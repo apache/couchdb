@@ -64,10 +64,16 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents
           }
 
           var routeObject = self.activeRouteObject,
-              routeCallback = routeObject.routeCallback(route);
+              routeCallback = routeObject.routeCallback(route),
+              roles = routeObject.getRouteRoles(route);
 
-          routeCallback.apply(routeObject, args);
-          routeObject.render(route, masterLayout, args);
+          var authPromise = app.auth.checkAccess(roles);
+
+          authPromise.then(function () {
+            routeCallback.apply(routeObject, args);
+            routeObject.render(route, masterLayout, args);
+          });
+
         });
       }, this);
     },
@@ -108,6 +114,7 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents
       //TODO: It would be nice to handle this with a router
       this.navBar = app.navBar = new Fauxton.NavBar();
       this.apiBar = app.apiBar = new Fauxton.ApiBar();
+      this.auth = app.auth = FauxtonAPI.auth;
 
       app.masterLayout = this.masterLayout = new Layout(this.navBar, this.apiBar);
       app.footer = new Fauxton.Footer({el: "#footer-content"});

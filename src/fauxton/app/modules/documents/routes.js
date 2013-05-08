@@ -173,7 +173,10 @@ function(app, FauxtonAPI, Documents, Databases) {
 
     routes: {
       "database/:database/_all_docs(:extra)": "allDocs", 
-      "database/:database/_design/:ddoc/_view/:view": "viewFn",
+      "database/:database/_design/:ddoc/_view/:view": {
+        route: "viewFn",
+        roles: ['_admin']
+      },
       "database/:database/new_view": "newViewEditor"
     },
 
@@ -280,8 +283,6 @@ function(app, FauxtonAPI, Documents, Databases) {
     }
 
   });
-
-
 
   var ChangesRouteObject = FauxtonAPI.RouteObject.extend({
     layout: "with_tabs",

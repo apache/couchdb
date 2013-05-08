@@ -17,6 +17,8 @@ define([
 
 function (app, FauxtonAPI) {
 
+  var Auth = new FauxtonAPI.addon();
+
   var Admin = Backbone.Model.extend({
 
     url: function () {
@@ -44,12 +46,10 @@ function (app, FauxtonAPI) {
     }
   });
 
-  var Auth = new FauxtonAPI.addon();
-
   Auth.Session = Backbone.Model.extend({
     url: '/_session',
 
-    is_admin_party: function () {
+    isAdminParty: function () {
       var userCtx = this.get('userCtx');
 
       if (!userCtx.name && userCtx.roles.indexOf("_admin") > -1) {
@@ -70,6 +70,30 @@ function (app, FauxtonAPI) {
       };
     },
 
+    userRoles: function () {
+      var user = this.user();
+
+      if (user && user.roles) { 
+        return user.roles;
+      }
+
+      return [];
+    },
+
+    matchesRoles: function (roles) {
+      if (roles.length === 0) {
+        return true;
+      }
+
+      var numberMatchingRoles = _.intersection(this.userRoles(), roles).length;
+
+      if (numberMatchingRoles > 0) {
+        return true;
+      }
+
+      return false;
+    },
+
     fetchOnce: function (opt) {
       var options = _.extend({}, opt);
 
@@ -80,7 +104,7 @@ function (app, FauxtonAPI) {
       return this._deferred;
     },
 
-    validate_user: function (username, password, msg) {
+    validateUser: function (username, password, msg) {
       if (_.isEmpty(username) || _.isEmpty(password)) {
         var deferred = $.Deferred();
 
@@ -89,7 +113,7 @@ function (app, FauxtonAPI) {
       }
     },
 
-    validate_passwords: function (password, password_confirm, msg) {
+    validatePasswords: function (password, password_confirm, msg) {
       if (_.isEmpty(password) || _.isEmpty(password_confirm) || (password !== password_confirm)) {
         var deferred = $.Deferred();
 
@@ -99,9 +123,9 @@ function (app, FauxtonAPI) {
 
     },
 
-    create_admin: function (username, password, login) {
+    createAdmin: function (username, password, login) {
       var self = this,
-          error_promise =  this.validate_user(username, password, 'Authname or password cannot be blank.');
+          error_promise =  this.validateUser(username, password, 'Authname or password cannot be blank.');
 
       if (error_promise) { return error_promise; }
 
@@ -120,7 +144,7 @@ function (app, FauxtonAPI) {
     },
 
     login: function (username, password) {
-      var error_promise =  this.validate_user(username, password, 'Authname or password cannot be blank.');
+      var error_promise =  this.validateUser(username, password, 'Authname or password cannot be blank.');
 
       if (error_promise) { return error_promise; }
 
@@ -150,8 +174,8 @@ function (app, FauxtonAPI) {
       });
     },
 
-    change_password: function (password, password_confirm) {
-      var error_promise =  this.validate_passwords(password, password_confirm, 'Passwords do not match.');
+    changePassword: function (password, password_confirm) {
+      var error_promise =  this.validatePasswords(password, password_confirm, 'Passwords do not match.');
 
       if (error_promise) { return error_promise; }
 
@@ -208,10 +232,10 @@ function (app, FauxtonAPI) {
     },
 
     events: {
-      "click #create-admin": "create_admin"
+      "click #create-admin": "createAdmin"
     },
 
-    create_admin: function (event) {
+    createAdmin: function (event) {
       event.preventDefault();
       this.clear_error_msg();
 
@@ -219,7 +243,7 @@ function (app, FauxtonAPI) {
       username = this.$('#username').val(),
       password = this.$('#password').val();
 
-      var promise = this.model.create_admin(username, password, this.login_after);
+      var promise = this.model.createAdmin(username, password, this.login_after);
 
       promise.then(function () {
         self.$('.modal').modal('hide');
@@ -265,10 +289,10 @@ function (app, FauxtonAPI) {
     template: 'addons/auth/templates/change_password_modal',
 
     events: {
-      "click #change-password": "change_password"
+      "click #change-password": "changePassword"
     },
 
-    change_password: function () {
+    changePassword: function () {
       event.preventDefault();
       this.clear_error_msg();
 
@@ -276,7 +300,7 @@ function (app, FauxtonAPI) {
           new_password = this.$('#password').val(),
           password_confirm = this.$('#password-confirm').val();
 
-      var promise = this.model.change_password(new_password, password_confirm);
+      var promise = this.model.changePassword(new_password, password_confirm);
 
       promise.done(function () {
         self.hide_modal();
@@ -299,7 +323,7 @@ function (app, FauxtonAPI) {
 
     serialize: function () {
       return {
-        admin_party: this.model.is_admin_party(),
+        admin_party: this.model.isAdminParty(),
         user: this.model.user()
       };
     },
@@ -345,6 +369,12 @@ function (app, FauxtonAPI) {
       this.model.logout();
     }
   });
+
+  Auth.NoAccessView = FauxtonAPI.View.extend({
+    template: "addons/auth/templates/noAccess"
+
+  });
+
 
   return Auth;
 });

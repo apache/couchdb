@@ -28,6 +28,8 @@ function(app, FauxtonAPI, Config) {
       this.configs = new Config.Collection();
     },
 
+    roles: ["_admin"],
+
     crumbs: [
       {"name": "Config","link": "_config"}
     ],
