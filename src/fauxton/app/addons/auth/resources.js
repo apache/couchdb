@@ -12,11 +12,38 @@
 
 define([
        "app",
-       "api",
-       "addons/config/resources"
+       "api"
 ],
 
-function (app, FauxtonAPI, Config) {
+function (app, FauxtonAPI) {
+
+  var Admin = Backbone.Model.extend({
+
+    url: function () {
+      return app.host + '/_config/admins/' + this.get("name");
+    },
+
+    isNew: function () { return false; },
+
+    sync: function (method, model, options) {
+
+      var params = {
+        url: model.url(),
+        contentType: 'application/json',
+        dataType: 'json',
+        data: JSON.stringify(model.get('value'))
+      };
+
+      if (method === 'delete') {
+        params.type = 'DELETE';
+      } else {
+        params.type = 'PUT';
+      }
+
+      return $.ajax(params);
+    }
+  });
+
   var Auth = new FauxtonAPI.addon();
 
   Auth.Session = Backbone.Model.extend({
@@ -78,8 +105,7 @@ function (app, FauxtonAPI, Config) {
 
       if (error_promise) { return error_promise; }
 
-      var admin = new Config.OptionModel({
-        section: "admins",
+      var admin = new Admin({
         name: username,
         value: password
       });
@@ -133,8 +159,7 @@ function (app, FauxtonAPI, Config) {
            info = this.get('info'),
            userCtx = this.get('userCtx');
 
-       var admin = new Config.OptionModel({
-        section: "admins",
+       var admin = new Admin({
         name: userCtx.name,
         value: password
       });

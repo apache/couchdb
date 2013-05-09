@@ -81,6 +81,7 @@ function(app, Backbone) {
       _.each(this.navLinks, function (link) {
         if (!link.view) { return; }
 
+        //TODO check if establish is a function
         var establish = link.establish || [];
         $.when.apply(null, establish).done( function () {
           self.insertView('#nav-links', link.view).render();
