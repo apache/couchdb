@@ -179,10 +179,10 @@ do_info(#st{module=Module, state=State}=St, Message) ->
 
 do_terminate(Reason, #st{module=Module, state=State}) ->
     % Order matters. We want to make sure Module:terminate/1
-    % is called even if couch_event:unregister_all/1 hangs
+    % is called even if couch_event:unregister/1 hangs
     % indefinitely.
     catch Module:terminate(Reason, State),
-    catch couch_event:unregister_all(self()),
+    catch couch_event:unregister(self()),
     Status = case Reason of
         normal -> normal;
         shutdown -> normal;

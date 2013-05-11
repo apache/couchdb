@@ -32,19 +32,12 @@ start_link() ->
 
 init(_) ->
     Children = [
-        {couch_event_registry,
-            {couch_event_registry, start_link, []},
+        {couch_event_server,
+            {couch_event_server, start_link, []},
             permanent,
             5000,
             worker,
-            [couch_event_registry]
-        },
-        {couch_event_dist,
-            {couch_event_dist, start_link, []},
-            permanent,
-            5000,
-            worker,
-            [couch_event_dist]
+            [couch_event_server]
         },
         {couch_event_os_sup,
             {couch_event_os_sup, start_link, []},

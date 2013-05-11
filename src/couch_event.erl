@@ -26,17 +26,15 @@
     register/2,
     register_many/2,
     register_all/1,
-    unregister/2,
-    unregister_many/2,
-    unregister_all/1
+    unregister/1
 ]).
 
--define(REGISTRY, couch_event_registry).
--define(DIST, couch_event_dist).
+
+-define(SERVER, couch_event_server).
 
 
 notify(DbName, Event) ->
-    gen_server:cast(?DIST, {DbName, Event}).
+    gen_server:cast(?SERVER, {notify, DbName, Event}).
 
 
 listen(Module, Function, State, Options) ->
@@ -52,24 +50,16 @@ stop_listener(Pid) ->
 
 
 register(Pid, DbName) ->
-    gen_server:call(?REGISTRY, {register, Pid, [DbName]}).
+    gen_server:call(?SERVER, {register, Pid, [DbName]}).
 
 
 register_many(Pid, DbNames) when is_list(DbNames) ->
-    gen_server:call(?REGISTRY, {register, Pid, DbNames}).
+    gen_server:call(?SERVER, {register, Pid, DbNames}).
 
 
 register_all(Pid) ->
-    gen_server:call(?REGISTRY, {register, Pid, [all_dbs]}).
+    gen_server:call(?SERVER, {register, Pid, [all_dbs]}).
 
 
-unregister(Pid, DbName) ->
-    gen_server:call(?REGISTRY, {unregister, Pid, [DbName]}).
-
-
-unregister_many(Pid, DbNames) when is_list(DbNames) ->
-    gen_server:call(?REGISTRY, {unregister, Pid, DbNames}).
-
-
-unregister_all(Pid) ->
-    gen_server:call(?REGISTRY, {unregister, Pid}).
+unregister(Pid) ->
+    gen_server:call(?SERVER, {unregister, Pid}).
