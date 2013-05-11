@@ -17,6 +17,6 @@
         couch_event_sup,
         couch_event_server
     ]},
-    {applications, [kernel, stdlib, couch_log, config]},
+    {applications, [kernel, stdlib, khash, couch_log, config]},
     {mod, {couch_event_app, []}}
 ]}.
