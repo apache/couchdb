@@ -37,7 +37,6 @@ Version 1.3.0
  * Added utc_id UUID algorithm.
  * Encode database name during URL rewriting.
  * Include user name in show/list ETags.
- * Per module log levels.
  * Server-wide UUID in some replication ids.
  * E4X support in views is now deprecated and will be removed in a future
    version.
