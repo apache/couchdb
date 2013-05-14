@@ -18,33 +18,31 @@ define([
 
 function(app, FauxtonAPI, Auth) {
 
+  Auth.session = new Auth.Session();
+  FauxtonAPI.setSession(Auth.session);
+
   Auth.initialize = function() {
-    var session = Auth.session = new Auth.Session();
     Auth.navLink = new Auth.NavLink({model: Auth.session});
 
     FauxtonAPI.addHeaderLink({
       title: "Auth", 
       href: "#_auth",
       view: Auth.navLink,
-      establish: [Auth.session.fetchOnce()]
+      establish: [FauxtonAPI.session.fetchUser()]
     });
 
-    var auth = function (roles, layout) {
+    var auth = function (session, roles) {
       var deferred = $.Deferred();
 
-      var sessionDeferred = session.fetchOnce().then(function () {
-        console.log(session);
+      if (session.isAdminParty()) {
+        deferred.resolve();
+      } else if(session.matchesRoles(roles)) {
+        deferred.resolve();
+      } else {
+        deferred.reject();
+      }
 
-        if (session.isAdminParty()) {
-          deferred.resolve();
-        } else if(session.matchesRoles(roles)) {
-          deferred.resolve();
-        } else {
-          deferred.reject();
-        }
-      });
-
-      return [sessionDeferred, deferred];
+      return [deferred];
     };
 
     var authDenied = function () {

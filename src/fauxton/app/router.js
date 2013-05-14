@@ -51,7 +51,7 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents
     routes: {},
 
     addModuleRouteObject: function(RouteObject) {
-      var self = this;
+      var that = this; //change that to that
       var masterLayout = this.masterLayout,
           routeUrls = RouteObject.prototype.getRouteUrls();
 
@@ -59,20 +59,21 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents
         this.route(route, route.toString(), function() {
           var args = Array.prototype.slice.call(arguments);
 
-          if (!self.activeRouteObject || !self.activeRouteObject.hasRoute(route)) {
-            self.activeRouteObject = new RouteObject(args);
+          if (!that.activeRouteObject || !that.activeRouteObject.hasRoute(route)) {
+            that.activeRouteObject = new RouteObject(args);
           }
 
-          var routeObject = self.activeRouteObject,
-              routeCallback = routeObject.routeCallback(route),
+          var routeObject = that.activeRouteObject,
               roles = routeObject.getRouteRoles(route);
 
           var authPromise = app.auth.checkAccess(roles);
 
           authPromise.then(function () {
-            routeCallback.apply(routeObject, args);
-            routeObject.render(route, masterLayout, args);
-          });
+            routeObject.routeCallback(route, args);
+            routeObject.renderWith(route, masterLayout, args);
+          }, function () { 
+            FauxtonAPI.auth.authDeniedCb();
+         });
 
         });
       }, this);
@@ -133,7 +134,6 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents
     triggerRouteEvent: function(event, args) {
       if (this.activeRouteObject) {
         var eventArgs = [event].concat(args);
-        console.log("CALLING ROUTE EVENT ON", this.activeRouteObject, arguments);
         this.activeRouteObject.trigger.apply(this.activeRouteObject, eventArgs );
         this.activeRouteObject.renderWith(eventArgs, this.masterLayout, args);
       }

@@ -46,7 +46,7 @@ function (app, FauxtonAPI) {
     }
   });
 
-  Auth.Session = Backbone.Model.extend({
+  Auth.Session = FauxtonAPI.Session.extend({
     url: '/_session',
 
     isAdminParty: function () {
@@ -57,17 +57,6 @@ function (app, FauxtonAPI) {
       }
 
       return false;
-    },
-
-    user: function () {
-      var userCtx = this.get('userCtx');
-
-      if (!userCtx || !userCtx.name) { return null; }
-
-      return {
-        name: userCtx.name,
-        roles: userCtx.roles
-      };
     },
 
     userRoles: function () {
@@ -94,19 +83,9 @@ function (app, FauxtonAPI) {
       return false;
     },
 
-    fetchOnce: function (opt) {
-      var options = _.extend({}, opt);
-
-      if (!this._deferred || this._deferred.isRejected() || options.forceFetch ) {
-        this._deferred = this.fetch();
-      }
-
-      return this._deferred;
-    },
-
     validateUser: function (username, password, msg) {
       if (_.isEmpty(username) || _.isEmpty(password)) {
-        var deferred = $.Deferred();
+        var deferred = FauxtonAPI.Deferred();
 
         deferred.rejectWith(this, [msg]);
         return deferred;
@@ -115,7 +94,7 @@ function (app, FauxtonAPI) {
 
     validatePasswords: function (password, password_confirm, msg) {
       if (_.isEmpty(password) || _.isEmpty(password_confirm) || (password !== password_confirm)) {
-        var deferred = $.Deferred();
+        var deferred = FauxtonAPI.Deferred();
 
         deferred.rejectWith(this, [msg]);
         return deferred;
@@ -124,7 +103,7 @@ function (app, FauxtonAPI) {
     },
 
     createAdmin: function (username, password, login) {
-      var self = this,
+      var that = this,
           error_promise =  this.validateUser(username, password, 'Authname or password cannot be blank.');
 
       if (error_promise) { return error_promise; }
@@ -136,9 +115,9 @@ function (app, FauxtonAPI) {
 
       return admin.save().then(function () {
         if (login) {
-          return self.login(username, password);
+          return that.login(username, password);
         } else {
-         return self.fetchOnce({forceFetch: true});
+         return that.fetchUser({forceFetch: true});
         }
       });
     },
@@ -148,7 +127,7 @@ function (app, FauxtonAPI) {
 
       if (error_promise) { return error_promise; }
 
-      var self = this;
+      var that = this;
 
       return $.ajax({
         type: "POST", 
@@ -156,12 +135,12 @@ function (app, FauxtonAPI) {
         dataType: "json",
         data: {name: username, password: password}
       }).then(function () {
-         return self.fetchOnce({forceFetch: true});
+         return that.fetchUser({forceFetch: true});
       });
     },
 
     logout: function () {
-      var self = this;
+      var that = this;
 
       return $.ajax({
         type: "DELETE", 
@@ -170,7 +149,7 @@ function (app, FauxtonAPI) {
         username : "_", 
         password : "_"
       }).then(function () {
-       return self.fetchOnce({forceFetch: true });
+       return that.fetchUser({forceFetch: true });
       });
     },
 
@@ -179,7 +158,7 @@ function (app, FauxtonAPI) {
 
       if (error_promise) { return error_promise; }
 
-      var  self = this,
+      var  that = this,
            info = this.get('info'),
            userCtx = this.get('userCtx');
 
@@ -189,7 +168,7 @@ function (app, FauxtonAPI) {
       });
 
       return admin.save().then(function () {
-        return self.login(userCtx.name, password);
+        return that.login(userCtx.name, password);
       });
     }
   });
@@ -205,6 +184,8 @@ function (app, FauxtonAPI) {
 
     hide_modal: function () {
       this.$('.modal').modal('hide');
+      // force this removal as the navbar
+      //$('.modal-backdrop').remove();
     },
 
     set_error_msg: function (msg) {
@@ -239,19 +220,19 @@ function (app, FauxtonAPI) {
       event.preventDefault();
       this.clear_error_msg();
 
-      var self = this,
+      var that = this,
       username = this.$('#username').val(),
       password = this.$('#password').val();
 
       var promise = this.model.createAdmin(username, password, this.login_after);
 
       promise.then(function () {
-        self.$('.modal').modal('hide');
-        self.hide_modal();
+        that.$('.modal').modal('hide');
+        that.hide_modal();
       });
 
       promise.fail(function (rsp) {
-        self.set_error_msg(rsp);
+        that.set_error_msg(rsp);
       });
     }
 
@@ -268,18 +249,17 @@ function (app, FauxtonAPI) {
       event.preventDefault();
       this.clear_error_msg();
 
-      var self = this,
-      username = this.$('#username').val(),
-      password = this.$('#password').val();
+      var that = this,
+          username = this.$('#username').val(),
+          password = this.$('#password').val(),
+          promise = this.model.login(username, password);
 
-      var promise = this.model.login(username, password);
-
-      promise.done(function () {
-        self.hide_modal();
+      promise.then(function () {
+        that.hide_modal();
       });
 
       promise.fail(function (rsp) {
-        self.set_error_msg(rsp);
+        that.set_error_msg(rsp);
       });
     }
 
@@ -296,19 +276,63 @@ function (app, FauxtonAPI) {
       event.preventDefault();
       this.clear_error_msg();
 
-      var self = this,
+      var that = this,
           new_password = this.$('#password').val(),
           password_confirm = this.$('#password-confirm').val();
 
       var promise = this.model.changePassword(new_password, password_confirm);
 
       promise.done(function () {
-        self.hide_modal();
+        that.hide_modal();
       });
 
       promise.fail(function (rsp) {
-        self.set_error_msg(rsp);
+        that.set_error_msg(rsp);
       });
+    }
+  });
+
+  Auth.NavLinkTitle = FauxtonAPI.View.extend({ 
+    template: 'addons/auth/templates/nav_link_title',
+    tagName: 'a',
+    attributes: {
+      id: "user-drop",
+      "class": "dropdown-toggle",
+      role: "button",
+      "data-toggle": "dropdown",
+      href:"#"
+    },
+
+    beforeRender: function () {
+      this.listenTo(this.model, 'change', this.render);
+    },
+
+    serialize: function () {
+      return {
+        admin_party: this.model.isAdminParty(),
+        user: this.model.user()
+      };
+    }
+  });
+
+  Auth.NavDropDown = FauxtonAPI.View.extend({ 
+    template: 'addons/auth/templates/nav_dropdown',
+    tagName: 'ul',
+    attributes: {
+      "class": "dropdown-menu",
+      role:"menu",
+      "aria-labelledby":"user-drop" 
+    },
+
+    beforeRender: function () {
+      this.listenTo(this.model, 'change', this.render);
+    },
+
+    serialize: function () {
+      return {
+        admin_party: this.model.isAdminParty(),
+        user: this.model.user()
+      };
     }
   });
 
@@ -317,16 +341,6 @@ function (app, FauxtonAPI) {
 
     tagName: "li",
     className: "dropdown",
-
-    initialize:function (options) {
-    },
-
-    serialize: function () {
-      return {
-        admin_party: this.model.isAdminParty(),
-        user: this.model.user()
-      };
-    },
 
     events: {
       "click #user-create-admin": 'show_admin_modal',
@@ -337,7 +351,8 @@ function (app, FauxtonAPI) {
     },
 
     beforeRender: function () {
-      this.listenTo(this.model, 'change', this.render);
+      this.nav_link_name = this.insertView(new Auth.NavLinkTitle({model: this.model}));
+      this.nav_link_name = this.insertView(new Auth.NavDropDown({model: this.model}));
       this.create_admin_modal = this.setView('#user-create-admin-modal', new Auth.CreateAdminModal({model: this.model}));
       this.login_modal = this.setView('#login-modal', new Auth.LoginModal({model: this.model}));
       this.change_password_modal = this.setView('#change-password-modal', new Auth.ChangePasswordModal({model: this.model}));

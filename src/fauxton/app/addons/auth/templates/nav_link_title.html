@@ -12,8 +12,13 @@ License for the specific language governing permissions and limitations under
 the License.
 -->
 
-<div id="nav-link-title"> </div>
-<div id="user-create-admin-modal"> </div>
-<div id="login-modal"> </div>
-<div id="change-password-modal"> </div>
-<div id="signup-modal"> </div>
+  <% if (admin_party) { %>
+  Admin Party!
+  <% } else if (user) { %>
+  <%= user.name %>
+  <% } else { %>
+  Login
+  <% } %>
+  <b class="caret"></b>
+
+

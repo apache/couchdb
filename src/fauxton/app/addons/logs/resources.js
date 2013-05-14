@@ -131,7 +131,7 @@ function (app, FauxtonAPI, Backbone) {
     },
 
     createFilteredCollection: function () {
-      var self = this;
+      var that = this;
 
       var filtered = _.reduce(this.filters, function (logs, filter) {
 
@@ -158,14 +158,14 @@ function (app, FauxtonAPI, Backbone) {
     },
 
     startRefreshInterval: function () {
-      var self = this;
+      var that = this;
 
       // Interval already set
-      if (self.intervalId) { return ; }
+      if (that.intervalId) { return ; }
 
-      self.intervalId = setInterval(function () {
-        self.collection.fetch();
-      }, self.refreshTime);
+      that.intervalId = setInterval(function () {
+        that.collection.fetch();
+      }, that.refreshTime);
 
     },
 

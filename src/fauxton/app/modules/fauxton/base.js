@@ -11,7 +11,7 @@
 // the License.
 
 define([
-  "app",
+       "app",
        // Libs
        "backbone"
 
@@ -75,15 +75,15 @@ function(app, Backbone) {
     },
 
     addLinkViews: function () {
-      var self = this;
+      var that = this;
 
       _.each(this.navLinks, function (link) {
         if (!link.view) { return; }
 
         //TODO check if establish is a function
         var establish = link.establish || [];
-        $.when.apply(null, establish).done( function () {
-          self.insertView('#nav-links', link.view).render();
+        $.when.apply(null, establish).then( function () {
+          that.insertView('#nav-links', link.view).render();
         });
       }, this);
     }

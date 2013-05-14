@@ -65,7 +65,7 @@ function(app, FauxtonAPI, Databases, Views) {
       var deferred = this.deferred;
 
       databases.fetch().done(function(resp) {
-        $.when.apply(null, databases.map(function(database) {
+        FauxtonAPI.when(databases.map(function(database) {
           return database.status.fetch();
         })).done(function(resp) {
           deferred.resolve();

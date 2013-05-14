@@ -11,10 +11,10 @@
 // the License.
 
 define([
-  "app",
+       "app",
 
-  // Modules
-  "modules/fauxton/base"
+       // Modules
+       "modules/fauxton/base"
 ],
 
 function(app, Fauxton) {
@@ -49,7 +49,7 @@ function(app, Fauxton) {
       return !!this.__manager__.hasRendered;
     },
 
-    reRender: function () {
+    forceRender: function () {
       this.__manager__.hasRendered = false;
     }
   });
@@ -65,6 +65,14 @@ function(app, Fauxton) {
   FauxtonAPI.Deferred = function() {
     return $.Deferred();
   };
+
+  FauxtonAPI.when = function (deferreds) {
+    if (deferreds instanceof Array) {
+      return $.when.apply(null, deferreds);
+    }
+
+    return $.when(deferreds);
+  },
 
   FauxtonAPI.addRoute = function(route) {
     app.router.route(route.route, route.name, route.callback);
@@ -108,6 +116,59 @@ function(app, Fauxton) {
     }
   });
 
+  FauxtonAPI.Session = Backbone.Model.extend({
+    url: '/_session',
+
+    user: function () {
+      var userCtx = this.get('userCtx');
+
+      if (!userCtx || !userCtx.name) { return null; }
+
+      return {
+        name: userCtx.name,
+        roles: userCtx.roles
+      };
+    },
+
+    fetchOnce: function (opt) {
+      var options = _.extend({}, opt);
+
+      if (!this._deferred || this._deferred.state() === "rejected" || options.forceFetch ) {
+        this._deferred = this.fetch();
+      }
+
+      return this._deferred;
+    },
+
+    fetchUser: function (opt) {
+      var that = this,
+      currentUser = this.user();
+
+      return this.fetchOnce(opt).then(function () {
+        var user = that.user();
+
+        // Notify anyone listening on these events that either a user has changed
+        // or current user is the same
+        if (currentUser !== user) {
+          that.trigger('session:userChanged');
+        } else {
+          that.trigger('session:userFetched');
+        }
+
+        // this will return the user as a value to all function that calls done on this
+        // eg. session.fetchUser().done(user) { .. do something with user ..}
+        return user; 
+      });
+    }
+  });
+
+  FauxtonAPI.setSession = function (newSession) {
+    FauxtonAPI.session = newSession;
+    return FauxtonAPI.session.fetchUser();
+  };
+
+  FauxtonAPI.setSession(new FauxtonAPI.Session());
+
   // This is not exposed externally as it should not need to be accessed or overridden
   var Auth = function (options) {
     this._options = options;
@@ -121,18 +182,10 @@ function(app, Fauxton) {
     authDeniedCb: function() {},
 
     initialize: function() {
-      var self = this;
-
-      $(document).ajaxError(function(event, jqxhr, settings, exception) {
-        console.log("UNAUTH");
-        console.log(arguments);
-        if (exception === "Unauthorized" || exception === "Forbidden") {
-          self.authDeniedCb();
-        }
-      });
+      var that = this;
     },
 
-    authHandlerCb : function (roles, layout) {
+    authHandlerCb : function (roles) {
       var deferred = $.Deferred();
       deferred.resolve();
       return deferred;
@@ -148,12 +201,11 @@ function(app, Fauxton) {
 
     checkAccess: function (roles) {
       var requiredRoles = roles || [],
-          authDeniedCb = this.authDeniedCb,
-          promise = $.when.apply(null, this.authHandlerCb(requiredRoles));
+      that = this;
 
-      promise.fail(function () { authDeniedCb();});
-
-      return promise;
+      return FauxtonAPI.session.fetchUser().then(function (user) {
+        return FauxtonAPI.when(that.authHandlerCb(FauxtonAPI.session, requiredRoles));
+      });
     }
   });
 
@@ -170,14 +222,13 @@ function(app, Fauxton) {
   // Piggy-back on Backbone's self-propagating extend function
   FauxtonAPI.RouteObject.extend = Backbone.Model.extend;
 
-  var routeObjectOptions = ["views", "routes", "events", "data", "crumbs", "layout", "apiUrl", "establish"];
+  var routeObjectOptions = ["views", "routes", "events", "roles", "crumbs", "layout", "apiUrl", "establish"];
 
   _.extend(FauxtonAPI.RouteObject.prototype, Backbone.Events, {
     // Should these be default vals or empty funcs?
     views: {},
     routes: {},
     events: {},
-    data: {},
     crumbs: [],
     layout: "with_sidebar",
     apiUrl: null,
@@ -188,18 +239,10 @@ function(app, Fauxton) {
     initialize: function() {}
   }, {
 
-    // TODO:: combine this and the renderWith function
-    // All the things should go through establish, as it will resolve
-    // immediately if its already done, but this way the RouteObject.route
-    // function can rebuild the deferred as needed
-    render: function(route, masterLayout, args) {
-      this.renderWith.apply(this, Array.prototype.slice.call(arguments));
-    },
-
     renderWith: function(route, masterLayout, args) {
       var routeObject = this;
 
-      // Can look at replacing this with events eg beforeRender, afterRender
+      // TODO: Can look at replacing this with events eg beforeRender, afterRender function and events
       this.route.call(this, route, args);
 
       // Only want to redo the template if its a full render
@@ -216,14 +259,13 @@ function(app, Fauxton) {
         }));
       }
 
-      $.when.apply(this, this.establish()).done(function(resp) {
+      FauxtonAPI.when(this.establish()).done(function(resp) {
         _.each(routeObject.getViews(), function(view, selector) {
           if(view.hasRendered()) { return; }
 
           masterLayout.setView(selector, view);
-          console.log('SET SELECTOR AND RENDER ', selector, view); 
 
-          $.when.apply(null, view.establish()).then(function(resp) {
+          FauxtonAPI.when(view.establish()).then(function(resp) {
             masterLayout.renderView(selector);
           }, function(resp) {
             view.establishError = {
@@ -284,36 +326,36 @@ function(app, Fauxton) {
       return this.views;
     },
 
-    // Could move getRouteUrls into the Constructor function and so it defines the urls
-    // only once. This would give us a small speed up.
     getRouteUrls: function () {
       return _.keys(this.get('routes'));
     },
 
     hasRoute: function (route) {
-      if (this.getRouteUrls().indexOf(route) > -1) {
+      if (this.get('routes')[route]) {
         return true;
       }
-
       return false;
     },
 
-    routeCallback: function (route) {
-      var routes = this.get('routes');
-      var routeObj = routes[route];
+    routeCallback: function (route, args) {
+      var routes = this.get('routes'),
+      routeObj = routes[route],
+      routeCallback;
 
       if (typeof routeObj === 'object') {
-        return this[routeObj.route];
+        routeCallback = this[routeObj.route];
       } else {
-        return this[routeObj];
+        routeCallback = this[routeObj];
       }
+
+      routeCallback.apply(this, args);
     },
 
     getRouteRoles: function (routeUrl) {
       var route = this.get('routes')[routeUrl];
 
       if ((typeof route === 'object') && route.roles) {
-       return route.roles; 
+        return route.roles; 
       }
 
       return this.roles;
