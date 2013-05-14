@@ -970,7 +970,7 @@ copy_compact(Db, NewDb0, Retry) ->
 start_copy_compact(#db{name=Name,filepath=Filepath,header=#db_header{purge_seq=PurgeSeq}}=Db) ->
     CompactFile = Filepath ++ ".compact",
     ?LOG_DEBUG("Compaction process spawned for db \"~s\"", [Name]),
-    case couch_file:open(CompactFile) of
+    case couch_file:open(CompactFile, [nologifmissing]) of
     {ok, Fd} ->
         Retry = true,
         case couch_file:read_header(Fd) of
