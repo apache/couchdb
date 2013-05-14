@@ -48,7 +48,7 @@ basic_name_pw(Req) ->
     AuthorizationHeader = header_value(Req, "Authorization"),
     case AuthorizationHeader of
     "Basic " ++ Base64Value ->
-        case re:split(base64:decode(Base64Value), ":",
+        try re:split(base64:decode(Base64Value), ":",
                       [{return, list}, {parts, 2}]) of
         ["_", "_"] ->
             % special name and pass to be logged out
@@ -57,6 +57,9 @@ basic_name_pw(Req) ->
             {User, Pass};
         _ ->
             nil
+        catch
+        error:function_clause ->
+            throw({bad_request, "Authorization header has invalid base64 value"})
         end;
     _ ->
         nil
