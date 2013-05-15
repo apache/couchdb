@@ -47,7 +47,7 @@ function(app, FauxtonAPI, Log) {
       this.setView("#dashboard-content", new Log.Views.View({collection: this.logs}));
     },
 
-    e1stablish: function() {
+    establish: function() {
       return [this.logs.fetch()];
     }
   });

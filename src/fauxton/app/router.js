@@ -89,7 +89,7 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents
         if (module){
           module.initialize();
           // This is pure routes the addon provides
-          if (module.Routes) {
+          if (module.RouteObjects) {
             _.each(module.RouteObjects, this.addModuleRouteObject, this);
           }
         }
