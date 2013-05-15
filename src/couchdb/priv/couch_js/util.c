@@ -77,7 +77,7 @@ couch_parse_args(int argc, const char* argv[])
         return NULL;
 
     memset(args, '\0', sizeof(couch_args));
-    args->stack_size = 8L * 1024L;
+    args->stack_size = 64L * 1024L * 1024L;
 
     while(i < argc) {
         if(strcmp("-h", argv[i]) == 0) {
