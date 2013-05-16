@@ -13,15 +13,10 @@
 define([
   "app",
 
-  "api",
-
-  // Views
-  "modules/documents/views"
-
-  // Plugins
+  "api"
 ],
 
-function(app, FauxtonAPI, Views) {
+function(app, FauxtonAPI) {
   var Documents = app.module();
 
   Documents.Doc = Backbone.Model.extend({
@@ -64,14 +59,61 @@ function(app, FauxtonAPI, Views) {
     hasViews: function() {
       if (!this.isDdoc()) return false;
       var doc = this.get('doc');
-      return doc && doc.views && _.keys(doc.views).length > 0;
+      if (doc) {
+        return doc && doc.views && _.keys(doc.views).length > 0;
+      }
+
+      var views = this.get('views');
+      return views && _.keys(views).length > 0;
     },
 
     getDdocView: function(view) {
       if (!this.isDdoc() || !this.hasViews()) return false;
 
       var doc = this.get('doc');
-      return doc.views[view];
+      if (doc) {
+        return doc.views[view];
+      }
+
+      return this.get('views')[view];
+    },
+
+    setDdocView: function (view, map, reduce) {
+      if (!this.isDdoc()) return false;
+      var views = this.get('views');
+
+      if (reduce) {
+        views[view] = {
+          map: map,
+          reduce: reduce
+        }; 
+      } else {
+        views[view].map = map;
+      }
+
+      this.set({views: views});
+
+      return true;
+    },
+
+    removeDdocView: function (viewName) {
+      if (!this.isDdoc()) return false;
+      var views = this.get('views');
+
+      delete views[viewName];
+      this.set({views: views});
+    },
+
+    dDocModel: function () {
+      if (!this.isDdoc()) return false;
+      var doc = this.get('doc');
+
+      if (doc) {
+        console.log('DOC', doc);
+        return new Documents.Doc(doc, {database: this.database});
+      } 
+
+      return this;
     },
 
     viewHasReduce: function(viewName) {
@@ -208,10 +250,10 @@ function(app, FauxtonAPI, Views) {
 
     initialize: function(_models, options) {
       this.database = options.database;
-      this.view = options.view;
-      this.design = options.design;
       this.params = _.extend({limit: 10, reduce: false}, options.params);
       this.idxType = "_view";
+      this.view = options.view;
+      this.design = options.design.replace('_design/','');
     },
 
     url: function() {
@@ -256,8 +298,56 @@ function(app, FauxtonAPI, Views) {
       return this.models;
     }
   });
+  
+  Documents.PouchIndexCollection = Backbone.Collection.extend({
+    model: Documents.ViewRow,
 
-  Documents.Views = Views;
+    initialize: function(_models, options) {
+      this.database = options.database;
+      this.rows = options.rows;
+      this.view = options.view;
+      this.design = options.design.replace('_design/','');
+      this.params = _.extend({limit: 10, reduce: false}, options.params);
+      this.idxType = "_view";
+    },
+
+    url: function () {
+      return '';
+    },
+
+    fetch: function() {
+      var deferred = FauxtonAPI.Deferred();
+      this.reset(this.rows, {silent: true});
+
+      this.viewMeta = {
+        total_rows: this.rows.length,
+        offest: 0,
+        update_seq: false
+      };
+
+      deferred.resolve();
+      return deferred;
+    },
+
+    totalRows: function() {
+      console.log('rows');
+      console.log(this);
+      return this.viewMeta.total_rows || "unknown";
+    },
+
+    updateSeq: function() {
+      return this.viewMeta.update_seq || false;
+    },
+
+    buildAllDocs: function(){
+      this.fetch();
+    },
+
+    allDocs: function(){
+      return this.models;
+    }
+  });
+
 
   return Documents;
 });

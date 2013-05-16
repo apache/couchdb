@@ -11,20 +11,24 @@
 // the License.
 
 define([
-  "app",
+       "app",
 
-  "api",
+       "api",
 
-  // Libs
-  "codemirror",
-  "jshint",
+       "modules/documents/resources",
+       "modules/pouchdb/base",
 
-  // Plugins
-  "plugins/codemirror-javascript",
-  "plugins/prettify"
+       // Libs
+       "codemirror",
+       "jshint",
+
+       // Plugins
+       "plugins/codemirror-javascript",
+       "plugins/prettify"
+
 ],
 
-function(app, FauxtonAPI, Codemirror, JSHint) {
+function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
   var Views = {};
 
   Views.Tabs = FauxtonAPI.View.extend({
@@ -276,161 +280,50 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
     template: "templates/documents/all_docs_list",
     events: {
       "click button.all": "selectAll",
-      "click button.bulk-delete": "bulkDelete",
-      "change form.view-query-update input": "updateFilters",
-      "change form.view-query-update select": "updateFilters",
-      "submit form.view-query-update": "updateView"
+      "click button.bulk-delete": "bulkDelete"
     },
 
     initialize: function(options){
       this.nestedView = options.nestedView || Views.Document;
       this.rows = {};
       this.viewList = !! options.viewList;
-      this.params = options.params;
+      this.database = options.database;
       if (options.ddocInfo) {
         this.designDocs = options.ddocInfo.designDocs;
         this.ddocID = options.ddocInfo.id;
       }
+      this.newView = options.newView || false;
     },
 
     establish: function() {
-      var deferreds = [
-        this.collection.fetch().error(function() {
-          // TODO: handle error requests that slip through
-          // This should just throw a notification, not break the page
-          console.log("ERROR: ", arguments);
-        })
-      ];
-      if (this.designDocs) {
-        deferreds.push(this.designDocs.fetch());
-      }
-      return deferreds;
+      if (this.newView) { return null; }
+
+      return this.collection.fetch().fail(function() {
+        // TODO: handle error requests that slip through
+        // This should just throw a notification, not break the page
+        console.log("ERROR: ", arguments);
+      });
     },
 
     selectAll: function(evt){
       $("input:checkbox").attr('checked', !$(evt.target).hasClass('active'));
     },
 
-    // TODO:: HACK::
-    // Hack to grab info about the ddoc and current view to determine whether
-    // or not the view has a reduce function so we can display the advanced
-    // options appropriately.
-    //
-    // NOTE: we have this here temporarily because we have to wait for the
-    // design docs to be present.
-    //
-    // NOTE: We should probably refactor this View out into a separate View
-    // dedicated to displaying view query results.
-    // If nothing else, we should at least switch to something along the lines
-    // of fetchOnce to ensure we're not reloading the ddocs here in addition to
-    // the sidebar.
-    setDdocInfo: function() {
-      if (!this.ddoc && this.designDocs) {
-        this.ddoc = this.designDocs.get(this.ddocID);
-      }
-    },
-
     serialize: function() {
-      this.setDdocInfo();
-      var data = {
-        database: this.collection,
-        viewList: this.viewList,
-        hasReduce: false,
-        params: this.params,
-        ddocs: this.designDocs
+      var totalRows = 0,
+      updateSeq = false;
+
+      if (!this.newView) {
+        totalRows = this.collection.totalRows();
+        updateSeq = this.collection.updateSeq();
+      }
+
+      return {
+        updateSeq: updateSeq,
+        totalRows: totalRows,
+        numModels: this.collection.models.length,
+        viewList: this.viewList
       };
-      if (this.ddoc) {
-        data.ddoc = this.ddoc;
-        data.hasReduce = this.ddoc.viewHasReduce(this.collection.view);
-      }
-      return data;
-    },
-
-    updateView: function(event) {
-      event.preventDefault();
-      var $form = $(event.currentTarget);
-
-      // Ignore params without a value
-      var params = _.filter($form.serializeArray(), function(param) {
-        return param.value;
-      });
-
-      // Validate *key* params to ensure they're valid JSON
-      var keyParams = ["key","keys","startkey","endkey"];
-      var errorParams = _.filter(params, function(param) {
-        if (_.contains(keyParams, param.name)) {
-          try {
-            JSON.parse(param.value);
-            return false;
-          } catch(e) {
-            return true;
-          }
-        } else {
-          return false;
-        }
-      });
-
-      if (_.any(errorParams)) {
-        _.map(errorParams, function(param) {
-
-          // TODO: Where to add this error?
-          // bootstrap wants the error on a control-group div, but we're not using that
-          //$('form.view-query-update input[name='+param+'], form.view-query-update select[name='+param+']').addClass('error');
-
-          return FauxtonAPI.addNotification({
-            msg: "JSON Parse Error on field: "+param.name,
-            type: "error",
-            selector: ".view.show .all-docs-list.errors-container"
-          });
-        });
-
-        FauxtonAPI.addNotification({
-          msg: "Make sure that strings are properly quoted and any other values are valid JSON structures",
-          type: "warning",
-          selector: ".view.show .all-docs-list.errors-container"
-        });
-
-        return false;
-      }
-
-      var fragment = window.location.hash.replace(/\?.*$/, '');
-      fragment = fragment + '?' + $.param(params);
-      FauxtonAPI.navigate(fragment);
-    },
-
-    updateFilters: function(event) {
-      event.preventDefault();
-      var $ele = $(event.currentTarget);
-      var name = $ele.attr('name');
-      this.updateFiltersFor(name, $ele);
-    },
-
-    updateFiltersFor: function(name, $ele) {
-      var $form = $ele.parents("form.view-query-update:first");
-      switch (name) {
-        // Reduce constraints
-        //   - Can't include_docs for reduce=true
-        //   - can't include group_level for reduce=false
-        case "reduce":
-          if ($ele.prop('checked') === true) {
-            if ($form.find("input[name=include_docs]").prop("checked") === true) {
-              $form.find("input[name=include_docs]").prop("checked", false);
-              var notification = FauxtonAPI.addNotification({
-                msg: "include_docs has been disabled as you cannot include docs on a reduced view",
-                type: "warn",
-                selector: ".view.show .all-docs-list.errors-container"
-              });
-            }
-            $form.find("input[name=include_docs]").prop("disabled", true);
-            $form.find("select[name=group_level]").prop("disabled", false);
-          } else {
-            $form.find("select[name=group_level]").prop("disabled", true);
-            $form.find("input[name=include_docs]").prop("disabled", false);
-          }
-          break;
-        case "include_docs":
-          break;
-      }
     },
 
     /*
@@ -468,14 +361,6 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
     },
 
     beforeRender: function() {
-      this.setDdocInfo();
-      if (this.viewList) {
-        this.viewEditorView = this.insertView("#edit-index-container", new Views.ViewEditor({
-          model: this.ddoc,
-          ddocs: this.designDocs,
-          viewCollection: this.collection
-        }));
-      }
       this.collection.each(function(doc) {
         this.rows[doc.id] = this.insertView("table.all-docs tbody", new this.nestedView({
           model: doc
@@ -485,34 +370,6 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
 
     afterRender: function(){
       prettyPrint();
-      if (this.params) {
-        var $form = this.$el.find("form.view-query-update");
-        _.each(this.params, function(val, key) {
-          var $ele;
-          switch (key) {
-            case "limit":
-            case "group_level":
-              $form.find("select[name='"+key+"']").val(val);
-              break;
-            case "include_docs":
-            case "stale":
-            case "descending":
-            case "inclusive_end":
-              $form.find("input[name='"+key+"']").prop('checked', true);
-              break;
-            case "reduce":
-              $ele = $form.find("input[name='"+key+"']");
-              if (val == "true") {
-                $ele.prop('checked', true);
-              }
-              this.updateFiltersFor(key, $ele);
-              break;
-            default:
-              $form.find("input[name='"+key+"']").val(val);
-              break;
-          }
-        }, this);
-      }
     }
   });
 
@@ -521,6 +378,10 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
 
     events: {
       "click button.save-doc": "saveDoc"
+    },
+
+    initialize: function (options) {
+      this.database = options.database;
     },
 
     updateValues: function() {
@@ -540,13 +401,15 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
     },
 
     saveDoc: function(event) {
-      var json, notification;
+      var json, notification, that = this;
       if (this.hasValidCode()) {
         json = JSON.parse(this.editor.getValue());
         this.model.clear({silent:true});
         this.model.set(json);
         notification = FauxtonAPI.addNotification({msg: "Saving document."});
-        this.model.save().error(function(xhr) {
+        this.model.save().then(function () {
+          FauxtonAPI.navigate('/database/' + that.database.id + '/' + that.model.id);
+        }).fail(function(xhr) {
           var responseText = JSON.parse(xhr.responseText).reason;
           notification = FauxtonAPI.addNotification({
             msg: "Save failed: " + responseText,
@@ -607,7 +470,8 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
         matchBrackets: true,
         lineWrapping: true,
         onChange: function() {
-          that.runJSHint();
+          //throwing errors at the moment
+          //that.runJSHint();
         },
         extraKeys: {
           "Ctrl-S": function(instance) { that.saveDoc(); },
@@ -646,6 +510,7 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
     }
   });
 
+  //TODO split this into two smaller views, one for advance query options and other for index editing
   Views.ViewEditor = FauxtonAPI.View.extend({
     template: "templates/documents/view_editor",
     builtinReduces: ['_sum', '_count', '_stats'],
@@ -653,12 +518,17 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
     events: {
       "click button.save": "saveView",
       "click button.preview": "previewView",
-      "change select#reduce-function-selector": "updateReduce"
+      "click button.delete": "deleteView",
+      "change select#reduce-function-selector": "updateReduce",
+      "change form.view-query-update input": "updateFilters",
+      "change form.view-query-update select": "updateFilters",
+      "change select#ddoc": "updateDesignDoc",
+      "submit form.view-query-update": "updateView"
     },
 
     langTemplates: {
       "javascript": {
-        map: "function(doc) {\n  emit(null, doc);\n}",
+        map: "function(doc) {\n  emit(doc.id, 1);\n}",
         reduce: "function(keys, values, rereduce){\n  if (rereduce){\n    return sum(values);\n  } else {\n    return values.length;\n  }\n}"
       }
     },
@@ -666,10 +536,27 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
     defaultLang: "javascript",
 
     initialize: function(options) {
+      this.newView = options.newView || false;
       this.ddocs = options.ddocs;
-      this.viewCollection = options.viewCollection;
-      this.reduceFunStr = this.model.viewHasReduce(this.viewCollection.view);
-      this.newView = false;
+      this.params = options.params;
+      this.database = options.database;
+      if (this.newView) {
+        this.viewName = 'newView';
+      } else {
+        this.ddocID = options.ddocInfo.id;
+        this.viewName = options.viewName;
+      } 
+    },
+
+    updateDesignDoc: function () {
+
+      if (this.$('#ddoc :selected').prop('id') === 'new-doc') {
+        this.$('#new-ddoc-section').show();
+
+      } else {
+        this.$('#new-ddoc-section').hide();
+      }
+
     },
 
     updateValues: function() {
@@ -694,43 +581,211 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
       }
     },
 
-    establish: function() {
-      //return [this.ddocs.fetch(), this.model.fetch()];
-      return [];
+    queryParams: function () {
+      var $form = $(".view-query-update");
+      // Ignore params without a value
+      var params = _.filter($form.serializeArray(), function(param) {
+        return param.value;
+      });
+
+      // Validate *key* params to ensure they're valid JSON
+      var keyParams = ["key","keys","startkey","endkey"];
+      var errorParams = _.filter(params, function(param) {
+        if (_.contains(keyParams, param.name)) {
+          try {
+            JSON.parse(param.value);
+            return false;
+          } catch(e) {
+            return true;
+          }
+        } else {
+          return false;
+        }
+      });
+
+      return {params: params, errorParams: errorParams};
+    },
+
+    deleteView: function (event) {
+      event.preventDefault();
+
+      if (this.newView) { return alert('Cannot delete a new view.'); }
+      if (!confirm('Are you sure you want to delete this view?')) {return;}
+
+      var that = this,
+          promise,
+          viewName = this.$('#index-name').val();
+          ddocName = this.$('#ddoc :selected').val(),
+          ddoc = this.getCurrentDesignDoc();
+
+      ddoc.removeDdocView(viewName);
+
+      if (ddoc.hasViews()) {
+        promise = ddoc.save(); 
+      } else {
+        promise = ddoc.destroy();
+      }
+
+      promise.then(function () {
+        FauxtonAPI.navigate('/database/' + that.database.id + '/_all_docs?limit=100');
+        FauxtonAPI.triggerRouteEvent('reloadDesignDocs');
+      });
+    },
+
+    updateView: function(event) {
+      event.preventDefault();
+
+      if (this.newView) { return alert('Please save this new view before querying it.'); }
+
+      var paramInfo = this.queryParams(),
+          errorParams = paramInfo.errorParams,
+          params = paramInfo.params;
+
+      if (_.any(errorParams)) {
+        _.map(errorParams, function(param) {
+
+          // TODO: Where to add this error?
+          // bootstrap wants the error on a control-group div, but we're not using that
+          //$('form.view-query-update input[name='+param+'], form.view-query-update select[name='+param+']').addClass('error');
+
+          return FauxtonAPI.addNotification({
+            msg: "JSON Parse Error on field: "+param.name,
+            type: "error",
+            selector: ".view.show .all-docs-list.errors-container"
+          });
+        });
+
+        FauxtonAPI.addNotification({
+          msg: "Make sure that strings are properly quoted and any other values are valid JSON structures",
+          type: "warning",
+          selector: ".view.show .all-docs-list.errors-container"
+        });
+
+        return false;
+      }
+
+      var fragment = window.location.hash.replace(/\?.*$/, '');
+      fragment = fragment + '?' + $.param(params);
+      FauxtonAPI.navigate(fragment, {trigger: false});
+
+      FauxtonAPI.triggerRouteEvent('updateAllDocs', {ddoc: this.ddocID, view: this.viewName});
+    },
+
+    updateFilters: function(event) {
+      event.preventDefault();
+      var $ele = $(event.currentTarget);
+      var name = $ele.attr('name');
+      this.updateFiltersFor(name, $ele);
+    },
+
+    updateFiltersFor: function(name, $ele) {
+      var $form = $ele.parents("form.view-query-update:first");
+      switch (name) {
+        // Reduce constraints
+        //   - Can't include_docs for reduce=true
+        //   - can't include group_level for reduce=false
+        case "reduce":
+          if ($ele.prop('checked') === true) {
+          if ($form.find("input[name=include_docs]").prop("checked") === true) {
+            $form.find("input[name=include_docs]").prop("checked", false);
+            var notification = FauxtonAPI.addNotification({
+              msg: "include_docs has been disabled as you cannot include docs on a reduced view",
+              type: "warn",
+              selector: ".view.show .all-docs-list.errors-container"
+            });
+          }
+          $form.find("input[name=include_docs]").prop("disabled", true);
+          $form.find("select[name=group_level]").prop("disabled", false);
+        } else {
+          $form.find("select[name=group_level]").prop("disabled", true);
+          $form.find("input[name=include_docs]").prop("disabled", false);
+        }
+        break;
+        case "include_docs":
+          break;
+      }
     },
 
     previewView: function(event) {
+      var that = this,
+          mapVal = this.mapEditor.getValue(),
+          reduceVal = this.reduceVal(),
+          paramsArr = this.queryParams().params;
+
+      var params = _.reduce(paramsArr, function (params, param) {
+        params[param.name] = param.value;
+        return params;
+      }, {reduce: false});
+
+      event.preventDefault();
+
       FauxtonAPI.addNotification({
         msg: "<strong>Warning!</strong> Preview executes the Map/Reduce functions in your browser, and may behave differently from CouchDB.",
         type: "warning",
         selector: "#define-view .errors-container",
-        fade: false
+        fade: true
       });
-      FauxtonAPI.addNotification({
-        msg: "Preview Functionality Coming Soon",
-        type: "warning",
-        selector: "#define-view .errors-container"
+
+      var promise = FauxtonAPI.Deferred();
+
+      if (!this.database.allDocs) {
+        this.database.buildAllDocs({limit: "100", include_docs: true});
+        promise = this.database.allDocs.fetch();
+      } else {
+        promise.resolve();
+      }
+
+      promise.then(function () {
+        params.docs = that.database.allDocs.map(function (model) { return model.get('doc');}); 
+
+        var queryPromise = pouchdb.runViewQuery({map: mapVal, reduce: reduceVal}, params);
+        queryPromise.then(function (results) {
+          FauxtonAPI.triggerRouteEvent('updatePreviewDocs', {rows: results.rows, ddoc: that.getCurrentDesignDoc().id, view: that.viewName});
+        });
       });
     },
 
     saveView: function(event) {
-      var json, notification;
+      var json, notification,
+      that = this;
+
+      event.preventDefault();
+
       if (this.hasValidCode()) {
-        var mapVal = this.mapEditor.getValue();
-        var reduceVal = this.reduceEditor.getValue();
-        /*
+        var mapVal = this.mapEditor.getValue(), 
+            reduceVal = this.reduceVal(),
+            viewName = this.$('#index-name').val(),
+            ddoc = this.getCurrentDesignDoc(),
+            ddocName = ddoc.id;
+
+        this.viewName = viewName;
+
         notification = FauxtonAPI.addNotification({
           msg: "Saving document.",
           selector: "#define-view .errors-container"
         });
-        */
-        FauxtonAPI.addNotification({
-          msg: "Save Functionality Coming Soon",
-          type: "warning",
-          selector: "#define-view .errors-container"
-        });
-        /*
-        this.model.save().error(function(xhr) {
+
+        ddoc.setDdocView(viewName, mapVal, reduceVal);
+
+        ddoc.save().then(function () {
+          FauxtonAPI.addNotification({
+            msg: "View has been saved.",
+            type: "success",
+            selector: "#define-view .errors-container"
+          });
+
+          if (that.newView) {
+            var fragment = '/database/' + that.database.id +'/' + ddocName + '/_view/' + viewName; 
+
+            FauxtonAPI.navigate(fragment, {trigger: false});
+            FauxtonAPI.triggerRouteEvent('reloadDesignDocs',{selectedTab: ddocName.replace('_design/','') + '_' + viewName});
+
+            that.newView = false;
+          }
+
+          FauxtonAPI.triggerRouteEvent('updateAllDocs', {ddoc: ddocName, view: viewName});
+
+        }, function(xhr) {
           var responseText = JSON.parse(xhr.responseText).reason;
           notification = FauxtonAPI.addNotification({
             msg: "Save failed: " + responseText,
@@ -738,14 +793,34 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
             clear: true
           });
         });
-        */
       } else {
         notification = FauxtonAPI.addNotification({
-          msg: "Please fix the JSON errors and try again.",
+          msg: "Please fix the Javascript errors and try again.",
           type: "error",
           selector: "#define-view .errors-container"
         });
       }
+    },
+
+    getCurrentDesignDoc: function () {
+      if (this.newDesignDoc()) {
+        var doc = {
+          _id: '_design/' + this.$('#new-ddoc').val(),
+          views: {},
+          language: "javascript"
+        };
+        return new Documents.Doc(doc, {database: this.database});
+      } else {
+        var ddocName = this.$('#ddoc').val();
+        return this.ddocs.find(function (ddoc) {
+          return ddoc.id === ddocName;
+        }).dDocModel();
+      }
+
+    },
+
+    newDesignDoc: function () {
+      return this.$('#ddoc :selected').prop('id') === 'new-doc';
     },
 
     isCustomReduceEnabled: function() {
@@ -753,6 +828,16 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
     },
 
     reduceVal: function() {
+      var reduceOption = this.$('#reduce-function-selector :selected').val(),
+      reduceVal = "";
+
+      if (reduceOption === 'CUSTOM') {
+        reduceVal = this.reduceEditor.getValue();
+      } else if ( reduceOption !== 'NONE') {
+        reduceVal = reduceOption;
+      }
+
+      return reduceVal;
     },
 
     hasValidCode: function() {
@@ -765,7 +850,7 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
         } else {
           // By default CouchDB view functions don't pass lint
           return _.every(JSHINT.errors, function(error) {
-            return FauxtonAPI.isIgnorableError(error.reason);
+            return FauxtonAPI.isIgnorableError(error.raw);
           });
         }
       }, this);
@@ -801,18 +886,36 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
 
     serialize: function() {
       return {
-        //database: this.model,
         ddocs: this.ddocs,
         ddoc: this.model,
-        viewCollection: this.viewCollection,
+        ddocName: this.model.id,
+        viewName: this.viewName,
         reduceFunStr: this.reduceFunStr,
+        hasReduce: this.reduceFunStr,
         isCustomReduce: this.hasCustomReduce(),
-        newView: this.newView
+        newView: this.newView,
+        langTemplates: this.langTemplates.javascript
       };
     },
 
     hasCustomReduce: function() {
       return this.reduceFunStr && ! _.contains(this.builtinReduces, this.reduceFunStr);
+    },
+
+    beforeRender: function () {
+
+      if (this.newView) {
+        this.reduceFunStr = '_sum';
+        if (this.ddocs.length === 0) {
+          this.model = new Documents.Doc(null, {database: this.database});
+        } else {
+          this.model = this.ddocs.first().dDocModel();
+        }
+        this.ddocID = this.model.id;
+      } else {
+        this.model = this.ddocs.get(this.ddocID).dDocModel();
+        this.reduceFunStr = this.model.viewHasReduce(this.viewName);
+      }
     },
 
     afterRender: function() {
@@ -823,13 +926,16 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
         mapFun.val(this.langTemplates[this.defaultLang].map);
         reduceFun.val(this.langTemplates[this.defaultLang].reduce);
       }
+
+      this.updateDesignDoc();
+
       this.mapEditor = Codemirror.fromTextArea(mapFun.get()[0], {
         mode: "javascript",
         lineNumbers: true,
         matchBrackets: true,
         lineWrapping: true,
         onChange: function() {
-          that.runJSHint("mapEditor");
+          //that.runJSHint("mapEditor");
         },
         extraKeys: {
           "Ctrl-S": function(instance) { that.saveView(); },
@@ -842,7 +948,7 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
         matchBrackets: true,
         lineWrapping: true,
         onChange: function() {
-          that.runJSHint("reduceEditor");
+          //that.runJSHint("reduceEditor");
         },
         extraKeys: {
           "Ctrl-S": function(instance) { that.saveView(); },
@@ -855,6 +961,36 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
       if ( ! this.hasCustomReduce()) {
         $(".control-group.reduce-function").hide();
       }
+
+      if (this.params) {
+        var $form = this.$el.find("form.view-query-update");
+        _.each(this.params, function(val, key) {
+          var $ele;
+          switch (key) {
+            case "limit":
+              case "group_level":
+              $form.find("select[name='"+key+"']").val(val);
+            break;
+            case "include_docs":
+              case "stale":
+              case "descending":
+              case "inclusive_end":
+              $form.find("input[name='"+key+"']").prop('checked', true);
+            break;
+            case "reduce":
+              $ele = $form.find("input[name='"+key+"']");
+            if (val == "true") {
+              $ele.prop('checked', true);
+            }
+            this.updateFiltersFor(key, $ele);
+            break;
+            default:
+              $form.find("input[name='"+key+"']").val(val);
+            break;
+          }
+        }, this);
+      }
+
     }
   });
 
@@ -868,14 +1004,6 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
       if (options.ddocInfo) {
         this.ddocID = options.ddocInfo.id;
         this.currView = options.ddocInfo.currView;
-      }
-    },
-
-    establish: function() {
-      if (this.collection) {
-        return [this.collection.fetch()];
-      } else {
-        return null;
       }
     },
 
@@ -929,7 +1057,14 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
       }, this);
     },
 
+    afterRender: function () {
+      if (this.selectedTab) {
+        this.setSelectedTab(this.selectedTab);
+      }
+    },
+
     setSelectedTab: function (selectedTab) {
+      this.selectedTab = selectedTab;
       this.$('li').removeClass('active');
       this.$('#' + selectedTab).parent().addClass('active');
     }
@@ -942,20 +1077,24 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
     template: "templates/documents/changes",
 
     establish: function() {
-      return [
-        this.model.changes.fetch()
-      ];
+      return [ this.model.changes.fetch()];
     },
 
     serialize: function () {
+      console.log('c', this.model.changes.toJSON());
       return {
         changes: this.model.changes.toJSON(),
         database: this.model
       };
+    },
+
+    afterRender: function(){
+      prettyPrint();
     }
+
 
   });
 
-
-  return Views;
+  Documents.Views = Views;
+  return Documents;
 });

@@ -32,7 +32,8 @@ function(app, Fauxton) {
   // List of JSHINT errors to ignore
   // Gets around problem of anonymous functions not being a valid statement
   FauxtonAPI.excludedViewErrors = [
-    "Missing name in function declaration."
+    "Missing name in function declaration.",
+    "['{a}'] is better written in dot notation."
   ];
 
   FauxtonAPI.isIgnorableError = function(msg) {
@@ -54,8 +55,9 @@ function(app, Fauxton) {
     }
   });
 
-  FauxtonAPI.navigate = function(url) {
-    Backbone.history.navigate(url, true);
+  FauxtonAPI.navigate = function(url, _opts) {
+    var options = _.extend({trigger: true}, _opts );
+    app.router.navigate(url,options);
   };
 
   FauxtonAPI.addHeaderLink = function(link) {

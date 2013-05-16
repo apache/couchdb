@@ -39,6 +39,36 @@ function(app, FauxtonAPI, Collate) {
   //var MapReduce = function(db) {
   var MapReduce = function() {
 
+    var builtInReduce = {
+      "_sum": function(keys, values){
+        return sum(values);
+      },
+
+      "_count": function(keys, values, rereduce){
+        if (rereduce){
+          return sum(values);
+        } else {
+          return values.length;
+        }
+      },
+
+      "_stats": function(keys, values, rereduce){
+        return {
+          'sum': sum(values),
+          'min': Math.min.apply(null, values),
+          'max': Math.max.apply(null, values),
+          'count': values.length,
+          'sumsqr': (function(){
+            _sumsqr = 0;
+            for(var idx in values){
+              _sumsqr += values[idx] * values[idx];
+            }
+            return _sumsqr;
+          })()
+        };
+      }
+    };
+
     function viewQuery(fun, options) {
       console.log("IN VIEW QUERY");
       if (!options.complete) {
@@ -55,13 +85,13 @@ function(app, FauxtonAPI, Collate) {
       var completed= false;
 
       var emit = function(key, val) {
-        console.log("IN EMIT: ", key, val, current);
+        //console.log("IN EMIT: ", key, val, current);
         var viewRow = {
           id: current.doc._id,
           key: key,
           value: val
         }; 
-        console.log("VIEW ROW: ", viewRow);
+        //console.log("VIEW ROW: ", viewRow);
 
         if (options.startkey && Pouch.collate(key, options.startkey) < 0) return;
         if (options.endkey && Pouch.collate(key, options.endkey) > 0) return;
@@ -95,7 +125,11 @@ function(app, FauxtonAPI, Collate) {
       // ugly way to make sure references to 'emit' in map/reduce bind to the
       // above emit
       eval('fun.map = ' + fun.map.toString() + ';');
-      if (fun.reduce) {
+      if (fun.reduce && options.reduce) {
+        if (builtInReduce[fun.reduce]) {
+          console.log('built in reduce');
+          fun.reduce = builtInReduce[fun.reduce];
+        }
         eval('fun.reduce = ' + fun.reduce.toString() + ';');
       }
 
@@ -105,6 +139,7 @@ function(app, FauxtonAPI, Collate) {
 
       //only proceed once all documents are mapped and joined
       var checkComplete= function(){
+        console.log('check');
         if (completed && results.length == num_started){
           results.sort(function(a, b) {
             return Pouch.collate(a.key, b.key);
@@ -116,6 +151,7 @@ function(app, FauxtonAPI, Collate) {
             return options.complete(null, {rows: results});
           }
 
+          console.log('reducing', options);
           var groups = [];
           results.forEach(function(e) {
             var last = groups[groups.length-1] || null;
@@ -130,19 +166,21 @@ function(app, FauxtonAPI, Collate) {
             e.value = fun.reduce(e.key, e.value) || null;
             e.key = e.key[0][0];
           });
+          console.log('GROUPs', groups);
           options.complete(null, {rows: groups});
         }
       };
 
       if (options.docs) {
-        console.log("RUNNING MR ON DOCS: ", options.docs);
+        //console.log("RUNNING MR ON DOCS: ", options.docs);
         _.each(options.docs, function(doc) {
           current = {doc: doc};
           fun.map.call(this, doc);
         }, this);
-        return options.complete(null, {rows: results});
+        completed = true;
+        return checkComplete();//options.complete(null, {rows: results});
       } else {
-        console.log("COULD NOT FIND DOCS");
+        //console.log("COULD NOT FIND DOCS");
         return false;
       }
 
