@@ -43,6 +43,8 @@ Futon
 HTTP Interface
 ^^^^^^^^^^^^^^^^^
 
+* :issue:`431`: Introduce experimental :ref:`CORS support <cors>`.
+  :commit:`b90e4021`
 * :issue:`1537`: Include user name in show/list `ETags`. :commit:`ac320479`
 * :issue:`1511`: CouchDB checks `roles` field for `_users` database documents
   with more care. :commit:`41205000`
