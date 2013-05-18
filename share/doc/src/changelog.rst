@@ -278,7 +278,7 @@ Storage System
 * Added support for automatic database and view compaction. This feature
   is disabled by default, but it can be enabled via the .ini configuration.
 * Performance improvements for the built-in changes feed filters `_doc_ids`
-  and `_design'.
+  and `_design`.
 
 View Server
 ^^^^^^^^^^^
