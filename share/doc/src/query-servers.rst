@@ -241,11 +241,11 @@ modules and functions:
 CommonJS Modules
 ----------------
 
-`CommonJS Modules <http://wiki.commonjs.org/wiki/Modules/1.1.1>`_ is the one of
-major CouchDB feature introduced in 0.11.0 version that allows to create modular
-design functions without needs to duplicate a lot of same functionality.
+Support for `CommonJS Modules <http://wiki.commonjs.org/wiki/Modules/1.1.1>`_
+(introduced in CouchDB 0.11.0) allows you to create modular design functions
+without the need for duplication of functionality.
 
-Example of CommonJS module that checks user permissions:
+Here's a CommonJS module that checks user permissions:
 
 .. code-block:: javascript
 
@@ -310,17 +310,17 @@ Example of CommonJS module that checks user permissions:
 
 Each module has access to additional global variables:
 
-- **module** (`object`): Contains information about stored module.
+- **module** (`object`): Contains information about the stored module
 
-  - **id** (`string`): Module id that is actually JSON path in ddoc context.
-  - **current** (`code`): Compiled module code object.
-  - **parent** (`object`): Parent frame.
-  - **exports** (`object`): Export statements.
+  - **id** (`string`): The module id; a JSON path in ddoc context
+  - **current** (`code`): Compiled module code object
+  - **parent** (`object`): Parent frame
+  - **exports** (`object`): Export statements
 
-- **exports** (`object`): Shortcut to ``module.exports`` object.
+- **exports** (`object`): Shortcut to the ``module.exports`` object
 
-Lets place module above within design document under `lib/validate` path.
-Now we could use it in our design functions:
+This module can be used after adding it to the design document, for example,
+under the `lib/validate` path. We may then use it in our view functions:
 
 .. code-block:: javascript
 
