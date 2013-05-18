@@ -339,19 +339,17 @@ Erlang
 
 .. warning::
 
-   Erlang query server runs out of sandbox feature like JavaScript has to!
-   This means, that Erlang code has full access to your OS, file system and
-   network which may leads to security issues. While Erlang functions are
-   faster than JavaScript ones, you need to be careful with running them,
-   especially if they  wasn't written by your own hands.
-
-   Keep in mind: don't trust every code - review it first before running.
+   Unlike the JavaScript query server, the Erlang query server does not
+   run in a sandbox. This means Erlang code has full access to your OS,
+   filesystem and network, which may lead to security issues. While Erlang
+   functions are faster than JavaScript ones, you need to be careful
+   about running them, especially if they were written by someone else.
 
 
 .. note::
 
-   Due to security restriction, Erlang query server is disabled by default.
-   To enable it you'll need to edit your `local.ini` to include a
+   Due to security restrictions, the Erlang query server is disabled by
+   default. To enable it, you need to edit your `local.ini` to include a
    ``native_query_servers`` section:
 
    .. code-block:: ini
@@ -359,13 +357,13 @@ Erlang
       [native_query_servers]
       erlang = {couch_native_process, start_link, []}
 
-   And don't forget to restart CouchDB after that and use ``language: "erlang"``
-   property in your Erlang design documents.
+   Don't forget to restart CouchDB after updating the configuration, and
+   use the ``language: "erlang"`` property in your Erlang design documents.
 
 
 .. function:: Emit(Id, Value)
 
-   Emits `key`-`value` pair to view indexer process.
+   Emits `key`-`value` pairs to view indexer process.
 
    .. code-block:: erlang
 
@@ -378,10 +376,10 @@ Erlang
 
 .. function:: FoldRows(Fun, Acc)
 
-   Helper to iterate over all rows in list function.
+   Helper to iterate over all rows in a list function.
 
    :param Fun: Function object.
-   :param Acc: Previous returned value by `Fun`.
+   :param Acc: The value previously returned by `Fun`.
 
    .. code-block:: erlang
 
@@ -399,7 +397,7 @@ Erlang
 
 .. function:: GetRow()
 
-   Retrieves next row from related view result.
+   Retrieves the next row from a related view result.
 
    .. code-block:: erlang
 
@@ -421,7 +419,7 @@ Erlang
 
 .. function:: Log(Msg)
 
-   :param Msg: Message to log in at CouchDB `INFO` level.
+   :param Msg: Log a message at the `INFO` level.
 
    .. code-block:: erlang
 
@@ -432,8 +430,8 @@ Erlang
         Emit(<<K>>, V)
       end.
 
-   On map function run in CouchDB logs (e.g. at `/var/log/couchdb/couch.log`)
-   you may find next record:
+   After the map function has run, the following line can be found in
+   CouchDB logs (e.g. at `/var/log/couchdb/couch.log`):
 
    .. code-block:: text
 
@@ -453,7 +451,7 @@ Erlang
         "!"
       end.
 
-   Function above produces next response:
+   The function above produces the following response:
 
    .. code-block:: text
 
@@ -464,8 +462,8 @@ Erlang
 
    :param Headers: Proplist of :ref:`response object<response_object>`.
 
-   Initialize :ref:`listfun` response. At this point response code and headers
-   may be defined. For example, next function redirect to CouchDB web site:
+   Initialize :ref:`listfun` response. At this point, response code and headers
+   may be defined. For example, this function redirects to the CouchDB web site:
 
    .. code-block:: erlang
 
@@ -477,5 +475,3 @@ Erlang
               ]}),
         "Relax!"
       end.
-
-
