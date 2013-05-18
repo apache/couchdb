@@ -42,7 +42,7 @@ JavaScript
 +--------------------------------+---------------------------------------------+
 | :func:`registerType`           | :ref:`showfun`, :ref:`listfun`              |
 +--------------------------------+---------------------------------------------+
-| :func:`require`                | every except :ref:`reducefun`               |
+| :func:`require`                | any, except :ref:`reducefun`                |
 +--------------------------------+---------------------------------------------+
 | :func:`send`                   | :ref:`listfun`                              |
 +--------------------------------+---------------------------------------------+
@@ -56,17 +56,17 @@ JavaScript
 Design functions context
 ------------------------
 
-Each design function executes within special context of predefined objects,
+Each design function executes in a special context of predefined objects,
 modules and functions:
 
 
 .. function:: emit(key, value)
 
-   Puts `key`-`value` pair into inner stack for further passing to CouchDB
-   when map function is done.
+   Emits a `key`-`value` pair for further processing by CouchDB after the map
+   function is done.
 
-   :param key: View's key.
-   :param value: Associated value with `key`.
+   :param key: The view key
+   :param value: The `key`'s associated value
 
    .. code-block:: javascript
 
@@ -77,7 +77,7 @@ modules and functions:
 
 .. function:: getRow()
 
-   Extracts next row from the related view result.
+   Extracts the next row from a related view result.
 
    :return: View result row
    :rtype: object
@@ -106,16 +106,18 @@ modules and functions:
 
 .. function:: isArray(obj)
 
-   Helper to check is provided value `array` or not
+   A helper function to check if the provided value is an `Array`.
 
    :param obj: Any Javascript value
-   :return: ``true`` is `obj` is `array` typed, ``false`` otherwise.
+   :return: ``true`` if `obj` is `Array`-typed, ``false`` otherwise
    :rtype: boolean
 
 
 .. function:: log(message)
 
-   :param message: Message to log in at CouchDB `INFO` level.
+   Log a message to the CouchDB log (at the `INFO` level).
+
+   :param message: Message to be logged
 
    .. code-block:: javascript
 
@@ -124,8 +126,8 @@ modules and functions:
         emit(doc['_id'], null);
       }
 
-   On map function run in CouchDB logs (e.g. at `/var/log/couchdb/couch.log`)
-   you may find next record:
+   After the map function has run, the following line can be found in CouchDB
+   logs (e.g. at `/var/log/couchdb/couch.log`):
 
    .. code-block:: text
 
@@ -137,7 +139,7 @@ modules and functions:
    Registers callable handler for specified MIME key.
 
    :param key: MIME key previously defined by :func:`registerType`
-   :param func: MIME type handler.
+   :param func: MIME type handler
 
 
 .. function:: registerType(key, *mimes)
@@ -145,7 +147,7 @@ modules and functions:
    Registers list of MIME types by associated `key`.
 
    :param key: MIME types
-   :param mimes: MIME types enumeration.
+   :param mimes: MIME types enumeration
 
    Predefined mappings (`key`-`array`):
 
@@ -169,10 +171,11 @@ modules and functions:
 
 .. function:: require(path)
 
-   Loads CommonJS module by specified `path`. Path shouldn't starts with slash.
+   Loads CommonJS module by a specified `path`. The path should not start with
+   a slash.
 
-   :param path: CommonJS module path started from design document root.
-   :return: Exported statements.
+   :param path: A CommonJS module path started from design document root
+   :return: Exported statements
 
 
 .. function:: send(chunk)
@@ -193,16 +196,16 @@ modules and functions:
 
 .. function:: start(init_resp)
 
-   Initiates chunked response. As an option, custom
+   Initiates chunked response. As an option, a custom
    :ref:`response <response_object>` object may be sent at this point.
    For `list`-functions only!
 
    .. note::
    
-      Only at this point list functions may set response `HTTP code` and
-      `headers`. Also, you need to run this function before :func:`send`,
-      :func:`getRow` or `return` statement or query server will implicitly call
-      this function with empty object (``{}``).
+      list functions may set the `HTTP response code` and `headers` by calling
+      this function. This function must be called before :func:`send`,
+      :func:`getRow` or a `return` statement; otherwise, the query server will
+      implicitly call this function with the empty object (``{}``).
 
    .. code-block:: javascript
 
@@ -219,19 +222,19 @@ modules and functions:
 
 .. function:: sum(arr)
 
-   Summarize `arr` items.
+   Sum `arr`'s items.
 
-   :param arr: Array of numbers.
+   :param arr: Array of numbers
    :rtype: number
 
 
 .. function:: toJSON(obj)
 
-   Encodes `obj` to JSON string. Actually is a proxy to ``JSON.stringify``
+   Encodes `obj` to JSON string. This is an alias for the ``JSON.stringify``
    method.
 
-   :param obj: JSON encodable object.
-   :return: JSON string.
+   :param obj: JSON encodable object
+   :return: JSON string
 
 
 
