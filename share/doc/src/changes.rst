@@ -211,4 +211,10 @@ specification`_ for further details.
     // stop listening for events
     source.removeEventListener('message', sourceListener , false);
 
+.. note::
+
+   EventSource connections are subject to cross-origin resource sharing
+   restrictions. You might need to use the experimental :ref:`CORS support
+   <cors>` to get the EventSource to work in your application.
+
 .. _W3C eventsource specification: http://www.w3.org/TR/eventsource/
