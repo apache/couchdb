@@ -199,6 +199,10 @@ specification`_ for further details.
     if (window.EventSource) {
 
       var source = new EventSource("/somedatabase/_changes?feed=eventsource");
+      source.onerror = function(e) {
+        alert('EventSource failed.');
+      };
+      
       var results = [];
       var sourceListener = function(e) {
         var data = JSON.parse(e.data);
