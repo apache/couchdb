@@ -197,19 +197,21 @@ specification`_ for further details.
 
     // define the event handling function
     if (window.EventSource) {
-      var source = new EventSource(
-              "/somedatabase/_changes?feed=eventsource");
+
+      var source = new EventSource("/somedatabase/_changes?feed=eventsource");
       var results = [];
       var sourceListener = function(e) {
         var data = JSON.parse(e.data);
         results.push(data);
       };
 
-    // start listening for events
-    source.addEventListener('message', sourceListener , false);
-
-    // stop listening for events
-    source.removeEventListener('message', sourceListener , false);
+      // start listening for events
+      source.addEventListener('message', sourceListener, false);
+      
+      // stop listening for events
+      source.removeEventListener('message', sourceListener, false);
+      
+    }
 
 .. note::
 
