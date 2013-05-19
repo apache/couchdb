@@ -186,8 +186,8 @@ Event Source
 ============
 
 The `eventsource` feed provides push notifications that can be consumed in
-the form of DOM events in the browser. Refer to theW3C specification for
-`W3 eventsource specification`_ for further details.
+the form of DOM events in the browser. Refer to the `W3C eventsource
+specification`_ for further details.
 
 .. code-block:: text
 
@@ -211,4 +211,4 @@ the form of DOM events in the browser. Refer to theW3C specification for
     // stop listening for events
     source.removeEventListener('message', sourceListener , false);
 
-.. _W3 eventsource specification: http://www.w3.org/TR/eventsource/
+.. _W3C eventsource specification: http://www.w3.org/TR/eventsource/
