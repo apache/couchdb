@@ -29,7 +29,7 @@ right. This will create a fork of CouchDB in your GitHub account. Mine is
 `janl`, so my fork lives at https://github.com/janl/couchdb. In the header, it
 tells me me my "GitHub Clone URL". We need to copy that and start a terminal:
 
-.. code-block: shell
+.. code-block:: bash
 
     $ git clone https://github.com/janl/couchdb.git
     $ cd couchdb
@@ -38,7 +38,7 @@ tells me me my "GitHub Clone URL". We need to copy that and start a terminal:
 I'm opening the whole CouchDB source tree in my favourite editor. It gives
 me the usual directory listing:
 
-.. code-block: shell
+.. code-block:: bash
 
     .git/
     .gitignore
@@ -70,8 +70,8 @@ me the usual directory listing:
     utils/
     var/
 
-The documentation sources live in `src/doc`, you can safely ignore all the
-other files and directories.
+The documentation sources live in `share/doc/src`, you can safely ignore all
+the other files and directories.
 
 First we should determine where we want to document this inside the
 documentation. We can look through http://docs.couchdb.org/en/latest/
@@ -88,7 +88,7 @@ but we'll leave this for later.
 
 Let's try and find the source file that builds the file
 http://docs.couchdb.org/en/latest/json-structure.html -- we are in luck, under
-`share/docs/src/` we find the file `json-structure.rst`. That looks promising.
+`share/doc/src` we find the file `json-structure.rst`. That looks promising.
 `.rst` stands for ReStructured Text (see
 http://thomas-cokelaer.info/tutorials/sphinx/rest_syntax.html
 for a markup reference), which is an ascii format for writing
@@ -161,9 +161,7 @@ Then we push the commit to our CouchDB fork::
     $ git push origin master
 
 Next, we go back to our GitHub page https://github.com/janl/couchdb and click
-the “Pull Request button”. Fill in the description with something useful and
+the "Pull Request" button. Fill in the description with something useful and
 hit the "Send Pull Request" button.
 
 And we're done!
-
-
