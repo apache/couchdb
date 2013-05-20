@@ -65,7 +65,6 @@ html_files = \
     html/_sources/index.txt \
     html/_sources/intro.txt \
     html/_sources/json-structure.txt \
-    html/_sources/pretty_urls.txt \
     html/_sources/query-servers.txt \
     html/_sources/release.txt \
     html/_sources/replication.txt \
@@ -112,7 +111,6 @@ html_files = \
     html/index.html \
     html/intro.html \
     html/json-structure.html \
-    html/pretty_urls.html \
     html/query-servers.html \
     html/release.html \
     html/replication.html \
@@ -158,7 +156,6 @@ src_files = \
     ../src/index.rst \
     ../src/intro.rst \
     ../src/json-structure.rst \
-    ../src/pretty_urls.rst \
     ../src/query-servers.rst \
     ../src/release.rst \
     ../src/replication.rst \
