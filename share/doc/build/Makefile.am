@@ -48,7 +48,6 @@ html_files = \
     html/_sources/api/authn.txt \
     html/_sources/api/configuration.txt \
     html/_sources/api/database.txt \
-    html/_sources/api/dbmaint.txt \
     html/_sources/api/design.txt \
     html/_sources/api/documents.txt \
     html/_sources/api/local.txt \
@@ -64,17 +63,13 @@ html_files = \
     html/_sources/contributing.txt \
     html/_sources/ddocs.txt \
     html/_sources/errors.txt \
-    html/_sources/http-proxying.txt \
     html/_sources/index.txt \
     html/_sources/intro.txt \
     html/_sources/json-structure.txt \
-    html/_sources/os-daemons.txt \
     html/_sources/pretty_urls.txt \
     html/_sources/query-servers.txt \
-    html/_sources/range.txt \
     html/_sources/release.txt \
     html/_sources/replication.txt \
-    html/_sources/ssl.txt \
     html/_static/ajax-loader.gif \
     html/_static/basic.css \
     html/_static/comment-bright.png \
@@ -101,7 +96,6 @@ html_files = \
     html/api/authn.html \
     html/api/configuration.html \
     html/api/database.html \
-    html/api/dbmaint.html \
     html/api/design.html \
     html/api/documents.html \
     html/api/local.html \
@@ -116,17 +110,13 @@ html_files = \
     html/configuring.html \
     html/ddocs.html \
     html/errors.html \
-    html/http-proxying.html \
     html/index.html \
     html/intro.html \
     html/json-structure.html \
-    html/os-daemons.html \
     html/pretty_urls.html \
     html/query-servers.html \
-    html/range.html \
     html/release.html \
     html/replication.html \
-    html/ssl.html \
     html/objects.inv \
     html/genindex.html \
     html/search.html \
@@ -152,7 +142,6 @@ src_files = \
     ../src/api/authn.rst \
     ../src/api/configuration.rst \
     ../src/api/database.rst \
-    ../src/api/dbmaint.rst \
     ../src/api/design.rst \
     ../src/api/documents.rst \
     ../src/api/local.rst \
@@ -168,17 +157,13 @@ src_files = \
     ../src/contributing.rst \
     ../src/ddocs.rst \
     ../src/errors.rst \
-    ../src/http-proxying.rst \
     ../src/index.rst \
     ../src/intro.rst \
     ../src/json-structure.rst \
-    ../src/os-daemons.rst \
     ../src/pretty_urls.rst \
     ../src/query-servers.rst \
-    ../src/range.rst \
     ../src/release.rst \
     ../src/replication.rst \
-    ../src/ssl.rst \
     ../src/conf.py
 
 src_files_html = \
