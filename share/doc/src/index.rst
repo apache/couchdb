@@ -29,7 +29,6 @@ Contents
 
     intro
     api-basics
-    pretty_urls
     configuring
     config_reference
     replication
