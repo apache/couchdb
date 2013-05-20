@@ -31,7 +31,6 @@ Contents
     api-basics
     pretty_urls
     configuring
-    http-proxying
     config_reference
     replication
     ddocs
