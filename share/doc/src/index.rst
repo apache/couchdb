@@ -32,7 +32,6 @@ Contents
     pretty_urls
     configuring
     ssl
-    os-daemons
     http-proxying
     config_reference
     replication
