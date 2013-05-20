@@ -473,7 +473,7 @@ such as Lucene:
 Cross-Origin Resource Sharing
 =============================
 
-CORS, or "Cross-origin resource sharing" allows a resource such as a web
+CORS, or "Cross-Origin Resource Sharing", allows a resource such as a web
 page running JavaScript inside a browser, to make AJAX requests
 (XMLHttpRequests) to a different domain, without compromising the security
 of either party.
@@ -484,38 +484,29 @@ avoids needing an intermediary proxy, using JSONP or similar workarounds
 to retrieve and host content.
 
 While CouchDB's integrated HTTP server and support for document attachments
-makes this less of a constraint for pure Couch projects, there are many
+makes this less of a constraint for pure CouchDB projects, there are many
 cases where separating the static content from the database access is
-desirable, and CORS makes this very straightforwards indeed.
+desirable, and CORS makes this very straightforward.
 
 By supporting CORS functionality, a CouchDB instance can accept direct
-connections to protected DBs and instances, without the browser
-functionality being blocked due to the same origin constraint. CORS is
-widely supported today on over 90% of browsers.
+connections to protected databases and instances, without the browser
+functionality being blocked due to same-origin constraints. CORS is
+supported today on over 90% of recent browsers.
 
-CORS support is provided as experimental functionality in 1.3.0, and as
-such will need to be enabled specifically in CouchDB's configuration.
+CORS support is provided as experimental functionality in 1.3.0, and as such
+will need to be enabled specifically in CouchDB's configuration. While all
+origins are forbidden from making requests by default, support is available
+for simple requests, preflight requests and per-vhost configuration.
 
-.. versionadded:: 1.3.0 added CORS support see JIRA :issue:`431`
-
-Features
---------
-
--  Simple requests for a couchdb instance
--  Preflight requests for a couchdb instance
--  Configuration for a specific CouchDB vhost
--  All origins are excluded by default
-
-Configuration
--------------
+.. versionadded:: 1.3.0
 
 Enabling CORS
-^^^^^^^^^^^^^
+-------------
 
-To enable CORS support, you need to set the option
-``enable_cors = true`` in the ``[httpd]`` section of ``local.ini``, and
-``[cors]`` section with ``origins = *``. Note that by default, no
-origins are accepted, you must either use a wildcard or whitelist.
+To enable CORS support, you need to set the ``enable_cors = true`` option
+in the ``[httpd]`` section of ``local.ini``, and add a ``[cors]`` section
+containing a ``origins = *`` setting. Note that by default, no origins are
+accepted; you must either use a wildcard or whitelist.
 
 .. code-block:: ini
 
@@ -526,26 +517,25 @@ origins are accepted, you must either use a wildcard or whitelist.
     origins = *
 
 Passing Credentials
-^^^^^^^^^^^^^^^^^^^
+-------------------
 
-By default, neither authentication headers nor cookies are included
-in requests and responses. To do so requires both setting
+By default, neither authentication headers nor cookies are included in
+requests and responses. To do so requires both setting
 `XmlHttpRequest.withCredentials = true` on the request object in the
-browser, and additionally enabling it within CouchDB.
+browser and enabling credentials support in CouchDB.
 
 .. code-block:: ini
 
     [cors]
     credentials = true
 
-CouchDB will respond to a credentials-enabled CORS request with an
-additional header, `Access-Control-Allow-Credentials=true`.
+CouchDB will respond to a credentials-enabled CORS request with an additional
+header, `Access-Control-Allow-Credentials=true`.
 
 Tightening Access
-^^^^^^^^^^^^^^^^^
+-----------------
 
-Restricting by Protocol, Host and optional Port
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Access can be restricted by protocol, host and optionally by port:
 
 .. code-block:: ini
 
@@ -554,10 +544,7 @@ Restricting by Protocol, Host and optional Port
     ; refer to http://tools.ietf.org/html/rfc6454 for specification
     origins = http://localhost, https://localhost, http://www.number10.gov.uk:80
 
-Restricting Accepted Methods
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Methods may be further restricted. These apply to all CORS-enabled instances.
+Specific HTTP methods may also be restricted:
 
 .. code-block:: ini
 
@@ -567,11 +554,10 @@ Methods may be further restricted. These apply to all CORS-enabled instances.
     methods = GET, POST, PUT, DELETE
 
 Configuration per vhost
-^^^^^^^^^^^^^^^^^^^^^^^
+-----------------------
 
-All the above parameters `origins`, `methods`, `headers`, `credentials`
-may be individually configured per CouchDB vhost. For example, the
-configuration section for `http://example.com/` would be contained in:
+All CORS-related settings may be configured on a per-vhost basis. For example,
+the configuration section for `http://example.com/` would be contained in:
 
 .. code-block:: ini
 
@@ -587,10 +573,10 @@ Useful References
 
 Standards and References:
 
-- IETF RFCs relating to methods `rfc2618 <http://tools.ietf.org/html/rfc2616>`_,
-  `rfc2817 <http://tools.ietf.org/html/rfc2817>`_, and
-  `rfc5789 <http://tools.ietf.org/html/rfc5789>`_.
-- IETF RFC for `Web Origins <http://tools.ietf.org/html/rfc6454>`_
+- IETF RFCs relating to methods `RFC 2618 <http://tools.ietf.org/html/rfc2616>`_,
+  `RFC 2817 <http://tools.ietf.org/html/rfc2817>`_, and
+  `RFC 5789 <http://tools.ietf.org/html/rfc5789>`_
+- IETF RFC 6454 for `Web Origins <http://tools.ietf.org/html/rfc6454>`_
 - W3C `CORS standard <http://www.w3.org/TR/cors>`_
 
 Mozilla Developer Network Resources:
@@ -600,9 +586,8 @@ Mozilla Developer Network Resources:
 - `Server-side Access Control <https://developer.mozilla.org/En/Server-Side_Access_Control>`_
 - `Javascript same origin policy <https://developer.mozilla.org/en-US/docs/Same_origin_policy_for_JavaScript>`_
 
-
 Client-side CORS support and usage:
 
 - `CORS browser support matrix <http://caniuse.com/cors>`_
-- `COS tutorial <http://www.html5rocks.com/en/tutorials/cors/>`_
-- `<http://hacks.mozilla.org/2009/07/cross-site-xmlhttprequest-with-cors/>`_
+- `CORS tutorial <http://www.html5rocks.com/en/tutorials/cors/>`_
+- `Cross-Site XMLHttpRequests with CORS <http://hacks.mozilla.org/2009/07/cross-site-xmlhttprequest-with-cors>`_
