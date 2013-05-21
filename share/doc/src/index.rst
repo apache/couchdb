@@ -30,13 +30,13 @@ Contents
     intro
     api-basics
     configuring
-    config_reference
     replication
     ddocs
     query-servers
     changes
     api/reference
     json-structure
+    config_reference
     contributing
     changelog
 
