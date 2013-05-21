@@ -34,7 +34,6 @@ Contents
     replication
     ddocs
     query-servers
-    commonjs
     errors
     changes
     release

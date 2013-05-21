@@ -236,7 +236,7 @@ modules and functions:
    :param obj: JSON encodable object
    :return: JSON string
 
-
+.. _commonjs:
 
 CommonJS Modules
 ----------------
@@ -249,61 +249,11 @@ Here's a CommonJS module that checks user permissions:
 
 .. code-block:: javascript
 
-    function user_context(userctx, secobj){
-      var is_admin = function(){
+    function user_context(userctx, secobj) {
+      var is_admin = function() {
         return userctx.indexOf('_admin') != -1;
       }
-      var is_db_admin = function(){
-        if (is_admin() || !secobj){
-          return true;
-        }
-        if (secobj.admins.names.indexOf(userctx.name) != -1){
-          return true;
-        }
-        for (var idx in userctx.roles){
-          if (secobj.admins.roles.indexOf(userctx.roles[idx]) != -1){
-            return true;
-          }
-        }
-        return false;
-      }
-      var is_db_member = function(){
-        if (is_admin() || is_db_admin() || !secobj){
-          return true;
-        }
-        if (secobj.members.names.indexOf(userctx.name) != -1){
-          return true;
-        }
-        for (var idx in userctx.roles){
-          if (secobj.members.roles.indexOf(userctx.roles[idx]) != -1){
-            return true;
-          }
-        }
-        return false;
-      }
-      var has_all_roles = function(roles){
-        for (var idx in roles){
-          if (userctx.roles.indexOf(roles[idx]) == -1){
-            return false;
-          }
-        }
-        return true;
-      }
-      var has_any_role = function(roles){
-        for (var idx in roles){
-          if (userctx.roles.indexOf(roles[idx]) != -1){
-            return true;
-          }
-        }
-        return false;
-      }
-      return {
-        'is_admin': is_admin,
-        'is_db_admin': is_db_admin,
-        'is_db_member': is_db_member,
-        'has_all_roles': has_all_roles,
-        'has_any_role': has_any_role
-      }
+      return {'is_admin': is_admin}
     }
 
     exports['user'] = user_context
@@ -319,21 +269,27 @@ Each module has access to additional global variables:
 
 - **exports** (`object`): Shortcut to the ``module.exports`` object
 
-This module can be used after adding it to the design document, for example,
-under the `lib/validate` path. We may then use it in our view functions:
+The CommonJS module can be added to a design document, like so:
 
 .. code-block:: javascript
 
-    function(newdoc, olddoc, userctx, secobj){
-      user = require('lib/validate').user(userctx, secobj);
-      if (user.is_admin()){
-        return true;
-      }
-      if (newdoc.author != olddoc.author){
-        throw({'forbidden': 'unable to update `author` field'});
-      }
+    {
+       "views": {
+          "lib": {
+             "security": "function user_context(userctx, secobj) { ... }"
+          },
+          "validate_doc_update": "function(newdoc, olddoc, userctx, secobj) {
+            user = require('lib/security').user(userctx, secobj);
+            return user.is_admin();
+          }"
+       },
+       "_id": "_design/test"
     }
 
+Modules paths are relative to the design document's ``views`` object, but
+modules can only be loaded from the object referenced via ``lib``. The
+``lib`` structure can still be used for view functions as well, by simply
+storing view functions at e.g. ``views.lib.map``, ``views.lib.reduce``, etc.
 
 .. _queryserver_erlang:
 

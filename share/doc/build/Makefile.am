@@ -56,7 +56,6 @@ html_files = \
     html/_sources/api-basics.txt \
     html/_sources/changelog.txt \
     html/_sources/changes.txt \
-    html/_sources/commonjs.txt \
     html/_sources/config_reference.txt \
     html/_sources/configuring.txt \
     html/_sources/contributing.txt \
@@ -102,7 +101,6 @@ html_files = \
     html/api-basics.html \
     html/changelog.html \
     html/changes.html \
-    html/commonjs.html \
     html/config_reference.html \
     html/configuring.html \
     html/ddocs.html \
@@ -146,7 +144,6 @@ src_files = \
     ../src/api-basics.rst \
     ../src/changelog.rst \
     ../src/changes.rst \
-    ../src/commonjs.rst \
     ../src/config_reference.rst \
     ../src/configuring.rst \
     ../src/contributing.rst \
