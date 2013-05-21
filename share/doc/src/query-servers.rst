@@ -13,7 +13,7 @@
 .. default-domain:: js
 
 =============
-Query servers
+Query Servers
 =============
 
 .. _queryserver_js:
