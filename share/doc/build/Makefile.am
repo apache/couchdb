@@ -60,7 +60,6 @@ html_files = \
     html/_sources/configuring.txt \
     html/_sources/contributing.txt \
     html/_sources/ddocs.txt \
-    html/_sources/errors.txt \
     html/_sources/index.txt \
     html/_sources/intro.txt \
     html/_sources/json-structure.txt \
@@ -104,7 +103,6 @@ html_files = \
     html/config_reference.html \
     html/configuring.html \
     html/ddocs.html \
-    html/errors.html \
     html/index.html \
     html/intro.html \
     html/json-structure.html \
@@ -148,7 +146,6 @@ src_files = \
     ../src/configuring.rst \
     ../src/contributing.rst \
     ../src/ddocs.rst \
-    ../src/errors.rst \
     ../src/index.rst \
     ../src/intro.rst \
     ../src/json-structure.rst \
