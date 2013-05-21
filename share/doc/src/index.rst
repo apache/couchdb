@@ -34,7 +34,6 @@ Contents
     replication
     ddocs
     query-servers
-    errors
     changes
     release
     api/reference
