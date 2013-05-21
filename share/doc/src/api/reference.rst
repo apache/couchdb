@@ -12,8 +12,8 @@
 
 .. _api-overview:
 
-CouchDB API Reference
-=====================
+API Reference
+=============
 
 The components of the API URL path help determine the part of the
 CouchDB server that is being accessed. The result is the structure of

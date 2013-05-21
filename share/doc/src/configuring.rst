@@ -12,9 +12,9 @@
 
 .. _configuring:
 
-===================
-Configuring CouchDB
-===================
+=============
+Configuration
+=============
 
 .. todo:: Configuring CouchDB
 

@@ -12,9 +12,9 @@
 
 .. _api-basics:
 
-===========
-CouchDB API
-===========
+==========
+API Basics
+==========
 
 The CouchDB API is the primary method of interfacing to a CouchDB
 instance. Requests are made using HTTP and requests are used to request
