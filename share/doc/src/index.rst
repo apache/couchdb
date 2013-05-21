@@ -35,7 +35,6 @@ Contents
     ddocs
     query-servers
     changes
-    release
     api/reference
     json-structure
     contributing

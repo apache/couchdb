@@ -16,6 +16,25 @@ Apache CouchDB CHANGES
 Version 1.3.0
 -------------
 
+Upgrade notes
+^^^^^^^^^^^^^
+
+You can upgrade your existing CouchDB 1.0.x installation to 1.3.0
+without any specific steps or migration. When you run CouchDB, the
+existing data and index files will be opened and used as normal.
+
+The first time you run a compaction routine on your database within 1.3.0,
+the data structure and indexes will be updated to the new version of the
+CouchDB database format that can only be read by CouchDB 1.3.0 and later.
+This step is not reversible. Once the data files have been updated and
+migrated to the new version the data files will no longer work with a
+CouchDB 1.0.x release.
+
+.. warning::
+   If you want to retain support for opening the data files in
+   CouchDB 1.0.x you must back up your data files before performing the
+   upgrade and compaction process.
+
 Database core
 ^^^^^^^^^^^^^
 
