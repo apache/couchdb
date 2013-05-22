@@ -276,6 +276,7 @@ function(app, Fauxton) {
           });
 
           var hooks = masterLayout.hooks[selector];
+          var boundRoute = route;
 
           _.each(hooks, function(hook){
             if (_.any(hook.routes, function(route){return route == boundRoute;})){
