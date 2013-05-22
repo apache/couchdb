@@ -28,7 +28,7 @@ function(app, FauxtonAPI, Documents, Databases) {
   var DocEditorRouteObject = FauxtonAPI.RouteObject.extend({
     layout: "one_pane",
 
-    initialize: function(options) {
+    initialize: function(route, masterLayout, options) {
       var databaseName = options[0], docID = options[1];
 
       this.database = this.database || new Databases.Model({id: databaseName});
@@ -180,7 +180,7 @@ function(app, FauxtonAPI, Documents, Databases) {
       "database/:database/new_view": "newViewEditor"
     },
 
-    initialize: function (options) {
+    initialize: function (route, masterLayout, options) {
       var docOptions = app.getParams();
       docOptions.include_docs = true;
 
@@ -299,7 +299,7 @@ function(app, FauxtonAPI, Documents, Databases) {
       "database/:database/_changes(:params)": "changes"
     },
 
-    initialize: function (options) {
+    initialize: function (route, masterLayout, options) {
       this.databaseName = options[0];
       this.database = new Databases.Model({id: this.databaseName});
 

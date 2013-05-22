@@ -21,7 +21,6 @@ define([
 ],
 
 function(app, FauxtonAPI,Stats) {
-  console.log(arguments);
   Views = {};
 
   datatypeEventer = {};
@@ -69,8 +68,6 @@ function(app, FauxtonAPI,Stats) {
 
         series = _.filter(series, function(d){return d.y > 0;});
         series = _.sortBy(series, function(d){return -d.y;});
-        console.log('series');
-        console.log(series);
 
         nv.addGraph(function() {
             var width = 550,

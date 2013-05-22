@@ -163,7 +163,7 @@ function(app, Fauxton) {
   });
 
   FauxtonAPI.setSession = function (newSession) {
-    FauxtonAPI.session = newSession;
+    app.session = FauxtonAPI.session = newSession;
     return FauxtonAPI.session.fetchUser();
   };
 
