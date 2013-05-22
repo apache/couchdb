@@ -198,8 +198,11 @@ handle_rewrite_req(#httpd{
                 design_url_handlers = DesignUrlHandlers,
                 default_fun = DefaultFun,
                 url_handlers = UrlHandlers,
-                user_ctx = UserCtx
+                user_ctx = UserCtx,
+               auth = Auth
             } = Req,
+
+            erlang:put(pre_rewrite_auth, Auth),
             erlang:put(pre_rewrite_user_ctx, UserCtx),
             couch_httpd:handle_request_int(MochiReq1, DefaultFun,
                     UrlHandlers, DbUrlHandlers, DesignUrlHandlers)
