@@ -213,6 +213,50 @@ Windows
 Version 1.2.0
 -------------
 
+Upgrade Notes
+^^^^^^^^^^^^^
+
+.. warning::
+
+   This version drops support for the database format that was introduced in
+   version 0.9.0. Compact your older databases (that have not been compacted
+   for a long time) before upgrading, or they will become inaccessible.
+
+Security changes
+~~~~~~~~~~~~~~~~
+
+The interface to the ``_users`` and ``_replicator`` databases have been
+changed so that non-administrator users can see less information:
+
+* In the ``_users`` database:
+
+  * User documents can now only be read by the respective users, as well as
+    administrators. Other users cannot read these documents.
+  * Views can only be defined and queried by administrator users.
+  * The ``_changes`` feed can only be queried by administrator users.
+
+* In the ``_replicator`` database:
+
+  * Documents now have a forced ``owner`` field that corresponds to the
+    authenticated user that created them.
+  * Non-owner users will not see confidential information like passwords or
+    OAuth tokens in replication documents; they can still see the other
+    contents of those documents. Administrators can see everything.
+  * Views can only be defined and queried by administrators.
+
+Database Compression
+~~~~~~~~~~~~~~~~~~~~
+
+The new optional (but enabled by default) compression of disk files requires
+an upgrade of the on-disk format (5 -> 6) which occurs on creation for new
+databases and views, and on compaction for existing files. This format is not
+supported in previous releases, so rollback would require replication to the
+previous CouchDB release or restoring from backup.
+
+Compression can be disabled by setting ``compression = none`` in your
+``local.ini`` ``[couchdb]`` section, but the on-disk format will still be
+upgraded.
+
 Authentication
 ^^^^^^^^^^^^^^
 
