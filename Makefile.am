@@ -41,7 +41,7 @@ EXTRA_DIST = \
     LICENSE \
     NEWS \
     NOTICE \
-    README \
+    README.rst \
     THANKS \
     build-aux/dist-error \
     build-aux/sphinx-build \
@@ -78,7 +78,7 @@ NEWS.gz: NEWS
 NOTICE.gz: NOTICE
 	gzip -9 < $< > $@
 
-README.gz: README
+README.gz: README.rst
 	gzip -9 < $< > $@
 
 THANKS.gz: THANKS
