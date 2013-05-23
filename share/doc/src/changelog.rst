@@ -11,13 +11,21 @@
 .. the License.
 
 Release History
-===============
+***************
 
-Version 1.3.0
+.. contents::
+   :depth: 1
+   :local:
+
+1.3.x Branch
+============
+
+.. contents::
+   :depth: 1
+   :local:
+
+Upgrade Notes
 -------------
-
-Upgrade notes
-^^^^^^^^^^^^^
 
 You can upgrade your existing CouchDB 1.0.x installation to 1.3.0
 without any specific steps or migration. When you run CouchDB, the
@@ -34,6 +42,9 @@ CouchDB 1.0.x release.
    If you want to retain support for opening the data files in
    CouchDB 1.0.x you must back up your data files before performing the
    upgrade and compaction process.
+
+Version 1.3.0
+-------------
 
 Database core
 ^^^^^^^^^^^^^
@@ -209,12 +220,15 @@ Windows
   :commit:`a6eaf9f1`
 * Allows building cleanly on Windows without cURL, :commit:`fb670f5712`
 
+1.2.x Branch
+============
 
-Version 1.2.0
--------------
+.. contents::
+   :depth: 1
+   :local:
 
 Upgrade Notes
-^^^^^^^^^^^^^
+-------------
 
 .. warning::
 
@@ -223,7 +237,7 @@ Upgrade Notes
    for a long time) before upgrading, or they will become inaccessible.
 
 Security changes
-~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^
 
 The interface to the ``_users`` and ``_replicator`` databases have been
 changed so that non-administrator users can see less information:
@@ -245,7 +259,7 @@ changed so that non-administrator users can see less information:
   * Views can only be defined and queried by administrators.
 
 Database Compression
-~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^
 
 The new optional (but enabled by default) compression of disk files requires
 an upgrade of the on-disk format (5 -> 6) which occurs on creation for new
@@ -256,6 +270,9 @@ previous CouchDB release or restoring from backup.
 Compression can be disabled by setting ``compression = none`` in your
 ``local.ini`` ``[couchdb]`` section, but the on-disk format will still be
 upgraded.
+
+Version 1.2.0
+-------------
 
 Authentication
 ^^^^^^^^^^^^^^
@@ -359,6 +376,12 @@ OAuth
 
 * Updated bundled erlang_oauth library to the latest version.
 
+1.1.x Branch
+============
+
+.. contents::
+   :depth: 1
+   :local:
 
 Version 1.1.1
 -------------
@@ -452,6 +475,12 @@ View Server
 * Added view query aliases start_key, end_key, start_key_doc_id and
   end_key_doc_id.
 
+1.0.x Branch
+============
+
+.. contents::
+   :depth: 1
+   :local:
 
 Version 1.0.3
 -------------
@@ -638,6 +667,12 @@ View Server
 * Faster default view collation.
 * Added option to include update_seq in view responses.
 
+0.11.x Branch
+=============
+
+.. contents::
+   :depth: 1
+   :local:
 
 Version 0.11.2
 --------------
@@ -868,6 +903,12 @@ View Server
 
 
 
+0.10.x Branch
+=============
+
+.. contents::
+   :depth: 1
+   :local:
 
 Version 0.10.1
 --------------
@@ -920,6 +961,12 @@ View Server
 
 * Added native Erlang views for high-performance applications.
 
+0.9.x Branch
+============
+
+.. contents::
+   :depth: 1
+   :local:
 
 Version 0.9.2
 -------------
@@ -1083,6 +1130,12 @@ Replication
 * Automatically retry of failed replications.
 * Stream attachments in pull-replication.
 
+0.8.x Branch
+============
+
+.. contents::
+   :depth: 1
+   :local:
 
 Version 0.8.1-incubating
 ------------------------
