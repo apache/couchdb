@@ -225,10 +225,8 @@ ensure_exists(DbName) ->
 
 owner(DbName, DocId) ->
     Shards = mem3:shards(DbName, DocId),
-    Nodes = [node()|nodes()],
-    LiveShards = [S || #shard{node=Node} = S <- Shards, lists:member(Node, Nodes)],
-    [#shard{node=Node}] = lists:usort(fun(#shard{name=A}, #shard{name=B}) ->
-                                              A =< B  end, LiveShards),
+    Ushards = mem3:ushards(DbName),
+    [Node] = [N || #shard{node=N} = S <- Shards, lists:member(S, Ushards)],
     node() =:= Node.
 
 is_deleted(Change) ->
