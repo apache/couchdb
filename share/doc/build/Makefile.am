@@ -64,7 +64,6 @@ html_files = \
     html/_sources/intro.txt \
     html/_sources/json-structure.txt \
     html/_sources/query-servers.txt \
-    html/_sources/release.txt \
     html/_sources/replication.txt \
     html/_static/ajax-loader.gif \
     html/_static/basic.css \
@@ -107,7 +106,6 @@ html_files = \
     html/intro.html \
     html/json-structure.html \
     html/query-servers.html \
-    html/release.html \
     html/replication.html \
     html/objects.inv \
     html/genindex.html \
@@ -150,7 +148,6 @@ src_files = \
     ../src/intro.rst \
     ../src/json-structure.rst \
     ../src/query-servers.rst \
-    ../src/release.rst \
     ../src/replication.rst \
     ../src/conf.py
 
