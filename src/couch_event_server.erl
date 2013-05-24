@@ -66,14 +66,15 @@ handle_call({register, Pid, NewDbNames}, _From, St) ->
     {reply, ok, St};
 
 handle_call({unregister, Pid}, _From, St) ->
-    case khash:get(St#st.by_pid, Pid) of
+    Reply = case khash:get(St#st.by_pid, Pid) of
         undefined ->
-            {reply, not_registered, St};
+            not_registered;
         {Ref, OldDbNames} ->
             unregister(St, Pid, OldDbNames),
-            erlang:demonitor(Ref, [flush])
+            erlang:demonitor(Ref, [flush]),
+            ok
     end,
-    {reply, ok, St};
+    {reply, Reply, St};
 
 handle_call(Msg, From, St) ->
     couch_log:notice("~s ignoring call ~w from ~w", [?MODULE, Msg, From]),
@@ -151,4 +152,3 @@ rem_listener(ByDbName, DbName, Pid) ->
     if Size > 0 -> ok; true ->
         khash:del(ByDbName, DbName)
     end.
-            
