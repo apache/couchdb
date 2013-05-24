@@ -287,7 +287,7 @@ handle_db_event(<<"shards/", _/binary>> = ShardName, updated, St) ->
         Live = nodes(),
         [?MODULE:push(ShardName,N) || #shard{node=N} <- Targets,
             lists:member(N, Live)]
-    catch error:database_does_not_eist ->
+    catch error:database_does_not_exist ->
         ok
     end,
     {ok, St};
