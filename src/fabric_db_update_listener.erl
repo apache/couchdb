@@ -24,6 +24,12 @@
     pid
 }).
 
+-record(cb_state, {
+    client_pid,
+    client_ref,
+    notify
+}).
+
 -record(acc, {
     parent,
     state
@@ -63,12 +69,12 @@ start_update_notifiers(DbName) ->
 start_update_notifier(DbNames) ->
     {Caller, Ref} = get(rexi_from),
     Notify = config:get("cloudant", "maintenance_mode", "false") /= "true",
-    State = {Caller, Ref, Notify},
+    State = #cb_state{client_pid = Caller, client_ref = Ref, notify = Notify},
     Options = [{dbnames, DbNames}],
     couch_event:listen(?MODULE, handle_db_event, State, Options).
 
-handle_db_event(_DbName, updated, {Caller, Ref, true}=St) ->
-    erlang:send(Caller, {Ref, db_updated}),
+handle_db_event(_DbName, updated, #cb_state{notify = true} = St) ->
+    erlang:send(St#cb_state.client_pid, {St#cb_state.client_ref, db_updated}),
     {ok, St};
 handle_db_event(_DbName, _Event, St) ->
     {ok, St}.
