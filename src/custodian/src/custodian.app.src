@@ -9,6 +9,7 @@
                   kernel,
                   stdlib,
                   config,
+                  couch_event,
                   couch,
                   twig,
                   mem3
