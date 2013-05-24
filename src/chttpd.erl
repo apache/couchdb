@@ -219,6 +219,8 @@ handle_request(MochiReq) ->
             exit(normal);
         exit:{uri_too_long, _} ->
             send_error(HttpReq, request_uri_too_long);
+        exit:{body_too_large, _} ->
+            send_error(HttpReq, request_entity_too_large);
         throw:Error ->
             send_error(HttpReq, Error);
         error:database_does_not_exist ->
@@ -479,16 +481,8 @@ recv_chunked(#httpd{mochi_req=MochiReq}, MaxChunkSize, ChunkFun, InitState) ->
     % called with Length == 0 on the last time.
     MochiReq:stream_body(MaxChunkSize, ChunkFun, InitState).
 
-body_length(Req) ->
-    case header_value(Req, "Transfer-Encoding") of
-        undefined ->
-            case header_value(Req, "Content-Length") of
-                undefined -> undefined;
-                Length -> list_to_integer(Length)
-            end;
-        "chunked" -> chunked;
-        Unknown -> {unknown_transfer_encoding, Unknown}
-    end.
+body_length(#httpd{mochi_req=MochiReq}) ->
+    MochiReq:get(body_length).
 
 body(#httpd{mochi_req=MochiReq, req_body=ReqBody}) ->
     case ReqBody of
@@ -723,6 +717,8 @@ error_info({error, illegal_database_name}) ->
         "allowed. Moreover, the database name must begin with a letter.">>};
 error_info({missing_stub, Reason}) ->
     {412, <<"missing_stub">>, Reason};
+error_info(request_entity_too_large) ->
+    {413, <<"too_large">>, <<"the request entity is too large">>};
 error_info(not_implemented) ->
     {501, <<"not_implemented">>, <<"this feature is not yet implemented">>};
 error_info({Error, null}) ->
