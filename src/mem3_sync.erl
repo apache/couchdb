@@ -25,6 +25,12 @@
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
+-record(event_listener, {
+    nodes,
+    shards,
+    users
+}).
+
 -record(state, {
     active = [],
     count = 0,
@@ -265,18 +271,22 @@ sync_push(ShardName, N) ->
     gen_server:call(mem3_sync, {push, #job{name=ShardName, node=N}}, infinity).
 
 start_event_listener() ->
-    State = {nodes_db(), shards_db(), users_db()},
+    State = #event_listener{
+        nodes = nodes_db(),
+        shards = shards_db(),
+        users = users_db()
+    },
     couch_event:link_listener(?MODULE, handle_db_event, State, [all_dbs]).
 
-handle_db_event(NodesDb, updated, {NodesDb, _, _}=St) ->
+handle_db_event(NodesDb, updated, #event_listener{nodes = NodesDb} = St) ->
     Nodes = mem3:nodes(),
     Live = nodes(),
     [?MODULE:push(NodesDb, N) || N <- Nodes, lists:member(N, Live)],
     {ok, St};
-handle_db_event(ShardsDb, updated, {_, ShardsDb, _}=St) ->
+handle_db_event(ShardsDb, updated, #event_listener{shards = ShardsDb} = St) ->
     ?MODULE:push(ShardsDb, find_next_node()),
     {ok, St};
-handle_db_event(UsersDb, updated, {_, _, UsersDb}=St) ->
+handle_db_event(UsersDb, updated, #event_listener{users = UsersDb} = St) ->
     ?MODULE:push(UsersDb, find_next_node()),
     {ok, St};
 handle_db_event(<<"shards/", _/binary>> = ShardName, updated, St) ->
