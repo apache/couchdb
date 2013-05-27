@@ -214,11 +214,11 @@ appropriately secured and readable only by system administrators.
     architect = -pbkdf2-43ecbd256a70a3a2f7de40d2374b6c3002918834,921a12f74df0c1052b3e562a23cd227f,10000
 
 Administrators can be added directly to the ``[admins]`` section, and when
-CouchDB is restarted, the passwords will be salted and encrypted. By using
-the HTTP, administrator accounts may be created immediately without needing
-a restart, nor of storing the plaintext password temporarily. The HTTP
-``_config/admins`` endpoint supports querying, deleting or creating new
-administrator accounts:
+CouchDB is restarted, the passwords will be salted and encrypted. You may
+also use the HTTP interface to create administrator accounts; this way,
+you don't need to restart CouchDB, and there's no need to temporarily store
+or transmit passwords in plaintext. The HTTP ``_config/admins`` endpoint
+supports querying, deleting or creating new admin accounts:
 
 .. code-block:: bash
 
