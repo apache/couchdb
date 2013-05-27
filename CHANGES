@@ -8,17 +8,17 @@ This version has not been released yet.
 
 Replicator:
 
-* Tolerate missing source and target fields in _replicator docs
+* Tolerate missing source and target fields in _replicator docs.
 
 Log System:
 
-* Don't log about missing .compact files
-* Fix bug in WARN level logging from 1.3.0
+* Don't log about missing .compact files.
+* Fix bug in WARN level logging from 1.3.0.
 
 Misc:
 
-* Improve documentation: better structure, improve language, less duplication
-* Improvements to test suite
+* Improve documentation: better structure, improve language, less duplication.
+* Improvements to test suite.
 
 Version 1.3.0
 -------------
