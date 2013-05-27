@@ -43,6 +43,27 @@ CouchDB 1.0.x release.
    CouchDB 1.0.x you must back up your data files before performing the
    upgrade and compaction process.
 
+Version 1.3.1
+-------------
+
+Replicator
+^^^^^^^^^^
+
+* :issue:`1788`: Tolerate missing source and target fields in _replicator docs.
+  :commit:`869f42e2`
+
+Log System
+^^^^^^^^^^
+
+* Don't log about missing .compact files. :commit:`06f1a8dc`
+* Fix bug in WARN level logging from 1.3.0.
+
+Miscellaneous
+^^^^^^^^^^^^^
+
+* Improve documentation: better structure, improve language, less duplication.
+* Improvements to test suite.
+
 Version 1.3.0
 -------------
 
