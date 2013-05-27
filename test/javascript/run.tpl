@@ -1,4 +1,4 @@
-#!/bin/bash -e
+#!/bin/sh -e
 
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not
 # use this file except in compliance with the License. You may obtain a copy of
@@ -65,7 +65,7 @@ process_response() {
 
 run() {
     # start the tests
-    echo -n "$1 ... "
+    /bin/echo -n "$1 ... "
     $COUCHJS -H -u $COUCH_URI_FILE \
         $SCRIPT_DIR/json2.js \
         $SCRIPT_DIR/sha1.js \
@@ -97,11 +97,13 @@ echo "Running javascript tests ..."
 if [ "$#" -eq 0 ];
 then
     COUNTER=1
-    FILES=($SCRIPT_DIR/test/*.js)
-    for TEST_SRC in "${FILES[@]}"
+    FILES="$SCRIPT_DIR/test/*.js"
+    FILE_COUNT=$(ls -l $FILES | wc -l)
+    FILE_COUNT=$(expr $FILE_COUNT + 0)
+    for TEST_SRC in $FILES
     do
-        echo -n "$COUNTER/${#FILES[@]} " 
-        let COUNTER=COUNTER+1
+        /bin/echo -n "$COUNTER/$FILE_COUNT "
+        COUNTER=$(expr $COUNTER + 1)
         run $TEST_SRC
     done
 else
