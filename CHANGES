@@ -42,7 +42,7 @@ Apache CouchDB CHANGES
 # Misc:
 
 #  * Improve documentation: better structure, improve language, less duplication.
-#  * Improvements to test suite.
+#  * Improvements to test suite and VPATH build system.
 
 Version 1.3.0
 -------------
