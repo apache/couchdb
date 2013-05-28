@@ -56,13 +56,20 @@ Log System
 ^^^^^^^^^^
 
 * Don't log about missing .compact files. :commit:`06f1a8dc`
-* Fix bug in WARN level logging from 1.3.0.
+* :issue:`1794`: Fix bug in WARN level logging from 1.3.0.
+
+View Server
+^^^^^^^^^^^
+
+* :issue:`1792`: Fix the -S option to couchjs to increase memory limits.
+  :commit:`cfaa66cd`
 
 Miscellaneous
 ^^^^^^^^^^^^^
 
 * Improve documentation: better structure, improve language, less duplication.
-* Improvements to test suite.
+* :issue:`1784`: Improvements to test suite and VPATH build system.
+  :commit:`01afaa4f`
 
 Version 1.3.0
 -------------
