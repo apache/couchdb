@@ -116,11 +116,6 @@ Build System:
  * Fixed issue in couchdb script where stopped status returns before process
    exits.
 
-# Version 1.2.3
-# -------------
-#
-# This version has not been released yet.
-
 Version 1.2.2
 -------------
 
