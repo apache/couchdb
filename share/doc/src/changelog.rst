@@ -43,6 +43,34 @@ CouchDB 1.0.x release.
    CouchDB 1.0.x you must back up your data files before performing the
    upgrade and compaction process.
 
+Version 1.3.1
+-------------
+
+Replicator
+^^^^^^^^^^
+
+* :issue:`1788`: Tolerate missing source and target fields in _replicator docs.
+  :commit:`869f42e2`
+
+Log System
+^^^^^^^^^^
+
+* Don't log about missing .compact files. :commit:`06f1a8dc`
+* :issue:`1794`: Fix bug in WARN level logging from 1.3.0.
+
+View Server
+^^^^^^^^^^^
+
+* :issue:`1792`: Fix the -S option to couchjs to increase memory limits.
+  :commit:`cfaa66cd`
+
+Miscellaneous
+^^^^^^^^^^^^^
+
+* Improve documentation: better structure, improve language, less duplication.
+* :issue:`1784`: Improvements to test suite and VPATH build system.
+  :commit:`01afaa4f`
+
 Version 1.3.0
 -------------
 
