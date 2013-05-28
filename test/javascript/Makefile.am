@@ -13,6 +13,7 @@
 EXTRA_DIST = \
 	cli_runner.js \
 	couch_http.js \
+	test_setup.js \
 	run.tpl
 
 noinst_SCRIPTS = run
