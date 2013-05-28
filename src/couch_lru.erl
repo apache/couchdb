@@ -47,6 +47,7 @@ close_int({Lru, DbName, Iter}, {Tree, Dict} = Cache) ->
         [#db{main_pid = Pid} = Db] = ets:lookup(couch_dbs, DbName),
         case couch_db:is_idle(Db) of true ->
             true = ets:delete(couch_dbs, DbName),
+            true = ets:delete(couch_dbs_pid_to_name, Pid),
             exit(Pid, kill),
             {gb_trees:delete(Lru, Tree), dict:erase(DbName, Dict)};
         false ->

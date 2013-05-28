@@ -198,6 +198,7 @@ init([]) ->
         "(\\.[0-9]{10,})?$" % but allow an optional shard timestamp at the end
     ),
     ets:new(couch_dbs, [set, protected, named_table, {keypos, #db.name}]),
+    ets:new(couch_dbs_pid_to_name, [set, protected, named_table]),
     process_flag(trap_exit, true),
     {ok, #server{root_dir=RootDir,
                 dbname_regexp=RegExp,
@@ -312,6 +313,7 @@ open_async(Server, From, DbName, Filepath, Options) ->
         fd_monitor = locked,
         options = Options
     }),
+    true = ets:insert(couch_dbs_pid_to_name, {Opener, DbName}),
     db_opened(Server, Options).
 
 handle_call(close_lru, _From, #server{lru=Lru} = Server) ->
@@ -326,8 +328,9 @@ handle_call({set_max_dbs_open, Max}, _From, Server) ->
     {reply, ok, Server#server{max_dbs_open=Max}};
 handle_call(get_server, _From, Server) ->
     {reply, {ok, Server}, Server};
-handle_call({open_result, DbName, {ok, Db}}, _From, Server) ->
+handle_call({open_result, DbName, {ok, Db}}, {FromPid, _Tag}, Server) ->
     link(Db#db.main_pid),
+    true = ets:delete(couch_dbs_pid_to_name, FromPid),
     case erase({async_open, DbName}) of undefined -> ok; T0 ->
         ?LOG_INFO("needed ~p ms to open new ~s", [timer:now_diff(os:timestamp(),T0)/1000,
             DbName])
@@ -344,6 +347,7 @@ handle_call({open_result, DbName, {ok, Db}}, _From, Server) ->
             ok
     end,
     true = ets:insert(couch_dbs, Db),
+    true = ets:insert(couch_dbs_pid_to_name, {Db#db.main_pid, DbName}),
     Lru = case couch_db:is_system_db(Db) of
         false ->
             Stat = {couchdb, open_databases},
@@ -355,12 +359,13 @@ handle_call({open_result, DbName, {ok, Db}}, _From, Server) ->
     {reply, ok, Server#server{lru = Lru}};
 handle_call({open_result, DbName, {error, eexist}}, From, Server) ->
     handle_call({open_result, DbName, file_exists}, From, Server);
-handle_call({open_result, DbName, Error}, _From, Server) ->
+handle_call({open_result, DbName, Error}, {FromPid, _Tag}, Server) ->
     % icky hack of field values - compactor_pid used to store clients
     [#db{fd=ReqType, compactor_pid=Froms}=Db] = ets:lookup(couch_dbs, DbName),
     [gen_server:reply(From, Error) || From <- Froms],
     ?LOG_INFO("open_result error ~p for ~s", [Error, DbName]),
     true = ets:delete(couch_dbs, DbName),
+    true = ets:delete(couch_dbs_pid_to_name, FromPid),
     NewServer = case ReqType of
         {create, DbName, Filepath, Options, CrFrom} ->
             open_async(Server, CrFrom, DbName, Filepath, Options);
@@ -435,11 +440,13 @@ handle_call({delete, DbName, Options}, _From, Server) ->
         [#db{main_pid=Pid, compactor_pid=Froms} = Db] when is_list(Froms) ->
             % icky hack of field values - compactor_pid used to store clients
             true = ets:delete(couch_dbs, DbName),
+            true = ets:delete(couch_dbs_pid_to_name, Pid),
             exit(Pid, kill),
             [gen_server:reply(F, not_found) || F <- Froms],
             db_closed(Server, Db#db.options);
         [#db{main_pid=Pid} = Db] ->
             true = ets:delete(couch_dbs, DbName),
+            true = ets:delete(couch_dbs_pid_to_name, Pid),
             exit(Pid, kill),
             db_closed(Server, Db#db.options)
         end,
@@ -485,8 +492,10 @@ code_change(_, State, _) ->
 handle_info({'EXIT', _Pid, config_change}, Server) ->
     {stop, config_change, Server};
 handle_info({'EXIT', Pid, Reason}, Server) ->
-    case ets:match_object(couch_dbs, #db{main_pid=Pid, _='_'}) of
-    [#db{name = DbName, compactor_pid=Froms} = Db] ->
+    case ets:lookup(couch_dbs_pid_to_name, Pid) of
+    [DbName] ->
+        [#db{compactor_pid=Froms}=Db] =
+            ets:match_object(couch_dbs, #db{name=DbName, _='_'}),
         if Reason /= snappy_nif_not_loaded -> ok; true ->
             Msg = io_lib:format("To open the database `~s`, Apache CouchDB "
                 "must be built with Erlang OTP R13B04 or higher.", [DbName]),
@@ -500,6 +509,7 @@ handle_info({'EXIT', Pid, Reason}, Server) ->
             ok
         end,
         true = ets:delete(couch_dbs, DbName),
+        true = ets:delete(couch_dbs_pid_to_name, Pid),
         {noreply, db_closed(Server, Db#db.options)};
     [] ->
         {noreply, Server}
