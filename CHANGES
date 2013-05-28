@@ -8,8 +8,7 @@ This version has not been released yet.
 
 Replicator:
 
- * Tolerate missing source and target fields in _replicator docs
-  (COUCHDB-1788).
+ * Tolerate missing source and target fields in _replicator docs (COUCHDB-1788).
 
 Log System:
 
