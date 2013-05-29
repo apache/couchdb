@@ -29,6 +29,22 @@ function() {
     // TODO: add dynamic path for different deploy targets
     return path;
   };
+	Helpers.currentYear = function(){
+		return new Date().getFullYear();
+	};
+
+	Helpers.ajaxLoader = function(elem, className){
+		var loadingClass = className || "loading",
+			loader = {
+				add: function(){
+					$(elem).addClass(loadingClass);
+				},
+				remove: function(){
+					$(elem).removeClass(loadingClass);
+				}
+			};
+		return loader;
+	};
 
   return Helpers;
 });
