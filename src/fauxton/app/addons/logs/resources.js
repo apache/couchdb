@@ -158,14 +158,14 @@ function (app, FauxtonAPI, Backbone) {
     },
 
     startRefreshInterval: function () {
-      var that = this;
+      var collection = this.collection;
 
       // Interval already set
-      if (that.intervalId) { return ; }
+      if (this.intervalId) { return ; }
 
       that.intervalId = setInterval(function () {
-        that.collection.fetch();
-      }, that.refreshTime);
+        collection.fetch();
+      }, this.refreshTime);
 
     },
 

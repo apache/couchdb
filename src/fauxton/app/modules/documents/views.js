@@ -545,7 +545,12 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
       } else {
         this.ddocID = options.ddocInfo.id;
         this.viewName = options.viewName;
+        this.ddocInfo = new Documents.DdocInfo({_id: this.ddocID},{database: this.database});
       } 
+    },
+
+    establish: function () {
+      return this.ddocInfo.fetch();
     },
 
     updateDesignDoc: function () {
@@ -915,6 +920,7 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
       } else {
         this.model = this.ddocs.get(this.ddocID).dDocModel();
         this.reduceFunStr = this.model.viewHasReduce(this.viewName);
+        this.setView('#ddoc-info', new Views.DdocInfo({model: this.ddocInfo }));
       }
     },
 
@@ -1081,7 +1087,6 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
     },
 
     serialize: function () {
-      console.log('c', this.model.changes.toJSON());
       return {
         changes: this.model.changes.toJSON(),
         database: this.model
@@ -1091,8 +1096,45 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
     afterRender: function(){
       prettyPrint();
     }
+  });
 
+  Views.DdocInfo = FauxtonAPI.View.extend({
+    template: "templates/documents/ddoc_info",
 
+    initialize: function (options) {
+      this.refreshTime = options.refreshTime || 5000;
+      this.listenTo(this.model, 'change', this.render);
+    },
+
+    serialize: function () {
+      return {
+        view_index: this.model.get('view_index')
+      };
+    },
+
+    afterRender: function () {
+      this.startRefreshInterval();
+    },
+
+    startRefreshInterval: function () {
+      var model = this.model;
+
+      // Interval already set
+      if (this.intervalId) { return ; }
+
+      this.intervalId = setInterval(function () {
+        console.log('refreshing');
+        model.fetch();
+      }, this.refreshTime);
+    },
+    
+    stopRefreshInterval: function () {
+      clearInterval(this.intervalId);
+    },
+
+    cleanup: function () {
+      this.stopRefreshInterval();
+    }
   });
 
   Documents.Views = Views;

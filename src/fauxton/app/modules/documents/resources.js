@@ -164,6 +164,31 @@ function(app, FauxtonAPI) {
     }
   });
 
+  Documents.DdocInfo = Backbone.Model.extend({
+    idAttribute: "_id",
+
+    initialize: function (_attrs, options) {
+      this.database = options.database;
+    },
+
+    url: function(context) {
+      if (context === "app") {
+        return this.database.url("app") + "/" + this.safeID() + '/_info';
+      } else {
+        return app.host + "/" + this.database.id + "/" + this.id + '/_info';
+      }
+    },
+
+    // Need this to work around backbone router thinking _design/foo
+    // is a separate route. Alternatively, maybe these should be
+    // treated separately. For instance, we could default into the
+    // json editor for docs, or into a ddoc specific page.
+    safeID: function() {
+      return this.id.replace('/', '%2F');
+    }
+
+  });
+
   Documents.ViewRow = Backbone.Model.extend({
     docType: function() {
       if (!this.id) return "reduction";
@@ -330,7 +355,6 @@ function(app, FauxtonAPI) {
     },
 
     totalRows: function() {
-      console.log('rows');
       console.log(this);
       return this.viewMeta.total_rows || "unknown";
     },
@@ -347,6 +371,7 @@ function(app, FauxtonAPI) {
       return this.models;
     }
   });
+
 
 
   return Documents;
