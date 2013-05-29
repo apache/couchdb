@@ -73,7 +73,7 @@ fold_reduce(#btree{root=Root}=Bt, Fun, Acc, Options) ->
     Dir = couch_util:get_value(dir, Options, fwd),
     StartKey = couch_util:get_value(start_key, Options),
     InEndRangeFun = make_key_in_end_range_function(Bt, Dir, Options),
-    KeyGroupFun = couch_util:get_value(key_group_fun, Options, fun(_,_) -> true end),
+    KeyGroupFun = get_group_fun(Bt, Options),
     try
         {ok, Acc2, GroupedRedsAcc2, GroupedKVsAcc2, GroupedKey2} =
             reduce_stream_node(Bt, Dir, Root, StartKey, InEndRangeFun, undefined, [], [],
@@ -102,6 +102,62 @@ size(#btree{root = {_P, _Red}}) ->
     nil;
 size(#btree{root = {_P, _Red, Size}}) ->
     Size.
+
+get_group_fun(Bt, Options) ->
+    case couch_util:get_value(key_group_level, Options) of
+        exact ->
+            make_group_fun(Bt, exact);
+        0 ->
+            fun(_, _) -> true end;
+        N when is_integer(N), N > 0 ->
+            make_group_fun(Bt, N);
+        undefined ->
+            couch_util:get_value(key_group_fun, Options, fun(_,_) -> true end)
+    end.
+
+make_group_fun(Bt, exact) ->
+    fun({Key1, _}, {Key2, _}) ->
+        case less(Bt, {Key1, nil}, {Key2, nil}) of
+            false ->
+                case less(Bt, {Key2, nil}, {Key1, nil}) of
+                    false ->
+                        true;
+                    _ ->
+                        false
+                end;
+            _ ->
+                false
+        end
+    end;
+make_group_fun(Bt, GroupLevel) when is_integer(GroupLevel), GroupLevel > 0 ->
+    fun
+        ({[_|_] = Key1, _}, {[_|_] = Key2, _}) ->
+            SL1 = lists:sublist(Key1, GroupLevel),
+            SL2 = lists:sublist(Key2, GroupLevel),
+            case less(Bt, {SL1, nil}, {SL2, nil}) of
+                false ->
+                    case less(Bt, {SL2, nil}, {SL1, nil}) of
+                        false ->
+                            true;
+                        _ ->
+                            false
+                    end;
+                _ ->
+                    false
+            end;
+        ({Key1, _}, {Key2, _}) ->
+            case less(Bt, {Key1, nil}, {Key2, nil}) of
+                false ->
+                    case less(Bt, {Key2, nil}, {Key1, nil}) of
+                        false ->
+                            true;
+                        _ ->
+                            false
+                    end;
+                _ ->
+                    false
+            end
+    end.
 
 % wraps a 2 arity function with the proper 3 arity function
 convert_fun_arity(Fun) when is_function(Fun, 2) ->
