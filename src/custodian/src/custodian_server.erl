@@ -106,9 +106,18 @@ handle_db_event(_DbName, _Event, _St) ->
     {ok, nil}.
 
 check_shards() ->
-    {Unavailable, Impaired} = custodian:summary(),
+    {Unavailable, Impaired, Conflicted} = custodian:summary(),
+    send_conflicted_alert(Conflicted),
     send_unavailable_alert(Unavailable),
     send_impaired_alert(Impaired).
+
+send_conflicted_alert(0) ->
+    twig:log(notice, "No partition tables conflicted in this cluster", []),
+    os:cmd("send_snmptrap --trap CLOUDANT-DBCORE-MIB::cloudantDbcoreNoPartitionTablesConflictedEvent");
+send_conflicted_alert(Count) when is_integer(Count) ->
+    twig:log(crit, "~B conflicted partition tables in this cluster", [Count]),
+    os:cmd("send_snmptrap --trap CLOUDANT-DBCORE-MIB::cloudantDbcorePartitionTablesConflictedEvent -o cloudantDbcoreShardCount:INTEGER:"
+           ++ integer_to_list(Count)).
 
 send_impaired_alert(0) ->
     twig:log(notice, "No shards impaired in this cluster", []),

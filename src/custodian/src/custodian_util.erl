@@ -12,18 +12,22 @@
 %% public functions.
 
 summary() ->
-    Fun = fun(_Id, _Range,  unavailable, {Unavailable, Impaired}) ->
-                  {Unavailable + 1, Impaired};
-             (_Id, _Range,  {impaired, _N}, {Unavailable, Impaired}) ->
-                  {Unavailable, Impaired + 1}
+    Fun = fun(_Id, _Range,  unavailable, {U, I, C}) ->
+                  {U + 1, I, C};
+             (_Id, _Range,  {impaired, _N}, {U, I, C}) ->
+                  {U, I + 1, C};
+             (_Id, _Range, {conflicted, _N}, {U, I, C}) ->
+                  {U, I, C + 1}
           end,
-    fold_dbs({0, 0}, Fun).
+    fold_dbs({0, 0, 0}, Fun).
 
 report() ->
     Fun = fun(Id, Range,  unavailable, Acc) ->
                   [{Id, Range, unavailable}|Acc];
              (Id, Range,  {impaired, N}, Acc) ->
-                  [{Id, Range, {impaired, N}}|Acc]
+                  [{Id, Range, {impaired, N}}|Acc];
+             (Id, _Range,  {conflicted, N}, Acc) ->
+                  [{Id, {conflicted, N}}|Acc]
           end,
     fold_dbs([], Fun).
 
@@ -50,11 +54,17 @@ fold_dbs(#full_doc_info{id = <<"_design/", _/binary>>}, _, Acc) ->
     {ok, Acc};
 fold_dbs(#full_doc_info{deleted=true}, _, Acc) ->
     {ok, Acc};
-fold_dbs(#full_doc_info{id = Id} = FDI, _, {_Live, _N, _Fun, Db, _Acc0} = Acc) ->
+fold_dbs(#full_doc_info{id = Id} = FDI, _, {_Live, _N, Fun, Db, Acc0} = Acc) ->
+    InternalAcc = case count_conflicts(FDI) of
+        0 ->
+            Acc0;
+        ConflictCount ->
+            Fun(Id, null, {conflicted, ConflictCount}, Acc0)
+    end,
     Shards = load_shards(Db, FDI),
     Rs = [R || #shard{range=R} <- lists:ukeysort(#shard.range, Shards)],
     ActualN = [{R1, [N || #shard{node=N,range=R2} <- Shards, R1 == R2]} ||  R1 <- Rs],
-    fold_dbs(Id, ActualN, Acc);
+    fold_dbs(Id, ActualN, setelement(5, Acc, InternalAcc));
 fold_dbs(_Id, [], Acc) ->
     {ok, Acc};
 fold_dbs(Id, [{Range, Nodes}|Rest], {Live, N, Fun, Db, Acc0}) ->
@@ -90,6 +100,10 @@ maybe_redirect([Node|Rest], Acc) ->
         Redirect ->
             maybe_redirect(Rest, [list_to_atom(Redirect)|Acc])
     end.
+
+count_conflicts(#full_doc_info{rev_tree = T}) ->
+    Leafs = [1 || {#leaf{deleted=false}, _} <- couch_key_tree:get_all_leafs(T)],
+    length(Leafs) - 1.
 
 ensure_custodian_ddoc_exists(Db) ->
     case couch_db:open_doc(Db, ?CUSTODIAN_ID) of
