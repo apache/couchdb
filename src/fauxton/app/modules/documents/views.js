@@ -318,12 +318,19 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
         updateSeq = this.collection.updateSeq();
       }
 
-      return {
+      var info = {
         updateSeq: updateSeq,
         totalRows: totalRows,
         numModels: this.collection.models.length,
-        viewList: this.viewList
+        viewList: this.viewList,
+        requestDuration: null
       };
+
+      if (this.collection.requestDurationInString) {
+        info.requestDuration = this.collection.requestDurationInString();
+      }
+
+      return info;
     },
 
     /*
@@ -550,7 +557,9 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
     },
 
     establish: function () {
-      return this.ddocInfo.fetch();
+      if (this.ddocInfo) {
+        return this.ddocInfo.fetch();
+      }
     },
 
     updateDesignDoc: function () {
@@ -1003,10 +1012,12 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
   Views.Sidebar = FauxtonAPI.View.extend({
     template: "templates/documents/sidebar",
     events: {
-      "click a.new#index": "newIndex"
+      "click a.new#index": "newIndex",
+      "submit #jump-to-doc": "jumpToDoc"
     },
 
     initialize: function(options) {
+      this.database = options.database;
       if (options.ddocInfo) {
         this.ddocID = options.ddocInfo.id;
         this.currView = options.ddocInfo.currView;
@@ -1037,6 +1048,12 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
       );
       url = event.currentTarget.href.split('#')[1];
       app.router.navigate(url);
+    },
+
+    jumpToDoc: function (event) {
+      event.preventDefault();
+      var docId = this.$('#jump-to-doc-id').val();
+      FauxtonAPI.navigate('/database/' + this.database.id +'/' + docId, {trigger: true});
     },
 
     buildIndexList: function(collection, selector, design){
@@ -1123,7 +1140,6 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
       if (this.intervalId) { return ; }
 
       this.intervalId = setInterval(function () {
-        console.log('refreshing');
         model.fetch();
       }, this.refreshTime);
     },

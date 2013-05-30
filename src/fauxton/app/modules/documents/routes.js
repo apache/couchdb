@@ -115,7 +115,8 @@ function(app, FauxtonAPI, Documents, Databases) {
       });
 
       this.sidebar = this.setView("#sidebar-content", new Documents.Views.Sidebar({
-        collection: this.data.designDocs
+        collection: this.data.designDocs,
+        database: this.data.database
       }));
 
       this.setView("#tabs", new Documents.Views.Tabs({

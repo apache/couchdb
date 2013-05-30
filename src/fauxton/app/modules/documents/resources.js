@@ -299,7 +299,9 @@ function(app, FauxtonAPI) {
     },
 
     parse: function(resp) {
-      that = this;
+      this.endTime = new Date().getTime();
+      this.requestDuration = (this.endTime - this.startTime);
+
       this.viewMeta = {
         total_rows: resp.total_rows,
         offest: resp.offest,
@@ -319,10 +321,50 @@ function(app, FauxtonAPI) {
       this.fetch();
     },
 
+    // We implement our own fetch to store the starttime so we that
+    // we can get the request duration
+    fetch: function () {
+      this.startTime = new Date().getTime();
+      return Backbone.Collection.prototype.fetch.call(this);
+    },
+
     allDocs: function(){
       return this.models;
+    },
+
+    // This is taken from futon.browse.js $.timeString
+    requestDurationInString: function () {
+      var ms, sec, min, h, timeString, milliseconds = this.requestDuration;
+
+      sec = Math.floor(milliseconds / 1000.0);
+      min = Math.floor(sec / 60.0);
+      sec = (sec % 60.0).toString();
+      if (sec.length < 2) {
+         sec = "0" + sec;
+      }
+
+      h = (Math.floor(min / 60.0)).toString();
+      if (h.length < 2) {
+        h = "0" + h;
+      }
+
+      min = (min % 60.0).toString();
+      if (min.length < 2) {
+        min = "0" + min;
+      }
+
+      timeString = h + ":" + min + ":" + sec;
+
+      ms = (milliseconds % 1000.0).toString();
+      while (ms.length < 3) {
+        ms = "0" + ms;
+      }
+      timeString += "." + ms;
+
+      return timeString;
     }
   });
+
   
   Documents.PouchIndexCollection = Backbone.Collection.extend({
     model: Documents.ViewRow,
@@ -355,7 +397,6 @@ function(app, FauxtonAPI) {
     },
 
     totalRows: function() {
-      console.log(this);
       return this.viewMeta.total_rows || "unknown";
     },
 

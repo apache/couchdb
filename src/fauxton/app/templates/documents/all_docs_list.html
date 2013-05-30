@@ -33,6 +33,11 @@ the License.
     <% if (updateSeq) { %>
       -- Update Sequence: <%= updateSeq %>
     <% } %>
+    <% if (requestDuration) { %>
+  <span class="view-request-duration">
+    View request duration: <strong> <%= requestDuration %> </strong> 
+   </span>
+   <% } %>
   </p>
   <table class="all-docs table table-striped table-condensed">
     <tbody></tbody>
