@@ -71,7 +71,7 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents
           authPromise.then(function () {
             routeObject.routeCallback(route, args);
             routeObject.renderWith(route, masterLayout, args);
-          }, function () { 
+          }, function () {
             FauxtonAPI.auth.authDeniedCb();
          });
 

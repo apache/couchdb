@@ -32,7 +32,7 @@ function(app, FauxtonAPI, Databases, Views) {
 
     routes: {
       "": "allDatabases",
-      "index.html": "allDatabases", 
+      "index.html": "allDatabases",
       "_all_dbs(:params)": "allDatabases"
     },
 
@@ -45,7 +45,7 @@ function(app, FauxtonAPI, Databases, Views) {
       this.deferred = FauxtonAPI.Deferred();
 
       this.sidebarView = this.setView("#sidebar-content", new Views.Sidebar({
-          collection: this.databases
+        collection: this.databases
       }));
     },
 
@@ -54,7 +54,7 @@ function(app, FauxtonAPI, Databases, Views) {
           dbPage = params.page;
 
       this.databasesView = this.setView("#dashboard-content", new Views.List({
-          collection: this.databases
+        collection: this.databases
       }));
 
       this.databasesView.setPage(dbPage);
@@ -75,7 +75,7 @@ function(app, FauxtonAPI, Databases, Views) {
       return [deferred];
     }
   });
-  
+
   Databases.RouteObjects = [AllDbsRouteObject];
 
   return Databases;
