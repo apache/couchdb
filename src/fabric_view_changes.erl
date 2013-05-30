@@ -177,7 +177,7 @@ handle_message({rexi_EXIT, Reason}, Worker, State) ->
 handle_message(_, _, #collector{limit=0} = State) ->
     {stop, State};
 
-handle_message(#change{key=Seq} = Row0, {Worker, From}, St) ->
+handle_message(#change{key=Key} = Row0, {Worker, From}, St) ->
     #collector{
         query_args = #changes_args{include_docs=IncludeDocs},
         callback = Callback,
@@ -191,7 +191,7 @@ handle_message(#change{key=Seq} = Row0, {Worker, From}, St) ->
         gen_server:reply(From, stop),
         {ok, St};
     _ ->
-        S1 = fabric_dict:store(Worker, Seq, S0),
+        S1 = fabric_dict:store(Worker, Key, S0),
         S2 = fabric_view:remove_overlapping_shards(Worker, S1),
         % this check should not be necessary at all, as holes in the ranges
         % created from DOWN messages would have led to errors
@@ -225,7 +225,7 @@ handle_message({no_pass, Seq}, {Worker, From}, St) ->
         {ok, St#collector{counters=S2}}
     end;
 
-handle_message({complete, EndSeq}, Worker, State) ->
+handle_message({complete, Key}, Worker, State) ->
     #collector{
         callback = Callback,
         counters = S0,
@@ -236,7 +236,7 @@ handle_message({complete, EndSeq}, Worker, State) ->
     undefined ->
         {ok, State};
     _ ->
-        S1 = fabric_dict:store(Worker, EndSeq, S0),
+        S1 = fabric_dict:store(Worker, Key, S0),
         % unlikely to have overlaps here, but possible w/ filters
         S2 = fabric_view:remove_overlapping_shards(Worker, S1),
         NewState = State#collector{counters=S2, total_rows=Completed+1},
@@ -291,9 +291,12 @@ collect_update_seqs(Seq, Shard, Counters) when is_integer(Seq) ->
 
 pack_seqs(Workers) ->
     SeqList = [{N,R,S} || {#shard{node=N, range=R}, S} <- Workers],
-    SeqSum = lists:sum(element(2, lists:unzip(Workers))),
+    SeqSum = lists:sum([seq(S) || {_,_,S} <- SeqList]),
     Opaque = couch_util:encodeBase64Url(term_to_binary(SeqList, [compressed])),
     [SeqSum, Opaque].
+
+seq({Seq, _Uuid, _Node}) -> Seq;
+seq(Seq)                 -> Seq.
 
 unpack_seqs(0, DbName) ->
     fabric_dict:init(mem3:shards(DbName), 0);
