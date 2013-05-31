@@ -219,13 +219,35 @@ handle_config_req(Req) ->
 
 % PUT /_config/Section/Key
 % "value"
-handle_approved_config_req(#httpd{method='PUT', path_parts=[_, Section, Key]}=Req, Persist) ->
-    Value = case Section of
-    <<"admins">> ->
-        couch_passwords:hash_admin_password(couch_httpd:json_body(Req));
-    _ ->
-        couch_httpd:json_body(Req)
+handle_approved_config_req(Req, Persist) ->
+    Query = couch_httpd:qs(Req),
+    UseRawValue = case lists:keyfind("raw", 1, Query) of
+    false            -> false; % Not specified
+    {"raw", ""}      -> false; % Specified with no value, i.e. "?raw" and "?raw="
+    {"raw", "false"} -> false;
+    {"raw", "true"}  -> true;
+    {"raw", InvalidValue} -> InvalidValue
     end,
+    handle_approved_config_req(Req, Persist, UseRawValue).
+
+handle_approved_config_req(#httpd{method='PUT', path_parts=[_, Section, Key]}=Req,
+                           Persist, UseRawValue)
+        when UseRawValue =:= false orelse UseRawValue =:= true ->
+    RawValue = couch_httpd:json_body(Req),
+    Value = case UseRawValue of
+    true ->
+        % Client requests no change to the provided value.
+        RawValue;
+    false ->
+        % Pre-process the value as necessary.
+        case Section of
+        <<"admins">> ->
+            couch_passwords:hash_admin_password(RawValue);
+        _ ->
+            RawValue
+        end
+    end,
+
     OldValue = couch_config:get(Section, Key, ""),
     case couch_config:set(Section, Key, ?b2l(Value), Persist) of
     ok ->
@@ -233,8 +255,14 @@ handle_approved_config_req(#httpd{method='PUT', path_parts=[_, Section, Key]}=Re
     Error ->
         throw(Error)
     end;
+
+handle_approved_config_req(#httpd{method='PUT'}=Req, _Persist, UseRawValue) ->
+    Err = io_lib:format("Bad value for 'raw' option: ~s", [UseRawValue]),
+    send_json(Req, 400, {[{error, ?l2b(Err)}]});
+
 % DELETE /_config/Section/Key
-handle_approved_config_req(#httpd{method='DELETE',path_parts=[_,Section,Key]}=Req, Persist) ->
+handle_approved_config_req(#httpd{method='DELETE',path_parts=[_,Section,Key]}=Req,
+                           Persist, _UseRawValue) ->
     case couch_config:get(Section, Key, null) of
     null ->
         throw({not_found, unknown_config_value});

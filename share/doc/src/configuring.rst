@@ -240,6 +240,32 @@ supports querying, deleting or creating new admin accounts:
             "architect": "-pbkdf2-43ecbd256a70a3a2f7de40d2374b6c3002918834,921a12f74df0c1052b3e562a23cd227f,10000"
         }
 
+If you already have a salted, encrypted password string (for example,
+from an old ``local.ini`` file, or from a different CouchDB server), then
+you can store the "raw" encrypted string, without having CouchDB doubly
+encrypt it.
+
+.. code-block:: bash
+
+    shell> PUT /_config/admins/architect?raw=true HTTP/1.1
+        Accept: application/json
+        Content-Type: application/json
+        Content-Length: 89
+        Host: localhost:5984
+
+        "-pbkdf2-43ecbd256a70a3a2f7de40d2374b6c3002918834,921a12f74df0c1052b3e562a23cd227f,10000"
+
+    HTTP/1.1 200 OK
+        Cache-Control: must-revalidate
+        Content-Length: 89
+        Content-Type: application/json
+        Date: Fri, 30 Nov 2012 11:39:18 GMT
+        Server: CouchDB/1.3.0 (Erlang OTP/R15B02)
+
+.. code-block:: json
+
+        "-pbkdf2-43ecbd256a70a3a2f7de40d2374b6c3002918834,921a12f74df0c1052b3e562a23cd227f,10000"
+
 Further details are available in ``security_``, including configuring the
 work factor for ``PBKDF2``, and the algorithm itself at
 `PBKDF2 (RFC-2898) <http://tools.ietf.org/html/rfc2898>`_.

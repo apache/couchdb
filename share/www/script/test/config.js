@@ -72,6 +72,54 @@ couchTests.config = function(debug) {
   config = JSON.parse(xhr.responseText);
   T(config == "bar");
 
+  // Server-side password hashing, and raw updates disabling that.
+  var password_plain = 's3cret';
+  var password_hashed = null;
+
+  xhr = CouchDB.request("PUT", "/_config/admins/administrator",{
+    body : JSON.stringify(password_plain),
+    headers: {"X-Couch-Persist": "false"}
+  });
+  TEquals(200, xhr.status, "Create an admin in the config");
+
+  T(CouchDB.login("administrator", password_plain).ok);
+
+  xhr = CouchDB.request("GET", "/_config/admins/administrator");
+  password_hashed = JSON.parse(xhr.responseText);
+  T(password_hashed.match(/^-pbkdf2-/) || password_hashed.match(/^-hashed-/),
+    "Admin password is hashed");
+
+  xhr = CouchDB.request("PUT", "/_config/admins/administrator?raw=nothanks",{
+    body : JSON.stringify(password_hashed),
+    headers: {"X-Couch-Persist": "false"}
+  });
+  TEquals(400, xhr.status, "CouchDB rejects an invalid 'raw' option");
+
+  xhr = CouchDB.request("PUT", "/_config/admins/administrator?raw=true",{
+    body : JSON.stringify(password_hashed),
+    headers: {"X-Couch-Persist": "false"}
+  });
+  TEquals(200, xhr.status, "Set an raw, pre-hashed admin password");
+
+  xhr = CouchDB.request("PUT", "/_config/admins/administrator?raw=false",{
+    body : JSON.stringify(password_hashed),
+    headers: {"X-Couch-Persist": "false"}
+  });
+  TEquals(200, xhr.status, "Set an admin password with raw=false");
+
+  // The password is literally the string "-pbkdf2-abcd...".
+  T(CouchDB.login("administrator", password_hashed).ok);
+
+  xhr = CouchDB.request("GET", "/_config/admins/administrator");
+  T(password_hashed != JSON.parse(xhr.responseText),
+    "Hashed password was not stored as a raw string");
+
+  xhr = CouchDB.request("DELETE", "/_config/admins/administrator",{
+    headers: {"X-Couch-Persist": "false"}
+  });
+  TEquals(200, xhr.status, "Delete an admin from the config");
+  T(CouchDB.logout().ok);
+
   // Non-term whitelist values allow further modification of the whitelist.
   xhr = CouchDB.request("PUT", "/_config/httpd/config_whitelist",{
     body : JSON.stringify("!This is an invalid Erlang term!"),
