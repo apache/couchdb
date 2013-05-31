@@ -34,6 +34,7 @@
     max_dbs_open=?MAX_DBS_OPEN,
     dbs_open=0,
     start_time="",
+    update_lru_on_read=true,
     lru = couch_lru:new()
     }).
 
@@ -213,6 +214,10 @@ terminate(_Reason, _Srv) ->
 handle_config_change("couchdb", "database_dir", _, _, _) ->
     exit(whereis(couch_server), config_change),
     remove_handler;
+handle_config_change("couchdb", "update_lru_on_read", "true", _, _) ->
+    {ok, gen_server:call(couch_server,{set_update_lru_on_read,true})};
+handle_config_change("couchdb", "update_lru_on_read", _, _, _) ->
+    {ok, gen_server:call(couch_server,{set_update_lru_on_read,false})};
 handle_config_change("couchdb", "max_dbs_open", Max, _, _) when is_list(Max) ->
     {ok, gen_server:call(couch_server,{set_max_dbs_open,list_to_integer(Max)})};
 handle_config_change("couchdb", "max_dbs_open", _, _, _) ->
@@ -324,6 +329,8 @@ handle_call(close_lru, _From, #server{lru=Lru} = Server) ->
     end;
 handle_call(open_dbs_count, _From, Server) ->
     {reply, Server#server.dbs_open, Server};
+handle_call({set_update_lru_on_read, UpdateOnRead}, _From, Server) ->
+    {reply, ok, Server#server{update_lru_on_read=UpdateOnRead}};
 handle_call({set_max_dbs_open, Max}, _From, Server) ->
     {reply, ok, Server#server{max_dbs_open=Max}};
 handle_call(get_server, _From, Server) ->
@@ -481,8 +488,10 @@ handle_call({db_updated, #db{name = DbName} = Db}, _From, Server) ->
     end,
     {reply, ok, Server#server{lru = Lru}}.
 
-handle_cast({update_lru, DbName}, #server{lru = Lru} = Server) ->
+handle_cast({update_lru, DbName}, #server{lru = Lru, update_lru_on_read=true} = Server) ->
     {noreply, Server#server{lru = couch_lru:update(DbName, Lru)}};
+handle_cast({update_lru, _DbName}, Server) ->
+    {noreply, Server};
 handle_cast(Msg, Server) ->
     {stop, {unknown_cast_message, Msg}, Server}.
 
@@ -494,8 +503,7 @@ handle_info({'EXIT', _Pid, config_change}, Server) ->
 handle_info({'EXIT', Pid, Reason}, Server) ->
     case ets:lookup(couch_dbs_pid_to_name, Pid) of
     [DbName] ->
-        [#db{compactor_pid=Froms}=Db] =
-            ets:match_object(couch_dbs, #db{name=DbName, _='_'}),
+        [#db{compactor_pid=Froms}=Db] = ets:lookup(couch_dbs, DbName),
         if Reason /= snappy_nif_not_loaded -> ok; true ->
             Msg = io_lib:format("To open the database `~s`, Apache CouchDB "
                 "must be built with Erlang OTP R13B04 or higher.", [DbName]),
