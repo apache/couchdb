@@ -31,6 +31,7 @@ Contents
     api-basics
     configuring
     replication
+    replicator
     ddocs
     query-servers
     changes

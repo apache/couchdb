@@ -65,6 +65,7 @@ html_files = \
     html/_sources/json-structure.txt \
     html/_sources/query-servers.txt \
     html/_sources/replication.txt \
+    html/_sources/replicator.txt \
     html/_static/ajax-loader.gif \
     html/_static/basic.css \
     html/_static/comment-bright.png \
@@ -107,6 +108,7 @@ html_files = \
     html/json-structure.html \
     html/query-servers.html \
     html/replication.html \
+    html/replicator.html \
     html/objects.inv \
     html/genindex.html \
     html/search.html \
@@ -149,6 +151,7 @@ src_files = \
     ../src/json-structure.rst \
     ../src/query-servers.rst \
     ../src/replication.rst \
+    ../src/replicator.rst \
     ../src/conf.py
 
 src_files_html = \

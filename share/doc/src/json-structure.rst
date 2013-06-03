@@ -238,6 +238,8 @@ List of Active Tasks
 |     type                       | Operation Type                              |
 +--------------------------------+---------------------------------------------+
 
+.. _replication-settings:
+
 Replication Settings
 ====================
 
@@ -259,6 +261,18 @@ Replication Settings
 | proxy (optional)               | Address of a proxy server through which     |
 |                                | replication should occur                    |
 +--------------------------------+---------------------------------------------+
+| since_seq (optional)           | Sequence from which the replication should  |
+|                                | start                                       |
++--------------------------------+---------------------------------------------+
+| filter (optional)              | name of the filter function in the form of  |
+|                                | ddoc/myfilter                               |
++--------------------------------+---------------------------------------------+
+| query_params (optional)        | query parameter that are passed to the      |
+|                                | filter function; value should be a document |
+|                                | containing parameters as members            |
++--------------------------------+---------------------------------------------+
+
+.. _replication-status:
 
 Replication Status
 ==================

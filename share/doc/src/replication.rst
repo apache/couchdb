@@ -12,372 +12,84 @@
 
 .. _replication:
 
-Replicator Database
-===================
+Replication
+===========
 
-A database where you ``PUT``/``POST`` documents to trigger replications
-and you ``DELETE`` to cancel ongoing replications. These documents have
-exactly the same content as the JSON objects we used to ``POST`` to
-``_replicate`` (fields ``source``, ``target``, ``create_target``,
-``continuous``, ``doc_ids``, ``filter``, ``query_params``.
+One of CouchDB's strengths is the ability to synchronize two copies of the same
+database. This enables users to distribute data across several nodes or
+datacenters, but also to move data more closely to clients.
 
-Replication documents can have a user defined ``_id``. Design documents
-(and ``_local`` documents) added to the replicator database are ignored.
+Replication involves a source and a destination database, which can be one the
+same or on different CouchDB instances. The aim of the replication is that at
+the end of the process, all active documents on the source database are also in
+the destination database and all documents that were deleted in the source
+databases are also deleted on the destination database (if they even existed).
 
-The default name of this database is ``_replicator``. The name can be
-changed in the ``local.ini`` configuration, section ``[replicator]``,
-parameter ``db``.
 
-Basics
-------
-
-Let's say you PUT the following document into ``_replicator``:
-
-.. code-block:: javascript
-
-    {
-        "_id": "my_rep",
-        "source":  "http://myserver.com:5984/foo",
-        "target":  "bar",
-        "create_target":  true
-    }
-
-In the couch log you'll see 2 entries like these:
-
-.. code-block:: text
-
-    [Thu, 17 Feb 2011 19:43:59 GMT] [info] [<0.291.0>] Document `my_rep` triggered replication `c0ebe9256695ff083347cbf95f93e280+create_target`
-    [Thu, 17 Feb 2011 19:44:37 GMT] [info] [<0.124.0>] Replication `c0ebe9256695ff083347cbf95f93e280+create_target` finished (triggered by document `my_rep`)
-
-As soon as the replication is triggered, the document will be updated by
-CouchDB with 3 new fields:
-
-.. code-block:: javascript
-
-    {
-        "_id": "my_rep",
-        "source":  "http://myserver.com:5984/foo",
-        "target":  "bar",
-        "create_target":  true,
-        "_replication_id":  "c0ebe9256695ff083347cbf95f93e280",
-        "_replication_state":  "triggered",
-        "_replication_state_time":  1297974122
-    }
-
-Special fields set by the replicator start with the prefix
-``_replication_``.
-
--  ``_replication_id``
-
-   The ID internally assigned to the replication. This is also the ID
-   exposed by ``/_active_tasks``.
-
--  ``_replication_state``
-
-   The current state of the replication.
-
--  ``_replication_state_time``
-
-   A Unix timestamp (number of seconds since 1 Jan 1970) that tells us
-   when the current replication state (marked in ``_replication_state``)
-   was set.
-
-When the replication finishes, it will update the ``_replication_state``
-field (and ``_replication_state_time``) with the value ``completed``, so
-the document will look like:
-
-.. code-block:: javascript
-
-    {
-        "_id": "my_rep",
-        "source":  "http://myserver.com:5984/foo",
-        "target":  "bar",
-        "create_target":  true,
-        "_replication_id":  "c0ebe9256695ff083347cbf95f93e280",
-        "_replication_state":  "completed",
-        "_replication_state_time":  1297974122
-    }
-
-When an error happens during replication, the ``_replication_state``
-field is set to ``error`` (and ``_replication_state`` gets updated of
-course).
-
-When you PUT/POST a document to the ``_replicator`` database, CouchDB
-will attempt to start the replication up to 10 times (configurable under
-``[replicator]``, parameter ``max_replication_retry_count``). If it
-fails on the first attempt, it waits 5 seconds before doing a second
-attempt. If the second attempt fails, it waits 10 seconds before doing a
-third attempt. If the third attempt fails, it waits 20 seconds before
-doing a fourth attempt (each attempt doubles the previous wait period).
-When an attempt fails, the Couch log will show you something like:
-
-.. code-block:: text
-
-    [error] [<0.149.0>] Error starting replication `67c1bb92010e7abe35d7d629635f18b6+create_target` (document `my_rep_2`): {db_not_found,<<"could not open http://myserver:5986/foo/">>
-
-.. note::
-   The ``_replication_state`` field is only set to ``error`` when all
-   the attempts were unsuccessful.
-
-There are only 3 possible values for the ``_replication_state`` field:
-``triggered``, ``completed`` and ``error``. Continuous replications
-never get their state set to ``completed``.
-
-Documents describing the same replication
------------------------------------------
-
-Lets suppose 2 documents are added to the ``_replicator`` database in
-the following order:
-
-.. code-block:: javascript
-
-    {
-        "_id": "doc_A",
-        "source":  "http://myserver.com:5984/foo",
-        "target":  "bar"
-    }
-
-and
-
-.. code-block:: javascript
-
-    {
-        "_id": "doc_B",
-        "source":  "http://myserver.com:5984/foo",
-        "target":  "bar"
-    }
-
-Both describe exactly the same replication (only their ``_ids`` differ).
-In this case document ``doc_A`` triggers the replication, getting
-updated by CouchDB with the fields ``_replication_state``,
-``_replication_state_time`` and ``_replication_id``, just like it was
-described before. Document ``doc_B`` however, is only updated with one
-field, the ``_replication_id`` so it will look like this:
-
-.. code-block:: javascript
-
-    {
-        "_id": "doc_B",
-        "source":  "http://myserver.com:5984/foo",
-        "target":  "bar",
-        "_replication_id":  "c0ebe9256695ff083347cbf95f93e280"
-    }
-
-While document ``doc_A`` will look like this:
-
-.. code-block:: javascript
-
-    {
-        "_id": "doc_A",
-        "source":  "http://myserver.com:5984/foo",
-        "target":  "bar",
-        "_replication_id":  "c0ebe9256695ff083347cbf95f93e280",
-        "_replication_state":  "triggered",
-        "_replication_state_time":  1297974122
-    }
-
-Note that both document get exactly the same value for the
-``_replication_id`` field. This way you can identify which documents
-refer to the same replication - you can for example define a view which
-maps replication IDs to document IDs.
-
-Canceling replications
+Triggering Replication
 ----------------------
 
-To cancel a replication simply ``DELETE`` the document which triggered
-the replication. The Couch log will show you an entry like the
-following:
+Replication is controlled through documents in the :ref:`replicator`, where
+each document describes one replication process (see
+:ref:`replication-settings`).
 
-.. code-block:: text
+A replication is triggered by storing a replication document in the replicator
+database. Its status can be inspected through the active tasks API (see
+:ref:`active-tasks` and :ref:`replication-status`). A replication can be
+stopped by deleting the document, or by updating it with its `cancel` property
+set to `true`.
 
-    [Thu, 17 Feb 2011 20:16:29 GMT] [info] [<0.125.0>] Stopped replication `c0ebe9256695ff083347cbf95f93e280+continuous+create_target` because replication document `doc_A` was deleted
 
-.. note::
-   You need to ``DELETE`` the document that triggered the replication.
-   ``DELETE``-ing another document that describes the same replication
-   but did not trigger it, will not cancel the replication.
+Replication Procedure
+---------------------
 
-Server restart
---------------
+During replication, CouchDB will compare the source and the destination
+database to determine which documents differ between the source and the
+destination database. It does so by following the :ref:`changes` on the source
+and comparing the documents to the destination. Changes are submitted to the
+destination in batches where they can introduce conflicts. Documents that
+already exist on the destination in the same revision are not transferred. As
+the deletion of documents is represented by a new revision, a document deleted
+on the source will also be deleted on the target.
 
-When CouchDB is restarted, it checks its ``_replicator`` database and
-restarts any replication that is described by a document that either has
-its ``_replication_state`` field set to ``triggered`` or it doesn't have
-yet the ``_replication_state`` field set.
+A replication task will finish once it reaches the end of the changes feed. If
+its `continuous` property is set to true, it will wait for new changes to
+appear until the task is cancelled. Replication tasks also create checkpoint
+documents on the destination to ensure that a restarted task can continue from
+where it stopped, for example after it has crashed.
 
-.. note::
-   Continuous replications always have a ``_replication_state`` field
-   with the value ``triggered``, therefore they're always restarted
-   when CouchDB is restarted.
+When a replication task is initiated on the sending node, it is called *push*
+replication, if it is initiated by the receiving node, it is called *pull*
+replication.
 
-Changing the Replicator Database
---------------------------------
 
-Imagine your replicator database (default name is ``_replicator``) has the
-two following documents that represent pull replications from servers A
-and B:
+Master - Master replication
+---------------------------
 
-.. code-block:: javascript
+One replication task will only transfer changes in one direction. To achieve
+master-master replication it is possible to set up two replication tasks in
+different directions. When a change is replication from database A to B by the
+first task, the second will discover that the new change on B already exists in
+A and will wait for further changes.
 
-    {
-        "_id": "rep_from_A",
-        "source":  "http://aserver.com:5984/foo",
-        "target":  "foo_a",
-        "continuous":  true,
-        "_replication_id":  "c0ebe9256695ff083347cbf95f93e280",
-        "_replication_state":  "triggered",
-        "_replication_state_time":  1297971311
-    }
 
-.. code-block:: javascript
+Controlling which Documents to Replicate
+----------------------------------------
 
-    {
-        "_id": "rep_from_B",
-        "source":  "http://bserver.com:5984/foo",
-        "target":  "foo_b",
-        "continuous":  true,
-        "_replication_id":  "231bb3cf9d48314eaa8d48a9170570d1",
-        "_replication_state":  "triggered",
-        "_replication_state_time":  1297974122
-    }
+There are two ways for controlling which documents are replicated, and which
+are skipped. *Local* documents are never replicated (see :ref:`api-local`).
 
-Now without stopping and restarting CouchDB, you change the name of the
-replicator database to ``another_replicator_db``:
+Additionally, :ref:`filterfun` can be used in a replication documents (see
+:ref:`replication-settings`). The replication task will then evaluate
+the filter function for each document in the changes feed. The document will
+only be replicated if the filter returns `true`.
 
-.. code-block:: bash
 
-    $ curl -X PUT http://localhost:5984/_config/replicator/db -d '"another_replicator_db"'
-    "_replicator"
+Migrating Data to Clients
+-------------------------
 
-As soon as this is done, both pull replications defined before, are
-stopped. This is explicitly mentioned in CouchDB's log:
-
-.. code-block:: text
-
-    [Fri, 11 Mar 2011 07:44:20 GMT] [info] [<0.104.0>] Stopping all ongoing replications because the replicator database was deleted or changed
-    [Fri, 11 Mar 2011 07:44:20 GMT] [info] [<0.127.0>] 127.0.0.1 - - PUT /_config/replicator/db 200
-
-Imagine now you add a replication document to the new replicator
-database named ``another_replicator_db``:
-
-.. code-block:: javascript
-
-    {
-        "_id": "rep_from_X",
-        "source":  "http://xserver.com:5984/foo",
-        "target":  "foo_x",
-        "continuous":  true
-    }
-
-From now own you have a single replication going on in your system: a
-pull replication pulling from server X. Now you change back the
-replicator database to the original one ``_replicator``:
-
-::
-
-    $ curl -X PUT http://localhost:5984/_config/replicator/db -d '"_replicator"'
-    "another_replicator_db"
-
-Immediately after this operation, the replication pulling from server X
-will be stopped and the replications defined in the ``_replicator``
-database (pulling from servers A and B) will be resumed.
-
-Changing again the replicator database to ``another_replicator_db`` will
-stop the pull replications pulling from servers A and B, and resume the
-pull replication pulling from server X.
-
-Replicating the replicator database
------------------------------------
-
-Imagine you have in server C a replicator database with the two
-following pull replication documents in it:
-
-.. code-block:: javascript
-
-    {
-         "_id": "rep_from_A",
-         "source":  "http://aserver.com:5984/foo",
-         "target":  "foo_a",
-         "continuous":  true,
-         "_replication_id":  "c0ebe9256695ff083347cbf95f93e280",
-         "_replication_state":  "triggered",
-         "_replication_state_time":  1297971311
-    }
-
-.. code-block:: javascript
-
-    {
-         "_id": "rep_from_B",
-         "source":  "http://bserver.com:5984/foo",
-         "target":  "foo_b",
-         "continuous":  true,
-         "_replication_id":  "231bb3cf9d48314eaa8d48a9170570d1",
-         "_replication_state":  "triggered",
-         "_replication_state_time":  1297974122
-    }
-
-Now you would like to have the same pull replications going on in server
-D, that is, you would like to have server D pull replicating from
-servers A and B. You have two options:
-
--  Explicitly add two documents to server's D replicator database
-
--  Replicate server's C replicator database into server's D replicator
-   database
-
-Both alternatives accomplish exactly the same goal.
-
-Delegations
------------
-
-Replication documents can have a custom ``user_ctx`` property. This
-property defines the user context under which a replication runs. For
-the old way of triggering replications (POSTing to ``/_replicate/``),
-this property was not needed (it didn't exist in fact) - this is because
-at the moment of triggering the replication it has information about the
-authenticated user. With the replicator database, since it's a regular
-database, the information about the authenticated user is only present
-at the moment the replication document is written to the database - the
-replicator database implementation is like a ``_changes`` feed consumer
-(with ``?include_docs=true``) that reacts to what was written to the
-replicator database - in fact this feature could be implemented with an
-external script/program. This implementation detail implies that for non
-admin users, a ``user_ctx`` property, containing the user's name and a
-subset of his/her roles, must be defined in the replication document.
-This is ensured by the document update validation function present in
-the default design document of the replicator database. This validation
-function also ensure that a non admin user can set a user name property
-in the ``user_ctx`` property that doesn't match his/her own name (same
-principle applies for the roles).
-
-For admins, the ``user_ctx`` property is optional, and if it's missing
-it defaults to a user context with name null and an empty list of roles
-- this mean design documents will not be written to local targets. If
-writing design documents to local targets is desired, the a user context
-with the roles ``_admin`` must be set explicitly.
-
-Also, for admins the ``user_ctx`` property can be used to trigger a
-replication on behalf of another user. This is the user context that
-will be passed to local target database document validation functions.
-
-.. note::
-   The ``user_ctx`` property only has effect for local endpoints.
-
-Example delegated replication document:
-
-.. code-block:: javascript
-
-    {
-         "_id": "my_rep",
-         "source":  "http://bserver.com:5984/foo",
-         "target":  "bar",
-         "continuous":  true,
-         "user_ctx": {
-              "name": "joe",
-              "roles": ["erlanger", "researcher"]
-         }
-    }
-
-As stated before, for admins the ``user_ctx`` property is optional, while
-for regular (non admin) users it's mandatory. When the roles property of
-``user_ctx`` is missing, it defaults to the empty list ``[ ]``.
+Replication can be especially useful for bringing data closer to clients.
+`PouchDB <http://pouchdb.com/>`_ implements the replication algorithm of CouchDB
+in JavaScript, making it possible to make data from a CouchDB database
+available in an offline browser application, and synchronize changes back to
+CouchDB.
