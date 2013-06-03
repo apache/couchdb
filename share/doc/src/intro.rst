@@ -81,7 +81,7 @@ The main sections are:
    Displays a list of the running background tasks on the server.
    Background tasks include view index building, compaction and
    replication. The Status page is an interface to the
-   :ref:`Active Tasks <active-tasks>` API call.
+   :ref:`Active Tasks <api/misc/active_tasks>` API call.
 
 -  Verify Installation
 
@@ -201,7 +201,7 @@ Once replication has been completed, the page will show the information
 returned when the replication process completes by the API.
 
 The Replicator tool is an interface to the underlying replication API.
-For more information, see :ref:`replicate`. For more information on
+For more information, see :ref:`api/misc/replicate`. For more information on
 replication, see :ref:`replication`.
 
 .. _using-curl:

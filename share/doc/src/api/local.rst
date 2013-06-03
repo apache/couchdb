@@ -10,7 +10,7 @@
 .. License for the specific language governing permissions and limitations under
 .. the License.
 
-.. _api-local:
+.. _api/local:
 
 ========================================
 Local (non-replicating) Document Methods
@@ -49,6 +49,9 @@ A list of the available methods and URL paths are provided below:
 +--------+-------------------------+-------------------------------------------+
 | COPY   | /db/_local/local-doc    | Copies the non-replicated document        |
 +--------+-------------------------+-------------------------------------------+
+
+.. _api/local/doc:
+.. _api/local/doc.get:
 
 ``GET /db/_local/local-doc``
 ============================
@@ -93,7 +96,7 @@ A list of the available methods and URL paths are provided below:
 
 Gets the specified local document. The semantics are identical to
 accessing a standard document in the specified database, except that the
-document is not replicated. See :ref:`api-get-doc`.
+document is not replicated. See :ref:`api/doc.get`.
 
 ``PUT /db/_local/local-doc``
 ============================
@@ -109,7 +112,7 @@ document is not replicated. See :ref:`api-get-doc`.
 
 Stores the specified local document. The semantics are identical to
 storing a standard document in the specified database, except that the
-document is not replicated. See :ref:`api-put-doc`.
+document is not replicated. See :ref:`api/doc.put`.
 
 ``DELETE /db/_local/local-doc``
 ===============================
@@ -140,7 +143,7 @@ document is not replicated. See :ref:`api-put-doc`.
 
 Deletes the specified local document. The semantics are identical to
 deleting a standard document in the specified database, except that the
-document is not replicated. See :ref:`api-del-doc`.
+document is not replicated. See :ref:`api/doc.delete`.
 
 ``COPY /db/_local/local-doc``
 =============================
@@ -166,4 +169,4 @@ document is not replicated. See :ref:`api-del-doc`.
 
 Copies the specified local document. The semantics are identical to
 copying a standard document in the specified database, except that the
-document is not replicated. See :ref:`api-copy-doc`.
+document is not replicated. See :ref:`api/doc.copy`.

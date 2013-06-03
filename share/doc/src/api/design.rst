@@ -10,7 +10,7 @@
 .. License for the specific language governing permissions and limitations under
 .. the License.
 
-.. _api-design:
+.. _api/ddoc:
 
 =======================
 Design Document Methods
@@ -31,6 +31,8 @@ output from your database.
 A list of the available methods and URL paths are provided below:
 
 Design Document API Calls
+
+.. _api/ddoc.get:
 
 ``GET /db/_design/design-doc``
 ==============================
@@ -93,7 +95,9 @@ The returned string will be the JSON of the design document:
 A list of the revisions can be obtained by using the ``revs`` query
 argument, or an extended list of revisions using the ``revs_info`` query
 argument. This operates in the same way as for other documents. Fur
-further examples, see :ref:`api-get-doc`.
+further examples, see :ref:`api/doc.get`.
+
+.. _api/ddoc.put:
 
 ``PUT /db/_design/design-doc``
 ==============================
@@ -116,7 +120,9 @@ document, as summarised in the following table.
     * **map**:  Map Function for View
     * **reduce (optional)**:  Reduce Function for View
 
-For more information on writing views, see :ref:`views`.
+For more information on writing views, see :ref:`api/ddoc/view`.
+
+.. _api/ddoc.delete:
 
 ``DELETE /db/_design/design-doc``
 =================================
@@ -168,6 +174,8 @@ The response contains the delete document ID and revision:
        "ok" : true,
        "rev" : "3-7a05370bff53186cb5d403f861aca154",
     }
+
+.. _api/ddoc.copy:
 
 ``COPY /db/_design/design-doc``
 ===============================
@@ -263,6 +271,9 @@ The return value will be the new revision of the copied document:
        "rev" : "2-55b6a1b251902a2c249b667dab1c6692",
     }
 
+.. _api/ddoc/attachment:
+.. _api/ddoc/attachment.get:
+
 ``GET /db/_design/design-doc/attachment``
 =========================================
 
@@ -276,6 +287,8 @@ document ``/_design_/design-doc``. The raw data of the associated
 attachment is returned (just as if you were accessing a static file. The
 returned HTTP ``Content-type`` will be the same as the content type set
 when the document attachment was submitted into the database.
+
+.. _api/ddoc/attachment.put:
 
 ``PUT /db/_design/design-doc/attachment``
 =========================================
@@ -313,7 +326,7 @@ Upload the supplied content as an attachment to the specified design
 document (``/_design/design-doc``). The ``attachment`` name provided
 must be a URL encoded string. You must also supply either the ``rev``
 query argument or the ``If-Match`` HTTP header for validation, and the
-HTTP headers (to set the attacment content type). The content type is
+HTTP headers (to set the attachment content type). The content type is
 used when the attachment is requested as the corresponding content-type
 in the returned document header.
 
@@ -356,6 +369,8 @@ The returned JSON contains the new document information:
 .. note::
    Uploading an attachment updates the corresponding document revision.
    Revisions are tracked for the parent document, not individual attachments.
+
+.. _api/ddoc/attachment.delete:
 
 ``DELETE /db/_design/design-doc/attachment``
 ============================================
@@ -407,6 +422,9 @@ parent document:
        "ok" : true,
        "rev" : "10-f3b15bb408961f8dcc3d86c7d3b54c4c",
     }
+
+.. _api/ddoc/info:
+.. _api/ddoc/info.get:
 
 ``GET /db/_design/design-doc/_info``
 ====================================
@@ -465,9 +483,8 @@ The individual fields in the returned JSON structure are detailed below:
   * **waiting_commit**:  Indicates if there are outstanding commits to the
     underlying database that need to processed
 
-.. _api-get-view:
-
-.. _views:
+.. _api/ddoc/view:
+.. _api/ddoc/view.get:
 
 ``GET /db/_design/design-doc/_view/view-name``
 ==============================================
@@ -639,7 +656,7 @@ completely eliminate, these issues. These include:
 
 -  Use the ``/db/_changes`` method to monitor for changes to the
    database and then access the view to force the corresponding view
-   index to be updated. See :ref:`api-changes` for more information.
+   index to be updated. See :ref:`api/db/changes` for more information.
 
 -  Use a monitor with the ``update_notification`` section of the CouchDB
    configuration file to monitor for changes to your database, and
@@ -683,7 +700,7 @@ In addition to using stale views, you can also make use of the
 view information including the update sequence of the database from
 which the view was generated. The returned value can be compared this to
 the current update sequence exposed in the database information
-(returned by :ref:`api-get-db`).
+(returned by :ref:`api/db.get`).
 
 Sorting Returned Rows
 ---------------------
@@ -886,6 +903,8 @@ View Reduction and Grouping
 
 TBC
 
+.. _api/ddoc/view.post:
+
 ``POST /db/_design/design-doc/_view/view-name``
 ===============================================
 
@@ -1005,7 +1024,7 @@ Executes the specified ``view-name`` from the specified ``design-doc``
 design document. Unlike the ``GET`` method for accessing views, the
 ``POST`` method supports the specification of explicit keys to be
 retrieved from the view results. The remainder of the ``POST`` view
-functionality is identical to the :ref:`api-get-view` API.
+functionality is identical to the :ref:`api/ddoc/view.get` API.
 
 For example, the request below will return all the recipes where the key
 for the view matches either “claret” or “clear apple cider” :
@@ -1055,7 +1074,7 @@ Multi-document Fetching
 By combining the ``POST`` method to a given view with the
 ``include_docs=true`` query argument you can obtain multiple documents
 from a database. The result is more efficient than using multiple
-:ref:`api-get-doc` requests.
+:ref:`api/doc.get` requests.
 
 For example, sending the following request for ingredients matching
 “claret” and “clear apple juice”:
@@ -1160,6 +1179,9 @@ Returns the full document for each recipe:
        "total_rows" : 26484
     }
 
+.. _api/ddoc/show:
+.. _api/ddoc/show.get:
+
 ``GET /db/_design/design-doc/_show/show-name``
 ===============================================
 
@@ -1183,6 +1205,8 @@ Returns the full document for each recipe:
     * **Optional**: yes
     * **Type**: string
 
+.. _api/ddoc/show/doc.post:
+
 ``POST /db/_design/design-doc/_show/show-name/doc``
 ===================================================
 
@@ -1192,6 +1216,9 @@ Returns the full document for each recipe:
 * **Request**:  Custom data
 * **Response**:  Returns the result of the show
 * **Admin Privileges Required**: no
+
+.. _api/ddoc/list/ddoc:
+.. _api/ddoc/list/ddoc.get:
 
 ``GET /db/_design/design-doc/_list/list-name/other-design-doc/view-name``
 =========================================================================
@@ -1203,6 +1230,8 @@ Returns the full document for each recipe:
 * **Response**:  TBC
 * **Admin Privileges Required**: no
 
+.. _api/ddoc/list/ddoc.post:
+
 ``POST /db/_design/design-doc/_list/list-name/other-design-doc/view-name``
 ==========================================================================
 
@@ -1212,6 +1241,9 @@ Returns the full document for each recipe:
 * **Request**:  TBC
 * **Response**:  TBC
 * **Admin Privileges Required**: no
+
+.. _api/ddoc/list:
+.. _api/ddoc/list.get:
 
 ``GET /db/_design/design-doc/_list/list-name/view-name``
 ========================================================
@@ -1223,6 +1255,8 @@ Returns the full document for each recipe:
 * **Response**:  TBC
 * **Admin Privileges Required**: no
 
+.. _api/ddoc/list.post:
+
 ``POST /db/_design/design-doc/_list/list-name/view-name``
 =========================================================
 
@@ -1232,6 +1266,9 @@ Returns the full document for each recipe:
 * **Request**:  TBC
 * **Response**:  TBC
 * **Admin Privileges Required**: no
+
+.. _api/ddoc/update/doc:
+.. _api/ddoc/update/doc.put:
 
 ``PUT /db/_design/design-doc/_update/updatename/doc``
 =====================================================
@@ -1243,6 +1280,9 @@ Returns the full document for each recipe:
 * **Response**:  TBC
 * **Admin Privileges Required**: no
 
+.. _api/ddoc/update:
+.. _api/ddoc/update.post:
+
 ``POST /db/_design/design-doc/_update/updatename``
 ==================================================
 
@@ -1252,6 +1292,8 @@ Returns the full document for each recipe:
 * **Request**:  TBC
 * **Response**:  TBC
 * **Admin Privileges Required**: no
+
+.. _api/ddoc/rewrite:
 
 ``ALL /db/_design/design-doc/_rewrite/rewrite-name/anything``
 =============================================================
