@@ -22,7 +22,8 @@
     get_proc_count/0,
     get_stale_proc_count/0,
     new_proc/1,
-    reload/0
+    reload/0,
+    terminate_stale_procs/0
 ]).
 
 % config_listener api
@@ -68,6 +69,9 @@ get_stale_proc_count() ->
 
 reload() ->
     gen_server:call(?MODULE, bump_threshold_ts).
+
+terminate_stale_procs() ->
+    gen_server:call(?MODULE, terminate_stale_procs).
 
 init([]) ->
     process_flag(trap_exit, true),
@@ -133,13 +137,19 @@ handle_call({ret_proc, #proc{client=Ref, lang=Lang0} = Proc}, _From, State) ->
 
 handle_call(bump_threshold_ts, _From, #state{tab = Tab} = State) ->
     FoldFun = fun(#proc_int{client = nil, pid = Pid}, _) ->
-        gen_server:cast(Pid, stop),
-        ets:delete(Tab, Pid);
+        remove_proc(Tab, Pid);
     (_, _) ->
         ok
     end,
     ets:foldl(FoldFun, nil, Tab),
     {reply, ok, State#state{threshold_ts = os:timestamp()}};
+
+handle_call(terminate_stale_procs, _From, State) ->
+    #state{tab = Tab, threshold_ts = T0} = State,
+    MatchHead = #proc_int{pid = '$1', t0 = '$2', _ = '_'},
+    MatchSpec = [{MatchHead, [{'<', '$2', T0}], ['$1']}],
+    lists:foreach(fun(P) -> remove_proc(Tab,P) end, ets:select(Tab, MatchSpec)),
+    {reply, ok, State};
 
 handle_call(_Call, _From, State) ->
     {reply, ignored, State}.
@@ -152,14 +162,7 @@ handle_cast({os_proc_idle, Pid}, #state{tab=Tab, proc_counts=Counts}=State0) ->
             case dict:find(Lang, Counts) of
                 {ok, Count} when Count > Limit ->
                     ?LOG_INFO("Closing idle OS Process: ~p", [Pid]),
-                    ets:delete(Tab, Pid),
-                    case is_process_alive(Pid) of
-                        true ->
-                            unlink(Pid),
-                            gen_server:cast(Pid, stop);
-                        _ ->
-                            ok
-                    end,
+                    remove_proc(Tab, Pid),
                     State0#state{
                         proc_counts=dict:update_counter(Lang, -1, Counts)
                     };
@@ -394,8 +397,7 @@ return_proc(#state{} = State, #proc_int{} = ProcInt) ->
         case get_waiting_client(Waiting, Lang) of
             nil ->
                 if ProcInt#proc_int.t0 < T0 ->
-                    gen_server:cast(Pid, stop),
-                    ets:delete(Tab, Pid);
+                    remove_proc(Tab, Pid);
                 true ->
                     gen_server:cast(Pid, garbage_collect),
                     ets:insert(Tab, ProcInt#proc_int{client=nil})
@@ -415,6 +417,15 @@ return_proc(#state{} = State, #proc_int{} = ProcInt) ->
             #client{}=Client ->
                 maybe_spawn_proc(State, Client)
         end
+    end.
+
+remove_proc(Tab, Pid) ->
+    ets:delete(Tab, Pid),
+    case is_process_alive(Pid) of true ->
+        unlink(Pid),
+        gen_server:cast(Pid, stop);
+    false ->
+        ok
     end.
 
 -spec export_proc(#proc_int{}) -> #proc{}.
