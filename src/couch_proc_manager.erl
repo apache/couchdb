@@ -17,7 +17,13 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, 
     code_change/3]).
 
--export([start_link/0, get_proc_count/0, new_proc/1]).
+-export([
+    start_link/0,
+    get_proc_count/0,
+    get_stale_proc_count/0,
+    new_proc/1,
+    reload/0
+]).
 
 % config_listener api
 -export([handle_config_change/5]).
@@ -28,7 +34,8 @@
     tab,
     config,
     proc_counts,
-    waiting
+    waiting,
+    threshold_ts
 }).
 
 -record(client, {
@@ -46,7 +53,8 @@
     ddoc_keys = [],
     prompt_fun,
     set_timeout_fun,
-    stop_fun
+    stop_fun,
+    t0 = os:timestamp()
 }).
 
 start_link() ->
@@ -54,6 +62,12 @@ start_link() ->
 
 get_proc_count() ->
     gen_server:call(?MODULE, get_proc_count).
+
+get_stale_proc_count() ->
+    gen_server:call(?MODULE, get_stale_proc_count).
+
+reload() ->
+    gen_server:call(?MODULE, bump_threshold_ts).
 
 init([]) ->
     process_flag(trap_exit, true),
@@ -71,6 +85,11 @@ handle_call(get_table, _From, State) ->
 
 handle_call(get_proc_count, _From, State) ->
     {reply, ets:info(State#state.tab, size), State};
+
+handle_call(get_stale_proc_count, _From, State) ->
+    #state{tab = Tab, threshold_ts = T0} = State,
+    MatchSpec = [{#proc_int{t0='$1', _='_'}, [{'<', '$1', T0}], [true]}],
+    {reply, ets:select_count(Tab, MatchSpec), State};
 
 handle_call({get_proc, #doc{body={Props}}=DDoc, DDocKey}, From, State) ->
     {ClientPid, _} = From,
@@ -111,6 +130,16 @@ handle_call({ret_proc, #proc{client=Ref, lang=Lang0} = Proc}, _From, State) ->
     % #proc_int{} from our own table, so the alternative is to do a lookup in the
     % table before the insert.  Don't know which approach is cheaper.
     {reply, true, return_proc(State, Proc#proc{lang=Lang})};
+
+handle_call(bump_threshold_ts, _From, #state{tab = Tab} = State) ->
+    FoldFun = fun(#proc_int{client = nil, pid = Pid}, _) ->
+        gen_server:cast(Pid, stop),
+        ets:delete(Tab, Pid);
+    (_, _) ->
+        ok
+    end,
+    ets:foldl(FoldFun, nil, Tab),
+    {reply, ok, State#state{threshold_ts = os:timestamp()}};
 
 handle_call(_Call, _From, State) ->
     {reply, ignored, State}.
@@ -199,11 +228,17 @@ terminate(_Reason, #state{tab=Tab}) ->
     ets:foldl(fun(#proc_int{pid=P}, _) -> couch_util:shutdown_sync(P) end, 0, Tab),
     ok.
 
-code_change(_OldVsn, #state{tab = Tab} = State, _Extra) ->
-    NewTab = ets:new(procs, [ordered_set, {keypos, #proc_int.pid}]),
-    true = ets:insert(NewTab, ets:tab2list(Tab)),
-    true = ets:delete(Tab),
-    {ok, State#state{tab = NewTab}}.
+code_change(_OldVsn, {state, Tab}, _Extra) ->
+    State = #state{tab = Tab, threshold_ts = {0,0,0}},
+    ProcInts = lists:map(
+        fun(#proc{} = P) ->
+            setelement(1, erlang:append_element(P, os:timestamp()), proc_int)
+        end,
+        ets:tab2list(Tab)
+    ),
+    ets:delete_all_objects(Tab),
+    ets:insert(Tab, ProcInts),
+    {ok, State}.
 
 handle_config_change("query_server_config", _, _, _, _) ->
     gen_server:cast(?MODULE, reload_config),
@@ -353,13 +388,18 @@ return_proc(#state{} = State, #proc{} = Proc) ->
             ok
     end;
 return_proc(#state{} = State, #proc_int{} = ProcInt) ->
-    #state{tab = Tab, waiting = Waiting} = State,
+    #state{tab = Tab, waiting = Waiting, threshold_ts = T0} = State,
     #proc_int{pid = Pid, lang = Lang} = ProcInt,
     case is_process_alive(Pid) of true ->
         case get_waiting_client(Waiting, Lang) of
             nil ->
-                gen_server:cast(Pid, garbage_collect),
-                ets:insert(Tab, ProcInt#proc_int{client=nil}),
+                if ProcInt#proc_int.t0 < T0 ->
+                    gen_server:cast(Pid, stop),
+                    ets:delete(Tab, Pid);
+                true ->
+                    gen_server:cast(Pid, garbage_collect),
+                    ets:insert(Tab, ProcInt#proc_int{client=nil})
+                end,
                 State;
             #client{}=Client ->
                 From = Client#client.from,
