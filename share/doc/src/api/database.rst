@@ -10,7 +10,7 @@
 .. License for the specific language governing permissions and limitations under
 .. the License.
 
-.. _api-db:
+.. _api/db:
 
 ================
 Database Methods
@@ -99,7 +99,7 @@ For clarity, the form below is used in the URL paths:
 
 Where ``db`` is the name of any database.
 
-.. _api-get-db:
+.. _api/db.get:
 
 ``GET /db``
 ===========
@@ -176,6 +176,8 @@ The elements of the returned structure are shown in the table below:
 |                                  | database.                                 |
 +----------------------------------+-------------------------------------------+
 
+.. _api/db.put:
+
 ``PUT /db``
 ===========
 
@@ -224,6 +226,8 @@ The returned content contains the JSON status:
 Anything should be treated as an error, and the problem should be taken
 form the HTTP response code.
 
+.. _api/db.delete:
+
 ``DELETE /db``
 ==============
 
@@ -258,7 +262,8 @@ If successful, the returned JSON will indicate success
        "ok" : true
     }
 
-.. _api-changes:
+.. _api/db/changes:
+.. _api/db/changes.get:
 
 ``GET /db/_changes``
 ====================
@@ -431,7 +436,8 @@ ID's or the list of ``_design`` documents in a database. If the
 passed in the ``doc_ids`` parameter as a JSON array. For more
 information, see :ref:`changes`.
 
-.. _api-compact:
+.. _api/db/compact:
+.. _api/db/compact.post:
 
 ``POST /db/_compact``
 =====================
@@ -460,7 +466,7 @@ disk database file by performing the following operations:
 
 -  Removes old revisions of documents from the database, up to the
    per-database limit specified by the ``_revs_limit`` database
-   parameter. See :ref:`api-get-db`.
+   parameter. See :ref:`api/db.get`.
 
 Compaction can only be requested on an individual database; you cannot
 compact all the databases for a CouchDB instance. The compaction process
@@ -469,12 +475,13 @@ runs as a background process.
 You can determine if the compaction process is operating on a database
 by obtaining the database meta information, the ``compact_running``
 value of the returned database structure will be set to true. See
-:ref:`api-get-db`.
+:ref:`api/db.get`.
 
 You can also obtain a list of running processes to determine whether
-compaction is currently running. See :ref:`active-tasks`.
+compaction is currently running. See :ref:`api/misc/active_tasks`.
 
-.. _api-compact-ddoc:
+.. _api/db/compact/ddoc:
+.. _api/db/compact/ddoc.post:
 
 ``POST /db/_compact/design-doc``
 ================================
@@ -515,6 +522,9 @@ compaction request has been received (HTTP status code 202):
     }
         
 
+.. _api/db/view_cleanup:
+.. _api/db/view_cleanup.post:
+
 ``POST /db/_view_cleanup``
 ==========================
 
@@ -538,6 +548,9 @@ If the request is successful, a basic status message us returned:
        "ok" : true
     }
         
+
+.. _api/db/ensure_full_commit:
+.. _api/db/ensure_full_commit.post:
 
 ``POST /db/_ensure_full_commit``
 ================================
@@ -575,6 +588,9 @@ timestamp for when the CouchDB instance was started:
       "ok" : true,
       "instance_start_time" : "1288186189373361"
     }
+
+.. _api/db/bulk_docs:
+.. _api/db/bulk_docs.post:
 
 ``POST /db/_bulk_docs``
 =======================
@@ -679,9 +695,9 @@ documents created, here with the combination and their revision IDs:
               
 
 The content and structure of the returned JSON will depend on the transaction
-semantics being used for the bulk update; see :ref:`bulk-semantics` for more
-information. Conflicts and validation errors when updating documents in
-bulk must be handled separately; see :ref:`bulk-validation`.
+semantics being used for the bulk update; see :ref:`api/db/bulk_docs/semantics`
+for more information. Conflicts and validation errors when updating documents in
+bulk must be handled separately; see :ref:`api/db/bulk_docs/validation`.
 
 Updating Documents in Bulk
 --------------------------
@@ -752,11 +768,11 @@ the returned structure indicating specific success or otherwise messages
 on a per-document basis.
 
 The content and structure of the returned JSON will depend on the transaction
-semantics being used for the bulk update; see :ref:`bulk-semantics` for more
-information. Conflicts and validation errors when updating documents in
-bulk must be handled separately; see :ref:`bulk-validation`.
+semantics being used for the bulk update; see :ref:`api/db/bulk_docs/semantics`
+for more information. Conflicts and validation errors when updating documents in
+bulk must be handled separately; see :ref:`api/db/bulk_docs/validation`.
 
-.. _bulk-semantics:
+.. _api/db/bulk_docs/semantics:
 
 Bulk Documents Transaction Semantics
 ------------------------------------
@@ -873,7 +889,7 @@ you make use of the all-or-nothing mode the exact list of documents,
 revisions (and their conflict state) may or may not be replicated to
 other databases correctly.
 
-.. _bulk-validation:
+.. _api/db/bulk_docs/validation:
 
 Bulk Document Validation and Conflict Errors
 --------------------------------------------
@@ -935,7 +951,9 @@ following type:
           "error" : "forbidden",
           "reason" : "invalid recipe ingredient"
        }
-             
+
+.. _api/db/temp_view:
+.. _api/db/temp_view.post:
 
 ``POST /db/_temp_view``
 =======================
@@ -990,6 +1008,9 @@ relies on being executed at the time of the request. In addition to the
 time taken, they are also computationally very expensive to produce. You
 should use a defined view if you want to achieve the best performance.
 
+.. _api/db/purge:
+.. _api/db/purge.post:
+
 ``POST /db/_purge``
 ===================
 
@@ -1023,7 +1044,7 @@ large number of documents you should run purge on each database.
 
    Purging documents does not remove the space used by them on disk. To
    reclaim disk space, you should run a database compact (see
-   :ref:`api-compact`), and compact views (see :ref:`api-compact-ddoc`).
+   :ref:`api/db/compact`), and compact views (see :ref:`api/db/compact/ddoc`).
 
 To perform a purge operation you must send a request including the JSON
 of the document IDs that you want to purge. For example:
@@ -1075,6 +1096,9 @@ If the difference between the stored sequence number and current
 database sequence is greater than 1, then the view index is entirely
 rebuilt. This is an expensive operation as every document in the
 database must be examined.
+
+.. _api/db/all_docs:
+.. _api/db/all_docs.get:
 
 ``GET /db/_all_docs``
 =====================
@@ -1249,6 +1273,8 @@ database documents, with the returned key consisting of the ID of the
 document. The remainder of the interface is therefore identical to the
 View query arguments and their behavior.
 
+.. _api/db/all_docs.post:
+
 ``POST /db/_all_docs``
 ======================
 
@@ -1260,7 +1286,7 @@ View query arguments and their behavior.
 The ``POST`` to ``_all_docs`` allows to specify multiple keys to be
 selected from the database. This enables you to request multiple
 documents in a single request, in place of multiple
-:ref:`api-get-doc` requests.
+:ref:`api/doc.get` requests.
 
 The request body should contain a list of the keys to be returned as an
 array to a ``keys`` object. For example:
@@ -1303,6 +1329,9 @@ selected keys in the output:
        "offset" : 0
     }
 
+.. _api/db/missing_revs:
+.. _api/db/missing_revs.post:
+
 ``POST /db/_missing_revs``
 ==========================
 
@@ -1311,6 +1340,9 @@ selected keys in the output:
 * **Response**: JSON of missing revisions
 * **Admin Privileges Required**: no
 
+.. _api/db/revs_diff:
+.. _api/db/revs_diff.post:
+
 ``POST /db/_revs_diff``
 =======================
 
@@ -1318,6 +1350,9 @@ selected keys in the output:
 * **Request**: JSON list of document revisions
 * **Response**: JSON list of differences from supplied document/revision list
 * **Admin Privileges Required**: no
+
+.. _api/db/security:
+.. _api/db/security.get:
 
 ``GET /db/_security``
 =====================
@@ -1373,6 +1408,8 @@ Security object structure is:
    If the security object for a database has never been set, then the
    value returned will be empty.
 
+.. _api/db/security.put:
+
 ``PUT /db/_security``
 =====================
 
@@ -1414,6 +1451,9 @@ If the setting was successful, a JSON status object will be returned:
        "ok" : true
     }
 
+.. _api/db/revs_limit:
+.. _api/db/revs_limit.get:
+
 ``GET /db/_revs_limit``
 =======================
 
@@ -1437,6 +1477,8 @@ The returned information is the current setting as a numerical scalar:
 .. code-block:: javascript
 
     1000
+
+.. _api/db/revs_limit.put:
 
 ``PUT /db/_revs_limit``
 =======================

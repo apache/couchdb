@@ -10,7 +10,7 @@
 .. License for the specific language governing permissions and limitations under
 .. the License.
 
-.. _api-misc:
+.. _api/misc:
 
 =====================
 Miscellaneous Methods
@@ -50,6 +50,9 @@ A list of the available methods and URL paths are provided below:
 | GET    | /favicon.ico            |  Get the site icon                        |
 +--------+-------------------------+-------------------------------------------+
 
+.. _api/misc/root:
+.. _api/misc/root.get:
+
 ``GET /``
 =========
 
@@ -74,7 +77,8 @@ server.
        "version" : "1.0.1"
     }
 
-.. _active-tasks:
+.. _api/misc/active_tasks:
+.. _api/misc/active_tasks.get:
 
 ``GET /_active_tasks``
 ======================
@@ -123,6 +127,9 @@ For operation type, valid values include:
 
 -  ``View Group Indexer``
 
+.. _api/misc/all_dbs:
+.. _api/misc/all_dbs.get:
+
 ``GET /_all_dbs``
 =================
 
@@ -155,17 +162,21 @@ The return is a JSON array:
        "locations"
     ]
 
+
+.. _api/misc/db_updates:
+.. _api/misc/db_updates.get:
+
 ``GET /_db_updates``
 ====================
 
 * **Method**: ``GET /_db_updates``
 * **Request**: None
 * **Admin Privileges Required**: yes
-* **Query ARguments**:
+* **Query Arguments**:
 
   * **Argument**: feed
 
-    * **Descroption**: Format of the response feed
+    * **Description**: Format of the response feed
     * **Optional**: yes
     * **Type**: string
     * **Default**: longpoll
@@ -177,14 +188,14 @@ The return is a JSON array:
 
   * **Argument**: timeout
 
-    * **Descroption**: Number of seconds until CouchDB closes the connection.
+    * **Description**: Number of seconds until CouchDB closes the connection.
     * **Optional**: yes
     * **Type**: numeric
     * **Default**: 60
 
   * **Argument**: heartbeat
 
-    * **Descroption**: Whether CouchDB will send a newline character (``\n``) on ``timeout``.
+    * **Description**: Whether CouchDB will send a newline character (``\n``) on ``timeout``.
     * **Optional**: yes
     * **Type**: boolean
     * **Default**: true
@@ -214,6 +225,8 @@ For example:
     {"dbname":"another-database", "type":"updated"}
 
 
+.. _api/misc/log:
+.. _api/misc/log.get:
 
 ``GET /_log``
 =============
@@ -279,7 +292,8 @@ following request:
 Reading of the log will start at 2000 bytes from the end of the log, and
 500 bytes will be shown.
 
-.. _replicate:
+.. _api/misc/replicate:
+.. _api/misc/replicate.post:
 
 ``POST /_replicate``
 ====================
@@ -558,6 +572,9 @@ Must be canceled using the request:
 Requesting cancellation of a replication that does not exist results in
 a 404 error.
 
+.. _api/misc/restart:
+.. _api/misc/restart.post:
+
 ``POST /_restart``
 ==================
 
@@ -598,6 +615,9 @@ status object indicating that the request has been received:
 
 If the server has already restarted, the header may be returned, but no
 actual data is contained in the response.
+
+.. _api/misc/stats:
+.. _api/misc/stats.get:
 
 ``GET /_stats``
 ===============
@@ -757,6 +777,8 @@ structure is as follows:
        }
     }
 
+.. _api/misc/utils:
+.. _api/misc/utils.get:
 
 ``GET /_utils``
 ===============
@@ -767,6 +789,9 @@ structure is as follows:
 * **Admin Privileges Required**: no
 
 Accesses the built-in Futon administration interface for CouchDB.
+
+.. _api/misc/uuids:
+.. _api/misc/uuids.get:
 
 ``GET /_uuids``
 ===============
@@ -822,7 +847,7 @@ Returns:
     }
 
 The UUID type is determined by the UUID type setting in the CouchDB
-configuration. See :ref:`api-put-config`.
+configuration. See :ref:`api/config/section/key.put`.
 
 For example, changing the UUID type to ``random``:
 
@@ -847,6 +872,9 @@ When obtaining a list of UUIDs:
           "2e0dbf7f6c4ad716f21938a016e4e59f"
        ]
     }
+
+.. _api/misc/favicon:
+.. _api/misc/favicon.get:
 
 ``GET /favicon.ico``
 ====================

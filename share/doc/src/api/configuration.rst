@@ -10,7 +10,7 @@
 .. License for the specific language governing permissions and limitations under
 .. the License.
 
-.. _api-config:
+.. _api/config:
 
 =====================
 Configuration Methods
@@ -37,6 +37,8 @@ A list of the available methods and URL paths are provided below:
 +--------+-------------------------+-------------------------------------------+
 | DELETE | /_config/section/key    | Delete the current setting                |
 +--------+-------------------------+-------------------------------------------+
+
+.. _api/config.get:
 
 ``GET /_config``
 ================
@@ -167,6 +169,9 @@ The response is the JSON structure:
     }
         
 
+.. _api/config/section:
+.. _api/config/section.get:
+
 ``GET /_config/section``
 ========================
 
@@ -204,6 +209,9 @@ section:
        "delayed_commits" : "true"
     }
 
+.. _api/config/section/key:
+.. _api/config/section/key.get:
+
 ``GET /_config/section/key``
 ============================
 
@@ -235,7 +243,7 @@ Returns the string of the log level:
    string or numeric value, or an array or object. Some client
    environments may not parse simple strings or numeric values as valid JSON.
 
-.. _api-put-config:
+.. _api/config/section/key.put:
 
 ``PUT /_config/section/key``
 ============================
@@ -268,6 +276,8 @@ For example, to set the function used to generate UUIDs by the
 
 The return value will be empty, with the response code indicating the
 success or failure of the configuration setting.
+
+.. _api/config/section/key.delete:
 
 ``DELETE /_config/section/key``
 ===============================

@@ -10,7 +10,7 @@
 .. License for the specific language governing permissions and limitations under
 .. the License.
 
-.. _api-doc:
+.. _api/doc:
 
 ================
 Document Methods
@@ -45,6 +45,8 @@ A list of the available methods and URL paths are provided below:
 +--------+-------------------------+-------------------------------------------+
 | DELETE | /db/doc/attachment      | Deletes an attachment of a document       |
 +--------+-------------------------+-------------------------------------------+
+
+.. _api/db.post:
 
 ``POST /db``
 ============
@@ -133,8 +135,6 @@ ID, and status message:
     }
         
 
-.. _api-batch-writes:
-
 UUID generation algorithms
 --------------------------
 
@@ -164,18 +164,21 @@ can be set simply by `PUT http://couchdb:5984/_config/uuids/algorithm`.
 |               | utc_id_suffix.      |                                    |
 +---------------+---------------------+------------------------------------+
 
-.. Impact of UUID choices::
-   The choice of UUID has a signficant impact on the layout of the B-tree,
-   prior to compaction. For example, a sequential UUID algorithm during
-   uploading thousands of documents, will avoid the need to rewrite many
-   intermediate B-tree nodes. A random UUID algorithm may require rewriting
-   intermediate nodes on a regular basis, with a corresponding decrease of
-   throughput, and significant wasted space due to the append-only B-tree
-   design. It is generally recommended to set your own UUIDs, or use the
-   sequential algorithm unless you have a specific need and take into account
-   the likely need for compaction to re-balance the B-tree and reclaim wasted
-   space.
+.. note:: **Impact of UUID choices:**
+   The choice of UUID has a significant impact on the layout of the B-tree,
+   prior to compaction.
 
+   For example, a sequential UUID algorithm during uploading thousands of
+   documents, will avoid the need to rewrite many intermediate B-tree nodes.
+   A random UUID algorithm may require rewriting intermediate nodes on a regular
+   basis, with a corresponding decrease of throughput, and significant wasted
+   space due to the append-only B-tree design.
+
+   It is generally recommended to set your own UUIDs, or use the sequential
+   algorithm unless you have a specific need and take into account the likely
+   need for compaction to re-balance the B-tree and reclaim wasted space.
+
+.. _api/doc/batch-writes:
 
 Batch Mode Writes
 -----------------
@@ -196,7 +199,7 @@ Including Attachments
 You can include one or more attachments with a given document by
 incorporating the attachment information within the JSON of the
 document. This provides a simpler alternative to loading documents with
-attachments than making a separate call (see :ref:`api-put-attachment`).
+attachments than making a separate call (see :ref:`api/doc/attachment.put`).
 
 * **_id** (optional): Document ID
 * **_rev** (optional): Revision ID (when updating an existing document)
@@ -228,12 +231,12 @@ the JSON structure below:
 
 The attachment ``styling.css`` can be accessed using
 ``/recipes/FishStew/styling.css``. For more information on attachments,
-see :ref:`api-get-attachment`.
+see :ref:`api/doc/attachment.get`.
 
 The document data embedded in to the structure must be encoded using
 base64.
 
-.. _api-get-doc:
+.. _api/doc.get:
 
 ``GET /db/doc``
 ===============
@@ -465,6 +468,8 @@ The specified revision of the document will be returned, including a
        "title" : "Fish Stew"
     }
 
+.. _api/doc.head:
+
 ``HEAD /db/doc``
 ================
 
@@ -540,7 +545,7 @@ returned. Note that the current revision is not returned when the
     Content-Length: 609
     Cache-Control: must-revalidate
 
-.. _api-put-doc:
+.. _api/doc.put:
 
 ``PUT /db/doc``
 ===============
@@ -648,9 +653,9 @@ The JSON returned will include the updated revision number:
     }
 
 For information on batched writes, which can provide improved
-performance, see :ref:`api-batch-writes`.
+performance, see :ref:`api/doc/batch-writes`.
 
-.. _api-del-doc:
+.. _api/doc.delete:
 
 ``DELETE /db/doc``
 ==================
@@ -711,7 +716,7 @@ The returned JSON contains the document ID, revision and status:
    use of a revision for deletion of the record allows replication of
    the database to correctly track the deletion in synchronized copies.
 
-.. _api-copy-doc:
+.. _api/doc.copy:
 
 ``COPY /db/doc``
 ================
@@ -809,7 +814,8 @@ The return value will be the new revision of the copied document:
        "rev" : "2-55b6a1b251902a2c249b667dab1c6692"
     }
 
-.. _api-get-attachment:
+.. _api/doc/attachment:
+.. _api/doc/attachment.get:
 
 ``GET /db/doc/attachment``
 ==========================
@@ -825,7 +831,7 @@ if you were accessing a static file. The returned HTTP ``Content-type``
 will be the same as the content type set when the document attachment
 was submitted into the database.
 
-.. _api-put-attachment:
+.. _api/doc/attachment.put:
 
 ``PUT /db/doc/attachment``
 ==========================
@@ -915,6 +921,8 @@ Uploading an attachment using an existing attachment name will update
 the corresponding stored content of the database. Since you must supply
 the revision information to add an attachment to a document, this serves
 as validation to update the existing attachment.
+
+.. _api/doc/attachment.delete:
 
 ``DELETE /db/doc/attachment``
 =============================
