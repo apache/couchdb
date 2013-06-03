@@ -39,6 +39,16 @@
     ddoc_key
 }).
 
+-record(proc_int, {
+    pid,
+    lang,
+    client = nil,
+    ddoc_keys = [],
+    prompt_fun,
+    set_timeout_fun,
+    stop_fun
+}).
+
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
@@ -49,7 +59,7 @@ init([]) ->
     process_flag(trap_exit, true),
     ok = config:listen_for_changes(?MODULE, nil),
     {ok, #state{
-        tab = ets:new(procs, [ordered_set, {keypos, #proc.pid}]),
+        tab = ets:new(procs, [ordered_set, {keypos, #proc_int.pid}]),
         config = get_proc_config(),
         proc_counts = dict:new(),
         waiting = ets:new(couch_proc_manage_waiting,
@@ -67,7 +77,7 @@ handle_call({get_proc, #doc{body={Props}}=DDoc, DDocKey}, From, State) ->
     Lang = couch_util:to_binary(
             couch_util:get_value(<<"language">>, Props, <<"javascript">>)),
     IterFun = fun(Proc, Acc) ->
-        case lists:member(DDocKey, Proc#proc.ddoc_keys) of
+        case lists:member(DDocKey, Proc#proc_int.ddoc_keys) of
             true ->
                 {stop, assign_proc(State#state.tab, ClientPid, Proc)};
             false ->
@@ -98,7 +108,7 @@ handle_call({ret_proc, #proc{client=Ref, lang=Lang0} = Proc}, _From, State) ->
     Lang = couch_util:to_binary(Lang0),
     % We need to check if the process is alive here, as the client could be
     % handing us a #proc{} with a dead one.  We would have already removed the
-    % #proc{} from our own table, so the alternative is to do a lookup in the
+    % #proc_int{} from our own table, so the alternative is to do a lookup in the
     % table before the insert.  Don't know which approach is cheaper.
     {reply, true, return_proc(State, Proc#proc{lang=Lang})};
 
@@ -109,7 +119,7 @@ handle_cast({os_proc_idle, Pid}, #state{tab=Tab, proc_counts=Counts}=State0) ->
     Limit = list_to_integer(
             config:get("query_server_config", "os_process_soft_limit", "100")),
     State = case ets:lookup(Tab, Pid) of
-        [#proc{client=nil, lang=Lang}] ->
+        [#proc_int{client=nil, lang=Lang}] ->
             case dict:find(Lang, Counts) of
                 {ok, Count} when Count > Limit ->
                     ?LOG_INFO("Closing idle OS Process: ~p", [Pid]),
@@ -141,7 +151,7 @@ handle_info(shutdown, State) ->
     {stop, shutdown, State};
 
 handle_info({'EXIT', _, {ok, Proc0, {ClientPid,_} = From}}, State) ->
-    link(Proc0#proc.pid),
+    link(Proc0#proc_int.pid),
     Proc = assign_proc(State#state.tab, ClientPid, Proc0),
     gen_server:reply(From, {ok, Proc, State#state.config}),
     {noreply, State};
@@ -152,7 +162,7 @@ handle_info({'EXIT', Pid, Reason}, State) ->
     MaybeProc = ets:lookup(State#state.tab, Pid),
     ets:delete(State#state.tab, Pid),
     case MaybeProc of
-        [#proc{lang=Lang}] ->
+        [#proc_int{lang=Lang}] ->
             case get_waiting_client(Waiting, Lang) of
                 nil ->
                     {noreply, State#state{
@@ -167,10 +177,10 @@ handle_info({'EXIT', Pid, Reason}, State) ->
     end;
 
 handle_info({'DOWN', Ref, _, _, _Reason}, State0) ->
-    case ets:match_object(State0#state.tab, #proc{client=Ref, _='_'}) of
+    case ets:match_object(State0#state.tab, #proc_int{client=Ref, _='_'}) of
     [] ->
         {noreply, State0};
-    [#proc{} = Proc] ->
+    [#proc_int{} = Proc] ->
         {noreply, return_proc(State0, Proc)}
     end;
 
@@ -186,11 +196,11 @@ handle_info(_Msg, State) ->
     {noreply, State}.
 
 terminate(_Reason, #state{tab=Tab}) ->
-    ets:foldl(fun(#proc{pid=P}, _) -> couch_util:shutdown_sync(P) end, 0, Tab),
+    ets:foldl(fun(#proc_int{pid=P}, _) -> couch_util:shutdown_sync(P) end, 0, Tab),
     ok.
 
 code_change(_OldVsn, #state{tab = Tab} = State, _Extra) ->
-    NewTab = ets:new(procs, [ordered_set, {keypos, #proc.pid}]),
+    NewTab = ets:new(procs, [ordered_set, {keypos, #proc_int.pid}]),
     true = ets:insert(NewTab, ets:tab2list(Tab)),
     true = ets:delete(Tab),
     {ok, State#state{tab = NewTab}}.
@@ -217,7 +227,7 @@ find_proc(State, Client, []) ->
 iter_procs(Tab, Lang, Fun, Acc) when is_list(Lang) ->
     iter_procs(Tab, list_to_binary(Lang), Fun, Acc);
 iter_procs(Tab, Lang, Fun, Acc) ->
-    Pattern = #proc{lang=Lang, client=nil, _='_'},
+    Pattern = #proc_int{lang=Lang, client=nil, _='_'},
     MSpec = [{Pattern, [], ['$_']}],
     case ets:select_reverse(Tab, MSpec, 25) of
         '$end_of_table' ->
@@ -283,7 +293,7 @@ new_proc_int(From, Lang) when is_list(Lang) ->
     end.
 
 proc_with_ddoc(DDoc, DDocKey, Procs) ->
-    Filter = fun(#proc{ddoc_keys=Keys}) -> not lists:member(DDocKey, Keys) end,
+    Filter = fun(#proc_int{ddoc_keys=Keys}) -> not lists:member(DDocKey, Keys) end,
     case lists:dropwhile(Filter, Procs) of
     [DDocProc|_] ->
         {ok, DDocProc};
@@ -300,12 +310,13 @@ teach_any_proc(DDoc, DDocKey, [Proc|Rest]) ->
 teach_any_proc(_, _, []) ->
     {error, noproc}.
 
-teach_ddoc(DDoc, {DDocId, _Rev}=DDocKey, #proc{ddoc_keys=Keys}=Proc) ->
+teach_ddoc(DDoc, {DDocId, _Rev}=DDocKey, #proc_int{ddoc_keys=Keys}=Proc) ->
     % send ddoc over the wire
     % we only share the rev with the client we know to update code
     % but it only keeps the latest copy, per each ddoc, around.
-    true = couch_query_servers:proc_prompt(Proc, [<<"ddoc">>, <<"new">>,
-        DDocId, couch_doc:to_json_obj(DDoc, [])]),
+    true = couch_query_servers:proc_prompt(
+        export_proc(Proc),
+        [<<"ddoc">>, <<"new">>, DDocId, couch_doc:to_json_obj(DDoc, [])]),
     % we should remove any other ddocs keys for this docid
     % because the query server overwrites without the rev
     Keys2 = [{D,R} || {D,R} <- Keys, D /= DDocId],
@@ -313,7 +324,7 @@ teach_ddoc(DDoc, {DDocId, _Rev}=DDocKey, #proc{ddoc_keys=Keys}=Proc) ->
     {ok, Proc#proc{ddoc_keys=[DDocKey|Keys2]}}.
 
 make_proc(Pid, Lang, Mod) ->
-    Proc = #proc{
+    Proc = #proc_int{
         lang = Lang,
         pid = Pid,
         prompt_fun = {Mod, prompt},
@@ -323,26 +334,37 @@ make_proc(Pid, Lang, Mod) ->
     unlink(Pid),
     {ok, Proc}.
 
-assign_proc(Tab, ClientPid, #proc{client=nil}=Proc0) when is_pid(ClientPid) ->
-    Proc = Proc0#proc{client = erlang:monitor(process, ClientPid)},
+assign_proc(Tab, ClientPid, #proc_int{client=nil}=Proc0) when is_pid(ClientPid) ->
+    Proc = Proc0#proc_int{client = erlang:monitor(process, ClientPid)},
     ets:insert(Tab, Proc),
-    Proc;
-assign_proc(Tab, #client{}=Client, #proc{client=nil}=Proc) ->
+    export_proc(Proc);
+assign_proc(Tab, #client{}=Client, #proc_int{client=nil}=Proc) ->
     {Pid, _} = Client#client.from,
     assign_proc(Tab, Pid, Proc).
 
-return_proc(State, #proc{pid=Pid, lang=Lang} = Proc) ->
-    #state{tab=Tab, waiting=Waiting} = State,
+return_proc(#state{} = State, #proc{} = Proc) ->
+    case ets:lookup(State#state.tab, Proc#proc.pid) of
+        [#proc_int{}=ProcInt] ->
+            return_proc(State, ProcInt);
+        [] ->
+            % Proc must've died and we already
+            % cleared it out of the table in
+            % the handle_info clause.
+            ok
+    end;
+return_proc(#state{} = State, #proc_int{} = ProcInt) ->
+    #state{tab = Tab, waiting = Waiting} = State,
+    #proc_int{pid = Pid, lang = Lang} = ProcInt,
     case is_process_alive(Pid) of true ->
         case get_waiting_client(Waiting, Lang) of
             nil ->
                 gen_server:cast(Pid, garbage_collect),
-                ets:insert(Tab, Proc#proc{client=nil}),
+                ets:insert(Tab, ProcInt#proc_int{client=nil}),
                 State;
             #client{}=Client ->
                 From = Client#client.from,
-                assign_proc(Tab, Client, Proc#proc{client=nil}),
-                gen_server:reply(From, {ok, Proc, State#state.config}),
+                assign_proc(Tab, Client, ProcInt#proc_int{client=nil}),
+                gen_server:reply(From, {ok, ProcInt, State#state.config}),
                 State
         end;
     false ->
@@ -354,6 +376,11 @@ return_proc(State, #proc{pid=Pid, lang=Lang} = Proc) ->
                 maybe_spawn_proc(State, Client)
         end
     end.
+
+-spec export_proc(#proc_int{}) -> #proc{}.
+export_proc(#proc_int{} = ProcInt) ->
+    [_ | Data] = lists:sublist(record_info(size, proc), tuple_to_list(ProcInt)),
+    list_to_tuple([proc | Data]).
 
 maybe_spawn_proc(State, Client) ->
     #state{proc_counts=Counts, waiting=Waiting} = State,
