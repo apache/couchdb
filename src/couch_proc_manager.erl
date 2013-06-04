@@ -233,12 +233,7 @@ terminate(_Reason, #state{tab=Tab}) ->
 
 code_change(_OldVsn, {state, Tab}, _Extra) ->
     State = #state{tab = Tab, threshold_ts = {0,0,0}},
-    ProcInts = lists:map(
-        fun(#proc{} = P) ->
-            setelement(1, erlang:append_element(P, os:timestamp()), proc_int)
-        end,
-        ets:tab2list(Tab)
-    ),
+    ProcInts = lists:map(fun import_proc/1, ets:tab2list(Tab)),
     ets:delete_all_objects(Tab),
     ets:insert(Tab, ProcInts),
     {ok, State}.
@@ -432,6 +427,11 @@ remove_proc(Tab, Pid) ->
 export_proc(#proc_int{} = ProcInt) ->
     [_ | Data] = lists:sublist(record_info(size, proc), tuple_to_list(ProcInt)),
     list_to_tuple([proc | Data]).
+
+import_proc(#proc{} = P) ->
+    lists:foldl(fun(Idx, ProcInt) ->
+        setelement(Idx, ProcInt, element(Idx, P))
+    end, #proc_int{}, lists:seq(2, tuple_size(P))).
 
 maybe_spawn_proc(State, Client) ->
     #state{proc_counts=Counts, waiting=Waiting} = State,
