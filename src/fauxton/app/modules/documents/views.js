@@ -477,8 +477,11 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
         matchBrackets: true,
         lineWrapping: true,
         onChange: function() {
-          //throwing errors at the moment
-          //that.runJSHint();
+          try {
+            that.runJSHint();
+          } catch (e) {
+            console.log('ERROR for jshint',e);
+          }
         },
         extraKeys: {
           "Ctrl-S": function(instance) { that.saveDoc(); },
@@ -950,7 +953,11 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
         matchBrackets: true,
         lineWrapping: true,
         onChange: function() {
-          //that.runJSHint("mapEditor");
+          try {
+            that.runJSHint("mapEditor");
+          } catch (e) {
+            console.log('ERROR for jshint',e);
+          }
         },
         extraKeys: {
           "Ctrl-S": function(instance) { that.saveView(); },
@@ -963,7 +970,11 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
         matchBrackets: true,
         lineWrapping: true,
         onChange: function() {
-          //that.runJSHint("reduceEditor");
+          try {
+            that.runJSHint("reduceEditor");
+          } catch (e) {
+            console.log('ERROR for jshint',e);
+          }
         },
         extraKeys: {
           "Ctrl-S": function(instance) { that.saveView(); },
