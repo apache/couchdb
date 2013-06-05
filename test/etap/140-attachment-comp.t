@@ -723,6 +723,6 @@ test_png_data() ->
 
 test_text_data() ->
     {ok, Data} = file:read_file(
-        test_util:source_file("README")
+        test_util:source_file("README.rst")
     ),
     Data.
