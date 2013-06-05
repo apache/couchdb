@@ -137,3 +137,9 @@ This product also includes the following third-party components:
  * codemirror-javascript.js (https://github.com/marijnh/CodeMirror)
 
    Copyright (C) 2013 by Marijn Haverbeke <marijnh@gmail.com>
+
+ * jquery.form.js (https://github.com/malsup/form/)
+
+   Copyright 2006-2013 (c) M. Alsup
+
+

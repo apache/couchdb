@@ -44,7 +44,7 @@ the License.
         <td class="key"><input type="text" class="input-large" value='' /></td>
         <td class="value"><input type="text" class="input-xxlarge" value='' /></td>
       </tr>
-      <% _.each(doc.attributes, function(value, key) { %>
+      <% _.each(doc, function(value, key) { %>
         <tr>
           <td class="select"><input type="checkbox" /></td>
           <td class="key">
@@ -53,6 +53,20 @@ the License.
           <td class="value"><input type="text" class="input-xxlarge" value='<%= JSON.stringify(value) %>' /></td>
         </tr>
       <% }); %>
+        <tr>
+          <th colspan="3">
+            Attachments
+          </th>
+        </tr>
+      <%_.each(attachments, function (att) { %>
+        <tr>
+          <td class="select"><input type="checkbox" /></td>
+          <td colspan="2">
+            <a href="<%= att.url %>" target="_blank"> <%= att.fileName %> </a>
+            <span> <%= att.contentType %>, <%= formatSize(att.size)%> </span>
+          </td>
+        </tr>
+      <% }) %>
     </tbody>
   </table>
   <a class="btn btn-small new" style="margin-left: 64px"><i class="icon-plus"></i> New field</a>

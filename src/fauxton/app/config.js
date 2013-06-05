@@ -47,7 +47,9 @@ require.config({
 
     "plugins/codemirror-javascript": ["codemirror"],
 
-    "plugins/prettify": []
+    "plugins/prettify": [],
+
+    "plugins/jquery.form": ["jquery"]
   }
 
 });

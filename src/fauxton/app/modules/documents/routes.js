@@ -51,6 +51,10 @@ function(app, FauxtonAPI, Documents, Databases) {
       "database/:database/:doc": "code_editor"
     },
 
+    events: {
+      "route:reRenderDoc": "reRenderDoc"
+    },
+
     crumbs: function() {
       return [
         {"name": "Databases", "link": "/_all_dbs"},
@@ -65,6 +69,11 @@ function(app, FauxtonAPI, Documents, Databases) {
         model: this.doc,
         database: this.database
       }));
+    },
+
+    reRenderDoc: function () {
+      this.docView.forceRender();
+      console.log('rerender');
     },
 
     field_editor: function(events) {

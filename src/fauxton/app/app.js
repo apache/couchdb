@@ -7,7 +7,8 @@ define([
   "helpers",
 
   // Plugins.
-  "plugins/backbone.layoutmanager"
+  "plugins/backbone.layoutmanager",
+  "plugins/jquery.form"
 ],
 
 function($, _, Backbone, Helpers) {

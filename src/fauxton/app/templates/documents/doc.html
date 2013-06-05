@@ -14,6 +14,23 @@ the License.
 
 <div id="doc">
   <div class="errors-container"></div>
+  <% if (attachments) { %>
+  <div class="btn-group pull-right" style="margin-bottom: 15px">
+    <a class="btn dropdown-toggle btn" data-toggle="dropdown" href="#">
+      View Attachments
+      <span class="caret"></span>
+    </a>
+    <ul class="dropdown-menu">
+      <%_.each(attachments, function (att) { %>
+      <li>
+      <a href="<%= att.url %>" target="_blank"> <strong> <%= att.fileName %> </strong> -
+        <span> <%= att.contentType %>, <%= formatSize(att.size)%> </span>
+      </a>
+      </li>
+      <% }) %>
+    </ul>
+  </div>
+  <% } %>
 
   <textarea class="doc-code"><%= JSON.stringify(doc.attributes, null, "  ") %></textarea>
   <br />

@@ -128,6 +128,94 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
     }
   });
 
+  Views.UploadModal = FauxtonAPI.View.extend({
+    template: "templates/documents/upload_modal",
+
+    initialize: function (options) {
+      _.bindAll(this);
+    },
+
+    events: {
+      "click a#upload-btn": "uploadFile"
+    },
+
+    uploadFile: function (event) {
+      event.preventDefault();
+
+      var docRev = this.model.get('_rev'),
+          $form = this.$('#file-upload');
+
+      if (!docRev) {
+        return this.set_error_msg('The document needs to be saved before adding an attachment.');
+      }
+
+      if ($('input[type="file"]')[0].files.length === 0) {
+        return this.set_error_msg('Selected a file to be uploaded.');
+      }
+
+      this.$('#_rev').val(docRev);
+
+      $form.ajaxSubmit({
+        url: this.model.url(),
+        type: 'POST',
+        beforeSend: this.beforeSend,
+        uploadProgress: this.uploadProgress,
+        success: this.success
+      });
+    },
+
+    success: function (resp) {
+      var hideModal = this.hideModal,
+          $form = this.$('#file-upload');
+
+      FauxtonAPI.triggerRouteEvent('reRenderDoc');
+      //slight delay to make this transistion a little more fluid and less jumpy
+      setTimeout(function () {
+        $form.clearForm();
+        hideModal();
+      }, 1000);
+    },
+
+    uploadProgress: function(event, position, total, percentComplete) {
+      this.$('.bar').css({width: percentComplete + '%'});
+    },
+
+    beforeSend: function () {
+     this.$('.progress').removeClass('hide');
+    },
+
+    showModal: function () {
+      this.$('.bar').css({width: '0%'});
+      this.$('.progress').addClass('hide');
+      this.clear_error_msg();
+      this.$('.modal').modal();
+      // hack to get modal visible 
+      $('.modal-backdrop').css('z-index',1025);
+    },
+
+    hideModal: function () {
+      this.$('.modal').modal('hide');
+    },
+
+    set_error_msg: function (msg) {
+      var text;
+      if (typeof(msg) == 'string') {
+        text = msg;
+      } else {
+        text = JSON.parse(msg.responseText).reason;
+      }
+      this.$('#modal-error').text(text).removeClass('hide');
+    },
+
+    clear_error_msg: function () {
+      this.$('#modal-error').text(' ').addClass('hide');
+    },
+
+    serialize: function () {
+      return this.model.toJSON();
+    }
+  });
+
   Views.FieldEditorTabs = FauxtonAPI.View.extend({
     template: "templates/documents/doc_field_editor_tabs",
 
@@ -137,7 +225,8 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
 
     events: {
       "click button.delete": "destroy",
-      "click button.duplicate": "duplicate"
+      "click button.duplicate": "duplicate",
+      "click button.upload": "upload"
     },
 
     destroy: function(event) {
@@ -158,6 +247,16 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
           type: "error"
         });
       });
+    },
+
+    beforeRender: function () {
+      this.uploadModal = this.setView('#upload-modal', new Views.UploadModal({model: this.model}));
+      this.uploadModal.render();
+    },
+    
+    upload: function (event) {
+      event.preventDefault();
+      this.uploadModal.showModal();
     },
 
     duplicate: function(event) {
@@ -463,8 +562,24 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
 
     serialize: function() {
       return {
-        doc: this.model
+        doc: this.model,
+        attachments: this.getAttachments()
       };
+    },
+
+    getAttachments: function () {
+      var attachments = this.model.get('_attachments');
+
+      if (!attachments) { return false; }
+
+      return _.map(attachments, function (att, key) {
+        return {
+          fileName: key,
+          size: att.length,
+          contentType: att.content_type,
+          url: this.model.url() + '/' + key
+        };
+      }, this);
     },
 
     afterRender: function() {
@@ -507,12 +622,30 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
 
     serialize: function() {
       return {
-        doc: this.getModel()
+        doc: this.getModelWithoutAttachments(),
+        attachments: this.getAttachments()
       };
     },
 
-    getModel: function() {
-      return this.model;
+    getModelWithoutAttachments: function() {
+      var model = this.model.toJSON();
+      delete model._attachments;
+      return model;
+    },
+
+    getAttachments: function () {
+      var attachments = this.model.get('_attachments');
+
+      if (!attachments) { return []; }
+
+      return _.map(attachments, function (att, key) {
+        return {
+          fileName: key,
+          size: att.length,
+          contentType: att.content_type,
+          url: this.model.url() + '/' + key
+        };
+      }, this);
     },
 
     establish: function() {
