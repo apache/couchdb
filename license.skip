@@ -140,3 +140,4 @@
 ^utils/Makefile.in
 ^var/Makefile
 ^var/Makefile.in
+^Vagrantfile
