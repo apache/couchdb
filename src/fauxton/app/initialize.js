@@ -16,10 +16,11 @@ define([
 
   // Libraries
   "lodash",
-  "bootstrap"
+  "bootstrap",
+  "helpers"
 ],
 
-function(app, _, Bootstrap) {
+function(app, _, Bootstrap, helpers) {
 
   // Provide a global location to place configuration settings and module
   // creation.
@@ -33,6 +34,8 @@ function(app, _, Bootstrap) {
     renderView: function(baseView, selector, view, options, callback) {
       baseView.setView(selector, new view(options)).render().then(callback);
     },
+
+    helpers: helpers,
 
     // Thanks to: http://stackoverflow.com/a/2880929
     getParams: function(queryString) {
