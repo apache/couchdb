@@ -59,6 +59,20 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
     receive
     {timeout, TimeoutRef} ->
         {timeout, Acc0};
+    {rexi, Ref, Msg} ->
+        case lists:keyfind(Ref, Keypos, RefList) of
+        false ->
+            {ok, Acc0};
+        Worker ->
+            Fun(Msg, Worker, Acc0)
+        end;
+    {rexi, Ref, From, Msg} ->
+        case lists:keyfind(Ref, Keypos, RefList) of
+        false ->
+            {ok, Acc0};
+        Worker ->
+            Fun(Msg, {Worker, From}, Acc0)
+        end;
     {Ref, Msg} ->
         case lists:keyfind(Ref, Keypos, RefList) of
         false ->
