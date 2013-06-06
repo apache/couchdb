@@ -12,13 +12,24 @@
 
 -module(chttpd_misc).
 
--export([handle_welcome_req/2,handle_favicon_req/2,handle_utils_dir_req/2,
-    handle_all_dbs_req/1,handle_replicate_req/1,handle_restart_req/1,
-    handle_uuids_req/1,handle_config_req/1,
-    handle_task_status_req/1,handle_sleep_req/1,handle_welcome_req/1,
-    handle_utils_dir_req/1, handle_favicon_req/1, handle_system_req/1,
-    handle_up_req/1]).
-
+-export([
+    handle_all_dbs_req/1,
+    handle_config_req/1,
+    handle_favicon_req/1,
+    handle_favicon_req/2,
+    handle_replicate_req/1,
+    handle_reload_query_servers_req/1,
+    handle_restart_req/1,
+    handle_sleep_req/1,
+    handle_system_req/1,
+    handle_task_status_req/1,
+    handle_up_req/1,
+    handle_utils_dir_req/1,
+    handle_utils_dir_req/2,
+    handle_uuids_req/1,
+    handle_welcome_req/1,
+    handle_welcome_req/2
+]).
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
@@ -184,6 +195,11 @@ handle_restart_req(#httpd{method='POST'}=Req) ->
 handle_restart_req(Req) ->
     send_method_not_allowed(Req, "POST").
 
+handle_reload_query_servers_req(#httpd{method='POST'}=Req) ->
+    ok = couch_proc_manager:reload(),
+    send_json(Req, 200, {[{ok, true}]});
+handle_reload_query_servers_req(Req) ->
+    send_method_not_allowed(Req, "POST").
 
 handle_uuids_req(Req) ->
     couch_httpd_misc_handlers:handle_uuids_req(Req).
@@ -262,6 +278,7 @@ handle_system_req(Req) ->
         {io_input, Input},
         {io_output, Output},
         {os_proc_count, couch_proc_manager:get_proc_count()},
+        {stale_proc_count, couch_proc_manager:get_stale_proc_count()},
         {process_count, erlang:system_info(process_count)},
         {process_limit, erlang:system_info(process_limit)},
         {message_queues, message_queues(registered())},
