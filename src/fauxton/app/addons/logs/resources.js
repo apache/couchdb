@@ -163,7 +163,7 @@ function (app, FauxtonAPI, Backbone) {
       // Interval already set
       if (this.intervalId) { return ; }
 
-      that.intervalId = setInterval(function () {
+      this.intervalId = setInterval(function () {
         collection.fetch();
       }, this.refreshTime);
 
