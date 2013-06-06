@@ -46,6 +46,10 @@ function(app, Fauxton) {
       return null;
     },
 
+    loaderClassname: 'loader',
+
+    disableLoader: false,
+
     hasRendered: function () {
       return !!this.__manager__.hasRendered;
     },
@@ -264,12 +268,12 @@ function(app, Fauxton) {
       FauxtonAPI.when(this.establish()).done(function(resp) {
         _.each(routeObject.getViews(), function(view, selector) {
           if(view.hasRendered()) { return; }
-
+          if (!view.disableLoader){ $(selector).addClass(view.loaderClassname);}
           masterLayout.setView(selector, view);
-
           FauxtonAPI.when(view.establish()).then(function(resp) {
+            if (!view.disableLoader) $(selector).removeClass(view.loaderClassname);
             masterLayout.renderView(selector);
-          }, function(resp) {
+            }, function(resp) {
             view.establishError = {
               error: true,
               reason: resp
