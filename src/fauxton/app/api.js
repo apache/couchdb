@@ -46,6 +46,10 @@ function(app, Fauxton) {
       return null;
     },
 
+    loaderClassname: 'loader',
+
+    disableLoader: false,
+
     hasRendered: function () {
       return !!this.__manager__.hasRendered;
     },
@@ -234,6 +238,8 @@ function(app, Fauxton) {
     crumbs: [],
     layout: "with_sidebar",
     apiUrl: null,
+    disableLoader: false,
+    loaderClassname: 'loader',
     renderedState: false,
     establish: function() {},
     route: function() {},
@@ -252,6 +258,11 @@ function(app, Fauxton) {
         masterLayout.setTemplate(this.layout);
       }
 
+      //add page loader. "app-container" shouldn't be overwritten. Even if a new index.underscore is provided in settings.json
+      if (!this.disableLoader) {
+        $('#app-container').addClass(this.loaderClassname);
+      }
+
       masterLayout.clearBreadcrumbs();
       var crumbs = this.get('crumbs');
 
@@ -262,14 +273,17 @@ function(app, Fauxton) {
       }
 
       FauxtonAPI.when(this.establish()).done(function(resp) {
+        if (!this.disableLoader) {
+          $('#app-container').removeClass(this.loaderClassname);
+        }
         _.each(routeObject.getViews(), function(view, selector) {
           if(view.hasRendered()) { return; }
-
+          if (!view.disableLoader){ $(selector).addClass(view.loaderClassname);}
           masterLayout.setView(selector, view);
-
           FauxtonAPI.when(view.establish()).then(function(resp) {
+            if (!view.disableLoader) $(selector).removeClass(view.loaderClassname);
             masterLayout.renderView(selector);
-          }, function(resp) {
+            }, function(resp) {
             view.establishError = {
               error: true,
               reason: resp
@@ -286,7 +300,7 @@ function(app, Fauxton) {
             }
           });
         });
-      });
+      }.bind(this));
 
       if (this.get('apiUrl')) masterLayout.apiBar.update(this.get('apiUrl'));
 
