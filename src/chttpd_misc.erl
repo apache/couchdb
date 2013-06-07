@@ -296,6 +296,8 @@ handle_up_req(#httpd{method='GET'} = Req) ->
     case config:get("couchdb", "maintenance_mode") of
     "true" ->
         send_json(Req, 404, {[{status, maintenance_mode}]});
+    "nolb" ->
+        send_json(Req, 404, {[{status, nolb}]});
     _ ->
         send_json(Req, 200, {[{status, ok}]})
     end;
