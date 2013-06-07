@@ -425,7 +425,7 @@ remove_proc(Tab, Pid) ->
 
 -spec export_proc(#proc_int{}) -> #proc{}.
 export_proc(#proc_int{} = ProcInt) ->
-    [_ | Data] = lists:sublist(record_info(size, proc), tuple_to_list(ProcInt)),
+    [_ | Data] = lists:sublist(tuple_to_list(ProcInt), record_info(size, proc)),
     list_to_tuple([proc | Data]).
 
 import_proc(#proc{} = P) ->
