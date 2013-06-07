@@ -15,7 +15,7 @@
 -export([open/2, open/3, query_modify/4, add/2, add_remove/3]).
 -export([fold/4, full_reduce/1, final_reduce/2, size/1, foldl/3, foldl/4]).
 -export([fold_reduce/4, lookup/2, get_state/1, set_options/2]).
--export([less/3]).
+-export([extract/2, assemble/3, less/3]).
 
 -include_lib("couch/include/couch_db.hrl").
 
