@@ -61,6 +61,7 @@ html_files = \
     html/_sources/config/os-daemons.txt \
     html/_sources/config/ssl.txt \
     html/_sources/config/update-notification.txt \
+    html/_sources/config/vendor.txt \
     html/_sources/config/vhosts.txt \
     html/_sources/config/proxying.txt \
     html/_sources/api-basics.txt \
@@ -113,6 +114,7 @@ html_files = \
     html/config/os-daemons.html \
     html/config/ssl.html \
     html/config/update-notification.html \
+    html/config/vendor.html \
     html/config/vhosts.html \
     html/config/proxying.html \
     html/api-basics.html \
@@ -163,6 +165,7 @@ src_files = \
     ../src/config/os-daemons.rst \
     ../src/config/ssl.rst \
     ../src/config/update-notification.rst \
+    ../src/config/vendor.rst \
     ../src/config/vhosts.rst \
     ../src/config/proxying.rst \
     ../src/api-basics.rst \
