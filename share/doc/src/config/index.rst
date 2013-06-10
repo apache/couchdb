@@ -54,6 +54,7 @@ Content:
    os-daemons
    ssl
    update-notification
+   vendor
    vhosts
 
    proxying
