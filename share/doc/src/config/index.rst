@@ -48,6 +48,7 @@ Content:
    :glob:
 
    admins
+   attachments
    cors
    httpd
    os-daemons
