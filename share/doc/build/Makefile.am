@@ -54,6 +54,7 @@ html_files = \
     html/_sources/api/misc.txt \
     html/_sources/api/reference.txt \
     html/_sources/config/admins.txt \
+    html/_sources/config/attachments.txt \
     html/_sources/config/cors.txt \
     html/_sources/config/httpd.txt \
     html/_sources/config/index.txt \
@@ -105,6 +106,7 @@ html_files = \
     html/api/misc.html \
     html/api/reference.html \
     html/config/admins.html \
+    html/config/attachments.html \
     html/config/cors.html \
     html/config/httpd.html \
     html/config/index.html \
@@ -154,6 +156,7 @@ src_files = \
     ../src/api/misc.rst \
     ../src/api/reference.rst \
     ../src/config/admins.rst \
+    ../src/config/attachments.rst \
     ../src/config/cors.rst \
     ../src/config/httpd.rst \
     ../src/config/index.rst \
