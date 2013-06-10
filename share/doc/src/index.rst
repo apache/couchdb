@@ -29,7 +29,7 @@ Contents
 
     intro
     api-basics
-    configuring
+    config/index
     replication
     replicator
     ddocs
@@ -37,7 +37,6 @@ Contents
     changes
     api/reference
     json-structure
-    config_reference
     contributing
     changelog
 

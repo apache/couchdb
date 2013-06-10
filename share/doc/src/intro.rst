@@ -68,7 +68,7 @@ The main sections are:
 
    An interface into the configuration of your CouchDB installation. The
    interface allows you to edit the different configurable parameters.
-   For more details on configuration, see :ref:`configuring`.
+   For more details on configuration, see :ref:`config` section.
 
 -  Replicator
 
