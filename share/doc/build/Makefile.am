@@ -53,11 +53,18 @@ html_files = \
     html/_sources/api/local.txt \
     html/_sources/api/misc.txt \
     html/_sources/api/reference.txt \
+    html/_sources/config/admins.txt \
+    html/_sources/config/cors.txt \
+    html/_sources/config/httpd.txt \
+    html/_sources/config/index.txt \
+    html/_sources/config/os-daemons.txt \
+    html/_sources/config/ssl.txt \
+    html/_sources/config/update-notification.txt \
+    html/_sources/config/vhosts.txt \
+    html/_sources/config/proxying.txt \
     html/_sources/api-basics.txt \
     html/_sources/changelog.txt \
     html/_sources/changes.txt \
-    html/_sources/config_reference.txt \
-    html/_sources/configuring.txt \
     html/_sources/contributing.txt \
     html/_sources/ddocs.txt \
     html/_sources/index.txt \
@@ -97,12 +104,18 @@ html_files = \
     html/api/local.html \
     html/api/misc.html \
     html/api/reference.html \
+    html/config/admins.html \
+    html/config/cors.html \
+    html/config/httpd.html \
+    html/config/index.html \
+    html/config/os-daemons.html \
+    html/config/ssl.html \
+    html/config/update-notification.html \
+    html/config/vhosts.html \
+    html/config/proxying.html \
     html/api-basics.html \
     html/changelog.html \
     html/changes.html \
-    html/config_reference.html \
-    html/configuring.html \
-    html/contributing.html \
     html/ddocs.html \
     html/index.html \
     html/intro.html \
@@ -140,11 +153,18 @@ src_files = \
     ../src/api/local.rst \
     ../src/api/misc.rst \
     ../src/api/reference.rst \
+    ../src/config/admins.rst \
+    ../src/config/cors.rst \
+    ../src/config/httpd.rst \
+    ../src/config/index.rst \
+    ../src/config/os-daemons.rst \
+    ../src/config/ssl.rst \
+    ../src/config/update-notification.rst \
+    ../src/config/vhosts.rst \
+    ../src/config/proxying.rst \
     ../src/api-basics.rst \
     ../src/changelog.rst \
     ../src/changes.rst \
-    ../src/config_reference.rst \
-    ../src/configuring.rst \
     ../src/contributing.rst \
     ../src/ddocs.rst \
     ../src/index.rst \
