@@ -58,6 +58,7 @@ html_files = \
     html/_sources/config/cors.txt \
     html/_sources/config/couch-httpd-auth.txt \
     html/_sources/config/couchdb.txt \
+    html/_sources/config/daemons.txt \
     html/_sources/config/httpd.txt \
     html/_sources/config/index.txt \
     html/_sources/config/os-daemons.txt \
@@ -115,6 +116,7 @@ html_files = \
     html/config/cors.html \
     html/config/couch-httpd-auth.html \
     html/config/couchdb.html \
+    html/config/daemons.html \
     html/config/httpd.html \
     html/config/index.html \
     html/config/os-daemons.html \
@@ -170,6 +172,7 @@ src_files = \
     ../src/config/cors.rst \
     ../src/config/couch-httpd-auth.rst \
     ../src/config/couchdb.rst \
+    ../src/config/daemons.rst \
     ../src/config/httpd.rst \
     ../src/config/index.rst \
     ../src/config/os-daemons.rst \
