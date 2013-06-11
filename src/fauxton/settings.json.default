@@ -1,5 +1,6 @@
 {
   "deps": [
+  { "name": "activetasks" },
   { "name": "config" },
   { "name": "logs" },
   { "name": "stats" },
