@@ -49,6 +49,7 @@ Content:
 
    admins
    attachments
+   compaction
    cors
    couch-httpd-auth
    couchdb
