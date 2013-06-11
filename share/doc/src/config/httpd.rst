@@ -209,3 +209,17 @@ whitelist::
   [httpd]
   config_whitelist = [{httpd,config_whitelist}, {log,level}, {etc,etc}]
 
+
+.. _config/httpd/redirect_vhost_handler:
+
+``redirect_vhost_handler`` :: Virtual Hosts custom redirect handler
+-------------------------------------------------------------------
+
+This option allows to change the default function that handles requests to
+:ref:`virtual hosts <config/vhosts>`::
+
+  [httpd]
+  redirect_vhost_handler = {Module, Fun}
+
+Specified function take 2 arguments: the Mochiweb request object and the target
+path.
