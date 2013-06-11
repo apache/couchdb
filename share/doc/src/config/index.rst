@@ -55,6 +55,7 @@ Content:
    os-daemons
    ssl
    update-notification
+   uuids
    vendor
    vhosts
 
