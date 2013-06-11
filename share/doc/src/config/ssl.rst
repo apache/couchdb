@@ -47,7 +47,7 @@ Now, you need to edit CouchDB's configuration, either by editing your
 configuration screen in Futon. Here is what you need to do in
 ``local.ini``, you can infer what needs doing in the other places.
 
-At first, enable HTTPS daemon::
+At first, :ref:`enable HTTPS daemon <config/daemons/httpsd>`::
 
   [daemons]
   httpsd = {couch_httpd, start_link, [https]}

@@ -52,6 +52,7 @@ Content:
    cors
    couch-httpd-auth
    couchdb
+   daemons
    httpd
    os-daemons
    ssl
