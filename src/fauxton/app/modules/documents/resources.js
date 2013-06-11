@@ -67,6 +67,10 @@ function(app, FauxtonAPI) {
       return views && _.keys(views).length > 0;
     },
 
+    hasAttachments: function () {
+      return !!this.get('_attachments');
+    },
+
     getDdocView: function(view) {
       if (!this.isDdoc() || !this.hasViews()) return false;
 
@@ -160,6 +164,14 @@ function(app, FauxtonAPI) {
       var data = this.get("doc") ? this.get("doc") : this;
 
       return JSON.stringify(data, null, "  ");
+    },
+
+    copy: function (copyId) {
+      return $.ajax({
+        type: 'COPY',
+        url: '/' + this.database.id + '/' + this.id,
+        headers: {Destination: copyId}
+      });
     }
   });
 

@@ -52,7 +52,8 @@ function(app, FauxtonAPI, Documents, Databases) {
     },
 
     events: {
-      "route:reRenderDoc": "reRenderDoc"
+      "route:reRenderDoc": "reRenderDoc",
+      "route:duplicateDoc": "duplicateDoc"
     },
 
     crumbs: function() {
@@ -80,6 +81,28 @@ function(app, FauxtonAPI, Documents, Databases) {
       this.docView = this.setView("#dashboard-content", new Documents.Views.DocFieldEditor({
         model: this.doc
       }));
+    },
+
+    duplicateDoc: function (newId) {
+      var doc = this.doc,
+          docView = this.docView,
+          database = this.database;
+
+      doc.copy(newId).then(function () {
+        doc.set({_id: newId}); 
+        docView.forceRender();
+        FauxtonAPI.navigate('/database/' + database.id + '/' + newId, {trigger: true});
+        FauxtonAPI.addNotification({
+          msg: "Document has been duplicated."
+        });
+
+      }, function (error) {
+        var errorMsg = "Could not duplicate document, reason: " + error.responseText + ".";
+        FauxtonAPI.addNotification({
+          msg: errorMsg,
+          type: "error"
+        });
+      });
     },
 
     apiUrl: function() {

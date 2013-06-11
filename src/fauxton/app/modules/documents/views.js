@@ -166,7 +166,7 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
 
     success: function (resp) {
       var hideModal = this.hideModal,
-          $form = this.$('#file-upload');
+      $form = this.$('#file-upload');
 
       FauxtonAPI.triggerRouteEvent('reRenderDoc');
       //slight delay to make this transistion a little more fluid and less jumpy
@@ -181,7 +181,7 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
     },
 
     beforeSend: function () {
-     this.$('.progress').removeClass('hide');
+      this.$('.progress').removeClass('hide');
     },
 
     showModal: function () {
@@ -214,6 +214,74 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
     serialize: function () {
       return this.model.toJSON();
     }
+  });
+
+  Views.DuplicateDocModal = FauxtonAPI.View.extend({
+    template: "templates/documents/duplicate_doc_modal",
+
+    initialize: function () {
+      _.bindAll(this);
+    },
+
+    events: {
+      "click #duplicate-btn":"duplicate"
+
+    },
+
+    duplicate: function (event) {
+      event.preventDefault();
+      var newId = this.$('#dup-id').val();
+
+      this.hideModal();
+      FauxtonAPI.triggerRouteEvent('duplicateDoc', newId);
+    },
+
+    _showModal: function () {
+      this.$('.bar').css({width: '0%'});
+      this.$('.progress').addClass('hide');
+      this.clear_error_msg();
+      this.$('.modal').modal();
+      // hack to get modal visible 
+      $('.modal-backdrop').css('z-index',1025);
+    },
+
+    showModal: function () {
+      var showModal = this._showModal,
+          setDefaultIdValue = this.setDefaultIdValue,
+          uuid = new FauxtonAPI.UUID();
+
+      uuid.fetch().then(function () {
+        setDefaultIdValue(uuid.next());
+        showModal();
+      });
+    },
+
+    setDefaultIdValue: function (id) {
+      this.$('#dup-id').val(id);
+    },
+
+    hideModal: function () {
+      this.$('.modal').modal('hide');
+    },
+
+    set_error_msg: function (msg) {
+      var text;
+      if (typeof(msg) == 'string') {
+        text = msg;
+      } else {
+        text = JSON.parse(msg.responseText).reason;
+      }
+      this.$('#modal-error').text(text).removeClass('hide');
+    },
+
+    clear_error_msg: function () {
+      this.$('#modal-error').text(' ').addClass('hide');
+    },
+
+    serialize: function () {
+      return this.model.toJSON();
+    }
+
   });
 
   Views.FieldEditorTabs = FauxtonAPI.View.extend({
@@ -252,18 +320,19 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
     beforeRender: function () {
       this.uploadModal = this.setView('#upload-modal', new Views.UploadModal({model: this.model}));
       this.uploadModal.render();
+
+      this.duplicateModal = this.setView('#duplicate-modal', new Views.DuplicateDocModal({model: this.model}));
+      this.duplicateModal.render();
     },
-    
+
     upload: function (event) {
       event.preventDefault();
       this.uploadModal.showModal();
     },
 
     duplicate: function(event) {
-      FauxtonAPI.addNotification({
-        type: "warning",
-        msg: "Duplicate functionality coming soon."
-      });
+      event.preventDefault();
+      this.duplicateModal.showModal();
     },
 
     updateSelected: function (selected) {
@@ -507,12 +576,15 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
     },
 
     saveDoc: function(event) {
-      var json, notification, that = this;
-      if (this.hasValidCode()) {
-        json = JSON.parse(this.editor.getValue());
-        this.model.clear({silent:true});
-        this.model.set(json);
+      var json, notification, 
+      that = this,
+      validDoc = this.getDocFromEditor();
+
+      if (validDoc) {
+        this.getDocFromEditor();
+
         notification = FauxtonAPI.addNotification({msg: "Saving document."});
+
         this.model.save().then(function () {
           FauxtonAPI.navigate('/database/' + that.database.id + '/' + that.model.id);
         }).fail(function(xhr) {
@@ -530,6 +602,18 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
           selector: "#doc .errors-container"
         });
       }
+    },
+
+    getDocFromEditor: function () {
+      if (!this.hasValidCode()) {
+        return false;
+      }
+
+      json = JSON.parse(this.editor.getValue());
+      this.model.clear({silent:true});
+      this.model.set(json);
+
+      return this.model;
     },
 
     hasValidCode: function() {
@@ -788,8 +872,8 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
       if (this.newView) { return alert('Please save this new view before querying it.'); }
 
       var paramInfo = this.queryParams(),
-          errorParams = paramInfo.errorParams,
-          params = paramInfo.params;
+      errorParams = paramInfo.errorParams,
+      params = paramInfo.params;
 
       if (_.any(errorParams)) {
         _.map(errorParams, function(param) {
@@ -858,9 +942,9 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
 
     previewView: function(event) {
       var that = this,
-          mapVal = this.mapEditor.getValue(),
-          reduceVal = this.reduceVal(),
-          paramsArr = this.queryParams().params;
+      mapVal = this.mapEditor.getValue(),
+      reduceVal = this.reduceVal(),
+      paramsArr = this.queryParams().params;
 
       var params = _.reduce(paramsArr, function (params, param) {
         params[param.name] = param.value;
@@ -903,10 +987,10 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
 
       if (this.hasValidCode()) {
         var mapVal = this.mapEditor.getValue(), 
-            reduceVal = this.reduceVal(),
-            viewName = this.$('#index-name').val(),
-            ddoc = this.getCurrentDesignDoc(),
-            ddocName = ddoc.id;
+        reduceVal = this.reduceVal(),
+        viewName = this.$('#index-name').val(),
+        ddoc = this.getCurrentDesignDoc(),
+        ddocName = ddoc.id;
 
         this.viewName = viewName;
 
@@ -1287,7 +1371,7 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
         model.fetch();
       }, this.refreshTime);
     },
-    
+
     stopRefreshInterval: function () {
       clearInterval(this.intervalId);
     },
