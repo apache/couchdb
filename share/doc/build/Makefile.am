@@ -61,6 +61,7 @@ html_files = \
     html/_sources/config/index.txt \
     html/_sources/config/os-daemons.txt \
     html/_sources/config/ssl.txt \
+    html/_sources/config/stats.txt \
     html/_sources/config/update-notification.txt \
     html/_sources/config/uuids.txt \
     html/_sources/config/vendor.txt \
@@ -116,6 +117,7 @@ html_files = \
     html/config/index.html \
     html/config/os-daemons.html \
     html/config/ssl.html \
+    html/config/stats.html \
     html/config/update-notification.html \
     html/config/uuids.html \
     html/config/vendor.html \
@@ -169,6 +171,7 @@ src_files = \
     ../src/config/index.rst \
     ../src/config/os-daemons.rst \
     ../src/config/ssl.rst \
+    ../src/config/stats.rst \
     ../src/config/update-notification.rst \
     ../src/config/uuids.rst \
     ../src/config/vendor.rst \
