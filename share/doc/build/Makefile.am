@@ -56,6 +56,7 @@ html_files = \
     html/_sources/config/admins.txt \
     html/_sources/config/attachments.txt \
     html/_sources/config/cors.txt \
+    html/_sources/config/couchdb.txt \
     html/_sources/config/httpd.txt \
     html/_sources/config/index.txt \
     html/_sources/config/os-daemons.txt \
@@ -109,6 +110,7 @@ html_files = \
     html/config/admins.html \
     html/config/attachments.html \
     html/config/cors.html \
+    html/config/couchdb.html \
     html/config/httpd.html \
     html/config/index.html \
     html/config/os-daemons.html \
@@ -160,6 +162,7 @@ src_files = \
     ../src/config/admins.rst \
     ../src/config/attachments.rst \
     ../src/config/cors.rst \
+    ../src/config/couchdb.rst \
     ../src/config/httpd.rst \
     ../src/config/index.rst \
     ../src/config/os-daemons.rst \
