@@ -50,6 +50,7 @@ Content:
    admins
    attachments
    cors
+   couch-httpd-auth
    couchdb
    httpd
    os-daemons
