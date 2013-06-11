@@ -56,6 +56,7 @@ html_files = \
     html/_sources/config/admins.txt \
     html/_sources/config/attachments.txt \
     html/_sources/config/compaction.txt \
+    html/_sources/config/compaction-daemon.txt \
     html/_sources/config/cors.txt \
     html/_sources/config/couch-httpd-auth.txt \
     html/_sources/config/couchdb.txt \
@@ -115,6 +116,7 @@ html_files = \
     html/config/admins.html \
     html/config/attachments.html \
     html/config/compaction.html \
+    html/config/compaction-daemon.html \
     html/config/cors.html \
     html/config/couch-httpd-auth.html \
     html/config/couchdb.html \
@@ -172,6 +174,7 @@ src_files = \
     ../src/config/admins.rst \
     ../src/config/attachments.rst \
     ../src/config/compaction.rst \
+    ../src/config/compaction-daemon.rst \
     ../src/config/cors.rst \
     ../src/config/couch-httpd-auth.rst \
     ../src/config/couchdb.rst \

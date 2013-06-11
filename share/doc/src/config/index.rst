@@ -50,6 +50,7 @@ Content:
    admins
    attachments
    compaction
+   compaction-daemon
    cors
    couch-httpd-auth
    couchdb
