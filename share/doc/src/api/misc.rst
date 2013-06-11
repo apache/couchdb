@@ -846,10 +846,12 @@ Returns:
        ]
     }
 
-The UUID type is determined by the UUID type setting in the CouchDB
-configuration. See :ref:`api/config/section/key.put`.
+The UUID type is determined by the :ref:`UUID algorithm <config/uuids/algorithm>`
+setting in the CouchDB configuration.
 
-For example, changing the UUID type to ``random``:
+The UUID type could be changed in anytime through
+:ref:`Config API <api/config/section/key.put>`. For example, changing the UUID
+type to ``random`` use next HTTP request:
 
 .. code-block:: http
 
@@ -859,7 +861,7 @@ For example, changing the UUID type to ``random``:
 
     "random"
 
-When obtaining a list of UUIDs:
+When obtaining a list of UUIDs you'll see the changes:
 
 .. code-block:: javascript
 
@@ -872,6 +874,7 @@ When obtaining a list of UUIDs:
           "2e0dbf7f6c4ad716f21938a016e4e59f"
        ]
     }
+
 
 .. _api/misc/favicon:
 .. _api/misc/favicon.get:
