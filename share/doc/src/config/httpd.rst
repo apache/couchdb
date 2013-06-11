@@ -19,6 +19,33 @@
 
 These options are under ``[httpd]`` section.
 
+.. _config/httpd/allow_jsonp:
+
+``allow_jsonp`` :: Enables JSONP support
+----------------------------------------
+
+::
+
+  [httpd]
+  allow_jsonp = false
+
+
+.. _config/httpd/authentication_handlers:
+
+``authentication_handlers`` :: Authentication handlers
+------------------------------------------------------
+
+List of used authentication handlers that used by CouchDB. You may extend them
+via third-party plugins or remove some of them if you won't let users to use one
+of provided methods::
+
+  [httpd]
+  authentication_handlers = {couch_httpd_oauth, oauth_authentication_handler}, {couch_httpd_auth, cookie_authentication_handler}, {couch_httpd_auth, default_authentication_handler}
+
+- ``{couch_httpd_oauth, oauth_authentication_handler}`` - handles OAuth;
+- ``{couch_httpd_auth, cookie_authentication_handler}`` - used for Cookie auth;
+- ``{couch_httpd_auth, default_authentication_handler}`` - used for Basic auth;
+
 
 .. _config/httpd/bind_address:
 
@@ -47,6 +74,56 @@ or ``::`` for any available::
   bind_address = ::
 
 
+.. _config/httpd/config_whitelist:
+
+``config_whitelist`` :: Config options while list
+-------------------------------------------------
+
+Sets the configuration modification whitelist. Only whitelisted values may be
+changed via the :ref:`config API <api/config>`. To allow the admin to change
+this value over HTTP, remember to include ``{httpd,config_whitelist}`` itself.
+Excluding it from the list would require editing this file to update the
+whitelist::
+
+  [httpd]
+  config_whitelist = [{httpd,config_whitelist}, {log,level}, {etc,etc}]
+
+
+.. _config/httpd/default_handler:
+
+``default_handler`` :: Default request handler
+----------------------------------------------
+
+Specifies default HTTP requests handler::
+
+  [httpd]
+  default_handler = {couch_httpd_db, handle_request}
+
+
+.. _config/httpd/enable_cors:
+
+``enable_cors`` :: Activates CORS
+---------------------------------
+
+.. versionadded:: 1.3
+
+Controls :ref:`CORS <config/cors>` feature::
+
+  [httpd]
+  enable_cors = false
+
+
+.. _config/httpd/log_max_chunk_size:
+
+``log_max_chunk_size`` :: Logs chunk size
+-----------------------------------------
+
+Defines maximum chunk size in bytes for :ref:`_log <api/misc/log>` resource::
+
+  [httpd]
+  log_max_chunk_size = 1000000
+
+
 .. _config/httpd/port:
 
 ``port`` :: Listen port
@@ -65,66 +142,19 @@ To let CouchDB handle any free port, set this option to ``0``::
 After that, CouchDB URI could be located within the URI file.
 
 
-.. _config/httpd/authentication_handlers:
+.. _config/httpd/redirect_vhost_handler:
 
-``authentication_handlers`` :: Authentication handlers
-------------------------------------------------------
+``redirect_vhost_handler`` :: Virtual Hosts custom redirect handler
+-------------------------------------------------------------------
 
-List of used authentication handlers that used by CouchDB. You may extend them
-via third-party plugins or remove some of them if you won't let users to use one
-of provided methods::
-
-  [httpd]
-  authentication_handlers = {couch_httpd_oauth, oauth_authentication_handler}, {couch_httpd_auth, cookie_authentication_handler}, {couch_httpd_auth, default_authentication_handler}
-
-* ``{couch_httpd_oauth, oauth_authentication_handler}`` - handles OAuth;
-* ``{couch_httpd_auth, cookie_authentication_handler}`` - used for Cookie auth;
-* ``{couch_httpd_auth, default_authentication_handler}`` - used for Basic auth;
-
-
-.. _config/httpd/default_handler:
-
-``default_handler`` :: Default request handler
-----------------------------------------------
-
-Specifies default HTTP requests handler::
-
-  [httpd]
-  default_handler = {couch_httpd_db, handle_request}
-
-
-.. _config/httpd/secure_rewrites:
-
-``secure_rewrites`` :: Default request handler
-----------------------------------------------
-
-This option allow to isolate databases via subdomains::
-
-  [httpd]
-  secure_rewrites = true
-
-
-.. _config/httpd/vhost_global_handlers:
-
-``vhost_global_handlers`` :: Virtual hosts global handlers
-----------------------------------------------------------
-
-List of global handlers that are available for
+This option allows to change the default function that handles requests to
 :ref:`virtual hosts <config/vhosts>`::
 
   [httpd]
-  vhost_global_handlers = _utils, _uuids, _session, _oauth, _users
+  redirect_vhost_handler = {Module, Fun}
 
-
-.. _config/httpd/allow_jsonp:
-
-``allow_jsonp`` :: Enables JSONP support
-----------------------------------------
-
-::
-
-  [httpd]
-  allow_jsonp = false
+Specified function take 2 arguments: the Mochiweb request object and the target
+path.
 
 
 .. _config/httpd/server_options:
@@ -140,6 +170,17 @@ configuration files::
 
 
 .. _MochiWeb: https://github.com/mochi/mochiweb
+
+
+.. _config/httpd/secure_rewrites:
+
+``secure_rewrites`` :: Default request handler
+----------------------------------------------
+
+This option allow to isolate databases via subdomains::
+
+  [httpd]
+  secure_rewrites = true
 
 
 .. _config/httpd/socket_options:
@@ -160,28 +201,16 @@ TCP/IP stack. A list of the supported options are provided in the
 .. _Erlang inet: http://www.erlang.org/doc/man/inet.html#setopts-2
 
 
-.. _config/httpd/log_max_chunk_size:
+.. _config/httpd/vhost_global_handlers:
 
-``log_max_chunk_size`` :: Logs chunk size
------------------------------------------
+``vhost_global_handlers`` :: Virtual hosts global handlers
+----------------------------------------------------------
 
-Defines maximum chunk size in bytes for :ref:`_log <api/misc/log>` resource::
-
-  [httpd]
-  log_max_chunk_size = 1000000
-
-
-.. _config/httpd/enable_cors:
-
-``enable_cors`` :: Activates CORS
----------------------------------
-
-.. versionadded:: 1.3
-
-Controls :ref:`CORS <config/cors>` feature::
+List of global handlers that are available for
+:ref:`virtual hosts <config/vhosts>`::
 
   [httpd]
-  enable_cors = false
+  vhost_global_handlers = _utils, _uuids, _session, _oauth, _users
 
 
 .. _config/httpd/WWW-Authenticate:
@@ -194,32 +223,3 @@ Set this option to trigger basic-auth popup on unauthorized requests::
   [httpd]
   WWW-Authenticate = Basic realm="Welcome to the Couch!"
 
-
-.. _config/httpd/config_whitelist:
-
-``config_whitelist`` :: Config options while list
--------------------------------------------------
-
-Sets the configuration modification whitelist. Only whitelisted values may be
-changed via the :ref:`config API <api/config>`. To allow the admin to change
-this value over HTTP, remember to include ``{httpd,config_whitelist}`` itself.
-Excluding it from the list would require editing this file to update the
-whitelist::
-
-  [httpd]
-  config_whitelist = [{httpd,config_whitelist}, {log,level}, {etc,etc}]
-
-
-.. _config/httpd/redirect_vhost_handler:
-
-``redirect_vhost_handler`` :: Virtual Hosts custom redirect handler
--------------------------------------------------------------------
-
-This option allows to change the default function that handles requests to
-:ref:`virtual hosts <config/vhosts>`::
-
-  [httpd]
-  redirect_vhost_handler = {Module, Fun}
-
-Specified function take 2 arguments: the Mochiweb request object and the target
-path.
