@@ -54,6 +54,7 @@ Content:
    httpd
    os-daemons
    ssl
+   stats
    update-notification
    uuids
    vendor
