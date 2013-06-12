@@ -112,7 +112,7 @@ compactor handling::
 ``query_servers``
 -----------------
 
-`Query servers` manager::
+:ref:`Query servers <config/query_servers>` manager::
 
   [daemons]
   query_servers={couch_query_servers, start_link, []}
