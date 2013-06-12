@@ -14,8 +14,8 @@
 
 .. _config/query_servers:
 
-``[query_servers]`` :: Query Servers Configuration
-==================================================
+``[query_servers]`` :: Query Servers Definition
+===============================================
 
 .. versionchanged:: 1.2: Added CoffeeScript query server
 
@@ -60,3 +60,50 @@ running via `Mozilla SpiderMonkey`_::
    :ref:`Native Erlang Query Server <config/native_query_servers>` that allows
    to process Erlang `ddocs` and runs within CouchDB bypassing stdio
    communication and JSON serialization/deserialization round trip overhead.
+
+
+.. _config/query_server_config:
+
+``[query_server_config]`` :: Query Servers Configuration
+========================================================
+
+
+.. _config/query_server_config/commit_freq:
+
+``commit_freq`` :: View index commit delay
+------------------------------------------
+
+Specifies delay in seconds (``5`` by default) before commit view index changes
+on disk::
+
+  [query_server_config]
+  commit_freq = 5
+
+
+.. _config/query_server_config/os_process_limit:
+
+``os_process_limit`` :: Query Server operation timeout
+------------------------------------------------------
+
+Amount of time in seconds that the Query Server may process CouchDB command::
+
+  [query_server_config]
+  os_process_limit = 10
+
+CouchDB will raise `os_process_timeout` error and kill the process in case when
+Query Server doesn't return any result within this time frame.
+
+
+.. _config/query_server_config/reduce_limit:
+
+``reduce_limit`` :: Reduce limit control
+----------------------------------------
+
+Controls `Reduce overflow` error that raises when output of
+:ref:`reduce functions <reducefun>` is too big::
+
+  [query_server_config]
+  reduce_limit = true
+
+Normally, you don't have to disable (by setting ``false`` value) this option
+since main propose of `reduce` functions is to *reduce* the input.
