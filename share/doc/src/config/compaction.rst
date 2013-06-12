@@ -101,3 +101,37 @@ Examples:
    compacted in parallel.
 
 
+.. _config/compaction_daemon:
+
+``[compaction_daemon]`` :: Configuration of Compaction Daemon
+=============================================================
+
+These options are under ``[compaction_daemon]`` section and belong to
+:ref:`compaction daemon <config/daemons/compaction_daemon>`.
+
+
+.. _config/compaction_daemon/check_interval:
+
+``check_interval``
+------------------
+
+The delay, in seconds, between each check for which database and view indexes
+need to be compacted::
+
+  [compaction_daemon]
+  check_interval = 300
+
+
+.. _config/compaction_daemon/min_file_size:
+
+``min_file_size``
+-----------------
+
+If a database or view index file is smaller then this value (in bytes),
+compaction will not happen. Very small files always have a very high
+fragmentation therefore it's not worth to compact them::
+
+  [compaction_daemon]
+  min_file_size = 131072
+
+
