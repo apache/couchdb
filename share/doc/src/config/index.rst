@@ -57,6 +57,7 @@ Content:
    daemons
    httpd
    native-query-servers
+   oauth
    os-daemons
    query-servers
    replicator
