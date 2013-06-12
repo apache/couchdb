@@ -56,6 +56,7 @@ Content:
    couchdb
    daemons
    httpd
+   native-query-servers
    os-daemons
    ssl
    stats
