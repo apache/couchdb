@@ -65,6 +65,7 @@ html_files = \
     html/_sources/config/index.txt \
     html/_sources/config/native-query-servers.txt \
     html/_sources/config/os-daemons.txt \
+    html/_sources/config/replicator.txt \
     html/_sources/config/ssl.txt \
     html/_sources/config/stats.txt \
     html/_sources/config/update-notification.txt \
@@ -126,6 +127,7 @@ html_files = \
     html/config/index.html \
     html/config/native-query-servers.html \
     html/config/os-daemons.html \
+    html/config/replicator.html \
     html/config/ssl.html \
     html/config/stats.html \
     html/config/update-notification.html \
@@ -185,6 +187,7 @@ src_files = \
     ../src/config/index.rst \
     ../src/config/native-query-servers.rst \
     ../src/config/os-daemons.rst \
+    ../src/config/replicator.rst \
     ../src/config/ssl.rst \
     ../src/config/stats.rst \
     ../src/config/update-notification.rst \
