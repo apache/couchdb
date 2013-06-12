@@ -60,6 +60,7 @@ html_files = \
     html/_sources/config/couch-httpd-auth.txt \
     html/_sources/config/couchdb.txt \
     html/_sources/config/daemons.txt \
+    html/_sources/config/database-compaction.txt \
     html/_sources/config/httpd.txt \
     html/_sources/config/index.txt \
     html/_sources/config/log.txt \
@@ -124,6 +125,7 @@ html_files = \
     html/config/couch-httpd-auth.html \
     html/config/couchdb.html \
     html/config/daemons.html \
+    html/config/database-compaction.html \
     html/config/httpd.html \
     html/config/index.html \
     html/config/log.html \
@@ -186,6 +188,7 @@ src_files = \
     ../src/config/couch-httpd-auth.rst \
     ../src/config/couchdb.rst \
     ../src/config/daemons.rst \
+    ../src/config/database-compaction.rst \
     ../src/config/httpd.rst \
     ../src/config/index.rst \
     ../src/config/log.rst \
