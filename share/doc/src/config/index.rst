@@ -58,6 +58,7 @@ Content:
    httpd
    native-query-servers
    os-daemons
+   query-servers
    replicator
    ssl
    stats
