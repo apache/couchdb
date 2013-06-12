@@ -63,6 +63,7 @@ html_files = \
     html/_sources/config/daemons.txt \
     html/_sources/config/httpd.txt \
     html/_sources/config/index.txt \
+    html/_sources/config/native-query-servers.txt \
     html/_sources/config/os-daemons.txt \
     html/_sources/config/ssl.txt \
     html/_sources/config/stats.txt \
@@ -123,6 +124,7 @@ html_files = \
     html/config/daemons.html \
     html/config/httpd.html \
     html/config/index.html \
+    html/config/native-query-servers.html \
     html/config/os-daemons.html \
     html/config/ssl.html \
     html/config/stats.html \
@@ -181,6 +183,7 @@ src_files = \
     ../src/config/daemons.rst \
     ../src/config/httpd.rst \
     ../src/config/index.rst \
+    ../src/config/native-query-servers.rst \
     ../src/config/os-daemons.rst \
     ../src/config/ssl.rst \
     ../src/config/stats.rst \

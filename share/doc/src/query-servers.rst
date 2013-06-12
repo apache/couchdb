@@ -296,29 +296,11 @@ storing view functions at e.g. ``views.lib.map``, ``views.lib.reduce``, etc.
 Erlang
 ======
 
-.. warning::
-
-   Unlike the JavaScript query server, the Erlang query server does not
-   run in a sandbox. This means Erlang code has full access to your OS,
-   filesystem and network, which may lead to security issues. While Erlang
-   functions are faster than JavaScript ones, you need to be careful
-   about running them, especially if they were written by someone else.
-
-
 .. note::
 
-   Due to security restrictions, the Erlang query server is disabled by
-   default. To enable it, you need to edit your `local.ini` to include a
-   ``native_query_servers`` section:
-
-   .. code-block:: ini
-
-      [native_query_servers]
-      erlang = {couch_native_process, start_link, []}
-
-   Don't forget to restart CouchDB after updating the configuration, and
-   use the ``language: "erlang"`` property in your Erlang design documents.
-
+   The Erlang query server is disabled by default.
+   Read :ref:`configuration guide <config/native_query_servers>` about
+   reasons why and how to enable it.
 
 .. function:: Emit(Id, Value)
 
