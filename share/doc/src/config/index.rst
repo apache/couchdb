@@ -54,6 +54,7 @@ Content:
    couch-httpd-auth
    couchdb
    daemons
+   database-compaction
    httpd
    log
    native-query-servers
