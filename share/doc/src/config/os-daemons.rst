@@ -21,7 +21,8 @@ This is a simple feature that allows users to configure CouchDB so that it
 maintains a given OS level process alive. If the process dies for any reason,
 CouchDB will restart it. If the process restarts too often, then CouchDB will
 mark it has halted and not attempt to restart it. The default max restart rate
-is ``3`` times in the last ``5`` seconds. These parameters are adjustable.
+is ``3`` times in the last ``5`` seconds. These parameters are
+:ref:`adjustable <config/os_daemons_settings>`.
 
 Commands that are started in this manner will have access to a simple
 API over stdio to request configuration parameters or to add log
@@ -94,3 +95,32 @@ see :ref:`http-proxying`. For further background on the OS Daemon service, see
 `CouchDB Externals API`_.
 
 .. _CouchDB Externals API: http://davispj.com/2010/09/26/new-couchdb-externals-api.html
+
+
+.. _config/os_daemons_settings:
+
+``[os_daemon_settings]`` :: OS Daemons settings
+===============================================
+
+.. _config/os_daemons_settings/max_retries:
+
+``max_retries`` :: Maximum restart retries
+------------------------------------------
+
+Specifies maximum attempts to run :ref:`os_daemon <config/os_daemons>` before
+mark him halted::
+
+  [os_daemon_settings]
+  max_retries = 3
+
+
+.. _config/os_daemons_settings/retry_time:
+
+``retry_time`` :: Delay between restart attempts
+------------------------------------------------
+
+Delay in seconds between :ref:`os_daemon <config/os_daemons>` restarts::
+
+  [os_daemon_settings]
+  retry_time = 5
+
