@@ -74,6 +74,18 @@ or ``::`` for any available::
   bind_address = ::
 
 
+.. _config/httpd/changes_timeout:
+
+``changes_timeout`` :: Changes feed timeout
+-------------------------------------------
+
+Specifies default `timeout` value for :ref:`Changes Feed <changes>` in
+milliseconds (60000 by default)::
+
+  [httpd]
+  changes_feed = 60000 ; 60 seconds
+
+
 .. _config/httpd/config_whitelist:
 
 ``config_whitelist`` :: Config options while list
