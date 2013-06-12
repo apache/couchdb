@@ -56,6 +56,7 @@ Content:
    couchdb
    daemons
    httpd
+   log
    native-query-servers
    oauth
    os-daemons
