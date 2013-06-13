@@ -41,7 +41,7 @@ changes(DbName, Options, StartVector) ->
         try
             {ok, {_, LastSeq, _, _}} =
                 couch_db:changes_since(Db, StartSeq, Enum, Opts, Acc0),
-            rexi:reply({complete, {LastSeq, Db#db.uuid, node()}})
+            rexi:reply({complete, {LastSeq, couch_db:get_uuid(Db), node()}})
         after
             couch_db:close(Db)
         end;
@@ -279,11 +279,14 @@ changes_enumerator(DocInfo, {Db, _Seq, Args, Options}) ->
 
 changes_row(Db, #doc_info{id=Id, high_seq=Seq}=DI, Results, Del, true, Opts) ->
     Doc = doc_member(Db, DI, Opts),
-    #change{key={Seq, Db#db.uuid, node()}, id=Id, value=Results, doc=Doc, deleted=Del};
+    Uuid = couch_db:get_uuid(Db),
+    #change{key={Seq, Uuid, node()}, id=Id, value=Results, doc=Doc, deleted=Del};
 changes_row(Db, #doc_info{id=Id, high_seq=Seq}, Results, true, _, _) ->
-    #change{key={Seq, Db#db.uuid, node()}, id=Id, value=Results, deleted=true};
+    Uuid = couch_db:get_uuid(Db),
+    #change{key={Seq, Uuid, node()}, id=Id, value=Results, deleted=true};
 changes_row(Db, #doc_info{id=Id, high_seq=Seq}, Results, _, _, _) ->
-    #change{key={Seq, Db#db.uuid, node()}, id=Id, value=Results}.
+    Uuid = couch_db:get_uuid(Db),
+    #change{key={Seq, Uuid, node()}, id=Id, value=Results}.
 
 doc_member(Shard, DocInfo, Opts) ->
     case couch_db:open_doc(Shard, DocInfo, [deleted | Opts]) of
@@ -365,16 +368,20 @@ set_io_priority(DbName, Options) ->
             ok
     end.
 
-calculate_start_seq(#db{uuid=Uuid1}, {_, Uuid2, _}) when Uuid1 =/= Uuid2 ->
-    %% The file was rebuilt, most likely in a different order, so rewind.
-    0;
-calculate_start_seq(#db{}=Db, {Seq, _Uuid, Node}) ->
-    case owner(Node, Seq, Db#db.epochs) of
-        true  -> Seq;
-        false -> 0
-    end;
 calculate_start_seq(_Db, Seq) when is_integer(Seq) ->
-    Seq.
+    Seq;
+calculate_start_seq(Db, {Seq, Uuid, Node}) ->
+    case couch_db:get_uuid(Db) == Uuid of
+        true ->
+            case owner(Node, Seq, couch_db:get_epochs(Db)) of
+                true -> Seq;
+                false -> 0
+            end;
+        false ->
+            %% The file was rebuilt, most likely in a different
+            %% order, so rewind.
+            0
+    end.
 
 owner(Node, Seq, Epochs) ->
     owner(Node, Seq, Epochs, infinity).
@@ -392,14 +399,15 @@ owner(Node, Seq, [{_EpochNode, EpochSeq} | Rest], _HighSeq) ->
 
 calculate_start_seq_test() ->
     %% uuid mismatch is always a rewind.
-    ?assertEqual(0, calculate_start_seq(#db{uuid=uuid1}, {1, uuid2, node1})),
+    Hdr1 = couch_db_header:new(),
+    Hdr2 = couch_db_header:set(Hdr1, [{uuid, uuid1}]),
+    ?assertEqual(0, calculate_start_seq(#db{header=Hdr2}, {1, uuid2, node1})),
     %% uuid matches and seq is owned by node.
-    ?assertEqual(2, calculate_start_seq(#db{uuid=uuid1, epochs=[{node1, 1}]},
-                                        {2, uuid1, node1})),
+    Hdr3 = couch_db_header:set(Hdr2, [{epochs, [{node1, 1}]}]),
+    ?assertEqual(2, calculate_start_seq(#db{header=Hdr3}, {2, uuid1, node1})),
     %% uuids match but seq is not owned by node.
-    ?assertEqual(0, calculate_start_seq(#db{uuid=uuid1,
-                                            epochs=[{node2, 2}, {node1, 1}]},
-                                        {3, uuid1, node1})),
+    Hdr4 = couch_db_header:set(Hdr2, [{epochs, [{node2, 2}, {node1, 1}]}]),
+    ?assertEqual(0, calculate_start_seq(#db{header=Hdr4}, {3, uuid1, node1})),
     %% return integer if we didn't get a vector.
     ?assertEqual(4, calculate_start_seq(#db{}, 4)).
 
