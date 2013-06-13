@@ -37,7 +37,7 @@ init({DbName, Filepath, Fd, Options}) ->
     case lists:member(create, Options) of
     true ->
         % create a new header and writes it to the file
-        Header =  #db_header{},
+        Header =  couch_db_header:new(),
         ok = couch_file:write_header(Fd, Header),
         % delete any old compaction files that might be hanging around
         RootDir = config:get("couchdb", "database_dir", "."),
@@ -50,7 +50,7 @@ init({DbName, Filepath, Fd, Options}) ->
             ok;
         no_valid_header ->
             % create a new header and writes it to the file
-            Header =  #db_header{},
+            Header =  couch_db_header:new(),
             ok = couch_file:write_header(Fd, Header),
             % delete any old compaction files that might be hanging around
             file:delete(Filepath ++ ".compact"),
@@ -133,7 +133,7 @@ handle_call({purge_docs, IdRevs}, _From, Db) ->
         id_tree = DocInfoByIdBTree,
         seq_tree = DocInfoBySeqBTree,
         update_seq = LastSeq,
-        header = Header = #db_header{purge_seq=PurgeSeq},
+        header = Header,
         compression = Comp
         } = Db,
     DocLookups = couch_btree:lookup(DocInfoByIdBTree,
@@ -181,16 +181,20 @@ handle_call({purge_docs, IdRevs}, _From, Db) ->
     {ok, Pointer, _} = couch_file:append_term(
             Fd, IdRevsPurged, [{compression, Comp}]),
 
+    NewHeader = couch_db_header:set(Header, [
+        {purge_seq, couch_db_header:purge_seq(Header) + 1},
+        {purged_docs, Pointer}
+    ]),
     Db2 = commit_data(
         Db#db{
             id_tree = DocInfoByIdBTree2,
             seq_tree = DocInfoBySeqBTree2,
             update_seq = NewSeq + 1,
-            header=Header#db_header{purge_seq=PurgeSeq+1, purged_docs=Pointer}}),
+            header=NewHeader}),
 
     ok = gen_server:call(couch_server, {db_updated, Db2}, infinity),
     couch_event:notify(Db#db.name, updated),
-    {reply, {ok, (Db2#db.header)#db_header.purge_seq, IdRevsPurged}, Db2}.
+    {reply, {ok, couch_db_header:purge_seq(NewHeader), IdRevsPurged}, Db2}.
 
 
 handle_cast({load_validation_funs, ValidationFuns}, Db) ->
@@ -444,34 +448,8 @@ btree_by_seq_reduce(reduce, DocInfos) ->
 btree_by_seq_reduce(rereduce, Reds) ->
     lists:sum(Reds).
 
-simple_upgrade_record(Old, New) when tuple_size(Old) < tuple_size(New) ->
-    OldSz = tuple_size(Old),
-    NewValuesTail =
-        lists:sublist(tuple_to_list(New), OldSz + 1, tuple_size(New) - OldSz),
-    list_to_tuple(tuple_to_list(Old) ++ NewValuesTail);
-simple_upgrade_record(Old, _New) ->
-    Old.
-
--define(OLD_DISK_VERSION_ERROR,
-    "Database files from versions smaller than 0.10.0 are no longer supported").
-
 init_db(DbName, Filepath, Fd, Header0, Options) ->
-    Header1 = simple_upgrade_record(Header0, #db_header{}),
-    Header2 =
-    case element(2, Header1) of
-    1 -> throw({database_disk_version_error, ?OLD_DISK_VERSION_ERROR});
-    2 -> throw({database_disk_version_error, ?OLD_DISK_VERSION_ERROR});
-    3 -> throw({database_disk_version_error, ?OLD_DISK_VERSION_ERROR});
-    4 -> Header1#db_header{security_ptr = nil}; % 0.10 and pre 0.11
-    5 -> Header1; % pre 1.2
-    ?LATEST_DISK_VERSION -> Header1;
-    _ -> throw({database_disk_version_error, "Incorrect disk header version"})
-    end,
-
-    Header = Header2#db_header{
-        uuid = initialize_uuid(Header2),
-        epochs = initialize_epochs(Header2)
-    },
+    Header = couch_db_header:upgrade(Header0),
 
     {ok, FsyncOptions} = couch_util:parse_term(
             config:get("couchdb", "fsync_options",
@@ -484,19 +462,22 @@ init_db(DbName, Filepath, Fd, Header0, Options) ->
 
     Compression = couch_compress:get_compression_method(),
 
-    {ok, IdBtree} = couch_btree:open(Header#db_header.id_tree_state, Fd,
+    IdTreeState = couch_db_header:id_tree_state(Header),
+    SeqTreeState = couch_db_header:seq_tree_state(Header),
+    LocalTreeState = couch_db_header:local_tree_state(Header),
+    {ok, IdBtree} = couch_btree:open(IdTreeState, Fd,
         [{split, fun ?MODULE:btree_by_id_split/1},
         {join, fun ?MODULE:btree_by_id_join/2},
         {reduce, fun ?MODULE:btree_by_id_reduce/2},
         {compression, Compression}]),
-    {ok, SeqBtree} = couch_btree:open(Header#db_header.seq_tree_state, Fd,
+    {ok, SeqBtree} = couch_btree:open(SeqTreeState, Fd,
             [{split, fun ?MODULE:btree_by_seq_split/1},
             {join, fun ?MODULE:btree_by_seq_join/2},
             {reduce, fun ?MODULE:btree_by_seq_reduce/2},
             {compression, Compression}]),
-    {ok, LocalDocsBtree} = couch_btree:open(Header#db_header.local_tree_state, Fd,
+    {ok, LocalDocsBtree} = couch_btree:open(LocalTreeState, Fd,
         [{compression, Compression}]),
-    case Header#db_header.security_ptr of
+    case couch_db_header:security_ptr(Header) of
     nil ->
         Security = [],
         SecurityPtr = nil;
@@ -515,27 +496,27 @@ init_db(DbName, Filepath, Fd, Header0, Options) ->
         id_tree = IdBtree,
         seq_tree = SeqBtree,
         local_tree = LocalDocsBtree,
-        committed_update_seq = Header#db_header.update_seq,
-        update_seq = Header#db_header.update_seq,
+        committed_update_seq = couch_db_header:update_seq(Header),
+        update_seq = couch_db_header:update_seq(Header),
         name = DbName,
         filepath = Filepath,
         security = Security,
         security_ptr = SecurityPtr,
         instance_start_time = StartTime,
-        revs_limit = Header#db_header.revs_limit,
+        revs_limit = couch_db_header:revs_limit(Header),
         fsync_options = FsyncOptions,
         options = Options,
         compression = Compression,
         before_doc_update = couch_util:get_value(before_doc_update, Options, nil),
         after_doc_read = couch_util:get_value(after_doc_read, Options, nil)
-        },
+    },
 
     % If we just created a new UUID while upgrading a
     % database then we want to flush that to disk or
     % we risk sending out the uuid and having the db
     % crash which would result in it generating a new
     % uuid each time it was reopened.
-    case Header /= Header2 of
+    case Header /= Header0 of
         true ->
             sync_header(Db, Header);
         false ->
@@ -815,13 +796,14 @@ update_local_docs(#db{local_tree=Btree}=Db, Docs) ->
     {ok, Db#db{local_tree = Btree2}}.
 
 db_to_header(Db, Header) ->
-    Header#db_header{
-        update_seq = Db#db.update_seq,
-        seq_tree_state = couch_btree:get_state(Db#db.seq_tree),
-        id_tree_state = couch_btree:get_state(Db#db.id_tree),
-        local_tree_state = couch_btree:get_state(Db#db.local_tree),
-        security_ptr = Db#db.security_ptr,
-        revs_limit = Db#db.revs_limit}.
+    couch_db_header:set(Header, [
+        {update_seq, Db#db.update_seq},
+        {seq_tree_state, couch_btree:get_state(Db#db.seq_tree)},
+        {id_tree_state, couch_btree:get_state(Db#db.id_tree)},
+        {local_tree_state, couch_btree:get_state(Db#db.local_tree)},
+        {security_ptr, Db#db.security_ptr},
+        {revs_limit, Db#db.revs_limit}
+    ]).
 
 commit_data(Db) ->
     commit_data(Db, false).
@@ -842,15 +824,13 @@ commit_data(Db, _) ->
         NewHeader -> sync_header(Db, NewHeader)
     end.
 
-sync_header(Db, NewHeader0) ->
+sync_header(Db, NewHeader) ->
     #db{
         fd = Fd,
         filepath = FilePath,
         fsync_options = FsyncOptions,
         waiting_delayed_commit = Timer
     } = Db,
-
-    NewHeader = update_epochs(NewHeader0),
 
     if is_reference(Timer) -> erlang:cancel_timer(Timer); true -> ok end,
 
@@ -1072,34 +1052,28 @@ start_copy_compact(#db{}=Db) ->
     gen_server:cast(Db#db.main_pid, {compact_done, DName}).
 
 
-open_compaction_files(DbName, Header, DbFilePath, Options) ->
+open_compaction_files(DbName, SrcHdr, DbFilePath, Options) ->
     DataFile = DbFilePath ++ ".compact.data",
     MetaFile = DbFilePath ++ ".compact.meta",
     {ok, DataFd, DataHdr} = open_compaction_file(DataFile),
     {ok, MetaFd, MetaHdr} = open_compaction_file(MetaFile),
+    DataHdrIsDbHdr = couch_db_header:is_header(DataHdr),
     case {DataHdr, MetaHdr} of
         {#comp_header{}=A, #comp_header{}=A} ->
             DbHeader = A#comp_header.db_header,
             Db0 = init_db(DbName, DataFile, DataFd, DbHeader, Options),
             Db1 = bind_emsort(Db0, MetaFd, A#comp_header.meta_state),
             {ok, Db1, DataFile, DataFd, MetaFd, Db0#db.id_tree};
-        {#db_header{}, _} ->
-            NewHeader = #db_header{
-                uuid = DataHdr#db_header.uuid,
-                epochs = DataHdr#db_header.epochs
-            },
-            ok = reset_compaction_file(MetaFd, NewHeader),
+        _ when DataHdrIsDbHdr ->
+            ok = reset_compaction_file(MetaFd, couch_db_header:from(SrcHdr)),
             Db0 = init_db(DbName, DataFile, DataFd, DataHdr, Options),
             Db1 = bind_emsort(Db0, MetaFd, nil),
             {ok, Db1, DataFile, DataFd, MetaFd, Db0#db.id_tree};
         _ ->
-            NewHeader = #db_header{
-                uuid = Header#db_header.uuid,
-                epochs = Header#db_header.epochs
-            },
-            ok = reset_compaction_file(DataFd, NewHeader),
-            ok = reset_compaction_file(MetaFd, NewHeader),
-            Db0 = init_db(DbName, DataFile, DataFd, NewHeader, Options),
+            Header = couch_db_header:from(SrcHdr),
+            ok = reset_compaction_file(DataFd, Header),
+            ok = reset_compaction_file(MetaFd, Header),
+            Db0 = init_db(DbName, DataFile, DataFd, Header, Options),
             Db1 = bind_emsort(Db0, MetaFd, nil),
             {ok, Db1, DataFile, DataFd, MetaFd, nil}
     end.
@@ -1126,16 +1100,16 @@ reset_compaction_file(Fd, Header) ->
 copy_purge_info(OldDb, NewDb) ->
     OldHdr = OldDb#db.header,
     NewHdr = NewDb#db.header,
-    if OldHdr#db_header.purge_seq > 0 ->
+    OldPurgeSeq = couch_db_header:purge_seq(OldHdr),
+    if OldPurgeSeq > 0 ->
         {ok, PurgedIdsRevs} = couch_db:get_last_purged(OldDb),
         Opts = [{compression, NewDb#db.compression}],
         {ok, Ptr, _} = couch_file:append_term(NewDb#db.fd, PurgedIdsRevs, Opts),
-        NewDb#db{
-            header=NewHdr#db_header{
-                purge_seq=OldHdr#db_header.purge_seq,
-                purged_docs=Ptr
-            }
-        };
+        NewNewHdr = couch_db_header:set(NewHdr, [
+            {purge_seq, OldPurgeSeq},
+            {purged_docs, Ptr}
+        ]),
+        NewDb#db{header = NewNewHdr};
     true ->
         NewDb
     end.
@@ -1154,7 +1128,7 @@ commit_compaction_data(#db{header=OldHeader}=Db0, Fd) ->
     % replace the logic to commit and fsync to a specific
     % fd instead of the Filepath stuff that commit_data/2
     % does.
-    DataState = OldHeader#db_header.id_tree_state,
+    DataState = couch_db_header:id_tree_state(OldHeader),
     MetaFd = couch_emsort:get_fd(Db0#db.id_tree),
     MetaState = couch_emsort:get_state(Db0#db.id_tree),
     Db1 = bind_id_tree(Db0, Db0#db.fd, DataState),
@@ -1197,7 +1171,7 @@ sort_meta_data(Db0) ->
 
 copy_meta_data(#db{fd=Fd, header=Header}=Db) ->
     Src = Db#db.id_tree,
-    DstState = Header#db_header.id_tree_state,
+    DstState = couch_db_header:id_tree_state(Header),
     {ok, IdTree0} = couch_btree:open(DstState, Fd, [
         {split, fun ?MODULE:btree_by_id_split/1},
         {join, fun ?MODULE:btree_by_id_join/2},
@@ -1299,48 +1273,3 @@ make_doc_summary(#db{compression = Comp}, {Body0, Atts0}) ->
     end,
     SummaryBin = ?term_to_bin({Body, Atts}),
     couch_file:assemble_file_chunk(SummaryBin, couch_util:md5(SummaryBin)).
-
-initialize_uuid(#db_header{uuid=nil}) ->
-    couch_uuids:random();
-initialize_uuid(#db_header{uuid=Uuid}) ->
-    Uuid.
-
-initialize_epochs(#db_header{epochs=nil}=Db) ->
-    [{node(), Db#db_header.update_seq}];
-initialize_epochs(#db_header{epochs=Epochs}) ->
-    Epochs.
-
-update_epochs(Db) ->
-    case Db#db.epochs of
-        [{Node, _} | _] when Node =:= node() ->
-            Db#db.epochs;
-        Epochs when is_list(Epochs) ->
-            %% Mark the sequence where this node took over.
-            [{node(), Db#db.update_seq} | Epochs]
-    end.
-
--ifdef(TEST).
--include_lib("eunit/include/eunit.hrl").
-
-initialize_uuid_is_stable_test() ->
-    %% UUID was initialized.
-    ?assertMatch(<<_:32/binary>>, initialize_uuid(#db_header{})),
-    %% UUID was preserved.
-    ?assertEqual(foo, initialize_uuid(#db_header{uuid=foo})).
-
-initialize_epochs_is_stable_test() ->
-    %% Epochs were initialized.
-    ?assertMatch([{'nonode@nohost', 0}], initialize_epochs(#db_header{})),
-    %% Epochs are preserved.
-    ?assertMatch(foo, initialize_epochs(#db_header{epochs=foo})).
-
-update_epochs_test() ->
-    %% Epochs are not extended if node stays the same.
-    ?assertMatch([{'nonode@nohost', 0}],
-                 update_epochs(#db{epochs=[{'nonode@nohost', 0}]})),
-
-    %% Epochs are extended if node changes.
-    ?assertMatch([{'nonode@nohost', 1}, {foo, 0}],
-                 update_epochs(#db{update_seq=1, epochs=[{foo, 0}]})).
-
--endif.

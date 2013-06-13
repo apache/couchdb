@@ -187,12 +187,14 @@ upgrade_tuple(Old) when is_tuple(Old) ->
     end,
     New.
 
+-define(OLD_DISK_VERSION_ERROR,
+    "Database files from versions smaller than 0.10.0 are no longer supported").
 
 upgrade_disk_version(#db_header{}=Header) ->
     case element(2, Header) of
-        1 -> Header#db_header{unused = 0, security_ptr = nil}; % 0.9]
-        2 -> Header#db_header{unused = 0, security_ptr = nil}; % (0.9 - 0.10)
-        3 -> Header#db_header{security_ptr = nil}; % (0.9 - 0.10)
+        1 -> throw({database_disk_version_error, ?OLD_DISK_VERSION_ERROR});
+        2 -> throw({database_disk_version_error, ?OLD_DISK_VERSION_ERROR});
+        3 -> throw({database_disk_version_error, ?OLD_DISK_VERSION_ERROR});
         4 -> Header#db_header{security_ptr = nil}; % [0.10 - 0.11)
         5 -> Header; % pre 1.2
         ?LATEST_DISK_VERSION -> Header;

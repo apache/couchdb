@@ -283,27 +283,30 @@ get_committed_update_seq(#db{committed_update_seq=Seq}) ->
 get_update_seq(#db{update_seq=Seq})->
     Seq.
 
-get_purge_seq(#db{header=#db_header{purge_seq=PurgeSeq}})->
-    PurgeSeq.
+get_purge_seq(#db{}=Db) ->
+    couch_db_header:purge_seq(Db#db.header).
 
-get_last_purged(#db{header=#db_header{purged_docs=nil}}) ->
-    {ok, []};
-get_last_purged(#db{fd=Fd, header=#db_header{purged_docs=PurgedPointer}}) ->
-    couch_file:pread_term(Fd, PurgedPointer).
+get_last_purged(#db{}=Db) ->
+    case couch_db_header:purged_docs(Db#db.header) of
+        nil ->
+            {ok, []};
+        Pointer ->
+            couch_file:pread_term(Db#db.fd, Pointer)
+    end.
 
 get_doc_count(Db) ->
     {ok, {Count, _, _}} = couch_btree:full_reduce(Db#db.id_tree),
     {ok, Count}.
 
-get_uuid(#db{header=Header}) ->
-    Header#header.uuid.
+get_uuid(#db{}=Db) ->
+    couch_db_header:uuid(Db#db.header).
 
-get_epochs(#db{header=Header}) ->
-    Header#header.epochs.
+get_epochs(#db{}=Db) ->
+    couch_db_header:epochs(Db#db.header).
 
 get_db_info(Db) ->
     #db{fd=Fd,
-        header=#db_header{disk_version=DiskVersion},
+        header=Header,
         compactor_pid=Compactor,
         update_seq=SeqNum,
         name=Name,
@@ -315,6 +318,7 @@ get_db_info(Db) ->
     } = Db,
     {ok, Size} = couch_file:bytes(Fd),
     {ok, DbReduction} = couch_btree:full_reduce(IdBtree),
+    DiskVersion = couch_db_header:disk_version(Header),
     Uuid = case get_uuid(Db) of
         undefined -> null;
         Uuid0 -> Uuid0

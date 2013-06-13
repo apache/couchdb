@@ -129,40 +129,13 @@
     handler
     }).
 
-% This should be updated anytime a header change happens that requires more
-% than filling in new defaults.
-%
-% As long the changes are limited to new header fields (with inline
-% defaults) added to the end of the record, then there is no need to increment
-% the disk revision number.
-%
-% if the disk revision is incremented, then new upgrade logic will need to be
-% added to couch_db_updater:init_db.
-
--define(LATEST_DISK_VERSION, 6).
-
--record(db_header,
-    {disk_version = ?LATEST_DISK_VERSION,
-     update_seq = 0,
-     unused = 0,
-     id_tree_state = nil,
-     seq_tree_state = nil,
-     local_tree_state = nil,
-     purge_seq = 0,
-     purged_docs = nil,
-     security_ptr = nil,
-     revs_limit = 1000,
-     uuid = nil,
-     epochs = nil
-    }).
-
 -record(db,
     {main_pid = nil,
     compactor_pid = nil,
     instance_start_time, % number of microsecs since jan 1 1970 as a binary string
     fd,
     fd_monitor,
-    header = #db_header{},
+    header = couch_db_header:new(),
     committed_update_seq,
     id_tree,
     seq_tree,
