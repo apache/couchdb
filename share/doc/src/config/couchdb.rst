@@ -93,6 +93,19 @@ section). Available methods are:
 .. _Google Snappy: http://code.google.com/p/snappy/
 
 
+.. _config/couchdb/fsync_options:
+
+``fsync_options`` :: Fsync options
+----------------------------------
+
+Conditions when to make `fsync` calls. `fsync` makes sure that any buffers kept
+by the operating system are written to disk. Normally, you have no need to edit
+this parameter::
+
+  [couchdb]
+  fsync_options = [before_header, after_header, on_file_open]
+
+
 .. _config/couchdb/max_dbs_open:
 
 ``max_dbs_open`` :: Limit of simultaneously opened databases
@@ -165,6 +178,19 @@ his content should be readable for user that runs CouchDB service::
 
   [couchdb]
   util_driver_dir = /usr/lib/couchdb/erlang/lib/couch-1.3.0/priv/lib
+
+
+.. _config/couchdb/uuid:
+
+``uuid`` :: CouchDB server UUID
+-------------------------------
+
+.. versionadded:: 1.3
+
+Unique identifier of CouchDB server instance::
+
+  [couchdb]
+  uuid = 0a959b9b8227188afc2ac26ccdf345a6
 
 
 .. _config/couchdb/view_index_dir:
