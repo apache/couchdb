@@ -72,6 +72,8 @@ test() ->
     couch_config:set(
         "couch_httpd_auth", "authentication_db",
         binary_to_list(auth_db_name()), false),
+    delete_db(auth_db_name()),
+    delete_db(auth_db_2_name()),
 
     test_auth_db_crash(),
 
