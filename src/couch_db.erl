@@ -21,6 +21,7 @@
 -export([open_doc/2,open_doc/3,open_doc_revs/4]).
 -export([set_revs_limit/2,get_revs_limit/1]).
 -export([get_missing_revs/2,name/1,get_update_seq/1,get_committed_update_seq/1]).
+-export([get_uuid/1, get_epochs/1]).
 -export([enum_docs/4,enum_docs_since/5]).
 -export([enum_docs_since_reduce_to_count/1,enum_docs_reduce_to_count/1]).
 -export([increment_update_seq/1,get_purge_seq/1,purge_docs/2,get_last_purged/1]).
@@ -294,6 +295,12 @@ get_doc_count(Db) ->
     {ok, {Count, _, _}} = couch_btree:full_reduce(Db#db.id_tree),
     {ok, Count}.
 
+get_uuid(#db{header=Header}) ->
+    Header#header.uuid.
+
+get_epochs(#db{header=Header}) ->
+    Header#header.epochs.
+
 get_db_info(Db) ->
     #db{fd=Fd,
         header=#db_header{disk_version=DiskVersion},
@@ -304,11 +311,14 @@ get_db_info(Db) ->
         committed_update_seq=CommittedUpdateSeq,
         id_tree = IdBtree,
         seq_tree = SeqBtree,
-        local_tree = LocalBtree,
-        uuid = Uuid
+        local_tree = LocalBtree
     } = Db,
     {ok, Size} = couch_file:bytes(Fd),
     {ok, DbReduction} = couch_btree:full_reduce(IdBtree),
+    Uuid = case get_uuid(Db) of
+        undefined -> null;
+        Uuid0 -> Uuid0
+    end,
     InfoList = [
         {db_name, Name},
         {doc_count, element(1, DbReduction)},

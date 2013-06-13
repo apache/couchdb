@@ -227,9 +227,7 @@ handle_cast({compact_done, CompactFilepath}, #db{filepath=Filepath}=Db) ->
             main_pid = self(),
             filepath = Filepath,
             instance_start_time = Db#db.instance_start_time,
-            revs_limit = Db#db.revs_limit,
-            uuid = Db#db.uuid,
-            epochs = Db#db.epochs
+            revs_limit = Db#db.revs_limit
         }),
 
         ?LOG_DEBUG("CouchDB swapping files ~s and ~s.",
@@ -459,7 +457,7 @@ simple_upgrade_record(Old, _New) ->
 
 init_db(DbName, Filepath, Fd, Header0, Options) ->
     Header1 = simple_upgrade_record(Header0, #db_header{}),
-    Header =
+    Header2 =
     case element(2, Header1) of
     1 -> throw({database_disk_version_error, ?OLD_DISK_VERSION_ERROR});
     2 -> throw({database_disk_version_error, ?OLD_DISK_VERSION_ERROR});
@@ -469,6 +467,11 @@ init_db(DbName, Filepath, Fd, Header0, Options) ->
     ?LATEST_DISK_VERSION -> Header1;
     _ -> throw({database_disk_version_error, "Incorrect disk header version"})
     end,
+
+    Header = Header2#db_header{
+        uuid = initialize_uuid(Header2),
+        epochs = initialize_epochs(Header2)
+    },
 
     {ok, FsyncOptions} = couch_util:parse_term(
             config:get("couchdb", "fsync_options",
@@ -505,7 +508,7 @@ init_db(DbName, Filepath, Fd, Header0, Options) ->
     StartTime = ?l2b(io_lib:format("~p",
             [(MegaSecs*1000000*1000000) + (Secs*1000000) + MicroSecs])),
     ok = couch_file:set_db_pid(Fd, self()),
-    #db{
+    Db = #db{
         fd=Fd,
         fd_monitor = erlang:monitor(process, Fd),
         header=Header,
@@ -524,10 +527,20 @@ init_db(DbName, Filepath, Fd, Header0, Options) ->
         options = Options,
         compression = Compression,
         before_doc_update = couch_util:get_value(before_doc_update, Options, nil),
-        after_doc_read = couch_util:get_value(after_doc_read, Options, nil),
-        uuid = initialize_uuid(Header),
-        epochs = initialize_epochs(Header)
-        }.
+        after_doc_read = couch_util:get_value(after_doc_read, Options, nil)
+        },
+
+    % If we just created a new UUID while upgrading a
+    % database then we want to flush that to disk or
+    % we risk sending out the uuid and having the db
+    % crash which would result in it generating a new
+    % uuid each time it was reopened.
+    case Header /= Header2 of
+        true ->
+            sync_header(Db, Header);
+        false ->
+            Db
+    end.
 
 
 close_db(#db{fd_monitor = Ref}) ->
@@ -808,9 +821,7 @@ db_to_header(Db, Header) ->
         id_tree_state = couch_btree:get_state(Db#db.id_tree),
         local_tree_state = couch_btree:get_state(Db#db.local_tree),
         security_ptr = Db#db.security_ptr,
-        revs_limit = Db#db.revs_limit,
-        uuid = Db#db.uuid,
-        epochs = update_epochs(Db)}.
+        revs_limit = Db#db.revs_limit}.
 
 commit_data(Db) ->
     commit_data(Db, false).
@@ -831,13 +842,15 @@ commit_data(Db, _) ->
         NewHeader -> sync_header(Db, NewHeader)
     end.
 
-sync_header(Db, NewHeader) ->
+sync_header(Db, NewHeader0) ->
     #db{
         fd = Fd,
         filepath = FilePath,
         fsync_options = FsyncOptions,
         waiting_delayed_commit = Timer
     } = Db,
+
+    NewHeader = update_epochs(NewHeader0),
 
     if is_reference(Timer) -> erlang:cancel_timer(Timer); true -> ok end,
 
@@ -1034,11 +1047,11 @@ copy_compact(Db, NewDb0, Retry) ->
 
 
 start_copy_compact(#db{}=Db) ->
-    #db{name=Name, filepath=Filepath, options=Options} = Db,
+    #db{name=Name, filepath=Filepath, options=Options, header=Header} = Db,
     ?LOG_DEBUG("Compaction process spawned for db \"~s\"", [Name]),
 
     {ok, NewDb, DName, DFd, MFd, Retry} =
-        open_compaction_files(Name, Filepath, Options),
+        open_compaction_files(Name, Header, Filepath, Options),
     erlang:monitor(process, MFd),
 
     % This is a bit worrisome. init_db/4 will monitor the data fd
@@ -1059,7 +1072,7 @@ start_copy_compact(#db{}=Db) ->
     gen_server:cast(Db#db.main_pid, {compact_done, DName}).
 
 
-open_compaction_files(DbName, DbFilePath, Options) ->
+open_compaction_files(DbName, Header, DbFilePath, Options) ->
     DataFile = DbFilePath ++ ".compact.data",
     MetaFile = DbFilePath ++ ".compact.meta",
     {ok, DataFd, DataHdr} = open_compaction_file(DataFile),
@@ -1071,15 +1084,22 @@ open_compaction_files(DbName, DbFilePath, Options) ->
             Db1 = bind_emsort(Db0, MetaFd, A#comp_header.meta_state),
             {ok, Db1, DataFile, DataFd, MetaFd, Db0#db.id_tree};
         {#db_header{}, _} ->
-            ok = reset_compaction_file(MetaFd, #db_header{}),
+            NewHeader = #db_header{
+                uuid = DataHdr#db_header.uuid,
+                epochs = DataHdr#db_header.epochs
+            },
+            ok = reset_compaction_file(MetaFd, NewHeader),
             Db0 = init_db(DbName, DataFile, DataFd, DataHdr, Options),
             Db1 = bind_emsort(Db0, MetaFd, nil),
             {ok, Db1, DataFile, DataFd, MetaFd, Db0#db.id_tree};
         _ ->
-            Header = #db_header{},
-            ok = reset_compaction_file(DataFd, Header),
-            ok = reset_compaction_file(MetaFd, Header),
-            Db0 = init_db(DbName, DataFile, DataFd, Header, Options),
+            NewHeader = #db_header{
+                uuid = Header#db_header.uuid,
+                epochs = Header#db_header.epochs
+            },
+            ok = reset_compaction_file(DataFd, NewHeader),
+            ok = reset_compaction_file(MetaFd, NewHeader),
+            Db0 = init_db(DbName, DataFile, DataFd, NewHeader, Options),
             Db1 = bind_emsort(Db0, MetaFd, nil),
             {ok, Db1, DataFile, DataFd, MetaFd, nil}
     end.

@@ -180,9 +180,7 @@
     options = [],
     compression,
     before_doc_update = nil, % nil | fun(Doc, Db) -> NewDoc
-    after_doc_read = nil,    % nil | fun(Doc, Db) -> NewDoc
-    uuid = nil,
-    epochs = nil
+    after_doc_read = nil    % nil | fun(Doc, Db) -> NewDoc
     }).
 
 -record(view_fold_helper_funs, {
