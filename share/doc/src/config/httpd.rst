@@ -225,6 +225,49 @@ List of global handlers that are available for
   vhost_global_handlers = _utils, _uuids, _session, _oauth, _users
 
 
+.. _config/httpd/x_forwarded_host:
+
+``x_forwarded_host`` :: X-Forwarder-Host
+----------------------------------------
+
+The `x_forwarded_host` header (``X-Forwarded-Host`` by default) is used to
+forward the original value of the ``Host`` header field in case, for example,
+if a reverse proxy is rewriting the "Host" header field to some internal host
+name before forward the request to CouchDB::
+
+  [httpd]
+  x_forwarded_host = X-Forwarded-Host
+
+This header has higher priority above ``Host`` one, if only it exists in the
+request.
+
+.. _config/httpd/x_forwarded_proto:
+
+``x_forwarded_proto`` :: X-Forwarder-Proto
+------------------------------------------
+
+`x_forwarded_proto` header (``X-Forwarder-Proto`` by default) is used for
+identifying the originating protocol of an HTTP request, since a reverse proxy
+may communicate with CouchDB instance using HTTP even if the request to
+the reverse proxy is HTTPS::
+
+  [httpd]
+  x_forwarded_proto = X-Forwarded-Proto
+
+
+.. _config/httpd/x_forwarded_ssl:
+
+``x_forwarded_ssl`` :: X-Forwarder-Ssl
+--------------------------------------
+
+The `x_forwarded_ssl` header (``X-Forwarded-Ssl`` by default) tells CouchDB that
+it should use the `https` scheme instead of the `http`. Actually, it's a synonym
+for ``X-Forwarded-Proto: https`` header, but used by some reverse proxies::
+
+  [httpd]
+  x_forwarded_ssl = X-Forwarded-Ssl
+
+
 .. _config/httpd/WWW-Authenticate:
 
 ``WWW-Authenticate`` :: Force basic auth
