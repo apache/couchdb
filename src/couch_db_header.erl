@@ -155,7 +155,11 @@ epochs(Header) ->
 
 
 get_field(Header, Field) ->
-    element(index(Field), Header).
+    Idx = index(Field),
+    case Idx > tuple_size(Header) of
+        true -> undefined;
+        false -> element(index(Field), Header)
+    end.
 
 
 set_field(Header, Field, Value) ->
@@ -341,6 +345,16 @@ upgrade_epochs_test() ->
     % Getting a reset header maintains the epoch data
     ResetHeader = from(NewNewHeader),
     ?assertEqual(OwnedEpochs, epochs(ResetHeader)).
+
+
+get_uuid_from_old_header_test() ->
+    Vsn5Header = mk_header(5),
+    ?assertEqual(undefined, uuid(Vsn5Header)).
+
+
+get_epochs_from_old_header_test() ->
+    Vsn5Header = mk_header(5),
+    ?assertEqual(undefined, epochs(Vsn5Header)).
 
 
 -endif.
