@@ -46,9 +46,12 @@ of provided methods::
   [httpd]
   authentication_handlers = {couch_httpd_oauth, oauth_authentication_handler}, {couch_httpd_auth, cookie_authentication_handler}, {couch_httpd_auth, default_authentication_handler}
 
-- ``{couch_httpd_oauth, oauth_authentication_handler}`` - handles OAuth;
-- ``{couch_httpd_auth, cookie_authentication_handler}`` - used for Cookie auth;
-- ``{couch_httpd_auth, default_authentication_handler}`` - used for Basic auth;
+- ``{couch_httpd_oauth, oauth_authentication_handler}``: handles OAuth;
+- ``{couch_httpd_auth, cookie_authentication_handler}``: used for Cookie auth;
+- ``{couch_httpd_auth, proxy_authentication_handler}``: used for Proxy auth;
+- ``{couch_httpd_auth, default_authentication_handler}``: used for Basic auth;
+- ``{couch_httpd_auth, null_authentication_handler}``: disables auth.
+  Everlasting `Admin Party`!
 
 
 .. _config/httpd/bind_address:
