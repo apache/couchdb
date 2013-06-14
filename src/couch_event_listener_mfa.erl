@@ -52,7 +52,7 @@ enter_loop(Mod, Func, State, Options) ->
 
 
 stop(Pid) ->
-    couch_event_listener:cast(Pid, shutown).
+    couch_event_listener:cast(Pid, shutdown).
 
 
 init({Parent, Mod, Func, State}) ->
