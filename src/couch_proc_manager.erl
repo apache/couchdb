@@ -92,7 +92,7 @@ handle_call(get_proc_count, _From, State) ->
 
 handle_call(get_stale_proc_count, _From, State) ->
     #state{tab = Tab, threshold_ts = T0} = State,
-    MatchSpec = [{#proc_int{t0='$1', _='_'}, [{'<', '$1', T0}], [true]}],
+    MatchSpec = [{#proc_int{t0='$1', _='_'}, [{'<', '$1', {T0}}], [true]}],
     {reply, ets:select_count(Tab, MatchSpec), State};
 
 handle_call({get_proc, #doc{body={Props}}=DDoc, DDocKey}, From, State) ->
@@ -147,7 +147,7 @@ handle_call(bump_threshold_ts, _From, #state{tab = Tab} = State) ->
 handle_call(terminate_stale_procs, _From, State) ->
     #state{tab = Tab, threshold_ts = T0} = State,
     MatchHead = #proc_int{pid = '$1', t0 = '$2', _ = '_'},
-    MatchSpec = [{MatchHead, [{'<', '$2', T0}], ['$1']}],
+    MatchSpec = [{MatchHead, [{'<', '$2', {T0}}], ['$1']}],
     lists:foreach(fun(P) -> remove_proc(Tab,P) end, ets:select(Tab, MatchSpec)),
     {reply, ok, State};
 
