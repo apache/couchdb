@@ -20,6 +20,28 @@
 These options are under ``[couch_httpd_auth]`` section.
 
 
+.. _config/couch_httpd_auth/allow_persistent_cookies:
+
+``allow_persistent_cookies`` :: Persistent cookies
+--------------------------------------------------
+
+Makes cookies persistent if ``true``::
+
+  [couch_httpd_auth]
+  allow_persistent_cookies = false
+
+
+.. _config/couch_httpd_auth/auth_cache_size:
+
+``auth_cache_size`` :: Authentication cache
+-------------------------------------------
+
+Number of :ref:`userctx_object` to cache in memory to reduce disk lookups::
+
+  [couch_httpd_auth]
+  auth_cache_size = 50
+
+
 .. _config/couch_httpd_auth/authentication_db:
 
 ``authentication_db`` :: Users database
@@ -45,28 +67,6 @@ response accepted by client (via ``Accept`` header)::
 
   [couch_httpd_auth]
   authentication_redirect = /_utils/session.html
-
-
-.. _config/couch_httpd_auth/auth_cache_size:
-
-``auth_cache_size`` :: Authentication cache
--------------------------------------------
-
-Number of :ref:`userctx_object` to cache in memory to reduce disk lookups::
-
-  [couch_httpd_auth]
-  auth_cache_size = 50
-
-
-.. _config/couch_httpd_auth/allow_persistent_cookies:
-
-``allow_persistent_cookies`` :: Persistent cookies
---------------------------------------------------
-
-Makes cookies persistent if ``true``::
-
-  [couch_httpd_auth]
-  allow_persistent_cookies = false
 
 
 .. _config/couch_httpd_auth/iterations:
