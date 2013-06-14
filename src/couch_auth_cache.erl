@@ -213,7 +213,7 @@ handle_info({'EXIT', LPid, _Reason}, #state{event_listener=LPid}=State) ->
 handle_info(restart_event_listener, State) ->
     [{auth_db_name, AuthDbName}] = ets:lookup(?STATE, auth_db_name),
     {ok, NewListener} = couch_event:link_listener(
-            ?MODULE, handle_db_event, nil, [{dbanme, AuthDbName}]
+            ?MODULE, handle_db_event, nil, [{dbname, AuthDbName}]
         ),
     {noreply, State#state{event_listener=NewListener}};
 handle_info({gen_event_EXIT, {config_listener, ?MODULE}, _Reason}, State) ->
