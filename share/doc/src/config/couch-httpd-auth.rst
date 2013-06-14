@@ -84,6 +84,18 @@ that requires authentication::
   iterations = 10000
 
 
+.. _config/couch_httpd_auth/proxy_use_secret:
+
+``proxy_use_secret`` :: Force proxy auth use secret token
+---------------------------------------------------------
+
+When this option ``true`` the :ref:`secret <config/couch_httpd_auth/secret>` is
+required for `Proxy Auth`::
+
+  [couch_httpd_auth]
+  proxy_use_secret = false
+
+
 .. _config/couch_httpd_auth/require_valid_user:
 
 ``require_valid_user`` :: Force users authentication
@@ -96,6 +108,17 @@ should be authenticated::
   require_valid_user = false
 
 
+.. _config/couch_httpd_auth/secret:
+
+``secret`` :: Proxy Auth secret token
+-------------------------------------
+
+The secret token used for `Proxy Auth` authentication method::
+
+  [couch_httpd_auth]
+  secret = 92de07df7e7a3fe14808cef90a7cc0d91
+
+
 .. _config/couch_httpd_auth/timeout:
 
 ``timeout`` :: Session timeout
@@ -105,4 +128,45 @@ Number of seconds since the last request before session will be expired::
 
   [couch_httpd_auth]
   timeout = 600
+
+
+.. _config/couch_httpd_auth/x_auth_roles:
+
+``x_auth_roles`` :: Proxy Auth roles header
+-------------------------------------------
+
+HTTP header name (``X-Auth-CouchDB-Roles`` by default) that contains the list of
+user's roles separated by a comma. Used for `Proxy Auth`::
+
+  [couch_httpd_auth]
+  x_auth_roles = X-Auth-CouchDB-Roles
+
+
+.. _config/couch_httpd_auth/x_auth_token:
+
+``x_auth_token`` :: Proxy Auth token header
+-------------------------------------------
+
+HTTP header name (``X-Auth-CouchDB-Token`` by default) with token to
+authenticate the authorization. This token is an `HMAC-SHA1` created from
+:ref:`secret key <config/couch_httpd_auth/secret>` and
+:ref:`username <config/couch_httpd_auth/x_auth_username>`. The secret key
+should be the same in the client and CouchDB node. This token is optional
+if value of :ref:`proxy_use_secret <config/couch_httpd_auth/proxy_use_secret>`
+option isn't ``true``. Used for `Proxy Auth`::
+
+  [couch_httpd_auth]
+  x_auth_roles = X-Auth-CouchDB-Token
+
+
+.. _config/couch_httpd_auth/x_auth_username:
+
+``x_auth_username`` :: Proxy Auth username header
+-------------------------------------------------
+
+HTTP header name (``X-Auth-CouchDB-UserName`` by default) containing the
+username. Used for `Proxy Auth`::
+
+  [couch_httpd_auth]
+  x_auth_username = X-Auth-CouchDB-UserName
 
