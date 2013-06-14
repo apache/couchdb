@@ -24,10 +24,14 @@ These options are under ``[httpd]`` section.
 ``allow_jsonp`` :: Enables JSONP support
 ----------------------------------------
 
-::
+The ``true`` value of this option enables `JSONP`_ support (it's ``false`` by
+default)::
 
   [httpd]
   allow_jsonp = false
+
+
+.. _JSONP: http://www.json-p.org/
 
 
 .. _config/httpd/authentication_handlers:
