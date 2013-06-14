@@ -68,6 +68,7 @@ Content:
    uuids
    vendor
    vhosts
+   view-compaction
 
    proxying
 

@@ -75,6 +75,7 @@ html_files = \
     html/_sources/config/uuids.txt \
     html/_sources/config/vendor.txt \
     html/_sources/config/vhosts.txt \
+    html/_sources/config/view-compaction.txt \
     html/_sources/config/proxying.txt \
     html/_sources/api-basics.txt \
     html/_sources/changelog.txt \
@@ -140,6 +141,7 @@ html_files = \
     html/config/uuids.html \
     html/config/vendor.html \
     html/config/vhosts.html \
+    html/config/view-compaction.html \
     html/config/proxying.html \
     html/api-basics.html \
     html/changelog.html \
@@ -203,6 +205,7 @@ src_files = \
     ../src/config/uuids.rst \
     ../src/config/vendor.rst \
     ../src/config/vhosts.rst \
+    ../src/config/view-compaction.rst \
     ../src/config/proxying.rst \
     ../src/api-basics.rst \
     ../src/changelog.rst \
