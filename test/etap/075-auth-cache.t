@@ -272,5 +272,5 @@ open_auth_db(DbName) ->
 
 
 delete_db(Name) ->
-    ok = couch_server:delete(
+    couch_server:delete(
         Name, [{user_ctx, #user_ctx{roles = [<<"_admin">>]}}]).
