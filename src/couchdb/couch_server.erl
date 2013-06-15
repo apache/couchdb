@@ -435,21 +435,18 @@ handle_info({'EXIT', Pid, Reason}, Server) ->
         % If not, that's an error, which is why there is no [] clause.
         case ets:lookup(couch_dbs_by_name, DbName) of
         [{_, {opening, Pid, Froms}}] ->
-            Msg = case Reason of
+            Reply = {_, Msg} = case Reason of
             snappy_nif_not_loaded ->
-                io_lib:format(
+                {bad_otp_release, io_lib:format(
                     "To open the database `~s`, Apache CouchDB "
                     "must be built with Erlang OTP R13B04 or higher.",
                     [Db]
-                );
+                )};
             true ->
-                io_lib:format("Error opening database ~p: ~p", [DbName, Reason])
+                {error, io_lib:format("Error opening database ~p: ~p", [DbName, Reason])}
             end,
             ?LOG_ERROR(Msg, []),
-            lists:foreach(
-              fun(F) -> gen_server:reply(F, {bad_otp_release, Msg}) end,
-              Froms
-            );
+            [gen_server:reply(F, Reply) || F <- Froms];
         [{_, {opened, Pid, LruTime}}] ->
             ?LOG_ERROR(
                 "Unexpected exit of database process ~p [~p]: ~p",
