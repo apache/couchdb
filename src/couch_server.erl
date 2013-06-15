@@ -502,7 +502,7 @@ handle_info({'EXIT', _Pid, config_change}, Server) ->
     {stop, config_change, Server};
 handle_info({'EXIT', Pid, Reason}, Server) ->
     case ets:lookup(couch_dbs_pid_to_name, Pid) of
-    [DbName] ->
+    [{Pid, DbName}] ->
         [#db{compactor_pid=Froms}=Db] = ets:lookup(couch_dbs, DbName),
         if Reason /= snappy_nif_not_loaded -> ok; true ->
             Msg = io_lib:format("To open the database `~s`, Apache CouchDB "
