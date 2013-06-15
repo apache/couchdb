@@ -428,28 +428,24 @@ handle_info({'EXIT', _Pid, config_change}, Server) ->
     {noreply, shutdown, Server};
 handle_info({'EXIT', Pid, Reason}, Server) ->
     Server2 = case ets:lookup(couch_dbs_by_pid, Pid) of
-    [{Pid, Db}] ->
-        DbName = Db#db.name,
+    [{Pid, DbName}] ->
 
         % If the Pid is known, the name should be as well.
         % If not, that's an error, which is why there is no [] clause.
         case ets:lookup(couch_dbs_by_name, DbName) of
         [{_, {opening, Pid, Froms}}] ->
-            Msg = case Reason of
+            Reply = {_, Msg} = case Reason of
             snappy_nif_not_loaded ->
-                io_lib:format(
+                {bad_otp_release, io_lib:format(
                     "To open the database `~s`, Apache CouchDB "
                     "must be built with Erlang OTP R13B04 or higher.",
-                    [Db]
-                );
+                    [DbName]
+                )};
             true ->
-                io_lib:format("Error opening database ~p: ~p", [DbName, Reason])
+                {error, io_lib:format("Error opening database ~p: ~p", [DbName, Reason])}
             end,
             ?LOG_ERROR(Msg, []),
-            lists:foreach(
-              fun(F) -> gen_server:reply(F, {bad_otp_release, Msg}) end,
-              Froms
-            );
+            [gen_server:reply(F, Reply) || F <- Froms];
         [{_, {opened, Pid, LruTime}}] ->
             ?LOG_ERROR(
                 "Unexpected exit of database process ~p [~p]: ~p",
@@ -462,7 +458,7 @@ handle_info({'EXIT', Pid, Reason}, Server) ->
         true = ets:delete(couch_dbs_by_name, DbName),
 
         case ets:lookup(couch_sys_dbs, DbName) of
-        [{Db, _}] ->
+        [{DbName, _}] ->
             true = ets:delete(couch_sys_dbs, DbName),
             Server;
         [] ->
