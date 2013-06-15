@@ -27,13 +27,18 @@
     code_change/3
 ]).
 
+-export([
+    watchdog/0
+]).
+
 
 -include("couch_event_int.hrl").
 
 
 -record(st, {
     by_pid,
-    by_dbname
+    by_dbname,
+    watchdog
 }).
 
 
@@ -46,7 +51,8 @@ init(_) ->
     {ok, ByDbName} = khash:new(),
     {ok, #st{
         by_pid = ByPid,
-        by_dbname = ByDbName
+        by_dbname = ByDbName,
+        watchdog = spawn_monitor(?MODULE, watchdog, [])
     }}.
 
 
@@ -90,6 +96,10 @@ handle_cast(Msg, St) ->
     {noreply, St}.
 
 
+handle_info({'DOWN', Ref, _, _, Reason}, #st{watchdog={_,Ref}}=St) ->
+    couch_log:notice("~s watchdog died: ~w", [?MODULE, Reason]),
+    erlang:send_after(60000, self(), spawn_watchdog),
+    {noreply, St#st{watchdog=undefined}};
 handle_info({'DOWN', Ref, process, Pid, _Reason}, St) ->
     case khash:get(St#st.by_pid, Pid) of
         {Ref, OldDbNames} ->
@@ -99,6 +109,10 @@ handle_info({'DOWN', Ref, process, Pid, _Reason}, St) ->
     end,
     {noreply, St};
 
+
+handle_info(spawn_watchdog, #st{watchdog=undefined}=St) ->
+    NewWD = spawn_monitor(?MODULE, watchdog, []),
+    {noreply, St#st{watchdog=NewWD}};
 handle_info(Msg, St) ->
     couch_log:notice("~s ignoring info ~w", [?MODULE, Msg]),
     {noreply, St}.
@@ -106,6 +120,18 @@ handle_info(Msg, St) ->
 
 code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
+
+
+watchdog() ->
+    Handlers = gen_event:which_handlers(couch_db_update),
+    case length(Handlers) > 0 of
+        true ->
+            exit(whereis(couch_db_update), force_upgrade);
+        false ->
+            ok
+    end,
+    timer:sleep(5000),
+    ?MODULE:watchdog().
 
 
 notify_listeners(ByDbName, DbName, Event) ->
