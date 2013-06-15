@@ -126,7 +126,10 @@ watchdog() ->
     Handlers = gen_event:which_handlers(couch_db_update),
     case length(Handlers) > 0 of
         true ->
-            exit(whereis(couch_db_update), force_upgrade);
+            supervisor:terminate_child(
+                    couch_primary_services, couch_db_update_event),
+            supervisor:restart_child(
+                    couch_primary_services, couch_db_update_event);
         false ->
             ok
     end,
