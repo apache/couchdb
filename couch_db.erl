@@ -756,10 +756,15 @@ update_docs(Db, Docs, Options, interactive_edit) ->
 
     if (AllOrNothing) and (PreCommitFailures /= []) ->
         {aborted,
-         lists:foldl(fun({#doc{id=Id,revs={Pos, RevIds}}, Ref},Acc) ->
+         lists:foldl(fun({#doc{id=Id,revs=Revs}, Ref},Acc) ->
                          case lists:keyfind(Ref,1,PreCommitFailures) of
                          {Ref, Error} ->
-                             [{{Id,{Pos,RevIds}}, Error} | Acc];
+                             case Revs of
+                             {Pos, [RevId|_]} ->
+                                 [{{Id,{Pos, RevId}}, Error} | Acc];
+                             {0, []} ->
+                                 [{{Id,{0, <<>>}}, Error} | Acc]
+                             end;
                          false ->
                              Acc
                          end
