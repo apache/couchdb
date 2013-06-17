@@ -18,7 +18,7 @@ module.exports = function (grunt) {
     path = require("path"),
     httpProxy = require('http-proxy'),
     express = require("express"),
-    options = grunt.config('couchserver'), 
+    options = grunt.config('couchserver'),
     app = express();
 
     // Options
@@ -42,20 +42,28 @@ module.exports = function (grunt) {
       res.sendfile(path.join(dist_dir,req.url));
     });
 
-    // serve main index file from here
-    app.get('/', function (req, res) {
-      res.sendfile(path.join(dist_dir, 'index.html'));
-    });
-
     // create proxy to couch for all couch requests
     var proxy = new httpProxy.HttpProxy(proxy_settings);
+
+    // serve main index file from here
+    // Also proxy out to the base CouchDB host for handle_welcome_req.
+    // We still need to reach the top level CouchDB host even through
+    // the proxy.
+    app.get('/', function (req, res) {
+      var accept = req.headers.accept.split(',');
+      if (accept[0] == 'application/json') {
+        proxy.proxyRequest(req, res);
+      } else {
+        res.sendfile(path.join(dist_dir, 'index.html'));
+      }
+    });
 
     app.all('*', function (req, res) {
       proxy.proxyRequest(req, res);
     });
 
     // Fail this task if any errors have been logged
-    if (grunt.errors) { 
+    if (grunt.errors) {
       return false;
     }
 

@@ -37,7 +37,7 @@ function(app, _, Bootstrap) {
     // Thanks to: http://stackoverflow.com/a/2880929
     getParams: function(queryString) {
       if (typeof queryString !== "undefined") {
-        // I think this could be combined into one if 
+        // I think this could be combined into one if
         if (queryString.substring(0,1) === "?") {
           queryString = queryString.substring(1);
         } else if (queryString.indexOf('?') > -1) {

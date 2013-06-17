@@ -35,11 +35,27 @@ function(app, Backbone) {
     }
   });
 
+  Fauxton.VersionInfo = Backbone.Model.extend({
+    url: app.host
+  });
+
+  // TODO: this View should extend from FauxtonApi.View.
+  // Chicken and egg problem, api.js extends fauxton/base.js.
+  // Need to sort the loading order.
   Fauxton.Footer = Backbone.View.extend({
     template: "templates/fauxton/footer",
+
+    initialize: function() {
+      this.versionInfo = new Fauxton.VersionInfo();
+    },
+
+    establish: function() {
+      return [this.versionInfo.fetch()];
+    },
+
     serialize: function() {
       return {
-        version: app.version
+        version: this.versionInfo.get("version")
       };
     }
   });

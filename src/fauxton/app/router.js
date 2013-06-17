@@ -129,7 +129,10 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents
       $("#app-container").html(this.masterLayout.el);
       this.masterLayout.render();
 
-      app.footer.render();
+      // TODO: move this to a proper Fauxton.View
+      $.when.apply(null, app.footer.establish()).done(function() {
+        app.footer.render();
+      });
     },
 
     triggerRouteEvent: function(event, args) {
