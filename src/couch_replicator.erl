@@ -659,7 +659,11 @@ read_changes(Parent, StartSeq, Db, ChangesQueue, Options, Ts) ->
                     % LS should never be undefined, but it doesn't hurt to be
                     % defensive inside the replicator.
                     Seq = case LS of undefined -> get(last_seq); _ -> LS end,
-                    ok = gen_server:call(Parent, {report_seq_done, {Ts, Seq}, #rep_stats{}}, infinity),
+                    OldSeq = get(last_seq),
+                    if Seq == OldSeq -> ok; true ->
+                        Msg = {report_seq_done, {Ts, Seq}, #rep_stats{}},
+                        ok = gen_server:call(Parent, Msg, infinity)
+                    end,
                     put(last_seq, Seq),
                     read_changes(Parent, Seq, Db, ChangesQueue, Options, Ts + 1);
                 _ ->
