@@ -123,6 +123,7 @@ code_change(_OldVsn, St, _Extra) ->
 
 
 watchdog() ->
+    timer:sleep(300000),
     Handlers = gen_event:which_handlers(couch_db_update),
     case length(Handlers) > 0 of
         true ->
@@ -133,7 +134,6 @@ watchdog() ->
         false ->
             ok
     end,
-    timer:sleep(5000),
     ?MODULE:watchdog().
 
 
