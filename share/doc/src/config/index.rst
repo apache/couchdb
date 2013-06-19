@@ -16,36 +16,11 @@
 Configuring CouchDB
 ===================
 
-CouchDB reads files from the following locations, in the following
-order.
-
-1. ``PREFIX/default.ini``
-
-2. ``PREFIX/default.d/*``
-
-3. ``PREFIX/local.ini``
-
-4. ``PREFIX/local.d/*``
-
-Settings in successive documents override the settings in earlier
-entries. For example, setting the
-:ref:`bind_address <config/httpd/bind_address>` parameter in ``local.ini``
-would override any setting in ``default.ini``.
-
-.. warning::
-   The ``default.ini`` file may be overwritten during an upgrade or
-   re-installation, so localised changes should be made to the
-   ``local.ini`` file or files within the ``local.d`` directory.
-
-Content:
-
-.. CouchDB configuration sections goes first.
-   Please keep them sorted to simplify eye searching.
-   After them - custom configuration tips and tricks.
-
 .. toctree::
    :maxdepth: 2
-   :glob:
+
+   intro
+   proxying
 
    admins
    attachments
@@ -70,5 +45,5 @@ Content:
    vhosts
    view-compaction
 
-   proxying
+
 
