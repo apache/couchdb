@@ -230,10 +230,10 @@ Change the ownership of the CouchDB directories by running:
 
 Change the permission of the CouchDB directories by running:
 
-    chmod 0755 /usr/local/etc/couchdb
-    chmod 0755 /usr/local/var/lib/couchdb
-    chmod 0755 /usr/local/var/log/couchdb
-    chmod 0755 /usr/local/var/run/couchdb
+    chmod 0770 /usr/local/etc/couchdb
+    chmod 0770 /usr/local/var/lib/couchdb
+    chmod 0770 /usr/local/var/log/couchdb
+    chmod 0770 /usr/local/var/run/couchdb
 
 Running as a Daemon
 -------------------
