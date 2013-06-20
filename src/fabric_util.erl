@@ -64,20 +64,21 @@ get_db(DbName, Options) ->
     % suppress shards from down nodes
     Nodes = [node()|erlang:nodes()],
     Live = [S || #shard{node = N} = S <- Shards, lists:member(N, Nodes)],
-    get_shard(Live, Options, 100).
+    Factor = list_to_integer(config:get("fabric", "shard_timeout_factor", "2")),
+    get_shard(Live, Options, 100, Factor).
 
-get_shard([], _Opts, _Timeout) ->
+get_shard([], _Opts, _Timeout, _Factor) ->
     erlang:error({internal_server_error, "No DB shards could be opened."});
-get_shard([#shard{node = Node, name = Name} | Rest], Opts, Timeout) ->
+get_shard([#shard{node = Node, name = Name} | Rest], Opts, Timeout, Factor) ->
     case rpc:call(Node, couch_db, open, [Name, [{timeout, Timeout} | Opts]]) of
     {ok, Db} ->
         {ok, Db};
     {unauthorized, _} = Error ->
         throw(Error);
     {badrpc, {'EXIT', {timeout, _}}} ->
-        get_shard(Rest, Opts, 2*Timeout);
+        get_shard(Rest, Opts, Factor * Timeout, Factor);
     _Else ->
-        get_shard(Rest, Opts, Timeout)
+        get_shard(Rest, Opts, Timeout, Factor)
     end.
 
 error_info({{<<"reduce_overflow_error">>, _} = Error, _Stack}) ->
