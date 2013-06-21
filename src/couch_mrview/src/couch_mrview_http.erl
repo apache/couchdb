@@ -106,8 +106,22 @@ all_docs_req(Req, Db, Keys) ->
         ok ->
             do_all_docs_req(Req, Db, Keys);
         _ ->
-            throw({forbidden, <<"Only admins can access _all_docs",
-                " of system databases.">>})
+            DbName = ?b2l(Db#db.name),
+            case couch_config:get("couch_httpd_auth",
+                                  "authentication_db",
+                                  "_users") of
+            DbName ->
+                case couch_config:get("couch_httpd_auth", "public_fields") of
+                undefined ->
+                    throw({forbidden, <<"Only admins can access _all_docs",
+                                        " of system databases.">>});
+                _ ->
+                    do_all_docs_req(Req, Db, Keys)
+                end;
+            _ ->
+                throw({forbidden, <<"Only admins can access _all_docs",
+                                    " of system databases.">>})
+            end
         end;
     false ->
         do_all_docs_req(Req, Db, Keys)
@@ -126,7 +140,16 @@ do_all_docs_req(Req, Db, Keys) ->
     Args = Args0#mrargs{preflight_fun=ETagFun},
     {ok, Resp} = couch_httpd:etag_maybe(Req, fun() ->
         VAcc0 = #vacc{db=Db, req=Req},
-        couch_mrview:query_all_docs(Db, Args, fun view_cb/2, VAcc0)
+        DbName = ?b2l(Db#db.name),
+        Callback = case couch_config:get("couch_httpd_auth",
+                                         "authentication_db",
+                                         "_users") of
+        DbName ->
+            fun filtered_view_cb/2;
+        _ ->
+            fun view_cb/2
+        end,
+        couch_mrview:query_all_docs(Db, Args, Callback, VAcc0)
     end),
     case is_record(Resp, vacc) of
         true -> {ok, Resp#vacc.resp};
@@ -152,6 +175,20 @@ design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
         true -> {ok, Resp#vacc.resp};
         _ -> {ok, Resp}
     end.
+
+
+filtered_view_cb({row, Row0}, Acc) ->
+  Row1 = lists:map(fun({doc, null}) ->
+        {doc, null};
+    ({doc, Body}) ->
+        Doc = couch_users_db:strip_non_public_fields(#doc{body=Body}),
+        {doc, Doc#doc.body};
+    (KV) ->
+        KV
+    end, Row0),
+    view_cb({row, Row1}, Acc);
+filtered_view_cb(Obj, Acc) ->
+    view_cb(Obj, Acc).
 
 
 view_cb({meta, Meta}, #vacc{resp=undefined}=Acc) ->
