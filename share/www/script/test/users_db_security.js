@@ -256,6 +256,50 @@ couchTests.users_db_security = function(debug) {
       // log in one last time so run_on_modified_server can clean up the admin account
       TEquals(true, CouchDB.login("jan", "apple").ok);
     });
+
+    run_on_modified_server([
+        {
+          section: "couch_httpd_auth",
+          key: "iterations",
+          value: "1"
+        },
+        {
+          section: "couch_httpd_auth",
+          key: "public_fields",
+          value: "name,type"
+        },
+        {
+          section: "admins",
+          key: "jan",
+          value: "apple"
+        }
+      ], function() {
+        var res = usersDb.open("org.couchdb.user:jchris");
+        TEquals("jchris", res.name);
+        TEquals("user", res.type);
+        TEquals(undefined, res.roles);
+        TEquals(undefined, res.salt);
+        TEquals(undefined, res.password_scheme);
+        TEquals(undefined, res.derived_key);
+
+        // log in one last time so run_on_modified_server can clean up the admin account
+        TEquals(true, CouchDB.login("jan", "apple").ok);
+
+        var all = usersDb.allDocs({ include_docs: true });
+        T(all.rows);
+        if (all.rows) {
+          T(all.rows.every(function(row) {
+            T(row.doc);
+            if (row.doc) {
+              return Object.keys(row.doc).every(function(key) {
+                return key === 'name' || key === 'type';
+              });
+            } else {
+              return false;
+            }
+          }));
+        }
+    });
   };
 
   usersDb.deleteDb();
