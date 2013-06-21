@@ -193,7 +193,7 @@ terminate(_Reason, #st{changes_pid=Pid}) ->
     ok.
 
 code_change(_OldVsn, St, _Extra) ->
-    {ok, St}.
+    {ok, cache_clear(St)}.
 
 %% internal functions
 
