@@ -101,10 +101,21 @@ after_doc_read(Doc, #db{user_ctx = UserCtx} = Db) ->
     _ when Name =:= DocName ->
         Doc;
     _ ->
-        throw(not_found)
+        Doc1 = strip_non_public_fields(Doc),
+        case Doc1 of
+          #doc{body={[]}} ->
+              throw(not_found);
+          _ ->
+              Doc1
+        end
     end.
 
 get_doc_name(#doc{id= <<"org.couchdb.user:", Name/binary>>}) ->
     Name;
 get_doc_name(_) ->
     undefined.
+
+strip_non_public_fields(#doc{body={Props}}=Doc) ->
+    Public = re:split(couch_config:get("couch_httpd_auth", "public_fields", ""),
+                      "\\s*,\\s*", [{return, binary}]),
+    Doc#doc{body={[{K, V} || {K, V} <- Props, lists:member(K, Public)]}}.
