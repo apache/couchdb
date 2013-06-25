@@ -261,8 +261,9 @@ group_by_proximity(Shards, ZoneMap) ->
     {Local, SameZone, DifferentZone}.
 
 choose_ushards(DbName, Shards) ->
-    [hd(G) || G <- [rotate_list(DbName, order_shards(G)) ||
-        G <- group_by_range(Shards)]].
+    Groups0 = group_by_range(Shards),
+    Groups1 = [rotate_list(DbName, order_shards(G)) || G <- Groups0],
+    [hd(G) || G <- Groups1].
 
 rotate_list(_DbName, []) ->
     [];
