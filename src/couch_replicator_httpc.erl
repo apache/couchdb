@@ -61,8 +61,12 @@ send_ibrowse_req(#httpdb{headers = BaseHeaders} = HttpDb, Params) ->
         lists:ukeymerge(1, get_value(ibrowse_options, Params, []),
             HttpDb#httpdb.ibrowse_options)
     ],
+    Timeout = case config:get("replicator", "request_timeout", "infinity") of
+        "infinity" -> infinity;
+        Milliseconds -> list_to_integer(Milliseconds)
+    end,
     Response = ibrowse:send_req_direct(
-        Worker, Url, Headers2, Method, Body, IbrowseOptions, infinity),
+        Worker, Url, Headers2, Method, Body, IbrowseOptions, Timeout),
     {Worker, Response}.
 
 
