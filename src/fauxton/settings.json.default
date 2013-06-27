@@ -24,5 +24,9 @@
           "okay_if_missing": true
         }
       }
+    },
+
+    "watch": {
+      "files": ["./app/**/*"]
     }
 }
