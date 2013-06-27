@@ -20,6 +20,8 @@ require.config({
     "nv.d3": "../assets/js/libs/nv.d3"
   },
 
+  baseUrl: '/',
+
   shim: {
     // Backbone library depends on lodash and jQuery.
     backbone: {
@@ -51,5 +53,4 @@ require.config({
 
     "plugins/jquery.form": ["jquery"]
   }
-
 });

@@ -56,7 +56,6 @@ function($, _, Backbone, Helpers) {
       } else {
         // Put fetch into `async-mode`.
         done = this.async();
-
         // Seek out the template asynchronously.
         return $.ajax({ url: app.root + path }).then(function(contents) {
           done(JST[path] = _.template(contents));

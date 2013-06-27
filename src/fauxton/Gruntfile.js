@@ -78,22 +78,33 @@ module.exports = function(grunt) {
         theAssets.img.push(imgPath + "/**");
       }
     });
-    grunt.log.write(theAssets.img[0]);
     return theAssets;
   }();
 
   var templateSettings = function(){
     var defaultSettings = {
-      "src": "assets/index.underscore",
-      "dest": "dist/debug/index.html",
-      "variables": {
-        "assets_root": "./",
-        "requirejs": "require.js",
-        "base": null
+     "development": {
+        "src": "assets/index.underscore",
+        "dest": "dist/debug/index.html",
+        "variables": {
+          "requirejs": "/assets/js/libs/require.js",
+          "css": "./css/index.css",
+          "base": null
+        }
+      },
+      "release": {
+        "src": "assets/index.underscore",
+        "dest": "dist/debug/index.html",
+        "variables": {
+          "requirejs": "./js/require.js",
+          "css": "./css/index.css",
+          "base": null
+        }
       }
     };
+
     var settings = helper.readSettingsFile();
-    return {template: settings.template || defaultSettings};
+    return settings.template || defaultSettings;
   }();
 
   grunt.initConfig({
@@ -154,7 +165,7 @@ module.exports = function(grunt) {
     // index.html.
     concat: {
       requirejs: {
-        src: ["assets/js/libs/almond.js", "dist/debug/templates.js", "dist/debug/require.js"],
+        src: [ "assets/js/libs/require.js", "dist/debug/templates.js", "dist/debug/require.js"],
         dest: "dist/debug/js/require.js"
       },
 
@@ -206,8 +217,17 @@ module.exports = function(grunt) {
     },
 
     watch: {
-      files: helper.watchFiles(["./app/**/*", "./assets/**/*"]),
-      tasks: ['debug', 'template']
+      js: { 
+        files: helper.watchFiles(['.js'], ["./app/**/*.js", '!./app/load_addons.js',"./assets/**/*.js"]),
+        tasks: ['watchRun'],
+      },
+      style: {
+        files: helper.watchFiles(['.less','.css'],["./app/**/*.css","./app/**/*.less","./assets/**/*.css", "./assets/**/*.less"]),
+        tasks: ['less', 'concat:index_css'],
+      },
+      options: {
+        nospawn: true,
+      }
     },
 
     requirejs: {
@@ -225,8 +245,8 @@ module.exports = function(grunt) {
 
           // Do not wrap everything in an IIFE.
           wrap: false,
-          optimize: "none"
-      }
+          optimize: "none",
+        }
       }
     },
 
@@ -294,6 +314,16 @@ module.exports = function(grunt) {
 
   });
 
+  // on watch events configure jshint:all to only run on changed file
+  grunt.event.on('watch', function(action, filepath) {
+    if (!!filepath.match(/.js$/)) {
+      grunt.config(['jshint', 'all'], filepath);
+    }
+    /*} else if (!!filepath.match(/.css$|.less$/)) {
+      grunt.task.run(['less', 'concat:index_css']);
+    }*/
+  });
+
   /*
    * Load Grunt plugins
    */
@@ -302,11 +332,23 @@ module.exports = function(grunt) {
   // Load the couchapp task
   grunt.loadNpmTasks('grunt-couchapp');
   // Load the copy task
-  grunt.loadNpmTasks('grunt-contrib');
+  grunt.loadNpmTasks('grunt-contrib-watch');
   // Load the exec task
   grunt.loadNpmTasks('grunt-exec');
   // Load Require.js task
-  grunt.loadNpmTasks('grunt-requirejs');
+  grunt.loadNpmTasks('grunt-contrib-requirejs');
+  // Load Copy task
+  grunt.loadNpmTasks('grunt-contrib-copy');
+  // Load Clean task
+  grunt.loadNpmTasks('grunt-contrib-clean');
+  // Load jshint task
+  grunt.loadNpmTasks('grunt-contrib-jshint');
+  // Load jst task
+  grunt.loadNpmTasks('grunt-contrib-jst');
+  // Load less task
+  grunt.loadNpmTasks('grunt-contrib-less');
+  // Load concat task
+  grunt.loadNpmTasks('grunt-contrib-concat');
   // Load UglifyJS task
   grunt.loadNpmTasks('grunt-contrib-uglify');
   // Load CSSMin task
@@ -326,7 +368,7 @@ module.exports = function(grunt) {
   // Fetch dependencies (from git or local dir), lint them and make load_addons
   grunt.registerTask('dependencies', ['get_deps', 'jshint', 'gen_load_addons:default']);
   // build templates, js and css
-  grunt.registerTask('build', ['jst', 'requirejs', 'concat:requirejs', 'less', 'concat:index_css', 'template']);
+  grunt.registerTask('build', ['less', 'concat:index_css', 'jst', 'requirejs', 'concat:requirejs', 'template:release']);
   // minify code and css, ready for release.
   grunt.registerTask('minify', ['uglify', 'cssmin:compress']);
 
@@ -334,9 +376,12 @@ module.exports = function(grunt) {
    * Build the app in either dev, debug, or release mode
    */
   // dev server
-  grunt.registerTask('dev', ['debug', 'couchserver']);
+  grunt.registerTask('dev', ['debugDev', 'couchserver']);
   // build a debug release
-  grunt.registerTask('debug', ['test', 'dependencies', 'build', 'copy:debug']);
+  grunt.registerTask('debug', ['test', 'dependencies', 'concat:requirejs','less', 'concat:index_css', 'template:development', 'copy:debug']);
+  grunt.registerTask('debugDev', ['test', 'dependencies', 'less', 'concat:index_css', 'template:development', 'copy:debug']);
+
+  grunt.registerTask('watchRun', ['dependencies']);
   // build a release
   grunt.registerTask('release', ['test' ,'dependencies', 'build', 'minify', 'copy:dist']);
 
@@ -348,7 +393,7 @@ module.exports = function(grunt) {
   // make a minimized install that is server by mochiweb under _utils
   grunt.registerTask('couchdb', ['release', 'copy:couchdb']);
   // make an install that can be deployed as a couchapp
-  grunt.registerTask('couchapp_setup', ['build', 'minify', 'copy:dist']);
+  grunt.registerTask('couchapp_setup', ['release']);
   // install fauxton as couchapp
   grunt.registerTask('couchapp_install', ['rmcouchdb:fauxton', 'mkcouchdb:fauxton', 'couchapp:fauxton']);
   // setup and install fauxton as couchapp

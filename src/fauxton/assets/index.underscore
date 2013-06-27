@@ -24,7 +24,7 @@
   <title>Project Fauxton</title>
 
   <!-- Application styles. -->
-  <link rel="stylesheet" href="<%= assets_root %>css/index.css">
+  <link rel="stylesheet" href="<%= css %>">
   <style type="text/css">
     body {
     padding-top: 60px;
@@ -49,6 +49,6 @@
   </div>
 
   <!-- Application source. -->
-  <script data-main="/app/config" src="<%= assets_root %>js/<%= requirejs %>"></script>
+  <script data-main="/config" src="<%= requirejs %>"></script>
 </body>
 </html>

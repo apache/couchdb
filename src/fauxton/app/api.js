@@ -78,7 +78,7 @@ function(app, Fauxton) {
     }
 
     return $.when(deferreds);
-  },
+  };
 
   FauxtonAPI.addRoute = function(route) {
     app.router.route(route.route, route.name, route.callback);

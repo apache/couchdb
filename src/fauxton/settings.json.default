@@ -7,12 +7,23 @@
   { "name": "auth" }
   ],
     "template": {
-      "src": "assets/index.underscore",
-      "dest": "dist/debug/index.html",
-      "variables": {
-        "assets_root": "./",
-        "requirejs": "require.js",
-        "base": null
+      "development": {
+        "src": "assets/index.underscore",
+        "dest": "dist/debug/index.html",
+        "variables": {
+          "requirejs": "/assets/js/libs/require.js",
+          "css": "./css/index.css",
+          "base": null
+        }
+      },
+      "release": {
+        "src": "assets/index.underscore",
+        "dest": "dist/debug/index.html",
+        "variables": {
+          "requirejs": "./js/require.js",
+          "css": "./css/index.css",
+          "base": null
+        }
       }
     },
 

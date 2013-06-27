@@ -764,7 +764,7 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
 
       var that = this,
           promise,
-          viewName = this.$('#index-name').val();
+          viewName = this.$('#index-name').val(),
           ddocName = this.$('#ddoc :selected').val(),
           ddoc = this.getCurrentDesignDoc();
 

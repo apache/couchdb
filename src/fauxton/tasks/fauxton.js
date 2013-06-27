@@ -20,7 +20,7 @@ module.exports = function(grunt) {
     grunt.file.write(data.dest, tmpl(data.variables));
   });
 
-  grunt.registerMultiTask('get_deps', 'Fetch external dependencies', function() {
+  grunt.registerMultiTask('get_deps', 'Fetch external dependencies', function(version) {
     grunt.log.writeln("Fetching external dependencies");
 
     var path = require('path');
