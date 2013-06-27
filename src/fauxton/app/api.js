@@ -256,6 +256,11 @@ function(app, Fauxton) {
       // Only want to redo the template if its a full render
       if (!this.renderedState) {
         masterLayout.setTemplate(this.layout);
+          $('#nav-links li').removeClass('active');
+
+        if (this.selectedHeaderId) {
+          $('#nav-links li#' + this.selectedHeaderId).addClass('active');
+        }
       }
 
       //add page loader. "app-container" shouldn't be overwritten. Even if a new index.underscore is provided in settings.json

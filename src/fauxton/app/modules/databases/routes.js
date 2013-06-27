@@ -40,6 +40,8 @@ function(app, FauxtonAPI, Databases, Views) {
       return this.databases.url();
     },
 
+    selectedHeaderId: "database",
+
     initialize: function() {
       this.databases = new Databases.List();
       this.deferred = FauxtonAPI.Deferred();

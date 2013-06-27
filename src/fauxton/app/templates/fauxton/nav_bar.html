@@ -25,7 +25,7 @@ the License.
         <ul id="nav-links" class="nav pull-right">
           <% _.each(navLinks, function(link) { %>
             <% if (!link.view) { %>
-              <li><a href="<%= link.href %>"><%= link.title %></a></li>
+            <li id= "<%= link.id %>" ><a href="<%= link.href %>"><%= link.title %></a></li>
             <% } %>
           <% }); %>
         </ul>
