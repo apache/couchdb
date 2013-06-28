@@ -47,12 +47,12 @@ test() ->
     etap:is(Length, 8, "Close also returns the number of bytes written."),
     etap:is(<<"foodfoob">>, read_all(Fd, Ptrs), "Returned pointers are valid."),
 
-    % Remeber where we expect the pointer to be.
+    % Remember where we expect the pointer to be.
     {ok, ExpPtr} = couch_file:bytes(Fd),
     {ok, Stream2} = couch_stream:open(Fd),
     OneBits = <<1:(8*10)>>,
     etap:is(ok, couch_stream:write(Stream2, OneBits),
-        "Successfully wrote 80 1 bits."),
+        "Successfully wrote 79 zero bits and 1 one bit."),
 
     ZeroBits = <<0:(8*10)>>,
     etap:is(ok, couch_stream:write(Stream2, ZeroBits),
