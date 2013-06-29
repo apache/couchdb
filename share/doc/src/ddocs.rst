@@ -48,25 +48,23 @@ Map functions
 
    :param doc: Processed document object.
 
-Map functions should take a single argument as document object and optionally
-emits paired values also known as `key` and `value`. Since JavaScript
-doesn't support generators and ``yield`` statement it is emulated via :func:`emit`:
+Map functions accept a single document as the argument and (optionally) :func:`emit`
+key/value pairs that are stored in a view.
 
 .. code-block:: javascript
 
-    function(doc){
-      if (!doc.tags || !isArray(doc.tags) || !doc.type || doc.type != 'post'){
-        return;
-      }
-      for (var idx in doc.tags){
-        emit(doc.tags[idx].toLower(), 1);
+    function (doc) {
+      if (doc.type === 'post' && doc.tags && Array.isArray(doc.tags)) {
+        doc.tags.forEach(function (tag) {
+          emit(tag.toLowerCase(), 1);
+        });
       }
     }
 
-In this example the map function produces documents view by tag if they
-has `tags` attribute as array and `type` attribute with "post" value. Note that
-:func:`emit` function could be called  multiple times, so the same document
-will be available by several `keys`.
+In this example a key/value pair is emitted for each value in the `tags` array
+of a document with a `type` of "post". Note that :func:`emit` may be called many
+times for a single document, so the same document may be available by several
+different keys.
 
 Also keep in mind that each document is *sealed* to prevent situation when one
 map function changes document state and the other one received a modified
@@ -77,7 +75,7 @@ each document is processed by group of map functions from all views of
 related design document. This means that if you trigger index update for one
 view in ddoc, all others will get updated too.
 
-Since `1.1.0` release `map` function supports 
+Since `1.1.0` release `map` function supports
 :ref:`CommonJS <commonjs>` modules and access to :func:`require` function.
 
 .. _reducefun:
@@ -128,7 +126,7 @@ JavaScript below:
 
     // could be replaced by _count
     function(keys, values, rereduce){
-      if (rereduce){
+      if (rereduce) {
         return sum(values);
       } else {
         return values.length;
@@ -143,11 +141,13 @@ JavaScript below:
         'max': Math.max.apply(null, values),
         'count': values.length,
         'sumsqr': (function(){
-          _sumsqr = 0;
-          for(var idx in values){
-            _sumsqr += values[idx] * values[idx];
-          }
-          return _sumsqr;
+          var sumsqr = 0;
+
+          values.forEach(function (value) {
+            sumsqr += value * value;
+          });
+
+          return sumsqr;
         })(),
       }
     }
@@ -208,7 +208,7 @@ Basic example of show function could be:
 .. code-block:: javascript
 
     function(doc, req){
-      if (doc){
+      if (doc) {
         return "Hello from " + doc._id + "!";
       } else {
         return "Hello, world!";
@@ -712,7 +712,7 @@ permissions:
 
 .. note::
 
-   The ``return`` statement used only for function, it has no impact on 
+   The ``return`` statement used only for function, it has no impact on
    the validation process.
 
 .. seealso::
