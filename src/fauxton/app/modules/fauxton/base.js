@@ -64,7 +64,7 @@ function(app, Backbone) {
     template: "templates/fauxton/nav_bar",
     // TODO: can we generate this list from the router?
     navLinks: [
-      {href:"#/_all_dbs", title:"Databases", id: "database"}
+      {href:"#/_all_dbs", title:"Databases"}
     ],
 
     initialize: function() {

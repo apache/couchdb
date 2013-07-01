@@ -40,7 +40,7 @@ function(app, FauxtonAPI, Databases, Views) {
       return this.databases.url();
     },
 
-    selectedHeaderId: "database",
+    selectedHeader: "Databases",
 
     initialize: function() {
       this.databases = new Databases.List();

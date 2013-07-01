@@ -258,8 +258,8 @@ function(app, Fauxton) {
         masterLayout.setTemplate(this.layout);
           $('#nav-links li').removeClass('active');
 
-        if (this.selectedHeaderId) {
-          $('#nav-links li#' + this.selectedHeaderId).addClass('active');
+        if (this.selectedHeader) {
+          $('#nav-links li[data-nav-name="' + this.selectedHeader + '"]').addClass('active');
         }
       }
 

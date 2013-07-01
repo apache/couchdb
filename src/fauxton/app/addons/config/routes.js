@@ -30,7 +30,7 @@ function(app, FauxtonAPI, Config) {
 
     roles: ["_admin"],
 
-    selectedHeaderId: "config",
+    selectedHeader: "Config",
 
     crumbs: [
       {"name": "Config","link": "_config"}

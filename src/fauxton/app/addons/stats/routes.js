@@ -26,7 +26,7 @@ function(app, FauxtonAPI, Stats) {
       "_stats": "showStats"
     },
 
-    selectedHeaderId: "stats",
+    selectedHeader: "Statistics",
 
     initialize: function () {
       this.stats = new Stats.Collection();
