@@ -10,9 +10,11 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-var fs = require('fs');
+var fs = require('fs'),
+    path = require('path');
 
 exports.init = function(grunt) {
+  var _ = grunt.util._;
 
   return { 
     readSettingsFile: function () {
@@ -27,6 +29,16 @@ exports.init = function(grunt) {
 
     processAddons: function (callback) {
       this.readSettingsFile().deps.forEach(callback);
+    },
+
+    watchFiles: function (defaults) {
+      return _.reduce(this.readSettingsFile().deps, function (files, dep) { 
+        if (dep.path) { 
+          files.push(path.join(dep.path, '**/*'));
+        }
+        return files
+      }, defaults);
+
     }
   };
 };
