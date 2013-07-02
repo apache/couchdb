@@ -23,7 +23,6 @@ A recent of [node.js](http://nodejs.org/) and npm is required.
 
     1. Clone the Couchdb repo: https://github.com/apache/couchdb.git or http://git-wip-us.apache.org/repos/asf/couchdb.git
     cd couchdb
-    git checkout fauxton
 
 ### Fauxton Setup ###
 
