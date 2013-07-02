@@ -47,13 +47,14 @@ rebalance2(TargetLevel, Shards, Nodes, [Node | Rest], Moves) ->
 
 victim(TargetLevel, Shards, Nodes, TargetNode) ->
     TargetZone = mem3:node_info(TargetNode, <<"zone">>),
-    CandidateNodes = lists:usort([Node || Node <- Nodes,
+    CandidateNodes = lists:usort([Node || Node <- mem3:nodes(),
                                      Node =/= TargetNode,
                                      mem3:node_info(Node, <<"zone">>) =:= TargetZone]),
     %% make {Node, ShardsInNode} list
     GroupedByNode0 = [{Node, [S || S <- Shards, S#shard.node =:= Node]} || Node <- CandidateNodes],
-    %% don't take from a node below target level
-    GroupedByNode1 = [{N, SS} || {N, SS} <- GroupedByNode0, length(SS) > TargetLevel],
+    %% don't take from a balancing node below target level
+    GroupedByNode1 = [{N, SS} || {N, SS} <- GroupedByNode0,
+        (length(SS) > TargetLevel) orelse (not lists:member(N, Nodes))],
     %% prefer to take from a node with more shards than others
     GroupedByNode2 = lists:sort(fun largest_first/2, GroupedByNode1),
     %% don't take a shard for a range the target already has
