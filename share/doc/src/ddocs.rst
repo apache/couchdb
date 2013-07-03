@@ -575,14 +575,41 @@ Validate document update functions
    :param secObj: :ref:`security_object`
 
    :throws: ``forbidden`` error to gracefully prevent document storing.
+   :throws: ``unauthorized`` error to prevent storage and allow the user to
+            re-auth.
 
-To perform validate operations on document saving there is a special design
-function type called `validate_doc_update`.
+A design document may contain a function named `validate_doc_update`
+which can be used to prevent invalid or unauthorized document update requests
+from being stored.  The function is passed the new document from the update
+request, the current document stored in the database, a :ref:`userctx_object`
+containing information about the user writing the document (if present), and
+a :ref:`security_object` with lists of database security roles.
 
-Instead of thousands words take a look at the next example of validate
-function - this function is used in ``_design/_auth`` ddoc from `_users`
-database to control users documents required field set and modification
-permissions:
+Validation functions typically examine the structure of the new document to
+ensure that required fields are present and to verify that the requesting user
+should be allowed to make changes to the document properties.  For example,
+an application may require that a user must be authenticated in order to create
+a new document or that specific document fields be present when a document
+is updated. The validation function can abort the pending document write
+by throwing one of two error objects:
+
+.. code-block:: javascript
+
+  // user is not authorized to make the change but may re-authenticate
+  throw({ unauthorized: 'Error message here.' });
+  
+  // change is not allowed
+  throw({ forbidden: 'Error message here.' });
+
+Document validation is optional, and each design document in the database may
+have at most one validation function.  When a write request is received for
+a given database, the validation function in each design document in that
+database is called in an unspecified order.  If any of the validation functions
+throw an error, the write will not succeed.
+
+**Example**: The ``_design/_auth`` ddoc from `_users` database uses a validation
+function to ensure that documents contain some required fields and are only
+modified by a user with the ``_admin`` role:
 
 .. code-block:: javascript
 
