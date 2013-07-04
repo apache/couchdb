@@ -166,7 +166,7 @@ The elements of the returned structure are shown in the table below:
 | doc_del_count                    | Number of deleted documents               |
 +----------------------------------+-------------------------------------------+
 | instance_start_time              | Timestamp of when the database was        |
-|                                  | created, expressed in milliseconds since  |
+|                                  | opened, expressed in microseconds since   |
 |                                  | the epoch.                                |
 +----------------------------------+-------------------------------------------+
 | purge_seq                        | The number of purge operations on the     |

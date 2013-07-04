@@ -136,8 +136,8 @@ CouchDB database information object
 |                                | disk. Views indexes are not included in the |
 |                                | calculation.                                |
 +--------------------------------+---------------------------------------------+
-| instance_start_time            | Timestamp of when the database was created, |
-|                                | expressed in milliseconds since the epoch.  |
+| instance_start_time            | Timestamp of when the database was opened,  |
+|                                | expressed in microseconds since the epoch.  |
 +--------------------------------+---------------------------------------------+
 | purge_seq                      | The number of purge operations on the       |
 |                                | database.                                   |
