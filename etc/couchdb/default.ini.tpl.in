@@ -1,100 +1,350 @@
 ; @configure_input@
 
-; Upgrading CouchDB will overwrite this file.
-[vendor]
-name = %package_author_name%
-version = %version%
+;; WARNING! DO NOT MODIFY THIS FILE!
+;; Upgrading CouchDB will overwrite this file!
+;; Instead, copy it as local.ini within the same directory and edit it to
+;; override these default setting. Make sure that couchdb user has read-write
+;; permissions for it.
+;;
+;; For the latest actual configuration options description please consult with
+;; CouchDB docs:
+;; http://docs.couchdb.org/en/latest/config/index.html
+;;
+
+
+;-------------------------------------------------------------------------------
+; Server Administrators
+;-------------------------------------------------------------------------------
+; To create an admin account uncomment the '[admins]' section below and add a
+; line in the format 'username = password'. When you next start CouchDB, it
+; will change the password to a hash (so that your passwords don't linger
+; around in plain-text files). You can add more admin accounts with more
+; 'username = password' lines. Don't forget to restart CouchDB after
+; changing this.
+[admins]
+;admin = mysecretpassword
+
+
+;-------------------------------------------------------------------------------
+; CouchDB Base Configuration
+;-------------------------------------------------------------------------------
 
 [couchdb]
+
+; Location of CouchDB's databases files.
 database_dir = %localstatelibdir%
+
+; Location of CouchDB's view index files.
 view_index_dir = %localstatelibdir%
+
+; Specified location of Erlang's binary drivers.
 util_driver_dir = %couchprivlibdir%
-max_document_size = 4294967296 ; 4 GB
-os_process_timeout = 5000 ; 5 seconds. for view and external servers.
-max_dbs_open = 100
-delayed_commits = true ; set this to false to ensure an fsync before 201 Created is returned
-uri_file = %localstaterundir%/couch.uri
-; Method used to compress everything that is appended to database and view index files, except
-; for attachments (see the attachments section). Available methods are:
+
+; Location of CouchDB plugins.
+plugin_dir = %locallibdir%/plugins
+
+; Location of the URI file.
+; Used to locate CouchDB active instance host:port pair.
 ;
-; none         - no compression
-; snappy       - use google snappy, a very fast compressor/decompressor
-; deflate_[N]  - use zlib's deflate, N is the compression level which ranges from 1 (fastest,
-;                lowest compression ratio) to 9 (slowest, highest compression ratio)
+uri_file = %localstaterundir%/couch.uri
+
+; CouchDB instance UUID. Sets automatically on first start.
+uuid =
+
+; This option places an upper bound on the number of databases that can be open
+; at one time. CouchDB reference counts database accesses internally and will
+; close idle databases when it must.
+; Sometimes it is necessary to keep more than the default open at once, such as
+; in deployments where many databases will be continuously replicating.
+;
+max_dbs_open = 100
+
+; Defines limit of size in bytes that document may has in JSON form.
+; Doesn’t applies for attachments since they are been transferred as stream of
+; chunks.
+;
+max_document_size = 4294967296 ; 4 GB
+
+; Number of milliseconds that external processes such as query servers and
+; externals may process CouchDB commands before return any result.
+; Keeping this value smaller you’ll be ensured that your services works fast,
+; but you may tweak it depending on your needs.
+;
+os_process_timeout = 5000 ; 5 seconds
+
+; When this config value as false the CouchDB provides guaranty of fsync call
+; before return HTTP 201 Created response on each document saving.
+; Setting this option as `true` may raise some overall performance with cost of
+; losing durability - it’s strongly not recommended to do such in production.
+;
+delayed_commits = true
+
+; Method used to compress everything that is appended to database and view index
+; files, except for attachments (see the attachments section).
+; Available methods are:
+;
+; * none        - no compression
+; * snappy      - use google snappy, a very fast compressor/decompressor
+; * deflate_[N] - use zlib's deflate, N is the compression level which ranges
+;                 from 1 (fastest, lowest compression ratio) to 9 (slowest,
+;                 highest compression ratio)
+;
 file_compression = snappy
+
 ; Higher values may give better read performance due to less read operations
 ; and/or more OS page cache hits, but they can also increase overall response
 ; time for writes when there are many attachment write requests in parallel.
+;
 attachment_stream_buffer_size = 4096
 
-plugin_dir = %locallibdir%/plugins
 
-[database_compaction]
-; larger buffer sizes can originate smaller files
-doc_buffer_size = 524288 ; value in bytes
-checkpoint_after = 5242880 ; checkpoint after every N bytes were written
+[attachments]
+; Defines zlib compression level for the attachments from 1 (lowest, fastest)
+; to 9 (highest, slowest). 0 value disables compression.
+;
+compression_level = 8
 
-[view_compaction]
-; larger buffer sizes can originate smaller files
-keyvalue_buffer_size = 2097152 ; value in bytes
+; List of attachments MIME types that are allowed to be compressed.
+compressible_types = text/*, application/javascript, application/json, application/xml
+
+
+[uuids]
+; Known algorithms:
+;
+;  * random     - 128 bits of random awesome. All awesome, all the time.
+;  * sequential - Monotonically increasing ids with random increments.
+;                 First 26 hex characters are random. Last 6 increment in
+;                 random amounts until an overflow occurs. On overflow, the
+;                 random prefix is regenerated and the process starts over.
+;  * utc_random - Time since Jan 1, 1970 UTC with microseconds.
+;                 First 14 characters are the time in hex. Last 18 are random.
+;  * utc_id     - Time since Jan 1, 1970 UTC with microseconds,
+;                 plus utc_id_suffix string.
+;                 First 14 characters are the time in hex,
+;                 uuids/utc_id_suffix string value is appended to these.
+;
+algorithm = sequential
+
+; The utc_id_suffix value will be appended to uuids generated by the utc_id
+; algorithm. Replicating instances should have unique utc_id_suffix values
+; to ensure uniqueness of utc_id ids.
+;
+utc_id_suffix =
+
+
+;-------------------------------------------------------------------------------
+; HTTP Server
+;-------------------------------------------------------------------------------
 
 [httpd]
-port = 5984
+
+; Defines the IP address by which CouchDB will be accessible.
+; To let CouchDB listen any available IP address, just setup 0.0.0.0 value:
+;bind_address = 0.0.0.0
+; For IPv6 support you need to set ::1 if you want to let CouchDB listen local
+; IP address:
+;bind_address = ::1
+; or :: for any available:
+;bind_address = ::
+;
 bind_address = 127.0.0.1
-authentication_handlers = {couch_httpd_oauth, oauth_authentication_handler}, {couch_httpd_auth, cookie_authentication_handler}, {couch_httpd_auth, default_authentication_handler}
-default_handler = {couch_httpd_db, handle_request}
-secure_rewrites = true
-vhost_global_handlers = _utils, _uuids, _session, _oauth, _users
-allow_jsonp = false
+
+; Defined the port number to listen. To let CouchDB handle any free port, set
+; this option to 0:
+;port = 0
+; The assigned port for CouchDB could be located in the URI file.
+;
+port = 5984
+
 ; Options for the MochiWeb HTTP server.
 ;server_options = [{backlog, 128}, {acceptor_pool_size, 16}]
+
 ; For more socket options, consult Erlang's module 'inet' man page.
 ;socket_options = [{recbuf, 262144}, {sndbuf, 262144}, {nodelay, true}]
-log_max_chunk_size = 1000000
+
+; List of used authentication handlers that used by CouchDB. You may extend
+; them via third-party plugins or remove some of them if you won’t let users
+; to use one of provided methods.
+;
+; Available handlers:
+;
+;    {couch_httpd_oauth, oauth_authentication_handler}: handles OAuth;
+;    {couch_httpd_auth, cookie_authentication_handler}: used for Cookie auth;
+;    {couch_httpd_auth, proxy_authentication_handler}: used for Proxy auth;
+;    {couch_httpd_auth, default_authentication_handler}: used for Basic auth;
+;    {couch_httpd_auth, null_authentication_handler}: Everlasting Admin Party!
+;
+authentication_handlers = {couch_httpd_oauth, oauth_authentication_handler}, {couch_httpd_auth, cookie_authentication_handler}, {couch_httpd_auth, default_authentication_handler}
+
+; Sets the configuration modification whitelist. Only whitelisted values may be
+; changed via the config's HTTP API. To allow the admin to change this list over
+; HTTP, remember to include {httpd,config_whitelist} itself to the whitelist.
+; Excluding it from the list would require editing config file for updates.
+; For example:
+;config_whitelist = [{httpd,config_whitelist}, {log,level}]
+;
+config_whitelist =
+
+; Controls JSONP feature support.
+allow_jsonp = false
+
+; Controls CORS feature support.
 enable_cors = false
 
+; Isolates databases via subdomains for rewrites.
+secure_rewrites = true
+
+; Specifies default HTTP requests handler.
+default_handler = {couch_httpd_db, handle_request}
+
+; List of global handlers that are available for virtual hosts.
+vhost_global_handlers = _utils, _uuids, _session, _oauth, _users
+
+; Specifies default timeout value for Changes Feed in milliseconds.
+changes_feed = 60000 ; 60 seconds
+
+; Defines maximum chunk size in bytes for _log resource.
+log_max_chunk_size = 1000000
+
+; The x_forwarded_host header (X-Forwarded-Host by default) is used to forward
+; the original value of the Host header field in case, for example, if a reverse
+; proxy is rewriting the “Host” header field to some internal host name before
+; forward the request to CouchDB.
+;
+x_forwarded_host = X-Forwarded-Host
+
+; The x_forwarded_proto header is used for identifying the originating
+; protocol of an HTTP request, since a reverse proxy may communicate
+; with CouchDB instance using HTTP even if the request to the reverse proxy is
+; HTTPS.
+;
+x_forwarded_proto = X-Forwarded-Proto
+
+; The x_forwarded_ssl header tells CouchDB that it should use the https scheme
+; instead of the http. Actually, it’s a synonym for "X-Forwarded-Proto: https"
+; header, but used by some reverse proxies.
+;
+x_forwarded_ssl = X-Forwarded-Ssl
+
+; Set this option to trigger basic-auth popup on unauthorized requests.
+; Commonly used with require_valid_user option from [couch_httpd_auth] section.
+; If you don't configure a WWW-Authenticate header, CouchDB will send
+; Basic realm="server" in order to prevent you getting logged out.
+;
+;WWW-Authenticate = Basic realm="Welcome to the CouchDB!"
+
+
+;-------------------------------------------------------------------------------
+; SSL Support
+;-------------------------------------------------------------------------------
+; To activate SSL support, enable HTTPS daemon first:
+;
+;   [daemons]
+;   httpsd = {couch_httpd, start_link, [https]}
+;
 [ssl]
+
+; Port number for HTTPS connections.
 port = 6984
 
-[log]
-file = %localstatelogdir%/couch.log
-level = info
-include_sasl = true
+; Path to file containing PEM encoded CA certificates (trusted
+; certificates used for verifying a peer certificate). May be omitted if
+; you do not want to verify the peer.
+;
+;cacert_file = /etc/ssl/certs
+
+; Path to a file containing the user’s certificate.
+;cert_file = /etc/couchdb/server.pem
+
+; Path to file containing user’s private PEM encoded key.
+;key_file = /etc/couchdb/server_key.pem
+
+; Certificate's password in plain text. Only used if the private keyfile is
+; password protected. Make sure that only trusted users may read config file.
+;
+;password = somepassword
+
+; Maximum peer certificate depth (must be set even if certificate
+; validation is off).
+;
+ssl_certificate_max_depth = 1
+
+; Set to true to validate peer certificates.
+verify_ssl_certificates = false
+
+; The verification fun (optional) if not specified, the default
+; verification fun will be used. The function definition should be written in
+; the next format:
+;verify_fun = {Module, VerifyFun}
+
+
+;-------------------------------------------------------------------------------
+; Authentication and Authorization
+;-------------------------------------------------------------------------------
 
 [couch_httpd_auth]
+; Makes cookies persistent if true.
+allow_persistent_cookies = false
+
+; Number of user context object's to cache in memory to reduce disk lookups.
+auth_cache_size = 50
+
+; Specifies name of the system database for storing CouchDB users.
 authentication_db = _users
+
+; Specifies location for redirection on successful authentication
+; if text/html response accepted by client (via Accept header).
+;
 authentication_redirect = /_utils/session.html
+
+; Number of iterations for password hashing by PBKDF2 algorithm.
+; Higher number provides better hash durability, but with cost of performance
+; on each request that requires authentication.
+;
+iterations = 10
+
+; When this option true the secret is required for Proxy Auth.
+proxy_use_secret = false
+
+; Allows all users browse /_all_docs resource of authentication database and
+; activates public_fields feature.
+;
+users_db_public = false
+
+; Comma-separated list of field names that will be available to view for
+; any user document in authentication_db. If unset or not specified,
+; authenticated users may retrieve only their own docs.
+; You need set users_db_public=true to enable this feature.
+;
+public_fields =
+
+; When this option true no requests allowed from anonymous users -
+; everyone should be authenticated. If you set this to true, you would like also
+; to set the WWW-Authenticate option in [httpd] section.
+;
 require_valid_user = false
-timeout = 600 ; number of seconds before automatic logout
-auth_cache_size = 50 ; size is number of cache entries
-allow_persistent_cookies = false ; set to true to allow persistent cookies
-iterations = 10 ; iterations for password hashing
-; comma-separated list of public fields, 404 if empty
-; public_fields =
 
-[cors]
-credentials = false
-; List of origins separated by a comma, * means accept all
-; Origins must include the scheme: http://example.com
-; You can’t set origins: * and credentials = true at the same time.
-;origins = *
-; List of accepted headers separated by a comma
-; headers =
-; List of accepted methods
-; methods =
+; Authentication secret. Sets automatically on first auth if was unset.
+secret =
 
+; Number of seconds since the last request before session will be expired.
+timeout = 600
 
-; Configuration for a vhost
-;[cors:http://example.com]
-; credentials = false
-; List of origins separated by a comma
-; Origins must include the scheme: http://example.com
-; You can’t set origins: * and credentials = true at the same time.
-;origins =
-; List of accepted headers separated by a comma
-; headers =
-; List of accepted methods
-; methods =
+; Specifies HTTP header name for Proxy Auth that contains the list of user’s
+; roles separated by a comma.
+;
+x_auth_roles = X-Auth-CouchDB-Roles
+
+; Specifies HTTP header name for Proxy Auth with token to authenticate
+; the authorization. This token is an HMAC-SHA1 created from secret key and
+; username. The secret key should be the same in the client and CouchDB node.
+; This token is optional if value of proxy_use_secret option isn’t true.
+;
+x_auth_roles = X-Auth-CouchDB-Token
+
+; Specifies HTTP header name for Proxy Auth containing the username.
+x_auth_username = X-Auth-CouchDB-UserName
+
 
 [couch_httpd_oauth]
 ; If set to 'true', oauth token and consumer secrets will be looked up
@@ -118,159 +368,70 @@ credentials = false
 ;             }
 ;         }
 ;     }
+;
 use_users_db = false
 
-[query_servers]
-javascript = %bindir%/%couchjs_command_name% %localbuilddatadir%/server/main.js
-coffeescript = %bindir%/%couchjs_command_name% %localbuilddatadir%/server/main-coffee.js
+
+;-------------------------------------------------------------------------------
+; Logging
+;-------------------------------------------------------------------------------
+
+[log]
+; Specifies the location of file for logging output.
+file = %localstatelogdir%/couch.log
+
+; Logging level defines how verbose and detailed logging will be
+; Available levels:
+;
+;  * debug: Very informative and detailed debug logging. Includes HTTP headers,
+;           external processes communications, auth information and more;
+;  * info: Informative logging. Includes HTTP requests headlines,
+;          startup notifications of external processes etc.
+;  * warning: Warning messages are alerts about edge situations which may lead
+;             to errors. For instance, compaction daemon alerts about low or
+;             insufficient disk space at this level.
+;  * error: Error level includes only things that going wrong, crush reports
+;           and HTTP error responses (5xx codes).
+;  * none: Disables logging for any messages.
+;
+level = info
+
+; Includes SASL information in logs.
+include_sasl = true
+
+[log_level_by_module]
+; In this section you can specify  log level on a per-module basis.
+; See src/*/*.erl for various available modules. For example:
+;couch_httpd = debug
+;couch_replicator = info
+;couch_query_servers = error
 
 
-; Changing reduce_limit to false will disable reduce_limit.
-; If you think you're hitting reduce_limit with a "good" reduce function,
-; please let us know on the mailing list so we can fine tune the heuristic.
-[query_server_config]
-reduce_limit = true
-os_process_limit = 25
+;-------------------------------------------------------------------------------
+; Compaction
+;-------------------------------------------------------------------------------
 
-[daemons]
-index_server={couch_index_server, start_link, []}
-external_manager={couch_external_manager, start_link, []}
-query_servers={couch_query_servers, start_link, []}
-vhosts={couch_httpd_vhost, start_link, []}
-httpd={couch_httpd, start_link, []}
-stats_aggregator={couch_stats_aggregator, start, []}
-stats_collector={couch_stats_collector, start, []}
-uuids={couch_uuids, start, []}
-auth_cache={couch_auth_cache, start_link, []}
-replicator_manager={couch_replicator_manager, start_link, []}
-os_daemons={couch_os_daemons, start_link, []}
-compaction_daemon={couch_compaction_daemon, start_link, []}
+[database_compaction]
+; Larger buffer sizes (in bytes) can originate smaller files.
+doc_buffer_size = 524288
 
-[httpd_global_handlers]
-/ = {couch_httpd_misc_handlers, handle_welcome_req, <<"Welcome">>}
-favicon.ico = {couch_httpd_misc_handlers, handle_favicon_req, "%localdatadir%/www"}
+; Checkpoint after every N bytes were written.
+checkpoint_after = 5242880
 
-_utils = {couch_httpd_misc_handlers, handle_utils_dir_req, "%localdatadir%/www"}
-_all_dbs = {couch_httpd_misc_handlers, handle_all_dbs_req}
-_active_tasks = {couch_httpd_misc_handlers, handle_task_status_req}
-_config = {couch_httpd_misc_handlers, handle_config_req}
-_replicate = {couch_replicator_httpd, handle_req}
-_uuids = {couch_httpd_misc_handlers, handle_uuids_req}
-_restart = {couch_httpd_misc_handlers, handle_restart_req}
-_stats = {couch_httpd_stats_handlers, handle_stats_req}
-_log = {couch_httpd_misc_handlers, handle_log_req}
-_session = {couch_httpd_auth, handle_session_req}
-_oauth = {couch_httpd_oauth, handle_oauth_req}
-_db_updates = {couch_dbupdates_httpd, handle_req}
-_plugins = {couch_plugins_httpd, handle_req}
-
-[httpd_db_handlers]
-_all_docs = {couch_mrview_http, handle_all_docs_req}
-_changes = {couch_httpd_db, handle_changes_req}
-_compact = {couch_httpd_db, handle_compact_req}
-_design = {couch_httpd_db, handle_design_req}
-_temp_view = {couch_mrview_http, handle_temp_view_req}
-_view_cleanup = {couch_mrview_http, handle_cleanup_req}
-
-; The external module takes an optional argument allowing you to narrow it to a
-; single script. Otherwise the script name is inferred from the first path section
-; after _external's own path.
-; _mypath = {couch_httpd_external, handle_external_req, <<"mykey">>}
-; _external = {couch_httpd_external, handle_external_req}
-
-[httpd_design_handlers]
-_compact = {couch_mrview_http, handle_compact_req}
-_info = {couch_mrview_http, handle_info_req}
-_list = {couch_mrview_show, handle_view_list_req}
-_rewrite = {couch_httpd_rewrite, handle_rewrite_req}
-_show = {couch_mrview_show, handle_doc_show_req}
-_update = {couch_mrview_show, handle_doc_update_req}
-_view = {couch_mrview_http, handle_view_req}
-
-; enable external as an httpd handler, then link it with commands here.
-; note, this api is still under consideration.
-; [external]
-; mykey = /path/to/mycommand
-
-; Here you can setup commands for CouchDB to manage
-; while it is alive. It will attempt to keep each command
-; alive if it exits.
-; [os_daemons]
-; some_daemon_name = /path/to/script -with args
-
-
-[uuids]
-; Known algorithms:
-;   random - 128 bits of random awesome
-;     All awesome, all the time.
-;   sequential - monotonically increasing ids with random increments
-;     First 26 hex characters are random. Last 6 increment in
-;     random amounts until an overflow occurs. On overflow, the
-;     random prefix is regenerated and the process starts over.
-;   utc_random - Time since Jan 1, 1970 UTC with microseconds
-;     First 14 characters are the time in hex. Last 18 are random.
-;   utc_id - Time since Jan 1, 1970 UTC with microseconds, plus utc_id_suffix string
-;     First 14 characters are the time in hex. uuids/utc_id_suffix string value is appended to these.
-algorithm = sequential
-; The utc_id_suffix value will be appended to uuids generated by the utc_id algorithm.
-; Replicating instances should have unique utc_id_suffix values to ensure uniqueness of utc_id ids.
-utc_id_suffix =
-
-[stats]
-; rate is in milliseconds
-rate = 1000
-; sample intervals are in seconds
-samples = [0, 60, 300, 900]
-
-[attachments]
-compression_level = 8 ; from 1 (lowest, fastest) to 9 (highest, slowest), 0 to disable compression
-compressible_types = text/*, application/javascript, application/json, application/xml
-
-[replicator]
-db = _replicator
-; Maximum replicaton retry count can be a non-negative integer or "infinity".
-max_replication_retry_count = 10
-; More worker processes can give higher network throughput but can also
-; imply more disk and network IO.
-worker_processes = 4
-; With lower batch sizes checkpoints are done more frequently. Lower batch sizes
-; also reduce the total amount of used RAM memory.
-worker_batch_size = 500
-; Maximum number of HTTP connections per replication.
-http_connections = 20
-; HTTP connection timeout per replication.
-; Even for very fast/reliable networks it might need to be increased if a remote
-; database is too busy.
-connection_timeout = 30000
-; If a request fails, the replicator will retry it up to N times.
-retries_per_request = 10
-; Some socket options that might boost performance in some scenarios:
-;       {nodelay, boolean()}
-;       {sndbuf, integer()}
-;       {recbuf, integer()}
-;       {priority, integer()}
-; See the `inet` Erlang module's man page for the full list of options.
-socket_options = [{keepalive, true}, {nodelay, false}]
-; Path to a file containing the user's certificate.
-;cert_file = /full/path/to/server_cert.pem
-; Path to file containing user's private PEM encoded key.
-;key_file = /full/path/to/server_key.pem
-; String containing the user's password. Only used if the private keyfile is password protected.
-;password = somepassword
-; Set to true to validate peer certificates.
-verify_ssl_certificates = false
-; File containing a list of peer trusted certificates (in the PEM format).
-;ssl_trusted_certificates_file = /etc/ssl/certs/ca-certificates.crt
-; Maximum peer certificate depth (must be set even if certificate validation is off).
-ssl_certificate_max_depth = 3
+[view_compaction]
+; Larger buffer sizes (in bytes) can originate smaller files.
+keyvalue_buffer_size = 2097152
 
 [compaction_daemon]
-; The delay, in seconds, between each check for which database and view indexes
+; The delay in seconds between checks for database and view indexes
 ; need to be compacted.
+;
 check_interval = 300
+
 ; If a database or view index file is smaller then this value (in bytes),
 ; compaction will not happen. Very small files always have a very high
 ; fragmentation therefore it's not worth to compact them.
+;
 min_file_size = 131072
 
 [compactions]
@@ -284,44 +445,44 @@ min_file_size = 131072
 ;
 ; Possible parameters:
 ;
-; * db_fragmentation - If the ratio (as an integer percentage), of the amount
-;                      of old data (and its supporting metadata) over the database
-;                      file size is equal to or greater then this value, this
-;                      database compaction condition is satisfied.
-;                      This value is computed as:
+; * db_fragmentation
+; If the ratio (as an integer percentage), of the amount of old data
+; (and its supporting metadata) is over the database file size is equal to
+; or greater then this value, this database compaction condition is satisfied.
+; This value is computed as:
 ;
-;                           (file_size - data_size) / file_size * 100
+;   (file_size - data_size) / file_size * 100
 ;
-;                      The data_size and file_size values can be obtained when
-;                      querying a database's information URI (GET /dbname/).
+; The data_size and file_size values can be obtained when querying a database's
+; information URI (GET /dbname/).
 ;
-; * view_fragmentation - If the ratio (as an integer percentage), of the amount
-;                        of old data (and its supporting metadata) over the view
-;                        index (view group) file size is equal to or greater then
-;                        this value, then this view index compaction condition is
-;                        satisfied. This value is computed as:
+; * view_fragmentation
+; If the ratio (as an integer percentage), of the amount of old data
+; (and its supporting metadata) over the view index (view group) file size
+; is equal to or greater then this value, then this view index compaction
+; condition is satisfied. This value is computed as:
 ;
-;                            (file_size - data_size) / file_size * 100
+;   (file_size - data_size) / file_size * 100
 ;
-;                        The data_size and file_size values can be obtained when
-;                        querying a view group's information URI
-;                        (GET /dbname/_design/groupname/_info).
+; The data_size and file_size values can be obtained when querying
+; a view group's information URI (GET /dbname/_design/groupname/_info).
 ;
-; * from _and_ to - The period for which a database (and its view groups) compaction
-;                   is allowed. The value for these parameters must obey the format:
+; * from _and_ to
+; The period for which a database (and its view groups) compaction is allowed.
+; The value for these parameters must obey the format:
 ;
-;                   HH:MM - HH:MM  (HH in [0..23], MM in [0..59])
+;   HH:MM - HH:MM  (HH in [0..23], MM in [0..59])
 ;
-; * strict_window - If a compaction is still running after the end of the allowed
-;                   period, it will be canceled if this parameter is set to 'true'.
-;                   It defaults to 'false' and it's meaningful only if the *period*
-;                   parameter is also specified.
+; * strict_window
+; If a compaction is still running after the end of the allowed period,
+; it will be canceled if this parameter is set to 'true'.
+; It defaults to 'false' and it's meaningful only if the *period* parameter
+; is also specified.
 ;
-; * parallel_view_compaction - If set to 'true', the database and its views are
-;                              compacted in parallel. This is only useful on
-;                              certain setups, like for example when the database
-;                              and view index directories point to different
-;                              disks. It defaults to 'false'.
+; * parallel_view_compaction
+; If set to 'true', the database and its views are compacted in parallel.
+; This is only useful on certain setups, like for example when the database
+; and view index directories point to different disks. It defaults to 'false'.
 ;
 ; Before a compaction is triggered, an estimation of how much free disk space is
 ; needed is computed. This estimation corresponds to 2 times the data size of
@@ -349,5 +510,295 @@ min_file_size = 131072
 ;    Similar to the preceding example, but a database and its views can be
 ;    compacted in parallel.
 ;
+; Example of the default compaction configuration:
+;
 ;_default = [{db_fragmentation, "70%"}, {view_fragmentation, "60%"}, {from, "23:00"}, {to, "04:00"}]
 
+
+;-------------------------------------------------------------------------------
+; Replicator
+;-------------------------------------------------------------------------------
+
+[replicator]
+
+; Replicator database name.
+db = _replicator
+
+; HTTP connection timeout per replication.
+; Even for very fast/reliable networks it might need to be increased if a remote
+; database is too busy.
+;
+connection_timeout = 30000
+
+; Defines replication checkpoint interval in milliseconds.
+checkpoint_interval = 5000
+
+; Maximum number of HTTP connections per replication.
+http_connections = 20
+
+; Maximum replication retry count can be a non-negative integer or "infinity".
+max_replication_retry_count = 10
+
+; If a request fails, the replicator will retry it up to N times.
+retries_per_request = 10
+
+; Some socket options that might boost performance in some scenarios:
+;  - {nodelay, boolean()}
+;  - {sndbuf, integer()}
+;  - {recbuf, integer()}
+;  - {priority, integer()}
+; See the `inet` Erlang module's man page for the full list of options.
+;
+socket_options = [{keepalive, true}, {nodelay, false}]
+
+; If enabled, CouchDB will make checkpoints during replication and at the
+; completion of replication to efficiently resume it from any of these.
+; This is not the option that you'd like to disable!
+;
+use_checkpoints = true
+
+; With lower batch sizes checkpoints are done more frequently. Lower batch sizes
+; also reduce the total amount of used RAM memory.
+;
+worker_batch_size = 500
+
+; More worker processes can give higher network throughput but can also
+; imply more disk and network IO.
+;
+worker_processes = 4
+
+;;; Replicators SSL options
+
+; Path to a file containing the user's certificate.
+;cert_file = /full/path/to/server_cert.pem
+
+; Path to file containing user's private PEM encoded key.
+;key_file = /full/path/to/server_key.pem
+
+; String containing the user's password. Only used if the private keyfile
+; is password protected.
+;
+;password = somepassword
+
+; Maximum peer certificate depth.
+; Must be set even if certificate validation is off.
+;
+ssl_certificate_max_depth = 3
+
+; File containing a list of peer trusted certificates (in the PEM format).
+;ssl_trusted_certificates_file = /etc/ssl/certs/ca-certificates.crt
+
+; Set to true to validate peer certificates.
+verify_ssl_certificates = false
+
+
+;-------------------------------------------------------------------------------
+; Query Servers
+;-------------------------------------------------------------------------------
+
+[query_servers]
+javascript = %bindir%/%couchjs_command_name% %localbuilddatadir%/server/main.js
+coffeescript = %bindir%/%couchjs_command_name% %localbuilddatadir%/server/main-coffee.js
+
+; Experimental Node.JS query server
+; nodejs = %bindir%/couchjs-node %localbuilddatadir%/server/main.js
+
+
+[query_server_config]
+; The  delay in seconds before commit view index changes on disk.
+commit_freq = 5
+
+; Amount of processes that may be spawned for single query server's group.
+os_process_limit = 25
+
+; Changing reduce_limit to false will disable reduce_limit.
+; If you think you're hitting reduce_limit with a "good" reduce function,
+; please let us know on the mailing list so we can fine tune the heuristic.
+;
+reduce_limit = true
+
+
+[native_query_servers]
+;; WARNING! Unlike the JavaScript query server, the Erlang one does not runs
+; in a sandbox mode. This means that Erlang code has full access to your OS,
+; filesystem and network, which may lead to security issues.
+; Enable this on your own risk.
+;
+;erlang = {couch_native_process, start_link, []}
+
+
+;-------------------------------------------------------------------------------
+; CORS Support
+;-------------------------------------------------------------------------------
+; This section requires httpd/enable_cors option have true value:
+;
+;  [httpd]
+;  enable_cors = true
+;
+
+;;; Global CORS settings
+[cors]
+; By default, neither authentication headers nor cookies are included in
+; requests and responses. To do so requires both setting
+; XmlHttpRequest.withCredentials = true on the request object in the browser
+; and enabling credentials support in CouchDB.
+;
+;credentials = false
+
+; List of origins separated by a comma, * means accept all.
+; Origins must include the scheme: http://example.com
+; You can’t set origins: * and credentials = true at the same time.
+;
+;origins = *
+
+; List of accepted headers separated by a comma.
+; headers =
+
+; List of accepted methods.
+; methods =
+
+;;; Configuration for a vhost
+;
+;[cors:http://example.com]
+; credentials = false
+; List of origins separated by a comma
+; Origins must include the scheme: http://example.com
+; You can’t set origins: * and credentials = true at the same time.
+;origins =
+; List of accepted headers separated by a comma
+; headers =
+; List of accepted methods
+; methods =
+
+
+;-------------------------------------------------------------------------------
+; Virtual Hosts
+;-------------------------------------------------------------------------------
+; To enable Virtual Hosts in CouchDB, add a vhost = path directive.
+; All requests to the Virual Host will be redirected to the path.
+; In the example below all requests to http://example.com/ are redirected
+; to /database.
+; If you run CouchDB on a specific port, include the port number in the vhost:
+; example.com:5984 = /database
+;
+[vhosts]
+;example.com = /database/
+
+
+;-------------------------------------------------------------------------------
+; Externals
+;-------------------------------------------------------------------------------
+
+[external]
+; Enable external as an httpd handler, then link it with commands here.
+; See [httpd_db_handlers] section for HTTP handler definition.
+;
+;mykey = /path/to/mycommand
+
+[os_daemons]
+; For any commands listed here, CouchDB will attempt to ensure that
+; the process remains alive. Daemons should monitor their environment
+; to know when to exit. This can most easily be accomplished by exiting
+; when stdin is closed.
+;
+;foo = /path/to/command -with args
+
+[update_notification]
+;unique notifier name=/full/path/to/exe -with "cmd line arg"
+
+
+;-------------------------------------------------------------------------------
+; HTTP Resource Handlers
+;-------------------------------------------------------------------------------
+
+[httpd_global_handlers]
+/ = {couch_httpd_misc_handlers, handle_welcome_req, <<"Welcome">>}
+favicon.ico = {couch_httpd_misc_handlers, handle_favicon_req, "%localdatadir%/www"}
+
+_utils = {couch_httpd_misc_handlers, handle_utils_dir_req, "%localdatadir%/www"}
+_all_dbs = {couch_httpd_misc_handlers, handle_all_dbs_req}
+_active_tasks = {couch_httpd_misc_handlers, handle_task_status_req}
+_config = {couch_httpd_misc_handlers, handle_config_req}
+_db_updates = {couch_dbupdates_httpd, handle_req}
+_log = {couch_httpd_misc_handlers, handle_log_req}
+_oauth = {couch_httpd_oauth, handle_oauth_req}
+_plugins = {couch_plugins_httpd, handle_req}
+_replicate = {couch_replicator_httpd, handle_req}
+_restart = {couch_httpd_misc_handlers, handle_restart_req}
+_session = {couch_httpd_auth, handle_session_req}
+_stats = {couch_httpd_stats_handlers, handle_stats_req}
+_uuids = {couch_httpd_misc_handlers, handle_uuids_req}
+
+;;; HTTP Proxy handler
+; Proxies HTTP requests to the specified location
+; Example: GET /_spec/rfc2616 -> http://tools.ietf.org/html/rfc2616
+;_spec = {couch_httpd_proxy, handle_proxy_req, <<"http://tools.ietf.org/html">>}
+
+
+[httpd_db_handlers]
+_all_docs = {couch_mrview_http, handle_all_docs_req}
+_changes = {couch_httpd_db, handle_changes_req}
+_compact = {couch_httpd_db, handle_compact_req}
+_design = {couch_httpd_db, handle_design_req}
+_temp_view = {couch_mrview_http, handle_temp_view_req}
+_view_cleanup = {couch_mrview_http, handle_cleanup_req}
+
+;;; HTTP External handler
+; The external module takes an optional argument allowing you to narrow it to a
+; single script. Otherwise the script name is inferred from the first path section
+; after _external's own path.
+; For "mykey" definition see [external] section.
+;
+;_mypath = {couch_httpd_external, handle_external_req, <<"mykey">>}
+;_external = {couch_httpd_external, handle_external_req}
+
+
+[httpd_design_handlers]
+_compact = {couch_mrview_http, handle_compact_req}
+_info = {couch_mrview_http, handle_info_req}
+_list = {couch_mrview_show, handle_view_list_req}
+_rewrite = {couch_httpd_rewrite, handle_rewrite_req}
+_show = {couch_mrview_show, handle_doc_show_req}
+_update = {couch_mrview_show, handle_doc_update_req}
+_view = {couch_mrview_http, handle_view_req}
+
+
+;-------------------------------------------------------------------------------
+; Internal Services
+;-------------------------------------------------------------------------------
+[daemons]
+auth_cache={couch_auth_cache, start_link, []}
+compaction_daemon={couch_compaction_daemon, start_link, []}
+external_manager={couch_external_manager, start_link, []}
+httpd={couch_httpd, start_link, []}
+index_server={couch_index_server, start_link, []}
+os_daemons={couch_os_daemons, start_link, []}
+query_servers={couch_query_servers, start_link, []}
+replicator_manager={couch_replicator_manager, start_link, []}
+stats_aggregator={couch_stats_aggregator, start, []}
+stats_collector={couch_stats_collector, start, []}
+uuids={couch_uuids, start, []}
+vhosts={couch_httpd_vhost, start_link, []}
+
+; Uncomment to enable HTTPS support. See [ssl] section for config options.
+;httpsd = {couch_httpd, start_link, [https]}
+
+
+;-------------------------------------------------------------------------------
+; Misc
+;-------------------------------------------------------------------------------
+
+[stats]
+; Rate of statistics gathering in milliseconds.
+rate = 1000
+
+; Samples are used tracks the mean and standard value deviation within specified
+; intervals (in seconds).
+;
+samples = [0, 60, 300, 900]
+
+; For CouchDB distributors there is option to explicitly define this information
+; in welcome message
+[vendor]
+name = %package_author_name%
+version = %version%

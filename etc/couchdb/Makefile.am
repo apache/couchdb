@@ -16,8 +16,6 @@ devcouchprivlibdir = $(abs_top_builddir)/src/couchdb/priv/.libs
 localconf_DATA = default.ini
 noinst_DATA = default_dev.ini local_dev.ini
 
-EXTRA_DIST = local.ini
-
 CLEANFILES = $(localconf_DATA) $(noinst_DATA)
 
 transform = @program_transform_name@
@@ -72,16 +70,13 @@ default_dev.ini: default.ini.tpl
 
 # Noah said to not specify local.ini but it borks
 # VPATH builds that make distcheck uses.
-local_dev.ini: local.ini
+local_dev.ini:
 	if test ! -f "$@"; then \
-	    cp $< $@; \
+	    touch $@; \
 	    chmod +w $@; \
 	fi
 
 install-data-hook:
-	if test ! -f "$(DESTDIR)$(localconfdir)/local.ini"; then \
-	    cp $(srcdir)/local.ini "$(DESTDIR)$(localconfdir)/local.ini"; \
-	fi
 	if test ! "$(mkdir_p)" = ""; then \
 	    $(mkdir_p) "$(DESTDIR)$(localconfdir)/default.d"; \
 	    $(mkdir_p) "$(DESTDIR)$(localconfdir)/local.d"; \
@@ -90,6 +85,3 @@ install-data-hook:
 	    mkdir -p "$(DESTDIR)$(localconfdir)/default.d"; \
 	    mkdir -p "$(DESTDIR)$(localconfdir)/local.d"; \
 	fi
-
-uninstall-local:
-	rm -f "$(DESTDIR)/$(localconfdir)/local.ini"
