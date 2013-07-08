@@ -665,7 +665,7 @@ read_changes(Parent, StartSeq, Db, ChangesQueue, Options, Ts) ->
                         ok = gen_server:call(Parent, Msg, infinity)
                     end,
                     put(last_seq, Seq),
-                    read_changes(Parent, Seq, Db, ChangesQueue, Options, Ts + 1);
+                    throw(recurse);
                 _ ->
                     % This clause is unreachable today, but let's plan ahead
                     % for the future where we checkpoint against last_seq
@@ -675,7 +675,11 @@ read_changes(Parent, StartSeq, Db, ChangesQueue, Options, Ts) ->
                 end
             end, Options),
         couch_work_queue:close(ChangesQueue)
-    catch exit:{http_request_failed, _, _, _} = Error ->
+    catch
+        throw:recurse ->
+            LS = get(last_seq),
+            read_changes(Parent, LS, Db, ChangesQueue, Options, Ts+1);
+        exit:{http_request_failed, _, _, _} = Error ->
         case get(retries_left) of
         N when N > 0 ->
             put(retries_left, N - 1),
