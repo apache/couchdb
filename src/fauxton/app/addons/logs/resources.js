@@ -97,10 +97,9 @@ function (app, FauxtonAPI, Backbone) {
       Log.events.on("log:remove", this.removeFilterLogs, this);
 
       this.filters = [];
-      this.filteredCollection = new Log.Collection(this.collection.toJSON());
 
       this.collection.on("add", function () {
-        this.createFilteredCollection();
+        this.render();
       }, this);
     },
 
@@ -109,7 +108,7 @@ function (app, FauxtonAPI, Backbone) {
     },
 
     serialize: function () {
-      return { logs: this.filteredCollection};
+      return { logs: new Log.Collection(this.createFilteredCollection())};
     },
 
     afterRender: function () {
@@ -122,18 +121,13 @@ function (app, FauxtonAPI, Backbone) {
 
     filterLogs: function (filter) {
       this.filters.push(filter);
-      this.createFilteredCollection();
-    },
-
-    resetFilterCollectionAndRender: function (logs) {
-      this.filteredCollection.reset(logs);
       this.render();
     },
 
     createFilteredCollection: function () {
       var that = this;
 
-      var filtered = _.reduce(this.filters, function (logs, filter) {
+      return _.reduce(this.filters, function (logs, filter) {
 
         return _.filter(logs, function (log) {
           var match = false;
@@ -149,12 +143,11 @@ function (app, FauxtonAPI, Backbone) {
 
       }, this.collection.toJSON(), this);
 
-      this.resetFilterCollectionAndRender(filtered);
     },
 
     removeFilterLogs: function (filter) {
       this.filters.splice(this.filters.indexOf(filter), 1);
-      this.createFilteredCollection();
+      this.render();
     },
 
     startRefreshInterval: function () {
