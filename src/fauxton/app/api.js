@@ -256,10 +256,10 @@ function(app, Fauxton) {
       // Only want to redo the template if its a full render
       if (!this.renderedState) {
         masterLayout.setTemplate(this.layout);
-          $('#nav-links li').removeClass('active');
+          $('#primary-navbar li').removeClass('active');
 
         if (this.selectedHeader) {
-          $('#nav-links li[data-nav-name="' + this.selectedHeader + '"]').addClass('active');
+          $('#primary-navbar li[data-nav-name="' + this.selectedHeader + '"]').addClass('active');
         }
       }
 
@@ -295,7 +295,7 @@ function(app, Fauxton) {
             };
             masterLayout.renderView(selector);
           });
-
+          
           var hooks = masterLayout.hooks[selector];
           var boundRoute = route;
 

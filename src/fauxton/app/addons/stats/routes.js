@@ -25,6 +25,11 @@ function(app, FauxtonAPI, Stats) {
       "stats":"showStats",
       "_stats": "showStats"
     },
+    
+    
+    crumbs: [
+      {"name": "Statistics", "link": "_stats"}
+    ],
 
     selectedHeader: "Statistics",
 

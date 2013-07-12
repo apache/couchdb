@@ -61,32 +61,42 @@ function(app, Backbone) {
   });
 
   Fauxton.NavBar = Backbone.View.extend({
+    className:"navbar",
     template: "templates/fauxton/nav_bar",
     // TODO: can we generate this list from the router?
     navLinks: [
-      {href:"#/_all_dbs", title:"Databases"}
+      {href:"#/_all_dbs", title:"Databases", icon: "fonticon-database", className: 'databases'}
     ],
+
+    bottomNavLinks: [],
 
     initialize: function() {
     },
 
     serialize: function() {
-      return {navLinks: this.navLinks};
+      return {navLinks: this.navLinks, bottomNavLinks: this.bottomNavLinks};
     },
 
     addLink: function(link) {
-      if (link.top){
+      // link.top means it gets pushed to the top of the array,
+      // link.bottomNav means it goes to the additional bottom nav
+      if (link.top && !link.bottomNav){
         this.navLinks.unshift(link);
+      } else if (link.top && link.bottomNav){
+        this.bottomNavLinks.unshift(link);
+      } else if (link.bottomNav) {
+        this.bottomNavLinks.push(link);
       } else {
         this.navLinks.push(link);
       }
-      this.trigger("link:add");
 
-      this.render();
+      //this.trigger("link:add");
+
+      //this.render();
     },
 
     beforeRender: function () {
-      this.addLinkViews();
+      //this.addLinkViews();
     },
 
     addLinkViews: function () {

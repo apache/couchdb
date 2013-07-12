@@ -21,7 +21,7 @@ define([
 
 function(app, FauxtonAPI, Log) {
   Log.initialize = function() {
-    FauxtonAPI.addHeaderLink({title: "Log", href: "#_log"});
+    FauxtonAPI.addHeaderLink({title: "Log", href: "#_log", icon: "fonticon-log", className: 'logs'});
   };
 
   return Log;

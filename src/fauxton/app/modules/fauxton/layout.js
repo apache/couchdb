@@ -30,6 +30,13 @@ function(Backbone) {
       views: {
         "#primary-navbar": this.navBar,
         "#api-navbar": this.apiBar
+      },
+      afterRender: function(){
+        $('#primary-navbar').on('click', function(e){
+          if(!$(e.target).is('a')){
+            $('body').toggleClass('closeMenu');
+          }
+        });
       }
     });
 
@@ -41,7 +48,6 @@ function(Backbone) {
 
   // creatings the dashboard object same way backbone does
   _.extend(Layout.prototype, {
-
     render: function () {
       return this.layout.render();
     },
