@@ -30,6 +30,9 @@ function(Backbone) {
       views: {
         "#primary-navbar": this.navBar,
         "#api-navbar": this.apiBar
+      },
+      afterRender: function(){
+
       }
     });
 
@@ -41,7 +44,6 @@ function(Backbone) {
 
   // creatings the dashboard object same way backbone does
   _.extend(Layout.prototype, {
-
     render: function () {
       return this.layout.render();
     },

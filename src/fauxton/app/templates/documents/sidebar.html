@@ -13,29 +13,53 @@ the License.
 -->
 
 <div id="sidenav">
-  <div class="row-fluid">
-    <div class="span4">
-      <a class="btn btn-small new" id="doc" href="#<%= database.url('app') %>/new"><i class="icon-file"></i> New doc</a>
-      <div class="btn-group" id="new-index">
-        <a class="btn btn-small" href="#<%= database.url('app') %>/new_view">New view</a>
+  <header class="row-fluid">
+    <div class="span5">
+      <div class="btn-group">
+        <button class="btn">Docs</button>
+        <button class="btn dropdown-toggle" data-toggle="dropdown">
+          <span class="caret"></span>
+        </button>
+        <ul class="dropdown-menu">
+          <!-- dropdown menu links -->
+          <li><a href="<%= db_url %>">Docs</a></li>
+          <!-- TODO::REENABLE
+          <li><a href="#">Permissions</a></li>
+          <li><a href="#">Stats</a></li>
+          -->
+          <li><a  href="<%= changes_url %>">Changes</a></li>
+        </ul>
       </div>
     </div>
-    <div class="span6">
-      <form id="jump-to-doc" class="form-inline">
-        <label> Jump To: 
-          <input type="text" id="jump-to-doc-id" class="input-small" placeholder="Document Id"></input>
-        </label>
-      </form>
-    </div>
-  </div>
 
-  <hr>
-  <ul class="nav nav-list">
-    <li class="active"><a id="all-docs" href="#<%= database.url('index') %>?limit=100" class="toggle-view"><i class="icon-list"></i> All documents</a></li>
-    <li><a id="design-docs" href='#<%= database.url("index") %>?limit=100&startkey="_design"&endkey="_e"'  class="toggle-view"><i class="icon-list"></i> All design docs</a></li>
-  </ul>
-  <ul class="nav nav-list views">
-    <li class="nav-header">Secondary Indexes</li>
-    <li><a id="new-view" href="#<%= database.url('app') %>/new_view" class="new"><i class="icon-plus"></i> New</a></li>
-  </ul>
+    <div class="span5 offset1">
+      <div class="btn-group">
+        <button class="btn">Add</button>
+        <button class="btn dropdown-toggle" data-toggle="dropdown">
+          <span class="caret"></span>
+        </button>
+        <ul class="dropdown-menu">
+          <!-- dropdown menu links -->
+           <li>
+            <a id="doc" href="#<%= database.url('app') %>/new">New doc</a>
+          </li>
+          <li>
+            <a href="#<%= database.url('app') %>/new_view">New view</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </header>
+
+  <nav>
+    <ul class="nav nav-list">
+      <li class="nav-header">Primary Indices</li>
+      <li class="active"><a id="all-docs" href="#<%= database.url('index') %>?limit=100" class="toggle-view"><i class="icon-list"></i> All documents</a></li>
+      <li><a id="design-docs" href='#<%= database.url("index") %>?limit=100&startkey="_design"&endkey="_e"'  class="toggle-view"><i class="icon-list"></i> All design docs</a></li>
+    </ul>
+    <ul class="nav nav-list views">
+      <li class="nav-header">Secondary Indices</li>
+      <li><a id="new-view" href="#<%= database.url('app') %>/new_view" class="new"><i class="icon-plus"></i> New</a></li>
+    </ul>
+  </nav>
 </div>

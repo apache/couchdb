@@ -15,17 +15,27 @@ the License.
 <div id="primary-navbar"></div>
 <div id="dashboard" class="container-fluid">
 
-<div class="row-fluid">
+<header class="row-fluid fixed-header">
   <div id="breadcrumbs" class="row-fluid"></div>
-  <div id="tabs" class="row-fluid"></div>
+  <div id="api-navbar"></div>
+</header>
 
-  <div class="row-fluid">
-    <div id="sidebar-content" class="sidebar span4"></div>
-    <div id="dashboard-content" class="list span8 pull-right">
-      <div id="dashboard-upper-content"></div>
-      <div id="dashboard-lower-content"></div>
-    </div>
+
+  <div class="with-sidebar content-area">
+
+    <div id="tabs" class="row-fluid"></div>
+
+    <aside id="sidebar-content" class="sidebar"></aside>
+
+    <section id="dashboard-content" class="list pull-right">
+      <div class="inner">
+        <div id="dashboard-upper-menu"></div>
+        <div id="dashboard-upper-content"></div>
+
+        <div id="dashboard-lower-content"></div>
+      </div>
+    </section>
+
   </div>
-</div>
 
-<div id="api-navbar"></div>
+

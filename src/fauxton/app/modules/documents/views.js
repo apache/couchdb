@@ -131,6 +131,8 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
   Views.UploadModal = FauxtonAPI.View.extend({
     template: "templates/documents/upload_modal",
 
+    disableLoader: true,
+    
     initialize: function (options) {
       _.bindAll(this);
     },
@@ -289,9 +291,7 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
 
   Views.FieldEditorTabs = FauxtonAPI.View.extend({
     template: "templates/documents/doc_field_editor_tabs",
-
     disableLoader: true,
-
     initialize: function(options) {
       this.selected = options.selected;
     },
@@ -563,11 +563,10 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
 
   Views.Doc = FauxtonAPI.View.extend({
     template: "templates/documents/doc",
-
     events: {
       "click button.save-doc": "saveDoc"
     },
-
+    disableLoader: true,
     initialize: function (options) {
       this.database = options.database;
     },
@@ -705,7 +704,7 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
 
   Views.DocFieldEditor = FauxtonAPI.View.extend({
     template: "templates/documents/doc_field_editor",
-
+    disableLoader: true,
     events: {
       "click button.save": "saveDoc"
     },
@@ -1250,11 +1249,24 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
     }
   });
 
+
+  //moved out of sidebar into it's own view
+  Views.JumpToDoc = FauxtonAPI.View.extend({
+    template: "templates/documents/jumpdoc",
+    events: {
+      "submit #jump-to-doc": "jumpToDoc"
+    },
+    jumpToDoc: function (event) {
+      event.preventDefault();
+      var docId = this.$('#jump-to-doc-id').val();
+      FauxtonAPI.navigate('/database/' + this.database.id +'/' + docId, {trigger: true});
+    }
+  });
+
   Views.Sidebar = FauxtonAPI.View.extend({
     template: "templates/documents/sidebar",
     events: {
-      "click a.new#index": "newIndex",
-      "submit #jump-to-doc": "jumpToDoc"
+      "click a.new#index": "newIndex"
     },
 
     initialize: function(options) {
@@ -1267,6 +1279,8 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
 
     serialize: function() {
       return {
+        changes_url: '#' + this.database.url('changes'),
+        db_url: '#' + this.database.url('index') + '?limit=100',
         index: [1,2,3],
         view: [1,2],
         database: this.collection.database
@@ -1289,12 +1303,6 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
       );
       url = event.currentTarget.href.split('#')[1];
       app.router.navigate(url);
-    },
-
-    jumpToDoc: function (event) {
-      event.preventDefault();
-      var docId = this.$('#jump-to-doc-id').val();
-      FauxtonAPI.navigate('/database/' + this.database.id +'/' + docId, {trigger: true});
     },
 
     buildIndexList: function(collection, selector, design){

@@ -13,11 +13,12 @@
 define([
        "app",
        // Libs
-       "backbone"
+       "backbone",
+       "windowResize"
 
 ],
 
-function(app, Backbone) {
+function(app, Backbone, WindowResize) {
   var Fauxton = app.module();
 
   Fauxton.Breadcrumbs = Backbone.View.extend({
@@ -61,32 +62,83 @@ function(app, Backbone) {
   });
 
   Fauxton.NavBar = Backbone.View.extend({
+    className:"navbar",
     template: "templates/fauxton/nav_bar",
     // TODO: can we generate this list from the router?
     navLinks: [
-      {href:"#/_all_dbs", title:"Databases"}
+      {href:"#/_all_dbs", title:"Databases", icon: "fonticon-database", className: 'databases'}
     ],
+
+    bottomNavLinks: [],
 
     initialize: function() {
     },
 
     serialize: function() {
-      return {navLinks: this.navLinks};
+      return {navLinks: this.navLinks, bottomNavLinks: this.bottomNavLinks};
     },
 
     addLink: function(link) {
-      if (link.top){
+      // link.top means it gets pushed to the top of the array,
+      // link.bottomNav means it goes to the additional bottom nav
+      if (link.top && !link.bottomNav){
         this.navLinks.unshift(link);
+      } else if (link.top && link.bottomNav){
+        this.bottomNavLinks.unshift(link);
+      } else if (link.bottomNav) {
+        this.bottomNavLinks.push(link);
       } else {
         this.navLinks.push(link);
       }
-      this.trigger("link:add");
 
-      this.render();
+      //this.trigger("link:add");
+
+      //this.render();
+    },
+
+    afterRender: function(){
+
+      $('#primary-navbar li[data-nav-name="' + app.selectedHeader + '"]').addClass('active');
+
+      var menuOpen = true;
+      var $selectorList = $('body');
+      $('.brand').off();
+      $('.brand').on({
+        click: function(e){
+          if(!$(e.target).is('a')){
+            toggleMenu();
+          }
+         }
+      });
+
+      function toggleMenu(){
+        $selectorList.toggleClass('closeMenu');
+        menuOpen = $selectorList.hasClass('closeMenu');
+        setTimeout(
+          function(){
+            app.windowResize.onResizeHandler();
+          }, 1000);
+      }
+
+      $('#primary-navbar').on("click", ".nav a", function(){
+        if (!($selectorList.hasClass('closeMenu'))){
+        setTimeout(
+          function(){
+            $selectorList.addClass('closeMenu');
+          },1000);
+
+        }
+      });
+
+     app.windowResize = new WindowResize({
+          columnType: "double",
+          selectorElements: '#dashboard-content, #dashboard-content .editcase'
+      });
+      app.windowResize.initialize();
     },
 
     beforeRender: function () {
-      this.addLinkViews();
+      //this.addLinkViews();
     },
 
     addLinkViews: function () {

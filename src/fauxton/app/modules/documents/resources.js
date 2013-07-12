@@ -271,7 +271,7 @@ function(app, FauxtonAPI) {
       that = this;
       this.viewMeta = {
         total_rows: resp.total_rows,
-        offest: resp.offest,
+        offest: resp.offset,
         update_seq: resp.update_seq
       };
       return _.map(resp.rows, function(row) {

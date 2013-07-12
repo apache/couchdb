@@ -24,7 +24,7 @@ define([
 function(app, FauxtonAPI, Databases, Views) {
 
   var AllDbsRouteObject = FauxtonAPI.RouteObject.extend({
-    layout: "with_sidebar",
+    layout: "one_pane",
 
     crumbs: [
       {"name": "Databases", "link": "/_all_dbs"}
@@ -46,9 +46,9 @@ function(app, FauxtonAPI, Databases, Views) {
       this.databases = new Databases.List();
       this.deferred = FauxtonAPI.Deferred();
 
-      this.sidebarView = this.setView("#sidebar-content", new Views.Sidebar({
-        collection: this.databases
-      }));
+      // this.sidebarView = this.setView("#sidebar-content", new Views.Sidebar({
+      //   collection: this.databases
+      // }));
     },
 
     allDatabases: function() {

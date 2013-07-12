@@ -25,12 +25,6 @@
 
   <!-- Application styles. -->
   <link rel="stylesheet" href="<%= css %>">
-  <style type="text/css">
-    body {
-    padding-top: 60px;
-    padding-bottom: 40px;
-    }
-  </style>
   <% if (base) { %>
   <base href="<%= base %>"></base>
   <% } %>
@@ -41,7 +35,6 @@
   <div role="main" id="main">
     <div id="global-notifications" class="container errors-container"></div>
     <div id="app-container"></div>
-    <hr>
 
     <footer>
       <div id="footer-content" class="container"></div>

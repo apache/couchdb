@@ -13,20 +13,6 @@ the License.
 -->
 
 <div class="view show">
-  <% if (!viewList) { %>
-    <div class="row">
-      <div class="btn-toolbar span6">
-        <button type="button" class="btn all" data-toggle="button">✓ All</button>
-        <button class="btn btn-small disabled bulk-delete"><i class="icon-trash"></i></button>
-      </div>
-      <!-- TODO::REENABLE
-      <div class="btn-toolbar pull-right">
-        <a href="#new-view-index" class="btn btn-small toggle-edit disabled"><i class="icon-wrench"></i> Edit index</a>
-        <a href="#params" class="btn btn-small toggle-params"><i class="icon-plus"></i> API preview</a>
-      </div>
-      -->
-    </div>
-  <% } %>
   <p>
     Showing 1-<%= numModels %> of <%= totalRows %> rows
     <% if (updateSeq) { %>

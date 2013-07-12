@@ -12,13 +12,9 @@ License for the specific language governing permissions and limitations under
 the License.
 -->
 
-<ul class="breadcrumb">
-  <% _.each(_.initial(crumbs), function(crumb) { %>
-    <li>
-      <a href="#<%= crumb.link %>"><%= crumb.name %></a>
-      <span class="divider fonticon fonticon-carrot"> </span>
-    </li>
-  <% }); %>
-  <% var last = _.last(crumbs) || {name: ''} %>
-  <li class="active"><%= last.name %></li>
-</ul>
+
+<form id="jump-to-doc" class="form-inline">
+	<label class="fonticon-search">
+    <input type="text" id="jump-to-doc-id" class="input-large" placeholder="Document ID"></input>
+  </label>
+</form>

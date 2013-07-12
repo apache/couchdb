@@ -12,13 +12,6 @@ License for the specific language governing permissions and limitations under
 the License.
 -->
 
-<ul class="breadcrumb">
-  <% _.each(_.initial(crumbs), function(crumb) { %>
-    <li>
-      <a href="#<%= crumb.link %>"><%= crumb.name %></a>
-      <span class="divider fonticon fonticon-carrot"> </span>
-    </li>
-  <% }); %>
-  <% var last = _.last(crumbs) || {name: ''} %>
-  <li class="active"><%= last.name %></li>
-</ul>
+<a class="button new" id="new"><i class="icon fonticon-new-database"></i>Add new database</a>
+
+
