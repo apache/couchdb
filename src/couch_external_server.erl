@@ -43,7 +43,7 @@ init([Name, Command]) ->
     Timeout = list_to_integer(config:get("couchdb", "os_process_timeout",
         "5000")),
     {ok, Pid} = couch_os_process:start_link(Command, [{timeout, Timeout}]),
-    ok = config:listen_for_changes(?MODULE, {Name, Command, Pid}, Pid),
+    ok = config:listen_for_changes(?MODULE, Pid),
     {ok, {Name, Command, Pid}}.
 
 terminate(_Reason, {_Name, _Command, Pid}) ->
