@@ -271,6 +271,9 @@ Replication Settings
 |                                | filter function; value should be a document |
 |                                | containing parameters as members            |
 +--------------------------------+---------------------------------------------+
+| use_checkpoints (optional)     | Whether to use replication checkpoints      |
+|                                | or not                                      |
++--------------------------------+---------------------------------------------+
 
 .. _replication-status:
 

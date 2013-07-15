@@ -22,7 +22,8 @@ cancel an ongoing replication.
 
 These documents have exactly the same content as the JSON objects we use to
 ``POST`` to ``_replicate`` (fields ``source``, ``target``, ``create_target``,
-``continuous``, ``doc_ids``, ``filter``, ``query_params``).
+``continuous``, ``doc_ids``, ``filter``, ``query_params``,
+``use_checkpoints``).
 
 Replication documents can have a user defined ``_id`` (handy for finding a
 specific replication request later). Design Documents
