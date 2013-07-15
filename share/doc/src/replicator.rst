@@ -19,7 +19,8 @@ A database where you ``PUT``/``POST`` documents to trigger replications
 and you ``DELETE`` to cancel ongoing replications. These documents have
 exactly the same content as the JSON objects we used to ``POST`` to
 ``_replicate`` (fields ``source``, ``target``, ``create_target``,
-``continuous``, ``doc_ids``, ``filter``, ``query_params``.
+``continuous``, ``doc_ids``, ``filter``, ``query_params``,
+``use_checkpoints``).
 
 Replication documents can have a user defined ``_id``. Design documents
 (and ``_local`` documents) added to the replicator database are ignored.
