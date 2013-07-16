@@ -12,25 +12,58 @@
 
 .. highlight:: ini
 
-.. _config/compaction:
+========================
+Compaction Configuration
+========================
 
-``[compaction]`` :: Compaction Daemon Rules
-===========================================
+.. _config/database_compaction:
 
-List of compaction rules for the
-:ref:`compaction daemon <config/daemons/compaction_daemon>`.
-The daemon compacts databases and their respective view groups when all the
-condition parameters are satisfied. Configuration can be per database or
-global, and it has the following format::
+``[database_compaction]`` :: Database Compaction Options
+========================================================
 
-  [compaction]
+.. _config/database_compaction/doc_buffer_size:
+
+``doc_buffer_size`` :: Documents buffer size
+--------------------------------------------
+
+Specifies maximum copy buffer size in bytes::
+
+  [database_compaction]
+  doc_buffer_size = 524288
+
+
+.. _config/database_compaction/checkpoint_after:
+
+``checkpoint_after`` :: Checkpoint trigger
+------------------------------------------
+
+Triggers checkpoint after special amount of bytes was successfully copied to
+the compacted database::
+
+  [database_compaction]
+  checkpoint_after = 5242880
+
+
+
+.. _config/compactions:
+
+``[compactions]`` :: Compaction Daemon Rules
+============================================
+
+Automatic compaction rules definition.
+The :ref:`compaction daemon <config/daemons/compaction_daemon>` compacts
+databases and their respective view groups when all the condition parameters are
+satisfied. Configuration can be per database or global, and it has the following
+format::
+
+  [compactions]
   database_name = [ {ParamName, ParamValue}, {ParamName, ParamValue}, ... ]
   _default = [ {ParamName, ParamValue}, {ParamName, ParamValue}, ... ]
 
 
 For example::
 
-  [compaction]
+  [compactions]
   _default = [{db_fragmentation, "70%"}, {view_fragmentation, "60%"}, {from, "23:00"}, {to, "04:00"}]
 
 Possible parameters:
@@ -106,10 +139,6 @@ Examples:
 ``[compaction_daemon]`` :: Configuration of Compaction Daemon
 =============================================================
 
-These options are under ``[compaction_daemon]`` section and belong to
-:ref:`compaction daemon <config/daemons/compaction_daemon>`.
-
-
 .. _config/compaction_daemon/check_interval:
 
 ``check_interval``
@@ -134,4 +163,19 @@ fragmentation therefore it's not worth to compact them::
   [compaction_daemon]
   min_file_size = 131072
 
+
+.. _config/view_compaction:
+
+``[view_compaction]`` :: Views Compaction Options
+=================================================
+
+.. _config/view_compaction/keyvalue_buffer_size:
+
+``keyvalue_buffer_size`` :: Key-Values buffer size
+--------------------------------------------------
+
+Specifies maximum copy buffer size in bytes used during compaction::
+
+  [view_compaction]
+  keyvalue_buffer_size = 2097152
 
