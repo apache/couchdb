@@ -20,16 +20,15 @@ Configuring CouchDB
    :maxdepth: 2
 
    intro
+   compaction
    proxying
 
    admins
    attachments
-   compaction
    cors
    couch-httpd-auth
    couchdb
    daemons
-   database-compaction
    httpd
    log
    native-query-servers
@@ -43,7 +42,6 @@ Configuring CouchDB
    uuids
    vendor
    vhosts
-   view-compaction
 
 
 

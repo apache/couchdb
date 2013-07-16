@@ -60,7 +60,6 @@ html_files = \
     html/_sources/config/couch-httpd-auth.txt \
     html/_sources/config/couchdb.txt \
     html/_sources/config/daemons.txt \
-    html/_sources/config/database-compaction.txt \
     html/_sources/config/httpd.txt \
     html/_sources/config/index.txt \
     html/_sources/config/log.txt \
@@ -75,7 +74,6 @@ html_files = \
     html/_sources/config/uuids.txt \
     html/_sources/config/vendor.txt \
     html/_sources/config/vhosts.txt \
-    html/_sources/config/view-compaction.txt \
     html/_sources/config/intro.txt \
     html/_sources/config/proxying.txt \
     html/_sources/api-basics.txt \
@@ -127,7 +125,6 @@ html_files = \
     html/config/couch-httpd-auth.html \
     html/config/couchdb.html \
     html/config/daemons.html \
-    html/config/database-compaction.html \
     html/config/httpd.html \
     html/config/index.html \
     html/config/log.html \
@@ -142,7 +139,6 @@ html_files = \
     html/config/uuids.html \
     html/config/vendor.html \
     html/config/vhosts.html \
-    html/config/view-compaction.html \
     html/config/intro.html \
     html/config/proxying.html \
     html/api-basics.html \
@@ -192,7 +188,6 @@ src_files = \
     ../src/config/couch-httpd-auth.rst \
     ../src/config/couchdb.rst \
     ../src/config/daemons.rst \
-    ../src/config/database-compaction.rst \
     ../src/config/httpd.rst \
     ../src/config/index.rst \
     ../src/config/log.rst \
@@ -207,7 +202,6 @@ src_files = \
     ../src/config/uuids.rst \
     ../src/config/vendor.rst \
     ../src/config/vhosts.rst \
-    ../src/config/view-compaction.rst \
     ../src/config/intro.rst \
     ../src/config/proxying.rst \
     ../src/api-basics.rst \
