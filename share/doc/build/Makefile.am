@@ -56,11 +56,10 @@ html_files = \
     html/_sources/config/admins.txt \
     html/_sources/config/attachments.txt \
     html/_sources/config/compaction.txt \
-    html/_sources/config/cors.txt \
     html/_sources/config/couch-httpd-auth.txt \
     html/_sources/config/couchdb.txt \
     html/_sources/config/daemons.txt \
-    html/_sources/config/httpd.txt \
+    html/_sources/config/http.txt \
     html/_sources/config/index.txt \
     html/_sources/config/log.txt \
     html/_sources/config/native-query-servers.txt \
@@ -68,12 +67,10 @@ html_files = \
     html/_sources/config/os-daemons.txt \
     html/_sources/config/query-servers.txt \
     html/_sources/config/replicator.txt \
-    html/_sources/config/ssl.txt \
     html/_sources/config/stats.txt \
     html/_sources/config/update-notification.txt \
     html/_sources/config/uuids.txt \
     html/_sources/config/vendor.txt \
-    html/_sources/config/vhosts.txt \
     html/_sources/config/intro.txt \
     html/_sources/config/proxying.txt \
     html/_sources/api-basics.txt \
@@ -121,11 +118,10 @@ html_files = \
     html/config/admins.html \
     html/config/attachments.html \
     html/config/compaction.html \
-    html/config/cors.html \
     html/config/couch-httpd-auth.html \
     html/config/couchdb.html \
     html/config/daemons.html \
-    html/config/httpd.html \
+    html/config/http.html \
     html/config/index.html \
     html/config/log.html \
     html/config/native-query-servers.html \
@@ -133,12 +129,10 @@ html_files = \
     html/config/os-daemons.html \
     html/config/query-servers.html \
     html/config/replicator.html \
-    html/config/ssl.html \
     html/config/stats.html \
     html/config/update-notification.html \
     html/config/uuids.html \
     html/config/vendor.html \
-    html/config/vhosts.html \
     html/config/intro.html \
     html/config/proxying.html \
     html/api-basics.html \
@@ -184,11 +178,10 @@ src_files = \
     ../src/config/admins.rst \
     ../src/config/attachments.rst \
     ../src/config/compaction.rst \
-    ../src/config/cors.rst \
     ../src/config/couch-httpd-auth.rst \
     ../src/config/couchdb.rst \
     ../src/config/daemons.rst \
-    ../src/config/httpd.rst \
+    ../src/config/http.rst \
     ../src/config/index.rst \
     ../src/config/log.rst \
     ../src/config/native-query-servers.rst \
@@ -196,12 +189,10 @@ src_files = \
     ../src/config/os-daemons.rst \
     ../src/config/query-servers.rst \
     ../src/config/replicator.rst \
-    ../src/config/ssl.rst \
     ../src/config/stats.rst \
     ../src/config/update-notification.rst \
     ../src/config/uuids.rst \
     ../src/config/vendor.rst \
-    ../src/config/vhosts.rst \
     ../src/config/intro.rst \
     ../src/config/proxying.rst \
     ../src/api-basics.rst \

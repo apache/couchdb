@@ -20,28 +20,25 @@ Configuring CouchDB
    :maxdepth: 2
 
    intro
+   http
    compaction
    proxying
 
    admins
    attachments
-   cors
    couch-httpd-auth
    couchdb
    daemons
-   httpd
    log
    native-query-servers
    oauth
    os-daemons
    query-servers
    replicator
-   ssl
    stats
    update-notification
    uuids
    vendor
-   vhosts
 
 
 
