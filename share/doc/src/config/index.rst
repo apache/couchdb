@@ -21,17 +21,15 @@ Configuring CouchDB
 
    intro
    http
+   auth
    compaction
    proxying
 
-   admins
    attachments
-   couch-httpd-auth
    couchdb
    daemons
    log
    native-query-servers
-   oauth
    os-daemons
    query-servers
    replicator
