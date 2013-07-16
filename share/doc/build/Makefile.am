@@ -53,17 +53,15 @@ html_files = \
     html/_sources/api/local.txt \
     html/_sources/api/misc.txt \
     html/_sources/api/reference.txt \
-    html/_sources/config/admins.txt \
     html/_sources/config/attachments.txt \
+    html/_sources/config/auth.txt \
     html/_sources/config/compaction.txt \
-    html/_sources/config/couch-httpd-auth.txt \
     html/_sources/config/couchdb.txt \
     html/_sources/config/daemons.txt \
     html/_sources/config/http.txt \
     html/_sources/config/index.txt \
     html/_sources/config/log.txt \
     html/_sources/config/native-query-servers.txt \
-    html/_sources/config/oauth.txt \
     html/_sources/config/os-daemons.txt \
     html/_sources/config/query-servers.txt \
     html/_sources/config/replicator.txt \
@@ -115,17 +113,15 @@ html_files = \
     html/api/local.html \
     html/api/misc.html \
     html/api/reference.html \
-    html/config/admins.html \
     html/config/attachments.html \
+    html/config/auth.html \
     html/config/compaction.html \
-    html/config/couch-httpd-auth.html \
     html/config/couchdb.html \
     html/config/daemons.html \
     html/config/http.html \
     html/config/index.html \
     html/config/log.html \
     html/config/native-query-servers.html \
-    html/config/oauth.html \
     html/config/os-daemons.html \
     html/config/query-servers.html \
     html/config/replicator.html \
@@ -175,17 +171,15 @@ src_files = \
     ../src/api/local.rst \
     ../src/api/misc.rst \
     ../src/api/reference.rst \
-    ../src/config/admins.rst \
     ../src/config/attachments.rst \
+    ../src/config/auth.rst \
     ../src/config/compaction.rst \
-    ../src/config/couch-httpd-auth.rst \
     ../src/config/couchdb.rst \
     ../src/config/daemons.rst \
     ../src/config/http.rst \
     ../src/config/index.rst \
     ../src/config/log.rst \
     ../src/config/native-query-servers.rst \
-    ../src/config/oauth.rst \
     ../src/config/os-daemons.rst \
     ../src/config/query-servers.rst \
     ../src/config/replicator.rst \
