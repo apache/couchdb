@@ -23,15 +23,14 @@ Configuring CouchDB
    http
    auth
    compaction
+   query-servers
    proxying
 
    attachments
    couchdb
    daemons
    log
-   native-query-servers
    os-daemons
-   query-servers
    replicator
    stats
    update-notification

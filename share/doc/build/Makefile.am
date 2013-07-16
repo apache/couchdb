@@ -61,7 +61,6 @@ html_files = \
     html/_sources/config/http.txt \
     html/_sources/config/index.txt \
     html/_sources/config/log.txt \
-    html/_sources/config/native-query-servers.txt \
     html/_sources/config/os-daemons.txt \
     html/_sources/config/query-servers.txt \
     html/_sources/config/replicator.txt \
@@ -121,7 +120,6 @@ html_files = \
     html/config/http.html \
     html/config/index.html \
     html/config/log.html \
-    html/config/native-query-servers.html \
     html/config/os-daemons.html \
     html/config/query-servers.html \
     html/config/replicator.html \
@@ -179,7 +177,6 @@ src_files = \
     ../src/config/http.rst \
     ../src/config/index.rst \
     ../src/config/log.rst \
-    ../src/config/native-query-servers.rst \
     ../src/config/os-daemons.rst \
     ../src/config/query-servers.rst \
     ../src/config/replicator.rst \
