@@ -12,6 +12,10 @@
 
 .. highlight:: ini
 
+=======
+Logging
+=======
+
 .. _config/log:
 
 ``[log]`` :: Logging options

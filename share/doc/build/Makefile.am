@@ -59,7 +59,7 @@ html_files = \
     html/_sources/config/externals.txt \
     html/_sources/config/http.txt \
     html/_sources/config/index.txt \
-    html/_sources/config/log.txt \
+    html/_sources/config/logging.txt \
     html/_sources/config/misc.txt \
     html/_sources/config/query-servers.txt \
     html/_sources/config/replicator.txt \
@@ -114,7 +114,7 @@ html_files = \
     html/config/externals.html \
     html/config/http.html \
     html/config/index.html \
-    html/config/log.html \
+    html/config/logging.html \
     html/config/misc.html \
     html/config/query-servers.html \
     html/config/replicator.html \
@@ -167,7 +167,7 @@ src_files = \
     ../src/config/externals.rst \
     ../src/config/http.rst \
     ../src/config/index.rst \
-    ../src/config/log.rst \
+    ../src/config/logging.rst \
     ../src/config/misc.rst \
     ../src/config/query-servers.rst \
     ../src/config/replicator.rst \

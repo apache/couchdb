@@ -24,11 +24,11 @@ Configuring CouchDB
    http
    auth
    compaction
+   logging
    query-servers
    externals
    services
    misc
    proxying
 
-   log
    replicator
