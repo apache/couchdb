@@ -53,7 +53,6 @@ html_files = \
     html/_sources/api/local.txt \
     html/_sources/api/misc.txt \
     html/_sources/api/reference.txt \
-    html/_sources/config/attachments.txt \
     html/_sources/config/auth.txt \
     html/_sources/config/compaction.txt \
     html/_sources/config/couchdb.txt \
@@ -62,11 +61,9 @@ html_files = \
     html/_sources/config/http.txt \
     html/_sources/config/index.txt \
     html/_sources/config/log.txt \
+    html/_sources/config/misc.txt \
     html/_sources/config/query-servers.txt \
     html/_sources/config/replicator.txt \
-    html/_sources/config/stats.txt \
-    html/_sources/config/uuids.txt \
-    html/_sources/config/vendor.txt \
     html/_sources/config/intro.txt \
     html/_sources/config/proxying.txt \
     html/_sources/api-basics.txt \
@@ -111,7 +108,6 @@ html_files = \
     html/api/local.html \
     html/api/misc.html \
     html/api/reference.html \
-    html/config/attachments.html \
     html/config/auth.html \
     html/config/compaction.html \
     html/config/couchdb.html \
@@ -120,11 +116,9 @@ html_files = \
     html/config/http.html \
     html/config/index.html \
     html/config/log.html \
+    html/config/misc.html \
     html/config/query-servers.html \
     html/config/replicator.html \
-    html/config/stats.html \
-    html/config/uuids.html \
-    html/config/vendor.html \
     html/config/intro.html \
     html/config/proxying.html \
     html/api-basics.html \
@@ -167,7 +161,6 @@ src_files = \
     ../src/api/local.rst \
     ../src/api/misc.rst \
     ../src/api/reference.rst \
-    ../src/config/attachments.rst \
     ../src/config/auth.rst \
     ../src/config/compaction.rst \
     ../src/config/couchdb.rst \
@@ -176,11 +169,9 @@ src_files = \
     ../src/config/http.rst \
     ../src/config/index.rst \
     ../src/config/log.rst \
+    ../src/config/misc.rst \
     ../src/config/query-servers.rst \
     ../src/config/replicator.rst \
-    ../src/config/stats.rst \
-    ../src/config/uuids.rst \
-    ../src/config/vendor.rst \
     ../src/config/intro.rst \
     ../src/config/proxying.rst \
     ../src/api-basics.rst \

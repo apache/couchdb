@@ -12,6 +12,67 @@
 
 .. highlight:: ini
 
+========================
+Miscellaneous Parameters
+========================
+
+.. _config/attachments:
+
+``[attachments]`` :: Configuration of Attachment Storage
+========================================================
+
+.. _config/attachments/compression_level:
+
+``compression_level``
+---------------------
+
+Defines zlib compression level for the attachments from ``1`` (lowest, fastest)
+to ``9`` (highest, slowest). ``0`` value disables compression::
+
+  [attachments]
+  compression_level = 8
+
+
+.. _config/attachments/compressible_types:
+
+``compressible_types``
+----------------------
+
+While not all attached files could be compressed well, it's possible to let
+CouchDB compress only specific attachments according by their MIME type::
+
+  [attachments]
+  compressible_types = text/*, application/javascript, application/json, application/xml
+
+
+.. _config/stats:
+
+``[stats]`` :: Statistic Calculation
+====================================
+
+.. _config/stats/rate:
+
+``rate``
+--------
+
+Rate of statistics gathering in milliseconds::
+
+  [stats]
+  rate = 1000
+
+
+.. _config/stats/samples:
+
+``samples``
+-----------
+
+Samples are used tracks the mean and standard value deviation within specified
+intervals (in seconds)::
+
+  [stats]
+  samples = [0, 60, 300, 900]
+
+
 .. _config/uuids:
 .. _config/uuids/algorithm:
 
@@ -124,4 +185,20 @@ ensure uniqueness of ``utc_id`` ids::
 
   [uuid]
   utc_id_suffix = my-awesome-suffix
+
+
+.. _config/vendor:
+
+``[vendor]`` :: Vendor information
+==================================
+
+.. versionadded:: 1.3
+
+For CouchDB distributors there is option to explicitly define this information
+in welcome message::
+
+  [vendor]
+  name = The Apache Software Foundation
+  version = 1.3.0
+
 
