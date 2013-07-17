@@ -58,14 +58,13 @@ html_files = \
     html/_sources/config/compaction.txt \
     html/_sources/config/couchdb.txt \
     html/_sources/config/daemons.txt \
+    html/_sources/config/externals.txt \
     html/_sources/config/http.txt \
     html/_sources/config/index.txt \
     html/_sources/config/log.txt \
-    html/_sources/config/os-daemons.txt \
     html/_sources/config/query-servers.txt \
     html/_sources/config/replicator.txt \
     html/_sources/config/stats.txt \
-    html/_sources/config/update-notification.txt \
     html/_sources/config/uuids.txt \
     html/_sources/config/vendor.txt \
     html/_sources/config/intro.txt \
@@ -117,14 +116,13 @@ html_files = \
     html/config/compaction.html \
     html/config/couchdb.html \
     html/config/daemons.html \
+    html/config/externals.html \
     html/config/http.html \
     html/config/index.html \
     html/config/log.html \
-    html/config/os-daemons.html \
     html/config/query-servers.html \
     html/config/replicator.html \
     html/config/stats.html \
-    html/config/update-notification.html \
     html/config/uuids.html \
     html/config/vendor.html \
     html/config/intro.html \
@@ -174,14 +172,13 @@ src_files = \
     ../src/config/compaction.rst \
     ../src/config/couchdb.rst \
     ../src/config/daemons.rst \
+    ../src/config/externals.rst \
     ../src/config/http.rst \
     ../src/config/index.rst \
     ../src/config/log.rst \
-    ../src/config/os-daemons.rst \
     ../src/config/query-servers.rst \
     ../src/config/replicator.rst \
     ../src/config/stats.rst \
-    ../src/config/update-notification.rst \
     ../src/config/uuids.rst \
     ../src/config/vendor.rst \
     ../src/config/intro.rst \

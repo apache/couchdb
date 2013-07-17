@@ -12,6 +12,10 @@
 
 .. highlight:: ini
 
+==================
+External Processes
+==================
+
 .. _config/os_daemons:
 
 ``[os_daemons]`` :: OS Daemons
@@ -124,3 +128,52 @@ Delay in seconds between :ref:`os_daemon <config/os_daemons>` restarts::
   [os_daemon_settings]
   retry_time = 5
 
+
+
+.. _update-notifications:
+.. _config/update-notification:
+
+``[update_notification]`` :: Update notifications
+=================================================
+
+CouchDB is able to spawn OS processes to notify them about recent databases
+updates. The notifications are in form of JSON messages sent as a line of text,
+terminated by ``CR`` (``\n``) character, to the OS processes through `stdout`::
+
+  [update_notification]
+  ;unique notifier name=/full/path/to/exe -with "cmd line arg"
+  index_updater = ruby /usr/local/bin/index_updater.rb
+
+
+The update notification messages are depend upon of event type:
+
+- **Database created**:
+
+  .. code-block:: javascript
+
+    {"type":"created","db":"dbname"}
+
+
+- **Database updated**:  this event raises when any document gets updated for
+  specified database:
+
+  .. code-block:: javascript
+
+    {"type":"updated","db":"dbname"}
+
+
+- **Design document updated**: for design document updates there is special
+  event raised in additional to regular db update one:
+
+  .. code-block:: javascript
+
+    {"type":"ddoc_updated","db":"dbname","id":"_design/ddoc_name"}
+
+
+- **Database deleted**:
+
+  .. code-block:: javascript
+
+    {"type":"deleted","db":"dbname"}
+
+.. note:: New line (``\n``) trailing character was removed from examples.
