@@ -810,7 +810,7 @@
          * @param {ajaxSettings} options <a href="http://api.jquery.com/
          * jQuery.ajax/#jQuery-ajax-settings">jQuery ajax settings</a>
          */
-        list: function(list, view, options, ajaxOptions) {
+        list: function(list, view, options) {
           var list = list.split('/');
           var options = options || {};
           var type = 'GET';
@@ -827,7 +827,7 @@
               url: this.uri + '_design/' + list[0] +
                    '/_list/' + list[1] + '/' + view + encodeOptions(options)
               },
-              ajaxOptions, 'An error occured accessing the list'
+              options, 'An error occured accessing the list'
           );
         },
 
