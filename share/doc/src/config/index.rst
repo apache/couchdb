@@ -24,16 +24,15 @@ Configuring CouchDB
    auth
    compaction
    query-servers
+   externals
    proxying
 
    attachments
    couchdb
    daemons
    log
-   os-daemons
    replicator
    stats
-   update-notification
    uuids
    vendor
 
