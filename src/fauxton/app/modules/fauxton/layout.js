@@ -32,11 +32,7 @@ function(Backbone) {
         "#api-navbar": this.apiBar
       },
       afterRender: function(){
-        $('#primary-navbar').on('click', function(e){
-          if(!$(e.target).is('a')){
-            $('body').toggleClass('closeMenu');
-          }
-        });
+
       }
     });
 
