@@ -26,9 +26,9 @@ Configuring CouchDB
    compaction
    query-servers
    externals
+   services
    misc
    proxying
 
-   daemons
    log
    replicator

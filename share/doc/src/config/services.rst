@@ -12,15 +12,16 @@
 
 .. highlight:: ini
 
-.. todo:: Add more detailed apps description and guide how to add custom ones.
+=========================
+CouchDB Internal Services
+=========================
 
 .. _config/daemons:
 
 ``[daemons]`` :: CouchDB Daemonized Mini Apps
 =============================================
 
-These options are under ``[daemons]`` section.
-
+.. todo:: Add more detailed apps description and guide how to add custom ones.
 
 .. _config/daemons/auth_cache:
 
@@ -39,8 +40,7 @@ closing of the `_users` database for each request requiring authentication::
 ``compaction_daemon``
 ---------------------
 
-Automatic compaction daemon. Could be configured with
-:ref:`compaction rules set <config/compaction>`::
+:ref:`Automatic compaction <compact/auto>` daemon::
 
   [daemons]
   compaction_daemon={couch_compaction_daemon, start_link, []}

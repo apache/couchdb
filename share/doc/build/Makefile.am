@@ -56,7 +56,6 @@ html_files = \
     html/_sources/config/auth.txt \
     html/_sources/config/compaction.txt \
     html/_sources/config/couchdb.txt \
-    html/_sources/config/daemons.txt \
     html/_sources/config/externals.txt \
     html/_sources/config/http.txt \
     html/_sources/config/index.txt \
@@ -64,6 +63,7 @@ html_files = \
     html/_sources/config/misc.txt \
     html/_sources/config/query-servers.txt \
     html/_sources/config/replicator.txt \
+    html/_sources/config/services.txt \
     html/_sources/config/intro.txt \
     html/_sources/config/proxying.txt \
     html/_sources/api-basics.txt \
@@ -111,7 +111,6 @@ html_files = \
     html/config/auth.html \
     html/config/compaction.html \
     html/config/couchdb.html \
-    html/config/daemons.html \
     html/config/externals.html \
     html/config/http.html \
     html/config/index.html \
@@ -119,6 +118,7 @@ html_files = \
     html/config/misc.html \
     html/config/query-servers.html \
     html/config/replicator.html \
+    html/config/services.html \
     html/config/intro.html \
     html/config/proxying.html \
     html/api-basics.html \
@@ -164,7 +164,6 @@ src_files = \
     ../src/config/auth.rst \
     ../src/config/compaction.rst \
     ../src/config/couchdb.rst \
-    ../src/config/daemons.rst \
     ../src/config/externals.rst \
     ../src/config/http.rst \
     ../src/config/index.rst \
@@ -172,6 +171,7 @@ src_files = \
     ../src/config/misc.rst \
     ../src/config/query-servers.rst \
     ../src/config/replicator.rst \
+    ../src/config/services.rst \
     ../src/config/intro.rst \
     ../src/config/proxying.rst \
     ../src/api-basics.rst \
