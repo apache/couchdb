@@ -25,10 +25,9 @@ Configuring CouchDB
    auth
    compaction
    logging
+   replicator
    query-servers
    externals
    services
    misc
    proxying
-
-   replicator

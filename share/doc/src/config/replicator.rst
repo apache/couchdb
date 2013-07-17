@@ -12,16 +12,16 @@
 
 .. highlight:: ini
 
+==========
+Replicator
+==========
+
 .. _config/replicator:
 
 ``[replicator]`` :: Replicator Database Configuration
 =====================================================
 
 .. versionadded:: 1.2
-
-These options are under ``[replicator]`` section and applies to
-:ref:`replicator` feature.
-
 
 .. _config/replicator/db:
 
