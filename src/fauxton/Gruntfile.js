@@ -127,7 +127,7 @@ module.exports = function(grunt) {
     // https://github.com/cowboy/grunt/blob/master/docs/task_lint.md
     lint: {
       files: [
-        "build/config.js", "app/**/*.js"
+        "build/config.js", "app/**/*.js" 
       ]
     },
 
@@ -144,7 +144,7 @@ module.exports = function(grunt) {
     // override inside main.js needs to test for them so as to not accidentally
     // route.
     jshint: {
-      all: ['app/**/*.js', 'Gruntfile.js'],
+      all: ['app/**/*.js', 'Gruntfile.js', "test/core/*.js"],
       options: {
         scripturl: true,
         evil: true
@@ -226,7 +226,7 @@ module.exports = function(grunt) {
 
     watch: {
       js: { 
-        files: helper.watchFiles(['.js'], ["./app/**/*.js", '!./app/load_addons.js',"./assets/**/*.js"]),
+        files: helper.watchFiles(['.js'], ["./app/**/*.js", '!./app/load_addons.js',"./assets/**/*.js", "./test/**/*.js"]),
         tasks: ['watchRun'],
       },
       style: {
@@ -256,18 +256,6 @@ module.exports = function(grunt) {
           optimize: "none",
         }
       }
-    },
-
-    // The headless QUnit testing environment is provided for "free" by Grunt.
-    // Simply point the configuration to your test directory.
-    qunit: {
-      all: ["test/qunit/*.html"]
-    },
-
-    // The headless Jasmine testing is provided by grunt-jasmine-task. Simply
-    // point the configuration to your test directory.
-    jasmine: {
-      all: ["test/jasmine/*.html"]
     },
 
     // Copy build artifacts and library code into the distribution
@@ -318,7 +306,19 @@ module.exports = function(grunt) {
 
     mkcouchdb: couch_config,
     rmcouchdb: couch_config,
-    couchapp: couch_config
+    couchapp: couch_config,
+
+    mochaSetup: {
+      default: {
+        files: { src: helper.watchFiles(['[Ss]pec.js'], ['./test/core/**/*[Ss]pec.js', './app/**/*[Ss]pec.js'])},
+        template: 'test/test.config.underscore',
+        config: './app/config.js'
+      }
+    },
+
+    mocha_phantomjs: {
+      all: ['test/runner.html']
+    }
 
   });
 
@@ -327,9 +327,11 @@ module.exports = function(grunt) {
     if (!!filepath.match(/.js$/)) {
       grunt.config(['jshint', 'all'], filepath);
     }
-    /*} else if (!!filepath.match(/.css$|.less$/)) {
-      grunt.task.run(['less', 'concat:index_css']);
-    }*/
+
+    console.log(filepath);
+    if (!!filepath.match(/[Ss]pec.js$/)) {
+      grunt.task.run(['mochaSetup','mocha_phantomjs']);
+    }
   });
 
   /*
@@ -361,6 +363,7 @@ module.exports = function(grunt) {
   grunt.loadNpmTasks('grunt-contrib-uglify');
   // Load CSSMin task
   grunt.loadNpmTasks('grunt-contrib-cssmin');
+  grunt.loadNpmTasks('grunt-mocha-phantomjs');
 
   /*
    * Default task
@@ -371,8 +374,9 @@ module.exports = function(grunt) {
   /*
    * Transformation tasks
    */
-  // clean out previous build artefacts, lint and unit test
-  grunt.registerTask('test', ['clean:release', 'jshint']); //qunit
+  // clean out previous build artefactsa and lint
+  grunt.registerTask('lint', ['clean', 'jshint']);
+  grunt.registerTask('test', ['lint', 'mochaSetup', 'mocha_phantomjs']);
   // Fetch dependencies (from git or local dir), lint them and make load_addons
   grunt.registerTask('dependencies', ['get_deps', 'jshint', 'gen_load_addons:default']);
   // build templates, js and css
@@ -386,12 +390,12 @@ module.exports = function(grunt) {
   // dev server
   grunt.registerTask('dev', ['debugDev', 'couchserver']);
   // build a debug release
-  grunt.registerTask('debug', ['test', 'dependencies', 'concat:requirejs','less', 'concat:index_css', 'template:development', 'copy:debug']);
-  grunt.registerTask('debugDev', ['test', 'dependencies', 'less', 'concat:index_css', 'template:development', 'copy:debug']);
+  grunt.registerTask('debug', ['lint', 'dependencies', 'concat:requirejs','less', 'concat:index_css', 'template:development', 'copy:debug']);
+  grunt.registerTask('debugDev', ['lint', 'dependencies', 'less', 'concat:index_css', 'template:development', 'copy:debug']);
 
   grunt.registerTask('watchRun', ['clean:watch', 'dependencies']);
   // build a release
-  grunt.registerTask('release', ['test' ,'dependencies', 'build', 'minify', 'copy:dist']);
+  grunt.registerTask('release', ['lint' ,'dependencies', 'build', 'minify', 'copy:dist']);
 
   /*
    * Install into CouchDB in either debug, release, or couchapp mode

@@ -47,6 +47,10 @@ A recent of [node.js](http://nodejs.org/) and npm is required.
 
     grunt dev
 
+### Running Tests
+    There are two ways to run the tests. `grunt test` will run the tests via the commandline. It is also possible to view them via the url
+    `http://localhost:8000/testrunner` when the dev server is running. Refreshing the url will rerun the tests via phantomjs and in the browser.
+
 ### To Deploy Fauxton
 
     ./bin/grunt couchapp_deploy - to deploy to your local [Couchdb instance] (http://localhost:5984/fauxton/_design/fauxton/index.html)

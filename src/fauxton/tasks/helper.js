@@ -40,7 +40,6 @@ exports.init = function(grunt) {
         }
         return files
       }, defaults);
-
     }
   };
 };

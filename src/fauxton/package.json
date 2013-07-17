@@ -28,7 +28,8 @@
     "url": "~0.7.9",
     "urls": "~0.0.3",
     "http-proxy": "~0.10.2",
-    "send": "~0.1.1"
+    "send": "~0.1.1",
+    "grunt-mocha-phantomjs": "~0.3.0"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"

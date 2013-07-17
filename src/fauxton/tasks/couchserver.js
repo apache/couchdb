@@ -42,21 +42,28 @@ module.exports = function (grunt) {
     var proxy = new httpProxy.HttpProxy(proxy_settings);
 
     http.createServer(function (req, res) {
-      var url = req.url,
+      var url = req.url.replace('app/',''),
           accept = req.headers.accept.split(','),
           filePath;
 
       if (!!url.match(/assets/)) {
         // serve any javascript or css files from here assets dir
-        filePath = path.join('./',req.url);
+        filePath = path.join('./',url);
+      } else if (!!url.match(/mocha|\/test\/core\/|test\.config/)) {
+        filePath = path.join('./test', url.replace('/test/',''));
       } else if (!!url.match(/\.css|img/)) {
-        filePath = path.join(dist_dir,req.url);
+        filePath = path.join(dist_dir,url);
       /*} else if (!!url.match(/\/js\//)) {
         // serve any javascript or files from dist debug dir
         filePath = path.join(dist_dir,req.url);*/
       } else if (!!url.match(/\.js$|\.html$/)) {
         // server js from app directory
-        filePath = path.join(app_dir,req.url.replace('/_utils/fauxton/app',''));
+        filePath = path.join(app_dir, url.replace('/_utils/fauxton/',''));
+      } else if (!!url.match(/testrunner/)) {
+        var testSetup = grunt.util.spawn({cmd: 'grunt', grunt: true, args: ['mochaSetup']}, function (error, result, code) {/* log.writeln(String(result));*/ });
+        testSetup.stdout.pipe(process.stdout);
+        testSetup.stderr.pipe(process.stderr);
+        filePath = path.join('./test/runner.html');
       } else if (url === '/' && accept[0] !== 'application/json') {
         // serve main index file from here
         filePath = path.join(dist_dir, 'index.html');
