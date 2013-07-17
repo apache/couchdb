@@ -20,6 +20,7 @@ Configuring CouchDB
    :maxdepth: 2
 
    intro
+   couchdb
    http
    auth
    compaction
@@ -28,7 +29,6 @@ Configuring CouchDB
    proxying
 
    attachments
-   couchdb
    daemons
    log
    replicator
