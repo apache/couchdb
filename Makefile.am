@@ -17,13 +17,11 @@ ACLOCAL_AMFLAGS = -I m4
 localdoc_DATA = \
     AUTHORS.gz \
     BUGS.gz \
-    CHANGES.gz \
     DEVELOPERS.gz \
     INSTALL.gz \
     INSTALL.Unix.gz \
     INSTALL.Windows.gz \
     LICENSE.gz \
-    NEWS.gz \
     NOTICE.gz \
     README.gz \
     THANKS.gz
@@ -33,13 +31,11 @@ DISTCLEANFILES = $(localdoc_DATA)
 EXTRA_DIST = \
     AUTHORS \
     BUGS \
-    CHANGES \
     DEVELOPERS \
     INSTALL \
     INSTALL.Unix \
     INSTALL.Windows \
     LICENSE \
-    NEWS \
     NOTICE \
     README.rst \
     THANKS \
@@ -52,9 +48,6 @@ AUTHORS.gz: AUTHORS
 	gzip -9 < $< > $@
 
 BUGS.gz: BUGS
-	gzip -9 < $< > $@
-
-CHANGES.gz: CHANGES
 	gzip -9 < $< > $@
 
 DEVELOPERS.gz: DEVELOPERS
@@ -70,9 +63,6 @@ INSTALL.Windows.gz: INSTALL.Windows
 	gzip -9 < $< > $@
 
 LICENSE.gz: LICENSE
-	gzip -9 < $< > $@
-
-NEWS.gz: NEWS
 	gzip -9 < $< > $@
 
 NOTICE.gz: NOTICE
