@@ -17,6 +17,25 @@ Release History
    :depth: 1
    :local:
 
+1.4.x Branch
+============
+
+.. contents::
+   :depth: 1
+   :local:
+
+Upgrade Notes
+-------------
+
+We now support Erlang/OTP R16; the minimum required version is R14B.
+
+Version 1.4.0
+-------------
+
+* Bumped Mochiweb dependency to 2.4.2.
+* Disabled link to the Futon test suite.
+* Split up replicator_db tests into multiple independent tests.
+
 1.3.x Branch
 ============
 
