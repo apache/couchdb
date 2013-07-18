@@ -20,8 +20,16 @@ Follow the proper instructions to get CouchDB installed on your system.
 
 If you're having problems, skip to the next section.
 
-Troubleshooting
-----------------
+Documentation
+-------------
+
+We have documentation:
+
+    http://docs.couchdb.org/
+
+They include a changelog:
+
+    http://docs.couchdb.org/en/latest/changelog.html
 
 For troubleshooting, see:
 
