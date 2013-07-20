@@ -620,6 +620,32 @@ couchTests.changes = function(debug) {
   TEquals(1, resp.results.length);
   TEquals(2, resp.results[0].changes.length);
 
+  // COUCHDB-1852
+  T(db.deleteDb());
+  T(db.createDb());
+
+  // create 4 documents... this assumes the update sequnce will start from 0 and get to 4
+  db.save({"bop" : "foom"});
+  db.save({"bop" : "foom"});
+  db.save({"bop" : "foom"});
+  db.save({"bop" : "foom"});
+
+  // simulate an EventSource request with a Last-Event-ID header
+  req = CouchDB.request("GET", "/test_suite_db/_changes?feed=eventsource&timeout=0&since=0",
+        {"headers": {"Accept": "text/event-stream", "Last-Event-ID": "2"}});
+
+  // "parse" the eventsource response and collect only the "id: ..." lines
+  var changes = req.responseText.split('\n')
+     .map(function (el) {
+        return el.split(":").map(function (el) { return el.trim()});
+     })
+     .filter(function (el) { return (el[0] === "id"); })
+
+  // make sure we only got 2 changes, and they are update_seq=3 and update_seq=4
+  T(changes.length === 2);
+  T(changes[0][1] === "3");
+  T(changes[1][1] === "4");
+
   // cleanup
   db.deleteDb();
 };

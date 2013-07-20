@@ -187,7 +187,8 @@ Event Source
 
 The `eventsource` feed provides push notifications that can be consumed in
 the form of DOM events in the browser. Refer to the `W3C eventsource
-specification`_ for further details.
+specification`_ for further details. CouchDB honors the ``Last-Event-ID`` header,
+and if it's present it will take precedence over the ``since`` query parameter.
 
 .. code-block:: text
 
