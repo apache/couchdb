@@ -714,7 +714,9 @@ stream_kp_node(Bt, Reds, [{Key, Node} | Rest], InRange, Dir, Fun, Acc) ->
             {stop, LastReds, Acc3}
         end;
     {skip, Acc2} ->
-        stream_kp_node(Bt, [Red | Reds], Rest, InRange, Dir, Fun, Acc2)
+        stream_kp_node(Bt, [Red | Reds], Rest, InRange, Dir, Fun, Acc2);
+    {stop, Acc2} ->
+        {stop, Reds, Acc2}
     end.
 
 drop_nodes(_Bt, Reds, _StartKey, []) ->
