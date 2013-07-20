@@ -1213,7 +1213,7 @@ parse_doc_query(Req) ->
     end, #doc_query_args{}, chttpd:qs(Req)).
 
 parse_changes_query(Req) ->
-    lists:foldl(fun({Key, Value}, Args) ->
+    ChangesArgs = lists:foldl(fun({Key, Value}, Args) ->
         case {string:to_lower(Key), Value} of
         {"feed", _} ->
             Args#changes_args{feed=Value};
@@ -1242,7 +1242,21 @@ parse_changes_query(Req) ->
         _Else -> % unknown key value pair, ignore.
             Args
         end
-    end, #changes_args{}, couch_httpd:qs(Req)).
+    end, #changes_args{}, couch_httpd:qs(Req)),
+    %% if it's an EventSource request with a Last-event-ID header
+    %% that should override the `since` query string, since it's
+    %% probably the browser reconnecting.
+    case ChangesArgs#changes_args.feed of
+        "eventsource" ->
+            case couch_httpd:header_value(Req, "last-event-id") of
+                undefined ->
+                    ChangesArgs;
+                Value ->
+                    ChangesArgs#changes_args{since=list_to_integer(Value)}
+            end;
+        _ ->
+            ChangesArgs
+    end.
 
 extract_header_rev(Req, ExplicitRev) when is_binary(ExplicitRev) or is_list(ExplicitRev)->
     extract_header_rev(Req, couch_doc:parse_rev(ExplicitRev));
