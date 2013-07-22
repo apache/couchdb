@@ -28,6 +28,7 @@ Configuring CouchDB
    replicator
    query-servers
    externals
+   http-handlers
    services
    misc
    proxying

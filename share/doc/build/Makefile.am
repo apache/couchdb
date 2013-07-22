@@ -58,6 +58,7 @@ html_files = \
     html/_sources/config/couchdb.txt \
     html/_sources/config/externals.txt \
     html/_sources/config/http.txt \
+    html/_sources/config/http-handlers.txt \
     html/_sources/config/index.txt \
     html/_sources/config/logging.txt \
     html/_sources/config/misc.txt \
@@ -113,6 +114,7 @@ html_files = \
     html/config/couchdb.html \
     html/config/externals.html \
     html/config/http.html \
+    html/config/http-handlers.html \
     html/config/index.html \
     html/config/logging.html \
     html/config/misc.html \
@@ -166,6 +168,7 @@ src_files = \
     ../src/config/couchdb.rst \
     ../src/config/externals.rst \
     ../src/config/http.rst \
+    ../src/config/http-handlers.rst \
     ../src/config/index.rst \
     ../src/config/logging.rst \
     ../src/config/misc.rst \
