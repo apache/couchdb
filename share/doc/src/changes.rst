@@ -16,6 +16,8 @@
 Changes Feed
 ============
 
+.. _changes/normal:
+
 Polling
 =======
 
@@ -135,6 +137,9 @@ including the given sequence number::
     ],
     "last_seq":5} 
 
+
+.. _changes/longpoll:
+
 Long Polling
 ============
 
@@ -148,6 +153,9 @@ The response is basically the same JSON as is sent for the normal feed.
 A timeout limits the maximum length of time the connection is open. If there
 are no changes before the timeout expires the response's results will be an
 empty list.  
+
+
+.. _changes/continuous:
 
 Continuous
 ==========
@@ -181,6 +189,9 @@ Obviously, `... tum tee tum ...` does not appear in the actual response, but
 represents a long pause before the change with seq 6 occurred.  
 
 .. _section in the book: http://books.couchdb.org/relax/reference/change-notifications
+
+
+.. _changes/eventsource:
 
 Event Source
 ============
