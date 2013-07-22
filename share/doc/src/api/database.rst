@@ -283,15 +283,16 @@ If successful, the returned JSON will indicate success
 
   * **Argument**: feed
 
-    * **Description**:  Type of feed
+    * **Description**: Type of the :ref:`changes <changes>` feed
     * **Optional**: yes
     * **Type**: string
     * **Default**: normal
     * **Supported Values**:
 
-      * **continuous**: Continuous (non-polling) mode
-      * **longpoll**: Long polling mode
-      * **normal**: Normal mode
+      * **continuous**: :ref:`Continuous <changes/continuous>` mode
+      * **eventsource**: :ref:`Event source <changes/eventsource>` mode
+      * **longpoll**: :ref:`Long polling <changes/longpoll>` mode
+      * **normal**: :ref:`Normal <changes/normal>` mode
 
   * **Argument**: filter
 
