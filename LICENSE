@@ -889,3 +889,9 @@ For src/fauxton/assets/js/plugins/codemirror-javascript.js
 	Please note that some subdirectories of the CodeMirror distribution
 	include their own LICENSE files, and are released under different
 	licences.
+
+For the src/couch_dbupdates component
+
+  2009-2012 (c) Benoît Chesneau <benoitc@e-engura.org>
+
+  Apache 2 License, see above.
