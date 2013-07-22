@@ -483,13 +483,22 @@ handle_call({delete, DbName, Options}, _From, Server) ->
     Error ->
         {reply, Error, Server}
     end;
-handle_call({db_updated, #db{name = DbName} = Db}, _From, Server) ->
-    true = ets:insert(couch_dbs, Db),
-    Lru = case couch_db:is_system_db(Db) of
-        false -> couch_lru:update(DbName, Server#server.lru);
-        true -> Server#server.lru
+handle_call({db_updated, #db{}=Db}, _From, Server0) ->
+    #db{name = DbName, instance_start_time = StartTime} = Db,
+    Server = try ets:lookup_element(couch_dbs, DbName, #db.instance_start_time) of
+        StartTime ->
+            true = ets:insert(couch_dbs, Db),
+            Lru = case couch_db:is_system_db(Db) of
+                false -> couch_lru:update(DbName, Server0#server.lru);
+                true -> Server0#server.lru
+            end,
+            Server0#server{lru = Lru};
+        _ ->
+            Server0
+    catch _:_ ->
+        Server0
     end,
-    {reply, ok, Server#server{lru = Lru}}.
+    {reply, ok, Server}.
 
 handle_cast({update_lru, DbName}, #server{lru = Lru, update_lru_on_read=true} = Server) ->
     {noreply, Server#server{lru = couch_lru:update(DbName, Lru)}};
