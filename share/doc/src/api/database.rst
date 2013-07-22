@@ -335,55 +335,11 @@ If successful, the returned JSON will indicate success
 
 Obtains a list of the changes made to the database. This can be used to
 monitor for update and modifications to the database for post processing
-or synchronization. There are three different types of supported changes
-feeds, poll, longpoll, and continuous. All requests are poll requests by
-default. You can select any feed type explicitly using the ``feed``
-query argument.
+or synchronization.
 
--  **Poll**
+.. seealso::
 
-   With polling you can request the changes that have occured since a
-   specific sequence number. This returns the JSON structure containing
-   the changed document information. When you perform a poll change
-   request, only the changes since the specific sequence number are
-   returned. For example, the query
-
-   .. code-block:: http
-
-       DELETE http://couchdb:5984/recipes/_changes
-       Content-Type: application/json
-
-   Will get all of the changes in the database. You can request a
-   starting point using the ``since`` query argument and specifying the
-   sequence number. You will need to record the latest sequence number
-   in your client and then use this when making another request as the
-   new value to the ``since`` parameter.
-
--  **Longpoll**
-
-   With long polling the request to the server will remain open until a
-   change is made on the database, when the changes will be reported,
-   and then the connection will close. The long poll is useful when you
-   want to monitor for changes for a specific purpose without wanting to
-   monitoring continuously for changes.
-
-   Because the wait for a change can be significant you can set a
-   timeout before the connection is automatically closed (the
-   ``timeout`` argument). You can also set a heartbeat interval (using
-   the ``heartbeat`` query argument), which sends a newline to keep the
-   connection open.
-
--  **Continuous**
-
-   Continuous sends all new changes back to the client immediately,
-   without closing the connection. In continuous mode the format of the
-   changes is slightly different to accommodate the continuous nature
-   while ensuring that the JSON output is still valid for each change
-   notification.
-
-   As with the longpoll feed type you can set both the timeout and
-   heartbeat intervals to ensure that the connection is kept open for
-   new changes and updates.
+   :ref:`Detailed description of available changes feed types <changes>`
 
 The return structure for ``normal`` and ``longpoll`` modes is a JSON
 array of changes objects, and the last update sequence number. The
