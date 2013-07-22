@@ -101,7 +101,7 @@ see :ref:`http-proxying`. For further background on the OS Daemon service, see
 .. _CouchDB Externals API: http://davispj.com/2010/09/26/new-couchdb-externals-api.html
 
 
-.. _config/os_daemons_settings:
+.. _config/os_daemon_settings:
 
 ``[os_daemon_settings]`` :: OS Daemons settings
 ===============================================
@@ -131,7 +131,7 @@ Delay in seconds between :ref:`os_daemon <config/os_daemons>` restarts::
 
 
 .. _update-notifications:
-.. _config/update-notification:
+.. _config/update_notification:
 
 ``[update_notification]`` :: Update notifications
 =================================================
