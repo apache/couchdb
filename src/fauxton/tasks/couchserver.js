@@ -51,7 +51,7 @@ module.exports = function (grunt) {
         filePath = path.join('./',req.url);
       } else if (!!url.match(/\.css|img/)) {
         filePath = path.join(dist_dir,req.url);
-      } else if (!!url.match(/\/js/)) {
+      } else if (!!url.match(/\/js\//)) {
         // serve any javascript or files from dist debug dir
         filePath = path.join(dist_dir,req.url);
       } else if (!!url.match(/\.js$|\.html$/)) {
@@ -70,6 +70,8 @@ module.exports = function (grunt) {
             } else {
               log.writeln('ERROR', filePath, err);
             }
+
+            res.end(err.message);
           })
           .pipe(res);
       } 

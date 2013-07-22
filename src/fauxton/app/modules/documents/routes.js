@@ -73,7 +73,6 @@ function(app, FauxtonAPI, Documents, Databases) {
 
     reRenderDoc: function () {
       this.docView.forceRender();
-      console.log('rerender');
     },
 
     field_editor: function(events) {

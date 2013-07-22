@@ -284,8 +284,8 @@ function(app, Fauxton) {
         _.each(routeObject.getViews(), function(view, selector) {
           if(view.hasRendered()) { return; }
           if (!view.disableLoader){ $(selector).addClass(view.loaderClassname);}
-          masterLayout.setView(selector, view);
           FauxtonAPI.when(view.establish()).then(function(resp) {
+            masterLayout.setView(selector, view);
             if (!view.disableLoader) $(selector).removeClass(view.loaderClassname);
             masterLayout.renderView(selector);
             }, function(resp) {
