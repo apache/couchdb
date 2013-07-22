@@ -599,6 +599,21 @@ timestamp for when the CouchDB instance was started:
 * **Request**: JSON of the docs and updates to be applied
 * **Response**: JSON success statement
 * **Admin Privileges Required**: no
+
+* **HTTP Headers**:
+
+  * **Header**: ``X-Couch-Full-Commit``
+
+    * **Description**: Overrides server's commit policy.
+    * **Optional**: yes
+    * **Values**:
+
+      * **true**: Ensures that any non-committed changes are committed to
+        physical storage.
+      * **false**: Uses the delay commit in opposite to ``true`` value. CouchDB
+        responses quickly, but without any guarantees that all data are
+        successfully stored on disk.
+
 * **Return Codes**:
 
   * **201**:
