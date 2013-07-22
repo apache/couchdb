@@ -143,16 +143,24 @@ including the given sequence number::
 Long Polling
 ============
 
+With long polling the request to the server will remain open until a
+change is made on the database, when the changes will be reported,
+and then the connection will close. The long poll is useful when you
+want to monitor for changes for a specific purpose without wanting to
+monitoring continuously for changes.
+
 The `longpoll` feed (probably most useful used from a browser) is a more
 efficient form of polling that waits for a change to occur before the response
 is sent. `longpoll` avoids the need to frequently poll CouchDB to discover
 nothing has changed!
 
-The response is basically the same JSON as is sent for the normal feed.
+The response is basically the same JSON as is sent for the `normal` feed.
 
-A timeout limits the maximum length of time the connection is open. If there
-are no changes before the timeout expires the response's results will be an
-empty list.  
+Because the wait for a change can be significant you can set a
+timeout before the connection is automatically closed (the
+``timeout`` argument). You can also set a heartbeat interval (using
+the ``heartbeat`` query argument), which sends a newline to keep the
+connection open.
 
 
 .. _changes/continuous:
@@ -167,6 +175,10 @@ strain on CouchDB.
 A continuous feed stays open and connected to the database until explicitly
 closed and changes are sent to the client as they happen, i.e. in near
 real-time.
+
+As with the `longpoll` feed type you can set both the timeout and heartbeat
+intervals to ensure that the connection is kept open for new changes
+and updates.
 
 The continuous feed's response is a little different than the other feed types
 to simplify the job of the client - each line of the response is either empty
