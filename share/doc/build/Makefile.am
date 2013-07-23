@@ -70,6 +70,7 @@ html_files = \
     html/_sources/config/proxying.txt \
     html/_sources/replications/index.txt \
     html/_sources/replications/intro.txt \
+    html/_sources/replications/protocol.txt \
     html/_sources/replications/replicator.txt \
     html/_sources/changelog.txt \
     html/_sources/changes.txt \
@@ -127,6 +128,7 @@ html_files = \
     html/config/proxying.html \
     html/replications/index.html \
     html/replications/intro.html \
+    html/replications/protocol.html \
     html/replications/replicator.html \
     html/changelog.html \
     html/changes.html \
@@ -182,6 +184,7 @@ src_files = \
     ../src/config/proxying.rst \
     ../src/replications/index.rst \
     ../src/replications/intro.rst \
+    ../src/replications/protocol.rst \
     ../src/replications/replicator.rst \
     ../src/changelog.rst \
     ../src/changes.rst \
