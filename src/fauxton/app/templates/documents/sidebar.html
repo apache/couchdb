@@ -15,9 +15,13 @@ the License.
 <div id="sidenav">
   <header class="row-fluid">
     <div class="span5">
-      <div class="dropdown select">
-        <a class="dropdown-toggle" data-toggle="dropdown" href="#">Docs</a>
-        <ul class="dropdown-menu" role="menu" aria-labelledby="dLabel">
+      <div class="btn-group">
+        <button class="btn">Docs</button>
+        <button class="btn dropdown-toggle" data-toggle="dropdown">
+          <span class="caret"></span>
+        </button>
+        <ul class="dropdown-menu">
+          <!-- dropdown menu links -->
           <li><a href="<%= db_url %>">Docs</a></li>
           <!-- TODO::REENABLE
           <li><a href="#">Permissions</a></li>
@@ -29,10 +33,15 @@ the License.
     </div>
 
     <div class="span5 offset1">
-      <div class="dropdown select">
-        <a class="dropdown-toggle" data-toggle="dropdown" href="#">Add</a>
-        <ul class="dropdown-menu" role="menu" aria-labelledby="dLabel">
-          <li><a id="doc" href="#<%= database.url('app') %>/new">New doc</a>
+      <div class="btn-group">
+        <button class="btn">Add</button>
+        <button class="btn dropdown-toggle" data-toggle="dropdown">
+          <span class="caret"></span>
+        </button>
+        <ul class="dropdown-menu">
+          <!-- dropdown menu links -->
+           <li>
+            <a id="doc" href="#<%= database.url('app') %>/new">New doc</a>
           </li>
           <li>
             <a href="#<%= database.url('app') %>/new_view">New view</a>
@@ -40,13 +49,6 @@ the License.
         </ul>
       </div>
     </div>
-<!--     <div class="span6">
-      <form id="jump-to-doc" class="form-inline">
-        <label> Jump To:
-          <input type="text" id="jump-to-doc-id" class="input-small" placeholder="Document Id"></input>
-        </label>
-      </form>
-    </div> -->
   </header>
 
   <nav>
