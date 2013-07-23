@@ -196,13 +196,17 @@ src_files_html = \
     ../templates/searchbox.html \
     ../templates/utilities.html
 
+sphinx_extensions = \
+    ../ext/github.py
+
 EXTRA_DIST = \
     $(image_files) \
     $(src_files) \
     $(src_files_html) \
     $(info_file_build) \
     $(pdf_file_build) \
-    $(html_files_build)
+    $(html_files_build) \
+    $(sphinx_extensions)
 
 BUILT_SOURCES = \
     $(info_file_build) \

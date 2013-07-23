@@ -21,4 +21,12 @@ specific language governing permissions and limitations under the License.
 <li><a href="https://couchdb.apache.org/#mailing-list">Mailing Lists</a></li>
 <li><a href="http://webchat.freenode.net/?channels=couchdb">IRC</a></li>
 <li><a href="https://issues.apache.org/jira/browse/CouchDB">Issues</a></li>
+{%- if github_show_url %}
+<li><a href="{{ github_show_url }}"
+       rel="nofollow">{{ _('Show on GitHub') }}</a></li>
+{%- endif %}
+{%- if github_edit_url %}
+<li><a href="{{ github_edit_url }}"
+       rel="nofollow">{{ _('Edit on GitHub') }}</a></li>
+{%- endif %}
 </ul>
