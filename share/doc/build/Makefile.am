@@ -68,6 +68,7 @@ html_files = \
     html/_sources/config/services.txt \
     html/_sources/config/intro.txt \
     html/_sources/config/proxying.txt \
+    html/_sources/replications/conflicts.txt \
     html/_sources/replications/index.txt \
     html/_sources/replications/intro.txt \
     html/_sources/replications/protocol.txt \
@@ -126,6 +127,7 @@ html_files = \
     html/config/services.html \
     html/config/intro.html \
     html/config/proxying.html \
+    html/replications/conflicts.html \
     html/replications/index.html \
     html/replications/intro.html \
     html/replications/protocol.html \
@@ -182,6 +184,7 @@ src_files = \
     ../src/config/services.rst \
     ../src/config/intro.rst \
     ../src/config/proxying.rst \
+    ../src/replications/conflicts.rst \
     ../src/replications/index.rst \
     ../src/replications/intro.rst \
     ../src/replications/protocol.rst \
