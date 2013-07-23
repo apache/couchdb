@@ -32,6 +32,6 @@ destination database.
    :maxdepth: 2
 
    intro
+   protocol
    replicator
    conflicts
-   protocol
