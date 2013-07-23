@@ -33,4 +33,5 @@ destination database.
 
    intro
    replicator
+   conflicts
    protocol
