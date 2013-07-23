@@ -24,6 +24,8 @@ A list of the available methods and URL paths are provided below:
 +--------+-------------------------+-------------------------------------------+
 | Method | Path                    | Description                               |
 +========+=========================+===========================================+
+| HEAD   | /db                     | Checks database existence                 |
++--------+-------------------------+-------------------------------------------+
 | GET    | /db                     | Returns database information              |
 +--------+-------------------------+-------------------------------------------+
 | PUT    | /db                     | Create a new database                     |
@@ -98,6 +100,27 @@ For clarity, the form below is used in the URL paths:
     GET /db
 
 Where ``db`` is the name of any database.
+
+.. _api/db.head:
+
+``HEAD /db``
+============
+
+* **Method**: ``HEAD /db``
+* **Request**: None
+* **Response**: None
+* **Admin Privileges Required**: no
+* **Return Codes**:
+
+  * **200**:
+    Database exists.
+
+  * **404**:
+    Requested database not found.
+
+Returns the HTTP Headers containing a minimal amount of information
+about the specified database. Since the response body is empty this method
+is a lightweight way to check is database exists or not.
 
 .. _api/db.get:
 
