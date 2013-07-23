@@ -10,10 +10,10 @@
 .. License for the specific language governing permissions and limitations under
 .. the License.
 
-.. _replication:
+.. _replication/intro:
 
-Replication
-===========
+Introduction Into Replications
+==============================
 
 One of CouchDB's strengths is the ability to synchronize two copies of the same
 database. This enables users to distribute data across several nodes or
