@@ -28,14 +28,13 @@ Contents
     :numbered:
 
     intro
-    api-basics
     config/index
     replication
     replicator
     ddocs
     query-servers
     changes
-    api/reference
+    api/index
     json-structure
     contributing
     changelog

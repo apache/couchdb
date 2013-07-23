@@ -10,7 +10,7 @@
 .. License for the specific language governing permissions and limitations under
 .. the License.
 
-.. _api-overview:
+.. _api:
 
 API Reference
 =============
@@ -33,10 +33,11 @@ This reference is structured according to the URL structure, as below.
 .. toctree::
    :maxdepth: 2
 
+   basics
    database
    documents
-   local
    design
-   misc
+   local
    configuration
    authn
+   misc

@@ -46,6 +46,7 @@ html_files = \
     html/_images/futon-overview.png \
     html/_images/futon-replform.png \
     html/_sources/api/authn.txt \
+    html/_sources/api/basics.txt \
     html/_sources/api/configuration.txt \
     html/_sources/api/database.txt \
     html/_sources/api/design.txt \
@@ -67,7 +68,6 @@ html_files = \
     html/_sources/config/services.txt \
     html/_sources/config/intro.txt \
     html/_sources/config/proxying.txt \
-    html/_sources/api-basics.txt \
     html/_sources/changelog.txt \
     html/_sources/changes.txt \
     html/_sources/contributing.txt \
@@ -102,6 +102,7 @@ html_files = \
     html/_static/up.png \
     html/_static/websupport.js \
     html/api/authn.html \
+    html/api/basics.html \
     html/api/configuration.html \
     html/api/database.html \
     html/api/design.html \
@@ -123,7 +124,6 @@ html_files = \
     html/config/services.html \
     html/config/intro.html \
     html/config/proxying.html \
-    html/api-basics.html \
     html/changelog.html \
     html/changes.html \
     html/ddocs.html \
@@ -156,6 +156,7 @@ image_files = \
 
 src_files = \
     ../src/api/authn.rst \
+    ../src/api/basics.rst \
     ../src/api/configuration.rst \
     ../src/api/database.rst \
     ../src/api/design.rst \
@@ -177,7 +178,6 @@ src_files = \
     ../src/config/services.rst \
     ../src/config/intro.rst \
     ../src/config/proxying.rst \
-    ../src/api-basics.rst \
     ../src/changelog.rst \
     ../src/changes.rst \
     ../src/contributing.rst \
