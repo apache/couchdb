@@ -29,7 +29,7 @@ Contents
 
     intro
     config/index
-    replications/index
+    replication/index
     ddocs
     query-servers
     changes
