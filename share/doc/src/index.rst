@@ -31,7 +31,7 @@ Contents
     config/index
     replication/index
     ddocs
-    query-servers
+    query-server/index
     changes
     api/index
     json-structure

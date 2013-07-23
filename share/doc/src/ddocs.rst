@@ -19,7 +19,7 @@ Design Docs
 ===========
 
 In this section we'll show how to write design documents, using the built-in
-:ref:`JavaScript Query Server <queryserver_js>`.
+:ref:`JavaScript Query Server <query-server/js>`.
 
 But before we start to write our first function, let's take a look at the list
 of common objects that will be used during our code journey - we'll be using
@@ -30,7 +30,7 @@ them extensively within each function:
 - :ref:`Response object <response_object>`
 - :ref:`UserCtx object <userctx_object>`
 - :ref:`Database Security object <security_object>`
-- :ref:`Guide to JavaScript Query Server <queryserver_js>`
+- :ref:`Guide to JavaScript Query Server <query-server/js>`
 
 .. _viewfun:
 
