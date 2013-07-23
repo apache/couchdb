@@ -275,7 +275,7 @@ setup three special sections in :ref:`configuration <config>` file:
 ::
 
   [oauth_consumer_secrets]
-  example.com = sekr1t
+  consumer1 = sekr1t
 
 2. Token secrets:
 
