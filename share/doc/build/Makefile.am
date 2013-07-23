@@ -184,11 +184,11 @@ src_files = \
     ../src/config/services.rst \
     ../src/config/intro.rst \
     ../src/config/proxying.rst \
-    ../src/replications/conflicts.rst \
-    ../src/replications/index.rst \
-    ../src/replications/intro.rst \
-    ../src/replications/protocol.rst \
-    ../src/replications/replicator.rst \
+    ../src/replication/conflicts.rst \
+    ../src/replication/index.rst \
+    ../src/replication/intro.rst \
+    ../src/replication/protocol.rst \
+    ../src/replication/replicator.rst \
     ../src/changelog.rst \
     ../src/changes.rst \
     ../src/contributing.rst \
