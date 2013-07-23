@@ -25,53 +25,115 @@
 
 /*define variable for color here, remove to seperate file later*/
 
+@brown: #3A2C2B;
 @red: #E93F33;
-@darkred: #AF2D24;
+@darkred: #73161E;
+@linkRed: #DA4F49;
+
+
+
+@orange: #F3622D;
 
 /*nav*/
-@primaryNav : #3A2C2B;
-@navBG: @darkred;
+@primaryNav : @brown;
+@navBG: @bottomNav;
 @navBGHighlight: @red;
-@navIconColor: #3A2C2B;
+@navBGHover: @red;
+@navIconColor: @darkred;
 @navIconHighlight: #FFFFFF;
+@bottomNav: @darkred;
 
 /*top header*/
 @breadcrumbBG: #F1F1F1;
-@breadcrumbText: @red;
+@breadcrumbText: #333333;
 @breadcrumbArrow: #999999;
-@breadcrumbBorder: #E93F33;
+@breadcrumbBorder: @red;
 
 /*background colors*/
-@background: #F2F2F2;
-@leftPanel: #E6E6E6;
+@background: #E6E6E6;
+@leftPanel: @background;
 @rightPanel: #CBCBCB;
 @defaultText: #4D4D4D;
 @defaultHTag: #333333;
 
 @saveButton: #80A221;
 
-@collapsedNavWidth: 100px;
+@collapsedNavWidth: 62px;
 @navWidth: 220px;
-
+@sidebarBG: @background;
 @sidebarWidth: 330px;
 
-@radius: 0;
-@transitionSpeed: .25s;
-@transitionEaseType: linear;
+@NavIconActive: #ffffff;
+@NavIcon: @brown;
+
 
 /*buttons */
 @redButton: @red;
-@linkColor: @red;
+@linkColor: @darkred;
+
+@boxShadow: 2px 2px rgba(0,0,0,0.2);
+@boxShadowOff: 2px 2px rgba(0,0,0,0);
+@textShadow: 1px 2px rgba(0,0,0,0.2);
+@textShadowOff: 1px 2px rgba(0,0,0,0);
+
+@radius: 4px;
+@transitionSpeed: .25s;
+@transitionEaseType: linear;
+
 
 
 body {
   background-color: #F2F2F2;
 }
 
+footer {
+  position: fixed;
+  bottom: 0;
+  padding: 20px;
+  font-size: 10px;
+  margin-left: @navWidth;
+}
+
+.hide-text {
+  font: 0/0 a;
+  color: transparent;
+  text-shadow: none;
+  background-color: transparent;
+  border: 0;
+}
+
+.row {
+  margin-left: 0;
+}
+
+// globals
+body {
+  font-size: 16px;
+  line-height:1.3;
+  padding-bottom: 0px;
+  color: #333;
+  padding-top: 92px;
+  &#home{
+    padding-top: 90px;
+  }
+  background-color: @sidebarBG;
+}
+
+h2,h3,h4 {font-weight: 600;}
+
+
+a, .btn{
+  .transition(all .25s linear);
+}
+
 a,
 a:visited,
 a:active {
   color: @linkColor;
+}
+
+a:hover{
+  color: @red;
 }
 
 /* ajax loader */
@@ -86,12 +148,16 @@ a:active {
   }
 }
 
-
 #global-notifications {
   position: fixed;
-  top: 67px;
+  top: 0px;
   display: block;
   z-index: 100000;
+  left: 340px;
+  .closeMenu & {
+    left: 63px;
+  }
+  width: 100%;
 }
 
 #app-container{
@@ -119,24 +185,54 @@ a:active {
   width: @navWidth;
   top: 0;
   bottom: 0;
+  background-color: @primaryNav;
+  #footer-links{
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+  }
 
   .navbar {
     a.brand {
-      display: block;
       .hide-text;
-      margin: 10px 0;
-      height: 30px;
-      width: 30px;
+      .customTransition(left, 1s, 0.805, 0.005, 0.165, 0.985);
+      margin: 10px 0 6px;
+      width: 174px;
+      height: 40px;
+      padding: 10px;
       .icon{
         background: url(../img/minilogo.png) no-repeat 0 0;
         display: block;
-        .background-size(cover);
         height: 100%;
         width: 100%; 
+      }
+      .burger{
+        .transition(all @transitionSpeed @transitionEaseType);
+        padding-top: 6px;
+        left: -8px;
+        position: absolute;
+        div{
+          .transition(all @transitionSpeed @transitionEaseType);
+          height: 4px;
+          width: 8px;
+          .border-radius(2);
+          background-color: @navBG;
+          margin: 4px 0px;
+        }
+      }
+      &:hover .burger div{
+        background-color: @orange;
+      }
+      .closeMenu & {
+        width: 40px;
+        .burger{
+          left: 0;
+        }
       }
     }
     nav {
       .nav{
+        margin: 0;
         li{
           .transition(all @transitionSpeed @transitionEaseType);
           padding: 15px 0px 15px 60px;
@@ -152,34 +248,81 @@ a:active {
             a{
               .box-shadow(none);
             }
-            background-color: @primaryNav;
+            background-color: @red;
           }
           &:hover a.fonticon:before{
             color: @white;
+          }
+          &.active a.cloudant:before,
+          &.active a.fonticon:before,
+          &:hover a.cloudant:before,
+          &:hover a.fonticon:before,
+          {
+            text-shadow: @boxShadow;
+            color: @NavIconActive;
           }
           a{
             background-color: transparent;
             padding: 0;
             color: #fff;
-            text-shadow: none;
+            text-shadow: @textShadowOff;
+            &.closeMenu{
+              color: transparent;
+            }
             &.fonticon {
               position: relative;
               &:before {
                 .transition(all @transitionSpeed @transitionEaseType);
                 position: absolute;
-                left: -35px;
-                font-size: 24px;
-                color: #fff;
+                left: -44px;
+                font-size: 28px;
+                color: @NavIcon;
+                text-shadow: @boxShadowOff;
               }
             }
           }
         }
       }
+      ul#footer-nav-links{
+        li{
+          background-color: @primaryNav;
+          border-top: 1px solid @red;
+          border-bottom: none;
+          font-size: 12px;
+          padding: 12px;
+          min-height: 44px;
+          &.active, &:hover{
+            background-color: @linkRed;
+            border-top: 1px solid @red;
+            a{
+              color: white;
+            }
+          }
+          a{
+            color: @red;
+          }
+        }
+      }
       ul#bottom-nav-links{
-        margin-top: 200px;
-        li {
-          background-color: #574C4B;
-          font-size: 16px;
+        margin-top: 0;
+        li{
+          min-height: 46px;
+          background-color: @bottomNav;
+          &.active{
+            background-color:@linkRed;
+          } 
+          &:hover{
+            background-color: @navBGHover;
+          }
+          a{
+            &.fonticon {
+              position: relative;
+              &:before {
+                left: -40px;
+                font-size: 22px;
+              }
+            }
+          }
         }
       }
     }
@@ -187,23 +330,36 @@ a:active {
 }
 
 
-
 #dashboard {
-  position: relative;
-  margin-left: @navWidth;
+  max-width: 1500px;
+  .customTransition(left, 1s, 0.805, 0.005, 0.165, 0.985); // alt 0.730, -0.425, 0.000, 0.960 or... 0.645, -0.295, 0.000, 0.960
+  .box-shadow(-6px 0 rgba(0, 0, 0, 0.1));
+  border-left: 1px solid #999;
+  position: absolute;
+  left: @navWidth;
+  margin-left: 0;
+  background-color: @sidebarBG;
+  min-width: 600px;
+  height: 100%;
+  .closeMenu &{
+    left: @collapsedNavWidth;
+  }
   &.one-pane{
-    margin-top: 60px;
+    min-width: 800px;
+    margin-top: 0;
   }
 }
-
 
 /*dashboard content can be in multiple templates*/
 
 #dashboard-content{
   padding: 20px;
   .with-sidebar &{
-    .box-shadow(-7px 0 15px -6px #000);
-    padding: 0px;
+    border-left: 1px solid #999;
+    border-right: 1px solid #999;
+    width: auto;
+    .box-shadow(-6px 0 rgba(0, 0, 0, 0.1));
+    padding: 20px;
     bottom: 0px;
     top: 60px;
     position: absolute;
@@ -214,21 +370,21 @@ a:active {
     .box-sizing(border-box);
   }
   > div.inner {
-    width: 100%;
-    position: relative;
     display: block;
   }
 }
 
 .with-sidebar.content-area {
-  position: fixed;
+  position: absolute;
   top: 0;
   bottom: 0;
-  left: @navWidth;
+  left: 0;
   right: 0;
 }
 
-
+// .closeMenu .with-sidebar.content-area {
+//   left: 0;
+// }
 /*tools*/
 
 
@@ -281,9 +437,6 @@ footer#mainFooter{
 #dashboard-upper-menu{
   .topmenu-defaults;
   background-color: #CBCBCB;
-  z-index: 1;
-  position: fixed;
-  width: inherit;
 }
 
 #dashboard-lower-content{
@@ -470,4 +623,7 @@ tr.all-docs-item{
   background: transparent;
 }
 
-
+/*logs*/
+#log-sidebar{
+  padding: 20px;
+}
