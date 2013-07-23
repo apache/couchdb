@@ -68,6 +68,9 @@ html_files = \
     html/_sources/config/services.txt \
     html/_sources/config/intro.txt \
     html/_sources/config/proxying.txt \
+    html/_sources/replications/index.txt \
+    html/_sources/replications/intro.txt \
+    html/_sources/replications/replicator.txt \
     html/_sources/changelog.txt \
     html/_sources/changes.txt \
     html/_sources/contributing.txt \
@@ -76,8 +79,6 @@ html_files = \
     html/_sources/intro.txt \
     html/_sources/json-structure.txt \
     html/_sources/query-servers.txt \
-    html/_sources/replication.txt \
-    html/_sources/replicator.txt \
     html/_static/ajax-loader.gif \
     html/_static/basic.css \
     html/_static/comment-bright.png \
@@ -124,6 +125,9 @@ html_files = \
     html/config/services.html \
     html/config/intro.html \
     html/config/proxying.html \
+    html/replications/index.html \
+    html/replications/intro.html \
+    html/replications/replicator.html \
     html/changelog.html \
     html/changes.html \
     html/ddocs.html \
@@ -131,8 +135,6 @@ html_files = \
     html/intro.html \
     html/json-structure.html \
     html/query-servers.html \
-    html/replication.html \
-    html/replicator.html \
     html/objects.inv \
     html/genindex.html \
     html/search.html \
@@ -178,6 +180,9 @@ src_files = \
     ../src/config/services.rst \
     ../src/config/intro.rst \
     ../src/config/proxying.rst \
+    ../src/replications/index.rst \
+    ../src/replications/intro.rst \
+    ../src/replications/replicator.rst \
     ../src/changelog.rst \
     ../src/changes.rst \
     ../src/contributing.rst \
@@ -186,8 +191,6 @@ src_files = \
     ../src/intro.rst \
     ../src/json-structure.rst \
     ../src/query-servers.rst \
-    ../src/replication.rst \
-    ../src/replicator.rst \
     ../src/conf.py
 
 src_files_html = \
