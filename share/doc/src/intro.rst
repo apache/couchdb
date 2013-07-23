@@ -303,7 +303,7 @@ document ID that was returned:
      "_rev":"1-33b9fbce46930280dab37d672bbc8bb9",
      "company":"Example, Inc."}
 
-The API samples in the :ref:`api-basics` show the HTTP command, URL and any
+The API samples in the :ref:`api/basics` show the HTTP command, URL and any
 payload information that needs to be submitted (and the expected return
 value). All of these examples can be reproduced using ``curl`` with the
 command-line examples shown above.

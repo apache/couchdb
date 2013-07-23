@@ -10,7 +10,7 @@
 .. License for the specific language governing permissions and limitations under
 .. the License.
 
-.. _api-basics:
+.. _api/basics:
 
 ==========
 API Basics
@@ -28,7 +28,7 @@ retrieval of information from the database is typically handled by the
 ``GET`` operation, while updates are handled by either a ``POST`` or
 ``PUT`` request. There are some differences between the information that
 must be supplied for the different methods. For a guide to the basic
-HTTP methods and request structure, see :ref:`api-format`.
+HTTP methods and request structure, see :ref:`api/format`.
 
 For nearly all operations, the submitted data, and the returned data
 structure, is defined within a JavaScript Object Notation (JSON) object.
@@ -41,10 +41,9 @@ provided in :ref:`errors`.
 
 When accessing specific areas of the CouchDB API, specific information
 and examples on the HTTP methods and request, JSON structures, and error
-codes are provided. For a guide to the different areas of the API, see
-:ref:`api-overview`.
+codes are provided.
 
-.. _api-format:
+.. _api/format:
 
 Request Format and Responses
 ============================
