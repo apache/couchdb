@@ -98,6 +98,8 @@ Gets the specified local document. The semantics are identical to
 accessing a standard document in the specified database, except that the
 document is not replicated. See :ref:`api/doc.get`.
 
+.. _api/local/doc.put:
+
 ``PUT /db/_local/local-doc``
 ============================
 
@@ -113,6 +115,8 @@ document is not replicated. See :ref:`api/doc.get`.
 Stores the specified local document. The semantics are identical to
 storing a standard document in the specified database, except that the
 document is not replicated. See :ref:`api/doc.put`.
+
+.. _api/local/doc.delete:
 
 ``DELETE /db/_local/local-doc``
 ===============================
@@ -144,6 +148,8 @@ document is not replicated. See :ref:`api/doc.put`.
 Deletes the specified local document. The semantics are identical to
 deleting a standard document in the specified database, except that the
 document is not replicated. See :ref:`api/doc.delete`.
+
+.. _api/local/doc.copy:
 
 ``COPY /db/_local/local-doc``
 =============================
