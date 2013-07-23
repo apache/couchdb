@@ -10,9 +10,12 @@
 ## License for the specific language governing permissions and limitations under
 ## the License.
 
-import sys, os
+import os
+import sys
 
-extensions = ["sphinx.ext.todo", "sphinx.ext.extlinks"]
+sys.path.insert(0, os.path.abspath('../ext'))
+
+extensions = ["sphinx.ext.todo", "sphinx.ext.extlinks", 'github']
 
 source_suffix = ".rst"
 
@@ -46,7 +49,7 @@ html_logo = "../images/logo.png"
 
 html_favicon = "../images/favicon.ico"
 
-html_sidebars= {
+html_sidebars = {
     "**": [
         "searchbox.html",
         "localtoc.html",
@@ -68,7 +71,7 @@ latex_documents = [(
 )]
 
 latex_elements = {
-    "papersize":"a4paper"
+    "papersize": "a4paper"
 }
 
 texinfo_documents = [(
@@ -86,3 +89,9 @@ extlinks = {
     'issue': ('https://issues.apache.org/jira/browse/COUCHDB-%s', 'COUCHDB-'),
     'commit': ('https://git-wip-us.apache.org/repos/asf?p=couchdb.git;a=commit;h=%s', '#')
 }
+
+github_project = 'apache/couchdb'
+
+github_branch = 'master'
+
+github_docs_path = 'share/doc/src'
