@@ -50,7 +50,7 @@ Where:
 - ``ARGS``: optionally, you may specify additional command line arguments for
   the executable ``PATH``.
 
-The default query server is written in :ref:`Javascript <queryserver_js>`,
+The default query server is written in :ref:`JavaScript <query-server/js>`,
 running via `Mozilla SpiderMonkey`_::
 
   [query_servers]
@@ -140,7 +140,7 @@ First, you'll need to edit your `local.ini` to include a
   erlang = {couch_native_process, start_link, []}
 
 To see these changes you will also need to restart the server.
-To test out using :ref:`Erlang views <queryserver_erlang>`, visit the
+To test out using :ref:`Erlang views <query-server/erlang>`, visit the
 `Futon` admin interface, create a new database and open a temporary view.
 You should now be able to select ``erlang`` from the language drop-down.
 
