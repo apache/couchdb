@@ -699,3 +699,88 @@ size, but CouchDB discards them. If you are constantly updating a document,
 the size of a git repo would grow forever. It is possible (with some effort)
 to use "history rewriting" to make git forget commits earlier than a particular
 one.
+
+
+What is the CouchDB replication protocol? Is it like Git?
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**Key points**
+
+**If you know Git, then you know how Couch replication works.** Replicating is
+*very* similar to pushing or pulling with distributed source managers like Git.
+
+**CouchDB replication does not have its own protocol.** A replicator simply
+connects to two DBs as a client, then reads from one and writes to the other.
+Push replication is reading the local data and updating the remote DB;
+pull replication is vice versa.
+
+* **Fun fact 1**: The replicator is actually an independent Erlang application,
+  in its own process. It connects to both couches, then reads records from one
+  and writes them to the other.
+* **Fun fact 2**: CouchDB has no way of knowing who is a normal client and who
+  is a replicator (let alone whether the replication is push or pull).
+  It all looks like client connections. Some of them read records. Some of them
+  write records.
+
+**Everything flows from the data model**
+
+The replication algorithm is trivial, uninteresting. A trained monkey could
+design it. It's simple because the cleverness is the data model, which has these
+useful characteristics:
+
+#. Every record in CouchDB is completely independent of all others. That sucks
+   if you want to do a JOIN or a transaction, but it's awesome if you want to
+   write a replicator. Just figure out how to replicate one record, and then
+   repeat that for each record.
+#. Like Git, records have a linked-list revision history. A record's revision ID
+   is the checksum of its own data. Subsequent revision IDs are checksums of:
+   the new data, plus the revision ID of the previous.
+
+#. In addition to application data (``{"name": "Jason", "awesome": true}``),
+   every record stores the evolutionary timeline of all previous revision IDs
+   leading up to itself.
+
+   - Exercise: Take a moment of quiet reflection. Consider any two different
+     records, A and B. If A's revision ID appears in B's timeline, then B
+     definitely evolved from A. Now consider Git's fast-forward merges.
+     Do you hear that? That is the sound of your mind being blown.
+
+#. Git isn't really a linear list. It has forks, when one parent has multiple
+   children. CouchDB has that too.
+
+   - Exercise: Compare two different records, A and B. A's revision ID does not
+     appear in B's timeline; however, one revision ID, C, is in both A's and B's
+     timeline. Thus A didn't evolve from B. B didn't evolve from A. But rather,
+     A and B have a common ancestor C. In Git, that is a "fork." In CouchDB,
+     it's a "conflict."
+
+   - In Git, if both children go on to develop their timelines independently,
+     that's cool. Forks totally support that.
+   - In CouchDB, if both children go on to develop their timelines
+     independently, that cool too. Conflicts totally support that.
+   - **Fun fact 3**: CouchDB "conflicts" do not correspond to Git "conflicts."
+     A Couch conflict is a divergent revision history, what Git calls a "fork."
+     For this reason the CouchDB community pronounces "conflict" with a silent
+     `n`: "co-flicked."
+
+#. Git also has merges, when one child has multiple parents. CouchDB *sort* of
+   has that too.
+
+   - **In the data model, there is no merge.** The client simply marks one
+     timeline as deleted and continues to work with the only extant timeline.
+   - **In the application, it feels like a merge.** Typically, the client merges
+     the *data* from each timeline in an application-specific way.
+     Then it writes the new data to the timeline. In Git, this is like copying
+     and pasting the changes from branch A into branch B, then commiting to
+     branch B and deleting branch A. The data was merged, but there was no
+     `git merge`.
+   - These behaviors are different because, in Git, the timeline itself is
+     important; but in CouchDB, the data is important and the timeline is
+     incidental—it's just there to support replication. That is one reason why
+     CouchDB's built-in revisioning is inappropriate for storing revision data
+     like a wiki page.
+
+**Final notes**
+
+At least one sentence in this writeup (possibly this one) is complete BS.
+
