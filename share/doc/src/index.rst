@@ -32,7 +32,6 @@ Contents
     replication/index
     ddocs
     query-server/index
-    changes
     api/index
     json-structure
     contributing
