@@ -10,48 +10,9 @@
 .. License for the specific language governing permissions and limitations under
 .. the License.
 
-.. _api/misc:
 
-=====================
-Miscellaneous Methods
-=====================
-
-The CouchDB Miscellaneous interface provides the basic interface to a
-CouchDB server for obtaining CouchDB information and getting and setting
-configuration information.
-
-A list of the available methods and URL paths are provided below:
-
-+--------+-------------------------+-------------------------------------------+
-| Method | Path                    | Description                               |
-+========+=========================+===========================================+
-| GET    | /                       |  Get the welcome message and version      |
-|        |                         |  information                              |
-+--------+-------------------------+-------------------------------------------+
-| GET    | /_active_tasks          |  Obtain a list of the tasks running in the|
-|        |                         |  server                                   |
-+--------+-------------------------+-------------------------------------------+
-| GET    | /_all_dbs               |  Get a list of all the DBs                |
-+--------+-------------------------+-------------------------------------------+
-| GET    | /_db_updates            |  A feed of database events                |
-+--------+-------------------------+-------------------------------------------+
-| GET    | /_log                   |  Return the server log file               |
-+--------+-------------------------+-------------------------------------------+
-| POST   | /_replicate             |  Set or cancel replication                |
-+--------+-------------------------+-------------------------------------------+
-| POST   | /_restart               |  Restart the server                       |
-+--------+-------------------------+-------------------------------------------+
-| GET    | /_stats                 |  Return server statistics                 |
-+--------+-------------------------+-------------------------------------------+
-| GET    | /_utils                 |  CouchDB administration interface (Futon) |
-+--------+-------------------------+-------------------------------------------+
-| GET    | /_uuids                 |  Get generated UUIDs from the server      |
-+--------+-------------------------+-------------------------------------------+
-| GET    | /favicon.ico            |  Get the site icon                        |
-+--------+-------------------------+-------------------------------------------+
-
-.. _api/misc/root:
-.. _api/misc/root.get:
+.. _api/server/root:
+.. _api/server/root.get:
 
 ``GET /``
 =========
@@ -77,8 +38,8 @@ server.
        "version" : "1.0.1"
     }
 
-.. _api/misc/active_tasks:
-.. _api/misc/active_tasks.get:
+.. _api/server/active_tasks:
+.. _api/server/active_tasks.get:
 
 ``GET /_active_tasks``
 ======================
@@ -127,8 +88,8 @@ For operation type, valid values include:
 
 -  ``View Group Indexer``
 
-.. _api/misc/all_dbs:
-.. _api/misc/all_dbs.get:
+.. _api/server/all_dbs:
+.. _api/server/all_dbs.get:
 
 ``GET /_all_dbs``
 =================
@@ -163,8 +124,8 @@ The return is a JSON array:
     ]
 
 
-.. _api/misc/db_updates:
-.. _api/misc/db_updates.get:
+.. _api/server/db_updates:
+.. _api/server/db_updates.get:
 
 ``GET /_db_updates``
 ====================
@@ -183,8 +144,10 @@ The return is a JSON array:
     * **Supported Values**:
 
       * **longpoll**: Closes the connection after the first event.
-      * **continuous**: Send a line of JSON per event. Keeps the socket open until ``timeout``.
-      * **eventsource**: Like, ``continuous``, but sends the events in EventSource format. See http://dev.w3.org/html5/eventsource/ for details,
+      * **continuous**: Send a line of JSON per event. Keeps the socket open
+        until ``timeout``.
+      * **eventsource**: Like, ``continuous``, but sends the events in
+        `EventSource <http://dev.w3.org/html5/eventsource/>`_ format.
 
   * **Argument**: timeout
 
@@ -195,7 +158,8 @@ The return is a JSON array:
 
   * **Argument**: heartbeat
 
-    * **Description**: Whether CouchDB will send a newline character (``\n``) on ``timeout``.
+    * **Description**: Whether CouchDB will send a newline character (``\n``)
+      on ``timeout``.
     * **Optional**: yes
     * **Type**: boolean
     * **Default**: true
@@ -225,8 +189,8 @@ For example:
     {"dbname":"another-database", "type":"updated"}
 
 
-.. _api/misc/log:
-.. _api/misc/log.get:
+.. _api/server/log:
+.. _api/server/log.get:
 
 ``GET /_log``
 =============
@@ -292,8 +256,8 @@ following request:
 Reading of the log will start at 2000 bytes from the end of the log, and
 500 bytes will be shown.
 
-.. _api/misc/replicate:
-.. _api/misc/replicate.post:
+.. _api/server/replicate:
+.. _api/server/replicate.post:
 
 ``POST /_replicate``
 ====================
@@ -572,8 +536,8 @@ Must be canceled using the request:
 Requesting cancellation of a replication that does not exist results in
 a 404 error.
 
-.. _api/misc/restart:
-.. _api/misc/restart.post:
+.. _api/server/restart:
+.. _api/server/restart.post:
 
 ``POST /_restart``
 ==================
@@ -616,8 +580,8 @@ status object indicating that the request has been received:
 If the server has already restarted, the header may be returned, but no
 actual data is contained in the response.
 
-.. _api/misc/stats:
-.. _api/misc/stats.get:
+.. _api/server/stats:
+.. _api/server/stats.get:
 
 ``GET /_stats``
 ===============
@@ -777,8 +741,8 @@ structure is as follows:
        }
     }
 
-.. _api/misc/utils:
-.. _api/misc/utils.get:
+.. _api/server/utils:
+.. _api/server/utils.get:
 
 ``GET /_utils``
 ===============
@@ -790,8 +754,8 @@ structure is as follows:
 
 Accesses the built-in Futon administration interface for CouchDB.
 
-.. _api/misc/uuids:
-.. _api/misc/uuids.get:
+.. _api/server/uuids:
+.. _api/server/uuids.get:
 
 ``GET /_uuids``
 ===============
@@ -876,8 +840,8 @@ When obtaining a list of UUIDs you'll see the changes:
     }
 
 
-.. _api/misc/favicon:
-.. _api/misc/favicon.get:
+.. _api/server/favicon:
+.. _api/server/favicon.get:
 
 ``GET /favicon.ico``
 ====================

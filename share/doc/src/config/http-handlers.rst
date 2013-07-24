@@ -25,8 +25,8 @@ These HTTP resources are provided for CouchDB server root level.
 
 .. _config/httpd_global_handlers/root:
 
-:ref:`/ <api/misc/root>`
-------------------------
+:ref:`/ <api/server/root>`
+--------------------------
 
 ::
 
@@ -36,8 +36,8 @@ These HTTP resources are provided for CouchDB server root level.
 
 .. _config/httpd_global_handlers/favicon.ico:
 
-:ref:`favicon.ico <api/misc/favicon>`
--------------------------------------
+:ref:`favicon.ico <api/server/favicon>`
+---------------------------------------
 
 The favicon handler looks for `favicon.ico` file within specified directory::
 
@@ -47,8 +47,8 @@ The favicon handler looks for `favicon.ico` file within specified directory::
 
 .. _config/httpd_global_handlers/_active_tasks:
 
-:ref:`_active_tasks <api/misc/active_tasks>`
---------------------------------------------
+:ref:`_active_tasks <api/server/active_tasks>`
+----------------------------------------------
 
 ::
 
@@ -58,8 +58,8 @@ The favicon handler looks for `favicon.ico` file within specified directory::
 
 .. _config/httpd_global_handlers/_all_dbs:
 
-:ref:`_all_dbs <api/misc/all_dbs>`
-----------------------------------
+:ref:`_all_dbs <api/server/all_dbs>`
+------------------------------------
 
 Provides list of all server's databases::
 
@@ -91,8 +91,8 @@ and doesn't requires server instance to be restarted::
 
 .. _config/httpd_global_handlers/_log:
 
-:ref:`_log <api/misc/log>`
---------------------------
+:ref:`_log <api/server/log>`
+----------------------------
 
 ::
 
@@ -113,10 +113,10 @@ and doesn't requires server instance to be restarted::
 
 .. _config/httpd_global_handlers/_replicate:
 
-:ref:`_replicate <api/misc/replicate>`
---------------------------------------
+:ref:`_replicate <api/server/replicate>`
+----------------------------------------
 
-Provides API to run :ref:`temporary replications <api/misc/replicate>`::
+Provides API to run :ref:`temporary replications <api/server/replicate>`::
 
   [httpd_global_handlers]
   _replicate = {couch_replicator_httpd, handle_req}
@@ -124,8 +124,8 @@ Provides API to run :ref:`temporary replications <api/misc/replicate>`::
 
 .. _config/httpd_global_handlers/_restart:
 
-:ref:`_restart <api/misc/restart>`
-----------------------------------
+:ref:`_restart <api/server/restart>`
+------------------------------------
 
 ::
 
@@ -146,8 +146,8 @@ Provides resource with information about current user's session::
 
 .. _config/httpd_global_handlers/_stats:
 
-:ref:`_stats <api/misc/stats>`
-------------------------------
+:ref:`_stats <api/server/stats>`
+--------------------------------
 
 ::
 
@@ -157,10 +157,10 @@ Provides resource with information about current user's session::
 
 .. _config/httpd_global_handlers/_utils:
 
-:ref:`_utils <api/misc/utils>`
-------------------------------
+:ref:`_utils <api/server/utils>`
+--------------------------------
 
-The :ref:`_utils <api/misc/utils>` handler serves `Futon`'s web administration
+The :ref:`_utils <api/server/utils>` handler serves `Futon`'s web administration
 page::
 
   [httpd_global_handlers]
@@ -172,8 +172,8 @@ files.
 
 .. _config/httpd_global_handlers/_uuids:
 
-:ref:`_uuids <api/misc/uuids>`
-------------------------------
+:ref:`_uuids <api/server/uuids>`
+--------------------------------
 
 Provides resource to get UUIDs generated on server side::
 

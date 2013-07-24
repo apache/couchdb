@@ -45,15 +45,30 @@ html_files = \
     html/_images/futon-editeddoc.png \
     html/_images/futon-overview.png \
     html/_images/futon-replform.png \
-    html/_sources/api/authn.txt \
-    html/_sources/api/basics.txt \
-    html/_sources/api/configuration.txt \
-    html/_sources/api/database.txt \
-    html/_sources/api/design.txt \
-    html/_sources/api/documents.txt \
-    html/_sources/api/local.txt \
-    html/_sources/api/misc.txt \
-    html/_sources/api/reference.txt \
+    html/_source/api/basics.txt \
+    html/_source/api/index.txt \
+    html/_source/api/local.txt \
+    html/_source/api/database/all-docs.txt \
+    html/_source/api/database/bulk-docs.txt \
+    html/_source/api/database/changes.txt \
+    html/_source/api/database/common.txt \
+    html/_source/api/database/compact.txt \
+    html/_source/api/database/index.txt \
+    html/_source/api/database/misc.txt \
+    html/_source/api/database/security.txt \
+    html/_source/api/database/temp-views.txt \
+    html/_source/api/document/attachments.txt \
+    html/_source/api/document/common.txt \
+    html/_source/api/document/index.txt \
+    html/_source/api/ddoc/common.txt \
+    html/_source/api/ddoc/index.txt \
+    html/_source/api/ddoc/render.txt \
+    html/_source/api/ddoc/rewrites.txt \
+    html/_source/api/ddoc/views.txt \
+    html/_source/api/server/authn.txt \
+    html/_source/api/server/common.txt \
+    html/_source/api/server/configuration.txt \
+    html/_source/api/server/index.txt \
     html/_sources/config/auth.txt \
     html/_sources/config/compaction.txt \
     html/_sources/config/couchdb.txt \
@@ -106,15 +121,30 @@ html_files = \
     html/_static/up-pressed.png \
     html/_static/up.png \
     html/_static/websupport.js \
-    html/api/authn.html \
     html/api/basics.html \
-    html/api/configuration.html \
-    html/api/database.html \
-    html/api/design.html \
-    html/api/documents.html \
+    html/api/index.html \
     html/api/local.html \
-    html/api/misc.html \
-    html/api/reference.html \
+    html/api/database/all-docs.html \
+    html/api/database/bulk-docs.html \
+    html/api/database/changes.html \
+    html/api/database/common.html \
+    html/api/database/compact.html \
+    html/api/database/index.html \
+    html/api/database/misc.html \
+    html/api/database/security.html \
+    html/api/database/temp-views.html \
+    html/api/document/attachments.html \
+    html/api/document/common.html \
+    html/api/document/index.html \
+    html/api/ddoc/common.html \
+    html/api/ddoc/index.html \
+    html/api/ddoc/render.html \
+    html/api/ddoc/rewrites.html \
+    html/api/ddoc/views.html \
+    html/api/server/authn.html \
+    html/api/server/common.html \
+    html/api/server/configuration.html \
+    html/api/server/index.html \
     html/config/auth.html \
     html/config/compaction.html \
     html/config/couchdb.html \
@@ -165,15 +195,30 @@ image_files = \
     ../images/logo.png
 
 src_files = \
-    ../src/api/authn.rst \
     ../src/api/basics.rst \
-    ../src/api/configuration.rst \
-    ../src/api/database.rst \
-    ../src/api/design.rst \
-    ../src/api/documents.rst \
+    ../src/api/index.rst \
     ../src/api/local.rst \
-    ../src/api/misc.rst \
-    ../src/api/reference.rst \
+    ../src/api/database/all-docs.rst \
+    ../src/api/database/bulk-docs.rst \
+    ../src/api/database/changes.rst \
+    ../src/api/database/common.rst \
+    ../src/api/database/compact.rst \
+    ../src/api/database/index.rst \
+    ../src/api/database/misc.rst \
+    ../src/api/database/security.rst \
+    ../src/api/database/temp-views.rst \
+    ../src/api/document/attachments.rst \
+    ../src/api/document/common.rst \
+    ../src/api/document/index.rst \
+    ../src/api/ddoc/common.rst \
+    ../src/api/ddoc/index.rst \
+    ../src/api/ddoc/render.rst \
+    ../src/api/ddoc/rewrites.rst \
+    ../src/api/ddoc/views.rst \
+    ../src/api/server/authn.rst \
+    ../src/api/server/common.rst \
+    ../src/api/server/configuration.rst \
+    ../src/api/server/index.rst \
     ../src/config/auth.rst \
     ../src/config/compaction.rst \
     ../src/config/couchdb.rst \
