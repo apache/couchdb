@@ -45,30 +45,30 @@ html_files = \
     html/_images/futon-editeddoc.png \
     html/_images/futon-overview.png \
     html/_images/futon-replform.png \
-    html/_source/api/basics.txt \
-    html/_source/api/index.txt \
-    html/_source/api/local.txt \
-    html/_source/api/database/all-docs.txt \
-    html/_source/api/database/bulk-docs.txt \
-    html/_source/api/database/changes.txt \
-    html/_source/api/database/common.txt \
-    html/_source/api/database/compact.txt \
-    html/_source/api/database/index.txt \
-    html/_source/api/database/misc.txt \
-    html/_source/api/database/security.txt \
-    html/_source/api/database/temp-views.txt \
-    html/_source/api/document/attachments.txt \
-    html/_source/api/document/common.txt \
-    html/_source/api/document/index.txt \
-    html/_source/api/ddoc/common.txt \
-    html/_source/api/ddoc/index.txt \
-    html/_source/api/ddoc/render.txt \
-    html/_source/api/ddoc/rewrites.txt \
-    html/_source/api/ddoc/views.txt \
-    html/_source/api/server/authn.txt \
-    html/_source/api/server/common.txt \
-    html/_source/api/server/configuration.txt \
-    html/_source/api/server/index.txt \
+    html/_sources/api/basics.txt \
+    html/_sources/api/index.txt \
+    html/_sources/api/local.txt \
+    html/_sources/api/database/all-docs.txt \
+    html/_sources/api/database/bulk-docs.txt \
+    html/_sources/api/database/changes.txt \
+    html/_sources/api/database/common.txt \
+    html/_sources/api/database/compact.txt \
+    html/_sources/api/database/index.txt \
+    html/_sources/api/database/misc.txt \
+    html/_sources/api/database/security.txt \
+    html/_sources/api/database/temp-views.txt \
+    html/_sources/api/document/attachments.txt \
+    html/_sources/api/document/common.txt \
+    html/_sources/api/document/index.txt \
+    html/_sources/api/ddoc/common.txt \
+    html/_sources/api/ddoc/index.txt \
+    html/_sources/api/ddoc/render.txt \
+    html/_sources/api/ddoc/rewrites.txt \
+    html/_sources/api/ddoc/views.txt \
+    html/_sources/api/server/authn.txt \
+    html/_sources/api/server/common.txt \
+    html/_sources/api/server/configuration.txt \
+    html/_sources/api/server/index.txt \
     html/_sources/config/auth.txt \
     html/_sources/config/compaction.txt \
     html/_sources/config/couchdb.txt \
@@ -83,9 +83,9 @@ html_files = \
     html/_sources/config/services.txt \
     html/_sources/config/intro.txt \
     html/_sources/config/proxying.txt \
-    html/_source/install/index.html \
-    html/_source/install/unix.html \
-    html/_source/install/windows.html \
+    html/_sources/install/index.html \
+    html/_sources/install/unix.html \
+    html/_sources/install/windows.html \
     html/_sources/query-server/index.txt \
     html/_sources/query-server/erlang.txt \
     html/_sources/query-server/javascript.txt \
