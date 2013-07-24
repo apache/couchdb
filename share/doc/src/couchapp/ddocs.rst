@@ -14,9 +14,9 @@
 
 .. _ddocs:
 
-===========
-Design Docs
-===========
+================
+Design Functions
+================
 
 In this section we'll show how to write design documents, using the built-in
 :ref:`JavaScript Query Server <query-server/js>`.
