@@ -217,3 +217,8 @@ To check that everything has worked, point your web browser to::
     http://127.0.0.1:5984/_utils/index.html
 
 From here you should run the verification tests in Firefox.
+
+
+.. seealso::
+
+   `Glazier: Automate building of CouchDB from source on Windows <https://github.com/dch/glazier>`_
