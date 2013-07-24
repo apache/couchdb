@@ -26,3 +26,4 @@ applications with CouchDB
   intro
   collation
   joins
+  nosql
