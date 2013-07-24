@@ -83,6 +83,9 @@ html_files = \
     html/_sources/config/services.txt \
     html/_sources/config/intro.txt \
     html/_sources/config/proxying.txt \
+    html/_source/install/index.html \
+    html/_source/install/unix.html \
+    html/_source/install/windows.html \
     html/_sources/query-server/index.txt \
     html/_sources/query-server/erlang.txt \
     html/_sources/query-server/javascript.txt \
@@ -158,6 +161,9 @@ html_files = \
     html/config/services.html \
     html/config/intro.html \
     html/config/proxying.html \
+    html/install/index.html \
+    html/install/unix.html \
+    html/install/windows.html \
     html/query-server/index.html \
     html/query-server/erlang.html \
     html/query-server/javascript.html \
@@ -231,6 +237,9 @@ src_files = \
     ../src/config/services.rst \
     ../src/config/intro.rst \
     ../src/config/proxying.rst \
+    ../src/install/index.rst \
+    ../src/install/unix.rst \
+    ../src/install/windows.rst \
     ../src/query-server/index.rst \
     ../src/query-server/erlang.rst \
     ../src/query-server/javascript.rst \

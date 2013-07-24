@@ -28,6 +28,7 @@ Contents
     :numbered:
 
     intro
+    install/index
     config/index
     replication/index
     ddocs
