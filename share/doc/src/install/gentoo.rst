@@ -11,18 +11,19 @@
 .. the License.
 
 
-.. _install:
+.. _install/gentoo:
 
-============
-Installation
-============
+Installation on Gentoo
+======================
 
-.. toctree::
-   :maxdepth: 2
+The simplest way is to use an the `ebuild`_ and install via `portage`_
+(``emerge``). This takes care of dependencies, creating the `couchdb` user,
+basically everything you need to get up and running.
 
-   unix
-   windows
-   freebsd
-   gentoo
+.. code-block:: text
+
+    emerge --ask --verbose couchdb
 
 
+.. _ebuild: http://devmanual.gentoo.org/quickstart/index.html
+.. _portage: http://www.gentoo.org/doc/en/handbook/handbook-x86.xml?part=2&chap=1

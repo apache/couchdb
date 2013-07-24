@@ -84,6 +84,8 @@ html_files = \
     html/_sources/config/intro.txt \
     html/_sources/config/proxying.txt \
     html/_sources/install/index.html \
+    html/_sources/install/freebsd.html \
+    html/_sources/install/gentoo.html \
     html/_sources/install/unix.html \
     html/_sources/install/windows.html \
     html/_sources/query-server/index.txt \
@@ -162,6 +164,8 @@ html_files = \
     html/config/intro.html \
     html/config/proxying.html \
     html/install/index.html \
+    html/install/freebsd.html \
+    html/install/gentoo.html \
     html/install/unix.html \
     html/install/windows.html \
     html/query-server/index.html \
@@ -238,6 +242,8 @@ src_files = \
     ../src/config/intro.rst \
     ../src/config/proxying.rst \
     ../src/install/index.rst \
+    ../src/install/freebsd.rst \
+    ../src/install/gentoo.rst \
     ../src/install/unix.rst \
     ../src/install/windows.rst \
     ../src/query-server/index.rst \
