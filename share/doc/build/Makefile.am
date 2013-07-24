@@ -104,6 +104,7 @@ html_files = \
     html/_sources/replications/replicator.txt \
     html/_sources/changelog.txt \
     html/_sources/contributing.txt \
+    html/_sources/externals.txt \
     html/_sources/index.txt \
     html/_sources/intro.txt \
     html/_sources/json-structure.txt \
@@ -188,6 +189,7 @@ html_files = \
     html/replications/protocol.html \
     html/replications/replicator.html \
     html/changelog.html \
+    html/externals.html \
     html/index.html \
     html/intro.html \
     html/json-structure.html \
@@ -272,6 +274,7 @@ src_files = \
     ../src/replication/replicator.rst \
     ../src/changelog.rst \
     ../src/contributing.rst \
+    ../src/externals.rst \
     ../src/index.rst \
     ../src/intro.rst \
     ../src/json-structure.rst \
