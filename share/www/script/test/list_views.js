@@ -170,6 +170,16 @@ couchTests.list_views = function(debug) {
         });
         send("bad request");
       }),
+      allDocs: stringFun(function(head, req){
+        start({'headers': {'Content-Type': 'application/json'}});
+        var resp = head;
+        var rows = [];
+        while(row=getRow()){
+          rows.push(row);
+        }
+        resp.rows = rows;
+        return toJSON(resp);
+      })
     }
   };
   var viewOnlyDesignDoc = {
@@ -492,4 +502,15 @@ couchTests.list_views = function(debug) {
   T(xhr.status == 400);
   T(xhr.getResponseHeader("X-My-Header") == "MyHeader");
   T(xhr.responseText.match(/^bad request$/));
+
+  // test handling _all_docs by _list functions. the result should be equal
+  var xhr_lAllDocs = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/allDocs/_all_docs");
+  T(xhr_lAllDocs.status == 200, "standard get should be 200");
+  var xhr_allDocs = CouchDB.request("GET", "/test_suite_db/_all_docs");
+  var allDocs = JSON.parse(xhr_allDocs.responseText);
+  var lAllDocs = JSON.parse(xhr_lAllDocs.responseText);
+  TEquals(allDocs.total_rows, lAllDocs.total_rows, "total_rows mismatch");
+  TEquals(allDocs.offset, lAllDocs.offset, "offset mismatch");
+  TEquals(allDocs.rows.length, lAllDocs.rows.length, "amount of rows mismatch");
+  TEquals(allDocs.rows, lAllDocs.rows, "rows mismatch");
 };

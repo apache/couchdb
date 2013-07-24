@@ -35,6 +35,8 @@ Version 1.4.0
 * Bumped Mochiweb dependency to 2.4.2.
 * Disabled link to the Futon test suite.
 * Split up replicator_db tests into multiple independent tests.
+* :issue:`1139`: it's possible to apply :ref:`list <listfun>`
+  functions to ``_all_docs`` view.
 
 1.3.x Branch
 ============
