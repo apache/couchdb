@@ -26,7 +26,7 @@ maintains a given OS level process alive. If the process dies for any reason,
 CouchDB will restart it. If the process restarts too often, then CouchDB will
 mark it has halted and not attempt to restart it. The default max restart rate
 is ``3`` times in the last ``5`` seconds. These parameters are
-:ref:`adjustable <config/os_daemons_settings>`.
+:ref:`adjustable <config/os_daemon_settings>`.
 
 Commands that are started in this manner will have access to a simple
 API over stdio to request configuration parameters or to add log
