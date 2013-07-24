@@ -179,6 +179,29 @@ required for `Proxy Auth`::
   proxy_use_secret = false
 
 
+.. _config/couch_httpd_auth/public_fields:
+
+``public_fields`` :: User documents public fields
+-------------------------------------------------
+
+.. warning::
+
+   Due to :issue:`1838` issue, setting `public fields` allows list all documents
+   in the :ref:`_users <config/couch_httpd_auth/authentication_db>` database,
+   no matter does their documents contains public fields or not. If your system
+   uses email-based user login, enabling this feature may be fatal from security
+   point.
+
+Comma-separated list of field names that will be available to view for any user
+document in :ref:`authentication_db <config/couch_httpd_auth/authentication_db>`
+If unset or not specified, authenticated users may retrieve only their own docs.
+
+::
+
+  [couch_httpd_auth]
+  public_fields = first_name, last_name, contacts, url
+
+
 .. _config/couch_httpd_auth/require_valid_user:
 
 ``require_valid_user`` :: Force users authentication
