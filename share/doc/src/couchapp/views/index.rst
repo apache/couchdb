@@ -10,20 +10,17 @@
 .. License for the specific language governing permissions and limitations under
 .. the License.
 
-========
-CouchApp
-========
 
-`CouchApps`_ are web applications served directly from CouchDB, mostly driven by
-JavaScript and HTML5. If you can fit your application into those constraints,
-then you get CouchDB's scalability and flexibility "for free" (and deploying
-your app is as simple as replicating it to the production server).
+.. _views:
 
-.. _CouchApps: http://couchapp.org/
+==============
+Guide to Views
+==============
+
+Views are the primary tool used for querying and reporting on CouchDB documents.
+There you'll learn how they works and how to use them to build effective
+applications with CouchDB
 
 .. toctree::
-   :maxdepth: 2
 
-   ddocs
-   views/index
-
+  intro

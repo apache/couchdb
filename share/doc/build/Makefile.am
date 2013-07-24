@@ -45,6 +45,10 @@ html_files = \
     html/_images/futon-editeddoc.png \
     html/_images/futon-overview.png \
     html/_images/futon-replform.png \
+    html/_images/views-intro-01.png \
+    html/_images/views-intro-02.png \
+    html/_images/views-intro-03.png \
+    html/_images/views-intro-04.png \
     html/_sources/api/basics.txt \
     html/_sources/api/index.txt \
     html/_sources/api/local.txt \
@@ -85,6 +89,8 @@ html_files = \
     html/_sources/config/proxying.txt \
     html/_sources/couchapp/ddocs.txt \
     html/_sources/couchapp/index.txt \
+    html/_sources/couchapp/views/index.txt \
+    html/_sources/couchapp/views/intro.txt \
     html/_sources/fauxton/addons.txt \
     html/_sources/fauxton/index.txt \
     html/_sources/fauxton/install.txt \
@@ -170,7 +176,9 @@ html_files = \
     html/config/intro.html \
     html/config/proxying.html \
     html/couchapp/ddocs.html \
-    html/couchapp/intdex.html \
+    html/couchapp/index.html \
+    html/couchapp/views/index.html \
+    html/couchapp/views/intro.html \
     html/fauxton/addons.html \
     html/fauxton/index.html \
     html/fauxton/install.html \
@@ -255,6 +263,8 @@ src_files = \
     ../src/config/proxying.rst \
     ../src/couchapp/ddocs.rst \
     ../src/couchapp/index.rst \
+    ../src/couchapp/views/index.rst \
+    ../src/couchapp/views/intro.rst \
     ../src/fauxton/addons.rst \
     ../src/fauxton/index.rst \
     ../src/fauxton/install.rst \
