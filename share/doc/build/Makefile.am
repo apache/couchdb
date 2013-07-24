@@ -83,6 +83,9 @@ html_files = \
     html/_sources/config/services.txt \
     html/_sources/config/intro.txt \
     html/_sources/config/proxying.txt \
+    html/_sources/fauxton/addons.txt \
+    html/_sources/fauxton/index.txt \
+    html/_sources/fauxton/install.txt \
     html/_sources/install/index.html \
     html/_sources/install/freebsd.html \
     html/_sources/install/gentoo.html \
@@ -163,6 +166,9 @@ html_files = \
     html/config/services.html \
     html/config/intro.html \
     html/config/proxying.html \
+    html/fauxton/addons.html \
+    html/fauxton/index.html \
+    html/fauxton/install.html \
     html/install/index.html \
     html/install/freebsd.html \
     html/install/gentoo.html \
@@ -241,6 +247,9 @@ src_files = \
     ../src/config/services.rst \
     ../src/config/intro.rst \
     ../src/config/proxying.rst \
+    ../src/fauxton/addons.rst \
+    ../src/fauxton/index.rst \
+    ../src/fauxton/install.rst \
     ../src/install/index.rst \
     ../src/install/freebsd.rst \
     ../src/install/gentoo.rst \

@@ -33,6 +33,7 @@ Contents
     replication/index
     ddocs
     query-server/index
+    fauxton/index
     api/index
     json-structure
     contributing
