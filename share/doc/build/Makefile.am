@@ -89,6 +89,7 @@ html_files = \
     html/_sources/config/proxying.txt \
     html/_sources/couchapp/ddocs.txt \
     html/_sources/couchapp/index.txt \
+    html/_sources/couchapp/views/collation.txt \
     html/_sources/couchapp/views/index.txt \
     html/_sources/couchapp/views/intro.txt \
     html/_sources/fauxton/addons.txt \
@@ -177,6 +178,7 @@ html_files = \
     html/config/proxying.html \
     html/couchapp/ddocs.html \
     html/couchapp/index.html \
+    html/couchapp/views/collation.html \
     html/couchapp/views/index.html \
     html/couchapp/views/intro.html \
     html/fauxton/addons.html \
@@ -263,6 +265,7 @@ src_files = \
     ../src/config/proxying.rst \
     ../src/couchapp/ddocs.rst \
     ../src/couchapp/index.rst \
+    ../src/couchapp/views/collation.rst \
     ../src/couchapp/views/index.rst \
     ../src/couchapp/views/intro.rst \
     ../src/fauxton/addons.rst \

@@ -24,3 +24,4 @@ applications with CouchDB
 .. toctree::
 
   intro
+  collation
