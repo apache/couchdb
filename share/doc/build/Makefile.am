@@ -106,11 +106,11 @@ html_files = \
     html/_sources/query-server/erlang.txt \
     html/_sources/query-server/javascript.txt \
     html/_sources/query-server/protocol.txt \
-    html/_sources/replications/conflicts.txt \
-    html/_sources/replications/index.txt \
-    html/_sources/replications/intro.txt \
-    html/_sources/replications/protocol.txt \
-    html/_sources/replications/replicator.txt \
+    html/_sources/replication/conflicts.txt \
+    html/_sources/replication/index.txt \
+    html/_sources/replication/intro.txt \
+    html/_sources/replication/protocol.txt \
+    html/_sources/replication/replicator.txt \
     html/_sources/changelog.txt \
     html/_sources/contributing.txt \
     html/_sources/externals.txt \
@@ -197,11 +197,11 @@ html_files = \
     html/query-server/erlang.html \
     html/query-server/javascript.html \
     html/query-server/protocol.html \
-    html/replications/conflicts.html \
-    html/replications/index.html \
-    html/replications/intro.html \
-    html/replications/protocol.html \
-    html/replications/replicator.html \
+    html/replication/conflicts.html \
+    html/replication/index.html \
+    html/replication/intro.html \
+    html/replication/protocol.html \
+    html/replication/replicator.html \
     html/changelog.html \
     html/externals.html \
     html/index.html \
