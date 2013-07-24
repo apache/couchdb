@@ -25,3 +25,4 @@ applications with CouchDB
 
   intro
   collation
+  joins
