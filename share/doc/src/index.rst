@@ -32,6 +32,7 @@ Contents
     config/index
     replication/index
     couchapp/index
+    externals
     query-server/index
     fauxton/index
     api/index
