@@ -11,6 +11,8 @@
 .. the License.
 
 
+.. _views/collation:
+
 ===============
 Views Collation
 ===============
