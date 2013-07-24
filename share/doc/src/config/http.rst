@@ -141,7 +141,7 @@ Controls :ref:`CORS <config/cors>` feature::
 ``log_max_chunk_size`` :: Logs chunk size
 -----------------------------------------
 
-Defines maximum chunk size in bytes for :ref:`_log <api/misc/log>` resource::
+Defines maximum chunk size in bytes for :ref:`_log <api/server/log>` resource::
 
   [httpd]
   log_max_chunk_size = 1000000

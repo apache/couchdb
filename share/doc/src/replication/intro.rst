@@ -35,7 +35,7 @@ each document describes one replication process (see
 
 A replication is triggered by storing a replication document in the replicator
 database. Its status can be inspected through the active tasks API (see
-:ref:`api/misc/active_tasks` and :ref:`replication-status`). A replication can be
+:ref:`api/server/active_tasks` and :ref:`replication-status`). A replication can be
 stopped by deleting the document, or by updating it with its `cancel` property
 set to `true`.
 

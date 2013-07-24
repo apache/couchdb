@@ -12,6 +12,7 @@
 
 .. _api:
 
+=============
 API Reference
 =============
 
@@ -34,10 +35,8 @@ This reference is structured according to the URL structure, as below.
    :maxdepth: 2
 
    basics
-   database
-   documents
-   design
+   server/index
+   database/index
+   document/index
+   ddoc/index
    local
-   configuration
-   authn
-   misc
