@@ -31,7 +31,7 @@ Contents
     install/index
     config/index
     replication/index
-    ddocs
+    couchapp/index
     query-server/index
     fauxton/index
     api/index

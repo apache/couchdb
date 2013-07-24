@@ -83,6 +83,8 @@ html_files = \
     html/_sources/config/services.txt \
     html/_sources/config/intro.txt \
     html/_sources/config/proxying.txt \
+    html/_sources/couchapp/ddocs.txt \
+    html/_sources/couchapp/index.txt \
     html/_sources/fauxton/addons.txt \
     html/_sources/fauxton/index.txt \
     html/_sources/fauxton/install.txt \
@@ -102,7 +104,6 @@ html_files = \
     html/_sources/replications/replicator.txt \
     html/_sources/changelog.txt \
     html/_sources/contributing.txt \
-    html/_sources/ddocs.txt \
     html/_sources/index.txt \
     html/_sources/intro.txt \
     html/_sources/json-structure.txt \
@@ -167,6 +168,8 @@ html_files = \
     html/config/services.html \
     html/config/intro.html \
     html/config/proxying.html \
+    html/couchapp/ddocs.html \
+    html/couchapp/intdex.html \
     html/fauxton/addons.html \
     html/fauxton/index.html \
     html/fauxton/install.html \
@@ -185,7 +188,6 @@ html_files = \
     html/replications/protocol.html \
     html/replications/replicator.html \
     html/changelog.html \
-    html/ddocs.html \
     html/index.html \
     html/intro.html \
     html/json-structure.html \
@@ -249,6 +251,8 @@ src_files = \
     ../src/config/services.rst \
     ../src/config/intro.rst \
     ../src/config/proxying.rst \
+    ../src/couchapp/ddocs.rst \
+    ../src/couchapp/index.rst \
     ../src/fauxton/addons.rst \
     ../src/fauxton/index.rst \
     ../src/fauxton/install.rst \
@@ -268,7 +272,6 @@ src_files = \
     ../src/replication/replicator.rst \
     ../src/changelog.rst \
     ../src/contributing.rst \
-    ../src/ddocs.rst \
     ../src/index.rst \
     ../src/intro.rst \
     ../src/json-structure.rst \
