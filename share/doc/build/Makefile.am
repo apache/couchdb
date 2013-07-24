@@ -92,7 +92,6 @@ html_files = \
     html/_sources/replications/protocol.txt \
     html/_sources/replications/replicator.txt \
     html/_sources/changelog.txt \
-    html/_sources/changes.txt \
     html/_sources/contributing.txt \
     html/_sources/ddocs.txt \
     html/_sources/index.txt \
@@ -168,7 +167,6 @@ html_files = \
     html/replications/protocol.html \
     html/replications/replicator.html \
     html/changelog.html \
-    html/changes.html \
     html/ddocs.html \
     html/index.html \
     html/intro.html \
@@ -242,7 +240,6 @@ src_files = \
     ../src/replication/protocol.rst \
     ../src/replication/replicator.rst \
     ../src/changelog.rst \
-    ../src/changes.rst \
     ../src/contributing.rst \
     ../src/ddocs.rst \
     ../src/index.rst \
