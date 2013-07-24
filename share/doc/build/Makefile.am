@@ -86,11 +86,11 @@ html_files = \
     html/_sources/fauxton/addons.txt \
     html/_sources/fauxton/index.txt \
     html/_sources/fauxton/install.txt \
-    html/_sources/install/index.html \
-    html/_sources/install/freebsd.html \
-    html/_sources/install/gentoo.html \
-    html/_sources/install/unix.html \
-    html/_sources/install/windows.html \
+    html/_sources/install/index.txt \
+    html/_sources/install/freebsd.txt \
+    html/_sources/install/gentoo.txt \
+    html/_sources/install/unix.txt \
+    html/_sources/install/windows.txt \
     html/_sources/query-server/index.txt \
     html/_sources/query-server/erlang.txt \
     html/_sources/query-server/javascript.txt \
