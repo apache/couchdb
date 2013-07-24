@@ -94,6 +94,7 @@ html_files = \
     html/_sources/query-server/index.txt \
     html/_sources/query-server/erlang.txt \
     html/_sources/query-server/javascript.txt \
+    html/_sources/query-server/protocol.txt \
     html/_sources/replications/conflicts.txt \
     html/_sources/replications/index.txt \
     html/_sources/replications/intro.txt \
@@ -177,6 +178,7 @@ html_files = \
     html/query-server/index.html \
     html/query-server/erlang.html \
     html/query-server/javascript.html \
+    html/query-server/protocol.html \
     html/replications/conflicts.html \
     html/replications/index.html \
     html/replications/intro.html \
@@ -258,6 +260,7 @@ src_files = \
     ../src/query-server/index.rst \
     ../src/query-server/erlang.rst \
     ../src/query-server/javascript.rst \
+    ../src/query-server/protocol.rst \
     ../src/replication/conflicts.rst \
     ../src/replication/index.rst \
     ../src/replication/intro.rst \

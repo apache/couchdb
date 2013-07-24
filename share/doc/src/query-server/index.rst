@@ -33,6 +33,7 @@ are assumed to be of type `javascript`, as are ad hoc queries that are POSTed to
 .. toctree::
    :maxdepth: 2
 
+   protocol
    javascript
    erlang
 

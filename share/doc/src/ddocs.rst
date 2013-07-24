@@ -534,6 +534,8 @@ and we can change filter behavior with easy::
 Combining filters with `continuous` feed allows to create powerful event-driven
 systems.
 
+.. _viewfilter:
+
 View filters
 ------------
 
