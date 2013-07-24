@@ -93,6 +93,7 @@ html_files = \
     html/_sources/couchapp/views/index.txt \
     html/_sources/couchapp/views/intro.txt \
     html/_sources/couchapp/views/joins.txt \
+    html/_sources/couchapp/views/nosql.txt \
     html/_sources/fauxton/addons.txt \
     html/_sources/fauxton/index.txt \
     html/_sources/fauxton/install.txt \
@@ -183,6 +184,7 @@ html_files = \
     html/couchapp/views/index.html \
     html/couchapp/views/intro.html \
     html/couchapp/views/joins.html \
+    html/couchapp/views/nosql.html \
     html/fauxton/addons.html \
     html/fauxton/index.html \
     html/fauxton/install.html \
@@ -271,6 +273,7 @@ src_files = \
     ../src/couchapp/views/index.rst \
     ../src/couchapp/views/intro.rst \
     ../src/couchapp/views/joins.rst \
+    ../src/couchapp/views/nosql.rst \
     ../src/fauxton/addons.rst \
     ../src/fauxton/index.rst \
     ../src/fauxton/install.rst \
