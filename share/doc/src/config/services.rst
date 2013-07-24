@@ -40,7 +40,7 @@ closing of the `_users` database for each request requiring authentication::
 ``compaction_daemon``
 ---------------------
 
-:ref:`Automatic compaction <compact/auto>` daemon::
+:ref:`Automatic compaction <config/compactions>` daemon::
 
   [daemons]
   compaction_daemon={couch_compaction_daemon, start_link, []}
