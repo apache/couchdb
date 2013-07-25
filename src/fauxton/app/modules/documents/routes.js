@@ -32,11 +32,17 @@ function(app, FauxtonAPI, Documents, Databases) {
       var databaseName = options[0], docID = options[1];
 
       this.database = this.database || new Databases.Model({id: databaseName});
-      this.doc = new Documents.Doc({
-        _id: docID
-      }, {
-        database: this.database
-      });
+      if (docID === "new"){
+        this.doc = new Documents.NewDoc(null,{
+          database: this.database
+        });
+      } else {
+        this.doc = new Documents.Doc({
+          _id: docID
+        }, {
+          database: this.database
+        });
+      }
 
       this.tabsView = this.setView("#tabs", new Documents.Views.FieldEditorTabs({
         selected: "code_editor",
@@ -64,8 +70,9 @@ function(app, FauxtonAPI, Documents, Databases) {
       ];
     },
 
-    code_editor: function (event) {
+    code_editor: function (database, doc) {
       this.tabsView.updateSelected('code_editor');
+
       this.docView = this.setView("#dashboard-content", new Documents.Views.Doc({
         model: this.doc,
         database: this.database
