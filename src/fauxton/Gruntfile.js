@@ -17,6 +17,7 @@
 
 module.exports = function(grunt) {
   var helper = require('./tasks/helper').init(grunt),
+  _ = grunt.util._,
   path = require('path');
 
   var couch_config = function () {
@@ -35,19 +36,23 @@ module.exports = function(grunt) {
     return settings_couch_config || default_couch_config;
   }();
 
-  var cleanable = function(){
-    // Whitelist files and directories to be cleaned
-
-    // You'll always want to clean these two directories
-    var theListToClean = ["dist/", "app/load_addons.js"];
-    // Now find the external addons you have and add them for cleaning up
+  var cleanableAddons =  function () {
+    var theListToClean = [];
     helper.processAddons(function(addon){
       // Only clean addons that are included from a local dir
       if (addon.path){
         theListToClean.push("app/addons/" + addon.name);
       }
     });
+
     return theListToClean;
+  }();
+
+  var cleanable = function(){
+    // Whitelist files and directories to be cleaned
+    // You'll always want to clean these two directories
+    // Now find the external addons you have and add them for cleaning up
+    return _.union(["dist/", "app/load_addons.js"], cleanableAddons);
   }();
 
   var assets = function(){
@@ -111,7 +116,10 @@ module.exports = function(grunt) {
 
     // The clean task ensures all files are removed from the dist/ directory so
     // that no files linger from previous builds.
-    clean:  cleanable,
+    clean: {
+      release:  cleanable,
+      watch: cleanableAddons
+    },
 
     // The lint task will run the build configuration and the application
     // JavaScript through JSHint and report any errors.  You can change the
@@ -364,7 +372,7 @@ module.exports = function(grunt) {
    * Transformation tasks
    */
   // clean out previous build artefacts, lint and unit test
-  grunt.registerTask('test', ['clean', 'jshint']); //qunit
+  grunt.registerTask('test', ['clean:release', 'jshint']); //qunit
   // Fetch dependencies (from git or local dir), lint them and make load_addons
   grunt.registerTask('dependencies', ['get_deps', 'jshint', 'gen_load_addons:default']);
   // build templates, js and css
@@ -381,7 +389,7 @@ module.exports = function(grunt) {
   grunt.registerTask('debug', ['test', 'dependencies', 'concat:requirejs','less', 'concat:index_css', 'template:development', 'copy:debug']);
   grunt.registerTask('debugDev', ['test', 'dependencies', 'less', 'concat:index_css', 'template:development', 'copy:debug']);
 
-  grunt.registerTask('watchRun', ['dependencies']);
+  grunt.registerTask('watchRun', ['clean:watch', 'dependencies']);
   // build a release
   grunt.registerTask('release', ['test' ,'dependencies', 'build', 'minify', 'copy:dist']);
 
