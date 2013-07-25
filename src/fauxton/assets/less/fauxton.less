@@ -30,6 +30,8 @@
 @darkred: #73161E;
 @linkRed: #DA4F49;
 
+@fontGrey: #808080;
+@secondarySidebar: #E4DFDC;
 
 
 @orange: #F3622D;
@@ -45,12 +47,12 @@
 
 /*top header*/
 @breadcrumbBG: #F1F1F1;
-@breadcrumbText: #333333;
+@breadcrumbText: @red;
 @breadcrumbArrow: #999999;
 @breadcrumbBorder: @red;
 
 /*background colors*/
-@background: #E6E6E6;
+@background: #F2F2F2;
 @leftPanel: @background;
 @rightPanel: #CBCBCB;
 @defaultText: #4D4D4D;
@@ -60,7 +62,7 @@
 
 @collapsedNavWidth: 62px;
 @navWidth: 220px;
-@sidebarBG: @background;
+@sidebarBG: #F2F2F2;
 @sidebarWidth: 330px;
 
 @NavIconActive: #ffffff;
@@ -359,7 +361,7 @@ a:hover{
     border-right: 1px solid #999;
     width: auto;
     .box-shadow(-6px 0 rgba(0, 0, 0, 0.1));
-    padding: 20px;
+    padding: 0px;
     bottom: 0px;
     top: 60px;
     position: absolute;
@@ -410,8 +412,15 @@ a:hover{
     background-color: transparent;
     padding: 0;
     li {
+      .divider {
+        font-size: 12px;
+        color: @breadcrumbArrow;
+      }
+      &:first-child {
+        font-size: 30px;
+      }
       color: @breadcrumbText;
-      font-size: 30px;
+      font-size: 18px;
       text-shadow: none;
       a{
         color: @breadcrumbText;
@@ -453,6 +462,9 @@ footer#mainFooter{
   }
   nav {
     .nav-list{
+      .divider {
+        border: none;
+      }
       li.active a {
         background-color: @darkred;
         color: #fff;
@@ -486,6 +498,7 @@ footer#mainFooter{
   left: 0;
   overflow-x: hidden;
   overflow-y: auto;
+  background-color: @secondarySidebar;
   > div.inner {
     display: block;
   }
@@ -515,9 +528,33 @@ table.databases {clear: both;}
 thead {border-bottom: 2px solid @redButton;}
 tbody {padding-top: 10px;}
 .table-condensed td {padding: 18px 5px;}
+.table-striped tbody > tr:nth-child(odd) > td, 
+.table-striped tbody > tr:nth-child(odd) > th
+{
+  background-color: #F7F7F7;
+}
 
 
 /*form elements and buttons*/
+
+.btn-group {
+  > .btn + .dropdown-toggle,
+  > .btn:first-child
+  {
+    .border-radius(0);
+    background-image: none;
+    text-shadow: none;
+  }
+  button{
+
+  }
+  .dropdown-menu{
+
+  }
+}
+
+
+
 .button{
   .transition(all @transitionSpeed @transitionEaseType);
   border: none;
@@ -627,3 +664,11 @@ tr.all-docs-item{
 #log-sidebar{
   padding: 20px;
 }
+
+
+/*documents and databases */
+.view.show{
+  color: @fontGrey;
+}
+
+

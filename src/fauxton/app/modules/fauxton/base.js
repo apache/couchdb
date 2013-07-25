@@ -13,11 +13,12 @@
 define([
        "app",
        // Libs
-       "backbone"
+       "backbone",
+       "windowResize"
 
 ],
 
-function(app, Backbone) {
+function(app, Backbone, WindowResize) {
   var Fauxton = app.module();
 
   Fauxton.Breadcrumbs = Backbone.View.extend({
@@ -93,6 +94,47 @@ function(app, Backbone) {
       //this.trigger("link:add");
 
       //this.render();
+    },
+
+    afterRender: function(){
+
+      $('#primary-navbar li[data-nav-name="' + app.selectedHeader + '"]').addClass('active');
+
+      var menuOpen = true;
+      var $selectorList = $('body');
+      $('.brand').off();
+      $('.brand').on({
+        click: function(e){
+          if(!$(e.target).is('a')){
+            toggleMenu();
+          }
+         }
+      });
+
+      function toggleMenu(){
+        $selectorList.toggleClass('closeMenu');
+        menuOpen = $selectorList.hasClass('closeMenu');
+        setTimeout(
+          function(){
+            app.windowResize.onResizeHandler();
+          }, 1000);
+      }
+
+      $('#primary-navbar').on("click", ".nav a", function(){
+        if (!($selectorList.hasClass('closeMenu'))){
+        setTimeout(
+          function(){
+            $selectorList.addClass('closeMenu');
+          },1000);
+
+        }
+      });
+
+     app.windowResize = new WindowResize({
+          columnType: "double",
+          selectorElements: '#dashboard-content, #dashboard-content .editcase'
+      });
+      app.windowResize.initialize();
     },
 
     beforeRender: function () {

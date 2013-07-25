@@ -259,6 +259,7 @@ function(app, Fauxton) {
           $('#primary-navbar li').removeClass('active');
 
         if (this.selectedHeader) {
+          app.selectedHeader = this.selectedHeader;
           $('#primary-navbar li[data-nav-name="' + this.selectedHeader + '"]').addClass('active');
         }
       }
