@@ -286,7 +286,7 @@ a whole lot of sense. But this example is easy to understand. We’ll explore mo
 useful reductions later.
 
 Reduce functions operate on the output of the map function (also called the map
-re⁠sult or intermediate result). The reduce function’s job, unsurprisingly, is to
+result or intermediate result). The reduce function’s job, unsurprisingly, is to
 reduce the list that the map function produces.
 
 Here’s what our summing reduce function looks like:
