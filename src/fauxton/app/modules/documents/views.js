@@ -160,7 +160,10 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
         type: 'POST',
         beforeSend: this.beforeSend,
         uploadProgress: this.uploadProgress,
-        success: this.success
+        success: this.success,
+        error: function () {
+          console.log('ERR on upload', arguments);
+        }
       });
     },
 
@@ -329,6 +332,13 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
 
     upload: function (event) {
       event.preventDefault();
+      if (this.model.isNewDoc()) {
+        FauxtonAPI.addNotification({
+          msg: 'Please save the document before uploading an attachment.',
+          type: 'warning'
+        });
+        return;
+      }
       this.uploadModal.showModal();
     },
 
@@ -347,6 +357,7 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
       var selected = this.selected;
       return {
         doc: this.model,
+        isNewDoc: this.model.isNewDoc(),
         isSelectedClass: function(item) {
           return item && item === selected ? "active" : "";
         }

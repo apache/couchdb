@@ -172,6 +172,10 @@ function(app, FauxtonAPI) {
         url: '/' + this.database.id + '/' + this.id,
         headers: {Destination: copyId}
       });
+    },
+
+    isNewDoc: function () {
+      return this.get('_rev') ? false : true;
     }
   });
 
@@ -235,7 +239,8 @@ function(app, FauxtonAPI) {
       });
 
       return deferred.promise();
-    }
+    },
+
   });
 
   Documents.AllDocs = Backbone.Collection.extend({

@@ -32,17 +32,11 @@ function(app, FauxtonAPI, Documents, Databases) {
       var databaseName = options[0], docID = options[1];
 
       this.database = this.database || new Databases.Model({id: databaseName});
-      if (docID === "new"){
-        this.doc = new Documents.NewDoc(null,{
-          database: this.database
-        });
-      } else {
-        this.doc = new Documents.Doc({
-          _id: docID
-        }, {
-          database: this.database
-        });
-      }
+      this.doc = new Documents.Doc({
+        _id: docID
+      }, {
+        database: this.database
+      });
 
       this.tabsView = this.setView("#tabs", new Documents.Views.FieldEditorTabs({
         selected: "code_editor",
@@ -92,8 +86,8 @@ function(app, FauxtonAPI, Documents, Databases) {
 
     duplicateDoc: function (newId) {
       var doc = this.doc,
-          docView = this.docView,
-          database = this.database;
+      docView = this.docView,
+      database = this.database;
 
       doc.copy(newId).then(function () {
         doc.set({_id: newId}); 
@@ -115,6 +109,28 @@ function(app, FauxtonAPI, Documents, Databases) {
     apiUrl: function() {
       return this.doc.url();
     }
+  });
+
+  var NewDocEditorRouteObject = DocEditorRouteObject.extend({
+    initialize: function (route, masterLayout, options) {
+      var databaseName = options[0];
+
+      this.database = this.database || new Databases.Model({id: databaseName});
+      this.doc = new Documents.NewDoc(null,{
+        database: this.database
+      });
+
+      this.tabsView = this.setView("#tabs", new Documents.Views.FieldEditorTabs({
+        selected: "code_editor",
+        model: this.doc
+      }));
+
+    },
+
+    routes: {
+      "database/:database/new": "code_editor"
+    },
+
   });
 
   var DocumentsRouteObject = FauxtonAPI.RouteObject.extend({
@@ -257,7 +273,7 @@ function(app, FauxtonAPI, Documents, Databases) {
 
     updateAllDocsFromView: function (event) {
       var view = event.view,
-          ddoc = event.ddoc;
+      ddoc = event.ddoc;
 
       this.data.indexedDocs = new Documents.IndexCollection(null, {
         database: this.data.database,
@@ -276,8 +292,8 @@ function(app, FauxtonAPI, Documents, Databases) {
 
     updateAllDocsFromPreview: function (event) {
       var view = event.view,
-          rows = event.rows,
-          ddoc = event.ddoc;
+      rows = event.rows,
+      ddoc = event.ddoc;
 
       this.data.indexedDocs = new Documents.PouchIndexCollection(null, {
         database: this.data.database,
@@ -345,17 +361,7 @@ function(app, FauxtonAPI, Documents, Databases) {
 
   });
 
-  /* Documents.Routes = {
-     "database/:database/_design%2F:doc": function(database, doc) {
-     var docID = "_design/"+doc;
-     return codeEditorCallback(database, docID);
-     },
-
-     "database/:database/new": newDocCodeEditorCallback,
-     "database/:database/new_view": newViewEditorCallback,
-    };*/
-
-  Documents.RouteObjects = [DocEditorRouteObject, DocumentsRouteObject, ChangesRouteObject];
+  Documents.RouteObjects = [DocEditorRouteObject, NewDocEditorRouteObject, DocumentsRouteObject, ChangesRouteObject];
 
   return Documents;
 });
