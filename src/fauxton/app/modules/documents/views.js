@@ -287,6 +287,8 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
   Views.FieldEditorTabs = FauxtonAPI.View.extend({
     template: "templates/documents/doc_field_editor_tabs",
 
+    disableLoader: true,
+
     initialize: function(options) {
       this.selected = options.selected;
     },
