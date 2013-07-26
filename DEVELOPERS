@@ -61,8 +61,22 @@ Optional dependencies:
     sudo apt-get install texinfo
     sudo apt-get install gnupg
 
+Gentoo-based Systems
+~~~~~~~~~~~~~~~~~~~~
+
+    sudo emerge autoconf
+    sudo emerge autoconf-archive
+    sudo emerge texinfo
+    sudo emerge gnupg
+    sudo emerge coreutils
+    sudo emerge pkgconfig
+    sudo emerge help2man
+    sudo emerge automake
+    sudo USE=latex emerge sphinx
+
 RedHat-based (Fedora, Centos, RHEL) Systems
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
     sudo yum install help2man
     sudo yum install python-sphinx
     sudo yum install python-docutils
