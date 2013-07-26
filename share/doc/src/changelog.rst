@@ -27,16 +27,34 @@ Release History
 Upgrade Notes
 -------------
 
-We now support Erlang/OTP R16; the minimum required version is R14B.
+We now support Erlang/OTP R16B and R16B01; the minimum required version is R14B.
+
+User document role values must now be strings. Other types of values will be
+refused when saving the user document.
 
 Version 1.4.0
 -------------
 
-* Bumped Mochiweb dependency to 2.4.2.
-* Disabled link to the Futon test suite.
-* Split up replicator_db tests into multiple independent tests.
+* :issue:`1684`: Support for server-wide changes feed reporting on creation,
+  updates and deletion of databases. :commit:`917d8988`
 * :issue:`1139`: it's possible to apply :ref:`list <listfun>`
-  functions to ``_all_docs`` view.
+  functions to ``_all_docs`` view. :commit:`54fd258e`
+* Automatic loading of CouchDB plugins. :commit:`3fab6bb5`
+* :issue:`1634`: Reduce PBKDF2 work factor. :commit:`f726bc4d`
+* Allow storing pre-hashed admin passwords via `_config` API.
+  :commit:`c98ba561`
+* :issue:`1772`: Prevent invalid JSON output when using `all_or_nothing`
+  `_bulk_docs` API. :commit:`dfd39d57`
+* Add a configurable whitelist of user document properties. :commit:`8d7ab8b1`
+* :issue:`1852`: Support Last-Event-ID header in EventSource changes feeds.
+  :commit:`dfd2199a`
+* Much improved documentation, including an :ref:`expanded description
+  <vdufun>` of `validate_doc_update` functions (commit:`ef9ac469`) and
+  a description of how  CouchDB handles JSON :ref:`number values
+  <number-handling>` (:commit:`bbd93f77`).
+* :issue:`1632`: Ignore epilogues in multipart/related MIME attachments.
+  :commit:`2b4ab67a`
+* Split up replicator_db tests into multiple independent tests.
 
 1.3.x Branch
 ============

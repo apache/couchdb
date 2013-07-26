@@ -635,6 +635,8 @@ View Head Information
         "offset": 3
     }
 
+.. _number-handling:
+
 Number Handling
 ===============
 
