@@ -12,8 +12,10 @@
 
 %% @doc module to handle Cross-Origin Resource Sharing
 %%
-%% This module handles CROSS requests and preflight request for a
-%% couchdb Node. The config is done in the ini file.
+%% This module handles CORS requests and preflight request for
+%% CouchDB. The configuration is done in the ini file.
+%%
+%% This implements http://www.w3.org/TR/cors/
 
 
 -module(couch_httpd_cors).
