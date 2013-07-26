@@ -19,6 +19,7 @@
 
 
 define([
+  "d3"
 ],
 
 function() {
@@ -43,6 +44,10 @@ function() {
       return size.toFixed(1) + ' ' + units[i - 1];
     };
 
+  Helpers.formatDate = function(timestamp){
+    format = d3.time.format("%b. %e at %H:%M%p"); 
+    return format(new Date(timestamp*1000));
+  };
 
   return Helpers;
 });
