@@ -106,9 +106,10 @@ handle_db_event(_DbName, _Event, _St) ->
     {ok, nil}.
 
 check_shards() ->
-    {Unavailable, Impaired, Conflicted} = custodian:summary(),
+    {Unavailable, OneCopy, Impaired, Conflicted} = custodian:summary(),
     send_conflicted_alert(Conflicted),
     send_unavailable_alert(Unavailable),
+    send_one_copy_alert(OneCopy),
     send_impaired_alert(Impaired).
 
 send_conflicted_alert(0) ->
@@ -133,4 +134,12 @@ send_unavailable_alert(0) ->
 send_unavailable_alert(Count) when is_integer(Count) ->
     twig:log(crit, "~B unavailable shards in this cluster", [Count]),
     os:cmd("send_snmptrap --trap CLOUDANT-DBCORE-MIB::cloudantDbcoreShardsUnavailableEvent -o cloudantDbcoreShardCount:INTEGER:"
+           ++ integer_to_list(Count)).
+
+send_one_copy_alert(0) ->
+    twig:log(notice, "No shards with only one copy in this cluster", []),
+    os:cmd("send_snmptrap --trap CLOUDANT-DBCORE-MIB::cloudantDbcoreAllShardsMultipleCopiesEvent");
+send_one_copy_alert(Count) when is_integer(Count) ->
+    twig:log(crit, "~B shards with only one copy in this cluster", [Count]),
+    os:cmd("send_snmptrap --trap CLOUDANT-DBCORE-MIB::cloudantDbcoreShardsOneCopyEvent -o cloudantDbcoreShardCount:INTEGER:"
            ++ integer_to_list(Count)).

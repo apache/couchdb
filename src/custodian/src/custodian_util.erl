@@ -12,14 +12,16 @@
 %% public functions.
 
 summary() ->
-    Fun = fun(_Id, _Range,  unavailable, {U, I, C}) ->
-                  {U + 1, I, C};
-             (_Id, _Range,  {impaired, _N}, {U, I, C}) ->
-                  {U, I + 1, C};
-             (_Id, _Range, {conflicted, _N}, {U, I, C}) ->
-                  {U, I, C + 1}
+    Fun = fun(_Id, _Range,  unavailable, {U, O, I, C}) ->
+                  {U + 1, O, I, C};
+             (_Id, _Range,  {impaired, 1}, {U, O, I, C}) ->
+                  {U, O + 1, I, C};
+             (_Id, _Range,  {impaired, _N}, {U, O, I, C}) ->
+                  {U, O, I + 1, C};
+             (_Id, _Range, {conflicted, _N}, {U, O, I, C}) ->
+                  {U, O, I, C + 1}
           end,
-    fold_dbs({0, 0, 0}, Fun).
+    fold_dbs({0, 0, 0, 0}, Fun).
 
 report() ->
     Fun = fun(Id, Range,  unavailable, Acc) ->
