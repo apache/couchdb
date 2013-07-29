@@ -11,35 +11,35 @@
 // the License.
 
 define([
-  // Load require for use in nested requiring
-  // as per the note in: http://requirejs.org/docs/api.html#multiversion
-  "require",
+       // Load require for use in nested requiring
+       // as per the note in: http://requirejs.org/docs/api.html#multiversion
+       "require",
 
-  // Application.
-  "app",
+       // Application.
+       "app",
 
-  // Initialize application
-  "initialize",
+       // Initialize application
+       "initialize",
 
-  // Load Fauxton API
-  "api",
+       // Load Fauxton API
+       "api",
 
-  // Modules
-  "modules/fauxton/base",
-  // Layout
-  "modules/fauxton/layout",
+       // Modules
+       "modules/fauxton/base",
+       // Layout
+       "modules/fauxton/layout",
 
-  // Routes return the module that they define routes for
-  "modules/databases/base",
-  "modules/documents/base",
-  "modules/pouchdb/base",
+       // Routes return the module that they define routes for
+       "modules/databases/base",
+       "modules/documents/base",
+       "modules/pouchdb/base",
 
 
-  // this needs to be added as a plugin later
-  // "modules/logs/base",
-  // "modules/config/base",
+       // this needs to be added as a plugin later
+       // "modules/logs/base",
+       // "modules/config/base",
 
-  "load_addons"
+       "load_addons"
 ],
 
 function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents, Pouch, LoadAddons) {
@@ -53,29 +53,27 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents
     addModuleRouteObject: function(RouteObject) {
       var that = this; //change that to that
       var masterLayout = this.masterLayout,
-          routeUrls = RouteObject.prototype.getRouteUrls();
+      routeUrls = RouteObject.prototype.getRouteUrls();
 
       _.each(routeUrls, function(route) {
         this.route(route, route.toString(), function() {
-          var args = Array.prototype.slice.call(arguments);
-
-          if (!that.activeRouteObject || !that.activeRouteObject.hasRoute(route)) {
-            that.activeRouteObject = new RouteObject(route, masterLayout, args);
-          }
-
-          var routeObject = that.activeRouteObject,
-              roles = routeObject.getRouteRoles(route);
-
-          var authPromise = app.auth.checkAccess(roles);
+          var args = Array.prototype.slice.call(arguments),
+          roles = RouteObject.prototype.getRouteRoles(route),
+          authPromise = app.auth.checkAccess(roles);
 
           authPromise.then(function () {
+            if (!that.activeRouteObject || !that.activeRouteObject.hasRoute(route)) {
+              that.activeRouteObject = new RouteObject(route, masterLayout, args);
+            }
+
+            var routeObject = that.activeRouteObject;
             routeObject.routeCallback(route, args);
             routeObject.renderWith(route, masterLayout, args);
           }, function () {
             FauxtonAPI.auth.authDeniedCb();
-         });
+          });
 
-        });
+        }); 
       }, this);
     },
 

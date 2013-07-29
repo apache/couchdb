@@ -104,7 +104,7 @@ function (app, FauxtonAPI) {
 
     createAdmin: function (username, password, login) {
       var that = this,
-          error_promise =  this.validateUser(username, password, 'Authname or password cannot be blank.');
+          error_promise =  this.validateUser(username, password, 'Username or password cannot be blank.');
 
       if (error_promise) { return error_promise; }
 
@@ -123,7 +123,7 @@ function (app, FauxtonAPI) {
     },
 
     login: function (username, password) {
-      var error_promise =  this.validateUser(username, password, 'Authname or password cannot be blank.');
+      var error_promise =  this.validateUser(username, password, 'Username or password cannot be blank.');
 
       if (error_promise) { return error_promise; }
 
