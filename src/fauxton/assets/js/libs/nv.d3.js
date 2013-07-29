@@ -1732,7 +1732,7 @@ nv.models.cumulativeLineChart = function() {
             .call(legend);
 
         if ( margin.top != legend.height()) {
-          margin.top = legend.height();
+          margin.top = legend.height() + legend.legendBelowPadding();// added legend.legendBelowPadding to allow for more spacing
           availableHeight = (height || parseInt(container.style('height')) || 400)
                              - margin.top - margin.bottom;
         }
@@ -3384,7 +3384,7 @@ nv.models.historicalBarChart = function() {
             .call(legend);
 
         if ( margin.top != legend.height()) {
-          margin.top = legend.height();
+          margin.top = legend.height() + legend.legendBelowPadding();// added legend.legendBelowPadding to allow for more spacing
           availableHeight = (height || parseInt(container.style('height')) || 400)
                              - margin.top - margin.bottom;
         }
@@ -3971,9 +3971,45 @@ nv.models.indentedTree = function() {
     , color = nv.utils.defaultColor()
     , align = true
     , dispatch = d3.dispatch('legendClick', 'legendDblclick', 'legendMouseover', 'legendMouseout')
+    , svgComputedTextPadding = 28
+    , roundedRecRadius = 0
+    , legendBelowPadding = 20
     ;
 
   //============================================================
+
+/*
+Rounded Rec Path:
+
+x: x-coordinate
+y: y-coordinate
+w: width
+h: height
+r: corner radius
+tl: top_left rounded?
+tr: top_right rounded?
+bl: bottom_left rounded?
+br: bottom_right rounded?
+*/
+
+function rounded_rect(x, y, w, h, r, tl, tr, bl, br) {
+    var retval;
+    retval  = "M" + (x + r) + "," + y;
+    retval += "h" + (w - 2*r);
+    if (tr) { retval += "a" + r + "," + r + " 0 0 1 " + r + "," + r; }
+    else { retval += "h" + r; retval += "v" + r; }
+    retval += "v" + (h - 2*r);
+    if (br) { retval += "a" + r + "," + r + " 0 0 1 " + -r + "," + r; }
+    else { retval += "v" + r; retval += "h" + -r; }
+    retval += "h" + (2*r - w);
+    if (bl) { retval += "a" + r + "," + r + " 0 0 1 " + -r + "," + -r; }
+    else { retval += "h" + -r; retval += "v" + -r; }
+    retval += "v" + (2*r - h);
+    if (tl) { retval += "a" + r + "," + r + " 0 0 1 " + r + "," + -r; }
+    else { retval += "v" + -r; retval += "h" + r; }
+    retval += "z";
+    return retval;
+}
 
 
   function chart(selection) {
@@ -4009,13 +4045,15 @@ nv.models.indentedTree = function() {
           .on('dblclick', function(d,i) {
             dispatch.legendDblclick(d,i);
           });
+
+      seriesEnter.append('path');
       seriesEnter.append('circle')
           .style('stroke-width', 2)
           .attr('r', 5);
       seriesEnter.append('text')
           .attr('text-anchor', 'start')
-          .attr('dy', '.32em')
-          .attr('dx', '8');
+          .attr('dy', '.33em')
+          .attr('dx', '12');
       series.classed('disabled', function(d) { return d.disabled });
       series.exit().remove();
       series.select('circle')
@@ -4030,11 +4068,13 @@ nv.models.indentedTree = function() {
       if (align) {
 
         var seriesWidths = [];
+
         series.each(function(d,i) {
               var legendText = d3.select(this).select('text');
               var svgComputedTextLength = legendText.node().getComputedTextLength() 
                                          || nv.utils.calcApproxTextWidth(legendText);
-              seriesWidths.push(svgComputedTextLength + 28); // 28 is ~ the width of the circle plus some padding
+              seriesWidths.push(svgComputedTextLength + svgComputedTextPadding); //40 is for adding additional padding, TODO make value a property
+            
             });
 
         //nv.log('Series Widths: ', JSON.stringify(seriesWidths));
@@ -4071,9 +4111,22 @@ nv.models.indentedTree = function() {
         }
 
         series
-            .attr('transform', function(d, i) {
-              return 'translate(' + xPositions[i % seriesPerRow] + ',' + (5 + Math.floor(i / seriesPerRow) * 20) + ')';
-            });
+        .attr('transform', function(d, i) {
+          return 'translate(' + xPositions[i % seriesPerRow] + ',' + (5 + Math.floor(i / seriesPerRow) * 20) + ')';
+        }).select("path")
+        .attr("d", function(d, i) {
+
+          var addLeftCap = false;
+          var addRightCap = false;
+
+          if(i == 0){
+            addLeftCap = true;
+          }else if (i ==  seriesWidths.length-1){
+            addRightCap = true;
+          }
+
+          return rounded_rect(-14, -14, seriesWidths[i] , 28, roundedRecRadius, addLeftCap, addRightCap, addLeftCap, addRightCap);
+        });
 
         //position legend as far right as possible within the total width
         g.attr('transform', 'translate(' + (width - margin.right - legendWidth) + ',' + margin.top + ')');
@@ -4120,6 +4173,24 @@ nv.models.indentedTree = function() {
   //------------------------------------------------------------
 
   chart.dispatch = dispatch;
+
+  chart.svgComputedTextPadding = function(_) {
+    if (!arguments.length) return svgComputedTextPadding;
+    svgComputedTextPadding = _;
+    return chart;
+  };
+
+  chart.roundedRecRadius = function(_) {
+    if (!arguments.length) return roundedRecRadius;
+    roundedRecRadius = _;
+    return chart;
+  };
+
+  chart.legendBelowPadding = function(_) {
+    if (!arguments.length) return legendBelowPadding;
+    legendBelowPadding = _;
+    return chart;
+  };
 
   chart.margin = function(_) {
     if (!arguments.length) return margin;
@@ -4612,7 +4683,7 @@ nv.models.lineChart = function() {
             .call(legend);
 
         if ( margin.top != legend.height()) {
-          margin.top = legend.height();
+          margin.top = legend.height() + legend.legendBelowPadding();// added legend.legendBelowPadding to allow for more spacing
           availableHeight = (height || parseInt(container.style('height')) || 400)
                              - margin.top - margin.bottom;
         }
@@ -5044,7 +5115,7 @@ nv.models.linePlusBarChart = function() {
           .call(legend);
 
         if ( margin.top != legend.height()) {
-          margin.top = legend.height();
+          margin.top = legend.height() + legend.legendBelowPadding();// added legend.legendBelowPadding to allow for more spacing
           availableHeight = (height || parseInt(container.style('height')) || 400)
                              - margin.top - margin.bottom;
         }
@@ -5488,7 +5559,7 @@ nv.models.lineWithFocusChart = function() {
             .call(legend);
 
         if ( margin.top != legend.height()) {
-          margin.top = legend.height();
+          margin.top = legend.height() + legend.legendBelowPadding();// added legend.legendBelowPadding to allow for more spacing
           availableHeight1 = (height || parseInt(container.style('height')) || 400)
                              - margin.top - margin.bottom - height2;
         }
@@ -6104,7 +6175,7 @@ nv.models.linePlusBarWithFocusChart = function() {
           .call(legend);
 
         if ( margin.top != legend.height()) {
-          margin.top = legend.height();
+          margin.top = legend.height() + legend.legendBelowPadding();// added legend.legendBelowPadding to allow for more spacing
           availableHeight1 = (height || parseInt(container.style('height')) || 400)
                              - margin.top - margin.bottom - height2;
         }
@@ -7155,7 +7226,7 @@ nv.models.multiBarChart = function() {
             .call(legend);
 
         if ( margin.top != legend.height()) {
-          margin.top = legend.height();
+          margin.top = legend.height() + legend.legendBelowPadding();// added legend.legendBelowPadding to allow for more spacing
           availableHeight = (height || parseInt(container.style('height')) || 400)
                              - margin.top - margin.bottom;
         }
@@ -8080,7 +8151,7 @@ nv.models.multiBarHorizontalChart = function() {
             .call(legend);
 
         if ( margin.top != legend.height()) {
-          margin.top = legend.height();
+          margin.top = legend.height() + legend.legendBelowPadding();// added legend.legendBelowPadding to allow for more spacing
           availableHeight = (height || parseInt(container.style('height')) || 400)
                              - margin.top - margin.bottom;
         }
@@ -8483,7 +8554,7 @@ nv.models.multiChart = function() {
           .call(legend);
 
         if ( margin.top != legend.height()) {
-          margin.top = legend.height();
+          margin.top = legend.height() + legend.legendBelowPadding();// added legend.legendBelowPadding to allow for more spacing
           availableHeight = (height || parseInt(container.style('height')) || 400)
                              - margin.top - margin.bottom;
         }
@@ -9337,9 +9408,9 @@ nv.models.pie = function() {
                        d.innerRadius = arcRadius + 15; // Set Inner Coordinate
                        var rotateAngle = (d.startAngle + d.endAngle) / 2 * (180 / Math.PI);
                        if ((d.startAngle+d.endAngle)/2 < Math.PI) {
-                       	 rotateAngle -= 90;
+                         rotateAngle -= 90;
                        } else {
-                       	 rotateAngle += 90;
+                         rotateAngle += 90;
                        }
                        return 'translate(' + labelsArc.centroid(d) + ') rotate(' + rotateAngle + ')';
                      } else {
@@ -9364,7 +9435,7 @@ nv.models.pie = function() {
 
           slices.select(".nv-label").transition()
             .attr('transform', function(d) {
-            	if (labelSunbeamLayout) {
+              if (labelSunbeamLayout) {
                   d.outerRadius = arcRadius + 10; // Set Outer Coordinate
                   d.innerRadius = arcRadius + 15; // Set Inner Coordinate
                   var rotateAngle = (d.startAngle + d.endAngle) / 2 * (180 / Math.PI);
@@ -9684,7 +9755,7 @@ nv.models.pieChart = function() {
             .call(legend);
 
         if ( margin.top != legend.height()) {
-          margin.top = legend.height();
+          margin.top = legend.height() + legend.legendBelowPadding();// added legend.legendBelowPadding to allow for more spacing
           availableHeight = (height || parseInt(container.style('height')) || 400)
                              - margin.top - margin.bottom;
         }
@@ -10711,7 +10782,7 @@ nv.models.scatterChart = function() {
             .call(legend);
 
         if ( margin.top != legend.height()) {
-          margin.top = legend.height();
+          margin.top = legend.height() + legend.legendBelowPadding();// added legend.legendBelowPadding to allow for more spacing
           availableHeight = (height || parseInt(container.style('height')) || 400)
                              - margin.top - margin.bottom;
         }
@@ -11330,7 +11401,7 @@ nv.models.scatterPlusLineChart = function() {
             .call(legend);
 
         if ( margin.top != legend.height()) {
-          margin.top = legend.height();
+          margin.top = legend.height() + legend.legendBelowPadding();// added legend.legendBelowPadding to allow for more spacing
           availableHeight = (height || parseInt(container.style('height')) || 400)
                              - margin.top - margin.bottom;
         }
@@ -11820,7 +11891,7 @@ nv.models.sparkline = function() {
               var yValues = data.map(function(d, i) { return getY(d,i); });
               function pointIndex(index) {
                   if (index != -1) {
-	              var result = data[index];
+                var result = data[index];
                       result.pointIndex = index;
                       return result;
                   } else {
@@ -12544,9 +12615,9 @@ nv.models.stackedArea = function() {
   };
 
   chart.interpolate = function(_) {
-	    if (!arguments.length) return interpolate;
-	    interpolate = _;
-	    return interpolate;
+      if (!arguments.length) return interpolate;
+      interpolate = _;
+      return interpolate;
   
   };
   
@@ -12712,7 +12783,7 @@ nv.models.stackedAreaChart = function() {
             .call(legend);
 
         if ( margin.top != legend.height()) {
-          margin.top = legend.height();
+          margin.top = legend.height() + legend.legendBelowPadding();// added legend.legendBelowPadding to allow for more spacing
           availableHeight = (height || parseInt(container.style('height')) || 400)
                              - margin.top - margin.bottom;
         }
