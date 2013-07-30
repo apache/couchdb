@@ -338,6 +338,48 @@ Compression can be disabled by setting ``compression = none`` in your
 ``local.ini`` ``[couchdb]`` section, but the on-disk format will still be
 upgraded.
 
+Version 1.2.1
+-------------
+
+Security
+^^^^^^^^
+
+* Fixed CVE-2012-5641: Apache CouchDB Information disclosure via unescaped
+  backslashes in URLs on Windows
+* Fixed CVE-2012-5649: Apache CouchDB JSONP arbitrary code execution with Adobe
+  Flash
+* Fixed CVE-2012-5650: Apache CouchDB DOM based Cross-Site Scripting via Futon
+  UI
+
+HTTP Interface
+^^^^^^^^^^^^^^
+
+* No longer rewrites the X-CouchDB-Requested-Path during recursive
+  calls to the rewriter.
+* Limit recursion depth in the URL rewriter. Defaults to a maximum
+  of 100 invocations but is configurable.
+
+Build System
+^^^^^^^^^^^^
+
+* Fix couchdb start script.
+* Win: fix linker invocations.
+
+Futon
+^^^^^
+
+* Disable buttons that aren't available for the logged-in user.
+
+Replication
+^^^^^^^^^^^
+
+* Fix potential timeouts.
+
+View System
+^^^^^^^^^^^
+
+* Change use of signals to avoid broken view groups.
+
 Version 1.2.0
 -------------
 
