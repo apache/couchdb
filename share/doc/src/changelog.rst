@@ -799,6 +799,11 @@ View Server
 Version 1.0.1
 -------------
 
+Security
+^^^^^^^^
+
+* Fixed CVE-2010-2234: Apache CouchDB Cross Site Request Forgery Attack.
+
 Authentication
 ^^^^^^^^^^^^^^
 
@@ -870,6 +875,12 @@ View Server
 Version 0.11.2
 --------------
 
+Security
+^^^^^^^^
+
+* Fixed CVE-2010-2234: Apache CouchDB Cross Site Request Forgery Attack.
+* Avoid potential DOS attack by guarding all creation of atoms.
+
 Authentication
 ^^^^^^^^^^^^^^
 
@@ -892,11 +903,6 @@ Replicator
    replicator for no good reason.
 * Fix bug when pulling design documents from a source that requires
    basic-auth.
-
-Security
-^^^^^^^^
-
-* Avoid potential DOS attack by guarding all creation of atoms.
 
 
 Version 0.11.1
