@@ -49,6 +49,15 @@ function (app, FauxtonAPI) {
   Auth.Session = FauxtonAPI.Session.extend({
     url: '/_session',
 
+    initialize: function (options) {
+      if (!options) { options = {}; }
+
+      this.messages = _.extend({},  { 
+          missingCredentials: 'Username or password cannot be blank.',
+          passwordsNotMatch:  'Passwords do not match.'
+        }, options.messages);
+    },
+
     isAdminParty: function () {
       var userCtx = this.get('userCtx');
 
@@ -104,7 +113,7 @@ function (app, FauxtonAPI) {
 
     createAdmin: function (username, password, login) {
       var that = this,
-          error_promise =  this.validateUser(username, password, 'Username or password cannot be blank.');
+          error_promise =  this.validateUser(username, password, this.messages.missingCredentials);
 
       if (error_promise) { return error_promise; }
 
@@ -123,7 +132,7 @@ function (app, FauxtonAPI) {
     },
 
     login: function (username, password) {
-      var error_promise =  this.validateUser(username, password, 'Username or password cannot be blank.');
+      var error_promise =  this.validateUser(username, password, this.messages.missingCredentials);
 
       if (error_promise) { return error_promise; }
 
@@ -154,7 +163,7 @@ function (app, FauxtonAPI) {
     },
 
     changePassword: function (password, password_confirm) {
-      var error_promise =  this.validatePasswords(password, password_confirm, 'Passwords do not match.');
+      var error_promise =  this.validatePasswords(password, password_confirm, this.messages.passwordsNotMatch);
 
       if (error_promise) { return error_promise; }
 
