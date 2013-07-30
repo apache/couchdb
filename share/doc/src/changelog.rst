@@ -492,6 +492,51 @@ OAuth
    :depth: 1
    :local:
 
+Version 1.1.2
+-------------
+
+Security
+^^^^^^^^
+
+* Fixed CVE-2012-5641: Apache CouchDB Information disclosure via unescaped
+  backslashes in URLs on Windows.
+* Fixed CVE-2012-5649: Apache CouchDB JSONP arbitrary code execution with
+  Adobe Flash.
+* Fixed CVE-2012-5650: Apache CouchDB DOM based Cross-Site Scripting via Futon
+  UI.
+
+HTTP Interface
+^^^^^^^^^^^^^^
+
+* ETag of attachment changes only when the attachment changes, not
+  the document.
+* Fix retrieval of headers larger than 4k.
+* Allow OPTIONS HTTP method for list requests.
+* Don't attempt to encode invalid json.
+
+Replicator
+^^^^^^^^^^
+
+* Fix pull replication of documents with many revisions.
+* Fix replication from an HTTP source to an HTTP target.
+
+View Server
+^^^^^^^^^^^
+
+* Avoid invalidating view indexes when running out of file descriptors.
+
+Log System
+^^^^^^^^^^
+
+* Improvements to log messages for file-related errors.
+
+Build System
+^^^^^^^^^^^^
+
+* Don't `ln` the `couchjs` install target on Windows
+* Remove ICU version dependency on Windows.
+* Improve SpiderMonkey version detection.
+
 Version 1.1.1
 -------------
 
