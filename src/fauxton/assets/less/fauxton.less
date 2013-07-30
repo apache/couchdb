@@ -195,7 +195,7 @@ a:hover{
   }
 
   .navbar {
-    a.brand {
+    div.brand {
       .hide-text;
       .customTransition(left, 1s, 0.805, 0.005, 0.165, 0.985);
       margin: 10px 0 6px;
@@ -237,7 +237,7 @@ a:hover{
         margin: 0;
         li{
           .transition(all @transitionSpeed @transitionEaseType);
-          padding: 15px 0px 15px 60px;
+          padding: 15px 0px 15px 62px;
           font-size: 19px;
           width: @navWidth;
           font-weight: normal;
@@ -672,3 +672,8 @@ tr.all-docs-item{
 }
 
 
+div.spinner {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+}

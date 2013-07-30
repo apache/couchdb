@@ -14,7 +14,8 @@ define([
        "app",
 
        // Modules
-       "modules/fauxton/base"
+       "modules/fauxton/base",
+       "spin"
 ],
 
 function(app, Fauxton) {
@@ -265,9 +266,9 @@ function(app, Fauxton) {
       }
 
       //add page loader. "app-container" shouldn't be overwritten. Even if a new index.underscore is provided in settings.json
-      if (!this.disableLoader) {
-        $('#app-container').addClass(this.loaderClassname);
-      }
+      // if (!this.disableLoader) {
+      //   $('#app-container').addClass(this.loaderClassname);
+      // }
 
       masterLayout.clearBreadcrumbs();
       var crumbs = this.get('crumbs');
@@ -279,16 +280,33 @@ function(app, Fauxton) {
       }
 
       FauxtonAPI.when(this.establish()).done(function(resp) {
-        if (!this.disableLoader) {
-          $('#app-container').removeClass(this.loaderClassname);
-        }
+        // if (!this.disableLoader) {
+        //   $('#app-container').removeClass(this.loaderClassname);
+        // }
         _.each(routeObject.getViews(), function(view, selector) {
           if(view.hasRendered()) { return; }
-          if (!view.disableLoader){ $(selector).addClass(view.loaderClassname);}
+          if (!view.disableLoader){ 
+            var opts = {
+              lines: 16, // The number of lines to draw
+              length: 8, // The length of each line
+              width: 4, // The line thickness
+              radius: 12, // The radius of the inner circle
+              color: '#ccc', // #rbg or #rrggbb
+              speed: 1, // Rounds per second
+              trail: 10, // Afterglow percentage
+              shadow: false // Whether to render a shadow
+            };
+            $('<div class="spinner"></div>').appendTo(selector);
+            var spinner = new Spinner(opts).spin();
+            $('.spinner').append(spinner.el);
+          }
           
           FauxtonAPI.when(view.establish()).then(function(resp) {
             masterLayout.setView(selector, view);
-            if (!view.disableLoader) $(selector).removeClass(view.loaderClassname);
+            if (!view.disableLoader){
+              spinner.stop();
+                }
+            // } $(selector).removeClass(view.loaderClassname);
             masterLayout.renderView(selector);
             }, function(resp) {
             view.establishError = {
