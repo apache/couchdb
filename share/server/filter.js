@@ -29,7 +29,7 @@ var Filter = (function() {
       },
       filter_view : function(fun, ddoc, args) {
         // recompile
-        var source = fun.toSource();
+        var source = fun.toSource ? fun.toSource() : '(' + fun.toString() + ')';
         fun = evalcx(source, filter_sandbox);
 
         var results = [];
