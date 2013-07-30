@@ -63,7 +63,8 @@ var Views = (function() {
       // will kill the OS process. This is not normally what you want.
       throw(err);
     }
-    var message = "function raised exception " + err.toSource();
+    var message = "function raised exception " +
+                  (err.toSource ? err.toSource() : err.stack);
     if (doc) message += " with doc._id " + doc._id;
     log(message);
   };

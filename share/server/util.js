@@ -94,7 +94,12 @@ var Couch = {
                   return require(name, newModule);
                 }]);
               } catch(e) { 
-                throw ["error","compilation_error","Module require('"+name+"') raised error "+e.toSource()]; 
+                throw [
+                  "error",
+                  "compilation_error",
+                  "Module require('" +name+ "') raised error " +
+                  (e.toSource ? e.toSource() : e.stack)
+                ];
               }
               ddoc._module_cache[newModule.id] = newModule.exports;
             }
@@ -107,13 +112,17 @@ var Couch = {
         var functionObject = evaluate_function_source(source, eval);
       }
     } catch (err) {
-      throw(["error", "compilation_error", err.toSource() + " (" + source + ")"]);
+      throw([
+        "error",
+        "compilation_error",
+        (err.toSource ? err.toSource() : err.stack) + " (" + source + ")"
+      ]);
     };
     if (typeof(functionObject) == "function") {
       return functionObject;
     } else {
       throw(["error","compilation_error",
-        "Expression does not eval to a function. (" + source.toSource() + ")"]);
+        "Expression does not eval to a function. (" + source.toString() + ")"]);
     };
   },
   recursivelySeal : function(obj) {
@@ -138,7 +147,7 @@ function respond(obj) {
     print(Couch.toJSON(obj));
   } catch(e) {
     log("Error converting object to JSON: " + e.toString());
-    log("error on obj: "+ obj.toSource());
+    log("error on obj: "+ (obj.toSource ? obj.toSource() : obj.toString()));
   }
 };
 

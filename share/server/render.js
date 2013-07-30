@@ -261,7 +261,7 @@ var Render = (function() {
       if (args[0] === null && isDocRequestPath(args[1])) {
         throw(["error", "not_found", "document not found"]);
       } else {
-        renderError(e, fun.toSource());
+        renderError(e, fun.toString());
       }
     }
   };
@@ -281,7 +281,7 @@ var Render = (function() {
         throw(["error", "render_error", "undefined response from update function"]);      
       }
     } catch(e) {
-      renderError(e, fun.toSource());
+      renderError(e, fun.toString());
     }
   };
 
@@ -310,7 +310,7 @@ var Render = (function() {
       }
       blowChunks("end");
     } catch(e) {
-      renderError(e, listFun.toSource());
+      renderError(e, listFun.toString());
     }
   };
 
@@ -318,7 +318,9 @@ var Render = (function() {
     if (e.error && e.reason || e[0] == "error" || e[0] == "fatal") {
       throw(e);
     } else {
-      var logMessage = "function raised error: "+e.toSource()+" \nstacktrace: "+e.stack;
+      var logMessage = "function raised error: " +
+                       (e.toSource ? e.toSource() : e.toString()) + " \n" +
+                       "stacktrace: " + e.stack;
       log(logMessage);
       throw(["error", "render_error", logMessage]);
     }

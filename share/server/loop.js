@@ -44,7 +44,7 @@ function init_filter_sandbox() {
     }
     filter_sandbox.emit = Filter.emit;
   } catch(e) {
-    log(e.toSource());
+    log(e.toSource ? e.toSource() : e.stack);
   }
 };
 
@@ -143,7 +143,7 @@ var Loop = function() {
     } else if (e.name) {
       respond(["error", e.name, e]);
     } else {
-      respond(["error","unnamed_error",e.toSource()]);
+      respond(["error","unnamed_error",e.toSource ? e.toSource() : e.stack]);
     }
   };
   while (line = readline()) {
