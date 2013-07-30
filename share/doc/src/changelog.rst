@@ -636,6 +636,40 @@ View Server
    :depth: 1
    :local:
 
+Version 1.0.4
+-------------
+
+Security
+^^^^^^^^
+
+* Fixed CVE-2012-5641: Apache CouchDB Information disclosure via unescaped
+  backslashes in URLs on Windows.
+* Fixed CVE-2012-5649: Apache CouchDB JSONP arbitrary code execution with
+  Adobe Flash.
+* Fixed CVE-2012-5650: Apache CouchDB DOM based Cross-Site Scripting via Futon
+  UI.
+
+Log System
+^^^^^^^^^^
+
+* Fix file descriptor leak in `_log`.
+
+HTTP Interface
+^^^^^^^^^^^^^^
+
+* Fix missing revisions in `_changes?style=all_docs`.
+* Fix validation of attachment names.
+
+View System
+^^^^^^^^^^^
+
+* Avoid invalidating view indexes when running out of file descriptors.
+
+Replicator
+^^^^^^^^^^
+
+* Fix a race condition where replications can go stale.
+
 Version 1.0.3
 -------------
 
