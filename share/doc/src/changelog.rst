@@ -728,6 +728,11 @@ Windows
 Version 1.0.2
 -------------
 
+Security
+^^^^^^^^
+
+* Fixed CVE-2010-3854: Apache CouchDB Cross Site Scripting Issue.
+
 Futon
 ^^^^^
 
