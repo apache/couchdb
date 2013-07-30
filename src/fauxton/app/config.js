@@ -16,6 +16,7 @@ require.config({
     bootstrap: "../assets/js/libs/bootstrap",
     codemirror: "../assets/js/libs/codemirror",
     jshint: "../assets/js/libs/jshint",
+    spin: "../assets/js/libs/spin.min",
     d3: "../assets/js/libs/d3",
     "nv.d3": "../assets/js/libs/nv.d3"
   },
