@@ -7,7 +7,9 @@ Here’s a <1 minute demo video:
 
   https://dl.dropboxusercontent.com/u/82149/couchdb-plugins-demo.mov
 
-  (alternative encoding: https://dl.dropboxusercontent.com/u/82149/couchdb-plugins-demo.m4v)
+Alternative encoding:
+
+  https://dl.dropboxusercontent.com/u/82149/couchdb-plugins-demo.m4v)
 
 
 In my head the whole plugin idea is a very wide area, but I was so
@@ -19,18 +21,20 @@ button in Futon. So I looked for a minimally viable plugin system.
 
 It took me a day to put this all together and this was only possible
 because I took a lot of shortcuts. I believe they are all viable for a
-first iteration of a plugins system.
+first iteration of a plugins system:
 
 1. Install with one click on a button in Futon (or HTTP call)
 2. Only pure Erlang plugins are allowed.
-3. The plugin author must provide a binary package for each Erlang (and
-   later each CouchDB version).
+3. The plugin author must provide a binary package for each Erlang (and,
+   later, each CouchDB version).
 4. Complete trust-based system. You trust me to not do any nasty things
    when you click on the install button. No crypto, no nothing. Only
    people who can commit to Futon can release new versions of plugins.
 5. Minimal user-friendlyness: won’t install plugins that don’t match 
-   the current Erlang version.
+   the current Erlang version, gives semi-sensible error messages
+   (wrapped in a HTTP 500 response :)
 6. Require a pretty strict format for binary releases.
+
 
 ## Roadmap
 
@@ -45,13 +49,14 @@ Here’s a list of things this first iterations does and doesn’t do:
 - No security checking of binaries.
 - No identity checking of binaries.
 
-Here are a few things I want to add before I call it MVP:
+Here are a few things I want to add before I call it MVP*:
 
 - Uninstall a plugin via Futon (or HTTP call). Admin only.
 - Only installs if CouchDB version matches.
 - Binaries must be published on *.apache.org.
 - Register installed plugins in the config system.
 - Make sure plugins start with the next restart of CouchDB.
+- Show when a particular plugin is installed.
 
 *MVP hopefully means you agree we can ship this with a few warnings
 so people can get a hang of it.
@@ -79,16 +84,17 @@ Milestone 4: Other Languages
 Milestone X: Later
  - Add some account/identity/maybe crypto-web-of-trust system for
    authors to publish “legit” plugins.
- - Sign & verify individual releases
+ - Sign & verify individual releases.
 
 A few more things that can happen concurrently depending on what
 plugins require:
- - integrate Erlang/JS tests in the installation
- - integrate docs
+ - Integrate Erlang/JS tests in the installation
+ - Integrate docs
+
 
 ## How it works
 
-This plugin system lives in src/couch_plugins and is a tiny CouchDB
+This plugin system lives in `src/couch_plugins` and is a tiny CouchDB
 module.
 
 It exposes one new API endpoint `/_plugins` that an admin user can
@@ -113,7 +119,8 @@ location:
 
     http://people.apache.org/~jan/geocouch-couchdb1.2.x_v0.3.0-12-g4ea0bea-R15B03.tar.gz
 
-(this url is live, feel free to play around with this tarball).
+It should be obvious how the URL is constructed from the POST data.
+(This url is live, feel free to play around with this tarball).
 
 Next it calculates the sha hash for the downloaded .tar.gz file and
 matches it against the correct version in the `checksums` parameter.
@@ -122,7 +129,7 @@ If that succeeds, we unpack the .tar.gz file (currently in `/tmp`,
 need to find a better place for this) and adds the extracted directory
 to the Erlang code path
 (`code:add_path("/tmp/couchdb_plugins/geocouch-couchdb1.2.x_v0.3.0-12-g4ea0bea-R15B03/ebin")`)
-and loads the included application (`application:load(geocouch)`)
+and loads the included application (`application:load(geocouch)`).
 
 Then it looks into the `./config` directory that lives next to `ebin/`
 in the plugin directory for a file `config.erlt` (“erl-terms”). with a
@@ -138,8 +145,8 @@ leaves a few things open (see above).
 
 One open question I’d like an answer for is finding a good location to
 unpack & install the plugin files that isn’t `tmp`. If the answer is
-different for a pre-BigCouch/rcouch-merge and
-post-BigCouch/rcouch-merge world, I’d love to know :)
+different for a pre-BigCouch/rcouch-merge and post-BigCouch/rcouch-
+merge world, I’d love to know :)
 
 
 ## Code
@@ -154,11 +161,15 @@ that shows how a binary package is built:
 
     https://github.com/janl/geocouch/compare/couchbase:couchdb1.3.x...couchdb1.3.x-plugins
 
+* * *
 
-Please comment and improve heavily.
+I hope you like this :) Please comment and improve heavily!
+
+Let me know if you have any questions :)
 
 If you have any criticism, please phrase it in a way that we can use
-to improve this.
+to improve this, thanks!
 
-Cheers
+Best,
 Jan
+-- 
