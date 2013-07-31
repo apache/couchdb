@@ -153,8 +153,8 @@ merge world, I’d love to know :)
 
 The main branch for this is 1867-feature-plugins:
 
-     ASF: https://git-wip-us.apache.org/repos/asf?p=couchdb.git;a=log;h=refs/heads/1867-feature-plugins
-  GitHub: https://github.com/janl/couchdb/compare/1867-feature-plugins
+  ASF: https://git-wip-us.apache.org/repos/asf?p=couchdb.git;a=log;h=refs/heads/1867-feature-plugins
+  GitHub: https://github.com/janl/couchdb/compare/apache:master...1867-feature-plugins
 
 I created a branch on GeoCouch that adds a few lines to its `Makefile`
 that shows how a binary package is built:
