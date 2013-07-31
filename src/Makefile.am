@@ -14,6 +14,7 @@ SUBDIRS = \
     couch_dbupdates \
     couch_index \
     couch_mrview \
+    couch_plugins \
     couch_replicator \
     couchdb \
     ejson \
