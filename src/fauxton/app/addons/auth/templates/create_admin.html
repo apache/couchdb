@@ -12,18 +12,11 @@ License for the specific language governing permissions and limitations under
 the License.
 -->
 
-<div class="modal hide fade">
-  <div class="modal-header">
-    <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
-    <h3>Create Server Admin</h3>
-  </div>
-  <div class="modal-body">
-    <div id="modal-error" class="hide alert alert-error"/>
-    <form>
-      <input id="username" type="text" name="name" placeholder= "Username:" size="24">
-      <br/>
-      <input id="password" type="password" name="password" placeholder= "Password" size="24">
-    </form>
+<div class="span12">
+  <form id="create-admin-form">
+    <input id="username" type="text" name="name" placeholder= "Username:" size="24">
+    <br/>
+    <input id="password" type="password" name="password" placeholder= "Password" size="24">
     <p class="help-block">
     Before a server admin is configured, all clients have admin privileges.
     This is fine when HTTP access is restricted 
@@ -38,9 +31,6 @@ the License.
     are controlled by validation functions. CouchDB can be configured to block all
     access to anonymous users.
     </p>
-  </div>
-  <div class="modal-footer">
-    <a href="#" data-dismiss="modal" class="btn">Cancel</a>
-    <a href="#" id="create-admin" class="btn btn-primary">Create Admin</a>
-  </div>
+    <button type="submit" href="#" id="create-admin" class="btn btn-primary">Create Admin</button>
+  </form>
 </div>
