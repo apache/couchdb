@@ -161,9 +161,16 @@ that shows how a binary package is built:
 
     https://github.com/janl/geocouch/compare/couchbase:couchdb1.3.x...couchdb1.3.x-plugins
 
-## Build this with
 
-   rebar compile
+## Build
+
+Build CouchDB as usual:
+
+    ./bootstrap
+    ./configure
+    make
+    make dev
+    ./utils/run
 
 * * *
 
