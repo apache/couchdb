@@ -29,7 +29,7 @@ handle_req(#httpd{method='POST'}=Req) ->
       {binary_to_list(K), binary_to_list(V)}
     end, Checksums0),
 
-    case couch_plugins:install({Name, Url, Version, Checksums}}) of
+    case couch_plugins:install({Name, Url, Version, Checksums}) of
     ok ->
         couch_httpd:send_json(Req, 202, {[{ok, true}]});
     Error ->
