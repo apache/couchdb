@@ -11,15 +11,16 @@ WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 License for the specific language governing permissions and limitations under
 the License.
 -->
-<a <% if (!user && !admin_party) { %> href="#login" <% } %> class="fonticon-user fonticon" >
-  <% if (admin_party) { %>
-  Admin Party!
-  <% } else if (user) { %>
-  <%= user.name %>
-  <% } else { %>
-  Login
-  <% } %>
-  <b class="caret"></b>
-</a>
-
+<div class="span12">
+  <form id="login">
+    <p class="help-block">
+      Login to CouchDB with your name and password.
+    </p>
+    <input id="username" type="text" name="name" placeholder= "Username:" size="24">
+    <br/>
+    <input id="password" type="password" name="password" placeholder= "Password" size="24">
+    <br/>
+    <button id="submit" class="btn" type="submit"> Login </button>
+  </form>
+</div>
 

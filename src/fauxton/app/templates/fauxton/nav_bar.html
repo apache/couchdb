@@ -16,14 +16,14 @@ the License.
 <nav id="main_navigation">
   <ul id="nav-links" class="nav pull-right">
     <% _.each(navLinks, function(link) { %>
-      <% if (!link.view) { %>
+    <% if (link.view) {return;}  %>
         <li data-nav-name= "<%= link.title %>" ><a class="<%= link.icon %> fonticon" href="<%= link.href %>"><%= link.title %></a></li>
-      <% } %>
     <% }); %>
   </ul>
 
     <ul id="bottom-nav-links" class="nav">
     <% _.each(bottomNavLinks, function(link) { %>
+    <% if (link.view) {return;}  %>
       <li data-nav-name= "<%= link.title %>">
           <a class="<%= link.icon %> fonticon" href="<%= link.href %>">
               <%= link.title %>

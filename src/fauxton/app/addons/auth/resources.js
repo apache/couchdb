@@ -54,7 +54,11 @@ function (app, FauxtonAPI) {
 
       this.messages = _.extend({},  { 
           missingCredentials: 'Username or password cannot be blank.',
-          passwordsNotMatch:  'Passwords do not match.'
+          passwordsNotMatch:  'Passwords do not match.',
+          incorrectCredentials: 'Incorrect username or password.',
+          loggedIn: 'You have been logged in.',
+          adminCreated: 'Couchdb admin created',
+          changePassword: 'Your password has been updated.'
         }, options.messages);
     },
 
@@ -182,81 +186,60 @@ function (app, FauxtonAPI) {
     }
   });
 
-  Auth.ModalView = FauxtonAPI.View.extend({
-
-    show_modal: function () {
-      this.clear_error_msg();
-      this.$('.modal').modal();
-      // hack to get modal visible 
-      $('.modal-backdrop').css('z-index',1025);
-    },
-
-    hide_modal: function () {
-      this.$('.modal').modal('hide');
-      // force this removal as the navbar
-      //$('.modal-backdrop').remove();
-    },
-
-    set_error_msg: function (msg) {
-      var text;
-      if (typeof(msg) == 'string') {
-        text = msg;
-      } else {
-        text = JSON.parse(msg.responseText).reason;
-      }
-
-      this.$('#modal-error').text(text).removeClass('hide');
-    },
-
-    clear_error_msg: function () {
-      this.$('#modal-error').text(' ').addClass('hide');
-    }
-
-  });
-
-  Auth.CreateAdminModal = Auth.ModalView.extend({
-    template: 'addons/auth/templates/create_admin_modal',
+  Auth.CreateAdminView = FauxtonAPI.View.extend({
+    template: 'addons/auth/templates/create_admin',
 
     initialize: function (options) {
-      this.login_after = options.login_after || true;
+      options = options || {};
+      this.login_after = options.login_after === false ? false : true;
+      console.log(this.login_after, 'lo');
     },
 
     events: {
-      "click #create-admin": "createAdmin"
+      "submit #create-admin-form": "createAdmin"
     },
 
     createAdmin: function (event) {
       event.preventDefault();
-      this.clear_error_msg();
 
       var that = this,
-      username = this.$('#username').val(),
-      password = this.$('#password').val();
+          username = this.$('#username').val(),
+          password = this.$('#password').val();
 
       var promise = this.model.createAdmin(username, password, this.login_after);
 
       promise.then(function () {
-        that.$('.modal').modal('hide');
-        that.hide_modal();
+        FauxtonAPI.addNotification({
+          msg: FauxtonAPI.session.messages.adminCreated,
+        });
+
+        if (that.login_after) {
+          FauxtonAPI.navigate('/');
+        } else {
+          that.$('#username').val('');
+          that.$('#password').val('');
+        }
       });
 
       promise.fail(function (rsp) {
-        that.set_error_msg(rsp);
+        FauxtonAPI.addNotification({
+          msg: 'Could not create admin. Reason' + rsp + '.',
+          type: 'error'
+        });
       });
     }
 
   });
 
-  Auth.LoginModal = Auth.ModalView.extend({
-    template: 'addons/auth/templates/login_modal',
+  Auth.LoginView = FauxtonAPI.View.extend({
+    template: 'addons/auth/templates/login',
 
     events: {
-      "click #login": "login"
+      "submit #login": "login"
     },
 
     login: function () {
       event.preventDefault();
-      this.clear_error_msg();
 
       var that = this,
           username = this.$('#username').val(),
@@ -264,26 +247,35 @@ function (app, FauxtonAPI) {
           promise = this.model.login(username, password);
 
       promise.then(function () {
-        that.hide_modal();
+        FauxtonAPI.addNotification({msg:  FauxtonAPI.session.messages.loggedIn });
+        FauxtonAPI.navigate('/');
       });
 
-      promise.fail(function (rsp) {
-        that.set_error_msg(rsp);
+      promise.fail(function (xhr, type, msg) {
+        if (arguments.length === 3 && msg === 'Unauthorized') {
+          msg = FauxtonAPI.session.messages.incorrectCredentials;
+        } else {
+          msg = xhr;
+        }
+
+        FauxtonAPI.addNotification({
+          msg: msg,
+          type: 'error'
+        });
       });
     }
 
   });
 
-  Auth.ChangePasswordModal = Auth.ModalView.extend({
-    template: 'addons/auth/templates/change_password_modal',
+  Auth.ChangePassword = FauxtonAPI.View.extend({
+    template: 'addons/auth/templates/change_password',
 
     events: {
-      "click #change-password": "changePassword"
+      "submit #change-password": "changePassword"
     },
 
     changePassword: function () {
       event.preventDefault();
-      this.clear_error_msg();
 
       var that = this,
           new_password = this.$('#password').val(),
@@ -292,25 +284,28 @@ function (app, FauxtonAPI) {
       var promise = this.model.changePassword(new_password, password_confirm);
 
       promise.done(function () {
-        that.hide_modal();
+        FauxtonAPI.addNotification({msg: FauxtonAPI.session.messages.changePassword});
+        that.$('#password').val('');
+        that.$('#password-confirm').val('');
       });
 
-      promise.fail(function (rsp) {
-        that.set_error_msg(rsp);
+      promise.fail(function (xhr, error, msg) {
+        if (arguments.length < 3) {
+          msg = xhr;
+        }
+
+        FauxtonAPI.addNotification({
+          msg: xhr,
+          type: 'error'
+        });
       });
     }
   });
 
   Auth.NavLinkTitle = FauxtonAPI.View.extend({ 
     template: 'addons/auth/templates/nav_link_title',
-    tagName: 'a',
-    attributes: {
-      id: "user-drop",
-      "class": "dropdown-toggle",
-      role: "button",
-      "data-toggle": "dropdown",
-      href:"#"
-    },
+    tagName: 'li',
+    className: 'menuDropdownToggle openMenu',
 
     beforeRender: function () {
       this.listenTo(this.model, 'change', this.render);
@@ -326,12 +321,6 @@ function (app, FauxtonAPI) {
 
   Auth.NavDropDown = FauxtonAPI.View.extend({ 
     template: 'addons/auth/templates/nav_dropdown',
-    tagName: 'ul',
-    attributes: {
-      "class": "dropdown-menu",
-      role:"menu",
-      "aria-labelledby":"user-drop" 
-    },
 
     beforeRender: function () {
       this.listenTo(this.model, 'change', this.render);
@@ -346,57 +335,26 @@ function (app, FauxtonAPI) {
   });
 
   Auth.NavLink = FauxtonAPI.View.extend({
-    template: 'addons/auth/templates/nav_link',
-
-    tagName: "li",
-    className: "dropdown",
-
-    events: {
-      "click #user-create-admin": 'show_admin_modal',
-      "click #user-create-more-admin": 'show_create_more_admin_modal',
-      "click #user-login": 'show_login_modal',
-      "click #user-change-password": 'show_change_password_modal',
-      "click #user-logout": 'logout_user'
-    },
+    className: "dropdown openMenu",
 
     beforeRender: function () {
       this.nav_link_name = this.insertView(new Auth.NavLinkTitle({model: this.model}));
-      this.nav_link_name = this.insertView(new Auth.NavDropDown({model: this.model}));
-      this.create_admin_modal = this.setView('#user-create-admin-modal', new Auth.CreateAdminModal({model: this.model}));
-      this.login_modal = this.setView('#login-modal', new Auth.LoginModal({model: this.model}));
-      this.change_password_modal = this.setView('#change-password-modal', new Auth.ChangePasswordModal({model: this.model}));
+      if (this.model.isAdminParty() || this.model.user()) {
+        this.nav_link_list = this.insertView(new Auth.NavDropDown({model: this.model}));
+      }
     },
 
-    show_admin_modal: function (event) {
-      event.preventDefault();
-      this.create_admin_modal.show_modal();
+    afterRender: function () {
+      var that = this;
+      //unbind this click incase it has been registered before
+      this.$('.menuDropdownToggle').unbind('click').click(function () {
+        that.$('.menuDropdown').toggle('slow');
+      });
     },
-
-    show_create_more_admin_modal: function (event) {
-      event.preventDefault();
-      this.create_admin_modal.login_after = false;
-      this.create_admin_modal.show_modal();
-    },
-
-    show_login_modal: function (event) {
-      event.preventDefault();
-      this.login_modal.show_modal();
-    },
-
-    show_change_password_modal: function (event) {
-      event.preventDefault();
-      this.change_password_modal.show_modal();
-    },
-
-    logout_user: function () {
-      event.preventDefault();
-      this.model.logout();
-    }
   });
 
   Auth.NoAccessView = FauxtonAPI.View.extend({
     template: "addons/auth/templates/noAccess"
-
   });
 
 

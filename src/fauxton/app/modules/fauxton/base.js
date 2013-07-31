@@ -100,8 +100,8 @@ function(app, Backbone, WindowResize) {
 
       $('#primary-navbar li[data-nav-name="' + app.selectedHeader + '"]').addClass('active');
 
-      var menuOpen = true;
-      var $selectorList = $('body');
+      var menuOpen = true,
+          $selectorList = $('body');
       $('.brand').off();
       $('.brand').on({
         click: function(e){
@@ -130,27 +130,31 @@ function(app, Backbone, WindowResize) {
         }
       });
 
+      $('#primary-navbar').on('click', ".nav li.openMenu", function () {
+        $selectorList.removeClass('closeMenu');
+      });
+
      app.windowResize = new WindowResize({
           columnType: "double",
           selectorElements: '#dashboard-content, #dashboard-content .editcase'
       });
-      app.windowResize.initialize();
     },
 
     beforeRender: function () {
-      //this.addLinkViews();
+      this.addLinkViews();
     },
 
     addLinkViews: function () {
       var that = this;
 
-      _.each(this.navLinks, function (link) {
+      _.each(_.union(this.navLinks, this.bottomNavLinks), function (link) {
         if (!link.view) { return; }
 
         //TODO check if establish is a function
         var establish = link.establish || [];
         $.when.apply(null, establish).then( function () {
-          that.insertView('#nav-links', link.view).render();
+          var selector =  link.bottomNav ? '#bottom-nav-links' : '#nav-links';
+          that.insertView(selector, link.view).render();
         });
       }, this);
     }
