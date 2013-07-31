@@ -1,12 +1,9 @@
 -module(couch_plugins).
 -include("couch_db.hrl").
-%% Application callbacks
 -export([install/1]).
-
 
 % couch_plugins:install({"geocouch", "http://127.0.0.1:8000", "1.0.0", [{"R15B03", "+XOJP6GSzmuO2qKdnjO+mWckXVs="}]}).
 % couch_plugins:install({"geocouch", "http://people.apache.org/~jan/", "couchdb1.2.x_v0.3.0-11-gd83ba22", [{"R15B03", "ZetgdHj2bY2w37buulWVf3USOZs="}]}).
-
 
 -define(PLUGIN_DIR, "/tmp/couchdb_plugins").
 
@@ -79,6 +76,7 @@ add_code_path(Name, Version) ->
       Else
   end.
 
+-spec load_plugin(string()) -> ok | {error, atom()}.
 load_plugin(NameList) ->
   Name = list_to_atom(NameList),
   application:load(Name).
@@ -126,6 +124,7 @@ download({Name, _BaseUrl, Version, _Checksums}=Plugin) ->
 
 -spec verify_checksum(string(), list()) -> ok | {error, string()}.
 verify_checksum(Filename, Checksums) ->
+
   OTPRelease = erlang:system_info(otp_release),
   case proplists:get_value(OTPRelease, Checksums) of
   undefined ->
@@ -137,6 +136,7 @@ verify_checksum(Filename, Checksums) ->
 
 -spec do_verify_checksum(string(), string()) -> ok | {error, string()}.
 do_verify_checksum(Filename, Checksum) ->
+  ?LOG_DEBUG("Filename: ~s", [Filename]),
   case file:read_file(Filename) of
   {ok, Data} ->
     ComputedChecksum = binary_to_list(base64:encode(crypto:sha(Data))),
@@ -150,7 +150,7 @@ do_verify_checksum(Filename, Checksum) ->
   end.
 
 
-
+%% utils
 
 -spec get_url(plugin()) -> string().
 get_url({Name, BaseUrl, Version, _Checksums}) ->
