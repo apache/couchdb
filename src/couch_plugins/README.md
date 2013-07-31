@@ -108,7 +108,7 @@ Futon (or you) post an object to `/_plugins` with four properties:
     {
       "name": "geocouch", // name of the plugin, must be unique
       "url": "http://people.apache.org/~jan", // “base URL” for plugin releases (see below)
-      "version": "couchdb1.2.x_v0.3.0-11-gd83ba22", // whatever version internal to the plugin
+      "version": "couchdb1.2.x_v0.3.0-11-g4ea0bea", // whatever version internal to the plugin
       "checksums": {
         "R15B03": "ZetgdHj2bY2w37buulWVf3USOZs=" // base64’d sha hash over the binary
       }
