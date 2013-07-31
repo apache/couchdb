@@ -5,7 +5,7 @@
 
 
 % couch_plugins:install({"geocouch", "http://127.0.0.1:8000", "1.0.0", [{"R15B03", "+XOJP6GSzmuO2qKdnjO+mWckXVs="}]}).
-% couch_plugins:install({"geocouch", "http://people.apache.org/~jan/", "couchdb1.2.x_v0.3.0-11-gd83ba22", [{"R15B03", "Z9xK+OKLRvqKx3uoQHsiTuv6mrY="}]}).
+% couch_plugins:install({"geocouch", "http://people.apache.org/~jan/", "couchdb1.2.x_v0.3.0-11-gd83ba22", [{"R15B03", "ZetgdHj2bY2w37buulWVf3USOZs="}]}).
 
 
 -define(PLUGIN_DIR, "/tmp/couchdb_plugins").
