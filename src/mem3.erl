@@ -262,15 +262,9 @@ group_by_proximity(Shards, ZoneMap) ->
 
 choose_ushards(DbName, Shards) ->
     Groups0 = group_by_range(Shards),
-    Groups1 = [rotate_list(term_to_binary({DbName, R}), order_shards(G))
+    Groups1 = [mem3_util:rotate_list({DbName, R}, order_shards(G))
                || {R, G} <- Groups0],
     [hd(G) || G <- Groups1].
-
-rotate_list(_Key, []) ->
-    [];
-rotate_list(Key, List) ->
-    {H, T} = lists:split(erlang:crc32(Key) rem length(List), List),
-    T ++ H.
 
 order_shards([#ordered_shard{}|_]=OrderedShards) ->
     lists:keysort(#ordered_shard.order, OrderedShards);
