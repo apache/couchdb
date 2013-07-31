@@ -224,10 +224,8 @@ ensure_exists(DbName) ->
 
 
 owner(DbName, DocId) ->
-    Shards = mem3:shards(DbName, DocId),
-    Ushards = mem3:ushards(DbName),
-    [Node] = [N || #shard{node=N} = S <- Shards, lists:member(S, Ushards)],
-    node() =:= Node.
+    Nodes = lists:sort([node()|nodes()]),
+    node() =:= hd(rotate_list({DbName, DocId}, Nodes)).
 
 is_deleted(Change) ->
     case couch_util:get_value(<<"deleted">>, Change) of
