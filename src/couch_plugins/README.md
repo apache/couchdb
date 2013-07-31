@@ -161,6 +161,10 @@ that shows how a binary package is built:
 
     https://github.com/janl/geocouch/compare/couchbase:couchdb1.3.x...couchdb1.3.x-plugins
 
+## Build this with
+
+   rebar compile
+
 * * *
 
 I hope you like this :) Please comment and improve heavily!
