@@ -10,6 +10,7 @@
 ## License for the specific language governing permissions and limitations under
 ## the License.
 
+couch_pluginslibdir = $(localerlanglibdir)/couch_plugins-0.1
 couch_pluginsebindir = $(couch_pluginslibdir)/ebin
 
 couch_pluginsebin_DATA = $(compiled_files)

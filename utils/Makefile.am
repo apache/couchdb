@@ -34,6 +34,7 @@ run: ../bin/couchdb.tpl
 	    -e "s|%localstatelogdir%|$(abs_top_builddir)/tmp/log|g" \
 	    -e "s|%localstatelibdir%|$(abs_top_builddir)/tmp/lib|g" \
 	    -e "s|%localstatedir%|$(abs_top_builddir)/tmp|g" \
+	    -e "s|%locallibdir%|$(abs_top_builddir)/tmp|g" \
 	    -e "s|%bug_uri%|@bug_uri@|g" \
 	    -e "s|%package_author_address%|@package_author_address@|g" \
 	    -e "s|%package_author_name%|@package_author_name@|g" \

@@ -51,6 +51,7 @@ couchdb: couchdb.tpl
 	    -e "s|%localstatelogdir%|@localstatelogdir@|g" \
 	    -e "s|%localstatelibdir%|@localstatelibdir@|g" \
 	    -e "s|%localstatedir%|@localstatedir@|g" \
+	    -e "s|%locallibdir%|@locallibdir@|g" \
 	    -e "s|%bug_uri%|@bug_uri@|g" \
 	    -e "s|%package_author_address%|@package_author_address@|g" \
 	    -e "s|%package_author_name%|@package_author_name@|g" \

@@ -25,6 +25,7 @@ HEART_BEAT_TIMEOUT=11
 HEART_COMMAND="%bindir%/%couchdb_command_name% -k"
 INTERACTIVE=false
 KILL=false
+PLUGINS_DIR=%locallibdir%/plugins
 LOCAL_CONFIG_DIR=%localconfdir%/local.d
 LOCAL_CONFIG_FILE=%localconfdir%/%localini%
 PID_FILE=%localstatedir%/run/couchdb/couchdb.pid
@@ -144,6 +145,8 @@ _add_config_dir () {
 _load_config () {
     _add_config_file "$DEFAULT_CONFIG_FILE"
     _add_config_dir "$DEFAULT_CONFIG_DIR"
+    # We initialize plugins here to get the desired default config load order
+    _find_plugins
     _add_config_file "$LOCAL_CONFIG_FILE"
     _add_config_dir "$LOCAL_CONFIG_DIR"
     if [ "$COUCHDB_ADDITIONAL_CONFIG_FILE" != '' ]
@@ -216,6 +219,26 @@ check_environment () {
     fi
 }
 
+_find_plugins () {
+    # Find plugins and add them to the Erlang path and load their default
+    # configurations. This should be called from _load_config.
+    if test -d "$PLUGINS_DIR"; then
+        for plugin in "$PLUGINS_DIR"/*; do
+            if echo "$COUCH_PLUGIN_BLACKLIST" | grep "$plugin" > /dev/null 2> /dev/null; then
+                : # Do not use this plugin.
+            else
+                if echo "$ERL_ZFLAGS" | grep "$plugin/ebin" > /dev/null 2> /dev/null; then
+                    : # It's already loaded.
+                else
+                    ERL_ZFLAGS="$ERL_ZFLAGS -pz '$plugin/ebin'"
+                fi
+                _add_config_dir "$plugin/priv/default.d"
+            fi
+        done
+        export ERL_ZFLAGS
+    fi
+}
+
 start_couchdb () {
     if test ! "$RECURSED" = "true"; then
         if check_status 2> /dev/null; then
@@ -230,22 +253,6 @@ start_couchdb () {
     if test "$BACKGROUND" = "true"; then
         touch $PID_FILE
         interactive_option="+Bd -noinput"
-    fi
-
-    # Find plugins and add them to the Erlang path.
-    if test -d "%localerlanglibdir%/../../plugins"; then
-        for plugin in "%localerlanglibdir%/../../plugins"/*; do
-            if echo "$ERL_ZFLAGS" | grep "$plugin/ebin" > /dev/null 2> /dev/null; then
-                : # It's already loaded.
-            else
-                if echo "$COUCH_PLUGIN_BLACKLIST" | grep "$plugin" > /dev/null 2> /dev/null; then
-                    : # Do not use this plugin.
-                else
-                    ERL_ZFLAGS="$ERL_ZFLAGS -pz '$plugin/ebin'"
-                fi
-            fi
-        done
-        export ERL_ZFLAGS
     fi
 
     command="%ERL% $interactive_option $ERL_START_OPTIONS \

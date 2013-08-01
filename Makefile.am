@@ -113,6 +113,7 @@ if TESTS
 	mkdir -p $(top_builddir)/tmp/lib
 	mkdir -p $(top_builddir)/tmp/log
 	mkdir -p $(top_builddir)/tmp/run/couchdb
+	mkdir -p $(top_builddir)/tmp/plugins
 endif
 
 install-data-hook:
