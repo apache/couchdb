@@ -44,6 +44,7 @@ default.ini: default.ini.tpl
 	    -e "s|%localconfdir%|$(localconfdir)|g" \
 	    -e "s|%localdatadir%|$(localdatadir)|g" \
 	    -e "s|%localbuilddatadir%|$(localdatadir)|g" \
+	    -e "s|%locallibdir%|$(locallibdir)|g" \
 	    -e "s|%localstatelibdir%|$(localstatelibdir)|g" \
 	    -e "s|%localstatelogdir%|$(localstatelogdir)|g" \
 	    -e "s|%localstaterundir%|$(localstaterundir)|g" \
@@ -58,6 +59,7 @@ default_dev.ini: default.ini.tpl
 	sed -e "s|%bindir%|$(abs_top_builddir)/bin|g" \
 	    -e "s|%localconfdir%|$(abs_top_builddir)/etc/couchdb|g" \
 	    -e "s|%localdatadir%|$(abs_top_srcdir)/share|g" \
+	    -e "s|%locallibdir%|$(abs_top_builddir)/tmp|g" \
 	    -e "s|%localbuilddatadir%|$(abs_top_builddir)/share|g" \
 	    -e "s|%localstatelibdir%|$(abs_top_builddir)/tmp/lib|g" \
 	    -e "s|%localstatelogdir%|$(abs_top_builddir)/tmp/log|g" \
