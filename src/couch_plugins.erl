@@ -16,7 +16,8 @@
 % couch_plugins:install({"geocouch", "http://127.0.0.1:8000", "1.0.0", [{"R15B03", "+XOJP6GSzmuO2qKdnjO+mWckXVs="}]}).
 % couch_plugins:install({"geocouch", "http://people.apache.org/~jan/", "couchdb1.2.x_v0.3.0-11-gd83ba22", [{"R15B03", "ZetgdHj2bY2w37buulWVf3USOZs="}]}).
 
--define(PLUGIN_DIR, "/tmp/couchdb_plugins").
+plugin_dir() ->
+  couch_config:get("couchdb", "plugin_dir").
 
 log(T) ->
   ?LOG_DEBUG("[couch_plugins] ~p ~n", [T]).
@@ -60,7 +61,7 @@ load_config(Name, Version) ->
       fun load_config_file/1,
       filelib:wildcard(
         filename:join(
-          [?PLUGIN_DIR, get_file_slug(Name, Version),
+          [plugin_dir(), get_file_slug(Name, Version),
            "priv", "default.d", "*.ini"]))).
 
 -spec load_config_file(string()) -> ok.
@@ -74,7 +75,7 @@ set_config({{Section, Key}, Value}) ->
 
 -spec add_code_path(string(), string()) -> ok | {error, bad_directory}.
 add_code_path(Name, Version) ->
-  PluginPath = ?PLUGIN_DIR ++ "/" ++ get_file_slug(Name, Version) ++ "/ebin",
+  PluginPath = plugin_dir() ++ "/" ++ get_file_slug(Name, Version) ++ "/ebin",
   case code:add_path(PluginPath) of
     true -> ok;
     Else ->
@@ -95,9 +96,9 @@ untargz(Filename) ->
   % gunzip
   log("unzipped"),
   TarData = zlib:gunzip(GzData),
-  ok = filelib:ensure_dir(?PLUGIN_DIR),
+  ok = filelib:ensure_dir(plugin_dir()),
   % untar
-  erl_tar:extract({binary, TarData}, [{cwd, ?PLUGIN_DIR}, keep_old_files]).
+  erl_tar:extract({binary, TarData}, [{cwd, plugin_dir()}, keep_old_files]).
 
 
 % downloads a pluygin .tar.gz into a local plugins directory
