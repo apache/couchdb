@@ -23,6 +23,7 @@ confdir="%localconfdir%"
 urifile="%localstaterundir%/couch.uri"
 logdir="%localstatelogdir%"
 erlangversion="%erlangversion%"
+erlangbin="%erlangbin%"
 
 version () {
     cat << EOF
@@ -53,6 +54,7 @@ script.
 Options:
 
   --erl-libs-dir    Erlang library directory
+  --erl-bin         Erlang binary
   --config-dir      configuration directory
   --db-dir          database directory
   --view-dir        view index directory
@@ -85,6 +87,9 @@ do
     case "$arg" in
         --erl-libs-dir)
             echo $erlanglibdir
+            ;;
+        --erl-bin)
+            echo $erlangbin
             ;;
         --config-dir)
             echo $confdir

@@ -693,6 +693,7 @@ AC_SUBST([localstatelibdir], [${localstatedir}/lib/${package_identifier}])
 AC_SUBST([localstatelogdir], [${localstatedir}/log/${package_identifier}])
 AC_SUBST([localstaterundir], [${localstatedir}/run/${package_identifier}])
 AC_SUBST([erlangversion], [${erlangversion}])
+AC_SUBST([erlangbin], [${ERL}])
 
 
 # On Windows we install directly into our erlang distribution.
