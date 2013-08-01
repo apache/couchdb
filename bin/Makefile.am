@@ -95,6 +95,7 @@ couch-config: couch-config.tpl
 	    -e "s|%package_author_name%|@package_author_name@|g" \
 	    -e "s|%package_name%|@package_name@|g" \
 	    -e "s|%version%|@version@|g" \
+	    -e "s|%erlangversion%|@erlangversion@|g" \
 	    -e "s|%couchdb_command_name%|$(couchdb_command_name)|g" > \
 	$@ < $<
 	chmod +x $@
@@ -118,6 +119,7 @@ couch-config_dev: couch-config.tpl
 	    -e "s|%package_author_name%|@package_author_name@|g" \
 	    -e "s|%package_name%|@package_name@|g" \
 	    -e "s|%version%|@version@|g" \
+	    -e "s|%erlangversion%|@erlangversion@|g" \
 	    -e "s|%couchdb_command_name%|$(abs_top_builddir)/utils/run|g" > \
 	$@ < $<
 	chmod +x $@

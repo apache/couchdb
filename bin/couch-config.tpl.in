@@ -22,6 +22,7 @@ viewdir="%localstatelibdir%"
 confdir="%localconfdir%"
 urifile="%localstaterundir%/couch.uri"
 logdir="%localstatelogdir%"
+erlangversion="%erlangversion%"
 
 version () {
     cat << EOF
@@ -60,6 +61,7 @@ Options:
   --log-dir         log directory
   --uri-file        daemon sockets file 
   --couch-version   version of Apache CouchDB
+  --erlang-version  version of Erlang that CouchDB was built with
   --version         version of $basename
   --help            Print usage
 
@@ -107,6 +109,9 @@ do
             ;;
         --couch-version)
             echo $couchversion
+            ;;
+        --erlang-version)
+            echo $erlangversion
             ;;
         --version)
             version

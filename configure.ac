@@ -123,6 +123,7 @@ else
 fi
 
 AC_PATH_PROG([ERL], [erl])
+AC_PATH_PROG([ESCRIPT], [escript])
 
 AS_IF([test x${ERL} = x], [
     AC_MSG_ERROR([Could not find the `erl' executable. Is Erlang installed?])
@@ -650,6 +651,9 @@ else
     fi
 fi
 
+ERL_VERSION_COMMAND="${ESCRIPT} bin/erlang-version.escript"
+erlangversion=`${ERL_VERSION_COMMAND}`
+
 AC_ARG_VAR([ERL], [path to the `erl' executable])
 AC_ARG_VAR([ERLC], [path to the `erlc' executable])
 
@@ -688,6 +692,8 @@ AC_SUBST([locallibdir], [${libdir}/${package_identifier}])
 AC_SUBST([localstatelibdir], [${localstatedir}/lib/${package_identifier}])
 AC_SUBST([localstatelogdir], [${localstatedir}/log/${package_identifier}])
 AC_SUBST([localstaterundir], [${localstatedir}/run/${package_identifier}])
+AC_SUBST([erlangversion], [${erlangversion}])
+
 
 # On Windows we install directly into our erlang distribution.
 if test x${IS_WINDOWS} = xTRUE; then

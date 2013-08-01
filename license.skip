@@ -24,6 +24,7 @@
 ^bin/Makefile.in
 ^bin/couchdb.1
 ^bin/couchjs.1
+^bin/erlang-version.escript
 ^build-aux/.*
 ^config..*
 ^configure
