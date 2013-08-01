@@ -19,9 +19,11 @@ define([
 function (app, FauxtonAPI, activetasks) {
 
   var Views = {},
-			pollRate="5",
 			Events = {},
-			poll;
+			pollingInfo ={
+				pollRate: "5",
+				pollIntervalId: null
+			};
 
 
 	_.extend(Events, Backbone.Events);
@@ -46,8 +48,8 @@ function (app, FauxtonAPI, activetasks) {
 		changePollInterval: function(e){
 			var range = $(e.currentTarget).val();
 			$('label[for="pollingRange"] span').text(range);
-			pollRate = range;
-			clearInterval(poll);
+			pollingInfo.pollRate = range;
+			clearInterval(pollingInfo.pollIntervalId);
 			Events.trigger('update:poll');
 		},
 		requestByType: function(e){
@@ -70,29 +72,24 @@ function (app, FauxtonAPI, activetasks) {
 			//remove the old stuff in a nice clean way
 			if (this.dataView) {
 				this.dataView.remove();
-				$(this.el).find('p').remove();
 			}
 
-			if (currentData && currentData.length > 0) {
 				//add the new stuff
-				this.dataView = that.insertView( new Views.tableData({ 
-					collection: currentData
-				}));
+			this.dataView = that.insertView( new Views.tableData({ 
+				collection: currentData,
+				currentView: this.model.get('currentView').replace('_',' ')
+			}));
 
-				this.dataView.render();
-			} else {
-				var currentView = this.model.get('currentView').replace('_',' ');
-				$(this.el).html("<p> There are no active tasks for "+currentView+' right now.</p>');
-			}
+			this.dataView.render();
 		},
 		establish: function(){
 			return [this.model.fetch()];
 		},
 		setPolling: function(){
 			var that = this;
-			poll = setInterval(function() {
+			pollingInfo.pollIntervalId = setInterval(function() {
 				that.establish();
-			}, pollRate*1000);
+			}, pollingInfo.pollRate*1000);
 		},
 		afterRender: function(){
 			this.listenTo(this.model, "change", this.showData);
@@ -108,11 +105,20 @@ function (app, FauxtonAPI, activetasks) {
 		events: {
 			"click th": "sortByType"
 		},
+		initialize: function(){
+			currentView = this.options.currentView;
+		},
 		sortByType:  function(e){
 			var currentTarget = e.currentTarget;
 					datatype = $(currentTarget).attr("data-type");
 			this.collection.sortByColumn(datatype);
 			this.render();
+		},
+		serialize: function(){
+			return {
+				currentView: currentView,
+				collection: this.collection
+			}
 		},
 		beforeRender: function(){
 			//iterate over the collection to add each

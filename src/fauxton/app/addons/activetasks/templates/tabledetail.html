@@ -19,10 +19,10 @@ the License.
   <%= objectField %>
 </td>
 <td>
-  <%= new Date(model.get("started_on")) %>
+  <%= formatDate(model.get("started_on")) %>
 </td>
 <td>
-  <%= new Date(model.get("updated_on")) %>
+  <%= formatDate(model.get("updated_on")) %>
 </td>
 <td>
   <%= model.get("pid")%>

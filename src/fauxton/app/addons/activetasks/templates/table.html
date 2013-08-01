@@ -26,6 +26,14 @@ License for the specific language governing permissions and limitations under
 the License.
 -->
 
+<% if (collection.length === 0){%>
+   <tr> 
+    <td>
+      <p>There are no active tasks for <%=currentView%> right now.</p>
+    </td>
+  </tr>
+<%}else{%>
+
   <thead>
     <tr>
       <th data-type="type">Type</th>
@@ -40,3 +48,5 @@ the License.
   <tbody id="tasks_go_here">
 
   </tbody>
+
+<% } %>

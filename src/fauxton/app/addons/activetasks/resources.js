@@ -25,14 +25,6 @@ function (app, backbone, Fauxton) {
   Active.Task = Backbone.Model.extend({
     initialize: function() { 
       this.set({"id": this.get('pid')});
-    },
-    getStartedOn: function(){
-      format = d3.time.format("%b. %e at %H:%M%p"); 
-      return format(new Date(this.get("started_on")));
-    },
-    getUpdatedOn: function(){
-      format = d3.time.format("%b. %e at %H:%M%p"); 
-      return format(new Date(this.get("updated_on")));
     }
   });
 
@@ -46,16 +38,17 @@ function (app, backbone, Fauxton) {
       "view_compaction": "View Compaction"
     },
     url: function () {
-      //return "https://dl.dropboxusercontent.com/u/44146427/sampleTasks.json";
       return app.host + '/_active_tasks';
     },
     parse: function(resp){
-      var typeCollections= {},
-      types = this.getUniqueTypes(resp);
+      // var typeCollections= {},
+      var types = this.getUniqueTypes(resp),
+          that = this;
 
-      _.each(types, function(val, key){
-        typeCollections[key] = new Active.AllTasks(this.sortThis(resp, key));
-      }, this);
+      var typeCollections = _.reduce(types, function (collection, val, key) {
+          collection[key] = new Active.AllTasks(that.sortThis(resp, key));
+          return collection;
+        }, {});
 
       typeCollections.all = new Active.AllTasks(resp);
 
@@ -64,8 +57,8 @@ function (app, backbone, Fauxton) {
     getUniqueTypes: function(resp){
       var types = this.alltypes;
 
-      _.each(resp, function(type){
-        if( typeof(types[type.type]) == "undefined"){
+      _.map(resp, function(type){
+        if( typeof(types[type.type]) === "undefined"){
           types[type.type] = type.type.replace(/_/g,' ');
         }
       },this);
