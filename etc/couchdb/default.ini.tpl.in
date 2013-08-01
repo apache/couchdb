@@ -160,6 +160,7 @@ _log = {couch_httpd_misc_handlers, handle_log_req}
 _session = {couch_httpd_auth, handle_session_req}
 _oauth = {couch_httpd_oauth, handle_oauth_req}
 _db_updates = {couch_dbupdates_httpd, handle_req}
+_plugins = {couch_plugins_httpd, handle_req}
 
 [httpd_db_handlers]
 _all_docs = {couch_mrview_http, handle_all_docs_req}
