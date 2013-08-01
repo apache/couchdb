@@ -2,7 +2,7 @@ couchperuser
 ============
 
 couchperuser is a CouchDB daemon that ensures that a private per-user
-database exists for each document _users.
+database exists for each document in _users.
 
 Currently this is very much purpose-built for CodeCosmos. Databases are
 in the form:
