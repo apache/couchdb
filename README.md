@@ -131,10 +131,10 @@ to the Erlang code path
 (`code:add_path("/tmp/couchdb_plugins/geocouch-couchdb1.2.x_v0.3.0-12-g4ea0bea-R15B03/ebin")`)
 and loads the included application (`application:load(geocouch)`).
 
-Then it looks into the `./config` directory that lives next to `ebin/`
-in the plugin directory for a file `config.erlt` (“erl-terms”). with a
-list of configuration parameters to load. We parse the file and set
-the config directives one by one.
+Then it looks into the `./priv/default.d` directory that lives next to
+`ebin/` in the plugin directory for configuration `.ini` files and loads them.
+On next startup these configuration files are loaded after global defaults,
+and before any local configuration.
 
 If that all goes to plan, we report success back to the HTTP caller.
 

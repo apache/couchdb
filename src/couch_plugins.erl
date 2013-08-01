@@ -18,7 +18,7 @@
 
 -define(PLUGIN_DIR, "/tmp/couchdb_plugins").
 
-log(T) -> 
+log(T) ->
   ?LOG_DEBUG("[couch_plugins] ~p ~n", [T]).
 
 %% "geocouch", "http://localhost:8000/dist", "1.0.0"
@@ -45,44 +45,30 @@ install({Name, _BaseUrl, Version, Checksums}=Plugin) ->
   log("loaded plugin"),
   ok.
 
--spec load_config(string(), string()) -> ok | {error, string()}.
+-spec load_config(string(), string()) -> ok.
 load_config(Name, Version) ->
-  ConfigFile = ?PLUGIN_DIR ++ "/" ++ get_file_slug(Name, Version) ++ "/priv/config.erlt",
-  load_config_file(file_exists(ConfigFile), ConfigFile).
+    lists:foreach(
+      fun load_config_file/1,
+      filelib:wildcard(
+        filename:join(
+          [?PLUGIN_DIR, get_file_slug(Name, Version),
+           "priv", "default.d", "*.ini"]))).
 
--spec load_config_file(boolean(), string()) -> ok | {error, string()}.
-load_config_file(false, _) -> ok;
-load_config_file(true, ConfigFile) ->
-  % read file
-  {ok, ConfigFileData} = file:read_file(ConfigFile),
-  % split by \n
-  Lines = binary:split(ConfigFileData, <<"\n">>, [global]),
-  % feed each line...
-  lists:foreach(
-    fun(<<>>) ->
-      ok; % skip empty lines
-    (<<";", _Rest/binary>>) ->
-      ok; % ignore comments
-    (Line) ->
-    % ...to couch_util:parse_term()...
-    case couch_util:parse_term(Line) of
-      {ok, {{Section, Key}, Value}} ->
-        % ...and set the configs
-        ?LOG_DEBUG("parsed Line correctly: ~p", [Line]),
-        couch_config:set(Section, Key, Value);
-      Else ->
-        ?LOG_ERROR("Error parsing plugin config from line ~s", [Line]),
-        Else
-      end
-  end, Lines),
-  ok.
+-spec load_config_file(string()) -> ok.
+load_config_file(File) ->
+    {ok, Config} = couch_config:parse_ini_file(File),
+    lists:foreach(fun set_config/1, Config).
+
+-spec set_config({{string(), string()}, string()}) -> ok.
+set_config({{Section, Key}, Value}) ->
+    ok = couch_config:set(Section, Key, Value, false).
 
 -spec add_code_path(string(), string()) -> ok | {error, bad_directory}.
 add_code_path(Name, Version) ->
   PluginPath = ?PLUGIN_DIR ++ "/" ++ get_file_slug(Name, Version) ++ "/ebin",
   case code:add_path(PluginPath) of
     true -> ok;
-    Else -> 
+    Else ->
       ?LOG_ERROR("Failed to add PluginPath: '~s'", [PluginPath]),
       Else
   end.
@@ -103,7 +89,7 @@ untargz(Filename) ->
   ok = filelib:ensure_dir(?PLUGIN_DIR),
   % untar
   erl_tar:extract({binary, TarData}, [{cwd, ?PLUGIN_DIR}, keep_old_files]).
-  
+
 
 % downloads a pluygin .tar.gz into a local plugins directory
 -spec download(string()) -> ok | {error, string()}.
@@ -256,4 +242,3 @@ does_file_exist(_Else) -> true.
 %  - in couch 1.x.x context
 %  - in bigcouch context
 %  - what is a server-user owned data/ dir we can use for this, that isn’t db_dir or index_dir or log or var/run or /tmp
-
