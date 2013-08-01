@@ -94,7 +94,7 @@ register(Fun, Pid) ->
 init(IniFiles) ->
     ets:new(?MODULE, [named_table, set, protected]),
     try
-        lists:map(fun(IniFile) ->
+        lists:foreach(fun(IniFile) ->
             {ok, ParsedIniValues} = parse_ini_file(IniFile),
             ets:insert(?MODULE, ParsedIniValues)
         end, IniFiles),
