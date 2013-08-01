@@ -14,13 +14,10 @@ the License.
 
 <!-- dropdown menu links -->
   <% if (admin_party) { %>
-  <li> <a id="user-create-admin" href="#"> Create Admin </a> </li>
+  <li class="menuDropdown"><a id="user-create-admin" href="#createAdmin"> Create Admin </a></li>
   <% } else if (user) { %>
-  <li> <a id="user-create-more-admin" href="#"> Create Admins </a> </li>
-  <li> <a id="user-change-password" href="#"> Change Password </a> </li>
-  <li> <a id="user-logout" href="#"> Logout </a> </li> 
-  <% } else { %>
-  <li> <a id="user-login" href="#"> Login </a> </li> 
-  <!--<li> <a id="user-sign-up"> Sign up </a> </li>-->
+  <li class="menuDropdown"><a id="user-create-more-admin" href="#addAdmin"> Create Admins </a></li>
+  <li class="menuDropdown"><a id="user-change-password" href="#changePassword"> Change Password </a></li>
+  <li class="menuDropdown"><a id="user-logout" href="#logout"> Logout </a> </li> 
   <% } %>
 

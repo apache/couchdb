@@ -6,6 +6,7 @@ function() {
   var Resize = function(options){
     this.options = options;
     this.options.selectorElements = options.selectorElements || "#dashboard-content";
+    this.initialize();
   };
 
   Resize.prototype = {
