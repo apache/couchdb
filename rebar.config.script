@@ -1,0 +1,18 @@
+%% -*- mode: erlang -*-
+try
+    begin
+        Cfg = os:cmd("couch-config --erl-libs-dir --couch-version"),
+        [LibDir, Version] = string:tokens(Cfg, "\n"),
+        true = filelib:is_dir(LibDir),
+        code:add_path(filename:join([LibDir, "couch-" ++ Version, "ebin"])),
+        CONFIG
+    end
+catch
+    _Err:_What ->
+        io:format(
+          "CONFIG ERROR:\n"
+          "Failed to run couch-config --erl-libs-dir --couch-version\n"
+          "Ensure that couch-config is on the PATH, or set ERL_LIBS "
+          "appropriately\n\n"),
+        CONFIG
+end.

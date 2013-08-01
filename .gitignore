@@ -1,0 +1,6 @@
+/.eunit
+/doc
+/ebin
+/deps
+TEST-*.xml
+*.beam
