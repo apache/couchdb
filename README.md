@@ -48,13 +48,13 @@ Here’s a list of things this first iterations does and doesn’t do:
 - Only installs if Erlang version matches.
 - No security checking of binaries.
 - No identity checking of binaries.
+- Register installed plugins in the config system.
 
 Here are a few things I want to add before I call it MVP*:
 
 - Uninstall a plugin via Futon (or HTTP call). Admin only.
 - Only installs if CouchDB version matches.
 - Binaries must be published on *.apache.org.
-- Register installed plugins in the config system.
 - Make sure plugins start with the next restart of CouchDB.
 - Show when a particular plugin is installed.
 

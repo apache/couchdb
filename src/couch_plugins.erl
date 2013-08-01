@@ -39,11 +39,20 @@ install({Name, _BaseUrl, Version, Checksums}=Plugin) ->
   ok = add_code_path(Name, Version),
   log("added code path"),
 
-  ok = load_config(Name, Version),
-  load_plugin(Name),
+  ok = register_plugin(Name, Version),
+  log("registered plugin"),
 
+  ok = load_plugin(Name),
   log("loaded plugin"),
+
+  load_config(Name, Version),
+  log("loaded config"),
+
   ok.
+
+-spec register_plugin(string(), string()) -> ok.
+register_plugin(Name, Version) ->
+  couch_config:set("plugins", Name, Version).
 
 -spec load_config(string(), string()) -> ok.
 load_config(Name, Version) ->
