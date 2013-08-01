@@ -27,6 +27,8 @@ file_compression = snappy
 ; time for writes when there are many attachment write requests in parallel.
 attachment_stream_buffer_size = 4096
 
+plugin_dir = %locallibdir%/plugins
+
 [database_compaction]
 ; larger buffer sizes can originate smaller files
 doc_buffer_size = 524288 ; value in bytes
