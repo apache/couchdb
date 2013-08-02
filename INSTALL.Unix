@@ -65,6 +65,7 @@ You can install the dependencies by running:
     sudo apt-get install libicu-dev
     sudo apt-get install libmozjs-dev
     sudo apt-get install libcurl4-openssl-dev
+    sudo apt-get install pkg-config
 
 There are lots of Erlang packages. If there is a problem with your install, try
 a different mix. There is more information on the wiki. Additionally, you might
@@ -98,6 +99,7 @@ You can install the dependencies by running:
     sudo yum install libicu-devel
     sudo yum install js-devel
     sudo yum install curl-devel
+    sudo yum install pkg-config
 
 While CouchDB builds against the default js-devel-1.7.0 included in some
 distributions, it's recommended to use a more recent js-devel-1.8.5.
@@ -117,6 +119,7 @@ You can install the other dependencies by running:
     brew install icu4c
     brew install spidermonkey
     brew install curl
+    brew install pkg-config
 
 You will need Homebrew installed to use the `brew` command.
 

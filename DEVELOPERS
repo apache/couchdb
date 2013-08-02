@@ -1,6 +1,10 @@
 Apache CouchDB DEVELOPERS
 =========================
 
+Before you start here, read `INSTALL.Unix` (or `INSTALL.Windows`) and
+follow the setup instructions including the installation of all the
+listed dependencies for your system.
+
 Only follow these instructions if you are building from a source checkout.
 
 If you're unsure what this means, ignore this document.
@@ -39,18 +43,12 @@ However, you do not need them if:
  * You are building from a distribution archive, or
  * You don't care about building the documentation
 
+
+Here is a list of *optional* dependencies for various operating systems.
+Installation will be easiest, when you install them all.
+
 Debian-based (inc. Ubuntu) Systems
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-You can install the required dependencies by running:
-
-    sudo apt-get install libtool
-    sudo apt-get install automake
-    sudo apt-get install autoconf
-    sudo apt-get install autoconf-archive
-    sudo apt-get install pkg-config
-
-Optional dependencies:
 
     sudo apt-get install help2man
     sudo apt-get install python-sphinx
@@ -64,14 +62,11 @@ Optional dependencies:
 Gentoo-based Systems
 ~~~~~~~~~~~~~~~~~~~~
 
-    sudo emerge autoconf
-    sudo emerge autoconf-archive
     sudo emerge texinfo
     sudo emerge gnupg
     sudo emerge coreutils
     sudo emerge pkgconfig
     sudo emerge help2man
-    sudo emerge automake
     sudo USE=latex emerge sphinx
 
 RedHat-based (Fedora, Centos, RHEL) Systems
@@ -92,14 +87,6 @@ Mac OS X
 Install Homebrew, if you do not have it already:
 
     https://github.com/mxcl/homebrew
-
-You can install the required dependencies by running:
-
-    brew install libtool
-    brew install automake
-    brew install autoconf
-    brew install autoconf-archive
-    brew install pkg-config
 
 Unless you want to install the optional dependencies, skip to the next section.
 
