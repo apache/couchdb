@@ -52,14 +52,10 @@ Here’s a list of things this first iterations does and doesn’t do:
 - Make sure plugins start with the next restart of CouchDB.
 - Uninstall a plugin via Futon (or HTTP call). Admin only.
 - Show when a particular plugin is installed.
-
-Here are a few things I want to add before I call it MVP*:
-
 - Only installs if CouchDB version matches.
-- Binaries must be published on *.apache.org.
 
-*MVP hopefully means you agree we can ship this with a few warnings
-so people can get a hang of it.
+I hope you agree we can ship this with a few warnings so people can get a
+hang of it.
 
 Here is a rough list of features squared against future milestones:
 
