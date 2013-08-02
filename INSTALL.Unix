@@ -105,9 +105,7 @@ distributions, it's recommended to use a more recent js-devel-1.8.5.
 Mac OS X
 ~~~~~~~~
 
-You can install the build tools by running:
-
-    open /Applications/Installers/Xcode\ Tools/XcodeTools.mpkg
+To build CouchDB from source on Mac OS X, you will need to install Xcode.
 
 You can install the other dependencies by running:
 
@@ -119,14 +117,6 @@ You can install the other dependencies by running:
     brew install icu4c
     brew install spidermonkey
     brew install curl
-
-You may want to link ICU so that CouchDB can find the header files automatically:
-
-    brew link icu4c
-
-The same is true for recent versions of Erlang:
-
-    brew link erlang
 
 You will need Homebrew installed to use the `brew` command.
 
