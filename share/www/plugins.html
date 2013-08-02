@@ -69,21 +69,24 @@ specific language governing permissions and limitations under the License.
       $.get("/_config/plugins/" + name + "/", function(body, textStatus) {
         body = JSON.parse(body);
         if(body == version) {
-          button.html("Already Installed");
+          button.html('Already Installed. Click to Uninstall');
+          button.data('delete', true);
         } else {
-          button.html("Other Version Installed: " + body);
+          button.html('Other Version Installed: ' + body);
+          button.attr('disabled', true);
         }
-        button.attr("disabled", true);
       });
     });
 
     $('.install-plugin').click(function(event) {
       var button = $(this);
+      var delete_plugin = button.data('delete') || false;
       var plugin_spec = JSON.stringify({
         name: button.data('name'),
         url: button.data('url'),
         version: button.data('version'),
-        checksums: button.data('checksums')
+        checksums: button.data('checksums'),
+        "delete": delete_plugin
       });
       var url = '/_plugins'
       $.ajax({
@@ -95,8 +98,9 @@ specific language governing permissions and limitations under the License.
         processData: false, // keep our precious JSON
         success: function(data, textStatus, jqXhr) {
           if(textStatus == "success") {
-            button.html("Sucessfully Installed");
-            button.attr("disabled", true);
+            var action = delete_plugin ? 'Uninstalled' : 'Installed';
+            button.html('Sucessfully ' + action);
+            button.attr('disabled', true);
           } else {
             button.html(textStatus);
           }

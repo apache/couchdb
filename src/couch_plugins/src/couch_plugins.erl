@@ -43,9 +43,6 @@ install({Name, _BaseUrl, Version, Checksums}=Plugin) ->
   ok = register_plugin(Name, Version),
   log("registered plugin"),
 
-  ok = load_plugin(Name),
-  log("loaded plugin"),
-
   load_config(Name, Version),
   log("loaded config"),
 
@@ -55,10 +52,6 @@ install({Name, _BaseUrl, Version, Checksums}=Plugin) ->
 % plugin, you get an `ok`.
 -spec uninstall(plugin()) -> ok | {error, string()}.
 uninstall({Name, _BaseUrl, Version, _Checksums}) ->
-  % unload app
-  ok = unload_plugin(Name),
-  log("plugin unloaded"),
-
   % unload config
   ok = unload_config(Name, Version),
   log("config unloaded"),
@@ -125,7 +118,7 @@ set_config({{Section, Key}, Value}) ->
     ok = couch_config:set(Section, Key, Value).
 
 -spec delete_config({{string(), string()}, _Value}) -> ok.
-delete_config({Section, Key}) ->
+delete_config({{Section, Key}, _Value}) ->
     ok = couch_config:delete(Section, Key).
 
 -spec file_names(string(), string()) -> string().
@@ -166,23 +159,6 @@ del_code_path(Name, Version) ->
 %% * * *
 
 
-%% Load Plugin
-%% This uses `appliction:load(<plugnname>)` to load the plugin
-%% and `appliction:unload(<plugnname>)` to unload the plugin.
-
--spec load_plugin(string()) -> ok | {error, atom()}.
-load_plugin(NameList) ->
-  Name = list_to_atom(NameList),
-  application:load(Name).
-
--spec unload_plugin(string()) -> ok | {error, atom()}.
-unload_plugin(NameList) ->
-  Name = list_to_atom(NameList),
-  application:unload(Name).
-
-%% * * *
-
-
 -spec untargz(string()) -> {ok, string()} | {error, string()}.
 untargz(Filename) ->
   % read .gz file
@@ -197,7 +173,8 @@ untargz(Filename) ->
 -spec delete_files(string(), string()) -> ok | {error, atom()}.
 delete_files(Name, Version) ->
   PluginPath = plugin_dir() ++ "/" ++ get_file_slug(Name, Version),
-  file:del_dir(PluginPath).
+  mochitemp:rmtempdir(PluginPath).
+
 
 % downloads a pluygin .tar.gz into a local plugins directory
 -spec download(string()) -> ok | {error, string()}.

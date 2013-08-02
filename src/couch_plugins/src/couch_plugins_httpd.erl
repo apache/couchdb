@@ -20,16 +20,18 @@ handle_req(#httpd{method='POST'}=Req) ->
     couch_httpd:validate_ctype(Req, "application/json"),
 
     {PluginSpec} = couch_httpd:json_body_obj(Req),
-  ?LOG_DEBUG("Plugin Spec: ~p", [PluginSpec]),
     Url = binary_to_list(couch_util:get_value(<<"url">>, PluginSpec)),
     Name = binary_to_list(couch_util:get_value(<<"name">>, PluginSpec)),
     Version = binary_to_list(couch_util:get_value(<<"version">>, PluginSpec)),
+    Delete = couch_util:get_value(<<"delete">>, PluginSpec),
     {Checksums0} = couch_util:get_value(<<"checksums">>, PluginSpec),
     Checksums = lists:map(fun({K, V}) ->
       {binary_to_list(K), binary_to_list(V)}
     end, Checksums0),
-
-    case couch_plugins:install({Name, Url, Version, Checksums}) of
+    Plugin = {Name, Url, Version, Checksums},
+    ?LOG_DEBUG("~p", [Plugin]),
+    ?LOG_DEBUG("~p", [Delete]),
+    case do_install(Delete, Plugin) of
     ok ->
         couch_httpd:send_json(Req, 202, {[{ok, true}]});
     Error ->
@@ -38,3 +40,8 @@ handle_req(#httpd{method='POST'}=Req) ->
     end;
 handle_req(Req) ->
     couch_httpd:send_method_not_allowed(Req, "POST").
+
+do_install(false, Plugin)->
+    couch_plugins:install(Plugin);
+do_install(true, Plugin)->
+    couch_plugins:uninstall(Plugin).
