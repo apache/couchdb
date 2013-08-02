@@ -207,18 +207,25 @@ download({Name, _BaseUrl, Version, _Checksums}=Plugin) ->
 -spec verify_checksum(string(), list()) -> ok | {error, string()}.
 verify_checksum(Filename, Checksums) ->
 
-  OTPRelease = erlang:system_info(otp_release),
-  case proplists:get_value(OTPRelease, Checksums) of
+  CouchDBVersion = couchdb_version(),
+  case proplists:get_value(CouchDBVersion, Checksums) of
   undefined ->
-    ?LOG_ERROR("[couch_plugins] Can't find checksum for OTP Release '~s'", [OTPRelease]),
-    {error, no_checksum};
-  Checksum ->
-    do_verify_checksum(Filename, Checksum)
+    ?LOG_ERROR("[couch_plugins] Can't find checksum for CouchDB Version '~s'", [CouchDBVersion]),
+    {error, no_couchdb_checksum};
+  OTPChecksum ->
+    OTPRelease = erlang:system_info(otp_release),
+    case proplists:get_value(OTPRelease, OTPChecksum) of
+    undefined ->
+      ?LOG_ERROR("[couch_plugins] Can't find checksum for Erlang Version '~s'", [OTPRelease]),
+      {error, no_erlang_checksum};
+    Checksum ->
+      do_verify_checksum(Filename, Checksum)
+    end
   end.
 
 -spec do_verify_checksum(string(), string()) -> ok | {error, string()}.
 do_verify_checksum(Filename, Checksum) ->
-  ?LOG_DEBUG("Filename: ~s", [Filename]),
+  ?LOG_DEBUG("Checking Filename: ~s", [Filename]),
   case file:read_file(Filename) of
   {ok, Data} ->
     ComputedChecksum = binary_to_list(base64:encode(crypto:sha(Data))),
@@ -246,7 +253,8 @@ get_filename(Name, Version) ->
 get_file_slug(Name, Version) ->
   % OtpRelease does not include patch levels like the -1 in R15B03-1
   OTPRelease = erlang:system_info(otp_release),
-  Name ++ "-" ++ Version ++ "-" ++ OTPRelease.
+  CouchDBVersion = couchdb_version(),
+  string:join([Name, Version, OTPRelease, CouchDBVersion], "-").
 
 -spec file_exists(string()) -> boolean().
 file_exists(Filename) ->
@@ -254,6 +262,11 @@ file_exists(Filename) ->
 -spec does_file_exist(term()) -> boolean().
 does_file_exist({error, enoent}) -> false;
 does_file_exist(_Else) -> true.
+
+couchdb_version() ->
+  %% strip git hash from version string
+  [Version|_Rest] = string:tokens(couch_server:get_version(), "+"),
+  Version.
 
 % installing a plugin:
 %  - POST /_plugins -d {plugin-def}
