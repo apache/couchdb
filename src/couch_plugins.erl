@@ -51,9 +51,29 @@ install({Name, _BaseUrl, Version, Checksums}=Plugin) ->
 
   ok.
 
+%% * * *
+
+
+%% Plugin Registration
+%% On uninstall:
+%%  - add plugins/name = version to config
+%% On uninstall:
+%%  - remove plugins/name from config
+
 -spec register_plugin(string(), string()) -> ok.
 register_plugin(Name, Version) ->
   couch_config:set("plugins", Name, Version).
+
+-spec unregister_plugin(string()) -> ok.
+unregister_plugin(Name) ->
+  couch_config:delete("plugins", Name).
+
+%% * * *
+
+
+%% Load Config
+%% Pareses <plugindir>/priv/default.d/<pluginname.ini> and applies
+%% the contents to the config system.
 
 -spec load_config(string(), string()) -> ok.
 load_config(Name, Version) ->
@@ -72,6 +92,10 @@ load_config_file(File) ->
 -spec set_config({{string(), string()}, string()}) -> ok.
 set_config({{Section, Key}, Value}) ->
     ok = couch_config:set(Section, Key, Value, false).
+
+%% * * *
+
+
 
 -spec add_code_path(string(), string()) -> ok | {error, bad_directory}.
 add_code_path(Name, Version) ->
