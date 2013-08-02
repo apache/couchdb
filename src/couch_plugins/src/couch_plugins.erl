@@ -11,7 +11,7 @@
 % the License.
 -module(couch_plugins).
 -include("couch_db.hrl").
--export([install/1]).
+-export([install/1, uninstall/1]).
 
 % couch_plugins:install({"geocouch", "http://127.0.0.1:8000", "1.0.0", [{"R15B03", "+XOJP6GSzmuO2qKdnjO+mWckXVs="}]}).
 % couch_plugins:install({"geocouch", "http://people.apache.org/~jan/", "couchdb1.2.x_v0.3.0-11-gd83ba22", [{"R15B03", "ZetgdHj2bY2w37buulWVf3USOZs="}]}).
@@ -53,30 +53,30 @@ install({Name, _BaseUrl, Version, Checksums}=Plugin) ->
 
 % Idempotent uninstall, if you uninstall a non-existant
 % plugin, you get an `ok`.
-% -spec uninstall(string()) -> ok | {error, string()}.
-% uninstall(Name) ->
-%   % unload app
-%   ok = unload_plugin(Name),
-%   log("plugin unloaded"),
+-spec uninstall(plugin()) -> ok | {error, string()}.
+uninstall({Name, _BaseUrl, Version, _Checksums}) ->
+  % unload app
+  ok = unload_plugin(Name),
+  log("plugin unloaded"),
 
-%   % unload config
-%   ok = unload_config(Name),
-%   log("config unloaded"),
+  % unload config
+  ok = unload_config(Name, Version),
+  log("config unloaded"),
 
-%   % delete files
-%   ok = delete_files(Name),
-%   log("files deleted"),
+  % delete files
+  ok = delete_files(Name, Version),
+  log("files deleted"),
 
-%   % remove code path
-%   ok = remove_code_path(Name),
-%   log("removed code path"),
+  % delete code path
+  ok = del_code_path(Name, Version),
+  log("deleted code path"),
 
-%   % unregister plugin
-%   ok = unregister_plugin(Name),
-%   log("unregistered plugin"),
+  % unregister plugin
+  ok = unregister_plugin(Name),
+  log("unregistered plugin"),
 
-%   % done
-%   ok.
+  % done
+  ok.
 
 %% * * *
 
@@ -99,30 +99,49 @@ unregister_plugin(Name) ->
 
 
 %% Load Config
-%% Pareses <plugindir>/priv/default.d/<pluginname.ini> and applies
-%% the contents to the config system.
+%% Parses <plugindir>/priv/default.d/<pluginname.ini> and applies
+%% the contents to the config system, or removes them on uninstall
 
 -spec load_config(string(), string()) -> ok.
 load_config(Name, Version) ->
-    lists:foreach(
-      fun load_config_file/1,
-      filelib:wildcard(
-        filename:join(
-          [plugin_dir(), get_file_slug(Name, Version),
-           "priv", "default.d", "*.ini"]))).
+    loop_config(Name, Version, fun set_config/1).
 
--spec load_config_file(string()) -> ok.
-load_config_file(File) ->
+-spec unload_config(string(), string()) -> ok.
+unload_config(Name, Version) ->
+    loop_config(Name, Version, fun delete_config/1).
+
+-spec loop_config(string(), string(), function()) -> ok.
+loop_config(Name, Version, Fun) ->
+    lists:foreach(fun(File) -> load_config_file(File, Fun) end,
+      filelib:wildcard(file_names(Name, Version))).
+
+-spec load_config_file(string(), function()) -> ok.
+load_config_file(File, Fun) ->
     {ok, Config} = couch_config:parse_ini_file(File),
-    lists:foreach(fun set_config/1, Config).
+    lists:foreach(Fun, Config).
 
 -spec set_config({{string(), string()}, string()}) -> ok.
 set_config({{Section, Key}, Value}) ->
-    ok = couch_config:set(Section, Key, Value, false).
+    ok = couch_config:set(Section, Key, Value).
+
+-spec delete_config({{string(), string()}, _Value}) -> ok.
+delete_config({Section, Key}) ->
+    ok = couch_config:delete(Section, Key).
+
+-spec file_names(string(), string()) -> string().
+file_names(Name, Version) ->
+  filename:join(
+    [plugin_dir(), get_file_slug(Name, Version),
+     "priv", "default.d", "*.ini"]).
 
 %% * * *
 
 
+%% Code Path Management
+%% The Erlang code path is where the Erlang runtime looks for `.beam`
+%% files to load on, say, `application:load()`. Since plugin directories
+%% are created on demand and named after CouchDB and Erlang versions,
+%% we manage the Erlang code path semi-automatically here.
 
 -spec add_code_path(string(), string()) -> ok | {error, bad_directory}.
 add_code_path(Name, Version) ->
@@ -134,10 +153,34 @@ add_code_path(Name, Version) ->
       Else
   end.
 
+-spec del_code_path(string(), string()) -> ok | {error, atom()}.
+del_code_path(Name, Version) ->
+  PluginPath = plugin_dir() ++ "/" ++ get_file_slug(Name, Version) ++ "/ebin",
+  case code:del_path(PluginPath) of
+    true -> ok;
+    _Else ->
+      ?LOG_DEBUG("Failed to delete PluginPath: '~s', ignoring", [PluginPath]),
+      ok
+  end.
+
+%% * * *
+
+
+%% Load Plugin
+%% This uses `appliction:load(<plugnname>)` to load the plugin
+%% and `appliction:unload(<plugnname>)` to unload the plugin.
+
 -spec load_plugin(string()) -> ok | {error, atom()}.
 load_plugin(NameList) ->
   Name = list_to_atom(NameList),
   application:load(Name).
+
+-spec unload_plugin(string()) -> ok | {error, atom()}.
+unload_plugin(NameList) ->
+  Name = list_to_atom(NameList),
+  application:unload(Name).
+
+%% * * *
 
 
 -spec untargz(string()) -> {ok, string()} | {error, string()}.
@@ -151,6 +194,10 @@ untargz(Filename) ->
   % untar
   erl_tar:extract({binary, TarData}, [{cwd, plugin_dir()}, keep_old_files]).
 
+-spec delete_files(string(), string()) -> ok | {error, atom()}.
+delete_files(Name, Version) ->
+  PluginPath = plugin_dir() ++ "/" ++ get_file_slug(Name, Version),
+  file:del_dir(PluginPath).
 
 % downloads a pluygin .tar.gz into a local plugins directory
 -spec download(string()) -> ok | {error, string()}.
