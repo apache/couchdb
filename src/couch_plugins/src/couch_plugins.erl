@@ -51,6 +51,33 @@ install({Name, _BaseUrl, Version, Checksums}=Plugin) ->
 
   ok.
 
+% Idempotent uninstall, if you uninstall a non-existant
+% plugin, you get an `ok`.
+% -spec uninstall(string()) -> ok | {error, string()}.
+% uninstall(Name) ->
+%   % unload app
+%   ok = unload_plugin(Name),
+%   log("plugin unloaded"),
+
+%   % unload config
+%   ok = unload_config(Name),
+%   log("config unloaded"),
+
+%   % delete files
+%   ok = delete_files(Name),
+%   log("files deleted"),
+
+%   % remove code path
+%   ok = remove_code_path(Name),
+%   log("removed code path"),
+
+%   % unregister plugin
+%   ok = unregister_plugin(Name),
+%   log("unregistered plugin"),
+
+%   % done
+%   ok.
+
 %% * * *
 
 
