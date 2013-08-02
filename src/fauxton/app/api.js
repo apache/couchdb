@@ -286,9 +286,18 @@ function(app, Fauxton) {
         _.each(routeObject.getViews(), function(view, selector) {
           if(view.hasRendered()) { return; }
           if (!view.disableLoader){ 
-            // $(selector).addClass(view.loaderClassname);
+            var opts = {
+              lines: 16, // The number of lines to draw
+              length: 8, // The length of each line
+              width: 4, // The line thickness
+              radius: 12, // The radius of the inner circle
+              color: '#ccc', // #rbg or #rrggbb
+              speed: 1, // Rounds per second
+              trail: 10, // Afterglow percentage
+              shadow: false // Whether to render a shadow
+            };
             $('<div class="spinner"></div>').appendTo(selector);
-            var spinner = new Spinner().spin();
+            var spinner = new Spinner(opts).spin();
             $('.spinner').append(spinner.el);
           }
           
