@@ -235,6 +235,10 @@ Change the permission of the CouchDB directories by running:
     chmod 0770 /usr/local/var/log/couchdb
     chmod 0770 /usr/local/var/run/couchdb
 
+Update the permissions for your `default.ini` file:
+
+    chmod 0644 /usr/local/etc/couchdb/default.ini
+
 Running as a Daemon
 -------------------
 
