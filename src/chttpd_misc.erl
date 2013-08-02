@@ -266,6 +266,8 @@ handle_system_req(Req) ->
         processes_used, binary, code, ets])],
     {NumberOfGCs, WordsReclaimed, _} = statistics(garbage_collection),
     {{input, Input}, {output, Output}} = statistics(io),
+    CouchFile = {couch_file, {couch_file_stats()}},
+    MessageQueues = [CouchFile|message_queues(registered())],
     send_json(Req, {[
         {uptime, element(1,statistics(wall_clock)) div 1000},
         {memory, {Memory}},
@@ -281,10 +283,39 @@ handle_system_req(Req) ->
         {stale_proc_count, couch_proc_manager:get_stale_proc_count()},
         {process_count, erlang:system_info(process_count)},
         {process_limit, erlang:system_info(process_limit)},
-        {message_queues, message_queues(registered())},
+        {message_queues, {MessageQueues}},
         {internal_replication_jobs, mem3_sync:get_backlog()},
         {distribution, {get_distribution_stats()}}
     ]}).
+
+couch_file_stats() ->
+    {monitors, M} = process_info(whereis(couch_stats_collector), monitors),
+    Candidates = [Pid || {process, Pid} <- M],
+    Mailboxes = lists:foldl(
+        fun(Pid, Acc) ->
+            PI = process_info(Pid, [message_queue_len, dictionary]),
+            Dictionary = proplists:get_value(dictionary, PI, []),
+            case proplists:get_value('$initial_call', Dictionary) of
+                {couch_file, init, 1} ->
+                    case proplists:get_value(message_queue_len, PI) of
+                        undefined -> Acc;
+                        Len -> [Len|Acc]
+                    end;
+                _  ->
+                    Acc
+            end
+        end, [], Candidates
+    ),
+    Sorted = lists:sort(Mailboxes),
+    Count = length(Sorted),
+    [
+        {count, Count},
+        {min, hd(Sorted)},
+        {max, lists:nth(Count, Sorted)},
+        {'50', lists:nth(round(Count * 0.5), Sorted)},
+        {'90', lists:nth(round(Count * 0.9), Sorted)},
+        {'99', lists:nth(round(Count * 0.99), Sorted)}
+    ].
 
 get_distribution_stats() ->
     lists:map(fun({Node, Socket}) ->
@@ -306,9 +337,8 @@ handle_up_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
 message_queues(Registered) ->
-    Queues = lists:map(fun(Name) ->
+    lists:map(fun(Name) ->
         Type = message_queue_len,
         {Type, Length} = process_info(whereis(Name), Type),
         {Name, Length}
-    end, Registered),
-    {Queues}.
+    end, Registered).
