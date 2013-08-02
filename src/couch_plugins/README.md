@@ -85,6 +85,8 @@ Milestone X: Later
  - Add some account/identity/maybe crypto-web-of-trust system for
    authors to publish “legit” plugins.
  - Sign & verify individual releases.
+ - Handle unclean un/installs if CouchDB crashes while installing/
+   uninstalling
 
 A few more things that can happen concurrently depending on what
 plugins require:
