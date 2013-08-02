@@ -351,6 +351,8 @@ AC_SUBST(JS_LIBS)
 LIBS="$OLD_LIBS"
 CPPFLAGS="$OLD_CPPFLAGS"
 
+%% auto detect "kegged" icu4c on Mac / Homebrew
+PATH="/usr/local/opt/icu4c/bin:$PATH"
 AC_ARG_WITH([win32-icu-binaries],
     [AS_HELP_STRING([--with-win32-icu-binaries=PATH],
         [set PATH to the Win32 native ICU binaries directory])
