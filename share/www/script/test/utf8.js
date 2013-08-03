@@ -23,6 +23,7 @@ couchTests.utf8 = function(debug) {
   texts[2] = "3. Math: ∮ E⋅da = Q,  n → ∞, ∑ f(i) = ∏ g(i),"
   texts[3] = "4. Geek: STARGΛ̊TE SG-1"
   texts[4] = "5. Braille: ⡌⠁⠧⠑ ⠼⠁⠒  ⡍⠜⠇⠑⠹⠰⠎ ⡣⠕⠌"
+  texts[5] = "6. null \u0000 byte" 
 
   // check that we can save a reload with full fidelity
   for (var i=0; i<texts.length; i++) {
