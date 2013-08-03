@@ -1,9 +1,10 @@
 NAME=couchperuser
 ERL=$(shell couch-config --erl-bin)
 ERLANG_VERSION=$(shell couch-config --erlang-version)
+COUCHDB_VERSION=$(shell couch-config --couch-version | sed 's/\+.*//')
 VERSION=1.0.0
 PLUGIN_DIRS=ebin priv
-PLUGIN_VERSION_SLUG=$(NAME)-$(VERSION)-$(ERLANG_VERSION)
+PLUGIN_VERSION_SLUG=$(NAME)-$(VERSION)-$(ERLANG_VERSION)-$(COUCHDB_VERSION)
 PLUGIN_DIST=$(PLUGIN_VERSION_SLUG)
 
 all: compile
