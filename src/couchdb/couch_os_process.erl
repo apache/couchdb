@@ -14,7 +14,7 @@
 -behaviour(gen_server).
 
 -export([start_link/1, start_link/2, start_link/3, stop/1]).
--export([set_timeout/2, prompt/2, prompt_many/2]).
+-export([set_timeout/2, prompt/2]).
 -export([send/2, writeline/2, readline/1, writejson/2, readjson/1]).
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2, code_change/3]).
 
@@ -55,40 +55,6 @@ prompt(Pid, Data) ->
         Error ->
             ?LOG_ERROR("OS Process Error ~p :: ~p",[Pid,Error]),
             throw(Error)
-    end.
-
-prompt_many(Pid, DataList) ->
-    OsProc = gen_server:call(Pid, get_os_proc, infinity),
-    true = port_connect(OsProc#os_proc.port, self()),
-    try
-        send_many(OsProc, DataList),
-        receive_many(length(DataList), OsProc, [])
-    after
-        % Can throw badarg error, when OsProc Pid is dead or port was closed
-        % by the readline function on error/timeout.
-        (catch port_connect(OsProc#os_proc.port, Pid)),
-        unlink(OsProc#os_proc.port),
-        drop_port_messages(OsProc#os_proc.port)
-    end.
-
-send_many(_OsProc, []) ->
-    ok;
-send_many(#os_proc{writer = Writer} = OsProc, [Data | Rest]) ->
-    Writer(OsProc, Data),
-    send_many(OsProc, Rest).
-
-receive_many(0, _OsProc, Acc) ->
-    {ok, lists:reverse(Acc)};
-receive_many(N, #os_proc{reader = Reader} = OsProc, Acc) ->
-    Line = Reader(OsProc),
-    receive_many(N - 1, OsProc, [Line | Acc]).
-
-drop_port_messages(Port) ->
-    receive
-    {Port, _} ->
-        drop_port_messages(Port)
-    after 0 ->
-        ok
     end.
 
 % Utility functions for reading and writing
@@ -209,8 +175,6 @@ terminate(_Reason, #os_proc{port=Port}) ->
     catch port_close(Port),
     ok.
 
-handle_call(get_os_proc, _From, OsProc) ->
-    {reply, OsProc, OsProc};
 handle_call({set_timeout, TimeOut}, _From, OsProc) ->
     {reply, ok, OsProc#os_proc{timeout=TimeOut}};
 handle_call({prompt, Data}, _From, OsProc) ->
