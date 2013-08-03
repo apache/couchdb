@@ -264,9 +264,7 @@ does_file_exist({error, enoent}) -> false;
 does_file_exist(_Else) -> true.
 
 couchdb_version() ->
-  %% strip git hash from version string
-  [Version|_Rest] = string:tokens(couch_server:get_version(), "+"),
-  Version.
+  couch_server:get_version(short).
 
 % installing a plugin:
 %  - POST /_plugins -d {plugin-def}
