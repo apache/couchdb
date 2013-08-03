@@ -35,9 +35,23 @@ handle_req(#httpd{method='POST'}=Req) ->
         ?LOG_DEBUG("Plugin Spec: ~p", [PluginSpec]),
         couch_httpd:send_error(Req, {bad_request, Error})
     end;
+% handles /_plugins/<pluginname>/<file>
+% serves <plugin_dir>/<pluginname>-<pluginversion>-<otpversion>-<couchdbversion>/<file>
+handle_req(#httpd{method='GET',path_parts=[_, Name0 | Path0]}=Req) ->
+    Name = ?b2l(Name0),
+    Path = lists:map(fun binary_to_list/1, Path0),
+    OTPRelease = erlang:system_info(otp_release),
+    PluginVersion = couch_config:get("plugins", Name),
+    CouchDBVersion = couch_server:get_version(short),
+    FullName = string:join([Name, PluginVersion, OTPRelease, CouchDBVersion], "-"),
+    FullPath = filename:join([FullName, "priv", "www", string:join(Path, "/")]) ++ "/",
+    ?LOG_DEBUG("Serving ~p from ~p", [FullPath, plugin_dir()]),
+    couch_httpd:serve_file(Req, FullPath, plugin_dir());
 handle_req(Req) ->
     couch_httpd:send_method_not_allowed(Req, "POST").
 
+plugin_dir() ->
+  couch_config:get("couchdb", "plugin_dir").
 do_install(false, Plugin) ->
     couch_plugins:install(Plugin);
 do_install(true, Plugin) ->
