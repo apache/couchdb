@@ -53,6 +53,7 @@ Here’s a list of things this first iterations does and doesn’t do:
 - Uninstall a plugin via Futon (or HTTP call). Admin only.
 - Show when a particular plugin is installed.
 - Only installs if CouchDB version matches.
+- Serve static web assets (for Futon/Fauxton) from `/_plugins/<name>/`.
 
 I hope you agree we can ship this with a few warnings so people can get a
 hang of it.
