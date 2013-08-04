@@ -17,7 +17,58 @@
 Installation on Windows
 =======================
 
-For a high-level guide to Microsoft Windows.
+There are two ways to install CouchDB on Windows.
+
+Installation from binaries
+==========================
+
+This is the most simplest way to go.
+
+#. Get `the latest Windows binaries`_ from `CouchDB web site`_.
+   Old releases are available at `archive`_.
+
+#. Follow the installation wizard steps:
+
+   - Next on "Welcome" screen
+   - Accept the License agreement
+   - Select the installation directory
+   - Specify "Start Menu" group name
+   - Approve that you'd like to install CouchDB as service and let him been
+     started automatically after installation (probably, you'd like so)
+   - Verify installation settings
+   - Install CouchDB
+
+#. `Open up Futon`_ (if you hadn't selected autostart CouchDB after
+   installation, you have to start it first manually)
+
+#. It's time to Relax!
+
+.. note::
+   In some cases you might been asked to reboot Windows to complete
+   installation process, because of using on different Microsoft Visual C++
+   runtimes by CouchDB.
+
+.. note:: **Upgrading note**
+
+   It's very recommended to uninstall previous CouchDB version before upgrading,
+   especially if the new one is built against different Erlang release.
+   The reason is simple: there may left a some of libraries with alternative or
+   incompatible versions from old Erlang release that may create conflicts,
+   errors and weird crushes.
+
+   In this case, make sure you'd backup of your `local.ini` config and CouchDB
+   database/index files.
+
+.. _Open up Futon: http://localhost:5984/_utils
+.. _CouchDB web site: http://couchdb.org/
+.. _archive: http://archive.apache.org/dist/couchdb/binary/win/
+.. _the latest Windows binaries: http://couchdb.org/#download
+
+
+Installation from sources
+=========================
+
+If you're Windows geek, this section is for you!
 
 Troubleshooting
 ---------------
