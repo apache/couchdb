@@ -274,29 +274,45 @@ function(app, Fauxton) {
         }));
       }
 
-      if (!this.disableLoader){ 
-        var opts = {
-          lines: 16, // The number of lines to draw
-          length: 8, // The length of each line
-          width: 4, // The line thickness
-          radius: 12, // The radius of the inner circle
-          color: '#aaa', // #rbg or #rrggbb
-          speed: 1, // Rounds per second
-          trail: 10, // Afterglow percentage
-          shadow: false // Whether to render a shadow
-        };
+      // if (!this.disableLoader){ 
+      //   var opts = {
+      //     lines: 16, // The number of lines to draw
+      //     length: 8, // The length of each line
+      //     width: 4, // The line thickness
+      //     radius: 12, // The radius of the inner circle
+      //     color: '#aaa', // #rbg or #rrggbb
+      //     speed: 1, // Rounds per second
+      //     trail: 10, // Afterglow percentage
+      //     shadow: false // Whether to render a shadow
+      //   };
 
-        if (!$('.spinner').length) {
-          $('<div class="spinner"></div>').appendTo('#app-container');
-        }
+      //   if (!$('.spinner').length) {
+      //     $('<div class="spinner"></div>').appendTo('#app-container');
+      //   }
 
-        var spinner = new Spinner(opts).spin();
-        $('.spinner').append(spinner.el);
-      }
+      //   var spinner = new Spinner(opts).spin();
+      //   $('.spinner').append(spinner.el);
+      // }
 
       FauxtonAPI.when(this.establish()).done(function(resp) {
         _.each(routeObject.getViews(), function(view, selector) {
           if(view.hasRendered()) { return; }
+
+          if (!view.disableLoader){ 
+            var opts = {
+              lines: 16, // The number of lines to draw
+              length: 8, // The length of each line
+              width: 4, // The line thickness
+              radius: 12, // The radius of the inner circle
+              color: '#ccc', // #rbg or #rrggbb
+              speed: 1, // Rounds per second
+              trail: 10, // Afterglow percentage
+              shadow: false // Whether to render a shadow
+            };
+            $('<div class="spinner"></div>').appendTo(selector);
+            var spinner = new Spinner(opts).spin();
+            $('.spinner').append(spinner.el);
+          }
           
           FauxtonAPI.when(view.establish()).then(function(resp) {
             masterLayout.setView(selector, view);

@@ -12,19 +12,21 @@ License for the specific language governing permissions and limitations under
 the License.
 -->
 
-<div class="navbar navbar-fixed-bottom">
-  <div class="navbar-inner">
-    <div class="container">
-      <div class="input-prepend input-append">
-        <span class="add-on">
-          API reference
-          <a href="http://docs.couchdb.org/en/latest/" target="_blank">
-            <i class="icon-question-sign"></i>
-          </a>
-        </span>
-        <input type="text" class="input-xxlarge" value="<%= endpoint %>">
-        <a href="<%= endpoint %>" target="_blank" class="btn">Show me</a>
-      </div>
+<button class="button api-url-btn">
+  API URL 
+  <span class="fonticon-plus icon"></span>
+</button>
+<div class="api-navbar" style="display: none">
+  <div class="container">
+    <div class="input-prepend input-append">
+      <span class="add-on">
+        API reference
+        <a href="http://docs.couchdb.org/en/latest/" target="_blank">
+          <i class="icon-question-sign"></i>
+        </a>
+      </span>
+      <input type="text" class="input-xxlarge" value="<%= endpoint %>">
+      <a href="<%= endpoint %>" target="_blank" class="btn">Show me</a>
     </div>
   </div>
 </div>

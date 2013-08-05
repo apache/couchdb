@@ -22,7 +22,8 @@
 @import "prettyprint.less";
 @import "database.less";
 @import "icons.less";
-@import "mixins.less";
+
+
 
 /*define variable for color here, remove to seperate file later*/
 
@@ -196,7 +197,7 @@ a:hover{
   }
 
   .navbar {
-    div.brand {
+    .brand {
       .hide-text;
       .customTransition(left, 1s, 0.805, 0.005, 0.165, 0.985);
       margin: 10px 0 6px;
@@ -282,6 +283,9 @@ a:hover{
                 color: @NavIcon;
                 text-shadow: @boxShadowOff;
               }
+            }
+            .closeMenu &{
+              color: transparent;
             }
           }
         }
@@ -390,23 +394,34 @@ a:hover{
 // }
 /*tools*/
 
+.row-fluid.content-area{
+  background-color: @background;
+}
+
 
 .fixed-header{
+  background-color: @breadcrumbBG;
+  .customTransition(left, 1s, 0.805, 0.005, 0.165, 0.985);
   position: fixed;
   top: 0;
+  right: 0;
+  left: @navWidth;
+  .closeMenu & {
+    left: @collapsedNavWidth;
+  }
   border-bottom: 5px solid @breadcrumbBorder;
   .box-shadow(0 4px 6px -2px #808080);
   z-index: 100;
   .one-pane & {
+    position: relative;
     border: none;
     .box-shadow(none);
-    position: relative;
     left: auto;
   }
 }
 
 #breadcrumbs {
-   background-color: @breadcrumbBG;
+   
    padding: 15px 20px;
    .breadcrumb {
     margin-bottom: 0;
@@ -686,5 +701,32 @@ div.spinner {
 
 .btn-primary a:visited {
   color: #fff;
+}
 
+#api-navbar{
+  position: relative;
+}
+
+.button.api-url-btn {
+  position: absolute;
+  right: 15px;
+  top: -50px;
+  span.icon {
+    font-size: 11px;
+  }
+}
+
+.api-navbar {
+  border-top: 1px solid @red;
+  padding: 20px 20px 15px;
+  .input-append.input-prepend {
+    margin-bottom: 0px;
+    .add-on {
+      border: none;
+      padding-right: 25px;
+    }
+    .btn:last-child{
+      margin-left: 15px;
+    }
+  }
 }
