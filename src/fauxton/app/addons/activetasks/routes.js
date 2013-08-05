@@ -25,7 +25,10 @@ function (app, FauxtonAPI, Activetasks, Views) {
       "activetasks/:id": "defaultView",
       "activetasks": "defaultView"
     },
-    crumbs: [],
+    selectedHeader: 'Active Tasks',
+    crumbs: [
+    {"name": "Active tasks", "link": "activetasks"}
+    ],
     apiUrl: function(){
       return app.host+"/_active_tasks";
     }, 

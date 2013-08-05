@@ -19,7 +19,7 @@ define([
 function (app, FauxtonAPI, Activetasks) {
 
   Activetasks.initialize = function() {
-    FauxtonAPI.addHeaderLink({title: "Active Tasks", href: "#/activetasks"});
+    FauxtonAPI.addHeaderLink({title: "Active Tasks", icon: "fonticon-activetasks", href: "#/activetasks"});
   };
  
   return Activetasks;
