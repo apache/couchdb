@@ -115,6 +115,7 @@
 ^src/fauxton/settings.json.*
 ^src/fauxton/test/.*
 ^src/fauxton/tasks/addon/rename.json
+^src/fauxton/app/addons/activetasks/assets/less/activetasks.less
 ^src/ibrowse/.*
 ^src/mochiweb/.*
 ^src/snappy/.*
