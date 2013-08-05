@@ -93,6 +93,9 @@ function (app, FauxtonAPI, activetasks) {
 				that.establish();
 			}, pollingInfo.rate*1000);
 		},
+		cleanup: function(){
+			clearInterval(pollingInfo.intervalId);
+		},
 		afterRender: function(){
 			this.listenTo(this.model, "change", this.showData);
 			Events.bind('update:poll', this.setPolling, this);
