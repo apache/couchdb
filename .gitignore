@@ -87,6 +87,7 @@ src/fauxton/build
 src/fauxton/app/load_addons.js
 !src/fauxton/app/addons/
 src/fauxton/app/addons/*
+!src/fauxton/app/addons/activetasks
 !src/fauxton/app/addons/config
 !src/fauxton/app/addons/logs
 !src/fauxton/app/addons/stats
