@@ -21,8 +21,8 @@ function (app, FauxtonAPI, activetasks) {
   var Views = {},
 			Events = {},
 			pollingInfo ={
-				pollRate: "5",
-				pollIntervalId: null
+				rate: "5",
+				intervalId: null
 			};
 
 
@@ -48,8 +48,8 @@ function (app, FauxtonAPI, activetasks) {
 		changePollInterval: function(e){
 			var range = $(e.currentTarget).val();
 			$('label[for="pollingRange"] span').text(range);
-			pollingInfo.pollRate = range;
-			clearInterval(pollingInfo.pollIntervalId);
+			pollingInfo.rate = range;
+			clearInterval(pollingInfo.intervalId);
 			Events.trigger('update:poll');
 		},
 		requestByType: function(e){
@@ -87,9 +87,9 @@ function (app, FauxtonAPI, activetasks) {
 		},
 		setPolling: function(){
 			var that = this;
-			pollingInfo.pollIntervalId = setInterval(function() {
+			pollingInfo.intervalId = setInterval(function() {
 				that.establish();
-			}, pollingInfo.pollRate*1000);
+			}, pollingInfo.rate*1000);
 		},
 		afterRender: function(){
 			this.listenTo(this.model, "change", this.showData);
