@@ -166,6 +166,14 @@ function(app, Backbone, WindowResize) {
     template: "templates/fauxton/api_bar",
     endpoint: '_all_docs',
 
+    events:  {
+      "click .api-url-btn" : "toggleAPIbar"
+    },
+
+    toggleAPIbar: function(){
+      $('.api-navbar').toggle();
+    },
+
     serialize: function() {
       return {endpoint: this.endpoint};
     },
