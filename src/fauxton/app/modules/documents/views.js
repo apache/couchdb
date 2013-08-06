@@ -303,6 +303,14 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
     },
 
     destroy: function(event) {
+      if (this.model.isNewDoc()) {
+        FauxtonAPI.addNotification({
+          msg: 'This document has not been saved yet.',
+          type: 'warning'
+        });
+        return;
+      }
+
       if (!window.confirm("Are you sure you want to delete this doc?")) {
         return false;
       }
@@ -343,6 +351,13 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
     },
 
     duplicate: function(event) {
+      if (this.model.isNewDoc()) {
+        FauxtonAPI.addNotification({
+          msg: 'Please save the document before duplicating it.',
+          type: 'warning'
+        });
+        return;
+      }
       event.preventDefault();
       this.duplicateModal.showModal();
     },
