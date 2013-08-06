@@ -1259,13 +1259,18 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
     }
   });
 
-
-  //moved out of sidebar into it's own view
   Views.JumpToDoc = FauxtonAPI.View.extend({
     template: "templates/documents/jumpdoc",
-    events: {
-      "submit #jump-to-doc": "jumpToDoc"
+
+    initialize: function (options) {
+      this.database = options.database;
     },
+
+    events: {
+      "submit #jump-to-doc": "jumpToDoc",
+      "click #jump-to-doc-label": "jumpToDoc"
+    },
+
     jumpToDoc: function (event) {
       event.preventDefault();
       var docId = this.$('#jump-to-doc-id').val();
