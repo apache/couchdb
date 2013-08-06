@@ -193,9 +193,19 @@ code_change(_OldVsn, State, _Extra) ->
 %
 
 start_port(Command) ->
+    start_port(Command, []).
+
+start_port(Command, EnvPairs) ->
     PrivDir = couch_util:priv_dir(),
     Spawnkiller = filename:join(PrivDir, "couchspawnkillable"),
-    Port = open_port({spawn, Spawnkiller ++ " " ++ Command}, ?PORT_OPTIONS),
+    Opts = case lists:keytake(env, 1, ?PORT_OPTIONS) of
+        false ->
+            ?PORT_OPTIONS ++ [ {env,EnvPairs} ];
+        {value, {env,OldPairs}, SubOpts} ->
+            AllPairs = lists:keymerge(1, EnvPairs, OldPairs),
+            SubOpts ++ [ {env,AllPairs} ]
+    end,
+    Port = open_port({spawn, Spawnkiller ++ " " ++ Command}, Opts),
     {ok, Port}.
 
 
