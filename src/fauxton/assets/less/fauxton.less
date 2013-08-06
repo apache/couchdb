@@ -22,6 +22,7 @@
 @import "prettyprint.less";
 @import "database.less";
 @import "icons.less";
+@import "mixins.less";
 
 /*define variable for color here, remove to seperate file later*/
 
@@ -671,9 +672,19 @@ tr.all-docs-item{
   color: @fontGrey;
 }
 
-
 div.spinner {
   position: absolute;
   left: 50%;
   top: 50%;
+}
+
+/* Code mirror overrides */
+.CodeMirror-scroll {
+  .border-radius(2px);
+  border: solid 1px #ddd;
+}
+
+.btn-primary a:visited {
+  color: #fff;
+
 }

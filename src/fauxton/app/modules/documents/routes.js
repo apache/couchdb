@@ -47,7 +47,8 @@ function(app, FauxtonAPI, Documents, Databases) {
     },
 
     routes: {
-      "database/:database/:doc/field_editor": "field_editor",
+      // We are hiding the field_editor for this first release
+      //"database/:database/:doc/field_editor": "field_editor",
       "database/:database/:doc/code_editor": "code_editor",
       "database/:database/:doc": "code_editor"
     },
@@ -173,11 +174,6 @@ function(app, FauxtonAPI, Documents, Databases) {
         collection: this.data.designDocs,
         database: this.data.database
       }));
-
-      // this.setView("#tabs", new Documents.Views.Tabs({
-      //   collection: this.data.designDocs,
-      //   database: this.data.database
-      // }));
     },
 
     establish: function () {
@@ -199,7 +195,7 @@ function(app, FauxtonAPI, Documents, Databases) {
       if (this.viewEditor) { this.viewEditor.remove(); }
 
 
-      this.toolsView = this.setView("#dashboard-upper-menu", new Documents.Views.JumpToDoc());
+      this.toolsView = this.setView("#dashboard-upper-menu", new Documents.Views.JumpToDoc({database: this.data.database}));
 
       this.documentsView = this.setView("#dashboard-lower-content", new Documents.Views.AllDocsList({
         collection: this.data.database.allDocs

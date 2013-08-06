@@ -265,11 +265,6 @@ function(app, Fauxton) {
         }
       }
 
-      //add page loader. "app-container" shouldn't be overwritten. Even if a new index.underscore is provided in settings.json
-      // if (!this.disableLoader) {
-      //   $('#app-container').addClass(this.loaderClassname);
-      // }
-
       masterLayout.clearBreadcrumbs();
       var crumbs = this.get('crumbs');
 
@@ -279,43 +274,47 @@ function(app, Fauxton) {
         }));
       }
 
+      if (!this.disableLoader){ 
+        var opts = {
+          lines: 16, // The number of lines to draw
+          length: 8, // The length of each line
+          width: 4, // The line thickness
+          radius: 12, // The radius of the inner circle
+          color: '#aaa', // #rbg or #rrggbb
+          speed: 1, // Rounds per second
+          trail: 10, // Afterglow percentage
+          shadow: false // Whether to render a shadow
+        };
+
+        if (!$('.spinner').length) {
+          $('<div class="spinner"></div>').appendTo('#app-container');
+        }
+
+        var spinner = new Spinner(opts).spin();
+        $('.spinner').append(spinner.el);
+      }
+
       FauxtonAPI.when(this.establish()).done(function(resp) {
-        // if (!this.disableLoader) {
-        //   $('#app-container').removeClass(this.loaderClassname);
-        // }
         _.each(routeObject.getViews(), function(view, selector) {
           if(view.hasRendered()) { return; }
-          if (!view.disableLoader){ 
-            var opts = {
-              lines: 16, // The number of lines to draw
-              length: 8, // The length of each line
-              width: 4, // The line thickness
-              radius: 12, // The radius of the inner circle
-              color: '#ccc', // #rbg or #rrggbb
-              speed: 1, // Rounds per second
-              trail: 10, // Afterglow percentage
-              shadow: false // Whether to render a shadow
-            };
-            $('<div class="spinner"></div>').appendTo(selector);
-            var spinner = new Spinner(opts).spin();
-            $('.spinner').append(spinner.el);
-          }
           
           FauxtonAPI.when(view.establish()).then(function(resp) {
             masterLayout.setView(selector, view);
+
             if (!view.disableLoader){
               spinner.stop();
-                }
-            // } $(selector).removeClass(view.loaderClassname);
+            }
+
             masterLayout.renderView(selector);
             }, function(resp) {
-            view.establishError = {
-              error: true,
-              reason: resp
-            };
+              view.establishError = {
+                error: true,
+                reason: resp
+              };
+
             masterLayout.renderView(selector);
           });
-          
+
           var hooks = masterLayout.hooks[selector];
           var boundRoute = route;
 
