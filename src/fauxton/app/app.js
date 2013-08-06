@@ -5,13 +5,14 @@ define([
   "backbone",
 
   "helpers",
+  "mixins",
 
   // Plugins.
   "plugins/backbone.layoutmanager",
   "plugins/jquery.form"
 ],
 
-function($, _, Backbone, Helpers) {
+function($, _, Backbone, Helpers, Mixins) {
 
   // Make sure we have a console.log
   if (typeof console == "undefined") {
@@ -25,7 +26,8 @@ function($, _, Backbone, Helpers) {
   var app = {
     // The root path to run the application.
     root: "/",
-    version: "0.0.1"
+    version: "0.0.1",
+    mixins: Mixins
   };
 
   // Localize or create a new JavaScript Template object.

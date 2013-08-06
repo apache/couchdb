@@ -284,6 +284,9 @@ a:hover{
                 text-shadow: @boxShadowOff;
               }
             }
+            .closeMenu &{
+              color: transparent;
+            }
           }
         }
       }
@@ -397,12 +400,20 @@ a:hover{
 
 
 .fixed-header{
+  background-color: @breadcrumbBG;
+  .customTransition(left, 1s, 0.805, 0.005, 0.165, 0.985);
   position: fixed;
   top: 0;
+  right: 0;
+  left: @navWidth;
+  .closeMenu & {
+    left: @collapsedNavWidth;
+  }
   border-bottom: 5px solid @breadcrumbBorder;
   .box-shadow(0 4px 6px -2px #808080);
   z-index: 100;
   .one-pane & {
+    position: relative;
     border: none;
     .box-shadow(none);
     left: auto;
@@ -410,7 +421,7 @@ a:hover{
 }
 
 #breadcrumbs {
-   background-color: @breadcrumbBG;
+   
    padding: 15px 20px;
    .breadcrumb {
     margin-bottom: 0;
@@ -693,19 +704,29 @@ div.spinner {
 }
 
 #api-navbar{
-  position: absolute;
-  top: 0;
+  position: relative;
 }
 
 .button.api-url-btn {
   position: absolute;
   right: 15px;
+  top: -50px;
+  span.icon {
+    font-size: 11px;
+  }
 }
 
-#api-navbar > div {
-  width: 100%;
-  position: relative;
-}
 .api-navbar {
-  top: 50px;
+  border-top: 1px solid @red;
+  padding: 20px 20px 15px;
+  .input-append.input-prepend {
+    margin-bottom: 0px;
+    .add-on {
+      border: none;
+      padding-right: 25px;
+    }
+    .btn:last-child{
+      margin-left: 15px;
+    }
+  }
 }

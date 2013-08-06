@@ -14,11 +14,19 @@ define([
        "app",
        // Libs
        "backbone",
-       "windowResize"
+       "resizeAnimation"
 
 ],
 
-function(app, Backbone, WindowResize) {
+function(app, Backbone, ResizeAnimation) {
+
+
+ //resizeAnimation
+   app.ResizeAnimation = new ResizeAnimation({
+        selectorElements: '#dashboard-content'
+   });
+
+
   var Fauxton = app.module();
 
   Fauxton.Breadcrumbs = Backbone.View.extend({
@@ -100,8 +108,8 @@ function(app, Backbone, WindowResize) {
 
       $('#primary-navbar li[data-nav-name="' + app.selectedHeader + '"]').addClass('active');
 
-      var menuOpen = true,
-          $selectorList = $('body');
+      var menuOpen = true;
+      var $selectorList = $('body');
       $('.brand').off();
       $('.brand').on({
         click: function(e){
@@ -114,10 +122,7 @@ function(app, Backbone, WindowResize) {
       function toggleMenu(){
         $selectorList.toggleClass('closeMenu');
         menuOpen = $selectorList.hasClass('closeMenu');
-        setTimeout(
-          function(){
-            app.windowResize.onResizeHandler();
-          }, 1000);
+        app.ResizeAnimation.onResizeHandler();
       }
 
       $('#primary-navbar').on("click", ".nav a", function(){
@@ -125,19 +130,13 @@ function(app, Backbone, WindowResize) {
         setTimeout(
           function(){
             $selectorList.addClass('closeMenu');
-          },1000);
+            app.ResizeAnimation.onResizeHandler();
+          },3000);
 
         }
       });
 
-      $('#primary-navbar').on('click', ".nav li.openMenu", function () {
-        $selectorList.removeClass('closeMenu');
-      });
-
-     app.windowResize = new WindowResize({
-          columnType: "double",
-          selectorElements: '#dashboard-content, #dashboard-content .editcase'
-      });
+      app.ResizeAnimation.initialize();
     },
 
     beforeRender: function () {
@@ -170,8 +169,16 @@ function(app, Backbone, WindowResize) {
       "click .api-url-btn" : "toggleAPIbar"
     },
 
-    toggleAPIbar: function(){
+    toggleAPIbar: function(e){
+      var $currentTarget = $(e.currentTarget).find('span');
+      if ($currentTarget.hasClass("fonticon-plus")){
+        $currentTarget.removeClass("fonticon-plus").addClass("fonticon-minus");
+      }else{
+        $currentTarget.removeClass("fonticon-minus").addClass("fonticon-plus");
+      }
+
       $('.api-navbar').toggle();
+
     },
 
     serialize: function() {
