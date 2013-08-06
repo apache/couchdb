@@ -777,7 +777,7 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
 
     langTemplates: {
       "javascript": {
-        map: "function(doc) {\n  emit(doc.id, 1);\n}",
+        map: "function(doc) {\n  emit(doc._id, 1);\n}",
         reduce: "function(keys, values, rereduce){\n  if (rereduce){\n    return sum(values);\n  } else {\n    return values.length;\n  }\n}"
       }
     },
@@ -978,7 +978,7 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
       FauxtonAPI.addNotification({
         msg: "<strong>Warning!</strong> Preview executes the Map/Reduce functions in your browser, and may behave differently from CouchDB.",
         type: "warning",
-        selector: "#define-view .errors-container",
+        selector: ".advanced-options",
         fade: true
       });
 
@@ -1176,9 +1176,10 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
     },
 
     afterRender: function() {
-      var that = this;
-      var mapFun = $("#map-function");
-      var reduceFun = $("#reduce-function");
+      var that = this, 
+          mapFun = this.$("#map-function"),
+          reduceFun = this.$("#reduce-function");
+
       if (this.newView) {
         mapFun.val(this.langTemplates[this.defaultLang].map);
         reduceFun.val(this.langTemplates[this.defaultLang].reduce);
