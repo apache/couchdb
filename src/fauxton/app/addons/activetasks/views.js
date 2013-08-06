@@ -89,7 +89,6 @@ function (app, FauxtonAPI, activetasks) {
 			var that = this;
 			clearInterval(pollingInfo.intervalId);
 			pollingInfo.intervalId = setInterval(function() {
-				console.log('hit me once');
 				that.establish();
 			}, pollingInfo.rate*1000);
 		},

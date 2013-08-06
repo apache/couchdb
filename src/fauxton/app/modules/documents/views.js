@@ -303,6 +303,14 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
     },
 
     destroy: function(event) {
+      if (this.model.isNewDoc()) {
+        FauxtonAPI.addNotification({
+          msg: 'This document has not been saved yet.',
+          type: 'warning'
+        });
+        return;
+      }
+
       if (!window.confirm("Are you sure you want to delete this doc?")) {
         return false;
       }
@@ -343,6 +351,13 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
     },
 
     duplicate: function(event) {
+      if (this.model.isNewDoc()) {
+        FauxtonAPI.addNotification({
+          msg: 'Please save the document before duplicating it.',
+          type: 'warning'
+        });
+        return;
+      }
       event.preventDefault();
       this.duplicateModal.showModal();
     },
@@ -461,7 +476,16 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
     template: "templates/documents/all_docs_list",
     events: {
       "click button.all": "selectAll",
-      "click button.bulk-delete": "bulkDelete"
+      "click button.bulk-delete": "bulkDelete",
+      "change .row-select":"toggleTrash"
+    },
+
+    toggleTrash: function () {
+      if (this.$('.row-select:checked').length > 0) {
+        this.$('.bulk-delete').removeClass('disabled');
+      } else {
+        this.$('.bulk-delete').addClass('disabled');
+      }
     },
 
     initialize: function(options){
@@ -487,7 +511,7 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
     },
 
     selectAll: function(evt){
-      $("input:checkbox").attr('checked', !$(evt.target).hasClass('active'));
+      $("input:checkbox").prop('checked', !$(evt.target).hasClass('active'));
     },
 
     serialize: function() {
@@ -539,6 +563,7 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
           that.rows[ele].$el.fadeOut();
 
           model.collection.remove(model.id);
+          that.$('.bulk-delete').addClass('disabled');
         }, function(resp) {
           FauxtonAPI.addNotification({
             msg: "Failed to destroy your doc!",
@@ -767,7 +792,7 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
 
     langTemplates: {
       "javascript": {
-        map: "function(doc) {\n  emit(doc.id, 1);\n}",
+        map: "function(doc) {\n  emit(doc._id, 1);\n}",
         reduce: "function(keys, values, rereduce){\n  if (rereduce){\n    return sum(values);\n  } else {\n    return values.length;\n  }\n}"
       }
     },
@@ -968,7 +993,7 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
       FauxtonAPI.addNotification({
         msg: "<strong>Warning!</strong> Preview executes the Map/Reduce functions in your browser, and may behave differently from CouchDB.",
         type: "warning",
-        selector: "#define-view .errors-container",
+        selector: ".advanced-options",
         fade: true
       });
 
@@ -1166,9 +1191,10 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
     },
 
     afterRender: function() {
-      var that = this;
-      var mapFun = $("#map-function");
-      var reduceFun = $("#reduce-function");
+      var that = this, 
+          mapFun = this.$("#map-function"),
+          reduceFun = this.$("#reduce-function");
+
       if (this.newView) {
         mapFun.val(this.langTemplates[this.defaultLang].map);
         reduceFun.val(this.langTemplates[this.defaultLang].reduce);
@@ -1249,13 +1275,18 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
     }
   });
 
-
-  //moved out of sidebar into it's own view
   Views.JumpToDoc = FauxtonAPI.View.extend({
     template: "templates/documents/jumpdoc",
-    events: {
-      "submit #jump-to-doc": "jumpToDoc"
+
+    initialize: function (options) {
+      this.database = options.database;
     },
+
+    events: {
+      "submit #jump-to-doc": "jumpToDoc",
+      "click #jump-to-doc-label": "jumpToDoc"
+    },
+
     jumpToDoc: function (event) {
       event.preventDefault();
       var docId = this.$('#jump-to-doc-id').val();
