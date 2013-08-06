@@ -461,7 +461,16 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
     template: "templates/documents/all_docs_list",
     events: {
       "click button.all": "selectAll",
-      "click button.bulk-delete": "bulkDelete"
+      "click button.bulk-delete": "bulkDelete",
+      "change .row-select":"toggleTrash"
+    },
+
+    toggleTrash: function () {
+      if (this.$('.row-select:checked').length > 0) {
+        this.$('.bulk-delete').removeClass('disabled');
+      } else {
+        this.$('.bulk-delete').addClass('disabled');
+      }
     },
 
     initialize: function(options){
@@ -487,7 +496,7 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
     },
 
     selectAll: function(evt){
-      $("input:checkbox").attr('checked', !$(evt.target).hasClass('active'));
+      $("input:checkbox").prop('checked', !$(evt.target).hasClass('active'));
     },
 
     serialize: function() {
@@ -539,6 +548,7 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
           that.rows[ele].$el.fadeOut();
 
           model.collection.remove(model.id);
+          that.$('.bulk-delete').addClass('disabled');
         }, function(resp) {
           FauxtonAPI.addNotification({
             msg: "Failed to destroy your doc!",
