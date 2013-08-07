@@ -269,6 +269,11 @@ couchTests.users_db_security = function(debug) {
           value: "name,type"
         },
         {
+          section: "couch_httpd_auth",
+          key: "users_db_public",
+          value: "true"
+        },
+        {
           section: "admins",
           key: "jan",
           value: "apple"
@@ -281,6 +286,8 @@ couchTests.users_db_security = function(debug) {
         TEquals(undefined, res.salt);
         TEquals(undefined, res.password_scheme);
         TEquals(undefined, res.derived_key);
+
+        TEquals(true, CouchDB.login("jchris", "couch").ok);
 
         var all = usersDb.allDocs({ include_docs: true });
         T(all.rows);
@@ -300,6 +307,41 @@ couchTests.users_db_security = function(debug) {
             }
           }));
         }
+      // log in one last time so run_on_modified_server can clean up the admin account
+      TEquals(true, CouchDB.login("jan", "apple").ok);
+    });
+
+    run_on_modified_server([
+      {
+        section: "couch_httpd_auth",
+        key: "iterations",
+        value: "1"
+      },
+      {
+        section: "couch_httpd_auth",
+        key: "public_fields",
+        value: "name,type"
+      },
+      {
+        section: "couch_httpd_auth",
+        key: "users_db_public",
+        value: "false"
+      },
+      {
+        section: "admins",
+        key: "jan",
+        value: "apple"
+      }
+    ], function() {
+      TEquals(true, CouchDB.login("jchris", "couch").ok);
+
+      try {
+        var all = usersDb.allDocs({ include_docs: true });
+        T(false); // should never hit
+      } catch(e) {
+        TEquals("forbidden", e.error, "should throw");
+      }
+
       // log in one last time so run_on_modified_server can clean up the admin account
       TEquals(true, CouchDB.login("jan", "apple").ok);
     });
