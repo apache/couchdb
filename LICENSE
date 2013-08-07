@@ -895,6 +895,7 @@ For the src/couch_dbupdates component
   2009-2012 (c) Benoît Chesneau <benoitc@e-engura.org>
 
   Apache 2 License, see above.
+
 For src/fauxton/test/mocha/mocha.js and src/fauxton/test/mocha/mocha.js
 
   Copyright (c) 2011-2013 TJ Holowaychuk <tj@vision-media.ca>
