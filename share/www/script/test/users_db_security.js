@@ -282,23 +282,26 @@ couchTests.users_db_security = function(debug) {
         TEquals(undefined, res.password_scheme);
         TEquals(undefined, res.derived_key);
 
-        // log in one last time so run_on_modified_server can clean up the admin account
-        TEquals(true, CouchDB.login("jan", "apple").ok);
-
         var all = usersDb.allDocs({ include_docs: true });
         T(all.rows);
         if (all.rows) {
           T(all.rows.every(function(row) {
-            T(row.doc);
             if (row.doc) {
               return Object.keys(row.doc).every(function(key) {
                 return key === 'name' || key === 'type';
               });
             } else {
-              return false;
+              if(row.id[0] == "_") {
+                // ignore design docs
+                return true
+              } else {
+                return false;
+              }
             }
           }));
         }
+      // log in one last time so run_on_modified_server can clean up the admin account
+      TEquals(true, CouchDB.login("jan", "apple").ok);
     });
   };
 
