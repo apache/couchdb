@@ -192,7 +192,6 @@ function (app, FauxtonAPI) {
     initialize: function (options) {
       options = options || {};
       this.login_after = options.login_after === false ? false : true;
-      console.log(this.login_after, 'lo');
     },
 
     events: {
