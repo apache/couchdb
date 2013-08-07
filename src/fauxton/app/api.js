@@ -288,7 +288,7 @@ function(app, Fauxton) {
 
          if (!$('.spinner').length) {
            $('<div class="spinner"></div>')
-            .appendTo('#app-container')
+            .appendTo('#app-container');
          }
 
          var routeObjectSpinner = new Spinner(opts).spin();
