@@ -14,15 +14,15 @@ define([
        "app",
        // Libs
        "backbone",
-       "resizeAnimation"
+       "resizeColumns"
 
 ],
 
-function(app, Backbone, ResizeAnimation) {
+function(app, Backbone, resizeColumns) {
 
 
    //resizeAnimation
-   app.ResizeAnimation = new ResizeAnimation({
+   app.resizeColumns = new resizeColumns({
         selectorElements: '#dashboard-content'
    });
 
@@ -121,7 +121,7 @@ function(app, Backbone, ResizeAnimation) {
       function toggleMenu(){
         $selectorList.toggleClass('closeMenu');
         menuOpen = $selectorList.hasClass('closeMenu');
-        app.ResizeAnimation.onResizeHandler();
+        app.resizeColumns.onResizeHandler();
       }
 
       $('#primary-navbar').on("click", ".nav a", function(){
@@ -129,13 +129,13 @@ function(app, Backbone, ResizeAnimation) {
         setTimeout(
           function(){
             $selectorList.addClass('closeMenu');
-            app.ResizeAnimation.onResizeHandler();
+            app.resizeColumns.onResizeHandler();
           },3000);
 
         }
       });
 
-      app.ResizeAnimation.initialize();
+      app.resizeColumns.initialize();
     },
 
     beforeRender: function () {
