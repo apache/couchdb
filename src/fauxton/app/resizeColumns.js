@@ -18,9 +18,10 @@
 // "purely functional" helper system.
 
 define([
+  "mixins"
 ],
 
-function() {
+function(mixins) {
 
   var Resize = function(options){
     this.options = options;
@@ -37,11 +38,12 @@ function() {
       return (this.getPrimaryNavWidth() + sidebarWidth); 
     },
     initialize: function(){
-      $(window).off('resize');
+     // $(window).off('resize');
       var that = this;
       //add throttler :) 
       this.lazyLayout = _.debounce(that.onResizeHandler, 300).bind(this);
-      $(window).on('resize', this.lazyLayout);
+      mixins.addWindowResize(this.lazyLayout,"animation");
+      mixins.initWindowResize();
       this.onResizeHandler();
     },
     updateOptions:function(options){
@@ -49,7 +51,7 @@ function() {
       this.options = options;
     },
     turnOff:function(){
-      $(window).off('resize');
+      mixins.removeWindowResize("animation");
     },
     onResizeHandler: function (){
       //if there is an override, do that instead
