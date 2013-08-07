@@ -274,29 +274,34 @@ function(app, Fauxton) {
         }));
       }
 
-      // if (!this.disableLoader){ 
-      //   var opts = {
-      //     lines: 16, // The number of lines to draw
-      //     length: 8, // The length of each line
-      //     width: 4, // The line thickness
-      //     radius: 12, // The radius of the inner circle
-      //     color: '#aaa', // #rbg or #rrggbb
-      //     speed: 1, // Rounds per second
-      //     trail: 10, // Afterglow percentage
-      //     shadow: false // Whether to render a shadow
-      //   };
+       if (!this.disableLoader){ 
+         var opts = {
+           lines: 16, // The number of lines to draw
+           length: 8, // The length of each line
+           width: 4, // The line thickness
+           radius: 12, // The radius of the inner circle
+           color: '#aaa', // #rbg or #rrggbb
+           speed: 1, // Rounds per second
+           trail: 10, // Afterglow percentage
+           shadow: false // Whether to render a shadow
+         };
 
-      //   if (!$('.spinner').length) {
-      //     $('<div class="spinner"></div>').appendTo('#app-container');
-      //   }
+         if (!$('.spinner').length) {
+           $('<div class="spinner"></div>')
+            .appendTo('#app-container')
+         }
 
-      //   var spinner = new Spinner(opts).spin();
-      //   $('.spinner').append(spinner.el);
-      // }
+         var routeObjectSpinner = new Spinner(opts).spin();
+         $('.spinner').append(routeObjectSpinner.el);
+       }
 
       FauxtonAPI.when(this.establish()).done(function(resp) {
         _.each(routeObject.getViews(), function(view, selector) {
           if(view.hasRendered()) { return; }
+
+          if (!routeObject.disableLoader) {
+            routeObjectSpinner.stop();
+          }
 
           if (!view.disableLoader){ 
             var opts = {
@@ -309,16 +314,17 @@ function(app, Fauxton) {
               trail: 10, // Afterglow percentage
               shadow: false // Whether to render a shadow
             };
-            $('<div class="spinner"></div>').appendTo(selector);
-            var spinner = new Spinner(opts).spin();
-            $('.spinner').append(spinner.el);
+            var viewSpinner = new Spinner(opts).spin();
+            $('<div class="spinner"></div>')
+              .appendTo(selector)
+              .append(viewSpinner.el);
           }
           
           FauxtonAPI.when(view.establish()).then(function(resp) {
             masterLayout.setView(selector, view);
 
             if (!view.disableLoader){
-              spinner.stop();
+              viewSpinner.stop();
             }
 
             masterLayout.renderView(selector);
@@ -328,7 +334,11 @@ function(app, Fauxton) {
                 reason: resp
               };
 
-            masterLayout.renderView(selector);
+              FauxtonAPI.addNotification({
+                msg: 'An Error occurred ' + resp,
+                type: 'error' 
+              });
+              masterLayout.renderView(selector);
           });
 
           var hooks = masterLayout.hooks[selector];

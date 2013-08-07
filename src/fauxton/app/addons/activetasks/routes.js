@@ -32,6 +32,9 @@ function (app, FauxtonAPI, Activetasks, Views) {
     apiUrl: function(){
       return app.host+"/_active_tasks";
     }, 
+
+    roles: ["_admin"],
+
     defaultView: function(id){
       var newtasks = new Activetasks.Tasks({
         currentView: "all", 

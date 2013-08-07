@@ -27,7 +27,11 @@ function($, _, Backbone, Helpers, Mixins) {
     // The root path to run the application.
     root: "/",
     version: "0.0.1",
-    mixins: Mixins
+    mixins: Mixins,
+    // move this to here otherwise every once in a while,
+    // the footer fails to configure as the url for it is not configured.
+    // Having the host declared here fixes it
+    host: window.location.protocol + "//" + window.location.host,
   };
 
   // Localize or create a new JavaScript Template object.

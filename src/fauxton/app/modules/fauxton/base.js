@@ -21,11 +21,10 @@ define([
 function(app, Backbone, ResizeAnimation) {
 
 
- //resizeAnimation
+   //resizeAnimation
    app.ResizeAnimation = new ResizeAnimation({
         selectorElements: '#dashboard-content'
    });
-
 
   var Fauxton = app.module();
 
