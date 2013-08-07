@@ -32,11 +32,6 @@ We now support Erlang/OTP R16B and R16B01; the minimum required version is R14B.
 User document role values must now be strings. Other types of values will be
 refused when saving the user document.
 
-.. warning::
-   Using the `public_fields` whitelist for user document properties makes
-   the existence of specific user documents public even if they don't contain
-   any of the whitelisted properties. See :issue:`1838` for more information.
-
 Version 1.4.0
 -------------
 
@@ -50,7 +45,8 @@ Version 1.4.0
   :commit:`c98ba561`
 * :issue:`1772`: Prevent invalid JSON output when using `all_or_nothing`
   `_bulk_docs` API. :commit:`dfd39d57`
-* Add a configurable whitelist of user document properties. :commit:`8d7ab8b1`
+* Add a :ref:`configurable whitelist <config-couch_httpd_auth>` of user
+  document properties. :commit:`8d7ab8b1`
 * :issue:`1852`: Support Last-Event-ID header in EventSource changes feeds.
   :commit:`dfd2199a`
 * Much improved documentation, including an :ref:`expanded description

@@ -133,6 +133,8 @@ httpd_db_handlers Configuration Options
 | _view_cleanup                        | _view_cleanup                         |
 +--------------------------------------+---------------------------------------+
 
+.. _config-couch_httpd_auth:
+
 couch_httpd_auth Configuration Options
 --------------------------------------
 
@@ -151,13 +153,15 @@ couch_httpd_auth Configuration Options
 +--------------------------------------+---------------------------------------+
 | iterations                           | Password key derivation iterations    |
 +--------------------------------------+---------------------------------------+
+| users_db_public                      | Allow all users to view user documents|
++--------------------------------------+---------------------------------------+
 | public_fields                        | World-viewable user document fields   |
 +--------------------------------------+---------------------------------------+
 
-.. warning::
-   Using the `public_fields` whitelist for user document properties makes
-   the existence of specific user documents public even if they don't contain
-   any of the whitelisted properties. See :issue:`1838` for more information.
+.. note::
+   Using the `public_fields` whitelist for user document properties requires
+   setting the `users_db_public` option to `true` (the latter option has no
+   other purpose).
 
 httpd Configuration Options
 ---------------------------
