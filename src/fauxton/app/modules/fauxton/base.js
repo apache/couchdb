@@ -13,11 +13,19 @@
 define([
        "app",
        // Libs
-       "backbone"
+       "backbone",
+       "resizeColumns"
 
 ],
 
-function(app, Backbone) {
+function(app, Backbone, resizeColumns) {
+
+
+   //resizeAnimation
+   app.resizeColumns = new resizeColumns({
+        selectorElements: '#dashboard-content'
+   });
+
   var Fauxton = app.module();
 
   Fauxton.Breadcrumbs = Backbone.View.extend({
@@ -61,28 +69,73 @@ function(app, Backbone) {
   });
 
   Fauxton.NavBar = Backbone.View.extend({
+    className:"navbar",
     template: "templates/fauxton/nav_bar",
     // TODO: can we generate this list from the router?
     navLinks: [
-      {href:"#/_all_dbs", title:"Databases"}
+      {href:"#/_all_dbs", title:"Databases", icon: "fonticon-database", className: 'databases'}
     ],
+
+    bottomNavLinks: [],
 
     initialize: function() {
     },
 
     serialize: function() {
-      return {navLinks: this.navLinks};
+      return {navLinks: this.navLinks, bottomNavLinks: this.bottomNavLinks};
     },
 
     addLink: function(link) {
-      if (link.top){
+      // link.top means it gets pushed to the top of the array,
+      // link.bottomNav means it goes to the additional bottom nav
+      if (link.top && !link.bottomNav){
         this.navLinks.unshift(link);
+      } else if (link.top && link.bottomNav){
+        this.bottomNavLinks.unshift(link);
+      } else if (link.bottomNav) {
+        this.bottomNavLinks.push(link);
       } else {
         this.navLinks.push(link);
       }
-      this.trigger("link:add");
 
-      this.render();
+      //this.trigger("link:add");
+
+      //this.render();
+    },
+
+    afterRender: function(){
+
+      $('#primary-navbar li[data-nav-name="' + app.selectedHeader + '"]').addClass('active');
+
+      var menuOpen = true;
+      var $selectorList = $('body');
+      $('.brand').off();
+      $('.brand').on({
+        click: function(e){
+          if(!$(e.target).is('a')){
+            toggleMenu();
+          }
+         }
+      });
+
+      function toggleMenu(){
+        $selectorList.toggleClass('closeMenu');
+        menuOpen = $selectorList.hasClass('closeMenu');
+        app.resizeColumns.onResizeHandler();
+      }
+
+      $('#primary-navbar').on("click", ".nav a", function(){
+        if (!($selectorList.hasClass('closeMenu'))){
+        setTimeout(
+          function(){
+            $selectorList.addClass('closeMenu');
+            app.resizeColumns.onResizeHandler();
+          },3000);
+
+        }
+      });
+
+      app.resizeColumns.initialize();
     },
 
     beforeRender: function () {
@@ -92,13 +145,14 @@ function(app, Backbone) {
     addLinkViews: function () {
       var that = this;
 
-      _.each(this.navLinks, function (link) {
+      _.each(_.union(this.navLinks, this.bottomNavLinks), function (link) {
         if (!link.view) { return; }
 
         //TODO check if establish is a function
         var establish = link.establish || [];
         $.when.apply(null, establish).then( function () {
-          that.insertView('#nav-links', link.view).render();
+          var selector =  link.bottomNav ? '#bottom-nav-links' : '#nav-links';
+          that.insertView(selector, link.view).render();
         });
       }, this);
     }
@@ -109,6 +163,22 @@ function(app, Backbone) {
   Fauxton.ApiBar = Backbone.View.extend({
     template: "templates/fauxton/api_bar",
     endpoint: '_all_docs',
+
+    events:  {
+      "click .api-url-btn" : "toggleAPIbar"
+    },
+
+    toggleAPIbar: function(e){
+      var $currentTarget = $(e.currentTarget).find('span');
+      if ($currentTarget.hasClass("fonticon-plus")){
+        $currentTarget.removeClass("fonticon-plus").addClass("fonticon-minus");
+      }else{
+        $currentTarget.removeClass("fonticon-minus").addClass("fonticon-plus");
+      }
+
+      $('.api-navbar').toggle();
+
+    },
 
     serialize: function() {
       return {endpoint: this.endpoint};

@@ -28,7 +28,6 @@ function(app, _, Bootstrap) {
     // TODO: pick this up wither at build time or from the browser
     root: "/_utils/fauxton/",
 
-    host: window.location.protocol + "//" + window.location.host,
 
     renderView: function(baseView, selector, view, options, callback) {
       baseView.setView(selector, new view(options)).render().then(callback);
@@ -36,7 +35,7 @@ function(app, _, Bootstrap) {
 
     // Thanks to: http://stackoverflow.com/a/2880929
     getParams: function(queryString) {
-      if (typeof queryString !== "undefined") {
+      if (queryString) {
         // I think this could be combined into one if
         if (queryString.substring(0,1) === "?") {
           queryString = queryString.substring(1);

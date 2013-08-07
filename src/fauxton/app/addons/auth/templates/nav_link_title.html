@@ -11,7 +11,7 @@ WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 License for the specific language governing permissions and limitations under
 the License.
 -->
-
+<a <% if (!user && !admin_party) { %> href="#login" <% } %> class="fonticon-user fonticon" >
   <% if (admin_party) { %>
   Admin Party!
   <% } else if (user) { %>
@@ -20,5 +20,6 @@ the License.
   Login
   <% } %>
   <b class="caret"></b>
+</a>
 
 

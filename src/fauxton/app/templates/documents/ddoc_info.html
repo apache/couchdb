@@ -13,9 +13,16 @@ the License.
 -->
 <div class="well" >
   <h2> Design Doc MetaData </h2>
-  <ul style="list-style-type: none;">
-  <% _.each(view_index, function (val, key) { %>
-    <li><strong> <%= key %></strong> : <%= val %>  </li>
-  <% }); %>
-  </ul>
+  <div class="row-fluid">
+	<% i=0; _.map(view_index, function (val, key) { %>
+		<% if(i%2==0){%>
+			<div class="row-fluid">
+		<% }; %>
+	    <div class="span6 well-item"><strong> <%= key %></strong> : <%= val %>  </div>
+	    <% if(i%2==1){%>
+			</div>
+		<% }; %>
+	  	<% ++i;
+	}); %>
+  </div>
 </div>

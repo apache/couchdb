@@ -1,5 +1,5 @@
 /*!
- * backbone.layoutmanager.js v0.8.7
+ * backbone.layoutmanager.js v0.8.8
  * Copyright 2013, Tim Branyen (@tbranyen)
  * backbone.layoutmanager.js may be freely distributed under the MIT license.
  */
@@ -91,25 +91,29 @@ var LayoutManager = Backbone.View.extend({
   // If the filter function is omitted it will return all subviews.  If a
   // String is passed instead, it will return the Views for that selector.
   getViews: function(fn) {
-    // Generate an array of all top level (no deeply nested) Views flattened.
-    var views = _.chain(this.views).map(function(view) {
-      return _.isArray(view) ? view : [view];
-    }, this).flatten().value();
+    var views;
 
     // If the filter argument is a String, then return a chained Version of the
-    // elements.
+    // elements. The value at the specified filter may be undefined, a single
+    // view, or an array of views; in all cases, chain on a flat array.
     if (typeof fn === "string") {
-      return _.chain([this.views[fn]]).flatten();
+      views = this.views[fn] || [];
+      return _.chain([].concat(views));
     }
+
+    // Generate an array of all top level (no deeply nested) Views flattened.
+    views = _.chain(this.views).map(function(view) {
+      return _.isArray(view) ? view : [view];
+    }, this).flatten();
 
     // If the argument passed is an Object, then pass it to `_.where`.
     if (typeof fn === "object") {
-      return _.chain([_.where(views, fn)]).flatten();
+      return views.where(fn);
     }
 
     // If a filter function is provided, run it on all Views and return a
     // wrapped chain. Otherwise, simply return a wrapped chain of all Views.
-    return _.chain(typeof fn === "function" ? _.filter(views, fn) : views);
+    return typeof fn === "function" ? views.filter(fn) : views;
   },
 
   // Use this to remove Views, internally uses `getViews` so you can pass the
@@ -421,7 +425,7 @@ var LayoutManager = Backbone.View.extend({
     // the DOM element.
     function applyTemplate(rendered) {
       // Actually put the rendered contents into the element.
-      if (rendered) {
+      if (_.isString(rendered)) {
         // If no container is specified, we must replace the content.
         if (manager.noel) {
           // Trim off the whitespace, since the contents are passed into `$()`.
@@ -609,6 +613,8 @@ var LayoutManager = Backbone.View.extend({
   cleanViews: function(views) {
     // Clear out all existing views.
     _.each(aConcat.call([], views), function(view) {
+      var cleanup;
+
       // Remove all custom events attached to this View.
       view.unbind();
 
@@ -627,7 +633,10 @@ var LayoutManager = Backbone.View.extend({
 
       // If a custom cleanup method was provided on the view, call it after
       // the initial cleanup is done
-      _.result(view.getAllOptions(), "cleanup");
+      cleanup = view.getAllOptions().cleanup;
+      if (_.isFunction(cleanup)) {
+        cleanup.call(view);
+      }
     });
   },
 
@@ -670,7 +679,8 @@ var LayoutManager = Backbone.View.extend({
         views: {},
 
         // Internal state object used to store whether or not a View has been
-        // taken over by layout manager and if it has been rendered into the DOM.
+        // taken over by layout manager and if it has been rendered into the
+        // DOM.
         __manager__: {},
 
         // Add the ability to remove all Views.
@@ -773,7 +783,7 @@ var LayoutManager = Backbone.View.extend({
 // Convenience assignment to make creating Layout's slightly shorter.
 Backbone.Layout = LayoutManager;
 // Tack on the version.
-LayoutManager.VERSION = "0.8.7";
+LayoutManager.VERSION = "0.8.8";
 
 // Override _configure to provide extra functionality that is necessary in
 // order for the render function reference to be bound during initialize.

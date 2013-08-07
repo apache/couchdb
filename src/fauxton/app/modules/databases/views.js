@@ -71,6 +71,12 @@ function(app, Fauxton, FauxtonAPI) {
     },
 
     beforeRender: function() {
+
+      this.insertView("#newButton", new Views.NewDatabaseButton({
+        collection: this.collection
+      }));
+
+
       _.each(this.paginated(), function(database) {
         this.insertView("table.databases tbody", new Views.Item({
           model: database
@@ -120,6 +126,53 @@ function(app, Fauxton, FauxtonAPI) {
 
     selectAll: function(evt){
       $("input:checkbox").attr('checked', !$(evt.target).hasClass('active'));
+    }
+  });
+
+
+  Views.NewDatabaseButton = FauxtonAPI.View.extend({
+    template: "templates/databases/newdatabase",
+    events: {
+      "click a#new": "newDatabase"
+    },
+    newDatabase: function() {
+      var notification;
+      var db;
+      // TODO: use a modal here instead of the prompt
+      var name = prompt('Name of database', 'newdatabase');
+      if (name === null) {
+        return;
+      } else if (name.length === 0) {
+        notification = FauxtonAPI.addNotification({
+          msg: "Please enter a valid database name",
+          type: "error",
+          clear: true
+        });
+        return;
+      }
+      db = new this.collection.model({
+        id: encodeURIComponent(name),
+        name: name
+      });
+      notification = FauxtonAPI.addNotification({msg: "Creating database."});
+      db.save().done(function() {
+        notification = FauxtonAPI.addNotification({
+          msg: "Database created successfully",
+          type: "success",
+          clear: true
+        });
+        var route = "#/database/" +  name + "/_all_docs?limit=100";
+        app.router.navigate(route, { trigger: true });
+      }
+      ).error(function(xhr) {
+        var responseText = JSON.parse(xhr.responseText).reason;
+        notification = FauxtonAPI.addNotification({
+          msg: "Create database failed: " + responseText,
+          type: "error",
+          clear: true
+        });
+      }
+      );
     }
   });
 

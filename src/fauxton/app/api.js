@@ -14,7 +14,8 @@ define([
        "app",
 
        // Modules
-       "modules/fauxton/base"
+       "modules/fauxton/base",
+       "spin"
 ],
 
 function(app, Fauxton) {
@@ -256,16 +257,12 @@ function(app, Fauxton) {
       // Only want to redo the template if its a full render
       if (!this.renderedState) {
         masterLayout.setTemplate(this.layout);
-          $('#nav-links li').removeClass('active');
+          $('#primary-navbar li').removeClass('active');
 
         if (this.selectedHeader) {
-          $('#nav-links li[data-nav-name="' + this.selectedHeader + '"]').addClass('active');
+          app.selectedHeader = this.selectedHeader;
+          $('#primary-navbar li[data-nav-name="' + this.selectedHeader + '"]').addClass('active');
         }
-      }
-
-      //add page loader. "app-container" shouldn't be overwritten. Even if a new index.underscore is provided in settings.json
-      if (!this.disableLoader) {
-        $('#app-container').addClass(this.loaderClassname);
       }
 
       masterLayout.clearBreadcrumbs();
@@ -277,23 +274,71 @@ function(app, Fauxton) {
         }));
       }
 
+       if (!this.disableLoader){ 
+         var opts = {
+           lines: 16, // The number of lines to draw
+           length: 8, // The length of each line
+           width: 4, // The line thickness
+           radius: 12, // The radius of the inner circle
+           color: '#aaa', // #rbg or #rrggbb
+           speed: 1, // Rounds per second
+           trail: 10, // Afterglow percentage
+           shadow: false // Whether to render a shadow
+         };
+
+         if (!$('.spinner').length) {
+           $('<div class="spinner"></div>')
+            .appendTo('#app-container');
+         }
+
+         var routeObjectSpinner = new Spinner(opts).spin();
+         $('.spinner').append(routeObjectSpinner.el);
+       }
+
       FauxtonAPI.when(this.establish()).done(function(resp) {
-        if (!this.disableLoader) {
-          $('#app-container').removeClass(this.loaderClassname);
-        }
         _.each(routeObject.getViews(), function(view, selector) {
           if(view.hasRendered()) { return; }
-          if (!view.disableLoader){ $(selector).addClass(view.loaderClassname);}
+
+          if (!routeObject.disableLoader) {
+            routeObjectSpinner.stop();
+          }
+
+          if (!view.disableLoader){ 
+            var opts = {
+              lines: 16, // The number of lines to draw
+              length: 8, // The length of each line
+              width: 4, // The line thickness
+              radius: 12, // The radius of the inner circle
+              color: '#ccc', // #rbg or #rrggbb
+              speed: 1, // Rounds per second
+              trail: 10, // Afterglow percentage
+              shadow: false // Whether to render a shadow
+            };
+            var viewSpinner = new Spinner(opts).spin();
+            $('<div class="spinner"></div>')
+              .appendTo(selector)
+              .append(viewSpinner.el);
+          }
+          
           FauxtonAPI.when(view.establish()).then(function(resp) {
             masterLayout.setView(selector, view);
-            if (!view.disableLoader) $(selector).removeClass(view.loaderClassname);
+
+            if (!view.disableLoader){
+              viewSpinner.stop();
+            }
+
             masterLayout.renderView(selector);
             }, function(resp) {
-            view.establishError = {
-              error: true,
-              reason: resp
-            };
-            masterLayout.renderView(selector);
+              view.establishError = {
+                error: true,
+                reason: resp
+              };
+
+              FauxtonAPI.addNotification({
+                msg: 'An Error occurred ' + resp,
+                type: 'error' 
+              });
+              masterLayout.renderView(selector);
           });
 
           var hooks = masterLayout.hooks[selector];
