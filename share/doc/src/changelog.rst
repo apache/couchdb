@@ -32,6 +32,11 @@ We now support Erlang/OTP R16B and R16B01; the minimum required version is R14B.
 User document role values must now be strings. Other types of values will be
 refused when saving the user document.
 
+.. warning::
+   Using the `public_fields` whitelist for user document properties makes
+   the existence of specific user documents public even if they don't contain
+   any of the whitelisted properties. See :issue:`1838` for more information.
+
 Version 1.4.0
 -------------
 

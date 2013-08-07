@@ -151,6 +151,13 @@ couch_httpd_auth Configuration Options
 +--------------------------------------+---------------------------------------+
 | iterations                           | Password key derivation iterations    |
 +--------------------------------------+---------------------------------------+
+| public_fields                        | World-viewable user document fields   |
++--------------------------------------+---------------------------------------+
+
+.. warning::
+   Using the `public_fields` whitelist for user document properties makes
+   the existence of specific user documents public even if they don't contain
+   any of the whitelisted properties. See :issue:`1838` for more information.
 
 httpd Configuration Options
 ---------------------------
