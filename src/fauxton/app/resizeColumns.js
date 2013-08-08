@@ -55,7 +55,6 @@ function(mixins) {
     },
     onResizeHandler: function (){
       //if there is an override, do that instead
-      console.log("onResizeHandler");
       if (this.options.onResizeHandler){
         this.options.onResizeHandler();
       } else {

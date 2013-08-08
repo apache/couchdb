@@ -51,12 +51,12 @@ function(app, Fauxton) {
 
     disableLoader: false,
 
-    hasRendered: function () {
+    /*hasRendered: function () {
       return !!this.__manager__.hasRendered;
-    },
+    },*/
 
     forceRender: function () {
-      this.__manager__.hasRendered = false;
+      this.hasRendered = false;
     }
   });
 
@@ -297,7 +297,7 @@ function(app, Fauxton) {
 
       FauxtonAPI.when(this.establish()).done(function(resp) {
         _.each(routeObject.getViews(), function(view, selector) {
-          if(view.hasRendered()) { return; }
+          if(view.hasRendered) { return; }
 
           if (!routeObject.disableLoader) {
             routeObjectSpinner.stop();

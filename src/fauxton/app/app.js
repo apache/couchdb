@@ -45,11 +45,11 @@ function($, _, Backbone, Helpers, Mixins) {
     prefix: "app/",
 
     // Inject app/helper.js for shared functionality across all html templates
-    render: function(template, context) {
+    renderTemplate: function(template, context) {
       return template(_.extend(Helpers, context));
     },
 
-    fetch: function(path) {
+    fetchTemplate: function(path) {
       // Initialize done for use in async-mode
       var done;
 

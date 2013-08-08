@@ -13,6 +13,7 @@ require.config({
     jquery: "../assets/js/libs/jquery",
     lodash: "../assets/js/libs/lodash",
     backbone: "../assets/js/libs/backbone",
+    "backbone.layoutmanger": "../assets/js/plugins/backbone.layoutmanager",
     bootstrap: "../assets/js/libs/bootstrap",
     codemirror: "../assets/js/libs/codemirror",
     jshint: "../assets/js/libs/jshint",
@@ -22,6 +23,13 @@ require.config({
   },
 
   baseUrl: '/',
+
+  map: {
+    "*": {
+      'underscore': 'lodash'
+    }
+
+  },
 
   shim: {
     // Backbone library depends on lodash and jQuery.
@@ -44,9 +52,6 @@ require.config({
       deps: ["jquery"],
       exports: "JSHINT"
     },
-
-    // Backbone.LayoutManager depends on Backbone.
-    "plugins/backbone.layoutmanager": ["backbone"],
 
     "plugins/codemirror-javascript": ["codemirror"],
 
