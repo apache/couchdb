@@ -173,7 +173,7 @@ that requires authentication::
 ---------------------------------------------------------
 
 When this option ``true`` the :ref:`secret <config/couch_httpd_auth/secret>` is
-required for `Proxy Auth`::
+required for :ref:`api/auth/proxy`::
 
   [couch_httpd_auth]
   proxy_use_secret = false
@@ -221,7 +221,7 @@ should be authenticated::
 ``secret`` :: Proxy Auth secret token
 -------------------------------------
 
-The secret token used for `Proxy Auth` authentication method::
+The secret token used for :ref:`api/auth/proxy` method::
 
   [couch_httpd_auth]
   secret = 92de07df7e7a3fe14808cef90a7cc0d91
@@ -259,7 +259,7 @@ all users documents while users may browse only their own document::
 -------------------------------------------
 
 HTTP header name (``X-Auth-CouchDB-Roles`` by default) that contains the list of
-user's roles separated by a comma. Used for `Proxy Auth`::
+user's roles separated by a comma. Used for :ref:`api/auth/proxy`::
 
   [couch_httpd_auth]
   x_auth_roles = X-Auth-CouchDB-Roles
@@ -276,7 +276,7 @@ authenticate the authorization. This token is an `HMAC-SHA1` created from
 :ref:`username <config/couch_httpd_auth/x_auth_username>`. The secret key
 should be the same in the client and CouchDB node. This token is optional
 if value of :ref:`proxy_use_secret <config/couch_httpd_auth/proxy_use_secret>`
-option isn't ``true``. Used for `Proxy Auth`::
+option isn't ``true``. Used for :ref:`api/auth/proxy`::
 
   [couch_httpd_auth]
   x_auth_roles = X-Auth-CouchDB-Token
@@ -288,7 +288,7 @@ option isn't ``true``. Used for `Proxy Auth`::
 -------------------------------------------------
 
 HTTP header name (``X-Auth-CouchDB-UserName`` by default) containing the
-username. Used for `Proxy Auth`::
+username. Used for :ref:`api/auth/proxy`::
 
   [couch_httpd_auth]
   x_auth_username = X-Auth-CouchDB-UserName
@@ -307,8 +307,9 @@ username. Used for `Proxy Auth`::
 Store credentials within config
 -------------------------------
 
-To let users be authenticated by `OAuth` (:rfc:`5849`) method there is need to
-setup three special sections in :ref:`configuration <config>` file:
+To let users be authenticated by :ref:`api/auth/oauth` (:rfc:`5849`) method
+there is need to setup three special sections in :ref:`configuration <config>`
+file:
 
 1. Consumer secret:
 
@@ -338,10 +339,10 @@ setup three special sections in :ref:`configuration <config>` file:
 Store OAuth credentials within auth database
 --------------------------------------------
 
-.. versionadded:: 1.2: CouchDB is able to store OAuth credentials within users
-   documents instead of config file.
+.. versionadded:: 1.2
 
-::
+CouchDB is able to store OAuth credentials within users documents instead of
+config file by using next option::
 
   [couch_httpd_oauth]
   use_users_db = true
