@@ -38,15 +38,25 @@
 
 
 start_link(Mod, Func, State, Options) ->
-    Arg = {self(), Mod, Func, State},
+    Parent = case proplists:get_value(parent, Options) of
+        P when is_pid(P) -> P;
+        _ -> self()
+    end,
+    Arg = {Parent, Mod, Func, State},
     couch_event_listener:start_link(?MODULE, Arg, Options).
 
 
 enter_loop(Mod, Func, State, Options) ->
+    Parent = case proplists:get_value(parent, Options) of
+        P when is_pid(P) -> P;
+        _ -> undefined
+    end,
+    erlang:monitor(process, Parent),
     St = #st{
         mod = Mod,
         func = Func,
-        state = State
+        state = State,
+        parent = Parent
     },
     couch_event_listener:enter_loop(?MODULE, St, Options).
 
