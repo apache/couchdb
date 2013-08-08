@@ -48,10 +48,12 @@ start_link(Mod, Func, State, Options) ->
 
 enter_loop(Mod, Func, State, Options) ->
     Parent = case proplists:get_value(parent, Options) of
-        P when is_pid(P) -> P;
-        _ -> undefined
+        P when is_pid(P) ->
+            erlang:monitor(process, P),
+            P;
+        _ ->
+            undefined
     end,
-    erlang:monitor(process, Parent),
     St = #st{
         mod = Mod,
         func = Func,
