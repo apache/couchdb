@@ -1,0 +1,166 @@
+.. Licensed under the Apache License, Version 2.0 (the "License"); you may not
+.. use this file except in compliance with the License. You may obtain a copy of
+.. the License at
+..
+..   http://www.apache.org/licenses/LICENSE-2.0
+..
+.. Unless required by applicable law or agreed to in writing, software
+.. distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+.. WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+.. License for the specific language governing permissions and limitations under
+.. the License.
+
+
+.. _release/1.1.x:
+
+1.1.x Branch
+============
+
+.. contents::
+   :depth: 1
+   :local:
+
+
+.. _release/1.1.2:
+
+Version 1.1.2
+-------------
+
+Build System
+^^^^^^^^^^^^
+
+* Don't `ln` the `couchjs` install target on Windows
+* Remove ICU version dependency on Windows.
+* Improve SpiderMonkey version detection.
+
+HTTP Interface
+^^^^^^^^^^^^^^
+
+* ETag of attachment changes only when the attachment changes, not
+  the document.
+* Fix retrieval of headers larger than 4k.
+* Allow OPTIONS HTTP method for list requests.
+* Don't attempt to encode invalid json.
+
+Log System
+^^^^^^^^^^
+
+* Improvements to log messages for file-related errors.
+
+Replicator
+^^^^^^^^^^
+
+ * Fix pull replication of documents with many revisions.
+ * Fix replication from an HTTP source to an HTTP target.
+
+Security
+^^^^^^^^
+
+* Fixed CVE-2012-5641: Apache CouchDB Information disclosure via unescaped
+  backslashes in URLs on Windows
+* Fixed CVE-2012-5649: Apache CouchDB JSONP arbitrary code execution with
+  Adobe Flash
+* Fixed CVE-2012-5650: Apache CouchDB DOM based Cross-Site Scripting via Futon
+  UI
+
+View Server
+^^^^^^^^^^^
+
+* Avoid invalidating view indexes when running out of file descriptors.
+
+
+.. _release/1.1.1:
+
+Version 1.1.1
+-------------
+
+* Support SpiderMonkey 1.8.5
+* Add configurable maximum to the number of bytes returned by _log.
+* Allow CommonJS modules to be an empty string.
+* Bump minimum Erlang version to R13B02.
+* Do not run deleted validate_doc_update functions.
+* ETags for views include current sequence if include_docs=true.
+* Fix bug where duplicates can appear in _changes feed.
+* Fix bug where update handlers break after conflict resolution.
+* Fix bug with _replicator where include "filter" could crash couch.
+* Fix crashes when compacting large views.
+* Fix file descriptor leak in _log
+* Fix missing revisions in _changes?style=all_docs.
+* Improve handling of compaction at max_dbs_open limit.
+* JSONP responses now send "text/javascript" for Content-Type.
+* Link to ICU 4.2 on Windows.
+* Permit forward slashes in path to update functions.
+* Reap couchjs processes that hit reduce_overflow error.
+* Status code can be specified in update handlers.
+* Support provides() in show functions.
+* _view_cleanup when ddoc has no views now removes all index files.
+* max_replication_retry_count now supports "infinity".
+* Fix replication crash when source database has a document with empty ID.
+* Fix deadlock when assigning couchjs processes to serve requests.
+* Fixes to the document multipart PUT API.
+* Fixes regarding file descriptor leaks for databases with views.
+
+
+.. _release/1.1.0:
+
+Version 1.1.0
+-------------
+
+.. note:: All CHANGES for 1.0.2 and 1.0.3 also apply to 1.1.0.
+
+Externals
+^^^^^^^^^
+
+* Added OS Process module to manage daemons outside of CouchDB.
+* Added HTTP Proxy handler for more scalable externals.
+
+Futon
+^^^^^
+
+* Added a "change password"-feature to Futon.
+
+HTTP Interface
+^^^^^^^^^^^^^^
+
+* Native SSL support.
+* Added support for HTTP range requests for attachments.
+* Added built-in filters for `_changes`: `_doc_ids` and `_design`.
+* Added configuration option for TCP_NODELAY aka "Nagle".
+* Allow POSTing arguments to `_changes`.
+* Allow `keys` parameter for GET requests to views.
+* Allow wildcards in vhosts definitions.
+* More granular ETag support for views.
+* More flexible URL rewriter.
+* Added support for recognizing "Q values" and media parameters in
+  HTTP Accept headers.
+* Validate doc ids that come from a PUT to a URL.
+
+Replicator
+^^^^^^^^^^
+
+* Added `_replicator` database to manage replications.
+* Fixed issues when an endpoint is a remote database accessible via SSL.
+* Added support for continuous by-doc-IDs replication.
+* Fix issue where revision info was omitted when replicating attachments.
+* Integrity of attachment replication is now verified by MD5.
+
+Storage System
+^^^^^^^^^^^^^^
+
+* Multiple micro-optimizations when reading data.
+
+URL Rewriter & Vhosts
+^^^^^^^^^^^^^^^^^^^^^
+
+* Fix for variable substituion
+
+View Server
+^^^^^^^^^^^
+
+* Added CommonJS support to map functions.
+* Added `stale=update_after` query option that triggers a view update after
+  returning a `stale=ok` response.
+* Warn about empty result caused by `startkey` and `endkey` limiting.
+* Built-in reduce function `_sum` now accepts lists of integers as input.
+* Added view query aliases start_key, end_key, start_key_doc_id and
+  end_key_doc_id.

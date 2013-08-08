@@ -1,0 +1,98 @@
+.. Licensed under the Apache License, Version 2.0 (the "License"); you may not
+.. use this file except in compliance with the License. You may obtain a copy of
+.. the License at
+..
+..   http://www.apache.org/licenses/LICENSE-2.0
+..
+.. Unless required by applicable law or agreed to in writing, software
+.. distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+.. WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+.. License for the specific language governing permissions and limitations under
+.. the License.
+
+
+.. _release/0.10.x:
+
+0.10.x Branch
+=============
+
+.. contents::
+   :depth: 1
+   :local:
+
+
+.. _release/0.10.2:
+
+Version 0.10.2
+--------------
+
+Build and System Integration
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+* Fixed distribution preparation for building on Mac OS X.
+
+Security
+^^^^^^^^
+
+* Fixed CVE-2010-0009: Apache CouchDB Timing Attack Vulnerability
+
+Replicator
+^^^^^^^^^^
+
+* Avoid leaking file descriptors on automatic replication restarts.
+
+
+.. _release/0.10.1:
+
+Version 0.10.1
+--------------
+
+Build and System Integration
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+* Test suite now works with the distcheck target.
+
+Replicator
+^^^^^^^^^^
+
+* Stability enhancements regarding redirects, timeouts, OAuth.
+
+Query Server
+^^^^^^^^^^^^
+
+* Avoid process leaks
+* Allow list and view to span languages
+
+Stats
+^^^^^
+
+* Eliminate new process flood on system wake
+
+
+.. _release/0.10.0:
+
+Version 0.10.0
+--------------
+
+Build and System Integration
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+* Changed `couchdb` script configuration options.
+* Added default.d and local.d configuration directories to load sequence.
+
+HTTP Interface
+^^^^^^^^^^^^^^
+
+* Added optional cookie-based authentication handler.
+* Added optional two-legged OAuth authentication handler.
+
+Storage Format
+^^^^^^^^^^^^^^
+
+* Add move headers with checksums to the end of database files for extra robust
+  storage and faster storage.
+
+View Server
+^^^^^^^^^^^
+
+* Added native Erlang views for high-performance applications.

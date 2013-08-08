@@ -1,0 +1,256 @@
+.. Licensed under the Apache License, Version 2.0 (the "License"); you may not
+.. use this file except in compliance with the License. You may obtain a copy of
+.. the License at
+..
+..   http://www.apache.org/licenses/LICENSE-2.0
+..
+.. Unless required by applicable law or agreed to in writing, software
+.. distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+.. WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+.. License for the specific language governing permissions and limitations under
+.. the License.
+
+
+.. _release/0.11.x:
+
+0.11.x Branch
+=============
+
+.. contents::
+   :depth: 1
+   :local:
+
+
+.. _release/0.11.2:
+
+Version 0.11.2
+--------------
+
+Authentication
+^^^^^^^^^^^^^^
+
+* User documents can now be deleted by admins or the user.
+
+Futon
+^^^^^
+
+* Add some Futon files that were missing from the Makefile.
+
+HTTP Interface
+^^^^^^^^^^^^^^
+
+* Better error messages on invalid URL requests.
+
+Replicator
+^^^^^^^^^^
+
+* Fix bug when pushing design docs by non-admins, which was hanging the
+  replicator for no good reason.
+* Fix bug when pulling design documents from a source that requires
+  basic-auth.
+
+Security
+^^^^^^^^
+
+* Avoid potential DOS attack by guarding all creation of atoms.
+* Fixed CVE-2010-2234: Apache CouchDB Cross Site Request Forgery Attack
+
+
+.. _release/0.11.1:
+
+Version 0.11.1
+--------------
+
+Build and System Integration
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+* Output of `couchdb --help` has been improved.
+* Fixed compatibility with the Erlang R14 series.
+* Fixed warnings on Linux builds.
+* Fixed build error when aclocal needs to be called during the build.
+* Require ICU 4.3.1.
+* Fixed compatibility with Solaris.
+
+Configuration System
+^^^^^^^^^^^^^^^^^^^^
+
+* Fixed timeout with large .ini files.
+
+Futon
+^^^^^
+
+* Use "expando links" for over-long document values in Futon.
+* Added continuous replication option.
+* Added option to replicating test results anonymously to a community
+  CouchDB instance.
+* Allow creation and deletion of config entries.
+* Fixed display issues with doc ids that have escaped characters.
+* Fixed various UI issues.
+
+HTTP Interface
+^^^^^^^^^^^^^^
+
+* Mask passwords in active tasks and logging.
+* Update mochijson2 to allow output of BigNums not in float form.
+* Added support for X-HTTP-METHOD-OVERRIDE.
+* Better error message for database names.
+* Disable jsonp by default.
+* Accept gzip encoded standalone attachments.
+* Made max_concurrent_connections configurable.
+* Made changes API more robust.
+* Send newly generated document rev to callers of an update function.
+
+JavaScript Clients
+^^^^^^^^^^^^^^^^^^
+
+* Added tests for couch.js and jquery.couch.js
+* Added changes handler to jquery.couch.js.
+* Added cache busting to jquery.couch.js if the user agent is msie.
+* Added support for multi-document-fetch (via _all_docs) to jquery.couch.js.
+* Added attachment versioning to jquery.couch.js.
+* Added option to control ensure_full_commit to jquery.couch.js.
+* Added list functionality to jquery.couch.js.
+* Fixed issues where bulkSave() wasn't sending a POST body.
+
+Log System
+^^^^^^^^^^
+
+* Log HEAD requests as HEAD, not GET.
+* Keep massive JSON blobs out of the error log.
+* Fixed a timeout issue.
+
+Replication System
+^^^^^^^^^^^^^^^^^^
+
+* Refactored various internal APIs related to attachment streaming.
+* Fixed hanging replication.
+* Fixed keepalive issue.
+
+Security
+^^^^^^^^
+
+* Added authentication redirect URL to log in clients.
+* Fixed query parameter encoding issue in oauth.js.
+* Made authentication timeout configurable.
+* Temporary views are now admin-only resources.
+
+Storage System
+^^^^^^^^^^^^^^
+
+* Don't require a revpos for attachment stubs.
+* Added checking to ensure when a revpos is sent with an attachment stub,
+  it's correct.
+* Make file deletions async to avoid pauses during compaction and db
+  deletion.
+* Fixed for wrong offset when writing headers and converting them to blocks,
+  only triggered when header is larger than 4k.
+* Preserve _revs_limit and instance_start_time after compaction.
+
+Test Suite
+^^^^^^^^^^
+
+* Made the test suite overall more reliable.
+
+View Server
+^^^^^^^^^^^
+
+* Provide a UUID to update functions (and all other functions) that they can
+  use to create new docs.
+* Upgrade CommonJS modules support to 1.1.1.
+* Fixed erlang filter funs and normalize filter fun API.
+* Fixed hang in view shutdown.
+
+URL Rewriter & Vhosts
+^^^^^^^^^^^^^^^^^^^^^
+
+* Allow more complex keys in rewriter.
+* Allow global rewrites so system defaults are available in vhosts.
+* Allow isolation of databases with vhosts.
+* Fix issue with passing variables to query parameters.
+
+
+.. _release/0.11.0:
+
+Version 0.11.0
+--------------
+
+Build and System Integration
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+* Updated and improved source documentation.
+* Fixed distribution preparation for building on Mac OS X.
+* Added support for building a Windows installer as part of 'make dist'.
+* Bug fix for building couch.app's module list.
+* ETap tests are now run during make distcheck. This included a number of
+  updates to the build system to properly support VPATH builds.
+* Gavin McDonald setup a build-bot instance. More info can be found at
+  http://ci.apache.org/buildbot.html
+
+Futon
+^^^^^
+
+* Added a button for view compaction.
+* JSON strings are now displayed as-is in the document view, without the
+  escaping of new-lines and quotes. That dramatically improves readability of
+  multi-line strings.
+* Same goes for editing of JSON string values. When a change to a field value is
+  submitted, and the value is not valid JSON it is assumed to be a string. This
+  improves editing of multi-line strings a lot.
+* Hitting tab in textareas no longer moves focus to the next form field, but
+  simply inserts a tab character at the current caret position.
+* Fixed some font declarations.
+
+HTTP Interface
+^^^^^^^^^^^^^^
+
+* Provide Content-MD5 header support for attachments.
+* Added URL Rewriter handler.
+* Added virtual host handling.
+
+Replication
+^^^^^^^^^^^
+
+* Added option to implicitly create replication target databases.
+* Avoid leaking file descriptors on automatic replication restarts.
+* Added option to replicate a list of documents by id.
+* Allow continuous replication to be cancelled.
+
+Runtime Statistics
+^^^^^^^^^^^^^^^^^^
+
+* Statistics are now calculated for a moving window instead of non-overlapping
+  timeframes.
+* Fixed a problem with statistics timers and system sleep.
+* Moved statistic names to a term file in the priv directory.
+
+Security
+^^^^^^^^
+
+* Fixed CVE-2010-0009: Apache CouchDB Timing Attack Vulnerability.
+* Added default cookie-authentication and users database.
+* Added Futon user interface for user signup and login.
+* Added per-database reader access control lists.
+* Added per-database security object for configuration data in validation
+  functions.
+* Added proxy authentication handler
+
+Storage System
+^^^^^^^^^^^^^^
+
+* Adds batching of multiple updating requests, to improve throughput with many
+  writers. Removed the now redundant couch_batch_save module.
+* Adds configurable compression of attachments.
+
+View Server
+^^^^^^^^^^^
+
+* Added optional 'raw' binary collation for faster view builds where Unicode
+  collation is not important.
+* Improved view index build time by reducing ICU collation callouts.
+* Improved view information objects.
+* Bug fix for partial updates during view builds.
+* Move query server to a design-doc based protocol.
+* Use json2.js for JSON serialization for compatiblity with native JSON.
+* Major refactoring of couchjs to lay the groundwork for disabling cURL
+  support. The new HTTP interaction acts like a synchronous XHR. Example usage
+  of the new system is in the JavaScript CLI test runner.

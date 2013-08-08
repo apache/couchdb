@@ -93,7 +93,7 @@ Further details are available in `security`, including configuring the
 work factor for ``PBKDF2``, and the algorithm itself at
 `PBKDF2 (RFC-2898) <http://tools.ietf.org/html/rfc2898>`_.
 
-.. versionchanged:: 1.3 `PBKDF2` server-side hashed salted password support
+.. versionchanged:: 1.4 `PBKDF2` server-side hashed salted password support
    added, now as a synchronous call for the ``_config/admins`` API.
 
 

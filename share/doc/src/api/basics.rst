@@ -301,6 +301,9 @@ languages, including Perl, Python, Ruby, Erlang and others.
    valid, invalid structures will cause CouchDB to return an HTTP status code
    of 500 (server error).
 
+
+.. _json/numbers:
+
 Number Handling
 ---------------
 
