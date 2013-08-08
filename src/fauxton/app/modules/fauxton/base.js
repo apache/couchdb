@@ -228,7 +228,7 @@ function(app, Backbone, resizeColumns) {
       if (this.clear) {
         $(selector).html('');
       }
-      this.render().view.$el.appendTo(selector);
+      this.render().$el.appendTo(selector);
       this.delayedFade();
       return this;
     }
