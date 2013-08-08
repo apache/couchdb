@@ -347,9 +347,10 @@ config file by using next option::
   [couch_httpd_oauth]
   use_users_db = true
 
-If set to ``true``, OAuth token and consumer secrets will be looked up
-in the authentication database (``_user``). These secrets are stored in
-a top level field named ``"oauth"`` in user documents. Example:
+If set to ``true``, OAuth token and consumer secrets will be looked up in the
+:ref:`authentication database <config/couch_httpd_auth/authentication_db>`.
+These secrets are stored in a top level field named ``"oauth"`` in user
+documents. Example:
 
 .. code-block:: javascript
 
