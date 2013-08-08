@@ -111,7 +111,16 @@ html_files = \
     html/_sources/replication/intro.txt \
     html/_sources/replication/protocol.txt \
     html/_sources/replication/replicator.txt \
-    html/_sources/changelog.txt \
+    html/_sources/whatsnew/0.8.txt \
+    html/_sources/whatsnew/0.9.txt \
+    html/_sources/whatsnew/0.10.txt \
+    html/_sources/whatsnew/0.11.txt \
+    html/_sources/whatsnew/1.0.txt \
+    html/_sources/whatsnew/1.1.txt \
+    html/_sources/whatsnew/1.2.txt \
+    html/_sources/whatsnew/1.3.txt \
+    html/_sources/whatsnew/1.4.txt \
+    html/_sources/whatsnew/index.txt \
     html/_sources/contributing.txt \
     html/_sources/externals.txt \
     html/_sources/index.txt \
@@ -202,7 +211,16 @@ html_files = \
     html/replication/intro.html \
     html/replication/protocol.html \
     html/replication/replicator.html \
-    html/changelog.html \
+    html/whatsnew/0.8.html \
+    html/whatsnew/0.9.html \
+    html/whatsnew/0.10.html \
+    html/whatsnew/0.11.html \
+    html/whatsnew/1.0.html \
+    html/whatsnew/1.1.html \
+    html/whatsnew/1.2.html \
+    html/whatsnew/1.3.html \
+    html/whatsnew/1.4.html \
+    html/whatsnew/index.html \
     html/externals.html \
     html/index.html \
     html/intro.html \
@@ -291,7 +309,16 @@ src_files = \
     ../src/replication/intro.rst \
     ../src/replication/protocol.rst \
     ../src/replication/replicator.rst \
-    ../src/changelog.rst \
+    ../src/whatsnew/0.8.rst \
+    ../src/whatsnew/0.9.rst \
+    ../src/whatsnew/0.10.rst \
+    ../src/whatsnew/0.11.rst \
+    ../src/whatsnew/1.0.rst \
+    ../src/whatsnew/1.1.rst \
+    ../src/whatsnew/1.2.rst \
+    ../src/whatsnew/1.3.rst \
+    ../src/whatsnew/1.4.rst \
+    ../src/whatsnew/index.rst \
     ../src/contributing.rst \
     ../src/externals.rst \
     ../src/index.rst \

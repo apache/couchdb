@@ -38,7 +38,7 @@ Contents
     api/index
     json-structure
     contributing
-    changelog
+    whatsnew/index
 
 .. This is how you get a TM sign into a link. Haha. Seriously.
 .. |Apache CouchDB(TM)| unicode:: Apache U+0020 CouchDB U+2122
