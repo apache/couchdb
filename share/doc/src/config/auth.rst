@@ -184,13 +184,7 @@ required for `Proxy Auth`::
 ``public_fields`` :: User documents public fields
 -------------------------------------------------
 
-.. warning::
-
-   Due to :issue:`1838` issue, setting `public fields` allows list all documents
-   in the :ref:`_users <config/couch_httpd_auth/authentication_db>` database,
-   no matter does their documents contains public fields or not. If your system
-   uses email-based user login, enabling this feature may be fatal from security
-   point.
+.. versionadded:: 1.4
 
 Comma-separated list of field names that will be available to view for any user
 document in :ref:`authentication_db <config/couch_httpd_auth/authentication_db>`
@@ -200,6 +194,14 @@ If unset or not specified, authenticated users may retrieve only their own docs.
 
   [couch_httpd_auth]
   public_fields = first_name, last_name, contacts, url
+
+.. note::
+   Using the ``public_fields`` whitelist for user document properties requires
+   setting the :ref:`users_db_public <config/couch_httpd_auth/users_db_public>`
+   option to ``true`` (the latter option has no other purpose)::
+
+     [couch_httpd_auth]
+     users_db_public = true
 
 
 .. _config/couch_httpd_auth/require_valid_user:
@@ -234,6 +236,21 @@ Number of seconds since the last request before session will be expired::
 
   [couch_httpd_auth]
   timeout = 600
+
+
+
+.. _config/couch_httpd_auth/users_db_public:
+
+``users_db_public`` :: Publish users info
+-----------------------------------------
+
+.. versionadded:: 1.4
+
+Allow all users to view user documents. By default, only admins may browse
+all users documents while users may browse only their own document::
+
+  [couch_httpd_auth]
+  users_db_public = false
 
 
 .. _config/couch_httpd_auth/x_auth_roles:
