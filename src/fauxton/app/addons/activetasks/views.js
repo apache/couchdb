@@ -52,6 +52,11 @@ function (app, FauxtonAPI, activetasks) {
       clearInterval(pollingInfo.intervalId);
       Events.trigger('update:poll');
     },
+
+    cleanup: function () {
+      clearInterval(pollingInfo.intervalId);
+    },
+
     requestByType: function(e){
       var currentTarget = e.currentTarget;
       datatype = $(currentTarget).attr("data-type");
