@@ -55,8 +55,8 @@ Replicator
 Log System
 ^^^^^^^^^^
 
-* Don't log about missing .compact files. :commit:`06f1a8dc`
 * :issue:`1794`: Fix bug in WARN level logging from 1.3.0.
+* Don't log about missing .compact files. :commit:`06f1a8dc`
 
 View Server
 ^^^^^^^^^^^
@@ -67,9 +67,9 @@ View Server
 Miscellaneous
 ^^^^^^^^^^^^^
 
-* Improve documentation: better structure, improve language, less duplication.
 * :issue:`1784`: Improvements to test suite and VPATH build system.
   :commit:`01afaa4f`
+* Improve documentation: better structure, improve language, less duplication.
 
 
 .. _release/1.3.0:
@@ -92,12 +92,12 @@ Documentation
 Futon
 ^^^^^
 
-* :issue:`1470`: Futon raises popup on attempt to navigate to missed/deleted
-  document. :commit:`5da40eef`
+* :issue:`509`: Added view request duration to Futon. :commit:`2d2c7d1e`
+* :issue:`627`: Support all timezones. :commit:`b1a049bb`
 * :issue:`1383`: Futon view editor won't allow you to save original view after
   saving a revision. :commit:`ce48342`
-* :issue:`627`: Support all timezones. :commit:`b1a049bb`
-* :issue:`509`: Added view request duration to Futon. :commit:`2d2c7d1e`
+* :issue:`1470`: Futon raises popup on attempt to navigate to missed/deleted
+  document. :commit:`5da40eef`
 * :issue:`1473`, :issue:`1472`: Disable buttons for actions that the user
   doesn't have permissions to. :commit:`7156254d`
 
@@ -106,24 +106,19 @@ HTTP Interface
 
 * :issue:`431`: Introduce experimental :ref:`CORS support <cors>`.
   :commit:`b90e4021`
-* :issue:`1537`: Include user name in show/list `ETags`. :commit:`ac320479`
-* :issue:`1511`: CouchDB checks `roles` field for `_users` database documents
-  with more care. :commit:`41205000`
-* :issue:`1502`: Allow users to delete own _users doc. :commit:`f0d6f19bc8`
-* :issue:`1501`: :ref:`Changes feed <changes>` now can take special parameter
-  ``since=now`` to emit changes since current point of time. :commit:`3bbb2612`
-* :issue:`1442`: No longer rewrites the `X-CouchDB-Requested-Path` during
-  recursive calls to the rewriter. :commit:`56744f2f`
-* :issue:`1441`: Limit recursion depth in the URL rewriter.
-  Defaults to a maximum of 100 invocations but is configurable.
-  :commit:`d076976c`
-* :issue:`1381`: Add jquery.couch support for Windows 8 Metro apps.
-  :commit:`dfc5d37c`
-* :issue:`1337`: Use MD5 for attachment ETag header value. :commit:`6d912c9f`
-* :issue:`1321`: Variables in rewrite rules breaks OAuth authentication.
-  :commit:`c307ba95`
-* :issue:`1285`: Allow configuration of vendor and modules version in CouchDB
-  welcome message. :commit:`3c24a94d`
+* :issue:`764`, :issue:`514`, :issue:`430`: Fix sending HTTP headers from
+  ``_list`` function, :commit:`2a74f88375`
+* :issue:`887`: Fix ``bytes`` and ``offset`` parameters semantic for `_log`
+  resource (`explanation <https://git-wip-us.apache.org/repos/asf?p=couchdb.git;a=blobdiff;f=src/couchdb/couch_log.erl;h=1b05f4db2;hp=0befe7aab;hb=ad700014;hpb=7809f3ca>`_)
+  :commit:`ad700014`
+* :issue:`986`: Added Server-Sent Events protocol to db changes API.
+  See http://www.w3.org/TR/eventsource/ for details. :commit:`093d2aa6`
+* :issue:`1026`: Database names are encoded with respect of special characters
+  in the rewriter now. :commit:`272d6415`
+* :issue:`1097`: Allow `OPTIONS` request to shows and lists functions.
+  :commit:`9f53704a`
+* :issue:`1210`: Files starting with underscore can be attached and updated now.
+  :commit:`05858792`
 * :issue:`1277`: Better query parameter support and code clarity:
   :commit:`7e3c69ba`
 
@@ -133,27 +128,32 @@ HTTP Interface
   * ``?batch=ok`` is now supported for `COPY` and `POST` /db/doc updates.
   * ``?new_edits=false`` is now supported for more operations.
 
-* :issue:`1210`: Files starting with underscore can be attached and updated now.
-  :commit:`05858792`
-* :issue:`1097`: Allow `OPTIONS` request to shows and lists functions.
-  :commit:`9f53704a`
-* :issue:`1026`: Database names are encoded with respect of special characters
-  in the rewriter now. :commit:`272d6415`
-* :issue:`986`: Added Server-Sent Events protocol to db changes API.
-  See http://www.w3.org/TR/eventsource/ for details. :commit:`093d2aa6`
-* :issue:`887`: Fix ``bytes`` and ``offset`` parameters semantic for `_log`
-  resource (`explanation <https://git-wip-us.apache.org/repos/asf?p=couchdb.git;a=blobdiff;f=src/couchdb/couch_log.erl;h=1b05f4db2;hp=0befe7aab;hb=ad700014;hpb=7809f3ca>`_)
-  :commit:`ad700014`
-* :issue:`764`, :issue:`514`, :issue:`430`: Fix sending HTTP headers from
-  ``_list`` function, :commit:`2a74f88375`
+* :issue:`1285`: Allow configuration of vendor and modules version in CouchDB
+  welcome message. :commit:`3c24a94d`
+* :issue:`1321`: Variables in rewrite rules breaks OAuth authentication.
+  :commit:`c307ba95`
+* :issue:`1337`: Use MD5 for attachment ETag header value. :commit:`6d912c9f`
+* :issue:`1381`: Add jquery.couch support for Windows 8 Metro apps.
+  :commit:`dfc5d37c`
+* :issue:`1441`: Limit recursion depth in the URL rewriter.
+  Defaults to a maximum of 100 invocations but is configurable.
+  :commit:`d076976c`
+* :issue:`1442`: No longer rewrites the `X-CouchDB-Requested-Path` during
+  recursive calls to the rewriter. :commit:`56744f2f`
+* :issue:`1501`: :ref:`Changes feed <changes>` now can take special parameter
+  ``since=now`` to emit changes since current point of time. :commit:`3bbb2612`
+* :issue:`1502`: Allow users to delete own _users doc. :commit:`f0d6f19bc8`
+* :issue:`1511`: CouchDB checks `roles` field for `_users` database documents
+  with more care. :commit:`41205000`
+* :issue:`1537`: Include user name in show/list `ETags`. :commit:`ac320479`
 * Send a 202 response for `_restart`. :commit:`b213e16f`
 * Make password hashing synchronous when using the /_config/admins API.
   :commit:`08071a80`
-* Fix `_session` for IE7.
-* Return ``X-Couch-Id`` header if doc is created, :commit:`98515bf0b9`
-* Allow any 2xx code to indicate success, :commit:`0d50103cfd`
-* Restore 400 error for empty PUT, :commit:`2057b895`
 * Add support to serve single file with CouchDB, :commit:`2774531ff2`
+* Allow any 2xx code to indicate success, :commit:`0d50103cfd`
+* Fix `_session` for IE7.
+* Restore 400 error for empty PUT, :commit:`2057b895`
+* Return ``X-Couch-Id`` header if doc is created, :commit:`98515bf0b9`
 * Support auth cookies with ``:`` characters, :commit:`d9566c831d`
 
 Log System
@@ -169,16 +169,16 @@ Log System
 Replicator
 ^^^^^^^^^^
 
-* :issue:`1557`: Upgrade some code to use BIFs bring good improvements for
-  replication.
+* :issue:`1248`: `HTTP 500` error now doesn't occurs when replicating with
+  ``?doc_ids=null``. :commit:`bea76dbf`
+* :issue:`1259`: Stabilize replication id, :commit:`c6252d6d7f`
+* :issue:`1323`: Replicator now acts as standalone application.
+  :commit:`f913ca6e`
 * :issue:`1363`: Fix rarely occurred, but still race condition in changes feed
   if a quick burst of changes happens while replication is starting the
   replication can go stale. :commit:`573a7bb9`
-* :issue:`1323`: Replicator now acts as standalone application.
-  :commit:`f913ca6e`
-* :issue:`1259`: Stabilize replication id, :commit:`c6252d6d7f`
-* :issue:`1248`: `HTTP 500` error now doesn't occurs when replicating with
-  ``?doc_ids=null``. :commit:`bea76dbf`
+* :issue:`1557`: Upgrade some code to use BIFs bring good improvements for
+  replication.
 
 Security
 ^^^^^^^^
@@ -203,17 +203,18 @@ Storage System
 Test Suite
 ^^^^^^^^^^
 
-* :issue:`1563`: Ensures urlPrefix is set in all ajax requests.
-  :commit:`07a6af222`
-* :issue:`1389`: Improved tracebacks printed by the JS CLI tests.
-* :issue:`1339`: Use shell trap to catch dying beam processes during test runs.
-  :commit:`2921c78`
+* :issue:`1321`: Moved the JS test suite to the CLI.
 * :issue:`1338`: Start CouchDB with ``port=0``. While CouchDB might be already
   running on the default port 5984, port number 0 let the TCP stack figure out a
   free port to run. :commit:`127cbe3`
-* :issue:`1321`: Moved the JS test suite to the CLI.
-* Improved the reliability of a number of tests.
+* :issue:`1339`: Use shell trap to catch dying beam processes during test runs.
+  :commit:`2921c78`
+* :issue:`1389`: Improved tracebacks printed by the JS CLI tests.
+* :issue:`1563`: Ensures urlPrefix is set in all ajax requests.
+  :commit:`07a6af222`
 * Fix race condition for test running on faster hardware.
+* Improved the reliability of a number of tests.
+
 
 URL Rewriter & Vhosts
 ^^^^^^^^^^^^^^^^^^^^^
@@ -229,24 +230,24 @@ UUID Algorithms
 Query and View Server
 ^^^^^^^^^^^^^^^^^^^^^
 
-* :issue:`1491`: Clenaup view tables. :commit:`c37204b7`
-* :issue:`1483`: Update handlers requires valid doc ids. :commit:`72ea7e38`
-* :issue:`1445`: CouchDB tries no more to delete view file if it couldn't open
-  it, even if the error is `emfile`.
-* :issue:`1444`: Fix missed_named_view error that occurs on existed design
-  documents and views. :commit:`b59ac98b`
-* :issue:`1372`: `_stats` builtin reduce function no longer produces error for
-  empty view result.
-* :issue:`410`: More graceful error handling for JavaScript validate_doc_update
-  functions.
 * :issue:`111`: Improve the errors reported by the javascript view server
   to provide a more friendly error report when something goes wrong.
   :commit:`0c619ed`
+* :issue:`410`: More graceful error handling for JavaScript validate_doc_update
+  functions.
+* :issue:`1372`: `_stats` builtin reduce function no longer produces error for
+  empty view result.
+* :issue:`1444`: Fix missed_named_view error that occurs on existed design
+  documents and views. :commit:`b59ac98b`
+* :issue:`1445`: CouchDB tries no more to delete view file if it couldn't open
+  it, even if the error is `emfile`.
+* :issue:`1483`: Update handlers requires valid doc ids. :commit:`72ea7e38`
+* :issue:`1491`: Clenaup view tables. :commit:`c37204b7`
 * Deprecate E4X support, :commit:`cdfdda2314`
 
 Windows
 ^^^^^^^
 
-* :issue:`1482`: Use correct linker flang to build `snappy_nif.dll` on Windows.
+* :issue:`1482`: Use correct linker flag to build `snappy_nif.dll` on Windows.
   :commit:`a6eaf9f1`
 * Allows building cleanly on Windows without cURL, :commit:`fb670f5712`
