@@ -15,7 +15,7 @@ import sys
 
 sys.path.insert(0, os.path.abspath('../ext'))
 
-extensions = ["sphinx.ext.todo", "sphinx.ext.extlinks", 'github']
+extensions = ["sphinx.ext.todo", "sphinx.ext.extlinks", 'github', 'httpdomain']
 
 source_suffix = ".rst"
 
