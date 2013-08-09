@@ -13,6 +13,7 @@
 
 .. _release/1.0.x:
 
+============
 1.0.x Branch
 ============
 
@@ -21,29 +22,51 @@
    :local:
 
 
+.. _release/1.0.x/upgrade:
+
+Upgrade Notes
+=============
+
+Note, to replicate with a 1.0 CouchDB instance you must first upgrade in-place
+your current CouchDB to 1.0 or 0.11.1 -- backporting so that 0.10.x can
+replicate to 1.0 wouldn't be that hard. All that is required is patching the
+replicator to use the ``application/json`` content type.
+
+- ``_log`` and ``_temp_views`` are now admin-only resources.
+- ``_bulk_docs`` now requires a valid `Content-Type` header of
+  ``application/json``.
+- `JSONP` is disabled by default. An .ini option was added to selectively
+  enable it.
+- The ``key``, ``startkey`` and ``endkey`` properties of the request object
+  passed to :ref:`list <listfun>` and :ref:`show <showfun>` functions now
+  contain JSON objects representing the URL encoded string values in the query
+  string. Previously, these properties contained strings which needed to be
+  converted to JSON before using.
+
+
 .. _release/1.0.4:
 
 Version 1.0.4
--------------
+=============
 
 HTTP Interface
-^^^^^^^^^^^^^^
+--------------
 
 * Fix missing revisions in ``_changes?style=all_docs``.
 * Fix validation of attachment names.
 
 Log System
-^^^^^^^^^^
+----------
 
 * Fix file descriptor leak in ``_log``.
 
 Replicator
-^^^^^^^^^^
+----------
 
 * Fix a race condition where replications can go stale
 
 Security
-^^^^^^^^
+--------
 
 * Fixed CVE-2012-5641: Apache CouchDB Information disclosure via unescaped
   backslashes in URLs on Windows
@@ -53,7 +76,7 @@ Security
   UI
 
 View System
-^^^^^^^^^^^
+-----------
 
 * Avoid invalidating view indexes when running out of file descriptors.
 
@@ -61,26 +84,26 @@ View System
 .. _release/1.0.3:
 
 Version 1.0.3
--------------
+=============
 
 General
-^^^^^^^
+-------
 
 * Fixed compatibility issues with Erlang R14B02.
 
 Etap Test Suite
-^^^^^^^^^^^^^^^
+---------------
 
 * Etap tests no longer require use of port 5984. They now use a randomly
   selected port so they won't clash with a running CouchDB.
 
 Futon
-^^^^^
+-----
 
 * Made compatible with jQuery 1.5.x.
 
 HTTP Interface
-^^^^^^^^^^^^^^
+--------------
 
 * Fix bug that allows invalid UTF-8 after valid escapes.
 * The query parameter `include_docs` now honors the parameter `conflicts`.
@@ -88,7 +111,7 @@ HTTP Interface
 * Added support for inclusive_end with reduce views.
 
 Replicator
-^^^^^^^^^^
+----------
 
 * Enabled replication over IPv6.
 * Fixed for crashes in continuous and filtered changes feeds.
@@ -97,19 +120,19 @@ Replicator
 * Fixed bug when using a filter and a limit of 1.
 
 Security
-^^^^^^^^
+--------
 
 * Fixed OAuth signature computation in OTP R14B02.
 * Handle passwords with : in them.
 
 Storage System
-^^^^^^^^^^^^^^
+--------------
 
 * More performant queries against _changes and _all_docs when using the
   `include_docs` parameter.
 
 Windows
-^^^^^^^
+-------
 
 * Windows builds now require ICU >= 4.4.0 and Erlang >= R14B03. See
   :issue:`1152`, and :issue:`963` + OTP-9139 for more information.
@@ -118,10 +141,10 @@ Windows
 .. _release/1.0.2:
 
 Version 1.0.2
--------------
+=============
 
 Futon
-^^^^^
+-----
 
 * Make test suite work with Safari and Chrome.
 * Fixed animated progress spinner.
@@ -129,7 +152,7 @@ Futon
 * Spell javascript correctly in loadScript(uri).
 
 HTTP Interface
-^^^^^^^^^^^^^^
+--------------
 
 * Allow reduce=false parameter in map-only views.
 * Fix parsing of Accept headers.
@@ -137,13 +160,13 @@ HTTP Interface
   local-local replication. See :issue:`1022` for details.
 
 Log System
-^^^^^^^^^^
+----------
 
 * Reduce lengthy stack traces.
 * Allow logging of native <xml> types.
 
 Replicator
-^^^^^^^^^^
+----------
 
 * Updated ibrowse library to 2.1.2 fixing numerous replication issues.
 * Make sure that the replicator respects HTTP settings defined in the config.
@@ -153,7 +176,7 @@ Replicator
 * Various fixes to make replication more resilient for edge-cases.
 
 Storage System
-^^^^^^^^^^^^^^
+--------------
 
 * Fix leaking file handles after compacting databases and views.
 * Fix databases forgetting their validation function after compaction.
@@ -172,7 +195,7 @@ Storage System
   view index files.
 
 View Server
-^^^^^^^^^^^
+-----------
 
 * Don't trigger view updates when requesting `_design/doc/_info`.
 * Fix for circular references in CommonJS requires.
@@ -186,40 +209,40 @@ View Server
 .. _release/1.0.1:
 
 Version 1.0.1
--------------
+=============
 
 Authentication
-^^^^^^^^^^^^^^
+--------------
 
 * Enable basic-auth popup when required to access the server, to prevent
    people from getting locked out.
 
 Build and System Integration
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+----------------------------
 
 * Included additional source files for distribution.
 
 Futon
-^^^^^
+-----
 
 * User interface element for querying stale (cached) views.
 
 HTTP Interface
-^^^^^^^^^^^^^^
+--------------
 
 * Expose `committed_update_seq` for monitoring purposes.
 * Show fields saved along with _deleted=true. Allows for auditing of deletes.
 * More robust Accept-header detection.
 
 Replicator
-^^^^^^^^^^
+----------
 
 * Added support for replication via an HTTP/HTTPS proxy.
 * Fix pull replication of attachments from 0.11 to 1.0.x.
 * Make the _changes feed work with non-integer seqnums.
 
 Storage System
-^^^^^^^^^^^^^^
+--------------
 
 * Fix data corruption bug :issue:`844`. Please see
   http://couchdb.apache.org/notice/1.0.1.html for details.
@@ -228,16 +251,16 @@ Storage System
 .. _release/1.0.0:
 
 Version 1.0.0
--------------
+=============
 
 Security
-^^^^^^^^
+--------
 
 * Added authentication caching, to avoid repeated opening and closing of the
   users database for each request requiring authentication.
 
 Storage System
-^^^^^^^^^^^^^^
+--------------
 
 * Small optimization for reordering result lists.
 * More efficient header commits.
@@ -246,7 +269,7 @@ Storage System
   concurrent reads.
 
 View Server
-^^^^^^^^^^^
+-----------
 
 * Faster default view collation.
 * Added option to include update_seq in view responses.

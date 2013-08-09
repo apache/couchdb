@@ -13,6 +13,7 @@
 
 .. _release/1.3.x:
 
+============
 1.3.x Branch
 ============
 
@@ -21,8 +22,10 @@
    :local:
 
 
+.. _release/1.3.x/upgrade:
+
 Upgrade Notes
--------------
+=============
 
 You can upgrade your existing CouchDB 1.0.x installation to 1.3.0
 without any specific steps or migration. When you run CouchDB, the
@@ -44,28 +47,28 @@ CouchDB 1.0.x release.
 .. _release/1.3.1:
 
 Version 1.3.1
--------------
+=============
 
 Replicator
-^^^^^^^^^^
+----------
 
 * :issue:`1788`: Tolerate missing source and target fields in _replicator docs.
   :commit:`869f42e2`
 
 Log System
-^^^^^^^^^^
+----------
 
 * :issue:`1794`: Fix bug in WARN level logging from 1.3.0.
 * Don't log about missing .compact files. :commit:`06f1a8dc`
 
 View Server
-^^^^^^^^^^^
+-----------
 
 * :issue:`1792`: Fix the -S option to couchjs to increase memory limits.
   :commit:`cfaa66cd`
 
 Miscellaneous
-^^^^^^^^^^^^^
+-------------
 
 * :issue:`1784`: Improvements to test suite and VPATH build system.
   :commit:`01afaa4f`
@@ -75,22 +78,22 @@ Miscellaneous
 .. _release/1.3.0:
 
 Version 1.3.0
--------------
+=============
 
 Database core
-^^^^^^^^^^^^^
+-------------
 
 * :issue:`1512`: Validate bind address before assignment. :commit:`09ead8a0`
 * Restore ``max_document_size`` protection. :commit:`bf1eb135`
 
 Documentation
-^^^^^^^^^^^^^
+-------------
 
 * :issue:`1523`: Import CouchBase documentation and convert them into
   `Sphinx docs <http://sphinx.pocoo.org/>`_
 
 Futon
-^^^^^
+-----
 
 * :issue:`509`: Added view request duration to Futon. :commit:`2d2c7d1e`
 * :issue:`627`: Support all timezones. :commit:`b1a049bb`
@@ -102,7 +105,7 @@ Futon
   doesn't have permissions to. :commit:`7156254d`
 
 HTTP Interface
-^^^^^^^^^^^^^^
+--------------
 
 * :issue:`431`: Introduce experimental :ref:`CORS support <cors>`.
   :commit:`b90e4021`
@@ -157,7 +160,7 @@ HTTP Interface
 * Support auth cookies with ``:`` characters, :commit:`d9566c831d`
 
 Log System
-^^^^^^^^^^
+----------
 
 * :issue:`1380`: Minor fixes for logrotate support.
 * Improve file I/O error logging and handling, :commit:`4b6475da`
@@ -167,7 +170,7 @@ Log System
   system dbs, :commit:`41667642f7`
 
 Replicator
-^^^^^^^^^^
+----------
 
 * :issue:`1248`: `HTTP 500` error now doesn't occurs when replicating with
   ``?doc_ids=null``. :commit:`bea76dbf`
@@ -181,13 +184,13 @@ Replicator
   replication.
 
 Security
-^^^^^^^^
+--------
 
 * :issue:`1060`: Passwords are now hashed using the PBKDF2 algorithm with a
   configurable work factor. :commit:`7d418134`
 
 Source Repository
-^^^^^^^^^^^^^^^^^
+-----------------
 
 * The source repository was migrated from `SVN`_ to `Git`_.
 
@@ -195,13 +198,13 @@ Source Repository
 .. _Git: https://git-wip-us.apache.org/repos/asf/couchdb.git
 
 Storage System
-^^^^^^^^^^^^^^
+--------------
 
 * Fixed unnecessary conflict when deleting and creating a
   document in the same batch.
 
 Test Suite
-^^^^^^^^^^
+----------
 
 * :issue:`1321`: Moved the JS test suite to the CLI.
 * :issue:`1338`: Start CouchDB with ``port=0``. While CouchDB might be already
@@ -217,18 +220,18 @@ Test Suite
 
 
 URL Rewriter & Vhosts
-^^^^^^^^^^^^^^^^^^^^^
+---------------------
 
 * :issue:`1026`: Database name is encoded during rewriting
   (allowing embedded /'s, etc). :commit:`272d6415`
 
 UUID Algorithms
-^^^^^^^^^^^^^^^
+---------------
 
 * :issue:`1373`: Added the utc_id algorithm :commit:`5ab712a2`
 
 Query and View Server
-^^^^^^^^^^^^^^^^^^^^^
+---------------------
 
 * :issue:`111`: Improve the errors reported by the javascript view server
   to provide a more friendly error report when something goes wrong.
@@ -246,7 +249,7 @@ Query and View Server
 * Deprecate E4X support, :commit:`cdfdda2314`
 
 Windows
-^^^^^^^
+-------
 
 * :issue:`1482`: Use correct linker flag to build `snappy_nif.dll` on Windows.
   :commit:`a6eaf9f1`
