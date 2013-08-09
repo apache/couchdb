@@ -59,6 +59,7 @@
 ^share/doc/Makefile
 ^share/doc/Makefile.in
 ^share/doc/build/.*
+^share/doc/ext/httpdomain.py
 ^share/doc/images/.*
 ^share/doc/static/rtd.css
 ^share/server/json2.js

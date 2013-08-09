@@ -357,7 +357,8 @@ src_files_html = \
     ../templates/utilities.html
 
 sphinx_extensions = \
-    ../ext/github.py
+    ../ext/github.py \
+    ../ext/httpdomain.py
 
 EXTRA_DIST = \
     $(image_files) \
