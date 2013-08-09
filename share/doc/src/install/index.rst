@@ -22,7 +22,6 @@ Installation
 
    unix
    windows
+   mac
    freebsd
    gentoo
-
-

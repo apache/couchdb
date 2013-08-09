@@ -44,6 +44,9 @@ Please work through these in order if you experience any problems.
 .. _wiki: http://wiki.apache.org/couchdb
 .. _friendly mailing lists: http://couchdb.apache.org/community/lists.html
 
+
+.. _install/unix/dependencies:
+
 Dependencies
 ------------
 
@@ -119,37 +122,8 @@ distributions, it's recommended to use a more recent js-devel-1.8.5.
 Mac OS X
 ~~~~~~~~
 
-You can install the build tools by running::
+Follow :ref:`install/mac/homebrew` reference till `brew install couchdb` step.
 
-    open /Applications/Installers/Xcode\ Tools/XcodeTools.mpkg
-
-You can install the other dependencies by running::
-
-    brew install autoconf
-    brew install autoconf-archive
-    brew install automake
-    brew install libtool
-    brew install erlang
-    brew install icu4c
-    brew install spidermonkey
-    brew install curl
-
-You may want to link ICU so that CouchDB can find the header files automatically::
-
-    brew link icu4c
-
-The same is true for recent versions of Erlang::
-
-    brew link erlang
-
-You will need `Homebrew`_ installed to use the `brew` command.
-
-Some versions of Mac OS X ship a problematic OpenSSL library. If you're
-experiencing troubles with CouchDB crashing intermittently with a segmentation
-fault or a bus error, you will need to install your own version of OpenSSL. See
-the troubleshooting guide, mentioned above, for more information.
-
-.. _Homebrew: http://mxcl.github.com/homebrew/
 
 Installing
 ----------
@@ -293,36 +267,3 @@ A `logrotate` configuration is installed into::
 Consult your `logrotate` documentation for more information.
 
 It is critical that the CouchDB logs are rotated so as not to fill your disk.
-
-Mac OS X
-~~~~~~~~
-
-You can use the `launchctl` command to control the CouchDB daemon.
-
-You can load the configuration by running::
-
-    sudo launchctl load \
-         /usr/local/Library/LaunchDaemons/org.apache.couchdb.plist
-
-You can stop the CouchDB daemon by running::
-
-    sudo launchctl unload \
-         /usr/local/Library/LaunchDaemons/org.apache.couchdb.plist
-
-You can start CouchDB by running::
-
-    sudo launchctl start org.apache.couchdb
-
-You can restart CouchDB by running::
-
-    sudo launchctl stop org.apache.couchdb
-
-You can edit the launchd configuration by running::
-
-    open /usr/local/Library/LaunchDaemons/org.apache.couchdb.plist
-
-To start the daemon on boot, copy the configuration file to::
-
-    /Library/LaunchDaemons
-
-Consult your system documentation for more information.

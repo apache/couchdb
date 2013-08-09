@@ -100,6 +100,7 @@ html_files = \
     html/_sources/install/index.txt \
     html/_sources/install/freebsd.txt \
     html/_sources/install/gentoo.txt \
+    html/_sources/install/mac.txt \
     html/_sources/install/unix.txt \
     html/_sources/install/windows.txt \
     html/_sources/query-server/index.txt \
@@ -200,6 +201,7 @@ html_files = \
     html/install/index.html \
     html/install/freebsd.html \
     html/install/gentoo.html \
+    html/install/mac.html \
     html/install/unix.html \
     html/install/windows.html \
     html/query-server/index.html \
@@ -298,6 +300,7 @@ src_files = \
     ../src/install/index.rst \
     ../src/install/freebsd.rst \
     ../src/install/gentoo.rst \
+    ../src/install/mac.rst \
     ../src/install/unix.rst \
     ../src/install/windows.rst \
     ../src/query-server/index.rst \
