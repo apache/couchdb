@@ -27,6 +27,11 @@
 Upgrade Notes
 =============
 
+.. warning::
+
+   :ref:`release/0.11.2` contains important security fixes. Previous `0.11.x`
+   releases are not recommended for regular usage.
+
 Changes Between 0.11.0 and 0.11.1
 ---------------------------------
 
@@ -149,7 +154,7 @@ Security
 --------
 
 * Avoid potential DOS attack by guarding all creation of atoms.
-* Fixed CVE-2010-2234: Apache CouchDB Cross Site Request Forgery Attack
+* Fixed :ref:`cve/2010-2234`
 
 
 .. _release/0.11.1:

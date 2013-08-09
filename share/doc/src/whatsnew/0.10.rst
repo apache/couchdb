@@ -27,6 +27,11 @@
 Upgrade Notes
 =============
 
+.. warning::
+
+   :ref:`release/0.10.2` contains important security fixes. Previous `0.10.x`
+   releases are not recommended for regular usage.
+
 Modular Configuration Directories
 ---------------------------------
 
@@ -67,6 +72,7 @@ View query reduce parameter strictness
 CouchDB now considers the parameter ``reduce=false`` to be an error for queries
 of map-only views, and responds with status code 400.
 
+
 .. _release/0.10.2:
 
 Version 0.10.2
@@ -80,7 +86,7 @@ Build and System Integration
 Security
 --------
 
-* Fixed CVE-2010-0009: Apache CouchDB Timing Attack Vulnerability
+* Fixed :ref:`cve/2010-0009`
 
 Replicator
 ----------

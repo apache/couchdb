@@ -19,6 +19,7 @@ Release History
 .. toctree::
    :glob:
 
+   ../cve/index
    1.4
    1.3
    1.2
@@ -28,3 +29,4 @@ Release History
    0.10
    0.9
    0.8
+
