@@ -148,8 +148,10 @@ class HTTPResource(ObjectDescription):
                    names=('jsonparameter', 'jsonparam', 'json'),
                    typerolename='obj', typenames=('jsonparamtype', 'jsontype')),
         TypedField('queryparameter', label='Query Parameters',
-                     names=('queryparameter', 'queryparam', 'qparam', 'query'),
-                     typerolename='obj', typenames=('queryparamtype', 'querytype', 'qtype')),
+                   names=('queryparameter', 'queryparam', 'qparam', 'query'),
+                   typerolename='obj', typenames=('queryparamtype',
+                                                  'querytype',
+                                                  'qtype')),
         GroupedField('formparameter', label='Form Parameters',
                      names=('formparameter', 'formparam', 'fparam', 'form')),
         GroupedField('requestheader', label='Request Headers',
@@ -169,13 +171,14 @@ class HTTPResource(ObjectDescription):
         method = self.method.upper() + ' '
         signode += addnodes.desc_name(method, method)
         offset = 0
+        path = None
         for match in http_sig_param_re.finditer(sig):
             path = sig[offset:match.start()]
             signode += addnodes.desc_name(path, path)
             params = addnodes.desc_parameterlist()
             typ = match.group('type')
             if typ:
-                typ = typ + ': '
+                typ += ': '
                 params += addnodes.desc_annotation(typ, typ)
             name = match.group('name')
             params += addnodes.desc_parameter(name, name)
@@ -184,6 +187,8 @@ class HTTPResource(ObjectDescription):
         if offset < len(sig):
             path = sig[offset:len(sig)]
             signode += addnodes.desc_name(path, path)
+        if path is None:
+            assert False, 'no matches for sig: %s' % sig
         fullname = self.method.upper() + ' ' + path
         signode['method'] = self.method
         signode['path'] = sig
@@ -242,7 +247,11 @@ class HTTPTrace(HTTPResource):
 
 
 def http_statuscode_role(name, rawtext, text, lineno, inliner,
-                         options={}, content=[]):
+                         options=None, content=None):
+    if options is None:
+        options = {}
+    if content is None:
+        content = []
     if text.isdigit():
         code = int(text)
         try:
@@ -268,11 +277,10 @@ def http_statuscode_role(name, rawtext, text, lineno, inliner,
     nodes.reference(rawtext)
     if code == 226:
         url = 'http://www.ietf.org/rfc/rfc3229.txt'
-    if code == 418:
+    elif code == 418:
         url = 'http://www.ietf.org/rfc/rfc2324.txt'
-    if code == 449:
-        url = 'http://msdn.microsoft.com/en-us/library' \
-              '/dd891478(v=prot.10).aspx'
+    elif code == 449:
+        url = 'http://msdn.microsoft.com/en-us/library/dd891478(v=prot.10).aspx'
     elif code in HTTP_STATUS_CODES:
         url = 'http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html' \
               '#sec10.' + ('%d.%d' % (code // 100, 1 + code % 100))
@@ -285,7 +293,11 @@ def http_statuscode_role(name, rawtext, text, lineno, inliner,
 
 
 def http_method_role(name, rawtext, text, lineno, inliner,
-                     options={}, content=[]):
+                     options=None, content=None):
+    if options is None:
+        options = {}
+    if content is None:
+        content = []
     method = str(text).lower()
     if method not in DOCREFS:
         msg = inliner.reporter.error('%s is not valid HTTP method' % method,
@@ -320,7 +332,8 @@ class HTTPIndex(Index):
     def __init__(self, *args, **kwargs):
         super(HTTPIndex, self).__init__(*args, **kwargs)
 
-        self.ignore = [[l for l in x.split('/') if l]
+        self.ignore = [
+            [l for l in x.split('/') if l]
             for x in self.domain.env.config['http_index_ignore_prefixes']]
         self.ignore.sort(key=lambda x: -len(x))
 
@@ -334,8 +347,8 @@ class HTTPIndex(Index):
     def generate(self, docnames=None):
         content = {}
         items = ((method, path, info)
-            for method, routes in self.domain.routes.iteritems()
-            for path, info in routes.iteritems())
+                 for method, routes in self.domain.routes.items()
+                 for path, info in routes.items())
         items = sorted(items, key=lambda item: item[1])
         for method, path, info in items:
             entries = content.setdefault(self.grouping_prefix(path), [])
@@ -343,9 +356,7 @@ class HTTPIndex(Index):
                 method.upper() + ' ' + path, 0, info[0],
                 http_resource_anchor(method, path), '', '', info[1]
             ])
-        content = content.items()
-        content.sort(key=lambda (k, v): k)
-        return (content, True)
+        return (sorted(content.items()), True)
 
 
 class HTTPDomain(Domain):
@@ -390,7 +401,7 @@ class HTTPDomain(Domain):
     }
 
     initial_data = {
-        'options': {}, # path: (docname, synopsis)
+        'options': {},  # path: (docname, synopsis)
         'head': {},
         'post': {},
         'get': {},
@@ -407,8 +418,8 @@ class HTTPDomain(Domain):
         return dict((key, self.data[key]) for key in self.object_types)
 
     def clear_doc(self, docname):
-        for typ, routes in self.routes.iteritems():
-            for path, info in routes.items():
+        for typ, routes in self.routes.items():
+            for path, info in list(routes.items()):
                 if info[0] == docname:
                     del routes[path]
 
@@ -425,8 +436,8 @@ class HTTPDomain(Domain):
                                 contnode, title)
 
     def get_objects(self):
-        for method, routes in self.routes.iteritems():
-            for path, info in routes.iteritems():
+        for method, routes in self.routes.items():
+            for path, info in routes.items():
                 anchor = http_resource_anchor(method, path)
                 yield (path, path, method, info[0], anchor, 1)
 
@@ -503,4 +514,3 @@ def setup(app):
     except ClassNotFound:
         app.add_lexer('http', HTTPLexer())
     app.add_config_value('http_index_ignore_prefixes', [], None)
-
