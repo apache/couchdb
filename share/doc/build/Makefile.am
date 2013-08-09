@@ -94,6 +94,13 @@ html_files = \
     html/_sources/couchapp/views/intro.txt \
     html/_sources/couchapp/views/joins.txt \
     html/_sources/couchapp/views/nosql.txt \
+    html/_sources/cve/2010-0009.txt \
+    html/_sources/cve/2010-2234.txt \
+    html/_sources/cve/2010-3854.txt \
+    html/_sources/cve/2012-5641.txt \
+    html/_sources/cve/2012-5649.txt \
+    html/_sources/cve/2012-5650.txt \
+    html/_sources/cve/index.txt \
     html/_sources/fauxton/addons.txt \
     html/_sources/fauxton/index.txt \
     html/_sources/fauxton/install.txt \
@@ -195,6 +202,13 @@ html_files = \
     html/couchapp/views/intro.html \
     html/couchapp/views/joins.html \
     html/couchapp/views/nosql.html \
+    html/cve/2010-0009.html \
+    html/cve/2010-2234.html \
+    html/cve/2010-3854.html \
+    html/cve/2012-5641.html \
+    html/cve/2012-5649.html \
+    html/cve/2012-5650.html \
+    html/cve/index.html \
     html/fauxton/addons.html \
     html/fauxton/index.html \
     html/fauxton/install.html \
@@ -294,6 +308,13 @@ src_files = \
     ../src/couchapp/views/intro.rst \
     ../src/couchapp/views/joins.rst \
     ../src/couchapp/views/nosql.rst \
+    ../src/cve/2010-0009.rst \
+    ../src/cve/2010-2234.rst \
+    ../src/cve/2010-3854.rst \
+    ../src/cve/2012-5641.rst \
+    ../src/cve/2012-5649.rst \
+    ../src/cve/2012-5650.rst \
+    ../src/cve/index.rst \
     ../src/fauxton/addons.rst \
     ../src/fauxton/index.rst \
     ../src/fauxton/install.rst \

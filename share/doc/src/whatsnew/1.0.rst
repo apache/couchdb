@@ -43,6 +43,11 @@ replicator to use the ``application/json`` content type.
   string. Previously, these properties contained strings which needed to be
   converted to JSON before using.
 
+.. warning::
+
+   :ref:`release/1.0.4` contains important security fixes. Previous `1.0.x`
+   releases are not recommended for regular usage.
+
 
 .. _release/1.0.4:
 
@@ -68,12 +73,9 @@ Replicator
 Security
 --------
 
-* Fixed CVE-2012-5641: Apache CouchDB Information disclosure via unescaped
-  backslashes in URLs on Windows
-* Fixed CVE-2012-5649: Apache CouchDB JSONP arbitrary code execution with
-  Adobe Flash
-* Fixed CVE-2012-5650: Apache CouchDB DOM based Cross-Site Scripting via Futon
-  UI
+* Fixed :ref:`cve/2012-5641`
+* Fixed :ref:`cve/2012-5649`
+* Fixed :ref:`cve/2012-5650`
 
 View System
 -----------
