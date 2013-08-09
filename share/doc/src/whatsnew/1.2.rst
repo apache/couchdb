@@ -13,6 +13,7 @@
 
 .. _release/1.2.x:
 
+============
 1.2.x Branch
 ============
 
@@ -21,8 +22,10 @@
    :local:
 
 
+.. _release/1.2.x/upgrade:
+
 Upgrade Notes
--------------
+=============
 
 .. warning::
 
@@ -31,7 +34,7 @@ Upgrade Notes
    for a long time) before upgrading, or they will become inaccessible.
 
 Security changes
-^^^^^^^^^^^^^^^^
+----------------
 
 The interface to the ``_users`` and ``_replicator`` databases have been
 changed so that non-administrator users can see less information:
@@ -53,7 +56,7 @@ changed so that non-administrator users can see less information:
   * Views can only be defined and queried by administrators.
 
 Database Compression
-^^^^^^^^^^^^^^^^^^^^
+--------------------
 
 The new optional (but enabled by default) compression of disk files requires
 an upgrade of the on-disk format (5 -> 6) which occurs on creation for new
@@ -69,16 +72,16 @@ upgraded.
 .. _release/1.2.2:
 
 Version 1.2.2
--------------
+=============
 
 Build System
-^^^^^^^^^^^^
+------------
 
 * Fixed issue in `couchdb` script where stopped status returns before process
   exits.
 
 HTTP Interface
-^^^^^^^^^^^^^^
+--------------
 
 * Reset rewrite counter on new request, avoiding unnecessary request failures
   due to bogus rewrite limit reports.
@@ -87,21 +90,21 @@ HTTP Interface
 .. _release/1.2.1:
 
 Version 1.2.1
--------------
+=============
 
 Build System
-^^^^^^^^^^^^
+------------
 
 * Fix couchdb start script.
 * Win: fix linker invocations.
 
 Futon
-^^^^^
+-----
 
 * Disable buttons that aren't available for the logged-in user.
 
 HTTP Interface
-^^^^^^^^^^^^^^
+--------------
 
 * No longer rewrites the ``X-CouchDB-Requested-Path`` during recursive
   calls to the rewriter.
@@ -109,7 +112,7 @@ HTTP Interface
   of 100 invocations but is configurable.
 
 Security
-^^^^^^^^
+--------
 
 * Fixed CVE-2012-5641: Apache CouchDB Information disclosure via unescaped
   backslashes in URLs on Windows
@@ -119,12 +122,12 @@ Security
   UI
 
 Replication
-^^^^^^^^^^^
+-----------
 
 * Fix potential timeouts.
 
 View Server
-^^^^^^^^^^^
+-----------
 
 * Change use of signals to avoid broken view groups.
 
@@ -132,10 +135,10 @@ View Server
 .. _release/1.2.0:
 
 Version 1.2.0
--------------
+=============
 
 Authentication
-^^^^^^^^^^^^^^
+--------------
 
 * Fix use of OAuth with VHosts and URL rewriting.
 * OAuth secrets can now be stored in the users system database
@@ -154,7 +157,7 @@ Authentication
   `couch_httpd_auth` section.
 
 Build System
-^^^^^^^^^^^^
+------------
 
 * cURL is no longer required to build CouchDB as it is only
   used by the command line JS test runner. If cURL is available
@@ -166,7 +169,7 @@ Build System
 * Added --with-js-lib-name option.
 
 Futon
-^^^^^
+-----
 
 * The `Status` screen (active tasks) now displays two new task status
   fields: `Started on` and `Updated on`.
@@ -174,7 +177,7 @@ Futon
   edit that amounts to a revert.
 
 HTTP Interface
-^^^^^^^^^^^^^^
+--------------
 
 * Added a native JSON parser.
 * The _active_tasks API now offers more granular fields. Each
@@ -186,12 +189,12 @@ HTTP Interface
 * Properly restart the SSL socket on configuration changes.
 
 OAuth
-^^^^^
+-----
 
 * Updated bundled `erlang_oauth` library to the latest version.
 
 Replicator
-^^^^^^^^^^
+----------
 
 * A new replicator implementation. It offers more performance and
   configuration options.
@@ -206,7 +209,7 @@ Replicator
   instead of the original replication object/document.
 
 Storage System
-^^^^^^^^^^^^^^
+--------------
 
 * Added optional database and view index file compression (using Google's
   snappy or zlib's deflate). This feature is enabled by default, but it
@@ -226,7 +229,7 @@ Storage System
   and `_design`.
 
 View Server
-^^^^^^^^^^^
+-----------
 
 * Add CoffeeScript (http://coffeescript.org/) as a first class view server
   language.
@@ -235,5 +238,3 @@ View Server
   configuration is matched.
 * Fixed incorrect reduce query results when using pagination parameters.
 * Made icu_driver work with Erlang R15B and later.
-
-

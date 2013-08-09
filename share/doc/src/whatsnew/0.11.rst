@@ -13,6 +13,7 @@
 
 .. _release/0.11.x:
 
+=============
 0.11.x Branch
 =============
 
@@ -21,28 +22,123 @@
    :local:
 
 
+.. _release/0.11.x/upgrade:
+
+Upgrade Notes
+=============
+
+Changes Between 0.11.0 and 0.11.1
+---------------------------------
+
+- ``_log`` and ``_temp_views`` are now admin-only resources.
+- ``_bulk_docs`` now requires a valid `Content-Type` header of
+  ``application/json``.
+- `JSONP` is disabled by default. An .ini option was added to selectively
+  enable it.
+- The ``key``, ``startkey`` and ``endkey`` properties of the request object
+  passed to :ref:`list <listfun>` and :ref:`show <showfun>` functions now
+  contain JSON objects representing the URL encoded string values in the query
+  string. Previously, these properties contained strings which needed to be
+  converted to JSON before using.
+
+
+Changes Between 0.10.x and 0.11.0
+---------------------------------
+
+show, list, update and validation functions
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The ``req`` argument to show, list, update and validation functions now contains
+the member method with the specified HTTP method of the current request.
+Previously, this member was called ``verb``. ``method`` is following :rfc:`2616`
+(HTTP 1.1) closer.
+
+_admins -> _security
+^^^^^^^^^^^^^^^^^^^^
+
+The `/db/_admins` handler has been removed and replaced with a
+:ref:`/db/_security <api/db/security>` object. Any existing `_admins` will be
+dropped and need to be added to the security object again. The reason for this
+is that the old system made no distinction between names and roles, while the
+new one does, so there is no way to automatically upgrade the old admins list.
+
+The security object has 2 special fields, ``admins`` and ``readers``, which
+contain lists of names and roles which are admins or readers on that database.
+Anything else may be stored in other fields on the security object. The entire
+object is made available to validation functions.
+
+json2.js
+^^^^^^^^
+
+JSON handling in the query server has been upgraded to use `json2.js`_.
+This allows us to use faster native JSON serialization when it is available.
+
+In previous versions, attempts to serialize undefined would throw an exception,
+causing the doc that emitted undefined to be dropped from the view index.
+The new behavior is to serialize undefined as null. Applications depending on
+the old behavior will need to explicitly check for undefined.
+
+Another change is that E4X's XML objects will not automatically be
+stringified. XML users will need to call ``my_xml_object.toXMLString()``
+to return a string value. :commit:`8d3b7ab3`
+
+.. _json2.js: https://github.com/douglascrockford/JSON-js/blob/master/json2.js
+
+
+WWW-Authenticate
+^^^^^^^^^^^^^^^^
+
+The default configuration has been changed to avoid causing basic-auth popups
+which result from sending the WWW-Authenticate header. To enable basic-auth
+popups, uncomment the :ref:`WWW-Authenticate <config/httpd/WWW-Authenticate>`
+line in `local.ini`.
+
+Query server line protocol
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The query server line protocol has changed for all functions except
+:ref:`map <qs/map_doc>`, :ref:`reduce <qs/reduce>`, and
+:ref:`rereduce <qs/rereduce>`. This allows us to cache the entire design
+document in the query server process, which results in faster performance for
+common operations. It also gives more flexibility to query server
+implementators and shouldn't require major changes in the future when adding
+new query server features.
+
+UTF8 JSON
+^^^^^^^^^
+
+JSON request bodies are validated for proper UTF-8 before saving, instead of
+waiting to fail on subsequent read requests.
+
+_changes line format
+^^^^^^^^^^^^^^^^^^^^
+
+Continuous changes are now newline delimited, instead of having each line
+followed by a comma.
+
+
 .. _release/0.11.2:
 
 Version 0.11.2
---------------
+==============
 
 Authentication
-^^^^^^^^^^^^^^
+--------------
 
 * User documents can now be deleted by admins or the user.
 
 Futon
-^^^^^
+-----
 
 * Add some Futon files that were missing from the Makefile.
 
 HTTP Interface
-^^^^^^^^^^^^^^
+--------------
 
 * Better error messages on invalid URL requests.
 
 Replicator
-^^^^^^^^^^
+----------
 
 * Fix bug when pushing design docs by non-admins, which was hanging the
   replicator for no good reason.
@@ -50,7 +146,7 @@ Replicator
   basic-auth.
 
 Security
-^^^^^^^^
+--------
 
 * Avoid potential DOS attack by guarding all creation of atoms.
 * Fixed CVE-2010-2234: Apache CouchDB Cross Site Request Forgery Attack
@@ -59,10 +155,10 @@ Security
 .. _release/0.11.1:
 
 Version 0.11.1
---------------
+==============
 
 Build and System Integration
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+----------------------------
 
 * Output of `couchdb --help` has been improved.
 * Fixed compatibility with the Erlang R14 series.
@@ -72,12 +168,12 @@ Build and System Integration
 * Fixed compatibility with Solaris.
 
 Configuration System
-^^^^^^^^^^^^^^^^^^^^
+--------------------
 
 * Fixed timeout with large .ini files.
 
 Futon
-^^^^^
+-----
 
 * Use "expando links" for over-long document values in Futon.
 * Added continuous replication option.
@@ -88,7 +184,7 @@ Futon
 * Fixed various UI issues.
 
 HTTP Interface
-^^^^^^^^^^^^^^
+--------------
 
 * Mask passwords in active tasks and logging.
 * Update mochijson2 to allow output of BigNums not in float form.
@@ -101,7 +197,7 @@ HTTP Interface
 * Send newly generated document rev to callers of an update function.
 
 JavaScript Clients
-^^^^^^^^^^^^^^^^^^
+------------------
 
 * Added tests for couch.js and jquery.couch.js
 * Added changes handler to jquery.couch.js.
@@ -113,21 +209,21 @@ JavaScript Clients
 * Fixed issues where bulkSave() wasn't sending a POST body.
 
 Log System
-^^^^^^^^^^
+----------
 
 * Log HEAD requests as HEAD, not GET.
 * Keep massive JSON blobs out of the error log.
 * Fixed a timeout issue.
 
 Replication System
-^^^^^^^^^^^^^^^^^^
+------------------
 
 * Refactored various internal APIs related to attachment streaming.
 * Fixed hanging replication.
 * Fixed keepalive issue.
 
 Security
-^^^^^^^^
+--------
 
 * Added authentication redirect URL to log in clients.
 * Fixed query parameter encoding issue in oauth.js.
@@ -135,7 +231,7 @@ Security
 * Temporary views are now admin-only resources.
 
 Storage System
-^^^^^^^^^^^^^^
+--------------
 
 * Don't require a revpos for attachment stubs.
 * Added checking to ensure when a revpos is sent with an attachment stub,
@@ -147,12 +243,12 @@ Storage System
 * Preserve _revs_limit and instance_start_time after compaction.
 
 Test Suite
-^^^^^^^^^^
+----------
 
 * Made the test suite overall more reliable.
 
 View Server
-^^^^^^^^^^^
+-----------
 
 * Provide a UUID to update functions (and all other functions) that they can
   use to create new docs.
@@ -161,7 +257,7 @@ View Server
 * Fixed hang in view shutdown.
 
 URL Rewriter & Vhosts
-^^^^^^^^^^^^^^^^^^^^^
+---------------------
 
 * Allow more complex keys in rewriter.
 * Allow global rewrites so system defaults are available in vhosts.
@@ -172,10 +268,10 @@ URL Rewriter & Vhosts
 .. _release/0.11.0:
 
 Version 0.11.0
---------------
+==============
 
 Build and System Integration
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+----------------------------
 
 * Updated and improved source documentation.
 * Fixed distribution preparation for building on Mac OS X.
@@ -187,7 +283,7 @@ Build and System Integration
   http://ci.apache.org/buildbot.html
 
 Futon
-^^^^^
+-----
 
 * Added a button for view compaction.
 * JSON strings are now displayed as-is in the document view, without the
@@ -201,14 +297,14 @@ Futon
 * Fixed some font declarations.
 
 HTTP Interface
-^^^^^^^^^^^^^^
+--------------
 
 * Provide Content-MD5 header support for attachments.
 * Added URL Rewriter handler.
 * Added virtual host handling.
 
 Replication
-^^^^^^^^^^^
+-----------
 
 * Added option to implicitly create replication target databases.
 * Avoid leaking file descriptors on automatic replication restarts.
@@ -216,7 +312,7 @@ Replication
 * Allow continuous replication to be cancelled.
 
 Runtime Statistics
-^^^^^^^^^^^^^^^^^^
+------------------
 
 * Statistics are now calculated for a moving window instead of non-overlapping
   timeframes.
@@ -224,7 +320,7 @@ Runtime Statistics
 * Moved statistic names to a term file in the priv directory.
 
 Security
-^^^^^^^^
+--------
 
 * Fixed CVE-2010-0009: Apache CouchDB Timing Attack Vulnerability.
 * Added default cookie-authentication and users database.
@@ -235,14 +331,14 @@ Security
 * Added proxy authentication handler
 
 Storage System
-^^^^^^^^^^^^^^
+--------------
 
 * Adds batching of multiple updating requests, to improve throughput with many
   writers. Removed the now redundant couch_batch_save module.
 * Adds configurable compression of attachments.
 
 View Server
-^^^^^^^^^^^
+-----------
 
 * Added optional 'raw' binary collation for faster view builds where Unicode
   collation is not important.

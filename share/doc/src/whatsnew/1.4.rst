@@ -13,6 +13,7 @@
 
 .. _release/1.4.x:
 
+============
 1.4.x Branch
 ============
 
@@ -21,8 +22,10 @@
    :local:
 
 
+.. _release/1.4.x/upgrade:
+
 Upgrade Notes
--------------
+=============
 
 We now support Erlang/OTP R16B and R16B01; the minimum required version is R14B.
 
@@ -33,7 +36,7 @@ refused when saving the user document.
 .. _release/1.4.0:
 
 Version 1.4.0
--------------
+=============
 
 * :issue:`1139`: it's possible to apply :ref:`list <listfun>`
   functions to ``_all_docs`` view. :commit:`54fd258e`

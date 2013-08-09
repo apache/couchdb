@@ -13,6 +13,7 @@
 
 .. _release/1.1.x:
 
+============
 1.1.x Branch
 ============
 
@@ -24,17 +25,17 @@
 .. _release/1.1.2:
 
 Version 1.1.2
--------------
+=============
 
 Build System
-^^^^^^^^^^^^
+------------
 
 * Don't `ln` the `couchjs` install target on Windows
 * Remove ICU version dependency on Windows.
 * Improve SpiderMonkey version detection.
 
 HTTP Interface
-^^^^^^^^^^^^^^
+--------------
 
 * ETag of attachment changes only when the attachment changes, not
   the document.
@@ -43,18 +44,18 @@ HTTP Interface
 * Don't attempt to encode invalid json.
 
 Log System
-^^^^^^^^^^
+----------
 
 * Improvements to log messages for file-related errors.
 
 Replicator
-^^^^^^^^^^
+----------
 
  * Fix pull replication of documents with many revisions.
  * Fix replication from an HTTP source to an HTTP target.
 
 Security
-^^^^^^^^
+--------
 
 * Fixed CVE-2012-5641: Apache CouchDB Information disclosure via unescaped
   backslashes in URLs on Windows
@@ -64,7 +65,7 @@ Security
   UI
 
 View Server
-^^^^^^^^^^^
+-----------
 
 * Avoid invalidating view indexes when running out of file descriptors.
 
@@ -72,7 +73,7 @@ View Server
 .. _release/1.1.1:
 
 Version 1.1.1
--------------
+=============
 
 * Support SpiderMonkey 1.8.5
 * Add configurable maximum to the number of bytes returned by _log.
@@ -104,23 +105,23 @@ Version 1.1.1
 .. _release/1.1.0:
 
 Version 1.1.0
--------------
+=============
 
 .. note:: All CHANGES for 1.0.2 and 1.0.3 also apply to 1.1.0.
 
 Externals
-^^^^^^^^^
+---------
 
 * Added OS Process module to manage daemons outside of CouchDB.
 * Added HTTP Proxy handler for more scalable externals.
 
 Futon
-^^^^^
+-----
 
 * Added a "change password"-feature to Futon.
 
 HTTP Interface
-^^^^^^^^^^^^^^
+--------------
 
 * Native SSL support.
 * Added support for HTTP range requests for attachments.
@@ -136,7 +137,7 @@ HTTP Interface
 * Validate doc ids that come from a PUT to a URL.
 
 Replicator
-^^^^^^^^^^
+----------
 
 * Added `_replicator` database to manage replications.
 * Fixed issues when an endpoint is a remote database accessible via SSL.
@@ -145,17 +146,17 @@ Replicator
 * Integrity of attachment replication is now verified by MD5.
 
 Storage System
-^^^^^^^^^^^^^^
+--------------
 
 * Multiple micro-optimizations when reading data.
 
 URL Rewriter & Vhosts
-^^^^^^^^^^^^^^^^^^^^^
+---------------------
 
 * Fix for variable substituion
 
 View Server
-^^^^^^^^^^^
+-----------
 
 * Added CommonJS support to map functions.
 * Added `stale=update_after` query option that triggers a view update after
