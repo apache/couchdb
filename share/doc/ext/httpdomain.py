@@ -508,7 +508,7 @@ class HTTPDomain(Domain):
             elif typ == 'mailheader':
                 return http_header_role(None, text, text, None, None)[0][0]
             else:
-                return None
+                return nodes.emphasis(text, text)
         else:
             anchor = http_resource_anchor(typ, target)
             title = typ.upper() + ' ' + target
