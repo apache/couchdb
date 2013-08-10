@@ -412,7 +412,8 @@ calculate_start_seq_test() ->
 
 is_owner_test() ->
     ?assertNot(is_owner(foo, 1, [])),
-    ?assert(is_owner(foo, 1, [{foo, 1}])),
+    ?assertNot(is_owner(foo, 1, [{foo, 1}])),
+    ?assert(is_owner(foo, 2, [{foo, 1}])),
     ?assert(is_owner(foo, 50, [{bar, 100}, {foo, 1}])),
     ?assert(is_owner(foo, 50, [{baz, 200}, {bar, 100}, {foo, 1}])),
     ?assert(is_owner(bar, 150, [{baz, 200}, {bar, 100}, {foo, 1}])).
