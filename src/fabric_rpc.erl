@@ -384,6 +384,7 @@ calculate_start_seq(Db, {Seq, Uuid, Node}) ->
     end.
 
 is_owner(Node, Seq, Epochs) ->
+    validate_epochs(Epochs),
     Node =:= owner_of(Seq, Epochs).
 
 owner_of(_Seq, []) ->
@@ -392,6 +393,18 @@ owner_of(Seq, [{EpochNode, EpochSeq} | _Rest]) when Seq > EpochSeq ->
     EpochNode;
 owner_of(Seq, [_ | Rest]) ->
     owner_of(Seq, Rest).
+
+validate_epochs(Epochs) ->
+    %% Assert uniqueness.
+    case length(Epochs) == length(lists:ukeysort(2, Epochs)) of
+        true  -> ok;
+        false -> erlang:error(duplicate_epoch)
+    end,
+    %% Assert order.
+    case Epochs == lists:sort(fun({_, A}, {_, B}) -> B =< A end, Epochs) of
+        true  -> ok;
+        false -> erlang:error(epoch_order)
+    end.
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -416,6 +429,8 @@ is_owner_test() ->
     ?assert(is_owner(foo, 2, [{foo, 1}])),
     ?assert(is_owner(foo, 50, [{bar, 100}, {foo, 1}])),
     ?assert(is_owner(foo, 50, [{baz, 200}, {bar, 100}, {foo, 1}])),
-    ?assert(is_owner(bar, 150, [{baz, 200}, {bar, 100}, {foo, 1}])).
+    ?assert(is_owner(bar, 150, [{baz, 200}, {bar, 100}, {foo, 1}])),
+    ?assertError(duplicate_epoch, is_owner(foo, 1, [{foo, 1}, {bar, 1}])),
+    ?assertError(epoch_order, is_owner(foo, 1, [{foo, 100}, {bar, 200}])).
 
 -endif.
