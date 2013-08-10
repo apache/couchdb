@@ -371,7 +371,9 @@ def http_header_role(name, rawtext, text, lineno, inliner,
         options = {}
     if content is None:
         content = []
-    header = str(text).title()
+    header = str(text)
+    if header not in HEADER_REFS:
+        header = header.title()
     if header not in HEADER_REFS:
         msg = inliner.reporter.error('%s is not unknown HTTP header' % header,
                                      lineno=lineno)
