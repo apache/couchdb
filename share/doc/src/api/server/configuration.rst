@@ -173,7 +173,7 @@ A list of the available methods and URL paths are provided below:
 ``/_config/section``
 ====================
 
-.. http:get:: /_config/<section>
+.. http:get:: /_config/{section}
 
   Gets the configuration structure for a single section.
 
@@ -217,7 +217,7 @@ A list of the available methods and URL paths are provided below:
 ``/_config/section/key``
 ========================
 
-.. http:get:: /_config/<section>/<key>
+.. http:get:: /_config/{section}/{key}
 
   Gets a single configuration value from within a specific configuration
   section.
@@ -253,7 +253,7 @@ A list of the available methods and URL paths are provided below:
      environments may not parse simple strings or numeric values as valid JSON.
 
 
-.. http:put:: /_config/<section>/<key>
+.. http:put:: /_config/{section}/{key}
 
   Updates a configuration value. The new value should be supplied in the
   request body in the corresponding JSON format. If you are setting a string
@@ -292,7 +292,7 @@ A list of the available methods and URL paths are provided below:
     "debug"
 
 
-.. http:delete:: /_config/<section>/<key>
+.. http:delete:: /_config/{section}/{key}
 
   Deletes a configuration value. The returned JSON will be the value of
   the configuration parameter before it was deleted.
