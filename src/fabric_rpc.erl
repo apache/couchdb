@@ -389,7 +389,7 @@ owner(Node, Seq, Epochs) ->
 owner(_Node, _Seq, [], _HighSeq) ->
     false;
 owner(Node, Seq, [{EpochNode, EpochSeq} | _Rest], HighSeq)
-  when Node =:= EpochNode andalso Seq < HighSeq andalso Seq >= EpochSeq ->
+  when Node =:= EpochNode andalso Seq < HighSeq andalso Seq > EpochSeq ->
     true;
 owner(Node, Seq, [{_EpochNode, EpochSeq} | Rest], _HighSeq) ->
     owner(Node, Seq, Rest, EpochSeq).
