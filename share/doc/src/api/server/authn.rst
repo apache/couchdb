@@ -46,23 +46,25 @@ with CouchDB. The main drawback is the need to send user credentials with each
 request which may be insecure and could hurt operation performance (since
 CouchDB must compute password hash with every request):
 
+**Request**:
+
 .. code-block:: http
 
     GET / HTTP/1.1
+    Accept: application/json
     Authorization: Basic cm9vdDpyZWxheA==
     Host: localhost:5984
-    Accept: application/json
+
+**Response**:
 
 .. code-block:: http
 
     HTTP/1.1 200 OK
-    Server: CouchDB/1.3.0 (Erlang OTP/R15B02)
-    Date: Mon, 03 Dec 2012 00:44:47 GMT
-    Content-Type: application/json
-    Content-Length: 177
     Cache-Control: must-revalidate
-
-.. code-block:: javascript
+    Content-Length: 177
+    Content-Type: application/json
+    Date: Mon, 03 Dec 2012 00:44:47 GMT
+    Server: CouchDB/1.3.0 (Erlang OTP/R15B02)
 
     {
       "couchdb":"Welcome",
@@ -95,134 +97,130 @@ To obtain the first token and thus authenticate a user for the first time, the
 :ref:`_session API <api/auth/session>`.
 
 .. _api/auth/session:
-.. _api/auth/session.post:
 
-``POST /_session``
-------------------
+``_session``
+------------
 
-* **Method**: ``POST /_session``
-* **Request**: User credentials
-* **Response**: User information
-* **Admin Privileges Required**: no
-* **Query Arguments**:
+.. http:post:: /_session
 
-  * **Argument**: next
+  Initiates new session for specified user credentials by providing `Cookie`
+  value. Credentials could be defined in ``application/x-www-form-urlencoded``
+  format with `name` and `password` fields.
 
-    * **Description**: Enforces redirect after successful login
-    * **Optional**: yes
-    * **Value**: Relative path from server root
+  :query next: Enforces redirect after successful login to the specified
+               location. This location is relative from server root.
+               *Optional*.
+  :qtype next: str
+  :reqheader Content-Type: Credentials data format:
+    - ``application/x-www-form-urlencoded``
+    - ``application/json``
+  :code 200: Successfully authenticated
+  :code 302: Redirect after successful authentication
+  :code 401: Username or password wasn't recognized
 
-* **HTTP Headers**
+  **Request**:
 
-  * **Header**: ``Content-Type``
-
-    * **Description**: Credentials data format
-    * **Optional**: no
-    * **Value**: ``application/x-www-form-urlencoded``
-
-* **Return Codes**:
-
-  * **200**:
-    Successfully authenticated
-
-  * **302**:
-    Redirect after successful authentication
-
-  * **401**:
-    Username or password wasn't recognized
-
-Initiates new session for specified user credentials by providing `Cookie`
-value. Credentials should be defined in ``application/x-www-form-urlencoded``
-format with `name` and `password` fields.
-
-.. code-block:: http
+  .. code-block:: http
 
     POST /_session HTTP/1.1
-    Host: localhost:5984
     Accept: application/json
     Content-Length: 24
     Content-Type: application/x-www-form-urlencoded
-
-.. code-block:: text
+    Host: localhost:5984
 
     name=root&password=relax
 
-In case of success will be returned next response:
+  It's also possible to send data as JSON:
 
-.. code-block:: http
+  .. code-block:: http
+
+    POST /_session HTTP/1.1
+    Accept: application/json
+    Content-Length: 37
+    Content-Type: application/json
+    Host: localhost:5984
+
+    {
+        "name": "root",
+        "password": "relax"
+    }
+
+  **Response**:
+
+  .. code-block:: http
 
     HTTP/1.1 200 OK
-    Set-Cookie: AuthSession=cm9vdDo1MEJCRkYwMjq0LO0ylOIwShrgt8y-UkhI-c6BGw; Version=1; Path=/; HttpOnly
-    Server: CouchDB/1.3.0 (Erlang OTP/R15B02)
-    Date: Mon, 03 Dec 2012 01:23:14 GMT
-    Content-Type: application/json
-    Content-Length: 43
     Cache-Control: must-revalidate
+    Content-Length: 43
+    Content-Type: application/json
+    Date: Mon, 03 Dec 2012 01:23:14 GMT
+    Server: CouchDB/1.3.0 (Erlang OTP/R15B02)
+    Set-Cookie: AuthSession=cm9vdDo1MEJCRkYwMjq0LO0ylOIwShrgt8y-UkhI-c6BGw; Version=1; Path=/; HttpOnly
 
-.. code-block:: javascript
+    {"ok":true,"name":"root","roles":["_admin"]}
 
-    {"ok":true,"name":null,"roles":["_admin"]}
+  If ``next`` query parameter was provided the response will trigger redirection
+  to the specified location in case of successful authentication:
 
-If ``next`` query parameter was provided the response will trigger redirection
-to the specified location in case of successful authentication:
+  **Request**:
 
-.. code-block:: http
+  .. code-block:: http
 
-    GET /_session?next=/blog/_design/sofa/_rewrite/recent-posts HTTP/1.1
-    Host: localhost:5984
+    POST /_session?next=/blog/_design/sofa/_rewrite/recent-posts HTTP/1.1
     Accept: application/json
+    Content-Type: application/x-www-form-urlencoded
+    Host: localhost:5984
 
-.. code-block:: http
+    name=root&password=relax
+
+  **Response**:
+
+  .. code-block:: http
 
     HTTP/1.1 302 Moved Temporarily
-    Set-Cookie: AuthSession=cm9vdDo1MEJDMDEzRTp7Vu5GKCkTxTVxwXbpXsBARQWnhQ; Version=1; Path=/; HttpOnly
-    Server: CouchDB/1.3.0 (Erlang OTP/R15B02)
-    Location: http://localhost:5984/blog/_design/sofa/_rewrite/recent-posts
-    Date: Mon, 03 Dec 2012 01:32:46 GMT
-    Content-Type: application/json
-    Content-Length: 43
     Cache-Control: must-revalidate
-
-.. code-block:: javascript
+    Content-Length: 43
+    Content-Type: application/json
+    Date: Mon, 03 Dec 2012 01:32:46 GMT
+    Location: http://localhost:5984/blog/_design/sofa/_rewrite/recent-posts
+    Server: CouchDB/1.3.0 (Erlang OTP/R15B02)
+    Set-Cookie: AuthSession=cm9vdDo1MEJDMDEzRTp7Vu5GKCkTxTVxwXbpXsBARQWnhQ; Version=1; Path=/; HttpOnly
 
     {"ok":true,"name":null,"roles":["_admin"]}
 
 
-.. _api/auth/session.get:
+.. http:get:: /_session
 
-``GET /_session``
------------------
+  Returns complete information about authenticated user.
+  This information contains :ref:`userctx_object`, authentication method and
+  available ones and authentication database.
 
-* **Method**: ``GET /_session``
-* **Request**: None
-* **Response**: User information
-* **Admin Privileges Required**: no
-* **Query Arguments**:
+  :query basic: Accept `Basic Auth` by requesting this resource. *Optional*.
+  :qtype basic: bool
 
-  * **Argument**: basic
+  :code 200: Successfully authenticated.
+  :code 401: Username or password wasn't recognized.
 
-    * **Description**: Accept `Basic Auth` by requesting this resource
-    * **Optional**: yes
-    * **Value**: ``true``
+  **Request**:
 
-* **Return Codes**:
-
-  * **200**:
-    Successfully authenticated.
-
-  * **401**:
-    Username or password wasn't recognized.
-
-Returns complete information about the authenticated user:
-
-.. code-block:: http
+  .. code-block:: http
 
     GET /_session HTTP/1.1
     Host: localhost:5984
     Accept: application/json
     Cookie: AuthSession=cm9vdDo1MEJDMDQxRDpqb-Ta9QfP9hpdPjHLxNTKg_Hf9w
 
-.. code-block:: javascript
+  **Response**:
+
+  .. code-block:: http
+
+    HTTP/1.1 200 OK
+    Cache-Control: must-revalidate
+    Content-Length: 175
+    Content-Type: application/json
+    Date: Fri, 09 Aug 2013 20:27:45 GMT
+    Server: CouchDB/1.3.0 (Erlang OTP/R15B02)
+    Set-Cookie: AuthSession=cm9vdDo1MjA1NTBDMTqmX2qKt1KDR--GUC80DQ6-Ew_XIw; Version=1; Path=/; HttpOnly
 
     {
         "info": {
@@ -243,32 +241,38 @@ Returns complete information about the authenticated user:
         }
     }
 
-This information contains :ref:`userctx_object`, authentication method and
-available ones and authentication database.
 
-.. _api/auth/session.delete:
+.. http:delete:: /_session
 
-``DELETE /_session``
---------------------
+  Closes user's session.
 
-* **Method**: ``DELETE /_session``
-* **Request**: None
-* **Response**: Status
-* **Admin Privileges Required**: no
+  :code 200: Successfully close session.
+  :code 401: User wasn't authenticated.
 
-* **Return Codes**:
+  **Request**:
 
-  * **200**:
-    Successfully close session.
+  .. code-block:: http
 
-  * **401**:
-    Username or password wasn't recognized.
+    DELETE /_session HTTP/1.1
+    Accept: application/json
+    Cookie: AuthSession=cm9vdDo1MjA1NEVGMDo1QXNQkqC_0Qmgrk8Fw61_AzDeXw
+    Host: localhost:5984
 
-Closes a user's session. If everything is ok, the response is:
+  **Response**:
 
-.. code-block:: javascript
+  .. code-block:: http
 
-    {"ok":true}
+    HTTP/1.1 200 OK
+    Cache-Control: must-revalidate
+    Content-Length: 12
+    Content-Type: application/json
+    Date: Fri, 09 Aug 2013 20:30:12 GMT
+    Server: CouchDB/1.3.0 (Erlang OTP/R15B02)
+    Set-Cookie: AuthSession=; Version=1; Path=/; HttpOnly
+
+    {
+        "ok": true
+    }
 
 
 .. _api/auth/proxy:
@@ -305,6 +309,8 @@ headers to CouchDB with related request:
   :ref:`force token be required <config/couch_httpd_auth/proxy_use_secret>`
   to prevent requests from untrusted sources.
 
+**Request**:
+
 .. code-block:: http
 
     GET /_session HTTP/1.1
@@ -314,7 +320,7 @@ headers to CouchDB with related request:
     X-Auth-CouchDB-Roles: users,blogger
     X-Auth-CouchDB-UserName: foo
 
-CouchDB sends the response:
+**Response**:
 
 .. code-block:: http
 
@@ -324,8 +330,6 @@ CouchDB sends the response:
     Content-Type: application/json
     Date: Fri, 14 Jun 2013 10:16:03 GMT
     Server: CouchDB/1.3.0 (Erlang OTP/R15B03)
-
-.. code-block:: javascript
 
     {
         "info": {
@@ -438,22 +442,21 @@ Both snippets produces similar request and response pair:
     Content-Length : 167
     Content-Type : application/json
     Date : Tue, 23 Jul 2013 06:51:15 GMT
-    Server : CouchDB/1.3.1 (Erlang OTP/R16B)
+    Server: CouchDB/1.3.0 (Erlang OTP/R15B02)
 
-.. code-block:: javascript
 
-  {
-    "ok": true,
-    "info": {
-      "authenticated": "oauth"
-      "authentication_db": "_users",
-      "authentication_handlers": ["oauth", "cookie", "default"]
-    },
-    "userCtx": {
-      "name": "couchdb_username",
-      "roles": []
+    {
+      "ok": true,
+      "info": {
+        "authenticated": "oauth",
+        "authentication_db": "_users",
+        "authentication_handlers": ["oauth", "cookie", "default"]
+      },
+      "userCtx": {
+        "name": "couchdb_username",
+        "roles": []
+      }
     }
-  }
 
 There we request the :ref:`_session <api/auth/session>` resource to ensure
 that authentication was successful and the target CouchDB username is correct.
