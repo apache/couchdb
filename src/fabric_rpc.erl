@@ -373,7 +373,7 @@ calculate_start_seq(_Db, Seq) when is_integer(Seq) ->
 calculate_start_seq(Db, {Seq, Uuid, Node}) ->
     case couch_db:get_uuid(Db) == Uuid of
         true ->
-            case owner(Node, Seq, couch_db:get_epochs(Db)) of
+            case is_owner(Node, Seq, couch_db:get_epochs(Db)) of
                 true -> Seq;
                 false -> 0
             end;
@@ -383,16 +383,15 @@ calculate_start_seq(Db, {Seq, Uuid, Node}) ->
             0
     end.
 
-owner(Node, Seq, Epochs) ->
-    owner(Node, Seq, Epochs, infinity).
+is_owner(Node, Seq, Epochs) ->
+    Node =:= owner_of(Seq, Epochs).
 
-owner(_Node, _Seq, [], _HighSeq) ->
-    false;
-owner(Node, Seq, [{EpochNode, EpochSeq} | _Rest], HighSeq)
-  when Node =:= EpochNode andalso Seq < HighSeq andalso Seq > EpochSeq ->
-    true;
-owner(Node, Seq, [{_EpochNode, EpochSeq} | Rest], _HighSeq) ->
-    owner(Node, Seq, Rest, EpochSeq).
+owner_of(_Seq, []) ->
+    undefined;
+owner_of(Seq, [{EpochNode, EpochSeq} | _Rest]) when Seq > EpochSeq ->
+    EpochNode;
+owner_of(Seq, [_ | Rest]) ->
+    owner_of(Seq, Rest).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -411,11 +410,11 @@ calculate_start_seq_test() ->
     %% return integer if we didn't get a vector.
     ?assertEqual(4, calculate_start_seq(#db{}, 4)).
 
-owner_test() ->
-    ?assertNot(owner(foo, 1, [])),
-    ?assert(owner(foo, 1, [{foo, 1}])),
-    ?assert(owner(foo, 50, [{bar, 100}, {foo, 1}])),
-    ?assert(owner(foo, 50, [{baz, 200}, {bar, 100}, {foo, 1}])),
-    ?assert(owner(bar, 150, [{baz, 200}, {bar, 100}, {foo, 1}])).
+is_owner_test() ->
+    ?assertNot(is_owner(foo, 1, [])),
+    ?assert(is_owner(foo, 1, [{foo, 1}])),
+    ?assert(is_owner(foo, 50, [{bar, 100}, {foo, 1}])),
+    ?assert(is_owner(foo, 50, [{baz, 200}, {bar, 100}, {foo, 1}])),
+    ?assert(is_owner(bar, 150, [{baz, 200}, {bar, 100}, {foo, 1}])).
 
 -endif.
