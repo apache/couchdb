@@ -49,7 +49,10 @@ class DocRef(object):
 
 #: The URL of the HTTP/1.1 RFC which defines the HTTP methods OPTIONS, GET,
 #: HEAD, POST, PUT, DELETE, TRACE, and CONNECT.
-RFC2616 = 'http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html'
+RFC2616_METHODS = 'http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html'
+
+#: The URL of the HTTP/1.1 RFC which defines the HTTP headers.
+RFC2616_HEADERS = 'http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html'
 
 #: The name to use for section anchors in RFC2616.
 RFC2616ANCHOR = 'sec'
@@ -63,17 +66,70 @@ RFC5789ANCHOR = 'section-'
 #: Mapping from lowercase HTTP method name to :class:`DocRef` object which
 #: maintains the URL which points to the section of the RFC which defines that
 #: HTTP method.
-DOCREFS = {
+METHOD_REFS = {
     'patch': DocRef(RFC5789, RFC5789ANCHOR, 2),
-    'options': DocRef(RFC2616, RFC2616ANCHOR, 9.2),
-    'get': DocRef(RFC2616, RFC2616ANCHOR, 9.3),
-    'head': DocRef(RFC2616, RFC2616ANCHOR, 9.4),
-    'post': DocRef(RFC2616, RFC2616ANCHOR, 9.5),
-    'put': DocRef(RFC2616, RFC2616ANCHOR, 9.6),
-    'delete': DocRef(RFC2616, RFC2616ANCHOR, 9.7),
-    'trace': DocRef(RFC2616, RFC2616ANCHOR, 9.8),
-    'connect': DocRef(RFC2616, RFC2616ANCHOR, 9.9)
+    'options': DocRef(RFC2616_METHODS, RFC2616ANCHOR, 9.2),
+    'get': DocRef(RFC2616_METHODS, RFC2616ANCHOR, 9.3),
+    'head': DocRef(RFC2616_METHODS, RFC2616ANCHOR, 9.4),
+    'post': DocRef(RFC2616_METHODS, RFC2616ANCHOR, 9.5),
+    'put': DocRef(RFC2616_METHODS, RFC2616ANCHOR, 9.6),
+    'delete': DocRef(RFC2616_METHODS, RFC2616ANCHOR, 9.7),
+    'trace': DocRef(RFC2616_METHODS, RFC2616ANCHOR, 9.8),
+    'connect': DocRef(RFC2616_METHODS, RFC2616ANCHOR, 9.9)
 }
+
+#: Mapping from HTTP header name to :class:`DocRef` object which
+#: maintains the URL which points to the related section of the RFC.
+HEADER_REFS = {
+    'Accept': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.1),
+    'Accept-Charset': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.2),
+    'Accept-Encoding': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.3),
+    'Accept-Language': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.4),
+    'Accept-Ranges': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.5),
+    'Age': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.6),
+    'Allow': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.7),
+    'Authorization': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.8),
+    'Cache-Control': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.9),
+    'Connection': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.10),
+    'Content-Encoding': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.11),
+    'Content-Language': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.12),
+    'Content-Length': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.13),
+    'Content-Location': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.14),
+    'Content-MD5': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.15),
+    'Content-Range': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.16),
+    'Content-Type': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.17),
+    'Date': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.18),
+    'ETag': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.19),
+    'Expect': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.20),
+    'Expires': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.21),
+    'From': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.22),
+    'Host': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.23),
+    'If-Match': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.24),
+    'If-Modified-Since': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.25),
+    'If-None-Match': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.26),
+    'If-Range': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.27),
+    'If-Unmodified-Since': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.28),
+    'Last-Modified': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.29),
+    'Location': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.30),
+    'Max-Forwards': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.31),
+    'Pragma': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.32),
+    'Proxy-Authenticate': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.33),
+    'Proxy-Authorization': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.34),
+    'Range': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.35),
+    'Referer': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.36),
+    'Retry-After': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.37),
+    'Server': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.38),
+    'TE': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.39),
+    'Trailer': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.40),
+    'Transfer-Encoding': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.41),
+    'Upgrade': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.42),
+    'User-Agent': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.43),
+    'Vary': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.44),
+    'Via': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.45),
+    'Warning': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.46),
+    'WWW-Authenticate': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.47)
+}
+
 
 HTTP_STATUS_CODES = {
     100: 'Continue',
@@ -299,13 +355,30 @@ def http_method_role(name, rawtext, text, lineno, inliner,
     if content is None:
         content = []
     method = str(text).lower()
-    if method not in DOCREFS:
+    if method not in METHOD_REFS:
         msg = inliner.reporter.error('%s is not valid HTTP method' % method,
                                      lineno=lineno)
         prb = inliner.problematic(rawtext, rawtext, msg)
         return [prb], [msg]
-    url = str(DOCREFS[method])
+    url = str(METHOD_REFS[method])
     node = nodes.reference(rawtext, method.upper(), refuri=url, **options)
+    return [node], []
+
+
+def http_header_role(name, rawtext, text, lineno, inliner,
+                     options=None, content=None):
+    if options is None:
+        options = {}
+    if content is None:
+        content = []
+    header = str(text).title()
+    if header not in HEADER_REFS:
+        msg = inliner.reporter.error('%s is not unknown HTTP header' % header,
+                                     lineno=lineno)
+        prb = inliner.problematic(rawtext, rawtext, msg)
+        return [prb], [msg]
+    url = str(HEADER_REFS[header])
+    node = nodes.reference(rawtext, header, refuri=url, **options)
     return [node], []
 
 
@@ -397,7 +470,8 @@ class HTTPDomain(Domain):
         'delete': HTTPXRefRole('delete'),
         'trace': HTTPXRefRole('trace'),
         'statuscode': http_statuscode_role,
-        'method': http_method_role
+        'method': http_method_role,
+        'header': http_header_role
     }
 
     initial_data = {
@@ -428,9 +502,13 @@ class HTTPDomain(Domain):
         try:
             info = self.data[str(typ)][target]
         except KeyError:
+            text = contnode.rawsource
             if typ == 'statuscode':
-                text = contnode.rawsource
                 return http_statuscode_role(None, text, text, None, None)[0][0]
+            elif typ == 'mailheader':
+                return http_header_role(None, text, text, None, None)[0][0]
+            else:
+                return None
         else:
             anchor = http_resource_anchor(typ, target)
             title = typ.upper() + ' ' + target
