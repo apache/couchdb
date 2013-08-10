@@ -153,8 +153,8 @@ API Reference
 
 - :ref:`api/db.head` -- Check Database existence
 - :ref:`api/db/ensure_full_commit` -- Ensure that all changes are stored on disk
-- :ref:`api/local/doc.get` -- Read the last Checkpoint
-- :ref:`api/local/doc.put` -- Save a new Checkpoint
+- :http:get:`/{db}/_local/{id}` -- Read the last Checkpoint
+- :http:put:`/{db}/_local/{id}` -- Save a new Checkpoint
 
 Push Only
 ~~~~~~~~~
