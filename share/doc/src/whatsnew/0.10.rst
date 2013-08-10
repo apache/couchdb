@@ -57,7 +57,7 @@ Show and List API change
 ------------------------
 
 Show and List functions must have a new structure in 0.10.
-See `Formatting_with_Show_and_List_ for details.
+See `Formatting_with_Show_and_List`_ for details.
 
 .. _Formatting_with_Show_and_List: http://wiki.apache.org/couchdb/Formatting_with_Show_and_List
 
