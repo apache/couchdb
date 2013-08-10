@@ -60,8 +60,14 @@ RFC2616ANCHOR = 'sec'
 #: The URL of the RFC which defines the HTTP PATCH method.
 RFC5789 = 'http://tools.ietf.org/html/rfc5789'
 
+#: The URL of the RFC which defines the HTTP COPY method.
+RFC2518 = 'http://tools.ietf.org/html/rfc2518'
+
 #: The name to use for section anchors in RFC5789.
 RFC5789ANCHOR = 'section-'
+
+#: The name to use for section anchors in RFC2518.
+RFC2518ANCHOR = 'section-'
 
 #: Mapping from lowercase HTTP method name to :class:`DocRef` object which
 #: maintains the URL which points to the section of the RFC which defines that
@@ -75,7 +81,8 @@ METHOD_REFS = {
     'put': DocRef(RFC2616_METHODS, RFC2616ANCHOR, 9.6),
     'delete': DocRef(RFC2616_METHODS, RFC2616ANCHOR, 9.7),
     'trace': DocRef(RFC2616_METHODS, RFC2616ANCHOR, 9.8),
-    'connect': DocRef(RFC2616_METHODS, RFC2616ANCHOR, 9.9)
+    'connect': DocRef(RFC2616_METHODS, RFC2616ANCHOR, 9.9),
+    'copy': DocRef(RFC2518, RFC2518ANCHOR, 8.8)
 }
 
 #: Mapping from HTTP header name to :class:`DocRef` object which
@@ -302,6 +309,11 @@ class HTTPTrace(HTTPResource):
     method = 'trace'
 
 
+class HTTPCopy(HTTPResource):
+
+    method = 'copy'
+
+
 def http_statuscode_role(name, rawtext, text, lineno, inliner,
                          options=None, content=None):
     if options is None:
@@ -448,7 +460,8 @@ class HTTPDomain(Domain):
         'put': ObjType('put', 'put', 'obj'),
         'patch': ObjType('patch', 'patch', 'obj'),
         'delete': ObjType('delete', 'delete', 'obj'),
-        'trace': ObjType('trace', 'trace', 'obj')
+        'trace': ObjType('trace', 'trace', 'obj'),
+        'copy': ObjType('copy', 'copy', 'obj')
     }
 
     directives = {
@@ -459,7 +472,8 @@ class HTTPDomain(Domain):
         'put': HTTPPut,
         'patch': HTTPPatch,
         'delete': HTTPDelete,
-        'trace': HTTPTrace
+        'trace': HTTPTrace,
+        'copy': HTTPCopy
     }
 
     roles = {
@@ -471,6 +485,7 @@ class HTTPDomain(Domain):
         'patch': HTTPXRefRole('patch'),
         'delete': HTTPXRefRole('delete'),
         'trace': HTTPXRefRole('trace'),
+        'copy': HTTPXRefRole('copy'),
         'statuscode': http_statuscode_role,
         'method': http_method_role,
         'header': http_header_role
@@ -484,7 +499,8 @@ class HTTPDomain(Domain):
         'put': {},
         'patch': {},
         'delete': {},
-        'trace': {}
+        'trace': {},
+        'copy': {}
     }
 
     indices = [HTTPIndex]
@@ -568,7 +584,8 @@ class HTTPLexer(RegexLexer):
 
     tokens = {
         'root': [
-            (r'(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE)( +)([^ ]+)( +)'
+            (r'(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE|COPY)'
+             r'( +)([^ ]+)( +)'
              r'(HTTPS?)(/)(1\.[01])(\r?\n|$)',
              bygroups(Name.Function, Text, Name.Namespace, Text,
                       Keyword.Reserved, Operator, Number, Text),
