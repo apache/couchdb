@@ -38,270 +38,286 @@ A list of the available methods and URL paths are provided below:
 | DELETE | /_config/section/key    | Delete the current setting                |
 +--------+-------------------------+-------------------------------------------+
 
-.. _api/config.get:
+``/_config``
+============
 
-``GET /_config``
-================
+.. http:get:: /_config
 
-* **Method**: ``GET /_config``
-* **Request**: None
-* **Response**: Returns a structure configuration name and value pairs,
-  organized by section
-* **Admin Privileges Required**: yes
-* **Return Codes**:
+  Returns the entire CouchDB server configuration as a JSON structure. The
+  structure is organized by different configuration sections, with
+  individual values.
 
-  * **200**:
-    Request completed successfully.
+  :code 200: Request completed successfully
+  :code 401: Administrator's privileges required
 
-Returns the entire CouchDB server configuration as a JSON structure. The
-structure is organized by different configuration sections, with
-individual values.
+  **Request**
 
-For example, to get the configuration for a server:
+  .. code-block:: http
 
-.. code-block:: http
-
-    GET http://couchdb:5984/_config
+    GET /_config HTTP/1.1
     Accept: application/json
+    Host: localhost:5984
 
-The response is the JSON structure:
+  **Response**:
 
-.. code-block:: javascript
+  .. code-block:: http
+
+    HTTP/1.1 200 OK
+    Cache-Control: must-revalidate
+    Content-Length: 4148
+    Content-Type: application/json
+    Date: Sat, 10 Aug 2013 12:01:42 GMT
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
 
     {
-       "query_server_config" : {
-          "reduce_limit" : "true"
-       },
-       "couchdb" : {
-          "os_process_timeout" : "5000",
-          "max_attachment_chunk_size" : "4294967296",
-          "max_document_size" : "4294967296",
-          "uri_file" : "/var/lib/couchdb/couch.uri",
-          "max_dbs_open" : "100",
-          "view_index_dir" : "/var/lib/couchdb",
-          "util_driver_dir" : "/usr/lib64/couchdb/erlang/lib/couch-1.0.1/priv/lib",
-          "database_dir" : "/var/lib/couchdb",
-          "delayed_commits" : "true"
-       },
-       "attachments" : {
-          "compressible_types" : "text/*, application/javascript, application/json,  application/xml",
-          "compression_level" : "8"
-       },
-       "uuids" : {
-          "algorithm" : "utc_random"
-       },
-       "daemons" : {
-          "view_manager" : "{couch_view, start_link, []}",
-          "auth_cache" : "{couch_auth_cache, start_link, []}",
-          "uuids" : "{couch_uuids, start, []}",
-          "stats_aggregator" : "{couch_stats_aggregator, start, []}",
-          "query_servers" : "{couch_query_servers, start_link, []}",
-          "httpd" : "{couch_httpd, start_link, []}",
-          "stats_collector" : "{couch_stats_collector, start, []}",
-          "db_update_notifier" : "{couch_db_update_notifier_sup, start_link, []}",
-          "external_manager" : "{couch_external_manager, start_link, []}"
-       },
-       "stats" : {
-          "samples" : "[0, 60, 300, 900]",
-          "rate" : "1000"
-       },
-       "httpd" : {
-          "vhost_global_handlers" : "_utils, _uuids, _session, _oauth, _users",
-          "secure_rewrites" : "true",
-          "authentication_handlers" : "{couch_httpd_oauth, oauth_authentication_handler},
-                                       {couch_httpd_auth, cookie_authentication_handler},
-                                       {couch_httpd_auth, default_authentication_handler}",
-          "port" : "5984",
-          "default_handler" : "{couch_httpd_db, handle_request}",
-          "allow_jsonp" : "false",
-          "bind_address" : "192.168.0.2",
-          "max_connections" : "2048"
-       },
-       "query_servers" : {
-          "javascript" : "/usr/bin/couchjs /usr/share/couchdb/server/main.js"
-       },
-       "couch_httpd_auth" : {
-          "authentication_db" : "_users",
-          "require_valid_user" : "false",
-          "authentication_redirect" : "/_utils/session.html",
-          "timeout" : "600",
-          "auth_cache_size" : "50"
-       },
-       "httpd_db_handlers" : {
-          "_design" : "{couch_httpd_db, handle_design_req}",
-          "_compact" : "{couch_httpd_db, handle_compact_req}",
-          "_view_cleanup" : "{couch_httpd_db, handle_view_cleanup_req}",
-          "_temp_view" : "{couch_httpd_view, handle_temp_view_req}",
-          "_changes" : "{couch_httpd_db, handle_changes_req}"
-       },
-       "replicator" : {
-          "max_http_sessions" : "10",
-          "max_http_pipeline_size" : "10"
-       },
-       "log" : {
-          "include_sasl" : "true",
-          "level" : "info",
-          "file" : "/var/log/couchdb/couch.log"
-       },
-       "httpd_design_handlers" : {
-          "_update" : "{couch_httpd_show, handle_doc_update_req}",
-          "_show" : "{couch_httpd_show, handle_doc_show_req}",
-          "_info" : "{couch_httpd_db,   handle_design_info_req}",
-          "_list" : "{couch_httpd_show, handle_view_list_req}",
-          "_view" : "{couch_httpd_view, handle_view_req}",
-          "_rewrite" : "{couch_httpd_rewrite, handle_rewrite_req}"
-       },
-       "httpd_global_handlers" : {
-          "_replicate" : "{couch_httpd_misc_handlers, handle_replicate_req}",
-          "/" : "{couch_httpd_misc_handlers, handle_welcome_req, <<\"Welcome\">>}",
-          "_config" : "{couch_httpd_misc_handlers, handle_config_req}",
-          "_utils" : "{couch_httpd_misc_handlers, handle_utils_dir_req, \"/usr/share/couchdb/www\"}",
-          "_active_tasks" : "{couch_httpd_misc_handlers, handle_task_status_req}",
-          "_session" : "{couch_httpd_auth, handle_session_req}",
-          "_log" : "{couch_httpd_misc_handlers, handle_log_req}",
-          "favicon.ico" : "{couch_httpd_misc_handlers, handle_favicon_req, \"/usr/share/couchdb/www\"}",
-          "_all_dbs" : "{couch_httpd_misc_handlers, handle_all_dbs_req}",
-          "_oauth" : "{couch_httpd_oauth, handle_oauth_req}",
-          "_restart" : "{couch_httpd_misc_handlers, handle_restart_req}",
-          "_uuids" : "{couch_httpd_misc_handlers, handle_uuids_req}",
-          "_stats" : "{couch_httpd_stats_handlers, handle_stats_req}"
-       }
+      "attachments": {
+          "compressible_types": "text/*, application/javascript, application/json,  application/xml",
+          "compression_level": "8"
+      },
+      "couch_httpd_auth": {
+          "auth_cache_size": "50",
+          "authentication_db": "_users",
+          "authentication_redirect": "/_utils/session.html",
+          "require_valid_user": "false",
+          "timeout": "600"
+      },
+      "couchdb": {
+          "database_dir": "/var/lib/couchdb",
+          "delayed_commits": "true",
+          "max_attachment_chunk_size": "4294967296",
+          "max_dbs_open": "100",
+          "max_document_size": "4294967296",
+          "os_process_timeout": "5000",
+          "uri_file": "/var/lib/couchdb/couch.uri",
+          "util_driver_dir": "/usr/lib64/couchdb/erlang/lib/couch-1.0.1/priv/lib",
+          "view_index_dir": "/var/lib/couchdb"
+      },
+      "daemons": {
+          "auth_cache": "{couch_auth_cache, start_link, []}",
+          "db_update_notifier": "{couch_db_update_notifier_sup, start_link, []}",
+          "external_manager": "{couch_external_manager, start_link, []}",
+          "httpd": "{couch_httpd, start_link, []}",
+          "query_servers": "{couch_query_servers, start_link, []}",
+          "stats_aggregator": "{couch_stats_aggregator, start, []}",
+          "stats_collector": "{couch_stats_collector, start, []}",
+          "uuids": "{couch_uuids, start, []}",
+          "view_manager": "{couch_view, start_link, []}"
+      },
+      "httpd": {
+          "allow_jsonp": "false",
+          "authentication_handlers": "{couch_httpd_oauth, oauth_authentication_handler}, {couch_httpd_auth, cookie_authentication_handler}, {couch_httpd_auth, default_authentication_handler}",
+          "bind_address": "192.168.0.2",
+          "default_handler": "{couch_httpd_db, handle_request}",
+          "max_connections": "2048",
+          "port": "5984",
+          "secure_rewrites": "true",
+          "vhost_global_handlers": "_utils, _uuids, _session, _oauth, _users"
+      },
+      "httpd_db_handlers": {
+          "_changes": "{couch_httpd_db, handle_changes_req}",
+          "_compact": "{couch_httpd_db, handle_compact_req}",
+          "_design": "{couch_httpd_db, handle_design_req}",
+          "_temp_view": "{couch_httpd_view, handle_temp_view_req}",
+          "_view_cleanup": "{couch_httpd_db, handle_view_cleanup_req}"
+      },
+      "httpd_design_handlers": {
+          "_info": "{couch_httpd_db,   handle_design_info_req}",
+          "_list": "{couch_httpd_show, handle_view_list_req}",
+          "_rewrite": "{couch_httpd_rewrite, handle_rewrite_req}",
+          "_show": "{couch_httpd_show, handle_doc_show_req}",
+          "_update": "{couch_httpd_show, handle_doc_update_req}",
+          "_view": "{couch_httpd_view, handle_view_req}"
+      },
+      "httpd_global_handlers": {
+          "/": "{couch_httpd_misc_handlers, handle_welcome_req, <<\"Welcome\">>}",
+          "_active_tasks": "{couch_httpd_misc_handlers, handle_task_status_req}",
+          "_all_dbs": "{couch_httpd_misc_handlers, handle_all_dbs_req}",
+          "_config": "{couch_httpd_misc_handlers, handle_config_req}",
+          "_log": "{couch_httpd_misc_handlers, handle_log_req}",
+          "_oauth": "{couch_httpd_oauth, handle_oauth_req}",
+          "_replicate": "{couch_httpd_misc_handlers, handle_replicate_req}",
+          "_restart": "{couch_httpd_misc_handlers, handle_restart_req}",
+          "_session": "{couch_httpd_auth, handle_session_req}",
+          "_stats": "{couch_httpd_stats_handlers, handle_stats_req}",
+          "_utils": "{couch_httpd_misc_handlers, handle_utils_dir_req, \"/usr/share/couchdb/www\"}",
+          "_uuids": "{couch_httpd_misc_handlers, handle_uuids_req}",
+          "favicon.ico": "{couch_httpd_misc_handlers, handle_favicon_req, \"/usr/share/couchdb/www\"}"
+      },
+      "log": {
+          "file": "/var/log/couchdb/couch.log",
+          "include_sasl": "true",
+          "level": "info"
+      },
+      "query_server_config": {
+          "reduce_limit": "true"
+      },
+      "query_servers": {
+          "javascript": "/usr/bin/couchjs /usr/share/couchdb/server/main.js"
+      },
+      "replicator": {
+          "max_http_pipeline_size": "10",
+          "max_http_sessions": "10"
+      },
+      "stats": {
+          "rate": "1000",
+          "samples": "[0, 60, 300, 900]"
+      },
+      "uuids": {
+          "algorithm": "utc_random"
+      }
     }
         
 
 .. _api/config/section:
-.. _api/config/section.get:
 
-``GET /_config/section``
-========================
+``/_config/section``
+====================
 
-* **Method**: ``GET /_config/section``
-* **Request**: None
-* **Response**: All the configuration values within a specified section
-* **Admin Privileges Required**: yes
-* **Return Codes**:
+.. http:get:: /_config/<section>
 
-  * **200**:
-    Request completed successfully.
+  Gets the configuration structure for a single section.
 
-Gets the configuration structure for a single section. For example, to
-retrieve the CouchDB configuration section values:
+  :code 200: Request completed successfully
+  :code 401: Administrator's privileges required
 
-.. code-block:: http
+  **Request**:
 
-    GET http://couchdb:5984/_config/couchdb
+  .. code-block:: http
+
+    GET /_config/httpd HTTP/1.1
     Accept: application/json
+    Host: localhost:5984
 
-The returned JSON contains just the configuration values for this
-section:
+  **Response**:
 
-.. code-block:: javascript
+  .. code-block:: http
+
+    HTTP/1.1 200 OK
+    Cache-Control: must-revalidate
+    Content-Length: 444
+    Content-Type: application/json
+    Date: Sat, 10 Aug 2013 12:10:40 GMT
+    Server: CouchDB/1.4.0+build.c843cef (Erlang OTP/R16B)
 
     {
-       "os_process_timeout" : "5000",
-       "max_attachment_chunk_size" : "4294967296",
-       "max_document_size" : "4294967296",
-       "uri_file" : "/var/lib/couchdb/couch.uri",
-       "max_dbs_open" : "100",
-       "view_index_dir" : "/var/lib/couchdb",
-       "util_driver_dir" : "/usr/lib64/couchdb/erlang/lib/couch-1.0.1/priv/lib",
-       "database_dir" : "/var/lib/couchdb",
-       "delayed_commits" : "true"
+        "allow_jsonp": "false",
+        "authentication_handlers": "{couch_httpd_oauth, oauth_authentication_handler}, {couch_httpd_auth, cookie_authentication_handler}, {couch_httpd_auth, default_authentication_handler}",
+        "bind_address": "127.0.0.1",
+        "default_handler": "{couch_httpd_db, handle_request}",
+        "enable_cors": "false",
+        "log_max_chunk_size": "1000000",
+        "port": "5984",
+        "secure_rewrites": "true",
+        "vhost_global_handlers": "_utils, _uuids, _session, _oauth, _users"
     }
 
+
 .. _api/config/section/key:
-.. _api/config/section/key.get:
 
-``GET /_config/section/key``
-============================
+``/_config/section/key``
+========================
 
-* **Method**: ``GET /_config/section/key``
-* **Request**: None
-* **Response**: Value of the specified key/section
-* **Admin Privileges Required**: yes
-* **Return Codes**:
+.. http:get:: /_config/<section>/<key>
 
-  * **200**:
-    Request completed successfully.
+  Gets a single configuration value from within a specific configuration
+  section.
 
-Gets a single configuration value from within a specific configuration
-section. For example, to obtain the current log level:
+  :code 200: Request completed successfully
+  :code 401: Administrator's privileges required
 
-.. code-block:: http
+  **Request**:
 
-    GET http://couchdb:5984/_config/log/level
+  .. code-block:: http
+
+    GET /_config/log/level HTTP/1.1
     Accept: application/json
+    Host: localhost:5984
 
-Returns the string of the log level:
+  **Response**:
 
-.. code-block:: javascript
+  .. code-block:: http
+
+    HTTP/1.1 200 OK
+    Cache-Control: must-revalidate
+    Content-Length: 8
+    Content-Type: application/json
+    Date: Sat, 10 Aug 2013 12:12:59 GMT
+    Server: CouchDB/1.3.1 (Erlang OTP/R15B02)
+
+    "debug"
+
+
+  .. note::
+     The returned value will be the JSON of the value, which may be a
+     string or numeric value, or an array or object. Some client
+     environments may not parse simple strings or numeric values as valid JSON.
+
+
+.. http:put:: /_config/<section>/<key>
+
+  Updates a configuration value. The new value should be supplied in the
+  request body in the corresponding JSON format. If you are setting a string
+  value, you must supply a valid JSON string. In response CouchDB sends old
+  value for target section key.
+
+  :reqheader Content-Type: :mimetype:`application/json`
+  :code 200: Request completed successfully
+  :code 400: Invalid JSON request body
+  :code 401: Administrator's privileges required
+  :code 500: Error setting configuration
+
+  **Request**:
+
+  .. code-block:: http
+
+    PUT /_config/log/level HTTP/1.1
+    Accept: application/json
+    Content-Length: 7
+    Content-Type: application/json
+    Host: localhost:5984
 
     "info"
 
-.. note::
-   The returned value will be the JSON of the value, which may be a
-   string or numeric value, or an array or object. Some client
-   environments may not parse simple strings or numeric values as valid JSON.
+  **Response**:
 
-.. _api/config/section/key.put:
+  .. code-block:: http
 
-``PUT /_config/section/key``
-============================
-
-* **Method**: ``PUT /_config/section/key``
-* **Request**: Value structure
-* **Response**: Previous value
-* **Admin Privileges Required**: yes
-* **Return Codes**:
-
-  * **200**:
-    Configuration option updated successfully
-
-  * **500**:
-    Error setting configuration
-
-Updates a configuration value. The new value should be supplied in the
-request body in the corresponding JSON format. For example, if you are
-setting a string value, you must supply a valid JSON string.
-
-For example, to set the function used to generate UUIDs by the
-``GET /_uuids`` API call to use the ``utc_random`` generator:
-
-.. code-block:: http
-
-    PUT http://couchdb:5984/_config/uuids/algorithm
+    HTTP/1.1 200 OK
+    Cache-Control: must-revalidate
+    Content-Length: 8
     Content-Type: application/json
+    Date: Sat, 10 Aug 2013 12:12:59 GMT
+    Server: CouchDB/1.3.1 (Erlang OTP/R15B02)
 
-    "utc_random"
+    "debug"
 
-The return value will be empty, with the response code indicating the
-success or failure of the configuration setting.
 
-.. _api/config/section/key.delete:
+.. http:delete:: /_config/<section>/<key>
 
-``DELETE /_config/section/key``
-===============================
+  Deletes a configuration value. The returned JSON will be the value of
+  the configuration parameter before it was deleted.
 
-* **Method**: ``DELETE /_config/section/key``
-* **Request**: None
-* **Response**: Previous value
-* **Admin Privileges Required**: yes
-* **Return Codes**:
+  :code 200: Request completed successfully
+  :code 401: Administrator's privileges required
+  :code 404: Specified configuration option not found
 
-  * **409**:
-    Supplied revision is incorrect or missing
+  **Request**:
 
-Deletes a configuration value. The returned JSON will be the value of
-the configuration parameter before it was deleted. For example, to
-delete the UUID parameter:
+  .. code-block:: http
 
-.. code-block:: http
+    DELETE /_config/log/level HTTP/1.1
+    Accept: application/json
+    Host: localhost:5984
 
-    DELETE http://couchdb:5984/_config/uuids/algorithm
+  **Response**:
+
+  .. code-block:: http
+
+    HTTP/1.1 200 OK
+    Cache-Control: must-revalidate
+    Content-Length: 7
     Content-Type: application/json
+    Date: Sat, 10 Aug 2013 12:29:03 GMT
+    Server: CouchDB/1.3.1 (Erlang OTP/R15B02)
 
-The returned value is the last configured UUID function:
-
-.. code-block:: javascript
-
-    "random"
+    "info"

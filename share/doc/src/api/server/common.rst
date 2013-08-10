@@ -860,7 +860,7 @@ The UUID type is determined by the :ref:`UUID algorithm <config/uuids/algorithm>
 setting in the CouchDB configuration.
 
 The UUID type could be changed in anytime through
-:ref:`Config API <api/config/section/key.put>`. For example, changing the UUID
+:ref:`Config API <api/config/section/key>`. For example, changing the UUID
 type to ``random`` use next HTTP request:
 
 .. code-block:: http
