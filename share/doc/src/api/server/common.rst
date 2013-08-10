@@ -12,108 +12,177 @@
 
 
 .. _api/server/root:
-.. _api/server/root.get:
 
-``GET /``
-=========
+``/``
+=====
 
-* **Method**: ``GET /``
-* **Request**: None
-* **Response**: Welcome message and version
-* **Admin Privileges Required**: no
-* **Return Codes**:
+.. http:get:: /
 
-  * **200**:
-    Request completed successfully.
+  Accessing the root of a CouchDB instance returns meta information about
+  the instance. The response is a JSON structure containing information
+  about the server, including a welcome message and the version of the
+  server.
 
-Accessing the root of a CouchDB instance returns meta information about
-the instance. The response is a JSON structure containing information
-about the server, including a welcome message and the version of the
-server.
+  **Request**:
 
-.. code-block:: javascript
+  .. code-block:: http
+
+    GET / HTTP/1.1
+    Accept: application/json
+    Host: localhost:5984
+
+  **Response**:
+
+  .. code-block:: http
+
+    HTTP/1.1 200 OK
+    Cache-Control: must-revalidate
+    Content-Length: 179
+    Content-Type: application/json
+    Date: Sat, 10 Aug 2013 06:33:33 GMT
+    Server: CouchDB/1.3.1 (Erlang OTP/R15B02)
 
     {
-       "couchdb" : "Welcome",
-       "version" : "1.0.1"
+        "couchdb": "Welcome",
+        "uuid": "85fb71bf700c17267fef77535820e371",
+        "vendor": {
+            "name": "The Apache Software Foundation",
+            "version": "1.3.1"
+        },
+        "version": "1.3.1"
     }
 
+
 .. _api/server/active_tasks:
-.. _api/server/active_tasks.get:
 
-``GET /_active_tasks``
-======================
+``/_active_tasks``
+==================
 
-* **Method**: ``GET /_active_tasks``
-* **Request**: None
-* **Response**: List of running tasks, including the task type, name, status
-  and process ID
-* **Admin Privileges Required**: yes
-* **Return Codes**:
+.. http:get:: /_active_tasks
 
-  * **200**:
-    Request completed successfully.
+  List of running tasks, including the task type, name, status
+  and process ID. The result is a JSON array of the currently running tasks,
+  with each task being described with a single object.
 
-You can obtain a list of active tasks by using the ``/_active_tasks``
-URL. The result is a JSON array of the currently running tasks, with
-each task being described with a single object. For example:
+  :code 200: Request completed successfully.
+  :code 401: Administrator's privileges required.
 
-.. code-block:: javascript
+  The returned structure includes the following fields for each task:
+
+  :json number changes_done: Processed changes
+  :json string database: Source database
+  :json string pid: Process ID
+  :json number progress: Current percentage progress
+  :json number started_on: Task start time as unix timestamp
+  :json string status: Task status message
+  :json string task: Task name
+  :json number total_changes: Total changes to process
+  :json string type: Operation Type
+  :json number updated_on: Unix timestamp of last operation update
+
+  Depending on operation type set of provided fields might be different.
+
+  **Request**:
+
+  .. code-block:: http
+
+    GET /_active_tasks HTTP/1.1
+    Accept: application/json
+    Host: localhost:5984
+
+  **Response**:
+
+  .. code-block:: http
+
+    HTTP/1.1 200 OK
+    Cache-Control: must-revalidate
+    Content-Length: 1690
+    Content-Type: application/json
+    Date: Sat, 10 Aug 2013 06:37:31 GMT
+    Server: CouchDB/1.3.1 (Erlang OTP/R15B02)
 
     [
-       {
-        "pid" : "<0.11599.0>",
-        "status" : "Copied 0 of 18369 changes (0%)",
-        "task" : "recipes",
-        "type" : "Database Compaction"
+        {
+            "changes_done": 64438,
+            "database": "mailbox",
+            "pid": "<0.12986.1>",
+            "progress": 84,
+            "started_on": 1376116576,
+            "total_changes": 76215,
+            "type": "database_compaction",
+            "updated_on": 1376116619
+        },
+        {
+            "changes_done": 14443,
+            "database": "mailbox",
+            "design_document": "c9753817b3ba7c674d92361f24f59b9f",
+            "pid": "<0.10461.3>",
+            "progress": 18,
+            "started_on": 1376116621,
+            "total_changes": 76215,
+            "type": "indexer",
+            "updated_on": 1376116650
+        },
+        {
+            "changes_done": 5454,
+            "database": "mailbox",
+            "design_document": "_design/meta",
+            "pid": "<0.6838.4>",
+            "progress": 7,
+            "started_on": 1376116632,
+            "total_changes": 76215,
+            "type": "indexer",
+            "updated_on": 1376116651
+        },
+        {
+            "checkpointed_source_seq": 68585,
+            "continuous": false,
+            "doc_id": null,
+            "doc_write_failures": 0,
+            "docs_read": 4524,
+            "docs_written": 4524,
+            "missing_revisions_found": 4524,
+            "pid": "<0.1538.5>",
+            "progress": 44,
+            "replication_id": "9bc1727d74d49d9e157e260bb8bbd1d5",
+            "revisions_checked": 4524,
+            "source": "mailbox",
+            "source_seq": 154419,
+            "started_on": 1376116644,
+            "target": "http://mailsrv:5984/mailbox",
+            "type": "replication",
+            "updated_on": 1376116651
         }
     ]
 
-The returned structure includes the following fields for each task:
-
-* **tasks** [array]: Active Task
-
-  * **pid**:Process ID
-  * **status**: Task status message
-  * **task**: Task name
-  * **type**: Operation Type
-
-For operation type, valid values include:
-
--  ``Database Compaction``
-
--  ``Replication``
-
--  ``View Group Compaction``
-
--  ``View Group Indexer``
 
 .. _api/server/all_dbs:
-.. _api/server/all_dbs.get:
 
-``GET /_all_dbs``
-=================
+``/_all_dbs``
+=============
 
-* **Method**: ``GET /_all_dbs``
-* **Request**: None
-* **Response**: JSON list of DBs
-* **Admin Privileges Required**: no
-* **Return Codes**:
+.. http:get:: /_all_dbs
 
-  * **200**:
-    Request completed successfully.
+  Returns a list of all the databases in the CouchDB instance.
 
-Returns a list of all the databases in the CouchDB instance. For
-example:
+  **Request**:
 
-.. code-block:: http
+  .. code-block:: http
 
-    GET http://couchdb:5984/_all_dbs
+    GET /_all_dbs HTTP/1.1
     Accept: application/json
+    Host: localhost:5984
 
-The return is a JSON array:
+  **Response**:
 
-.. code-block:: javascript
+  .. code-block:: http
+
+    HTTP/1.1 200 OK
+    Cache-Control: must-revalidate
+    Content-Length: 52
+    Content-Type: application/json
+    Date: Sat, 10 Aug 2013 06:57:48 GMT
+    Server: CouchDB/1.3.1 (Erlang OTP/R15B02)
 
     [
        "_users",
@@ -125,117 +194,94 @@ The return is a JSON array:
 
 
 .. _api/server/db_updates:
-.. _api/server/db_updates.get:
 
-``GET /_db_updates``
-====================
+``/_db_updates``
+================
 
-* **Method**: ``GET /_db_updates``
-* **Request**: None
-* **Admin Privileges Required**: yes
-* **Query Arguments**:
+.. versionadded:: 1.4
 
-  * **Argument**: feed
+.. http:get:: /_db_updates
 
-    * **Description**: Format of the response feed
-    * **Optional**: yes
-    * **Type**: string
-    * **Default**: longpoll
-    * **Supported Values**:
+  Returns a list of all database events in the CouchDB instance.
 
-      * **longpoll**: Closes the connection after the first event.
-      * **continuous**: Send a line of JSON per event. Keeps the socket open
-        until ``timeout``.
-      * **eventsource**: Like, ``continuous``, but sends the events in
-        `EventSource <http://dev.w3.org/html5/eventsource/>`_ format.
+  :query string feed: Format of the response feed. Default is ``longpoll``.
+    Supported values: ``longpoll``, ``continuous``, ``eventsource``.
+  :query number timeout: Number of seconds until CouchDB closes the connection.
+    Default is ``60``.
+  :query boolean heartbeat: Whether CouchDB will send a newline character
+    (``\n``) on ``timeout``. Default is ``true``.
 
-  * **Argument**: timeout
+  :code 200: Request completed successfully.
+  :code 401: Administrator's privileges required.
 
-    * **Description**: Number of seconds until CouchDB closes the connection.
-    * **Optional**: yes
-    * **Type**: numeric
-    * **Default**: 60
+  Supported feeds are:
 
-  * **Argument**: heartbeat
+    - **longpoll**: Closes the connection after the first event.
+    - **continuous**: Send a line of JSON per event. Keeps the socket open
+      until ``timeout``.
+    - **eventsource**: Like, ``continuous``, but sends the events in
+      `EventSource <http://dev.w3.org/html5/eventsource/>`_ format.
 
-    * **Description**: Whether CouchDB will send a newline character (``\n``)
-      on ``timeout``.
-    * **Optional**: yes
-    * **Type**: boolean
-    * **Default**: true
+  The returned structure includes the following fields for each event:
 
-* **Return Codes**:
+  :json string db_name: Database name
+  :json boolean ok: Event operation status
+  :json string type: A database event is one of ``created``, ``updated``,
+    ``deleted``
 
-  * **200**
-    Request completed successfully.
+  **Request**:
 
-Returns a list of all database events in the CouchDB instance.
+  .. code-block:: http
 
-A database event is one of `created`, `updated`, `deleted`.
-
-For example:
-
-.. code-block:: http
-
-    GET http://couchdb:5984/_db_events?feed=continuous
+    GET /_db_updates HTTP/1.1
     Accept: application/json
+    Host: localhost:5984
 
-.. code-block:: javascript
+  .. code-block:: http
 
-    {"dbname":"my-database", "type":"created"}
-    {"dbname":"my-database", "type":"updated"}
-    {"dbname":"another-database", "type":"created"}
-    {"dbname":"my-database", "type":"deleted"}
-    {"dbname":"another-database", "type":"updated"}
+
+    HTTP/1.1 200 OK
+    Cache-Control: must-revalidate
+    Content-Type: application/json
+    Date: Sat, 10 Aug 2013 07:02:41 GMT
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Transfer-Encoding: chunked
+
+    {
+        "db_name": "mailbox",
+        "ok": true,
+        "type": "created"
+    }
 
 
 .. _api/server/log:
-.. _api/server/log.get:
 
-``GET /_log``
-=============
+``/_log``
+=========
 
-* **Method**: ``GET /_log``
-* **Request**: None
-* **Response**: Log content
-* **Admin Privileges Required**: yes
-* **Query Arguments**:
+.. http:get:: /_log
 
-  * **Argument**: bytes
+  Gets the CouchDB log, equivalent to accessing the local log file of the
+  corresponding CouchDB instance.
 
-    * **Description**:  Bytes to be returned
-    * **Optional**: yes
-    * **Type**: numeric
-    * **Default**: 1000
+  :resheader Content-Type: :mimetype:`text/plain; charset=utf-8`
+  :query number bytes: Bytes to be returned. Default is ``1000``.
+  :query number offset: Offset in bytes where the log tail should be started.
+    Default is ``0``.
+  :code 200: Request completed successfully.
+  :code 401: Administrator's privileges required.
 
-  * **Argument**: offset
+  **Request**:
 
-    * **Description**:  Offset in bytes where the log tail should be started
-    * **Optional**: yes
-    * **Type**: numeric
-    * **Default**: 0
+  .. code-block:: http
 
-* **Return Codes**:
+    GET /_log HTTP/1.1
+    Accept: application/json
+    Host: localhost:5984
 
-  * **200**:
-    Request completed successfully.
+  **Response**:
 
-Gets the CouchDB log, equivalent to accessing the local log file of the
-corresponding CouchDB instance.
-
-When you request the log, the response is returned as plain (UTF-8)
-text, with an HTTP ``Content-type`` header as ``text/plain``.
-
-For example, the request:
-
-.. code-block:: http
-
-    GET http://couchdb:5984/_log
-    Accept: */*
-
-The raw text is returned:
-
-.. code-block:: text
+  .. code-block:: text
 
     [Wed, 27 Oct 2010 10:49:42 GMT] [info] [<0.23338.2>] 192.168.0.2 - - 'PUT' /authdb 401
     [Wed, 27 Oct 2010 11:02:19 GMT] [info] [<0.23428.2>] 192.168.0.116 - - 'GET' /recipes/FishStew 200
@@ -251,65 +297,63 @@ following request:
 
 .. code-block:: http
 
-    GET /_log?bytes=500&offset=2000
+  GET /_log?bytes=500&offset=2000
 
 Reading of the log will start at 2000 bytes from the end of the log, and
 500 bytes will be shown.
 
+**How bytes/offset works?**
+
+CouchDB reads specified amount of ``bytes`` from the end of log file,
+jumping to ``offset`` bytes towards the beginning of the file first:
+
+.. code-block:: text
+
+   Log File    FilePos
+   ----------
+  |          |  10
+  |          |  20
+  |          |  30
+  |          |  40
+  |          |  50
+  |          |  60
+  |          |  70 -- Bytes = 20  --
+  |          |  80                 | Chunk
+  |          |  90 -- Offset = 10 --
+  |__________| 100
+
+
+
 .. _api/server/replicate:
-.. _api/server/replicate.post:
 
-``POST /_replicate``
-====================
+``/_replicate``
+===============
 
-.. todo:: POST /_replicate :: what response is?
+.. http:post:: /_replicate
 
-* **Method**: ``POST /_replicate``
-* **Request**: Replication specification
-* **Response**: TBD
-* **Admin Privileges Required**: yes
-* **Query Arguments**:
+  Request, configure, or stop, a replication operation.
 
-  * **Argument**: bytes
+  :code 200: Replication request successfully completed
+  :code 202: Continuous replication request has been accepted
+  :code 401: Administrator's privileges required
+  :code 404: Either the source or target DB is not found or attempt to
+    cancel unknown replication task
+  :code 500: JSON specification was invalid
 
-    * **Description**:  Bytes to be returned
-    * **Optional**: yes
-    * **Type**: numeric
-    * **Default**: 1000
+  The specification of the replication request is controlled through the
+  JSON content of the request. The JSON should be an object with the
+  fields defining the source, target and other options. The fields of the
+  JSON request are shown below:
 
-  * **Argument**: offset
-
-    * **Description**:  Offset in bytes where the log tail should be started
-    * **Optional**: yes
-    * **Type**: numeric
-    * **Default**: 0
-
-* **Return Codes**:
-
-  * **200**:
-    Replication request successfully completed
-  * **202**:
-    Continuous replication request has been accepted
-  * **404**:
-    Either the source or target DB is not found
-  * **500**:
-    JSON specification was invalid
-
-Request, configure, or stop, a replication operation.
-
-The specification of the replication request is controlled through the
-JSON content of the request. The JSON should be an object with the
-fields defining the source, target and other options. The fields of the
-JSON request are shown in the table below:
-
-* **cancel (optional)**:  Cancels the replication
-* **continuous (optional)**:  Configure the replication to be continuous
-* **create_target (optional)**:  Creates the target database
-* **doc_ids (optional)**:  Array of document IDs to be synchronized
-* **proxy (optional)**:  Address of a proxy server through which replication
-  should occur
-* **source**:  Source database name or URL
-* **target**:  Target database name or URL
+  :json boolean cancel: Cancels the replication
+  :json boolean continuous: Configure the replication to be continuous
+  :json boolean create_target: Creates the target database.
+    Required administrator's privileges on target server.
+  :json array doc_ids: Array of document IDs to be synchronized
+  :json string proxy: Address of a proxy server through which replication
+    should occur
+  :json string source: Source database name or URL
+  :json string target: Target database name or URL
 
 Replication Operation
 ---------------------
@@ -322,7 +366,7 @@ deleted (if they exist) on the destination database.
 Replication can be described as either push or pull replication:
 
 -  *Pull replication* is where the ``source`` is the remote CouchDB
-   instance, and the ``destination`` is the local database.
+   instance, and the ``target`` is the local database.
 
    Pull replication is the most useful solution to use if your source
    database has a permanent IP address, and your destination (local)
@@ -331,7 +375,7 @@ Replication can be described as either push or pull replication:
    to a mobile or other device from a central server.
 
 -  *Push replication* is where the ``source`` is a local database, and
-   ``destination`` is a remote database.
+   ``target`` is a remote database.
 
 Specifying the Source and Target Database
 -----------------------------------------
@@ -401,8 +445,8 @@ and ``target`` fields within the request JSON content.
 .. code-block:: http
 
     POST http://couchdb:5984/_replicate
-    Content-Type: application/json
     Accept: application/json
+    Content-Type: application/json
 
     {
        "source" : "recipes",
@@ -474,8 +518,8 @@ request that replication ceases.
 .. code-block:: http
 
     POST http://couchdb:5984/_replicate
-    Content-Type: application/json
     Accept: application/json
+    Content-Type: application/json
 
     {
        "continuous" : true
@@ -489,8 +533,8 @@ network connection is available between the two instances.
 .. note::
    Two keep two databases synchronized with each other, you need to set
    replication in both directions; that is, you must replicate from
-   ``databasea`` to ``databaseb``, and separately from ``databaseb`` to
-   ``databasea``.
+   ``source`` to ``target``, and separately from ``target`` to
+   ``source``.
 
 Canceling Continuous Replication
 --------------------------------
@@ -522,8 +566,8 @@ Must be canceled using the request:
 .. code-block:: http
 
     POST http://couchdb:5984/_replicate
-    Content-Type: application/json
     Accept: application/json
+    Content-Type: application/json
 
     {
         "cancel" : true,
@@ -537,86 +581,88 @@ Requesting cancellation of a replication that does not exist results in
 a 404 error.
 
 .. _api/server/restart:
-.. _api/server/restart.post:
 
 ``POST /_restart``
 ==================
 
-* **Method**: ``POST /_restart``
-* **Request**: None
-* **Response**: JSON status message
-* **Admin Privileges Required**: yes
-* **HTTP Headers**:
+.. http:post:: /_restart
 
-  * **Header**: ``Content-Type``
+  Restarts the CouchDB instance. You must be authenticated as a user with
+  administration privileges for this to work.
 
-    * **Description**: Request content type
-    * **Optional**: no
-    * **Value**: :mimetype:`application/json`
+  :reqheader Content-Type: :mimetype:`application/json`
+  :code 202: Server goes to restart (there is no guarantee that it will be
+    alive after)
+  :code 401: Administrator's privileges required
 
-* **Return Codes**:
 
-  * **200**:
-    Replication request successfully completed
+  **Request**:
 
-Restarts the CouchDB instance. You must be authenticated as a user with
-administration privileges for this to work.
+  .. code-block:: http
 
-For example:
+    POST /_restart HTTP/1.1
+    Accept: application/json
+    Host: localhost:5984
 
-.. code-block:: http
+  **Response**:
 
-    POST http://admin:password@couchdb:5984/_restart
+  .. code-block:: http
 
-The return value (if the server has not already restarted) is a JSON
-status object indicating that the request has been received:
-
-.. code-block:: javascript
+    HTTP/1.1 202 Accepted
+    Cache-Control: must-revalidate
+    Content-Length: 12
+    Content-Type: application/json
+    Date: Sat, 10 Aug 2013 11:33:50 GMT
+    Server: CouchDB/1.3.1 (Erlang OTP/R15B02)
 
     {
-       "ok" : true,
+        "ok": true
     }
 
-If the server has already restarted, the header may be returned, but no
-actual data is contained in the response.
 
 .. _api/server/stats:
-.. _api/server/stats.get:
 
-``GET /_stats``
-===============
+``/_stats``
+===========
 
-* **Method**: ``GET /_stats``
-* **Request**: None
-* **Response**: Server statistics
-* **Admin Privileges Required**: no
-* **Return Codes**:
+.. http:get:: /_stats
 
-  * **200**:
-    Request completed successfully.
+  The ``_stats`` resource returns a JSON object containing the statistics
+  for the running server. The object is structured with top-level sections
+  collating the statistics for a range of entries, with each individual
+  statistic being easily identified, and the content of each statistic is
+  self-describing
 
-The ``_stats`` method returns a JSON object containing the statistics
-for the running server. The object is structured with top-level sections
-collating the statistics for a range of entries, with each individual
-statistic being easily identified, and the content of each statistic is
-self-describing. For example, the request time statistics, within the
-``couchdb`` section are structured as follows:
+  **Request**:
 
-.. code-block:: javascript
+  .. code-block:: http
+
+    GET /_stats/couchdb/request_time HTTP/1.1
+    Accept: application/json
+    Host: localhost:5984
+
+  **Response**:
+
+  .. code-block:: http
+
+    HTTP/1.1 200 OK
+    Cache-Control: must-revalidate
+    Content-Length: 187
+    Content-Type: application/json
+    Date: Sat, 10 Aug 2013 11:41:11 GMT
+    Server: CouchDB/1.3.1 (Erlang OTP/R15B02)
 
     {
-       "couchdb" : {
-    ...
-          "request_time" : {
-             "stddev" : "27.509",
-             "min" : "0.333333333333333",
-             "max" : "152",
-             "current" : "400.976",
-             "mean" : "10.837",
-             "sum" : "400.976",
-             "description" : "length of a request inside CouchDB without MochiWeb"
-          },
-    ...
+        "couchdb": {
+            "request_time": {
+                "current": 21.0,
+                "description": "length of a request inside CouchDB without MochiWeb",
+                "max": 19.0,
+                "mean": 7.0,
+                "min": 1.0,
+                "stddev": 10.392,
+                "sum": 21.0
+            }
         }
     }
 
@@ -627,91 +673,97 @@ defined, but the descriptions below provide
 
 The statistics are divided into the following top-level sections:
 
--  ``couchdb``: Describes statistics specific to the internals of CouchDB.
+``couchdb``
+-----------
 
-   +-------------------------+-------------------------------------------------------+----------------+
-   | Statistic ID            | Description                                           | Unit           |
-   +=========================+=======================================================+================+
-   | ``auth_cache_hits``     | Number of authentication cache hits                   | number         |
-   +-------------------------+-------------------------------------------------------+----------------+
-   | ``auth_cache_misses``   | Number of authentication cache misses                 | number         |
-   +-------------------------+-------------------------------------------------------+----------------+
-   | ``database_reads``      | Number of times a document was read from a database   | number         |
-   +-------------------------+-------------------------------------------------------+----------------+
-   | ``database_writes``     | Number of times a database was changed                | number         |
-   +-------------------------+-------------------------------------------------------+----------------+
-   | ``open_databases``      | Number of open databases                              | number         |
-   +-------------------------+-------------------------------------------------------+----------------+
-   | ``open_os_files``       | Number of file descriptors CouchDB has open           | number         |
-   +-------------------------+-------------------------------------------------------+----------------+
-   | ``request_time``        | Length of a request inside CouchDB without MochiWeb   | milliseconds   |
-   +-------------------------+-------------------------------------------------------+----------------+
+Describes statistics specific to the internals of CouchDB
 
--  ``httpd_request_methods``
++-------------------------+-------------------------------------------------------+----------------+
+| Statistic ID            | Description                                           | Unit           |
++=========================+=======================================================+================+
+| ``auth_cache_hits``     | Number of authentication cache hits                   | number         |
++-------------------------+-------------------------------------------------------+----------------+
+| ``auth_cache_misses``   | Number of authentication cache misses                 | number         |
++-------------------------+-------------------------------------------------------+----------------+
+| ``database_reads``      | Number of times a document was read from a database   | number         |
++-------------------------+-------------------------------------------------------+----------------+
+| ``database_writes``     | Number of times a database was changed                | number         |
++-------------------------+-------------------------------------------------------+----------------+
+| ``open_databases``      | Number of open databases                              | number         |
++-------------------------+-------------------------------------------------------+----------------+
+| ``open_os_files``       | Number of file descriptors CouchDB has open           | number         |
++-------------------------+-------------------------------------------------------+----------------+
+| ``request_time``        | Length of a request inside CouchDB without MochiWeb   | milliseconds   |
++-------------------------+-------------------------------------------------------+----------------+
 
-   +----------------+----------------------------------+----------+
-   | Statistic ID   | Description                      | Unit     |
-   +================+==================================+==========+
-   | ``COPY``       | Number of HTTP COPY requests     | number   |
-   +----------------+----------------------------------+----------+
-   | ``DELETE``     | Number of HTTP DELETE requests   | number   |
-   +----------------+----------------------------------+----------+
-   | ``GET``        | Number of HTTP GET requests      | number   |
-   +----------------+----------------------------------+----------+
-   | ``HEAD``       | Number of HTTP HEAD requests     | number   |
-   +----------------+----------------------------------+----------+
-   | ``POST``       | Number of HTTP POST requests     | number   |
-   +----------------+----------------------------------+----------+
-   | ``PUT``        | Number of HTTP PUT requests      | number   |
-   +----------------+----------------------------------+----------+
+``httpd_request_methods``
+-------------------------
 
--  ``httpd_status_codes``
++----------------+----------------------------------+----------+
+| Statistic ID   | Description                      | Unit     |
++================+==================================+==========+
+| ``COPY``       | Number of HTTP COPY requests     | number   |
++----------------+----------------------------------+----------+
+| ``DELETE``     | Number of HTTP DELETE requests   | number   |
++----------------+----------------------------------+----------+
+| ``GET``        | Number of HTTP GET requests      | number   |
++----------------+----------------------------------+----------+
+| ``HEAD``       | Number of HTTP HEAD requests     | number   |
++----------------+----------------------------------+----------+
+| ``POST``       | Number of HTTP POST requests     | number   |
++----------------+----------------------------------+----------+
+| ``PUT``        | Number of HTTP PUT requests      | number   |
++----------------+----------------------------------+----------+
 
-   +----------------+------------------------------------------------------+----------+
-   | Statistic ID   | Description                                          | Unit     |
-   +================+======================================================+==========+
-   | ``200``        | Number of HTTP 200 OK responses                      | number   |
-   +----------------+------------------------------------------------------+----------+
-   | ``201``        | Number of HTTP 201 Created responses                 | number   |
-   +----------------+------------------------------------------------------+----------+
-   | ``202``        | Number of HTTP 202 Accepted responses                | number   |
-   +----------------+------------------------------------------------------+----------+
-   | ``301``        | Number of HTTP 301 Moved Permanently responses       | number   |
-   +----------------+------------------------------------------------------+----------+
-   | ``304``        | Number of HTTP 304 Not Modified responses            | number   |
-   +----------------+------------------------------------------------------+----------+
-   | ``400``        | Number of HTTP 400 Bad Request responses             | number   |
-   +----------------+------------------------------------------------------+----------+
-   | ``401``        | Number of HTTP 401 Unauthorized responses            | number   |
-   +----------------+------------------------------------------------------+----------+
-   | ``403``        | Number of HTTP 403 Forbidden responses               | number   |
-   +----------------+------------------------------------------------------+----------+
-   | ``404``        | Number of HTTP 404 Not Found responses               | number   |
-   +----------------+------------------------------------------------------+----------+
-   | ``405``        | Number of HTTP 405 Method Not Allowed responses      | number   |
-   +----------------+------------------------------------------------------+----------+
-   | ``409``        | Number of HTTP 409 Conflict responses                | number   |
-   +----------------+------------------------------------------------------+----------+
-   | ``412``        | Number of HTTP 412 Precondition Failed responses     | number   |
-   +----------------+------------------------------------------------------+----------+
-   | ``500``        | Number of HTTP 500 Internal Server Error responses   | number   |
-   +----------------+------------------------------------------------------+----------+
+``httpd_status_codes``
+----------------------
 
--  ``httpd``
++----------------+------------------------------------------------------+----------+
+| Statistic ID   | Description                                          | Unit     |
++================+======================================================+==========+
+| ``200``        | Number of HTTP 200 OK responses                      | number   |
++----------------+------------------------------------------------------+----------+
+| ``201``        | Number of HTTP 201 Created responses                 | number   |
++----------------+------------------------------------------------------+----------+
+| ``202``        | Number of HTTP 202 Accepted responses                | number   |
++----------------+------------------------------------------------------+----------+
+| ``301``        | Number of HTTP 301 Moved Permanently responses       | number   |
++----------------+------------------------------------------------------+----------+
+| ``304``        | Number of HTTP 304 Not Modified responses            | number   |
++----------------+------------------------------------------------------+----------+
+| ``400``        | Number of HTTP 400 Bad Request responses             | number   |
++----------------+------------------------------------------------------+----------+
+| ``401``        | Number of HTTP 401 Unauthorized responses            | number   |
++----------------+------------------------------------------------------+----------+
+| ``403``        | Number of HTTP 403 Forbidden responses               | number   |
++----------------+------------------------------------------------------+----------+
+| ``404``        | Number of HTTP 404 Not Found responses               | number   |
++----------------+------------------------------------------------------+----------+
+| ``405``        | Number of HTTP 405 Method Not Allowed responses      | number   |
++----------------+------------------------------------------------------+----------+
+| ``409``        | Number of HTTP 409 Conflict responses                | number   |
++----------------+------------------------------------------------------+----------+
+| ``412``        | Number of HTTP 412 Precondition Failed responses     | number   |
++----------------+------------------------------------------------------+----------+
+| ``500``        | Number of HTTP 500 Internal Server Error responses   | number   |
++----------------+------------------------------------------------------+----------+
 
-   +----------------------------------+----------------------------------------------+----------+
-   | Statistic ID                     | Description                                  | Unit     |
-   +==================================+==============================================+==========+
-   | ``bulk_requests``                | Number of bulk requests                      | number   |
-   +----------------------------------+----------------------------------------------+----------+
-   | ``clients_requesting_changes``   | Number of clients for continuous _changes    | number   |
-   +----------------------------------+----------------------------------------------+----------+
-   | ``requests``                     | Number of HTTP requests                      | number   |
-   +----------------------------------+----------------------------------------------+----------+
-   | ``temporary_view_reads``         | Number of temporary view reads               | number   |
-   +----------------------------------+----------------------------------------------+----------+
-   | ``view_reads``                   | Number of view reads                         | number   |
-   +----------------------------------+----------------------------------------------+----------+
+``httpd``
+---------
+
++----------------------------------+----------------------------------------------+----------+
+| Statistic ID                     | Description                                  | Unit     |
++==================================+==============================================+==========+
+| ``bulk_requests``                | Number of bulk requests                      | number   |
++----------------------------------+----------------------------------------------+----------+
+| ``clients_requesting_changes``   | Number of clients for continuous _changes    | number   |
++----------------------------------+----------------------------------------------+----------+
+| ``requests``                     | Number of HTTP requests                      | number   |
++----------------------------------+----------------------------------------------+----------+
+| ``temporary_view_reads``         | Number of temporary view reads               | number   |
++----------------------------------+----------------------------------------------+----------+
+| ``view_reads``                   | Number of view reads                         | number   |
++----------------------------------+----------------------------------------------+----------+
 
 You can also access individual statistics by quoting the statistics
 sections and statistic ID as part of the URL path. For example, to get
@@ -741,73 +793,67 @@ structure is as follows:
        }
     }
 
+
 .. _api/server/utils:
-.. _api/server/utils.get:
 
-``GET /_utils``
-===============
+``/_utils``
+===========
 
-* **Method**: ``GET /_utils``
-* **Request**: None
-* **Response**: Administration interface
-* **Admin Privileges Required**: no
+.. http:get:: /_utils
 
-Accesses the built-in Futon administration interface for CouchDB.
+  Accesses the built-in Futon administration interface for CouchDB.
+
 
 .. _api/server/uuids:
-.. _api/server/uuids.get:
 
 ``GET /_uuids``
 ===============
 
-* **Method**: ``GET /_uuids``
-* **Request**: None
-* **Response**: List of UUIDs
-* **Admin Privileges Required**: no
-* **Query Arguments**:
+.. http:get:: /_uuids
 
-  * **Argument**: count
+  Requests one or more Universally Unique Identifiers (UUIDs) from the
+  CouchDB instance. The response is a JSON object providing a list of
+  UUIDs.
 
-    * **Description**:  Number of UUIDs to return
-    * **Optional**: yes
-    * **Type**: numeric
+  :query number count: Number of UUIDs to return. Default is ``1``.
+  :resheader ETag:
+  :code 200: Request completed successfully
 
-* **Return Codes**:
 
-  * **200**:
-    Request completed successfully.
+  **Request**:
 
-Requests one or more Universally Unique Identifiers (UUIDs) from the
-CouchDB instance. The response is a JSON object providing a list of
-UUIDs. For example:
+  .. code-block:: http
 
-.. code-block:: javascript
+    GET /_uuids?count=10 HTTP/1.1
+    Accept: application/json
+    Host: localhost:5984
 
-    {
-       "uuids" : [
-          "7e4b5a14b22ec1cf8e58b9cdd0000da3"
-       ]
-    }
+  **Response**:
 
-You can use the ``count`` argument to specify the number of UUIDs to be
-returned. For example:
+  .. code-block:: http
 
-.. code-block:: http
-
-    GET http://couchdb:5984/_uuids?count=5
-
-Returns:
-
-.. code-block:: javascript
+    HTTP/1.1 200 OK
+    Content-Length: 362
+    Content-Type: application/json
+    Date: Sat, 10 Aug 2013 11:46:25 GMT
+    ETag: "DGRWWQFLUDWN5MRKSLKQ425XV"
+    Expires: Fri, 01 Jan 1990 00:00:00 GMT
+    Pragma: no-cache
+    Server: CouchDB/1.3.1 (Erlang OTP/R15B02)
 
     {
-       "uuids" : [
-          "c9df0cdf4442f993fc5570225b405a80",
-          "c9df0cdf4442f993fc5570225b405bd2",
-          "c9df0cdf4442f993fc5570225b405e42",
-          "c9df0cdf4442f993fc5570225b4061a0",
-          "c9df0cdf4442f993fc5570225b406a20"
-       ]
+        "uuids": [
+            "75480ca477454894678e22eec6002413",
+            "75480ca477454894678e22eec600250b",
+            "75480ca477454894678e22eec6002c41",
+            "75480ca477454894678e22eec6003b90",
+            "75480ca477454894678e22eec6003fca",
+            "75480ca477454894678e22eec6004bef",
+            "75480ca477454894678e22eec600528f",
+            "75480ca477454894678e22eec6005e0b",
+            "75480ca477454894678e22eec6006158",
+            "75480ca477454894678e22eec6006161"
+        ]
     }
 
 The UUID type is determined by the :ref:`UUID algorithm <config/uuids/algorithm>`
@@ -841,22 +887,14 @@ When obtaining a list of UUIDs you'll see the changes:
 
 
 .. _api/server/favicon:
-.. _api/server/favicon.get:
 
-``GET /favicon.ico``
-====================
+``/favicon.ico``
+================
 
-* **Method**: ``GET /favicon.ico``
-* **Request**: None
-* **Response**: Binary content for the `favicon.ico` site icon
-* **Admin Privileges Required**: no
-* **Return Codes**:
+.. http:get:: /favicon.ico
 
-  * **200**:
-    Request completed successfully.
-  * **404**:
-    The requested content could not be found. The returned content will include
-    further information, as a JSON object, if available.
+  Binary content for the `favicon.ico` site icon.
 
-Returns the site icon. The return ``Content-Type`` header is
-:mimetype:`image/x-icon`, and the content stream is the image data.
+  :resheader Content-Type: :mimetype:`image/x-icon`
+  :code 200: Request completed successfully
+  :code 404: The requested content could not be found
