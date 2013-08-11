@@ -104,8 +104,7 @@ Where ``db`` is the name of any database.
 .. toctree::
 
    common
-   all-docs
-   bulk-docs
+   bulk-api
    changes
    compact
    security
