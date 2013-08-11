@@ -104,16 +104,18 @@ To obtain the first token and thus authenticate a user for the first time, the
 .. http:post:: /_session
 
   Initiates new session for specified user credentials by providing `Cookie`
-  value. Credentials could be defined in ``application/x-www-form-urlencoded``
-  format with `name` and `password` fields.
+  value.
 
-  :query next: Enforces redirect after successful login to the specified
-               location. This location is relative from server root.
-               *Optional*.
-  :qtype next: str
-  :reqheader Content-Type: Credentials data format:
-    - ``application/x-www-form-urlencoded``
-    - ``application/json``
+  :<header Content-Type: - :mimetype:`application/x-www-form-urlencoded`
+                         - :mimetype:`application/json`
+  :query string next: Enforces redirect after successful login to the specified
+    location. This location is relative from server root. *Optional*.
+  :form name: User name
+  :form password: Password
+  :>header Set-Cookie: Authorization token
+  :>json boolean ok: Operation status
+  :>json string name: Username
+  :>json array roles: List of user roles
   :code 200: Successfully authenticated
   :code 302: Redirect after successful authentication
   :code 401: Username or password wasn't recognized
@@ -195,9 +197,8 @@ To obtain the first token and thus authenticate a user for the first time, the
   This information contains :ref:`userctx_object`, authentication method and
   available ones and authentication database.
 
-  :query basic: Accept `Basic Auth` by requesting this resource. *Optional*.
-  :qtype basic: bool
-
+  :query boolean basic: Accept `Basic Auth` by requesting this resource.
+    *Optional*.
   :code 200: Successfully authenticated.
   :code 401: Username or password wasn't recognized.
 
