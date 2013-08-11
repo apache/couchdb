@@ -47,94 +47,87 @@ class DocRef(object):
         return '{}#{}{}'.format(self.base_url, self.anchor, self.section)
 
 
-#: The URL of the HTTP/1.1 RFC which defines the HTTP methods OPTIONS, GET,
-#: HEAD, POST, PUT, DELETE, TRACE, and CONNECT.
-RFC2616_METHODS = 'http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html'
+class RFC2616Ref(DocRef):
 
-#: The URL of the HTTP/1.1 RFC which defines the HTTP headers.
-RFC2616_HEADERS = 'http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html'
+    def __init__(self, section):
+        url = 'http://www.w3.org/Protocols/rfc2616/rfc2616-sec{0:d}.html'
+        url = url.format(int(section))
+        super(RFC2616Ref, self).__init__(url, 'sec', section)
 
-#: The name to use for section anchors in RFC2616.
-RFC2616ANCHOR = 'sec'
 
-#: The URL of the RFC which defines the HTTP PATCH method.
-RFC5789 = 'http://tools.ietf.org/html/rfc5789'
+class IETFRef(DocRef):
 
-#: The URL of the RFC which defines the HTTP COPY method.
-RFC2518 = 'http://tools.ietf.org/html/rfc2518'
-
-#: The name to use for section anchors in RFC5789.
-RFC5789ANCHOR = 'section-'
-
-#: The name to use for section anchors in RFC2518.
-RFC2518ANCHOR = 'section-'
+    def __init__(self, rfc, section):
+        url = 'http://tools.ietf.org/html/rfc{0:d}'.format(rfc)
+        super(IETFRef, self).__init__(url, 'section-', section)
+        
 
 #: Mapping from lowercase HTTP method name to :class:`DocRef` object which
 #: maintains the URL which points to the section of the RFC which defines that
 #: HTTP method.
 METHOD_REFS = {
-    'patch': DocRef(RFC5789, RFC5789ANCHOR, 2),
-    'options': DocRef(RFC2616_METHODS, RFC2616ANCHOR, 9.2),
-    'get': DocRef(RFC2616_METHODS, RFC2616ANCHOR, 9.3),
-    'head': DocRef(RFC2616_METHODS, RFC2616ANCHOR, 9.4),
-    'post': DocRef(RFC2616_METHODS, RFC2616ANCHOR, 9.5),
-    'put': DocRef(RFC2616_METHODS, RFC2616ANCHOR, 9.6),
-    'delete': DocRef(RFC2616_METHODS, RFC2616ANCHOR, 9.7),
-    'trace': DocRef(RFC2616_METHODS, RFC2616ANCHOR, 9.8),
-    'connect': DocRef(RFC2616_METHODS, RFC2616ANCHOR, 9.9),
-    'copy': DocRef(RFC2518, RFC2518ANCHOR, 8.8)
+    'patch': IETFRef(5789, 2),
+    'options': RFC2616Ref(9.2),
+    'get': RFC2616Ref(9.3),
+    'head': RFC2616Ref(9.4),
+    'post': RFC2616Ref(9.5),
+    'put': RFC2616Ref(9.6),
+    'delete': RFC2616Ref(9.7),
+    'trace': RFC2616Ref(9.8),
+    'connect': RFC2616Ref(9.9),
+    'copy': IETFRef(2518, 8.8)
 }
 
 #: Mapping from HTTP header name to :class:`DocRef` object which
 #: maintains the URL which points to the related section of the RFC.
 HEADER_REFS = {
-    'Accept': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.1),
-    'Accept-Charset': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.2),
-    'Accept-Encoding': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.3),
-    'Accept-Language': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.4),
-    'Accept-Ranges': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.5),
-    'Age': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.6),
-    'Allow': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.7),
-    'Authorization': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.8),
-    'Cache-Control': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.9),
-    'Connection': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.10),
-    'Content-Encoding': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.11),
-    'Content-Language': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.12),
-    'Content-Length': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.13),
-    'Content-Location': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.14),
-    'Content-MD5': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.15),
-    'Content-Range': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.16),
-    'Content-Type': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.17),
-    'Date': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.18),
-    'ETag': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.19),
-    'Expect': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.20),
-    'Expires': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.21),
-    'From': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.22),
-    'Host': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.23),
-    'If-Match': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.24),
-    'If-Modified-Since': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.25),
-    'If-None-Match': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.26),
-    'If-Range': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.27),
-    'If-Unmodified-Since': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.28),
-    'Last-Modified': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.29),
-    'Location': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.30),
-    'Max-Forwards': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.31),
-    'Pragma': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.32),
-    'Proxy-Authenticate': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.33),
-    'Proxy-Authorization': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.34),
-    'Range': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.35),
-    'Referer': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.36),
-    'Retry-After': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.37),
-    'Server': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.38),
-    'TE': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.39),
-    'Trailer': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.40),
-    'Transfer-Encoding': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.41),
-    'Upgrade': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.42),
-    'User-Agent': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.43),
-    'Vary': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.44),
-    'Via': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.45),
-    'Warning': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.46),
-    'WWW-Authenticate': DocRef(RFC2616_HEADERS, RFC2616ANCHOR, 14.47)
+    'Accept': RFC2616Ref(14.1),
+    'Accept-Charset': RFC2616Ref(14.2),
+    'Accept-Encoding': RFC2616Ref(14.3),
+    'Accept-Language': RFC2616Ref(14.4),
+    'Accept-Ranges': RFC2616Ref(14.5),
+    'Age': RFC2616Ref(14.6),
+    'Allow': RFC2616Ref(14.7),
+    'Authorization': RFC2616Ref(14.8),
+    'Cache-Control': RFC2616Ref(14.9),
+    'Connection': RFC2616Ref(14.10),
+    'Content-Encoding': RFC2616Ref(14.11),
+    'Content-Language': RFC2616Ref(14.12),
+    'Content-Length': RFC2616Ref(14.13),
+    'Content-Location': RFC2616Ref(14.14),
+    'Content-MD5': RFC2616Ref(14.15),
+    'Content-Range': RFC2616Ref(14.16),
+    'Content-Type': RFC2616Ref(14.17),
+    'Date': RFC2616Ref(14.18),
+    'ETag': RFC2616Ref(14.19),
+    'Expect': RFC2616Ref(14.20),
+    'Expires': RFC2616Ref(14.21),
+    'From': RFC2616Ref(14.22),
+    'Host': RFC2616Ref(14.23),
+    'If-Match': RFC2616Ref(14.24),
+    'If-Modified-Since': RFC2616Ref(14.25),
+    'If-None-Match': RFC2616Ref(14.26),
+    'If-Range': RFC2616Ref(14.27),
+    'If-Unmodified-Since': RFC2616Ref(14.28),
+    'Last-Modified': RFC2616Ref(14.29),
+    'Location': RFC2616Ref(14.30),
+    'Max-Forwards': RFC2616Ref(14.31),
+    'Pragma': RFC2616Ref(14.32),
+    'Proxy-Authenticate': RFC2616Ref(14.33),
+    'Proxy-Authorization': RFC2616Ref(14.34),
+    'Range': RFC2616Ref(14.35),
+    'Referer': RFC2616Ref(14.36),
+    'Retry-After': RFC2616Ref(14.37),
+    'Server': RFC2616Ref(14.38),
+    'TE': RFC2616Ref(14.39),
+    'Trailer': RFC2616Ref(14.40),
+    'Transfer-Encoding': RFC2616Ref(14.41),
+    'Upgrade': RFC2616Ref(14.42),
+    'User-Agent': RFC2616Ref(14.43),
+    'Vary': RFC2616Ref(14.44),
+    'Via': RFC2616Ref(14.45),
+    'Warning': RFC2616Ref(14.46),
+    'WWW-Authenticate': RFC2616Ref(14.47)
 }
 
 
