@@ -402,6 +402,8 @@ def http_header_role(name, rawtext, text, lineno, inliner,
     if header not in HEADER_REFS:
         header = header.title()
     if header not in HEADER_REFS:
+        if header.startswith(('X-Couch-', 'Couch-')):
+            return [nodes.strong(header, header)], []
         msg = inliner.reporter.error('%s is not unknown HTTP header' % header,
                                      lineno=lineno)
         prb = inliner.problematic(rawtext, rawtext, msg)
