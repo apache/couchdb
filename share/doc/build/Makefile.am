@@ -52,8 +52,7 @@ html_files = \
     html/_sources/api/basics.txt \
     html/_sources/api/index.txt \
     html/_sources/api/local.txt \
-    html/_sources/api/database/all-docs.txt \
-    html/_sources/api/database/bulk-docs.txt \
+    html/_sources/api/database/bulk-api.txt \
     html/_sources/api/database/changes.txt \
     html/_sources/api/database/common.txt \
     html/_sources/api/database/compact.txt \
@@ -160,8 +159,7 @@ html_files = \
     html/api/basics.html \
     html/api/index.html \
     html/api/local.html \
-    html/api/database/all-docs.html \
-    html/api/database/bulk-docs.html \
+    html/api/database/bulk-api.html \
     html/api/database/changes.html \
     html/api/database/common.html \
     html/api/database/compact.html \
@@ -266,8 +264,7 @@ src_files = \
     ../src/api/basics.rst \
     ../src/api/index.rst \
     ../src/api/local.rst \
-    ../src/api/database/all-docs.rst \
-    ../src/api/database/bulk-docs.rst \
+    ../src/api/database/bulk-api.rst \
     ../src/api/database/changes.rst \
     ../src/api/database/common.rst \
     ../src/api/database/compact.rst \
