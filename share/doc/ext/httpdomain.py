@@ -424,9 +424,9 @@ class HTTPXRefRole(XRefRole):
 
 class HTTPIndex(Index):
 
-    name = 'routingtable'
-    localname = 'HTTP Routing Table'
-    shortname = 'routing table'
+    name = 'api'
+    localname = 'CouchDB HTTP API Reference'
+    shortname = 'api'
 
     def __init__(self, *args, **kwargs):
         super(HTTPIndex, self).__init__(*args, **kwargs)
