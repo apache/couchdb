@@ -47,6 +47,10 @@ A list of the available methods and URL paths are provided below:
   structure is organized by different configuration sections, with
   individual values.
 
+  :<header Accept: - :mimetype:`application/json`
+                   - :mimetype:`text/plain`
+  :>header Content-Type: - :mimetype:`application/json`
+                         - :mimetype:`text/plain; charset=utf-8`
   :code 200: Request completed successfully
   :code 401: Administrator's privileges required
 
@@ -177,6 +181,10 @@ A list of the available methods and URL paths are provided below:
 
   Gets the configuration structure for a single section.
 
+  :<header Accept: - :mimetype:`application/json`
+                   - :mimetype:`text/plain`
+  :>header Content-Type: - :mimetype:`application/json`
+                         - :mimetype:`text/plain; charset=utf-8`
   :code 200: Request completed successfully
   :code 401: Administrator's privileges required
 
@@ -222,6 +230,10 @@ A list of the available methods and URL paths are provided below:
   Gets a single configuration value from within a specific configuration
   section.
 
+  :<header Accept: - :mimetype:`application/json`
+                   - :mimetype:`text/plain`
+  :>header Content-Type: - :mimetype:`application/json`
+                         - :mimetype:`text/plain; charset=utf-8`
   :code 200: Request completed successfully
   :code 401: Administrator's privileges required
 
@@ -260,7 +272,11 @@ A list of the available methods and URL paths are provided below:
   value, you must supply a valid JSON string. In response CouchDB sends old
   value for target section key.
 
-  :reqheader Content-Type: :mimetype:`application/json`
+  :<header Accept: - :mimetype:`application/json`
+                   - :mimetype:`text/plain`
+  :<header Content-Type: :mimetype:`application/json`
+  :>header Content-Type: - :mimetype:`application/json`
+                         - :mimetype:`text/plain; charset=utf-8`
   :code 200: Request completed successfully
   :code 400: Invalid JSON request body
   :code 401: Administrator's privileges required
@@ -297,6 +313,10 @@ A list of the available methods and URL paths are provided below:
   Deletes a configuration value. The returned JSON will be the value of
   the configuration parameter before it was deleted.
 
+  :<header Accept: - :mimetype:`application/json`
+                   - :mimetype:`text/plain`
+  :>header Content-Type: - :mimetype:`application/json`
+                         - :mimetype:`text/plain; charset=utf-8`
   :code 200: Request completed successfully
   :code 401: Administrator's privileges required
   :code 404: Specified configuration option not found

@@ -23,6 +23,12 @@
   about the server, including a welcome message and the version of the
   server.
 
+  :<header Accept: - :mimetype:`application/json`
+                   - :mimetype:`text/plain`
+  :>header Content-Type: - :mimetype:`application/json`
+                         - :mimetype:`text/plain; charset=utf-8`
+  :code 200: Request completed successfully
+
   **Request**:
 
   .. code-block:: http
@@ -62,25 +68,25 @@
 
   List of running tasks, including the task type, name, status
   and process ID. The result is a JSON array of the currently running tasks,
-  with each task being described with a single object.
+  with each task being described with a single object. Depending on operation
+  type set of response object fields might be different.
 
-  :code 200: Request completed successfully.
-  :code 401: Administrator's privileges required.
-
-  The returned structure includes the following fields for each task:
-
-  :json number changes_done: Processed changes
-  :json string database: Source database
-  :json string pid: Process ID
-  :json number progress: Current percentage progress
-  :json number started_on: Task start time as unix timestamp
-  :json string status: Task status message
-  :json string task: Task name
-  :json number total_changes: Total changes to process
-  :json string type: Operation Type
-  :json number updated_on: Unix timestamp of last operation update
-
-  Depending on operation type set of provided fields might be different.
+  :<header Accept: - :mimetype:`application/json`
+                   - :mimetype:`text/plain`
+  :>header Content-Type: - :mimetype:`application/json`
+                         - :mimetype:`text/plain; charset=utf-8`
+  :>json number changes_done: Processed changes
+  :>json string database: Source database
+  :>json string pid: Process ID
+  :>json number progress: Current percentage progress
+  :>json number started_on: Task start time as unix timestamp
+  :>json string status: Task status message
+  :>json string task: Task name
+  :>json number total_changes: Total changes to process
+  :>json string type: Operation Type
+  :>json number updated_on: Unix timestamp of last operation update
+  :code 200: Request completed successfully
+  :code 401: Administrator's privileges required
 
   **Request**:
 
@@ -165,6 +171,12 @@
 
   Returns a list of all the databases in the CouchDB instance.
 
+  :<header Accept: - :mimetype:`application/json`
+                   - :mimetype:`text/plain`
+  :>header Content-Type: - :mimetype:`application/json`
+                         - :mimetype:`text/plain; charset=utf-8`
+  :code 200: Request completed successfully
+
   **Request**:
 
   .. code-block:: http
@@ -204,30 +216,26 @@
 
   Returns a list of all database events in the CouchDB instance.
 
-  :query string feed: Format of the response feed. Default is ``longpoll``.
-    Supported values: ``longpoll``, ``continuous``, ``eventsource``.
-  :query number timeout: Number of seconds until CouchDB closes the connection.
-    Default is ``60``.
-  :query boolean heartbeat: Whether CouchDB will send a newline character
-    (``\n``) on ``timeout``. Default is ``true``.
-
-  :code 200: Request completed successfully.
-  :code 401: Administrator's privileges required.
-
-  Supported feeds are:
-
-    - **longpoll**: Closes the connection after the first event.
+  :<header Accept: - :mimetype:`application/json`
+                   - :mimetype:`text/plain`
+  :query string feed: - **longpoll**: Closes the connection after the first event.
     - **continuous**: Send a line of JSON per event. Keeps the socket open
       until ``timeout``.
     - **eventsource**: Like, ``continuous``, but sends the events in
       `EventSource <http://dev.w3.org/html5/eventsource/>`_ format.
-
-  The returned structure includes the following fields for each event:
-
-  :json string db_name: Database name
-  :json boolean ok: Event operation status
-  :json string type: A database event is one of ``created``, ``updated``,
+  :query number timeout: Number of seconds until CouchDB closes the connection.
+    Default is ``60``.
+  :query boolean heartbeat: Whether CouchDB will send a newline character
+    (``\n``) on ``timeout``. Default is ``true``.
+  :>header Content-Type: - :mimetype:`application/json`
+                         - :mimetype:`text/plain; charset=utf-8`
+  :>header Transfer-Encoding: ``chunked``
+  :>json string db_name: Database name
+  :>json boolean ok: Event operation status
+  :>json string type: A database event is one of ``created``, ``updated``,
     ``deleted``
+  :code 200: Request completed successfully.
+  :code 401: Administrator's privileges required.
 
   **Request**:
 
@@ -237,8 +245,9 @@
     Accept: application/json
     Host: localhost:5984
 
-  .. code-block:: http
+  **Response**:
 
+  .. code-block:: http
 
     HTTP/1.1 200 OK
     Cache-Control: must-revalidate
@@ -264,10 +273,12 @@
   Gets the CouchDB log, equivalent to accessing the local log file of the
   corresponding CouchDB instance.
 
-  :resheader Content-Type: :mimetype:`text/plain; charset=utf-8`
+  :<header Accept: - :mimetype:`text/plain`
   :query number bytes: Bytes to be returned. Default is ``1000``.
   :query number offset: Offset in bytes where the log tail should be started.
     Default is ``0``.
+  :>header Content-Type: :mimetype:`text/plain; charset=utf-8`
+  :>header Transfer-Encoding: ``chunked``
   :code 200: Request completed successfully.
   :code 401: Administrator's privileges required.
 
@@ -333,8 +344,28 @@ jumping to ``offset`` bytes towards the beginning of the file first:
 
   Request, configure, or stop, a replication operation.
 
+  :<header Accept: - :mimetype:`application/json`
+                   - :mimetype:`text/plain`
+  :<header Content-Type: :mimetype:`application/json`
+  :<json boolean cancel: Cancels the replication
+  :<json boolean continuous: Configure the replication to be continuous
+  :<json boolean create_target: Creates the target database.
+    Required administrator's privileges on target server.
+  :<json array doc_ids: Array of document IDs to be synchronized
+  :<json string proxy: Address of a proxy server through which replication
+    should occur
+  :<json string source: Source database name or URL
+  :<json string target: Target database name or URL
+  :>header Content-Type: - :mimetype:`application/json`
+                         - :mimetype:`text/plain; charset=utf-8`
+  :>json array history: Replication history (see below)
+  :>json boolean ok: Replication status
+  :>json number replication_id_version: Replication protocol version
+  :>json string session_id: Unique session ID
+  :>json number source_last_seq: Last sequence number read from source database
   :code 200: Replication request successfully completed
   :code 202: Continuous replication request has been accepted
+  :code 400: Invalid JSON data
   :code 401: Administrator's privileges required
   :code 404: Either the source or target DB is not found or attempt to
     cancel unknown replication task
@@ -342,18 +373,85 @@ jumping to ``offset`` bytes towards the beginning of the file first:
 
   The specification of the replication request is controlled through the
   JSON content of the request. The JSON should be an object with the
-  fields defining the source, target and other options. The fields of the
-  JSON request are shown below:
+  fields defining the source, target and other options.
 
-  :json boolean cancel: Cancels the replication
-  :json boolean continuous: Configure the replication to be continuous
-  :json boolean create_target: Creates the target database.
-    Required administrator's privileges on target server.
-  :json array doc_ids: Array of document IDs to be synchronized
-  :json string proxy: Address of a proxy server through which replication
-    should occur
-  :json string source: Source database name or URL
-  :json string target: Target database name or URL
+  The `Replication history` is an array of objects with following structure:
+
+  :json number doc_write_failures: Number of document write failures
+  :json number docs_read:  Number of documents read
+  :json number docs_written:  Number of documents written to target
+  :json number end_last_seq:  Last sequence number in changes stream
+  :json string end_time:  Date/Time replication operation completed in
+    :rfc:`2822` format
+  :json number missing_checked:  Number of missing documents checked
+  :json number missing_found:  Number of missing documents found
+  :json number recorded_seq:  Last recorded sequence number
+  :json string session_id:  Session ID for this replication operation
+  :json number start_last_seq:  First sequence number in changes stream
+  :json string start_time:  Date/Time replication operation started in
+    :rfc:`2822` format
+
+  **Request**
+
+  .. code-block:: http
+
+    POST /_replicate HTTP/1.1
+    Accept: application/json
+    Content-Length: 36
+    Content-Type: application/json
+    Host: localhost:5984
+
+    {
+        "source": "db_a",
+        "target": "db_b"
+    }
+
+  **Response**
+
+  .. code-block:: http
+
+    HTTP/1.1 200 OK
+    Cache-Control: must-revalidate
+    Content-Length: 692
+    Content-Type: application/json
+    Date: Sun, 11 Aug 2013 20:38:50 GMT
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+
+    {
+        "history": [
+            {
+                "doc_write_failures": 0,
+                "docs_read": 10,
+                "docs_written": 10,
+                "end_last_seq": 28,
+                "end_time": "Sun, 11 Aug 2013 20:38:50 GMT",
+                "missing_checked": 10,
+                "missing_found": 10,
+                "recorded_seq": 28,
+                "session_id": "142a35854a08e205c47174d91b1f9628",
+                "start_last_seq": 1,
+                "start_time": "Sun, 11 Aug 2013 20:38:50 GMT"
+            },
+            {
+                "doc_write_failures": 0,
+                "docs_read": 1,
+                "docs_written": 1,
+                "end_last_seq": 1,
+                "end_time": "Sat, 10 Aug 2013 15:41:54 GMT",
+                "missing_checked": 1,
+                "missing_found": 1,
+                "recorded_seq": 1,
+                "session_id": "6314f35c51de3ac408af79d6ee0c1a09",
+                "start_last_seq": 0,
+                "start_time": "Sat, 10 Aug 2013 15:41:54 GMT"
+            }
+        ],
+        "ok": true,
+        "replication_id_version": 3,
+        "session_id": "142a35854a08e205c47174d91b1f9628",
+        "source_last_seq": 28
+    }
+
 
 Replication Operation
 ---------------------
@@ -482,27 +580,6 @@ statistics about the process:
        "source_last_seq" : 1000
     }
 
-The structure defines the replication status, as described in the table
-below:
-
-* **history [array]**:  Replication History
-
-  * **doc_write_failures**:  Number of document write failures
-  * **docs_read**:  Number of documents read
-  * **docs_written**:  Number of documents written to target
-  * **end_last_seq**:  Last sequence number in changes stream
-  * **end_time**:  Date/Time replication operation completed
-  * **missing_checked**:  Number of missing documents checked
-  * **missing_found**:  Number of missing documents found
-  * **recorded_seq**:  Last recorded sequence number
-  * **session_id**:  Session ID for this replication operation
-  * **start_last_seq**:  First sequence number in changes stream
-  * **start_time**:  Date/Time replication operation started
-
-* **ok**:  Replication status
-* **session_id**:  Unique session ID
-* **source_last_seq**:  Last sequence number read from source database
-
 Continuous Replication
 ----------------------
 
@@ -580,21 +657,26 @@ Must be canceled using the request:
 Requesting cancellation of a replication that does not exist results in
 a 404 error.
 
+
 .. _api/server/restart:
 
-``POST /_restart``
-==================
+``/_restart``
+=============
 
 .. http:post:: /_restart
 
   Restarts the CouchDB instance. You must be authenticated as a user with
   administration privileges for this to work.
 
-  :reqheader Content-Type: :mimetype:`application/json`
+  :<header Accept: - :mimetype:`application/json`
+                   - :mimetype:`text/plain`
+  :<header Content-Type: :mimetype:`application/json`
+  :>header Content-Type: - :mimetype:`application/json`
+                         - :mimetype:`text/plain; charset=utf-8`
   :code 202: Server goes to restart (there is no guarantee that it will be
     alive after)
   :code 401: Administrator's privileges required
-
+  :code 415: Bad request`s :http:header:`Content-Type`
 
   **Request**:
 
@@ -632,6 +714,12 @@ a 404 error.
   collating the statistics for a range of entries, with each individual
   statistic being easily identified, and the content of each statistic is
   self-describing
+
+  :<header Accept: - :mimetype:`application/json`
+                   - :mimetype:`text/plain`
+  :>header Content-Type: - :mimetype:`application/json`
+                         - :mimetype:`text/plain; charset=utf-8`
+  :code 200: Request completed successfully
 
   **Request**:
 
@@ -803,11 +891,20 @@ structure is as follows:
 
   Accesses the built-in Futon administration interface for CouchDB.
 
+  :>header Location: New URI location
+  :code 301: Redirects to :http:get:`/_utils/`
+
+.. http:get:: /_utils/
+
+  :>header Content-Type: :mimetype:`text/html`
+  :>header Last-Modified: Static files modification timestamp
+  :code 200: Request completed successfully
+
 
 .. _api/server/uuids:
 
-``GET /_uuids``
-===============
+``/_uuids``
+===========
 
 .. http:get:: /_uuids
 
@@ -815,10 +912,13 @@ structure is as follows:
   CouchDB instance. The response is a JSON object providing a list of
   UUIDs.
 
+  :<header Accept: - :mimetype:`application/json`
+                   - :mimetype:`text/plain`
   :query number count: Number of UUIDs to return. Default is ``1``.
-  :resheader ETag:
+  :>header Content-Type: - :mimetype:`application/json`
+                         - :mimetype:`text/plain; charset=utf-8`
+  :>header ETag: Response hash
   :code 200: Request completed successfully
-
 
   **Request**:
 
@@ -895,6 +995,6 @@ When obtaining a list of UUIDs you'll see the changes:
 
   Binary content for the `favicon.ico` site icon.
 
-  :resheader Content-Type: :mimetype:`image/x-icon`
+  :>header Content-Type: :mimetype:`image/x-icon`
   :code 200: Request completed successfully
   :code 404: The requested content could not be found
