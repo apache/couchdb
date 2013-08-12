@@ -152,7 +152,8 @@ API Reference
 -------------
 
 - :http:head:`/{db}` -- Check Database existence
-- :ref:`api/db/ensure_full_commit` -- Ensure that all changes are stored on disk
+- :http:post:`/{db}/_ensure_full_commit` -- Ensure that all changes are stored
+  on disk
 - :http:get:`/{db}/_local/{id}` -- Read the last Checkpoint
 - :http:put:`/{db}/_local/{id}` -- Save a new Checkpoint
 
@@ -160,7 +161,7 @@ Push Only
 ~~~~~~~~~
 
 - :http:put:`/{db}` -- Create Target if it not exists and option was provided
-- :ref:`api/db/revs_diff.post` -- Locate Revisions that are not known to the
+- :http:post:`/{db}/_revs_diff` -- Locate Revisions that are not known to the
   Target
 - :http:post:`/{db}/_bulk_docs` -- Upload Revisions to the Target
 - :ref:`api/doc.put`?new_edits=false -- Upload a single Document with

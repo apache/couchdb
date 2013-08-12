@@ -12,65 +12,87 @@
 
 
 .. _api/db/purge:
-.. _api/db/purge.post:
 
-``POST /db/_purge``
-===================
+``/db/_purge``
+==============
 
-* **Method**: ``POST /db/_purge``
-* **Request**: JSON of the document IDs/revisions to be purged
-* **Response**: JSON structure with purged documents and purge sequence
-* **Admin Privileges Required**: no
+.. http:post:: /{db}/_purge
 
-A database purge permanently removes the references to deleted documents
-from the database. Deleting a document within CouchDB does not actually
-remove the document from the database, instead, the document is marked as
-a deleted (and a new revision is created). This is to ensure that
-deleted documents are replicated to other databases as having been
-deleted. This also means that you can check the status of a document and
-identify that the document has been deleted.
+  A database purge permanently removes the references to deleted documents
+  from the database. Deleting a document within CouchDB does not actually
+  remove the document from the database, instead, the document is marked as
+  a deleted (and a new revision is created). This is to ensure that
+  deleted documents are replicated to other databases as having been
+  deleted. This also means that you can check the status of a document and
+  identify that the document has been deleted.
 
-The purge operation removes the references to the deleted documents from
-the database. The purging of old documents is not replicated to other
-databases. If you are replicating between databases and have deleted a
-large number of documents you should run purge on each database.
+  The purge operation removes the references to the deleted documents from
+  the database. The purging of old documents is not replicated to other
+  databases. If you are replicating between databases and have deleted a
+  large number of documents you should run purge on each database.
 
-.. note::
+  .. note::
 
-   Purging documents does not remove the space used by them on disk. To
-   reclaim disk space, you should run a database compact (see
-   :ref:`api/db/compact`), and compact views (see :ref:`api/db/compact/ddoc`).
+     Purging documents does not remove the space used by them on disk. To
+     reclaim disk space, you should run a database compact (see
+     :ref:`api/db/compact`), and compact views (see :ref:`api/db/compact/ddoc`).
 
-To perform a purge operation you must send a request including the JSON
-of the document IDs that you want to purge. For example:
+  The format of the request must include the document ID and one or more
+  revisions that must be purged.
 
-.. code-block:: http
+  The response will contain the purge sequence number, and a list of the
+  document IDs and revisions successfully purged.
 
-    POST http://couchdb:5984/recipes/_purge
+  :param db: Database name
+  :<header Accept: - :mimetype:`application/json`
+                   - :mimetype:`text/plain`
+  :<header Content-Type: :mimetype:`application/json`
+  :<json object: Mapping of document ID to list of revisions to purge
+  :>header Content-Type: - :mimetype:`application/json`
+                         - :mimetype:`text/plain; charset=utf-8`
+  :>json number purge_seq: Purge sequence number
+  :>json object purged: Mapping of document ID to list of purged revisions
+  :code 200: Request completed successfully
+  :code 400: Invalid database name or JSON payload
+  :code 415: Bad :http:header:`Content-Type` value
+
+  **Request**:
+
+  .. code-block:: http
+
+    POST /db/_purge HTTP/1.1
+    Accept: application/json
+    Content-Length: 76
     Content-Type: application/json
+    Host: localhost:5984
 
     {
-      "FishStew" : [
-        "17-b3eb5ac6fbaef4428d712e66483dcb79"
+      "c6114c65e295552ab1019e2b046b10e": [
+        "3-b06fcd1c1c9e0ec7c480ee8aa467bf3b",
+        "3-0e871ef78849b0c206091f1a7af6ec41"
+      ]
+    }
+
+  **Response**:
+
+  .. code-block:: http
+
+    HTTP/1.1 200 OK
+    Cache-Control: must-revalidate
+    Content-Length: 103
+    Content-Type: application/json
+    Date: Mon, 12 Aug 2013 10:53:24 GMT
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+
+    {
+      "purge_seq":3,
+      "purged":{
+        "c6114c65e295552ab1019e2b046b10e": [
+          "3-b06fcd1c1c9e0ec7c480ee8aa467bf3b"
         ]
+      }
     }
 
-The format of the request must include the document ID and one or more
-revisions that must be purged.
-
-The response will contain the purge sequence number, and a list of the
-document IDs and revisions successfully purged.
-
-.. code-block:: javascript
-
-    {
-       "purged" : {
-          "FishStew" : [
-             "17-b3eb5ac6fbaef4428d712e66483dcb79"
-          ]
-       },
-       "purge_seq" : 11
-    }
 
 Updating Indexes
 ----------------
@@ -92,88 +114,218 @@ database sequence is greater than 1, then the view index is entirely
 rebuilt. This is an expensive operation as every document in the
 database must be examined.
 
+
 .. _api/db/missing_revs:
-.. _api/db/missing_revs.post:
 
-``POST /db/_missing_revs``
-==========================
+``/db/_missing_revs``
+=====================
 
-* **Method**: ``POST /db/_missing_revs``
-* **Request**: JSON list of document revisions
-* **Response**: JSON of missing revisions
-* **Admin Privileges Required**: no
+.. http:post:: /{db}/_missing_revs
+
+  With given a list of document revisions, returns the document revisions that
+  do not exist in the database.
+
+  :param db: Database name
+  :<header Accept: - :mimetype:`application/json`
+                   - :mimetype:`text/plain`
+  :<header Content-Type: :mimetype:`application/json`
+  :<json object: Mapping of document ID to list of revisions to lookup
+  :>header Content-Type: - :mimetype:`application/json`
+                         - :mimetype:`text/plain; charset=utf-8`
+  :>json object missing_revs: Mapping of document ID to list of missed revisions
+  :code 200: Request completed successfully
+  :code 400: Invalid database name or JSON payload
+
+  **Request**:
+
+  .. code-block:: http
+
+    POST /db/_missing_revs HTTP/1.1
+    Accept: application/json
+    Content-Length: 76
+    Content-Type: application/json
+    Host: localhost:5984
+
+    {
+      "c6114c65e295552ab1019e2b046b10e": [
+        "3-b06fcd1c1c9e0ec7c480ee8aa467bf3b",
+        "3-0e871ef78849b0c206091f1a7af6ec41"
+      ]
+    }
+
+  **Response**:
+
+  .. code-block:: http
+
+    HTTP/1.1 200 OK
+    Cache-Control: must-revalidate
+    Content-Length: 64
+    Content-Type: application/json
+    Date: Mon, 12 Aug 2013 10:53:24 GMT
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+
+    {
+      "missed_revs":{
+        "c6114c65e295552ab1019e2b046b10e": [
+          "3-b06fcd1c1c9e0ec7c480ee8aa467bf3b"
+        ]
+      }
+    }
+
 
 .. _api/db/revs_diff:
-.. _api/db/revs_diff.post:
 
-``POST /db/_revs_diff``
-=======================
+``/db/_revs_diff``
+==================
 
-* **Method**: ``POST /db/_revs_diff``
-* **Request**: JSON list of document revisions
-* **Response**: JSON list of differences from supplied document/revision list
-* **Admin Privileges Required**: no
+.. http:post:: /{db}/_revs_diff
 
+  Given a set of document/revision IDs, returns the subset of those that do
+  not correspond to revisions stored in the database.
+
+  Its primary use is by the replicator, as an important optimization: after
+  receiving a set of new revision IDs from the source database, the replicator
+  sends this set to the destination database's ``_revs_diff`` to find out which
+  of them already exist there. It can then avoid fetching and sending
+  already-known document bodies.
+
+  Both the request and response bodies are JSON objects whose keys are document
+  IDs; but the values are structured differently:
+
+  - In the request, a value is an array of revision IDs for that document.
+
+  - In the response, a value is an object with a "missing": key, whose value
+    is a list of revision IDs for that document (the ones that are not stored
+    in the database) and optionally a "possible_ancestors" key, whose value is
+    an array of revision IDs that are known that might be ancestors of
+    the missing revisions.
+
+  :param db: Database name
+  :<header Accept: - :mimetype:`application/json`
+                   - :mimetype:`text/plain`
+  :<header Content-Type: :mimetype:`application/json`
+  :<json object: Mapping of document ID to list of revisions to lookup
+  :>header Content-Type: - :mimetype:`application/json`
+                         - :mimetype:`text/plain; charset=utf-8`
+  :>json object missing_revs: Mapping of document ID to list of missed revisions
+  :code 200: Request completed successfully
+  :code 400: Invalid database name or JSON payload
+
+  **Request**:
+
+  .. code-block:: http
+
+    POST /db/_revs_diff HTTP/1.1
+    Accept: application/json
+    Content-Length: 113
+    Content-Type: application/json
+    Host: localhost:5984
+
+    {
+      "190f721ca3411be7aa9477db5f948bbb": [
+        "3-bb72a7682290f94a985f7afac8b27137",
+        "4-10265e5a26d807a3cfa459cf1a82ef2e"
+      ]
+    }
+
+  **Response**:
+
+  .. code-block:: http
+
+    HTTP/1.1 200 OK
+    Cache-Control: must-revalidate
+    Content-Length: 88
+    Content-Type: application/json
+    Date: Mon, 12 Aug 2013 16:56:02 GMT
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+
+    {
+      "190f721ca3411be7aa9477db5f948bbb": {
+        "missing": [
+          "3-bb72a7682290f94a985f7afac8b27137"
+        ]
+      }
+    }
 
 
 .. _api/db/revs_limit:
-.. _api/db/revs_limit.get:
 
-``GET /db/_revs_limit``
-=======================
+``/db/_revs_limit``
+===================
 
-* **Method**: ``GET /db/_revs_limit``
-* **Request**: None
-* **Response**: The current revision limit setting
-* **Admin Privileges Required**: no
+.. http:get:: /{db}/_revs_limit
 
+  Gets the current ``revs_limit`` (revision limit) setting.
 
-Gets the current ``revs_limit`` (revision limit) setting.
+  :param db: Database name
+  :<header Accept: - :mimetype:`application/json`
+                   - :mimetype:`text/plain`
+  :>header Content-Type: - :mimetype:`application/json`
+                         - :mimetype:`text/plain; charset=utf-8`
+  :code 200: Request completed successfully
 
-For example to get the current limit:
+  **Request**:
 
-.. code-block:: http
+  .. code-block:: http
 
-    GET http://couchdb:5984/recipes/_revs_limit
+    GET /db/_revs_limit HTTP/1.1
+    Accept: application/json
+    Host: localhost:5984
+
+  **Response**:
+
+  .. code-block:: http
+
+    HTTP/1.1 200 OK
+    Cache-Control: must-revalidate
+    Content-Length: 5
     Content-Type: application/json
-
-The returned information is the current setting as a numerical scalar:
-
-.. code-block:: javascript
+    Date: Mon, 12 Aug 2013 17:27:30 GMT
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
 
     1000
 
-.. _api/db/revs_limit.put:
 
-``PUT /db/_revs_limit``
-=======================
+.. http:put:: /{db}/_revs_limit
 
-* **Method**: ``PUT /db/_revs_limit``
-* **Request**: A scalar integer of the revision limit setting
-* **Response**: Confirmation of setting of the revision limit
-* **Admin Privileges Required**: no
+  Sets the maximum number of document revisions that will be tracked by
+  CouchDB, even after compaction has occurred. You can set the revision
+  limit on a database with a scalar integer of the limit that you want
+  to set as the request body.
 
-Sets the maximum number of document revisions that will be tracked by
-CouchDB, even after compaction has occurred. You can set the revision
-limit on a database by using ``PUT`` with a scalar integer of the limit
-that you want to set as the request body.
+  :param db: Database name
+  :<header Accept: - :mimetype:`application/json`
+                   - :mimetype:`text/plain`
+  :<header Content-Type: :mimetype:`application/json`
+  :>header Content-Type: - :mimetype:`application/json`
+                         - :mimetype:`text/plain; charset=utf-8`
+  :>json boolean ok: Operation status
+  :code 200: Request completed successfully
+  :code 400: Invalid JSON data
 
-For example to set the revs limit to 100 for the ``recipes`` database:
+  **Request**:
 
-.. code-block:: http
+  .. code-block:: http
 
-    PUT http://couchdb:5984/recipes/_revs_limit
+    PUT /db/_revs_limit HTTP/1.1
+    Accept: application/json
+    Content-Length: 5
     Content-Type: application/json
+    Host: localhost:5984
 
-    100
+    1000
 
-If the setting was successful, a JSON status object will be returned:
+  **Response**:
 
-.. code-block:: javascript
+  .. code-block:: http
+
+    HTTP/1.1 200 OK
+    Cache-Control: must-revalidate
+    Content-Length: 12
+    Content-Type: application/json
+    Date: Mon, 12 Aug 2013 17:47:52 GMT
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
 
     {
-       "ok" : true
+        "ok": true
     }
-
-.. _JSON object: #table-couchdb-api-db_db-json-changes
-
