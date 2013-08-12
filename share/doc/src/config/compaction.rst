@@ -76,7 +76,7 @@ Possible parameters:
     (file_size - data_size) / file_size * 100
 
   The data_size and file_size values can be obtained when
-  querying a :ref:`database's information URI <api/db.get>`.
+  querying :http:get:`/{db}`.
 
 - ``view_fragmentation``: If the ratio of legacy data, including metadata, to
   current data in a view index file size is equal to or greater then this
