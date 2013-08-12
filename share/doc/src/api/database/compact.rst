@@ -12,157 +12,215 @@
 
 
 .. _api/db/compact:
-.. _api/db/compact.post:
 
-``POST /db/_compact``
-=====================
+``/db/_compact``
+================
 
-* **Method**: ``POST /db/_compact``
-* **Request**: None
-* **Response**: JSON success statement
-* **Admin Privileges Required**: yes
-* **Return Codes**:
+.. http:post:: /{db}/_compact
 
-  * **202**:
-    Compaction request has been accepted
+  Request compaction of the specified database. Compaction compresses the
+  disk database file by performing the following operations:
 
-  * **404**:
-    The requested content could not be found. The returned content will include
-    further information, as a JSON object, if available.
+  -  Writes a new version of the database file, removing any unused
+     sections from the new version during write. Because a new file is
+     temporary created for this purpose, you will need twice the current
+     storage space of the specified database in order for the compaction
+     routine to complete.
 
-Request compaction of the specified database. Compaction compresses the
-disk database file by performing the following operations:
+  -  Removes old revisions of documents from the database, up to the
+     per-database limit specified by the ``_revs_limit`` database
+     parameter.
 
--  Writes a new version of the database file, removing any unused
-   sections from the new version during write. Because a new file is
-   temporary created for this purpose, you will need twice the current
-   storage space of the specified database in order for the compaction
-   routine to complete.
+  Compaction can only be requested on an individual database; you cannot
+  compact all the databases for a CouchDB instance. The compaction process
+  runs as a background process.
 
--  Removes old revisions of documents from the database, up to the
-   per-database limit specified by the ``_revs_limit`` database
-   parameter.
+  You can determine if the compaction process is operating on a database
+  by obtaining the database meta information, the ``compact_running``
+  value of the returned database structure will be set to true. See
+  :http:get:`/{db}`.
 
-Compaction can only be requested on an individual database; you cannot
-compact all the databases for a CouchDB instance. The compaction process
-runs as a background process.
+  You can also obtain a list of running processes to determine whether
+  compaction is currently running. See :ref:`api/server/active_tasks`.
 
-You can determine if the compaction process is operating on a database
-by obtaining the database meta information, the ``compact_running``
-value of the returned database structure will be set to true. See
-:http:get:`/{db}`.
+  :param db: Database name
+  :<header Accept: - :mimetype:`application/json`
+                   - :mimetype:`text/plain`
+  :<header Content-Type: :mimetype:`application/json`
+  :>header Content-Type: - :mimetype:`application/json`
+                         - :mimetype:`text/plain; charset=utf-8`
+  :>json boolean ok: Operation status
+  :code 202: Compaction request has been accepted
+  :code 400: Invalid database name
+  :code 401: Administrator`s privileges required
+  :code 415: Bad :http:header:`Content-Type` value
 
-You can also obtain a list of running processes to determine whether
-compaction is currently running. See :ref:`api/server/active_tasks`.
+  **Request**:
 
-.. _api/db/compact/ddoc:
-.. _api/db/compact/ddoc.post:
+  .. code-block:: http
 
-``POST /db/_compact/design-doc``
-================================
-
-* **Method**: ``POST /db/_compact/design-doc``
-* **Request**: None
-* **Response**: JSON success statement
-* **Admin Privileges Required**: yes
-* **Return Codes**:
-
-  * **202**:
-    Compaction request has been accepted
-
-  * **404**:
-    The requested content could not be found. The returned content will include
-    further information, as a JSON object, if available.
-
-Compacts the view indexes associated with the specified design document.
-You can use this in place of the full database compaction if you know a
-specific set of view indexes have been affected by a recent database
-change.
-
-For example, to compact the views associated with the ``recipes`` design
-document:
-
-.. code-block:: http
-
-    POST http://couchdb:5984/recipes/_compact/recipes
+    POST /db/_compact HTTP/1.1
+    Accept: application/json
     Content-Type: application/json
+    Host: localhost:5984
 
-CouchDB will immediately return with a status indicating that the
-compaction request has been received (HTTP status code 202):
+  **Response**:
 
-.. code-block:: javascript
+  .. code-block:: http
+
+    HTTP/1.1 202 Accepted
+    Cache-Control: must-revalidate
+    Content-Length: 12
+    Content-Type: application/json
+    Date: Mon, 12 Aug 2013 09:27:43 GMT
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
 
     {
-       "ok" : true
+        "ok": true
     }
 
 
+.. _api/db/compact/ddoc:
 
+``/db/_compact/design-doc``
+===========================
+
+.. http:post:: /{db}/_compact/{ddoc}
+
+  Compacts the view indexes associated with the specified design document.
+  You can use this in place of the full database compaction if you know a
+  specific set of view indexes have been affected by a recent database
+  change.
+
+  :param db: Database name
+  :param ddoc: Design document name
+  :<header Accept: - :mimetype:`application/json`
+                   - :mimetype:`text/plain`
+  :<header Content-Type: :mimetype:`application/json`
+  :>header Content-Type: - :mimetype:`application/json`
+                         - :mimetype:`text/plain; charset=utf-8`
+  :>json boolean ok: Operation status
+  :code 202: Compaction request has been accepted
+  :code 400: Invalid database name
+  :code 401: Administrator`s privileges required
+  :code 404: Design document not found
+  :code 415: Bad :http:header:`Content-Type` value
+
+  **Request**:
+
+  .. code-block:: http
+
+    POST /db/_compact/posts HTTP/1.1
+    Accept: application/json
+    Content-Type: application/json
+    Host: localhost:5984
+
+  **Response**:
+
+  .. code-block:: http
+
+    HTTP/1.1 202 Accepted
+    Cache-Control: must-revalidate
+    Content-Length: 12
+    Content-Type: application/json
+    Date: Mon, 12 Aug 2013 09:36:44 GMT
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+
+    {
+        "ok": true
+    }
 
 
 .. _api/db/ensure_full_commit:
-.. _api/db/ensure_full_commit.post:
 
-``POST /db/_ensure_full_commit``
-================================
+``/db/_ensure_full_commit``
+===========================
 
-* **Method**: ``POST /db/_ensure_full_commit``
-* **Request**: None
-* **Response**: JSON success statement
-* **Admin Privileges Required**: no
-* **Return Codes**:
+.. http:post:: /{db}/_ensure_full_commit
 
-  * **202**:
-    Commit completed successfully
+  Commits any recent changes to the specified database to disk. You should
+  call this if you want to ensure that recent changes have been written.
 
-  * **404**:
-    The requested content could not be found. The returned content will include
-    further information, as a JSON object, if available.
+  :param db: Database name
+  :<header Accept: - :mimetype:`application/json`
+                   - :mimetype:`text/plain`
+  :<header Content-Type: :mimetype:`application/json`
+  :>header Content-Type: - :mimetype:`application/json`
+                         - :mimetype:`text/plain; charset=utf-8`
+  :>json string instance_start_time: Timestamp of when the database was opened,
+    expressed in microseconds since the epoch.
+  :>json boolean ok: Operation status
+  :code 201: Commit completed successfully
+  :code 400: Invalid database name
+  :code 415: Bad :http:header:`Content-Type` value
 
+  **Request**:
 
-Commits any recent changes to the specified database to disk. You should
-call this if you want to ensure that recent changes have been written.
-For example, to commit all the changes to disk for the database
-``recipes`` you would use:
+  .. code-block:: http
 
-.. code-block:: http
-
-    POST http://couchdb:5984/recipes/_ensure_full_commit
+    POST /db/_ensure_full_commit HTTP/1.1
+    Accept: application/json
     Content-Type: application/json
+    Host: localhost:5984
 
-This returns a status message, containing the success message and the
-timestamp for when the CouchDB instance was started:
+  **Response**:
 
-.. code-block:: javascript
+  .. code-block:: http
+
+    HTTP/1.1 201 Created
+    Cache-Control: must-revalidate
+    Content-Length: 53
+    Content-Type: application/json
+    Date: Mon, 12 Aug 2013 10:22:19 GMT
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
 
     {
-      "ok" : true,
-      "instance_start_time" : "1288186189373361"
+        "instance_start_time": "1376269047459338",
+        "ok": true
     }
 
 
 .. _api/db/view_cleanup:
-.. _api/db/view_cleanup.post:
 
-``POST /db/_view_cleanup``
-==========================
+``/db/_view_cleanup``
+=====================
 
-* **Method**: ``POST /db/_view_cleanup``
-* **Request**: None
-* **Response**: JSON success statement
-* **Admin Privileges Required**: yes
+.. http:post:: /{db}/_view_cleanup
 
-Cleans up the cached view output on disk for a given view. For example:
+  Cleans up the cached view output on disk for a given view.
 
-.. code-block:: http
+  :param db: Database name
+  :<header Accept: - :mimetype:`application/json`
+                   - :mimetype:`text/plain`
+  :<header Content-Type: :mimetype:`application/json`
+  :>header Content-Type: - :mimetype:`application/json`
+                         - :mimetype:`text/plain; charset=utf-8`
+  :>json boolean ok: Operation status
+  :code 202: Compaction request has been accepted
+  :code 400: Invalid database name
+  :code 401: Administrator`s privileges required
+  :code 415: Bad :http:header:`Content-Type` value
 
-    POST http://couchdb:5984/recipes/_view_cleanup
+  **Request**:
+
+  .. code-block:: http
+
+    POST /db/_view_cleanup HTTP/1.1
+    Accept: application/json
     Content-Type: application/json
+    Host: localhost:5984
 
-If the request is successful, a basic status message us returned:
+  **Response**:
 
-.. code-block:: javascript
+  .. code-block:: http
+
+    HTTP/1.1 202 Accepted
+    Cache-Control: must-revalidate
+    Content-Length: 12
+    Content-Type: application/json
+    Date: Mon, 12 Aug 2013 09:27:43 GMT
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
 
     {
-       "ok" : true
+        "ok": true
     }
