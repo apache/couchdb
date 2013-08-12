@@ -212,12 +212,13 @@
                    - :mimetype:`text/plain`
   :<header Content-Type: :mimetype:`application/json`
   :<header X-Couch-Full-Commit: Overrides server's
-    :ref:`commit policy <config/couchdb/delayed_commits>`. *Optional*.
-    Default is ``true``.
+    :ref:`commit policy <config/couchdb/delayed_commits>`. Possible values
+    are: ``false`` and ``true``. *Optional*.
   :<json boolean all_or_nothing: Sets the database commit mode to use
     `all-or-nothing` semantics. Default is ``false``. *Optional*.
   :<json array docs: List of documents objects
-  :<json boolean new_edits: Default is ``false``. *Optional*.
+  :<json boolean new_edits: If ``false``, prevents the database from assigning
+    them new revision IDs. Default is ``true``. *Optional*.
   :>header Content-Type: - :mimetype:`application/json`
                          - :mimetype:`text/plain; charset=utf-8`
   :>jsonarr string id: Document ID
