@@ -10,186 +10,246 @@
 .. License for the specific language governing permissions and limitations under
 .. the License.
 
-.. _api/db.head:
+.. _api/db:
 
-``HEAD /db``
-============
+``/db``
+=======
 
-* **Method**: ``HEAD /db``
-* **Request**: None
-* **Response**: None
-* **Admin Privileges Required**: no
-* **Return Codes**:
+.. http:head:: /{db}
 
-  * **200**:
-    Database exists.
+  Returns the HTTP Headers containing a minimal amount of information
+  about the specified database. Since the response body is empty this method
+  is a lightweight way to check is database exists or not.
 
-  * **404**:
-    Requested database not found.
+  :param db: Database name
+  :code 200: Database exists
+  :code 404: Requested database not found
 
-Returns the HTTP Headers containing a minimal amount of information
-about the specified database. Since the response body is empty this method
-is a lightweight way to check is database exists or not.
+  **Request**:
 
-.. _api/db.get:
+  .. code-block:: http
 
-``GET /db``
-===========
+    HEAD /test HTTP/1.1
+    Host: localhost:5984
 
-* **Method**: ``GET /db``
-* **Request**: None
-* **Response**: Information about the database in JSON format
-* **Admin Privileges Required**: no
-* **Return Codes**:
+  **Response**:
 
-  * **404**:
-    The requested content could not be found. The returned content will include
-    further information, as a JSON object, if available.
+  .. code-block:: http
 
-Gets information about the specified database. For example, to retrieve
-the information for the database ``recipe``:
+    HTTP/1.1 200 OK
+    Cache-Control: must-revalidate
+    Content-Type: application/json
+    Date: Mon, 12 Aug 2013 01:27:41 GMT
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
 
-.. code-block:: http
 
-    GET http://couchdb:5984/recipes
+.. http:get:: /{db}
+
+  Gets information about the specified database.
+
+  :param db: Database name
+  :<header Accept: - :mimetype:`application/json`
+                   - :mimetype:`text/plain`
+  :>header Content-Type: - :mimetype:`application/json`
+                         - :mimetype:`text/plain; charset=utf-8`
+  :>json number committed_update_seq: The number of committed update.
+  :>json boolean compact_running: Set to ``true`` if the database compaction
+    routine is operating on this database.
+  :>json string db_name: The name of the database.
+  :>json number disk_format_version: The version of the physical format used
+    for the data when it is stored on disk.
+  :>json number disk_size: Size in bytes of the data as stored on the disk.
+    Views indexes are not included in the calculation.
+  :>json number doc_count: A count of the documents in the specified database.
+  :>json number doc_del_count: Number of deleted documents
+  :>json string instance_start_time: Timestamp of when the database was opened,
+    expressed in microseconds since the epoch.
+  :>json number purge_seq: The number of purge operations on the database.
+  :>json number update_seq: The current number of updates to the database.
+  :code 200: Request completed successfully
+  :code 404: Requested database not found
+
+  **Request**:
+
+  .. code-block:: http
+
+    GET /receipts HTTP/1.1
     Accept: application/json
+    Host: localhost:5984
 
-The JSON response contains meta information about the database. A sample
-of the JSON returned for an empty database is provided below:
+  **Response**:
 
-.. code-block:: javascript
+  .. code-block:: http
 
-    {
-       "compact_running" : false,
-       "committed_update_seq" : 375048,
-       "disk_format_version" : 5,
-       "disk_size" : 33153123,
-       "doc_count" : 18386,
-       "doc_del_count" : 0,
-       "db_name" : "recipes",
-       "instance_start_time" : "1290700340925570",
-       "purge_seq" : 10,
-       "update_seq" : 375048
-    }
-
-
-The elements of the returned structure are shown in the table below:
-
-+----------------------------------+-------------------------------------------+
-| Field                            | Description                               |
-+==================================+===========================================+
-| committed_update_seq             | The number of committed update.           |
-+----------------------------------+-------------------------------------------+
-| compact_running                  | Set to true if the database compaction    |
-|                                  | routine is operating on this database.    |
-+----------------------------------+-------------------------------------------+
-| db_name                          | The name of the database.                 |
-+----------------------------------+-------------------------------------------+
-| disk_format_version              | The version of the physical format used   |
-|                                  | for the data when it is stored on disk.   |
-+----------------------------------+-------------------------------------------+
-| disk_size                        | Size in bytes of the data as stored on the|
-|                                  | disk. Views indexes are not included in   |
-|                                  | the calculation.                          |
-+----------------------------------+-------------------------------------------+
-| doc_count                        | A count of the documents in the specified |
-|                                  | database.                                 |
-+----------------------------------+-------------------------------------------+
-| doc_del_count                    | Number of deleted documents               |
-+----------------------------------+-------------------------------------------+
-| instance_start_time              | Timestamp of when the database was        |
-|                                  | opened, expressed in microseconds since   |
-|                                  | the epoch.                                |
-+----------------------------------+-------------------------------------------+
-| purge_seq                        | The number of purge operations on the     |
-|                                  | database.                                 |
-+----------------------------------+-------------------------------------------+
-| update_seq                       | The current number of updates to the      |
-|                                  | database.                                 |
-+----------------------------------+-------------------------------------------+
-
-.. _api/db.put:
-
-``PUT /db``
-===========
-
-* **Method**: ``PUT /db``
-* **Request**: None
-* **Response**: JSON success statement
-* **Admin Privileges Required**: no
-* **Return Codes**:
-
-  * **400**:
-    Invalid database name
-
-  * **412**:
-    Database already exists
-
-Creates a new database. The database name must be composed of one or
-more of the following characters:
-
--  Lowercase characters (``a-z``)
-
--  Name must begin with a lowercase letter
-
--  Digits (``0-9``)
-
--  Any of the characters ``_``, ``$``, ``(``, ``)``, ``+``, ``-``, and
-   ``/``.
-
-Trying to create a database that does not meet these requirements will
-return an error quoting these restrictions.
-
-To create the database ``recipes``:
-
-.. code-block:: http
-
-    PUT http://couchdb:5984/recipes
+    HTTP/1.1 200 OK
+    Cache-Control: must-revalidate
+    Content-Length: 258
     Content-Type: application/json
-
-The returned content contains the JSON status:
-
-.. code-block:: javascript
+    Date: Mon, 12 Aug 2013 01:38:57 GMT
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
 
     {
-       "ok" : true
+        "committed_update_seq": 292786,
+        "compact_running": false,
+        "data_size": 65031503,
+        "db_name": "receipts",
+        "disk_format_version": 6,
+        "disk_size": 137433211,
+        "doc_count": 6146,
+        "doc_del_count": 64637,
+        "instance_start_time": "1376269325408900",
+        "purge_seq": 0,
+        "update_seq": 292786
     }
 
-Anything should be treated as an error, and the problem should be taken
-form the HTTP response code.
 
-.. _api/db.delete:
+.. http::put /{db}
 
-``DELETE /db``
-==============
+  Creates a new database. The database name ``{db}`` must be composed by
+  following next rules:
 
-* **Method**: ``DELETE /db``
-* **Request**: None
-* **Response**: JSON success statement
-* **Admin Privileges Required**: no
-* **Return Codes**:
+  -  Name must begin with a lowercase letter (``a-z``)
 
-  * **200**:
-    Database has been deleted
+  -  Lowercase characters (``a-z``)
 
-  * **404**:
-    The requested content could not be found. The returned content will include
-    further information, as a JSON object, if available.
+  -  Digits (``0-9``)
 
-Deletes the specified database, and all the documents and attachments
-contained within it.
+  -  Any of the characters ``_``, ``$``, ``(``, ``)``, ``+``, ``-``, and
+     ``/``.
 
-To delete the database ``recipes`` you would send the request:
+  If you're familiar with `Regular Expressions`_, the rules above could be
+  written as ``^[a-z][a-z0-9_$()+/-]*$``.
 
-.. code-block:: http
+  :param db: Database name
+  :<header Accept: - :mimetype:`application/json`
+                   - :mimetype:`text/plain`
+  :>header Content-Type: - :mimetype:`application/json`
+                         - :mimetype:`text/plain; charset=utf-8`
+  :>header Location: Database URI location
+  :>json boolean ok: Operation status. Available in case of success
+  :>json string error: Error type. Available if response code is ``4xx``
+  :>json string reason: Error description. Available if response code is ``4xx``
+  :code 201: Database created successfully
+  :code 400: Invalid database name
+  :code 401: Administrator`s privileges required
+  :code 412: Database already exists
 
-    DELETE http://couchdb:5984/recipes
+  **Request**:
+
+  .. code-block:: http
+
+    PUT /db HTTP/1.1
+    Accept: application/json
+    Host: localhost:5984
+
+  **Response**:
+
+  .. code-block:: http
+
+    HTTP/1.1 201 Created
+    Cache-Control: must-revalidate
+    Content-Length: 12
     Content-Type: application/json
-
-If successful, the returned JSON will indicate success
-
-.. code-block:: javascript
+    Date: Mon, 12 Aug 2013 08:01:45 GMT
+    Location: http://localhost:5984/db
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
 
     {
-       "ok" : true
+        "ok": true
     }
+
+  If we repeat same request to CouchDB, it will response with :code:`412` since
+  database is already exists:
+
+  **Request**:
+
+  .. code-block:: http
+
+    PUT /db HTTP/1.1
+    Accept: application/json
+    Host: localhost:5984
+
+  **Response**:
+
+  .. code-block:: http
+
+    HTTP/1.1 412 Precondition Failed
+    Cache-Control: must-revalidate
+    Content-Length: 95
+    Content-Type: application/json
+    Date: Mon, 12 Aug 2013 08:01:16 GMT
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+
+    {
+        "error": "file_exists",
+        "reason": "The database could not be created, the file already exists."
+    }
+
+  In case of invalid database name CouchDB returns response with :code:`400`:
+
+  **Request**:
+
+  .. code-block:: http
+
+    PUT /_db HTTP/1.1
+    Accept: application/json
+    Host: localhost:5984
+
+  **Request**:
+
+  .. code-block:: http
+
+    HTTP/1.1 400 Bad Request
+    Cache-Control: must-revalidate
+    Content-Length: 194
+    Content-Type: application/json
+    Date: Mon, 12 Aug 2013 08:02:10 GMT
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+
+    {
+        "error": "illegal_database_name",
+        "reason": "Name: '_db'. Only lowercase characters (a-z), digits (0-9), and any of the characters _, $, (, ), +, -, and / are allowed. Must begin with a letter."
+    }
+
+
+.. http:delete:: /{db}
+
+  Deletes the specified database, and all the documents and attachments
+  contained within it.
+
+  :param db: Database name
+  :<header Accept: - :mimetype:`application/json`
+                   - :mimetype:`text/plain`
+  :>header Content-Type: - :mimetype:`application/json`
+                         - :mimetype:`text/plain; charset=utf-8`
+  :>json boolean ok: Operation status
+  :code 200: Database removed successfully
+  :code 400: Invalid database name
+  :code 401: Administrator`s privileges required
+  :code 404: Database doesn't already exists
+
+  **Request**:
+
+  .. code-block:: http
+
+    DELETE /db HTTP/1.1
+    Accept: application/json
+    Host: localhost:5984
+
+  **Response**:
+
+  .. code-block:: http
+
+    HTTP/1.1 200 OK
+    Cache-Control: must-revalidate
+    Content-Length: 12
+    Content-Type: application/json
+    Date: Mon, 12 Aug 2013 08:54:00 GMT
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+
+    {
+        "ok": true
+    }
+
+
+.. _Regular Expressions: http://en.wikipedia.org/wiki/Regular_expression
