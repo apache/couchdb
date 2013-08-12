@@ -24,6 +24,7 @@
   contents, consisting the ID, revision and key. The key is generated from
   the document ID.
 
+  :param db: Database name
   :<header Accept: - :mimetype:`application/json`
                    - :mimetype:`text/plain`
   :query boolean conflicts: Includes `conflicts` information in response.
@@ -187,59 +188,94 @@
 
 
 .. _api/db/bulk_docs:
-.. _api/db/bulk_docs.post:
 
-``POST /db/_bulk_docs``
-=======================
+``/db/_bulk_docs``
+==================
 
-* **Method**: ``POST /db/_bulk_docs``
-* **Request**: JSON of the docs and updates to be applied
-* **Response**: JSON success statement
-* **Admin Privileges Required**: no
+.. http:post:: /{db}/_bulk_docs
 
-* **HTTP Headers**:
+  The bulk document API allows you to create and update multiple documents
+  at the same time within a single request. The basic operation is similar
+  to creating or updating a single document, except that you batch the
+  document structure and information.
 
-  * **Header**: ``X-Couch-Full-Commit``
+  When creating new documents the document ID (``_id``) is optional.
 
-    * **Description**: Overrides server's commit policy.
-    * **Optional**: yes
-    * **Values**:
+  For updating existing documents, you must provide the document ID, revision
+  information (``_rev``), and new document values.
 
-      * **true**: Ensures that any non-committed changes are committed to
-        physical storage.
-      * **false**: Uses delayed commits. CouchDB responds faster, but without
-        any guarantees that all data is successfully stored on disk.
+  In case of batch deleting documents all fields as document ID, revision
+  information and deletion status (``_deleted``) are required.
 
-* **Return Codes**:
+  :param db: Database name
+  :<header Accept: - :mimetype:`application/json`
+                   - :mimetype:`text/plain`
+  :<header Content-Type: :mimetype:`application/json`
+  :<header X-Couch-Full-Commit: Overrides server's
+    :ref:`commit policy <config/couchdb/delayed_commits>`. *Optional*.
+    Default is ``true``.
+  :<json boolean all_or_nothing: Sets the database commit mode to use
+    `all-or-nothing` semantics. Default is ``false``. *Optional*.
+  :<json array docs: List of documents objects
+  :<json boolean new_edits: Default is ``false``. *Optional*.
+  :>header Content-Type: - :mimetype:`application/json`
+                         - :mimetype:`text/plain; charset=utf-8`
+  :>jsonarr string id: Document ID
+  :>jsonarr string rev: New document revision token. *Optional*. Available
+    if document have saved without errors.
+  :>jsonarr string error: Error type. *Optional*.
+  :>jsonarr string reason: Error reason. *Optional*.
+  :code 201: Document(s) have been created or updated
+  :code 400: Invalid request`s JSON data
+  :code 500: Malformed data provided
 
-  * **201**:
-    Document(s) have been created or updated
+  **Request**:
 
-The bulk document API allows you to create and update multiple documents
-at the same time within a single request. The basic operation is similar
-to creating or updating a single document, except that you batch the
-document structure and information and . When creating new documents the
-document ID is optional. For updating existing documents, you must
-provide the document ID, revision information, and new document values.
+  .. code-block:: http
 
-For both inserts and updates the basic structure of the JSON is the
-same:
+    POST /db/_bulk_docs HTTP/1.1
+    Accept: application/json
+    Content-Length: 109
+    Content-Type:application/json
+    Host: localhost:5984
 
-+----------------------------------+-------------------------------------------+
-| Field                            | Description                               |
-+==================================+===========================================+
-| all_or_nothing (optional)        | Sets the database commit mode to use      |
-|                                  | all-or-nothing semantics                  |
-+----------------------------------+-------------------------------------------+
-| docs [array]                     | Bulk Documents Document                   |
-+----------------------------------+-------------------------------------------+
-|         _id (optional)           | List of changes, field-by-field, for this |
-|                                  | document                                  |
-+----------------------------------+-------------------------------------------+
-|         _rev (optional)          | Document ID                               |
-+----------------------------------+-------------------------------------------+
-|         _deleted (optional)      | Update sequence number                    |
-+----------------------------------+-------------------------------------------+
+    {
+      "docs": [
+        {
+          "_id": "FishStew"
+        },
+        {
+          "_id": "LambStew",
+          "_rev": "2-0786321986194c92dd3b57dfbfc741ce",
+          "_deleted": true
+        }
+      ]
+    }
+
+  **Response**:
+
+  .. code-block:: http
+
+    HTTP/1.1 201 Created
+    Cache-Control: must-revalidate
+    Content-Length: 144
+    Content-Type: appliaction/json
+    Date: Mon, 12 Aug 2013 00:15:05 GMT
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+
+    [
+      {
+        "ok": true,
+        "id": "FishStew",
+        "rev":" 1-967a00dff5e02add41819138abb3284d"
+      },
+      {
+        "ok": true,
+        "id": "LambStew",
+        "rev": "3-f9c62b2169d0999103e9f41949090807"
+      }
+    ]
+
 
 Inserting Documents in Bulk
 ---------------------------
@@ -374,7 +410,7 @@ You can optionally delete documents during a bulk update by adding the
 ``_deleted`` field with a value of ``true`` to each document ID/revision
 combination within the submitted JSON structure.
 
-The return type from a bulk insertion will be 201, with the content of
+The return type from a bulk insertion will be :code:`201`, with the content of
 the returned structure indicating specific success or otherwise messages
 on a per-document basis.
 
@@ -510,20 +546,6 @@ of JSON structures, one for each document in the original submission.
 The returned JSON structure should be examined to ensure that all of the
 documents submitted in the original request were successfully added to
 the database.
-
-The exact structure of the returned information is:
-
-+----------------------------------+-------------------------------------------+
-| Field                            | Description                               |
-+==================================+===========================================+
-| docs [array]                     | Bulk Documents Document                   |
-+----------------------------------+-------------------------------------------+
-|         id                       | Document ID                               |
-+----------------------------------+-------------------------------------------+
-|         error                    | Error type                                |
-+----------------------------------+-------------------------------------------+
-|         reason                   | Error string with extended reason         |
-+----------------------------------+-------------------------------------------+
 
 When a document (or document revision) is not correctly committed to the
 database because of an error, you should check the ``error`` field to
