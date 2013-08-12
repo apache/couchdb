@@ -228,7 +228,7 @@ In addition to using stale views, you can also make use of the
 view information including the update sequence of the database from
 which the view was generated. The returned value can be compared this to
 the current update sequence exposed in the database information
-(returned by :ref:`api/db.get`).
+(returned by :http:get:`/{db}`).
 
 Sorting Returned Rows
 ---------------------

@@ -41,7 +41,7 @@ disk database file by performing the following operations:
 
 -  Removes old revisions of documents from the database, up to the
    per-database limit specified by the ``_revs_limit`` database
-   parameter. See :ref:`api/db.get`.
+   parameter.
 
 Compaction can only be requested on an individual database; you cannot
 compact all the databases for a CouchDB instance. The compaction process
@@ -50,7 +50,7 @@ runs as a background process.
 You can determine if the compaction process is operating on a database
 by obtaining the database meta information, the ``compact_running``
 value of the returned database structure will be set to true. See
-:ref:`api/db.get`.
+:http:get:`/{db}`.
 
 You can also obtain a list of running processes to determine whether
 compaction is currently running. See :ref:`api/server/active_tasks`.
