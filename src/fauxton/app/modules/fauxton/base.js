@@ -238,12 +238,11 @@ function(app, Backbone, resizeColumns) {
     template: "templates/fauxton/pagination",
 
     initialize: function(options) {
-      this.page = options.page;
+      this.page = parseInt(options.page, 10);
       this.perPage = options.perPage;
       this.total = options.total;
       this.totalPages = Math.ceil(this.total / this.perPage);
       this.urlFun = options.urlFun;
-
     },
 
     serialize: function() {

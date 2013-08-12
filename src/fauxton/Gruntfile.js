@@ -378,7 +378,7 @@ module.exports = function(grunt) {
   grunt.registerTask('lint', ['clean', 'jshint']);
   grunt.registerTask('test', ['lint', 'mochaSetup', 'mocha_phantomjs']);
   // Fetch dependencies (from git or local dir), lint them and make load_addons
-  grunt.registerTask('dependencies', ['get_deps', 'jshint', 'gen_load_addons:default']);
+  grunt.registerTask('dependencies', ['get_deps', 'gen_load_addons:default']);
   // build templates, js and css
   grunt.registerTask('build', ['less', 'concat:index_css', 'jst', 'requirejs', 'concat:requirejs', 'template:release']);
   // minify code and css, ready for release.
@@ -391,11 +391,11 @@ module.exports = function(grunt) {
   grunt.registerTask('dev', ['debugDev', 'couchserver']);
   // build a debug release
   grunt.registerTask('debug', ['lint', 'dependencies', 'concat:requirejs','less', 'concat:index_css', 'template:development', 'copy:debug']);
-  grunt.registerTask('debugDev', ['lint', 'dependencies', 'less', 'concat:index_css', 'template:development', 'copy:debug']);
+  grunt.registerTask('debugDev', ['clean', 'dependencies','jshint','less', 'concat:index_css', 'template:development', 'copy:debug']);
 
-  grunt.registerTask('watchRun', ['clean:watch', 'dependencies']);
+  grunt.registerTask('watchRun', ['clean:watch', 'dependencies', 'jshint']);
   // build a release
-  grunt.registerTask('release', ['lint' ,'dependencies', 'build', 'minify', 'copy:dist']);
+  grunt.registerTask('release', ['clean' ,'dependencies','jshint', 'build', 'minify', 'copy:dist']);
 
   /*
    * Install into CouchDB in either debug, release, or couchapp mode
