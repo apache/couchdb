@@ -12,91 +12,136 @@
 
 
 .. _api/db/changes:
-.. _api/db/changes.get:
 
-====================
-``GET /db/_changes``
-====================
+================
+``/db/_changes``
+================
 
-* **Method**: ``GET /db/_changes``
-* **Request**: None
-* **Response**: JSON success statement
-* **Admin Privileges Required**: no
+.. http:get:: /{db}/_changes
+.. http:head:: /{db}/_changes
+.. http:post:: /{db}/_changes
 
-A list of changes made to documents in the database, in the order they were
-made, can be obtained from the database's ``_changes`` resource.
-This can be used to monitor for update and modifications to the database for
-post processing or synchronization. You can query the ``_changes`` resource by
-issuing a ``GET`` request with the following (optional) parameters:
+  A list of changes made to documents in the database, in the order they were
+  made, can be obtained from the database's ``_changes`` resource.
+  This can be used to monitor for update and modifications to the database for
+  post processing or synchronization.
 
-+--------------+----------------------------------------------+---------------+--------------+
-| Parameter    | Value                                        | Default Value |  Notes       |
-+==============+==============================================+===============+==============+
-| since        | seqnum / now                                 | 0             | \(1)         |
-+--------------+----------------------------------------------+---------------+--------------+
-| limit        | maxsequences                                 | none          | \(2)         |
-+--------------+----------------------------------------------+---------------+--------------+
-| descending   | boolean                                      | false         | \(3)         |
-+--------------+----------------------------------------------+---------------+--------------+
-| feed         | normal / longpoll / continuous / eventsource | normal        | \(4)         |
-+--------------+----------------------------------------------+---------------+--------------+
-| heartbeat    | milliseconds                                 | 60000         | \(5)         |
-+--------------+----------------------------------------------+---------------+--------------+
-| timeout      | milliseconds                                 | 60000         | \(6)         |
-+--------------+----------------------------------------------+---------------+--------------+
-| filter       | designdoc/filtername / _view                 | none          | \(7)         |
-+--------------+----------------------------------------------+---------------+--------------+
-| include_docs | boolean                                      | false         | \(8)         |
-+--------------+----------------------------------------------+---------------+--------------+
-| style        | all_docs / main_only                         | main_only     | \(9)         |
-+--------------+----------------------------------------------+---------------+--------------+
-| view         | designdoc/filtername                         | none          | \(10)        |
-+--------------+----------------------------------------------+---------------+--------------+
+  :param db: Database name
+  :<header Accept: - :mimetype:`application/json`
+                   - :mimetype:`text/event-stream`
+                   - :mimetype:`text/plain`
+  :<header Last-Event-ID: ID of the last events received by the server on a
+    previous connection. Overrides `since` query parameter.
+  :query boolean conflicts: Includes `conflicts` information in response.
+    Ignored if `include_docs` isn't ``true``. Default is ``false``.
+  :query boolean descending: Return the change results in descending sequence
+    order (most recent change first). Default is ``false``.
+  :query string feed: see :ref:`changes`. Default is ``normal``.
+  :query string filter: Reference to a :ref:`filter function <filterfun>`
+    from a design document that will filter whole stream emitting only filtered
+    events. See the `section in the book`_ for more information.
+  :query number heartbeat: Period in *milliseconds* after which an empty line is
+    sent in the results. Only applicable for :ref:`longpoll <changes/longpoll>`
+    or :ref:`continuous <changes/continuous>` feeds. Overrides any timeout to
+    keep the feed alive indefinitely. Default is ``60000``. May be ``true`` to
+    use default value.
+  :query boolean include_docs: Include the associated document with each result.
+    If there are conflicts, only the winning revision is returned.
+    Default is ``false``.
+  :query number last-event-id: Alias of `Last-Event-ID` header.
+  :query number limit: Limit number of result rows to the specified value
+    (note that using ``0`` here has the same effect as ``1``).
+  :query since: Start the results from the change immediately after the given
+    sequence number. Can be integer number or ``now`` value. Default is ``0``.
+  :query string style: Specifies how many revisions are returned in the changes
+    array. The default, ``main_only``, will only return the current "winning"
+    revision; ``all_docs`` will return all leaf revisions (including conflicts
+    and deleted former conflicts).
+  :query number timeout: Maximum period in *milliseconds* to wait for a change
+    before the response is sent, even if there are no results. Only applicable
+    for :ref:`longpoll <changes/longpoll>` or :ref:`continuous
+    <changes/continuous>` feeds. Default value is specified by
+    :ref:`changes_timeout <config/httpd/changes_timeout>` configuration option.
+    Note that ``60000`` value is also the default maximum timeout to prevent
+    undetected dead connections.
+  :query string view: Allows to use view functions as filters. It requires to
+    set ``filter`` special value ``_view`` to enable this feature.
+    Documents counted as "passed" for view filter in case if map function emits
+    at least one record for them.
+  :>header Cache-Control: ``no-cache`` if changes feed is
+    :ref:`eventsource <changes/eventsource>`
+  :>header Content-Type: - :mimetype:`application/json`
+                         - :mimetype:`text/event-stream`
+                         - :mimetype:`text/plain; charset=utf-8`
+  :>header ETag: Response hash is changes feed is `normal`
+  :>header Transfer-Encoding: ``chunked``
+  :>json number last_seq: Last change sequence number
+  :>json array results: Changes made to a database
+  :code 200: Request completed successfully
 
-Notes:
+  The ``result`` field of database changes
 
-(1) Start the results from the change immediately after the given sequence
-    number.
+  :json array changes: List of document`s leafs with single field ``rev``
+  :json string id: Document ID
+  :json number seq: Update sequence number
 
-(2) Limit number of result rows to the specified value (note that using 0 here
-    has the same effect as 1).
+  **Request**:
 
-(3) Return the change results in descending sequence order (most recent change
-    first)
+  .. code-block:: http
 
-(4) Select the type of feed.
+    GET /db/_changes?style=all_docs HTTP/1.1
+    Accept: application/json
+    Host: localhost:5984
 
-(5) Period in milliseconds after which an empty line is sent in the results.
-    Only applicable for `longpoll` or `continuous` feeds. Overrides any timeout
-    to keep the feed alive indefinitely.
+  **Response**:
 
-(6) Maximum period in milliseconds to wait for a change before the response is
-    sent, even if there are no results. Only applicable for `longpoll` or
-    `continuous` feeds. Note that 60000 is also the default maximum timeout to
-    prevent undetected dead connections.
+  .. code-block:: http
 
-    You can change the default maximum timeout in your ini-configuration:
+    HTTP/1.1 200 OK
+    Cache-Control: must-revalidate
+    Content-Type: application/json
+    Date: Mon, 12 Aug 2013 00:54:58 GMT
+    ETag: "6ASLEKEMSRABT0O5XY9UPO9Z"
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Transfer-Encoding: chunked
 
-    .. code-block:: ini
+    {
+        "last_seq": 11,
+        "results": [
+            {
+                "changes": [
+                    {
+                        "rev": "2-7051cbe5c8faecd085a3fa619e6e6337"
+                    }
+                ],
+                "id": "6478c2ae800dfc387396d14e1fc39626",
+                "seq": 6
+            },
+            {
+                "changes": [
+                    {
+                        "rev": "3-7379b9e515b161226c6559d90c4dc49f"
+                    }
+                ],
+                "deleted": true,
+                "id": "5bbc9ca465f1b0fcd62362168a7c8831",
+                "seq": 9
+            },
+            {
+                "changes": [
+                    {
+                        "rev": "6-460637e73a6288cb24d532bf91f32969"
+                    },
+                    {
+                        "rev": "5-eeaa298781f60b7bcae0c91bdedd1b87"
+                    }
+                ],
+                "id": "729eb57437745e506b333068fff665ae",
+                "seq": 11
+            }
+        ]
+    }
 
-        [httpd]
-        changes_timeout=#millisecs
-
-(7) Reference to a :ref:`filter function <filterfun>` from a design document
-    that will filter whole stream emitting only filtered events.
-    See the `section in the book`_ for more information.
-
-(8) Include the associated document with each result. If there are conflicts,
-    only the winning revision is returned.
-
-(9) Specifies how many revisions are returned in the changes array.
-    The default, `main_only`, will only return the current "winning" revision;
-    `all_docs` will return all leaf revisions (including conflicts and deleted
-    former conflicts.)
-
-(10) Allows to use view functions as filters. It requires to set ``filter``
-     special value `_view` to enable this feature. Documents counted as "passed"
-     for view filter in case if map function emits at least one record for them.
 
 .. versionchanged:: 0.11.0 added ``include_docs`` parameter
 .. versionchanged:: 1.2.0 added ``view`` parameter and special value `_view`
@@ -104,6 +149,7 @@ Notes:
 .. versionchanged:: 1.3.0 ``since`` parameter could take `now` value to start
    listen changes since current seq number.
 .. versionchanged:: 1.3.0 ``eventsource`` feed type added.
+.. versionchanged:: 1.4.0 Support ``Last-Event-ID`` header.
 
 
 .. _changes:
@@ -146,23 +192,7 @@ including the given sequence number::
 
 
 The return structure for ``normal`` and ``longpoll`` modes is a JSON
-array of changes objects, and the last update sequence number. The
-structure is described in the following table.
-
-+----------------------------------+-------------------------------------------+
-| Field                            | Description                               |
-+==================================+===========================================+
-| last_seq                         | Last change sequence number.              |
-+----------------------------------+-------------------------------------------+
-| results [array]                  | Changes made to a database                |
-+----------------------------------+-------------------------------------------+
-|         changes [array]          | List of changes, field-by-field, for this |
-|                                  | document                                  |
-+----------------------------------+-------------------------------------------+
-|         id                       | Document ID                               |
-+----------------------------------+-------------------------------------------+
-|         seq                      | Update sequence number                    |
-+----------------------------------+-------------------------------------------+
+array of changes objects, and the last update sequence number.
 
 The return format for ``continuous`` mode the server sends a ``CRLF``
 (carriage-return, linefeed) delimited line for each change. Each line

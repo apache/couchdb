@@ -62,6 +62,13 @@ class IETFRef(DocRef):
         super(IETFRef, self).__init__(url, 'section-', section)
         
 
+class EventSourceRef(DocRef):
+
+    def __init__(self, section):
+        url = 'http://www.w3.org/TR/eventsource/'
+        super(EventSourceRef, self).__init__(url, section, '')
+
+
 #: Mapping from lowercase HTTP method name to :class:`DocRef` object which
 #: maintains the URL which points to the section of the RFC which defines that
 #: HTTP method.
@@ -110,6 +117,7 @@ HEADER_REFS = {
     'If-None-Match': RFC2616Ref(14.26),
     'If-Range': RFC2616Ref(14.27),
     'If-Unmodified-Since': RFC2616Ref(14.28),
+    'Last-Event-ID': EventSourceRef('last-event-id'),
     'Last-Modified': RFC2616Ref(14.29),
     'Location': RFC2616Ref(14.30),
     'Max-Forwards': RFC2616Ref(14.31),
