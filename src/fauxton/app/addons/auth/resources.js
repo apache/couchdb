@@ -301,10 +301,9 @@ function (app, FauxtonAPI) {
     }
   });
 
-  Auth.NavLinkTitle = FauxtonAPI.View.extend({ 
+  Auth.NavLink = FauxtonAPI.View.extend({ 
     template: 'addons/auth/templates/nav_link_title',
     tagName: 'li',
-    className: 'menuDropdownToggle openMenu',
 
     beforeRender: function () {
       this.listenTo(this.model, 'change', this.render);
@@ -325,31 +324,25 @@ function (app, FauxtonAPI) {
       this.listenTo(this.model, 'change', this.render);
     },
 
+    setTab: function (selectedTab) {
+      this.selectedTab = selectedTab;
+      this.$('.active').removeClass('active');
+      var $tab = this.$('a[data-select="' + selectedTab +'"]');
+      $tab.parent().addClass('active');
+    },
+
+    afterRender: function () {
+      if (this.selectedTab) {
+        this.setTab(this.selectedTab);
+      }
+    },
+
     serialize: function () {
       return {
         admin_party: this.model.isAdminParty(),
         user: this.model.user()
       };
     }
-  });
-
-  Auth.NavLink = FauxtonAPI.View.extend({
-    className: "dropdown openMenu",
-
-    beforeRender: function () {
-      this.nav_link_name = this.insertView(new Auth.NavLinkTitle({model: this.model}));
-      if (this.model.isAdminParty() || this.model.user()) {
-        this.nav_link_list = this.insertView(new Auth.NavDropDown({model: this.model}));
-      }
-    },
-
-    afterRender: function () {
-      var that = this;
-      //unbind this click incase it has been registered before
-      this.$('.menuDropdownToggle').unbind('click').click(function () {
-        that.$('.menuDropdown').toggle('slow');
-      });
-    },
   });
 
   Auth.NoAccessView = FauxtonAPI.View.extend({

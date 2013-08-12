@@ -51,10 +51,6 @@ function(app, Fauxton) {
 
     disableLoader: false,
 
-    /*hasRendered: function () {
-      return !!this.__manager__.hasRendered;
-    },*/
-
     forceRender: function () {
       this.hasRendered = false;
     }
@@ -301,6 +297,7 @@ function(app, Fauxton) {
 
           if (!routeObject.disableLoader) {
             routeObjectSpinner.stop();
+            $('.spinner').remove();
           }
 
           if (!view.disableLoader){ 

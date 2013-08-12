@@ -12,12 +12,16 @@ License for the specific language governing permissions and limitations under
 the License.
 -->
 
-<!-- dropdown menu links -->
-  <% if (admin_party) { %>
-  <li class="menuDropdown"><a id="user-create-admin" href="#createAdmin"> Create Admin </a></li>
-  <% } else if (user) { %>
-  <li class="menuDropdown"><a id="user-create-more-admin" href="#addAdmin"> Create Admins </a></li>
-  <li class="menuDropdown"><a id="user-change-password" href="#changePassword"> Change Password </a></li>
-  <li class="menuDropdown"><a id="user-logout" href="#logout"> Logout </a> </li> 
-  <% } %>
+<div id="sidenav">
+<header class="row-fluid">
+  <h3> <%= user.name %> </h3>
+</header>
+<nav>
+<ul class="nav nav-list">
+  <li class="active" ><a data-select="change-password" id="user-change-password" href="#changePassword"> Change Password </a></li>
+  <li ><a data-select="add-admin" href="#addAdmin"> Create Admins </a></li>
+  <li ><a data-select"user-logout" href="#logout"> Logout </a> </li> 
+</ul>
+</nav>
+</div>
 
