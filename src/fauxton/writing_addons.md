@@ -110,26 +110,39 @@ Then define a route in `routes.js` that the addon is accessible at:
     ],
 
     function(app, FauxtonAPI, Resources) {
-      var helloRoute = function () {
-        console.log('helloRoute callback yo');
-        return {
-          layout: "one_pane",
-          crumbs: [
-            {"name": "Hello","link": "_hello"}
-          ],
-          views: {
-            "#dashboard-content": new Resources.Hello({})
-          },
-          apiUrl: 'hello'
-        };
-      };
+      var  HelloRouteObject = FauxtonAPI.RouteObject.extend({
+        layout: "one_pane",
 
-      Routes = {
-        "_hello": helloRoute
-      };
+        crumbs: [
+          {"name": "Hello","link": "_hello"}
+        ],
 
-      return Routes;
+        routes: {
+           "_hello": "helloRoute"
+        },
+
+        selectedHeader: "Hello",
+
+        roles: ["_admin"],
+
+        apiUrl:'hello',
+
+        initialize: function () {
+            //put common views used on all your routes here (eg:  sidebars )
+        },
+
+        helloRoute: function () {
+          this.setView("#dashboard-content", new Resources.Hello({}));
+        }
+      });
+
+      Resources.RouteObjects = [HelloRouteObject];
+
+      return Resources;
+
     });
+
+
 
 
 Then wire it all together in base.js:
@@ -141,16 +154,12 @@ Then wire it all together in base.js:
     ],
 
     function(app, FauxtonAPI, HelloRoutes) {
-      var Hello = new FauxtonAPI.addon();
-      console.log('hello from hello');
 
-      Hello.initialize = function() {
+      HelloRoutes.initialize = function() {
         FauxtonAPI.addHeaderLink({title: "Hello", href: "#_hello"});
       };
 
-      Hello.Routes = HelloRoutes;
-      console.log(Hello);
-      return Hello;
+      return HelloRoutes;
     });
 
 Once the code is in place include the add on in your `settings.json` so that it
