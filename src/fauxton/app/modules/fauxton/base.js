@@ -77,23 +77,28 @@ function(app, Backbone, resizeColumns) {
     ],
 
     bottomNavLinks: [],
-
-    initialize: function() {
-    },
+    footerNavLinks: [],
 
     serialize: function() {
-      return {navLinks: this.navLinks, bottomNavLinks: this.bottomNavLinks};
+      return {
+        navLinks: this.navLinks,
+        bottomNavLinks: this.bottomNavLinks,
+        footerNavLinks: this.footerNavLinks
+      };
     },
 
     addLink: function(link) {
       // link.top means it gets pushed to the top of the array,
       // link.bottomNav means it goes to the additional bottom nav
+      // link.footerNav means goes to the footer nav
       if (link.top && !link.bottomNav){
         this.navLinks.unshift(link);
       } else if (link.top && link.bottomNav){
         this.bottomNavLinks.unshift(link);
       } else if (link.bottomNav) {
         this.bottomNavLinks.push(link);
+      } else if (link.footerNav) {
+        this.footerNavLinks.push(link);
       } else {
         this.navLinks.push(link);
       }
@@ -101,6 +106,28 @@ function(app, Backbone, resizeColumns) {
       //this.trigger("link:add");
 
       //this.render();
+    },
+
+    removeLink: function (removeLink) {
+      var links = this.navlinks;
+
+      if (removeLink.bottomNav) {
+        links = this.bottomNavLinks;
+      } else if (removeLink.footerNav) {
+        links = this.footerNavLinks;
+      }
+
+      var foundIndex = -1;
+
+      _.each(links, function (link, index) {
+        if (link.title === removeLink.title) {
+          foundIndex = index;
+        }
+      });
+
+      if (foundIndex === -1) {return;}
+      links.splice(foundIndex, 1);
+      this.render();
     },
 
     afterRender: function(){

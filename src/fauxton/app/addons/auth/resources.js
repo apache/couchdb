@@ -72,6 +72,16 @@ function (app, FauxtonAPI) {
       return false;
     },
 
+    isLoggedIn: function () {
+      var userCtx = this.get('userCtx');
+
+      if (userCtx.name) {
+        return true;
+      }
+
+      return false;
+    },
+
     userRoles: function () {
       var user = this.user();
 
@@ -237,7 +247,7 @@ function (app, FauxtonAPI) {
       "submit #login": "login"
     },
 
-    login: function () {
+    login: function (event) {
       event.preventDefault();
 
       var that = this,
@@ -251,7 +261,7 @@ function (app, FauxtonAPI) {
       });
 
       promise.fail(function (xhr, type, msg) {
-        if (arguments.length === 3 && msg === 'Unauthorized') {
+        if (arguments.length === 3) {
           msg = FauxtonAPI.session.messages.incorrectCredentials;
         } else {
           msg = xhr;
@@ -348,7 +358,6 @@ function (app, FauxtonAPI) {
   Auth.NoAccessView = FauxtonAPI.View.extend({
     template: "addons/auth/templates/noAccess"
   });
-
 
   return Auth;
 });

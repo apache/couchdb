@@ -32,6 +32,7 @@ function(app, FauxtonAPI, Auth) {
       bottomNav: true,
       establish: [FauxtonAPI.session.fetchUser()]
     });
+      
 
     var auth = function (session, roles) {
       var deferred = $.Deferred();
@@ -54,7 +55,16 @@ function(app, FauxtonAPI, Auth) {
 
     FauxtonAPI.auth.registerAuth(auth);
     FauxtonAPI.auth.registerAuthDenied(authDenied);
+
+    FauxtonAPI.session.on('change', function () {
+      if (FauxtonAPI.session.isLoggedIn()) {
+        FauxtonAPI.addHeaderLink({footerNav: true, href:"#logout", title:"Logout", icon: "", className: 'logout'});
+      } else {
+        FauxtonAPI.removeHeaderLink({title: "Logout", footerNav: true});
+      }
+    });
   };
+
 
   return Auth;
 });

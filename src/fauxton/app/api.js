@@ -65,6 +65,10 @@ function(app, Fauxton) {
     app.masterLayout.navBar.addLink(link);
   };
 
+  FauxtonAPI.removeHeaderLink = function(link) {
+    app.masterLayout.navBar.removeLink(link);
+  };
+
   FauxtonAPI.Deferred = function() {
     return $.Deferred();
   };
