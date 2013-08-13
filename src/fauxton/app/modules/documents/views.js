@@ -1297,7 +1297,8 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
   Views.Sidebar = FauxtonAPI.View.extend({
     template: "templates/documents/sidebar",
     events: {
-      "click a.new#index": "newIndex"
+      "click a.new#index": "newIndex",
+      "click button#delete-database": "deleteDatabase"
     },
 
     initialize: function(options) {
@@ -1306,6 +1307,27 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
         this.ddocID = options.ddocInfo.id;
         this.currView = options.ddocInfo.currView;
       }
+    },
+
+    deleteDatabase: function (event) {
+      event.preventDefault();
+
+      var result = confirm('Are you sure you want to delete this database?');
+
+      if (!result) { return; }
+      var databaseName = this.database.id;
+
+      this.database.destroy().then(function () {
+        FauxtonAPI.navigate('/');
+        FauxtonAPI.addNotification({
+          msg: 'The database ' + databaseName + ' has been deleted.'
+        });
+      }).fail(function (rsp, error, msg) {
+        FauxtonAPI.addNotification({
+          msg: 'Could not delete the database, reason ' + msg + '.',
+          type: 'error'
+        });
+      });
     },
 
     serialize: function() {
