@@ -122,12 +122,13 @@
   :param db: Database name
   :<header Accept: - :mimetype:`application/json`
                    - :mimetype:`text/plain`
-  :>header Content-Type: - :mimetype:`application/json`
-                         - :mimetype:`text/plain; charset=utf-8`
+  :<header Content-Type: :mimetype:`application/json`
   :<json object admins: Object with two fields as ``names`` and ``roles``.
     :ref:`See description above for more info <api/db/security>`.
   :<json object members: Object with two fields as ``names`` and ``roles``.
     :ref:`See description above for more info <api/db/security>`.
+  :>header Content-Type: - :mimetype:`application/json`
+                         - :mimetype:`text/plain; charset=utf-8`
   :>json boolean ok: Operation status
   :code 200: Request completed successfully
   :code 401: Administrator's privileges required
