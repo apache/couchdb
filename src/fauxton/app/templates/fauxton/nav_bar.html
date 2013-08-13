@@ -29,26 +29,38 @@ the License.
     <% }); %>
   </ul>
 
+  <div id="footer-links">
+
     <ul id="bottom-nav-links" class="nav">
-    <% _.each(bottomNavLinks, function(link) { %>
-    <% if (link.view) {return;}  %>
-      <li data-nav-name= "<%= link.title %>">
-          <a class="<%= link.icon %> fonticon" href="<%= link.href %>">
-              <%= link.title %>
-          </a>
-      </li>
-    <% }); %>
-  </ul>
-  <ul id="footer-nav-links" class="nav">
-    <% _.each(footerNavLinks, function(link) { %>
-    <% if (link.view) {return;}  %>
-      <li data-nav-name= "<%= link.title %>">
-          <a class="<%= link.icon %> fonticon" href="<%= link.href %>">
-              <%= link.title %>
-          </a>
-      </li>
-    <% }); %>
-  </ul>
+        <li data-nav-name= "Documentation">
+            <a class="fonticon-bookmark fonticon" target="_blank" href="http://docs.couchdb.org/en/latest/">
+                Documentation
+            </a>
+        </li>
+
+
+      <% _.each(bottomNavLinks, function(link) { %>
+      <% if (link.view) {return;}  %>
+        <li data-nav-name= "<%= link.title %>">
+            <a class="<%= link.icon %> fonticon" href="<%= link.href %>">
+                <%= link.title %>
+            </a>
+        </li>
+      <% }); %>
+    </ul>
+
+    <ul id="footer-nav-links" class="nav">
+      <% _.each(footerNavLinks, function(link) { %>
+      <% if (link.view) {return;}  %>
+        <li data-nav-name= "<%= link.title %>">
+            <a class="<%= link.icon %> fonticon" href="<%= link.href %>">
+                <%= link.title %>
+            </a>
+        </li>
+      <% }); %>
+    </ul>
+
+  </div>
 </nav>
 
 
