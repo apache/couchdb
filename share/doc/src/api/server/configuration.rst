@@ -181,6 +181,7 @@ A list of the available methods and URL paths are provided below:
 
   Gets the configuration structure for a single section.
 
+  :param section: Configuration section name
   :<header Accept: - :mimetype:`application/json`
                    - :mimetype:`text/plain`
   :>header Content-Type: - :mimetype:`application/json`
@@ -230,6 +231,8 @@ A list of the available methods and URL paths are provided below:
   Gets a single configuration value from within a specific configuration
   section.
 
+  :param section: Configuration section name
+  :param key: Configuration option name
   :<header Accept: - :mimetype:`application/json`
                    - :mimetype:`text/plain`
   :>header Content-Type: - :mimetype:`application/json`
@@ -272,6 +275,8 @@ A list of the available methods and URL paths are provided below:
   value, you must supply a valid JSON string. In response CouchDB sends old
   value for target section key.
 
+  :param section: Configuration section name
+  :param key: Configuration option name
   :<header Accept: - :mimetype:`application/json`
                    - :mimetype:`text/plain`
   :<header Content-Type: :mimetype:`application/json`
@@ -313,6 +318,8 @@ A list of the available methods and URL paths are provided below:
   Deletes a configuration value. The returned JSON will be the value of
   the configuration parameter before it was deleted.
 
+  :param section: Configuration section name
+  :param key: Configuration option name
   :<header Accept: - :mimetype:`application/json`
                    - :mimetype:`text/plain`
   :>header Content-Type: - :mimetype:`application/json`
