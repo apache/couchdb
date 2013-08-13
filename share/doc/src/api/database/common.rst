@@ -252,4 +252,170 @@
     }
 
 
+.. http:post:: /{db}
+
+  Creates a new document in the specified database, using the supplied JSON
+  document structure.
+
+  If the JSON structure includes the ``_id`` field, then the document will be
+  created with the specified document ID.
+
+  If the ``_id`` field is not specified, a new unique ID will be generated.
+
+  :param db: Database name
+  :<header Accept: - :mimetype:`application/json`
+                   - :mimetype:`text/plain`
+  :<header Content-Type: :mimetype:`application/json`
+  :<header X-Couch-Full-Commit: Overrides server's
+    :ref:`commit policy <config/couchdb/delayed_commits>`. Possible values
+    are: ``false`` and ``true``. *Optional*.
+  :query string batch: Stores document in :ref:`batch mode
+    <api/doc/batch-writes>` Possible values: ``ok``. *Optional*
+  :>header Content-Type: - :mimetype:`application/json`
+                         - :mimetype:`text/plain; charset=utf-8`
+  :>header ETag: Quoted new document's revision
+  :>header Location: Document URI
+  :>json string id: Created document ID
+  :>json boolean ok: Operation status
+  :>json string rev: Revision info
+  :code 201: Document created and stored on disk
+  :code 202: Document data accepted, but not yet stored on disk
+  :code 400: Invalid database name
+  :code 401: Write privileges required
+  :code 404: Database doesn't already exists
+  :code 409: Document with the specified document ID already exists
+
+  **Request**:
+
+  .. code-block:: http
+
+    POST /db HTTP/1.1
+    Accept: application/json
+    Content-Length: 81
+    Content-Type: application/json
+
+    {
+        "servings": 4,
+        "subtitle": "Delicious with fresh bread",
+        "title": "Fish Stew"
+    }
+
+  **Response**:
+
+  .. code-block:: http
+
+    HTTP/1.1 201 Created
+    Cache-Control: must-revalidate
+    Content-Length: 95
+    Content-Type: application/json
+    Date: Tue, 13 Aug 2013 15:19:25 GMT
+    ETag: "1-9c65296036141e575d32ba9c034dd3ee"
+    Location: http://localhost:5984/db/ab39fe0993049b84cfa81acd6ebad09d
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+
+    {
+        "id": "ab39fe0993049b84cfa81acd6ebad09d",
+        "ok": true,
+        "rev": "1-9c65296036141e575d32ba9c034dd3ee"
+    }
+
+
+Specifying the Document ID
+--------------------------
+
+The document ID can be specified by including the ``_id`` field in the
+JSON of the submitted record. The following request will create the same
+document with the ID ``FishStew``.
+
+  **Request**:
+
+  .. code-block:: http
+
+    POST /db HTTP/1.1
+    Accept: application/json
+    Content-Length: 98
+    Content-Type: application/json
+
+    {
+        "_id": "FishStew",
+        "servings": 4,
+        "subtitle": "Delicious with fresh bread",
+        "title": "Fish Stew"
+    }
+
+  **Response**:
+
+  .. code-block:: http
+
+    HTTP/1.1 201 Created
+    Cache-Control: must-revalidate
+    Content-Length: 71
+    Content-Type: application/json
+    Date: Tue, 13 Aug 2013 15:19:25 GMT
+    ETag: "1-9c65296036141e575d32ba9c034dd3ee"
+    Location: http://localhost:5984/db/FishStew
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+
+    {
+        "id": "FishStew",
+        "ok": true,
+        "rev": "1-9c65296036141e575d32ba9c034dd3ee"
+    }
+
+
+.. _api/doc/batch-writes:
+
+Batch Mode Writes
+-----------------
+
+You can write documents to the database at a higher rate by using the
+batch option. This collects document writes together in memory (on a
+user-by-user basis) before they are committed to disk. This increases
+the risk of the documents not being stored in the event of a failure,
+since the documents are not written to disk immediately.
+
+To use the batched mode, append the ``batch=ok`` query argument to the
+URL of the ``PUT`` or :http:post:`/{db}` request. The CouchDB server will
+respond with a HTTP :http:statuscode:`202` response code immediately.
+
+.. note::
+
+   Creating or updating documents with batch mode doesn't guarantees that
+   document will be successfully stored on disk and CouchDB doesn't ensures you
+   that it will to. Document may not be saved due to conflicts, rejection by
+   :ref:`validation function <vdufun>` or by other reasons.
+
+**Request**:
+
+.. code-block:: http
+
+  POST /db?batch=ok HTTP/1.1
+  Accept: application/json
+  Content-Length: 98
+  Content-Type: application/json
+
+  {
+      "_id": "FishStew",
+      "servings": 4,
+      "subtitle": "Delicious with fresh bread",
+      "title": "Fish Stew"
+  }
+
+**Response**:
+
+.. code-block:: http
+
+  HTTP/1.1 202 Accepted
+  Cache-Control: must-revalidate
+  Content-Length: 28
+  Content-Type: application/json
+  Date: Tue, 13 Aug 2013 15:19:25 GMT
+  Location: http://localhost:5984/db/FishStew
+  Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+
+  {
+      "id": "FishStew",
+      "ok": true
+  }
+
 .. _Regular Expressions: http://en.wikipedia.org/wiki/Regular_expression
