@@ -22,6 +22,10 @@ function(app, FauxtonAPI) {
   Documents.Doc = Backbone.Model.extend({
     idAttribute: "_id",
 
+    defaults: {
+      views: {}
+    },
+
     url: function(context) {
       if (context === "app") {
         return this.getDatabase().url("app") + "/" + this.safeID();

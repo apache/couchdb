@@ -214,9 +214,9 @@ module.exports = function(grunt) {
       port: 8000,
       proxy: {
         target: {
-          host: 'garrensmith.cloudant.com',
-          port: 443,
-          https: true
+          host: 'localhost',
+          port: 5984,
+          https: false
         },
         // This sets the Host header in the proxy so that you can use external
         // CouchDB instances and not have the Host set to 'localhost'
