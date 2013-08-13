@@ -99,9 +99,8 @@ the License.
                   <hr />
                   <div class="controls">
                     <button class="btn btn-success save">Save</button>
-                    <button class="btn btn-small btn-info preview">Preview</button>
                     <% if (!this.newView) { %>
-                    <button class="btn btn-small btn-danger delete">Delete</button>
+                    <button class="btn btn-danger delete">Delete</button>
                     <% } %>
                   </div>
                 </div>
@@ -121,7 +120,7 @@ the License.
           </a>
         </div>
         <div id="collapse-advanced-options" class="accordion-body collapse">
-          <div class="accordion-inner">
+          <div class="accordion-inner advanced-options">
             <form class="view-query-update">
               <div class="controls controls-row">
                 <label class="span3 inline">
@@ -184,6 +183,7 @@ the License.
               </div>
               <div class="controls controls-row">
                 <button type="submit" class="btn btn-primary">Query</button>
+                <button class="btn btn-small btn-info preview">Preview</button>
               </div>
             </form>
 
