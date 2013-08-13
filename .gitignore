@@ -122,3 +122,4 @@ test/javascript/run_js_tests.sh
 test/local.ini
 tmp
 utils/run
+src/fauxton/test/test.config.js
