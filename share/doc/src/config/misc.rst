@@ -171,6 +171,20 @@ Available algorithms:
       ]
     }
 
+.. note:: **Impact of UUID choices:**
+   The choice of UUID has a significant impact on the layout of the B-tree,
+   prior to compaction.
+
+   For example, a sequential UUID algorithm during uploading thousands of
+   documents, will avoid the need to rewrite many intermediate B-tree nodes.
+   A random UUID algorithm may require rewriting intermediate nodes on a regular
+   basis, with a corresponding decrease of throughput, and significant wasted
+   space due to the append-only B-tree design.
+
+   It is generally recommended to set your own UUIDs, or use the sequential
+   algorithm unless you have a specific need and take into account the likely
+   need for compaction to re-balance the B-tree and reclaim wasted space.
+
 
 .. _config/uuids/utc_id_suffix:
 

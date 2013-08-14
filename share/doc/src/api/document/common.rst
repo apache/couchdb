@@ -11,89 +11,370 @@
 .. the License.
 
 
-.. _api/doc.get:
+.. _api/doc:
 
-``GET /db/doc``
-===============
+``/db/doc``
+===========
 
-* **Method**: ``GET /db/doc``
-* **Request**: None
-* **Response**: Returns the JSON for the document
-* **Admin Privileges Required**: no
-* **Query Arguments**:
+.. http:head:: /{db}/{docid}
 
-  * **Argument**: conflicts
+  Returns the HTTP Headers containing a minimal amount of information
+  about the specified document. The method supports the same query
+  arguments as the :http:get:`/{db}/{docid}` method, but only the header
+  information (including document size, and the revision as an ETag), is
+  returned.
 
-    * **Description**: Returns the conflict tree for the document.
-    * **Optional**: yes
-    * **Type**: boolean
-    * **Default**: false
-    * **Supported Values**:
+  The :http:header:`ETag` header shows the current revision for the requested
+  document, and the :http:header:`Content-Length` specifies the length of the
+  data, if the document were requested in full.
 
-      * **true**: Includes the revisions
+  Adding any of the query arguments (see :http:get:`/{db}/{docid}`), then the
+  resulting HTTP Headers will correspond to what would be returned.
 
-  * **Argument**: rev
+  :param db: Database name
+  :param docid: Document ID
+  :<header If-None-Match: Double quoted document's revision token
+  :>header Content-Length: Document size
+  :>header ETag: Double quoted document's revision token
+  :code 200: Document exists
+  :code 304: Document wasn't modified since specified revision
+  :code 401: Read privilege required
+  :code 404: Document not found
 
-    * **Description**: Specify the revision to return
-    * **Optional**: yes
-    * **Type**: string
-    * **Supported Values**:
+  **Request**:
 
-      * **true**: Includes the revisions
+  .. code-block:: http
 
-  * **Argument**: revs
-
-    * **Description**:  Return a list of the revisions for the document
-    * **Optional**: yes
-    * **Type**: boolean
-
-  * **Argument**: revs_info
-
-    * **Description**: Return a list of detailed revision information for the
-      document
-    * **Optional**: yes
-    * **Type**: boolean
-    * **Supported Values**:
-
-      * **true**: Includes the revisions
-
-* **Return Codes**:
-
-  * **200**:
-    Document retrieved
-  * **400**:
-    The format of the request or revision was invalid
-  * **404**:
-    The specified document or revision cannot be found, or has been deleted
-  * **409**:
-    Conflict - a document with the specified document ID already exists
-
-Returns the specified ``doc`` from the specified ``db``. For example, to
-retrieve the document with the id ``FishStew`` you would send the
-following request:
-
-.. code-block:: http
-
-    GET http://couchdb:5984/recipes/FishStew
-    Content-Type: application/json
+    GET /db/SpaghettiWithMeatballs HTTP/1.1
     Accept: application/json
+    Host: localhost:5984
 
-The returned JSON is the JSON of the document, including the document ID
-and revision number:
+  **Response**:
 
-.. code-block:: javascript
+  .. code-block:: http
+
+    HTTP/1.1 200 OK
+    Cache-Control: must-revalidate
+    Content-Length: 660
+    Content-Type: application/json
+    Date: Tue, 13 Aug 2013 21:35:37 GMT
+    ETag: "12-151bb8678d45aaa949ec3698ef1c7e78"
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+
+
+.. http:get:: /{db}/{docid}
+
+  Returns document by the specified ``docid`` from the specified ``db``.
+  Unless you request a specific revision, the latest revision of the
+  document will always be returned.
+
+  :param db: Database name
+  :param docid: Document ID
+
+  :<header Accept: - :mimetype:`application/json`
+                   - :mimetype:`multipart/mixed`
+                   - :mimetype:`text/plain`
+  :<header If-None-Match: Double quoted document's revision token
+
+  :query boolean attachments: Includes attachments bodies in response.
+    Default is ``false``
+  :query boolean att_encoding_info: Includes encoding information into
+    attachment's stubs for compressed ones. Default is ``false``
+  :query array atts_since: Includes attachments only since specified revisions.
+    Doesn't includes attachments for specified revisions. *Optional*
+  :query boolean conflicts: Includes information about conflicts in document.
+    Default is ``false``
+  :query boolean deleted_conflicts: Includes information about deleted
+    conflicted revisions. Default is ``false``
+  :query boolean latest: Forces retrieving latest "leaf" revision, no matter
+    what `rev` was requested. Default is ``false``
+  :query boolean local_seq: Includes last update sequence number for the
+    document. Default is ``false``
+  :query boolean meta: Acts same as specifying all `conflicts`,
+    `deleted_conflicts` and `open_revs` query parameters. Default is ``false``
+  :query array open_revs: Retrieves documents of specified leaf revisions.
+    Additionally, it accepts value as ``all`` to return all leaf revisions.
+    *Optional*
+  :query string rev: Retrieves document of specified revision. *Optional*
+  :query boolean revs: Includes list of all known document revisions.
+    Default is ``false``
+  :query boolean revs_info: Includes detailed information for all known
+    document revisions. Default is ``false``
+
+  :>header Content-Type: - :mimetype:`application/json`
+                         - :mimetype:`multipart/mixed`
+                         - :mimetype:`text/plain; charset=utf-8`
+  :>header ETag: Double quoted document's revision token. Not available when
+    retrieving conflicts-related information
+  :>header Transfer-Encoding: ``chunked``. Available if requested with
+    query parameter ``open_revs``
+
+  :>json string _id: Document ID
+  :>json string _rev: Revision MVCC token
+  :>json boolean _deleted: Deletion flag. Available if document was removed
+  :>json object _attachments: Attachment's stubs. Available if document has
+    any attachments
+  :>json array _conflicts: List of conflicted revisions. Available if requested
+    with ``conflicts=true`` query parameter
+  :>json array _deleted_conflicts: List of deleted conflicted revisions.
+    Available if requested with ``deleted_conflicts=true`` query parameter
+  :>json number _local_seq: Document's sequence number in current database.
+    Available if requested with ``local_seq=true`` query parameter
+  :>json array _revs_info: List of objects with information about local
+    revisions and their status. Available if requested with ``open_revs`` query
+    parameter
+  :>json object _revisions: List of local revision tokens without.
+    Available if requested with ``revs=true`` query parameter
+
+  :code 200: Request completed successfully
+  :code 304: Document wasn't modified since specified revision
+  :code 400: The format of the request or revision was invalid
+  :code 401: Read privilege required
+  :code 404: Document not found
+
+  **Request**:
+
+  .. code-block:: http
+
+    GET /recipes/SpaghettiWithMeatballs HTTP/1.1
+    Accept: application/json
+    Host: localhost:5984
+
+  **Response**:
+
+  .. code-block:: http
+
+    HTTP/1.1 200 OK
+    Cache-Control: must-revalidate
+    Content-Length: 660
+    Content-Type: application/json
+    Date: Tue, 13 Aug 2013 21:35:37 GMT
+    ETag: "1-917fa2381192822767f010b95b45325b"
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
 
     {
-       "_id" : "FishStew",
-       "_rev" : "3-a1a9b39ee3cc39181b796a69cb48521c",
-       "servings" : 4,
-       "subtitle" : "Delicious with a green salad",
-       "title" : "Irish Fish Stew"
+        "_id": "SpaghettiWithMeatballs",
+        "_rev": "1-917fa2381192822767f010b95b45325b",
+        "description": "An Italian-American dish that usually consists of spaghetti, tomato sauce and meatballs.",
+        "ingredients": [
+            "spaghetti",
+            "tomato sauce",
+            "meatballs"
+        ],
+        "name": "Spaghetti with meatballs"
+    }
+
+.. http:put:: /{db}/{docid}
+
+  The :http:method:`PUT` method creates a new named document, or creates a new
+  revision of the existing document. Unlike the :http:post:`/{db}` method, you
+  must specify the document ID in the request URL.
+
+  :param db: Database name
+  :param docid: Document ID
+  :<header Accept: - :mimetype:`application/json`
+                   - :mimetype:`text/plain`
+  :<header Content-Type: :mimetype:`application/json`
+  :<header If-Match: Document's revision. Alternative to `rev` query parameter
+  :<header X-Couch-Full-Commit: Overrides server's
+    :ref:`commit policy <config/couchdb/delayed_commits>`. Possible values
+    are: ``false`` and ``true``. *Optional*
+  :query string batch: Stores document in :ref:`batch mode
+    <api/doc/batch-writes>` Possible values: ``ok``. *Optional*
+  :>header Content-Type: - :mimetype:`application/json`
+                         - :mimetype:`text/plain; charset=utf-8`
+  :>header ETag: Quoted document's new revision
+  :>header Location: Document URI
+  :>json string id: Created document ID
+  :>json boolean ok: Operation status
+  :>json string rev: Revision MVCC token
+  :code 201: Document created and stored on disk
+  :code 202: Document data accepted, but not yet stored on disk
+  :code 400: Invalid request body or parameters
+  :code 401: Write privileges required
+  :code 404: Specified database or document ID doesn't exists
+  :code 409: Document with the specified ID already exists or specified
+    revision is not latest for target document
+
+  **Request**:
+
+  .. code-block:: http
+
+    PUT /recipes/SpaghettiWithMeatballs HTTP/1.1
+    Accept: application/json
+    Content-Length: 196
+    Content-Type: application/json
+    Host: localhost:5984
+
+    {
+        "description": "An Italian-American dish that usually consists of spaghetti, tomato sauce and meatballs.",
+        "ingredients": [
+            "spaghetti",
+            "tomato sauce",
+            "meatballs"
+        ],
+        "name": "Spaghetti with meatballs"
+    }
+
+  **Response**:
+
+  .. code-block:: http
+
+    HTTP/1.1 201 Created
+    Cache-Control: must-revalidate
+    Content-Length: 85
+    Content-Type: application/json
+    Date: Wed, 14 Aug 2013 20:31:39 GMT
+    ETag: "1-917fa2381192822767f010b95b45325b"
+    Location: http://localhost:5984/recipes/SpaghettiWithMeatballs
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+
+    {
+        "id": "SpaghettiWithMeatballs",
+        "ok": true,
+        "rev": "1-917fa2381192822767f010b95b45325b"
     }
 
 
-Unless you request a specific revision, the latest revision of the
-document will always be returned.
+.. http:delete:: /{db}/{docid}
+
+  Deletes the specified document from the database. You must supply the
+  current (latest) revision, either by using the ``rev`` parameter to
+  specify the revision.
+
+  .. note::
+    Note that deletion of a record increments the revision number.
+    The use of a revision for deletion of the record allows replication of
+    the database to correctly track the deletion in synchronized copies.
+
+  :param db: Database name
+  :param docid: Document ID
+  :<header Accept: - :mimetype:`application/json`
+                   - :mimetype:`text/plain`
+  :<header If-Match: Document's revision. Alternative to `rev` query parameter
+  :<header X-Couch-Full-Commit: Overrides server's
+    :ref:`commit policy <config/couchdb/delayed_commits>`. Possible values
+    are: ``false`` and ``true``. *Optional*
+  :query string rev: Actual document's revision
+  :query string batch: Stores document in :ref:`batch mode
+    <api/doc/batch-writes>` Possible values: ``ok``. *Optional*
+  :>header Content-Type: - :mimetype:`application/json`
+                         - :mimetype:`text/plain; charset=utf-8`
+  :>header ETag: Double quoted document's new revision
+  :>json string id: Created document ID
+  :>json boolean ok: Operation status
+  :>json string rev: Revision MVCC token
+  :code 200: Document successfully removed
+  :code 202: Request was accepted, but changes are not yet stored on disk
+  :code 400: Invalid request body or parameters
+  :code 401: Write privileges required
+  :code 404: Specified database or document ID doesn't exists
+  :code 409: Specified revision is not latest for target document
+
+  **Request**:
+
+  .. code-block:: http
+
+    DELETE /recipes/FishStew?rev=1-9c65296036141e575d32ba9c034dd3ee HTTP/1.1
+    Accept: application/json
+    Host: localhost:5984
+
+  Alternatively, instead of ``rev`` query parameter you may use
+  :http:header:`If-Match` header:
+
+  .. code-block:: http
+
+    DELETE /recipes/FishStew HTTP/1.1
+    Accept: application/json
+    If-Match: 1-9c65296036141e575d32ba9c034dd3ee
+    Host: localhost:5984
+
+  **Response**:
+
+  .. code-block:: http
+
+    HTTP/1.1 200 OK
+    Cache-Control: must-revalidate
+    Content-Length: 71
+    Content-Type: application/json
+    Date: Wed, 14 Aug 2013 12:23:13 GMT
+    ETag: "2-056f5f44046ecafc08a2bc2b9c229e20"
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+
+    {
+        "id": "FishStew",
+        "ok": true,
+        "rev": "2-056f5f44046ecafc08a2bc2b9c229e20"
+    }
+
+
+.. http:copy:: /{db}/{docid}
+
+  The :http:method:`COPY` (which is non-standard HTTP) copies an existing
+  document to a new or existing document.
+
+  The source document is specified on the request line, with the
+  :http:header:`Destination` header of the request specifying the target
+  document.
+
+  :param db: Database name
+  :param docid: Document ID
+  :<header Accept: - :mimetype:`application/json`
+                   - :mimetype:`text/plain`
+  :<header Destination: Destination document
+  :<header If-Match: Source document's revision. Alternative to `rev` query
+    parameter
+  :<header X-Couch-Full-Commit: Overrides server's
+    :ref:`commit policy <config/couchdb/delayed_commits>`. Possible values
+    are: ``false`` and ``true``. *Optional*
+  :query string rev: Revision to copy from. *Optional*
+  :query string batch: Stores document in :ref:`batch mode
+    <api/doc/batch-writes>` Possible values: ``ok``. *Optional*
+  :>header Content-Type: - :mimetype:`application/json`
+                         - :mimetype:`text/plain; charset=utf-8`
+  :>header ETag: Double quoted document's new revision
+  :>header Location: Document's URI
+  :>json string id: Created document ID
+  :>json boolean ok: Operation status
+  :>json string rev: Revision MVCC token
+  :code 201: Document successfully created
+  :code 202: Request was accepted, but changes are not yet stored on disk
+  :code 400: Invalid request body or parameters
+  :code 401: Read or write privileges required
+  :code 404: Specified database, document ID  or his revision doesn't exists
+  :code 409: Document with the specified ID already exists or specified
+    revision is not latest for target document
+
+  **Request**:
+
+  .. code-block:: http
+
+    COPY /recipes/SpaghettiWithMeatballs HTTP/1.1
+    Accept: application/json
+    Destination: SpaghettiWithMeatballs_Italian
+    Host: localhost:5984
+
+  **Response**:
+
+  .. code-block:: http
+
+    HTTP/1.1 201 Created
+    Cache-Control: must-revalidate
+    Content-Length: 93
+    Content-Type: application/json
+    Date: Wed, 14 Aug 2013 14:21:00 GMT
+    ETag: "1-e86fdf912560c2321a5fcefc6264e6d9"
+    Location: http://localhost:5984/recipes/SpaghettiWithMeatballs_Italian
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+
+    {
+        "id": "SpaghettiWithMeatballs_Italian",
+        "ok": true,
+        "rev": "1-e86fdf912560c2321a5fcefc6264e6d9"
+    }
+
+
+.. _api/doc/attachments:
 
 Attachments
 -----------
@@ -103,76 +384,317 @@ contain a summary of the attachments associated with the document, but
 not the attachment data itself.
 
 The JSON for the returned document will include the ``_attachments``
-field, with one or more attachment definitions. For example:
+field, with one or more attachment definitions.
 
-.. code-block:: javascript
+The ``_attachments`` object keys are attachments names while values are
+information objects with next structure:
 
-    {
-       "_id" : "FishStew",
-       "servings" : 4,
-       "subtitle" : "Delicious with fresh bread",
-       "title" : "Fish Stew"
-       "_attachments" : {
-          "styling.css" : {
-             "stub" : true,
-             "content-type" : "text/css",
-             "length" : 783426,
-             },
-       },
-    }
+- **content_type** (*string*): Attachment MIME type
+- **data** (*string*): Base64-encoded content. Available if attachment content
+  requested by using ``attachments=true`` or ``atts_since`` query parameters
+- **digest** (*string*): Content hash digest.
+  It starts with prefix which announce hash type (``md5-``) and continues with
+  Base64-encoded hash digest
+- **encoded_length** (*number*): Compressed attachment size in bytes
+  Available when query parameter ``att_encoding_info=true`` was specified and
+  ``content_type`` is in :ref:`list of compressiable types
+  <config/attachments/compressible_types>`
+- **encoding** (*string*): Compression codec. Available when query parameter
+  ``att_encoding_info=true`` was specified
+- **length** (*number*): Real attachment size in bytes. Not available if attachment
+  content requested
+- **revpos** (*number*): Revision *number* when attachment was added
+- **stub** (*boolean*): Has ``true`` value if object contains stub info and no
+  content. Otherwise omitted in response
 
-The format of the returned JSON is shown in the table below:
 
-* **_id** (optional): Document ID
-* **_rev** (optional): Revision ID (when updating an existing document)
-* **_attachments** (optional): Document Attachment
+Basic Attachments Info
+^^^^^^^^^^^^^^^^^^^^^^
 
-  * **filename**: Attachment information
+**Request**:
 
-    * **content_type**: MIME Content type string
-    * **length**: Length (bytes) of the attachment data
-    * **revpos**: Revision where this attachment exists
-    * **stub**: Indicates whether the attachment is a stub
+.. code-block:: http
+
+  GET /recipes/SpaghettiWithMeatballs HTTP/1.1
+  Accept: application/json
+  Host: localhost:5984
+
+**Response**:
+
+.. code-block:: http
+
+  HTTP/1.1 200 OK
+  Cache-Control: must-revalidate
+  Content-Length: 660
+  Content-Type: application/json
+  Date: Tue, 13 Aug 2013 21:35:37 GMT
+  ETag: "5-fd96acb3256302bf0dd2f32713161f2a"
+  Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+
+  {
+      "_attachments": {
+          "grandma_recipe.txt": {
+              "content_type": "text/plain",
+              "digest": "md5-Ids41vtv725jyrN7iUvMcQ==",
+              "length": 1872,
+              "revpos": 4,
+              "stub": true
+          },
+          "my_recipe.txt": {
+              "content_type": "text/plain",
+              "digest": "md5-198BPPNiT5fqlLxoYYbjBA==",
+              "length": 85,
+              "revpos": 5,
+              "stub": true
+          },
+          "photo.jpg": {
+              "content_type": "image/jpeg",
+              "digest": "md5-7Pv4HW2822WY1r/3WDbPug==",
+              "length": 165504,
+              "revpos": 2,
+              "stub": true
+          }
+      },
+      "_id": "SpaghettiWithMeatballs",
+      "_rev": "5-fd96acb3256302bf0dd2f32713161f2a",
+      "description": "An Italian-American dish that usually consists of spaghetti, tomato sauce and meatballs.",
+      "ingredients": [
+          "spaghetti",
+          "tomato sauce",
+          "meatballs"
+      ],
+      "name": "Spaghetti with meatballs"
+  }
+
+
+Retrieving Attachments Content
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+It's possible to retrieve document with all attached files content by using
+``attachements=true`` query parameter:
+
+**Request**:
+
+.. code-block:: http
+
+  GET /db/pixel?attachments=true HTTP/1.1
+  Accept: application/json
+  Host: localhost:5984
+
+**Response**:
+
+.. code-block:: http
+
+  HTTP/1.1 200 OK
+  Cache-Control: must-revalidate
+  Content-Length: 553
+  Content-Type: application/json
+  Date: Wed, 14 Aug 2013 11:32:40 GMT
+  ETag: "4-f1bcae4bf7bbb92310079e632abfe3f4"
+  Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+
+  {
+      "_attachments": {
+          "pixel.gif": {
+              "content_type": "image/gif",
+              "data": "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7",
+              "digest": "md5-2JdGiI2i2VELZKnwMers1Q==",
+              "revpos": 2
+          },
+          "pixel.png": {
+              "content_type": "image/png",
+              "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAAAXNSR0IArs4c6QAAAANQTFRFAAAAp3o92gAAAAF0Uk5TAEDm2GYAAAABYktHRACIBR1IAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH3QgOCx8VHgmcNwAAAApJREFUCNdjYAAAAAIAAeIhvDMAAAAASUVORK5CYII=",
+              "digest": "md5-Dgf5zxgGuchWrve73evvGQ==",
+              "revpos": 3
+          }
+      },
+      "_id": "pixel",
+      "_rev": "4-f1bcae4bf7bbb92310079e632abfe3f4"
+  }
+
+Or retrieve attached files content since specific revision using ``atts_since``
+query parameter:
+
+**Request**:
+
+.. code-block:: http
+
+  GET /recipes/SpaghettiWithMeatballs?atts_since=[%224-874985bc28906155ba0e2e0538f67b05%22]  HTTP/1.1
+  Accept: application/json
+  Host: localhost:5984
+
+**Response**:
+
+.. code-block:: http
+
+  HTTP/1.1 200 OK
+  Cache-Control: must-revalidate
+  Content-Length: 760
+  Content-Type: application/json
+  Date: Tue, 13 Aug 2013 21:35:37 GMT
+  ETag: "5-fd96acb3256302bf0dd2f32713161f2a"
+  Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+
+  {
+      "_attachments": {
+          "grandma_recipe.txt": {
+              "content_type": "text/plain",
+              "digest": "md5-Ids41vtv725jyrN7iUvMcQ==",
+              "length": 1872,
+              "revpos": 4,
+              "stub": true
+          },
+          "my_recipe.txt": {
+              "content_type": "text/plain",
+              "data": "MS4gQ29vayBzcGFnaGV0dGkKMi4gQ29vayBtZWV0YmFsbHMKMy4gTWl4IHRoZW0KNC4gQWRkIHRvbWF0byBzYXVjZQo1LiAuLi4KNi4gUFJPRklUIQ==",
+              "digest": "md5-198BPPNiT5fqlLxoYYbjBA==",
+              "revpos": 5
+          },
+          "photo.jpg": {
+              "content_type": "image/jpeg",
+              "digest": "md5-7Pv4HW2822WY1r/3WDbPug==",
+              "length": 165504,
+              "revpos": 2,
+              "stub": true
+          }
+      },
+      "_id": "SpaghettiWithMeatballs",
+      "_rev": "5-fd96acb3256302bf0dd2f32713161f2a",
+      "description": "An Italian-American dish that usually consists of spaghetti, tomato sauce and meatballs.",
+      "ingredients": [
+          "spaghetti",
+          "tomato sauce",
+          "meatballs"
+      ],
+      "name": "Spaghetti with meatballs"
+  }
+
+
+Retrieving Attachments Encoding Info
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+By using ``att_encoding_info=true`` query parameter you may retrieve information
+about compressed attachments size and used codec.
+
+**Request**:
+
+.. code-block:: http
+
+  GET /recipes/SpaghettiWithMeatballs?att_encoding_info=true HTTP/1.1
+  Accept: application/json
+  Host: localhost:5984
+
+**Response**:
+
+.. code-block:: http
+
+  HTTP/1.1 200 OK
+  Cache-Control: must-revalidate
+  Content-Length: 736
+  Content-Type: application/json
+  Date: Tue, 13 Aug 2013 21:35:37 GMT
+  ETag: "5-fd96acb3256302bf0dd2f32713161f2a"
+  Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+
+  {
+      "_attachments": {
+          "grandma_recipe.txt": {
+              "content_type": "text/plain",
+              "digest": "md5-Ids41vtv725jyrN7iUvMcQ==",
+              "encoded_length": 693,
+              "encoding": "gzip",
+              "length": 1872,
+              "revpos": 4,
+              "stub": true
+          },
+          "my_recipe.txt": {
+              "content_type": "text/plain",
+              "digest": "md5-198BPPNiT5fqlLxoYYbjBA==",
+              "encoded_length": 100,
+              "encoding": "gzip",
+              "length": 85,
+              "revpos": 5,
+              "stub": true
+          },
+          "photo.jpg": {
+              "content_type": "image/jpeg",
+              "digest": "md5-7Pv4HW2822WY1r/3WDbPug==",
+              "length": 165504,
+              "revpos": 2,
+              "stub": true
+          }
+      },
+      "_id": "SpaghettiWithMeatballs",
+      "_rev": "5-fd96acb3256302bf0dd2f32713161f2a",
+      "description": "An Italian-American dish that usually consists of spaghetti, tomato sauce and meatballs.",
+      "ingredients": [
+          "spaghetti",
+          "tomato sauce",
+          "meatballs"
+      ],
+      "name": "Spaghetti with meatballs"
+  }
+
 
 Getting a List of Revisions
 ---------------------------
 
 You can obtain a list of the revisions for a given document by adding
-the ``revs=true`` parameter to the request URL. For example:
+the ``revs=true`` parameter to the request URL:
+
+**Request**:
 
 .. code-block:: http
 
-    GET http://couchdb:5984/recipes/FishStew?revs=true
-    Accept: application/json
+  GET /recipes/SpaghettiWithMeatballs?revs=true  HTTP/1.1
+  Accept: application/json
+  Host: localhost:5984
+
+**Response**:
+
+.. code-block:: http
+
+  HTTP/1.1 200 OK
+  Cache-Control: must-revalidate
+  Content-Length: 584
+  Content-Type: application/json
+  Date: Wed, 14 Aug 2013 11:38:26 GMT
+  ETag: "5-fd96acb3256302bf0dd2f32713161f2a"
+  Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+
+  {
+      "_id": "SpaghettiWithMeatballs",
+      "_rev": "8-6f5ad8db0f34af24a6e0984cd1a6cfb9",
+      "_revisions": {
+          "ids": [
+              "6f5ad8db0f34af24a6e0984cd1a6cfb9",
+              "77fba3a059497f51ec99b9b478b569d2",
+              "136813b440a00a24834f5cb1ddf5b1f1",
+              "fd96acb3256302bf0dd2f32713161f2a",
+              "874985bc28906155ba0e2e0538f67b05",
+              "0de77a37463bf391d14283e626831f2e",
+              "d795d1b924777732fdea76538c558b62",
+              "917fa2381192822767f010b95b45325b"
+          ],
+          "start": 8
+      },
+      "description": "An Italian-American dish that usually consists of spaghetti, tomato sauce and meatballs.",
+      "ingredients": [
+          "spaghetti",
+          "tomato sauce",
+          "meatballs"
+      ],
+      "name": "Spaghetti with meatballs"
+  }
+
 
 The returned JSON structure includes the original document, including a
-``_revisions`` structure that includes the revision information:
+``_revisions`` structure that includes the revision information in next form:
 
-.. code-block:: javascript
-
-    {
-       "servings" : 4,
-       "subtitle" : "Delicious with a green salad",
-       "_id" : "FishStew",
-       "title" : "Irish Fish Stew",
-       "_revisions" : {
-          "ids" : [
-             "a1a9b39ee3cc39181b796a69cb48521c",
-             "7c4740b4dcf26683e941d6641c00c39d",
-             "9c65296036141e575d32ba9c034dd3ee"
-          ],
-          "start" : 3
-       },
-       "_rev" : "3-a1a9b39ee3cc39181b796a69cb48521c"
-    }
-
-* **_id** (optional): Document ID
-* **_rev** (optional): Revision ID (when updating an existing document)
-* **_revisions**: CouchDB Document Revisions
-
-  * **ids** [array]: Array of valid revision IDs, in reverse order
+- **ids** (*array*): Array of valid revision IDs, in reverse order
     (latest first)
-  * **start**: Prefix number for the latest revision
+- **start** (*number*): Prefix number for the latest revision
+
 
 Obtaining an Extended Revision History
 --------------------------------------
@@ -180,412 +702,327 @@ Obtaining an Extended Revision History
 You can get additional information about the revisions for a given
 document by supplying the ``revs_info`` argument to the query:
 
+**Request**:
+
 .. code-block:: http
 
-    GET http://couchdb:5984/recipes/FishStew?revs_info=true
-    Accept: application/json
+  GET /recipes/SpaghettiWithMeatballs?revs_info=true  HTTP/1.1
+  Accept: application/json
+  Host: localhost:5984
 
-This returns extended revision information, including the availability
-and status of each revision:
+**Response**:
 
-.. code-block:: javascript
+.. code-block:: http
 
-    {
-       "servings" : 4,
-       "subtitle" : "Delicious with a green salad",
-       "_id" : "FishStew",
-       "_revs_info" : [
+  HTTP/1.1 200 OK
+  Cache-Control: must-revalidate
+  Content-Length: 802
+  Content-Type: application/json
+  Date: Wed, 14 Aug 2013 11:40:55 GMT
+  Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+
+  {
+      "_id": "SpaghettiWithMeatballs",
+      "_rev": "8-6f5ad8db0f34af24a6e0984cd1a6cfb9",
+      "_revs_info": [
           {
-             "status" : "available",
-             "rev" : "3-a1a9b39ee3cc39181b796a69cb48521c"
+              "rev": "8-6f5ad8db0f34af24a6e0984cd1a6cfb9",
+              "status": "available"
           },
           {
-             "status" : "available",
-             "rev" : "2-7c4740b4dcf26683e941d6641c00c39d"
+              "rev": "7-77fba3a059497f51ec99b9b478b569d2",
+              "status": "deleted"
           },
           {
-             "status" : "available",
-             "rev" : "1-9c65296036141e575d32ba9c034dd3ee"
+              "rev": "6-136813b440a00a24834f5cb1ddf5b1f1",
+              "status": "available"
+          },
+          {
+              "rev": "5-fd96acb3256302bf0dd2f32713161f2a",
+              "status": "missing"
+          },
+          {
+              "rev": "4-874985bc28906155ba0e2e0538f67b05",
+              "status": "missing"
+          },
+          {
+              "rev": "3-0de77a37463bf391d14283e626831f2e",
+              "status": "missing"
+          },
+          {
+              "rev": "2-d795d1b924777732fdea76538c558b62",
+              "status": "missing"
+          },
+          {
+              "rev": "1-917fa2381192822767f010b95b45325b",
+              "status": "missing"
           }
-       ],
-       "title" : "Irish Fish Stew",
-       "_rev" : "3-a1a9b39ee3cc39181b796a69cb48521c"
-    }
+      ],
+      "description": "An Italian-American dish that usually consists of spaghetti, tomato sauce and meatballs.",
+      "ingredients": [
+          "spaghetti",
+          "tomato sauce",
+          "meatballs"
+      ],
+      "name": "Spaghetti with meatballs"
+  }
 
-* **_id** (optional): Document ID
-* **_rev** (optional): Revision ID (when updating an existing document)
-* **_revs_info** [array]: CouchDB Document Extended Revision Info
 
-  * **rev**: Full revision string
-  * **status**: Status of the revision
+The returned document contains ``_rev_info`` field with extended revision
+information, including the availability and status of each revision. This array
+field contains objects with following structure:
+
+- **rev** (*string*): Full revision string
+- **status** (*string*): Status of the revision.
+  Maybe one of:
+
+  - ``available``: Revision is available for retrieving with `rev` query
+    parameter
+  - ``missing``: Revision is not available
+  - ``deleted``: Revision belongs to deleted document
+
 
 Obtaining a Specific Revision
 -----------------------------
 
 To get a specific revision, use the ``rev`` argument to the request, and
-specify the full revision number:
+specify the full revision number. The specified revision of the document will
+be returned, including a ``_rev`` field specifying the revision that was
+requested.
+
+**Request**:
 
 .. code-block:: http
 
-    GET http://couchdb:5984/recipes/FishStew?rev=2-7c4740b4dcf26683e941d6641c00c39d
-    Accept: application/json
+  GET /recipes/SpaghettiWithMeatballs?rev=6-136813b440a00a24834f5cb1ddf5b1f1  HTTP/1.1
+  Accept: application/json
+  Host: localhost:5984
 
-The specified revision of the document will be returned, including a
-``_rev`` field specifying the revision that was requested:
-
-.. code-block:: javascript
-
-    {
-       "_id" : "FishStew",
-       "_rev" : "2-7c4740b4dcf26683e941d6641c00c39d",
-       "servings" : 4,
-       "subtitle" : "Delicious with a green salad",
-       "title" : "Fish Stew"
-    }
-
-.. _api/doc.head:
-
-``HEAD /db/doc``
-================
-
-* **Method**: ``HEAD /db/doc``
-* **Request**: None
-* **Response**: None
-* **Admin Privileges Required**: no
-* **Query Arguments**:
-
-  * **Argument**: rev
-
-    * **Description**:  Specify the revision to return
-    * **Optional**: yes
-    * **Type**: string
-
-  * **Argument**: revs
-
-    * **Description**:  Return a list of the revisions for the document
-    * **Optional**: yes
-    * **Type**: boolean
-
-  * **Argument**: revs_info
-
-    * **Description**:  Return a list of detailed revision information for the
-      document
-    * **Optional**: yes
-    * **Type**: boolean
-
-* **Return Codes**:
-
-  * **404**:
-    The specified document or revision cannot be found, or has been deleted
-
-Returns the HTTP Headers containing a minimal amount of information
-about the specified document. The method supports the same query
-arguments as the ``GET`` method, but only the header information
-(including document size, and the revision as an ETag), is returned. For
-example, a simple ``HEAD`` request:
+**Response**:
 
 .. code-block:: http
 
-    HEAD http://couchdb:5984/recipes/FishStew
-    Content-Type: application/json
+  HTTP/1.1 200 OK
+  Cache-Control: must-revalidate
+  Content-Length: 271
+  Content-Type: application/json
+  Date: Wed, 14 Aug 2013 11:40:55 GMT
+  Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+
+  {
+      "_id": "SpaghettiWithMeatballs",
+      "_rev": "6-136813b440a00a24834f5cb1ddf5b1f1",
+      "description": "An Italian-American dish that usually consists of spaghetti, tomato sauce and meatballs.",
+      "ingredients": [
+          "spaghetti",
+          "tomato sauce",
+          "meatballs"
+      ],
+      "name": "Spaghetti with meatballs"
+  }
 
 
-Returns the following HTTP Headers:
+Retrieving Deleted Documents
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. code-block:: javascript
+CouchDB doesn't actually deletes documents via :http:delete:`/{db}/{docid}`.
+Instead of this, it leaves tombstone with very basic information about document.
+If you just :http:get:`/{db}/{docid}` CouchDB returns :http:statuscode:`404`
+response:
 
-    HTTP/1.1 200 OK
-    Server: CouchDB/1.0.1 (Erlang OTP/R13B)
-    Etag: "7-a19a1a5ecd946dad70e85233ba039ab2"
-    Date: Fri, 05 Nov 2010 14:54:43 GMT
-    Content-Type: text/plain;charset=utf-8
-    Content-Length: 136
-    Cache-Control: must-revalidate
-
-The ``Etag`` header shows the current revision for the requested
-document, and the ``Content-Length`` specifies the length of the data,
-if the document were requested in full.
-
-Adding any of the query arguments (as supported by ```GET```_ method),
-then the resulting HTTP Headers will correspond to what would be
-returned. Note that the current revision is not returned when the
-``refs_info`` argument is used. For example:
-
-.. code-block:: http
-
-    HTTP/1.1 200 OK
-    Server: CouchDB/1.0.1 (Erlang OTP/R13B)
-    Date: Fri, 05 Nov 2010 14:57:16 GMT
-    Content-Type: text/plain;charset=utf-8
-    Content-Length: 609
-    Cache-Control: must-revalidate
-
-.. _api/doc.put:
-
-``PUT /db/doc``
-===============
-
-* **Method**: ``PUT /db/doc``
-* **Request**: JSON of the new document, or updated version of the existed
-  document
-* **Response**: JSON of the document ID and revision
-* **Admin Privileges Required**: no
-* **Query Arguments**:
-
-  * **Argument**: batch
-
-    * **Description**:  Allow document store request to be batched with others
-    * **Optional**: yes
-    * **Type**: string
-    * **Supported Values**:
-
-      * **ok**: Enable
-
-* **HTTP Headers**
-
-  * **Header**: ``If-Match``
-
-    * **Description**: Current revision of the document for validation
-    * **Optional**: yes
-
-* **Return Codes**:
-
-  * **201**:
-    Document has been created successfully
-  * **202**:
-    Document accepted for writing (batch mode)
-
-
-The ``PUT`` method creates a new named document, or creates a new
-revision of the existing document. Unlike the ``POST`` method, you
-must specify the document ID in the request URL.
-
-For example, to create the document ``FishStew``, you would send the
-following request:
+**Request**:
 
 .. code-block:: http
 
-    PUT http://couchdb:5984/recipes/FishStew
-    Content-Type: application/json
+  GET /recipes/FishStew  HTTP/1.1
+  Accept: application/json
+  Host: localhost:5984
 
-    {
-      "servings" : 4,
-      "subtitle" : "Delicious with fresh bread",
-      "title" : "Fish Stew"
-    }
+**Response**:
 
-The return type is JSON of the status, document ID,and revision number:
+.. code-block:: http
 
-.. code-block:: javascript
+  HTTP/1.1 404 Object Not Found
+  Cache-Control: must-revalidate
+  Content-Length: 41
+  Content-Type: application/json
+  Date: Wed, 14 Aug 2013 12:23:27 GMT
+  Server: CouchDB/1.4.0 (Erlang OTP/R16B)
 
-    {
-       "id" : "FishStew",
-       "ok" : true,
-       "rev" : "1-9c65296036141e575d32ba9c034dd3ee"
-    }
+  {
+      "error": "not_found",
+      "reason": "deleted"
+  }
+
+However, you may retrieve document's tombstone by using ``rev`` query parameter
+with :http:get:`/{db}/{docid}` request:
+
+**Request**:
+
+.. code-block:: http
+
+  GET /recipes/FishStew?rev=2-056f5f44046ecafc08a2bc2b9c229e20  HTTP/1.1
+  Accept: application/json
+  Host: localhost:5984
+
+**Response**:
+
+.. code-block:: http
+
+  HTTP/1.1 200 OK
+  Cache-Control: must-revalidate
+  Content-Length: 79
+  Content-Type: application/json
+  Date: Wed, 14 Aug 2013 12:30:22 GMT
+  ETag: "2-056f5f44046ecafc08a2bc2b9c229e20"
+  Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+
+  {
+      "_deleted": true,
+      "_id": "FishStew",
+      "_rev": "2-056f5f44046ecafc08a2bc2b9c229e20"
+  }
+
 
 Updating an Existing Document
 -----------------------------
 
 To update an existing document you must specify the current revision
-number within the ``_rev`` parameter. For example:
+number within the ``_rev`` parameter.
+
+**Request**:
 
 .. code-block:: http
 
-    PUT http://couchdb:5984/recipes/FishStew
-    Content-Type: application/json
+  PUT /recipes/SpaghettiWithMeatballs HTTP/1.1
+  Accept: application/json
+  Content-Length: 258
+  Content-Type: application/json
+  Host: localhost:5984
 
-    {
-      "_rev" : "1-9c65296036141e575d32ba9c034dd3ee",
-      "servings" : 4,
-      "subtitle" : "Delicious with fresh salad",
-      "title" : "Fish Stew"
-    }
+  {
+      "_rev": "1-917fa2381192822767f010b95b45325b",
+      "description": "An Italian-American dish that usually consists of spaghetti, tomato sauce and meatballs.",
+      "ingredients": [
+          "spaghetti",
+          "tomato sauce",
+          "meatballs"
+      ],
+      "name": "Spaghetti with meatballs",
+      "serving": "hot"
+  }
 
 Alternatively, you can supply the current revision number in the
-``If-Match`` HTTP header of the request. For example:
+``If-Match`` HTTP header of the request:
 
 .. code-block:: http
 
-    PUT http://couchdb:5984/recipes/FishStew
-    If-Match: 2-d953b18035b76f2a5b1d1d93f25d3aea
-    Content-Type: application/json
+  PUT /recipes/SpaghettiWithMeatballs HTTP/1.1
+  Accept: application/json
+  Content-Length: 258
+  Content-Type: application/json
+  If-Match: 1-917fa2381192822767f010b95b45325b
+  Host: localhost:5984
 
-    {
-       "servings" : 4,
-       "subtitle" : "Delicious with fresh salad",
-       "title" : "Fish Stew"
-    }
+  {
+      "description": "An Italian-American dish that usually consists of spaghetti, tomato sauce and meatballs.",
+      "ingredients": [
+          "spaghetti",
+          "tomato sauce",
+          "meatballs"
+      ],
+      "name": "Spaghetti with meatballs",
+      "serving": "hot"
+  }
 
-The JSON returned will include the updated revision number:
 
-.. code-block:: javascript
-
-    {
-       "id" : "FishStew99",
-       "ok" : true,
-       "rev" : "2-d953b18035b76f2a5b1d1d93f25d3aea"
-    }
-
-For information on batched writes, which can provide improved
-performance, see :ref:`api/doc/batch-writes`.
-
-.. _api/doc.delete:
-
-``DELETE /db/doc``
-==================
-
-* **Method**: ``DELETE /db/doc``
-* **Request**: None
-* **Response**: JSON of the deleted revision
-* **Admin Privileges Required**: no
-* **Query Arguments**:
-
-  * **Argument**: rev
-
-    * **Description**:  Current revision of the document for validation
-    * **Optional**: yes
-    * **Type**: string
-
-* **HTTP Headers**
-
-  * **Header**: ``If-Match``
-
-    * **Description**: Current revision of the document for validation
-    * **Optional**: yes
-
-* **Return Codes**:
-
-  * **409**:
-    Revision is missing, invalid or not the latest
-
-Deletes the specified document from the database. You must supply the
-current (latest) revision, either by using the ``rev`` parameter to
-specify the revision:
+**Response**:
 
 .. code-block:: http
 
-    DELETE http://couchdb:5984/recipes/FishStew?rev=3-a1a9b39ee3cc39181b796a69cb48521c
-    Content-Type: application/json
+  HTTP/1.1 201 Created
+  Cache-Control: must-revalidate
+  Content-Length: 85
+  Content-Type: application/json
+  Date: Wed, 14 Aug 2013 20:33:56 GMT
+  ETag: "2-790895a73b63fb91dd863388398483dd"
+  Location: http://localhost:5984/recipes/SpaghettiWithMeatballs
+  Server: CouchDB/1.4.0 (Erlang OTP/R16B)
 
-Alternatively, you can use ETags with the ``If-Match`` field:
+  {
+      "id": "SpaghettiWithMeatballs",
+      "ok": true,
+      "rev": "2-790895a73b63fb91dd863388398483dd"
+  }
 
-.. code-block:: http
-
-    DELETE http://couchdb:5984/recipes/FishStew
-    If-Match: 3-a1a9b39ee3cc39181b796a69cb48521c
-    Content-Type: application/json
-
-
-The returned JSON contains the document ID, revision and status:
-
-.. code-block:: javascript
-
-    {
-       "id" : "FishStew",
-       "ok" : true,
-       "rev" : "4-2719fd41187c60762ff584761b714cfb"
-    }
-
-.. note:: Note that deletion of a record increments the revision number. The
-   use of a revision for deletion of the record allows replication of
-   the database to correctly track the deletion in synchronized copies.
-
-.. _api/doc.copy:
-
-``COPY /db/doc``
-================
-
-* **Method**: ``COPY /db/doc``
-* **Request**: None
-* **Response**: JSON of the new document and revision
-* **Admin Privileges Required**: no
-* **Query Arguments**:
-
-  * **Argument**: rev
-
-    * **Description**:  Revision to copy from
-    * **Optional**: yes
-    * **Type**: string
-
-* **HTTP Headers**
-
-  * **Header**: ``Destination``
-
-    * **Description**: Destination document (and optional revision)
-    * **Optional**: no
-
-* **Return Codes**:
-
-  * **201**:
-    Document has been copied and created successfully
-  * **409**:
-    Revision is missing, invalid or not the latest
-
-The ``COPY`` command (which is non-standard HTTP) copies an existing
-document to a new or existing document.
-
-The source document is specified on the request line, with the
-``Destination`` HTTP Header of the request specifying the target
-document.
-
-Copying a Document
-------------------
-
-You can copy the latest version of a document to a new document by
-specifying the current document and target document:
-
-.. code-block:: http
-
-    COPY http://couchdb:5984/recipes/FishStew
-    Content-Type: application/json
-    Destination: IrishFishStew
-
-The above request copies the document ``FishStew`` to the new document
-``IrishFishStew``. The response is the ID and revision of the new
-document.
-
-.. code-block:: javascript
-
-    {
-       "id" : "IrishFishStew",
-       "rev" : "1-9c65296036141e575d32ba9c034dd3ee"
-    }
 
 Copying from a Specific Revision
 --------------------------------
 
 To copy *from* a specific version, use the ``rev`` argument to the query
-string:
+string or :http:header:`If-Match`:
+
+**Request**:
 
 .. code-block:: http
 
-    COPY http://couchdb:5984/recipes/FishStew?rev=5-acfd32d233f07cea4b4f37daaacc0082
-    Content-Type: application/json
-    Destination: IrishFishStew
+  COPY /recipes/SpaghettiWithMeatballs HTTP/1.1
+  Accept: application/json
+  Destination: http://localhost:5984/recipes_old/SpaghettiWithMeatballs_Original
+  If-Match: 1-917fa2381192822767f010b95b45325b
+  Host: localhost:5984
 
-The new document will be created using the information in the specified
-revision of the source document.
+**Response**:
+
+.. code-block:: http
+
+  HTTP/1.1 201 Created
+  Cache-Control: must-revalidate
+  Content-Length: 93
+  Content-Type: application/json
+  Date: Wed, 14 Aug 2013 14:21:00 GMT
+  ETag: "1-917fa2381192822767f010b95b45325b"
+  Location: http://localhost:5984/recipes_old/SpaghettiWithMeatballs_Original
+  Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+
+  {
+      "id": "SpaghettiWithMeatballs_Original",
+      "ok": true,
+      "rev": "1-917fa2381192822767f010b95b45325b"
+  }
+
 
 Copying to an Existing Document
 -------------------------------
 
 To copy to an existing document, you must specify the current revision
-string for the target document, using the ``rev`` parameter to the
-``Destination`` HTTP Header string. For example:
+string for the target document by appending the ``rev`` parameter to the
+:http:header:`Destination` header string.
+
+**Request**:
 
 .. code-block:: http
 
-    COPY http://couchdb:5984/recipes/FishStew
-    Content-Type: application/json
-    Destination: IrishFishStew?rev=1-9c65296036141e575d32ba9c034dd3ee
+  COPY /recipes/SpaghettiWithMeatballs?rev=8-6f5ad8db0f34af24a6e0984cd1a6cfb9 HTTP/1.1
+  Accept: application/json
+  Destination: http://localhost:5984/recipes_old/SpaghettiWithMeatballs_Original?rev=1-917fa2381192822767f010b95b45325b
+  Host: localhost:5984
 
-The return value will be the new revision of the copied document:
+**Response**:
 
-.. code-block:: javascript
+.. code-block:: http
 
-    {
-       "id" : "IrishFishStew",
-       "rev" : "2-55b6a1b251902a2c249b667dab1c6692"
-    }
+  HTTP/1.1 201 Created
+  Cache-Control: must-revalidate
+  Content-Length: 93
+  Content-Type: application/json
+  Date: Wed, 14 Aug 2013 14:21:00 GMT
+  ETag: "2-62e778c9ec09214dd685a981dcc24074""
+  Location: http://localhost:5984/recipes_old/SpaghettiWithMeatballs_Original
+  Server: CouchDB/1.4.0 (Erlang OTP/R16B)
 
+  {
+      "id": "SpaghettiWithMeatballs_Original",
+      "ok": true,
+      "rev": "2-62e778c9ec09214dd685a981dcc24074"
+  }

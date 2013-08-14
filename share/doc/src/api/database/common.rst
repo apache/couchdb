@@ -274,7 +274,7 @@
   :>header Content-Type: - :mimetype:`application/json`
                          - :mimetype:`text/plain; charset=utf-8`
   :>header ETag: Quoted new document's revision
-  :>header Location: Document URI
+  :>header Location: Document's URI
   :>json string id: Created document ID
   :>json boolean ok: Operation status
   :>json string rev: Revision info

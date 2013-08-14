@@ -602,7 +602,7 @@ Multi-document Fetching
 By combining the ``POST`` method to a given view with the
 ``include_docs=true`` query argument you can obtain multiple documents
 from a database. The result is more efficient than using multiple
-:ref:`api/doc.get` requests.
+:http:get:`/{db}/{docid}` requests.
 
 For example, sending the following request for ingredients matching
 “claret” and “clear apple juice”:
