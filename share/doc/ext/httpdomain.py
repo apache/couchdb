@@ -437,21 +437,6 @@ class HTTPIndex(Index):
     localname = 'CouchDB HTTP API Reference'
     shortname = 'api'
 
-    def __init__(self, *args, **kwargs):
-        super(HTTPIndex, self).__init__(*args, **kwargs)
-
-        self.ignore = [
-            [l for l in x.split('/') if l]
-            for x in self.domain.env.config['http_index_ignore_prefixes']]
-        self.ignore.sort(key=lambda x: -len(x))
-
-    def grouping_prefix(self, path):
-        letters = [x for x in path.split('/') if x]
-        for prefix in self.ignore:
-            if letters[:len(prefix)] == prefix:
-                return '/' + '/'.join(letters[:len(prefix) + 1])
-        return '/%s' % (letters[0] if letters else '',)
-
     def generate(self, docnames=None):
         content = {}
         items = ((method, path, info)
@@ -459,7 +444,7 @@ class HTTPIndex(Index):
                  for path, info in routes.items())
         items = sorted(items, key=lambda item: item[1])
         for method, path, info in items:
-            entries = content.setdefault(self.grouping_prefix(path), [])
+            entries = content.setdefault(path, [])
             entries.append([
                 method.upper() + ' ' + path, 0, info[0],
                 http_resource_anchor(method, path), '', '', info[1]
@@ -633,4 +618,3 @@ def setup(app):
         get_lexer_by_name('http')
     except ClassNotFound:
         app.add_lexer('http', HTTPLexer())
-    app.add_config_value('http_index_ignore_prefixes', [], None)
