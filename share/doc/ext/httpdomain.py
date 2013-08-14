@@ -435,7 +435,7 @@ class HTTPIndex(Index):
 
     name = 'api'
     localname = 'CouchDB HTTP API Reference'
-    shortname = 'api'
+    shortname = 'API Reference'
 
     def generate(self, docnames=None):
         content = {}
