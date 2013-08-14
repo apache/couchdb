@@ -49,6 +49,8 @@ html_logo = "../images/logo.png"
 
 html_favicon = "../images/favicon.ico"
 
+html_use_index = False
+
 html_sidebars = {
     "**": [
         "searchbox.html",
@@ -92,6 +94,12 @@ extlinks = {
 
 github_project = 'apache/couchdb'
 
-github_branch = 'master'
+github_branch = '1781-reorganize-and-improve-docs'
 
 github_docs_path = 'share/doc/src'
+
+http_index_name = 'apiref'
+
+http_index_localname = 'HTTP API Reference'
+
+http_index_shortname = 'apiref'
