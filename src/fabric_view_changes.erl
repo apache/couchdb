@@ -339,7 +339,7 @@ do_unpack_seqs(Opaque, DbName) ->
     Unpacked = lists:flatmap(fun({Node, [A,B], Seq}) ->
         case mem3:get_shard(DbName, Node, [A,B]) of
         {ok, Shard} ->
-            [{Shard, Seq}];
+            [{Shard, seq(Seq)}];
         {error, not_found} ->
             []
         end
