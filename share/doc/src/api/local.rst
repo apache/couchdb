@@ -59,22 +59,22 @@ A list of the available methods and URL paths are provided below:
 
   Gets the specified local document. The semantics are identical to
   accessing a standard document in the specified database, except that the
-  document is not replicated. See :ref:`api/doc.get`.
+  document is not replicated. See :http:get:`/{db}/{docid}`.
 
 .. http:put:: /{db}/_local/{id}
 
   Stores the specified local document. The semantics are identical to
   storing a standard document in the specified database, except that the
-  document is not replicated. See :ref:`api/doc.put`.
+  document is not replicated. See :http:put:`/{db}/{docid}`.
 
 .. http:delete:: /{db}/_local/{id}
 
   Deletes the specified local document. The semantics are identical to
   deleting a standard document in the specified database, except that the
-  document is not replicated. See :ref:`api/doc.delete`.
+  document is not replicated. See :http:delete:`/{db}/{docid}`.
 
 .. http:copy:: /{db}/_local/{id}
 
   Copies the specified local document. The semantics are identical to
   copying a standard document in the specified database, except that the
-  document is not replicated. See :ref:`api/doc.copy`.
+  document is not replicated. See :http:copy:`/{db}/{docid}`.

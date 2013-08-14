@@ -164,7 +164,7 @@ Push Only
 - :http:post:`/{db}/_revs_diff` -- Locate Revisions that are not known to the
   Target
 - :http:post:`/{db}/_bulk_docs` -- Upload Revisions to the Target
-- :ref:`api/doc.put`?new_edits=false -- Upload a single Document with
+- :http:put:`/{db}/{docid}`?new_edits=false -- Upload a single Document with
   attachments to the Target
 
 Pull Only
@@ -179,7 +179,7 @@ Pull Only
   - ``limit=limit``
   - ``heartbeat=heartbeat``
 
-- :ref:`api/doc.get` -- Retrieve a single Document from Source with attachments.
+- :http:get:`/{db}/{docid}` -- Retrieve a single Document from Source with attachments.
   The request uses next query parameters:
 
   - ``open_revs=revid`` - where ``revid`` is the actual Document Revision at the

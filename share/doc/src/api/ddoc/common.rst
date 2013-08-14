@@ -74,7 +74,7 @@ The returned string will be the JSON of the design document:
 A list of the revisions can be obtained by using the ``revs`` query
 argument, or an extended list of revisions using the ``revs_info`` query
 argument. This operates in the same way as for other documents. Fur
-further examples, see :ref:`api/doc.get`.
+further examples, see :http:get:`/{db}/{docid}`.
 
 .. _api/ddoc.put:
 

@@ -11,7 +11,7 @@
 .. the License.
 
 
-.. _api/ddoc:
+.. _api/design-docs:
 
 =======================
 Design Document Methods
