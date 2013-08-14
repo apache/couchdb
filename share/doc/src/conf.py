@@ -94,12 +94,6 @@ extlinks = {
 
 github_project = 'apache/couchdb'
 
-github_branch = '1781-reorganize-and-improve-docs'
+github_branch = 'master'
 
 github_docs_path = 'share/doc/src'
-
-http_index_name = 'apiref'
-
-http_index_localname = 'HTTP API Reference'
-
-http_index_shortname = 'apiref'
