@@ -293,16 +293,20 @@ couch_file_stats() ->
     Candidates = [Pid || {process, Pid} <- M],
     Mailboxes = lists:foldl(
         fun(Pid, Acc) ->
-            PI = process_info(Pid, [message_queue_len, dictionary]),
-            Dictionary = proplists:get_value(dictionary, PI, []),
-            case proplists:get_value('$initial_call', Dictionary) of
-                {couch_file, init, 1} ->
-                    case proplists:get_value(message_queue_len, PI) of
-                        undefined -> Acc;
-                        Len -> [Len|Acc]
-                    end;
-                _  ->
-                    Acc
+            case process_info(Pid, [message_queue_len, dictionary]) of
+                undefined ->
+                    Acc;
+                PI ->
+                    Dictionary = proplists:get_value(dictionary, PI, []),
+                    case proplists:get_value('$initial_call', Dictionary) of
+                        {couch_file, init, 1} ->
+                            case proplists:get_value(message_queue_len, PI) of
+                                undefined -> Acc;
+                                Len -> [Len|Acc]
+                            end;
+                        _  ->
+                            Acc
+                    end
             end
         end, [], Candidates
     ),
