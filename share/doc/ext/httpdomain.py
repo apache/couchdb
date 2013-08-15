@@ -434,7 +434,7 @@ class HTTPXRefRole(XRefRole):
 class HTTPIndex(Index):
 
     name = 'api'
-    localname = 'CouchDB HTTP API Reference'
+    localname = 'HTTP API Reference'
     shortname = 'API Reference'
 
     def generate(self, docnames=None):
