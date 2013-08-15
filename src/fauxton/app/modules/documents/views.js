@@ -47,7 +47,7 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
       return {
         // TODO make this not hard coded here
         changes_url: '#' + this.database.url('changes'),
-        db_url: '#' + this.database.url('index') + '?limit=100'
+        db_url: '#' + this.database.url('index') + '?limit=100',
       };
     },
 
@@ -1333,6 +1333,7 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
     serialize: function() {
       return {
         changes_url: '#' + this.database.url('changes'),
+        permissions_url: '#' + this.database.url('app') + '/permissions',
         db_url: '#' + this.database.url('index') + '?limit=100',
         index: [1,2,3],
         view: [1,2],
