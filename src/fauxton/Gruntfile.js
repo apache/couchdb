@@ -231,7 +231,11 @@ module.exports = function(grunt) {
       },
       style: {
         files: helper.watchFiles(['.less','.css'],["./app/**/*.css","./app/**/*.less","./assets/**/*.css", "./assets/**/*.less"]),
-        tasks: ['less', 'concat:index_css'],
+        tasks: ['clean:watch', 'dependencies','less', 'concat:index_css'],
+      },
+      html: {
+        files: helper.watchFiles(['.html'], []),
+        tasks: ['clean:watch', 'dependencies']
       },
       options: {
         nospawn: true,
@@ -328,7 +332,6 @@ module.exports = function(grunt) {
       grunt.config(['jshint', 'all'], filepath);
     }
 
-    console.log(filepath);
     if (!!filepath.match(/[Ss]pec.js$/)) {
       grunt.task.run(['mochaSetup','mocha_phantomjs']);
     }
