@@ -579,6 +579,16 @@ Specific HTTP methods may also be restricted:
     ; refer to http://tools.ietf.org/html/rfc2616, rfc2817, rfc5789
     methods = GET, POST, PUT, DELETE
 
+You can allow additional HTTP header fields to be allowed:
+
+.. code-block:: ini
+
+    [cors]
+    ; List of accepted headers separated by a comma
+    headers = Authorization, Cookie
+
+Note that `Authorization` and `Cookie` are not part of the standard set.
+
 Configuration per vhost
 -----------------------
 
