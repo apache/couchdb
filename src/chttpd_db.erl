@@ -320,21 +320,14 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, 
     case couch_util:get_value(<<"new_edits">>, JsonProps, true) of
     true ->
         Docs = lists:map(
-            fun({ObjProps} = JsonObj) ->
+            fun(JsonObj) ->
                 Doc = couch_doc:from_json_obj(JsonObj),
                 validate_attachment_names(Doc),
                 Id = case Doc#doc.id of
                     <<>> -> couch_uuids:new();
                     Id0 -> Id0
                 end,
-                case couch_util:get_value(<<"_rev">>, ObjProps) of
-                undefined ->
-                    Revs = {0, []};
-                Rev  ->
-                    {Pos, RevId} = couch_doc:parse_rev(Rev),
-                    Revs = {Pos, [RevId]}
-                end,
-                Doc#doc{id=Id,revs=Revs}
+                Doc#doc{id=Id}
             end,
             DocsArray),
         Options2 =
