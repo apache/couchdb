@@ -146,7 +146,7 @@ init_p(From, MFA) ->
     string() | undefined) -> any().
 init_p(From, {M,F,A}, Nonce) ->
     put(rexi_from, From),
-    put(initial_call, {M,F,length(A)}),
+    put('$initial_call', {M,F,length(A)}),
     put(nonce, Nonce),
     try apply(M, F, A) catch exit:normal -> ok; Class:Reason ->
         Stack = clean_stack(),
