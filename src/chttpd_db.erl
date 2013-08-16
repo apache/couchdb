@@ -302,7 +302,14 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, 
     couch_stats_collector:increment({httpd, bulk_requests}),
     couch_httpd:validate_ctype(Req, "application/json"),
     {JsonProps} = chttpd:json_body_obj(Req),
-    DocsArray = couch_util:get_value(<<"docs">>, JsonProps),
+    DocsArray = case couch_util:get_value(<<"docs">>, JsonProps) of
+    undefined ->
+        throw({bad_request, <<"POST body must include `docs` parameter.">>});
+    DocsArray0 when not is_list(DocsArray0) ->
+        throw({bad_request, <<"`docs` parameter must be an array.">>});
+    DocsArray0 ->
+        DocsArray0
+    end,
     W = case couch_util:get_value(<<"w">>, JsonProps) of
     Value when is_integer(Value) ->
         integer_to_list(Value);
