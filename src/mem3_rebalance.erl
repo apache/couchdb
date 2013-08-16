@@ -23,8 +23,43 @@ rebalance(DbName) ->
 rebalance(DbName, TargetNodes) when is_binary(DbName) ->
     rebalance(mem3:shards(DbName), TargetNodes);
 rebalance(Shards, TargetNodes) when is_list(Shards) ->
+    %% first migrate shards off of non-target nodes
+    {OK, MoveThese} = lists:partition(fun(#shard{node=Node}) ->
+        lists:member(Node, TargetNodes)
+    end, Shards),
+    ShardsByTargetNode0 = lists:foldl(fun(Shard, Acc) ->
+        orddict:append(Shard#shard.node, Shard, Acc)
+    end, orddict:new(), OK),
+    ShardsByTargetNode = lists:sort(lists:foldl(fun(Node, Acc) ->
+        case orddict:is_key(Node, ShardsByTargetNode0) of
+            true ->
+                Acc;
+            false ->
+                [{Node, []} | Acc]
+        end
+    end, ShardsByTargetNode0, TargetNodes)),
+    Moves = find_replacements(MoveThese, ShardsByTargetNode, []),
+    Moved = [Shard#shard{node = Node} || {Shard, Node} <- Moves],
     TargetLevel = length(Shards) div length(TargetNodes),
-    rebalance2(TargetLevel, Shards, TargetNodes, TargetNodes, []).
+    rebalance2(TargetLevel, OK ++ Moved, TargetNodes, TargetNodes, Moves).
+
+find_replacements([], _ShardsByTargetNode, Result) ->
+    Result;
+find_replacements([Shard | Rest], ShardsByNode, Acc) ->
+    Zone = mem3:node_info(Shard#shard.node, <<"zone">>),
+    % Find a node in the same zone
+    InZone = [{Node, Shards} || {Node, Shards} <- ShardsByNode,
+        mem3:node_info(Node, <<"zone">>) =:= Zone],
+    % Prefer a node with the fewest number of shards
+    if InZone =:= [] ->
+        erlang:error({empty_zone, Zone, Shard});
+    true ->
+        ok
+    end,
+    [{TargetNode, _} | _] = lists:sort(fun smallest_first/2, InZone),
+    TargetShard = Shard#shard{node = TargetNode},
+    find_replacements(Rest, orddict:append(TargetNode, TargetShard, ShardsByNode),
+        [{Shard, TargetNode} | Acc]).
 
 rebalance2(_TargetLevel, Shards, _Nodes, [], Moves) ->
     {Shards, Moves};
@@ -70,6 +105,9 @@ victim(TargetLevel, Shards, Nodes, TargetNode) ->
 
 largest_first({_, A}, {_, B}) ->
     length(A) >= length(B).
+
+smallest_first({_, A}, {_, B}) ->
+    length(A) < length(B).
 
 replace(A, B, List) ->
     replace(A, B, List, []).
