@@ -12,21 +12,245 @@
 
 
 .. _api/doc/attachment:
-.. _api/doc/attachment.get:
 
-``GET /db/doc/attachment``
-==========================
+``/db/doc/attachment``
+======================
 
-* **Method**: ``GET /db/doc/attachment``
-* **Request**: None
-* **Response**: Returns the attachment data
-* **Admin Privileges Required**: no
+.. http:head:: /{db}/{docid}/{attname}
 
-Returns the file attachment ``attachment`` associated with the document
-``doc``. The raw data of the associated attachment is returned (just as
-if you were accessing a static file. The returned HTTP ``Content-type``
-will be the same as the content type set when the document attachment
-was submitted into the database.
+  Returns the HTTP headers containing a minimal amount of information
+  about the specified attachment. The method supports the same query
+  arguments as the :http:get:`/{db}/{docid}/{attname}` method, but only
+  the header information (including attachment size, encoding and the MD5 hash
+  as an :http:header:`ETag`), is returned.
+
+  :param db: Database name
+  :param docid: Document ID
+  :param attname: Attachment name
+  :<header If-Match: Document's revision. Alternative to `rev` query parameter
+  :<header If-None-Match: Attachment's base64 encoded MD5 binary digest.
+    *Optional*
+  :query string rev: Document's revision. *Optional*
+  :>header Accept-Ranges: :ref:`Range request aware <api/doc/attachment/range>`.
+    Used for attachments with :mimetype:`application/octet-stream` content type
+  :>header Content-Encoding: Used compression codec. Available if attachment's
+    ``content_type`` is in :ref:`list of compressiable types
+    <config/attachments/compressible_types>`
+  :>header Content-Length: Attachment size. If compression codec was used,
+    this value is about compressed size, not actual
+  :>header Content-MD5: Base64 encoded MD5 binary digest
+  :>header ETag: Double quoted base64 encoded MD5 binary digest
+  :code 200: Attachment exists
+  :code 304: Attachment wasn't modified if :http:header:`ETag` equals specified
+    :http:header:`If-None-Match` header
+  :code 401: Read privilege required
+  :code 404: Specified database, document or attachment was not found
+
+  **Request**:
+
+  .. code-block:: http
+
+    HEAD /recipes/SpaghettiWithMeatballs/recipe.txt HTTP/1.1
+    Host: localhost:5984
+
+  **Response**:
+
+  .. code-block:: http
+
+    HTTP/1.1 200 OK
+    Accept-Ranges: none
+    Cache-Control: must-revalidate
+    Content-Encoding: gzip
+    Content-Length: 100
+    Content-MD5: vVa/YgiE1+Gh0WfoFJAcSg==
+    Content-Type: text/plain
+    Date: Thu, 15 Aug 2013 12:42:42 GMT
+    ETag: "vVa/YgiE1+Gh0WfoFJAcSg=="
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+
+
+.. http:get:: /{db}/{docid}/{attname}
+
+  Returns the file attachment  associated with the document.
+  The raw data of the associated attachment is returned (just as if you were
+  accessing a static file. The returned :http:header:`Content-Type`
+  will be the same as the content type set when the document attachment
+  was submitted into the database.
+
+  :param db: Database name
+  :param docid: Document ID
+  :param attname: Attachment name
+  :<header If-Match: Document's revision. Alternative to `rev` query parameter
+  :<header If-None-Match: Attachment's base64 encoded MD5 binary digest.
+    *Optional*
+  :query string rev: Document's revision. *Optional*
+  :>header Accept-Ranges: :ref:`Range request aware <api/doc/attachment/range>`.
+    Used for attachments with :mimetype:`application/octet-stream`
+  :>header Content-Encoding: Used compression codec. Available if attachment's
+    ``content_type`` is in :ref:`list of compressiable types
+    <config/attachments/compressible_types>`
+  :>header Content-Length: Attachment size. If compression codec is used,
+    this value is about compressed size, not actual
+  :>header Content-MD5: Base64 encoded MD5 binary digest
+  :>header ETag: Double quoted base64 encoded MD5 binary digest
+  :response: Stored content
+  :code 200: Attachment exists
+  :code 304: Attachment wasn't modified if :http:header:`ETag` equals specified
+    :http:header:`If-None-Match` header
+  :code 401: Read privilege required
+  :code 404: Specified database, document or attachment was not found
+
+
+.. http:put:: /{db}/{docid}/{attname}
+
+  Uploads the supplied content as an attachment to the specified document.
+  The attachment name provided must be a URL encoded string. You must also
+  supply either the ``rev`` query argument or the :http:header:`If-Match`
+  HTTP header for validation, and the HTTP headers (to set the attachment
+  content type).
+
+  If case when uploading an attachment using an existing attachment name,
+  CouchDB will update the corresponding stored content of the database.
+  Since you must supply the revision information to add an attachment to
+  the document, this serves as validation to update the existing attachment.
+
+  .. note::
+     Uploading an attachment updates the corresponding document revision.
+     Revisions are tracked for the parent document, not individual attachments.
+
+  :param db: Database name
+  :param docid: Document ID
+  :param attname: Attachment name
+  :<header Content-Type: Attachment MIME type. *Required*
+  :<header If-Match: Document revision. Alternative to `rev` query parameter
+  :query string rev: Document revision. *Required*
+  :>header Accept-Ranges: :ref:`Range request aware <api/doc/attachment/range>`.
+    Used for attachments with :mimetype:`application/octet-stream`
+  :>header Content-Encoding: Used compression codec. Available if attachment's
+    ``content_type`` is in :ref:`list of compressiable types
+    <config/attachments/compressible_types>`
+  :>header Content-Length: Attachment size. If compression codec is used,
+    this value is about compressed size, not actual
+  :>header Content-MD5: Base64 encoded MD5 binary digest
+  :>header ETag: Double quoted base64 encoded MD5 binary digest
+  :>json string id: Document ID
+  :>json boolean ok: Operation status
+  :>json string rev: Revision MVCC token
+  :code 200: Attachment successfully removed
+  :code 202: Request was accepted, but changes are not yet stored on disk
+  :code 400: Invalid request body or parameters
+  :code 401: Write privileges required
+  :code 404: Specified database, document or attachment was not found
+  :code 409: Document's revision wasn't specified or it's not the latest
+
+  **Request**:
+
+  .. code-block:: http
+
+    PUT /recipes/SpaghettiWithMeatballs/recipe.txt HTTP/1.1
+    Accept: application/json
+    Content-Length: 86
+    Content-Type: text/plain
+    Host: localhost:5984
+    If-Match: 1-917fa2381192822767f010b95b45325b
+
+    1. Cook spaghetti
+    2. Cook meatballs
+    3. Mix them
+    4. Add tomato sauce
+    5. ...
+    6. PROFIT!
+
+  **Response**:
+
+  .. code-block:: http
+
+    HTTP/1.1 201 Created
+    Cache-Control: must-revalidate
+    Content-Length: 85
+    Content-Type: application/json
+    Date: Thu, 15 Aug 2013 12:38:04 GMT
+    ETag: "2-ce91aed0129be8f9b0f650a2edcfd0a4"
+    Location: http://localhost:5984/recipes/SpaghettiWithMeatballs/recipe.txt
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+
+    {
+        "id": "SpaghettiWithMeatballs",
+        "ok": true,
+        "rev": "2-ce91aed0129be8f9b0f650a2edcfd0a4"
+    }
+
+
+.. http:delete:: /{db}/{docid}/{attname}
+
+  Deletes the attachment ``attachment`` of the specified ``doc``. You must
+  supply the ``rev`` query parameter or :http:header:`If-Match` with the current
+  revision to delete the attachment.
+
+  .. note::
+     Deleting an attachment updates the corresponding document revision.
+     Revisions are tracked for the parent document, not individual attachments.
+
+  :param db: Database name
+  :param docid: Document ID
+  :<header Accept: - :mimetype:`application/json`
+                   - :mimetype:`text/plain`
+  :<header If-Match: Document revision. Alternative to `rev` query parameter
+  :<header X-Couch-Full-Commit: Overrides server's
+    :ref:`commit policy <config/couchdb/delayed_commits>`. Possible values
+    are: ``false`` and ``true``. *Optional*
+  :query string rev: Document revision. *Required*
+  :query string batch: Store changes in :ref:`batch mode
+    <api/doc/batch-writes>` Possible values: ``ok``. *Optional*
+  :>header Content-Type: - :mimetype:`application/json`
+                         - :mimetype:`text/plain; charset=utf-8`
+  :>header ETag: Double quoted document's new revision
+  :>json string id: Document ID
+  :>json boolean ok: Operation status
+  :>json string rev: Revision MVCC token
+  :code 200: Attachment successfully removed
+  :code 202: Request was accepted, but changes are not yet stored on disk
+  :code 400: Invalid request body or parameters
+  :code 401: Write privileges required
+  :code 404: Specified database, document or attachment was not found
+  :code 409: Document's revision wasn't specified or it's not the latest
+
+  **Request**:
+
+  .. code-block:: http
+
+    DELETE /recipes/SpaghettiWithMeatballs?rev=6-440b2dd39c20413045748b42c6aba6e2 HTTP/1.1
+    Accept: application/json
+    Host: localhost:5984
+
+  Alternatively, instead of ``rev`` query parameter you may use
+  :http:header:`If-Match` header:
+
+  .. code-block:: http
+
+    DELETE /recipes/SpaghettiWithMeatballs HTTP/1.1
+    Accept: application/json
+    If-Match: 6-440b2dd39c20413045748b42c6aba6e2
+    Host: localhost:5984
+
+  **Response**:
+
+  .. code-block:: http
+
+    HTTP/1.1 200 OK
+    Cache-Control: must-revalidate
+    Content-Length: 85
+    Content-Type: application/json
+    Date: Wed, 14 Aug 2013 12:23:13 GMT
+    ETag: "7-05185cf5fcdf4b6da360af939431d466"
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+
+    {
+        "id": "SpaghettiWithMeatballs",
+        "ok": true,
+        "rev": "7-05185cf5fcdf4b6da360af939431d466"
+    }
+
 
 .. _api/doc/attachment/range:
 
@@ -90,153 +314,3 @@ ranges. Read all about it in `RFC 2616`_.
    better algorithm to find byte ranges.
 
 .. _RFC 2616: http://tools.ietf.org/html/rfc2616#section-14.27
-
-
-.. _api/doc/attachment.put:
-
-``PUT /db/doc/attachment``
-==========================
-
-* **Method**: ``PUT /db/doc/attachment``
-* **Request**: Raw document data
-* **Response**: JSON document status
-* **Admin Privileges Required**: no
-* **Query Arguments**:
-
-  * **Argument**: rev
-
-    * **Description**:  Current document revision
-    * **Optional**: no
-    * **Type**: string
-
-* **HTTP Headers**
-
-  * **Header**: ``Content-Length``
-
-    * **Description**: Length (bytes) of the attachment being uploaded
-    * **Optional**: no
-
-  * **Header**: ``Content-Type``
-
-    * **Description**: MIME type for the uploaded attachment
-    * **Optional**: no
-
-  * **Header**: ``If-Match``
-
-    * **Description**: Current revision of the document for validation
-    * **Optional**: yes
-
-* **Return Codes**:
-
-  * **201**:
-    Attachment has been accepted
-
-Upload the supplied content as an attachment to the specified document
-(``doc``). The ``attachment`` name provided must be a URL encoded
-string. You must also supply either the ``rev`` query argument or the
-``If-Match`` HTTP header for validation, and the HTTP headers (to set
-the attachment content type). The content type is used when the
-attachment is requested as the corresponding content-type in the
-returned document header.
-
-For example, you could upload a simple text document using the following
-request:
-
-.. code-block:: http
-
-    PUT http://couchdb:5984/recipes/FishStew/basic?rev=8-a94cb7e50ded1e06f943be5bfbddf8ca
-    Content-Length: 10
-    Content-Type: text/plain
-
-    Roast it
-
-Or by using the ``If-Match`` HTTP header:
-
-.. code-block:: http
-
-    PUT http://couchdb:5984/recipes/FishStew/basic
-    If-Match: 8-a94cb7e50ded1e06f943be5bfbddf8ca
-    Content-Length: 10
-    Content-Type: text/plain
-
-    Roast it
-
-The returned JSON contains the new document information:
-
-.. code-block:: javascript
-
-    {
-       "id" : "FishStew",
-       "ok" : true,
-       "rev" : "9-247bb19a41bfd9bfdaf5ee6e2e05be74"
-    }
-
-.. note:: Uploading an attachment updates the corresponding document revision.
-   Revisions are tracked for the parent document, not individual
-   attachments.
-
-Updating an Existing Attachment
--------------------------------
-
-Uploading an attachment using an existing attachment name will update
-the corresponding stored content of the database. Since you must supply
-the revision information to add an attachment to a document, this serves
-as validation to update the existing attachment.
-
-.. _api/doc/attachment.delete:
-
-``DELETE /db/doc/attachment``
-=============================
-
-* **Method**: ``DELETE /db/doc/attachment``
-* **Request**: None
-* **Response**: JSON status
-* **Admin Privileges Required**: no
-* **Query Arguments**:
-
-  * **Argument**: rev
-
-    * **Description**:  Current document revision
-    * **Optional**: no
-    * **Type**: string
-
-* **HTTP Headers**
-
-  * **Header**: ``If-Match``
-
-    * **Description**: Current revision of the document for validation
-    * **Optional**: yes
-
-* **Return Codes**:
-
-  * **200**:
-    Attachment deleted successfully
-  * **409**:
-    Supplied revision is incorrect or missing
-
-Deletes the attachment ``attachment`` to the specified ``doc``. You must
-supply the ``rev`` argument with the current revision to delete the
-attachment.
-
-For example to delete the attachment ``basic`` from the recipe
-``FishStew``:
-
-.. code-block:: http
-
-    DELETE http://couchdb:5984/recipes/FishStew/basic?rev=9-247bb19a41bfd9bfdaf5ee6e2e05be74
-    Content-Type: application/json
-
-
-
-The returned JSON contains the updated revision information:
-
-.. code-block:: javascript
-
-    {
-       "id" : "FishStew",
-       "ok" : true,
-       "rev" : "10-561bf6b1e27615cee83d1f48fa65dd3e"
-    }
-
-.. _JSON object: #table-couchdb-api-db_db-json-changes
-.. _POST: #couchdb-api-dbdoc_db_post
