@@ -37,9 +37,6 @@
   :query string endkey_docid: Stop returning records when the specified
     document ID is reached. *Optional*.
   :query string end_key_doc_id: Alias for `endkey_docid` param.
-  :query boolean group: Group the results using the reduce function to a group
-    or single row. Default is ``false``.
-  :query number group_level: Specify the group level to be used. *Optional*.
   :query boolean include_docs: Include the full content of the documents in
     the return. Default is ``false``.
   :query boolean inclusive_end: Specifies whether the specified end key should
@@ -48,7 +45,6 @@
     *Optional*.
   :query number limit: Limit the number of the returned documents to the
     specified number. *Optional*.
-  :query boolean reduce: Use the reduction function. Default is ``true``.
   :query number skip: Skip this number of records before starting to return
     the results. Default is ``0``.
   :query string stale: Allow the results from a stale view to be used.
