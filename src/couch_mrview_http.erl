@@ -87,7 +87,7 @@ handle_compact_req(#httpd{method='POST'}=Req, Db, DDoc) ->
     ok = couch_mrview:compact(Db, DDoc),
     couch_httpd:send_json(Req, 202, {[{ok, true}]});
 handle_compact_req(Req, _Db, _DDoc) ->
-    couch_httpd:send_method_not_allowd(Req, "POST").
+    couch_httpd:send_method_not_allowed(Req, "POST").
 
 
 handle_cleanup_req(#httpd{method='POST'}=Req, Db) ->
