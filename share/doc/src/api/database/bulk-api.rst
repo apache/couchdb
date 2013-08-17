@@ -260,7 +260,7 @@
     HTTP/1.1 201 Created
     Cache-Control: must-revalidate
     Content-Length: 144
-    Content-Type: appliaction/json
+    Content-Type: application/json
     Date: Mon, 12 Aug 2013 00:15:05 GMT
     Server: CouchDB/1.4.0 (Erlang OTP/R16B)
 
