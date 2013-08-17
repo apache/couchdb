@@ -275,7 +275,7 @@
                          - :mimetype:`text/plain; charset=utf-8`
   :>header ETag: Quoted new document's revision
   :>header Location: Document's URI
-  :>json string id: Created document ID
+  :>json string id: Document ID
   :>json boolean ok: Operation status
   :>json string rev: Revision info
   :code 201: Document created and stored on disk

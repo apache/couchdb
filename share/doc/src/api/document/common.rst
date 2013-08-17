@@ -185,7 +185,7 @@
                          - :mimetype:`text/plain; charset=utf-8`
   :>header ETag: Quoted document's new revision
   :>header Location: Document URI
-  :>json string id: Created document ID
+  :>json string id: Document ID
   :>json boolean ok: Operation status
   :>json string rev: Revision MVCC token
   :code 201: Document created and stored on disk
@@ -261,7 +261,7 @@
   :>header Content-Type: - :mimetype:`application/json`
                          - :mimetype:`text/plain; charset=utf-8`
   :>header ETag: Double quoted document's new revision
-  :>json string id: Created document ID
+  :>json string id: Document ID
   :>json boolean ok: Operation status
   :>json string rev: Revision MVCC token
   :code 200: Document successfully removed
@@ -269,7 +269,7 @@
   :code 400: Invalid request body or parameters
   :code 401: Write privileges required
   :code 404: Specified database or document ID doesn't exists
-  :code 409: Specified revision is not latest for target document
+  :code 409: Specified revision is not the latest for target document
 
   **Request**:
 
@@ -333,8 +333,8 @@
   :>header Content-Type: - :mimetype:`application/json`
                          - :mimetype:`text/plain; charset=utf-8`
   :>header ETag: Double quoted document's new revision
-  :>header Location: Document's URI
-  :>json string id: Created document ID
+  :>header Location: Document URI
+  :>json string id: Document document ID
   :>json boolean ok: Operation status
   :>json string rev: Revision MVCC token
   :code 201: Document successfully created
