@@ -71,7 +71,7 @@
 
 .. http:get:: /{db}/{docid}/{attname}
 
-  Returns the file attachment  associated with the document.
+  Returns the file attachment associated with the document.
   The raw data of the associated attachment is returned (just as if you were
   accessing a static file. The returned :http:header:`Content-Type`
   will be the same as the content type set when the document attachment
@@ -264,8 +264,8 @@ streams alike. This is available for all attachments inside CouchDB.
 This is just a real quick run through how this looks under the hood.
 Usually, you will have larger binary files to serve from CouchDB, like
 MP3s and videos, but to make things a little more obvious, I use a text
-file here (Note that I use the ``application/octet-stream`` Content-Type
-instead of ``text/plain``).
+file here (Note that I use the :mimetype:`application/octet-stream`
+:http:header`Content-Type` instead of :mimetype:`text/plain`).
 
 .. code-block:: bash
 
@@ -304,7 +304,7 @@ But say we only want the first 13 bytes:
     My hovercraft
 
 HTTP supports many ways to specify single and even multiple byte
-ranges. Read all about it in `RFC 2616`_.
+ranges. Read all about it in :rfc:`2616#section-14.27`.
 
 .. note::
    Databases that have been created with CouchDB 1.0.2 or earlier will
@@ -312,5 +312,3 @@ ranges. Read all about it in `RFC 2616`_.
    algorithm. If you plan to make heavy use of this feature, make sure
    to compact your database with CouchDB |version| to take advantage of a
    better algorithm to find byte ranges.
-
-.. _RFC 2616: http://tools.ietf.org/html/rfc2616#section-14.27
