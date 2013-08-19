@@ -15,7 +15,7 @@ the License.
 <td class="select"><input type="checkbox" class="row-select"></td>
 <td>
   <div>
-    <pre class="prettyprint"><%= doc.prettyJSON() %></pre>
+    <pre class="prettyprint"><%- doc.prettyJSON() %></pre>
     <% if (doc.isEditable()) { %>
       <div class="btn-group">
         <a href="#<%= doc.url('app') %>" class="btn btn-small edits">Edit <%= doc.docType() %></a>
