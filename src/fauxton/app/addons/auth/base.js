@@ -49,8 +49,7 @@ function(app, FauxtonAPI, Auth) {
     };
 
     var authDenied = function () {
-      app.masterLayout.setView('#dashboard', new Auth.NoAccessView());
-      app.masterLayout.renderView('#dashboard');
+      FauxtonAPI.navigate('/noAccess');
     };
 
     FauxtonAPI.auth.registerAuth(auth);

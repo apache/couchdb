@@ -52,6 +52,7 @@ function(app, FauxtonAPI, Auth) {
     noAccess: function () {
       this.crumbs = [{name: 'Access Denied', link:"#"}];
       this.setView('#dashboard-content', new Auth.NoAccessView());
+      this.apiUrl = 'noAccess';
     },
   });
 
