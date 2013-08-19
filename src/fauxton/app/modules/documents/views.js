@@ -1201,6 +1201,12 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
       }
 
       this.updateDesignDoc();
+      // This is a hack around a bug in backbone.layoutmanager with grunt dev
+      // When in grunt dev mode we load templates asynchronously
+      // and this can cause a double render which then gives us two 
+      // mapeditors
+      if (this.mapViewSet) { return;}
+      this.mapViewSet = true;
 
       this.mapEditor = Codemirror.fromTextArea(mapFun.get()[0], {
         mode: "javascript",

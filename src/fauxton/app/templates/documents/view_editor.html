@@ -12,184 +12,169 @@ License for the specific language governing permissions and limitations under
 the License.
 -->
 <div class="row">
+  <ul class="nav nav-tabs" id="myTab">
+    <li class="active"> <a data-toggle="tab" href="#index"><i class="icon-wrench"></i> <% if (newView) { %> Create Index <% } else { %> Edit Index <% } %></a></li>
+    <li><a href="#query" data-toggle="tab"> <i class="icon-plus"></i> Advanced Options</a></li>
+    <li><a href="#metadata" data-toggle="tab">Design Doc Metadata</a></li>
+  </ul>
   <div class="all-docs-list errors-container"></div>
-  <div id="edit-index-container">
-    <div id="ddoc-info"> </div>
-
-    <div class="accordion" id="edit-index-accordion">
-      <div class="accordion-group">
-        <div class="accordion-heading">
-          <a class="accordion-toggle" data-bypass="true" data-toggle="collapse" data-parent="#edit-index-accordion" href="#collapse-edit-index">
-            <i class="icon-wrench"></i> <% if (newView) { %> Create Index <% } else { %> Edit Index <% } %>
-          </a>
-        </div>
-        <div id="collapse-edit-index" class="accordion-body <% if (!newView) { %> collapse <% } %>">
-          <div class="accordion-inner">
-            <div id="define-view" class="ddoc-alert well">
-              <div class="errors-container"></div>
-              <form class="form-horizontal">
-                <h3>Define your index</h3>
-                <div class="control-group">
-                  <div class="row" style="margin-left:10px">
-                    <div class="span3">
-                      <label class="control-label" for="ddoc">Design document <a target="_couch_docs" href="http://docs.couchdb.org/en/latest/ddocs/#design-docs"><i class="icon-question-sign"></i></a></label>
-                      <div class="controls">
-                        <select id="ddoc">
-                          <optgroup label="Select a document">
-                            <option id="new-doc">New document</option>
-                            <% ddocs.each(function(ddoc) { %>
-                            <% if (ddoc.id === ddocName) { %>
-                            <option selected="selected"><%= ddoc.id %></option>
-                            <% } else { %>
-                            <option><%= ddoc.id %></option>
-                            <% } %>
-                            <% }); %>
-                          </optgroup>
-                        </select>
-                      </div>
-                    </div>
-                    <div id="new-ddoc-section" class="span5 offset1" style="display:none">
-                      <label class="control-label" for="new-ddoc"> _design/ </label>
-                      <div class="controls">
-                        <input type="text" id="new-ddoc" placeholder="newDesignDoc">
-                      </div>
-                    </div>
-                  </div>
+  <div class="tab-content">
+    <div class="tab-pane active" id="index">
+      <div id="define-view" class="ddoc-alert well">
+        <div class="errors-container"></div>
+        <form class="form-horizontal">
+          <h3>Define your index</h3>
+          <div class="control-group">
+            <div class="row" style="margin-left:10px">
+              <div class="span3">
+                <label class="control-label" for="ddoc">Design document <a target="_couch_docs" href="http://docs.couchdb.org/en/latest/ddocs/#design-docs"><i class="icon-question-sign"></i></a></label>
+                <div class="controls">
+                  <select id="ddoc">
+                    <optgroup label="Select a document">
+                      <option id="new-doc">New document</option>
+                      <% ddocs.each(function(ddoc) { %>
+                      <% if (ddoc.id === ddocName) { %>
+                      <option selected="selected"><%= ddoc.id %></option>
+                      <% } else { %>
+                      <option><%= ddoc.id %></option>
+                      <% } %>
+                      <% }); %>
+                    </optgroup>
+                  </select>
                 </div>
-                <div class="control-group">
-                  <label class="control-label" for="index-name">Index name <a target="_couch_docs" href="http://docs.couchdb.org/en/latest/ddocs/#view-functions"><i class="icon-question-sign"></i></a></label>
-                  <div class="controls">
-                    <input type="text" id="index-name" value="<%= viewName %>" placeholder="Index name" />
-                  </div>
+              </div>
+              <div id="new-ddoc-section" class="span5 offset1" style="display:none">
+                <label class="control-label" for="new-ddoc"> _design/ </label>
+                <div class="controls">
+                  <input type="text" id="new-ddoc" placeholder="newDesignDoc">
                 </div>
-                <div class="control-group">
-                  <label class="control-label" for="map-function">Map function <a target="_couch_docs" href="http://docs.couchdb.org/en/latest/ddocs/#map-functions"><i class="icon-question-sign"></i></a></label>
-                  <div class="controls">
-                    <% if (newView) { %>
-                    <textarea class="js-editor" id="map-function"><%= langTemplates.map %></textarea>
-                    <% } else { %>
-                    <textarea class="js-editor" id="map-function"><%= ddoc.get('views')[viewName].map %></textarea>
-                    <% } %>
-                  </div>
-                </div>
-                <div class="control-group">
-                  <label class="control-label" for="reduce-function-selector">Reduce function <a target="_couch_docs" href="http://docs.couchdb.org/en/latest/ddocs.html#reduce-and-rereduce-functions"><i class="icon-question-sign"></i></a></label>
-                  <div class="controls">
-                    <select id="reduce-function-selector">
-                      <option value="" <%= !reduceFunStr ? 'selected="selected"' : '' %>>None</option>
-                      <% _.each(["_sum", "_count", "_stats"], function(reduce) { %>
-                      <option value="<%= reduce %>" <% if (reduce == reduceFunStr) { %>selected<% } %>><%= reduce %></option>
-                      <% }) %>
-                      <option value="CUSTOM" <% if (isCustomReduce) { %>selected<% } %>>Custom reduce</option>
-                    </select>
-                    <span class="help-block">Reduce functions are optional.</span>
-                  </div>
-                </div>
-                <div class="control-group reduce-function">
-                  <label class="control-label" for="reduce-function">Custom Reduce</label>
-                  <div class="controls">
-                    <% if (newView) { %>
-                    <textarea class="js-editor" id="reduce-function"><%= langTemplates.reduce %></textarea>
-                    <% } else { %>
-                    <textarea class="js-editor" id="reduce-function"><%= ddoc.get('views')[viewName].reduce %></textarea>
-                    <% } %>
-                  </div>
-                </div>
-                <div class="control-group">
-                  <hr />
-                  <div class="controls">
-                    <button class="btn btn-success save">Save</button>
-                    <% if (!this.newView) { %>
-                    <button class="btn btn-danger delete">Delete</button>
-                    <% } %>
-                  </div>
-                </div>
-                <div class="clearfix"></div>
-              </form>
+              </div>
             </div>
           </div>
-        </div>
-
+          <div class="control-group">
+            <label class="control-label" for="index-name">Index name <a target="_couch_docs" href="http://docs.couchdb.org/en/latest/ddocs/#view-functions"><i class="icon-question-sign"></i></a></label>
+            <div class="controls">
+              <input type="text" id="index-name" value="<%= viewName %>" placeholder="Index name" />
+            </div>
+          </div>
+          <div class="control-group">
+            <label class="control-label" for="map-function">Map function <a target="_couch_docs" href="http://docs.couchdb.org/en/latest/ddocs/#map-functions"><i class="icon-question-sign"></i></a></label>
+            <div class="controls">
+              <% if (newView) { %>
+              <textarea class="js-editor" id="map-function"><%= langTemplates.map %></textarea>
+              <% } else { %>
+              <textarea class="js-editor" id="map-function"><%= ddoc.get('views')[viewName].map %></textarea>
+              <% } %>
+            </div>
+          </div>
+          <div class="control-group">
+            <label class="control-label" for="reduce-function-selector">Reduce function <a target="_couch_docs" href="http://docs.couchdb.org/en/latest/ddocs.html#reduce-and-rereduce-functions"><i class="icon-question-sign"></i></a></label>
+            <div class="controls">
+              <select id="reduce-function-selector">
+                <option value="" <%= !reduceFunStr ? 'selected="selected"' : '' %>>None</option>
+                <% _.each(["_sum", "_count", "_stats"], function(reduce) { %>
+                <option value="<%= reduce %>" <% if (reduce == reduceFunStr) { %>selected<% } %>><%= reduce %></option>
+                <% }) %>
+                <option value="CUSTOM" <% if (isCustomReduce) { %>selected<% } %>>Custom reduce</option>
+              </select>
+              <span class="help-block">Reduce functions are optional.</span>
+            </div>
+          </div>
+          <div class="control-group reduce-function">
+            <label class="control-label" for="reduce-function">Custom Reduce</label>
+            <div class="controls">
+              <% if (newView) { %>
+              <textarea class="js-editor" id="reduce-function"><%= langTemplates.reduce %></textarea>
+              <% } else { %>
+              <textarea class="js-editor" id="reduce-function"><%= ddoc.get('views')[viewName].reduce %></textarea>
+              <% } %>
+            </div>
+          </div>
+          <div class="control-group">
+            <hr />
+            <div class="controls">
+              <button class="btn btn-success save">Save</button>
+              <% if (!this.newView) { %>
+              <button class="btn btn-danger delete">Delete</button>
+              <% } %>
+            </div>
+          </div>
+          <div class="clearfix"></div>
+        </form>
       </div>
     </div>
-    <div class="accordion" id="advanced-options-accordion">
-      <div class="accordion-group">
-        <div class="accordion-heading">
-          <a class="accordion-toggle" data-bypass="true" data-toggle="collapse" data-parent="#advanced-options-accordion" href="#collapse-advanced-options">
-            <i class="icon-plus"></i> Advanced Options
-          </a>
-        </div>
-        <div id="collapse-advanced-options" class="accordion-body collapse">
-          <div class="accordion-inner advanced-options">
-            <form class="view-query-update">
-              <div class="controls controls-row">
-                <label class="span3 inline">
-                  Limit:
-                  <select name="limit" class="input-small">
-                    <option>5</option>
-                    <option selected="selected">10</option>
-                    <option>25</option>
-                    <option>50</option>
-                    <option>100</option>
-                  </select>
-                </label>
-                <label class="span3 checkbox inline">
-                  <input name="include_docs" type="checkbox" value="true"> Include Docs
-                </label>
-                <% if (hasReduce) { %>
-                <label class="span2 checkbox inline">
-                  <input name="reduce" type="checkbox" value="true"> Reduce
-                </label>
-                <label class="span4 inline">
-                  Group Level:
-                  <select disabled name="group_level" class="input-small">
-                    <option value="0">None</option>
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                    <option value="4">4</option>
-                    <option value="5">5</option>
-                    <option value="6">6</option>
-                    <option value="7">7</option>
-                    <option value="8">8</option>
-                    <option value="9">9</option>
-                    <option value="999" selected="selected">exact</option>
-                  </select>
-                </label>
-                <% } %>
-              </div>
-
-              <div class="controls controls-row">
-                <input name="key" class="span4" type="text" placeholder="Key">
-                <input name="keys" class="span8" type="text" placeholder="Keys">
-              </div>
-              <div class="controls controls-row">
-                <input name="startkey" class="span6" type="text" placeholder="Start Key">
-                <input name="endkey" class="span6" type="text" placeholder="End Key">
-              </div>
-              <div class="controls controls-row">
-                <label class="span2 checkbox inline">
-                  <input name="stale" type="checkbox" value="ok"> Stale
-                </label>
-                <label class="span2 checkbox inline">
-                  <input name="descending" type="checkbox" value="true"> Descending
-                </label>
-                <label class="span4 checkbox inline">
-                  <input name="inclusive_end" type="checkbox" value="false"> Disable Inclusive End
-                </label>
-                <label class="span4 checkbox inline">
-                  <input name="update_seq" type="checkbox" value="true"> Include Update Sequence
-                </label>
-              </div>
-              <div class="controls controls-row">
-                <button type="submit" class="btn btn-primary">Query</button>
-                <button class="btn btn-info preview">Preview</button>
-              </div>
-            </form>
-
+    <div class="tab-pane" id="metadata">
+      <div id="ddoc-info"> </div>
+    </div>
+    <div class="tab-pane" id="query">
+      <div class="advanced-options">
+        <form class="view-query-update">
+          <div class="controls controls-row">
+            <label class="span3 inline">
+              Limit:
+              <select name="limit" class="input-small">
+                <option>5</option>
+                <option selected="selected">10</option>
+                <option>25</option>
+                <option>50</option>
+                <option>100</option>
+              </select>
+            </label>
+            <label class="span3 checkbox inline">
+              <input name="include_docs" type="checkbox" value="true"> Include Docs
+            </label>
+            <% if (hasReduce) { %>
+            <label class="span2 checkbox inline">
+              <input name="reduce" type="checkbox" value="true"> Reduce
+            </label>
+            <label class="span4 inline">
+              Group Level:
+              <select disabled name="group_level" class="input-small">
+                <option value="0">None</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+                <option value="7">7</option>
+                <option value="8">8</option>
+                <option value="9">9</option>
+                <option value="999" selected="selected">exact</option>
+              </select>
+            </label>
+            <% } %>
           </div>
-        </div>
 
+          <div class="controls controls-row">
+            <input name="key" class="span4" type="text" placeholder="Key">
+            <input name="keys" class="span8" type="text" placeholder="Keys">
+          </div>
+          <div class="controls controls-row">
+            <input name="startkey" class="span6" type="text" placeholder="Start Key">
+            <input name="endkey" class="span6" type="text" placeholder="End Key">
+          </div>
+          <div class="controls controls-row">
+            <label class="span2 checkbox inline">
+              <input name="stale" type="checkbox" value="ok"> Stale
+            </label>
+            <label class="span2 checkbox inline">
+              <input name="descending" type="checkbox" value="true"> Descending
+            </label>
+            <label class="span4 checkbox inline">
+              <input name="inclusive_end" type="checkbox" value="false"> Disable Inclusive End
+            </label>
+            <label class="span4 checkbox inline">
+              <input name="update_seq" type="checkbox" value="true"> Include Update Sequence
+            </label>
+          </div>
+          <div class="controls controls-row">
+            <button type="submit" class="btn btn-primary">Query</button>
+            <button class="btn btn-info preview">Preview</button>
+          </div>
+        </form>
       </div>
     </div>
   </div>
+</div>
+
