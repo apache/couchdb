@@ -27,17 +27,11 @@ rebalance(Shards, TargetNodes) when is_list(Shards) ->
     {OK, MoveThese} = lists:partition(fun(#shard{node=Node}) ->
         lists:member(Node, TargetNodes)
     end, Shards),
-    ShardsByTargetNode0 = lists:foldl(fun(Shard, Acc) ->
+    % ensure every target node is present in the orddict
+    ShardsByTargetNode0 = orddict:from_list([{N,[]} || N <- TargetNodes]),
+    ShardsByTargetNode = lists:foldl(fun(Shard, Acc) ->
         orddict:append(Shard#shard.node, Shard, Acc)
-    end, orddict:new(), OK),
-    ShardsByTargetNode = lists:sort(lists:foldl(fun(Node, Acc) ->
-        case orddict:is_key(Node, ShardsByTargetNode0) of
-            true ->
-                Acc;
-            false ->
-                [{Node, []} | Acc]
-        end
-    end, ShardsByTargetNode0, TargetNodes)),
+    end, ShardsByTargetNode0, OK),
     Moves = find_replacements(MoveThese, ShardsByTargetNode, []),
     Moved = [Shard#shard{node = Node} || {Shard, Node} <- Moves],
     TargetLevel = length(Shards) div length(TargetNodes),
@@ -107,7 +101,7 @@ largest_first({_, A}, {_, B}) ->
     length(A) >= length(B).
 
 smallest_first({_, A}, {_, B}) ->
-    length(A) < length(B).
+    length(A) =< length(B).
 
 replace(A, B, List) ->
     replace(A, B, List, []).
