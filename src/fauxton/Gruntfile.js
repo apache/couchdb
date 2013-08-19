@@ -234,7 +234,9 @@ module.exports = function(grunt) {
         tasks: ['clean:watch', 'dependencies','less', 'concat:index_css'],
       },
       html: {
-        files: helper.watchFiles(['.html'], []),
+        // the index.html is added in as a dummy file incase there is no
+        // html dependancies this will break. So we need one include pattern
+        files: helper.watchFiles(['.html'], ['./index.html']),
         tasks: ['clean:watch', 'dependencies']
       },
       options: {
