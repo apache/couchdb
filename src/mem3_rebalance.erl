@@ -23,11 +23,11 @@ rebalance(DbName) ->
 rebalance(DbName, TargetNodes) when is_binary(DbName) ->
     rebalance(mem3:shards(DbName), TargetNodes);
 rebalance(Shards, TargetNodes) when is_list(Shards) ->
-    %% first migrate shards off of non-target nodes
+    % First migrate all shards off of non-target nodes
     {OK, MoveThese} = lists:partition(fun(#shard{node=Node}) ->
         lists:member(Node, TargetNodes)
     end, Shards),
-    % ensure every target node is present in the orddict
+    % Ensure every target node is present in the orddict
     ShardsByTargetNode0 = orddict:from_list([{N,[]} || N <- TargetNodes]),
     ShardsByTargetNode = lists:foldl(fun(Shard, Acc) ->
         orddict:append(Shard#shard.node, Shard, Acc)
