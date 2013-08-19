@@ -998,6 +998,9 @@ should use a defined view if you want to achieve the best performance.
 * **Response**: JSON structure with purged documents and purge sequence
 * **Admin Privileges Required**: no
 
+Occasionaly something into ends up in your database that should never have
+written to it, like a password or private key. Purge can help you here.
+
 A database purge permanently removes the references to deleted documents
 from the database. Deleting a document within CouchDB does not actually
 remove the document from the database, instead, the document is marked as
@@ -1005,6 +1008,12 @@ a deleted (and a new revision is created). This is to ensure that
 deleted documents are replicated to other databases as having been
 deleted. This also means that you can check the status of a document and
 identify that the document has been deleted.
+
+
+.. note::
+
+    Don't use purge as a regular operation, it is designed to be used
+    in exceptional cases.
 
 The purge operation removes the references to the deleted documents from
 the database. The purging of old documents is not replicated to other
