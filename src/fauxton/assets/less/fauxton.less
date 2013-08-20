@@ -17,6 +17,7 @@
  *
  */
 @import "bootstrap/bootstrap.less";
+@import "bootstrap/mixins.less";
 @import "config.less";
 @import "logs.less";
 @import "prettyprint.less";
@@ -28,8 +29,8 @@
 /*define variable for color here, remove to seperate file later*/
 
 @brown: #3A2C2B;
-@red: #E93F33;
-@darkred: #73161E;
+@red: #E33F3B;
+@darkRed: #AF2D24;
 @linkRed: #DA4F49;
 @greyBrown: #554D4C;
 @fontGrey: #808080;
@@ -40,10 +41,10 @@
 
 /*nav*/
 @primaryNav : @brown;
-@navBG: @darkred;
+@navBG: @darkRed;
 @navBGHighlight: @red;
 @navBGHover: @red;
-@navIconColor: @darkred;
+@navIconColor: @darkRed;
 @navIconHighlight: #FFFFFF;
 @bottomNav: @greyBrown;
 
@@ -73,7 +74,7 @@
 
 /*buttons */
 @redButton: @red;
-@linkColor: @darkred;
+@linkColor: @darkRed;
 
 @boxShadow: 2px 2px rgba(0,0,0,0.2);
 @boxShadowOff: 2px 2px rgba(0,0,0,0);
@@ -121,6 +122,14 @@ body {
     padding-top: 90px;
   }
   background-color: @sidebarBG;
+  /* OVERRIDE BOOTSTRAP BTN STYLES */
+  .btn{
+    .box-shadow(none);
+    .border-radius(0);
+    background-image: none;
+    text-shadow: none;
+    background-repeat: no-repeat;
+  }
 }
 
 h2,h3,h4 {font-weight: 600;}
@@ -455,11 +464,13 @@ footer#mainFooter{
 .topmenu-defaults {
   height: 70px;
   padding: 20px 10px 0;
-  border-bottom: 1px solid @darkred;
+  border-bottom: 1px solid @darkRed;
   .box-sizing(border-box);
 }
 
 #dashboard-upper-menu{
+  position: fixed;
+  z-index: 11;
   .topmenu-defaults;
   background-color: #CBCBCB;
 }
@@ -468,6 +479,15 @@ footer#mainFooter{
   padding: 20px;
   background-color: #F1F1F1;
 }
+
+#dashboard-upper-content{
+  .well{
+    padding: 20px;
+    .border-radius(0);
+    .box-shadow(none);
+  }
+}
+
 #sidenav{
   padding: 0;
   header {
@@ -482,7 +502,7 @@ footer#mainFooter{
         border: none;
       }
       li.active a {
-        background-color: @darkred;
+        background-color: @darkRed;
         color: #fff;
         i {
           background-image: url("../img/glyphicons-halflings-white.png");
@@ -537,6 +557,44 @@ footer#mainFooter{
 }
 .navbar-form.pull-right.database-search {
   margin-right: 36px;
+}
+
+#db-views-tabs-nav{
+  position: fixed;
+  z-index: 12;
+  margin-top: 31px;
+  margin-bottom: 0;
+  /*background-color: #f4f4f4;*/
+  padding: 0 20px;
+}
+
+.nav-tabs > li > a {
+  border-color: #eeeeee #eeeeee #dddddd;
+  text-decoration: none;
+  background-color: #eeeeee;
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+  &.fonticon:before{
+    margin-right: 6px;
+    font-size: 16px;
+  }
+}
+
+.nav-tabs > li > a:hover, .nav-tabs > li > a:focus {
+  background-color: @linkRed;
+  border-top: 1px solid @red;
+  color: white;
+}
+
+.nav-tabs > .active > a, .nav-tabs > .active > a:hover, .nav-tabs > .active > a:focus {
+  color: white;
+  background-color: @darkRed;
+  border: 1px solid @darkRed;
+}
+
+.tab-content {
+  margin-top: 70px;
 }
 
 /*TABLE STYLES*/

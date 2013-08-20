@@ -21,6 +21,7 @@ define([
        // Libs
        "codemirror",
        "jshint",
+       "resizeColumns",
 
        // Plugins
        "plugins/codemirror-javascript",
@@ -28,7 +29,7 @@ define([
 
 ],
 
-function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
+function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint, resizeColumns) {
   var Views = {};
 
   Views.Tabs = FauxtonAPI.View.extend({
@@ -1191,6 +1192,13 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint) {
     },
 
     afterRender: function() {
+
+      //resizeAnimation
+      app.resizeColumns = new resizeColumns({
+            selectorElements: '#dashboard-content, #dashboard-upper-menu, #db-views-tabs-nav'
+      });
+      app.resizeColumns.onResizeHandler();
+
       var that = this, 
           mapFun = this.$("#map-function"),
           reduceFun = this.$("#reduce-function");

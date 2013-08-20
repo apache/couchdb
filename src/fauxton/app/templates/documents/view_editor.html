@@ -12,9 +12,9 @@ License for the specific language governing permissions and limitations under
 the License.
 -->
 <div class="row">
-  <ul class="nav nav-tabs" id="myTab">
-    <li class="active"> <a data-toggle="tab" href="#index"><i class="icon-wrench"></i> <% if (newView) { %> Create Index <% } else { %> Edit Index <% } %></a></li>
-    <li><a href="#query" data-toggle="tab"> <i class="icon-plus"></i> Advanced Options</a></li>
+  <ul class="nav nav-tabs" id="db-views-tabs-nav">
+    <li class="active"> <a class="fonticon-wrench fonticon" data-toggle="tab" href="#index"><% if (newView) { %>Create Index <% } else { %>Edit Index <% } %></a></li>
+    <li><a class="fonticon-plus fonticon" href="#query" data-toggle="tab">Advanced Options</a></li>
     <li><a href="#metadata" data-toggle="tab">Design Doc Metadata</a></li>
   </ul>
   <div class="all-docs-list errors-container"></div>
@@ -104,10 +104,10 @@ the License.
       </div>
     </div>
     <div class="tab-pane" id="metadata">
-      <div id="ddoc-info"> </div>
+      <div id="ddoc-info" class="well"> </div>
     </div>
     <div class="tab-pane" id="query">
-      <div class="advanced-options">
+      <div class="advanced-options well">
         <form class="view-query-update">
           <div class="controls controls-row">
             <label class="span3 inline">
@@ -145,32 +145,39 @@ the License.
             </label>
             <% } %>
           </div>
-
-          <div class="controls controls-row">
-            <input name="key" class="span4" type="text" placeholder="Key">
-            <input name="keys" class="span8" type="text" placeholder="Keys">
+          <div class="row-fluid">
+            <div class="controls controls-row">
+              <input name="key" class="span6" type="text" placeholder="Key">
+              <input name="keys" class="span6" type="text" placeholder="Keys">
+            </div>
           </div>
-          <div class="controls controls-row">
-            <input name="startkey" class="span6" type="text" placeholder="Start Key">
-            <input name="endkey" class="span6" type="text" placeholder="End Key">
+          <div class="row-fluid">
+            <div class="controls controls-row">
+              <input name="startkey" class="span6" type="text" placeholder="Start Key">
+              <input name="endkey" class="span6" type="text" placeholder="End Key">
+            </div>
           </div>
-          <div class="controls controls-row">
-            <label class="span2 checkbox inline">
-              <input name="stale" type="checkbox" value="ok"> Stale
-            </label>
-            <label class="span2 checkbox inline">
-              <input name="descending" type="checkbox" value="true"> Descending
-            </label>
-            <label class="span4 checkbox inline">
-              <input name="inclusive_end" type="checkbox" value="false"> Disable Inclusive End
-            </label>
-            <label class="span4 checkbox inline">
-              <input name="update_seq" type="checkbox" value="true"> Include Update Sequence
-            </label>
+          <div class="row-fluid">
+            <div class="controls controls-row">
+              <label class="span2 checkbox inline">
+                <input name="stale" type="checkbox" value="ok"> Stale
+              </label>
+              <label class="span2 checkbox inline">
+                <input name="descending" type="checkbox" value="true"> Descending
+              </label>
+              <label class="span4 checkbox inline">
+                <input name="inclusive_end" type="checkbox" value="false"> Disable Inclusive End
+              </label>
+              <label class="span4 checkbox inline">
+                <input name="update_seq" type="checkbox" value="true"> Include Update Sequence
+              </label>
+            </div>
           </div>
-          <div class="controls controls-row">
-            <button type="submit" class="btn btn-primary">Query</button>
-            <button class="btn btn-info preview">Preview</button>
+          <div class="row-fluid">
+            <div class="controls controls-row">
+              <button type="submit" class="btn btn-primary">Query</button>
+              <button class="btn btn-info preview">Preview</button>
+            </div>
           </div>
         </form>
       </div>
