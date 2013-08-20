@@ -28,6 +28,7 @@ function(app, FauxtonAPI, Documents, Databases) {
   var DocEditorRouteObject = FauxtonAPI.RouteObject.extend({
     layout: "one_pane",
     disableLoader: true,
+    selectedHeader: "Databases",
     initialize: function(route, masterLayout, options) {
       var databaseName = options[0], docID = options[1]||'new';
 
@@ -132,12 +133,13 @@ function(app, FauxtonAPI, Documents, Databases) {
     routes: {
       "database/:database/new": "code_editor"
     },
+    selectedHeader: "Databases",
 
   });
 
   var DocumentsRouteObject = FauxtonAPI.RouteObject.extend({
     layout: "with_tabs_sidebar",
-    navSelector: '.databases',
+    selectedHeader: "Databases",
     routes: {
       "database/:database/_all_docs(:extra)": "allDocs", 
       "database/:database/_design/:ddoc/_view/:view": {
@@ -330,7 +332,7 @@ function(app, FauxtonAPI, Documents, Databases) {
 
   var ChangesRouteObject = FauxtonAPI.RouteObject.extend({
     layout: "with_tabs",
-    navSelector: '.databases',
+    selectedHeader: "Databases",
     crumbs: function () {
       return [
         {"name": "Databases", "link": "/_all_dbs"},
