@@ -13,13 +13,38 @@
 define([
        "chai",
        "sinon-chai",
+       "underscore"
 ],
 function(chai, sinonChai) {
   chai.use(sinonChai);
 
+  var ViewSandbox = function () {
+    this.initialize();
+  };
+   
+   _.extend(ViewSandbox.prototype, {
+    initialize: function () {
+      this.$el = $('<div></div>');
+      this.$ = this.$el.find;
+    },
+    views: [],
+    renderView: function (view) {
+      this.views.push(view);
+      this.$el.append(view.el);
+      view.render();
+    },
+
+    remove: function () {
+      _.each(this.views, function (view) {
+        view.remove();
+      }, this);
+    }
+  });
+
   return {
     chai: chai,
-    assert: chai.assert
+    assert: chai.assert,
+    ViewSandbox: ViewSandbox
   };
 });
 

@@ -180,8 +180,12 @@ module.exports = function(grunt) {
       index_css: {
         src: ["dist/debug/css/*.css", 'assets/css/*.css'],
         dest: 'dist/debug/css/index.css'
-      }
+      },
 
+      test_config_js: {
+        src: ["dist/debug/templates.js", "test/test.config.js"],
+        dest: 'test/test.config.js'
+      }
     },
 
     cssmin: {
@@ -330,12 +334,12 @@ module.exports = function(grunt) {
 
   // on watch events configure jshint:all to only run on changed file
   grunt.event.on('watch', function(action, filepath) {
-    if (!!filepath.match(/.js$/)) {
+    if (!!filepath.match(/.js$/) && filepath.indexOf('test.config.js') === -1) {
       grunt.config(['jshint', 'all'], filepath);
     }
 
     if (!!filepath.match(/[Ss]pec.js$/)) {
-      grunt.task.run(['mochaSetup','mocha_phantomjs']);
+      grunt.task.run(['mochaSetup','jst', 'concat:test_config_js', 'mocha_phantomjs']);
     }
   });
 
@@ -381,7 +385,7 @@ module.exports = function(grunt) {
    */
   // clean out previous build artefactsa and lint
   grunt.registerTask('lint', ['clean', 'jshint']);
-  grunt.registerTask('test', ['lint', 'mochaSetup', 'mocha_phantomjs']);
+  grunt.registerTask('test', ['lint', 'mochaSetup','jst', 'concat:test_config_js', 'mocha_phantomjs']);
   // Fetch dependencies (from git or local dir), lint them and make load_addons
   grunt.registerTask('dependencies', ['get_deps', 'gen_load_addons:default']);
   // build templates, js and css

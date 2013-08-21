@@ -26,7 +26,7 @@ function (app, FauxtonAPI, activetasks) {
       };
 
 
-  _.extend(Events, Backbone.Events);
+  Views.Events = _.extend(Events, Backbone.Events);
 
   Views.TabMenu = FauxtonAPI.View.extend({
     template: "addons/activetasks/templates/tabs",
@@ -43,11 +43,11 @@ function (app, FauxtonAPI, activetasks) {
       };
     },
     afterRender: function(){
-      $('.task-tabs').find('li').eq(0).addClass('active');
+      this.$('.task-tabs').find('li').eq(0).addClass('active');
     },
     changePollInterval: function(e){
-      var range = $(e.currentTarget).val();
-      $('label[for="pollingRange"] span').text(range);
+      var range = this.$(e.currentTarget).val();
+      this.$('label[for="pollingRange"] span').text(range);
       pollingInfo.rate = range;
       clearInterval(pollingInfo.intervalId);
       Events.trigger('update:poll');
@@ -59,33 +59,30 @@ function (app, FauxtonAPI, activetasks) {
 
     requestByType: function(e){
       var currentTarget = e.currentTarget;
-      datatype = $(currentTarget).attr("data-type");
+      datatype = this.$(currentTarget).attr("data-type");
 
-      $('.task-tabs').find('li').removeClass('active');
-      $(currentTarget).addClass('active');
+      this.$('.task-tabs').find('li').removeClass('active');
+      this.$(currentTarget).addClass('active');
       this.model.changeView(datatype);
     }
   });
 
   Views.DataSection = FauxtonAPI.View.extend({
     showData: function(){
-      var that = this,
-      currentData = this.model.getCurrentViewData();
-      //remove the old stuff in a nice clean way
+      var currentData = this.model.getCurrentViewData();
+
       if (this.dataView) {
-        this.dataView.remove();
+       this.dataView.update(currentData, this.model.get('currentView').replace('_',' '));
+      } else {
+        this.dataView = this.insertView( new Views.TableData({ 
+          collection: currentData,
+          currentView: this.model.get('currentView').replace('_',' ')
+        }));
       }
-
-      //add the new stuff
-      this.dataView = that.insertView( new Views.TableData({ 
-        collection: currentData,
-        currentView: this.model.get('currentView').replace('_',' ')
-      }));
-
     },
     showDataAndRender: function () {
       this.showData();
-      this.render();
+      this.dataView.render();
     },
 
     beforeRender: function () {
@@ -133,6 +130,12 @@ function (app, FauxtonAPI, activetasks) {
         collection: this.collection
       };
     },
+
+    update: function (collection, currentView) {
+      this.collection = collection;
+      this.currentView = currentView;
+    },
+
     beforeRender: function(){
       //iterate over the collection to add each
       this.collection.forEach(function(item) {
