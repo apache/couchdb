@@ -13,12 +13,77 @@
 
 .. _api/ddoc/rewrite:
 
-``ALL /db/_design/design-doc/_rewrite/rewrite-name/anything``
-=============================================================
+``/db/_design/design-doc/_rewrite/path``
+========================================
 
-.. todo:: ALL /db/_design/design-doc/_rewrite/rewrite-name/anything
+.. http:any:: /{db}/_design/{ddocname}/_rewrite/{path}
 
-* **Method**: ``ALL /db/_design/design-doc/_rewrite/rewrite-name/anything``
-* **Request**:  TBC
-* **Response**:  TBC
-* **Admin Privileges Required**: no
+  Rewrites the specified path by rules defined in the specified design document.
+
+  The rewrite rules are defined in *array* field of the design document called
+  ``rewrites``. Each rule is an *object* with next structure:
+
+  - **from** (*string*): The path rule used to bind current uri to the rule.
+    It use pattern matching for that
+  - **to** (*string*): Rule to rewrite an url. It can contain variables
+    depending on  binding variables discovered during pattern matching and
+    query args (url args and from the query member)
+  - **method** (*string*): Method to bind the request method to the rule.
+    Default is ``"*"``
+  - **query** (*object*): Query args you want to define they can contain
+    dynamic variable by binding the key
+
+  The ``to``and ``from`` paths may contains string patterns with leading ``:``
+  or ``*`` characters.
+
+  For example: ``/somepath/:var/*``
+
+  - This path is converted in Erlang list by splitting ``/``
+  - Each ``var`` are converted in atom
+  - ``""`` are converted to ``''`` atom
+  - The pattern matching is done by splitting ``/`` in request url in a list of
+    token
+  - A string pattern will match equal token
+  - The star atom (``'*'`` in single quotes) will match any number of tokens,
+    but may only be present as the last `pathterm` in a `pathspec`
+  - If all tokens are matched and all `pathterms` are used, then the `pathspec`
+    matches
+
+  The pattern matching is done by first matching the request method to a rule.
+  By default all methods match a rule. (method is equal to ``"*"`` by default).
+  Then It will try to match the path to one rule. If no rule match, then a
+  :http:statuscode:`404` response returned.
+
+  Once a rule is found we rewrite the request url using the ``to`` and ``query``
+  fields. The identified token are matched to the rule and will replace var.
+  If ``'*'`` is found in the rule it will contain the remaining part if it
+  exists.
+  
+  Examples:
+  
+  +--------------------------------------+----------+------------------+-------+
+  |               Rule                   |    Url   |  Rewrite to      | Tokens|
+  +======================================+==========+==================+=======+
+  | {"from": "/a", "to": "/some"}        | /a       | /some            |       |
+  +--------------------------------------+----------+------------------+-------+
+  | {"from": "/a/\*", "to": "/some/\*}   | /a/b/c   | /some/b/c        |       |
+  +--------------------------------------+----------+------------------+-------+
+  | {"from": "/a/b", "to": "/some"}      | /a/b?k=v | /some?k=v        | k=v   |
+  +--------------------------------------+----------+------------------+-------+
+  | {"from": "/a/b", "to": "/some/:var"} | /a/b     | /some/b?var=b    | var=b |
+  +--------------------------------------+----------+------------------+-------+
+  | {"from": "/a/:foo/",                 | /a/b/c   | /some/b/c?foo=b  | foo=b |
+  | "to": "/some/:foo/"}                 |          |                  |       |
+  +--------------------------------------+----------+------------------+-------+
+  | {"from": "/a/:foo", "to": "/some",   | /a/b     | /some/?k=b&foo=b | foo=b |
+  | "query": { "k": ":foo" }}            |          |                  |       |
+  +--------------------------------------+----------+------------------+-------+
+  | {"from": "/a", "to": "/some/:foo"}   | /a?foo=b | /some/?b&foo=b   | foo=b |
+  +--------------------------------------+----------+------------------+-------+
+
+  Request method, header, query parameters, request payload and response body
+  are depended on endpoint to which url will be rewrited.
+
+  :param db: Database name
+  :param ddocname: Design document name
+  :param path: URL path to rewrite
