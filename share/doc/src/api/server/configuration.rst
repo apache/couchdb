@@ -20,24 +20,6 @@ The CouchDB API Server Configuration Methods provide an interface to
 query and update the various configuration values within a running
 CouchDB instance.
 
-A list of the available methods and URL paths are provided below:
-
-+--------+-------------------------+-------------------------------------------+
-| Method | Path                    | Description                               |
-+========+=========================+===========================================+
-| GET    | /_config                | Obtain a list of the entire server        |
-|        |                         | configuration                             |
-+--------+-------------------------+-------------------------------------------+
-| GET    | /_config/section        | Get all the configuration values for the  |
-|        |                         | specified section                         |
-+--------+-------------------------+-------------------------------------------+
-| GET    | /_config/section/key    | Get a specific section/configuration value|
-+--------+-------------------------+-------------------------------------------+
-| PUT    | /_config/section/key    | Set the specified configuration value     |
-+--------+-------------------------+-------------------------------------------+
-| DELETE | /_config/section/key    | Delete the current setting                |
-+--------+-------------------------+-------------------------------------------+
-
 ``/_config``
 ============
 

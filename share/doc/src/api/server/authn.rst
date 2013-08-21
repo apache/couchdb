@@ -19,19 +19,6 @@ Authentication Methods
 The CouchDB Authentication methods provide an interface for obtaining
 session and authorization data.
 
-A list of the available methods and URL paths are provided below:
-
-+--------+-------------------------+-------------------------------------------+
-| Method | Path                    | Description                               |
-+========+=========================+===========================================+
-| GET    | /_session               | Returns cookie based login user           |
-|        |                         | information                               |
-+--------+-------------------------+-------------------------------------------+
-| POST   | /_session               | Do cookie based user login                |
-+--------+-------------------------+-------------------------------------------+
-| DELETE | /_session               | Logout cookie based user                  |
-+--------+-------------------------+-------------------------------------------+
-
 .. note:: We're also strongly recommend you to
    :ref:`setup SSL <config/ssl>` to improve all authentication methods security.
 
