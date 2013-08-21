@@ -12,115 +12,369 @@
 
 
 .. _api/ddoc/show:
-.. _api/ddoc/show.get:
 
-``GET /db/_design/design-doc/_show/show-name``
-===============================================
+``/db/_design/design-doc/_show/show-name``
+==========================================
 
-.. todo:: GET /db/_design/design-doc/_show/show-name
+.. http:get:: /{db}/_design/{ddoc}/_show/{func}
+.. http:post:: /{db}/_design/{ddoc}/_show/{func}
 
-* **Method**: ``GET /db/_design/design-doc/_show/show-name``
-* **Request**:  None
-* **Response**:  Returns the result of the show
-* **Admin Privileges Required**: no
-* **Query Arguments**:
+  Applies :ref:`show function <showfun>` for `null` document.
 
-  * **Argument**: details
+  The request and response parameters are depended upon function implementation.
 
-    * **Description**:  Indicates whether details should be included
-    * **Optional**: yes
-    * **Type**: string
+  :param db: Database name
+  :param ddoc: Design document name
+  :param func: Show function name
+  :>header ETag: Response signature
+  :query boolean details: Indicates whether details should be included
+  :query string format: Format of the returned response.
+    Used by :js:func:`provides` function
+  :code 200: Request completed successfully
+  :code 500: Query server error
 
-  * **Argument**: format
+  **Function**:
 
-    * **Description**:  Format of the returned information
-    * **Optional**: yes
-    * **Type**: string
+  .. code-block:: javascript
 
-.. _api/ddoc/show/doc.post:
+    function(doc, req) {
+      if (!doc) {
+        return {body: "no doc"}
+      } else {
+        return {body: doc.description}
+      }
+    }
 
-``POST /db/_design/design-doc/_show/show-name/doc``
-===================================================
+  **Request**:
 
-.. todo:: POST /db/_design/design-doc/_show/show-name/doc
+  .. code-block:: http
 
-* **Method**: ``POST /db/_design/design-doc/_show/show-name``
-* **Request**:  Custom data
-* **Response**:  Returns the result of the show
-* **Admin Privileges Required**: no
+    GET /recipes/_design/recipe/_show/description HTTP/1.1
+    Accept: application/json
+    Host: localhost:5984
 
-.. _api/ddoc/list/ddoc:
-.. _api/ddoc/list/ddoc.get:
+  **Response**:
 
-``GET /db/_design/design-doc/_list/list-name/other-design-doc/view-name``
-=========================================================================
+  .. code-block:: http
 
-.. todo:: GET /db/_design/design-doc/_list/list-name/other-design-doc/view-name
+    HTTP/1.1 200 OK
+    Content-Length: 6
+    Content-Type: text/html; charset=utf-8
+    Date: Wed, 21 Aug 2013 12:34:07 GMT
+    Etag: "7Z2TO7FPEMZ0F4GH0RJCRIOAU"
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Vary: Accept
 
-* **Method**: ``GET /db/_design/design-doc/_list/list-name/other-design-doc/view-name``
-* **Request**:  TBC
-* **Response**:  TBC
-* **Admin Privileges Required**: no
+    no doc
 
-.. _api/ddoc/list/ddoc.post:
 
-``POST /db/_design/design-doc/_list/list-name/other-design-doc/view-name``
-==========================================================================
+.. _api/ddoc/show/id:
 
-.. todo:: POST /db/_design/design-doc/_list/list-name/other-design-doc/view-name
+``/db/_design/design-doc/_show/show-name/doc-id``
+=================================================
 
-* **Method**: ``POST /db/_design/design-doc/_list/list-name/other-design-doc/view-name``
-* **Request**:  TBC
-* **Response**:  TBC
-* **Admin Privileges Required**: no
+.. http:get:: /{db}/_design/{ddoc}/_show/{func}/{docid}
+.. http:post:: /{db}/_design/{ddoc}/_show/{func}/{docid}
+
+  Applies :ref:`show function <showfun>` for the specified document.
+
+  The request and response parameters are depended upon function implementation.
+
+  :param db: Database name
+  :param ddoc: Design document name
+  :param func: Show function name
+  :param docid: Document ID
+  :>header ETag: Response signature
+  :query boolean details: Indicates whether details should be included
+  :query string format: Format of the returned response.
+    Used by :js:func:`provides` function
+  :code 200: Request completed successfully
+  :code 500: Query server error
+
+  **Function**:
+
+  .. code-block:: javascript
+
+    function(doc, req) {
+      if (!doc) {
+        return {body: "no doc"}
+      } else {
+        return {body: doc.description}
+      }
+    }
+
+  **Request**:
+
+  .. code-block:: http
+
+    GET /recipes/_design/recipe/_show/description/SpaghettiWithMeatballs HTTP/1.1
+    Accept: application/json
+    Host: localhost:5984
+
+  **Response**:
+
+  .. code-block:: http
+
+    HTTP/1.1 200 OK
+    Content-Length: 88
+    Content-Type: text/html; charset=utf-8
+    Date: Wed, 21 Aug 2013 12:38:08 GMT
+    Etag: "8IEBO8103EI98HDZL5Z4I1T0C"
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Vary: Accept
+
+    An Italian-American dish that usually consists of spaghetti, tomato sauce and meatballs.
+
 
 .. _api/ddoc/list:
-.. _api/ddoc/list.get:
 
-``GET /db/_design/design-doc/_list/list-name/view-name``
-========================================================
+``/db/_design/design-doc/_list/list-name/view-name``
+====================================================
 
-.. todo:: GET /db/_design/design-doc/_list/list-name/view-name
+.. http:get:: /{db}/_design/{ddoc}/_list/{func}/{view}
+.. http:post:: /{db}/_design/{ddoc}/_list/{func}/{view}
 
-* **Method**: ``GET /db/_design/design-doc/_list/list-name/view-name``
-* **Request**:  TBC
-* **Response**:  TBC
-* **Admin Privileges Required**: no
+  Applies :ref:`list function <listfun>` for the :ref:`view function <viewfun>`
+  from the same design document.
 
-.. _api/ddoc/list.post:
+  The request and response parameters are depended upon function implementation.
 
-``POST /db/_design/design-doc/_list/list-name/view-name``
-=========================================================
+  :param db: Database name
+  :param ddoc: Design document name
+  :param func: List function name
+  :param view: View function name
+  :>header ETag: Response signature
+  :>header Transfer-Encoding: ``chunked``
+  :query string format: Format of the returned response.
+    Used by :js:func:`provides` function
+  :code 200: Request completed successfully
+  :code 500: Query server error
 
-.. todo:: POST /db/_design/design-doc/_list/list-name/view-name
+  **Function**:
 
-* **Method**: ``POST /db/_design/design-doc/_list/list-name/view-name``
-* **Request**:  TBC
-* **Response**:  TBC
-* **Admin Privileges Required**: no
+  .. code-block:: javascript
 
-.. _api/ddoc/update/doc:
-.. _api/ddoc/update/doc.put:
+    function(head, req) {
+      var row = getRow();
+      if (!row){
+        return 'no ingredients'
+      }
+      send(row.key);
+      while(row=getRow()){
+        send(', ' + row.key);
+      }
+    }
 
-``PUT /db/_design/design-doc/_update/updatename/doc``
-=====================================================
+  **Request**:
 
-.. todo:: POST /db/_design/design-doc/_update/updatename/doc
+  .. code-block:: http
 
-* **Method**: ``POST /db/_design/design-doc/_update/updatename/doc``
-* **Request**:  TBC
-* **Response**:  TBC
-* **Admin Privileges Required**: no
+    GET /recipes/_design/recipe/_list/ingredients/by_name HTTP/1.1
+    Accept: text/plain
+    Host: localhost:5984
+
+  **Response**:
+
+  .. code-block:: http
+
+    HTTP/1.1 200 OK
+    Content-Type: text/plain; charset=utf-8
+    Date: Wed, 21 Aug 2013 12:49:15 GMT
+    Etag: "D52L2M1TKQYDD1Y8MEYJR8C84"
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Transfer-Encoding: chunked
+    Vary: Accept
+
+    meatballs, spaghetti, tomato sauce
+
+
+.. _api/ddoc/list/ddoc:
+
+``/db/_design/design-doc/_list/list-name/other-ddoc/view-name``
+===============================================================
+
+.. http:get:: /{db}/_design/{ddoc}/_list/{func}/{other-ddoc}/{view}
+.. http:post:: /{db}/_design/{ddoc}/_list/{func}/{other-ddoc}/{view}
+
+  Applies :ref:`list function <listfun>` for the :ref:`view function <viewfun>`
+  from the other design document.
+
+  The request and response parameters are depended upon function implementation.
+
+  :param db: Database name
+  :param ddoc: Design document name
+  :param func: List function name
+  :param other-ddoc: Other design document name that holds view function
+  :param view: View function name
+  :>header ETag: Response signature
+  :>header Transfer-Encoding: ``chunked``
+  :query string format: Format of the returned response.
+    Used by :js:func:`provides` function
+  :code 200: Request completed successfully
+  :code 500: Query server error
+
+  **Function**:
+
+  .. code-block:: javascript
+
+    function(head, req) {
+      var row = getRow();
+      if (!row){
+        return 'no ingredients'
+      }
+      send(row.key);
+      while(row=getRow()){
+        send(', ' + row.key);
+      }
+    }
+
+  **Request**:
+
+  .. code-block:: http
+
+    GET /recipes/_design/ingredient/_list/ingredients/recipe/by_ingredient?key="spaghetti" HTTP/1.1
+    Accept: text/plain
+    Host: localhost:5984
+
+  **Response**:
+
+  .. code-block:: http
+
+    HTTP/1.1 200 OK
+    Content-Type: text/plain; charset=utf-8
+    Date: Wed, 21 Aug 2013 12:49:15 GMT
+    Etag: "5L0975X493R0FB5Z3043POZHD"
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Transfer-Encoding: chunked
+    Vary: Accept
+
+    spaghetti
+
 
 .. _api/ddoc/update:
-.. _api/ddoc/update.post:
 
-``POST /db/_design/design-doc/_update/updatename``
-==================================================
+``/db/_design/design-doc/_update/update-name``
+==============================================
 
-.. todo:: PUT /db/_design/design-doc/_update/updatename/doc
+.. http:post:: /{db}/_design/{ddoc}/_update/{func}
 
-* **Method**: ``PUT /db/_design/design-doc/_update/updatename/doc``
-* **Request**:  TBC
-* **Response**:  TBC
-* **Admin Privileges Required**: no
+  Executes :ref:`update function <updatefun>` on server side for ``null``
+  document.
+
+  :param db: Database name
+  :param ddoc: Design document name
+  :param func: Update function name
+  :>header X-Couch-Id: Created/updated document's ID
+  :>header X-Couch-Update-NewRev: Created/updated document's revision
+  :code 200: No document was created or updated
+  :code 201: Document was created or updated
+  :code 500: Query server error
+
+  **Function**:
+
+  .. code-block:: javascript
+
+    function(doc, req) {
+      if (!doc){
+        return [null, {'code': 400,
+                       'json': {'error': 'missed',
+                                'reason': 'no document to update'}}]
+      } else {
+        doc.ingredients.push(req.body);
+        return [doc, {'json': {'status': 'ok'}}];
+      }
+    }
+
+  **Request**:
+
+  .. code-block:: http
+
+    POST /recipes/_design/recipe/_update/ingredients HTTP/1.1
+    Accept: application/json
+    Content-Length: 10
+    Content-Type: application/json
+    Host: localhost:5984
+
+    something
+
+  **Response**:
+
+  .. code-block:: http
+
+    HTTP/1.1 404 Object Not Found
+    Cache-Control: must-revalidate
+    Content-Length: 52
+    Content-Type: application/json
+    Date: Wed, 21 Aug 2013 14:00:58 GMT
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+
+    {
+        "error": "missed",
+        "reason": "no document to update"
+    }
+
+
+.. _api/ddoc/update/id:
+
+``/db/_design/design-doc/_update/update-name/doc-id``
+=====================================================
+
+.. http:put:: /{db}/_design/{ddoc}/_update/{func}/{docid}
+
+
+  Executes :ref:`update function <updatefun>` on server side for the specified
+  document.
+
+  :param db: Database name
+  :param ddoc: Design document name
+  :param func: Update function name
+  :param docid: Document ID
+  :>header X-Couch-Id: Created/updated document's ID
+  :>header X-Couch-Update-NewRev: Created/updated document's revision
+  :code 200: No document was created or updated
+  :code 201: Document was created or updated
+  :code 500: Query server error
+
+  **Function**:
+
+  .. code-block:: javascript
+
+    function(doc, req) {
+      if (!doc){
+        return [null, {'code': 400,
+                       'json': {'error': 'missed',
+                                'reason': 'no document to update'}}]
+      } else {
+        doc.ingredients.push(req.body);
+        return [doc, {'json': {'status': 'ok'}}];
+      }
+    }
+
+  **Request**:
+
+  .. code-block:: http
+
+    POST /recipes/_design/recipe/_update/ingredients/SpaghettiWithMeatballs HTTP/1.1
+    Accept: application/json
+    Content-Length: 5
+    Content-Type: application/json
+    Host: localhost:5984
+
+    love
+
+  **Response**:
+
+  .. code-block:: http
+
+    HTTP/1.1 201 Created
+    Cache-Control: must-revalidate
+    Content-Length: 16
+    Content-Type: application/json
+    Date: Wed, 21 Aug 2013 14:11:34 GMT
+    Server: CouchDB/1.4.0+build.c843cef (Erlang OTP/R16B)
+    X-Couch-Id: SpaghettiWithMeatballs
+    X-Couch-Update-NewRev: 12-a5e099df5720988dae90c8b664496baf
+
+    {
+        "status": "ok"
+    }
