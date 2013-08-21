@@ -12,125 +12,193 @@
 
 
 .. _api/ddoc/view:
-.. _api/ddoc/view.get:
 
-``GET /db/_design/design-doc/_view/view-name``
-==============================================
+``/db/_design/design-doc/_view/view-name``
+==========================================
 
-* **Method**: ``GET /db/_design/design-doc/_view/view-name``
-* **Request**: None
-* **Response**: JSON of the documents returned by the view
-* **Admin Privileges Required**: no
-* **Query Arguments**:
+.. http:get:: /{db}/_design/{ddocname}/_view/{viewname}
 
-  * **Argument**: descending
+  Executes the specified view function from the specified design document.
 
-    * **Description**:  Return the documents in descending by key order
-    * **Optional**: yes
-    * **Type**: boolean
-    * **Default**: false
+  :param db: Database name
+  :param ddocname: Design document name
+  :param viewname: View function name
 
-  * **Argument**: endkey
+  :<header Accept: - :mimetype:`application/json`
+                   - :mimetype:`text/plain`
 
-    * **Description**:  Stop returning records when the specified key is reached
-    * **Optional**: yes
-    * **Type**: string
+  :query boolean conflicts: Includes `conflicts` information in response.
+    Ignored if `include_docs` isn't ``true``. Default is ``false``
+  :query boolean descending: Return the documents in descending by key order.
+    Default is ``false``
+  :query string endkey: Stop returning records when the specified key is
+    reached. *Optional*
+  :query string end_key: Alias for `endkey` param
+  :query string endkey_docid: Stop returning records when the specified
+    document ID is reached. *Optional*
+  :query string end_key_doc_id: Alias for `endkey_docid` param
+  :query boolean group: Group the results using the reduce function to a group
+    or single row. Default is ``false``
+  :query number group_level: Specify the group level to be used. *Optional*
+  :query boolean include_docs: Include the full content of the documents in
+    the return. Default is ``false``
+  :query boolean inclusive_end: Specifies whether the specified end key should
+    be included in the result. Default is ``true``
+  :query string key: Return only documents that match the specified key.
+    *Optional*
+  :query number limit: Limit the number of the returned documents to the
+    specified number. *Optional*
+  :query boolean reduce: Use the reduction function. Default is ``true``
+  :query number skip: Skip this number of records before starting to return
+    the results. Default is ``0``
+  :query string stale: Allow the results from a stale view to be used.
+    Supported values: ``ok`` and ``update_after``. *Optional*
+  :query string startkey: Return records starting with the specified key.
+    *Optional*
+  :query string start_key: Alias for `startkey` param
+  :query string startkey_docid: Return records starting with the specified
+    document ID. *Optional*
+  :query string start_key_doc_id: Alias for `startkey_docid` param
+  :query boolean update_seq: Response includes an ``update_seq`` value
+    indicating which sequence id of the database the view reflects.
+    Default is ``false``
 
-  * **Argument**: endkey_docid
+  :>header Content-Type: - :mimetype:`application/json`
+                         - :mimetype:`text/plain; charset=utf-8`
+  :>header ETag: Response signature
+  :>header Transfer-Encoding: ``chunked``
 
-    * **Description**:  Stop returning records when the specified document
-      ID is reached
-    * **Optional**: yes
-    * **Type**: string
+  :>json number offset: Offset where the document list started
+  :>json array rows: Array of view row objects. By default the information
+    returned contains only the document ID and revision
+  :>json number total_rows: Number of documents in the database/view
+  :>json number update_seq: Current update sequence for the database
 
-  * **Argument**: group
+  :code 200: Request completed successfully
+  :code 400: Invalid request
+  :code 401: Read permission required
+  :code 404: Specified database, design document or view is missed
+  :code 500: View function execution error
 
-    * **Description**:  Group the results using the reduce function to a
-      group or single row
-    * **Optional**: yes
-    * **Type**: boolean
-    * **Default**: false
+  **Request**:
 
-  * **Argument**: group_level
+  .. code-block:: http
 
-    * **Description**:  Specify the group level to be used
-    * **Optional**: yes
-    * **Type**: numeric
+    GET /recipes/_design/ingredients/_view/by_name HTTP/1.1
+    Accept: application/json
+    Host: localhost:5984
 
-  * **Argument**: include_docs
+  **Response**:
 
-    * **Description**:  Include the full content of the documents in the return
-    * **Optional**: yes
-    * **Type**: boolean
-    * **Default**: false
+  .. code-block:: http
 
-  * **Argument**: inclusive_end
+    HTTP/1.1 200 OK
+    Cache-Control: must-revalidate
+    Content-Type: application/json
+    Date: Wed, 21 Aug 2013 09:12:06 GMT
+    ETag: "2FOLSBSW4O6WB798XU4AQYA9B"
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Transfer-Encoding: chunked
 
-    * **Description**:  Specifies whether the specified end key should be
-      included in the result
-    * **Optional**: yes
-    * **Type**: boolean
-    * **Default**: true
+    {
+        "offset": 0,
+        "rows": [
+            {
+                "id": "SpaghettiWithMeatballs",
+                "key": "meatballs",
+                "value": 1
+            },
+            {
+                "id": "SpaghettiWithMeatballs",
+                "key": "spaghetti",
+                "value": 1
+            },
+            {
+                "id": "SpaghettiWithMeatballs",
+                "key": "tomato sauce",
+                "value": 1
+            }
+        ],
+        "total_rows": 3
+    }
 
-  * **Argument**: key
 
-    * **Description**:  Return only documents that match the specified key
-    * **Optional**: yes
-    * **Type**: string
+.. http:post:: /{db}/_design/{ddocname}/_view/{viewname}
 
-  * **Argument**: limit
+  Executes the specified view function from the specified design document.
+  Unlike the :http:get:`/{db}/_design/{ddocname}/_view/{viewname}`  method
+  for accessing views, the :http:method:`POST` method supports the specification
+  of explicit keys to be retrieved from the view results. The remainder of the
+  :http:method:`POST` view functionality is identical to the
+  :http:get:`/{db}/_design/{ddocname}/_view/{viewname}` API.
 
-    * **Description**:  Limit the number of the returned documents to the
-      specified number
-    * **Optional**: yes
-    * **Type**: numeric
+  **Request**:
 
-  * **Argument**: reduce
+  .. code-block:: http
 
-    * **Description**:  Use the reduction function
-    * **Optional**: yes
-    * **Type**: boolean
-    * **Default**: true
+    POST /recipes/_design/ingredients/_view/by_name HTTP/1.1
+    Accept: application/json
+    Content-Length: 37
+    Host: localhost:5984
 
-  * **Argument**: skip
+    {
+        "keys": [
+            "meatballs",
+            "spaghetti"
+        ]
+    }
 
-    * **Description**:  Skip this number of records before starting to return
-      the results
-    * **Optional**: yes
-    * **Type**: numeric
-    * **Default**: 0
+  **Response**:
 
-  * **Argument**: stale
+  .. code-block:: http
 
-    * **Description**:  Allow the results from a stale view to be used
-    * **Optional**: yes
-    * **Type**: string
-    * **Default**:
-    * **Supported Values**
+    HTTP/1.1 200 OK
+    Cache-Control: must-revalidate
+    Content-Type: application/json
+    Date: Wed, 21 Aug 2013 09:14:13 GMT
+    ETag: "6R5NM8E872JIJF796VF7WI3FZ"
+    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Transfer-Encoding: chunked
 
-      * **ok**: Allow stale views
+    {
+        "offset": 0,
+        "rows": [
+            {
+                "id": "SpaghettiWithMeatballs",
+                "key": "meatballs",
+                "value": 1
+            },
+            {
+                "id": "SpaghettiWithMeatballs",
+                "key": "spaghetti",
+                "value": 1
+            }
+        ],
+        "total_rows": 3
+    }
 
-  * **Argument**: startkey
 
-    * **Description**:  Return records starting with the specified key
-    * **Optional**: yes
-    * **Type**: string
+.. _api/ddoc/view/options:
 
-  * **Argument**: startkey_docid
+View Options
+------------
 
-    * **Description**:  Return records starting with the specified document ID
-    * **Optional**: yes
-    * **Type**: string
+There are two view indexing options that can be defined in a design document
+as boolean properties of an ``options`` object. Unlike the others querying
+options, these aren't URL parameters because they take effect when the view
+index is generated, not when it's accessed:
 
-  * **Argument**: update_seq
+- **local_seq** (*boolean*): Makes documents' local sequence numbers available
+  to map functions (as a ``_local_seq`` document property)
+- **include_design** (*boolean*): Allows map functions to be called on design
+  documents as well as regular documents
 
-    * **Description**:  Include the update sequence in the generated results
-    * **Optional**: yes
-    * **Type**: boolean
-    * **Default**: false
+In additional to these options, you may specify :ref:`any other <api/ddoc/view>`
+with their default value. E.g. having option ``"include_docs": true`` will
+automatically includes document body for view results response. You still may
+override such by explicitly defining same query parameter name with other value.
 
-Executes the specified ``view-name`` from the specified ``design-doc``
-design document.
+.. _api/ddoc/view/indexing:
 
 Querying Views and Indexes
 --------------------------
@@ -182,14 +250,13 @@ completely eliminate, these issues. These include:
    either before users are allowed to use the view, or you can access
    the view manually after documents are added or updated.
 
--  Use the ``/db/_changes`` method to monitor for changes to the
+-  Use the :ref:`changes feed <api/db/changes>` to monitor for changes to the
    database and then access the view to force the corresponding view
-   index to be updated. See :ref:`api/db/changes` for more information.
+   index to be updated.
 
--  Use a monitor with the ``update_notification`` section of the CouchDB
-   configuration file to monitor for changes to your database, and
-   trigger a view query to force the view to be updated. For more
-   information, see :ref:`update-notifications`.
+-  Use a monitor with the :ref:`update notification <update-notifications>`
+   section of the CouchDB configuration file to monitor for changes to your
+   database, and trigger a view query to force the view to be updated.
 
 None of these can completely eliminate the need for the indexes to be
 rebuilt or updated when the view is accessed, but they may lessen the
@@ -206,7 +273,7 @@ For example, to access the existing stale view ``by_recipe`` in the
 
 .. code-block:: text
 
-    http://couchdb:5984/recipes/_design/recipes/_view/by_recipe?stale=ok
+    http://localhost:5984/recipes/_design/recipes/_view/by_recipe?stale=ok
 
 Accessing a stale view:
 
@@ -230,6 +297,9 @@ which the view was generated. The returned value can be compared this to
 the current update sequence exposed in the database information
 (returned by :http:get:`/{db}`).
 
+
+.. _api/ddoc/view/sorting:
+
 Sorting Returned Rows
 ---------------------
 
@@ -251,118 +321,261 @@ content. The basic order of output is as follows:
 
 -  Objects (according to the values of keys, in key order)
 
-You can reverse the order of the returned view information by using the
-``descending`` query value set to true. For example, Retrieving the list
-of recipes using the ``by_title`` (limited to 5 records) view:
-
-.. code-block:: javascript
-
-    {
-       "offset" : 0,
-       "rows" : [
-          {
-             "id" : "3-tiersalmonspinachandavocadoterrine",
-             "key" : "3-tier salmon, spinach and avocado terrine",
-             "value" : [
-                null,
-                "3-tier salmon, spinach and avocado terrine"
-             ]
-          },
-          {
-             "id" : "Aberffrawcake",
-             "key" : "Aberffraw cake",
-             "value" : [
-                null,
-                "Aberffraw cake"
-             ]
-          },
-          {
-             "id" : "Adukiandorangecasserole-microwave",
-             "key" : "Aduki and orange casserole - microwave",
-             "value" : [
-                null,
-                "Aduki and orange casserole - microwave"
-             ]
-          },
-          {
-             "id" : "Aioli-garlicmayonnaise",
-             "key" : "Aioli - garlic mayonnaise",
-             "value" : [
-                null,
-                "Aioli - garlic mayonnaise"
-             ]
-          },
-          {
-             "id" : "Alabamapeanutchicken",
-             "key" : "Alabama peanut chicken",
-             "value" : [
-                null,
-                "Alabama peanut chicken"
-             ]
-          }
-       ],
-       "total_rows" : 2667
-    }
-
-Requesting the same in descending order will reverse the entire view
-content. For example the request
+**Request**:
 
 .. code-block:: http
 
-    GET http://couchdb:5984/recipes/_design/recipes/_view/by_title?limit=5&descending=true
-    Accept: application/json
-    Content-Type: application/json
+  GET /db/_design/test/_view/sorting HTTP/1.1
+  Accept: application/json
+  Host: localhost:5984
 
-Returns the last 5 records from the view:
 
-.. code-block:: javascript
+**Response**:
 
-    {
-       "offset" : 0,
-       "rows" : [
+.. code-block:: http
+
+  HTTP/1.1 200 OK
+  Cache-Control: must-revalidate
+  Content-Type: application/json
+  Date: Wed, 21 Aug 2013 10:09:25 GMT
+  ETag: "8LA1LZPQ37B6R9U8BK9BGQH27"
+  Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+  Transfer-Encoding: chunked
+  
+  {
+      "offset": 0, 
+      "rows": [
           {
-             "id" : "Zucchiniinagrodolcesweet-sourcourgettes",
-             "key" : "Zucchini in agrodolce (sweet-sour courgettes)",
-             "value" : [
-                null,
-                "Zucchini in agrodolce (sweet-sour courgettes)"
-             ]
-          },
+              "id": "dummy-doc", 
+              "key": null, 
+              "value": null
+          }, 
           {
-             "id" : "Zingylemontart",
-             "key" : "Zingy lemon tart",
-             "value" : [
-                null,
-                "Zingy lemon tart"
-             ]
-          },
+              "id": "dummy-doc", 
+              "key": false, 
+              "value": null
+          }, 
           {
-             "id" : "Zestyseafoodavocado",
-             "key" : "Zesty seafood avocado",
-             "value" : [
-                null,
-                "Zesty seafood avocado"
-             ]
-          },
+              "id": "dummy-doc", 
+              "key": true, 
+              "value": null
+          }, 
           {
-             "id" : "Zabaglione",
-             "key" : "Zabaglione",
-             "value" : [
-                null,
-                "Zabaglione"
-             ]
-          },
+              "id": "dummy-doc", 
+              "key": 0, 
+              "value": null
+          }, 
           {
-             "id" : "Yogurtraita",
-             "key" : "Yogurt raita",
-             "value" : [
-                null,
-                "Yogurt raita"
-             ]
+              "id": "dummy-doc", 
+              "key": 1, 
+              "value": null
+          }, 
+          {
+              "id": "dummy-doc", 
+              "key": 10, 
+              "value": null
+          }, 
+          {
+              "id": "dummy-doc", 
+              "key": 42, 
+              "value": null
+          }, 
+          {
+              "id": "dummy-doc", 
+              "key": "10", 
+              "value": null
+          }, 
+          {
+              "id": "dummy-doc", 
+              "key": "hello", 
+              "value": null
+          }, 
+          {
+              "id": "dummy-doc", 
+              "key": "Hello", 
+              "value": null
+          }, 
+          {
+              "id": "dummy-doc", 
+              "key": "привет", 
+              "value": null
+          }, 
+          {
+              "id": "dummy-doc", 
+              "key": [], 
+              "value": null
+          }, 
+          {
+              "id": "dummy-doc", 
+              "key": [
+                  1, 
+                  2, 
+                  3
+              ], 
+              "value": null
+          }, 
+          {
+              "id": "dummy-doc", 
+              "key": [
+                  2, 
+                  3
+              ], 
+              "value": null
+          }, 
+          {
+              "id": "dummy-doc", 
+              "key": [
+                  3
+              ], 
+              "value": null
+          }, 
+          {
+              "id": "dummy-doc", 
+              "key": {}, 
+              "value": null
+          }, 
+          {
+              "id": "dummy-doc", 
+              "key": {
+                  "foo": "bar"
+              }, 
+              "value": null
           }
-       ],
-       "total_rows" : 2667
-    }
+      ], 
+      "total_rows": 17
+  }
+
+
+You can reverse the order of the returned view information by using the
+``descending`` query value set to true:
+
+**Request**:
+
+.. code-block:: http
+
+  GET /db/_design/test/_view/sorting?descending=true HTTP/1.1
+  Accept: application/json
+  Host: localhost:5984
+
+
+**Response**:
+
+.. code-block:: http
+
+  HTTP/1.1 200 OK
+  Cache-Control: must-revalidate
+  Content-Type: application/json
+  Date: Wed, 21 Aug 2013 10:09:25 GMT
+  ETag: "Z4N468R15JBT98OM0AMNSR8U"
+  Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+  Transfer-Encoding: chunked
+  
+  {
+      "offset": 0,
+      "rows": [
+          {
+              "id": "dummy-doc",
+              "key": {
+                  "foo": "bar"
+              },
+              "value": null
+          },
+          {
+              "id": "dummy-doc",
+              "key": {},
+              "value": null
+          },
+          {
+              "id": "dummy-doc",
+              "key": [
+                  3
+              ],
+              "value": null
+          },
+          {
+              "id": "dummy-doc",
+              "key": [
+                  2,
+                  3
+              ],
+              "value": null
+          },
+          {
+              "id": "dummy-doc",
+              "key": [
+                  1,
+                  2,
+                  3
+              ],
+              "value": null
+          },
+          {
+              "id": "dummy-doc",
+              "key": [],
+              "value": null
+          },
+          {
+              "id": "dummy-doc",
+              "key": "привет",
+              "value": null
+          },
+          {
+              "id": "dummy-doc",
+              "key": "Hello",
+              "value": null
+          },
+          {
+              "id": "dummy-doc",
+              "key": "hello",
+              "value": null
+          },
+          {
+              "id": "dummy-doc",
+              "key": "10",
+              "value": null
+          },
+          {
+              "id": "dummy-doc",
+              "key": 42,
+              "value": null
+          },
+          {
+              "id": "dummy-doc",
+              "key": 10,
+              "value": null
+          },
+          {
+              "id": "dummy-doc",
+              "key": 1,
+              "value": null
+          },
+          {
+              "id": "dummy-doc",
+              "key": 0,
+              "value": null
+          },
+          {
+              "id": "dummy-doc",
+              "key": true,
+              "value": null
+          },
+          {
+              "id": "dummy-doc",
+              "key": false,
+              "value": null
+          },
+          {
+              "id": "dummy-doc",
+              "key": null,
+              "value": null
+          }
+      ],
+      "total_rows": 17
+  }
+
+
+Sorting order and startkey/endkey
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The sorting direction is applied before the filtering applied using the
 ``startkey`` and ``endkey`` query arguments. For example the following
@@ -372,27 +585,23 @@ query:
 
     GET http://couchdb:5984/recipes/_design/recipes/_view/by_ingredient?startkey=%22carrots%22&endkey=%22egg%22
     Accept: application/json
-    Content-Type: application/json
 
-Will operate correctly when listing all the matching entries between
-“carrots” and ``egg``. If the order of output is reversed with the
+will operate correctly when listing all the matching entries between
+``carrots`` and ``egg``. If the order of output is reversed with the
 ``descending`` query argument, the view request will return no entries:
 
 .. code-block:: http
 
-    GET http://couchdb:5984/recipes/_design/recipes/_view/by_ingredient?descending=true&startkey=%22carrots%22&endkey=%22egg%22
-    Accept: application/json
-    Content-Type: application/json
 
-The returned result is empty:
+  GET /recipes/_design/recipes/_view/by_ingredient?descending=true&startkey=%22carrots%22&endkey=%22egg%22 HTTP/1.1
+  Accept: application/json
+  Host: localhost:5984
 
-.. code-block:: javascript
-
-    {
-       "total_rows" : 26453,
-       "rows" : [],
-       "offset" : 21882
-    }
+  {
+     "total_rows" : 26453,
+     "rows" : [],
+     "offset" : 21882
+  }
 
 The results will be empty because the entries in the view are reversed
 before the key filter is applied, and therefore the ``endkey`` of “egg”
@@ -405,304 +614,166 @@ keys. Changing the previous example to:
 
 .. code-block:: http
 
-    GET http://couchdb:5984/recipes/_design/recipes/_view/by_ingredient?descending=true&startkey=%22egg%22&endkey=%22carrots%22
-    Accept: application/json
-    Content-Type: application/json
+  GET /recipes/_design/recipes/_view/by_ingredient?descending=true&startkey=%22egg%22&endkey=%22carrots%22 HTTP/1.1
+  Accept: application/json
+  Host: localhost:5984
 
-Specifying Start and End Values
--------------------------------
 
-.. todo:: Specifying Start and End Values
+.. _api/ddoc/view/sorting/raw:
 
-The ``startkey`` and ``endkey`` query arguments can be used to specify
-the range of values to be displayed when querying the view.
+Raw collation
+^^^^^^^^^^^^^
+
+By default CouchDB using `ICU`_ driver for sorting view results. It's possible
+use binary collation instead for faster view builds where Unicode collation is
+not important.
+
+To use raw collation add ``"collation": "raw"`` key-value pair to the design
+documents ``options`` object at the root level. After that, views will be
+regenerated and new order applied.
+
+.. seealso::
+
+   :ref:`views/collation`
+
+.. _ICU: http://site.icu-project.org/
+
+.. _api/ddoc/view/limiting:
 
 Using Limits and Skipping Rows
 ------------------------------
 
-.. todo:: Using Limits and Skipping Rows
+By default requestion views result returns all records for it. That's ok when
+they are small, but this may lead to problems when there are billions of them
+since the clients might have to read them all and consume all available memory.
 
-TBC
+But it's possible to reduce output result rows by specifying ``limit`` query
+parameter. For example, retrieving the list of recipes using the ``by_title``
+view and limited to 5 returns only 5 records, while there are total 2667 records
+in view:
 
-View Reduction and Grouping
----------------------------
-
-.. todo:: View Reduction and Grouping
-
-TBC
-
-.. _api/ddoc/view.post:
-
-``POST /db/_design/design-doc/_view/view-name``
-===============================================
-
-* **Method**: ``POST /db/_design/design-doc/_view/view-name``
-* **Request**:  List of keys to be returned from specified view
-* **Response**:  JSON of the documents returned by the view
-* **Admin Privileges Required**: no
-* **Query Arguments**:
-
-  * **Argument**: descending
-
-    * **Description**:  Return the documents in descending by key order
-    * **Optional**: yes
-    * **Type**: boolean
-    * **Default**: false
-
-  * **Argument**: endkey
-
-    * **Description**:  Stop returning records when the specified key is reached
-    * **Optional**: yes
-    * **Type**: string
-
-  * **Argument**: endkey_docid
-
-    * **Description**:  Stop returning records when the specified document ID
-      is reached
-    * **Optional**: yes
-    * **Type**: string
-
-  * **Argument**: group
-
-    * **Description**:  Group the results using the reduce function to a group
-      or single row
-    * **Optional**: yes
-    * **Type**: boolean
-    * **Default**: false
-
-  * **Argument**: group_level
-
-    * **Description**:  Specify the group level to be used
-    * **Optional**: yes
-    * **Type**: numeric
-
-  * **Argument**: include_docs
-
-    * **Description**:  Include the full content of the documents in the return
-    * **Optional**: yes
-    * **Type**: boolean
-    * **Default**: false
-
-  * **Argument**: inclusive_end
-
-    * **Description**:  Specifies whether the specified end key should be
-      included in the result
-    * **Optional**: yes
-    * **Type**: boolean
-    * **Default**: true
-
-  * **Argument**: key
-
-    * **Description**:  Return only documents that match the specified key
-    * **Optional**: yes
-    * **Type**: string
-
-  * **Argument**: limit
-
-    * **Description**:  Limit the number of the returned documents to the
-      specified number
-    * **Optional**: yes
-    * **Type**: numeric
-
-  * **Argument**: reduce
-
-    * **Description**:  Use the reduction function
-    * **Optional**: yes
-    * **Type**: boolean
-    * **Default**: true
-
-  * **Argument**: skip
-
-    * **Description**:  Skip this number of records before starting to return
-      the results
-    * **Optional**: yes
-    * **Type**: numeric
-    * **Default**: 0
-
-  * **Argument**: stale
-
-    * **Description**:  Allow the results from a stale view to be used
-    * **Optional**: yes
-    * **Type**: string
-    * **Default**:
-    * **Supported Values**:
-
-      * **ok**: Allow stale views
-
-  * **Argument**: startkey
-
-    * **Description**:  Return records starting with the specified key
-    * **Optional**: yes
-    * **Type**: string
-
-  * **Argument**: startkey_docid
-
-    * **Description**:  Return records starting with the specified document ID
-    * **Optional**: yes
-    * **Type**: string
-
-  * **Argument**: update_seq
-
-    * **Description**:  Include the update sequence in the generated results
-    * **Optional**: yes
-    * **Type**: boolean
-    * **Default**: false
-
-Executes the specified ``view-name`` from the specified ``design-doc``
-design document. Unlike the ``GET`` method for accessing views, the
-``POST`` method supports the specification of explicit keys to be
-retrieved from the view results. The remainder of the ``POST`` view
-functionality is identical to the :ref:`api/ddoc/view.get` API.
-
-For example, the request below will return all the recipes where the key
-for the view matches either “claret” or “clear apple cider” :
+**Request**:
 
 .. code-block:: http
 
-    POST http://couchdb:5984/recipes/_design/recipes/_view/by_ingredient
-    Content-Type: application/json
+  GET /recipes/_design/recipes/_view/by_title?limit=5 HTTP/1.1
+  Accept: application/json
+  Host: localhost:5984
 
-    {
-       "keys" : [
-          "claret",
-          "clear apple juice"
-       ]
-    }
-
-
-The returned view data contains the standard view information, but only
-where the keys match.
-
-.. code-block:: javascript
-
-    {
-       "total_rows" : 26484,
-       "rows" : [
-          {
-             "value" : [
-                "Scotch collops"
-             ],
-             "id" : "Scotchcollops",
-             "key" : "claret"
-          },
-          {
-             "value" : [
-                "Stand pie"
-             ],
-             "id" : "Standpie",
-             "key" : "clear apple juice"
-          }
-       ],
-       "offset" : 6324
-    }
-
-Multi-document Fetching
------------------------
-
-By combining the ``POST`` method to a given view with the
-``include_docs=true`` query argument you can obtain multiple documents
-from a database. The result is more efficient than using multiple
-:http:get:`/{db}/{docid}` requests.
-
-For example, sending the following request for ingredients matching
-“claret” and “clear apple juice”:
+**Response**:
 
 .. code-block:: http
 
-    POST http://couchdb:5984/recipes/_design/recipes/_view/by_ingredient?include_docs=true
-    Content-Type: application/json
+  HTTP/1.1 200 OK
+  Cache-Control: must-revalidate
+  Content-Type: application/json
+  Date: Wed, 21 Aug 2013 09:14:13 GMT
+  ETag: "9Q6Q2GZKPH8D5F8L7PB6DBSS9"
+  Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+  Transfer-Encoding: chunked
 
-    {
-       "keys" : [
-          "claret",
-          "clear apple juice"
-       ]
-    }
+  {
+     "offset" : 0,
+     "rows" : [
+        {
+           "id" : "3-tiersalmonspinachandavocadoterrine",
+           "key" : "3-tier salmon, spinach and avocado terrine",
+           "value" : [
+              null,
+              "3-tier salmon, spinach and avocado terrine"
+           ]
+        },
+        {
+           "id" : "Aberffrawcake",
+           "key" : "Aberffraw cake",
+           "value" : [
+              null,
+              "Aberffraw cake"
+           ]
+        },
+        {
+           "id" : "Adukiandorangecasserole-microwave",
+           "key" : "Aduki and orange casserole - microwave",
+           "value" : [
+              null,
+              "Aduki and orange casserole - microwave"
+           ]
+        },
+        {
+           "id" : "Aioli-garlicmayonnaise",
+           "key" : "Aioli - garlic mayonnaise",
+           "value" : [
+              null,
+              "Aioli - garlic mayonnaise"
+           ]
+        },
+        {
+           "id" : "Alabamapeanutchicken",
+           "key" : "Alabama peanut chicken",
+           "value" : [
+              null,
+              "Alabama peanut chicken"
+           ]
+        }
+     ],
+     "total_rows" : 2667
+  }
 
-Returns the full document for each recipe:
+To omit some records you may use ``skip`` query parameter:
 
-.. code-block:: javascript
+**Request**:
 
-    {
-       "offset" : 6324,
-       "rows" : [
-          {
-             "doc" : {
-                "_id" : "Scotchcollops",
-                "_rev" : "1-bcbdf724f8544c89697a1cbc4b9f0178",
-                "cooktime" : "8",
-                "ingredients" : [
-                   {
-                      "ingredient" : "onion",
-                      "ingredtext" : "onion, peeled and chopped",
-                      "meastext" : "1"
-                   },
-                ...
-                ],
-                "keywords" : [
-                   "cook method.hob, oven, grill@hob",
-                   "diet@wheat-free",
-                   "diet@peanut-free",
-                   "special collections@classic recipe",
-                   "cuisine@british traditional",
-                   "diet@corn-free",
-                   "diet@citrus-free",
-                   "special collections@very easy",
-                   "diet@shellfish-free",
-                   "main ingredient@meat",
-                   "occasion@christmas",
-                   "meal type@main",
-                   "diet@egg-free",
-                   "diet@gluten-free"
-                ],
-                "preptime" : "10",
-                "servings" : "4",
-                "subtitle" : "This recipe comes from an old recipe book of 1683 called 'The Gentlewoman's Kitchen'. This is an excellent way of making a rich and full-flavoured meat dish in a very short time.",
-                "title" : "Scotch collops",
-                "totaltime" : "18"
-             },
-             "id" : "Scotchcollops",
-             "key" : "claret",
-             "value" : [
-                "Scotch collops"
-             ]
-          },
-          {
-             "doc" : {
-                "_id" : "Standpie",
-                "_rev" : "1-bff6edf3ca2474a243023f2dad432a5a",
-                "cooktime" : "92",
-                "ingredients" : [
-    ...            ],
-                "keywords" : [
-                   "diet@dairy-free",
-                   "diet@peanut-free",
-                   "special collections@classic recipe",
-                   "cuisine@british traditional",
-                   "diet@corn-free",
-                   "diet@citrus-free",
-                   "occasion@buffet party",
-                   "diet@shellfish-free",
-                   "occasion@picnic",
-                   "special collections@lunchbox",
-                   "main ingredient@meat",
-                   "convenience@serve with salad for complete meal",
-                   "meal type@main",
-                   "cook method.hob, oven, grill@hob / oven",
-                   "diet@cow dairy-free"
-                ],
-                "preptime" : "30",
-                "servings" : "6",
-                "subtitle" : "Serve this pie with pickled vegetables and potato salad.",
-                "title" : "Stand pie",
-                "totaltime" : "437"
-             },
-             "id" : "Standpie",
-             "key" : "clear apple juice",
-             "value" : [
-                "Stand pie"
-             ]
-          }
-       ],
-       "total_rows" : 26484
-    }
+.. code-block:: http
+
+  GET /recipes/_design/recipes/_view/by_title?limit=3&skip=2 HTTP/1.1
+  Accept: application/json
+  Host: localhost:5984
+
+**Response**:
+
+.. code-block:: http
+
+  HTTP/1.1 200 OK
+  Cache-Control: must-revalidate
+  Content-Type: application/json
+  Date: Wed, 21 Aug 2013 09:14:13 GMT
+  ETag: "H3G7YZSNIVRRHO5FXPE16NJHN"
+  Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+  Transfer-Encoding: chunked
+
+  {
+     "offset" : 2,
+     "rows" : [
+        {
+           "id" : "Adukiandorangecasserole-microwave",
+           "key" : "Aduki and orange casserole - microwave",
+           "value" : [
+              null,
+              "Aduki and orange casserole - microwave"
+           ]
+        },
+        {
+           "id" : "Aioli-garlicmayonnaise",
+           "key" : "Aioli - garlic mayonnaise",
+           "value" : [
+              null,
+              "Aioli - garlic mayonnaise"
+           ]
+        },
+        {
+           "id" : "Alabamapeanutchicken",
+           "key" : "Alabama peanut chicken",
+           "value" : [
+              null,
+              "Alabama peanut chicken"
+           ]
+        }
+     ],
+     "total_rows" : 2667
+  }
+
+.. warning::
+
+   Using ``limit`` and ``skip`` parameters is not recommended for results
+   pagination. Read :ref:`pagination recipe <views/pagination>` why it's so
+   and how to make it better.
