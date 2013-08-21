@@ -22,7 +22,7 @@ There are two ways to install CouchDB on Windows.
 Installation from binaries
 ==========================
 
-This is the most simplest way to go.
+This is the simplest way to go.
 
 #. Get `the latest Windows binaries`_ from `CouchDB web site`_.
    Old releases are available at `archive`_.
@@ -50,13 +50,13 @@ This is the most simplest way to go.
 
 .. note:: **Upgrading note**
 
-   It's very recommended to uninstall previous CouchDB version before upgrading,
+   It's recommended to uninstall previous CouchDB version before upgrading,
    especially if the new one is built against different Erlang release.
-   The reason is simple: there may left a some of libraries with alternative or
+   The reason is simple: there may be leftover libraries with alternative or
    incompatible versions from old Erlang release that may create conflicts,
-   errors and weird crushes.
+   errors and weird crashes.
 
-   In this case, make sure you'd backup of your `local.ini` config and CouchDB
+   In this case, make sure you backup of your `local.ini` config and CouchDB
    database/index files.
 
 .. _Open up Futon: http://localhost:5984/_utils

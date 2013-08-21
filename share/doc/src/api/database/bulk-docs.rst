@@ -32,9 +32,8 @@
 
       * **true**: Ensures that any non-committed changes are committed to
         physical storage.
-      * **false**: Uses the delay commit in opposite to ``true`` value. CouchDB
-        responses quickly, but without any guarantees that all data are
-        successfully stored on disk.
+      * **false**: Uses delayed commits. CouchDB responds faster, but without
+        any guarantees that all data is successfully stored on disk.
 
 * **Return Codes**:
 

@@ -170,14 +170,14 @@ After that, CouchDB URI could be located within the URI file.
 ``redirect_vhost_handler`` :: Virtual Hosts custom redirect handler
 -------------------------------------------------------------------
 
-This option allows to change the default function that handles requests to
+This option customizes the default function that handles requests to
 :ref:`virtual hosts <config/vhosts>`::
 
   [httpd]
   redirect_vhost_handler = {Module, Fun}
 
-Specified function take 2 arguments: the Mochiweb request object and the target
-path.
+The specified function take 2 arguments: the Mochiweb request object and the 
+target path.
 
 
 .. _config/httpd/server_options:
@@ -648,21 +648,22 @@ Finally, add an entry to your :ref:`configuration file <config>` in the
   couchdb.local:5984 = /example
   *.couchdb.local:5984 = /example
 
-If your CouchDB is listening on the default HTTP port, or is sitting
-behind a proxy, then don't specify a port number in the `vhost` key.
+If your CouchDB is listening on the the default HTTP port (80), or is sitting
+behind a proxy, then you don't need to specify a port number in the `vhost` key.
 
 The first line will rewrite the request to display the content of the `example`
 database. This rule works only if the ``Host`` header is ``couchdb.local`` and
-won't work for `CNAMEs`. Second rule on the other hand match all `CNAMEs` to
-`example` db. So `www.couchdb.local` or `db.couchdb.local` will work.
+won't work for `CNAMEs`. The second rule on the other hand matches all
+`CNAMEs` to `example` db. So `www.couchdb.local` or `db.couchdb.local` will
+work.
 
 
 .. _config/vhosts/rewriting:
 
-Rewriting Hosts to path
------------------------
+Rewriting Hosts to a Path
+-------------------------
 
-Like in the :ref:`_rewrite <api/ddoc/rewrite>` handler you could match some
+Like in the :ref:`_rewrite <api/ddoc/rewrite>` handler you can match some
 variable and use them to create the target path. Some examples::
 
   [vhosts]
@@ -671,9 +672,8 @@ variable and use them to create the target path. Some examples::
   :ddocname.:dbname.example.com = /:dbname/_design/:ddocname/_rewrite
 
 
-First rule pass wildcard as `dbname`. The second one does the same, but uses a
-variable name. And the third one allows you to use any app with `ddocname` in
-any database with `dbname`.
+The first rule passes the wildcard as `dbname`. The second one does the same, 
+but uses a variable name. And the third one allows you to use any URL with `ddocname` in any database with `dbname`.
 
 You could also change the default function to handle request by changing
 the setting :ref:`redirect_vhost_handler <config/httpd/redirect_vhost_handler>`

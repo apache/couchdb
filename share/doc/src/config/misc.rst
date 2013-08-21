@@ -38,8 +38,8 @@ to ``9`` (highest, slowest). ``0`` value disables compression::
 ``compressible_types``
 ----------------------
 
-While not all attached files could be compressed well, it's possible to let
-CouchDB compress only specific attachments according by their MIME type::
+While not all attached files could be compressed well, it is possible to let
+CouchDB compress only specific attachments identified by their MIME type::
 
   [attachments]
   compressible_types = text/*, application/javascript, application/json, application/xml
@@ -66,7 +66,7 @@ Rate of statistics gathering in milliseconds::
 ``samples``
 -----------
 
-Samples are used tracks the mean and standard value deviation within specified
+Samples are used to track the mean and standard value deviation within specified
 intervals (in seconds)::
 
   [stats]
@@ -194,8 +194,8 @@ ensure uniqueness of ``utc_id`` ids::
 
 .. versionadded:: 1.3
 
-For CouchDB distributors there is option to explicitly define this information
-in welcome message::
+For CouchDB distributors there is an option to customise CouchDB's welcome
+message which is returned when requesting ``GET /``.
 
   [vendor]
   name = The Apache Software Foundation

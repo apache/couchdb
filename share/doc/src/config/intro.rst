@@ -158,11 +158,11 @@ easy to make CouchDB unavailable. For instance, you'd like to change the
 
   curl -X PUT http://localhost:5984/_config/httpd/bind_address -d '"10.10.0.128"'
 
-Whatever if you'd made a typo or the specified IP address is not available from
-your network, you'll make CouchDB unavailable for you in both cases and you will
-have the only way to fix the problem by edit the configuration file and restart
-the server. To protect yourself against such accidents you may setup the
-:ref:`whilelist <config/httpd/config_whitelist>` of configuration parameters
-that are allowed to edit via the HTTP API. For others you'll need to directly
-edit the configuration file so you may quick fix any problems that had occurred
-due to misconfiguring.
+However, if you would made a typo or the specified IP address is not available
+from your network, you'll make CouchDB unavailable for you in both cases and
+you will have the only way to fix the problem by edit the configuration file
+and restart the server. To protect yourself against such accidents you may
+setup the :ref:`whilelist <config/httpd/config_whitelist>` of configuration
+parameters that are allowed to edit via the HTTP API. For others you'll need to
+directly edit the configuration file so you may quick fix any problems that had
+occurred due to misconfiguring.

@@ -26,7 +26,7 @@ Compaction Configuration
 ``doc_buffer_size`` :: Documents buffer size
 --------------------------------------------
 
-Specifies maximum copy buffer size in bytes::
+Specifies the copy buffer's maximum size in bytes::
 
   [database_compaction]
   doc_buffer_size = 524288
@@ -37,8 +37,8 @@ Specifies maximum copy buffer size in bytes::
 ``checkpoint_after`` :: Checkpoint trigger
 ------------------------------------------
 
-Triggers checkpoint after special amount of bytes was successfully copied to
-the compacted database::
+Triggers a checkpoint after the specified amount of bytes were successfully 
+copied to the compacted database::
 
   [database_compaction]
   checkpoint_after = 5242880
@@ -68,20 +68,20 @@ For example::
 
 Possible parameters:
 
-- ``db_fragmentation``: If the ratio (as an integer percentage), of the amount
-  of old data (and its supporting metadata) over the database file size is equal
-  to or greater then this value, this database compaction condition is
-  satisfied. This value is computed as::
+- ``db_fragmentation``: If the ratio of legacy data, including metadata, to
+  current data in the database file size is equal to or greater then this
+  value, this database compaction condition is satisfied. The percentage is 
+  expressed as an integer percentage. This value is computed as::
 
     (file_size - data_size) / file_size * 100
 
   The data_size and file_size values can be obtained when
   querying a :ref:`database's information URI <api/db.get>`.
 
-- ``view_fragmentation``: If the ratio (as an integer percentage), of the amount
-  of old data (and its supporting metadata) over the view index (view group)
-  file size is equal to or greater then this value, then this view index
-  compaction condition is satisfied. This value is computed as::
+- ``view_fragmentation``: If the ratio of legacy data, including metadata, to
+  current data in a view index file size is equal to or greater then this
+  value, this database compaction condition is satisfied. The percentage is 
+  expressed as an integer percentage. This value is computed as::
 
     (file_size - data_size) / file_size * 100
 
@@ -104,7 +104,7 @@ Possible parameters:
   It defaults to `false`.
 
 Before a compaction is triggered, an estimation of how much free disk space is
-needed is computed. This estimation corresponds to 2 times the data size of
+needed is computed. This estimation corresponds to two times the data size of
 the database or view index. When there's not enough free disk space to compact
 a particular database or view index, a warning message is logged.
 
