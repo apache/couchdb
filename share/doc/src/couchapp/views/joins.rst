@@ -208,7 +208,7 @@ all blog posts, keyed by author:
 
   function(doc) {
     for (var i in doc.comments) {
-      map(doc.comments[i].author, doc.comments[i].content);
+      emit(doc.comments[i].author, doc.comments[i].content);
     }
   }
 
@@ -286,7 +286,7 @@ ID:
 
   function(doc) {
     if (doc.type == "comment") {
-      map(doc.post, {author: doc.author, content: doc.content});
+      emit(doc.post, {author: doc.author, content: doc.content});
     }
   }
 
@@ -299,7 +299,7 @@ Viewing all comments by author is just as easy as before:
 
   function(doc) {
     if (doc.type == "comment") {
-      map(doc.author, {post: doc.post, content: doc.content});
+      emit(doc.author, {post: doc.post, content: doc.content});
     }
   }
 
@@ -332,9 +332,9 @@ some use of that:
 
   function(doc) {
     if (doc.type == "post") {
-      map([doc._id, 0], doc);
+      emit([doc._id, 0], doc);
     } else if (doc.type == "comment") {
-      map([doc.post, 1], doc);
+      emit([doc.post, 1], doc);
     }
   }
 
