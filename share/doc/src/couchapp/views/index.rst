@@ -27,3 +27,4 @@ applications with CouchDB
   collation
   joins
   nosql
+  pagination
