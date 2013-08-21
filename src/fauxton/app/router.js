@@ -51,7 +51,7 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents
     routes: {},
 
     addModuleRouteObject: function(RouteObject) {
-      var that = this; //change that to that
+      var that = this;
       var masterLayout = this.masterLayout,
       routeUrls = RouteObject.prototype.getRouteUrls();
 
@@ -63,6 +63,9 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents
 
           authPromise.then(function () {
             if (!that.activeRouteObject || !that.activeRouteObject.hasRoute(route)) {
+              if (that.activeRouteObject) {
+                that.activeRouteObject.removeViews();
+              }
               that.activeRouteObject = new RouteObject(route, masterLayout, args);
             }
 

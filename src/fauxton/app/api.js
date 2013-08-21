@@ -295,7 +295,7 @@ function(app, Fauxton) {
          $('.spinner').append(routeObjectSpinner.el);
        }
 
-      FauxtonAPI.when(this.establish()).done(function(resp) {
+      FauxtonAPI.when(this.establish()).then(function(resp) {
         _.each(routeObject.getViews(), function(view, selector) {
           if(view.hasRendered) { return; }
 
@@ -336,7 +336,7 @@ function(app, Fauxton) {
               };
 
               FauxtonAPI.addNotification({
-                msg: 'An Error occurred ' + resp,
+                msg: 'An Error occurred ' + resp.responseText,
                 type: 'error' 
               });
               masterLayout.renderView(selector);
@@ -351,7 +351,12 @@ function(app, Fauxton) {
             }
           });
         });
-      }.bind(this));
+      }.bind(this), function (resp) {
+          FauxtonAPI.addNotification({
+                msg: 'An Error occurred ' + resp.responseText,
+                type: 'error' 
+          });
+      });
 
       if (this.get('apiUrl')) masterLayout.apiBar.update(this.get('apiUrl'));
 
@@ -392,6 +397,13 @@ function(app, Fauxton) {
 
     getViews: function() {
       return this.views;
+    },
+
+    removeViews: function () {
+      _.each(this.views, function (view, selector) {
+        view.remove();
+        delete this.views[selector];
+      }, this);
     },
 
     getRouteUrls: function () {
