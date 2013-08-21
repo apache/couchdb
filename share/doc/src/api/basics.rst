@@ -340,7 +340,7 @@ is exactly what almost all other languages use as well.
 
 .. _IEEE 754: https://en.wikipedia.org/wiki/IEEE_754-2008
 
-What CouchDB does a bit differently than other languages is that it
+What Erlang does a bit differently than other languages is that it
 does not attempt to pretty print the resulting output to use the
 shortest number of characters. For instance, this is why we have this
 relationship:
@@ -353,7 +353,7 @@ relationship:
 What can be confusing here is that internally those two formats
 decode into the same IEEE-754 representation. And more importantly, it
 will decode into a fairly close representation when passed through all
-major parsers that I know about.
+major parsers that we know about.
 
 While we've only been discussing cases where the textual
 representation changes, another important case is when an input value
@@ -361,8 +361,8 @@ is contains more precision than can actually represented in a double.
 (You could argue that this case is actually "losing" data if you don't
 accept that numbers are stored in doubles).
 
-Here's a log for a couple of the more common JSON libraries I happen
-to have on my machine:
+Here's a log for a couple of the more common JSON libraries that happen
+to be on the author's machine:
 
 Spidermonkey::
 
@@ -482,11 +482,11 @@ string or by using integer types (although integer types can still
 bite you if you use a platform that has a different integer
 representation than normal, ie, JavaScript).
 
-Also, if anyone is really interested in changing this behavior, I'm
+Also, if anyone is really interested in changing this behavior, we're
 all ears for contributions to `jiffy`_ (which is theoretically going to
-replace ejson when I get around to updating the build system). The
-places I've looked for inspiration are TCL and Python. If you know a
-decent implementation of this float printing algorithm give me a
+replace ejson when we get around to updating the build system). The
+places we've looked for inspiration are TCL and Python. If you know a
+decent implementation of this float printing algorithm give us a
 holler.
 
 .. _jiffy: https://github.com/davisp/jiffy
