@@ -13,26 +13,63 @@
 
 .. _install/mac:
 
-=====================
-Installation on MacOS
-=====================
+========================
+Installation on Mac OS X
+========================
+
 
 .. _install/mac/binary:
 
-Install from binaries
-=====================
+Installation using the Apache CouchDB native application
+========================================================
 
-#. Get `the latest MacOS binaries`_ from `CouchDB web site`_.
+The easiest way to run CouchDB on Mac OS X is through his native Mac OS X
+application. Just follow the below instructions:
+
+#. `Download Apache CouchDB for Mac OS X`_.
    Old releases are available at `archive`_.
-#. Unzip it and place CouchDB Server into the Applications directory
-#. Run CouchDB
-#. `Open up Futon`_
-#. It's time to Relax!
+#. Double click on the Zip file
+#. Drag and drop the Apache CouchDB.app into Applications folder
+
+.. _Download Apache CouchDB for Mac OS X: http://couchdb.org/#download
+.. _archive: http://archive.apache.org/dist/couchdb/binary/mac/
+
+That's all, now CouchDB is installed on your Mac:
+
+#. Run Apache CouchDB application
+#. `Open up Futon`_, the CouchDB admin interface
+#. Time to Relax!
 
 .. _Open up Futon: http://localhost:5984/_utils
-.. _CouchDB web site: http://couchdb.org/
-.. _archive: http://archive.apache.org/dist/couchdb/binary/mac/
-.. _the latest MacOS binaries: http://couchdb.org/#download
+
+
+.. _install/mac/macports:
+
+Installation from MacPorts
+==========================
+
+To install CouchDB using MacPorts you have 2 package choices:
+
+- ``couchdb`` - the latest release version
+- ``couchdb-devel`` - updated every few weeks from the master branch
+
+::
+
+  $ sudo port install couchdb
+  
+or, if you want the last development version:
+
+  $ sudo port install couchdb-devel
+
+MacPorts takes care of installing all necessary dependencies.
+It should now be up and accessible via Futon at http://127.0.0.1:5984/_utils.
+
+If you want to run CouchDB as a service, load the launchd configuration which
+comes  with the project, with this command::
+
+  $ sudo port load couchdb
+
+Now CouchDB should be started automatically after every reboot.
 
 
 .. _install/mac/homebrew:
@@ -67,7 +104,7 @@ The same is true for recent versions of Erlang::
 
 Now it's time to brew CouchDB::
 
-  brew install couchdb
+    brew install couchdb
 
 
 The above Erlang install will use the bottled (pre-compiled) version if you are:
@@ -185,4 +222,3 @@ to reflect the latest versions of available packages. In order to do that run::
   $ sudo port selfupdate
 
 to update the port tree, and then install just as explained.
-
