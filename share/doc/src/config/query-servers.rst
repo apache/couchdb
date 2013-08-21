@@ -77,8 +77,8 @@ running via `Mozilla SpiderMonkey`_::
 ``commit_freq`` :: View index commit delay
 ------------------------------------------
 
-Specifies delay in seconds (``5`` by default) before commit view index changes
-on disk::
+Specifies the delay in seconds before view index changes are committed to disk.
+The default value is ``5``::
 
   [query_server_config]
   commit_freq = 5
@@ -94,8 +94,8 @@ Amount of time in seconds that the Query Server may process CouchDB command::
   [query_server_config]
   os_process_limit = 10
 
-CouchDB will raise `os_process_timeout` error and kill the process in case when
-Query Server doesn't return any result within this time frame.
+CouchDB will raise `os_process_timeout` error and kill the process in case the
+Query Server doesn't return any result within this limit.
 
 
 .. _config/query_server_config/reduce_limit:
@@ -130,8 +130,7 @@ since main propose of `reduce` functions is to *reduce* the input.
    about running them, especially if they were written by someone else.
 
 CouchDB has a native Erlang query server, allowing you to write your map/reduce
-functions in Erlang. There is need no longer to manually install `erlview`_,
-unless you are running an old version (pre 0.10) of CouchDB.
+functions in Erlang.
 
 First, you'll need to edit your `local.ini` to include a
 ``[native_query_servers]`` section::
@@ -163,5 +162,3 @@ following functions as a temporary view:
 
 If all has gone well, after running the view you should see a list of the total
 number of documents at each revision number.
-
-.. _erlview: https://github.com/mmcdanie/erlview

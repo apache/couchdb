@@ -112,7 +112,7 @@ see :ref:`http-proxying`. For further background on the OS Daemon service, see
 ------------------------------------------
 
 Specifies maximum attempts to run :ref:`os_daemon <config/os_daemons>` before
-mark him halted::
+mark them halted::
 
   [os_daemon_settings]
   max_retries = 3

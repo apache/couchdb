@@ -130,7 +130,7 @@ Number of :ref:`userctx_object` to cache in memory to reduce disk lookups::
 ``authentication_db`` :: Users database
 ---------------------------------------
 
-Specifies name of the system database for storing CouchDB users::
+Specifies the name of the system database for storing CouchDB users::
 
   [couch_httpd_auth]
   authentication_db = _users
@@ -145,8 +145,8 @@ Specifies name of the system database for storing CouchDB users::
 ``authentication_redirect`` :: Default redirect for authentication requests
 ---------------------------------------------------------------------------
 
-Specifies location for redirection on successful authentication if ``text/html``
-response accepted by client (via ``Accept`` header)::
+Specifies the location for redirection on successful authentication if a
+``text/html`` response is accepted by the client (via ``Accept`` header)::
 
   [couch_httpd_auth]
   authentication_redirect = /_utils/session.html
@@ -159,9 +159,8 @@ response accepted by client (via ``Accept`` header)::
 
 .. versionadded:: 1.3
 
-Number of iterations for password hashing by PBKDF2 algorithm. Higher number
-provides better hash durability, but with cost of performance on each request
-that requires authentication::
+The umbenr of iterations for password hashing by the PBKDF2 algorithm. A higher 
+number provides better hash durability, but with cost of performance on each request that requires authentication::
 
   [couch_httpd_auth]
   iterations = 10000
@@ -172,8 +171,8 @@ that requires authentication::
 ``proxy_use_secret`` :: Force proxy auth use secret token
 ---------------------------------------------------------
 
-When this option ``true`` the :ref:`secret <config/couch_httpd_auth/secret>` is
-required for :ref:`api/auth/proxy`::
+When this option is ``true`` the :ref:`secret <config/couch_httpd_auth/secret>` 
+is required for :ref:`api/auth/proxy`::
 
   [couch_httpd_auth]
   proxy_use_secret = false
@@ -203,14 +202,13 @@ If unset or not specified, authenticated users may retrieve only their own docs.
      [couch_httpd_auth]
      users_db_public = true
 
-
 .. _config/couch_httpd_auth/require_valid_user:
 
 ``require_valid_user`` :: Force users authentication
 ----------------------------------------------------
 
-When this option ``true`` no requests allowed from anonymous users - everyone
-should be authenticated::
+When this option ``true`` no requests allowed from anonymous users. Everyone
+must be authenticated::
 
   [couch_httpd_auth]
   require_valid_user = false

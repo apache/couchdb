@@ -41,10 +41,10 @@ A list of the available methods and URL paths are provided below:
 Basic Authentication
 ====================
 
-`Basic authentication`_ (:rfc:`2617`) is a quick and simple way to be
-authenticated by CouchDB. The main flaw of this simplicity is the need to send
-user credentials with each request which may be insecure and hurts operations
-performance (since CouchDB must compute password hash with every request):
+`Basic authentication`_ (:rfc:`2617`) is a quick and simple way to authenticate
+with CouchDB. The main drawback is the need to send user credentials with each
+request which may be insecure and could hurt operation performance (since
+CouchDB must compute password hash with every request):
 
 .. code-block:: http
 
@@ -82,12 +82,12 @@ performance (since CouchDB must compute password hash with every request):
 Cookie Authentication
 =====================
 
-For cookie authentication (:rfc:`2109`) CouchDB generates a one-time token that
-the client can use for next requests to CouchDB. When CouchDB sees non expired
-the token in a subsequent request, it will authenticate user by this token
-without requesting the password again. By default, cookies are valid for
-10 minutes, but it's :ref:`adjustable <config/couch_httpd_auth/timeout>`.
-Also it's possible to make cookies
+For cookie authentication (:rfc:`2109`) CouchDB generates a token that the
+client can use for the next few requests to CouchDB. Tokens are valid until
+a timeout. When CouchDB sees a valid token in a subsequent request, it will
+authenticate user by this token without requesting the password again. By
+default, cookies are valid for 10 minutes, but it's :ref:`adjustable
+<config/couch_httpd_auth/timeout>`. Also it's possible to make cookies
 :ref:`persistent <config/couch_httpd_auth/allow_persistent_cookies>`
 
 To obtain the first token and thus authenticate a user for the first time, the
@@ -213,7 +213,7 @@ to the specified location in case of successful authentication:
   * **401**:
     Username or password wasn't recognized.
 
-Returns complete information about authenticated user:
+Returns complete information about the authenticated user:
 
 .. code-block:: http
 
@@ -264,7 +264,7 @@ available ones and authentication database.
   * **401**:
     Username or password wasn't recognized.
 
-Closes user's session. If everything is ok, the response is:
+Closes a user's session. If everything is ok, the response is:
 
 .. code-block:: javascript
 
@@ -288,8 +288,8 @@ Proxy Authentication
       authentication_handlers = {couch_httpd_oauth, oauth_authentication_handler}, {couch_httpd_auth, cookie_authentication_handler}, {couch_httpd_auth, proxy_authentication_handler}, {couch_httpd_auth, default_authentication_handler}
 
 
-`Proxy authentication` is very useful in case when your application is already
-uses some external authentication service and you won't duplicate users and
+`Proxy authentication` is very useful in case your application already uses
+some external authentication service and you don't want to duplicate users and
 their roles in CouchDB.
 
 This authentication method allows creation of a :ref:`userctx_object` for
@@ -349,7 +349,7 @@ CouchDB sends the response:
     }
 
 
-Note, that you don't need to request :ref:`session <api/auth/session>` resource
+Note that you don't need to request :ref:`session <api/auth/session>`
 to be authenticated by this method if all required HTTP headers are provided.
 
 
@@ -455,6 +455,6 @@ Both snippets produces similar request and response pair:
     }
   }
 
-There we'd requested the :ref:`_session <api/auth/session>` resource to ensure
-that authentication was successful and target CouchDB username is correct.
+There we request the :ref:`_session <api/auth/session>` resource to ensure
+that authentication was successful and the target CouchDB username is correct.
 Change the target URL to request required resource.

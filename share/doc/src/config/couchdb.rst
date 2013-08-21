@@ -99,9 +99,9 @@ section). Available methods are:
 ``fsync_options`` :: Fsync options
 ----------------------------------
 
-Conditions when to make `fsync` calls. `fsync` makes sure that any buffers kept
-by the operating system are written to disk. Normally, you have no need to edit
-this parameter::
+Specifies when to make `fsync` calls. `fsync` makes sure that any file system 
+buffers kept by the operating system are written to disk. Normally, you have no
+need to edit this parameter::
 
   [couchdb]
   fsync_options = [before_header, after_header, on_file_open]
