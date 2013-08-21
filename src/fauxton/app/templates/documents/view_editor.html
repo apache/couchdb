@@ -109,42 +109,6 @@ the License.
     <div class="tab-pane" id="query">
       <div class="advanced-options well">
         <form class="view-query-update">
-          <div class="controls controls-row">
-            <label class="span3 inline">
-              Limit:
-              <select name="limit" class="input-small">
-                <option>5</option>
-                <option selected="selected">10</option>
-                <option>25</option>
-                <option>50</option>
-                <option>100</option>
-              </select>
-            </label>
-            <label class="span3 checkbox inline">
-              <input name="include_docs" type="checkbox" value="true"> Include Docs
-            </label>
-            <% if (hasReduce) { %>
-            <label class="span2 checkbox inline">
-              <input name="reduce" type="checkbox" value="true"> Reduce
-            </label>
-            <label class="span4 inline">
-              Group Level:
-              <select disabled name="group_level" class="input-small">
-                <option value="0">None</option>
-                <option value="1">1</option>
-                <option value="2">2</option>
-                <option value="3">3</option>
-                <option value="4">4</option>
-                <option value="5">5</option>
-                <option value="6">6</option>
-                <option value="7">7</option>
-                <option value="8">8</option>
-                <option value="9">9</option>
-                <option value="999" selected="selected">exact</option>
-              </select>
-            </label>
-            <% } %>
-          </div>
           <div class="row-fluid">
             <div class="controls controls-row">
               <input name="key" class="span6" type="text" placeholder="Key">
@@ -159,16 +123,57 @@ the License.
           </div>
           <div class="row-fluid">
             <div class="controls controls-row">
-              <label class="span2 checkbox inline">
+
+              <label class="checkbox inline">
+                <input name="include_docs" type="checkbox" value="true"> Include Docs
+              </label>
+
+              <% if (hasReduce) { %>
+              <label class="checkbox inline">
+                <input name="reduce" type="checkbox" value="true"> Reduce
+              </label>
+
+              <label class="checkbox inline">
+                Group Level:
+                <select disabled name="group_level" class="input-small">
+                  <option value="0">None</option>
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="5">5</option>
+                  <option value="6">6</option>
+                  <option value="7">7</option>
+                  <option value="8">8</option>
+                  <option value="9">9</option>
+                  <option value="999" selected="selected">exact</option>
+                </select>
+              </label>
+              <% } %>
+            </div>
+            <div class="controls controls-row">
+              <label class="checkbox inline">
                 <input name="stale" type="checkbox" value="ok"> Stale
               </label>
-              <label class="span2 checkbox inline">
+              <label class="checkbox inline">
                 <input name="descending" type="checkbox" value="true"> Descending
               </label>
-              <label class="span4 checkbox inline">
+              <label class="checkbox inline">
+                Limit:
+                <select name="limit" class="input-small">
+                  <option>5</option>
+                  <option selected="selected">10</option>
+                  <option>25</option>
+                  <option>50</option>
+                  <option>100</option>
+                </select>
+              </label>
+            </div>
+            <div class="controls controls-row">
+              <label class="checkbox inline">
                 <input name="inclusive_end" type="checkbox" value="false"> Disable Inclusive End
               </label>
-              <label class="span4 checkbox inline">
+              <label class="checkbox inline">
                 <input name="update_seq" type="checkbox" value="true"> Include Update Sequence
               </label>
             </div>

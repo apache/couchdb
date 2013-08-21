@@ -610,10 +610,11 @@ tbody {padding-top: 10px;}
 
 
 /*form elements and buttons*/
-
 .btn-group {
   > .btn + .dropdown-toggle,
-  > .btn:first-child
+  > .btn:first-child,
+  > .btn:last-child,
+  > .dropdown-toggle
   {
     .border-radius(0);
     background-image: none;
@@ -680,6 +681,7 @@ input[type=text], input[type=password],
   padding: 7px;
   margin-top: -5px;
   border: 1px solid @inputBorder;
+  .border-radius(0);
 }
 
 
@@ -743,6 +745,7 @@ tr.all-docs-item{
 /*documents and databases */
 .view.show{
   color: @fontGrey;
+  margin-top: 56px;
 }
 
 div.spinner {
