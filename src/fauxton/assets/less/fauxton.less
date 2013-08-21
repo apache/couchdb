@@ -74,7 +74,7 @@
 
 /*buttons */
 @redButton: @red;
-@linkColor: @darkRed;
+@linkColor: @red;
 
 @boxShadow: 2px 2px rgba(0,0,0,0.2);
 @boxShadowOff: 2px 2px rgba(0,0,0,0);
@@ -207,6 +207,7 @@ a:hover{
 
   .navbar {
     .brand {
+      .box-sizing(content-box);
       .hide-text;
       .customTransition(left, 1s, 0.805, 0.005, 0.165, 0.985);
       margin: 10px 0 6px;
@@ -214,6 +215,7 @@ a:hover{
       height: 40px;
       padding: 10px;
       .icon{
+        .box-sizing(content-box);
         background: url(../img/minilogo.png) no-repeat 0 0;
         display: block;
         height: 100%;
@@ -430,7 +432,6 @@ a:hover{
 }
 
 #breadcrumbs {
-   
    padding: 15px 20px;
    .breadcrumb {
     margin-bottom: 0;
@@ -447,6 +448,9 @@ a:hover{
       color: @breadcrumbText;
       font-size: 18px;
       text-shadow: none;
+      &.active{
+        color: #333;
+      }
       a{
         color: @breadcrumbText;
       }
@@ -568,16 +572,20 @@ footer#mainFooter{
   padding: 0 20px;
 }
 
-.nav-tabs > li > a {
+.nav-tabs > li{
+  margin-right: 2px;
+  > a {
+  color: #333;
   border-color: #eeeeee #eeeeee #dddddd;
   text-decoration: none;
   background-color: #eeeeee;
   border-radius: 0;
   border-left: none;
   border-right: none;
-  &.fonticon:before{
-    margin-right: 6px;
-    font-size: 16px;
+    &.fonticon:before{
+      margin-right: 6px;
+      font-size: 16px;
+    }
   }
 }
 
@@ -595,6 +603,18 @@ footer#mainFooter{
 
 .tab-content {
   margin-top: 70px;
+}
+
+.well { 
+  .controls-group {
+  &:first-child, &:last-child{
+    margin-top: 24px;
+  }
+  margin-bottom: 8px;
+  }
+  .controls-row {
+    margin-bottom: 8px;
+  }
 }
 
 /*TABLE STYLES*/
@@ -678,10 +698,12 @@ tbody {padding-top: 10px;}
 
 input[type=text], input[type=password],
 .navbar-form input{
-  padding: 7px;
-  margin-top: -5px;
-  border: 1px solid @inputBorder;
   .border-radius(0);
+  padding: 12px;
+  margin-top: -4px;
+  border: 1px solid #ccc;
+  height: auto;
+  font-size: 16px;
 }
 
 
@@ -689,18 +711,127 @@ input[type=checkbox]{
 
 }
 label.fonticon-search {
+  .box-sizing(content-box);
   position: relative;
   &:before {
+    .transition(all .25s linear);
+    font-size: 16px;
     position: absolute;
-    right: -35px;
+    right: -47px;
     background-color: #E1E1E1;
-    height: 18px;
-    width: 18px;
-    border: 1px solid @inputBorder;
-    padding: 8px;
-    top: -5px;
+    height: 46px;
+    width: 48px;
+    border: 1px solid #cccccc;
+    padding: 14px;
+    top: -4px;
+  }
+  &:hover{
+    color:white;
+    &:before {
+      background-color: @red;
+    }
   }
 }
+
+*, *:before, *:after {
+  .box-sizing(border-box);
+}
+
+input[type="checkbox"], input[type="radio"] {
+  box-sizing: border-box;
+  padding: 0;
+}
+
+input[type="file"], input[type="checkbox"], input[type="radio"], select {
+  margin: 0 0 1em 0;
+}
+
+.well select {
+  margin: 0;
+}
+
+form.custom .hidden-field {
+  margin-left: -99999px;
+  position: absolute;
+  visibility: hidden;
+}
+
+label{
+  padding-left: 25px;  
+  margin-right: 15px; 
+  display: inline-block;  
+  cursor: pointer;  
+  position: relative;  
+  font-size: 14px;  
+}
+
+.custom-inputs{
+
+  input[type=radio], 
+  input[type=checkbox] {  
+    display: none;  
+  } 
+
+  .checkbox label:before {  
+    border-radius: 3px;  
+  }  
+
+  .controls > .radio:first-child, .controls > .checkbox:first-child {
+    padding-top: 15px;
+  }
+
+  .radio.inline, .checkbox.inline {
+    display: inline-block;
+    padding-top: 15px;
+    margin-bottom: 12px;
+    vertical-align: middle;
+  }
+
+  input[type=checkbox]:checked + label:before {  
+    /*content: "\2713"; */
+    content: "\00d7"; 
+    text-shadow: 1px 1px 1px rgba(0, 0, 0, .2);  
+    font-size: 16px;
+    background-color: @red;  
+    color: white;  
+    text-align: center;  
+    line-height: 15px;  
+  }  
+
+  label:before {  
+    content: "";  
+    display: inline-block;  
+
+    width: 16px;  
+    height: 16px;  
+
+    margin-right: 10px;  
+    position: absolute;  
+    left: 0;  
+    bottom: 1px;  
+    background-color: #aaa;  
+    box-shadow: inset 0px 2px 3px 0px rgba(0, 0, 0, .3), 0px 1px 0px 0px rgba(255, 255, 255, .8);  
+  }  
+
+  .radio label:before {  
+    border-radius: 8px;  
+  }  
+
+  input[type=radio]:checked + label:before {  
+    content: "\2022";  
+    color: #f3f3f3;  
+    font-size: 30px;  
+    text-align: center;  
+    line-height: 18px;  
+  }
+
+  label.drop-down{
+    &:before{
+    display: none;
+    }
+  }
+}
+
 
 .form-actions {
   background: none;
@@ -783,11 +914,20 @@ div.spinner {
   .input-append.input-prepend {
     margin-bottom: 0px;
     .add-on {
+      margin-top: -4px;
+      background: none;
+      padding: 14px 12px 32px 12px;
       border: none;
-      padding-right: 25px;
     }
     .btn:last-child{
-      margin-left: 15px;
+      margin-left: -1px;
+      margin-top: -4px;
+      background: none;
+      padding: 13px 12px 11px 12px;
+      &:hover{
+        background-color: @red;
+        color: white;
+      }
     }
   }
 }
