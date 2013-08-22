@@ -1,0 +1,290 @@
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not
+// use this file except in compliance with the License. You may obtain a copy of
+// the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+// License for the specific language governing permissions and limitations under
+// the License.
+
+define([
+  "app",
+  "api",
+  "addons/replication/resources"
+],
+function(app, FauxtonAPI, replication) {
+  var View = {},
+			Events ={},
+			pollingInfo ={
+        rate: 5,
+        intervalId: null
+      };
+
+  _.extend(Events, Backbone.Events);
+  
+// NOTES: http://wiki.apache.org/couchdb/Replication
+
+// Replication form view is huge
+// -----------------------------------
+// afterRender: autocomplete on the target input field
+// beforeRender:  add the status table
+// disableFields:  disable non active fields on submit 
+// enableFields:  enable field when radio btns are clicked
+// establish:  get the DB list for autocomplete
+// formValidation:  make sure fields aren't empty
+// showProgress:  make a call to active_tasks model and show only replication types.  Poll every 5 seconds. (make this it's own view)
+// startReplication:  saves to the model, starts replication
+// submit:  form submit handler
+// swapFields:  change to and from target
+// toggleAdvancedOptions:  toggle advanced
+
+  View.ReplicationForm = FauxtonAPI.View.extend({
+		template: "addons/replication/templates/form",
+		events:  {
+			"submit #replication": "submit",
+			"click input[type=radio]": "enableFields",
+			"click .swap": "swapFields",
+			"click .options": "toggleAdvancedOptions"
+		},
+		initialize: function(){
+			this.status = this.options.status;
+			this.newRepModel = new replication.Replicate({});
+		},
+		afterRender: function(){
+			var dbLimit = 30;
+      var ajaxReq;
+      //re-using what we have on DB search
+      this.$el.find("input#to_name").typeahead({
+        source: function(query, process) {
+          var url = [
+            app.host,
+            "/_all_dbs?startkey=%22",
+            query,
+            "%22&endkey=%22",
+            query,
+            "\u9999%22&limit=",
+            dbLimit
+          ].join('');
+          if (ajaxReq) ajaxReq.abort();
+          ajaxReq = $.ajax({
+            url: url,
+            dataType: 'json',
+            success: function(data) {
+              process(data);
+            }
+          });
+        }
+      });
+
+		},
+
+		beforeRender:  function(){
+		this.insertView("#replicationStatus", new View.ReplicationList({
+			collection: this.status
+		}));
+		},
+		cleanup: function(){
+			clearInterval(pollingInfo.intervalId);
+		},
+		disableFields: function(){
+			this.$('input[type=radio]').attr('disabled',true);
+			this.$('.advancedOptions:hidden').find('input').attr('disabled',true);
+		},
+
+		enableFields: function(e){
+			var $currentTarget = this.$(e.currentTarget);
+					$currentTarget.parents(".form_set").find('input[type="text"], select').attr('disabled','true').addClass('disabled');
+					$currentTarget.parents('.control-group').find('input[type="text"], select').removeAttr('disabled').removeClass('disabled');
+		},
+		establish: function(){
+			return [ this.collection.fetch(), this.status.fetch()];
+		},
+
+		formValidation: function(){
+			var $remote = this.$el.find("[value='remote']:checked").parents('.control-group').find('input[type=text]'),
+					error = false;
+			for(var i=0; i<$remote.length; i++){
+				if ($remote[i].value =="http://" || $remote[i].value ==" "){
+					error = true;
+				}
+			}
+			return error;
+		},
+		serialize: function(){
+			return {
+				databases:  this.collection.toJSON()
+			};
+		},
+		startReplication: function(json){
+			var that = this;
+			this.newRepModel.save(json,{
+				success: function(resp){
+					var notification = FauxtonAPI.addNotification({
+						msg: "Replication from "+resp.get('source')+" to "+ resp.get('target')+" has begun.",
+						type: "success",
+						clear: true
+					});
+					that.updateButtonText(false);
+					Events.trigger('update:tasks');
+				},
+				error: function(model, xhr, options){
+					var errorMessage = JSON.parse(xhr.responseText);
+					var notification = FauxtonAPI.addNotification({
+						msg: errorMessage.reason,
+						type: "error",
+						clear: true
+					});
+					that.updateButtonText(false);
+				}
+			});
+		},		
+		updateButtonText: function(wait){
+			var $button = this.$('#replication button[type=submit]');
+			if(wait){
+				$button.text('Starting replication...').attr('disabled', true);
+			} else {
+				$button.text('Replication').attr('disabled', false);
+			}
+		},
+		submit: function(e){
+			e.preventDefault();
+			this.disableFields(); //disable fields not relevant to submitting
+
+			var formJSON = {};
+			_.map(this.$(e.currentTarget).serializeArray(), function(formData){
+				if(formData.value !== ''){
+					formJSON[formData.name] = formData.value;
+				}
+			});
+
+			var alreadyExists = this.collection.where({"name":$('input#to_name').val()});
+
+			if (alreadyExists.length === 0){
+				formJSON.create_target = true;
+			}
+			console.log($(e.currentTarget).serializeArray(), formJSON);
+			this.updateButtonText(true);
+			this.startReplication(formJSON);
+		},	
+		swapFields: function(e){
+			//WALL O' VARIABLES
+			var $fromSelect = this.$('#from_name'),
+					$toSelect = this.$('#to_name'),
+					$toInput = this.$('#to_url'),
+					$fromInput = this.$('#from_url'),
+					fromSelectVal = $fromSelect.val(),
+					fromInputVal = $fromInput.val(),
+					toSelectVal = $toSelect.val(),
+					toInputVal = $toInput.val();
+
+					$fromSelect.val(toSelectVal);
+					$toSelect.val(fromSelectVal);
+
+					$fromInput.val(toInputVal);
+					$toInput.val(fromInputVal);
+		}
+  });
+
+
+View.ReplicationList = FauxtonAPI.View.extend({
+	tagName: "ul",
+	initialize:  function(){
+		Events.bind('update:tasks', this.establish, this);
+		this.listenTo(this.collection, "reset", this.render);
+		this.$el.prepend("<li class='header'><h2>Active Replication Tasks</h2></li>");
+	},
+	establish: function(){
+		return [this.collection.fetch({reset: true})];
+	},
+	setPolling: function(){
+		var that = this;
+		this.cleanup();
+		pollingInfo.intervalId = setInterval(function() {
+			that.establish();
+		}, pollingInfo.rate*1000);
+	},
+  cleanup: function(){
+		clearInterval(pollingInfo.intervalId);
+  },
+	beforeRender:  function(){
+		var that = this;
+    this.collection.forEach(function(item) {
+      this.insertView(new View.replicationItem({ 
+        model: item
+      }));
+    }, this);
+	},
+	showHeader: function(){
+		if (this.collection.length > 0){
+			this.$el.parent().addClass('showHeader');
+		} else {
+			this.$el.parent().removeClass('showHeader');
+		}
+	},
+	afterRender: function(){
+		this.showHeader();
+		this.setPolling();
+	}
+});
+
+	//make this a table row item.
+	View.replicationItem = FauxtonAPI.View.extend({
+		tagName: "li",
+		className: "row",
+		template: "addons/replication/templates/progress",
+		events: {
+			"click .cancel": "cancelReplication"
+		},
+		initialize: function(){
+			this.newRepModel = new replication.Replicate({});
+		},
+		establish: function(){
+			return [this.model.fetch()];
+		},
+		cancelReplication: function(e){
+			//need to pass "cancel": true with source & target
+			var $currentTarget = $(e.currentTarget),
+					repID = $currentTarget.attr('data-rep-id');
+			this.newRepModel.save({
+				"replication_id": repID,
+				"cancel": true
+			},
+			{
+				success: function(model, xhr, options){
+					var notification = FauxtonAPI.addNotification({
+						msg: "Replication stopped.",
+						type: "success",
+						clear: true
+					});
+				},
+				error: function(model, xhr, options){
+					var errorMessage = JSON.parse(xhr.responseText);
+					var notification = FauxtonAPI.addNotification({
+						msg: errorMessage.reason,
+						type: "error",
+						clear: true
+					});
+				}
+			});
+		},
+		afterRender: function(){
+			if (this.model.get('continuous')){
+				this.$el.addClass('continuous');
+			}
+		},
+		serialize: function(){
+			return {
+				progress:  this.model.get('progress'),
+				target: this.model.get('target'),
+				source: this.model.get('source'),
+				continuous: this.model.get('continuous'),
+				repid: this.model.get('replication_id')
+			};
+		}
+	});
+
+  return View;
+});

@@ -1,0 +1,129 @@
+#replication {
+	position: relative;
+
+	.options {
+		position: relative;
+		&:after{
+			content: '';
+			display: block;
+			position: absolute;
+			right: -16px;
+			top: 9px;
+			width: 0; 
+			height: 0; 
+			border-left: 5px solid transparent;
+			border-right: 5px solid transparent;
+			border-bottom: 5px solid black;
+			border-top: none;
+		}
+		&.off {
+			&:after{
+			content: '';
+			display: block;
+			position: absolute;
+			right: -16px;
+			top: 9px;
+			width: 0; 
+			height: 0; 
+			border-left: 5px solid transparent;
+			border-right: 5px solid transparent;
+			border-bottom: none;
+			border-top: 5px solid black;
+			}
+		}
+	}
+	.control-group{
+		label{
+			float: left;
+			min-height: 30px;
+			vertical-align: top;
+			padding-right: 5px;
+			min-width: 130px;
+		}
+		input[type=text],
+		input[type=radio],
+		input[type=checkbox],
+		select {
+			margin-top: -2px;
+		}
+	}
+
+
+	.swap {
+			cursor: pointer;
+			position: absolute;
+			font-size: 12px;
+			width: 27px;
+			height: 12px;
+			display: block;
+			border-top: 3px solid #8E9292;
+			border-bottom: 3px solid #8E9292;
+			top: 20%;
+			left: 42%;
+			&:hover {
+				border-color: #2C2C2C;
+				&:before {
+					bottom: -8px;
+					right: 23px;
+					position: absolute;
+					border-right: 7px solid #2C2C2C;
+					border-top: 7px solid rgba(44, 44, 44, 0);
+					border-bottom: 7px solid rgba(44, 44, 44, 0);
+					content: "";
+				}
+				&:after {
+					top: -8px;
+					left: 23px;
+					position: absolute;
+					border-left: 7px solid #2C2C2C;
+					border-top: 7px solid rgba(44, 44, 44, 0);
+					border-bottom: 7px solid rgba(44, 44, 44, 0);
+					content: "";
+				}
+		}
+		&:before {
+			bottom: -8px;
+			right: 23px;
+			position: absolute;
+			border-right: 7px solid #8E9292;
+			border-top: 7px solid rgba(44, 44, 44, 0);
+			border-bottom: 7px solid rgba(44, 44, 44, 0);
+			content: "";
+
+		}
+		&:after {
+			top: -8px;
+			left: 23px;
+			position: absolute;
+			border-left: 7px solid #8E9292;
+			border-top: 7px solid rgba(44, 44, 44, 0);
+			border-bottom: 7px solid rgba(44, 44, 44, 0);
+			content: "";
+		}
+	}
+
+}
+#replicationStatus{
+	&.showHeader{
+		li.header{
+			display: block;
+		}
+	}
+	li.header{
+		display: none;
+	}
+	ul{
+		margin: 0;
+		li{
+			.progress,
+			p{
+				margin: 0px;
+				vertical-align: bottom;
+			}
+			padding: 10px 0 ;
+			margin: 0;
+			list-style: none;
+			border-bottom: 1px solid #e3e3e3;
+		}
+	}
+}

@@ -1,0 +1,76 @@
+<!--
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use this file except in compliance with the License. You may obtain a copy of
+the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+License for the specific language governing permissions and limitations under
+the License.
+-->
+
+<form id="replication" class="form-horizontal">
+	<div class="row">
+		<div class="span5 from form_set">
+			<div class="control-group from_local">
+				<label for="from_local">
+					<input type="radio" id="from_local" name="from_type" value="local" checked="" class="setType"> 
+					Local database: 
+				</label>
+				<select id="from_name" name="source">
+					<% _.each( databases, function( db, i ){ %>
+					   <option value="<%=db.name%>"><%=db.name%></option>
+					<% }); %>
+				</select>
+			</div>
+
+			<div class="control-group from_to_remote">
+				<label for="from_to_remote">
+					<input type="radio" id="from_to_remote" name="from_type" value="remote" class="setType"> 
+					Remote database:
+				</label>
+				<input type="text" id="from_url" name="source" size="30" value="http://" disabled="true">
+			</div>
+		</div>
+
+		
+		<div class="span2">
+			<span class="swap">
+			</span>
+		</div>
+
+		<div class="to form_set span5">
+			<div class="to_local control-group">
+				<label for="to_local">
+					<input type="radio" id="to_local" name="to_type" value="local" checked="" class="setType"> 
+					Local database: 
+				</label>
+				<input type="text" id="to_name" name="target" size="30">
+			</div>
+
+			<div class="to_remote control-group">
+				<label for="to_remote">
+					<input type="radio" id="to_remote" name="to_type" value="remote" class="setType"> 
+					Remote database: 
+				</label>
+				<input type="text" id="to_url" name="target" size="30" value="http://" disabled="true">
+			</div>
+		</div>
+	</div>
+
+	<div class="actions">
+		<div class="control-group">
+			<label for="continuous">
+				<input type="checkbox" name="continuous" value="continuous" id="continuous">
+				Continuous
+			</label>
+		</div>
+
+		<button class="btn btn-success btn-large save" type="submit">Replicate</button>
+	</div>
+</form>
+
+<div id="replicationStatus"></div>
