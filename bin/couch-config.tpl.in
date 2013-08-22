@@ -53,7 +53,7 @@ Options:
 
   --erl-libs-dir    Erlang library directory
   --config-dir      configuration directory
-  --db-dir          database dirrectory
+  --db-dir          database directory
   --view-dir        view index directory
   --static-dir      static asset directory
   --doc-dir         documentation directory
