@@ -919,18 +919,16 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint, resizeColumns)
           // TODO: Where to add this error?
           // bootstrap wants the error on a control-group div, but we're not using that
           //$('form.view-query-update input[name='+param+'], form.view-query-update select[name='+param+']').addClass('error');
-
           return FauxtonAPI.addNotification({
             msg: "JSON Parse Error on field: "+param.name,
             type: "error",
-            selector: ".view.show .all-docs-list.errors-container"
+            selector: ".advanced-options .errors-container"
           });
         });
-
         FauxtonAPI.addNotification({
           msg: "Make sure that strings are properly quoted and any other values are valid JSON structures",
           type: "warning",
-          selector: ".view.show .all-docs-list.errors-container"
+          selector: ".advanced-options .errors-container"
         });
 
         return false;
@@ -994,7 +992,7 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint, resizeColumns)
       FauxtonAPI.addNotification({
         msg: "<strong>Warning!</strong> Preview executes the Map/Reduce functions in your browser, and may behave differently from CouchDB.",
         type: "warning",
-        selector: ".advanced-options",
+        selector: ".advanced-options .errors-container",
         fade: true
       });
 
