@@ -161,3 +161,7 @@ This product also includes the following third-party components:
  * views/intro.rst views/nosql.rst views/pagination.rst
 
    Copyright 2013, Creative Commons Attribution license
+
+ * share/doc/src/couchapp/views/joins.rst (Using View Collation)
+
+   Copyright 2007, Christopher Lenz <cmlenz@gmail.com>

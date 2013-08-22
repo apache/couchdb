@@ -161,6 +161,10 @@ emit a ``"_rev"`` property as well as ``"_id"``.
 Using View Collation
 ====================
 
+:Author: Christopher Lenz
+:Date: 2007-10-05
+:Source: http://www.cmlenz.net/archives/2007/10/couchdb-joins
+
 Just today, there was a discussion on IRC how you'd go about modeling a simple
 blogging system with “post” and “comment” entities, where any blog post might
 have N comments. If you'd be using an SQL database, you'd obviously have two
