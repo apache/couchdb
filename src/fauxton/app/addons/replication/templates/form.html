@@ -13,58 +13,49 @@ the License.
 -->
 
 <form id="replication" class="form-horizontal">
-	<div class="row">
-		<div class="span5 from form_set">
-			<div class="control-group from_local">
-				<label for="from_local">
-					<input type="radio" id="from_local" name="from_type" value="local" checked="" class="setType"> 
-					Local database: 
-				</label>
+		<div class="from form_set  local">
+			<div class="btn-group">
+			  <button class="btn local-btn" type="button" value="local">Local</button>
+			  <button class="btn remote-btn" type="button" value="remote">Remote</button>
+			</div>
+
+			<div class="from_local local_option">
 				<select id="from_name" name="source">
 					<% _.each( databases, function( db, i ){ %>
 					   <option value="<%=db.name%>"><%=db.name%></option>
 					<% }); %>
 				</select>
 			</div>
-
-			<div class="control-group from_to_remote">
-				<label for="from_to_remote">
-					<input type="radio" id="from_to_remote" name="from_type" value="remote" class="setType"> 
-					Remote database:
-				</label>
-				<input type="text" id="from_url" name="source" size="30" value="http://" disabled="true">
+			<div class="from_to_remote remote_option">
+				<input type="text" id="from_url" name="source" size="30" value="http://">
 			</div>
 		</div>
 
-		
-		<div class="span2">
+		<div class="form_set middle">
+			<span class="circle "></span>
 			<span class="swap">
 			</span>
 		</div>
 
-		<div class="to form_set span5">
-			<div class="to_local control-group">
-				<label for="to_local">
-					<input type="radio" id="to_local" name="to_type" value="local" checked="" class="setType"> 
-					Local database: 
-				</label>
-				<input type="text" id="to_name" name="target" size="30">
+		<div class="to form_set local">
+			<div class="btn-group">
+			  <button class="btn local-btn" type="button" value="local">Local</button>
+			  <button class="btn remote-btn" type="button" value="remote">Remote</button>
+			</div>
+			<div class="to_local local_option">
+				<input type="text" id="to_name" name="target" size="30" placeholder="database name">
 			</div>
 
-			<div class="to_remote control-group">
-				<label for="to_remote">
-					<input type="radio" id="to_remote" name="to_type" value="remote" class="setType"> 
-					Remote database: 
-				</label>
-				<input type="text" id="to_url" name="target" size="30" value="http://" disabled="true">
+			<div class="to_remote remote_option">
+				<input type="text" id="to_url" name="target" size="30" value="http://">
 			</div>
 		</div>
-	</div>
+
 
 	<div class="actions">
 		<div class="control-group">
 			<label for="continuous">
-				<input type="checkbox" name="continuous" value="continuous" id="continuous">
+				<input type="checkbox" name="continuous" value="true" id="continuous">
 				Continuous
 			</label>
 		</div>

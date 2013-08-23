@@ -45,7 +45,7 @@ function(app, FauxtonAPI, replication) {
 		template: "addons/replication/templates/form",
 		events:  {
 			"submit #replication": "submit",
-			"click input[type=radio]": "enableFields",
+			"click .btn-group .btn": "showFields",
 			"click .swap": "swapFields",
 			"click .options": "toggleAdvancedOptions"
 		},
@@ -89,22 +89,31 @@ function(app, FauxtonAPI, replication) {
 		cleanup: function(){
 			clearInterval(pollingInfo.intervalId);
 		},
-		disableFields: function(){
-			this.$('input[type=radio]').attr('disabled',true);
-			this.$('.advancedOptions:hidden').find('input').attr('disabled',true);
+
+		disableFields: function(disable){
+			if(disable){
+				this.$el.find('input:hidden','select:hidden').attr('disabled',true);
+			}else{
+				this.$el.find('input','select').attr('disabled',false);
+			}
 		},
 
-		enableFields: function(e){
-			var $currentTarget = this.$(e.currentTarget);
-					$currentTarget.parents(".form_set").find('input[type="text"], select').attr('disabled','true').addClass('disabled');
-					$currentTarget.parents('.control-group').find('input[type="text"], select').removeAttr('disabled').removeClass('disabled');
+		showFields: function(e){
+			var $currentTarget = $(e.currentTarget),
+					targetVal = $currentTarget.val();
+
+			if (targetVal === "local"){
+				$currentTarget.parents('.form_set').addClass('local');
+			}else{
+				$currentTarget.parents('.form_set').removeClass('local');
+			}
 		},
 		establish: function(){
 			return [ this.collection.fetch(), this.status.fetch()];
 		},
 
 		formValidation: function(){
-			var $remote = this.$el.find("[value='remote']:checked").parents('.control-group').find('input[type=text]'),
+			var $remote = this.$el.find('input:visible'),
 					error = false;
 			for(var i=0; i<$remote.length; i++){
 				if ($remote[i].value =="http://" || $remote[i].value ==" "){
@@ -140,6 +149,7 @@ function(app, FauxtonAPI, replication) {
 					that.updateButtonText(false);
 				}
 			});
+			this.disableFields(false);
 		},		
 		updateButtonText: function(wait){
 			var $button = this.$('#replication button[type=submit]');
@@ -151,12 +161,13 @@ function(app, FauxtonAPI, replication) {
 		},
 		submit: function(e){
 			e.preventDefault();
-			this.disableFields(); //disable fields not relevant to submitting
+			this.disableFields(true); //disable fields not relevant to submitting
 
 			var formJSON = {};
 			_.map(this.$(e.currentTarget).serializeArray(), function(formData){
 				if(formData.value !== ''){
-					formJSON[formData.name] = formData.value;
+					formJSON[formData.name] = (formData.value ==="true"? true: formData.value.replace(/\s/g, ''));
+
 				}
 			});
 
@@ -194,7 +205,7 @@ View.ReplicationList = FauxtonAPI.View.extend({
 	initialize:  function(){
 		Events.bind('update:tasks', this.establish, this);
 		this.listenTo(this.collection, "reset", this.render);
-		this.$el.prepend("<li class='header'><h2>Active Replication Tasks</h2></li>");
+		this.$el.prepend("<li class='header'><h4>Active Replication Tasks</h4></li>");
 	},
 	establish: function(){
 		return [this.collection.fetch({reset: true})];
