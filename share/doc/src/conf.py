@@ -20,9 +20,9 @@ master_doc = "index"
 
 nitpicky = True
 
-version = "1.3"
+version = "1.4"
 
-release = "1.3.0"
+release = "1.4.0"
 
 project = u"Apache CouchDB"
 
