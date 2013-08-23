@@ -15,10 +15,10 @@ Introduction
 
 |Apache CouchDB(TM)|_ is a document database built for the web.
 
-If you would like to help document the project, please send a note to the
-`developer mailing list <http://couchdb.apache.org/#mailing-list>`_.
-
-This is a work in progress.
+This documentation is a work in progress. You can 
+`browse <https://couchdb.readthedocs.org/en/latest/>`_ the latest version,
+`download <https://readthedocs.org/projects/couchdb/downloads/>`_ it for offline use, or
+`contribute <https://couchdb.readthedocs.org/en/latest/contributing.html>`_.
 
 Contents
 ========
