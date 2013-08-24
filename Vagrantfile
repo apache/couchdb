@@ -14,7 +14,7 @@ Vagrant::Config.run do |config|
   # Install couchdb dependencies if deployment was not done
   if Dir.glob("#{File.dirname(__FILE__)}/.vagrant/machines/default/*/id").empty?
     # install build-essential
-    pkg_cmd = "apt-get update -qq; apt-get install -q -y build-essential git " 
+    pkg_cmd = "apt-get update -qq; apt-get install -q -y build-essential git " \
         "autoconf autoconf-archive gnu-standards help2man texinfo; "
 
     # Install erlang
