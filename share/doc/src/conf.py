@@ -64,7 +64,9 @@ highlight_language = "json"
 
 pygments_style = "sphinx"
 
-html_theme = "default"
+html_theme = "couchdb"
+
+html_theme_path = ['../templates']
 
 templates_path = ["../templates"]
 

@@ -186,3 +186,6 @@ This product also includes the following third-party components:
 
    Copyright 2007, Christopher Lenz <cmlenz@gmail.com>
 
+ * share/doc/src/templates/couchdb/domainindex.html
+
+   Copyright 2007-2011 by the Sphinx team
