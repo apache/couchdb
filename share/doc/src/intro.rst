@@ -227,10 +227,16 @@ clarity):
 
 .. code-block:: json
 
-    {
-       "couchdb" : "Welcome",
-       "version" : "|version|",
-    }
+  {
+      "couchdb": "Welcome",
+      "uuid": "85fb71bf700c17267fef77535820e371",
+      "vendor": {
+          "name": "The Apache Software Foundation",
+          "version": "1.4.0"
+      },
+      "version": "1.4.0"
+  }
+
 
 .. note:: For some URLs, especially those that include special characters such
    as ampersand, exclamation mark, or question mark, you should quote
