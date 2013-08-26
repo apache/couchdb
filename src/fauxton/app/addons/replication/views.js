@@ -120,6 +120,14 @@ function(app, FauxtonAPI, replication) {
 					error = true;
 				}
 			}
+
+			if (this.$('input#to_name').is(':visible')){
+				var alreadyExists = this.collection.where({"name":this.$('input#to_name').val()});
+				if (alreadyExists.length === 0){
+					error = true;
+				}
+			}
+
 			return error;
 		},
 		serialize: function(){
@@ -166,21 +174,17 @@ function(app, FauxtonAPI, replication) {
 			var formJSON = {};
 			_.map(this.$(e.currentTarget).serializeArray(), function(formData){
 				if(formData.value !== ''){
-					formJSON[formData.name] = (formData.value ==="true"? true: formData.value.replace(/\s/g, ''));
+					formJSON[formData.name] = (formData.value ==="true"? true: formData.value.replace(/\s/g, '').toLowerCase());
 
 				}
 			});
 
-			var alreadyExists = this.collection.where({"name":$('input#to_name').val()});
-
-			if (alreadyExists.length === 0){
-				formJSON.create_target = true;
-			}
 			console.log($(e.currentTarget).serializeArray(), formJSON);
 			this.updateButtonText(true);
 			this.startReplication(formJSON);
 		},	
 		swapFields: function(e){
+			e.preventDefault();
 			//WALL O' VARIABLES
 			var $fromSelect = this.$('#from_name'),
 					$toSelect = this.$('#to_name'),

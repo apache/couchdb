@@ -13,26 +13,27 @@
 	position: relative;
 
 	.form_set{
-		width: 300px;
+		width: 350px;
 		display: inline-block;
 		border: 1px solid @greyBrown;
-		padding: 10px;
+		padding: 15px 10px 0;
 		margin-bottom: 20px;
 		&.middle{
-			width: 200px;
+			width: 100px;
 			border: none;
 			position: relative;
 			height: 100px;
 			margin: 0;
 		}
 		input, select {
-			margin: 0 0 16px 35px;
+			margin: 0 0 16px 5px;
 			height: 40px;
+			width: 318px;
 		}
 		.btn-group{
-			margin: 0 0 16px 35px;
+			margin: 0 0 16px 5px;
 			.btn {
-				padding: 10px 30px;
+				padding: 10px 57px;
 			}
 		}
 		&.local{
@@ -101,11 +102,9 @@
 			min-width: 130px;
 			padding-left: 0px;
 		}
-		input[type=text],
 		input[type=radio],
-		input[type=checkbox],
-		select {
-
+		input[type=checkbox]{
+			margin: 0 0 2px 0;
 		}
 	}
 
@@ -113,7 +112,7 @@
 		z-index: 0;
 		position: absolute;
 		top: 20px;
-		left: 63px;
+		left: 15px;
 
 		&:after {
 			width: 70px;
@@ -129,56 +128,17 @@
 		}
 	}
 	.swap {
-			z-index: 30;
-			cursor: pointer;
-			position: absolute;
-			font-size: 12px;
-			width: 27px;
-			height: 12px;
-			display: block;
-			border-top: 3px solid @greyBrown;
-			border-bottom: 3px solid @greyBrown;
-			top: 50px;
-			left: 84px;
-			&:hover {
-				border-color: #2C2C2C;
-				&:before {
-					bottom: -8px;
-					right: 23px;
-					position: absolute;
-					border-right: 7px solid #2C2C2C;
-					border-top: 7px solid rgba(44, 44, 44, 0);
-					border-bottom: 7px solid rgba(44, 44, 44, 0);
-					content: "";
-				}
-				&:after {
-					top: -8px;
-					left: 23px;
-					position: absolute;
-					border-left: 7px solid #2C2C2C;
-					border-top: 7px solid rgba(44, 44, 44, 0);
-					border-bottom: 7px solid rgba(44, 44, 44, 0);
-					content: "";
-				}
-		}
-		&:before {
-			bottom: -8px;
-			right: 23px;
-			position: absolute;
-			border-right: 7px solid @greyBrown;
-			border-top: 7px solid rgba(44, 44, 44, 0);
-			border-bottom: 7px solid rgba(44, 44, 44, 0);
-			content: "";
-
-		}
-		&:after {
-			top: -8px;
-			left: 23px;
-			position: absolute;
-			border-left: 7px solid @greyBrown;
-			border-top: 7px solid rgba(44, 44, 44, 0);
-			border-bottom: 7px solid rgba(44, 44, 44, 0);
-			content: "";
+		text-decoration: none;
+		z-index: 30;
+		cursor: pointer;
+		position: absolute;
+		font-size: 40px;
+		width: 27px;
+		height: 12px;
+		top: 31px;
+		left: 30px;
+		&:hover {
+			color: @greyBrown;
 		}
 	}
 
