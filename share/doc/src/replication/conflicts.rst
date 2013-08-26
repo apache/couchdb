@@ -702,8 +702,14 @@ to use "history rewriting" to make git forget commits earlier than a particular
 one.
 
 
+.. _replication/conflicts/git:
+
 What is the CouchDB replication protocol? Is it like Git?
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+:Author: Jason Smith
+:Date: 2011-01-29
+:Source: http://stackoverflow.com/questions/4766391/what-is-the-couchdb-replication-protocol-is-it-like-git
 
 **Key points**
 
