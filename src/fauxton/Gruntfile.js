@@ -245,6 +245,7 @@ module.exports = function(grunt) {
       },
       options: {
         nospawn: true,
+        debounceDelay: 500
       }
     },
 

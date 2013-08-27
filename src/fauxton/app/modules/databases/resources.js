@@ -115,13 +115,17 @@ function(app, FauxtonAPI, Documents) {
       // cribbed from http://stackoverflow.com/questions/10420352/converting-file-size-in-bytes-to-human-readable
       var i = -1;
       var byteUnits = [' kB', ' MB', ' GB', ' TB', 'PB', 'EB', 'ZB', 'YB'];
-      var fileSizeInBytes = this.get("disk_size");
+      var fileSizeInBytes = this.diskSize();
       do {
           fileSizeInBytes = fileSizeInBytes / 1024;
           i++;
       } while (fileSizeInBytes > 1024);
 
       return Math.max(fileSizeInBytes, 0.1).toFixed(1) + byteUnits[i];
+    },
+
+    diskSize: function () {
+      return this.get("disk_size");
     }
   });
 
