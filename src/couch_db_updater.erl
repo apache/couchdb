@@ -264,7 +264,7 @@ handle_cast(Msg, #db{name = Name} = Db) ->
 
 handle_info({update_docs, Client, GroupedDocs, NonRepDocs, MergeConflicts,
         FullCommit}, Db) ->
-    GroupedDocs2 = [[{Client, D} || D <- DocGroup] || DocGroup <- GroupedDocs],
+    GroupedDocs2 = maybe_tag_grouped_docs(Client, GroupedDocs),
     if NonRepDocs == [] ->
         {GroupedDocs3, Clients, FullCommit2} = collect_updates(GroupedDocs2,
                 [Client], MergeConflicts, FullCommit);
@@ -319,6 +319,20 @@ handle_info({'DOWN', Ref, _, _, Reason}, #db{fd_monitor=Ref, name=Name} = Db) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
+maybe_tag_grouped_docs(Client, GroupedDocs) ->
+    lists:map(fun(DocGroup) ->
+        [{Client, maybe_tag_doc(D)} || D <- DocGroup]
+    end, GroupedDocs).
+
+maybe_tag_doc(#doc{id=Id, revs={Pos,[_Rev|PrevRevs]}, meta=Meta0}=Doc) ->
+    case lists:keymember(ref, 1, Meta0) of
+        true ->
+            Doc;
+        false ->
+            Key = {Id, {Pos-1, PrevRevs}},
+            Doc#doc{meta=[{ref, Key} | Meta0]}
+    end.
+
 merge_updates([[{_,#doc{id=X}}|_]=A|RestA], [[{_,#doc{id=X}}|_]=B|RestB]) ->
     [A++B | merge_updates(RestA, RestB)];
 merge_updates([[{_,#doc{id=X}}|_]|_]=A, [[{_,#doc{id=Y}}|_]|_]=B) when X < Y ->
@@ -337,8 +351,7 @@ collect_updates(GroupedDocsAcc, ClientsAcc, MergeConflicts, FullCommit) ->
         % updaters than deal with their possible conflicts, and local docs
         % writes are relatively rare. Can be optmized later if really needed.
         {update_docs, Client, GroupedDocs, [], MergeConflicts, FullCommit2} ->
-            GroupedDocs2 = [[{Client, Doc} || Doc <- DocGroup]
-                    || DocGroup <- GroupedDocs],
+            GroupedDocs2 = maybe_tag_grouped_docs(Client, GroupedDocs),
             GroupedDocsAcc2 =
                 merge_updates(GroupedDocsAcc, GroupedDocs2),
             collect_updates(GroupedDocsAcc2, [Client | ClientsAcc],
@@ -597,9 +610,16 @@ flush_trees(#db{fd = Fd} = Db,
     flush_trees(Db, RestUnflushed, [InfoFlushed | AccFlushed]).
 
 
-send_result(Client, Id, OriginalRevs, NewResult) ->
+send_result(Client, Doc, NewResult) ->
     % used to send a result to the client
-    catch(Client ! {result, self(), {{Id, OriginalRevs}, NewResult}}).
+    catch(Client ! {result, self(), {doc_tag(Doc), NewResult}}).
+
+doc_tag(#doc{meta=Meta}) ->
+    case lists:keyfind(ref, 1, Meta) of
+        {ref, Ref} -> Ref;
+        false -> throw(no_doc_tag);
+        Else -> throw({invalid_doc_tag, Else})
+    end.
 
 merge_rev_trees(_Limit, _Merge, [], [], AccNewInfos, AccRemoveSeqs, AccSeq) ->
     {ok, lists:reverse(AccNewInfos), AccRemoveSeqs, AccSeq};
@@ -613,7 +633,7 @@ merge_rev_trees(Limit, MergeConflicts, [NewDocs|RestDocsList],
                 case couch_key_tree:merge(AccTree, couch_doc:to_path(NewDoc),
                     Limit) of
                 {_NewTree, conflicts} when (not OldDeleted) ->
-                    send_result(Client, Id, {Pos-1,PrevRevs}, conflict),
+                    send_result(Client, NewDoc, conflict),
                     {AccTree, OldDeleted};
                 {NewTree, conflicts} when PrevRevs /= [] ->
                     % Check to be sure if prev revision was specified, it's
@@ -625,7 +645,7 @@ merge_rev_trees(Limit, MergeConflicts, [NewDocs|RestDocsList],
                     if IsPrevLeaf ->
                         {NewTree, OldDeleted};
                     true ->
-                        send_result(Client, Id, {Pos-1,PrevRevs}, conflict),
+                        send_result(Client, NewDoc, conflict),
                         {AccTree, OldDeleted}
                     end;
                 {NewTree, no_conflicts} when  AccTree == NewTree ->
@@ -644,11 +664,11 @@ merge_rev_trees(Limit, MergeConflicts, [NewDocs|RestDocsList],
                         {NewTree2, _} = couch_key_tree:merge(AccTree,
                                 couch_doc:to_path(NewDoc2), Limit),
                         % we changed the rev id, this tells the caller we did
-                        send_result(Client, Id, {Pos-1,PrevRevs},
-                            {ok, {OldPos + 1, NewRevId}}),
+                        send_result(Client, NewDoc,
+                                {ok, {OldPos + 1, NewRevId}}),
                         {NewTree2, OldDeleted};
                     true ->
-                        send_result(Client, Id, {Pos-1,PrevRevs}, conflict),
+                        send_result(Client, NewDoc, conflict),
                         {AccTree, OldDeleted}
                     end;
                 {NewTree, _} ->
@@ -754,7 +774,13 @@ update_local_docs(#db{local_tree=Btree}=Db, Docs) ->
     Ids = [Id || {_Client, #doc{id=Id}} <- Docs],
     OldDocLookups = couch_btree:lookup(Btree, Ids),
     BtreeEntries = lists:zipwith(
-        fun({Client, #doc{id=Id,deleted=Delete,revs={0,PrevRevs},body=Body}}, _OldDocLookup) ->
+        fun({Client, NewDoc}, _OldDocLookup) ->
+            #doc{
+                id = Id,
+                deleted = Delete,
+                revs = {0, PrevRevs},
+                body = Body
+            } = NewDoc,
             case PrevRevs of
             [RevStr|_] ->
                 PrevRev = list_to_integer(?b2l(RevStr));
@@ -771,11 +797,11 @@ update_local_docs(#db{local_tree=Btree}=Db, Docs) ->
             % true ->
                 case Delete of
                     false ->
-                        send_result(Client, Id, {0, PrevRevs}, {ok,
+                        send_result(Client, NewDoc, {ok,
                                 {0, ?l2b(integer_to_list(PrevRev + 1))}}),
                         {update, {Id, {PrevRev + 1, Body}}};
                     true  ->
-                        send_result(Client, Id, {0, PrevRevs},
+                        send_result(Client, NewDoc,
                                 {ok, {0, <<"0">>}}),
                         {remove, Id}
                 end%;

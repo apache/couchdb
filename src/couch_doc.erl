@@ -70,7 +70,7 @@ revs_to_strs([{Pos, RevId}| Rest]) ->
     [rev_to_str({Pos, RevId}) | revs_to_strs(Rest)].
 
 to_json_meta(Meta) ->
-    lists:map(
+    lists:flatmap(
         fun({revs_info, Start, RevsInfo}) ->
             {JsonRevsInfo, _Pos}  = lists:mapfoldl(
                 fun({RevId, Status}, PosAcc) ->
@@ -78,13 +78,15 @@ to_json_meta(Meta) ->
                         {<<"status">>, ?l2b(atom_to_list(Status))}]},
                     {JsonObj, PosAcc - 1}
                 end, Start, RevsInfo),
-            {<<"_revs_info">>, JsonRevsInfo};
+            [{<<"_revs_info">>, JsonRevsInfo}];
         ({local_seq, Seq}) ->
-            {<<"_local_seq">>, Seq};
+            [{<<"_local_seq">>, Seq}];
         ({conflicts, Conflicts}) ->
-            {<<"_conflicts">>, revs_to_strs(Conflicts)};
+            [{<<"_conflicts">>, revs_to_strs(Conflicts)}];
         ({deleted_conflicts, DConflicts}) ->
-            {<<"_deleted_conflicts">>, revs_to_strs(DConflicts)}
+            [{<<"_deleted_conflicts">>, revs_to_strs(DConflicts)}];
+        (_) ->
+            []
         end, Meta).
 
 to_json_attachments(Attachments, Options) ->

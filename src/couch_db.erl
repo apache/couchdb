@@ -500,11 +500,17 @@ update_docs(Db, Docs) ->
 % group_alike_docs groups the sorted documents into sublist buckets, by id.
 % ([DocA, DocA, DocB, DocC], []) -> [[DocA, DocA], [DocB], [DocC]]
 group_alike_docs(Docs) ->
-    Sorted = lists:sort(fun(#doc{id=A},#doc{id=B})-> A < B end, Docs),
-    group_alike_docs(Sorted, []).
+    % Here we're just asserting that our doc sort is stable so that
+    % if we have duplicate docids we don't have to worry about the
+    % behavior of lists:sort/2 which isn't documented anyhwere as
+    % being stable.
+    WithPos = lists:zip(Docs, lists:seq(1, length(Docs))),
+    SortFun = fun({D1, P1}, {D2, P2}) -> {D1#doc.id, P1} =< {D2#doc.id, P2} end,
+    SortedDocs = [D || {D, _} <- lists:sort(SortFun, WithPos)],
+    group_alike_docs(SortedDocs, []).
 
 group_alike_docs([], Buckets) ->
-    lists:reverse(Buckets);
+    lists:reverse(lists:map(fun lists:reverse/1, Buckets));
 group_alike_docs([Doc|Rest], []) ->
     group_alike_docs(Rest, [[Doc]]);
 group_alike_docs([Doc|Rest], [Bucket|RestBuckets]) ->
@@ -627,10 +633,10 @@ prep_and_validate_update(Db, #doc{id=Id,revs={RevStart, Revs}}=Doc,
 
 prep_and_validate_updates(_Db, [], [], _AllowConflict, AccPrepped,
         AccFatalErrors) ->
-   {AccPrepped, AccFatalErrors};
+    AccPrepped2 = lists:reverse(lists:map(fun lists:reverse/1, AccPrepped)),
+    {AccPrepped2, AccFatalErrors};
 prep_and_validate_updates(Db, [DocBucket|RestBuckets], [not_found|RestLookups],
         AllowConflict, AccPrepped, AccErrors) ->
-    [#doc{id=Id}|_]=DocBucket,
     % no existing revs are known,
     {PreppedBucket, AccErrors3} = lists:foldl(
         fun(#doc{revs=Revs}=Doc, {AccBucket, AccErrors2}) ->
@@ -645,11 +651,11 @@ prep_and_validate_updates(Db, [DocBucket|RestBuckets], [not_found|RestLookups],
                 ok ->
                     {[Doc | AccBucket], AccErrors2};
                 Error ->
-                    {AccBucket, [{{Id, {0, []}}, Error} | AccErrors2]}
+                    {AccBucket, [{doc_tag(Doc), Error} | AccErrors2]}
                 end;
             _ ->
                 % old revs specified but none exist, a conflict
-                {AccBucket, [{{Id, Revs}, conflict} | AccErrors2]}
+                {AccBucket, [{doc_tag(Doc), conflict} | AccErrors2]}
             end
         end,
         {[], AccErrors}, DocBucket),
@@ -670,9 +676,9 @@ prep_and_validate_updates(Db, [DocBucket|RestBuckets],
                     LeafRevsDict, AllowConflict) of
             {ok, Doc2} ->
                 {[Doc2 | Docs2Acc], AccErrors2};
-            {Error, #doc{id=Id,revs=Revs}} ->
+            {Error, _} ->
                 % Record the error
-                {Docs2Acc, [{{Id, Revs}, Error} |AccErrors2]}
+                {Docs2Acc, [{doc_tag(Doc), Error} |AccErrors2]}
             end
         end,
         {[], AccErrors}, DocBucket),
@@ -687,7 +693,8 @@ update_docs(Db, Docs, Options) ->
 prep_and_validate_replicated_updates(_Db, [], [], AccPrepped, AccErrors) ->
     Errors2 = [{{Id, {Pos, Rev}}, Error} ||
             {#doc{id=Id,revs={Pos,[Rev|_]}}, Error} <- AccErrors],
-    {lists:reverse(AccPrepped), lists:reverse(Errors2)};
+    AccPrepped2 = lists:reverse(lists:map(fun lists:reverse/1, AccPrepped)),
+    {AccPrepped2, lists:reverse(Errors2)};
 prep_and_validate_replicated_updates(Db, [Bucket|RestBuckets], [OldInfo|RestOldInfo], AccPrepped, AccErrors) ->
     case OldInfo of
     not_found ->
@@ -782,10 +789,10 @@ new_revs([], OutBuckets, IdRevsAcc) ->
     {lists:reverse(OutBuckets), IdRevsAcc};
 new_revs([Bucket|RestBuckets], OutBuckets, IdRevsAcc) ->
     {NewBucket, IdRevsAcc3} = lists:mapfoldl(
-        fun(#doc{id=Id,revs={Start, RevIds}}=Doc, IdRevsAcc2)->
+        fun(#doc{revs={Start, RevIds}}=Doc, IdRevsAcc2)->
         NewRevId = new_revid(Doc),
         {Doc#doc{revs={Start+1, [NewRevId | RevIds]}},
-            [{{Id, {Start, RevIds}}, {ok, {Start+1, NewRevId}}} | IdRevsAcc2]}
+            [{doc_tag(Doc), {ok, {Start+1, NewRevId}}} | IdRevsAcc2]}
     end, IdRevsAcc, Bucket),
     new_revs(RestBuckets, [NewBucket|OutBuckets], IdRevsAcc3).
 
@@ -802,9 +809,23 @@ check_dup_atts2(_) ->
     ok.
 
 
-update_docs(Db, Docs, Options, replicated_changes) ->
+tag_docs([]) ->
+    [];
+tag_docs([#doc{meta=Meta}=Doc | Rest]) ->
+    [Doc#doc{meta=[{ref, make_ref()} | Meta]} | tag_docs(Rest)].
+
+doc_tag(#doc{meta=Meta}) ->
+    case lists:keyfind(ref, 1, Meta) of
+        {ref, Ref} when is_reference(Ref) -> Ref;
+        false -> throw(doc_not_tagged);
+        Else -> throw({invalid_doc_tag, Else})
+    end.
+
+update_docs(Db, Docs0, Options, replicated_changes) ->
     increment_stat(Db, {couchdb, database_writes}),
+    Docs = tag_docs(Docs0),
     DocBuckets = before_docs_update(Db, group_alike_docs(Docs)),
+
     case (Db#db.validate_doc_funs /= []) orelse
         lists:any(
             fun(#doc{id= <<?DESIGN_DOC_PREFIX, _/binary>>}) -> true;
@@ -827,21 +848,17 @@ update_docs(Db, Docs, Options, replicated_changes) ->
     {ok, []} = write_and_commit(Db, DocBuckets4, [], [merge_conflicts | Options]),
     {ok, DocErrors};
 
-update_docs(Db, Docs, Options, interactive_edit) ->
+update_docs(Db, Docs0, Options, interactive_edit) ->
     increment_stat(Db, {couchdb, database_writes}),
     AllOrNothing = lists:member(all_or_nothing, Options),
-    % go ahead and generate the new revision ids for the documents.
-    % separate out the NonRep documents from the rest of the documents
+    Docs = tag_docs(Docs0),
 
-    {Docs2, NonRepDocs} = lists:foldl(
-         fun(#doc{id=Id}=Doc, {DocsAcc, NonRepDocsAcc}) ->
-            case Id of
-            <<?LOCAL_DOC_PREFIX, _/binary>> ->
-                {DocsAcc, [Doc | NonRepDocsAcc]};
-            Id->
-                {[Doc | DocsAcc], NonRepDocsAcc}
-            end
-        end, {[], []}, Docs),
+    % Separate _local docs from normal docs
+    IsLocal = fun
+        (#doc{id= <<?LOCAL_DOC_PREFIX, _/binary>>}) -> true;
+        (_) -> false
+    end,
+    {NonRepDocs, Docs2} = lists:partition(IsLocal, Docs),
 
     DocBuckets = before_docs_update(Db, group_alike_docs(Docs2)),
 
@@ -868,12 +885,14 @@ update_docs(Db, Docs, Options, interactive_edit) ->
     end,
 
     if (AllOrNothing) and (PreCommitFailures /= []) ->
-        {aborted, lists:map(
-            fun({{Id,{Pos, [RevId|_]}}, Error}) ->
-                {{Id, {Pos, RevId}}, Error};
-            ({{Id,{0, []}}, Error}) ->
-                {{Id, {0, <<>>}}, Error}
-            end, PreCommitFailures)};
+        RefErrorDict = dict:from_list([{doc_tag(Doc), Doc} || Doc <- Docs]),
+        {aborted, lists:map(fun({Ref, Error}) ->
+            #doc{id=Id,revs={Start,RevIds}} = dict:fetch(Ref, RefErrorDict),
+            case {Start, RevIds} of
+                {Pos, [RevId | _]} -> {{Id, {Pos, RevId}}, Error};
+                {0, []} -> {{Id, {0, <<>>}}, Error}
+            end
+        end, PreCommitFailures)};
     true ->
         Options2 = if AllOrNothing -> [merge_conflicts];
                 true -> [] end ++ Options,
@@ -885,12 +904,12 @@ update_docs(Db, Docs, Options, interactive_edit) ->
 
         {ok, CommitResults} = write_and_commit(Db, DocBuckets4, NonRepDocs, Options2),
 
-        ResultsDict = dict:from_list(IdRevs ++ CommitResults ++ PreCommitFailures),
-        {ok, lists:map(
-            fun(#doc{id=Id,revs={Pos, RevIds}}) ->
-                {ok, Result} = dict:find({Id, {Pos, RevIds}}, ResultsDict),
-                Result
-            end, Docs)}
+        ResultsDict = lists:foldl(fun({Key, Resp}, ResultsAcc) ->
+            dict:store(Key, Resp, ResultsAcc)
+        end, dict:from_list(IdRevs), CommitResults ++ PreCommitFailures),
+        {ok, lists:map(fun(Doc) ->
+            dict:fetch(doc_tag(Doc), ResultsDict)
+        end, Docs)}
     end.
 
 % Returns the first available document on disk. Input list is a full rev path
