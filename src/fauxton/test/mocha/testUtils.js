@@ -24,7 +24,7 @@ function(chai, sinonChai) {
    
    _.extend(ViewSandbox.prototype, {
     initialize: function () {
-      this.$el = $('<div></div>');
+      this.$el = $('<div style="display:none"></div>').appendTo('body');
       this.$ = this.$el.find;
     },
     views: [],
