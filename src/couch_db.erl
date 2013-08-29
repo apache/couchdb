@@ -1190,8 +1190,14 @@ with_stream(Fd, #att{md5=InMd5,type=Type,encoding=Enc}=Att, Fun) ->
 
 write_streamed_attachment(_Stream, _F, 0) ->
     ok;
+write_streamed_attachment(_Stream, _F, LenLeft) when LenLeft < 0 ->
+    throw({bad_request, <<"attachment longer than expected">>});
 write_streamed_attachment(Stream, F, LenLeft) when LenLeft > 0 ->
-    Bin = read_next_chunk(F, LenLeft),
+    Bin = try read_next_chunk(F, LenLeft)
+    catch
+        {mp_parser_died, normal} ->
+            throw({bad_request, <<"attachment shorter than expected">>})
+    end,
     ok = couch_stream:write(Stream, Bin),
     write_streamed_attachment(Stream, F, LenLeft - size(Bin)).
 

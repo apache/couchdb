@@ -990,8 +990,14 @@ get_boundary(ContentType) ->
 split_header(<<>>) ->
     [];
 split_header(Line) ->
-    {Name, [$: | Value]} = lists:splitwith(fun (C) -> C =/= $: end,
-                                           binary_to_list(Line)),
+    {Name, Rest} = lists:splitwith(fun (C) -> C =/= $: end,
+                                   binary_to_list(Line)),
+    [$: | Value] = case Rest of
+        [] ->
+            throw({bad_request, <<"bad part header">>});
+        Res ->
+            Res
+    end,
     [{string:to_lower(string:strip(Name)),
      mochiweb_util:parse_header(Value)}].
 

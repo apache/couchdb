@@ -595,7 +595,7 @@ doc_from_multi_part_stream(ContentType, DataFun) ->
 doc_from_multi_part_stream(ContentType, DataFun, Ref) ->
     Parent = self(),
     NumMpWriters = num_mp_writers(),
-    Parser = spawn_link(fun() ->
+    {Parser, ParserRef} = spawn_monitor(fun() ->
         ParentRef = erlang:monitor(process, Parent),
         put(mp_parent_ref, ParentRef),
         put(num_mp_writers, NumMpWriters),
@@ -604,7 +604,6 @@ doc_from_multi_part_stream(ContentType, DataFun, Ref) ->
             fun(Next) -> mp_parse_doc(Next, []) end),
         unlink(Parent)
         end),
-    ParserRef = erlang:monitor(process, Parser),
     Parser ! {get_doc_bytes, Ref, self()},
     receive
     {started_open_doc_revs, NewRef} ->
@@ -623,7 +622,17 @@ doc_from_multi_part_stream(ContentType, DataFun, Ref) ->
             receive {'DOWN', ParserRef, _, _, _} -> ok end,
             erlang:put(mochiweb_request_recv, true)
         end,
-        {ok, Doc#doc{atts=Atts2}, WaitFun, Parser}
+        {ok, Doc#doc{atts=Atts2}, WaitFun, Parser};
+    {'DOWN', ParserRef, _, _, normal} ->
+        ok;
+    {'DOWN', ParserRef, process, Parser, {{nocatch, {Error, Msg}}, _}} ->
+        ?LOG_ERROR("Multipart streamer ~p died with reason ~p",
+                    [ParserRef, Msg]),
+        throw({Error, Msg});
+    {'DOWN', ParserRef, _, _, Reason} ->
+        ?LOG_ERROR("Multipart streamer ~p died with reason ~p",
+                    [ParserRef, Reason]),
+        throw({error, Reason})
     end.
 
 
@@ -632,7 +641,9 @@ mp_parse_doc({headers, H}, []) ->
     {"application/json", _} ->
         fun (Next) ->
             mp_parse_doc(Next, [])
-        end
+        end;
+    _ ->
+        throw({bad_ctype, <<"Content-Type must be application/json">>})
     end;
 mp_parse_doc({body, Bytes}, AccBytes) ->
     fun (Next) ->
