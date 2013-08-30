@@ -18,7 +18,7 @@
 
 %% @doc Options aren't used at all now in couch on delete but are left here
 %%      to be consistent with fabric_db_create for possible future use
-%% @see couch_server:delete_db
+%% @see couch_server:delete/2
 %%
 go(DbName, _Options) ->
     Shards = mem3:shards(DbName),
