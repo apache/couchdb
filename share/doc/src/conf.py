@@ -90,6 +90,12 @@ html_favicon = "../images/favicon.ico"
 
 html_use_index = False
 
+html_additional_pages = {
+    'download': 'pages/download.html'
+}
+
+html_context = {}
+
 html_sidebars = {
     "**": [
         "searchbox.html",
@@ -133,7 +139,7 @@ extlinks = {
 
 github_project = 'apache/couchdb'
 
-github_branch = 'master'
+html_context['git_branch'] = github_branch = 'master'
 
 github_docs_path = 'share/doc/src'
 

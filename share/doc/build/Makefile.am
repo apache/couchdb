@@ -391,6 +391,7 @@ src_files = \
 
 src_files_html = \
     ../static/rtd.css \
+    ../templates/pages/download.html \
     ../templates/help.html \
     ../templates/searchbox.html \
     ../templates/utilities.html
