@@ -51,7 +51,11 @@ release = '.'.join([
     _info['LOCAL_VERSION_MAJOR'],
     _info['LOCAL_VERSION_MINOR'],
     _info['LOCAL_VERSION_REVISION']
-]) + _info['LOCAL_VERSION_STAGE'] + '' + _info['LOCAL_VERSION_RELEASE']
+]) + (
+    _info['LOCAL_VERSION_STAGE'] + '' + _info['LOCAL_VERSION_RELEASE']
+    if _info['LOCAL_VERSION_RELEASE'] == '%revision%'
+    else '-dev'
+)
 
 project = _info['LOCAL_PACKAGE_NAME']
 
