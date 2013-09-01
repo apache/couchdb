@@ -109,6 +109,13 @@ html_files = \
     html/_sources/install/mac.txt \
     html/_sources/install/unix.txt \
     html/_sources/install/windows.txt \
+    html/_sources/intro/consistency.txt \
+    html/_sources/intro/curl.txt \
+    html/_sources/intro/futon.txt \
+    html/_sources/intro/index.txt \
+    html/_sources/intro/overview.txt \
+    html/_sources/intro/tour.txt \
+    html/_sources/intro/why.txt \
     html/_sources/query-server/index.txt \
     html/_sources/query-server/erlang.txt \
     html/_sources/query-server/javascript.txt \
@@ -131,7 +138,6 @@ html_files = \
     html/_sources/contributing.txt \
     html/_sources/externals.txt \
     html/_sources/index.txt \
-    html/_sources/intro.txt \
     html/_sources/json-structure.txt \
     html/_static/ajax-loader.gif \
     html/_static/basic.css \
@@ -216,6 +222,13 @@ html_files = \
     html/install/mac.html \
     html/install/unix.html \
     html/install/windows.html \
+    html/intro/consistency.html \
+    html/intro/curl.html \
+    html/intro/futon.html \
+    html/intro/index.html \
+    html/intro/overview.html \
+    html/intro/tour.html \
+    html/intro/why.html \
     html/query-server/index.html \
     html/query-server/erlang.html \
     html/query-server/javascript.html \
@@ -237,7 +250,6 @@ html_files = \
     html/whatsnew/index.html \
     html/externals.html \
     html/index.html \
-    html/intro.html \
     html/json-structure.html \
     html/objects.inv \
     html/genindex.html \
@@ -258,7 +270,31 @@ image_files = \
     ../images/futon-editeddoc.png \
     ../images/futon-overview.png \
     ../images/futon-replform.png \
-    ../images/logo.png
+    ../images/intro-consistency-01.png \
+    ../images/intro-consistency-02.png \
+    ../images/intro-consistency-03.png \
+    ../images/intro-consistency-04.png \
+    ../images/intro-consistency-05.png \
+    ../images/intro-consistency-06.png \
+    ../images/intro-consistency-07.png \
+    ../images/intro-tour-01.png \
+    ../images/intro-tour-02.png \
+    ../images/intro-tour-03.png \
+    ../images/intro-tour-04.png \
+    ../images/intro-tour-05.png \
+    ../images/intro-tour-06.png \
+    ../images/intro-tour-07.png \
+    ../images/intro-tour-08.png \
+    ../images/intro-tour-09.png \
+    ../images/intro-tour-10.png \
+    ../images/intro-why-01.png \
+    ../images/intro-why-02.png \
+    ../images/intro-why-03.png \
+    ../images/logo.png \
+    ../images/views-intro-01.png \
+    ../images/views-intro-02.png \
+    ../images/views-intro-03.png \
+    ../images/views-intro-04.png
 
 src_files = \
     ../src/api/basics.rst \
@@ -321,6 +357,13 @@ src_files = \
     ../src/install/mac.rst \
     ../src/install/unix.rst \
     ../src/install/windows.rst \
+    ../src/intro/consistency.rst \
+    ../src/intro/curl.rst \
+    ../src/intro/futon.rst \
+    ../src/intro/index.rst \
+    ../src/intro/overview.rst \
+    ../src/intro/tour.rst \
+    ../src/intro/why.rst \
     ../src/query-server/index.rst \
     ../src/query-server/erlang.rst \
     ../src/query-server/javascript.rst \
@@ -343,7 +386,6 @@ src_files = \
     ../src/contributing.rst \
     ../src/externals.rst \
     ../src/index.rst \
-    ../src/intro.rst \
     ../src/json-structure.rst \
     ../src/conf.py
 

@@ -10,24 +10,15 @@
 .. License for the specific language governing permissions and limitations under
 .. the License.
 
-Introduction
-============
 
-|Apache CouchDB(TM)|_ is a document database built for the web.
+|Apache CouchDB(TM)|_ |release| Documentation
+=============================================
 
-If you would like to help document the project, please send a note to the
-`developer mailing list <http://couchdb.apache.org/#mailing-list>`_.
-
-This is a work in progress.
-
-Contents
-========
-   
 .. toctree::
     :maxdepth: 3
     :numbered:
 
-    intro
+    intro/index
     install/index
     config/index
     replication/index
