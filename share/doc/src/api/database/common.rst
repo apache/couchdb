@@ -103,7 +103,7 @@
     }
 
 
-.. http::put /{db}
+.. http:put:: /{db}
 
   Creates a new database. The database name ``{db}`` must be composed by
   following next rules:
