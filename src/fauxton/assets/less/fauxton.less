@@ -556,11 +556,12 @@ footer#mainFooter{
   width: 100%;
   margin-bottom: 10px;
 }
-.navbar-form input{
-  margin-top: -5px;
-}
+
 .navbar-form.pull-right.database-search {
   margin-right: 36px;
+    input[type=text]{
+      margin-top: -4px;
+    }
 }
 
 #db-views-tabs-nav{
@@ -648,7 +649,11 @@ tbody {padding-top: 10px;}
   }
 }
 
-
+.btn {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  margin-top: 0px;
+}
 
 .button{
   .transition(all @transitionSpeed @transitionEaseType);
@@ -700,10 +705,10 @@ input[type=text], input[type=password],
 .navbar-form input{
   .border-radius(0);
   padding: 12px;
-  margin-top: -4px;
   border: 1px solid #ccc;
   height: auto;
   font-size: 16px;
+  margin-top: 0;
 }
 
 
@@ -733,6 +738,13 @@ label.fonticon-search {
   }
 }
 
+
+.form-inline {
+  input[type=password],
+  input[type=text]{
+    width: auto;
+  }
+}
 *, *:before, *:after {
   .box-sizing(border-box);
 }
@@ -756,15 +768,28 @@ form.custom .hidden-field {
   visibility: hidden;
 }
 
-label{
-  padding-left: 25px;  
-  margin-right: 15px; 
-  display: inline-block;  
-  cursor: pointer;  
-  position: relative;  
-  font-size: 14px;  
+
+.checkbox {
+  label{
+    display: inline-block;
+    padding-left:25px;
+  }
 }
 
+label{ 
+  margin-right: 15px; 
+  padding-left:0;
+  display: block;  
+  cursor: pointer;  
+  position: relative;  
+  font-size: 14px; 
+  &.inline{
+    display: inline-block;
+  } 
+}
+.help-block{
+  font-size: 12px;
+}
 .custom-inputs{
 
   input[type=radio], 
@@ -841,10 +866,21 @@ label{
 .input-append,
 .input-prepend {
   .add-on {
-    font-size: 15px;
-    padding: 7px 5px;
-    margin-top: -5px;
+    font-size: 18px;
+    padding: 14px 5px 30px;
   }
+}
+
+.input-append .btn:last-child, 
+.input-append .btn-group:last-child > .dropdown-toggle {
+  padding: 10px 5px 14px;
+}
+.input-append .btn{
+  padding: 10px 5px 14px;
+}
+.row-fluid .input-append [class*="span"],
+.input-prepend input[class*="span"]{
+  width: auto;
 }
 
 /*pretty print*/
@@ -914,14 +950,12 @@ div.spinner {
   .input-append.input-prepend {
     margin-bottom: 0px;
     .add-on {
-      margin-top: -4px;
       background: none;
       padding: 14px 12px 32px 12px;
       border: none;
     }
     .btn:last-child{
       margin-left: -1px;
-      margin-top: -4px;
       background: none;
       padding: 13px 12px 11px 12px;
       &:hover{
