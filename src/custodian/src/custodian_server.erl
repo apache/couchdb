@@ -115,13 +115,13 @@ check_shards() ->
 %% specific alert functions
 send_conflicted_alert(Count) ->
     send_snmp_alert(Count, "partition tables conflicted", "NoPartitionTablesConflictedEvent", "PartitionTablesConflictedEvent").
- 
+
 send_impaired_alert(Count) ->
     send_snmp_alert(Count, "shards impaired", "AllShardsUnimpairedEvent", "ShardsImpairedEvent").
- 
-send_unavailable_alert(Count) -> 
+
+send_unavailable_alert(Count) ->
     send_snmp_alert(Count, "unavailable shards", "AllShardsAvailableEvent", "ShardsUnavailableEvent").
- 
+
 send_one_copy_alert(Count) ->
     send_snmp_alert(Count, "shards with only one copy", "AllShardsMultipleCopiesEvent", "ShardsOneCopyEvent").
 
