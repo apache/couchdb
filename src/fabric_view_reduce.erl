@@ -124,21 +124,6 @@ handle_message(complete, Worker, #collector{counters = Counters0} = State) ->
     C1 = fabric_dict:update_counter(Worker, 1, Counters0),
     fabric_view:maybe_send_row(State#collector{counters = C1}).
 
-complete_worker_test() ->
-    meck:new(config),
-    meck:expect(config, get, fun("rexi","server_per_node",_) -> rexi_server end),
-    Shards =
-        mem3_util:create_partition_map("foo",3,3,[node(),node(),node()]),
-    Workers = lists:map(fun(#shard{} = Shard) ->
-                            Ref = make_ref(),
-                            Shard#shard{ref = Ref}
-                        end,
-                        Shards),
-    State = #collector{counters=fabric_dict:init(Workers,0)},
-    {ok, NewState} = handle_message(complete, lists:nth(2,Workers), State),
-    meck:unload(config),
-    ?assertEqual(orddict:size(NewState#collector.counters),length(Workers) - 2).
-
 os_proc_needed(<<"_", _/binary>>) -> false;
 os_proc_needed(_) -> true.
 
