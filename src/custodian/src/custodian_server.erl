@@ -132,5 +132,5 @@ send_snmp_alert(0, AlertType, ClearMib, _) ->
     os:cmd(Cmd);
 send_snmp_alert(Count, AlertType, _, AlertMib) when is_integer(Count) ->
     twig:log(crit, "~B ~s in this cluster", [Count, AlertType]),
-    Cmd = lists:concat(["send_snmptrap --trap CLOUDANT-DBCORE-MIB::cloudantDbcore", AlertMib," -o cloudantDbcoreShardCount:INTEGER ", Count]),
+    Cmd = lists:concat(["send_snmptrap --trap CLOUDANT-DBCORE-MIB::cloudantDbcore", AlertMib," -o cloudantDbcoreShardCount:INTEGER:", Count]),
     os:cmd(Cmd).
