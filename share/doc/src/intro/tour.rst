@@ -398,6 +398,14 @@ which shows each fruit sorted by price. Click "hello-world" to return to the
 hello-world overview, and then from the "select view" menu choose "Temporary
 view…" to create a new view.
 
+
+.. figure:: ../../images/intro-tour-07.png
+   :align: center
+   :alt: A temporary view in Futon
+
+   Figure 7. A temporary view in Futon
+
+
 Edit the map function, on the left, so that it looks like the following:
 
 .. code-block:: javascript
