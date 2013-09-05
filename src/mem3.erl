@@ -94,7 +94,7 @@ shards_int(DbName, Options) ->
             node = node(),
             name = ShardDbName,
             dbname = ShardDbName,
-            range = [0, 2 bsl 31],
+            range = [0, (2 bsl 31)-1],
             order = undefined}];
     ShardDbName ->
         %% shard_db is treated as a single sharded db to support calls to db_info
@@ -103,7 +103,7 @@ shards_int(DbName, Options) ->
             node = node(),
             name = ShardDbName,
             dbname = ShardDbName,
-            range = [0, 2 bsl 31]}];
+            range = [0, (2 bsl 31)-1]}];
     _ ->
         mem3_shards:for_db(DbName, Options)
     end.
