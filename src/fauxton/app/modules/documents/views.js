@@ -725,6 +725,7 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint, resizeColumns)
           "Ctrl-/": "undo"
         }
       });
+      setTimeout(function(){that.editor.setSize(null,$('#dashboard').outerHeight()-250);},200);
     }
   });
 
