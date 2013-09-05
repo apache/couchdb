@@ -231,6 +231,8 @@ terminate(_Reason, #state{tab=Tab}) ->
     ets:foldl(fun(#proc_int{pid=P}, _) -> couch_util:shutdown_sync(P) end, 0, Tab),
     ok.
 
+code_change(_OldVsn, #state{}=State, _Extra) ->
+    {ok, State};
 code_change(_OldVsn, {state, Tab}, _Extra) ->
     State = #state{tab = Tab, threshold_ts = {0,0,0}},
     ProcInts = lists:map(fun import_proc/1, ets:tab2list(Tab)),
