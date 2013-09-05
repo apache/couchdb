@@ -25,7 +25,7 @@ function(mixins) {
 
   var Resize = function(options){
     this.options = options;
-    this.options.selectorElements = options.selectorElements || "#dashboard-content";
+    this.options.selectorElements = options.selectorElements || ".window-resizeable";
   };
 
   Resize.prototype = {
@@ -49,9 +49,13 @@ function(mixins) {
     updateOptions:function(options){
       this.options = {};
       this.options = options;
+      this.options.selectorElements = options.selectorElements || ".window-resizeable";
     },
     turnOff:function(){
       mixins.removeWindowResize("animation");
+    },
+    cleanupCallback: function(){
+      this.callback = null;
     },
     onResizeHandler: function (){
       //if there is an override, do that instead
