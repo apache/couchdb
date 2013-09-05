@@ -371,6 +371,10 @@ a:hover{
 /*dashboard content can be in multiple templates*/
 
 #dashboard-content{
+  &.row-fluid{
+    /*remove gutter without rewriting variable*/
+    margin-left: 0px;
+  }
   padding: 20px;
   .with-sidebar &{
     border-left: 1px solid #999;
@@ -619,6 +623,19 @@ footer#mainFooter{
 }
 
 /*TABLE STYLES*/
+table.table {
+  table-layout: fixed;
+}
+table {
+  tr{
+    td{
+      word-wrap: break-word;
+      &.select {
+        width: 20px;
+      }
+    }
+  }
+}
 table.databases {clear: both;}
 thead {border-bottom: 2px solid @redButton;}
 tbody {padding-top: 10px;}
