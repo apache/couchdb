@@ -30,7 +30,7 @@ function(mixins) {
 
   Resize.prototype = {
     getPrimaryNavWidth: function(){
-      var primaryNavWidth  = $('body').hasClass('closeMenu')? 66:220;
+      var primaryNavWidth  = $('body').hasClass('closeMenu')? 64:224;
       return primaryNavWidth;
     },
     getPanelWidth: function(){
