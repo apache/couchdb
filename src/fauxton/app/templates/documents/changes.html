@@ -29,7 +29,7 @@ the License.
         <td> <a href="#<%= database.url('app') %>/<%= change.id %>"><%= change.id %></a> </td>
       <% } %>
         <td> 
-          <pre class="prettyprint">  <%= JSON.stringify({changes: change.changes, doc: change.doc}, null, " ") %> </pre>
+          <pre class="prettyprint">  <%- JSON.stringify({changes: change.changes, doc: change.doc}, null, " ") %> </pre>
       </td>
       <td><%= change.deleted ? "true" : "false" %></td>
     </tr>
