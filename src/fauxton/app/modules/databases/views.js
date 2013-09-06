@@ -13,11 +13,11 @@
 define([
   "app",
 
-  "modules/fauxton/base",
+  "modules/fauxton/paginate",
   "api"
 ],
 
-function(app, Fauxton, FauxtonAPI) {
+function(app, Paginate, FauxtonAPI) {
   var Views = {};
 
   Views.Item = FauxtonAPI.View.extend({
@@ -32,8 +32,8 @@ function(app, Fauxton, FauxtonAPI) {
   });
 
   Views.List = FauxtonAPI.View.extend({
-    dbLimit: 10,
-    perPage: 10,
+    dbLimit: 20,
+    perPage: 20,
     template: "templates/databases/list",
     events: {
       "click button.all": "selectAll",
@@ -83,7 +83,7 @@ function(app, Fauxton, FauxtonAPI) {
         }));
       }, this);
 
-      this.insertView("#database-pagination", new Fauxton.Pagination({
+      this.insertView("#database-pagination", new Paginate.Pagination({
         page: this.page,
         perPage: this.perPage,
         total: this.collection.length,

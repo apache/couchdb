@@ -14,6 +14,7 @@ define([
        "app",
 
        "api",
+       "modules/fauxton/paginate",
 
        "modules/documents/resources",
        "modules/pouchdb/base",
@@ -29,7 +30,7 @@ define([
 
 ],
 
-function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint, resizeColumns) {
+function(app, FauxtonAPI, Paginate, Documents, pouchdb, Codemirror, JSHint, resizeColumns) {
   var Views = {};
 
   Views.Tabs = FauxtonAPI.View.extend({
@@ -435,6 +436,7 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint, resizeColumns)
         this.ddocID = options.ddocInfo.id;
       }
       this.newView = options.newView || false;
+      this.addPagination();
     },
 
     establish: function() {
@@ -510,7 +512,39 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint, resizeColumns)
       }, this);
     },
 
+    addPagination: function () {
+      var collection = this.collection;
+
+      this.pagination = new Paginate.IndexPagination({
+        collection: this.collection,
+        scrollToSelector: '#dashboard-lower-content',
+        previousUrlfn: function () {
+          return collection.urlPreviousPage(20, this.previousIds.pop());
+        },
+        canShowPreviousfn: function () {
+          if (collection.viewMeta.offset === 0) {
+            return false;
+          }
+
+          return true;
+        },
+        canShowNextfn: function () {
+          
+          if ((collection.viewMeta.offset + 1) === collection.viewMeta.total_rows) {
+            return false;
+          }
+
+          return true;
+        },
+        
+        nextUrlfn: function () {
+          return collection.urlNextPage(20);
+        }
+      });
+    },
+
     beforeRender: function() {
+      this.insertView('#documents-pagination', this.pagination);
       this.collection.each(function(doc) {
         this.rows[doc.id] = this.insertView("table.all-docs tbody", new this.nestedView({
           model: doc

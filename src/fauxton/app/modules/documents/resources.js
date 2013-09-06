@@ -255,12 +255,39 @@ function(app, FauxtonAPI) {
       this.params = options.params;
     },
 
-    url: function() {
+    url: function(context) {
       var query = "";
       if (this.params) {
         query = "?" + $.param(this.params);
       }
+
+      if (context === 'app') {
+        return 'database/' + this.database.id + "/_all_docs" + query;
+      }
       return app.host + "/" + this.database.id + "/_all_docs" + query;
+    },
+
+    urlNextPage: function (num, lastId) {
+      if (!lastId) {
+        lastId = this.last().id;
+      }
+
+      this.params.startkey_docid = '"' + lastId + '"';
+      this.params.startkey = '"' + lastId + '"';
+      this.params.limit = num;
+      return this.url('app');
+    },
+
+    urlPreviousPage: function (num, firstId) {
+      this.params.limit = num;
+      if (firstId) { 
+        this.params.startkey_docid = '"' + firstId + '"';
+        this.params.startkey = '"' + firstId + '"';
+      } else {
+        delete this.params.startkey;
+        delete this.params.startkey_docid;
+      }
+      return this.url('app');
     },
 
     totalRows: function() {
@@ -301,13 +328,42 @@ function(app, FauxtonAPI) {
       this.design = options.design.replace('_design/','');
     },
 
-    url: function() {
+    url: function(context) {
       var query = "";
       if (this.params) {
         query = "?" + $.param(this.params);
       }
-      var url = [app.host, this.database.id, "_design", this.design, this.idxType, this.view];
+      
+      var startOfUrl = app.host;
+      if (context === 'app') {
+        startOfUrl = 'database';
+      }
+
+      var url = [startOfUrl, this.database.id, "_design", this.design, this.idxType, this.view];
       return url.join("/") + query;
+    },
+
+    urlNextPage: function (num, lastId) {
+      if (!lastId) {
+        lastId = this.last().id;
+      }
+
+      this.params.startkey_docid = '"' + lastId + '"';
+      this.params.startkey = '"' + lastId + '"';
+      this.params.limit = num;
+      return this.url('app');
+    },
+
+     urlPreviousPage: function (num, firstId) {
+      this.params.limit = num;
+      if (firstId) { 
+        this.params.startkey_docid = '"' + firstId + '"';
+        this.params.startkey = '"' + firstId + '"';
+      } else {
+        delete this.params.startkey;
+        delete this.params.startkey_docid;
+      }
+      return this.url('app');
     },
 
     totalRows: function() {
@@ -324,7 +380,7 @@ function(app, FauxtonAPI) {
 
       this.viewMeta = {
         total_rows: resp.total_rows,
-        offest: resp.offest,
+        offset: resp.offset,
         update_seq: resp.update_seq
       };
       return _.map(resp.rows, function(row) {
