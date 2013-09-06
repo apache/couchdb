@@ -14,8 +14,9 @@ the License.
 
 <div id="doc">
   <div class="errors-container"></div>
+   
+<div class="btn-group" style="margin-bottom: 15px"> 
   <% if (attachments) { %>
-  <div class="btn-group pull-right" style="margin-bottom: 15px">
     <a class="btn dropdown-toggle btn" data-toggle="dropdown" href="#">
       View Attachments
       <span class="caret"></span>
@@ -29,8 +30,16 @@ the License.
       </li>
       <% }) %>
     </ul>
-  </div>
-  <% } %>
+
+  <% } %> 
+  <button class="btn btn-small upload"><i class="icon-circle-arrow-up"></i> Upload Attachment</button>
+  <button class="btn btn-small duplicate"><i class="icon-repeat"></i> Duplicate document</button>
+  <button class="btn btn-small delete"><i class="icon-trash"></i> Delete document</button>
+  </ul>
+
+<div id="upload-modal"> </div>
+<div id="duplicate-modal"> </div> 
+</div>
 
   <textarea class="doc-code"><%- JSON.stringify(doc.attributes, null, "  ") %></textarea>
   <br />

@@ -298,71 +298,7 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint, resizeColumns)
     },
 
     events: {
-      "click button.delete": "destroy",
-      "click button.duplicate": "duplicate",
-      "click button.upload": "upload"
     },
-
-    destroy: function(event) {
-      if (this.model.isNewDoc()) {
-        FauxtonAPI.addNotification({
-          msg: 'This document has not been saved yet.',
-          type: 'warning'
-        });
-        return;
-      }
-
-      if (!window.confirm("Are you sure you want to delete this doc?")) {
-        return false;
-      }
-
-      var database = this.model.database;
-
-      this.model.destroy().then(function(resp) {
-        FauxtonAPI.addNotification({
-          msg: "Succesfully destroyed your doc"
-        });
-        FauxtonAPI.navigate(database.url("index"));
-      }, function(resp) {
-        FauxtonAPI.addNotification({
-          msg: "Failed to destroy your doc!",
-          type: "error"
-        });
-      });
-    },
-
-    beforeRender: function () {
-      this.uploadModal = this.setView('#upload-modal', new Views.UploadModal({model: this.model}));
-      this.uploadModal.render();
-
-      this.duplicateModal = this.setView('#duplicate-modal', new Views.DuplicateDocModal({model: this.model}));
-      this.duplicateModal.render();
-    },
-
-    upload: function (event) {
-      event.preventDefault();
-      if (this.model.isNewDoc()) {
-        FauxtonAPI.addNotification({
-          msg: 'Please save the document before uploading an attachment.',
-          type: 'warning'
-        });
-        return;
-      }
-      this.uploadModal.showModal();
-    },
-
-    duplicate: function(event) {
-      if (this.model.isNewDoc()) {
-        FauxtonAPI.addNotification({
-          msg: 'Please save the document before duplicating it.',
-          type: 'warning'
-        });
-        return;
-      }
-      event.preventDefault();
-      this.duplicateModal.showModal();
-    },
-
     updateSelected: function (selected) {
       this.selected = selected;
       this.$('.active').removeClass('active');
@@ -590,13 +526,74 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint, resizeColumns)
   Views.Doc = FauxtonAPI.View.extend({
     template: "templates/documents/doc",
     events: {
-      "click button.save-doc": "saveDoc"
+      "click button.save-doc": "saveDoc",
+      "click button.delete": "destroy",
+      "click button.duplicate": "duplicate",
+      "click button.upload": "upload"
     },
     disableLoader: true,
     initialize: function (options) {
       this.database = options.database;
     },
+    destroy: function(event) {
+      if (this.model.isNewDoc()) {
+        FauxtonAPI.addNotification({
+          msg: 'This document has not been saved yet.',
+          type: 'warning'
+        });
+        return;
+      }
 
+      if (!window.confirm("Are you sure you want to delete this doc?")) {
+        return false;
+      }
+
+      var database = this.model.database;
+
+      this.model.destroy().then(function(resp) {
+        FauxtonAPI.addNotification({
+          msg: "Succesfully destroyed your doc"
+        });
+        FauxtonAPI.navigate(database.url("index"));
+      }, function(resp) {
+        FauxtonAPI.addNotification({
+          msg: "Failed to destroy your doc!",
+          type: "error"
+        });
+      });
+    },
+
+    beforeRender: function () {
+      this.uploadModal = this.setView('#upload-modal', new Views.UploadModal({model: this.model}));
+      this.uploadModal.render();
+
+      this.duplicateModal = this.setView('#duplicate-modal', new Views.DuplicateDocModal({model: this.model}));
+      this.duplicateModal.render();
+    },
+
+    upload: function (event) {
+      event.preventDefault();
+      if (this.model.isNewDoc()) {
+        FauxtonAPI.addNotification({
+          msg: 'Please save the document before uploading an attachment.',
+          type: 'warning'
+        });
+        return;
+      }
+      this.uploadModal.showModal();
+    },
+
+    duplicate: function(event) {
+      if (this.model.isNewDoc()) {
+        FauxtonAPI.addNotification({
+          msg: 'Please save the document before duplicating it.',
+          type: 'warning'
+        });
+        return;
+      }
+      event.preventDefault();
+      this.duplicateModal.showModal();
+    },
     updateValues: function() {
       var notification;
       if (this.model.changedAttributes()) {
