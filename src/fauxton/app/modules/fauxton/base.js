@@ -22,9 +22,7 @@ function(app, Backbone, resizeColumns) {
 
 
    //resizeAnimation
-   app.resizeColumns = new resizeColumns({
-        selectorElements: '#dashboard-content, #dashboard-upper-menu'
-   });
+   app.resizeColumns = new resizeColumns({});
    app.resizeColumns.onResizeHandler();
 
   var Fauxton = app.module();

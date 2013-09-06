@@ -1192,11 +1192,6 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint, resizeColumns)
 
     afterRender: function() {
 
-      //resizeAnimation
-      app.resizeColumns = new resizeColumns({
-            selectorElements: '#dashboard-content, #dashboard-upper-menu, #db-views-tabs-nav'
-      });
-      app.resizeColumns.onResizeHandler();
 
       var that = this, 
           mapFun = this.$("#map-function"),
