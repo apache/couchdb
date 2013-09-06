@@ -517,7 +517,7 @@ function(app, FauxtonAPI, Paginate, Documents, pouchdb, Codemirror, JSHint, resi
 
       this.pagination = new Paginate.IndexPagination({
         collection: this.collection,
-        scrollToSelector: '#dashboard-lower-content',
+        scrollToSelector: '#dashboard-content',
         previousUrlfn: function () {
           return collection.urlPreviousPage(20, this.previousIds.pop());
         },
