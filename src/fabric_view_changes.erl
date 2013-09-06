@@ -362,7 +362,8 @@ do_unpack_seqs(Opaque, DbName) ->
         true ->
             Unpacked;
         false ->
-            Ranges = lists:usort([R || #shard{range=R} <- Unpacked]),
+            Extract = fun({Shard, _Seq}) -> Shard#shard.range end,
+            Ranges = lists:usort(lists:map(Extract, Unpacked)),
             Filter = fun(S) -> not lists:member(S#shard.range, Ranges) end,
             Replacements = lists:filter(Filter, mem3:shards(DbName)),
             Unpacked ++ [{R, 0} || R <- Replacements]
