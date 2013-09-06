@@ -707,6 +707,9 @@ function(app, FauxtonAPI, Documents, pouchdb, Codemirror, JSHint, resizeColumns)
     afterRender: function() {
       this.model.on("sync", this.updateValues, this);
       var that = this;
+      if ($('.CodeMirror').length > 0){
+        $('.CodeMirror').remove();
+      }
       this.editor = Codemirror.fromTextArea(this.$el.find("textarea.doc-code").get()[0], {
         mode: "application/json",
         json: false,
