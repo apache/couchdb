@@ -1,0 +1,18 @@
+{application, global_changes, [
+    {description, "_changes-like feeds for multiple DBs"},
+    {vsn, git},
+    {registered, [global_changes_config_listener, global_changes_server]},
+    {applications, [
+        kernel,
+        stdlib,
+        config,
+        couch_log,
+        couch,
+        mem3,
+        fabric
+    ]},
+    {mod, {global_changes_app, []}},
+    {env, [
+        {dbname, <<"global_changes">>}
+    ]}
+]}.
