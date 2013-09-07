@@ -37,6 +37,10 @@ consistent <intro/consistency>`. And we care *a lot* about your data.
 CouchDB has a fault-tolerant storage engine that puts the safety of your data
 first.
 
+In this section you'll learn about every basic bit of CouchDB, see upon what
+conceptions and technologies it built and walk through short tutorial that
+teach how to use CouchDB.
+
 .. _distributed scaling: http://en.wikipedia.org/wiki/CAP_theorem
 
 .. toctree::
@@ -46,5 +50,6 @@ first.
    why
    consistency
    tour
+   api
    futon
    curl

@@ -109,6 +109,7 @@ html_files = \
     html/_sources/install/mac.txt \
     html/_sources/install/unix.txt \
     html/_sources/install/windows.txt \
+    html/_sources/intro/api.txt \
     html/_sources/intro/consistency.txt \
     html/_sources/intro/curl.txt \
     html/_sources/intro/futon.txt \
@@ -222,6 +223,7 @@ html_files = \
     html/install/mac.html \
     html/install/unix.html \
     html/install/windows.html \
+    html/intro/api.html \
     html/intro/consistency.html \
     html/intro/curl.html \
     html/intro/futon.html \
@@ -357,6 +359,7 @@ src_files = \
     ../src/install/mac.rst \
     ../src/install/unix.rst \
     ../src/install/windows.rst \
+    ../src/intro/api.rst \
     ../src/intro/consistency.rst \
     ../src/intro/curl.rst \
     ../src/intro/futon.rst \
