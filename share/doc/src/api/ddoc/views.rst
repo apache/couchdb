@@ -397,7 +397,7 @@ content. The basic order of output is as follows:
           }, 
           {
               "id": "dummy-doc", 
-              "key": "привет", 
+              "key": "\u043f\u0440\u0438\u0432\u0435\u0442",
               "value": null
           }, 
           {
@@ -516,7 +516,7 @@ You can reverse the order of the returned view information by using the
           },
           {
               "id": "dummy-doc",
-              "key": "привет",
+              "key": "\u043f\u0440\u0438\u0432\u0435\u0442",
               "value": null
           },
           {
