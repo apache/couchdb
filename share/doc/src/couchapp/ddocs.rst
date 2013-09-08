@@ -112,8 +112,14 @@ that main task of reduce functions is to *reduce* mapped result, not to make it
 even bigger. Generally, your reduce function should converge rapidly to a single
 value - which could be an array or similar object.
 
-Also CouchDB has three built-in reduce functions. These are implemented in
-Erlang and run right inside CouchDB, so they are much faster than the equivalent
+
+.. _reducefun/builtin:
+
+Builtin reduce functions
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+Additionally, CouchDB has three built-in reduce functions. These are implemented
+in Erlang and runs inside CouchDB, so they are much faster than the equivalent
 JavaScript functions: ``_sum``, ``_count`` and ``_stats``. Their equivalents in
 JavaScript below:
 
