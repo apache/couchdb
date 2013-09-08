@@ -18,3 +18,4 @@ CouchDB Maintenance
 .. toctree::
 
   compaction
+  performance
