@@ -117,6 +117,8 @@ html_files = \
     html/_sources/intro/overview.txt \
     html/_sources/intro/tour.txt \
     html/_sources/intro/why.txt \
+    html/_sources/maintenance/compaction.txt \
+    html/_sources/maintenance/index.txt \
     html/_sources/query-server/index.txt \
     html/_sources/query-server/erlang.txt \
     html/_sources/query-server/javascript.txt \
@@ -231,6 +233,8 @@ html_files = \
     html/intro/overview.html \
     html/intro/tour.html \
     html/intro/why.html \
+    html/maintenance/compaction.html \
+    html/maintenance/index.html \
     html/query-server/index.html \
     html/query-server/erlang.html \
     html/query-server/javascript.html \
@@ -367,6 +371,8 @@ src_files = \
     ../src/intro/overview.rst \
     ../src/intro/tour.rst \
     ../src/intro/why.rst \
+    ../src/maintenance/compaction.rst \
+    ../src/maintenance/index.rst \
     ../src/query-server/index.rst \
     ../src/query-server/erlang.rst \
     ../src/query-server/javascript.rst \

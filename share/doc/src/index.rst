@@ -21,6 +21,7 @@
     intro/index
     install/index
     config/index
+    maintenance/index
     replication/index
     couchapp/index
     externals
