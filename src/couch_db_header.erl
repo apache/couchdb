@@ -32,7 +32,8 @@
     security_ptr/1,
     revs_limit/1,
     uuid/1,
-    epochs/1
+    epochs/1,
+    compacted_seq/1
 ]).
 
 
@@ -60,7 +61,8 @@
     security_ptr = nil,
     revs_limit = 1000,
     uuid,
-    epochs
+    epochs,
+    compacted_seq
 }).
 
 
@@ -75,7 +77,8 @@ from(Header0) ->
     Header = upgrade(Header0),
     #db_header{
         uuid = Header#db_header.uuid,
-        epochs = Header#db_header.epochs
+        epochs = Header#db_header.epochs,
+        compacted_seq = Header#db_header.compacted_seq
     }.
 
 
@@ -93,7 +96,8 @@ upgrade(Header) ->
         fun upgrade_tuple/1,
         fun upgrade_disk_version/1,
         fun upgrade_uuid/1,
-        fun upgrade_epochs/1
+        fun upgrade_epochs/1,
+        fun upgrade_compacted_seq/1
     ],
     lists:foldl(fun(F, HdrAcc) ->
         F(HdrAcc)
@@ -152,6 +156,10 @@ uuid(Header) ->
 
 epochs(Header) ->
     get_field(Header, epochs).
+
+
+compacted_seq(Header) ->
+    get_field(Header, compacted_seq).
 
 
 get_field(Header, Field) ->
@@ -265,6 +273,15 @@ remove_dup_epochs([{N1, S}, {_N2, S} | Rest]) ->
 remove_dup_epochs([{N1, S1}, {N2, S2} | Rest]) ->
     % Seqs don't match, recurse to check others
     remove_dup_epochs([{N1, S1} | remove_dup_epochs([{N2, S2} | Rest])]).
+
+
+upgrade_compacted_seq(#db_header{}=Header) ->
+    case Header#db_header.compacted_seq of
+        undefined ->
+            Header#db_header{compacted_seq=0};
+        _ ->
+            Header
+    end.
 
 
 -ifdef(TEST).

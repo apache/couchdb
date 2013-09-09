@@ -21,7 +21,7 @@
 -export([open_doc/2,open_doc/3,open_doc_revs/4]).
 -export([set_revs_limit/2,get_revs_limit/1]).
 -export([get_missing_revs/2,name/1,get_update_seq/1,get_committed_update_seq/1]).
--export([get_uuid/1, get_epochs/1]).
+-export([get_uuid/1, get_epochs/1, get_compacted_seq/1]).
 -export([enum_docs/4,enum_docs_since/5]).
 -export([enum_docs_since_reduce_to_count/1,enum_docs_reduce_to_count/1]).
 -export([increment_update_seq/1,get_purge_seq/1,purge_docs/2,get_last_purged/1]).
@@ -304,6 +304,9 @@ get_uuid(#db{}=Db) ->
 get_epochs(#db{}=Db) ->
     couch_db_header:epochs(Db#db.header).
 
+get_compacted_seq(#db{}=Db) ->
+    couch_db_header:compacted_seq(Db#db.header).
+
 get_db_info(Db) ->
     #db{fd=Fd,
         header=Header,
@@ -323,6 +326,10 @@ get_db_info(Db) ->
         undefined -> null;
         Uuid0 -> Uuid0
     end,
+    CompactedSeq = case get_compacted_seq(Db) of
+        undefined -> null;
+        Else1 -> Else1
+    end,
     InfoList = [
         {db_name, Name},
         {doc_count, element(1, DbReduction)},
@@ -335,6 +342,7 @@ get_db_info(Db) ->
         {instance_start_time, StartTime},
         {disk_format_version, DiskVersion},
         {committed_update_seq, CommittedUpdateSeq},
+        {compacted_seq, CompactedSeq},
         {uuid, Uuid}
         ],
     {ok, InfoList}.

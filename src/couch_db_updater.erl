@@ -212,7 +212,10 @@ handle_cast(start_compact, Db) ->
     end;
 handle_cast({compact_done, CompactFilepath}, #db{filepath=Filepath}=Db) ->
     {ok, NewFd} = couch_file:open(CompactFilepath),
-    {ok, NewHeader} = couch_file:read_header(NewFd),
+    {ok, NewHeader0} = couch_file:read_header(NewFd),
+    NewHeader = couch_db_header:set(NewHeader0, [
+        {compacted_seq, Db#db.update_seq}
+    ]),
     #db{update_seq=NewSeq} = NewDb =
         init_db(Db#db.name, Filepath, NewFd, NewHeader, Db#db.options),
     unlink(NewFd),
