@@ -4,7 +4,8 @@
   { "name": "config" },
   { "name": "logs" },
   { "name": "stats" },
-  { "name":  "replication" },
+  { "name": "replication" },
+  { "name": "plugins" },
   { "name": "contribute" },
   { "name": "permissions" },
   { "name": "auth" }

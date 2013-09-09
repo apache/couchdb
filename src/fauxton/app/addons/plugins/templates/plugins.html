@@ -1,0 +1,88 @@
+    <div id="content">
+      <div class="row">
+        <h2>GeoCouch</h2>
+        <p>Version: <strong>couchdb1.2.x_v0.3.0-11-g66e6219</strong></p>
+        <p>Author: Volker Mische</p>
+        <p>
+          Available Erlang Versions:
+          <ul>
+            <li>CouchDB 1.4.0-XXX R15B01</li>
+          </ul>
+        </p>
+        <p>
+          <button href="#" class="install-plugin" data-url="http://people.apache.org/~jan" data-checksums='{"1.4.0": {"R15B03":"D5QPhrJTAifM42DXqAj4RxzfEtI="}}' data-name="geocouch" data-version="couchdb1.2.x_v0.3.0-16-g66e6219">Install GeoCouch Now</button>
+        </p>
+      </div>
+      <div class="row">
+        <h2>CouchPerUser</h2>
+        <p>Version: <strong>1.0.0</strong></p>
+        <p>Author: Bob Ippolito</p>
+        <p>
+          Available Erlang Versions:
+          <ul>
+            <li>CouchDB 1.4.0-XXX R15B01</li>
+          </ul>
+        </p>
+        <p>
+          <button href="#" class="install-plugin" data-url="http://people.apache.org/~jan" data-checksums='{"1.4.0": {"R15B03":"Aj3mjC6M75NA62q5/xkP0tl8Hws="}}' data-name="couchperuser" data-version="1.0.0">Install CouchPerUser Now</button>
+        </p>
+      </div>
+    </div>
+  </div></body>
+  <script>
+    $('.install-plugin').each(function() {
+      var button = $(this);
+      var name = button.data('name');
+      var version = button.data('version');
+      $.get("/_config/plugins/" + name + "/", function(body, textStatus) {
+        body = JSON.parse(body);
+        if(body == version) {
+          button.html('Already Installed. Click to Uninstall');
+          button.data('delete', true);
+        } else {
+          button.html('Other Version Installed: ' + body);
+          button.attr('disabled', true);
+        }
+      });
+    });
+
+    $('.install-plugin').click(function(event) {
+      var button = $(this);
+      var delete_plugin = button.data('delete') || false;
+      var plugin_spec = JSON.stringify({
+        name: button.data('name'),
+        url: button.data('url'),
+        version: button.data('version'),
+        checksums: button.data('checksums'),
+        "delete": delete_plugin
+      });
+      var url = '/_plugins'
+      $.ajax({
+        url: url,
+        type: 'POST',
+        data: plugin_spec,
+        contentType: 'application/json', // what we send to the server
+        dataType: 'json', // expected from the server
+        processData: false, // keep our precious JSON
+        success: function(data, textStatus, jqXhr) {
+          if(textStatus == "success") {
+            var action = delete_plugin ? 'Uninstalled' : 'Installed';
+            button.html('Sucessfully ' + action);
+            button.attr('disabled', true);
+          } else {
+            button.html(textStatus);
+          }
+        },
+        beforeSend: function(xhr) {
+          xhr.setRequestHeader('Accept', 'application/json');
+        },
+      });
+    });
+  </script>
+  <style type="text/css">
+  .row {
+    background-color: #FFF;
+    padding:1em;
+    margin-bottom:1em;
+  }
+  </style>
