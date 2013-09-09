@@ -53,7 +53,7 @@ function (app, FauxtonAPI, ActiveTasks) {
     parse: function(resp){
       //only want replication tasks to return
       return _.filter(resp, function(task){
-        return task["type"] === "replication";
+        return task.type === "replication";
       });
     }
   });

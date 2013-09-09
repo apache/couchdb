@@ -32,7 +32,7 @@ function(app, FauxtonAPI, Replication, Views) {
     ],
     defaultView: function(){
 			this.databases = new Replication.DBList({});
-      this.tasks = new Replication.Tasks({id: "ReplicationTasks"}); //replace with with a call to active tasks when that is merged in
+      this.tasks = new Replication.Tasks({id: "ReplicationTasks"});
 			this.setView("#dashboard-content", new Views.ReplicationForm({
 				collection: this.databases,
         status:  this.tasks

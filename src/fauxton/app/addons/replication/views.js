@@ -44,13 +44,13 @@ function(app, FauxtonAPI, replication) {
   View.ReplicationForm = FauxtonAPI.View.extend({
 		template: "addons/replication/templates/form",
 		events:  {
-			"submit #replication": "submit",
+			"submit #replication": "validate",
 			"click .btn-group .btn": "showFields",
 			"click .swap": "swapFields",
 			"click .options": "toggleAdvancedOptions"
 		},
-		initialize: function(){
-			this.status = this.options.status;
+		initialize: function(options){
+			this.status = options.status;
 			this.newRepModel = new replication.Replicate({});
 		},
 		afterRender: function(){
@@ -89,17 +89,14 @@ function(app, FauxtonAPI, replication) {
 		cleanup: function(){
 			clearInterval(pollingInfo.intervalId);
 		},
-
-		disableFields: function(disable){
-			if(disable){
-				this.$el.find('input:hidden','select:hidden').attr('disabled',true);
-			}else{
-				this.$el.find('input','select').attr('disabled',false);
-			}
+		enableFields: function(){
+			this.$el.find('input','select').attr('disabled',false);
 		},
-
+		disableFields: function(){
+				this.$el.find('input:hidden','select:hidden').attr('disabled',true);
+		},
 		showFields: function(e){
-			var $currentTarget = $(e.currentTarget),
+			var $currentTarget = this.$(e.currentTarget),
 					targetVal = $currentTarget.val();
 
 			if (targetVal === "local"){
@@ -111,23 +108,36 @@ function(app, FauxtonAPI, replication) {
 		establish: function(){
 			return [ this.collection.fetch(), this.status.fetch()];
 		},
-
-		formValidation: function(){
-			var $remote = this.$el.find('input:visible'),
-					error = false;
-			for(var i=0; i<$remote.length; i++){
-				if ($remote[i].value =="http://" || $remote[i].value ==" "){
-					error = true;
-				}
-			}
-
-			if (this.$('input#to_name').is(':visible')){
+		validate: function(e){
+			e.preventDefault();
+			var notification;
+			if (this.formValidation()){
+					notification = FauxtonAPI.addNotification({
+						msg: "Please enter every field.",
+						type: "error",
+						clear: true
+					});
+			}else if (this.$('input#to_name').is(':visible') && !this.$('input[name=create_target]').is(':checked')){
 				var alreadyExists = this.collection.where({"name":this.$('input#to_name').val()});
 				if (alreadyExists.length === 0){
+					notification = FauxtonAPI.addNotification({
+						msg: "This database doesn't exist. Check create target if you want to create it.",
+						type: "error",
+						clear: true
+					});
+				}
+			}else{
+				this.submit(e);
+			}
+		},
+		formValidation: function(e){
+			var $remote = this.$el.find('input:visible'),
+      error = false;
+      for(var i=0; i<$remote.length; i++){
+				if ($remote[i].value =="http://" || $remote[i].value ===""){
 					error = true;
 				}
-			}
-
+      }
 			return error;
 		},
 		serialize: function(){
@@ -157,7 +167,7 @@ function(app, FauxtonAPI, replication) {
 					that.updateButtonText(false);
 				}
 			});
-			this.disableFields(false);
+			this.enableFields();
 		},		
 		updateButtonText: function(wait){
 			var $button = this.$('#replication button[type=submit]');
@@ -168,9 +178,7 @@ function(app, FauxtonAPI, replication) {
 			}
 		},
 		submit: function(e){
-			e.preventDefault();
-			this.disableFields(true); //disable fields not relevant to submitting
-
+			this.disableFields(); 
 			var formJSON = {};
 			_.map(this.$(e.currentTarget).serializeArray(), function(formData){
 				if(formData.value !== ''){
@@ -179,7 +187,6 @@ function(app, FauxtonAPI, replication) {
 				}
 			});
 
-			console.log($(e.currentTarget).serializeArray(), formJSON);
 			this.updateButtonText(true);
 			this.startReplication(formJSON);
 		},	
@@ -225,7 +232,6 @@ View.ReplicationList = FauxtonAPI.View.extend({
 		clearInterval(pollingInfo.intervalId);
   },
 	beforeRender:  function(){
-		var that = this;
     this.collection.forEach(function(item) {
       this.insertView(new View.replicationItem({ 
         model: item
@@ -261,7 +267,7 @@ View.ReplicationList = FauxtonAPI.View.extend({
 		},
 		cancelReplication: function(e){
 			//need to pass "cancel": true with source & target
-			var $currentTarget = $(e.currentTarget),
+			var $currentTarget = this.$(e.currentTarget),
 					repID = $currentTarget.attr('data-rep-id');
 			this.newRepModel.save({
 				"replication_id": repID,
