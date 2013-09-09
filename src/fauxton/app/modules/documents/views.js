@@ -442,7 +442,7 @@ function(app, FauxtonAPI, Paginate, Documents, pouchdb, Codemirror, JSHint, resi
     establish: function() {
       if (this.newView) { return null; }
 
-      return this.collection.fetch().fail(function() {
+      return this.collection.fetch({reset: true}).fail(function() {
         // TODO: handle error requests that slip through
         // This should just throw a notification, not break the page
         console.log("ERROR: ", arguments);
@@ -455,17 +455,21 @@ function(app, FauxtonAPI, Paginate, Documents, pouchdb, Codemirror, JSHint, resi
 
     serialize: function() {
       var totalRows = 0,
-      updateSeq = false;
+          recordStart = 0,
+          updateSeq = false;
 
       if (!this.newView) {
         totalRows = this.collection.totalRows();
         updateSeq = this.collection.updateSeq();
       }
 
+      recordStart = this.collection.recordStart();
+
       var info = {
         updateSeq: updateSeq,
+        offset: recordStart,
         totalRows: totalRows,
-        numModels: this.collection.models.length,
+        numModels: this.collection.models.length + recordStart - 1,
         viewList: this.viewList,
         requestDuration: null
       };
@@ -530,7 +534,7 @@ function(app, FauxtonAPI, Paginate, Documents, pouchdb, Codemirror, JSHint, resi
         },
         canShowNextfn: function () {
           
-          if ((collection.viewMeta.offset + 1) === collection.viewMeta.total_rows) {
+          if ((collection.viewMeta.offset + collection.length + 2) >= collection.viewMeta.total_rows) {
             return false;
           }
 

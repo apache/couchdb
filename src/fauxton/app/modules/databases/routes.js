@@ -64,7 +64,6 @@ function(app, FauxtonAPI, Databases, Views) {
 
       databases.fetch().done(function(resp) {
         FauxtonAPI.when(databases.map(function(database) {
-          console.log('fetching', database);
           return database.status.fetch();
         })).always(function(resp) {
           //make this always so that even if a user is not allowed access to a database

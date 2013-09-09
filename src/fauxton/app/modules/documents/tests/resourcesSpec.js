@@ -68,7 +68,7 @@ define([
     it('Should return urlNext', function () {
       var url = collection.urlNextPage(20);
 
-      assert.equal(url, 'database/databaseId/_all_docs?limit=20&startkey_docid=%22myId2%22&startkey=%22myId2%22');
+      assert.equal(url, 'database/databaseId/_all_docs?limit=21&startkey_docid=%22myId2%22&startkey=%22myId2%22');
 
     });
 

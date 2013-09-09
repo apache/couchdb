@@ -55,12 +55,9 @@ define([
     });
 
     describe('#next', function () {
-
-      it('should set direction as next', function () {
-        paginate.$('a#next').click();
-
-        assert.equal(paginate.currentDirection, 'next');
-
+      beforeEach(function () {
+        //do this so it doesn't throw an error on other unwired up components
+        FauxtonAPI.triggerRouteEvent = function () {};
       });
 
       it('Should navigate', function () {
@@ -70,6 +67,15 @@ define([
 
         assert.ok(navigateMock.calledOnce);
         FauxtonAPI.navigate.restore();
+      });
+
+      it('Should trigger routeEvent', function () {
+        var navigateMock = sinon.spy(FauxtonAPI, 'triggerRouteEvent');
+
+        paginate.$('a#next').click();
+
+        assert.ok(navigateMock.calledOnce);
+        FauxtonAPI.triggerRouteEvent.restore();
       });
 
     });
@@ -77,13 +83,6 @@ define([
 
     describe('#previous', function () {
 
-      it('should set direction as next', function () {
-        paginate.$('a#previous').click();
-
-        assert.equal(paginate.currentDirection, 'previous');
-
-      });
-
       it('Should navigate', function () {
         var navigateMock = sinon.spy(FauxtonAPI, 'navigate');
 
@@ -93,6 +92,14 @@ define([
         FauxtonAPI.navigate.restore();
       });
 
+      it('Should trigger routeEvent', function () {
+        var navigateMock = sinon.spy(FauxtonAPI, 'triggerRouteEvent');
+
+        paginate.$('a#previous').click();
+
+        assert.ok(navigateMock.calledOnce);
+        FauxtonAPI.triggerRouteEvent.restore();
+      });
 
     });
 

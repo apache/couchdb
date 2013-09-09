@@ -159,7 +159,8 @@ function(app, FauxtonAPI, Documents, Databases) {
     events: {
       "route:updateAllDocs": "updateAllDocsFromView",
       "route:updatePreviewDocs": "updateAllDocsFromPreview",
-      "route:reloadDesignDocs": "reloadDesignDocs"
+      "route:reloadDesignDocs": "reloadDesignDocs",
+      "route:paginate": "paginate"
     },
 
     initialize: function (route, masterLayout, options) {
@@ -326,6 +327,16 @@ function(app, FauxtonAPI, Documents, Databases) {
         nestedView: Documents.Views.Row,
         viewList: true
       }));
+    },
+
+    paginate: function (direction) {
+      _.extend(this.documentsView.collection.params, app.getParams());
+      this.documentsView.forceRender();
+      if (direction === 'next') {
+        this.documentsView.collection.skipFirstItem = true;
+      } else {
+        this.documentsView.collection.skipFirstItem = false;
+      }
     },
 
     reloadDesignDocs: function (event) {
