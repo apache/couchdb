@@ -129,7 +129,13 @@ function(app, FauxtonAPI, Documents, Databases) {
       }));
 
     },
-
+    crumbs: function() {
+      return [
+        {"name": "Databases", "link": "/_all_dbs"},
+        {"name": this.database.id, "link": Databases.databaseUrl(this.database)},
+        {"name": "New", "link": "#"}
+      ];
+    },
     routes: {
       "database/:database/new": "code_editor"
     },
