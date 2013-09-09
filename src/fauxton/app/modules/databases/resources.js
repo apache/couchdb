@@ -116,6 +116,11 @@ function(app, FauxtonAPI, Documents) {
       var i = -1;
       var byteUnits = [' kB', ' MB', ' GB', ' TB', 'PB', 'EB', 'ZB', 'YB'];
       var fileSizeInBytes = this.diskSize();
+
+      if (!fileSizeInBytes) {
+        return 0;
+      }
+
       do {
           fileSizeInBytes = fileSizeInBytes / 1024;
           i++;

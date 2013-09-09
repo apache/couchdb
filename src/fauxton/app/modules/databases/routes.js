@@ -45,10 +45,6 @@ function(app, FauxtonAPI, Databases, Views) {
     initialize: function() {
       this.databases = new Databases.List();
       this.deferred = FauxtonAPI.Deferred();
-
-      // this.sidebarView = this.setView("#sidebar-content", new Views.Sidebar({
-      //   collection: this.databases
-      // }));
     },
 
     allDatabases: function() {
@@ -68,8 +64,11 @@ function(app, FauxtonAPI, Databases, Views) {
 
       databases.fetch().done(function(resp) {
         FauxtonAPI.when(databases.map(function(database) {
+          console.log('fetching', database);
           return database.status.fetch();
-        })).done(function(resp) {
+        })).always(function(resp) {
+          //make this always so that even if a user is not allowed access to a database
+          //they will still see a list of all databases
           deferred.resolve();
         });
       });
