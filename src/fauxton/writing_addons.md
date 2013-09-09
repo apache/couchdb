@@ -15,10 +15,11 @@ have the following structure:
 
 ## Generating an addon
 We have a `grunt-init` template that lets you create a skeleton addon,
-including all the boiler plate code. Run `grunt-init tasks/addon` and answer
-the questions it asks to create an addon:
+including all the boiler plate code. Run
+`./node_modules/.bin/grunt-init tasks/addon` and answer the questions
+it asks to create an addon:
 
-    ± grunt-init tasks/addon
+    $ ./node_modules/.bin/grunt-init tasks/addon
     path.existsSync is now called `fs.existsSync`.
     Running "addon" task
 
