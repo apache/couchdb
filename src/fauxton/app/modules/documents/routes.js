@@ -30,11 +30,12 @@ function(app, FauxtonAPI, Documents, Databases) {
     disableLoader: true,
     selectedHeader: "Databases",
     initialize: function(route, masterLayout, options) {
-      var databaseName = options[0], docID = options[1]||'new';
+      var databaseName = options[0];
+      this.docID = options[1]||'new';
 
       this.database = this.database || new Databases.Model({id: databaseName});
       this.doc = new Documents.Doc({
-        _id: docID
+        _id: this.docID
       }, {
         database: this.database
       });
