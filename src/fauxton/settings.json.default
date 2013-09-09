@@ -4,6 +4,7 @@
   { "name": "config" },
   { "name": "logs" },
   { "name": "stats" },
+  { "name":  "replication" },
   { "name": "contribute" },
   { "name": "auth" }
   ],
