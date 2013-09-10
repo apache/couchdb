@@ -177,9 +177,14 @@ form#replication {
 				margin: 0px;
 				vertical-align: bottom;
 				&.break {
-					padding-right: 20px;
-					text-overflow: ellipsis;
-					overflow: hidden;
+					-ms-word-break: break-all;
+					word-break: break-all;
+
+					/* Non standard for webkit */
+					word-break: break-word;
+					-webkit-hyphens: auto;
+					-moz-hyphens: auto;
+					hyphens: auto;
 				}
 			}
 			padding: 10px 10px;
