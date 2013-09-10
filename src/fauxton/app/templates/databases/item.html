@@ -18,3 +18,14 @@ the License.
 <td><%= database.status.humanSize() %></td>
 <td><%= database.status.numDocs() %></td>
 <td><%= database.status.updateSeq() %></td>
+<td>
+  <div class="dropdown">
+    <a class="dropdown-toggle fonticon-cog"
+       data-toggle="dropdown"
+       href="#">
+    </a>
+    <ul class="dropdown-menu">
+	    <li><a class="set-replication-start" href="#/replication/<%= database.get("name") %>">replicate</a></li>
+    </ul>
+  </div>
+</td>

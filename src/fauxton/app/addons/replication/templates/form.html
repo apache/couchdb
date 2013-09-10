@@ -22,7 +22,7 @@ the License.
 			<div class="from_local local_option">
 				<select id="from_name" name="source">
 					<% _.each( databases, function( db, i ){ %>
-					   <option value="<%=db.name%>"><%=db.name%></option>
+					   <option value="<%=db.name%>" <% if(selectedDB == db.name){%>selected<%}%> ><%=db.name%></option>
 					<% }); %>
 				</select>
 			</div>

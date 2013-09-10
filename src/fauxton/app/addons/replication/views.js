@@ -51,6 +51,7 @@ function(app, FauxtonAPI, replication) {
 		},
 		initialize: function(options){
 			this.status = options.status;
+			this.selectedDB = options.selectedDB;
 			this.newRepModel = new replication.Replicate({});
 		},
 		afterRender: function(){
@@ -142,7 +143,8 @@ function(app, FauxtonAPI, replication) {
 		},
 		serialize: function(){
 			return {
-				databases:  this.collection.toJSON()
+				databases:  this.collection.toJSON(),
+				selectedDB: this.selectedDB
 			};
 		},
 		startReplication: function(json){
