@@ -14,7 +14,7 @@
 
 -export([is_progress_possible/1, remove_overlapping_shards/2, maybe_send_row/1,
     transform_row/1, keydict/1, extract_view/4, get_shards/2,
-    check_down_shards/2]).
+    check_down_shards/2, handle_worker_exit/3]).
 
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
@@ -36,6 +36,13 @@ check_down_shards(Collector, BadNode) ->
         false ->
             {ok, Collector}
     end.
+
+%% @doc Handle a worker that dies during a stream
+-spec handle_worker_exit(#collector{}, #shard{}, any()) -> {error, any()}.
+handle_worker_exit(Collector, _Worker, Reason) ->
+    #collector{callback=Callback, user_acc=Acc} = Collector,
+    {ok, Resp} = Callback({error, fabric_util:error_info(Reason)}, Acc),
+    {error, Resp}.
 
 %% @doc looks for a fully covered keyrange in the list of counters
 -spec is_progress_possible([{#shard{}, term()}]) -> boolean().
