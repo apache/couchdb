@@ -710,7 +710,8 @@ function(app, FauxtonAPI, Paginate, Documents, pouchdb, Codemirror, JSHint, resi
 
           setTimeout(function() {
             $(".CodeMirror ."+className).tooltip({
-              title: "ERROR: " + error.reason
+              title: "ERROR: " + error.reason,
+              container: 'body'
             });
           }, 0);
         }, this);
