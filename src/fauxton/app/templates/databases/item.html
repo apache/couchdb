@@ -19,13 +19,5 @@ the License.
 <td><%= database.status.numDocs() %></td>
 <td><%= database.status.updateSeq() %></td>
 <td>
-  <div class="dropdown">
-    <a class="dropdown-toggle fonticon-cog"
-       data-toggle="dropdown"
-       href="#">
-    </a>
-    <ul class="dropdown-menu">
-	    <li><a class="set-replication-start" href="#/replication/<%= database.get("name") %>">replicate</a></li>
-    </ul>
-  </div>
+  <a class="db-actions btn fonticon-replicate set-replication-start" href="#/replication/<%= database.get("name") %>"></a>
 </td>
