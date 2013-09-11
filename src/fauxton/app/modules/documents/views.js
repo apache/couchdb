@@ -1059,7 +1059,7 @@ function(app, FauxtonAPI, Paginate, Documents, pouchdb, Codemirror, JSHint, resi
       var json, notification,
       that = this;
 
-      event.preventDefault();
+      if (event) { event.preventDefault();}
 
       if (this.hasValidCode()) {
         var mapVal = this.mapEditor.getValue(), 
