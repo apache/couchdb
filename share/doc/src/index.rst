@@ -21,8 +21,8 @@
     intro/index
     install/index
     config/index
-    maintenance/index
     replication/index
+    maintenance/index
     couchapp/index
     externals
     query-server/index
