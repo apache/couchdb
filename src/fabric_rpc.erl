@@ -29,18 +29,19 @@
 
 changes(DbName, #changes_args{} = Args, StartSeq) ->
     changes(DbName, [Args], StartSeq);
-changes(DbName, Options, StartSeq) ->
+changes(DbName, Options, StartVector) ->
     erlang:put(io_priority, {interactive, DbName}),
     #changes_args{dir=Dir} = Args = lists:keyfind(changes_args, 1, Options),
     case get_or_create_db(DbName, []) of
     {ok, Db} ->
+        StartSeq = calculate_start_seq(Db, node(), StartVector),
         Enum = fun changes_enumerator/2,
         Opts = [{dir,Dir}],
         Acc0 = {Db, StartSeq, Args, Options},
         try
             {ok, {_, LastSeq, _, _}} =
                 couch_db:changes_since(Db, StartSeq, Enum, Opts, Acc0),
-            rexi:reply({complete, LastSeq})
+            rexi:reply({complete, {LastSeq, uuid(Db)}})
         after
             couch_db:close(Db)
         end;
@@ -278,11 +279,11 @@ changes_enumerator(DocInfo, {Db, _Seq, Args, Options}) ->
 
 changes_row(Db, #doc_info{id=Id, high_seq=Seq}=DI, Results, Del, true, Opts) ->
     Doc = doc_member(Db, DI, Opts),
-    #change{key=Seq, id=Id, value=Results, doc=Doc, deleted=Del};
-changes_row(_, #doc_info{id=Id, high_seq=Seq}, Results, true, _, _) ->
-    #change{key=Seq, id=Id, value=Results, deleted=true};
-changes_row(_, #doc_info{id=Id, high_seq=Seq}, Results, _, _, _) ->
-    #change{key=Seq, id=Id, value=Results}.
+    #change{key={Seq, uuid(Db)}, id=Id, value=Results, doc=Doc, deleted=Del};
+changes_row(Db, #doc_info{id=Id, high_seq=Seq}, Results, true, _, _) ->
+    #change{key={Seq, uuid(Db)}, id=Id, value=Results, deleted=true};
+changes_row(Db, #doc_info{id=Id, high_seq=Seq}, Results, _, _, _) ->
+    #change{key={Seq, uuid(Db)}, id=Id, value=Results}.
 
 doc_member(Shard, DocInfo, Opts) ->
     case couch_db:open_doc(Shard, DocInfo, [deleted | Opts]) of
@@ -363,3 +364,80 @@ set_io_priority(DbName, Options) ->
         _ ->
             ok
     end.
+
+calculate_start_seq(_Db, _Node, Seq) when is_integer(Seq) ->
+    Seq;
+calculate_start_seq(Db, Node, {Seq, Uuid}) ->
+    case is_prefix(Uuid, couch_db:get_uuid(Db)) of
+        true ->
+            case is_owner(Node, Seq, couch_db:get_epochs(Db)) of
+                true -> Seq;
+                false -> 0
+            end;
+        false ->
+            %% The file was rebuilt, most likely in a different
+            %% order, so rewind.
+            0
+    end.
+
+is_prefix(Pattern, Subject) ->
+     binary:longest_common_prefix([Pattern, Subject]) == size(Pattern).
+
+is_owner(Node, Seq, Epochs) ->
+    validate_epochs(Epochs),
+    Node =:= owner_of(Seq, Epochs).
+
+owner_of(_Seq, []) ->
+    undefined;
+owner_of(Seq, [{EpochNode, EpochSeq} | _Rest]) when Seq > EpochSeq ->
+    EpochNode;
+owner_of(Seq, [_ | Rest]) ->
+    owner_of(Seq, Rest).
+
+validate_epochs(Epochs) ->
+    %% Assert uniqueness.
+    case length(Epochs) == length(lists:ukeysort(2, Epochs)) of
+        true  -> ok;
+        false -> erlang:error(duplicate_epoch)
+    end,
+    %% Assert order.
+    case Epochs == lists:sort(fun({_, A}, {_, B}) -> B =< A end, Epochs) of
+        true  -> ok;
+        false -> erlang:error(epoch_order)
+    end.
+
+uuid(Db) ->
+    Uuid = couch_db:get_uuid(Db),
+    binary:part(Uuid, {0, uuid_prefix_len()}).
+
+uuid_prefix_len() ->
+    list_to_integer(config:get("fabric", "uuid_prefix_len", "7")).
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+calculate_start_seq_test() ->
+    %% uuid mismatch is always a rewind.
+    Hdr1 = couch_db_header:new(),
+    Hdr2 = couch_db_header:set(Hdr1, [{epochs, [{node1, 1}]}, {uuid, <<"uuid1">>}]),
+    ?assertEqual(0, calculate_start_seq(#db{header=Hdr2}, node1, {1, <<"uuid2">>})),
+    %% uuid matches and seq is owned by node.
+    Hdr3 = couch_db_header:set(Hdr2, [{epochs, [{node1, 1}]}]),
+    ?assertEqual(2, calculate_start_seq(#db{header=Hdr3}, node1, {2, <<"uuid1">>})),
+    %% uuids match but seq is not owned by node.
+    Hdr4 = couch_db_header:set(Hdr2, [{epochs, [{node2, 2}, {node1, 1}]}]),
+    ?assertEqual(0, calculate_start_seq(#db{header=Hdr4}, node1, {3, <<"uuid1">>})),
+    %% return integer if we didn't get a vector.
+    ?assertEqual(4, calculate_start_seq(#db{}, foo, 4)).
+
+is_owner_test() ->
+    ?assertNot(is_owner(foo, 1, [])),
+    ?assertNot(is_owner(foo, 1, [{foo, 1}])),
+    ?assert(is_owner(foo, 2, [{foo, 1}])),
+    ?assert(is_owner(foo, 50, [{bar, 100}, {foo, 1}])),
+    ?assert(is_owner(foo, 50, [{baz, 200}, {bar, 100}, {foo, 1}])),
+    ?assert(is_owner(bar, 150, [{baz, 200}, {bar, 100}, {foo, 1}])),
+    ?assertError(duplicate_epoch, is_owner(foo, 1, [{foo, 1}, {bar, 1}])),
+    ?assertError(epoch_order, is_owner(foo, 1, [{foo, 100}, {bar, 200}])).
+
+-endif.

@@ -297,8 +297,8 @@ pack_seqs(Workers) ->
     Opaque = couch_util:encodeBase64Url(term_to_binary(SeqList, [compressed])),
     [SeqSum, Opaque].
 
-seq({Seq, _Uuid, _Node}) -> Seq;
-seq(Seq)                 -> Seq.
+seq({Seq, _Uuid}) -> Seq;
+seq(Seq)          -> Seq.
 
 unpack_seqs(0, DbName) ->
     fabric_dict:init(mem3:shards(DbName), 0);
@@ -339,7 +339,7 @@ do_unpack_seqs(Opaque, DbName) ->
     Unpacked = lists:flatmap(fun({Node, [A,B], Seq}) ->
         case mem3:get_shard(DbName, Node, [A,B]) of
         {ok, Shard} ->
-            [{Shard, seq(Seq)}];
+            [{Shard, Seq}];
         {error, not_found} ->
             []
         end
