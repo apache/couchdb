@@ -713,6 +713,7 @@ doc_from_multi_part_stream(ContentType, DataFun, Ref) ->
     {doc_bytes, Ref, DocBytes} ->
         Doc = couch_doc:from_json_obj(?JSON_DECODE(DocBytes)),
         ReadAttachmentDataFun = fun() ->
+            link(Parser),
             Parser ! {get_bytes, Ref, self()},
             receive
             {started_open_doc_revs, NewRef} ->
