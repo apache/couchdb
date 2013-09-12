@@ -25,11 +25,15 @@ go(DbName, GroupId, View, Args, Callback, Acc0) when is_binary(GroupId) ->
 
 go(DbName, DDoc, View, Args, Callback, Acc) ->
     Shards = fabric_view:get_shards(DbName, Args),
-    Workers0 = fabric_util:submit_jobs(
-            Shards, fabric_rpc, map_view, [DDoc, View, Args]),
+    Repls = fabric_view:get_shard_replacements(DbName, Shards),
+    RPCArgs = [DDoc, View, Args],
+    StartFun = fun(Shard) ->
+        hd(fabric_util:submit_jobs([Shard], fabric_rpc, map_view, RPCArgs))
+    end,
+    Workers0 = fabric_util:submit_jobs(Shards, fabric_rpc, map_view, RPCArgs),
     RexiMon = fabric_util:create_monitors(Workers0),
     try
-        case fabric_util:stream_start(Workers0, #shard.ref) of
+        case fabric_util:stream_start(Workers0, #shard.ref, StartFun, Repls) of
             {ok, Workers} ->
                 try
                     go(DbName, Workers, Args, Callback, Acc)
@@ -73,11 +77,6 @@ handle_message({rexi_DOWN, _, {_, NodeRef}, _}, _, State) ->
 
 handle_message({rexi_EXIT, Reason}, Worker, State) ->
     fabric_view:handle_worker_exit(State, Worker, Reason);
-
-handle_message({rexi_EXIT, Reason}, _, State) ->
-    #collector{callback=Callback, user_acc=Acc} = State,
-    {ok, Resp} = Callback({error, fabric_util:error_info(Reason)}, Acc),
-    {error, Resp};
 
 handle_message({meta, Meta0}, {Worker, From}, State) ->
     Tot = couch_util:get_value(total, Meta0, 0),
