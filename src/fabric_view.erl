@@ -14,7 +14,8 @@
 
 -export([is_progress_possible/1, remove_overlapping_shards/2, maybe_send_row/1,
     transform_row/1, keydict/1, extract_view/4, get_shards/2,
-    check_down_shards/2, handle_worker_exit/3]).
+    check_down_shards/2, handle_worker_exit/3,
+    get_shard_replacements/2]).
 
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
@@ -304,6 +305,34 @@ get_shards(DbName, #mrargs{stale=Stale})
     mem3:ushards(DbName);
 get_shards(DbName, #mrargs{stale=false}) ->
     mem3:shards(DbName).
+
+get_shard_replacements(DbName, UsedShards) ->
+    % We only want to generate a replacements list from shards
+    % that aren't already used.
+    AllLiveShards = mem3:live_shards(DbName, [node() | nodes()]),
+    UnusedShards = AllLiveShards -- UsedShards,
+
+    % If we have more than one copy of a range then we don't
+    % want to try and add a replacement to any copy.
+    RangeCounts = lists:foldl(fun(#shard{range=R}, Acc) ->
+        dict:update_counter(R, 1, Acc)
+    end, dict:new(), UsedShards),
+
+    % For each seq shard range with a count of 1, find any
+    % possible replacements from the unused shards. The
+    % replacement list is keyed by range.
+    lists:foldl(fun(#shard{range=Range}, Acc) ->
+        case dict:find(Range, RangeCounts) of
+            {ok, 1} ->
+                Repls = [S || S <- UnusedShards, S#shard.range =:= Range],
+                % Only keep non-empty lists of replacements
+                if Repls == [] -> Acc; true ->
+                    [{Range, Repls} | Acc]
+                end;
+            _ ->
+                Acc
+        end
+    end, [], UsedShards).
 
 % unit test
 is_progress_possible_test() ->
