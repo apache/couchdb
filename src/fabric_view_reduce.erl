@@ -25,13 +25,16 @@ go(DbName, GroupId, View, Args, Callback, Acc0, VInfo) when is_binary(GroupId) -
 
 go(DbName, DDoc, VName, Args, Callback, Acc, {red, {_, Lang, _}, _}=VInfo) ->
     RedSrc = couch_mrview_util:extract_view_reduce(VInfo),
-    Workers0 = lists:map(fun(#shard{name=Name, node=N} = Shard) ->
-        Ref = rexi:cast(N, {fabric_rpc, reduce_view, [Name,DDoc,VName,Args]}),
-        Shard#shard{ref = Ref}
-    end, fabric_view:get_shards(DbName, Args)),
+    RPCArgs = [DDoc, VName, Args],
+    Shards = fabric_view:get_shards(DbName, Args),
+    Repls = fabric_view:get_shard_replacements(DbName, Shards),
+    StartFun = fun(Shard) ->
+        hd(fabric_util:submit_jobs([Shard], fabric_rpc, reduce_view, RPCArgs))
+    end,
+    Workers0 = fabric_util:submit_jobs(Shards,fabric_rpc,reduce_view,RPCArgs),
     RexiMon = fabric_util:create_monitors(Workers0),
     try
-        case fabric_util:stream_start(Workers0, #shard.ref) of
+        case fabric_util:stream_start(Workers0, #shard.ref, StartFun, Repls) of
             {ok, Workers} ->
                 try
                     go2(DbName, Workers, Lang, RedSrc, Args, Callback, Acc)
