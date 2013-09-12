@@ -131,14 +131,22 @@ send_changes(DbName, ChangesArgs, Callback, PackedSeqs, AccIn, Timeout) ->
         end
     end, unpack_seqs(PackedSeqs, DbName)),
     {Workers0, _} = lists:unzip(Seqs),
+    Repls = fabric_view:get_shard_replacements(DbName, Workers0),
+    StartFun = fun(#shard{name=Name, node=N}=Shard) ->
+        Ref = rexi:cast(N, {fabric_rpc, changes, [Name, ChangesArgs, 0]}),
+        Shard#shard{ref = Ref}
+    end,
     RexiMon = fabric_util:create_monitors(Workers0),
     try
-        case fabric_util:stream_start(Workers0, #shard.ref) of
+        case fabric_util:stream_start(Workers0, #shard.ref, StartFun, Repls) of
             {ok, Workers} ->
                 try
-                    LiveSeqs = lists:filter(fun({W, _S}) ->
-                        lists:member(W, Workers)
-                    end, Seqs),
+                    LiveSeqs = lists:map(fun(W) ->
+                        case lists:keyfind(W, 1, Seqs) of
+                            {W, Seq} -> {W, Seq};
+                            _ -> {W, 0}
+                        end
+                    end, Workers),
                     send_changes(DbName, Workers, LiveSeqs, ChangesArgs,
                             Callback, AccIn, Timeout)
                 after
