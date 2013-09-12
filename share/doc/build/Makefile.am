@@ -403,6 +403,8 @@ src_files = \
 
 src_files_html = \
     ../static/rtd.css \
+    ../templates/couchdb/domainindex.html \
+    ../templates/couchdb/theme.conf \
     ../templates/pages/download.html \
     ../templates/pages/index.html \
     ../templates/layout.html \
