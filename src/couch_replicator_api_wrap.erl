@@ -221,7 +221,7 @@ open_doc_revs(#httpdb{} = HttpDb, Id, Revs, Options, Fun, Acc) ->
             ),
             #httpdb{retries = Retries, wait = Wait0} = HttpDb,
             Wait = 2 * erlang:min(Wait0 * 2, ?MAX_WAIT),
-            twig:log(notice,"Retrying GET to ~s in ~p seconds due to error ~s",
+            twig:log(notice,"Retrying GET to ~s in ~p seconds due to error ~p",
                 [Url, Wait / 1000, Else]
             ),
             ok = timer:sleep(Wait),
@@ -278,7 +278,11 @@ update_doc(#httpdb{} = HttpDb, #doc{id = DocId} = Doc, Options, Type) ->
     end ++ [{"Content-Type", ?b2l(ContentType)}, {"Content-Length", Len}],
     Body = {fun stream_doc/1, {JsonBytes, Doc#doc.atts, Boundary, Len}},
     send_req(
-        HttpDb,
+        % A crash here bubbles all the way back up to run_user_fun inside
+        % open_doc_revs, which will retry the whole thing.  That's the
+        % appropriate course of action, since we've already started streaming
+        % the response body from the GET request.
+        HttpDb#httpdb{retries = 0},
         [{method, put}, {path, encode_doc_id(DocId)},
             {qs, QArgs}, {headers, Headers}, {body, Body}],
         fun(Code, _, {Props}) when Code =:= 200 orelse Code =:= 201 ->
