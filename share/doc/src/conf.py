@@ -38,8 +38,6 @@ looks like there is no such file there.''')
 
 source_suffix = ".rst"
 
-master_doc = "index"
-
 nitpicky = True
 
 version = '.'.join([
@@ -79,7 +77,7 @@ html_static_path = ["../static"]
 html_title = ' '.join([
     project,
     version,
-    'Manual'
+    'Documentation'
 ])
 
 html_style = "rtd.css"
@@ -91,7 +89,8 @@ html_favicon = "../images/favicon.ico"
 html_use_index = False
 
 html_additional_pages = {
-    'download': 'pages/download.html'
+    'download': 'pages/download.html',
+    'index': 'pages/index.html'
 }
 
 html_context = {}

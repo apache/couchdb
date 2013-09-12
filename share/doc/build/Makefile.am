@@ -260,7 +260,7 @@ html_files = \
     html/index.html \
     html/json-structure.html \
     html/objects.inv \
-    html/genindex.html \
+    html/http-api.html \
     html/search.html \
     html/searchindex.js
 
@@ -404,6 +404,8 @@ src_files = \
 src_files_html = \
     ../static/rtd.css \
     ../templates/pages/download.html \
+    ../templates/pages/index.html \
+    ../templates/layout.html \
     ../templates/help.html \
     ../templates/searchbox.html \
     ../templates/utilities.html
