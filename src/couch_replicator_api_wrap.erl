@@ -221,7 +221,7 @@ open_doc_revs(#httpdb{} = HttpDb, Id, Revs, Options, Fun, Acc) ->
             ),
             #httpdb{retries = Retries, wait = Wait0} = HttpDb,
             Wait = 2 * erlang:min(Wait0 * 2, ?MAX_WAIT),
-            twig:log(notice,"Retrying GET to ~s in ~p seconds due to error ~p",
+            ?LOG_INFO("Retrying GET to ~s in ~p seconds due to error ~p",
                 [Url, Wait / 1000, Else]
             ),
             ok = timer:sleep(Wait),
@@ -834,6 +834,12 @@ rev_to_str({_Pos, _Id} = Rev) ->
 rev_to_str(Rev) ->
     Rev.
 
+write_fun() ->
+    fun(Data) ->
+        receive {get_data, Ref, From} ->
+            From ! {data, Ref, Data}
+        end
+    end.
 
 stream_doc({JsonBytes, Atts, Boundary, Len}) ->
     case erlang:erase({doc_streamer, Boundary}) of
@@ -843,17 +849,11 @@ stream_doc({JsonBytes, Atts, Boundary, Len}) ->
     _ ->
         ok
     end,
-    Self = self(),
-    DocStreamer = spawn_link(fun() ->
-        couch_doc:doc_to_multi_part_stream(
-            Boundary, JsonBytes, Atts,
-            fun(Data) ->
-                receive {get_data, Ref, From} ->
-                    From ! {data, Ref, Data}
-                end
-            end, true),
-        unlink(Self)
-    end),
+    DocStreamer = spawn_link(
+        couch_doc,
+        doc_to_multi_part_stream,
+        [Boundary, JsonBytes, Atts, write_fun(), true]
+    ),
     erlang:put({doc_streamer, Boundary}, DocStreamer),
     {ok, <<>>, {Len, Boundary}};
 stream_doc({0, Id}) ->
