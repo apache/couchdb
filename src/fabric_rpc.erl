@@ -277,13 +277,14 @@ changes_enumerator(DocInfo, {Db, _Seq, Args, Options}) ->
         {Go, {Db, Seq, Args, Options}}
     end.
 
+% TODO change to {Seq, uuid(Db)}
 changes_row(Db, #doc_info{id=Id, high_seq=Seq}=DI, Results, Del, true, Opts) ->
     Doc = doc_member(Db, DI, Opts),
-    #change{key={Seq, uuid(Db)}, id=Id, value=Results, doc=Doc, deleted=Del};
+    #change{key={Seq, uuid(Db), []}, id=Id, value=Results, doc=Doc, deleted=Del};
 changes_row(Db, #doc_info{id=Id, high_seq=Seq}, Results, true, _, _) ->
-    #change{key={Seq, uuid(Db)}, id=Id, value=Results, deleted=true};
+    #change{key={Seq, uuid(Db), []}, id=Id, value=Results, deleted=true};
 changes_row(Db, #doc_info{id=Id, high_seq=Seq}, Results, _, _, _) ->
-    #change{key={Seq, uuid(Db)}, id=Id, value=Results}.
+    #change{key={Seq, uuid(Db), []}, id=Id, value=Results}.
 
 doc_member(Shard, DocInfo, Opts) ->
     case couch_db:open_doc(Shard, DocInfo, [deleted | Opts]) of
@@ -367,6 +368,8 @@ set_io_priority(DbName, Options) ->
 
 calculate_start_seq(_Db, _Node, Seq) when is_integer(Seq) ->
     Seq;
+calculate_start_seq(Db, Node, {Seq, Uuid, _}) -> % remove me
+    calculate_start_seq(Db, Node, {Seq, Uuid});
 calculate_start_seq(Db, Node, {Seq, Uuid}) ->
     case is_prefix(Uuid, couch_db:get_uuid(Db)) of
         true ->
