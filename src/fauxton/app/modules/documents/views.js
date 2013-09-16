@@ -466,6 +466,7 @@ function(app, FauxtonAPI, Paginate, Documents, pouchdb, Codemirror, JSHint, resi
       recordStart = this.collection.recordStart();
 
       var info = {
+        database: this.collection.database.id,
         updateSeq: updateSeq,
         offset: recordStart,
         totalRows: totalRows,

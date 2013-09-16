@@ -28,7 +28,12 @@ the License.
     </div>
   <% } %>
   <p>
-  Showing <%=offset%> - <%= numModels %> of <%= totalRows %> rows
+
+  <% if (totalRows === "unknown"){ %>
+    Showing 0 documents. <a href="#/database/<%=database%>/new"> Create your first document.</a>
+  <% } else { %>
+    Showing <%=offset%> - <%= numModels %> of <%= totalRows %> rows
+  <%}%>
     <% if (updateSeq) { %>
       -- Update Sequence: <%= updateSeq %>
     <% } %>
