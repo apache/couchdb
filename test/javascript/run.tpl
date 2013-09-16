@@ -118,9 +118,9 @@ else
                 echo "file $1 does not exist"
                 exit 1
             fi
-            run $TEST_SRC
         fi
     fi
+    run $TEST_SRC
 fi
 
 if [ -z $COUCHDB_NO_START ]; then
