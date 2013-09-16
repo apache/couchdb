@@ -56,7 +56,9 @@ process_response() {
     do
         if [ $data = 'restart' ];
         then
-            restart
+            if [ -z $COUCHDB_NO_START ]; then
+                restart
+            fi
         else
             echo "$data"
         fi
@@ -121,6 +123,9 @@ else
     fi
 fi
 
-stop
+if [ -z $COUCHDB_NO_START ]; then
+    stop
+fi
+
 trap - 0
 exit $RESULT
