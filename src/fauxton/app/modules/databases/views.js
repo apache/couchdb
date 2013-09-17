@@ -13,11 +13,11 @@
 define([
   "app",
 
-  "modules/fauxton/paginate",
-  "api"
+  "modules/fauxton/components",
+  "api",
 ],
 
-function(app, Paginate, FauxtonAPI) {
+function(app, Components, FauxtonAPI) {
   var Views = {};
 
   Views.Item = FauxtonAPI.View.extend({
@@ -83,7 +83,7 @@ function(app, Paginate, FauxtonAPI) {
         }));
       }, this);
 
-      this.insertView("#database-pagination", new Paginate.Pagination({
+      this.insertView("#database-pagination", new Components.Pagination({
         page: this.page,
         perPage: this.perPage,
         total: this.collection.length,
@@ -98,30 +98,12 @@ function(app, Paginate, FauxtonAPI) {
     },
 
     afterRender: function() {
-      var dbLimit = this.dbLimit;
-      var ajaxReq;
-
-      this.$el.find("input.search-query").typeahead({
-        source: function(query, process) {
-          var url = [
-            app.host,
-            "/_all_dbs?startkey=%22",
-            query,
-            "%22&endkey=%22",
-            query,
-            "\u9999%22&limit=",
-            dbLimit
-          ].join('');
-          if (ajaxReq) ajaxReq.abort();
-          ajaxReq = $.ajax({
-            url: url,
-            dataType: 'json',
-            success: function(data) {
-              process(data);
-            }
-          });
-        }
+      this.dbSearchTypeahead = new Components.DbSearchTypeahead({
+        dbLimit: this.dbLimit,
+        el: "input.search-query"
       });
+
+      this.dbSearchTypeahead.render();
     },
 
     selectAll: function(evt){

@@ -14,7 +14,7 @@ define([
        "app",
 
        "api",
-       "modules/fauxton/paginate",
+       "modules/fauxton/components",
 
        "modules/documents/resources",
        "modules/pouchdb/base",
@@ -30,7 +30,7 @@ define([
 
 ],
 
-function(app, FauxtonAPI, Paginate, Documents, pouchdb, Codemirror, JSHint, resizeColumns) {
+function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, resizeColumns) {
   var Views = {};
 
   Views.Tabs = FauxtonAPI.View.extend({
@@ -520,7 +520,7 @@ function(app, FauxtonAPI, Paginate, Documents, pouchdb, Codemirror, JSHint, resi
     addPagination: function () {
       var collection = this.collection;
 
-      this.pagination = new Paginate.IndexPagination({
+      this.pagination = new Components.IndexPagination({
         collection: this.collection,
         scrollToSelector: '#dashboard-content',
         previousUrlfn: function () {

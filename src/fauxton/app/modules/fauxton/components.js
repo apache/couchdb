@@ -13,13 +13,13 @@
 define([
        "app",
        // Libs
-      "api"
+       "api"
 ],
 
 function(app, FauxtonAPI) {
-  var Paginate = app.module();
-   
-  Paginate.Pagination = FauxtonAPI.View.extend({
+  var Components = app.module();
+
+  Components.Pagination = FauxtonAPI.View.extend({
     template: "templates/fauxton/pagination",
 
     initialize: function(options) {
@@ -41,7 +41,7 @@ function(app, FauxtonAPI) {
     }
   });
 
-  Paginate.IndexPagination = FauxtonAPI.View.extend({
+  Components.IndexPagination = FauxtonAPI.View.extend({
     template: "templates/fauxton/index_pagination",
     events: {
       "click a": 'scrollTo',
@@ -87,6 +87,52 @@ function(app, FauxtonAPI) {
 
   });
 
-  return Paginate;
+  //TODO allow more of the typeahead options.
+  //Current this just does what we need but we
+  //need to support the other typeahead options.
+  Components.Typeahead = FauxtonAPI.View.extend({
+
+    initialize: function (options) {
+      this.source = options.source;
+      _.bindAll(this);
+    },
+
+    afterRender: function () {
+      this.$el.typeahead({
+        source: this.source
+      });
+    }
+
+  });
+
+  Components.DbSearchTypeahead = Components.Typeahead.extend({
+    initialize: function (options) {
+      this.dbLimit = options.dbLimit || 30;
+      _.bindAll(this);
+    },
+    source: function(query, process) {
+      var url = [
+        app.host,
+        "/_all_dbs?startkey=%22",
+        query,
+        "%22&endkey=%22",
+        query,
+        "\u9999%22&limit=",
+        this.dbLimit
+      ].join('');
+
+      if (this.ajaxReq) { this.ajaxReq.abort(); }
+
+      this.ajaxReq = $.ajax({
+        url: url,
+        dataType: 'json',
+        success: function(data) {
+          process(data);
+        }
+      });
+    }
+  });
+
+  return Components;
 });
 

@@ -11,7 +11,7 @@
 // the License.
 define([
        'api',
-       'modules/fauxton/paginate',
+       'modules/fauxton/components',
        'modules/documents/resources',
        'testUtils',
        'app'
