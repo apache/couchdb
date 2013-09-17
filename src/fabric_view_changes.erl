@@ -297,7 +297,7 @@ pack_seqs(Workers) ->
     Opaque = couch_util:encodeBase64Url(term_to_binary(SeqList, [compressed])),
     [SeqSum, Opaque].
 
-seq({Seq, _Uuid, _Node}) -> Seq; % remove me
+seq({Seq, _Uuid, _Node}) -> Seq; % downgrade clause
 seq({Seq, _Uuid}) -> Seq;
 seq(Seq)          -> Seq.
 
