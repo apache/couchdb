@@ -829,7 +829,8 @@ function(app, FauxtonAPI, Paginate, Documents, pouchdb, Codemirror, JSHint, resi
       "change form.view-query-update input": "updateFilters",
       "change form.view-query-update select": "updateFilters",
       "change select#ddoc": "updateDesignDoc",
-      "submit form.view-query-update": "updateView"
+      "submit form.view-query-update": "updateView",
+      "click #db-views-tabs-nav": 'toggleIndexNav'
     },
 
     langTemplates: {
@@ -1194,6 +1195,17 @@ function(app, FauxtonAPI, Paginate, Documents, pouchdb, Codemirror, JSHint, resi
         }, this);
       }
     },
+    toggleIndexNav: function (event) {
+      var $index = this.$('#index'),
+          $targetId = this.$(event.target).attr('id');
+
+      if ($targetId === 'index-nav') {
+        if (this.newView) { return; }
+        $index.toggle('slow');
+      } else {
+        $index.removeAttr('style');
+      }
+    },
 
     serialize: function() {
       return {
@@ -1231,8 +1243,6 @@ function(app, FauxtonAPI, Paginate, Documents, pouchdb, Codemirror, JSHint, resi
     },
 
     afterRender: function() {
-
-
       var that = this, 
           mapFun = this.$("#map-function"),
           reduceFun = this.$("#reduce-function");
@@ -1240,6 +1250,9 @@ function(app, FauxtonAPI, Paginate, Documents, pouchdb, Codemirror, JSHint, resi
       if (this.newView) {
         mapFun.val(this.langTemplates[this.defaultLang].map);
         reduceFun.val(this.langTemplates[this.defaultLang].reduce);
+      } else {
+        this.$('#index').hide();
+        this.$('#index-nav').parent().removeClass('active');
       }
 
       this.updateDesignDoc();
