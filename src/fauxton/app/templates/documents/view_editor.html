@@ -25,7 +25,7 @@ the License.
         <form class="form-horizontal view-query-save">
 
           <div class="control-group">
-            <label for="ddoc">Design document <a target="_couch_docs" href="http://docs.couchdb.org/en/latest/ddocs/#design-docs"><i class="icon-question-sign"></i></a></label>
+            <label for="ddoc">Design document <a href="<%=getDocUrl('design_doc')%>" target="_blank"><i class="icon-question-sign"></i></a></label>
               <select id="ddoc">
                 <optgroup label="Select a document">
                   <option id="new-doc">New document</option>
@@ -47,13 +47,13 @@ the License.
           </div>
 
           <div class="control-group">
-            <label for="index-name">Index name <a target="_couch_docs" href="http://docs.couchdb.org/en/latest/ddocs/#view-functions"><i class="icon-question-sign"></i></a></label>
+            <label for="index-name">Index name <a href="<%=getDocUrl('view_functions')%>" target="_blank"><i class="icon-question-sign"></i></a></label>
             <input type="text" id="index-name" value="<%= viewName %>" placeholder="Index name" />
           </div>
 
 
           <div class="control-group">
-            <label for="map-function">Map function <a target="_couch_docs" href="http://docs.couchdb.org/en/latest/ddocs/#map-functions"><i class="icon-question-sign"></i></a></label>
+            <label for="map-function">Map function <a href="<%=getDocUrl('map_functions')%>" target="_blank"><i class="icon-question-sign"></i></a></label>
               <% if (newView) { %>
               <textarea class="js-editor" id="map-function"><%= langTemplates.map %></textarea>
               <% } else { %>
@@ -63,7 +63,7 @@ the License.
 
 
           <div class="control-group">
-            <label for="reduce-function-selector">Reduce function <a target="_couch_docs" href="http://docs.couchdb.org/en/latest/ddocs.html#reduce-and-rereduce-functions"><i class="icon-question-sign"></i></a></label>
+            <label for="reduce-function-selector">Reduce function <a href="<%=getDocUrl('reduce_functions')%>" target="_blank"><i class="icon-question-sign"></i></a></label>
 
               <select id="reduce-function-selector">
                 <option value="" <%= !reduceFunStr ? 'selected="selected"' : '' %>>None</option>

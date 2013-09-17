@@ -31,6 +31,23 @@ function() {
     return path;
   };
 
+
+  // Get the URL for documentation, wiki, wherever we store it.
+  // update the URLs in documentation_urls.js 
+  Helpers.docs =  {
+    "docs": "http://docs.couchdb.org/en/latest/index.html",
+    "replication_doc": "http://docs.couchdb.org/en/latest/replicator.html#basics",
+    "design_doc": "http://docs.couchdb.org/en/latest/ddocs.html#design-docs",
+    "view_functions": "http://docs.couchdb.org/en/latest/ddocs.html#view-functions",
+    "map_functions": "http://docs.couchdb.org/en/latest/ddocs.html#map-functions",
+    "reduce_functions": "http://docs.couchdb.org/en/latest/ddocs.html#reduce-and-rereduce-functions",
+    "api_reference": "http://docs.couchdb.org/en/latest/api-basics.html?highlight=api"
+  }; 
+  
+  Helpers.getDocUrl = function(doc){
+    return Helpers.docs[doc] || '#';
+  };
+
   // File size pretty printing, taken from futon.format.js
   Helpers.formatSize = function(size) {
       var jump = 512;
