@@ -14,6 +14,9 @@
 
 -export([go/5, pack_seqs/1, unpack_seqs/2]).
 
+%% exported for upgrade purposes.
+-export([keep_sending_changes/8]).
+
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
@@ -96,7 +99,7 @@ keep_sending_changes(DbName, Args, Callback, Seqs, AccIn, Timeout, UpListen, T0)
             Callback({stop, LastSeq}, AccOut);
         _ ->
             {ok, AccTimeout} = Callback(timeout, AccOut),
-            keep_sending_changes(
+            ?MODULE:keep_sending_changes(
                 DbName,
                 Args#changes_args{limit=Limit2},
                 Callback,
