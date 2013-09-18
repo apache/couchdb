@@ -651,7 +651,7 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
           deferred = $.Deferred();
 
       promise.then(function () {
-        deferred.resolve()
+        deferred.resolve();
       }, function (xhr, reason, msg) {
         if (xhr.status === 404) {
           FauxtonAPI.addNotification({
