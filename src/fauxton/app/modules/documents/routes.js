@@ -205,7 +205,10 @@ function(app, FauxtonAPI, Documents, Databases) {
       if (this.viewEditor) { this.viewEditor.remove(); }
 
 
-      this.toolsView = this.setView("#dashboard-upper-menu", new Documents.Views.JumpToDoc({database: this.data.database}));
+      this.toolsView = this.setView("#dashboard-upper-menu", new Documents.Views.JumpToDoc({
+        database: this.data.database,
+        collection: this.data.database.allDocs
+      }));
 
       this.documentsView = this.setView("#dashboard-lower-content", new Documents.Views.AllDocsList({
         collection: this.data.database.allDocs

@@ -646,7 +646,24 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
     },
 
     establish: function() {
-      return [this.model.fetch()];
+      var promise = this.model.fetch(),
+          databaseId = this.database.id,
+          deferred = $.Deferred();
+
+      promise.then(function () {
+        deferred.resolve()
+      }, function (xhr, reason, msg) {
+        if (xhr.status === 404) {
+          FauxtonAPI.addNotification({
+            msg: 'The document does not exist',
+            type: 'error'
+          });
+          FauxtonAPI.navigate('/database/' + databaseId + '/_all_docs?limit=20');
+        }
+        deferred.reject();
+     });
+      
+      return deferred;
     },
 
     saveDoc: function(event) {
@@ -1345,13 +1362,19 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
 
     events: {
       "submit #jump-to-doc": "jumpToDoc",
-      "click #jump-to-doc-label": "jumpToDoc"
     },
 
     jumpToDoc: function (event) {
       event.preventDefault();
+
       var docId = this.$('#jump-to-doc-id').val();
+
       FauxtonAPI.navigate('/database/' + this.database.id +'/' + docId, {trigger: true});
+    },
+
+    afterRender: function () {
+     this.typeAhead = new Components.DocSearchTypeahead({el: '#jump-to-doc-id', database: this.database});
+     this.typeAhead.render();
     }
   });
 

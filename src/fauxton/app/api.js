@@ -335,10 +335,13 @@ function(app, Fauxton) {
                 reason: resp
               };
 
-              FauxtonAPI.addNotification({
-                msg: 'An Error occurred ' + resp.responseText,
-                type: 'error' 
-              });
+              if (resp) { 
+                FauxtonAPI.addNotification({
+                  msg: 'An Error occurred' + resp.responseText,
+                  type: 'error' 
+                });
+              }
+
               masterLayout.renderView(selector);
           });
 
@@ -352,8 +355,9 @@ function(app, Fauxton) {
           });
         });
       }.bind(this), function (resp) {
+          if (!resp) { return; }
           FauxtonAPI.addNotification({
-                msg: 'An Error occurred ' + resp.responseText,
+                msg: 'An Error occurred' + resp.responseText,
                 type: 'error' 
           });
       });

@@ -105,6 +105,7 @@ function(app, FauxtonAPI) {
 
   });
 
+
   Components.DbSearchTypeahead = Components.Typeahead.extend({
     initialize: function (options) {
       this.dbLimit = options.dbLimit || 30;
@@ -128,6 +129,40 @@ function(app, FauxtonAPI) {
         dataType: 'json',
         success: function(data) {
           process(data);
+        }
+      });
+    }
+  });
+
+  Components.DocSearchTypeahead = Components.Typeahead.extend({
+    initialize: function (options) {
+      this.docLimit = options.docLimit || 30;
+      this.database = options.database;
+      _.bindAll(this);
+    },
+    source: function(query, process) {
+      var url = [
+        app.host,
+        "/",
+        this.database.id,
+        "/_all_docs?startkey=%22",
+        query,
+        "%22&endkey=%22",
+        query,
+        "\u9999%22&limit=",
+        this.docLimit
+      ].join('');
+
+      if (this.ajaxReq) { this.ajaxReq.abort(); }
+
+      this.ajaxReq = $.ajax({
+        url: url,
+        dataType: 'json',
+        success: function(data) {
+          var ids = _.map(data.rows, function (row) {
+            return row.id;
+          });
+          process(ids);
         }
       });
     }
