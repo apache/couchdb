@@ -656,7 +656,8 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
         if (xhr.status === 404) {
           FauxtonAPI.addNotification({
             msg: 'The document does not exist',
-            type: 'error'
+            type: 'error',
+            clear: true
           });
           FauxtonAPI.navigate('/database/' + databaseId + '/_all_docs?limit=20');
         }
