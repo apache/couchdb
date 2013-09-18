@@ -336,8 +336,9 @@ function(app, Fauxton) {
               };
 
               if (resp) { 
+                var errorText = JSON.parse(resp.responseText).reason;
                 FauxtonAPI.addNotification({
-                  msg: 'An Error occurred' + resp.responseText,
+                  msg: 'An Error occurred: ' + errorText,
                   type: 'error' 
                 });
               }
