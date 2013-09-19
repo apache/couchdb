@@ -147,6 +147,7 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
       event.preventDefault();
 
       var docRev = this.model.get('_rev'),
+          that = this,
           $form = this.$('#file-upload');
 
       if (!docRev) {
@@ -165,21 +166,23 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
         beforeSend: this.beforeSend,
         uploadProgress: this.uploadProgress,
         success: this.success,
-        error: function () {
-          console.log('ERR on upload', arguments);
+        error: function (resp) {
+          console.log('ERR on upload', resp);
+          return that.set_error_msg('Could not upload document: ' + JSON.parse(resp.responseText).reason);
         }
       });
     },
 
     success: function (resp) {
       var hideModal = this.hideModal,
-      $form = this.$('#file-upload');
+          $form = this.$('#file-upload');
 
       FauxtonAPI.triggerRouteEvent('reRenderDoc');
       //slight delay to make this transistion a little more fluid and less jumpy
       setTimeout(function () {
         $form.clearForm();
         hideModal();
+        $('.modal-backdrop').remove();
       }, 1000);
     },
 
