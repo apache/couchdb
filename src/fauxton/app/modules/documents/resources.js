@@ -44,6 +44,12 @@ function(app, FauxtonAPI) {
       return this.database ? this.database : this.collection.database;
     },
 
+    validate: function(attrs, options) {
+      if (this.id && this.id !== attrs._id && this.get('_rev') ) {
+        return "Cannot change a documents id.";
+      }
+    },
+
     docType: function() {
       return this.id.match(/^_design/) ? "design doc" : "doc";
     },

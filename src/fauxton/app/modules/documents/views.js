@@ -633,6 +633,7 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
       event.preventDefault();
       this.duplicateModal.showModal();
     },
+
     updateValues: function() {
       var notification;
       if (this.model.changedAttributes()) {
@@ -676,6 +677,7 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
         this.getDocFromEditor();
 
         notification = FauxtonAPI.addNotification({msg: "Saving document."});
+        console.log('save',this.model);
 
         this.model.save().then(function () {
           FauxtonAPI.navigate('/database/' + that.database.id + '/' + that.model.id);
@@ -684,9 +686,17 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
           notification = FauxtonAPI.addNotification({
             msg: "Save failed: " + responseText,
             type: "error",
-            clear: true
+            clear: true,
+            selector: "#doc .errors-container"
           });
         });
+      } else if(this.model.validationError && this.model.validationError === 'Cannot change a documents id.') {
+          notification = FauxtonAPI.addNotification({
+            msg: "Cannot save: " + 'Cannot change a documents _id, try Duplicate doc instead!',
+            type: "error",
+            selector: "#doc .errors-container"
+          });
+        delete this.model.validationError;
       } else {
         notification = FauxtonAPI.addNotification({
           msg: "Please fix the JSON errors and try again.",
@@ -702,8 +712,10 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
       }
 
       json = JSON.parse(this.editor.getValue());
-      this.model.clear({silent:true});
-      this.model.set(json);
+      this.model.set(json, {validate: true});
+      if (this.model.validationError) {
+        return false;
+      }
 
       return this.model;
     },
