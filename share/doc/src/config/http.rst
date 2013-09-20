@@ -653,9 +653,9 @@ behind a proxy, then you don't need to specify a port number in the `vhost` key.
 
 The first line will rewrite the request to display the content of the `example`
 database. This rule works only if the ``Host`` header is ``couchdb.local`` and
-won't work for `CNAMEs`. The second rule on the other hand matches all
-`CNAMEs` to `example` db. So `www.couchdb.local` or `db.couchdb.local` will
-work.
+won't work for `CNAMEs`. The second rule, on the other hand, matches all
+`CNAMEs` to `example` db, so that both `www.couchdb.local` and `db.couchdb.local`
+will work.
 
 
 .. _config/vhosts/rewriting:

@@ -108,7 +108,9 @@ work factor for ``PBKDF2``, and the algorithm itself at
 ``allow_persistent_cookies`` :: Persistent cookies
 --------------------------------------------------
 
-Makes cookies persistent if ``true``::
+Makes cookies persistent if ``true``.
+
+::
 
   [couch_httpd_auth]
   allow_persistent_cookies = false
@@ -119,7 +121,9 @@ Makes cookies persistent if ``true``::
 ``auth_cache_size`` :: Authentication cache
 -------------------------------------------
 
-Number of :ref:`userctx_object` to cache in memory to reduce disk lookups::
+Number of :ref:`userctx_object` to cache in memory, to reduce disk lookups.
+
+::
 
   [couch_httpd_auth]
   auth_cache_size = 50
@@ -130,14 +134,15 @@ Number of :ref:`userctx_object` to cache in memory to reduce disk lookups::
 ``authentication_db`` :: Users database
 ---------------------------------------
 
-Specifies the name of the system database for storing CouchDB users::
+Specifies the name of the system database for storing CouchDB users.
+
+::
 
   [couch_httpd_auth]
   authentication_db = _users
 
-.. warning:: If there was any reasons to change this name for you, don't forget
-   to remove/cleanup old database since it wouldn't be protected by CouchDB
-   anymore.
+.. warning:: If you change the database name, do not forget to remove or clean
+   up the old database, since it will no longer be protected by CouchDB.
 
 
 .. _config/couch_httpd_auth/authentication_redirect:
@@ -146,7 +151,9 @@ Specifies the name of the system database for storing CouchDB users::
 ---------------------------------------------------------------------------
 
 Specifies the location for redirection on successful authentication if a
-``text/html`` response is accepted by the client (via ``Accept`` header)::
+``text/html`` response is accepted by the client (via an ``Accept`` header).
+
+::
 
   [couch_httpd_auth]
   authentication_redirect = /_utils/session.html
@@ -159,8 +166,11 @@ Specifies the location for redirection on successful authentication if a
 
 .. versionadded:: 1.3
 
-The umbenr of iterations for password hashing by the PBKDF2 algorithm. A higher 
-number provides better hash durability, but with cost of performance on each request that requires authentication::
+The number of iterations for password hashing by the PBKDF2 algorithm. A higher 
+number provides better hash durability, but comes at a cost in performance for
+each request that requires authentication.
+
+::
 
   [couch_httpd_auth]
   iterations = 10000
@@ -171,8 +181,11 @@ number provides better hash durability, but with cost of performance on each req
 ``proxy_use_secret`` :: Force proxy auth use secret token
 ---------------------------------------------------------
 
-When this option is ``true`` the :ref:`secret <config/couch_httpd_auth/secret>` 
-is required for :ref:`api/auth/proxy`::
+When this option is set to ``true``, the
+:ref:`secret <config/couch_httpd_auth/secret>` option is required for
+:ref:`api/auth/proxy`.
+
+::
 
   [couch_httpd_auth]
   proxy_use_secret = false
@@ -185,9 +198,10 @@ is required for :ref:`api/auth/proxy`::
 
 .. versionadded:: 1.4
 
-Comma-separated list of field names that will be available to view for any user
-document in :ref:`authentication_db <config/couch_httpd_auth/authentication_db>`
-If unset or not specified, authenticated users may retrieve only their own docs.
+A comma-separated list of field names in user documents (in
+:ref:`authentication_db <config/couch_httpd_auth/authentication_db>`) that can
+be read by any user. If unset or not specified, authenticated users can only
+retrieve their own document.
 
 ::
 
@@ -204,11 +218,13 @@ If unset or not specified, authenticated users may retrieve only their own docs.
 
 .. _config/couch_httpd_auth/require_valid_user:
 
-``require_valid_user`` :: Force users authentication
-----------------------------------------------------
+``require_valid_user`` :: Force user authentication
+---------------------------------------------------
 
-When this option ``true`` no requests allowed from anonymous users. Everyone
-must be authenticated::
+When this option is set to ``true``, no requests are allowed from anonymous
+users. Everyone must be authenticated.
+
+::
 
   [couch_httpd_auth]
   require_valid_user = false
@@ -219,7 +235,9 @@ must be authenticated::
 ``secret`` :: Proxy Auth secret token
 -------------------------------------
 
-The secret token used for :ref:`api/auth/proxy` method::
+The secret token used for :ref:`api/auth/proxy` method.
+
+::
 
   [couch_httpd_auth]
   secret = 92de07df7e7a3fe14808cef90a7cc0d91
@@ -230,7 +248,9 @@ The secret token used for :ref:`api/auth/proxy` method::
 ``timeout`` :: Session timeout
 ------------------------------
 
-Number of seconds since the last request before session will be expired::
+Number of seconds since the last request before sessions will be expired.
+
+::
 
   [couch_httpd_auth]
   timeout = 600
@@ -239,13 +259,15 @@ Number of seconds since the last request before session will be expired::
 
 .. _config/couch_httpd_auth/users_db_public:
 
-``users_db_public`` :: Publish users info
------------------------------------------
+``users_db_public`` :: Publish user documents
+---------------------------------------------
 
 .. versionadded:: 1.4
 
 Allow all users to view user documents. By default, only admins may browse
-all users documents while users may browse only their own document::
+all users documents, while users may browse only their own document.
+
+::
 
   [couch_httpd_auth]
   users_db_public = false
@@ -256,8 +278,10 @@ all users documents while users may browse only their own document::
 ``x_auth_roles`` :: Proxy Auth roles header
 -------------------------------------------
 
-HTTP header name (``X-Auth-CouchDB-Roles`` by default) that contains the list of
-user's roles separated by a comma. Used for :ref:`api/auth/proxy`::
+The HTTP header name (``X-Auth-CouchDB-Roles`` by default) that contains the
+list of a user's roles, separated by a comma. Used for :ref:`api/auth/proxy`.
+
+::
 
   [couch_httpd_auth]
   x_auth_roles = X-Auth-CouchDB-Roles
@@ -268,13 +292,16 @@ user's roles separated by a comma. Used for :ref:`api/auth/proxy`::
 ``x_auth_token`` :: Proxy Auth token header
 -------------------------------------------
 
-HTTP header name (``X-Auth-CouchDB-Token`` by default) with token to
-authenticate the authorization. This token is an `HMAC-SHA1` created from
-:ref:`secret key <config/couch_httpd_auth/secret>` and
+The HTTP header name (``X-Auth-CouchDB-Token`` by default) containing the
+token used to authenticate the authorization. This token is an `HMAC-SHA1`
+created from :ref:`secret key <config/couch_httpd_auth/secret>` and
 :ref:`username <config/couch_httpd_auth/x_auth_username>`. The secret key
-should be the same in the client and CouchDB node. This token is optional
-if value of :ref:`proxy_use_secret <config/couch_httpd_auth/proxy_use_secret>`
-option isn't ``true``. Used for :ref:`api/auth/proxy`::
+should be the same on the client and the CouchDB node. This token is optional
+if the value of the
+:ref:`proxy_use_secret <config/couch_httpd_auth/proxy_use_secret>`
+option is not ``true``. Used for :ref:`api/auth/proxy`.
+
+::
 
   [couch_httpd_auth]
   x_auth_roles = X-Auth-CouchDB-Token
@@ -285,8 +312,10 @@ option isn't ``true``. Used for :ref:`api/auth/proxy`::
 ``x_auth_username`` :: Proxy Auth username header
 -------------------------------------------------
 
-HTTP header name (``X-Auth-CouchDB-UserName`` by default) containing the
-username. Used for :ref:`api/auth/proxy`::
+The HTTP header name (``X-Auth-CouchDB-UserName`` by default) containing the
+username. Used for :ref:`api/auth/proxy`.
+
+::
 
   [couch_httpd_auth]
   x_auth_username = X-Auth-CouchDB-UserName
@@ -305,11 +334,10 @@ username. Used for :ref:`api/auth/proxy`::
 Store credentials within config
 -------------------------------
 
-To let users be authenticated by :ref:`api/auth/oauth` (:rfc:`5849`) method
-there is need to setup three special sections in :ref:`configuration <config>`
-file:
+To let users be authenticated by :ref:`api/auth/oauth` (:rfc:`5849`), three
+special sections must be set up in the :ref:`configuration <config>` file:
 
-1. Consumer secret:
+1. The Consumer secret:
 
 ::
 
@@ -323,7 +351,7 @@ file:
   [oauth_token_secrets]
   token1 = tokensekr1t
 
-3. Tokens to users mapping:
+3. A mapping from tokens to users:
 
 ::
 
@@ -339,8 +367,8 @@ Store OAuth credentials within auth database
 
 .. versionadded:: 1.2
 
-CouchDB is able to store OAuth credentials within users documents instead of
-config file by using next option::
+CouchDB is able to store OAuth credentials within user documents instead of
+config file by using this option::
 
   [couch_httpd_oauth]
   use_users_db = true
@@ -348,7 +376,7 @@ config file by using next option::
 If set to ``true``, OAuth token and consumer secrets will be looked up in the
 :ref:`authentication database <config/couch_httpd_auth/authentication_db>`.
 These secrets are stored in a top level field named ``"oauth"`` in user
-documents. Example:
+documents, as below.
 
 .. code-block:: javascript
 

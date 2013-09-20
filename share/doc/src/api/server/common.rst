@@ -959,9 +959,9 @@ structure is as follows:
 The UUID type is determined by the :ref:`UUID algorithm <config/uuids/algorithm>`
 setting in the CouchDB configuration.
 
-The UUID type could be changed in anytime through
-:ref:`Config API <api/config/section/key>`. For example, changing the UUID
-type to ``random`` use next HTTP request:
+The UUID type may be changed at any time through the
+:ref:`Configuration API <api/config/section/key>`. For example, the UUID type
+could be changed to ``random`` by sending this HTTP request:
 
 .. code-block:: http
 
@@ -971,7 +971,7 @@ type to ``random`` use next HTTP request:
 
     "random"
 
-When obtaining a list of UUIDs you'll see the changes:
+You can verify the change by obtaining a list of UUIDs:
 
 .. code-block:: javascript
 

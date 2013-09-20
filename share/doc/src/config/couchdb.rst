@@ -26,9 +26,12 @@ Base Configuration
 ``attachment_stream_buffer_size`` :: Attachment streaming buffer
 ----------------------------------------------------------------
 
-Higher values may give better read performance due to less read operations
-and/or more OS page cache hits, but they can also increase overall response
-time for writes when there are many attachment write requests in parallel::
+Higher values may result in better read performance due to fewer read
+operations and/or more OS page cache hits. However, they can also increase
+overall response time for writes when there are many attachment write
+requests in parallel.
+
+::
 
   [couchdb]
   attachment_stream_buffer_size = 4096
@@ -39,9 +42,11 @@ time for writes when there are many attachment write requests in parallel::
 ``database_dir`` :: Databases location directory
 ------------------------------------------------
 
-Specifies location of CouchDB databases files (``*.couch`` named). This location
-should be writable and readable for user that runs CouchDB service (``couchdb``
-by default)::
+Specifies location of CouchDB database files (``*.couch`` named). This location
+should be writable and readable for the user the CouchDB service runs as
+(``couchdb`` by default).
+
+::
 
   [couchdb]
   database_dir = /var/lib/couchdb
@@ -74,15 +79,15 @@ losing durability - it's strongly not recommended to do such in production::
 ``file_compression`` :: Compression method for documents
 -----------------------------------------------------------
 
-.. versionchanged:: 1.2 Added `Google Snappy`_ compression algorithm
+.. versionchanged:: 1.2 Added `Google Snappy`_ compression algorithm.
 
 Method used to compress everything that is appended to database and view index
 files, except for attachments (see the :ref:`[attachments] <config/attachments>`
 section). Available methods are:
 
 * ``none``: no compression
-* ``snappy``: use Google Snappy, a very fast compressor/decompressor.
-* ``deflate_N``: use zlib's deflate, ``N`` is the compression level which ranges
+* ``snappy``: use Google Snappy, a very fast compressor/decompressor
+* ``deflate_N``: use zlib's deflate; ``N`` is the compression level which ranges
   from 1 (fastest, lowest compression ratio) to 9 (slowest, highest compression
   ratio)
 
@@ -99,9 +104,11 @@ section). Available methods are:
 ``fsync_options`` :: Fsync options
 ----------------------------------
 
-Specifies when to make `fsync` calls. `fsync` makes sure that any file system 
-buffers kept by the operating system are written to disk. Normally, you have no
-need to edit this parameter::
+Specifies when to make `fsync` calls. `fsync` makes sure that the contents of
+any file system buffers kept by the operating system are flushed to disk.
+There is generally no need to modify this parameter.
+
+::
 
   [couchdb]
   fsync_options = [before_header, after_header, on_file_open]
@@ -112,11 +119,13 @@ need to edit this parameter::
 ``max_dbs_open`` :: Limit of simultaneously opened databases
 ------------------------------------------------------------
 
-This option places an upper bound on the number of databases that can be open at
-one time. CouchDB reference counts database accesses internally and will close
-idle databases when it must. Sometimes it is necessary to keep more than the
+This option places an upper bound on the number of databases that can be open
+at once. CouchDB reference counts database accesses internally and will close
+idle databases as needed. Sometimes it is necessary to keep more than the
 default open at once, such as in deployments where many databases will be
-continuously replicating::
+replicating continuously.
+
+::
 
   [couchdb]
   max_dbs_open = 100
@@ -129,11 +138,13 @@ continuously replicating::
 
 .. versionchanged:: 1.3 This option now actually works.
 
-Defines limit of size in bytes that document may has in JSON form. Doesn't
-applies for attachments since they are been transferred as stream of chunks.
-Do not set this value too small since you want be able to modify config options,
-database security and other options until you restore this value by edit config
-file::
+Defines a maximum size for JSON documents, in bytes. This limit does not
+apply to attachments, since they are transferred as a stream of chunks. If you
+set this to a small value, you might be unable to modify configuration options,
+database security and other larger documents until a larger value is restored
+by editing the configuration file.
+
+::
 
   [couchdb]
   max_document_size = 4294967296 ; 4 GB
@@ -144,10 +155,12 @@ file::
 ``os_process_timeout`` :: External processes time limit
 -------------------------------------------------------
 
-Number of microseconds that external processes such as `query server` and
-`externals` may process CouchDB commands before return any result. Keeping
-this value smaller you'll be ensured that your services works fast, but you may
-tweak it depending on your needs::
+If an external process, such as a query server or external process, runs for
+this amount of microseconds without returning any results, it will be
+terminated. Keeping this value smaller ensures you get expedient errors, but
+you may want to tweak it for your specific needs.
+
+::
 
   [couchdb]
   os_process_timeout = 5000 ; 5 sec
@@ -158,10 +171,13 @@ tweak it depending on your needs::
 ``uri_file`` :: Discovery CouchDB help file
 -------------------------------------------
 
-This file contains full `URI`_ that runs CouchDB. It's used to help discover
-CouchDB served port if it was set to ``0`` (e.g. automatically assigned any
-free one). This file should be writable and readable for user that runs CouchDB
-service (``couchdb`` by default)::
+This file contains the full `URI`_ that can be used to access this instance of
+CouchDB. It is used to help discover the port CouchDB is running on (if it was
+set to ``0`` (e.g. automatically assigned any free one). This file should be
+writable and readable for the user that runs the CouchDB service (``couchdb``
+by default).
+
+::
 
   [couchdb]
   uri_file = /var/run/couchdb/couchdb.uri
@@ -174,8 +190,10 @@ service (``couchdb`` by default)::
 ``util_driver_dir`` :: CouchDB binary utility drivers
 -----------------------------------------------------
 
-Specified location of binary drivers (`icu`, `ejson`, etc.). This location and
-his content should be readable for user that runs CouchDB service::
+Specifies location of binary drivers (`icu`, `ejson`, etc.). This location and
+its contents should be readable for the user that runs the CouchDB service.
+
+::
 
   [couchdb]
   util_driver_dir = /usr/lib/couchdb/erlang/lib/couch-1.3.0/priv/lib
@@ -188,7 +206,9 @@ his content should be readable for user that runs CouchDB service::
 
 .. versionadded:: 1.3
 
-Unique identifier of CouchDB server instance::
+Unique identifier for this CouchDB server instance.
+
+::
 
   [couchdb]
   uuid = 0a959b9b8227188afc2ac26ccdf345a6
@@ -200,7 +220,9 @@ Unique identifier of CouchDB server instance::
 -----------------------------------------------------
 
 Specifies location of CouchDB view index files. This location should be writable
-and readable for user that runs CouchDB service (``couchdb`` by default)::
+and readable for the user that runs the CouchDB service (``couchdb`` by default).
+
+::
 
   [couchdb]
   view_index_dir = /var/lib/couchdb
