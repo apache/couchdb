@@ -51,7 +51,7 @@ release = '.'.join([
     _info['LOCAL_VERSION_REVISION']
 ]) + (
     _info['LOCAL_VERSION_STAGE'] + '' + _info['LOCAL_VERSION_RELEASE']
-    if _info['LOCAL_VERSION_RELEASE'] == '%revision%'
+    if _info.get('LOCAL_VERSION_RELEASE') == '%revision%'
     else '-dev'
 )
 
