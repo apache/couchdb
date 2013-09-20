@@ -42,36 +42,6 @@ That's all, now CouchDB is installed on your Mac:
 
 .. _Open up Futon: http://localhost:5984/_utils
 
-
-.. _install/mac/macports:
-
-Installation from MacPorts
-==========================
-
-To install CouchDB using MacPorts you have 2 package choices:
-
-- ``couchdb`` - the latest release version
-- ``couchdb-devel`` - updated every few weeks from the master branch
-
-::
-
-  $ sudo port install couchdb
-  
-or, if you want the last development version:
-
-  $ sudo port install couchdb-devel
-
-MacPorts takes care of installing all necessary dependencies.
-It should now be up and accessible via Futon at http://127.0.0.1:5984/_utils.
-
-If you want to run CouchDB as a service, load the launchd configuration which
-comes  with the project, with this command::
-
-  $ sudo port load couchdb
-
-Now CouchDB should be started automatically after every reboot.
-
-
 .. _install/mac/homebrew:
 
 Installation with HomeBrew
