@@ -97,6 +97,8 @@
 ^src/couchdb/priv/couchjs
 ^src/couchdb/priv/couchspawnkillable
 ^src/couchdb/priv/stat_descriptions.cfg
+^src/couchjs-node/package.json
+^src/couchjs-node/README.md
 ^src/erlang-oauth/.*
 ^src/couch_dbupdates
 ^src/ejson/.*
