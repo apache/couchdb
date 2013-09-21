@@ -30,7 +30,7 @@ first iteration of a plugins system:
 4. Complete trust-based system. You trust me to not do any nasty things
    when you click on the install button. No crypto, no nothing. Only
    people who can commit to Futon can release new versions of plugins.
-5. Minimal user-friendlyness: won’t install plugins that don’t match 
+5. Minimal user-friendlyness: won’t install plugins that don’t match
    the current Erlang version, gives semi-sensible error messages
    (wrapped in a HTTP 500 response :)
 6. Require a pretty strict format for binary releases.
@@ -61,7 +61,7 @@ hang of it.
 Here is a rough list of features squared against future milestones:
 
 Milestone 2: Be creator friendly
- - Make it easy to build a CouchDB plugin by providing one or more easy 
+ - Make it easy to build a CouchDB plugin by providing one or more easy
    to start templates.
  - Make it easy to publish new plugins and new versions of existing plugins.
  - Make it easy to supply packages for multiple Erlang & CouchDB versions.
@@ -100,7 +100,7 @@ module.
 It exposes one new API endpoint `/_plugins` that an admin user can
 POST to.
 
-The additional Futon page lives at /_utils/plugins.html it is
+The additional Futon page lives at `/_utils/plugins.html` it is
 hardcoded.
 
 Futon (or you) post an object to `/_plugins` with four properties:
@@ -183,4 +183,4 @@ to improve this, thanks!
 
 Best,
 Jan
--- 
+--
