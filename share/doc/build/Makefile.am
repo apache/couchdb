@@ -143,6 +143,7 @@ html_files = \
     html/_sources/about.txt \
     html/_sources/contents.txt \
     html/_sources/contributing.txt \
+    html/_sources/experimental.txt \
     html/_sources/externals.txt \
     html/_sources/json-structure.txt \
     html/_static/ajax-loader.gif \
@@ -403,6 +404,7 @@ src_files = \
     ../src/whatsnew/index.rst \
     ../src/about.rst \
     ../src/contents.rst \
+    ../src/experimental.rst \
     ../src/contributing.rst \
     ../src/externals.rst \
     ../src/json-structure.rst \

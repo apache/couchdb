@@ -29,6 +29,7 @@
     fauxton/index
     api/index
     json-structure
+    experimental
     contributing
     whatsnew/index
     cve/index
