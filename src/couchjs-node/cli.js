@@ -24,7 +24,6 @@ var child_process = require('child_process')
 
 var couchjs = require('./couchjs')
 var package_json = require('./package.json')
-var couchdb_extra = require('./extra')
 var LineStream = require('./stream')
 var inspector = require('./inspector')
 var log = require('./console').log
@@ -35,15 +34,10 @@ var opts = optimist.boolean(['h', 'V', 'H'])
                              , 'V': 'display version information and exit'
                              , 'H': 'enable couchjs cURL bindings (not implemented)'
                              })
-                   .boolean('extra')
-                   .describe('extra', 'Extra features for CouchDB, for os_daemons')
                    .usage('$0 <path to main.js>')
 
 
 function main() {
-  if(opts.argv.extra)
-    return couchdb_extra()
-
   var main_js = opts.argv._[0]
   if(!main_js)
     return console.error(opts.help())
