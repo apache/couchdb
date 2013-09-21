@@ -58,6 +58,7 @@ html_files = \
     html/_sources/changes.txt \
     html/_sources/config_reference.txt \
     html/_sources/configuring.txt \
+    html/_sources/experimental.txt \
     html/_sources/contributing.txt \
     html/_sources/ddocs.txt \
     html/_sources/index.txt \
@@ -144,6 +145,7 @@ src_files = \
     ../src/changes.rst \
     ../src/config_reference.rst \
     ../src/configuring.rst \
+    ../src/experimental.rst \
     ../src/contributing.rst \
     ../src/ddocs.rst \
     ../src/index.rst \

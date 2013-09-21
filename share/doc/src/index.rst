@@ -38,6 +38,7 @@ Contents
     api/reference
     json-structure
     config_reference
+    experimental
     contributing
     changelog
 
