@@ -179,7 +179,7 @@ couchTests.attachments_multipart= function(debug) {
   TEquals("790", xhr.getResponseHeader("Content-Length"),
     "Content-Length should be correct");
   T(sections.length == 3);
-  // The first section is the json doc. Check it's content-type.
+  // The first section is the json doc. Check its content-type.
   // Each part carries their own meta data.
   TEquals("application/json", sections[0].headers['Content-Type'],
     "Content-Type should be application/json for section[0]");
@@ -287,6 +287,67 @@ couchTests.attachments_multipart= function(debug) {
   T(doc._attachments['bar.txt'].follows == true);
   
   TEquals("this is 18 chars l", sections[1].body, "should be 18 chars long 4");
+
+// POST mime multipart document
+            
+  xhr = CouchDB.request("POST", "/test_suite_db/", {
+    headers: {"Content-Type": "multipart/related;boundary=\"abc123\""},
+    body:
+      "--abc123\r\n" +
+      "content-type: application/json\r\n" +
+      "\r\n" +
+      JSON.stringify({
+        "body":"This is a POSTed body.",
+        "_attachments":{
+          "foo.txt": {
+            "follows":true,
+            "content_type":"application/test",
+            "length":32
+            },
+          "bar.txt": {
+            "follows":true,
+            "content_type":"application/test",
+            "length":31
+            },
+          "baz.txt": {
+            "follows":true,
+            "content_type":"text/plain",
+            "length":30
+            }
+          }
+        }) +
+      "\r\n--abc123\r\n" +
+      "\r\n" +
+      "this attachment is 32 chars long" +
+      "\r\n--abc123\r\n" +
+      "\r\n" +
+      "this attachment is 31 chars lon" +
+      "\r\n--abc123\r\n" +
+      "\r\n" +
+      "this attachment is 30 chars lo" +
+      "\r\n--abc123--epilogue"
+    });
+    
+  var result = JSON.parse(xhr.responseText);
+  
+  T(result.ok);
+  
+  TEquals(201, xhr.status, "should send 201 Accepted");
+  
+  var baseUrl = "/test_suite_db/" + result.id + "/";
+  
+  xhr = CouchDB.request("GET", baseUrl + "foo.txt");
+  
+  T(xhr.responseText == "this attachment is 32 chars long");
+  
+  xhr = CouchDB.request("GET", baseUrl + "bar.txt");
+  
+  T(xhr.responseText == "this attachment is 31 chars lon");
+  
+  xhr = CouchDB.request("GET", baseUrl + "baz.txt");
+  
+  T(xhr.responseText == "this attachment is 30 chars lo");
+
 
   // check that with the document multipart/mixed API it's possible to receive
   // attachments in compressed form (if they're stored in compressed form)
