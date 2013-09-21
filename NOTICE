@@ -189,3 +189,7 @@ This product also includes the following third-party components:
  * share/doc/src/templates/couchdb/domainindex.html
 
    Copyright 2007-2011 by the Sphinx team
+
+ * sandbox.js https://github.com/KlausTrainer/sandbox.js
+
+   (c) 2013 Klaus Trainer
