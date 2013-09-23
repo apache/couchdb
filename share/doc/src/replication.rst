@@ -84,6 +84,12 @@ Additionally, :ref:`filterfun` can be used in a replication documents (see
 the filter function for each document in the changes feed. The document will
 only be replicated if the filter returns `true`.
 
+When using replication filters that depend on documents' content, the DELETE
+method should not be used to remove documents; instead the PUT method should
+be used to update the document and add a ``_deleted:true`` field, preserving
+the fields required for the filter. A Document Update Handler should be used
+to ensure the fields required for replication filters are always present.
+
 
 Migrating Data to Clients
 -------------------------
