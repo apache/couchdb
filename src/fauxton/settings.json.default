@@ -6,6 +6,7 @@
   { "name": "stats" },
   { "name":  "replication" },
   { "name": "contribute" },
+  { "name": "permissions" },
   { "name": "auth" }
   ],
     "template": {
