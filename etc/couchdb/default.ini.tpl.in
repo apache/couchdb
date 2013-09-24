@@ -123,7 +123,6 @@ use_users_db = false
 [query_servers]
 javascript = %bindir%/%couchjs_command_name% %localbuilddatadir%/server/main.js
 coffeescript = %bindir%/%couchjs_command_name% %localbuilddatadir%/server/main-coffee.js
-nodejs = /usr/local/bin/couchjs-node %localbuilddatadir%/server/main.js
 
 
 ; Changing reduce_limit to false will disable reduce_limit.
