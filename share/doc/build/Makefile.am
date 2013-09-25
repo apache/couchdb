@@ -264,6 +264,7 @@ html_files = \
     html/config-ref.html \
     html/contents.html \
     html/externals.html \
+    html/experimental.html \
     html/json-structure.html \
     html/objects.inv \
     html/http-api.html \
