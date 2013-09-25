@@ -37,7 +37,7 @@
     <div id="app-container"></div>
 
     <footer>
-      <div id="footer-content" class="container"></div>
+      <div id="footer-content"></div>
     </footer>
   </div>
 
