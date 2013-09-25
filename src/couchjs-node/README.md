@@ -6,29 +6,7 @@ CouchJS is a command-line Node.js program. It is 100% compatible with Apache Cou
 
 By using CouchJS, you will get 100% CouchDB compatibility (the test suite completely passes) but your JavaScript environment is V8, or Node.js.
 
-CouchJS is available as an npm module.
-
-    $ npm install -g couchjs
-
-## Usage
-
-Install CouchDB. Install this package with npm. Confirm your `couchjs` install location.
-
-    $ which couchjs # Note, your path will be different from mine.
-    /home/jhs/node/bin/couchjs
-
-Look at the CouchDB config for the JavaScript query server.
-
-    $ curl http://localhost:5984/_config/query_servers/javascript
-    "/home/jhs/couchdb/bin/couchjs /home/jhs/couchdb/share/couchdb/server/main.js"
-
-Change that to this `couchjs`. **Leave the second argument the same.**
-
-    $ curl -X PUT http://localhost:5984/_config/query_servers/javascript \
-      -H content-type:application/json \
-      -d "\"`which couchjs` /home/jhs/couchdb/share/couchdb/server/main.js\""
-
-Done!
+See share/doc/src/experimental.rst for installation instructions.
 
 ## Idea
 
