@@ -537,8 +537,7 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
           return true;
         },
         canShowNextfn: function () {
-          
-          if ((collection.viewMeta.offset + collection.length + 2) >= collection.viewMeta.total_rows) {
+          if (collection.length === 0 || (collection.viewMeta.offset + collection.length + 2) >= collection.viewMeta.total_rows) {
             return false;
           }
 

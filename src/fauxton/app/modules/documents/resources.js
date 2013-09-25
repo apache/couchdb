@@ -98,6 +98,10 @@ function(app, FauxtonAPI) {
           reduce: reduce
         }; 
       } else {
+        if (!views[view]) {
+          views[view] = {};
+        }
+
         views[view].map = map;
       }
 
@@ -513,6 +517,10 @@ function(app, FauxtonAPI) {
 
       deferred.resolve();
       return deferred;
+    },
+
+    recordStart: function () {
+      return 1;
     },
 
     totalRows: function() {
