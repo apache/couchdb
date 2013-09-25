@@ -75,7 +75,7 @@ function (app, FauxtonAPI, Permissions ) {
 
     events: {
       "submit .permission-item-form": "addItem",
-      'click .close': "removeItem"
+      'click button.close': "removeItem"
     },
 
     beforeRender: function () {
@@ -85,14 +85,14 @@ function (app, FauxtonAPI, Permissions ) {
       this.roleViews = [];
 
       _.each(section.names, function (name) {
-        var nameView = this.insertView('#items-names', new Permissions.PermissionItem({
+        var nameView = this.insertView('#'+this.section+'-items-names', new Permissions.PermissionItem({
           item: name,
         }));
         this.nameViews.push(nameView);
       }, this);
 
       _.each(section.roles, function (role) {
-        var roleView = this.insertView('#items-roles', new Permissions.PermissionItem({
+        var roleView = this.insertView('#'+this.section+'-items-roles', new Permissions.PermissionItem({
           item: role,
         }));
         this.roleViews.push(roleView);
@@ -164,6 +164,7 @@ function (app, FauxtonAPI, Permissions ) {
   });
 
   Permissions.PermissionItem = FauxtonAPI.View.extend({
+    tagName: "li",
     template: "addons/permissions/templates/item",
     initialize: function (options) {
       this.item = options.item;

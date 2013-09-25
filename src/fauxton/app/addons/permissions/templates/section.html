@@ -11,27 +11,36 @@ WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 License for the specific language governing permissions and limitations under
 the License.
 -->
-<h1> <%= section %> </h1>
+<header class="border-hdr">
+<h3> <%= (section) %> </h3>
 <p id="help"> <%= help %> </p>
+</header>
 
 <div class="row">
   <div class="span6">
-    <h3> Names </h3>
-    <ul id="items-names"></ul>
-
+    <header>
+      <h4> Users </h4>
+      <p>Specify users who will have <%= section %> access to this database.</p>
+    </header>
     <form class="permission-item-form form-inline">
       <input data-section="<%= section %>" data-type="names" type="text" class="item input-small" placeholder="Add Name">
-      <input type="submit" class="btn" value="Add Name" >
+      <button type="submit" class="button btn green fonticon-circle-plus">Add Name</button>
     </form>
-
+    <ul class="clearfix unstyled permission-items span10" id="<%= (section) %>-items-names">
+    </ul>
   </div>
   <div class="span6">
-    <h3> Roles </h3>
-    <ul id="items-roles"></ul>
+    <header>
+      <h4> Roles </h4>
+      <p>All users under the following role(s) will have <%= section %> access.</p>
+    </header>
+
 
     <form class="permission-item-form form-inline">
       <input data-section="<%= section %>" data-type="roles" type="text" class="item input-small" placeholder="Add Role">
-      <input type="submit" class="btn" value="Add Role" >
+      <button type="submit" class="button btn green fonticon-circle-plus">Add Role</button>
     </form>
+    <ul class="unstyled permission-items span10" id="<%= (section) %>-items-roles">
+    </ul>
   </div>
 </div>
