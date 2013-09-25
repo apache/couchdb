@@ -155,7 +155,7 @@ a:hover{
       padding: 10px;
       .icon{
         .box-sizing(content-box);
-        background: url(../img/minilogo.png) no-repeat 0 0;
+        background: url(../img/couchdb-site.png) no-repeat 0 0;
         display: block;
         height: 100%;
         width: 100%; 
@@ -178,7 +178,10 @@ a:hover{
         background-color: @orange;
       }
       .closeMenu & {
-        width: 40px;
+        .icon {
+          background: url(../img/minilogo.png) no-repeat 0 0;
+        }
+        width: 45px;
         .burger{
           left: 0;
         }
