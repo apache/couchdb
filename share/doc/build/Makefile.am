@@ -102,6 +102,7 @@ html_files = \
     html/changes.html \
     html/config_reference.html \
     html/configuring.html \
+    html/contributing.html \
     html/ddocs.html \
     html/index.html \
     html/intro.html \
