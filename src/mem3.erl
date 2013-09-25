@@ -20,6 +20,7 @@
 -export([quorum/1, group_by_proximity/1]).
 -export([live_shards/2]).
 -export([belongs/2]).
+-export([get_placement/1]).
 
 %% For mem3 use only.
 -export([name/1, node/1, range/1]).
