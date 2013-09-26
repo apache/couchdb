@@ -771,10 +771,8 @@ update_docs_int(Db, DocsList, NonRepDocs, MergeConflicts, FullCommit) ->
 update_local_docs(Db, []) ->
     {ok, Db};
 update_local_docs(#db{local_tree=Btree}=Db, Docs) ->
-    Ids = [Id || {_Client, #doc{id=Id}} <- Docs],
-    OldDocLookups = couch_btree:lookup(Btree, Ids),
-    BtreeEntries = lists:zipwith(
-        fun({Client, NewDoc}, _OldDocLookup) ->
+    BtreeEntries = lists:map(
+        fun({Client, NewDoc}) ->
             #doc{
                 id = Id,
                 deleted = Delete,
@@ -787,29 +785,17 @@ update_local_docs(#db{local_tree=Btree}=Db, Docs) ->
             [] ->
                 PrevRev = 0
             end,
-            %% disabled conflict checking for local docs -- APK 16 June 2010
-            % OldRev =
-            % case OldDocLookup of
-            %     {ok, {_, {OldRev0, _}}} -> OldRev0;
-            %     not_found -> 0
-            % end,
-            % case OldRev == PrevRev of
-            % true ->
-                case Delete of
-                    false ->
-                        send_result(Client, NewDoc, {ok,
-                                {0, ?l2b(integer_to_list(PrevRev + 1))}}),
-                        {update, {Id, {PrevRev + 1, Body}}};
-                    true  ->
-                        send_result(Client, NewDoc,
-                                {ok, {0, <<"0">>}}),
-                        {remove, Id}
-                end%;
-            % false ->
-            %     send_result(Client, Ref, conflict),
-            %     ignore
-            % end
-        end, Docs, OldDocLookups),
+            case Delete of
+                false ->
+                    send_result(Client, NewDoc, {ok,
+                        {0, ?l2b(integer_to_list(PrevRev + 1))}}),
+                    {update, {Id, {PrevRev + 1, Body}}};
+                true  ->
+                    send_result(Client, NewDoc,
+                        {ok, {0, <<"0">>}}),
+                    {remove, Id}
+            end
+        end, Docs),
 
     BtreeIdsRemove = [Id || {remove, Id} <- BtreeEntries],
     BtreeIdsUpdate = [{Key, Val} || {update, {Key, Val}} <- BtreeEntries],
