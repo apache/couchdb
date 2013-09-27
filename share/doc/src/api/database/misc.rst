@@ -19,12 +19,20 @@
 .. http:post:: /{db}/_purge
 
   A database purge permanently removes the references to deleted documents
-  from the database. Deleting a document within CouchDB does not actually
+  from the database. Normal deletion of a document within CouchDB does not
   remove the document from the database, instead, the document is marked as
-  a deleted (and a new revision is created). This is to ensure that
-  deleted documents are replicated to other databases as having been
+  ``_deleted=true`` (and a new revision is created). This is to ensure that
+  deleted documents can be replicated to other databases as having been
   deleted. This also means that you can check the status of a document and
-  identify that the document has been deleted.
+  identify that the document has been deleted by its absence.
+
+  .. warning::
+
+     Purging a document from a database should only be done as a last resort
+     when sensitive information has been introduced inadvertently into a
+     database. In clustered or replicated environments it is very difficult
+     to guarantee that a particular purged document has been removed from all
+     replicas. Do not rely on this API as a way of doing secure deletion.
 
   The purge operation removes the references to the deleted documents from
   the database. The purging of old documents is not replicated to other

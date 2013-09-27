@@ -31,7 +31,7 @@
     write (and edit) design documents, add/remove database admins and members,
     set the :ref:`database revisions limit <api/db/revs_limit>` and execute
     :ref:`temporary views <api/db/temp_view>` against the database.
-    They can not create a database and neither delete a database.
+    They can not create a database nor delete a database.
 
   Both ``members`` and ``admins`` objects are contains two array-typed fields:
 
@@ -56,6 +56,7 @@
   read documents from the database (or do a :http:get:`/{db}` call).
 
   .. note::
+
      If the security object for a database has never been set, then the
      value returned will be empty.
 

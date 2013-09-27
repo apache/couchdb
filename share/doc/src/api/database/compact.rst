@@ -21,9 +21,9 @@
   Request compaction of the specified database. Compaction compresses the
   disk database file by performing the following operations:
 
-  -  Writes a new version of the database file, removing any unused
+  -  Writes a new, optimised, version of the database file, removing any unused
      sections from the new version during write. Because a new file is
-     temporary created for this purpose, you will need twice the current
+     temporarily created for this purpose, you may require up to twice the current
      storage space of the specified database in order for the compaction
      routine to complete.
 
@@ -130,6 +130,11 @@
         "ok": true
     }
 
+    .. note::
+
+      View indexes are stored in a separate ``.couch`` file based on
+      a hash of the design document's relevant functions, in a sub directory
+      of where the main ``.couch`` database files are located.
 
 .. _api/db/ensure_full_commit:
 
@@ -187,7 +192,10 @@
 
 .. http:post:: /{db}/_view_cleanup
 
-  Cleans up the cached view output on disk for a given view.
+  Removes view index files that are no longer required by CouchDB as a result
+  of changed views within design documents. As the view filename is based on
+  a hash of the view functions, over time old views will remain, consuming
+  storage. This call cleans up the cached view output on disk for a given view.
 
   :param db: Database name
   :<header Accept: - :mimetype:`application/json`

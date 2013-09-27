@@ -23,9 +23,13 @@
 
   The arguments also available to standard view requests also apply to
   temporary views, but the execution of the view may take some time as it
-  relies on being executed at the time of the request. In addition to the
-  time taken, they are also computationally very expensive to produce. You
-  should use a defined view if you want to achieve the best performance.
+  relies on being executed at the time of the request. This means that for
+  every temporary view you create, the entire database will be read
+  one doc at a time and passed through the view function.
+
+  This should not be used on production CouchDB instances, and is purely a
+  convenience function for quick development testing. You should use a
+  defined view if you want to achieve the best performance.
 
   See :ref:`api/ddoc/view` for more info.
 

@@ -19,7 +19,7 @@
 
   Returns the HTTP Headers containing a minimal amount of information
   about the specified database. Since the response body is empty this method
-  is a lightweight way to check is database exists or not.
+  is a lightweight way to check if the database exists already or not.
 
   :param db: Database name
   :code 200: Database exists
@@ -158,8 +158,8 @@
         "ok": true
     }
 
-  If we repeat same request to CouchDB, it will response with :code:`412` since
-  database is already exists:
+  If we repeat the same request to CouchDB, it will response with :code:`412`
+  since the database already exists:
 
   **Request**:
 
@@ -185,7 +185,7 @@
         "reason": "The database could not be created, the file already exists."
     }
 
-  In case of invalid database name CouchDB returns response with :code:`400`:
+  If an invalid database name is supplied, CouchDB returns response with :code:`400`:
 
   **Request**:
 
@@ -225,8 +225,8 @@
   :>json boolean ok: Operation status
   :code 200: Database removed successfully
   :code 400: Invalid database name
-  :code 404: Database doesn't already exists
   :code 401: CouchDB Server Administrator privileges required
+  :code 404: Database doesn't exist
 
   **Request**:
 
@@ -260,7 +260,8 @@
   If the JSON structure includes the ``_id`` field, then the document will be
   created with the specified document ID.
 
-  If the ``_id`` field is not specified, a new unique ID will be generated.
+  If the ``_id`` field is not specified, a new unique ID will be generated,
+  following whatever UUID algorithm is configured for that server.
 
   :param db: Database name
   :<header Accept: - :mimetype:`application/json`
@@ -282,8 +283,8 @@
   :code 202: Document data accepted, but not yet stored on disk
   :code 400: Invalid database name
   :code 401: Write privileges required
-  :code 404: Database doesn't already exists
-  :code 409: Document with the specified document ID already exists
+  :code 404: Database doesn't exist
+  :code 409: A Conflicting Document with same ID already exists
 
   **Request**:
 
@@ -380,10 +381,11 @@ respond with a HTTP :http:statuscode:`202` response code immediately.
 
 .. note::
 
-   Creating or updating documents with batch mode doesn't guarantees that
-   document will be successfully stored on disk and CouchDB doesn't ensures you
-   that it will to. Document may not be saved due to conflicts, rejection by
-   :ref:`validation function <vdufun>` or by other reasons.
+   Creating or updating documents with batch mode doesn't guarantee that
+   document will be successfully stored on disk and CouchDB does not
+   guarantee that. For example, individual documents may not be saved due to
+   conflicts, rejection by :ref:`validation function <vdufun>` or by other
+   reasons, even if overall the batch transfer was sucessfully submitted.
 
 **Request**:
 
