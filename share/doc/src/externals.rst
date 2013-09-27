@@ -233,7 +233,7 @@ And then start CouchDB and try:
     >
     < HTTP/1.1 200
     < Transfer-Encoding: chunked
-    < Server: CouchDB/1.3.0 (Erlang OTP/R14B)
+    < Server: CouchDB (Erlang/OTP)
     < Date: Mon, 27 Sep 2010 01:13:37 GMT
     < Content-Type: text/plain
     < Connection: keep-alive
@@ -244,7 +244,7 @@ And then start CouchDB and try:
 
 The corresponding CouchDB logs look like::
 
-    Apache CouchDB 1.3.0 (LogLevel=info) is starting.
+    Apache CouchDB 1.5.0 (LogLevel=info) is starting.
     Apache CouchDB has started. Time to relax.
     [info] [<0.31.0>] Apache CouchDB has started on http://127.0.0.1:5984/
     [info] [<0.105.0>] 127.0.0.1 - - 'GET' /_hello 200

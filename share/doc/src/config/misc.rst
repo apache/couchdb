@@ -218,4 +218,4 @@ message. This is returned when requesting ``GET /``.
 
   [vendor]
   name = The Apache Software Foundation
-  version = 1.3.0
+  version = 1.5.0

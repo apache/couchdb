@@ -62,9 +62,9 @@ CouchDB replies, all excited to get going:
     "uuid": "85fb71bf700c17267fef77535820e371",
     "vendor": {
         "name": "The Apache Software Foundation",
-        "version": "1.4.0"
+        "version": "1.5.0"
     },
-    "version": "1.4.0"
+    "version": "1.5.0"
   }
 
 You get back a JSON string, that, if parsed into a native object or data
@@ -136,7 +136,7 @@ curl elaborates::
   > Accept: */*
   >
   < HTTP/1.1 201 Created
-  < Server: CouchDB/0.9.0 (Erlang OTP/R12B)
+  < Server: CouchDB (Erlang/OTP)
   < Date: Sun, 05 Jul 2009 22:48:28 GMT
   < Content-Type: text/plain;charset=utf-8
   < Content-Length: 12
@@ -242,7 +242,7 @@ code.
 
 ::
 
-  < Server: CouchDB/0.10.1 (Erlang OTP/R13B)
+  < Server: CouchDB (Erlang/OTP)
 
 The :header:`Server` header is good for diagnostics. It tells us which 
 CouchDB version and which underlying Erlang version we are talking to. 

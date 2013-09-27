@@ -59,7 +59,7 @@
     Content-Type: application/json
     Date: Tue, 13 Aug 2013 21:35:37 GMT
     ETag: "12-151bb8678d45aaa949ec3698ef1c7e78"
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
 
 
 .. http:get:: /{db}/{docid}
@@ -150,7 +150,7 @@
     Content-Type: application/json
     Date: Tue, 13 Aug 2013 21:35:37 GMT
     ETag: "1-917fa2381192822767f010b95b45325b"
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
 
     {
         "_id": "SpaghettiWithMeatballs",
@@ -227,7 +227,7 @@
     Date: Wed, 14 Aug 2013 20:31:39 GMT
     ETag: "1-917fa2381192822767f010b95b45325b"
     Location: http://localhost:5984/recipes/SpaghettiWithMeatballs
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
 
     {
         "id": "SpaghettiWithMeatballs",
@@ -299,7 +299,7 @@
     Content-Type: application/json
     Date: Wed, 14 Aug 2013 12:23:13 GMT
     ETag: "2-056f5f44046ecafc08a2bc2b9c229e20"
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
 
     {
         "id": "FishStew",
@@ -365,7 +365,7 @@
     Date: Wed, 14 Aug 2013 14:21:00 GMT
     ETag: "1-e86fdf912560c2321a5fcefc6264e6d9"
     Location: http://localhost:5984/recipes/SpaghettiWithMeatballs_Italian
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
 
     {
         "id": "SpaghettiWithMeatballs_Italian",
@@ -429,7 +429,7 @@ Basic Attachments Info
   Content-Type: application/json
   Date: Tue, 13 Aug 2013 21:35:37 GMT
   ETag: "5-fd96acb3256302bf0dd2f32713161f2a"
-  Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+  Server: CouchDB (Erlang/OTP)
 
   {
       "_attachments": {
@@ -491,7 +491,7 @@ It's possible to retrieve document with all attached files content by using
   Content-Type: application/json
   Date: Wed, 14 Aug 2013 11:32:40 GMT
   ETag: "4-f1bcae4bf7bbb92310079e632abfe3f4"
-  Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+  Server: CouchDB (Erlang/OTP)
 
   {
       "_attachments": {
@@ -533,7 +533,7 @@ query parameter:
   Content-Type: application/json
   Date: Tue, 13 Aug 2013 21:35:37 GMT
   ETag: "5-fd96acb3256302bf0dd2f32713161f2a"
-  Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+  Server: CouchDB (Erlang/OTP)
 
   {
       "_attachments": {
@@ -594,7 +594,7 @@ about compressed attachments size and used codec.
   Content-Type: application/json
   Date: Tue, 13 Aug 2013 21:35:37 GMT
   ETag: "5-fd96acb3256302bf0dd2f32713161f2a"
-  Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+  Server: CouchDB (Erlang/OTP)
 
   {
       "_attachments": {
@@ -660,7 +660,7 @@ the ``revs=true`` parameter to the request URL:
   Content-Type: application/json
   Date: Wed, 14 Aug 2013 11:38:26 GMT
   ETag: "5-fd96acb3256302bf0dd2f32713161f2a"
-  Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+  Server: CouchDB (Erlang/OTP)
 
   {
       "_id": "SpaghettiWithMeatballs",
@@ -719,7 +719,7 @@ document by supplying the ``revs_info`` argument to the query:
   Content-Length: 802
   Content-Type: application/json
   Date: Wed, 14 Aug 2013 11:40:55 GMT
-  Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+  Server: CouchDB (Erlang/OTP)
 
   {
       "_id": "SpaghettiWithMeatballs",
@@ -807,7 +807,7 @@ requested.
   Content-Length: 271
   Content-Type: application/json
   Date: Wed, 14 Aug 2013 11:40:55 GMT
-  Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+  Server: CouchDB (Erlang/OTP)
 
   {
       "_id": "SpaghettiWithMeatballs",
@@ -847,7 +847,7 @@ response:
   Content-Length: 41
   Content-Type: application/json
   Date: Wed, 14 Aug 2013 12:23:27 GMT
-  Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+  Server: CouchDB (Erlang/OTP)
 
   {
       "error": "not_found",
@@ -875,7 +875,7 @@ with :http:get:`/{db}/{docid}` request:
   Content-Type: application/json
   Date: Wed, 14 Aug 2013 12:30:22 GMT
   ETag: "2-056f5f44046ecafc08a2bc2b9c229e20"
-  Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+  Server: CouchDB (Erlang/OTP)
 
   {
       "_deleted": true,
@@ -947,7 +947,7 @@ Alternatively, you can supply the current revision number in the
   Date: Wed, 14 Aug 2013 20:33:56 GMT
   ETag: "2-790895a73b63fb91dd863388398483dd"
   Location: http://localhost:5984/recipes/SpaghettiWithMeatballs
-  Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+  Server: CouchDB (Erlang/OTP)
 
   {
       "id": "SpaghettiWithMeatballs",
@@ -983,7 +983,7 @@ string or :http:header:`If-Match`:
   Date: Wed, 14 Aug 2013 14:21:00 GMT
   ETag: "1-917fa2381192822767f010b95b45325b"
   Location: http://localhost:5984/recipes_old/SpaghettiWithMeatballs_Original
-  Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+  Server: CouchDB (Erlang/OTP)
 
   {
       "id": "SpaghettiWithMeatballs_Original",
@@ -1019,7 +1019,7 @@ string for the target document by appending the ``rev`` parameter to the
   Date: Wed, 14 Aug 2013 14:21:00 GMT
   ETag: "2-62e778c9ec09214dd685a981dcc24074""
   Location: http://localhost:5984/recipes_old/SpaghettiWithMeatballs_Original
-  Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+  Server: CouchDB (Erlang/OTP)
 
   {
       "id": "SpaghettiWithMeatballs_Original",

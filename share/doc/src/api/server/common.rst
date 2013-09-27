@@ -46,7 +46,7 @@
     Content-Length: 179
     Content-Type: application/json
     Date: Sat, 10 Aug 2013 06:33:33 GMT
-    Server: CouchDB/1.3.1 (Erlang OTP/R15B02)
+    Server: CouchDB (Erlang/OTP)
 
     {
         "couchdb": "Welcome",
@@ -105,7 +105,7 @@
     Content-Length: 1690
     Content-Type: application/json
     Date: Sat, 10 Aug 2013 06:37:31 GMT
-    Server: CouchDB/1.3.1 (Erlang OTP/R15B02)
+    Server: CouchDB (Erlang/OTP)
 
     [
         {
@@ -194,7 +194,7 @@
     Content-Length: 52
     Content-Type: application/json
     Date: Sat, 10 Aug 2013 06:57:48 GMT
-    Server: CouchDB/1.3.1 (Erlang OTP/R15B02)
+    Server: CouchDB (Erlang/OTP)
 
     [
        "_users",
@@ -253,7 +253,7 @@
     Cache-Control: must-revalidate
     Content-Type: application/json
     Date: Sat, 10 Aug 2013 07:02:41 GMT
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
     Transfer-Encoding: chunked
 
     {
@@ -415,7 +415,7 @@ jumping to ``offset`` bytes towards the beginning of the file first:
     Content-Length: 692
     Content-Type: application/json
     Date: Sun, 11 Aug 2013 20:38:50 GMT
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
 
     {
         "history": [
@@ -695,7 +695,7 @@ a 404 error.
     Content-Length: 12
     Content-Type: application/json
     Date: Sat, 10 Aug 2013 11:33:50 GMT
-    Server: CouchDB/1.3.1 (Erlang OTP/R15B02)
+    Server: CouchDB (Erlang/OTP)
 
     {
         "ok": true
@@ -738,7 +738,7 @@ a 404 error.
     Content-Length: 187
     Content-Type: application/json
     Date: Sat, 10 Aug 2013 11:41:11 GMT
-    Server: CouchDB/1.3.1 (Erlang OTP/R15B02)
+    Server: CouchDB (Erlang/OTP)
 
     {
         "couchdb": {
@@ -939,7 +939,7 @@ structure is as follows:
     ETag: "DGRWWQFLUDWN5MRKSLKQ425XV"
     Expires: Fri, 01 Jan 1990 00:00:00 GMT
     Pragma: no-cache
-    Server: CouchDB/1.3.1 (Erlang OTP/R15B02)
+    Server: CouchDB (Erlang/OTP)
 
     {
         "uuids": [

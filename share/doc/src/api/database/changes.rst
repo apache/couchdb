@@ -102,7 +102,7 @@
     Content-Type: application/json
     Date: Mon, 12 Aug 2013 00:54:58 GMT
     ETag: "6ASLEKEMSRABT0O5XY9UPO9Z"
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
     Transfer-Encoding: chunked
 
     {

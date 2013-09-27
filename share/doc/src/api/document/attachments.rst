@@ -66,7 +66,7 @@
     Content-Type: text/plain
     Date: Thu, 15 Aug 2013 12:42:42 GMT
     ETag: "vVa/YgiE1+Gh0WfoFJAcSg=="
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
 
 
 .. http:get:: /{db}/{docid}/{attname}
@@ -172,7 +172,7 @@
     Date: Thu, 15 Aug 2013 12:38:04 GMT
     ETag: "2-ce91aed0129be8f9b0f650a2edcfd0a4"
     Location: http://localhost:5984/recipes/SpaghettiWithMeatballs/recipe.txt
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
 
     {
         "id": "SpaghettiWithMeatballs",
@@ -243,7 +243,7 @@
     Content-Type: application/json
     Date: Wed, 14 Aug 2013 12:23:13 GMT
     ETag: "7-05185cf5fcdf4b6da360af939431d466"
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
 
     {
         "id": "SpaghettiWithMeatballs",

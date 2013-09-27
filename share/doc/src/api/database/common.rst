@@ -40,7 +40,7 @@
     Cache-Control: must-revalidate
     Content-Type: application/json
     Date: Mon, 12 Aug 2013 01:27:41 GMT
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
 
 
 .. http:get:: /{db}
@@ -86,7 +86,7 @@
     Content-Length: 258
     Content-Type: application/json
     Date: Mon, 12 Aug 2013 01:38:57 GMT
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
 
     {
         "committed_update_seq": 292786,
@@ -152,7 +152,7 @@
     Content-Type: application/json
     Date: Mon, 12 Aug 2013 08:01:45 GMT
     Location: http://localhost:5984/db
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
 
     {
         "ok": true
@@ -178,7 +178,7 @@
     Content-Length: 95
     Content-Type: application/json
     Date: Mon, 12 Aug 2013 08:01:16 GMT
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
 
     {
         "error": "file_exists",
@@ -204,7 +204,7 @@
     Content-Length: 194
     Content-Type: application/json
     Date: Mon, 12 Aug 2013 08:02:10 GMT
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
 
     {
         "error": "illegal_database_name",
@@ -245,7 +245,7 @@
     Content-Length: 12
     Content-Type: application/json
     Date: Mon, 12 Aug 2013 08:54:00 GMT
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
 
     {
         "ok": true
@@ -311,7 +311,7 @@
     Date: Tue, 13 Aug 2013 15:19:25 GMT
     ETag: "1-9c65296036141e575d32ba9c034dd3ee"
     Location: http://localhost:5984/db/ab39fe0993049b84cfa81acd6ebad09d
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
 
     {
         "id": "ab39fe0993049b84cfa81acd6ebad09d",
@@ -354,7 +354,7 @@ document with the ID ``FishStew``.
     Date: Tue, 13 Aug 2013 15:19:25 GMT
     ETag: "1-9c65296036141e575d32ba9c034dd3ee"
     Location: http://localhost:5984/db/FishStew
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
 
     {
         "id": "FishStew",
@@ -411,7 +411,7 @@ respond with a HTTP :http:statuscode:`202` response code immediately.
   Content-Type: application/json
   Date: Tue, 13 Aug 2013 15:19:25 GMT
   Location: http://localhost:5984/db/FishStew
-  Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+  Server: CouchDB (Erlang/OTP)
 
   {
       "id": "FishStew",

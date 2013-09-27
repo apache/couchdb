@@ -54,7 +54,7 @@ supports querying, deleting or creating new admin accounts:
    Content-Length: 196
    Content-Type: application/json
    Date: Fri, 30 Nov 2012 11:37:18 GMT
-   Server: CouchDB/1.3.0 (Erlang OTP/R15B03)
+   Server: CouchDB (Erlang/OTP)
 
 .. code-block:: json
 
@@ -85,7 +85,7 @@ encrypt it.
    Content-Length: 89
    Content-Type: application/json
    Date: Fri, 30 Nov 2012 11:39:18 GMT
-   Server: CouchDB/1.3.0 (Erlang OTP/R15B02)
+   Server: CouchDB (Erlang/OTP)
 
    "-pbkdf2-43ecbd256a70a3a2f7de40d2374b6c3002918834,921a12f74df0c1052b3e562a23cd227f,10000"
 

@@ -85,7 +85,7 @@
     Content-Type: application/json
     Date: Sat, 10 Aug 2013 16:22:56 GMT
     ETag: "1W2DJUZFZSZD9K78UFA3GZWB4"
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
     Transfer-Encoding: chunked
 
     {
@@ -258,7 +258,7 @@
     Content-Length: 144
     Content-Type: application/json
     Date: Mon, 12 Aug 2013 00:15:05 GMT
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
 
     [
       {

@@ -53,7 +53,7 @@
     Content-Type: application/json
     Date: Tue, 13 Aug 2013 12:28:12 GMT
     ETag: "AU33B3N7S9K4SAZSFA048HVB4"
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
     Transfer-Encoding: chunked
 
     {

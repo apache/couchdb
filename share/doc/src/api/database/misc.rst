@@ -82,7 +82,7 @@
     Content-Length: 103
     Content-Type: application/json
     Date: Mon, 12 Aug 2013 10:53:24 GMT
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
 
     {
       "purge_seq":3,
@@ -162,7 +162,7 @@ database must be examined.
     Content-Length: 64
     Content-Type: application/json
     Date: Mon, 12 Aug 2013 10:53:24 GMT
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
 
     {
       "missed_revs":{
@@ -237,7 +237,7 @@ database must be examined.
     Content-Length: 88
     Content-Type: application/json
     Date: Mon, 12 Aug 2013 16:56:02 GMT
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
 
     {
       "190f721ca3411be7aa9477db5f948bbb": {
@@ -281,7 +281,7 @@ database must be examined.
     Content-Length: 5
     Content-Type: application/json
     Date: Mon, 12 Aug 2013 17:27:30 GMT
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
 
     1000
 
@@ -324,7 +324,7 @@ database must be examined.
     Content-Length: 12
     Content-Type: application/json
     Date: Mon, 12 Aug 2013 17:47:52 GMT
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
 
     {
         "ok": true

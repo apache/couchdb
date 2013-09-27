@@ -97,7 +97,7 @@
     Content-Type: application/json
     Date: Wed, 21 Aug 2013 09:12:06 GMT
     ETag: "2FOLSBSW4O6WB798XU4AQYA9B"
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
     Transfer-Encoding: chunked
 
     {
@@ -157,7 +157,7 @@
     Content-Type: application/json
     Date: Wed, 21 Aug 2013 09:14:13 GMT
     ETag: "6R5NM8E872JIJF796VF7WI3FZ"
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
     Transfer-Encoding: chunked
 
     {
@@ -339,7 +339,7 @@ content. The basic order of output is as follows:
   Content-Type: application/json
   Date: Wed, 21 Aug 2013 10:09:25 GMT
   ETag: "8LA1LZPQ37B6R9U8BK9BGQH27"
-  Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+  Server: CouchDB (Erlang/OTP)
   Transfer-Encoding: chunked
   
   {
@@ -467,7 +467,7 @@ You can reverse the order of the returned view information by using the
   Content-Type: application/json
   Date: Wed, 21 Aug 2013 10:09:25 GMT
   ETag: "Z4N468R15JBT98OM0AMNSR8U"
-  Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+  Server: CouchDB (Erlang/OTP)
   Transfer-Encoding: chunked
   
   {
@@ -669,7 +669,7 @@ in view:
   Content-Type: application/json
   Date: Wed, 21 Aug 2013 09:14:13 GMT
   ETag: "9Q6Q2GZKPH8D5F8L7PB6DBSS9"
-  Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+  Server: CouchDB (Erlang/OTP)
   Transfer-Encoding: chunked
 
   {
@@ -738,7 +738,7 @@ To omit some records you may use ``skip`` query parameter:
   Content-Type: application/json
   Date: Wed, 21 Aug 2013 09:14:13 GMT
   ETag: "H3G7YZSNIVRRHO5FXPE16NJHN"
-  Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+  Server: CouchDB (Erlang/OTP)
   Transfer-Encoding: chunked
 
   {

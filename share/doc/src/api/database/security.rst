@@ -92,7 +92,7 @@
     Content-Length: 109
     Content-Type: application/json
     Date: Mon, 12 Aug 2013 19:05:29 GMT
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
 
     {
         "admins": {
@@ -172,7 +172,7 @@
     Content-Length: 12
     Content-Type: application/json
     Date: Tue, 13 Aug 2013 11:26:28 GMT
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
 
     {
         "ok": true

@@ -368,7 +368,7 @@ specify the ``-k`` option as the message reads:
 .. code-block:: bash
 
     shell> curl -k https://127.0.0.1:6984/
-    {"couchdb":"Welcome","version":"1.3.0"}
+    {"couchdb":"Welcome","version":"1.5.0"}
 
 All done.
 

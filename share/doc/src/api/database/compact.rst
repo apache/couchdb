@@ -73,7 +73,7 @@
     Content-Length: 12
     Content-Type: application/json
     Date: Mon, 12 Aug 2013 09:27:43 GMT
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
 
     {
         "ok": true
@@ -124,7 +124,7 @@
     Content-Length: 12
     Content-Type: application/json
     Date: Mon, 12 Aug 2013 09:36:44 GMT
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
 
     {
         "ok": true
@@ -172,7 +172,7 @@
     Content-Length: 53
     Content-Type: application/json
     Date: Mon, 12 Aug 2013 10:22:19 GMT
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
 
     {
         "instance_start_time": "1376269047459338",
@@ -219,7 +219,7 @@
     Content-Length: 12
     Content-Type: application/json
     Date: Mon, 12 Aug 2013 09:27:43 GMT
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
 
     {
         "ok": true

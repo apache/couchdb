@@ -62,7 +62,7 @@
     Content-Type: text/html; charset=utf-8
     Date: Wed, 21 Aug 2013 12:34:07 GMT
     Etag: "7Z2TO7FPEMZ0F4GH0RJCRIOAU"
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
     Vary: Accept
 
     no doc
@@ -120,7 +120,7 @@
     Content-Type: text/html; charset=utf-8
     Date: Wed, 21 Aug 2013 12:38:08 GMT
     Etag: "8IEBO8103EI98HDZL5Z4I1T0C"
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
     Vary: Accept
 
     An Italian-American dish that usually consists of spaghetti, tomato sauce and meatballs.
@@ -181,7 +181,7 @@
     Content-Type: text/plain; charset=utf-8
     Date: Wed, 21 Aug 2013 12:49:15 GMT
     Etag: "D52L2M1TKQYDD1Y8MEYJR8C84"
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
     Transfer-Encoding: chunked
     Vary: Accept
 
@@ -244,7 +244,7 @@
     Content-Type: text/plain; charset=utf-8
     Date: Wed, 21 Aug 2013 12:49:15 GMT
     Etag: "5L0975X493R0FB5Z3043POZHD"
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
     Transfer-Encoding: chunked
     Vary: Accept
 
@@ -306,7 +306,7 @@
     Content-Length: 52
     Content-Type: application/json
     Date: Wed, 21 Aug 2013 14:00:58 GMT
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
 
     {
         "error": "missed",
@@ -371,7 +371,7 @@
     Content-Length: 16
     Content-Type: application/json
     Date: Wed, 21 Aug 2013 14:11:34 GMT
-    Server: CouchDB/1.4.0+build.c843cef (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
     X-Couch-Id: SpaghettiWithMeatballs
     X-Couch-Update-NewRev: 12-a5e099df5720988dae90c8b664496baf
 

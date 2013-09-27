@@ -172,7 +172,7 @@
     Content-Length: 263
     Content-Type: application/json
     Date: Sat, 17 Aug 2013 12:54:17 GMT
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
 
     {
         "name": "recipe",

@@ -51,7 +51,7 @@ CouchDB must compute password hash with every request):
     Content-Length: 177
     Content-Type: application/json
     Date: Mon, 03 Dec 2012 00:44:47 GMT
-    Server: CouchDB/1.3.0 (Erlang OTP/R15B02)
+    Server: CouchDB (Erlang/OTP)
 
     {
       "couchdb":"Welcome",
@@ -143,7 +143,7 @@ To obtain the first token and thus authenticate a user for the first time, the
     Content-Length: 43
     Content-Type: application/json
     Date: Mon, 03 Dec 2012 01:23:14 GMT
-    Server: CouchDB/1.3.0 (Erlang OTP/R15B02)
+    Server: CouchDB (Erlang/OTP)
     Set-Cookie: AuthSession=cm9vdDo1MEJCRkYwMjq0LO0ylOIwShrgt8y-UkhI-c6BGw; Version=1; Path=/; HttpOnly
 
     {"ok":true,"name":"root","roles":["_admin"]}
@@ -172,7 +172,7 @@ To obtain the first token and thus authenticate a user for the first time, the
     Content-Type: application/json
     Date: Mon, 03 Dec 2012 01:32:46 GMT
     Location: http://localhost:5984/blog/_design/sofa/_rewrite/recent-posts
-    Server: CouchDB/1.3.0 (Erlang OTP/R15B02)
+    Server: CouchDB (Erlang/OTP)
     Set-Cookie: AuthSession=cm9vdDo1MEJDMDEzRTp7Vu5GKCkTxTVxwXbpXsBARQWnhQ; Version=1; Path=/; HttpOnly
 
     {"ok":true,"name":null,"roles":["_admin"]}
@@ -207,7 +207,7 @@ To obtain the first token and thus authenticate a user for the first time, the
     Content-Length: 175
     Content-Type: application/json
     Date: Fri, 09 Aug 2013 20:27:45 GMT
-    Server: CouchDB/1.3.0 (Erlang OTP/R15B02)
+    Server: CouchDB (Erlang/OTP)
     Set-Cookie: AuthSession=cm9vdDo1MjA1NTBDMTqmX2qKt1KDR--GUC80DQ6-Ew_XIw; Version=1; Path=/; HttpOnly
 
     {
@@ -255,7 +255,7 @@ To obtain the first token and thus authenticate a user for the first time, the
     Content-Length: 12
     Content-Type: application/json
     Date: Fri, 09 Aug 2013 20:30:12 GMT
-    Server: CouchDB/1.3.0 (Erlang OTP/R15B02)
+    Server: CouchDB (Erlang/OTP)
     Set-Cookie: AuthSession=; Version=1; Path=/; HttpOnly
 
     {
@@ -317,7 +317,7 @@ headers to CouchDB with related request:
     Content-Length: 190
     Content-Type: application/json
     Date: Fri, 14 Jun 2013 10:16:03 GMT
-    Server: CouchDB/1.3.0 (Erlang OTP/R15B03)
+    Server: CouchDB (Erlang/OTP)
 
     {
         "info": {
@@ -430,7 +430,7 @@ Both snippets produces similar request and response pair:
     Content-Length : 167
     Content-Type : application/json
     Date : Tue, 23 Jul 2013 06:51:15 GMT
-    Server: CouchDB/1.3.0 (Erlang OTP/R15B02)
+    Server: CouchDB (Erlang/OTP)
 
 
     {

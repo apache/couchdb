@@ -53,7 +53,7 @@ CouchDB instance.
     Content-Length: 4148
     Content-Type: application/json
     Date: Sat, 10 Aug 2013 12:01:42 GMT
-    Server: CouchDB/1.4.0 (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
 
     {
       "attachments": {
@@ -75,7 +75,7 @@ CouchDB instance.
           "max_document_size": "4294967296",
           "os_process_timeout": "5000",
           "uri_file": "/var/lib/couchdb/couch.uri",
-          "util_driver_dir": "/usr/lib64/couchdb/erlang/lib/couch-1.0.1/priv/lib",
+          "util_driver_dir": "/usr/lib64/couchdb/erlang/lib/couch-1.5.0/priv/lib",
           "view_index_dir": "/var/lib/couchdb"
       },
       "daemons": {
@@ -188,7 +188,7 @@ CouchDB instance.
     Content-Length: 444
     Content-Type: application/json
     Date: Sat, 10 Aug 2013 12:10:40 GMT
-    Server: CouchDB/1.4.0+build.c843cef (Erlang OTP/R16B)
+    Server: CouchDB (Erlang/OTP)
 
     {
         "allow_jsonp": "false",
@@ -239,7 +239,7 @@ CouchDB instance.
     Content-Length: 8
     Content-Type: application/json
     Date: Sat, 10 Aug 2013 12:12:59 GMT
-    Server: CouchDB/1.3.1 (Erlang OTP/R15B02)
+    Server: CouchDB (Erlang/OTP)
 
     "debug"
 
@@ -290,7 +290,7 @@ CouchDB instance.
     Content-Length: 8
     Content-Type: application/json
     Date: Sat, 10 Aug 2013 12:12:59 GMT
-    Server: CouchDB/1.3.1 (Erlang OTP/R15B02)
+    Server: CouchDB (Erlang/OTP)
 
     "debug"
 
@@ -327,6 +327,6 @@ CouchDB instance.
     Content-Length: 7
     Content-Type: application/json
     Date: Sat, 10 Aug 2013 12:29:03 GMT
-    Server: CouchDB/1.3.1 (Erlang OTP/R15B02)
+    Server: CouchDB (Erlang/OTP)
 
     "info"

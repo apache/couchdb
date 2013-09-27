@@ -196,7 +196,7 @@ its contents should be readable for the user that runs the CouchDB service.
 ::
 
   [couchdb]
-  util_driver_dir = /usr/lib/couchdb/erlang/lib/couch-1.3.0/priv/lib
+  util_driver_dir = /usr/lib/couchdb/erlang/lib/couch-1.5.0/priv/lib
 
 
 .. _config/couchdb/uuid:

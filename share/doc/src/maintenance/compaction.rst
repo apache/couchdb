@@ -58,7 +58,7 @@ On success, HTTP status :http:statuscode:`202` is returned immediately:
   Content-Length: 12
   Content-Type: text/plain; charset=utf-8
   Date: Wed, 19 Jun 2013 09:43:52 GMT
-  Server: CouchDB/1.3.0 (Erlang OTP/R15B03)
+  Server: CouchDB (Erlang/OTP)
 
 .. code-block:: javascript
 
@@ -76,7 +76,7 @@ for the request. If you don't, you will be aware about with HTTP status
   Content-Length: 78
   Content-Type: application/json
   Date: Wed, 19 Jun 2013 09:43:44 GMT
-  Server: CouchDB/1.3.0 (Erlang OTP/R15B03)
+  Server: CouchDB (Erlang/OTP)
 
   {"error":"bad_content_type","reason":"Content-Type must be application/json"}
 
@@ -92,7 +92,7 @@ information about it via :ref:`database information resource <api/db>`::
   Content-Length: 246
   Content-Type: application/json
   Date: Wed, 19 Jun 2013 16:51:20 GMT
-  Server: CouchDB/1.3.0 (Erlang OTP/R15B03)
+  Server: CouchDB (Erlang/OTP)
 
   {
       "committed_update_seq": 76215,
@@ -122,7 +122,7 @@ is actually running. To track the compaction progress you may query the
   Content-Length: 175
   Content-Type: application/json
   Date: Wed, 19 Jun 2013 16:27:23 GMT
-  Server: CouchDB/1.3.0 (Erlang OTP/R15B03)
+  Server: CouchDB (Erlang/OTP)
 
   [
       {
