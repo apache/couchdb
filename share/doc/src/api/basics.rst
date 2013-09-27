@@ -223,7 +223,7 @@ below.
 
    ETags have been assigned to a map/reduce group (the collection of
    views in a single design document). Any change to any of the indexes
-   for those views would generate a new ETag for all view URL's in a
+   for those views would generate a new ETag for all view URLs in a
    single design doc, even if that specific view's results had not
    changed.
 
@@ -307,11 +307,15 @@ languages, including Perl, Python, Ruby, Erlang and others.
 Number Handling
 ---------------
 
+Developers and users new to computer handling of numbers often encounter
+suprises when expecting that a number stored in JSON format does not
+necessarily return as the same number as compared character by character.
+
 Any numbers defined in JSON that contain a decimal point or exponent
 will be passed through the Erlang VM's idea of the "double" data type.
-Any numbers that are used in views will pass through the views idea of
-a number (the common JavaScript case means even integers pass through
-a double due to JavaScript's definition of a number).
+Any numbers that are used in views will pass through the view server's
+idea of a number (the common JavaScript case means even integers pass
+through a double due to JavaScript's definition of a number).
 
 Consider this document that we write to CouchDB:
 
@@ -357,7 +361,7 @@ major parsers that we know about.
 
 While we've only been discussing cases where the textual
 representation changes, another important case is when an input value
-is contains more precision than can actually represented in a double.
+contains more precision than can actually represented in a double.
 (You could argue that this case is actually "losing" data if you don't
 accept that numbers are stored in doubles).
 
@@ -446,7 +450,7 @@ the 1.1 input as described above.
 The important point to realize here is that a double can only hold a
 finite number of values. What we're doing here is generating a string
 that when passed through the "standard" floating point parsing
-algorithms (ie, strtod) will result in the same bit pattern in memory
+algorithms (ie, ``strtod``) will result in the same bit pattern in memory
 as we started with. Or, slightly different, the bytes in a JSON
 serialized number are chosen such that they refer to a single specific
 value that a double can represent.
@@ -481,6 +485,12 @@ representation. In JSON this is accomplished by encoding them as a
 string or by using integer types (although integer types can still
 bite you if you use a platform that has a different integer
 representation than normal, ie, JavaScript).
+
+Further information can be found easily, including the
+`Floating Point Guide`_, and  `David Goldberg's Reference`_.
+
+.. _Floating Point Guide: http://floating-point-gui.de/
+.. _David Goldberg's Reference: http://docs.oracle.com/cd/E19957-01/806-3568/ncg_goldberg.html
 
 Also, if anyone is really interested in changing this behavior, we're
 all ears for contributions to `jiffy`_ (which is theoretically going to
