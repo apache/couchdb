@@ -21,9 +21,10 @@
 .. http:head:: /{db}/_changes
 .. http:post:: /{db}/_changes
 
-  A list of changes made to documents in the database, in the order they were
-  made, can be obtained from the database's ``_changes`` resource.
-  This can be used to monitor for update and modifications to the database for
+  A sorted list of changes made to documents in the database, in the order
+  they were made, can be obtained from the database's ``_changes`` resource.
+
+  This can be used to listen for update and modifications to the database for
   post processing or synchronization.
 
   :param db: Database name
@@ -162,7 +163,7 @@ Changes Feeds
 Polling
 -------
 
-By default all changes are immediately returned as a JSON object::
+By default all changes are immediately returned within the JSON body::
 
     GET /somedatabase/_changes HTTP/1.1
 
@@ -194,7 +195,7 @@ including the given sequence number::
 The return structure for ``normal`` and ``longpoll`` modes is a JSON
 array of changes objects, and the last update sequence number.
 
-The return format for ``continuous`` mode the server sends a ``CRLF``
+In the return format for ``continuous`` mode, the server sends a ``CRLF``
 (carriage-return, linefeed) delimited line for each change. Each line
 contains the `JSON object` described above.
 
@@ -203,27 +204,35 @@ of just the change notification) by using the ``include_docs`` parameter.
 
 .. code-block:: javascript
 
-    {"results":[
-    {"seq":5,"id":"deleted","changes":[{"rev":"2-eec205a9d413992850a6e32678485900"}],"deleted":true}
-    ],
-    "last_seq":5} 
-
+    {
+        "last_seq": 5
+        "results": [
+            {
+                "changes": [
+                    {
+                        "rev": "2-eec205a9d413992850a6e32678485900"
+                    }
+                ],
+                "deleted": true,
+                "id": "deleted",
+                "seq": 5,
+            }
+        ]
+    }
 
 .. _changes/longpoll:
 
 Long Polling
 ------------
 
-With long polling the request to the server will remain open until a
-change is made on the database, when the changes will be reported,
-and then the connection will close. The long poll is useful when you
-want to monitor for changes for a specific purpose without wanting to
-monitoring continuously for changes.
-
-The `longpoll` feed (probably most useful used from a browser) is a more
+The `longpoll` feed, probably most applicable for a browser, is a more
 efficient form of polling that waits for a change to occur before the response
 is sent. `longpoll` avoids the need to frequently poll CouchDB to discover
 nothing has changed!
+
+The request to the server will remain open until a change is made on the
+database and is subsequently transferred, and then the connection will close.
+This is low load for both server and client.
 
 The response is basically the same JSON as is sent for the `normal` feed.
 
@@ -231,7 +240,7 @@ Because the wait for a change can be significant you can set a
 timeout before the connection is automatically closed (the
 ``timeout`` argument). You can also set a heartbeat interval (using
 the ``heartbeat`` query argument), which sends a newline to keep the
-connection open.
+connection active.
 
 
 .. _changes/continuous:
@@ -239,7 +248,7 @@ connection open.
 Continuous
 ----------
 
-Polling the CouchDB server is not a good thing to do. Setting up new HTTP
+Continually polling the CouchDB server is not ideal - setting up new HTTP
 connections just to tell the client that nothing happened puts unnecessary
 strain on CouchDB.
 
@@ -271,8 +280,7 @@ results.
 Obviously, `... tum tee tum ...` does not appear in the actual response, but
 represents a long pause before the change with seq 6 occurred.  
 
-.. _section in the book: http://books.couchdb.org/relax/reference/change-notifications
-
+.. _section in the book: http://guide.couchdb.org/draft/notifications.html
 
 .. _changes/eventsource:
 
@@ -282,7 +290,6 @@ Event Source
 The `eventsource` feed provides push notifications that can be consumed in
 the form of DOM events in the browser. Refer to the `W3C eventsource
 specification`_ for further details. CouchDB also honors the ``Last-Event-ID``
-header, and if it's present it will take precedence over the ``since`` query
 parameter.
 
 .. code-block:: text
@@ -316,7 +323,7 @@ parameter.
 .. note::
 
    EventSource connections are subject to cross-origin resource sharing
-   restrictions. You might need to use the experimental :ref:`CORS support
+   restrictions. You might need to configure :ref:`CORS support
    <cors>` to get the EventSource to work in your application.
 
 .. _W3C eventsource specification: http://www.w3.org/TR/eventsource/
