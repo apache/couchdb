@@ -41,7 +41,8 @@ function() {
     "view_functions": "http://docs.couchdb.org/en/latest/ddocs.html#view-functions",
     "map_functions": "http://docs.couchdb.org/en/latest/ddocs.html#map-functions",
     "reduce_functions": "http://docs.couchdb.org/en/latest/ddocs.html#reduce-and-rereduce-functions",
-    "api_reference": "http://docs.couchdb.org/en/latest/api-basics.html?highlight=api"
+    "api_reference": "http://docs.couchdb.org/en/latest/api-basics.html?highlight=api",
+    "database_permission": "http://docs.couchdb.org/en/latest/api/database.html#get-db-security"
   }; 
   
   Helpers.getDocUrl = function(doc){
