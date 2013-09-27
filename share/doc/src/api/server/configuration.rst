@@ -34,7 +34,7 @@ CouchDB instance.
   :>header Content-Type: - :mimetype:`application/json`
                          - :mimetype:`text/plain; charset=utf-8`
   :code 200: Request completed successfully
-  :code 401: Administrator's privileges required
+  :code 401: CouchDB Server Administrator privileges required
 
   **Request**
 
@@ -169,7 +169,7 @@ CouchDB instance.
   :>header Content-Type: - :mimetype:`application/json`
                          - :mimetype:`text/plain; charset=utf-8`
   :code 200: Request completed successfully
-  :code 401: Administrator's privileges required
+  :code 401: CouchDB Server Administrator privileges required
 
   **Request**:
 
@@ -220,7 +220,7 @@ CouchDB instance.
   :>header Content-Type: - :mimetype:`application/json`
                          - :mimetype:`text/plain; charset=utf-8`
   :code 200: Request completed successfully
-  :code 401: Administrator's privileges required
+  :code 401: CouchDB Server Administrator privileges required
 
   **Request**:
 
@@ -266,7 +266,7 @@ CouchDB instance.
                          - :mimetype:`text/plain; charset=utf-8`
   :code 200: Request completed successfully
   :code 400: Invalid JSON request body
-  :code 401: Administrator's privileges required
+  :code 401: CouchDB Server Administrator privileges required
   :code 500: Error setting configuration
 
   **Request**:
@@ -307,7 +307,7 @@ CouchDB instance.
   :>header Content-Type: - :mimetype:`application/json`
                          - :mimetype:`text/plain; charset=utf-8`
   :code 200: Request completed successfully
-  :code 401: Administrator's privileges required
+  :code 401: CouchDB Server Administrator privileges required
   :code 404: Specified configuration option not found
 
   **Request**:

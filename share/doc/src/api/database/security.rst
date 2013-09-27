@@ -131,7 +131,7 @@
                          - :mimetype:`text/plain; charset=utf-8`
   :>json boolean ok: Operation status
   :code 200: Request completed successfully
-  :code 401: Administrator's privileges required
+  :code 401: CouchDB Server Administrator privileges required
 
   **Request**:
 

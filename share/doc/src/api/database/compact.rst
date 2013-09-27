@@ -52,7 +52,7 @@
   :>json boolean ok: Operation status
   :code 202: Compaction request has been accepted
   :code 400: Invalid database name
-  :code 401: Administrator`s privileges required
+  :code 401: CouchDB Server Administrator privileges required
   :code 415: Bad :http:header:`Content-Type` value
 
   **Request**:
@@ -102,7 +102,7 @@
   :>json boolean ok: Operation status
   :code 202: Compaction request has been accepted
   :code 400: Invalid database name
-  :code 401: Administrator`s privileges required
+  :code 401: CouchDB Server Administrator privileges required
   :code 404: Design document not found
   :code 415: Bad :http:header:`Content-Type` value
 
@@ -198,7 +198,7 @@
   :>json boolean ok: Operation status
   :code 202: Compaction request has been accepted
   :code 400: Invalid database name
-  :code 401: Administrator`s privileges required
+  :code 401: CouchDB Server Administrator privileges required
   :code 415: Bad :http:header:`Content-Type` value
 
   **Request**:

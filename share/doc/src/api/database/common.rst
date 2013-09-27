@@ -131,7 +131,7 @@
   :>json string reason: Error description. Available if response code is ``4xx``
   :code 201: Database created successfully
   :code 400: Invalid database name
-  :code 401: Administrator`s privileges required
+  :code 401: CouchDB Server Administrator privileges required
   :code 412: Database already exists
 
   **Request**:
@@ -225,8 +225,8 @@
   :>json boolean ok: Operation status
   :code 200: Database removed successfully
   :code 400: Invalid database name
-  :code 401: Administrator`s privileges required
   :code 404: Database doesn't already exists
+  :code 401: CouchDB Server Administrator privileges required
 
   **Request**:
 

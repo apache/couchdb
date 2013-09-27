@@ -86,7 +86,7 @@
   :>json string type: Operation Type
   :>json number updated_on: Unix timestamp of last operation update
   :code 200: Request completed successfully
-  :code 401: Administrator's privileges required
+  :code 401: CouchDB Server Administrator privileges required
 
   **Request**:
 
@@ -234,8 +234,8 @@
   :>json boolean ok: Event operation status
   :>json string type: A database event is one of ``created``, ``updated``,
     ``deleted``
-  :code 200: Request completed successfully.
-  :code 401: Administrator's privileges required.
+  :code 200: Request completed successfully
+  :code 401: CouchDB Server Administrator privileges required
 
   **Request**:
 
@@ -279,8 +279,8 @@
     Default is ``0``.
   :>header Content-Type: :mimetype:`text/plain; charset=utf-8`
   :>header Transfer-Encoding: ``chunked``
-  :code 200: Request completed successfully.
-  :code 401: Administrator's privileges required.
+  :code 200: Request completed successfully
+  :code 401: CouchDB Server Administrator privileges required
 
   **Request**:
 
@@ -366,7 +366,7 @@ jumping to ``offset`` bytes towards the beginning of the file first:
   :code 200: Replication request successfully completed
   :code 202: Continuous replication request has been accepted
   :code 400: Invalid JSON data
-  :code 401: Administrator's privileges required
+  :code 401: CouchDB Server Administrator privileges required
   :code 404: Either the source or target DB is not found or attempt to
     cancel unknown replication task
   :code 500: JSON specification was invalid
@@ -675,7 +675,7 @@ a 404 error.
                          - :mimetype:`text/plain; charset=utf-8`
   :code 202: Server goes to restart (there is no guarantee that it will be
     alive after)
-  :code 401: Administrator's privileges required
+  :code 401: CouchDB Server Administrator privileges required
   :code 415: Bad request`s :http:header:`Content-Type`
 
   **Request**:
