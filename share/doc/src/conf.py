@@ -108,7 +108,7 @@ html_sidebars = {
 text_newlines = "native"
 
 latex_documents = [(
-    "index",
+    "contents",
     "CouchDB.tex",
     project,
     "",
@@ -121,7 +121,7 @@ latex_elements = {
 }
 
 texinfo_documents = [(
-    "index",
+    "contents",
     "CouchDB",
     project,
     "",

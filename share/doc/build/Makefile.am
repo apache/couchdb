@@ -139,9 +139,9 @@ html_files = \
     html/_sources/whatsnew/1.3.txt \
     html/_sources/whatsnew/1.4.txt \
     html/_sources/whatsnew/index.txt \
+    html/_sources/contents.txt \
     html/_sources/contributing.txt \
     html/_sources/externals.txt \
-    html/_sources/index.txt \
     html/_sources/json-structure.txt \
     html/_static/ajax-loader.gif \
     html/_static/basic.css \
@@ -256,8 +256,8 @@ html_files = \
     html/whatsnew/1.3.html \
     html/whatsnew/1.4.html \
     html/whatsnew/index.html \
+    html/contents.html \
     html/externals.html \
-    html/index.html \
     html/json-structure.html \
     html/objects.inv \
     html/http-api.html \
@@ -395,9 +395,9 @@ src_files = \
     ../src/whatsnew/1.3.rst \
     ../src/whatsnew/1.4.rst \
     ../src/whatsnew/index.rst \
+    ../src/contents.rst \
     ../src/contributing.rst \
     ../src/externals.rst \
-    ../src/index.rst \
     ../src/json-structure.rst \
     ../src/conf.py
 
