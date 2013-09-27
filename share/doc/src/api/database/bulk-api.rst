@@ -20,9 +20,9 @@
 
   Returns a JSON structure of all of the documents in a given database.
   The information is returned as a JSON structure containing meta
-  information about the return structure, and the list documents and basic
-  contents, consisting the ID, revision and key. The key is generated from
-  the document ID.
+  information about the return structure, including a list of all documents
+  and basic contents, consisting the ID, revision and key. The key is the
+  from the document's ``_id``.
 
   :param db: Database name
   :<header Accept: - :mimetype:`application/json`
@@ -47,7 +47,8 @@
     specified number. *Optional*.
   :query number skip: Skip this number of records before starting to return
     the results. Default is ``0``.
-  :query string stale: Allow the results from a stale view to be used.
+  :query string stale: Allow the results from a stale view to be used, without
+    triggering a rebuild of all views within the encompassing design doc.
     Supported values: ``ok`` and ``update_after``. *Optional*.
   :query string startkey: Return records starting with the specified key.
     *Optional*.
@@ -56,7 +57,7 @@
     document ID. *Optional*.
   :query string start_key_doc_id: Alias for `startkey_docid` param.
   :query boolean update_seq: Response includes an ``update_seq`` value
-    indicating which sequence id of the database the view reflects.
+    indicating which sequence id of the underlying database the view reflects.
     Default is ``false``.
   :>header Content-Type: - :mimetype:`application/json`
                          - :mimetype:`text/plain; charset=utf-8`
@@ -64,7 +65,8 @@
   :>json number offset: Offset where the document list started
   :>json array rows: Array of view row objects. By default the information
     returned contains only the document ID and revision.
-  :>json number total_rows: Number of documents in the database/view
+  :>json number total_rows: Number of documents in the database/view. Note that
+    this is not the number of rows returned in the actual query.
   :>json number update_seq: Current update sequence for the database
   :code 200: Request completed successfully
 
@@ -156,7 +158,7 @@
        ]
     }
 
-  The return JSON is the all documents structure, but with only the
+  The returned JSON is the all documents structure, but with only the
   selected keys in the output:
 
   .. code-block:: javascript
@@ -223,7 +225,10 @@
   :>jsonarr string error: Error type. *Optional*.
   :>jsonarr string reason: Error reason. *Optional*.
   :code 201: Document(s) have been created or updated
-  :code 400: Invalid request`s JSON data
+  :code 400: The request provided invalid JSON data. Check that your data
+    is both ``utf-8`` and complies to the `JSON specification`_. Tools such as
+    `yajl`_ are available on all platforms that CouchDB runs on to assist with
+    validation and pretty printing.
   :code 500: Malformed data provided
 
   **Request**:
@@ -273,16 +278,27 @@
       }
     ]
 
+.. _JSON specification: http://json.org/
+.. _yajl: http://lloyd.github.io/yajl/
+
 
 Inserting Documents in Bulk
 ---------------------------
+
+Each time a document is stored or updated in CouchDB, the internal B-tree
+is updated. Bulk insertion provides efficiency gains in both storage space,
+and time, by consolidating many of the updates to intermediate B-tree nodes.
+
+It is not intended as a way to perform ``ACID``-like transactions in CouchDB,
+the only transaction boundary within CouchDB is a single update to a single
+database. The constraints are detailed in :ref:`api/db/bulk_docs/semantics`.
 
 To insert documents in bulk into a database you need to supply a JSON
 structure with the array of documents that you want to add to the
 database. Using this method you can either include a document ID, or
 allow the document ID to be automatically generated.
 
-For example, the following inserts three new documents, two with the
+For example, the following update inserts three new documents, two with the
 supplied document IDs, and one which will have a document ID generated:
 
 .. code-block:: javascript
