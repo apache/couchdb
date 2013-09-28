@@ -381,11 +381,11 @@ respond with a HTTP :http:statuscode:`202` response code immediately.
 
 .. note::
 
-   Creating or updating documents with batch mode doesn't guarantee that
-   document will be successfully stored on disk and CouchDB does not
-   guarantee that. For example, individual documents may not be saved due to
-   conflicts, rejection by :ref:`validation function <vdufun>` or by other
-   reasons, even if overall the batch transfer was sucessfully submitted.
+   Creating or updating documents with batch mode doesn't guarantee that all
+   documents will be successfully stored on disk. For example, individual
+   documents may not be saved due to conflicts, rejection by
+   :ref:`validation function <vdufun>` or by other reasons, even if overall
+   the batch was sucessfully submitted.
 
 **Request**:
 

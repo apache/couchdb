@@ -88,9 +88,10 @@
 .. http:post:: /{db}/_compact/{ddoc}
 
   Compacts the view indexes associated with the specified design document.
-  You can use this in place of the full database compaction if you know a
-  specific set of view indexes have been affected by a recent database
-  change.
+  If may be that compacting a large view can return more storage than
+  compacting the atual db. Thus, you can use this in place of the full
+  database compaction if you know a specific set of view indexes have been
+  affected by a recent database change.
 
   :param db: Database name
   :param ddoc: Design document name
@@ -144,7 +145,11 @@
 .. http:post:: /{db}/_ensure_full_commit
 
   Commits any recent changes to the specified database to disk. You should
-  call this if you want to ensure that recent changes have been written.
+  call this if you want to ensure that recent changes have been flushed.
+  This function is likely not required, assuming you have the recommended
+  configuration setting of ``delayed_commits=false``, which requires CouchDB
+  to ensure changes are written to disk before a 200 or similar result is
+  returned.
 
   :param db: Database name
   :<header Accept: - :mimetype:`application/json`

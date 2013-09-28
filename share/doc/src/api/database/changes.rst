@@ -21,11 +21,17 @@
 .. http:head:: /{db}/_changes
 .. http:post:: /{db}/_changes
 
-  A sorted list of changes made to documents in the database, in the order
-  they were made, can be obtained from the database's ``_changes`` resource.
+  A sorted list of changes made to documents in the database, in time order of
+  application, can be obtained from the database's ``_changes`` resource. Only
+  the most recent change for a given document is guaranteed to be provided,
+  for example if a document has had fields added, and then deleted, an API
+  client checking for changes will not necessarily receive the intermediate
+  state of added documents.
 
   This can be used to listen for update and modifications to the database for
-  post processing or synchronization.
+  post processing or synchronization, and for practical purposes, a continuously
+  connected ``_changes`` feed is a reasonable approach for generating a
+  real-time log for most applications.
 
   :param db: Database name
   :<header Accept: - :mimetype:`application/json`
@@ -289,7 +295,7 @@ Event Source
 
 The `eventsource` feed provides push notifications that can be consumed in
 the form of DOM events in the browser. Refer to the `W3C eventsource
-specification`_ for further details. CouchDB also honors the ``Last-Event-ID``
+specification`_ for further details. CouchDB also honours the ``Last-Event-ID``
 parameter.
 
 .. code-block:: text
