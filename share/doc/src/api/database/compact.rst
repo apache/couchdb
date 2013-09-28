@@ -38,7 +38,7 @@
   You can determine if the compaction process is operating on a database
   by obtaining the database meta information, the ``compact_running``
   value of the returned database structure will be set to true. See
-  :http:get:`/{db}`.
+  :get:`/{db}`.
 
   You can also obtain a list of running processes to determine whether
   compaction is currently running. See :ref:`api/server/active_tasks`.
@@ -53,7 +53,7 @@
   :code 202: Compaction request has been accepted
   :code 400: Invalid database name
   :code 401: CouchDB Server Administrator privileges required
-  :code 415: Bad :http:header:`Content-Type` value
+  :code 415: Bad :header:`Content-Type` value
 
   **Request**:
 
@@ -105,7 +105,7 @@
   :code 400: Invalid database name
   :code 401: CouchDB Server Administrator privileges required
   :code 404: Design document not found
-  :code 415: Bad :http:header:`Content-Type` value
+  :code 415: Bad :header:`Content-Type` value
 
   **Request**:
 
@@ -162,7 +162,7 @@
   :>json boolean ok: Operation status
   :code 201: Commit completed successfully
   :code 400: Invalid database name
-  :code 415: Bad :http:header:`Content-Type` value
+  :code 415: Bad :header:`Content-Type` value
 
   **Request**:
 
@@ -212,7 +212,7 @@
   :code 202: Compaction request has been accepted
   :code 400: Invalid database name
   :code 401: CouchDB Server Administrator privileges required
-  :code 415: Bad :http:header:`Content-Type` value
+  :code 415: Bad :header:`Content-Type` value
 
   **Request**:
 

@@ -376,8 +376,8 @@ the risk of the documents not being stored in the event of a failure,
 since the documents are not written to disk immediately.
 
 To use the batched mode, append the ``batch=ok`` query argument to the
-URL of the ``PUT`` or :http:post:`/{db}` request. The CouchDB server will
-respond with a HTTP :http:statuscode:`202` response code immediately.
+URL of the ``PUT`` or :post:`/{db}` request. The CouchDB server will
+respond with a HTTP :statuscode:`202` response code immediately.
 
 .. note::
 

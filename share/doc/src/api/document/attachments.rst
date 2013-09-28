@@ -20,9 +20,9 @@
 
   Returns the HTTP headers containing a minimal amount of information
   about the specified attachment. The method supports the same query
-  arguments as the :http:get:`/{db}/{docid}/{attname}` method, but only
+  arguments as the :get:`/{db}/{docid}/{attname}` method, but only
   the header information (including attachment size, encoding and the MD5 hash
-  as an :http:header:`ETag`), is returned.
+  as an :header:`ETag`), is returned.
 
   :param db: Database name
   :param docid: Document ID
@@ -41,8 +41,8 @@
   :>header Content-MD5: Base64 encoded MD5 binary digest
   :>header ETag: Double quoted base64 encoded MD5 binary digest
   :code 200: Attachment exists
-  :code 304: Attachment wasn't modified if :http:header:`ETag` equals specified
-    :http:header:`If-None-Match` header
+  :code 304: Attachment wasn't modified if :header:`ETag` equals specified
+    :header:`If-None-Match` header
   :code 401: Read privilege required
   :code 404: Specified database, document or attachment was not found
 
@@ -73,7 +73,7 @@
 
   Returns the file attachment associated with the document.
   The raw data of the associated attachment is returned (just as if you were
-  accessing a static file. The returned :http:header:`Content-Type`
+  accessing a static file. The returned :header:`Content-Type`
   will be the same as the content type set when the document attachment
   was submitted into the database.
 
@@ -95,8 +95,8 @@
   :>header ETag: Double quoted base64 encoded MD5 binary digest
   :response: Stored content
   :code 200: Attachment exists
-  :code 304: Attachment wasn't modified if :http:header:`ETag` equals specified
-    :http:header:`If-None-Match` header
+  :code 304: Attachment wasn't modified if :header:`ETag` equals specified
+    :header:`If-None-Match` header
   :code 401: Read privilege required
   :code 404: Specified database, document or attachment was not found
 
@@ -105,7 +105,7 @@
 
   Uploads the supplied content as an attachment to the specified document.
   The attachment name provided must be a URL encoded string. You must also
-  supply either the ``rev`` query argument or the :http:header:`If-Match`
+  supply either the ``rev`` query argument or the :header:`If-Match`
   HTTP header for validation, and the HTTP headers (to set the attachment
   content type).
 
@@ -184,7 +184,7 @@
 .. http:delete:: /{db}/{docid}/{attname}
 
   Deletes the attachment ``attachment`` of the specified ``doc``. You must
-  supply the ``rev`` query parameter or :http:header:`If-Match` with the current
+  supply the ``rev`` query parameter or :header:`If-Match` with the current
   revision to delete the attachment.
 
   .. note::
@@ -224,7 +224,7 @@
     Host: localhost:5984
 
   Alternatively, instead of ``rev`` query parameter you may use
-  :http:header:`If-Match` header:
+  :header:`If-Match` header:
 
   .. code-block:: http
 
@@ -265,7 +265,7 @@ This is just a real quick run through how this looks under the hood.
 Usually, you will have larger binary files to serve from CouchDB, like
 MP3s and videos, but to make things a little more obvious, I use a text
 file here (Note that I use the :mimetype:`application/octet-stream`
-:http:header`Content-Type` instead of :mimetype:`text/plain`).
+:header`Content-Type` instead of :mimetype:`text/plain`).
 
 .. code-block:: bash
 

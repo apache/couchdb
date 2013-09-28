@@ -53,7 +53,7 @@
 
   If there are any member names or roles defined for a database, then only
   authenticated users having a matching name or role are allowed to
-  read documents from the database (or do a :http:get:`/{db}` call).
+  read documents from the database (or do a :get:`/{db}` call).
 
   .. note::
 

@@ -137,7 +137,7 @@
 
   The ``POST`` to ``_all_docs`` allows to specify multiple keys to be
   selected from the database. This enables you to request multiple
-  documents in a single request, in place of multiple :http:get:`/{db}/{docid}`
+  documents in a single request, in place of multiple :get:`/{db}/{docid}`
   requests.
 
   The request body should contain a list of the keys to be returned as an

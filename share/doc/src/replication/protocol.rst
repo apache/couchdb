@@ -151,26 +151,26 @@ Optimisations
 API Reference
 -------------
 
-- :http:head:`/{db}` -- Check Database existence
-- :http:post:`/{db}/_ensure_full_commit` -- Ensure that all changes are stored
+- :head:`/{db}` -- Check Database existence
+- :post:`/{db}/_ensure_full_commit` -- Ensure that all changes are stored
   on disk
-- :http:get:`/{db}/_local/{id}` -- Read the last Checkpoint
-- :http:put:`/{db}/_local/{id}` -- Save a new Checkpoint
+- :get:`/{db}/_local/{id}` -- Read the last Checkpoint
+- :put:`/{db}/_local/{id}` -- Save a new Checkpoint
 
 Push Only
 ~~~~~~~~~
 
-- :http:put:`/{db}` -- Create Target if it not exists and option was provided
-- :http:post:`/{db}/_revs_diff` -- Locate Revisions that are not known to the
+- :put:`/{db}` -- Create Target if it not exists and option was provided
+- :post:`/{db}/_revs_diff` -- Locate Revisions that are not known to the
   Target
-- :http:post:`/{db}/_bulk_docs` -- Upload Revisions to the Target
-- :http:put:`/{db}/{docid}`?new_edits=false -- Upload a single Document with
+- :post:`/{db}/_bulk_docs` -- Upload Revisions to the Target
+- :put:`/{db}/{docid}`?new_edits=false -- Upload a single Document with
   attachments to the Target
 
 Pull Only
 ~~~~~~~~~
 
-- :http:get:`/{db}/_changes` -- Locate changes since on Source the last pull.
+- :get:`/{db}/_changes` -- Locate changes since on Source the last pull.
   The request uses next query parameters:
 
   - ``style=all_docs``
@@ -179,7 +179,7 @@ Pull Only
   - ``limit=limit``
   - ``heartbeat=heartbeat``
 
-- :http:get:`/{db}/{docid}` -- Retrieve a single Document from Source with attachments.
+- :get:`/{db}/{docid}` -- Retrieve a single Document from Source with attachments.
   The request uses next query parameters:
 
   - ``open_revs=revid`` - where ``revid`` is the actual Document Revision at the

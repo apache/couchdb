@@ -676,7 +676,7 @@ a 404 error.
   :code 202: Server goes to restart (there is no guarantee that it will be
     alive after)
   :code 401: CouchDB Server Administrator privileges required
-  :code 415: Bad request`s :http:header:`Content-Type`
+  :code 415: Bad request`s :header:`Content-Type`
 
   **Request**:
 
@@ -892,7 +892,7 @@ structure is as follows:
   Accesses the built-in Futon administration interface for CouchDB.
 
   :>header Location: New URI location
-  :code 301: Redirects to :http:get:`/_utils/`
+  :code 301: Redirects to :get:`/_utils/`
 
 .. http:get:: /_utils/
 

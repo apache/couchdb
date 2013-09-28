@@ -126,11 +126,11 @@
 .. http:post:: /{db}/_design/{ddoc}/_view/{view}
 
   Executes the specified view function from the specified design document.
-  Unlike the :http:get:`/{db}/_design/{ddoc}/_view/{view}`  method
-  for accessing views, the :http:method:`POST` method supports the specification
+  Unlike the :get:`/{db}/_design/{ddoc}/_view/{view}`  method
+  for accessing views, the :method:`POST` method supports the specification
   of explicit keys to be retrieved from the view results. The remainder of the
-  :http:method:`POST` view functionality is identical to the
-  :http:get:`/{db}/_design/{ddoc}/_view/{view}` API.
+  :method:`POST` view functionality is identical to the
+  :get:`/{db}/_design/{ddoc}/_view/{view}` API.
 
   **Request**:
 
@@ -295,7 +295,7 @@ In addition to using stale views, you can also make use of the
 view information including the update sequence of the database from
 which the view was generated. The returned value can be compared this to
 the current update sequence exposed in the database information
-(returned by :http:get:`/{db}`).
+(returned by :get:`/{db}`).
 
 
 .. _api/ddoc/view/sorting:

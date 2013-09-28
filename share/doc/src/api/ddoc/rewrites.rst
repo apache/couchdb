@@ -52,7 +52,7 @@
   The pattern matching is done by first matching the request method to a rule.
   By default all methods match a rule. (method is equal to ``"*"`` by default).
   Then It will try to match the path to one rule. If no rule match, then a
-  :http:statuscode:`404` response returned.
+  :statuscode:`404` response returned.
 
   Once a rule is found we rewrite the request url using the ``to`` and ``query``
   fields. The identified token are matched to the rule and will replace var.

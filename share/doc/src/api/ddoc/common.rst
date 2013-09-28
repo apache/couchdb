@@ -23,7 +23,7 @@
 
   .. seealso::
 
-    :http:head:`/{db}/{docid}`
+    :head:`/{db}/{docid}`
 
 
 .. http:get:: /{db}/_design/{ddoc}
@@ -34,12 +34,12 @@
 
   .. seealso::
 
-    :http:get:`/{db}/{docid}`
+    :get:`/{db}/{docid}`
 
 
 .. http:put:: /{db}/_design/{ddoc}
 
-  The :http:method:`PUT` method creates a new named design document, or creates
+  The :method:`PUT` method creates a new named design document, or creates
   a new revision of the existing design document.
 
   The design documents have some agreement upon their fields and structure.
@@ -64,7 +64,7 @@
 
   .. seealso::
 
-    :http:put:`/{db}/{docid}`
+    :put:`/{db}/{docid}`
 
 
 .. http:delete:: /{db}/_design/{ddoc}
@@ -75,11 +75,11 @@
 
   .. seealso::
 
-    :http:delete:`/{db}/{docid}`
+    :delete:`/{db}/{docid}`
 
 .. http:copy:: /{db}/_design/{ddoc}
 
-  The :http:method:`COPY` (which is non-standard HTTP) copies an existing
+  The :method:`COPY` (which is non-standard HTTP) copies an existing
   design document to a new or existing one.
 
   .. note::
@@ -89,7 +89,7 @@
 
   .. seealso::
 
-    :http:copy:`/{db}/{docid}`
+    :copy:`/{db}/{docid}`
 
 
 .. _api/ddoc/attachment:
@@ -104,7 +104,7 @@
 
   .. seealso::
 
-    :http:head:`/{db}/{docid}/{attname}`
+    :head:`/{db}/{docid}/{attname}`
 
 .. http:get:: /{db}/_design/{ddoc}/{attname}
 
@@ -114,7 +114,7 @@
 
   .. seealso::
 
-    :http:get:`/{db}/{docid}/{attname}`
+    :get:`/{db}/{docid}/{attname}`
 
 .. http:put:: /{db}/_design/{ddoc}/{attname}
 
@@ -123,7 +123,7 @@
 
   .. seealso::
 
-    :http:put:`/{db}/{docid}/{attname}`
+    :put:`/{db}/{docid}/{attname}`
 
 .. http:delete:: /{db}/_design/{ddoc}/{attname}
 
@@ -131,7 +131,7 @@
 
   .. seealso::
 
-    :http:delete:`/{db}/{docid}/{attname}`
+    :delete:`/{db}/{docid}/{attname}`
 
 
 .. _api/ddoc/info:
@@ -196,7 +196,7 @@
 View Index Information
 ----------------------
 
-The response from :http:get:`/{db}/_design/{ddoc}/_info` contains
+The response from :get:`/{db}/_design/{ddoc}/_info` contains
 ``view_index`` (*object*) field with the next structure:
 
 * **compact_running** (*boolean*):  Indicates whether a compaction routine

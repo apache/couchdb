@@ -20,15 +20,15 @@
 
   Returns the HTTP Headers containing a minimal amount of information
   about the specified document. The method supports the same query
-  arguments as the :http:get:`/{db}/{docid}` method, but only the header
+  arguments as the :get:`/{db}/{docid}` method, but only the header
   information (including document size, and the revision as an ETag), is
   returned.
 
-  The :http:header:`ETag` header shows the current revision for the requested
-  document, and the :http:header:`Content-Length` specifies the length of the
+  The :header:`ETag` header shows the current revision for the requested
+  document, and the :header:`Content-Length` specifies the length of the
   data, if the document were requested in full.
 
-  Adding any of the query arguments (see :http:get:`/{db}/{docid}`), then the
+  Adding any of the query arguments (see :get:`/{db}/{docid}`), then the
   resulting HTTP Headers will correspond to what would be returned.
 
   :param db: Database name
@@ -166,8 +166,8 @@
 
 .. http:put:: /{db}/{docid}
 
-  The :http:method:`PUT` method creates a new named document, or creates a new
-  revision of the existing document. Unlike the :http:post:`/{db}` method, you
+  The :method:`PUT` method creates a new named document, or creates a new
+  revision of the existing document. Unlike the :post:`/{db}` method, you
   must specify the document ID in the request URL.
 
   :param db: Database name
@@ -280,7 +280,7 @@
     Host: localhost:5984
 
   Alternatively, instead of ``rev`` query parameter you may use
-  :http:header:`If-Match` header:
+  :header:`If-Match` header:
 
   .. code-block:: http
 
@@ -310,11 +310,11 @@
 
 .. http:copy:: /{db}/{docid}
 
-  The :http:method:`COPY` (which is non-standard HTTP) copies an existing
+  The :method:`COPY` (which is non-standard HTTP) copies an existing
   document to a new or existing document.
 
   The source document is specified on the request line, with the
-  :http:header:`Destination` header of the request specifying the target
+  :header:`Destination` header of the request specifying the target
   document.
 
   :param db: Database name
@@ -718,11 +718,11 @@ just inline base64 encoded attachments data into the document body:
 Alternatively, you can upload a document with attachments more efficiently in
 :mimetype:`multipart/related` format. This avoids having to Base64-encode
 the attachments, saving CPU and bandwidth. To do this, set the
-:http:header:`Content-Type` header of the :http:put:`/{db}/{docid}` request to
+:header:`Content-Type` header of the :put:`/{db}/{docid}` request to
 :mimetype:`multipart/related`.
 
 The first MIME body is the document itself, which should have its own
-:http:header:`Content-Type` of :mimetype:`application/json"`. It also should
+:header:`Content-Type` of :mimetype:`application/json"`. It also should
 include  an ``_attachments`` metadata object in which each attachment object
 has a key ``follows`` with value ``true``.
 
@@ -975,9 +975,9 @@ requested.
 Retrieving Deleted Documents
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-CouchDB doesn't actually deletes documents via :http:delete:`/{db}/{docid}`.
+CouchDB doesn't actually deletes documents via :delete:`/{db}/{docid}`.
 Instead of this, it leaves tombstone with very basic information about document.
-If you just :http:get:`/{db}/{docid}` CouchDB returns :http:statuscode:`404`
+If you just :get:`/{db}/{docid}` CouchDB returns :statuscode:`404`
 response:
 
 **Request**:
@@ -1005,7 +1005,7 @@ response:
   }
 
 However, you may retrieve document's tombstone by using ``rev`` query parameter
-with :http:get:`/{db}/{docid}` request:
+with :get:`/{db}/{docid}` request:
 
 **Request**:
 
@@ -1110,7 +1110,7 @@ Copying from a Specific Revision
 --------------------------------
 
 To copy *from* a specific version, use the ``rev`` argument to the query
-string or :http:header:`If-Match`:
+string or :header:`If-Match`:
 
 **Request**:
 
@@ -1147,7 +1147,7 @@ Copying to an Existing Document
 
 To copy to an existing document, you must specify the current revision
 string for the target document by appending the ``rev`` parameter to the
-:http:header:`Destination` header string.
+:header:`Destination` header string.
 
 **Request**:
 

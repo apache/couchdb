@@ -109,10 +109,10 @@ Conflict avoidance
 ==================
 
 When working on a single node, CouchDB will avoid creating conflicting revisions
-by returning a :http:statuscode:`409` error. This is because, when you
+by returning a :statuscode:`409` error. This is because, when you
 PUT a new version of a document, you must give the ``_rev`` of the previous
 version. If that ``_rev`` has already been superseded, the update is rejected
-with a  :http:statuscode:`409` response.
+with a  :statuscode:`409` response.
 
 So imagine two users on the same node are fetching Bob's business card, updating
 it concurrently, and writing it back:
@@ -238,7 +238,7 @@ arbitrarily large.
 Working with conflicting documents
 ==================================
 
-The basic :http:get:`/{doc}/{docid}` operation will not show you any
+The basic :get:`/{doc}/{docid}` operation will not show you any
 information about conflicts. You see only the deterministically-chosen winner,
 and get no indication as to whether other conflicting revisions exist or not:
 

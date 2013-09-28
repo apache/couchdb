@@ -62,7 +62,7 @@
   :>json object purged: Mapping of document ID to list of purged revisions
   :code 200: Request completed successfully
   :code 400: Invalid database name or JSON payload
-  :code 415: Bad :http:header:`Content-Type` value
+  :code 415: Bad :header:`Content-Type` value
 
   **Request**:
 

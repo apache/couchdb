@@ -64,6 +64,8 @@ copyright = '%d, %s' % (
 
 highlight_language = "json"
 
+primary_domain = "http"
+
 pygments_style = "sphinx"
 
 html_theme = "couchdb"
