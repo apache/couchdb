@@ -60,8 +60,10 @@
 ^share/doc/Makefile.in
 ^share/doc/build/.*
 ^share/doc/ext/httpdomain.py
+^share/doc/ext/http-api-descr.json
 ^share/doc/images/.*
 ^share/doc/static/rtd.css
+^share/doc/templates/couchdb/domainindex.html
 ^share/server/json2.js
 ^share/server/mimeparse.js
 ^share/server/coffee-script.js
