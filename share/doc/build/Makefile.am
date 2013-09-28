@@ -138,6 +138,7 @@ html_files = \
     html/_sources/whatsnew/1.2.txt \
     html/_sources/whatsnew/1.3.txt \
     html/_sources/whatsnew/1.4.txt \
+    html/_sources/whatsnew/1.5.txt \
     html/_sources/whatsnew/index.txt \
     html/_sources/about.txt \
     html/_sources/contents.txt \
@@ -256,6 +257,7 @@ html_files = \
     html/whatsnew/1.2.html \
     html/whatsnew/1.3.html \
     html/whatsnew/1.4.html \
+    html/whatsnew/1.5.html \
     html/whatsnew/index.html \
     html/about.html \
     html/contents.html \
@@ -396,6 +398,7 @@ src_files = \
     ../src/whatsnew/1.2.rst \
     ../src/whatsnew/1.3.rst \
     ../src/whatsnew/1.4.rst \
+    ../src/whatsnew/1.5.rst \
     ../src/whatsnew/index.rst \
     ../src/about.rst \
     ../src/contents.rst \
