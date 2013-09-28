@@ -120,6 +120,7 @@
 ^src/fauxton/tasks/addon/rename.json
 ^src/fauxton/app/addons/activetasks/assets/less/activetasks.less
 ^src/fauxton/app/addons/auth/assets/less/auth.less
+^src/fauxton/app/addons/permissions/assets/less/permissions.less
 ^src/ibrowse/.*
 ^src/mochiweb/.*
 ^src/snappy/.*
