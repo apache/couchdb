@@ -18,15 +18,13 @@
 ================
 
 .. http:get:: /{db}/_changes
-.. http:head:: /{db}/_changes
-.. http:post:: /{db}/_changes
 
-  A sorted list of changes made to documents in the database, in time order of
-  application, can be obtained from the database's ``_changes`` resource. Only
-  the most recent change for a given document is guaranteed to be provided,
-  for example if a document has had fields added, and then deleted, an API
-  client checking for changes will not necessarily receive the intermediate
-  state of added documents.
+  Returns a sorted list of changes made to documents in the database, in time
+  order of application, can be obtained from the database's ``_changes``
+  resource. Only the most recent change for a given document is guaranteed to
+  be provided, for example if a document has had fields added, and then deleted,
+  an API client checking for changes will not necessarily receive the
+  intermediate state of added documents.
 
   This can be used to listen for update and modifications to the database for
   post processing or synchronization, and for practical purposes, a continuously
@@ -39,6 +37,10 @@
                    - :mimetype:`text/plain`
   :<header Last-Event-ID: ID of the last events received by the server on a
     previous connection. Overrides `since` query parameter.
+  :query array doc_ids: List of document IDs to filter the changes feed as
+   valid JSON array. Used with :ref:`_doc_ids <changes/filter/doc_ids>` filter.
+   Since `length of URL is limited`_, you better use :http:post:`/{db}/_changes`
+   method instead.
   :query boolean conflicts: Includes `conflicts` information in response.
     Ignored if `include_docs` isn't ``true``. Default is ``false``.
   :query boolean descending: Return the change results in descending sequence
@@ -71,10 +73,9 @@
     :ref:`changes_timeout <config/httpd/changes_timeout>` configuration option.
     Note that ``60000`` value is also the default maximum timeout to prevent
     undetected dead connections.
-  :query string view: Allows to use view functions as filters. It requires to
-    set ``filter`` special value ``_view`` to enable this feature.
-    Documents counted as "passed" for view filter in case if map function emits
-    at least one record for them.
+  :query string view: Allows to use view functions as filters. Documents
+    counted as "passed" for view filter in case if map function emits at least
+    one record for them. See :ref:`changes/filter/view` for more info.
   :>header Cache-Control: ``no-cache`` if changes feed is
     :ref:`eventsource <changes/eventsource>`
   :>header Content-Type: - :mimetype:`application/json`
@@ -85,6 +86,7 @@
   :>json number last_seq: Last change sequence number
   :>json array results: Changes made to a database
   :code 200: Request completed successfully
+  :code 400: Bad request
 
   The ``result`` field of database changes
 
@@ -149,6 +151,7 @@
         ]
     }
 
+.. _length of URL is limited: http://stackoverflow.com/a/417184/965635
 
 .. versionchanged:: 0.11.0 added ``include_docs`` parameter
 .. versionchanged:: 1.2.0 added ``view`` parameter and special value `_view`
@@ -157,6 +160,57 @@
    listen changes since current seq number.
 .. versionchanged:: 1.3.0 ``eventsource`` feed type added.
 .. versionchanged:: 1.4.0 Support ``Last-Event-ID`` header.
+
+
+.. http:post:: /{db}/_changes
+
+  Requests the database changes feed in the same way as
+  :http:get:`/{db}/_changes` does, but this method is widely used with
+  ``?filter=_doc_ids`` query parameter and allows to pass larger list of
+  document IDs to filter.
+
+  **Request**:
+
+  .. code-block:: http
+
+    POST /recipes/_changes?filter=_doc_ids HTTP/1.1
+    Accept: application/json
+    Content-Length: 40
+    Content-Type: application/json
+    Host: localhost:5984
+
+    {
+        "doc_ids": [
+            "SpaghettiWithMeatballs"
+        ]
+    }
+
+  **Response**:
+
+  .. code-block:: http
+
+    HTTP/1.1 200 OK
+    Cache-Control: must-revalidate
+    Content-Type: application/json
+    Date: Sat, 28 Sep 2013 07:23:09 GMT
+    ETag: "ARIHFWL3I7PIS0SPVTFU6TLR2"
+    Server: CouchDB (Erlang OTP)
+    Transfer-Encoding: chunked
+
+    {
+        "last_seq": 38,
+        "results": [
+            {
+                "changes": [
+                    {
+                        "rev": "13-bcb9d6388b60fd1e960d9ec4e8e3f29e"
+                    }
+                ],
+                "id": "SpaghettiWithMeatballs",
+                "seq": 38
+            }
+        ]
+    }
 
 
 .. _changes:
@@ -335,6 +389,8 @@ parameter.
 .. _W3C eventsource specification: http://www.w3.org/TR/eventsource/
 
 
+.. _changes/filter:
+
 Filtering
 =========
 
@@ -348,13 +404,153 @@ You can also filter the ``_changes`` feed by defining a filter function
 within a design document. The specification for the filter is the same
 as for replication filters. You specify the name of the filter function
 to the ``filter`` parameter, specifying the design document name and
-filter name. For example:
+:ref:`filter name <filterfun>`. For example:
 
 .. code-block:: http
 
     GET /db/_changes?filter=design_doc/filtername
 
-The ``_changes`` feed can be used to watch changes to specific document
-ID's or the list of ``_design`` documents in a database. If the
-``filters`` parameter is set to ``_doc_ids`` a list of doc IDs can be
-passed in the ``doc_ids`` parameter as a JSON array.
+Additionally, there are couple of builtin filters are available and described
+below.
+
+
+.. _changes/filter/doc_ids:
+
+_doc_ids
+--------
+
+This filter accepts only changes for documents which ID in specified in
+``doc_ids`` query parameter or payload's object array. See
+:http:post:`/{db}/_changes` for an example.
+
+
+.. _changes/filter/design:
+
+_design
+-------
+
+The ``_design`` filter accepts only changes for any design document within the
+requested database.
+
+**Request**:
+
+.. code-block:: http
+
+  GET /recipes/_changes?filter=_design HTTP/1.1
+  Accept: application/json
+  Host: localhost:5984
+
+**Response**:
+
+.. code-block:: http
+
+  HTTP/1.1 200 OK
+  Cache-Control: must-revalidate
+  Content-Type: application/json
+  Date: Sat, 28 Sep 2013 07:28:28 GMT
+  ETag: "ARIHFWL3I7PIS0SPVTFU6TLR2"
+  Server: CouchDB (Erlang OTP)
+  Transfer-Encoding: chunked
+
+  {
+      "last_seq": 38,
+      "results": [
+          {
+              "changes": [
+                  {
+                      "rev": "10-304cae84fd862832ea9814f02920d4b2"
+                  }
+              ],
+              "id": "_design/ingredients",
+              "seq": 29
+          },
+          {
+              "changes": [
+                  {
+                      "rev": "123-6f7c1b7c97a9e4f0d22bdf130e8fd817"
+                  }
+              ],
+              "deleted": true,
+              "id": "_design/cookbook",
+              "seq": 35
+          },
+          {
+              "changes": [
+                  {
+                      "rev": "6-5b8a52c22580e922e792047cff3618f3"
+                  }
+              ],
+              "deleted": true,
+              "id": "_design/meta",
+              "seq": 36
+          }
+      ]
+  }
+
+
+.. _changes/filter/view:
+
+_view
+-----
+
+.. versionadded:: 1.2
+
+The special filter ``_view`` allows to use existed :ref:`map function <mapfun>`
+as the :ref:`filter <filterfun>`. If the map function emits anything for the
+processed document he counts as accepted and the changes event emits to the
+feed. For most use-practice cases `filter` functions are very similar to `map`
+ones, so this feature helps to reduce amount of duplicated code.
+
+.. warning::
+
+   While :ref:`map functions <mapfun>` doesn't process the design documents,
+   using ``_view`` filter forces them to do this. You need to be sure, that
+   they are ready to handle documents with *alien* structure without panic
+   crush.
+
+.. note::
+
+   Using ``_view`` filter doesn't queries the view index files, so you cannot
+   use common :ref:`view query parameters <api/ddoc/view>` to additionally
+   filter the changes feed by index key. Also, CouchDB doesn't returns
+   the result instantly as he does for views - it really uses the specified
+   map function as filter.
+
+   Moreover, you cannot make such filters dynamic e.g. process the request
+   query parameters or handle the :ref:`userctx_object` - the map function is
+   only operates with the document.
+
+**Request**:
+
+.. code-block:: http
+
+  GET /recipes/_changes?filter=_view&view=ingredients/by_recipe HTTP/1.1
+  Accept: application/json
+  Host: localhost:5984
+
+**Response**:
+
+.. code-block:: http
+
+  HTTP/1.1 200 OK
+  Cache-Control: must-revalidate
+  Content-Type: application/json
+  Date: Sat, 28 Sep 2013 07:36:40 GMT
+  ETag: "ARIHFWL3I7PIS0SPVTFU6TLR2"
+  Server: CouchDB (Erlang OTP)
+  Transfer-Encoding: chunked
+
+  {
+      "last_seq": 38,
+      "results": [
+          {
+              "changes": [
+                  {
+                      "rev": "13-bcb9d6388b60fd1e960d9ec4e8e3f29e"
+                  }
+              ],
+              "id": "SpaghettiWithMeatballs",
+              "seq": 38
+          }
+      ]
+  }
