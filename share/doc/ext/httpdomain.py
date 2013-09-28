@@ -201,6 +201,16 @@ http_sig_param_re = re.compile(r'\((?:(?P<type>[^:)]+):)?(?P<name>[\w_]+)\)',
                                re.VERBOSE)
 
 
+def sort_by_method(entries):
+    def cmp(item):
+        order = ['HEAD', 'GET', 'POST', 'PUT', 'DELETE', 'COPY', 'OPTIONS']
+        method = item[0].split(' ', 1)[0]
+        if method in order:
+            return order.index(method)
+        return 100
+    return sorted(entries, key=cmp)
+
+
 def http_resource_anchor(method, path):
     path = re.sub(r'[<>:/]', '-', path)
     return method.lower() + '-' + path
@@ -455,7 +465,11 @@ class HTTPIndex(Index):
                 method.upper() + ' ' + path, 0, info[0],
                 http_resource_anchor(method, path), '', '', info[1]
             ])
-        return (sorted(content.items()), True)
+        items = sorted(
+            (path, sort_by_method(entries))
+            for path, entries in content.items()
+        )
+        return (items, True)
 
 
 class HTTPDomain(Domain):
