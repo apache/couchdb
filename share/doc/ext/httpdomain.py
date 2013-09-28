@@ -9,6 +9,8 @@
 
 """
 
+import os
+import json
 import re
 
 from docutils import nodes
@@ -452,6 +454,8 @@ class HTTPIndex(Index):
     name = 'api'
     localname = 'HTTP API Reference'
     shortname = 'API Reference'
+    api_descr = json.load(open(os.path.join(os.path.dirname(__file__),
+                                            'http-api-descr.json')))
 
     def generate(self, docnames=None):
         content = {}
@@ -461,9 +465,11 @@ class HTTPIndex(Index):
         items = sorted(items, key=lambda item: item[1])
         for method, path, info in items:
             entries = content.setdefault(path, [])
+            entry_name = method.upper() + ' ' + path
             entries.append([
-                method.upper() + ' ' + path, 0, info[0],
-                http_resource_anchor(method, path), '', '', info[1]
+                entry_name, 0, info[0],
+                http_resource_anchor(method, path),
+                '', '', self.api_descr.get(entry_name, '')
             ])
         items = sorted(
             (path, sort_by_method(entries))
