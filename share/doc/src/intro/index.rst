@@ -51,5 +51,6 @@ teach how to use CouchDB.
    consistency
    tour
    api
+   security
    futon
    curl

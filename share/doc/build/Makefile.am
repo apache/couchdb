@@ -115,6 +115,7 @@ html_files = \
     html/_sources/intro/futon.txt \
     html/_sources/intro/index.txt \
     html/_sources/intro/overview.txt \
+    html/_sources/intro/security.txt \
     html/_sources/intro/tour.txt \
     html/_sources/intro/why.txt \
     html/_sources/maintenance/compaction.txt \
@@ -234,6 +235,7 @@ html_files = \
     html/intro/futon.html \
     html/intro/index.html \
     html/intro/overview.html \
+    html/intro/security.html \
     html/intro/tour.html \
     html/intro/why.html \
     html/maintenance/compaction.html \
@@ -375,6 +377,7 @@ src_files = \
     ../src/intro/futon.rst \
     ../src/intro/index.rst \
     ../src/intro/overview.rst \
+    ../src/intro/security.rst \
     ../src/intro/tour.rst \
     ../src/intro/why.rst \
     ../src/maintenance/compaction.rst \
