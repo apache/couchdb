@@ -7,6 +7,7 @@
 *.lo
 *.o
 *.orig
+*.pyc
 *.rej
 *.stamp
 *.sw*
@@ -21,6 +22,7 @@ acinclude.m4
 aclocal.m4
 apache-couchdb-*
 autom4te.cache
+__pycache__
 bin/.deps/
 bin/couch-config
 bin/couch-config_dev

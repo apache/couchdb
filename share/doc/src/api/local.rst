@@ -10,7 +10,7 @@
 .. License for the specific language governing permissions and limitations under
 .. the License.
 
-.. _api-local:
+.. _api/local:
 
 ========================================
 Local (non-replicating) Document Methods
@@ -29,7 +29,7 @@ Local documents have the following limitations:
    accessed. You cannot obtain a list of local documents from the
    database.
 
--  Local documents are not output by views, or the ``_all_docs`` view.
+-  Local documents are not output by views, or the :ref:`api/db/all_docs` view.
 
 Local documents can be used when you want to store configuration or
 other information for the current (local) instance of a given database.
@@ -39,131 +39,42 @@ A list of the available methods and URL paths are provided below:
 +--------+-------------------------+-------------------------------------------+
 | Method | Path                    | Description                               |
 +========+=========================+===========================================+
-| GET    | /db/_local/local-doc    | Returns the latest revision of the        |
+| GET    | /db/_local/id           | Returns the latest revision of the        |
 |        |                         | non-replicated document                   |
 +--------+-------------------------+-------------------------------------------+
-| PUT    | /db/_local/local-doc    | Inserts a new version of the              |
+| PUT    | /db/_local/id           | Inserts a new version of the              |
 |        |                         | non-replicated document                   |
 +--------+-------------------------+-------------------------------------------+
-| DELETE | /db/_local/local-doc    | Deletes the non-replicated document       |
+| DELETE | /db/_local/id           | Deletes the non-replicated document       |
 +--------+-------------------------+-------------------------------------------+
-| COPY   | /db/_local/local-doc    | Copies the non-replicated document        |
+| COPY   | /db/_local/id           | Copies the non-replicated document        |
 +--------+-------------------------+-------------------------------------------+
 
-``GET /db/_local/local-doc``
-============================
+.. _api/local/doc:
 
-* **Method**: ``GET /db/_local/local-doc``
-* **Request**: None
-* **Response**: JSON of the returned document
-* **Admin Privileges Required**: no
-* **Query Arguments**:
+``/db/_local/id``
+========================
 
-  * **Argument**: rev
+.. http:get:: /{db}/_local/{docid}
 
-    * **Description**:  Specify the revision to return
-    * **Optional**: yes
-    * **Type**: string
-    * **Supported Values**:
+  Gets the specified local document. The semantics are identical to
+  accessing a standard document in the specified database, except that the
+  document is not replicated. See :get:`/{db}/{docid}`.
 
-      * **true**: Includes the revisions
+.. http:put:: /{db}/_local/{docid}
 
-  * **Argument**: revs
+  Stores the specified local document. The semantics are identical to
+  storing a standard document in the specified database, except that the
+  document is not replicated. See :put:`/{db}/{docid}`.
 
-    * **Description**:  Return a list of the revisions for the document
-    * **Optional**: yes
-    * **Type**: boolean
+.. http:delete:: /{db}/_local/{docid}
 
-  * **Argument**: revs_info
+  Deletes the specified local document. The semantics are identical to
+  deleting a standard document in the specified database, except that the
+  document is not replicated. See :delete:`/{db}/{docid}`.
 
-    * **Description**:  Return a list of detailed revision information for
-      the document
-    * **Optional**: yes
-    * **Type**: boolean
-    * **Supported Values**
+.. http:copy:: /{db}/_local/{docid}
 
-      * **true**: Includes the revisions
-
-* **Return Codes**:
-
-  * **400**:
-    The format of the request or revision was invalid
-  * **404**:
-    The specified document or revision cannot be found, or has been deleted
-
-Gets the specified local document. The semantics are identical to
-accessing a standard document in the specified database, except that the
-document is not replicated. See :ref:`api-get-doc`.
-
-``PUT /db/_local/local-doc``
-============================
-
-* **Method**: ``PUT /db/_local/local-doc``
-* **Request**: JSON of the document
-* **Response**: JSON with the committed document information
-* **Admin Privileges Required**: no
-* **Return Codes**:
-
-  * **201**:
-    Document has been created successfully
-
-Stores the specified local document. The semantics are identical to
-storing a standard document in the specified database, except that the
-document is not replicated. See :ref:`api-put-doc`.
-
-``DELETE /db/_local/local-doc``
-===============================
-
-* **Method**: ``DELETE /db/_local/local-doc``
-* **Request**: None
-* **Response**: JSON with the deleted document information
-* **Admin Privileges Required**: no
-* **Query Arguments**:
-
-  * **Argument**: rev
-
-    * **Description**: Current revision of the document for validation
-    * **Optional**: yes
-    * **Type**: string
-
-* **HTTP Headers**
-
-  * **Header**: ``If-Match``
-
-    * **Description**: Current revision of the document for validation
-    * **Optional**: yes
-
-* **Return Codes**:
-
-  * **409**:
-    Supplied revision is incorrect or missing
-
-Deletes the specified local document. The semantics are identical to
-deleting a standard document in the specified database, except that the
-document is not replicated. See :ref:`api-del-doc`.
-
-``COPY /db/_local/local-doc``
-=============================
-
-* **Method**: ``COPY /db/_local/local-doc``
-* **Request**: None
-* **Response**: JSON of the copied document
-* **Admin Privileges Required**: no
-* **Query Arguments**:
-
-  * **Argument**: rev
-
-    * **Description**: Revision to copy from
-    * **Optional**: yes
-    * **Type**: string
-
-* **HTTP Headers**
-
-  * **Header**: ``Destination``
-
-    * **Description**: Destination document (and optional revision)
-    * **Optional**: no
-
-Copies the specified local document. The semantics are identical to
-copying a standard document in the specified database, except that the
-document is not replicated. See :ref:`api-copy-doc`.
+  Copies the specified local document. The semantics are identical to
+  copying a standard document in the specified database, except that the
+  document is not replicated. See :copy:`/{db}/{docid}`.

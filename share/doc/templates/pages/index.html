@@ -1,0 +1,156 @@
+<!--
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License. You may obtain a copy of the
+License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied. See the License for the
+specific language governing permissions and limitations under the License.
+
+-->
+
+{% extends "defindex.html" %}
+{% block tables %}
+<h2>Meet CouchDB</h2>
+<table class="contentstable" align="center">
+  <tr>
+    <td width="50%">
+      <p class="biglink">
+        <a class="biglink" href="{{ pathto("whatsnew/" + version) }}">
+          What's new in CouchDB {{ version }}?
+        </a>
+        <br />
+        <span class="linkdescr">
+          or browse <a href="{{ pathto("whatsnew/index") }}">all "What's new" documents</a>
+        </span>
+      </p>
+      <p class="biglink">
+        <a class="biglink" href="{{ pathto("intro/why") }}">
+          Why CouchDB?
+        </a>
+        <br />
+        <span class="linkdescr">reasons to use CouchDB is there</span>
+      </p>
+    <td width="50%">
+      <p class="biglink">
+        <a class="biglink" href="{{ pathto("intro/overview") }}">
+          Technical Overview
+        </a>
+        <br />
+        <span class="linkdescr">quick overview about base technologies</span>
+      </p>
+      <p class="biglink">
+        <a class="biglink" href="{{ pathto("intro/consistency") }}">
+          Eventual Consistency
+        </a>
+        <br />
+        <span class="linkdescr">the main conception of document databases</span>
+      </p>
+    </td>
+  </tr>
+</table>
+
+<h2>Getting started</h2>
+<table class="contentstable" align="center">
+  <tr>
+    <td width="50%">
+      <p class="biglink">
+        <a class="biglink" href="{{ pathto("install/index") }}">
+          Installation guides
+        </a>
+        <br />
+        <span class="linkdescr">
+          install CouchDB on <a href="{{ pathto("install/windows") }}">Windows</a>,
+          <a href="{{ pathto("install/macos") }}">MacOS X</a> or
+          <a href="{{ pathto("install/unix") }}">Linux</a> in few minutes.
+        </span>
+      </p>
+      <p class="biglink">
+        <a class="biglink" href="{{ pathto("intro/tour") }}">
+          Tutorial
+        </a>
+        <br />
+        <span class="linkdescr">start using CouchDB with
+          <a href="{{ pathto("intro/futon") }}">Futon</a> and
+          <a href="{{ pathto("intro/curl") }}">cURL</a></span>
+      </p>
+      <p class="biglink">
+        <a class="biglink" href="{{ pathto("intro/api") }}">
+          HTTP API overview
+        </a>
+        <br />
+        <span class="linkdescr">short walk though API basics</span>
+      </p>
+    <td width="50%">
+      <p class="biglink">
+        <a class="biglink" href="{{ pathto("couchapp/views/intro") }}">
+          Guide to Views
+        </a>
+        <br />
+        <span class="linkdescr">how query JSON data with no sql</span>
+      </p>
+      <p class="biglink">
+        <a class="biglink" href="{{ pathto("replication/intro") }}">
+          Data Replication
+        </a>
+        <br />
+        <span class="linkdescr">
+          painless master-master data synchronization
+        </span>
+      </p>
+      <p class="biglink">
+        <a class="biglink" href="{{ pathto("config/index") }}">
+          Configuration Reference
+        </a>
+        <br />
+        <span class="linkdescr">tweak CouchDB like you want</span>
+      </p>
+    </td>
+  </tr>
+</table>
+
+<h2>Developing with CouchDB</h2>
+<table class="contentstable" align="center"><tr>
+  <tr>
+    <td width="50%">
+      <p class="biglink">
+        <a class="biglink" href="{{ pathto("api/index") }}">
+          Complete HTTP API Reference
+        </a>
+        <br />
+        <span class="linkdescr">
+          your favourite bookmark
+        </span>
+      </p>
+    <td width="50%">
+      <p class="biglink">
+        <a class="biglink" href="{{ pathto("couchapp/ddocs") }}">
+          Design Documents
+        </a>
+        <br />
+        <span class="linkdescr">
+          transform, update and validate documents like a rock star
+        </span>
+      </p>
+    </td>
+  </tr>
+</table>
+
+
+<h2>Links</h2>
+<table class="contentstable" align="center"><tr>
+  <td width="50%">
+    <p class="biglink"><a class="biglink" href="{{ pathto("contents") }}">Documentation Contents</a></p>
+    <p class="biglink"><a class="biglink" href="{{ pathto("http-api") }}">HTTP API Index</a></p>
+    <p class="biglink"><a class="biglink" href="{{ pathto("contributing") }}">Contributing to this Documentation</a></p>
+  </td><td width="50%">
+    <p class="biglink"><a class="biglink" href="http://couchdb.org/">CouchDB Web site</a></p>
+    <p class="biglink"><a class="biglink" href="http://couchdb.org/#download">Download</a></p>
+    <p class="biglink"><a class="biglink" href="http://couchdb.org/#mailing-list">Mailing Lists</a></p>
+  </td></tr>
+</table>
+{% endblock %}

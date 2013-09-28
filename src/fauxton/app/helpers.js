@@ -36,13 +36,13 @@ function() {
   // update the URLs in documentation_urls.js 
   Helpers.docs =  {
     "docs": "http://docs.couchdb.org/en/latest/index.html",
-    "replication_doc": "http://docs.couchdb.org/en/latest/replicator.html#basics",
-    "design_doc": "http://docs.couchdb.org/en/latest/ddocs.html#design-docs",
-    "view_functions": "http://docs.couchdb.org/en/latest/ddocs.html#view-functions",
-    "map_functions": "http://docs.couchdb.org/en/latest/ddocs.html#map-functions",
-    "reduce_functions": "http://docs.couchdb.org/en/latest/ddocs.html#reduce-and-rereduce-functions",
-    "api_reference": "http://docs.couchdb.org/en/latest/api-basics.html?highlight=api",
-    "database_permission": "http://docs.couchdb.org/en/latest/api/database.html#get-db-security"
+    "replication_doc": "http://docs.couchdb.org/en/latest/replication/replicator.html#basics",
+    "design_doc": "http://docs.couchdb.org/en/latest/couchapp/ddocs.html#design-docs",
+    "view_functions": "http://docs.couchdb.org/en/latest/couchapp/ddocs.html#view-functions",
+    "map_functions": "http://docs.couchdb.org/en/latest/couchapp/ddocs.html#map-functions",
+    "reduce_functions": "http://docs.couchdb.org/en/latest/couchapp/ddocs.html#reduce-and-rereduce-functions",
+    "api_reference": "http://docs.couchdb.org/en/latest/http-api.html",
+    "database_permission": "http://docs.couchdb.org/en/latest/api/database/security.html#db-security"
   }; 
   
   Helpers.getDocUrl = function(doc){
