@@ -570,6 +570,59 @@ query parameter:
   }
 
 
+Efficient Multiple Attachments Retrieving
+`````````````````````````````````````````
+
+As you had noted above, retrieving document with ``attachements=true`` returns
+large JSON object where all attachments are included.  While you document and
+files are smaller it's ok, but if you have attached something bigger like media
+files (audio/video), parsing such response might be very expensive.
+
+To solve this problem, CouchDB allows to get documents in
+:mimetype:`multipart/related` format:
+
+**Request**:
+
+.. code-block:: http
+
+  GET /recipes/secret?attachments=true HTTP/1.1
+  Accept: multipart/related
+  Host: localhost:5984
+
+**Response**:
+
+.. code-block:: http
+
+  HTTP/1.1 200 OK
+  Content-Length: 538
+  Content-Type: multipart/related; boundary="e89b3e29388aef23453450d10e5aaed0"
+  Date: Sat, 28 Sep 2013 08:08:22 GMT
+  ETag: "2-c1c6c44c4bc3c9344b037c8690468605"
+  Server: CouchDB (Erlang OTP)
+
+  --e89b3e29388aef23453450d10e5aaed0
+  Content-Type: application/json
+
+  {"_id":"secret","_rev":"2-c1c6c44c4bc3c9344b037c8690468605","_attachments":{"recipe.txt":{"content_type":"text/plain","revpos":2,"digest":"md5-HV9aXJdEnu0xnMQYTKgOFA==","length":86,"follows":true}}}
+  --e89b3e29388aef23453450d10e5aaed0
+  Content-Disposition: attachment; filename="recipe.txt"
+  Content-Type: text/plain
+  Content-Length: 86
+
+  1. Take R
+  2. Take E
+  3. Mix with L
+  4. Add some A
+  5. Serve with X
+
+  --e89b3e29388aef23453450d10e5aaed0--
+
+In this response the document contains only attachments stub information and
+quite short while all attachments goes as separate entities which reduces
+memory footprint and processing overhead (you'd noticed, that attachment content
+goes as raw data, not in base64 encoding, right?).
+
+
 Retrieving Attachments Encoding Info
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -633,6 +686,103 @@ about compressed attachments size and used codec.
           "meatballs"
       ],
       "name": "Spaghetti with meatballs"
+  }
+
+
+Creating Multiple Attachments
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+To create a document with multiple attachments with single request you need
+just inline base64 encoded attachments data into the document body:
+
+.. code-block:: javascript
+
+  {
+    "_id":"multiple_attachments",
+    "_attachments":
+    {
+      "foo.txt":
+      {
+        "content_type":"text\/plain",
+        "data": "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
+      },
+
+     "bar.txt":
+      {
+        "content_type":"text\/plain",
+        "data": "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
+      }
+    }
+  }
+
+Alternatively, you can upload a document with attachments more efficiently in
+:mimetype:`multipart/related` format. This avoids having to Base64-encode
+the attachments, saving CPU and bandwidth. To do this, set the
+:http:header:`Content-Type` header of the :http:put:`/{db}/{docid}` request to
+:mimetype:`multipart/related`.
+
+The first MIME body is the document itself, which should have its own
+:http:header:`Content-Type` of :mimetype:`application/json"`. It also should
+include  an ``_attachments`` metadata object in which each attachment object
+has a key ``follows`` with value ``true``.
+
+The subsequent MIME bodies are the attachments.
+
+**Request**:
+
+.. code-block:: http
+
+  PUT /temp/somedoc HTTP/1.1
+  Accept: application/json
+  Content-Length: 372
+  Content-Type: multipart/related;boundary="abc123"
+  Host: localhost:5984
+  User-Agent: HTTPie/0.6.0
+
+  --abc123
+  Content-Type: application/json
+
+  {
+      "body": "This is a body.",
+      "_attachments": {
+          "foo.txt": {
+              "follows": true,
+              "content_type": "text/plain",
+              "length": 21
+          },
+          "bar.txt": {
+              "follows": true,
+              "content_type": "text/plain",
+              "length": 20
+          }
+      }
+  }
+
+  --abc123
+
+  this is 21 chars long
+  --abc123
+
+  this is 20 chars lon
+  --abc123--
+
+**Response**:
+
+.. code-block:: http
+
+  HTTP/1.1 201 Created
+  Cache-Control: must-revalidate
+  Content-Length: 72
+  Content-Type: application/json
+  Date: Sat, 28 Sep 2013 09:13:24 GMT
+  ETag: "1-5575e26acdeb1df561bb5b70b26ba151"
+  Location: http://localhost:5984/temp/somedoc
+  Server: CouchDB (Erlang OTP)
+
+  {
+      "id": "somedoc",
+      "ok": true,
+      "rev": "1-5575e26acdeb1df561bb5b70b26ba151"
   }
 
 
