@@ -16,7 +16,7 @@
 ``/db/_design/design-doc``
 ==========================
 
-.. http:head:: /{db}/_design/{ddocname}
+.. http:head:: /{db}/_design/{ddoc}
 
   Returns the HTTP Headers containing a minimal amount of information
   about the specified design document.
@@ -26,7 +26,7 @@
     :http:head:`/{db}/{docid}`
 
 
-.. http:get:: /{db}/_design/{ddocname}
+.. http:get:: /{db}/_design/{ddoc}
 
   Returns design document with the specified design document` from the specified
   database. Unless you request a specific revision, the latest revision of the
@@ -37,7 +37,7 @@
     :http:get:`/{db}/{docid}`
 
 
-.. http:put:: /{db}/_design/{ddocname}
+.. http:put:: /{db}/_design/{ddoc}
 
   The :http:method:`PUT` method creates a new named design document, or creates
   a new revision of the existing design document.
@@ -67,7 +67,7 @@
     :http:put:`/{db}/{docid}`
 
 
-.. http:delete:: /{db}/_design/{ddocname}
+.. http:delete:: /{db}/_design/{ddoc}
 
   Deletes the specified document from the database. You must supply the
   current (latest) revision, either by using the ``rev`` parameter to
@@ -77,7 +77,7 @@
 
     :http:delete:`/{db}/{docid}`
 
-.. http:copy:: /{db}/_design/{ddocname}
+.. http:copy:: /{db}/_design/{ddoc}
 
   The :http:method:`COPY` (which is non-standard HTTP) copies an existing
   design document to a new or existing one.
@@ -97,7 +97,7 @@
 ``/db/_design/design-doc/attachment``
 =====================================
 
-.. http:head:: /{db}/_design/{ddocname}/{attname}
+.. http:head:: /{db}/_design/{ddoc}/{attname}
 
   Returns the HTTP headers containing a minimal amount of information
   about the specified attachment.
@@ -106,7 +106,7 @@
 
     :http:head:`/{db}/{docid}/{attname}`
 
-.. http:get:: /{db}/_design/{ddocname}/{attname}
+.. http:get:: /{db}/_design/{ddoc}/{attname}
 
   Returns the file attachment associated with the design document.
   The raw data of the associated attachment is returned (just as if you were
@@ -116,7 +116,7 @@
 
     :http:get:`/{db}/{docid}/{attname}`
 
-.. http:put:: /{db}/_design/{ddocname}/{attname}
+.. http:put:: /{db}/_design/{ddoc}/{attname}
 
   Uploads the supplied content as an attachment to the specified design
   document. The attachment name provided must be a URL encoded string.
@@ -125,7 +125,7 @@
 
     :http:put:`/{db}/{docid}/{attname}`
 
-.. http:delete:: /{db}/_design/{ddocname}/{attname}
+.. http:delete:: /{db}/_design/{ddoc}/{attname}
 
   Deletes the attachment of the specified design document.
 
@@ -139,14 +139,14 @@
 ``/db/_design/design-doc/_info``
 ================================
 
-.. http:get:: /{db}/_design/{ddocname}/_info
+.. http:get:: /{db}/_design/{ddoc}/_info
 
   Obtains information about the specified design document, including the index,
   index size and current status of the design document and associated
   index information.
 
   :param db: Database name
-  :param ddocname: Design document name
+  :param ddoc: Design document name
   :<header Accept: - :mimetype:`application/json`
                    - :mimetype:`text/plain`
   :>header Content-Type: - :mimetype:`application/json`
@@ -196,7 +196,7 @@
 View Index Information
 ----------------------
 
-The response from :http:get:`/{db}/_design/{ddocname}/_info` contains
+The response from :http:get:`/{db}/_design/{ddoc}/_info` contains
 ``view_index`` (*object*) field with the next structure:
 
 * **compact_running** (*boolean*):  Indicates whether a compaction routine

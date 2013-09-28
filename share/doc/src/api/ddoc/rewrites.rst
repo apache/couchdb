@@ -16,7 +16,7 @@
 ``/db/_design/design-doc/_rewrite/path``
 ========================================
 
-.. http:any:: /{db}/_design/{ddocname}/_rewrite/{path}
+.. http:any:: /{db}/_design/{ddoc}/_rewrite/{path}
 
   Rewrites the specified path by rules defined in the specified design document.
 
@@ -85,5 +85,5 @@
   are depended on endpoint to which url will be rewrited.
 
   :param db: Database name
-  :param ddocname: Design document name
+  :param ddoc: Design document name
   :param path: URL path to rewrite

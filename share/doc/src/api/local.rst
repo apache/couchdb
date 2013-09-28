@@ -55,25 +55,25 @@ A list of the available methods and URL paths are provided below:
 ``/db/_local/id``
 ========================
 
-.. http:get:: /{db}/_local/{id}
+.. http:get:: /{db}/_local/{docid}
 
   Gets the specified local document. The semantics are identical to
   accessing a standard document in the specified database, except that the
   document is not replicated. See :http:get:`/{db}/{docid}`.
 
-.. http:put:: /{db}/_local/{id}
+.. http:put:: /{db}/_local/{docid}
 
   Stores the specified local document. The semantics are identical to
   storing a standard document in the specified database, except that the
   document is not replicated. See :http:put:`/{db}/{docid}`.
 
-.. http:delete:: /{db}/_local/{id}
+.. http:delete:: /{db}/_local/{docid}
 
   Deletes the specified local document. The semantics are identical to
   deleting a standard document in the specified database, except that the
   document is not replicated. See :http:delete:`/{db}/{docid}`.
 
-.. http:copy:: /{db}/_local/{id}
+.. http:copy:: /{db}/_local/{docid}
 
   Copies the specified local document. The semantics are identical to
   copying a standard document in the specified database, except that the

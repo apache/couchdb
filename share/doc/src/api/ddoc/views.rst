@@ -16,13 +16,13 @@
 ``/db/_design/design-doc/_view/view-name``
 ==========================================
 
-.. http:get:: /{db}/_design/{ddocname}/_view/{viewname}
+.. http:get:: /{db}/_design/{ddoc}/_view/{view}
 
   Executes the specified view function from the specified design document.
 
   :param db: Database name
-  :param ddocname: Design document name
-  :param viewname: View function name
+  :param ddoc: Design document name
+  :param view: View function name
 
   :<header Accept: - :mimetype:`application/json`
                    - :mimetype:`text/plain`
@@ -123,14 +123,14 @@
     }
 
 
-.. http:post:: /{db}/_design/{ddocname}/_view/{viewname}
+.. http:post:: /{db}/_design/{ddoc}/_view/{view}
 
   Executes the specified view function from the specified design document.
-  Unlike the :http:get:`/{db}/_design/{ddocname}/_view/{viewname}`  method
+  Unlike the :http:get:`/{db}/_design/{ddoc}/_view/{view}`  method
   for accessing views, the :http:method:`POST` method supports the specification
   of explicit keys to be retrieved from the view results. The remainder of the
   :http:method:`POST` view functionality is identical to the
-  :http:get:`/{db}/_design/{ddocname}/_view/{viewname}` API.
+  :http:get:`/{db}/_design/{ddoc}/_view/{view}` API.
 
   **Request**:
 
