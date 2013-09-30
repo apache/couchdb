@@ -20,6 +20,9 @@
     set_revs_limit/3, create_shard_db_doc/2, delete_shard_db_doc/2]).
 -export([get_all_security/2]).
 
+-export([get_db_info/2, get_doc_count/2, get_update_seq/2,
+         changes/4, map_view/5, reduce_view/5, group_info/3]).
+
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
@@ -27,12 +30,16 @@
 %% rpc endpoints
 %%  call to with_db will supply your M:F with a #db{} and then remaining args
 
-changes(DbName, #changes_args{} = Args, StartSeq) ->
-    changes(DbName, [Args], StartSeq);
-changes(DbName, Options, StartVector) ->
+%% @equiv changes(DbName, Args, StartSeq, [])
+changes(DbName, Args, StartSeq) ->
+    changes(DbName, Args, StartSeq, []).
+
+changes(DbName, #changes_args{} = Args, StartSeq, DbOptions) ->
+    changes(DbName, [Args], StartSeq, DbOptions);
+changes(DbName, Options, StartVector, DbOptions) ->
     erlang:put(io_priority, {interactive, DbName}),
     #changes_args{dir=Dir} = Args = lists:keyfind(changes_args, 1, Options),
-    case get_or_create_db(DbName, []) of
+    case get_or_create_db(DbName, DbOptions) of
     {ok, Db} ->
         StartSeq = calculate_start_seq(Db, node(), StartVector),
         Enum = fun changes_enumerator/2,
@@ -55,15 +62,23 @@ all_docs(DbName, Options, #mrargs{keys=undefined} = Args0) ->
     VAcc0 = #vacc{db=Db},
     couch_mrview:query_all_docs(Db, Args, fun view_cb/2, VAcc0).
 
+%% @equiv map_view(DbName, DDoc, ViewName, Args0, [])
 map_view(DbName, DDoc, ViewName, Args0) ->
+    map_view(DbName, DDoc, ViewName, Args0, []).
+
+map_view(DbName, DDoc, ViewName, Args0, DbOptions) ->
     Args = fix_skip_and_limit(Args0),
-    {ok, Db} = get_or_create_db(DbName, []),
+    {ok, Db} = get_or_create_db(DbName, DbOptions),
     VAcc0 = #vacc{db=Db},
     couch_mrview:query_view(Db, DDoc, ViewName, Args, fun view_cb/2, VAcc0).
 
+%% @equiv reduce_view(DbName, DDoc, ViewName, Args0)
 reduce_view(DbName, DDoc, ViewName, Args0) ->
+    reduce_view(DbName, DDoc, ViewName, Args0, []).
+
+reduce_view(DbName, DDoc, ViewName, Args0, DbOptions) ->
     Args = fix_skip_and_limit(Args0),
-    {ok, Db} = get_or_create_db(DbName, []),
+    {ok, Db} = get_or_create_db(DbName, DbOptions),
     VAcc0 = #vacc{db=Db},
     couch_mrview:query_view(Db, DDoc, ViewName, Args, fun reduce_cb/2, VAcc0).
 
@@ -88,14 +103,26 @@ delete_db(DbName) ->
 delete_shard_db_doc(_, DocId) ->
     rexi:reply(mem3_util:delete_db_doc(DocId)).
 
+%% @equiv get_db_info(DbName, [])
 get_db_info(DbName) ->
-    with_db(DbName, [], {couch_db, get_db_info, []}).
+    get_db_info(DbName, []).
 
+get_db_info(DbName, DbOptions) ->
+    with_db(DbName, DbOptions, {couch_db, get_db_info, []}).
+
+%% equiv get_doc_count(DbName, [])
 get_doc_count(DbName) ->
-    with_db(DbName, [], {couch_db, get_doc_count, []}).
+    get_doc_count(DbName, []).
 
+get_doc_count(DbName, DbOptions) ->
+    with_db(DbName, DbOptions, {couch_db, get_doc_count, []}).
+
+%% equiv get_update_seq(DbName, [])
 get_update_seq(DbName) ->
-    with_db(DbName, [], {couch_db, get_update_seq, []}).
+    get_update_seq(DbName, []).
+
+get_update_seq(DbName, DbOptions) ->
+    with_db(DbName, DbOptions, {couch_db, get_update_seq, []}).
 
 set_security(DbName, SecObj, Options) ->
     with_db(DbName, Options, {couch_db, set_security, [SecObj]}).
@@ -144,8 +171,12 @@ update_docs(DbName, Docs0, Options) ->
     Docs = make_att_readers(Docs0),
     with_db(DbName, Options, {couch_db, update_docs, [Docs, Options, X]}).
 
+%% @equiv group_info(DbName, DDocId, [])
 group_info(DbName, DDocId) ->
-    with_db(DbName, [], {couch_mrview, get_info, [DDocId]}).
+    group_info(DbName, DDocId, []).
+
+group_info(DbName, DDocId, DbOptions) ->
+    with_db(DbName, DbOptions, {couch_mrview, get_info, [DDocId]}).
 
 reset_validation_funs(DbName) ->
     case get_or_create_db(DbName, []) of
