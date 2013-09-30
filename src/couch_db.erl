@@ -548,6 +548,8 @@ validate_ddoc(DbName, DDoc) ->
     try
         couch_index_server:validate(DbName, couch_doc:with_ejson_body(DDoc))
     catch
+        throw:{invalid_design_doc, Reason} ->
+            {bad_request, invalid_design_doc, Reason};
         throw:Error ->
             Error
     end.
