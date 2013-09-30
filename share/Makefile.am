@@ -218,7 +218,6 @@ nobase_dist_localdata_DATA = \
     www/script/test/view_update_seq.js \
     www/script/test/view_pagination.js \
     www/script/test/view_sandboxing.js \
-    www/script/test/view_xml.js \
     www/spec/couch_js_class_methods_spec.js \
     www/spec/couch_js_instance_methods_1_spec.js \
     www/spec/couch_js_instance_methods_2_spec.js \

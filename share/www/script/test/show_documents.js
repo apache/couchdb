@@ -70,14 +70,6 @@ couchTests.show_documents = function(debug) {
       "fail" : stringFun(function(doc, req) {
         return doc._id;
       }),
-      "xml-type" : stringFun(function(doc, req) {
-         return {
-           "headers" : {
-             "Content-Type" : "application/xml"
-           },
-           "body" : new XML('<xml><node foo="bar"/></xml>').toXMLString()
-         }
-       }),
       "no-set-etag" : stringFun(function(doc, req) {
         return {
           headers : {
@@ -159,16 +151,6 @@ couchTests.show_documents = function(debug) {
           return "Ha ha, you said \"" + doc.word + "\".";
         });
 
-        provides("xml", function() {
-          var xml = new XML('<xml><node/></xml>');
-          // Becase Safari can't stand to see that dastardly
-          // E4X outside of a string. Outside of tests you
-          // can just use E4X literals.
-          eval('xml.node.@foo = doc.word');
-          log('xml: '+xml.toSource());
-          return xml.toXMLString();
-        });
-        
         provides("foo", function() {
           return "foofoo";
         });
@@ -252,11 +234,6 @@ couchTests.show_documents = function(debug) {
   T(equals(resp.method, "GET"));
   T(equals(resp.path[5], docid));
   T(equals(resp.info.db_name, "test_suite_db"));
-
-  // returning a content-type
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/xml-type/"+docid);
-  T("application/xml" == xhr.getResponseHeader("Content-Type"));
-  T("Accept" == xhr.getResponseHeader("Vary"));
 
   // accept header switching
   // different mime has different etag
@@ -349,16 +326,6 @@ couchTests.show_documents = function(debug) {
   T(/text\/html/.test(ct))
   T(xhr.responseText == "Ha ha, you said \"plankton\".");
 
-  // now with xml
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/provides/"+docid, {
-    headers: {
-      "Accept": 'application/xml'
-    }
-  });
-  T(xhr.getResponseHeader("Content-Type") == "application/xml");
-  T(xhr.responseText.match(/node/));
-  T(xhr.responseText.match(/plankton/));
-
   // registering types works
   xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/provides/"+docid, {
     headers: {
@@ -377,15 +344,6 @@ couchTests.show_documents = function(debug) {
   var rs = JSON.parse(xhr.responseText);
   T(rs.error == "not_acceptable")
 
-
-  // should fallback on the first one
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/provides/"+docid, {
-   headers: {
-     "Accept": 'application/x-foo, application/xml'
-   }
-  });
-  var ct = xhr.getResponseHeader("Content-Type");
-  T(/application\/xml/.test(ct));  
 
   // test inclusion of conflict state
   var doc1 = {_id:"foo", a:1};

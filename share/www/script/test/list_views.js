@@ -90,20 +90,6 @@ couchTests.list_views = function(debug) {
           // tail
           return '</ul>';
         });
-
-        provides("xml", function() {
-          send('<feed xmlns="http://www.w3.org/2005/Atom">'
-            +'<title>Test XML Feed</title>');
-
-          while (row = getRow()) {
-            var entry = new XML('<entry/>');
-            entry.id = row.id;
-            entry.title = row.key;
-            entry.content = row.value;
-            send(entry);
-          }
-          return "</feed>";
-        });
       }),
       qsParams: stringFun(function(head, req) {
         return toJSON(req.query) + "\n";
@@ -413,21 +399,11 @@ couchTests.list_views = function(debug) {
   T(xhr.responseText.match(/HTML/));
   T(xhr.responseText.match(/Value/));
 
-  // now with xml
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/acceptSwitch/basicView", {
-    headers: {
-      "Accept": 'application/xml'
-    }
-  });
-  T(xhr.getResponseHeader("Content-Type") == "application/xml");
-  T(xhr.responseText.match(/XML/));
-  T(xhr.responseText.match(/entry/));
-
   // Test we can run lists and views from separate docs.
   T(db.save(viewOnlyDesignDoc).ok);
   var url = "/test_suite_db/_design/lists/_list/simpleForm/views/basicView" +
                 "?startkey=-3";
-  xhr = CouchDB.request("GET", url); 
+  xhr = CouchDB.request("GET", url);
   T(xhr.status == 200, "multiple design docs.");
   T(!(/Key: -4/.test(xhr.responseText)));
   T(/FirstKey: -3/.test(xhr.responseText));
