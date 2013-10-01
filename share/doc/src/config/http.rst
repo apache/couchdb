@@ -277,7 +277,7 @@ Secure Socket Level Options
   configuration screen in Futon. Here is what you need to do in
   ``local.ini``, you can infer what needs doing in the other places.
 
-  At first, :option:`enable HTTPS daemon <daemons/httpsd>`::
+  At first, :option:`enable the HTTPS daemon <daemons/httpsd>`::
 
     [daemons]
     httpsd = {couch_httpd, start_link, [https]}

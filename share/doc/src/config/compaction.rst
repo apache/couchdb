@@ -49,10 +49,10 @@ Compaction Daemon Rules
 
 .. config:section:: compactions :: Compaction Daemon Rules
 
-  Automatic compaction rules definition. The :option:`daemons/compaction_daemon`
-  compacts databases and their respective view groups when all the condition
-  parameters are satisfied. Configuration can be per database or global, and it
-  has the following format::
+  A list of rules to determine when to run automatic compaction. The
+  :option:`daemons/compaction_daemon` compacts databases and their respective
+  view groups when all the condition parameters are satisfied. Configuration
+  can be per-database or global, and it has the following format::
 
     [compactions]
     database_name = [ {ParamName, ParamValue}, {ParamName, ParamValue}, ... ]
@@ -64,12 +64,10 @@ Compaction Daemon Rules
     [compactions]
     _default = [{db_fragmentation, "70%"}, {view_fragmentation, "60%"}, {from, "23:00"}, {to, "04:00"}]
 
-  Possible parameters:
-
   - ``db_fragmentation``: If the ratio of legacy data, including metadata, to
-    current data in the database file size is equal to or greater then this
-    value, this database compaction condition is satisfied. The percentage is
-    expressed as an integer percentage. This value is computed as::
+    current data in the database file size is equal to or greater than this
+    value, this condition is satisfied. The percentage is expressed as an
+    integer percentage. This value is computed as::
 
       (file_size - data_size) / file_size * 100
 
@@ -86,15 +84,15 @@ Compaction Daemon Rules
     The data_size and file_size values can be obtained when querying a
     :ref:`view group's information URI <api/ddoc/info>`.
 
-  - ``from`` and ``to``: The period for which a database (and its view groups)
+  - ``from`` and ``to``: The period for which a database (and its view group)
     compaction is allowed. The value for these parameters must obey the format::
 
       HH:MM - HH:MM  (HH in [0..23], MM in [0..59])
 
   - ``strict_window``: If a compaction is still running after the end of the
     allowed period, it will be canceled if this parameter is set to `true`.
-    It defaults to `false` and it's meaningful only if the *period* parameter
-    is also specified.
+    It defaults to `false` and is meaningful only if the *period* parameter is
+    also specified.
 
   - ``parallel_view_compaction``: If set to `true`, the database and its views
     are compacted in parallel. This is only useful on certain setups, like
@@ -150,9 +148,11 @@ Configuration of Compaction Daemon
 
   .. config:option:: min_file_size
 
-    If a database or view index file is smaller then this value (in bytes),
-    compaction will not happen. Very small files always have a very high
-    fragmentation therefore it's not worth to compact them::
+    If a database or view index file is smaller than this value (in bytes),
+    compaction will not happen. Very small files always have high fragmentation,
+    so compacting them is inefficient.
+
+    ::
 
       [compaction_daemon]
       min_file_size = 131072
