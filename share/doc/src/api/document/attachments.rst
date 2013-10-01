@@ -34,8 +34,8 @@
   :>header Accept-Ranges: :ref:`Range request aware <api/doc/attachment/range>`.
     Used for attachments with :mimetype:`application/octet-stream` content type
   :>header Content-Encoding: Used compression codec. Available if attachment's
-    ``content_type`` is in :ref:`list of compressiable types
-    <config/attachments/compressible_types>`
+    ``content_type`` is in :config:option:`list of compressiable types
+    <attachments/compressible_types>`
   :>header Content-Length: Attachment size. If compression codec was used,
     this value is about compressed size, not actual
   :>header Content-MD5: Base64 encoded MD5 binary digest
@@ -87,8 +87,8 @@
   :>header Accept-Ranges: :ref:`Range request aware <api/doc/attachment/range>`.
     Used for attachments with :mimetype:`application/octet-stream`
   :>header Content-Encoding: Used compression codec. Available if attachment's
-    ``content_type`` is in :ref:`list of compressiable types
-    <config/attachments/compressible_types>`
+    ``content_type`` is in :config:option:`list of compressiable types
+    <attachments/compressible_types>`
   :>header Content-Length: Attachment size. If compression codec is used,
     this value is about compressed size, not actual
   :>header Content-MD5: Base64 encoded MD5 binary digest
@@ -127,8 +127,8 @@
   :>header Accept-Ranges: :ref:`Range request aware <api/doc/attachment/range>`.
     Used for attachments with :mimetype:`application/octet-stream`
   :>header Content-Encoding: Used compression codec. Available if attachment's
-    ``content_type`` is in :ref:`list of compressiable types
-    <config/attachments/compressible_types>`
+    ``content_type`` is in :config:option:`list of compressiable types
+    <attachments/compressible_types>`
   :>header Content-Length: Attachment size. If compression codec is used,
     this value is about compressed size, not actual
   :>header Content-MD5: Base64 encoded MD5 binary digest
@@ -197,7 +197,7 @@
                    - :mimetype:`text/plain`
   :<header If-Match: Document revision. Alternative to `rev` query parameter
   :<header X-Couch-Full-Commit: Overrides server's
-    :ref:`commit policy <config/couchdb/delayed_commits>`. Possible values
+    :config:option:`commit policy <couchdb/delayed_commits>`. Possible values
     are: ``false`` and ``true``. *Optional*
   :query string rev: Document revision. *Required*
   :query string batch: Store changes in :ref:`batch mode

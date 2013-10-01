@@ -18,324 +18,274 @@ HTTP Resource Handlers
 
 .. _config/httpd_global_handlers:
 
-``[httpd_global_handlers]`` :: Global HTTP Handlers
-===================================================
+Global HTTP Handlers
+====================
 
-These HTTP resources are provided for CouchDB server root level.
+.. config:section:: httpd_global_handlers :: Global HTTP Handlers
 
-.. _config/httpd_global_handlers/root:
+  These HTTP resources are provided for CouchDB server root level.
 
-:ref:`/ <api/server/root>`
---------------------------
+  .. config:option:: /
 
-::
+    ::
 
-  [httpd_global_handlers]
-  / = {couch_httpd_misc_handlers, handle_welcome_req, <<"Welcome">>}
+      [httpd_global_handlers]
+      / = {couch_httpd_misc_handlers, handle_welcome_req, <<"Welcome">>}
 
 
-.. _config/httpd_global_handlers/favicon.ico:
 
-:ref:`favicon.ico <api/server/favicon>`
----------------------------------------
+  .. config:option:: favicon.ico
 
-The favicon handler looks for `favicon.ico` file within specified directory::
+    The favicon handler looks for `favicon.ico` file within specified directory::
 
-  [httpd_global_handlers]
-  favicon.ico = {couch_httpd_misc_handlers, handle_favicon_req, "/usr/share/couchdb/www"}
+      [httpd_global_handlers]
+      favicon.ico = {couch_httpd_misc_handlers, handle_favicon_req, "/usr/share/couchdb/www"}
 
 
-.. _config/httpd_global_handlers/_active_tasks:
 
-:ref:`_active_tasks <api/server/active_tasks>`
-----------------------------------------------
+  .. config:option:: _active_tasks
 
-::
+    ::
 
-  [httpd_global_handlers]
-  _active_tasks = {couch_httpd_misc_handlers, handle_task_status_req}
+      [httpd_global_handlers]
+      _active_tasks = {couch_httpd_misc_handlers, handle_task_status_req}
 
 
-.. _config/httpd_global_handlers/_all_dbs:
 
-:ref:`_all_dbs <api/server/all_dbs>`
-------------------------------------
+  .. config:option:: _all_dbs
 
-Provides a list of all server's databases::
+    Provides a list of all server's databases::
 
-  [httpd_global_handlers]
-  _all_dbs = {couch_httpd_misc_handlers, handle_all_dbs_req}
+      [httpd_global_handlers]
+      _all_dbs = {couch_httpd_misc_handlers, handle_all_dbs_req}
 
-.. note::
+    .. note::
 
-   Sometimes you don't want to disclose database names for everyone, but you
-   also don't like/want/able to setup any proxies in front of CouchDB. Removing
-   this handler disables ``_all_dbs`` resource and there will be no way to get
-   list of available databases.
+       Sometimes you don't want to disclose database names for everyone, but
+       you also don't like/want/able to setup any proxies in front of CouchDB.
+       Removing this handler disables ``_all_dbs`` resource and there will be
+       no way to get list of available databases.
 
-   The s`ame also is true for other resource handlers.
+       The same also is true for other resource handlers.
 
 
-.. _config/httpd_global_handlers/_config:
 
-:ref:`_config <api/config>`
----------------------------
+  .. config:option:: _config
 
-Provides resource to work with CouchDB config :ref:`remotely <api/config>`.
-Any config changes that was made via HTTP API are applied automatically on fly
-and doesn't requires server instance to be restarted::
+    Provides resource to work with CouchDB config :ref:`remotely <api/config>`.
+    Any config changes that was made via HTTP API are applied automatically on
+    fly and doesn't requires server instance to be restarted::
 
-  [httpd_global_handlers]
-  _config = {couch_httpd_misc_handlers, handle_config_req}
+      [httpd_global_handlers]
+      _config = {couch_httpd_misc_handlers, handle_config_req}
 
 
-.. _config/httpd_global_handlers/_log:
 
-:ref:`_log <api/server/log>`
-----------------------------
+  .. config:option:: _log
 
-::
+    ::
 
-  [httpd_global_handlers]
-  _log = {couch_httpd_misc_handlers, handle_log_req}
+      [httpd_global_handlers]
+      _log = {couch_httpd_misc_handlers, handle_log_req}
 
 
-.. _config/httpd_global_handlers/_oauth:
 
-``_oauth``
-----------
+    .. config:option:: _oauth
 
-::
+    ::
 
-  [httpd_global_handlers]
-  _oauth = {couch_httpd_oauth, handle_oauth_req}
+      [httpd_global_handlers]
+      _oauth = {couch_httpd_oauth, handle_oauth_req}
 
 
-.. _config/httpd_global_handlers/_replicate:
 
-:ref:`_replicate <api/server/replicate>`
-----------------------------------------
+  .. config:option:: _replicate
 
-Provides an API to run :ref:`temporary replications <api/server/replicate>`::
+    Provides an API to run :ref:`temporary replications <api/server/replicate>`::
 
-  [httpd_global_handlers]
-  _replicate = {couch_replicator_httpd, handle_req}
+      [httpd_global_handlers]
+      _replicate = {couch_replicator_httpd, handle_req}
 
 
-.. _config/httpd_global_handlers/_restart:
 
-:ref:`_restart <api/server/restart>`
-------------------------------------
+  .. config:option:: _restart
 
-::
+    ::
 
-  [httpd_global_handlers]
-  _restart = {couch_httpd_misc_handlers, handle_restart_req}
+      [httpd_global_handlers]
+      _restart = {couch_httpd_misc_handlers, handle_restart_req}
 
 
-.. _config/httpd_global_handlers/_session:
 
-``_session``
-------------
+  .. config:option:: _session
 
-Provides a resource with information about the current user's session::
+    Provides a resource with information about the current user's session::
 
-  [httpd_global_handlers]
-  _session = {couch_httpd_auth, handle_session_req}
+      [httpd_global_handlers]
+      _session = {couch_httpd_auth, handle_session_req}
 
 
-.. _config/httpd_global_handlers/_stats:
+  .. config:option:: _stats
 
-:ref:`_stats <api/server/stats>`
---------------------------------
+    ::
 
-::
+      [httpd_global_handlers]
+      _stats = {couch_httpd_stats_handlers, handle_stats_req}
 
-  [httpd_global_handlers]
-  _stats = {couch_httpd_stats_handlers, handle_stats_req}
 
+  .. config:option:: _utils
 
-.. _config/httpd_global_handlers/_utils:
+    The :ref:`_utils <api/server/utils>` handler serves `Futon`'s web administration
+    page::
 
-:ref:`_utils <api/server/utils>`
---------------------------------
+      [httpd_global_handlers]
+      _utils = {couch_httpd_misc_handlers, handle_utils_dir_req, "/usr/share/couchdb/www"}
 
-The :ref:`_utils <api/server/utils>` handler serves `Futon`'s web administration
-page::
+    In similar way, you may setup custom handler to let CouchDB serve any static
+    files.
 
-  [httpd_global_handlers]
-  _utils = {couch_httpd_misc_handlers, handle_utils_dir_req, "/usr/share/couchdb/www"}
 
-In similar way, you may setup custom handler to let CouchDB serve any static
-files.
+  .. config:option:: _uuids
 
+    Provides a resource to get UUIDs generated by CouchDB::
 
-.. _config/httpd_global_handlers/_uuids:
+      [httpd_global_handlers]
+      _uuids = {couch_httpd_misc_handlers, handle_uuids_req}
 
-:ref:`_uuids <api/server/uuids>`
---------------------------------
+    This is useful when your client environment isn't capable of providing truly
+    random IDs (web browsers e.g.).
 
-Provides a resource to get UUIDs generated by CouchDB::
-
-  [httpd_global_handlers]
-  _uuids = {couch_httpd_misc_handlers, handle_uuids_req}
-
-This is useful when your client environment isn't capable of providing truly
-random IDs (web browsers e.g.).
 
 .. _config/httpd_db_handlers:
 
-``[httpd_db_handlers]`` :: Database HTTP Handlers
-=================================================
+Database HTTP Handlers
+======================
 
-These HTTP resources are available on every CouchDB database.
+.. config:section:: httpd_db_handlers :: Database HTTP Handlers
 
-.. _config/httpd_db_handlers/_all_docs:
-
-:ref:`_all_docs <api/db/all_docs>`
-----------------------------------
-
-::
-
-  [httpd_db_handlers]
-  _all_docs = {couch_mrview_http, handle_all_docs_req}
+  These HTTP resources are available on every CouchDB database.
 
 
-.. _config/httpd_db_handlers/_changes:
+  .. config:option:: _all_docs
 
-:ref:`_changes <changes>`
--------------------------
+    ::
 
-::
-
-  [httpd_db_handlers]
-  _changes = {couch_httpd_db, handle_changes_req}
+      [httpd_db_handlers]
+      _all_docs = {couch_mrview_http, handle_all_docs_req}
 
 
-.. _config/httpd_db_handlers/_compact:
 
-:ref:`_compact <api/db/compact>`
---------------------------------
+  .. config:option:: _changes
 
-::
+    ::
 
-  [httpd_db_handlers]
-  _compact = {couch_httpd_db, handle_compact_req}
+      [httpd_db_handlers]
+      _changes = {couch_httpd_db, handle_changes_req}
 
 
-.. _config/httpd_db_handlers/_design:
 
-:ref:`_design <api/ddoc>`
--------------------------
+  .. config:option:: _compact
 
-::
+    ::
 
-  [httpd_db_handlers]
-  _design = {couch_httpd_db, handle_design_req}
+      [httpd_db_handlers]
+      _compact = {couch_httpd_db, handle_compact_req}
 
 
-.. _config/httpd_db_handlers/_temp_view:
 
-:ref:`_temp_view <api/db/temp_view>`
-------------------------------------
+  .. config:option:: _design
 
-::
+    ::
 
-  [httpd_db_handlers]
-  _temp_view = {couch_mrview_http, handle_temp_view_req}
+      [httpd_db_handlers]
+      _design = {couch_httpd_db, handle_design_req}
 
 
-.. _config/httpd_db_handlers/_view_cleanup:
 
-:ref:`_view_cleanup <api/db/view_cleanup>`
-------------------------------------------
+  .. config:option:: _temp_view
 
-::
+    ::
 
-  [httpd_db_handlers]
-  _view_cleanup = {couch_mrview_http, handle_cleanup_req}
+      [httpd_db_handlers]
+      _temp_view = {couch_mrview_http, handle_temp_view_req}
+
+
+
+  .. config:option:: _view_cleanup
+
+    ::
+
+      [httpd_db_handlers]
+      _view_cleanup = {couch_mrview_http, handle_cleanup_req}
 
 
 .. _config/httpd_design_handlers:
 
-``[httpd_design_handlers]`` :: Design Documents HTTP Handlers
-=============================================================
+Design Documents HTTP Handlers
+==============================
+
+.. config:section:: httpd_design_handlers :: Design Documents HTTP Handlers
 
 These HTTP resources are provided for design documents.
 
-.. _config/httpd_design_handlers/_compact:
 
-:ref:`_compact <api/db/compact/ddoc>`
--------------------------------------
+  .. config:option:: _compact
 
-::
+    ::
 
-  [httpd_design_handlers]
-  _compact = {couch_mrview_http, handle_compact_req}
+      [httpd_design_handlers]
+      _compact = {couch_mrview_http, handle_compact_req}
 
 
-.. _config/httpd_design_handlers/_info:
 
-:ref:`_info <api/ddoc/info>`
-----------------------------
+  .. config:option:: _info
 
-::
+    ::
 
-  [httpd_design_handlers]
-  _info = {couch_mrview_http, handle_info_req}
+      [httpd_design_handlers]
+      _info = {couch_mrview_http, handle_info_req}
 
 
-.. _config/httpd_design_handlers/_list:
 
-:ref:`_list <api/ddoc/list>`
-----------------------------
+  .. config:option:: _list
 
-::
+    ::
 
-  [httpd_design_handlers]
-  _list = {couch_mrview_show, handle_view_list_req}
+      [httpd_design_handlers]
+      _list = {couch_mrview_show, handle_view_list_req}
 
 
-.. _config/httpd_design_handlers/_rewrite:
 
-:ref:`_rewrite <api/ddoc/rewrite>`
-----------------------------------
+  .. config:option:: _rewrite
 
-::
+    ::
 
-  [httpd_design_handlers]
-  _rewrite = {couch_httpd_rewrite, handle_rewrite_req}
+      [httpd_design_handlers]
+      _rewrite = {couch_httpd_rewrite, handle_rewrite_req}
 
 
-.. _config/httpd_design_handlers/_show:
 
-:ref:`_show <api/ddoc/show>`
-----------------------------
+  .. config:option:: _show
 
-::
+    ::
 
-  [httpd_design_handlers]
-  _show = {couch_mrview_show, handle_doc_show_req}
+      [httpd_design_handlers]
+      _show = {couch_mrview_show, handle_doc_show_req}
 
 
-.. _config/httpd_design_handlers/_update:
 
-:ref:`_update <api/ddoc/update>`
---------------------------------
+  .. config:option:: _update
 
-::
+    ::
 
-  [httpd_design_handlers]
-  _update = {couch_mrview_show, handle_doc_update_req}
+      [httpd_design_handlers]
+      _update = {couch_mrview_show, handle_doc_update_req}
 
 
-.. _config/httpd_design_handlers/_view:
 
-:ref:`_view <api/ddoc/view>`
-----------------------------
+  .. config:option:: _view
 
-::
+    ::
 
-  [httpd_design_handlers]
-  _view = {couch_mrview_http, handle_view_req}
-
+      [httpd_design_handlers]
+      _view = {couch_mrview_http, handle_view_req}

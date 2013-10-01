@@ -956,8 +956,8 @@ structure is as follows:
         ]
     }
 
-The UUID type is determined by the :ref:`UUID algorithm <config/uuids/algorithm>`
-setting in the CouchDB configuration.
+The UUID type is determined by the :config:option:`UUID algorithm
+<uuids/algorithm>` setting in the CouchDB configuration.
 
 The UUID type may be changed at any time through the
 :ref:`Configuration API <api/config/section/key>`. For example, the UUID type

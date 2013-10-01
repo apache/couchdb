@@ -54,8 +54,8 @@ Work-Around
 Users may simply exclude any file-based web serving components directly
 within their configuration file, typically in `local.ini`. On a default
 CouchDB installation, this requires amending the
-:ref:`config/httpd_global_handlers/favicon.ico` and
-:ref:`config/httpd_global_handlers/_utils` lines within
+:config:option:`httpd_global_handlers/favicon.ico` and
+:config::`config/httpd_global_handlers/_utils` lines within
 ``[httpd_global_handlers]``::
 
     [httpd_global_handlers]

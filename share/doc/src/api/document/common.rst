@@ -177,7 +177,7 @@
   :<header Content-Type: :mimetype:`application/json`
   :<header If-Match: Document's revision. Alternative to `rev` query parameter
   :<header X-Couch-Full-Commit: Overrides server's
-    :ref:`commit policy <config/couchdb/delayed_commits>`. Possible values
+    :config:option:`commit policy <couchdb/delayed_commits>`. Possible values
     are: ``false`` and ``true``. *Optional*
   :query string batch: Stores document in :ref:`batch mode
     <api/doc/batch-writes>` Possible values: ``ok``. *Optional*
@@ -253,7 +253,7 @@
                    - :mimetype:`text/plain`
   :<header If-Match: Document's revision. Alternative to `rev` query parameter
   :<header X-Couch-Full-Commit: Overrides server's
-    :ref:`commit policy <config/couchdb/delayed_commits>`. Possible values
+    :config:option:`commit policy <couchdb/delayed_commits>`. Possible values
     are: ``false`` and ``true``. *Optional*
   :query string rev: Actual document's revision
   :query string batch: Stores document in :ref:`batch mode
@@ -325,7 +325,7 @@
   :<header If-Match: Source document's revision. Alternative to `rev` query
     parameter
   :<header X-Couch-Full-Commit: Overrides server's
-    :ref:`commit policy <config/couchdb/delayed_commits>`. Possible values
+    :config:option:`commit policy <couchdb/delayed_commits>`. Possible values
     are: ``false`` and ``true``. *Optional*
   :query string rev: Revision to copy from. *Optional*
   :query string batch: Stores document in :ref:`batch mode
@@ -397,8 +397,8 @@ information objects with next structure:
   Base64-encoded hash digest
 - **encoded_length** (*number*): Compressed attachment size in bytes
   Available when query parameter ``att_encoding_info=true`` was specified and
-  ``content_type`` is in :ref:`list of compressiable types
-  <config/attachments/compressible_types>`
+  ``content_type`` is in :config:option:`list of compressiable types
+  <attachments/compressible_types>`
 - **encoding** (*string*): Compression codec. Available when query parameter
   ``att_encoding_info=true`` was specified
 - **length** (*number*): Real attachment size in bytes. Not available if attachment

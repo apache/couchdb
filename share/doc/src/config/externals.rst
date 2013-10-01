@@ -10,6 +10,8 @@
 .. License for the specific language governing permissions and limitations under
 .. the License.
 
+.. default-domain:: config
+
 .. highlight:: ini
 
 ==================
@@ -18,162 +20,160 @@ External Processes
 
 .. _config/os_daemons:
 
-``[os_daemons]`` :: OS Daemons
-==============================
+OS Daemons
+==========
 
-This is a simple feature that allows users to configure CouchDB so that it
-maintains a given OS level process alive. If the process dies for any reason,
-CouchDB will restart it. If the process restarts too often, then CouchDB will
-mark it has halted and not attempt to restart it. The default max restart rate
-is ``3`` times in the last ``5`` seconds. These parameters are
-:ref:`adjustable <config/os_daemon_settings>`.
+.. config:section:: os_daemons :: OS Daemons
 
-Commands that are started in this manner will have access to a simple
-API over stdio to request configuration parameters or to add log
-statements to CouchDB's logs.
+  This is a simple feature that allows users to configure CouchDB so that it
+  maintains a given OS level process alive. If the process dies for any reason,
+  CouchDB will restart it. If the process restarts too often, then CouchDB will
+  mark it has halted and not attempt to restart it. The default max restart rate
+  is ``3`` times in the last ``5`` seconds. These parameters are
+  :section:`adjustable <os_daemon_settings>`.
 
-To configure an OS process as a CouchDB os_daemon, create a section
-in your `local.ini` like such::
+  Commands that are started in this manner will have access to a simple
+  API over stdio to request configuration parameters or to add log
+  statements to CouchDB's logs.
 
-  [os_daemons]
-  daemon_name = /path/to/command -with args
+  To configure an OS process as a CouchDB os_daemon, create a section
+  in your `local.ini` like such::
 
-This will make CouchDB bring up the command and attempt to keep it
-alive. To request a configuration parameter, an `os_daemon` can write
-a simple JSON message to stdout like such::
+    [os_daemons]
+    daemon_name = /path/to/command -with args
 
-  ["get", "os_daemons"]\n
+  This will make CouchDB bring up the command and attempt to keep it
+  alive. To request a configuration parameter, an `os_daemon` can write
+  a simple JSON message to stdout like such::
 
-which would return::
+    ["get", "os_daemons"]\n
 
-  {"daemon_name": "/path/to/command -with args"}\n
+  which would return::
 
-Or::
+    {"daemon_name": "/path/to/command -with args"}\n
 
-  ["get", "os_daemons", "daemon_name"]\n
+  Or::
 
-which would return::
+    ["get", "os_daemons", "daemon_name"]\n
 
-  "/path/to/command -with args"\n
+  which would return::
 
-There's no restriction on what configuration variables are visible.
-There's also no method for altering the configuration.
+    "/path/to/command -with args"\n
 
-If you would like your OS daemon to be restarted in the event that
-the configuration changes, you can send the following messages::
+  There's no restriction on what configuration variables are visible.
+  There's also no method for altering the configuration.
 
-  ["register", $(SECTION)]\n
+  If you would like your OS daemon to be restarted in the event that
+  the configuration changes, you can send the following messages::
 
-When anything in that section changes, your OS process will be
-rebooted so it can pick up the new configuration settings. If you
-want to listen for changes on a specific key, you can send something
-like::
+    ["register", $(SECTION)]\n
 
-  ["register", $(SECTION), $(KEY)]\n
+  When anything in that section changes, your OS process will be
+  rebooted so it can pick up the new configuration settings. If you
+  want to listen for changes on a specific key, you can send something
+  like::
 
-In this case, CouchDB will only restart your daemon if that exact
-section/key pair changes, instead of anything in that entire section.
+    ["register", $(SECTION), $(KEY)]\n
 
-Logging commands look like::
+  In this case, CouchDB will only restart your daemon if that exact
+  section/key pair changes, instead of anything in that entire section.
 
-  ["log", $(JSON_MESSAGE)]\n
+  Logging commands look like::
 
-Where ``$(JSON_MESSAGE)`` is arbitrary JSON data. These messages are
-logged at the 'info' level. If you want to log at a different level
-you can pass messages like such::
+    ["log", $(JSON_MESSAGE)]\n
 
-  ["log", $(JSON_MESSAGE), {"level": $(LEVEL)}]\n
+  Where ``$(JSON_MESSAGE)`` is arbitrary JSON data. These messages are
+  logged at the 'info' level. If you want to log at a different level
+  you can pass messages like such::
 
-Where ``$(LEVEL)`` is one of "debug", "info", or "error".
+    ["log", $(JSON_MESSAGE), {"level": $(LEVEL)}]\n
 
-When implementing a daemon process to be managed by CouchDB you
-should remember to use a method like checking the parent process
-id or if stdin has been closed. These flags can tell you if
-your daemon process has been orphaned so you can exit cleanly.
+  Where ``$(LEVEL)`` is one of "debug", "info", or "error".
 
-There is no interactivity between CouchDB and the running process, but
-you can use the OS Daemons service to create new HTTP servers and
-responders and then use the new proxy service to redirect requests and
-output to the CouchDB managed service. For more information on proxying,
-see :ref:`http-proxying`. For further background on the OS Daemon service, see
-`CouchDB Externals API`_.
+  When implementing a daemon process to be managed by CouchDB you
+  should remember to use a method like checking the parent process
+  id or if stdin has been closed. These flags can tell you if
+  your daemon process has been orphaned so you can exit cleanly.
 
-.. _CouchDB Externals API: http://davispj.com/2010/09/26/new-couchdb-externals-api.html
+  There is no interactivity between CouchDB and the running process, but
+  you can use the OS Daemons service to create new HTTP servers and
+  responders and then use the new proxy service to redirect requests and
+  output to the CouchDB managed service. For more information on proxying,
+  see :ref:`http-proxying`. For further background on the OS Daemon service,
+  see :ref:`externals`.
 
 
 .. _config/os_daemon_settings:
 
-``[os_daemon_settings]`` :: OS Daemons settings
-===============================================
+OS Daemons settings
+===================
 
-.. _config/os_daemons_settings/max_retries:
-
-``max_retries`` :: Maximum restart retries
-------------------------------------------
-
-Specifies maximum attempts to run :ref:`os_daemon <config/os_daemons>` before
-mark them halted::
-
-  [os_daemon_settings]
-  max_retries = 3
+.. config:section:: os_daemon_settings :: OS Daemons settings
 
 
-.. _config/os_daemons_settings/retry_time:
+  .. config:option:: max_retries :: Maximum restart retries
 
-``retry_time`` :: Delay between restart attempts
-------------------------------------------------
+    Specifies maximum attempts to run :section:`os_daemons` before
+    mark them halted::
 
-Delay in seconds between :ref:`os_daemon <config/os_daemons>` restarts::
+      [os_daemon_settings]
+      max_retries = 3
 
-  [os_daemon_settings]
-  retry_time = 5
 
+  .. config:option:: retry_time :: Delay between restart attempts
+
+    Delay in seconds between :section:`os_daemons` restarts::
+
+      [os_daemon_settings]
+      retry_time = 5
 
 
 .. _update-notifications:
 .. _config/update_notification:
 
-``[update_notification]`` :: Update notifications
-=================================================
+Update notifications
+====================
 
-CouchDB is able to spawn OS processes to notify them about recent databases
-updates. The notifications are in form of JSON messages sent as a line of text,
-terminated by ``CR`` (``\n``) character, to the OS processes through `stdout`::
+.. config:section:: update_notification :: Update notifications
 
-  [update_notification]
-  ;unique notifier name=/full/path/to/exe -with "cmd line arg"
-  index_updater = ruby /usr/local/bin/index_updater.rb
+  CouchDB is able to spawn OS processes to notify them about recent databases
+  updates. The notifications are in form of JSON messages sent as a line of
+  text, terminated by ``CR`` (``\n``) character, to the OS processes through
+  `stdout`::
 
+    [update_notification]
+    ;unique notifier name=/full/path/to/exe -with "cmd line arg"
+    index_updater = ruby /usr/local/bin/index_updater.rb
 
-The update notification messages are depend upon of event type:
+  The update notification messages are depend upon of event type:
 
-- **Database created**:
+  - **Database created**:
 
-  .. code-block:: javascript
+    .. code-block:: javascript
 
-    {"type":"created","db":"dbname"}
-
-
-- **Database updated**:  this event raises when any document gets updated for
-  specified database:
-
-  .. code-block:: javascript
-
-    {"type":"updated","db":"dbname"}
+      {"type":"created","db":"dbname"}
 
 
-- **Design document updated**: for design document updates there is special
-  event raised in additional to regular db update one:
+  - **Database updated**:  this event raises when any document gets updated for
+    specified database:
 
-  .. code-block:: javascript
+    .. code-block:: javascript
 
-    {"type":"ddoc_updated","db":"dbname","id":"_design/ddoc_name"}
+      {"type":"updated","db":"dbname"}
 
 
-- **Database deleted**:
+  - **Design document updated**: for design document updates there is special
+    event raised in additional to regular db update one:
 
-  .. code-block:: javascript
+    .. code-block:: javascript
 
-    {"type":"deleted","db":"dbname"}
+      {"type":"ddoc_updated","db":"dbname","id":"_design/ddoc_name"}
 
-.. note:: New line (``\n``) trailing character was removed from examples.
+
+  - **Database deleted**:
+
+    .. code-block:: javascript
+
+      {"type":"deleted","db":"dbname"}
+
+  .. note:: New line (``\n``) trailing character was removed from examples.

@@ -18,176 +18,150 @@ Replicator
 
 .. _config/replicator:
 
-``[replicator]`` :: Replicator Database Configuration
-=====================================================
+Replicator Database Configuration
+=================================
 
-.. versionadded:: 1.2
+.. config:section:: replicator :: Replicator Database Configuration
 
-.. _config/replicator/db:
+  .. versionadded:: 1.2
 
-``db``
-------
 
-Specifies replicator database name::
+  .. config:option:: db
 
-  [replicator]
-  db = _replicator
+    Specifies replicator database name::
 
+      [replicator]
+      db = _replicator
 
-.. _config/replicator/max_replication_retry_count:
 
-``max_replication_retry_count``
--------------------------------
 
-Maximum replication retry count can be a non-negative integer or "infinity"::
+  .. config:option:: max_replication_retry_count
 
-  [replicator]
-  max_replication_retry_count = 10
+    Maximum replication retry count can be a non-negative integer or "infinity"
+    ::
 
+      [replicator]
+      max_replication_retry_count = 10
 
-.. _config/replicator/worker_batch_size:
 
-``worker_batch_size``
----------------------
 
-With lower batch sizes checkpoints are done more frequently. Lower batch sizes
-also reduce the total amount of used RAM memory::
+  .. config:option:: worker_batch_size
 
-  [replicator]
-  worker_batch_size = 500
+    With lower batch sizes checkpoints are done more frequently. Lower batch
+    sizes also reduce the total amount of used RAM memory::
 
+      [replicator]
+      worker_batch_size = 500
 
-.. _config/replicator/worker_processes:
 
-``worker_processes``
---------------------
 
-More worker processes can give higher network throughput but can also imply more
-disk and network IO::
+  .. config:option:: worker_processes
 
-  [replicator]
-  worker_processes = 4
+    More worker processes can give higher network throughput but can also imply
+    more disk and network IO::
 
+      [replicator]
+      worker_processes = 4
 
-.. _config/replicator/http_connections:
 
-``http_connections``
---------------------
 
-Maximum number of HTTP connections per replication::
+  .. config:option:: http_connections
 
-  [replicator]
-  http_connections = 20
+    Maximum number of HTTP connections per replication::
 
+      [replicator]
+      http_connections = 20
 
-.. _config/replicator/connection_timeout:
 
-``connection_timeout``
-----------------------
 
-HTTP connection timeout per replication.
-Even for very fast/reliable networks it might need to be increased if a remote
-database is too busy::
+  .. config:option:: connection_timeout
 
-  [replicator]
-  connection_timeout = 30000
+    HTTP connection timeout per replication.
+    Even for very fast/reliable networks it might need to be increased if
+    a remote database is too busy::
 
+      [replicator]
+      connection_timeout = 30000
 
-.. _config/replicator/retries_per_request:
 
-``retries_per_request``
------------------------
 
-If a request fails, the replicator will retry it up to N times::
+  .. config:option:: retries_per_request
 
-  [replicator]
-  retries_per_request = 10
+    If a request fails, the replicator will retry it up to N times::
 
+      [replicator]
+      retries_per_request = 10
 
-.. _config/replicator/socket_options:
 
-``socket_options``
-------------------
 
-Some socket options that might boost performance in some scenarios:
+  .. config:option:: socket_options
 
-- ``{nodelay, boolean()}``
-- ``{sndbuf, integer()}``
-- ``{recbuf, integer()}``
-- ``{priority, integer()}``
+    Some socket options that might boost performance in some scenarios:
 
-See the `inet`_ Erlang module's man page for the full list of options::
+    - ``{nodelay, boolean()}``
+    - ``{sndbuf, integer()}``
+    - ``{recbuf, integer()}``
+    - ``{priority, integer()}``
 
-  [replicator]
-  socket_options = [{keepalive, true}, {nodelay, false}]
+    See the `inet`_ Erlang module's man page for the full list of options::
 
-.. _inet: http://www.erlang.org/doc/man/inet.html#setopts-2
+      [replicator]
+      socket_options = [{keepalive, true}, {nodelay, false}]
 
+    .. _inet: http://www.erlang.org/doc/man/inet.html#setopts-2
 
-.. _config/replicator/cert_file:
 
-``cert_file``
--------------
 
-Path to a file containing the user's certificate::
+  .. config:option:: cert_file
 
-  [replicator]
-  cert_file = /full/path/to/server_cert.pem
+    Path to a file containing the user's certificate::
 
+      [replicator]
+      cert_file = /full/path/to/server_cert.pem
 
-.. _config/replicator/key_file:
 
-``key_file``
-------------
 
-Path to file containing user's private PEM encoded key::
+  .. config:option:: key_file
 
-  [replicator]
-  key_file = /full/path/to/server_key.pem
+    Path to file containing user's private PEM encoded key::
 
+      [replicator]
+      key_file = /full/path/to/server_key.pem
 
-.. _config/replicator/password:
 
-``password``
-------------
 
-String containing the user's password. Only used if the private keyfile is
-password protected::
+  .. config:option:: password
 
-  [replicator]
-  password = somepassword
+    String containing the user's password. Only used if the private keyfile is
+    password protected::
 
+      [replicator]
+      password = somepassword
 
-.. _config/replicator/verify_ssl_certificates:
 
-``verify_ssl_certificates``
----------------------------
 
-Set to true to validate peer certificates::
+  .. config:option:: verify_ssl_certificates
 
-  [replicator]
-  verify_ssl_certificates = false
+    Set to true to validate peer certificates::
 
+      [replicator]
+      verify_ssl_certificates = false
 
-.. _config/replicator/ssl_trusted_certificates_file:
 
-``ssl_trusted_certificates_file``
----------------------------------
 
-File containing a list of peer trusted certificates (in the PEM format)::
+  .. config:option:: ssl_trusted_certificates_file
 
-  [replicator]
-  ssl_trusted_certificates_file = /etc/ssl/certs/ca-certificates.crt
+    File containing a list of peer trusted certificates (in the PEM format)::
 
+      [replicator]
+      ssl_trusted_certificates_file = /etc/ssl/certs/ca-certificates.crt
 
-.. _config/replicator/ssl_certificate_max_depth:
 
-``ssl_certificate_max_depth``
------------------------------
 
-Maximum peer certificate depth (must be set even if certificate validation is
-off)::
+  .. config:option:: ssl_certificate_max_depth
 
-  [replicator]
-  ssl_certificate_max_depth = 3
+    Maximum peer certificate depth (must be set even if certificate validation
+    is off)::
 
+      [replicator]
+      ssl_certificate_max_depth = 3

@@ -16,160 +16,135 @@
 CouchDB Internal Services
 =========================
 
+
 .. _config/daemons:
 
-``[daemons]`` :: CouchDB Daemonized Mini Apps
-=============================================
+CouchDB Daemonized Mini Apps
+============================
 
-.. todo:: Add more detailed apps description and guide how to add custom ones.
+.. config:section:: daemons :: CouchDB Daemonized Mini Apps
 
-.. _config/daemons/auth_cache:
 
-``auth_cache``
---------------
+  .. config:option:: auth_cache
 
-This daemon provides authentication caching to avoid repeated opening and
-closing of the `_users` database for each request requiring authentication::
+    This daemon provides authentication caching to avoid repeated opening and
+    closing of the `_users` database for each request requiring authentication::
 
-  [daemons]
-  auth_cache={couch_auth_cache, start_link, []}
+      [daemons]
+      auth_cache={couch_auth_cache, start_link, []}
 
 
-.. _config/daemons/compaction_daemon:
 
-``compaction_daemon``
----------------------
+  .. config:option:: compaction_daemon
 
-:ref:`Automatic compaction <config/compactions>` daemon::
+    :ref:`Automatic compaction <config/compactions>` daemon::
 
-  [daemons]
-  compaction_daemon={couch_compaction_daemon, start_link, []}
+      [daemons]
+      compaction_daemon={couch_compaction_daemon, start_link, []}
 
 
-.. _config/daemons/external_manager:
 
-``external_manager``
---------------------
+  .. config:option:: external_manager
 
-`External` processes manager::
+    `External` processes manager::
 
-  [daemons]
-  external_manager={couch_external_manager, start_link, []}
+      [daemons]
+      external_manager={couch_external_manager, start_link, []}
 
 
 
-.. _config/daemons/httpd:
+  .. config:option:: httpd
 
-``httpd``
----------
+    HTTP server daemon::
 
-HTTP server daemon::
+      [daemons]
+      httpd={couch_httpd, start_link, []}
 
-  [daemons]
-  httpd={couch_httpd, start_link, []}
 
 
-.. _config/daemons/httpsd:
+  .. config:option:: httpsd
 
-``httpsd``
-----------
+    Provides :ref:`SSL support <config/ssl>`. The default ssl port CouchDB
+    listens on is `6984`::
 
-Provides :ref:`SSL support <config/ssl>`. The default ssl port CouchDB listens
-on is 6984::
+      [daemons]
+      httpsd = {couch_httpd, start_link, [https]}
 
-  [daemons]
-  httpsd = {couch_httpd, start_link, [https]}
 
 
 
-.. _config/daemons/index_server:
+  .. config:option:: index_server
 
-``index_server``
-----------------
+    The `couch_index` application is responsible for managing all of the
+    different types of indexers. This manages the process handling for
+    keeping track of the index state as well as managing the updater and
+    compactor handling::
 
-The `couch_index` application is responsible for managing all of the
-different types of indexers. This manages the process handling for
-keeping track of the index state as well as managing the updater and
-compactor handling::
+      [daemons]
+      index_server={couch_index_server, start_link, []}
 
-  [daemons]
-  index_server={couch_index_server, start_link, []}
 
 
-.. _config/daemons/os_daemons:
+  .. config:option:: os_daemons
 
-``os_daemons``
---------------
+    :ref:`OS Daemons <config/os_daemons>` manager::
 
-:ref:`OS Daemons <config/os_daemons>` manager::
+      [daemons]
+      os_daemons={couch_os_daemons, start_link, []}
 
-  [daemons]
-  os_daemons={couch_os_daemons, start_link, []}
 
 
-.. _config/daemons/query_servers:
+  .. config:option:: query_servers
 
-``query_servers``
------------------
+    :ref:`Query servers <config/query_servers>` manager::
 
-:ref:`Query servers <config/query_servers>` manager::
+      [daemons]
+      query_servers={couch_query_servers, start_link, []}
 
-  [daemons]
-  query_servers={couch_query_servers, start_link, []}
 
 
-.. _config/daemons/replicator_manager:
+  .. config:option:: replicator_manager
 
-``replicator_manager``
-----------------------
+    Replications manager::
 
-Replications manager::
+      [daemons]
+      replicator_manager={couch_replicator_manager, start_link, []}
 
-  [daemons]
-  replicator_manager={couch_replicator_manager, start_link, []}
 
 
-.. _config/daemons/aggregator:
+  .. config:option:: stats_aggregator
 
-``stats_aggregator``
---------------------
+    Runtime statistics aggregator::
 
-Runtime statistics aggregator::
+      [daemons]
+      stats_aggregator={couch_stats_aggregator, start, []}
 
-  [daemons]
-  stats_aggregator={couch_stats_aggregator, start, []}
 
 
-.. _config/daemons/stats_collector:
+  .. config:option:: stats_collector
 
-``stats_collector``
--------------------
+    Runtime statistics collector::
 
-Runtime statistics collector::
+      [daemons]
+      stats_collector={couch_stats_collector, start, []}
 
-  [daemons]
-  stats_collector={couch_stats_collector, start, []}
 
 
-.. _config/daemons/uuids:
+  .. config:option:: uuids
 
-``uuids``
----------
+    :ref:`UUIDs <config/uuids>` generator daemon::
 
-:ref:`UUIDs <config/uuids>` generator daemon::
+      [daemons]
+      uuids={couch_uuids, start, []}
 
-  [daemons]
-  uuids={couch_uuids, start, []}
 
 
-.. _config/daemons/vhosts:
+  .. config:option:: vhosts
 
-``vhosts``
-----------
+    :ref:`Virtual hosts <config/vhosts>` manager. Provides dynamic add of vhosts
+    without restart, wildcards support and dynamic routing via pattern matching
+    ::
 
-:ref:`Virtual hosts <config/vhosts>` manager. Provides dynamic add of vhosts
-without restart, wildcards support and dynamic routing via pattern matching::
-
-  [daemons]
-  vhosts={couch_httpd_vhost, start_link, []}
+      [daemons]
+      vhosts={couch_httpd_vhost, start_link, []}
 

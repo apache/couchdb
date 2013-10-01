@@ -95,8 +95,8 @@ WWW-Authenticate
 
 The default configuration has been changed to avoid causing basic-auth popups
 which result from sending the WWW-Authenticate header. To enable basic-auth
-popups, uncomment the :ref:`WWW-Authenticate <config/httpd/WWW-Authenticate>`
-line in `local.ini`.
+popups, uncomment the :config:option:`httpd/WWW-Authenticate` line in
+`local.ini`.
 
 Query server line protocol
 ^^^^^^^^^^^^^^^^^^^^^^^^^^

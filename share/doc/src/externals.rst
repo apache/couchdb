@@ -103,7 +103,8 @@ one instance of it is alive. If you have something where you want multiple
 processes, you need to either tell CouchDB about each one, or have a main
 process that forks off the required sub-processes.
 
-To configure an :ref:`OS daemon <config/os_daemons>`, add this to your local.ini::
+To configure an :config:section:`OS daemon <os_daemons>`, add this to your
+`local.ini`::
 
     [os_daemons]
     my_daemon = /path/to/command -with args
@@ -114,8 +115,9 @@ Configuration API
 As an added benefit, because stdio is now free, I implemented a simple API
 that OS daemons can use to read the configuration of their CouchDB host. This
 way you can have them store their configuration inside CouchDB's config system
-if you desire. Or they can peek at things like the :ref:`bind_address
-<config/httpd/bind_address>` and port that CouchDB is using.
+if you desire. Or they can peek at things like the
+:config:option:`httpd/bind_address` and :config:option:`httpd/port` that CouchDB
+is using.
 
 A request for a config section looks like this::
 
@@ -149,13 +151,13 @@ Dynamic Daemons
 +++++++++++++++
 
 The OS daemons react in real time to changes to the configuration system. If
-you set or delete keys in the :ref:`os_daemons <config/os_daemons>` section,
+you set or delete keys in the :config:section:`os_daemons` section,
 the corresponding daemons will be started or killed as appropriate.
 
 Neat. But So What?
 ------------------
 
-It was suggested that a good first demo would be  a `Node.js`_ handler. So, I
+It was suggested that a good first demo would be a `Node.js`_ handler. So, I
 present to you a "Hello, World" Node.js handler. Also, remember that this
 currently relies on code in my fork on `GitHub`_.
 

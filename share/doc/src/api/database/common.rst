@@ -268,7 +268,7 @@
                    - :mimetype:`text/plain`
   :<header Content-Type: :mimetype:`application/json`
   :<header X-Couch-Full-Commit: Overrides server's
-    :ref:`commit policy <config/couchdb/delayed_commits>`. Possible values
+    :config:option:`commit policy <couchdb/delayed_commits>`. Possible values
     are: ``false`` and ``true``. *Optional*.
   :query string batch: Stores document in :ref:`batch mode
     <api/doc/batch-writes>` Possible values: ``ok``. *Optional*

@@ -47,7 +47,7 @@ Version 1.4.0
   updates and deletion of databases. :commit:`917d8988`
 * :issue:`1772`: Prevent invalid JSON output when using `all_or_nothing`
   :ref:`of bulk API <api/db/bulk_docs>`. :commit:`dfd39d57`
-* Add a :ref:`configurable whitelist <config/couch_httpd_auth/public_fields>`
+* Add a :config:option:`configurable whitelist <couch_httpd_auth/public_fields>`
   of user document properties. :commit:`8d7ab8b1`
 * :issue:`1852`: Support Last-Event-ID header in EventSource changes feeds.
   :commit:`dfd2199a`

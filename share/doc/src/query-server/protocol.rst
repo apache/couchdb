@@ -964,4 +964,4 @@ CouchDB responds nothing, but writes received message into log file::
 
   [Sun, 13 Feb 2009 23:31:30 GMT] [info] [<0.72.0>] Query Server Log Message: some message
 
-These messages are only logged at :ref:`info level <config/log/level>`.
+These messages are only logged at :config:option:`info level <log/level>`.

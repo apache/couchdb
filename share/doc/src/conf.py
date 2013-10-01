@@ -17,7 +17,8 @@ import sys
 
 sys.path.insert(0, os.path.abspath('../ext'))
 
-extensions = ["sphinx.ext.todo", "sphinx.ext.extlinks", 'github', 'httpdomain']
+extensions = ["sphinx.ext.todo", "sphinx.ext.extlinks", 'github',
+              'httpdomain', 'configdomain']
 
 _info = {}
 _regex = re.compile('m4_define\(\[(.+)\],\s+\[(.+)\]\)')

@@ -46,7 +46,7 @@
   Currently it is the next:
 
   * **language** (*string*): Defines :ref:`Query Server <query-server>`
-    :ref:`key <config/query_servers>` to process design document functions
+    :config:section:`key <query_servers>` to process design document functions
   * **options** (*object*): View's default options
   * **filters** (*object*): :ref:`Filter functions <filterfun>` definition
   * **lists** (*object*): :ref:`List functions <listfun>` definition

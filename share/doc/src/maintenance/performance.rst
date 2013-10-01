@@ -78,7 +78,7 @@ CouchDB Configuration Options
 delayed_commits
 ^^^^^^^^^^^^^^^
 
-The :ref:`delayed commits <config/couchdb/delayed_commits>` allows it to
+The :config:option:`delayed commits <couchdb/delayed_commits>` allows to
 achieve better write performance for some workloads while sacrificing a small
 amount of durability. The setting causes CouchDB to wait up to a full second
 before committing new data after an update. If the server crashes before
@@ -89,7 +89,7 @@ max_dbs_open
 ^^^^^^^^^^^^
 
 In your :ref:`configuration <config>` (local.ini or similar) familiarize
-yourself with the :ref:`max_dbs_open <config/couchdb/max_dbs_open>`:
+yourself with the :config:option:`couchdb/max_dbs_open`:
 
 .. code-block:: ini
 
@@ -174,8 +174,8 @@ sent to the TCP socket, like the reply to a document write request (or reading
 a very small document), will not be sent immediately to the network - TCP will
 buffer it for a while hoping that it will be asked to send more data through
 the same socket and then send all the data at once for increased performance.
-This TCP buffering behaviour can be disabled via :ref:`socket_options
-<config/httpd/socket_options>`:
+This TCP buffering behaviour can be disabled via
+:config:option:`httpd/socket_options`:
 
 .. code-block:: ini
 

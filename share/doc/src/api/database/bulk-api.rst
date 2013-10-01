@@ -210,7 +210,7 @@
                    - :mimetype:`text/plain`
   :<header Content-Type: :mimetype:`application/json`
   :<header X-Couch-Full-Commit: Overrides server's
-    :ref:`commit policy <config/couchdb/delayed_commits>`. Possible values
+    :config:option:`commit policy <couchdb/delayed_commits>`. Possible values
     are: ``false`` and ``true``. *Optional*.
   :<json boolean all_or_nothing: Sets the database commit mode to use
     `all-or-nothing` semantics. Default is ``false``. *Optional*.

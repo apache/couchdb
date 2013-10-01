@@ -10,6 +10,8 @@
 .. License for the specific language governing permissions and limitations under
 .. the License.
 
+.. default-domain:: config
+
 .. highlight:: ini
 
 ========================
@@ -18,204 +20,204 @@ Miscellaneous Parameters
 
 .. _config/attachments:
 
-``[attachments]`` :: Configuration of Attachment Storage
-========================================================
+Configuration of Attachment Storage
+===================================
 
-.. _config/attachments/compression_level:
+.. config:section:: attachments :: Configuration of Attachment Storage
 
-``compression_level``
----------------------
+  .. config:option:: compression_level
+    
+    Defines zlib compression level for the attachments from ``1`` (lowest,
+    fastest) to ``9`` (highest, slowest). A value of ``0`` disables compression
 
-Defines zlib compression level for the attachments from ``1`` (lowest, fastest)
-to ``9`` (highest, slowest). A value of ``0`` disables compression::
+    ::
+    
+      [attachments]
+      compression_level = 8
+    
 
-  [attachments]
-  compression_level = 8
-
-
-.. _config/attachments/compressible_types:
-
-``compressible_types``
-----------------------
-
-Since compression is ineffective for some types of files, it is possible to let
-CouchDB compress only some types of attachments, specified by their MIME type::
-
-  [attachments]
-  compressible_types = text/*, application/javascript, application/json, application/xml
+  .. config:option:: compressible_types
+    
+    Since compression is ineffective for some types of files, it is possible
+    to let CouchDB compress only some types of attachments, specified by their
+    MIME type::
+    
+      [attachments]
+      compressible_types = text/*, application/javascript, application/json, application/xml
 
 
 .. _config/stats:
 
-``[stats]`` :: Statistic Calculation
-====================================
+Statistic Calculation
+=====================
 
-.. _config/stats/rate:
+.. config:section:: stats :: Statistic Calculation
+  
+  
+  .. config:option:: rate
+    
+    Rate of statistics gathering in milliseconds::
+    
+      [stats]
+      rate = 1000
 
-``rate``
---------
-
-Rate of statistics gathering in milliseconds::
-
-  [stats]
-  rate = 1000
-
-
-.. _config/stats/samples:
-
-``samples``
------------
-
-Samples are used to track the mean and standard value deviation within specified
-intervals (in seconds)::
-
-  [stats]
-  samples = [0, 60, 300, 900]
+    
+  .. config:option:: samples
+    
+    Samples are used to track the mean and standard value deviation within
+    specified intervals (in seconds)::
+    
+      [stats]
+      samples = [0, 60, 300, 900]
 
 
 .. _config/uuids:
-.. _config/uuids/algorithm:
 
-``[uuids]`` :: UUID Generation Algorithm
-========================================
+UUIDs Configuration
+===================
 
-.. versionchanged:: 1.3 ``utc_id`` algorithm.
+.. config:section:: uuids :: UUIDs Configuration
 
-CouchDB provides various algorithms to generate the UUID values that are used
-for document `_id`'s by default::
+  .. config:option:: algorithm :: Generation Algorithm
 
-  [uuids]
-  algorithm = sequential
+    .. versionchanged:: 1.3 Added ``utc_id`` algorithm.
 
-Available algorithms:
+    CouchDB provides various algorithms to generate the UUID values that are
+    used for document `_id`'s by default::
 
-- ``random``: 128 bits of random awesome. All awesome, all the time:
+      [uuids]
+      algorithm = sequential
 
-  .. code-block:: javascript
+    Available algorithms:
 
-    {
-      "uuids": [
-        "5fcbbf2cb171b1d5c3bc6df3d4affb32",
-        "9115e0942372a87a977f1caf30b2ac29",
-        "3840b51b0b81b46cab99384d5cd106e3",
-        "b848dbdeb422164babf2705ac18173e1",
-        "b7a8566af7e0fc02404bb676b47c3bf7",
-        "a006879afdcae324d70e925c420c860d",
-        "5f7716ee487cc4083545d4ca02cd45d4",
-        "35fdd1c8346c22ccc43cc45cd632e6d6",
-        "97bbdb4a1c7166682dc026e1ac97a64c",
-        "eb242b506a6ae330bda6969bb2677079"
-      ]
-    }
+    - ``random``: 128 bits of random awesome. All awesome, all the time:
 
-- ``sequential``: Monotonically increasing ids with random increments.
-  The first 26 hex characters are random, the last 6 increment in random
-  amounts until an overflow occurs. On overflow, the random prefix is
-  regenerated and the process starts over.
+      .. code-block:: javascript
 
-  .. code-block:: javascript
+        {
+          "uuids": [
+            "5fcbbf2cb171b1d5c3bc6df3d4affb32",
+            "9115e0942372a87a977f1caf30b2ac29",
+            "3840b51b0b81b46cab99384d5cd106e3",
+            "b848dbdeb422164babf2705ac18173e1",
+            "b7a8566af7e0fc02404bb676b47c3bf7",
+            "a006879afdcae324d70e925c420c860d",
+            "5f7716ee487cc4083545d4ca02cd45d4",
+            "35fdd1c8346c22ccc43cc45cd632e6d6",
+            "97bbdb4a1c7166682dc026e1ac97a64c",
+            "eb242b506a6ae330bda6969bb2677079"
+          ]
+        }
 
-    {
-      "uuids": [
-        "4e17c12963f4bee0e6ec90da54804894",
-        "4e17c12963f4bee0e6ec90da5480512f",
-        "4e17c12963f4bee0e6ec90da54805c25",
-        "4e17c12963f4bee0e6ec90da54806ba1",
-        "4e17c12963f4bee0e6ec90da548072b3",
-        "4e17c12963f4bee0e6ec90da54807609",
-        "4e17c12963f4bee0e6ec90da54807718",
-        "4e17c12963f4bee0e6ec90da54807754",
-        "4e17c12963f4bee0e6ec90da54807e5d",
-        "4e17c12963f4bee0e6ec90da54808d28"
-      ]
-    }
+    - ``sequential``: Monotonically increasing ids with random increments.
+      The first 26 hex characters are random, the last 6 increment in random
+      amounts until an overflow occurs. On overflow, the random prefix is
+      regenerated and the process starts over.
 
-- ``utc_random``: The time since Jan 1, 1970 UTC, in microseconds. The first
-  14 characters are the time in hex. The last 18 are random.
+      .. code-block:: javascript
 
-  .. code-block:: javascript
+        {
+          "uuids": [
+            "4e17c12963f4bee0e6ec90da54804894",
+            "4e17c12963f4bee0e6ec90da5480512f",
+            "4e17c12963f4bee0e6ec90da54805c25",
+            "4e17c12963f4bee0e6ec90da54806ba1",
+            "4e17c12963f4bee0e6ec90da548072b3",
+            "4e17c12963f4bee0e6ec90da54807609",
+            "4e17c12963f4bee0e6ec90da54807718",
+            "4e17c12963f4bee0e6ec90da54807754",
+            "4e17c12963f4bee0e6ec90da54807e5d",
+            "4e17c12963f4bee0e6ec90da54808d28"
+          ]
+        }
 
-    {
-      "uuids": [
-        "04dd32b3af699659b6db9486a9c58c62",
-        "04dd32b3af69bb1c2ac7ebfee0a50d88",
-        "04dd32b3af69d8591b99a8e86a76e0fb",
-        "04dd32b3af69f4a18a76efd89867f4f4",
-        "04dd32b3af6a1f7925001274bbfde952",
-        "04dd32b3af6a3fe8ea9b120ed906a57f",
-        "04dd32b3af6a5b5c518809d3d4b76654",
-        "04dd32b3af6a78f6ab32f1e928593c73",
-        "04dd32b3af6a99916c665d6bbf857475",
-        "04dd32b3af6ab558dd3f2c0afacb7d66"
-      ]
-    }
+    - ``utc_random``: The time since Jan 1, 1970 UTC, in microseconds. The first
+      14 characters are the time in hex. The last 18 are random.
 
-- ``utc_id``: The time since Jan 1, 1970 UTC, in microseconds, plus
-  the ``utc_id_suffix`` string. The first 14 characters are the time in hex.
-  The :ref:`config/uuids/utc_id_suffix` string value is appended to these.
+      .. code-block:: javascript
 
-  .. code-block:: javascript
+        {
+          "uuids": [
+            "04dd32b3af699659b6db9486a9c58c62",
+            "04dd32b3af69bb1c2ac7ebfee0a50d88",
+            "04dd32b3af69d8591b99a8e86a76e0fb",
+            "04dd32b3af69f4a18a76efd89867f4f4",
+            "04dd32b3af6a1f7925001274bbfde952",
+            "04dd32b3af6a3fe8ea9b120ed906a57f",
+            "04dd32b3af6a5b5c518809d3d4b76654",
+            "04dd32b3af6a78f6ab32f1e928593c73",
+            "04dd32b3af6a99916c665d6bbf857475",
+            "04dd32b3af6ab558dd3f2c0afacb7d66"
+          ]
+        }
 
-    {
-      "uuids": [
-        "04dd32bd5eabcc@mycouch",
-        "04dd32bd5eabee@mycouch",
-        "04dd32bd5eac05@mycouch",
-        "04dd32bd5eac28@mycouch",
-        "04dd32bd5eac43@mycouch",
-        "04dd32bd5eac58@mycouch",
-        "04dd32bd5eac6e@mycouch",
-        "04dd32bd5eac84@mycouch",
-        "04dd32bd5eac98@mycouch",
-        "04dd32bd5eacad@mycouch"
-      ]
-    }
+    - ``utc_id``: The time since Jan 1, 1970 UTC, in microseconds, plus
+      the ``utc_id_suffix`` string. The first 14 characters are the time in hex.
+      The :option:`uuids/utc_id_suffix` string value is appended to these.
 
-.. note::
+      .. code-block:: javascript
 
-   **Impact of UUID choices:** the choice of UUID has a significant impact on
-   the layout of the B-tree, prior to compaction.
+        {
+          "uuids": [
+            "04dd32bd5eabcc@mycouch",
+            "04dd32bd5eabee@mycouch",
+            "04dd32bd5eac05@mycouch",
+            "04dd32bd5eac28@mycouch",
+            "04dd32bd5eac43@mycouch",
+            "04dd32bd5eac58@mycouch",
+            "04dd32bd5eac6e@mycouch",
+            "04dd32bd5eac84@mycouch",
+            "04dd32bd5eac98@mycouch",
+            "04dd32bd5eacad@mycouch"
+          ]
+        }
 
-   For example, using a sequential UUID algorithm while uploading a large batch
-   of documents will avoid the need to rewrite many intermediate B-tree nodes.
-   A random UUID algorithm may require rewriting intermediate nodes on a regular
-   basis, resulting in significantly decreased throughput and wasted disk space
-   space due to the append-only B-tree design.
+    .. note::
 
-   It is generally recommended to set your own UUIDs, or use the sequential
-   algorithm unless you have a specific need and take into account the likely
-   need for compaction to re-balance the B-tree and reclaim wasted space.
+       **Impact of UUID choices:** the choice of UUID has a significant impact
+       on the layout of the B-tree, prior to compaction.
 
+       For example, using a sequential UUID algorithm while uploading a large
+       batch of documents will avoid the need to rewrite many intermediate
+       B-tree nodes. A random UUID algorithm may require rewriting intermediate
+       nodes on a regular basis, resulting in significantly decreased throughput
+       and wasted disk space space due to the append-only B-tree design.
 
-.. _config/uuids/utc_id_suffix:
+       It is generally recommended to set your own UUIDs, or use the sequential
+       algorithm unless you have a specific need and take into account
+       the likely need for compaction to re-balance the B-tree and reclaim
+       wasted space.
+  
 
-UTC ID Suffix
--------------
+  .. config:option:: utc_id_suffix :: UTC ID Suffix
 
-.. versionadded:: 1.3
+    .. versionadded:: 1.3
 
-The ``utc_id_suffix`` value will be appended to UUIDs generated by the
-``utc_id`` algorithm. Replicating instances should have unique
-``utc_id_suffix`` values to ensure uniqueness of ``utc_id`` ids.
+    The ``utc_id_suffix`` value will be appended to UUIDs generated by the
+    ``utc_id`` algorithm. Replicating instances should have unique
+    ``utc_id_suffix`` values to ensure uniqueness of ``utc_id`` ids.
 
-::
+    ::
 
-  [uuid]
-  utc_id_suffix = my-awesome-suffix
+      [uuid]
+      utc_id_suffix = my-awesome-suffix
+
 
 
 .. _config/vendor:
 
-``[vendor]`` :: Vendor information
-==================================
+Vendor information
+==================
 
-.. versionadded:: 1.3
+.. config:section:: vendor :: Vendor information
 
-CouchDB distributors have the option of customizing CouchDB's welcome
-message. This is returned when requesting ``GET /``.
+  .. versionadded:: 1.3
 
-::
+  CouchDB distributors have the option of customizing CouchDB's welcome
+  message. This is returned when requesting ``GET /``.
 
-  [vendor]
-  name = The Apache Software Foundation
-  version = 1.5.0
+  ::
+
+    [vendor]
+    name = The Apache Software Foundation
+    version = 1.5.0

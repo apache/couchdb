@@ -137,13 +137,13 @@ any changes back to the `.ini` files.
 The `.ini` files can also be edited by hand when CouchDB is not running.
 Instead of creating the admin user as we showed previously, you could have
 stopped CouchDB, opened your `local.ini`, added ``anna = secret`` to the
-:ref:`[admins] section <config/admins>`, and restarted CouchDB. Upon reading
-the new line from local.ini, CouchDB would run the hashing algorithm and write
-back the hash to `local.ini`, replacing the plain-text password. To make sure
-CouchDB only hashes plain-text passwords and not an existing hash a second time,
-it prefixes the hash with ``-hashed-``, to distinguish between plain-text
-passwords and hashed passwords. This means your plain-text password can't start
-with the characters ``-hashed-``, but that's pretty unlikely to begin with.
+:config:section:`admins`, and restarted CouchDB. Upon reading the new line from
+`local.ini`, CouchDB would run the hashing algorithm and write back the hash to
+`local.ini`, replacing the plain-text password. To make sure CouchDB only hashes
+plain-text passwords and not an existing hash a second time, it prefixes
+the hash with ``-hashed-``, to distinguish between plain-text passwords and
+hashed passwords. This means your plain-text password can't start with the
+characters ``-hashed-``, but that's pretty unlikely to begin with.
 
 .. note::
 
@@ -485,8 +485,8 @@ Users Public Information
 Sometimes users *wants* to share some information with the World. For instance,
 their contact email to let other users get in touch with him. To solve this
 problem, but still keep sensitive and private information secured there is
-special :ref:`configuration <config>` option :ref:`public_fields
-<config/couch_httpd_auth/public_fields>`. In this options you may define comma
+special :ref:`configuration <config>` option :config:option:`public_fields
+<couch_httpd_auth/public_fields>`. In this options you may define comma
 separated list of users document fields that will be publicity available.
 
 Normally, if you request any user's document and you're not administrator or

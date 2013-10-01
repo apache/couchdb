@@ -10,6 +10,8 @@
 .. License for the specific language governing permissions and limitations under
 .. the License.
 
+.. default-domain:: config
+
 .. highlight:: ini
 
 .. _config/intro:
@@ -52,8 +54,8 @@ CouchDB configuration::
   /etc/couchdb/local.d/vendor.ini
 
 Settings in successive documents override the settings in earlier entries.
-For example, setting the :ref:`bind_address <config/httpd/bind_address>`
-parameter in ``local.ini`` would override any setting in ``default.ini``.
+For example, setting the :option:`httpd/bind_address` parameter in ``local.ini``
+would override any setting in ``default.ini``.
 
 .. warning::
    The ``default.ini`` file may be overwritten during an upgrade or
@@ -112,8 +114,8 @@ specification, empty (space and newline characters only) or `commented` line.
 You can setup `inline` commentaries for `sections` or `parameters`.
 
 The `section` defines group of parameters that are belongs to some specific
-CouchDB subsystem. For instance, :ref:`httpd <config/httpd>` section holds not
-only HTTP server parameters, but also others that directly interacts with it.
+CouchDB subsystem. For instance, :section:`httpd` section holds not only HTTP
+server parameters, but also others that directly interacts with it.
 
 The `parameter` specification contains two parts divided by the `equal` sign
 (``=``): the parameter name on the left side and the parameter value on the
@@ -154,7 +156,7 @@ In the response the old parameter's value returns::
 
 You should be careful with changing configuration via the HTTP API since it's
 easy to make CouchDB unavailable. For instance, you'd like to change the
-:ref:`bind_address <config/httpd/bind_address>` for new one::
+:option:`httpd/bind_address` for new one::
 
   curl -X PUT http://localhost:5984/_config/httpd/bind_address -d '"10.10.0.128"'
 
@@ -162,7 +164,7 @@ However, if you would made a typo or the specified IP address is not available
 from your network, you'll make CouchDB unavailable for you in both cases and
 you will have the only way to fix the problem by edit the configuration file
 and restart the server. To protect yourself against such accidents you may
-setup the :ref:`whilelist <config/httpd/config_whitelist>` of configuration
-parameters that are allowed to edit via the HTTP API. For others you'll need to
-directly edit the configuration file so you may quick fix any problems that had
-occurred due to misconfiguring.
+setup the :option:`httpd/config_whitelist` of configuration parameters that
+are allowed to edit via the HTTP API. For others you'll need to directly edit
+the configuration file so you may quick fix any problems that had occurred due
+to misconfiguring.

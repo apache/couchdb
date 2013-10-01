@@ -75,13 +75,13 @@ For cookie authentication (:rfc:`2109`) CouchDB generates a token that the
 client can use for the next few requests to CouchDB. Tokens are valid until
 a timeout. When CouchDB sees a valid token in a subsequent request, it will
 authenticate user by this token without requesting the password again. By
-default, cookies are valid for 10 minutes, but it's :ref:`adjustable
-<config/couch_httpd_auth/timeout>`. Also it's possible to make cookies
-:ref:`persistent <config/couch_httpd_auth/allow_persistent_cookies>`
+default, cookies are valid for 10 minutes, but it's :config:option:`adjustable
+<couch_httpd_auth/timeout>`. Also it's possible to make cookies
+:config:option:`persistent <couch_httpd_auth/allow_persistent_cookies>`
 
 To obtain the first token and thus authenticate a user for the first time, the
-`username` and `password` must be sent to the
-:ref:`_session API <api/auth/session>`.
+`username` and `password` must be sent to the :ref:`_session API
+<api/auth/session>`.
 
 .. _api/auth/session:
 
@@ -271,8 +271,7 @@ Proxy Authentication
 .. note::
    To use this authentication method make sure that the
    ``{couch_httpd_auth, proxy_authentication_handler}`` value in added to
-   the list of the active
-   :ref:`authentication handlers <config/httpd/authentication_handlers>`:
+   the list of the active :config:option:`httpd/authentication_handlers`:
 
    .. code-block:: ini
 
@@ -288,13 +287,13 @@ This authentication method allows creation of a :ref:`userctx_object` for
 remotely authenticated user. By default, the client just need to pass specific
 headers to CouchDB with related request:
 
-- :ref:`X-Auth-CouchDB-UserName <config/couch_httpd_auth/x_auth_username>`:
+- :config:option:`X-Auth-CouchDB-UserName <couch_httpd_auth/x_auth_username>`:
   username;
-- :ref:`X-Auth-CouchDB-Roles <config/couch_httpd_auth/x_auth_roles>`:
+- :config:option:`X-Auth-CouchDB-Roles <couch_httpd_auth/x_auth_roles>`:
   list of user roles separated by a comma (``,``);
-- :ref:`X-Auth-CouchDB-Token <config/couch_httpd_auth/x_auth_token>`:
+- :config:option:`X-Auth-CouchDB-Token <couch_httpd_auth/x_auth_token>`:
   authentication token. Optional, but strongly recommended to
-  :ref:`force token be required <config/couch_httpd_auth/proxy_use_secret>`
+  :config:option:`force token be required <couch_httpd_auth/proxy_use_secret>`
   to prevent requests from untrusted sources.
 
 **Request**:

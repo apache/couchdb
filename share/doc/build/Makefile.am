@@ -262,6 +262,7 @@ html_files = \
     html/whatsnew/1.5.html \
     html/whatsnew/index.html \
     html/about.html \
+    html/config-ref.html \
     html/contents.html \
     html/externals.html \
     html/json-structure.html \
@@ -422,6 +423,7 @@ src_files_html = \
     ../templates/utilities.html
 
 sphinx_extensions = \
+    ../ext/configdomain.py \
     ../ext/github.py \
     ../ext/httpdomain.py \
     ../ext/http-api-descr.json

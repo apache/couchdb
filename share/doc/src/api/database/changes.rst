@@ -70,7 +70,7 @@
     before the response is sent, even if there are no results. Only applicable
     for :ref:`longpoll <changes/longpoll>` or :ref:`continuous
     <changes/continuous>` feeds. Default value is specified by
-    :ref:`changes_timeout <config/httpd/changes_timeout>` configuration option.
+    :config:option:`httpd/changes_timeout` configuration option.
     Note that ``60000`` value is also the default maximum timeout to prevent
     undetected dead connections.
   :query string view: Allows to use view functions as filters. Documents

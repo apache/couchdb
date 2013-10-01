@@ -10,172 +10,165 @@
 .. License for the specific language governing permissions and limitations under
 .. the License.
 
+.. default-domain:: config
+
 .. highlight:: ini
 
 ========================
 Compaction Configuration
 ========================
 
-.. _config/database_compaction:
+.. _conifg/database_compaction:
 
-``[database_compaction]`` :: Database Compaction Options
-========================================================
+Database Compaction Options
+===========================
 
-.. _config/database_compaction/doc_buffer_size:
+.. config:section:: database_compaction :: Database Compaction Options
 
-``doc_buffer_size`` :: Documents buffer size
---------------------------------------------
+  .. config:option:: doc_buffer_size :: Documents buffer size
 
-Specifies the copy buffer's maximum size in bytes::
+    Specifies the copy buffer's maximum size in bytes::
 
-  [database_compaction]
-  doc_buffer_size = 524288
+      [database_compaction]
+      doc_buffer_size = 524288
 
 
-.. _config/database_compaction/checkpoint_after:
+  .. config:option:: checkpoint_after :: Checkpoint trigger
 
-``checkpoint_after`` :: Checkpoint trigger
-------------------------------------------
+    Triggers a checkpoint after the specified amount of bytes were successfully
+    copied to the compacted database::
 
-Triggers a checkpoint after the specified amount of bytes were successfully 
-copied to the compacted database::
-
-  [database_compaction]
-  checkpoint_after = 5242880
-
+      [database_compaction]
+      checkpoint_after = 5242880
 
 
 .. _config/compactions:
 
-``[compactions]`` :: Compaction Daemon Rules
-============================================
+Compaction Daemon Rules
+=======================
 
-Automatic compaction rules definition.
-The :ref:`compaction daemon <config/daemons/compaction_daemon>` compacts
-databases and their respective view groups when all the condition parameters are
-satisfied. Configuration can be per database or global, and it has the following
-format::
+.. config:section:: compactions :: Compaction Daemon Rules
 
-  [compactions]
-  database_name = [ {ParamName, ParamValue}, {ParamName, ParamValue}, ... ]
-  _default = [ {ParamName, ParamValue}, {ParamName, ParamValue}, ... ]
+  Automatic compaction rules definition. The :option:`daemons/compaction_daemon`
+  compacts databases and their respective view groups when all the condition
+  parameters are satisfied. Configuration can be per database or global, and it
+  has the following format::
+
+    [compactions]
+    database_name = [ {ParamName, ParamValue}, {ParamName, ParamValue}, ... ]
+    _default = [ {ParamName, ParamValue}, {ParamName, ParamValue}, ... ]
 
 
-For example::
+  For example::
 
-  [compactions]
-  _default = [{db_fragmentation, "70%"}, {view_fragmentation, "60%"}, {from, "23:00"}, {to, "04:00"}]
+    [compactions]
+    _default = [{db_fragmentation, "70%"}, {view_fragmentation, "60%"}, {from, "23:00"}, {to, "04:00"}]
 
-Possible parameters:
+  Possible parameters:
 
-- ``db_fragmentation``: If the ratio of legacy data, including metadata, to
-  current data in the database file size is equal to or greater then this
-  value, this database compaction condition is satisfied. The percentage is 
-  expressed as an integer percentage. This value is computed as::
+  - ``db_fragmentation``: If the ratio of legacy data, including metadata, to
+    current data in the database file size is equal to or greater then this
+    value, this database compaction condition is satisfied. The percentage is
+    expressed as an integer percentage. This value is computed as::
 
-    (file_size - data_size) / file_size * 100
+      (file_size - data_size) / file_size * 100
 
-  The data_size and file_size values can be obtained when
-  querying :get:`/{db}`.
+    The data_size and file_size values can be obtained when
+    querying :http:get:`/{db}`.
 
-- ``view_fragmentation``: If the ratio of legacy data, including metadata, to
-  current data in a view index file size is equal to or greater then this
-  value, this database compaction condition is satisfied. The percentage is 
-  expressed as an integer percentage. This value is computed as::
+  - ``view_fragmentation``: If the ratio of legacy data, including metadata, to
+    current data in a view index file size is equal to or greater then this
+    value, this database compaction condition is satisfied. The percentage is
+    expressed as an integer percentage. This value is computed as::
 
-    (file_size - data_size) / file_size * 100
+      (file_size - data_size) / file_size * 100
 
-  The data_size and file_size values can be obtained when querying a
-  :ref:`view group's information URI <api/ddoc/info>`.
+    The data_size and file_size values can be obtained when querying a
+    :ref:`view group's information URI <api/ddoc/info>`.
 
-- ``from`` and ``to``: The period for which a database (and its view groups)
-  compaction is allowed. The value for these parameters must obey the format::
+  - ``from`` and ``to``: The period for which a database (and its view groups)
+    compaction is allowed. The value for these parameters must obey the format::
 
-    HH:MM - HH:MM  (HH in [0..23], MM in [0..59])
+      HH:MM - HH:MM  (HH in [0..23], MM in [0..59])
 
-- ``strict_window``: If a compaction is still running after the end of the
-  allowed period, it will be canceled if this parameter is set to `true`.
-  It defaults to `false` and it's meaningful only if the *period* parameter is
-  also specified.
+  - ``strict_window``: If a compaction is still running after the end of the
+    allowed period, it will be canceled if this parameter is set to `true`.
+    It defaults to `false` and it's meaningful only if the *period* parameter
+    is also specified.
 
-- ``parallel_view_compaction``: If set to `true`, the database and its views are
-  compacted in parallel. This is only useful on certain setups, like for example
-  when the database and view index directories point to different disks.
-  It defaults to `false`.
+  - ``parallel_view_compaction``: If set to `true`, the database and its views
+    are compacted in parallel. This is only useful on certain setups, like
+    for example when the database and view index directories point to different
+    disks. It defaults to `false`.
 
-Before a compaction is triggered, an estimation of how much free disk space is
-needed is computed. This estimation corresponds to two times the data size of
-the database or view index. When there's not enough free disk space to compact
-a particular database or view index, a warning message is logged.
+  Before a compaction is triggered, an estimation of how much free disk space is
+  needed is computed. This estimation corresponds to two times the data size of
+  the database or view index. When there's not enough free disk space to compact
+  a particular database or view index, a warning message is logged.
 
-Examples:
+  Examples:
 
-#. ``[{db_fragmentation, "70%"}, {view_fragmentation, "60%"}]``
+  #. ``[{db_fragmentation, "70%"}, {view_fragmentation, "60%"}]``
 
-   The `foo` database is compacted if its fragmentation is 70% or more.
-   Any view index of this database is compacted only if its fragmentation
-   is 60% or more.
+     The `foo` database is compacted if its fragmentation is 70% or more.
+     Any view index of this database is compacted only if its fragmentation
+     is 60% or more.
 
-#. ``[{db_fragmentation, "70%"}, {view_fragmentation, "60%"}, {from, "00:00"}, {to, "04:00"}]``
+  #. ``[{db_fragmentation, "70%"}, {view_fragmentation, "60%"}, {from, "00:00"}, {to, "04:00"}]``
 
-   Similar to the preceding example but a compaction (database or view index)
-   is only triggered if the current time is between midnight and 4 AM.
+     Similar to the preceding example but a compaction (database or view index)
+     is only triggered if the current time is between midnight and 4 AM.
 
-#. ``[{db_fragmentation, "70%"}, {view_fragmentation, "60%"}, {from, "00:00"}, {to, "04:00"}, {strict_window, true}]``
+  #. ``[{db_fragmentation, "70%"}, {view_fragmentation, "60%"}, {from, "00:00"}, {to, "04:00"}, {strict_window, true}]``
 
-   Similar to the preceding example - a compaction (database or view index)
-   is only triggered if the current time is between midnight and 4 AM. If at
-   4 AM the database or one of its views is still compacting, the compaction
-   process will be canceled.
+     Similar to the preceding example - a compaction (database or view index)
+     is only triggered if the current time is between midnight and 4 AM. If at
+     4 AM the database or one of its views is still compacting, the compaction
+     process will be canceled.
 
-#. ``[{db_fragmentation, "70%"}, {view_fragmentation, "60%"}, {from, "00:00"}, {to, "04:00"}, {strict_window, true}, {parallel_view_compaction, true}]``
+  #. ``[{db_fragmentation, "70%"}, {view_fragmentation, "60%"}, {from, "00:00"}, {to, "04:00"}, {strict_window, true}, {parallel_view_compaction, true}]``
 
-   Similar to the preceding example, but a database and its views can be
-   compacted in parallel.
+     Similar to the preceding example, but a database and its views can be
+     compacted in parallel.
 
 
 .. _config/compaction_daemon:
 
-``[compaction_daemon]`` :: Configuration of Compaction Daemon
-=============================================================
+Configuration of Compaction Daemon
+==================================
 
-.. _config/compaction_daemon/check_interval:
+.. config:section:: compaction_daemon :: Configuration of Compaction Daemon
 
-``check_interval``
-------------------
+  .. config:option:: check_interval
 
-The delay, in seconds, between each check for which database and view indexes
-need to be compacted::
+    The delay, in seconds, between each check for which database and view
+    indexes need to be compacted::
 
-  [compaction_daemon]
-  check_interval = 300
+      [compaction_daemon]
+      check_interval = 300
 
 
-.. _config/compaction_daemon/min_file_size:
+  .. config:option:: min_file_size
 
-``min_file_size``
------------------
+    If a database or view index file is smaller then this value (in bytes),
+    compaction will not happen. Very small files always have a very high
+    fragmentation therefore it's not worth to compact them::
 
-If a database or view index file is smaller then this value (in bytes),
-compaction will not happen. Very small files always have a very high
-fragmentation therefore it's not worth to compact them::
-
-  [compaction_daemon]
-  min_file_size = 131072
+      [compaction_daemon]
+      min_file_size = 131072
 
 
 .. _config/view_compaction:
 
-``[view_compaction]`` :: Views Compaction Options
-=================================================
+Views Compaction Options
+========================
 
-.. _config/view_compaction/keyvalue_buffer_size:
+.. config:section:: view_compaction :: Views Compaction Options
 
-``keyvalue_buffer_size`` :: Key-Values buffer size
---------------------------------------------------
 
-Specifies maximum copy buffer size in bytes used during compaction::
+  .. config:option:: keyvalue_buffer_size :: Key-Values buffer size
 
-  [view_compaction]
-  keyvalue_buffer_size = 2097152
+    Specifies maximum copy buffer size in bytes used during compaction::
 
+      [view_compaction]
+      keyvalue_buffer_size = 2097152
