@@ -24,4 +24,3 @@ Installation
    windows
    mac
    freebsd
-   gentoo
