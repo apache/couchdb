@@ -12,9 +12,9 @@
 
 .. _replication:
 
-================
-Data Replication
-================
+===========
+Replication
+===========
 
 The replication is an incremental one way process involving two databases
 (a source and a destination).
