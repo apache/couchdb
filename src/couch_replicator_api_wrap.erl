@@ -222,7 +222,7 @@ open_doc_revs(#httpdb{} = HttpDb, Id, Revs, Options, Fun, Acc) ->
             #httpdb{retries = Retries, wait = Wait0} = HttpDb,
             Wait = 2 * erlang:min(Wait0 * 2, ?MAX_WAIT),
             ?LOG_INFO("Retrying GET to ~s in ~p seconds due to error ~p",
-                [Url, Wait / 1000, Else]
+                [Url, Wait / 1000, error_reason(Else)]
             ),
             ok = timer:sleep(Wait),
             RetryDb = HttpDb#httpdb{
@@ -235,6 +235,14 @@ open_doc_revs(Db, Id, Revs, Options, Fun, Acc) ->
     {ok, Results} = couch_db:open_doc_revs(Db, Id, Revs, Options),
     {ok, lists:foldl(fun(R, A) -> {_, A2} = Fun(R, A), A2 end, Acc, Results)}.
 
+error_reason({http_request_failed, "GET", _Url, {error, timeout}}) ->
+    timeout;
+error_reason({http_request_failed, "GET", _Url, {error, {_, req_timedout}}}) ->
+    req_timedout;
+error_reason({http_request_failed, "GET", _Url, Error}) ->
+    Error;
+error_reason(Else) ->
+    Else.
 
 open_doc(#httpdb{} = Db, Id, Options) ->
     send_req(
