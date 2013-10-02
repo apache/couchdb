@@ -22,9 +22,12 @@ extensions = ["sphinx.ext.todo", "sphinx.ext.extlinks", 'github',
 
 _info = {}
 _regex = re.compile('m4_define\(\[(.+)\],\s+\[(.+)\]\)')
+_acinclude_m4 = '../../../acinclude.m4'
 _acinclude_m4_in = '../../../acinclude.m4.in'
 if os.path.exists(_acinclude_m4_in):
     _source = _acinclude_m4_in
+elif os.path.exists(_acinclude_m4):
+    _source = _acinclude_m4
 else:
     _source = None
 if _source is not None:
@@ -142,4 +145,4 @@ html_context['git_branch'] = github_branch = 'master'
 
 github_docs_path = 'share/doc/src'
 
-del _info, _regex, _acinclude_m4_in, _source
+del _info, _regex, _acinclude_m4, _acinclude_m4_in, _source
