@@ -1224,6 +1224,7 @@ parse_doc_query(Req) ->
     end, #doc_query_args{}, chttpd:qs(Req)).
 
 parse_changes_query(Req) ->
+    erlang:erase(changes_seq_interval),
     ChangesArgs = lists:foldl(fun({Key, Value}, Args) ->
         case {string:to_lower(Key), Value} of
         {"feed", _} ->
@@ -1250,6 +1251,16 @@ parse_changes_query(Req) ->
             Args#changes_args{conflicts=true};
         {"filter", _} ->
             Args#changes_args{filter=Value};
+        {"seq_interval", _} ->
+            try list_to_integer(Value) of
+                V when V > 0 ->
+                    erlang:put(changes_seq_interval, V),
+                    Args;
+                _ ->
+                    throw({bad_request, invalid_seq_interval})
+            catch error:badarg ->
+                throw({bad_request, invalid_seq_interval})
+            end;
         _Else -> % unknown key value pair, ignore.
             Args
         end
