@@ -75,7 +75,7 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
       if (!result) { return; }
 
       return this.database.destroy().done(function () {
-        app.router.navigate('/', {trigger: true});
+        app.router.navigate('#/_all_dbs', {trigger: true});
       });
     }
   });
@@ -1283,7 +1283,7 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
         mapFun.val(this.langTemplates[this.defaultLang].map);
         reduceFun.val(this.langTemplates[this.defaultLang].reduce);
       } else {
-        this.$('#index').hide();
+        setTimeout(function(){this.$('#index').hide();}, 300);
         this.$('#index-nav').parent().removeClass('active');
       }
 
@@ -1417,7 +1417,7 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
       var databaseName = this.database.id;
 
       this.database.destroy().then(function () {
-        FauxtonAPI.navigate('/');
+        FauxtonAPI.navigate('#/_all_dbs');
         FauxtonAPI.addNotification({
           msg: 'The database ' + databaseName + ' has been deleted.'
         });
