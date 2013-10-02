@@ -18,7 +18,7 @@ define([
 
 function(app, FauxtonAPI, plugins) {
   plugins.initialize = function() {
-    FauxtonAPI.addHeaderLink({title: "Plugins", href: "#_plugins", icon: "fonticon-plugins", className: 'plugins'});
+    //FauxtonAPI.addHeaderLink({title: "Plugins", href: "#_plugins", icon: "fonticon-plugins", className: 'plugins'});
   };
   return plugins;
 });
