@@ -202,7 +202,13 @@ handle_message(#change{key=Key} = Row0, {Worker, From}, St) ->
         % created from DOWN messages would have led to errors
         case fabric_view:is_progress_possible(S2) of
         true ->
-            Row = Row0#change{key = pack_seqs(S2)},
+            % Temporary hack for FB 23637
+            Interval = erlang:get(changes_seq_interval),
+            if (Interval == undefined) orelse (Limit rem Interval == 0) ->
+                Row = Row0#change{key = pack_seqs(S2)};
+            true ->
+                Row = Row0#change{key = null}
+            end,
             {Go, Acc} = Callback(changes_row(Row, IncludeDocs), AccIn),
             gen_server:reply(From, Go),
             {Go, St#collector{counters=S2, limit=Limit-1, user_acc=Acc}};
