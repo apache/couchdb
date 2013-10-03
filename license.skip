@@ -80,6 +80,7 @@
 ^share/www/script/base64.js
 ^share/www/script/test/lorem.*
 ^share/www/style/jquery-ui-1.8.11.custom.css
+^share/www/fauxton/img/.*
 ^src/Makefile
 ^src/Makefile.in
 ^src/couch_index/Makefile
