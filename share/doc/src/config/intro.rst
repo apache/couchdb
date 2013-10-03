@@ -28,11 +28,13 @@ in the following order:
 
 #. ``LOCALCONFDIR/default.ini``
 
-#. ``LOCALCONFDIR/default.d/*``
+#. ``LOCALCONFDIR/default.d/*.ini``
+
+#. ``PLUGINS_DIR/*/priv/default.d/*.ini``
 
 #. ``LOCALCONFDIR/local.ini``
 
-#. ``LOCALCONFDIR/local.d/*``
+#. ``LOCALCONFDIR/local.d/*.ini``
 
 The ``LOCALCONFDIR`` points to the directory that contains configuration files
 (``/usr/local/etc/couchdb`` by default). This variable may vary from the
