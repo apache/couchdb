@@ -20,7 +20,7 @@ endif
 
 man1dir = $(mandir)/man1
 
-noinst_SCRIPTS = couchjs_dev couch-config_dev
+noinst_SCRIPTS = couchjs_dev couch-config_dev erlang-version.escript
 
 man_file = couchdb.1
 
