@@ -29,3 +29,11 @@ Version 1.5.0
 .. warning::
 
    This version is not released yet.
+
+* A new administration UI, codenamed Fauxton, has been included as an
+  experimental preview. It can be accessed at ``/_utils/fauxton/``. There
+  are too many improvements here to list them all, you should try it!
+* :issue:`1781` The official documentation has been overhauled. A lot of
+  content from other sources have been merged, and the index page
+  has been rebuilt to make the docs much more accessible.
+  :commit:`17e0b7c6`
