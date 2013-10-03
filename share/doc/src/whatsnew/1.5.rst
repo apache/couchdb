@@ -37,7 +37,7 @@ Version 1.5.0
 * :issue:`1888` Fixed an issue where admin users would be restricted by
   the `public_fields` feature.
 * Fixed an issue with the JavaScript CLI test runner. :commit:`be76882`,
-  :commit:`be76882`
+  :commit:`54813a7`
 * A new administration UI, codenamed Fauxton, has been included as an
   experimental preview. It can be accessed at ``/_utils/fauxton/``. There
   are too many improvements here to list them all. We are looking for
