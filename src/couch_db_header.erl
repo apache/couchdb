@@ -236,7 +236,35 @@ upgrade_epochs(#db_header{}=Header) ->
             % and marking the update sequence where it happened.
             [{node(), Header#db_header.update_seq} | Epochs1]
     end,
-    Header#db_header{epochs=NewEpochs}.
+    % Its possible for a node to open a db and claim
+    % ownership but never make a write to the db. This
+    % removes nodes that claimed ownership but never
+    % changed the database.
+    DedupedEpochs = remove_dup_epochs(NewEpochs),
+    Header#db_header{epochs=DedupedEpochs}.
+
+
+% This is slightly relying on the udpate_seq's being sorted
+% in epochs due to how we only ever push things onto the
+% front. Although if we ever had a case where the update_seq
+% is not monotonically increasing I don't know that we'd
+% want to remove dupes (by calling a sort on the input to this
+% function). So for now we don't sort but are relying on the
+% idea that epochs is always sorted.
+remove_dup_epochs([_]=Epochs) ->
+    Epochs;
+remove_dup_epochs([{N1, S}, {_N2, S}]) ->
+    % Seqs match, keep the most recent owner
+    remove_dup_epochs([{N1, S}]);
+remove_dup_epochs([_, _]=Epochs) ->
+    % Seqs don't match.
+    Epochs;
+remove_dup_epochs([{N1, S}, {_N2, S} | Rest]) ->
+    % Seqs match, keep the most recent owner
+    remove_dup_epochs([{N1, S} | Rest]);
+remove_dup_epochs([{N1, S1}, {N2, S2} | Rest]) ->
+    % Seqs don't match, recurse to check others
+    remove_dup_epochs([{N1, S1} | remove_dup_epochs([{N2, S2} | Rest])]).
 
 
 -ifdef(TEST).
