@@ -48,3 +48,5 @@ Version 1.5.0
 * :issue:`1894`: An experimental Node.js-based query server runtime
   has been added. See :ref:`experimental` for details. We invite the
   community to test and report any findings.
+* :issue:`1901`: Better retry mechanism for transferring attachments
+  during replication. :commit:`4ca2cec`
