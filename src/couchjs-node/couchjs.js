@@ -14,6 +14,7 @@
 
 var vm = require('vm');
 var Fiber = require('fibers');
+var util = require('util');
 
 var XML = require('./xml');
 var log = require('./console').log;
@@ -22,11 +23,6 @@ var INPUT = {
   'queue':[],
   'waiting':null
 };
-
-Error.prototype.toSource = Error.prototype.toSource || toSource;
-Error.prototype.toString = Error.prototype.toString || toSource;
-Function.prototype.toSource = Function.prototype.toSource || toSource;
-Function.prototype.toString = Function.prototype.toString || toSource;
 
 
 function print(line) {
@@ -71,9 +67,10 @@ function readline () {
 
 function evalcx (source, sandbox) {
   sandbox = sandbox || {};
+  var func;
   //log('evalcx in %j: %j', Object.keys(sandbox), source)
 
-  if (source == '') {
+  if (source === '') {
     return sandbox;
   }
 
@@ -87,7 +84,7 @@ function evalcx (source, sandbox) {
     var id = Math.floor(Math.random() * 1000*1000);
     var filename = '_couchdb:' + id + '.js';
     var script = vm.createScript(source, filename);
-    var func = script.runInNewContext(sandbox);
+    func = script.runInNewContext(sandbox);
   } catch (er) {
     log('Error making code: %s', er.stack);
     return sandbox;
@@ -109,7 +106,7 @@ function gc() { }
 
 
 function toSource() {
-  if (typeof this == 'function') {
+  if (typeof this === 'function') {
     return '' + this;
   }
 
@@ -119,6 +116,11 @@ function toSource() {
 
   return util.inspect(this);
 }
+
+Error.prototype.toSource = Error.prototype.toSource || toSource;
+Error.prototype.toString = Error.prototype.toString || toSource;
+Function.prototype.toSource = Function.prototype.toSource || toSource;
+Function.prototype.toString = Function.prototype.toString || toSource;
 
 module.exports = {
   'print': print,
