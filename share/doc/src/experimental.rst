@@ -38,16 +38,12 @@ Setup
 You will need to install Node.JS version 0.10.0 or later. See `Node.JS
 Downloads <http://nodejs.org/download/>`_ for options.
 
-1. Install the `couchjs-node` binary. Either from the CouchDB sources:
-
-.. code-block:: shell
+1. Install the `couchjs-node` binary. Either from the CouchDB sources::
 
     cd src/couchjs-node
     npm link
 
-Or via NPM:
-
-.. code-block:: shell
+Or via NPM::
 
     npm install -g couchjs
 
