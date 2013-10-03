@@ -46,5 +46,5 @@ Version 1.5.0
   `src/couch_plugin/README.md` for details. We invite the community to
   test and report any findings.
 * :issue: `1894` An experimental Node.js-based query server runtime
-  has been added. See `experimental/nodejs query server` for details.
-  We invite the community to test and report any findings.
+  has been added. See :ref:`experimental` for details. We invite the
+  community to test and report any findings.
