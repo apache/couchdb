@@ -66,24 +66,31 @@ enc_charbuf(const jschar* src, size_t srclen, char* dst, size_t* dstlenp)
         c = *src++;
         srclen--;
 
-        if((c >= 0xDC00) && (c <= 0xDFFF)) goto bad_surrogate;
-        
-        if(c < 0xD800 || c > 0xDBFF)
+        if(c <= 0xD7FF || c >= 0xE000)
         {
-            v = c;
+            v = (uint32) c;
         }
-        else
+        else if(c >= 0xD800 && c <= 0xDBFF)
         {
             if(srclen < 1) goto buffer_too_small;
             c2 = *src++;
             srclen--;
-            if ((c2 < 0xDC00) || (c2 > 0xDFFF))
+            if(c2 >= 0xDC00 && c2 <= 0xDFFF)
             {
-                c = c2;
-                goto bad_surrogate;
+                v = (uint32) (((c - 0xD800) << 10) + (c2 - 0xDC00) + 0x10000);
             }
-            v = ((c - 0xD800) << 10) + (c2 - 0xDC00) + 0x10000;
+            else
+            {
+                // Invalid second half of surrogate pair
+                v = (uint32) 0xFFFD;
+            }
         }
+        else
+        {
+            // Invalid first half surrogate pair
+            v = (uint32) 0xFFFD;
+        }
+
         if(v < 0x0080)
         {
             /* no encoding necessary - performance hack */
@@ -108,10 +115,6 @@ enc_charbuf(const jschar* src, size_t srclen, char* dst, size_t* dstlenp)
     
     *dstlenp = (origDstlen - dstlen);
     return JS_TRUE;
-
-bad_surrogate:
-    *dstlenp = (origDstlen - dstlen);
-    return JS_FALSE;
 
 buffer_too_small:
     *dstlenp = (origDstlen - dstlen);
