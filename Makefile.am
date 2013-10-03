@@ -26,7 +26,7 @@ compiled_files = \
     ebin/couch_plugins.beam \
     ebin/couch_plugins_httpd.beam
 
-EXTRA_DIST = $(source_files)
+EXTRA_DIST = $(source_files) README.md
 CLEANFILES = $(compiled_files)
 
 ebin/%.app: src/%.app.src
