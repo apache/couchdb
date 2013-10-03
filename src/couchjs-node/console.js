@@ -41,7 +41,7 @@ if (stat) {
   };
 
   var on_err = function (er) {
-    module.exports.error('Uncaught error:\n%s', er.stack || er.message || JSON.stringify(er))
+    module.exports.error('Uncaught error:\n%s', er.stack || er.message || JSON.stringify(er));
 
     if (er.stack) {
       er = ['fatal', 'unknown_error', er.stack];

@@ -14,7 +14,6 @@ var vm = require('vm');
 var util = require('util');
 
 var STATE = 'wait';
-var v = 'vm';
 
 function main() {
   process.debugPort = 5859;

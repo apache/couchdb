@@ -13,10 +13,8 @@
 // the License.
 
 var fs = require('fs');
-var util = require('util');
 var Fiber = require('fibers');
 var optimist = require('optimist');
-var child_process = require('child_process');
 
 var couchjs = require('./couchjs');
 var package_json = require('./package.json');

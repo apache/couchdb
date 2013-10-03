@@ -12,16 +12,29 @@
 
 // Text line stream
 
-module.exports = LineStream;
-module.exports.v2 = LineStream2;
-
 var stream = require('stream');
 var util = require('util');
 
 
-util.inherits(LineStream2, stream.Transform);
+function LineStream() {
 
-function LineStream2 () {
+  var self = this;
+  stream.call(self);
+
+  self.readable = true;
+  self.writable = true;
+
+  self.buffer = '';
+  self.downstream = null;
+
+  self.on('pipe', function(upstream) {
+    upstream.on('end', function(data, encoding) {
+      self.emit('end', data, encoding);
+    });
+  });
+}
+
+function LineStream2() {
 
   if (!(this instanceof LineStream2)) {
     return new LineStream2();
@@ -30,6 +43,8 @@ function LineStream2 () {
   stream.Transform.call(this);
   this.setEncoding('utf8');
 }
+
+util.inherits(LineStream2, stream.Transform);
 
 LineStream2.prototype._transform = function(message, encoding, done) {
   var self = this;
@@ -52,25 +67,9 @@ LineStream2.prototype._transform = function(message, encoding, done) {
 
 util.inherits(LineStream, stream);
 
-function LineStream () {
-  var self = this;
-  stream.call(self);
-
-  self.readable = true;
-  self.writable = true;
-
-  self.buffer = '';
-  self.downstream = null;
-
-  self.on('pipe', function(upstream) {
-    upstream.on('end', function(data, encoding) {
-      self.emit('end', data, encoding);
-    });
-  });
-}
 
 
-LineStream.prototype.write = function(data, encoding) {
+LineStream.prototype.write = function(data) {
   var self = this;
 
   data = data || '';
@@ -88,7 +87,7 @@ LineStream.prototype.write = function(data, encoding) {
 };
 
 
-LineStream.prototype.end = function(data, encoding) {
+LineStream.prototype.end = function(data) {
   var self = this;
 
   self.is_ending = true;
@@ -109,3 +108,8 @@ LineStream.prototype.error = function(er) {
   // The write() method sometimes returns this value, so if there was an error, make write() return false.
   return false;
 };
+
+
+module.exports = LineStream;
+module.exports.v2 = LineStream2;
+
