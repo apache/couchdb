@@ -30,21 +30,21 @@ Version 1.5.0
 
    This version is not released yet.
 
-* :issue:`1781` The official documentation has been overhauled. A lot of
+* :issue:`1781`: The official documentation has been overhauled. A lot of
   content from other sources have been merged, and the index page
   has been rebuilt to make the docs much more accessible.
-  :commit:`54813a7`
-* :issue:`1888` Fixed an issue where admin users would be restricted by
-  the `public_fields` feature.
-* Fixed an issue with the JavaScript CLI test runner. :commit:`be76882`,
   :commit:`54813a7`
 * A new administration UI, codenamed Fauxton, has been included as an
   experimental preview. It can be accessed at ``/_utils/fauxton/``. There
   are too many improvements here to list them all. We are looking for
   feedback from the community on this preview release.
-* :issue:`1867` An experimental plugin feature has been added. See
-  `src/couch_plugin/README.md` for details. We invite the community to
+* :issue:`1888`: Fixed an issue where admin users would be restricted by
+  the ``public_fields`` feature.
+* Fixed an issue with the JavaScript CLI test runner. :commit:`be76882`,
+  :commit:`54813a7`
+* :issue:`1867`: An experimental plugin feature has been added. See
+  ``src/couch_plugin/README.md`` for details. We invite the community to
   test and report any findings.
-* :issue:`1894` An experimental Node.js-based query server runtime
+* :issue:`1894`: An experimental Node.js-based query server runtime
   has been added. See :ref:`experimental` for details. We invite the
   community to test and report any findings.
