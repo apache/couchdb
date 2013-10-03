@@ -10,14 +10,6 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-module.exports = {
-  'print': print,
-  'readline': readline,
-  'stdin': stdin,
-  'evalcx': evalcx,
-  'quit': quit,
-  'gc': gc
-};
 
 
 var vm = require('vm');
@@ -127,3 +119,13 @@ function toSource() {
 
   return util.inspect(this);
 }
+
+module.exports = {
+  'print': print,
+  'readline': readline,
+  'stdin': stdin,
+  'evalcx': evalcx,
+  'quit': quit,
+  'gc': gc
+};
+
