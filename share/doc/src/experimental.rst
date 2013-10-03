@@ -77,3 +77,11 @@ Differences from the SpiderMonkey Query Server
 V8 and SpiderMonkey roughly behave similar, but there might be engine-
 specific differences that make or break a JavaScript function in one or
 the other server.
+
+
+Plugins
+=======
+
+See `src/couch_plugins/README.md`.
+
+
