@@ -26,10 +26,6 @@
 Version 1.5.0
 =============
 
-.. warning::
-
-   This version is not released yet.
-
 * :issue:`1781`: The official documentation has been overhauled. A lot of
   content from other sources have been merged, and the index page
   has been rebuilt to make the docs much more accessible.
