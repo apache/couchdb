@@ -10,54 +10,57 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-var fs = require('fs')
-var util = require('util')
+var fs = require('fs');
+var util = require('util');
 
+var noop = function() {};
 
-module.exports = {}
-module.exports.log = noop
-module.exports.debug = noop
-module.exports.info = noop
-module.exports.warn = noop
-module.exports.error = noop
+module.exports = {};
+module.exports.log = noop;
+module.exports.debug = noop;
+module.exports.info = noop;
+module.exports.warn = noop;
+module.exports.error = noop;
 
-var LOG_PATH = '/tmp/couchjs.log'
-  , stat = null
-  , LOG = null
+var LOG_PATH = '/tmp/couchjs.log';
+var stat = null;
+var LOG = null;
 
 try {
-  stat = fs.statSync(LOG_PATH)
+  stat = fs.statSync(LOG_PATH);
 } catch(er) {}
 
-if(stat) {
-  LOG = fs.createWriteStream(LOG_PATH, {'flags':'a'})
+if (stat) {
+  LOG = fs.createWriteStream(LOG_PATH, {
+    'flags':'a'
+  });
 
-  module.exports.log = log
-  module.exports.debug = log
-  module.exports.info = log
-  module.exports.warn = log
-  module.exports.error = log
+  var log = function () {
+    var str = util.format.apply(this, arguments);
+    LOG.write(str + '\n');
+  };
+
+  var on_err = function (er) {
+    module.exports.error('Uncaught error:\n%s', er.stack || er.message || JSON.stringify(er))
+
+    if (er.stack) {
+      er = ['fatal', 'unknown_error', er.stack];
+    }
+
+    process.stdout.write(JSON.stringify(er) + '\n');
+    process.exit(1);
+  };
+
+  module.exports.log = log;
+  module.exports.debug = log;
+  module.exports.info = log;
+  module.exports.warn = log;
+  module.exports.error = log;
 
   process.on('exit', function() {
-    module.exports.log('Exit %d', process.pid)
-  })
+    module.exports.log('Exit %d', process.pid);
+  });
 
-  process.on('uncaughtException', on_err)
+  process.on('uncaughtException', on_err);
 }
 
-function log() {
-  var str = util.format.apply(this, arguments)
-  LOG.write(str + '\n')
-}
-
-function on_err(er) {
-  module.exports.error('Uncaught error:\n%s', er.stack || er.message || JSON.stringify(er))
-
-  if(er.stack)
-    er = ['fatal', 'unknown_error', er.stack]
-
-  process.stdout.write(JSON.stringify(er) + '\n')
-  process.exit(1)
-}
-
-function noop() {}

@@ -10,12 +10,13 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-module.exports = XML
 
 function XML () {
-  this.foo = 'bar'
+  this.foo = 'bar';
 }
 
 XML.prototype.toXMLString = function() {
-  return '<xml>\n  <title>test</title>\n</xml>'
-}
+  return '<xml>\n  <title>test</title>\n</xml>';
+};
+
+module.exports = XML;
