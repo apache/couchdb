@@ -168,7 +168,7 @@ couchTests.users_db_security = function(debug) {
         "should not_found opening another user's user doc");
 
 
-      // save a db amin 
+      // save a db admin
       var benoitcDoc = {
         _id: "org.couchdb.user:benoitc",
         type: "user",
@@ -320,7 +320,7 @@ couchTests.users_db_security = function(debug) {
       {
         section: "couch_httpd_auth",
         key: "public_fields",
-        value: "name,type"
+        value: "name"
       },
       {
         section: "couch_httpd_auth",
@@ -341,6 +341,13 @@ couchTests.users_db_security = function(debug) {
       } catch(e) {
         TEquals("forbidden", e.error, "should throw");
       }
+
+      // COUCHDB-1888 make sure admins always get all fields
+      TEquals(true, CouchDB.login("jan", "apple").ok);
+      var all_admin = usersDb.allDocs({ include_docs: "true" });
+      TEquals("user", all_admin.rows[2].doc.type,
+          "should return type");
+
 
       // log in one last time so run_on_modified_server can clean up the admin account
       TEquals(true, CouchDB.login("jan", "apple").ok);

@@ -129,7 +129,6 @@ all_docs_req(Req, Db, Keys) ->
         do_all_docs_req(Req, Db, Keys)
     end.
 
-
 do_all_docs_req(Req, Db, Keys) ->
     Args0 = parse_qs(Req, Keys),
     ETagFun = fun(Sig, Acc0) ->
@@ -143,20 +142,37 @@ do_all_docs_req(Req, Db, Keys) ->
     {ok, Resp} = couch_httpd:etag_maybe(Req, fun() ->
         VAcc0 = #vacc{db=Db, req=Req},
         DbName = ?b2l(Db#db.name),
-        Callback = case couch_config:get("couch_httpd_auth",
+        UsersDbName = couch_config:get("couch_httpd_auth",
                                          "authentication_db",
-                                         "_users") of
-        DbName ->
-            fun filtered_view_cb/2;
-        _ ->
-            fun view_cb/2
-        end,
+                                         "_users"),
+        IsAdmin = is_admin(Db),
+        Callback = get_view_callback(DbName, UsersDbName, IsAdmin),
         couch_mrview:query_all_docs(Db, Args, Callback, VAcc0)
     end),
     case is_record(Resp, vacc) of
         true -> {ok, Resp#vacc.resp};
         _ -> {ok, Resp}
     end.
+
+is_admin(Db) ->
+    case catch couch_db:check_is_admin(Db) of
+    {unauthorized, _} ->
+        false;
+    ok ->
+        true
+    end.
+
+
+% admin users always get all fields
+get_view_callback(_, _, true) ->
+    fun view_cb/2;
+% if we are operating on the users db and we aren't
+% admin, filter the view
+get_view_callback(_DbName, _DbName, false) ->
+    fun filtered_view_cb/2;
+% non _users databases get all fields
+get_view_callback(_, _, _) ->
+    fun view_cb/2.
 
 
 design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
