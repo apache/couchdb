@@ -10,7 +10,7 @@
 ## License for the specific language governing permissions and limitations under
 ## the License.
 
-EXTRA_DIST =
+EXTRA_DIST = \
   .gitignore \
   Makefile.dist \
   priv/default.d/my_first_couchdb_plugin.ini \
