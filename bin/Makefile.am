@@ -15,7 +15,7 @@ MAKE_SAFE = $(MAKE)
 if WINDOWS
 bin_SCRIPTS = couchdb.bat
 else
-bin_SCRIPTS = couchdb couch-config erlang-version.escript
+bin_SCRIPTS = couchdb couch-config
 endif
 
 man1dir = $(mandir)/man1
@@ -32,7 +32,7 @@ endif
 
 BUILT_SOURCES = $(man_file_build)
 
-EXTRA_DIST = $(man_file_build)
+EXTRA_DIST = $(man_file_build) erlang-version.escript
 
 CLEANFILES = $(bin_SCRIPTS) $(man_file_build) $(noinst_SCRIPTS)
 
