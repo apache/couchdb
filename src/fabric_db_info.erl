@@ -21,9 +21,13 @@ go(DbName) ->
     Shards = mem3:shards(DbName),
     Workers = fabric_util:submit_jobs(Shards, get_db_info, []),
     RexiMon = fabric_util:create_monitors(Shards),
+    Fun = fun handle_message/3,
     Acc0 = {fabric_dict:init(Workers, nil), []},
     try
-        fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0)
+        case fabric_util:recv(Workers, #shard.ref, Fun, Acc0) of
+            {ok, Acc} -> {ok, Acc};
+            {error, Error} -> throw(Error)
+        end
     after
         rexi_monitor:stop(RexiMon)
     end.
@@ -37,7 +41,7 @@ handle_message({rexi_DOWN, _, {_,NodeRef},_}, _Shard, {Counters, Acc}) ->
     end;
 
 handle_message({rexi_EXIT, Reason}, Shard, {Counters, Acc}) ->
-    NewCounters = lists:keydelete(Shard, #shard.ref, Counters),
+    NewCounters = fabric_dict:erase(Shard, Counters),
     case fabric_view:is_progress_possible(NewCounters) of
     true ->
         {ok, {NewCounters, Acc}};
