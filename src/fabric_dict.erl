@@ -22,6 +22,9 @@ init(Keys, InitialValue) ->
 is_key(Key, Dict) ->
     orddict:is_key(Key, Dict).
 
+fetch_keys(Dict) ->
+    orddict:fetch_keys(Dict).
+
 decrement_all(Dict) ->
     [{K,V-1} || {K,V} <- Dict].
 
