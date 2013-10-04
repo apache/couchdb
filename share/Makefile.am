@@ -105,6 +105,7 @@ nobase_dist_localdata_DATA = \
     www/image/toggle-expand.gif \
     www/image/twisty.gif \
     www/index.html \
+    www/plugins.html \
     www/replicator.html \
     www/script/couch.js \
     www/script/couch_tests.js \
