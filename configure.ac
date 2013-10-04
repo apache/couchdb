@@ -129,7 +129,7 @@ AS_IF([test x${ERL} = x], [
     AC_MSG_ERROR([Could not find the `erl' executable. Is Erlang installed?])
 ])
 
-AC_ARG_WITH([erlang], 
+AC_ARG_WITH([erlang],
     [AS_HELP_STRING([--with-erlang=PATH],
         [set PATH to the Erlang include directory])
 ], [
@@ -477,35 +477,35 @@ tests_enabled=yes
 docs_enabled=yes
 strictness_enabled=no
 
-AC_ARG_ENABLE([init], 
+AC_ARG_ENABLE([init],
     [AS_HELP_STRING([--disable-init],
         [don't install init script where applicable])
 ], [
     use_init=$enableval
 ], [])
 
-AC_ARG_ENABLE([launchd], 
+AC_ARG_ENABLE([launchd],
     [AS_HELP_STRING([--disable-launchd],
         [don't install launchd configuration where applicable])
 ], [
     use_launchd=$enableval
 ], [])
 
-AC_ARG_ENABLE([native-mochijson], 
+AC_ARG_ENABLE([native-mochijson],
     [AS_HELP_STRING([--enable-native-mochijson],
         [compile mochijson to native code (EXPERIMENTAL)])
 ], [
     native_mochijson_enabled=$enableval
 ], [])
 
-AC_ARG_ENABLE([tests], 
+AC_ARG_ENABLE([tests],
     [AS_HELP_STRING([--disable-tests],
         [skip tests during build])
 ], [
     tests_enabled=$enableval
 ], [])
 
-AC_ARG_ENABLE([docs], 
+AC_ARG_ENABLE([docs],
     [AS_HELP_STRING([--disable-docs],
         [skip docs during build])
 ], [
@@ -615,7 +615,7 @@ if test x${docs_enabled} = xyes; then
         build_html=yes
         if test x${HAS_MAKEINFO} = xyes; then
             build_info=yes
-        fi    
+        fi
         if test x${HAS_PDFLATEX} = xyes; then
             build_pdf=yes
         fi
