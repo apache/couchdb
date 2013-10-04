@@ -15,12 +15,12 @@ MAKE_SAFE = $(MAKE)
 if WINDOWS
 bin_SCRIPTS = couchdb.bat
 else
-bin_SCRIPTS = couchdb couch-config
+bin_SCRIPTS = couchdb couch-config erlang-version.escript
 endif
 
 man1dir = $(mandir)/man1
 
-noinst_SCRIPTS = couchjs_dev couch-config_dev erlang-version.escript
+noinst_SCRIPTS = couchjs_dev couch-config_dev
 
 man_file = couchdb.1
 
