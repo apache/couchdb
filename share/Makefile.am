@@ -71,6 +71,29 @@ nobase_dist_localdata_DATA = \
     www/dialog/_save_view_as.html \
     www/dialog/_upload_attachment.html \
     www/document.html \
+    share/www/fauxton \
+    share/www/fauxton/css \
+    share/www/fauxton/css/index.css \
+    share/www/fauxton/img \
+    share/www/fauxton/img/couchdb-site.png \
+    share/www/fauxton/img/couchdblogo.png \
+    share/www/fauxton/img/fontawesome-webfont.eot \
+    share/www/fauxton/img/fontawesome-webfont.svg \
+    share/www/fauxton/img/fontawesome-webfont.ttf \
+    share/www/fauxton/img/fontawesome-webfont.woff \
+    share/www/fauxton/img/FontAwesome.otf \
+    share/www/fauxton/img/fontcustom_fauxton.eot \
+    share/www/fauxton/img/fontcustom_fauxton.svg \
+    share/www/fauxton/img/fontcustom_fauxton.ttf \
+    share/www/fauxton/img/fontcustom_fauxton.woff \
+    share/www/fauxton/img/glyphicons-halflings-white.png \
+    share/www/fauxton/img/glyphicons-halflings.png \
+    share/www/fauxton/img/linen.png \
+    share/www/fauxton/img/loader.gif \
+    share/www/fauxton/img/minilogo.png \
+    share/www/fauxton/index.html \
+    share/www/fauxton/js \
+    share/www/fauxton/js/require.js \
     www/favicon.ico \
     www/image/add.png \
     www/image/apply.gif \
