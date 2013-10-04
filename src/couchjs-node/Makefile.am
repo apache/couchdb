@@ -10,17 +10,15 @@
 ## License for the specific language governing permissions and limitations under
 ## the License.
 
-
 EXTRA_DIST = \
-  couchjs-node/cli.js \
-  couchjs-node/console.js \
-  couchjs-node/couchdb.js \
-  couchjs-node/couchjs.js \
-  couchjs-node/inspector.js \
-  couchjs-node/Makefile.am \
-  couchjs-node/package.json \
-  couchjs-node/README.md \
-  couchjs-node/sandbox.js \
-  couchjs-node/stream.js \
-  couchjs-node/test/experiment.js \
-  couchjs-node/xml.js
+  cli.js \
+  console.js \
+  couchdb.js \
+  couchjs.js \
+  inspector.js \
+  package.json \
+  README.md \
+  sandbox.js \
+  stream.js \
+  test/experiment.js \
+  xml.js
