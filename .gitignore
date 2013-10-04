@@ -102,11 +102,11 @@ src/fauxton/app/addons/*
 !src/fauxton/app/addons/permissions
 src/fauxton/settings.json*
 !src/fauxton/settings.json.default
-
 src/ibrowse/ibrowse.app
 src/ibrowse/ibrowse.app
 src/mochiweb/mochiweb.app
 src/mochiweb/mochiweb.app
+!src/my-first-couchdb-plugin/.gitignore
 src/snappy/.deps/
 src/snappy/.libs/
 src/snappy/google-snappy/.deps/
