@@ -13,7 +13,6 @@
 EXTRA_DIST =
   .gitignore \
   Makefile.dist \
-  Makefile.am \
   priv/default.d/my_first_couchdb_plugin.ini \
   README.md \
   src/my_first_couchdb_plugin.app.src \
