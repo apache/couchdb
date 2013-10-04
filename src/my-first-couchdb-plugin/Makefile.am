@@ -10,18 +10,12 @@
 ## License for the specific language governing permissions and limitations under
 ## the License.
 
-SUBDIRS = \
-    couch_dbupdates \
-    couch_index \
-    couch_mrview \
-    couch_plugins \
-    couch_replicator \
-    couchdb \
-    ejson \
-    erlang-oauth \
-    etap \
-    ibrowse \
-    mochiweb \
-    snappy \
-    couchjs-node \
-    my-first-couchdb-plugin
+EXTRA_DIST =
+  .gitignore \
+  Makefile.dist \
+  Makefile.am \
+  priv/default.d/my_first_couchdb_plugin.ini \
+  README.md \
+  src/my_first_couchdb_plugin.app.src \
+  src/my_first_couchdb_plugin.erl \
+  test/my_first_couchdb_plugin_tests.erl
