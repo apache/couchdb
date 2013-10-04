@@ -49,6 +49,8 @@ process_mailbox(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
     case process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) of
     {ok, Acc} ->
         process_mailbox(RefList, Keypos, Fun, Acc, TimeoutRef, PerMsgTO);
+    {new_refs, NewRefList, Acc} ->
+        process_mailbox(NewRefList, Keypos, Fun, Acc, TimeoutRef, PerMsgTO);
     {stop, Acc} ->
         {ok, Acc};
     Error ->
