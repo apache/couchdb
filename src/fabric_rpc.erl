@@ -37,7 +37,7 @@ changes(DbName, Args, StartSeq) ->
 changes(DbName, #changes_args{} = Args, StartSeq, DbOptions) ->
     changes(DbName, [Args], StartSeq, DbOptions);
 changes(DbName, Options, StartVector, DbOptions) ->
-    erlang:put(io_priority, {interactive, DbName}),
+    set_io_priority(DbName, DbOptions),
     #changes_args{dir=Dir} = Args = lists:keyfind(changes_args, 1, Options),
     case get_or_create_db(DbName, DbOptions) of
     {ok, Db} ->
@@ -57,6 +57,7 @@ changes(DbName, Options, StartVector, DbOptions) ->
     end.
 
 all_docs(DbName, Options, #mrargs{keys=undefined} = Args0) ->
+    set_io_priority(DbName, Options),
     Args = fix_skip_and_limit(Args0),
     {ok, Db} = get_or_create_db(DbName, Options),
     VAcc0 = #vacc{db=Db},
@@ -67,6 +68,7 @@ map_view(DbName, DDoc, ViewName, Args0) ->
     map_view(DbName, DDoc, ViewName, Args0, []).
 
 map_view(DbName, DDoc, ViewName, Args0, DbOptions) ->
+    set_io_priority(DbName, DbOptions),
     Args = fix_skip_and_limit(Args0),
     {ok, Db} = get_or_create_db(DbName, DbOptions),
     VAcc0 = #vacc{db=Db},
@@ -77,6 +79,7 @@ reduce_view(DbName, DDoc, ViewName, Args0) ->
     reduce_view(DbName, DDoc, ViewName, Args0, []).
 
 reduce_view(DbName, DDoc, ViewName, Args0, DbOptions) ->
+    set_io_priority(DbName, DbOptions),
     Args = fix_skip_and_limit(Args0),
     {ok, Db} = get_or_create_db(DbName, DbOptions),
     VAcc0 = #vacc{db=Db},
