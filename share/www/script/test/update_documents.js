@@ -33,8 +33,8 @@ couchTests.update_documents = function(debug) {
             // and returns an HTML response to the client.
             "<p>New World</p>"];
           };
-          // 
-          return [null, "<p>Empty World</p>"];          
+          //
+          return [null, "<p>Empty World</p>"];
         };
         // we can update the document inline
         doc.world = "hello";
@@ -66,20 +66,6 @@ couchTests.update_documents = function(debug) {
       "error" : stringFun(function(doc, req) {
         superFail.badCrash;
       }),
-      "xml" : stringFun(function(doc, req) {
-        var xml = new XML('<xml></xml>');
-        xml.title = doc.title;
-        var posted_xml = new XML(req.body);
-        doc.via_xml = posted_xml.foo.toString();
-        var resp =  {
-          "headers" : {
-            "Content-Type" : "application/xml"
-          },
-          "body" : xml.toXMLString()
-        };
-         
-         return [doc, resp];
-       }),
        "get-uuid" : stringFun(function(doc, req) {
          return [null, req.uuid];
        }),
@@ -156,7 +142,7 @@ couchTests.update_documents = function(debug) {
   xhr = CouchDB.request("GET", "/test_suite_db/nonExistingDoc");
   T(xhr.status == 200);
 
-  // in place update 
+  // in place update
   xhr = CouchDB.request("PUT", "/test_suite_db/_design/update/_update/in-place/"+docid+'?field=title&value=test');
   T(xhr.status == 201);
   T(xhr.responseText == "set title to test");
@@ -195,17 +181,6 @@ couchTests.update_documents = function(debug) {
   
   T(doc.counter == 2);
 
-  // parse xml
-  xhr = CouchDB.request("PUT", "/test_suite_db/_design/update/_update/xml/"+docid, {
-    headers : {"X-Couch-Full-Commit":"true"},
-    "body" : '<xml><foo>bar</foo></xml>'
-  });
-  T(xhr.status == 201);
-  T(xhr.responseText == "<xml>\n  <title>test</title>\n</xml>");
-  
-  doc = db.open(docid);
-  T(doc.via_xml == "bar");
-  
   // Server provides UUID when POSTing without an ID in the URL
   xhr = CouchDB.request("POST", "/test_suite_db/_design/update/_update/get-uuid/");
   T(xhr.status == 200);
