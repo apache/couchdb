@@ -36,7 +36,7 @@ Next, install *rebar* from <https://github.com/rebar/rebar>. Rebar is a build to
 
 It doesn’t do much, but you get your first module going. Let’s try to compile it.
 
-`my_first_couchdb_plugin` comes with a `Makefile.dist` that helps you with common tasks. To make your life easier, rename it from `Makefile.dist` to `Makefile`.
+`my_first_couchdb_plugin` comes with a `Makefile` that helps you with common tasks.
 
 To compile your code, simply run:
 
