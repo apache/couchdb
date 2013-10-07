@@ -137,7 +137,11 @@
 ^src/fauxton/app/addons/permissions/assets/less/permissions.less
 ^src/ibrowse/.*
 ^src/mochiweb/.*
-^src/my-first-couchdb-plugin/.*
+^src/my-first-couchdb-plugin/priv/*/*
+^src/my-first-couchdb-plugin/README.md
+^src/my-first-couchdb-plugin/.gitignore
+^src/my-first-couchdb-plugin/Makefile
+^src/my-first-couchdb-plugin/Makefile.in
 ^src/snappy/.*
 ^stamp-h1
 ^test/Makefile
