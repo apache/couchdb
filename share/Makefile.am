@@ -71,6 +71,25 @@ nobase_dist_localdata_DATA = \
     www/dialog/_save_view_as.html \
     www/dialog/_upload_attachment.html \
     www/document.html \
+    www/fauxton/css/index.css \
+    www/fauxton/img/couchdb-site.png \
+    www/fauxton/img/couchdblogo.png \
+    www/fauxton/img/fontawesome-webfont.eot \
+    www/fauxton/img/fontawesome-webfont.svg \
+    www/fauxton/img/fontawesome-webfont.ttf \
+    www/fauxton/img/fontawesome-webfont.woff \
+    www/fauxton/img/FontAwesome.otf \
+    www/fauxton/img/fontcustom_fauxton.eot \
+    www/fauxton/img/fontcustom_fauxton.svg \
+    www/fauxton/img/fontcustom_fauxton.ttf \
+    www/fauxton/img/fontcustom_fauxton.woff \
+    www/fauxton/img/glyphicons-halflings-white.png \
+    www/fauxton/img/glyphicons-halflings.png \
+    www/fauxton/img/linen.png \
+    www/fauxton/img/loader.gif \
+    www/fauxton/img/minilogo.png \
+    www/fauxton/index.html \
+    www/fauxton/js/require.js \
     www/favicon.ico \
     www/image/add.png \
     www/image/apply.gif \
@@ -105,6 +124,7 @@ nobase_dist_localdata_DATA = \
     www/image/toggle-expand.gif \
     www/image/twisty.gif \
     www/index.html \
+    www/plugins.html \
     www/replicator.html \
     www/script/couch.js \
     www/script/couch_tests.js \
