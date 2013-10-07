@@ -107,6 +107,7 @@ src/ibrowse/ibrowse.app
 src/mochiweb/mochiweb.app
 src/mochiweb/mochiweb.app
 !src/my-first-couchdb-plugin/.gitignore
+!src/my-first-couchdb-plugin/Makefile
 src/snappy/.deps/
 src/snappy/.libs/
 src/snappy/google-snappy/.deps/

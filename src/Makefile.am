@@ -23,5 +23,13 @@ SUBDIRS = \
     ibrowse \
     mochiweb \
     snappy \
-    couchjs-node \
-    my-first-couchdb-plugin
+    couchjs-node
+
+EXTRA_DIST = \
+  my-first-couchdb-plugin/.gitignore \
+  my-first-couchdb-plugin/Makefile \
+  my-first-couchdb-plugin/priv/default.d/my_first_couchdb_plugin.ini \
+  my-first-couchdb-plugin/README.md \
+  my-first-couchdb-plugin/src/my_first_couchdb_plugin.app.src \
+  my-first-couchdb-plugin/src/my_first_couchdb_plugin.erl \
+  my-first-couchdb-plugin/test/my_first_couchdb_plugin_tests.erl
