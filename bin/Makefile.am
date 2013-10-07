@@ -32,7 +32,7 @@ endif
 
 BUILT_SOURCES = $(man_file_build)
 
-EXTRA_DIST = $(man_file_build)
+EXTRA_DIST = $(man_file_build) erlang-version.escript
 
 CLEANFILES = $(bin_SCRIPTS) $(man_file_build) $(noinst_SCRIPTS)
 

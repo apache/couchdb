@@ -213,6 +213,7 @@ html_files = \
     html/couchapp/views/intro.html \
     html/couchapp/views/joins.html \
     html/couchapp/views/nosql.html \
+    html/couchapp/views/pagination.html \
     html/cve/2010-0009.html \
     html/cve/2010-2234.html \
     html/cve/2010-3854.html \
@@ -356,6 +357,7 @@ src_files = \
     ../src/couchapp/views/intro.rst \
     ../src/couchapp/views/joins.rst \
     ../src/couchapp/views/nosql.rst \
+    ../src/couchapp/views/pagination.rst \
     ../src/cve/2010-0009.rst \
     ../src/cve/2010-2234.rst \
     ../src/cve/2010-3854.rst \
