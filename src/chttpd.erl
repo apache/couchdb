@@ -508,7 +508,7 @@ json_body(Httpd) ->
         undefined ->
             throw({bad_request, "Missing request body"});
         Body ->
-            ?JSON_DECODE(Body)
+            ?JSON_DECODE(maybe_decompress(Httpd, Body))
     end.
 
 json_body_obj(Httpd) ->
@@ -868,3 +868,13 @@ json_stack_item(_) ->
 
 json_stack_arity(A) ->
     if is_integer(A) -> A; is_list(A) -> length(A); true -> 0 end.
+
+maybe_decompress(Httpd, Body) ->
+    case header_value(Httpd, "Content-Encoding", "identity") of
+    "gzip" ->
+        zlib:gunzip(Body);
+    "identity" ->
+        Body;
+    Else ->
+        throw({bad_ctype, [Else, " is not a supported content encoding."]})
+    end.
