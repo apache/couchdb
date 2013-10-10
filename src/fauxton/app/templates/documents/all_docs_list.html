@@ -19,29 +19,17 @@ the License.
         <button type="button" class="btn all" data-toggle="button">✓ All</button>
         <button class="btn btn-small disabled bulk-delete"><i class="icon-trash"></i></button>
       </div>
-      <!-- TODO::REENABLE
-      <div class="btn-toolbar pull-right">
-        <a href="#new-view-index" class="btn btn-small toggle-edit disabled"><i class="icon-wrench"></i> Edit index</a>
-        <a href="#params" class="btn btn-small toggle-params"><i class="icon-plus"></i> API preview</a>
-      </div>
-      -->
     </div>
   <% } %>
   <p>
 
-  <% if (totalRows === "unknown"){ %>
-    Showing 0 documents. <a href="#/database/<%=database%>/new"> Create your first document.</a>
-  <% } else { %>
-    Showing <%=offset%> - <%= numModels %> of <%= totalRows %> rows
-  <%}%>
-    <% if (updateSeq) { %>
-      -- Update Sequence: <%= updateSeq %>
-    <% } %>
-    <% if (requestDuration) { %>
-  <span class="view-request-duration">
+  <div id="item-numbers"> </div>
+
+  <% if (requestDuration) { %>
+    <span class="view-request-duration">
     View request duration: <strong> <%= requestDuration %> </strong> 
-   </span>
-   <% } %>
+    </span>
+  <% } %>
   </p>
   <table class="all-docs table table-striped table-condensed">
     <tbody></tbody>

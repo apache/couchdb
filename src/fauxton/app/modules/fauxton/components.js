@@ -73,7 +73,12 @@ function(app, FauxtonAPI) {
 
     nextClicked: function (event) {
       event.preventDefault();
-      this.previousIds.push(this.collection.first().id);
+      var doc = this.collection.first();
+
+      if (doc) {
+        this.previousIds.push(doc.id);
+      }
+
       FauxtonAPI.navigate(this.nextUrlfn(), {trigger: false});
       FauxtonAPI.triggerRouteEvent('paginate', 'next');
     },

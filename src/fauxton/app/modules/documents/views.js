@@ -362,8 +362,11 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
         FauxtonAPI.addNotification({
           msg: "Succesfully destroyed your doc"
         });
-        that.$el.fadeOut();
-        that.model.collection.remove(that.id);
+        that.$el.fadeOut(function () {
+          that.remove();
+        });
+
+        that.model.collection.remove(that.model.id);
       }, function(resp) {
         FauxtonAPI.addNotification({
           msg: "Failed to destroy your doc!",
@@ -376,6 +379,16 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
   Views.Row = FauxtonAPI.View.extend({
     template: "templates/documents/index_row_docular",
     tagName: "tr",
+
+    events: {
+      "click button.delete": "destroy"
+    },
+
+    destroy: function (event) {
+      event.preventDefault(); 
+      
+      window.alert('Cannot delete a document generated from a view.');
+    },
 
     serialize: function() {
       return {
@@ -410,6 +423,38 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
         this.$el.addClass("active");
       }
     }
+  });
+
+  Views.AllDocsNumber = FauxtonAPI.View.extend({
+    template: "templates/documents/all_docs_number",
+
+    initialize: function (options) {
+      this.newView = options.newView || false;
+      
+      this.listenTo(this.collection, 'totalRows:decrement', this.render);
+    },
+
+    serialize: function () {
+       var totalRows = 0,
+          recordStart = 0,
+          updateSeq = false;
+
+      if (!this.newView) {
+        totalRows = this.collection.totalRows();
+        updateSeq = this.collection.updateSeq();
+      }
+
+      recordStart = this.collection.recordStart();
+
+      return {
+        database: this.collection.database.id,
+        updateSeq: updateSeq,
+        offset: recordStart,
+        totalRows: totalRows,
+        numModels: this.collection.models.length + recordStart - 1,
+      };
+    }
+
   });
 
   // TODO: Rename to reflect that this is a list of rows or documents
@@ -457,32 +502,16 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
     },
 
     serialize: function() {
-      var totalRows = 0,
-          recordStart = 0,
-          updateSeq = false;
-
-      if (!this.newView) {
-        totalRows = this.collection.totalRows();
-        updateSeq = this.collection.updateSeq();
-      }
-
-      recordStart = this.collection.recordStart();
-
-      var info = {
-        database: this.collection.database.id,
-        updateSeq: updateSeq,
-        offset: recordStart,
-        totalRows: totalRows,
-        numModels: this.collection.models.length + recordStart - 1,
-        viewList: this.viewList,
-        requestDuration: null
-      };
+      var requestDuration = false;
 
       if (this.collection.requestDurationInString) {
-        info.requestDuration = this.collection.requestDurationInString();
+        requestDuration = this.collection.requestDurationInString();
       }
 
-      return info;
+      return {
+        viewList: this.viewList,
+        requestDuration: requestDuration
+      };
     },
 
     /*
@@ -497,7 +526,10 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
     bulkDelete: function() {
       var that = this;
       // yuck, data binding ftw?
-      var eles = this.$el.find("input.row-select:checked").parents("tr.all-docs-item").map(function(e) { return $(this).attr("data-id"); }).get();
+      var eles = this.$el.find("input.row-select:checked")
+                         .parents("tr.all-docs-item")
+                         .map(function(e) { return $(this).attr("data-id"); })
+                         .get();
 
       if (!window.confirm("Are you sure you want to delete these " + eles.length + " docs?")) {
         return false;
@@ -507,7 +539,9 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
         var model = this.collection.get(ele);
 
         model.destroy().then(function(resp) {
-          that.rows[ele].$el.fadeOut();
+          that.rows[ele].$el.fadeOut(function () {
+            $(this).remove();
+          });
 
           model.collection.remove(model.id);
           that.$('.bulk-delete').addClass('disabled');
@@ -551,6 +585,11 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
     },
 
     beforeRender: function() {
+      this.allDocsNumber = this.setView('#item-numbers', new Views.AllDocsNumber({
+        collection: this.collection,
+        newView: this.newView
+      }));
+
       this.insertView('#documents-pagination', this.pagination);
       this.collection.each(function(doc) {
         this.rows[doc.id] = this.insertView("table.all-docs tbody", new this.nestedView({
@@ -679,7 +718,6 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
         this.getDocFromEditor();
 
         notification = FauxtonAPI.addNotification({msg: "Saving document."});
-        console.log('save',this.model);
 
         this.model.save().then(function () {
           FauxtonAPI.navigate('/database/' + that.database.id + '/' + that.model.id);
