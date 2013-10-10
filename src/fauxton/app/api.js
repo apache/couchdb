@@ -363,7 +363,11 @@ function(app, Fauxton) {
           });
       });
 
-      if (this.get('apiUrl')) masterLayout.apiBar.update(this.get('apiUrl'));
+      if (this.get('apiUrl')){
+        masterLayout.apiBar.update(this.get('apiUrl'));
+      } else {
+        masterLayout.apiBar.hide();
+      }
 
       // Track that we've done a full initial render
       this.renderedState = true;

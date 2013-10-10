@@ -29,6 +29,10 @@ function(app, FauxtonAPI, Documents) {
       });
     },
 
+    documentation: function(){
+      return "all_dbs";
+    },
+    
     buildAllDocs: function(params) {
       this.allDocs = new Documents.AllDocs(null, {
         database: this,
@@ -137,7 +141,9 @@ function(app, FauxtonAPI, Documents) {
   // TODO: shared databases - read from the user doc
   Databases.List = Backbone.Collection.extend({
     model: Databases.Model,
-
+    documentation: function(){
+      return "all_dbs";
+    },
     url: function() {
       return app.host + "/_all_dbs";
     },

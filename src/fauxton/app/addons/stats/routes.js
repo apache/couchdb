@@ -52,7 +52,9 @@ function(app, FauxtonAPI, Stats) {
       return [this.stats.fetch()];
     },
 
-    apiUrl: "_stats"
+    apiUrl: function(){
+      return [ this.stats.url, this.stats.documentation]; 
+    }
   });
 
   Stats.RouteObjects = [StatsRouteObject];

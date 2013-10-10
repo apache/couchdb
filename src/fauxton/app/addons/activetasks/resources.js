@@ -37,6 +37,7 @@ function (app, backbone, Fauxton) {
       "indexer": "Indexer",
       "view_compaction": "View Compaction"
     },
+    documentation: "_active_tasks",
     url: function () {
       return app.host + '/_active_tasks';
     },

@@ -30,23 +30,23 @@ function (app, FauxtonAPI, Activetasks, Views) {
     {"name": "Active tasks", "link": "activetasks"}
     ],
     apiUrl: function(){
-      return app.host+"/_active_tasks";
+      return [this.newtasks.url(), this.newtasks.documentation];
     }, 
 
     roles: ["_admin"],
 
     defaultView: function(id){
-      var newtasks = new Activetasks.Tasks({
+     this.newtasks = new Activetasks.Tasks({
         currentView: "all", 
         id:'activeTasks'
       });
       this.setView("#sidebar-content", new Views.TabMenu({
         currentView: "all",
-        model: newtasks
+        model: this.newtasks
       })); 
 
       this.setView("#dashboard-content", new Views.DataSection({
-        model: newtasks,
+        model: this.newtasks,
         currentView: "all"
       })); 
     }

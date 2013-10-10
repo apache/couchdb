@@ -21,7 +21,9 @@ function(app, FauxtonAPI) {
 
   Documents.Doc = Backbone.Model.extend({
     idAttribute: "_id",
-
+    documentation: function(){
+      return "docs";
+    },
     url: function(context) {
       if (context === "app") {
         return this.getDatabase().url("app") + "/" + this.safeID();
@@ -191,7 +193,9 @@ function(app, FauxtonAPI) {
 
   Documents.DdocInfo = Backbone.Model.extend({
     idAttribute: "_id",
-
+    documentation: function(){
+      return "docs";
+    },
     initialize: function (_attrs, options) {
       this.database = options.database;
     },
@@ -220,7 +224,9 @@ function(app, FauxtonAPI) {
 
       return this.id.match(/^_design/) ? "design doc" : "doc";
     },
-
+    documentation: function(){
+      return "docs";
+    },
     url: function(context) {
       if (!this.isEditable()) return false;
 
@@ -249,13 +255,15 @@ function(app, FauxtonAPI) {
       });
 
       return deferred.promise();
-    },
+    }
 
   });
 
   Documents.AllDocs = Backbone.Collection.extend({
     model: Documents.Doc,
-
+    documentation: function(){
+      return "docs";
+    },
     initialize: function(_models, options) {
       this.database = options.database;
       this.params = options.params;
@@ -296,7 +304,6 @@ function(app, FauxtonAPI) {
         delete this.params.startkey;
         delete this.params.startkey_docid;
       }
-
       return this.url('app');
     },
 
@@ -348,7 +355,9 @@ function(app, FauxtonAPI) {
 
   Documents.IndexCollection = Backbone.Collection.extend({
     model: Documents.ViewRow,
-
+    documentation: function(){
+      return "docs";
+    },
     initialize: function(_models, options) {
       this.database = options.database;
       this.params = _.extend({limit: 20, reduce: false}, options.params);
@@ -491,7 +500,9 @@ function(app, FauxtonAPI) {
   
   Documents.PouchIndexCollection = Backbone.Collection.extend({
     model: Documents.ViewRow,
-
+    documentation: function(){
+      return "docs";
+    },
     initialize: function(_models, options) {
       this.database = options.database;
       this.rows = options.rows;

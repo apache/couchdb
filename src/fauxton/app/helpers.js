@@ -35,18 +35,24 @@ function() {
   // Get the URL for documentation, wiki, wherever we store it.
   // update the URLs in documentation_urls.js 
   Helpers.docs =  {
-    "docs": "http://docs.couchdb.org/en/latest/index.html",
+    "docs": "http://docs.couchdb.org/en/latest/intro/api.html#documents",
+    "all_dbs": "http://docs.couchdb.org/en/latest/api/server/common.html?highlight=all_dbs#get--_all_dbs",
     "replication_doc": "http://docs.couchdb.org/en/latest/replication/replicator.html#basics",
     "design_doc": "http://docs.couchdb.org/en/latest/couchapp/ddocs.html#design-docs",
     "view_functions": "http://docs.couchdb.org/en/latest/couchapp/ddocs.html#view-functions",
     "map_functions": "http://docs.couchdb.org/en/latest/couchapp/ddocs.html#map-functions",
     "reduce_functions": "http://docs.couchdb.org/en/latest/couchapp/ddocs.html#reduce-and-rereduce-functions",
     "api_reference": "http://docs.couchdb.org/en/latest/http-api.html",
-    "database_permission": "http://docs.couchdb.org/en/latest/api/database/security.html#db-security"
+    "database_permission": "http://docs.couchdb.org/en/latest/api/database/security.html#db-security",
+    "stats": "http://docs.couchdb.org/en/latest/api/server/common.html?highlight=stats#get--_stats",
+    "_active_tasks": "http://docs.couchdb.org/en/latest/api/server/common.html?highlight=stats#active-tasks",
+    "log": "http://docs.couchdb.org/en/latest/api/server/common.html?highlight=stats#log",
+    "config": "http://docs.couchdb.org/en/latest/config/index.html",
+    "views": "http://docs.couchdb.org/en/latest/intro/overview.html#views"
   }; 
   
-  Helpers.getDocUrl = function(doc){
-    return Helpers.docs[doc] || '#';
+  Helpers.getDocUrl = function(docKey){
+    return Helpers.docs[docKey] || '#';
   };
 
   // File size pretty printing, taken from futon.format.js

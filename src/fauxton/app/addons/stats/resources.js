@@ -23,7 +23,8 @@ function (app, FauxtonAPI, backbone, _, Fauxton) {
 
   Stats.Collection = Backbone.Collection.extend({
     model: Backbone.Model,
-    url: "/_stats",
+    documentation: "stats",
+    url: app.host+"/_stats",
     parse: function(resp) {
       return _.flatten(_.map(resp, function(doc, key) {
         return _.map(doc, function(v, k){
