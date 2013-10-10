@@ -43,6 +43,9 @@
 
 -define(OPENING, ddoc_cache_opening).
 
+-type dbname() :: iodata().
+-type docid() :: iodata().
+-type revision() :: {integer(), binary()}.
 
 -record(opener, {
     key,
@@ -62,7 +65,7 @@ start_link() ->
 
 init(_) ->
     process_flag(trap_exit, true),
-    ets:new(?OPENING, [set, protected, named_table, {keypos, #opener.key}]),
+    _ = ets:new(?OPENING, [set, protected, named_table, {keypos, #opener.key}]),
     {ok, Evictor} = couch_event:link_listener(
             ?MODULE, handle_db_event, nil, [all_dbs]
         ),
@@ -144,7 +147,7 @@ handle_info({'EXIT', Pid, Reason}, St) ->
     Pattern = #opener{pid=Pid, _='_'},
     case ets:match_object(?OPENING, Pattern) of
         [#opener{key=Key, clients=Clients}] ->
-            [gen_server:reply(C, {error, Reason}) || C <- Clients],
+            _ = [gen_server:reply(C, {error, Reason}) || C <- Clients],
             ets:delete(?OPENING, Key),
             {noreply, St};
         [] ->
@@ -169,6 +172,7 @@ handle_db_event(_DbName, _Event, St) ->
     {ok, St}.
 
 
+-spec open_ddoc({dbname(), validation_funs | docid()}) -> no_return().
 open_ddoc({DbName, validation_funs}=Key) ->
     {ok, DDocs} = fabric:design_docs(mem3:dbname(DbName)),
     Funs = lists:flatmap(fun(DDoc) ->
@@ -194,5 +198,5 @@ open_ddoc({DbName, DDocId}=Key) ->
 
 respond(Key, Resp) ->
     [#opener{clients=Clients}] = ets:lookup(?OPENING, Key),
-    [gen_server:reply(C, Resp) || C <- Clients],
+    _ = [gen_server:reply(C, Resp) || C <- Clients],
     ets:delete(?OPENING, Key).
