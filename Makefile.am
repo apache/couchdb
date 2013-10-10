@@ -42,7 +42,8 @@ EXTRA_DIST = \
     build-aux/dist-error \
     build-aux/sphinx-build \
     build-aux/sphinx-touch \
-    license.skip
+    license.skip \
+    Vagrantfile
 
 AUTHORS.gz: AUTHORS
 	gzip -9 < $< > $@
