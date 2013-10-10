@@ -28,8 +28,8 @@
   - **to** (*string*): Rule to rewrite an url. It can contain variables
     depending on  binding variables discovered during pattern matching and
     query args (url args and from the query member)
-  - **method** (*string*): Method to bind the request method to the rule.
-    Default is ``"*"``
+  - **method** (*string*): HTTP request method to bind the request method to
+    the rule. Default is ``"*"``
   - **query** (*object*): Query args you want to define they can contain
     dynamic variable by binding the key
 
@@ -49,10 +49,10 @@
   - If all tokens are matched and all `pathterms` are used, then the `pathspec`
     matches
 
-  The pattern matching is done by first matching the request method to a rule.
-  By default all methods match a rule. (method is equal to ``"*"`` by default).
-  Then It will try to match the path to one rule. If no rule match, then a
-  :statuscode:`404` response returned.
+  The pattern matching is done by first matching the HTTP request method to a
+  rule. ``method`` is equal to ``"*"`` by default, and will match any HTTP
+  method. It will then try to match the path to one rule. If no rule matches,
+  then a :statuscode:`404` response returned.
 
   Once a rule is found we rewrite the request url using the ``to`` and ``query``
   fields. The identified token are matched to the rule and will replace var.
