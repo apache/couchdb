@@ -13,9 +13,7 @@
 -module(ddoc_cache_opener).
 -behaviour(gen_server).
 
-
 -include_lib("mem3/include/mem3.hrl").
-
 
 -export([
     start_link/0
@@ -41,6 +39,7 @@
 ]).
 
 
+-define(CACHE, ddoc_cache_lru).
 -define(OPENING, ddoc_cache_opening).
 
 -type dbname() :: iodata().
@@ -120,9 +119,9 @@ handle_cast({do_evict, DbName}, St) ->
     handle_cast({do_evict, DbName, DDocIds}, St);
 
 handle_cast({do_evict, DbName, DDocIds}, St) ->
-    ets_lru:remove(ddoc_cache_lru, {DbName, validation_funs}),
+    ets_lru:remove(?CACHE, {DbName, validation_funs}),
     lists:foreach(fun(DDocId) ->
-        ets_lru:remove(ddoc_cache_lru, {DbName, DDocId})
+        ets_lru:remove(?CACHE, {DbName, DDocId})
     end, DDocIds),
     {noreply, St};
 
@@ -181,12 +180,12 @@ open_ddoc({DbName, validation_funs}=Key) ->
             Fun -> [Fun]
         end
     end, DDocs),
-    ok = ets_lru:insert(ddoc_cache_lru, {DbName, validation_funs}, Funs),
+    ok = ets_lru:insert(?CACHE, {DbName, validation_funs}, Funs),
     exit({open_ok, Key, {ok, Funs}});
 open_ddoc({DbName, DDocId}=Key) ->
     try fabric:open_doc(DbName, DDocId, [ejson_body]) of
         {ok, Doc} ->
-            ok = ets_lru:insert(ddoc_cache_lru, {DbName, DDocId}, Doc),
+            ok = ets_lru:insert(?CACHE, {DbName, DDocId}, Doc),
             exit({open_ok, Key, {ok, Doc}});
         Else ->
             exit({open_ok, Key, Else})
