@@ -12,14 +12,14 @@
 
 .. _api/database:
 
-================
-Database Methods
-================
+=========
+Databases
+=========
 
-The Database methods provide an interface to an entire database withing
-CouchDB. These are database, rather than document, level requests.
+The Database endpoint provides an interface to an entire database with in
+CouchDB. These are database-level, rather than document-level requests.
 
-For all the database methods, the database name within the URL path
+For all these requests, the database name within the URL path
 should be the database name that you wish to perform the operation on.
 For example, to obtain the meta information for the database
 ``recipes``, you would use the HTTP request:

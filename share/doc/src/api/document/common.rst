@@ -167,7 +167,7 @@
 .. http:put:: /{db}/{docid}
 
   The :method:`PUT` method creates a new named document, or creates a new
-  revision of the existing document. Unlike the :post:`/{db}` method, you
+  revision of the existing document. Unlike the :post:`/{db}`, you
   must specify the document ID in the request URL.
 
   :param db: Database name

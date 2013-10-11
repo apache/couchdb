@@ -13,12 +13,11 @@
 
 .. _api/document:
 
-================
-Document Methods
-================
+=========
+Documents
+=========
 
-The CouchDB API Server Document methods detail how to create, read,
-update and delete documents within a database.
+Details on how to create, read, update and delete documents within a database.
 
 .. toctree::
 

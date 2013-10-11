@@ -12,9 +12,9 @@
 
 .. _api/local:
 
-========================================
-Local (non-replicating) Document Methods
-========================================
+=================================
+Local (non-replicating) Documents
+=================================
 
 The Local (non-replicating) document interface allows you to create
 local documents that are not replicated to other databases. These

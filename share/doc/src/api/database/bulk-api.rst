@@ -295,8 +295,8 @@ database. The constraints are detailed in :ref:`api/db/bulk_docs/semantics`.
 
 To insert documents in bulk into a database you need to supply a JSON
 structure with the array of documents that you want to add to the
-database. Using this method you can either include a document ID, or
-allow the document ID to be automatically generated.
+database. You can either include a document ID, or allow the document ID to be
+automatically generated.
 
 For example, the following update inserts three new documents, two with the
 supplied document IDs, and one which will have a document ID generated:

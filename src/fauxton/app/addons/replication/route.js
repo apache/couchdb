@@ -26,7 +26,7 @@ function(app, FauxtonAPI, Replication, Views) {
     },
     selectedHeader: "Replication",
     apiUrl: function() {
-      return app.host+"/_replication";
+      return [this.replication.url(), this.replication.documentation];
     },
     crumbs: [
       {"name": "Replicate changes from: ", "link": "replication"}
@@ -34,6 +34,7 @@ function(app, FauxtonAPI, Replication, Views) {
     defaultView: function(dbname){
 			this.databases = new Replication.DBList({});
       this.tasks = new Replication.Tasks({id: "ReplicationTasks"});
+      this.replication = new Replication.Replicate({});
 			this.setView("#dashboard-content", new Views.ReplicationForm({
         selectedDB: dbname ||"",
 				collection: this.databases,

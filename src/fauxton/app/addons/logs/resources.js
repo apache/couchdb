@@ -51,6 +51,8 @@ function (app, FauxtonAPI, Backbone) {
     initialize: function (options) {
       this.params = {bytes: 5000};
     },
+    
+    documentation: "log",
 
     url: function () {
       query = "?" + $.param(this.params);

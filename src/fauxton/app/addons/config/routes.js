@@ -37,7 +37,7 @@ function(app, FauxtonAPI, Config) {
     ],
 
     apiUrl: function () {
-      this.configs.url();
+      return [this.configs.url(), this.configs.documentation];
     },
 
     routes: {

@@ -39,8 +39,8 @@
     previous connection. Overrides `since` query parameter.
   :query array doc_ids: List of document IDs to filter the changes feed as
    valid JSON array. Used with :ref:`_doc_ids <changes/filter/doc_ids>` filter.
-   Since `length of URL is limited`_, you better use :post:`/{db}/_changes`
-   method instead.
+   Since `length of URL is limited`_, it is better to use
+   :post:`/{db}/_changes` instead.
   :query boolean conflicts: Includes `conflicts` information in response.
     Ignored if `include_docs` isn't ``true``. Default is ``false``.
   :query boolean descending: Return the change results in descending sequence
@@ -165,8 +165,8 @@
 .. http:post:: /{db}/_changes
 
   Requests the database changes feed in the same way as
-  :get:`/{db}/_changes` does, but this method is widely used with
-  ``?filter=_doc_ids`` query parameter and allows to pass larger list of
+  :get:`/{db}/_changes` does, but is widely used with
+  ``?filter=_doc_ids`` query parameter and allows one to pass a larger list of
   document IDs to filter.
 
   **Request**:

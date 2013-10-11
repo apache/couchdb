@@ -12,12 +12,11 @@
 
 .. _api/auth:
 
-======================
-Authentication Methods
-======================
+==============
+Authentication
+==============
 
-The CouchDB Authentication methods provide an interface for obtaining
-session and authorization data.
+Interfaces for obtaining session and authorization data.
 
 .. note:: We're also strongly recommend you to
    :ref:`setup SSL <config/ssl>` to improve all authentication methods security.

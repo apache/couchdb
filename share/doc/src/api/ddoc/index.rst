@@ -13,9 +13,9 @@
 
 .. _api/design-docs:
 
-=======================
-Design Document Methods
-=======================
+================
+Design Documents
+================
 
 In CouchDB, design documents provide the main interface for building a
 CouchDB application. The design document defines the views used to

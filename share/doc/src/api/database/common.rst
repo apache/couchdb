@@ -18,8 +18,9 @@
 .. http:head:: /{db}
 
   Returns the HTTP Headers containing a minimal amount of information
-  about the specified database. Since the response body is empty this method
-  is a lightweight way to check if the database exists already or not.
+  about the specified database. Since the response body is empty, using the
+  HEAD method is a lightweight way to check if the database exists already or
+  not.
 
   :param db: Database name
   :code 200: Database exists

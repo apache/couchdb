@@ -37,7 +37,7 @@ function(app, FauxtonAPI, Log) {
     roles: ["_admin"],
 
     apiUrl: function() {
-      return this.logs.url();
+      return [this.logs.url(), this.logs.documentation];
     },
 
     initialize: function () {
