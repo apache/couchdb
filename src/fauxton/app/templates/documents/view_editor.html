@@ -57,42 +57,42 @@ the License.
 
           <div class="control-group">
             <label for="map-function">Map function <a href="<%=getDocUrl('map_functions')%>" target="_blank"><i class="icon-question-sign"></i></a></label>
-              <% if (newView) { %>
-              <textarea class="js-editor" id="map-function"><%= langTemplates.map %></textarea>
-              <% } else { %>
-              <textarea class="js-editor" id="map-function"><%= ddoc.get('views')[viewName].map %></textarea>
-              <% } %>
+            <% if (newView) { %>
+            <textarea class="js-editor" id="map-function"><%= langTemplates.map %></textarea>
+            <% } else { %>
+            <textarea class="js-editor" id="map-function"><%= ddoc.get('views')[viewName].map %></textarea>
+            <% } %>
           </div>
 
 
           <div class="control-group">
             <label for="reduce-function-selector">Reduce function <a href="<%=getDocUrl('reduce_functions')%>" target="_blank"><i class="icon-question-sign"></i></a></label>
 
-              <select id="reduce-function-selector">
-                <option value="" <%= !reduceFunStr ? 'selected="selected"' : '' %>>None</option>
-                <% _.each(["_sum", "_count", "_stats"], function(reduce) { %>
-                <option value="<%= reduce %>" <% if (reduce == reduceFunStr) { %>selected<% } %>><%= reduce %></option>
-                <% }) %>
-                <option value="CUSTOM" <% if (isCustomReduce) { %>selected<% } %>>Custom reduce</option>
-              </select>
-              <span class="help-block">Reduce functions are optional.</span>
+            <select id="reduce-function-selector">
+              <option value="" <%= !reduceFunStr ? 'selected="selected"' : '' %>>None</option>
+              <% _.each(["_sum", "_count", "_stats"], function(reduce) { %>
+              <option value="<%= reduce %>" <% if (reduce == reduceFunStr) { %>selected<% } %>><%= reduce %></option>
+              <% }) %>
+              <option value="CUSTOM" <% if (isCustomReduce) { %>selected<% } %>>Custom reduce</option>
+            </select>
+            <span class="help-block">Reduce functions are optional.</span>
           </div>
 
 
           <div class="control-group reduce-function">
             <label for="reduce-function">Custom Reduce</label>
-              <% if (newView) { %>
-              <textarea class="js-editor" id="reduce-function"><%= langTemplates.reduce %></textarea>
-              <% } else { %>
-              <textarea class="js-editor" id="reduce-function"><%= ddoc.get('views')[viewName].reduce %></textarea>
-              <% } %>
+            <% if (newView) { %>
+            <textarea class="js-editor" id="reduce-function"><%= langTemplates.reduce %></textarea>
+            <% } else { %>
+            <textarea class="js-editor" id="reduce-function"><%= ddoc.get('views')[viewName].reduce %></textarea>
+            <% } %>
           </div>
 
           <div class="control-group">
-              <button class="button green save fonticon-circle-check">Save</button>
-              <% if (!this.newView) { %>
-              <button class="button cancel-button outlineGray fonticon-circle-x">Delete</button>
-              <% } %>
+            <button class="button green save fonticon-circle-check">Save</button>
+            <% if (!this.newView) { %>
+            <button class="button cancel-button outlineGray fonticon-circle-x">Delete</button>
+            <% } %>
           </div>
           <div class="clearfix"></div>
         </form>
@@ -102,85 +102,6 @@ the License.
       <div id="ddoc-info" class="well"> </div>
     </div>
     <div class="tab-pane" id="query">
-      <div class="advanced-options well">
-        <div class="errors-container"></div>
-        <form class="view-query-update custom-inputs">
-          <div class="controls-group">
-            <div class="row-fluid">
-              <div class="controls controls-row">
-                <input name="key" class="span6" type="text" placeholder="Key">
-                <input name="keys" class="span6" type="text" placeholder="Keys">
-              </div>
-            </div>
-            <div class="row-fluid">
-              <div class="controls controls-row">
-                <input name="startkey" class="span6" type="text" placeholder="Start Key">
-                <input name="endkey" class="span6" type="text" placeholder="End Key">
-              </div>
-            </div>
-          </div>
-          <div class="controls-group">
-            <div class="row-fluid">
-              <div class="controls controls-row">
-                <div class="checkbox inline">  
-                  <input id="check1" type="checkbox" name="include_docs" value="true">  
-                  <label name="include_docs" for="check1">Include Docs</label>  
-                  <% if (hasReduce) { %>
-                  <input id="check2" name="reduce" type="checkbox" value="true">
-                  <label for="check2">Reduce</label>  
-                </div> 
-                <label id="select1" class="drop-down inline">
-                  Group Level:
-                  <select id="select1" disabled name="group_level" class="input-small">
-                    <option value="0">None</option>
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                    <option value="4">4</option>
-                    <option value="5">5</option>
-                    <option value="6">6</option>
-                    <option value="7">7</option>
-                    <option value="8">8</option>
-                    <option value="9">9</option>
-                    <option value="999" selected="selected">exact</option>
-                  </select>
-                </label>
-                <% } %>
-                <div class="checkbox inline">  
-                  <input id="check3" name="stale" type="checkbox" value="ok">
-                  <label for="check3">Stale</label>
-                  <input id="check4" name="descending" type="checkbox" value="true">  
-                  <label for="check4">Descending</label>  
-                </div> 
-                <label class="drop-down inline">
-                  Limit:
-                  <select name="limit" class="input-small">
-                    <option>5</option>
-                    <option selected="selected">10</option>
-                    <option>25</option>
-                    <option>50</option>
-                    <option>100</option>
-                  </select>
-                </label>
-                <div class="checkbox inline">  
-                  <input id="check5" name="inclusive_end" type="checkbox" value="false">
-                  <label for="check5">Disable Inclusive End</label>
-                  <input id="check6" name="update_seq" type="checkbox" value="true">  
-                  <label for="check6">Descending</label>  
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="controls-group">
-            <div class="row-fluid">
-              <div class="controls controls-row">
-                <button type="submit" class="btn btn-primary btn-large">Query</button>
-                <button class="btn btn-info btn-large preview">Preview</button>
-              </div>
-            </div>
-          </div>
-        </form>
-      </div>
     </div>
   </div>
 </div>
