@@ -247,6 +247,19 @@
     The use of a revision for deletion of the record allows replication of
     the database to correctly track the deletion in synchronized copies.
 
+  .. warning::
+    There is a potential interaction between compaction and the repeated deletion and creation of an identical document.
+    During compaction, if you delete a document the next creation of that document will silently fail. 
+    See https://issues.apache.org/jira/browse/COUCHDB-1415 for more information.  It is suggested that you add a field that changes with
+    each creation(salt).  For example, include a time stamp with each creation.
+  .. code-block:: json
+
+    	{
+			"_id": "MyId",
+			"myvalue": "42",
+			"updated_at":  "1381416411724"
+    	}
+
   :param db: Database name
   :param docid: Document ID
   :<header Accept: - :mimetype:`application/json`
