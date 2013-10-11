@@ -251,14 +251,15 @@
     There is a potential interaction between compaction and the repeated deletion and creation of an identical document.
     During compaction, if you delete a document the next creation of that document will silently fail. 
     See https://issues.apache.org/jira/browse/COUCHDB-1415 for more information.  It is suggested that you add a field that changes with
-    each creation(salt).  For example, include a time stamp with each creation.
-  .. code-block:: json
+    each creation(salt).  For example, include a new uuid or a random number.
 
-    	{
-			"_id": "MyId",
-			"myvalue": "42",
-			"updated_at":  "1381416411724"
-    	}
+    **Example**::
+
+          {
+              "_id": "Mt_St_Helens",
+              "Erupting": False,
+              "uuid":  "cb3d21a8-3278-11e3-b0c0-3c07540286af"  
+          }
 
   :param db: Database name
   :param docid: Document ID
