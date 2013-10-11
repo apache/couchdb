@@ -126,8 +126,8 @@
 .. http:post:: /{db}/_design/{ddoc}/_view/{view}
 
   Executes the specified view function from the specified design document.
-  Unlike the :get:`/{db}/_design/{ddoc}/_view/{view}`  method
-  for accessing views, the :method:`POST` method supports the specification
+  Unlike :get:`/{db}/_design/{ddoc}/_view/{view}` for accessing views, the
+  :method:`POST` method supports the specification
   of explicit keys to be retrieved from the view results. The remainder of the
   :method:`POST` view functionality is identical to the
   :get:`/{db}/_design/{ddoc}/_view/{view}` API.
