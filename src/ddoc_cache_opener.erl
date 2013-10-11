@@ -105,17 +105,7 @@ handle_cast({evict, DbName, DDocIds}, St) ->
     {noreply, St};
 
 handle_cast({do_evict, DbName}, St) ->
-    % Bit of hack to introspect the ets_lru ETS tables directly
-    % but I think this is better than having to manage our own
-    % DbName -> DDocIdList table
-    DDocIds = ets:foldl(fun(Obj, Acc) ->
-        entry = element(1, Obj), % assert this is an entry record
-        {EntryDbName, EntryDDocId} = element(2, Obj),
-        case EntryDbName == DbName of
-            true -> [EntryDDocId | Acc];
-            false -> Acc
-        end
-    end, [], ddoc_cache_lru_objects),
+    DDocIds = ets_lru:match(?CACHE, {DbName, '$1'}, '_'),
     handle_cast({do_evict, DbName, DDocIds}, St);
 
 handle_cast({do_evict, DbName, DDocIds}, St) ->
