@@ -266,8 +266,9 @@ handle_system_req(Req) ->
         processes_used, binary, code, ets])],
     {NumberOfGCs, WordsReclaimed, _} = statistics(garbage_collection),
     {{input, Input}, {output, Output}} = statistics(io),
-    CouchFile = {couch_file, {couch_file_stats()}},
-    MessageQueues = [CouchFile|message_queues(registered())],
+    {CF, CDU} = db_pid_stats(),
+    MessageQueues0 = [{couch_file, {CF}}, {couch_db_updater, {CDU}}],
+    MessageQueues = MessageQueues0 ++ message_queues(registered()),
     send_json(Req, {[
         {uptime, element(1,statistics(wall_clock)) div 1000},
         {memory, {Memory}},
@@ -288,9 +289,14 @@ handle_system_req(Req) ->
         {distribution, {get_distribution_stats()}}
     ]}).
 
-couch_file_stats() ->
+db_pid_stats() ->
     {monitors, M} = process_info(whereis(couch_stats_collector), monitors),
     Candidates = [Pid || {process, Pid} <- M],
+    CouchFiles = db_pid_stats(couch_file, Candidates),
+    CouchDbUpdaters = db_pid_stats(couch_db_updater, Candidates),
+    {CouchFiles, CouchDbUpdaters}.
+
+db_pid_stats(Mod, Candidates) ->
     Mailboxes = lists:foldl(
         fun(Pid, Acc) ->
             case process_info(Pid, [message_queue_len, dictionary]) of
@@ -299,7 +305,7 @@ couch_file_stats() ->
                 PI ->
                     Dictionary = proplists:get_value(dictionary, PI, []),
                     case proplists:get_value('$initial_call', Dictionary) of
-                        {couch_file, init, 1} ->
+                        {Mod, init, 1} ->
                             case proplists:get_value(message_queue_len, PI) of
                                 undefined -> Acc;
                                 Len -> [Len|Acc]
