@@ -46,7 +46,7 @@ class DocRef(object):
         location of the RFC which defines some HTTP method.
 
         """
-        return '{}#{}{}'.format(self.base_url, self.anchor, self.section)
+        return '{0}#{1}{2}'.format(self.base_url, self.anchor, self.section)
 
 
 class RFC2616Ref(DocRef):
@@ -62,7 +62,7 @@ class IETFRef(DocRef):
     def __init__(self, rfc, section):
         url = 'http://tools.ietf.org/html/rfc{0:d}'.format(rfc)
         super(IETFRef, self).__init__(url, 'section-', section)
-        
+
 
 class EventSourceRef(DocRef):
 
