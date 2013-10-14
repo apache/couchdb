@@ -29,7 +29,7 @@
 /* PAGE LAYOUT -------------------------------------------------------------- */
 
 body {
-    font: 100%/1.5 "ff-meta-web-pro-1","ff-meta-web-pro-2",Arial,"Helvetica Neue",sans-serif; 
+    font: 100%/1.5 "ff-meta-web-pro-1","ff-meta-web-pro-2",Arial,"Helvetica Neue",sans-serif;
     text-align: center;
     color: black;
     background-color: #465158;
@@ -604,7 +604,7 @@ p {
 /* MOBILE LAYOUT -------------------------------------------------------------- */
 
 @media screen and (max-width: 600px) {
-    
+
     h1, h2, h3, h4, h5 {
         position: relative;
     }
@@ -764,7 +764,7 @@ p {
 
     table.indextable {
         display: block;
-        width: auto; 
+        width: auto;
     }
 
     .indextable tr {
@@ -792,4 +792,10 @@ p {
         margin-left: 0;
     }
 
+}
+
+/* Override RTD basic.css
+Fix style for quick search bar. This is temporary solution.*/
+div.sphinxsidebar #searchbox input[type="text"] {
+    width: 140px;
 }
