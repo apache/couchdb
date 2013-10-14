@@ -29,7 +29,7 @@
 /* PAGE LAYOUT -------------------------------------------------------------- */
 
 body {
-    font: 100%/1.5 "ff-meta-web-pro-1","ff-meta-web-pro-2",Arial,"Helvetica Neue",sans-serif; 
+    font: 100%/1.5 "ff-meta-web-pro-1","ff-meta-web-pro-2",Arial,"Helvetica Neue",sans-serif;
     text-align: center;
     color: black;
     background-color: #465158;
@@ -604,7 +604,7 @@ p {
 /* MOBILE LAYOUT -------------------------------------------------------------- */
 
 @media screen and (max-width: 600px) {
-    
+
     h1, h2, h3, h4, h5 {
         position: relative;
     }
@@ -764,7 +764,7 @@ p {
 
     table.indextable {
         display: block;
-        width: auto; 
+        width: auto;
     }
 
     .indextable tr {
