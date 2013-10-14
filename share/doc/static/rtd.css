@@ -793,9 +793,3 @@ p {
     }
 
 }
-
-/* Override RTD basic.css
-Fix style for quick search bar. This is temporary solution.*/
-div.sphinxsidebar #searchbox input[type="text"] {
-    width: 140px;
-}
