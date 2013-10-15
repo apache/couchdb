@@ -21,8 +21,8 @@ handle_global_changes_req(#httpd{method='GET'}=Req) ->
     Feed = couch_httpd:qs_value(Req, "feed", "normal"),
     Options = parse_global_changes_query(Req),
     Heartbeat = case lists:keyfind(heartbeat, 1, Options) of
-        {heartbeat, Other} -> Other;
         {heartbeat, true} -> 60000;
+        {heartbeat, Other} -> Other;
         false -> false
     end,
     chttpd:verify_is_server_admin(Req),
