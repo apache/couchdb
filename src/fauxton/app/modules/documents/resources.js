@@ -12,7 +12,6 @@
 
 define([
   "app",
-
   "api"
 ],
 

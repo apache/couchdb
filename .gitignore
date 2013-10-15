@@ -100,6 +100,7 @@ src/fauxton/app/addons/*
 !src/fauxton/app/addons/auth
 !src/fauxton/app/addons/exampleAuth
 !src/fauxton/app/addons/permissions
+!src/fauxton/app/addons/verifyinstall
 src/fauxton/settings.json*
 !src/fauxton/settings.json.default
 src/ibrowse/ibrowse.app
