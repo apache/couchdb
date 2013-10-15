@@ -12,70 +12,60 @@
 
 -module(ddoc_cache).
 
+-include_lib("couch/include/couch_db.hrl").
 
--export([
-    start/0,
-    stop/0,
-    
-    open/2,
-    evict/2
-]).
+-export([start/0, stop/0]).
 
+% public API
+-export([open_doc/2, open_doc/3, open_validation_funs/1, evict/2]).
 
--define(CACHE, ddoc_cache_lru).
--define(OPENER, ddoc_cache_opener).
-
+% deprecated API
+-export([open/2]).
 
 start() ->
     application:start(ddoc_cache).
 
-
 stop() ->
     application:stop(ddoc_cache).
 
-
-open(DbName, validation_funs) ->
-    open({DbName, validation_funs});
-open(DbName, <<"_design/", _/binary>>=DDocId) when is_binary(DbName) ->
-    open({DbName, DDocId});
-open(DbName, DDocId) when is_binary(DDocId) ->
-    open({DbName, <<"_design/", DDocId/binary>>}).
-
-
-open(Key) ->
-    try ets_lru:lookup_d(?CACHE, Key) of
+open_doc(DbName, DocId) ->
+    Key = {DbName, DocId, '_'},
+    case ddoc_cache_opener:match_newest(Key) of
         {ok, _} = Resp ->
             Resp;
-        _ ->
-            case gen_server:call(?OPENER, {open, Key}, infinity) of
-                {open_ok, Resp} ->
-                    Resp;
-                {open_error, throw, Error} ->
-                    throw(Error);
-                {open_error, error, Error} ->
-                    erlang:error(Error);
-                {open_error, exit, Error} ->
-                    exit(Error)
-            end
-    catch
-        error:badarg ->
-            recover(Key)
+        missing ->
+            ddoc_cache_opener:open_doc(DbName, DocId);
+        recover ->
+            ddoc_cache_opener:recover_doc(DbName, DocId)
     end.
 
+open_doc(DbName, DocId, RevId) ->
+    Key = {DbName, DocId, RevId},
+    case ddoc_cache_opener:lookup(Key) of
+        {ok, _} = Resp ->
+            Resp;
+        missing ->
+            ddoc_cache_opener:open_doc(DbName, DocId, RevId);
+        recover ->
+            ddoc_cache_opener:recover_doc(DbName, DocId, RevId)
+    end.
+
+open_validation_funs(DbName) ->
+    Key = {DbName, validation_funs},
+    case ddoc_cache_opener:lookup(Key) of
+        {ok, _} = Resp ->
+            Resp;
+        missing ->
+            ddoc_cache_opener:open_validation_funs(DbName);
+        recover ->
+            ddoc_cache_opener:recover_validation_funs(DbName)
+    end.
 
 evict(ShardDbName, DDocIds) ->
     DbName = mem3:dbname(ShardDbName),
-    gen_server:cast(?OPENER, {evict, DbName, DDocIds}).
+    ddoc_cache_opener:evict_docs(DbName, DDocIds).
 
-
-recover({DbName, validation_funs}) ->
-    {ok, DDocs} = fabric:design_docs(mem3:dbname(DbName)),
-    Funs = lists:flatmap(fun(DDoc) ->
-        case couch_doc:get_validate_doc_fun(DDoc) of
-            nil -> [];
-            Fun -> [Fun]
-        end
-    end, DDocs),
-    {ok, Funs};
-recover({DbName, DDocId}) ->
-    fabric:open_doc(DbName, DDocId, [ejson_body]).
+open(DbName, validation_funs) ->
+    open_validation_funs(DbName);
+open(DbName, DocId) ->
+    open_doc(DbName, DocId).
