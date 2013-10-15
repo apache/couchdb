@@ -1634,13 +1634,17 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
     },
 
     serialize: function() {
+      var docLinks = FauxtonAPI.getExtensions('docLinks');
+      console.log(docLinks);
       return {
         changes_url: '#' + this.database.url('changes'),
         permissions_url: '#' + this.database.url('app') + '/permissions',
         db_url: '#' + this.database.url('index') + '?limit=100',
         index: [1,2,3],
         view: [1,2],
-        database: this.collection.database
+        database: this.collection.database,
+        database_url: '#' + this.database.url('app'), 
+        docLinks: docLinks
       };
     },
 

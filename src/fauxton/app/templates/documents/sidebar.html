@@ -25,6 +25,9 @@ the License.
           <li><a class="icon-file" href="<%= db_url %>">Docs</a></li>
           <li><a class="icon-lock" href="<%= permissions_url %>">Permissions</a></li>
           <li><a class="icon-forward" href="<%= changes_url %>">Changes</a></li>
+          <% _.each(docLinks, function (link) { %>
+          <li><a class="<%= link.icon %>" href="<%= database_url + '/' + link.url %>"><%= link.title %></a></li>
+          <% }); %>
         </ul>
       </div>
     </div>

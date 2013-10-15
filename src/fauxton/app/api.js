@@ -452,6 +452,29 @@ function(app, Fauxton) {
 
   });
 
+  var extensions = _.extend({}, Backbone.Events);
+  // Can look at a remove function later.
+  FauxtonAPI.registerExtension = function (name, view) {
+    if (!extensions[name]) {
+      extensions[name] = [];
+    }
+
+    extensions.trigger('add:' + name, view);
+    extensions[name].push(view);
+  };
+
+  FauxtonAPI.getExtensions = function (name) {
+    var views = extensions[name];
+
+    if (!views) {
+      views = [];
+    }
+
+    return views;
+  };
+
+  FauxtonAPI.extensions = extensions;
+
   app.fauxtonAPI = FauxtonAPI;
   return app.fauxtonAPI;
 });
