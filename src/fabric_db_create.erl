@@ -42,7 +42,7 @@ validate_dbname(DbName, Options) ->
     false ->
         ok;
     true ->
-        case re:run(DbName, ?DBNAME_REGEX, [{capture,none}]) of
+        case re:run(DbName, ?DBNAME_REGEX, [{capture,none}, dollar_endonly]) of
         match ->
             ok;
         nomatch when DbName =:= <<"_users">> ->
