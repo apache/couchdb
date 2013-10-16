@@ -8,9 +8,9 @@
   { "name": "plugins" },
   { "name": "contribute" },
   { "name": "permissions" },
-  { "name": "verifyinstall" }
   { "name": "compaction" },
-  { "name": "auth" }
+  { "name": "auth" },
+  { "name": "verifyinstall" }
   ],
     "template": {
       "development": {

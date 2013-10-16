@@ -11,17 +11,26 @@ WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 License for the specific language governing permissions and limitations under
 the License.
 -->
+<div class="row">
+  <div class="span12 compaction-option">
+    <h3> Compact Database </h3>
+    <p>Compacting a database removes deleted documents and previous revisions. It is an irreversible operation and may take a while to complete for large databases.</p>
+    <button id="compact-db" class="btn btn-large btn-primary"> Run </button>
+  </div>
+</div>
 
-<table class="table table-striped table-bordered">
-  <tbody>
-  <tr> 
-    <td>
-      <h3> Compact Database </h3>
-      <p>Compacting a database removes deleted documents and previous revisions. It is an irreversible operation and may take a while to complete for large databases.</p>
-      <button id="compact-db" class="btn btn-large btn-primary"> Run </button>
-    </td>
-  </tr>
-  </tbody>
+<div class="row">
+  <div class="span12 compaction-option">
+    <h3> Compact Views </h3>
+    <p>View compaction will affect all views in this design document. This operation may take some time to complete. Your views will still operate normally during compaction.</p>
+    <button id="compact-view" class="btn btn-large btn-primary"> Run </button>
+  </div>
+</div>
 
-</table>
-
+<div class="row">
+  <div class="span12 compaction-option">
+    <h3> Cleanup Views </h3>
+    <p>Cleaning up views in a database removes old view files still stored on the filesystem. It is an irreversible operation.</p>
+    <button id="cleanup-views" class="btn btn-large btn-primary"> Run </button>
+  </div>
+</div>

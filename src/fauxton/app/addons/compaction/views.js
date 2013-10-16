@@ -23,12 +23,66 @@ function (app, FauxtonAPI, Compaction) {
   Compaction.Layout = FauxtonAPI.View.extend({
     template: 'addons/compaction/templates/layout',
 
+    initialize: function () {
+      _.bindAll(this);
+    },
+
     events: {
-      "click compact-db": "compactDB"
+      "click #compact-db": "compactDB",
+      "click #compact-view": "compactDB",
+      "click #cleanup-views": "cleanupViews"
+    },
+
+    disableButton: function (selector, text) {
+      this.$(selector).attr('disabled', 'disabled').text(text);
+    },
+
+    enableButton: function (selector, text) {
+      this.$(selector).removeAttr('disabled').text(text);
     },
 
     compactDB: function (event) {
+      var enableButton = this.enableButton;
       event.preventDefault();
+
+      this.disableButton('#compact-db', 'Compacting...');
+
+      Compaction.compactDB(this.model).then(function () {
+        FauxtonAPI.addNotification({
+          type: 'success',
+          msg: 'Database compaction has started.'
+        });
+      }, function (xhr, error, reason) {
+        console.log(arguments);
+        FauxtonAPI.addNotification({
+          type: 'error',
+          msg: 'Error: ' + JSON.parse(xhr.responseText).reason
+        });
+      }).always(function () {
+        enableButton('#compact-db', 'Run');
+      });
+    },
+
+    cleanupViews: function (event) {
+      var enableButton = this.enableButton;
+      event.preventDefault();
+
+      this.disableButton('#cleanup-view', 'Cleaning...');
+
+      Compaction.cleanupViews(this.model).then(function () {
+        FauxtonAPI.addNotification({
+          type: 'success',
+          msg: 'View cleanup has started.'
+        });
+      }, function (xhr, error, reason) {
+        console.log(arguments);
+        FauxtonAPI.addNotification({
+          type: 'error',
+          msg: 'Error: ' + JSON.parse(xhr.responseText).reason
+        });
+      }).always(function () {
+        enableButton('#cleanup-views', 'Run');
+      });
     }
 
 

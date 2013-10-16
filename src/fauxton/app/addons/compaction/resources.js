@@ -17,5 +17,22 @@ define([
 
 function (app, FauxtonAPI) {
   var Compaction = FauxtonAPI.addon();
+
+  Compaction.compactDB = function (db) {
+    return $.ajax({
+      url: db.url() + '/_compact',
+      contentType: 'application/json',
+      type: 'POST'
+    });
+  };
+
+  Compaction.cleanupViews = function (db) {
+    return $.ajax({
+      url: db.url() + '/_view_cleanup',
+      contentType: 'application/json',
+      type: 'POST'
+    });
+  }
+
   return Compaction;
 });
