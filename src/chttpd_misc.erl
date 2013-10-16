@@ -171,15 +171,39 @@ handle_replicate_req(Req) ->
     send_method_not_allowed(Req, "POST").
 
 replicate({Props} = PostBody, Ctx) ->
-    Node = choose_node([
-        couch_util:get_value(<<"source">>, Props),
-        couch_util:get_value(<<"target">>, Props)
-    ]),
-    case rpc:call(Node, couch_replicator, replicate, [PostBody, Ctx]) of
-    {badrpc, Reason} ->
-        erlang:error(Reason);
-    Res ->
-        Res
+    case couch_util:get_value(<<"cancel">>, Props) of
+    true ->
+        cancel_replication(PostBody, Ctx);
+    false ->
+        Node = choose_node([
+            couch_util:get_value(<<"source">>, Props),
+            couch_util:get_value(<<"target">>, Props)
+        ]),
+        case rpc:call(Node, couch_replicator, replicate, [PostBody, Ctx]) of
+        {badrpc, Reason} ->
+            erlang:error(Reason);
+        Res ->
+            Res
+        end
+    end.
+
+cancel_replication(PostBody, Ctx) ->
+    {Res, Bad} = rpc:multicall(couch_replicator, replicate, [PostBody, Ctx]),
+    case [X || {ok, {cancelled, _}} = X <- Res] of
+    [Success|_] ->
+        % Report success if at least one node canceled the replication
+        Success;
+    [] ->
+        case lists:usort(Res) of
+        [UniqueReply] ->
+            % Report a universally agreed-upon reply
+            UniqueReply;
+        [] ->
+            {error, badrpc};
+        Else ->
+            % Unclear what to do here -- pick the first error?
+            hd(Else)
+        end
     end.
 
 choose_node(Key) when is_binary(Key) ->
