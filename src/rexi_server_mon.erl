@@ -47,7 +47,7 @@ status() ->
 
 init(ChildMod) ->
     net_kernel:monitor_nodes(true),
-    erlang:send_after(?INTERVAL, self(), check_nodes),
+    erlang:send(self(), check_nodes),
     {ok, ChildMod}.
 
 
