@@ -22,14 +22,6 @@ start_link(Args) ->
 init([]) ->
     {ok, {{one_for_one, 3, 10}, [
         {
-            rexi_gov_manager,
-            {rexi_gov_manager, start_link, []},
-            permanent,
-            100,
-            worker,
-            [rexi_gov_manager]
-        },
-        {
             rexi_server,
             {rexi_server, start_link, [rexi_server]},
             permanent,
