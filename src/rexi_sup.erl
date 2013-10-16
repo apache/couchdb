@@ -39,7 +39,7 @@ init([]) ->
         },
         {
             rexi_server_sup,
-            {rexi_server_sup, start_link, []},
+            {rexi_server_sup, start_link, [rexi_server_sup]},
             permanent,
             100,
             supervisor,
@@ -47,7 +47,23 @@ init([]) ->
         },
         {
             rexi_server_mon,
-            {rexi_server_mon, start_link, []},
+            {rexi_server_mon, start_link, [rexi_server]},
+            permanent,
+            100,
+            worker,
+            [rexi_server_mon]
+        },
+        {
+            rexi_governor_sup,
+            {rexi_server_sup, start_link, [rexi_governor_sup]},
+            permanent,
+            100,
+            supervisor,
+            [rexi_server_sup]
+        },
+        {
+            rexi_governor_mon,
+            {rexi_server_mon, start_link, [rexi_governor]},
             permanent,
             100,
             worker,

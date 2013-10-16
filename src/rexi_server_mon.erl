@@ -1,4 +1,4 @@
-% Copyright 2010 Cloudant
+% Copyright 2010-2013 Cloudant
 % 
 % Licensed under the Apache License, Version 2.0 (the "License"); you may not
 % use this file except in compliance with the License. You may obtain a copy of
@@ -18,7 +18,7 @@
 
 
 -export([
-    start_link/0,
+    start_link/1,
     status/0
 ]).
 
@@ -33,35 +33,34 @@
 ]).
 
 
--define(SUP_MODULE, rexi_server_sup).
--define(CHILD_MODULE, rexi_server).
 -define(INTERVAL, 60000).
 
 
-start_link() ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+start_link(ChildMod) ->
+    Name = list_to_atom(lists:concat([ChildMod, "_mon"])),
+    gen_server:start_link({local, Name}, ?MODULE, ChildMod, []).
 
 
 status() ->
     gen_server:call(?MODULE, status).
 
 
-init([]) ->
+init(ChildMod) ->
     net_kernel:monitor_nodes(true),
     erlang:send_after(?INTERVAL, self(), check_nodes),
-    {ok, nil}.
+    {ok, ChildMod}.
 
 
 terminate(_Reason, _St) ->
     ok.
 
 
-handle_call(status, _From, St) ->
-    case missing_servers() of
+handle_call(status, _From, ChildMod) ->
+    case missing_servers(ChildMod) of
         [] ->
-            {reply, ok, St};
+            {reply, ok, ChildMod};
         Missing ->
-            {reply, {waiting, length(Missing)}, St}
+            {reply, {waiting, length(Missing)}, ChildMod}
     end;
 
 handle_call(Msg, _From, St) ->
@@ -74,52 +73,58 @@ handle_cast(Msg, St) ->
     {noreply, St}.
 
 
-handle_info({nodeup, _}, St) ->
-    start_rexi_servers(),
-    {noreply, St};
+handle_info({nodeup, _}, ChildMod) ->
+    start_servers(ChildMod),
+    {noreply, ChildMod};
 
 handle_info({nodedown, _}, St) ->
     {noreply, St};
 
-handle_info(check_nodes, St) ->
-    start_rexi_servers(),
+handle_info(check_nodes, ChildMod) ->
+    start_servers(ChildMod),
     erlang:send_after(?INTERVAL, self(), check_nodes),
-    {noreply, St};
+    {noreply, ChildMod};
 
 handle_info(Msg, St) ->
     twig:log(notice, "~s ignored_info ~w", [?MODULE, Msg]),
     {noreply, St}.
 
 
+code_change(_OldVsn, nil, _Extra) ->
+    {ok, rexi_server};
 code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
 
 
-start_rexi_servers() ->
+start_servers(ChildMod) ->
     lists:foreach(fun(Id) ->
-        {ok, _} = start_rexi_server(Id)
-    end, missing_servers()).
+        {ok, _} = start_server(ChildMod, Id)
+    end, missing_servers(ChildMod)).
 
 
-missing_servers() ->
-    ServerIds = [list_to_atom("rexi_server_" ++ atom_to_list(Node))
+missing_servers(ChildMod) ->
+    ServerIds = [list_to_atom(lists:concat([ChildMod, "_", Node]))
         || Node <- [node() | nodes()]],
-    ChildIds = [Id || {Id, _, _, _} <- supervisor:which_children(?SUP_MODULE)],
+    SupModule = sup_module(ChildMod),
+    ChildIds = [Id || {Id, _, _, _} <- supervisor:which_children(SupModule)],
     ServerIds -- ChildIds.
 
 
-start_rexi_server(ChildId) ->
+start_server(ChildMod, ChildId) ->
     ChildSpec = {
         ChildId,
-        {rexi_server, start_link, [ChildId]},
+        {ChildMod, start_link, [ChildId]},
         permanent,
         brutal_kill,
         worker,
-        [?CHILD_MODULE]
+        [ChildMod]
     },
-    case supervisor:start_child(?SUP_MODULE, ChildSpec) of
+    case supervisor:start_child(sup_module(ChildMod), ChildSpec) of
         {ok, Pid} ->
             {ok, Pid};
         Else ->
             erlang:error(Else)
     end.
+
+sup_module(ChildMod) ->
+    list_to_atom(lists:concat([ChildMod, "_sup"])).
