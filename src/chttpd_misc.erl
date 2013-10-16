@@ -188,7 +188,7 @@ replicate({Props} = PostBody, Ctx) ->
     end.
 
 cancel_replication(PostBody, Ctx) ->
-    {Res, Bad} = rpc:multicall(couch_replicator, replicate, [PostBody, Ctx]),
+    {Res, _Bad} = rpc:multicall(couch_replicator, replicate, [PostBody, Ctx]),
     case [X || {ok, {cancelled, _}} = X <- Res] of
     [Success|_] ->
         % Report success if at least one node canceled the replication
