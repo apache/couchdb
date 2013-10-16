@@ -32,7 +32,7 @@ function (app, FauxtonAPI) {
       contentType: 'application/json',
       type: 'POST'
     });
-  }
+  };
 
   return Compaction;
 });

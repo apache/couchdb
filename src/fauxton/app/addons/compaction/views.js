@@ -14,7 +14,6 @@ define([
        "app",
 
        "api",
-
        // Modules
        "addons/compaction/resources"
 ],
@@ -84,11 +83,7 @@ function (app, FauxtonAPI, Compaction) {
         enableButton('#cleanup-views', 'Run');
       });
     }
-
-
   });
-
-
 
   return Compaction;
 });
