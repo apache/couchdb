@@ -1106,7 +1106,7 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
 
     events: {
       "click button.save": "saveView",
-      "click button.cancel-button": "deleteView",
+      "click button.delete": "deleteView",
       "change select#reduce-function-selector": "updateReduce",
       "change select#ddoc": "updateDesignDoc",
       "click #db-views-tabs-nav": 'toggleIndexNav'
