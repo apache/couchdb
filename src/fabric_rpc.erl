@@ -306,43 +306,27 @@ changes_enumerator(DocInfo, {Db, _Seq, Args, Options}) ->
         filter = Acc
     } = Args,
     Conflicts = proplists:get_value(conflicts, Options, false),
-    #doc_info{high_seq=Seq, revs=[#rev_info{deleted=Del}|_]} = DocInfo,
+    #doc_info{id=Id, high_seq=Seq, revs=[#rev_info{deleted=Del}|_]} = DocInfo,
     case [X || X <- couch_changes:filter(Db, DocInfo, Acc), X /= null] of
     [] ->
         {ok, {Db, Seq, Args, Options}};
     Results ->
         Opts = if Conflicts -> [conflicts]; true -> [] end,
-        ChangesRow = changes_row(Db, DocInfo, Results, Del, IncludeDocs, Opts),
+        ChangesRow = {change, [
+            {seq, {Seq, uuid(Db)}},
+            {id, Id},
+            {changes, Results},
+            {deleted, Del} |
+            if IncludeDocs -> [doc_member(Db, DocInfo, Opts)]; true -> [] end
+        ]},
         Go = rexi:sync_reply(ChangesRow),
         {Go, {Db, Seq, Args, Options}}
     end.
 
-changes_row(Db, #doc_info{id=Id, high_seq=Seq}=DI, Results, Del, true, Opts) ->
-    {change, [
-        {seq, {Seq, uuid(Db)}},
-        {id, Id},
-        {changes, Results},
-        {deleted, Del},
-        {doc, doc_member(Db, DI, Opts)}
-    ]};
-changes_row(Db, #doc_info{id=Id, high_seq=Seq}, Results, true, _, _) ->
-    {change, [
-        {seq, {Seq, uuid(Db)}},
-        {id, Id},
-        {changes, Results},
-        {deleted, true}
-    ]};
-changes_row(Db, #doc_info{id=Id, high_seq=Seq}, Results, _, _, _) ->
-    {change, [
-        {seq, {Seq, uuid(Db)}},
-        {id, Id},
-        {changes, Results}
-    ]}.
-
 doc_member(Shard, DocInfo, Opts) ->
     case couch_db:open_doc(Shard, DocInfo, [deleted | Opts]) of
     {ok, Doc} ->
-        couch_doc:to_json_obj(Doc, []);
+        {doc, couch_doc:to_json_obj(Doc, [])};
     Error ->
         Error
     end.
