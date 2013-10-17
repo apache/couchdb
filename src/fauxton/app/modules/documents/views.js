@@ -684,11 +684,15 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
       "click button.save-doc": "saveDoc",
       "click button.delete": "destroy",
       "click button.duplicate": "duplicate",
-      "click button.upload": "upload"
+      "click button.upload": "upload",
+      "click button.cancel-button": "goback"
     },
     disableLoader: true,
     initialize: function (options) {
       this.database = options.database;
+    },
+    goback: function(){
+      window.history.back();
     },
     destroy: function(event) {
       if (this.model.isNewDoc()) {
