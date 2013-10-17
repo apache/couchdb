@@ -848,14 +848,29 @@ update_doc(#httpd{user_ctx=Ctx} = Req, Db, DocId, #doc{deleted=Deleted}=Doc,
         _ ->
             [UpdateType, {user_ctx,Ctx}, {w,W}]
         end,
-    {_, Ref} = spawn_monitor(fun() -> exit(fabric:update_doc(Db, Doc, Options)) end),
-    Result = receive {'DOWN', Ref, _, _, Res} -> Res end,
-    case Result of
-    {{nocatch, Exception}, _Reason} ->
-        % Exceptions from spawned processes are swallowed and returned, rethrow
-        throw(Exception);
-    _ ->
-        ok
+
+    {_, Ref} = spawn_monitor(fun() ->
+        try fabric:update_doc(Db, Doc, Options) of
+            Resp ->
+                exit({exit_ok, Resp})
+        catch
+            throw:Reason ->
+                exit({exit_throw, Reason});
+            error:Reason ->
+                exit({exit_error, Reason});
+            exit:Reason ->
+                exit({exit_exit, Reason})
+        end
+    end),
+    Result = receive
+        {'DOWN', Ref, _, _, {exit_ok, Ret}} ->
+            Ret;
+        {'DOWN', Ref, _, _, {exit_throw, Reason}} ->
+            throw(Reason);
+        {'DOWN', Ref, _, _, {exit_error, Reason}} ->
+            erlang:error(Reason);
+        {'DOWN', Ref, _, _, {exit_exit, Reason}} ->
+            erlang:exit(Reason)
     end,
 
     case Result of
