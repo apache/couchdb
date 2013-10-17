@@ -189,10 +189,24 @@ handle_message({rexi_DOWN, _, {_, NodeRef}, _}, _, State) ->
 handle_message({rexi_EXIT, Reason}, Worker, State) ->
     fabric_view:handle_worker_exit(State, Worker, Reason);
 
+% Temporary upgrade clause - Case 24236
+handle_message({complete, Key}, Worker, State) when is_tuple(Key) ->
+    handle_message({complete, [{seq, Key}]}, Worker, State);
+
 handle_message(_, _, #collector{limit=0} = State) ->
     {stop, State};
 
-handle_message(#change{key=Key} = Row0, {Worker, From}, St) ->
+handle_message(#change{} = Row, {Worker, From}, St) ->
+    Change = {change, [
+        {seq, Row#change.key},
+        {id, Row#change.id},
+        {changes, Row#change.value},
+        {deleted, Row#change.deleted},
+        {doc, Row#change.doc}
+    ]},
+    handle_message(Change, {Worker, From}, St);
+
+handle_message({change, Props}, {Worker, From}, St) ->
     #collector{
         query_args = #changes_args{include_docs=IncludeDocs},
         callback = Callback,
@@ -201,15 +215,15 @@ handle_message(#change{key=Key} = Row0, {Worker, From}, St) ->
         user_acc = AccIn
     } = St,
     true = fabric_dict:is_key(Worker, S0),
-    S1 = fabric_dict:store(Worker, Key, S0),
+    S1 = fabric_dict:store(Worker, couch_util:get_value(seq, Props), S0),
     % Temporary hack for FB 23637
     Interval = erlang:get(changes_seq_interval),
     if (Interval == undefined) orelse (Limit rem Interval == 0) ->
-        Row = Row0#change{key = pack_seqs(S1)};
+        Props2 = lists:keyreplace(seq, 1, Props, {seq, pack_seqs(S1)});
     true ->
-        Row = Row0#change{key = null}
+        Props2 = lists:keyreplace(seq, 1, Props, {seq, null})
     end,
-    {Go, Acc} = Callback(changes_row(Row, IncludeDocs), AccIn),
+    {Go, Acc} = Callback(changes_row(Props2, IncludeDocs), AccIn),
     rexi:stream_ack(From),
     {Go, St#collector{counters=S1, limit=Limit-1, user_acc=Acc}};
 
@@ -220,7 +234,8 @@ handle_message({no_pass, Seq}, {Worker, From}, St) ->
     rexi:stream_ack(From),
     {ok, St#collector{counters=S1}};
 
-handle_message({complete, Key}, Worker, State) ->
+handle_message({complete, Props}, Worker, State) ->
+    Key = couch_util:get_value(seq, Props),
     #collector{
         counters = S0,
         total_rows = Completed % override
@@ -350,16 +365,25 @@ do_unpack_seqs(Opaque, DbName) ->
             Unpacked ++ [{R, 0} || R <- Replacements]
     end.
 
-changes_row(#change{key=Seq, id=Id, value=Value, deleted=true, doc=Doc}, true) ->
-    {change, {[{seq,Seq}, {id,Id}, {changes,Value}, {deleted, true}, {doc, Doc}]}};
-changes_row(#change{key=Seq, id=Id, value=Value, deleted=true}, false) ->
-    {change, {[{seq,Seq}, {id,Id}, {changes,Value}, {deleted, true}]}};
-changes_row(#change{key=Seq, id=Id, value=Value, doc={error,Reason}}, true) ->
-    {change, {[{seq,Seq}, {id,Id}, {changes,Value}, {error,Reason}]}};
-changes_row(#change{key=Seq, id=Id, value=Value, doc=Doc}, true) ->
-    {change, {[{seq,Seq}, {id,Id}, {changes,Value}, {doc,Doc}]}};
-changes_row(#change{key=Seq, id=Id, value=Value}, false) ->
-    {change, {[{seq,Seq}, {id,Id}, {changes,Value}]}}.
+changes_row(Props0, IncludeDocs) ->
+    Props1 = case {IncludeDocs, couch_util:get_value(doc, Props0)} of
+        {true, {error, Reason}} ->
+            % Transform {doc, {error, Reason}} to {error, Reason} for JSON
+            lists:keyreplace(doc, 1, Props0, {error, Reason});
+        {false, _} ->
+            lists:keydelete(doc, 1, Props0);
+        _ ->
+            Props0
+    end,
+    Props2 = case couch_util:get_value(deleted, Props1) of
+        true ->
+            Props1;
+        _ ->
+            lists:keydelete(deleted, 1, Props1)
+    end,
+    Allowed = [seq, id, changes, deleted, doc],
+    Props3 = lists:filter(fun({K,_V}) -> lists:member(K, Allowed) end, Props0),
+    {change, {Props3}}.
 
 find_replacement_shards(#shard{range=Range}, AllShards) ->
     % TODO make this moar betta -- we might have split or merged the partition
