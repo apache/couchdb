@@ -88,9 +88,15 @@ changes_callback({change, Change}, {"continuous", Resp}) ->
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp, [?JSON_ENCODE(Change) | "\n"]),
     {ok, {"continuous", Resp1}};
 changes_callback({stop, EndSeq0}, {"continuous", Resp}) ->
+    % Temporary upgrade clause - Case 24236
+    changes_callback({stop, EndSeq0, null}, {"continuous", Resp});
+changes_callback({stop, EndSeq0, Pending}, {"continuous", Resp}) ->
     EndSeq = case is_old_couch(Resp) of true -> 0; false -> EndSeq0 end,
-    {ok, Resp1} = chttpd:send_delayed_chunk(Resp,
-        [?JSON_ENCODE({[{<<"last_seq">>, EndSeq}]}) | "\n"]),
+    Row = {[
+        {<<"last_seq">>, EndSeq},
+        {<<"pending">>, Pending}
+    ]},
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, [?JSON_ENCODE(Row) | "\n"]),
     chttpd:end_delayed_json_response(Resp1);
 
 % callbacks for eventsource feed (newline-delimited eventsource Objects)
@@ -130,13 +136,21 @@ changes_callback(start, {_, Req}) ->
 changes_callback({change, Change}, {Prepend, Resp}) ->
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp, [Prepend, ?JSON_ENCODE(Change)]),
     {ok, {",\r\n", Resp1}};
-changes_callback({stop, EndSeq}, {_, Resp}) ->
+changes_callback({stop, EndSeq}, Acc) ->
+    % Temporary upgrade clause - Case 24236
+    changes_callback({stop, EndSeq, null}, Acc);
+changes_callback({stop, EndSeq, Pending}, {_, Resp}) ->
     {ok, Resp1} = case is_old_couch(Resp) of
     true ->
         chttpd:send_delayed_chunk(Resp, "\n],\n\"last_seq\":0}\n");
     false ->
-        chttpd:send_delayed_chunk(Resp,
-            ["\n],\n\"last_seq\":", ?JSON_ENCODE(EndSeq), "}\n"])
+        chttpd:send_delayed_chunk(Resp, [
+            "\n],\n\"last_seq\":",
+            ?JSON_ENCODE(EndSeq),
+            ",\"pending\":",
+            ?JSON_ENCODE(Pending),
+            "}\n"
+        ])
     end,
     chttpd:end_delayed_json_response(Resp1);
 
