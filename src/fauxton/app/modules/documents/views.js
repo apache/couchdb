@@ -1106,7 +1106,7 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
 
     events: {
       "click button.save": "saveView",
-      "click button.delete": "deleteView",
+      "click button.cancel-button": "deleteView",
       "change select#reduce-function-selector": "updateReduce",
       "change select#ddoc": "updateDesignDoc",
       "click #db-views-tabs-nav": 'toggleIndexNav'
@@ -1575,6 +1575,8 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
         this.ddocID = options.ddocInfo.id;
         this.currView = options.ddocInfo.currView;
       }
+      // this.listenTo(this.collection, "add", this.render);
+      // this.listenTo(this.collection, "remove", this.render);
     },
 
     deleteDatabase: function (event) {
