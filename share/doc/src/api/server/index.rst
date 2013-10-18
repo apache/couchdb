@@ -13,9 +13,9 @@
 
 .. _api/server:
 
-==============
-Server Methods
-==============
+======
+Server
+======
 
 The CouchDB server interface provides the basic interface to a
 CouchDB server for obtaining CouchDB information and getting and setting
