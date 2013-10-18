@@ -214,7 +214,7 @@ def sort_by_method(entries):
 
 
 def http_resource_anchor(method, path):
-    path = re.sub(r'[<>:/]', '-', path)
+    path = re.sub(r'[{}]', '', re.sub(r'[<>:/]', '-', path))
     return method.lower() + '-' + path
 
 
