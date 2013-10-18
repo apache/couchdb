@@ -64,7 +64,7 @@
     changes_manager,
     changes_reader,
     workers,
-    stats = #rep_stats{},
+    stats = couch_replicator_stats:new(),
     session_id,
     source_db_compaction_notifier = nil,
     target_db_compaction_notifier = nil,
@@ -694,11 +694,11 @@ do_checkpoint(State) ->
             {<<"start_last_seq">>, StartSeq},
             {<<"end_last_seq">>, NewSeq},
             {<<"recorded_seq">>, NewSeq},
-            {<<"missing_checked">>, Stats#rep_stats.missing_checked},
-            {<<"missing_found">>, Stats#rep_stats.missing_found},
-            {<<"docs_read">>, Stats#rep_stats.docs_read},
-            {<<"docs_written">>, Stats#rep_stats.docs_written},
-            {<<"doc_write_failures">>, Stats#rep_stats.doc_write_failures}
+            {<<"missing_checked">>, couch_replicator_stats:missing_checked(Stats)},
+            {<<"missing_found">>, couch_replicator_stats:missing_found(Stats)},
+            {<<"docs_read">>, couch_replicator_stats:docs_read(Stats)},
+            {<<"docs_written">>, couch_replicator_stats:docs_written(Stats)},
+            {<<"doc_write_failures">>, couch_replicator_stats:doc_write_failures(Stats)}
         ]},
         BaseHistory = [
             {<<"session_id">>, SessionId},
@@ -714,9 +714,9 @@ do_checkpoint(State) ->
             [
                 {<<"start_time">>, StartTime},
                 {<<"end_time">>, EndTime},
-                {<<"docs_read">>, Stats#rep_stats.docs_read},
-                {<<"docs_written">>, Stats#rep_stats.docs_written},
-                {<<"doc_write_failures">>, Stats#rep_stats.doc_write_failures}
+                {<<"docs_read">>, couch_replicator_stats:docs_read(Stats)},
+                {<<"docs_written">>, couch_replicator_stats:docs_written(Stats)},
+                {<<"doc_write_failures">>, couch_replicator_stats:doc_write_failures(Stats)}
             ]
         end,
         % limit history to 50 entries
@@ -921,12 +921,12 @@ rep_stats(State) ->
         source_seq = SourceCurSeq
     } = State,
     [
-        {revisions_checked, Stats#rep_stats.missing_checked},
-        {missing_revisions_found, Stats#rep_stats.missing_found},
-        {docs_read, Stats#rep_stats.docs_read},
-        {docs_written, Stats#rep_stats.docs_written},
+        {revisions_checked, couch_replicator_stats:missing_checked(Stats)},
+        {missing_revisions_found, couch_replicator_stats:missing_found(Stats)},
+        {docs_read, couch_replicator_stats:docs_read(Stats)},
+        {docs_written, couch_replicator_stats:docs_written(Stats)},
         {changes_pending, pending(SourceCurSeq, CommittedSeq)},
-        {doc_write_failures, Stats#rep_stats.doc_write_failures},
+        {doc_write_failures, couch_replicator_stats:doc_write_failures(Stats)},
         {checkpointed_source_seq, CommittedSeq}
     ].
 

@@ -20,11 +20,3 @@
     user_ctx,
     doc_id
 }).
-
--record(rep_stats, {
-    missing_checked = 0,
-    missing_found = 0,
-    docs_read = 0,
-    docs_written = 0,
-    doc_write_failures = 0
-}).

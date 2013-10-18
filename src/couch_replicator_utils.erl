@@ -392,17 +392,9 @@ handle_db_event(DbName, compacted, Server) ->
 handle_db_event(_DbName, _Event, Server) ->
     {ok, Server}.
 
-
-sum_stats(#rep_stats{} = S1, #rep_stats{} = S2) ->
-    #rep_stats{
-        missing_checked =
-            S1#rep_stats.missing_checked + S2#rep_stats.missing_checked,
-        missing_found = S1#rep_stats.missing_found + S2#rep_stats.missing_found,
-        docs_read = S1#rep_stats.docs_read + S2#rep_stats.docs_read,
-        docs_written = S1#rep_stats.docs_written + S2#rep_stats.docs_written,
-        doc_write_failures =
-            S1#rep_stats.doc_write_failures + S2#rep_stats.doc_write_failures
-    }.
+% Obsolete - remove in next release
+sum_stats(S1, S2) ->
+    couch_replicator_stats:sum_stats(S1, S2).
 
 mp_parse_doc({headers, H}, []) ->
     case couch_util:get_value("content-type", H) of

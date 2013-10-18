@@ -93,7 +93,7 @@ process_change({last_seq, LS}, {Parent, _, _, true = _Continuous, Ts}) ->
     Seq = case LS of undefined -> get(last_seq); _ -> LS end,
     OldSeq = get(last_seq),
     if Seq == OldSeq -> ok; true ->
-        Msg = {report_seq_done, {Ts, Seq}, #rep_stats{}},
+        Msg = {report_seq_done, {Ts, Seq}, couch_replicator_stats:new()},
         ok = gen_server:call(Parent, Msg, infinity)
     end,
     put(last_seq, Seq),
