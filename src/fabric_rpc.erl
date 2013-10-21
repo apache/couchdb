@@ -64,10 +64,11 @@ all_docs(DbName, Options, #mrargs{keys=undefined} = Args0) ->
     couch_mrview:query_all_docs(Db, Args, fun view_cb/2, VAcc0).
 
 %% @equiv map_view(DbName, DDoc, ViewName, Args0, [])
-map_view(DbName, DDoc, ViewName, Args0) ->
-    map_view(DbName, DDoc, ViewName, Args0, []).
+map_view(DbName, DDocInfo, ViewName, Args0) ->
+    map_view(DbName, DDocInfo, ViewName, Args0, []).
 
-map_view(DbName, DDoc, ViewName, Args0, DbOptions) ->
+map_view(DbName, {DDocId, Rev}, ViewName, Args0, DbOptions) ->
+    {ok, DDoc} = ddoc_cache:open_doc(mem3:dbname(DbName), DDocId, Rev),
     set_io_priority(DbName, DbOptions),
     Args = fix_skip_and_limit(Args0),
     {ok, Db} = get_or_create_db(DbName, DbOptions),
@@ -75,10 +76,11 @@ map_view(DbName, DDoc, ViewName, Args0, DbOptions) ->
     couch_mrview:query_view(Db, DDoc, ViewName, Args, fun view_cb/2, VAcc0).
 
 %% @equiv reduce_view(DbName, DDoc, ViewName, Args0)
-reduce_view(DbName, DDoc, ViewName, Args0) ->
-    reduce_view(DbName, DDoc, ViewName, Args0, []).
+reduce_view(DbName, DDocInfo, ViewName, Args0) ->
+    reduce_view(DbName, DDocInfo, ViewName, Args0, []).
 
-reduce_view(DbName, DDoc, ViewName, Args0, DbOptions) ->
+reduce_view(DbName, {DDocId, Rev}, ViewName, Args0, DbOptions) ->
+    {ok, DDoc} = ddoc_cache:open_doc(mem3:dbname(DbName), DDocId, Rev),
     set_io_priority(DbName, DbOptions),
     Args = fix_skip_and_limit(Args0),
     {ok, Db} = get_or_create_db(DbName, DbOptions),

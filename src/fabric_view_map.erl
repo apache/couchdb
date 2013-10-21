@@ -26,7 +26,7 @@ go(DbName, GroupId, View, Args, Callback, Acc0) when is_binary(GroupId) ->
 go(DbName, DDoc, View, Args, Callback, Acc) ->
     Shards = fabric_view:get_shards(DbName, Args),
     Repls = fabric_view:get_shard_replacements(DbName, Shards),
-    RPCArgs = [DDoc, View, Args],
+    RPCArgs = [fabric_util:doc_id_and_rev(DDoc), View, Args],
     StartFun = fun(Shard) ->
         hd(fabric_util:submit_jobs([Shard], fabric_rpc, map_view, RPCArgs))
     end,
