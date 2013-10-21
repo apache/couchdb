@@ -167,7 +167,6 @@ function(app, FauxtonAPI) {
       if (resp.ok) {
         delete resp.ok;
       }
-
       return resp;
     },
 

@@ -1099,7 +1099,60 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
     }
   });
 
-  //TODO split this into two smaller views, one for advance query options and other for index editing
+  Views.DesignDocSelector = FauxtonAPI.View.extend({
+    template: "templates/documents/design_doc_selector",
+
+    events: {
+      "change select#ddoc": "updateDesignDoc"
+    },
+
+    initialize: function (options) {
+      this.ddocName = options.ddocName;
+      this.database = options.database;
+      this.listenTo(this.collection, 'add', this.ddocAdded);
+    },
+
+    ddocAdded: function (ddoc) {
+      this.ddocName = ddoc.id;
+      this.render();
+    },
+
+    serialize: function () {
+      return {
+        ddocName: this.ddocName,
+        ddocs: this.collection
+      };
+    },
+
+    updateDesignDoc: function () {
+      if (this.$('#ddoc :selected').prop('id') === 'new-doc') {
+        this.$('#new-ddoc-section').show();
+      } else {
+        this.$('#new-ddoc-section').hide();
+      }
+    },
+
+    newDesignDoc: function () {
+      return this.$('#ddoc :selected').prop('id') === 'new-doc';
+    },
+
+    getCurrentDesignDoc: function () {
+      if (this.newDesignDoc()) {
+        var doc = {
+          _id: '_design/' + this.$('#new-ddoc').val(),
+          views: {},
+          language: "javascript"
+        };
+        return new Documents.Doc(doc, {database: this.database});
+      } else {
+        var ddocName = this.$('#ddoc').val();
+        return this.collection.find(function (ddoc) {
+          return ddoc.id === ddocName;
+        }).dDocModel();
+      }
+    }
+  });
+
   Views.ViewEditor = FauxtonAPI.View.extend({
     template: "templates/documents/view_editor",
     builtinReduces: ['_sum', '_count', '_stats'],
@@ -1108,7 +1161,7 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
       "click button.save": "saveView",
       "click button.delete": "deleteView",
       "change select#reduce-function-selector": "updateReduce",
-      "change select#ddoc": "updateDesignDoc",
+      
       "click #db-views-tabs-nav": 'toggleIndexNav'
     },
 
@@ -1143,17 +1196,7 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
       }
     },
 
-    updateDesignDoc: function () {
-
-      if (this.$('#ddoc :selected').prop('id') === 'new-doc') {
-        this.$('#new-ddoc-section').show();
-
-      } else {
-        this.$('#new-ddoc-section').hide();
-      }
-
-    },
-
+    
     updateValues: function() {
       var notification;
       if (this.model.changedAttributes()) {
@@ -1335,26 +1378,9 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
     },
 
     getCurrentDesignDoc: function () {
-      if (this.newDesignDoc()) {
-        var doc = {
-          _id: '_design/' + this.$('#new-ddoc').val(),
-          views: {},
-          language: "javascript"
-        };
-        return new Documents.Doc(doc, {database: this.database});
-      } else {
-        var ddocName = this.$('#ddoc').val();
-        return this.ddocs.find(function (ddoc) {
-          return ddoc.id === ddocName;
-        }).dDocModel();
-      }
-
+      return this.designDocSelector.getCurrentDesignDoc();
     },
-
-    newDesignDoc: function () {
-      return this.$('#ddoc :selected').prop('id') === 'new-doc';
-    },
-
+    
     isCustomReduceEnabled: function() {
       return $("#reduce-function-selector").val() == "CUSTOM";
     },
@@ -1461,6 +1487,12 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
         this.setView('#ddoc-info', new Views.DdocInfo({model: this.ddocInfo }));
       }
 
+      this.designDocSelector = this.setView('.design-doc-group', new Views.DesignDocSelector({
+        collection: this.ddocs,
+        ddocName: this.model.id,
+        database: this.database
+      }));
+
       this.advancedOptions = this.insertView('#query', new Views.AdvancedOptions({
         updateViewFn: this.updateView,
         previewFn: this.previewView
@@ -1480,7 +1512,7 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
         this.$('#index-nav').parent().removeClass('active');
       }
 
-      this.updateDesignDoc();
+      this.designDocSelector.updateDesignDoc();
       // This is a hack around a bug in backbone.layoutmanager with grunt dev
       // When in grunt dev mode we load templates asynchronously
       // and this can cause a double render which then gives us two 
