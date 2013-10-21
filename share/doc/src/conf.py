@@ -24,10 +24,10 @@ _info = {}
 _regex = re.compile('m4_define\(\[(.+)\],\s+\[(.+)\]\)')
 _acinclude_m4 = '../../../acinclude.m4'
 _acinclude_m4_in = '../../../acinclude.m4.in'
-if os.path.exists(_acinclude_m4_in):
-    _source = _acinclude_m4_in
-elif os.path.exists(_acinclude_m4):
+if os.path.exists(_acinclude_m4):
     _source = _acinclude_m4
+elif os.path.exists(_acinclude_m4_in):
+    _source = _acinclude_m4_in
 else:
     _source = None
 if _source is not None:
@@ -50,11 +50,12 @@ release = '.'.join([
     _info['LOCAL_VERSION_MAJOR'],
     _info['LOCAL_VERSION_MINOR'],
     _info['LOCAL_VERSION_REVISION']
-]) + (
-    _info['LOCAL_VERSION_STAGE'] + '' + _info['LOCAL_VERSION_RELEASE']
-    if _info.get('LOCAL_VERSION_RELEASE') == '%revision%'
-    else '-dev'
-)
+])
+
+if _info.get('LOCAL_VERSION_RELEASE') == '.%revision%':
+    release += '-dev'
+elif _info.get('LOCAL_VERSION_RELEASE'):
+    release += _info['LOCAL_VERSION_STAGE'] + _info['LOCAL_VERSION_RELEASE']
 
 project = _info['LOCAL_PACKAGE_NAME']
 

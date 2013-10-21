@@ -26,6 +26,7 @@ function(app, Components, FauxtonAPI) {
 
     serialize: function() {
       return {
+        encoded: encodeURIComponent(this.model.get("name")),
         database: this.model
       };
     }
@@ -59,7 +60,7 @@ function(app, Components, FauxtonAPI) {
         // TODO: switch to using a model, or Databases.databaseUrl()
         // Neither of which are in scope right now
         // var db = new Database.Model({id: dbname});
-        var url = ["/database/", dbname, "/_all_docs?limit=10"].join('');
+        var url = ["/database/", encodeURIComponent(dbname), "/_all_docs?limit=10"].join('');
         FauxtonAPI.navigate(url);
       }
     },

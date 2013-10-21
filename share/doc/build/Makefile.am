@@ -45,6 +45,26 @@ html_files = \
     html/_images/futon-editeddoc.png \
     html/_images/futon-overview.png \
     html/_images/futon-replform.png \
+    html/_images/intro-consistency-01.png \
+    html/_images/intro-consistency-02.png \
+    html/_images/intro-consistency-03.png \
+    html/_images/intro-consistency-04.png \
+    html/_images/intro-consistency-05.png \
+    html/_images/intro-consistency-06.png \
+    html/_images/intro-consistency-07.png \
+    html/_images/intro-tour-01.png \
+    html/_images/intro-tour-02.png \
+    html/_images/intro-tour-03.png \
+    html/_images/intro-tour-04.png \
+    html/_images/intro-tour-05.png \
+    html/_images/intro-tour-06.png \
+    html/_images/intro-tour-07.png \
+    html/_images/intro-tour-08.png \
+    html/_images/intro-tour-09.png \
+    html/_images/intro-tour-10.png \
+    html/_images/intro-why-01.png \
+    html/_images/intro-why-02.png \
+    html/_images/intro-why-03.png \
     html/_images/views-intro-01.png \
     html/_images/views-intro-02.png \
     html/_images/views-intro-03.png \
@@ -93,6 +113,7 @@ html_files = \
     html/_sources/couchapp/views/intro.txt \
     html/_sources/couchapp/views/joins.txt \
     html/_sources/couchapp/views/nosql.txt \
+    html/_sources/couchapp/views/pagination.txt \
     html/_sources/cve/2010-0009.txt \
     html/_sources/cve/2010-2234.txt \
     html/_sources/cve/2010-3854.txt \
@@ -264,11 +285,14 @@ html_files = \
     html/about.html \
     html/config-ref.html \
     html/contents.html \
-    html/externals.html \
+    html/contributing.html \
+    html/download.html \
     html/experimental.html \
+    html/externals.html \
+    html/http-api.html \
+    html/index.html \
     html/json-structure.html \
     html/objects.inv \
-    html/http-api.html \
     html/search.html \
     html/searchindex.js
 

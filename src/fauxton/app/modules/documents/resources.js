@@ -12,7 +12,6 @@
 
 define([
   "app",
-
   "api"
 ],
 
@@ -168,7 +167,6 @@ function(app, FauxtonAPI) {
       if (resp.ok) {
         delete resp.ok;
       }
-
       return resp;
     },
 
@@ -268,6 +266,8 @@ function(app, FauxtonAPI) {
       this.database = options.database;
       this.params = options.params;
       this.skipFirstItem = false;
+
+      this.on("remove",this.decrementTotalRows , this);
     },
 
     url: function(context) {
@@ -284,7 +284,13 @@ function(app, FauxtonAPI) {
 
     urlNextPage: function (num, lastId) {
       if (!lastId) {
-        lastId = this.last().id;
+        var doc = this.last();
+
+        if (doc) {
+          lastId = doc.id;
+        } else {
+          lastId = '';
+        }
       }
 
       this.params.startkey_docid = '"' + lastId + '"';
@@ -309,6 +315,13 @@ function(app, FauxtonAPI) {
 
     totalRows: function() {
       return this.viewMeta.total_rows || "unknown";
+    },
+
+    decrementTotalRows: function () {
+      if (this.viewMeta.total_rows) {
+        this.viewMeta.total_rows = this.viewMeta.total_rows -1;
+        this.trigger('totalRows:decrement');
+      }
     },
 
     updateSeq: function() {

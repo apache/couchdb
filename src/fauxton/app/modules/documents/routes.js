@@ -167,7 +167,7 @@ function(app, FauxtonAPI, Documents, Databases) {
       var docOptions = app.getParams();
       docOptions.include_docs = true;
 
-      this.databaseName = options[0];
+      this.databaseName = encodeURIComponent(options[0]);
 
       this.data = {
         database: new Databases.Model({id:this.databaseName})
@@ -204,10 +204,15 @@ function(app, FauxtonAPI, Documents, Databases) {
 
       if (this.viewEditor) { this.viewEditor.remove(); }
 
-
       this.toolsView = this.setView("#dashboard-upper-menu", new Documents.Views.JumpToDoc({
         database: this.data.database,
         collection: this.data.database.allDocs
+      }));
+
+      this.setView("#dashboard-upper-content", new Documents.Views.AllDocsLayout({
+        database: this.data.database,
+        collection: this.data.database.allDocs,
+        params: docOptions
       }));
 
       this.documentsView = this.setView("#dashboard-lower-content", new Documents.Views.AllDocsList({
@@ -295,7 +300,14 @@ function(app, FauxtonAPI, Documents, Databases) {
 
     updateAllDocsFromView: function (event) {
       var view = event.view,
-      ddoc = event.ddoc;
+          docOptions = app.getParams(),
+          ddoc = event.ddoc;
+
+      if (event.allDocs) {
+        docOptions.include_docs = true;
+        this.data.database.buildAllDocs(docOptions);
+        return;
+      }
 
       this.data.indexedDocs = new Documents.IndexCollection(null, {
         database: this.data.database,
@@ -367,7 +379,7 @@ function(app, FauxtonAPI, Documents, Databases) {
     },
 
     initialize: function (route, masterLayout, options) {
-      this.databaseName = options[0];
+      this.databaseName = encodeURIComponent(options[0]);
       this.database = new Databases.Model({id: this.databaseName});
 
       var docOptions = app.getParams();

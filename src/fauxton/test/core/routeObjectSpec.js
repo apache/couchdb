@@ -27,6 +27,8 @@ define([
         });
 
         testRouteObject = new TestRouteObject();
+        var apiBar = {};
+        apiBar.hide = sinon.spy();
 
         // Need to find a better way of doing this
         mockLayout = {
@@ -35,7 +37,8 @@ define([
           setView: sinon.spy(),
           renderView: sinon.spy(),
           hooks: [],
-          setBreadcrumbs: sinon.spy()
+          setBreadcrumbs: sinon.spy(),
+          apiBar: apiBar
         };
 
       });

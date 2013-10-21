@@ -11,13 +11,11 @@ WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 License for the specific language governing permissions and limitations under
 the License.
 -->
-
-<td>
-  <a href="#/database/<%=encoded%>/_all_docs?limit=100"><%= database.get("name") %></a>
-</td>
-<td><%= database.status.humanSize() %></td>
-<td><%= database.status.numDocs() %></td>
-<td><%= database.status.updateSeq() %></td>
-<td>
-  <a class="db-actions btn fonticon-replicate set-replication-start" href="#/replication/<%= database.get("name") %>"></a>
-</td>
+<% if (totalRows === "unknown"){ %>
+  Showing 0 documents. <a href="#/database/<%=database%>/new"> Create your first document.</a>
+<% } else { %>
+  Showing <%=offset%> - <%= numModels %> of <%= totalRows %> rows
+<%}%>
+<% if (updateSeq) { %>
+  -- Update Sequence: <%= updateSeq %>
+<% } %>

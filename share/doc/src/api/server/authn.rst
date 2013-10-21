@@ -84,7 +84,7 @@ To obtain the first token and thus authenticate a user for the first time, the
 
 .. _api/auth/session:
 
-``_session``
+``/_session``
 ------------
 
 .. http:post:: /_session

@@ -216,10 +216,10 @@ function(app, Backbone, resizeColumns) {
     },
 
     hide: function(){
-      $(this.el).addClass('hide');
+      this.$el.addClass('hide');
     },
     show: function(){
-      $(this.el).removeClass('hide');
+      this.$el.removeClass('hide');
     },
     update: function(endpoint) {
       this.show();

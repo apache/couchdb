@@ -12,13 +12,12 @@
 
 .. _api/config:
 
-=====================
-Configuration Methods
-=====================
+=============
+Configuration
+=============
 
-The CouchDB API Server Configuration Methods provide an interface to
-query and update the various configuration values within a running
-CouchDB instance.
+The CouchDB Server Configuration API provide an interface to query and update
+the various configuration values within a running CouchDB instance.
 
 ``/_config``
 ============
@@ -152,7 +151,7 @@ CouchDB instance.
           "algorithm": "utc_random"
       }
     }
-        
+
 
 .. _api/config/section:
 
