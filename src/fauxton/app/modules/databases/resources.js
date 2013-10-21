@@ -50,6 +50,8 @@ function(app, FauxtonAPI, Documents) {
     url: function(context) {
       if (context === "index") {
         return "/database/" + this.id + "/_all_docs";
+      } else if (context === "web-index") {
+        return "#/database/"+ encodeURIComponent(this.get("name"))  + "/_all_docs?limit=100";
       } else if (context === "changes") {
         return "/database/" + this.id + "/_changes?descending=true&limit=100&include_docs=true";
       } else if (context === "app") {
