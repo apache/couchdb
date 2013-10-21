@@ -34,11 +34,12 @@ receiver(Req, Length) when is_integer(Length) ->
     Middleman = spawn(fun() -> middleman(Req, Length) end),
     fun() ->
         Middleman ! {self(), gimme_data},
+        Timeout = fabric_util:attachments_timeout(),
         receive
             {Middleman, Data} ->
                 rexi:reply(attachment_chunk_received),
                 iolist_to_binary(Data)
-        after 600000 ->
+        after Timeout ->
             exit(timeout)
         end
     end;
@@ -64,6 +65,7 @@ maybe_send_continue(#httpd{mochi_req = MochiReq} = Req) ->
 
 write_chunks(MiddleMan, ChunkFun) ->
     MiddleMan ! {self(), gimme_data},
+    Timeout = fabric_util:attachments_timeout(),
     receive
     {MiddleMan, ChunkRecordList} ->
         rexi:reply(attachment_chunk_received),
@@ -71,7 +73,7 @@ write_chunks(MiddleMan, ChunkFun) ->
         continue -> write_chunks(MiddleMan, ChunkFun);
         done -> ok
         end
-    after 600000 ->
+    after Timeout ->
         exit(timeout)
     end.
 

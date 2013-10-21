@@ -68,13 +68,14 @@ go(DbName, Options, QueryArgs, Callback, Acc0) ->
         true -> lists:sublist(Keys2, Limit);
         false -> Keys2
     end,
+    Timeout = fabric_util:all_docs_timeout(),
     receive {'DOWN', Ref0, _, _, {ok, TotalRows}} ->
         {ok, Acc1} = Callback({meta, [{total, TotalRows}]}, Acc0),
         {ok, Acc2} = doc_receive_loop(
             Keys3, queue:new(), SpawnFun, MaxJobs, Callback, Acc1
         ),
         Callback(complete, Acc2)
-    after 10000 ->
+    after Timeout ->
         Callback(timeout, Acc0)
     end.
 
@@ -176,6 +177,7 @@ doc_receive_loop(Keys, Pids, SpawnFun, MaxJobs, Callback, AccIn) ->
         doc_receive_loop(RKeys, Pids1, SpawnFun, MaxJobs, Callback, AccIn);
     _ ->
         {{value, {Pid, Ref}}, RestPids} = queue:out(Pids),
+        Timeout = fabric_util:all_docs_timeout(),
         receive {'DOWN', Ref, process, Pid, #view_row{} = Row} ->
             case Callback(fabric_view:transform_row(Row), AccIn) of
             {ok, Acc} ->
@@ -186,7 +188,7 @@ doc_receive_loop(Keys, Pids, SpawnFun, MaxJobs, Callback, AccIn) ->
                 cancel_read_pids(RestPids),
                 {ok, Acc}
             end
-        after 10000 ->
+        after Timeout ->
             timeout
         end
     end.
