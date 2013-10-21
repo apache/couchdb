@@ -40,7 +40,7 @@ provided by the couch_replicator_ module available in Apache CouchDB.
 
 The CouchDB_ replication protocol is using the `CouchDB REST API
 <http://wiki.apache.org/couchdb/Reference>`_ and so is based on HTTP and
-the Apache CouchDB MVC Data model. The primary goal of this
+the Apache CouchDB MVCC Data model. The primary goal of this
 specification is to describe the CouchDB replication algorithm.
 
 
