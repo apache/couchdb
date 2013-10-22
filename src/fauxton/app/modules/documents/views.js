@@ -479,7 +479,8 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
         updateViewFn: this.updateView,
         previewFn: this.previewView,
         hasReduce: false,
-        showPreview: false
+        showPreview: false,
+        database: this.database
       }));
 
       this.$('#query').hide();
@@ -970,6 +971,9 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
     className: "advanced-options well",
 
     initialize: function (options) {
+      this.database = options.database;
+      this.ddocName = options.ddocName;
+      this.viewName = options.viewName;
       this.updateViewFn = options.updateViewFn;
       this.previewFn = options.previewFn;
       this.hadReduce = options.hasReduce || true;
@@ -992,6 +996,16 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
       "change form.view-query-update select": "updateFilters",
       "submit form.view-query-update": "updateView",
       "click button.preview": "previewView"
+    },
+
+    beforeRender: function () {
+      if (this.viewName && this.ddocName) {
+        var buttonViews = FauxtonAPI.getExtensions('advancedOptions:ViewButton');
+        _.each(buttonViews, function (view) {
+          this.insertView('#button-options', view);
+          view.update(this.database, this.ddocName, this.viewName);
+        }, this);
+      }
     },
 
     queryParams: function () {
@@ -1496,7 +1510,10 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
 
       this.advancedOptions = this.insertView('#query', new Views.AdvancedOptions({
         updateViewFn: this.updateView,
-        previewFn: this.previewView
+        previewFn: this.previewView,
+        database: this.database,
+        viewName: this.viewName,
+        ddocName: this.model.id
       }));
     },
 
@@ -1635,7 +1652,6 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
 
     serialize: function() {
       var docLinks = FauxtonAPI.getExtensions('docLinks');
-      console.log(docLinks);
       return {
         changes_url: '#' + this.database.url('changes'),
         permissions_url: '#' + this.database.url('app') + '/permissions',

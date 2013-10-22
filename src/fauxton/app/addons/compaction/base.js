@@ -23,6 +23,8 @@ function(app, FauxtonAPI, Compaction) {
       url: "compact", 
       icon: "icon-cogs"
     });
+
+    FauxtonAPI.registerExtension('advancedOptions:ViewButton', new Compaction.CompactView({}));
   };
 
   return Compaction;

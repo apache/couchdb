@@ -49,7 +49,7 @@ function (app, FauxtonAPI, Compaction) {
       Compaction.compactDB(this.model).then(function () {
         FauxtonAPI.addNotification({
           type: 'success',
-          msg: 'Database compaction has started.'
+          msg: 'Database compaction has started. Visit <a href="#activetasks">Active Tasks</a> to view the compaction progress.',
         });
       }, function (xhr, error, reason) {
         console.log(arguments);
@@ -71,10 +71,9 @@ function (app, FauxtonAPI, Compaction) {
       Compaction.cleanupViews(this.model).then(function () {
         FauxtonAPI.addNotification({
           type: 'success',
-          msg: 'View cleanup has started.'
+          msg: 'View cleanup has started. Visit <a href="#activetasks">Active Tasks</a> to view progress.'
         });
       }, function (xhr, error, reason) {
-        console.log(arguments);
         FauxtonAPI.addNotification({
           type: 'error',
           msg: 'Error: ' + JSON.parse(xhr.responseText).reason
@@ -83,6 +82,58 @@ function (app, FauxtonAPI, Compaction) {
         enableButton('#cleanup-views', 'Run');
       });
     }
+  });
+
+  Compaction.CompactView = FauxtonAPI.View.extend({
+    template: 'addons/compaction/templates/compact_view',
+    className: 'btn btn-info btn-large pull-right',
+    tagName: 'button',
+
+    initialize: function () {
+      _.bindAll(this);
+    },
+
+    events: {
+      "click": "compact"
+    },
+
+    disableButton: function () {
+      this.$el.attr('disabled', 'disabled').text('Compacting...');
+    },
+
+    enableButton: function () {
+      this.$el.removeAttr('disabled').text('Compact View');
+    },
+
+
+    update: function (database, designDoc, viewName) {
+      this.database = database;
+      this.designDoc = designDoc;
+      this.viewName = viewName;
+    },
+
+    compact: function (event) {
+      event.preventDefault();
+      var enableButton = this.enableButton;
+
+      this.disableButton();
+
+      Compaction.compactView(this.database, this.designDoc).then(function () {
+        FauxtonAPI.addNotification({
+          type: 'success',
+          msg: 'View compaction has started. Visit <a href="#activetasks">Active Tasks</a> to view progress.'
+        });
+      }, function (xhr, error, reason) {
+        FauxtonAPI.addNotification({
+          type: 'error',
+          msg: 'Error: ' + JSON.parse(xhr.responseText).reason
+        });
+      }).always(function () {
+        enableButton();
+      });
+
+    }
+
   });
 
   return Compaction;

@@ -25,9 +25,13 @@ function(app, FauxtonAPI, Compaction, Databases) {
   var  CompactionRouteObject = FauxtonAPI.RouteObject.extend({
     layout: "one_pane",
 
-    crumbs: [
-      {"name": "Compact & Clean", "link": "compact"}
-    ],
+    crumbs: function () {
+      return [
+        {"name": "Databases", "link": "/_all_dbs"},
+        {"name": this.database.id, "link": Databases.databaseUrl(this.database)},
+        {"name": "Compact & Clean", "link": "compact"}
+      ];
+    },
 
     routes: {
       "database/:database/compact": "compaction"
