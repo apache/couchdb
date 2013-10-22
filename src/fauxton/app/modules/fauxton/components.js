@@ -67,12 +67,14 @@ function(app, FauxtonAPI) {
 
     previousClicked: function (event) {
       event.preventDefault();
+      if (!this.canShowPreviousfn()) { return; }
       FauxtonAPI.navigate(this.previousUrlfn(), {trigger: false});
       FauxtonAPI.triggerRouteEvent('paginate', 'previous');
     },
 
     nextClicked: function (event) {
       event.preventDefault();
+      if (!this.canShowNextfn()) { return; }
       var doc = this.collection.first();
 
       if (doc) {
