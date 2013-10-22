@@ -174,7 +174,7 @@ replicate({Props} = PostBody, Ctx) ->
     case couch_util:get_value(<<"cancel">>, Props) of
     true ->
         cancel_replication(PostBody, Ctx);
-    false ->
+    _ ->
         Node = choose_node([
             couch_util:get_value(<<"source">>, Props),
             couch_util:get_value(<<"target">>, Props)
