@@ -382,7 +382,7 @@ changes_row(Props0, IncludeDocs) ->
             lists:keydelete(deleted, 1, Props1)
     end,
     Allowed = [seq, id, changes, deleted, doc],
-    Props3 = lists:filter(fun({K,_V}) -> lists:member(K, Allowed) end, Props0),
+    Props3 = lists:filter(fun({K,_V}) -> lists:member(K, Allowed) end, Props2),
     {change, {Props3}}.
 
 find_replacement_shards(#shard{range=Range}, AllShards) ->
