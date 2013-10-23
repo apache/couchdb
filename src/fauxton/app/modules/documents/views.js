@@ -1251,7 +1251,7 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
 
       if (event) { event.preventDefault();}
 
-      if (this.hasValidCode()) {
+      if (this.hasValidCode() && this.$('#new-ddoc:visible').val() !=="") {
         var mapVal = this.mapEditor.getValue(), 
         reduceVal = this.reduceVal(),
         viewName = this.$('#index-name').val(),
@@ -1294,8 +1294,9 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
           });
         });
       } else {
+        var errormessage = (this.$('#new-ddoc:visible').val() ==="")?"Enter a design doc name":"Please fix the Javascript errors and try again.";
         notification = FauxtonAPI.addNotification({
-          msg: "Please fix the Javascript errors and try again.",
+          msg: errormessage,
           type: "error",
           selector: "#define-view .errors-container"
         });
