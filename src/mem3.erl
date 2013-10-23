@@ -157,7 +157,7 @@ choose_shards(DbName, Options) when is_list(DbName) ->
 choose_shards(DbName, Options) ->
     try shards(DbName)
     catch error:E when E==database_does_not_exist; E==badarg ->
-        Nodes = mem3:nodes(),
+        Nodes = allowed_nodes(),
         case get_placement(Options) of
             undefined ->
                 choose_shards(DbName, Nodes, Options);
@@ -236,6 +236,9 @@ range(#ordered_shard{range = Range}) ->
 range(<<"shards/", Start:8/binary, "-", End:8/binary, "/", _/binary>>) ->
     [httpd_util:hexlist_to_integer(binary_to_list(Start)),
      httpd_util:hexlist_to_integer(binary_to_list(End))].
+
+allowed_nodes() ->
+    [Node || Node <- mem3:nodes(), mem3:node_info(Node, <<"decom">>) =/= true].
 
 nodes_in_zone(Nodes, Zone) ->
     [Node || Node <- Nodes, Zone == mem3:node_info(Node, <<"zone">>)].
