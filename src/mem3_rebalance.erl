@@ -43,14 +43,14 @@ expand() ->
 %% @doc Expands all databases in the cluster, stopping at Limit operations.
 -spec expand(integer()) -> [{atom(), #shard{}, node()}].
 expand(Limit) when is_integer(Limit), Limit > 0 ->
-    TargetNodes = allowed_nodes(fun(Zone) -> Zone =/= <<"decom">> end),
+    TargetNodes = surviving_nodes(),
     LocalBalanceFun = fun(Db, Moves) -> expand(Db, TargetNodes, Moves) end,
     LocalBalanceOps = apply_to_cluster(LocalBalanceFun, Limit),
     % Now apply additional operations as needed to achieve global balance.
     global_expand(TargetNodes, LocalBalanceOps, Limit);
 
 expand(DbName) when is_binary(DbName); is_list(DbName) ->
-    TargetNodes = allowed_nodes(fun(Zone) -> Zone =/= <<"decom">> end),
+    TargetNodes = surviving_nodes(),
     expand(DbName, TargetNodes, []).
 
 %% @doc Computes a plan to balance the shards across the target nodes.
@@ -73,11 +73,11 @@ contract() ->
 %% @doc Computes a plan to remove up to Limit shards from nodes in "decom" zone.
 -spec contract(integer()) -> [{atom(), #shard{}, node()}].
 contract(Limit) when is_integer(Limit), Limit > 0 ->
-    TargetNodes = allowed_nodes(fun(Zone) -> Zone =/= <<"decom">> end),
+    TargetNodes = surviving_nodes(),
     apply_to_cluster(fun(Db, Moves) -> contract(Db, TargetNodes, Moves) end, Limit);
 
 contract(DbName) when is_binary(DbName); is_list(DbName) ->
-    TargetNodes = allowed_nodes(fun(Zone) -> Zone =/= <<"decom">> end),
+    TargetNodes = surviving_nodes(),
     contract(DbName, TargetNodes, []).
 
 %% @doc Computes a plan to consolidate shards from a single database onto the
@@ -337,6 +337,11 @@ apply_shard_moves(Shards, [{copy, Shard, Node}| Rest]) ->
 allowed_nodes(Fun) ->
     lists:filter(fun(Node) ->
         Fun(mem3:node_info(Node, <<"zone">>))
+    end, mem3:nodes()).
+
+surviving_nodes() ->
+    lists:filter(fun(Node) ->
+        mem3:node_info(Node, <<"decom">>) =/= true
     end, mem3:nodes()).
 
 shards_by_node(Shards, Nodes) ->
