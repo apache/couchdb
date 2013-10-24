@@ -12,15 +12,20 @@
 
 -module(ddoc_cache).
 
--include_lib("couch/include/couch_db.hrl").
+-export([
+    start/0,
+    stop/0
+]).
 
--export([start/0, stop/0]).
+-export([
+    open_doc/2,
+    open_doc/3,
+    open_validation_funs/1,
+    evict/2,
 
-% public API
--export([open_doc/2, open_doc/3, open_validation_funs/1, evict/2]).
-
-% deprecated API
--export([open/2]).
+    %% deprecated
+    open/2
+]).
 
 start() ->
     application:start(ddoc_cache).
@@ -67,5 +72,7 @@ evict(ShardDbName, DDocIds) ->
 
 open(DbName, validation_funs) ->
     open_validation_funs(DbName);
-open(DbName, DocId) ->
-    open_doc(DbName, DocId).
+open(DbName, <<"_design/", _/binary>>=DDocId) when is_binary(DbName) ->
+    open_doc(DbName, DDocId);
+open(DbName, DDocId) when is_binary(DDocId) ->
+    open_doc(DbName, <<"_design/", DDocId/binary>>).

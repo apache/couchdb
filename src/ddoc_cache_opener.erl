@@ -16,10 +16,20 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("mem3/include/mem3.hrl").
 
-% worker API
--export([start_link/0]).
+-export([
+    start_link/0
+]).
+-export([
+    init/1,
+    terminate/2,
 
-% public API
+    handle_call/3,
+    handle_cast/2,
+    handle_info/2,
+
+    code_change/3
+]).
+
 -export([
     open_doc/2,
     open_doc/3,
@@ -31,21 +41,9 @@
     recover_doc/3,
     recover_validation_funs/1
 ]).
-
-% couch_event listener callback
--export([handle_db_event/3]).
-
-% gen_server behavior
 -export([
-    init/1,
-    terminate/2,
-    handle_call/3,
-    handle_cast/2,
-    handle_info/2,
-    code_change/3
+    handle_db_event/3
 ]).
-
-% sub-process spawn API
 -export([
     fetch_doc_data/1
 ]).
@@ -55,7 +53,8 @@
 
 -type dbname() :: iodata().
 -type docid() :: iodata().
--type revision() :: {pos_integer(), <<_:128>>}.
+-type doc_hash() :: <<_:128>>.
+-type revision() :: {pos_integer(), doc_hash()}.
 
 -record(opener, {
     key,
@@ -77,8 +76,8 @@ open_doc(DbName, DocId) ->
     handle_open_response(Resp).
 
 -spec open_doc(dbname(), docid(), revision()) -> {ok, #doc{}}.
-open_doc(DbName, DocId, RevId) ->
-    Resp = gen_server:call(?MODULE, {open, {DbName, DocId, RevId}}, infinity),
+open_doc(DbName, DocId, Rev) ->
+    Resp = gen_server:call(?MODULE, {open, {DbName, DocId, Rev}}, infinity),
     handle_open_response(Resp).
 
 -spec open_validation_funs(dbname()) -> {ok, [fun()]}.
@@ -106,9 +105,10 @@ match_newest(Key) ->
         [] ->
             missing;
         Docs ->
-            Sorted = lists:sort(fun (#doc{revs=L}, #doc{revs=R}) ->
-                L >= R
-            end, Docs),
+            Sorted = lists:sort(
+                fun (#doc{deleted=DelL, revs=L}, #doc{deleted=DelR, revs=R}) ->
+                    {not DelL, L} > {not DelR, R}
+                end, Docs),
             {ok, hd(Sorted)}
     catch
         error:badarg ->
@@ -118,8 +118,8 @@ match_newest(Key) ->
 recover_doc(DbName, DDocId) ->
     fabric:open_doc(DbName, DDocId, []).
 
-recover_doc(DbName, DDocId, RevId) ->
-    {ok, [Resp]} = fabric:open_revs(DbName, DDocId, [RevId], []),
+recover_doc(DbName, DDocId, Rev) ->
+    {ok, [Resp]} = fabric:open_revs(DbName, DDocId, [Rev], []),
     Resp.
 
 recover_validation_funs(DbName) ->
@@ -188,10 +188,10 @@ handle_cast({do_evict, DbName}, St) ->
 handle_cast({do_evict, DbName, DDocIds}, St) ->
     ets_lru:remove(?CACHE, {DbName, validation_funs}),
     lists:foreach(fun(DDocId) ->
-        RevIds = ets_lru:match(?CACHE, {DbName, DDocId, '$1'}, '_'),
-        lists:foreach(fun([RevId]) ->
-            ets_lru:remove(?CACHE, {DbName, DDocId, RevId})
-        end, RevIds)
+        Revs = ets_lru:match(?CACHE, {DbName, DDocId, '$1'}, '_'),
+        lists:foreach(fun([Rev]) ->
+            ets_lru:remove(?CACHE, {DbName, DDocId, Rev})
+        end, Revs)
     end, DDocIds),
     {noreply, St};
 
@@ -231,18 +231,16 @@ code_change(_OldVsn, State, _Extra) ->
 -spec fetch_doc_data({dbname(), validation_funs}) -> no_return();
                     ({dbname(), docid()}) -> no_return();
                     ({dbname(), docid(), revision()}) -> no_return().
-fetch_doc_data({DbName, validation_funs}) ->
-    OpenerKey = {DbName, validation_funs},
+fetch_doc_data({DbName, validation_funs}=OpenerKey) ->
     {ok, Funs} = recover_validation_funs(DbName),
     ok = ets_lru:insert(?CACHE, OpenerKey, Funs),
     exit({open_ok, OpenerKey, {ok, Funs}});
-fetch_doc_data({DbName, DocId}) ->
-    OpenerKey = {DbName, DocId},
+fetch_doc_data({DbName, DocId}=OpenerKey) ->
     try recover_doc(DbName, DocId) of
         {ok, Doc} ->
-            {RevCount, [RevHash| _]} = Doc#doc.revs,
-            RevId = {RevCount, RevHash},
-            ok = ets_lru:insert(?CACHE, {DbName, DocId, RevId}, Doc),
+            {RevDepth, [RevHash| _]} = Doc#doc.revs,
+            Rev = {RevDepth, RevHash},
+            ok = ets_lru:insert(?CACHE, {DbName, DocId, Rev}, Doc),
             exit({open_ok, OpenerKey, {ok, Doc}});
         Else ->
             exit({open_ok, OpenerKey, Else})
@@ -250,11 +248,10 @@ fetch_doc_data({DbName, DocId}) ->
         Type:Reason ->
             exit({open_error, OpenerKey, Type, Reason})
     end;
-fetch_doc_data({DbName, DocId, RevId}) ->
-    OpenerKey = {DbName, DocId, RevId},
-    try recover_doc(DbName, DocId, RevId) of
+fetch_doc_data({DbName, DocId, Rev}=OpenerKey) ->
+    try recover_doc(DbName, DocId, Rev) of
         {ok, Doc} ->
-            ok = ets_lru:insert(?CACHE, {DbName, DocId, RevId}, Doc),
+            ok = ets_lru:insert(?CACHE, {DbName, DocId, Rev}, Doc),
             exit({open_ok, OpenerKey, {ok, Doc}});
         Else ->
             exit({open_ok, OpenerKey, Else})
