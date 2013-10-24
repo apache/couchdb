@@ -69,6 +69,8 @@ map_view(DbName, DDocInfo, ViewName, Args0) ->
 
 map_view(DbName, {DDocId, Rev}, ViewName, Args0, DbOptions) ->
     {ok, DDoc} = ddoc_cache:open_doc(mem3:dbname(DbName), DDocId, Rev),
+    map_view(DbName, DDoc, ViewName, Args0, DbOptions);
+map_view(DbName, DDoc, ViewName, Args0, DbOptions) ->
     set_io_priority(DbName, DbOptions),
     Args = fix_skip_and_limit(Args0),
     {ok, Db} = get_or_create_db(DbName, DbOptions),
@@ -81,6 +83,8 @@ reduce_view(DbName, DDocInfo, ViewName, Args0) ->
 
 reduce_view(DbName, {DDocId, Rev}, ViewName, Args0, DbOptions) ->
     {ok, DDoc} = ddoc_cache:open_doc(mem3:dbname(DbName), DDocId, Rev),
+    reduce_view(DbName, DDoc, ViewName, Args0, DbOptions);
+reduce_view(DbName, DDoc, ViewName, Args0, DbOptions) ->
     set_io_priority(DbName, DbOptions),
     Args = fix_skip_and_limit(Args0),
     {ok, Db} = get_or_create_db(DbName, DbOptions),

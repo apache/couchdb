@@ -25,7 +25,7 @@ go(DbName, GroupId, View, Args, Callback, Acc0, VInfo) when is_binary(GroupId) -
 
 go(DbName, DDoc, VName, Args, Callback, Acc, {red, {_, Lang, _}, _}=VInfo) ->
     RedSrc = couch_mrview_util:extract_view_reduce(VInfo),
-    RPCArgs = [fabric_util:doc_id_and_rev(DDoc), VName, Args],
+    RPCArgs = [DDoc, VName, Args],
     Shards = fabric_view:get_shards(DbName, Args),
     Repls = fabric_view:get_shard_replacements(DbName, Shards),
     StartFun = fun(Shard) ->
