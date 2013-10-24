@@ -263,7 +263,7 @@ remove_dup_epochs([_]=Epochs) ->
     Epochs;
 remove_dup_epochs([{N1, S}, {_N2, S}]) ->
     % Seqs match, keep the most recent owner
-    remove_dup_epochs([{N1, S}]);
+    [{N1, S}];
 remove_dup_epochs([_, _]=Epochs) ->
     % Seqs don't match.
     Epochs;
@@ -272,7 +272,7 @@ remove_dup_epochs([{N1, S}, {_N2, S} | Rest]) ->
     remove_dup_epochs([{N1, S} | Rest]);
 remove_dup_epochs([{N1, S1}, {N2, S2} | Rest]) ->
     % Seqs don't match, recurse to check others
-    remove_dup_epochs([{N1, S1} | remove_dup_epochs([{N2, S2} | Rest])]).
+    [{N1, S1} | remove_dup_epochs([{N2, S2} | Rest])].
 
 
 upgrade_compacted_seq(#db_header{}=Header) ->
