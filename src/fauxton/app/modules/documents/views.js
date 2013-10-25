@@ -539,6 +539,7 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
     events: {
       "click button.all": "selectAll",
       "click button.bulk-delete": "bulkDelete",
+      "click #collapse": "collapse",
       "change .row-select":"toggleTrash"
     },
 
@@ -560,6 +561,7 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
         this.ddocID = options.ddocInfo.id;
       }
       this.newView = options.newView || false;
+      this.expandDocs = true;
       this.addPagination();
     },
 
@@ -586,8 +588,21 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
 
       return {
         viewList: this.viewList,
-        requestDuration: requestDuration
+        requestDuration: requestDuration,
+        expandDocs: this.expandDocs
       };
+    },
+
+    collapse: function (event) {
+      event.preventDefault();
+
+      if (this.expandDocs) {
+        this.expandDocs = false;
+      } else {
+        this.expandDocs = true;
+      }
+
+      this.render();
     },
 
     /*
@@ -667,7 +682,10 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
       }));
 
       this.insertView('#documents-pagination', this.pagination);
-      this.collection.each(function(doc) {
+      var docs = this.expandDocs ? this.collection : this.collection.simple();
+      console.log('docs', docs);
+
+      docs.each(function(doc) {
         this.rows[doc.id] = this.insertView("table.all-docs tbody", new this.nestedView({
           model: doc
         }));

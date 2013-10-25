@@ -282,6 +282,20 @@ function(app, FauxtonAPI) {
       return app.host + "/" + this.database.id + "/_all_docs" + query;
     },
 
+    simple: function () {
+      var docs = this.map(function (item) {
+        return {
+          _id: item.id,
+          _rev: item.get('_rev'),
+        };
+      });
+
+      return new Documents.AllDocs(docs, {
+        database: this.database,
+        params: this.params
+      });
+    },
+
     urlNextPage: function (num, lastId) {
       if (!lastId) {
         var doc = this.last();
@@ -438,6 +452,23 @@ function(app, FauxtonAPI) {
       return this.viewMeta.update_seq || false;
     },
 
+    simple: function () {
+      var docs = this.map(function (item) {
+        return {
+          _id: item.id,
+          key: item.get('key'),
+          value: item.get('value')
+        };
+      });
+
+      return new Documents.IndexCollection(docs, {
+        database: this.database,
+        params: this.params,
+        view: this.view,
+        design: this.design
+      });
+    },
+
     parse: function(resp) {
       var rows = resp.rows;
       this.endTime = new Date().getTime();
@@ -527,6 +558,25 @@ function(app, FauxtonAPI) {
 
     url: function () {
       return '';
+    },
+
+    simple: function () {
+      var docs = this.map(function (item) {
+        return {
+          _id: item.id,
+          key: item.get('key'),
+          value: item.get('value')
+        };
+      });
+
+      return new Documents.PouchIndexCollection(docs, {
+        database: this.database,
+        params: this.params,
+        view: this.view,
+        design: this.design,
+        rows: this.rows
+      });
+
     },
 
     fetch: function() {
