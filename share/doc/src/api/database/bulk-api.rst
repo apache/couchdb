@@ -211,25 +211,25 @@
   :<header Content-Type: :mimetype:`application/json`
   :<header X-Couch-Full-Commit: Overrides server's
     :config:option:`commit policy <couchdb/delayed_commits>`. Possible values
-    are: ``false`` and ``true``. *Optional*.
+    are: ``false`` and ``true``. *Optional*
   :<json boolean all_or_nothing: Sets the database commit mode to use
-    `all-or-nothing` semantics. Default is ``false``. *Optional*.
+    :ref:`all-or-nothing <api/db/bulk_docs/semantics>` semantics.
+    Default is ``false``. *Optional*
   :<json array docs: List of documents objects
   :<json boolean new_edits: If ``false``, prevents the database from assigning
-    them new revision IDs. Default is ``true``. *Optional*.
+    them new revision IDs. Default is ``true``. *Optional*
   :>header Content-Type: - :mimetype:`application/json`
                          - :mimetype:`text/plain; charset=utf-8`
   :>jsonarr string id: Document ID
-  :>jsonarr string rev: New document revision token. *Optional*. Available
-    if document have saved without errors.
-  :>jsonarr string error: Error type. *Optional*.
-  :>jsonarr string reason: Error reason. *Optional*.
+  :>jsonarr string rev: New document revision token. Available
+    if document have saved without errors. *Optional*
+  :>jsonarr string error: Error type. *Optional*
+  :>jsonarr string reason: Error reason. *Optional*
   :code 201: Document(s) have been created or updated
-  :code 400: The request provided invalid JSON data. Check that your data
-    is both ``utf-8`` and complies to the `JSON specification`_. Tools such as
-    `yajl`_ are available on all platforms that CouchDB runs on to assist with
-    validation and pretty printing.
-  :code 500: Malformed data provided
+  :code 400: The request provided invalid JSON data
+  :code 417: Occurs when ``all_or_nothing`` option set as ``true`` and
+    at least one document was rejected by :ref:`validation function <vdufun>`
+  :code 500: Malformed data provided, while it's still valid JSON
 
   **Request**:
 
@@ -278,9 +278,6 @@
       }
     ]
 
-.. _JSON specification: http://json.org/
-.. _yajl: http://lloyd.github.io/yajl/
-
 
 Inserting Documents in Bulk
 ---------------------------
@@ -294,64 +291,78 @@ the only transaction boundary within CouchDB is a single update to a single
 database. The constraints are detailed in :ref:`api/db/bulk_docs/semantics`.
 
 To insert documents in bulk into a database you need to supply a JSON
-structure with the array of documents that you want to add to the
-database. You can either include a document ID, or allow the document ID to be
+structure with the array of documents that you want to add to the database.
+You can either include a document ID, or allow the document ID to be
 automatically generated.
 
 For example, the following update inserts three new documents, two with the
 supplied document IDs, and one which will have a document ID generated:
 
-.. code-block:: javascript
+.. code-block:: http
 
-    {
-       "docs" : [
+  POST /source/_bulk_docs HTTP/1.1
+  Accept: application/json
+  Content-Length: 323
+  Content-Type: application/json
+  Host: localhost:5984
+
+  {
+      "docs": [
           {
-             "_id" : "FishStew",
-             "servings" : 4,
-             "subtitle" : "Delicious with fresh bread",
-             "title" : "Fish Stew"
+              "_id": "FishStew",
+              "servings": 4,
+              "subtitle": "Delicious with freshly baked bread",
+              "title": "FishStew"
           },
           {
-             "_id" : "LambStew",
-             "servings" : 6,
-             "subtitle" : "Delicious with scone topping",
-             "title" : "Lamb Stew"
+              "_id": "LambStew",
+              "servings": 6,
+              "subtitle": "Serve with a whole meal scone topping",
+              "title": "LambStew"
           },
           {
-             "servings" : 8,
-             "subtitle" : "Delicious with suet dumplings",
-             "title" : "Beef Stew"
-          },
-       ]
-    }
+              "_id": "BeefStew",
+              "servings": 8,
+              "subtitle": "Hand-made dumplings make a great accompaniment",
+              "title": "BeefStew"
+          }
+      ]
+  }
 
 
-The return type from a bulk insertion will be 201, with the content of
-the returned structure indicating specific success or otherwise messages
-on a per-document basis.
+The return type from a bulk insertion will be :statuscode:`201`,
+with the content of the returned structure indicating specific success
+or otherwise messages on a per-document basis.
 
 The return structure from the example above contains a list of the
 documents created, here with the combination and their revision IDs:
 
 .. code-block:: http
 
-    POST http://couchdb:5984/recipes/_bulk_docs
-    Content-Type: application/json
+  HTTP/1.1 201 Created
+  Cache-Control: must-revalidate
+  Content-Length: 215
+  Content-Type: application/json
+  Date: Sat, 26 Oct 2013 00:10:39 GMT
+  Server: CouchDB (Erlang OTP)
 
-    [
-       {
-          "id" : "FishStew",
-          "rev" : "1-9c65296036141e575d32ba9c034dd3ee",
-       },
-       {
-          "id" : "LambStew",
-          "rev" : "1-34c318924a8f327223eed702ddfdc66d",
-       },
-       {
-          "id" : "7f7638c86173eb440b8890839ff35433",
-          "rev" : "1-857c7cbeb6c8dd1dd34a0c73e8da3c44",
-       }
-    ]
+  [
+      {
+          "id": "FishStew",
+          "ok": true,
+          "rev": "1-6a466d5dfda05e613ba97bd737829d67"
+      },
+      {
+          "id": "LambStew",
+          "ok": true,
+          "rev": "1-648f1b989d52b8e43f05aa877092cc7c"
+      },
+      {
+          "id": "BeefStew",
+          "ok": true,
+          "rev": "1-e4602845fc4c99674f50b1d5a804fdfa"
+      }
+  ]
 
 
 The content and structure of the returned JSON will depend on the transaction
@@ -370,62 +381,76 @@ For example, you could send the following request:
 
 .. code-block:: http
 
-    POST http://couchdb:5984/recipes/_bulk_docs
-    Content-Type: application/json
+  POST /recipes/_bulk_docs HTTP/1.1
+  Accept: application/json
+  Content-Length: 464
+  Content-Type: application/json
+  Host: localhost:5984
 
-    {
-       "docs" : [
+  {
+      "docs": [
           {
-             "_id" : "FishStew",
-             "_rev" : "1-9c65296036141e575d32ba9c034dd3ee",
-             "servings" : 4,
-             "subtitle" : "Delicious with freshly baked bread",
-             "title" : "Fish Stew"
+              "_id": "FishStew",
+              "_rev": "1-6a466d5dfda05e613ba97bd737829d67",
+              "servings": 4,
+              "subtitle": "Delicious with freshly baked bread",
+              "title": "FishStew"
           },
           {
-             "_id" : "LambStew",
-             "_rev" : "1-34c318924a8f327223eed702ddfdc66d",
-             "servings" : 6,
-             "subtitle" : "Serve with a wholemeal scone topping",
-             "title" : "Lamb Stew"
+              "_id": "LambStew",
+              "_rev": "1-648f1b989d52b8e43f05aa877092cc7c",
+              "servings": 6,
+              "subtitle": "Serve with a whole meal scone topping",
+              "title": "LambStew"
           },
           {
-             "_id" : "7f7638c86173eb440b8890839ff35433"
-             "_rev" : "1-857c7cbeb6c8dd1dd34a0c73e8da3c44",
-             "servings" : 8,
-             "subtitle" : "Hand-made dumplings make a great accompaniment",
-             "title" : "Beef Stew"
+              "_id": "BeefStew",
+              "_rev": "1-e4602845fc4c99674f50b1d5a804fdfa",
+              "servings": 8,
+              "subtitle": "Hand-made dumplings make a great accompaniment",
+              "title": "BeefStew"
           }
-       ]
-    }
+      ]
+  }
 
 The return structure is the JSON of the updated documents, with the new
 revision and ID information:
 
-.. code-block:: javascript
+.. code-block:: http
 
-    [
-       {
-          "id" : "FishStew",
-          "rev" : "2-e7af4c4e9981d960ecf78605d79b06d1"
-       },
-       {
-          "id" : "LambStew",
-          "rev" : "2-0786321986194c92dd3b57dfbfc741ce"
-       },
-       {
-          "id" : "7f7638c86173eb440b8890839ff35433",
-          "rev" : "2-bdd3bf3563bee516b96885a66c743f8e"
-       }
-    ]
+  HTTP/1.1 201 Created
+  Cache-Control: must-revalidate
+  Content-Length: 215
+  Content-Type: application/json
+  Date: Sat, 26 Oct 2013 00:10:39 GMT
+  Server: CouchDB (Erlang OTP)
+
+  [
+      {
+          "id": "FishStew",
+          "ok": true,
+          "rev": "2-2bff94179917f1dec7cd7f0209066fb8"
+      },
+      {
+          "id": "LambStew",
+          "ok": true,
+          "rev": "2-6a7aae7ac481aa98a2042718d09843c4"
+      },
+      {
+          "id": "BeefStew",
+          "ok": true,
+          "rev": "2-9801936a42f06a16f16c30027980d96f"
+      }
+  ]
+
 
 You can optionally delete documents during a bulk update by adding the
 ``_deleted`` field with a value of ``true`` to each document ID/revision
 combination within the submitted JSON structure.
 
-The return type from a bulk insertion will be :code:`201`, with the content of
-the returned structure indicating specific success or otherwise messages
-on a per-document basis.
+The return type from a bulk insertion will be :statuscode:`201`, with the
+content of the returned structure indicating specific success or otherwise
+messages on a per-document basis.
 
 The content and structure of the returned JSON will depend on the transaction
 semantics being used for the bulk update; see :ref:`api/db/bulk_docs/semantics`
@@ -442,9 +467,9 @@ documents using the bulk documentation system. Each mode affects both
 the state of the documents in the event of system failure, and the level
 of conflict checking performed on each document. The two modes are:
 
--  ``non-atomic``
+-  **non-atomic**
 
-   The default mode is non-atomic, that is, CouchDB will only guarantee
+   The default mode is `non-atomic`, that is, CouchDB will only guarantee
    that some of the documents will be saved when you send the request.
    The response will contain the list of documents successfully inserted
    or updated during the process. In the event of a crash, some of the
@@ -470,7 +495,7 @@ of conflict checking performed on each document. The two modes are:
              "reason" : "Document update conflict."
           },
           {
-             "id" : "7f7638c86173eb440b8890839ff35433",
+             "id" : "BeefStew",
              "error" : "conflict",
              "reason" : "Document update conflict."
           }
@@ -481,9 +506,9 @@ of conflict checking performed on each document. The two modes are:
    submit the document update, with the correct revision tag, to update
    the document.
 
--  ``all-or-nothing``
+-  **all-or-nothing**
 
-   In all-or-nothing mode, either all documents are written to the
+   In `all-or-nothing` mode, either all documents are written to the
    database, or no documents are written to the database, in the event
    of a system failure during commit.
 
@@ -493,22 +518,32 @@ of conflict checking performed on each document. The two modes are:
    The returned structure contains the list of documents with new
    revisions:
 
-   .. code-block:: javascript
+   .. code-block:: http
 
-       [
+      HTTP/1.1 201 Created
+      Cache-Control: must-revalidate
+      Content-Length: 215
+      Content-Type: application/json
+      Date: Sat, 26 Oct 2013 00:13:33 GMT
+      Server: CouchDB (Erlang OTP)
+
+      [
           {
-             "id" : "FishStew",
-             "rev" : "2-e7af4c4e9981d960ecf78605d79b06d1"
+              "id": "FishStew",
+              "ok": true,
+              "rev": "1-6a466d5dfda05e613ba97bd737829d67"
           },
           {
-             "id" : "LambStew",
-             "rev" : "2-0786321986194c92dd3b57dfbfc741ce"
+              "id": "LambStew",
+              "ok": true,
+              "rev": "1-648f1b989d52b8e43f05aa877092cc7c"
           },
           {
-             "id" : "7f7638c86173eb440b8890839ff35433",
-             "rev" : "2-bdd3bf3563bee516b96885a66c743f8e"
+              "id": "BeefStew",
+              "ok": true,
+              "rev": "1-e4602845fc4c99674f50b1d5a804fdfa"
           }
-       ]
+      ]
 
    When updating documents using this mode the revision of a document
    included in views will be arbitrary. You can check the conflict
@@ -545,7 +580,7 @@ summarized below:
 Replication of documents is independent of the type of insert or update.
 The documents and revisions created during a bulk insert or update are
 replicated in the same way as any other document. This can mean that if
-you make use of the all-or-nothing mode the exact list of documents,
+you make use of the `all-or-nothing` mode the exact list of documents,
 revisions (and their conflict state) may or may not be replicated to
 other databases correctly.
 
@@ -565,7 +600,7 @@ database because of an error, you should check the ``error`` field to
 determine error type and course of action. Errors will be one of the
 following type:
 
--  ``conflict``
+-  **conflict**
 
    The document as submitted is in conflict. If you used the default
    bulk transaction mode then the new revision will not have been
@@ -577,23 +612,32 @@ following type:
    is identical to the resolution procedures used when resolving
    conflict errors during replication.
 
--  ``forbidden``
+-  **forbidden**
 
    Entries with this error type indicate that the validation routine
    applied to the document during submission has returned an error.
 
-   For example, if your validation routine includes the following:
+   For example, if your :ref:`validation routine <vdufun>` includes
+   the following:
 
    .. code-block:: javascript
 
         throw({forbidden: 'invalid recipe ingredient'});
 
-   The error returned will be:
+   The error response returned will be:
 
-   .. code-block:: javascript
+   .. code-block:: http
+
+       HTTP/1.1 417 Expectation Failed
+       Cache-Control: must-revalidate
+       Content-Length: 120
+       Content-Type: application/json
+       Date: Sat, 26 Oct 2013 00:05:17 GMT
+       Server: CouchDB (Erlang OTP)
 
        {
-          "id" : "7f7638c86173eb440b8890839ff35433",
-          "error" : "forbidden",
-          "reason" : "invalid recipe ingredient"
+           "error": "forbidden",
+           "id": "LambStew",
+           "reason": "invalid recipe ingredient",
+           "rev": "1-34c318924a8f327223eed702ddfdc66d"
        }
