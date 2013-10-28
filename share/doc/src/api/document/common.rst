@@ -842,7 +842,7 @@ The returned JSON structure includes the original document, including a
 ``_revisions`` structure that includes the revision information in next form:
 
 - **ids** (*array*): Array of valid revision IDs, in reverse order
-    (latest first)
+  (latest first)
 - **start** (*number*): Prefix number for the latest revision
 
 
