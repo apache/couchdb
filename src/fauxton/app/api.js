@@ -226,6 +226,43 @@ function(app, Fauxton) {
     this.addEvents();
   };
 
+  var broadcaster = {};
+  _.extend(broadcaster, Backbone.Events);
+
+  FauxtonAPI.RouteObject.on = function (eventName, fn) {
+    broadcaster.on(eventName, fn); 
+  };
+  
+  /* How Route Object events work
+   To listen to a specific route objects events:
+
+   myRouteObject = FauxtonAPI.RouteObject.extend({
+    events: {
+      "beforeRender": "beforeRenderEvent"
+    },
+
+    beforeRenderEvent: function (view, selector) {
+      console.log('Hey, beforeRenderEvent triggered',arguments);
+    },
+   });
+
+    It is also possible to listen to events triggered from all Routeobjects. 
+    This is great for more general things like adding loaders, hooks.
+
+    FauxtonAPI.RouteObject.on('beforeRender', function (routeObject, view, selector) {
+      console.log('hey, this will trigger when any routeobject renders a view');
+    });
+
+   Current Events to subscribe to:
+    * beforeFullRender -- before a full render is being done
+    * beforeEstablish -- before the routeobject calls establish
+    * AfterEstablish -- after the routeobject has run establish
+    * beforeRender -- before a view is rendered
+    * afterRender -- a view is finished being rendered
+    * renderComplete -- all rendering is complete
+    
+  */
+
   // Piggy-back on Backbone's self-propagating extend function
   FauxtonAPI.RouteObject.extend = Backbone.Model.extend;
 
@@ -249,15 +286,14 @@ function(app, Fauxton) {
   }, {
 
     renderWith: function(route, masterLayout, args) {
-      var routeObject = this;
-
-      // TODO: Can look at replacing this with events eg beforeRender, afterRender function and events
-      this.route.call(this, route, args);
+      var routeObject = this,
+          triggerBroadcast = _.bind(this.triggerBroadcast, this);
 
       // Only want to redo the template if its a full render
       if (!this.renderedState) {
         masterLayout.setTemplate(this.layout);
-          $('#primary-navbar li').removeClass('active');
+        triggerBroadcast('beforeFullRender');
+        $('#primary-navbar li').removeClass('active');
 
         if (this.selectedHeader) {
           app.selectedHeader = this.selectedHeader;
@@ -274,61 +310,18 @@ function(app, Fauxton) {
         }));
       }
 
-       if (!this.disableLoader){ 
-         var opts = {
-           lines: 16, // The number of lines to draw
-           length: 8, // The length of each line
-           width: 4, // The line thickness
-           radius: 12, // The radius of the inner circle
-           color: '#aaa', // #rbg or #rrggbb
-           speed: 1, // Rounds per second
-           trail: 10, // Afterglow percentage
-           shadow: false // Whether to render a shadow
-         };
-
-         if (!$('.spinner').length) {
-           $('<div class="spinner"></div>')
-            .appendTo('#app-container');
-         }
-
-         var routeObjectSpinner = new Spinner(opts).spin();
-         $('.spinner').append(routeObjectSpinner.el);
-       }
-
+      triggerBroadcast('beforeEstablish');
       FauxtonAPI.when(this.establish()).then(function(resp) {
+        triggerBroadcast('afterEstablish');
         _.each(routeObject.getViews(), function(view, selector) {
           if(view.hasRendered) { return; }
 
-          if (!routeObject.disableLoader) {
-            routeObjectSpinner.stop();
-            $('.spinner').remove();
-          }
-
-          if (!view.disableLoader){ 
-            var opts = {
-              lines: 16, // The number of lines to draw
-              length: 8, // The length of each line
-              width: 4, // The line thickness
-              radius: 12, // The radius of the inner circle
-              color: '#ccc', // #rbg or #rrggbb
-              speed: 1, // Rounds per second
-              trail: 10, // Afterglow percentage
-              shadow: false // Whether to render a shadow
-            };
-            var viewSpinner = new Spinner(opts).spin();
-            $('<div class="spinner"></div>')
-              .appendTo(selector)
-              .append(viewSpinner.el);
-          }
-          
+          triggerBroadcast('beforeRender', view, selector);
           FauxtonAPI.when(view.establish()).then(function(resp) {
             masterLayout.setView(selector, view);
 
-            if (!view.disableLoader){
-              viewSpinner.stop();
-            }
-
             masterLayout.renderView(selector);
+            triggerBroadcast('afterRender', view, selector);
             }, function(resp) {
               view.establishError = {
                 error: true,
@@ -346,14 +339,14 @@ function(app, Fauxton) {
               masterLayout.renderView(selector);
           });
 
-          var hooks = masterLayout.hooks[selector];
+          /*var hooks = masterLayout.hooks[selector];
           var boundRoute = route;
 
           _.each(hooks, function(hook){
             if (_.any(hook.routes, function(route){return route == boundRoute;})){
               hook.callback(view);
             }
-          });
+          });*/
         });
       }.bind(this), function (resp) {
           if (!resp) { return; }
@@ -371,6 +364,15 @@ function(app, Fauxton) {
 
       // Track that we've done a full initial render
       this.renderedState = true;
+      triggerBroadcast('renderComplete');
+    },
+
+    triggerBroadcast: function (eventName) {
+      var args = Array.prototype.slice.call(arguments);
+      this.trigger.apply(this, args);
+
+      args.splice(0,1, eventName, this);
+      broadcaster.trigger.apply(broadcaster, args);
     },
 
     get: function(key) {
@@ -450,6 +452,63 @@ function(app, Fauxton) {
       return this.roles;
     }
 
+  });
+
+  // We could look at moving the spinner code out to its own module
+  var routeObjectSpinner;
+  FauxtonAPI.RouteObject.on('beforeEstablish', function (routeObject) {
+    if (!routeObject.disableLoader){ 
+      var opts = {
+        lines: 16, // The number of lines to draw
+        length: 8, // The length of each line
+        width: 4, // The line thickness
+        radius: 12, // The radius of the inner circle
+        color: '#aaa', // #rbg or #rrggbb
+        speed: 1, // Rounds per second
+        trail: 10, // Afterglow percentage
+        shadow: false // Whether to render a shadow
+     };
+
+     if (!$('.spinner').length) {
+       $('<div class="spinner"></div>')
+        .appendTo('#app-container');
+     }
+
+     routeObjectSpinner = new Spinner(opts).spin();
+     $('.spinner').append(routeObjectSpinner.el);
+   }
+  });
+
+  var viewSpinner;
+  FauxtonAPI.RouteObject.on('beforeRender', function (routeObject, view, selector) {
+    if (!routeObject.disableLoader) {
+      routeObjectSpinner.stop();
+      $('.spinner').remove();
+    }
+
+    if (!view.disableLoader){ 
+      var opts = {
+        lines: 16, // The number of lines to draw
+        length: 8, // The length of each line
+        width: 4, // The line thickness
+        radius: 12, // The radius of the inner circle
+        color: '#ccc', // #rbg or #rrggbb
+        speed: 1, // Rounds per second
+        trail: 10, // Afterglow percentage
+        shadow: false // Whether to render a shadow
+      };
+
+      viewSpinner = new Spinner(opts).spin();
+      $('<div class="spinner"></div>')
+        .appendTo(selector)
+        .append(viewSpinner.el);
+    }
+  });
+
+  FauxtonAPI.RouteObject.on('afterRender', function (routeObject, view, selector) {
+    if (!view.disableLoader){
+      viewSpinner.stop();
+    }
   });
 
   var extensions = _.extend({}, Backbone.Events);
