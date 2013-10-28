@@ -683,7 +683,6 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
 
       this.insertView('#documents-pagination', this.pagination);
       var docs = this.expandDocs ? this.collection : this.collection.simple();
-      console.log('docs', docs);
 
       docs.each(function(doc) {
         this.rows[doc.id] = this.insertView("table.all-docs tbody", new this.nestedView({
@@ -1633,18 +1632,16 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
   Views.Sidebar = FauxtonAPI.View.extend({
     template: "templates/documents/sidebar",
     events: {
-      "click a.new#index": "newIndex",
       "click button#delete-database": "deleteDatabase"
     },
 
     initialize: function(options) {
       this.database = options.database;
+      this.showNewView = true;
       if (options.ddocInfo) {
         this.ddocID = options.ddocInfo.id;
         this.currView = options.ddocInfo.currView;
       }
-      // this.listenTo(this.collection, "add", this.render);
-      // this.listenTo(this.collection, "remove", this.render);
     },
 
     deleteDatabase: function (event) {
@@ -1674,34 +1671,14 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
         changes_url: '#' + this.database.url('changes'),
         permissions_url: '#' + this.database.url('app') + '/permissions',
         db_url: '#' + this.database.url('index') + '?limit=100',
-        index: [1,2,3],
-        view: [1,2],
         database: this.collection.database,
         database_url: '#' + this.database.url('app'), 
-        docLinks: docLinks
+        docLinks: docLinks,
+        showNewView: this.showNewView
       };
     },
 
-    newIndex:  function(event){
-      event.preventDefault();
-      $.contribute(
-        'Create a new view.',
-        'app/addons/documents/views.js'
-      );
-    },
-
-    toggleView: function(event){
-      event.preventDefault();
-      $.contribute(
-        'Filter data by type or view',
-        'app/addons/databases/views.js'
-      );
-      url = event.currentTarget.href.split('#')[1];
-      app.router.navigate(url);
-    },
-
     buildIndexList: function(collection, selector, design){
-
       _.each(_.keys(collection), function(key){
         var selected = this.ddocID == "_design/"+design;
         this.insertView("ul.nav." + selector, new Views.IndexItem({
@@ -1734,8 +1711,15 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
       this.selectedTab = selectedTab;
       this.$('li').removeClass('active');
       this.$('#' + selectedTab).parent().addClass('active');
-    }
+    },
 
+    toggleNewView: function (show) {
+      // only render if there is a change
+      if (show !== this.showNewView) {
+        this.showNewView = show;
+        this.render();
+      }
+    },
   });
 
   Views.Indexed = FauxtonAPI.View.extend({});

@@ -43,9 +43,11 @@ the License.
            <li>
             <a id="doc" href="#<%= database.url('app') %>/new">New doc</a>
           </li>
-          <li>
-            <a href="#<%= database.url('app') %>/new_view">New view</a>
-          </li>
+          <% if (showNewView) { %>
+            <li>
+              <a href="#<%= database.url('app') %>/new_view">New view</a>
+            </li>
+          <% } %>
         </ul>
       </div>
     </div>
@@ -62,7 +64,9 @@ the License.
     </ul>
     <ul class="nav nav-list views">
       <li class="nav-header">Secondary Indices</li>
-      <li><a id="new-view" href="#<%= database.url('app') %>/new_view" class="new"><i class="icon-plus"></i> New</a></li>
+      <% if (showNewView) { %>
+        <li><a id="new-view" href="#<%= database.url('app') %>/new_view" class="new"><i class="icon-plus"></i> New</a></li>
+        <% } %>
     </ul>
   </nav>
 </div>
