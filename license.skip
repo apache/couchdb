@@ -143,6 +143,7 @@
 ^src/fauxton/test/mocha/sinon.js
 ^src/fauxton/test/mocha/sinon-chai.js
 ^src/fauxton/tasks/addon/rename.json
+^src/fauxton/assets/lib/ace/.*
 ^src/ibrowse/.*
 ^src/mochiweb/.*
 ^src/my-first-couchdb-plugin/priv/*/*

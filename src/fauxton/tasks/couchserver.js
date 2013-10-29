@@ -78,7 +78,9 @@ module.exports = function (grunt) {
               log.writeln('ERROR', filePath, err);
             }
 
-            res.end(err.message);
+            res.setHeader("Content-Type", "text/javascript");
+            res.statusCode = 404;
+            res.end(JSON.stringify({error: err.message}));
           })
           .pipe(res);
       } 

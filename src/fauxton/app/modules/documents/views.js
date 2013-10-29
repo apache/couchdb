@@ -20,17 +20,14 @@ define([
        "modules/pouchdb/base",
 
        // Libs
-       "codemirror",
-       "jshint",
        "resizeColumns",
 
        // Plugins
-       "plugins/codemirror-javascript",
        "plugins/prettify"
 
 ],
 
-function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, resizeColumns) {
+function(app, FauxtonAPI, Components, Documents, pouchdb, resizeColumns) {
   var Views = {};
 
   Views.Tabs = FauxtonAPI.View.extend({
@@ -708,6 +705,7 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
     disableLoader: true,
     initialize: function (options) {
       this.database = options.database;
+      _.bindAll(this);
     },
     goback: function(){
       window.history.back();
@@ -849,6 +847,7 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
       }
 
       json = JSON.parse(this.editor.getValue());
+
       this.model.set(json, {validate: true});
       if (this.model.validationError) {
         return false;
@@ -858,32 +857,8 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
     },
 
     hasValidCode: function() {
-      return JSHINT(this.editor.getValue()) !== false;
-    },
-
-    runJSHint: function() {
-      var json = this.editor.getValue();
-      var output = JSHint(json);
-
-      // Clear existing markers
-      for (var i = 0, l = this.editor.lineCount(); i < l; i++) {
-        this.editor.clearMarker(i);
-      }
-
-      if (output === false) {
-        _.map(JSHint.errors, function(error) {
-          var line = error.line - 1;
-          var className = "view-code-error-line-" + line;
-          this.editor.setMarker(line, "●", "view-code-error "+className);
-
-          setTimeout(function() {
-            $(".CodeMirror ."+className).tooltip({
-              title: "ERROR: " + error.reason,
-              container: 'body'
-            });
-          }, 0);
-        }, this);
-      }
+      var errors = this.editor.getAnnotations();
+      return errors.length === 0;
     },
 
     serialize: function() {
@@ -909,30 +884,21 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
     },
 
     afterRender: function() {
-      this.model.on("sync", this.updateValues, this);
-      var that = this;
-      if ($('.CodeMirror').length > 0){
-        $('.CodeMirror').remove();
-      }
-      this.editor = Codemirror.fromTextArea(this.$el.find("textarea.doc-code").get()[0], {
-        mode: "application/json",
-        json: false,
-        lineNumbers: true,
-        matchBrackets: true,
-        lineWrapping: true,
-        onChange: function() {
-          try {
-            that.runJSHint();
-          } catch (e) {
-            console.log('ERROR for jshint',e);
-          }
-        },
-        extraKeys: {
-          "Ctrl-S": function(instance) { that.saveDoc(); },
-          "Ctrl-/": "undo"
-        }
+      var saveDoc = this.saveDoc;
+
+      this.editor = new Components.Editor({
+        editorId: "editor-container",
+        commands: [{
+          name: 'save',
+          bindKey: {win: 'Ctrl-S',  mac: 'Ctrl-S'},
+          exec: function(editor) {
+            saveDoc();
+          },
+          readOnly: true // false if this command should not apply in readOnly mode
+        }]
       });
-      setTimeout(function(){that.editor.setSize(null,$('#dashboard').outerHeight()-295);},200);
+      this.editor.render();
+      this.model.on("sync", this.updateValues, this);
     }
   });
 
@@ -1244,6 +1210,7 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
       var $ele = $("#reduce-function-selector");
       var $reduceContainer = $(".control-group.reduce-function");
       if ($ele.val() == "CUSTOM") {
+        this.createReduceEditor();
         $reduceContainer.show();
       } else {
         $reduceContainer.hide();
@@ -1334,42 +1301,6 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
       }
     },
 
-    updateView: function(event, paramInfo) {
-      event.preventDefault();
-
-      if (this.newView) { return alert('Please save this new view before querying it.'); }
-
-      var errorParams = paramInfo.errorParams,
-          params = paramInfo.params;
-
-      if (_.any(errorParams)) {
-        _.map(errorParams, function(param) {
-
-          // TODO: Where to add this error?
-          // bootstrap wants the error on a control-group div, but we're not using that
-          //$('form.view-query-update input[name='+param+'], form.view-query-update select[name='+param+']').addClass('error');
-          return FauxtonAPI.addNotification({
-            msg: "JSON Parse Error on field: "+param.name,
-            type: "error",
-            selector: ".advanced-options .errors-container"
-          });
-        });
-        FauxtonAPI.addNotification({
-          msg: "Make sure that strings are properly quoted and any other values are valid JSON structures",
-          type: "warning",
-          selector: ".advanced-options .errors-container"
-        });
-
-        return false;
-      }
-
-      var fragment = window.location.hash.replace(/\?.*$/, '');
-      fragment = fragment + '?' + $.param(params);
-      FauxtonAPI.navigate(fragment, {trigger: false});
-
-      FauxtonAPI.triggerRouteEvent('updateAllDocs', {ddoc: this.ddocID, view: this.viewName});
-    },
-
     previewView: function(event, paramsInfo) {
       var that = this,
       mapVal = this.mapEditor.getValue(),
@@ -1433,46 +1364,13 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
     hasValidCode: function() {
       return _.every(["mapEditor", "reduceEditor"], function(editorName) {
         var editor = this[editorName];
-        if (editorName == "reduceEditor" && ! this.isCustomReduceEnabled()) {
+        if (editorName === "reduceEditor" && ! this.isCustomReduceEnabled()) {
           return true;
-        } else if (JSHINT(editor.getValue()) !== false) {
-          return true;
-        } else {
-          // By default CouchDB view functions don't pass lint
-          return _.every(JSHINT.errors, function(error) {
-            return FauxtonAPI.isIgnorableError(error.raw);
-          });
-        }
+        } 
+        return editor.hadValidCode();
       }, this);
     },
 
-    runJSHint: function(editorName) {
-      var editor = this[editorName];
-      var json = editor.getValue();
-      var output = JSHint(json);
-
-      // Clear existing markers
-      for (var i = 0, l = editor.lineCount(); i < l; i++) {
-        editor.clearMarker(i);
-      }
-
-      if (output === false) {
-        _.map(JSHint.errors, function(error) {
-          // By default CouchDB view functions don't pass lint
-          if (FauxtonAPI.isIgnorableError(error.reason)) return true;
-
-          var line = error.line - 1;
-          var className = "view-code-error-line-" + line;
-          editor.setMarker(line, "●", "view-code-error "+className);
-
-          setTimeout(function() {
-            $(".CodeMirror ."+className).tooltip({
-              title: "ERROR: " + error.reason
-            });
-          }, 0);
-        }, this);
-      }
-    },
     toggleIndexNav: function (event) {
       var $index = this.$('#index'),
           $targetId = this.$(event.target).attr('id');
@@ -1480,6 +1378,7 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
       if ($targetId === 'index-nav') {
         if (this.newView) { return; }
         $index.toggle('slow');
+        this.showEditors();
       } else {
         $index.removeAttr('style');
       }
@@ -1501,6 +1400,19 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
 
     hasCustomReduce: function() {
       return this.reduceFunStr && ! _.contains(this.builtinReduces, this.reduceFunStr);
+    },
+
+    createReduceEditor: function () {
+      if (this.reduceEditor) {
+        this.reduceEditor.remove();
+      }
+
+      this.reduceEditor = new Components.Editor({
+        editorId: "reduce-function",
+        mode: "javascript",
+        couchJSHINT: true
+      });
+      this.reduceEditor.render();
     },
 
     beforeRender: function () {
@@ -1535,71 +1447,37 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, Codemirror, JSHint, re
     },
 
     afterRender: function() {
-      var that = this, 
-          mapFun = this.$("#map-function"),
-          reduceFun = this.$("#reduce-function");
-
-      if (this.newView) {
-        mapFun.val(this.langTemplates[this.defaultLang].map);
-        reduceFun.val(this.langTemplates[this.defaultLang].reduce);
-      } else {
-        setTimeout(function(){this.$('#index').hide();}, 300);
-        this.$('#index-nav').parent().removeClass('active');
-      }
-
-      this.designDocSelector.updateDesignDoc();
-      // This is a hack around a bug in backbone.layoutmanager with grunt dev
-      // When in grunt dev mode we load templates asynchronously
-      // and this can cause a double render which then gives us two 
-      // mapeditors
-      if (this.mapViewSet) { return;}
-      this.mapViewSet = true;
-
-      this.mapEditor = Codemirror.fromTextArea(mapFun.get()[0], {
-        mode: "javascript",
-        lineNumbers: true,
-        matchBrackets: true,
-        lineWrapping: true,
-        onChange: function() {
-          try {
-            that.runJSHint("mapEditor");
-          } catch (e) {
-            console.log('ERROR for jshint',e);
-          }
-        },
-        extraKeys: {
-          "Ctrl-S": function(instance) { that.saveView(); },
-          "Ctrl-/": "undo"
-        }
-      });
-      this.reduceEditor = Codemirror.fromTextArea(reduceFun.get()[0], {
-        mode: "javascript",
-        lineNumbers: true,
-        matchBrackets: true,
-        lineWrapping: true,
-        onChange: function() {
-          try {
-            that.runJSHint("reduceEditor");
-          } catch (e) {
-            console.log('ERROR for jshint',e);
-          }
-        },
-        extraKeys: {
-          "Ctrl-S": function(instance) { that.saveView(); },
-          "Ctrl-/": "undo"
-        }
-      });
-      // HACK: this should be in the html
-      // but CodeMirror's head explodes and it won't set the hight properly.
-      // So render it first, set the editor, then hide.
-      if ( ! this.hasCustomReduce()) {
-        $(".control-group.reduce-function").hide();
-      }
-
       if (this.params) {
         this.advancedOptions.updateFromParams(this.params);
       }
 
+      this.designDocSelector.updateDesignDoc();
+      if (this.newView) {
+        this.showEditors();
+      } else {
+        this.$('#index').hide();
+        this.$('#index-nav').parent().removeClass('active');
+      }
+    },
+
+    showEditors: function () {
+      this.mapEditor = new Components.Editor({
+        editorId: "map-function",
+        mode: "javascript",
+        couchJSHINT: true
+      });
+      this.mapEditor.render();
+
+      if (this.hasCustomReduce()) {
+        this.createReduceEditor();
+      } else {
+        $(".control-group.reduce-function").hide();
+      }
+
+      if (this.newView) {
+        this.mapEditor.setValue(this.langTemplates[this.defaultLang].map);
+        this.reduceEditor.setValue(this.langTemplates[this.defaultLang].reduce);
+      } 
     }
   });
 
