@@ -35,6 +35,14 @@
 
 -include("mem3.hrl").
 
+-record (gacc, {
+    node,
+    targets,
+    moves,
+    limit,
+    target_level
+}).
+
 %% @equiv expand(1000)
 -spec expand() -> [{atom(), #shard{}, node()}].
 expand() ->
@@ -137,11 +145,15 @@ global_expand(TargetNodes0, LocalOps, Limit) ->
             Acc;
         ({Node0, Count}, Acc) ->
             Node = list_to_existing_atom(binary_to_list(Node0)),
-            % Compute the max number of shards to donate.
-            DC0 = erlang:min(Count - TargetLevel, Limit - length(Acc)),
-            InternalAcc0 = {Node, TargetNodes0, Acc, DC0},
+            InternalAcc0 = #gacc{
+                node = Node,
+                targets = TargetNodes0,
+                moves = Acc,
+                limit = erlang:min(Count - TargetLevel, Limit - length(Acc)),
+                target_level = TargetLevel
+            },
             try mem3_shards:fold(fun donate_fold/2, InternalAcc0) of
-                {_, _, Moves, _} ->
+                #gacc{moves = Moves} ->
                     Moves
             catch
                 {complete, Moves} ->
@@ -150,9 +162,15 @@ global_expand(TargetNodes0, LocalOps, Limit) ->
     end,
     lists:foldl(FoldFun, LocalOps, CountByNode).
 
-donate_fold(_Shard, {_, _, Moves, 0}) ->
+donate_fold(_Shard, #gacc{limit = 0, moves = Moves}) ->
     throw({complete, Moves});
-donate_fold(#shard{node = Node} = Shard, {Node, Nodes, Moves, DC}) ->
+donate_fold(#shard{node = Node} = Shard, #gacc{node = Node} = Acc0) ->
+     #gacc{
+        targets = Nodes,
+        moves = Moves,
+        limit = DC,
+        target_level = TargetLevel
+    } = Acc0,
     Zone = mem3:node_info(Node, <<"zone">>),
     Shards = apply_shard_moves(mem3:shards(Shard#shard.dbname), Moves),
     InZone = filter_map_by_zone(shards_by_node(Shards, Nodes), Zone),
@@ -162,21 +180,27 @@ donate_fold(#shard{node = Node} = Shard, {Node, Nodes, Moves, DC}) ->
     end, SortedByCount),
     case {lists:member(Shard, Shards), Candidates} of
         {false, _} ->
-            {Node, Nodes, Moves, DC};
+            Acc0;
         {true, []} ->
-            {Node, Nodes, Moves, DC};
+            Acc0;
         {true, [{Node, _} | _]} ->
-            {Node, Nodes, Moves, DC};
+            Acc0;
         {true, [{Target, _} | _]} ->
             % Execute the move only if the target has fewer shards for this DB
             % than the source. Otherwise we'd generate a local imbalance.
             SourceCount = get_shard_count(Node, SortedByCount),
             TargetCount = get_shard_count(Target, SortedByCount),
-            if TargetCount < SourceCount ->
+            % Execute the move only if the target needs shards.
+            NodeKey = couch_util:to_binary(Target),
+            Total = couch_util:get_value(NodeKey, shard_count_by_node(Moves)),
+            if (TargetCount < SourceCount), (Total < TargetLevel) ->
                 print({move, Shard, Target}),
-                {Node, Nodes, [{move, Shard, Target} | Moves], DC - 1};
+                Acc0#gacc{
+                    moves = [{move, Shard, Target} | Moves],
+                    limit = DC - 1
+                };
             true ->
-                {Node, Nodes, Moves, DC}
+                Acc0
             end
     end;
 donate_fold(_Shard, Acc) ->
