@@ -40,8 +40,12 @@
 expand() ->
     expand(1000).
 
+%% @doc Expands a cluster without requiring each DB to be optimally balanced.
+-spec expand(integer() | global) -> [{atom(), #shard{}, node()}].
+expand(global) ->
+    global_expand(surviving_nodes(), [], 1000);
+
 %% @doc Expands all databases in the cluster, stopping at Limit operations.
--spec expand(integer()) -> [{atom(), #shard{}, node()}].
 expand(Limit) when is_integer(Limit), Limit > 0 ->
     TargetNodes = surviving_nodes(),
     LocalBalanceFun = fun(Db, Moves) -> expand(Db, TargetNodes, Moves) end,
