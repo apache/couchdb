@@ -175,33 +175,40 @@ donate_fold(#shard{node = Node} = Shard, #gacc{node = Node} = Acc0) ->
     Shards = apply_shard_moves(mem3:shards(Shard#shard.dbname), Moves),
     InZone = filter_map_by_zone(shards_by_node(Shards, Nodes), Zone),
     SortedByCount = lists:sort(smallest_first(Moves), InZone),
-    Candidates = lists:dropwhile(fun({_Node, OwnShards}) ->
-        lists:keymember(Shard#shard.range, #shard.range, OwnShards)
-    end, SortedByCount),
-    case {lists:member(Shard, Shards), Candidates} of
+    SourceCount = get_shard_count(Node, SortedByCount),
+    Fun = fun({CandidateNode, OwnShards}) ->
+        HasRange = lists:keymember(Shard#shard.range, #shard.range, OwnShards),
+        TargetCount = get_shard_count(CandidateNode, SortedByCount),
+        NodeKey = couch_util:to_binary(CandidateNode),
+        Total = couch_util:get_value(NodeKey, shard_count_by_node(Moves)),
+        if
+            CandidateNode =:= Node ->
+                % Can't move a shard to ourselves
+                true;
+            HasRange ->
+                % The candidate already has this shard
+                true;
+            TargetCount >= SourceCount ->
+                % Executing this move would create a local imbalance in the DB
+                true;
+            Total >= TargetLevel ->
+                % The candidate has already achieved the target level
+                true;
+            true ->
+                false
+        end
+    end,
+    case {lists:member(Shard, Shards), lists:dropwhile(Fun, SortedByCount)} of
         {false, _} ->
             Acc0;
         {true, []} ->
             Acc0;
-        {true, [{Node, _} | _]} ->
-            Acc0;
         {true, [{Target, _} | _]} ->
-            % Execute the move only if the target has fewer shards for this DB
-            % than the source. Otherwise we'd generate a local imbalance.
-            SourceCount = get_shard_count(Node, SortedByCount),
-            TargetCount = get_shard_count(Target, SortedByCount),
-            % Execute the move only if the target needs shards.
-            NodeKey = couch_util:to_binary(Target),
-            Total = couch_util:get_value(NodeKey, shard_count_by_node(Moves)),
-            if (TargetCount < SourceCount), (Total < TargetLevel) ->
-                print({move, Shard, Target}),
-                Acc0#gacc{
-                    moves = [{move, Shard, Target} | Moves],
-                    limit = DC - 1
-                };
-            true ->
-                Acc0
-            end
+            print({move, Shard, Target}),
+            Acc0#gacc{
+                moves = [{move, Shard, Target} | Moves],
+                limit = DC - 1
+            }
     end;
 donate_fold(_Shard, Acc) ->
     Acc.
