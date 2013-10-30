@@ -481,7 +481,7 @@ print({Op, Shard, TargetNode} = Operation) ->
     ),
     {match, [Range, Account, DbName]} = re:run(
         Shard#shard.name,
-        "shards/(?<range>[0-9a-f\-]+)/(?<account>.+)/(?<dbname>[a-z][a-z0-9\\_\\$()\\+\\-\\/]+)\.[0-9]{8}",
+        "shards/(?<range>[0-9a-f\-]+)/(?<account>.+)/(?<dbname>[a-z\\_][a-z0-9\\_\\$()\\+\\-\\/]+)\.[0-9]{8}",
         [{capture, all_but_first, binary}]
     ),
     OpName = case Op of move -> move2; _ -> Op end,
