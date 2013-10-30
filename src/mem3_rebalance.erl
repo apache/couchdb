@@ -138,8 +138,8 @@ global_expand(TargetNodes0, LocalOps, Limit) ->
         ({Node0, Count}, Acc) ->
             Node = list_to_existing_atom(binary_to_list(Node0)),
             % Compute the max number of shards to donate.
-            DC0 = erlang:max(Count - TargetLevel, Limit - length(Acc)),
-            InternalAcc0 = {Node, TargetNodes, Acc, DC0},
+            DC0 = erlang:min(Count - TargetLevel, Limit - length(Acc)),
+            InternalAcc0 = {Node, TargetNodes0, Acc, DC0},
             try mem3_shards:fold(fun donate_fold/2, InternalAcc0) of
                 {_, _, Moves, _} ->
                     Moves
