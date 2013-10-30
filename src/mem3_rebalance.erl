@@ -135,7 +135,7 @@ global_expand(TargetNodes0, LocalOps, Limit) ->
         lists:member(Node, TargetNodes)
     end, shard_count_by_node(LocalOps)),
     TotalCount = lists:foldl(fun({_, C}, Sum) -> Sum + C end, 0, CountByNode),
-    TargetLevel = (TotalCount div length(TargetNodes)) + 1,
+    TargetLevel = TotalCount div length(TargetNodes),
     FoldFun = fun
         (_, Acc) when length(Acc) >= Limit ->
             % We've already accumulated the max number of shard ops.
@@ -176,11 +176,12 @@ donate_fold(#shard{node = Node} = Shard, #gacc{node = Node} = Acc0) ->
     InZone = filter_map_by_zone(shards_by_node(Shards, Nodes), Zone),
     SortedByCount = lists:sort(smallest_first(Moves), InZone),
     SourceCount = get_shard_count(Node, SortedByCount),
+    GlobalShardCounts = shard_count_by_node(Moves),
+    TotalSource = get_global_shard_count(Node, GlobalShardCounts),
     Fun = fun({CandidateNode, OwnShards}) ->
         HasRange = lists:keymember(Shard#shard.range, #shard.range, OwnShards),
         TargetCount = get_shard_count(CandidateNode, SortedByCount),
-        NodeKey = couch_util:to_binary(CandidateNode),
-        Total = couch_util:get_value(NodeKey, shard_count_by_node(Moves)),
+        TotalTarget = get_global_shard_count(CandidateNode, GlobalShardCounts),
         if
             CandidateNode =:= Node ->
                 % Can't move a shard to ourselves
@@ -191,8 +192,11 @@ donate_fold(#shard{node = Node} = Shard, #gacc{node = Node} = Acc0) ->
             TargetCount >= SourceCount ->
                 % Executing this move would create a local imbalance in the DB
                 true;
-            Total >= TargetLevel ->
-                % The candidate has already achieved the target level
+            TotalTarget > TargetLevel ->
+                % The candidate has already exceeded the target level
+                true;
+            (TotalSource - TotalTarget) < 2 ->
+                % Donating here is wasted work
                 true;
             true ->
                 false
@@ -215,6 +219,11 @@ donate_fold(_Shard, Acc) ->
 
 get_shard_count(AtomKey, ShardsByNode) when is_atom(AtomKey) ->
     length(couch_util:get_value(AtomKey, ShardsByNode, [])).
+
+get_global_shard_count(Node, Counts) when is_atom(Node) ->
+    get_global_shard_count(couch_util:to_binary(Node), Counts);
+get_global_shard_count(Node, Counts) when is_binary(Node) ->
+    couch_util:get_value(Node, Counts, 0).
 
 compute_moves(IdealZoning, IdealZoning, _Copies, OtherMoves) ->
     OtherMoves;
@@ -330,8 +339,8 @@ smallest_first(PrevMoves) ->
     fun(A, B) -> sort_by_count(A, B, Global) =< 0 end.
 
 sort_by_count({NodeA, SA}, {NodeB, SB}, Global) when length(SA) =:= length(SB) ->
-    CountA = couch_util:get_value(couch_util:to_binary(NodeA), Global, 0),
-    CountB = couch_util:get_value(couch_util:to_binary(NodeB), Global, 0),
+    CountA = get_global_shard_count(NodeA, Global),
+    CountB = get_global_shard_count(NodeB, Global),
     cmp(CountA, CountB);
 sort_by_count({_, A}, {_, B}, _) ->
     cmp(length(A), length(B)).
