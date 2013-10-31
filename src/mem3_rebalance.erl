@@ -51,10 +51,14 @@ expand() ->
 %% @doc Expands a cluster without requiring each DB to be optimally balanced.
 -spec expand(integer() | global) -> [{atom(), #shard{}, node()}].
 expand(global) ->
+    {ok, FD} = file:open("/tmp/rebalance_plan.txt", [write]),
+    erlang:put(fd, FD),
     global_expand(surviving_nodes(), [], 1000);
 
 %% @doc Expands all databases in the cluster, stopping at Limit operations.
 expand(Limit) when is_integer(Limit), Limit > 0 ->
+    {ok, FD} = file:open("/tmp/rebalance_plan.txt", [write]),
+    erlang:put(fd, FD),
     TargetNodes = surviving_nodes(),
     LocalBalanceFun = fun(Db, Moves) -> expand(Db, TargetNodes, Moves) end,
     LocalBalanceOps = apply_to_cluster(LocalBalanceFun, Limit),
@@ -85,6 +89,8 @@ contract() ->
 %% @doc Computes a plan to remove up to Limit shards from nodes in "decom" zone.
 -spec contract(integer()) -> [{atom(), #shard{}, node()}].
 contract(Limit) when is_integer(Limit), Limit > 0 ->
+    {ok, FD} = file:open("/tmp/rebalance_plan.txt", [write]),
+    erlang:put(fd, FD),
     TargetNodes = surviving_nodes(),
     apply_to_cluster(fun(Db, Moves) -> contract(Db, TargetNodes, Moves) end, Limit);
 
@@ -111,6 +117,8 @@ fix_zoning() ->
 %%      levels and improper zoning.
 -spec fix_zoning(integer()) -> [{atom(), #shard{}, node()}].
 fix_zoning(Limit) when is_integer(Limit), Limit > 0 ->
+    {ok, FD} = file:open("/tmp/rebalance_plan.txt", [write]),
+    erlang:put(fd, FD),
     apply_to_cluster(fun fix_zoning/2, Limit);
 
 fix_zoning(DbName) when is_binary(DbName); is_list(DbName) ->
@@ -485,8 +493,14 @@ print({Op, Shard, TargetNode} = Operation) ->
         [{capture, all_but_first, binary}]
     ),
     OpName = case Op of move -> move2; _ -> Op end,
-    io:format("clou shard ~s ~s ~s ~s ~s ~s ~s~n", [OpName, Cluster, Account, DbName,
-         Range, SourceId, TargetId]),
+    case get(fd) of
+        undefined ->
+            io:format("clou shard ~s ~s ~s ~s ~s ~s ~s~n", [OpName,
+                 Cluster, Account, DbName, Range, SourceId, TargetId]);
+        FD ->
+            io:format(FD, "clou shard ~s ~s ~s ~s ~s ~s ~s~n", [OpName,
+                 Cluster, Account, DbName, Range, SourceId, TargetId])
+    end,
     Operation;
 
 print(Operations) when is_list(Operations) ->
