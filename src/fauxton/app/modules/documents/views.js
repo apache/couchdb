@@ -1378,7 +1378,8 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, resizeColumns) {
       if ($targetId === 'index-nav') {
         if (this.newView) { return; }
         $index.toggle('slow');
-        this.showEditors();
+        var that = this;
+        setTimeout(function(){that.showEditors();},100);
       } else {
         $index.removeAttr('style');
       }
@@ -1478,6 +1479,7 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, resizeColumns) {
         this.mapEditor.setValue(this.langTemplates[this.defaultLang].map);
         this.reduceEditor.setValue(this.langTemplates[this.defaultLang].reduce);
       } 
+
     }
   });
 
