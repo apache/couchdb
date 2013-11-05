@@ -37,7 +37,7 @@ function(Backbone) {
     });
 
     this.layoutViews = {};
-    this.hooks = {};
+    //this.hooks = {};
 
     this.el = this.layout.el;
   };

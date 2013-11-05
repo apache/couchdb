@@ -36,9 +36,9 @@ the License.
           <div class="control-group">
             <label for="map-function">Map function <a href="<%=getDocUrl('map_functions')%>" target="_blank"><i class="icon-question-sign"></i></a></label>
             <% if (newView) { %>
-            <textarea class="js-editor" id="map-function"><%= langTemplates.map %></textarea>
+            <div class="js-editor" id="map-function"><%= langTemplates.map %></div>
             <% } else { %>
-            <textarea class="js-editor" id="map-function"><%= ddoc.get('views')[viewName].map %></textarea>
+            <div class="js-editor" id="map-function"><%= ddoc.get('views')[viewName].map %></div>
             <% } %>
           </div>
 
@@ -60,9 +60,9 @@ the License.
           <div class="control-group reduce-function">
             <label for="reduce-function">Custom Reduce</label>
             <% if (newView) { %>
-            <textarea class="js-editor" id="reduce-function"><%= langTemplates.reduce %></textarea>
+            <div class="js-editor" id="reduce-function"><%= langTemplates.reduce %></div>
             <% } else { %>
-            <textarea class="js-editor" id="reduce-function"><%= ddoc.get('views')[viewName].reduce %></textarea>
+            <div class="js-editor" id="reduce-function"><%= ddoc.get('views')[viewName].reduce %></div>
             <% } %>
           </div>
 

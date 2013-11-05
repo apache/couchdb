@@ -202,9 +202,9 @@ database must be examined.
 
   - In the request, a value is an array of revision IDs for that document.
 
-  - In the response, a value is an object with a "missing": key, whose value
+  - In the response, a value is an object with a ``missing``: key, whose value
     is a list of revision IDs for that document (the ones that are not stored
-    in the database) and optionally a "possible_ancestors" key, whose value is
+    in the database) and optionally a ``possible_ancestors`` key, whose value is
     an array of revision IDs that are known that might be ancestors of
     the missing revisions.
 
@@ -215,7 +215,9 @@ database must be examined.
   :<json object: Mapping of document ID to list of revisions to lookup
   :>header Content-Type: - :mimetype:`application/json`
                          - :mimetype:`text/plain; charset=utf-8`
-  :>json object missing_revs: Mapping of document ID to list of missed revisions
+  :>json array missing: List of missed revisions for specified document
+  :>json array possible_ancestors: List of revisions that *may be* ancestors
+    for specified document and his current revision in requested database
   :code 200: Request completed successfully
   :code 400: Invalid database name or JSON payload
 
@@ -232,7 +234,8 @@ database must be examined.
     {
       "190f721ca3411be7aa9477db5f948bbb": [
         "3-bb72a7682290f94a985f7afac8b27137",
-        "4-10265e5a26d807a3cfa459cf1a82ef2e"
+        "4-10265e5a26d807a3cfa459cf1a82ef2e",
+        "5-067a00dff5e02add41819138abb3284d"
       ]
     }
 
@@ -250,7 +253,11 @@ database must be examined.
     {
       "190f721ca3411be7aa9477db5f948bbb": {
         "missing": [
-          "3-bb72a7682290f94a985f7afac8b27137"
+          "3-bb72a7682290f94a985f7afac8b27137",
+          "5-067a00dff5e02add41819138abb3284d"
+        ],
+        "possible_ancestors": [
+          "4-10265e5a26d807a3cfa459cf1a82ef2e"
         ]
       }
     }

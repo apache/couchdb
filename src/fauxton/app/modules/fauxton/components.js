@@ -11,12 +11,13 @@
 // the License.
 
 define([
-       "app",
-       // Libs
-       "api"
+  "app",
+  // Libs
+  "api",
+  "ace/ace"
 ],
 
-function(app, FauxtonAPI) {
+function(app, FauxtonAPI, ace) {
   var Components = app.module();
 
   Components.Pagination = FauxtonAPI.View.extend({
@@ -67,12 +68,14 @@ function(app, FauxtonAPI) {
 
     previousClicked: function (event) {
       event.preventDefault();
+      if (!this.canShowPreviousfn()) { return; }
       FauxtonAPI.navigate(this.previousUrlfn(), {trigger: false});
       FauxtonAPI.triggerRouteEvent('paginate', 'previous');
     },
 
     nextClicked: function (event) {
       event.preventDefault();
+      if (!this.canShowNextfn()) { return; }
       var doc = this.collection.first();
 
       if (doc) {
@@ -171,6 +174,76 @@ function(app, FauxtonAPI) {
         }
       });
     }
+  });
+
+  Components.Editor = FauxtonAPI.View.extend({
+    initialize: function (options) {
+      this.editorId = options.editorId;
+      this.mode = options.mode || "json";
+      this.commands = options.commands;
+      this.theme = options.theme || 'crimson_editor';
+      this.couchJSHINT = options.couchJSHINT;
+    },
+
+    afterRender: function () {
+      this.editor = ace.edit(this.editorId);
+      this.editor.setTheme("ace/theme/" + this.theme);
+      this.editor.getSession().setMode("ace/mode/" + this.mode);
+      this.editor.setShowPrintMargin(false);
+      this.editor.gotoLine(2);
+      this.addCommands();
+
+      if (this.couchJSHINT) {
+        this.removeIncorrectAnnotations();
+      }
+    },
+
+    addCommands: function () {
+      _.each(this.commands, function (command) {
+        this.editor.commands.addCommand(command);
+      }, this);
+    },
+
+    removeIncorrectAnnotations: function () {
+      var editor = this.editor;
+
+      this.editor.getSession().on("changeAnnotation", function(){
+        var annotations = editor.getSession().getAnnotations();
+
+        var newAnnotations = _.reduce(annotations, function (annotations, error) {
+          if (!FauxtonAPI.isIgnorableError(error.raw)) {
+            annotations.push(error);
+          }
+          return annotations;
+        }, []);
+
+        if (annotations.length !== newAnnotations.length) {
+          editor.getSession().setAnnotations(newAnnotations);
+        }
+      });
+    },
+
+    setValue: function (data, lineNumber) {
+      lineNumber = lineNumber ? lineNumber : -1;
+      this.editor.setValue(data, lineNumber);
+    },
+
+    getValue: function () {
+      return this.editor.getValue();
+    },
+
+    getAnnotations: function () {
+      return this.editor.getSession().getAnnotations();
+    },
+
+    hadValidCode: function () {
+     var errors = this.getAnnotations();
+     // By default CouchDB view functions don't pass lint
+     return _.every(errors, function(error) {
+      return FauxtonAPI.isIgnorableError(error.raw);
+      },this);
+    }
+
   });
 
   return Components;

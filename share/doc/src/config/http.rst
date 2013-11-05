@@ -530,7 +530,7 @@ Virtual Hosts
 .. config:section:: vhosts :: Virtual Hosts
 
   CouchDB can map requests to different locations based on the ``Host`` header,
-  even if they arrive on the some inbound IP address.
+  even if they arrive on the same inbound IP address.
 
   This allows different virtual hosts on the same machine to map to different
   databases or design documents, etc. The most common use case is to map a

@@ -97,7 +97,7 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents
       }, this);
     },
 
-    setAddonHooks: function() {
+    /*setAddonHooks: function() {
       _.each(LoadAddons.addons, function(module) {
         // This is updates to views by the addon
         if (module && module.hooks){
@@ -110,7 +110,7 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents
           }, this);
         }
       }, this);
-    },
+    },*/
 
     initialize: function() {
       //TODO: It would be nice to handle this with a router
@@ -124,7 +124,7 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents
 
       // NOTE: This must be below creation of the layout
       // FauxtonAPI header links and others depend on existence of the layout
-      this.setAddonHooks();
+      //this.setAddonHooks();
       this.setModuleRoutes();
 
       $("#app-container").html(this.masterLayout.el);
