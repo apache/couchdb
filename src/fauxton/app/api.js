@@ -463,7 +463,7 @@ function(app, Fauxton) {
         length: 8, // The length of each line
         width: 4, // The line thickness
         radius: 12, // The radius of the inner circle
-        color: '#aaa', // #rbg or #rrggbb
+        color: '#333', // #rbg or #rrggbb
         speed: 1, // Rounds per second
         trail: 10, // Afterglow percentage
         shadow: false // Whether to render a shadow
@@ -492,7 +492,7 @@ function(app, Fauxton) {
         length: 8, // The length of each line
         width: 4, // The line thickness
         radius: 12, // The radius of the inner circle
-        color: '#ccc', // #rbg or #rrggbb
+        color: '#333', // #rbg or #rrggbb
         speed: 1, // Rounds per second
         trail: 10, // Afterglow percentage
         shadow: false // Whether to render a shadow
