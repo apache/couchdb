@@ -65,16 +65,16 @@ identification for certain requests:
 - Setup a database security (:put:`PUT /database/_security
   </{db}/_security>`)
 - Creating a design document (:put:`PUT /database/_design/app
-  </{db}/_design/{ddocname}>`)
+  </{db}/_design/{ddoc}>`)
 - Updating a design document (:put:`PUT /database/_design/app?rev=1-4E2
-  </{db}/_design/{ddocname}>`)
+  </{db}/_design/{ddoc}>`)
 - Deleting a design document (:delete:`DELETE /database/_design/app?rev=2-6A7
-  </{db}/_design/{ddocname}>`)
+  </{db}/_design/{ddoc}>`)
 - Execute a temporary view (:post:`POST /database/_temp_view
   </{db}/_temp_view>`)
 - Triggering compaction (:post:`POST /database/_compact </{db}/_compact>`)
 - Reading the task status list (:get:`GET /_active_tasks </_active_tasks>`)
-- Restarting the server (:post:`:POST /_restart </_restart>`)
+- Restarting the server (:post:`POST /_restart </_restart>`)
 - Reading the active configuration (:get:`GET /_config </_config>`)
 - Updating the active configuration (:put:`PUT /_config/section/key
   </_config/{section}/{key}>`)
