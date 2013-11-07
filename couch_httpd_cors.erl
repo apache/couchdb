@@ -35,6 +35,8 @@
 % as defined in http://www.w3.org/TR/cors/#terminology
 -define(SIMPLE_HEADERS, ["Cache-Control", "Content-Language",
         "Content-Type", "Expires", "Last-Modified", "Pragma"]).
+-define(ALLOWED_HEADERS, lists:sort(["Server", "Etag",
+        "Accept-Ranges" | ?SIMPLE_HEADERS])).
 -define(SIMPLE_CONTENT_TYPE_VALUES, ["application/x-www-form-urlencoded",
         "multipart/form-data", "text/plain"]).
 
@@ -212,7 +214,7 @@ maybe_apply_cors_headers(CorsHeaders, RequestHeaders0) ->
     % return: RequestHeaders ++ CorsHeaders ++ ACEH
 
     RequestHeaders = [K || {K,_V} <- RequestHeaders0],
-    ExposedHeaders0 = reduce_headers(RequestHeaders, ?SIMPLE_HEADERS),
+    ExposedHeaders0 = reduce_headers(RequestHeaders, ?ALLOWED_HEADERS),
 
     % here we may have not moved Content-Type into ExposedHeaders,
     % now we need to check whether the Content-Type valus is
@@ -242,10 +244,10 @@ reduce_headers(A, B) ->
     reduce_headers0(A, B, []).
 
 reduce_headers0([], _B, Result) ->
-    Result;
+    lists:sort(Result);
 reduce_headers0([ElmA|RestA], B, Result) ->
     R = case member_nocase(ElmA, B) of
-    true -> Result;
+    false -> Result;
     _Else -> [ElmA | Result]
     end,
     reduce_headers0(RestA, B, R).
