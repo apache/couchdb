@@ -219,7 +219,7 @@ test_db_request(VHost) ->
             "http://example.com",
             "db Access-Control-Allow-Origin ok"),
         etap:is(proplists:get_value("Access-Control-Expose-Headers", RespHeaders),
-            "Content-Type, Server",
+            "Cache-Control, Content-Type, Server",
             "db Access-Control-Expose-Headers ok");
     _ ->
         etap:is(false, true, "ibrowse failed")
