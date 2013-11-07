@@ -66,13 +66,13 @@ operation.
 Documents are indexed in `B-trees`_ by their name (DocID) and a Sequence ID.
 Each update to a database instance generates a new sequential number.
 Sequence IDs are used later for incrementally finding changes in a database.
-TheseBb-tree indexes are updated simultaneously when documents are saved or
+These B-tree indexes are updated simultaneously when documents are saved or
 deleted. The index updates always occur at the end of the file (append-only
 updates).
 
 Documents have the advantage of data being already conveniently packaged for
 storage rather than split out across numerous tables and rows in most
-databases systems. When documents are committed to disk, the document fields
+database systems. When documents are committed to disk, the document fields
 and metadata are packed into buffers, sequentially one document after another
 (helpful later for efficient building of views).
 
@@ -105,14 +105,14 @@ Wasted space is recovered by occasional compaction. On schedule, or when the
 database file exceeds a certain amount of wasted space, the compaction process
 clones all the active data to a new file and then discards the old file.
 The database remains completely online the entire time and all updates and
-reads are allowed to complete successfully. The old file is deleted only when
+reads are allowed to complete successfully. The old database file is deleted only when
 all the data has been copied and all users transitioned to the new file.
 
 
 Views
 =====
 
-ACID properties only deal with storage and updates, we also need the ability
+ACID properties only deal with storage and updates, but we also need the ability
 to show our data in interesting and useful ways. Unlike SQL databases where
 data must be carefully decomposed into tables, data in CouchDB is stored in
 semi-structured documents. CouchDB documents are flexible and each has its
@@ -136,7 +136,7 @@ View Model
 To address this problem of adding structure back to unstructured and
 semi-structured data, CouchDB integrates a view model. Views are the method
 of aggregating and reporting on the documents in a database, and are built
-on-demand to aggregate, join and report on database documents. Views are built
+on-demand to aggregate, join and report on database documents. Because views are built
 dynamically and don’t affect the underlying document, you can have as many
 different view representations of the same data as you like.
 
