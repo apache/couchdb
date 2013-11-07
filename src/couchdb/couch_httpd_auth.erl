@@ -111,12 +111,16 @@ null_authentication_handler(Req) ->
 %   ecret key is the secret key in couch_httpd_auth section of ini. This token is optional
 %   if value of proxy_use_secret key in couch_httpd_auth section of ini isn't true.
 %
-proxy_authentification_handler(Req) ->
+proxy_authentication_handler(Req) ->
     case proxy_auth_user(Req) of
         nil -> Req;
         Req2 -> Req2
     end.
-    
+
+% keep the old handler name to avoid breaking compatibility with existing configs
+proxy_authentification_handler(Req) ->
+    proxy_authentication_handler(Req).
+
 proxy_auth_user(Req) ->
     XHeaderUserName = couch_config:get("couch_httpd_auth", "x_auth_username",
                                 "X-Auth-CouchDB-UserName"),
