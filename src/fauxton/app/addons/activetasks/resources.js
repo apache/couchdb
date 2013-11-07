@@ -41,6 +41,11 @@ function (app, backbone, Fauxton) {
     url: function () {
       return app.host + '/_active_tasks';
     },
+    fetch: function (options) {
+     var fetchoptions = options || {};
+     fetchoptions.cache = false;
+     return Backbone.Model.prototype.fetch.call(this, fetchoptions);
+    },
     parse: function(resp){
       var types = this.getUniqueTypes(resp),
           that = this;

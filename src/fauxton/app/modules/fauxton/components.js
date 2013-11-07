@@ -126,13 +126,15 @@ function(app, FauxtonAPI, ace) {
         query,
         "%22&endkey=%22",
         query,
-        "\u9999%22&limit=",
+        "\u9999",
+        "%22&limit=",
         this.dbLimit
       ].join('');
 
       if (this.ajaxReq) { this.ajaxReq.abort(); }
 
       this.ajaxReq = $.ajax({
+        cache: false,
         url: url,
         dataType: 'json',
         success: function(data) {
@@ -157,13 +159,15 @@ function(app, FauxtonAPI, ace) {
         query,
         "%22&endkey=%22",
         query,
-        "\u9999%22&limit=",
+        "\u9999",
+        "%22&limit=",
         this.docLimit
       ].join('');
 
       if (this.ajaxReq) { this.ajaxReq.abort(); }
 
       this.ajaxReq = $.ajax({
+        cache: false,
         url: url,
         dataType: 'json',
         success: function(data) {

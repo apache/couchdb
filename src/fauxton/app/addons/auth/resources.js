@@ -153,6 +153,7 @@ function (app, FauxtonAPI) {
       var that = this;
 
       return $.ajax({
+        cache: false,
         type: "POST", 
         url: "/_session", 
         dataType: "json",
