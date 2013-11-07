@@ -159,14 +159,12 @@ FAUXTON_FILES = \
     fauxton/app/templates/fauxton/nav_bar.html \
     fauxton/app/templates/fauxton/notification.html \
     fauxton/app/templates/fauxton/pagination.html \
-    fauxton/app/templates/layouts/login_pane.html \
     fauxton/app/templates/layouts/one_pane.html \
     fauxton/app/templates/layouts/two_pane.html \
     fauxton/app/templates/layouts/with_right_sidebar.html \
     fauxton/app/templates/layouts/with_sidebar.html \
     fauxton/app/templates/layouts/with_tabs.html \
     fauxton/app/templates/layouts/with_tabs_sidebar.html \
-    fauxton/assets/css/codemirror.css \
     fauxton/assets/css/nv.d3.css \
     fauxton/assets/img/couchdb-site.png \
     fauxton/assets/img/couchdblogo.png \
@@ -185,10 +183,36 @@ FAUXTON_FILES = \
     fauxton/assets/img/loader.gif \
     fauxton/assets/img/minilogo.png \
     fauxton/assets/index.underscore \
+    fauxton/assets/js/libs/ace/ace.js \              
+    fauxton/assets/js/libs/ace/ext-static_highlight.js \
+    fauxton/assets/js/libs/ace/ext-chromevox.js \        
+    fauxton/assets/js/libs/ace/ext-statusbar.js \
+    fauxton/assets/js/libs/ace/ext-elastic_tabstops_lite.js \    
+    fauxton/assets/js/libs/ace/ext-textarea.js \
+    fauxton/assets/js/libs/ace/ext-emmet.js \            
+    fauxton/assets/js/libs/ace/ext-themelist.js \
+    fauxton/assets/js/libs/ace/ext-keybinding_menu.js \      
+    fauxton/assets/js/libs/ace/ext-whitespace.js \
+    fauxton/assets/js/libs/ace/ext-language_tools.js \       
+    fauxton/assets/js/libs/ace/mode-javascript.js \
+    fauxton/assets/js/libs/ace/ext-modelist.js \         
+    fauxton/assets/js/libs/ace/mode-json.js \
+    fauxton/assets/js/libs/ace/ext-old_ie.js \           
+    fauxton/assets/js/libs/ace/mode-jsoniq.js \
+    fauxton/assets/js/libs/ace/ext-options.js \          
+    fauxton/assets/js/libs/ace/ext-searchbox.js \        
+    fauxton/assets/js/libs/ace/theme-crimson_editor.js \
+    fauxton/assets/js/libs/ace/ext-settings_menu.js \        
+    fauxton/assets/js/libs/ace/worker-javascript.js \
+    fauxton/assets/js/libs/ace/ext-spellcheck.js \       
+    fauxton/assets/js/libs/ace/worker-json.js \
+    fauxton/assets/js/libs/ace/ext-split.js \
+    fauxton/assets/js/libs/ace/snippets/javascript.js \   
+    fauxton/assets/js/libs/ace/snippets/json.js \     
+    fauxton/assets/js/libs/ace/snippets/jsoniq.js \
     fauxton/assets/js/libs/almond.js \
     fauxton/assets/js/libs/backbone.js \
     fauxton/assets/js/libs/bootstrap.js \
-    fauxton/assets/js/libs/codemirror.js \
     fauxton/assets/js/libs/d3.js \
     fauxton/assets/js/libs/jquery.js \
     fauxton/assets/js/libs/jshint.js \
@@ -197,7 +221,6 @@ FAUXTON_FILES = \
     fauxton/assets/js/libs/require.js \
     fauxton/assets/js/libs/spin.min.js \
     fauxton/assets/js/plugins/backbone.layoutmanager.js \
-    fauxton/assets/js/plugins/codemirror-javascript.js \
     fauxton/assets/js/plugins/jquery.form.js \
     fauxton/assets/js/plugins/prettify.js \
     fauxton/assets/less/bootstrap/accordion.less \
