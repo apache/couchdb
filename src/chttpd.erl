@@ -234,8 +234,6 @@ handle_request(MochiReq) ->
                 {exit, normal, [{mochiweb_request, send, _} | _]} ->
                     exit(normal); % Client disconnect (R14)
                 _Else ->
-                    JsonStack = json_stack({Error, nil, Stack}),
-                    couch_log:error("req_err ~p:~p ~p", [Tag, Error, JsonStack]),
                     send_error(HttpReq, {Error, nil, Stack})
             end
     end,
@@ -643,6 +641,7 @@ send_delayed_error(#delayed_resp{req=Req,resp=nil}, Reason) ->
     {Code, ErrorStr, ReasonStr} = error_info(Reason),
     send_error(Req, Code, ErrorStr, ReasonStr);
 send_delayed_error(#delayed_resp{resp=Resp}, Reason) ->
+    log_stack_trace(json_stack(Reason)),
     throw({http_abort, Resp, Reason}).
 
 end_delayed_json_response(#delayed_resp{}=DelayedResp) ->
@@ -808,11 +807,16 @@ send_error(Req, Error) ->
 send_error(Req, Code, ErrorStr, ReasonStr) ->
     send_error(Req, Code, [], ErrorStr, ReasonStr, []).
 
-send_error(Req, Code, Headers, ErrorStr, ReasonStr, Stack) ->
+send_error(Req, Code, Headers, ErrorStr, ReasonStr, []) ->
     send_json(Req, Code, Headers,
         {[{<<"error">>,  ErrorStr},
-        {<<"reason">>, ReasonStr} |
-        case Stack of [] -> []; _ -> [{stack, Stack}] end
+        {<<"reason">>, ReasonStr}]});
+send_error(Req, Code, Headers, ErrorStr, ReasonStr, Stack) ->
+    log_stack_trace(Stack),
+    send_json(Req, Code, [stack_trace_id(Stack) | Headers],
+        {[{<<"error">>,  ErrorStr},
+        {<<"reason">>, ReasonStr},
+        {<<"ref">>, stack_hash(Stack)}
     ]}).
 
 % give the option for list functions to output html or other raw errors
@@ -821,11 +825,13 @@ send_chunked_error(Resp, {_Error, {[{<<"body">>, Reason}]}}) ->
     send_chunk(Resp, []);
 
 send_chunked_error(Resp, Error) ->
+    Stack = json_stack(Error),
+    log_stack_trace(Stack),
     {Code, ErrorStr, ReasonStr} = error_info(Error),
     JsonError = {[{<<"code">>, Code},
         {<<"error">>,  ErrorStr},
-        {<<"reason">>, ReasonStr} |
-        case json_stack(Error) of [] -> []; Stack -> [{stack, Stack}] end
+        {<<"reason">>, ReasonStr},
+        {<<"ref">>, stack_hash(Stack)}
     ]},
     send_chunk(Resp, ?l2b([$\n,?JSON_ENCODE(JsonError),$\n])),
     send_chunk(Resp, []).
@@ -882,3 +888,12 @@ maybe_decompress(Httpd, Body) ->
     Else ->
         throw({bad_ctype, [Else, " is not a supported content encoding."]})
     end.
+
+log_stack_trace(Stack) ->
+    couch_log:error("~p failed with trace: ~p", [stack_hash(Stack), Stack]).
+
+stack_trace_id(Stack) ->
+    {"X-Cloudant-Stack-Hash", stack_hash(Stack)}.
+
+stack_hash(Stack) ->
+    erlang:crc32(term_to_binary(Stack)).
