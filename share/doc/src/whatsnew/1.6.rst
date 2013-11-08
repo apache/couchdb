@@ -1,0 +1,48 @@
+.. Licensed under the Apache License, Version 2.0 (the "License"); you may not
+.. use this file except in compliance with the License. You may obtain a copy of
+.. the License at
+..
+..   http://www.apache.org/licenses/LICENSE-2.0
+..
+.. Unless required by applicable law or agreed to in writing, software
+.. distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+.. WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+.. License for the specific language governing permissions and limitations under
+.. the License.
+
+
+.. _release/1.6.x:
+
+============
+1.6.x Branch
+============
+
+.. contents::
+   :depth: 1
+   :local:
+
+.. _release/1.6.x/upgrade:
+
+Upgrade Notes
+=============
+
+The :ref:`Proxy Authentication <api/auth/proxy>` handler was renamed to
+``proxy_authentication_handler`` to follow the ``*_authentication_handler`` form
+of all other handlers. The old ``proxy_authentification_handler`` name is marked
+as deprecated and will be removed in future releases. It's strongly recommended
+to update :config:option:`httpd/authentication_handlers` option with new value
+in case if you had used such handler.
+
+
+.. _release/1.6.0:
+
+Version 1.6.0
+=============
+
+.. warning::
+
+   This version is not released yet.
+
+* :issue:`1922`: Fix CORS exposed headers :commit:`4f619833`
+* Rename ``proxy_authentification_handler`` to ``proxy_authentication_handler``
+  :commit:`c66ac4a8`
