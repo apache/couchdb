@@ -17,7 +17,7 @@
 Security
 ********
 
-In this chapter, we'll look at the basic security mechanisms in CouchDB: the
+In this document, we'll look at the basic security mechanisms in CouchDB: the
 `Admin Party`, `Basic Authentication`, `Cookie Authentication`; how CouchDB
 handles users and protects their credentials.
 

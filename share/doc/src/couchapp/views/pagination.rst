@@ -77,7 +77,7 @@ names that make up one page, and a link for the previous five,
 if we’re not on the first page.
 
 We learned how to use the ``startkey``, ``limit``, and ``skip`` parameters in
-earlier chapters. We’ll use these again here. First, let’s have a look at
+earlier documents. We’ll use these again here. First, let’s have a look at
 the full result set:
 
 .. code-block:: javascript

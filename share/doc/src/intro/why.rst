@@ -18,11 +18,11 @@ Why CouchDB?
 ============
 
 Apache CouchDB is one of a new breed of database management systems.
-This chapter explains why there's a need for new systems as well as the
+This topic explains why there's a need for new systems as well as the
 motivations behind building CouchDB.
 
 As CouchDB developers, we're naturally very excited to be using CouchDB.
-In this chapter we'll share with you the reasons for our enthusiasm.
+In this topic we'll share with you the reasons for our enthusiasm.
 We'll show you how CouchDB's schema-free document model is a better fit
 for common applications, how the built-in query engine is a powerful way
 to use and process your data, and how CouchDB's design lends itself
@@ -32,9 +32,8 @@ to modularization and scalability.
 Relax
 =====
 
-If there's one word to describe CouchDB, it is *relax*. It is in the title of
-this book, it is the byline to CouchDB's official logo,
-and when you start CouchDB, you see::
+If there's one word to describe CouchDB, it is *relax*. It is the byline 
+to CouchDB's official logo and when you start CouchDB, you see::
 
   Apache CouchDB has started. Time to relax.
 
@@ -198,7 +197,7 @@ performance hit, CouchDB lets you build these systems.
 
 There are a multitude of knobs you could turn to make a system work better in
 one area, but you'll affect another area when doing so. One example would be
-the CAP theorem discussed in the next chapter. To give you an idea of other
+the CAP theorem discussed in :ref:`intro/consistency`. To give you an idea of other
 things that affect storage systems, see :ref:`Figure 2 <intro/why-figure-02>`
 and :ref:`Figure 3 <intro/why-figure-03>`.
 
@@ -311,5 +310,6 @@ less powerful than today's phones.
 Wrapping Up
 ===========
 
-The next chapter further explores the distributed nature of CouchDB. We
-should have given you enough bites to whet your interest. Let's go!
+The next document :ref:`intro/consistency` further explores the distributed nature 
+of CouchDB. We should have given you enough bites to whet your interest. 
+Let's go!

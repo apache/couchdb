@@ -17,7 +17,7 @@
 Getting Started
 ===============
 
-In this chapter, we'll take a quick tour of CouchDB's features,
+In this document, we'll take a quick tour of CouchDB's features,
 familiarizing ourselves with Futon, the built-in administration interface.
 We'll create our first document and experiment with CouchDB views.
 
@@ -28,7 +28,7 @@ All Systems Are Go!
 We'll have a very quick look at CouchDB's bare-bones Application Programming
 Interface (API) by using the command-line utility curl. Please note that this
 is not the only way of talking to CouchDB. We will show you plenty more
-throughout the rest of the book. What's interesting about curl is that it
+throughout the rest of the documents. What's interesting about curl is that it
 gives you control over raw HTTP requests, and you can see exactly what is
 going on "underneath the hood" of your database.
 
@@ -175,8 +175,8 @@ To load Futon in your browser, visit::
   http://127.0.0.1:5984/_utils/
 
 If you're running version 0.9 or later, you should see something similar to
-:ref:`intro/tour-01`. In later chapters, we'll focus on using CouchDB from
-server-side languages such as Ruby and Python. As such, this chapter is a great
+:ref:`intro/tour-01`. In later documents, we'll focus on using CouchDB from
+server-side languages such as Ruby and Python. As such, this document is a great
 opportunity to showcase an example of natively serving up a dynamic web
 application using nothing more than CouchDB's integrated web server, something
 you may wish to do with your own applications.
@@ -282,7 +282,7 @@ should look like :ref:`intro/tour-04` document in Futon".
 
 
 You'll notice that the document's _rev has changed. We'll go into more detail
-about this in later chapters, but for now, the important thing to note is
+about this in later documents, but for now, the important thing to note is
 that _rev acts like a safety feature when saving a document. As long as you
 and CouchDB agree on the most recent _rev of a document, you can successfully 
 save your changes.
@@ -534,7 +534,7 @@ Wrapping Up
 
 Now that you've seen most of Futon's features, you'll be prepared to dive in
 and inspect your data as we build our example application in the next few
-chapters. Futon's pure JavaScript approach to managing CouchDB shows how it's
+documents. Futon's pure JavaScript approach to managing CouchDB shows how it's
 possible to build a fully featured web application using only CouchDB's HTTP
 API and integrated web server.
 

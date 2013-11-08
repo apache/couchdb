@@ -48,7 +48,8 @@
   :query string feed: see :ref:`changes`. Default is ``normal``.
   :query string filter: Reference to a :ref:`filter function <filterfun>`
     from a design document that will filter whole stream emitting only filtered
-    events. See the `section in the book`_ for more information.
+    events. See the section `Change Notifications in the book 
+    CouchDB The Definitive Guide`_ for more information.
   :query number heartbeat: Period in *milliseconds* after which an empty line is
     sent in the results. Only applicable for :ref:`longpoll <changes/longpoll>`
     or :ref:`continuous <changes/continuous>` feeds. Overrides any timeout to
@@ -340,7 +341,7 @@ results.
 Obviously, `... tum tee tum ...` does not appear in the actual response, but
 represents a long pause before the change with seq 6 occurred.  
 
-.. _section in the book: http://guide.couchdb.org/draft/notifications.html
+.. _Change Notifications in the book CouchDB The Definitive Guide: http://guide.couchdb.org/draft/notifications.html
 
 .. _changes/eventsource:
 

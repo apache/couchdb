@@ -17,8 +17,8 @@
 Eventual Consistency
 ====================
 
-In the previous chapter, we saw that CouchDB's flexibility allows us to
-evolve our data as our applications grow and change. In this chapter,
+In the previous document :ref:`intro/why`, we saw that CouchDB's flexibility allows us to
+evolve our data as our applications grow and change. In this topic,
 we'll explore how working "with the grain" of CouchDB promotes simplicity in
 our applications and helps us naturally build scalable, distributed systems.
 

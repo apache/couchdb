@@ -20,7 +20,7 @@ View Cookbook for SQL Jockeys
 This is a collection of some common SQL queries and how to get the same result
 in CouchDB. The key to remember here is that CouchDB does not work like an SQL
 database at all and that best practices from the SQL world do not translate well
-or at all to CouchDB. This chapter’s “cookbook” assumes that you are familiar
+or at all to CouchDB. This documents’s “cookbook” assumes that you are familiar
 with the CouchDB basics such as creating and updating databases and documents.
 
 Using Views
@@ -331,7 +331,7 @@ For example, from a list of integer values that specify the age, calculate the
 sum of all years of life for the news headline,
 `“786 life years present at event.”` A little contrived, but very simple and
 thus good for demonstration purposes. Consider the documents and the map view we
-used earlier in this chapter.
+used earlier in this document.
 
 The reduce function to calculate the total age of all girls is:
 

@@ -17,18 +17,18 @@
 The Core API
 ============
 
-This chapter explores the CouchDB in minute detail. It shows all the
+This document explores the CouchDB in minute detail. It shows all the
 nitty-gritty and clever bits. We show you best practices and guide you around
 common pitfalls.
 
-We start out by revisiting the basic operations we ran in the last chapter,
-looking behind the scenes. We also show what Futon needs to do behind its
-user interface to give us the nice features we saw earlier.
+We start out by revisiting the basic operations we ran in the previous document
+:ref:`intro/tour`, looking behind the scenes. We also show what Futon needs to 
+do behind its user interface to give us the nice features we saw earlier.
 
-This chapter is both an introduction to the core CouchDB API as well as a
+This document is both an introduction to the core CouchDB API as well as a
 reference. If you can't remember how to run a particular request or why some
 parameters are needed, you can always come back here and look things up (we
-are probably the heaviest users of this chapter).
+are probably the heaviest users of this document).
 
 While explaining the API bits and pieces, we sometimes need to take a larger
 detour to explain the reasoning for a particular request. This is a good
@@ -322,7 +322,7 @@ The last two lines are curl telling us that it kept the TCP connection it
 opened in the beginning open for a moment, but then closed it after it
 received the entire response.
 
-Throughout the book, we'll show more requests with the ``-v`` option,
+Throughout the documents, we'll show more requests with the ``-v`` option,
 but we'll omit some of the headers we've seen here and include only those
 that are important for the particular request.
 
@@ -496,12 +496,12 @@ work, and less code is always good because the ratio of defects per lines of
 code is static.
 
 The revision system also has positive effects on replication and storage
-mechanisms, but we'll explore these later in the book.
+mechanisms, but we'll explore these later in the documents.
 
 .. warning::
 
   The terms *version* and *revision* might sound familiar (if you are
-  programming without version control, drop this book right now and start
+  programming without version control, stop reading this guide right now and start
   learning one of the popular systems). Using new versions for document changes
   works a lot like version control, but there's an important difference:
   **CouchDB does not guarantee that older versions are kept around**.
@@ -636,8 +636,8 @@ In a simple :method:`POST` request, you tell CouchDB the *source* and the
 document revisions are on *source* that are not yet on *target*, and will
 proceed  to move the missing documents and revisions over.
 
-We'll take an in-depth look at replication later in the book; in this
-chapter, we'll just show you how to use it.
+We'll take an in-depth look at replication in the document :ref:`replication/intro`;
+in this document, we'll just show you how to use it.
 
 First, we'll create a target database. Note that CouchDB won't automatically
 create a target database for you, and will return a replication failure if
@@ -747,7 +747,7 @@ operations::
   requests don't look very RESTy to the trained eye. What's up with that?
   While CouchDB's core database, document, and attachment API are RESTful,
   not all of CouchDB's API is. The replication API is one example. There are
-  more, as we'll see later in the book.
+  more, as we'll see later in the documents.
 
   Why are there RESTful and non-RESTful APIs mixed up here? Have the developers
   been too lazy to go REST all the way? Remember, REST is an architectural
