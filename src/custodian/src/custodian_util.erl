@@ -12,16 +12,16 @@
 %% public functions.
 
 summary() ->
-    Fun = fun(_Id, _Range,  unavailable, {U, O, I, C}) ->
-                  {U + 1, O, I, C};
-             (_Id, _Range,  {impaired, 1}, {U, O, I, C}) ->
-                  {U, O + 1, I, C};
-             (_Id, _Range,  {impaired, _N}, {U, O, I, C}) ->
-                  {U, O, I + 1, C};
-             (_Id, _Range, {conflicted, _N}, {U, O, I, C}) ->
-                  {U, O, I, C + 1}
+    Fun = fun(_Id, _Range, unavailable, Dict) ->
+                  dict:update_counter(unavailable, 1, Dict);
+             (_Id, _Range,  {impaired, 1}, Dict) ->
+                  dict:update_counter(one_copy, 1, Dict);
+             (_Id, _Range,  {impaired, _N}, Dict) ->
+                  dict:update_counter(impaired, 1, Dict);
+             (_Id, _Range, {conflicted, _N}, Dict) ->
+                  dict:update_counter(conflicted, 1, Dict)
           end,
-    fold_dbs({0, 0, 0, 0}, Fun).
+    dict:to_list(fold_dbs(dict:new(), Fun)).
 
 report() ->
     Fun = fun(Id, Range,  unavailable, Acc) ->

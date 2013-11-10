@@ -106,11 +106,11 @@ handle_db_event(_DbName, _Event, _St) ->
     {ok, nil}.
 
 check_shards() ->
-    {Unavailable, OneCopy, Impaired, Conflicted} = custodian:summary(),
-    send_conflicted_alert(Conflicted),
-    send_unavailable_alert(Unavailable),
-    send_one_copy_alert(OneCopy),
-    send_impaired_alert(Impaired).
+    Summary = custodian:summary(),
+    send_conflicted_alert(proplists:get_value(conflicted, Summary)),
+    send_unavailable_alert(proplists:get_value(unavailable, Summary)),
+    send_one_copy_alert(proplists:get_value(one_copy, Summary)),
+    send_impaired_alert(proplists:get_value(impaired, Summary)).
 
 %% specific alert functions
 send_conflicted_alert(Count) ->
@@ -126,7 +126,7 @@ send_one_copy_alert(Count) ->
     send_snmp_alert(Count, "shards with only one copy", "AllShardsMultipleCopiesEvent", "ShardsOneCopyEvent").
 
 %% generic SNMP alert functions
-send_snmp_alert(0, AlertType, ClearMib, _) ->
+send_snmp_alert(undefined, AlertType, ClearMib, _) ->
     twig:log(notice, "No ~s in this cluster", [AlertType]),
     Cmd = lists:concat(["send_snmptrap --trap CLOUDANT-DBCORE-MIB::cloudantDbcore", ClearMib]),
     os:cmd(Cmd);
