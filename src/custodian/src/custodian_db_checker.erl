@@ -151,20 +151,16 @@ get_bacon_db() ->
 send_missing_db_alert(DbName) ->
     twig:log(notice, "Missing system database ~s", [DbName]),
     Command = [
-        "send_snmptrap",
-        "--trap",
-        "CLOUDANT-DBCORE-MIB::cloudantDbcoreMissingDbEvent",
-        "-o",
-        "'cloudantDbcoreDbName:STRING:" ++ binary_to_list(DbName) ++ "'"
-    ],
-    os:cmd(string:join(Command, " ")).
-
+        "send-sensu-event --standalone --critical",
+        " --output=\"Missing system database ",
+        binary_to_list(DbName),
+        "\" --handler=default custodian-missing-db-check"],
+    os:cmd(lists:concat(Command)).
 
 clear_missing_dbs_alert() ->
     twig:log(notice, "All system databases exist.", []),
     Command = [
-        "send_snmptrap",
-        "--trap",
-        "CLOUDANT-DBCORE-MIB::cloudantDbcoreAllDbsAvailableEvent"
-    ],
-    os:cmd(string:join(Command, " ")).
+        "send-sensu-event --standalone --ok",
+        " --output=\"All system databases exist\"",
+        " --handler=default custodian-missing-db-check"],
+    os:cmd(lists:concat(Command)).
