@@ -2,6 +2,7 @@
 
 -module(custodian_server).
 -behaviour(gen_server).
+-behaviour(config_listener).
 
 % public api.
 -export([start_link/0]).
@@ -16,6 +17,9 @@
     handle_db_event/3
 ]).
 
+% config_listener callback
+-export([handle_config_change/5]).
+
 % private records.
 -record(state, {
     event_listener,
@@ -28,10 +32,17 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
+handle_config_change("cloudant", "maintenance_mode", _, _, S) ->
+    ok = gen_server:cast(S, refresh),
+    {ok, S};
+handle_config_change(_, _, _, _, S) ->
+    {ok, S}.
+
 % gen_server functions.
 init(_) ->
     process_flag(trap_exit, true),
     net_kernel:monitor_nodes(true),
+    ok = config:listen_for_changes(?MODULE, self()),
     {ok, LisPid} = start_event_listener(),
     {ok, start_shard_checker(#state{
         event_listener=LisPid
@@ -42,6 +53,14 @@ handle_call(_Msg, _From, State) ->
 
 handle_cast(refresh, State) ->
     {noreply, start_shard_checker(State)}.
+
+handle_info({gen_event_EXIT, {config_listener, ?MODULE}, _Reason}, State) ->
+    erlang:send_after(5000, self(), restart_config_listener),
+    {noreply, State};
+
+handle_info(restart_config_listener, State) ->
+    ok = config:listen_for_changes(?MODULE, self()),
+    {noreply, State};
 
 handle_info({nodeup, _}, State) ->
     {noreply, start_shard_checker(State)};
