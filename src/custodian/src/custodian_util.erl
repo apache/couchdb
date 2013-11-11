@@ -24,12 +24,10 @@ summary() ->
     dict:to_list(fold_dbs(dict:new(), Fun)).
 
 report() ->
-    Fun = fun(Id, Range,  unavailable, Acc) ->
-                  [{Id, Range, unavailable}|Acc];
-             (Id, Range,  {impaired, N}, Acc) ->
-                  [{Id, Range, {impaired, N}}|Acc];
-             (Id, _Range,  {conflicted, N}, Acc) ->
-                  [{Id, {conflicted, N}}|Acc]
+    Fun = fun(Id, _Range, {conflicted, N}, Acc) ->
+                  [{Id, {conflicted, N}} | Acc];
+             (Id, Range, Item, Acc) ->
+                  [{Id, Range, Item} | Acc]
           end,
     fold_dbs([], Fun).
 
