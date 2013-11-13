@@ -1059,7 +1059,7 @@
           success: function(resp) {
             page.isDirty = false;
             location.href = "?" + encodeURIComponent(dbName) +
-              "/" + $.couch.encodeDocId(page.docId);
+              "/" + $.couch.encodeDocId(resp.id);
           }
         });
       }
