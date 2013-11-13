@@ -29,8 +29,7 @@
 body {
   background-color: #F2F2F2;
 }
-
-footer {
+#main > footer {
   position: fixed;
   bottom: 0;
   font-size: 10px;
@@ -38,6 +37,9 @@ footer {
   padding: 5px 10px;
   background-color: #F2F2F2;
   width: 100%;
+  .closeMenu & {
+    margin-left: @collapsedNavWidth;
+  }
 }
 
 .hide-text {
