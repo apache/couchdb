@@ -196,8 +196,9 @@ a:hover{
         margin: 0;
         li{
           .transition(all @transitionSpeed @transitionEaseType);
-          padding: 15px 0px 15px 62px;
-          font-size: 19px;
+          padding: 0;
+          font-size: 20px;
+          line-height: 23px;
           width: @navWidth;
           font-weight: normal;
           font-family: helvetica;
@@ -214,26 +215,23 @@ a:hover{
           &:hover a.fonticon:before{
             color: @white;
           }
-          &.active a.cloudant:before,
           &.active a.fonticon:before,
-          &:hover a.cloudant:before,
           &:hover a.fonticon:before,
           {
             text-shadow: @boxShadow;
             color: @NavIconActive;
           }
           a{
+            padding: 17px 25px 12px 60px;
             background-color: transparent;
-            padding: 0;
             color: #fff;
             text-shadow: @textShadowOff;
             &.closeMenu{
               color: transparent;
             }
-            &.fonticon {
+            & span.fonticon {
               position: relative;
               &:before {
-                .transition(all @transitionSpeed @transitionEaseType);
                 position: absolute;
                 left: -44px;
                 font-size: 28px;
@@ -362,7 +360,6 @@ a:hover{
 
 .fixed-header{
   background-color: @breadcrumbBG;
-  .customTransition(left, 1s, 0.805, 0.005, 0.165, 0.985);
   position: fixed;
   top: 0;
   right: 0;
@@ -975,7 +972,7 @@ div.spinner {
 }
 
 #jump-to-doc {
-  width: 88%;
+  width: 50%;
   max-width: 600px;
   float:right;
   margin-right: 40px;

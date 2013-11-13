@@ -25,7 +25,12 @@ the License.
   <ul id="nav-links" class="nav pull-right">
     <% _.each(navLinks, function(link) { %>
     <% if (link.view) {return;}  %>
-        <li data-nav-name= "<%= link.title %>" ><a class="<%= link.icon %> fonticon" href="<%= link.href %>"><%= link.title %></a></li>
+        <li data-nav-name= "<%= link.title %>" >
+          <a href="<%= link.href %>">
+            <span class="<%= link.icon %> fonticon"></span>
+            <%= link.title %>
+          </a>
+        </li>
     <% }); %>
   </ul>
 
@@ -33,7 +38,8 @@ the License.
 
     <ul id="bottom-nav-links" class="nav">
         <li data-nav-name= "Documentation">
-            <a class="fonticon-bookmark fonticon" href="<%=getDocUrl('docs')%>" target="_blank">
+            <a href="<%=getDocUrl('docs')%>" target="_blank">
+              <span class="fonticon-bookmark fonticon"></span>
                 Documentation
             </a>
         </li>
@@ -42,8 +48,9 @@ the License.
       <% _.each(bottomNavLinks, function(link) { %>
       <% if (link.view) {return;}  %>
         <li data-nav-name= "<%= link.title %>">
-            <a class="<%= link.icon %> fonticon" href="<%= link.href %>">
-                <%= link.title %>
+            <a href="<%= link.href %>">
+              <span class="<%= link.icon %> fonticon"></span>
+              <%= link.title %>
             </a>
         </li>
       <% }); %>
@@ -53,8 +60,9 @@ the License.
       <% _.each(footerNavLinks, function(link) { %>
       <% if (link.view) {return;}  %>
         <li data-nav-name= "<%= link.title %>">
-            <a class="<%= link.icon %> fonticon" href="<%= link.href %>">
-                <%= link.title %>
+            <a href="<%= link.href %>">
+              <span class="<%= link.icon %> fonticon"></span>
+              <%= link.title %>
             </a>
         </li>
       <% }); %>
