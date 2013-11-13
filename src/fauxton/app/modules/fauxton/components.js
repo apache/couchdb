@@ -193,6 +193,7 @@ function(app, FauxtonAPI, ace) {
       this.editor = ace.edit(this.editorId);
       this.editor.setTheme("ace/theme/" + this.theme);
       this.editor.getSession().setMode("ace/mode/" + this.mode);
+      this.editor.getSession().setUseWrapMode(true);
       this.editor.setShowPrintMargin(false);
       this.editor.gotoLine(2);
       this.addCommands();
