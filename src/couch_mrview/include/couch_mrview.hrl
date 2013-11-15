@@ -72,6 +72,7 @@
     stale = false,
     inclusive_end = true,
     include_docs = false,
+    doc_options = [],
     update_seq=false,
     conflicts,
     callback,

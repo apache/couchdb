@@ -59,6 +59,13 @@
   :query boolean include_docs: Include the associated document with each result.
     If there are conflicts, only the winning revision is returned.
     Default is ``false``.
+  :query boolean attachments: Include the Base64-encoded content of
+    :ref:`attachments <api/doc/attachments>` in the documents that are included
+    if `include_docs` is ``true``. Ignored if `include_docs` isn't ``true``.
+    Default is ``false``.
+  :query boolean att_encoding_info: Include encoding information in attachment
+    stubs if `include_docs` is ``true`` and the particular attachment is
+    compressed. Ignored if `include_docs` isn't ``true``. Default is ``false``.
   :query number last-event-id: Alias of `Last-Event-ID` header.
   :query number limit: Limit number of result rows to the specified value
     (note that using ``0`` here has the same effect as ``1``).
@@ -162,6 +169,14 @@
    listen changes since current seq number.
 .. versionchanged:: 1.3.0 ``eventsource`` feed type added.
 .. versionchanged:: 1.4.0 Support ``Last-Event-ID`` header.
+.. versionchanged:: 1.6.0 added ``attachments`` and ``att_encoding_info``
+   parameters
+
+.. warning::
+   Using the ``attachments`` parameter to include attachments in the changes
+   feed is not recommended for large attachment sizes. Also note that the
+   Base64-encoding that is used leads to a 33% overhead (i.e. one third) in
+   transfer size for attachments.
 
 
 .. http:post:: /{db}/_changes
