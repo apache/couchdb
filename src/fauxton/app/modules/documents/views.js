@@ -573,7 +573,7 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, resizeColumns) {
     },
 
     selectAll: function(evt){
-      $("input:checkbox").prop('checked', !$(evt.target).hasClass('active'));
+      $("input:checkbox").prop('checked', !$(evt.target).hasClass('active')).trigger('change');
     },
 
     serialize: function() {
@@ -619,7 +619,7 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, resizeColumns) {
                          .map(function(e) { return $(this).attr("data-id"); })
                          .get();
 
-      if (!window.confirm("Are you sure you want to delete these " + eles.length + " docs?")) {
+      if (eles.length === 0 || !window.confirm("Are you sure you want to delete these " + eles.length + " docs?")) {
         return false;
       }
 
