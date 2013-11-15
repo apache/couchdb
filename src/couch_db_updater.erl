@@ -629,90 +629,115 @@ merge_rev_trees(_Limit, _Merge, [], [], AccNewInfos, AccRemoveSeqs, AccSeq) ->
     {ok, lists:reverse(AccNewInfos), AccRemoveSeqs, AccSeq};
 merge_rev_trees(Limit, MergeConflicts, [NewDocs|RestDocsList],
         [OldDocInfo|RestOldInfo], AccNewInfos, AccRemoveSeqs, AccSeq) ->
-    #full_doc_info{id=Id,rev_tree=OldTree,deleted=OldDeleted0,update_seq=OldSeq}
-            = OldDocInfo,
-    {NewRevTree, _} = lists:foldl(
-        fun({Client, #doc{revs={Pos,[_Rev|PrevRevs]}}=NewDoc}, {AccTree, OldDeleted}) ->
-            if not MergeConflicts ->
-                case couch_key_tree:merge(AccTree, couch_doc:to_path(NewDoc),
-                    Limit) of
-                {_NewTree, conflicts} when (not OldDeleted) ->
-                    send_result(Client, NewDoc, conflict),
-                    {AccTree, OldDeleted};
-                {NewTree, conflicts} when PrevRevs /= [] ->
-                    % Check to be sure if prev revision was specified, it's
-                    % a leaf node in the tree
-                    Leafs = couch_key_tree:get_all_leafs(AccTree),
-                    IsPrevLeaf = lists:any(fun({_, {LeafPos, [LeafRevId|_]}}) ->
-                            {LeafPos, LeafRevId} == {Pos-1, hd(PrevRevs)}
-                        end, Leafs),
-                    if IsPrevLeaf ->
-                        {NewTree, OldDeleted};
-                    true ->
-                        send_result(Client, NewDoc, conflict),
-                        {AccTree, OldDeleted}
-                    end;
-                {NewTree, no_conflicts} when  AccTree == NewTree ->
-                    % the tree didn't change at all
-                    % meaning we are saving a rev that's already
-                    % been editted again.
-                    if (Pos == 1) and OldDeleted ->
-                        % this means we are recreating a brand new document
-                        % into a state that already existed before.
-                        % put the rev into a subsequent edit of the deletion
-                        #doc_info{revs=[#rev_info{rev={OldPos,OldRev}}|_]} =
-                                couch_doc:to_doc_info(OldDocInfo),
-                        NewRevId = couch_db:new_revid(
-                                NewDoc#doc{revs={OldPos, [OldRev]}}),
-                        NewDoc2 = NewDoc#doc{revs={OldPos + 1, [NewRevId, OldRev]}},
-                        {NewTree2, _} = couch_key_tree:merge(AccTree,
-                                couch_doc:to_path(NewDoc2), Limit),
-                        % we changed the rev id, this tells the caller we did
-                        send_result(Client, NewDoc,
-                                {ok, {OldPos + 1, NewRevId}}),
-                        {NewTree2, OldDeleted};
-                    true ->
-                        send_result(Client, NewDoc, conflict),
-                        {AccTree, OldDeleted}
-                    end;
-                {NewTree, _} ->
-                    {NewTree, NewDoc#doc.deleted}
-                end;
-            true ->
-                {NewTree, _} = couch_key_tree:merge(AccTree,
-                            couch_doc:to_path(NewDoc), Limit),
-                {NewTree, OldDeleted}
-            end
-        end,
-        {OldTree, OldDeleted0}, NewDocs),
-    if NewRevTree == OldTree ->
+    NewDocInfo0 = lists:foldl(fun({Client, NewDoc}, OldInfoAcc) ->
+        merge_rev_tree(OldInfoAcc, NewDoc, Client, Limit, MergeConflicts)
+    end, OldDocInfo, NewDocs),
+    % When MergeConflicts is false, we updated #full_doc_info.deleted on every
+    % iteration of merge_rev_tree. However, merge_rev_tree does not update
+    % #full_doc_info.deleted when MergeConflicts is true, since we don't need
+    % to know whether the doc is deleted between iterations. Since we still
+    % need to know if the doc is deleted after the merge happens, we have to
+    % set it here.
+    NewDocInfo1 = case MergeConflicts of
+        true ->
+            NewDocInfo0#full_doc_info{
+                deleted = couch_doc:is_deleted(NewDocInfo0)
+            };
+        false ->
+            NewDocInfo0
+    end,
+    if NewDocInfo1 == OldDocInfo ->
         % nothing changed
         merge_rev_trees(Limit, MergeConflicts, RestDocsList, RestOldInfo,
             AccNewInfos, AccRemoveSeqs, AccSeq);
     true ->
-        % we have updated the document, give it a new seq #
-        NewInfo = #full_doc_info{id=Id,update_seq=AccSeq+1,rev_tree=NewRevTree},
+        % We have updated the document, give it a new update_seq. Its
+        % important to note that the update_seq on OldDocInfo should
+        % be identical to the value on NewDocInfo1.
+        OldSeq = OldDocInfo#full_doc_info.update_seq,
+        NewDocInfo2 = NewDocInfo1#full_doc_info{
+            update_seq = AccSeq + 1
+        },
         RemoveSeqs = case OldSeq of
             0 -> AccRemoveSeqs;
             _ -> [OldSeq | AccRemoveSeqs]
         end,
         merge_rev_trees(Limit, MergeConflicts, RestDocsList, RestOldInfo,
-            [NewInfo|AccNewInfos], RemoveSeqs, AccSeq+1)
+            [NewDocInfo2|AccNewInfos], RemoveSeqs, AccSeq+1)
     end.
 
+merge_rev_tree(OldInfo, NewDoc, Client, Limit, false)
+        when OldInfo#full_doc_info.deleted ->
+    % We're recreating a document that was previously
+    % deleted. To check that this is a recreation from
+    % the root we assert that the new document has a
+    % revision depth of 1 (this is to avoid recreating a
+    % doc from a previous internal revision) and is also
+    % not deleted. To avoid expanding the revision tree
+    % unnecessarily we create a new revision based on
+    % the winning deleted revision.
 
+    {RevDepth, _} = NewDoc#doc.revs,
+    NewDeleted = NewDoc#doc.deleted,
+    case RevDepth == 1 andalso not NewDeleted of
+        true ->
+            % Update the new doc based on revisions in OldInfo
+            #doc_info{revs=[WinningRev | _]} = couch_doc:to_doc_info(OldInfo),
+            #rev_info{rev={OldPos, OldRev}} = WinningRev,
+            NewRevId = couch_db:new_revid(NewDoc#doc{revs={OldPos, [OldRev]}}),
+            NewDoc2 = NewDoc#doc{revs={OldPos + 1, [NewRevId, OldRev]}},
 
-new_index_entries([], AccById, AccDDocIds) ->
-    {AccById, AccDDocIds};
-new_index_entries([#full_doc_info{id=Id}=Info | Rest], AccById, AccDDocIds) ->
-    #doc_info{revs=[#rev_info{deleted=Del}|_]} = couch_doc:to_doc_info(Info),
-    AccById2 = [Info#full_doc_info{deleted=Del} | AccById],
-    AccDDocIds2 = case Id of
-        <<?DESIGN_DOC_PREFIX, _/binary>> -> [Id | AccDDocIds];
-        _ -> AccDDocIds
-    end,
-    new_index_entries(Rest, AccById2, AccDDocIds2).
+            % Merge our modified new doc into the tree
+            #full_doc_info{rev_tree=OldTree} = OldInfo,
+            NewTree0 = couch_doc:to_path(NewDoc2),
+            case couch_key_tree:merge(OldTree, NewTree0, Limit) of
+                {NewTree1, new_leaf} ->
+                    % We changed the revision id so inform the caller
+                    send_result(Client, NewDoc, {ok, {OldPos+1, NewRevId}}),
+                    OldInfo#full_doc_info{
+                        rev_tree = NewTree1,
+                        deleted = false
+                    };
+                _ ->
+                    throw(doc_recreation_failed)
+            end;
+        _ ->
+            send_result(Client, NewDoc, conflict),
+            OldInfo
+    end;
+merge_rev_tree(OldInfo, NewDoc, Client, Limit, false) ->
+    % We're attempting to merge a new revision into an
+    % undeleted document. To not be a conflict we require
+    % that the merge results in extending a branch.
 
+    OldTree = OldInfo#full_doc_info.rev_tree,
+    NewTree0 = couch_doc:to_path(NewDoc),
+    NewDeleted = NewDoc#doc.deleted,
+    case couch_key_tree:merge(OldTree, NewTree0, Limit) of
+        {NewTree, new_leaf} when not NewDeleted ->
+            OldInfo#full_doc_info{
+                rev_tree = NewTree,
+                deleted = false
+            };
+        {NewTree, new_leaf} when NewDeleted ->
+            % We have to check if we just deleted this
+            % document completely or if it was a conflict
+            % resolution.
+            OldInfo#full_doc_info{
+                rev_tree = NewTree,
+                deleted = couch_doc:is_deleted(NewTree)
+            };
+        _ ->
+            send_result(Client, NewDoc, conflict),
+            OldInfo
+    end;
+merge_rev_tree(OldInfo, NewDoc, _Client, Limit, true) ->
+    % We're merging in revisions without caring about
+    % conflicts. Most likely this is a replication update.
+    OldTree = OldInfo#full_doc_info.rev_tree,
+    NewTree0 = couch_doc:to_path(NewDoc),
+    {NewTree, _} = couch_key_tree:merge(OldTree, NewTree0, Limit),
+    OldInfo#full_doc_info{rev_tree = NewTree}.
 
 stem_full_doc_infos(#db{revs_limit=Limit}, DocInfos) ->
     [Info#full_doc_info{rev_tree=couch_key_tree:stem(Tree, Limit)} ||
@@ -745,10 +770,7 @@ update_docs_int(Db, DocsList, NonRepDocs, MergeConflicts, FullCommit) ->
 
     % Write out the document summaries (the bodies are stored in the nodes of
     % the trees, the attachments are already written to disk)
-    {ok, FlushedFullDocInfos} = flush_trees(Db2, NewFullDocInfos, []),
-
-    {IndexFullDocInfos, UpdatedDDocIds} =
-            new_index_entries(FlushedFullDocInfos, [], []),
+    {ok, IndexFullDocInfos} = flush_trees(Db2, NewFullDocInfos, []),
 
     % and the indexes
     {ok, DocInfoByIdBTree2} = couch_btree:add_remove(DocInfoByIdBTree, IndexFullDocInfos, []),
@@ -761,6 +783,11 @@ update_docs_int(Db, DocsList, NonRepDocs, MergeConflicts, FullCommit) ->
 
     % Check if we just updated any design documents, and update the validation
     % funs if we did.
+    UpdatedDDocIds = lists:flatmap(fun
+        (<<"_design/", _/binary>> = Id) -> [Id];
+        (_) -> []
+    end, Ids),
+
     Db4 = case length(UpdatedDDocIds) > 0 of
         true ->
             couch_event:notify(Db3#db.name, ddoc_updated),
