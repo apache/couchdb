@@ -37,7 +37,7 @@
 %% this limit is exceeded only the last 1000 are kept. This comes in to play
 %% when branches are merged. The comparison has to begin at the same place in
 %% the branches. A revision id is of the form N-XXXXXXX where N is the current
-%% revision. So each path will have a start number, calculated in
+%% revision depth. So each path will have a start number, calculated in
 %% couch_doc:to_path using the formula N - length(RevIds) + 1 So, .eg. if a doc
 %% was edit 1003 times this start number would be 4, indicating that 3
 %% revisions were truncated.
@@ -47,9 +47,22 @@
 
 -module(couch_key_tree).
 
--export([merge/3, find_missing/2, get_key_leafs/2, get_full_key_paths/2, get/2]).
--export([get_all_leafs/1, count_leafs/1, remove_leafs/2, get_all_leafs_full/1, stem/2]).
--export([map/2, mapfold/3, map_leafs/2, fold/3]).
+-export([
+count_leafs/1,
+find_missing/2,
+fold/3,
+get/2,
+get_all_leafs/1,
+get_all_leafs_full/1,
+get_full_key_paths/2,
+get_key_leafs/2,
+map/2,
+map_leafs/2,
+mapfold/3,
+merge/3,
+remove_leafs/2,
+stem/2
+]).
 
 -include_lib("couch/include/couch_db.hrl").
 
