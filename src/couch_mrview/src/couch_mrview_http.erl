@@ -348,6 +348,22 @@ parse_qs(Key, Val, Args) ->
             Args#mrargs{inclusive_end=parse_boolean(Val)};
         "include_docs" ->
             Args#mrargs{include_docs=parse_boolean(Val)};
+        "attachments" ->
+            case parse_boolean(Val) of
+            true ->
+                Opts = Args#mrargs.doc_options,
+                Args#mrargs{doc_options=[attachments|Opts]};
+            false ->
+                Args
+            end;
+        "att_encoding_info" ->
+            case parse_boolean(Val) of
+            true ->
+                Opts = Args#mrargs.doc_options,
+                Args#mrargs{doc_options=[att_encoding_info|Opts]};
+            false ->
+                Args
+            end;
         "update_seq" ->
             Args#mrargs{update_seq=parse_boolean(Val)};
         "conflicts" ->

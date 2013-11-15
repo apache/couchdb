@@ -41,8 +41,15 @@
   :query boolean group: Group the results using the reduce function to a group
     or single row. Default is ``false``
   :query number group_level: Specify the group level to be used. *Optional*
-  :query boolean include_docs: Include the full content of the documents in
-    the return. Default is ``false``
+  :query boolean include_docs: Include the associated document with each row.
+    Default is ``false``.
+  :query boolean attachments: Include the Base64-encoded content of
+    :ref:`attachments <api/doc/attachments>` in the documents that are included
+    if `include_docs` is ``true``. Ignored if `include_docs` isn't ``true``.
+    Default is ``false``.
+  :query boolean att_encoding_info: Include encoding information in attachment
+    stubs if `include_docs` is ``true`` and the particular attachment is
+    compressed. Ignored if `include_docs` isn't ``true``. Default is ``false``.
   :query boolean inclusive_end: Specifies whether the specified end key should
     be included in the result. Default is ``true``
   :query string key: Return only documents that match the specified key.
@@ -122,6 +129,15 @@
         ],
         "total_rows": 3
     }
+
+.. versionchanged:: 1.6.0 added ``attachments`` and ``att_encoding_info``
+   parameters
+
+.. warning::
+   Using the ``attachments`` parameter to include attachments in view results
+   is not recommended for large attachment sizes. Also note that the
+   Base64-encoding that is used leads to a 33% overhead (i.e. one third) in
+   transfer size for attachments.
 
 
 .. http:post:: /{db}/_design/{ddoc}/_view/{view}

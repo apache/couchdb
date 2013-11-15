@@ -80,8 +80,8 @@
 
   :query boolean attachments: Includes attachments bodies in response.
     Default is ``false``
-  :query boolean att_encoding_info: Includes encoding information into
-    attachment's stubs for compressed ones. Default is ``false``
+  :query boolean att_encoding_info: Includes encoding information in attachment
+    stubs if the particular attachment is compressed. Default is ``false``.
   :query array atts_since: Includes attachments only since specified revisions.
     Doesn't includes attachments for specified revisions. *Optional*
   :query boolean conflicts: Includes information about conflicts in document.
@@ -396,16 +396,28 @@ information objects with next structure:
 
 - **content_type** (*string*): Attachment MIME type
 - **data** (*string*): Base64-encoded content. Available if attachment content
-  requested by using ``attachments=true`` or ``atts_since`` query parameters
+  is requested by using the following query parameters:
+    - ``attachments=true`` when querying a document
+    - ``attachments=true&include_docs=true`` when querying a
+      :ref:`changes feed <api/db/changes>` or a :ref:`view <api/ddoc/view>`
+    - ``atts_since``.
 - **digest** (*string*): Content hash digest.
   It starts with prefix which announce hash type (``md5-``) and continues with
   Base64-encoded hash digest
-- **encoded_length** (*number*): Compressed attachment size in bytes
-  Available when query parameter ``att_encoding_info=true`` was specified and
-  ``content_type`` is in :config:option:`list of compressiable types
-  <attachments/compressible_types>`
-- **encoding** (*string*): Compression codec. Available when query parameter
-  ``att_encoding_info=true`` was specified
+- **encoded_length** (*number*): Compressed attachment size in bytes.
+  Available if ``content_type`` is in :config:option:`list of compressible types
+  <attachments/compressible_types>` when the attachment was added and the
+  following query parameters are specified:
+    - ``att_encoding_info=true`` when querying a document
+    - ``att_encoding_info=true&include_docs=true`` when querying a
+      :ref:`changes feed <api/db/changes>` or a :ref:`view <api/ddoc/view>`
+- **encoding** (*string*): Compression codec. Available if ``content_type`` is
+  in :config:option:`list of compressible types
+  <attachments/compressible_types>` when the attachment was added and the
+  following query parameters are specified:
+    - ``att_encoding_info=true`` when querying a document
+    - ``att_encoding_info=true&include_docs=true`` when querying a
+      :ref:`changes feed <api/db/changes>` or a :ref:`view <api/ddoc/view>`
 - **length** (*number*): Real attachment size in bytes. Not available if attachment
   content requested
 - **revpos** (*number*): Revision *number* when attachment was added
