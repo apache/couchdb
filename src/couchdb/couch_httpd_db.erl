@@ -1141,6 +1141,8 @@ parse_changes_query(Req, Db) ->
             Args#changes_args{timeout=list_to_integer(Value)};
         {"include_docs", "true"} ->
             Args#changes_args{include_docs=true};
+        {"attachments", "true"} ->
+            Args#changes_args{attachments=true};
         {"conflicts", "true"} ->
             Args#changes_args{conflicts=true};
         {"filter", _} ->

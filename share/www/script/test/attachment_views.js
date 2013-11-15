@@ -19,13 +19,15 @@ couchTests.attachment_views= function(debug) {
 
   // count attachments in a view
 
+  var attachmentData = "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ=";
+
   db.bulkSave(makeDocs(0, 10));
 
   db.bulkSave(makeDocs(10, 20, {
     _attachments:{
       "foo.txt": {
         content_type:"text/plain",
-        data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
+        data: attachmentData
       }
     }
   }));
@@ -34,11 +36,11 @@ couchTests.attachment_views= function(debug) {
     _attachments:{
       "foo.txt": {
         content_type:"text/plain",
-        data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
+        data: attachmentData
       },
       "bar.txt": {
         content_type:"text/plain",
-        data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
+        data: attachmentData
       }
     }
   }));
@@ -47,15 +49,15 @@ couchTests.attachment_views= function(debug) {
     _attachments:{
       "foo.txt": {
         content_type:"text/plain",
-        data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
+        data: attachmentData
       },
       "bar.txt": {
         content_type:"text/plain",
-        data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
+        data: attachmentData
       },
       "baz.txt": {
         content_type:"text/plain",
-        data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
+        data: attachmentData
       }
     }
   }));
@@ -95,4 +97,30 @@ couchTests.attachment_views= function(debug) {
   T(result.rows.length == 1);
   T(result.rows[0].value == 20);
 
+  var result = db.query(mapFunction, null, {
+    startkey: 20,
+    endkey: 29,
+    include_docs: true
+  });
+
+  T(result.rows.length == 10);
+  T(result.rows[0].value == 2);
+  T(result.rows[0].doc._attachments['foo.txt'].stub === true);
+  T(result.rows[0].doc._attachments['foo.txt'].data === undefined);
+  T(result.rows[0].doc._attachments['bar.txt'].stub === true);
+  T(result.rows[0].doc._attachments['bar.txt'].data === undefined);
+
+  var result = db.query(mapFunction, null, {
+    startkey: 20,
+    endkey: 29,
+    include_docs: true,
+    attachments: true
+  });
+
+  T(result.rows.length == 10);
+  T(result.rows[0].value == 2);
+  T(result.rows[0].doc._attachments['foo.txt'].data === attachmentData);
+  T(result.rows[0].doc._attachments['foo.txt'].stub === undefined);
+  T(result.rows[0].doc._attachments['bar.txt'].data === attachmentData);
+  T(result.rows[0].doc._attachments['bar.txt'].stub === undefined);
 };
