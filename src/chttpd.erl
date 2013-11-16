@@ -637,9 +637,10 @@ send_delayed_chunk(#delayed_resp{}=DelayedResp, Chunk) ->
 send_delayed_last_chunk(Req) ->
     send_delayed_chunk(Req, []).
 
-send_delayed_error(#delayed_resp{req=Req,resp=nil}, Reason) ->
+send_delayed_error(#delayed_resp{req=Req,resp=nil}=DelayedResp, Reason) ->
     {Code, ErrorStr, ReasonStr} = error_info(Reason),
-    send_error(Req, Code, ErrorStr, ReasonStr);
+    {ok, Resp} = send_error(Req, Code, ErrorStr, ReasonStr),
+    {ok, DelayedResp#delayed_resp{resp=Resp}};
 send_delayed_error(#delayed_resp{resp=Resp}, Reason) ->
     log_stack_trace(json_stack(Reason)),
     throw({http_abort, Resp, Reason}).
