@@ -420,6 +420,18 @@ calculate_start_seq(Db, Node, {Seq, Uuid}) ->
             %% The file was rebuilt, most likely in a different
             %% order, so rewind.
             0
+    end;
+calculate_start_seq(Db, _Node, {replace, OriginalNode, Uuid, Seq}) ->
+    case is_prefix(Uuid, couch_db:get_uuid(Db)) of
+        true ->
+            start_seq(get_epochs(Db), OriginalNode, Seq);
+        false ->
+            %% Scan history looking for an entry with
+            %%  * target_node == TargetNode
+            %%  * target_uuid == TargetUUID
+            %%  * target_seq  =< TargetSeq
+            %% If such an entry is found, stream from associated source_seq
+            mem3_rep:find_source_seq(Db, OriginalNode, Uuid, Seq)
     end.
 
 is_prefix(Pattern, Subject) ->
@@ -435,6 +447,24 @@ owner_of(Seq, [{EpochNode, EpochSeq} | _Rest]) when Seq > EpochSeq ->
     EpochNode;
 owner_of(Seq, [_ | Rest]) ->
     owner_of(Seq, Rest).
+
+get_epochs(Db) ->
+    Epochs = couch_db:get_epochs(Db),
+    validate_epochs(Epochs),
+    Epochs.
+
+start_seq([{OrigNode, EpochSeq} | _], OrigNode, Seq) when Seq > EpochSeq ->
+    %% OrigNode is the owner of the Seq so we can safely stream from there
+    Seq;
+start_seq([{_, NewSeq}, {OrigNode, _} | _], OrigNode, Seq) when Seq > NewSeq ->
+    %% We transferred this file before Seq was written on OrigNode, so we need
+    %% to stream from the beginning of the next epoch. Note that it is _not_
+    %% necessary for the current node to own the epoch beginning at NewSeq
+    NewSeq;
+start_seq([_ | Rest], OrigNode, Seq) ->
+    start_seq(Rest, OrigNode, Seq);
+start_seq([], OrigNode, Seq) ->
+    erlang:error({epoch_mismatch, OrigNode, Seq}).
 
 validate_epochs(Epochs) ->
     %% Assert uniqueness.
