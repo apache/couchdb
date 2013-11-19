@@ -27,7 +27,6 @@ require.config({
     backbone: "../assets/js/libs/backbone",
     "backbone.layoutmanger": "../assets/js/plugins/backbone.layoutmanager",
     bootstrap: "../assets/js/libs/bootstrap",
-    jshint: "../assets/js/libs/jshint",
     spin: "../assets/js/libs/spin.min",
     d3: "../assets/js/libs/d3",
     "nv.d3": "../assets/js/libs/nv.d3",
@@ -54,11 +53,6 @@ require.config({
     bootstrap: {
       deps: ["jquery"],
       exports: "Bootstrap"
-    },
-
-    jshint: {
-      deps: ["jquery"],
-      exports: "JSHINT"
     },
 
     "plugins/prettify": [],
