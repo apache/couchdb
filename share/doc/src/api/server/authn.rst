@@ -275,7 +275,7 @@ Proxy Authentication
    .. code-block:: ini
 
       [httpd]
-      authentication_handlers = {couch_httpd_oauth, oauth_authentication_handler}, {couch_httpd_auth, cookie_authentication_handler}, {couch_httpd_auth, proxy_authentication_handler}, {couch_httpd_auth, default_authentication_handler}
+      authentication_handlers = {couch_httpd_oauth, oauth_authentication_handler}, {couch_httpd_auth, cookie_authentication_handler}, {couch_httpd_auth, proxy_authentification_handler}, {couch_httpd_auth, default_authentication_handler}
 
 
 `Proxy authentication` is very useful in case your application already uses
