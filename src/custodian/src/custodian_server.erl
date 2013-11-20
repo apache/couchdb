@@ -98,6 +98,9 @@ code_change(_OldVsn, {state, Pid}, _Extra) ->
         shard_checker=undefined,
         rescan=false
     }};
+code_change("0.2.7", State, _Extra) ->
+    ok = config:listen_for_changes(?MODULE, self()),
+    {ok, State};
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
