@@ -69,7 +69,8 @@
     source_monitor = nil,
     target_monitor = nil,
     source_seq = nil,
-    use_checkpoints = true
+    use_checkpoints = true,
+    checkpoint_interval = 5000
 }).
 
 
@@ -248,7 +249,8 @@ do_init(#rep{options = Options, id = {BaseId, Ext}} = Rep) ->
         target_name = TargetName,
         start_seq = {_Ts, StartSeq},
         source_seq = SourceCurSeq,
-        committed_seq = {_, CommittedSeq}
+        committed_seq = {_, CommittedSeq},
+        checkpoint_interval = CheckpointInterval
     } = State = init_state(Rep),
 
     NumWorkers = get_value(worker_processes, Options),
@@ -289,7 +291,8 @@ do_init(#rep{options = Options, id = {BaseId, Ext}} = Rep) ->
         {doc_write_failures, 0},
         {source_seq, SourceCurSeq},
         {checkpointed_source_seq, CommittedSeq},
-        {progress, 0}
+        {progress, 0},
+        {checkpoint_interval, CheckpointInterval}
     ]),
     couch_task_status:set_update_frequency(1000),
 
@@ -456,9 +459,11 @@ handle_cast({report_seq, Seq},
     {noreply, State#rep_state{seqs_in_progress = NewSeqsInProgress}}.
 
 
-code_change(_OldVsn, OldState, _Extra) when tuple_size(OldState) =:= 30 ->
-    {ok, erlang:append_element(OldState, true)};
-code_change(_OldVsn, State, _Extra) ->
+code_change(OldVsn, OldState, Extra) when tuple_size(OldState) =:= 30 ->
+    code_change(OldVsn, erlang:append_element(OldState, true), Extra);
+code_change(OldVsn, OldState, Extra) when tuple_size(OldState) =:= 31 ->
+    code_change(OldVsn, erlang:append_element(OldState, 5000), Extra);
+code_change(_OldVsn, #rep_state{}=State, _Extra) ->
     {ok, State}.
 
 
@@ -508,7 +513,7 @@ do_last_checkpoint(#rep_state{seqs_in_progress = [],
 
 
 start_timer(State) ->
-    After = checkpoint_interval(State),
+    After = State#rep_state.checkpoint_interval,
     case timer:apply_after(After, gen_server, cast, [self(), checkpoint]) of
     {ok, Ref} ->
         Ref;
@@ -567,7 +572,8 @@ init_state(Rep) ->
         source_monitor = db_monitor(Source),
         target_monitor = db_monitor(Target),
         source_seq = get_value(<<"update_seq">>, SourceInfo, ?LOWEST_SEQ),
-        use_checkpoints = get_value(use_checkpoints, Options, true)
+        use_checkpoints = get_value(use_checkpoints, Options, true),
+        checkpoint_interval = get_value(checkpoint_interval, Options, 5000)
     },
     State#rep_state{timer = start_timer(State)}.
 
@@ -672,9 +678,6 @@ changes_manager_loop_open(Parent, ChangesQueue, BatchSize, Ts) ->
         changes_manager_loop_open(Parent, ChangesQueue, BatchSize, Ts + 1)
     end.
 
-
-checkpoint_interval(_State) ->
-    5000.
 
 do_checkpoint(#rep_state{use_checkpoints=false} = State) ->
     NewState = State#rep_state{checkpoint_history = {[{<<"use_checkpoints">>, false}]} },
