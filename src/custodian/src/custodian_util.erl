@@ -9,27 +9,24 @@
 -export([summary/0, report/0]).
 -export([ensure_dbs_exists/0]).
 
+-record(state, {live, safe, n, callback, db, acc}).
+
 %% public functions.
 
 summary() ->
-    Fun = fun(_Id, _Range,  unavailable, {U, O, I, C}) ->
-                  {U + 1, O, I, C};
-             (_Id, _Range,  {impaired, 1}, {U, O, I, C}) ->
-                  {U, O + 1, I, C};
-             (_Id, _Range,  {impaired, _N}, {U, O, I, C}) ->
-                  {U, O, I + 1, C};
-             (_Id, _Range, {conflicted, _N}, {U, O, I, C}) ->
-                  {U, O, I, C + 1}
-          end,
-    fold_dbs({0, 0, 0, 0}, Fun).
+    Dict0 = dict:from_list([{conflicted, 0}] ++
+        [{{live, N}, 0} || N <- lists:seq(0, cluster_n() - 1)] ++
+        [{{safe, N}, 0} || N <- lists:seq(0, cluster_n() - 1)]),
+    Fun = fun(_Id, _Range, Item, Dict) ->
+        dict:update_counter(Item, 1, Dict)
+    end,
+    dict:to_list(fold_dbs(Dict0, Fun)).
 
 report() ->
-    Fun = fun(Id, Range,  unavailable, Acc) ->
-                  [{Id, Range, unavailable}|Acc];
-             (Id, Range,  {impaired, N}, Acc) ->
-                  [{Id, Range, {impaired, N}}|Acc];
-             (Id, _Range,  {conflicted, N}, Acc) ->
-                  [{Id, {conflicted, N}}|Acc]
+    Fun = fun(Id, _Range, {conflicted, N}, Acc) ->
+                  [{Id, {conflicted, N}} | Acc];
+             (Id, Range, Item, Acc) ->
+                  [{Id, Range, Item} | Acc]
           end,
     fold_dbs([], Fun).
 
@@ -41,13 +38,15 @@ ensure_dbs_exists() ->
 
 %% private functions.
 
-fold_dbs(Acc0, Fun) ->
-    Live = [node() | nodes()],
-    N = list_to_integer(config:get("cluster", "n", "3")),
+fold_dbs(Acc, Fun) ->
+    Safe = maybe_redirect([node() | nodes()]),
+    Live = Safe -- maintenance_nodes(Safe),
+    N = cluster_n(),
     {ok, Db} = ensure_dbs_exists(),
     try
-        {ok, _, {_, _, _, _, Acc1}} = couch_db:enum_docs(Db, fun fold_dbs/3, {Live, N, Fun, Db, Acc0}, []),
-        Acc1
+        State0 = #state{live=Live, safe=Safe, n=N, callback=Fun, db=Db, acc=Acc},
+        {ok, _, State1} = couch_db:enum_docs(Db, fun fold_dbs/3, State0, []),
+        State1#state.acc
     after
         couch_db:close(Db)
     end.
@@ -56,31 +55,47 @@ fold_dbs(#full_doc_info{id = <<"_design/", _/binary>>}, _, Acc) ->
     {ok, Acc};
 fold_dbs(#full_doc_info{deleted=true}, _, Acc) ->
     {ok, Acc};
-fold_dbs(#full_doc_info{id = Id} = FDI, _, {_Live, _N, Fun, Db, Acc0} = Acc) ->
+fold_dbs(#full_doc_info{id = Id} = FDI, _, State) ->
     InternalAcc = case count_conflicts(FDI) of
         0 ->
-            Acc0;
+            State#state.acc;
         ConflictCount ->
-            Fun(Id, null, {conflicted, ConflictCount}, Acc0)
+            (State#state.callback)(Id, null, {conflicted, ConflictCount}, State#state.acc)
     end,
-    Shards = load_shards(Db, FDI),
+    Shards = load_shards(State#state.db, FDI),
     Rs = [R || #shard{range=R} <- lists:ukeysort(#shard.range, Shards)],
     ActualN = [{R1, [N || #shard{node=N,range=R2} <- Shards, R1 == R2]} ||  R1 <- Rs],
-    fold_dbs(Id, ActualN, setelement(5, Acc, InternalAcc));
+    fold_dbs(Id, ActualN, State#state{acc=InternalAcc});
 fold_dbs(_Id, [], Acc) ->
     {ok, Acc};
-fold_dbs(Id, [{Range, Nodes}|Rest], {Live, N, Fun, Db, Acc0}) ->
-    Nodes1 = maybe_redirect(Nodes),
-    Nodes2 = [Node || Node <- Nodes1, lists:member(Node, Live)],
-    Acc1 = case length(Nodes2) of
-        0 ->
-            Fun(Id, Range, unavailable, Acc0);
-        N1 when N1 < N ->
-            Fun(Id, Range, {impaired, N1}, Acc0);
-        _ ->
-            Acc0
+fold_dbs(Id, [{Range, Nodes}|Rest], State) ->
+    Live = [Node || Node <- Nodes, lists:member(Node, State#state.live)],
+    Safe = [Node || Node <- Nodes, lists:member(Node, State#state.safe)],
+    TargetN = State#state.n,
+    Acc0 = State#state.acc,
+
+    Acc1 = case length(Live) of
+        TargetN ->
+            Acc0;
+        LiveN ->
+            (State#state.callback)(Id, Range, {live, LiveN}, Acc0)
     end,
-    fold_dbs(Id, Rest, {Live, N, Fun, Db, Acc1}).
+
+    Acc2 = case length(Safe) of
+        TargetN ->
+            Acc1;
+        SafeN ->
+            (State#state.callback)(Id, Range, {safe, SafeN}, Acc1)
+    end,
+
+    fold_dbs(Id, Rest, State#state{acc=Acc2}).
+
+cluster_n() ->
+    list_to_integer(config:get("cluster", "n", "3")).
+
+maintenance_nodes(Nodes) ->
+    {Modes, _} = rpc:multicall(Nodes, config, get, ["cloudant", "maintenance_mode"]),
+    [N || {N, Mode} <- lists:zip(Nodes, Modes), Mode =:= "true"].
 
 load_shards(Db, #full_doc_info{id = Id} = FDI) ->
     case couch_db:open_doc(Db, FDI, []) of

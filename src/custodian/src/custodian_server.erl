@@ -2,6 +2,7 @@
 
 -module(custodian_server).
 -behaviour(gen_server).
+-behaviour(config_listener).
 
 % public api.
 -export([start_link/0]).
@@ -16,6 +17,9 @@
     handle_db_event/3
 ]).
 
+% config_listener callback
+-export([handle_config_change/5]).
+
 % private records.
 -record(state, {
     event_listener,
@@ -28,10 +32,17 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
+handle_config_change("cloudant", "maintenance_mode", _, _, S) ->
+    ok = gen_server:cast(S, refresh),
+    {ok, S};
+handle_config_change(_, _, _, _, S) ->
+    {ok, S}.
+
 % gen_server functions.
 init(_) ->
     process_flag(trap_exit, true),
     net_kernel:monitor_nodes(true),
+    ok = config:listen_for_changes(?MODULE, self()),
     {ok, LisPid} = start_event_listener(),
     {ok, start_shard_checker(#state{
         event_listener=LisPid
@@ -42,6 +53,14 @@ handle_call(_Msg, _From, State) ->
 
 handle_cast(refresh, State) ->
     {noreply, start_shard_checker(State)}.
+
+handle_info({gen_event_EXIT, {config_listener, ?MODULE}, _Reason}, State) ->
+    erlang:send_after(5000, self(), restart_config_listener),
+    {noreply, State};
+
+handle_info(restart_config_listener, State) ->
+    ok = config:listen_for_changes(?MODULE, self()),
+    {noreply, State};
 
 handle_info({nodeup, _}, State) ->
     {noreply, start_shard_checker(State)};
@@ -79,6 +98,9 @@ code_change(_OldVsn, {state, Pid}, _Extra) ->
         shard_checker=undefined,
         rescan=false
     }};
+code_change("0.2.7", State, _Extra) ->
+    ok = config:listen_for_changes(?MODULE, self()),
+    {ok, State};
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
@@ -106,31 +128,43 @@ handle_db_event(_DbName, _Event, _St) ->
     {ok, nil}.
 
 check_shards() ->
-    {Unavailable, OneCopy, Impaired, Conflicted} = custodian:summary(),
-    send_conflicted_alert(Conflicted),
-    send_unavailable_alert(Unavailable),
-    send_one_copy_alert(OneCopy),
-    send_impaired_alert(Impaired).
+    [send_sensu_event(Item) || Item <- custodian:summary()].
 
-%% specific alert functions
-send_conflicted_alert(Count) ->
-    send_snmp_alert(Count, "partition tables conflicted", "NoPartitionTablesConflictedEvent", "PartitionTablesConflictedEvent").
-
-send_impaired_alert(Count) ->
-    send_snmp_alert(Count, "shards impaired", "AllShardsUnimpairedEvent", "ShardsImpairedEvent").
-
-send_unavailable_alert(Count) ->
-    send_snmp_alert(Count, "unavailable shards", "AllShardsAvailableEvent", "ShardsUnavailableEvent").
-
-send_one_copy_alert(Count) ->
-    send_snmp_alert(Count, "shards with only one copy", "AllShardsMultipleCopiesEvent", "ShardsOneCopyEvent").
-
-%% generic SNMP alert functions
-send_snmp_alert(0, AlertType, ClearMib, _) ->
-    twig:log(notice, "No ~s in this cluster", [AlertType]),
-    Cmd = lists:concat(["send_snmptrap --trap CLOUDANT-DBCORE-MIB::cloudantDbcore", ClearMib]),
-    os:cmd(Cmd);
-send_snmp_alert(Count, AlertType, _, AlertMib) when is_integer(Count) ->
-    twig:log(crit, "~B ~s in this cluster", [Count, AlertType]),
-    Cmd = lists:concat(["send_snmptrap --trap CLOUDANT-DBCORE-MIB::cloudantDbcore", AlertMib," -o cloudantDbcoreShardCount:INTEGER:", Count]),
+send_sensu_event({_, Count} = Item) ->
+    if Count > 0 -> twig:log(crit, "~s", [describe(Item)]); true -> ok end,
+    Cmd = lists:concat(["send-sensu-event --standalone ",
+                        level(Item),
+                        " --output=\"",
+                        describe(Item),
+                        "\" ",
+                        check_name(Item)]),
     os:cmd(Cmd).
+
+level({_, 0}) ->
+    "--ok";
+level(_) ->
+    "--critical".
+
+describe({{safe, N}, Count}) ->
+    lists:concat([Count, " ", shards(Count), " in cluster with only ", N,
+                  " ", copies(N), " on nodes that are currently up"]);
+describe({{live, N}, Count}) ->
+    lists:concat([Count, " ", shards(Count), " in cluster with only ",
+                  N, " ", copies(N), " on nodes not in maintenance mode"]);
+describe({conflicted, Count}) ->
+    lists:concat([Count, " conflicted ", shards(Count), " in cluster"]).
+
+check_name({{Type, N}, _}) ->
+    lists:concat(["custodian-", N, "-", Type, "-shards-check"]);
+check_name({Type, _}) ->
+    lists:concat(["custodian-", Type, "-shards-check"]).
+
+shards(1) ->
+    "shard";
+shards(_) ->
+    "shards".
+
+copies(1) ->
+    "copy";
+copies(_) ->
+    "copies".
