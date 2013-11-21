@@ -15,13 +15,17 @@
 Replicator Database
 ===================
 
-A database where you ``PUT``/``POST`` documents to trigger replications
-and you ``DELETE`` to cancel ongoing replications. These documents have
-exactly the same content as the JSON objects we used to ``POST`` to
-``_replicate`` (fields ``source``, ``target``, ``create_target``,
-``continuous``, ``doc_ids``, ``filter``, ``query_params``.
+The ``_replicator`` database works like any other in CouchDB, but documents
+added to it will trigger replications. Creating (``PUT`` or ``POST``) a
+document to start a replication. ``DELETE`` a replicaiton document to
+cancel an ongoing replication.
 
-Replication documents can have a user defined ``_id``. Design documents
+These documents have exactly the same content as the JSON objects we use to
+``POST`` to ``_replicate`` (fields ``source``, ``target``, ``create_target``,
+``continuous``, ``doc_ids``, ``filter``, ``query_params``).
+
+Replication documents can have a user defined ``_id`` (handy for finding a
+specific replication request later). Design Documents
 (and ``_local`` documents) added to the replicator database are ignored.
 
 The default name of this database is ``_replicator``. The name can be
@@ -31,7 +35,7 @@ parameter ``db``.
 Basics
 ------
 
-Let's say you PUT the following document into ``_replicator``:
+Let's say you POST the following document into ``_replicator``:
 
 .. code-block:: javascript
 
