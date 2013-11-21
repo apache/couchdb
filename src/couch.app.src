@@ -29,5 +29,5 @@
     ]},
     {mod, {couch_app, []}},
     {applications, [kernel, stdlib, crypto, sasl, inets, oauth, ibrowse,
-        mochiweb, ssl, couch_log, couch_event]}
+        mochiweb, ssl, couch_log, couch_event, b64url]}
 ]}.
