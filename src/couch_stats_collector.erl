@@ -106,7 +106,7 @@ handle_cast({track_process_count, Pid, Stat}, State) ->
 
 handle_info({'DOWN', Ref, _, _, _}, State) ->
     Stat = dict:fetch(Ref, State),
-    ok = couch_stats_collector:decrement(Stat),
+    couch_stats_collector:decrement(Stat),
     {noreply, dict:erase(Ref, State)}.
 
 code_change(_OldVersion, State, _Extra) when is_list(State) ->
