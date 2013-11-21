@@ -185,6 +185,11 @@ module.exports = function(grunt) {
       test_config_js: {
         src: ["dist/debug/templates.js", "test/test.config.js"],
         dest: 'test/test.config.js'
+      },
+
+      boom: {
+          dest: "dist/release/js/require.js",
+          src: "dist/debug/js/require.js"
       }
     },
 
@@ -265,6 +270,7 @@ module.exports = function(grunt) {
           // Do not wrap everything in an IIFE.
           wrap: false,
           optimize: "none",
+          findNestedDependencies: true
         }
       }
     },
@@ -290,6 +296,14 @@ module.exports = function(grunt) {
           {src: ["**"], dest: "../../share/www/fauxton/css/", cwd:"dist/debug/css/", expand: true}
         ]
       },
+      ace: {
+        files: [
+          {src: "assets/js/libs/ace/worker-json.js", dest: "dist/release/js/ace/worker-json.js"},
+          {src: "assets/js/libs/ace/mode-json.js", dest: "dist/release/js/ace/mode-json.js"},
+          {src: "assets/js/libs/ace/theme-crimson_editor.js", dest: "dist/release/js/ace/theme-crimson_editor.js"},
+        ]
+      },
+
       dist:{
         files:[
           {src: "dist/debug/index.html", dest: "dist/release/index.html"},
@@ -392,7 +406,7 @@ module.exports = function(grunt) {
   // build templates, js and css
   grunt.registerTask('build', ['less', 'concat:index_css', 'jst', 'requirejs', 'concat:requirejs', 'template:release']);
   // minify code and css, ready for release.
-  grunt.registerTask('minify', ['uglify', 'cssmin:compress']);
+  grunt.registerTask('minify', ['concat:boom', 'cssmin:compress']);
 
   /*
    * Build the app in either dev, debug, or release mode
@@ -413,7 +427,7 @@ module.exports = function(grunt) {
   // make a development install that is server by mochiweb under _utils
   grunt.registerTask('couchdebug', ['debug', 'copy:couchdebug']);
   // make a minimized install that is server by mochiweb under _utils
-  grunt.registerTask('couchdb', ['release', 'copy:couchdb']);
+  grunt.registerTask('couchdb', ['release', 'copy:ace', 'copy:couchdb']);
   // make an install that can be deployed as a couchapp
   grunt.registerTask('couchapp_setup', ['release']);
   // install fauxton as couchapp

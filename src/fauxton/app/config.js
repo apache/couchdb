@@ -37,10 +37,8 @@ require.config({
 
   map: {
     "*": {
-      'underscore': 'lodash',
-      //'./lib/dom':'ace/lib/dom'
+      'underscore': 'lodash'
     }
-
   },
 
   shim: {

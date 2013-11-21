@@ -10,11 +10,21 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
+define('ace_configuration', ["app", "ace/ace"], function (app, ace) {
+  var path = app.host + app.root + 'js/ace';
+  var config = require("ace/config");
+  config.set("packaged", true);
+  config.set("workerPath",path);
+  config.set("modePath",path);
+  config.set("themePath", path);
+  return ace;
+});
+
 define([
   "app",
   // Libs
   "api",
-  "ace/ace"
+  "ace_configuration",
 ],
 
 function(app, FauxtonAPI, ace) {
