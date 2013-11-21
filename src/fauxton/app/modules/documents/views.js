@@ -1477,7 +1477,8 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, resizeColumns) {
 
       if (this.newView) {
         this.mapEditor.setValue(this.langTemplates[this.defaultLang].map);
-        this.reduceEditor.setValue(this.langTemplates[this.defaultLang].reduce);
+        //Use a built in view by default
+        //this.reduceEditor.setValue(this.langTemplates[this.defaultLang].reduce);
       } 
 
     }

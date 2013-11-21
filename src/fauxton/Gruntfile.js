@@ -186,11 +186,6 @@ module.exports = function(grunt) {
         src: ["dist/debug/templates.js", "test/test.config.js"],
         dest: 'test/test.config.js'
       },
-
-      boom: {
-          dest: "dist/release/js/require.js",
-          src: "dist/debug/js/require.js"
-      }
     },
 
     cssmin: {
@@ -301,6 +296,8 @@ module.exports = function(grunt) {
           {src: "assets/js/libs/ace/worker-json.js", dest: "dist/release/js/ace/worker-json.js"},
           {src: "assets/js/libs/ace/mode-json.js", dest: "dist/release/js/ace/mode-json.js"},
           {src: "assets/js/libs/ace/theme-crimson_editor.js", dest: "dist/release/js/ace/theme-crimson_editor.js"},
+          {src: "assets/js/libs/ace/mode-javascript.js", dest: "dist/release/js/ace/mode-javascript.js"},
+          {src: "assets/js/libs/ace/worker-javascript.js", dest: "dist/release/js/ace/worker-javascript.js"},
         ]
       },
 
@@ -406,7 +403,7 @@ module.exports = function(grunt) {
   // build templates, js and css
   grunt.registerTask('build', ['less', 'concat:index_css', 'jst', 'requirejs', 'concat:requirejs', 'template:release']);
   // minify code and css, ready for release.
-  grunt.registerTask('minify', ['concat:boom', 'cssmin:compress']);
+  grunt.registerTask('minify', ['uglify', 'cssmin:compress']);
 
   /*
    * Build the app in either dev, debug, or release mode
