@@ -27,6 +27,8 @@
     rescan=false
 }).
 
+-define(VSN_0_2_7, 184129240591641721395874905059581858099).
+
 % public functions.
 
 start_link() ->
@@ -98,7 +100,7 @@ code_change(_OldVsn, {state, Pid}, _Extra) ->
         shard_checker=undefined,
         rescan=false
     }};
-code_change("0.2.7", State, _Extra) ->
+code_change(?VSN_0_2_7, State, _Extra) ->
     ok = config:listen_for_changes(?MODULE, self()),
     {ok, State};
 code_change(_OldVsn, State, _Extra) ->
