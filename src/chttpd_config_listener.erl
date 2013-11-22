@@ -12,6 +12,7 @@
 
 -module(chttpd_config_listener).
 -behaviour(gen_server).
+-vsn(1).
 -behaviour(config_listener).
 
 % public interface
