@@ -1413,9 +1413,10 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, resizeColumns) {
 
       if ($targetId === 'index-nav') {
         if (this.newView) { return; }
-        $index.toggle('slow');
         var that = this;
-        setTimeout(function(){that.showEditors();},100);
+        $index.toggle('slow', function(){
+           that.showEditors();
+        });
       } else {
         $index.removeAttr('style');
       }
