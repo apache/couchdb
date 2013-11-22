@@ -25,6 +25,7 @@
 
 -record(state, {
     buffer = queue:new(),
+    sender = nil,
     count = 0
 }).
 
@@ -55,19 +56,30 @@ handle_cast({deliver, Dest, Msg}, #state{buffer = Q, count = C} = State) ->
             {noreply, State#state{buffer = Q2, count = C+1}, 0}
     end.
 
-handle_info(timeout, State) ->
+handle_info(timeout, #state{sender = nil} = State) ->
     #state{buffer = Q, count = C} = State,
-    case queue:out_r(Q) of
+    Sender = case queue:out_r(Q) of
         {{value, {Dest, Msg}}, Q2} ->
-            erlang:send(Dest, Msg);
+            case erlang:send(Dest, Msg, [noconnect, nosuspend]) of
+                ok ->
+                    nil;
+                _Else ->
+                    spawn_monitor(erlang, send, [Dest, Msg])
+            end;
         {empty, Q2} ->
-            ok
+            nil
     end,
-    if C > 1 ->
+    if Sender =:= nil, C > 1 ->
         {noreply, State#state{buffer = Q2, count = C-1}, 0};
     true ->
-        {noreply, State#state{buffer = Q2, count = 0}}
-    end.
+        {noreply, State#state{buffer = Q2, sender = Sender, count = C-1}}
+    end;
+handle_info(timeout, State) ->
+    % Waiting on a sender to return
+    {noreply, State};
+
+handle_info({'DOWN', Ref, _, Pid, _}, #state{sender = {Pid, Ref}} = State) ->
+    {noreply, State#state{sender = nil}, 0}.
 
 terminate(_Reason, _State) ->
     ok.
