@@ -12,6 +12,7 @@
 
 -module(couch_replicator_httpc_pool).
 -behaviour(gen_server).
+-vsn(1).
 
 % public API
 -export([start_link/2, stop/1]).
@@ -163,17 +164,7 @@ handle_info({'DOWN', Ref, process, _, _}, #state{callers = Callers} = State) ->
             {noreply, State}
     end.
 
-code_change(_OldVsn, OldState, _Extra) when tuple_size(OldState) =:= 7 ->
-    case element(7, OldState) of
-        EtsTable when is_integer(EtsTable) ->
-            NewState = setelement(7, OldState, ets:tab2list(EtsTable)),
-            ets:delete(EtsTable),
-            {ok, NewState};
-        Callers when is_list(Callers) ->
-            % Already upgraded
-            {ok, OldState}
-    end;
-code_change(_OldVsn, State, _Extra) ->
+code_change(_OldVsn, #state{}=State, _Extra) ->
     {ok, State}.
 
 

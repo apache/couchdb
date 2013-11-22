@@ -13,6 +13,7 @@
 -module(couch_replicator_notifier).
 
 -behaviour(gen_event).
+-vsn(1).
 
 % public API
 -export([start_link/1, stop/1, notify/1]).

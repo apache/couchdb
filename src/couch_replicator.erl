@@ -12,6 +12,7 @@
 
 -module(couch_replicator).
 -behaviour(gen_server).
+-vsn(1).
 
 % public API
 -export([replicate/2]).
@@ -466,10 +467,6 @@ handle_cast({report_seq, Seq},
     {noreply, State#rep_state{seqs_in_progress = NewSeqsInProgress}}.
 
 
-code_change(OldVsn, OldState, Extra) when tuple_size(OldState) =:= 30 ->
-    code_change(OldVsn, erlang:append_element(OldState, true), Extra);
-code_change(OldVsn, OldState, Extra) when tuple_size(OldState) =:= 31 ->
-    code_change(OldVsn, erlang:append_element(OldState, 5000), Extra);
 code_change(_OldVsn, #rep_state{}=State, _Extra) ->
     {ok, State}.
 

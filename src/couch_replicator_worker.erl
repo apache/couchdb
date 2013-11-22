@@ -12,6 +12,7 @@
 
 -module(couch_replicator_worker).
 -behaviour(gen_server).
+-vsn(1).
 
 % public API
 -export([start_link/5]).
