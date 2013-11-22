@@ -12,6 +12,7 @@
 
 -module(couch_stream).
 -behaviour(gen_server).
+-vsn(1).
 
 % public API
 -export([open/1, open/2, close/1]).

@@ -12,6 +12,7 @@
 
 -module(couch_os_process).
 -behaviour(gen_server).
+-vsn(1).
 
 -export([start_link/1, start_link/2, start_link/3, stop/1]).
 -export([set_timeout/2, prompt/2, killer/1]).

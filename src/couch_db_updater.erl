@@ -12,6 +12,7 @@
 
 -module(couch_db_updater).
 -behaviour(gen_server).
+-vsn(1).
 
 -export([btree_by_id_split/1, btree_by_id_join/2, btree_by_id_reduce/2]).
 -export([btree_by_seq_split/1, btree_by_seq_join/2, btree_by_seq_reduce/2]).

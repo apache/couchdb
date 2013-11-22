@@ -13,6 +13,7 @@
 -module(couch_server).
 -behaviour(gen_server).
 -behaviour(config_listener).
+-vsn(1).
 
 -export([open/2,create/2,delete/2,get_version/0,get_version/1,get_uuid/0]).
 -export([all_databases/0, all_databases/2]).
@@ -507,7 +508,7 @@ handle_cast({update_lru, _DbName}, Server) ->
 handle_cast(Msg, Server) ->
     {stop, {unknown_cast_message, Msg}, Server}.
 
-code_change(_, State, _) ->
+code_change(_OldVsn, #server{}=State, _Extra) ->
     {ok, State}.
 
 handle_info({'EXIT', _Pid, config_change}, Server) ->

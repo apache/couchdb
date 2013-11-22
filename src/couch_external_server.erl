@@ -12,6 +12,7 @@
 
 -module(couch_external_server).
 -behaviour(gen_server).
+-vsn(1).
 -behaviour(config_listener).
 
 -export([start_link/2, stop/1, execute/2]).

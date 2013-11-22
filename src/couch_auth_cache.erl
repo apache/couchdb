@@ -12,6 +12,7 @@
 
 -module(couch_auth_cache).
 -behaviour(gen_server).
+-vsn(1).
 -behaviour(config_listener).
 
 % public API

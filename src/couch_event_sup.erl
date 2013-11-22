@@ -16,6 +16,7 @@
 
 -module(couch_event_sup).
 -behaviour(gen_server).
+-vsn(1).
 
 -include_lib("couch/include/couch_db.hrl").
 

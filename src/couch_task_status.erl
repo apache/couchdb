@@ -12,6 +12,7 @@
 
 -module(couch_task_status).
 -behaviour(gen_server).
+-vsn(1).
 
 % This module is used to track the status of long running tasks.
 % Long running tasks register themselves, via a call to add_task/1, and then

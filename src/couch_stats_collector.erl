@@ -17,6 +17,7 @@
 -module(couch_stats_collector).
 
 -behaviour(gen_server).
+-vsn(1).
 
 -export([start/0, stop/0]).
 -export([all/0, all/1, get/1, increment/1, decrement/1, record/2, clear/1]).
@@ -109,9 +110,7 @@ handle_info({'DOWN', Ref, _, _, _}, State) ->
     couch_stats_collector:decrement(Stat),
     {noreply, dict:erase(Ref, State)}.
 
-code_change(_OldVersion, State, _Extra) when is_list(State) ->
-    {ok, dict:from_list(State)};
-code_change(_OldVersion, State, _Extra) ->
+code_change(_, State, _Extra) ->
     {ok, State}.
 
 

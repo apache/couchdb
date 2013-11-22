@@ -13,6 +13,7 @@
 -module(couch_proc_manager).
 -behaviour(gen_server).
 -behaviour(config_listener).
+-vsn(1).
 
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, 
     code_change/3]).
@@ -232,12 +233,6 @@ terminate(_Reason, #state{tab=Tab}) ->
     ok.
 
 code_change(_OldVsn, #state{}=State, _Extra) ->
-    {ok, State};
-code_change(_OldVsn, {state, Tab}, _Extra) ->
-    State = #state{tab = Tab, threshold_ts = {0,0,0}},
-    ProcInts = lists:map(fun import_proc/1, ets:tab2list(Tab)),
-    ets:delete_all_objects(Tab),
-    ets:insert(Tab, ProcInts),
     {ok, State}.
 
 handle_config_change("query_server_config", _, _, _, _) ->
