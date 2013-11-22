@@ -64,6 +64,15 @@
             });
         }
 
+        if (newDoc.password_scheme === \"pbkdf2\") {
+            if (typeof(newDoc.iterations) !== \"number\") {
+               throw({forbidden: \"iterations must be a number.\"});
+            }
+            if (typeof(newDoc.derived_key) !== \"string\") {
+               throw({forbidden: \"derived_key must be a string.\"});
+            }
+        }
+
         var is_server_or_database_admin = function(userCtx, secObj) {
             // see if the user is a server admin
             if(userCtx.roles.indexOf('_admin') !== -1) {
