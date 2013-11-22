@@ -2,6 +2,7 @@
 
 -module(custodian_server).
 -behaviour(gen_server).
+-vsn(1).
 -behaviour(config_listener).
 
 % public api.
@@ -94,16 +95,10 @@ terminate(_Reason, State) ->
     couch_util:shutdown_sync(State#state.shard_checker),
     ok.
 
-code_change(_OldVsn, {state, Pid}, _Extra) ->
-    {ok, #state{
-        event_listener=Pid,
-        shard_checker=undefined,
-        rescan=false
-    }};
 code_change(?VSN_0_2_7, State, _Extra) ->
     ok = config:listen_for_changes(?MODULE, self()),
     {ok, State};
-code_change(_OldVsn, State, _Extra) ->
+code_change(_OldVsn, #state{}=State, _Extra) ->
     {ok, State}.
 
 % private functions
