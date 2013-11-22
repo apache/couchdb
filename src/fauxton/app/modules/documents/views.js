@@ -1193,7 +1193,6 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, resizeColumns) {
       }
     },
 
-    
     updateValues: function() {
       var notification;
       if (this.model.changedAttributes()) {
@@ -1300,6 +1299,43 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, resizeColumns) {
         });
       }
     },
+
+    updateView: function(event, paramInfo) {
+       event.preventDefault();
+ 
+       if (this.newView) { return alert('Please save this new view before querying it.'); }
+ 
+       var errorParams = paramInfo.errorParams,
+           params = paramInfo.params;
+ 
+       if (_.any(errorParams)) {
+         _.map(errorParams, function(param) {
+ 
+           // TODO: Where to add this error?
+           // bootstrap wants the error on a control-group div, but we're not using that
+           //$('form.view-query-update input[name='+param+'], form.view-query-update select[name='+param+']').addClass('error');
+           return FauxtonAPI.addNotification({
+             msg: "JSON Parse Error on field: "+param.name,
+             type: "error",
+             selector: ".advanced-options .errors-container"
+           });
+         });
+         FauxtonAPI.addNotification({
+           msg: "Make sure that strings are properly quoted and any other values are valid JSON structures",
+           type: "warning",
+           selector: ".advanced-options .errors-container"
+         });
+ 
+         return false;
+      }
+ 
+       var fragment = window.location.hash.replace(/\?.*$/, '');
+       fragment = fragment + '?' + $.param(params);
+       FauxtonAPI.navigate(fragment, {trigger: false});
+ 
+       FauxtonAPI.triggerRouteEvent('updateAllDocs', {ddoc: this.ddocID, view: this.viewName});
+    },
+
 
     previewView: function(event, paramsInfo) {
       var that = this,
