@@ -12,6 +12,7 @@
 
 -module(rexi_server).
 -behaviour(gen_server).
+-vsn(1).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
     code_change/3]).
 
@@ -123,20 +124,8 @@ terminate(_Reason, St) ->
         St#st.workers),
     ok.
 
-code_change(_OldVsn, {st, Workers}, _Extra) ->
-    {ok, #st{workers = Workers}};
-
-code_change(_OldVsn, {st, Workers0, Errors, Limit, Count}, _Extra) ->
-    Jobs = [#job{worker_pid=A, worker=B, client_pid=C, client=D}
-        || {A, B, {C, D}} <- ets:tab2list(Workers0)],
-    ets:delete(Workers0),
-    State = #st{errors = Errors, error_limit = Limit, error_count = Count},
-    ets:insert(State#st.workers, Jobs),
-    ets:insert(State#st.clients, Jobs),
-    {ok, State};
-
-code_change(_OldVsn, St, _Extra) ->
-    {ok, St}.
+code_change(_OldVsn, #st{}=State, _Extra) ->
+    {ok, State}.
 
 init_p(From, MFA) ->
     init_p(From, MFA, undefined).

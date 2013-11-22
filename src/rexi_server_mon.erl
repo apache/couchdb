@@ -14,6 +14,7 @@
 
 -module(rexi_server_mon).
 -behaviour(gen_server).
+-vsn(1).
 
 
 -export([

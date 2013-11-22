@@ -12,6 +12,7 @@
 -module(rexi_governor).
 
 -behaviour(gen_server).
+-vsn(1).
 
 %  gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
