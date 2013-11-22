@@ -1,7 +1,8 @@
 % Copyright 2013 Cloudant. All rights reserved.
 
 -module(global_changes_server).
--behavior(gen_server).
+-behaviour(gen_server).
+-vsn(1).
 
 
 -export([

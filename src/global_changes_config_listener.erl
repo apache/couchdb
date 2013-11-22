@@ -1,7 +1,8 @@
 % Copyright 2013 Cloudant. All rights reserved.
 
 -module(global_changes_config_listener).
--behavior(gen_server).
+-behaviour(gen_server).
+-vsn(1).
 -behavior(config_listener).
 
 
