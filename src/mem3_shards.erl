@@ -12,6 +12,7 @@
 
 -module(mem3_shards).
 -behaviour(gen_server).
+-vsn(1).
 -behaviour(config_listener).
 
 -export([init/1, terminate/2, code_change/3]).
@@ -192,8 +193,8 @@ terminate(_Reason, #st{changes_pid=Pid}) ->
     exit(Pid, kill),
     ok.
 
-code_change(_OldVsn, St, _Extra) ->
-    {ok, cache_clear(St)}.
+code_change(_OldVsn, #st{}=St, _Extra) ->
+    {ok, St}.
 
 %% internal functions
 

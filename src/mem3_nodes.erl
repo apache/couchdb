@@ -12,6 +12,7 @@
 
 -module(mem3_nodes).
 -behaviour(gen_server).
+-vsn(1).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
     code_change/3]).
 
@@ -83,11 +84,7 @@ handle_info(_Info, State) ->
 terminate(_Reason, _State) ->
     ok.
 
-code_change(_OldVsn, {state, ChangesPid, UpdateSeq, _}, _Extra) ->
-    ets:new(?MODULE, [named_table, {read_concurrency, true}]),
-    initialize_nodelist(),
-    {ok, #state{changes_pid = ChangesPid, update_seq = UpdateSeq}};
-code_change(_OldVsn, State, _Extra) ->
+code_change(_OldVsn, #state{}=State, _Extra) ->
     {ok, State}.
 
 %% internal functions
