@@ -11,7 +11,8 @@
 % the License.
 
 -module(couch_event_server).
--behavior(gen_server).
+-behaviour(gen_server).
+-vsn(1).
 
 
 -export([
