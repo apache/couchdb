@@ -133,8 +133,20 @@ send_changes(DbName, ChangesArgs, Callback, PackedSeqs, AccIn, Timeout) ->
     end, unpack_seqs(PackedSeqs, DbName)),
     {Workers0, _} = lists:unzip(Seqs),
     Repls = fabric_view:get_shard_replacements(DbName, Workers0),
-    StartFun = fun(#shard{name=Name, node=N}=Shard) ->
-        Ref = rexi:cast(N, {fabric_rpc, changes, [Name, ChangesArgs, 0]}),
+    StartFun = fun(#shard{name=Name, node=N, range=R0}=Shard) ->
+        %% Find the original shard copy in the Seqs array
+        case lists:dropwhile(fun({S, _}) -> S#shard.range =/= R0 end, Seqs) of
+            [{#shard{node = OldNode}, OldSeq} | _] when is_integer(OldSeq) ->
+                SeqArg = make_replacement_arg(OldNode, OldSeq);
+            _ ->
+                % TODO this clause is probably unreachable in the N>2
+                % case because we compute replacements only if a shard has one
+                % in the original set.
+                couch_log:error("Streaming ~s from zero while replacing ~p",
+                    [Name, PackedSeqs]),
+                SeqArg = 0
+        end,
+        Ref = rexi:cast(N, {fabric_rpc, changes, [Name, ChangesArgs, SeqArg]}),
         Shard#shard{ref = Ref}
     end,
     RexiMon = fabric_util:create_monitors(Workers0),
