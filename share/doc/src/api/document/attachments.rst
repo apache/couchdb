@@ -17,6 +17,7 @@
 ======================
 
 .. http:head:: /{db}/{docid}/{attname}
+  :synopsis: Returns bare information in the HTTP Headers for the attachment
 
   Returns the HTTP headers containing a minimal amount of information
   about the specified attachment. The method supports the same query
@@ -70,6 +71,7 @@
 
 
 .. http:get:: /{db}/{docid}/{attname}
+  :synopsis: Gets the attachment of a document
 
   Returns the file attachment associated with the document.
   The raw data of the associated attachment is returned (just as if you were
@@ -102,6 +104,7 @@
 
 
 .. http:put:: /{db}/{docid}/{attname}
+  :synopsis: Adds an attachment of a document
 
   Uploads the supplied content as an attachment to the specified document.
   The attachment name provided must be a URL encoded string. You must also
@@ -182,6 +185,7 @@
 
 
 .. http:delete:: /{db}/{docid}/{attname}
+  :synopsis: Deletes an attachment of a document
 
   Deletes the attachment ``attachment`` of the specified ``doc``. You must
   supply the ``rev`` query parameter or :header:`If-Match` with the current

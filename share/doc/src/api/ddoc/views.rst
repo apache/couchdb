@@ -17,6 +17,7 @@
 ==========================================
 
 .. http:get:: /{db}/_design/{ddoc}/_view/{view}
+  :synopsis: Returns results for the specified stored view
 
   Executes the specified view function from the specified design document.
 
@@ -124,6 +125,7 @@
 
 
 .. http:post:: /{db}/_design/{ddoc}/_view/{view}
+  :synopsis: Returns certain rows for the specified stored view
 
   Executes the specified view function from the specified design document.
   Unlike :get:`/{db}/_design/{ddoc}/_view/{view}` for accessing views, the
@@ -341,107 +343,107 @@ content. The basic order of output is as follows:
   ETag: "8LA1LZPQ37B6R9U8BK9BGQH27"
   Server: CouchDB (Erlang/OTP)
   Transfer-Encoding: chunked
-  
+
   {
-      "offset": 0, 
+      "offset": 0,
       "rows": [
           {
-              "id": "dummy-doc", 
-              "key": null, 
+              "id": "dummy-doc",
+              "key": null,
               "value": null
-          }, 
+          },
           {
-              "id": "dummy-doc", 
-              "key": false, 
+              "id": "dummy-doc",
+              "key": false,
               "value": null
-          }, 
+          },
           {
-              "id": "dummy-doc", 
-              "key": true, 
+              "id": "dummy-doc",
+              "key": true,
               "value": null
-          }, 
+          },
           {
-              "id": "dummy-doc", 
-              "key": 0, 
+              "id": "dummy-doc",
+              "key": 0,
               "value": null
-          }, 
+          },
           {
-              "id": "dummy-doc", 
-              "key": 1, 
+              "id": "dummy-doc",
+              "key": 1,
               "value": null
-          }, 
+          },
           {
-              "id": "dummy-doc", 
-              "key": 10, 
+              "id": "dummy-doc",
+              "key": 10,
               "value": null
-          }, 
+          },
           {
-              "id": "dummy-doc", 
-              "key": 42, 
+              "id": "dummy-doc",
+              "key": 42,
               "value": null
-          }, 
+          },
           {
-              "id": "dummy-doc", 
-              "key": "10", 
+              "id": "dummy-doc",
+              "key": "10",
               "value": null
-          }, 
+          },
           {
-              "id": "dummy-doc", 
-              "key": "hello", 
+              "id": "dummy-doc",
+              "key": "hello",
               "value": null
-          }, 
+          },
           {
-              "id": "dummy-doc", 
-              "key": "Hello", 
+              "id": "dummy-doc",
+              "key": "Hello",
               "value": null
-          }, 
+          },
           {
-              "id": "dummy-doc", 
+              "id": "dummy-doc",
               "key": "\u043f\u0440\u0438\u0432\u0435\u0442",
               "value": null
-          }, 
+          },
           {
-              "id": "dummy-doc", 
-              "key": [], 
+              "id": "dummy-doc",
+              "key": [],
               "value": null
-          }, 
+          },
           {
-              "id": "dummy-doc", 
+              "id": "dummy-doc",
               "key": [
-                  1, 
-                  2, 
+                  1,
+                  2,
                   3
-              ], 
+              ],
               "value": null
-          }, 
+          },
           {
-              "id": "dummy-doc", 
+              "id": "dummy-doc",
               "key": [
-                  2, 
+                  2,
                   3
-              ], 
+              ],
               "value": null
-          }, 
+          },
           {
-              "id": "dummy-doc", 
+              "id": "dummy-doc",
               "key": [
                   3
-              ], 
+              ],
               "value": null
-          }, 
+          },
           {
-              "id": "dummy-doc", 
-              "key": {}, 
+              "id": "dummy-doc",
+              "key": {},
               "value": null
-          }, 
+          },
           {
-              "id": "dummy-doc", 
+              "id": "dummy-doc",
               "key": {
                   "foo": "bar"
-              }, 
+              },
               "value": null
           }
-      ], 
+      ],
       "total_rows": 17
   }
 
@@ -469,7 +471,7 @@ You can reverse the order of the returned view information by using the
   ETag: "Z4N468R15JBT98OM0AMNSR8U"
   Server: CouchDB (Erlang/OTP)
   Transfer-Encoding: chunked
-  
+
   {
       "offset": 0,
       "rows": [

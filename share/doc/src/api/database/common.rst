@@ -16,6 +16,7 @@
 =======
 
 .. http:head:: /{db}
+  :synopsis: Checks the database existence
 
   Returns the HTTP Headers containing a minimal amount of information
   about the specified database. Since the response body is empty, using the
@@ -45,6 +46,7 @@
 
 
 .. http:get:: /{db}
+  :synopsis: Returns the database information
 
   Gets information about the specified database.
 
@@ -105,6 +107,7 @@
 
 
 .. http:put:: /{db}
+  :synopsis: Creates a new database
 
   Creates a new database. The database name ``{db}`` must be composed by
   following next rules:
@@ -214,6 +217,7 @@
 
 
 .. http:delete:: /{db}
+  :synopsis: Deletes an existing database
 
   Deletes the specified database, and all the documents and attachments
   contained within it.
@@ -254,6 +258,7 @@
 
 
 .. http:post:: /{db}
+  :synopsis: Creates a new document with generic ID if he had not specified
 
   Creates a new document in the specified database, using the supplied JSON
   document structure.

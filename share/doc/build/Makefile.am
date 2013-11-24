@@ -454,8 +454,7 @@ src_files_html = \
 sphinx_extensions = \
     ../ext/configdomain.py \
     ../ext/github.py \
-    ../ext/httpdomain.py \
-    ../ext/http-api-descr.json
+    ../ext/httpdomain.py
 
 EXTRA_DIST = \
     $(image_files) \

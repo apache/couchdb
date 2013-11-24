@@ -17,6 +17,7 @@
 =================
 
 .. http:get:: /{db}/_security
+  :synopsis: Returns the special security object for the database
 
   Returns the current security object from the specified database.
 
@@ -117,6 +118,7 @@
 
 
 .. http:put:: /{db}/_security
+  :synopsis: Sets the special security object for the database
 
   Sets the security object for the given database.
 

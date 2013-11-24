@@ -17,6 +17,7 @@
 ===========
 
 .. http:head:: /{db}/{docid}
+  :synopsis: Returns bare information in the HTTP Headers for the document
 
   Returns the HTTP Headers containing a minimal amount of information
   about the specified document. The method supports the same query
@@ -63,6 +64,7 @@
 
 
 .. http:get:: /{db}/{docid}
+  :synopsis: Returns the document
 
   Returns document by the specified ``docid`` from the specified ``db``.
   Unless you request a specific revision, the latest revision of the
@@ -165,6 +167,7 @@
     }
 
 .. http:put:: /{db}/{docid}
+  :synopsis: Creates a new document or new version of an existing document
 
   The :method:`PUT` method creates a new named document, or creates a new
   revision of the existing document. Unlike the :post:`/{db}`, you
@@ -237,6 +240,7 @@
 
 
 .. http:delete:: /{db}/{docid}
+  :synopsis: Deletes the document
 
   Deletes the specified document from the database. You must supply the
   current (latest) revision, either by using the ``rev`` parameter to
@@ -309,6 +313,7 @@
 
 
 .. http:copy:: /{db}/{docid}
+  :synopsis: Copies the document within the same database
 
   The :method:`COPY` (which is non-standard HTTP) copies an existing
   document to a new or existing document.

@@ -88,6 +88,7 @@ To obtain the first token and thus authenticate a user for the first time, the
 -------------
 
 .. http:post:: /_session
+  :synopsis: Authenticates user by Cookie-based user login
 
   Initiates new session for specified user credentials by providing `Cookie`
   value.
@@ -178,6 +179,7 @@ To obtain the first token and thus authenticate a user for the first time, the
 
 
 .. http:get:: /_session
+  :synopsis: Returns Cookie-based login user information
 
   Returns complete information about authenticated user.
   This information contains :ref:`userctx_object`, authentication method and
@@ -230,6 +232,7 @@ To obtain the first token and thus authenticate a user for the first time, the
 
 
 .. http:delete:: /_session
+  :synopsis: Logout Cookie-based user
 
   Closes user's session.
 

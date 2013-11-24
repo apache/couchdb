@@ -56,24 +56,28 @@ A list of the available methods and URL paths are provided below:
 ========================
 
 .. http:get:: /{db}/_local/{docid}
+  :synopsis: Returns the latest revision of the local document
 
   Gets the specified local document. The semantics are identical to
   accessing a standard document in the specified database, except that the
   document is not replicated. See :get:`/{db}/{docid}`.
 
 .. http:put:: /{db}/_local/{docid}
+  :synopsis: Inserts a new version of the local document
 
   Stores the specified local document. The semantics are identical to
   storing a standard document in the specified database, except that the
   document is not replicated. See :put:`/{db}/{docid}`.
 
 .. http:delete:: /{db}/_local/{docid}
+  :synopsis: Deletes the local document
 
   Deletes the specified local document. The semantics are identical to
   deleting a standard document in the specified database, except that the
   document is not replicated. See :delete:`/{db}/{docid}`.
 
 .. http:copy:: /{db}/_local/{docid}
+  :synopsis: Copies the local document within the same database
 
   Copies the specified local document. The semantics are identical to
   copying a standard document in the specified database, except that the

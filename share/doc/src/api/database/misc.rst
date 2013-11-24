@@ -17,6 +17,7 @@
 ==============
 
 .. http:post:: /{db}/_purge
+  :synopsis: Purges some historical documents entirely from database history
 
   A database purge permanently removes the references to deleted documents
   from the database. Normal deletion of a document within CouchDB does not
@@ -129,6 +130,7 @@ database must be examined.
 =====================
 
 .. http:post:: /{db}/_missing_revs
+  :synopsis: By given list of document revisions returns the document revisions that do not exist in the database
 
   With given a list of document revisions, returns the document revisions that
   do not exist in the database.
@@ -187,6 +189,7 @@ database must be examined.
 ==================
 
 .. http:post:: /{db}/_revs_diff
+  :synopsis: By given list of document revisions returns differences between the given revisions and ones that are in the database
 
   Given a set of document/revision IDs, returns the subset of those that do
   not correspond to revisions stored in the database.
@@ -269,6 +272,7 @@ database must be examined.
 ===================
 
 .. http:get:: /{db}/_revs_limit
+  :synopsis: Returns the limit of historical revisions to store for a single document in the database
 
   Gets the current ``revs_limit`` (revision limit) setting.
 
@@ -302,6 +306,7 @@ database must be examined.
 
 
 .. http:put:: /{db}/_revs_limit
+  :synopsis: Sets the limit of historical revisions to store for a single document in the database
 
   Sets the maximum number of document revisions that will be tracked by
   CouchDB, even after compaction has occurred. You can set the revision

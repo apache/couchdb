@@ -17,7 +17,10 @@
 ==========================================
 
 .. http:get:: /{db}/_design/{ddoc}/_show/{func}
+  :synopsis: Executes a show function against null document
+
 .. http:post:: /{db}/_design/{ddoc}/_show/{func}
+  :synopsis: Same as GET /{db}/_design/{ddoc}/_show/{func}
 
   Applies :ref:`show function <showfun>` for `null` document.
 
@@ -74,7 +77,9 @@
 =================================================
 
 .. http:get:: /{db}/_design/{ddoc}/_show/{func}/{docid}
+  :synopsis: Executes a show function against the specified document
 .. http:post:: /{db}/_design/{ddoc}/_show/{func}/{docid}
+  :synopsis: Same as GET /{db}/_design/{ddoc}/_show/{func}/{docid}
 
   Applies :ref:`show function <showfun>` for the specified document.
 
@@ -132,7 +137,9 @@
 ====================================================
 
 .. http:get:: /{db}/_design/{ddoc}/_list/{func}/{view}
+  :synopsis: Executes a list function against the view from the same design document
 .. http:post:: /{db}/_design/{ddoc}/_list/{func}/{view}
+  :synopsis: Same as GET /{db}/_design/{ddoc}/_list/{func}/{view}
 
   Applies :ref:`list function <listfun>` for the :ref:`view function <viewfun>`
   from the same design document.
@@ -194,7 +201,9 @@
 ===============================================================
 
 .. http:get:: /{db}/_design/{ddoc}/_list/{func}/{other-ddoc}/{view}
+  :synopsis: Executes a list function against the view from other design document
 .. http:post:: /{db}/_design/{ddoc}/_list/{func}/{other-ddoc}/{view}
+  :synopsis: Same as GET /{db}/_design/{ddoc}/_list/{func}/{other-ddoc}/{view}
 
   Applies :ref:`list function <listfun>` for the :ref:`view function <viewfun>`
   from the other design document.
@@ -257,6 +266,7 @@
 ==============================================
 
 .. http:post:: /{db}/_design/{ddoc}/_update/{func}
+  :synopsis: Executes an update function against the null document
 
   Executes :ref:`update function <updatefun>` on server side for ``null``
   document.
@@ -320,7 +330,7 @@
 =====================================================
 
 .. http:put:: /{db}/_design/{ddoc}/_update/{func}/{docid}
-
+  :synopsis: Executes an update function against the specified document
 
   Executes :ref:`update function <updatefun>` on server side for the specified
   document.

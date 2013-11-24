@@ -17,6 +17,7 @@
 ========================================
 
 .. http:any:: /{db}/_design/{ddoc}/_rewrite/{path}
+  :synopsis: Rewrites HTTP request for the specified path by using stored routing rules
 
   Rewrites the specified path by rules defined in the specified design document.
 
@@ -58,9 +59,9 @@
   fields. The identified token are matched to the rule and will replace var.
   If ``'*'`` is found in the rule it will contain the remaining part if it
   exists.
-  
+
   Examples:
-  
+
   +--------------------------------------+----------+------------------+-------+
   |               Rule                   |    Url   |  Rewrite to      | Tokens|
   +======================================+==========+==================+=======+
@@ -82,7 +83,7 @@
   +--------------------------------------+----------+------------------+-------+
 
   Request method, header, query parameters, request payload and response body
-  are depended on endpoint to which url will be rewrited.
+  are depended on endpoint to which url will be rewritten.
 
   :param db: Database name
   :param ddoc: Design document name

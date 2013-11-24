@@ -17,6 +17,7 @@
 ==================
 
 .. http:post:: /{db}/_temp_view
+  :synopsis: Executes a given view function for all documents and returns the result
 
   Creates (and executes) a temporary view based on the view function
   supplied in the JSON request.

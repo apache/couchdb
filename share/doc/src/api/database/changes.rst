@@ -18,6 +18,7 @@
 ================
 
 .. http:get:: /{db}/_changes
+  :synopsis: Returns changes for the given database
 
   Returns a sorted list of changes made to documents in the database, in time
   order of application, can be obtained from the database's ``_changes``
@@ -48,7 +49,7 @@
   :query string feed: see :ref:`changes`. Default is ``normal``.
   :query string filter: Reference to a :ref:`filter function <filterfun>`
     from a design document that will filter whole stream emitting only filtered
-    events. See the section `Change Notifications in the book 
+    events. See the section `Change Notifications in the book
     CouchDB The Definitive Guide`_ for more information.
   :query number heartbeat: Period in *milliseconds* after which an empty line is
     sent in the results. Only applicable for :ref:`longpoll <changes/longpoll>`
@@ -164,6 +165,7 @@
 
 
 .. http:post:: /{db}/_changes
+  :synopsis: Returns changes for the given database for certain document IDs
 
   Requests the database changes feed in the same way as
   :get:`/{db}/_changes` does, but is widely used with

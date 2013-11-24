@@ -17,6 +17,7 @@
 =====
 
 .. http:get:: /
+  :synopsis: Returns the welcome message and version information
 
   Accessing the root of a CouchDB instance returns meta information about
   the instance. The response is a JSON structure containing information
@@ -65,6 +66,7 @@
 ==================
 
 .. http:get:: /_active_tasks
+  :synopsis: Obtains a list of the tasks running in the server
 
   List of running tasks, including the task type, name, status
   and process ID. The result is a JSON array of the currently running tasks,
@@ -168,6 +170,7 @@
 =============
 
 .. http:get:: /_all_dbs
+  :synopsis: Returns a list of all the databases
 
   Returns a list of all the databases in the CouchDB instance.
 
@@ -213,6 +216,7 @@
 .. versionadded:: 1.4
 
 .. http:get:: /_db_updates
+  :synopsis: Return the server changes of databases
 
   Returns a list of all database events in the CouchDB instance.
 
@@ -269,6 +273,7 @@
 =========
 
 .. http:get:: /_log
+  :synopsis: Returns the server log file
 
   Gets the CouchDB log, equivalent to accessing the local log file of the
   corresponding CouchDB instance.
@@ -341,6 +346,7 @@ jumping to ``offset`` bytes towards the beginning of the file first:
 ===============
 
 .. http:post:: /_replicate
+  :synopsis: Starts or cancels the replication
 
   Request, configure, or stop, a replication operation.
 
@@ -664,6 +670,7 @@ a 404 error.
 =============
 
 .. http:post:: /_restart
+  :synopsis: Restarts the server
 
   Restarts the CouchDB instance. You must be authenticated as a user with
   administration privileges for this to work.
@@ -708,6 +715,7 @@ a 404 error.
 ===========
 
 .. http:get:: /_stats
+  :synopsis: Returns server statistics
 
   The ``_stats`` resource returns a JSON object containing the statistics
   for the running server. The object is structured with top-level sections
@@ -888,6 +896,7 @@ structure is as follows:
 ===========
 
 .. http:get:: /_utils
+  :synopsis: Redirects to /_utils/
 
   Accesses the built-in Futon administration interface for CouchDB.
 
@@ -895,6 +904,7 @@ structure is as follows:
   :code 301: Redirects to :get:`/_utils/`
 
 .. http:get:: /_utils/
+  :synopsis: CouchDB administration interface (Futon)
 
   :>header Content-Type: :mimetype:`text/html`
   :>header Last-Modified: Static files modification timestamp
@@ -907,6 +917,7 @@ structure is as follows:
 ===========
 
 .. http:get:: /_uuids
+  :synopsis: Generates a list of UUIDs from the server
 
   Requests one or more Universally Unique Identifiers (UUIDs) from the
   CouchDB instance. The response is a JSON object providing a list of
@@ -992,6 +1003,7 @@ You can verify the change by obtaining a list of UUIDs:
 ================
 
 .. http:get:: /favicon.ico
+  :synopsis: Returns the site icon
 
   Binary content for the `favicon.ico` site icon.
 

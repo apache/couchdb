@@ -17,6 +17,7 @@
 ================
 
 .. http:post:: /{db}/_compact
+  :synopsis: Starts a compaction for the database
 
   Request compaction of the specified database. Compaction compresses the
   disk database file by performing the following operations:
@@ -86,6 +87,7 @@
 ===========================
 
 .. http:post:: /{db}/_compact/{ddoc}
+  :synopsis: Starts a compaction for all the views in the selected design document
 
   Compacts the view indexes associated with the specified design document.
   If may be that compacting a large view can return more storage than
@@ -143,6 +145,7 @@
 ===========================
 
 .. http:post:: /{db}/_ensure_full_commit
+  :synopsis: Makes sure all uncommitted changes are written and synchronized to the disk
 
   Commits any recent changes to the specified database to disk. You should
   call this if you want to ensure that recent changes have been flushed.
@@ -196,6 +199,7 @@
 =====================
 
 .. http:post:: /{db}/_view_cleanup
+  :synopsis: Removes view files that are not used by any design document
 
   Removes view index files that are no longer required by CouchDB as a result
   of changed views within design documents. As the view filename is based on
