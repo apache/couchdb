@@ -271,6 +271,8 @@ handle_message({complete, Props}, Worker, State) ->
 make_replacement_arg(Node, {Seq, Uuid}) ->
     {replace, Node, Uuid, Seq};
 make_replacement_arg(Node, {Seq, Uuid, _}) ->
+    %% TODO Deprecated, remove when we're confident no seqs with this format
+    %% are in the wild
     {replace, Node, Uuid, Seq};
 make_replacement_arg(_, _) ->
     0.
