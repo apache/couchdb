@@ -167,8 +167,15 @@ function (app, FauxtonAPI, Databases, Documents) {
       }, deferred.reject);
 
       return deferred;
+    },
+
+    removeDBs: function () {
+      dbReplicate.destroy();
+      db.destroy();
+
     }
   };
+
 
   return Verifyinstall;
 });

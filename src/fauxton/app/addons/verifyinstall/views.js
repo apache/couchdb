@@ -114,6 +114,7 @@ function(app, FauxtonAPI, VerifyInstall) {
       .then(function () {
           setPass('replicate');
           complete();
+          testProcess.removeDBs();
       }, formatError('replicate'));
 
       this.enableButton();
