@@ -668,24 +668,28 @@ expand_dups([KV | Rest], Acc) ->
 
 maybe_load_doc(_Db, _DI, #mrargs{include_docs=false}) ->
     [];
-maybe_load_doc(Db, #doc_info{}=DI, #mrargs{conflicts=true}) ->
-    doc_row(couch_index_util:load_doc(Db, DI, [conflicts]));
-maybe_load_doc(Db, #doc_info{}=DI, _Args) ->
-    doc_row(couch_index_util:load_doc(Db, DI, [])).
+maybe_load_doc(Db, #doc_info{}=DI, #mrargs{conflicts=true}=MRArgs) ->
+    doc_row(couch_index_util:load_doc(Db, DI, [conflicts]), MRArgs);
+maybe_load_doc(Db, #doc_info{}=DI, MRArgs) ->
+    doc_row(couch_index_util:load_doc(Db, DI, []), MRArgs).
 
 
 maybe_load_doc(_Db, _Id, _Val, #mrargs{include_docs=false}) ->
     [];
-maybe_load_doc(Db, Id, Val, #mrargs{conflicts=true}) ->
-    doc_row(couch_index_util:load_doc(Db, docid_rev(Id, Val), [conflicts]));
-maybe_load_doc(Db, Id, Val, _Args) ->
-    doc_row(couch_index_util:load_doc(Db, docid_rev(Id, Val), [])).
+maybe_load_doc(Db, Id, Val, #mrargs{conflicts=true}=MRArgs) ->
+    doc_row(couch_index_util:load_doc(Db, docid_rev(Id, Val), [conflicts]), MRArgs);
+maybe_load_doc(Db, Id, Val, MRArgs) ->
+    doc_row(couch_index_util:load_doc(Db, docid_rev(Id, Val), []), MRArgs).
 
 
-doc_row(null) ->
+doc_row(null, _MRArgs) ->
     [{doc, null}];
-doc_row(Doc) ->
-    [{doc, couch_doc:to_json_obj(Doc, [])}].
+doc_row(Doc, MRArgs) ->
+    ToJsonOpts = case MRArgs#mrargs.attachments of
+    true -> [attachments];
+    _ -> []
+    end,
+    [{doc, couch_doc:to_json_obj(Doc, ToJsonOpts)}].
 
 
 docid_rev(Id, {Props}) ->
