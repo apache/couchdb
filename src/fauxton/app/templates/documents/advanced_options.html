@@ -53,7 +53,10 @@ the License.
             <option value="999" selected="selected">exact</option>
           </select>
         </label>
+        <% } else{ %>
+        </div>
         <% } %>
+
         <div class="checkbox inline">  
           <input id="check3" name="stale" type="checkbox" value="ok">
           <label for="check3">Stale</label>
@@ -74,7 +77,7 @@ the License.
           <input id="check5" name="inclusive_end" type="checkbox" value="false">
           <label for="check5">Disable Inclusive End</label>
           <input id="check6" name="update_seq" type="checkbox" value="true">  
-          <label for="check6">Descending</label>  
+          <label for="check6">Update Sequence</label>  
         </div>
       </div>
     </div>
