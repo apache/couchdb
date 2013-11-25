@@ -30,9 +30,9 @@
 .. http:get:: /{db}/_design/{ddoc}
   :synopsis: Returns the design document
 
-  Returns design document with the specified design document` from the specified
-  database. Unless you request a specific revision, the latest revision of the
-  document will always be returned.
+  Returns the contents of the design document specified with the name of the design 
+  document and from the specified database from the URL. Unless you request a specific
+  revision, the latest revision of the document will always be returned.
 
   .. seealso::
 
