@@ -97,7 +97,7 @@ module.exports = function(grunt) {
     var settings = grunt.file.readJSON(settingsFile);
     var template = "app/initialize.js.underscore";
     var dest = "app/initialize.js";
-    var root = settings.root;
+    var root = settings.root || "/";
     var tmpl = _.template(grunt.file.read(template));
     grunt.file.write(dest, tmpl({root: root}));
   });
