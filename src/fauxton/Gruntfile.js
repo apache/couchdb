@@ -326,6 +326,11 @@ module.exports = function(grunt) {
         src: "settings.json"
       }
     },
+    gen_initialize: {
+      "default": {
+        src: "settings.json"
+      }
+    },
 
     mkcouchdb: couch_config,
     rmcouchdb: couch_config,
@@ -400,7 +405,7 @@ module.exports = function(grunt) {
   grunt.registerTask('lint', ['clean', 'jshint']);
   grunt.registerTask('test', ['lint', 'mochaSetup','jst', 'concat:test_config_js', 'mocha_phantomjs']);
   // Fetch dependencies (from git or local dir), lint them and make load_addons
-  grunt.registerTask('dependencies', ['get_deps', 'gen_load_addons:default']);
+  grunt.registerTask('dependencies', ['get_deps', 'gen_load_addons:default', "gen_initialize:default"]);
   // build templates, js and css
   grunt.registerTask('build', ['less', 'concat:index_css', 'jst', 'requirejs', 'concat:requirejs', 'template:release']);
   // minify code and css, ready for release.

@@ -89,6 +89,19 @@ module.exports = function(grunt) {
     grunt.file.write(dest, tmpl({deps: deps}));
   });
 
+  grunt.registerMultiTask('gen_initialize', 'Generate the initialize.js file', function() {
+    var path = require('path');
+    var data = this.data;
+    var _ = grunt.util._;
+    var settingsFile = path.existsSync(data.src) ? data.src : "settings.json.default";
+    var settings = grunt.file.readJSON(settingsFile);
+    var template = "app/initialize.js.underscore";
+    var dest = "app/initialize.js";
+    var root = settings.root;
+    var tmpl = _.template(grunt.file.read(template));
+    grunt.file.write(dest, tmpl({root: root}));
+  });
+
   grunt.registerMultiTask('mochaSetup','Generate a config.js and runner.html for tests', function(){
     var data = this.data,
         configInfo,

@@ -32,7 +32,7 @@ function(app, _, Bootstrap) {
   _.extend(app, {
     // The root path to run the application through.
     // TODO: pick this up wither at build time or from the browser
-    root: "/dashboard.beta/dashboard.assets/",
+    root: <%= '"' +root+ '"' %>,
 
     renderView: function(baseView, selector, view, options, callback) {
       baseView.setView(selector, new view(options)).render().then(callback);
