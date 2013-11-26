@@ -17,8 +17,10 @@ summary() ->
     Dict0 = dict:from_list([{conflicted, 0}] ++
         [{{live, N}, 0} || N <- lists:seq(0, cluster_n() - 1)] ++
         [{{safe, N}, 0} || N <- lists:seq(0, cluster_n() - 1)]),
-    Fun = fun(_Id, _Range, Item, Dict) ->
-        dict:update_counter(Item, 1, Dict)
+    Fun = fun(_Id, _Range, {conflicted, _N}, Dict) ->
+                  dict:update_counter(conflicted, 1, Dict);
+             (_Id, _Range, Item, Dict) ->
+                  dict:update_counter(Item, 1, Dict)
     end,
     dict:to_list(fold_dbs(Dict0, Fun)).
 
