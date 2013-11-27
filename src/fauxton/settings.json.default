@@ -20,6 +20,11 @@
           "requirejs": "/assets/js/libs/require.js",
           "css": "./css/index.css",
           "base": null
+        },
+        "app": {
+          "root": "/",
+          "host": "../..",
+          "version": "1.0.dev"
         }
       },
       "release": {
@@ -29,6 +34,11 @@
           "requirejs": "./js/require.js",
           "css": "./css/index.css",
           "base": null
+        },
+        "app": {
+          "root": "/utils/fauxton/",
+          "host": "../..",
+          "version": "1.0"
         }
       }
     },

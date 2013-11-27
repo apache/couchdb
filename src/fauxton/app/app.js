@@ -11,22 +11,27 @@
 // the License.
 
 define([
-  // Libraries.
+  // Application.
+  "initialize",
+
+  // Libraries
   "jquery",
   "lodash",
   "backbone",
+  "bootstrap",
 
   "helpers",
   "mixins",
 
-  // Plugins.
+   // Plugins.
   "plugins/backbone.layoutmanager",
   "plugins/jquery.form"
+
 ],
 
-function($, _, Backbone, Helpers, Mixins) {
+function(app, $, _, Backbone, Bootstrap, Helpers, Mixins) {
 
-  // Make sure we have a console.log
+   // Make sure we have a console.log
   if (typeof console == "undefined") {
     console = {
       log: function(){}
@@ -34,17 +39,47 @@ function($, _, Backbone, Helpers, Mixins) {
   }
 
   // Provide a global location to place configuration settings and module
-  // creation.
-  var app = {
-    // The root path to run the application.
-    root: "/",
-    version: "0.0.1",
+  // creation also mix in Backbone.Events
+  _.extend(app, Backbone.Events, {
     mixins: Mixins,
-    // move this to here otherwise every once in a while,
-    // the footer fails to configure as the url for it is not configured.
-    // Having the host declared here fixes it
-    host: window.location.protocol + "//" + window.location.host,
-  };
+
+    renderView: function(baseView, selector, view, options, callback) {
+      baseView.setView(selector, new view(options)).render().then(callback);
+    },
+
+    // Create a custom object with a nested Views object.
+    module: function(additionalProps) {
+      return _.extend({ Views: {} }, additionalProps);
+    },
+
+    // Thanks to: http://stackoverflow.com/a/2880929
+    getParams: function(queryString) {
+      if (queryString) {
+        // I think this could be combined into one if
+        if (queryString.substring(0,1) === "?") {
+          queryString = queryString.substring(1);
+        } else if (queryString.indexOf('?') > -1) {
+          queryString = queryString.split('?')[1];
+        }
+      }
+      var hash = window.location.hash.split('?')[1];
+      queryString = queryString || hash || window.location.search.substring(1);
+      var match,
+      urlParams = {},
+      pl     = /\+/g,  // Regex for replacing addition symbol with a space
+      search = /([^&=]+)=?([^&]*)/g,
+      decode = function (s) { return decodeURIComponent(s.replace(pl, " ")); },
+      query  = queryString;
+
+      if (queryString) {
+        while ((match = search.exec(query))) {
+          urlParams[decode(match[1])] = decode(match[2]);
+        }
+      }
+
+      return urlParams;
+    }
+  });
 
   // Localize or create a new JavaScript Template object.
   var JST = window.JST = window.JST || {};
@@ -82,12 +117,6 @@ function($, _, Backbone, Helpers, Mixins) {
     }
   });
 
-  // Mix Backbone.Events, and modules into the app object.
-  return _.extend(app, {
-    // Create a custom object with a nested Views object.
-    module: function(additionalProps) {
-      return _.extend({ Views: {} }, additionalProps);
-    }
-  }, Backbone.Events);
 
+  return app;
 });

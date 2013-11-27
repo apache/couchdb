@@ -14,9 +14,10 @@ module.exports = function(grunt) {
   var _ = grunt.util._;
 
   grunt.registerMultiTask('template', 'generates an html file from a specified template', function(){
-    var data = this.data;
-    var _ = grunt.util._;
-    var tmpl = _.template(grunt.file.read(data.src), null, data.variables);
+    var data = this.data,
+        _ = grunt.util._,
+        tmpl = _.template(grunt.file.read(data.src), null, data.variables);
+
     grunt.file.write(data.dest, tmpl(data.variables));
   });
 
@@ -24,12 +25,12 @@ module.exports = function(grunt) {
     grunt.log.writeln("Fetching external dependencies");
 
     var path = require('path');
-    var done = this.async();
-    var data = this.data;
-    var target = data.target || "app/addons/";
-    var settingsFile = path.existsSync(data.src) ? data.src : "settings.json.default";
-    var settings = grunt.file.readJSON(settingsFile);
-    var _ = grunt.util._;
+        done = this.async(),
+        data = this.data,
+        target = data.target || "app/addons/",
+        settingsFile = path.existsSync(data.src) ? data.src : "settings.json.default",
+        settings = grunt.file.readJSON(settingsFile),
+        _ = grunt.util._;
 
     // This should probably be a helper, though they seem to have been removed
     var fetch = function(deps, command){
@@ -76,30 +77,36 @@ module.exports = function(grunt) {
 
   grunt.registerMultiTask('gen_load_addons', 'Generate the load_addons.js file', function() {
     var path = require('path');
-    var data = this.data;
-    var _ = grunt.util._;
-    var settingsFile = path.existsSync(data.src) ? data.src : "settings.json.default";
-    var settings = grunt.file.readJSON(settingsFile);
-    var template = "app/load_addons.js.underscore";
-    var dest = "app/load_addons.js";
-    var deps = _.map(settings.deps, function(dep) {
-      return "addons/" + dep.name + "/base";
-    });
+        data = this.data,
+        _ = grunt.util._,
+        settingsFile = path.existsSync(data.src) ? data.src : "settings.json.default",
+        settings = grunt.file.readJSON(settingsFile),
+        template = "app/load_addons.js.underscore",
+        dest = "app/load_addons.js",
+        deps = _.map(settings.deps, function(dep) {
+          return "addons/" + dep.name + "/base";
+        });
+
     var tmpl = _.template(grunt.file.read(template));
     grunt.file.write(dest, tmpl({deps: deps}));
   });
 
-  grunt.registerMultiTask('gen_initialize', 'Generate the initialize.js file', function() {
-    var path = require('path');
-    var data = this.data;
-    var _ = grunt.util._;
-    var settingsFile = path.existsSync(data.src) ? data.src : "settings.json.default";
-    var settings = grunt.file.readJSON(settingsFile);
-    var template = "app/initialize.js.underscore";
-    var dest = "app/initialize.js";
-    var root = settings.root || "/";
-    var tmpl = _.template(grunt.file.read(template));
-    grunt.file.write(dest, tmpl({root: root}));
+  grunt.registerMultiTask('gen_initialize', 'Generate the app.js file', function() {
+    var _ = grunt.util._,
+        settings = this.data,
+        template = "app/initialize.js.underscore",
+        dest = "app/initialize.js"
+        tmpl = _.template(grunt.file.read(template)),
+        app = {};
+      
+
+    _.defaults(app, settings.app, {
+      root: '/',
+      host: '../../',
+      version: "0.0"
+    });
+
+    grunt.file.write(dest, tmpl(app));
   });
 
   grunt.registerMultiTask('mochaSetup','Generate a config.js and runner.html for tests', function(){
