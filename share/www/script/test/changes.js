@@ -646,6 +646,53 @@ couchTests.changes = function(debug) {
   T(changes[0][1] === "3");
   T(changes[1][1] === "4");
 
+  // COUCHDB-1923
+  T(db.deleteDb());
+  T(db.createDb());
+
+  var attachmentData = "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ=";
+
+  db.bulkSave(makeDocs(20, 30, {
+    _attachments:{
+      "foo.txt": {
+        content_type:"text/plain",
+        data: attachmentData
+      },
+      "bar.txt": {
+        content_type:"text/plain",
+        data: attachmentData
+      }
+    }
+  }));
+
+  var mapFunction = function(doc) {
+    var count = 0;
+
+    for(var idx in doc._attachments) {
+      count = count + 1;
+    }
+
+    emit(parseInt(doc._id), count);
+  };
+
+  var req = CouchDB.request("GET", "/test_suite_db/_changes?include_docs=true");
+  var resp = JSON.parse(req.responseText);
+
+  T(resp.results.length == 10);
+  T(resp.results[0].doc._attachments['foo.txt'].stub === true);
+  T(resp.results[0].doc._attachments['foo.txt'].data === undefined);
+  T(resp.results[0].doc._attachments['bar.txt'].stub === true);
+  T(resp.results[0].doc._attachments['bar.txt'].data === undefined);
+
+  var req = CouchDB.request("GET", "/test_suite_db/_changes?include_docs=true&attachments=true");
+  var resp = JSON.parse(req.responseText);
+
+  T(resp.results.length == 10);
+  T(resp.results[0].doc._attachments['foo.txt'].data === attachmentData);
+  T(resp.results[0].doc._attachments['foo.txt'].stub === undefined);
+  T(resp.results[0].doc._attachments['bar.txt'].data == attachmentData);
+  T(resp.results[0].doc._attachments['bar.txt'].stub === undefined);
+
   // cleanup
   db.deleteDb();
 };

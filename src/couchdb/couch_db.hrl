@@ -219,6 +219,7 @@
 
     view_type = nil,
     include_docs = false,
+    attachments = false,
     conflicts = false,
     stale = false,
     multi_get = false,
@@ -269,6 +270,7 @@
     filter_fun,
     filter_args = [],
     include_docs = false,
+    attachments = false,
     conflicts = false,
     db_open_options = []
 }).
