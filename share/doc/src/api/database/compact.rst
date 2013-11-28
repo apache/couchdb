@@ -91,7 +91,7 @@
 
   Compacts the view indexes associated with the specified design document.
   If may be that compacting a large view can return more storage than
-  compacting the atual db. Thus, you can use this in place of the full
+  compacting the actual db. Thus, you can use this in place of the full
   database compaction if you know a specific set of view indexes have been
   affected by a recent database change.
 
