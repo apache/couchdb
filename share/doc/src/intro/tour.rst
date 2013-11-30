@@ -260,7 +260,7 @@ finalize creating the hello field. Double-click the hello field's value
 You can experiment with other JSON values; e.g., ``[1, 2, "c"]`` or
 ``{"foo": "bar"}``. Once you've entered your values into the document,
 make a note of its ``_rev`` attribute and click "Save Document." The result
-should look like :ref:`intro/tour-04` document in Futon".
+should look like :ref:`intro/tour-04`.
 
 
 .. _intro/tour-03:
