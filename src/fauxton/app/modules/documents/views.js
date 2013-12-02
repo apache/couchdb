@@ -328,7 +328,8 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, resizeColumns) {
     className: "all-docs-item",
 
     events: {
-      "click button.delete": "destroy"
+      "click button.delete": "destroy",
+      "dblclick pre.prettyprint": "edit"
     },
 
     attributes: function() {
@@ -345,6 +346,11 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, resizeColumns) {
 
     establish: function() {
       return [this.model.fetch()];
+    },
+
+    edit: function(event) {
+      event.preventDefault();
+      FauxtonAPI.navigate("#" + this.model.url('app'));
     },
 
     destroy: function(event) {
