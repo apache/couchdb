@@ -201,6 +201,7 @@ function(app, FauxtonAPI, ace) {
 
     afterRender: function () {
       this.editor = ace.edit(this.editorId);
+      this.setHeightToLineCount();
       this.editor.setTheme("ace/theme/" + this.theme);
       this.editor.getSession().setMode("ace/mode/" + this.mode);
       this.editor.getSession().setUseWrapMode(true);
@@ -211,6 +212,21 @@ function(app, FauxtonAPI, ace) {
       if (this.couchJSHINT) {
         this.removeIncorrectAnnotations();
       }
+
+      var that = this;
+
+      this.editor.getSession().on('change', function () {
+        that.setHeightToLineCount();
+      });
+    },
+
+    setHeightToLineCount: function () {
+      var lines = this.editor.getSession().getDocument().getLength();
+      this.editor.setOptions({
+        maxLines: lines
+      });
+
+      this.editor.resize();
     },
 
     addCommands: function () {

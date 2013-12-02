@@ -1408,17 +1408,22 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, resizeColumns) {
     },
 
     toggleIndexNav: function (event) {
-      var $index = this.$('#index'),
-          $targetId = this.$(event.target).attr('id');
+      var $targetId = this.$(event.target).attr('id'),
+          $previousTab = this.$(this.$('li.active a').attr('href')),
+          $targetTab = this.$(this.$(event.target).attr('href'));
+
+      if ($targetTab.attr('id') !== $previousTab.attr('id')) {
+        $previousTab.removeAttr('style');
+      }
 
       if ($targetId === 'index-nav') {
         if (this.newView) { return; }
         var that = this;
-        $index.toggle('slow', function(){
+        $targetTab.toggle('slow', function(){
            that.showEditors();
         });
       } else {
-        $index.removeAttr('style');
+        $targetTab.toggle('slow');
       }
     },
 
