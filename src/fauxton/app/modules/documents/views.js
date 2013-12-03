@@ -965,10 +965,11 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, resizeColumns) {
       this.viewName = options.viewName;
       this.updateViewFn = options.updateViewFn;
       this.previewFn = options.previewFn;
-      this.hadReduce = options.hasReduce || true;
+      //this.hadReduce = options.hasReduce || true;
 
       if (typeof(options.hasReduce) === 'undefined') {
         this.hasReduce = true;
+        console.log('set true');
       } else {
         this.hasReduce = options.hasReduce;
       }
@@ -995,6 +996,11 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, resizeColumns) {
           view.update(this.database, this.ddocName, this.viewName);
         }, this);
       }
+    },
+
+    renderOnUpdatehasReduce: function (hasReduce) {
+      this.hasReduce = hasReduce;
+      this.render();
     },
 
     queryParams: function () {
@@ -1216,6 +1222,7 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, resizeColumns) {
       var $reduceContainer = $(".control-group.reduce-function");
       if ($ele.val() == "CUSTOM") {
         this.createReduceEditor();
+        this.reduceEditor.setValue(this.langTemplates.javascript.reduce);
         $reduceContainer.show();
       } else {
         $reduceContainer.hide();
@@ -1286,6 +1293,11 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, resizeColumns) {
             that.newView = false;
           }
 
+          if (that.reduceFunStr !== reduceVal) {
+            that.reduceFunStr = reduceVal;
+            that.advancedOptions.renderOnUpdatehasReduce(that.hasReduce()); 
+          }
+
           FauxtonAPI.triggerRouteEvent('updateAllDocs', {ddoc: ddocName, view: viewName});
 
         }, function(xhr) {
@@ -1350,8 +1362,6 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, resizeColumns) {
       reduceVal = this.reduceVal(),
       paramsArr = [];
 
-      console.log(mapVal);
-      
       if (paramsInfo && paramsInfo.params) {
         paramsArr = paramsInfo.params;
       }
@@ -1398,7 +1408,6 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, resizeColumns) {
     },
 
     mapVal: function () {
-
       if (this.mapEditor) {
         return this.mapEditor.getValue();
       }
@@ -1418,6 +1427,7 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, resizeColumns) {
 
       return reduceVal;
     },
+
 
     hasValidCode: function() {
       return _.every(["mapEditor", "reduceEditor"], function(editorName) {
@@ -1456,7 +1466,6 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, resizeColumns) {
         ddocName: this.model.id,
         viewName: this.viewName,
         reduceFunStr: this.reduceFunStr,
-        hasReduce: this.reduceFunStr,
         isCustomReduce: this.hasCustomReduce(),
         newView: this.newView,
         langTemplates: this.langTemplates.javascript
@@ -1465,6 +1474,10 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, resizeColumns) {
 
     hasCustomReduce: function() {
       return this.reduceFunStr && ! _.contains(this.builtinReduces, this.reduceFunStr);
+    },
+
+    hasReduce: function () {
+      return this.reduceFunStr || false;
     },
 
     createReduceEditor: function () {
@@ -1501,13 +1514,14 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, resizeColumns) {
         ddocName: this.model.id,
         database: this.database
       }));
-
+      
       this.advancedOptions = this.insertView('#query', new Views.AdvancedOptions({
         updateViewFn: this.updateView,
         previewFn: this.previewView,
         database: this.database,
         viewName: this.viewName,
-        ddocName: this.model.id
+        ddocName: this.model.id,
+        hasReduce: this.hasReduce
       }));
     },
 
