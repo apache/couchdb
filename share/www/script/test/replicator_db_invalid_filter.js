@@ -41,6 +41,8 @@ couchTests.replicator_db_invalid_filter = function(debug) {
     repDoc1 = repDb.open(repDoc1._id);
     TEquals("undefined", typeof repDoc1._replication_id);
     TEquals("error", repDoc1._replication_state);
+    TEquals("Could not open source database `couch_foo_test_db`: {db_not_found,<<\"couch_foo_test_db\">>}",
+            repDoc1._replication_state_reason);
 
     populate_db(dbA, docs1);
     populate_db(dbB, []);
@@ -58,6 +60,8 @@ couchTests.replicator_db_invalid_filter = function(debug) {
     repDoc2 = repDb.open(repDoc2._id);
     TEquals("undefined", typeof repDoc2._replication_id);
     TEquals("error", repDoc2._replication_state);
+    TEquals("Couldn't open document `_design/test` from source database `test_suite_rep_db_a`: {error,<<\"not_found\">>}",
+            repDoc2._replication_state_reason);
 
     var ddoc = {
       _id: "_design/mydesign",

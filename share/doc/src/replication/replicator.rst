@@ -86,6 +86,10 @@ Special fields set by the replicator start with the prefix
    when the current replication state (marked in ``_replication_state``)
    was set.
 
+-  ``_replication_state_reason``
+
+   If ``replication_state`` is ``error``, this field contains the reason.
+
 When the replication finishes, it will update the ``_replication_state``
 field (and ``_replication_state_time``) with the value ``completed``, so
 the document will look like:
@@ -103,8 +107,8 @@ the document will look like:
     }
 
 When an error happens during replication, the ``_replication_state``
-field is set to ``error`` (and ``_replication_state_time`` gets updated of
-course).
+field is set to ``error`` (and ``_replication_state_reason`` and
+``_replication_state_time`` are updated).
 
 When you PUT/POST a document to the ``_replicator`` database, CouchDB
 will attempt to start the replication up to 10 times (configurable under
