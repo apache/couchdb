@@ -1164,7 +1164,7 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, resizeColumns) {
       "click button.save": "saveView",
       "click button.delete": "deleteView",
       "change select#reduce-function-selector": "updateReduce",
-      
+      "click button.preview": "previewView",
       "click #db-views-tabs-nav": 'toggleIndexNav'
     },
 
@@ -1344,10 +1344,17 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, resizeColumns) {
 
 
     previewView: function(event, paramsInfo) {
+      event.preventDefault();
       var that = this,
-      mapVal = this.mapEditor.getValue(),
+      mapVal = this.mapVal(),
       reduceVal = this.reduceVal(),
-      paramsArr = paramsInfo.params;
+      paramsArr = [];
+
+      console.log(mapVal);
+      
+      if (paramsInfo && paramsInfo.params) {
+        paramsArr = paramsInfo.params;
+      }
 
       var params = _.reduce(paramsArr, function (params, param) {
         params[param.name] = param.value;
@@ -1388,6 +1395,15 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, resizeColumns) {
     
     isCustomReduceEnabled: function() {
       return $("#reduce-function-selector").val() == "CUSTOM";
+    },
+
+    mapVal: function () {
+
+      if (this.mapEditor) {
+        return this.mapEditor.getValue();
+      }
+
+      return this.$('#map-function').text();
     },
 
     reduceVal: function() {
