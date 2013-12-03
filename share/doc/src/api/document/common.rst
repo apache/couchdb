@@ -397,10 +397,12 @@ information objects with next structure:
 - **content_type** (*string*): Attachment MIME type
 - **data** (*string*): Base64-encoded content. Available if attachment content
   is requested by using the following query parameters:
+
     - ``attachments=true`` when querying a document
     - ``attachments=true&include_docs=true`` when querying a
       :ref:`changes feed <api/db/changes>` or a :ref:`view <api/ddoc/view>`
     - ``atts_since``.
+
 - **digest** (*string*): Content hash digest.
   It starts with prefix which announce hash type (``md5-``) and continues with
   Base64-encoded hash digest
@@ -408,16 +410,20 @@ information objects with next structure:
   Available if ``content_type`` is in :config:option:`list of compressible types
   <attachments/compressible_types>` when the attachment was added and the
   following query parameters are specified:
+
     - ``att_encoding_info=true`` when querying a document
     - ``att_encoding_info=true&include_docs=true`` when querying a
       :ref:`changes feed <api/db/changes>` or a :ref:`view <api/ddoc/view>`
+
 - **encoding** (*string*): Compression codec. Available if ``content_type`` is
   in :config:option:`list of compressible types
   <attachments/compressible_types>` when the attachment was added and the
   following query parameters are specified:
+
     - ``att_encoding_info=true`` when querying a document
     - ``att_encoding_info=true&include_docs=true`` when querying a
       :ref:`changes feed <api/db/changes>` or a :ref:`view <api/ddoc/view>`
+
 - **length** (*number*): Real attachment size in bytes. Not available if attachment
   content requested
 - **revpos** (*number*): Revision *number* when attachment was added
