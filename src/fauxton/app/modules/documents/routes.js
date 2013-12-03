@@ -59,7 +59,6 @@ function(app, FauxtonAPI, Documents, Databases) {
 
     crumbs: function() {
       return [
-        {"name": "Databases", "link": "/_all_dbs"},
         {"name": this.database.id, "link": Databases.databaseUrl(this.database)},
         {"name": this.docID, "link": "#"}
       ];
@@ -129,7 +128,6 @@ function(app, FauxtonAPI, Documents, Databases) {
     },
     crumbs: function() {
       return [
-        {"name": "Databases", "link": "/_all_dbs"},
         {"name": this.database.id, "link": Databases.databaseUrl(this.database)},
         {"name": "New", "link": "#"}
       ];
@@ -220,7 +218,6 @@ function(app, FauxtonAPI, Documents, Databases) {
       }));
 
       this.crumbs = [
-        {"name": "Databases", "link": "/_all_dbs"},
         {"name": this.data.database.id, "link": Databases.databaseUrl(this.data.database)}
       ];
 
@@ -269,9 +266,7 @@ function(app, FauxtonAPI, Documents, Databases) {
 
       this.crumbs = function () {
         return [
-          {"name": "Databases", "link": "/_all_dbs"},
           {"name": this.data.database.id, "link": Databases.databaseUrl(this.data.database)},
-          {"name": ddoc + "/" + view, "link": this.data.indexedDocs.url()}
         ];
       };
 
@@ -291,9 +286,7 @@ function(app, FauxtonAPI, Documents, Databases) {
       this.sidebar.setSelectedTab('new-view');
       this.crumbs = function () {
         return [
-          {"name": "Databases", "link": "/_all_dbs"},
           {"name": this.data.database.id, "link": Databases.databaseUrl(this.data.database)},
-          {"name": "new"}
         ];
       };
     },
@@ -377,7 +370,6 @@ function(app, FauxtonAPI, Documents, Databases) {
     selectedHeader: "Databases",
     crumbs: function () {
       return [
-        {"name": "Databases", "link": "/_all_dbs"},
         {"name": this.database.id, "link": Databases.databaseUrl(this.database)},
         {"name": "_changes", "link": "/_changes"}
       ];

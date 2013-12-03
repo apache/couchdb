@@ -27,7 +27,6 @@ function(app, FauxtonAPI, Compaction, Databases) {
 
     crumbs: function () {
       return [
-        {"name": "Databases", "link": "/_all_dbs"},
         {"name": this.database.id, "link": Databases.databaseUrl(this.database)},
         {"name": "Compact & Clean", "link": "compact"}
       ];

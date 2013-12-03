@@ -51,7 +51,6 @@ function (app, FauxtonAPI, Databases, Permissions) {
 
     crumbs: function () {
       return [
-        {"name": "Databases", "link": "/_all_dbs"},
         {"name": this.database.id, "link": Databases.databaseUrl(this.database)},
         {"name": "Permissions", "link": "/permissions"}
       ];
