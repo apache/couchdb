@@ -1085,27 +1085,29 @@ find_in_binary(_B, <<>>) ->
 find_in_binary(B, Data) ->
     case binary:match(Data, [B], []) of
     nomatch ->
-        partial_find(binary:part(B, {0, byte_size(B) - 1}),
-                     binary:part(Data, {byte_size(Data), -byte_size(Data) + 1}), 1);
+        MatchLength = erlang:min(byte_size(B), byte_size(Data)),
+        match_prefix_at_end(binary:part(B, {0, MatchLength}), 
+                            binary:part(Data, {byte_size(Data), -MatchLength}),
+                            MatchLength, byte_size(Data) - MatchLength);
     {Pos, _Len} ->
         {exact, Pos}
     end.
 
-partial_find(<<>>, _Data, _Pos) ->
+match_prefix_at_end(Prefix, Data, PrefixLength, N) ->
+    FirstCharMatches = binary:matches(Data, [binary:part(Prefix, {0, 1})], []),
+    match_rest_of_prefix(FirstCharMatches, Prefix, Data, PrefixLength, N).
+
+match_rest_of_prefix([], _Prefix, _Data, _PrefixLength, _N) ->
     not_found;
 
-partial_find(B, Data, N) when byte_size(Data) > 0 ->
-    case binary:match(Data, [B], []) of
-    nomatch ->
-        partial_find(binary:part(B, {0, byte_size(B) - 1}),
-                     binary:part(Data, {byte_size(Data), -byte_size(Data) + 1}), N + 1);
-    {Pos, _Len} ->
-        {partial, N + Pos}
-    end;
-
-partial_find(_B, _Data, _N) ->
-    not_found.
-
+match_rest_of_prefix([{Pos, _Len} | Rest], Prefix, Data, PrefixLength, N) ->
+    case binary:match(binary:part(Data, {PrefixLength, Pos - PrefixLength}),
+                      [binary:part(Prefix, {0, PrefixLength - Pos})], []) of
+        nomatch ->
+            match_rest_of_prefix(Rest, Prefix, Data, PrefixLength, N);
+        {_Pos, _Len1} ->
+            {partial, N + Pos}
+    end.
 
 validate_bind_address(Address) ->
     case inet_parse:address(Address) of
