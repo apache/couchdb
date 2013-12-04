@@ -314,7 +314,10 @@ function(app, Fauxton) {
       FauxtonAPI.when(this.establish()).then(function(resp) {
         triggerBroadcast('afterEstablish');
         _.each(routeObject.getViews(), function(view, selector) {
-          if(view.hasRendered) { return; }
+          if(view.hasRendered) { 
+            triggerBroadcast('viewHasRendered', view, selector);
+            return;
+          }
 
           triggerBroadcast('beforeRender', view, selector);
           FauxtonAPI.when(view.establish()).then(function(resp) {
@@ -339,14 +342,6 @@ function(app, Fauxton) {
               masterLayout.renderView(selector);
           });
 
-          /*var hooks = masterLayout.hooks[selector];
-          var boundRoute = route;
-
-          _.each(hooks, function(hook){
-            if (_.any(hook.routes, function(route){return route == boundRoute;})){
-              hook.callback(view);
-            }
-          });*/
         });
       }.bind(this), function (resp) {
           if (!resp) { return; }
@@ -479,12 +474,23 @@ function(app, Fauxton) {
    }
   });
 
-  var viewSpinner;
-  FauxtonAPI.RouteObject.on('beforeRender', function (routeObject, view, selector) {
-    if (!routeObject.disableLoader) {
+  var removeRouteObjectSpinner = function () {
+    if (routeObjectSpinner) {
       routeObjectSpinner.stop();
       $('.spinner').remove();
     }
+  };
+
+  var removeViewSpinner = function () {
+    if (viewSpinner){
+      viewSpinner.stop();
+      $('.spinner').remove();
+    }
+  };
+
+  var viewSpinner;
+  FauxtonAPI.RouteObject.on('beforeRender', function (routeObject, view, selector) {
+    removeRouteObjectSpinner();
 
     if (!view.disableLoader){ 
       var opts = {
@@ -506,9 +512,12 @@ function(app, Fauxton) {
   });
 
   FauxtonAPI.RouteObject.on('afterRender', function (routeObject, view, selector) {
-    if (!view.disableLoader){
-      viewSpinner.stop();
-    }
+    removeViewSpinner();
+  });
+
+  FauxtonAPI.RouteObject.on('viewHasRendered', function () {
+    removeViewSpinner();
+    removeRouteObjectSpinner();
   });
 
   var extensions = _.extend({}, Backbone.Events);
