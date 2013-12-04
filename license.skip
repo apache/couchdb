@@ -118,6 +118,7 @@
 ^src/couch_dbupdates
 ^src/ejson/.*
 ^src/etap/.*
+^src/fauxton/app/addons/config/assets/less/config.less
 ^src/fauxton/app/modules/pouchdb/base.js
 ^src/fauxton/app/modules/pouchdb/pouch.collate.js
 ^src/fauxton/app/modules/pouchdb/pouchdb.mapreduce.js
