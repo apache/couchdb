@@ -116,8 +116,17 @@ function(app, FauxtonAPI, ace) {
     },
 
     afterRender: function () {
+      var onUpdate = this.onUpdate;
+
       this.$el.typeahead({
-        source: this.source
+        source: this.source,
+        updater: function (item) {
+          if (onUpdate) {
+            onUpdate(item);
+          }
+
+          return item;
+        }
       });
     }
 
@@ -127,6 +136,7 @@ function(app, FauxtonAPI, ace) {
   Components.DbSearchTypeahead = Components.Typeahead.extend({
     initialize: function (options) {
       this.dbLimit = options.dbLimit || 30;
+      this.onUpdate = options.onUpdate;
       _.bindAll(this);
     },
     source: function(query, process) {

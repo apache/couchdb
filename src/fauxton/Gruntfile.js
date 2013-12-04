@@ -142,12 +142,13 @@ module.exports = function(grunt) {
 
     // The jshint option for scripturl is set to lax, because the anchor
     // override inside main.js needs to test for them so as to not accidentally
-    // route.
+    // route. Settings expr true so we can do `migtBeNullObject && mightBeNullObject.coolFunction()`
     jshint: {
       all: ['app/**/*.js', 'Gruntfile.js', "test/core/*.js"],
       options: {
         scripturl: true,
-        evil: true
+        evil: true,
+        expr: true
       }
     },
 

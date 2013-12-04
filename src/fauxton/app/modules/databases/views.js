@@ -38,7 +38,8 @@ function(app, Components, FauxtonAPI) {
     template: "templates/databases/list",
     events: {
       "click button.all": "selectAll",
-      "submit form.database-search": "switchDatabase"
+      "submit form.database-search": "switchDatabase",
+      "click label.fonticon-search": "switchDatabase"
     },
 
     initialize: function(options) {
@@ -52,9 +53,14 @@ function(app, Components, FauxtonAPI) {
       };
     },
 
-    switchDatabase: function(event) {
-      event.preventDefault();
+    switchDatabase: function(event, selectedName) {
+      event && event.preventDefault();
+
       var dbname = this.$el.find("input.search-query").val();
+
+      if (selectedName) {
+        dbname = selectedName;
+      }
 
       if (dbname) {
         // TODO: switch to using a model, or Databases.databaseUrl()
@@ -77,7 +83,6 @@ function(app, Components, FauxtonAPI) {
         collection: this.collection
       }));
 
-
       _.each(this.paginated(), function(database) {
         this.insertView("table.databases tbody", new Views.Item({
           model: database
@@ -99,9 +104,14 @@ function(app, Components, FauxtonAPI) {
     },
 
     afterRender: function() {
+      var that = this;
       this.dbSearchTypeahead = new Components.DbSearchTypeahead({
         dbLimit: this.dbLimit,
-        el: "input.search-query"
+        el: "input.search-query",
+        onUpdate: function (item) {
+          console.log('boom', item);
+          that.switchDatabase(null, item);
+        }
       });
 
       this.dbSearchTypeahead.render();
