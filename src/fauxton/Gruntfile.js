@@ -423,7 +423,7 @@ module.exports = function(grunt) {
 
   grunt.registerTask('watchRun', ['clean:watch', 'dependencies', 'jshint']);
   // build a release
-  grunt.registerTask('release', ['clean' ,'dependencies', "gen_initialize:release", 'jshint', 'build', 'minify', 'copy:dist']);
+  grunt.registerTask('release', ['clean' ,'dependencies', "gen_initialize:release", 'jshint', 'build', 'minify', 'copy:dist', 'copy:ace']);
 
   /*
    * Install into CouchDB in either debug, release, or couchapp mode
@@ -431,7 +431,7 @@ module.exports = function(grunt) {
   // make a development install that is server by mochiweb under _utils
   grunt.registerTask('couchdebug', ['debug', 'copy:couchdebug']);
   // make a minimized install that is server by mochiweb under _utils
-  grunt.registerTask('couchdb', ['release', 'copy:ace', 'copy:couchdb']);
+  grunt.registerTask('couchdb', ['release', 'copy:couchdb']);
   // make an install that can be deployed as a couchapp
   grunt.registerTask('couchapp_setup', ['release']);
   // install fauxton as couchapp
