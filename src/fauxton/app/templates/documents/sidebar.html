@@ -34,18 +34,18 @@ the License.
 
     <div class="span4 offset1">
       <div class="btn-group">
-        <button class="btn">Add</button>
+        <button class="btn">New</button>
         <button class="btn dropdown-toggle" data-toggle="dropdown">
           <span class="caret"></span>
         </button>
         <ul class="dropdown-menu">
           <!-- dropdown menu links -->
            <li>
-            <a id="doc" href="#<%= database.url('app') %>/new">New doc</a>
+            <a id="doc" href="#<%= database.url('app') %>/new">Document</a>
           </li>
           <% if (showNewView) { %>
             <li>
-              <a href="#<%= database.url('app') %>/new_view">New view</a>
+              <a href="#<%= database.url('app') %>/new_view">Secondary Index</a>
             </li>
           <% } %>
         </ul>
