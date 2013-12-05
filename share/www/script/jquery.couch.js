@@ -1018,7 +1018,7 @@
         if (options.ajaxStart) {
           options.ajaxStart(resp);
         }
-        if (req.status == options.successStatus) {
+        if (req.status == options.successStatus || req.status == 201) {
           if (options.beforeSuccess) options.beforeSuccess(req, resp, reqDuration);
           if (options.success) options.success(resp, reqDuration);
         } else if (options.error) {
