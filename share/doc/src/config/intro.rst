@@ -126,7 +126,7 @@ improve configuration readability.
 
 .. note::
    In case when you'd like to remove some parameter from the `default.ini`
-   without modifiying that file, you may override in `local.ini`, but
+   without modifying that file, you may override in `local.ini`, but
    without any value::
 
      [httpd_global_handlers]
