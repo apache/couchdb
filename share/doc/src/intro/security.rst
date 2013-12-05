@@ -281,7 +281,7 @@ structure. So how `authentication database` is different from others?
   any document (to be honest, that they always can do)
 - There is special design document ``_auth`` that cannot be modified
 - Every document (of course, except `design documents`) represents registered
-  CouchDB users and belong to him
+  CouchDB users and belong to them
 - Users may only access (:get:`GET /_users/org.couchdb.user:Jan
   </{db}/{docid}>`) or modify (:put:`PUT /_users/org.couchdb.user:Jan
   </{db}/{docid}>`) documents that they owns
