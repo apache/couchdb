@@ -102,7 +102,7 @@ module.exports = function(grunt) {
 
     _.defaults(app, settings.app, {
       root: '/',
-      host: '../../',
+      host: '../..',
       version: "0.0"
     });
 

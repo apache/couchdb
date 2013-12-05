@@ -207,6 +207,7 @@ function(app, FauxtonAPI, ace) {
       this.commands = options.commands;
       this.theme = options.theme || 'crimson_editor';
       this.couchJSHINT = options.couchJSHINT;
+      this.edited = false;
     },
 
     afterRender: function () {
@@ -224,10 +225,27 @@ function(app, FauxtonAPI, ace) {
       }
 
       var that = this;
-
       this.editor.getSession().on('change', function () {
         that.setHeightToLineCount();
+        that.edited = true;
       });
+
+      $(window).on('beforeunload.editor', function() {
+        if (that.edited) {
+          return 'Your changes have not been saved. Click cancel to return to the document.';
+        }
+      });
+
+      FauxtonAPI.beforeUnload("editor", function (deferred) {
+        if (that.edited) {
+          return 'Your changes have not been saved. Click cancel to return to the document.';
+        }
+      });
+    },
+
+    cleanup: function () {
+      $(window).off('beforeunload.editor');
+      FauxtonAPI.removeBeforeUnload("editor");
     },
 
     setHeightToLineCount: function () {
@@ -262,6 +280,10 @@ function(app, FauxtonAPI, ace) {
           editor.getSession().setAnnotations(newAnnotations);
         }
       });
+    },
+
+    editSaved: function () {
+      this.edited = false;
     },
 
     setValue: function (data, lineNumber) {

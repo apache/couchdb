@@ -47,8 +47,33 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents
   // TODO: auto generate this list if possible
   var modules = [Databases, Documents];
 
+  var beforeUnloads = {};
+
   var Router = app.router = Backbone.Router.extend({
     routes: {},
+
+    beforeUnload: function (name, fn) {
+      beforeUnloads[name] = fn;
+    },
+
+    removeBeforeUnload: function (name) {
+      delete beforeUnloads[name];
+    },
+
+    navigate: function (fragment, trigger) {
+      var continueNav  = true,
+          msg = _.find(_.map(beforeUnloads, function (fn) { return fn(); }), function (beforeReturn) {
+            if (beforeReturn) { return true; }
+          });
+
+      if (msg) {
+        continueNav = window.confirm(msg);
+      }
+
+      if (continueNav) {
+        Backbone.Router.prototype.navigate(fragment, trigger);
+      }
+    },
 
     addModuleRouteObject: function(RouteObject) {
       var that = this;

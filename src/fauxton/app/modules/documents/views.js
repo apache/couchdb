@@ -715,7 +715,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       _.bindAll(this);
     },
     goback: function(){
-      window.history.back();
+      FauxtonAPI.navigate(this.database.url("index") + "?limit=100");
     },
     destroy: function(event) {
       if (this.model.isNewDoc()) {
@@ -814,6 +814,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     saveDoc: function(event) {
       var json, notification, 
       that = this,
+      editor = this.editor,
       validDoc = this.getDocFromEditor();
 
       if (validDoc) {
@@ -822,6 +823,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         notification = FauxtonAPI.addNotification({msg: "Saving document."});
 
         this.model.save().then(function () {
+          editor.editSaved();
           FauxtonAPI.navigate('/database/' + that.database.id + '/' + that.model.id);
         }).fail(function(xhr) {
           var responseText = JSON.parse(xhr.responseText).reason;
@@ -906,6 +908,10 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       });
       this.editor.render();
       this.model.on("sync", this.updateValues, this);
+    },
+
+    cleanup: function () {
+      this.editor.remove();
     }
   });
 
@@ -1560,6 +1566,11 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         //this.reduceEditor.setValue(this.langTemplates[this.defaultLang].reduce);
       } 
 
+    },
+
+    cleanup: function () {
+      this.mapEditor && this.mapEditor.remove();
+      this.reduceEditor && this.reduceEditor.remove();
     }
   });
 
