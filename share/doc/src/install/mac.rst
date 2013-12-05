@@ -23,7 +23,7 @@ Installation on Mac OS X
 Installation using the Apache CouchDB native application
 ========================================================
 
-The easiest way to run CouchDB on Mac OS X is through his native Mac OS X
+The easiest way to run CouchDB on Mac OS X is through the native Mac OS X
 application. Just follow the below instructions:
 
 #. `Download Apache CouchDB for Mac OS X`_.

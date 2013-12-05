@@ -513,9 +513,9 @@ _view
 
 .. versionadded:: 1.2
 
-The special filter ``_view`` allows to use existed :ref:`map function <mapfun>`
+The special filter ``_view`` allows to use existing :ref:`map function <mapfun>`
 as the :ref:`filter <filterfun>`. If the map function emits anything for the
-processed document he counts as accepted and the changes event emits to the
+processed document it counts as accepted and the changes event emits to the
 feed. For most use-practice cases `filter` functions are very similar to `map`
 ones, so this feature helps to reduce amount of duplicated code.
 
@@ -531,7 +531,7 @@ ones, so this feature helps to reduce amount of duplicated code.
    Using ``_view`` filter doesn't queries the view index files, so you cannot
    use common :ref:`view query parameters <api/ddoc/view>` to additionally
    filter the changes feed by index key. Also, CouchDB doesn't returns
-   the result instantly as he does for views - it really uses the specified
+   the result instantly as it does for views - it really uses the specified
    map function as filter.
 
    Moreover, you cannot make such filters dynamic e.g. process the request

@@ -33,7 +33,7 @@ This is the simplest way to go.
    - Accept the License agreement
    - Select the installation directory
    - Specify "Start Menu" group name
-   - Approve that you'd like to install CouchDB as service and let him been
+   - Approve that you'd like to install CouchDB as service and let it be
      started automatically after installation (probably, you'd like so)
    - Verify installation settings
    - Install CouchDB

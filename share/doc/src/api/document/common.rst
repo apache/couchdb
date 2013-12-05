@@ -346,7 +346,7 @@
   :code 202: Request was accepted, but changes are not yet stored on disk
   :code 400: Invalid request body or parameters
   :code 401: Read or write privileges required
-  :code 404: Specified database, document ID  or his revision doesn't exists
+  :code 404: Specified database, document ID  or revision doesn't exists
   :code 409: Document with the specified ID already exists or specified
     revision is not latest for target document
 

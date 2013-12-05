@@ -351,11 +351,11 @@ replicator database implementation is like a ``_changes`` feed consumer
 replicator database - in fact this feature could be implemented with an
 external script/program. This implementation detail implies that for non
 admin users, a ``user_ctx`` property, containing the user's name and a
-subset of his/her roles, must be defined in the replication document.
+subset of their roles, must be defined in the replication document.
 This is ensured by the document update validation function present in
 the default design document of the replicator database. This validation
 function also ensure that a non admin user can set a user name property
-in the ``user_ctx`` property that doesn't match his/her own name (same
+in the ``user_ctx`` property that doesn't match their own name (same
 principle applies for the roles).
 
 For admins, the ``user_ctx`` property is optional, and if it's missing

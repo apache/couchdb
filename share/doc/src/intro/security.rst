@@ -281,7 +281,7 @@ structure. So how `authentication database` is different from others?
   any document (to be honest, that they always can do)
 - There is special design document ``_auth`` that cannot be modified
 - Every document (of course, except `design documents`) represents registered
-  CouchDB users and belong to him
+  CouchDB users and belong to them
 - Users may only access (:get:`GET /_users/org.couchdb.user:Jan
   </{db}/{docid}>`) or modify (:put:`PUT /_users/org.couchdb.user:Jan
   </{db}/{docid}>`) documents that they owns
@@ -318,8 +318,8 @@ process:
 - **type** (*string*): Document type. Constantly have value ``user``
 
 Additionally, you may specify any custom fields that are relates to the target
-user. This is good place to store user's private information because only he and
-CouchDB administrators may browse it.
+user. This is good place to store user's private information because only the
+target user and CouchDB administrators may browse it.
 
 .. _org.couchdb.user:
 
@@ -396,7 +396,7 @@ the next error message:
 Password Changing
 =================
 
-This is quite common situation: user had forgot his password, it was leaked
+This is quite common situation: user had forgot their password, it was leaked
 somehow (via copy-paste, screenshot, or by typing in wrong chat window) or
 something else. Let's change password for our user `jan`.
 
@@ -466,7 +466,7 @@ CouchDB should respond with:
   {"ok":true,"name":"jan","roles":[]}
 
 Hooray! You may wonder why so complex: need to retrieve user's document, add
-special field to him, post it back - where is one big button that changes the
+special field to it, post it back - where is one big button that changes the
 password without worry about document's content? Actually, :ref:`Futon
 <intro/futon>` has such at the right bottom corner if you have logged in -
 all implementation details are hidden from your sight.
@@ -483,7 +483,7 @@ Users Public Information
 .. versionadded:: 1.4
 
 Sometimes users *wants* to share some information with the World. For instance,
-their contact email to let other users get in touch with him. To solve this
+their contact email to let other users get in touch with them. To solve this
 problem, but still keep sensitive and private information secured there is
 special :ref:`configuration <config>` option :config:option:`public_fields
 <couch_httpd_auth/public_fields>`. In this options you may define comma
@@ -503,7 +503,7 @@ security reasons.
 
 Now let's share field ``name``. First, setup the ``public_fields`` configuration
 option. Remember, that this action requires administrator's privileges and
-the next command will ask for password for user `admin`, assuming that he is
+the next command will ask for password for user `admin`, assuming that they are
 the server administrator::
 
   curl -X PUT http://localhost:5984/_config/couch_http_auth/public_fields \

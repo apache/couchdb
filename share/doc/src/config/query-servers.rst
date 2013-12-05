@@ -41,7 +41,7 @@ Query Servers Definition
   - ``LANGUAGE``: is a programming language which code this query server may
     execute. For instance, there are `python`, `ruby`, `clojure` and other query
     servers in wild. This value is also used for `ddoc` field ``language``
-    to determine query server that will process his functions.
+    to determine which query server process the functions.
 
     Note, that you may setup multiple query servers for the same programming
     language, but you have to name them different (like `python-dev` etc.).

@@ -220,7 +220,7 @@ database must be examined.
                          - :mimetype:`text/plain; charset=utf-8`
   :>json array missing: List of missed revisions for specified document
   :>json array possible_ancestors: List of revisions that *may be* ancestors
-    for specified document and his current revision in requested database
+    for specified document and its current revision in requested database
   :code 200: Request completed successfully
   :code 400: Invalid database name or JSON payload
 

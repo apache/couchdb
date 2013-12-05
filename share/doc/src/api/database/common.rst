@@ -258,7 +258,7 @@
 
 
 .. http:post:: /{db}
-  :synopsis: Creates a new document with generic ID if he had not specified
+  :synopsis: Creates a new document with generated ID if _id is not specified
 
   Creates a new document in the specified database, using the supplied JSON
   document structure.

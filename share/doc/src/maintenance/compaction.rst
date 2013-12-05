@@ -27,8 +27,8 @@ extension and transfers only actual data into. Because of this, CouchDB checks
 first for the available disk space - it should be *twice greater* than the
 compacted file's data.
 
-When all actual data successful transferred to the `compacted` file CouchDB
-*removes* the `target` replacing him with it.
+When all actual data is successfully transferred to the `compacted` file CouchDB
+replaces the `target` with the `compacted` file.
 
 
 .. _compact/db:

@@ -515,7 +515,7 @@ on three parts:
      ]
 
    When there is no more view rows to process, CouchDB sends special message,
-   that signs about that there is no more data to send from his side::
+   that signs about that there is no more data to send from its side::
 
      ["list_end"]
 
@@ -573,7 +573,7 @@ string chunks, but let's take a look on logs::
 Note, that now the Query Server sends response by lightweight chunks and if
 our communication process was extremely slow, the client will see how response
 data appears on their screen. Chunk by chunk, without waiting for the complete
-result, like he have for our previous list function.
+result, like they have for our previous list function.
 
 .. _qs/ddoc/updates:
 
