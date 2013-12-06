@@ -204,15 +204,12 @@ save_on_target(Node, Name, Docs) ->
 open_docs(#acc{source=Source, infos=Infos}, Missing) ->
     lists:flatmap(fun({Id, Revs, _}) ->
         FDI = lists:keyfind(Id, #full_doc_info.id, Infos),
-        open_doc_revs(Source, FDI, Revs)
+        RevTree = FDI#full_doc_info.rev_tree,
+        {FoundRevs, _} = couch_key_tree:get_key_leafs(RevTree, Revs),
+        lists:map(fun({#leaf{deleted=IsDel, ptr=SummaryPtr}, FoundRevPath}) ->
+            couch_db:make_doc(Source, Id, IsDel, SummaryPtr, FoundRevPath)
+        end, FoundRevs)
     end, Missing).
-
-
-open_doc_revs(Db, #full_doc_info{id=Id, rev_tree=RevTree}, Revs) ->
-    {FoundRevs, _} = couch_key_tree:get_key_leafs(RevTree, Revs),
-    lists:map(fun({#leaf{deleted=IsDel, ptr=SummaryPtr}, FoundRevPath}) ->
-                  couch_db:make_doc(Db, Id, IsDel, SummaryPtr, FoundRevPath)
-    end, FoundRevs).
 
 
 update_locals(Acc) ->
