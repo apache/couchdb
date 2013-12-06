@@ -136,7 +136,10 @@ send_changes(DbName, ChangesArgs, Callback, PackedSeqs, AccIn, Timeout) ->
     StartFun = fun(#shard{name=Name, node=N, range=R0}=Shard) ->
         %% Find the original shard copy in the Seqs array
         case lists:dropwhile(fun({S, _}) -> S#shard.range =/= R0 end, Seqs) of
-            [{#shard{node = OldNode}, OldSeq} | _] when is_integer(OldSeq) ->
+            % The {_, _}=OldSeq pattern match is so that we don't
+            % accidentally try and replace based on the generated
+            % {replace, _, _, _} tuples.
+            [{#shard{node = OldNode}, {_, _}=OldSeq} | _] ->
                 SeqArg = make_replacement_arg(OldNode, OldSeq);
             _ ->
                 % TODO this clause is probably unreachable in the N>2
