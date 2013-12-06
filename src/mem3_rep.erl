@@ -135,12 +135,10 @@ make_local_id(SourceThing, TargetThing, Filter) ->
 %% as they've seen updates on this node. We can detect that by
 %% looking for our push replication history and choosing the
 %% largest source_seq that has a target_seq =< TgtSeq.
-find_source_seq(SrcDb, TgtNode, TgtUUID, TgtSeq) ->
-    SrcNode = atom_to_binary(node(), utf8),
-    SrcUUID = couch_db:get_uuid(SrcDb),
-    DocId = make_local_id(SrcUUID, TgtUUID),
-    case couch_db:open_doc(SrcDb, DocId, []) of
-    {ok, Doc} ->
+find_source_seq(SrcDb, TgtNode, TgtUUIDPrefix, TgtSeq) ->
+    case find_repl_doc(SrcDb, TgtUUIDPrefix) of
+    {ok, TgtUUID, Doc} ->
+        SrcNode = atom_to_binary(node(), utf8),
         find_source_seq_int(Doc, SrcNode, TgtNode, TgtUUID, TgtSeq);
     {not_found, _} ->
         0
@@ -300,6 +298,42 @@ update_locals(Acc) ->
     ],
     NewBody = mem3_rpc:save_checkpoint(Node, Name, Id, Seq, NewEntry, History),
     {ok, _} = couch_db:update_doc(Db, #doc{id = Id, body = NewBody}, []).
+
+
+find_repl_doc(SrcDb, TgtUUIDPrefix) ->
+    SrcUUID = couch_db:get_uuid(SrcDb),
+    S = couch_util:encodeBase64Url(couch_util:md5(term_to_binary(SrcUUID))),
+    DocIdPrefix = <<"_local/shard-sync-", S/binary, "-">>,
+    FoldFun = fun({DocId, {Rev0, {BodyProps}}}, _, _) ->
+        TgtUUID = couch_util:get_value(<<"target_uuid">>, BodyProps, <<>>),
+        case is_prefix(DocIdPrefix, DocId) of
+            true ->
+                case is_prefix(TgtUUIDPrefix, TgtUUID) of
+                    true ->
+                        Rev = list_to_binary(integer_to_list(Rev0)),
+                        Doc = #doc{id=DocId, revs={0, [Rev]}, body={BodyProps}},
+                        {stop, {TgtUUID, Doc}};
+                    false ->
+                        {ok, not_found}
+                end;
+            _ ->
+                {stop, not_found}
+        end
+    end,
+    Options = [{start_key, DocIdPrefix}],
+    case couch_btree:fold(SrcDb#db.local_tree, FoldFun, not_found, Options) of
+        {ok, _, {TgtUUID, Doc}} ->
+            {ok, TgtUUID, Doc};
+        {ok, _, not_found} ->
+            {not_found, missing};
+        Else ->
+            twig:log(err, "Error finding replication doc: ~w", [Else]),
+            {not_found, missing}
+    end.
+
+
+is_prefix(Prefix, Subject) ->
+    binary:longest_common_prefix([Prefix, Subject]) == size(Prefix).
 
 
 filter_doc(Filter, FullDocInfo) when is_function(Filter) ->
