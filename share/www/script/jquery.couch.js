@@ -977,7 +977,7 @@
     errorMessage = errorMessage || "Unknown error";
     timeStart = (new Date()).getTime();
     $.ajax($.extend($.extend({
-      type: "GET", dataType: "json", cache : !$.browser.msie,
+      type: "GET", dataType: "json", cache : maybeUseCache(),
       beforeSend: function(xhr){
         if(ajaxOptions && ajaxOptions.headers){
           for (var header in ajaxOptions.headers){
@@ -1056,6 +1056,19 @@
    */
   function toJSON(obj) {
     return obj !== null ? JSON.stringify(obj) : null;
+  }
+
+  /**
+   * @private
+   */
+  function maybeUseCache() {
+    if (!navigator){
+      return true;
+    }
+    else if (/(MSIE|Trident)/.test(navigator.userAgent)){
+      return false;
+    }
+    return true;
   }
 
 })(jQuery);
