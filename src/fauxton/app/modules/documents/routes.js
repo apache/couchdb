@@ -276,6 +276,10 @@ function(app, FauxtonAPI, Documents, Databases) {
     newViewEditor: function () {
       var params = app.getParams();
 
+      if (this.toolsView) {
+        this.toolsView.remove();
+      }
+
       this.viewEditor = this.setView("#dashboard-upper-content", new Documents.Views.ViewEditor({
         ddocs: this.data.designDocs,
         params: params,

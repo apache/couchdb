@@ -17,6 +17,7 @@ define([
        "modules/fauxton/components",
 
        "modules/documents/resources",
+       "modules/databases/resources",
        "modules/pouchdb/base",
 
        // Libs
@@ -27,7 +28,7 @@ define([
 
 ],
 
-function(app, FauxtonAPI, Components, Documents, pouchdb, resizeColumns) {
+function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColumns) {
   var Views = {};
 
   Views.Tabs = FauxtonAPI.View.extend({
@@ -46,7 +47,7 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, resizeColumns) {
       return {
         // TODO make this not hard coded here
         changes_url: '#' + this.database.url('changes'),
-        db_url: '#' + this.database.url('index') + '?limit=100',
+        db_url: '#' + this.database.url('index') + '?limit=' + Databases.DocLimit,
       };
     },
 
@@ -802,7 +803,7 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, resizeColumns) {
             type: 'error',
             clear: true
           });
-          FauxtonAPI.navigate('/database/' + databaseId + '/_all_docs?limit=20');
+          FauxtonAPI.navigate('/database/' + databaseId + '/_all_docs?limit=' + Databases.DocLimit);
         }
         deferred.reject();
      });
@@ -1250,7 +1251,7 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, resizeColumns) {
       }
 
       promise.then(function () {
-        FauxtonAPI.navigate('/database/' + that.database.id + '/_all_docs?limit=100');
+        FauxtonAPI.navigate('/database/' + that.database.id + '/_all_docs?limit=' + Databases.DocLimit);
         FauxtonAPI.triggerRouteEvent('reloadDesignDocs');
       });
     },
@@ -1383,7 +1384,7 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, resizeColumns) {
       var promise = FauxtonAPI.Deferred();
 
       if (!this.database.allDocs) {
-        this.database.buildAllDocs({limit: "100", include_docs: true});
+        this.database.buildAllDocs({limit: Databases.DocLimit.toString(), include_docs: true});
         promise = this.database.allDocs.fetch();
       } else {
         promise.resolve();
@@ -1629,11 +1630,12 @@ function(app, FauxtonAPI, Components, Documents, pouchdb, resizeColumns) {
       return {
         changes_url: '#' + this.database.url('changes'),
         permissions_url: '#' + this.database.url('app') + '/permissions',
-        db_url: '#' + this.database.url('index') + '?limit=100',
+        db_url: '#' + this.database.url('index') + '?limit=' + Databases.DocLimit,
         database: this.collection.database,
         database_url: '#' + this.database.url('app'), 
         docLinks: docLinks,
-        showNewView: this.showNewView
+        showNewView: this.showNewView,
+        docLimit: Databases.DocLimit
       };
     },
 

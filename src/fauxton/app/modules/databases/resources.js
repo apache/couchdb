@@ -22,6 +22,8 @@ define([
 function(app, FauxtonAPI, Documents) {
   var Databases = FauxtonAPI.module();
 
+  Databases.DocLimit = 20;
+
   Databases.Model = Backbone.Model.extend({
     initialize: function(options) {
       this.status = new Databases.Status({
@@ -51,7 +53,7 @@ function(app, FauxtonAPI, Documents) {
       if (context === "index") {
         return "/database/" + this.id + "/_all_docs";
       } else if (context === "web-index") {
-        return "#/database/"+ encodeURIComponent(this.get("name"))  + "/_all_docs?limit=100";
+        return "#/database/"+ encodeURIComponent(this.get("name"))  + "/_all_docs?limit=" + Databases.DocLimit;
       } else if (context === "changes") {
         return "/database/" + this.id + "/_changes?descending=true&limit=100&include_docs=true";
       } else if (context === "app") {

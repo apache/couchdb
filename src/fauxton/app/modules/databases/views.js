@@ -12,12 +12,13 @@
 
 define([
   "app",
-
+  
   "modules/fauxton/components",
   "api",
+  "modules/databases/resources"
 ],
 
-function(app, Components, FauxtonAPI) {
+function(app, Components, FauxtonAPI, Databases) {
   var Views = {};
 
   Views.Item = FauxtonAPI.View.extend({
@@ -27,7 +28,8 @@ function(app, Components, FauxtonAPI) {
     serialize: function() {
       return {
         encoded: encodeURIComponent(this.model.get("name")),
-        database: this.model
+        database: this.model,
+        docLimit: Databases.DocLimit
       };
     }
   });
@@ -66,7 +68,7 @@ function(app, Components, FauxtonAPI) {
         // TODO: switch to using a model, or Databases.databaseUrl()
         // Neither of which are in scope right now
         // var db = new Database.Model({id: dbname});
-        var url = ["/database/", encodeURIComponent(dbname), "/_all_docs?limit=10"].join('');
+        var url = ["/database/", encodeURIComponent(dbname), "/_all_docs?limit=" + Databases.DocLimit].join('');
         FauxtonAPI.navigate(url);
       }
     },
@@ -154,7 +156,7 @@ function(app, Components, FauxtonAPI) {
           type: "success",
           clear: true
         });
-        var route = "#/database/" +  name + "/_all_docs?limit=100";
+        var route = "#/database/" +  name + "/_all_docs?limit=" + Databases.DocLimit;
         app.router.navigate(route, { trigger: true });
       }
       ).error(function(xhr) {
@@ -203,7 +205,7 @@ function(app, Components, FauxtonAPI) {
           type: "success",
           clear: true
         });
-        var route = "#/database/" +  name + "/_all_docs?limit=100";
+        var route = "#/database/" +  name + "/_all_docs?limit=" + Databases.DocLimit;
         app.router.navigate(route, { trigger: true });
       }
       ).error(function(xhr) {

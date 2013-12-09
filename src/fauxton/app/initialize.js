@@ -22,8 +22,8 @@ function() {
   // creation.
   var app = {
     // The root path to run the application.
-    root: "/utils/fauxton/",
-    version: "1.0",
+    root: "/",
+    version: "1.0.dev",
     // Host is used as prefix for urls
     host: "../.." ,
   };

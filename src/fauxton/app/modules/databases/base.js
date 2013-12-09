@@ -29,7 +29,7 @@ function(app, FauxtonAPI, Databases, Views) {
   Databases.databaseUrl = function(database) {
     var name = _.isObject(database) ? database.id : database;
 
-    return ["/database/", name, "/_all_docs?limit=10"].join('');
+    return ["/database/", name, "/_all_docs?limit=" + Databases.DocLimit].join('');
   };
 
   return Databases;

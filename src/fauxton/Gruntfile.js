@@ -220,7 +220,7 @@ module.exports = function(grunt) {
       proxy: {
         target: {
           host: 'localhost',
-          port: 5984,
+          port: 5684,
           https: false
         },
         // This sets the Host header in the proxy so that you can use external
@@ -358,7 +358,7 @@ module.exports = function(grunt) {
     }
 
     if (!!filepath.match(/[Ss]pec.js$/)) {
-      grunt.task.run(['mochaSetup','jst', 'concat:test_config_js', 'mocha_phantomjs']);
+      //grunt.task.run(['mochaSetup','jst', 'concat:test_config_js', 'mocha_phantomjs']);
     }
   });
 

@@ -16,8 +16,8 @@ the License.
   <header class="row-fluid">
     <div class="span5">
       <div class="btn-group">
-        <button class="btn">Docs</button>
-        <button class="btn dropdown-toggle" data-toggle="dropdown">
+        <button class="btn dropdown-toggle dropdown-toggle-btn" data-toggle="dropdown">
+          Docs
           <span class="caret"></span>
         </button>
         <ul class="dropdown-menu">
@@ -34,8 +34,8 @@ the License.
 
     <div class="span4 offset1">
       <div class="btn-group">
-        <button class="btn">Add</button>
-        <button class="btn dropdown-toggle" data-toggle="dropdown">
+        <button class="btn dropdown-toggle dropdown-toggle-btn" data-toggle="dropdown">
+          Add
           <span class="caret"></span>
         </button>
         <ul class="dropdown-menu">
@@ -58,11 +58,11 @@ the License.
 
   <nav>
     <ul class="nav nav-list">
-      <li class="active"><a id="all-docs" href="#<%= database.url('index') %>?limit=100" class="toggle-view"><i class="icon-list"></i> All documents</a></li>
-      <li><a id="design-docs" href='#<%= database.url("index") %>?limit=100&startkey="_design"&endkey="_e"'  class="toggle-view"><i class="icon-list"></i> All design docs</a></li>
+      <li class="active"><a id="all-docs" href="#<%= database.url('index') %>?limit=<%= docLimit %>" class="toggle-view"><i class="icon-list"></i> All documents</a></li>
+      <li><a id="design-docs" href='#<%= database.url("index") %>?limit=<%= docLimit %>&startkey="_design"&endkey="_e"'  class="toggle-view"><i class="icon-list"></i> All design docs</a></li>
     </ul>
     <ul class="nav nav-list views">
-      <li class="nav-header">Secondary Indices</li>
+      <li class="nav-header">Secondary Indexes</li>
       <% if (showNewView) { %>
         <li><a id="new-view" href="#<%= database.url('app') %>/new_view" class="new"><i class="icon-plus"></i> New</a></li>
         <% } %>
