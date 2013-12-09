@@ -14,7 +14,7 @@ the License.
 
 <div id="sidenav">
   <header class="row-fluid">
-    <div class="span5">
+    <div class="span12">
       <div class="btn-group">
         <button class="btn dropdown-toggle dropdown-toggle-btn" data-toggle="dropdown">
           Docs
@@ -30,9 +30,7 @@ the License.
           <% }); %>
         </ul>
       </div>
-    </div>
 
-    <div class="span4 offset1">
       <div class="btn-group">
         <button class="btn dropdown-toggle dropdown-toggle-btn" data-toggle="dropdown">
           Add
@@ -40,19 +38,17 @@ the License.
         </button>
         <ul class="dropdown-menu">
           <!-- dropdown menu links -->
-           <li>
-            <a id="doc" href="#<%= database.url('app') %>/new">New doc</a>
+          <li>
+          <a id="doc" href="#<%= database.url('app') %>/new">New doc</a>
           </li>
           <% if (showNewView) { %>
-            <li>
-              <a href="#<%= database.url('app') %>/new_view">New view</a>
-            </li>
+          <li>
+          <a href="#<%= database.url('app') %>/new_view">New view</a>
+          </li>
           <% } %>
         </ul>
       </div>
-    </div>
-    <div class="span1">
-    <button id="delete-database" class="btn"><i class="icon-trash"></i></button>
+        <button id="delete-database" class="btn"><i class="icon-trash"></i> Database</button>
     </div>
   </header>
 
@@ -64,8 +60,8 @@ the License.
     <ul class="nav nav-list views">
       <li class="nav-header">Secondary Indexes</li>
       <% if (showNewView) { %>
-        <li><a id="new-view" href="#<%= database.url('app') %>/new_view" class="new"><i class="icon-plus"></i> New</a></li>
-        <% } %>
+      <li><a id="new-view" href="#<%= database.url('app') %>/new_view" class="new"><i class="icon-plus"></i> New</a></li>
+      <% } %>
     </ul>
   </nav>
 </div>

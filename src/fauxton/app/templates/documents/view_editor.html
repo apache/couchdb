@@ -14,8 +14,10 @@ the License.
 <div class="row">
   <ul class="nav nav-tabs window-resizeable" id="db-views-tabs-nav">
     <li class="active"> <a id="index-nav" class="fonticon-wrench fonticon" data-toggle="tab" href="#index"><% if (newView) { %>Create Index <% } else { %>Edit Index <% } %></a></li>
+    <% if (!newView) { %>
     <li><a id="query-nav" class="fonticon-plus fonticon" href="#query" data-toggle="tab">Query Options</a></li>
     <li><a id="meta-nav" href="#metadata" data-toggle="tab">Design Doc Metadata</a></li>
+    <% } %>
   </ul>
   <div class="all-docs-list errors-container"></div>
   <div class="tab-content">

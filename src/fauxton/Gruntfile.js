@@ -220,7 +220,7 @@ module.exports = function(grunt) {
       proxy: {
         target: {
           host: 'localhost',
-          port: 5684,
+          port: 5984,
           https: false
         },
         // This sets the Host header in the proxy so that you can use external
