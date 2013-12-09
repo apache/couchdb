@@ -25,7 +25,7 @@ handle_stats_req(#httpd{method='GET', path_parts=[_]}=Req) ->
     send_json(Req, couch_stats_aggregator:all(range(Req)));
 
 handle_stats_req(#httpd{method='GET', path_parts=[_, _Mod]}) ->
-    throw({bad_request, <<"Stat names must have exactly to parts.">>});
+    throw({bad_request, <<"Stat names must have exactly two parts.">>});
 
 handle_stats_req(#httpd{method='GET', path_parts=[_, Mod, Key]}=Req) ->
     flush(Req),
