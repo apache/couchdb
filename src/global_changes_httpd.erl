@@ -13,7 +13,8 @@
     prepend,
     resp,
     etag,
-    username
+    username,
+    limit
 }).
 
 handle_global_changes_req(#httpd{method='GET'}=Req) ->
@@ -25,22 +26,27 @@ handle_global_changes_req(#httpd{method='GET'}=Req) ->
         {heartbeat, Other} -> Other;
         false -> false
     end,
+    % Limit is handled in the changes callback, since the limit count needs to
+    % only account for changes which happen after the filter.
+    Limit = couch_util:get_value(limit, Options),
+    Options1 = lists:keydelete(limit, 1, Options),
     chttpd:verify_is_server_admin(Req),
     Acc = #acc{
         username=admin,
         feed=Feed,
         resp=Req,
-        heartbeat_interval=Heartbeat
+        heartbeat_interval=Heartbeat,
+        limit=Limit
     },
     case Feed of
         "normal" ->
             {ok, Info} = fabric:get_db_info(Db),
             Etag = chttpd:make_etag(Info),
             chttpd:etag_respond(Req, Etag, fun() ->
-                fabric:changes(Db, fun changes_callback/2, Acc#acc{etag=Etag}, Options)
+                fabric:changes(Db, fun changes_callback/2, Acc#acc{etag=Etag}, Options1)
             end);
         Feed when Feed =:= "continuous"; Feed =:= "longpoll" ->
-            fabric:changes(Db, fun changes_callback/2, Acc, Options);
+            fabric:changes(Db, fun changes_callback/2, Acc, Options1);
         _ ->
             Msg = <<"Supported `feed` types: normal, continuous, longpoll">>,
             throw({bad_request, Msg})
@@ -84,6 +90,11 @@ transform_change(Username, _Resp, {Props}) ->
     end.
 
 
+% This clause is only hit when _db_updates is queried with limit=0. For
+% limit>0, the request is stopped by maybe_finish/1.
+changes_callback({change, _}, #acc{limit=0}=Acc) ->
+    {stop, Acc};
+
 % callbacks for continuous feed (newline-delimited JSON Objects)
 changes_callback(start, #acc{feed="continuous"}=Acc) ->
     #acc{resp=Req} = Acc,
@@ -97,7 +108,11 @@ changes_callback({change, Change0}, #acc{feed="continuous"}=Acc) ->
         Change ->
             Line = [?JSON_ENCODE(Change) | "\n"],
             {ok, Resp1} = chttpd:send_delayed_chunk(Resp, Line),
-            {ok, Acc#acc{resp=Resp1, last_data_sent_time=os:timestamp()}}
+            Acc1 = Acc#acc{
+                resp=Resp1,
+                last_data_sent_time=os:timestamp()
+            },
+            maybe_finish(Acc1)
     end;
 changes_callback({stop, EndSeq}, #acc{feed="continuous"}=Acc) ->
     % Temporary upgrade clause - Case 24236
@@ -120,7 +135,12 @@ changes_callback(start, Acc) ->
     #acc{resp=Req} = Acc,
     FirstChunk = "{\"results\":[\n",
     {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, [], FirstChunk),
-    {ok, Acc#acc{resp=Resp, prepend="", last_data_sent_time=os:timestamp()}};
+    Acc1 = Acc#acc{
+        resp=Resp,
+        prepend="",
+        last_data_sent_time=os:timestamp()
+    },
+    maybe_finish(Acc1);
 changes_callback({change, Change0}, Acc) ->
     #acc{resp=Resp, prepend=Prepend, username=Username} = Acc,
     case transform_change(Username, Resp, Change0) of
@@ -135,7 +155,7 @@ changes_callback({change, Change0}, Acc) ->
                 resp=Resp1,
                 last_data_sent_time=os:timestamp()
             },
-            {ok, Acc1}
+            maybe_finish(Acc1)
     end;
 changes_callback({stop, EndSeq}, Acc) ->
     % Temporary upgrade clause - Case 24236
@@ -158,6 +178,17 @@ changes_callback({error, Reason}, Acc) ->
             chttpd:send_error(Resp, Reason);
         _ ->
             chttpd:send_delayed_error(Resp, Reason)
+    end.
+
+
+maybe_finish(Acc) ->
+    case Acc#acc.limit of
+        0 ->
+            {stop, Acc};
+        undefined ->
+            {ok, Acc};
+        Limit ->
+            {ok, Acc#acc{limit=Limit-1}}
     end.
 
 
