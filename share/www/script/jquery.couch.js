@@ -412,6 +412,7 @@
           // set up the promise object within a closure for this handler
           var timeout = 100, db = this, active = true,
             listeners = [],
+            xhr = null,
             promise = /** @lends $.couch.db.changes */ {
               /**
                * Add a listener callback
@@ -428,6 +429,9 @@
                */
             stop : function() {
               active = false;
+              if (xhr){
+                xhr.abort();
+              }
             }
           };
           // call each listener when there is a change
@@ -458,7 +462,7 @@
               feed : "longpoll",
               since : since
             });
-            ajax(
+            xhr = ajax(
               {url: db.uri + "_changes"+encodeOptions(opts)},
               options,
               "Error connecting to "+db.uri+"/_changes."
@@ -976,7 +980,7 @@
     ajaxOptions = $.extend(defaultAjaxOpts, ajaxOptions);
     errorMessage = errorMessage || "Unknown error";
     timeStart = (new Date()).getTime();
-    $.ajax($.extend($.extend({
+    return $.ajax($.extend($.extend({
       type: "GET", dataType: "json", cache : maybeUseCache(),
       beforeSend: function(xhr){
         if(ajaxOptions && ajaxOptions.headers){
