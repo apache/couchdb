@@ -9,7 +9,7 @@
 % WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 % License for the specific language governing permissions and limitations under
 % the License.
--module(rexi_governor).
+-module(rexi_buffer).
 
 -behaviour(gen_server).
 -vsn(1).
@@ -36,7 +36,7 @@ start_link(ServerId) ->
     gen_server:start_link({local, ServerId}, ?MODULE, nil, []).
 
 send(Dest, Msg) ->
-    Server = list_to_atom(lists:concat([rexi_governor, "_", get_node(Dest)])),
+    Server = list_to_atom(lists:concat([rexi_buffer, "_", get_node(Dest)])),
     gen_server:cast(Server, {deliver, Dest, Msg}).
 
 

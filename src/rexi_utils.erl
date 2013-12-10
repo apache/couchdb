@@ -34,7 +34,7 @@ send(Dest, Msg) ->
         ok;
     _ ->
         % treat nosuspend and noconnect the same
-        rexi_governor:send(Dest, Msg)
+        rexi_buffer:send(Dest, Msg)
     end.
 
 %% @doc set up the receive loop with an overall timeout
