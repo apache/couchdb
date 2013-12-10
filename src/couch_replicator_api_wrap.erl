@@ -26,6 +26,7 @@
     db_open/3,
     db_close/1,
     get_db_info/1,
+    get_pending_count/2,
     update_doc/3,
     update_doc/4,
     update_docs/3,
@@ -122,6 +123,20 @@ get_db_info(#db{name = DbName, user_ctx = UserCtx}) ->
     {ok, Info} = couch_db:get_db_info(Db),
     couch_db:close(Db),
     {ok, [{couch_util:to_binary(K), V} || {K, V} <- Info]}.
+
+
+get_pending_count(#httpdb{} = Db, Seq) ->
+    send_req(
+        Db,
+        [{path, "_changes"}, {qs, [{"since", Seq}, {"limit", "0"}]}],
+        fun(200, _, {Props}) ->
+            {ok, couch_util:get_value(<<"pending">>, Props, null)}
+        end);
+get_pending_count(#db{name=DbName, user_ctx = UserCtx}, Seq) ->
+    {ok, Db} = couch_db:open(DbName, [{user_ctx, UserCtx}]),
+    Pending = couch_db:count_changes_since(Db, Seq),
+    couch_db:close(Db),
+    {ok, Pending}.
 
 
 ensure_full_commit(#httpdb{} = Db) ->
