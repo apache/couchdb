@@ -351,7 +351,12 @@ collect_update_seqs(Seq, Shard, Counters) when is_integer(Seq) ->
     end.
 
 pending_count(Dict) ->
-    fabric_dict:fold(fun(_Worker, C, Acc) -> C+Acc end, 0, Dict).
+    fabric_dict:fold(fun
+        (_Worker, Count, Acc) when is_integer(Count), is_integer(Acc) ->
+            Count + Acc;
+        (_Worker, _Count, _Acc) ->
+            null
+    end, 0, Dict).
 
 pack_seqs(Workers) ->
     SeqList = [{N,R,S} || {#shard{node=N, range=R}, S} <- Workers],
