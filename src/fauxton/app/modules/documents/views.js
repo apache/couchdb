@@ -976,7 +976,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
       if (typeof(options.hasReduce) === 'undefined') {
         this.hasReduce = true;
-        console.log('set true');
       } else {
         this.hasReduce = options.hasReduce;
       }
@@ -1126,6 +1125,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       this.ddocName = options.ddocName;
       this.database = options.database;
       this.listenTo(this.collection, 'add', this.ddocAdded);
+      this.DocModel = options.DocModel || Documents.Doc;
     },
 
     ddocAdded: function (ddoc) {
@@ -1159,7 +1159,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
           views: {},
           language: "javascript"
         };
-        return new Documents.Doc(doc, {database: this.database});
+        return new this.DocModel(doc, {database: this.database});
       } else {
         var ddocName = this.$('#ddoc').val();
         return this.collection.find(function (ddoc) {

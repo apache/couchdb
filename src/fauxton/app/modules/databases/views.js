@@ -111,7 +111,6 @@ function(app, Components, FauxtonAPI, Databases) {
         dbLimit: this.dbLimit,
         el: "input.search-query",
         onUpdate: function (item) {
-          console.log('boom', item);
           that.switchDatabase(null, item);
         }
       });
