@@ -642,7 +642,7 @@ send_delayed_error(#delayed_resp{req=Req,resp=nil}=DelayedResp, Reason) ->
     {ok, Resp} = send_error(Req, Code, ErrorStr, ReasonStr),
     {ok, DelayedResp#delayed_resp{resp=Resp}};
 send_delayed_error(#delayed_resp{resp=Resp}, Reason) ->
-    log_stack_trace(json_stack(Reason)),
+    log_error_with_stack_trace(Reason),
     throw({http_abort, Resp, Reason}).
 
 end_delayed_json_response(#delayed_resp{}=DelayedResp) ->
@@ -813,11 +813,11 @@ send_error(Req, Code, Headers, ErrorStr, ReasonStr, []) ->
         {[{<<"error">>,  ErrorStr},
         {<<"reason">>, ReasonStr}]});
 send_error(Req, Code, Headers, ErrorStr, ReasonStr, Stack) ->
-    log_stack_trace(Stack),
+    log_error_with_stack_trace({ErrorStr, ReasonStr, Stack}),
     send_json(Req, Code, [stack_trace_id(Stack) | Headers],
         {[{<<"error">>,  ErrorStr},
-        {<<"reason">>, ReasonStr},
-        {<<"ref">>, stack_hash(Stack)}
+        {<<"reason">>, ReasonStr} |
+        case Stack of [] -> []; _ -> [{<<"ref">>, stack_hash(Stack)}] end
     ]}).
 
 % give the option for list functions to output html or other raw errors
@@ -827,12 +827,12 @@ send_chunked_error(Resp, {_Error, {[{<<"body">>, Reason}]}}) ->
 
 send_chunked_error(Resp, Error) ->
     Stack = json_stack(Error),
-    log_stack_trace(Stack),
+    log_error_with_stack_trace(Error),
     {Code, ErrorStr, ReasonStr} = error_info(Error),
     JsonError = {[{<<"code">>, Code},
         {<<"error">>,  ErrorStr},
-        {<<"reason">>, ReasonStr},
-        {<<"ref">>, stack_hash(Stack)}
+        {<<"reason">>, ReasonStr} |
+        case Stack of [] -> []; _ -> [{<<"ref">>, stack_hash(Stack)}] end
     ]},
     send_chunk(Resp, ?l2b([$\n,?JSON_ENCODE(JsonError),$\n])),
     send_chunk(Resp, []).
@@ -890,8 +890,13 @@ maybe_decompress(Httpd, Body) ->
         throw({bad_ctype, [Else, " is not a supported content encoding."]})
     end.
 
-log_stack_trace(Stack) ->
-    couch_log:error("~p failed with trace: ~p", [stack_hash(Stack), Stack]).
+log_error_with_stack_trace({bad_request, _, _}) ->
+    ok;
+log_error_with_stack_trace({Error, Reason, Stack}) ->
+    couch_log:error("ref: ~p req_err ~p:~p ~p",
+             [stack_hash(Stack), Error, Reason, Stack]);
+log_error_with_stack_trace(_) ->
+    ok.
 
 stack_trace_id(Stack) ->
     {"X-Cloudant-Stack-Hash", stack_hash(Stack)}.
