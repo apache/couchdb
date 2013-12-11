@@ -875,7 +875,28 @@ db_monitor(_HttpDb) ->
     nil.
 
 
-get_pending_count(#rep_state{source = #httpdb{} = Db0}=St) ->
+get_pending_count(St) ->
+    Rep = St#rep_state.rep_details,
+    Timeout = get_value(connection_timeout, Rep#rep.options),
+    TimeoutMicro = Timeout * 1000,
+    case get(pending_count_state) of
+        {LastUpdate, PendingCount} ->
+            case timer:now_diff(os:timestamp(), LastUpdate) > TimeoutMicro of
+                true ->
+                    NewPendingCount = get_pending_count_int(St),
+                    put(pending_count_state, {os:timestamp(), NewPendingCount}),
+                    NewPendingCount;
+                false ->
+                    PendingCount
+            end;
+        undefined ->
+            NewPendingCount = get_pending_count_int(St),
+            put(pending_count_state, {os:timestamp(), NewPendingCount}),
+            NewPendingCount
+    end.
+
+
+get_pending_count_int(#rep_state{source = #httpdb{} = Db0}=St) ->
     {_, Seq} = St#rep_state.highest_seq_done,
     Db = Db0#httpdb{retries = 3},
     case (catch couch_replicator_api_wrap:get_pending_count(Db, Seq)) of
@@ -884,7 +905,7 @@ get_pending_count(#rep_state{source = #httpdb{} = Db0}=St) ->
     _ ->
         null
     end;
-get_pending_count(#rep_state{source = Db}=St) ->
+get_pending_count_int(#rep_state{source = Db}=St) ->
     {_, Seq} = St#rep_state.highest_seq_done,
     {ok, Pending} = couch_replicator_api_wrap:get_pending_count(Db, Seq),
     Pending.
