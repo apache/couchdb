@@ -287,7 +287,6 @@ do_init(#rep{options = Options, id = {BaseId, Ext}, user_ctx=UserCtx} = Rep) ->
         {doc_write_failures, 0},
         {source_seq, HighestSeq},
         {checkpointed_source_seq, CommittedSeq},
-        {progress, 0},
         {checkpoint_interval, CheckpointInterval}
     ]),
     couch_task_status:set_update_frequency(1000),
@@ -917,8 +916,7 @@ update_task(State) ->
     } = State,
     couch_task_status:update(
         rep_stats(State) ++ [
-        {source_seq, HighestSeq},
-        {progress, 0}
+        {source_seq, HighestSeq}
     ]).
 
 
