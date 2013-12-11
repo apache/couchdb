@@ -69,19 +69,20 @@ send_ibrowse_req(#httpdb{headers = BaseHeaders} = HttpDb, Params) ->
     Body = get_value(body, Params, []),
     IsChanges = get_value(path, Params) == "_changes",
     if IsChanges ->
-        {ok, Worker} = ibrowse:spawn_link_worker_process(Url);
+        {ok, Worker} = ibrowse:spawn_link_worker_process(Url),
+        Timeout = infinity;
     true ->
-        {ok, Worker} = couch_replicator_httpc_pool:get_worker(HttpDb#httpdb.httpc_pool)
+        {ok, Worker} = couch_replicator_httpc_pool:get_worker(HttpDb#httpdb.httpc_pool),
+        Timeout = case config:get("replicator", "request_timeout", "infinity") of
+            "infinity" -> infinity;
+            Milliseconds -> list_to_integer(Milliseconds)
+        end
     end,
     IbrowseOptions = [
         {response_format, binary}, {inactivity_timeout, HttpDb#httpdb.timeout} |
         lists:ukeymerge(1, get_value(ibrowse_options, Params, []),
             HttpDb#httpdb.ibrowse_options)
     ],
-    Timeout = case config:get("replicator", "request_timeout", "infinity") of
-        "infinity" -> infinity;
-        Milliseconds -> list_to_integer(Milliseconds)
-    end,
     Response = ibrowse:send_req_direct(
         Worker, Url, Headers2, Method, Body, IbrowseOptions, Timeout),
     {Worker, Response, IsChanges}.
