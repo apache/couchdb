@@ -198,9 +198,6 @@ function(app, FauxtonAPI, Documents, Databases) {
       }
 
       if (this.viewEditor) { this.viewEditor.remove(); }
-      
-      this.listenTo(this.data.database.allDocs, 'reset', this.checkExistingDocs);
-      this.listenTo(this.data.database.allDocs, 'remove', this.checkExistingDocs);
 
       this.toolsView = this.setView("#dashboard-upper-menu", new Documents.Views.JumpToDoc({
         database: this.data.database,
@@ -356,14 +353,6 @@ function(app, FauxtonAPI, Documents, Databases) {
 
       if (event && event.selectedTab) {
         this.sidebar.setSelectedTab(event.selectedTab);
-      }
-    },
-
-    checkExistingDocs: function () {
-      if (this.data.database.allDocs.length > 0) {
-        this.sidebar.toggleNewView(true);
-      } else {
-        this.sidebar.toggleNewView(false);
       }
     }
 

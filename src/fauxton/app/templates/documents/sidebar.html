@@ -41,11 +41,9 @@ the License.
           <li>
           <a id="doc" href="#<%= database.url('app') %>/new">Document</a>
           </li>
-          <% if (showNewView) { %>
           <li>
           <a href="#<%= database.url('app') %>/new_view">Secondary Index</a>
           </li>
-          <% } %>
         </ul>
       </div>
         <button id="delete-database" class="btn"><i class="icon-trash"></i> Database</button>
@@ -54,14 +52,12 @@ the License.
 
   <nav>
     <ul class="nav nav-list">
-      <li class="active"><a id="all-docs" href="#<%= database.url('index') %>?limit=<%= docLimit %>" class="toggle-view"><i class="icon-list"></i> All documents</a></li>
-      <li><a id="design-docs" href='#<%= database.url("index") %>?limit=<%= docLimit %>&startkey="_design"&endkey="_e"'  class="toggle-view"><i class="icon-list"></i> All design docs</a></li>
+      <li class="active"><a id="all-docs" href="#<%= database.url('index') %>?limit=<%= docLimit %>" class="toggle-view"> All documents</a></li>
+      <li><a id="design-docs" href='#<%= database.url("index") %>?limit=<%= docLimit %>&startkey="_design"&endkey="_e"'  class="toggle-view"> All design docs</a></li>
     </ul>
     <ul class="nav nav-list views">
       <li class="nav-header">Secondary Indexes</li>
-      <% if (showNewView) { %>
       <li><a id="new-view" href="#<%= database.url('app') %>/new_view" class="new"><i class="icon-plus"></i> New</a></li>
-      <% } %>
     </ul>
     <div id="extension-navs"></div>
   </nav>

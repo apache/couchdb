@@ -1608,7 +1608,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
     initialize: function(options) {
       this.database = options.database;
-      this.showNewView = true;
       if (options.ddocInfo) {
         this.ddocID = options.ddocInfo.id;
         this.currView = options.ddocInfo.currView;
@@ -1647,7 +1646,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         database: this.collection.database,
         database_url: '#' + this.database.url('app'), 
         docLinks: docLinks,
-        showNewView: this.showNewView,
         docLimit: Databases.DocLimit,
         addLinks: addLinks,
         extensionList: extensionList > 0
@@ -1696,15 +1694,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       this.selectedTab = selectedTab;
       this.$('li').removeClass('active');
       this.$('#' + selectedTab).parent().addClass('active');
-    },
-
-    toggleNewView: function (show) {
-      // only render if there is a change
-      if (show !== this.showNewView) {
-        this.showNewView = show;
-        this.render();
-      }
-    },
+    }
   });
 
   Views.Indexed = FauxtonAPI.View.extend({});
