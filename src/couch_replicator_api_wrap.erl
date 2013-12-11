@@ -125,15 +125,24 @@ get_db_info(#db{name = DbName, user_ctx = UserCtx}) ->
     {ok, [{couch_util:to_binary(K), V} || {K, V} <- Info]}.
 
 
+get_pending_count(#httpdb{} = Db, Seq) when is_number(Seq) ->
+    % Source looks like Apache CouchDB and not Cloudant so we fall
+    % back to using update sequence differences.
+    send_req(Db, [], fun(200, _, {Props}) ->
+        case get_value(<<"update_seq">>, Props) of
+            UpdateSeq when is_number(UpdateSeq) ->
+                {ok, UpdateSeq - Seq};
+            _ ->
+                {ok, null}
+        end
+    end);
 get_pending_count(#httpdb{} = Db, Seq) ->
-    send_req(
-        Db,
-        [{path, "_changes"}, {qs, [{"since", Seq}, {"limit", "0"}]}],
-        fun(200, _, {Props}) ->
-            {ok, couch_util:get_value(<<"pending">>, Props, null)}
-        end);
-get_pending_count(#db{name=DbName, user_ctx = UserCtx}, Seq) ->
-    {ok, Db} = couch_db:open(DbName, [{user_ctx, UserCtx}]),
+    Options = [{path, "_changes"}, {qs, [{"since", Seq}, {"limit", "0"}]}],
+    send_req(Db, Options, fun(200, _, {Props}) ->
+        {ok, couch_util:get_value(<<"pending">>, Props, null)}
+    end);
+get_pending_count(#db{name=DbName}=Db, Seq) when is_number(Seq) ->
+    {ok, Db} = couch_db:open(DbName, [{user_ctx, Db#db.user_ctx}]),
     Pending = couch_db:count_changes_since(Db, Seq),
     couch_db:close(Db),
     {ok, Pending}.
