@@ -934,13 +934,3 @@ rep_stats(State) ->
         {doc_write_failures, couch_replicator_stats:doc_write_failures(Stats)},
         {checkpointed_source_seq, CommittedSeq}
     ].
-
-unpack_seq(Seq) when is_number(Seq) ->
-    Seq;
-unpack_seq([SeqNum, _]) ->
-    SeqNum;
-unpack_seq(Seq) when is_binary(Seq) ->
-    Pattern = "^\\[?(?<seqnum>[0-9]+)",
-    Options = [{capture, [seqnum], list}],
-    {match, [SeqNum]} = re:run(Seq, Pattern, Options),
-    list_to_integer(SeqNum).
