@@ -588,7 +588,7 @@ db_doc_req(#httpd{method='GET'}=Req, Db, DocId) ->
                         send_chunk(Resp, AccSeparator ++ Json);
                     {{not_found, missing}, RevId} ->
                         RevStr = couch_doc:rev_to_str(RevId),
-                        Json = ?JSON_ENCODE({[{"missing", RevStr}]}),
+                        Json = ?JSON_ENCODE({[{<<"missing">>, RevStr}]}),
                         send_chunk(Resp, AccSeparator ++ Json)
                     end,
                     "," % AccSeparator now has a comma
@@ -795,7 +795,7 @@ send_docs_multipart(Req, Results, Options1) ->
             end;
         ({{not_found, missing}, RevId}) ->
              RevStr = couch_doc:rev_to_str(RevId),
-             Json = ?JSON_ENCODE({[{"missing", RevStr}]}),
+             Json = ?JSON_ENCODE({[{<<"missing">>, RevStr}]}),
              couch_httpd:send_chunk(Resp,
                 [<<"\r\nContent-Type: application/json; error=\"true\"\r\n\r\n">>,
                 Json,
