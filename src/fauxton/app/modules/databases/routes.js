@@ -59,20 +59,7 @@ function(app, FauxtonAPI, Databases, Views) {
     },
 
     establish: function() {
-      var databases = this.databases;
-      var deferred = this.deferred;
-
-      databases.fetch().done(function(resp) {
-        FauxtonAPI.when(databases.map(function(database) {
-          return database.status.fetch();
-        })).always(function(resp) {
-          //make this always so that even if a user is not allowed access to a database
-          //they will still see a list of all databases
-          deferred.resolve();
-        });
-      });
-
-      return [deferred];
+     return [this.databases.fetch()];
     }
   });
 
