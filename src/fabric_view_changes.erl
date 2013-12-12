@@ -174,8 +174,10 @@ send_changes(DbName, ChangesArgs, Callback, PackedSeqs, AccIn, Timeout) ->
                 after
                     fabric_util:cleanup(Workers)
                 end;
+            {error, Reason} ->
+                throw({error, Reason});
             Else ->
-                Callback(Else, AccIn)
+                throw({error, Else})
         end
     after
         rexi_monitor:stop(RexiMon)
