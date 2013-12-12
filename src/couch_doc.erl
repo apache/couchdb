@@ -22,6 +22,7 @@
 -export([to_path/1]).
 -export([mp_parse_doc/2]).
 -export([with_ejson_body/1]).
+-export([is_deleted/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -367,6 +368,23 @@ to_doc_info_path(#full_doc_info{id=Id,rev_tree=Tree,update_seq=FDISeq}) ->
     {#doc_info{id=Id, high_seq=max_seq(Tree, FDISeq), revs=RevInfos}, WinPath}.
 
 
+is_deleted(#full_doc_info{rev_tree=Tree}) ->
+    is_deleted(Tree);
+is_deleted(Tree) ->
+    Leafs = couch_key_tree:get_all_leafs(Tree),
+    try
+        lists:foldl(fun
+            ({#leaf{deleted=false},_}, _) ->
+                throw(not_deleted);
+            ({#doc{deleted=false},_}, _) ->
+                throw(not_deleted);
+            (_, Acc) ->
+                Acc
+        end, nil, Leafs),
+        true
+    catch throw:not_deleted ->
+        false
+    end.
 
 
 att_foldl(#att{data=Bin}, Fun, Acc) when is_binary(Bin) ->
