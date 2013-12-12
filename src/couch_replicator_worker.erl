@@ -434,7 +434,8 @@ batch_doc(#doc{atts = []}) ->
 batch_doc(#doc{atts = Atts}) ->
     (length(Atts) =< ?MAX_BULK_ATTS_PER_DOC) andalso
         lists:all(
-            fun(#att{disk_len = L, data = Data}) ->
+            fun(Att) ->
+                [L, Data] = couch_att:fetch([disk_len, data], Att),
                 (L =< ?MAX_BULK_ATT_SIZE) andalso (Data =/= stub)
             end, Atts).
 
