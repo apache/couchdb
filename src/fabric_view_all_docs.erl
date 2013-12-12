@@ -204,7 +204,18 @@ doc_receive_loop(Keys, Pids, SpawnFun, MaxJobs, Callback, AccIn) ->
         end
     end.
 
+
 open_doc(DbName, Options, Id, IncludeDocs) ->
+    try
+        open_doc_int(DbName, Options, Id, IncludeDocs)
+    catch Type:Reason ->
+        Stack = erlang:get_stacktrace(),
+        couch_log:error("_all_docs open error: ~s ~s :: ~w ~w", [
+                DbName, Id, {Type, Reason}, Stack]),
+        exit({Id, Reason})
+    end.
+
+open_doc_int(DbName, Options, Id, IncludeDocs) ->
     Row = case fabric:open_doc(DbName, Id, [deleted | Options]) of
     {not_found, missing} ->
         Doc = undefined,
