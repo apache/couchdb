@@ -373,7 +373,7 @@ make_att_readers([]) ->
 make_att_readers([#doc{atts=Atts0} = Doc | Rest]) ->
     % % go through the attachments looking for 'follows' in the data,
     % % replace with function that reads the data from MIME stream.
-    Atts = [Att#att{data=make_att_reader(D)} || #att{data=D} = Att <- Atts0],
+    Atts = [couch_att:transform(data, fun make_att_reader/1, Att) || Att <- Atts0],
     [Doc#doc{atts = Atts} | make_att_readers(Rest)].
 
 make_att_reader({follows, Parser, Ref}) ->
