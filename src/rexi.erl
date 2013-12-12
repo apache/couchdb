@@ -98,7 +98,7 @@ async_server_call(Server, Caller, Request) ->
 -spec reply(any()) -> any().
 reply(Reply) ->
     {Caller, Ref} = get(rexi_from),
-    erlang:send(Caller, {rexi, Ref, Reply}).
+    erlang:send(Caller, {Ref,Reply}).
 
 %% @equiv sync_reply(Reply, 300000)
 sync_reply(Reply) ->
@@ -111,7 +111,7 @@ sync_reply(Reply) ->
 sync_reply(Reply, Timeout) ->
     {Caller, Ref} = get(rexi_from),
     Tag = make_ref(),
-    erlang:send(Caller, {rexi, Ref, {self(),Tag}, Reply}),
+    erlang:send(Caller, {Ref, {self(),Tag}, Reply}),
     receive {Tag, Response} ->
         Response
     after Timeout ->
@@ -179,7 +179,7 @@ stream(Msg, Limit, Timeout) ->
         {ok, Count} ->
             put(rexi_unacked, Count+1),
             {Caller, Ref} = get(rexi_from),
-            erlang:send(Caller, {rexi, Ref, self(), Msg}),
+            erlang:send(Caller, {Ref, self(), Msg}),
             ok
     catch throw:timeout ->
         exit(timeout)
