@@ -1657,6 +1657,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
     serialize: function() {
       var docLinks = FauxtonAPI.getExtensions('docLinks'),
+          newLinks = FauxtonAPI.getExtensions('sidebar:newLinks'),
           addLinks = FauxtonAPI.getExtensions('sidebar:links'),
           extensionList = FauxtonAPI.getExtensions('sidebar:list');
       return {
@@ -1668,6 +1669,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         docLinks: docLinks,
         docLimit: Databases.DocLimit,
         addLinks: addLinks,
+        newLinks: newLinks,
         extensionList: extensionList > 0
       };
     },

@@ -43,6 +43,9 @@ the License.
           </li>
           <li>
           <a href="#<%= database.url('app') %>/new_view">Secondary Index</a>
+           <% _.each(newLinks, function (item) { %>
+           <a href="#<%= database.url('app') %>/<%=item.url%>"> <%= item.name %></a>
+           <% }); %>
           </li>
         </ul>
       </div>
