@@ -14,11 +14,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-%% XXX: Figure out how to -include("couch_db.hrl")
--record(doc, {id= <<"">>, revs={0, []}, body={[]},
-            atts=[], deleted=false, meta=[]}).
--record(att, {name, type, att_len, disk_len, md5= <<>>, revpos=0, data,
-            encoding=identity}).
+-include_lib("couch/include/couch_db.hrl").
 
 main(_) ->
     test_util:init_code_path(),
@@ -114,22 +110,22 @@ test_to_json_success() ->
         },
         {
             #doc{atts=[
-                #att{
-                    name = <<"big.xml">>, 
-                    type = <<"xml/sucks">>, 
-                    data = fun() -> ok end,
-                    revpos = 1,
-                    att_len = 400,
-                    disk_len = 400
-                },
-                #att{
-                    name = <<"fast.json">>, 
-                    type = <<"json/ftw">>, 
-                    data = <<"{\"so\": \"there!\"}">>,
-                    revpos = 1,
-                    att_len = 16,
-                    disk_len = 16
-                }
+                couch_att:new([
+                    {name, <<"big.xml">>},
+                    {type, <<"xml/sucks">>},
+                    {data, fun() -> ok end},
+                    {revpos, 1},
+                    {att_len, 400},
+                    {disk_len, 400}
+                ]),
+                couch_att:new([
+                    {name, <<"fast.json">>},
+                    {type, <<"json/ftw">>},
+                    {data, <<"{\"so\": \"there!\"}">>},
+                    {revpos, 1},
+                    {att_len, 16},
+                    {disk_len, 16}
+                ])
             ]},
             {[
                 {<<"_id">>, <<>>},
@@ -153,20 +149,20 @@ test_to_json_success() ->
         {
             [attachments],
             #doc{atts=[
-                #att{
-                    name = <<"stuff.txt">>,
-                    type = <<"text/plain">>,
-                    data = fun() -> <<"diet pepsi">> end,
-                    revpos = 1,
-                    att_len = 10,
-                    disk_len = 10
-                },
-                #att{
-                    name = <<"food.now">>,
-                    type = <<"application/food">>,
-                    revpos = 1,
-                    data = <<"sammich">>
-                }
+                couch_att:new([
+                    {name, <<"stuff.txt">>},
+                    {type, <<"text/plain">>},
+                    {data, fun() -> <<"diet pepsi">> end},
+                    {revpos, 1},
+                    {att_len, 10},
+                    {disk_len, 10}
+                ]),
+                couch_att:new([
+                    {name, <<"food.now">>},
+                    {type, <<"application/food">>},
+                    {revpos, 1},
+                    {data, <<"sammich">>}
+                ])
             ]},
             {[
                 {<<"_id">>, <<>>},
