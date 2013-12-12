@@ -100,6 +100,9 @@ changes_callback({change, Change0}, #acc{feed="continuous"}=Acc) ->
             {ok, Acc#acc{resp=Resp1, last_data_sent_time=os:timestamp()}}
     end;
 changes_callback({stop, EndSeq}, #acc{feed="continuous"}=Acc) ->
+    % Temporary upgrade clause - Case 24236
+    changes_callback({stop, EndSeq, null}, Acc);
+changes_callback({stop, EndSeq, _Pending}, #acc{feed="continuous"}=Acc) ->
     #acc{resp=Resp} = Acc,
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp,
         [?JSON_ENCODE({[{<<"last_seq">>, EndSeq}]}) | "\n"]),
@@ -135,6 +138,9 @@ changes_callback({change, Change0}, Acc) ->
             {ok, Acc1}
     end;
 changes_callback({stop, EndSeq}, Acc) ->
+    % Temporary upgrade clause - Case 24236
+    changes_callback({stop, EndSeq, null}, Acc);
+changes_callback({stop, EndSeq, _Pending}, Acc) ->
     #acc{resp=Resp} = Acc,
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp,
         ["\n],\n\"last_seq\":", ?JSON_ENCODE(EndSeq), "}\n"]),
