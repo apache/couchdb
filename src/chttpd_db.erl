@@ -619,16 +619,19 @@ db_doc_req(#httpd{method='POST', user_ctx=Ctx}=Req, Db, DocId) ->
         {ok, [{ok, Doc}]} = fabric:open_revs(Db, DocId, [Rev], [])
     end,
     UpdatedAtts = [
-        #att{name=validate_attachment_name(Name),
-            type=list_to_binary(ContentType),
-            data=Content} ||
+        couch_att:new([
+            {name, validate_attachment_name(Name)},
+            {type, list_to_binary(ContentType)},
+            {data, Content}
+        ]) ||
         {Name, {ContentType, _}, Content} <-
         proplists:get_all_values("_attachments", Form)
     ],
     #doc{atts=OldAtts} = Doc,
     OldAtts2 = lists:flatmap(
-        fun(#att{name=OldName}=Att) ->
-            case [1 || A <- UpdatedAtts, A#att.name == OldName] of
+        fun(Att) ->
+            OldName = couch_att:fetch(name, Att),
+            case [1 || A <- UpdatedAtts, couch_att:fetch(name, A) == OldName] of
             [] -> [Att]; % the attachment wasn't in the UpdatedAtts, return it
             _ -> [] % the attachment was in the UpdatedAtts, drop it
             end
@@ -951,10 +954,11 @@ db_attachment_req(#httpd{method='GET',mochi_req=MochiReq}=Req, Db, DocId, FileNa
     #doc{
         atts=Atts
     } = Doc = couch_doc_open(Db, DocId, Rev, Options),
-    case [A || A <- Atts, A#att.name == FileName] of
+    case [A || A <- Atts, couch_att:fetch(name, A) == FileName] of
     [] ->
         throw({not_found, "Document is missing attachment"});
-    [#att{type=Type, encoding=Enc, disk_len=DiskLen, att_len=AttLen}=Att] ->
+    [Att] ->
+        [Type, Enc, DiskLen, AttLen] = couch_att:fetch([type, encoding, disk_len, att_len], Att),
         Refs = monitor_attachments(Att),
         try
         Etag = chttpd:doc_etag(Doc),
@@ -1000,9 +1004,9 @@ db_attachment_req(#httpd{method='GET',mochi_req=MochiReq}=Req, Db, DocId, FileNa
         end,
         AttFun = case ReqAcceptsAttEnc of
         false ->
-            fun couch_doc:att_foldl_decode/3;
+            fun couch_att:foldl_decode/3;
         true ->
-            fun couch_doc:att_foldl/3
+            fun couch_att:foldl/3
         end,
         chttpd:etag_respond(
             Req,
@@ -1020,14 +1024,14 @@ db_attachment_req(#httpd{method='GET',mochi_req=MochiReq}=Req, Db, DocId, FileNa
                             Headers1 = [{<<"Content-Range">>, make_content_range(From, To, Len)}]
                                 ++ Headers,
                             {ok, Resp} = start_response_length(Req, 206, Headers1, To - From + 1),
-                            couch_doc:range_att_foldl(Att, From, To + 1,
+                            couch_att:range_foldl(Att, From, To + 1,
                                 fun(Seg, _) -> send(Resp, Seg) end, {ok, Resp});
                         {identity, Ranges} when is_list(Ranges) andalso length(Ranges) < 10 ->
                             send_ranges_multipart(Req, Type, Len, Att, Ranges);
                         _ ->
                             Headers1 = Headers ++
                                 if Enc =:= identity orelse ReqAcceptsAttEnc =:= true ->
-                                    [{"Content-MD5", base64:encode(Att#att.md5)}];
+                                    [{"Content-MD5", base64:encode(couch_att:fetch(md5, Att))}];
                                 true ->
                                     []
                             end,
@@ -1054,38 +1058,39 @@ db_attachment_req(#httpd{method=Method, user_ctx=Ctx}=Req, Db, DocId, FileNamePa
         'DELETE' ->
             [];
         _ ->
-            [#att{
-                name=FileName,
-                type = case couch_httpd:header_value(Req,"Content-Type") of
-                    undefined ->
-                        % We could throw an error here or guess by the FileName.
-                        % Currently, just giving it a default.
-                        <<"application/octet-stream">>;
-                    CType ->
-                        list_to_binary(CType)
-                    end,
-                data = fabric:att_receiver(Req, chttpd:body_length(Req)),
-                att_len = case couch_httpd:header_value(Req,"Content-Length") of
-                    undefined ->
-                        undefined;
-                    Length ->
-                        list_to_integer(Length)
-                    end,
-                md5 = get_md5_header(Req),
-                encoding = case string:to_lower(string:strip(
-                    couch_httpd:header_value(Req,"Content-Encoding","identity")
-                )) of
+            MimeType = case couch_httpd:header_value(Req,"Content-Type") of
+                % We could throw an error here or guess by the FileName.
+                % Currently, just giving it a default.
+                undefined -> <<"application/octet-stream">>;
+                CType -> list_to_binary(CType)
+            end,
+            Data = fabric:att_receiver(Req, chttpd:body_length(Req)),
+            ContentLen = case couch_httpd:header_value(Req,"Content-Length") of
+                undefined -> undefined;
+                Length -> list_to_integer(Length)
+            end,
+            ContentEnc = string:to_lower(string:strip(
+                couch_httpd:header_value(Req, "Content-Encoding", "identity")
+            )),
+            Encoding = case ContentEnc of
                 "identity" ->
-                   identity;
+                    identity;
                 "gzip" ->
-                   gzip;
+                    gzip;
                 _ ->
-                   throw({
-                       bad_ctype,
-                       "Only gzip and identity content-encodings are supported"
-                   })
-                end
-            }]
+                    throw({
+                        bad_ctype,
+                        "Only gzip and identity content-encodings are supported"
+                    })
+            end,
+            [couch_att:new([
+                {name, FileName},
+                {type, MimeType},
+                {data, Data},
+                {att_len, ContentLen},
+                {md5, get_md5_header(Req)},
+                {encoding, Encoding}
+            ])]
     end,
 
     Doc = case extract_header_rev(Req, couch_httpd:qs_value(Req, "rev")) of
@@ -1101,7 +1106,7 @@ db_attachment_req(#httpd{method=Method, user_ctx=Ctx}=Req, Db, DocId, FileNamePa
 
     #doc{atts=Atts} = Doc,
     DocEdited = Doc#doc{
-        atts = NewAtt ++ [A || A <- Atts, A#att.name /= FileName]
+        atts = NewAtt ++ [A || A <- Atts, couch_att:fetch(name, A) /= FileName]
     },
     case fabric:update_doc(Db, DocEdited, [{user_ctx,Ctx}]) of
     {ok, UpdatedRev} ->
@@ -1140,7 +1145,7 @@ send_ranges_multipart(Req, ContentType, Len, Att, Ranges) ->
             <<"\r\nContent-Type: ", ContentType/binary, "\r\n",
             "Content-Range: ", ContentRange/binary, "\r\n",
            "\r\n">>),
-        couch_doc:range_att_foldl(Att, From, To + 1,
+        couch_att:range_foldl(Att, From, To + 1,
             fun(Seg, _) -> send_chunk(Resp, Seg) end, {ok, Resp}),
         couch_httpd:send_chunk(Resp, <<"\r\n--", Boundary/binary>>)
     end, Ranges),
@@ -1327,7 +1332,8 @@ extract_header_rev(Req, ExplicitRev) ->
 
 
 validate_attachment_names(Doc) ->
-    lists:foreach(fun(#att{name=Name}) ->
+    lists:foreach(fun(Att) ->
+        Name = couch_att:fetch(name, Att),
         validate_attachment_name(Name)
     end, Doc#doc.atts).
 
@@ -1342,11 +1348,14 @@ validate_attachment_name(Name) ->
         false -> throw({bad_request, <<"Attachment name is not UTF-8 encoded">>})
     end.
 
--spec monitor_attachments(#att{} | [#att{}]) -> [reference()].
-monitor_attachments(#att{}=Att) ->
-    monitor_attachments([Att]);
+-spec monitor_attachments(couch_att:att() | [couch_att:att()]) -> [reference()].
 monitor_attachments(Atts) when is_list(Atts) ->
-    [monitor(process, Fd) || #att{data={Fd,_}} <- Atts].
+    lists:map(fun(Att) ->
+        {Fd, _} = couch_att:fetch(data, Att),
+        monitor(process, Fd)
+    end, Atts);
+monitor_attachments(Att) ->
+    monitor_attachments([Att]).
 
 demonitor_refs(Refs) when is_list(Refs) ->
     [demonitor(Ref) || Ref <- Refs].
