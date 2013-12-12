@@ -893,8 +893,10 @@ maybe_decompress(Httpd, Body) ->
 log_error_with_stack_trace({bad_request, _, _}) ->
     ok;
 log_error_with_stack_trace({Error, Reason, Stack}) ->
-    couch_log:error("ref: ~p req_err ~p:~p ~p",
-             [stack_hash(Stack), Error, Reason, Stack]);
+    EFmt = if is_binary(Error) -> "~s"; true -> "~w" end,
+    RFmt = if is_binary(Reason) -> "~s"; true -> "~w" end,
+    Fmt = "req_err(~w) " ++ EFmt ++ " : " ++ RFmt ++ "~n    ~p",
+    couch_log:error(Fmt, [stack_hash(Stack), Error, Reason, Stack]);
 log_error_with_stack_trace(_) ->
     ok.
 
