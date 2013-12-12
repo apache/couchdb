@@ -591,7 +591,7 @@ flush_trees(#db{fd = Fd} = Db,
                 {ok, NewSummaryPointer, SummarySize} =
                     couch_file:append_raw_chunk(Fd, Summary),
                 TotalSize = lists:foldl(
-                    fun(#att{att_len = L}, A) -> A + L end,
+                    fun(Att, A) -> A + couch_att:fetch(att_len, Att) end,
                     SummarySize, Value#doc.atts),
                 NewValue = #leaf{deleted=IsDeleted, ptr=NewSummaryPointer,
                                  seq=UpdateSeq, size=TotalSize},

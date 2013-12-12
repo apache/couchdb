@@ -547,16 +547,19 @@ db_doc_req(#httpd{method='POST'}=Req, Db, DocId) ->
         Doc = couch_doc_from_req(Req, DocId, ?JSON_DECODE(Json))
     end,
     UpdatedAtts = [
-        #att{name=validate_attachment_name(Name),
-            type=list_to_binary(ContentType),
-            data=Content} ||
+        couch_att:new([
+            {name, validate_attachment_name(Name)},
+            {type, list_to_binary(ContentType)},
+            {data, Content}
+        ]) ||
         {Name, {ContentType, _}, Content} <-
         proplists:get_all_values("_attachments", Form)
     ],
     #doc{atts=OldAtts} = Doc,
     OldAtts2 = lists:flatmap(
-        fun(#att{name=OldName}=Att) ->
-            case [1 || A <- UpdatedAtts, A#att.name == OldName] of
+        fun(Att) ->
+            OldName = couch_att:fetch(name, Att),
+            case [1 || A <- UpdatedAtts, couch_att:fetch(name, A) == OldName] of
             [] -> [Att]; % the attachment wasn't in the UpdatedAtts, return it
             _ -> [] % the attachment was in the UpdatedAtts, drop it
             end
@@ -684,7 +687,7 @@ send_ranges_multipart(Req, ContentType, Len, Att, Ranges) ->
             <<"\r\nContent-Type: ", ContentType/binary, "\r\n",
             "Content-Range: ", ContentRange/binary, "\r\n",
            "\r\n">>),
-        couch_doc:range_att_foldl(Att, From, To + 1,
+        couch_att:range_foldl(Att, From, To + 1,
             fun(Seg, _) -> send_chunk(Resp, Seg) end, {ok, Resp}),
         couch_httpd:send_chunk(Resp, <<"\r\n--", Boundary/binary>>)
     end, Ranges),
@@ -833,13 +836,14 @@ db_attachment_req(#httpd{method='GET',mochi_req=MochiReq}=Req, Db, DocId, FileNa
     #doc{
         atts=Atts
     } = Doc = couch_doc_open(Db, DocId, Rev, Options),
-    case [A || A <- Atts, A#att.name == FileName] of
+    case [A || A <- Atts, couch_att:fetch(name, A) == FileName] of
     [] ->
         throw({not_found, "Document is missing attachment"});
-    [#att{type=Type, encoding=Enc, disk_len=DiskLen, att_len=AttLen}=Att] ->
-        Etag = case Att#att.md5 of
+    [Att] ->
+        [Type, Enc, DiskLen, AttLen, Md5] = couch_att:fetch([type, encoding, disk_len, att_len, md5], Att),
+        Etag = case Md5 of
             <<>> -> couch_httpd:doc_etag(Doc);
-            Md5 -> "\"" ++ ?b2l(base64:encode(Md5)) ++ "\""
+            _ -> "\"" ++ ?b2l(base64:encode(Md5)) ++ "\""
         end,
         ReqAcceptsAttEnc = lists:member(
            atom_to_list(Enc),
@@ -883,9 +887,9 @@ db_attachment_req(#httpd{method='GET',mochi_req=MochiReq}=Req, Db, DocId, FileNa
         end,
         AttFun = case ReqAcceptsAttEnc of
         false ->
-            fun couch_doc:att_foldl_decode/3;
+            fun couch_att:foldl_decode/3;
         true ->
-            fun couch_doc:att_foldl/3
+            fun couch_att:foldl/3
         end,
         couch_httpd:etag_respond(
             Req,
@@ -903,14 +907,14 @@ db_attachment_req(#httpd{method='GET',mochi_req=MochiReq}=Req, Db, DocId, FileNa
                             Headers1 = [{"Content-Range", make_content_range(From, To, Len)}]
                                 ++ Headers,
                             {ok, Resp} = start_response_length(Req, 206, Headers1, To - From + 1),
-                            couch_doc:range_att_foldl(Att, From, To + 1,
+                            couch_att:range_foldl(Att, From, To + 1,
                                 fun(Seg, _) -> send(Resp, Seg) end, {ok, Resp});
                         {identity, Ranges} when is_list(Ranges) andalso length(Ranges) < 10 ->
                             send_ranges_multipart(Req, Type, Len, Att, Ranges);
                         _ ->
                             Headers1 = Headers ++
                                 if Enc =:= identity orelse ReqAcceptsAttEnc =:= true ->
-                                    [{"Content-MD5", base64:encode(Att#att.md5)}];
+                                    [{"Content-MD5", base64:encode(Md5)}];
                                 true ->
                                     []
                             end,
@@ -929,60 +933,54 @@ db_attachment_req(#httpd{method=Method,mochi_req=MochiReq}=Req, Db, DocId, FileN
                     mochiweb_util:join(
                         lists:map(fun binary_to_list/1,
                             FileNameParts),"/")),
-
     NewAtt = case Method of
         'DELETE' ->
             [];
         _ ->
-            [#att{
-                name = FileName,
-                type = case couch_httpd:header_value(Req,"Content-Type") of
-                    undefined ->
-                        % We could throw an error here or guess by the FileName.
-                        % Currently, just giving it a default.
-                        <<"application/octet-stream">>;
-                    CType ->
-                        list_to_binary(CType)
+            MimeType = case couch_httpd:header_value(Req,"Content-Type") of
+                % We could throw an error here or guess by the FileName.
+                % Currently, just giving it a default.
+                undefined -> <<"application/octet-stream">>;
+                CType -> list_to_binary(CType)
+            end,
+            Data = case couch_httpd:body_length(Req) of
+                undefined ->
+                    <<"">>;
+                {unknown_transfer_encoding, Unknown} ->
+                    exit({unknown_transfer_encoding, Unknown});
+                chunked ->
+                    fun(MaxChunkSize, ChunkFun, InitState) ->
+                        couch_httpd:recv_chunked(
+                            Req, MaxChunkSize, ChunkFun, InitState
+                        )
+                    end;
+                0 ->
+                    <<"">>;
+                Length when is_integer(Length) ->
+                    Expect = case couch_httpd:header_value(Req, "expect") of
+                        undefined ->
+                            undefined;
+                        Value when is_list(Value) ->
+                            string:to_lower(Value)
                     end,
-                data = case couch_httpd:body_length(Req) of
-                    undefined ->
-                        <<"">>;
-                    {unknown_transfer_encoding, Unknown} ->
-                        exit({unknown_transfer_encoding, Unknown});
-                    chunked ->
-                        fun(MaxChunkSize, ChunkFun, InitState) ->
-                            couch_httpd:recv_chunked(Req, MaxChunkSize,
-                                ChunkFun, InitState)
-                        end;
-                    0 ->
-                        <<"">>;
-                    Length when is_integer(Length) ->
-                        Expect = case couch_httpd:header_value(Req, "expect") of
-                                     undefined ->
-                                         undefined;
-                                     Value when is_list(Value) ->
-                                         string:to_lower(Value)
-                                 end,
-                        case Expect of
-                            "100-continue" ->
-                                MochiReq:start_raw_response({100, gb_trees:empty()});
-                            _Else ->
-                                ok
-                        end,
-
-
-                        fun(Size) -> couch_httpd:recv(Req, Size) end
+                    case Expect of
+                        "100-continue" ->
+                            MochiReq:start_raw_response({100, gb_trees:empty()});
+                        _Else ->
+                            ok
                     end,
-                att_len = case couch_httpd:header_value(Req,"Content-Length") of
-                    undefined ->
-                        undefined;
-                    Length ->
-                        list_to_integer(Length)
-                    end,
-                md5 = get_md5_header(Req),
-                encoding = case string:to_lower(string:strip(
-                    couch_httpd:header_value(Req,"Content-Encoding","identity")
-                )) of
+                    fun() -> couch_httpd:recv(Req, 0) end;
+                Length ->
+                    exit({length_not_integer, Length})
+            end,
+            AttLen = case couch_httpd:header_value(Req,"Content-Length") of
+                undefined -> undefined;
+                Len -> list_to_integer(Len)
+            end,
+            ContentEnc = string:to_lower(string:strip(
+                couch_httpd:header_value(Req,"Content-Encoding","identity")
+            )),
+            Encoding = case ContentEnc of
                 "identity" ->
                    identity;
                 "gzip" ->
@@ -992,8 +990,15 @@ db_attachment_req(#httpd{method=Method,mochi_req=MochiReq}=Req, Db, DocId, FileN
                        bad_ctype,
                        "Only gzip and identity content-encodings are supported"
                    })
-                end
-            }]
+            end,
+            [couch_att:new([
+                {name, FileName},
+                {type, MimeType},
+                {data, Data},
+                {att_len, AttLen},
+                {md5, get_md5_header(Req)},
+                {encoding, Encoding}
+            ])]
     end,
 
     Doc = case extract_header_rev(Req, couch_httpd:qs_value(Req, "rev")) of
@@ -1010,7 +1015,7 @@ db_attachment_req(#httpd{method=Method,mochi_req=MochiReq}=Req, Db, DocId, FileN
 
     #doc{atts=Atts} = Doc,
     DocEdited = Doc#doc{
-        atts = NewAtt ++ [A || A <- Atts, A#att.name /= FileName]
+        atts = NewAtt ++ [A || A <- Atts, couch_att:fetch(name, A) /= FileName]
     },
 
     Headers = case Method of
@@ -1216,7 +1221,8 @@ parse_copy_destination_header(Req) ->
     end.
 
 validate_attachment_names(Doc) ->
-    lists:foreach(fun(#att{name=Name}) ->
+    lists:foreach(fun(Att) ->
+        Name = couch_att:fetch(name, Att),
         validate_attachment_name(Name)
     end, Doc#doc.atts).
 

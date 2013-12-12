@@ -31,6 +31,7 @@
 -export([check_is_admin/1, check_is_member/1, get_doc_count/1]).
 -export([reopen/1, is_system_db/1, compression/1, make_doc/5]).
 -export([load_validation_funs/1]).
+-export([check_md5/2, with_stream/3]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -191,12 +192,16 @@ apply_open_options(Else,_Options) ->
 
 apply_open_options2(Doc,[]) ->
     {ok, Doc};
-apply_open_options2(#doc{atts=Atts,revs=Revs}=Doc,
+apply_open_options2(#doc{atts=Atts0,revs=Revs}=Doc,
         [{atts_since, PossibleAncestors}|Rest]) ->
     RevPos = find_ancestor_rev_pos(Revs, PossibleAncestors),
-    apply_open_options2(Doc#doc{atts=[A#att{data=
-        if AttPos>RevPos -> Data; true -> stub end}
-        || #att{revpos=AttPos,data=Data}=A <- Atts]}, Rest);
+    Atts = lists:map(fun(Att) ->
+        [AttPos, Data] = couch_att:fetch([revpos, data], Att),
+        if  AttPos > RevPos -> couch_att:store(data, Data, Att);
+            true -> couch_att:store(data, stub, Att)
+        end
+    end, Atts0),
+    apply_open_options2(Doc#doc{atts=Atts}, Rest);
 apply_open_options2(Doc, [ejson_body | Rest]) ->
     apply_open_options2(couch_doc:with_ejson_body(Doc), Rest);
 apply_open_options2(Doc,[_|Rest]) ->
@@ -784,15 +789,21 @@ prep_and_validate_replicated_updates(Db, [Bucket|RestBuckets], [OldInfo|RestOldI
 
 
 
-new_revid(#doc{body=Body,revs={OldStart,OldRevs},
-        atts=Atts,deleted=Deleted}) ->
-    case [{N, T, M} || #att{name=N,type=T,md5=M} <- Atts, M =/= <<>>] of
-    Atts2 when length(Atts) =/= length(Atts2) ->
-        % We must have old style non-md5 attachments
-        ?l2b(integer_to_list(couch_util:rand32()));
-    Atts2 ->
-        OldRev = case OldRevs of [] -> 0; [OldRev0|_] -> OldRev0 end,
-        couch_util:md5(term_to_binary([Deleted, OldStart, OldRev, Body, Atts2]))
+new_revid(#doc{body=Body, revs={OldStart,OldRevs}, atts=Atts, deleted=Deleted}) ->
+    DigestedAtts = lists:foldl(fun(Att, Acc) ->
+        [N, T, M] = couch_att:fetch([name, type, md5], Att),
+        case M == <<>> of
+            true -> Acc;
+            false -> [{N, T, M} | Acc]
+        end
+    end, [], Atts),
+    case DigestedAtts of
+        Atts2 when length(Atts) =/= length(Atts2) ->
+            % We must have old style non-md5 attachments
+            ?l2b(integer_to_list(couch_util:rand32()));
+        Atts2 ->
+            OldRev = case OldRevs of [] -> 0; [OldRev0|_] -> OldRev0 end,
+            couch_util:md5(term_to_binary([Deleted, OldStart, OldRev, Body, Atts2]))
     end.
 
 new_revs([], OutBuckets, IdRevsAcc) ->
@@ -807,17 +818,14 @@ new_revs([Bucket|RestBuckets], OutBuckets, IdRevsAcc) ->
     new_revs(RestBuckets, [NewBucket|OutBuckets], IdRevsAcc3).
 
 check_dup_atts(#doc{atts=Atts}=Doc) ->
-    Atts2 = lists:sort(fun(#att{name=N1}, #att{name=N2}) -> N1 < N2 end, Atts),
-    check_dup_atts2(Atts2),
+    lists:foldl(fun(Att, Names) ->
+        Name = couch_att:fetch(name, Att),
+        case ordsets:is_element(Name, Names) of
+            true -> throw({bad_request, <<"Duplicate attachments">>});
+            false -> ordsets:add_element(Name, Names)
+        end
+    end, ordsets:new(), Atts),
     Doc.
-
-check_dup_atts2([#att{name=N}, #att{name=N} | _]) ->
-    throw({bad_request, <<"Duplicate attachments">>});
-check_dup_atts2([_ | Rest]) ->
-    check_dup_atts2(Rest);
-check_dup_atts2(_) ->
-    ok.
-
 
 tag_docs([]) ->
     [];
@@ -1000,11 +1008,10 @@ write_and_commit(#db{main_pid=Pid, user_ctx=Ctx}=Db, DocBuckets1,
 prepare_doc_summaries(Db, BucketList) ->
     [lists:map(
         fun(#doc{body = Body, atts = Atts} = Doc) ->
-            DiskAtts = [{N, T, P, AL, DL, R, M, E} ||
-                #att{name = N, type = T, data = {_, P}, md5 = M, revpos = R,
-                    att_len = AL, disk_len = DL, encoding = E} <- Atts],
+            DiskAtts = [couch_att:to_disk_term(Att) || Att <- Atts],
             AttsFd = case Atts of
-            [#att{data = {Fd, _}} | _] ->
+            [Att | _] ->
+                {Fd, _} = couch_att:fetch(data, Att),
                 Fd;
             [] ->
                 nil
@@ -1025,85 +1032,23 @@ before_docs_update(#db{before_doc_update = Fun} = Db, BucketList) ->
         Bucket) || Bucket <- BucketList].
 
 
-set_new_att_revpos(#doc{revs={RevPos,_Revs},atts=Atts}=Doc) ->
-    Doc#doc{atts= lists:map(fun(#att{data={_Fd,_Sp}}=Att) ->
-            % already commited to disk, do not set new rev
-            Att;
-        (Att) ->
-            Att#att{revpos=RevPos+1}
-        end, Atts)}.
+set_new_att_revpos(#doc{revs={RevPos,_Revs},atts=Atts0}=Doc) ->
+    Atts = lists:map(
+        fun(Att) ->
+            case couch_att:fetch(data, Att) of
+                {_Fd, _Sp} -> Att; % already commited to disk, don't set new rev
+                _ -> couch_att:store(revpos, RevPos+1, Att)
+            end
+        end, Atts0),
+    Doc#doc{atts = Atts}.
 
 
 doc_flush_atts(Doc, Fd) ->
-    Doc#doc{atts=[flush_att(Fd, Att) || Att <- Doc#doc.atts]}.
+    Doc#doc{atts=[couch_att:flush(Fd, Att) || Att <- Doc#doc.atts]}.
 
 check_md5(_NewSig, <<>>) -> ok;
 check_md5(Sig, Sig) -> ok;
 check_md5(_, _) -> throw(md5_mismatch).
-
-flush_att(Fd, #att{data={Fd0, _}}=Att) when Fd0 == Fd ->
-    % already written to our file, nothing to write
-    Att;
-
-flush_att(Fd, #att{data={OtherFd,StreamPointer}, md5=InMd5,
-    disk_len=InDiskLen} = Att) ->
-    {NewStreamData, Len, _IdentityLen, Md5, IdentityMd5} =
-            couch_stream:copy_to_new_stream(OtherFd, StreamPointer, Fd),
-    check_md5(IdentityMd5, InMd5),
-    Att#att{data={Fd, NewStreamData}, md5=Md5, att_len=Len, disk_len=InDiskLen};
-
-flush_att(Fd, #att{data=Data}=Att) when is_binary(Data) ->
-    with_stream(Fd, Att, fun(OutputStream) ->
-        couch_stream:write(OutputStream, Data)
-    end);
-
-flush_att(Fd, #att{data=Fun,att_len=undefined}=Att) when is_function(Fun) ->
-    MaxChunkSize = list_to_integer(
-        config:get("couchdb", "attachment_stream_buffer_size", "4096")),
-    with_stream(Fd, Att, fun(OutputStream) ->
-        % Fun(MaxChunkSize, WriterFun) must call WriterFun
-        % once for each chunk of the attachment,
-        Fun(MaxChunkSize,
-            % WriterFun({Length, Binary}, State)
-            % WriterFun({0, _Footers}, State)
-            % Called with Length == 0 on the last time.
-            % WriterFun returns NewState.
-            fun({0, Footers}, _) ->
-                F = mochiweb_headers:from_binary(Footers),
-                case mochiweb_headers:get_value("Content-MD5", F) of
-                undefined ->
-                    ok;
-                Md5 ->
-                    {md5, base64:decode(Md5)}
-                end;
-            ({_Length, Chunk}, _) ->
-                couch_stream:write(OutputStream, Chunk)
-            end, ok)
-    end);
-
-flush_att(Fd, #att{data=Fun,att_len=AttLen}=Att) when is_function(Fun) ->
-    with_stream(Fd, Att, fun(OutputStream) ->
-        write_streamed_attachment(OutputStream, Fun, AttLen)
-    end);
-
-flush_att(Fd, #att{data={follows, Parser, Ref}}=Att) when is_pid(Parser) ->
-    ParserRef = erlang:monitor(process, Parser),
-    Fun = fun() ->
-        Parser ! {get_bytes, Ref, self()},
-        receive
-            {started_open_doc_revs, NewRef} ->
-                couch_doc:restart_open_doc_revs(Parser, Ref, NewRef);
-            {bytes, Ref, Bytes} ->
-                Bytes;
-            {'DOWN', ParserRef, _, _, Reason} ->
-                throw({mp_parser_died, Reason})
-        end
-    end,
-    try
-        flush_att(Fd, Att#att{data=Fun})
-    after
-        erlang:demonitor(ParserRef, [flush])
-    end.
 
 
 compressible_att_type(MimeType) when is_binary(MimeType) ->
@@ -1133,7 +1078,8 @@ compressible_att_type(MimeType) ->
 % is present in the request, but there is no Content-MD5
 % trailer, we're free to ignore this inconsistency and
 % pretend that no Content-MD5 exists.
-with_stream(Fd, #att{md5=InMd5,type=Type,encoding=Enc}=Att, Fun) ->
+with_stream(Fd, Att, Fun) ->
+    [InMd5, Type, Enc] = couch_att:fetch([md5, type, encoding], Att),
     BufferSize = list_to_integer(
         config:get("couchdb", "attachment_stream_buffer_size", "4096")),
     {ok, OutputStream} = case (Enc =:= identity) andalso
@@ -1168,43 +1114,25 @@ with_stream(Fd, #att{md5=InMd5,type=Type,encoding=Enc}=Att, Fun) ->
             {Len, IdentityLen, gzip}
         end;
     gzip ->
-        case {Att#att.att_len, Att#att.disk_len} of
-        {AL, DL} when AL =:= undefined orelse DL =:= undefined ->
-            % Compressed attachment uploaded through the standalone API.
-            {Len, Len, gzip};
-        {AL, DL} ->
-            % This case is used for efficient push-replication, where a
-            % compressed attachment is located in the body of multipart
-            % content-type request.
-            {AL, DL, gzip}
+        case couch_att:fetch([att_len, disk_len], Att) of
+            [AL, DL] when AL =:= undefined orelse DL =:= undefined ->
+                % Compressed attachment uploaded through the standalone API.
+                {Len, Len, gzip};
+            [AL, DL] ->
+                % This case is used for efficient push-replication, where a
+                % compressed attachment is located in the body of multipart
+                % content-type request.
+                {AL, DL, gzip}
         end
     end,
-    Att#att{
-        data={Fd,StreamInfo},
-        att_len=AttLen,
-        disk_len=DiskLen,
-        md5=Md5,
-        encoding=NewEnc
-    }.
+    couch_att:store([
+        {data, {Fd,StreamInfo}},
+        {att_len, AttLen},
+        {disk_len, DiskLen},
+        {md5, Md5},
+        {encoding, NewEnc}
+    ], Att).
 
-
-write_streamed_attachment(_Stream, _F, 0) ->
-    ok;
-write_streamed_attachment(_Stream, _F, LenLeft) when LenLeft < 0 ->
-    throw({bad_request, <<"attachment longer than expected">>});
-write_streamed_attachment(Stream, F, LenLeft) when LenLeft > 0 ->
-    Bin = try read_next_chunk(F, LenLeft)
-    catch
-        {mp_parser_died, normal} ->
-            throw({bad_request, <<"attachment shorter than expected">>})
-    end,
-    ok = couch_stream:write(Stream, Bin),
-    write_streamed_attachment(Stream, F, LenLeft - size(Bin)).
-
-read_next_chunk(F, _) when is_function(F, 0) ->
-    F();
-read_next_chunk(F, LenLeft) when is_function(F, 1) ->
-    F(lists:min([LenLeft, 16#2000])).
 
 enum_docs_since_reduce_to_count(Reds) ->
     couch_btree:final_reduce(
@@ -1367,60 +1295,28 @@ read_doc(#db{fd=Fd}, Pos) ->
     couch_file:pread_term(Fd, Pos).
 
 
-make_doc(#db{fd = Fd} = Db, Id, Deleted, Bp, RevisionPath) ->
-    {BodyData, Atts} =
-    case Bp of
-    nil ->
-        {[], []};
-    _ ->
-        {ok, {BodyData0, Atts00}} = read_doc(Db, Bp),
-        Atts0 = case Atts00 of
-        _ when is_binary(Atts00) ->
-            couch_compress:decompress(Atts00);
-        _ when is_list(Atts00) ->
-            % pre 1.2 format
-            Atts00
-        end,
-        {BodyData0,
-            lists:map(
-                fun({Name,Type,Sp,AttLen,DiskLen,RevPos,Md5,Enc}) ->
-                    #att{name=Name,
-                        type=Type,
-                        att_len=AttLen,
-                        disk_len=DiskLen,
-                        md5=Md5,
-                        revpos=RevPos,
-                        data={Fd,Sp},
-                        encoding=
-                            case Enc of
-                            true ->
-                                % 0110 UPGRADE CODE
-                                gzip;
-                            false ->
-                                % 0110 UPGRADE CODE
-                                identity;
-                            _ ->
-                                Enc
-                            end
-                    };
-                ({Name,Type,Sp,AttLen,RevPos,Md5}) ->
-                    #att{name=Name,
-                        type=Type,
-                        att_len=AttLen,
-                        disk_len=AttLen,
-                        md5=Md5,
-                        revpos=RevPos,
-                        data={Fd,Sp}};
-                ({Name,{Type,Sp,AttLen}}) ->
-                    #att{name=Name,
-                        type=Type,
-                        att_len=AttLen,
-                        disk_len=AttLen,
-                        md5= <<>>,
-                        revpos=0,
-                        data={Fd,Sp}}
-                end, Atts0)}
+make_doc(_Db, Id, Deleted, nil = _Bp, RevisionPath) ->
+    #doc{
+        id = Id,
+        revs = RevisionPath,
+        body = [],
+        atts = [],
+        deleted = Deleted
+    };
+make_doc(#db{fd=Fd}=Db, Id, Deleted, Bp, RevisionPath) ->
+    {BodyData, Atts0} = case Bp of
+        nil ->
+            {[], []};
+        _ ->
+            case read_doc(Db, Bp) of
+                {ok, {BodyData0, Atts1}} when is_binary(Atts1) ->
+                    {BodyData0, couch_compress:decompress(Atts1)};
+                {ok, {BodyData0, Atts1}} when is_list(Atts1) ->
+                    % pre 1.2 format
+                    {BodyData0, Atts1}
+            end
     end,
+    Atts = [couch_att:from_disk_term(Fd, T) || T <- Atts0],
     Doc = #doc{
         id = Id,
         revs = RevisionPath,

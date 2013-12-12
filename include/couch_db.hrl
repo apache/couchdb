@@ -89,30 +89,13 @@
     % the json body object.
     body = {[]},
 
-    atts = [], % attachments
+    atts = [] :: [couch_att:att()], % attachments
 
     deleted = false,
 
     % key/value tuple of meta information, provided when using special options:
     % couch_db:open_doc(Db, Id, Options).
     meta = []
-}).
-
-
--record(att, {
-    name,
-    type,
-    att_len,
-    disk_len, % length of the attachment in its identity form
-              % (that is, without a content encoding applied to it)
-              % differs from att_len when encoding /= identity
-    md5= <<>>,
-    revpos=0,
-    data,
-    encoding=identity % currently supported values are:
-                      %     identity, gzip
-                      % additional values to support in the future:
-                      %     deflate, compress
 }).
 
 
