@@ -371,6 +371,9 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         });
 
         that.model.collection.remove(that.model.id);
+        if (!!that.model.id.match('_design')) {
+          FauxtonAPI.triggerRouteEvent('reloadDesignDocs');
+        }
       }, function(resp) {
         FauxtonAPI.addNotification({
           msg: "Failed to destroy your doc!",
@@ -639,6 +642,10 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
           });
 
           model.collection.remove(model.id);
+          console.log(model.id.match('_design'), !!model.id.match('_design'));
+          if (!!model.id.match('_design')) { 
+            FauxtonAPI.triggerRouteEvent('reloadDesignDocs');
+          }
           that.$('.bulk-delete').addClass('disabled');
         }, function(resp) {
           FauxtonAPI.addNotification({
@@ -1159,7 +1166,9 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
           views: {},
           language: "javascript"
         };
-        return new this.DocModel(doc, {database: this.database});
+        var ddoc = new this.DocModel(doc, {database: this.database});
+        this.collection.add(ddoc);
+        return ddoc;
       } else {
         var ddocName = this.$('#ddoc').val();
         return this.collection.find(function (ddoc) {
@@ -1201,8 +1210,9 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         this.ddocID = options.ddocInfo.id;
         this.viewName = options.viewName;
         this.ddocInfo = new Documents.DdocInfo({_id: this.ddocID},{database: this.database});
-      } 
+      }
 
+      this.showIndex = false;
       _.bindAll(this);
     },
 
@@ -1285,6 +1295,9 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         ddoc.setDdocView(viewName, mapVal, reduceVal);
 
         ddoc.save().then(function () {
+          that.mapEditor.editSaved();
+          that.reduceEditor && that.reduceEditor.editSaved();
+
           FauxtonAPI.addNotification({
             msg: "View has been saved.",
             type: "success",
@@ -1295,9 +1308,13 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
             var fragment = '/database/' + that.database.id +'/' + ddocName + '/_view/' + viewName; 
 
             FauxtonAPI.navigate(fragment, {trigger: false});
-            FauxtonAPI.triggerRouteEvent('reloadDesignDocs',{selectedTab: ddocName.replace('_design/','') + '_' + viewName});
-
             that.newView = false;
+            that.ddocID = ddoc.id;
+            that.viewName = viewName;
+            that.ddocInfo = ddoc;
+            that.showIndex = true;
+            that.render();
+            FauxtonAPI.triggerRouteEvent('reloadDesignDocs',{selectedTab: ddocName.replace('_design/','') + '_' + viewName});
           }
 
           if (that.reduceFunStr !== reduceVal) {
@@ -1538,8 +1555,9 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       }
 
       this.designDocSelector.updateDesignDoc();
-      if (this.newView) {
+      if (this.newView || this.showIndex) {
         this.showEditors();
+        this.showIndex = false;
       } else {
         this.$('#index').hide();
         this.$('#index-nav').parent().removeClass('active');
@@ -1566,6 +1584,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         //this.reduceEditor.setValue(this.langTemplates[this.defaultLang].reduce);
       } 
 
+      this.mapEditor.editSaved();
+      this.reduceEditor && this.reduceEditor.editSaved();
     },
 
     cleanup: function () {
