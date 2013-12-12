@@ -86,13 +86,14 @@ handle_stream_start({rexi_DOWN, _, {_, NodeRef}, _}, _, St) ->
     end;
 handle_stream_start({rexi_EXIT, Reason}, Worker, St) ->
     Workers = fabric_dict:erase(Worker, St#stream_acc.workers),
+    Replacements = St#stream_acc.replacements,
     case {fabric_view:is_progress_possible(Workers), Reason} of
     {true, _} ->
         {ok, St#stream_acc{workers=Workers}};
-    {false, {maintenance_mode, _Node}} ->
+    {false, {maintenance_mode, _Node}} when Replacements /= undefined ->
         % Check if we have replacements for this range
         % and start the new workers if so.
-        case lists:keytake(Worker#shard.range, 1, St#stream_acc.replacements) of
+        case lists:keytake(Worker#shard.range, 1, Replacements) of
             {value, {_Range, WorkerReplacements}, NewReplacements} ->
                 FinalWorkers = lists:foldl(fun(Repl, NewWorkers) ->
                     NewWorker = (St#stream_acc.start_fun)(Repl),
