@@ -46,3 +46,8 @@ Version 1.6.0
 * :issue:`1922`: Fix CORS exposed headers :commit:`4f619833`
 * Rename ``proxy_authentification_handler`` to ``proxy_authentication_handler``
   :commit:`c66ac4a8`
+* :issue:`1795`: Ensure startup script couchdb clears pid file on termination
+  :commit:`818ef4f9`
+* :issue:`1962`: Various replicator enhancements
+  :commit:`1d5fe2aa` write access for checkpoints is not required on source db
+  :commit:`0693f98e` make the replication checkpoint interval configurable

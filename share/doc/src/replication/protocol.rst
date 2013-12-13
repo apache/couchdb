@@ -107,7 +107,7 @@ Algorithm
 
 5. GET each revisions from the source Database by calling the URL
    `/<source>/<docid>?revs=true&open_revs`=<revision>` . This
-   will get the document with teh parent revisions. Also don't forget to
+   will get the document with its parent revisions. Also don't forget to
    get attachments that aren't already stored at the target. As an
    optimisation you can use the HTTP multipart api to get all.
 
@@ -190,7 +190,7 @@ Pull Only
 Reference
 ---------
 
-* `TouchDB Ios wiki <https://github.com/couchbaselabs/TouchDB-iOS/wiki/Replication-Algorithm>`_
+* `TouchDB iOS wiki <https://github.com/couchbaselabs/TouchDB-iOS/wiki/Replication-Algorithm>`_
 * `CouchDB documentation
   <http://wiki.apache.org/couchdb/Replication>`_
 * CouchDB `change notifications`_

@@ -91,6 +91,19 @@ Special fields set by the replicator start with the prefix
 
    If ``replication_state`` is ``error``, this field contains the reason.
 
+.. code-block:: javascript
+
+    {
+    "_id": "my_rep",
+    "_rev": "2-9f2c0d9372f4ee4dc75652ab8f8e7c70",
+    "source": "foodb",
+    "target": "bardb",
+    "_replication_state": "error",
+    "_replication_state_time": "2013-12-13T18:48:00+01:00",
+    "_replication_state_reason": "db_not_found: could not open foodb",
+    "_replication_id": "fe965cdc47b4d5f6c02811d9d351ac3d"
+    }
+
 When the replication finishes, it will update the ``_replication_state``
 field (and ``_replication_state_time``) with the value ``completed``, so
 the document will look like:
