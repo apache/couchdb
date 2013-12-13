@@ -135,12 +135,11 @@ changes_callback(start, Acc) ->
     #acc{resp=Req} = Acc,
     FirstChunk = "{\"results\":[\n",
     {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, [], FirstChunk),
-    Acc1 = Acc#acc{
+    {ok, Acc#acc{
         resp=Resp,
         prepend="",
         last_data_sent_time=os:timestamp()
-    },
-    maybe_finish(Acc1);
+    }};
 changes_callback({change, Change0}, Acc) ->
     #acc{resp=Resp, prepend=Prepend, username=Username} = Acc,
     case transform_change(Username, Resp, Change0) of
