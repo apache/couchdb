@@ -88,6 +88,18 @@ run() {
 
 }
 
+run_files() {
+    COUNTER=1
+    FILE_COUNT=$(ls -l $1 | wc -l)
+    FILE_COUNT=$(expr $FILE_COUNT + 0)
+    for TEST_SRC in $1
+    do
+        /bin/echo -n "$COUNTER/$FILE_COUNT "
+        COUNTER=$(expr $COUNTER + 1)
+        run $TEST_SRC
+    done
+}
+
 # start CouchDB
 if [ -z $COUCHDB_NO_START ]; then
     $MAKE dev
@@ -98,25 +110,20 @@ echo "Running javascript tests ..."
 
 if [ "$#" -eq 0 ];
 then
-    COUNTER=1
-    FILES="$SCRIPT_DIR/test/*.js"
-    FILE_COUNT=$(ls -l $FILES | wc -l)
-    FILE_COUNT=$(expr $FILE_COUNT + 0)
-    for TEST_SRC in $FILES
-    do
-        /bin/echo -n "$COUNTER/$FILE_COUNT "
-        COUNTER=$(expr $COUNTER + 1)
-        run $TEST_SRC
-    done
+    run_files "$SCRIPT_DIR/test/*.js"
 else
-    TEST_SRC="$1"
-    if [ ! -f $TEST_SRC ]; then
-        TEST_SRC="$SCRIPT_DIR/test/$1"
+    if [ -d $1 ]; then
+        run_files "$1/*.js"
+    else
+        TEST_SRC="$1"
         if [ ! -f $TEST_SRC ]; then
-            TEST_SRC="$SCRIPT_DIR/test/$1.js"
+            TEST_SRC="$SCRIPT_DIR/test/$1"
             if [ ! -f $TEST_SRC ]; then
-                echo "file $1 does not exist"
-                exit 1
+                TEST_SRC="$SCRIPT_DIR/test/$1.js"
+                if [ ! -f $TEST_SRC ]; then
+                    echo "file $1 does not exist"
+                    exit 1
+                fi
             fi
         fi
     fi
