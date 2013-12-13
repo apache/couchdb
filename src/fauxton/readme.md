@@ -31,6 +31,11 @@ A recent of [node.js](http://nodejs.org/) and npm is required.
     # Install all dependencies
     npm install
 
+### Dev Server
+    Using the dev server is the easiest way to use fauxton, specially when developing for it.
+
+    grunt dev
+
 #### (Optional) To avoid a npm global install
     # Add node_modules/.bin to your path
     # export PATH=./node_modules/.bin:$PATH
@@ -42,10 +47,12 @@ A recent of [node.js](http://nodejs.org/) and npm is required.
     # Or fully compiled install
     # ./bin/grunt couchdb
 
-### Dev Server
-    Using the dev server is the easiest way to use fauxton, specially when developing for it.
+### Prepare Fauxton Release
+    Follow the "Fauxton Setup" section then:
 
-    grunt dev
+    ./bin/grunt couchdb
+
+    This will install the latest version of Fauxton into `/share/www/fauxton`
 
 ### Running Tests
     There are two ways to run the tests. `grunt test` will run the tests via the commandline. It is also possible to view them via the url
