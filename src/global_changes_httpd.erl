@@ -182,7 +182,7 @@ changes_callback({error, Reason}, Acc) ->
 
 maybe_finish(Acc) ->
     case Acc#acc.limit of
-        0 ->
+        1 ->
             {stop, Acc};
         undefined ->
             {ok, Acc};
