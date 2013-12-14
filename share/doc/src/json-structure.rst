@@ -274,6 +274,8 @@ Replication Settings
 | use_checkpoints (optional)     | Whether to use replication checkpoints      |
 |                                | or not                                      |
 +--------------------------------+---------------------------------------------+
+| checkpoint_interval (optional) | Specifies checkpoint interval in ms.        |
++--------------------------------+---------------------------------------------+
 
 .. _replication-status:
 
