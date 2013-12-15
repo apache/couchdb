@@ -1,0 +1,3 @@
+{variables, [{module, "mymodule"}]}.
+{template, "basicnif.erl", "src/{{module}}.erl"}.
+{template, "basicnif.c", "c_src/{{module}}.c"}.

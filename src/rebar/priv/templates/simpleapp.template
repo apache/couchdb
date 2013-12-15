@@ -1,0 +1,4 @@
+{variables, [{appid, "myapp"}]}.
+{template, "simpleapp.app.src", "src/{{appid}}.app.src"}.
+{template, "simpleapp_app.erl", "src/{{appid}}_app.erl"}.
+{template, "simpleapp_sup.erl", "src/{{appid}}_sup.erl"}.

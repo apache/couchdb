@@ -1,0 +1,9 @@
+{application, dummy, [
+    {description, "a dummy app"},
+    {vsn, "0.1"},
+    {registered, [
+      dummy_app
+    ]},
+    {mod, {dummy_app, []}},
+    {applications, [kernel, stdlib, sasl]}
+]}.

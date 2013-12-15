@@ -1,0 +1,3 @@
+
+rebar_eunit.erl:388: Call to missing or unexported function eunit_test:function_wrapper/2
+rebar_utils.erl:163: Call to missing or unexported function escript:foldl/3

@@ -1,0 +1,28 @@
+
+* Major operations
+** Compile
+*** Code generation
+*** Compilation/linking
+*** App validation
+** Clean
+** ct testing
+** eunit testing
+** Installation
+** Doc generation
+
+* Modes/File types
+** Erlang 
+** Port driver
+** NIF driver
+** SNMP MIBs
+** ASN.1 files
+
+* Misc. Notes
+** Port/NIF driver compilation needs pre/post hook
+** Need to support code generation for things like protobuf
+** Need to support compilation flags
+
+* Contexts
+** Application
+** General
+** Release ?!
