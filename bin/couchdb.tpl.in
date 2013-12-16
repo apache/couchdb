@@ -153,6 +153,9 @@ _load_config () {
     _add_config_dir "$DEFAULT_CONFIG_DIR"
     # We initialize plugins here to get the desired default config load order
     _find_plugins
+    if test ! -r "$LOCAL_CONFIG_FILE" ; then
+      touch "$LOCAL_CONFIG_FILE" 2> /dev/null || true
+    fi
     _add_config_file "$LOCAL_CONFIG_FILE"
     _add_config_dir "$LOCAL_CONFIG_DIR"
     if [ "$COUCHDB_ADDITIONAL_CONFIG_FILE" != '' ]
