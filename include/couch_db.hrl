@@ -47,31 +47,29 @@
 -type path() :: {Start::pos_integer(), branch()}.
 -type tree() :: [branch()]. % sorted by key
 
--record(rev_info,
-    {
+-record(rev_info, {
     rev,
     seq = 0,
     deleted = false,
     body_sp = nil % stream pointer
-    }).
+}).
 
--record(doc_info,
-    {
+-record(doc_info, {
     id = <<"">>,
     high_seq = 0,
     revs = [] % rev_info
-    }).
+}).
 
--record(full_doc_info,
-    {id = <<"">>,
+-record(full_doc_info, {
+    id = <<"">>,
     update_seq = 0,
     deleted = false,
     rev_tree = [],
     leafs_size = 0
-    }).
+}).
 
--record(httpd,
-    {mochi_req,
+-record(httpd, {
+    mochi_req,
     peer,
     method,
     requested_path_parts,
@@ -83,11 +81,10 @@
     auth,
     default_fun,
     url_handlers
-    }).
+}).
 
 
--record(doc,
-    {
+-record(doc, {
     id = <<"">>,
     revs = {0, []},
 
@@ -101,11 +98,10 @@
     % key/value tuple of meta information, provided when using special options:
     % couch_db:open_doc(Db, Id, Options).
     meta = []
-    }).
+}).
 
 
--record(att,
-    {
+-record(att, {
     name,
     type,
     att_len,
@@ -119,18 +115,17 @@
                       %     identity, gzip
                       % additional values to support in the future:
                       %     deflate, compress
-    }).
+}).
 
 
--record(user_ctx,
-    {
+-record(user_ctx, {
     name=null,
     roles=[],
     handler
-    }).
+}).
 
--record(db,
-    {main_pid = nil,
+-record(db, {
+    main_pid = nil,
     compactor_pid = nil,
     instance_start_time, % number of microsecs since jan 1 1970 as a binary string
     fd,
@@ -154,7 +149,7 @@
     compression,
     before_doc_update = nil, % nil | fun(Doc, Db) -> NewDoc
     after_doc_read = nil    % nil | fun(Doc, Db) -> NewDoc
-    }).
+}).
 
 -record(view_fold_helper_funs, {
     reduce_count,
@@ -177,12 +172,12 @@
     json = nil
 }).
 
--record(index_header,
-    {seq=0,
+-record(index_header, {
+    seq=0,
     purge_seq=0,
     id_btree_state=nil,
     view_states=nil
-    }).
+}).
 
 % small value used in revision trees to indicate the revision isn't stored
 -define(REV_MISSING, []).
