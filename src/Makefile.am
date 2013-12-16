@@ -109,7 +109,7 @@ FAUXTON_FILES = \
     fauxton/app/app.js \
     fauxton/app/config.js \
     fauxton/app/helpers.js \
-    fauxton/app/initialize.js \
+    fauxton/app/initialize.js.underscore \
     fauxton/app/load_addons.js.underscore \
     fauxton/app/main.js \
     fauxton/app/mixins.js \
