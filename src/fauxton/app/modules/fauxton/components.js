@@ -78,6 +78,7 @@ function(app, FauxtonAPI, ace) {
 
     previousClicked: function (event) {
       event.preventDefault();
+      event.stopPropagation();
       if (!this.canShowPreviousfn()) { return; }
       FauxtonAPI.navigate(this.previousUrlfn(), {trigger: false});
       FauxtonAPI.triggerRouteEvent('paginate', 'previous');
@@ -85,6 +86,7 @@ function(app, FauxtonAPI, ace) {
 
     nextClicked: function (event) {
       event.preventDefault();
+      event.stopPropagation();
       if (!this.canShowNextfn()) { return; }
       var doc = this.collection.first();
 
