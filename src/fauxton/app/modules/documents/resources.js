@@ -99,11 +99,9 @@ function(app, FauxtonAPI) {
           reduce: reduce
         }; 
       } else {
-        if (!views[view]) {
-          views[view] = {};
-        }
-
-        views[view].map = map;
+        views[view] = {
+          map: map
+        };
       }
 
       this.set({views: views});

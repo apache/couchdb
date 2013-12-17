@@ -1545,7 +1545,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         database: this.database,
         viewName: this.viewName,
         ddocName: this.model.id,
-        hasReduce: this.hasReduce
+        hasReduce: this.hasReduce()
       }));
     },
 
