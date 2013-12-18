@@ -1,4 +1,0 @@
-ebin/*.beam
-ebin/*.app
-TEST-*
-.eunit
