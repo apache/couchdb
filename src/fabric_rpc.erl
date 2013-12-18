@@ -22,6 +22,7 @@
 
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("couch_mrview/include/couch_mrview.hrl").
 
 -record (view_acc, {
     db,
@@ -38,13 +39,13 @@
 %% rpc endpoints
 %%  call to with_db will supply your M:F with a #db{} and then remaining args
 
-all_docs(DbName, #view_query_args{keys=nil} = QueryArgs) ->
+all_docs(DbName, #mrargs{keys=nil} = QueryArgs) ->
     {ok, Db} = get_or_create_db(DbName, []),
-    #view_query_args{
+    #mrargs{
         start_key = StartKey,
-        start_docid = StartDocId,
+        start_key_docid = StartDocId,
         end_key = EndKey,
-        end_docid = EndDocId,
+        end_key_docid = EndDocId,
         limit = Limit,
         skip = Skip,
         include_docs = IncludeDocs,
@@ -93,7 +94,7 @@ changes(DbName, Options, StartSeq) ->
 
 map_view(DbName, DDoc, ViewName, QueryArgs) ->
     {ok, Db} = get_or_create_db(DbName, []),
-    #view_query_args{
+    #mrargs{
         limit = Limit,
         skip = Skip,
         keys = Keys,
@@ -126,7 +127,7 @@ map_view(DbName, DDoc, ViewName, QueryArgs) ->
         {ok, _, Acc} = couch_view:fold(View, fun view_fold/3, Acc0, Options);
     _ ->
         Acc = lists:foldl(fun(Key, AccIn) ->
-            KeyArgs = QueryArgs#view_query_args{start_key=Key, end_key=Key},
+            KeyArgs = QueryArgs#mrargs{start_key=Key, end_key=Key},
             Options = couch_httpd_view:make_key_options(KeyArgs),
             {_Go, _, Out} = couch_view:fold(View, fun view_fold/3, AccIn,
                 Options),
@@ -141,7 +142,7 @@ reduce_view(DbName, #doc{} = DDoc, ViewName, QueryArgs) ->
 reduce_view(DbName, Group0, ViewName, QueryArgs) ->
     erlang:put(io_priority, {interactive, DbName}),
     {ok, Db} = get_or_create_db(DbName, []),
-    #view_query_args{
+    #mrargs{
         group_level = GroupLevel,
         limit = Limit,
         skip = Skip,
@@ -168,7 +169,7 @@ reduce_view(DbName, Group0, ViewName, QueryArgs) ->
         couch_view:fold_reduce(ReduceView, fun reduce_fold/3, Acc0, Options);
     _ ->
         lists:map(fun(Key) ->
-            KeyArgs = QueryArgs#view_query_args{start_key=Key, end_key=Key},
+            KeyArgs = QueryArgs#mrargs{start_key=Key, end_key=Key},
             Options0 = couch_httpd_view:make_key_options(KeyArgs),
             Options = [{key_group_fun, GroupFun} | Options0],
             couch_view:fold_reduce(ReduceView, fun reduce_fold/3, Acc0, Options)

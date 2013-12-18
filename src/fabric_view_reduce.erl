@@ -17,6 +17,7 @@
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("couch_mrview/include/couch_mrview.hrl").
 
 go(DbName, GroupId, View, Args, Callback, Acc0) when is_binary(GroupId) ->
     {ok, DDoc} = fabric:open_doc(DbName, <<"_design/", GroupId/binary>>, []),
@@ -27,13 +28,13 @@ go(DbName, DDoc, VName, Args, Callback, Acc0) ->
     Lang = couch_view_group:get_language(Group),
     Views = couch_view_group:get_views(Group),
     {NthRed, View} = fabric_view:extract_view(nil, VName, Views, reduce),
-    {VName, RedSrc} = lists:nth(NthRed, View#view.reduce_funs),
+    {VName, RedSrc} = lists:nth(NthRed, View#mrview.reduce_funs),
     Workers = lists:map(fun(#shard{name=Name, node=N} = Shard) ->
         Ref = rexi:cast(N, {fabric_rpc, reduce_view, [Name,DDoc,VName,Args]}),
         Shard#shard{ref = Ref}
     end, fabric_view:get_shards(DbName, Args)),
     RexiMon = fabric_util:create_monitors(Workers),
-    #view_query_args{limit = Limit, skip = Skip} = Args,
+    #mrargs{limit = Limit, skip = Skip} = Args,
     OsProc = case os_proc_needed(RedSrc) of
         true -> couch_query_servers:get_os_process(Lang);
         _ -> nil
@@ -43,7 +44,7 @@ go(DbName, DDoc, VName, Args, Callback, Acc0) ->
         query_args = Args,
         callback = Callback,
         counters = fabric_dict:init(Workers, 0),
-        keys = Args#view_query_args.keys,
+        keys = Args#mrargs.keys,
         skip = Skip,
         limit = Limit,
         lang = Lang,

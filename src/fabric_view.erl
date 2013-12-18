@@ -19,6 +19,7 @@
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("couch_mrview/include/couch_mrview.hrl").
 
 -spec remove_down_shards(#collector{}, node()) ->
     {ok, #collector{}} | {error, any()}.
@@ -139,7 +140,7 @@ possibly_embed_doc(_State,
     Row;
 possibly_embed_doc(#collector{db_name=DbName, query_args=Args},
               #view_row{key=_Key, id=_Id, value=Value, doc=_Doc}=Row) ->
-    #view_query_args{include_docs=IncludeDocs} = Args,
+    #mrargs{include_docs=IncludeDocs} = Args,
     case IncludeDocs andalso is_tuple(Value) of
     true ->
         {Props} = Value,
@@ -190,7 +191,7 @@ get_next_row(#collector{rows = []}) ->
     throw(complete);
 get_next_row(#collector{reducer = RedSrc} = St) when RedSrc =/= undefined ->
     #collector{
-        query_args = #view_query_args{direction=Dir},
+        query_args = #mrargs{direction=Dir},
         keys = Keys,
         rows = RowDict,
         os_proc = Proc,
@@ -269,9 +270,9 @@ extract_view(Pid, ViewName, [View|Rest], ViewType) ->
     end.
 
 view_names(View, Type) when Type == red_map; Type == reduce ->
-    [Name || {Name, _} <- View#view.reduce_funs];
+    [Name || {Name, _} <- View#mrview.reduce_funs];
 view_names(View, map) ->
-    View#view.map_names.
+    View#mrview.map_names.
 
 index_of(X, List) ->
     index_of(X, List, 1).
@@ -283,10 +284,10 @@ index_of(X, [X|_Rest], I) ->
 index_of(X, [_|Rest], I) ->
     index_of(X, Rest, I+1).
 
-get_shards(DbName, #view_query_args{stale=Stale})
+get_shards(DbName, #mrargs{stale=Stale})
   when Stale == ok orelse Stale == update_after ->
     mem3:ushards(DbName);
-get_shards(DbName, #view_query_args{stale=false}) ->
+get_shards(DbName, #mrargs{stale=false}) ->
     mem3:shards(DbName).
 
 % unit test
