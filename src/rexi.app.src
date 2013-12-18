@@ -12,7 +12,7 @@
 
 {application, rexi, [
     {description, "Lightweight RPC server"},
-    {vsn, "%version%"},
+    {vsn, git},
     {modules, [
         rexi,
         rexi_app,
