@@ -12,6 +12,7 @@
 
 -module(chttpd_view).
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("couch_mrview/include/couch_mrview.hrl").
 
 -export([handle_view_req/3, handle_temp_view_req/2, get_reduce_type/1,
     parse_view_params/3, view_group_etag/2, view_group_etag/3,
@@ -91,11 +92,11 @@ view_callback({error, Reason}, {_, Resp}) ->
 extract_view_type(_ViewName, [], _IsReduce) ->
     throw({not_found, missing_named_view});
 extract_view_type(ViewName, [View|Rest], IsReduce) ->
-    case lists:member(ViewName, [Name || {Name, _} <- View#view.reduce_funs]) of
+    case lists:member(ViewName, [Name || {Name, _} <- View#mrview.reduce_funs]) of
     true ->
         if IsReduce -> reduce; true -> red_map end;
     false ->
-        case lists:member(ViewName, View#view.map_names) of
+        case lists:member(ViewName, View#mrview.map_names) of
         true -> map;
         false -> extract_view_type(ViewName, Rest, IsReduce)
         end
@@ -153,7 +154,7 @@ parse_view_params(Req, Keys, ViewType) when not is_list(Req) ->
     parse_view_params(QueryParams, Keys, ViewType);
 parse_view_params(QueryParams, Keys, ViewType) ->
     IsMultiGet = (Keys =/= nil),
-    Args = #view_query_args{
+    Args = #mrargs{
         view_type=ViewType,
         multi_get=IsMultiGet,
         keys=Keys
@@ -162,7 +163,7 @@ parse_view_params(QueryParams, Keys, ViewType) ->
         validate_view_query(K, V, Args2)
     end, Args, QueryParams),
 
-    GroupLevel = QueryArgs#view_query_args.group_level,
+    GroupLevel = QueryArgs#mrargs.group_level,
     case {ViewType, GroupLevel, IsMultiGet} of
         {reduce, exact, true} ->
             QueryArgs;
@@ -180,9 +181,9 @@ parse_view_params(QueryParams, Keys, ViewType) ->
 parse_json_view_param({<<"key">>, V}) ->
     [{start_key, V}, {end_key, V}];
 parse_json_view_param({<<"startkey_docid">>, V}) ->
-    [{start_docid, V}];
+    [{start_key_docid, V}];
 parse_json_view_param({<<"endkey_docid">>, V}) ->
-    [{end_docid, V}];
+    [{end_key_docid, V}];
 parse_json_view_param({<<"startkey">>, V}) ->
     [{start_key, V}];
 parse_json_view_param({<<"endkey">>, V}) ->
@@ -224,9 +225,9 @@ parse_view_param("key", Value) ->
     JsonKey = ?JSON_DECODE(Value),
     [{start_key, JsonKey}, {end_key, JsonKey}];
 parse_view_param("startkey_docid", Value) ->
-    [{start_docid, ?l2b(Value)}];
+    [{start_key_docid, ?l2b(Value)}];
 parse_view_param("endkey_docid", Value) ->
-    [{end_docid, ?l2b(Value)}];
+    [{end_key_docid, ?l2b(Value)}];
 parse_view_param("startkey", Value) ->
     [{start_key, ?JSON_DECODE(Value)}];
 parse_view_param("endkey", Value) ->
@@ -273,64 +274,64 @@ parse_view_param(Key, Value) ->
     [{extra, {Key, Value}}].
 
 validate_view_query(start_key, Value, Args) ->
-    case Args#view_query_args.multi_get of
+    case Args#mrargs.multi_get of
         true ->
             Msg = <<"Query parameter `start_key` is "
                     "not compatiible with multi-get">>,
             throw({query_parse_error, Msg});
         _ ->
-            Args#view_query_args{start_key=Value}
+            Args#mrargs{start_key=Value}
     end;
-validate_view_query(start_docid, Value, Args) ->
-    Args#view_query_args{start_docid=Value};
+validate_view_query(start_key_docid, Value, Args) ->
+    Args#mrargs{start_key_docid=Value};
 validate_view_query(end_key, Value, Args) ->
-    case Args#view_query_args.multi_get of
+    case Args#mrargs.multi_get of
         true->
             Msg = <<"Query paramter `end_key` is "
                     "not compatibile with multi-get">>,
             throw({query_parse_error, Msg});
         _ ->
-            Args#view_query_args{end_key=Value}
+            Args#mrargs{end_key=Value}
     end;
-validate_view_query(end_docid, Value, Args) ->
-    Args#view_query_args{end_docid=Value};
+validate_view_query(end_key_docid, Value, Args) ->
+    Args#mrargs{end_key_docid=Value};
 validate_view_query(limit, Value, Args) ->
-    Args#view_query_args{limit=Value};
+    Args#mrargs{limit=Value};
 validate_view_query(list, Value, Args) ->
-    Args#view_query_args{list=Value};
+    Args#mrargs{list=Value};
 validate_view_query(stale, Value, Args) ->
-    Args#view_query_args{stale=Value};
+    Args#mrargs{stale=Value};
 validate_view_query(descending, true, Args) ->
-    case Args#view_query_args.direction of
+    case Args#mrargs.direction of
         rev -> Args; % Already reversed
         fwd ->
-            Args#view_query_args{
+            Args#mrargs{
                 direction = rev,
-                start_docid =
-                    reverse_key_default(Args#view_query_args.start_docid),
-                end_docid =
-                    reverse_key_default(Args#view_query_args.end_docid)
+                start_key_docid =
+                    reverse_key_default(Args#mrargs.start_key_docid),
+                end_key_docid =
+                    reverse_key_default(Args#mrargs.end_key_docid)
             }
     end;
 validate_view_query(descending, false, Args) ->
     Args; % Ignore default condition
 validate_view_query(skip, Value, Args) ->
-    Args#view_query_args{skip=Value};
+    Args#mrargs{skip=Value};
 validate_view_query(group_level, Value, Args) ->
-    case Args#view_query_args.view_type of
+    case Args#mrargs.view_type of
         reduce ->
-            Args#view_query_args{group_level=Value};
+            Args#mrargs{group_level=Value};
         _ ->
             Msg = <<"Invalid URL parameter 'group' or "
                     " 'group_level' for non-reduce view.">>,
             throw({query_parse_error, Msg})
     end;
 validate_view_query(inclusive_end, Value, Args) ->
-    Args#view_query_args{inclusive_end=Value};
+    Args#mrargs{inclusive_end=Value};
 validate_view_query(reduce, false, Args) ->
     Args;
 validate_view_query(reduce, _, Args) ->
-    case Args#view_query_args.view_type of
+    case Args#mrargs.view_type of
         map ->
             Msg = <<"Invalid URL parameter `reduce` for map view.">>,
             throw({query_parse_error, Msg});
@@ -338,29 +339,29 @@ validate_view_query(reduce, _, Args) ->
             Args
     end;
 validate_view_query(include_docs, true, Args) ->
-    case Args#view_query_args.view_type of
+    case Args#mrargs.view_type of
         reduce ->
             Msg = <<"Query paramter `include_docs` "
                     "is invalid for reduce views.">>,
             throw({query_parse_error, Msg});
         _ ->
-            Args#view_query_args{include_docs=true}
+            Args#mrargs{include_docs=true}
     end;
 validate_view_query(include_docs, _Value, Args) ->
     Args;
 validate_view_query(conflicts, true, Args) ->
-    case Args#view_query_args.view_type of
+    case Args#mrargs.view_type of
     reduce ->
         Msg = <<"Query parameter `conflicts` "
                 "is invalid for reduce views.">>,
         throw({query_parse_error, Msg});
     _ ->
-        Args#view_query_args{extra = [conflicts|Args#view_query_args.extra]}
+        Args#mrargs{extra = [conflicts|Args#mrargs.extra]}
     end;
 validate_view_query(conflicts, _Value, Args) ->
     Args;
 validate_view_query(sorted, false, Args) ->
-    Args#view_query_args{sorted=false};
+    Args#mrargs{sorted=false};
 validate_view_query(sorted, _Value, Args) ->
     Args;
 validate_view_query(extra, _Value, Args) ->
