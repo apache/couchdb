@@ -12,7 +12,7 @@
 
 {application, ddoc_cache, [
     {description, "Design Document Cache"},
-    {vsn, "%version%"},
+    {vsn, git},
     {modules, [
         ddoc_cache,
         ddoc_cache_app,
