@@ -70,11 +70,13 @@
     skip = 0,
     group_level = 0,
     stale = false,
+    multi_get = false,
     inclusive_end = true,
     include_docs = false,
     update_seq=false,
     conflicts,
     callback,
     list,
+    sorted = true,
     extra = []
 }).

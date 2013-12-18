@@ -12,7 +12,7 @@
 
 {application, ets_lru, [
     {description, "ETS Base LRU Cache"},
-    {vsn, "%version%"},
+    {vsn, git},
     {modules, [
         ets_lru
     ]},

@@ -1,0 +1,4 @@
+Ignore these files for now.
+
+This is to pacify newer rebar that insists on having a sys.config and
+a vm.args in releases/$VSN/.

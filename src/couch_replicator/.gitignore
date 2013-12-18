@@ -1,4 +1,0 @@
-*.beam
-.eunit
-ebin/replicator.app
-.DS_Store

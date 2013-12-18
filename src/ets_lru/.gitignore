@@ -1,5 +1,0 @@
-erl_crash.dump
-
-.eunit/
-ebin/
-test/*.beam

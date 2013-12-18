@@ -1,0 +1,7 @@
+{application, ibrowse,
+        [{description, "Erlang HTTP client application"},
+         {vsn, git},
+         {registered, [ibrowse_sup, ibrowse]},
+         {applications, [kernel,stdlib]},
+	 {env, []},
+	 {mod, {ibrowse_app, []}}]}.

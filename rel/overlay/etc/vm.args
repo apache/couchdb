@@ -1,0 +1,23 @@
+# Each node in the system must have a unique name.  A name can be short
+# (specified using -sname) or it can by fully qualified (-name).  There can be
+# no communication between nodes running with the -sname flag and those running 
+# with the -name flag.
+{{node_name}}
+
+# All nodes must share the same magic cookie for distributed Erlang to work.
+# Comment out this line if you synchronized the cookies by other means (using
+# the ~/.erlang.cookie file, for example).
+-setcookie monster
+
+# Tell kernel and SASL not to log anything
+-kernel error_logger silent
+-sasl sasl_error_logger false
+
+# Use kernel poll functionality if supported by emulator
++K true
+
+# Start a pool of asynchronous IO threads
++A 16
+
+# Comment this line out to enable the interactive Erlang shell on startup
++Bd -noinput

@@ -12,7 +12,7 @@
 
 {application, couch_replicator, [
     {description, "CouchDB replicator"},
-    {vsn, "%version%"},
+    {vsn, git},
     {modules, [
         couch_replicator,
         couch_replicator_api_wrap,

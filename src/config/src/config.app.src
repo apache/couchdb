@@ -12,7 +12,7 @@
 
 {application, config, [
     {description, "INI file configuration system for Apache CouchDB"},
-    {vsn, "%version%"},
+    {vsn, git},
     {modules, [
         config,
         config_app,

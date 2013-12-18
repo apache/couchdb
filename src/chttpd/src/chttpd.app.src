@@ -12,7 +12,7 @@
 
  {application, chttpd, [
     {description, "HTTP interface for CouchDB cluster"},
-    {vsn, "%version%"},
+    {vsn, git},
     {modules, [
         chttpd,
         chttpd_app,

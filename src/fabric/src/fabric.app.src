@@ -12,7 +12,7 @@
 
 {application, fabric, [
     {description, "Routing and proxying layer for CouchDB cluster"},
-    {vsn, "%version%"},
+    {vsn, git},
     {modules, [
         fabric,
         fabric_db_create,

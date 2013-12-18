@@ -1,1 +1,0 @@
-{suites, "test", all}.

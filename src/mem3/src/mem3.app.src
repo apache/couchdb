@@ -12,7 +12,7 @@
 
 {application, mem3, [
     {description, "CouchDB Cluster Membership"},
-    {vsn, "%version%"},
+    {vsn, git},
     {modules, [
         mem3,
         mem3_app,
