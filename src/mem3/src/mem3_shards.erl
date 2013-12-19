@@ -131,14 +131,11 @@ handle_call(_Call, _From, St) ->
     {noreply, St}.
 
 handle_cast({cache_hit, DbName}, St) ->
-    margaret_counter:increment([dbcore, mem3, shard_cache, hit]),
     cache_hit(DbName),
     {noreply, St};
 handle_cast({cache_insert, DbName, Shards}, St) ->
-    margaret_counter:increment([dbcore, mem3, shard_cache, miss]),
     {noreply, cache_free(cache_insert(St, DbName, Shards))};
 handle_cast({cache_remove, DbName}, St) ->
-    margaret_counter:increment([dbcore, mem3, shard_cache, eviction]),
     {noreply, cache_remove(St, DbName)};
 handle_cast(_Msg, St) ->
     {noreply, St}.
