@@ -45,10 +45,8 @@ open(DbName, DDocId) when is_binary(DDocId) ->
 open(Key) ->
     try ets_lru:lookup_d(?CACHE, Key) of
         {ok, _} = Resp ->
-            margaret_counter:increment([ddoc_cache, hit]),
             Resp;
         _ ->
-            margaret_counter:increment([ddoc_cache, miss]),
             case gen_server:call(?OPENER, {open, Key}, infinity) of
                 {open_ok, Resp} ->
                     Resp;
@@ -61,7 +59,6 @@ open(Key) ->
             end
     catch
         error:badarg ->
-            margaret_counter:increment([ddoc_cache, recovery]),
             recover(Key)
     end.
 
