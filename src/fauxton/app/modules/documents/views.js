@@ -1148,7 +1148,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     },
 
     updateDesignDoc: function () {
-      if (this.$('#ddoc :selected').prop('id') === 'new-doc') {
+      if (this.newDesignDoc()) {
         this.$('#new-ddoc-section').show();
       } else {
         this.$('#new-ddoc-section').hide();
@@ -1156,9 +1156,12 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     },
 
     newDesignDoc: function () {
-      return this.$('#ddoc :selected').prop('id') === 'new-doc';
+      return this.$('#ddoc').val() === 'new-doc';
     },
 
+    newDocValidation: function(){
+      return this.newDesignDoc() && this.$('#new-ddoc').val()==="";
+    },
     getCurrentDesignDoc: function () {
       if (this.newDesignDoc()) {
         var doc = {
@@ -1169,7 +1172,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         var ddoc = new this.DocModel(doc, {database: this.database});
         this.collection.add(ddoc);
         return ddoc;
-      } else {
+      } else if ( !this.newDesignDoc() ) {
         var ddocName = this.$('#ddoc').val();
         return this.collection.find(function (ddoc) {
           return ddoc.id === ddocName;
