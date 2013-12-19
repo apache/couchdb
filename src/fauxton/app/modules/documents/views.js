@@ -1602,16 +1602,22 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     },
 
     events: {
-      "submit #jump-to-doc": "jumpToDoc",
-      "click #jump-to-doc-label": "jumpToDoc"
+      "submit #jump-to-doc": "jumpToDoc"
     },
 
     jumpToDoc: function (event) {
       event.preventDefault();
 
-      var docId = this.$('#jump-to-doc-id').val();
+      var docId = this.$('#jump-to-doc-id').val().trim();
 
-      FauxtonAPI.navigate('/database/' + this.database.id +'/' + docId, {trigger: true});
+      if (this.database.allDocs.where({"_id":docId}).length > 0){
+        FauxtonAPI.navigate('/database/' + this.database.id +'/' + docId, {trigger: true});
+      } else {
+        FauxtonAPI.addNotification({
+          msg: 'Document ID does not exist.',
+          type: 'error'
+        });
+      }
     },
 
     afterRender: function () {
