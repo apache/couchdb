@@ -34,7 +34,7 @@ handle_welcome_req(Req) ->
 handle_welcome_req(#httpd{method='GET'}=Req, WelcomeMessage) ->
     send_json(Req, {[
         {couchdb, WelcomeMessage},
-        {version, list_to_binary(couch:version())},
+        {version, list_to_binary(couch_server:get_version())},
         {bigcouch, get_version()}
     ]});
 handle_welcome_req(Req, _) ->
