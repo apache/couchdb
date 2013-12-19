@@ -55,7 +55,16 @@ release = '.'.join([
 if _info.get('LOCAL_VERSION_RELEASE') == '.%revision%':
     release += '-dev'
 elif _info.get('LOCAL_VERSION_RELEASE'):
-    release += _info['LOCAL_VERSION_STAGE'] + _info['LOCAL_VERSION_RELEASE']
+    # jenkins hack, the release name is too long or uses
+    # characters that cause pain down the road. Example:
+    # 1.6.0+build.jenkins-ERLANG_VERSION=R14B04,label=Mac-OS-10-8-2-832-76-g2996574
+    # which breaks the LaTeX PDF build. Let’s strip this
+    # down to the git hash at the end.
+    if 'jenkins' in _info['LOCAL_VERSION_RELEASE']:
+        release += _info['LOCAL_VERSION_RELEASE'][-9:]
+    else: # regular case
+        release += _info['LOCAL_VERSION_STAGE'] + _info['LOCAL_VERSION_RELEASE']
+
 
 project = _info['LOCAL_PACKAGE_NAME']
 
