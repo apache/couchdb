@@ -76,7 +76,7 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, LoadAddons) {
           authPromise.then(function () {
             if (!that.activeRouteObject || !that.activeRouteObject.hasRoute(route)) {
               if (that.activeRouteObject) {
-                that.activeRouteObject.removeViews();
+                that.activeRouteObject.cleanup();
               }
               that.activeRouteObject = new RouteObject(route, masterLayout, args);
             }

@@ -290,6 +290,7 @@ function(app, Fauxton) {
     establish: function() {},
     route: function() {},
     roles: [],
+    _promises: [],
     initialize: function() {}
   }, {
 
@@ -319,7 +320,9 @@ function(app, Fauxton) {
       }
 
       triggerBroadcast('beforeEstablish');
-      FauxtonAPI.when(this.establish()).then(function(resp) {
+      var establishPromise = this.establish();
+      this.addPromise(establishPromise);
+      FauxtonAPI.when(establishPromise).then(function(resp) {
         triggerBroadcast('afterEstablish');
         _.each(routeObject.getViews(), function(view, selector) {
           if(view.hasRendered) { 
@@ -328,6 +331,8 @@ function(app, Fauxton) {
           }
 
           triggerBroadcast('beforeRender', view, selector);
+          var viewPromise = view.establish();
+          routeObject.addPromise(viewPromise);
           FauxtonAPI.when(view.establish()).then(function(resp) {
             masterLayout.setView(selector, view);
 
@@ -339,7 +344,7 @@ function(app, Fauxton) {
                 reason: resp
               };
 
-              if (resp) { 
+              if (resp && resp.responseText) { 
                 var errorText = JSON.parse(resp.responseText).reason;
                 FauxtonAPI.addNotification({
                   msg: 'An Error occurred: ' + errorText,
@@ -353,7 +358,7 @@ function(app, Fauxton) {
 
         });
       }.bind(this), function (resp) {
-          if (!resp) { return; }
+          if (!resp || !resp.responseText) { return; }
           FauxtonAPI.addNotification({
                 msg: 'An Error occurred' + JSON.parse(resp.responseText).reason,
                 type: 'error',
@@ -420,6 +425,36 @@ function(app, Fauxton) {
         view.remove();
         delete this.views[selector];
       }, this);
+    },
+
+    addPromise: function (promise) {
+      if (_.isEmpty(promise)) { return; }
+
+      if (_.isArray(promise)) {
+        return _.each(promise, function (p) {
+          this._promises.push(p);
+        }, this);
+      }
+
+     this._promises.push(promise);
+    },
+
+    cleanup: function () {
+      this.removeViews();
+      this.rejectPromises();
+    },
+
+    rejectPromises: function () {
+      _.each(this._promises, function (promise) {
+        if (promise.state() === "resolved") { return; }
+        if (promise.abort) {
+          return promise.abort("Route change");
+        } 
+
+        promise.reject();
+      }, this);
+
+      this._promises = [];
     },
 
     getRouteUrls: function () {
