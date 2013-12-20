@@ -400,7 +400,7 @@ apply_shard_moves(Shards, [{copy, Shard, Node}| Rest]) ->
 allowed_nodes(Fun) ->
     lists:filter(fun(Node) ->
         Fun(mem3:node_info(Node, <<"zone">>))
-    end, mem3:nodes()).
+    end, surviving_nodes()).
 
 surviving_nodes() ->
     lists:filter(fun(Node) ->
