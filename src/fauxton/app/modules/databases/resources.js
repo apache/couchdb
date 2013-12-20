@@ -51,18 +51,23 @@ function(app, FauxtonAPI, Documents) {
 
     url: function(context) {
       if (context === "index") {
-        return "/database/" + this.id + "/_all_docs";
+        return "/database/" + this.safeID() + "/_all_docs";
       } else if (context === "web-index") {
-        return "#/database/"+ encodeURIComponent(this.get("name"))  + "/_all_docs?limit=" + Databases.DocLimit;
+        return "#/database/"+ this.safeID() + "/_all_docs?limit=" + Databases.DocLimit;
       } else if (context === "changes") {
-        return "/database/" + this.id + "/_changes?descending=true&limit=100&include_docs=true";
+        return "/database/" + this.safeID() + "/_changes?descending=true&limit=100&include_docs=true";
       } else if (context === "app") {
-        return "/database/" + this.id;
+        return "/database/" + this.safeID();
       } else {
-        return app.host + "/" + this.id;
+        return app.host + "/" + this.safeID();
       }
     },
-
+    safeName: function(){
+      return app.mixins.safeURLName(this.get("name"));
+    },
+    safeID: function() {
+      return app.mixins.safeURLName(this.id);
+    },
     buildChanges: function (params) {
       this.changes = new Databases.Changes({
         database: this,
@@ -86,7 +91,7 @@ function(app, FauxtonAPI, Documents) {
         query = "?" + $.param(this.params);
       }
 
-      return app.host + '/' + this.database.id + '/_changes' + query;
+      return app.host + '/' + this.database.safeID() + '/_changes' + query;
     },
 
     parse: function (resp) {
@@ -97,7 +102,7 @@ function(app, FauxtonAPI, Documents) {
 
   Databases.Status = Backbone.Model.extend({
     url: function() {
-      return app.host + "/" + this.database.id;
+      return app.host + "/" + this.database.safeID();
     },
 
     initialize: function(options) {
@@ -156,7 +161,7 @@ function(app, FauxtonAPI, Documents) {
       // TODO: pagination!
       return _.map(resp, function(database) {
         return {
-          id: encodeURIComponent(database),
+          id: app.mixins.safeURLName(database),
           name: database
         };
       });

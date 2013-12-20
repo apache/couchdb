@@ -420,6 +420,11 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         index: this.index,
         ddoc: this.ddoc,
         database: this.database,
+        index_clean: app.mixins.removeSpecialCharacters(this.index),
+        ddoc_clean: app.mixins.removeSpecialCharacters(this.ddoc), 
+        index_encoded: app.mixins.safeURLName(this.index),
+        ddoc_encoded: app.mixins.safeURLName(this.ddoc),
+        database_encoded: app.mixins.safeURLName(this.database),
         selected: this.selected
       };
     },
@@ -798,7 +803,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
     establish: function() {
       var promise = this.model.fetch(),
-          databaseId = this.database.id,
+          databaseId = this.database.safeID(),
           deferred = $.Deferred();
 
       promise.then(function () {
@@ -831,7 +836,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
         this.model.save().then(function () {
           editor.editSaved();
-          FauxtonAPI.navigate('/database/' + that.database.id + '/' + that.model.id);
+          FauxtonAPI.navigate('/database/' + that.database.safeID() + '/' + that.model.id);
         }).fail(function(xhr) {
           var responseText = JSON.parse(xhr.responseText).reason;
           notification = FauxtonAPI.addNotification({
@@ -1270,7 +1275,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       }
 
       promise.then(function () {
-        FauxtonAPI.navigate('/database/' + that.database.id + '/_all_docs?limit=' + Databases.DocLimit);
+        FauxtonAPI.navigate('/database/' + that.database.safeID() + '/_all_docs?limit=' + Databases.DocLimit);
         FauxtonAPI.triggerRouteEvent('reloadDesignDocs');
       });
     },
@@ -1308,16 +1313,18 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
           });
 
           if (that.newView) {
-            var fragment = '/database/' + that.database.id +'/' + ddocName + '/_view/' + viewName; 
+            var fragment = '/database/' + that.database.safeID() +'/' + ddoc.safeID() + '/_view/' + app.mixins.safeURLName(viewName); 
 
             FauxtonAPI.navigate(fragment, {trigger: false});
             that.newView = false;
-            that.ddocID = ddoc.id;
+            that.ddocID = ddoc.safeID();
             that.viewName = viewName;
             that.ddocInfo = ddoc;
             that.showIndex = true;
             that.render();
-            FauxtonAPI.triggerRouteEvent('reloadDesignDocs',{selectedTab: ddocName.replace('_design/','') + '_' + viewName});
+            FauxtonAPI.triggerRouteEvent('reloadDesignDocs', {
+              selectedTab: app.mixins.removeSpecialCharacters(ddocName.replace(/_design\//,'')) + '_' + app.mixins.removeSpecialCharacters(viewName)
+            });
           }
 
           if (that.reduceFunStr !== reduceVal) {
@@ -1614,7 +1621,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       var docId = this.$('#jump-to-doc-id').val().trim();
 
       if (this.database.allDocs.where({"_id":docId}).length > 0){
-        FauxtonAPI.navigate('/database/' + this.database.id +'/' + docId, {trigger: true});
+        FauxtonAPI.navigate('/database/' + app.mixins.safeURLName(this.database.id) +'/' + app.mixins.safeURLName(docId), {trigger: true});
       } else {
         FauxtonAPI.addNotification({
           msg: 'Document ID does not exist.',
@@ -1707,7 +1714,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
       this.collection.each(function(design) {
         if (design.has('doc')){
-          var ddoc = design.id.split('/')[1];
+          var ddoc = design.id.replace(/_design\//,"");
           if (design.get('doc').views){
             this.buildIndexList(design.get('doc').views, "views", ddoc);
           }

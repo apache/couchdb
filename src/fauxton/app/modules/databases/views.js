@@ -29,7 +29,7 @@ function(app, Components, FauxtonAPI, Databases) {
     },
     serialize: function() {
       return {
-        encoded: encodeURIComponent(this.model.get("name")),
+        encoded: app.mixins.safeURLName(this.model.get("name")),
         database: this.model,
         docLimit: Databases.DocLimit
       };
@@ -82,7 +82,7 @@ function(app, Components, FauxtonAPI, Databases) {
         // TODO: switch to using a model, or Databases.databaseUrl()
         // Neither of which are in scope right now
         // var db = new Database.Model({id: dbname});
-        var url = ["/database/", encodeURIComponent(dbname), "/_all_docs?limit=" + Databases.DocLimit].join('');
+        var url = ["/database/", app.mixins.safeURLName(dbname), "/_all_docs?limit=" + Databases.DocLimit].join('');
         FauxtonAPI.navigate(url);
       }
     },
@@ -159,7 +159,7 @@ function(app, Components, FauxtonAPI, Databases) {
         return;
       }
       db = new this.collection.model({
-        id: encodeURIComponent(name),
+        id: name,
         name: name
       });
       notification = FauxtonAPI.addNotification({msg: "Creating database."});
@@ -169,7 +169,7 @@ function(app, Components, FauxtonAPI, Databases) {
           type: "success",
           clear: true
         });
-        var route = "#/database/" +  name + "/_all_docs?limit=" + Databases.DocLimit;
+        var route = "#/database/" +  app.mixins.safeURLName(name) + "/_all_docs?limit=" + Databases.DocLimit;
         app.router.navigate(route, { trigger: true });
       }
       ).error(function(xhr) {

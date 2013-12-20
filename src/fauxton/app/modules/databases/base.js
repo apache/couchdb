@@ -27,9 +27,10 @@ function(app, FauxtonAPI, Databases, Views) {
 
   // Utility functions
   Databases.databaseUrl = function(database) {
-    var name = _.isObject(database) ? database.id : database;
+    var name = _.isObject(database) ? database.id : database,
+        dbname = app.mixins.safeURLName(name);
 
-    return ["/database/", name, "/_all_docs?limit=" + Databases.DocLimit].join('');
+    return ["/database/", dbname, "/_all_docs?limit=" + Databases.DocLimit].join('');
   };
 
   return Databases;

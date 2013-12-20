@@ -19,5 +19,6 @@ the License.
 <td><%= database.status.numDocs() %></td>
 <td><%= database.status.updateSeq() %></td>
 <td>
-  <a class="db-actions btn fonticon-replicate set-replication-start" href="#/replication/<%= database.get("name") %>"></a>
+  <a class="db-actions btn fonticon-replicate set-replication-start" title="Replicate <%= database.get("name") %>" href="#/replication/new/<%=encoded%>"></a>
+  <a class="db-actions btn icon-lock set-permissions" title="Set permissions for <%= database.get("name") %>" href="#/database/<%=encoded%>/permissions"></a>
 </td>

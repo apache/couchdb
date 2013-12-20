@@ -27,7 +27,7 @@ function(app, FauxtonAPI) {
       if (context === "app") {
         return this.getDatabase().url("app") + "/" + this.safeID();
       } else {
-        return app.host + "/" + this.getDatabase().id + "/" + this.id;
+        return app.host + "/" + this.getDatabase().safeID() + "/" + this.safeID();
       }
     },
 
@@ -139,7 +139,7 @@ function(app, FauxtonAPI) {
     // treated separately. For instance, we could default into the
     // json editor for docs, or into a ddoc specific page.
     safeID: function() {
-      return this.id.replace('/', '%2F');
+      return app.mixins.safeURLName(this.id);
     },
 
     destroy: function() {
@@ -177,7 +177,7 @@ function(app, FauxtonAPI) {
     copy: function (copyId) {
       return $.ajax({
         type: 'COPY',
-        url: '/' + this.database.id + '/' + this.id,
+        url: '/' + this.database.safeID() + '/' + this.safeID(),
         headers: {Destination: copyId}
       });
     },
@@ -200,7 +200,7 @@ function(app, FauxtonAPI) {
       if (context === "app") {
         return this.database.url("app") + "/" + this.safeID() + '/_info';
       } else {
-        return app.host + "/" + this.database.id + "/" + this.id + '/_info';
+        return app.host + "/" + this.database.safeID() + "/" + this.safeID() + '/_info';
       }
     },
 
@@ -209,7 +209,8 @@ function(app, FauxtonAPI) {
     // treated separately. For instance, we could default into the
     // json editor for docs, or into a ddoc specific page.
     safeID: function() {
-      return this.id.replace('/', '%2F');
+      var ddoc = this.id.replace(/_design\//,"");
+      return "_design/"+app.mixins.safeURLName(ddoc);
     }
 
   });
@@ -226,11 +227,14 @@ function(app, FauxtonAPI) {
     url: function(context) {
       if (!this.isEditable()) return false;
 
-      return this.collection.database.url(context) + "/" + this.id;
+      return this.collection.database.url(context) + "/" + this.safeID();
     },
 
     isEditable: function() {
       return this.docType() != "reduction";
+    },
+    safeID: function() {
+      return app.mixins.safeURLName(this.id);
     },
 
     prettyJSON: function() {
@@ -275,9 +279,9 @@ function(app, FauxtonAPI) {
       }
 
       if (context === 'app') {
-        return 'database/' + this.database.id + "/_all_docs" + query;
+        return 'database/' + this.database.safeID() + "/_all_docs" + query;
       }
-      return app.host + "/" + this.database.id + "/_all_docs" + query;
+      return app.host + "/" + this.database.safeID() + "/_all_docs" + query;
     },
 
     simple: function () {
@@ -402,8 +406,10 @@ function(app, FauxtonAPI) {
       if (context === 'app') {
         startOfUrl = 'database';
       }
+      var design = app.mixins.safeURLName(this.design),
+          view = app.mixins.safeURLName(this.view);
 
-      var url = [startOfUrl, this.database.id, "_design", this.design, this.idxType, this.view];
+      var url = [startOfUrl, this.database.safeID(), "_design", design, this.idxType, view];
       return url.join("/") + query;
     },
 

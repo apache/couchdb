@@ -51,6 +51,15 @@ function($, _ ) {
     };
   };
 
+  mixins.removeSpecialCharacters = function(name){
+    return name.replace(/[^\w\s]/gi,"");
+  };
+
+  mixins.safeURLName = function(name){
+    var checkforBad = name.match(/[\$\-/_,+-]/g);
+    return (checkforBad !== null)?encodeURIComponent(name):name;
+  };
+
   return mixins;
 });
 

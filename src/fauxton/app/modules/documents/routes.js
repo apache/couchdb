@@ -92,7 +92,7 @@ function(app, FauxtonAPI, Documents, Databases) {
       doc.copy(newId).then(function () {
         doc.set({_id: newId}); 
         docView.forceRender();
-        FauxtonAPI.navigate('/database/' + database.id + '/' + newId, {trigger: true});
+        FauxtonAPI.navigate('/database/' + database.safeID() + '/' + app.mixins.safeURLName(newId), {trigger: true});
         FauxtonAPI.addNotification({
           msg: "Document has been duplicated."
         });
@@ -162,7 +162,7 @@ function(app, FauxtonAPI, Documents, Databases) {
       var docOptions = app.getParams();
       docOptions.include_docs = true;
 
-      this.databaseName = encodeURIComponent(options[0]);
+      this.databaseName = app.mixins.safeURLName(options[0]);
 
       this.data = {
         database: new Databases.Model({id:this.databaseName})
@@ -259,7 +259,7 @@ function(app, FauxtonAPI, Documents, Databases) {
         ddocInfo: ddocInfo
       }));
 
-      this.sidebar.setSelectedTab(ddoc + '_' + view);
+      this.sidebar.setSelectedTab(app.mixins.removeSpecialCharacters(ddoc) + '_' + app.mixins.removeSpecialCharacters(view));
 
       this.crumbs = function () {
         return [
@@ -373,7 +373,7 @@ function(app, FauxtonAPI, Documents, Databases) {
     },
 
     initialize: function (route, masterLayout, options) {
-      this.databaseName = encodeURIComponent(options[0]);
+      this.databaseName = app.mixins.safeURLName(options[0]);
       this.database = new Databases.Model({id: this.databaseName});
 
       var docOptions = app.getParams();
