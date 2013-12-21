@@ -941,7 +941,7 @@ document by supplying the ``revs_info`` argument to the query:
   }
 
 
-The returned document contains ``_rev_info`` field with extended revision
+The returned document contains ``_revs_info`` field with extended revision
 information, including the availability and status of each revision. This array
 field contains objects with following structure:
 
