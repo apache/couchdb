@@ -78,4 +78,4 @@ recover({DbName, validation_funs}) ->
     end, DDocs),
     {ok, Funs};
 recover({DbName, DDocId}) ->
-    fabric:open_doc(DbName, DDocId, []).
+    fabric:open_doc(DbName, DDocId, [ejson_body]).
