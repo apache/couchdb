@@ -195,7 +195,7 @@ rexi_call(Node, MFA) ->
     end.
 
 calculate_start_seq(Db, #shard{node=Node, name=Name}, LocalId) ->
-    case couch_db:open_doc(Db, LocalId, []) of
+    case couch_db:open_doc(Db, LocalId, [ejson_body]) of
     {ok, #doc{body = {SProps}}} ->
         Opts = [{user_ctx, ?CTX}, {io_priority, {internal_repl, Name}}],
         try rexi_call(Node, {fabric_rpc, open_doc, [Name, LocalId, Opts]}) of

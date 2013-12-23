@@ -69,7 +69,7 @@ attach_nodes([S | Rest], Acc, [Node | Nodes], UsedNodes) ->
 open_db_doc(DocId) ->
     DbName = ?l2b(config:get("mem3", "shard_db", "dbs")),
     {ok, Db} = couch_db:open(DbName, []),
-    try couch_db:open_doc(Db, DocId, []) after couch_db:close(Db) end.
+    try couch_db:open_doc(Db, DocId, [ejson_body]) after couch_db:close(Db) end.
 
 write_db_doc(Doc) ->
     DbName = ?l2b(config:get("mem3", "shard_db", "dbs")),
@@ -77,7 +77,7 @@ write_db_doc(Doc) ->
 
 write_db_doc(DbName, #doc{id=Id, body=Body} = Doc, ShouldMutate) ->
     {ok, Db} = couch_db:open(DbName, []),
-    try couch_db:open_doc(Db, Id, []) of
+    try couch_db:open_doc(Db, Id, [ejson_body]) of
     {ok, #doc{body = Body}} ->
         % the doc is already in the desired state, we're done here
         ok;
