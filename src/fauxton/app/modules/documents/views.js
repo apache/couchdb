@@ -238,10 +238,11 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
     duplicate: function (event) {
       event.preventDefault();
-      var newId = this.$('#dup-id').val();
+      var newId = this.$('#dup-id').val(),
+          encodedID = app.mixins.safeURLName(newId);
 
       this.hideModal();
-      FauxtonAPI.triggerRouteEvent('duplicateDoc', newId);
+      FauxtonAPI.triggerRouteEvent('duplicateDoc', encodedID);
     },
 
     _showModal: function () {
@@ -1161,6 +1162,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     },
 
     newDesignDoc: function () {
+
       return this.$('#ddoc').val() === 'new-doc';
     },
 
@@ -1175,7 +1177,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
           language: "javascript"
         };
         var ddoc = new this.DocModel(doc, {database: this.database});
-        this.collection.add(ddoc);
+        //this.collection.add(ddoc);
         return ddoc;
       } else if ( !this.newDesignDoc() ) {
         var ddocName = this.$('#ddoc').val();
@@ -1303,6 +1305,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         ddoc.setDdocView(viewName, mapVal, reduceVal);
 
         ddoc.save().then(function () {
+          that.ddocs.add(ddoc);
+
           that.mapEditor.editSaved();
           that.reduceEditor && that.reduceEditor.editSaved();
 
@@ -1714,7 +1718,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
       this.collection.each(function(design) {
         if (design.has('doc')){
-          var ddoc = design.id.replace(/_design\//,"");
+          var ddoc = design.id.replace(/^_design\//,"");
           if (design.get('doc').views){
             this.buildIndexList(design.get('doc').views, "views", ddoc);
           }

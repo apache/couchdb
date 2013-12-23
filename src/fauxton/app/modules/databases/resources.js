@@ -84,7 +84,9 @@ function(app, FauxtonAPI, Documents) {
       this.database = options.database;
       this.params = options.params;
     },
-
+    documentation: function(){
+      return "changes";
+    },
     url: function () {
       var query = "";
       if (this.params) {

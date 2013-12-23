@@ -162,7 +162,7 @@ function(app, FauxtonAPI, Documents, Databases) {
       var docOptions = app.getParams();
       docOptions.include_docs = true;
 
-      this.databaseName = app.mixins.safeURLName(options[0]);
+      this.databaseName = options[0];
 
       this.data = {
         database: new Databases.Model({id:this.databaseName})
@@ -222,19 +222,22 @@ function(app, FauxtonAPI, Documents, Databases) {
     },
 
     viewFn: function (databaseName, ddoc, view) {
-      var params = app.getParams();
+      var params = app.getParams(),
+          decodeDdoc = decodeURIComponent(ddoc);
 
       view = view.replace(/\?.*$/,'');
 
       this.data.indexedDocs = new Documents.IndexCollection(null, {
         database: this.data.database,
-        design: ddoc,
+        design: decodeDdoc,
         view: view,
         params: params
       });
 
+
+
       var ddocInfo = {
-        id: "_design/" + ddoc,
+        id: "_design/" + decodeDdoc,
         currView: view,
         designDocs: this.data.designDocs
       };
@@ -373,7 +376,7 @@ function(app, FauxtonAPI, Documents, Databases) {
     },
 
     initialize: function (route, masterLayout, options) {
-      this.databaseName = app.mixins.safeURLName(options[0]);
+      this.databaseName = options[0];
       this.database = new Databases.Model({id: this.databaseName});
 
       var docOptions = app.getParams();
@@ -394,7 +397,7 @@ function(app, FauxtonAPI, Documents, Databases) {
     },
 
     apiUrl: function() {
-      return [this.database.changes.url(), this.database.changes.documentation()];
+      return [this.database.url(), this.database.documentation()];
     }
 
   });

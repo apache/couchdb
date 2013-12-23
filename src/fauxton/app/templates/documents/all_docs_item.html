@@ -18,7 +18,7 @@ the License.
     <pre class="prettyprint"><%- doc.prettyJSON() %></pre>
     <% if (doc.isEditable()) { %>
       <div class="btn-group">
-        <a href="#<%= doc.url('app') %>" class="btn btn-small edits">Edit <%= doc.docType() %></a>
+        <a href="#<%= doc.url('web-index') %>" class="btn btn-small edits">Edit <%= doc.docType() %></a>
         <button href="#" class="btn btn-small btn-danger delete" title="Delete this document."><i class="icon icon-trash"></i></button>
       </div>
     <% } %>
