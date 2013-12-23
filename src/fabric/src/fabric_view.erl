@@ -178,7 +178,7 @@ possibly_embed_doc(#collector{db_name=DbName, query_args=Args},
     end.
 
 
-keydict(nil) ->
+keydict(undefined) ->
     undefined;
 keydict(Keys) ->
     {Dict,_} = lists:foldl(fun(K, {D,I}) -> {dict:store(K,I,D), I+1} end,

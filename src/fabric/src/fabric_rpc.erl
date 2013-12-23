@@ -39,7 +39,7 @@
 %% rpc endpoints
 %%  call to with_db will supply your M:F with a #db{} and then remaining args
 
-all_docs(DbName, #mrargs{keys=nil} = QueryArgs) ->
+all_docs(DbName, #mrargs{keys=undefined} = QueryArgs) ->
     {ok, Db} = get_or_create_db(DbName, []),
     #mrargs{
         start_key = StartKey,
@@ -122,7 +122,7 @@ map_view(DbName, DDoc, ViewName, QueryArgs) ->
         reduce_fun = fun couch_view:reduce_to_count/1
     },
     case Keys of
-    nil ->
+    undefined ->
         Options = couch_httpd_view:make_key_options(QueryArgs),
         {ok, _, Acc} = couch_view:fold(View, fun view_fold/3, Acc0, Options);
     _ ->
@@ -163,7 +163,7 @@ reduce_view(DbName, Group0, ViewName, QueryArgs) ->
     ReduceView = {reduce, NthRed, Lang, View},
     Acc0 = #view_acc{group_level = GroupLevel, limit = Limit+Skip},
     case Keys of
-    nil ->
+    undefined ->
         Options0 = couch_httpd_view:make_key_options(QueryArgs),
         Options = [{key_group_fun, GroupFun} | Options0],
         couch_view:fold_reduce(ReduceView, fun reduce_fold/3, Acc0, Options);
