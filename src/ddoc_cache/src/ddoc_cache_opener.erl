@@ -178,7 +178,7 @@ open_ddoc({DbName, validation_funs}=Key) ->
     ok = ets_lru:insert(ddoc_cache_lru, {DbName, validation_funs}, Funs),
     exit({open_ok, Key, {ok, Funs}});
 open_ddoc({DbName, DDocId}=Key) ->
-    try fabric:open_doc(DbName, DDocId, []) of
+    try fabric:open_doc(DbName, DDocId, [ejson_body]) of
         {ok, Doc} ->
             ok = ets_lru:insert(ddoc_cache_lru, {DbName, DDocId}, Doc),
             exit({open_ok, Key, {ok, Doc}});
