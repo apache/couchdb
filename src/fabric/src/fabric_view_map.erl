@@ -17,6 +17,7 @@
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("couch_mrview/include/couch_mrview.hrl").
 
 go(DbName, GroupId, View, Args, Callback, Acc0) when is_binary(GroupId) ->
     {ok, DDoc} = fabric:open_doc(DbName, <<"_design/", GroupId/binary>>, []),
@@ -25,7 +26,7 @@ go(DbName, GroupId, View, Args, Callback, Acc0) when is_binary(GroupId) ->
 go(DbName, DDoc, View, Args, Callback, Acc0) ->
     Shards = fabric_view:get_shards(DbName, Args),
     Workers = fabric_util:submit_jobs(Shards, map_view, [DDoc, View, Args]),
-    #view_query_args{limit = Limit, skip = Skip, keys = Keys} = Args,
+    #mrargs{limit = Limit, skip = Skip, keys = Keys} = Args,
     State = #collector{
         db_name=DbName,
         query_args = Args,
@@ -34,7 +35,7 @@ go(DbName, DDoc, View, Args, Callback, Acc0) ->
         skip = Skip,
         limit = Limit,
         keys = fabric_view:keydict(Keys),
-        sorted = Args#view_query_args.sorted,
+        sorted = Args#mrargs.sorted,
         user_acc = Acc0
     },
     RexiMon = fabric_util:create_monitors(Workers),
@@ -116,7 +117,7 @@ handle_message(#view_row{} = Row, {_,From}, #collector{sorted=false} = St) ->
 
 handle_message(#view_row{} = Row, {Worker, From}, State) ->
     #collector{
-        query_args = #view_query_args{direction=Dir},
+        query_args = #mrargs{direction=Dir},
         counters = Counters0,
         rows = Rows0,
         keys = KeyDict

@@ -291,7 +291,7 @@ get_last_purged(#db{fd=Fd, header=#db_header{purged_docs=PurgedPointer}}) ->
     couch_file:pread_term(Fd, PurgedPointer).
 
 get_doc_count(Db) ->
-    {ok, {Count, _DelCount}} = couch_btree:full_reduce(Db#db.id_tree),
+    {ok, {Count, _, _}} = couch_btree:full_reduce(Db#db.id_tree),
     {ok, Count}.
 
 get_db_info(Db) ->
