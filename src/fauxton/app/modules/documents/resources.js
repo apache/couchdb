@@ -28,6 +28,8 @@ function(app, FauxtonAPI) {
         return this.getDatabase().url("app") + "/" + this.safeID();
       } else if (context === "web-index") {
         return this.getDatabase().url("app") + "/" + app.mixins.safeURLName(this.id);
+      } else if (context === "apiurl"){
+        return window.location.origin + "/" + this.getDatabase().safeID() + "/" + this.safeID();
       } else {
         return app.host + "/" + this.getDatabase().safeID() + "/" + this.safeID();
       }
@@ -206,6 +208,8 @@ function(app, FauxtonAPI) {
     url: function(context) {
       if (context === "app") {
         return this.database.url("app") + "/" + this.safeID() + '/_info';
+      } else if (context === "apiurl"){
+        return window.location.origin + "/" + this.database.safeID() + "/" + this.safeID() + '/_info';
       } else {
         return app.host + "/" + this.database.safeID() + "/" + this.safeID() + '/_info';
       }
@@ -287,8 +291,11 @@ function(app, FauxtonAPI) {
 
       if (context === 'app') {
         return 'database/' + this.database.safeID() + "/_all_docs" + query;
+      } else if (context === "apiurl"){
+        return window.location.origin + "/" + this.database.safeID() + "/_all_docs" + query;
+      } else {
+        return app.host + "/" + this.database.safeID() + "/_all_docs" + query;
       }
-      return app.host + "/" + this.database.safeID() + "/_all_docs" + query;
     },
 
     simple: function () {
@@ -412,6 +419,8 @@ function(app, FauxtonAPI) {
       var startOfUrl = app.host;
       if (context === 'app') {
         startOfUrl = 'database';
+      } else if (context === "apiurl"){
+        startOfUrl = window.location.origin;
       }
       var design = app.mixins.safeURLName(this.design),
           view = app.mixins.safeURLName(this.view);

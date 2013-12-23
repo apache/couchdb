@@ -107,7 +107,7 @@ function(app, FauxtonAPI, Documents, Databases) {
     },
 
     apiUrl: function() {
-      return [this.doc.url(), this.doc.documentation()];
+      return [this.doc.url("apiurl"), this.doc.documentation()];
     }
   });
 
@@ -218,7 +218,7 @@ function(app, FauxtonAPI, Documents, Databases) {
         {"name": this.data.database.id, "link": Databases.databaseUrl(this.data.database)}
       ];
 
-      this.apiUrl = [this.data.database.allDocs.url(), this.data.database.allDocs.documentation() ];
+      this.apiUrl = [this.data.database.allDocs.url("apiurl"), this.data.database.allDocs.documentation() ];
     },
 
     viewFn: function (databaseName, ddoc, view) {
@@ -270,7 +270,7 @@ function(app, FauxtonAPI, Documents, Databases) {
         ];
       };
 
-      this.apiUrl = [this.data.indexedDocs.url(), "docs"];
+      this.apiUrl = [this.data.indexedDocs.url("apiurl"), "docs"];
     },
 
     newViewEditor: function () {
@@ -397,7 +397,7 @@ function(app, FauxtonAPI, Documents, Databases) {
     },
 
     apiUrl: function() {
-      return [this.database.url(), this.database.documentation()];
+      return [this.database.url("apiurl"), this.database.documentation()];
     }
 
   });

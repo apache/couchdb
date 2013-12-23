@@ -38,8 +38,12 @@ function (app, backbone, Fauxton) {
       "view_compaction": "View Compaction"
     },
     documentation: "_active_tasks",
-    url: function () {
-      return app.host + '/_active_tasks';
+    url: function (context) {
+      if (context === "apiurl"){
+        return window.location.origin + '/_active_tasks';
+      } else {
+        return app.host + '/_active_tasks';
+      }
     },
     fetch: function (options) {
      var fetchoptions = options || {};

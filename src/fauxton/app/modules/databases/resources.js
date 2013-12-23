@@ -54,8 +54,12 @@ function(app, FauxtonAPI, Documents) {
         return "/database/" + this.safeID() + "/_all_docs";
       } else if (context === "web-index") {
         return "#/database/"+ this.safeID() + "/_all_docs?limit=" + Databases.DocLimit;
+      } else if (context === "apiurl") { 
+        return window.location.origin + "/database/" + this.safeID() + "/_all_docs";
       } else if (context === "changes") {
         return "/database/" + this.safeID() + "/_changes?descending=true&limit=100&include_docs=true";
+      } else if (context === "changes-apiurl") { 
+        return window.location.origin + "/database/" + this.safeID() + "/_changes?descending=true&limit=100&include_docs=true";
       } else if (context === "app") {
         return "/database/" + this.safeID();
       } else {
@@ -87,13 +91,17 @@ function(app, FauxtonAPI, Documents) {
     documentation: function(){
       return "changes";
     },
-    url: function () {
+    url: function (context) {
       var query = "";
       if (this.params) {
         query = "?" + $.param(this.params);
       }
+      if (context === "apiurl") { 
+        return window.location.origin + '/' + this.database.safeID() + '/_changes' + query;
+      } else {
 
       return app.host + '/' + this.database.safeID() + '/_changes' + query;
+      }
     },
 
     parse: function (resp) {
@@ -130,7 +138,7 @@ function(app, FauxtonAPI, Documents) {
       // cribbed from http://stackoverflow.com/questions/10420352/converting-file-size-in-bytes-to-human-readable
       var i = -1;
       var byteUnits = [' kB', ' MB', ' GB', ' TB', 'PB', 'EB', 'ZB', 'YB'];
-      var fileSizeInBytes = this.diskSize();
+      var fileSizeInBytes = this.dataSize();
 
       if (!fileSizeInBytes) {
         return 0;
@@ -143,9 +151,12 @@ function(app, FauxtonAPI, Documents) {
 
       return Math.max(fileSizeInBytes, 0.1).toFixed(1) + byteUnits[i];
     },
-
     diskSize: function () {
       return this.get("disk_size");
+    },
+
+    dataSize: function () {
+      return this.get("other").data_size;
     }
   });
 
@@ -155,8 +166,12 @@ function(app, FauxtonAPI, Documents) {
     documentation: function(){
       return "all_dbs";
     },
-    url: function() {
-      return app.host + "/_all_dbs";
+    url: function(context) {
+      if (context === "apiurl") { 
+        return window.location.origin + "/_all_dbs";
+      } else {
+        return app.host + "/_all_dbs";
+      }
     },
 
     parse: function(resp) {
