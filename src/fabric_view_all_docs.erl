@@ -19,7 +19,7 @@
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
-go(DbName, #view_query_args{keys=nil} = QueryArgs, Callback, Acc0) ->
+go(DbName, #view_query_args{keys=undefined} = QueryArgs, Callback, Acc0) ->
     Workers = fabric_util:submit_jobs(mem3:shards(DbName),all_docs,[QueryArgs]),
     #view_query_args{limit = Limit, skip = Skip} = QueryArgs,
     State = #collector{
