@@ -177,7 +177,7 @@ fold_fun(#full_doc_info{}=FDI, _, Acc) ->
     DI = couch_doc:to_doc_info(FDI),
     fold_fun(DI, nil, Acc);
 fold_fun(#doc_info{}=DI, _, {Db, UFun, UAcc}) ->
-    case couch_db:open_doc(Db, DI, [conflicts]) of
+    case couch_db:open_doc(Db, DI, [ejson_body, conflicts]) of
         {ok, Doc} ->
             {Props} = Doc#doc.body,
             Shards = mem3_util:build_shards(Doc#doc.id, Props),
@@ -242,7 +242,7 @@ load_shards_from_disk(DbName) when is_binary(DbName) ->
     end.
 
 load_shards_from_db(#db{} = ShardDb, DbName) ->
-    case couch_db:open_doc(ShardDb, DbName, []) of
+    case couch_db:open_doc(ShardDb, DbName, [ejson_body]) of
     {ok, #doc{body = {Props}}} ->
         Shards = mem3_util:build_shards(DbName, Props),
         gen_server:cast(?MODULE, {cache_insert, DbName, Shards}),

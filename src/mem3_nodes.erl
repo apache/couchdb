@@ -113,7 +113,7 @@ first_fold(#full_doc_info{id = <<"_design/", _/binary>>}, _, Acc) ->
 first_fold(#full_doc_info{deleted=true}, _, Acc) ->
     {ok, Acc};
 first_fold(#full_doc_info{id=Id}=DocInfo, _, Db) ->
-    {ok, #doc{body={Props}}} = couch_db:open_doc(Db, DocInfo),
+    {ok, #doc{body={Props}}} = couch_db:open_doc(Db, DocInfo, [ejson_body]),
     ets:insert(?MODULE, {mem3_util:to_atom(Id), Props}),
     {ok, Db}.
 
