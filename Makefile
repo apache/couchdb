@@ -40,6 +40,10 @@ install: dist
 	@touch $(prefix)/var/log/couchdb.log
 	@chown $(user) $(prefix)/var/log/couchdb.log
 
+install.mk:
+	@echo "No install.mk found. Run ./configure"
+	@exit 1
+
 dev: compile
 	@rm -rf rel/dev1 rel/dev2 rel/dev3
 	@echo "==> Building development node #1 (ports 15984/15986)"
