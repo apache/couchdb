@@ -48,7 +48,10 @@ A recent of [node.js](http://nodejs.org/) and npm is required.
     # ./bin/grunt couchdb
 
 ### Prepare Fauxton Release
-    Follow the "Fauxton Setup" section then:
+    Follow the "Fauxton Setup" section,
+    Edit settings.json variable root where the document will live.  eg.  "/_utils/fauxton/"
+    
+    then:
 
     ./bin/grunt couchdb
 
