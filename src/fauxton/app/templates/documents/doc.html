@@ -15,26 +15,35 @@ the License.
 <div id="doc">
   <div class="errors-container"></div>
    
-<div class="btn-group" style="margin-bottom: 15px"> 
-  <% if (attachments) { %>
-    <a class="btn dropdown-toggle btn" data-toggle="dropdown" href="#">
-      View Attachments
-      <span class="caret"></span>
-    </a>
-    <ul class="dropdown-menu">
-      <%_.each(attachments, function (att) { %>
-      <li>
-      <a href="<%= att.url %>" target="_blank"> <strong> <%= att.fileName %> </strong> -
-        <span> <%= att.contentType %>, <%= formatSize(att.size)%> </span>
-      </a>
-      </li>
-      <% }) %>
-    </ul>
+<div class="row doc-editor-buttons"> 
+  <div class="span3">
+    <button class="save-doc button green btn-large save fonticon-circle-check" type="button">Save</button>
+    <button class="button cancel-button gray btn-large">Back to _all_docs</button>
+  </div>
 
-  <% } %> 
-  <button class="btn btn-small upload"><i class="icon-circle-arrow-up"></i> Upload Attachment</button>
-  <button class="btn btn-small duplicate"><i class="icon-repeat"></i> Duplicate document</button>
-  <button class="btn btn-small delete"><i class="icon-trash"></i> Delete document</button>
+  <div class="span7">
+    <% if (attachments) { %>
+    <div class="btn-group">
+      <a class="button gray btn-large dropdown-toggle btn" data-bypass="true" data-toggle="dropdown" href="#">
+        View Attachments
+        <span class="caret"></span>
+      </a>
+      <ul class="dropdown-menu">
+        <%_.each(attachments, function (att) { %>
+        <li>
+        <a href="<%= att.url %>" target="_blank"> <strong> <%= att.fileName %> </strong> -
+          <span> <%= att.contentType %>, <%= formatSize(att.size)%> </span>
+        </a>
+        </li>
+        <% }) %>
+      </ul>
+    </div>
+    <% } %> 
+    <button class="button gray btn-large  upload"><i class="icon-circle-arrow-up"></i> Upload Attachment</button>
+    <button class="button gray btn-large  duplicate"><i class="icon-repeat"></i> Duplicate document</button>
+  </div>
+
+  <button class="button red btn-large delete"><i class="icon-trash"></i></button>
   </ul>
 
 <div id="upload-modal"> </div>
