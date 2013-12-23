@@ -430,7 +430,7 @@ changes_enumerator(DocInfo, {Db, _Seq, Args, Options}) ->
     } = Args,
     Conflicts = proplists:get_value(conflicts, Options, false),
     #doc_info{high_seq=Seq, revs=[#rev_info{deleted=Del}|_]} = DocInfo,
-    case [X || X <- couch_changes:filter(DocInfo, Acc), X /= null] of
+    case [X || X <- couch_changes:filter(Db, DocInfo, Acc), X /= null] of
     [] ->
         {ok, {Db, Seq, Args, Options}};
     Results ->
