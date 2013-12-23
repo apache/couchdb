@@ -179,32 +179,6 @@
     after_doc_read = nil     % nil | fun(Doc, Db) -> NewDoc
     }).
 
-
--record(view_query_args, {
-    start_key,
-    end_key,
-    start_docid = ?MIN_STR,
-    end_docid = ?MAX_STR,
-
-    direction = fwd,
-    inclusive_end=true, % aka a closed-interval
-
-    limit = 10000000000, % Huge number to simplify logic
-    skip = 0,
-
-    group_level = 0,
-
-    view_type = nil,
-    include_docs = false,
-    conflicts = false,
-    stale = false,
-    multi_get = false,
-    callback = nil,
-    list = nil,
-    keys = nil,
-    sorted = true
-}).
-
 -record(view_fold_helper_funs, {
     reduce_count,
     passed_end,
