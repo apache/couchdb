@@ -14,6 +14,7 @@
 
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("couch_mrview/include/couch_mrview.hrl").
 
 -define(ADMIN_CTX, {user_ctx, #user_ctx{roles = [<<"_admin">>]}}).
 
@@ -237,9 +238,9 @@ att_receiver(Req, Length) ->
 %%      also be passed to further constrain the query. See <a href=
 %%      "http://wiki.apache.org/couchdb/HTTP_Document_API#All_Documents">
 %%      all_docs</a> for details
--spec all_docs(dbname(), callback(), [] | tuple(), #view_query_args{}) ->
+-spec all_docs(dbname(), callback(), [] | tuple(), #mrargs{}) ->
     {ok, [any()]}.
-all_docs(DbName, Callback, Acc0, #view_query_args{} = QueryArgs) when
+all_docs(DbName, Callback, Acc0, #mrargs{} = QueryArgs) when
         is_function(Callback, 2) ->
     fabric_view_all_docs:go(dbname(DbName), QueryArgs, Callback, Acc0);
 
@@ -260,9 +261,9 @@ changes(DbName, Callback, Acc0, #changes_args{}=Options) ->
 changes(DbName, Callback, Acc0, Options) ->
     changes(DbName, Callback, Acc0, kl_to_changes_args(Options)).
 
-%% @equiv query_view(DbName, DesignName, ViewName, #view_query_args{})
+%% @equiv query_view(DbName, DesignName, ViewName, #mrargs{})
 query_view(DbName, DesignName, ViewName) ->
-    query_view(DbName, DesignName, ViewName, #view_query_args{}).
+    query_view(DbName, DesignName, ViewName, #mrargs{}).
 
 %% @equiv query_view(DbName, DesignName,
 %%                     ViewName, fun default_callback/2, [], QueryArgs)
@@ -275,7 +276,7 @@ query_view(DbName, DesignName, ViewName, QueryArgs) ->
 %%      see <a href="http://wiki.apache.org/couchdb/HTTP_view_API#Querying_Options">
 %%      query args</a> for details.
 -spec query_view(dbname(), #doc{} | binary(), iodata(), callback(), any(),
-        #view_query_args{}) ->
+        #mrargs{}) ->
     any().
 query_view(DbName, Design, ViewName, Callback, Acc0, QueryArgs) ->
     Db = dbname(DbName), View = name(ViewName),
@@ -307,7 +308,7 @@ get_view_group_info(DbName, DesignId) ->
 %% @doc retrieve all the design docs from a database
 -spec design_docs(dbname()) -> {ok, [json_obj()]}.
 design_docs(DbName) ->
-    QueryArgs = #view_query_args{
+    QueryArgs = #mrargs{
         start_key = <<"_design/">>,
         end_key = <<"_design0">>,
         include_docs=true
@@ -436,7 +437,7 @@ default_callback(complete, Acc) ->
 default_callback(Row, Acc) ->
     {ok, [Row | Acc]}.
 
-is_reduce_view(_, _, _, #view_query_args{view_type=Reduce}) ->
+is_reduce_view(_, _, _, #mrargs{view_type=Reduce}) ->
     Reduce =:= reduce.
 
 %% @doc convenience method for use in the shell, converts a keylist
@@ -445,9 +446,9 @@ kl_to_changes_args(KeyList) ->
     kl_to_record(KeyList, changes_args).
 
 %% @doc convenience method for use in the shell, converts a keylist
-%%      to a `view_query_args' record
+%%      to a `mrargs' record
 kl_to_query_args(KeyList) ->
-    kl_to_record(KeyList, view_query_args).
+    kl_to_record(KeyList, mrargs).
 
 %% @doc finds the index of the given Key in the record.
 %%      note that record_info is only known at compile time
@@ -459,9 +460,9 @@ lookup_index(Key,RecName) ->
         changes_args ->
             lists:zip(record_info(fields, changes_args),
                         lists:seq(2, record_info(size, changes_args)));
-        view_query_args ->
-            lists:zip(record_info(fields, view_query_args),
-                        lists:seq(2, record_info(size, view_query_args)))
+        mrargs ->
+            lists:zip(record_info(fields, mrargs),
+                        lists:seq(2, record_info(size, mrargs)))
         end,
     couch_util:get_value(Key, Indexes).
 
@@ -470,7 +471,7 @@ lookup_index(Key,RecName) ->
 kl_to_record(KeyList,RecName) ->
     Acc0 = case RecName of
           changes_args -> #changes_args{};
-          view_query_args -> #view_query_args{}
+          mrargs -> #mrargs{}
           end,
     lists:foldl(fun({Key, Value}, Acc) ->
                     Index = lookup_index(couch_util:to_existing_atom(Key),RecName),

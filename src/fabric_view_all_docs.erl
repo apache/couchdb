@@ -18,10 +18,11 @@
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("couch_mrview/include/couch_mrview.hrl").
 
-go(DbName, #view_query_args{keys=undefined} = QueryArgs, Callback, Acc0) ->
+go(DbName, #mrargs{keys=undefined} = QueryArgs, Callback, Acc0) ->
     Workers = fabric_util:submit_jobs(mem3:shards(DbName),all_docs,[QueryArgs]),
-    #view_query_args{limit = Limit, skip = Skip} = QueryArgs,
+    #mrargs{limit = Limit, skip = Skip} = QueryArgs,
     State = #collector{
         query_args = QueryArgs,
         callback = Callback,
@@ -46,7 +47,7 @@ go(DbName, #view_query_args{keys=undefined} = QueryArgs, Callback, Acc0) ->
 
 
 go(DbName, QueryArgs, Callback, Acc0) ->
-    #view_query_args{
+    #mrargs{
         direction = Dir,
         include_docs = IncludeDocs,
         limit = Limit,
@@ -134,7 +135,7 @@ handle_message({total_and_offset, Tot, Off}, {Worker, From}, State) ->
 
 handle_message(#view_row{} = Row, {Worker, From}, State) ->
     #collector{query_args = Args, counters = Counters0, rows = Rows0} = State,
-    Dir = Args#view_query_args.direction,
+    Dir = Args#mrargs.direction,
     Rows = merge_row(Dir, Row#view_row{worker={Worker, From}}, Rows0),
     Counters1 = fabric_dict:update_counter(Worker, 1, Counters0),
     State1 = State#collector{rows=Rows, counters=Counters1},
