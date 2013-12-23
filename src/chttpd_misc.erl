@@ -21,6 +21,7 @@
 
 
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("couch_mrview/include/couch_mrview.hrl").
 
 -import(chttpd,
     [send_json/2,send_json/3,send_method_not_allowed/2,
@@ -96,7 +97,7 @@ handle_all_dbs_req(#httpd{method='GET'}=Req) ->
     chttpd:etag_respond(Req, Etag, fun() ->
         {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, [{"Etag",Etag}]),
         fabric:all_docs(ShardDbName, fun all_dbs_callback/2,
-            {nil, Resp}, #view_query_args{})
+            {nil, Resp}, #mrargs{})
     end);
 handle_all_dbs_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
