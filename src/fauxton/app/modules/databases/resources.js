@@ -156,7 +156,11 @@ function(app, FauxtonAPI, Documents) {
     },
 
     dataSize: function () {
-      return this.get("other").data_size;
+      if (this.get("other")){
+        return this.get("other").data_size;
+      }else{
+        return 0;
+      }  
     }
   });
 
