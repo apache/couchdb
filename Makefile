@@ -29,6 +29,17 @@ dist: compile
 distclean: clean
 	@rm -rf rel/couchdb
 
+include install.mk
+install: dist
+	@mkdir -p $(prefix)
+	@cp -R rel/couchdb/* $(prefix)
+	@mkdir -p $(data_dir)
+	@chown $(user) $(data_dir)
+	@mkdir -p $(view_dir)
+	@chown $(user) $(view_dir)
+	@touch $(prefix)/var/log/couchdb.log
+	@chown $(user) $(prefix)/var/log/couchdb.log
+
 dev: compile
 	@rm -rf rel/dev1 rel/dev2 rel/dev3
 	@echo "==> Building development node #1 (ports 15984/15986)"
