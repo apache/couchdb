@@ -1,4 +1,4 @@
-Apache CouchDB README.Unix
+Apache CouchDB INSTALL.Unix
 ==========================
 
 A high-level guide to Unix-like systems, inc. Mac OS X and Ubuntu.
@@ -153,7 +153,7 @@ Once you have satisfied the dependencies you should run:
 This script will configure CouchDB to be installed into `/usr/local`
 by default.
 
-If you wish to customise the installation, pass `--help` to this
+If you wish to customize the installation, pass `--help` to this
 script.
 
 If everything was successful you should see the following message:
