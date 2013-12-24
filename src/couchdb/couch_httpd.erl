@@ -256,7 +256,7 @@ handle_request_int(MochiReq, DefaultFun,
 
     HandlerKey =
     case mochiweb_util:partition(Path, "/") of
-    {"", "", ""} ->
+    {"", _, _} ->
         <<"/">>; % Special case the root url handler
     {FirstPart, _, _} ->
         list_to_binary(FirstPart)
