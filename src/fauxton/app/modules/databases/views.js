@@ -42,8 +42,7 @@ function(app, Components, FauxtonAPI, Databases) {
     template: "templates/databases/list",
     events: {
       "click button.all": "selectAll",
-      "submit form.database-search": "switchDatabase",
-      "click label.fonticon-search": "switchDatabase"
+      "submit form#jump-to-db": "switchDatabase"
     },
 
     initialize: function(options) {
@@ -72,18 +71,23 @@ function(app, Components, FauxtonAPI, Databases) {
     switchDatabase: function(event, selectedName) {
       event && event.preventDefault();
 
-      var dbname = this.$el.find("input.search-query").val();
+      var dbname = this.$el.find("[name='search-query']").val().trim();
 
       if (selectedName) {
         dbname = selectedName;
       }
 
-      if (dbname) {
-        // TODO: switch to using a model, or Databases.databaseUrl()
-        // Neither of which are in scope right now
-        // var db = new Database.Model({id: dbname});
-        var url = ["/database/", app.mixins.safeURLName(dbname), "/_all_docs?limit=" + Databases.DocLimit].join('');
-        FauxtonAPI.navigate(url);
+      if (dbname && this.collection.where({"id":app.mixins.safeURLName(dbname)}).length > 0){
+          // TODO: switch to using a model, or Databases.databaseUrl()
+          // Neither of which are in scope right now
+          // var db = new Database.Model({id: dbname});
+          var url = ["/database/", app.mixins.safeURLName(dbname), "/_all_docs?limit=" + Databases.DocLimit].join('');
+          FauxtonAPI.navigate(url);
+      } else {
+        FauxtonAPI.addNotification({
+          msg: 'Database does not exist.',
+          type: 'error'
+        });
       }
     },
 
@@ -123,7 +127,7 @@ function(app, Components, FauxtonAPI, Databases) {
       var that = this;
       this.dbSearchTypeahead = new Components.DbSearchTypeahead({
         dbLimit: this.dbLimit,
-        el: "input.search-query",
+        el: "input.search-autocomplete",
         onUpdate: function (item) {
           that.switchDatabase(null, item);
         }

@@ -14,11 +14,12 @@ the License.
 
 <div class="result-tools" style="">
   <div id="newButton" class="pull-left"></div>
-  <form class="navbar-form pull-right database-search">
-    <label class="fonticon-search">
-      <input type="text" class="search-query" placeholder="Search by database name">
-    </label>
+  <form id="jump-to-db" class="navbar-form pull-right input-append database-search">
+    <input type="text" name="search-query" placeholder="Database name"></input>
+    <button class="fonticon-search btn button red " type="submit"></button>
   </form>
+
+
 </div>
 <table class="databases table table-striped">
   <thead>
