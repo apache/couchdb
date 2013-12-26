@@ -17,14 +17,14 @@ the License.
    
 <div class="row doc-editor-buttons"> 
   <div class="span3">
-    <button class="save-doc button green btn-large save fonticon-circle-check" type="button">Save</button>
-    <button class="button cancel-button gray btn-large">Back to _all_docs</button>
+    <button class="save-doc button green btn-medium save fonticon-circle-check" type="button">Save</button>
+    <button class="button cancel-button gray btn-medium">Back to _all_docs</button>
   </div>
 
   <div class="span7">
     <% if (attachments) { %>
     <div class="btn-group">
-      <a class="button gray btn-large dropdown-toggle btn" data-bypass="true" data-toggle="dropdown" href="#">
+      <a class="button gray btn-medium dropdown-toggle btn" data-bypass="true" data-toggle="dropdown" href="#">
         View Attachments
         <span class="caret"></span>
       </a>
@@ -39,11 +39,11 @@ the License.
       </ul>
     </div>
     <% } %> 
-    <button class="button gray btn-large  upload"><i class="icon-circle-arrow-up"></i> Upload Attachment</button>
-    <button class="button gray btn-large  duplicate"><i class="icon-repeat"></i> Duplicate document</button>
+    <button class="button gray btn-medium  upload"><i class="icon-circle-arrow-up"></i> Upload Attachment</button>
+    <button class="button gray btn-medium duplicate"><i class="icon-repeat"></i> Duplicate document</button>
   </div>
 
-  <button class="button red btn-large delete"><i class="icon-trash"></i></button>
+  <button class="button red btn-medium delete"><i class="icon-trash"></i></button>
   </ul>
 
 <div id="upload-modal"> </div>
@@ -51,10 +51,5 @@ the License.
 </div>
 
   <div id="editor-container" class="doc-code"><%- JSON.stringify(doc.attributes, null, "  ") %></div>
-  <br />
-  <p>
-       <button class="save-doc button green btn-large save fonticon-circle-check" type="button">Save</button>
-       <button class="button gray btn-large cancel-button outlineGray fonticon-circle-x" type="button">Cancel</button>
-  </p>
 
 </div>
