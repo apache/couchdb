@@ -271,6 +271,10 @@ get_db_info(Db) ->
     } = Db,
     {ok, Size} = couch_file:bytes(Fd),
     {ok, DbReduction} = couch_btree:full_reduce(by_id_btree(Db)),
+
+    DbDir = couch_config:get("couchdb", "database_dir"),
+    DiskFree = couch_util:free_space(DbDir),
+
     InfoList = [
         {db_name, Name},
         {doc_count, element(1, DbReduction)},
@@ -280,6 +284,7 @@ get_db_info(Db) ->
         {compact_running, Compactor/=nil},
         {disk_size, Size},
         {data_size, db_data_size(DbReduction, [SeqBtree, IdBtree, LocalBtree])},
+        {disk_free, DiskFree},
         {instance_start_time, StartTime},
         {disk_format_version, DiskVersion},
         {committed_update_seq, CommittedUpdateSeq}
