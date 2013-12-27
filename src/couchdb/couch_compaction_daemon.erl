@@ -297,7 +297,7 @@ can_db_compact(#config{db_frag = Threshold} = Config, Db) ->
         false ->
             false;
         true ->
-            Free = free_space(couch_config:get("couchdb", "database_dir")),
+            Free = couch_util:free_space(couch_config:get("couchdb", "database_dir")),
             case Free >= SpaceRequired of
             true ->
                 true;
@@ -328,7 +328,7 @@ can_view_compact(Config, DbName, GroupId, GroupInfo) ->
             false ->
                 false;
             true ->
-                Free = free_space(couch_index_util:root_dir()),
+                Free = couch_util:free_space(couch_index_util:root_dir()),
                 case Free >= SpaceRequired of
                 true ->
                     true;
@@ -473,32 +473,3 @@ config_record([{parallel_view_compaction, false} | Rest], Config) ->
 parse_time(String) ->
     [HH, MM] = string:tokens(String, ":"),
     {list_to_integer(HH), list_to_integer(MM)}.
-
-
-free_space(Path) ->
-    DiskData = lists:sort(
-        fun({PathA, _, _}, {PathB, _, _}) ->
-            length(filename:split(PathA)) > length(filename:split(PathB))
-        end,
-        disksup:get_disk_data()),
-    free_space_rec(abs_path(Path), DiskData).
-
-free_space_rec(_Path, []) ->
-    undefined;
-free_space_rec(Path, [{MountPoint0, Total, Usage} | Rest]) ->
-    MountPoint = abs_path(MountPoint0),
-    case MountPoint =:= string:substr(Path, 1, length(MountPoint)) of
-    false ->
-        free_space_rec(Path, Rest);
-    true ->
-        trunc(Total - (Total * (Usage / 100))) * 1024
-    end.
-
-abs_path(Path0) ->
-    Path = filename:absname(Path0),
-    case lists:last(Path) of
-    $/ ->
-        Path;
-    _ ->
-        Path ++ "/"
-    end.
