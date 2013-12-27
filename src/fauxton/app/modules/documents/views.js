@@ -463,7 +463,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       recordStart = this.collection.recordStart();
 
       return {
-        database: this.collection.database.id,
+        database: app.mixins.safeURLName(this.collection.database.id),
         updateSeq: updateSeq,
         offset: recordStart,
         totalRows: totalRows,
