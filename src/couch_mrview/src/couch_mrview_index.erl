@@ -52,11 +52,16 @@ get(Property, State) ->
             } = State,
             {ok, Size} = couch_file:bytes(Fd),
             {ok, DataSize} = couch_mrview_util:calculate_data_size(Btree,Views),
+
+            IndexDir = couch_index_util:root_dir(),
+            DiskFree = couch_util:free_space(IndexDir),
+
             {ok, [
                 {signature, list_to_binary(couch_index_util:hexsig(Sig))},
                 {language, Lang},
                 {disk_size, Size},
                 {data_size, DataSize},
+                {disk_free, DiskFree},
                 {update_seq, UpdateSeq},
                 {purge_seq, PurgeSeq}
             ]};

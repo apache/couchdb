@@ -213,6 +213,8 @@ The response from :get:`/{db}/_design/{ddoc}/_info` contains
   is currently running on the view
 * **data_size** (*number*): Actual size in bytes of the view
 * **disk_size** (*number*): Size in bytes of the view as stored on disk
+* **disk_free** (*number*): Size in bytes that is available/unused on
+  the view index file system partition.
 * **language** (*string*): Language for the defined views
 * **purge_seq** (*number*): The purge sequence that has been processed
 * **signature** (*string*): MD5 signature of the views for the design document

@@ -29,6 +29,7 @@
 -export([encode_doc_id/1]).
 -export([with_db/2]).
 -export([rfc1123_date/0, rfc1123_date/1]).
+-export([free_space/1]).
 
 -include("couch_db.hrl").
 
@@ -487,3 +488,32 @@ month(9) -> "Sep";
 month(10) -> "Oct";
 month(11) -> "Nov";
 month(12) -> "Dec".
+
+
+free_space(Path) ->
+    DiskData = lists:sort(
+        fun({PathA, _, _}, {PathB, _, _}) ->
+            length(filename:split(PathA)) > length(filename:split(PathB))
+        end,
+        disksup:get_disk_data()),
+    free_space_rec(abs_path(Path), DiskData).
+
+free_space_rec(_Path, []) ->
+    undefined;
+free_space_rec(Path, [{MountPoint0, Total, Usage} | Rest]) ->
+    MountPoint = abs_path(MountPoint0),
+    case MountPoint =:= string:substr(Path, 1, length(MountPoint)) of
+    false ->
+        free_space_rec(Path, Rest);
+    true ->
+        trunc(Total - (Total * (Usage / 100))) * 1024
+    end.
+
+abs_path(Path0) ->
+    Path = filename:absname(Path0),
+    case lists:last(Path) of
+    $/ ->
+        Path;
+    _ ->
+        Path ++ "/"
+    end.

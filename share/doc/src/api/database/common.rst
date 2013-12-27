@@ -64,6 +64,8 @@
   :>json number data_size: Actual data size in bytes of the database data.
   :>json number disk_size: Size in bytes of the data as stored on the disk.
     Views indexes are not included in the calculation.
+  :>json disk_free: Size in bytes that is available/unused on the database's
+    file system partition.
   :>json number doc_count: A count of the documents in the specified database.
   :>json number doc_del_count: Number of deleted documents
   :>json string instance_start_time: Timestamp of when the database was opened,
