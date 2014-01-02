@@ -343,7 +343,8 @@ function(app, Fauxton) {
                 var errorText = JSON.parse(resp.responseText).reason;
                 FauxtonAPI.addNotification({
                   msg: 'An Error occurred: ' + errorText,
-                  type: 'error' 
+                  type: 'error',
+                  clear: true
                 });
               }
 
@@ -355,7 +356,8 @@ function(app, Fauxton) {
           if (!resp) { return; }
           FauxtonAPI.addNotification({
                 msg: 'An Error occurred' + JSON.parse(resp.responseText).reason,
-                type: 'error' 
+                type: 'error',
+                clear: true
           });
       });
 

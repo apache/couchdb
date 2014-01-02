@@ -808,7 +808,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     establish: function() {
       var promise = this.model.fetch(),
           databaseId = this.database.safeID(),
-          deferred = $.Deferred();
+          deferred = $.Deferred(),
+          that = this;
 
       promise.then(function () {
         deferred.resolve();
@@ -819,7 +820,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
             type: 'error',
             clear: true
           });
-          FauxtonAPI.navigate('/database/' + databaseId + '/_all_docs?limit=' + Databases.DocLimit);
+          that.goback();
         }
         deferred.reject();
      });
@@ -927,7 +928,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     },
 
     cleanup: function () {
-      this.editor.remove();
+      if (this.editor) this.editor.remove();
     }
   });
 
@@ -1624,17 +1625,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
     jumpToDoc: function (event) {
       event.preventDefault();
-
       var docId = this.$('#jump-to-doc-id').val().trim();
-
-      if (this.database.allDocs.where({"_id":docId}).length > 0){
-        FauxtonAPI.navigate('/database/' + app.mixins.safeURLName(this.database.id) +'/' + app.mixins.safeURLName(docId), {trigger: true});
-      } else {
-        FauxtonAPI.addNotification({
-          msg: 'Document ID does not exist.',
-          type: 'error'
-        });
-      }
+      FauxtonAPI.navigate('/database/' + app.mixins.safeURLName(this.database.id) +'/' + app.mixins.safeURLName(docId), {trigger: true});
     },
 
     afterRender: function () {
