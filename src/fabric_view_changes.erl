@@ -328,29 +328,10 @@ make_changes_args(Args) ->
 
 get_start_seq(DbName, #changes_args{dir=Dir, since=Since})
   when Dir == rev; Since == "now" ->
-    Shards = mem3:shards(DbName),
-    Workers = fabric_util:submit_jobs(Shards, get_update_seq, []),
-    {ok, Seqs} = fabric_util:recv(Workers, #shard.ref,
-        fun collect_update_seqs/3, fabric_dict:init(Workers, -1)),
-    Seqs;
+    {ok, Info} = fabric:get_db_info(DbName),
+    couch_util:get_value(update_seq, Info);
 get_start_seq(_DbName, #changes_args{dir=fwd, since=Since}) ->
     Since.
-
-collect_update_seqs(Seq, Shard, Counters) when is_integer(Seq) ->
-    case fabric_dict:lookup_element(Shard, Counters) of
-    undefined ->
-        % already heard from someone else in this range
-        {ok, Counters};
-    -1 ->
-        C1 = fabric_dict:store(Shard, Seq, Counters),
-        C2 = fabric_view:remove_overlapping_shards(Shard, C1),
-        case fabric_dict:any(-1, C2) of
-        true ->
-            {ok, C2};
-        false ->
-            {stop, pack_seqs(C2)}
-        end
-    end.
 
 pending_count(Dict) ->
     fabric_dict:fold(fun
