@@ -90,6 +90,11 @@ nobase_dist_localdata_DATA = \
     www/fauxton/img/minilogo.png \
     www/fauxton/index.html \
     www/fauxton/js/require.js \
+    www/fauxton/js/ace/mode-javascript.js \
+    www/fauxton/js/ace/mode-json.js \
+    www/fauxton/js/ace/theme-crimson_editor.js \
+    www/fauxton/js/ace/worker-javascript.js \
+    www/fauxton/js/ace/worker-json.js \
     www/favicon.ico \
     www/image/add.png \
     www/image/apply.gif \

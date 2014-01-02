@@ -36,7 +36,7 @@
           "base": null
         },
         "app": {
-          "root": "/utils/fauxton/",
+          "root": "/_utils/fauxton/",
           "host": "../..",
           "version": "1.0"
         }
