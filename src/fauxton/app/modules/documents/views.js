@@ -874,7 +874,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
       json = JSON.parse(this.editor.getValue());
 
-      this.model.set(json, {validate: true});
+      this.model.clear().set(json, {validate: true});
       if (this.model.validationError) {
         return false;
       }
