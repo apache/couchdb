@@ -96,17 +96,10 @@ function(app, FauxtonAPI) {
     setDdocView: function (view, map, reduce) {
       if (!this.isDdoc()) return false;
       var views = this.get('views');
-
       if (reduce) {
-        views[view] = {
-          map: map,
-          reduce: reduce
-        }; 
-      } else {
-        views[view] = {
-          map: map
-        };
-      }
+        views[view].reduce=reduce; 
+      } 
+      views[view].map= map;
 
       this.set({views: views});
 
