@@ -40,6 +40,7 @@
 -record(state, {host, port, connect_timeout,
                 inactivity_timer_ref,
                 use_http_proxy = false, http_proxy_auth_digest,
+                socks5_host, socks5_port,
                 ssl_options = [], is_ssl = false, socket,
                 proxy_tunnel_setup = false,
                 tunnel_setup_queue = [],
@@ -488,6 +489,10 @@ handle_sock_closed(#state{reply_buffer = Buf, reqs = Reqs, http_status_code = SC
             State
     end.
 
+do_connect(Host, Port, Options0, #state{socks5_host = SocksHost}=State, Timeout)
+  when SocksHost /= undefined ->
+    Options = get_sock_options(SocksHost, Options0, []),
+    ibrowse_socks5:connect(Host, Port, SocksHost, State#state.socks5_port, Options, Timeout);
 do_connect(Host, Port, Options, #state{is_ssl         = true,
                                        use_http_proxy = false,
                                        ssl_options    = SSLOptions},
@@ -621,17 +626,24 @@ send_req_1(From,
                 port = Port} = Url,
            Headers, Method, Body, Options, Timeout,
            #state{socket = undefined} = State) ->
+    ProxyHost = get_value(proxy_host, Options, false),
+    ProxyProtocol = get_value(proxy_protocol, Options, http),
     {Host_1, Port_1, State_1} =
-        case get_value(proxy_host, Options, false) of
-            false ->
+        case {ProxyHost, ProxyProtocol} of
+            {false, _} ->
                 {Host, Port, State};
-            PHost ->
+            {_, http} ->
                 ProxyUser     = get_value(proxy_user, Options, []),
                 ProxyPassword = get_value(proxy_password, Options, []),
                 Digest        = http_auth_digest(ProxyUser, ProxyPassword),
-                {PHost, get_value(proxy_port, Options, 80),
+                {ProxyHost, get_value(proxy_port, Options, 80),
                  State#state{use_http_proxy = true,
-                             http_proxy_auth_digest = Digest}}
+                             http_proxy_auth_digest = Digest}};
+            {_, socks5} ->
+                ProxyPort = get_value(proxy_port, Options, 1080),
+                {Host, Port,
+                 State#state{socks5_host = ProxyHost,
+                             socks5_port = ProxyPort}}
         end,
     State_2 = check_ssl_options(Options, State_1),
     do_trace("Connecting...~n", []),
