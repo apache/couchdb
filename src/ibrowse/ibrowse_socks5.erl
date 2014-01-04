@@ -75,9 +75,9 @@ connect(Host, Port, Via) when is_list(Host) ->
     connect(list_to_binary(Host), Port, Via);
 connect(Host, Port, Via) when is_binary(Host), is_integer(Port),
                               is_port(Via) ->
-    Len = byte_size(Host),
     ok = gen_tcp:send(Via,
-        <<?VERSION, ?CONNECT, ?RESERVED, ?ATYP_DOMAINNAME, Len, Host/binary,
+        <<?VERSION, ?CONNECT, ?RESERVED, ?ATYP_DOMAINNAME,
+          (byte_size(Host)), Host/binary,
           (Port):16>>),
     case gen_tcp:recv(Via, 0) of
         {ok, <<?VERSION, ?SUCCEEDED, ?RESERVED, _/binary>>} ->
