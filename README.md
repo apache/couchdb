@@ -58,38 +58,11 @@ Here’s a list of things this first iterations does and doesn’t do:
 I hope you agree we can ship this with a few warnings so people can get a
 hang of it.
 
-Here is a rough list of features squared against future milestones:
 
-Milestone 2: Be creator friendly
- - Make it easy to build a CouchDB plugin by providing one or more easy
-   to start templates.
- - Make it easy to publish new plugins and new versions of existing plugins.
- - Make it easy to supply packages for multiple Erlang & CouchDB versions.
+A roadmap, progress and issues can be found here:
 
-Milestone 3: Public registry
- - Instead of hardcoding a list of plugins into Futon/Fauxton, we load
-   a list of applicable plugins from a central (and configurable)
-   plugins repository.
- - This allows plugin authors to publish new plugins and new versions
-   of existing plugins independently.
+https://issues.apache.org/jira/issues/?jql=component+%3D+Plugins+AND+project+%3D+COUCHDB+AND+resolution+%3D+Unresolved+ORDER+BY+priority+DESC
 
-Milestone 4: Other Languages
- - Figure out how to handle C-dependencies for Erlang plugins.
- - Figure out how to allow other language plugins
-   (c.f. non-JS query servers)
-
-Milestone X: Later
- - Add some account/identity/maybe crypto-web-of-trust system for
-   authors to publish “legit” plugins.
- - Sign & verify individual releases.
- - Handle unclean un/installs if CouchDB crashes while installing/
-   uninstalling.
- - Add `--aditional_plugin_dir` parameter to `couchdb`.
-
-A few more things that can happen concurrently depending on what
-plugins require:
- - Integrate Erlang/JS tests in the installation
- - Integrate docs
 
 
 ## How it works
