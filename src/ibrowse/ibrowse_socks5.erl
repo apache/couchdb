@@ -16,6 +16,7 @@
 -define(CONNECT, 1).
 
 -define(NO_AUTH, 0).
+-define(USERPASS, 2).
 -define(UNACCEPTABLE, 16#FF).
 -define(RESERVED, 0).
 
@@ -25,12 +26,16 @@
 
 -define(SUCCEEDED, 0).
 
--export([connect/6]).
+-export([connect/5]).
 
-connect(TargetHost, TargetPort, SocksHost, SocksPort, Options, Timeout) ->
-    case gen_tcp:connect(SocksHost, SocksPort, Options, Timeout) of
+-import(ibrowse_lib, [get_value/2, get_value/3]).
+
+connect(TargetHost, TargetPort, ProxyOptions, Options, Timeout) ->
+    case gen_tcp:connect(get_value(host, ProxyOptions),
+                         get_value(port, ProxyOptions),
+                         Options, Timeout) of
         {ok, Socket} ->
-            case handshake(Socket) of
+            case handshake(Socket, Options) of
                 ok ->
                     case connect(TargetHost, TargetPort, Socket) of
                         ok ->
@@ -47,10 +52,18 @@ connect(TargetHost, TargetPort, SocksHost, SocksPort, Options, Timeout) ->
             Else
     end.
 
-handshake(Socket) when is_port(Socket) ->
-    ok = gen_tcp:send(Socket, <<?VERSION, 1, ?NO_AUTH>>),
+handshake(Socket, ProxyOptions) when is_port(Socket) ->
+    {Handshake, Success} = case get_value(user, ProxyOptions, <<>>) of
+        <<>> ->
+            {<<?VERSION, 1, ?NO_AUTH>>, ?NO_AUTH};
+        User ->
+            Password = get_value(password, ProxyOptions, <<>>),
+            {<<?VERSION, 1, ?USERPASS, (byte_size(User)), User,
+               (byte_size(Password)), Password>>, ?USERPASS}
+    end,
+    ok = gen_tcp:send(Socket, Handshake),
     case gen_tcp:recv(Socket, 0) of
-        {ok, <<?VERSION, ?NO_AUTH>>} ->
+        {ok, <<?VERSION, Success>>} ->
             ok;
         {ok, <<?VERSION, ?UNACCEPTABLE>>} ->
             {error, unacceptable};
