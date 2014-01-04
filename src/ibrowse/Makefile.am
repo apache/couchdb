@@ -19,6 +19,7 @@ ibrowse_file_collection = \
     ibrowse_http_client.erl \
     ibrowse_lb.erl \
     ibrowse_lib.erl \
+    ibrowse_socks5.erl \
     ibrowse_sup.erl \
     ibrowse_test.erl
 
@@ -29,6 +30,7 @@ ibrowseebin_make_generated_file_list = \
     ibrowse_http_client.beam \
     ibrowse_lb.beam \
     ibrowse_lib.beam \
+    ibrowse_socks5.beam \
     ibrowse_sup.beam \
     ibrowse_test.beam
 
