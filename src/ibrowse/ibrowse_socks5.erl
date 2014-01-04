@@ -39,7 +39,7 @@ connect(TargetHost, TargetPort, ProxyOptions, Options, Timeout) ->
                 ok ->
                     case connect(TargetHost, TargetPort, Socket) of
                         ok ->
-                            {ok, Socket};
+                            maybe_ssl(Socket, ProxyOptions, Timeout);
                         Else ->
                             gen_tcp:close(Socket),
                             Else
@@ -86,6 +86,16 @@ connect(Host, Port, Via) when is_binary(Host), is_integer(Port),
             {error, rep(Rep)};
         {error, Reason} ->
             {error, Reason}
+    end.
+
+maybe_ssl(Socket, ProxyOptions, Timeout) ->
+    IsSsl = get_value(is_ssl, ProxyOptions, false),
+    SslOpts = get_value(ssl_opts, ProxyOptions, []),
+    case IsSsl of
+        false ->
+            {ok, Socket};
+        true ->
+            ssl:connect(Socket, SslOpts, Timeout)
     end.
 
 rep(0) -> succeeded;

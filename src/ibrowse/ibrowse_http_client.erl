@@ -495,7 +495,9 @@ do_connect(Host, Port, Options, #state{socks5_host = SocksHost}=State, Timeout)
         {user,     State#state.socks5_user},
         {password, State#state.socks5_password},
         {host,     SocksHost},
-        {port,     State#state.socks5_port}],
+        {port,     State#state.socks5_port},
+        {is_ssl,   State#state.is_ssl},
+        {ssl_opts, State#state.ssl_options}],
     ibrowse_socks5:connect(Host, Port, ProxyOptions,
                            get_sock_options(SocksHost, Options, []),
                            Timeout);
