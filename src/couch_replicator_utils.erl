@@ -300,9 +300,10 @@ parse_proxy_params(ProxyUrl) ->
         host = Host,
         port = Port,
         username = User,
-        password = Passwd
+        password = Passwd,
+        protocol = Protocol
     } = ibrowse_lib:parse_url(ProxyUrl),
-    [{proxy_host, Host}, {proxy_port, Port}] ++
+    [{proxy_protocol, Protocol}, {proxy_host, Host}, {proxy_port, Port}] ++
         case is_list(User) andalso is_list(Passwd) of
         false ->
             [];
