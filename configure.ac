@@ -24,7 +24,7 @@ AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_HEADERS([src/snappy/google-snappy/config.h])
 
-AM_INIT_AUTOMAKE([1.6.3 foreign])
+AM_INIT_AUTOMAKE([1.6.3 foreign tar-ustar])
 
 AC_USE_SYSTEM_EXTENSIONS
 AC_ENABLE_SHARED
