@@ -11,19 +11,18 @@
 // the License.
 
 define([
-       "app",
-        // Libs
-       "backbone",
-	   "resizeColumns",
+  "app",
+  // Libs
+  "backbone",
+  "resizeColumns",
 ],
 
 function(app, Backbone, resizeColumns) {
 
-
   //resizeAnimation
   app.resizeColumns = new resizeColumns({});
   app.resizeColumns.onResizeHandler();
- 
+
   var Fauxton = {};
 
   Fauxton.Breadcrumbs = Backbone.View.extend({
@@ -136,7 +135,7 @@ function(app, Backbone, resizeColumns) {
           if(!$(e.target).is('a')){
             toggleMenu();
           }
-         }
+        }
       });
 
       function toggleMenu(){
@@ -147,8 +146,8 @@ function(app, Backbone, resizeColumns) {
 
       $('#primary-navbar').on("click", ".nav a", function(){
         if (!($selectorList.hasClass('closeMenu'))){
-        setTimeout(
-          function(){
+          setTimeout(
+            function(){
             $selectorList.addClass('closeMenu');
             app.resizeColumns.onResizeHandler();
           },3000);
@@ -266,6 +265,6 @@ function(app, Backbone, resizeColumns) {
     }
   });
 
-  
+
   return Fauxton;
 });
