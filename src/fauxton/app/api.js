@@ -14,7 +14,7 @@ define([
        "app",
 
        // Modules
-       "modules/fauxton/base",
+       "addons/fauxton/base",
        "spin"
 ],
 

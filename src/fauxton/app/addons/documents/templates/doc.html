@@ -1,0 +1,55 @@
+<!--
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use this file except in compliance with the License. You may obtain a copy of
+the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+License for the specific language governing permissions and limitations under
+the License.
+-->
+
+<div id="doc">
+  <div class="errors-container"></div>
+   
+<div class="row doc-editor-buttons"> 
+  <div class="span3">
+    <button class="save-doc button green btn-medium save fonticon-circle-check" type="button">Save</button>
+    <button class="button cancel-button gray btn-medium">Back to _all_docs</button>
+  </div>
+
+  <div class="span7">
+    <% if (attachments) { %>
+    <div class="btn-group">
+      <a class="button gray btn-medium dropdown-toggle btn" data-bypass="true" data-toggle="dropdown" href="#">
+        View Attachments
+        <span class="caret"></span>
+      </a>
+      <ul class="dropdown-menu">
+        <%_.each(attachments, function (att) { %>
+        <li>
+        <a href="<%= att.url %>" target="_blank"> <strong> <%= att.fileName %> </strong> -
+          <span> <%= att.contentType %>, <%= formatSize(att.size)%> </span>
+        </a>
+        </li>
+        <% }) %>
+      </ul>
+    </div>
+    <% } %> 
+    <button class="button gray btn-medium  upload"><i class="icon-circle-arrow-up"></i> Upload Attachment</button>
+    <button class="button gray btn-medium duplicate"><i class="icon-repeat"></i> Duplicate document</button>
+  </div>
+
+  <button class="button red btn-medium delete"><i class="icon-trash"></i></button>
+  </ul>
+
+<div id="upload-modal"> </div>
+<div id="duplicate-modal"> </div> 
+</div>
+
+  <div id="editor-container" class="doc-code"><%- JSON.stringify(doc.attributes, null, "  ") %></div>
+
+</div>

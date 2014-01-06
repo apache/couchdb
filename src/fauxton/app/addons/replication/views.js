@@ -13,7 +13,7 @@
 define([
        "app",
        "api",
-       "modules/fauxton/components",
+       "addons/fauxton/components",
        "addons/replication/resources"
 ],
 function(app, FauxtonAPI, Components, replication) {

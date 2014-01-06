@@ -1,0 +1,67 @@
+<!--
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use this file except in compliance with the License. You may obtain a copy of
+the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+License for the specific language governing permissions and limitations under
+the License.
+-->
+
+<div id="sidenav">
+  <header class="row-fluid">
+    <div class="span12">
+      <div class="btn-group">
+        <button class="btn dropdown-toggle dropdown-toggle-btn" data-toggle="dropdown">
+          Docs
+          <span class="caret"></span>
+        </button>
+        <ul class="dropdown-menu">
+          <!-- dropdown menu links -->
+          <li><a class="icon-file" href="<%= db_url %>">Docs</a></li>
+          <li><a class="icon-lock" href="<%= permissions_url %>">Permissions</a></li>
+          <li><a class="icon-forward" href="<%= changes_url %>">Changes</a></li>
+          <% _.each(docLinks, function (link) { %>
+          <li><a class="<%= link.icon %>" href="<%= database_url + '/' + link.url %>"><%= link.title %></a></li>
+          <% }); %>
+        </ul>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn dropdown-toggle dropdown-toggle-btn" data-toggle="dropdown">
+          New
+          <span class="caret"></span>
+        </button>
+        <ul class="dropdown-menu">
+          <!-- dropdown menu links -->
+          <li>
+          <a id="doc" href="#<%= database.url('app') %>/new">Document</a>
+          </li>
+          <li>
+          <a href="#<%= database.url('app') %>/new_view">Secondary Index</a>
+           <% _.each(newLinks, function (item) { %>
+           <a href="#<%= database.url('app') %>/<%=item.url%>"> <%= item.name %></a>
+           <% }); %>
+          </li>
+        </ul>
+      </div>
+        <button id="delete-database" class="btn"><i class="icon-trash"></i> Database</button>
+    </div>
+  </header>
+
+  <nav>
+    <ul class="nav nav-list">
+      <li class="active"><a id="all-docs" href="#<%= database.url('index') %>?limit=<%= docLimit %>" class="toggle-view"> All documents</a></li>
+      <li><a id="design-docs" href='#<%= database.url("index") %>?limit=<%= docLimit %>&startkey="_design"&endkey="_e"'  class="toggle-view"> All design docs</a></li>
+    </ul>
+    <ul class="nav nav-list views">
+      <li class="nav-header">Secondary Indexes</li>
+      <li><a id="new-view" href="#<%= database.url('app') %>/new_view" class="new"><i class="icon-plus"></i> New</a></li>
+    </ul>
+    <div id="extension-navs"></div>
+  </nav>
+</div>

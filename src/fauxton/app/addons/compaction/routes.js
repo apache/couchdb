@@ -17,7 +17,7 @@ define([
 
        // Modules
        "addons/compaction/views",
-       "modules/databases/resources"
+       "addons/databases/resources"
 ],
 
 function(app, FauxtonAPI, Compaction, Databases) {

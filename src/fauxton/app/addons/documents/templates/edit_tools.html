@@ -1,0 +1,44 @@
+<!--
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use this file except in compliance with the License. You may obtain a copy of
+the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+License for the specific language governing permissions and limitations under
+the License.
+-->
+
+<div class="view show">
+  <p>
+    Showing 1-<%= numModels %> of <%= totalRows %> rows
+    <% if (updateSeq) { %>
+      -- Update Sequence: <%= updateSeq %>
+    <% } %>
+    <% if (requestDuration) { %>
+  <span class="view-request-duration">
+    View request duration: <strong> <%= requestDuration %> </strong> 
+   </span>
+   <% } %>
+  </p>
+  <table class="all-docs table table-striped table-condensed">
+    <tbody></tbody>
+  </table>
+  <!--
+  <div class="pagination pagination-centered">
+    <ul>
+      <li class="disabled"><a href="#">&laquo;</a></li>
+      <li class="active"><a href="#">1</a></li>
+      <li><a href="#">2</a></li>
+      <li><a href="#">3</a></li>
+      <li><a href="#">4</a></li>
+      <li><a href="#">5</a></li>
+      <li><a href="#">&raquo;</a></li>
+    </ul>
+  </div>
+  -->
+
+</div>

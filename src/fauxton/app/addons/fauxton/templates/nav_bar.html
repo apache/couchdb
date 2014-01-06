@@ -1,0 +1,75 @@
+<!--
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use this file except in compliance with the License. You may obtain a copy of
+the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+License for the specific language governing permissions and limitations under
+the License.
+-->
+
+<div class="brand">
+  <div class="burger">
+    <div><!-- * --></div>
+    <div><!-- * --></div>
+    <div><!-- * --></div>
+  </div>
+  <div class="icon">Apache Fauxton</div>
+</div>
+
+<nav id="main_navigation">
+  <ul id="nav-links" class="nav pull-right">
+    <% _.each(navLinks, function(link) { %>
+    <% if (link.view) {return;}  %>
+        <li data-nav-name= "<%= link.title %>" >
+          <a href="<%= link.href %>">
+            <span class="<%= link.icon %> fonticon"></span>
+            <%= link.title %>
+          </a>
+        </li>
+    <% }); %>
+  </ul>
+
+  <div id="footer-links">
+
+    <ul id="bottom-nav-links" class="nav">
+        <li data-nav-name= "Documentation">
+            <a href="<%=getDocUrl('docs')%>" target="_blank">
+              <span class="fonticon-bookmark fonticon"></span>
+                Documentation
+            </a>
+        </li>
+
+
+      <% _.each(bottomNavLinks, function(link) { %>
+      <% if (link.view) {return;}  %>
+        <li data-nav-name= "<%= link.title %>">
+            <a href="<%= link.href %>">
+              <span class="<%= link.icon %> fonticon"></span>
+              <%= link.title %>
+            </a>
+        </li>
+      <% }); %>
+    </ul>
+
+    <ul id="footer-nav-links" class="nav">
+      <% _.each(footerNavLinks, function(link) { %>
+      <% if (link.view) {return;}  %>
+        <li data-nav-name= "<%= link.title %>">
+            <a href="<%= link.href %>">
+              <span class="<%= link.icon %> fonticon"></span>
+              <%= link.title %>
+            </a>
+        </li>
+      <% }); %>
+    </ul>
+
+  </div>
+</nav>
+
+
+

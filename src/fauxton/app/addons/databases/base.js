@@ -11,28 +11,27 @@
 // the License.
 
 define([
-       "app",
-       "api",
-       "backbone",
-       "lodash",
-       "addons/fauxton/base"
+  "app",
+
+  "api",
+
+  // Modules
+  "addons/databases/routes",
+  // Views
+  "addons/databases/views"
+
 ],
 
-function (app, FauxtonAPI, backbone, _, Fauxton) {
-  var Stats = new FauxtonAPI.addon();
+function(app, FauxtonAPI, Databases, Views) {
+  Databases.Views = Views;
 
-  Stats.Collection = Backbone.Collection.extend({
-    model: Backbone.Model,
-    documentation: "stats",
-    url: app.host+"/_stats",
-    parse: function(resp) {
-      return _.flatten(_.map(resp, function(doc, key) {
-        return _.map(doc, function(v, k){
-          return _.extend({id: k, type: key}, v);
-        });
-      }), true);
-    }
-  });
+  // Utility functions
+  Databases.databaseUrl = function(database) {
+    var name = _.isObject(database) ? database.id : database,
+        dbname = app.mixins.safeURLName(name);
 
-  return Stats;
+    return ["/database/", dbname, "/_all_docs?limit=" + Databases.DocLimit].join('');
+  };
+
+  return Databases;
 });

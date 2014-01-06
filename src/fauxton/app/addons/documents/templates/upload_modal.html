@@ -1,0 +1,42 @@
+<!--
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use this file except in compliance with the License. You may obtain a copy of
+the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+License for the specific language governing permissions and limitations under
+the License.
+-->
+
+<div class="modal hide fade">
+  <div class="modal-header">
+    <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+    <h3>Upload an Attachment</h3>
+  </div>
+  <div class="modal-body">
+    <div id="modal-error" class="alert alert-error hide" style="font-size: 16px;"> </div>
+    <form id="file-upload" class="form" method="post">
+      <p class="help-block">
+      Please select the file you want to upload as an attachment to this document. 
+      Please note that this will result in the immediate creation of a new revision of the document, 
+      so it's not necessary to save the document after the upload.
+      </p>
+      <input id="_attachments" type="file" name="_attachments">
+      <input id="_rev" type="hidden" name="_rev" value="" >
+      <br/>
+    </form>
+
+    <div class="progress progress-info">
+      <div class="bar" style="width: 0%"></div>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <a href="#" data-dismiss="modal" data-bypass="true" class="btn button cancel-button outlineGray fonticon-circle-x">Cancel</a>
+    <a href="#" id="upload-btn" data-bypass="true" class="btn btn-primary button green save fonticon-circle-check">Upload</a>
+  </div>
+</div>
+

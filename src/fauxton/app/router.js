@@ -25,27 +25,14 @@ define([
        "api",
 
        // Modules
-       "modules/fauxton/base",
+       "addons/fauxton/base",
        // Layout
-       "modules/fauxton/layout",
-
-       // Routes return the module that they define routes for
-       "modules/databases/base",
-       "modules/documents/base",
-       "modules/pouchdb/base",
-
-
-       // this needs to be added as a plugin later
-       // "modules/logs/base",
-       // "modules/config/base",
+       "addons/fauxton/layout",
 
        "load_addons"
 ],
 
-function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents, Pouch, LoadAddons) {
-
-  // TODO: auto generate this list if possible
-  var modules = [Databases, Documents];
+function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, LoadAddons) {
 
   var beforeUnloads = {};
 
@@ -106,11 +93,6 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents
     },
 
     setModuleRoutes: function() {
-      _.each(modules, function(module) {
-        if (module){
-          _.each(module.RouteObjects, this.addModuleRouteObject, this);
-        }
-      }, this);
       _.each(LoadAddons.addons, function(module) {
         if (module){
           module.initialize();
@@ -121,21 +103,6 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents
         }
       }, this);
     },
-
-    /*setAddonHooks: function() {
-      _.each(LoadAddons.addons, function(module) {
-        // This is updates to views by the addon
-        if (module && module.hooks){
-          _.each(module.hooks, function(callback, route){
-            if (this.masterLayout.hooks[route]) {
-              this.masterLayout.hooks[route].push(callback);
-            } else {
-              this.masterLayout.hooks[route] = [callback];
-            }
-          }, this);
-        }
-      }, this);
-    },*/
 
     initialize: function() {
       //TODO: It would be nice to handle this with a router

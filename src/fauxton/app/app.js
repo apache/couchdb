@@ -22,6 +22,8 @@ define([
 
   "helpers",
   "mixins",
+  // Modules
+  "resizeColumns",
 
    // Plugins.
   "plugins/backbone.layoutmanager",
@@ -29,7 +31,7 @@ define([
 
 ],
 
-function(app, $, _, Backbone, Bootstrap, Helpers, Mixins) {
+function(app, $, _, Backbone, Bootstrap, Helpers, Mixins, resizeColumns) {
 
    // Make sure we have a console.log
   if (typeof console == "undefined") {
@@ -80,6 +82,10 @@ function(app, $, _, Backbone, Bootstrap, Helpers, Mixins) {
       return urlParams;
     }
   });
+
+  //resizeAnimation
+  app.resizeColumns = new resizeColumns({});
+  app.resizeColumns.onResizeHandler();
 
   // Localize or create a new JavaScript Template object.
   var JST = window.JST = window.JST || {};

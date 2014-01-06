@@ -103,6 +103,10 @@ src/fauxton/app/addons/*
 !src/fauxton/app/addons/permissions
 !src/fauxton/app/addons/verifyinstall
 !src/fauxton/app/addons/compaction
+!src/fauxton/app/addons/fauxton
+!src/fauxton/app/addons/pouchdb
+!src/fauxton/app/addons/databases
+!src/fauxton/app/addons/documents
 src/fauxton/settings.json*
 !src/fauxton/settings.json.default
 src/ibrowse/ibrowse.app

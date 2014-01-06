@@ -11,28 +11,14 @@
 // the License.
 
 define([
-       "app",
-       "api",
-       "backbone",
-       "lodash",
-       "addons/fauxton/base"
+  "app",
+
+  "api",
+
+  // Modules
+  "addons/documents/routes"
 ],
 
-function (app, FauxtonAPI, backbone, _, Fauxton) {
-  var Stats = new FauxtonAPI.addon();
-
-  Stats.Collection = Backbone.Collection.extend({
-    model: Backbone.Model,
-    documentation: "stats",
-    url: app.host+"/_stats",
-    parse: function(resp) {
-      return _.flatten(_.map(resp, function(doc, key) {
-        return _.map(doc, function(v, k){
-          return _.extend({id: k, type: key}, v);
-        });
-      }), true);
-    }
-  });
-
-  return Stats;
+function(app, FauxtonAPI, Documents) {
+  return Documents;
 });

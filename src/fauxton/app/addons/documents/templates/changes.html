@@ -1,0 +1,38 @@
+<!--
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use this file except in compliance with the License. You may obtain a copy of
+the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+License for the specific language governing permissions and limitations under
+the License.
+-->
+
+<table id="changes-table" class="table">
+  <thead>
+    <th id="seq"> seq </th>
+    <th> id </th>
+    <th id="changes"> changes </th>
+    <th id="deleted"> deleted? </th>
+  </thead>
+  <tbody>
+  <% _.each(changes, function (change) { %>
+    <tr>
+      <td> <%= change.seq %> </td>
+      <% if (change.deleted) { %>
+        <td> <%= change.id %> </td>
+      <% } else { %>
+        <td> <a href="#<%= database.url('app') %>/<%= change.id %>"><%= change.id %></a> </td>
+      <% } %>
+        <td> 
+          <pre class="prettyprint">  <%- JSON.stringify({changes: change.changes, doc: change.doc}, null, " ") %> </pre>
+      </td>
+      <td><%= change.deleted ? "true" : "false" %></td>
+    </tr>
+  <% }); %>
+  </tbody>
+</table>

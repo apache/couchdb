@@ -13,8 +13,8 @@
 define([
   "app",
   "api",
-  "modules/databases/resources",
-  "modules/documents/resources"
+  "addons/databases/resources",
+  "addons/documents/resources"
 ],
 
 function (app, FauxtonAPI, Databases, Documents) {

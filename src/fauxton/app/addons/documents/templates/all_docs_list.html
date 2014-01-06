@@ -1,0 +1,43 @@
+<!--
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use this file except in compliance with the License. You may obtain a copy of
+the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+License for the specific language governing permissions and limitations under
+the License.
+-->
+
+<div class="view show">
+  <% if (!viewList) { %>
+    <div class="row">
+      <div class="btn-toolbar span6">
+        <button type="button" class="btn all" data-toggle="button">✓ All</button>
+        <button class="btn btn-small disabled bulk-delete"><i class="icon-trash"></i></button>
+        <% if (expandDocs) { %>
+        <button id="collapse" class="btn"><i class="icon-minus"></i> Collapse</button>
+        <% } else { %>
+        <button id="collapse" class="btn"><i class="icon-plus"></i> Expand</button>
+        <% } %>
+      </div>
+    </div>
+  <% } %>
+  <p>
+
+  <div id="item-numbers"> </div>
+
+  <% if (requestDuration) { %>
+    <span class="view-request-duration">
+    View request duration: <strong> <%= requestDuration %> </strong> 
+    </span>
+  <% } %>
+  </p>
+  <table class="all-docs table table-striped table-condensed">
+    <tbody></tbody>
+  </table>
+  <div id="documents-pagination"></div>
+</div>

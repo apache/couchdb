@@ -1,0 +1,87 @@
+<!--
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use this file except in compliance with the License. You may obtain a copy of
+the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+License for the specific language governing permissions and limitations under
+the License.
+-->
+<div class="row">
+  <ul class="nav nav-tabs" id="db-views-tabs-nav">
+    <li class="active"> <a data-bypass="true" id="index-nav" class="fonticon-wrench fonticon" data-toggle="tab" href="#index"><% if (newView) { %>Create Index <% } else { %>Edit Index <% } %></a></li>
+    <% if (!newView) { %>
+    <li><a data-bypass="true" id="query-nav" class="fonticon-plus fonticon" href="#query" data-toggle="tab">Query Options</a></li>
+    <li><a data-bypass="true" id="meta-nav" href="#metadata" data-toggle="tab">Design Doc Metadata</a></li>
+    <% } %>
+  </ul>
+  <div class="all-docs-list errors-container"></div>
+  <div class="tab-content">
+    <div class="tab-pane active" id="index">
+      <div id="define-view" class="ddoc-alert well">
+        <div class="errors-container"></div>
+        <form class="form-horizontal view-query-save">
+
+          <div class="control-group design-doc-group">
+          </div>
+
+          <div class="control-group">
+            <label for="index-name">Index name <a href="<%=getDocUrl('view_functions')%>" target="_blank"><i class="icon-question-sign"></i></a></label>
+            <input type="text" id="index-name" value="<%= viewName %>" placeholder="Index name" />
+          </div>
+
+
+          <div class="control-group">
+            <label for="map-function">Map function <a href="<%=getDocUrl('map_functions')%>" target="_blank"><i class="icon-question-sign"></i></a></label>
+            <% if (newView) { %>
+            <div class="js-editor" id="map-function"><%= langTemplates.map %></div>
+            <% } else { %>
+            <div class="js-editor" id="map-function"><%- ddoc.get('views')[viewName].map %></div>
+            <% } %>
+          </div>
+
+
+          <div class="control-group">
+            <label for="reduce-function-selector">Reduce (optional) <a href="<%=getDocUrl('reduce_functions')%>" target="_blank"><i class="icon-question-sign"></i></a></label>
+
+            <select id="reduce-function-selector">
+              <option value="" <%= !reduceFunStr ? 'selected="selected"' : '' %>>None</option>
+              <% _.each(["_sum", "_count", "_stats"], function(reduce) { %>
+              <option value="<%= reduce %>" <% if (reduce == reduceFunStr) { %>selected<% } %>><%= reduce %></option>
+              <% }) %>
+              <option value="CUSTOM" <% if (isCustomReduce) { %>selected<% } %>>Custom Reduce function</option>
+            </select>
+          </div>
+
+          <div class="control-group reduce-function">
+            <label for="reduce-function">Custom Reduce function</label>
+            <% if (newView) { %>
+            <div class="js-editor" id="reduce-function"><%= langTemplates.reduce %></div>
+            <% } else { %>
+            <div class="js-editor" id="reduce-function"><%- ddoc.get('views')[viewName].reduce %></div>
+            <% } %>
+          </div>
+
+          <div class="control-group">
+            <button class="button green save fonticon-circle-check">Save &amp; Build Index</button>
+            <button class="button btn-info preview">Preview</button>
+            <% if (!newView) { %>
+            <button class="button delete outlineGray fonticon-circle-x">Delete</button>
+            <% } %>
+          </div>
+          <div class="clearfix"></div>
+        </form>
+      </div>
+    </div>
+    <div class="tab-pane" id="metadata">
+      <div id="ddoc-info" class="well"> </div>
+    </div>
+    <div class="tab-pane" id="query">
+    </div>
+  </div>
+</div>
+
