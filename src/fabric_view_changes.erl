@@ -223,7 +223,7 @@ handle_message({change, Props}, {Worker, _}, #collector{limit=0} = State) ->
     O1 = case fabric_dict:lookup_element(Worker, O0) of
         null ->
             % Use Pending+1 because we're ignoring this row in the response
-            Pending = couch_util:get_value(pending, Props),
+            Pending = couch_util:get_value(pending, Props, 0),
             fabric_dict:store(Worker, Pending+1, O0);
         _ ->
             O0
