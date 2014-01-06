@@ -359,7 +359,7 @@ jumping to ``offset`` bytes towards the beginning of the file first:
     Required administrator's privileges on target server.
   :<json array doc_ids: Array of document IDs to be synchronized
   :<json string proxy: Address of a proxy server through which replication
-    should occur
+    should occur (protocol can be "http" or "socks5")
   :<json string source: Source database name or URL
   :<json string target: Target database name or URL
   :>header Content-Type: - :mimetype:`application/json`
