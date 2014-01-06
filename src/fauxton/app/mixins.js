@@ -56,7 +56,8 @@ function($, _ ) {
   };
 
   mixins.safeURLName = function(name){
-    var checkforBad = name.match(/[\$\-/_,+-]/g);
+    var testName = name || "";
+    var checkforBad = testName.match(/[\$\-/_,+-]/g);
     return (checkforBad !== null)?encodeURIComponent(name):name;
   };
 
