@@ -51,3 +51,4 @@ Version 1.6.0
 * :issue:`1962`: Various replicator enhancements
   :commit:`1d5fe2aa` write access for checkpoints is not required on source db
   :commit:`0693f98e` make the replication checkpoint interval configurable
+  :issue:`2025`: Support SOCKS5 protocol for replication sources and targets
