@@ -225,6 +225,10 @@ function(app, FauxtonAPI) {
   });
 
   Documents.ViewRow = Backbone.Model.extend({
+    // this is a hack so that backbone.collections doesn't group 
+    // these by id and reduce the number of items returned.
+    idAttribute: "_id",
+
     docType: function() {
       if (!this.id) return "reduction";
 
@@ -329,16 +333,15 @@ function(app, FauxtonAPI) {
       return this.url('app');
     },
 
-    urlPreviousPage: function (num, firstId) {
-      this.params.limit = num;
-      if (firstId) { 
-        this.params.startkey_docid = '"' + firstId + '"';
-        this.params.startkey = '"' + firstId + '"';
+    urlPreviousPage: function (num, params) {
+      if (params) { 
+        this.params = params;
       } else {
-        delete this.params.startkey;
-        delete this.params.startkey_docid;
+        this.params = {reduce: false};
       }
-      return this.url('app');
+
+      this.params.limit = num;
+      return this.url('app'); 
     },
 
     totalRows: function() {
@@ -429,24 +432,27 @@ function(app, FauxtonAPI) {
 
     urlNextPage: function (num, lastId) {
       if (!lastId) {
-        lastId = this.last().id;
+        lastDoc = this.last();
       }
 
-      this.params.startkey_docid = '"' + lastId + '"';
-      this.params.startkey = '"' + lastId + '"';
-      this.params.limit = num;
+      var id = lastDoc.get("id");
+      if (id) {
+        this.params.startkey_docid = id;
+      }
+
+      this.params.startkey =  JSON.stringify(lastDoc.get('key'));
+      this.params.limit = num + 1;
       return this.url('app');
     },
 
-     urlPreviousPage: function (num, firstId) {
-      this.params.limit = num;
-      if (firstId) { 
-        this.params.startkey_docid = '"' + firstId + '"';
-        this.params.startkey = '"' + firstId + '"';
+     urlPreviousPage: function (num, params) {
+      if (params) { 
+        this.params = params;
       } else {
-        delete this.params.startkey;
-        delete this.params.startkey_docid;
+        this.params = {reduce: false};
       }
+
+      this.params.limit = num;
       return this.url('app');
     },
 
@@ -463,6 +469,8 @@ function(app, FauxtonAPI) {
     },
 
     totalRows: function() {
+      if (this.params.reduce) { return "unknown_reduce";}
+
       return this.viewMeta.total_rows || "unknown";
     },
 

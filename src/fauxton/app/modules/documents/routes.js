@@ -188,7 +188,6 @@ function(app, FauxtonAPI, Documents, Databases) {
     allDocs: function(databaseName, options) {
       var docOptions = app.getParams(options);
 
-      docOptions.include_docs = true;
       this.data.database.buildAllDocs(docOptions);
 
       if (docOptions.startkey && docOptions.startkey.indexOf('_design') > -1) {
@@ -233,8 +232,6 @@ function(app, FauxtonAPI, Documents, Databases) {
         view: view,
         params: params
       });
-
-
 
       var ddocInfo = {
         id: "_design/" + decodeDdoc,
@@ -301,9 +298,9 @@ function(app, FauxtonAPI, Documents, Databases) {
           ddoc = event.ddoc;
 
       if (event.allDocs) {
-        docOptions.include_docs = true;
-        this.data.database.buildAllDocs(docOptions);
-        return;
+        this.documentsView.collection = this.data.database.buildAllDocs(docOptions);
+        this.documentsView.cleanup();
+        return this.documentsView.forceRender();
       }
 
       this.data.indexedDocs = new Documents.IndexCollection(null, {
@@ -313,6 +310,7 @@ function(app, FauxtonAPI, Documents, Databases) {
         params: app.getParams()
       });
 
+      this.documentsView && this.documentsView.remove();
       this.documentsView = this.setView("#dashboard-lower-content", new Documents.Views.AllDocsList({
         database: this.data.database,
         collection: this.data.indexedDocs,

@@ -13,7 +13,7 @@ the License.
 -->
 
 <td>
-  <a href="#/database/<%=encoded%>/_all_docs?limit=<%=docLimit%>"><%= database.get("name") %></a>
+  <a href="#/database/<%=encoded%>/_all_docs?limit=<%=docLimit%>&include_docs=true"><%= database.get("name") %></a>
 </td>
 <td><%= database.status.humanSize() %></td>
 <td><%= database.status.numDocs() %></td>

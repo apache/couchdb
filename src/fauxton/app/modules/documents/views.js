@@ -446,6 +446,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
     initialize: function (options) {
       this.newView = options.newView || false;
+      this.showNumbers = options.showNumbers;
+      this.pagination = options.pagination;
       
       this.listenTo(this.collection, 'totalRows:decrement', this.render);
     },
@@ -453,7 +455,9 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     serialize: function () {
        var totalRows = 0,
           recordStart = 0,
-          updateSeq = false;
+          updateSeq = false,
+          pageStart = 0,
+          pageEnd = 20;
 
       if (!this.newView) {
         totalRows = this.collection.totalRows();
@@ -461,13 +465,20 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       }
 
       recordStart = this.collection.recordStart();
+      if (this.pagination) {
+        pageStart = this.pagination.pageStart();
+        pageEnd =  this.pagination.pageEnd();
+      }
 
       return {
         database: app.mixins.safeURLName(this.collection.database.id),
         updateSeq: updateSeq,
         offset: recordStart,
         totalRows: totalRows,
+        showNumbers: this.showNumbers,
         numModels: this.collection.models.length + recordStart - 1,
+        pageStart: pageStart,
+        pageEnd: pageEnd
       };
     }
 
@@ -492,7 +503,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
     beforeRender: function () {
       this.advancedOptions = this.insertView('#query', new Views.AdvancedOptions({
-        updateViewFn: this.updateView,
+        updateViewFn: this.updateAllDocs,
         previewFn: this.previewView,
         hasReduce: false,
         showPreview: false,
@@ -509,7 +520,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
     },
 
-    updateView: function (event, paramInfo) {
+    updateAllDocs: function (event, paramInfo) {
       event.preventDefault();
 
       var errorParams = paramInfo.errorParams,
@@ -578,7 +589,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       }
       this.newView = options.newView || false;
       this.expandDocs = true;
-      this.addPagination();
     },
 
     establish: function() {
@@ -651,7 +661,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
           });
 
           model.collection.remove(model.id);
-          console.log(model.id.match('_design'), !!model.id.match('_design'));
           if (!!model.id.match('_design')) { 
             FauxtonAPI.triggerRouteEvent('reloadDesignDocs');
           }
@@ -667,22 +676,31 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
     addPagination: function () {
       var collection = this.collection;
+      var perPage = function () {
+        if (collection.params.limit && collection.skipFirstItem) {
+          return parseInt(collection.params.limit, 10) - 1;
+        } else if (collection.params.limit) {
+          return parseInt(collection.params.limit, 10);
+        }
+
+        return 20;
+      };
 
       this.pagination = new Components.IndexPagination({
         collection: this.collection,
         scrollToSelector: '#dashboard-content',
         previousUrlfn: function () {
-          return collection.urlPreviousPage(20, this.previousIds.pop());
+          return collection.urlPreviousPage(perPage(), this.previousParams.pop());
         },
         canShowPreviousfn: function () {
-          if (collection.viewMeta.offset === 0) {
+          if (this.previousParams.length === 0) {
             return false;
           }
 
           return true;
         },
         canShowNextfn: function () {
-          if (collection.length === 0 || (collection.viewMeta.offset + collection.length + 2) >= collection.viewMeta.total_rows) {
+          if (collection.length < (perPage() -1)) {
             return false;
           }
 
@@ -690,18 +708,34 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         },
         
         nextUrlfn: function () {
-          return collection.urlNextPage(20);
+          return collection.urlNextPage(perPage());
         }
       });
     },
+    
+    cleanup: function () {
+      this.pagination.remove();
+      this.allDocsNumber.remove();
+      _.each(this.rows, function (row) {row.remove();});
+    },
 
     beforeRender: function() {
+      var showNumbers = true;
+
+      this.addPagination();
+      this.insertView('#documents-pagination', this.pagination);
+
+      if (this.designDocs || this.collection.idxType === '_view' || this.collection.params.startkey === '"_design"') {
+        showNumbers = false;
+      }
+
       this.allDocsNumber = this.setView('#item-numbers', new Views.AllDocsNumber({
         collection: this.collection,
-        newView: this.newView
+        newView: this.newView,
+        showNumbers: showNumbers,
+        pagination: this.pagination
       }));
 
-      this.insertView('#documents-pagination', this.pagination);
       var docs = this.expandDocs ? this.collection : this.collection.simple();
 
       docs.each(function(doc) {

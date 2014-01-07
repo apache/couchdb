@@ -55,7 +55,7 @@ the License.
 
   <nav>
     <ul class="nav nav-list">
-      <li class="active"><a id="all-docs" href="#<%= database.url('index') %>?limit=<%= docLimit %>" class="toggle-view"> All documents</a></li>
+      <li class="active"><a id="all-docs" href="#<%= database.url('index') %>?limit=<%= docLimit %>&include_docs=true" class="toggle-view"> All documents</a></li>
       <li><a id="design-docs" href='#<%= database.url("index") %>?limit=<%= docLimit %>&startkey="_design"&endkey="_e"'  class="toggle-view"> All design docs</a></li>
     </ul>
     <ul class="nav nav-list views">
