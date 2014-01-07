@@ -43,12 +43,25 @@ Version 1.6.0
 
    This version is not released yet.
 
-* :issue:`1922`: Fix CORS exposed headers :commit:`4f619833`
-* Rename ``proxy_authentification_handler`` to ``proxy_authentication_handler``
+* Fauxton: many improvements in our experimental new user interface, including
+  switching the code editor from CodeMirror to Ace as well as better support
+  for various browsers.
+* :issue:`1922`: fix CORS exposed headers. :commit:`4f619833`
+* Rename ``proxy_authentification_handler`` to ``proxy_authentication_handler``.
   :commit:`c66ac4a8`
-* :issue:`1795`: Ensure startup script couchdb clears pid file on termination
+* :issue:`1795`: ensure the startup script clears the pid file on termination.
   :commit:`818ef4f9`
-* :issue:`1962`: Various replicator enhancements
-  :commit:`1d5fe2aa` write access for checkpoints is not required on source db
-  :commit:`0693f98e` make the replication checkpoint interval configurable
-  :issue:`2025`: Support SOCKS5 protocol for replication sources and targets
+* :issue:`1962`: replication can now be performed without having write access
+  to the source database (:commit:`1d5fe2aa`), the replication checkpoint
+  interval is now configurable (:commit:`0693f98e`).
+* :issue:`2025`: add support for SOCKS5 proxies for replication.
+  :commit:`fcd76c9`
+* :issue:`1930`: redirect to the correct page after submitting a new document
+  with a different ID than the one suggested by Futon. :commit:`4906b591`
+* :issue:`1923`: add support for `attachments` and `att_encoding_info` options
+  (formerly only available on the documents API) to the view API.
+  :commit:`ca41964b`
+* :issue:`1647`: for failed replications originating from a document in the
+  `_replicator` database, store the failure reason in the document.
+  :commit:`08cac68b`
+* A number of improvements for the documentation.
