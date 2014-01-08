@@ -61,7 +61,10 @@ json_req_obj(#httpd{mochi_req=Req,
                req_body=ReqBody
             }, Db, DocId) ->
     Body = case ReqBody of
-        undefined -> Req:recv_body();
+        undefined ->
+            MaxSize = list_to_integer(
+                config:get("couchdb", "max_document_size", "4294967296")),
+            Req:recv_body(MaxSize);
         Else -> Else
     end,
     ParsedForm = case Req:get_primary_header_value("content-type") of
