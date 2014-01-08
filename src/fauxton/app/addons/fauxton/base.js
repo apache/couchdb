@@ -12,18 +12,86 @@
 
 define([
   "app",
-  // Libs
-  "backbone",
-  "resizeColumns",
+  "api",
+  "addons/fauxton/resizeColumns"
 ],
 
-function(app, Backbone, resizeColumns) {
+function(app, FauxtonAPI, resizeColumns) {
 
-  //resizeAnimation
-  app.resizeColumns = new resizeColumns({});
-  app.resizeColumns.onResizeHandler();
+  var Fauxton = FauxtonAPI.addon();
+  FauxtonAPI.addNotification = function (options) {
+    options = _.extend({
+      msg: "Notification Event Triggered!",
+      type: "info",
+      selector: "#global-notifications"
+    }, options);
 
-  var Fauxton = {};
+    var view = new Fauxton.Notification(options);
+    return view.renderNotification();
+  };
+
+  FauxtonAPI.UUID = FauxtonAPI.Model.extend({
+    initialize: function(options) {
+      options = _.extend({count: 1}, options);
+      this.count = options.count;
+    },
+
+    url: function() {
+      return app.host + "/_uuids?count=" + this.count;
+    },
+
+    next: function() {
+      return this.get("uuids").pop();
+    }
+  });
+
+
+  Fauxton.initialize = function () {
+    app.footer = new Fauxton.Footer({el: "#footer-content"}),
+    app.navBar = new Fauxton.NavBar();
+    app.apiBar = new Fauxton.ApiBar();
+
+    FauxtonAPI.when.apply(null, app.footer.establish()).done(function() {
+      FauxtonAPI.masterLayout.setView("#primary-navbar", app.navBar, true);
+      FauxtonAPI.masterLayout.setView("#api-navbar", app.apiBar, true);
+      app.navBar.render();
+      app.apiBar.render();
+
+      app.footer.render();
+    });
+
+    FauxtonAPI.masterLayout.navBar = app.navBar;
+    FauxtonAPI.masterLayout.apiBar = app.apiBar;
+
+    FauxtonAPI.RouteObject.on('beforeFullRender', function (routeObject) {
+      $('#primary-navbar li').removeClass('active');
+
+      if (routeObject.selectedHeader) {
+        app.selectedHeader = routeObject.selectedHeader;
+        $('#primary-navbar li[data-nav-name="' + routeObject.selectedHeader + '"]').addClass('active');
+      }
+    });
+
+    FauxtonAPI.RouteObject.on('beforeEstablish', function (routeObject) {
+      FauxtonAPI.masterLayout.removeView('#breadcrumbs');
+      var crumbs = routeObject.get('crumbs');
+
+      if (crumbs.length) {
+        FauxtonAPI.masterLayout.setView('#breadcrumbs', new Fauxton.Breadcrumbs({
+          crumbs: crumbs
+        }), true).render();
+      }
+    });
+
+    FauxtonAPI.RouteObject.on('renderComplete', function (routeObject) {
+      var masterLayout = FauxtonAPI.masterLayout;
+      if (routeObject.get('apiUrl')){
+        masterLayout.apiBar.update(routeObject.get('apiUrl'));
+      } else {
+        masterLayout.apiBar.hide();
+      }
+    });
+  };
 
   Fauxton.Breadcrumbs = Backbone.View.extend({
     template: "templates/fauxton/breadcrumbs",
@@ -41,7 +109,9 @@ function(app, Backbone, resizeColumns) {
   });
 
   Fauxton.VersionInfo = Backbone.Model.extend({
-    url: app.host
+    url: function () {
+      return app.host;
+    }
   });
 
   // TODO: this View should extend from FauxtonApi.View.
@@ -75,6 +145,16 @@ function(app, Backbone, resizeColumns) {
 
     bottomNavLinks: [],
     footerNavLinks: [],
+
+    initialize: function () {
+      _.bindAll(this);
+      //resizeAnimation
+      this.resizeColumns = new resizeColumns({});
+      this.resizeColumns.onResizeHandler();
+      
+      FauxtonAPI.extensions.on('add:navbar:addHeaderLink', this.addLink);
+      FauxtonAPI.extensions.on('removeItem:navbar:addHeaderLink', this.removeLink);
+    },
 
     serialize: function() {
       return {
@@ -124,7 +204,6 @@ function(app, Backbone, resizeColumns) {
     },
 
     afterRender: function(){
-
       $('#primary-navbar li[data-nav-name="' + app.selectedHeader + '"]').addClass('active');
 
       var menuOpen = true;
@@ -141,21 +220,22 @@ function(app, Backbone, resizeColumns) {
       function toggleMenu(){
         $selectorList.toggleClass('closeMenu');
         menuOpen = $selectorList.hasClass('closeMenu');
-        app.resizeColumns.onResizeHandler();
+        this.resizeColumns.onResizeHandler();
       }
-
+      
+      var that = this;
       $('#primary-navbar').on("click", ".nav a", function(){
         if (!($selectorList.hasClass('closeMenu'))){
           setTimeout(
             function(){
             $selectorList.addClass('closeMenu');
-            app.resizeColumns.onResizeHandler();
+            that.resizeColumns.onResizeHandler();
           },3000);
 
         }
       });
 
-      app.resizeColumns.initialize();
+      this.resizeColumns.initialize();
     },
 
     beforeRender: function () {
@@ -264,7 +344,6 @@ function(app, Backbone, resizeColumns) {
       return this;
     }
   });
-
 
   return Fauxton;
 });

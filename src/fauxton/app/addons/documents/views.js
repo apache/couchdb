@@ -21,7 +21,7 @@ define([
        "addons/pouchdb/base",
 
        // Libs
-       "resizeColumns",
+       "addons/Fauxton/resizeColumns",
 
        // Plugins
        "plugins/beautify",
@@ -720,11 +720,11 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     },
     
     cleanup: function () {
-      //if (!this.pagination) { return; }
-      this.pagination.remove();
-      //this.pagination = null;
       this.allDocsNumber.remove();
       _.each(this.rows, function (row) {row.remove();});
+
+      if (!this.pagination) { return; }
+      this.pagination.remove();
     },
 
     beforeRender: function() {

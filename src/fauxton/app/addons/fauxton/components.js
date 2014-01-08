@@ -25,10 +25,11 @@ define([
   // Libs
   "api",
   "ace_configuration",
+  "spin"
 ],
 
-function(app, FauxtonAPI, ace) {
-  var Components = app.module();
+function(app, FauxtonAPI, ace, spin) {
+  var Components = FauxtonAPI.addon();
 
   Components.Pagination = FauxtonAPI.View.extend({
     template: "templates/fauxton/pagination",
@@ -124,7 +125,7 @@ function(app, FauxtonAPI, ace) {
 
     pageEnd: function () {
       if (this.collection.length < this.pageLimit()) {
-        return this.collection.length;
+        return (this.previousParams.length * this.pageLimit()) + this.collection.length;
       }
 
       return (this.previousParams.length * this.pageLimit()) + this.pageLimit();
@@ -235,6 +236,8 @@ function(app, FauxtonAPI, ace) {
       this.theme = options.theme || 'crimson_editor';
       this.couchJSHINT = options.couchJSHINT;
       this.edited = false;
+
+      _.bindAll(this);
     },
 
     afterRender: function () {
@@ -295,13 +298,14 @@ function(app, FauxtonAPI, ace) {
     },
 
     removeIncorrectAnnotations: function () {
-      var editor = this.editor;
+      var editor = this.editor,
+          isIgnorableError = this.isIgnorableError;
 
-      this.editor.getSession().on("changeAnnotation", function(){
+      this.editor.getSession().on("changeAnnotation", function () {
         var annotations = editor.getSession().getAnnotations();
 
         var newAnnotations = _.reduce(annotations, function (annotations, error) {
-          if (!FauxtonAPI.isIgnorableError(error.raw)) {
+          if (!isIgnorableError(error.raw)) {
             annotations.push(error);
           }
           return annotations;
@@ -338,10 +342,92 @@ function(app, FauxtonAPI, ace) {
      var errors = this.getAnnotations();
      // By default CouchDB view functions don't pass lint
      return _.every(errors, function(error) {
-      return FauxtonAPI.isIgnorableError(error.raw);
+      return this.isIgnorableError(error.raw);
       },this);
+    },
+
+    // List of JSHINT errors to ignore
+    // Gets around problem of anonymous functions not being a valid statement
+    excludedViewErrors: [
+      "Missing name in function declaration.",
+      "['{a}'] is better written in dot notation."
+    ],
+
+    isIgnorableError: function(msg) {
+      return _.contains(this.excludedViewErrors, msg);
     }
 
+  });
+
+  //need to make this into a backbone view...
+  var routeObjectSpinner;
+  FauxtonAPI.RouteObject.on('beforeEstablish', function (routeObject) {
+    if (!routeObject.disableLoader){ 
+      var opts = {
+        lines: 16, // The number of lines to draw
+        length: 8, // The length of each line
+        width: 4, // The line thickness
+        radius: 12, // The radius of the inner circle
+        color: '#333', // #rbg or #rrggbb
+        speed: 1, // Rounds per second
+        trail: 10, // Afterglow percentage
+        shadow: false // Whether to render a shadow
+     };
+
+     if (!$('.spinner').length) {
+       $('<div class="spinner"></div>')
+        .appendTo('#app-container');
+     }
+
+     routeObjectSpinner = new Spinner(opts).spin();
+     $('.spinner').append(routeObjectSpinner.el);
+   }
+  });
+
+  var removeRouteObjectSpinner = function () {
+    if (routeObjectSpinner) {
+      routeObjectSpinner.stop();
+      $('.spinner').remove();
+    }
+  };
+
+  var removeViewSpinner = function () {
+    if (viewSpinner){
+      viewSpinner.stop();
+      $('.spinner').remove();
+    }
+  };
+
+  var viewSpinner;
+  FauxtonAPI.RouteObject.on('beforeRender', function (routeObject, view, selector) {
+    removeRouteObjectSpinner();
+
+    if (!view.disableLoader){ 
+      var opts = {
+        lines: 16, // The number of lines to draw
+        length: 8, // The length of each line
+        width: 4, // The line thickness
+        radius: 12, // The radius of the inner circle
+        color: '#333', // #rbg or #rrggbb
+        speed: 1, // Rounds per second
+        trail: 10, // Afterglow percentage
+        shadow: false // Whether to render a shadow
+      };
+
+      viewSpinner = new Spinner(opts).spin();
+      $('<div class="spinner"></div>')
+        .appendTo(selector)
+        .append(viewSpinner.el);
+    }
+  });
+
+  FauxtonAPI.RouteObject.on('afterRender', function (routeObject, view, selector) {
+    removeViewSpinner();
+  });
+
+  FauxtonAPI.RouteObject.on('viewHasRendered', function () {
+    removeViewSpinner();
+    removeRouteObjectSpinner();
   });
 
   return Components;

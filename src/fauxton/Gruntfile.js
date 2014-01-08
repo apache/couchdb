@@ -357,7 +357,7 @@ module.exports = function(grunt) {
 
     mochaSetup: {
       default: {
-        files: { src: helper.watchFiles(['[Ss]pec.js'], ['./test/core/**/*[Ss]pec.js', './app/**/*[Ss]pec.js'])},
+        files: { src: helper.watchFiles(['[Ss]pec.js'], ['./app/**/*[Ss]pec.js'])},
         template: 'test/test.config.underscore',
         config: './app/config.js'
       }
@@ -424,7 +424,7 @@ module.exports = function(grunt) {
   grunt.registerTask('lint', ['clean', 'jshint']);
   grunt.registerTask('test', ['lint', 'dependencies', 'test_inline']);
   // lighter weight test task for use inside dev/watch
-  grunt.registerTask('test_inline', ['mochaSetup','jst', 'concat:test_config_js', 'mocha_phantomjs']);
+  grunt.registerTask('test_inline', ['mochaSetup','jst', 'concat:test_config_js','mocha_phantomjs']);
   // Fetch dependencies (from git or local dir), lint them and make load_addons
   grunt.registerTask('dependencies', ['get_deps', 'gen_load_addons:default']);
   // build templates, js and css

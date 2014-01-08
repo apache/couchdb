@@ -25,7 +25,7 @@ require.config({
     jquery: "../assets/js/libs/jquery",
     lodash: "../assets/js/libs/lodash",
     backbone: "../assets/js/libs/backbone",
-    "backbone.layoutmanger": "../assets/js/plugins/backbone.layoutmanager",
+    "backbone.layoutmanager": "../assets/js/plugins/backbone.layoutmanager",
     bootstrap: "../assets/js/libs/bootstrap",
     spin: "../assets/js/libs/spin.min",
     d3: "../assets/js/libs/d3",
@@ -37,7 +37,8 @@ require.config({
 
   map: {
     "*": {
-      'underscore': 'lodash'
+      'underscore': 'lodash',
+      'api':'core/api'
     }
   },
 

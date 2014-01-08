@@ -61,7 +61,7 @@ module.exports = function (grunt) {
         // server js from app directory
         filePath = path.join(app_dir, url.replace('/_utils/fauxton/',''));
       } else if (!!url.match(/testrunner/)) {
-        var testSetup = grunt.util.spawn({cmd: 'grunt', grunt: true, args: ['mochaSetup']}, function (error, result, code) {/* log.writeln(String(result));*/ });
+        var testSetup = grunt.util.spawn({cmd: 'grunt', grunt: true, args: ['test_inline']}, function (error, result, code) {/* log.writeln(String(result));*/ });
         testSetup.stdout.pipe(process.stdout);
         testSetup.stderr.pipe(process.stderr);
         filePath = path.join('./test/runner.html');

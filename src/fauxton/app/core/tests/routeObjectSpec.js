@@ -57,16 +57,7 @@ define([
         assert.ok(mockLayout.setTemplate.calledOnce, 'SetTemplate not meant to be called');
       });
 
-      it('Should clear breadcrumbs', function () {
-        testRouteObject.renderWith('the-route', mockLayout, 'args');
-        assert.ok(mockLayout.clearBreadcrumbs.calledOnce, 'Clear Breadcrumbs called');
-      });
-
-      it('Should set breadcrumbs when breadcrumbs exist', function () {
-        testRouteObject.renderWith('the-route', mockLayout, 'args');
-        assert.ok(mockLayout.setBreadcrumbs.calledOnce, 'Set Breadcrumbs was called');
-      });
-
+      
       it("Should call establish of routeObject", function () {
         var establishSpy = sinon.spy(testRouteObject,"establish");
 

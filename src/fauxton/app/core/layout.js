@@ -10,36 +10,24 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-define(["backbone"],
-
-function(Backbone) {
+define([
+  "backbone", 
+  "plugins/backbone.layoutmanager"
+], function(Backbone) {
 
   // A wrapper of the main Backbone.layoutmanager
   // Allows the main layout of the page to be changed by any plugin.
-  // Exposes the different views:
-  //    navBar -> the top navigation bar
-  //    dashboardContent -> Main display view
-  //    breadcrumbs -> Breadcrumbs navigation section
-  var Layout = function (navBar, apiBar) {
-    this.navBar = navBar;
-    this.apiBar = apiBar;
-
+  var Layout = function () {
     this.layout = new Backbone.Layout({
       template: "templates/layouts/with_sidebar",
-
-      views: {
-        "#primary-navbar": this.navBar,
-        "#api-navbar": this.apiBar
-      },
-      afterRender: function(){
-
-      }
     });
 
     this.layoutViews = {};
-    //this.hooks = {};
-
     this.el = this.layout.el;
+  };
+
+  Layout.configure = function (options) {
+    Backbone.Layout.configure(options);
   };
 
   // creatings the dashboard object same way backbone does
@@ -61,25 +49,14 @@ function(Backbone) {
       this.render();
     },
 
-    setTabs: function(view){
-      // TODO: Not sure I like this - seems fragile/repetitive
-      this.tabs = this.layout.setView("#tabs", view);
-      this.tabs.render();
-    },
+    setView: function(selector, view, keep) {
+      this.layout.setView(selector, view, false);
 
-    setBreadcrumbs: function(view) {
-      this.breadcrumbs = this.layout.setView("#breadcrumbs", view);
-      this.breadcrumbs.render();
-    },
+      if (!keep) {
+        this.layoutViews[selector] = view;
+      }
 
-    clearBreadcrumbs: function () {
-      if (!this.breadcrumbs) {return ;}
-
-      this.breadcrumbs.remove();
-    },
-
-    setView: function(selector, view) {
-      this.layoutViews[selector] = this.layout.setView(selector, view, false);
+      return view;
     },
 
     renderView: function(selector) {
@@ -89,6 +66,22 @@ function(Backbone) {
       } else {
         return view.render();
       }
+    },
+
+    removeView: function (selector) {
+      var view = this.layout.getView(selector);
+
+      if (!view) {
+        return false;
+      }
+
+      view.remove();
+      
+      if (this.layoutViews[selector]) {
+        delete this.layoutViews[selector];
+      }
+
+      return true;
     }
 
   });

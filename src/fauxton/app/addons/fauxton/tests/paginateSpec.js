@@ -10,12 +10,12 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 define([
-       'api',
+       'app',
        'addons/fauxton/components',
        'addons/documents/resources',
        'testUtils',
-       'app'
-], function (FauxtonAPI, Views, Models, testUtils, app) {
+       'api'
+], function (app, Views, Models, testUtils, FauxtonAPI) {
   var assert = testUtils.assert,
   ViewSandbox = testUtils.ViewSandbox;
 
@@ -23,10 +23,6 @@ define([
   describe('IndexPaginate', function () {
     var viewSandbox, paginate, collection, navigateMock;
     beforeEach(function () {
-      app.router = {
-        navigate: function () {}
-      };
-
       collection = new Models.IndexCollection([{
         id:'myId1',
         doc: 'num1'
