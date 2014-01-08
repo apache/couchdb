@@ -26,7 +26,7 @@ define([
         id:'myId2',
         doc: 'num2'
       }], {
-        database: {id: 'databaseId'},
+        database: {id: 'databaseId', safeID: function () { return this.id; }},
         design: '_design/myDoc'
       });
 
@@ -35,14 +35,14 @@ define([
     it('Should return urlNext', function () {
       var url = collection.urlNextPage(20);
 
-      assert.equal(url, 'database/databaseId/_design/myDoc/_view/?limit=20&reduce=false&startkey_docid=%22myId2%22&startkey=%22myId2%22');
+      assert.equal(url, 'database/databaseId/_design/myDoc/_view/?limit=21&reduce=false&startkey_docid=myId2&startkey=');
 
     });
 
     it('Should return urlPrevious', function () {
-      var url = collection.urlPreviousPage(20, 'myId1');
+      var url = collection.urlPreviousPage(20, {limit: 21, reduce: false,  startkey_docid: "myId1",startkey:"myId1"} );
 
-      assert.equal(url, 'database/databaseId/_design/myDoc/_view/?limit=20&reduce=false&startkey_docid=%22myId1%22&startkey=%22myId1%22');
+      assert.equal(url, 'database/databaseId/_design/myDoc/_view/?limit=20&reduce=false&startkey_docid=myId1&startkey=myId1');
 
     });
 
@@ -59,7 +59,7 @@ define([
         _id:'myId2',
         doc: 'num2'
       }], {
-        database: {id: 'databaseId'},
+        database: {id: 'databaseId', safeID: function () { return this.id; }},
         params: {limit: 20}
       });
 
@@ -73,8 +73,8 @@ define([
     });
 
      it('Should return urlPrevious', function () {
-      var url = collection.urlPreviousPage(20, 'myId1');
-      assert.equal(url, 'database/databaseId/_all_docs?limit=20&startkey_docid=%22myId1%22&startkey=%22myId1%22');
+      var url = collection.urlPreviousPage(20, {limit: 21, startkey_docid: "myId1",startkey:"myId1"} );
+      assert.equal(url, 'database/databaseId/_all_docs?limit=20&startkey_docid=myId1&startkey=myId1');
     });
 
 
