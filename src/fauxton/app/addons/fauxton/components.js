@@ -301,7 +301,7 @@ function(app, FauxtonAPI, ace) {
         var annotations = editor.getSession().getAnnotations();
 
         var newAnnotations = _.reduce(annotations, function (annotations, error) {
-          if (!FauxtonAPI.isIgnorableError(error.raw)) {
+          if (!this.isIgnorableError(error.raw)) {
             annotations.push(error);
           }
           return annotations;
@@ -338,8 +338,19 @@ function(app, FauxtonAPI, ace) {
      var errors = this.getAnnotations();
      // By default CouchDB view functions don't pass lint
      return _.every(errors, function(error) {
-      return FauxtonAPI.isIgnorableError(error.raw);
+      return this.isIgnorableError(error.raw);
       },this);
+    },
+
+    // List of JSHINT errors to ignore
+    // Gets around problem of anonymous functions not being a valid statement
+    excludedViewErrors: [
+      "Missing name in function declaration.",
+      "['{a}'] is better written in dot notation."
+    ],
+
+    isIgnorableError: function(msg) {
+      return _.contains(this.excludedViewErrors, msg);
     }
 
   });
