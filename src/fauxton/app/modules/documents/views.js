@@ -1116,7 +1116,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         }
         break;
         case "include_docs":
-          break;
+        break;
       }
     },
 

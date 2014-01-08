@@ -133,7 +133,6 @@ FAUXTON_FILES = \
     fauxton/app/templates/databases/item.html \
     fauxton/app/templates/databases/list.html \
     fauxton/app/templates/databases/newdatabase.html \
-    fauxton/app/templates/databases/sidebar.html \
     fauxton/app/templates/documents/all_docs_item.html \
     fauxton/app/templates/documents/all_docs_list.html \
     fauxton/app/templates/documents/changes.html \
