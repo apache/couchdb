@@ -31,56 +31,6 @@ define([
 function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColumns) {
   var Views = {};
 
-  // Views.Tabs = FauxtonAPI.View.extend({
-  //   template: "templates/documents/tabs",
-  //   initialize: function(options){
-  //     this.collection = options.collection;
-  //     this.database = options.database;
-  //     this.active_id = options.active_id;
-  //   },
-
-  //   events: {
-  //     "click #delete-database": "delete_database"
-  //   },
-
-  //   serialize: function () {
-  //     return {
-  //       // TODO make this not hard coded here
-  //       changes_url: '#' + this.database.url('changes'),
-  //       db_url: '#' + this.database.url('index') + '?limit=' + Databases.DocLimit,
-  //     };
-  //   },
-
-  //   beforeRender: function(manage) {
-  //     this.insertView("#search", new Views.SearchBox({
-  //       collection: this.collection,
-  //       database: this.database.id
-  //     }));
-  //   },
-
-  //   afterRender: function () {
-  //     if (this.active_id) {
-  //       this.$('.active').removeClass('active');
-  //       this.$('#'+this.active_id).addClass('active');
-  //     }
-  //   },
-
-  //   delete_database: function (event) {
-  //     event.preventDefault();
-
-  //     var result = confirm("Are you sure you want to delete this database?");
-
-  //     if (!result) { return; }
-  //     FauxtonAPI.addNotification({
-  //       msg: "Deleting your database...",
-  //       type: "error"
-  //     });
-  //     return this.database.destroy().done(function () {
-  //       app.router.navigate('#/_all_dbs', {trigger: true});
-  //     });
-  //   }
-  // });
-
   Views.SearchBox = FauxtonAPI.View.extend({
     template: "templates/documents/search",
     tagName: "form",
@@ -714,7 +664,9 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     },
     
     cleanup: function () {
+      //if (!this.pagination) { return; }
       this.pagination.remove();
+      //this.pagination = null;
       this.allDocsNumber.remove();
       _.each(this.rows, function (row) {row.remove();});
     },
@@ -722,7 +674,10 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     beforeRender: function() {
       var showNumbers = true;
 
-      this.addPagination();
+      if (!this.pagination) {
+        this.addPagination();
+      }
+
       this.insertView('#documents-pagination', this.pagination);
 
       if (this.designDocs || this.collection.idxType === '_view' || this.collection.params.startkey === '"_design"') {

@@ -297,10 +297,14 @@ function(app, FauxtonAPI, Documents, Databases) {
           docOptions = app.getParams(),
           ddoc = event.ddoc;
 
+      this.documentsView && this.documentsView.remove();
+
       if (event.allDocs) {
-        this.documentsView.collection = this.data.database.buildAllDocs(docOptions);
-        this.documentsView.cleanup();
-        return this.documentsView.forceRender();
+        this.data.database.buildAllDocs(docOptions);
+        this.documentsView = this.setView("#dashboard-lower-content", new Documents.Views.AllDocsList({
+          collection: this.data.database.allDocs
+        }));
+        return;
       }
 
       this.data.indexedDocs = new Documents.IndexCollection(null, {
@@ -310,7 +314,6 @@ function(app, FauxtonAPI, Documents, Databases) {
         params: app.getParams()
       });
 
-      this.documentsView && this.documentsView.remove();
       this.documentsView = this.setView("#dashboard-lower-content", new Documents.Views.AllDocsList({
         database: this.data.database,
         collection: this.data.indexedDocs,

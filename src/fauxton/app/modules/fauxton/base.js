@@ -20,7 +20,6 @@ define([
 
 function(app, Backbone, resizeColumns) {
 
-
    //resizeAnimation
    app.resizeColumns = new resizeColumns({});
    app.resizeColumns.onResizeHandler();
