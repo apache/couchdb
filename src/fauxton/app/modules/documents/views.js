@@ -1535,7 +1535,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         }
         this.ddocID = this.model.id;
       } else {
-        this.model = this.ddocs.get(this.ddocID).dDocModel();
+        var ddocDecode = decodeURIComponent(this.ddocID);
+        this.model = this.ddocs.get(ddocDecode).dDocModel();
         this.reduceFunStr = this.model.viewHasReduce(this.viewName);
         this.setView('#ddoc-info', new Views.DdocInfo({model: this.ddocInfo }));
       }
@@ -1717,10 +1718,26 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       }, this);
     },
 
+    addNewSidebarItem: function(key, selector, design){
+      console.log(args, "sidebarupdate");
+      // var selected = this.ddocID == "_design/"+design;
+      // var view = this.insertView("ul.nav.views", new Views.IndexItem({
+      //     ddoc: design,
+      //     index: key,
+      //     database: this.collection.database.id,
+      //     selected: selected && key == this.currView
+      //   }));
+      // if (render !== false) {
+      //   view.render();
+      // }
+    },
+
     afterRender: function () {
       if (this.selectedTab) {
         this.setSelectedTab(this.selectedTab);
       }
+
+      this.listenTo(this.collection, "add", this.addNewSidebarItem);
     },
 
     setSelectedTab: function (selectedTab) {
