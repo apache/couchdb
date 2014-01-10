@@ -43,6 +43,7 @@ oauth_auth_callback(#httpd{mochi_req = MochiReq} = Req, CbParams) ->
     Method = atom_to_list(MochiReq:get(method)),
     #callback_params{
         consumer = Consumer,
+        token = Token,
         token_secret = TokenSecret,
         url = Url,
         signature = Sig,
@@ -61,7 +62,7 @@ oauth_auth_callback(#httpd{mochi_req = MochiReq} = Req, CbParams) ->
             "Consumer is `~p`, token secret is `~p`~n"
             "Expected signature was `~p`~n",
             [User, Sig, Method, Url, Params, Consumer, TokenSecret,
-                oauth:signature(Method, Url, Params, Consumer, TokenSecret)]),
+                oauth:sign(Method, Url, Params, Consumer, Token, TokenSecret)]),
         Req
     end.
 
