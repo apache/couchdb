@@ -601,7 +601,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     },
 
     selectAll: function(evt){
-      $("input:checkbox").prop('checked', !$(evt.target).hasClass('active')).trigger('change');
+      $('.all-docs').find("input:checkbox").prop('checked', !$(evt.target).hasClass('active')).trigger('change');
     },
 
     serialize: function() {
