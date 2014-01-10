@@ -497,6 +497,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     },
 
     toggleQuery: function (event) {
+      $('#dashboard-content').scrollTop(0);
       this.$('#query').toggle('fast');
     },
 
@@ -881,6 +882,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
           editor.editSaved();
           FauxtonAPI.navigate('/database/' + that.database.safeID() + '/' + that.model.id);
         }).fail(function(xhr) {
+
           var responseText = JSON.parse(xhr.responseText).reason;
           notification = FauxtonAPI.addNotification({
             msg: "Save failed: " + responseText,
@@ -1330,6 +1332,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
       if (event) { event.preventDefault();}
 
+      $('#dashboard-content').scrollTop(0); //scroll up
+
       if (this.hasValidCode() && this.$('#new-ddoc:visible').val() !=="") {
         var mapVal = this.mapEditor.getValue(), 
         reduceVal = this.reduceVal(),
@@ -1341,7 +1345,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
         notification = FauxtonAPI.addNotification({
           msg: "Saving document.",
-          selector: "#define-view .errors-container"
+          selector: "#define-view .errors-container",
+          clear: true
         });
 
         ddoc.setDdocView(viewName, mapVal, reduceVal);
@@ -1355,7 +1360,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
           FauxtonAPI.addNotification({
             msg: "View has been saved.",
             type: "success",
-            selector: "#define-view .errors-container"
+            selector: "#define-view .errors-container",
+            clear: true
           });
 
           if (that.newView) {
@@ -1393,7 +1399,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         notification = FauxtonAPI.addNotification({
           msg: errormessage,
           type: "error",
-          selector: "#define-view .errors-container"
+          selector: "#define-view .errors-container",
+          clear: true
         });
       }
     },
@@ -1415,13 +1422,15 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
            return FauxtonAPI.addNotification({
              msg: "JSON Parse Error on field: "+param.name,
              type: "error",
-             selector: ".advanced-options .errors-container"
+             selector: ".advanced-options .errors-container",
+             clear: true
            });
          });
          FauxtonAPI.addNotification({
            msg: "Make sure that strings are properly quoted and any other values are valid JSON structures",
            type: "warning",
-           selector: ".advanced-options .errors-container"
+           selector: ".advanced-options .errors-container",
+           clear: true
          });
  
          return false;
@@ -1531,6 +1540,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       if ($targetId === 'index-nav') {
         if (this.newView) { return; }
         var that = this;
+        $('#dashboard-content').scrollTop(0); //scroll up
         $targetTab.toggle('slow', function(){
            that.showEditors();
         });
