@@ -40,7 +40,15 @@ go(DbName, DDoc, View, Args, Callback, Acc) ->
                 after
                     fabric_util:cleanup(Workers)
                 end;
-            {timeout, _} ->
+            {timeout, NewState} ->
+                DefunctWorkers = fabric_util:remove_done_workers(
+                    NewState#stream_acc.workers,
+                    waiting
+                ),
+                fabric_util:log_timeout(
+                    DefunctWorkers,
+                    "map_view"
+                ),
                 Callback({error, timeout}, Acc);
             {error, Error} ->
                 Callback({error, Error}, Acc)

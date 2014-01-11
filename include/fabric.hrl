@@ -32,5 +32,11 @@
     user_acc
 }).
 
+-record(stream_acc, {
+    workers,
+    start_fun,
+    replacements
+}).
+
 -record(view_row, {key, id, value, doc, worker}).
 -record(change, {key, id, value, deleted=false, doc, worker}).

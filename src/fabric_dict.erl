@@ -52,3 +52,6 @@ filter(Fun, Dict) ->
 
 fold(Fun, Acc0, Dict) ->
     orddict:fold(Fun, Acc0, Dict).
+
+to_list(Dict) ->
+    orddict:to_list(Dict).

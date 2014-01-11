@@ -29,19 +29,22 @@ set_revs_limit(DbName, Limit, Options) ->
     Shards = mem3:shards(DbName),
     Workers = fabric_util:submit_jobs(Shards, set_revs_limit, [Limit, Options]),
     Handler = fun handle_revs_message/3,
-    Waiting = length(Workers) - 1,
-    case fabric_util:recv(Workers, #shard.ref, Handler, Waiting) of
+    Acc0 = {Workers, length(Workers) - 1},
+    case fabric_util:recv(Workers, #shard.ref, Handler, Acc0) of
     {ok, ok} ->
         ok;
+    {timeout, {DefunctWorkers, _}} ->
+        fabric_util:log_timeout(DefunctWorkers, "set_revs_limit"),
+        {error, timeout};
     Error ->
         Error
     end.
 
-handle_revs_message(ok, _, 0) ->
+handle_revs_message(ok, _, {_Workers, 0}) ->
     {stop, ok};
-handle_revs_message(ok, _, Waiting) ->
-    {ok, Waiting - 1};
-handle_revs_message(Error, _, _Waiting) ->
+handle_revs_message(ok, Worker, {Workers, Waiting}) ->
+    {ok, {lists:delete(Worker, Workers), Waiting - 1}};
+handle_revs_message(Error, _, _Acc) ->
     {error, Error}.
 
 
@@ -61,6 +64,9 @@ set_security(DbName, SecObj, Options) ->
             ok -> ok;
             Error -> Error
         end;
+    {timeout, #acc{workers=DefunctWorkers}} ->
+        fabric_util:log_timeout(DefunctWorkers, "set_security"),
+        {error, timeout};
     Error ->
         Error
     after
@@ -133,6 +139,12 @@ get_all_security(DbName, Options) ->
         {ok, SecObjs};
     {ok, _} ->
         {error, no_majority};
+    {timeout, #acc{workers=DefunctWorkers}} ->
+        fabric_util:log_timeout(
+            DefunctWorkers,
+            "get_all_security"
+        ),
+        {error, timeout};
     Error ->
         Error
     after

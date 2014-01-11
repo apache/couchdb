@@ -43,7 +43,12 @@ delete_shard_db_doc(Doc) ->
     Workers = fabric_util:submit_jobs(Shards, delete_shard_db_doc, [Doc]),
     Acc0 = {length(Shards), fabric_dict:init(Workers, nil)},
     try fabric_util:recv(Workers, #shard.ref, fun handle_db_update/3, Acc0) of
-    {timeout, _} ->
+    {timeout, {_, WorkersDict}} ->
+        DefunctWorkers = fabric_util:remove_done_workers(WorkersDict, nil),
+        fabric_util:log_timeout(
+            DefunctWorkers,
+            "delete_shard_db_doc"
+        ),
         {error, timeout};
     Else ->
         Else

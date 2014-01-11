@@ -23,8 +23,13 @@ go(DbName) ->
     Workers = fabric_util:submit_jobs(Shards, get_doc_count, []),
     RexiMon = fabric_util:create_monitors(Shards),
     Acc0 = {fabric_dict:init(Workers, nil), 0},
-    try
-        fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0)
+    try fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0) of
+    {timeout, {WorkersDict, _}} ->
+        DefunctWorkers = fabric_util:remove_done_workers(WorkersDict, nil),
+        fabric_util:log_timeout(DefunctWorkers, "get_doc_count"),
+        {error, timeout};
+    Else ->
+        Else
     after
         rexi_monitor:stop(RexiMon)
     end.

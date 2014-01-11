@@ -29,8 +29,15 @@ go(DbName, AllIdsRevs, Options) ->
     ResultDict = dict:from_list([{Id, {{nil,Revs},[]}} || {Id, Revs} <- AllIdsRevs]),
     RexiMon = fabric_util:create_monitors(Workers),
     Acc0 = {length(Workers), ResultDict, Workers},
-    try
-        fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0)
+    try fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0) of
+    {timeout, {_, _, DefunctWorkers}} ->
+        fabric_util:log_timeout(
+            DefunctWorkers,
+            "get_missing_revs"
+        ),
+        {error, timeout};
+    Else ->
+        Else
     after
         rexi_monitor:stop(RexiMon)
     end.

@@ -26,6 +26,16 @@ go(DbName) ->
     try
         case fabric_util:recv(Workers, #shard.ref, Fun, Acc0) of
             {ok, Acc} -> {ok, Acc};
+            {timeout, {WorkersDict, _}} ->
+                DefunctWorkers = fabric_util:remove_done_workers(
+                    WorkersDict,
+                    nil
+                ),
+                fabric_util:log_timeout(
+                    DefunctWorkers,
+                    "get_db_info"
+                ),
+                {error, timeout};
             {error, Error} -> throw(Error)
         end
     after

@@ -39,7 +39,9 @@ go(DbName, AllDocs0, Opts) ->
     {ok, {Health, Results}} when Health =:= ok; Health =:= accepted ->
         {Health, [R || R <- couch_util:reorder_results(AllDocs, Results), R =/= noreply]};
     {timeout, Acc} ->
-        {_, _, W1, _, DocReplDict} = Acc,
+        {_, _, W1, GroupedDocs1, DocReplDict} = Acc,
+        {DefunctWorkers, _} = lists:unzip(GroupedDocs1),
+        fabric_util:log_timeout(DefunctWorkers, "update_docs"),
         {Health, _, Resp} = dict:fold(fun force_reply/3, {ok, W1, []},
             DocReplDict),
         {Health, [R || R <- couch_util:reorder_results(AllDocs, Resp), R =/= noreply]};

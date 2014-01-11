@@ -17,6 +17,7 @@
         remove_down_workers/2, doc_id_and_rev/1]).
 -export([request_timeout/0, attachments_timeout/0, all_docs_timeout/0]).
 -export([stream_start/2, stream_start/4]).
+-export([log_timeout/2, remove_done_workers/2]).
 
 -compile({inline, [{doc_id_and_rev,1}]}).
 
@@ -24,12 +25,6 @@
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("eunit/include/eunit.hrl").
-
--record(stream_acc, {
-    workers,
-    start_fun,
-    replacements
-}).
 
 remove_down_workers(Workers, BadNode) ->
     Filter = fun(#shard{node = Node}, _) -> Node =/= BadNode end,
@@ -154,6 +149,15 @@ timeout(Type, Default) ->
         "infinity" -> infinity;
         N -> list_to_integer(N)
     end.
+
+log_timeout(Workers, EndPoint) ->
+    lists:map(fun(#shard{node=Dest, name=Name}) ->
+        Fmt = "fabric_worker_timeout ~s,~p,~p",
+        ?LOG_ERROR(Fmt, [EndPoint, Dest, Name])
+    end, Workers).
+
+remove_done_workers(Workers, WaitingIndicator) ->
+    [W || {W, WI} <- fabric_dict:to_list(Workers), WI == WaitingIndicator].
 
 get_db(DbName) ->
     get_db(DbName, []).
