@@ -32,6 +32,7 @@ bin/couchjs_dev
 bin/couchpw
 build-aux/config.*
 build-aux/depcomp
+build-aux/compile
 build-aux/install-sh
 build-aux/ltmain.sh
 build-aux/missing
