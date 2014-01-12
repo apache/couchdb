@@ -567,7 +567,7 @@ documents, music, or movie files. Let's make one.
 Attachments get their own URL where you can upload data. Say we want to add
 the album artwork to the ``6e1295ed6c29495e54cc05947f18c8af`` document
 (*"There is Nothing Left to Lose"*), and let's also say the artwork is in a file
-artwork `.jpg` in the current directory::
+`artwork.jpg` in the current directory::
 
   curl -vX PUT http://127.0.0.1:5984/albums/6e1295ed6c29495e54cc05947f18c8af/artwork.jpg?rev=2-2739352689 \
        --data-binary @artwork.jpg -H "Content-Type:image/jpg"
