@@ -39,10 +39,6 @@ in case if you had used such handler.
 Version 1.6.0
 =============
 
-.. warning::
-
-   This version is not released yet.
-
 * Fauxton: many improvements in our experimental new user interface, including
   switching the code editor from CodeMirror to Ace as well as better support
   for various browsers.
