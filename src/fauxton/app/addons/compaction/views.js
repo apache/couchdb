@@ -85,7 +85,7 @@ function (app, FauxtonAPI, Compaction) {
 
   Compaction.CompactView = FauxtonAPI.View.extend({
     template: 'addons/compaction/templates/compact_view',
-    className: 'btn btn-info btn-large pull-right',
+    className: 'btn btn-info pull-right',
     tagName: 'button',
 
     initialize: function () {
