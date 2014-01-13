@@ -234,7 +234,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     },
 
     events: {
-      "click #duplicate-btn":"duplicate"
+      "click #duplicate-btn":"duplicate",
+      "submit #doc-duplicate": "duplicate"
 
     },
 
@@ -1481,6 +1482,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       promise.then(function () {
         params.docs = that.database.allDocs.map(function (model) { return model.get('doc');}); 
 
+        console.log('p', params, paramsInfo);
         var queryPromise = pouchdb.runViewQuery({map: mapVal, reduce: reduceVal}, params);
         queryPromise.then(function (results) {
           FauxtonAPI.triggerRouteEvent('updatePreviewDocs', {rows: results.rows, ddoc: that.getCurrentDesignDoc().id, view: that.viewName});
@@ -1507,8 +1509,9 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     reduceVal: function() {
       var reduceOption = this.$('#reduce-function-selector :selected').val(),
       reduceVal = "";
-
+      
       if (reduceOption === 'CUSTOM') {
+        if (!this.reduceEditor) { this.createReduceEditor(); }
         reduceVal = this.reduceEditor.getValue();
       } else if ( reduceOption !== 'NONE') {
         reduceVal = reduceOption;

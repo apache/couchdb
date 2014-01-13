@@ -11,8 +11,8 @@
 // the License.
 define([
        'api',
-       'modules/fauxton/components',
-       'modules/documents/resources',
+       'addons/fauxton/components',
+       'addons/documents/resources',
        'testUtils',
        'app'
 ], function (FauxtonAPI, Views, Models, testUtils, app) {

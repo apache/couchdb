@@ -10,7 +10,7 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 define([
-       'modules/fauxton/base',
+       'addons/fauxton/base',
       'testUtils'
 ], function (Fauxton, testUtils) {
   var assert = testUtils.assert,

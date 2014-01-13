@@ -273,12 +273,12 @@ FAUXTON_FILES = \
     fauxton/assets/less/bootstrap/utilities.less \
     fauxton/assets/less/bootstrap/variables.less \
     fauxton/assets/less/bootstrap/wells.less \
-    fauxton/addons/config/assets/less/config.less \
+    fauxton/app/addons/config/assets/less/config.less \
     fauxton/assets/less/couchdb.less \
-    fauxton/addons/databases/assets/less/databases.less \
+    fauxton/app/addons/databases/assets/less/databases.less \
     fauxton/assets/less/fauxton.less \
     fauxton/assets/less/icons.less \
-    fauxton/addons/logs/assets/less/logs.less \
+    fauxton/app/addons/logs/assets/less/logs.less \
     fauxton/assets/less/prettyprint.less \
     fauxton/assets/less/variables.less \
     fauxton/bin/grunt \

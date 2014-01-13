@@ -124,9 +124,6 @@
 ^src/ejson/.*
 ^src/etap/.*
 ^src/fauxton/app/addons/config/assets/less/config.less
-^src/fauxton/app/modules/pouchdb/base.js
-^src/fauxton/app/modules/pouchdb/pouch.collate.js
-^src/fauxton/app/modules/pouchdb/pouchdb.mapreduce.js
 ^src/fauxton/assets/css/codemirror.css
 ^src/fauxton/assets/css/nv.d3.css
 ^src/fauxton/assets/img/.*
@@ -152,6 +149,8 @@
 ^src/fauxton/test/mocha/sinon-chai.js
 ^src/fauxton/tasks/addon/rename.json
 ^src/fauxton/assets/lib/ace/.*
+^src/fauxton/app/addons/pouchdb/pouch.collate.js
+^src/fauxton/app/addons/pouchdb/pouchdb.mapreduce.js
 ^src/ibrowse/.*
 ^src/mochiweb/.*
 ^src/my-first-couchdb-plugin/priv/*/*
@@ -184,3 +183,7 @@
 ^var/Makefile
 ^var/Makefile.in
 ^Vagrantfile
+^share/www/fauxton/Makefile
+^share/www/fauxton/Makefile.in
+^share/www/Makefile
+^share/www/Makefile.in
