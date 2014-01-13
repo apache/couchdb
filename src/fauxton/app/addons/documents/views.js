@@ -890,6 +890,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
           notification = FauxtonAPI.addNotification({
             msg: "Save failed: " + responseText,
             type: "error",
+            fade: false,
             clear: true,
             selector: "#doc .errors-container"
           });
