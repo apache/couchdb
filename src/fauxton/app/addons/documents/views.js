@@ -31,7 +31,7 @@ define([
 function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColumns) {
   var Views = {};
   Views.Tabs = FauxtonAPI.View.extend({
-    template: "templates/documents/tabs",
+    template: "addons/documents/templates/tabs",
     initialize: function(options){
       this.collection = options.collection;
       this.database = options.database;
@@ -81,7 +81,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
   });
 
   Views.SearchBox = FauxtonAPI.View.extend({
-    template: "templates/documents/search",
+    template: "addons/documents/templates/search",
     tagName: "form",
     initialize: function(options){
       this.collection = options.collection;
@@ -131,7 +131,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
   });
 
   Views.UploadModal = FauxtonAPI.View.extend({
-    template: "templates/documents/upload_modal",
+    template: "addons/documents/templates/upload_modal",
 
     disableLoader: true,
     
@@ -227,7 +227,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
   });
 
   Views.DuplicateDocModal = FauxtonAPI.View.extend({
-    template: "templates/documents/duplicate_doc_modal",
+    template: "addons/documents/templates/duplicate_doc_modal",
 
     initialize: function () {
       _.bindAll(this);
@@ -299,7 +299,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
   });
 
   Views.FieldEditorTabs = FauxtonAPI.View.extend({
-    template: "templates/documents/doc_field_editor_tabs",
+    template: "addons/documents/templates/doc_field_editor_tabs",
     disableLoader: true,
     initialize: function(options) {
       this.selected = options.selected;
@@ -330,7 +330,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
   });
 
   Views.Document = FauxtonAPI.View.extend({
-    template: "templates/documents/all_docs_item",
+    template: "addons/documents/templates/all_docs_item",
     tagName: "tr",
     className: "all-docs-item",
 
@@ -390,7 +390,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
   });
 
   Views.Row = FauxtonAPI.View.extend({
-    template: "templates/documents/index_row_docular",
+    template: "addons/documents/templates/index_row_docular",
     tagName: "tr",
 
     events: {
@@ -411,7 +411,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
   });
 
   Views.IndexItem = FauxtonAPI.View.extend({
-    template: "templates/documents/index_menu_item",
+    template: "addons/documents/templates/index_menu_item",
     tagName: "li",
 
     initialize: function(options){
@@ -444,7 +444,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
   });
 
   Views.AllDocsNumber = FauxtonAPI.View.extend({
-    template: "templates/documents/all_docs_number",
+    template: "addons/documents/templates/all_docs_number",
 
     initialize: function (options) {
       this.newView = options.newView || false;
@@ -487,7 +487,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
   });
 
   Views.AllDocsLayout = FauxtonAPI.View.extend({
-    template: "templates/documents/all_docs_layout",
+    template: "addons/documents/templates/all_docs_layout",
     className: "row",
 
     initialize: function (options) {
@@ -565,7 +565,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
   // TODO: Rename to reflect that this is a list of rows or documents
   Views.AllDocsList = FauxtonAPI.View.extend({
-    template: "templates/documents/all_docs_list",
+    template: "addons/documents/templates/all_docs_list",
     events: {
       "click button.all": "selectAll",
       "click button.bulk-delete": "bulkDelete",
@@ -759,7 +759,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
   });
 
   Views.Doc = FauxtonAPI.View.extend({
-    template: "templates/documents/doc",
+    template: "addons/documents/templates/doc",
     events: {
       "click button.save-doc": "saveDoc",
       "click button.delete": "destroy",
@@ -977,7 +977,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
   });
 
   Views.DocFieldEditor = FauxtonAPI.View.extend({
-    template: "templates/documents/doc_field_editor",
+    template: "addons/documents/templates/doc_field_editor",
     disableLoader: true,
     events: {
       "click button.save": "saveDoc"
@@ -1024,7 +1024,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
   });
 
   Views.AdvancedOptions = FauxtonAPI.View.extend({
-    template: "templates/documents/advanced_options",
+    template: "addons/documents/templates/advanced_options",
     className: "advanced-options well",
 
     initialize: function (options) {
@@ -1176,7 +1176,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
   });
 
   Views.DesignDocSelector = FauxtonAPI.View.extend({
-    template: "templates/documents/design_doc_selector",
+    template: "addons/documents/templates/design_doc_selector",
 
     events: {
       "change select#ddoc": "updateDesignDoc"
@@ -1237,7 +1237,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
   });
 
   Views.ViewEditor = FauxtonAPI.View.extend({
-    template: "templates/documents/view_editor",
+    template: "addons/documents/templates/view_editor",
     builtinReduces: ['_sum', '_count', '_stats'],
 
     events: {
@@ -1668,7 +1668,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
   });
 
   Views.JumpToDoc = FauxtonAPI.View.extend({
-    template: "templates/documents/jumpdoc",
+    template: "addons/documents/templates/jumpdoc",
 
     initialize: function (options) {
       this.database = options.database;
@@ -1691,7 +1691,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
   });
 
   Views.Sidebar = FauxtonAPI.View.extend({
-    template: "templates/documents/sidebar",
+    template: "addons/documents/templates/sidebar",
     events: {
       "click button#delete-database": "deleteDatabase"
     },
@@ -1800,7 +1800,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
   Views.Indexed = FauxtonAPI.View.extend({});
 
   Views.Changes = FauxtonAPI.View.extend({
-    template: "templates/documents/changes",
+    template: "addons/documents/templates/changes",
 
     establish: function() {
       return [ this.model.changes.fetch()];
@@ -1819,7 +1819,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
   });
 
   Views.DdocInfo = FauxtonAPI.View.extend({
-    template: "templates/documents/ddoc_info",
+    template: "addons/documents/templates/ddoc_info",
 
     initialize: function (options) {
       this.refreshTime = options.refreshTime || 5000;

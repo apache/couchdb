@@ -22,7 +22,7 @@ function(app, Components, FauxtonAPI, Databases) {
   var Views = {};
 
   Views.Item = FauxtonAPI.View.extend({
-    template: "templates/databases/item",
+    template: "addons/databases/templates/item",
     tagName: "tr",
     establish: function(){
       return [this.model.fetch()];
@@ -39,7 +39,7 @@ function(app, Components, FauxtonAPI, Databases) {
   Views.List = FauxtonAPI.View.extend({
     dbLimit: 20,
     perPage: 20,
-    template: "templates/databases/list",
+    template: "addons/databases/templates/list",
     events: {
       "click button.all": "selectAll",
       "submit form#jump-to-db": "switchDatabase"
@@ -143,7 +143,7 @@ function(app, Components, FauxtonAPI, Databases) {
 
 
   Views.NewDatabaseButton = FauxtonAPI.View.extend({
-    template: "templates/databases/newdatabase",
+    template: "addons/databases/templates/newdatabase",
     events: {
       "click a#new": "newDatabase"
     },
@@ -189,7 +189,7 @@ function(app, Components, FauxtonAPI, Databases) {
   });
 
   Views.Sidebar = FauxtonAPI.View.extend({
-    template: "templates/databases/sidebar",
+    template: "addons/databases/templates/sidebar",
     events: {
       "click a#new": "newDatabase",
       "click a#owned": "showMine",
