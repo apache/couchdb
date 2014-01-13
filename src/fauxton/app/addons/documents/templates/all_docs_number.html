@@ -13,8 +13,10 @@ the License.
 -->
 <% if (totalRows === "unknown"){ %>
   Showing 0 documents. <a href="#/database/<%=database%>/new"> Create your first document.</a>
-<% } else { %>
+<% } else if (showNumbers) { %>
   Showing <%=offset%> - <%= numModels %> of <%= totalRows %> rows
+<% } else { %>
+  Showing <%=pageStart%> - <%= pageEnd %>
 <%}%>
 <% if (updateSeq) { %>
   -- Update Sequence: <%= updateSeq %>
