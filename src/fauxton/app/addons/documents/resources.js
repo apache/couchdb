@@ -56,7 +56,7 @@ function(app, FauxtonAPI) {
     },
 
     docType: function() {
-      return this.id.match(/^_design/) ? "design doc" : "doc";
+      return this.id && this.id.match(/^_design\//) ? "design doc" : "doc";
     },
 
     isEditable: function() {

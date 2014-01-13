@@ -242,7 +242,9 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     duplicate: function (event) {
       event.preventDefault();
       var newId = this.$('#dup-id').val(),
-          encodedID = app.utils.safeURLName(newId);
+          isDDoc = newId.match(/^_design\//),
+          removeDDocID = newId.replace(/^_design\//,""),
+          encodedID = isDDoc? "_design/"+ app.utils.safeURLName(removeDDocID):app.utils.safeURLName(newId);
 
       this.hideModal();
       FauxtonAPI.triggerRouteEvent('duplicateDoc', encodedID);
