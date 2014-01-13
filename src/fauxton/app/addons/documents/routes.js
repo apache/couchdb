@@ -92,7 +92,7 @@ function(app, FauxtonAPI, Documents, Databases) {
       doc.copy(newId).then(function () {
         doc.set({_id: newId}); 
         docView.forceRender();
-        FauxtonAPI.navigate('/database/' + database.safeID() + '/' + app.mixins.safeURLName(newId), {trigger: true});
+        FauxtonAPI.navigate('/database/' + database.safeID() + '/' + app.utils.safeURLName(newId), {trigger: true});
         FauxtonAPI.addNotification({
           msg: "Document has been duplicated."
         });
@@ -259,7 +259,7 @@ function(app, FauxtonAPI, Documents, Databases) {
         ddocInfo: ddocInfo
       }));
 
-      this.sidebar.setSelectedTab(app.mixins.removeSpecialCharacters(ddoc) + '_' + app.mixins.removeSpecialCharacters(view));
+      this.sidebar.setSelectedTab(app.utils.removeSpecialCharacters(ddoc) + '_' + app.utils.removeSpecialCharacters(view));
 
       this.crumbs = function () {
         return [

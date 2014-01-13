@@ -18,10 +18,10 @@
 // "purely functional" helper system.
 
 define([
-  "mixins"
+  "utils"
 ],
 
-function(mixins) {
+function(utils) {
 
   var Resize = function(options){
     this.options = options;
@@ -42,8 +42,8 @@ function(mixins) {
       var that = this;
       //add throttler :) 
       this.lazyLayout = _.debounce(that.onResizeHandler, 300).bind(this);
-      mixins.addWindowResize(this.lazyLayout,"animation");
-      mixins.initWindowResize();
+      utils.addWindowResize(this.lazyLayout,"animation");
+      utils.initWindowResize();
       this.onResizeHandler();
     },
     updateOptions:function(options){
@@ -52,7 +52,7 @@ function(mixins) {
       this.options.selectorElements = options.selectorElements || ".window-resizeable";
     },
     turnOff:function(){
-      mixins.removeWindowResize("animation");
+      utils.removeWindowResize("animation");
     },
     cleanupCallback: function(){
       this.callback = null;

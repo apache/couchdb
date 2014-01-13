@@ -241,7 +241,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     duplicate: function (event) {
       event.preventDefault();
       var newId = this.$('#dup-id').val(),
-          encodedID = app.mixins.safeURLName(newId);
+          encodedID = app.utils.safeURLName(newId);
 
       this.hideModal();
       FauxtonAPI.triggerRouteEvent('duplicateDoc', encodedID);
@@ -423,11 +423,11 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         index: this.index,
         ddoc: this.ddoc,
         database: this.database,
-        index_clean: app.mixins.removeSpecialCharacters(this.index),
-        ddoc_clean: app.mixins.removeSpecialCharacters(this.ddoc), 
-        index_encoded: app.mixins.safeURLName(this.index),
-        ddoc_encoded: app.mixins.safeURLName(this.ddoc),
-        database_encoded: app.mixins.safeURLName(this.database),
+        index_clean: app.utils.removeSpecialCharacters(this.index),
+        ddoc_clean: app.utils.removeSpecialCharacters(this.ddoc), 
+        index_encoded: app.utils.safeURLName(this.index),
+        ddoc_encoded: app.utils.safeURLName(this.ddoc),
+        database_encoded: app.utils.safeURLName(this.database),
         selected: this.selected
       };
     },
@@ -470,7 +470,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       }
 
       return {
-        database: app.mixins.safeURLName(this.collection.database.id),
+        database: app.utils.safeURLName(this.collection.database.id),
         updateSeq: updateSeq,
         offset: recordStart,
         totalRows: totalRows,
@@ -1365,7 +1365,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
           });
 
           if (that.newView) {
-            var fragment = '/database/' + that.database.safeID() +'/' + ddoc.safeID() + '/_view/' + app.mixins.safeURLName(viewName); 
+            var fragment = '/database/' + that.database.safeID() +'/' + ddoc.safeID() + '/_view/' + app.utils.safeURLName(viewName); 
 
             FauxtonAPI.navigate(fragment, {trigger: false});
             that.newView = false;
@@ -1375,7 +1375,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
             that.showIndex = true;
             that.render();
             FauxtonAPI.triggerRouteEvent('reloadDesignDocs', {
-              selectedTab: app.mixins.removeSpecialCharacters(ddocName.replace(/_design\//,'')) + '_' + app.mixins.removeSpecialCharacters(viewName)
+              selectedTab: app.utils.removeSpecialCharacters(ddocName.replace(/_design\//,'')) + '_' + app.utils.removeSpecialCharacters(viewName)
             });
           }
 
@@ -1675,7 +1675,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     jumpToDoc: function (event) {
       event.preventDefault();
       var docId = this.$('#jump-to-doc-id').val().trim();
-      FauxtonAPI.navigate('/database/' + app.mixins.safeURLName(this.database.id) +'/' + app.mixins.safeURLName(docId), {trigger: true});
+      FauxtonAPI.navigate('/database/' + app.utils.safeURLName(this.database.id) +'/' + app.utils.safeURLName(docId), {trigger: true});
     },
 
     afterRender: function () {

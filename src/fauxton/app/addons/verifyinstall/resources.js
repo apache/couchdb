@@ -130,7 +130,7 @@ function (app, FauxtonAPI, Databases, Documents) {
 
     setupReplicate: function () {
       return $.ajax({
-        url: '/_replicate',
+        url: app.host + '/_replicate',
         contentType: 'application/json',
         type: 'POST',
         dataType: 'json',
@@ -145,11 +145,6 @@ function (app, FauxtonAPI, Databases, Documents) {
 
     testReplicate: function () {
       var deferred = FauxtonAPI.Deferred();
-      /*var dbReplicate = new Databases.Model({
-          id: 'verifytestdb_replicate',
-          name: 'verifytestdb_replicate'
-        });*/
-
       var promise = dbReplicate.fetch();
 
       promise.then(function () {

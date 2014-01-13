@@ -48,7 +48,8 @@ function() {
     "_active_tasks": "http://docs.couchdb.org/en/latest/api/server/common.html?highlight=stats#active-tasks",
     "log": "http://docs.couchdb.org/en/latest/api/server/common.html?highlight=stats#log",
     "config": "http://docs.couchdb.org/en/latest/config/index.html",
-    "views": "http://docs.couchdb.org/en/latest/intro/overview.html#views"
+    "views": "http://docs.couchdb.org/en/latest/intro/overview.html#views",
+    "changes": "http://docs.couchdb.org/en/latest/api/database/changes.html?highlight=changes#post--db-_changes"
   }; 
   
   Helpers.getDocUrl = function(docKey){

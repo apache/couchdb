@@ -25,23 +25,23 @@ define([
 
 function($, _ ) {
 
-  var mixins = {};
+  var utils = {};
 
   var onWindowResize = {};
    
-  mixins.addWindowResize = function(fun, key){
+  utils.addWindowResize = function(fun, key){
     onWindowResize[key]=fun;
     // You shouldn't need to call it here. Just define it at startup and each time it will loop 
     // through all the functions in the hash.
     //app.initWindowResize();
   };
    
-  mixins.removeWindowResize = function(key){
+  utils.removeWindowResize = function(key){
     delete onWindowResize[key];
-    mixins.initWindowResize();
+    utils.initWindowResize();
   };
    
-  mixins.initWindowResize = function(){
+  utils.initWindowResize = function(){
   //when calling this it should be overriding what was called previously
     window.onresize = function(e) {
        // could do this instead of the above for loop
@@ -51,16 +51,16 @@ function($, _ ) {
     };
   };
 
-  mixins.removeSpecialCharacters = function(name){
+  utils.removeSpecialCharacters = function(name){
     return name.replace(/[^\w\s]/gi,"");
   };
 
-  mixins.safeURLName = function(name){
+  utils.safeURLName = function(name){
     var testName = name || "";
     var checkforBad = testName.match(/[\$\-/_,+-]/g);
     return (checkforBad !== null)?encodeURIComponent(name):name;
   };
 
-  return mixins;
+  return utils;
 });
 

@@ -47,7 +47,7 @@ function (app, FauxtonAPI) {
   });
 
   Auth.Session = FauxtonAPI.Session.extend({
-    url: '/_session',
+    url: app.host + '/_session',
 
     initialize: function (options) {
       if (!options) { options = {}; }
@@ -155,7 +155,7 @@ function (app, FauxtonAPI) {
       return $.ajax({
         cache: false,
         type: "POST", 
-        url: "/_session", 
+        url: app.host + "/_session", 
         dataType: "json",
         data: {name: username, password: password}
       }).then(function () {
@@ -168,7 +168,7 @@ function (app, FauxtonAPI) {
 
       return $.ajax({
         type: "DELETE", 
-        url: "/_session", 
+        url: app.host + "/_session", 
         dataType: "json",
         username : "_", 
         password : "_"

@@ -29,7 +29,7 @@ function(app, Components, FauxtonAPI, Databases) {
     },
     serialize: function() {
       return {
-        encoded: app.mixins.safeURLName(this.model.get("name")),
+        encoded: app.utils.safeURLName(this.model.get("name")),
         database: this.model,
         docLimit: Databases.DocLimit
       };
@@ -77,11 +77,11 @@ function(app, Components, FauxtonAPI, Databases) {
         dbname = selectedName;
       }
 
-      if (dbname && this.collection.where({"id":app.mixins.safeURLName(dbname)}).length > 0){
+      if (dbname && this.collection.where({"id":app.utils.safeURLName(dbname)}).length > 0){
           // TODO: switch to using a model, or Databases.databaseUrl()
           // Neither of which are in scope right now
           // var db = new Database.Model({id: dbname});
-          var url = ["/database/", app.mixins.safeURLName(dbname), "/_all_docs?limit=" + Databases.DocLimit].join('');
+          var url = ["/database/", app.utils.safeURLName(dbname), "/_all_docs?limit=" + Databases.DocLimit].join('');
           FauxtonAPI.navigate(url);
       } else {
         FauxtonAPI.addNotification({
@@ -173,7 +173,7 @@ function(app, Components, FauxtonAPI, Databases) {
           type: "success",
           clear: true
         });
-        var route = "#/database/" +  app.mixins.safeURLName(name) + "/_all_docs?limit=" + Databases.DocLimit;
+        var route = "#/database/" +  app.utils.safeURLName(name) + "/_all_docs?limit=" + Databases.DocLimit;
         app.router.navigate(route, { trigger: true });
       }
       ).error(function(xhr) {

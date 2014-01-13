@@ -21,7 +21,7 @@ define([
   "bootstrap",
 
   "helpers",
-  "mixins",
+  "utils",
   // Modules
   "resizeColumns",
 
@@ -31,7 +31,7 @@ define([
 
 ],
 
-function(app, $, _, Backbone, Bootstrap, Helpers, Mixins, resizeColumns) {
+function(app, $, _, Backbone, Bootstrap, Helpers, Utils, resizeColumns) {
 
    // Make sure we have a console.log
   if (typeof console == "undefined") {
@@ -43,7 +43,7 @@ function(app, $, _, Backbone, Bootstrap, Helpers, Mixins, resizeColumns) {
   // Provide a global location to place configuration settings and module
   // creation also mix in Backbone.Events
   _.extend(app, Backbone.Events, {
-    mixins: Mixins,
+    utils: Utils,
 
     renderView: function(baseView, selector, view, options, callback) {
       baseView.setView(selector, new view(options)).render().then(callback);

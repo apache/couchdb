@@ -132,7 +132,7 @@ function(app, Fauxton) {
   });
 
   FauxtonAPI.Session = Backbone.Model.extend({
-    url: '/_session',
+    url: app.host + '/_session',
 
     user: function () {
       var userCtx = this.get('userCtx');

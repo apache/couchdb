@@ -27,7 +27,7 @@ function(app, FauxtonAPI) {
       if (context === "app") {
         return this.getDatabase().url("app") + "/" + this.safeID();
       } else if (context === "web-index") {
-        return this.getDatabase().url("app") + "/" + app.mixins.safeURLName(this.id);
+        return this.getDatabase().url("app") + "/" + app.utils.safeURLName(this.id);
       } else if (context === "apiurl"){
         return window.location.origin + "/" + this.getDatabase().safeID() + "/" + this.safeID();
       } else {
@@ -143,9 +143,9 @@ function(app, FauxtonAPI) {
     safeID: function() {
       if (this.isDdoc()){
         var ddoc = this.id.replace(/^_design\//,"");
-        return "_design/"+app.mixins.safeURLName(ddoc);
+        return "_design/"+app.utils.safeURLName(ddoc);
       }else{
-        return app.mixins.safeURLName(this.id);
+        return app.utils.safeURLName(this.id);
       }
     },
 
@@ -219,7 +219,7 @@ function(app, FauxtonAPI) {
     // json editor for docs, or into a ddoc specific page.
     safeID: function() {
       var ddoc = this.id.replace(/^_design\//,"");
-      return "_design/"+app.mixins.safeURLName(ddoc);
+      return "_design/"+app.utils.safeURLName(ddoc);
     }
 
   });
@@ -247,7 +247,7 @@ function(app, FauxtonAPI) {
       return this.docType() != "reduction";
     },
     safeID: function() {
-      return app.mixins.safeURLName(this.id);
+      return app.utils.safeURLName(this.id);
     },
 
     prettyJSON: function() {
@@ -423,8 +423,8 @@ function(app, FauxtonAPI) {
       } else if (context === "apiurl"){
         startOfUrl = window.location.origin;
       }
-      var design = app.mixins.safeURLName(this.design),
-          view = app.mixins.safeURLName(this.view);
+      var design = app.utils.safeURLName(this.design),
+          view = app.utils.safeURLName(this.view);
 
       var url = [startOfUrl, this.database.safeID(), "_design", design, this.idxType, view];
       return url.join("/") + query;

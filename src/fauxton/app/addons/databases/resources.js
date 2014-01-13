@@ -67,10 +67,10 @@ function(app, FauxtonAPI, Documents) {
       }
     },
     safeName: function(){
-      return app.mixins.safeURLName(this.get("name"));
+      return app.utils.safeURLName(this.get("name"));
     },
     safeID: function() {
-      return app.mixins.safeURLName(this.id);
+      return app.utils.safeURLName(this.id);
     },
     buildChanges: function (params) {
       this.changes = new Databases.Changes({
@@ -182,7 +182,7 @@ function(app, FauxtonAPI, Documents) {
       // TODO: pagination!
       return _.map(resp, function(database) {
         return {
-          id: app.mixins.safeURLName(database),
+          id: app.utils.safeURLName(database),
           name: database
         };
       });
