@@ -112,52 +112,52 @@ FAUXTON_FILES = \
     fauxton/app/initialize.js.underscore \
     fauxton/app/load_addons.js.underscore \
     fauxton/app/main.js \
-    fauxton/app/mixins.js \
-    fauxton/app/modules/databases/base.js \
-    fauxton/app/modules/databases/resources.js \
-    fauxton/app/modules/databases/routes.js \
-    fauxton/app/modules/databases/views.js \
-    fauxton/app/modules/documents/base.js \
-    fauxton/app/modules/documents/resources.js \
-    fauxton/app/modules/documents/routes.js \
-    fauxton/app/modules/documents/tests/resourcesSpec.js \
-    fauxton/app/modules/documents/views.js \
-    fauxton/app/modules/fauxton/base.js \
-    fauxton/app/modules/fauxton/components.js \
-    fauxton/app/modules/fauxton/layout.js \
-    fauxton/app/modules/pouchdb/base.js \
-    fauxton/app/modules/pouchdb/pouch.collate.js \
-    fauxton/app/modules/pouchdb/pouchdb.mapreduce.js \
+    fauxton/app/utils.js \
+    fauxton/app/addons/databases/base.js \
+    fauxton/app/addons/databases/resources.js \
+    fauxton/app/addons/databases/routes.js \
+    fauxton/app/addons/databases/views.js \
+    fauxton/app/addons/documents/base.js \
+    fauxton/app/addons/documents/resources.js \
+    fauxton/app/addons/documents/routes.js \
+    fauxton/app/addons/documents/tests/resourcesSpec.js \
+    fauxton/app/addons/documents/views.js \
+    fauxton/app/addons/fauxton/base.js \
+    fauxton/app/addons/fauxton/components.js \
+    fauxton/app/addons/fauxton/layout.js \
+    fauxton/app/addons/pouchdb/base.js \
+    fauxton/app/addons/pouchdb/pouch.collate.js \
+    fauxton/app/addons/pouchdb/pouchdb.mapreduce.js \
     fauxton/app/resizeColumns.js \
     fauxton/app/router.js \
-    fauxton/app/templates/databases/item.html \
-    fauxton/app/templates/databases/list.html \
-    fauxton/app/templates/databases/newdatabase.html \
-    fauxton/app/templates/documents/all_docs_item.html \
-    fauxton/app/templates/documents/all_docs_list.html \
-    fauxton/app/templates/documents/changes.html \
-    fauxton/app/templates/documents/ddoc_info.html \
-    fauxton/app/templates/documents/doc.html \
-    fauxton/app/templates/documents/doc_field_editor.html \
-    fauxton/app/templates/documents/doc_field_editor_tabs.html \
-    fauxton/app/templates/documents/duplicate_doc_modal.html \
-    fauxton/app/templates/documents/edit_tools.html \
-    fauxton/app/templates/documents/index_menu_item.html \
-    fauxton/app/templates/documents/index_row_docular.html \
-    fauxton/app/templates/documents/index_row_tabular.html \
-    fauxton/app/templates/documents/jumpdoc.html \
-    fauxton/app/templates/documents/search.html \
-    fauxton/app/templates/documents/sidebar.html \
-    fauxton/app/templates/documents/tabs.html \
-    fauxton/app/templates/documents/upload_modal.html \
-    fauxton/app/templates/documents/view_editor.html \
-    fauxton/app/templates/fauxton/api_bar.html \
-    fauxton/app/templates/fauxton/breadcrumbs.html \
-    fauxton/app/templates/fauxton/footer.html \
-    fauxton/app/templates/fauxton/index_pagination.html \
-    fauxton/app/templates/fauxton/nav_bar.html \
-    fauxton/app/templates/fauxton/notification.html \
-    fauxton/app/templates/fauxton/pagination.html \
+    fauxton/app/addons/databases/templates/item.html \
+    fauxton/app/addons/databases/templates/list.html \
+    fauxton/app/addons/databases/templates/newdatabase.html \
+    fauxton/app/addons/documents/templates/all_docs_item.html \
+    fauxton/app/addons/documents/templates/all_docs_list.html \
+    fauxton/app/addons/documents/templates/changes.html \
+    fauxton/app/addons/documents/templates/ddoc_info.html \
+    fauxton/app/addons/documents/templates/doc.html \
+    fauxton/app/addons/documents/templates/doc_field_editor.html \
+    fauxton/app/addons/documents/templates/doc_field_editor_tabs.html \
+    fauxton/app/addons/documents/templates/duplicate_doc_modal.html \
+    fauxton/app/addons/documents/templates/edit_tools.html \
+    fauxton/app/addons/documents/templates/index_menu_item.html \
+    fauxton/app/addons/documents/templates/index_row_docular.html \
+    fauxton/app/addons/documents/templates/index_row_tabular.html \
+    fauxton/app/addons/documents/templates/jumpdoc.html \
+    fauxton/app/addons/documents/templates/search.html \
+    fauxton/app/addons/documents/templates/sidebar.html \
+    fauxton/app/addons/documents/templates/tabs.html \
+    fauxton/app/addons/documents/templates/upload_modal.html \
+    fauxton/app/addons/documents/templates/view_editor.html \
+    fauxton/app/addons/fauxton/templates/api_bar.html \
+    fauxton/app/addons/fauxton/templates/breadcrumbs.html \
+    fauxton/app/addons/fauxton/templates/footer.html \
+    fauxton/app/addons/fauxton/templates/index_pagination.html \
+    fauxton/app/addons/fauxton/templates/nav_bar.html \
+    fauxton/app/addons/fauxton/templates/notification.html \
+    fauxton/app/addons/fauxton/templates/pagination.html \
     fauxton/app/templates/layouts/one_pane.html \
     fauxton/app/templates/layouts/two_pane.html \
     fauxton/app/templates/layouts/with_right_sidebar.html \
@@ -273,12 +273,12 @@ FAUXTON_FILES = \
     fauxton/assets/less/bootstrap/utilities.less \
     fauxton/assets/less/bootstrap/variables.less \
     fauxton/assets/less/bootstrap/wells.less \
-    fauxton/assets/less/config.less \
+    fauxton/addons/config/assets/less/config.less \
     fauxton/assets/less/couchdb.less \
-    fauxton/assets/less/database.less \
+    fauxton/addons/databases/assets/less/databases.less \
     fauxton/assets/less/fauxton.less \
     fauxton/assets/less/icons.less \
-    fauxton/assets/less/logs.less \
+    fauxton/addons/logs/assets/less/logs.less \
     fauxton/assets/less/prettyprint.less \
     fauxton/assets/less/variables.less \
     fauxton/bin/grunt \
