@@ -160,7 +160,6 @@ FAUXTON_FILES = \
     fauxton/app/addons/fauxton/templates/pagination.html \
     fauxton/app/templates/layouts/one_pane.html \
     fauxton/app/templates/layouts/two_pane.html \
-    fauxton/app/templates/layouts/with_right_sidebar.html \
     fauxton/app/templates/layouts/with_sidebar.html \
     fauxton/app/templates/layouts/with_tabs.html \
     fauxton/app/templates/layouts/with_tabs_sidebar.html \
