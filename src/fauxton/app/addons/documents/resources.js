@@ -238,8 +238,6 @@ function(app, FauxtonAPI) {
       return "docs";
     },
     url: function(context) {
-      if (!this.isEditable()) return false;
-
       return this.collection.database.url(context) + "/" + this.safeID();
     },
 
@@ -247,7 +245,9 @@ function(app, FauxtonAPI) {
       return this.docType() != "reduction";
     },
     safeID: function() {
-      return app.utils.safeURLName(this.id);
+      var id = this.id || this.get("id");
+
+      return app.utils.safeURLName(id);
     },
 
     prettyJSON: function() {
