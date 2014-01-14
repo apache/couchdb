@@ -112,6 +112,28 @@ module.exports = function(grunt) {
     return settings.template || defaultSettings;
   }();
 
+  var couchserver_config  = function () {
+    // add a "couchserver" key to settings.json with JSON that matches the
+    // keys and values below (plus your customizations) to have Fauxton work
+    // against a remote CouchDB-compatible server.
+    var defaults = {
+      dist: './dist/debug/',
+      port: 8000,
+      proxy: {
+        target: {
+          host: 'localhost',
+          port: 5984,
+          https: false
+        },
+        // This sets the Host header in the proxy so that you can use external
+        // CouchDB instances and not have the Host set to 'localhost'
+        changeOrigin: true
+      }
+    };
+
+    return helper.readSettingsFile().couchserver || defaults;
+  }();
+
   grunt.initConfig({
 
     // The clean task ensures all files are removed from the dist/ directory so
@@ -223,20 +245,7 @@ module.exports = function(grunt) {
     },
 
     // Runs a proxy server for easier development, no need to keep deploying to couchdb
-    couchserver: {
-      dist: './dist/debug/',
-      port: 8000,
-      proxy: {
-        target: {
-          host: 'localhost',
-          port: 5984,
-          https: false
-        },
-        // This sets the Host header in the proxy so that you can use external
-        // CouchDB instances and not have the Host set to 'localhost'
-        changeOrigin: true
-      }
-    },
+    couchserver: couchserver_config,
 
     watch: {
       js: { 
