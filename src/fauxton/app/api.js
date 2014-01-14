@@ -333,7 +333,7 @@ function(app, Fauxton) {
           triggerBroadcast('beforeRender', view, selector);
           var viewPromise = view.establish();
           routeObject.addPromise(viewPromise);
-          FauxtonAPI.when(view.establish()).then(function(resp) {
+          FauxtonAPI.when(viewPromise).then(function(resp) {
             masterLayout.setView(selector, view);
 
             masterLayout.renderView(selector);
