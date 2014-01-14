@@ -9,11 +9,13 @@
 // the License.
 
 define([
-  "app",
   "core/base"
 ],
-function (app, FauxtonAPI) {
+function (FauxtonAPI) {
   //this later needs to be dynamically loaded 
+  var app = {
+    host: ""
+  };
 
   FauxtonAPI.UUID = FauxtonAPI.Model.extend({
     initialize: function(options) {
@@ -67,7 +69,7 @@ function (app, FauxtonAPI) {
   });
 
   FauxtonAPI.setSession = function (newSession) {
-    app.session = FauxtonAPI.session = newSession;
+    FauxtonAPI.session = newSession;
     return FauxtonAPI.session.fetchUser();
   };
 

@@ -11,17 +11,11 @@
 // the License.
 
 define([
-  "app",
-  // Libs
-  "backbone",
-  "resizeColumns",
+  "api",
+  "addons/fauxton/resizeColumns"
 ],
 
-function(app, Backbone, resizeColumns) {
-
-  //resizeAnimation
-  app.resizeColumns = new resizeColumns({});
-  app.resizeColumns.onResizeHandler();
+function(FauxtonAPI, resizeColumns) {
 
   var Fauxton = {};
 
@@ -41,7 +35,9 @@ function(app, Backbone, resizeColumns) {
   });
 
   Fauxton.VersionInfo = Backbone.Model.extend({
-    url: app.host
+    url: function () {
+      return FauxtonAPI.host;
+    }
   });
 
   // TODO: this View should extend from FauxtonApi.View.
@@ -75,6 +71,13 @@ function(app, Backbone, resizeColumns) {
 
     bottomNavLinks: [],
     footerNavLinks: [],
+
+    initialize: function () {
+      //resizeAnimation
+      this.resizeColumns = new resizeColumns({});
+      this.resizeColumns.onResizeHandler();
+
+    },
 
     serialize: function() {
       return {
@@ -141,7 +144,7 @@ function(app, Backbone, resizeColumns) {
       function toggleMenu(){
         $selectorList.toggleClass('closeMenu');
         menuOpen = $selectorList.hasClass('closeMenu');
-        app.resizeColumns.onResizeHandler();
+        this.resizeColumns.onResizeHandler();
       }
 
       $('#primary-navbar').on("click", ".nav a", function(){
@@ -149,13 +152,13 @@ function(app, Backbone, resizeColumns) {
           setTimeout(
             function(){
             $selectorList.addClass('closeMenu');
-            app.resizeColumns.onResizeHandler();
+            this.resizeColumns.onResizeHandler();
           },3000);
 
         }
       });
 
-      app.resizeColumns.initialize();
+      this.resizeColumns.initialize();
     },
 
     beforeRender: function () {

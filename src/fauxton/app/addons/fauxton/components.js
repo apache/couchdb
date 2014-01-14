@@ -25,10 +25,11 @@ define([
   // Libs
   "api",
   "ace_configuration",
+  "spin"
 ],
 
-function(app, FauxtonAPI, ace) {
-  var Components = app.module();
+function(app, FauxtonAPI, ace, spin) {
+  var Components = FauxtonAPI.addon();
 
   Components.Pagination = FauxtonAPI.View.extend({
     template: "templates/fauxton/pagination",
@@ -353,6 +354,77 @@ function(app, FauxtonAPI, ace) {
       return _.contains(this.excludedViewErrors, msg);
     }
 
+  });
+
+  //need to make this into a backbone view...
+  var routeObjectSpinner;
+  FauxtonAPI.RouteObject.on('beforeEstablish', function (routeObject) {
+    if (!routeObject.disableLoader){ 
+      var opts = {
+        lines: 16, // The number of lines to draw
+        length: 8, // The length of each line
+        width: 4, // The line thickness
+        radius: 12, // The radius of the inner circle
+        color: '#333', // #rbg or #rrggbb
+        speed: 1, // Rounds per second
+        trail: 10, // Afterglow percentage
+        shadow: false // Whether to render a shadow
+     };
+
+     if (!$('.spinner').length) {
+       $('<div class="spinner"></div>')
+        .appendTo('#app-container');
+     }
+
+     routeObjectSpinner = new Spinner(opts).spin();
+     $('.spinner').append(routeObjectSpinner.el);
+   }
+  });
+
+  var removeRouteObjectSpinner = function () {
+    if (routeObjectSpinner) {
+      routeObjectSpinner.stop();
+      $('.spinner').remove();
+    }
+  };
+
+  var removeViewSpinner = function () {
+    if (viewSpinner){
+      viewSpinner.stop();
+      $('.spinner').remove();
+    }
+  };
+
+  var viewSpinner;
+  FauxtonAPI.RouteObject.on('beforeRender', function (routeObject, view, selector) {
+    removeRouteObjectSpinner();
+
+    if (!view.disableLoader){ 
+      var opts = {
+        lines: 16, // The number of lines to draw
+        length: 8, // The length of each line
+        width: 4, // The line thickness
+        radius: 12, // The radius of the inner circle
+        color: '#333', // #rbg or #rrggbb
+        speed: 1, // Rounds per second
+        trail: 10, // Afterglow percentage
+        shadow: false // Whether to render a shadow
+      };
+
+      viewSpinner = new Spinner(opts).spin();
+      $('<div class="spinner"></div>')
+        .appendTo(selector)
+        .append(viewSpinner.el);
+    }
+  });
+
+  FauxtonAPI.RouteObject.on('afterRender', function (routeObject, view, selector) {
+    removeViewSpinner();
+  });
+
+  FauxtonAPI.RouteObject.on('viewHasRendered', function () {
+    removeViewSpinner();
+    removeRouteObjectSpinner();
   });
 
   return Components;

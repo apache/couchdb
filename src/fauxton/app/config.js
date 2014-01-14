@@ -37,7 +37,8 @@ require.config({
 
   map: {
     "*": {
-      'underscore': 'lodash'
+      'underscore': 'lodash',
+      'api':'core/api'
     }
   },
 

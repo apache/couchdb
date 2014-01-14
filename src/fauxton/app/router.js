@@ -22,7 +22,7 @@ define([
        "initialize",
 
        // Load Fauxton API
-       "api",
+       "core/api",
 
        // Modules
        "addons/fauxton/base",
@@ -94,6 +94,7 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, LoadAddons) {
 
     setModuleRoutes: function() {
       _.each(LoadAddons.addons, function(module) {
+        console.log('aa', module);
         if (module){
           module.initialize();
           // This is pure routes the addon provides
@@ -116,7 +117,6 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, LoadAddons) {
 
       // NOTE: This must be below creation of the layout
       // FauxtonAPI header links and others depend on existence of the layout
-      //this.setAddonHooks();
       this.setModuleRoutes();
 
       $("#app-container").html(this.masterLayout.el);

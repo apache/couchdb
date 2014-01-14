@@ -14,7 +14,28 @@ define([
 ],
 
 function() {
-  var FauxtonAPI = {};
+  var FauxtonAPI = {
+    //add default objects
+    router: {
+      navigate: function () {}
+    },
+
+    masterLayout: {
+      // remove these by converting to extensions
+      navBar: {
+        addLink: function () {},
+        removeLink: function () {}
+      }
+    },
+
+    addNotification: function () {
+
+    },
+
+    config: function (options) {
+      return _.extend(this, options);
+    }
+  };
 
   FauxtonAPI.Deferred = function() {
     return $.Deferred();
@@ -26,6 +47,16 @@ function() {
     }
 
     return $.when(deferreds);
+  };
+
+  FauxtonAPI.addonExtensions = {
+    initialize: function() {},
+    RouteObjects: {},
+    Views: {}
+  };
+
+  FauxtonAPI.addon = function(extra) {
+    return _.extend(_.clone(FauxtonAPI.addonExtensions), extra);
   };
 
   FauxtonAPI.View = Backbone.View.extend({
@@ -44,8 +75,40 @@ function() {
   });
 
   FauxtonAPI.Model = Backbone.Model.extend({
-    //add fetchOnce
+    fetchOnce: function (opt) {
+      var options = _.extend({}, opt);
+
+      if (!this._deferred || this._deferred.state() === "rejected" || options.forceFetch ) {
+        this._deferred = this.fetch();
+      }
+
+      return this._deferred;
+    }
   });
+
+  var extensions = _.extend({}, Backbone.Events);
+  // Can look at a remove function later.
+  FauxtonAPI.registerExtension = function (name, view) {
+    if (!extensions[name]) {
+      extensions[name] = [];
+    }
+
+    extensions.trigger('add:' + name, view);
+    extensions[name].push(view);
+  };
+
+  FauxtonAPI.getExtensions = function (name) {
+    var views = extensions[name];
+
+    if (!views) {
+      views = [];
+    }
+
+    return views;
+  };
+
+  FauxtonAPI.extensions = extensions;
+
 
   return FauxtonAPI;
 });

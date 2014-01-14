@@ -24,14 +24,15 @@ define([
   "utils",
   // Modules
   "resizeColumns",
-
+  "core/api",
+  "addons/fauxton/base",
    // Plugins.
   "plugins/backbone.layoutmanager",
   "plugins/jquery.form"
 
 ],
 
-function(app, $, _, Backbone, Bootstrap, Helpers, Utils, resizeColumns) {
+function(app, $, _, Backbone, Bootstrap, Helpers, Utils, resizeColumns, FauxtonAPI, Fauxton) {
 
    // Make sure we have a console.log
   if (typeof console == "undefined") {
@@ -44,15 +45,6 @@ function(app, $, _, Backbone, Bootstrap, Helpers, Utils, resizeColumns) {
   // creation also mix in Backbone.Events
   _.extend(app, Backbone.Events, {
     utils: Utils,
-
-    renderView: function(baseView, selector, view, options, callback) {
-      baseView.setView(selector, new view(options)).render().then(callback);
-    },
-
-    // Create a custom object with a nested Views object.
-    module: function(additionalProps) {
-      return _.extend({ Views: {} }, additionalProps);
-    },
 
     // Thanks to: http://stackoverflow.com/a/2880929
     getParams: function(queryString) {
@@ -81,11 +73,37 @@ function(app, $, _, Backbone, Bootstrap, Helpers, Utils, resizeColumns) {
 
       return urlParams;
     }
+
   });
 
-  //resizeAnimation
-  app.resizeColumns = new resizeColumns({});
-  app.resizeColumns.onResizeHandler();
+  //MOVE THIS ELSEWHERE
+  app.footer = new Fauxton.Footer({el: "#footer-content"});
+  // TODO: move this to a proper Fauxton.View
+  $.when.apply(null, app.footer.establish()).done(function() {
+    app.footer.render();
+  });
+  app.navBar = new Fauxton.NavBar();
+  app.apiBar = new Fauxton.ApiBar();
+  // Define your master router on the application namespace and trigger all
+  // navigation from this instance.
+  app.router = new FauxtonAPI.Router();
+  FauxtonAPI.config({
+    router: app.router,
+    masterLayout: new Layout(app.navBar, app.apiBar),
+    addNotification: function (options) {
+      options = _.extend({
+        msg: "Notification Event Triggered!",
+        type: "info",
+        selector: "#global-notifications"
+      }, options);
+
+      var view = new Fauxton.Notification(options);
+      return view.renderNotification();
+    }
+  });
+  // Trigger the initial route and enable HTML5 History API support, set the
+  // root folder to '/' by default.  Change in app.js.
+  Backbone.history.start({ pushState: false, root: app.root });
 
   // Localize or create a new JavaScript Template object.
   var JST = window.JST = window.JST || {};

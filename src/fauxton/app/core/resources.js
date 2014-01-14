@@ -12,7 +12,7 @@
 
 define([
   "app",
-  "core/couchdb",
+  "core/couchdbSession",
   "addons/fauxton/base",
   "backbone"
 ],
