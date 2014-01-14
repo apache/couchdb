@@ -25,7 +25,7 @@ define([
         'names': ['_user'],
         'roles': []
       }
-      }, {database: 'fakedb'});
+      }, {database: {id: 'fakedb', safeID: function () { return this.id; }}});
 
       section = new Views.Permissions({
         database: 'fakedb',

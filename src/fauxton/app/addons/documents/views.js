@@ -405,7 +405,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
     serialize: function() {
       return {
-        doc: this.model
+        doc: this.model,
+        url: this.model.url('app')
       };
     }
   });

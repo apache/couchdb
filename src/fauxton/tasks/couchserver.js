@@ -19,7 +19,8 @@ module.exports = function (grunt) {
         http = require("http"),
         httpProxy = require('http-proxy'),
         send = require('send'),
-        options = grunt.config('couchserver');
+        options = grunt.config('couchserver'),
+        _ = grunt.util._;
 
     // Options
     var dist_dir = options.dist || './dist/debug/',
@@ -97,6 +98,21 @@ module.exports = function (grunt) {
 
     watch.stdout.pipe(process.stdout);
     watch.stderr.pipe(process.stderr);
+
+    var logo = [
+      [""],
+      [" ______                        _                   "],
+      ["|  ____|                      | |                  "],
+      ["| |__    __ _   _   _  __  __ | |_    ___    _ __  "],
+      ["|  __|  / _` | | | | | \\ \\/ / | __|  / _ \\  | '_ \\ "],
+      ["| |    | (_| | | |_| |  >  <  | |_  | (_) | | | | |"],
+      ["|_|     \\__,_|  \\__,_| /_/\\_\\  \\__|  \\___/  |_| |_|"],
+      [""]
+   ];
+
+    _.each(logo, function (line) {
+      console.log(line.toString());
+    });
 
     log.writeln('Listening on ' + port);
   });

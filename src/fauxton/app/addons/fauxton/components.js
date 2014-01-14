@@ -123,6 +123,10 @@ function(app, FauxtonAPI, ace) {
     },
 
     pageEnd: function () {
+      if (this.collection.length < this.pageLimit()) {
+        return this.collection.length;
+      }
+
       return (this.previousParams.length * this.pageLimit()) + this.pageLimit();
     }
 
