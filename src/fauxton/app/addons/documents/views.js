@@ -21,7 +21,7 @@ define([
        "addons/pouchdb/base",
 
        // Libs
-       "resizeColumns",
+       "addons/Fauxton/resizeColumns",
 
        // Plugins
        "plugins/beautify",

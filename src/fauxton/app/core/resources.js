@@ -13,10 +13,9 @@
 define([
   "app",
   "core/couchdbSession",
-  "addons/fauxton/base",
   "backbone"
 ],
-function(app, FauxtonAPI, Fauxton) {
+function(app, FauxtonAPI) {
 
   // This is not exposed externally as it should not need to be accessed or overridden
   var Auth = function (options) {
@@ -139,21 +138,6 @@ function(app, FauxtonAPI, Fauxton) {
       if (!this.renderedState) {
         masterLayout.setTemplate(this.layout);
         triggerBroadcast('beforeFullRender');
-        $('#primary-navbar li').removeClass('active');
-
-        if (this.selectedHeader) {
-          app.selectedHeader = this.selectedHeader;
-          $('#primary-navbar li[data-nav-name="' + this.selectedHeader + '"]').addClass('active');
-        }
-      }
-
-      masterLayout.clearBreadcrumbs();
-      var crumbs = this.get('crumbs');
-
-      if (crumbs.length) {
-        masterLayout.setBreadcrumbs(new Fauxton.Breadcrumbs({
-          crumbs: crumbs
-        }));
       }
 
       triggerBroadcast('beforeEstablish');

@@ -11,13 +11,62 @@
 // the License.
 
 define([
+  "app",
   "api",
   "addons/fauxton/resizeColumns"
 ],
 
-function(FauxtonAPI, resizeColumns) {
+function(app, FauxtonAPI, resizeColumns) {
 
-  var Fauxton = {};
+  var Fauxton = FauxtonAPI.addon();
+  FauxtonAPI.addNotification = function (options) {
+    options = _.extend({
+      msg: "Notification Event Triggered!",
+      type: "info",
+      selector: "#global-notifications"
+    }, options);
+
+    var view = new Fauxton.Notification(options);
+    return view.renderNotification();
+  };
+
+  Fauxton.initialize = function () {
+    app.footer = new Fauxton.Footer({el: "#footer-content"}),
+    app.navBar = new Fauxton.NavBar();
+    app.apiBar = new Fauxton.ApiBar();
+
+    FauxtonAPI.when.apply(null, app.footer.establish()).done(function() {
+      FauxtonAPI.masterLayout.layout.setView("#primary-navbar", app.navBar);
+      FauxtonAPI.masterLayout.layout.setView("#api-navbar", app.apiBar);
+      app.navBar.render();
+      app.apiBar.render();
+
+      app.footer.render();
+    });
+
+    FauxtonAPI.masterLayout.navBar = app.navBar;
+    FauxtonAPI.masterLayout.apiBar = app.apiBar;
+
+    FauxtonAPI.RouteObject.on('beforeFullRender', function (routeObject) {
+      $('#primary-navbar li').removeClass('active');
+
+      if (routeObject.selectedHeader) {
+        app.selectedHeader = routeObject.selectedHeader;
+        $('#primary-navbar li[data-nav-name="' + routeObject.selectedHeader + '"]').addClass('active');
+      }
+    });
+
+    FauxtonAPI.RouteObject.on('beforeEstablish', function (routeObject) {
+      FauxtonAPI.masterLayout.clearBreadcrumbs();
+      var crumbs = routeObject.get('crumbs');
+
+      if (crumbs.length) {
+        FauxtonAPI.masterLayout.setBreadcrumbs(new Fauxton.Breadcrumbs({
+          crumbs: crumbs
+        }));
+      }
+    });
+  };
 
   Fauxton.Breadcrumbs = Backbone.View.extend({
     template: "templates/fauxton/breadcrumbs",
@@ -36,7 +85,7 @@ function(FauxtonAPI, resizeColumns) {
 
   Fauxton.VersionInfo = Backbone.Model.extend({
     url: function () {
-      return FauxtonAPI.host;
+      return app.host;
     }
   });
 
@@ -73,10 +122,12 @@ function(FauxtonAPI, resizeColumns) {
     footerNavLinks: [],
 
     initialize: function () {
+      _.bindAll(this);
       //resizeAnimation
       this.resizeColumns = new resizeColumns({});
       this.resizeColumns.onResizeHandler();
-
+      
+      FauxtonAPI.extensions.on('add:navbar:addHeaderLink', this.addLink);
     },
 
     serialize: function() {
@@ -102,6 +153,8 @@ function(FauxtonAPI, resizeColumns) {
       } else {
         this.navLinks.push(link);
       }
+
+      //this.render();
     },
 
     removeLink: function (removeLink) {
@@ -127,7 +180,6 @@ function(FauxtonAPI, resizeColumns) {
     },
 
     afterRender: function(){
-
       $('#primary-navbar li[data-nav-name="' + app.selectedHeader + '"]').addClass('active');
 
       var menuOpen = true;
@@ -146,13 +198,14 @@ function(FauxtonAPI, resizeColumns) {
         menuOpen = $selectorList.hasClass('closeMenu');
         this.resizeColumns.onResizeHandler();
       }
-
+      
+      var that = this;
       $('#primary-navbar').on("click", ".nav a", function(){
         if (!($selectorList.hasClass('closeMenu'))){
           setTimeout(
             function(){
             $selectorList.addClass('closeMenu');
-            this.resizeColumns.onResizeHandler();
+            that.resizeColumns.onResizeHandler();
           },3000);
 
         }
@@ -267,7 +320,6 @@ function(FauxtonAPI, resizeColumns) {
       return this;
     }
   });
-
 
   return Fauxton;
 });

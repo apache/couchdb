@@ -18,10 +18,10 @@
 // "purely functional" helper system.
 
 define([
-  "utils"
+  "api"
 ],
 
-function(utils) {
+function(FauxtonAPI) {
 
   var Resize = function(options){
     this.options = options;
@@ -42,8 +42,8 @@ function(utils) {
       var that = this;
       //add throttler :) 
       this.lazyLayout = _.debounce(that.onResizeHandler, 300).bind(this);
-      utils.addWindowResize(this.lazyLayout,"animation");
-      utils.initWindowResize();
+      FauxtonAPI.utils.addWindowResize(this.lazyLayout,"animation");
+      FauxtonAPI.utils.initWindowResize();
       this.onResizeHandler();
     },
     updateOptions:function(options){
@@ -52,7 +52,7 @@ function(utils) {
       this.options.selectorElements = options.selectorElements || ".window-resizeable";
     },
     turnOff:function(){
-      utils.removeWindowResize("animation");
+      FauxtonAPI.utils.removeWindowResize("animation");
     },
     cleanupCallback: function(){
       this.callback = null;

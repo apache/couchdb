@@ -25,9 +25,9 @@ define([
        "core/api",
 
        // Modules
-       "addons/fauxton/base",
+       //"addons/fauxton/base",
        // Layout
-       "addons/fauxton/layout",
+       //"addons/fauxton/layout",
 
        "load_addons"
 ],

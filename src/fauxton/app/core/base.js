@@ -109,7 +109,6 @@ function() {
 
   FauxtonAPI.extensions = extensions;
 
-
   return FauxtonAPI;
 });
 

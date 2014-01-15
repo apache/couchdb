@@ -12,11 +12,11 @@
 
 define([
        "core/resources",
-       // Modules
+       "core/utils"
 ],
 
-function(FauxtonAPI, Fauxton) {
-    
+function(FauxtonAPI, utils) {
+  FauxtonAPI.utils = utils;
   FauxtonAPI.navigate = function(url, _opts) {
     var options = _.extend({trigger: true}, _opts );
     FauxtonAPI.router.navigate(url,options);
@@ -28,14 +28,6 @@ function(FauxtonAPI, Fauxton) {
 
   FauxtonAPI.removeBeforeUnload = function () {
     FauxtonAPI.router.removeBeforeUnload.apply(FauxtonAPI.router, arguments);
-  };
-
-  FauxtonAPI.addHeaderLink = function(link) {
-    FauxtonAPI.masterLayout.navBar.addLink(link);
-  };
-
-  FauxtonAPI.removeHeaderLink = function(link) {
-    FauxtonAPI.masterLayout.navBar.removeLink(link);
   };
 
   FauxtonAPI.addRoute = function(route) {
@@ -83,7 +75,7 @@ function(FauxtonAPI, Fauxton) {
         this.route(route, route.toString(), function() {
           var args = Array.prototype.slice.call(arguments),
           roles = RouteObject.prototype.getRouteRoles(route),
-          authPromise = app.auth.checkAccess(roles);
+          authPromise = FauxtonAPI.auth.checkAccess(roles);
 
           authPromise.then(function () {
             if (!that.activeRouteObject || !that.activeRouteObject.hasRoute(route)) {
@@ -104,8 +96,8 @@ function(FauxtonAPI, Fauxton) {
       }, this);
     },
 
-    setModuleRoutes: function() {
-      _.each(LoadAddons.addons, function(module) {
+    setModuleRoutes: function(addons) {
+      _.each(addons, function(module) {
         if (module){
           module.initialize();
           // This is pure routes the addon provides
@@ -116,14 +108,14 @@ function(FauxtonAPI, Fauxton) {
       }, this);
     },
 
-    initialize: function() {
-      //TODO: It would be nice to handle this with a router
-      this.auth = app.auth = FauxtonAPI.auth;
+    initialize: function(addons) {
+      this.addons = addons;
+      this.auth = FauxtonAPI.auth;
       // NOTE: This must be below creation of the layout
       // FauxtonAPI header links and others depend on existence of the layout
-      this.setModuleRoutes();
+      this.setModuleRoutes(addons);
 
-      $("#app-container").html(FauxtonAPI.masterLayout.el);
+      $(FauxtonAPI.el).html(FauxtonAPI.masterLayout.el);
       FauxtonAPI.masterLayout.render();
     },
 

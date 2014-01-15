@@ -20,25 +20,12 @@ function(Backbone) {
   //    navBar -> the top navigation bar
   //    dashboardContent -> Main display view
   //    breadcrumbs -> Breadcrumbs navigation section
-  var Layout = function (navBar, apiBar) {
-    this.navBar = navBar;
-    this.apiBar = apiBar;
-
+  var Layout = function () {
     this.layout = new Backbone.Layout({
       template: "templates/layouts/with_sidebar",
-
-      views: {
-        "#primary-navbar": this.navBar,
-        "#api-navbar": this.apiBar
-      },
-      afterRender: function(){
-
-      }
     });
 
     this.layoutViews = {};
-    //this.hooks = {};
-
     this.el = this.layout.el;
   };
 
