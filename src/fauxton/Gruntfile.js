@@ -422,7 +422,7 @@ module.exports = function(grunt) {
    */
   // clean out previous build artefactsa and lint
   grunt.registerTask('lint', ['clean', 'jshint']);
-  grunt.registerTask('test', ['lint', 'mochaSetup','jst', 'concat:test_config_js', 'mocha_phantomjs']);
+  grunt.registerTask('test', ['lint', 'dependencies', 'mochaSetup','jst', 'concat:test_config_js', 'mocha_phantomjs']);
   // Fetch dependencies (from git or local dir), lint them and make load_addons
   grunt.registerTask('dependencies', ['get_deps', 'gen_load_addons:default']);
   // build templates, js and css
