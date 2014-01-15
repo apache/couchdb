@@ -1,0 +1,10 @@
+{application, couch_stats, [
+    {description, "Simple statistics collection"},
+    {vsn, git},
+    {registered, [couch_stats_stats_collector, couch_stats_process_tracker]},
+    {applications, [kernel, stdlib, folsom]},
+    {mod, {couch_stats_app, []}},
+    {env, [
+        {collection_interval, 10}
+    ]}
+]}.
