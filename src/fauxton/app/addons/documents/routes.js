@@ -304,6 +304,7 @@ function(app, FauxtonAPI, Documents, Databases) {
         this.documentsView = this.setView("#dashboard-lower-content", new Documents.Views.AllDocsList({
           collection: this.data.database.allDocs
         }));
+        //this.apiUrl = [this.data.database.allDocs.url("apiurl"), this.data.database.allDocs.documentation() ];
         return;
       }
 
@@ -320,6 +321,8 @@ function(app, FauxtonAPI, Documents, Databases) {
         nestedView: Documents.Views.Row,
         viewList: true
       }));
+
+      this.apiUrl = [this.data.indexedDocs.url("apiurl"), "docs"];
     },
 
     updateAllDocsFromPreview: function (event) {
