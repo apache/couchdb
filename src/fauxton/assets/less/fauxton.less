@@ -209,11 +209,11 @@ a:hover{
             }
             background-color: @red;
           }
-          &:hover a.fonticon:before{
+          &:hover .fonticon:before{
             color: @white;
           }
-          &.active a.fonticon:before,
-          &:hover a.fonticon:before,
+          &.active .fonticon:before,
+          &:hover .fonticon:before,
           {
             text-shadow: @boxShadow;
             color: @NavIconActive;
@@ -226,7 +226,7 @@ a:hover{
             &.closeMenu{
               color: transparent;
             }
-            & span.fonticon {
+            .fonticon {
               position: relative;
               &:before {
                 position: absolute;
@@ -884,7 +884,7 @@ div.spinner {
   position: absolute;
   right: 15px;
   top: -50px;
-  span.icon {
+  .icon {
     font-size: 11px;
   }
 }
