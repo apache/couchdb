@@ -1593,7 +1593,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     beforeRender: function () {
 
       if (this.newView) {
-        this.reduceFunStr = '_sum';
+        this.reduceFunStr = '';
         if (this.ddocs.length === 0) {
           this.model = new Documents.Doc(null, {database: this.database});
         } else {
