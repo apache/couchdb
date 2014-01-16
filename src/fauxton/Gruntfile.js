@@ -422,7 +422,9 @@ module.exports = function(grunt) {
    */
   // clean out previous build artefactsa and lint
   grunt.registerTask('lint', ['clean', 'jshint']);
-  grunt.registerTask('test', ['lint', 'mochaSetup','jst', 'concat:test_config_js', 'mocha_phantomjs']);
+  grunt.registerTask('test', ['lint', 'dependencies', 'mochaSetup','jst', 'concat:test_config_js', 'mocha_phantomjs']);
+  // lighter weight test task for use inside dev/watch
+  grunt.registerTask('test_inline', ['jst', 'concat:test_config_js', 'mocha_phantomjs']);
   // Fetch dependencies (from git or local dir), lint them and make load_addons
   grunt.registerTask('dependencies', ['get_deps', 'gen_load_addons:default']);
   // build templates, js and css
@@ -434,7 +436,7 @@ module.exports = function(grunt) {
    * Build the app in either dev, debug, or release mode
    */
   // dev server
-  grunt.registerTask('dev', ['debugDev', 'couchserver']);
+  grunt.registerTask('dev', ['debugDev', 'test_inline', 'couchserver']);
   // build a debug release
   grunt.registerTask('debug', ['lint', 'dependencies', "gen_initialize:development", 'concat:requirejs','less', 'concat:index_css', 'template:development', 'copy:debug']);
   grunt.registerTask('debugDev', ['clean', 'dependencies', "gen_initialize:development",'jshint','less', 'concat:index_css', 'template:development', 'copy:debug']);
