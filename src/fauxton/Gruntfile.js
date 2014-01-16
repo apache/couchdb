@@ -210,7 +210,7 @@ module.exports = function(grunt) {
       },
 
       index_css: {
-        src: ["dist/debug/css/*.css", 'assets/css/*.css'],
+        src: ["dist/debug/css/*.css", '!dist/debug/css/index.css', 'assets/css/*.css'],
         dest: 'dist/debug/css/index.css'
       },
 
