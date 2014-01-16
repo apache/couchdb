@@ -110,6 +110,6 @@ function(app, FauxtonAPI, Collate) {
 
   return Pouch;
 
-}).call(this);
+});
 
 
