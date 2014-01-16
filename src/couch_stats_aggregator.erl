@@ -1,4 +1,4 @@
--module(couch_stats_stats_collector).
+-module(couch_stats_aggregator).
 
 -behaviour(gen_server).
 

@@ -26,7 +26,7 @@ stop() ->
     application:stop(couch_stats).
 
 fetch() ->
-    couch_stats_stats_collector:fetch().
+    couch_stats_aggregator:fetch().
 
 -spec sample(any()) -> stat().
 sample(Name) ->

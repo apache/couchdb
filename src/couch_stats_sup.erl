@@ -16,7 +16,7 @@ start_link() ->
 init([]) ->
     {ok, {
         {one_for_one, 5, 10}, [
-            ?CHILD(couch_stats_stats_collector, worker),
+            ?CHILD(couch_stats_aggregator, worker),
             ?CHILD(couch_stats_process_tracker, worker)
         ]
     }}.
