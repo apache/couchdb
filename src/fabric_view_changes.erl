@@ -305,10 +305,11 @@ handle_message({complete, Props}, Worker, State) ->
 
 make_replacement_arg(Node, {Seq, Uuid}) ->
     {replace, Node, Uuid, Seq};
-make_replacement_arg(Node, {Seq, Uuid, _}) ->
-    %% TODO Deprecated, remove when we're confident no seqs with this format
-    %% are in the wild
-    {replace, Node, Uuid, Seq};
+make_replacement_arg(_Node, {Seq, Uuid, EpochNode}) ->
+    % The replacement should properly be computed aginst the node that owned
+    % the sequence when it was written to disk (the EpochNode) rather than the
+    % node we're trying to replace.
+    {replace, EpochNode, Uuid, Seq};
 make_replacement_arg(_, _) ->
     0.
 
@@ -347,7 +348,7 @@ pack_seqs(Workers) ->
     Opaque = couch_util:encodeBase64Url(term_to_binary(SeqList, [compressed])),
     [SeqSum, Opaque].
 
-seq({Seq, _Uuid, _Node}) -> Seq; % downgrade clause
+seq({Seq, _Uuid, _Node}) -> Seq;
 seq({Seq, _Uuid}) -> Seq;
 seq(Seq)          -> Seq.
 

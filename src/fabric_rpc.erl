@@ -32,7 +32,8 @@
     seq,
     args,
     options,
-    pending
+    pending,
+    epochs
 }).
 
 %% rpc endpoints
@@ -57,7 +58,8 @@ changes(DbName, Options, StartVector, DbOptions) ->
           seq = StartSeq,
           args = Args,
           options = Options,
-          pending = couch_db:count_changes_since(Db, StartSeq)
+          pending = couch_db:count_changes_since(Db, StartSeq),
+          epochs = get_epochs(Db)
         },
         try
             {ok, #cacc{seq=LastSeq, pending=Pending}} =
@@ -321,7 +323,8 @@ changes_enumerator(DocInfo, Acc) ->
         db = Db,
         args = #changes_args{include_docs = IncludeDocs, filter = Filter},
         options = Options,
-        pending = Pending
+        pending = Pending,
+        epochs = Epochs
     } = Acc,
     Conflicts = proplists:get_value(conflicts, Options, false),
     #doc_info{id=Id, high_seq=Seq, revs=[#rev_info{deleted=Del}|_]} = DocInfo,
@@ -332,7 +335,7 @@ changes_enumerator(DocInfo, Acc) ->
         Opts = if Conflicts -> [conflicts]; true -> [] end,
         ChangesRow = {change, [
 	    {pending, Pending-1},
-            {seq, {Seq, uuid(Db)}},
+            {seq, {Seq, uuid(Db), owner_of(Seq, Epochs)}},
             {id, Id},
             {changes, Results},
             {deleted, Del} |
@@ -424,12 +427,13 @@ set_io_priority(DbName, Options) ->
 
 calculate_start_seq(_Db, _Node, Seq) when is_integer(Seq) ->
     Seq;
-calculate_start_seq(Db, Node, {Seq, Uuid, _}) -> % downgrade clause
-    calculate_start_seq(Db, Node, {Seq, Uuid});
 calculate_start_seq(Db, Node, {Seq, Uuid}) ->
+    % Treat the current node as the epoch node
+    calculate_start_seq(Db, Node, {Seq, Uuid, Node});
+calculate_start_seq(Db, Node, {Seq, Uuid, EpochNode}) ->
     case is_prefix(Uuid, couch_db:get_uuid(Db)) of
         true ->
-            case is_owner(Node, Seq, couch_db:get_epochs(Db)) of
+            case is_owner(EpochNode, Seq, couch_db:get_epochs(Db)) of
                 true -> Seq;
                 false -> 0
             end;
