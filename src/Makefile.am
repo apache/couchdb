@@ -105,6 +105,12 @@ FAUXTON_FILES = \
     fauxton/app/addons/stats/templates/stats.html \
     fauxton/app/addons/stats/templates/statselect.html \
     fauxton/app/addons/stats/views.js \
+    fauxton/app/addons/verifyinstall/views.js \
+    fauxton/app/addons/verifyinstall/resources.js \
+    fauxton/app/addons/verifyinstall/base.js \
+    fauxton/app/addons/verifyinstall/routes.js \
+    fauxton/app/addons/verifyinstall/templates/main.html \
+    fauxton/app/addons/verifyinstall/assets/less/verifyinstall.less \
     fauxton/app/api.js \
     fauxton/app/app.js \
     fauxton/app/config.js \
