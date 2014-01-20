@@ -59,9 +59,18 @@ FAUXTON_FILES = \
     fauxton/app/addons/auth/templates/nav_dropdown.html \
     fauxton/app/addons/auth/templates/nav_link_title.html \
     fauxton/app/addons/auth/templates/noAccess.html \
+    fauxton/app/addons/compaction/base.js \
+    fauxton/app/addons/compaction/resources.js \
+    fauxton/app/addons/compaction/routes.js \
+    fauxton/app/addons/compaction/views.js \
+    fauxton/app/addons/compaction/assets/less/compaction.less \
+    fauxton/app/addons/compaction/templates/compact_view.html \
+    fauxton/app/addons/compaction/templates/layout.html \
     fauxton/app/addons/config/base.js \
     fauxton/app/addons/config/resources.js \
     fauxton/app/addons/config/routes.js \
+    fauxton/app/addons/config/views.js \
+    fauxton/app/addons/config/assets/less/config.less \
     fauxton/app/addons/config/templates/dashboard.html \
     fauxton/app/addons/config/templates/item.html \
     fauxton/app/addons/contribute/base.js \
@@ -105,6 +114,12 @@ FAUXTON_FILES = \
     fauxton/app/addons/stats/templates/stats.html \
     fauxton/app/addons/stats/templates/statselect.html \
     fauxton/app/addons/stats/views.js \
+    fauxton/app/addons/verifyinstall/base.js \
+    fauxton/app/addons/verifyinstall/resources.js \
+    fauxton/app/addons/verifyinstall/routes.js \
+    fauxton/app/addons/verifyinstall/views.js \
+    fauxton/app/addons/verifyinstall/assets/less/verifyinstall.less \
+    fauxton/app/addons/verifyinstall/templates/main.html \
     fauxton/app/api.js \
     fauxton/app/app.js \
     fauxton/app/config.js \
@@ -135,7 +150,11 @@ FAUXTON_FILES = \
     fauxton/app/templates/databases/newdatabase.html \
     fauxton/app/templates/documents/all_docs_item.html \
     fauxton/app/templates/documents/all_docs_list.html \
+    fauxton/app/templates/documents/all_docs_layout.html \
+    fauxton/app/templates/documents/all_docs_number.html \
+    fauxton/app/templates/documents/advanced_options.html \
     fauxton/app/templates/documents/changes.html \
+    fauxton/app/templates/documents/design_doc_selector.html \
     fauxton/app/templates/documents/ddoc_info.html \
     fauxton/app/templates/documents/doc.html \
     fauxton/app/templates/documents/doc_field_editor.html \
@@ -160,6 +179,7 @@ FAUXTON_FILES = \
     fauxton/app/templates/fauxton/pagination.html \
     fauxton/app/templates/layouts/one_pane.html \
     fauxton/app/templates/layouts/two_pane.html \
+    fauxton/app/templates/layouts/one_pane_notabs.html
     fauxton/app/templates/layouts/with_right_sidebar.html \
     fauxton/app/templates/layouts/with_sidebar.html \
     fauxton/app/templates/layouts/with_tabs.html \
@@ -312,3 +332,4 @@ FAUXTON_FILES = \
     fauxton/test/test.config.underscore \
     fauxton/TODO.md \
     fauxton/writing_addons.md
+    fauxton/extensions.md
