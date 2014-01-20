@@ -12,69 +12,62 @@ define([
   "core/base"
 ],
 function (FauxtonAPI) {
-  //this later needs to be dynamically loaded 
-  var app = {
-    host: ""
+  var CouchdbSession = {
+    UUID: FauxtonAPI.Model.extend({
+      initialize: function(options) {
+        options = _.extend({count: 1}, options);
+        this.count = options.count;
+      },
+
+      url: function() {
+        return "/_uuids?count=" + this.count;
+      },
+
+      next: function() {
+        return this.get("uuids").pop();
+      }
+    }),
+
+    Session: FauxtonAPI.Model.extend({
+      url: '/_session',
+
+      user: function () {
+        var userCtx = this.get('userCtx');
+
+        if (!userCtx || !userCtx.name) { return null; }
+
+        return {
+          name: userCtx.name,
+          roles: userCtx.roles
+        };
+      },
+
+      fetchUser: function (opt) {
+        var that = this,
+        currentUser = this.user();
+
+        return this.fetchOnce(opt).then(function () {
+          var user = that.user();
+
+          // Notify anyone listening on these events that either a user has changed
+          // or current user is the same
+          if (currentUser !== user) {
+            that.trigger('session:userChanged');
+          } else {
+            that.trigger('session:userFetched');
+          }
+
+          // this will return the user as a value to all function that calls done on this
+          // eg. session.fetchUser().done(user) { .. do something with user ..}
+          return user; 
+        });
+      }
+    })
   };
 
-  FauxtonAPI.UUID = FauxtonAPI.Model.extend({
-    initialize: function(options) {
-      options = _.extend({count: 1}, options);
-      this.count = options.count;
-    },
-
-    url: function() {
-      return app.host + "/_uuids?count=" + this.count;
-    },
-
-    next: function() {
-      return this.get("uuids").pop();
-    }
-  });
-
-  FauxtonAPI.Session = FauxtonAPI.Model.extend({
-    url: app.host + '/_session',
-
-    user: function () {
-      var userCtx = this.get('userCtx');
-
-      if (!userCtx || !userCtx.name) { return null; }
-
-      return {
-        name: userCtx.name,
-        roles: userCtx.roles
-      };
-    },
-
-    fetchUser: function (opt) {
-      var that = this,
-      currentUser = this.user();
-
-      return this.fetchOnce(opt).then(function () {
-        var user = that.user();
-
-        // Notify anyone listening on these events that either a user has changed
-        // or current user is the same
-        if (currentUser !== user) {
-          that.trigger('session:userChanged');
-        } else {
-          that.trigger('session:userFetched');
-        }
-
-        // this will return the user as a value to all function that calls done on this
-        // eg. session.fetchUser().done(user) { .. do something with user ..}
-        return user; 
-      });
-    }
-  });
-
-  FauxtonAPI.setSession = function (newSession) {
-    FauxtonAPI.session = newSession;
-    return FauxtonAPI.session.fetchUser();
-  };
 
   //set default session
-  FauxtonAPI.setSession(new FauxtonAPI.Session());
+  //FauxtonAPI.setSession(new FauxtonAPI.Session());
 
-  return FauxtonAPI;
+  return CouchdbSession;
 });

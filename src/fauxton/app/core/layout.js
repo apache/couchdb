@@ -10,9 +10,10 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-define(["backbone"],
-
-function(Backbone) {
+define([
+  "backbone", 
+  "plugins/backbone.layoutmanager"
+], function(Backbone) {
 
   // A wrapper of the main Backbone.layoutmanager
   // Allows the main layout of the page to be changed by any plugin.

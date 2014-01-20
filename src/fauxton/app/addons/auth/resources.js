@@ -12,10 +12,11 @@
 
 define([
        "app",
-       "api"
+       "api",
+       "core/CouchdbSession"
 ],
 
-function (app, FauxtonAPI) {
+function (app, FauxtonAPI, CouchdbSession) {
 
   var Auth = new FauxtonAPI.addon();
 
@@ -46,7 +47,7 @@ function (app, FauxtonAPI) {
     }
   });
 
-  Auth.Session = FauxtonAPI.Session.extend({
+  Auth.Session = CouchdbSession.Session.extend({
     url: app.host + '/_session',
 
     initialize: function (options) {

@@ -5,6 +5,7 @@ require.config(
 );
 
 require([
+        "app",
         <% _.each(testFiles, function (test) {%>
            '../<%= test %>',
         <% }) %>

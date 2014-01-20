@@ -11,59 +11,12 @@
 // the License.
 
 define([
-  "app",
-  "core/couchdbSession",
+  "core/base",
   "backbone"
 ],
-function(app, FauxtonAPI) {
+function(FauxtonAPI, Backbone) {
 
-  // This is not exposed externally as it should not need to be accessed or overridden
-  var Auth = function (options) {
-    this._options = options;
-    this.initialize.apply(this, arguments);
-  };
-
-  // Piggy-back on Backbone's self-propagating extend function,
-  Auth.extend = Backbone.Model.extend;
-
-  _.extend(Auth.prototype, Backbone.Events, {
-    authDeniedCb: function() {},
-
-    initialize: function() {
-      var that = this;
-    },
-
-    authHandlerCb : function (roles) {
-      var deferred = $.Deferred();
-      deferred.resolve();
-      return deferred;
-    },
-
-    registerAuth: function (authHandlerCb) {
-      this.authHandlerCb = authHandlerCb;
-    },
-
-    registerAuthDenied: function (authDeniedCb) {
-      this.authDeniedCb = authDeniedCb;
-    },
-
-    checkAccess: function (roles) {
-      var requiredRoles = roles || [],
-      that = this;
-
-      if (!FauxtonAPI.session) {
-        throw new Error("Fauxton.session is not configured.");
-      }
-
-      return FauxtonAPI.session.fetchUser().then(function (user) {
-        return FauxtonAPI.when(that.authHandlerCb(FauxtonAPI.session, requiredRoles));
-      });
-    }
-  });
-
-  FauxtonAPI.auth = new Auth();
-
-  FauxtonAPI.RouteObject = function(options) {
+  var RouteObject = function(options) {
     this._options = options;
 
     this._configure(options || {});
@@ -74,7 +27,7 @@ function(app, FauxtonAPI) {
   var broadcaster = {};
   _.extend(broadcaster, Backbone.Events);
 
-  FauxtonAPI.RouteObject.on = function (eventName, fn) {
+  RouteObject.on = function (eventName, fn) {
     broadcaster.on(eventName, fn); 
   };
   
@@ -109,11 +62,11 @@ function(app, FauxtonAPI) {
   */
 
   // Piggy-back on Backbone's self-propagating extend function
-  FauxtonAPI.RouteObject.extend = Backbone.Model.extend;
+  RouteObject.extend = Backbone.Model.extend;
 
   var routeObjectOptions = ["views", "routes", "events", "roles", "crumbs", "layout", "apiUrl", "establish"];
 
-  _.extend(FauxtonAPI.RouteObject.prototype, Backbone.Events, {
+  _.extend(RouteObject.prototype, Backbone.Events, {
     // Should these be default vals or empty funcs?
     views: {},
     routes: {},
@@ -127,6 +80,7 @@ function(app, FauxtonAPI) {
     establish: function() {},
     route: function() {},
     roles: [],
+    _promises: [],
     initialize: function() {}
   }, {
 
@@ -141,7 +95,9 @@ function(app, FauxtonAPI) {
       }
 
       triggerBroadcast('beforeEstablish');
-      FauxtonAPI.when(this.establish()).then(function(resp) {
+      var establishPromise = this.establish();
+      this.addPromise(establishPromise);
+      FauxtonAPI.when(establishPromise).then(function(resp) {
         triggerBroadcast('afterEstablish');
         _.each(routeObject.getViews(), function(view, selector) {
           if(view.hasRendered) { 
@@ -150,7 +106,9 @@ function(app, FauxtonAPI) {
           }
 
           triggerBroadcast('beforeRender', view, selector);
-          FauxtonAPI.when(view.establish()).then(function(resp) {
+          var viewPromise = view.establish();
+          routeObject.addPromise(viewPromise);
+          FauxtonAPI.when(viewPromise).then(function(resp) {
             masterLayout.setView(selector, view);
 
             masterLayout.renderView(selector);
@@ -161,7 +119,7 @@ function(app, FauxtonAPI) {
                 reason: resp
               };
 
-              if (resp) { 
+              if (resp && resp.responseText) { 
                 var errorText = JSON.parse(resp.responseText).reason;
                 FauxtonAPI.addNotification({
                   msg: 'An Error occurred: ' + errorText,
@@ -169,25 +127,18 @@ function(app, FauxtonAPI) {
                   clear: true
                 });
               }
-
               masterLayout.renderView(selector);
           });
 
         });
       }.bind(this), function (resp) {
-          if (!resp) { return; }
+          if (!resp || !resp.responseText) { return; }
           FauxtonAPI.addNotification({
                 msg: 'An Error occurred' + JSON.parse(resp.responseText).reason,
                 type: 'error',
                 clear: true
           });
       });
-
-      if (this.get('apiUrl')){
-        masterLayout.apiBar.update(this.get('apiUrl'));
-      } else {
-        masterLayout.apiBar.hide();
-      }
 
       // Track that we've done a full initial render
       this.renderedState = true;
@@ -244,6 +195,36 @@ function(app, FauxtonAPI) {
       }, this);
     },
 
+    addPromise: function (promise) {
+      if (_.isEmpty(promise)) { return; }
+
+      if (_.isArray(promise)) {
+        return _.each(promise, function (p) {
+          this._promises.push(p);
+        }, this);
+      }
+
+     this._promises.push(promise);
+    },
+
+    cleanup: function () {
+      this.removeViews();
+      this.rejectPromises();
+    },
+
+    rejectPromises: function () {
+      _.each(this._promises, function (promise) {
+        if (promise.state() === "resolved") { return; }
+        if (promise.abort) {
+          return promise.abort("Route change");
+        } 
+
+        promise.reject();
+      }, this);
+
+      this._promises = [];
+    },
+
     getRouteUrls: function () {
       return _.keys(this.get('routes'));
     },
@@ -280,6 +261,5 @@ function(app, FauxtonAPI) {
     }
 
   });
-
-  return FauxtonAPI;
+  return RouteObject;
 });

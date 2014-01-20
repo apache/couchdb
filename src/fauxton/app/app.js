@@ -24,14 +24,14 @@ define([
   "core/utils",
   // Modules
   "core/api",
-  "addons/Fauxton/layout",
+  "core/couchdbSession",
   // Plugins.
   "plugins/backbone.layoutmanager",
   "plugins/jquery.form"
 
 ],
 
-function(app, $, _, Backbone, Bootstrap, Helpers, Utils, FauxtonAPI, Layout, LoadAddons) {
+function(app, $, _, Backbone, Bootstrap, Helpers, Utils, FauxtonAPI, Couchdb) {
   // Make sure we have a console.log
   if (typeof console == "undefined") {
     console = {
@@ -52,7 +52,7 @@ function(app, $, _, Backbone, Bootstrap, Helpers, Utils, FauxtonAPI, Layout, Loa
   var JST = window.JST = window.JST || {};
 
   // Configure LayoutManager with Backbone Boilerplate defaults.
-  Backbone.Layout.configure({
+  FauxtonAPI.Layout.configure({
     // Allow LayoutManager to augment Backbone.View.prototype.
     manage: true,
 
@@ -84,11 +84,13 @@ function(app, $, _, Backbone, Bootstrap, Helpers, Utils, FauxtonAPI, Layout, Loa
     }
   });
 
+  FauxtonAPI.setSession(new Couchdb.Session());
+
   // Define your master router on the application namespace and trigger all
   // navigation from this instance.
   FauxtonAPI.config({
     el: "#app-container",
-    masterLayout: new Layout(),
+    masterLayout: new FauxtonAPI.Layout(),
     
     addHeaderLink: function(link) {
       FauxtonAPI.registerExtension('navbar:addHeaderLink', link);

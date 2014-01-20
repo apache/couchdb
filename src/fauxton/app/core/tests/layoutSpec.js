@@ -10,18 +10,16 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 define([
-       'addons/fauxton/layout',
-      'testUtils'
-], function (Layout, testUtils) {
+  'api',
+  'testUtils'
+], function (FauxtonAPI, testUtils) {
   var assert = testUtils.assert;
 
   describe("Faxuton Layout", function () {
     var layout;
 
     beforeEach(function () {
-      var navBar = new Backbone.View();
-      var apiBar = new Backbone.View();
-      layout = new Layout(navBar, apiBar);
+      layout = new FauxtonAPI.Layout();
     });
 
     describe('#setTemplate', function () {

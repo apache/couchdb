@@ -11,26 +11,19 @@
 // the License.
 
 define([
+  "backbone"
 ],
 
-function() {
+function(Backbone) {
   var FauxtonAPI = {
     //add default objects
     router: {
       navigate: function () {}
     },
 
-    masterLayout: {
-      // remove these by converting to extensions
-      navBar: {
-        addLink: function () {},
-        removeLink: function () {}
-      }
-    },
+    masterLayout: {},
 
-    addNotification: function () {
-
-    },
+    addNotification: function () {},
 
     config: function (options) {
       return _.extend(this, options);
@@ -108,6 +101,11 @@ function() {
   };
 
   FauxtonAPI.extensions = extensions;
+
+  FauxtonAPI.setSession = function (newSession) {
+    FauxtonAPI.session = newSession;
+    return FauxtonAPI.session.fetchUser();
+  };
 
   return FauxtonAPI;
 });

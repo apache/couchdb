@@ -66,6 +66,15 @@ function(app, FauxtonAPI, resizeColumns) {
         }));
       }
     });
+
+    FauxtonAPI.RouteObject.on('renderComplete', function (routeObject) {
+      var masterLayout = FauxtonAPI.masterLayout;
+      if (routeObject.get('apiUrl')){
+        masterLayout.apiBar.update(routeObject.get('apiUrl'));
+      } else {
+        masterLayout.apiBar.hide();
+      }
+    });
   };
 
   Fauxton.Breadcrumbs = Backbone.View.extend({
