@@ -13,21 +13,6 @@ define([
 ],
 function (FauxtonAPI) {
   var CouchdbSession = {
-    UUID: FauxtonAPI.Model.extend({
-      initialize: function(options) {
-        options = _.extend({count: 1}, options);
-        this.count = options.count;
-      },
-
-      url: function() {
-        return "/_uuids?count=" + this.count;
-      },
-
-      next: function() {
-        return this.get("uuids").pop();
-      }
-    }),
-
     Session: FauxtonAPI.Model.extend({
       url: '/_session',
 
@@ -64,10 +49,6 @@ function (FauxtonAPI) {
       }
     })
   };
-
-
-  //set default session
-  //FauxtonAPI.setSession(new FauxtonAPI.Session());
 
   return CouchdbSession;
 });

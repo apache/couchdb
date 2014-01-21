@@ -264,7 +264,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     showModal: function () {
       var showModal = this._showModal,
           setDefaultIdValue = this.setDefaultIdValue,
-          uuid = new FauxtonAPI.UUID();
+          uuid = new Documents.UUID();
 
       uuid.fetch().then(function () {
         setDefaultIdValue(uuid.next());
@@ -720,11 +720,11 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     },
     
     cleanup: function () {
-      //if (!this.pagination) { return; }
-      this.pagination.remove();
-      //this.pagination = null;
       this.allDocsNumber.remove();
       _.each(this.rows, function (row) {row.remove();});
+
+      if (!this.pagination) { return; }
+      this.pagination.remove();
     },
 
     beforeRender: function() {

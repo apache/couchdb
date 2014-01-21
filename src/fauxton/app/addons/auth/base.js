@@ -20,6 +20,7 @@ function(app, FauxtonAPI, Auth) {
 
   Auth.session = new Auth.Session();
   FauxtonAPI.setSession(Auth.session);
+  app.session = Auth.session;
 
   Auth.initialize = function() {
     Auth.navLink = new Auth.NavLink({model: Auth.session});

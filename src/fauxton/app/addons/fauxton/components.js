@@ -125,7 +125,7 @@ function(app, FauxtonAPI, ace, spin) {
 
     pageEnd: function () {
       if (this.collection.length < this.pageLimit()) {
-        return this.collection.length;
+        return (this.previousParams.length * this.pageLimit()) + this.collection.length;
       }
 
       return (this.previousParams.length * this.pageLimit()) + this.pageLimit();
@@ -236,6 +236,8 @@ function(app, FauxtonAPI, ace, spin) {
       this.theme = options.theme || 'crimson_editor';
       this.couchJSHINT = options.couchJSHINT;
       this.edited = false;
+
+      _.bindAll(this);
     },
 
     afterRender: function () {
@@ -296,13 +298,14 @@ function(app, FauxtonAPI, ace, spin) {
     },
 
     removeIncorrectAnnotations: function () {
-      var editor = this.editor;
+      var editor = this.editor,
+          isIgnorableError = this.isIgnorableError;
 
-      this.editor.getSession().on("changeAnnotation", function(){
+      this.editor.getSession().on("changeAnnotation", function () {
         var annotations = editor.getSession().getAnnotations();
 
         var newAnnotations = _.reduce(annotations, function (annotations, error) {
-          if (!this.isIgnorableError(error.raw)) {
+          if (!isIgnorableError(error.raw)) {
             annotations.push(error);
           }
           return annotations;

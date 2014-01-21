@@ -111,14 +111,22 @@ FAUXTON_FILES = \
     fauxton/app/addons/verifyinstall/routes.js \
     fauxton/app/addons/verifyinstall/templates/main.html \
     fauxton/app/addons/verifyinstall/assets/less/verifyinstall.less \
-    fauxton/app/api.js \
+    fauxton/app/core/api.js \
+    fauxton/app/core/auth.js \
+    fauxton/app/core/base.js \
+    fauxton/app/core/couchdbSession.js \
+    fauxton/app/core/layout.js \
+    fauxton/app/core/routeObject.js \
+    fauxton/app/core/router.js \
+    fauxton/app/core/utils.js \
+    fauxton/app/core/tests/layoutSpec.js \
+    fauxton/app/core/tests/routeObjectSpec.js \
     fauxton/app/app.js \
     fauxton/app/config.js \
     fauxton/app/helpers.js \
     fauxton/app/initialize.js.underscore \
     fauxton/app/load_addons.js.underscore \
     fauxton/app/main.js \
-    fauxton/app/utils.js \
     fauxton/app/addons/databases/base.js \
     fauxton/app/addons/databases/resources.js \
     fauxton/app/addons/databases/routes.js \
@@ -131,11 +139,13 @@ FAUXTON_FILES = \
     fauxton/app/addons/fauxton/base.js \
     fauxton/app/addons/fauxton/components.js \
     fauxton/app/addons/fauxton/layout.js \
+    fauxton/app/addons/fauxton/resizeColumns.js \
+    fauxton/app/addons/fauxton/tests/baseSpec.js \
+    fauxton/app/addons/fauxton/tests/navbarSpec.js \
+    fauxton/app/addons/fauxton/tests/paginateSpec.js \
     fauxton/app/addons/pouchdb/base.js \
     fauxton/app/addons/pouchdb/pouch.collate.js \
     fauxton/app/addons/pouchdb/pouchdb.mapreduce.js \
-    fauxton/app/resizeColumns.js \
-    fauxton/app/router.js \
     fauxton/app/addons/databases/templates/item.html \
     fauxton/app/addons/databases/templates/list.html \
     fauxton/app/addons/databases/templates/newdatabase.html \
@@ -309,10 +319,6 @@ FAUXTON_FILES = \
     fauxton/tasks/couchserver.js \
     fauxton/tasks/fauxton.js \
     fauxton/tasks/helper.js \
-    fauxton/test/core/layoutSpec.js \
-    fauxton/test/core/navbarSpec.js \
-    fauxton/test/core/paginateSpec.js \
-    fauxton/test/core/routeObjectSpec.js \
     fauxton/test/mocha/chai.js \
     fauxton/test/mocha/mocha.css \
     fauxton/test/mocha/mocha.js \
