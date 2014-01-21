@@ -90,6 +90,14 @@ function(Backbone) {
     extensions[name].push(view);
   };
 
+  FauxtonAPI.unRegisterExtension = function (name) {
+    var views = extensions[name];
+    
+    if (!views) { return; }
+    extensions.trigger('remove:' + name, views);
+    delete extensions[name];
+  };
+
   FauxtonAPI.getExtensions = function (name) {
     var views = extensions[name];
 
@@ -98,6 +106,23 @@ function(Backbone) {
     }
 
     return views;
+  };
+
+  FauxtonAPI.removeExtensionItem = function (name, view, cb) {
+    var views = extensions[name];
+    if (!views) { return; }
+
+    var _cb = arguments[arguments.length -1];
+    if (_.isObject(view) && !cb) {
+      _cb = function (item) { return _.isEqual(item, view);};
+    } 
+
+    views = _.filter(views, function (item) {
+      return !_cb(item);
+    });
+
+    extensions[name] = views;
+    extensions.trigger('removeItem:' + name, view);
   };
 
   FauxtonAPI.extensions = extensions;

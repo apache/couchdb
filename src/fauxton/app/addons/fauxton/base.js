@@ -137,6 +137,7 @@ function(app, FauxtonAPI, resizeColumns) {
       this.resizeColumns.onResizeHandler();
       
       FauxtonAPI.extensions.on('add:navbar:addHeaderLink', this.addLink);
+      FauxtonAPI.extensions.on('removeItem:navbar:addHeaderLink', this.removeLink);
     },
 
     serialize: function() {

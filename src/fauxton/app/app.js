@@ -97,7 +97,13 @@ function(app, $, _, Backbone, Bootstrap, Helpers, Utils, FauxtonAPI, Couchdb) {
     },
 
     removeHeaderLink: function(link) {
-      // TODO add remove to extensions
+      FauxtonAPI.removeExtensionItem('navbar:addHeaderLink', link, function (item) {
+        if (item.title === link.title) {
+          return true;
+        }
+
+        return false;
+      });
     }
   });
 
