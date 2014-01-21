@@ -317,6 +317,10 @@ function(app, FauxtonAPI, ace) {
       this.edited = false;
     },
 
+    setReadOnly: function (value) {
+      return this.editor.setReadOnly(value);
+    },
+
     setValue: function (data, lineNumber) {
       lineNumber = lineNumber ? lineNumber : -1;
       this.editor.setValue(data, lineNumber);

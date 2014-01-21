@@ -961,6 +961,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
       this.editor = new Components.Editor({
         editorId: "editor-container",
+        forceMissingId: true,
         commands: [{
           name: 'save',
           bindKey: {win: 'Ctrl-S',  mac: 'Ctrl-S'},
@@ -972,6 +973,38 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       });
       this.editor.render();
       this.model.on("sync", this.updateValues, this);
+
+      var editor = this.editor,
+          model = this.model;
+
+      editor.editor.on("change", function (event) {
+        //if (event.data.action !== 'removeText') { return; }
+        //if (!event.data.text.match(/_id/) && !event.data.text.match(/_rev/)) { return; }
+
+        var changedDoc;
+        try {
+          changedDoc = JSON.parse(editor.getValue());
+        } catch(exception) {
+          //not complete doc. Cannot work with it
+          return;
+        }
+        
+        var keyChecked = ["_id"];
+        if (model.get("_rev")) { keyChecked.push("_rev");}
+
+        //check the changedDoc has all the required standard keys
+        if (_.isEmpty(_.difference(keyChecked, _.keys(changedDoc)))) { return; }
+
+        editor.setReadOnly(true);
+        setTimeout(function () { editor.setReadOnly(false);}, 400);
+        // use extend so that _id stays at the top of the object with displaying the doc
+        changedDoc = _.extend({_id: model.id, _rev: model.get("_rev")}, changedDoc);
+        editor.setValue(JSON.stringify(changedDoc, null, "  "));
+        FauxtonAPI.addNotification({
+          type: "error",
+          msg: "Cannot remove a documents Id or Revision."
+        });
+      });
     },
 
     cleanup: function () {
