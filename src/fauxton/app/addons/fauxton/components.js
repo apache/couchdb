@@ -355,7 +355,7 @@ function(app, FauxtonAPI, ace, spin) {
       this.mode = this.getModeName(options.mode || "json");
       this.commands = options.commands;
       this.theme = options.theme || 'crimson_editor';
-      this.couchJSHINT = options.couchJSHINT;
+      this.couchJSHINT = options.couchJSHINT || (this.mode == 'javascript');
       this.edited = false;
 
       _.bindAll(this);

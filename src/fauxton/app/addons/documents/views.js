@@ -1677,8 +1677,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, Config, pouchdb, res
 
       this.reduceEditor = new Components.Editor({
         editorId: "reduce-function",
-        mode: this.language,
-        couchJSHINT: (this.language == 'javascript')
+        mode: this.language
       });
       this.reduceEditor.render();
 
@@ -1758,8 +1757,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, Config, pouchdb, res
     showEditors: function () {
       this.mapEditor = new Components.Editor({
         editorId: "map-function",
-        mode: this.language,
-        couchJSHINT: (this.language == 'javascript')
+        mode: this.language
       });
       mapEditor = this.mapEditor;
       this.mapEditor.render();
