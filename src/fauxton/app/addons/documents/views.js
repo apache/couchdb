@@ -1344,9 +1344,14 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         reduceVal = this.reduceVal(),
         viewName = this.$('#index-name').val(),
         ddoc = this.getCurrentDesignDoc(),
-        ddocName = ddoc.id;
+        ddocName = ddoc.id,
+        viewNameChange = false;
 
-        this.viewName = viewName;
+        if (this.viewName !== viewName) {
+          ddoc.removeDdocView(this.viewName);
+          this.viewName = viewName;
+          viewNameChange = true;
+        }
 
         notification = FauxtonAPI.addNotification({
           msg: "Saving document.",
@@ -1369,7 +1374,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
             clear: true
           });
 
-          if (that.newView) {
+          if (that.newView || viewNameChange) {
             var fragment = '/database/' + that.database.safeID() +'/' + ddoc.safeID() + '/_view/' + app.utils.safeURLName(viewName); 
 
             FauxtonAPI.navigate(fragment, {trigger: false});
@@ -1485,8 +1490,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
       promise.then(function () {
         params.docs = that.database.allDocs.map(function (model) { return model.get('doc');}); 
-
-        console.log('p', params, paramsInfo);
         var queryPromise = pouchdb.runViewQuery({map: mapVal, reduce: reduceVal}, params);
         queryPromise.then(function (results) {
           FauxtonAPI.triggerRouteEvent('updatePreviewDocs', {rows: results.rows, ddoc: that.getCurrentDesignDoc().id, view: that.viewName});
