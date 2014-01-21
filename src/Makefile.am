@@ -179,7 +179,7 @@ FAUXTON_FILES = \
     fauxton/app/templates/fauxton/pagination.html \
     fauxton/app/templates/layouts/one_pane.html \
     fauxton/app/templates/layouts/two_pane.html \
-    fauxton/app/templates/layouts/one_pane_notabs.html
+    fauxton/app/templates/layouts/one_pane_notabs.html \
     fauxton/app/templates/layouts/with_right_sidebar.html \
     fauxton/app/templates/layouts/with_sidebar.html \
     fauxton/app/templates/layouts/with_tabs.html \
@@ -331,5 +331,5 @@ FAUXTON_FILES = \
     fauxton/test/runner.html \
     fauxton/test/test.config.underscore \
     fauxton/TODO.md \
-    fauxton/writing_addons.md
+    fauxton/writing_addons.md \
     fauxton/extensions.md
