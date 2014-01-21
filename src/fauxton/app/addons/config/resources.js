@@ -65,6 +65,7 @@ function (app, FauxtonAPI) {
     parse: function (resp) {
       return _.map(resp, function (section, section_name) {
         return {
+          id: section_name,
           section: section_name,
           options: _.map(section, function (option, option_name) {
             return {

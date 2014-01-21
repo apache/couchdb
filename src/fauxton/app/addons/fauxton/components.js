@@ -352,13 +352,26 @@ function(app, FauxtonAPI, ace, spin) {
   Components.Editor = FauxtonAPI.View.extend({
     initialize: function (options) {
       this.editorId = options.editorId;
-      this.mode = options.mode || "json";
+      this.mode = this.getModeName(options.mode || "json");
       this.commands = options.commands;
       this.theme = options.theme || 'crimson_editor';
       this.couchJSHINT = options.couchJSHINT;
       this.edited = false;
 
       _.bindAll(this);
+    },
+
+    getModeName: function(language) {
+      var modeMap = {
+        coffeescript: 'coffee'
+      };
+      return modeMap[language] || language;
+    },
+
+    setMode: function(language) {
+      mode = this.getModeName(language);
+      this.mode = mode;
+      this.editor.getSession().setMode("ace/mode/" + this.mode);
     },
 
     afterRender: function () {
