@@ -1331,7 +1331,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, Config, pouchdb, res
       var new_language = $('#design-doc-language').val() || this.defaultLang;
       var overwrite = true;
       // check if the editor is "dirty"
-      if (this.mapEditor.edited) {
+      if (this.mapEditor.edited || (this.reduceEditor && this.reduceEditor.edited)) {
         // ask the user if they want to overwrite the contents
         overwrite = confirm('Do you want to replace the editor contents?');
       }
@@ -1343,8 +1343,17 @@ function(app, FauxtonAPI, Components, Documents, Databases, Config, pouchdb, res
         this.mapEditor.setValue(this.langTemplates[new_language].map);
         // since this is a template, let's tell the editor it's new
         this.mapEditor.edited = false;
+        // next do the same for the reduceEditor
+        if (this.reduceEditor) {
+          this.reduceEditor.setMode(new_language);
+          this.reduceEditor.setValue(this.langTemplates[new_language].reduce);
+          this.reduceEditor.edited = false;
+        }
+        // now set the language of the Design Doc to this new language choice
         this.language = new_language;
       }
+      // make sure the language in the select box matches the code in the
+      // editors
       $('#design-doc-language').val(this.language);
     },
 
@@ -1365,7 +1374,9 @@ function(app, FauxtonAPI, Components, Documents, Databases, Config, pouchdb, res
       var $reduceContainer = $(".control-group.reduce-function");
       if ($ele.val() == "CUSTOM") {
         this.createReduceEditor();
-        this.reduceEditor.setValue(this.langTemplates.javascript.reduce);
+        this.reduceEditor.setValue(this.langTemplates[this.language].reduce);
+        // template-based edits don't count as edits
+        this.reduceEditor.edited = false;
         $reduceContainer.show();
       } else {
         $reduceContainer.hide();
