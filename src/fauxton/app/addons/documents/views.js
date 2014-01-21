@@ -1656,7 +1656,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, Config, pouchdb, res
         reduceFunStr: this.reduceFunStr,
         isCustomReduce: this.hasCustomReduce(),
         newView: this.newView,
-        langTemplates: this.langTemplates.javascript,
+        langTemplates: this.langTemplates[this.defaultLang],
         languages: this.languages,
         language: this.language
       };
