@@ -1306,7 +1306,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, Config, pouchdb, res
         this.ddocID = options.ddocInfo.id;
         this.viewName = options.viewName;
         this.ddocInfo = new Documents.DdocInfo({_id: this.ddocID},{database: this.database});
-        this.language = this.ddocInfo.get('language') || this.defaultLang;
       }
 
       this.showIndex = false;
@@ -1425,7 +1424,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, Config, pouchdb, res
         viewName = this.$('#index-name').val(),
         ddoc = this.getCurrentDesignDoc(),
         ddocName = ddoc.id,
-        viewNameChange = false;
+        viewNameChange = false,
+        language = this.$('#design-doc-language').val() || this.defaultLang;
 
         if (this.viewName !== viewName) {
           ddoc.removeDdocView(this.viewName);
@@ -1440,6 +1440,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, Config, pouchdb, res
         });
 
         ddoc.setDdocView(viewName, mapVal, reduceVal);
+        ddoc.set('language', language);
 
         ddoc.save().then(function () {
           that.ddocs.add(ddoc);
@@ -1712,7 +1713,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, Config, pouchdb, res
         var ddocDecode = decodeURIComponent(this.ddocID);
         this.model = this.ddocs.get(ddocDecode).dDocModel();
         this.reduceFunStr = this.model.viewHasReduce(this.viewName);
-        
+        this.setView('#ddoc-info', new Views.DdocInfo({model: this.ddocInfo }));
+        this.language = this.model.get('language') || this.defaultLang;
       }
 
       this.designDocSelector = this.setView('.design-doc-group', new Views.DesignDocSelector({
