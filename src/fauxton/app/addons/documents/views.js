@@ -1293,20 +1293,12 @@ function(app, FauxtonAPI, Components, Documents, Databases, Config, pouchdb, res
     defaultLang: "javascript",
 
     initialize: function(options) {
-      var self = this;
       this.newView = options.newView || false;
       this.ddocs = options.ddocs;
       this.params = options.params;
       this.database = options.database;
       this.language = this.defaultLang;
-
       this.languages = [];
-      // TODO: put configs in the caching layer once that is a thing
-      (new Config.Collection()).fetch({
-        success: function(collection, response, options) {
-          self.languages = _.pluck(collection.get('query_servers').get('options'), 'name');
-        }
-      });
 
       if (this.newView) {
         this.viewName = 'newView';
@@ -1322,13 +1314,20 @@ function(app, FauxtonAPI, Components, Documents, Databases, Config, pouchdb, res
     },
 
     establish: function () {
+      var that = this;
+      // TODO: put configs in the caching layer once that is a thing
+      var config = new Config.Collection();
+      config.fetch().then(function() {
+        that.languages = _.pluck(config.get('query_servers').get('options'), 'name');
+      });
+
       if (this.ddocInfo) {
         return this.ddocInfo.fetch();
       }
     },
 
     changeLanguage: function() {
-      var new_language = $('#design-doc-language').val() || this.defaultLang;
+      var new_language = this.$('#design-doc-language').val() || this.defaultLang;
       var overwrite = true;
       // check if the editor is "dirty"
       if (this.mapEditor.edited || (this.reduceEditor && this.reduceEditor.edited)) {
@@ -1342,19 +1341,19 @@ function(app, FauxtonAPI, Components, Documents, Databases, Config, pouchdb, res
         // and replace contents with template for the selected language
         this.mapEditor.setValue(this.langTemplates[new_language].map);
         // since this is a template, let's tell the editor it's new
-        this.mapEditor.edited = false;
+        this.mapEditor.editSaved();
         // next do the same for the reduceEditor
         if (this.reduceEditor) {
           this.reduceEditor.setMode(new_language);
           this.reduceEditor.setValue(this.langTemplates[new_language].reduce);
-          this.reduceEditor.edited = false;
+          this.reduceEditor.editSaved();
         }
         // now set the language of the Design Doc to this new language choice
         this.language = new_language;
       }
       // make sure the language in the select box matches the code in the
       // editors
-      $('#design-doc-language').val(this.language);
+      this.$('#design-doc-language').val(this.language);
     },
 
     updateValues: function() {
