@@ -1317,12 +1317,15 @@ function(app, FauxtonAPI, Components, Documents, Databases, Config, pouchdb, res
       var that = this;
       // TODO: put configs in the caching layer once that is a thing
       var config = new Config.Collection();
-      config.fetch().then(function() {
+      var config_promise = config.fetch();
+      config_promise.then(function() {
         that.languages = _.pluck(config.get('query_servers').get('options'), 'name');
       });
 
       if (this.ddocInfo) {
-        return this.ddocInfo.fetch();
+        return [this.ddocInfo.fetch(), config_promise];
+      } else {
+        return [config_promise];
       }
     },
 
