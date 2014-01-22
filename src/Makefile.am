@@ -232,6 +232,7 @@ FAUXTON_FILES = \
     fauxton/assets/js/libs/ace/ext-whitespace.js \
     fauxton/assets/js/libs/ace/ext-language_tools.js \
     fauxton/assets/js/libs/ace/mode-javascript.js \
+    fauxton/assets/js/libs/ace/mode-coffeescript.js \
     fauxton/assets/js/libs/ace/ext-modelist.js \
     fauxton/assets/js/libs/ace/mode-json.js \
     fauxton/assets/js/libs/ace/ext-old_ie.js \
@@ -241,6 +242,7 @@ FAUXTON_FILES = \
     fauxton/assets/js/libs/ace/theme-crimson_editor.js \
     fauxton/assets/js/libs/ace/ext-settings_menu.js \
     fauxton/assets/js/libs/ace/worker-javascript.js \
+    fauxton/assets/js/libs/ace/worker-coffeescript.js \
     fauxton/assets/js/libs/ace/ext-spellcheck.js \
     fauxton/assets/js/libs/ace/worker-json.js \
     fauxton/assets/js/libs/ace/ext-split.js \

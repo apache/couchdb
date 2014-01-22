@@ -83,9 +83,11 @@
 ^share/www/fauxton/img/.*
 ^share/www/fauxton/js/ace/mode-javascript.js
 ^share/www/fauxton/js/ace/mode-json.js
+^share/www/fauxton/js/ace/mode-coffeescript.js
 ^share/www/fauxton/js/ace/theme-crimson_editor.js
 ^share/www/fauxton/js/ace/worker-javascript.js
 ^share/www/fauxton/js/ace/worker-json.js
+^share/www/fauxton/js/ace/worker-coffeescript.js
 ^src/Makefile
 ^src/Makefile.in
 ^src/couch_index/Makefile
