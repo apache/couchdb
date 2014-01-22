@@ -182,6 +182,10 @@ couchTests.rewrite = function(debug) {
             {
               "from": "/",
               "to": "_view/basicView",
+            },
+            {
+              "from": "/db/*",
+              "to": "../../*"
             }
           ],
           lists: {
@@ -402,6 +406,13 @@ couchTests.rewrite = function(debug) {
         var result = JSON.parse(xhr.responseText);
         T(typeof(result.rows[0].doc) === "object");
         
+        // COUCHDB-2031 - path normalization versus qs params
+        xhr = CouchDB.request("GET", "/"+dbName+"/_design/test/_rewrite/db/_design/test?meta=true");
+        T(xhr.status == 200, "path normalization works with qs params");
+        var result = JSON.parse(xhr.responseText);
+        T(result['_id'] == "_design/test");
+        T(typeof(result['_revs_info']) === "object");
+
         // test path relative to server
         designDoc.rewrites.push({
           "from": "uuids",
