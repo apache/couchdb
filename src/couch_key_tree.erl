@@ -90,7 +90,8 @@ merge(RevTree, Tree) ->
 %% @doc Attempt to merge Tree into each branch of the RevTree.
 %% If it can't find a branch that the new tree merges into, add it as a
 %% new branch in the RevTree.
--spec merge_tree(revtree(), tree(), revtree()) -> {revtree(), boolean()}.
+-spec merge_tree(revtree(), tree(), revtree()) ->
+                {revtree(), new_leaf | new_branch | internal_node}.
 merge_tree([], Tree, []) ->
     {[Tree], new_leaf};
 merge_tree([], Tree, MergeAcc) ->
@@ -122,7 +123,8 @@ merge_tree([{Depth, Nodes} | Rest], {IDepth, INodes}=Tree, MergeAcc) ->
 %% before we can start comparing node keys. If one of the branches
 %% ends up running out of nodes we know that these two branches can
 %% not be merged.
--spec merge_at([node()], integer(), [node()]) -> {revtree(), boolean()} | fail.
+-spec merge_at([node()], integer(), [node()]) ->
+                {revtree(), new_leaf | new_branch | internal_node} | fail.
 merge_at(_Nodes, _Pos, []) ->
     fail;
 merge_at([], _Pos, _INodes) ->
@@ -164,7 +166,8 @@ merge_at([Tree | Sibs], 0, INodes) ->
         fail -> fail
     end.
 
--spec merge_extend(tree(), tree()) -> {tree(), atom()}.
+-spec merge_extend(tree(), tree()) ->
+                {tree(), new_leaf | new_branch | internal_node}.
 merge_extend([], B) when B =/= [] ->
     % Most likely the insert branch simply extends this one, so the new
     % branch is exactly B. Its also possible that B is a branch because
