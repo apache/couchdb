@@ -119,30 +119,30 @@ CouchDB database information object
 +================================+=============================================+
 | db_name                        | The name of the database.                   |
 +--------------------------------+---------------------------------------------+
-| committed_update_seq           | The number of committed update.             |
+| committed_update_seq           | The number of committed updates.            |
 +--------------------------------+---------------------------------------------+
-| doc_count                      | A count of the documents in the specified   |
-|                                | database.                                   |
+| doc_count                      | The number of documents in the database.    |
 +--------------------------------+---------------------------------------------+
-| doc_del_count                  | Number of deleted documents                 |
+| doc_del_count                  | The number of deleted documents.            |
 +--------------------------------+---------------------------------------------+
 | compact_running                | Set to true if the database compaction      |
 |                                | routine is operating on this database.      |
 +--------------------------------+---------------------------------------------+
 | disk_format_version            | The version of the physical format used for |
-|                                | the data when it is stored on disk.         |
+|                                | the data when it is stored on hard disk.    |
 +--------------------------------+---------------------------------------------+
-| disk_size                      | Size in bytes of the data as stored on the  |
-|                                | disk. Views indexes are not included in the |
+| disk_size                      | Size in bytes of the data as stored on disk.|
+|                                | View indexes are not included in the        |
 |                                | calculation.                                |
 +--------------------------------+---------------------------------------------+
-| instance_start_time            | Timestamp of when the database was opened,  |
-|                                | expressed in microseconds since the epoch.  |
+| instance_start_time            | Timestamp indicating when the database was  |
+|                                | opened, expressed in microseconds since the |
+|                                | epoch.                                      |
 +--------------------------------+---------------------------------------------+
 | purge_seq                      | The number of purge operations on the       |
 |                                | database.                                   |
 +--------------------------------+---------------------------------------------+
-| update_seq                     | The current number of updates to the        |
+| update_seq                     | The current number of updates made in the   |
 |                                | database.                                   |
 +--------------------------------+---------------------------------------------+
 
@@ -227,7 +227,7 @@ List of Active Tasks
 +--------------------------------+---------------------------------------------+
 | Field                          | Description                                 |
 +================================+=============================================+
-| tasks [array]                  | Active Task                                 |
+| tasks [array]                  | Active Tasks                                 |
 +--------------------------------+---------------------------------------------+
 |     pid                        | Process ID                                  |
 +--------------------------------+---------------------------------------------+
@@ -265,16 +265,16 @@ Replication Settings
 |                                | start                                       |
 +--------------------------------+---------------------------------------------+
 | filter (optional)              | name of the filter function in the form of  |
-|                                | ddoc/myfilter                               |
+|                                | ``ddoc/myfilter``                           |
 +--------------------------------+---------------------------------------------+
-| query_params (optional)        | query parameter that are passed to the      |
-|                                | filter function; value should be a document |
-|                                | containing parameters as members            |
+| query_params (optional)        | Query parameter that are passed to the      |
+|                                | filter function; the value should be a      |
+|                                | document containing parameters as members   |
 +--------------------------------+---------------------------------------------+
 | use_checkpoints (optional)     | Whether to use replication checkpoints      |
 |                                | or not                                      |
 +--------------------------------+---------------------------------------------+
-| checkpoint_interval (optional) | Specifies checkpoint interval in ms.        |
+| checkpoint_interval (optional) | Specifies the checkpoint interval in ms.    |
 +--------------------------------+---------------------------------------------+
 
 .. _replication-status:
@@ -289,7 +289,7 @@ Replication Status
 +--------------------------------+---------------------------------------------+
 | session_id                     | Unique session ID                           |
 +--------------------------------+---------------------------------------------+
-| source_last_seq                | Last sequence number read from source       |
+| source_last_seq                | Last sequence number read from the source   |
 |                                | database                                    |
 +--------------------------------+---------------------------------------------+
 | history [array]                | Replication History                         |
@@ -326,16 +326,16 @@ Request object
 | Field                          | Description                                 |
 +================================+=============================================+
 | body                           | Request body data as `string`.              |
-|                                | If request method is `GET` method contains  |
-|                                | this field contains ``"undefined"`` value,  |
-|                                | while if `DELETE` or `HEAD` value is ``""`` |
-|                                | (empty string)                              |
+|                                | If the request method is `GET` this field   |
+|                                | contains the value ``"undefined"``. If the  |
+|                                | method is `DELETE` or `HEAD` the value is   |
+|                                | ``""`` (empty string).                      |
 +--------------------------------+---------------------------------------------+
 | cookie                         | Cookies `object`.                           |
 +--------------------------------+---------------------------------------------+
 | form                           | Form data `object`.                         |
-|                                | Contains decoded body as key-value pairs if |
-|                                | `Content-Type` header was                   |
+|                                | Contains the decoded body as key-value      |
+|                                | pairs if the `Content-Type` header was      |
 |                                | ``application/x-www-form-urlencoded``.      |
 +--------------------------------+---------------------------------------------+
 | headers                        | Request headers `object`.                   |
@@ -346,18 +346,18 @@ Request object
 | info                           | :ref:`Database information <dbinfo_object>` |
 +--------------------------------+---------------------------------------------+
 | method                         | Request method as `string` or `array`.      |
-|                                | String value is method is one of: `HEAD`,   |
+|                                | String value is a method as one of: `HEAD`, |
 |                                | `GET`, `POST`, `PUT`, `DELETE`, `OPTIONS`,  |
-|                                | and `TRACE`, otherwise it will be           |
-|                                | represented as array of char codes.         |
+|                                | and `TRACE`. Otherwise it will be           |
+|                                | represented as an array of char codes.      |
 +--------------------------------+---------------------------------------------+
 | path                           | List of requested path sections.            |
 +--------------------------------+---------------------------------------------+
 | peer                           | Request source IP address.                  |
 +--------------------------------+---------------------------------------------+
 | query                          | URL query parameters `object`.              |
-|                                | Note that multiple keys not supported and   |
-|                                | last key value suppress others.             |
+|                                | Note that multiple keys are not supported   |
+|                                | and teh last key value suppresses others.   |
 +--------------------------------+---------------------------------------------+
 | requested_path                 | List of actual requested path section.      |
 +--------------------------------+---------------------------------------------+
@@ -367,8 +367,8 @@ Request object
 +--------------------------------+---------------------------------------------+
 | userCtx                        | :ref:`userctx_object`.                      |
 +--------------------------------+---------------------------------------------+
-| uuid                           | Generated UUID by specified algorithm in    |
-|                                | config file.                                |
+| uuid                           | Generated UUID by a specified algorithm in  |
+|                                | the config file.                            |
 +--------------------------------+---------------------------------------------+
 
 .. code-block:: javascript
@@ -481,15 +481,15 @@ Response object
 +--------------------------------+---------------------------------------------+
 
 .. warning::
-   ``body``, ``base64`` and ``json`` object keys are overlaps each other and
-   the last wins. Since most realizations of key-value objects doesn't preserve
-   key order mixing them may create confusing situation. Try to use only one of
-   them.
+   The ``body``, ``base64`` and ``json`` object keys are overlapping each other
+   where the last one wins. Since most realizations of key-value objects do
+   not preserve the key order or if they are mixed, confusing situations can
+   occure. Try to use only one of them.
 
 .. note::
-   Any custom property makes CouchDB raise internal exception.
-   Also `Response object` could be a simple string value which would be
-   implicitly wrapped into ``{"body": ...}`` object.
+   Any custom property makes CouchDB raise an internal exception.
+   Furthermore, the `Response object` could be a simple string value which would
+   be implicitly wrapped into a ``{"body": ...}`` object.
 
 
 Returned CouchDB Document with Detailed Revision Info
@@ -503,7 +503,7 @@ Returned CouchDB Document with Detailed Revision Info
 | _rev (optional)                | Revision ID (when updating an existing      |
 |                                | document)                                   |
 +--------------------------------+---------------------------------------------+
-| _revs_info [array]             | CouchDB Document Extended Revision Info     |
+| _revs_info [array]             | CouchDB document extended revision info     |
 +--------------------------------+---------------------------------------------+
 |         rev                    | Full revision string                        |
 +--------------------------------+---------------------------------------------+
@@ -521,7 +521,7 @@ Returned CouchDB Document with Revision Info
 | _rev (optional)                | Revision ID (when updating an existing      |
 |                                | document)                                   |
 +--------------------------------+---------------------------------------------+
-| _revisions                     | CouchDB Document Revisions                  |
+| _revisions                     | CouchDB document revisions                  |
 +--------------------------------+---------------------------------------------+
 |     ids [array]                | Array of valid revision IDs, in reverse     |
 |                                | order (latest first)                        |
@@ -540,7 +540,7 @@ Returned Document with Attachments
 | _rev (optional)                | Revision ID (when updating an existing      |
 |                                | document)                                   |
 +--------------------------------+---------------------------------------------+
-| _attachments (optional)        | Document Attachment                         |
+| _attachments (optional)        | Document attachment                         |
 +--------------------------------+---------------------------------------------+
 |     filename                   | Attachment                                  |
 +--------------------------------+---------------------------------------------+
@@ -601,8 +601,8 @@ User Context Object
 +--------------------------------+---------------------------------------------+
 | Field                          | Description                                 |
 +================================+=============================================+
-| db                             | Database name in context of provided        |
-|                                | operation.                                  |
+| db                             | Database name in the context of the         |
+|                                | provided operation.                         |
 +--------------------------------+---------------------------------------------+
 | name                           | User name.                                  |
 +--------------------------------+---------------------------------------------+
