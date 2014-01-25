@@ -1003,7 +1003,7 @@ split_header(Line) ->
      mochiweb_util:parse_header(Value)}].
 
 read_until(#mp{data_fun=DataFun, buffer=Buffer}=Mp, Pattern, Callback) ->
-    case find_in_binary(Pattern, Buffer) of
+    case couch_util:find_in_binary(Pattern, Buffer) of
     not_found ->
         Callback2 = Callback(Buffer),
         {Buffer2, DataFun2} = DataFun(),
@@ -1078,34 +1078,6 @@ check_for_last(#mp{buffer=Buffer, data_fun=DataFun}=Mp) ->
         check_for_last(Mp#mp{buffer= <<Buffer/binary, Data/binary>>,
                 data_fun = DataFun2})
     end.
-
-find_in_binary(_B, <<>>) ->
-    not_found;
-
-find_in_binary(B, Data) ->
-    case binary:match(Data, [B], []) of
-    nomatch ->
-        partial_find(binary:part(B, {0, byte_size(B) - 1}),
-                     binary:part(Data, {byte_size(Data), -byte_size(Data) + 1}), 1);
-    {Pos, _Len} ->
-        {exact, Pos}
-    end.
-
-partial_find(<<>>, _Data, _Pos) ->
-    not_found;
-
-partial_find(B, Data, N) when byte_size(Data) > 0 ->
-    case binary:match(Data, [B], []) of
-    nomatch ->
-        partial_find(binary:part(B, {0, byte_size(B) - 1}),
-                     binary:part(Data, {byte_size(Data), -byte_size(Data) + 1}), N + 1);
-    {Pos, _Len} ->
-        {partial, N + Pos}
-    end;
-
-partial_find(_B, _Data, _N) ->
-    not_found.
-
 
 validate_bind_address(Address) ->
     case inet_parse:address(Address) of
