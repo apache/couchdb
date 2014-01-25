@@ -58,7 +58,7 @@ function (app, FauxtonAPI, CouchdbSession) {
           passwordsNotMatch:  'Passwords do not match.',
           incorrectCredentials: 'Incorrect username or password.',
           loggedIn: 'You have been logged in.',
-          adminCreated: 'Couchdb admin created',
+          adminCreated: 'CouchDB admin created',
           changePassword: 'Your password has been updated.'
         }, options.messages);
     },

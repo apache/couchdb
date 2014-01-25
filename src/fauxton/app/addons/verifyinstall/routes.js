@@ -29,7 +29,7 @@ function(app, FauxtonAPI, VerifyInstall) {
       this.setView('#dashboard-content', new VerifyInstall.Main({}));
     },
 
-    crumbs: [{name: 'Verify Couchdb Installation', link: '#'}]
+    crumbs: [{name: 'Verify CouchDB Installation', link: '#'}]
   });
 
   VerifyInstall.RouteObjects = [VerifyRouteObject];

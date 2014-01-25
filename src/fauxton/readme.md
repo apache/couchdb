@@ -21,7 +21,7 @@ A recent of [node.js](http://nodejs.org/) and npm is required.
 
 ### CouchDB Setup ###
 
-    1. Clone the Couchdb repo: https://github.com/apache/couchdb.git or http://git-wip-us.apache.org/repos/asf/couchdb.git
+    1. Clone the CouchDB repo: https://github.com/apache/couchdb.git or http://git-wip-us.apache.org/repos/asf/couchdb.git
     cd couchdb
 
 ### Fauxton Setup ###
@@ -63,7 +63,7 @@ A recent of [node.js](http://nodejs.org/) and npm is required.
 
 ### To Deploy Fauxton
 
-    ./bin/grunt couchapp_deploy - to deploy to your local [Couchdb instance] (http://localhost:5984/fauxton/_design/fauxton/index.html)
+    ./bin/grunt couchapp_deploy - to deploy to your local [CouchDB instance] (http://localhost:5984/fauxton/_design/fauxton/index.html)
 
 ## Understang Fauxton Code layout
 
