@@ -132,7 +132,7 @@ CouchDB database information object
 |                                | the data when it is stored on hard disk.    |
 +--------------------------------+---------------------------------------------+
 | disk_size                      | Size in bytes of the data as stored on disk.|
-|                                | Views indexes are not included in the       |
+|                                | View indexes are not included in the        |
 |                                | calculation.                                |
 +--------------------------------+---------------------------------------------+
 | instance_start_time            | Timestamp indicating when the database was  |
