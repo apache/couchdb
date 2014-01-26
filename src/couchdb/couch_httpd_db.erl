@@ -244,17 +244,30 @@ db_req(#httpd{method='GET',path_parts=[_DbName]}=Req, Db) ->
     send_json(Req, {DbInfo});
 
 db_req(#httpd{method='POST',path_parts=[_DbName]}=Req, Db) ->
-    couch_httpd:validate_ctype(Req, "application/json"),
-    Doc = couch_doc:from_json_obj(couch_httpd:json_body(Req)),
-    validate_attachment_names(Doc),
-    Doc2 = case Doc#doc.id of
-        <<"">> ->
-            Doc#doc{id=couch_uuids:new(), revs={0, []}};
-        _ ->
-            Doc
-    end,
-    DocId = Doc2#doc.id,
-    update_doc(Req, Db, DocId, Doc2);
+    case couch_util:to_list(couch_httpd:header_value(Req, "Content-Type")) of
+    ("application/json" ++ _) ->
+        Doc = couch_doc:from_json_obj(couch_httpd:json_body(Req)),
+        validate_attachment_names(Doc),
+        Doc2 = maybe_add_docid(Doc),
+        DocId = Doc2#doc.id,
+        update_doc(Req, Db, DocId, Doc2);
+    ("multipart/related;" ++ _) = ContentType ->
+        {ok, Doc0, WaitFun, Parser} = couch_doc:doc_from_multi_part_stream(
+            ContentType, fun() -> receive_request_data(Req) end),
+        validate_attachment_names(Doc0),
+        Doc2 = maybe_add_docid(Doc0),
+        DocId = Doc2#doc.id,
+        try
+            Result = update_doc(Req, Db, DocId, Doc2),
+            WaitFun(),
+            {Mega1, Units1, Micro1} = now(),
+            Result
+        catch throw:Err ->
+            % Document rejected by a validate_doc_update function.
+            couch_doc:abort_multi_part_stream(Parser),
+            throw(Err)
+        end
+    end;
 
 db_req(#httpd{path_parts=[_DbName]}=Req, _Db) ->
     send_method_not_allowed(Req, "DELETE,GET,HEAD,POST");
@@ -687,14 +700,27 @@ send_ranges_multipart(Req, ContentType, Len, Att, Ranges) ->
     {ok, Resp}.
 
 receive_request_data(Req) ->
-    receive_request_data(Req, couch_httpd:body_length(Req)).
+    Parent = self(),
+	Ref = make_ref(),
+    Receiver = spawn_link(fun() ->
+        couch_httpd:recv_chunked(Req, 4096, fun
+            ({_Len, Data}, _State) ->
+                Parent ! {chunked_bytes, Ref, Data},
+                receive
+                ok ->
+                    null
+                end
+            end, null),
+            unlink(Parent)
+        end),
+    receive_stream_data(Receiver, Ref).
 
-receive_request_data(Req, LenLeft) when LenLeft > 0 ->
-    Len = erlang:min(4096, LenLeft),
-    Data = couch_httpd:recv(Req, Len),
-    {Data, fun() -> receive_request_data(Req, LenLeft - iolist_size(Data)) end};
-receive_request_data(_Req, _) ->
-    throw(<<"expected more data">>).
+receive_stream_data(Receiver, Ref) ->
+    receive
+    {chunked_bytes, Ref, Data} ->
+        Receiver ! ok,
+        {Data, fun() -> receive_stream_data(Receiver, Ref) end}
+    end.
 
 make_content_range(From, To, Len) ->
     io_lib:format("bytes ~B-~B/~B", [From, To, Len]).
@@ -760,6 +786,14 @@ update_doc(Req, Db, DocId, #doc{deleted=Deleted}=Doc, Headers, UpdateType) ->
                 {ok, true},
                 {id, DocId},
                 {rev, NewRevStr}]})
+    end.
+
+maybe_add_docid(Doc) ->
+    case Doc#doc.id of
+        <<"">> ->
+            Doc#doc{id=couch_uuids:new(), revs={0, []}};
+        _  ->
+            Doc
     end.
 
 couch_doc_from_req(Req, DocId, #doc{revs=Revs}=Doc) ->
