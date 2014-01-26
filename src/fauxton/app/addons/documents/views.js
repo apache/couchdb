@@ -111,6 +111,76 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     }
   });
 
+  Views.DeleteDBModal = FauxtonAPI.View.extend({
+    template: "addons/documents/templates/delete_database_modal",
+
+    disableLoader: true,
+
+    initialize: function (options) {
+      _.bindAll(this);
+    },
+
+    events: {
+      "click a#delete-db-btn": "deleteDatabase",
+      "submit #delete-db-check": "deleteDatabase"
+    },
+
+    deleteDatabase: function (event) {
+      event.preventDefault();
+      var enterredName = this.$('#db_name')[0].value;
+      if (this.database.id != enterredName) {
+        this.set_error_msg(enterredName + " does not match database id - are you sure you want to delete " + this.database.id + "?");
+        return;
+      }
+      this.hideModal();
+      var databaseName = this.database.id;
+      FauxtonAPI.addNotification({
+        msg: "Deleting your database...",
+        type: "error",
+        clear: true
+      });
+
+      this.database.destroy().then(function () {
+        FauxtonAPI.navigate('#/_all_dbs');
+        FauxtonAPI.addNotification({
+          msg: 'The database <code>' + databaseName + '</code> has been deleted.',
+          clear: true
+        });
+      }).fail(function (rsp, error, msg) {
+        FauxtonAPI.addNotification({
+          msg: 'Could not delete the database, reason ' + msg + '.',
+          type: 'error',
+          clear: true
+        });
+      });
+    },
+
+    showModal: function () {
+      this.clear_error_msg();
+      this.$('.modal').modal();
+      // hack to get modal visible
+      $('.modal-backdrop').css('z-index',1025);
+    },
+
+    hideModal: function () {
+      this.$('.modal').modal('hide');
+    },
+
+    set_error_msg: function (msg) {
+      var text;
+      if (typeof(msg) == 'string') {
+        text = msg;
+      } else {
+        text = JSON.parse(msg.responseText).reason;
+      }
+      this.$('#modal-error').text(text).removeClass('hide');
+    },
+
+    clear_error_msg: function () {
+      this.$('#modal-error').text(' ').addClass('hide');
+    }
+  });
+
   Views.UploadModal = FauxtonAPI.View.extend({
     template: "addons/documents/templates/upload_modal",
 
@@ -409,7 +479,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         ddoc: this.ddoc,
         database: this.database,
         index_clean: app.utils.removeSpecialCharacters(this.index),
-        ddoc_clean: app.utils.removeSpecialCharacters(this.ddoc), 
+        ddoc_clean: app.utils.removeSpecialCharacters(this.ddoc),
         index_encoded: app.utils.safeURLName(this.index),
         ddoc_encoded: app.utils.safeURLName(this.ddoc),
         database_encoded: app.utils.safeURLName(this.database),
@@ -1356,7 +1426,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
           });
 
           if (that.newView || viewNameChange) {
-            var fragment = '/database/' + that.database.safeID() +'/' + ddoc.safeID() + '/_view/' + app.utils.safeURLName(viewName); 
+            var fragment = '/database/' + that.database.safeID() +'/' + ddoc.safeID() + '/_view/' + app.utils.safeURLName(viewName);
 
             FauxtonAPI.navigate(fragment, {trigger: false});
             that.newView = false;
@@ -1470,7 +1540,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
        }
 
       promise.then(function () {
-        params.docs = that.database.allDocs.map(function (model) { return model.get('doc');}); 
+        params.docs = that.database.allDocs.map(function (model) { return model.get('doc');});
         var queryPromise = pouchdb.runViewQuery({map: mapVal, reduce: reduceVal}, params);
         queryPromise.then(function (results) {
           FauxtonAPI.triggerRouteEvent('updatePreviewDocs', {rows: results.rows, ddoc: that.getCurrentDesignDoc().id, view: that.viewName});
@@ -1497,7 +1567,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     reduceVal: function() {
       var reduceOption = this.$('#reduce-function-selector :selected').val(),
       reduceVal = "";
-      
+
       if (reduceOption === 'CUSTOM') {
         if (!this.reduceEditor) { this.createReduceEditor(); }
         reduceVal = this.reduceEditor.getValue();
@@ -1678,7 +1748,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
   Views.Sidebar = FauxtonAPI.View.extend({
     template: "addons/documents/templates/sidebar",
     events: {
-      "click button#delete-database": "deleteDatabase"
+      "click button#delete-database": "showDeleteDatabaseModal"
     },
 
     initialize: function(options) {
@@ -1688,33 +1758,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         this.currView = options.ddocInfo.currView;
       }
     },
-
-    deleteDatabase: function (event) {
-      event.preventDefault();
-
-      var result = confirm('Are you sure you want to delete this database?');
-
-      if (!result) { return; }
-      var databaseName = this.database.id;
-      FauxtonAPI.addNotification({
-        msg: "Deleting your database...",
-        type: "error",
-        clear: true
-      });
-
-      this.database.destroy().then(function () {
-        FauxtonAPI.navigate('#/_all_dbs');
-        FauxtonAPI.addNotification({
-          msg: 'The database <code>' + databaseName + '</code> has been deleted.',
-          clear: true
-        });
-      }).fail(function (rsp, error, msg) {
-        FauxtonAPI.addNotification({
-          msg: 'Could not delete the database, reason ' + msg + '.',
-          type: 'error',
-          clear: true
-        });
-      });
+    showDeleteDatabaseModal: function(event){
+      this.deleteDBModal.showModal();
     },
 
     serialize: function() {
@@ -1749,6 +1794,10 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     },
 
     beforeRender: function(manage) {
+      this.deleteDBModal = this.setView(
+        '#delete-db-modal',
+        new Views.DeleteDBModal({database: this.database})
+      );
 
       var sidebarListViews = FauxtonAPI.getExtensions('sidebar:list');
       _.each(sidebarListViews, function (view) {
@@ -1756,7 +1805,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         extension.update(this.database, this.collection, this.viewName);
         extension.render();
       }, this);
-
 
       this.collection.each(function(design) {
         if (design.has('doc')){
