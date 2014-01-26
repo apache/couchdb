@@ -40,10 +40,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       this.active_id = options.active_id;
     },
 
-    events: {
-      "click #delete-database": "delete_database"
-    },
-
     serialize: function () {
       return {
         // TODO make this not hard coded here
@@ -64,21 +60,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         this.$('.active').removeClass('active');
         this.$('#'+this.active_id).addClass('active');
       }
-    },
-
-    delete_database: function (event) {
-      event.preventDefault();
-
-      var result = confirm("Are you sure you want to delete this database?");
-
-      if (!result) { return; }
-      FauxtonAPI.addNotification({
-        msg: "Deleting your database...",
-        type: "error"
-      });
-      return this.database.destroy().done(function () {
-        app.router.navigate('#/_all_dbs', {trigger: true});
-      });
     }
   });
 
@@ -1778,7 +1759,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       this.database.destroy().then(function () {
         FauxtonAPI.navigate('#/_all_dbs');
         FauxtonAPI.addNotification({
-          msg: 'The database ' + databaseName + ' has been deleted.',
+          msg: 'The database <code>' + databaseName + '</code> has been deleted.',
           clear: true
         });
       }).fail(function (rsp, error, msg) {
