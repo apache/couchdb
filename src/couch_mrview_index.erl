@@ -51,14 +51,17 @@ get(Property, State) ->
             #mrst{
                 fd = Fd,
                 sig = Sig,
-                id_btree = Btree,
+                id_btree = IdBtree,
+                log_btree = LogBtree,
                 language = Lang,
                 update_seq = UpdateSeq,
                 purge_seq = PurgeSeq,
                 views = Views
             } = State,
             {ok, FileSize} = couch_file:bytes(Fd),
-            {ok, ExternalSize} = couch_mrview_util:calculate_external_size(Views),
+            {ok, ExternalSize} = couch_mrview_util:calculate_external_size(IdBtree,
+                                                                           LogBtree,
+                                                                           Views),
             ActiveSize = ExternalSize + couch_btree:size(Btree),
             {ok, [
                 {signature, list_to_binary(couch_index_util:hexsig(Sig))},
