@@ -30,14 +30,30 @@ function(app, FauxtonAPI, resizeColumns) {
     return view.renderNotification();
   };
 
+  FauxtonAPI.UUID = FauxtonAPI.Model.extend({
+    initialize: function(options) {
+      options = _.extend({count: 1}, options);
+      this.count = options.count;
+    },
+
+    url: function() {
+      return app.host + "/_uuids?count=" + this.count;
+    },
+
+    next: function() {
+      return this.get("uuids").pop();
+    }
+  });
+
+
   Fauxton.initialize = function () {
     app.footer = new Fauxton.Footer({el: "#footer-content"}),
     app.navBar = new Fauxton.NavBar();
     app.apiBar = new Fauxton.ApiBar();
 
     FauxtonAPI.when.apply(null, app.footer.establish()).done(function() {
-      FauxtonAPI.masterLayout.layout.setView("#primary-navbar", app.navBar);
-      FauxtonAPI.masterLayout.layout.setView("#api-navbar", app.apiBar);
+      FauxtonAPI.masterLayout.setView("#primary-navbar", app.navBar, true);
+      FauxtonAPI.masterLayout.setView("#api-navbar", app.apiBar, true);
       app.navBar.render();
       app.apiBar.render();
 
@@ -57,13 +73,13 @@ function(app, FauxtonAPI, resizeColumns) {
     });
 
     FauxtonAPI.RouteObject.on('beforeEstablish', function (routeObject) {
-      FauxtonAPI.masterLayout.clearBreadcrumbs();
+      FauxtonAPI.masterLayout.removeView('#breadcrumbs');
       var crumbs = routeObject.get('crumbs');
 
       if (crumbs.length) {
-        FauxtonAPI.masterLayout.setBreadcrumbs(new Fauxton.Breadcrumbs({
+        FauxtonAPI.masterLayout.setView('#breadcrumbs', new Fauxton.Breadcrumbs({
           crumbs: crumbs
-        }));
+        }), true).render();
       }
     });
 
@@ -163,8 +179,6 @@ function(app, FauxtonAPI, resizeColumns) {
       } else {
         this.navLinks.push(link);
       }
-
-      //this.render();
     },
 
     removeLink: function (removeLink) {

@@ -25,7 +25,7 @@ function(FauxtonAPI,chai, sinonChai) {
    
    _.extend(ViewSandbox.prototype, {
     initialize: function () {
-      this.$el = $('<div style="display:no1ne"></div>').appendTo('body');
+      this.$el = $('<div style="display:none"></div>').appendTo('body');
       this.$ = this.$el.find;
     },
     views: [],

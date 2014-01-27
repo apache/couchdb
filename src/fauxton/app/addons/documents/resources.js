@@ -18,21 +18,6 @@ define([
 function(app, FauxtonAPI) {
   var Documents = FauxtonAPI.addon();
 
-  Documents.UUID = FauxtonAPI.Model.extend({
-    initialize: function(options) {
-      options = _.extend({count: 1}, options);
-      this.count = options.count;
-    },
-
-    url: function() {
-      return "/_uuids?count=" + this.count;
-    },
-
-    next: function() {
-      return this.get("uuids").pop();
-    }
-  });
-
   Documents.Doc = Backbone.Model.extend({
     idAttribute: "_id",
     documentation: function(){
@@ -273,7 +258,7 @@ function(app, FauxtonAPI) {
 
   Documents.NewDoc = Documents.Doc.extend({
     fetch: function() {
-      var uuid = new Documents.UUID();
+      var uuid = new FauxtonAPI.UUID();
       var deferred = this.deferred = $.Deferred();
       var that = this;
 

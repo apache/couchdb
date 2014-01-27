@@ -15,11 +15,10 @@ define([
        "core/layout",
        "core/router",
        "core/routeObject",
-       "core/couchdbSession",
        "core/utils"
 ],
 
-function(FauxtonAPI, Layout, Router, RouteObject, CouchdbSession, utils) {
+function(FauxtonAPI, Layout, Router, RouteObject, utils) {
   FauxtonAPI = _.extend(FauxtonAPI, {
     Layout: Layout,
     Router: Router,

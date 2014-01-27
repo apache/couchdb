@@ -264,7 +264,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     showModal: function () {
       var showModal = this._showModal,
           setDefaultIdValue = this.setDefaultIdValue,
-          uuid = new Documents.UUID();
+          uuid = new FauxtonAPI.UUID();
 
       uuid.fetch().then(function () {
         setDefaultIdValue(uuid.next());

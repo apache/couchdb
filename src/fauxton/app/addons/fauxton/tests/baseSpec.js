@@ -34,13 +34,18 @@ define([
       testRouteObject = new TestRouteObject();
       var apiBar = {};
       apiBar.hide = sinon.spy();
+      var setViewSpy = sinon.stub();
+      setViewSpy.returns({
+        render: function () {}
+      });
 
       // Need to find a better way of doing this
       mockLayout = {
         setTemplate: sinon.spy(),
         clearBreadcrumbs: sinon.spy(),
-        setView: sinon.spy(),
+        setView: setViewSpy,
         renderView: sinon.spy(),
+        removeView: sinon.spy(),
         hooks: [],
         setBreadcrumbs: sinon.spy(),
         apiBar: apiBar,
@@ -59,13 +64,13 @@ define([
     it('Should clear breadcrumbs', function () {
       FauxtonAPI.masterLayout = mockLayout;
       testRouteObject.renderWith('the-route', mockLayout, 'args');
-      assert.ok(mockLayout.clearBreadcrumbs.calledOnce, 'Clear Breadcrumbs called');
+      assert.ok(mockLayout.removeView.calledWith('#breadcrumbs'), 'Clear Breadcrumbs called');
     });
 
     it('Should set breadcrumbs when breadcrumbs exist', function () {
       FauxtonAPI.masterLayout = mockLayout;
       testRouteObject.renderWith('the-route', mockLayout, 'args');
-      assert.ok(mockLayout.setBreadcrumbs.calledOnce, 'Set Breadcrumbs was called');
+      assert.ok(mockLayout.setView.calledOnce, 'Set Breadcrumbs was called');
     });
 
   });
