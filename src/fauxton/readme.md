@@ -32,7 +32,11 @@ A recent of [node.js](http://nodejs.org/) and npm is required.
     npm install
 
 ### Dev Server
-    Using the dev server is the easiest way to use fauxton, specially when developing for it.
+Using the dev server is the easiest way to use fauxton, specially when
+developing for it. Copy or symlink the `settings.json.default` (or the
+`settings.json.dev` file if you'd like to see the `styletests` addon).
+
+And then...
 
     grunt dev
 
