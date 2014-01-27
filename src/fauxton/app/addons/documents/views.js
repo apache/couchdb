@@ -113,14 +113,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     }
   });
 
-  Views.DeleteDBModal = FauxtonAPI.View.extend({
+  Views.DeleteDBModal = Components.ModalView.extend({
     template: "addons/documents/templates/delete_database_modal",
-
-    disableLoader: true,
-
-    initialize: function (options) {
-      _.bindAll(this);
-    },
 
     events: {
       "click a#delete-db-btn": "deleteDatabase",
@@ -155,42 +149,11 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
           clear: true
         });
       });
-    },
-
-    showModal: function () {
-      this.clear_error_msg();
-      this.$('.modal').modal();
-      // hack to get modal visible
-      $('.modal-backdrop').css('z-index',1025);
-    },
-
-    hideModal: function () {
-      this.$('.modal').modal('hide');
-    },
-
-    set_error_msg: function (msg) {
-      var text;
-      if (typeof(msg) == 'string') {
-        text = msg;
-      } else {
-        text = JSON.parse(msg.responseText).reason;
-      }
-      this.$('#modal-error').text(text).removeClass('hide');
-    },
-
-    clear_error_msg: function () {
-      this.$('#modal-error').text(' ').addClass('hide');
     }
   });
 
-  Views.UploadModal = FauxtonAPI.View.extend({
+  Views.UploadModal = Components.ModalView.extend({
     template: "addons/documents/templates/upload_modal",
-
-    disableLoader: true,
-
-    initialize: function (options) {
-      _.bindAll(this);
-    },
 
     events: {
       "click a#upload-btn": "uploadFile"
@@ -247,39 +210,13 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       this.$('.progress').removeClass('hide');
     },
 
-    showModal: function () {
+    _showModal: function () {
       this.$('.bar').css({width: '0%'});
       this.$('.progress').addClass('hide');
-      this.clear_error_msg();
-      this.$('.modal').modal();
-      // hack to get modal visible
-      $('.modal-backdrop').css('z-index',1025);
-    },
-
-    hideModal: function () {
-      this.$('.modal').modal('hide');
-    },
-
-    set_error_msg: function (msg) {
-      var text;
-      if (typeof(msg) == 'string') {
-        text = msg;
-      } else {
-        text = JSON.parse(msg.responseText).reason;
-      }
-      this.$('#modal-error').text(text).removeClass('hide');
-    },
-
-    clear_error_msg: function () {
-      this.$('#modal-error').text(' ').addClass('hide');
-    },
-
-    serialize: function () {
-      return this.model.toJSON();
     }
   });
 
-  Views.DuplicateDocModal = FauxtonAPI.View.extend({
+  Views.DuplicateDocModal = Components.ModalView.extend({
     template: "addons/documents/templates/duplicate_doc_modal",
 
     initialize: function () {
@@ -325,30 +262,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
     setDefaultIdValue: function (id) {
       this.$('#dup-id').val(id);
-    },
-
-    hideModal: function () {
-      this.$('.modal').modal('hide');
-    },
-
-    set_error_msg: function (msg) {
-      var text;
-      if (typeof(msg) == 'string') {
-        text = msg;
-      } else {
-        text = JSON.parse(msg.responseText).reason;
-      }
-      this.$('#modal-error').text(text).removeClass('hide');
-    },
-
-    clear_error_msg: function () {
-      this.$('#modal-error').text(' ').addClass('hide');
-    },
-
-    serialize: function () {
-      return this.model.toJSON();
     }
-
   });
 
   Views.FieldEditorTabs = FauxtonAPI.View.extend({
