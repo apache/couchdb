@@ -150,7 +150,6 @@ view_changes_since(Db, DDoc, VName, StartSeq, Fun, Options, Acc) ->
                 true -> View#mrview.key_byseq_btree;
                 _ -> View#mrview.seq_btree
             end,
-            io:format("opt list ~p~n", [OptList]),
             AccOut = lists:foldl(fun(Opts, Acc0) ->
                         {ok, _R, A} = couch_mrview_util:fold_changes(
                                     Btree, Fun, Acc0, Opts),

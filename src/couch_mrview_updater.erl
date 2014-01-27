@@ -55,40 +55,66 @@ start_update(Partial, State, NumChanges) ->
 purge(_Db, PurgeSeq, PurgedIdRevs, State) ->
     #mrst{
         id_btree=IdBtree,
+        log_btree=LogBtree,
         views=Views
     } = State,
 
     Ids = [Id || {Id, _Revs} <- PurgedIdRevs],
-    {ok, Lookups, IdBtree2} = couch_btree:query_modify(IdBtree, Ids, [], Ids),
+    {ok, Lookups, LLookups, LogBtree2, IdBtree2} = case LogBtree of
+        nil ->
+            {ok, L, Bt} = couch_btree:query_modify(IdBtree, Ids, [], Ids),
+            {ok, L, [], nil, Bt};
+        _ ->
+            {ok, L, Bt} = couch_btree:query_modify(IdBtree, Ids, [], Ids),
+            {ok, LL, LBt} = couch_btree:query_modify(LogBtree, Ids, [], Ids),
+            {ok, L, LL, LBt, Bt}
+    end,
 
     MakeDictFun = fun
         ({ok, {DocId, ViewNumRowKeys}}, DictAcc) ->
-            FoldFun = fun({ViewNum, RowKey}, DictAcc2) ->
-                dict:append(ViewNum, {RowKey, DocId}, DictAcc2)
+            FoldFun = fun
+                ({ViewNum, {Key, Seq, _Op}}, DictAcc2) ->
+                    dict:append(ViewNum, {Key, Seq, DocId}, DictAcc2);
+                ({ViewNum, RowKey}, DictAcc2) ->
+                    dict:append(ViewNum, {RowKey, DocId}, DictAcc2)
             end,
             lists:foldl(FoldFun, DictAcc, ViewNumRowKeys);
         ({not_found, _}, DictAcc) ->
             DictAcc
     end,
     KeysToRemove = lists:foldl(MakeDictFun, dict:new(), Lookups),
+    SeqsToRemove = lists:foldl(MakeDictFun, dict:new(), LLookups),
 
-    RemKeysFun = fun(#mrview{id_num=Num, btree=Btree}=View) ->
-        case dict:find(Num, KeysToRemove) of
-            {ok, RemKeys} ->
-                {ok, Btree2} = couch_btree:add_remove(Btree, [], RemKeys),
-                NewPurgeSeq = case Btree2 /= Btree of
-                    true -> PurgeSeq;
-                    _ -> View#mrview.purge_seq
-                end,
-                View#mrview{btree=Btree2, purge_seq=NewPurgeSeq};
-            error ->
-                View
-        end
+    RemKeysFun = fun(#mrview{id_num=ViewId}=View) ->
+        ToRem = couch_util:dict_find(ViewId, KeysToRemove, []),
+        {ok, VBtree2} = couch_btree:add_remove(View#mrview.btree, [], ToRem),
+        NewPurgeSeq = case VBtree2 =/= View#mrview.btree of
+            true -> PurgeSeq;
+            _ -> View#mrview.purge_seq
+        end,
+        {SeqBtree2, KeyBySeqBtree2} = case View#mrview.seq_indexed of
+            true ->
+                SToRem = couch_util:dict_find(ViewId, SeqsToRemove, []),
+                SKs = [{Seq, Key} || {Key, Seq, _} <- SToRem],
+                KSs = [{[Seq, Key], DocId} || {Key, Seq, DocId} <- SToRem],
+                {ok, SBt} = couch_btree:add_remove(View#mrview.seq_btree,
+                                                   [], SKs),
+                {ok, KSbt} = couch_btree:add_remove(View#mrview.key_byseq_btree,
+                                                    [], KSs),
+                {SBt, KSbt};
+            _ -> {nil, nil}
+        end,
+        View#mrview{btree=VBtree2,
+                    seq_btree=SeqBtree2,
+                    key_byseq_btree=KeyBySeqBtree2,
+                    purge_seq=NewPurgeSeq}
+
     end,
 
     Views2 = lists:map(RemKeysFun, Views),
     {ok, State#mrst{
         id_btree=IdBtree2,
+        log_btree=LogBtree2,
         views=Views2,
         purge_seq=PurgeSeq
     }}.
@@ -345,7 +371,6 @@ update_log(Btree, Log, UpdatedSeq, _) ->
                             end, KeysAcc, DIKeys),
                 {[Id | IdsAcc], KeysAcc1} end, {[], []}, Log),
 
-    io:format("updated ~p~n", [Updated]),
     RemValue = {[{<<"_removed">>, true}]},
     {Log1, AddAcc, DelAcc} = walk_log(Btree, fun({DocId, VIdKeys},
                                                           {Log2, AddAcc2, DelAcc2}) ->
