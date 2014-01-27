@@ -49,7 +49,6 @@ FAUXTON_FILES = \
     fauxton/app/addons/activetasks/templates/tabs.html \
     fauxton/app/addons/activetasks/tests/viewsSpec.js \
     fauxton/app/addons/activetasks/views.js \
-    fauxton/app/addons/auth/assets/less/auth.less \
     fauxton/app/addons/auth/base.js \
     fauxton/app/addons/auth/resources.js \
     fauxton/app/addons/auth/routes.js \
