@@ -15,7 +15,7 @@
 % the License.
 
 main(_) ->
-    etap:plan(10),
+    etap:plan(14),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -40,7 +40,8 @@ test() ->
     test_basic_count_since(Db),
     test_range_count_since(Db),
     test_compact(Db),
-    test_util:stop_couch(),
+    test_remove_key(Db),
+    catch test_util:stop_couch(),
     ok.
 
 
@@ -111,6 +112,43 @@ test_compact(Db) ->
     etap:is(Result, ok, "compact view is OK"),
     Count = run_count_query(Db, 0, []),
     etap:is(Count, 10, "compact view worked.").
+
+test_remove_key(Db) ->
+    %% add new doc
+    Doc = couch_mrview_test_util:doc(11),
+    {ok, Rev} = couch_db:update_doc(Db, Doc, []),
+    RevStr = couch_doc:rev_to_str(Rev),
+    {ok, _} =  couch_db:ensure_full_commit(Db),
+    {ok, Db1} = couch_db:reopen(Db),
+    Result = run_count_query(Db1, 0, []),
+    etap:is(Result, 11, "Add new doc worked."),
+    %% check new view key
+    Result1 = run_query(Db1, 0, [{start_key, 11}, {end_key, 11}]),
+    Expect = {ok, [
+                {{12, 11, <<"11">>}, 11}
+    ]},
+    etap:is(Result1, Expect, "added key OK."),
+
+    %% delete doc
+    Doc2 = couch_doc:from_json_obj({[
+                {<<"_id">>, <<"11">>},
+                {<<"_rev">>, RevStr},
+                {<<"_deleted">>, true}
+    ]}),
+    {ok, _} = couch_db:update_doc(Db1, Doc2, []),
+    {ok, Db2} = couch_db:reopen(Db1),
+    Result2 = run_count_query(Db2, 0, []),
+    etap:is(Result2, 11, "removed key saved."),
+    %% check new view key
+    Result3 = run_query(Db2, 0, [{start_key, 11}, {end_key, 11}]),
+    Expect2 = {ok, [
+                {{13, 11, <<"11">>}, {[{<<"_removed">>, true}]}}
+    ]},
+    etap:is(Result3, Expect2, "removed key OK.").
+
+
+
+
 
 run_query(Db, Since, Opts) ->
     Fun = fun(KV, Acc) -> {ok, [KV | Acc]} end,
