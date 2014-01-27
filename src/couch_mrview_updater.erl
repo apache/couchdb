@@ -311,13 +311,15 @@ write_kvs(State, UpdateSeq, ViewKVs, DocIdKeys, Log) ->
             true ->
                 SToRem = couch_util:dict_find(ViewId, SeqsToRemove, []),
                 SToAdd = couch_util:dict_find(ViewId, SeqsToAdd, []),
+                RemSKs = [{Seq, Key} || {Key, Seq, _} <- SToRem],
+                RemKSs = [{[Seq, Key], DocId} || {Key, Seq, DocId} <- SToRem],
                 SKVs1 = SKVs ++ SToAdd,
                 {ok, SBt} = couch_btree:add_remove(View#mrview.seq_btree,
-                                                   SKVs1, SToRem),
+                                                   SKVs1, RemSKs),
 
                 {ok, KSbt} = couch_btree:add_remove(View#mrview.key_byseq_btree,
                                                     couch_mrview_util:to_key_seq(SKVs1),
-                                                    couch_mrview_util:to_key_seq(SToRem)),
+                                                    RemKSs),
                 {SBt, KSbt};
             _ -> {nil, nil}
         end,
@@ -382,8 +384,9 @@ update_log(Btree, Log, UpdatedSeq, _) ->
                                 true ->
                                     %% the log is updated, deleted old
                                     %% record from the view
-                                    DelAcc5 = dict:append(ViewId, {Seq, Key},
-                                                        DelAcc4),
+                                    DelAcc5 = dict:append(ViewId,
+                                                          {Key, Seq, DocId},
+                                                          DelAcc4),
                                     {Log4, AddAcc4, DelAcc5};
                                 false when Op /= del ->
                                     %% an update operation has been
@@ -396,8 +399,9 @@ update_log(Btree, Log, UpdatedSeq, _) ->
                                                        {ViewId,
                                                         {Key,UpdatedSeq, del}},
                                                        Log4),
-                                    DelAcc5 = dict:append(ViewId, {Seq, Key},
-                                                        DelAcc4),
+                                    DelAcc5 = dict:append(ViewId,
+                                                          {Key, Seq, DocId},
+                                                          DelAcc4),
                                     AddAcc5 = dict:append(ViewId,
                                                           {{UpdatedSeq, Key},
                                                            {DocId, RemValue}},
