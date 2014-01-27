@@ -236,13 +236,8 @@ init_state(Db, Fd, State, Header) ->
         views=Views2
     }.
 
-less_json_seqs({SeqA, JsonA}, {SeqB, JsonB}) ->
-    case couch_ejson_compare:less(SeqA, SeqB) of
-        0 ->
-            couch_ejson_compare:less_json(JsonA, JsonB);
-        Result ->
-            Result < 0
-    end.
+less_json_seqs({SeqA, _JsonA}, {SeqB, _JsonB}) ->
+    couch_ejson_compare:less(SeqA, SeqB) < 0.
 
 open_view(Db, Fd, Lang, {BTState, SeqBTState, KSeqBTState, USeq, PSeq}, View) ->
     FunSrcs = [FunSrc || {_Name, FunSrc} <- View#mrview.reduce_funs],
@@ -355,11 +350,22 @@ fold_fun(Fun, [KV|Rest], {KVReds, Reds}, Acc) ->
             {stop, Acc2}
     end.
 
+
 fold_changes(Bt, Fun, Acc, Opts) ->
     WrapperFun = fun(KV, _Reds, Acc2) ->
-        Fun(changes_expand_dups([KV], []), Acc2)
+        fold_changes_fun(Fun, changes_expand_dups([KV], []), Acc2)
     end,
     {ok, _LastRed, _Acc} = couch_btree:fold(Bt, WrapperFun, Acc, Opts).
+
+fold_changes_fun(_Fun, [], Acc) ->
+    {ok, Acc};
+fold_changes_fun(Fun, [KV|Rest],  Acc) ->
+    case Fun(KV, Acc) of
+        {ok, Acc2} ->
+            fold_changes_fun(Fun, Rest, Acc2);
+        {stop, Acc2} ->
+            {stop, Acc2}
+    end.
 
 
 fold_reduce({NthRed, Lang, View}, Fun,  Acc, Options) ->
@@ -788,15 +794,15 @@ expand_dups([KV | Rest], Acc) ->
 changes_expand_dups([], Acc) ->
     lists:reverse(Acc);
 changes_expand_dups([{{[Key, Seq], DocId}, {dups, Vals}} | Rest], Acc) ->
-    Expanded = [{{Key, Seq, DocId}, Val} || Val <- Vals],
+    Expanded = [{{Seq, Key, DocId}, Val} || Val <- Vals],
     changes_expand_dups(Rest, Expanded ++ Acc);
-changes_expand_dups([{{Key, Seq}, {DocId, {dups, Vals}}} | Rest], Acc) ->
-    Expanded = [{{Key, Seq, DocId}, Val} || Val <- Vals],
+changes_expand_dups([{{Seq, Key}, {DocId, {dups, Vals}}} | Rest], Acc) ->
+    Expanded = [{{Seq, Key, DocId}, Val} || Val <- Vals],
     changes_expand_dups(Rest, Expanded ++ Acc);
 changes_expand_dups([{{[Key, Seq], DocId}, Val} | Rest], Acc) ->
-    changes_expand_dups(Rest, [{{Key, Seq, DocId}, Val} | Acc]);
-changes_expand_dups([{{Key, Seq}, {DocId, Val}} | Rest], Acc) ->
-    changes_expand_dups(Rest, [{{Key, Seq, DocId}, Val} | Acc]).
+    changes_expand_dups(Rest, [{{Seq, Key, DocId}, Val} | Acc]);
+changes_expand_dups([{{Seq, Key}, {DocId, Val}} | Rest], Acc) ->
+    changes_expand_dups(Rest, [{{Seq, Key, DocId}, Val} | Acc]).
 
 maybe_load_doc(_Db, _DI, #mrargs{include_docs=false}) ->
     [];

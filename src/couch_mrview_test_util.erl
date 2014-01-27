@@ -40,14 +40,31 @@ save_docs(Db, Docs) ->
 
 
 make_docs(Count) ->
-    make_docs(Count, []).
+    [doc(I) || I <- lists:seq(1, Count)].
 
-make_docs(Count, Acc) when Count =< 0 ->
-    Acc;
-make_docs(Count, Acc) ->
-    make_docs(Count-1, [doc(Count) | Acc]).
-
-
+ddoc(changes) ->
+    couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/bar">>},
+        {<<"options">>, {[
+            {<<"seq_indexed">>, true}
+        ]}},
+        {<<"views">>, {[
+            {<<"baz">>, {[
+                {<<"map">>, <<"function(doc) {emit(doc.val, doc.val);}">>}
+            ]}},
+            {<<"bing">>, {[
+                {<<"map">>, <<"function(doc) {}">>}
+            ]}},
+            {<<"zing">>, {[
+                {<<"map">>, <<
+                    "function(doc) {\n"
+                    "  if(doc.foo !== undefined)\n"
+                    "    emit(doc.foo, 0);\n"
+                    "}"
+                >>}
+            ]}}
+        ]}}
+    ]});
 ddoc(map) ->
     couch_doc:from_json_obj({[
         {<<"_id">>, <<"_design/bar">>},

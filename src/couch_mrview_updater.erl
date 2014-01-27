@@ -312,7 +312,7 @@ write_kvs(State, UpdateSeq, ViewKVs, DocIdKeys, Log) ->
                 SToRem = couch_util:dict_find(ViewId, SeqsToRemove, []),
                 SToAdd = couch_util:dict_find(ViewId, SeqsToAdd, []),
                 RemSKs = [{Seq, Key} || {Key, Seq, _} <- SToRem],
-                RemKSs = [{[Seq, Key], DocId} || {Key, Seq, DocId} <- SToRem],
+                RemKSs = [{[Key, Seq], DocId} || {Key, Seq, DocId} <- SToRem],
                 SKVs1 = SKVs ++ SToAdd,
                 {ok, SBt} = couch_btree:add_remove(View#mrview.seq_btree,
                                                    SKVs1, RemSKs),
