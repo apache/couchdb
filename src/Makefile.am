@@ -231,6 +231,7 @@ FAUXTON_FILES = \
     fauxton/assets/js/plugins/backbone.layoutmanager.js \
     fauxton/assets/js/plugins/jquery.form.js \
     fauxton/assets/js/plugins/prettify.js \
+    fauxton/assets/js/plugins/beautify.js\
     fauxton/assets/less/bootstrap/accordion.less \
     fauxton/assets/less/bootstrap/alerts.less \
     fauxton/assets/less/bootstrap/bootstrap.less \
