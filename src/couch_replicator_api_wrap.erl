@@ -69,20 +69,37 @@ db_open(Db, Options) ->
 
 db_open(#httpdb{} = Db1, _Options, Create) ->
     {ok, Db} = couch_replicator_httpc:setup(Db1),
-    case Create of
-    false ->
-        ok;
-    true ->
-        send_req(Db, [{method, put}], fun(_, _, _) -> ok end)
-    end,
-    send_req(Db, [{method, head}],
-        fun(200, _, _) ->
-            {ok, Db};
-        (401, _, _) ->
-            throw({unauthorized, ?l2b(db_uri(Db))});
-        (_, _, _) ->
-            throw({db_not_found, ?l2b(db_uri(Db))})
-        end);
+    try
+        case Create of
+        false ->
+            ok;
+        true ->
+            send_req(Db, [{method, put}],
+                fun(401, _, _) ->
+                    throw({unauthorized, ?l2b(db_uri(Db))});
+                (_, _, _) ->
+                    ok
+                end)
+        end,
+        send_req(Db, [{method, head}],
+            fun(200, _, _) ->
+                {ok, Db};
+            (401, _, _) ->
+                throw({unauthorized, ?l2b(db_uri(Db))});
+            (_, _, _) ->
+                throw({db_not_found, ?l2b(db_uri(Db))})
+            end)
+    catch
+        throw:Error ->
+            db_close(Db),
+            throw(Error);
+        error:Error ->
+            db_close(Db),
+            erlang:error(Error);
+        exit:Error ->
+            db_close(Db),
+            erlang:exit(Error)
+    end;
 db_open(DbName, Options, Create) ->
     try
         case Create of
