@@ -24,11 +24,13 @@ define([
        "resizeColumns",
 
        // Plugins
-       "plugins/prettify"
+       "plugins/beautify",
+       "plugins/prettify",
+
 
 ],
 
-function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColumns) {
+function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColumns, beautify) {
   var Views = {};
   Views.Tabs = FauxtonAPI.View.extend({
     template: "addons/documents/templates/tabs",
@@ -1246,7 +1248,9 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       "click button.delete": "deleteView",
       "change select#reduce-function-selector": "updateReduce",
       "click button.preview": "previewView",
-      "click #db-views-tabs-nav": 'toggleIndexNav'
+      "click #db-views-tabs-nav": 'toggleIndexNav',
+      "click .beautify_map":  "beautifyCode",
+      "click .beautify_reduce":  "beautifyCode"
     },
 
     langTemplates: {
@@ -1591,6 +1595,11 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         couchJSHINT: true
       });
       this.reduceEditor.render();
+
+      if (this.reduceEditor.getLines() === 1){
+        this.$('.beautify_reduce').removeClass("hidden");
+        $('.beautify-tooltip').tooltip();
+      }
     },
 
     beforeRender: function () {
@@ -1639,6 +1648,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         this.$('#index').hide();
         this.$('#index-nav').parent().removeClass('active');
       }
+
+
     },
 
     showEditors: function () {
@@ -1663,8 +1674,18 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
       this.mapEditor.editSaved();
       this.reduceEditor && this.reduceEditor.editSaved();
-    },
 
+      if (this.mapEditor.getLines() === 1){
+        this.$('.beautify_map').removeClass("hidden");
+        $('.beautify-tooltip').tooltip();
+      }
+    },
+    beautifyCode: function(e){
+      e.preventDefault();
+      var targetEditor = $(e.currentTarget).hasClass('beautify_reduce')?this.reduceEditor:this.mapEditor;
+      var beautifiedCode = beautify(targetEditor.getValue());
+      targetEditor.setValue(beautifiedCode);
+    },
     cleanup: function () {
       this.mapEditor && this.mapEditor.remove();
       this.reduceEditor && this.reduceEditor.remove();

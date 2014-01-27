@@ -284,6 +284,10 @@ function(app, FauxtonAPI, ace) {
       this.editor.resize();
     },
 
+    getLines: function(){
+      return this.editor.getSession().getDocument().getLength();
+    },
+
     addCommands: function () {
       _.each(this.commands, function (command) {
         this.editor.commands.addCommand(command);
