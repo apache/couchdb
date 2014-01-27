@@ -16,6 +16,7 @@
 -export([query_all_docs/2, query_all_docs/4]).
 -export([query_view/3, query_view/4, query_view/6]).
 -export([view_changes_since/6, view_changes_since/7]).
+-export([count_view_changes_since/4, count_view_changes_since/5]).
 -export([get_info/2]).
 -export([trigger_update/2, trigger_update/3]).
 -export([compact/2, compact/3, cancel_compaction/2]).
@@ -160,10 +161,34 @@ view_changes_since(Db, DDoc, VName, StartSeq, Fun, Options, Acc) ->
             {error, seqs_not_indexed}
     end.
 
-get_info(Db, DDocId) when is_binary(DDocId) ->
-    DbName = mem3:dbname(Db#db.name),
-    {ok, DDoc} = ddoc_cache:open(DbName, DDocId),
-    get_info(Db, DDoc);
+count_view_changes_since(Db, DDoc, VName, SinceSeq) ->
+    count_view_changes_since(Db, DDoc, VName, SinceSeq, []).
+
+count_view_changes_since(Db, DDoc, VName, SinceSeq, Options) ->
+    Args0 = make_view_changes_args(Options),
+    {ok, {_, View}, _, Args} = couch_mrview_util:get_view(Db, DDoc, VName,
+                                                          Args0),
+    case View#mrview.seq_indexed of
+        true ->
+            OptList = make_view_changes_opts(SinceSeq, Options, Args),
+            Btree = case is_key_byseq(Options) of
+                true -> View#mrview.key_byseq_btree;
+                _ -> View#mrview.seq_btree
+            end,
+            lists:foldl(fun(Opts, Acc0) ->
+                            {ok, N} = couch_btree:fold_reduce(
+                                    Btree, fun(_SeqStart, PartialReds, 0) ->
+                                        {ok, couch_btree:final_reduce(
+                                                    Btree, PartialReds)}
+                                    end,
+                                0, Opts),
+                            Acc0 + N
+                    end, 0, OptList);
+        _ ->
+            {error, seqs_not_indexed}
+    end.
+
+
 get_info(Db, DDoc) ->
     {ok, Pid} = couch_index_server:get_index(couch_mrview_index, Db, DDoc),
     couch_index:get_info(Pid).

@@ -244,7 +244,6 @@ less_json_seqs({SeqA, JsonA}, {SeqB, JsonB}) ->
             Result < 0
     end.
 
-
 open_view(Db, Fd, Lang, {BTState, SeqBTState, KSeqBTState, USeq, PSeq}, View) ->
     FunSrcs = [FunSrc || {_Name, FunSrc} <- View#mrview.reduce_funs],
     ReduceFun =
@@ -273,10 +272,15 @@ open_view(Db, Fd, Lang, {BTState, SeqBTState, KSeqBTState, USeq, PSeq}, View) ->
 
     {SeqBtree, KeyBySeqBtree} = case View#mrview.seq_indexed of
         true ->
+            BySeqReduceFun = fun couch_db_updater:btree_by_seq_reduce/2,
             ViewSeqBtOpts = [{less, fun less_json_seqs/2},
+                             {reduce, BySeqReduceFun},
                              {compression, couch_db:compression(Db)}],
+            KeyBySeqBtOpts = [{less, Less},
+                              {reduce, BySeqReduceFun},
+                              {compression, couch_db:compression(Db)}],
             {ok, SBt} = couch_btree:open(SeqBTState, Fd, ViewSeqBtOpts),
-            {ok, KSBt} = couch_btree:open(KSeqBTState, Fd, ViewBtOpts),
+            {ok, KSBt} = couch_btree:open(KSeqBTState, Fd, KeyBySeqBtOpts),
             {SBt, KSBt};
         false ->
             {nil, nil}
