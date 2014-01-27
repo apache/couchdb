@@ -118,7 +118,7 @@ function(app, FauxtonAPI, ace) {
     },
 
     pageStart: function () {
-      return (this.previousParams.length * this.pageLimit()) + 1; 
+      return (this.previousParams.length * this.pageLimit()) + 1;
 
     },
 
@@ -159,6 +159,47 @@ function(app, FauxtonAPI, ace) {
 
   });
 
+  Components.ModalView = FauxtonAPI.View.extend({
+
+    disableLoader: true,
+
+    initialize: function (options) {
+      _.bindAll(this);
+    },
+
+    showModal: function () {
+      if (this._showModal){ this._showModal();}
+      this.clear_error_msg();
+      this.$('.modal').modal();
+      // hack to get modal visible
+      $('.modal-backdrop').css('z-index',1025);
+    },
+
+    hideModal: function () {
+      this.$('.modal').modal('hide');
+    },
+
+    set_error_msg: function (msg) {
+      var text;
+      if (typeof(msg) == 'string') {
+        text = msg;
+      } else {
+        text = JSON.parse(msg.responseText).reason;
+      }
+      this.$('#modal-error').text(text).removeClass('hide');
+    },
+
+    clear_error_msg: function () {
+      this.$('#modal-error').text(' ').addClass('hide');
+    },
+
+    serialize: function () {
+      if (this.model){
+        return this.model.toJSON();
+      }
+      return {};
+    }
+  });
 
   Components.DbSearchTypeahead = Components.Typeahead.extend({
     initialize: function (options) {
