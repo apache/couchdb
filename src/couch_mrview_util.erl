@@ -18,6 +18,7 @@
 -export([index_file/2, compaction_file/2, open_file/1]).
 -export([delete_files/2, delete_index_file/2, delete_compaction_file/2]).
 -export([get_row_count/1, all_docs_reduce_to_count/1, reduce_to_count/1]).
+-export([get_view_changes_count/1]).
 -export([all_docs_key_opts/1, all_docs_key_opts/2, key_opts/1, key_opts/2]).
 -export([fold/4, fold_reduce/4]).
 -export([temp_view_to_ddoc/1]).
@@ -333,6 +334,12 @@ reduce_to_count(Reductions) ->
     {Count, _} = couch_btree:final_reduce(Reduce, Reductions),
     Count.
 
+%% @doc get all changes for a view
+get_view_changes_count(#mrview{seq_btree=Btree}) ->
+    couch_btree:fold_reduce(
+            Btree, fun(_SeqStart, PartialReds, 0) ->
+                    {ok, couch_btree:final_reduce(Btree, PartialReds)}
+            end,0, []).
 
 fold(#mrview{btree=Bt}, Fun, Acc, Opts) ->
     WrapperFun = fun(KV, Reds, Acc2) ->
@@ -634,10 +641,13 @@ reset_state(State) ->
     State#mrst{
         fd=nil,
         qserver=nil,
+        seq_indexed=State#mrst.seq_indexed,
         update_seq=0,
         id_btree=nil,
         log_btree=nil,
-        views=[View#mrview{btree=nil, seq_btree=nil, key_byseq_btree=nil}
+        views=[View#mrview{btree=nil, seq_btree=nil,
+                           key_byseq_btree=nil,
+                           seq_indexed=View#mrview.seq_indexed}
                || View <- State#mrst.views]
     }.
 

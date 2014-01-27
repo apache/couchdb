@@ -40,6 +40,8 @@ compact(State) ->
         sig=Sig,
         update_seq=Seq,
         id_btree=IdBtree,
+        log_btree=LogBtree,
+        seq_indexed=SeqIndexed,
         views=Views
     } = State,
     erlang:put(io_priority, {view_compact, DbName, IdxName}),
@@ -57,15 +59,28 @@ compact(State) ->
 
     #mrst{
         id_btree = EmptyIdBtree,
+        log_btree = EmptyLogBtree,
         views = EmptyViews
     } = EmptyState,
+
+    TotalChanges0 = case SeqIndexed of
+        true -> NumDocIds * 2;
+        _ -> NumDocIds
+    end,
 
     TotalChanges = lists:foldl(
         fun(View, Acc) ->
             {ok, Kvs} = couch_mrview_util:get_row_count(View),
-            Acc + Kvs
+            case SeqIndexed of
+                true ->
+                    {ok, SKvs} = couch_mrview_util:get_view_changes_count(View),
+                    Acc + Kvs + SKvs * 2;
+                false ->
+                    Acc + Kvs
+            end
         end,
-        NumDocIds, Views),
+        TotalChanges0, Views),
+
     couch_task_status:add_task([
         {type, view_compaction},
         {database, DbName},
@@ -107,13 +122,25 @@ compact(State) ->
     {ok, NewIdBtree} = couch_btree:add(Bt3, lists:reverse(Uncopied)),
     FinalAcc2 = update_task(FinalAcc, length(Uncopied)),
 
+
+    {NewLogBtree, FinalAcc3} = case SeqIndexed of
+        true ->
+            compact_log(LogBtree, BufferSize,
+                        FinalAcc2#acc{kvs=[],
+                                      kvs_size=0,
+                                      btree=EmptyLogBtree});
+        _ ->
+            {nil, FinalAcc2}
+    end,
+
     {NewViews, _} = lists:mapfoldl(fun({View, EmptyView}, Acc) ->
         compact_view(View, EmptyView, BufferSize, Acc)
-    end, FinalAcc2, lists:zip(Views, EmptyViews)),
+    end, FinalAcc3, lists:zip(Views, EmptyViews)),
 
     unlink(EmptyState#mrst.fd),
     {ok, EmptyState#mrst{
         id_btree=NewIdBtree,
+        log_btree=NewLogBtree,
         views=NewViews,
         update_seq=Seq
     }}.
@@ -130,9 +157,53 @@ recompact(State) ->
             {ok, State2}
     end.
 
+compact_log(LogBtree, BufferSize, Acc0) ->
+    FoldFun = fun(KV, Acc) ->
+        #acc{btree = Bt, kvs = Kvs, kvs_size = KvsSize} = Acc,
+        KvsSize2 = KvsSize + ?term_size(KV),
+        case KvsSize2 >= BufferSize of
+            true ->
+                {ok, Bt2} = couch_btree:add(Bt, lists:reverse([KV | Kvs])),
+                Acc2 = update_task(Acc, 1 + length(Kvs)),
+                {ok, Acc2#acc{
+                    btree = Bt2, kvs = [], kvs_size = 0}};
+            _ ->
+                {ok, Acc#acc{
+                    kvs = [KV | Kvs], kvs_size = KvsSize2}}
+        end
+    end,
+
+    {ok, _, FinalAcc} = couch_btree:foldl(LogBtree, FoldFun, Acc0),
+    #acc{btree = Bt3, kvs = Uncopied} = FinalAcc,
+    {ok, NewLogBtree} = couch_btree:add(Bt3, lists:reverse(Uncopied)),
+    FinalAcc2 = update_task(FinalAcc, length(Uncopied)),
+    {NewLogBtree, FinalAcc2}.
 
 %% @spec compact_view(View, EmptyView, Retry, Acc) -> {CompactView, NewAcc}
 compact_view(#mrview{id_num=VID}=View, EmptyView, BufferSize, Acc0) ->
+
+    {NewBt, Acc1} = compact_view_btree(View#mrview.btree,
+                                       EmptyView#mrview.btree,
+                                       VID, BufferSize, Acc0),
+
+    %% are we indexing changes by sequences?
+    {NewSeqBt, NewKeyBySeqBt, FinalAcc} = case View#mrview.seq_indexed of
+        true ->
+            {SBt, Acc2} = compact_view_btree(View#mrview.seq_btree,
+                                             EmptyView#mrview.seq_btree,
+                                             VID, BufferSize, Acc1),
+            {KSBt, Acc3} = compact_view_btree(View#mrview.key_byseq_btree,
+                                              EmptyView#mrview.key_byseq_btree,
+                                              VID, BufferSize, Acc2),
+            {SBt, KSBt, Acc3};
+        _ ->
+            {nil, nil, Acc1}
+    end,
+    {EmptyView#mrview{btree=NewBt,
+                      seq_btree=NewSeqBt,
+                      key_byseq_btree=NewKeyBySeqBt}, FinalAcc}.
+
+compact_view_btree(Btree, EmptyBtree, VID, BufferSize, Acc0) ->
     Fun = fun(KV, #acc{btree = Bt, kvs = Kvs, kvs_size = KvsSize} = Acc) ->
         KvsSize2 = KvsSize + ?term_size(KV),
         if KvsSize2 >= BufferSize ->
@@ -144,13 +215,12 @@ compact_view(#mrview{id_num=VID}=View, EmptyView, BufferSize, Acc0) ->
         end
     end,
 
-    InitAcc = Acc0#acc{kvs = [], kvs_size = 0, btree = EmptyView#mrview.btree},
-    {ok, _, FinalAcc} = couch_btree:foldl(View#mrview.btree, Fun, InitAcc),
+    InitAcc = Acc0#acc{kvs = [], kvs_size = 0, btree = EmptyBtree},
+    {ok, _, FinalAcc} = couch_btree:foldl(Btree, Fun, InitAcc),
     #acc{btree = Bt3, kvs = Uncopied} = FinalAcc,
     {ok, NewBt} = couch_btree:add(Bt3, lists:reverse(Uncopied)),
     FinalAcc2 = update_task(VID, FinalAcc, length(Uncopied)),
-    {EmptyView#mrview{btree=NewBt}, FinalAcc2}.
-
+    {NewBt, FinalAcc2}.
 
 update_task(Acc, ChangesInc) ->
     update_task(null, Acc, ChangesInc).
