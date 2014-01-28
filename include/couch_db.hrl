@@ -58,12 +58,17 @@
     revs = [] % rev_info
 }).
 
+-record(size_info, {
+    active = 0,
+    external = 0
+}).
+
 -record(full_doc_info, {
     id = <<"">>,
     update_seq = 0,
     deleted = false,
     rev_tree = [],
-    leafs_size = 0
+    sizes = #size_info{}
 }).
 
 -record(httpd, {
@@ -204,6 +209,7 @@
     deleted,
     ptr,
     seq,
-    size = nil
+    sizes = #size_info{},
+    atts = []
 }).
 

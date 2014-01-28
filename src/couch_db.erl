@@ -321,12 +321,15 @@ get_db_info(Db) ->
         name=Name,
         instance_start_time=StartTime,
         committed_update_seq=CommittedUpdateSeq,
-        id_tree = IdBtree,
-        seq_tree = SeqBtree,
-        local_tree = LocalBtree
+        id_tree = IdBtree
     } = Db,
-    {ok, Size} = couch_file:bytes(Fd),
+    {ok, FileSize} = couch_file:bytes(Fd),
     {ok, DbReduction} = couch_btree:full_reduce(IdBtree),
+    SizeInfo0 = element(3, DbReduction),
+    SizeInfo = if is_record(SizeInfo0, size_info) -> SizeInfo0; true ->
+        #size_info{active=SizeInfo0}
+    end,
+    ActiveSize = active_size(Db, SizeInfo),
     DiskVersion = couch_db_header:disk_version(Header),
     Uuid = case get_uuid(Db) of
         undefined -> null;
@@ -343,8 +346,14 @@ get_db_info(Db) ->
         {update_seq, SeqNum},
         {purge_seq, couch_db:get_purge_seq(Db)},
         {compact_running, Compactor/=nil},
-        {disk_size, Size},
-        {data_size, db_data_size(DbReduction, [SeqBtree, IdBtree, LocalBtree])},
+        {disk_size, FileSize}, % legacy
+        {other, {[{data_size, SizeInfo#size_info.external}]}}, % legacy
+        {data_size, ActiveSize}, % legacy
+        {sizes, {[
+            {file, FileSize},
+            {active, ActiveSize},
+            {external, SizeInfo#size_info.external}
+        ]}},
         {instance_start_time, StartTime},
         {disk_format_version, DiskVersion},
         {committed_update_seq, CommittedUpdateSeq},
@@ -353,23 +362,24 @@ get_db_info(Db) ->
         ],
     {ok, InfoList}.
 
-db_data_size({_Count, _DelCount}, _Trees) ->
-    % pre 1.2 format, upgraded on compaction
-    null;
-db_data_size({_Count, _DelCount, nil}, _Trees) ->
-    null;
-db_data_size({_Count, _DelCount, DocAndAttsSize}, Trees) ->
-    sum_tree_sizes(DocAndAttsSize, Trees).
-
-sum_tree_sizes(Acc, []) ->
-    Acc;
-sum_tree_sizes(Acc, [T | Rest]) ->
-    case couch_btree:size(T) of
-    nil ->
-        null;
-    Sz ->
-        sum_tree_sizes(Acc + Sz, Rest)
-    end.
+active_size(#db{}=Db, Size) when is_integer(Size) ->
+    active_size(Db, #size_info{active=Size});
+active_size(#db{}=Db, #size_info{}=SI) ->
+    Trees = [
+        Db#db.id_tree,
+        Db#db.seq_tree,
+        Db#db.local_tree
+    ],
+    lists:foldl(fun(T, Acc) ->
+        case couch_btree:size(T) of
+            _ when Acc == null ->
+                null;
+            undefined ->
+                null;
+            Size ->
+                Acc + Size
+        end
+    end, SI#size_info.active, Trees).
 
 get_design_docs(#db{name = <<"shards/", _:18/binary, DbName/binary>>}) ->
     {_, Ref} = spawn_monitor(fun() -> exit(fabric:design_docs(DbName)) end),
@@ -1022,6 +1032,7 @@ prepare_doc_summaries(Db, BucketList) ->
     [lists:map(
         fun(#doc{body = Body, atts = Atts} = Doc) ->
             DiskAtts = [couch_att:to_disk_term(Att) || Att <- Atts],
+            {ok, SizeInfo} = couch_att:size_info(Atts),
             AttsFd = case Atts of
             [Att | _] ->
                 {Fd, _} = couch_att:fetch(data, Att),
@@ -1030,7 +1041,7 @@ prepare_doc_summaries(Db, BucketList) ->
                 nil
             end,
             SummaryChunk = couch_db_updater:make_doc_summary(Db, {Body, DiskAtts}),
-            Doc#doc{body = {summary, SummaryChunk, AttsFd}}
+            Doc#doc{body = {summary, SummaryChunk, SizeInfo, AttsFd}}
         end,
         Bucket) || Bucket <- BucketList].
 

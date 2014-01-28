@@ -27,7 +27,7 @@
 ]).
 
 -export([
-    disk_info/2,
+    size_info/1,
     to_disk_term/1,
     from_disk_term/2
 ]).
@@ -276,22 +276,14 @@ merge_stubs([], _, Merged) ->
     {ok, lists:reverse(Merged)}.
 
 
-disk_info(_, []) ->
-    {ok, [], []};
-disk_info(ActiveFd, Atts) ->
-    {AttFd, _} = fetch(data, hd(Atts)),
-    if
-        AttFd == ActiveFd ->
-            Tuples = [to_disk_term(Att) || Att <- Atts],
-            Info = lists:map(fun(Att) ->
-                [{_, Pos}, AttLen] = fetch([data, att_len], Att),
-                {Pos, AttLen}
-            end, Atts),
-            {ok, Tuples, Info};
-        true ->
-            ?LOG_ERROR("MISMATCH: ~p ; ~p~n", [ActiveFd, Atts]),
-            file_mismatch
-    end.
+size_info([]) ->
+    {ok, []};
+size_info(Atts) ->
+    Info = lists:map(fun(Att) ->
+        [{_, Pos}, AttLen] = fetch([data, att_len], Att),
+        {Pos, AttLen}
+    end, Atts),
+    {ok, lists:usort(Info)}.
 
 
 %% When converting an attachment to disk term format, attempt to stay with the
