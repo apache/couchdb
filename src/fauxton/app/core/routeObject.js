@@ -85,66 +85,91 @@ function(FauxtonAPI, Backbone) {
   }, {
 
     renderWith: function(route, masterLayout, args) {
-      var routeObject = this,
-          triggerBroadcast = _.bind(this.triggerBroadcast, this);
+      //set the configs for this object
+      this.config = {
+        masterLayout: masterLayout,
+        route: route,
+        args: args
+      };
 
+      //check if it's done the full initial render
+      this.checkRenderedState();
+
+      this.triggerBroadcast('beforeEstablish');
+
+      var success = _.bind(this.establishRouteSuccess, this),
+          error = _.bind(this.establishError, this),
+          promise = this.establish();
+
+      //call all the establish functions in each route
+
+      this.callEstablish(promise, success, error);
+
+      // Track that we've done a full initial render
+      this.setRenderedState(true);
+      this.triggerBroadcast('renderComplete');
+    },
+
+    callEstablish: function(establishPromise, successCallback, errorCallback){
+      this.addPromise(establishPromise);
+      FauxtonAPI.when(establishPromise).then(successCallback, errorCallback); 
+    },
+    establishViewSuccess: function(viewInfo, resp, xhr){
+      console.log(viewInfo);
+      var masterLayout = this.config.masterLayout;
+      masterLayout.setView(viewInfo.selector, viewInfo.view);
+      masterLayout.renderView(viewInfo.selector);
+      this.triggerBroadcast('afterRender', viewInfo.view, viewInfo.selector);
+    },
+    establishRouteSuccess: function(resp){
+      this.triggerBroadcast('afterEstablish');
+      this.renderEachView();
+    },
+    establishError: function(resp){
+      if (!resp || !resp.responseText) { return; }
+      FauxtonAPI.addNotification({
+            msg: 'An Error occurred' + JSON.parse(resp.responseText).reason,
+            type: 'error',
+            clear: true
+      });
+    },
+    setRenderedState: function(bool){
+      this.renderedState = bool;
+    },
+    checkRenderedState: function(){
       // Only want to redo the template if its a full render
       if (!this.renderedState) {
-        masterLayout.setTemplate(this.layout);
-        triggerBroadcast('beforeFullRender');
+        this.config.masterLayout.setTemplate(this.layout);
+        this.triggerBroadcast('beforeFullRender');
       }
+    },
+    callViewEstablish: function(promise, viewinfo){
+      var success = _.bind(this.establishViewSuccess, this, viewinfo),
+          error = _.bind(this.establishError, this),
+          callEstablish = _.bind(this.callEstablish, this);
 
-      triggerBroadcast('beforeEstablish');
-      var establishPromise = this.establish();
-      this.addPromise(establishPromise);
-      FauxtonAPI.when(establishPromise).then(function(resp) {
-        triggerBroadcast('afterEstablish');
+          callEstablish(promise, success, error);
+
+    },
+    renderEachView: function(){
+        var routeObject = this,
+            triggerBroadcast = _.bind(this.triggerBroadcast, this),
+            callViewEstablish = _.bind(this.callViewEstablish, this);
+            
         _.each(routeObject.getViews(), function(view, selector) {
+          var viewInfo = {view: view, selector: selector};
+
           if(view.hasRendered) { 
             triggerBroadcast('viewHasRendered', view, selector);
             return;
           }
 
           triggerBroadcast('beforeRender', view, selector);
+          
           var viewPromise = view.establish();
-          routeObject.addPromise(viewPromise);
-          FauxtonAPI.when(viewPromise).then(function(resp) {
-            masterLayout.setView(selector, view);
-
-            masterLayout.renderView(selector);
-            triggerBroadcast('afterRender', view, selector);
-            }, function(resp) {
-              view.establishError = {
-                error: true,
-                reason: resp
-              };
-
-              if (resp && resp.responseText) { 
-                var errorText = JSON.parse(resp.responseText).reason;
-                FauxtonAPI.addNotification({
-                  msg: 'An Error occurred: ' + errorText,
-                  type: 'error',
-                  clear: true
-                });
-              }
-              masterLayout.renderView(selector);
-          });
-
+          callViewEstablish(viewPromise, viewInfo);
         });
-      }.bind(this), function (resp) {
-          if (!resp || !resp.responseText) { return; }
-          FauxtonAPI.addNotification({
-                msg: 'An Error occurred' + JSON.parse(resp.responseText).reason,
-                type: 'error',
-                clear: true
-          });
-      });
-
-      // Track that we've done a full initial render
-      this.renderedState = true;
-      triggerBroadcast('renderComplete');
     },
-
     triggerBroadcast: function (eventName) {
       var args = Array.prototype.slice.call(arguments);
       this.trigger.apply(this, args);
