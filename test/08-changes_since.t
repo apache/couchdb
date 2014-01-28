@@ -146,10 +146,6 @@ test_remove_key(Db) ->
     ]},
     etap:is(Result3, Expect2, "removed key OK.").
 
-
-
-
-
 run_query(Db, Since, Opts) ->
     Fun = fun(KV, Acc) -> {ok, [KV | Acc]} end,
     {ok, R} = couch_mrview:view_changes_since(Db, <<"_design/bar">>, <<"baz">>,
