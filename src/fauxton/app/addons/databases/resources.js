@@ -22,7 +22,7 @@ define([
 function(app, FauxtonAPI, Documents) {
   var Databases = FauxtonAPI.addon();
 
-  Databases.DocLimit = 20;
+  Databases.DocLimit = 100;
 
   Databases.Model = FauxtonAPI.Model.extend({
     initialize: function(options) {

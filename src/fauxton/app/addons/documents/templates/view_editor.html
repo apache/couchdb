@@ -17,12 +17,14 @@ the License.
       <% if (newView) { %>Create Index <% } else { %>Edit Index <% } %></a></li>
     <% if (!newView) { %>
     <li><a data-bypass="true" id="query-nav" href="#query" data-toggle="tab">
-      <i class="fonticon-plus fonticon"></i> Query Options</a></li>
+      <i class="fonticon-plus fonticon"></i> Query Options</a>
+    </li>
     <li><a data-bypass="true" id="meta-nav" href="#metadata" data-toggle="tab">Design Doc Metadata</a></li>
     <% } %>
   </ul>
   <div class="all-docs-list errors-container"></div>
   <div class="tab-content">
+	 <div id="query-options-wrapper"></div>
     <div class="tab-pane active" id="index">
       <div id="define-view" class="ddoc-alert well">
         <div class="errors-container"></div>

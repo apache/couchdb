@@ -155,13 +155,11 @@ function(app, FauxtonAPI, Documents, Databases) {
       "route:updateAllDocs": "updateAllDocsFromView",
       "route:updatePreviewDocs": "updateAllDocsFromPreview",
       "route:reloadDesignDocs": "reloadDesignDocs",
-      "route:paginate": "paginate"
+      "route:paginate": "paginate",
+      "route:perPageChange": "perPageChange"
     },
 
     initialize: function (route, masterLayout, options) {
-      var docOptions = app.getParams();
-      docOptions.include_docs = true;
-
       this.databaseName = options[0];
 
       this.data = {
@@ -170,9 +168,11 @@ function(app, FauxtonAPI, Documents, Databases) {
 
       this.data.designDocs = new Documents.AllDocs(null, {
         database: this.data.database,
-        params: {startkey: '"_design"',
+        params: {
+          startkey: '"_design"',
           endkey: '"_design1"',
-          include_docs: true}
+          include_docs: true
+        }
       });
 
       this.sidebar = this.setView("#sidebar-content", new Documents.Views.Sidebar({
@@ -185,12 +185,32 @@ function(app, FauxtonAPI, Documents, Databases) {
       return this.data.designDocs.fetch();
     },
 
+    createParams: function (options) {
+      var urlParams = app.getParams(options);
+      return {
+        urlParams: urlParams,
+        docParams: _.extend(_.clone(urlParams), {limit: this.getDocPerPageLimit(urlParams, 20)})
+      };
+    },
+
+    /*
+    * docParams are the options collection uses to fetch from the server 
+    * urlParams are what are shown in the url and to the user
+    * They are not the same when paginating
+    */
     allDocs: function(databaseName, options) {
-      var docOptions = app.getParams(options);
+      var params = this.createParams(options),
+          urlParams = params.urlParams,
+          docParams = params.docParams;
 
-      this.data.database.buildAllDocs(docOptions);
+      if (this.eventAllDocs) {
+        this.eventAllDocs = false;
+        return;
+      }
 
-      if (docOptions.startkey && docOptions.startkey.indexOf('_design') > -1) {
+      this.data.database.buildAllDocs(docParams);
+
+      if (docParams.startkey && docParams.startkey.indexOf('_design') > -1) {
         this.sidebar.setSelectedTab('design-docs');
       } else {
         this.sidebar.setSelectedTab('all-docs');
@@ -206,22 +226,29 @@ function(app, FauxtonAPI, Documents, Databases) {
       this.setView("#dashboard-upper-content", new Documents.Views.AllDocsLayout({
         database: this.data.database,
         collection: this.data.database.allDocs,
-        params: docOptions
+        params: urlParams,
+        docParams: docParams
       }));
 
       this.documentsView = this.setView("#dashboard-lower-content", new Documents.Views.AllDocsList({
-        collection: this.data.database.allDocs
+        collection: this.data.database.allDocs,
+        docParams: docParams,
+        params: urlParams
       }));
 
       this.crumbs = [
         {"name": this.data.database.id, "link": Databases.databaseUrl(this.data.database)}
       ];
 
-      this.apiUrl = [this.data.database.allDocs.url("apiurl"), this.data.database.allDocs.documentation() ];
+      this.apiUrl = [this.data.database.allDocs.url("apiurl", urlParams), this.data.database.allDocs.documentation() ];
+      //reset the pagination history - the history is used for pagination.previous
+      Documents.paginate.reset();
     },
 
     viewFn: function (databaseName, ddoc, view) {
-      var params = app.getParams(),
+      var params = this.createParams(),
+          urlParams = params.urlParams,
+          docParams = params.docParams;
           decodeDdoc = decodeURIComponent(ddoc);
 
       view = view.replace(/\?.*$/,'');
@@ -230,7 +257,7 @@ function(app, FauxtonAPI, Documents, Databases) {
         database: this.data.database,
         design: decodeDdoc,
         view: view,
-        params: params
+        params: docParams
       });
 
       var ddocInfo = {
@@ -243,7 +270,7 @@ function(app, FauxtonAPI, Documents, Databases) {
         model: this.data.database,
         ddocs: this.data.designDocs,
         viewName: view,
-        params: params,
+        params: urlParams,
         newView: false,
         database: this.data.database,
         ddocInfo: ddocInfo
@@ -256,7 +283,9 @@ function(app, FauxtonAPI, Documents, Databases) {
         collection: this.data.indexedDocs,
         nestedView: Documents.Views.Row,
         viewList: true,
-        ddocInfo: ddocInfo
+        ddocInfo: ddocInfo,
+        docParams: docParams,
+        params: urlParams
       }));
 
       this.sidebar.setSelectedTab(app.utils.removeSpecialCharacters(ddoc) + '_' + app.utils.removeSpecialCharacters(view));
@@ -267,15 +296,15 @@ function(app, FauxtonAPI, Documents, Databases) {
         ];
       };
 
-      this.apiUrl = [this.data.indexedDocs.url("apiurl"), "docs"];
+      this.apiUrl = [this.data.indexedDocs.url("apiurl", urlParams), "docs"];
+      Documents.paginate.reset();
     },
 
     newViewEditor: function () {
       var params = app.getParams();
 
-      if (this.toolsView) {
-        this.toolsView.remove();
-      }
+      this.toolsView && this.toolsView.remove();
+      this.documentsView && this.documentsView.remove();
 
       this.viewEditor = this.setView("#dashboard-upper-content", new Documents.Views.ViewEditor({
         ddocs: this.data.designDocs,
@@ -290,39 +319,41 @@ function(app, FauxtonAPI, Documents, Databases) {
           {"name": this.data.database.id, "link": Databases.databaseUrl(this.data.database)},
         ];
       };
+
+      Documents.paginate.reset();
     },
 
     updateAllDocsFromView: function (event) {
       var view = event.view,
-          docOptions = app.getParams(),
-          ddoc = event.ddoc;
+          params = this.createParams(),
+          urlParams = params.urlParams,
+          docParams = params.docParams,
+          ddoc = event.ddoc,
+          collection;
 
-      this.documentsView && this.documentsView.remove();
+      docParams.limit = this.getDocPerPageLimit(urlParams, this.documentsView.perPage());
+      this.documentsView.forceRender();
 
       if (event.allDocs) {
-        this.data.database.buildAllDocs(docOptions);
-        this.documentsView = this.setView("#dashboard-lower-content", new Documents.Views.AllDocsList({
-          collection: this.data.database.allDocs
-        }));
-        //this.apiUrl = [this.data.database.allDocs.url("apiurl"), this.data.database.allDocs.documentation() ];
-        return;
+        this.eventAllDocs = true; // this is horrible. But I cannot get the trigger not to fire the route!
+        this.data.database.buildAllDocs(docParams);
+        collection = this.data.database.allDocs;
+
+      } else {
+        collection = this.data.indexedDocs = new Documents.IndexCollection(null, {
+          database: this.data.database,
+          design: ddoc,
+          view: view,
+          params: docParams
+        });
+
       }
 
-      this.data.indexedDocs = new Documents.IndexCollection(null, {
-        database: this.data.database,
-        design: ddoc,
-        view: view,
-        params: app.getParams()
-      });
+      this.documentsView.setCollection(collection);
+      this.documentsView.setParams(docParams, urlParams);
 
-      this.documentsView = this.setView("#dashboard-lower-content", new Documents.Views.AllDocsList({
-        database: this.data.database,
-        collection: this.data.indexedDocs,
-        nestedView: Documents.Views.Row,
-        viewList: true
-      }));
-
-      this.apiUrl = [this.data.indexedDocs.url("apiurl"), "docs"];
+      this.apiUrl = [collection.url("apiurl", urlParams), "docs"];
+      Documents.paginate.reset();
     },
 
     updateAllDocsFromPreview: function (event) {
@@ -345,14 +376,49 @@ function(app, FauxtonAPI, Documents, Databases) {
       }));
     },
 
-    paginate: function (direction) {
-      _.extend(this.documentsView.collection.params, app.getParams());
+    perPageChange: function (perPage) {
+      var params = app.getParams();
+      this.perPage = perPage;
+      this.documentsView.updatePerPage(perPage);
       this.documentsView.forceRender();
-      if (direction === 'next') {
-        this.documentsView.collection.skipFirstItem = true;
+      params.limit = perPage;
+      this.documentsView.collection.params = params;
+      this.setDocPerPageLimit(perPage);
+    },
+
+    paginate: function (options) {
+      var params = {},
+          urlParams = app.getParams(),
+          collection = this.documentsView.collection;
+
+      this.documentsView.forceRender();
+
+      // this is really ugly. But we basically need to make sure that
+      // all parameters are in the correct state and have been parsed before we
+      // calculate how to paginate the collection
+      collection.params = Documents.QueryParams.parse(collection.params);
+      urlParams = Documents.QueryParams.parse(urlParams);
+
+      if (options.direction === 'next') {
+          params = Documents.paginate.next(collection.toJSON(), 
+                                           collection.params,
+                                           options.perPage, 
+                                           !!collection.isAllDocs);
       } else {
-        this.documentsView.collection.skipFirstItem = false;
+          params = Documents.paginate.previous(collection.toJSON(), 
+                                               collection.params, 
+                                               options.perPage, 
+                                               !!collection.isAllDocs);
       }
+
+      // use the perPage sent from IndexPagination as it calculates how many
+      // docs to fetch for next page
+      params.limit = options.perPage;
+
+      // again not pretty but need to make sure all the parameters can be correctly
+      // built into a query
+      params = Documents.QueryParams.stringify(params);
+      collection.updateParams(params);
     },
 
     reloadDesignDocs: function (event) {
@@ -360,6 +426,32 @@ function(app, FauxtonAPI, Documents, Databases) {
 
       if (event && event.selectedTab) {
         this.sidebar.setSelectedTab(event.selectedTab);
+      }
+    },
+
+    setDocPerPageLimit: function (perPage) {
+      window.localStorage.setItem('fauxton:perpage', perPage);
+    },
+
+
+    getDocPerPageLimit: function (urlParams, perPage) {
+      var storedPerPage = perPage;
+
+      if (window.localStorage) {
+        storedPerPage = window.localStorage.getItem('fauxton:perpage');
+
+        if (!storedPerPage) {
+          this.setDocPerPageLimit(perPage);
+          storedPerPage = perPage;
+        } else {
+          storedPerPage = parseInt(storedPerPage, 10);
+        }
+      } 
+
+      if (!urlParams.limit || urlParams.limit > storedPerPage) {
+        return storedPerPage;
+      } else {
+        return urlParams.limit;
       }
     }
 
@@ -383,9 +475,9 @@ function(app, FauxtonAPI, Documents, Databases) {
       this.databaseName = options[0];
       this.database = new Databases.Model({id: this.databaseName});
 
-      var docOptions = app.getParams();
+      var docParams = app.getParams();
 
-      this.database.buildChanges(docOptions);
+      this.database.buildChanges(docParams);
 
       this.setView("#tabs", new Documents.Views.Tabs({
         collection: this.designDocs,

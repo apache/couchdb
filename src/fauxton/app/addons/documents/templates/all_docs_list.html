@@ -29,15 +29,16 @@ the License.
   <p>
 
   <div id="item-numbers"> </div>
-
-  <% if (requestDuration) { %>
-    <span class="view-request-duration pull-right">
-    View request duration: <strong> <%= requestDuration %> </strong> 
-    </span>
-  <% } %>
-  </p>
   <table class="all-docs table table-striped table-condensed">
     <tbody></tbody>
   </table>
+  
+  <% if (endOfResults) { %>  
+  <div class="text-center well">
+    <p class="muted">
+      End of results - <a id="js-end-results" href="#query" data-bypass="true" data-toggle="tab">edit query</a>
+    </p>
+    </div>
+  <% } %>
   <div id="documents-pagination"></div>
 </div>

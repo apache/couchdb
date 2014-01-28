@@ -58,15 +58,6 @@ define([
         //FauxtonAPI.navigate.restore && FauxtonAPI.navigate.restore(); 
       });
 
-      it('Should navigate', function () {
-        var navigateMock = sinon.spy(FauxtonAPI, 'navigate');
-
-        paginate.$('a#next').click();
-
-        assert.ok(navigateMock.calledOnce);
-        FauxtonAPI.navigate.restore();
-      });
-
       it('Should trigger routeEvent', function () {
         var navigateMock = sinon.spy(FauxtonAPI, 'triggerRouteEvent');
 
@@ -80,15 +71,6 @@ define([
 
 
     describe('#previous', function () {
-
-      it('Should navigate', function () {
-        var navigateMock = sinon.spy(FauxtonAPI, 'navigate');
-
-        paginate.$('a#previous').click();
-
-        assert.ok(navigateMock.calledOnce);
-        FauxtonAPI.navigate.restore();
-      });
 
       it('Should trigger routeEvent', function () {
         var navigateMock = sinon.spy(FauxtonAPI, 'triggerRouteEvent');
