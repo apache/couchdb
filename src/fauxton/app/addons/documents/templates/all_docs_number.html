@@ -12,12 +12,24 @@ License for the specific language governing permissions and limitations under
 the License.
 -->
 <% if (totalRows === "unknown"){ %>
-  Showing 0 documents. <a href="#/database/<%=database%>/new"> Create your first document.</a>
-<% } else if (showNumbers) { %>
-  Showing <%=offset%> - <%= numModels %> of <%= totalRows %> rows
+Showing 0 documents. <a href="#/database/<%=database%>/new"> Create your first document.</a>
 <% } else { %>
-  Showing <%=pageStart%> - <%= pageEnd %>
+Showing <%=pageStart%> - <%= pageEnd %>
 <%}%>
 <% if (updateSeq) { %>
-  -- Update Sequence: <%= updateSeq %>
+-- Update Sequence: <%= updateSeq %>
 <% } %>
+
+<div id="per-page">
+<label id="per-page" class="drop-down inline">
+  Per page:
+  <select id="select-per-page" name="per-page" class="input-small">
+    <option value="5">5</option>
+    <option value="10">10</option>
+    <option value="20">20</option>
+    <option value="30">30</option>
+    <option value="50">50</option>
+    <option value="100">100</option>
+  </select>
+</label>
+</div>

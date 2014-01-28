@@ -281,7 +281,7 @@ function(app, FauxtonAPI) {
       this.database = options.database;
       this.params = options.params;
       this.skipFirstItem = false;
-
+      this.totalRowsToPaginate = 100;
       this.on("remove",this.decrementTotalRows , this);
     },
 
@@ -314,7 +314,17 @@ function(app, FauxtonAPI) {
       });
     },
 
-    urlNextPage: function (num, lastId) {
+    updateLimit: function (limit) {
+      if (this.params.startkey_docid && this.params.startkey) {
+        //we are paginating so set limit + 1
+        this.params.limit = limit + 1;
+        return;
+      }
+
+      this.params.limit = limit;
+    },
+
+    nextPage: function (num, lastId) {
       if (!lastId) {
         var doc = this.last();
 
@@ -333,7 +343,7 @@ function(app, FauxtonAPI) {
       return this.url('app');
     },
 
-    urlPreviousPage: function (num, params) {
+    previousPage: function (num, params) {
       if (params) { 
         this.params = params;
       } else {
@@ -430,7 +440,7 @@ function(app, FauxtonAPI) {
       return url.join("/") + query;
     },
 
-    urlNextPage: function (num, lastId) {
+    nextPage: function (num, lastId) {
       if (!lastId) {
         lastDoc = this.last();
       }
@@ -445,7 +455,7 @@ function(app, FauxtonAPI) {
       return this.url('app');
     },
 
-     urlPreviousPage: function (num, params) {
+     previousPage: function (num, params) {
       if (params) { 
         this.params = params;
       } else {
@@ -454,6 +464,16 @@ function(app, FauxtonAPI) {
 
       this.params.limit = num;
       return this.url('app');
+    },
+
+    updateLimit: function (limit) {
+      if (this.params.startkey_docid && this.params.startkey) {
+        //we are paginating so set limit + 1
+        this.params.limit = limit + 1;
+        return;
+      }
+
+      this.params.limit = limit;
     },
 
     recordStart: function () {

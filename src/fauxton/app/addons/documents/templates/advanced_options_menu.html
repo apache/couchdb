@@ -1,0 +1,46 @@
+<!--
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use this file except in compliance with the License. You may obtain a copy of
+the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+License for the specific language governing permissions and limitations under
+the License.
+-->
+<div class="row-fluid custom-inputs">
+  <div class="controls controls-row">
+    <div class="checkbox inline">  
+      <input id="include-docs-views" type="checkbox" name="include-docs" value="true">  
+      <label for="include-docs-views">
+        Include Docs</label>  
+    </div> 
+    <% if (hasReduce) { %>
+    <div class="checkbox inline">  
+      <input id="reduce" name="reduce" type="checkbox" value="true">
+      <label for="reduce">Reduce</label>  
+      <label id="group-level-label" style="display:none" class="drop-down inline">
+        Group Level:
+        <select id="group-level"  name="group_level" class="input-small">
+          <option value="0">None</option>
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+          <option value="6">6</option>
+          <option value="7">7</option>
+          <option value="8">8</option>
+          <option value="9">9</option>
+          <option value="999" selected="selected">exact</option>
+        </select>
+      </label>
+    </div> 
+    <% } %>
+    <a data-bypass="true" id="query-nav" class="" href="#query" data-toggle="tab">More query options</a></li>
+  </div> 
+</div> 
+

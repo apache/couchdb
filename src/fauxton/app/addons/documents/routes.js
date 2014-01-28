@@ -155,7 +155,8 @@ function(app, FauxtonAPI, Documents, Databases) {
       "route:updateAllDocs": "updateAllDocsFromView",
       "route:updatePreviewDocs": "updateAllDocsFromPreview",
       "route:reloadDesignDocs": "reloadDesignDocs",
-      "route:paginate": "paginate"
+      "route:paginate": "paginate",
+      "route:perPageChange": "perPageChange"
     },
 
     initialize: function (route, masterLayout, options) {
@@ -304,7 +305,6 @@ function(app, FauxtonAPI, Documents, Databases) {
         this.documentsView = this.setView("#dashboard-lower-content", new Documents.Views.AllDocsList({
           collection: this.data.database.allDocs
         }));
-        //this.apiUrl = [this.data.database.allDocs.url("apiurl"), this.data.database.allDocs.documentation() ];
         return;
       }
 
@@ -345,13 +345,19 @@ function(app, FauxtonAPI, Documents, Databases) {
       }));
     },
 
-    paginate: function (direction) {
-      _.extend(this.documentsView.collection.params, app.getParams());
+    perPageChange: function (perPage) {
+      this.documentsView.collection.updateLimit(perPage);
       this.documentsView.forceRender();
-      if (direction === 'next') {
+    },
+
+    paginate: function (options) {
+      this.documentsView.forceRender();
+      if (options.direction === 'next') {
         this.documentsView.collection.skipFirstItem = true;
+        this.documentsView.collection.nextPage(options.perPage);
       } else {
         this.documentsView.collection.skipFirstItem = false;
+        this.documentsView.collection.previousPage(options.perPage);
       }
     },
 

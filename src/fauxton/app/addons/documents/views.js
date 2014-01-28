@@ -416,10 +416,26 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
     initialize: function (options) {
       this.newView = options.newView || false;
-      this.showNumbers = options.showNumbers;
       this.pagination = options.pagination;
+      
+      this.perPage = 20;
+      
 
       this.listenTo(this.collection, 'totalRows:decrement', this.render);
+    },
+
+    events: {
+      'change #select-per-page': 'updatePerPage'
+    },
+
+    updatePerPage: function (event) {
+      this.perPage = parseInt(this.$('#select-per-page :selected').val(), 10);
+      FauxtonAPI.triggerRouteEvent('perPageChange', this.perPage);
+      this.pagination.updatePerPage(this.perPage);
+    },
+
+    afterRender: function () {
+      this.$('option[value="' + this.perPage + '"]').attr('selected', "selected");
     },
 
     serialize: function () {
@@ -445,7 +461,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         updateSeq: updateSeq,
         offset: recordStart,
         totalRows: totalRows,
-        showNumbers: this.showNumbers,
         numModels: this.collection.models.length + recordStart - 1,
         pageStart: pageStart,
         pageEnd: pageEnd
@@ -463,22 +478,30 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     },
 
     events: {
-      'click #toggle-query': "toggleQuery"
+      'click #query-nav': "toggleQuery"
     },
 
     toggleQuery: function (event) {
       $('#dashboard-content').scrollTop(0);
-      this.$('#query').toggle('fast');
+      this.$('#query').toggle('slow');
     },
 
     beforeRender: function () {
+      this.eventer = _.extend({}, Backbone.Events);
+
       this.advancedOptions = this.insertView('#query', new Views.AdvancedOptions({
         updateViewFn: this.updateAllDocs,
         previewFn: this.previewView,
         hasReduce: false,
         showPreview: false,
-        database: this.database
+        database: this.database,
+        eventer: this.eventer
       }));
+
+      this.advancedOptionsMenu = this.insertView('#query-options-wrapper', new Views.AdvancedOptionsMenu({
+        hasReduce: false,
+        eventer:  this.eventer
+       }));
 
       this.$('#query').hide();
     },
@@ -486,6 +509,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     afterRender: function () {
       if (this.params) {
         this.advancedOptions.updateFromParams(this.params);
+        this.advancedOptionsMenu.updateFromParams(this.params);
       }
 
     },
@@ -576,15 +600,9 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     },
 
     serialize: function() {
-      var requestDuration = false;
-
-      if (this.collection.requestDurationInString) {
-        requestDuration = this.collection.requestDurationInString();
-      }
-
       return {
         viewList: this.viewList,
-        requestDuration: requestDuration,
+        requestDuration: false,
         expandDocs: this.expandDocs
       };
     },
@@ -646,53 +664,20 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
     addPagination: function () {
       var collection = this.collection;
-      var perPage = function () {
-        if (collection.params.limit && collection.skipFirstItem) {
-          return parseInt(collection.params.limit, 10) - 1;
-        } else if (collection.params.limit) {
-          return parseInt(collection.params.limit, 10);
-        }
-
-        return 20;
-      };
 
       this.pagination = new Components.IndexPagination({
         collection: this.collection,
-        scrollToSelector: '#dashboard-content',
-        previousUrlfn: function () {
-          return collection.urlPreviousPage(perPage(), this.previousParams.pop());
-        },
-        canShowPreviousfn: function () {
-          if (this.previousParams.length === 0) {
-            return false;
-          }
-
-          return true;
-        },
-        canShowNextfn: function () {
-          if (collection.length < (perPage() -1)) {
-            return false;
-          }
-
-          return true;
-        },
-
-        nextUrlfn: function () {
-          return collection.urlNextPage(perPage());
-        }
+        scrollToSelector: '#dashboard-content'
       });
     },
 
     cleanup: function () {
+      this.pagination.remove();
       this.allDocsNumber.remove();
       _.each(this.rows, function (row) {row.remove();});
-
-      if (!this.pagination) { return; }
-      this.pagination.remove();
     },
 
     beforeRender: function() {
-      var showNumbers = true;
 
       if (!this.pagination) {
         this.addPagination();
@@ -700,16 +685,15 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
       this.insertView('#documents-pagination', this.pagination);
 
-      if (this.designDocs || this.collection.idxType === '_view' || this.collection.params.startkey === '"_design"') {
-        showNumbers = false;
+      if (!this.allDocsNumber) {
+        this.allDocsNumber = new Views.AllDocsNumber({
+          collection: this.collection,
+          newView: this.newView,
+          pagination: this.pagination
+        });
       }
 
-      this.allDocsNumber = this.setView('#item-numbers', new Views.AllDocsNumber({
-        collection: this.collection,
-        newView: this.newView,
-        showNumbers: showNumbers,
-        pagination: this.pagination
-      }));
+      this.setView('#item-numbers', this.allDocsNumber);
 
       var docs = this.expandDocs ? this.collection : this.collection.simple();
 
@@ -942,9 +926,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
           model = this.model;
 
       editor.editor.on("change", function (event) {
-        //if (event.data.action !== 'removeText') { return; }
-        //if (!event.data.text.match(/_id/) && !event.data.text.match(/_rev/)) { return; }
-
         var changedDoc;
         try {
           changedDoc = JSON.parse(editor.getValue());
@@ -1023,6 +1004,73 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     }
   });
 
+  Views.AdvancedOptionsMenu = FauxtonAPI.View.extend({
+    template: 'addons/documents/templates/advanced_options_menu',
+    tagName: "div",
+    className: "controls-group advanced-options-menu",
+    events: {
+      "click input": "updateRows",
+      'change #group-level': 'updateRows',
+      'click #query-nav': 'toggleMenu'
+    },
+
+    initialize: function (options) {
+      this.hasReduce = options.hasReduce;
+      this.eventer = options.eventer;
+    },
+
+    toggleMenu: function (event) {
+      this.$('.checkbox').toggle();
+    },
+
+    updateRows: function (event) {
+      var $groupLevel = this.$('#group-level-label'),
+          params = {
+            include_docs: false,
+            reduce: false,
+            group_level: 0
+          };
+
+      if (this.$('#include-docs-views').prop('checked')) {
+        params.include_docs = true;
+      }
+
+      if (this.hasReduce && this.$('#reduce').prop('checked')) {
+        params.reduce = true;
+        params.group_level = this.$('#group-level option:selected').val();
+        $groupLevel.show();
+      } else {
+        $groupLevel.hide();
+      }
+      this.eventer.trigger('options:param_update', params);
+    },
+
+    updateFromParams: function (params) {
+      if (params.reduce) {
+        var $reduce = this.$('#reduce');
+        $reduce.prop("checked", true);
+        this.$('#group-level-label').show();
+        this.$('option[value="' + params.group_level + '"]').prop('selected', true);
+
+      } else if (params.include_docs) {
+        var $include_docs = this.$('#include-docs-views');
+        $include_docs.prop("checked", true);
+      }
+    },
+
+    serialize: function () {
+      return {
+        hasReduce: this.hasReduce
+      };
+    },
+
+    setHasReduce: function (hasReduce) {
+      this.hasReduce = hasReduce;
+    }
+
+  });
+
+
   Views.AdvancedOptions = FauxtonAPI.View.extend({
     template: "addons/documents/templates/advanced_options",
     className: "advanced-options well",
@@ -1033,7 +1081,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       this.viewName = options.viewName;
       this.updateViewFn = options.updateViewFn;
       this.previewFn = options.previewFn;
-      //this.hadReduce = options.hasReduce || true;
+      this.eventer = options.eventer;
 
       if (typeof(options.hasReduce) === 'undefined') {
         this.hasReduce = true;
@@ -1046,6 +1094,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       } else {
         this.showPreview = options.showPreview;
       }
+
+      this.eventer && this.listenTo(this.eventer, 'options:param_update', this.optionsParamsUpdate);
     },
 
     events: {
@@ -1053,6 +1103,24 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       "change form.view-query-update select": "updateFilters",
       "submit form.view-query-update": "updateView",
       "click button.preview": "previewView"
+    },
+
+    optionsParamsUpdate: function (params) {
+       var $form = this.$el.find("form.view-query-update");
+
+       if (!params.group_level) {
+        this.$("select[name='group_level']").attr('disabled', 'disabled');
+       }
+
+       if (params.reduce && params.group_level) {
+        $form.find("select[name='group_level']").val(params.group_level).removeAttr('disabled');
+        delete params.group_level;
+       } 
+
+      _.each(params, function(val, key) {
+        $form.find("input[name='"+key+"']").prop('checked', val);
+      });
+      this.$('form.view-query-update').submit();
     },
 
     beforeRender: function () {
@@ -1136,7 +1204,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         var $ele;
         switch (key) {
           case "limit":
-            case "group_level":
+          case "group_level":
             $form.find("select[name='"+key+"']").val(val);
           break;
           case "include_docs":
@@ -1247,7 +1315,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       "click button.preview": "previewView",
       "click #db-views-tabs-nav": 'toggleIndexNav',
       "click .beautify_map":  "beautifyCode",
-      "click .beautify_reduce":  "beautifyCode"
+      "click .beautify_reduce":  "beautifyCode",
+      "click #query-options-wrapper": 'toggleIndexNav'
     },
 
     langTemplates: {
@@ -1368,6 +1437,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
           that.mapEditor.editSaved();
           that.reduceEditor && that.reduceEditor.editSaved();
 
+
           FauxtonAPI.addNotification({
             msg: "View has been saved.",
             type: "success",
@@ -1394,6 +1464,9 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
             that.reduceFunStr = reduceVal;
             that.advancedOptions.renderOnUpdatehasReduce(that.hasReduce());
           }
+
+          that.advancedOptionsMenu.setHasReduce(that.hasReduce());
+          that.advancedOptionsMenu.render();
 
           FauxtonAPI.triggerRouteEvent('updateAllDocs', {ddoc: ddocName, view: viewName});
 
@@ -1622,19 +1695,29 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         database: this.database
       }));
 
+      this.eventer = _.extend({}, Backbone.Events);
+
       this.advancedOptions = this.insertView('#query', new Views.AdvancedOptions({
         updateViewFn: this.updateView,
         previewFn: this.previewView,
         database: this.database,
         viewName: this.viewName,
         ddocName: this.model.id,
-        hasReduce: this.hasReduce()
+        hasReduce: this.hasReduce(),
+        eventer: this.eventer
       }));
+
+      this.advancedOptionsMenu = this.insertView('#query-options-wrapper', new Views.AdvancedOptionsMenu({
+        hasReduce: this.hasReduce(),
+        eventer:  this.eventer
+       }));
+
     },
 
     afterRender: function() {
       if (this.params) {
         this.advancedOptions.updateFromParams(this.params);
+        this.advancedOptionsMenu.updateFromParams(this.params);
       }
 
       this.designDocSelector.updateDesignDoc();
