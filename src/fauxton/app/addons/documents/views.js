@@ -1630,7 +1630,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       this.reduceEditor.render();
 
       if (this.reduceEditor.getLines() === 1){
-        this.$('.beautify_reduce').removeClass("hidden");
+        this.$('.beautify_reduce').removeClass("hide");
         $('.beautify-tooltip').tooltip();
       }
     },
@@ -1709,7 +1709,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       this.reduceEditor && this.reduceEditor.editSaved();
 
       if (this.mapEditor.getLines() === 1){
-        this.$('.beautify_map').removeClass("hidden");
+        this.$('.beautify_map').removeClass("hide");
         $('.beautify-tooltip').tooltip();
       }
     },
