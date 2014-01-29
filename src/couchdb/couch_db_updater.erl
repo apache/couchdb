@@ -824,14 +824,16 @@ copy_doc_attachments(#db{updater_fd = SrcFd} = SrcDb, SrcSp, DestFd) ->
     end,
     % copy the bin values
     NewBinInfos = lists:map(
-        fun({Name, Type, BinSp, AttLen, RevPos, Md5}) ->
+        fun({Name, Type, BinSp, AttLen, RevPos, ExpectedMd5}) ->
             % 010 UPGRADE CODE
-            {NewBinSp, AttLen, AttLen, Md5, _IdentityMd5} =
+            {NewBinSp, AttLen, AttLen, ActualMd5, _IdentityMd5} =
                 couch_stream:copy_to_new_stream(SrcFd, BinSp, DestFd),
-            {Name, Type, NewBinSp, AttLen, AttLen, RevPos, Md5, identity};
-        ({Name, Type, BinSp, AttLen, DiskLen, RevPos, Md5, Enc1}) ->
-            {NewBinSp, AttLen, _, Md5, _IdentityMd5} =
+            check_md5(ExpectedMd5, ActualMd5),
+            {Name, Type, NewBinSp, AttLen, AttLen, RevPos, ExpectedMd5, identity};
+        ({Name, Type, BinSp, AttLen, DiskLen, RevPos, ExpectedMd5, Enc1}) ->
+            {NewBinSp, AttLen, _, ActualMd5, _IdentityMd5} =
                 couch_stream:copy_to_new_stream(SrcFd, BinSp, DestFd),
+            check_md5(ExpectedMd5, ActualMd5),
             Enc = case Enc1 of
             true ->
                 % 0110 UPGRADE CODE
@@ -842,9 +844,12 @@ copy_doc_attachments(#db{updater_fd = SrcFd} = SrcDb, SrcSp, DestFd) ->
             _ ->
                 Enc1
             end,
-            {Name, Type, NewBinSp, AttLen, DiskLen, RevPos, Md5, Enc}
+            {Name, Type, NewBinSp, AttLen, DiskLen, RevPos, ExpectedMd5, Enc}
         end, BinInfos),
     {BodyData, NewBinInfos}.
+
+check_md5(Md5, Md5) -> ok;
+check_md5(_, _) -> throw(md5_mismatch).
 
 copy_docs(Db, #db{updater_fd = DestFd} = NewDb, InfoBySeq0, Retry) ->
     % COUCHDB-968, make sure we prune duplicates during compaction
