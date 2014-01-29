@@ -89,7 +89,6 @@ function(app, FauxtonAPI, ace, spin) {
         return false;
       }
 
-      console.log(this.pageStart() + this.perPage, this.docLimit);
       if ((this.pageStart() + this.perPage) >= this.docLimit) {
         return false;
       }
@@ -119,9 +118,16 @@ function(app, FauxtonAPI, ace, spin) {
       this.pageNumber = this.pageNumber + 1;
       this.incPageStart();
 
+      var documentsLeftToFetch = this.docLimit - (this.pageNumber * this.perPage),
+          limit = this.perPage;
+
+      if (documentsLeftToFetch < this.perPage) {
+        limit = documentsLeftToFetch;
+      }
+
       FauxtonAPI.triggerRouteEvent('paginate', {
        direction: 'next',
-       perPage: this.perPage
+       perPage: limit
       });
     },
 
@@ -163,6 +169,7 @@ function(app, FauxtonAPI, ace, spin) {
         return this.page() + this.collection.length;
       }
 
+      return this.page() + this.perPage;
     }
 
   });
