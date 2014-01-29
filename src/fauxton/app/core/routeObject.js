@@ -85,46 +85,78 @@ function(FauxtonAPI, Backbone) {
   }, {
 
     renderWith: function(route, masterLayout, args) {
-      //set the configs for this object
-      this.config = {
+      //set the options for this render
+      var options = {
         masterLayout: masterLayout,
         route: route,
         args: args
       };
 
-      //check if it's done the full initial render
-      this.checkRenderedState();
+      this.setTemplateOnFullRender(masterLayout);
 
       this.triggerBroadcast('beforeEstablish');
 
-      var success = _.bind(this.establishRouteSuccess, this),
-          error = _.bind(this.establishError, this),
+      var renderAllViews = _.bind(this.renderAllViews, this, options),
+          establishError = _.bind(this.establishError, this),
+          renderComplete = _.bind(this.renderComplete, this),
           promise = this.establish();
 
-      //call all the establish functions in each route
-
-      this.callEstablish(promise, success, error);
-
-      // Track that we've done a full initial render
-      this.setRenderedState(true);
-      this.triggerBroadcast('renderComplete');
+      this.callEstablish(promise)
+        .then(renderAllViews, establishError)
+        .then(renderComplete);
     },
 
-    callEstablish: function(establishPromise, successCallback, errorCallback){
+    setTemplateOnFullRender: function(masterLayout){
+      // Only want to redo the template if its a full render
+      if (!this.renderedState) {
+        masterLayout.setTemplate(this.layout);
+        this.triggerBroadcast('beforeFullRender');
+      }
+    },
+
+    callEstablish: function(establishPromise) {
       this.addPromise(establishPromise);
-      FauxtonAPI.when(establishPromise).then(successCallback, errorCallback); 
+      return FauxtonAPI.when(establishPromise);
     },
-    establishViewSuccess: function(viewInfo, resp, xhr){
-      console.log(viewInfo);
-      var masterLayout = this.config.masterLayout;
+
+    renderAllViews: function(options, resp){
+      var routeObject = this,
+          renderView = _.bind(this.renderView, this, routeObject, options);
+
+      this.triggerBroadcast('afterEstablish');
+
+      var promises = _.map(routeObject.getViews(), renderView, this);
+      return FauxtonAPI.when(promises);
+    },
+    
+    renderView: function(routeObject, options, view, selector) {
+      var viewInfo = {
+        view: view, 
+        selector: selector,
+        masterLayout: options.masterLayout
+      };
+
+      var renderViewOnLayout = _.bind(this.renderViewOnLayout, this, viewInfo);
+
+      if(view.hasRendered) { 
+        this.triggerBroadcast('viewHasRendered', view, selector);
+        return;
+      }
+
+      this.triggerBroadcast('beforeRender', view, selector);
+      
+      return this.callEstablish(view.establish()).then(renderViewOnLayout, this.establishError);
+    },
+
+    renderViewOnLayout: function(viewInfo, resp, xhr){
+      var masterLayout = viewInfo.masterLayout;
+
       masterLayout.setView(viewInfo.selector, viewInfo.view);
       masterLayout.renderView(viewInfo.selector);
+
       this.triggerBroadcast('afterRender', viewInfo.view, viewInfo.selector);
     },
-    establishRouteSuccess: function(resp){
-      this.triggerBroadcast('afterEstablish');
-      this.renderEachView();
-    },
+
     establishError: function(resp){
       if (!resp || !resp.responseText) { return; }
       FauxtonAPI.addNotification({
@@ -133,43 +165,17 @@ function(FauxtonAPI, Backbone) {
             clear: true
       });
     },
+
+    renderComplete: function () {
+      // Track that we've done a full initial render
+      this.setRenderedState(true);
+      this.triggerBroadcast('renderComplete');
+    },
+
     setRenderedState: function(bool){
       this.renderedState = bool;
     },
-    checkRenderedState: function(){
-      // Only want to redo the template if its a full render
-      if (!this.renderedState) {
-        this.config.masterLayout.setTemplate(this.layout);
-        this.triggerBroadcast('beforeFullRender');
-      }
-    },
-    callViewEstablish: function(promise, viewinfo){
-      var success = _.bind(this.establishViewSuccess, this, viewinfo),
-          error = _.bind(this.establishError, this),
-          callEstablish = _.bind(this.callEstablish, this);
-
-          callEstablish(promise, success, error);
-
-    },
-    renderEachView: function(){
-        var routeObject = this,
-            triggerBroadcast = _.bind(this.triggerBroadcast, this),
-            callViewEstablish = _.bind(this.callViewEstablish, this);
-            
-        _.each(routeObject.getViews(), function(view, selector) {
-          var viewInfo = {view: view, selector: selector};
-
-          if(view.hasRendered) { 
-            triggerBroadcast('viewHasRendered', view, selector);
-            return;
-          }
-
-          triggerBroadcast('beforeRender', view, selector);
-          
-          var viewPromise = view.establish();
-          callViewEstablish(viewPromise, viewInfo);
-        });
-    },
+    
     triggerBroadcast: function (eventName) {
       var args = Array.prototype.slice.call(arguments);
       this.trigger.apply(this, args);

@@ -4,7 +4,6 @@
   { "name": "databases" },
   { "name": "documents" },
   { "name": "pouchdb" },
-  { "name": "fauxton" },
   { "name": "activetasks" },
   { "name": "config" },
   { "name": "logs" },
