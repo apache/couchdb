@@ -279,10 +279,11 @@ function(app, FauxtonAPI) {
     },
     initialize: function(_models, options) {
       this.database = options.database;
-      this.params = options.params;
+      this.params = _.clone(options.params);
       this.skipFirstItem = false;
       this.totalRowsToPaginate = 100;
       this.on("remove",this.decrementTotalRows , this);
+      this.perPageLimit = options.perPageLimit || 20;
     },
 
     url: function(context) {
@@ -315,6 +316,8 @@ function(app, FauxtonAPI) {
     },
 
     updateLimit: function (limit) {
+      this.perPageLimit = limit;
+
       if (this.params.startkey_docid && this.params.startkey) {
         //we are paginating so set limit + 1
         this.params.limit = limit + 1;

@@ -74,6 +74,7 @@ function(app, FauxtonAPI, ace, spin) {
       this.pageNumber = 0;
       this._pageStart = 1;
       this.perPage = 20;
+      this.docLimit = options.docLimit || 100;
     },
 
     canShowPreviousfn: function () {
@@ -87,6 +88,12 @@ function(app, FauxtonAPI, ace, spin) {
       if (this.collection.length < (this.perPage -1)) {
         return false;
       }
+
+      console.log(this.pageStart() + this.perPage, this.docLimit);
+      if ((this.pageStart() + this.perPage) >= this.docLimit) {
+        return false;
+      }
+
       return true;
     },
 

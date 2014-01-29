@@ -211,7 +211,8 @@ function(app, FauxtonAPI, Documents, Databases) {
       }));
 
       this.documentsView = this.setView("#dashboard-lower-content", new Documents.Views.AllDocsList({
-        collection: this.data.database.allDocs
+        collection: this.data.database.allDocs,
+        docLimit: parseInt(docOptions.limit, 10)
       }));
 
       this.crumbs = [

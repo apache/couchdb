@@ -582,6 +582,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         this.ddocID = options.ddocInfo.id;
       }
       this.newView = options.newView || false;
+      this.docLimit = options.docLimit;
       this.expandDocs = true;
     },
 
@@ -667,7 +668,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
       this.pagination = new Components.IndexPagination({
         collection: this.collection,
-        scrollToSelector: '#dashboard-content'
+        scrollToSelector: '#dashboard-content',
+        docLimit: this.docLimit
       });
     },
 
