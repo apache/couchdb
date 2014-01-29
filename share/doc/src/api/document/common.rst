@@ -238,23 +238,22 @@
         "rev": "1-917fa2381192822767f010b95b45325b"
     }
 
-
 .. http:delete:: /{db}/{docid}
   :synopsis: Deletes the document
 
-  Marks the specified document as deleted by adding a field _deleted with
-  the value true. Documents with this field will not be returned within
+  Marks the specified document as deleted by adding a field ``_deleted`` with
+  the value ``true``. Documents with this field will not be returned within
   requests anymore, but stay in the database. You must supply the current
   (latest) revision, either by using the ``rev`` parameter or by using the
-  ``If-Match`` header to specify the revision.
+  :header:`If-Match` header to specify the revision.
 
   .. seealso::
     :ref:`Retrieving Deleted Documents <api/doc/retrieving-deleted-documents>`
 
   .. note::
-    Note that deletion of a record increments the revision number.
-    The use of a revision for deletion of the record allows replication of
-    the database to correctly track the deletion in synchronized copies.
+    CouchDB doesn't actually delete documents. The reason is the need to track
+    them correctly during the replication process between databases to prevent
+    accidental document recovery for any previous state.
 
   :param db: Database name
   :param docid: Document ID
