@@ -229,13 +229,13 @@ function(FauxtonAPI, Backbone) {
     addPromise: function (promise) {
       if (_.isEmpty(promise)) { return; }
 
-      if (_.isArray(promise)) {
-        return _.each(promise, function (p) {
-          this._promises.push(p);
-        }, this);
+      if (!_.isArray(promise)) {
+        return this._promises.push(promise);
       }
 
-     this._promises.push(promise);
+      _.each(promise, function (p) {
+          this._promises.push(p);
+      }, this);
     },
 
     cleanup: function () {
