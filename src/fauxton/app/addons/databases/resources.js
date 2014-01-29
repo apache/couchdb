@@ -151,16 +151,17 @@ function(app, FauxtonAPI, Documents) {
 
       return Math.max(fileSizeInBytes, 0.1).toFixed(1) + byteUnits[i];
     },
-    diskSize: function () {
-      return this.get("disk_size");
-    },
 
     dataSize: function () {
       if (this.get("other")){
         return this.get("other").data_size;
-      }else{
+      } else if (this.get('data_size')) {
+        return this.get('data_size');
+      } else if (this.get('disk_size')) {
+        return this.get('disk_size');
+      } else {
         return 0;
-      }  
+      } 
     }
   });
 
