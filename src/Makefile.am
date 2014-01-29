@@ -59,6 +59,13 @@ FAUXTON_FILES = \
     fauxton/app/addons/auth/templates/nav_dropdown.html \
     fauxton/app/addons/auth/templates/nav_link_title.html \
     fauxton/app/addons/auth/templates/noAccess.html \
+    fauxton/app/addons/compaction/assets/less/compaction.less \
+    fauxton/app/addons/compaction/templates/compact_view.html \
+    fauxton/app/addons/compaction/templates/layout.html \
+    fauxton/app/addons/compaction/base.js \
+    fauxton/app/addons/compaction/resources.js \
+    fauxton/app/addons/compaction/routes.js \
+    fauxton/app/addons/compaction/views.js \
     fauxton/app/addons/config/base.js \
     fauxton/app/addons/config/resources.js \
     fauxton/app/addons/config/routes.js \
@@ -173,6 +180,7 @@ FAUXTON_FILES = \
     fauxton/app/addons/documents/templates/tabs.html \
     fauxton/app/addons/documents/templates/upload_modal.html \
     fauxton/app/addons/documents/templates/view_editor.html \
+    fauxton/app/addons/documents/tests/resourcesSpec.js \
     fauxton/app/addons/fauxton/templates/api_bar.html \
     fauxton/app/addons/fauxton/templates/breadcrumbs.html \
     fauxton/app/addons/fauxton/templates/footer.html \
