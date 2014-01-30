@@ -11,9 +11,9 @@ WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 License for the specific language governing permissions and limitations under
 the License.
 -->
-<header class="border-hdr">
+<header class="page-header">
 <h3> <%= (section) %> </h3>
-<p id="help"> <%= help %> <a href="<%=getDocUrl('database_permission')%>" target="_blank"><i class="icon-question-sign"> </i> </a></p>
+<p class="help"> <%= help %> <a href="<%=getDocUrl('database_permission')%>" target="_blank"><i class="icon-question-sign"> </i> </a></p>
 </header>
 
 <div class="row">
@@ -24,7 +24,7 @@ the License.
     </header>
     <form class="permission-item-form form-inline">
       <input data-section="<%= section %>" data-type="names" type="text" class="item input-small" placeholder="Add Name">
-      <button type="submit" class="button btn green fonticon-circle-plus">Add Name</button>
+      <button type="submit" class="btn btn-success"><i class="icon fonticon-circle-plus"></i> Add Name</button>
     </form>
     <ul class="clearfix unstyled permission-items span10" id="<%= (section) %>-items-names">
     </ul>
@@ -38,7 +38,7 @@ the License.
 
     <form class="permission-item-form form-inline">
       <input data-section="<%= section %>" data-type="roles" type="text" class="item input-small" placeholder="Add Role">
-      <button type="submit" class="button btn green fonticon-circle-plus">Add Role</button>
+      <button type="submit" class="btn btn-success"><i class="icon fonticon-circle-plus"></i> Add Role</button>
     </form>
     <ul class="unstyled permission-items span10" id="<%= (section) %>-items-roles">
     </ul>

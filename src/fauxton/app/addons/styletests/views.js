@@ -10,6 +10,20 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-.datatypes {
-  padding: 0 15px;
-}
+define([
+  "app",
+  "api"
+],
+
+
+function (app, FauxtonAPI) {
+  var Views= {};
+
+  Views.tests = FauxtonAPI.View.extend({
+    template: "addons/styletests/templates/theme"
+  });
+
+  return Views;
+});
+
+

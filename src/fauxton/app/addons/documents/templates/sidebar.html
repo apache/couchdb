@@ -22,11 +22,11 @@ the License.
         </button>
         <ul class="dropdown-menu">
           <!-- dropdown menu links -->
-          <li><a class="icon-file" href="<%= db_url %>">Docs</a></li>
-          <li><a class="icon-lock" href="<%= permissions_url %>">Permissions</a></li>
-          <li><a class="icon-forward" href="<%= changes_url %>">Changes</a></li>
+          <li><a href="<%= db_url %>"><i class="icon icon-file"></i> Docs</a></li>
+          <li><a href="<%= permissions_url %>"><i class="icon icon-lock"></i> Permissions</a></li>
+          <li><a href="<%= changes_url %>"><i class="icon icon-forward"></i> Changes</a></li>
           <% _.each(docLinks, function (link) { %>
-          <li><a class="<%= link.icon %>" href="<%= database_url + '/' + link.url %>"><%= link.title %></a></li>
+          <li><a href="<%= database_url + '/' + link.url %>"><i class="icon <%= link.icon %>"></i> <%= link.title %></a></li>
           <% }); %>
         </ul>
       </div>
@@ -49,7 +49,7 @@ the License.
           </li>
         </ul>
       </div>
-        <button id="delete-database" class="btn"><i class="icon-trash"></i> Database</button>
+        <button id="delete-database" class="btn pull-right"><i class="icon-trash"></i> Database</button>
     </div>
   </header>
 

@@ -10,6 +10,13 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-.menuDropdown {
-  display: none;
-}
+define([
+  "app",
+  "api"
+],
+
+function (app, FauxtonAPI) {
+  var resources = {};
+
+  return resources;
+});

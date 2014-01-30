@@ -10,7 +10,7 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 /*ALL DOCS TABLE*/
-tr.all-docs-item{
+tr.all-docs-item {
   border: none;
   background: transparent;
     .btn-group {
@@ -21,4 +21,72 @@ tr.all-docs-item{
 }
 button.beautify {
 	margin-top: 20px;
+}
+
+
+/** used in all_docs_list.html **/
+.view {
+    table td div {
+        position: relative;
+    }
+
+    table td div div {
+        display: none;
+        line-height: 1;
+        position: absolute;
+        right: 4px;
+        top: 4px;
+    }
+
+    table td div:hover div a.edits {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    table td div:hover div {
+        display: block;
+    }
+}
+
+/** used in ddocs_info.html **/
+.well {
+    .row-fluid {
+        margin: 0;
+    }
+    .row-fluid .row-fluid:last-child .well-item {
+        border: none;
+    }
+    .well-item {
+        color: #666;
+        font-size: 12px;
+        border-bottom: 1px solid #e5e5e5;
+        padding: 8px 4px;
+        strong {
+            font-size: 16px;
+        }
+    }
+}
+
+/** used in view_editor.html **/
+.design-doc-group{
+    .span3 { margin: 0;}
+    #new-ddoc-section {
+        margin-top: 10px;
+        label{ width: 100px}
+        .controls{
+            margin-left: 100px;
+        }
+    }
+}
+
+/** used in changes.html **/
+#changes-table {
+
+  #changes {
+    width: 50%;
+  }
+
+  #seq, #deleted {
+    width: 5%;
+  }
 }
