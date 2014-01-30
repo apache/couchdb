@@ -11,7 +11,8 @@
 // the License.
 
 define([
-  "backbone"
+  "backbone",
+  "plugins/backbone.layoutmanager"
 ],
 
 function(Backbone) {
@@ -57,9 +58,8 @@ function(Backbone) {
     establish: function() {
       return null;
     },
-
     loaderClassname: 'loader',
-
+    manage: true,
     disableLoader: false,
 
     forceRender: function () {

@@ -28,7 +28,7 @@ function(app, Components, FauxtonAPI, Databases) {
       return [this.model.fetch()];
     },
     serialize: function() {
-      console.log('db', this.model);
+      
       return {
         encoded: app.utils.safeURLName(this.model.get("name")),
         database: this.model,
