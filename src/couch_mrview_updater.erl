@@ -194,6 +194,9 @@ write_results(Parent, State) ->
                 Parent ! {new_state, NewState};
             true ->
                 send_partial(NewState#mrst.partial_resp_pid, NewState),
+                % notifify the view update
+                couch_index_event:notify({index_update, {DbName, IdxName,
+                                                         couch_mrview_index}}),
                 write_results(Parent, NewState)
             end
     end.
