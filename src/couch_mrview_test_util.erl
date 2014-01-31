@@ -33,6 +33,8 @@ new_db(Name, Type) ->
     {ok, Db} = couch_db:create(Name, [?ADMIN_USER]),
     save_docs(Db, [ddoc(Type)]).
 
+delete_db(Name) ->
+    couch_server:delete(Name, [{user_ctx, ?ADMIN}]).
 
 save_docs(Db, Docs) ->
     {ok, _} = couch_db:update_docs(Db, Docs, []),
