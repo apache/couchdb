@@ -72,9 +72,6 @@ cast(Node, Caller, MFA, Options) ->
 %% No rexi_EXIT message will be sent.
 -spec kill(node(), reference()) -> ok.
 kill(Node, Ref) ->
-    % This first version is to tide us over during the upgrade. We'll
-    % remove it in the next commit that will be in a separate release.
-    rexi_utils:send({rexi_server, Node}, cast_msg({kill, Ref})),
     rexi_utils:send(rexi_utils:server_pid(Node), cast_msg({kill, Ref})),
     ok.
 
