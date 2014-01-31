@@ -115,6 +115,8 @@ wait_db_updated({Pid, Ref}) ->
             State;
         {'DOWN', MonRef, process, Pid, Reason} ->
             throw({changes_feed_died, Reason})
+    after 300000 ->
+        ?MODULE:wait_db_updated({Pid, Ref})
     end.
 
 receive_results(Workers, Acc0, Timeout) ->
