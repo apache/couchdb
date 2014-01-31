@@ -72,16 +72,17 @@ handle_info(timeout, #state{sender = nil} = State) ->
     if Sender =:= nil, C > 1 ->
         {noreply, State#state{buffer = Q2, count = C-1}, 0};
     true ->
+        NewState = State#state{buffer = Q2, sender = Sender, count = C-1},
         % When Sender is nil and C-1 == 0 we're reverting to an
         % idle state with no outstanding or queued messages. We'll
         % use this oppurtunity to hibernate this process and
         % run a garbage collection.
-        Timeout = case {Sender, C-1} of
-            {nil, 0} -> hibernate;
-            _ -> infinity
-        end,
-        NewState = State#state{buffer = Q2, sender = Sender, count = C-1},
-        {noreply, NewState, Timeout}
+        case {Sender, C-1} of
+            {nil, 0} ->
+                {noreply, NewState, hibernate};
+            _ ->
+                {noreply, NewState, infinity}
+        end
     end;
 handle_info(timeout, State) ->
     % Waiting on a sender to return
