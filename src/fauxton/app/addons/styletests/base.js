@@ -10,6 +10,24 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-.datatypes {
-  padding: 0 15px;
-}
+define([
+  "app",
+  "api",
+  "addons/styletests/routes"
+],
+
+function(app, FauxtonAPI, tests) {
+
+	tests.initialize = function() {
+
+		FauxtonAPI.addHeaderLink({
+			title: "Tests", 
+			href: '#/tests',
+			bottomNav: true,
+			icon: "fonticon-wrench"
+		});
+		
+	};
+
+	return tests;
+});

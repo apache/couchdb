@@ -15,19 +15,19 @@ the License.
 <div id="doc">
   <div class="errors-container"></div>
    
-<div class="row doc-editor-buttons"> 
+<div class="nav">
   <div class="span3">
-    <button class="save-doc button green btn-medium save fonticon-circle-check" type="button">Save</button>
-    <button class="button cancel-button gray btn-medium">Back to _all_docs</button>
+    <button class="save-doc btn btn-success save" type="button"><i class="icon fonticon-circle-check"></i> Save</button>
+    <button class="btn cancel-button">Back to _all_docs</button>
   </div>
 
   <div class="span7">
     <% if (attachments) { %>
     <div class="btn-group">
-      <a class="button gray btn-medium dropdown-toggle btn" data-bypass="true" data-toggle="dropdown" href="#">
+      <button class="dropdown-toggle btn" data-bypass="true" data-toggle="dropdown">
         View Attachments
         <span class="caret"></span>
-      </a>
+      </button>
       <ul class="dropdown-menu">
         <%_.each(attachments, function (att) { %>
         <li>
@@ -39,11 +39,11 @@ the License.
       </ul>
     </div>
     <% } %> 
-    <button class="button gray btn-medium  upload"><i class="icon-circle-arrow-up"></i> Upload Attachment</button>
-    <button class="button gray btn-medium duplicate"><i class="icon-repeat"></i> Duplicate document</button>
+    <button class="btn upload"><i class="icon icon-circle-arrow-up"></i> Upload Attachment</button>
+    <button class="btn duplicate"><i class="icon icon-repeat"></i> Duplicate document</button>
   </div>
 
-  <button class="button red btn-medium delete"><i class="icon-trash"></i></button>
+  <button class="btn btn-danger delete"><i class="icon icon-trash"></i></button>
   </ul>
 
 <div id="upload-modal"> </div>

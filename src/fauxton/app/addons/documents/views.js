@@ -156,7 +156,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     template: "addons/documents/templates/upload_modal",
 
     events: {
-      "click a#upload-btn": "uploadFile"
+      "click #upload-btn": "uploadFile"
     },
 
     uploadFile: function (event) {
