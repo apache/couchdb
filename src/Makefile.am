@@ -149,7 +149,6 @@ FAUXTON_FILES = \
     fauxton/app/addons/documents/views.js \
     fauxton/app/addons/fauxton/base.js \
     fauxton/app/addons/fauxton/components.js \
-    fauxton/app/addons/fauxton/layout.js \
     fauxton/app/addons/fauxton/resizeColumns.js \
     fauxton/app/addons/fauxton/tests/baseSpec.js \
     fauxton/app/addons/fauxton/tests/navbarSpec.js \
