@@ -1,48 +1,11 @@
-*.o
-*.so
-*.Tpo
-*.beam
-erl_crash.dump
-wiki/
-
-# building
-src/*/ebin/
-rel/couchdb
-rel/couchdb.config
-rel/overlay.config
 install.mk
-rebar
-deps/
-
-# scons building
-couchjs/.sconf_temp/
-couchjs/.sconsign.dblite
-couchjs/build/
-couchjs/config.log
-*.pyc
-
-# testing
-.eunit
-@abs_top_builddir@/
-src/couch/test/etap/temp*
-.dialyzer_filter
-.dialyzer_out
-*.plt
-
-# dev
-dev/lib
-dev/logs
+rel/*.config
 rel/dev*
 rel/tmpdata
-rel/logs
 
-# vim
-*.swp
-*~
-
-# eclipse
-.project
-/.pydevproject
+*.o
+*.so
+ebin/
 
 share/server/main-coffee.js
 share/server/main.js
