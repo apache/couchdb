@@ -1,5 +1,6 @@
 {
   "deps": [
+  { "name": "fauxton" },
   { "name": "databases" },
   { "name": "documents" },
   { "name": "pouchdb" },
@@ -23,7 +24,8 @@
         "variables": {
           "requirejs": "/assets/js/libs/require.js",
           "css": "./css/index.css",
-          "base": null
+          "base": null,
+          "cachebuster": ""
         },
         "app": {
           "root": "/",
@@ -37,7 +39,8 @@
         "variables": {
           "requirejs": "./js/require.js",
           "css": "./css/index.css",
-          "base": null
+          "base": null,
+          "cachebuster": "?v1.0"
         },
         "app": {
           "root": "/_utils/fauxton/",
