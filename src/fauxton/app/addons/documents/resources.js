@@ -285,7 +285,9 @@ function(app, FauxtonAPI) {
       this.on("remove",this.decrementTotalRows , this);
       this.perPageLimit = options.perPageLimit || 20;
 
-      this.params.limit = this.perPageLimit; 
+      if (this.params.limit > this.perPageLimit) {
+        this.params.limit = this.perPageLimit; 
+      }
     },
 
     url: function(context) {

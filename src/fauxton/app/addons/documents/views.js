@@ -446,7 +446,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
           pageEnd = 20;
 
       if (!this.newView) {
-        totalRows = this.collection.totalRows();
+        totalRows = this.collection.length;
         updateSeq = this.collection.updateSeq();
       }
 
@@ -456,6 +456,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         pageEnd =  this.pagination.pageEnd();
       }
 
+      console.log('t', totalRows, this.collection);
       return {
         database: app.utils.safeURLName(this.collection.database.id),
         updateSeq: updateSeq,
@@ -1697,27 +1698,30 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         database: this.database
       }));
 
-      this.eventer = _.extend({}, Backbone.Events);
 
-      this.advancedOptions = this.insertView('#query', new Views.AdvancedOptions({
-        updateViewFn: this.updateView,
-        previewFn: this.previewView,
-        database: this.database,
-        viewName: this.viewName,
-        ddocName: this.model.id,
-        hasReduce: this.hasReduce(),
-        eventer: this.eventer
-      }));
+      if (!this.newView) {
+        this.eventer = _.extend({}, Backbone.Events);
 
-      this.advancedOptionsMenu = this.insertView('#query-options-wrapper', new Views.AdvancedOptionsMenu({
-        hasReduce: this.hasReduce(),
-        eventer:  this.eventer
-       }));
+        this.advancedOptions = this.insertView('#query', new Views.AdvancedOptions({
+          updateViewFn: this.updateView,
+          previewFn: this.previewView,
+          database: this.database,
+          viewName: this.viewName,
+          ddocName: this.model.id,
+          hasReduce: this.hasReduce(),
+          eventer: this.eventer
+        }));
+
+        this.advancedOptionsMenu = this.insertView('#query-options-wrapper', new Views.AdvancedOptionsMenu({
+          hasReduce: this.hasReduce(),
+          eventer:  this.eventer
+         }));
+      }
 
     },
 
     afterRender: function() {
-      if (this.params) {
+      if (this.params && !this.newView) {
         this.advancedOptions.updateFromParams(this.params);
         this.advancedOptionsMenu.updateFromParams(this.params);
       }
