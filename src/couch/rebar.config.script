@@ -48,21 +48,26 @@ end,
 CFLAGS1 = CFLAGS0 ++ " -DWITHOUT_CURL",
 
 PortEnv = [
+    {"DRV_CFLAGS",  "$DRV_CFLAGS -DPIC -O2 -fno-common"},
+    {"DRV_LDFLAGS", "$DRV_LDFLAGS -lm -licuuc -licudata -licui18n -lpthread"},
     {"CFLAGS", "$CFLAGS -Wall -c -g -O2 " ++ CFLAGS1},
     {"LDFLAGS", LDFLAGS}],
 
 CouchJSSpec = [{filename:join(["priv", CouchJSName]),
                 ["priv/couch_js/{help,http,main,utf8,util}.c"]}],
 SpawnSpec = [{"priv/couchspawnkillable", ["priv/spawnkillable/*.c"]}],
+IcuSpec = [{"priv/couch_icu_driver.so", ["priv/icu_driver/*.c"]}],
+
+BaseSpecs = CouchJSSpec ++ IcuSpec,
 
 PortSpecs = case os:type() of
     {win32, _} ->
-        CouchJSSpec ++ SpawnSpec;
+        BaseSpecs ++ SpawnSpec;
     _ ->
         {ok, _} = file:copy("priv/spawnkillable/couchspawnkillable.sh",
                             "priv/couchspawnkillable"),
         os:cmd("chmod +x priv/couchspawnkillable"),
-        CouchJSSpec
+        BaseSpecs
 end,
 
 [{port_env, PortEnv},
