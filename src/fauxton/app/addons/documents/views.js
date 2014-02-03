@@ -456,7 +456,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
   Views.AllDocsLayout = FauxtonAPI.View.extend({
     template: "addons/documents/templates/all_docs_layout",
-    className: "row",
 
     initialize: function (options) {
       this.database = options.database;

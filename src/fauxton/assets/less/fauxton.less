@@ -22,10 +22,32 @@
 @import "prettyprint.less";
 @import "icons.less";
 
-
+// globals
 body {
-  background-color: #F2F2F2;
+  font-size: 16px;
+  line-height:1.3;
+  padding-bottom: 0px;
+  color: #333;
+  padding-top: 90px;
+  background-color: @sidebarBG;
 }
+
+h2,h3,h4 {font-weight: 600;}
+
+a {
+  .transition(all .25s linear);
+}
+
+a,
+a:visited,
+a:active {
+  color: @linkColor;
+}
+
+a:hover {
+  color: @red;
+}
+
 #main > footer {
   position: fixed;
   bottom: 0;
@@ -37,56 +59,6 @@ body {
   .closeMenu & {
     margin-left: @collapsedNavWidth;
   }
-}
-
-.hide-text {
-  font: 0/0 a;
-  color: transparent;
-  text-shadow: none;
-  background-color: transparent;
-  border: 0;
-}
-
-.row {
-  margin-left: 0;
-}
-
-// globals
-body {
-  font-size: 16px;
-  line-height:1.3;
-  padding-bottom: 0px;
-  color: #333;
-  padding-top: 92px;
-  &#home{
-    padding-top: 90px;
-  }
-  background-color: @sidebarBG;
-  /* OVERRIDE BOOTSTRAP BTN STYLES */
-  .btn{
-    .box-shadow(none);
-    .border-radius(@baseBorderRadius);
-    background-image: none;
-    text-shadow: none;
-    background-repeat: no-repeat;
-  }
-}
-
-h2,h3,h4 {font-weight: 600;}
-
-
-a, .btn{
-  .transition(all .25s linear);
-}
-
-a,
-a:visited,
-a:active {
-  color: @linkColor;
-}
-
-a:hover{
-  color: @red;
 }
 
 /* ajax loader */
@@ -413,11 +385,6 @@ a:hover{
 }
 
 
-footer#mainFooter{
-  position: fixed;
-  bottom: 0;
-}
-
 /*SIDEBAR TEMPLATE STYLES*/
 .topmenu-defaults {
   height: 70px;
@@ -439,6 +406,9 @@ footer#mainFooter{
 }
 
 #dashboard-upper-content{
+  .tab-content {
+    padding-top: 70px;
+  }
   .well{
     padding: 20px;
     .border-radius(0);
@@ -550,11 +520,6 @@ footer#mainFooter{
   color: white;
 }
 
-
-.tab-content {
-  margin-top: 70px;
-}
-
 .well { 
   .controls-group {
   &:first-child, &:last-child{
@@ -606,6 +571,11 @@ tbody {padding-top: 10px;}
 }
 
 .btn {
+  .box-shadow(none);
+  .border-radius(@baseBorderRadius);
+  background-image: none;
+  text-shadow: none;
+  background-repeat: no-repeat;
   padding: 10px;
   margin-top: 0px;
   .icon {
