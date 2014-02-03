@@ -59,7 +59,7 @@ PortEnv = [
 
 
 BaseSpecs = [
-    {CouchJSPath, ["priv/couch_js/*.c"]},
+    {CouchJSPath, ["priv/couch_js/{help,http,main,utf8,util}.c"]},
     {"priv/couch_icu_driver.so", ["priv/icu_driver/*.c"]},
     {"priv/couch_ejson_compare.so", ["priv/couch_ejson_compare/*.c"]}
 ],
