@@ -17,7 +17,7 @@ CouchJSName = case os:type() of
     _ ->
         "couchjs"
 end,
-Version = string:strip(os:cmd("git describe"), right, $\n),
+Version = string:strip(os:cmd("git describe --always"), right, $\n),
 
 %% build config.h
 ConfigH = [
