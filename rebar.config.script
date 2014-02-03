@@ -10,30 +10,32 @@
 %% License for the specific language governing permissions and limitations under
 %% the License.
 
-%% declare values
 CouchJSName = case os:type() of
     {win32, _} ->
         "couchjs.exe";
     _ ->
         "couchjs"
 end,
+CouchJSPath = filename:join(["priv", CouchJSName]),
 Version = string:strip(os:cmd("git describe --always"), right, $\n),
 
-%% build config.h
+
 ConfigH = [
- {"SM185", ""},
- {"HAVE_JS_GET_STRING_CHARS_AND_LENGTH", "1"},
- {"JSSCRIPT_TYPE", "JSObject*"},
- {"COUCHJS_NAME", "\"" ++ CouchJSName++ "\""},
- {"PACKAGE", "\"apache-couchdb\""},
- {"PACKAGE_BUGREPORT", "\"https://issues.apache.org/jira/browse/COUCHDB\""},
- {"PACKAGE_NAME", "\"Apache CouchDB\""},
- {"PACKAGE_STRING", "\"Apache CouchDB " ++ Version ++ "\""},
- {"PACKAGE_VERSION", "\"" ++ Version ++ "\""}],
+    {"SM185", ""},
+    {"HAVE_JS_GET_STRING_CHARS_AND_LENGTH", "1"},
+    {"JSSCRIPT_TYPE", "JSObject*"},
+    {"COUCHJS_NAME", "\"" ++ CouchJSName++ "\""},
+    {"PACKAGE", "\"apache-couchdb\""},
+    {"PACKAGE_BUGREPORT", "\"https://issues.apache.org/jira/browse/COUCHDB\""},
+    {"PACKAGE_NAME", "\"Apache CouchDB\""},
+    {"PACKAGE_STRING", "\"Apache CouchDB " ++ Version ++ "\""},
+    {"PACKAGE_VERSION", "\"" ++ Version ++ "\""}
+],
+
 ConfigSrc = [["#define ", K, " ", V, $\n] || {K, V} <- ConfigH],
 ok = file:write_file("priv/couch_js/config.h", ConfigSrc),
 
-%% compile-time parameters
+
 JSLIBS = "-lmozjs185",
 {CFLAGS0, LDFLAGS} = case os:type() of
     {unix, darwin} ->
@@ -47,19 +49,24 @@ JSLIBS = "-lmozjs185",
 end,
 CFLAGS1 = CFLAGS0 ++ " -DWITHOUT_CURL",
 
+
 PortEnv = [
     {"DRV_CFLAGS",  "$DRV_CFLAGS -DPIC -O2 -fno-common"},
     {"DRV_LDFLAGS", "$DRV_LDFLAGS -lm -licuuc -licudata -licui18n -lpthread"},
     {"CFLAGS", "$CFLAGS -Wall -c -g -O2 " ++ CFLAGS1},
-    {"LDFLAGS", LDFLAGS}],
+    {"LDFLAGS", LDFLAGS}
+],
 
-CouchJSSpec = [{filename:join(["priv", CouchJSName]),
-                ["priv/couch_js/{help,http,main,utf8,util}.c"]}],
-SpawnSpec = [{"priv/couchspawnkillable", ["priv/spawnkillable/*.c"]}],
-IcuSpec = [{"priv/couch_icu_driver.so", ["priv/icu_driver/*.c"]}],
-CompareSpec = [{"priv/couch_ejson_compare.so", ["priv/couch_ejson_compare/*.c"]}],
 
-BaseSpecs = CouchJSSpec ++ IcuSpec ++ CompareSpec,
+BaseSpecs = [
+    {CouchJSPath, ["priv/couch_js/*.c"]},
+    {"priv/couch_icu_driver.so", ["priv/icu_driver/*.c"]},
+    {"priv/couch_ejson_compare.so", ["priv/couch_ejson_compare/*.c"]}
+],
+
+SpawnSpec = [
+    {"priv/couchspawnkillable", ["priv/spawnkillable/*.c"]}
+],
 
 PortSpecs = case os:type() of
     {win32, _} ->
@@ -71,5 +78,8 @@ PortSpecs = case os:type() of
         BaseSpecs
 end,
 
-[{port_env, PortEnv},
- {port_specs, PortSpecs}].
+
+[
+    {port_env, PortEnv},
+    {port_specs, PortSpecs}
+].
