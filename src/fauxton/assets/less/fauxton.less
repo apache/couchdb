@@ -16,9 +16,10 @@
  * Fauxton less style files
  *
  */
+@import "bootstrap/variables.less";
+@import "variables.less";
 @import "bootstrap/bootstrap.less";
 @import "bootstrap/mixins.less";
-@import "variables.less";
 @import "prettyprint.less";
 @import "icons.less";
 
@@ -48,6 +49,125 @@ a:hover {
   color: @red;
 }
 
+/* bootstrap overrides */
+.page-header {
+  border-bottom: 1px solid #E3E3E3;
+  margin-bottom: 10px;
+  h3 {
+    text-transform: capitalize;
+    margin-bottom: 0;
+  }
+}
+
+.nav-tabs > li {
+  margin-right: 2px;
+  > a {
+    cursor: pointer;
+    color: #333;
+    border-color: #eeeeee #eeeeee #dddddd;
+    text-decoration: none;
+    background-color: #eeeeee;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    &:hover,
+    &:focus {
+      background-color: @linkRed;
+      border-top: 1px solid @red;
+      color: white;
+    }
+  }
+}
+
+.well {
+  .controls-group {
+    &:first-child,
+    &:last-child {
+      margin-top: 24px;
+    }
+    margin-bottom: 8px;
+  }
+  .controls-row {
+    margin-bottom: 8px;
+  }
+}
+
+/*TABLE STYLES*/
+table.table {
+  table-layout: fixed;
+}
+table tr td{
+  word-wrap: break-word;
+  &.select {
+    width: 20px;
+  }
+}
+thead {
+  border-bottom: 2px solid @redButton;
+}
+tbody {
+  padding-top: 10px;
+}
+.table-condensed td {
+  padding: 18px 5px;
+}
+.table-striped tbody > tr:nth-child(odd) > td,
+.table-striped tbody > tr:nth-child(odd) > th
+{
+  background-color: #F7F7F7;
+}
+
+/*form elements and buttons*/
+.btn-group {
+  > .btn + .dropdown-toggle,
+  > .btn:first-child,
+  > .btn:last-child,
+  > .dropdown-toggle {
+    .border-radius(0);
+    background-image: none;
+    text-shadow: none;
+  }
+}
+
+.btn {
+  .box-shadow(none);
+  .border-radius(@baseBorderRadius);
+  background-image: none;
+  text-shadow: none;
+  background-repeat: no-repeat;
+  padding: 10px;
+  margin-top: 0px;
+  .icon {
+    margin-right: 0.2em;
+  }
+  &.btn-small {
+    padding: 5px 10px;
+    .icon {
+      margin-right: 0;
+      font-size: inherit;
+    }
+  }
+  &.btn-mini {
+    padding: 3px 8px;
+    .icon {
+      margin-right: 0;
+      font-size: inherit;
+    }
+  }
+}
+
+/**
+ * Fauxton-specific Bootstrap additions
+ **/
+table.databases {
+  clear: both;
+}
+.nav-tabs > li > a .fonticon:before {
+  margin-right: 6px;
+  font-size: 16px;
+}
+
+/* application specific stuff */
 #main > footer {
   position: fixed;
   bottom: 0;
@@ -94,20 +214,6 @@ a:hover {
   left: 0;
   > .row-fluid {
     height: 100%;
-  }
-}
-
-/* bootstrap overrides */
-.container-fluid {
-  padding-right: 0px;
-  padding-left: 0px;
-}
-.page-header {
-  border-bottom: 1px solid #E3E3E3;
-  margin-bottom: 10px;
-  h3 {
-    text-transform: capitalize;
-    margin-bottom: 0;
   }
 }
 
@@ -278,6 +384,8 @@ a:hover {
   left: @navWidth;
   right: 0;
   margin-left: 0;
+  padding-left: 0;
+  padding-right: 0;
   background-color: @sidebarBG;
   min-width: 600px;
   height: 100%;
@@ -496,107 +604,7 @@ a:hover {
   max-width: 500px;
 }
 
-.nav-tabs > li{
-  margin-right: 2px;
-  > a {
-  cursor: pointer;
-  color: #333;
-  border-color: #eeeeee #eeeeee #dddddd;
-  text-decoration: none;
-  background-color: #eeeeee;
-  border-radius: 0;
-  border-left: none;
-  border-right: none;
-    &.fonticon:before{
-      margin-right: 6px;
-      font-size: 16px;
-    }
-  }
-}
-
-.nav-tabs > li > a:hover, .nav-tabs > li > a:focus {
-  background-color: @linkRed;
-  border-top: 1px solid @red;
-  color: white;
-}
-
-.well { 
-  .controls-group {
-  &:first-child, &:last-child{
-    margin-top: 24px;
-  }
-  margin-bottom: 8px;
-  }
-  .controls-row {
-    margin-bottom: 8px;
-  }
-}
-
-/*TABLE STYLES*/
-table.table {
-  table-layout: fixed;
-}
-table {
-  tr{
-    td{
-      word-wrap: break-word;
-      &.select {
-        width: 20px;
-      }
-    }
-  }
-}
-table.databases {clear: both;}
-thead {border-bottom: 2px solid @redButton;}
-tbody {padding-top: 10px;}
-.table-condensed td {padding: 18px 5px;}
-.table-striped tbody > tr:nth-child(odd) > td, 
-.table-striped tbody > tr:nth-child(odd) > th
-{
-  background-color: #F7F7F7;
-}
-
-
-/*form elements and buttons*/
-.btn-group {
-  > .btn + .dropdown-toggle,
-  > .btn:first-child,
-  > .btn:last-child,
-  > .dropdown-toggle
-  {
-    .border-radius(0);
-    background-image: none;
-    text-shadow: none;
-  }
-}
-
-.btn {
-  .box-shadow(none);
-  .border-radius(@baseBorderRadius);
-  background-image: none;
-  text-shadow: none;
-  background-repeat: no-repeat;
-  padding: 10px;
-  margin-top: 0px;
-  .icon {
-    margin-right: 0.2em;
-  }
-  &.btn-small {
-    padding: 5px 10px;
-    .icon {
-      margin-right: 0;
-      font-size: inherit;
-    }
-  }
-  &.btn-mini {
-    padding: 3px 8px;
-    .icon {
-      margin-right: 0;
-      font-size: inherit;
-    }
-  }
-}
-
+/** table row selector thing **/
 .select{
   > a{
     display: block;
