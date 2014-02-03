@@ -23,7 +23,14 @@
 @import "prettyprint.less";
 @import "icons.less";
 
-// globals
+/**
+ * HTML-wide overrides
+ **/
+
+*, *:before, *:after {
+  .box-sizing(border-box);
+}
+
 body {
   font-size: 16px;
   line-height:1.3;
@@ -48,6 +55,30 @@ a:active {
 a:hover {
   color: @red;
 }
+
+input[type=text],
+input[type=password] {
+  .border-radius(0);
+  padding: 12px;
+  border: 1px solid #ccc;
+  height: auto;
+  font-size: 16px;
+  margin-top: 0;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  box-sizing: border-box;
+  padding: 0;
+}
+
+input[type="file"],
+input[type="checkbox"],
+input[type="radio"],
+select {
+  margin: 0 0 1em 0;
+}
+
 
 /* bootstrap overrides */
 .page-header {
@@ -635,18 +666,6 @@ table.databases {
   }
 }
 
-input[type=text], input[type=password],
-.navbar-form input{
-  .border-radius(0);
-  padding: 12px;
-  border: 1px solid #ccc;
-  height: auto;
-  font-size: 16px;
-  margin-top: 0;
-}
-
-
-
 label.fonticon-search {
   .box-sizing(content-box);
   position: relative;
@@ -676,18 +695,6 @@ label.fonticon-search {
   input[type=text]{
     width: auto;
   }
-}
-*, *:before, *:after {
-  .box-sizing(border-box);
-}
-
-input[type="checkbox"], input[type="radio"] {
-  box-sizing: border-box;
-  padding: 0;
-}
-
-input[type="file"], input[type="checkbox"], input[type="radio"], select {
-  margin: 0 0 1em 0;
 }
 
 .well select {
