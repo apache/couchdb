@@ -64,7 +64,10 @@ module.exports = function(grunt) {
           "dist/debug/css/fauxton.css": "assets/less/fauxton.less"
         }
       },
-      img: ["assets/img/**"]
+      img: ["assets/img/**"],
+      // used in concat:index_css to keep file ordering intact
+      // fauxton.css should load first
+      css: ["dist/debug/css/fauxton.css"]
     };
     helper.processAddons(function(addon){
       // Less files from addons
@@ -75,6 +78,7 @@ module.exports = function(grunt) {
         theAssets.less.paths.push(lessPath);
         theAssets.less.files["dist/debug/css/" + addon.name + ".css"] =
           lessPath + "/" + addon.name + ".less";
+        theAssets.css.push("dist/debug/css/" + addon.name + ".css");
       }
       // Images
       root = addon.path || "app/addons/" + addon.name;
@@ -210,7 +214,7 @@ module.exports = function(grunt) {
       },
 
       index_css: {
-        src: ["dist/debug/css/*.css", '!dist/debug/css/index.css', 'assets/css/*.css'],
+        src: assets.css,
         dest: 'dist/debug/css/index.css'
       },
 
