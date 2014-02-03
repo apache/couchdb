@@ -67,7 +67,7 @@ module.exports = function(grunt) {
       img: ["assets/img/**"],
       // used in concat:index_css to keep file ordering intact
       // fauxton.css should load first
-      css: ["dist/debug/css/fauxton.css"]
+      css: ["assets/css/*.css", "dist/debug/css/fauxton.css"]
     };
     helper.processAddons(function(addon){
       // Less files from addons
