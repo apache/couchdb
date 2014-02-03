@@ -80,3 +80,5 @@ cat > rel/dev$i.config << EOF
 {backend_port, `expr 10000 \* $i + 5986`}.
 EOF
 done
+
+rebar get-deps && rebar update-deps && cat rel/couchdb.config

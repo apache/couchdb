@@ -2,6 +2,7 @@ install.mk
 rel/*.config
 rel/dev*
 rel/tmpdata
+src/
 
 *.o
 *.so

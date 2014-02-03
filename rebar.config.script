@@ -1,0 +1,47 @@
+% Licensed under the Apache License, Version 2.0 (the "License"); you may not
+% use this file except in compliance with the License. You may obtain a copy of
+% the License at
+%
+%   http://www.apache.org/licenses/LICENSE-2.0
+%
+% Unless required by applicable law or agreed to in writing, software
+% distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+% WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+% License for the specific language governing permissions and limitations under
+% the License.
+
+{require_otp_vsn, "R14B01|R14B03|R14B04|R15B02|R15B03|R16"}.
+
+DepDescs = [
+    {chttpd, "couchdb-chttpd", {branch, import}},
+    {config, "couchdb-config", {branch, import}},
+    {couch, "couchdb-couch", {branch, import}},
+    {couch_index, "couchdb-couch-index", {branch, import}},
+    {couch_mrview, "couchdb-couch-mrview", {branch, import}},
+    {couch_replicator, "couchdb-couch-replicator", {branch,  import}},
+    {ddoc_cache, "couchdb-ddoc-cache", {branch, import}},
+    {ets_lru, "couchdb-ets-lru", {branch, import}},
+    {fabric, "couchdb-fabric", {branch,  import}},
+    {ibrowse, "couchdb-ibrowse", {branch,  import}},
+    {jiffy, "couchdb-jiffy", {branch, import}},
+    {mem3, "couchdb-mem3", {branch, import}},
+    {mochiweb, "couchdb-mochiweb", {branch, import}},
+    {oauth, "couchdb-oauth", {branch, import}},
+    {rexi, "couchdb-rexi", {branch, import}},
+    {snappy, "couchdb-snappy", {branch, import}},
+    {twig, "couchdb-twig", {branch, import}}
+],
+
+MakeDep = fun({AppName, RepoName, Version}) ->
+    Url = "https://git-wip-us.apache.org/repos/asf/" ++ RepoName ++ ".git",
+    {AppName, ".*", {git, Url, Version}}
+end,
+
+[
+    {deps_dir, "src"},
+    {deps, lists:map(MakeDep, DepDescs)},
+    {sub_dirs, ["rel"]},
+    {lib_dirs, ["src/"]},
+    {erl_opts, [debug_info]},
+    {post_hooks, [{compile, "escript support/build_js.escript"}]}
+].
