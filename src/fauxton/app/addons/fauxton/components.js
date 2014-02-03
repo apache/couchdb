@@ -75,6 +75,7 @@ function(app, FauxtonAPI, ace, spin) {
       this._pageStart = 1;
       this.perPage = 20;
       this.docLimit = options.docLimit || 100;
+      this.paramsHistory = [];
     },
 
     canShowPreviousfn: function () {
@@ -106,7 +107,8 @@ function(app, FauxtonAPI, ace, spin) {
 
       FauxtonAPI.triggerRouteEvent('paginate', {
        direction: 'previous',
-       perPage: this.perPage
+       perPage: this.perPage,
+       params: this.paramsHistory.pop()
       });
     },
 
@@ -114,7 +116,8 @@ function(app, FauxtonAPI, ace, spin) {
       event.preventDefault();
       event.stopPropagation();
       if (!this.canShowNextfn()) { return; }
-      
+
+      this.paramsHistory.push(_.clone(this.collection.params));
       this.pageNumber = this.pageNumber + 1;
       this.incPageStart();
 
@@ -129,6 +132,7 @@ function(app, FauxtonAPI, ace, spin) {
        direction: 'next',
        perPage: limit
       });
+
     },
 
     serialize: function () {

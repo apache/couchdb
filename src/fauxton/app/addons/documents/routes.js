@@ -356,8 +356,12 @@ function(app, FauxtonAPI, Documents, Databases) {
         this.documentsView.collection.skipFirstItem = true;
         this.documentsView.collection.nextPage(options.perPage);
       } else {
-        this.documentsView.collection.skipFirstItem = false;
-        this.documentsView.collection.previousPage(options.perPage);
+        if (options.params && options.params.startkey) {
+          this.documentsView.collection.skipFirstItem = true;
+        } else {
+          this.documentsView.collection.skipFirstItem = false;
+        }
+        this.documentsView.collection.previousPage(options.perPage, options.params);
       }
     },
 

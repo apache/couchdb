@@ -281,7 +281,6 @@ function(app, FauxtonAPI) {
       this.database = options.database;
       this.params = _.clone(options.params);
       this.skipFirstItem = false;
-      this.totalRowsToPaginate = 100;
       this.on("remove",this.decrementTotalRows , this);
       this.perPageLimit = options.perPageLimit || 20;
 
@@ -426,6 +425,12 @@ function(app, FauxtonAPI) {
       this.view = options.view;
       this.design = options.design.replace('_design/','');
       this.skipFirstItem = false;
+      this.perPageLimit = options.perPageLimit || 20;
+
+      if (this.params.limit > this.perPageLimit) {
+        this.params.limit = this.perPageLimit; 
+      }
+
     },
 
     url: function(context) {

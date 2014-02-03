@@ -456,7 +456,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         pageEnd =  this.pagination.pageEnd();
       }
 
-      console.log('t', totalRows, this.collection);
       return {
         database: app.utils.safeURLName(this.collection.database.id),
         updateSeq: updateSeq,
