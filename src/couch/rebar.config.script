@@ -57,8 +57,9 @@ CouchJSSpec = [{filename:join(["priv", CouchJSName]),
                 ["priv/couch_js/{help,http,main,utf8,util}.c"]}],
 SpawnSpec = [{"priv/couchspawnkillable", ["priv/spawnkillable/*.c"]}],
 IcuSpec = [{"priv/couch_icu_driver.so", ["priv/icu_driver/*.c"]}],
+CompareSpec = [{"priv/couch_ejson_compare.so", ["priv/couch_ejson_compare/*.c"]}],
 
-BaseSpecs = CouchJSSpec ++ IcuSpec,
+BaseSpecs = CouchJSSpec ++ IcuSpec ++ CompareSpec,
 
 PortSpecs = case os:type() of
     {win32, _} ->
