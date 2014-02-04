@@ -24,7 +24,7 @@ function(app, FauxtonAPI, Documents) {
 
   Databases.DocLimit = 20;
 
-  Databases.Model = Backbone.Model.extend({
+  Databases.Model = FauxtonAPI.Model.extend({
     initialize: function(options) {
       this.status = new Databases.Status({
         database: this
@@ -82,7 +82,7 @@ function(app, FauxtonAPI, Documents) {
     }
   });
 
-  Databases.Changes = Backbone.Collection.extend({
+  Databases.Changes = FauxtonAPI.Collection.extend({
 
     initialize: function(options) {
       this.database = options.database;
@@ -110,7 +110,7 @@ function(app, FauxtonAPI, Documents) {
     }
   });
 
-  Databases.Status = Backbone.Model.extend({
+  Databases.Status = FauxtonAPI.Model.extend({
     url: function() {
       return app.host + "/" + this.database.safeID();
     },
@@ -166,7 +166,7 @@ function(app, FauxtonAPI, Documents) {
   });
 
   // TODO: shared databases - read from the user doc
-  Databases.List = Backbone.Collection.extend({
+  Databases.List = FauxtonAPI.Collection.extend({
     model: Databases.Model,
     documentation: function(){
       return "all_dbs";

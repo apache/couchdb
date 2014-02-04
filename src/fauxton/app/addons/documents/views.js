@@ -1803,11 +1803,31 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
   Views.Changes = FauxtonAPI.View.extend({
     template: "addons/documents/templates/changes",
 
+    initialize: function () {
+      var that = this;
+      this.listenTo( this.model.changes, 'change', function () {
+        console.log('render on change'); 
+        that.render();
+      });
+      this.listenTo( this.model.changes, 'cachesync', function () {
+        console.log('render on cachesync'); 
+        that.render();
+      });
+    },
+
     establish: function() {
-      return [ this.model.changes.fetch()];
+      return [ this.model.changes.fetchOnce({prefill: true,
+        success: function () {
+          console.log('hi ajax success');
+        },
+        prefillSuccess: function () {
+          console.log('hi prefill success');
+        }
+      })];
     },
 
     serialize: function () {
+      console.log('ss');
       return {
         changes: this.model.changes.toJSON(),
         database: this.model

@@ -182,7 +182,7 @@ function(app, FauxtonAPI, Documents, Databases) {
     },
 
     establish: function () {
-      return this.data.designDocs.fetch();
+      return this.data.designDocs.fetchOnce();
     },
 
     allDocs: function(databaseName, options) {

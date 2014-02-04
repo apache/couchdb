@@ -12,10 +12,12 @@
 
 define([
   "backbone",
-  "plugins/backbone.layoutmanager"
+  "plugins/backbone.layoutmanager",
+  "backbone.fetch-cache"
 ],
 
-function(Backbone) {
+function(Backbone, LayoutManager, BackboneCache) {
+  console.log(BackboneCache);
   var FauxtonAPI = {
     //add default objects
     router: {
@@ -67,16 +69,25 @@ function(Backbone) {
     }
   });
 
+
   FauxtonAPI.Model = Backbone.Model.extend({
-    fetchOnce: function (opt) {
-      var options = _.extend({}, opt);
 
-      if (!this._deferred || this._deferred.state() === "rejected" || options.forceFetch ) {
-        this._deferred = this.fetch();
-      }
+  });
 
-      return this._deferred;
+  FauxtonAPI.Collection = Backbone.Collection.extend({
+
+  });
+
+  var caching = {
+    fetchOnce: function (opts) {
+      var options = _.defaults(opts || {}, this.cache, {cache: true});
+      console.log('opts', options);
+      return this.fetch(options);
     }
+  };
+
+  _.each([FauxtonAPI.Collection, FauxtonAPI.Model], function (ctor) {
+    _.extend(ctor.prototype, caching);
   });
 
   var extensions = _.extend({}, Backbone.Events);

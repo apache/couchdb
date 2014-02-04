@@ -18,7 +18,7 @@ define([
 function(app, FauxtonAPI) {
   var Documents = FauxtonAPI.addon();
 
-  Documents.Doc = Backbone.Model.extend({
+  Documents.Doc = FauxtonAPI.Model.extend({
     idAttribute: "_id",
     documentation: function(){
       return "docs";
@@ -194,7 +194,7 @@ function(app, FauxtonAPI) {
     }
   });
 
-  Documents.DdocInfo = Backbone.Model.extend({
+  Documents.DdocInfo = FauxtonAPI.Model.extend({
     idAttribute: "_id",
     documentation: function(){
       return "docs";
@@ -224,7 +224,7 @@ function(app, FauxtonAPI) {
 
   });
 
-  Documents.ViewRow = Backbone.Model.extend({
+  Documents.ViewRow = FauxtonAPI.Model.extend({
     // this is a hack so that backbone.collections doesn't group 
     // these by id and reduce the number of items returned.
     idAttribute: "_id",
@@ -272,7 +272,7 @@ function(app, FauxtonAPI) {
 
   });
 
-  Documents.AllDocs = Backbone.Collection.extend({
+  Documents.AllDocs = FauxtonAPI.Collection.extend({
     model: Documents.Doc,
     documentation: function(){
       return "docs";
@@ -397,7 +397,7 @@ function(app, FauxtonAPI) {
     }
   });
 
-  Documents.IndexCollection = Backbone.Collection.extend({
+  Documents.IndexCollection = FauxtonAPI.Collection.extend({
     model: Documents.ViewRow,
     documentation: function(){
       return "docs";
@@ -527,7 +527,7 @@ function(app, FauxtonAPI) {
     // we can get the request duration
     fetch: function () {
       this.startTime = new Date().getTime();
-      return Backbone.Collection.prototype.fetch.call(this);
+      return FauxtonAPI.Collection.prototype.fetch.call(this);
     },
 
     allDocs: function(){
@@ -568,7 +568,7 @@ function(app, FauxtonAPI) {
   });
 
   
-  Documents.PouchIndexCollection = Backbone.Collection.extend({
+  Documents.PouchIndexCollection = FauxtonAPI.Collection.extend({
     model: Documents.ViewRow,
     documentation: function(){
       return "docs";
