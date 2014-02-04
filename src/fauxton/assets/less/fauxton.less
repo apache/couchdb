@@ -186,6 +186,67 @@ tbody {
     }
   }
 }
+.btn-primary {
+  background: @redButton;
+}
+
+.btn-primary a:visited {
+  color: #fff;
+}
+
+.form-actions {
+  background: none;
+  border: none;
+}
+
+.input-append,
+.input-prepend {
+  .add-on {
+    font-size: 18px;
+    padding: 14px 5px 30px;
+  }
+  .btn .icon {
+    font-size: 21.5px;
+    margin-right: 0;
+  }
+}
+
+.row-fluid .input-append [class*="span"],
+.input-prepend input[class*="span"] {
+  width: auto;
+}
+
+.form-inline {
+  input[type=password],
+  input[type=text] {
+    width: auto;
+  }
+}
+.checkbox {
+  label {
+    display: inline-block;
+    padding-left:25px;
+  }
+}
+
+label {
+  margin-right: 15px;
+  padding-left:0;
+  display: block;
+  cursor: pointer;
+  position: relative;
+  font-size: 14px;
+  &.inline {
+    display: inline-block;
+  }
+}
+.help-block {
+  font-size: 12px;
+}
+
+input[type=text].error {
+  border: red 1px solid;
+}
 
 /**
  * Fauxton-specific Bootstrap additions
@@ -689,14 +750,6 @@ label.fonticon-search {
   }
 }
 
-
-.form-inline {
-  input[type=password],
-  input[type=text]{
-    width: auto;
-  }
-}
-
 .well select {
   margin: 0;
 }
@@ -705,33 +758,6 @@ form.custom .hidden-field {
   margin-left: -99999px;
   position: absolute;
   visibility: hidden;
-}
-
-
-.checkbox {
-  label{
-    display: inline-block;
-    padding-left:25px;
-  }
-}
-
-label{ 
-  margin-right: 15px; 
-  padding-left:0;
-  display: block;  
-  cursor: pointer;  
-  position: relative;  
-  font-size: 14px; 
-  &.inline{
-    display: inline-block;
-  } 
-}
-.help-block{
-  font-size: 12px;
-}
-
-input[type=text].error{
-  border: red 1px solid;
 }
 
 .custom-inputs{
@@ -805,29 +831,6 @@ form.view-query-update, form.view-query-save {
   max-width: 100%;
 }
 
-
-.form-actions {
-  background: none;
-  border: none;
-}
-
-.input-append,
-.input-prepend {
-  .add-on {
-    font-size: 18px;
-    padding: 14px 5px 30px;
-  }
-  .btn .icon{
-    font-size: 21.5px;
-    margin-right: 0;
-  }
-}
-
-.row-fluid .input-append [class*="span"],
-.input-prepend input[class*="span"]{
-  width: auto;
-}
-
 /*logs*/
 #log-sidebar{
   padding: 20px;
@@ -843,14 +846,6 @@ div.spinner {
   position: absolute;
   left: 50%;
   top: 50%;
-}
-
-.btn-primary {
-  background: @redButton;
-}
-
-.btn-primary a:visited {
-  color: #fff;
 }
 
 #api-navbar{
