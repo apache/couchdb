@@ -216,9 +216,18 @@ calculate_start_seq(Acc) ->
             end,
             Acc1#acc{seq = Seq, history = History};
         {not_found, _} ->
-            Acc1
+            compare_epochs(Acc1)
     end.
 
+compare_epochs(Acc) ->
+    #acc{
+        source = Db,
+        target = #shard{node=Node, name=Name}
+    } = Acc,
+    UUID = couch_db:get_uuid(Db),
+    Epochs = couch_db:get_epochs(Db),
+    Seq = mem3_rpc:find_common_seq(Node, Name, UUID, Epochs),
+    Acc#acc{seq = Seq, history = {[]}}.
 
 changes_enumerator(#doc_info{id=DocId}, Reds, #acc{db=Db}=Acc) ->
     {ok, FDI} = couch_db:get_full_doc_info(Db, DocId),

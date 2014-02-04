@@ -16,6 +16,7 @@
 
 
 -export([
+    find_common_seq/4,
     get_missing_revs/4,
     update_docs/4,
     load_checkpoint/4,
@@ -24,6 +25,7 @@
 
 % Private RPC callbacks
 -export([
+    find_common_seq_rpc/3,
     load_checkpoint_rpc/3,
     save_checkpoint_rpc/5
 ]).
@@ -52,6 +54,11 @@ load_checkpoint(Node, DbName, SourceNode, SourceUUID) ->
 save_checkpoint(Node, DbName, DocId, Seq, Entry, History) ->
     Args = [DbName, DocId, Seq, Entry, History],
     rexi_call(Node, {mem3_rpc, save_checkpoint_rpc, Args}).
+
+
+find_common_seq(Node, DbName, SourceUUID, SourceEpochs) ->
+    Args = [DbName, SourceUUID, SourceEpochs],
+    rexi_call(Node, {mem3_rpc, find_common_seq_rpc, Args}).
 
 
 load_checkpoint_rpc(DbName, SourceNode, SourceUUID) ->
@@ -106,6 +113,44 @@ save_checkpoint_rpc(DbName, Id, SourceSeq, NewEntry0, History0) ->
         Error ->
             rexi:reply(Error)
     end.
+
+find_common_seq_rpc(DbName, SourceUUID, SourceEpochs) ->
+    erlang:put(io_priority, {internal_repl, DbName}),
+    case couch_db:open_int(DbName, [{user_ctx, ?CTX}]) of
+    {ok, Db} ->
+        case couch_db:get_uuid(Db) of
+        SourceUUID ->
+            TargetEpochs = couch_db:get_epochs(Db),
+            Seq = compare_epochs(SourceEpochs, TargetEpochs),
+            rexi:reply({ok, Seq});
+        _Else ->
+            rexi:reply({ok, 0})
+        end;
+    Error ->
+        rexi:reply(Error)
+    end.
+
+
+%% @doc Return the sequence where two files with the same UUID diverged.
+compare_epochs(SourceEpochs, TargetEpochs) ->
+    compare_rev_epochs(
+        lists:reverse(SourceEpochs),
+        lists:reverse(TargetEpochs)
+    ).
+
+
+compare_rev_epochs([{Node, Seq} | SourceRest], [{Node, Seq} | TargetRest]) ->
+    % Common history, fast-forward
+    compare_epochs(SourceRest, TargetRest);
+compare_rev_epochs([], [{_, TargetSeq} | _]) ->
+    % Source has not moved, start from seq just before the target took over
+    TargetSeq - 1;
+compare_rev_epochs([{_, SourceSeq} | _], []) ->
+    % Target has not moved, start from seq where source diverged
+    SourceSeq;
+compare_rev_epochs([{_, SourceSeq} | _], [{_, TargetSeq} | _]) ->
+    % The source was moved to a new location independently, take the minimum
+    erlang:min(SourceSeq, TargetSeq) - 1.
 
 
 %% @doc This adds a new update sequence checkpoint to the replication
