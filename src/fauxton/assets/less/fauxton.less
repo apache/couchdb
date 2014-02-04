@@ -111,6 +111,9 @@ select {
 }
 
 .well {
+  select {
+    margin: 0;
+  }
   .controls-group {
     &:first-child,
     &:last-child {
@@ -120,6 +123,21 @@ select {
   }
   .controls-row {
     margin-bottom: 8px;
+  }
+  .row-fluid {
+    margin: 0;
+  }
+  .row-fluid .row-fluid:last-child .well-item {
+    border: none;
+  }
+  .well-item {
+    color: #666;
+    font-size: 12px;
+    border-bottom: 1px solid #e5e5e5;
+    padding: 8px 4px;
+    strong {
+        font-size: 16px;
+    }
   }
 }
 
@@ -725,10 +743,6 @@ table.databases {
       top: 0;
     }
   }
-}
-
-.well select {
-  margin: 0;
 }
 
 .custom-inputs{
