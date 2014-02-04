@@ -35,33 +35,21 @@ ConfigH = [
 ConfigSrc = [["#define ", K, " ", V, $\n] || {K, V} <- ConfigH],
 ok = file:write_file("priv/couch_js/config.h", ConfigSrc),
 
-
-JSLIBS = "-lmozjs185",
-{CFLAGS0, LDFLAGS} = case os:type() of
-    {unix, darwin} ->
-        {"-DXP_UNIX -I/usr/local/include/js", JSLIBS};
-    {unix, linux} ->
-        {"-DXP_UNIX -I/usr/include/js", JSLIBS ++ " -lm"};
-    {unix, _} ->
-        {"-DXP_UNIX -I/usr/local/include/js", JSLIBS ++ " -lm"};
-    _ ->
-        {"-DXP_WIN -I/usr/include/js", JSLIBS}
-end,
-CFLAGS1 = CFLAGS0 ++ " -DWITHOUT_CURL",
-
-
-PortEnv = [
-    {"DRV_CFLAGS",  "$DRV_CFLAGS -DPIC -O2 -fno-common"},
-    {"DRV_LDFLAGS", "$DRV_LDFLAGS -lm -licuuc -licudata -licui18n -lpthread"},
-    {"CFLAGS", "$CFLAGS -Wall -c -g -O2 " ++ CFLAGS1},
-    {"LDFLAGS", LDFLAGS}
-],
-
+JS_LDFLAGS = "-lmozjs185 -DWITHOUTCURL",
+CouchJSSrc = ["priv/couch_js/{help,http,main,utf8,util}.c"],
 
 BaseSpecs = [
-    {CouchJSPath, ["priv/couch_js/{help,http,main,utf8,util}.c"]},
-    {"priv/couch_icu_driver.so", ["priv/icu_driver/*.c"]},
-    {"priv/couch_ejson_compare.so", ["priv/couch_ejson_compare/*.c"]}
+        %% couchjs
+        {"darwin", CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", "-DXP_UNIX -I/usr/local/include/js"}, {"LDFLAGS", JS_LDFLAGS}]}]},
+        {"linux",  CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", "-DXP_UNIX -I/usr/include/js"}, {"LDFLAGS", JS_LDFLAGS ++ " -lm"}]}]},
+        {"unix",   CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", "-DXP_UNIX -I/usr/local/include/js}"}, {"LDFLAGS", JS_LDFLAGS ++ " -lm"}]}]},
+        {"win32",  CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", "-DXP_WIN -I/usr/include/js"}, {"LDFLAGS", JS_LDFLAGS}]}]},
+        % ICU
+        {"", "priv/couch_icu_driver.so", ["priv/icu_driver/*.c"], [{env, [
+            {"DRV_CFLAGS",  "$DRV_CFLAGS -DPIC -O2 -fno-common"},
+            {"DRV_LDFLAGS", "$DRV_LDFLAGS -lm -licuuc -licudata -licui18n -lpthread"}]}]},
+        % ejson_compare
+        {"priv/couch_ejson_compare.so", ["priv/couch_ejson_compare/*.c"]}
 ],
 
 SpawnSpec = [
@@ -79,7 +67,4 @@ PortSpecs = case os:type() of
 end,
 
 
-[
-    {port_env, PortEnv},
-    {port_specs, PortSpecs}
-].
+[{port_specs, PortSpecs}].
