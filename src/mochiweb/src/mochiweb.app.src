@@ -1,8 +1,0 @@
-{application, mochiweb,
- [{description, "MochiMedia Web Server"},
-  {vsn, git},
-  {modules, []},
-  {registered, []},
-  {mod, {mochiweb_app, []}},
-  {env, []},
-  {applications, [kernel, stdlib, crypto, inets]}]}.
