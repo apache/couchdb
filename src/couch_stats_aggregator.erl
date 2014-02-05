@@ -71,11 +71,11 @@ reload_metrics() ->
     Existing = couch_stats:list(),
     Current = load_metrics_for_applications(),
     ToDelete = lists:foldl(
-        fun({_, {Name, [{type, Type}, _]}}, Acc) ->
-            E = {Name, [{type, Type}]},
-            case sets:is_element(E, Acc) of
+        fun({Name, Props}=Stat, Acc) ->
+            Type = proplists:get_value(type, Props),
+            case sets:is_element(Stat, Acc) of
                 true ->
-                    sets:del_element(E, Acc);
+                    sets:del_element(Stat, Acc);
                 false ->
                     couch_stats:new(Type, Name),
                     Acc
