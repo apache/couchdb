@@ -91,7 +91,7 @@ reload_metrics() ->
     {ok, Current}.
 
 load_metrics_for_applications() ->
-    Apps = [element(1, A) || A <- application:which_applications()],
+    Apps = [element(1, A) || A <- application:loaded_applications()],
     lists:foldl(
         fun(AppName, Acc) ->
             case load_metrics_for_application(AppName) of
