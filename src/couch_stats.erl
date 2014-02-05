@@ -37,18 +37,18 @@ sample(Name) ->
 new(counter, Name) ->
     case folsom_metrics:new_counter(Name) of
         ok -> ok;
-        {error, Name, metric_exists} -> {error, metric_exists}
+        {error, Name, metric_already_exists} -> {error, metric_exists}
     end;
 new(histogram, Name) ->
     {ok, Time} = application:get_env(couch_stats, collection_interval),
     case folsom_metrics:new_histogram(Name, slide_uniform, {Time, 1024}) of
         ok -> ok;
-        {error, Name, metric_exists} -> {error, metric_exists}
+        {error, Name, metric_already_exists} -> {error, metric_exists}
     end;
 new(gauge, Name) ->
     case folsom_metrics:new_gauge(Name) of
         ok -> ok;
-        {error, Name, metric_exists} -> {error, metric_exists}
+        {error, Name, metric_already_exists} -> {error, metric_exists}
     end;
 new(_, _) ->
     {error, unsupported_type}.
