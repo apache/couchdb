@@ -358,9 +358,9 @@ http_uri(JSContext* cx, JSObject* req, couch_args* args, jsval* uri_val)
     FILE* uri_fp = NULL;
     JSString* uri_str;
 
-    // Default is http://localhost:5984/ when no uri file is specified
+    // Default is http://localhost:15986/ when no uri file is specified
     if (!args->uri_file) {
-        uri_str = JS_InternString(cx, "http://localhost:5984/");
+        uri_str = JS_InternString(cx, "http://localhost:15986/");
         *uri_val = STRING_TO_JSVAL(uri_str);
         return JS_TRUE;
     }
