@@ -49,7 +49,7 @@ ok = file:write_file("priv/couch_js/config.h", ConfigSrc),
         {"", "-lmozjs185"}
 end,
 
-CouchJSSrc = ["priv/couch_js/{help,http,main,utf8,util}.c"],
+CouchJSSrc = ["priv/couch_js/*.c"],
 
 BaseSpecs = [
         %% couchjs
