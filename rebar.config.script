@@ -19,6 +19,13 @@ end,
 CouchJSPath = filename:join(["priv", CouchJSName]),
 Version = string:strip(os:cmd("git describe --always"), right, $\n),
 
+CouchConfig = case filelib:is_file(os:getenv("COUCHDB_CONFIG")) of
+    true ->
+        {ok, Result} = file:consult(os:getenv("COUCHDB_CONFIG")),
+        Result;
+    false ->
+        []
+end.
 
 ConfigH = [
     {"SM185", ""},
@@ -35,15 +42,21 @@ ConfigH = [
 ConfigSrc = [["#define ", K, " ", V, $\n] || {K, V} <- ConfigH],
 ok = file:write_file("priv/couch_js/config.h", ConfigSrc),
 
-JS_LDFLAGS = "-lmozjs185 -DWITHOUTCURL",
+{JS_CFLAGS, JS_LDFLAGS} = case lists:keyfind(with_curl, 1, CouchConfig) of
+    {with_curl, true} ->
+        {"-DHAVE_CURL ", "-DHAVE_CURL -lmozjs185 -lcurl"};
+    _ ->
+        {"", "-lmozjs185"}
+end,
+
 CouchJSSrc = ["priv/couch_js/{help,http,main,utf8,util}.c"],
 
 BaseSpecs = [
         %% couchjs
-        {"darwin", CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", "-DXP_UNIX -I/usr/local/include/js"}, {"LDFLAGS", JS_LDFLAGS}]}]},
-        {"linux",  CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", "-DXP_UNIX -I/usr/include/js"}, {"LDFLAGS", JS_LDFLAGS ++ " -lm"}]}]},
-        {"unix",   CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", "-DXP_UNIX -I/usr/local/include/js}"}, {"LDFLAGS", JS_LDFLAGS ++ " -lm"}]}]},
-        {"win32",  CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", "-DXP_WIN -I/usr/include/js"}, {"LDFLAGS", JS_LDFLAGS}]}]},
+        {"darwin", CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", JS_CFLAGS ++ "-DXP_UNIX -I/usr/local/include/js"}, {"LDFLAGS", JS_LDFLAGS}]}]},
+        {"linux",  CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", JS_CFLAGS ++ "-DXP_UNIX -I/usr/include/js"}, {"LDFLAGS", JS_LDFLAGS ++ " -lm"}]}]},
+        {"unix",   CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", JS_CFLAGS ++ "-DXP_UNIX -I/usr/local/include/js}"}, {"LDFLAGS", JS_LDFLAGS ++ " -lm"}]}]},
+        {"win32",  CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", JS_CFLAGS ++ "-DXP_WIN -I/usr/include/js"}, {"LDFLAGS", JS_LDFLAGS}]}]},
         % ICU
         {"", "priv/couch_icu_driver.so", ["priv/icu_driver/*.c"], [{env, [
             {"DRV_CFLAGS",  "$DRV_CFLAGS -DPIC -O2 -fno-common"},
