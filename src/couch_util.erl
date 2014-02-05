@@ -21,6 +21,7 @@
 -export([get_nested_json_value/2, json_user_ctx/1]).
 -export([proplist_apply_field/2, json_apply_field/2]).
 -export([to_binary/1, to_integer/1, to_list/1, url_encode/1]).
+-export([json_encode/1, json_decode/1]).
 -export([verify/2,simple_call/2,shutdown_sync/1]).
 -export([get_value/2, get_value/3]).
 -export([md5/1, md5_init/0, md5_update/2, md5_final/1]).
@@ -375,6 +376,17 @@ url_encode([H|T]) ->
     end;
 url_encode([]) ->
     [].
+
+json_encode(V) ->
+    jiffy:encode(V, [force_utf8]).
+
+json_decode(V) ->
+    try
+        jiffy:decode(V)
+    catch
+        throw:Error ->
+            throw({invalid_json, Error})
+    end.
 
 verify([X|RestX], [Y|RestY], Result) ->
     verify(RestX, RestY, (X bxor Y) bor Result);

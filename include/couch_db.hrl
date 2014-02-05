@@ -18,8 +18,8 @@
 -define(MIN_STR, <<"">>).
 -define(MAX_STR, <<255>>). % illegal utf string
 
--define(JSON_ENCODE(V), ejson:encode(V)).
--define(JSON_DECODE(V), ejson:decode(V)).
+-define(JSON_ENCODE(V), couch_util:json_encode(V)).
+-define(JSON_DECODE(V), couch_util:json_decode(V)).
 
 -define(b2l(V), binary_to_list(V)).
 -define(l2b(V), list_to_binary(V)).
