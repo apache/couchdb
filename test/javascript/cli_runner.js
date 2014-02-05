@@ -38,7 +38,6 @@ function runTest() {
   } catch(e) {
     console.log("FAIL\nReason: " + e.message);
     fmtStack(e.stack);
-    quit(1);
   }
 }
 
