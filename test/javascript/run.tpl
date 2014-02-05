@@ -12,73 +12,26 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-SRC_DIR=%abs_top_srcdir%
-BUILD_DIR=%abs_top_builddir%
+SRC_DIR=%rootdir%
+BUILD_DIR=%rootdir%
 SCRIPT_DIR=$SRC_DIR/share/www/script
 JS_TEST_DIR=$SRC_DIR/test/javascript
+COUCHJS=%rootdir%/src/couch/priv/couchjs
 
-COUCHJS=%abs_top_builddir%/src/couchdb/priv/couchjs
-COUCH_URI_FILE=%localstaterundir%/couch.uri
-
-# make check-js calls us with MAKE=$(MAKE) so BSDish `gmake` invocations
-# will get passed on correctly. If $0 gets run manually, default to
-# `make`
-if [ -z "$MAKE" ]; then
-    MAKE=make
-fi
-
-trap 'abort' EXIT INT
-
-start() {
-	./utils/run -b -r 0 -n \
-		-a $BUILD_DIR/etc/couchdb/default_dev.ini \
-		-a $SRC_DIR/test/random_port.ini \
-		-a $BUILD_DIR/etc/couchdb/local_dev.ini 1>/dev/null
-}
-
-stop() {
-    ./utils/run -d 1>/dev/null
-}
-
-restart() {
-    stop
-    start
-}
-
-abort() {
-    trap - 0
-    stop
-    exit 2
-}
-
-process_response() {
-    while read data
-    do
-        if [ $data = 'restart' ];
-        then
-            if [ -z $COUCHDB_NO_START ]; then
-                restart
-            fi
-        else
-            echo "$data"
-        fi
-    done
-}
 
 run() {
     # start the tests
     /bin/echo -n "$1 ... "
-    $COUCHJS -H -u $COUCH_URI_FILE \
+    $COUCHJS -H \
         $SCRIPT_DIR/json2.js \
         $SCRIPT_DIR/sha1.js \
         $SCRIPT_DIR/oauth.js \
         $SCRIPT_DIR/couch.js \
-        $SCRIPT_DIR/replicator_db_inc.js \
         $SCRIPT_DIR/couch_test_runner.js \
         $JS_TEST_DIR/couch_http.js \
         $JS_TEST_DIR/test_setup.js \
         $1 \
-        $JS_TEST_DIR/cli_runner.js | process_response
+        $JS_TEST_DIR/cli_runner.js
 
     if [ -z $RESULT ]; then
         RESULT=$?
@@ -99,12 +52,6 @@ run_files() {
         run $TEST_SRC
     done
 }
-
-# start CouchDB
-if [ -z $COUCHDB_NO_START ]; then
-    $MAKE dev
-    start
-fi
 
 echo "Running javascript tests ..."
 
@@ -130,9 +77,4 @@ else
     run $TEST_SRC
 fi
 
-if [ -z $COUCHDB_NO_START ]; then
-    stop
-fi
-
-trap - 0
 exit $RESULT
