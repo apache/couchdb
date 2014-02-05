@@ -17,7 +17,7 @@ BUILD_DIR=%abs_top_builddir%
 SCRIPT_DIR=$SRC_DIR/share/www/script
 JS_TEST_DIR=$SRC_DIR/test/javascript
 
-COUCHJS=%abs_top_builddir%/src/couch/priv/couchjs
+COUCHJS=%abs_top_builddir%/src/couchdb/priv/couchjs
 COUCH_URI_FILE=%localstaterundir%/couch.uri
 
 # make check-js calls us with MAKE=$(MAKE) so BSDish `gmake` invocations
@@ -27,59 +27,112 @@ if [ -z "$MAKE" ]; then
     MAKE=make
 fi
 
-if [ "$#" -eq 0 ];
-then
-    TEST_SRC="$SCRIPT_DIR/test/*.js"
-else
-    TEST_SRC="$1"
-    if [ ! -f $TEST_SRC ]; then
-        TEST_SRC="$SCRIPT_DIR/test/$1"
-        if [ ! -f $TEST_SRC ]; then
-            TEST_SRC="$SCRIPT_DIR/test/$1.js"
-            if [ ! -f $TEST_SRC ]; then
-                echo "file $1 does not exist"
-                exit 1
-            fi
-        fi
-    fi
-fi
+trap 'abort' EXIT INT
 
-# stop CouchDB on exit from various signals
+start() {
+	./utils/run -b -r 0 -n \
+		-a $BUILD_DIR/etc/couchdb/default_dev.ini \
+		-a $SRC_DIR/test/random_port.ini \
+		-a $BUILD_DIR/etc/couchdb/local_dev.ini 1>/dev/null
+}
+
+stop() {
+    ./utils/run -d 1>/dev/null
+}
+
+restart() {
+    stop
+    start
+}
+
 abort() {
     trap - 0
-    ./utils/run -d
+    stop
     exit 2
+}
+
+process_response() {
+    while read data
+    do
+        if [ $data = 'restart' ];
+        then
+            if [ -z $COUCHDB_NO_START ]; then
+                restart
+            fi
+        else
+            echo "$data"
+        fi
+    done
+}
+
+run() {
+    # start the tests
+    /bin/echo -n "$1 ... "
+    $COUCHJS -H -u $COUCH_URI_FILE \
+        $SCRIPT_DIR/json2.js \
+        $SCRIPT_DIR/sha1.js \
+        $SCRIPT_DIR/oauth.js \
+        $SCRIPT_DIR/couch.js \
+        $SCRIPT_DIR/replicator_db_inc.js \
+        $SCRIPT_DIR/couch_test_runner.js \
+        $JS_TEST_DIR/couch_http.js \
+        $JS_TEST_DIR/test_setup.js \
+        $1 \
+        $JS_TEST_DIR/cli_runner.js | process_response
+
+    if [ -z $RESULT ]; then
+        RESULT=$?
+    elif [ "$?" -eq 1 ]; then
+        RESULT=$?
+    fi
+
+}
+
+run_files() {
+    COUNTER=1
+    FILE_COUNT=$(ls -l $1 | wc -l)
+    FILE_COUNT=$(expr $FILE_COUNT + 0)
+    for TEST_SRC in $1
+    do
+        /bin/echo -n "$COUNTER/$FILE_COUNT "
+        COUNTER=$(expr $COUNTER + 1)
+        run $TEST_SRC
+    done
 }
 
 # start CouchDB
 if [ -z $COUCHDB_NO_START ]; then
     $MAKE dev
-    trap 'abort' EXIT INT
-	./utils/run -b -r 1 -n \
-		-a $BUILD_DIR/etc/couchdb/default_dev.ini \
-		-a $SRC_DIR/test/random_port.ini \
-		-a $BUILD_DIR/etc/couchdb/local_dev.ini
-	sleep 1 # give it a sec
+    start
 fi
 
-# start the tests
-$COUCHJS -H -u $COUCH_URI_FILE \
-	$SCRIPT_DIR/json2.js \
-	$SCRIPT_DIR/sha1.js \
-	$SCRIPT_DIR/oauth.js \
-	$SCRIPT_DIR/couch.js \
-	$SCRIPT_DIR/couch_test_runner.js \
-	$SCRIPT_DIR/couch_tests.js \
-	$TEST_SRC \
-	$JS_TEST_DIR/couch_http.js \
-	$JS_TEST_DIR/cli_runner.js
+echo "Running javascript tests ..."
 
-RESULT=$?
+if [ "$#" -eq 0 ];
+then
+    run_files "$SCRIPT_DIR/test/*.js"
+else
+    if [ -d $1 ]; then
+        run_files "$1/*.js"
+    else
+        TEST_SRC="$1"
+        if [ ! -f $TEST_SRC ]; then
+            TEST_SRC="$SCRIPT_DIR/test/$1"
+            if [ ! -f $TEST_SRC ]; then
+                TEST_SRC="$SCRIPT_DIR/test/$1.js"
+                if [ ! -f $TEST_SRC ]; then
+                    echo "file $1 does not exist"
+                    exit 1
+                fi
+            fi
+        fi
+    fi
+    run $TEST_SRC
+fi
 
 if [ -z $COUCHDB_NO_START ]; then
-    # stop CouchDB
-    ./utils/run -d
-    trap - 0
+    stop
 fi
 
+trap - 0
 exit $RESULT
