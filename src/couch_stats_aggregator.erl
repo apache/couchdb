@@ -96,7 +96,7 @@ load_metrics_for_applications() ->
         fun(AppName, Acc) ->
             case load_metrics_for_application(AppName) of
                 error -> Acc;
-                Descriptions -> [{AppName, Descriptions}|Acc]
+                Descriptions -> Descriptions ++ Acc
             end
         end,
         [],
