@@ -17,7 +17,6 @@ define([
 ],
 
 function(Backbone, LayoutManager, BackboneCache) {
-  console.log(BackboneCache);
   var FauxtonAPI = {
     //add default objects
     router: {
@@ -81,8 +80,24 @@ function(Backbone, LayoutManager, BackboneCache) {
   var caching = {
     fetchOnce: function (opts) {
       var options = _.defaults(opts || {}, this.cache, {cache: true});
-      console.log('opts', options);
-      return this.fetch(options);
+
+      if (opts && !opts.cache) {
+        delete options.cache;
+      }
+
+      if (!options.prefill) {
+        return this.fetch(options);
+      }
+
+      //With Prefill, the Caching with resolve with whatever is in the cache for that model/collection
+      //and at the sametime it will fetch from the server the latest. 
+      var promise = FauxtonAPI.Deferred(),
+          fetchPromise = this.fetch(options);
+
+      fetchPromise.progress(promise.resolveWith); // Fires when the cache hit happens
+      fetchPromise.then(promise.resolveWith); // Fires after the AJAX call
+
+      return promise;
     }
   };
 

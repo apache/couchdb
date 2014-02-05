@@ -29,9 +29,16 @@ function (FauxtonAPI) {
 
       fetchUser: function (opt) {
         var that = this,
-        currentUser = this.user();
+            options = opt || {},
+        currentUser = this.user(),
+        fetch = this.fetchOnce;
 
-        return this.fetchOnce(opt).then(function () {
+        if (options.forceFetch) {
+          fetch = this.fetch;
+          Backbone.fetchCache.clearItem(_.result(this.url));
+        }
+
+        return this.fetch(opt).then(function () {
           var user = that.user();
 
           // Notify anyone listening on these events that either a user has changed

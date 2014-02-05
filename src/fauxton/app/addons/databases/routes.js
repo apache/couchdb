@@ -59,7 +59,7 @@ function(app, FauxtonAPI, Databases, Views) {
     },
 
     establish: function() {
-     return [this.databases.fetch()];
+     return [this.databases.fetchOnce()];
     }
   });
 

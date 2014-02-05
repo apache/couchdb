@@ -61,7 +61,7 @@ function(app, Components, FauxtonAPI, Databases) {
       var deferred = FauxtonAPI.Deferred();
 
       FauxtonAPI.when(currentDBs.map(function(database) {
-        return database.status.fetch();
+        return database.status.fetchOnce();
       })).always(function(resp) {
         //make this always so that even if a user is not allowed access to a database
         //they will still see a list of all databases

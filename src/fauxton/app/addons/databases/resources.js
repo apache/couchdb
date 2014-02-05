@@ -171,6 +171,11 @@ function(app, FauxtonAPI, Documents) {
     documentation: function(){
       return "all_dbs";
     },
+
+    cache: {
+      expires: 60
+    },
+
     url: function(context) {
       if (context === "apiurl") { 
         return window.location.origin + "/_all_dbs";
