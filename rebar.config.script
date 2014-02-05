@@ -37,11 +37,15 @@ MakeDep = fun({AppName, RepoName, Version}) ->
     {AppName, ".*", {git, Url, Version}}
 end,
 
-[
+AddConfig = [
     {deps_dir, "src"},
     {deps, lists:map(MakeDep, DepDescs)},
     {sub_dirs, ["rel"]},
     {lib_dirs, ["src/"]},
     {erl_opts, [debug_info]},
     {post_hooks, [{compile, "escript support/build_js.escript"}]}
-].
+],
+
+C = lists:foldl(fun({K, V}, CfgAcc) ->
+    lists:keystore(K, 1, CfgAcc, {K, V})
+end, CONFIG, AddConfig).
