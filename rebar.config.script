@@ -66,5 +66,9 @@ PortSpecs = case os:type() of
         BaseSpecs
 end,
 
+AddConfig = [{port_specs, PortSpecs}].
 
-[{port_specs, PortSpecs}].
+lists:foldl(fun({K, V}, CfgAcc) ->
+    lists:keystore(K, 1, CfgAcc, {K, V})
+end, CONFIG, AddConfig).
+
