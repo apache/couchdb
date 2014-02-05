@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -e
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not
 # use this file except in compliance with the License. You may obtain a copy of
 # the License at
@@ -13,42 +13,73 @@
 
 PREFIX="/opt/couchdb"
 COUCHDB_USER=`whoami`
-ABSPATH="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
-if test ! -n "$DIRPATH"; then DIRPATH=`dirname "$ABSPATH"`; fi
+WITH_CURL="false"
 
-while [ $# -gt 0 ]
-do
-  case $1
-  in
-    -p)
-      PREFIX=$2
-      shift 2
-    ;;
-    -t)
-      TEMPLATE=$2
-      shift 2
-    ;;
-    -d)
-      DATA=$2
-      shift 2
-    ;;
-    -v)
-      VIEW=$2
-      shift 2
-    ;;
-    -u)
-      COUCHDB_USER=$2
-      shift 2
-    ;;
-    *)
-      echo "usage: $0 [-p {prefix} -t {template} -d {data_dir} -v {view_dir} -u {user}]"
-      exit
-    ;;
-  esac
-done
+rootdir="$(cd "${0%/*}" 2>/dev/null; echo "$PWD")"
+basename=`basename $0`
 
-if test ! -n "$DATA"; then DATA="$PREFIX/var/lib"; fi
-if test ! -n "$VIEW"; then VIEW="$PREFIX/var/lib"; fi
+
+display_help () {
+    cat << EOF
+Usage: $basename [OPTION]
+
+The $basename command is responsible for generating the build
+system for Apache CouchDB.
+
+Options:
+
+  -h            display a short help message and exit
+  -u USER       set the username to run as (defaults to $COUCHDB_USER)
+  -p DIRECTORY  set the prefix for installation (defaults to $PREFIX)
+  -d DIRECTORY  specify the data directory (defaults to $PREFIX/var/lib)
+  -v DIRECTORY  specify the view directory (defaults to $PREFIX/var/lib)
+  -c            request that couchjs is linked to cURL (default false)
+
+EOF
+}
+
+
+display_error () {
+    if test -n "$1"; then
+        echo $1 >&2
+    fi
+    echo >&2
+    echo "Try \"$basename -h\" for more information." >&2
+    false
+}
+
+
+parse_opts () {
+    set +e
+    options=`getopt hu:p:d:v:c $@`
+    if test ! $? -eq 0; then
+        display_error
+    fi
+    set -e
+    eval set -- $options
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -h) shift; display_help; exit;;
+            -u) shift; COUCHDB_USER=$1; shift;;
+            -p) shift; PREFIX=$1; shift;;
+            -d) shift; DATA=$1; shift;;
+            -v) shift; VIEW=$1; shift;;
+            -c) shift; WITH_CURL="true";;
+            --) shift; break;;
+            *) display_error "Unknown option: $1" >&2;;
+        esac
+    done
+    if test ! -n "$DATA"; then
+        DATA="$PREFIX/var/lib";
+    fi
+    if test ! -n "$VIEW"; then
+        VIEW="$PREFIX/var/lib";
+    fi
+}
+
+
+parse_opts $@
+
 
 echo "==> configuring couchdb in rel/couchdb.config"
 cat > rel/couchdb.config << EOF
@@ -69,16 +100,22 @@ view_dir = $VIEW
 user = $COUCHDB_USER
 EOF
 
+cat > $rootdir/config.erl << EOF
+{with_curl, $WITH_CURL}.
+EOF
+
 # finally, a few config files for local development nodes
 for i in 1 2 3; do
 cat > rel/dev$i.config << EOF
-{prefix, "$DIRPATH/rel/dev$i"}.
-{data_dir, "$DIRPATH/rel/tmpdata/dev$i"}.
-{view_dir, "$DIRPATH/rel/tmpdata/dev$i"}.
+{prefix, "$rootdir/rel/dev$i"}.
+{data_dir, "$rootdir/rel/tmpdata/dev$i"}.
+{view_dir, "$rootdir/rel/tmpdata/dev$i"}.
 {node_name, "-name dev$i@127.0.0.1"}.
 {cluster_port, `expr 10000 \* $i + 5984`}.
 {backend_port, `expr 10000 \* $i + 5986`}.
 EOF
 done
 
-rebar get-deps && rebar update-deps && cat rel/couchdb.config
+
+echo "==> updating dependencies"
+rebar get-deps update-deps

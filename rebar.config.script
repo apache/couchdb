@@ -10,7 +10,11 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-{require_otp_vsn, "R14B01|R14B03|R14B04|R15B02|R15B03|R16"}.
+% Set the path to the configuration environment generated
+% by `./configure`.
+ConfigureEnv = filename:join(filename:dirname(SCRIPT), "config.erl"),
+os:putenv("COUCHDB_CONFIG", ConfigureEnv).
+
 
 DepDescs = [
     {chttpd, "couchdb-chttpd", {branch, import}},
@@ -38,6 +42,7 @@ MakeDep = fun({AppName, RepoName, Version}) ->
 end,
 
 AddConfig = [
+    {require_otp_vsn, "R14B01|R14B03|R14B04|R15B02|R15B03|R16"},
     {deps_dir, "src"},
     {deps, lists:map(MakeDep, DepDescs)},
     {sub_dirs, ["rel"]},

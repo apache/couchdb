@@ -12,7 +12,13 @@
 
 all:  compile
 
-compile:
+config.erl:
+	@echo "Apache CouchDB has not been configured."
+	@echo "Try \"./configure -h\" for help."
+	@echo
+	@false
+
+compile: config.erl
 	@echo "==> couchjs (compile)"
 	@rebar compile
 
