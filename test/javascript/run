@@ -55,9 +55,13 @@ def run_couchjs(test):
             stdout = sp.PIPE,
             stderr = sys.stderr
         )
-    for line in p.stdout:
+    while True:
+        line = p.stdout.readline()
+        if not line:
+            break
         if line.strip() == "restart":
-            print "reboot_nodes()"
+            sys.stdout.write("reboot_nodes()" + os.linesep)
+            sys.stdout.flush()
         else:
             sys.stderr.write(line)
     p.wait()
