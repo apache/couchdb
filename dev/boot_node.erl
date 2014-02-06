@@ -68,7 +68,6 @@ load_app(App) ->
             case application:get_key(App, modules) of
                 {ok, Modules} ->
                     lists:foreach(fun(Mod) ->
-                        OK = load_app_module(Mod),
                         case load_app_module(Mod) of
                             ok -> ok;
                             E -> io:format("~p = load_app_module(~p)~n", [E, Mod])
