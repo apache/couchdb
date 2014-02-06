@@ -9,6 +9,10 @@ src/
 *.so
 ebin/
 
+dev/boot_node.beam
+dev/lib/
+dev/logs/
+
 share/server/main-coffee.js
 share/server/main.js
 
