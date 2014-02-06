@@ -23,6 +23,7 @@ import select
 import subprocess as sp
 import sys
 import time
+import traceback
 import urllib
 
 
@@ -103,7 +104,7 @@ def write_configs(opts):
     for i in range(1,4):
         node = "node%d" % i
         args = {
-            "prefix": os.path.join(COUCHDB, "rel", "overlay"),
+            "prefix": COUCHDB,
             "data_dir": os.path.join(DEV_PATH, "lib", node, "data"),
             "view_dir": os.path.join(DEV_PATH, "lib", node, "data"),
             "node_name": "-name %s@127.0.0.1" % node,
