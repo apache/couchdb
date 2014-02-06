@@ -62,8 +62,13 @@ def hack_default_ini(opts, node, args, contents):
     # Replace couchjs command
     couchjs = os.path.join(COUCHDB, "src", "couch", "priv", "couchjs")
     mainjs = os.path.join(COUCHDB, "share", "server", "main.js")
+    coffeejs = os.path.join(COUCHDB, "share", "server", "main-coffee.js")
+
     repl = "javascript = %s %s" % (couchjs, mainjs)
     contents = re.sub("(?m)^javascript.*$", repl, contents)
+
+    repl = "coffeescript = %s %s" % (couchjs, coffeejs)
+    contents = re.sub("(?m)^coffeescript.*$", repl, contents)
 
     return contents
 
@@ -203,7 +208,10 @@ def reboot_nodes():
 
 def run_command(cmd):
     p = sp.Popen(cmd, shell=True, stdout=sp.PIPE, stderr=sys.stderr)
-    for line in p.stdout:
+    while True:
+        line = p.stdout.readline()
+        if not line:
+            break
         try:
             eval(line)
         except:
