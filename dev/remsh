@@ -1,0 +1,18 @@
+#!/bin/bash
+
+if [ -z $NODE ]; then
+    if [ -z $1 ]; then
+        NODE=1
+    else
+        NODE=$1
+    fi
+fi
+
+if [ -z $HOST ]; then
+    HOST="127.0.0.1"
+fi
+
+NAME="remsh$$@$HOST"
+NODE="node$NODE@$HOST"
+COOKIE=monster
+erl -name $NAME -remsh $NODE -setcookie $COOKIE -hidden
