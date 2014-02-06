@@ -201,7 +201,13 @@ def reboot_nodes():
 
 
 def run_command(cmd):
-    p = sp.Popen(cmd, shell=True)
+    p = sp.Popen(cmd, shell=True, stdout=sp.PIPE, stderr=sys.stderr)
+    for line in p.stdout:
+        try:
+            eval(line)
+        except:
+            traceback.print_exc()
+            exit(1)
     p.wait()
     exit(p.returncode)
 
