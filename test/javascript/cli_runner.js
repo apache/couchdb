@@ -34,10 +34,11 @@ function runTest() {
     // Add artificial wait for each test of 1 sec
     while (new Date().getTime() < start + 1200);
     couchTests[name]();
-    print('OK');
+    quit(0);
   } catch(e) {
-    console.log("FAIL\nReason: " + e.message);
+    console.log("Error: " + e.message);
     fmtStack(e.stack);
+    quit(1)
   }
 }
 
