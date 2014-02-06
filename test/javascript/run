@@ -57,7 +57,7 @@ def run_couchjs(test):
         )
     for line in p.stdout:
         if line.strip() == "restart":
-            print "restart_nodes()"
+            print "reboot_nodes()"
         else:
             sys.stderr.write(line)
     p.wait()
