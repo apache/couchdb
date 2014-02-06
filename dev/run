@@ -56,8 +56,8 @@ def hack_default_ini(opts, node, args, contents):
     contents = re.sub("(?m)^file.*$", repl, contents)
 
     # Replace couchjs command
-    couchjs = os.path.join(COUCHDB, "couchjs", "build", "couchjs")
-    mainjs = os.path.join(COUCHDB, "couchjs", "build", "main.js")
+    couchjs = os.path.join(COUCHDB, "src", "couch", "priv", "couchjs")
+    mainjs = os.path.join(COUCHDB, "share", "server", "main.js")
     repl = "javascript = %s %s" % (couchjs, mainjs)
     contents = re.sub("(?m)^javascript.*$", repl, contents)
 
