@@ -18,6 +18,7 @@
  * test object, return an error.
  */
 function runTest() {
+  CouchDB.reloadConfig();
   var count = 0;
   var start = new Date().getTime();
 
