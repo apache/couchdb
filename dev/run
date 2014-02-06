@@ -119,7 +119,7 @@ def all_nodes_alive(n):
         while True:
             try:
                 with ctx.closing(urllib.urlopen(url)) as resp:
-                    print(resp.read())
+                    pass
             except IOError:
                 time.sleep(0.25)
                 continue
@@ -153,7 +153,6 @@ def boot_node(node):
     ]
     logfname = os.path.join(DEV_PATH, "logs", "%s.log" % node)
     log = open(logfname, "w")
-    print ' '.join(cmd)
     return sp.Popen(
             cmd,
             stdin=sp.PIPE,
