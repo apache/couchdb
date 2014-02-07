@@ -362,6 +362,7 @@ http_uri(JSContext* cx, JSObject* req, couch_args* args, jsval* uri_val)
     if (!args->uri_file) {
         uri_str = JS_InternString(cx, "http://localhost:15986/");
         *uri_val = STRING_TO_JSVAL(uri_str);
+        JS_SetReservedSlot(cx, req, 0, *uri_val);
         return JS_TRUE;
     }
 
