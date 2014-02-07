@@ -63,6 +63,7 @@
     start_key_docid,
     end_key,
     end_key_docid,
+    key,
     keys,
 
     direction = fwd,

@@ -301,7 +301,7 @@ parse_qs(Key, Val, Args) ->
             Args#mrargs{reduce=parse_boolean(Val)};
         "key" ->
             JsonKey = ?JSON_DECODE(Val),
-            Args#mrargs{start_key=JsonKey, end_key=JsonKey};
+            Args#mrargs{key=JsonKey, start_key=JsonKey, end_key=JsonKey};
         "keys" ->
             Args#mrargs{keys=?JSON_DECODE(Val)};
         "startkey" ->

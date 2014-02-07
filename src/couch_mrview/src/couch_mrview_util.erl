@@ -359,6 +359,13 @@ validate_args(Args) ->
         _ -> mrverror(<<"`keys` must be an array of strings.">>)
     end,
 
+    case {Args#mrargs.keys, Args#mrargs.key} of
+        {undefined, _} -> ok;
+        {[], _} -> ok;
+        {[_|_], undefined} -> ok;
+        _ -> mrverror(<<"`key` is incompatible with `keys`">>)
+    end,
+
     case {Args#mrargs.keys, Args#mrargs.start_key} of
         {undefined, _} -> ok;
         {[], _} -> ok;
