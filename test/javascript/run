@@ -66,9 +66,9 @@ def run_couchjs(test):
             sys.stderr.write(line)
     p.wait()
     if p.returncode == 0:
-        sys.stderr.write("OK" + os.linesep)
+        sys.stderr.write("pass" + os.linesep)
     else:
-        sys.stderr.write("FAIL" + os.linesep)
+        sys.stderr.write("fail" + os.linesep)
     sys.stderr.flush()
 
 
@@ -89,12 +89,14 @@ def main():
         elif os.path.isfile(name):
             tests.append(name)
         else:
-            name = os.path.join("share/www/script/test", name)
-            if os.path.isfile(name):
-                tests.append(name)
-            elif os.path.isfile(name + ".js"):
-                tests.append(name + ".js")
-
+            pname = os.path.join("share/www/script/test", name)
+            if os.path.isfile(pname):
+                tests.append(pname)
+            elif os.path.isfile(pname + ".js"):
+                tests.append(pname + ".js")
+            else:
+                sys.stderr.write("Unknown test: " + name + os.linesep)
+                exit(1)
     for test in tests:
         run_couchjs(test)
 
