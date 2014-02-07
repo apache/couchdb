@@ -45,10 +45,34 @@ SCRIPTS = """
 RUNNER = "test/javascript/cli_runner.js"
 
 
-def run_couchjs(test, longname):
-    padding = (longname - len(test)) * " "
-    sys.stderr.write(test + "   " + padding)
-    sys.stderr.flush()
+def mkformatter(tests):
+    longest = max(map(len, tests))
+    green = "\033[32m"
+    red = "\033[31m"
+    clear = "\033[0m"
+    if not sys.stderr.isatty():
+        green, read, clear = "", "", ""
+    def _colorized(passed):
+        if passed:
+            return green + "pass" + clear
+        else:
+            return red + "fail" + clear
+    def _fmt(test):
+        if isinstance(test, basestring):
+            padding = (longest - len(test)) * " "
+            sys.stderr.write(test + "   " + padding)
+            sys.stderr.flush()
+        elif isinstance(test, bool):
+            if test:
+                sys.stderr.write(_colorized(test) + os.linesep)
+            else:
+                sys.stderr.write(_colorized(test) + os.linesep)
+            sys.stderr.flush()
+    return _fmt
+
+
+def run_couchjs(test, fmt):
+    fmt(test)
     cmd = [COUCHJS, "-H"] + SCRIPTS + [test, RUNNER]
     p = sp.Popen(
             cmd,
@@ -66,11 +90,7 @@ def run_couchjs(test, longname):
         else:
             sys.stderr.write(line)
     p.wait()
-    if p.returncode == 0:
-        sys.stderr.write("pass" + os.linesep)
-    else:
-        sys.stderr.write("fail" + os.linesep)
-    sys.stderr.flush()
+    fmt(p.returncode == 0)
 
 
 def options():
@@ -98,9 +118,9 @@ def main():
             else:
                 sys.stderr.write("Unknown test: " + name + os.linesep)
                 exit(1)
-    longname = max(map(len, tests))
+    fmt = mkformatter(tests)
     for test in tests:
-        run_couchjs(test, longname)
+        run_couchjs(test, fmt)
 
 
 
