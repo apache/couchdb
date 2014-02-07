@@ -141,10 +141,8 @@ view_changes_since(#vst{dbname=DbName, ddoc=DDocId, view=View,
                 true -> OldSeq
             end,
 
-            case Callback(KV, Acc2) of
-                {ok, Acc3} -> {ok, {Go, Acc3, LastSeq}};
-                {stop, Acc3} -> {stop, {stop, Acc3, LastSeq}}
-            end
+            {Go, Acc3} = Callback(KV, Acc2),
+            {Go, {Go, Acc3, LastSeq}}
     end,
 
     Acc0 = {ok, UserAcc, Since},

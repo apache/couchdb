@@ -39,8 +39,10 @@ get(Property, State) ->
             Opts = State#mrst.design_opts,
             IncDesign = couch_util:get_value(<<"include_design">>, Opts, false),
             LocalSeq = couch_util:get_value(<<"local_seq">>, Opts, false),
+            SeqIndexed = couch_util:get_value(<<"seq_indexed">>, Opts, false),
             if IncDesign -> [include_design]; true -> [] end
-                ++ if LocalSeq -> [local_seq]; true -> [] end;
+                ++ if LocalSeq -> [local_seq]; true -> [] end
+                ++ if SeqIndexed -> [seq_indexed]; true -> [] end;
         fd ->
             State#mrst.fd;
         language ->
@@ -56,13 +58,24 @@ get(Property, State) ->
                 language = Lang,
                 update_seq = UpdateSeq,
                 purge_seq = PurgeSeq,
-                views = Views
+                views = Views,
+                design_opts = Opts
             } = State,
             {ok, FileSize} = couch_file:bytes(Fd),
             {ok, ExternalSize} = couch_mrview_util:calculate_external_size(IdBtree,
                                                                            LogBtree,
                                                                            Views),
             ActiveSize = ExternalSize + couch_btree:size(Btree),
+
+            IncDesign = couch_util:get_value(<<"include_design">>, Opts, false),
+            LocalSeq = couch_util:get_value(<<"local_seq">>, Opts, false),
+            SeqIndexed = couch_util:get_value(<<"seq_indexed">>, Opts, false),
+            UpdateOptions =
+                if IncDesign -> [<<"include_design">>]; true -> [] end
+                ++ if LocalSeq -> [<<"local_seq">>]; true -> [] end
+                ++ if SeqIndexed -> [<<"seq_indexed">>]; true -> [] end,
+
+
             {ok, [
                 {signature, list_to_binary(couch_index_util:hexsig(Sig))},
                 {language, Lang},
@@ -74,7 +87,8 @@ get(Property, State) ->
                     {external, ExternalSize}
                 ]}},
                 {update_seq, UpdateSeq},
-                {purge_seq, PurgeSeq}
+                {purge_seq, PurgeSeq},
+                {update_options, UpdateOptions}
             ]};
         Other ->
             throw({unknown_index_property, Other})
