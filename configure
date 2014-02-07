@@ -104,10 +104,6 @@ cat > $rootdir/config.erl << EOF
 {with_curl, $WITH_CURL}.
 EOF
 
-# Write out the JavaScript test command
-sed -e "s|%rootdir%|$rootdir|" < test/javascript/run.tpl > test/javascript/run
-chmod +x test/javascript/run
-
 # finally, a few config files for local development nodes
 for i in 1 2 3; do
 cat > rel/dev$i.config << EOF
