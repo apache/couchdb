@@ -110,29 +110,33 @@ delete(DbName, Options) ->
 maybe_add_sys_db_callbacks(DbName, Options) when is_binary(DbName) ->
     maybe_add_sys_db_callbacks(?b2l(DbName), Options);
 maybe_add_sys_db_callbacks(DbName, Options) ->
-    case config:get("replicator", "db", "_replicator") of
-    DbName ->
-        [
-            {before_doc_update, fun couch_replicator_manager:before_doc_update/2},
-            {after_doc_read, fun couch_replicator_manager:after_doc_read/2},
-            sys_db | Options
-        ];
-    _ ->
-        case config:get("couch_httpd_auth", "authentication_db", "_users") of
-        DbName ->
-        [
-            {before_doc_update, fun couch_users_db:before_doc_update/2},
-            {after_doc_read, fun couch_users_db:after_doc_read/2},
-            sys_db | Options
-        ];
-        _ ->
-            case config:get("mem3", "shard_db", "dbs") of
-            DbName ->
-                [sys_db | Options];
-            _ ->
-                Options
-            end
-        end
+    ReplicatorDbName = config:get("replicator", "db", "_replicator"),
+    ReplicatorDbOptions = [
+        {before_doc_update, fun couch_replicator_manager:before_doc_update/2},
+        {after_doc_read, fun couch_replicator_manager:after_doc_read/2},
+        sys_db
+    ] ++ Options,
+    UsersDbName = config:get("couch_httpd_auth", "authentication_db", "_users"),
+    UsersDbOptions = [
+        {before_doc_update, fun couch_users_db:before_doc_update/2},
+        {after_doc_read, fun couch_users_db:after_doc_read/2},
+        sys_db
+    ] ++ Options,
+    DbsDbName = config:get("mem3", "shard_db", "dbs"),
+    DbsDbOptions = [sys_db | Options],
+    NodesDbName = config:get("mem3", "node_db", "nodes"),
+    NodesDbOptions = [sys_db | Options],
+    KnownSysDbs = [
+        {ReplicatorDbName, ReplicatorDbOptions},
+        {UsersDbName, UsersDbOptions},
+        {DbsDbName, DbsDbOptions},
+        {NodesDbName, NodesDbOptions}
+    ],
+    case lists:keyfind(DbName, 1, KnownSysDbs) of
+        {DbName, SysOptions} ->
+            SysOptions;
+        false ->
+            Options
     end.
 
 check_dbname(#server{dbname_regexp=RegExp}, DbName) ->
