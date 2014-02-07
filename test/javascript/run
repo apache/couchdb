@@ -45,8 +45,9 @@ SCRIPTS = """
 RUNNER = "test/javascript/cli_runner.js"
 
 
-def run_couchjs(test):
-    sys.stderr.write(test + " ... ")
+def run_couchjs(test, longname):
+    padding = (longname - len(test)) * " "
+    sys.stderr.write(test + "   " + padding)
     sys.stderr.flush()
     cmd = [COUCHJS, "-H"] + SCRIPTS + [test, RUNNER]
     p = sp.Popen(
@@ -97,8 +98,9 @@ def main():
             else:
                 sys.stderr.write("Unknown test: " + name + os.linesep)
                 exit(1)
+    longname = max(map(len, tests))
     for test in tests:
-        run_couchjs(test)
+        run_couchjs(test, longname)
 
 
 
