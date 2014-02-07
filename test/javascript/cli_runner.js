@@ -37,7 +37,7 @@ function runTest() {
     couchTests[name]();
     quit(0);
   } catch(e) {
-    console.log("Error: " + e.message);
+    console.log("\nError: " + e.message);
     fmtStack(e.stack);
     quit(1)
   }
