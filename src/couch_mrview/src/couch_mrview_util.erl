@@ -359,24 +359,19 @@ validate_args(Args) ->
         _ -> mrverror(<<"`keys` must be an array of strings.">>)
     end,
 
-    case {Args#mrargs.keys, Args#mrargs.start_key} of
-        {undefined, _} -> ok;
-        {[], _} -> ok;
-        {[_|_], undefined} -> ok;
-        _ -> mrverror(<<"`start_key` is incompatible with `keys`">>)
+    case {Args#mrargs.keys, Args#mrargs.start_key,
+          Args#mrargs.end_key} of
+        {undefined, _, _} -> ok;
+        {[], _, _} -> ok;
+        {[_|_], undefined, undefined} -> ok;
+        _ -> mrverror(<<"`keys` is incompatible with `key`"
+                        ", `start_key` and `end_key`">>)
     end,
 
     case Args#mrargs.start_key_docid of
         undefined -> ok;
         SKDocId0 when is_binary(SKDocId0) -> ok;
         _ -> mrverror(<<"`start_key_docid` must be a string.">>)
-    end,
-
-    case {Args#mrargs.keys, Args#mrargs.end_key} of
-        {undefined, _} -> ok;
-        {[], _} -> ok;
-        {[_|_], undefined} -> ok;
-        _ -> mrverror(<<"`end_key` is incompatible with `keys`">>)
     end,
 
     case Args#mrargs.end_key_docid of
