@@ -216,11 +216,11 @@ get_view_info(Db, DDoc, VName) ->
     {ok, TotalSeqs} = case SeqBtree of
         nil -> {ok, 0};
         _ ->
-            {ok, {Count, _Reds}} = couch_btree:full_reduce(SeqBtree),
-            {ok, Count}
+            couch_btree:full_reduce(SeqBtree)
     end,
 
-    {ok, [{update_seq, View#mrview.update_seq},
+    {ok, [{seq_indexed, View#mrview.seq_indexed},
+          {update_seq, View#mrview.update_seq},
           {purge_seq, View#mrview.purge_seq},
           {total_rows, TotalRows},
           {total_seqs, TotalSeqs}]}.

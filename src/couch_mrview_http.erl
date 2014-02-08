@@ -51,6 +51,18 @@ handle_all_docs_req(Req, _Db) ->
     couch_httpd:send_method_not_allowed(Req, "GET,POST,HEAD").
 
 
+handle_view_req(#httpd{method='GET',
+                      path_parts=[_, _, DDocName, _, VName, <<"_info">>]}=Req,
+                Db, DDoc) ->
+
+    DDocId = <<"_design/", DDocName/binary >>,
+    {ok, Info} = couch_mrview:get_view_info(Db#db.name, DDocId, VName),
+
+    FinalInfo = [{db_name, Db#db.name},
+                 {ddoc, DDocId},
+                 {view, VName}] ++ Info,
+    couch_httpd:send_json(Req, 200, {FinalInfo});
+
 handle_view_req(#httpd{method='GET'}=Req, Db, DDoc) ->
     [_, _, _, _, ViewName] = Req#httpd.path_parts,
     couch_stats:increment_counter([couchdb, httpd, view_reads]),
