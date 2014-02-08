@@ -15,7 +15,7 @@
 % the License.
 
 main(_) ->
-    etap:plan(6),
+    etap:plan(8),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -35,6 +35,7 @@ test() ->
     test_stream_once_timeout(Db),
     test_stream_once_heartbeat(Db),
     test_stream(Db),
+    test_indexer(Db),
     test_util:stop_couch(),
     ok.
 
@@ -171,6 +172,20 @@ test_stream(Db) ->
     after 5000 ->
             io:format("never got the change", [])
     end.
+
+
+test_indexer(Db) ->
+    Result = run_query(Db, [{since, 14}]),
+    Expect = {ok, 15, [{{15,14,<<"14">>},14}]},
+    etap:is(Result, Expect, "refresh index by hand OK."),
+
+    {ok, Db1} = save_doc(Db, 15),
+    timer:sleep(1000),
+    Result1 = run_query(Db, [{since, 14}]),
+    Expect1 = {ok, 16, [{{15,14,<<"14">>},14},
+                       {{16,15,<<"15">>},15}]},
+    etap:is(Result1, Expect1, "changes indexed in background OK."),
+    ok.
 
 
 save_doc(Db, Id) ->

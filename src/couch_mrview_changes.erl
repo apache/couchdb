@@ -28,14 +28,16 @@
               heartbeat,
               timeout_acc=0,
               notifier,
-              stream}).
+              stream,
+              refresh}).
 
 -type changes_stream() :: true | false | once.
 -type changes_options() :: [{stream, changes_stream()} |
                             {since, integer()} |
                             {view_options, list()} |
                             {timeout, integer()} |
-                            {heartbeat, true | integer()}].
+                            {heartbeat, true | integer()} |
+                            {refresh, true | false}].
 
 -export_type([changes_stream/0]).
 -export_type([changes_options/0]).
@@ -47,6 +49,7 @@ handle_changes(DbName, DDocId, View, Fun, Acc, Options) ->
     Since = proplists:get_value(since, Options, 0),
     Stream = proplists:get_value(stream, Options, false),
     ViewOptions = proplists:get_value(view_options, Options, []),
+    Refresh = proplists:get_value(refresh, Options, false),
 
     State0 = #vst{dbname=DbName,
                   ddoc=DDocId,
@@ -56,20 +59,25 @@ handle_changes(DbName, DDocId, View, Fun, Acc, Options) ->
                   callback=Fun,
                   acc=Acc},
 
-    case view_changes_since(State0) of
-        {ok, #vst{since=LastSeq, acc=Acc2}=State} ->
-            case Stream of
-                true ->
-                    start_loop(State#vst{stream=true}, Options);
-                once when LastSeq =:= Since ->
-                    start_loop(State#vst{stream=once}, Options);
-                _ ->
-                    Fun(stop, {LastSeq, Acc2})
-            end;
-        {stop, #vst{since=LastSeq, acc=Acc2}} ->
-            Fun(stop, {LastSeq, Acc2});
-        Error ->
-            Error
+    maybe_acquire_indexer(Refresh, DbName, DDocId),
+    try
+        case view_changes_since(State0) of
+            {ok, #vst{since=LastSeq, acc=Acc2}=State} ->
+                case Stream of
+                    true ->
+                        start_loop(State#vst{stream=true}, Options);
+                    once when LastSeq =:= Since ->
+                        start_loop(State#vst{stream=once}, Options);
+                    _ ->
+                        Fun(stop, {LastSeq, Acc2})
+                end;
+            {stop, #vst{since=LastSeq, acc=Acc2}} ->
+                Fun(stop, {LastSeq, Acc2});
+            Error ->
+                Error
+        end
+    after
+        maybe_release_indexer(Refresh, DbName, DDocId)
     end.
 
 start_loop(#vst{dbname=DbName, ddoc=DDocId}=State, Options) ->
@@ -169,3 +177,19 @@ index_update_notifier(DbName, DDocId) ->
                     ok
             end),
     NotifierPid.
+
+%% acquire the background indexing task so it can eventually be started
+%% if the process close the background task will be automatically
+%% released.
+maybe_acquire_indexer(false, _, _) ->
+    ok;
+maybe_acquire_indexer(true, DbName, DDocId) ->
+    couch_index_server:acquire_indexer(couch_mrview_index, DbName,
+                                       DDocId).
+
+%% release the background indexing task so it can eventually be stopped
+maybe_release_indexer(false, _, _) ->
+    ok;
+maybe_release_indexer(true, DbName, DDocId) ->
+    couch_index_server:release_indexer(couch_mrview_index, DbName,
+                                       DDocId).
