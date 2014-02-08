@@ -19,6 +19,7 @@
 % Many options and apis aren't yet supported here, they are added as needed.
 
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("couch_mrview/include/couch_mrview.hrl").
 -include("couch_replicator_api_wrap.hrl").
 
 -export([
@@ -27,6 +28,7 @@
     db_close/1,
     get_db_info/1,
     get_pending_count/2,
+    get_view_info/3,
     update_doc/3,
     update_doc/4,
     update_docs/3,
@@ -163,6 +165,15 @@ get_pending_count(#db{name=DbName}=Db, Seq) when is_number(Seq) ->
     Pending = couch_db:count_changes_since(CountDb, Seq),
     couch_db:close(CountDb),
     {ok, Pending}.
+
+get_view_info(#httpdb{} = Db, DDocId, ViewName) ->
+    Path = iolist_to_binary([DDocId, "/_view/", ViewName, "/_info"]),
+    send_req(Db, [{path, Path}],
+        fun(200, _, {Props}) ->
+            {ok, Props}
+        end);
+get_view_info(#db{name = DbName}, DDocId, ViewName) ->
+    couch_mrview:get_view_info(DbName, DDocId, ViewName).
 
 
 ensure_full_commit(#httpdb{} = Db) ->
@@ -517,6 +528,10 @@ maybe_add_changes_filter_q_args(BaseQS, Options) ->
     undefined ->
         BaseQS;
     FilterName ->
+        %% get list of view attributes
+        ViewFields0 = [atom_to_list(F) || F <- record_info(fields,  mrargs)],
+        ViewFields = ["key" | ViewFields0],
+
         {Params} = get_value(query_params, Options, {[]}),
         [{"filter", ?b2l(FilterName)} | lists:foldl(
             fun({K, V}, QSAcc) ->
@@ -524,6 +539,12 @@ maybe_add_changes_filter_q_args(BaseQS, Options) ->
                 case lists:keymember(Ks, 1, QSAcc) of
                 true ->
                     QSAcc;
+                false when FilterName =:= <<"_view">> ->
+                    V1 = case lists:member(Ks, ViewFields) of
+                        true -> ?JSON_ENCODE(V);
+                        false -> couch_util:to_list(V)
+                    end,
+                    [{Ks, V1} | QSAcc];
                 false ->
                     [{Ks, couch_util:to_list(V)} | QSAcc]
                 end

@@ -40,13 +40,34 @@ parse_rep_doc({Props}, UserCtx) ->
     true ->
         {ok, #rep{options = Options, user_ctx = UserCtx}};
     false ->
-        Source = parse_rep_db(get_value(<<"source">>, Props), ProxyParams, Options),
-        Target = parse_rep_db(get_value(<<"target">>, Props), ProxyParams, Options),
+        Source = parse_rep_db(get_value(<<"source">>, Props),
+                              ProxyParams, Options),
+        Target = parse_rep_db(get_value(<<"target">>, Props),
+                              ProxyParams, Options),
+
+
+        {RepType, View} = case get_value(<<"filter">>, Props) of
+                <<"_view">> ->
+                    {QP}  = get_value(query_params, Options, {[]}),
+                    ViewParam = get_value(<<"view">>, QP),
+                    View1 = case re:split(ViewParam, <<"/">>) of
+                        [DName, ViewName] ->
+                            {<< "_design/", DName/binary >>, ViewName};
+                        _ ->
+                            throw({bad_request, "Invalid `view` parameter."})
+                    end,
+                    {view, View1};
+                _ ->
+                    {db, nil}
+            end,
+
         Rep = #rep{
             source = Source,
             target = Target,
             options = Options,
             user_ctx = UserCtx,
+            type = RepType,
+            view = View,
             doc_id = get_value(<<"_id">>, Props, null)
         },
         {ok, Rep#rep{id = replication_id(Rep)}}
@@ -103,6 +124,8 @@ maybe_append_filters(Base,
             DocIds ->
                 [DocIds]
             end;
+        <<"_", _/binary>> = Filter ->
+                [Filter, get_value(query_params, Options, {[]})];
         Filter ->
             [filter_code(Filter, Source, UserCtx),
                 get_value(query_params, Options, {[]})]
