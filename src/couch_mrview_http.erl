@@ -53,7 +53,7 @@ handle_all_docs_req(Req, _Db) ->
 
 handle_view_req(#httpd{method='GET',
                       path_parts=[_, _, DDocName, _, VName, <<"_info">>]}=Req,
-                Db, DDoc) ->
+                Db, _DDoc) ->
 
     DDocId = <<"_design/", DDocName/binary >>,
     {ok, Info} = couch_mrview:get_view_info(Db#db.name, DDocId, VName),
