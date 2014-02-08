@@ -175,13 +175,13 @@ test_stream(Db) ->
 
 
 test_indexer(Db) ->
-    Result = run_query(Db, [{since, 14}]),
+    Result = run_query(Db, [{since, 14}, refresh]),
     Expect = {ok, 15, [{{15,14,<<"14">>},14}]},
     etap:is(Result, Expect, "refresh index by hand OK."),
 
     {ok, Db1} = save_doc(Db, 15),
-    timer:sleep(1000),
-    Result1 = run_query(Db, [{since, 14}]),
+    timer:sleep(1500),
+    Result1 = run_query(Db1, [{since, 14}], false),
     Expect1 = {ok, 16, [{{15,14,<<"14">>},14},
                        {{16,15,<<"15">>},15}]},
     etap:is(Result1, Expect1, "changes indexed in background OK."),
@@ -195,6 +195,9 @@ save_doc(Db, Id) ->
     couch_db:reopen(Db).
 
 run_query(Db, Opts) ->
+    run_query(Db, Opts, true).
+
+run_query(Db, Opts, Refresh) ->
     Fun = fun
         (stop, {LastSeq, Acc}) ->
             {ok, LastSeq, Acc};
@@ -203,7 +206,12 @@ run_query(Db, Opts) ->
         (Event, Acc) ->
             {ok, [Event | Acc]}
     end,
-    couch_mrview:refresh(Db, <<"_design/bar">>),
+    case Refresh of
+        true ->
+            couch_mrview:refresh(Db, <<"_design/bar">>);
+        false ->
+            ok
+    end,
     {ok, LastSeq, R} = couch_mrview_changes:handle_changes(Db, <<"_design/bar">>,
                                                   <<"baz">>, Fun, [], Opts),
     {ok, LastSeq, lists:reverse(R)}.
