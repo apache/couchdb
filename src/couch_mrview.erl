@@ -19,6 +19,7 @@
 -export([count_view_changes_since/4, count_view_changes_since/5]).
 -export([get_info/2]).
 -export([trigger_update/2, trigger_update/3]).
+-export([get_view_info/3]).
 -export([refresh/2]).
 -export([compact/2, compact/3, cancel_compaction/2]).
 -export([cleanup/1]).
@@ -198,10 +199,32 @@ get_info(Db, DDoc) ->
 trigger_update(Db, DDoc) ->
     trigger_update(Db, DDoc, couch_db:get_update_seq(Db)).
 
-
 trigger_update(Db, DDoc, UpdateSeq) ->
     {ok, Pid} = couch_index_server:get_index(couch_mrview_index, Db, DDoc),
     couch_index:trigger_update(Pid, UpdateSeq).
+
+%% get informations on a view
+get_view_info(Db, DDoc, VName) ->
+    {ok, {_, View}, _, _Args} = couch_mrview_util:get_view(Db, DDoc, VName,
+                                                          #mrargs{}),
+
+    %% get the total number of rows
+    {ok, TotalRows} =  couch_mrview_util:get_row_count(View),
+
+    %% get the total number of sequence logged in this view
+    SeqBtree = View#mrview.seq_btree,
+    {ok, TotalSeqs} = case SeqBtree of
+        nil -> {ok, 0};
+        _ ->
+            {ok, {Count, _Reds}} = couch_btree:full_reduce(SeqBtree),
+            {ok, Count}
+    end,
+
+    {ok, [{update_seq, View#mrview.update_seq},
+          {purge_seq, View#mrview.purge_seq},
+          {total_rows, TotalRows},
+          {total_seqs, TotalSeqs}]}.
+
 
 %% @doc refresh a view index
 refresh(#db{name=DbName}, DDoc) ->
