@@ -201,8 +201,14 @@ view_changes_cb(stop, {LastSeq, {_, _, _, Callback, Args}}) ->
 view_changes_cb(heartbeat, {_, _, _, Callback, Args}=Acc) ->
     Callback(timeout, Args#changes_args.feed),
     {ok, Acc};
-view_changes_cb({{Seq, _Key, DocId}, _VAl},
+view_changes_cb({{Seq, _Key, DocId}, Val},
                 {Prepend, OldLimit, Db0, Callback, Args}=Acc) ->
+
+    %% is the key removed from the index?
+    Removed = case Val of
+        {[{<<"_removed">>, true}]} -> true;
+        _ -> false
+    end,
 
     #changes_args{
         feed = ResponseType,
@@ -220,16 +226,24 @@ view_changes_cb({{Seq, _Key, DocId}, _VAl},
     case couch_db:get_doc_info(Db, DocId) of
         {ok, DocInfo} ->
             %% get change row
-            ChangeRow = view_change_row(Db, DocInfo, Args),
-            %% emit change row
-            Callback({change, ChangeRow, Prepend}, ResponseType),
+            {Deleted, ChangeRow} = view_change_row(Db, DocInfo, Args),
 
-            %% if we achieved the limit, stop here, else continue.
-            NewLimit = OldLimit + 1,
-            if Limit > NewLimit ->
-                    {ok, {<<",\n">>, Db, NewLimit, Callback, Args}};
-                true ->
-                    {stop, {<<"">>, Db, NewLimit, Callback, Args}}
+            case Removed of
+                true when Deleted /= true ->
+                    %% the key has been removed from the view but the
+                    %% document hasn't been deleted so ignore it.
+                    {ok, Acc};
+                _ ->
+                    %% emit change row
+                    Callback({change, ChangeRow, Prepend}, ResponseType),
+
+                    %% if we achieved the limit, stop here, else continue.
+                    NewLimit = OldLimit + 1,
+                    if Limit > NewLimit ->
+                            {ok, {<<",\n">>, NewLimit, Db, Callback, Args}};
+                        true ->
+                            {stop, {<<"">>, NewLimit, Db, Callback, Args}}
+                    end
             end;
         {error, not_found} ->
             %% doc not found, continue
@@ -256,7 +270,7 @@ view_change_row(Db, DocInfo, Args) ->
                 || #rev_info{rev=R} <- Revs]
     end,
 
-    {[{<<"seq">>, Seq}, {<<"id">>, Id}, {<<"changes">>, Changes}] ++
+    {Del, {[{<<"seq">>, Seq}, {<<"id">>, Id}, {<<"changes">>, Changes}] ++
      deleted_item(Del) ++ case InDoc of
             true ->
                 Opts = case Conflicts of
@@ -272,7 +286,7 @@ view_change_row(Db, DocInfo, Args) ->
                 end;
             false ->
                 []
-        end}.
+    end}}.
 
 parse_changes_query(Req, Db) ->
     ChangesArgs = lists:foldl(fun({Key, Value}, Args) ->
