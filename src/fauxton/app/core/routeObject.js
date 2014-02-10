@@ -223,6 +223,7 @@ function(FauxtonAPI, Backbone) {
       _.each(this.views, function (view, selector) {
         view.remove();
         delete this.views[selector];
+        view = null;
       }, this);
     },
 
@@ -230,6 +231,7 @@ function(FauxtonAPI, Backbone) {
       if (_.isEmpty(promise)) { return; }
 
       if (!_.isArray(promise)) {
+        if (!promise.abort && !promise.reject) {
         return this._promises.push(promise);
       }
 
@@ -250,7 +252,7 @@ function(FauxtonAPI, Backbone) {
           return promise.abort("Route change");
         } 
 
-        promise.reject();
+        promise.reject && promise.reject();
       }, this);
 
       this._promises = [];

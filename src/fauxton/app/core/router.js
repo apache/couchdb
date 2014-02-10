@@ -59,13 +59,13 @@ function(FauxtonAPI, Auth, Backbone) {
 
           authPromise.then(function () {
             if (!that.activeRouteObject || !that.activeRouteObject.hasRoute(route)) {
-              if (that.activeRouteObject) {
-                that.activeRouteObject.cleanup();
-              }
+              that.activeRouteObject && that.activeRouteObject.cleanup();
+
               that.activeRouteObject = new RouteObject(route, masterLayout, args);
             }
 
             var routeObject = that.activeRouteObject;
+            routeObject.rejectPromises();
             routeObject.routeCallback(route, args);
             routeObject.renderWith(route, masterLayout, args);
           }, function () {

@@ -96,6 +96,7 @@ function(Backbone, LayoutManager, BackboneCache) {
 
       fetchPromise.progress(promise.resolveWith); // Fires when the cache hit happens
       fetchPromise.then(promise.resolveWith); // Fires after the AJAX call
+      promise.fail(fetchPromise.abort);
 
       return promise;
     }
