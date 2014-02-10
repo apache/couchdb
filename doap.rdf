@@ -10,7 +10,7 @@
     <homepage rdf:resource="http://couchdb.apache.org/" />
     <asfext:pmc rdf:resource="http://couchdb.apache.org" />
     <shortdesc>NoSQL document database using HTTP, JSON, and MapReduce</shortdesc>
-    <description>CouchDB is a database that completely embraces the web. Store your data with JSON documents. Access your documents with your web browser, via HTTP. Query, combine, and transform your documents with JavaScript. CouchDB works well with modern web and mobile apps. You can even serve web apps directly out of CouchDB. And you can distribute your data, or your apps, efficiently using CouchDB’s incremental replication. CouchDB supports master-master setups with automatic conflict detection.</description>
+    <description>Apache CouchDB is a database that completely embraces the web. Store your data with JSON documents. Access your documents with your web browser, via HTTP. Query, combine, and transform your documents with JavaScript. Apache CouchDB works well with modern web and mobile apps. You can even serve web apps directly out of Apache CouchDB. And you can distribute your data, or your apps, efficiently using Apache CouchDB’s incremental replication. Apache CouchDB supports master-master setups with automatic conflict detection.</description>
     <bug-database rdf:resource="http://issues.apache.org/jira/browse/COUCHDB" />
     <mailing-list rdf:resource="http://couchdb.apache.org/1275_1_1.html"/>
     <download-page rdf:resource="http://couchdb.apache.org/1284_1_1.html" />
