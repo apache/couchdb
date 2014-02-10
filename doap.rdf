@@ -3,14 +3,14 @@
     xmlns="http://usefulinc.com/ns/doap#" 
     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" 
     xmlns:asfext="http://projects.apache.org/ns/asfext#">
-  <Project rdf:about="http://cocoon.apache.org/">
+  <Project rdf:about="http://couchdb.apache.org/">
     <created>2013-11-05</created>
     <license rdf:resource="http://usefulinc.com/doap/licenses/asl20" />
     <name>Apache CouchDB</name>
     <homepage rdf:resource="http://couchdb.apache.org/" />
     <asfext:pmc rdf:resource="http://couchdb.apache.org" />
     <shortdesc>NoSQL document database using HTTP, JSON, and MapReduce</shortdesc>
-    <description>Apache Cocoon is a web development framework built around the concepts of separation of concerns (making sure people can interact and collaborate on a project, without stepping on each other toes) and component-based web development. Cocoon implements these concepts around the notion of "component pipelines", each component on the pipeline specializing on a particular operation. This makes it possible to use a "building block" approach for web solutions, hooking together components into pipelines without any required programming.</description>
+    <description>CouchDB is a database that completely embraces the web. Store your data with JSON documents. Access your documents with your web browser, via HTTP. Query, combine, and transform your documents with JavaScript. CouchDB works well with modern web and mobile apps. You can even serve web apps directly out of CouchDB. And you can distribute your data, or your apps, efficiently using CouchDB’s incremental replication. CouchDB supports master-master setups with automatic conflict detection.</description>
     <bug-database rdf:resource="http://issues.apache.org/jira/browse/COUCHDB" />
     <mailing-list rdf:resource="http://couchdb.apache.org/1275_1_1.html"/>
     <download-page rdf:resource="http://couchdb.apache.org/1284_1_1.html" />
