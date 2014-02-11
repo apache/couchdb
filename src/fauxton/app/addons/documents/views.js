@@ -416,8 +416,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       this.newView = options.newView || false;
       this.pagination = options.pagination;
       
-      this.perPage = 20;
-      
+      this._perPage = 20;
 
       this.listenTo(this.collection, 'totalRows:decrement', this.render);
     },
@@ -427,13 +426,13 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     },
 
     updatePerPage: function (event) {
-      this.perPage = parseInt(this.$('#select-per-page :selected').val(), 10);
-      FauxtonAPI.triggerRouteEvent('perPageChange', this.perPage);
-      this.pagination.updatePerPage(this.perPage);
+      this._perPage = parseInt(this.$('#select-per-page :selected').val(), 10);
+      this.pagination.updatePerPage(this.perPage());
+      FauxtonAPI.triggerRouteEvent('perPageChange', this.pagination.documentsLeftToFetch());
     },
 
     afterRender: function () {
-      this.$('option[value="' + this.perPage + '"]').attr('selected', "selected");
+      this.$('option[value="' + this.perPage() + '"]').attr('selected', "selected");
     },
 
     serialize: function () {
@@ -463,6 +462,10 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         pageStart: pageStart,
         pageEnd: pageEnd
       };
+    },
+
+    perPage: function () {
+      return this._perPage;
     }
 
   });
@@ -495,19 +498,11 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         database: this.database,
         eventer: this.eventer
       }));
-
-      /*this.advancedOptionsMenu = this.insertView('#query-options-wrapper', new Views.AdvancedOptionsMenu({
-        hasReduce: false,
-        eventer:  this.eventer
-       }));*/
-
-      //this.$('#query').hide();
     },
 
     afterRender: function () {
       if (this.params) {
         this.advancedOptions.updateFromParams(this.params);
-        //this.advancedOptionsMenu.updateFromParams(this.params);
       }
 
     },
@@ -540,9 +535,12 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       }
 
       var fragment = window.location.hash.replace(/\?.*$/, '');
-      fragment = fragment + '?' + $.param(params);
-      FauxtonAPI.navigate(fragment, {trigger: false});
 
+      if (!_.isEmpty(params)) {
+        fragment = fragment + '?' + $.param(params);
+      }
+
+      FauxtonAPI.navigate(fragment, {trigger: false});
       FauxtonAPI.triggerRouteEvent('updateAllDocs', {allDocs: true});
     },
 
@@ -706,6 +704,10 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
     afterRender: function(){
       prettyPrint();
+    },
+
+    perPage: function () {
+      return this.allDocsNumber.perPage();
     }
   });
 
@@ -1142,10 +1144,10 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       var $form = this.$(".view-query-update");
       // Ignore params without a value
       var params = _.reduce($form.serializeArray(), function(params, param) {
-        if (!params.value) { return params; }
+        if (!param.value) { return params; }
         if (param.name === "limit" && param.value === 'None') { return params; }
 
-        params.push(param.value);
+        params.push(param);
         return params;
       }, []);
 
@@ -1209,6 +1211,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         switch (key) {
           case "limit":
           case "group_level":
+            if (!val) { return; }
             $form.find("select[name='"+key+"']").val(val);
           break;
           case "include_docs":
@@ -1469,9 +1472,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
             that.advancedOptions.renderOnUpdatehasReduce(that.hasReduce());
           }
 
-          //that.advancedOptionsMenu.setHasReduce(that.hasReduce());
-          //that.advancedOptionsMenu.render();
-
           FauxtonAPI.triggerRouteEvent('updateAllDocs', {ddoc: ddocName, view: viewName});
 
         }, function(xhr) {
@@ -1525,9 +1525,11 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       }
 
        var fragment = window.location.hash.replace(/\?.*$/, '');
-       fragment = fragment + '?' + $.param(params);
-       FauxtonAPI.navigate(fragment, {trigger: false});
+       if (!_.isEmpty(params)) {
+        fragment = fragment + '?' + $.param(params);
+       }
 
+       FauxtonAPI.navigate(fragment, {trigger: false});
        FauxtonAPI.triggerRouteEvent('updateAllDocs', {ddoc: this.ddocID, view: this.viewName});
     },
 
@@ -1712,11 +1714,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
           hasReduce: this.hasReduce(),
           eventer: this.eventer
         }));
-
-        /*this.advancedOptionsMenu = this.insertView('#query-options-wrapper', new Views.AdvancedOptionsMenu({
-          hasReduce: this.hasReduce(),
-          eventer:  this.eventer
-         }));*/
       }
 
     },
@@ -1724,7 +1721,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     afterRender: function() {
       if (this.params && !this.newView) {
         this.advancedOptions.updateFromParams(this.params);
-        //this.advancedOptionsMenu.updateFromParams(this.params);
       }
 
       this.designDocSelector.updateDesignDoc();
@@ -1735,7 +1731,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         this.$('#index').hide();
         this.$('#index-nav').parent().removeClass('active');
       }
-
 
     },
 
@@ -1827,11 +1822,10 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       return {
         changes_url: '#' + this.database.url('changes'),
         permissions_url: '#' + this.database.url('app') + '/permissions',
-        db_url: '#' + this.database.url('index') + '?limit=' + Databases.DocLimit,
+        db_url: '#' + this.database.url('index'),
         database: this.collection.database,
         database_url: '#' + this.database.url('app'),
         docLinks: docLinks,
-        docLimit: Databases.DocLimit,
         addLinks: addLinks,
         newLinks: newLinks,
         extensionList: extensionList > 0

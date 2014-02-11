@@ -71,15 +71,15 @@ function(app, FauxtonAPI, ace, spin) {
       this.nextUrlfn = options.nextUrlfn;
       this.scrollToSelector = options.scrollToSelector;
       _.bindAll(this);
-      this.pageNumber = 0;
+      this._pageNumber = [];
       this._pageStart = 1;
       this.perPage = 20;
-      this.docLimit = options.docLimit || 100;
+      this.docLimit = options.docLimit || 1000000;
       this.paramsHistory = [];
     },
 
     canShowPreviousfn: function () {
-      if (this.pageNumber <= 0) {
+      if (this._pageStart === 1) {
         return false;
       }
       return true;
@@ -102,8 +102,7 @@ function(app, FauxtonAPI, ace, spin) {
       event.stopPropagation();
       if (!this.canShowPreviousfn()) { return; }
 
-      this.pageNumber = this.pageNumber -1;
-      this.decPageStart();
+      this.decPageNumber();
 
       FauxtonAPI.triggerRouteEvent('paginate', {
        direction: 'previous',
@@ -112,25 +111,28 @@ function(app, FauxtonAPI, ace, spin) {
       });
     },
 
+    documentsLeftToFetch: function () {
+      var documentsLeftToFetch = this.docLimit - this.totalDocsViewed(),
+          limit = this.perPage;
+
+      if (documentsLeftToFetch < this.perPage ) {
+        limit = documentsLeftToFetch;
+      }
+
+      return limit;
+    },
+
     nextClicked: function (event) {
       event.preventDefault();
       event.stopPropagation();
       if (!this.canShowNextfn()) { return; }
 
       this.paramsHistory.push(_.clone(this.collection.params));
-      this.pageNumber = this.pageNumber + 1;
-      this.incPageStart();
-
-      var documentsLeftToFetch = this.docLimit - (this.pageNumber * this.perPage),
-          limit = this.perPage;
-
-      if (documentsLeftToFetch < this.perPage) {
-        limit = documentsLeftToFetch;
-      }
+      this.incPageNumber();
 
       FauxtonAPI.triggerRouteEvent('paginate', {
        direction: 'next',
-       perPage: limit
+       perPage: this.documentsLeftToFetch()
       });
 
     },
@@ -150,11 +152,19 @@ function(app, FauxtonAPI, ace, spin) {
       return this._pageStart - 1;
     },
 
-    incPageStart: function () {
+    incPageNumber: function () {
+      this._pageNumber.push({perPage: this.perPage});
       this._pageStart = this._pageStart + this.perPage;
     },
 
-    decPageStart: function () {
+    totalDocsViewed: function () {
+      return _.reduce(this._pageNumber, function (total, value) {
+        return total + value.perPage;
+      }, 0);
+    },
+
+    decPageNumber: function () {
+      this._pageNumber.pop();
       var val = this._pageStart - this.perPage;
       if (val < 1) {
         this._pageStart = 1;
@@ -175,7 +185,6 @@ function(app, FauxtonAPI, ace, spin) {
 
       return this.page() + this.perPage;
     }
-
   });
 
   //TODO allow more of the typeahead options.

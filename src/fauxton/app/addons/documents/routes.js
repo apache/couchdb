@@ -187,8 +187,19 @@ function(app, FauxtonAPI, Documents, Databases) {
     },
 
     allDocs: function(databaseName, options) {
-      var docOptions = app.getParams(options);
+      var docOptions = app.getParams(options),
+          docLimit;
 
+      if (this.eventAllDocs) {
+        this.eventAllDocs = false;
+        return;
+      }
+
+      if (docOptions.limit) {
+        docLimit = docOptions.limit;
+      }
+
+      docOptions.limit = 20; //default per page
       this.data.database.buildAllDocs(docOptions);
 
       if (docOptions.startkey && docOptions.startkey.indexOf('_design') > -1) {
@@ -212,7 +223,7 @@ function(app, FauxtonAPI, Documents, Databases) {
 
       this.documentsView = this.setView("#dashboard-lower-content", new Documents.Views.AllDocsList({
         collection: this.data.database.allDocs,
-        docLimit: parseInt(docOptions.limit, 10)
+        docLimit: parseInt(docLimit, 10)
       }));
 
       this.crumbs = [
@@ -224,8 +235,14 @@ function(app, FauxtonAPI, Documents, Databases) {
 
     viewFn: function (databaseName, ddoc, view) {
       var params = app.getParams(),
-          decodeDdoc = decodeURIComponent(ddoc);
+          decodeDdoc = decodeURIComponent(ddoc),
+          docLimit;
 
+      if (params.limit) {
+        docLimit = params.limit;
+      } 
+
+      params.limit = 20; //default per page
       view = view.replace(/\?.*$/,'');
 
       this.data.indexedDocs = new Documents.IndexCollection(null, {
@@ -245,7 +262,7 @@ function(app, FauxtonAPI, Documents, Databases) {
         model: this.data.database,
         ddocs: this.data.designDocs,
         viewName: view,
-        params: params,
+        params: _.extend(params, {limit: docLimit}),
         newView: false,
         database: this.data.database,
         ddocInfo: ddocInfo
@@ -258,7 +275,8 @@ function(app, FauxtonAPI, Documents, Databases) {
         collection: this.data.indexedDocs,
         nestedView: Documents.Views.Row,
         viewList: true,
-        ddocInfo: ddocInfo
+        ddocInfo: ddocInfo,
+        docLimit: parseInt(docLimit, 10)
       }));
 
       this.sidebar.setSelectedTab(app.utils.removeSpecialCharacters(ddoc) + '_' + app.utils.removeSpecialCharacters(view));
@@ -296,14 +314,22 @@ function(app, FauxtonAPI, Documents, Databases) {
     updateAllDocsFromView: function (event) {
       var view = event.view,
           docOptions = app.getParams(),
-          ddoc = event.ddoc;
+          ddoc = event.ddoc,
+          docLimit;
 
+      if (docOptions.limit) {
+        docLimit = docOptions.limit;
+      }
+
+      docOptions.limit = this.documentsView.perPage();
       this.documentsView && this.documentsView.remove();
 
       if (event.allDocs) {
+        this.eventAllDocs = true; // this is horrible. But I cannot get the trigger not to fire the route!
         this.data.database.buildAllDocs(docOptions);
         this.documentsView = this.setView("#dashboard-lower-content", new Documents.Views.AllDocsList({
-          collection: this.data.database.allDocs
+          collection: this.data.database.allDocs,
+          docLimit: parseInt(docLimit, 10)
         }));
         return;
       }
@@ -319,7 +345,8 @@ function(app, FauxtonAPI, Documents, Databases) {
         database: this.data.database,
         collection: this.data.indexedDocs,
         nestedView: Documents.Views.Row,
-        viewList: true
+        viewList: true,
+        docLimit: parseInt(docLimit, 10)
       }));
 
       this.apiUrl = [this.data.indexedDocs.url("apiurl"), "docs"];
@@ -352,6 +379,7 @@ function(app, FauxtonAPI, Documents, Databases) {
 
     paginate: function (options) {
       this.documentsView.forceRender();
+
       if (options.direction === 'next') {
         this.documentsView.collection.skipFirstItem = true;
         this.documentsView.collection.nextPage(options.perPage);
