@@ -26,8 +26,6 @@ define([
        // Plugins
        "plugins/beautify",
        "plugins/prettify",
-
-
 ],
 
 function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColumns, beautify) {
@@ -498,18 +496,18 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         eventer: this.eventer
       }));
 
-      this.advancedOptionsMenu = this.insertView('#query-options-wrapper', new Views.AdvancedOptionsMenu({
+      /*this.advancedOptionsMenu = this.insertView('#query-options-wrapper', new Views.AdvancedOptionsMenu({
         hasReduce: false,
         eventer:  this.eventer
-       }));
+       }));*/
 
-      this.$('#query').hide();
+      //this.$('#query').hide();
     },
 
     afterRender: function () {
       if (this.params) {
         this.advancedOptions.updateFromParams(this.params);
-        this.advancedOptionsMenu.updateFromParams(this.params);
+        //this.advancedOptionsMenu.updateFromParams(this.params);
       }
 
     },
@@ -1143,9 +1141,13 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     queryParams: function () {
       var $form = this.$(".view-query-update");
       // Ignore params without a value
-      var params = _.filter($form.serializeArray(), function(param) {
-        return param.value;
-      });
+      var params = _.reduce($form.serializeArray(), function(params, param) {
+        if (!params.value) { return params; }
+        if (param.name === "limit" && param.value === 'None') { return params; }
+
+        params.push(param.value);
+        return params;
+      }, []);
 
       // Validate *key* params to ensure they're valid JSON
       var keyParams = ["key","keys","startkey","endkey"];
@@ -1467,8 +1469,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
             that.advancedOptions.renderOnUpdatehasReduce(that.hasReduce());
           }
 
-          that.advancedOptionsMenu.setHasReduce(that.hasReduce());
-          that.advancedOptionsMenu.render();
+          //that.advancedOptionsMenu.setHasReduce(that.hasReduce());
+          //that.advancedOptionsMenu.render();
 
           FauxtonAPI.triggerRouteEvent('updateAllDocs', {ddoc: ddocName, view: viewName});
 
@@ -1711,10 +1713,10 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
           eventer: this.eventer
         }));
 
-        this.advancedOptionsMenu = this.insertView('#query-options-wrapper', new Views.AdvancedOptionsMenu({
+        /*this.advancedOptionsMenu = this.insertView('#query-options-wrapper', new Views.AdvancedOptionsMenu({
           hasReduce: this.hasReduce(),
           eventer:  this.eventer
-         }));
+         }));*/
       }
 
     },
@@ -1722,7 +1724,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     afterRender: function() {
       if (this.params && !this.newView) {
         this.advancedOptions.updateFromParams(this.params);
-        this.advancedOptionsMenu.updateFromParams(this.params);
+        //this.advancedOptionsMenu.updateFromParams(this.params);
       }
 
       this.designDocSelector.updateDesignDoc();

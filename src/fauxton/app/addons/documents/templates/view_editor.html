@@ -16,6 +16,9 @@ the License.
       <i class="fonticon-wrench fonticon"></i>
       <% if (newView) { %>Create Index <% } else { %>Edit Index <% } %></a></li>
     <% if (!newView) { %>
+    <li><a data-bypass="true" id="query-nav" href="#query" data-toggle="tab">
+      <i class="fonticon-plus fonticon"></i> Query Options</a>
+    </li>
     <li><a data-bypass="true" id="meta-nav" href="#metadata" data-toggle="tab">Design Doc Metadata</a></li>
     <% } %>
   </ul>
