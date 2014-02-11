@@ -415,6 +415,8 @@ function(app, FauxtonAPI, ace, spin) {
         shadow: false // Whether to render a shadow
      };
 
+     if (routeObjectSpinner) { return; }
+
      if (!$('.spinner').length) {
        $('<div class="spinner"></div>')
         .appendTo('#app-container');
@@ -428,18 +430,22 @@ function(app, FauxtonAPI, ace, spin) {
   var removeRouteObjectSpinner = function () {
     if (routeObjectSpinner) {
       routeObjectSpinner.stop();
+      routeObjectSpinner = null;
       $('.spinner').remove();
     }
   };
 
-  var removeViewSpinner = function () {
+  var removeViewSpinner = function (selector) {
+    var viewSpinner = viewSpinners[selector];
+
     if (viewSpinner){
       viewSpinner.stop();
-      $('.spinner').remove();
+      $(selector).find('.spinner').remove();
+      delete viewSpinners[selector];
     }
   };
 
-  var viewSpinner;
+  var viewSpinners = {};
   FauxtonAPI.RouteObject.on('beforeRender', function (routeObject, view, selector) {
     removeRouteObjectSpinner();
 
@@ -455,19 +461,21 @@ function(app, FauxtonAPI, ace, spin) {
         shadow: false // Whether to render a shadow
       };
 
-      viewSpinner = new Spinner(opts).spin();
+      var viewSpinner = new Spinner(opts).spin();
       $('<div class="spinner"></div>')
         .appendTo(selector)
         .append(viewSpinner.el);
+
+      viewSpinners[selector] = viewSpinner;
     }
   });
 
   FauxtonAPI.RouteObject.on('afterRender', function (routeObject, view, selector) {
-    removeViewSpinner();
+    removeViewSpinner(selector);
   });
 
-  FauxtonAPI.RouteObject.on('viewHasRendered', function () {
-    removeViewSpinner();
+  FauxtonAPI.RouteObject.on('viewHasRendered', function (view, selector) {
+    removeViewSpinner(selector);
     removeRouteObjectSpinner();
   });
 
