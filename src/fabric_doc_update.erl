@@ -96,7 +96,7 @@ force_reply(Doc, [FirstReply|_] = Replies, {Health, W, Acc}) ->
     {true, Reply} ->
         {Health, W, [{Doc,Reply} | Acc]};
     false ->
-        twig:log(warn, "write quorum (~p) failed for ~s", [W, Doc#doc.id]),
+        couch_log:log(warn, "write quorum (~p) failed for ~s", [W, Doc#doc.id]),
         case [Reply || {ok, Reply} <- Replies] of
         [] ->
             % check if all errors are identical, if so inherit health

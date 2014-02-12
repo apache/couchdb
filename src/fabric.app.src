@@ -44,6 +44,6 @@
         couch,
         rexi,
         mem3,
-        twig
+        couch_log
     ]}
 ]}.

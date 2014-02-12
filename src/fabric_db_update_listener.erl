@@ -89,7 +89,7 @@ cleanup_monitor(Parent, Ref, Notifiers) ->
         {Parent, stop} ->
             stop_update_notifiers(Notifiers);
         Else ->
-            twig:log(error, "Unkown message in ~w :: ~w", [?MODULE, Else]),
+            couch_log:log(error, "Unkown message in ~w :: ~w", [?MODULE, Else]),
             stop_update_notifiers(Notifiers),
             exit(Parent, {unknown_message, Else})
     end.

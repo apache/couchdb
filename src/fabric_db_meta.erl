@@ -78,7 +78,7 @@ handle_set_message(ok, W, Acc) ->
     maybe_finish_set(NewAcc);
 handle_set_message(Error, W, Acc) ->
     Dst = {W#shard.node, W#shard.name},
-    twig:log(err, "Failed to set security object on ~p :: ~p", [Dst, Error]),
+    couch_log:log(err, "Failed to set security object on ~p :: ~p", [Dst, Error]),
     NewAcc = Acc#acc{workers = (Acc#acc.workers -- [W])},
     maybe_finish_set(NewAcc).
 
@@ -147,7 +147,7 @@ handle_get_message({Props}=SecObj, W, Acc) when is_list(Props) ->
     maybe_finish_get(NewAcc);
 handle_get_message(Error, W, Acc) ->
     Dst = {W#shard.node, W#shard.name},
-    twig:log(err, "Failed to get security object on ~p :: ~p", [Dst, Error]),
+    couch_log:log(err, "Failed to get security object on ~p :: ~p", [Dst, Error]),
     NewAcc = Acc#acc{workers = (Acc#acc.workers -- [W])},
     maybe_finish_set(NewAcc).
 

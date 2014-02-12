@@ -74,7 +74,7 @@ maybe_stop(W, Counters) ->
         case {Ok + NotFound, Ok, NotFound} of
         {W, 0, W} ->
             {#shard{dbname=Name}, _} = hd(Counters),
-            twig:log(warn, "~p not_found ~s", [?MODULE, Name]),
+            couch_log:log(warn, "~p not_found ~s", [?MODULE, Name]),
             {stop, not_found};
         {W, _, _} ->
             {stop, ok};

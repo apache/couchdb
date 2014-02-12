@@ -289,7 +289,7 @@ with_db(DbName, Options, {M,F,A}) ->
         catch Exception ->
             Exception;
         error:Reason ->
-            twig:log(error, "rpc ~p:~p/~p ~p ~p", [M, F, length(A)+1, Reason,
+            couch_log:log(error, "rpc ~p:~p/~p ~p ~p", [M, F, length(A)+1, Reason,
                 clean_stack()]),
             {error, Reason}
         end);
@@ -300,7 +300,7 @@ with_db(DbName, Options, {M,F,A}) ->
 get_or_create_db(DbName, Options) ->
     case couch_db:open_int(DbName, Options) of
     {not_found, no_db_file} ->
-        twig:log(warn, "~p creating ~s", [?MODULE, DbName]),
+        couch_log:log(warn, "~p creating ~s", [?MODULE, DbName]),
         couch_server:create(DbName, Options);
     Else ->
         Else
