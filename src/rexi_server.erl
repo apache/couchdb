@@ -89,7 +89,7 @@ handle_cast({kill, FromRef}, #st{clients = Clients} = St) ->
     end;
 
 handle_cast(_, St) ->
-    couch_log:log(notice, "rexi_server ignored_cast"),
+    couch_log:notice("rexi_server ignored_cast"),
     {noreply, St}.
 
 handle_info({'DOWN', Ref, process, _, normal}, #st{workers=Workers} = St) ->
@@ -150,7 +150,7 @@ init_p(From, {M,F,A}, Nonce) ->
     put(nonce, Nonce),
     try apply(M, F, A) catch exit:normal -> ok; Class:Reason ->
         Stack = clean_stack(),
-        couch_log:log(error, "rexi_server ~p:~p ~100p", [Class, Reason, Stack]),
+        couch_log:error("rexi_server ~p:~p ~100p", [Class, Reason, Stack]),
         exit(#error{
             timestamp = now(),
             reason = {Class, Reason},
