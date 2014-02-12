@@ -198,6 +198,9 @@ handle_request(MochiReq) ->
     % put small token on heap to keep requests synced to backend calls
     erlang:put(nonce, couch_util:to_hex(crypto:rand_bytes(4))),
 
+    % suppress duplicate log
+    erlang:put(dont_log_request, true),
+
     Result =
     try
         case authenticate_request(HttpReq, AuthenticationFuns) of
