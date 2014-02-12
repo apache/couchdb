@@ -134,7 +134,7 @@ handle_info({'EXIT', Active, {{not_found, no_db_file}, _Stack}}, State) ->
 handle_info({'EXIT', Active, Reason}, State) ->
     NewState = case lists:keyfind(Active, #job.pid, State#state.active) of
         #job{name=OldDbName, node=OldNode} = Job ->
-        couch_log:log(warn, "~s ~s ~s ~w", [?MODULE, OldDbName, OldNode, Reason]),
+        couch_log:warning("~s ~s ~s ~w", [?MODULE, OldDbName, OldNode, Reason]),
         case Reason of {pending_changes, Count} ->
             maybe_resubmit(State, Job#job{pid = nil, count = Count});
         _ ->
@@ -150,7 +150,7 @@ handle_info({'EXIT', Active, Reason}, State) ->
     handle_replication_exit(NewState, Active);
 
 handle_info(Msg, State) ->
-    couch_log:log(notice, "unexpected msg at replication manager ~p", [Msg]),
+    couch_log:notice("unexpected msg at replication manager ~p", [Msg]),
     {noreply, State}.
 
 terminate(_Reason, State) ->
@@ -221,7 +221,7 @@ add_to_queue(State, #job{name=DbName, node=Node, pid=From} = Job) ->
         if From =/= nil -> gen_server:reply(From, ok); true -> ok end,
         State;
     false ->
-        couch_log:log(debug, "adding ~s -> ~p to mem3_sync queue", [DbName, Node]),
+        couch_log:debug("adding ~s -> ~p to mem3_sync queue", [DbName, Node]),
         State#state{
             dict = dict:store({DbName,Node}, ok, D),
             waiting = in(Job, WQ)
@@ -339,6 +339,6 @@ maybe_redirect(Node) ->
         undefined ->
             Node;
         Redirect ->
-            couch_log:log(debug, "Redirecting push from ~p to ~p", [Node, Redirect]),
+            couch_log:debug("Redirecting push from ~p to ~p", [Node, Redirect]),
             list_to_existing_atom(Redirect)
     end.

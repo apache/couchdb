@@ -37,7 +37,7 @@ maybe_sync_int(#shard{name=Name}=Src, Dst) ->
             end;
         Else ->
             Args = [DbName, Else],
-            couch_log:log(err, "Error checking security objects for ~s :: ~p", Args)
+            couch_log:error("Error checking security objects for ~s :: ~p", Args)
     end.
 
 go() ->
@@ -55,18 +55,18 @@ handle_db(DbName) ->
         ok ->
             ok;
         {fixable, SecObj} ->
-            couch_log:log(info, "Sync security object for ~p: ~p", [DbName, SecObj]),
+            couch_log:info("Sync security object for ~p: ~p", [DbName, SecObj]),
             case fabric:set_security(DbName, SecObj) of
                 ok -> ok;
                 Error ->
-                    couch_log:log(err, "Error setting security object in ~p: ~p",
+                    couch_log:error("Error setting security object in ~p: ~p",
                         [DbName, Error])
             end;
         broken ->
-            couch_log:log(err, "Bad security object in ~p: ~p", [DbName, SecObjs])
+            couch_log:error("Bad security object in ~p: ~p", [DbName, SecObjs])
         end;
     Error ->
-        couch_log:log(err, "Error getting security objects for ~p: ~p", [
+        couch_log:error("Error getting security objects for ~p: ~p", [
                 DbName, Error])
     end.
 

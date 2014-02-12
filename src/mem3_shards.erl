@@ -147,7 +147,7 @@ handle_info({'DOWN', _, _, Pid, Reason}, #st{changes_pid=Pid}=St) ->
         shard_db_changed ->
             {cache_clear(St), get_update_seq()};
         _ ->
-            couch_log:log(notice, "~p changes listener died ~p", [?MODULE, Reason]),
+            couch_log:notice("~p changes listener died ~p", [?MODULE, Reason]),
             {St, get_update_seq()}
     end,
     erlang:send_after(5000, self(), {start_listener, Seq}),
@@ -218,7 +218,7 @@ changes_callback({change, {Change}, _}, _) ->
         false ->
             case couch_util:get_value(doc, Change) of
             {error, Reason} ->
-                couch_log:log(error, "missing partition table for ~s: ~p",
+                couch_log:error("missing partition table for ~s: ~p",
                     [DbName, Reason]);
             {Doc} ->
                 Shards = mem3_util:build_shards(DbName, Doc),
@@ -268,7 +268,7 @@ create_if_missing(Name) ->
         {ok, Db} ->
             couch_db:close(Db);
         Error ->
-            couch_log:log(error, "~p tried to create ~s, got ~p",
+            couch_log:error("~p tried to create ~s, got ~p",
                 [?MODULE, Name, Error])
         end
     end.
