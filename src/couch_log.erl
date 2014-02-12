@@ -12,27 +12,28 @@
 
 -module(couch_log).
 
--export([log/3]).
+-export([debug/2, info/2, notice/2, warning/2, error/2, critical/2, alert/2, emergency/2]).
 
-log(debug, Msg, Args) ->
-    lager:debug(Msg, Args);
-log(info, Msg, Args) ->
-    lager:info(Msg, Args);
-log(notice, Msg, Args) ->
-    lager:notice(Msg, Args);
-log(warn, Msg, Args) ->
-    lager:warning(Msg, Args);
-log(warning, Msg, Args) ->
-    lager:warning(Msg, Args);
-log(err, Msg, Args) ->
-    lager:error(Msg, Args);
-log(error, Msg, Args) ->
-    lager:error(Msg, Args);
-log(critical, Msg, Args) ->
-    lager:critical(Msg, Args);
-log(alert, Msg, Args) ->
-    lager:alert(Msg, Args);
-log(emerg, Msg, Args) ->
-    lager:emergency(Msg, Args);
-log(emergency, Msg, Args) ->
-    lager:emergency(Msg, Args).
+debug(Fmt, Args) ->
+    lager:debug(Fmt, Args).
+
+info(Fmt, Args) ->
+    lager:info(Fmt, Args).
+
+notice(Fmt, Args) ->
+    lager:notice(Fmt, Args).
+
+warning(Fmt, Args) ->
+    lager:warning(Fmt, Args).
+
+error(Fmt, Args) ->
+    lager:error(Fmt, Args).
+
+critical(Fmt, Args) ->
+    lager:critical(Fmt, Args).
+
+alert(Fmt, Args) ->
+    lager:alert(Fmt, Args).
+
+emergency(Fmt, Args) ->
+    lager:emergency(Fmt, Args).
