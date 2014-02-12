@@ -120,7 +120,7 @@ read_repair(#acc{dbname=DbName, replies=Replies}) ->
         Ctx = #user_ctx{roles=[<<"_admin">>]},
         Opts = [replicated_changes, {user_ctx, Ctx}],
         Res = fabric:update_docs(DbName, Docs, Opts),
-        couch_log:log(notice, "read_repair ~s ~s ~p", [DbName, Id, Res]),
+        couch_log:notice("read_repair ~s ~s ~p", [DbName, Id, Res]),
         choose_reply(Docs);
     [] ->
         % Try hard to return some sort of information
