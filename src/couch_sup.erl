@@ -43,7 +43,7 @@ start_link() ->
 
 
 init(_Args) ->
-    couch_log:log(info, "Starting ~s", [?MODULE]),
+    couch_log:info("Starting ~s", [?MODULE]),
     {ok, {{one_for_one,10, 60}, [
         {
             couch_primary_services,

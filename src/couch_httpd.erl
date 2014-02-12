@@ -586,7 +586,7 @@ log_request(#httpd{mochi_req=MochiReq,peer=Peer}, Code) ->
         true ->
             ok;
         _ ->
-            couch_log:log(notice, "~s - - ~s ~s ~B", [
+            couch_log:notice("~s - - ~s ~s ~B", [
                 Peer,
                 MochiReq:get(method),
                 MochiReq:get(raw_path),
