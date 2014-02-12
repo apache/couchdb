@@ -32,7 +32,7 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init([]) ->
-    ets:new(?MODULE, [named_table]),
+    ets:new(?MODULE, [named_table, public, set]),
     {ok, #st{}}.
 
 handle_call(Msg, _From, State) ->
