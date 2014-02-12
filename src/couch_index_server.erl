@@ -186,7 +186,7 @@ handle_info({'EXIT', Pid, Reason}, Server) ->
     end,
     {noreply, Server};
 handle_info(Msg, State) ->
-    twig:log(warn, "~p did not expect ~p", [?MODULE, Msg]),
+    couch_log:log(warn, "~p did not expect ~p", [?MODULE, Msg]),
     {noreply, State}.
 
 
