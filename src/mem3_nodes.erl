@@ -69,7 +69,7 @@ handle_cast(_Msg, State) ->
     {noreply, State}.
 
 handle_info({'DOWN', _, _, Pid, Reason}, #state{changes_pid=Pid} = State) ->
-    twig:log(notice, "~p changes listener died ~p", [?MODULE, Reason]),
+    couch_log:log(notice, "~p changes listener died ~p", [?MODULE, Reason]),
     StartSeq = State#state.update_seq,
     Seq = case Reason of {seq, EndSeq} -> EndSeq; _ -> StartSeq end,
     erlang:send_after(5000, self(), start_listener),

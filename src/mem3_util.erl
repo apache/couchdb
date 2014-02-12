@@ -155,7 +155,7 @@ n_val(undefined, NodeCount) ->
 n_val(N, NodeCount) when is_list(N) ->
     n_val(list_to_integer(N), NodeCount);
 n_val(N, NodeCount) when is_integer(NodeCount), N > NodeCount ->
-    twig:log(error, "Request to create N=~p DB but only ~p node(s)", [N, NodeCount]),
+    couch_log:log(error, "Request to create N=~p DB but only ~p node(s)", [N, NodeCount]),
     NodeCount;
 n_val(N, _) when N < 1 ->
     1;

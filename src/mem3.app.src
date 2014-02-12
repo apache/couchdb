@@ -45,6 +45,6 @@
         mochiweb,
         couch,
         rexi,
-        twig
+        couch_log
     ]}
 ]}.
