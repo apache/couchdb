@@ -43,7 +43,7 @@ start_link() ->
 
 
 init(_Args) ->
-    twig:log(info, "Starting ~s", [?MODULE]),
+    couch_log:log(info, "Starting ~s", [?MODULE]),
     {ok, {{one_for_one,10, 60}, [
         {
             couch_primary_services,
@@ -77,9 +77,8 @@ handle_config_change(_, _, _, _, _) ->
 
 
 notify_starting() ->
-    io:format("Apache CouchDB ~s (LogLevel=~s) is starting.~n", [
-        couch_server:get_version(),
-        config:get("log", "level", "info")
+    io:format("Apache CouchDB ~s is starting.~n", [
+        couch_server:get_version()
     ]).
 
 
