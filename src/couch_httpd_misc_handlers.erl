@@ -14,7 +14,7 @@
 
 -export([handle_welcome_req/2,handle_favicon_req/2,handle_utils_dir_req/2,
     handle_all_dbs_req/1,handle_restart_req/1,
-    handle_uuids_req/1,handle_config_req/1,handle_log_req/1,
+    handle_uuids_req/1,handle_config_req/1,
     handle_task_status_req/1, handle_file_req/2]).
 
 -export([increment_update_seq_req/2]).
@@ -270,37 +270,3 @@ increment_update_seq_req(#httpd{method='POST'}=Req, Db) ->
     ]});
 increment_update_seq_req(Req, _Db) ->
     send_method_not_allowed(Req, "POST").
-
-% httpd log handlers
-
-handle_log_req(#httpd{method='GET'}=Req) ->
-    ok = couch_httpd:verify_is_server_admin(Req),
-    Bytes = list_to_integer(couch_httpd:qs_value(Req, "bytes", "1000")),
-    Offset = list_to_integer(couch_httpd:qs_value(Req, "offset", "0")),
-    Chunk = couch_log:read(Bytes, Offset),
-    {ok, Resp} = start_chunked_response(Req, 200, [
-        % send a plaintext response
-        {"Content-Type", "text/plain; charset=utf-8"},
-        {"Content-Length", integer_to_list(length(Chunk))}
-    ]),
-    send_chunk(Resp, Chunk),
-    last_chunk(Resp);
-handle_log_req(#httpd{method='POST'}=Req) ->
-    {PostBody} = couch_httpd:json_body_obj(Req),
-    Level = couch_util:get_value(<<"level">>, PostBody),
-    Message = ?b2l(couch_util:get_value(<<"message">>, PostBody)),
-    case Level of
-    <<"debug">> ->
-        ?LOG_DEBUG(Message, []),
-        send_json(Req, 200, {[{ok, true}]});
-    <<"info">> ->
-        ?LOG_INFO(Message, []),
-        send_json(Req, 200, {[{ok, true}]});
-    <<"error">> ->
-        ?LOG_ERROR(Message, []),
-        send_json(Req, 200, {[{ok, true}]});
-    _ ->
-        send_json(Req, 400, {[{error, ?l2b(io_lib:format("Unrecognized log level '~s'", [Level]))}]})
-    end;
-handle_log_req(Req) ->
-    send_method_not_allowed(Req, "GET,POST").

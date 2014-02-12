@@ -18,7 +18,6 @@
         couch_db_update_notifier_sup,
         couch_external_manager,
         couch_httpd,
-        couch_log,
         couch_primary_services,
         couch_proc_manager,
         couch_secondary_services,
@@ -30,5 +29,5 @@
     ]},
     {mod, {couch_app, []}},
     {applications, [kernel, stdlib, crypto, sasl, inets, oauth, ibrowse,
-        mochiweb, ssl, twig]}
+        mochiweb, ssl, lager]}
 ]}.
