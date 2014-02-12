@@ -17,7 +17,7 @@
 ]).
 
 -record(st, {
-    tracked
+
 }).
 
 -spec track(any()) -> ok.
@@ -32,24 +32,34 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init([]) ->
-    {ok, #st{tracked = dict:new()}}.
+    ets:new(?MODULE, [named_table]),
+    {ok, #st{}}.
 
 handle_call(Msg, _From, State) ->
     twig:log(notice, "~p received unknown call ~p", [?MODULE, Msg]),
     {noreply, State}.
 
-handle_cast({track, Pid, Name}, #st{tracked=Tracked}=State) ->
+handle_cast({track, Pid, Name}, State) ->
     couch_stats:increment_counter(Name),
     Ref = erlang:monitor(process, Pid),
-    {noreply, State#st{tracked=dict:store(Ref, Name, Tracked)}};
+    ets:insert(?MODULE, {Ref, Name}),
+    {noreply, State};
 handle_cast(Msg, State) ->
     twig:log(notice, "~p received unknown cast ~p", [?MODULE, Msg]),
     {noreply, State}.
 
-handle_info({'DOWN', Ref, _, _, _}, #st{tracked=Tracked}=State) ->
-    Name = dict:fetch(Ref, Tracked),
-    couch_stats:decrement_counter(Name),
-    {noreply, State#st{tracked=dict:erase(Ref, Tracked)}};
+handle_info({'DOWN', Ref, _, _, _}=Msg, State) ->
+    case ets:lookup(?MODULE, Ref) of
+        [] ->
+            twig:log(
+                notice,
+                "~p received unknown exit; message was ~p", [?MODULE, Msg]
+            );
+        [{Ref, Name}] ->
+            couch_stats:decrement_counter(Name),
+            ets:delete(?MODULE, Ref)
+    end,
+    {noreply, State};
 handle_info(Msg, State) ->
     twig:log(notice, "~p received unknown message ~p", [?MODULE, Msg]),
     {noreply, State}.
