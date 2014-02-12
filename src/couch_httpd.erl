@@ -582,12 +582,17 @@ verify_is_server_admin(#user_ctx{roles=Roles}) ->
     end.
 
 log_request(#httpd{mochi_req=MochiReq,peer=Peer}, Code) ->
-    ?LOG_INFO("~s - - ~s ~s ~B", [
-        Peer,
-        MochiReq:get(method),
-        MochiReq:get(raw_path),
-        Code
-    ]).
+    case erlang:get(dont_log_request) of
+        true ->
+            ok;
+        _ ->
+            couch_log:log(notice, "~s - - ~s ~s ~B", [
+                Peer,
+                MochiReq:get(method),
+                MochiReq:get(raw_path),
+                Code
+            ])
+    end.
 
 start_response_length(#httpd{mochi_req=MochiReq}=Req, Code, Headers, Length) ->
     log_request(Req, Code),
