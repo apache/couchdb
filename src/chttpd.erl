@@ -168,7 +168,7 @@ handle_request(MochiReq) ->
     MethodOverride = MochiReq:get_primary_header_value("X-HTTP-Method-Override"),
     Method2 = case lists:member(MethodOverride, ["GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT", "COPY"]) of
     true ->
-        couch_log:log(notice, "MethodOverride: ~s (real method was ~s)", [MethodOverride, Method1]),
+        couch_log:notice("MethodOverride: ~s (real method was ~s)", [MethodOverride, Method1]),
         case Method1 of
         'POST' -> couch_util:to_existing_atom(MethodOverride);
         _ ->
@@ -218,7 +218,7 @@ handle_request(MochiReq) ->
         throw:{invalid_json, _} ->
             send_error(HttpReq, {bad_request, "invalid UTF-8 JSON"});
         exit:{mochiweb_recv_error, E} ->
-            couch_log:log(notice, LogForClosedSocket ++ " - ~p", [E]),
+            couch_log:notice(LogForClosedSocket ++ " - ~p", [E]),
             exit(normal);
         throw:Error ->
             send_error(HttpReq, Error);
@@ -234,7 +234,7 @@ handle_request(MochiReq) ->
                     exit(normal); % Client disconnect (R14)
                 _Else ->
                     JsonStack = json_stack({Error, nil, Stack}),
-                    couch_log:log(error, "req_err ~p:~p ~p", [Tag, Error, JsonStack]),
+                    couch_log:error("req_err ~p:~p ~p", [Tag, Error, JsonStack]),
                     send_error(HttpReq, {Error, nil, Stack})
             end
     end,
@@ -249,7 +249,7 @@ handle_request(MochiReq) ->
         {aborted, Resp:get(code)}
     end,
     Host = MochiReq:get_header_value("Host"),
-    couch_log:log(notice, "~s ~s ~s ~s ~B ~p ~B", [Peer, Host,
+    couch_log:notice("~s ~s ~s ~s ~B ~p ~B", [Peer, Host,
         atom_to_list(Method1), RawUri, Code, Status, round(RequestTime)]),
     couch_stats_collector:record({couchdb, request_time}, RequestTime),
     case Result of
@@ -258,7 +258,7 @@ handle_request(MochiReq) ->
         {ok, Resp};
     {aborted, _, Reason} ->
         couch_stats_collector:increment({httpd, aborted_requests}),
-        couch_log:log(error, "Response abnormally terminated: ~p", [Reason]),
+        couch_log:error("Response abnormally terminated: ~p", [Reason]),
         exit(normal)
     end.
 
