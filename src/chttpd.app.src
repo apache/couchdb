@@ -32,7 +32,7 @@
     {applications, [
         kernel,
         stdlib,
-        twig,
+        couch_log,
         config,
         couch,
         fabric
