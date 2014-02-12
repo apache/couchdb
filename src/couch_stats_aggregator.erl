@@ -68,25 +68,24 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 reload_metrics() ->
-    Existing = couch_stats:list(),
     Current = load_metrics_for_applications(),
-    ToDelete = lists:foldl(
-        fun({Name, Props}=Stat, Acc) ->
-            Type = proplists:get_value(type, Props),
-            case sets:is_element(Stat, Acc) of
-                true ->
-                    sets:del_element(Stat, Acc);
-                false ->
-                    couch_stats:new(Type, Name),
-                    Acc
-            end
-        end,
-        sets:from_list(Existing),
-        Current
+    CurrentSet = sets:from_list(Current),
+    ExistingSet = sets:from_list(couch_stats:list()),
+    ToDelete = sets:subtract(ExistingSet, CurrentSet),
+    ToCreate = sets:subtract(CurrentSet, ExistingSet),
+    sets:fold(
+        fun({Name, _}, _) -> couch_stats:delete(Name), nil end,
+        nil,
+        ToDelete
     ),
-    lists:foreach(
-        fun({Name, _}) -> couch_stats:delete(Name) end,
-        sets:to_list(ToDelete)
+    sets:fold(
+        fun({Name, Props}, _) ->
+            Type = proplists:get_value(type, Props),
+            couch_stats:new(Type, Name),
+            nil
+        end,
+        nil,
+        ToCreate
     ),
     {ok, Current}.
 
