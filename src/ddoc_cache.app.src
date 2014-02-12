@@ -31,7 +31,7 @@
         ets_lru,
         mem3,
         fabric,
-        twig
+        couch_log
     ]},
     {mod, {ddoc_cache_app, []}},
     {env, [

@@ -126,7 +126,7 @@ handle_cast(Msg, St) ->
 
 
 handle_info({'EXIT', Pid, Reason}, #st{evictor=Pid}=St) ->
-    twig:log(err, "ddoc_cache_opener evictor died ~w", [Reason]),
+    couch_log:log(err, "ddoc_cache_opener evictor died ~w", [Reason]),
     {ok, Evictor} = couch_db_update_notifier:start_link(fun ?MODULE:evictor/1),
     {noreply, St#st{evictor=Evictor}};
 
