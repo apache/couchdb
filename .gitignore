@@ -4,6 +4,7 @@ rel/*.config
 rel/dev*
 rel/tmpdata
 src/
+/log
 
 *.o
 *.so

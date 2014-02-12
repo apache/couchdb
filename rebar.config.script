@@ -17,6 +17,7 @@ os:putenv("COUCHDB_CONFIG", ConfigureEnv).
 
 
 DepDescs = [
+    {couch_log, "couchdb-couch-log", {branch, "1843-feature-bigcouch"}},
     {chttpd, "couchdb-chttpd", {branch, "1843-feature-bigcouch"}},
     {config, "couchdb-config", {branch, "1843-feature-bigcouch"}},
     {couch, "couchdb-couch", {branch, "1843-feature-bigcouch"}},
@@ -32,8 +33,7 @@ DepDescs = [
     {mochiweb, "couchdb-mochiweb", {branch, "1843-feature-bigcouch"}},
     {oauth, "couchdb-oauth", {branch, "1843-feature-bigcouch"}},
     {rexi, "couchdb-rexi", {branch, "1843-feature-bigcouch"}},
-    {snappy, "couchdb-snappy", {branch, "1994-merge-rcouch"}},
-    {twig, "couchdb-twig", {branch, "1843-feature-bigcouch"}}
+    {snappy, "couchdb-snappy", {branch, "1994-merge-rcouch"}}
 ],
 
 MakeDep = fun({AppName, RepoName, Version}) ->
