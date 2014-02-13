@@ -536,11 +536,11 @@ options_to_query_args([{open_revs, Revs} | Rest], Acc) ->
     options_to_query_args(Rest, [{"open_revs", JsonRevs} | Acc]).
 
 
+-define(MAX_URL_LEN, 7000).
+
 atts_since_arg(_UrlLen, [], Acc) ->
     lists:reverse(Acc);
 atts_since_arg(UrlLen, [PA | Rest], Acc) ->
-    MaxUrlLen = list_to_integer(
-        couch_config:get("replicator", "max_url_len", "7000")),
     RevStr = couch_doc:rev_to_str(PA),
     NewUrlLen = case Rest of
     [] ->
@@ -550,7 +550,7 @@ atts_since_arg(UrlLen, [PA | Rest], Acc) ->
         % plus 2 double quotes and a comma (% encoded)
         UrlLen + size(RevStr) + 9
     end,
-    case NewUrlLen >= MaxUrlLen of
+    case NewUrlLen >= ?MAX_URL_LEN of
     true ->
         lists:reverse(Acc);
     false ->
