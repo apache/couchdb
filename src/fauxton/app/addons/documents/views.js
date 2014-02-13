@@ -479,11 +479,12 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     },
 
     events: {
-      'click #query-nav': "toggleQuery"
+      'click #toggle-query': "toggleQuery"
     },
 
     toggleQuery: function (event) {
       $('#dashboard-content').scrollTop(0);
+      console.log('hi');
       this.$('#query').toggle('slow');
     },
 
