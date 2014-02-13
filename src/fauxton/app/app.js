@@ -24,7 +24,7 @@ define([
   "core/utils",
   // Modules
   "core/api",
-  "core/couchdbsession",
+  "core/couchdbSession",
   // Plugins.
   "plugins/backbone.layoutmanager",
   "plugins/jquery.form"
