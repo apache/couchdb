@@ -53,6 +53,8 @@ function (app, FauxtonAPI, CouchdbSession) {
     initialize: function (options) {
       if (!options) { options = {}; }
 
+      _.bindAll(this);
+
       this.messages = _.extend({},  { 
           missingCredentials: 'Username or password cannot be blank.',
           passwordsNotMatch:  'Passwords do not match.',
