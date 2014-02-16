@@ -182,8 +182,8 @@
     signup: function(user_doc, password, options) {
       options = options || {};
       user_doc.password = password;
-      user_doc.roles =  user_doc.roles || [];
-      user_doc.type =  user_doc.type = "user" || [];
+      user_doc.roles = user_doc.roles || [];
+      user_doc.type = "user";
       var user_prefix = "org.couchdb.user:";
       user_doc._id = user_doc._id || user_prefix + user_doc.name;
 
