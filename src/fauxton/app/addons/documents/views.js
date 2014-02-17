@@ -117,7 +117,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     template: "addons/documents/templates/delete_database_modal",
 
     events: {
-      "click a#delete-db-btn": "deleteDatabase",
+      "click #delete-db-btn": "deleteDatabase",
       "submit #delete-db-check": "deleteDatabase"
     },
 
