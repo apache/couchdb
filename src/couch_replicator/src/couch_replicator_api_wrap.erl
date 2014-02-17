@@ -50,6 +50,9 @@
 
 -define(MAX_WAIT, 5 * 60 * 1000).
 
+-define(MAX_URL_LEN, 7000).
+-define(MIN_URL_LEN, 200).
+
 db_uri(#httpdb{url = Url}) ->
     couch_util:url_strip_password(Url);
 
@@ -171,13 +174,16 @@ open_doc_revs(#httpdb{} = HttpDb, Id, Revs, Options, Fun, Acc) ->
     QS = options_to_query_args(HttpDb, Path, [revs, {open_revs, Revs} | Options]),
     {Pid, Ref} = spawn_monitor(fun() ->
         Self = self(),
-        Callback = fun(200, Headers, StreamDataFun) ->
+        Callback = fun
+          (200, Headers, StreamDataFun) ->
             remote_open_doc_revs_streamer_start(Self),
             {<<"--">>, _, _} = couch_httpd:parse_multipart_request(
                 get_value("Content-Type", Headers),
                 StreamDataFun,
                 fun mp_parse_mixed/1
-            )
+            );
+          (414, _, _) ->
+            exit(request_uri_too_long)
         end,
         Streamer = spawn_link(fun() ->
             Params = [
@@ -217,6 +223,17 @@ open_doc_revs(#httpdb{} = HttpDb, Id, Revs, Options, Fun, Acc) ->
             Ret;
         {'DOWN', Ref, process, Pid, {{nocatch, {missing_stub,_} = Stub}, _}} ->
             throw(Stub);
+        {'DOWN', Ref, process, Pid, request_uri_too_long} ->
+            NewMaxLen = get_value(max_url_len, Options, ?MAX_URL_LEN) div 2,
+            case NewMaxLen < ?MIN_URL_LEN of
+                true ->
+                    throw(request_uri_too_long);
+                false ->
+                    ?LOG_INFO("Reducing url length to ~B because of 414 response", [NewMaxLen]),
+                    Options1 = lists:keystore(max_url_len, 1, Options,
+                                              {max_url_len, NewMaxLen}),
+                    open_doc_revs(HttpDb, Id, Revs, Options1, Fun, Acc)
+            end;
         {'DOWN', Ref, process, Pid, Else} ->
             Url = couch_util:url_strip_password(
                 couch_replicator_httpc:full_url(HttpDb, [{path,Path}, {qs,QS}])
@@ -501,7 +518,11 @@ changes_json_req(Db, FilterName, {QueryParams}, _Options) ->
     ]}.
 
 
-options_to_query_args(HttpDb, Path, Options) ->
+options_to_query_args(HttpDb, Path, Options0) ->
+    case lists:keytake(max_url_len, 1, Options0) of
+        false -> MaxLen = ?MAX_URL_LEN, Options = Options0;
+        {value, {max_url_len, MaxLen}, Options} -> ok
+    end,
     case lists:keytake(atts_since, 1, Options) of
     false ->
         options_to_query_args(Options, []);
@@ -514,7 +535,7 @@ options_to_query_args(HttpDb, Path, Options) ->
         RevList = atts_since_arg(
             length("GET " ++ FullUrl ++ " HTTP/1.1\r\n") +
             length("&atts_since=") + 6,  % +6 = % encoded [ and ]
-            PAs, []),
+            PAs, MaxLen, []),
         [{"atts_since", ?JSON_ENCODE(RevList)} | QueryArgs1]
     end.
 
@@ -535,12 +556,9 @@ options_to_query_args([{open_revs, Revs} | Rest], Acc) ->
     JsonRevs = ?b2l(?JSON_ENCODE(couch_doc:revs_to_strs(Revs))),
     options_to_query_args(Rest, [{"open_revs", JsonRevs} | Acc]).
 
-
-atts_since_arg(_UrlLen, [], Acc) ->
+atts_since_arg(_UrlLen, [], _MaxLen, Acc) ->
     lists:reverse(Acc);
-atts_since_arg(UrlLen, [PA | Rest], Acc) ->
-    MaxUrlLen = list_to_integer(
-        couch_config:get("replicator", "max_url_len", "7000")),
+atts_since_arg(UrlLen, [PA | Rest], MaxLen, Acc) ->
     RevStr = couch_doc:rev_to_str(PA),
     NewUrlLen = case Rest of
     [] ->
@@ -550,11 +568,11 @@ atts_since_arg(UrlLen, [PA | Rest], Acc) ->
         % plus 2 double quotes and a comma (% encoded)
         UrlLen + size(RevStr) + 9
     end,
-    case NewUrlLen >= MaxUrlLen of
+    case NewUrlLen >= MaxLen of
     true ->
         lists:reverse(Acc);
     false ->
-        atts_since_arg(NewUrlLen, Rest, [RevStr | Acc])
+        atts_since_arg(NewUrlLen, Rest, MaxLen, [RevStr | Acc])
     end.
 
 
