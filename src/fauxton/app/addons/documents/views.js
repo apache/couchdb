@@ -117,7 +117,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     template: "addons/documents/templates/delete_database_modal",
 
     events: {
-      "click a#delete-db-btn": "deleteDatabase",
+      "click #delete-db-btn": "deleteDatabase",
       "submit #delete-db-check": "deleteDatabase"
     },
 
@@ -456,7 +456,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
   Views.AllDocsLayout = FauxtonAPI.View.extend({
     template: "addons/documents/templates/all_docs_layout",
-    className: "row",
 
     initialize: function (options) {
       this.database = options.database;

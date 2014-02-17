@@ -12,8 +12,8 @@
  */
 
 pre.prettyprint {
-  background: #000;
-  border-radius: 0;
+  background: #E5E0DD;
+  border: none;
   font-size: 83%;
   line-height: 1.4;
   margin: 0;
@@ -21,26 +21,15 @@ pre.prettyprint {
 }
 .prettyprint {
   .pln, .pun,  .typ {
-    color: #f8f8f8;
+    color: #333;
   }
   .kwd {
     color: #ff8300;
   }
-  .str {
-    color: #ff8300;
-  }
-  .lit {
-    color: #00ff00;
+  .str, .lit {
+    color: @red;
   }
   .com {
     color: #666;
-  }
-}
-.CodeMirror-wrap pre{
-  &.view-code-error{
-    color: @darkRed;
-  }
-  .tooltip{
-    z-index: 100000000;
   }
 }
