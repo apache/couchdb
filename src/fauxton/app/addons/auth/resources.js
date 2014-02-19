@@ -13,7 +13,7 @@
 define([
        "app",
        "api",
-       "core/CouchdbSession"
+       "core/couchdbSession"
 ],
 
 function (app, FauxtonAPI, CouchdbSession) {
@@ -55,7 +55,7 @@ function (app, FauxtonAPI, CouchdbSession) {
 
       _.bindAll(this);
 
-      this.messages = _.extend({},  { 
+      this.messages = _.extend({},  {
           missingCredentials: 'Username or password cannot be blank.',
           passwordsNotMatch:  'Passwords do not match.',
           incorrectCredentials: 'Incorrect username or password.',
@@ -88,7 +88,7 @@ function (app, FauxtonAPI, CouchdbSession) {
     userRoles: function () {
       var user = this.user();
 
-      if (user && user.roles) { 
+      if (user && user.roles) {
         return user.roles;
       }
 
@@ -157,8 +157,8 @@ function (app, FauxtonAPI, CouchdbSession) {
 
       return $.ajax({
         cache: false,
-        type: "POST", 
-        url: app.host + "/_session", 
+        type: "POST",
+        url: app.host + "/_session",
         dataType: "json",
         data: {name: username, password: password}
       }).then(function () {
@@ -170,10 +170,10 @@ function (app, FauxtonAPI, CouchdbSession) {
       var that = this;
 
       return $.ajax({
-        type: "DELETE", 
-        url: app.host + "/_session", 
+        type: "DELETE",
+        url: app.host + "/_session",
         dataType: "json",
-        username : "_", 
+        username : "_",
         password : "_"
       }).then(function () {
        return that.fetchUser({forceFetch: true });
@@ -315,7 +315,7 @@ function (app, FauxtonAPI, CouchdbSession) {
     }
   });
 
-  Auth.NavLink = FauxtonAPI.View.extend({ 
+  Auth.NavLink = FauxtonAPI.View.extend({
     template: 'addons/auth/templates/nav_link_title',
     tagName: 'li',
 
@@ -331,7 +331,7 @@ function (app, FauxtonAPI, CouchdbSession) {
     }
   });
 
-  Auth.NavDropDown = FauxtonAPI.View.extend({ 
+  Auth.NavDropDown = FauxtonAPI.View.extend({
     template: 'addons/auth/templates/nav_dropdown',
 
     beforeRender: function () {

@@ -21,7 +21,7 @@ define([
        "addons/pouchdb/base",
 
        // Libs
-       "addons/Fauxton/resizeColumns",
+       "addons/fauxton/resizeColumns",
 
        // Plugins
        "plugins/beautify",
@@ -952,7 +952,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
           //not complete doc. Cannot work with it
           return;
         }
-        
+
         var keyChecked = ["_id"];
         if (model.get("_rev")) { keyChecked.push("_rev");}
 
