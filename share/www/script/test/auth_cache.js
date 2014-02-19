@@ -184,11 +184,7 @@ couchTests.auth_cache = function(debug) {
     hits_before = hits_after;
     misses_before = misses_after;
 
-    var new_salt = CouchDB.newUuids(1)[0];
-    var new_passwd = hex_sha1("foobar" + new_salt);
-    fdmanana.salt = new_salt;
-    fdmanana.password_sha = new_passwd;
-
+    fdmanana.password = "foobar";
     T(authDb.save(fdmanana).ok);
 
     // cache was refreshed
@@ -206,11 +202,7 @@ couchTests.auth_cache = function(debug) {
     misses_before = misses_after;
 
     // and yet another update
-    new_salt = CouchDB.newUuids(1)[0];
-    new_passwd = hex_sha1("javascript" + new_salt);
-    fdmanana.salt = new_salt;
-    fdmanana.password_sha = new_passwd;
-
+    fdmanana.password = "javascript";
     T(authDb.save(fdmanana).ok);
 
     // cache was refreshed

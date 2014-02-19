@@ -115,7 +115,7 @@ couchTests.cookie_auth = function(debug) {
 
       // we can't create docs with malformed ids
       var badIdDoc = CouchDB.prepareUserDoc({
-        name: "foo"
+        name: "w00x"
       }, "bar");
 
       badIdDoc._id = "org.apache.couchdb:w00x";
@@ -153,8 +153,8 @@ couchTests.cookie_auth = function(debug) {
         usersDb.deleteDoc(jchrisUserDoc);
         T(false && "Can't delete other users docs. Should have thrown an error.");
       } catch (e) {
-        TEquals("forbidden", e.error);
-        TEquals(403, usersDb.last_req.status);
+        TEquals("not_found", e.error);
+        TEquals(404, usersDb.last_req.status);
       }
 
       // TODO should login() throw an exception here?
@@ -197,8 +197,8 @@ couchTests.cookie_auth = function(debug) {
         usersDb.save(jasonUserDoc);
         T(false && "Can't update someone else's user doc. Should have thrown an error.");
       } catch (e) {
-        T(e.error == "forbidden");
-        T(usersDb.last_req.status == 403);
+        T(e.error == "not_found");
+        T(usersDb.last_req.status == 404);
       }
 
       // test that you can't edit roles unless you are admin
@@ -272,7 +272,6 @@ couchTests.cookie_auth = function(debug) {
 
   var usersDb = new CouchDB("test_suite_users", {"X-Couch-Full-Commit":"false"});
   usersDb.deleteDb();
-  usersDb.createDb();
 
   run_on_modified_server(
     [
