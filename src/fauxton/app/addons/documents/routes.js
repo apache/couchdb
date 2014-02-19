@@ -209,6 +209,7 @@ function(app, FauxtonAPI, Documents, Databases) {
         return;
       }
 
+      docParams.limit = this.getDocPerPageLimit(urlParams, 20);
       this.data.database.buildAllDocs(docParams);
 
       if (docParams.startkey && docParams.startkey.indexOf('_design') > -1) {
@@ -245,22 +246,19 @@ function(app, FauxtonAPI, Documents, Databases) {
     },
 
     viewFn: function (databaseName, ddoc, view) {
-      var params = app.getParams(),
-          decodeDdoc = decodeURIComponent(ddoc),
-          docLimit;
+      var params = this.createParams(),
+          urlParams = params.urlParams,
+          docParams = params.docParams;
+          decodeDdoc = decodeURIComponent(ddoc);
 
-      if (params.limit) {
-        docLimit = params.limit;
-      } 
-
-      params.limit = 20; //default per page
+      docParams.limit = this.getDocPerPageLimit(urlParams, 20);
       view = view.replace(/\?.*$/,'');
 
       this.data.indexedDocs = new Documents.IndexCollection(null, {
         database: this.data.database,
         design: decodeDdoc,
         view: view,
-        params: params
+        params: docParams
       });
 
       var ddocInfo = {
@@ -273,7 +271,7 @@ function(app, FauxtonAPI, Documents, Databases) {
         model: this.data.database,
         ddocs: this.data.designDocs,
         viewName: view,
-        params: _.extend(params, {limit: docLimit}),
+        params: urlParams,
         newView: false,
         database: this.data.database,
         ddocInfo: ddocInfo
@@ -287,7 +285,8 @@ function(app, FauxtonAPI, Documents, Databases) {
         nestedView: Documents.Views.Row,
         viewList: true,
         ddocInfo: ddocInfo,
-        docLimit: parseInt(docLimit, 10)
+        docParams: docParams,
+        params: urlParams
       }));
 
       this.sidebar.setSelectedTab(app.utils.removeSpecialCharacters(ddoc) + '_' + app.utils.removeSpecialCharacters(view));
@@ -330,8 +329,7 @@ function(app, FauxtonAPI, Documents, Databases) {
           ddoc = event.ddoc,
           collection;
 
-      docParams.limit = this.documentsView.perPage();
-
+      docParams.limit = this.getDocPerPageLimit(urlParams, this.documentsView.perPage());
       this.documentsView.forceRender();
 
       if (event.allDocs) {
@@ -388,7 +386,7 @@ function(app, FauxtonAPI, Documents, Databases) {
       this.documentsView.forceRender();
 
       if (options.direction === 'next') {
-        params = Documents.paginate.next(collection.map(function (item) { return item.toJSON(); }), collection.params, options.perPage, !!collection.isAllDocs);
+          params = Documents.paginate.next(collection.map(function (item) { return item.toJSON(); }), collection.params, options.perPage, !!collection.isAllDocs);
       }
       
       collection.updateParams(params);
@@ -399,6 +397,15 @@ function(app, FauxtonAPI, Documents, Databases) {
 
       if (event && event.selectedTab) {
         this.sidebar.setSelectedTab(event.selectedTab);
+      }
+    },
+
+
+    getDocPerPageLimit: function (urlParams, perPage) {
+      if (!urlParams.limit || urlParams.limit > perPage) {
+        return perPage;
+      } else {
+        return urlParams.limit;
       }
     }
 

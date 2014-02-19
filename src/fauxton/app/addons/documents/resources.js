@@ -26,6 +26,10 @@ function(app, FauxtonAPI) {
           lastId = '',
           isView = !!!_isAllDocs,
           key;
+      
+      _.each(doc, function (value, key) {
+        doc[key] = JSON.stringify(doc[key]);
+      });
 
       if (currentParams.keys) {
         throw "Cannot paginate _all_docs with keys";
@@ -45,6 +49,7 @@ function(app, FauxtonAPI) {
       lastId = doc.id || doc._id;
 
       if (isView) {
+        console.log(doc.key, doc, lastId);
         key = doc.key;
         docId = lastId;
       } else {
@@ -486,6 +491,14 @@ function(app, FauxtonAPI) {
     url: function(context) {
       var query = "";
       if (this.params) {
+        /*this.params = _.reduce(['startkey', 'endkey', 'key', 'keys'], function (params, key) {
+          if (_.has(params, key)) {
+            params[key] = JSON.stringify(params[key]);
+          }
+
+          return params;
+        }, this.params);*/
+
         query = "?" + $.param(this.params);
       }
       
