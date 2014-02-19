@@ -71,14 +71,21 @@ function(app, FauxtonAPI, ace, spin) {
       this.nextUrlfn = options.nextUrlfn;
       this.scrollToSelector = options.scrollToSelector;
       _.bindAll(this);
+      this.docLimit = options.docLimit || 1000000;
+      this.perPage = 20;
+      this.setDefaults();
+    },
+
+    setDefaults: function () {
       this._pageNumber = [];
       this._pageStart = 1;
-      this.perPage = 20;
-      this.docLimit = options.docLimit || 1000000;
       this.paramsHistory = [];
+      this.enabled = true;
     },
 
     canShowPreviousfn: function () {
+      if (!this.enabled) { return this.enabled; }
+
       if (this._pageStart === 1) {
         return false;
       }
@@ -86,11 +93,17 @@ function(app, FauxtonAPI, ace, spin) {
     },
 
     canShowNextfn: function () {
+      if (!this.enabled) { return this.enabled; }
+
       if (this.collection.length < (this.perPage -1)) {
         return false;
       }
 
       if ((this.pageStart() + this.perPage) >= this.docLimit) {
+        return false;
+      }
+
+      if (this.collection.viewMeta && this.collection.viewMeta.total_rows <= this.pageStart() + this.perPage) {
         return false;
       }
 
@@ -103,11 +116,12 @@ function(app, FauxtonAPI, ace, spin) {
       if (!this.canShowPreviousfn()) { return; }
 
       this.decPageNumber();
+      var params = this.paramsHistory.pop();
 
       FauxtonAPI.triggerRouteEvent('paginate', {
        direction: 'previous',
        perPage: this.perPage,
-       params: this.paramsHistory.pop()
+       params: params
       });
     },
 
@@ -179,12 +193,22 @@ function(app, FauxtonAPI, ace, spin) {
     },
 
     pageEnd: function () {
-      if (this.collection.length < this.perPage) {
-        return this.page() + this.collection.length;
-      }
+      return this.page() + this.collection.length;
+    },
 
-      return this.page() + this.perPage;
+    disable: function () {
+      this.enabled = false;
+    },
+
+    enable: function () {
+      this.enabled = true;
+    },
+
+    setCollection: function (collection) {
+      this.collection = collection;
+      this.setDefaults();
     }
+
   });
 
   //TODO allow more of the typeahead options.

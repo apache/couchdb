@@ -45,7 +45,6 @@ function(app, FauxtonAPI, resizeColumns) {
     }
   });
 
-
   Fauxton.initialize = function () {
     app.footer = new Fauxton.Footer({el: "#footer-content"}),
     app.navBar = new Fauxton.NavBar();
@@ -93,7 +92,7 @@ function(app, FauxtonAPI, resizeColumns) {
     });
   };
 
-  Fauxton.Breadcrumbs = Backbone.View.extend({
+  Fauxton.Breadcrumbs = FauxtonAPI.View.extend({
     template: "templates/fauxton/breadcrumbs",
 
     serialize: function() {
@@ -114,10 +113,7 @@ function(app, FauxtonAPI, resizeColumns) {
     }
   });
 
-  // TODO: this View should extend from FauxtonApi.View.
-  // Chicken and egg problem, api.js extends fauxton/base.js.
-  // Need to sort the loading order.
-  Fauxton.Footer = Backbone.View.extend({
+  Fauxton.Footer = FauxtonAPI.View.extend({
     template: "templates/fauxton/footer",
 
     initialize: function() {
@@ -135,7 +131,7 @@ function(app, FauxtonAPI, resizeColumns) {
     }
   });
 
-  Fauxton.NavBar = Backbone.View.extend({
+  Fauxton.NavBar = FauxtonAPI.View.extend({
     className:"navbar",
     template: "templates/fauxton/nav_bar",
     // TODO: can we generate this list from the router?
@@ -260,7 +256,7 @@ function(app, FauxtonAPI, resizeColumns) {
     // TODO: ADD ACTIVE CLASS
   });
 
-  Fauxton.ApiBar = Backbone.View.extend({
+  Fauxton.ApiBar = FauxtonAPI.View.extend({
     template: "templates/fauxton/api_bar",
     endpoint: '_all_docs',
 
@@ -304,7 +300,7 @@ function(app, FauxtonAPI, resizeColumns) {
 
   });
 
-  Fauxton.Notification = Backbone.View.extend({
+  Fauxton.Notification = FauxtonAPI.View.extend({
     fadeTimer: 5000,
 
     initialize: function(options) {

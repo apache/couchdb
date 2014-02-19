@@ -160,8 +160,8 @@ function(app, FauxtonAPI, Documents, Databases) {
     },
 
     initialize: function (route, masterLayout, options) {
-      var docOptions = app.getParams();
-      docOptions.include_docs = true;
+      var docParams = app.getParams();
+      docParams.include_docs = true;
 
       this.databaseName = options[0];
 
@@ -186,23 +186,32 @@ function(app, FauxtonAPI, Documents, Databases) {
       return this.data.designDocs.fetch();
     },
 
+    createParams: function (options) {
+      var urlParams = app.getParams(options);
+      return {
+        urlParams: urlParams,
+        docParams: _.extend(_.clone(urlParams), {limit: 20})
+      };
+    },
+
+    /*
+    * docParams are the options collection uses to fetch from the server 
+    * urlParams are what are shown in the url and to the user
+    * They are not the same when paginating
+    */
     allDocs: function(databaseName, options) {
-      var docOptions = app.getParams(options),
-          docLimit;
+      var params = this.createParams(options),
+          urlParams = params.urlParams,
+          docParams = params.docParams;
 
       if (this.eventAllDocs) {
         this.eventAllDocs = false;
         return;
       }
 
-      if (docOptions.limit) {
-        docLimit = docOptions.limit;
-      }
+      this.data.database.buildAllDocs(docParams);
 
-      docOptions.limit = 20; //default per page
-      this.data.database.buildAllDocs(docOptions);
-
-      if (docOptions.startkey && docOptions.startkey.indexOf('_design') > -1) {
+      if (docParams.startkey && docParams.startkey.indexOf('_design') > -1) {
         this.sidebar.setSelectedTab('design-docs');
       } else {
         this.sidebar.setSelectedTab('all-docs');
@@ -218,12 +227,14 @@ function(app, FauxtonAPI, Documents, Databases) {
       this.setView("#dashboard-upper-content", new Documents.Views.AllDocsLayout({
         database: this.data.database,
         collection: this.data.database.allDocs,
-        params: docOptions
+        params: urlParams,
+        docParams: docParams
       }));
 
       this.documentsView = this.setView("#dashboard-lower-content", new Documents.Views.AllDocsList({
         collection: this.data.database.allDocs,
-        docLimit: parseInt(docLimit, 10)
+        docParams: docParams,
+        params: urlParams
       }));
 
       this.crumbs = [
@@ -313,43 +324,34 @@ function(app, FauxtonAPI, Documents, Databases) {
 
     updateAllDocsFromView: function (event) {
       var view = event.view,
-          docOptions = app.getParams(),
+          params = this.createParams(),
+          urlParams = params.urlParams,
+          docParams = params.docParams,
           ddoc = event.ddoc,
-          docLimit;
+          collection;
 
-      if (docOptions.limit) {
-        docLimit = docOptions.limit;
-      }
+      docParams.limit = this.documentsView.perPage();
 
-      docOptions.limit = this.documentsView.perPage();
-      this.documentsView && this.documentsView.remove();
+      this.documentsView.forceRender();
 
       if (event.allDocs) {
         this.eventAllDocs = true; // this is horrible. But I cannot get the trigger not to fire the route!
-        this.data.database.buildAllDocs(docOptions);
-        this.documentsView = this.setView("#dashboard-lower-content", new Documents.Views.AllDocsList({
-          collection: this.data.database.allDocs,
-          docLimit: parseInt(docLimit, 10)
-        }));
-        return;
+        this.data.database.buildAllDocs(docParams);
+        collection = this.data.database.allDocs;
+
+      } else {
+        collection = this.data.indexedDocs = new Documents.IndexCollection(null, {
+          database: this.data.database,
+          design: ddoc,
+          view: view,
+          params: docParams
+        });
+
+        this.apiUrl = [this.data.indexedDocs.url("apiurl"), "docs"];
       }
 
-      this.data.indexedDocs = new Documents.IndexCollection(null, {
-        database: this.data.database,
-        design: ddoc,
-        view: view,
-        params: app.getParams()
-      });
-
-      this.documentsView = this.setView("#dashboard-lower-content", new Documents.Views.AllDocsList({
-        database: this.data.database,
-        collection: this.data.indexedDocs,
-        nestedView: Documents.Views.Row,
-        viewList: true,
-        docLimit: parseInt(docLimit, 10)
-      }));
-
-      this.apiUrl = [this.data.indexedDocs.url("apiurl"), "docs"];
+      this.documentsView.setCollection(collection);
+      this.documentsView.setParams(docParams, urlParams);
     },
 
     updateAllDocsFromPreview: function (event) {
@@ -373,24 +375,23 @@ function(app, FauxtonAPI, Documents, Databases) {
     },
 
     perPageChange: function (perPage) {
+      this.perPage = perPage;
       this.documentsView.collection.updateLimit(perPage);
       this.documentsView.forceRender();
     },
 
     paginate: function (options) {
+      var params = options.params,
+          urlParams = app.getParams(),
+          collection = this.documentsView.collection;
+
       this.documentsView.forceRender();
 
       if (options.direction === 'next') {
-        this.documentsView.collection.skipFirstItem = true;
-        this.documentsView.collection.nextPage(options.perPage);
-      } else {
-        if (options.params && options.params.startkey) {
-          this.documentsView.collection.skipFirstItem = true;
-        } else {
-          this.documentsView.collection.skipFirstItem = false;
-        }
-        this.documentsView.collection.previousPage(options.perPage, options.params);
+        params = Documents.paginate.next(collection.map(function (item) { return item.toJSON(); }), collection.params, options.perPage, !!collection.isAllDocs);
       }
+      
+      collection.updateParams(params);
     },
 
     reloadDesignDocs: function (event) {
@@ -421,9 +422,9 @@ function(app, FauxtonAPI, Documents, Databases) {
       this.databaseName = options[0];
       this.database = new Databases.Model({id: this.databaseName});
 
-      var docOptions = app.getParams();
+      var docParams = app.getParams();
 
-      this.database.buildChanges(docOptions);
+      this.database.buildChanges(docParams);
 
       this.setView("#tabs", new Documents.Views.Tabs({
         collection: this.designDocs,

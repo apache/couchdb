@@ -18,6 +18,51 @@ define([
 function(app, FauxtonAPI) {
   var Documents = FauxtonAPI.addon();
 
+  Documents.paginate = {
+    next: function (docs, currentParams, perPage, _isAllDocs) {
+      var params = {limit: perPage, skip: 1},
+          doc = _.last(docs),
+          docId = '',
+          lastId = '',
+          isView = !!!_isAllDocs,
+          key;
+
+      if (currentParams.keys) {
+        throw "Cannot paginate _all_docs with keys";
+      }
+
+      if (_.isUndefined(doc)) {
+        throw "Require docs to paginate";
+      }
+
+      params = _.reduce(['reduce', 'keys', 'endkey', 'descending', 'inclusive_end'], function (params, p) {
+        if (_.has(currentParams, p)) {
+          params[p] = currentParams[p]; 
+        }
+        return params;
+      }, params);
+
+      lastId = doc.id || doc._id;
+
+      if (isView) {
+        key = doc.key;
+        docId = lastId;
+      } else {
+        docId = key = lastId;
+      }
+
+      if (isView && !currentParams.keys) {
+        params.startkey_docid = docId; 
+        params.startkey = key;
+      } else if (currentParams.startkey) {
+        params.startkey = key;
+      } else {
+        params.startkey_docid = docId; 
+      }
+      return params;
+    }
+ };
+
   Documents.Doc = FauxtonAPI.Model.extend({
     idAttribute: "_id",
     documentation: function(){
@@ -274,6 +319,7 @@ function(app, FauxtonAPI) {
 
   Documents.AllDocs = FauxtonAPI.Collection.extend({
     model: Documents.Doc,
+    isAllDocs: true,
     documentation: function(){
       return "docs";
     },
@@ -328,6 +374,10 @@ function(app, FauxtonAPI) {
       }
 
       this.params.limit = limit;
+    },
+
+    updateParams: function (params) {
+      this.params = params;
     },
 
     nextPage: function (num, lastId) {
@@ -476,6 +526,10 @@ function(app, FauxtonAPI) {
 
       this.params.limit = num;
       return this.url('app');
+    },
+
+    updateParams: function (params) {
+      this.params = params;
     },
 
     updateLimit: function (limit) {
