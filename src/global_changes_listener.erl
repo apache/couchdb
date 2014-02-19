@@ -112,8 +112,7 @@ maybe_send_updates(#state{update_db=true}=State) ->
             try group_updates_by_node(State#state.dbname, Updates) of
                 Grouped ->
                     dict:map(fun(Node, Docs) ->
-                        MFA = {global_changes_server, update_docs, [Docs]},
-                        rexi:cast(Node, MFA)
+                        global_changes_server:update_docs(Node, Docs)
                     end, Grouped)
             catch error:database_does_not_exist ->
                 ok
