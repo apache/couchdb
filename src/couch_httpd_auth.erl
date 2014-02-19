@@ -68,11 +68,14 @@ default_authentication_handler(Req) ->
             nil ->
                 throw({unauthorized, <<"Name or password is incorrect.">>});
             UserProps ->
-                case authenticate(?l2b(Pass), UserProps) of
+                UserName = ?l2b(User),
+                Password = ?l2b(Pass),
+                case authenticate(Password, UserProps) of
                     true ->
+                        UserProps2 = maybe_upgrade_password_hash(UserName, Password, UserProps),
                         Req#httpd{user_ctx=#user_ctx{
-                            name=?l2b(User),
-                            roles=couch_util:get_value(<<"roles">>, UserProps, [])
+                            name=UserName,
+                            roles=couch_util:get_value(<<"roles">>, UserProps2, [])
                         }};
                     _Else ->
                         throw({unauthorized, <<"Name or password is incorrect.">>})
@@ -263,15 +266,16 @@ handle_session_req(#httpd{method='POST', mochi_req=MochiReq}=Req) ->
     UserName = ?l2b(couch_util:get_value("name", Form, "")),
     Password = ?l2b(couch_util:get_value("password", Form, "")),
     ?LOG_DEBUG("Attempt Login: ~s",[UserName]),
-    User = case couch_auth_cache:get_user_creds(UserName) of
+    UserProps = case couch_auth_cache:get_user_creds(UserName) of
         nil -> [];
         Result -> Result
     end,
-    UserSalt = couch_util:get_value(<<"salt">>, User, <<>>),
-    case authenticate(Password, User) of
+    case authenticate(Password, UserProps) of
         true ->
+            UserProps2 = maybe_upgrade_password_hash(UserName, Password, UserProps),
             % setup the session cookie
             Secret = ?l2b(ensure_cookie_auth_secret()),
+            UserSalt = couch_util:get_value(<<"salt">>, UserProps2),
             CurrentTime = make_cookie_time(),
             Cookie = cookie_auth_cookie(Req, ?b2l(UserName), <<Secret/binary, UserSalt/binary>>, CurrentTime),
             % TODO document the "next" feature in Futon
@@ -284,8 +288,8 @@ handle_session_req(#httpd{method='POST', mochi_req=MochiReq}=Req) ->
             send_json(Req#httpd{req_body=ReqBody}, Code, Headers,
                 {[
                     {ok, true},
-                    {name, couch_util:get_value(<<"name">>, User, null)},
-                    {roles, couch_util:get_value(<<"roles">>, User, [])}
+                    {name, couch_util:get_value(<<"name">>, UserProps2, null)},
+                    {roles, couch_util:get_value(<<"roles">>, UserProps2, [])}
                 ]});
         _Else ->
             % clear the session
@@ -339,6 +343,21 @@ handle_session_req(Req) ->
 maybe_value(_Key, undefined, _Fun) -> [];
 maybe_value(Key, Else, Fun) ->
     [{Key, Fun(Else)}].
+
+maybe_upgrade_password_hash(UserName, Password, UserProps) ->
+    case couch_util:get_value(<<"password_scheme">>, UserProps, <<"simple">>) of
+    <<"simple">> ->
+        DbName = ?l2b(config:get("couch_httpd_auth", "authentication_db", "_users")),
+        couch_util:with_db(DbName, fun(UserDb) ->
+            UserProps2 = proplists:delete(<<"password_sha">>, UserProps),
+            UserProps3 = [{<<"password">>, Password} | UserProps2],
+            NewUserDoc = couch_doc:from_json_obj({UserProps3}),
+            {ok, _NewRev} = couch_db:update_doc(UserDb, NewUserDoc, []),
+            couch_auth_cache:get_user_creds(UserName)
+        end);
+    _ ->
+        UserProps
+    end.
 
 authenticate(Pass, UserProps) ->
     UserSalt = couch_util:get_value(<<"salt">>, UserProps, <<>>),
