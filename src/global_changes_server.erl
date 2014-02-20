@@ -46,7 +46,7 @@ init([]) ->
     {ok, Handler} = global_changes_listener:start(),
     % get configs as strings
     UpdateDb0 = config:get("global_changes", "update_db", "true"),
-    MaxWriteDelay0 = config:get("global_changes", "max_write_delay", "25"),
+    MaxWriteDelay0 = config:get("global_changes", "max_write_delay", "500"),
 
     % make config strings into other data types
     UpdateDb = case UpdateDb0 of "false" -> false; _ -> true end,

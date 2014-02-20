@@ -36,7 +36,7 @@ start() ->
 init(_) ->
     % get configs as strings
     UpdateDb0 = config:get("global_changes", "update_db", "true"),
-    MaxEventDelay0 = config:get("global_changes", "max_event_delay", "25"),
+    MaxEventDelay0 = config:get("global_changes", "max_event_delay", "500"),
 
     % make config strings into other data types
     UpdateDb = case UpdateDb0 of "false" -> false; _ -> true end,
