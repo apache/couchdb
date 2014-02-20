@@ -438,7 +438,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
     serialize: function () {
        var totalRows = 0,
-          recordStart = 0,
           updateSeq = false,
           pageStart = 0,
           pageEnd = 20;
@@ -448,7 +447,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         updateSeq = this.collection.updateSeq();
       }
 
-      recordStart = this.collection.recordStart();
       if (this.pagination) {
         pageStart = this.pagination.pageStart();
         pageEnd =  this.pagination.pageEnd();
@@ -457,7 +455,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       return {
         database: app.utils.safeURLName(this.collection.database.id),
         updateSeq: updateSeq,
-        offset: recordStart,
         totalRows: totalRows,
         numModels: this.collection.models.length + recordStart - 1,
         pageStart: pageStart,

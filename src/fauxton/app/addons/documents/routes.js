@@ -242,7 +242,7 @@ function(app, FauxtonAPI, Documents, Databases) {
         {"name": this.data.database.id, "link": Databases.databaseUrl(this.data.database)}
       ];
 
-      this.apiUrl = [this.data.database.allDocs.url("apiurl"), this.data.database.allDocs.documentation() ];
+      this.apiUrl = [this.data.database.allDocs.url("apiurl", urlParams), this.data.database.allDocs.documentation() ];
     },
 
     viewFn: function (databaseName, ddoc, view) {
@@ -297,7 +297,7 @@ function(app, FauxtonAPI, Documents, Databases) {
         ];
       };
 
-      this.apiUrl = [this.data.indexedDocs.url("apiurl"), "docs"];
+      this.apiUrl = [this.data.indexedDocs.url("apiurl", urlParams), "docs"];
     },
 
     newViewEditor: function () {
@@ -345,11 +345,13 @@ function(app, FauxtonAPI, Documents, Databases) {
           params: docParams
         });
 
-        this.apiUrl = [this.data.indexedDocs.url("apiurl"), "docs"];
       }
+
 
       this.documentsView.setCollection(collection);
       this.documentsView.setParams(docParams, urlParams);
+
+      this.apiUrl = [collection.url("apiurl", urlParams), "docs"];
     },
 
     updateAllDocsFromPreview: function (event) {
@@ -373,22 +375,34 @@ function(app, FauxtonAPI, Documents, Databases) {
     },
 
     perPageChange: function (perPage) {
+      console.log('pp', perPage);
       this.perPage = perPage;
       this.documentsView.collection.updateLimit(perPage);
       this.documentsView.forceRender();
     },
 
     paginate: function (options) {
-      var params = options.params,
+      var params = {},
           urlParams = app.getParams(),
           collection = this.documentsView.collection;
 
       this.documentsView.forceRender();
+      var rawCollection = collection.map(function (item) { return item.toJSON(); });
 
       if (options.direction === 'next') {
-          params = Documents.paginate.next(collection.map(function (item) { return item.toJSON(); }), collection.params, options.perPage, !!collection.isAllDocs);
+          collection.reverse = false;
+          params = Documents.paginate.next(rawCollection, 
+                                           collection.params,
+                                           options.perPage, 
+                                           !!collection.isAllDocs);
+      } else {
+          collection.reverse = true;
+          params = Documents.paginate.previous(rawCollection, 
+                                               collection.params, 
+                                               options.perPage, 
+                                               !!collection.isAllDocs);
       }
-      
+      params.limit = options.perPage;
       collection.updateParams(params);
     },
 
