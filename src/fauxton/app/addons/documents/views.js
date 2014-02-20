@@ -439,6 +439,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     serialize: function () {
        var totalRows = 0,
           updateSeq = false,
+          recordStart = 0,
           pageStart = 0,
           pageEnd = 20;
 
@@ -586,10 +587,21 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     establish: function() {
       if (this.newView) { return null; }
 
-      return this.collection.fetch({reset: true}).fail(function() {
-        // TODO: handle error requests that slip through
-        // This should just throw a notification, not break the page
-        console.log("ERROR: ", arguments);
+      return this.collection.fetch({
+        reset: true,
+        success:  function() { },
+        error: function(model, xhr, options){
+          // TODO: handle error requests that slip through
+          // This should just throw a notification, not break the page
+          FauxtonAPI.addNotification({
+            msg: "Bad Request",
+            type: "error"
+          });
+
+          //now redirect back to alldocs
+          FauxtonAPI.navigate(model.database.url("index") + "?limit=100");
+          console.log("ERROR: ", arguments);
+        }
       });
     },
 
