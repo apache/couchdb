@@ -1073,7 +1073,34 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       "change form.js-view-query-update input": "updateFilters",
       "change form.js-view-query-update select": "updateFilters",
       "submit form.js-view-query-update": "updateView",
-      "click button.preview": "previewView"
+      "click button.preview": "previewView",
+      "click .toggle-btns > label":  "toggleQuery"
+    },
+
+    toggleQuery: function(e){
+      e.preventDefault();
+      var showFunctionName =this.$(e.currentTarget).attr("for");
+      //highlight current
+      this.$(".toggle-btns > label").removeClass('active');
+      this.$(e.currentTarget).addClass("active");
+      
+      this.$("[id^='js-show']").hide();
+
+      //show section & disable what needs to be disabled
+      this[showFunctionName]();
+    },
+
+    showKeys: function(){
+      this.$("#js-showKeys, .js-disabled-message").show();
+      this.$('[name="skip"],[name="startkey"],[name="limit"],[name="endkey"],[name="inclusive_end"]').attr("disabled","true");
+      this.$('[name="keys"]').removeAttr("disabled");
+    },
+
+    showStartEnd: function(){
+      this.$("#js-showStartEnd").show();
+      this.$('[name="skip"],[name="startkey"],[name="limit"],[name="endkey"],[name="inclusive_end"]').removeAttr("disabled");
+      this.$('.js-disabled-message').hide();
+      this.$('[name="keys"]').attr("disabled","true");
     },
 
     beforeRender: function () {
@@ -1090,10 +1117,25 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       this.hasReduce = hasReduce;
       this.render();
     },
+    getKeys: function(val){
+      var keys = val.value.replace(/\s/g,"").split(',');
 
+      if (keys.length > 1){
+        return {
+          name: "keys",
+          value:  JSON.stringify(keys)
+        };
+      } else if (keys.length === 1) {
+        return {
+          name: "key",
+          value: keys[0]
+        };
+      }
+
+    },
     queryParams: function () {
-      var $form = this.$(".js-view-query-update");
-      // Ignore params without a value
+      var $form = this.$(".view-query-update"),
+          getKeys = this.getKeys;
       var params = _.reduce($form.serializeArray(), function(params, param) {
         if (!param.value) { return params; }
         if (param.name === "limit" && param.value === 'None') { return params; }
@@ -1101,9 +1143,25 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         params.push(param);
         return params;
       }, []);
+      });
+      var filteredParams = _.filter(params, function(param) {
+        return param.value;
+      });
+        
+
+
+      var params = _.map(filteredParams, function(param) {
+        if (param.name === "keys"){
+          return getKeys(param);
+        }else{
+          return param;
+        }
+      });
+
+
 
       // Validate *key* params to ensure they're valid JSON
-      var keyParams = ["key","keys","startkey","endkey"];
+      var keyParams = ["keys","startkey","endkey"];
       var errorParams = _.filter(params, function(param) {
         if (_.contains(keyParams, param.name)) {
           try {
@@ -1118,6 +1176,24 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       });
 
       return {params: params, errorParams: errorParams};
+
+
+
+
+
+
+      // Ignore params without a value
+      _.map($form.serializeArray(), function(param) {
+        if (param.value){
+          if (param.name === "keys"){
+            var keys = getKeys(param.value);
+            data[keys.name] = keys.value;
+          }else{
+            data[param.name] = param.value;
+          }
+        }
+      });
+
     },
 
     updateFilters: function(event) {
@@ -1161,13 +1237,13 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         var $ele;
         switch (key) {
           case "limit":
+          case "descending":
           case "group_level":
             if (!val) { return; }
             $form.find("select[name='"+key+"']").val(val);
           break;
           case "include_docs":
             case "stale":
-            case "descending":
             case "inclusive_end":
             $form.find("input[name='"+key+"']").prop('checked', true);
           break;
@@ -1186,6 +1262,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     },
 
     updateView: function (event) {
+      event.preventDefault();
       this.updateViewFn(event, this.queryParams());
     },
 

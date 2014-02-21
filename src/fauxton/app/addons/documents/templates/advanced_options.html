@@ -12,79 +12,113 @@ License for the specific language governing permissions and limitations under
 the License.
 -->
 <div class="errors-container"></div>
-<form class="js-view-query-update custom-inputs">
-  <div class="controls-group">
-    <div class="row-fluid">
+<form class="view-query-update custom-inputs">
+
+
+<!-- tabs for choosing Keys or Start & end -->
+
+
+
+
+  <div class="btn-group toggle-btns">
+    <label for="showKeys" class="drop-down btn active">
+     Specific Keys 
+    </label>
+    <label for="showStartEnd" class="drop-down btn">
+      Bounded Queries
+    </label>
+  </div>
+
+  <div class="controls-group well">
+    <div class="row-fluid" id="js-showKeys">
       <div class="controls controls-row">
-        <input name="key" class="span6" type="text" placeholder="Key">
-        <input name="keys" class="span6" type="text" placeholder="Keys">
+        <input name="keys" class="input-xxlarge" type="text" placeholder="Enter a key, or list of keys seperated by a comma.">
       </div>
     </div>
-    <div class="row-fluid">
+    <div class="row-fluid hide" id="js-showStartEnd">
       <div class="controls controls-row">
-        <input name="startkey" class="span6" type="text" placeholder="Start Key">
+        <input name="startkey" class="span6" type="text" placeholder="Start Key" disabled>
         <input name="endkey" class="span6" type="text" placeholder="End Key">
       </div>
-    </div>
-  </div>
-  <div class="controls-group">
-    <div class="row-fluid">
-      <div class="controls controls-row">
-        <div class="checkbox inline">  
-          <input id="check1" type="checkbox" name="include_docs" value="true">  
-          <label name="include_docs" for="check1">Include Docs</label>  
-          <% if (hasReduce) { %>
-          <input id="check2" name="reduce" type="checkbox" value="true">
-          <label for="check2">Reduce</label>  
-        </div> 
-        <label id="select1" class="drop-down inline">
-          Group Level:
-          <select id="select1" disabled name="group_level" class="input-small">
-            <option value="0">None</option>
-            <option value="1">1</option>
-            <option value="2">2</option>
-            <option value="3">3</option>
-            <option value="4">4</option>
-            <option value="5">5</option>
-            <option value="6">6</option>
-            <option value="7">7</option>
-            <option value="8">8</option>
-            <option value="9">9</option>
-            <option value="999" selected="selected">exact</option>
-          </select>
-        </label>
-        <% } else{ %>
-        </div>
-        <% } %>
-
-        <div class="checkbox inline">  
-          <input id="check3" name="stale" type="checkbox" value="ok">
-          <label for="check3">Stale</label>
-          <input id="check4" name="descending" type="checkbox" value="true">  
-          <label for="check4">Descending</label>  
-        </div> 
-        <label class="drop-down inline">
-          Limit:
-          <select name="limit" class="input-small">
-            <option>5</option>
-            <option>10</option>
-            <option >20</option>
-            <option>30</option>
-            <option>50</option>
-            <option >100</option>
-            <option>500</option>
-            <option selected="selected">None</option>
-          </select>
-        </label>
-        <div class="checkbox inline">  
-          <input id="check5" name="inclusive_end" type="checkbox" value="false">
-          <label for="check5">Disable Inclusive End</label>
-          <input id="check6" name="update_seq" type="checkbox" value="true">  
-          <label for="check6">Update Sequence</label>  
-        </div>
+      <div class="controls controls-row checkbox inline">  
+        <input id="check5" name="inclusive_end" type="checkbox" value="false" disabled>
+        <label for="check5">Disable Inclusive End</label>
       </div>
     </div>
   </div>
+
+
+
+<!-- Limit and Skip are conditional -->
+
+  <div class="controls-group">
+      <label class="drop-down inline">
+        Limit:
+        <select name="limit" class="input-small" disabled>
+          <option>5</option>
+          <option>10</option>
+          <option selected="selected">20</option>
+          <option>30</option>
+          <option>50</option>
+          <option>100</option>
+		  <option>500</option>
+        </select>
+      </label>
+      <label for="skipRows" class="inline drop-down">
+        Skip
+        <input name="skip" class="input-large" type="text" id="skipRows" disabled placeholder="Number of rows to skip">
+      </label>
+      <span class="js-disabled-message"> Limit &amp; and Skip are disabled when using Keys.</span>
+
+      <div class="checkbox inline"> 
+        <input id="check1" type="checkbox" name="include_docs" value="true">  
+        <label name="include_docs" for="check1">Include Docs (show the entire doc body)</label>  
+
+        <input id="check3" name="stale" type="checkbox" value="ok">
+        <label for="check3">Stale</label>
+      </div>
+
+      <% if (hasReduce) { %>
+      <div class="checkbox inline">  
+        <input id="check2" name="reduce" type="checkbox" value="true">
+        <label for="check2">Reduce</label>  
+      </div> 
+      <label id="select1" class="drop-down inline">
+        Group Level:
+        <select id="select1" disabled name="group_level" class="input-small">
+          <option value="0">None</option>
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+          <option value="6">6</option>
+          <option value="7">7</option>
+          <option value="8">8</option>
+          <option value="9">9</option>
+          <option value="999" selected="selected">exact</option>
+        </select>
+      </label>
+      <% } %>
+
+      <label id="select2" class="drop-down inline">
+        Order: 
+        <select id="select2" name="descending" class="input-large">
+          <option value="false">Accending</option>
+          <option value="true">Descending</option>
+        </select>
+      </label>
+
+      <div class="checkbox inline">  
+        <input id="check6" name="update_seq" type="checkbox" value="true">  
+        <label for="check6">Update Sequence</label>  
+      </div>
+
+  </div>
+
+
+
+
   <div class="controls-group">
     <div class="row-fluid">
       <div id="button-options" class="controls controls-row">
