@@ -439,7 +439,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     serialize: function () {
        var totalRows = 0,
           updateSeq = false,
-          recordStart = 0,
           pageStart = 0,
           pageEnd = 20;
 
@@ -738,6 +737,14 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
     perPage: function () {
       return this.allDocsNumber.perPage();
+    },
+
+    updatePerPage: function (newPerPage) {
+      if (this.collection.reverse) {
+        delete this.collection.params.descending
+        this.collection.reverse = false;
+      }
+      this.collection.updateLimit(newPerPage);
     }
   });
 

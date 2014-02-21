@@ -26,22 +26,21 @@ function(app, FauxtonAPI) {
           key;
 
       if (currentParams.keys) {
-        throw "Cannot paginate _all_docs with keys";
+        throw "Cannot paginate when keys is specfied";
       }
 
       if (_.isUndefined(doc)) {
         throw "Require docs to paginate";
       }
 
-      var params = _.reduce(['reduce', 'keys', 'key', 'endkey', 'descending', 'inclusive_end'], function (params, key) {
-        if (_.has(currentParams, key)) {
-          params[key] = currentParams[key]; 
-        }
-        return params;
-      }, defaultParams);
+
+      // defaultParams should always override the user-specified parameters
+      _.extend(currentParams, defaultParams);
 
       lastId = doc.id || doc._id;
 
+      // If we are paginating on a view, we need to set a ``key`` and a ``docId``
+      // and expect that they are different values.
       if (isView) {
         key = doc.key;
         docId = lastId;
@@ -49,29 +48,24 @@ function(app, FauxtonAPI) {
         docId = key = lastId;
       }
 
-      if (isView && !currentParams.keys) {
-        params.startkey_docid = docId; 
-        params.startkey = key;
+      // Set parameters to paginate
+      if (isView) {
+        currentParams.startkey_docid = docId; 
+        currentParams.startkey = key;
       } else if (currentParams.startkey) {
-        params.startkey = key;
+        currentParams.startkey = key;
       } else {
-        params.startkey_docid = docId; 
+        currentParams.startkey_docid = docId; 
       }
 
-      _.each(['startkey', 'endkey', 'key'], function (key) {
-        if (_.has(params, key)) {
-          params[key] = JSON.stringify(params[key]);
-        }
-      });
-
-      return params;
+      return currentParams;
     },
 
     next: function (docs, currentParams, perPage, _isAllDocs) {
       var params = {limit: perPage, skip: 1},
           doc = _.last(docs);
           
-      return this.calculate(doc, params, currentParams, _isAllDocs);
+            return this.calculate(doc, params, currentParams, _isAllDocs);
     },
 
     previous: function (docs, currentParams, perPage, _isAllDocs) {

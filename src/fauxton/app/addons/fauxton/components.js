@@ -80,6 +80,7 @@ function(app, FauxtonAPI, ace, spin) {
       this._pageNumber = [];
       this._pageStart = 1;
       this.enabled = true;
+      this.currentPage = 1;
     },
 
     canShowPreviousfn: function () {
@@ -119,6 +120,7 @@ function(app, FauxtonAPI, ace, spin) {
       FauxtonAPI.triggerRouteEvent('paginate', {
        direction: 'previous',
        perPage: this.perPage,
+       currentPage: this.currentPage
       });
     },
 
@@ -142,7 +144,8 @@ function(app, FauxtonAPI, ace, spin) {
 
       FauxtonAPI.triggerRouteEvent('paginate', {
        direction: 'next',
-       perPage: this.documentsLeftToFetch()
+       perPage: this.documentsLeftToFetch(),
+       currentPage: this.currentPage
       });
 
     },
@@ -154,8 +157,10 @@ function(app, FauxtonAPI, ace, spin) {
       };
     },
 
-    updatePerPage: function (perPage) {
-      this.perPage = perPage;
+    updatePerPage: function (newPerPage) {
+      var docsView = this.page() + newPerPage;
+      this.currentPage = Math.ceil(docsView / newPerPage);
+      this.perPage = newPerPage;
     },
 
     page: function () {
@@ -163,6 +168,7 @@ function(app, FauxtonAPI, ace, spin) {
     },
 
     incPageNumber: function () {
+      this.currentPage = this.currentPage + 1;
       this._pageNumber.push({perPage: this.perPage});
       this._pageStart = this._pageStart + this.perPage;
     },
@@ -174,11 +180,11 @@ function(app, FauxtonAPI, ace, spin) {
     },
 
     decPageNumber: function () {
+      this.currentPage = this.currentPage - 1;
       this._pageNumber.pop();
       var val = this._pageStart - this.perPage;
       if (val < 1) {
-        this._pageStart = 1;
-        return;
+        val = 1;
       }
 
       this._pageStart = val;
@@ -203,7 +209,7 @@ function(app, FauxtonAPI, ace, spin) {
     setCollection: function (collection) {
       this.collection = collection;
       this.setDefaults();
-    }
+    },
 
   });
 

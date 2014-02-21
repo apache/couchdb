@@ -375,34 +375,51 @@ function(app, FauxtonAPI, Documents, Databases) {
     },
 
     perPageChange: function (perPage) {
-      console.log('pp', perPage);
       this.perPage = perPage;
-      this.documentsView.collection.updateLimit(perPage);
+      this.documentsView.updatePerPage(perPage);
       this.documentsView.forceRender();
     },
 
     paginate: function (options) {
       var params = {},
           urlParams = app.getParams(),
+          currentPage = options.currentPage,
           collection = this.documentsView.collection;
 
       this.documentsView.forceRender();
       var rawCollection = collection.map(function (item) { return item.toJSON(); });
+      collection.reverse = false;
+
+      _.each(collection.params, function (val, key) {
+        collection.params[key] = JSON.parse(val);
+      });
+
+      _.each(urlParams, function (val, key) {
+        urlParams[key] = JSON.parse(val);
+      });
+
 
       if (options.direction === 'next') {
-          collection.reverse = false;
           params = Documents.paginate.next(rawCollection, 
                                            collection.params,
                                            options.perPage, 
                                            !!collection.isAllDocs);
       } else {
+        if (currentPage <= 1) {
+          params = _.clone(urlParams);
+          params.limit = collection.params.limit;
+        } else {
           collection.reverse = true;
           params = Documents.paginate.previous(rawCollection, 
                                                collection.params, 
                                                options.perPage, 
                                                !!collection.isAllDocs);
+        }
       }
       params.limit = options.perPage;
+      _.each(params, function (val, key) {
+        params[key] = JSON.stringify(val);
+      });
       collection.updateParams(params);
     },
 
