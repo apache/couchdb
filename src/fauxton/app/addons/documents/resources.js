@@ -19,6 +19,7 @@ function(app, FauxtonAPI) {
   var Documents = FauxtonAPI.addon();
 
   Documents.paginate = {
+    history: [],
     calculate: function (doc, defaultParams, currentParams, _isAllDocs) {
       var docId = '',
           lastId = '',
@@ -65,14 +66,20 @@ function(app, FauxtonAPI) {
       var params = {limit: perPage, skip: 1},
           doc = _.last(docs);
           
-            return this.calculate(doc, params, currentParams, _isAllDocs);
+      this.history.push(_.clone(currentParams));
+      return this.calculate(doc, params, currentParams, _isAllDocs);
     },
 
     previous: function (docs, currentParams, perPage, _isAllDocs) {
-      var params = {descending: true, limit: perPage, skip: 1},
+      var params = this.history.pop(),
           doc = _.first(docs);
 
-      return this.calculate(doc, params, currentParams, _isAllDocs);
+      params.limit = perPage;
+      return params;
+    },
+
+    reset: function () {
+      this.history = [];
     }
   };
 
@@ -421,7 +428,7 @@ function(app, FauxtonAPI) {
       if (this.skipFirstItem) {
         rows = rows.splice(1);
       }
-      var mappedRows = _.map(rows, function(row) {
+      return _.map(rows, function(row) {
         return {
           _id: row.id,
           _rev: row.value.rev,
@@ -430,12 +437,6 @@ function(app, FauxtonAPI) {
           doc: row.doc || undefined
         };
       });
-
-      if (this.reverse) {
-        return _(mappedRows).reverse().value();
-      }
-
-      return mappedRows;
     }
   });
 
@@ -539,7 +540,7 @@ function(app, FauxtonAPI) {
         offset: resp.offset,
         update_seq: resp.update_seq
       };
-      var mappedRows =  _.map(rows, function(row) {
+      return _.map(rows, function(row) {
         return {
           value: row.value,
           key: row.key,
@@ -547,12 +548,6 @@ function(app, FauxtonAPI) {
           id: row.id
         };
       });
-
-      if (this.reverse) {
-        return _(mappedRows).reverse().value();
-      }
-
-      return mappedRows;
     },
 
     buildAllDocs: function(){

@@ -740,10 +740,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     },
 
     updatePerPage: function (newPerPage) {
-      if (this.collection.reverse) {
-        delete this.collection.params.descending
-        this.collection.reverse = false;
-      }
       this.collection.updateLimit(newPerPage);
     }
   });

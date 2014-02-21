@@ -243,6 +243,7 @@ function(app, FauxtonAPI, Documents, Databases) {
       ];
 
       this.apiUrl = [this.data.database.allDocs.url("apiurl", urlParams), this.data.database.allDocs.documentation() ];
+      Documents.paginate.reset();
     },
 
     viewFn: function (databaseName, ddoc, view) {
@@ -298,6 +299,7 @@ function(app, FauxtonAPI, Documents, Databases) {
       };
 
       this.apiUrl = [this.data.indexedDocs.url("apiurl", urlParams), "docs"];
+      Documents.paginate.reset();
     },
 
     newViewEditor: function () {
@@ -352,6 +354,7 @@ function(app, FauxtonAPI, Documents, Databases) {
       this.documentsView.setParams(docParams, urlParams);
 
       this.apiUrl = [collection.url("apiurl", urlParams), "docs"];
+      Documents.paginate.reset();
     },
 
     updateAllDocsFromPreview: function (event) {
@@ -375,8 +378,11 @@ function(app, FauxtonAPI, Documents, Databases) {
     },
 
     perPageChange: function (perPage) {
+      var params = app.getParams();
       this.perPage = perPage;
       this.documentsView.updatePerPage(perPage);
+      params.limit = perPage;
+      this.documentsView.collection.params = params;
       this.documentsView.forceRender();
     },
 
@@ -405,21 +411,17 @@ function(app, FauxtonAPI, Documents, Databases) {
                                            options.perPage, 
                                            !!collection.isAllDocs);
       } else {
-        if (currentPage <= 1) {
-          params = _.clone(urlParams);
-          params.limit = collection.params.limit;
-        } else {
-          collection.reverse = true;
           params = Documents.paginate.previous(rawCollection, 
                                                collection.params, 
                                                options.perPage, 
                                                !!collection.isAllDocs);
-        }
       }
       params.limit = options.perPage;
-      _.each(params, function (val, key) {
-        params[key] = JSON.stringify(val);
-      });
+      _.each(['startkey', 'endkey', 'key'], function (key) {
+        if (_.has(params, key)) {
+          params[key] = JSON.stringify(params[key]);
+        }
+    });
       collection.updateParams(params);
     },
 
