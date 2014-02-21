@@ -33,7 +33,7 @@ function(app, FauxtonAPI) {
         throw "Require docs to paginate";
       }
 
-      var params = _.reduce(['reduce', 'keys', 'endkey', 'descending', 'inclusive_end'], function (params, key) {
+      var params = _.reduce(['reduce', 'keys', 'key', 'endkey', 'descending', 'inclusive_end'], function (params, key) {
         if (_.has(currentParams, key)) {
           params[key] = currentParams[key]; 
         }

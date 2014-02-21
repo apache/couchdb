@@ -457,7 +457,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         database: app.utils.safeURLName(this.collection.database.id),
         updateSeq: updateSeq,
         totalRows: totalRows,
-        numModels: this.collection.models.length + recordStart - 1,
         pageStart: pageStart,
         pageEnd: pageEnd
       };
