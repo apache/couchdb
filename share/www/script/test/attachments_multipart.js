@@ -17,105 +17,119 @@ couchTests.attachments_multipart= function(debug) {
   if (debug) debugger;
   
   // mime multipart
-            
-  var xhr = CouchDB.request("PUT", "/test_suite_db/multipart", {
-    headers: {"Content-Type": "multipart/related;boundary=\"abc123\""},
-    body:
-      "--abc123\r\n" +
-      "content-type: application/json\r\n" +
-      "\r\n" +
-      JSON.stringify({
-        "body":"This is a body.",
-        "_attachments":{
-          "foo.txt": {
-            "follows":true,
-            "content_type":"application/test",
-            "length":21
-            },
-          "bar.txt": {
-            "follows":true,
-            "content_type":"application/test",
-            "length":20
-            },
-          "baz.txt": {
-            "follows":true,
-            "content_type":"text/plain",
-            "length":19
-            }
+  function testMime(docName, includeLength) {
+    var body = {
+      "body":"This is a body.",
+      "_attachments":{
+        "foo.txt": {
+          "follows":true,
+          "content_type":"application/test"
+          },
+        "bar.txt": {
+          "follows":true,
+          "content_type":"application/test"
+          },
+        "baz.txt": {
+          "follows":true,
+          "content_type":"text/plain"
           }
-        }) +
-      "\r\n--abc123\r\n" +
-      "\r\n" +
-      "this is 21 chars long" +
-      "\r\n--abc123\r\n" +
-      "\r\n" +
-      "this is 20 chars lon" +
-      "\r\n--abc123\r\n" +
-      "\r\n" +
-      "this is 19 chars lo" +
-      "\r\n--abc123--epilogue"
-    });
+        }
+      };
+    if (includeLength) {
+      body._attachments["foo.txt"].length = 21;
+      body._attachments["bar.txt"].length = 20;
+      body._attachments["baz.txt"].length = 19;
+    }
+    var method = (docName == "") ? "POST" : "PUT";
+    var xhr = CouchDB.request(method, "/test_suite_db/" + docName, {
+      headers: {"Content-Type": "multipart/related;boundary=\"abc123\""},
+      body:
+        "--abc123\r\n" +
+        "content-type: application/json\r\n" +
+        "\r\n" +
+        JSON.stringify(body) +
+        "\r\n--abc123\r\n" +
+        "\r\n" +
+        "this is 21 chars long" +
+        "\r\n--abc123\r\n" +
+        "\r\n" +
+        "this is 20 chars lon" +
+        "\r\n--abc123\r\n" +
+        "\r\n" +
+        "this is 19 chars lo" +
+        "\r\n--abc123--epilogue"
+      });
+      
+    var result = JSON.parse(xhr.responseText);
     
-  var result = JSON.parse(xhr.responseText);
-  
-  T(result.ok);
-  
-  
+    T(result.ok);
     
-  TEquals(201, xhr.status, "should send 201 Accepted");
+    docName = result.id;
+      
+    TEquals(201, xhr.status, "should send 201 Accepted");
+    
+    xhr = CouchDB.request("GET", "/test_suite_db/" + docName + "/foo.txt");
+    
+    T(xhr.responseText == "this is 21 chars long");
+    
+    xhr = CouchDB.request("GET", "/test_suite_db/" + docName + "/bar.txt");
+    
+    T(xhr.responseText == "this is 20 chars lon");
+    
+    xhr = CouchDB.request("GET", "/test_suite_db/" + docName + "/baz.txt");
+    
+    T(xhr.responseText == "this is 19 chars lo");
+    
+    // now edit an attachment
+    
+    var doc = db.open(docName, {att_encoding_info: true});
+    var firstrev = doc._rev;
+    
+    T(doc._attachments["foo.txt"].stub == true);
+    T(doc._attachments["bar.txt"].stub == true);
+    T(doc._attachments["baz.txt"].stub == true);
+    TEquals("undefined", typeof doc._attachments["foo.txt"].encoding);
+    TEquals("undefined", typeof doc._attachments["bar.txt"].encoding);
+    TEquals("gzip", doc._attachments["baz.txt"].encoding);
+    
+    //lets change attachment bar
+    delete doc._attachments["bar.txt"].stub; // remove stub member (or could set to false)
+    delete doc._attachments["bar.txt"].digest; // remove the digest (it's for the gzip form)
+    if (includeLength) {
+      doc._attachments["bar.txt"].length = 18;
+    }
+    doc._attachments["bar.txt"].follows = true;
+    //lets delete attachment baz:
+    delete doc._attachments["baz.txt"];
+    
+    var xhr = CouchDB.request("PUT", "/test_suite_db/" + docName, {
+      headers: {"Content-Type": "multipart/related;boundary=\"abc123\""},
+      body:
+        "--abc123\r\n" +
+        "content-type: application/json\r\n" +
+        "\r\n" +
+        JSON.stringify(doc) +
+        "\r\n--abc123\r\n" +
+        "\r\n" +
+        "this is 18 chars l" +
+        "\r\n--abc123--"
+      });
+    TEquals(201, xhr.status);
+    
+    xhr = CouchDB.request("GET", "/test_suite_db/" + docName + "/bar.txt");
+    
+    T(xhr.responseText == "this is 18 chars l");
+    
+    xhr = CouchDB.request("GET", "/test_suite_db/" + docName + "/baz.txt");
+    T(xhr.status == 404);
+    return firstrev;
+  }
   
-  xhr = CouchDB.request("GET", "/test_suite_db/multipart/foo.txt");
-  
-  T(xhr.responseText == "this is 21 chars long");
-  
-  xhr = CouchDB.request("GET", "/test_suite_db/multipart/bar.txt");
-  
-  T(xhr.responseText == "this is 20 chars lon");
-  
-  xhr = CouchDB.request("GET", "/test_suite_db/multipart/baz.txt");
-  
-  T(xhr.responseText == "this is 19 chars lo");
-  
-  // now edit an attachment
-  
-  var doc = db.open("multipart", {att_encoding_info: true});
-  var firstrev = doc._rev;
-  
-  T(doc._attachments["foo.txt"].stub == true);
-  T(doc._attachments["bar.txt"].stub == true);
-  T(doc._attachments["baz.txt"].stub == true);
-  TEquals("undefined", typeof doc._attachments["foo.txt"].encoding);
-  TEquals("undefined", typeof doc._attachments["bar.txt"].encoding);
-  TEquals("gzip", doc._attachments["baz.txt"].encoding);
-  
-  //lets change attachment bar
-  delete doc._attachments["bar.txt"].stub; // remove stub member (or could set to false)
-  delete doc._attachments["bar.txt"].digest; // remove the digest (it's for the gzip form)
-  doc._attachments["bar.txt"].length = 18;
-  doc._attachments["bar.txt"].follows = true;
-  //lets delete attachment baz:
-  delete doc._attachments["baz.txt"];
-  
-  var xhr = CouchDB.request("PUT", "/test_suite_db/multipart", {
-    headers: {"Content-Type": "multipart/related;boundary=\"abc123\""},
-    body:
-      "--abc123\r\n" +
-      "content-type: application/json\r\n" +
-      "\r\n" +
-      JSON.stringify(doc) +
-      "\r\n--abc123\r\n" +
-      "\r\n" +
-      "this is 18 chars l" +
-      "\r\n--abc123--"
-    });
-  TEquals(201, xhr.status);
-  
-  xhr = CouchDB.request("GET", "/test_suite_db/multipart/bar.txt");
-  
-  T(xhr.responseText == "this is 18 chars l");
-  
-  xhr = CouchDB.request("GET", "/test_suite_db/multipart/baz.txt");
-  T(xhr.status == 404);
+  // PUT then POST multipart doc with and without attachment lengths
+  var firstrev = testMime("multipart", true);
+  testMime("multipartNoLength", false);
+  testMime("", true);
+  testMime("", false);
   
   // now test receiving multipart docs
   
