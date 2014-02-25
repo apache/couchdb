@@ -145,95 +145,88 @@ function(app, Components, FauxtonAPI, Databases) {
 
   Views.NewDatabaseButton = FauxtonAPI.View.extend({
     template: "addons/databases/templates/newdatabase",
+
     events: {
       "click a#new": "newDatabase"
     },
-    newDatabase: function() {
+
+    newDatabase: function(){
+      this.newDatabaseModal.showModal();
+    },
+
+    beforeRender: function(manage) {
+      this.newDatabaseModal = this.insertView(
+        '#add-db-modal',
+        new Views.NewDatabaseModal({
+          collection: this.collection
+        })
+      );
+    }
+  });
+
+  Views.NewDatabaseModal = Components.ModalView.extend({
+    template: "addons/databases/templates/new_database_modal",
+
+    events: {
+      "click #add-db-btn": "newDatabase",
+      "submit #add-db-check": "newDatabase"
+    },
+
+    newDatabase: function(event) {
+      event.preventDefault();
       var notification;
       var db;
-      // TODO: use a modal here instead of the prompt
-      var name = prompt('Name of database', 'newdatabase');
-      if (name === null) {
-        return;
-      } else if (name.length === 0) {
-        notification = FauxtonAPI.addNotification({
-          msg: "Please enter a valid database name",
-          type: "error",
-          clear: true
+      var name = this.$('#db_name')[0].value;
+      console.log(name.match(/\b[a-z][a-z0-9\_\$\(\)\+\/\-]/g));
+      if (name === null || name.length === 0 || name.match(/^[a-z][a-z0-9\_\$\(\)\+\/\-]/g) === null) {
+        msg = name + " is an invalid database name. ";
+        msg += "Only lower case letters (a-z), digits (0-9), and any of the ";
+        msg += "characters _, $, (, ), +, -, / are allowed, and the name ";
+        msg += "must begin with a letter.";
+        this.set_error_msg(msg);
+      } else {
+        db = new this.collection.model({
+          id: encodeURIComponent(name),
+          name: name
         });
-        return;
-      }
-      db = new this.collection.model({
-        id: name,
-        name: name
-      });
-      notification = FauxtonAPI.addNotification({msg: "Creating database."});
-      db.save().done(function() {
-        notification = FauxtonAPI.addNotification({
-          msg: "Database created successfully",
-          type: "success",
-          clear: true
-        });
-        var route = "#/database/" +  app.utils.safeURLName(name) + "/_all_docs?limit=" + Databases.DocLimit;
-        app.router.navigate(route, { trigger: true });
-      }
-      ).error(function(xhr) {
-        var responseText = JSON.parse(xhr.responseText).reason;
-        notification = FauxtonAPI.addNotification({
-          msg: "Create database failed: " + responseText,
-          type: "error",
-          clear: true
+        notification = FauxtonAPI.addNotification({msg: "Creating database."});
+        var that = this;
+        db.save().done(function() {
+          notification = FauxtonAPI.addNotification({
+            msg: "Database created successfully",
+            type: "success",
+            clear: true
+          });
+          var route = "#/database/" +  name + "/_all_docs?limit=" + Databases.DocLimit;
+          app.router.navigate(route, { trigger: true });
+        }).error(function(xhr) {
+          var responseText = JSON.parse(xhr.responseText).reason;
+          that.set_error_msg("Create database failed: " + responseText);
         });
       }
-      );
     }
   });
 
   Views.Sidebar = FauxtonAPI.View.extend({
     template: "addons/databases/templates/sidebar",
+
     events: {
       "click a#new": "newDatabase",
       "click a#owned": "showMine",
       "click a#shared": "showShared"
     },
 
-    newDatabase: function() {
-      var notification;
-      var db;
-      // TODO: use a modal here instead of the prompt
-      var name = prompt('Name of database', 'newdatabase');
-      if (name === null) {
-        return;
-      } else if (name.length === 0) {
-        notification = FauxtonAPI.addNotification({
-          msg: "Please enter a valid database name",
-          type: "error",
-          clear: true
-        });
-        return;
-      }
-      db = new this.collection.model({
-        id: encodeURIComponent(name),
-        name: name
-      });
-      notification = FauxtonAPI.addNotification({msg: "Creating database."});
-      db.save().done(function() {
-        notification = FauxtonAPI.addNotification({
-          msg: "Database created successfully",
-          type: "success",
-          clear: true
-        });
-        var route = "#/database/" +  name + "/_all_docs?limit=" + Databases.DocLimit;
-        app.router.navigate(route, { trigger: true });
-      }
-      ).error(function(xhr) {
-        var responseText = JSON.parse(xhr.responseText).reason;
-        notification = FauxtonAPI.addNotification({
-          msg: "Create database failed: " + responseText,
-          type: "error",
-          clear: true
-        });
-      }
+    newDatabase: function(){
+      this.newDatabaseModal.showModal();
+    },
+
+    beforeRender: function(manage) {
+      // I think this should use the ensure thingy
+      this.newDatabaseModal = this.insertView(
+        '#add-db-modal',
+        new Views.NewDatabaseModal({
+          collection: this.collection
+        })
       );
     },
 
