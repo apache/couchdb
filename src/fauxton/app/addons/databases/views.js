@@ -178,7 +178,7 @@ function(app, Components, FauxtonAPI, Databases) {
       var db;
       var name = this.$('#db_name')[0].value;
 
-      if (name === null || name.length === 0 || name.match(/^[a-z][a-z0-9\_\$\(\)\+\/\-]/g) === null) {
+      if (name === null || name.length === 0 || name.match(/^[a-z][a-z0-9\_\$\(\)\+\/\-]?/g) === null) {
         msg = name + " is an invalid database name. ";
         msg += "Only lower case letters (a-z), digits (0-9), and any of the ";
         msg += "characters _, $, (, ), +, -, / are allowed, and the name ";
