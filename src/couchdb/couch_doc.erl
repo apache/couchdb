@@ -581,7 +581,7 @@ doc_from_multi_part_stream(ContentType, DataFun) ->
         % replace with function that reads the data from MIME stream.
         ReadAttachmentDataFun = fun() ->
             Parser ! {get_bytes, Ref, self()},
-            receive {bytes, Ref, Bytes} -> Bytes end
+            receive {Kind, Ref, Bytes} -> {Kind, Bytes} end
         end,
         Atts2 = lists:map(
             fun(#att{data=follows}=A) ->
@@ -623,6 +623,9 @@ mp_parse_atts({body, Bytes}) ->
     end,
     fun mp_parse_atts/1;
 mp_parse_atts(body_end) ->
+    receive {get_bytes, Ref, From} ->
+        From ! {body_end, Ref, <<>>}
+    end,
     fun mp_parse_atts/1.
 
 

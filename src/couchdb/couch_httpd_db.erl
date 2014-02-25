@@ -699,14 +699,27 @@ send_ranges_multipart(Req, ContentType, Len, Att, Ranges) ->
     {ok, Resp}.
 
 receive_request_data(Req) ->
-    receive_request_data(Req, couch_httpd:body_length(Req)).
+    Parent = self(),
+    Ref = make_ref(),
+    Receiver = spawn_link(fun() ->
+        couch_httpd:recv_chunked(Req, 4096, fun
+            ({_Len, Data}, _State) ->
+                Parent ! {chunked_bytes, Ref, Data},
+                receive
+                ok ->
+                    null
+                end
+            end, null),
+        unlink(Parent)
+    end),
+    receive_stream_data(Receiver, Ref).
 
-receive_request_data(Req, LenLeft) when LenLeft > 0 ->
-    Len = erlang:min(4096, LenLeft),
-    Data = couch_httpd:recv(Req, Len),
-    {Data, fun() -> receive_request_data(Req, LenLeft - iolist_size(Data)) end};
-receive_request_data(_Req, _) ->
-    throw(<<"expected more data">>).
+receive_stream_data(Receiver, Ref) ->
+    receive
+    {chunked_bytes, Ref, Data} ->
+        Receiver ! ok,
+        {Data, fun() -> receive_stream_data(Receiver, Ref) end}
+    end.
 
 make_content_range(From, To, Len) ->
     io_lib:format("bytes ~B-~B/~B", [From, To, Len]).
