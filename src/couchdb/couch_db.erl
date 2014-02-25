@@ -927,6 +927,11 @@ flush_att(Fd, #att{data=Data}=Att) when is_binary(Data) ->
         couch_stream:write(OutputStream, Data)
     end);
 
+flush_att(Fd, #att{data=Fun}=Att) when is_function(Fun, 0) ->
+    with_stream(Fd, Att, fun(OutputStream) ->
+        write_to_body_end(OutputStream, Fun)
+    end);
+
 flush_att(Fd, #att{data=Fun,att_len=undefined}=Att) when is_function(Fun) ->
     MaxChunkSize = list_to_integer(
         couch_config:get("couchdb", "attachment_stream_buffer_size", "4096")),
@@ -1038,18 +1043,21 @@ with_stream(Fd, #att{md5=InMd5,type=Type,encoding=Enc}=Att, Fun) ->
         encoding=NewEnc
     }.
 
+write_to_body_end(Stream, F) ->
+    case F() of
+        {body_end, _} ->
+            ok;
+        {bytes, Bin} ->
+            ok = couch_stream:write(Stream, Bin),
+            write_to_body_end(Stream, F)
+    end.
 
 write_streamed_attachment(_Stream, _F, 0) ->
     ok;
 write_streamed_attachment(Stream, F, LenLeft) when LenLeft > 0 ->
-    Bin = read_next_chunk(F, LenLeft),
+    Bin = F(lists:min([LenLeft, 16#2000])),
     ok = couch_stream:write(Stream, Bin),
     write_streamed_attachment(Stream, F, LenLeft - size(Bin)).
-
-read_next_chunk(F, _) when is_function(F, 0) ->
-    F();
-read_next_chunk(F, LenLeft) when is_function(F, 1) ->
-    F(lists:min([LenLeft, 16#2000])).
 
 enum_docs_since_reduce_to_count(Reds) ->
     couch_btree:final_reduce(
