@@ -329,8 +329,7 @@ function(app, FauxtonAPI, ace, spin) {
     },
 
     getLines: function(){
-      return 5;
-     // return this.editor.getSession().getDocument().getLength();
+     return this.editor.getSession().getDocument().getLength();
     },
 
     addCommands: function () {
