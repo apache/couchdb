@@ -177,7 +177,7 @@ function(app, Components, FauxtonAPI, Databases) {
       var notification;
       var db;
       var name = this.$('#db_name')[0].value;
-      console.log(name.match(/\b[a-z][a-z0-9\_\$\(\)\+\/\-]/g));
+
       if (name === null || name.length === 0 || name.match(/^[a-z][a-z0-9\_\$\(\)\+\/\-]/g) === null) {
         msg = name + " is an invalid database name. ";
         msg += "Only lower case letters (a-z), digits (0-9), and any of the ";
@@ -197,6 +197,7 @@ function(app, Components, FauxtonAPI, Databases) {
             type: "success",
             clear: true
           });
+          that.hideModal();
           var route = "#/database/" +  name + "/_all_docs?limit=" + Databases.DocLimit;
           app.router.navigate(route, { trigger: true });
         }).error(function(xhr) {
