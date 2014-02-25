@@ -403,7 +403,7 @@ function(app, FauxtonAPI, ace, spin) {
   //need to make this into a backbone view...
   var routeObjectSpinner;
   FauxtonAPI.RouteObject.on('beforeEstablish', function (routeObject) {
-    if (!routeObject.disableLoader){ 
+    if (!routeObject.disableLoader){
       var opts = {
         lines: 16, // The number of lines to draw
         length: 8, // The length of each line
@@ -449,7 +449,7 @@ function(app, FauxtonAPI, ace, spin) {
   FauxtonAPI.RouteObject.on('beforeRender', function (routeObject, view, selector) {
     removeRouteObjectSpinner();
 
-    if (!view.disableLoader){ 
+    if (!view.disableLoader){
       var opts = {
         lines: 16, // The number of lines to draw
         length: 8, // The length of each line

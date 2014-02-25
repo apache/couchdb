@@ -12,7 +12,7 @@
 
 define([
   "app",
-  
+
   "addons/fauxton/components",
   "api",
   "addons/databases/resources"
@@ -28,7 +28,7 @@ function(app, Components, FauxtonAPI, Databases) {
       return [this.model.fetch()];
     },
     serialize: function() {
-      
+
       return {
         encoded: app.utils.safeURLName(this.model.get("name")),
         database: this.model,
