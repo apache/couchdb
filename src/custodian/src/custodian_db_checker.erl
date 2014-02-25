@@ -117,8 +117,7 @@ check_db(DbsDb, DbName) when is_binary(DbName) ->
 get_dbs() ->
     lists:flatten([
         get_users_db(),
-        get_stats_db(),
-        get_bacon_db()
+        get_stats_db()
     ]).
 
 
@@ -129,17 +128,6 @@ get_users_db() ->
 
 get_stats_db() ->
     case application:get_env(ioq, stats_db) of
-        {ok, DbName} when is_binary(DbName) ->
-            [DbName];
-        {ok, DbName} when is_list(DbName) ->
-            [iolist_to_binary(DbName)];
-        _ ->
-            []
-    end.
-
-
-get_bacon_db() ->
-    case application:get_env(bacon, dbname) of
         {ok, DbName} when is_binary(DbName) ->
             [DbName];
         {ok, DbName} when is_list(DbName) ->
