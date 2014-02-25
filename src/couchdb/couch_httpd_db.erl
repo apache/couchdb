@@ -244,17 +244,29 @@ db_req(#httpd{method='GET',path_parts=[_DbName]}=Req, Db) ->
     send_json(Req, {DbInfo});
 
 db_req(#httpd{method='POST',path_parts=[_DbName]}=Req, Db) ->
-    couch_httpd:validate_ctype(Req, "application/json"),
-    Doc = couch_doc:from_json_obj(couch_httpd:json_body(Req)),
-    validate_attachment_names(Doc),
-    Doc2 = case Doc#doc.id of
-        <<"">> ->
-            Doc#doc{id=couch_uuids:new(), revs={0, []}};
-        _ ->
-            Doc
-    end,
-    DocId = Doc2#doc.id,
-    update_doc(Req, Db, DocId, Doc2);
+    case couch_util:to_list(couch_httpd:header_value(Req, "Content-Type")) of
+    ("application/json" ++ _) ->
+        Doc = couch_doc:from_json_obj(couch_httpd:json_body(Req)),
+        validate_attachment_names(Doc),
+        Doc2 = maybe_add_docid(Doc),
+        DocId = Doc2#doc.id,
+        update_doc(Req, Db, DocId, Doc2);
+    ("multipart/related;" ++ _) = ContentType ->
+        {ok, Doc0, WaitFun, Parser} = couch_doc:doc_from_multi_part_stream(
+            ContentType, fun() -> receive_request_data(Req) end),
+        validate_attachment_names(Doc0),
+        Doc2 = maybe_add_docid(Doc0),
+        DocId = Doc2#doc.id,
+        try
+            Result = update_doc(Req, Db, DocId, Doc2),
+            WaitFun(),
+            Result
+        catch throw:Err ->
+            % Document rejected by a validate_doc_update function.
+            couch_doc:abort_multi_part_stream(Parser),
+            throw(Err)
+        end
+    end;
 
 db_req(#httpd{path_parts=[_DbName]}=Req, _Db) ->
     send_method_not_allowed(Req, "DELETE,GET,HEAD,POST");
@@ -760,6 +772,14 @@ update_doc(Req, Db, DocId, #doc{deleted=Deleted}=Doc, Headers, UpdateType) ->
                 {ok, true},
                 {id, DocId},
                 {rev, NewRevStr}]})
+    end.
+
+maybe_add_docid(Doc) ->
+    case Doc#doc.id of
+        <<"">> ->
+            Doc#doc{id=couch_uuids:new(), revs={0, []}};
+        _  ->
+            Doc
     end.
 
 couch_doc_from_req(Req, DocId, #doc{revs=Revs}=Doc) ->
