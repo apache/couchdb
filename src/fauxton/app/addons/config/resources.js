@@ -51,6 +51,11 @@ function (app, FauxtonAPI) {
   Config.Collection = Backbone.Collection.extend({
     model: Config.Model,
     documentation: "config",
+    comparator: function (OptionModel) {
+      if (OptionModel.get("section")) {
+        return OptionModel.get("section");
+      }
+    },
     url: function () {
       return app.host + '/_config';
     },
