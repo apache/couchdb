@@ -144,7 +144,7 @@ changes_timeout(Options) ->
 view_changes_since(#vst{dbname=DbName, ddoc=DDocId, view=View,
                         view_options=Options, since=Since,
                         callback=Callback, acc=UserAcc}=State) ->
-    Wrapper = fun ({{Seq, _Key, _DocId}, _Val}=KV, {Go, Acc2, OldSeq}) ->
+    Wrapper = fun ({{Seq, _Key, _DocId}, _Val}=KV, {_Go, Acc2, OldSeq}) ->
             LastSeq = if OldSeq < Seq -> Seq;
                 true -> OldSeq
             end,
