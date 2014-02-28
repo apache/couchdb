@@ -210,7 +210,9 @@ init([]) ->
                 update_lru_on_read=UpdateLruOnRead,
                 start_time=couch_util:rfc1123_date()}}.
 
-terminate(_Reason, _Srv) ->
+terminate(Reason, Srv) ->
+    ?LOG_ERROR("couch_server terminating with ~p, state ~2048p", [Reason,
+         Srv#server{dbname_regexp = redacted, lru = redacted}]),
     ets:foldl(fun(#db{main_pid=Pid}, _) -> couch_util:shutdown_sync(Pid) end,
         nil, couch_dbs),
     ok.
