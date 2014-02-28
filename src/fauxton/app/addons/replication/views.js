@@ -175,7 +175,6 @@ function(app, FauxtonAPI, Components, replication) {
       this.startReplication(formJSON);
     },	
     swapFields: function(e){
-      e.preventDefault();
       //WALL O' VARIABLES
       var $fromSelect = this.$('#from_name'),
           $toSelect = this.$('#to_name'),
@@ -191,6 +190,9 @@ function(app, FauxtonAPI, Components, replication) {
 
       $fromInput.val(toInputVal);
       $toInput.val(fromInputVal);
+
+      // prevent other click handlers from running
+      return false;
     }
   });
 
