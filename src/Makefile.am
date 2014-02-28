@@ -52,6 +52,7 @@ FAUXTON_FILES = \
     fauxton/app/addons/auth/base.js \
     fauxton/app/addons/auth/resources.js \
     fauxton/app/addons/auth/routes.js \
+    fauxton/app/addons/auth/assets/less/auth.less \
     fauxton/app/addons/auth/templates/change_password.html \
     fauxton/app/addons/auth/templates/create_admin.html \
     fauxton/app/addons/auth/templates/login.html \
