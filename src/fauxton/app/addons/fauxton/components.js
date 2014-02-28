@@ -284,7 +284,7 @@ function(app, FauxtonAPI, ace, spin) {
     afterRender: function () {
       this.editor = ace.edit(this.editorId);
       this.setHeightToLineCount();
-      this.editor.getSession().setUseWorker(false);
+
       this.editor.setTheme("ace/theme/" + this.theme);
 
       this.editor.getSession().setMode("ace/mode/" + this.mode);
