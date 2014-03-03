@@ -158,8 +158,7 @@ function(app, FauxtonAPI, ace, spin) {
     },
 
     updatePerPage: function (newPerPage) {
-      var docsView = this.page() + newPerPage;
-      this.currentPage = Math.ceil(docsView / newPerPage);
+      this.setDefaults();
       this.perPage = newPerPage;
     },
 
