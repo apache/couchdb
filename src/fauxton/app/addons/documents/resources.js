@@ -34,7 +34,6 @@ function(app, FauxtonAPI) {
         throw "Require docs to paginate";
       }
 
-
       // defaultParams should always override the user-specified parameters
       _.extend(currentParams, defaultParams);
 
@@ -51,12 +50,12 @@ function(app, FauxtonAPI) {
 
       // Set parameters to paginate
       if (isView) {
-        currentParams.startkey_docid = docId; 
+        currentParams.startkey_docid = docId;
         currentParams.startkey = key;
       } else if (currentParams.startkey) {
         currentParams.startkey = key;
       } else {
-        currentParams.startkey_docid = docId; 
+        currentParams.startkey_docid = docId;
       }
 
       return currentParams;
@@ -349,7 +348,7 @@ function(app, FauxtonAPI) {
       this.on("remove",this.decrementTotalRows , this);
       this.perPageLimit = options.perPageLimit || 20;
 
-      if (this.params.limit > this.perPageLimit) {
+      if (!this.params.limit) {
         this.params.limit = this.perPageLimit; 
       }
     },
@@ -454,7 +453,7 @@ function(app, FauxtonAPI) {
       this.skipFirstItem = false;
       this.perPageLimit = options.perPageLimit || 20;
 
-      if (this.params.limit > this.perPageLimit) {
+      if (!this.params.limit) {
         this.params.limit = this.perPageLimit; 
       }
 

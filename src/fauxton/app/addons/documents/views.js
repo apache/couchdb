@@ -418,7 +418,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       _.bindAll(this);
       
       this._perPage = options.perPageDefault || 20;
-
       this.listenTo(this.collection, 'totalRows:decrement', this.render);
     },
 
@@ -579,7 +578,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       this.docParams = options.docParams;
       this.params = options.params || {};
       this.expandDocs = true;
-      this.perPageDefault = options.perPageDefault || 20;
+      this.perPageDefault = this.docParams.limit || 20;
     },
 
     establish: function() {
@@ -676,7 +675,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       this.pagination = new Components.IndexPagination({
         collection: this.collection,
         scrollToSelector: '#dashboard-content',
-        docLimit: this.params.limit
+        docLimit: this.params.limit,
+        perPage: this.perPageDefault
       });
     },
 
@@ -725,6 +725,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     setParams: function (docParams, urlParams) {
       this.docParams = docParams;
       this.params = urlParams;
+      this.perPageDefault = this.docParams.limit;
 
       if (this.params.limit) {
         this.pagination.docLimit = this.params.limit;

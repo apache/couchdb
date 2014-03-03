@@ -160,9 +160,6 @@ function(app, FauxtonAPI, Documents, Databases) {
     },
 
     initialize: function (route, masterLayout, options) {
-      var docParams = app.getParams();
-      docParams.include_docs = true;
-
       this.databaseName = options[0];
 
       this.data = {
@@ -171,9 +168,11 @@ function(app, FauxtonAPI, Documents, Databases) {
 
       this.data.designDocs = new Documents.AllDocs(null, {
         database: this.data.database,
-        params: {startkey: '"_design"',
+        params: {
+          startkey: '"_design"',
           endkey: '"_design1"',
-          include_docs: true}
+          include_docs: true
+        }
       });
 
       this.sidebar = this.setView("#sidebar-content", new Documents.Views.Sidebar({
@@ -190,7 +189,7 @@ function(app, FauxtonAPI, Documents, Databases) {
       var urlParams = app.getParams(options);
       return {
         urlParams: urlParams,
-        docParams: _.extend(_.clone(urlParams), {limit: 20})
+        docParams: _.extend(_.clone(urlParams), {limit: this.getDocPerPageLimit(urlParams, 20)})
       };
     },
 
@@ -209,7 +208,6 @@ function(app, FauxtonAPI, Documents, Databases) {
         return;
       }
 
-      docParams.limit = this.getDocPerPageLimit(urlParams, 20);
       this.data.database.buildAllDocs(docParams);
 
       if (docParams.startkey && docParams.startkey.indexOf('_design') > -1) {
@@ -243,6 +241,7 @@ function(app, FauxtonAPI, Documents, Databases) {
       ];
 
       this.apiUrl = [this.data.database.allDocs.url("apiurl", urlParams), this.data.database.allDocs.documentation() ];
+      //reset the pagination history - the history is used for pagination.previous
       Documents.paginate.reset();
     },
 
@@ -252,7 +251,6 @@ function(app, FauxtonAPI, Documents, Databases) {
           docParams = params.docParams;
           decodeDdoc = decodeURIComponent(ddoc);
 
-      docParams.limit = this.getDocPerPageLimit(urlParams, 20);
       view = view.replace(/\?.*$/,'');
 
       this.data.indexedDocs = new Documents.IndexCollection(null, {
@@ -321,6 +319,8 @@ function(app, FauxtonAPI, Documents, Databases) {
           {"name": this.data.database.id, "link": Databases.databaseUrl(this.data.database)},
         ];
       };
+
+      Documents.paginate.reset();
     },
 
     updateAllDocsFromView: function (event) {
@@ -348,7 +348,6 @@ function(app, FauxtonAPI, Documents, Databases) {
         });
 
       }
-
 
       this.documentsView.setCollection(collection);
       this.documentsView.setParams(docParams, urlParams);
@@ -381,29 +380,32 @@ function(app, FauxtonAPI, Documents, Databases) {
       var params = app.getParams();
       this.perPage = perPage;
       this.documentsView.updatePerPage(perPage);
+      this.documentsView.forceRender();
       params.limit = perPage;
       this.documentsView.collection.params = params;
-      this.documentsView.forceRender();
+      this.setDocPerPageLimit(perPage);
     },
 
     paginate: function (options) {
       var params = {},
           urlParams = app.getParams(),
-          currentPage = options.currentPage,
           collection = this.documentsView.collection;
 
       this.documentsView.forceRender();
       var rawCollection = collection.map(function (item) { return item.toJSON(); });
-      collection.reverse = false;
 
-      _.each(collection.params, function (val, key) {
-        collection.params[key] = JSON.parse(val);
+      // this is really ugly. But we basically need to make sure that
+      // all parameters are in the correct state and have been parsed before we
+      // calculate how to paginate the collection
+      _.each(['startkey', 'endkey', 'key'], function (key) {
+        if (_.has(collection.params, key)) {
+          collection.params[key] = JSON.parse(collection.params[key]);
+        }
+
+        if (_.has(urlParams, key)) {
+          urlParams[key] = JSON.parse(urlParams[key]);
+        }
       });
-
-      _.each(urlParams, function (val, key) {
-        urlParams[key] = JSON.parse(val);
-      });
-
 
       if (options.direction === 'next') {
           params = Documents.paginate.next(rawCollection, 
@@ -416,12 +418,19 @@ function(app, FauxtonAPI, Documents, Databases) {
                                                options.perPage, 
                                                !!collection.isAllDocs);
       }
+
+      // use the perPage sent from IndexPagination as it calculates how many
+      // docs to fetch for next page
       params.limit = options.perPage;
+
+      // again not pretty but need to make sure all the parameters can be correctly
+      // built into a query
       _.each(['startkey', 'endkey', 'key'], function (key) {
         if (_.has(params, key)) {
           params[key] = JSON.stringify(params[key]);
         }
-    });
+      });
+
       collection.updateParams(params);
     },
 
@@ -433,10 +442,27 @@ function(app, FauxtonAPI, Documents, Databases) {
       }
     },
 
+    setDocPerPageLimit: function (perPage) {
+      window.localStorage.setItem('fauxton:perpage', perPage);
+    },
+
 
     getDocPerPageLimit: function (urlParams, perPage) {
-      if (!urlParams.limit || urlParams.limit > perPage) {
-        return perPage;
+      var storedPerPage = perPage;
+
+      if (window.localStorage) {
+        storedPerPage = window.localStorage.getItem('fauxton:perpage');
+
+        if (!storedPerPage) {
+          this.setDocPerPageLimit(perPage);
+          storedPerPage = perPage;
+        } else {
+          storedPerPage = parseInt(storedPerPage, 10);
+        }
+      } 
+
+      if (!urlParams.limit || urlParams.limit > storedPerPage) {
+        return storedPerPage;
       } else {
         return urlParams.limit;
       }

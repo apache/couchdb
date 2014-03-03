@@ -72,7 +72,7 @@ function(app, FauxtonAPI, ace, spin) {
       this.scrollToSelector = options.scrollToSelector;
       _.bindAll(this);
       this.docLimit = options.docLimit || 1000000;
-      this.perPage = 20;
+      this.perPage = options.perPage || 20;
       this.setDefaults();
     },
 
@@ -84,9 +84,7 @@ function(app, FauxtonAPI, ace, spin) {
     },
 
     canShowPreviousfn: function () {
-      if (!this.enabled) { return this.enabled; }
-
-      if (this._pageStart === 1) {
+      if (this._pageStart === 1 || !this.enabled) {
         return false;
       }
       return true;
