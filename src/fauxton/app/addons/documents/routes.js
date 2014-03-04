@@ -392,28 +392,20 @@ function(app, FauxtonAPI, Documents, Databases) {
           collection = this.documentsView.collection;
 
       this.documentsView.forceRender();
-      var rawCollection = collection.map(function (item) { return item.toJSON(); });
 
       // this is really ugly. But we basically need to make sure that
       // all parameters are in the correct state and have been parsed before we
       // calculate how to paginate the collection
-      _.each(['startkey', 'endkey', 'key'], function (key) {
-        if (_.has(collection.params, key)) {
-          collection.params[key] = JSON.parse(collection.params[key]);
-        }
-
-        if (_.has(urlParams, key)) {
-          urlParams[key] = JSON.parse(urlParams[key]);
-        }
-      });
+      collection.params = Documents.QueryParams.parse(collection.params);
+      urlParams = Documents.QueryParams.parse(urlParams);
 
       if (options.direction === 'next') {
-          params = Documents.paginate.next(rawCollection, 
+          params = Documents.paginate.next(collection.toJSON(), 
                                            collection.params,
                                            options.perPage, 
                                            !!collection.isAllDocs);
       } else {
-          params = Documents.paginate.previous(rawCollection, 
+          params = Documents.paginate.previous(collection.toJSON(), 
                                                collection.params, 
                                                options.perPage, 
                                                !!collection.isAllDocs);
@@ -425,12 +417,7 @@ function(app, FauxtonAPI, Documents, Databases) {
 
       // again not pretty but need to make sure all the parameters can be correctly
       // built into a query
-      _.each(['startkey', 'endkey', 'key'], function (key) {
-        if (_.has(params, key)) {
-          params[key] = JSON.stringify(params[key]);
-        }
-      });
-
+      params = Documents.QueryParams.stringify(params);
       collection.updateParams(params);
     },
 

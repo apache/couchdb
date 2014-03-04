@@ -18,6 +18,28 @@ define([
 function(app, FauxtonAPI) {
   var Documents = FauxtonAPI.addon();
 
+  Documents.QueryParams = (function () {
+    var _eachParams = function (params, action) {
+      _.each(['startkey', 'endkey', 'key'], function (key) {
+        if (_.has(params, key)) {
+          params[key] = action(params[key]);
+        }
+      });
+
+      return params;
+    };
+
+    return {
+      parse: function (params) {
+        return _eachParams(params, JSON.parse);
+      },
+
+      stringify: function (params) {
+        return _eachParams(params, JSON.stringify);
+      }
+    };
+  })();
+
   Documents.paginate = {
     history: [],
     calculate: function (doc, defaultParams, currentParams, _isAllDocs) {
@@ -79,7 +101,7 @@ function(app, FauxtonAPI) {
 
     reset: function () {
       this.history = [];
-    }
+    } 
   };
 
   Documents.Doc = FauxtonAPI.Model.extend({
@@ -595,6 +617,7 @@ function(app, FauxtonAPI) {
 
       return timeString;
     }
+
   });
 
   

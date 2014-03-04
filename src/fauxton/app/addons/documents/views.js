@@ -1065,9 +1065,9 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     },
 
     events: {
-      "change form.view-query-update input": "updateFilters",
-      "change form.view-query-update select": "updateFilters",
-      "submit form.view-query-update": "updateView",
+      "change form.js-view-query-update input": "updateFilters",
+      "change form.js-view-query-update select": "updateFilters",
+      "submit form.js-view-query-update": "updateView",
       "click button.preview": "previewView"
     },
 
@@ -1087,7 +1087,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     },
 
     queryParams: function () {
-      var $form = this.$(".view-query-update");
+      var $form = this.$(".js-view-query-update");
       // Ignore params without a value
       var params = _.reduce($form.serializeArray(), function(params, param) {
         if (!param.value) { return params; }
@@ -1123,7 +1123,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     },
 
     updateFiltersFor: function(name, $ele) {
-      var $form = $ele.parents("form.view-query-update:first");
+      var $form = $ele.parents("form.js-view-query-update:first");
       switch (name) {
         // Reduce constraints
         //   - Can't include_docs for reduce=true
@@ -1151,7 +1151,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     },
 
     updateFromParams: function (params) {
-      var $form = this.$el.find("form.view-query-update");
+      var $form = this.$el.find("form.js-view-query-update");
       _.each(params, function(val, key) {
         var $ele;
         switch (key) {
