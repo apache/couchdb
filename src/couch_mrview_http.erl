@@ -14,6 +14,7 @@
 
 -export([
     handle_all_docs_req/2,
+    handle_reindex_req/3,
     handle_view_req/3,
     handle_temp_view_req/2,
     handle_info_req/3,
@@ -50,6 +51,15 @@ handle_all_docs_req(#httpd{method='POST'}=Req, Db) ->
 handle_all_docs_req(Req, _Db) ->
     couch_httpd:send_method_not_allowed(Req, "GET,POST,HEAD").
 
+handle_reindex_req(#httpd{method='POST',
+                          path_parts=[_, _, DName,<<"_reindex">>]}=Req,
+                   Db, DDoc) ->
+    ok = couch_db:check_is_admin(Db),
+    couch_mrview:trigger_update(Db, <<"_design/", DName/binary>>),
+    couch_httpd:send_json(Req, 201, {[{<<"ok">>, true}]});
+handle_reindex_req(Req, _Db, _DDoc) ->
+    couch_httpd:send_method_not_allowed(Req, "POST").
+
 
 handle_view_req(#httpd{method='GET',
                       path_parts=[_, _, DDocName, _, VName, <<"_info">>]}=Req,
@@ -62,7 +72,6 @@ handle_view_req(#httpd{method='GET',
                  {ddoc, DDocId},
                  {view, VName}] ++ Info,
     couch_httpd:send_json(Req, 200, {FinalInfo});
-
 handle_view_req(#httpd{method='GET'}=Req, Db, DDoc) ->
     [_, _, _, _, ViewName] = Req#httpd.path_parts,
     couch_stats:increment_counter([couchdb, httpd, view_reads]),
