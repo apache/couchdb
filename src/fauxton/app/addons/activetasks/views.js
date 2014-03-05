@@ -165,10 +165,20 @@ function (app, FauxtonAPI, activetasks) {
         progress = "Processed " +this.model.get('changes_done')+ " of "+this.model.get('total_changes')+ ' changes.';
       } else if (this.type === "replication"){
         progress = this.model.get('docs_written')+ " docs written. ";
-        if (this.model.get('changes_pending') !== null) { 
-          progress += this.model.get('changes_pending')+' pending changes.';
+        if (this.model.get('changes_pending') !== undefined) {
+          progress += this.model.get('changes_pending') + ' pending changes. ';
         }
       }
+      if (this.model.get('source_seq') !== undefined) {
+        progress += "Current source sequence: " + this.model.get('source_seq') + ". "
+      }
+      if (this.model.get('changes_done') !== undefined) {
+        progress += this.model.get('changes_done') + " Changes done. "
+      }
+      if (this.model.get('progress') !== undefined) {
+        progress += "Progress: " + this.model.get('progress') + "% "
+      }
+
       return progress;
     },
     serialize: function(){
