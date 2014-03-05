@@ -31,8 +31,7 @@ function(app, Components, FauxtonAPI, Databases) {
       
       return {
         encoded: app.utils.safeURLName(this.model.get("name")),
-        database: this.model,
-        docLimit: Databases.DocLimit
+        database: this.model
       };
     }
   });

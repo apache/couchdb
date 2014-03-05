@@ -69,19 +69,68 @@ function(app, FauxtonAPI, ace, spin) {
     initialize: function (options) {
       this.previousUrlfn = options.previousUrlfn;
       this.nextUrlfn = options.nextUrlfn;
-      this.canShowPreviousfn = options.canShowPreviousfn;
-      this.canShowNextfn = options.canShowNextfn;
       this.scrollToSelector = options.scrollToSelector;
       _.bindAll(this);
-      this.previousParams = [];
+      this.docLimit = options.docLimit || 1000000;
+      this.perPage = options.perPage || 20;
+      this.setDefaults();
+    },
+
+    setDefaults: function () {
+      this._pageNumber = [];
+      this._pageStart = 1;
+      this.enabled = true;
+      this.currentPage = 1;
+    },
+
+    canShowPreviousfn: function () {
+      if (this._pageStart === 1 || !this.enabled) {
+        return false;
+      }
+      return true;
+    },
+
+    canShowNextfn: function () {
+      if (!this.enabled) { return this.enabled; }
+
+      if (this.collection.length < (this.perPage -1)) {
+        return false;
+      }
+
+      if ((this.pageStart() + this.perPage) >= this.docLimit) {
+        return false;
+      }
+
+      if (this.collection.viewMeta && this.collection.viewMeta.total_rows <= this.pageStart() + this.perPage) {
+        return false;
+      }
+
+      return true;
     },
 
     previousClicked: function (event) {
       event.preventDefault();
       event.stopPropagation();
       if (!this.canShowPreviousfn()) { return; }
-      FauxtonAPI.navigate(this.previousUrlfn(), {trigger: false});
-      FauxtonAPI.triggerRouteEvent('paginate', 'previous');
+
+      this.decPageNumber();
+
+      FauxtonAPI.triggerRouteEvent('paginate', {
+       direction: 'previous',
+       perPage: this.perPage,
+       currentPage: this.currentPage
+      });
+    },
+
+    documentsLeftToFetch: function () {
+      var documentsLeftToFetch = this.docLimit - this.totalDocsViewed(),
+          limit = this.perPage;
+
+      if (documentsLeftToFetch < this.perPage ) {
+        limit = documentsLeftToFetch;
+      }
+
+      return limit;
     },
 
     nextClicked: function (event) {
@@ -89,14 +138,14 @@ function(app, FauxtonAPI, ace, spin) {
       event.stopPropagation();
       if (!this.canShowNextfn()) { return; }
 
-      var params = _.clone(this.collection.params);
+      this.incPageNumber();
 
-      if (params) {
-        this.previousParams.push(params);
-      }
+      FauxtonAPI.triggerRouteEvent('paginate', {
+       direction: 'next',
+       perPage: this.documentsLeftToFetch(),
+       currentPage: this.currentPage
+      });
 
-      FauxtonAPI.navigate(this.nextUrlfn(), {trigger: false});
-      FauxtonAPI.triggerRouteEvent('paginate', 'next');
     },
 
     serialize: function () {
@@ -106,30 +155,58 @@ function(app, FauxtonAPI, ace, spin) {
       };
     },
 
-    pageLimit: function () {
-      var limit = 20;
+    updatePerPage: function (newPerPage) {
+      this.setDefaults();
+      this.perPage = newPerPage;
+    },
 
-      if (this.collection.params.limit && this.collection.skipFirstItem) {
-        limit = parseInt(this.collection.params.limit, 10) - 1;
-      } else if (this.collection.params.limit) {
-        limit = parseInt(this.collection.params.limit, 10);
+    page: function () {
+      return this._pageStart - 1;
+    },
+
+    incPageNumber: function () {
+      this.currentPage = this.currentPage + 1;
+      this._pageNumber.push({perPage: this.perPage});
+      this._pageStart = this._pageStart + this.perPage;
+    },
+
+    totalDocsViewed: function () {
+      return _.reduce(this._pageNumber, function (total, value) {
+        return total + value.perPage;
+      }, 0);
+    },
+
+    decPageNumber: function () {
+      this.currentPage = this.currentPage - 1;
+      this._pageNumber.pop();
+      var val = this._pageStart - this.perPage;
+      if (val < 1) {
+        val = 1;
       }
 
-      return limit;
+      this._pageStart = val;
     },
 
     pageStart: function () {
-      return (this.previousParams.length * this.pageLimit()) + 1;
-
+      return this._pageStart;
     },
 
     pageEnd: function () {
-      if (this.collection.length < this.pageLimit()) {
-        return (this.previousParams.length * this.pageLimit()) + this.collection.length;
-      }
+      return this.page() + this.collection.length;
+    },
 
-      return (this.previousParams.length * this.pageLimit()) + this.pageLimit();
-    }
+    disable: function () {
+      this.enabled = false;
+    },
+
+    enable: function () {
+      this.enabled = true;
+    },
+
+    setCollection: function (collection) {
+      this.collection = collection;
+      this.setDefaults();
+    },
 
   });
 
