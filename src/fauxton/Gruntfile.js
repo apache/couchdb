@@ -18,7 +18,7 @@
 module.exports = function(grunt) {
   var helper = require('./tasks/helper').init(grunt),
   _ = grunt.util._,
-  path = require('path');
+  fs = require('fs');
 
   var couch_config = function () {
 
@@ -73,7 +73,7 @@ module.exports = function(grunt) {
       // Less files from addons
       var root = addon.path || "app/addons/" + addon.name;
       var lessPath = root + "/assets/less";
-      if(path.existsSync(lessPath)){
+      if(fs.existsSync(lessPath)){
         // .less files exist for this addon
         theAssets.less.paths.push(lessPath);
         theAssets.less.files["dist/debug/css/" + addon.name + ".css"] =
@@ -83,7 +83,7 @@ module.exports = function(grunt) {
       // Images
       root = addon.path || "app/addons/" + addon.name;
       var imgPath = root + "/assets/img";
-      if(path.existsSync(imgPath)){
+      if(fs.existsSync(imgPath)){
         theAssets.img.push(imgPath + "/**");
       }
     });
