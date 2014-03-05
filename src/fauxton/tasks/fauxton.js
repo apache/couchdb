@@ -11,7 +11,8 @@
 // the License.
 
 module.exports = function(grunt) {
-  var _ = grunt.util._;
+  var _ = grunt.util._,
+      fs = require('fs');
 
   grunt.registerMultiTask('template', 'generates an html file from a specified template', function(){
     var data = this.data,
@@ -24,11 +25,10 @@ module.exports = function(grunt) {
   grunt.registerMultiTask('get_deps', 'Fetch external dependencies', function(version) {
     grunt.log.writeln("Fetching external dependencies");
 
-    var path = require('path');
-        done = this.async(),
+    var done = this.async(),
         data = this.data,
         target = data.target || "app/addons/",
-        settingsFile = path.existsSync(data.src) ? data.src : "settings.json.default",
+        settingsFile = fs.existsSync(data.src) ? data.src : "settings.json.default",
         settings = grunt.file.readJSON(settingsFile),
         _ = grunt.util._;
 
@@ -76,10 +76,9 @@ module.exports = function(grunt) {
   });
 
   grunt.registerMultiTask('gen_load_addons', 'Generate the load_addons.js file', function() {
-    var path = require('path');
-        data = this.data,
+    var data = this.data,
         _ = grunt.util._,
-        settingsFile = path.existsSync(data.src) ? data.src : "settings.json.default",
+        settingsFile = fs.existsSync(data.src) ? data.src : "settings.json.default",
         settings = grunt.file.readJSON(settingsFile),
         template = "app/load_addons.js.underscore",
         dest = "app/load_addons.js",
