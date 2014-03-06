@@ -170,13 +170,13 @@ function (app, FauxtonAPI, activetasks) {
         }
       }
       if (this.model.get('source_seq') !== undefined) {
-        progress += "Current source sequence: " + this.model.get('source_seq') + ". "
+        progress += "Current source sequence: " + this.model.get('source_seq') + ". ";
       }
       if (this.model.get('changes_done') !== undefined) {
-        progress += this.model.get('changes_done') + " Changes done. "
+        progress += this.model.get('changes_done') + " Changes done. ";
       }
       if (this.model.get('progress') !== undefined) {
-        progress += "Progress: " + this.model.get('progress') + "% "
+        progress += "Progress: " + this.model.get('progress') + "% ";
       }
 
       return progress;
