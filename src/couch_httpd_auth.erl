@@ -395,7 +395,7 @@ auth_name(String) when is_list(String) ->
     ?l2b(Name).
 
 make_cookie_time() ->
-    {NowMS, NowS, _} = erlang:now(),
+    {NowMS, NowS, _} = os:timestamp(),
     NowMS * 1000000 + NowS.
 
 cookie_scheme(#httpd{mochi_req=MochiReq}) ->
