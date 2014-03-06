@@ -20,6 +20,18 @@ function (app, FauxtonAPI, CouchdbSession) {
 
   var Auth = new FauxtonAPI.addon();
 
+  var promiseErrorHandler = function (xhr, type, msg) {
+    msg = xhr;
+    if (arguments.length === 3) {
+      msg = xhr.responseJSON.reason;
+    }
+
+    FauxtonAPI.addNotification({
+      msg: msg,
+      type: 'error'
+    });
+  };
+
   var Admin = Backbone.Model.extend({
 
     url: function () {
@@ -58,7 +70,6 @@ function (app, FauxtonAPI, CouchdbSession) {
       this.messages = _.extend({},  {
           missingCredentials: 'Username or password cannot be blank.',
           passwordsNotMatch:  'Passwords do not match.',
-          incorrectCredentials: 'Incorrect username or password.',
           loggedIn: 'You have been logged in.',
           adminCreated: 'CouchDB admin created',
           changePassword: 'Your password has been updated.'
@@ -234,16 +245,7 @@ function (app, FauxtonAPI, CouchdbSession) {
         }
       });
 
-      promise.fail(function (xhr, type, msg) {
-        msg = xhr;
-        if (arguments.length === 3) {
-          msg = xhr.responseJSON.reason;
-        }
-        FauxtonAPI.addNotification({
-          msg: msg,
-          type: 'error'
-        });
-      });
+      promise.fail(promiseErrorHandler);
     }
 
   });
@@ -268,18 +270,7 @@ function (app, FauxtonAPI, CouchdbSession) {
         FauxtonAPI.navigate('/');
       });
 
-      promise.fail(function (xhr, type, msg) {
-        if (arguments.length === 3) {
-          msg = FauxtonAPI.session.messages.incorrectCredentials;
-        } else {
-          msg = xhr;
-        }
-
-        FauxtonAPI.addNotification({
-          msg: msg,
-          type: 'error'
-        });
-      });
+      promise.fail(promiseErrorHandler);
     }
 
   });
@@ -306,16 +297,7 @@ function (app, FauxtonAPI, CouchdbSession) {
         that.$('#password-confirm').val('');
       });
 
-      promise.fail(function (xhr, error, msg) {
-        if (arguments.length < 3) {
-          msg = xhr;
-        }
-
-        FauxtonAPI.addNotification({
-          msg: xhr,
-          type: 'error'
-        });
-      });
+      promise.fail(promiseErrorHandler);
     }
   });
 
