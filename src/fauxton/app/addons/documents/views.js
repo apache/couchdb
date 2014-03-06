@@ -1177,13 +1177,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
       return {params: params, errorParams: errorParams};
 
-
-
-
-
-
       // Ignore params without a value
-      _.map($form.serializeArray(), function(param) {
+      /*_.map($form.serializeArray(), function(param) {
         if (param.value){
           if (param.name === "keys"){
             var keys = getKeys(param.value);
@@ -1192,7 +1187,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
             data[param.name] = param.value;
           }
         }
-      });
+      });(*/
 
     },
 
