@@ -234,9 +234,13 @@ function (app, FauxtonAPI, CouchdbSession) {
         }
       });
 
-      promise.fail(function (rsp) {
+      promise.fail(function (xhr, type, msg) {
+        msg = xhr;
+        if (arguments.length === 3) {
+          msg = xhr.responseJSON.reason;
+        }
         FauxtonAPI.addNotification({
-          msg: 'Could not create admin. Reason' + rsp + '.',
+          msg: msg,
           type: 'error'
         });
       });
