@@ -377,12 +377,13 @@ function(app, FauxtonAPI, Documents, Databases) {
     },
 
     perPageChange: function (perPage) {
-      var params = app.getParams();
+      // We need to restore the collection parameters to the defaults (1st page)
+      // and update the page size
+      var params = this.documentsView.collection.restoreDefaultParameters();
       this.perPage = perPage;
       this.documentsView.updatePerPage(perPage);
       this.documentsView.forceRender();
-      params.limit = perPage;
-      this.documentsView.collection.params = params;
+      this.documentsView.collection.params.limit = perPage;
       this.setDocPerPageLimit(perPage);
     },
 

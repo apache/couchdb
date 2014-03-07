@@ -358,7 +358,23 @@ function(app, FauxtonAPI) {
 
   });
 
-  Documents.AllDocs = FauxtonAPI.Collection.extend({
+  var DefaultParametersMixin = function() {
+    // keep this variable private
+    var defaultParams;
+
+    return {
+      saveDefaultParameters: function() {
+        // store the default parameters so we can reset to the first page
+        defaultParams = _.clone(this.params);
+      },
+
+      restoreDefaultParameters: function() {
+        this.params = _.clone(defaultParams);
+      }
+    };
+  };
+
+  Documents.AllDocs = FauxtonAPI.Collection.extend(_.extend({}, DefaultParametersMixin(), {
     model: Documents.Doc,
     isAllDocs: true,
     documentation: function(){
@@ -367,12 +383,15 @@ function(app, FauxtonAPI) {
     initialize: function(_models, options) {
       this.database = options.database;
       this.params = _.clone(options.params);
+
       this.on("remove",this.decrementTotalRows , this);
       this.perPageLimit = options.perPageLimit || 20;
 
       if (!this.params.limit) {
-        this.params.limit = this.perPageLimit; 
+        this.params.limit = this.perPageLimit;
       }
+
+      this.saveDefaultParameters();
     },
 
     url: function(context, params) {
@@ -459,9 +478,9 @@ function(app, FauxtonAPI) {
         };
       });
     }
-  });
+  }));
 
-  Documents.IndexCollection = FauxtonAPI.Collection.extend({
+  Documents.IndexCollection = FauxtonAPI.Collection.extend(_.extend({}, DefaultParametersMixin(), {
     model: Documents.ViewRow,
     documentation: function(){
       return "docs";
@@ -469,6 +488,7 @@ function(app, FauxtonAPI) {
     initialize: function(_models, options) {
       this.database = options.database;
       this.params = _.extend({limit: 20, reduce: false}, options.params);
+
       this.idxType = "_view";
       this.view = options.view;
       this.design = options.design.replace('_design/','');
@@ -476,9 +496,10 @@ function(app, FauxtonAPI) {
       this.perPageLimit = options.perPageLimit || 20;
 
       if (!this.params.limit) {
-        this.params.limit = this.perPageLimit; 
+        this.params.limit = this.perPageLimit;
       }
-
+      
+      this.saveDefaultParameters();
     },
 
     url: function(context, params) {
@@ -618,10 +639,10 @@ function(app, FauxtonAPI) {
       return timeString;
     }
 
-  });
+  }));
 
   
-  Documents.PouchIndexCollection = FauxtonAPI.Collection.extend({
+  Documents.PouchIndexCollection = FauxtonAPI.Collection.extend(_.extend({}, DefaultParametersMixin(), {
     model: Documents.ViewRow,
     documentation: function(){
       return "docs";
@@ -632,7 +653,10 @@ function(app, FauxtonAPI) {
       this.view = options.view;
       this.design = options.design.replace('_design/','');
       this.params = _.extend({limit: 20, reduce: false}, options.params);
+
       this.idxType = "_view";
+
+      this.saveDefaultParameters();
     },
 
     url: function () {
@@ -687,7 +711,7 @@ function(app, FauxtonAPI) {
     allDocs: function(){
       return this.models;
     }
-  });
+  }));
 
 
 
