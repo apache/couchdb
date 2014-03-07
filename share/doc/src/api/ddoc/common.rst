@@ -46,7 +46,7 @@
   a new revision of the existing design document.
 
   The design documents have some agreement upon their fields and structure.
-  Currently it is the next:
+  Currently it is the following:
 
   * **language** (*string*): Defines :ref:`Query Server <query-server>`
     :config:section:`key <query_servers>` to process design document functions
