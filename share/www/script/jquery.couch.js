@@ -70,7 +70,7 @@
      * /#jQuery-ajax-settings">jQuery ajax settings</a>
      */
     activeTasks: function(options) {
-      ajax(
+      return ajax(
         {url: this.urlPrefix + "/_active_tasks"},
         options,
         "Active task status could not be retrieved"
@@ -85,7 +85,7 @@
      * /#jQuery-ajax-settings">jQuery ajax settings</a>
      */
     allDbs: function(options) {
-      ajax(
+      return ajax(
         {url: this.urlPrefix + "/_all_dbs"},
         options,
         "An error occurred retrieving the list of all databases"
@@ -123,7 +123,7 @@
         req.processData = false
       }
 
-      ajax(req, options,
+      return ajax(req, options,
         "An error occurred retrieving/updating the server configuration"
       );
     },
@@ -138,7 +138,7 @@
      */
     session: function(options) {
       options = options || {};
-      ajax({
+      return ajax({
         type: "GET", url: this.urlPrefix + "/_session",
         beforeSend: function(xhr) {
             xhr.setRequestHeader('Accept', 'application/json');
@@ -296,7 +296,7 @@
          */
         compact: function(options) {
           $.extend(options, {successStatus: 202});
-          ajax({
+          return ajax({
               type: "POST", url: this.uri + "_compact",
               data: "", processData: false
             },
@@ -314,7 +314,7 @@
          */
         viewCleanup: function(options) {
           $.extend(options, {successStatus: 202});
-          ajax({
+          return ajax({
               type: "POST", url: this.uri + "_view_cleanup",
               data: "", processData: false
             },
@@ -337,7 +337,7 @@
          */
         compactView: function(groupname, options) {
           $.extend(options, {successStatus: 202});
-          ajax({
+          return ajax({
               type: "POST", url: this.uri + "_compact/" + groupname,
               data: "", processData: false
             },
@@ -355,7 +355,7 @@
          */
         create: function(options) {
           $.extend(options, {successStatus: 201});
-          ajax({
+          return ajax({
               type: "PUT", url: this.uri, contentType: "application/json",
               data: "", processData: false
             },
@@ -373,7 +373,7 @@
          * jQuery.ajax/#jQuery-ajax-settings">jQuery ajax settings</a>
          */
         drop: function(options) {
-          ajax(
+          return ajax(
             {type: "DELETE", url: this.uri},
             options,
             "The database could not be deleted"
@@ -388,7 +388,7 @@
          * jQuery.ajax/#jQuery-ajax-settings">jQuery ajax settings</a>
          */
         info: function(options) {
-          ajax(
+          return ajax(
             {url: this.uri},
             options,
             "Database information could not be retrieved"
@@ -501,7 +501,7 @@
             delete options["keys"];
             data = toJSON({ "keys": keys });
           }
-          ajax({
+          return ajax({
               type: type,
               data: data,
               url: this.uri + "_all_docs" + encodeOptions(options)
@@ -591,7 +591,7 @@
               }
             });
           }
-          ajax({url: this.uri + encodeDocId(docId) + encodeOptions(options)},
+          return ajax({url: this.uri + encodeDocId(docId) + encodeOptions(options)},
             options,
             "The document could not be retrieved",
             ajaxOptions
@@ -663,7 +663,7 @@
         bulkSave: function(docs, options) {
           var beforeSend = fullCommit(options);
           $.extend(options, {successStatus: 201, beforeSend : beforeSend});
-          ajax({
+          return ajax({
               type: "POST",
               url: this.uri + "_bulk_docs" + encodeOptions(options),
               contentType: "application/json", data: toJSON(docs)
@@ -684,7 +684,7 @@
          * jQuery.ajax/#jQuery-ajax-settings">jQuery ajax settings</a>
          */
         removeDoc: function(doc, options) {
-          ajax({
+          return ajax({
               type: "DELETE",
               url: this.uri +
                    encodeDocId(doc._id) +
@@ -710,7 +710,7 @@
             }
           );
           $.extend(options, {successStatus: 201});
-          ajax({
+          return ajax({
               type: "POST",
               url: this.uri + "_bulk_docs" + encodeOptions(options),
               data: toJSON(docs)
@@ -744,7 +744,7 @@
               }
             }
           });
-          ajax({
+          return ajax({
               type: "COPY",
               url: this.uri + encodeDocId(docId)
             },
@@ -779,7 +779,7 @@
                 : "(" + reduceFun.toString() + ")";
             body.reduce = reduceFun;
           }
-          ajax({
+          return ajax({
               type: "POST",
               url: this.uri + "_temp_view" + encodeOptions(options),
               contentType: "application/json", data: toJSON(body)
@@ -814,7 +814,7 @@
             delete options['keys'];
             data = toJSON({'keys': keys });
           }
-          ajax({
+          return ajax({
               type: type,
               data: data,
               url: this.uri + '_design/' + list[0] +
@@ -847,7 +847,7 @@
             delete options["keys"];
             data = toJSON({ "keys": keys });
           }
-          ajax({
+          return ajax({
               type: type,
               data: data,
               url: this.uri + "_design/" + name[0] +
@@ -866,7 +866,7 @@
          * jQuery.ajax/#jQuery-ajax-settings">jQuery ajax settings</a>
          */
         getDbProperty: function(propName, options, ajaxOptions) {
-          ajax({url: this.uri + propName + encodeOptions(options)},
+          return ajax({url: this.uri + propName + encodeOptions(options)},
             options,
             "The property could not be retrieved",
             ajaxOptions
@@ -883,7 +883,7 @@
          * jQuery.ajax/#jQuery-ajax-settings">jQuery ajax settings</a>
          */
         setDbProperty: function(propName, propValue, options, ajaxOptions) {
-          ajax({
+          return ajax({
             type: "PUT",
             url: this.uri + propName + encodeOptions(options),
             data : JSON.stringify(propValue)
@@ -910,7 +910,7 @@
      * jQuery.ajax/#jQuery-ajax-settings">jQuery ajax settings</a>
      */
     info: function(options) {
-      ajax(
+      return ajax(
         {url: this.urlPrefix + "/"},
         options,
         "Server information could not be retrieved"
@@ -932,7 +932,7 @@
       if (repOpts.continuous && !repOpts.cancel) {
         ajaxOptions.successStatus = 202;
       }
-      ajax({
+      return ajax({
           type: "POST", url: this.urlPrefix + "/_replicate",
           data: JSON.stringify(repOpts),
           contentType: "application/json"
