@@ -30,8 +30,21 @@
 
 
 setup(#httpdb{httpc_pool = nil, url = Url, http_connections = MaxConns} = Db) ->
-    {ok, Pid} = couch_replicator_httpc_pool:start_link(Url, [{max_connections, MaxConns}]),
-    {ok, Db#httpdb{httpc_pool = Pid}}.
+    Url2 = couch_util:url_strip_credentials(Url),
+    RootUrl = couch_util:root_url(Url2),
+    {ok, Pid} = couch_replicator_httpc_pool:start_link(
+        Url2, [{max_connections, MaxConns}]),
+    case Url of
+    Url2 -> % there are no basic auth credentials included in Url
+        {ok, Db#httpdb{root_url = RootUrl, httpc_pool = Pid}};
+    _ ->
+        #url{username = Username, password = Password} =
+            ibrowse_lib:parse_url(Url),
+        Credentials = ets:new(credentials, [public, {read_concurrency, true}]),
+        ets:insert(Credentials, {basic_auth, {Username, Password}}),
+        {ok, #httpdb{url = Url2, root_url = RootUrl, httpc_pool = Pid,
+                     credentials = Credentials}}
+    end.
 
 
 send_req(HttpDb, Params1, Callback) ->
@@ -43,19 +56,30 @@ send_req(HttpDb, Params1, Callback) ->
     process_response(Response, Worker, HttpDb, Params, Callback).
 
 
-send_ibrowse_req(#httpdb{headers = BaseHeaders} = HttpDb, Params) ->
+send_ibrowse_req(HttpDb, Params) ->
+    {ok, Worker} = case get_value(path, Params) of
+    "_changes" -> ibrowse:spawn_link_worker_process(full_url(HttpDb, Params));
+    _ -> couch_replicator_httpc_pool:get_worker(HttpDb#httpdb.httpc_pool)
+    end,
+    send_ibrowse_req(HttpDb, Params, Worker).
+
+
+send_ibrowse_req(#httpdb{headers = Headers} = HttpDb, Params, Worker) ->
+    BaseHeaders = case HttpDb#httpdb.credentials of
+    undefined ->
+        Headers;
+    Credentials ->
+        case ets:lookup(Credentials, cookie) of
+        [] -> Headers;
+        [{cookie, Cookie, _}] -> [{"Cookie", Cookie} | Headers]
+        end
+    end,
     Method = get_value(method, Params, get),
     UserHeaders = lists:keysort(1, get_value(headers, Params, [])),
     Headers1 = lists:ukeymerge(1, UserHeaders, BaseHeaders),
     Headers2 = oauth_header(HttpDb, Params) ++ Headers1,
     Url = full_url(HttpDb, Params),
     Body = get_value(body, Params, []),
-    case get_value(path, Params) of
-    "_changes" ->
-        {ok, Worker} = ibrowse:spawn_link_worker_process(Url);
-    _ ->
-        {ok, Worker} = couch_replicator_httpc_pool:get_worker(HttpDb#httpdb.httpc_pool)
-    end,
     IbrowseOptions = [
         {response_format, binary}, {inactivity_timeout, HttpDb#httpdb.timeout} |
         lists:ukeymerge(1, get_value(ibrowse_options, Params, []),
@@ -78,7 +102,6 @@ process_response({ibrowse_req_id, ReqId}, Worker, HttpDb, Params, Callback) ->
     process_stream_response(ReqId, Worker, HttpDb, Params, Callback);
 
 process_response({ok, Code, Headers, Body}, Worker, HttpDb, Params, Callback) ->
-    release_worker(Worker, HttpDb),
     case list_to_integer(Code) of
     Ok when (Ok >= 200 andalso Ok < 300) ; (Ok >= 400 andalso Ok < 500) ->
         EJson = case Body of
@@ -87,10 +110,27 @@ process_response({ok, Code, Headers, Body}, Worker, HttpDb, Params, Callback) ->
         Json ->
             ?JSON_DECODE(Json)
         end,
-        Callback(Ok, Headers, EJson);
+        case Ok of
+        401 ->
+            case maybe_start_new_session(HttpDb, Worker) of
+            true ->
+                {Worker, Response} =
+                    send_ibrowse_req(HttpDb, Params, Worker),
+                process_response(Response, Worker, HttpDb, Params, Callback);
+            false ->
+                release_worker(Worker, HttpDb),
+                Callback(Ok, Headers, EJson)
+            end;
+        _ ->
+            release_worker(Worker, HttpDb),
+            maybe_set_session_cookie(HttpDb, Headers),
+            Callback(Ok, Headers, EJson)
+        end;
     R when R =:= 301 ; R =:= 302 ; R =:= 303 ->
+        release_worker(Worker, HttpDb),
         do_redirect(Worker, R, Headers, HttpDb, Params, Callback);
     Error ->
+        release_worker(Worker, HttpDb),
         maybe_retry({code, Error}, Worker, HttpDb, Params, Callback)
     end;
 
@@ -102,20 +142,20 @@ process_stream_response(ReqId, Worker, HttpDb, Params, Callback) ->
     receive
     {ibrowse_async_headers, ReqId, Code, Headers} ->
         case list_to_integer(Code) of
-        Ok when (Ok >= 200 andalso Ok < 300) ; (Ok >= 400 andalso Ok < 500) ->
-            StreamDataFun = fun() ->
-                stream_data_self(HttpDb, Params, Worker, ReqId, Callback)
-            end,
-            ibrowse:stream_next(ReqId),
-            try
-                Ret = Callback(Ok, Headers, StreamDataFun),
-                release_worker(Worker, HttpDb),
+        401 ->
+            case maybe_start_new_session(HttpDb) of
+            true ->
                 clean_mailbox_req(ReqId),
-                Ret
-            catch throw:{maybe_retry_req, Err} ->
-                clean_mailbox_req(ReqId),
-                maybe_retry(Err, Worker, HttpDb, Params, Callback)
+                {Worker, Response} = send_ibrowse_req(HttpDb, Params, Worker),
+                process_response(Response, Worker, HttpDb, Params, Callback);
+            false ->
+                process_stream_response_headers(
+                    ReqId, 401, Headers, Worker, HttpDb, Params, Callback)
             end;
+        Ok when (Ok >= 200 andalso Ok < 300) ; (Ok > 401 andalso Ok < 500) ->
+            maybe_set_session_cookie(HttpDb, Headers),
+            process_stream_response_headers(
+                ReqId, Ok, Headers, Worker, HttpDb, Params, Callback);
         R when R =:= 301 ; R =:= 302 ; R =:= 303 ->
             do_redirect(Worker, R, Headers, HttpDb, Params, Callback);
         Error ->
@@ -128,6 +168,90 @@ process_stream_response(ReqId, Worker, HttpDb, Params, Callback) ->
         % seem to be always true when there's a very high rate of requests
         % and many open connections.
         maybe_retry(timeout, Worker, HttpDb, Params, Callback)
+    end.
+
+
+process_stream_response_headers(ReqId, Code, Headers, Worker, HttpDb, Params, Callback) ->
+    StreamDataFun = fun() ->
+        stream_data_self(HttpDb, Params, Worker, ReqId, Callback)
+    end,
+    ibrowse:stream_next(ReqId),
+    try
+        Ret = Callback(Code, Headers, StreamDataFun),
+        release_worker(Worker, HttpDb),
+        clean_mailbox_req(ReqId),
+        Ret
+    catch throw:{maybe_retry_req, Err} ->
+        clean_mailbox_req(ReqId),
+        maybe_retry(Err, Worker, HttpDb, Params, Callback)
+    end.
+
+
+maybe_start_new_session(HttpDb) ->
+    case need_new_session(HttpDb) of
+    false -> false;
+    true -> start_new_session(HttpDb)
+    end.
+
+
+maybe_start_new_session(HttpDb, Worker) ->
+    case need_new_session(HttpDb) of
+    false -> false;
+    true -> start_new_session(HttpDb, Worker)
+    end.
+
+
+need_new_session(#httpdb{credentials = undefined}) ->
+    false;
+
+need_new_session(#httpdb{credentials = Credentials}) ->
+    case ets:lookup(Credentials, cookie) of
+    [] ->
+        true;
+    [{cookie, _, UpdatedAt}] ->
+        %% As we don't know when the cookie will expire, we just decide
+        %% that we want a new session if the current one is older than
+        %% one minute.
+        OneMinute = 60 * 1000000, % microseconds
+        timer:now_diff(os:timestamp(), UpdatedAt) > OneMinute
+    end.
+
+
+start_new_session(#httpdb{httpc_pool = Pool} = HttpDb) ->
+    {ok, Worker} = couch_replicator_httpc_pool:get_worker(Pool),
+    Result = start_new_session(HttpDb, Worker),
+    release_worker(Worker, HttpDb),
+    Result.
+
+
+start_new_session(#httpdb{credentials = Credentials} = HttpDb, Worker) ->
+    SessionUrl = HttpDb#httpdb.root_url ++ "_session",
+    {Username, Password} = ets:lookup_element(Credentials, basic_auth, 2),
+    JsonBody = ?JSON_ENCODE(
+        {[{name, ?l2b(Username)}, {password, ?l2b(Password)}]}),
+    Response = ibrowse:send_req_direct(Worker, SessionUrl,
+        [{"Content-Type", "application/json"}], post, JsonBody,
+        [{response_format, binary}], infinity),
+    Callback =
+        fun (401, _, _) -> false;
+            (200, Headers, _) -> maybe_set_session_cookie(HttpDb, Headers)
+        end,
+    process_response(Response, Worker, HttpDb, [], Callback).
+
+
+maybe_set_session_cookie(#httpdb{credentials = undefined}, _) ->
+    false;
+
+maybe_set_session_cookie(#httpdb{credentials = Credentials}, Headers) ->
+    case get_value("Set-Cookie", Headers) of
+    undefined ->
+        false;
+    Cookie ->
+        CookieProps = mochiweb_cookies:parse_cookie(Cookie),
+        case couch_util:get_value(?AUTH_SESSION_COOKIE_KEY, CookieProps) of
+        undefined -> false;
+        _ -> ets:insert(Credentials, {cookie, Cookie, os:timestamp()})
+        end
     end.
 
 
@@ -153,7 +277,7 @@ maybe_retry(Error, Worker, #httpdb{retries = Retries, wait = Wait} = HttpDb,
     Params, Cb) ->
     release_worker(Worker, HttpDb),
     Method = string:to_upper(atom_to_list(get_value(method, Params, get))),
-    Url = couch_util:url_strip_password(full_url(HttpDb, Params)),
+    Url = full_url(HttpDb, Params),
     ?LOG_INFO("Retrying ~s request to ~s in ~p seconds due to error ~s",
         [Method, Url, Wait / 1000, error_cause(Error)]),
     ok = timer:sleep(Wait),
@@ -163,7 +287,7 @@ maybe_retry(Error, Worker, #httpdb{retries = Retries, wait = Wait} = HttpDb,
 
 report_error(Worker, HttpDb, Params, Error) ->
     Method = string:to_upper(atom_to_list(get_value(method, Params, get))),
-    Url = couch_util:url_strip_password(full_url(HttpDb, Params)),
+    Url = full_url(HttpDb, Params),
     do_report_error(Url, Method, Error),
     release_worker(Worker, HttpDb),
     exit({http_request_failed, Method, Url, Error}).

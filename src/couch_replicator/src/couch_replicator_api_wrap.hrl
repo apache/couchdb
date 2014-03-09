@@ -24,7 +24,10 @@
     retries = 10,
     wait = 250,         % milliseconds
     httpc_pool = nil,
-    http_connections
+    http_connections,
+    root_url,           % e.g. "http://example.com:5984/"
+    credentials         % ets table for storing the basic auth
+                        % credentials and the session cookie
 }).
 
 -record(oauth, {
