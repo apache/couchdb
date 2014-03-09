@@ -160,7 +160,7 @@ proxy_auth_user(Req) ->
 
 
 cookie_authentication_handler(#httpd{mochi_req=MochiReq}=Req) ->
-    case MochiReq:get_cookie_value("AuthSession") of
+    case MochiReq:get_cookie_value(?AUTH_SESSION_COOKIE_KEY) of
     undefined -> Req;
     [] -> Req;
     Cookie ->
@@ -222,7 +222,7 @@ cookie_auth_header(#httpd{user_ctx=#user_ctx{name=User}, auth={Secret, true}}=Re
     % themselves.
     CookieHeader = couch_util:get_value("Set-Cookie", Headers, ""),
     Cookies = mochiweb_cookies:parse_cookie(CookieHeader),
-    AuthSession = couch_util:get_value("AuthSession", Cookies),
+    AuthSession = couch_util:get_value(?AUTH_SESSION_COOKIE_KEY, Cookies),
     if AuthSession == undefined ->
         TimeStamp = make_cookie_time(),
         [cookie_auth_cookie(Req, ?b2l(User), Secret, TimeStamp)];
@@ -234,7 +234,7 @@ cookie_auth_header(_Req, _Headers) -> [].
 cookie_auth_cookie(Req, User, Secret, TimeStamp) ->
     SessionData = User ++ ":" ++ erlang:integer_to_list(TimeStamp, 16),
     Hash = crypto:sha_mac(Secret, SessionData),
-    mochiweb_cookies:cookie("AuthSession",
+    mochiweb_cookies:cookie(?AUTH_SESSION_COOKIE_KEY,
         couch_util:encodeBase64Url(SessionData ++ ":" ++ ?b2l(Hash)),
         [{path, "/"}] ++ cookie_scheme(Req) ++ max_age()).
 
@@ -293,7 +293,7 @@ handle_session_req(#httpd{method='POST', mochi_req=MochiReq}=Req) ->
                 ]});
         _Else ->
             % clear the session
-            Cookie = mochiweb_cookies:cookie("AuthSession", "", [{path, "/"}] ++ cookie_scheme(Req)),
+            Cookie = mochiweb_cookies:cookie(?AUTH_SESSION_COOKIE_KEY, "", [{path, "/"}] ++ cookie_scheme(Req)),
             {Code, Headers} = case couch_httpd:qs_value(Req, "fail", nil) of
                 nil ->
                     {401, [Cookie]};
@@ -329,7 +329,7 @@ handle_session_req(#httpd{method='GET', user_ctx=UserCtx}=Req) ->
     end;
 % logout by deleting the session
 handle_session_req(#httpd{method='DELETE'}=Req) ->
-    Cookie = mochiweb_cookies:cookie("AuthSession", "", [{path, "/"}] ++ cookie_scheme(Req)),
+    Cookie = mochiweb_cookies:cookie(?AUTH_SESSION_COOKIE_KEY, "", [{path, "/"}] ++ cookie_scheme(Req)),
     {Code, Headers} = case couch_httpd:qs_value(Req, "next", nil) of
         nil ->
             {200, [Cookie]};

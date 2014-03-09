@@ -25,7 +25,7 @@
 -export([get_value/2, get_value/3]).
 -export([md5/1, md5_init/0, md5_update/2, md5_final/1]).
 -export([reorder_results/2]).
--export([url_strip_password/1]).
+-export([root_url/1, url_strip_password/1, url_strip_credentials/1]).
 -export([encode_doc_id/1]).
 -export([with_db/2]).
 -export([rfc1123_date/0, rfc1123_date/1]).
@@ -416,11 +416,28 @@ reorder_results(Keys, SortedResults) ->
     KeyDict = dict:from_list(SortedResults),
     [dict:fetch(Key, KeyDict) || Key <- Keys].
 
+%% e.g. "https://foo.bar:6984/foo/bar?baz=42" -> "https://foo.bar:6984/"
+root_url(Url) ->
+    re:replace(Url,
+        "http(s)?://([^/]+).*$",
+        "http\\1://\\2/",
+        [{return, list}]).
+
 url_strip_password(Url) ->
     re:replace(Url,
         "http(s)?://([^:]+):[^@]+@(.*)$",
         "http\\1://\\2:*****@\\3",
         [{return, list}]).
+
+url_strip_credentials(Url) ->
+    Options = case is_list(Url) of
+    true -> [{return, list}];
+    false when is_binary(Url) -> [{return, binary}]
+    end,
+    re:replace(Url,
+        "http(s)?://(?:[^:]+):[^@]+@(.*)$",
+        "http\\1://\\2",
+        Options).
 
 encode_doc_id(#doc{id = Id}) ->
     encode_doc_id(Id);
