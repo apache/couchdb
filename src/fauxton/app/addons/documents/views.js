@@ -1588,7 +1588,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
            that.showEditors();
         });
       } else if ($targetId === "meta-nav"){
-        if ($previousTab.attr('id') !== "metadata"){
+        if (!$("#ddoc-info").is(":visible")){
           this.ddocInfoView.startRefreshInterval();
         } 
         $targetTab.toggle('slow'); 
