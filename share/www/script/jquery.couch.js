@@ -203,7 +203,7 @@
      */
     login: function(options) {
       options = options || {};
-      $.ajax({
+      return $.ajax({
         type: "POST", url: this.urlPrefix + "/_session", dataType: "json",
         data: {name: options.name, password: options.password},
         beforeSend: function(xhr) {
@@ -233,7 +233,7 @@
      */
     logout: function(options) {
       options = options || {};
-      $.ajax({
+      return $.ajax({
         type: "DELETE", url: this.urlPrefix + "/_session", dataType: "json",
         username : "_", password : "_",
         beforeSend: function(xhr) {
@@ -517,7 +517,7 @@
          * jQuery.ajax/#jQuery-ajax-settings">jQuery ajax settings</a>
          */
         allDesignDocs: function(options) {
-          this.allDocs($.extend(
+          return this.allDocs($.extend(
             {startkey:"_design", endkey:"_design0"}, options));
         },
 
@@ -532,7 +532,7 @@
           options = options || {};
           var self = this;
           if (options.eachApp) {
-            this.allDesignDocs({
+            return this.allDesignDocs({
               success: function(resp) {
                 $.each(resp.rows, function() {
                   self.openDoc(this.id, {
@@ -622,7 +622,7 @@
             var uri = this.uri + encodeDocId(doc._id);
           }
           var versioned = maybeApplyVersion(doc);
-          $.ajax({
+          return $.ajax({
             type: method, url: uri + encodeOptions(options),
             contentType: "application/json",
             dataType: "json", data: toJSON(doc),
