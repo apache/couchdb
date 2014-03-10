@@ -1577,6 +1577,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       if ($targetTab.attr('id') !== $previousTab.attr('id')) {
         $previousTab.removeAttr('style');
       }
+      //stop polling
+      this.ddocInfoView.stopRefreshInterval(); 
 
       if ($targetId === 'index-nav') {
         if (this.newView) { return; }
@@ -1585,6 +1587,11 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         $targetTab.toggle('slow', function(){
            that.showEditors();
         });
+      } else if ($targetId === "meta-nav"){
+        if ($previousTab.attr('id') !== "metadata"){
+          this.ddocInfoView.startRefreshInterval();
+        } 
+        $targetTab.toggle('slow'); 
       } else {
         $targetTab.toggle('slow');
       }
@@ -1628,7 +1635,14 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         $('.beautify-tooltip').tooltip();
       }
     },
+    renderDdocInfo: function(){
+      if(this.ddocInfoView){
+        this.ddocInfoView.remove();
+      } 
+      this.ddocInfoView = this.setView('#ddoc-info', new Views.DdocInfo({model: this.ddocInfo }));
+      this.ddocInfoView.render();
 
+    },
     beforeRender: function () {
 
       if (this.newView) {
@@ -1643,7 +1657,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         var ddocDecode = decodeURIComponent(this.ddocID);
         this.model = this.ddocs.get(ddocDecode).dDocModel();
         this.reduceFunStr = this.model.viewHasReduce(this.viewName);
-        this.setView('#ddoc-info', new Views.DdocInfo({model: this.ddocInfo }));
+        
       }
 
       this.designDocSelector = this.setView('.design-doc-group', new Views.DesignDocSelector({
@@ -1670,6 +1684,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     },
 
     afterRender: function() {
+      this.renderDdocInfo();
+
       if (this.params && !this.newView) {
         this.advancedOptions.updateFromParams(this.params);
       }
@@ -1872,15 +1888,11 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       };
     },
 
-    afterRender: function () {
-      this.startRefreshInterval();
-    },
-
     startRefreshInterval: function () {
       var model = this.model;
 
       // Interval already set
-      if (this.intervalId) { return ; }
+      if (this.intervalId) { this.stopRefreshInterval(); }
 
       this.intervalId = setInterval(function () {
         model.fetch();
