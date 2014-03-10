@@ -81,10 +81,10 @@ function (app, FauxtonAPI) {
     template: "addons/config/templates/item",
 
     events: {
-      "click .edit-button": "editValue",
-      "click #delete-value": "deleteValue",
-      "click #cancel-value": "cancelEdit",
-      "click #save-value": "saveValue"
+      "dblclick .js-edit-value": "editValue",
+      "click .js-delete-value": "deleteValue",
+      "click .js-cancel-value": "cancelEdit",
+      "click .js-save-value": "saveValue"
     },
 
     deleteValue: function (event) {
@@ -97,18 +97,18 @@ function (app, FauxtonAPI) {
     },
 
     editValue: function (event) {
-      this.$("#show-value").hide();
-      this.$("#edit-value-form").show();
+      this.$(".js-show-value").hide();
+      this.$(".js-edit-value-form").show();
     },
 
     saveValue: function (event) {
-      this.model.save({value: this.$(".value-input").val()});
+      this.model.save({value: this.$(".js-value-input").val()});
       this.render();
     },
 
     cancelEdit: function (event) {
-      this.$("#edit-value-form").hide();
-      this.$("#show-value").show();
+      this.$(".js-edit-value-form").hide();
+      this.$(".js-show-value").show();
     },
 
     serialize: function () {
