@@ -629,6 +629,7 @@ merge_rev_trees(_Limit, _Merge, [], [], AccNewInfos, AccRemoveSeqs, AccSeq) ->
     {ok, lists:reverse(AccNewInfos), AccRemoveSeqs, AccSeq};
 merge_rev_trees(Limit, MergeConflicts, [NewDocs|RestDocsList],
         [OldDocInfo|RestOldInfo], AccNewInfos, AccRemoveSeqs, AccSeq) ->
+    erlang:put(last_id_merged, OldDocInfo#full_doc_info.id), % for debugging
     NewDocInfo0 = lists:foldl(fun({Client, NewDoc}, OldInfoAcc) ->
         merge_rev_tree(OldInfoAcc, NewDoc, Client, Limit, MergeConflicts)
     end, OldDocInfo, NewDocs),
