@@ -97,8 +97,8 @@ function (app, FauxtonAPI) {
     },
 
     editValue: function (event) {
-      this.$(".js-show-value").hide();
-      this.$(".js-edit-value-form").show();
+      this.$(".js-show-value").addClass("js-hidden");
+      this.$(".js-edit-value-form").removeClass("js-hidden");
     },
 
     saveValue: function (event) {
@@ -107,8 +107,8 @@ function (app, FauxtonAPI) {
     },
 
     cancelEdit: function (event) {
-      this.$(".js-edit-value-form").hide();
-      this.$(".js-show-value").show();
+      this.$(".js-edit-value-form").addClass("js-hidden");
+      this.$(".js-show-value").removeClass("js-hidden");
     },
 
     serialize: function () {
