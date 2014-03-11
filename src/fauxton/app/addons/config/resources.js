@@ -22,7 +22,7 @@ function (app, FauxtonAPI) {
   Config.Model = Backbone.Model.extend({});
   Config.OptionModel = Backbone.Model.extend({
     documentation: "config",
-    
+
     url: function () {
       return app.host + '/_config/' + this.get("section") + '/' + this.get("name");
     },
@@ -84,7 +84,8 @@ function (app, FauxtonAPI) {
       "dblclick .js-edit-value": "editValue",
       "click .js-delete-value": "deleteValue",
       "click .js-cancel-value": "cancelEdit",
-      "click .js-save-value": "saveValue"
+      "click .js-save-value": "saveValue",
+      "keyup .js-value-input": "saveValueIfEnterPressed"
     },
 
     deleteValue: function (event) {
@@ -101,9 +102,14 @@ function (app, FauxtonAPI) {
       this.$(".js-edit-value-form").removeClass("js-hidden");
     },
 
+    saveValueIfEnterPressed: function (event) {
+      if (event.keyCode === 13) {
+        this.saveAndRender();
+      }
+    },
+
     saveValue: function (event) {
-      this.model.save({value: this.$(".js-value-input").val()});
-      this.render();
+      this.saveAndRender();
     },
 
     cancelEdit: function (event) {
@@ -113,6 +119,11 @@ function (app, FauxtonAPI) {
 
     serialize: function () {
       return {option: this.model.toJSON()};
+    },
+
+    saveAndRender: function () {
+      this.model.save({value: this.$(".js-value-input").val()});
+      this.render();
     }
 
   });

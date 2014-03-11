@@ -17,7 +17,7 @@ define([
   var assert = testUtils.assert,
       ViewSandbox = testUtils.ViewSandbox;
 
-  describe("ViewItem", function () {
+  describe("Config: ViewItem", function () {
     var tabMenu, optionModel;
 
     beforeEach(function () {
@@ -48,6 +48,18 @@ define([
 
         tabMenu.$('.js-edit-value').trigger('dblclick');
         tabMenu.$('.js-save-value').trigger('click');
+
+        assert.ok(renderSpy.calledOnce);
+        assert.ok(saveSpy.calledOnce);
+      });
+
+      it("pressing enter should save the model and render", function () {
+        var renderSpy = sinon.stub(tabMenu, 'render');
+        var saveSpy = sinon.stub(optionModel, 'save');
+
+        var e = $.Event("keyup");
+        e.keyCode = 13;
+        tabMenu.$('.js-value-input').trigger(e);
 
         assert.ok(renderSpy.calledOnce);
         assert.ok(saveSpy.calledOnce);
