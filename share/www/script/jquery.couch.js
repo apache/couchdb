@@ -160,7 +160,7 @@
      * @private
      */
     userDb : function(callback) {
-      $.couch.session({
+      return $.couch.session({
         success : function(resp) {
           var userDb = $.couch.db(resp.info.authentication_db);
           callback(userDb);
@@ -187,7 +187,7 @@
       var user_prefix = "org.couchdb.user:";
       user_doc._id = user_doc._id || user_prefix + user_doc.name;
 
-      $.couch.userDb(function(db) {
+      return $.couch.userDb(function(db) {
         db.saveDoc(user_doc, options);
       });
     },
