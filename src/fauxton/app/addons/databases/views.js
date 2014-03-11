@@ -124,15 +124,18 @@ function(app, Components, FauxtonAPI, Databases) {
     },
 
     afterRender: function() {
-      var that = this;
-      this.dbSearchTypeahead = new Components.DbSearchTypeahead({
-        dbLimit: this.dbLimit,
+      var that = this,
+          AllDBsArray = _.map(this.collection.toJSON(), function(item, key){ 
+            return item.name; 
+          });
+
+      this.dbSearchTypeahead = new Components.Typeahead({
         el: "input.search-autocomplete",
+        source: AllDBsArray,
         onUpdate: function (item) {
           that.switchDatabase(null, item);
         }
       });
-
       this.dbSearchTypeahead.render();
     },
 
