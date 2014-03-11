@@ -1134,31 +1134,33 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
     },
     queryParams: function () {
-      var $form = this.$(".view-query-update"),
+      var $form = this.$(".js-view-query-update"),
           getKeys = this.getKeys;
-      var params = _.reduce($form.serializeArray(), function(params, param) {
+
+      var rawParams = _.reduce($form.serializeArray(), function(params, param) {
         if (!param.value) { return params; }
         if (param.name === "limit" && param.value === 'None') { return params; }
 
         params.push(param);
         return params;
       }, []);
-      });
-      var filteredParams = _.filter(params, function(param) {
+
+      var filteredParams = _.filter(rawParams, function(param) {
         return param.value;
       });
-        
 
-
-      var params = _.map(filteredParams, function(param) {
+      console.log('filtered', filteredParams);
+      var params = filteredParams;
+      /*var params = _.map(filteredParams, function(param) {
         if (param.name === "keys"){
-          return getKeys(param);
+          param.value = JSON.parse(param.value);
+          //param.value = JSON.stringify(b);
+          return param;
+          //return getKeys(param);
         }else{
           return param;
         }
-      });
-
-
+      });*/
 
       // Validate *key* params to ensure they're valid JSON
       var keyParams = ["keys","startkey","endkey"];
@@ -1175,20 +1177,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         }
       });
 
-      return {params: params, errorParams: errorParams};
-
-      // Ignore params without a value
-      /*_.map($form.serializeArray(), function(param) {
-        if (param.value){
-          if (param.name === "keys"){
-            var keys = getKeys(param.value);
-            data[keys.name] = keys.value;
-          }else{
-            data[param.name] = param.value;
-          }
-        }
-      });(*/
-
+      console.log('params', params);
+      return {params: params, errorParams: {}}; //errorParams};
     },
 
     updateFilters: function(event) {
