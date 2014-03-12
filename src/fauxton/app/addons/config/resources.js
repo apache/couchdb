@@ -100,6 +100,7 @@ function (app, FauxtonAPI) {
     editValue: function (event) {
       this.$(".js-show-value").addClass("js-hidden");
       this.$(".js-edit-value-form").removeClass("js-hidden");
+      this.$(".js-value-input").focus();
     },
 
     processKeyEvents: function (event) {
