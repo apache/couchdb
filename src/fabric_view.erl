@@ -306,10 +306,11 @@ get_shards(DbName, #mrargs{stale=Stale})
 get_shards(DbName, #mrargs{stale=false}) ->
     mem3:shards(DbName).
 
-get_shard_replacements(DbName, UsedShards) ->
+get_shard_replacements(DbName, UsedShards0) ->
     % We only want to generate a replacements list from shards
     % that aren't already used.
     AllLiveShards = mem3:live_shards(DbName, [node() | nodes()]),
+    UsedShards = [S#shard{ref=undefined} || S <- UsedShards0],
     UnusedShards = AllLiveShards -- UsedShards,
 
     % If we have more than one copy of a range then we don't
