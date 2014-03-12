@@ -85,7 +85,7 @@ function (app, FauxtonAPI) {
       "click .js-delete-value": "deleteValue",
       "click .js-cancel-value": "cancelEdit",
       "click .js-save-value": "saveValue",
-      "keyup .js-value-input": "saveValueIfEnterPressed"
+      "keyup .js-value-input": "processKeyEvents"
     },
 
     deleteValue: function (event) {
@@ -102,9 +102,14 @@ function (app, FauxtonAPI) {
       this.$(".js-edit-value-form").removeClass("js-hidden");
     },
 
-    saveValueIfEnterPressed: function (event) {
+    processKeyEvents: function (event) {
+      // Enter key
       if (event.keyCode === 13) {
-        this.saveAndRender();
+        return this.saveAndRender();
+      }
+      // Esc key
+      if (event.keyCode === 27) {
+        return this.discardValue();
       }
     },
 
@@ -112,9 +117,13 @@ function (app, FauxtonAPI) {
       this.saveAndRender();
     },
 
-    cancelEdit: function (event) {
+    discardValue: function (event) {
       this.$(".js-edit-value-form").addClass("js-hidden");
       this.$(".js-show-value").removeClass("js-hidden");
+    },
+
+    cancelEdit: function (event) {
+      this.discardValue();
     },
 
     serialize: function () {

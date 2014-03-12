@@ -64,6 +64,21 @@ define([
         assert.ok(renderSpy.calledOnce);
         assert.ok(saveSpy.calledOnce);
       });
+
+      it("pressing Esc hides the field", function () {
+        var e = $.Event("keyup");
+        e.keyCode = 27;
+        tabMenu.$('.js-value-input').trigger(e);
+
+        assert.ok(tabMenu.$('.js-edit-value-form').hasClass('js-hidden'));
+      });
+
+      it("pressing Cancel hides the field", function () {
+        tabMenu.$('.js-edit-value').trigger('dblclick');
+        tabMenu.$('.js-cancel-value').trigger('click');
+
+        assert.ok(tabMenu.$('.js-edit-value-form').hasClass('js-hidden'));
+      });
     });
   });
 });
