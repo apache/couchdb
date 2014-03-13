@@ -267,18 +267,20 @@ function(app, FauxtonAPI, Documents, Databases) {
         params: urlParams,
         newView: false,
         database: this.data.database,
-        ddocInfo: ddocInfo
+        ddocInfo: this.ddocInfo(decodeDdoc, this.data.designDocs, view)
       }));
 
       if (this.toolsView) { this.toolsView.remove(); }
 
-      this.documentsView = this.createViewDocumentsView(
-        decodeDdoc,
-        docParams, 
-        urlParams,
-        this.data.database,
-        this.indexedDocs,
-        this.data.designDocs);
+      this.documentsView = this.createViewDocumentsView({
+        designDoc: decodeDdoc,
+        docParams: docParams, 
+        urlParams: urlParams,
+        database: this.data.database,
+        indexedDocs: this.data.indexedDocs,
+        designDocs: this.data.designDocs,
+        view: view
+      });
 
       this.sidebar.setSelectedTab(app.utils.removeSpecialCharacters(ddoc) + '_' + app.utils.removeSpecialCharacters(view));
 
@@ -292,21 +294,24 @@ function(app, FauxtonAPI, Documents, Databases) {
       Documents.paginate.reset();
     },
 
-    createViewDocumentsView: function (designDoc, docParams, urlParams, database, indexedDocs, designDocs) {
-       var ddocInfo = {
+    ddocInfo: function (designDoc, designDocs, view) {
+      return {
         id: "_design/" + designDoc,
         currView: view,
-        designDocs: this.data.designDocs
+        designDocs: designDocs
       };
+    },
+
+    createViewDocumentsView: function (options) { 
 
       return this.setView("#dashboard-lower-content", new Documents.Views.AllDocsList({
-        database: database,
-        collection: indexedDocs,
+        database: options.database,
+        collection: options.indexedDocs,
         nestedView: Documents.Views.Row,
         viewList: true,
-        ddocInfo: ddocInfo,
-        docParams: docParams,
-        params: urlParams
+        ddocInfo: this.ddocInfo(options.designDoc, options.designDocs, options.view),
+        docParams: options.docParams,
+        params: options.urlParams
       }));
     },
 
@@ -358,13 +363,15 @@ function(app, FauxtonAPI, Documents, Databases) {
         });
 
         if (!this.documentsView) {
-          this.documentsView = this.createViewDocumentsView(
-            ddoc,
-            docParams, 
-            urlParams,
-            this.data.database,
-            this.indexedDocs,
-            this.data.designDocs);
+          this.documentsView = this.createViewDocumentsView({
+            designDoc: ddoc,
+            docParams: docParams, 
+            urlParams: urlParams,
+            database: this.data.database,
+            indexedDocs: this.indexedDocs,
+            designDocs: this.data.designDocs,
+            view: view
+          });
         }
       }
 
