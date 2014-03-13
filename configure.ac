@@ -411,23 +411,25 @@ esac
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking Erlang version compatibility" >&5
 $as_echo_n "checking Erlang version compatibility... " >&6; }
-erlang_version_error="The installed Erlang version must be >= R14B (erts-5.8.1) and <R17 (erts-5.11)"
+erlang_version_error="The installed Erlang version must be >= R14B (erts-5.8.1) and =< 17 (erts-6.0)"
 
 version="`${ERL} -version 2>&1 | ${SED} 's/[[^0-9]]/ /g'` 0 0 0"
 major_version=`echo $version | ${AWK} "{print \\$1}"`
 minor_version=`echo $version | ${AWK} "{print \\$2}"`
 patch_version=`echo $version | ${AWK} "{print \\$3}"`
+echo -n "detected Erlang version: $major_version.$minor_version.$patch_version..."
 
-if test $major_version -ne 5; then
-    as_fn_error $? "$erlang_version_error" "$LINENO" 5
+if test $major_version -lt 5 -o $major_version -gt 6; then
+    as_fn_error $? "$erlang_version_error major_version does not match" "$LINENO" 5
 fi
 
-if test $minor_version -lt 8 -o $minor_version -gt 10; then
-    as_fn_error $? "$erlang_version_error" "$LINENO" 5
+if test $major_version -eq 5 -a $minor_version -lt 8; then
+    as_fn_error $? "$erlang_version_error minor_version does not match" "$LINENO" 5
 fi
 
 AC_MSG_RESULT(compatible)
 
+# returns 17 for erts-6.0, and R14B03 or similar for earlier releases
 otp_release="`\
     ${ERL} -noshell \
     -eval 'io:put_chars(erlang:system_info(otp_release)).' \
@@ -435,8 +437,10 @@ otp_release="`\
 
 AC_SUBST(otp_release)
 
-AM_CONDITIONAL([USE_OTP_NIFS], [test x$otp_release \> xR13B03])
-AM_CONDITIONAL([USE_EJSON_COMPARE_NIF], [test x$otp_release \> xR14B03])
+AM_CONDITIONAL([USE_OTP_NIFS],
+    [test x$otp_release \> xR14B -o $otp_release -ge 17 ])
+AM_CONDITIONAL([USE_EJSON_COMPARE_NIF],
+    [test x$otp_release \> xR14B03])
 
 has_crypto=`\
     ${ERL} -eval "\
