@@ -259,13 +259,7 @@ function(app, FauxtonAPI, Documents, Databases) {
         view: view,
         params: docParams
       });
-
-      var ddocInfo = {
-        id: "_design/" + decodeDdoc,
-        currView: view,
-        designDocs: this.data.designDocs
-      };
-
+     
       this.viewEditor = this.setView("#dashboard-upper-content", new Documents.Views.ViewEditor({
         model: this.data.database,
         ddocs: this.data.designDocs,
@@ -278,15 +272,13 @@ function(app, FauxtonAPI, Documents, Databases) {
 
       if (this.toolsView) { this.toolsView.remove(); }
 
-      this.documentsView = this.setView("#dashboard-lower-content", new Documents.Views.AllDocsList({
-        database: this.data.database,
-        collection: this.data.indexedDocs,
-        nestedView: Documents.Views.Row,
-        viewList: true,
-        ddocInfo: ddocInfo,
-        docParams: docParams,
-        params: urlParams
-      }));
+      this.documentsView = this.createViewDocumentsView(
+        decodeDdoc,
+        docParams, 
+        urlParams,
+        this.data.database,
+        this.indexedDocs,
+        this.data.designDocs);
 
       this.sidebar.setSelectedTab(app.utils.removeSpecialCharacters(ddoc) + '_' + app.utils.removeSpecialCharacters(view));
 
@@ -298,6 +290,24 @@ function(app, FauxtonAPI, Documents, Databases) {
 
       this.apiUrl = [this.data.indexedDocs.url("apiurl", urlParams), "docs"];
       Documents.paginate.reset();
+    },
+
+    createViewDocumentsView: function (designDoc, docParams, urlParams, database, indexedDocs, designDocs) {
+       var ddocInfo = {
+        id: "_design/" + designDocs,
+        currView: view,
+        designDocs: this.data.designDocs
+      };
+
+      return this.setView("#dashboard-lower-content", new Documents.Views.AllDocsList({
+        database: database,
+        collection: indexedDocs,
+        nestedView: Documents.Views.Row,
+        viewList: true,
+        ddocInfo: ddocInfo,
+        docParams: docParams,
+        params: urlParams
+      }));
     },
 
     newViewEditor: function () {
@@ -347,6 +357,15 @@ function(app, FauxtonAPI, Documents, Databases) {
           params: docParams
         });
 
+        if (!this.documentsView) {
+          this.documentsView = this.createViewDocumentsView(
+            ddoc,
+            docParams, 
+            urlParams,
+            this.data.database,
+            this.indexedDocs,
+            this.data.designDocs);
+        }
       }
 
       this.documentsView.setCollection(collection);

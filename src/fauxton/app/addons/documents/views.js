@@ -1639,6 +1639,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       if(this.ddocInfoView){
         this.ddocInfoView.remove();
       } 
+
+      if (this.newView) { return; }
       this.ddocInfoView = this.setView('#ddoc-info', new Views.DdocInfo({model: this.ddocInfo }));
       this.ddocInfoView.render();
 
