@@ -93,7 +93,7 @@ function(app, FauxtonAPI, resizeColumns) {
   };
 
   Fauxton.Breadcrumbs = FauxtonAPI.View.extend({
-    template: "templates/fauxton/breadcrumbs",
+    template: "addons/fauxton/templates/breadcrumbs",
 
     serialize: function() {
       var crumbs = _.clone(this.crumbs);
@@ -114,7 +114,7 @@ function(app, FauxtonAPI, resizeColumns) {
   });
 
   Fauxton.Footer = FauxtonAPI.View.extend({
-    template: "templates/fauxton/footer",
+    template: "addons/fauxton/templates/footer",
 
     initialize: function() {
       this.versionInfo = new Fauxton.VersionInfo();
@@ -133,7 +133,7 @@ function(app, FauxtonAPI, resizeColumns) {
 
   Fauxton.NavBar = FauxtonAPI.View.extend({
     className:"navbar",
-    template: "templates/fauxton/nav_bar",
+    template: "addons/fauxton/templates/nav_bar",
     // TODO: can we generate this list from the router?
     navLinks: [
       {href:"#/_all_dbs", title:"Databases", icon: "fonticon-database", className: 'databases'}
@@ -257,7 +257,7 @@ function(app, FauxtonAPI, resizeColumns) {
   });
 
   Fauxton.ApiBar = FauxtonAPI.View.extend({
-    template: "templates/fauxton/api_bar",
+    template: "addons/fauxton/templates/api_bar",
     endpoint: '_all_docs',
 
     documentation: 'docs',
@@ -310,7 +310,7 @@ function(app, FauxtonAPI, resizeColumns) {
       this.fade = options.fade === undefined ? true : options.fade;
       this.clear = options.clear;
       this.data = options.data || "";
-      this.template = options.template || "templates/fauxton/notification";
+      this.template = options.template || "addons/fauxton/templates/notification";
     },
 
     serialize: function() {

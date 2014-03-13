@@ -32,7 +32,7 @@ function(app, FauxtonAPI, ace, spin) {
   var Components = FauxtonAPI.addon();
 
   Components.Pagination = FauxtonAPI.View.extend({
-    template: "templates/fauxton/pagination",
+    template: "addons/fauxton/templates/pagination",
 
     initialize: function(options) {
       this.page = parseInt(options.page, 10);
@@ -54,7 +54,7 @@ function(app, FauxtonAPI, ace, spin) {
   });
 
   Components.IndexPagination = FauxtonAPI.View.extend({
-    template: "templates/fauxton/index_pagination",
+    template: "addons/fauxton/templates/index_pagination",
     events: {
       "click a": 'scrollTo',
       "click a#next": 'nextClicked',
