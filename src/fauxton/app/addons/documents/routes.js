@@ -294,7 +294,7 @@ function(app, FauxtonAPI, Documents, Databases) {
 
     createViewDocumentsView: function (designDoc, docParams, urlParams, database, indexedDocs, designDocs) {
        var ddocInfo = {
-        id: "_design/" + designDocs,
+        id: "_design/" + designDoc,
         currView: view,
         designDocs: this.data.designDocs
       };
