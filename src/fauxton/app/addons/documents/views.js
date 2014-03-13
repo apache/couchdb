@@ -1249,7 +1249,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, Config, pouchdb, res
         var doc = {
           _id: '_design/' + this.$('#new-ddoc').val(),
           views: {},
-          language: "javascript"
+          language: this.defaultLang
         };
         var ddoc = new this.DocModel(doc, {database: this.database});
         //this.collection.add(ddoc);
