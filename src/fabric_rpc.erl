@@ -152,7 +152,13 @@ get_update_seq(DbName) ->
 get_update_seq(DbName, DbOptions) ->
     with_db(DbName, DbOptions, {couch_db, get_update_seq, []}).
 
-set_security(DbName, SecObj, Options) ->
+set_security(DbName, SecObj, Options0) ->
+    Options = case lists:keyfind(io_priority, 1, Options0) of
+        false ->
+            [{io_priority, {db_meta, security}}|Options0];
+        _ ->
+            Options0
+    end,
     with_db(DbName, Options, {couch_db, set_security, [SecObj]}).
 
 get_all_security(DbName, Options) ->
