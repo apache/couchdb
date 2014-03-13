@@ -71,6 +71,7 @@ FAUXTON_FILES = \
     fauxton/app/addons/config/routes.js \
     fauxton/app/addons/config/templates/dashboard.html \
     fauxton/app/addons/config/templates/item.html \
+    fauxton/app/addons/config/tests/resourcesSpec.js \
     fauxton/app/addons/contribute/base.js \
     fauxton/app/addons/exampleAuth/base.js \
     fauxton/app/addons/exampleAuth/templates/noAccess.html \

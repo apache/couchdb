@@ -15,7 +15,7 @@ define([
 ], function (FauxtonAPI, testUtils) {
   var assert = testUtils.assert;
 
-  describe("Faxuton Layout", function () {
+  describe("Fauxton Layout", function () {
     var layout;
 
     beforeEach(function () {
