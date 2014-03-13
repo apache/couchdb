@@ -12,12 +12,13 @@
 define([
       'api',
       'addons/config/resources',
+      'addons/config/views',
       'testUtils'
-], function (FauxtonAPI, Resources, testUtils) {
+], function (FauxtonAPI, Resources, Views, testUtils) {
   var assert = testUtils.assert,
       ViewSandbox = testUtils.ViewSandbox;
 
-  describe("Config: ViewItem", function () {
+  describe("Config: TableRow", function () {
     var tabMenu, optionModel;
 
     beforeEach(function () {
@@ -26,7 +27,7 @@ define([
         name: "bar"
       });
 
-      tabMenu = new Resources.ViewItem({
+      tabMenu = new Views.TableRow({
         model: optionModel
       });
     });
