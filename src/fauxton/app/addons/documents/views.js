@@ -1275,7 +1275,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, Config, pouchdb, res
       "click #db-views-tabs-nav": 'toggleIndexNav',
       "click .beautify_map":  "beautifyCode",
       "click .beautify_reduce":  "beautifyCode",
-      "click #query-options-wrapper": 'toggleIndexNav'
+      "click #query-options-wrapper": 'toggleIndexNav',
       "change #design-doc-language": "changeLanguage"
     },
 
