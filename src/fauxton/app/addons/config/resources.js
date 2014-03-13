@@ -84,7 +84,7 @@ function (app, FauxtonAPI) {
       "dblclick .js-edit-value": "editValue",
       "click .js-delete-value": "deleteValue",
       "click .js-cancel-value": "cancelEdit",
-      "click .js-save-value": "saveValue",
+      "click .js-save-value": "saveAndRender",
       "keyup .js-value-input": "processKeyEvents"
     },
 
@@ -114,9 +114,6 @@ function (app, FauxtonAPI) {
       }
     },
 
-    saveValue: function (event) {
-      this.saveAndRender();
-    },
 
     discardValue: function (event) {
       this.$(".js-edit-value-form").addClass("js-hidden");
