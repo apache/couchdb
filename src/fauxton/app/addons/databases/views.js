@@ -137,6 +137,7 @@ function(app, Components, FauxtonAPI, Databases) {
         }
       });
       this.dbSearchTypeahead.render();
+      this.$el.find(".js-db-graveyard").tooltip();
     },
 
     selectAll: function(evt){
