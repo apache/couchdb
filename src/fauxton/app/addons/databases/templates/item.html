@@ -16,7 +16,13 @@ the License.
   <a href="#/database/<%=encoded%>/_all_docs"><%= database.get("name") %></a>
 </td>
 <td><%= database.status.humanSize() %></td>
-<td><%= database.status.numDocs() %></td>
+<td>
+  <%= database.status.numDocs() %>
+  <% if (database.status.isGraveYard()) { %>
+    <i class="js-db-graveyard icon icon-exclamation-sign" data-toggle="tooltip"
+      title="This database has just <%= database.status.numDocs() %> docs and <%= database.status.numDeletedDocs() %> deleted docs"></i>
+  <% } %>
+</td>
 <td><%= database.status.updateSeq() %></td>
 <td>
   <a class="db-actions btn fonticon-replicate set-replication-start" title="Replicate <%= database.get("name") %>" href="#/replication/new/<%=encoded%>"></a>

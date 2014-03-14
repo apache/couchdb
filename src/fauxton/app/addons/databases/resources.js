@@ -123,6 +123,14 @@ function(app, FauxtonAPI, Documents) {
       return this.get("doc_count");
     },
 
+    numDeletedDocs: function() {
+      return this.get("doc_del_count");
+    },
+
+    isGraveYard: function() {
+      return this.numDeletedDocs() > this.numDocs();
+    },
+
     updateSeq: function(full) {
       var updateSeq = this.get("update_seq");
       if (full || (typeof(updateSeq) === 'number')) {
