@@ -1118,12 +1118,21 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       this.render();
     },
     getKeys: function(val){
-      var keys = val.value.replace(/\s/g,"").split(',');
+      var keys = val.value.replace(/\s/g,"");
+      
+      var regKeys = keys.match(/(\[.*?\])/g); 
+      if (regKeys) {
+        keys = regKeys;
+      } else {
+        keys = keys.split(',');
+      }
 
-      if (keys.length > 1){
+      keys = _.map(keys, function (key) { return JSON.parse(key); });
+
+      if (_.isArray(keys)){
         return {
           name: "keys",
-          value:  JSON.stringify(keys)
+          value: JSON.stringify(keys)
         };
       } else if (keys.length === 1) {
         return {
@@ -1131,36 +1140,22 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
           value: keys[0]
         };
       }
-
     },
     queryParams: function () {
       var $form = this.$(".js-view-query-update"),
           getKeys = this.getKeys;
 
-      var rawParams = _.reduce($form.serializeArray(), function(params, param) {
+      var params = _.reduce($form.serializeArray(), function(params, param) {
         if (!param.value) { return params; }
         if (param.name === "limit" && param.value === 'None') { return params; }
+        
+        if (param.name === "keys"){
+          param = getKeys(param);
+        }
 
         params.push(param);
         return params;
       }, []);
-
-      var filteredParams = _.filter(rawParams, function(param) {
-        return param.value;
-      });
-
-      console.log('filtered', filteredParams);
-      var params = filteredParams;
-      /*var params = _.map(filteredParams, function(param) {
-        if (param.name === "keys"){
-          param.value = JSON.parse(param.value);
-          //param.value = JSON.stringify(b);
-          return param;
-          //return getKeys(param);
-        }else{
-          return param;
-        }
-      });*/
 
       // Validate *key* params to ensure they're valid JSON
       var keyParams = ["keys","startkey","endkey"];
@@ -1177,8 +1172,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         }
       });
 
-      console.log('params', params);
-      return {params: params, errorParams: {}}; //errorParams};
+      return {params: params, errorParams: errorParams};
     },
 
     updateFilters: function(event) {
@@ -1239,6 +1233,17 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
           }
           this.updateFiltersFor(key, $ele);
           break;
+          case "keys":
+            val = JSON.parse(val);
+            var processVal = val;
+            if (_.isArray(val)) {
+              processVal = _.map(val, function (arr) {
+                return JSON.stringify(arr);
+              }).join(', ');
+            }
+
+            $form.find("input[name='keys']").val(processVal);
+            break;
           default:
             $form.find("input[name='"+key+"']").val(val);
           break;
