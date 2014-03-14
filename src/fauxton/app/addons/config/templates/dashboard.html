@@ -13,10 +13,10 @@ the License.
 -->
 
 <div class="row">
-    <button id="add-section" href="#" class="btn btn-primary pull-right">
-      <i class="icon icon-plus icon-white"> </i>
-      Add Section
-    </button>
+  <button id="js-add-section" href="#" class="btn btn-primary pull-right">
+    <i class="icon icon-plus icon-white"> </i>
+    Add Section
+  </button>
 </div>
 <table class="config table table-striped table-bordered">
   <thead>
@@ -28,23 +28,4 @@ the License.
   <tbody>
   </tbody>
 </table>
-<div id="add-section-modal" class="modal hide fade">
-  <div class="modal-header">
-    <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
-    <h3>Create Config Option</h3>
-  </div>
-  <div class="modal-body">
-    <form id="add-section-form" class="form well">
-      <label>Section</label>
-      <input type="text" name="section" placeholder="Section">
-      <span class="help-block">Enter an existing section name to add to it.</span>
-      <input type="text" name="name" placeholder="Name">
-      <br/>
-      <input type="text" name="value" placeholder="Value">
-      <div class="modal-footer">
-        <button type="button" class="btn" data-dismiss="modal">Cancel</button>
-        <button type="submit" class="btn btn-primary"> Save </button>
-      </div>
-    </form>
-  </div>
-</div>
+<div id="add-section-modal"></div>

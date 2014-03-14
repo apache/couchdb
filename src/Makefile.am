@@ -70,6 +70,8 @@ FAUXTON_FILES = \
     fauxton/app/addons/config/resources.js \
     fauxton/app/addons/config/views.js \
     fauxton/app/addons/config/routes.js \
+    fauxton/app/addons/config/views.js \
+    fauxton/app/addons/config/templates/modal.html \
     fauxton/app/addons/config/templates/dashboard.html \
     fauxton/app/addons/config/templates/item.html \
     fauxton/app/addons/config/tests/resourcesSpec.js \

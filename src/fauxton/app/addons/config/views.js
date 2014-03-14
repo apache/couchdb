@@ -1,4 +1,4 @@
- // Licensed under the Apache License, Version 2.0 (the "License"); you may not
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
 // the License at
 //
@@ -14,11 +14,13 @@ define([
   "app",
   "api",
   "addons/config/resources",
+  "addons/fauxton/components"
 ],
+function(app, FauxtonAPI, Config, Components) {
+  var Views ={},
+      Events = {};
 
-function (app, FauxtonAPI, Config) {
-
-  var Views = {};
+  Views.Events = _.extend(Events, Backbone.Events);
 
   Views.TableRow = FauxtonAPI.View.extend({
     tagName: "tr",
@@ -59,7 +61,6 @@ function (app, FauxtonAPI, Config) {
       }
     },
 
-
     discardValue: function (event) {
       this.$(".js-edit-value-form").addClass("js-hidden");
       this.$(".js-show-value").removeClass("js-hidden");
@@ -84,12 +85,63 @@ function (app, FauxtonAPI, Config) {
     template: "addons/config/templates/dashboard",
 
     events: {
-      "click #add-section": "addSection",
-      "submit #add-section-form": "submitForm"
+      "click #js-add-section": "addSection"
     },
 
-    submitForm: function (event) {
+    initialize: function(){
+      this.listenTo(Views.Events, "newSection", this.render);
+    },
+
+    addSection: function (event) {
       event.preventDefault();
+      this.modal.show();
+    },
+
+    beforeRender: function() {
+      this.modal = this.insertView("#add-section-modal", new Views.Modal({
+                      collection: this.collection
+                    }));
+
+      this.modal.render();
+
+      this.collection.each(function(config) {
+        _.each(config.get("options"), function (option, index) {
+          this.insertView("table.config tbody", new Views.TableRow({
+            model: new Config.OptionModel({
+              section: config.get("section"),
+              name: option.name,
+              value: option.value,
+              index: index
+            })
+          }));
+        }, this);
+      }, this);
+    },
+
+    establish: function() {
+      return [this.collection.fetch()];
+    }
+  });
+
+  Views.Modal = FauxtonAPI.View.extend({
+    className: "modal hide fade",
+    template:  "addons/config/templates/modal",
+    events: {
+      "submit #js-add-section-form": "validate"
+    },
+    initialize: function(){
+      this.sourceArray = _.map(this.collection.toJSON(), function(item, key){ 
+        return item.section; 
+      });
+    },
+    afterRender: function(){
+      this.sectionTypeAhead = new Components.Typeahead({
+        source: this.sourceArray,
+        el: 'input[name="section"]'
+      });
+      this.sectionTypeAhead.render();
+    },
+    submitForm: function (event) {
       var option = new Config.OptionModel({
         section: this.$('input[name="section"]').val(),
         name: this.$('input[name="name"]').val(),
@@ -111,34 +163,58 @@ function (app, FauxtonAPI, Config) {
         });
       }
 
-      this.$("#add-section-modal").modal('hide');
-      this.render();
-    },
+      this.hide();
+      Views.Events.trigger("newSection");
 
-    addSection: function (event) {
+    },
+    isNew: function(collection){
+      var sectionName = this.$('input[name="section"]').val(),
+          name = this.$('input[name="name"]').val();
+          var section = _.findWhere(collection.toJSON(), {"section":sectionName});
+          var options = _.findWhere(section.options, {name: name});
+          
+          return options;
+    },
+    isSection: function(){
+      var section = this.$('input[name="section"]').val();
+      return _.find(this.sourceArray, function(item){ return item === section; });
+    },
+    validate: function (event){
       event.preventDefault();
-      this.$("#add-section-modal").modal({show:true});
-    },
+      var section = this.$('input[name="section"]').val(),
+          name = this.$('input[name="name"]').val(),
+          value = this.$('input[name="value"]').val(),
+          collection = this.collection;
 
-    beforeRender: function() {
-      this.collection.each(function(config) {
-        _.each(config.get("options"), function (option, index) {
-          this.insertView("table.config tbody", new Views.TableRow({
-            model: new Config.OptionModel({
-              section: config.get("section"),
-              name: option.name,
-              value: option.value,
-              index: index
-            })
-          }));
-        }, this);
-      }, this);
+      if(!this.isSection()){
+         this.errorMessage("You need to use an existing section");
+      } else if (!name) {
+        this.errorMessage("Add a name");
+      } else if (!value) {
+        this.errorMessage("Add a value");
+      } else if (this.isNew(collection)){
+        this.errorMessage("Must have a unique name");
+      } else {
+        this.submitForm();
+      }
     },
-
-    establish: function() {
-      return [this.collection.fetch()];
+    errorMessage: function(msg){
+      this.error = FauxtonAPI.addNotification({
+          msg: msg,
+          type: "error",
+          clear: true,
+          selector: ".js-form-error-config"
+      });
+    },
+    show: function(){
+      this.$el.modal({show:true});
+    },
+    hide: function(){
+      this.$el.modal('hide');
     }
+
   });
 
   return Views;
+
 });
