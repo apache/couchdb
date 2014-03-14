@@ -29,13 +29,9 @@ function(app, FauxtonAPI, Config, javascript, coffeescript) {
   QueryServers.initialize = function () {
     javascript.register();
 
-    var config = new Config.Collection();
-    var config_promise = config.fetch();
-    config_promise.then(function() {
-      var languages = _.pluck(config.get('query_servers').get('options'), 'name');
-      _.each(languages, function(lang) {
+    $.getJSON('/_config/query_servers').done(function(config) {
+      _.each(_.keys(config), function(lang) {
         if (lang in other_langs) {
-          console.log(other_langs[lang]);
           other_langs[lang].register();
         }
       });
