@@ -940,7 +940,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
           fileName: key,
           size: att.length,
           contentType: att.content_type,
-          url: this.model.url() + '/' + key
+          url: this.model.url() + '/' + app.utils.safeURLName(key)
         };
       }, this);
     },
