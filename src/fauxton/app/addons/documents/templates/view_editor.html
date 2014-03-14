@@ -34,7 +34,7 @@ the License.
             <div class="design-doc-group pull-left"></div>
             <div class="pull-right">
               <label for="design-doc-language">Design Document Language</label>
-              <% if (newView) { %>
+              <% if (newView && languages.length > 1) { %>
               <select id="design-doc-language" class="pull-right">
                 <% _.each(languages, function(lang) { %>
                 <option<% if (lang == language) { %> selected<% } %>><%= lang %></option>
