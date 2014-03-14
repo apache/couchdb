@@ -68,9 +68,6 @@ function(app, FauxtonAPI, Config, Components) {
 
     cancelEdit: function (event) {
       this.discardValue();
-      this.$("#edit-value-form").hide();
-      this.$("#show-value").show();
-
     },
 
     serialize: function () {
@@ -94,9 +91,7 @@ function(app, FauxtonAPI, Config, Components) {
     initialize: function(){
       this.listenTo(Views.Events, "newSection", this.render);
     },
-    alert: function(){
-      console.log('bleh');
-    },
+
     addSection: function (event) {
       event.preventDefault();
       this.modal.show();
@@ -192,9 +187,9 @@ function(app, FauxtonAPI, Config, Components) {
           collection = this.collection;
 
       if(!this.isSection()){
-         this.errorMessage("You need to use an existing section.");
+         this.errorMessage("You need to use an existing section");
       } else if (!name) {
-        this.errorMessage("Add a name.");
+        this.errorMessage("Add a name");
       } else if (!value) {
         this.errorMessage("Add a value");
       } else if (this.isNew(collection)){
