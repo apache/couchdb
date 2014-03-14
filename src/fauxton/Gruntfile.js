@@ -170,7 +170,7 @@ module.exports = function(grunt) {
     // override inside main.js needs to test for them so as to not accidentally
     // route. Settings expr true so we can do `migtBeNullObject && mightBeNullObject.coolFunction()`
     jshint: {
-      all: ['app/**/*.js', 'Gruntfile.js', "test/core/*.js"],
+      all: ['app/**/*.js', 'Gruntfile.js', "!app/**/assets/js/*.js"],
       options: {
         scripturl: true,
         evil: true,

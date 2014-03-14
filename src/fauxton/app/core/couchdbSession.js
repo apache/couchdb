@@ -35,7 +35,6 @@ function (FauxtonAPI) {
 
         if (options.forceFetch) {
           fetch = _.bind(this.fetch, this);
-          Backbone.fetchCache.clearItem(_.result(this, 'url'));
         }
 
         return fetch(opt).then(function () {

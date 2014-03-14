@@ -47,7 +47,9 @@ module.exports = function (grunt) {
           accept = req.headers.accept.split(','),
           filePath;
 
-      if (!!url.match(/assets/)) {
+      if (!!url.match(/^\/addons\/.*\/assets\/js/)) {
+        filePath = path.join(app_dir, url.replace('/_utils/fauxton/',''));
+      } else if (!!url.match(/assets/)) {
         // serve any javascript or css files from here assets dir
         filePath = path.join('./',url);
       } else if (!!url.match(/mocha|\/test\/core\/|test\.config/)) {
