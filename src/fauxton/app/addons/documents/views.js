@@ -18,7 +18,6 @@ define([
 
        "addons/documents/resources",
        "addons/databases/resources",
-       "addons/config/resources",
        "addons/pouchdb/base",
 
        // Libs
@@ -29,8 +28,10 @@ define([
        "plugins/prettify",
 ],
 
-function(app, FauxtonAPI, Components, Documents, Databases, Config, pouchdb, resizeColumns, beautify) {
+function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColumns, beautify) {
+  var queryservers = FauxtonAPI.getExtensions('queryservers:templates');
   var Views = {};
+
   Views.Tabs = FauxtonAPI.View.extend({
     template: "addons/documents/templates/tabs",
     initialize: function(options){
@@ -1279,17 +1280,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, Config, pouchdb, res
       "change #design-doc-language": "changeLanguage"
     },
 
-    langTemplates: {
-      "javascript": {
-        map: "function(doc) {\n  emit(doc._id, 1);\n}",
-        reduce: "function(keys, values, rereduce){\n  if (rereduce){\n    return sum(values);\n  } else {\n    return values.length;\n  }\n}"
-      },
-      "coffeescript": {
-        map: "(doc) ->\n  emit(doc._id, 1)",
-        reduce: "(keys, values, rereduce) ->\n  return sum(values) if rereduce\n  return values.length"
-      }
-    },
-
     defaultLang: "javascript",
 
     initialize: function(options) {
@@ -1298,7 +1288,9 @@ function(app, FauxtonAPI, Components, Documents, Databases, Config, pouchdb, res
       this.params = options.params;
       this.database = options.database;
       this.language = this.defaultLang;
-      this.languages = [];
+      this.languages = _.map(queryservers, function(obj) {
+        return _.keys(obj)[0];
+      });
 
       if (this.newView) {
         this.viewName = 'newView';
@@ -1314,22 +1306,14 @@ function(app, FauxtonAPI, Components, Documents, Databases, Config, pouchdb, res
 
     establish: function () {
       var that = this;
-      // TODO: put configs in the caching layer once that is a thing
-      var config = new Config.Collection();
-      var config_promise = config.fetch();
-      config_promise.then(function() {
-        that.languages = _.pluck(config.get('query_servers').get('options'), 'name');
-      });
-
       if (this.ddocInfo) {
-        return [this.ddocInfo.fetch(), config_promise];
-      } else {
-        return [config_promise];
+        return [this.ddocInfo.fetch()];
       }
     },
 
     changeLanguage: function() {
       var new_language = this.$('#design-doc-language').val() || this.defaultLang;
+      var langTemplate = _.filter(_.pluck(queryservers, new_language))[0];
       var overwrite = true;
       // check if the editor is "dirty"
       if (this.mapEditor.edited || (this.reduceEditor && this.reduceEditor.edited)) {
@@ -1341,13 +1325,13 @@ function(app, FauxtonAPI, Components, Documents, Databases, Config, pouchdb, res
         // set the mode
         this.mapEditor.setMode(new_language);
         // and replace contents with template for the selected language
-        this.mapEditor.setValue(this.langTemplates[new_language].map);
+        this.mapEditor.setValue(langTemplate.map);
         // since this is a template, let's tell the editor it's new
         this.mapEditor.editSaved();
         // next do the same for the reduceEditor
         if (this.reduceEditor) {
           this.reduceEditor.setMode(new_language);
-          this.reduceEditor.setValue(this.langTemplates[new_language].reduce);
+          this.reduceEditor.setValue(langTemplate.reduce);
           this.reduceEditor.editSaved();
         }
         // now set the language of the Design Doc to this new language choice
@@ -1373,9 +1357,11 @@ function(app, FauxtonAPI, Components, Documents, Databases, Config, pouchdb, res
     updateReduce: function(event) {
       var $ele = $("#reduce-function-selector");
       var $reduceContainer = $(".control-group.reduce-function");
+      var langTemplate = _.filter(_.pluck(queryservers, this.language))[0];
+
       if ($ele.val() == "CUSTOM") {
         this.createReduceEditor();
-        this.reduceEditor.setValue(this.langTemplates[this.language].reduce);
+        this.reduceEditor.setValue(langTemplate.reduce);
         // template-based edits don't count as edits
         this.reduceEditor.edited = false;
         $reduceContainer.show();
@@ -1659,7 +1645,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, Config, pouchdb, res
         reduceFunStr: this.reduceFunStr,
         isCustomReduce: this.hasCustomReduce(),
         newView: this.newView,
-        langTemplates: this.langTemplates[this.defaultLang],
+        langTemplates: _.pluck(queryservers, this.defaultLang)[0],
         languages: this.languages,
         language: this.language
       };
@@ -1773,9 +1759,9 @@ function(app, FauxtonAPI, Components, Documents, Databases, Config, pouchdb, res
       }
 
       if (this.newView) {
-        this.mapEditor.setValue(this.langTemplates[this.defaultLang].map);
+        this.mapEditor.setValue(_.filter(_.pluck(queryservers, this.defaultLang))[0].map);
         //Use a built in view by default
-        //this.reduceEditor.setValue(this.langTemplates[this.defaultLang].reduce);
+        //this.reduceEditor.setValue(_.filter(_.pluck(queryservers, this.defaultLang))[0].reduce);
       }
 
       this.mapEditor.editSaved();
