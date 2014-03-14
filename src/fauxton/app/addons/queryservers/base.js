@@ -13,10 +13,33 @@
 define([
   "app",
   "api",
+
+  "addons/config/resources",
+
   "addons/queryservers/javascript",
   "addons/queryservers/coffeescript"
 ],
 
-function(app, FauxtonAPI, javascript, coffeescript) {
+function(app, FauxtonAPI, Config, javascript, coffeescript) {
   // action happens in the inclues
+  var QueryServers = FauxtonAPI.addon();
+  var other_langs = {
+    "coffeescript": coffeescript
+  };
+  QueryServers.initialize = function () {
+    javascript.register();
+
+    var config = new Config.Collection();
+    var config_promise = config.fetch();
+    config_promise.then(function() {
+      var languages = _.pluck(config.get('query_servers').get('options'), 'name');
+      _.each(languages, function(lang) {
+        if (lang in other_langs) {
+          console.log(other_langs[lang]);
+          other_langs[lang].register();
+        }
+      });
+    });
+  };
+  return QueryServers;
 });

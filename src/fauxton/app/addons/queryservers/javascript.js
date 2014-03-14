@@ -16,10 +16,14 @@ define([
 ],
 
 function(app, FauxtonAPI) {
-  FauxtonAPI.registerExtension('queryservers:templates', {
-    javascript: {
-      map: "function(doc) {\n  emit(doc._id, 1);\n}",
-      reduce: "function(keys, values, rereduce){\n  if (rereduce){\n    return sum(values);\n  } else {\n    return values.length;\n  }\n}"
+  return {
+    register: function () {
+      FauxtonAPI.registerExtension('queryservers:templates', {
+        javascript: {
+          map: "function(doc) {\n  emit(doc._id, 1);\n}",
+          reduce: "function(keys, values, rereduce){\n  if (rereduce){\n    return sum(values);\n  } else {\n    return values.length;\n  }\n}"
+        }
+      });
     }
-  });
+  };
 });
