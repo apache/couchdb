@@ -13,11 +13,13 @@
 define([
   "app",
   "api"
+
 ],
 
 function (app, FauxtonAPI) {
 
   var Config = FauxtonAPI.addon();
+
 
   Config.Model = Backbone.Model.extend({});
   Config.OptionModel = Backbone.Model.extend({
@@ -74,6 +76,8 @@ function (app, FauxtonAPI) {
       });
     }
   });
+
+ 
 
   return Config;
 });

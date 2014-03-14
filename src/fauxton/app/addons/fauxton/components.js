@@ -210,32 +210,7 @@ function(app, FauxtonAPI, ace, spin) {
 
   });
 
-  //TODO allow more of the typeahead options.
-  //Current this just does what we need but we
-  //need to support the other typeahead options.
-  Components.Typeahead = FauxtonAPI.View.extend({
 
-    initialize: function (options) {
-      this.source = options.source;
-      _.bindAll(this);
-    },
-
-    afterRender: function () {
-      var onUpdate = this.onUpdate;
-
-      this.$el.typeahead({
-        source: this.source,
-        updater: function (item) {
-          if (onUpdate) {
-            onUpdate(item);
-          }
-
-          return item;
-        }
-      });
-    }
-
-  });
 
   Components.ModalView = FauxtonAPI.View.extend({
 
@@ -277,6 +252,34 @@ function(app, FauxtonAPI, ace, spin) {
       }
       return {};
     }
+  });
+
+  //TODO allow more of the typeahead options.
+  //Current this just does what we need but we
+  //need to support the other typeahead options.
+  Components.Typeahead = FauxtonAPI.View.extend({
+
+    initialize: function (options) {
+      this.source = options.source;
+      this.onUpdate = options.onUpdate;
+      _.bindAll(this);
+    },
+
+    afterRender: function () {
+      var onUpdate = this.onUpdate;
+
+      this.$el.typeahead({
+        source: this.source,
+        updater: function (item) {
+          if (onUpdate) {
+            onUpdate(item);
+          }
+
+          return item;
+        }
+      });
+    }
+
   });
 
   Components.DbSearchTypeahead = Components.Typeahead.extend({
