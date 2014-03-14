@@ -12,11 +12,10 @@
 
 define([
   "backbone",
-  "plugins/backbone.layoutmanager",
-  "backbone.fetch-cache"
+  "plugins/backbone.layoutmanager"
 ],
 
-function(Backbone, LayoutManager, BackboneCache) {
+function(Backbone, LayoutManager) {
   var FauxtonAPI = {
     //add default objects
     router: {
@@ -68,44 +67,26 @@ function(Backbone, LayoutManager, BackboneCache) {
     }
   });
 
-
-  FauxtonAPI.Model = Backbone.Model.extend({
-
-  });
-
-  FauxtonAPI.Collection = Backbone.Collection.extend({
-
-  });
-
   var caching = {
-    fetchOnce: function (opts) {
-      var options = _.defaults(opts || {}, this.cache, {cache: true});
+    fetchOnce: function (opt) {
+      var options = _.extend({}, opt);
 
-      if (opts && !opts.cache) {
-        delete options.cache;
+      if (!this._deferred || this._deferred.state() === "rejected" || options.forceFetch ) {
+        this._deferred = this.fetch();
       }
 
-      if (!options.prefill) {
-        return this.fetch(options);
-      }
-
-      //With Prefill, the Caching with resolve with whatever is in the cache for that model/collection
-      //and at the sametime it will fetch from the server the latest. 
-      var promise = FauxtonAPI.Deferred(),
-          fetchPromise = this.fetch(options);
-
-      fetchPromise.progress(promise.resolveWith); // Fires when the cache hit happens
-      fetchPromise.then(promise.resolveWith); // Fires after the AJAX call
-      promise.fail(fetchPromise.abort);
-
-      return promise;
+      return this._deferred;
     }
   };
 
-  _.each([FauxtonAPI.Collection, FauxtonAPI.Model], function (ctor) {
+  FauxtonAPI.Model = Backbone.Model.extend({ });
+
+  FauxtonAPI.Collection = Backbone.Collection.extend({ });
+
+  _.each([FauxtonAPI.Model, FauxtonAPI.Collection], function (ctor) {
     _.extend(ctor.prototype, caching);
   });
-
+  
   var extensions = _.extend({}, Backbone.Events);
   // Can look at a remove function later.
   FauxtonAPI.registerExtension = function (name, view) {
