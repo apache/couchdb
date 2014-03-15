@@ -147,6 +147,7 @@ FAUXTON_FILES = \
     fauxton/app/addons/databases/resources.js \
     fauxton/app/addons/databases/routes.js \
     fauxton/app/addons/databases/views.js \
+    fauxton/app/addons/databases/tests/resourcesSpec.js \
     fauxton/app/addons/documents/base.js \
     fauxton/app/addons/documents/resources.js \
     fauxton/app/addons/documents/routes.js \
