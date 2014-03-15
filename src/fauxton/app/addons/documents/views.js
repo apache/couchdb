@@ -335,7 +335,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
       this.model.destroy().then(function(resp) {
         FauxtonAPI.addNotification({
-          msg: "Succesfully destroyed your doc"
+          msg: "Succesfully destroyed your doc",
+          clear:  true
         });
         that.$el.fadeOut(function () {
           that.remove();
@@ -348,7 +349,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       }, function(resp) {
         FauxtonAPI.addNotification({
           msg: "Failed to destroy your doc!",
-          type: "error"
+          type: "error",
+          clear:  true
         });
       });
     }
@@ -518,13 +520,15 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
           return FauxtonAPI.addNotification({
             msg: "JSON Parse Error on field: "+param.name,
             type: "error",
-            selector: ".advanced-options .errors-container"
+            selector: ".advanced-options .errors-container",
+            clear:  true
           });
         });
         FauxtonAPI.addNotification({
           msg: "Make sure that strings are properly quoted and any other values are valid JSON structures",
           type: "warning",
-          selector: ".advanced-options .errors-container"
+          selector: ".advanced-options .errors-container",
+          clear:  true
         });
 
         return false;
@@ -580,7 +584,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         this.ddocID = options.ddocInfo.id;
       }
       this.newView = options.newView || false;
-      this.docParams = options.docParams;
+      this.docParams = options.docParams || {};
       this.params = options.params || {};
       this.expandDocs = true;
       this.perPageDefault = this.docParams.limit || 20;
@@ -597,7 +601,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
           // This should just throw a notification, not break the page
           FauxtonAPI.addNotification({
             msg: "Bad Request",
-            type: "error"
+            type: "error",
+            clear:  true
           });
 
           //now redirect back to alldocs
@@ -668,7 +673,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         }, function(resp) {
           FauxtonAPI.addNotification({
             msg: "Failed to destroy your doc!",
-            type: "error"
+            type: "error",
+            clear:  true
           });
         });
       }, this);
@@ -771,7 +777,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       if (this.model.isNewDoc()) {
         FauxtonAPI.addNotification({
           msg: 'This document has not been saved yet.',
-          type: 'warning'
+          type: 'warning',
+          clear:  true
         });
         return;
       }
@@ -784,13 +791,15 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
       this.model.destroy().then(function(resp) {
         FauxtonAPI.addNotification({
-          msg: "Succesfully destroyed your doc"
+          msg: "Succesfully destroyed your doc",
+          clear:  true
         });
         FauxtonAPI.navigate(database.url("index"));
       }, function(resp) {
         FauxtonAPI.addNotification({
           msg: "Failed to destroy your doc!",
-          type: "error"
+          type: "error",
+          clear:  true
         });
       });
     },
@@ -808,7 +817,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       if (this.model.isNewDoc()) {
         FauxtonAPI.addNotification({
           msg: 'Please save the document before uploading an attachment.',
-          type: 'warning'
+          type: 'warning',
+          clear:  true
         });
         return;
       }
@@ -819,7 +829,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       if (this.model.isNewDoc()) {
         FauxtonAPI.addNotification({
           msg: 'Please save the document before duplicating it.',
-          type: 'warning'
+          type: 'warning',
+          clear:  true
         });
         return;
       }
@@ -891,14 +902,16 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
           notification = FauxtonAPI.addNotification({
             msg: "Cannot save: " + 'Cannot change a documents _id, try Duplicate doc instead!',
             type: "error",
-            selector: "#doc .errors-container"
+            selector: "#doc .errors-container",
+            clear:  true
           });
         delete this.model.validationError;
       } else {
         notification = FauxtonAPI.addNotification({
           msg: "Please fix the JSON errors and try again.",
           type: "error",
-          selector: "#doc .errors-container"
+          selector: "#doc .errors-container",
+          clear:  true
         });
       }
     },
@@ -988,7 +1001,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         editor.setValue(JSON.stringify(changedDoc, null, "  "));
         FauxtonAPI.addNotification({
           type: "error",
-          msg: "Cannot remove a documents Id or Revision."
+          msg: "Cannot remove a documents Id or Revision.",
+          clear:  true
         });
       });
     },
@@ -1008,7 +1022,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     saveDoc: function(event) {
       FauxtonAPI.addNotification({
         type: "warning",
-        msg: "Save functionality coming soon."
+        msg: "Save functionality coming soon.",
+        clear:  true
       });
     },
 
@@ -1195,7 +1210,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
             var notification = FauxtonAPI.addNotification({
               msg: "include_docs has been disabled as you cannot include docs on a reduced view",
               type: "warn",
-              selector: ".view.show .all-docs-list.errors-container"
+              selector: ".view.show .all-docs-list.errors-container",
+              clear:  true
             });
           }
           $form.find("input[name=include_docs]").prop("disabled", true);
