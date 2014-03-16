@@ -140,6 +140,7 @@
 ^src/fauxton/readme.md
 ^src/fauxton/writing_addons.md
 ^src/fauxton/TODO.md
+^src/fauxton/CONTRIBUTING.md
 ^src/fauxton/settings.json.*
 ^src/fauxton/test/test.config.underscore
 ^src/fauxton/test/mocha/chai.js
