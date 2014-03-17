@@ -59,6 +59,7 @@ FAUXTON_FILES = \
     fauxton/app/addons/auth/templates/nav_dropdown.html \
     fauxton/app/addons/auth/templates/nav_link_title.html \
     fauxton/app/addons/auth/templates/noAccess.html \
+    fauxton/app/addons/auth/test/baseSpec.js \
     fauxton/app/addons/compaction/assets/less/compaction.less \
     fauxton/app/addons/compaction/templates/compact_view.html \
     fauxton/app/addons/compaction/templates/layout.html \
