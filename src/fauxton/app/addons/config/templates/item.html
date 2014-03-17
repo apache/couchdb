@@ -17,13 +17,22 @@ the License.
 <% } else { %>
 <td></td>
 <% } %>
-<td > <%= option.name %> </td>
+<td class="js-edit-value"> 
+  <div class="js-show-value">
+    <%= option.name %>
+  </div>
+  <div class="js-edit-value-form js-hidden">
+    <input class="js-value-input" type="text" name="name" value="<%- option.name %>" />
+    <button class="js-save-value btn btn-success fonticon-circle-check btn-small"> </button>
+    <button class="js-cancel-value btn btn-small fonticon-circle-x"> </button>
+  </div>
+</td>
 <td class="js-edit-value">
   <div class="js-show-value">
     <%= option.value %>
   </div>
   <div class="js-edit-value-form js-hidden">
-    <input class="js-value-input" type="text" value="<%- option.value %>" />
+    <input class="js-value-input" type="text" name="value" value="<%- option.value %>" />
     <button class="js-save-value btn btn-success fonticon-circle-check btn-small"> </button>
     <button class="js-cancel-value btn btn-small fonticon-circle-x"> </button>
   </div>
