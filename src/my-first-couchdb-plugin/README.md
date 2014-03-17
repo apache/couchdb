@@ -2,7 +2,7 @@
 
 A practical guide to developing CouchDB plugins.
 
-*NOTE: This is incomplete, barely tested, works only with the 1867-feature-plugin branch of Apache CouchDB and expects that you understand some Erlang. This is mostly for early review, but if you are daring, you can learn someting already :)*
+*NOTE: This is incomplete, barely tested, works only with the 1867-feature-plugin branch of Apache CouchDB and expects that you understand some Erlang. This is mostly for early review, but if you are daring, you can learn something already :)*
 
 
 ## Preparation
@@ -84,7 +84,7 @@ Note: from now on you can just type `make dev`, it will run `make` for you inter
 
 * * *
 
-That is all that is needed to get started building a CouchDB plugin. The rest of this guide will explain how to hook into the various parts of CouchDB that allow you to do all sorts of fun things. That means you can write different types of plugins, once that handle HTTP requests, others that operate on database changes, and yet others that provide a deamon that does useful things for us.
+That is all that is needed to get started building a CouchDB plugin. The rest of this guide will explain how to hook into the various parts of CouchDB that allow you to do all sorts of fun things. That means you can write different types of plugins, ones that handle HTTP requests, others that operate on database changes, and yet others that provide a daemon that does useful things for us.
 
 * * *
 
@@ -111,9 +111,9 @@ That’s the easy part. The hard part is publishing the plugin. And since this i
 
 Our module above is not very useful on its own. You can call it when you are in the Erlang command prompt for your local CouchDB, but CouchDB itself doesn’t know what to do with it and you can’t do anything with it from CouchDB’s HTTP API. Let’s fix that!
 
-CouchDB’s main API is HTTP and thus we can expect to have a lot of infrastructure to work with. Luckily, it is mostly straigtforward to get into and we don’t need to learn a whole lot before can get started, and learn more as we go along.
+CouchDB’s main API is HTTP and thus we can expect to have a lot of infrastructure to work with. Luckily, it is mostly straightforward to get into and we don’t need to learn a whole lot before can get started, and learn more as we go along.
 
-Before ge get goint, let’s create another file that handles all our HTTP handler code. Create `src/my_first_couchdb_plugin_httpd.erl` and put in the following contents:
+Before we get going, let’s create another file that handles all our HTTP handler code. Create `src/my_first_couchdb_plugin_httpd.erl` and put in the following contents:
 
     -module(my_first_couchdb_plugin_httpd).
 
@@ -142,11 +142,11 @@ Now we have a function that can handle HTTP requests, but we haven’t told Couc
 
 To do this, we need to take a little detour into the CouchDB configuration system, as CouchDB’s HTTP routing is fully dynamic and configurable at runtime.
 
-To get an idea, open this file in CouchDB source directory: `etc/couchdb/default.ini.tpl.in`, don’t mind the triple file extensions, this is essentialy an `.ini` file. Now scroll down to the section `[httpd_global_handlers]`. You will find a list of API endpoints with mapping to the code in CouchDB that handles it. for example:
+To get an idea, open this file in CouchDB source directory: `etc/couchdb/default.ini.tpl.in`, don’t mind the triple file extensions, this is essentially an `.ini` file. Now scroll down to the section `[httpd_global_handlers]`. You will find a list of API endpoints with mapping to the code in CouchDB that handles it. for example:
 
     _utils = {couch_httpd_misc_handlers, handle_utils_dir_req, "%localdatadir%/www"}
 
-This means that `/_utils` is handled by the erlang module `couch_httpd_misc_handlers` and its function `handle_utils_dir_req` and it takes one additinal argument that is the document root for Futon.
+This means that `/_utils` is handled by the erlang module `couch_httpd_misc_handlers` and its function `handle_utils_dir_req` and it takes one additional argument that is the document root for Futon.
 
 Another example:
 
@@ -154,7 +154,7 @@ Another example:
 
 This means that `/_all_dbs`, the API endpoint that allows you to list all databases in CouchDB is handled by, again, `couch_httpd_misc_handlers` but this time its function `handle_all_dbs_req`, which does not take an additional argument.
 
-Say we want to make our `handle_req` function answer under the enpoint `/_my_plugin` (you want to start with an underscore here, as CouchDB will consider all other characters as real database names), we would add something like this:
+Say we want to make our `handle_req` function answer under the endpoint `/_my_plugin` (you want to start with an underscore here, as CouchDB will consider all other characters as real database names), we would add something like this:
 
     _my_plugin = {my_first_couchdb_plugin, handle_req}
 
