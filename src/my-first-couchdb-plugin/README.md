@@ -8,9 +8,8 @@ A practical guide to developing CouchDB plugins.
 
 To get started, you need to install CouchDB from source, grab the CouchDB sources:
 
-    git clone https://git-wip-us.apache.org/repos/asf/couchdb.git
+    git clone https://github.com/apache/couchdb.git
     cd couchdb
-    git checkout -b 1867-feature-plugin origin/1867-feature-plugins
 
 Follow the instructions in `couchdb/INSTALL.Unix` and `couchdb/DEVELOPERS` to get a development environment going.
 
