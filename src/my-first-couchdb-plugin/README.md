@@ -2,16 +2,14 @@
 
 A practical guide to developing CouchDB plugins.
 
-*NOTE: This is incomplete, barely tested, works only with the 1867-feature-plugin branch of Apache CouchDB and expects that you understand some Erlang. This is mostly for early review, but if you are daring, you can learn something already :)*
-
+*NOTE: this feature is considered beta, possibly subject to change and expects that you understand some Erlang.
 
 ## Preparation
 
 To get started, you need to install CouchDB from source, grab the CouchDB sources:
 
-    git clone https://git-wip-us.apache.org/repos/asf/couchdb.git
+    git clone https://github.com/apache/couchdb.git
     cd couchdb
-    git checkout -b 1867-feature-plugin origin/1867-feature-plugins
 
 Follow the instructions in `couchdb/INSTALL.Unix` and `couchdb/DEVELOPERS` to get a development environment going.
 
