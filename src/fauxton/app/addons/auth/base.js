@@ -50,7 +50,7 @@ function(app, FauxtonAPI, Auth) {
     };
 
     var authDenied = function () {
-      FauxtonAPI.navigate('/noAccess');
+      FauxtonAPI.navigate('/noAccess', {replace: true});
     };
 
     FauxtonAPI.auth.registerAuth(auth);
