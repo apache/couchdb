@@ -1132,42 +1132,15 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       this.hasReduce = hasReduce;
       this.render();
     },
-    getKeys: function(val){
-      var keys = val.value.replace(/\s/g,"");
-      
-      var regKeys = keys.match(/(\[.*?\])/g); 
-      if (regKeys) {
-        keys = regKeys;
-      } else {
-        keys = keys.split(',');
-      }
-
-      keys = _.map(keys, function (key) { return JSON.parse(key); });
-
-      if (_.isArray(keys)){
-        return {
-          name: "keys",
-          value: JSON.stringify(keys)
-        };
-      } else if (keys.length === 1) {
-        return {
-          name: "key",
-          value: keys[0]
-        };
-      }
+    validateKeys:  function(val){
+      return JSON.parse(val);
     },
     queryParams: function () {
-      var $form = this.$(".js-view-query-update"),
-          getKeys = this.getKeys;
+      var $form = this.$(".js-view-query-update");
 
       var params = _.reduce($form.serializeArray(), function(params, param) {
         if (!param.value) { return params; }
         if (param.name === "limit" && param.value === 'None') { return params; }
-        
-        if (param.name === "keys"){
-          param = getKeys(param);
-        }
-
         params.push(param);
         return params;
       }, []);
@@ -1249,17 +1222,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
           }
           this.updateFiltersFor(key, $ele);
           break;
-          case "keys":
-            val = JSON.parse(val);
-            var processVal = val;
-            if (_.isArray(val)) {
-              processVal = _.map(val, function (arr) {
-                return JSON.stringify(arr);
-              }).join(', ');
-            }
-
-            $form.find("input[name='keys']").val(processVal);
-            break;
           default:
             $form.find("input[name='"+key+"']").val(val);
           break;
