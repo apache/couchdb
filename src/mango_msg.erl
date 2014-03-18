@@ -38,6 +38,29 @@ new(<<Size:4/?LI, Rest/binary>>=All) ->
     end.
 
 
+reply(Resp) ->
+    ReqId = req_id(),
+    RespTo = get_key(resp_to, Resp),
+    Flags = get_key(flags, Resp),
+    CursorId = get_key(cursor, Resp, 0),
+    Offset = get_key(offset, Resp, 0),
+    DocsEJson = get_key(docs, Resp, []),
+    DocsBinary = mango_bson:from_ejson(DocsEJson),
+    Size = 36 + size(DocsBinary),
+    <<
+        Size:4/little-integer,
+        ReqId:4/little-integer,
+        RespTo:4/little-integer,
+        ?OP_REPLY:4/little-integer,
+        Flags:4/little-integer,
+        CursorId:8/little-integer,
+        Offset:4/little-integer,
+        length(DocsEJson):4/little-integer,
+        DocsBinary/binary
+    >>.
+        
+
+
 parse(Data) ->
     % Grab our values from the message header
     case Data of
@@ -151,13 +174,11 @@ parse_bin([{Name, docs}], Data, Acc)
             Error
     end;
 parse_bin([{Name, cursors}], Data, Acc) ->
-    % This has to be the last element of the message
-    % so we assert that in the pattern match.
     case Data of
-        <<Num:4/?LI, Rest/binary>> ->
-            case parse_cursors(Num, Rest, []) of
-                {ok, Cursors} ->
-                    {ok, lists:reverse(Acc, [{Name, Cursors}]), <<>>};
+        <<Num:4/?LI, Rest0/binary>> ->
+            case parse_cursors(Num, Rest0, []) of
+                {ok, Cursors, Rest1} ->
+                    {ok, lists:reverse(Acc, [{Name, Cursors}]), Rest1};
                 Error ->
                     Error
             end;
@@ -188,9 +209,18 @@ parse_docs(Data, Acc) ->
     end.
 
 
-parse_cursors(0, <<>>, Acc) ->
-    {ok, lists:reverse(Acc)};
+parse_cursors(0, Rest, Acc) ->
+    {ok, lists:reverse(Acc), Rest};
 parse_cursors(N, <<Cursor:8/little-integer, Rest/binary>>, Acc) ->
     parse_cursors(N-1, Rest, [Cursor | Acc]);
 parse_cursors(_, _, _) ->
     {error, truncated_cursors}.
+
+
+get_key(Name, Data) ->
+    case lists:keyfind(Name, 1, Data) of
+        {Name, Value} ->
+            Value;
+        false ->
+            undefined
+    end.

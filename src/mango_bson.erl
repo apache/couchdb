@@ -3,7 +3,9 @@
 
 -export([
     to_ejson/1,
-    to_ejson/2
+    to_ejson/2,
+    
+    from_ejson/1
 ]).
 
 
@@ -45,6 +47,12 @@ to_ejson(Data, Opts) ->
         Error ->
             Error
     end.
+
+
+from_ejson(Docs) when is_list(Docs) ->
+    render(Docs, []);
+frome_ejson(Doc) when tuple_size(Doc) == 1 ->
+    render([Doc], []).
 
 
 parse(Data) ->
@@ -190,6 +198,7 @@ parse_val(?V_CODE, Data) ->
 parse_val(?V_SYMBOL, Data) ->
     parse_string(Data);
 parse_val(?V_CODE_W_S, Data) ->
+    % Yuck...
     case Data of
         <<Size:4/little-integer, Rest0/binary>> ->
             case parse_string(Rest0) of
@@ -245,6 +254,50 @@ parse_val(Type, _Data) ->
     {error, {unknown_type, Type}}.
 
 
+render([Doc | Rest], Acc) ->
+    AsBin = render_doc(Doc),
+    render(Rest, NewAcc).
+
+
+render_doc({[{<<"$binary">>, Bin}, {<<"$type">>, Type}]}) ->
+    binary;
+render_doc({[{<<"$type">>, Type}, {<<"$binary">>, Bin}]}) ->
+    binary;
+render_doc({[{<<"$undefined">>, true}]}) ->
+    undefined;
+render_doc({[{<<"$id">>, ObjId}]}) ->
+    objid;
+render_doc({[{<<"$date">>, Date}]}) ->
+    datetime;
+render_doc({[{<<"$regex">>, Regex}, {<<"$options">>, Opts}]}) ->
+    regex;
+render_doc({[{<<"$options">>, Opts}, {<<"$regex">>, RegEx}]}) ->
+    regex;
+render_doc({[{<<"$ref">>, Ref}, {<<"$id">>, Id}]}) ->
+    dbref;
+render_doc({[{<<"$id">>, Id}, {<<"$ref">>, Ref}]}) ->
+    dbref;
+render_doc({[{<<"$timestamp">>, Doc}]}) ->
+    timestamp;
+render_doc({[{<<"$code">>, Code}]}) ->
+    code;
+render_doc({[{<<"$code">>, Code}, {<<"$scope">>, Scop}]}) ->
+    code_w_s;
+render_doc({[{<<"$scope">>, Scope}, {<<"$code">>, Code}]}) ->
+    code_w_s;
+render_doc({[{<<"$minKey">>, 1}]}) ->
+    minkey;
+render_doc({[{<<"$maxKey">>, 1}]}) ->
+    maxkey;
+render_doc({Props}) ->
+    render_props(Props, []).
+
+
+render_props([{Key, Val} | Rest], Acc) ->
+    KeyBin = render_cstring(Key),
+    {Type, ValBin} = render_val(Val),
+    
+
 parse_cstring(Data, O) ->
     case Data of
         <<Key:O/binary, 0, Rest/binary>> ->
@@ -254,6 +307,10 @@ parse_cstring(Data, O) ->
         _ ->
             parse_key(Data, O)
     end.
+
+
+render_cstring(Bin) when is_binary(Bin) ->
+    ok.
 
 
 parse_string(Data) ->
@@ -271,6 +328,10 @@ parse_string(Data) ->
     end.
 
 
+render_string(Data) ->
+    ok.
+
+
 parse_objid(Data) ->
     case 12 =< size(Data) of
         true ->
@@ -280,6 +341,10 @@ parse_objid(Data) ->
         false ->
             {error, truncated_object_id}
     end.
+
+
+render_objid(ObjId) when is_binary(ObjId), size(ObjId) == 12 ->
+    ok.
 
 
 to_hex(<<>>, Acc) ->

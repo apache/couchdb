@@ -86,7 +86,7 @@ dispatch({Type, Props}, St) ->
         ok ->
             {noreply, St};
         {ok, Resp} ->
-            {noreply, send_resp(Resp, St)};
+            send_resp(Resp, St);
         Error ->
             {noreply, add_error(Error, St)}
     end.
@@ -96,9 +96,15 @@ set_active(#st{socket=S, transport=T}) ->
     ok = T:setopts(S, [{active, once}]).
 
 
-send_resp(_Resp, St) ->
-    St.
-
+send_resp(Resp, #st{socket=S, transport=T}=St) ->
+    Msg = mango_msg:reply(Resp),
+    case T:send(S, Msg) of
+        ok ->
+            {noreply, St};
+        {error, Reason} ->
+            {stop, Reason, St}
+    end.
+            
 
 add_error(Error, #st{errors=Errors}=St) ->
     St#st{errors = [Error | Errors]}.
