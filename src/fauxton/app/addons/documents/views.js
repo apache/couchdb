@@ -1107,13 +1107,13 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
     showKeys: function(){
       this.$("#js-showKeys, .js-disabled-message").show();
-      this.$('[name="skip"],[name="startkey"],[name="limit"],[name="endkey"],[name="inclusive_end"]').attr("disabled","true");
+      this.$('[name="startkey"],[name="endkey"],[name="inclusive_end"]').attr("disabled","true");
       this.$('[name="keys"]').removeAttr("disabled");
     },
 
     showStartEnd: function(){
       this.$("#js-showStartEnd").show();
-      this.$('[name="skip"],[name="startkey"],[name="limit"],[name="endkey"],[name="inclusive_end"]').removeAttr("disabled");
+      this.$('[name="startkey"],[name="endkey"],[name="inclusive_end"]').removeAttr("disabled");
       this.$('.js-disabled-message').hide();
       this.$('[name="keys"]').attr("disabled","true");
     },
