@@ -148,7 +148,7 @@ function (app, FauxtonAPI, Permissions ) {
         });
       }, function (xhr) {
         FauxtonAPI.addNotification({
-          msg: 'Could not update permissions - reason: ' + xhr.responseText,
+          msg: 'Could not update permissions - reason: ' + xhr.responseJSON.reason,
           type: 'error'
         });
       });
