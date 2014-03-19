@@ -1222,6 +1222,10 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
           }
           this.updateFiltersFor(key, $ele);
           break;
+          case "key": 
+          case "keys": 
+            $form.find("textarea[name='"+key+"']").val(val);
+          break;
           default:
             $form.find("input[name='"+key+"']").val(val);
           break;
@@ -1615,6 +1619,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     },
 
     toggleIndexNav: function (event) {
+      $('#dashboard-content').scrollTop(0); //scroll up
+      
       var $targetId = this.$(event.target).attr('id'),
           $previousTab = this.$(this.$('li.active a').attr('href')),
           $targetTab = this.$(this.$(event.target).attr('href'));
