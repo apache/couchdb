@@ -1132,18 +1132,33 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       this.hasReduce = hasReduce;
       this.render();
     },
-    validateKeys:  function(val){
-      return JSON.parse(val);
+    validateKeys:  function(param){
+      var parsedValue = JSON.parse(param.value);
+      if (!_.isArray(parsedValue)) {
+        FauxtonAPI.addNotification({
+          type: "error",
+          msg: "Keys values must be in an array. E.g [1,2,3]",
+          clear:  false,
+          selector: '.js-keys-error'
+        });
+        return false;
+      }
+      return true; 
     },
     queryParams: function () {
-      var $form = this.$(".js-view-query-update");
+      var $form = this.$(".js-view-query-update"),
+          keysParam = false;
 
       var params = _.reduce($form.serializeArray(), function(params, param) {
         if (!param.value) { return params; }
         if (param.name === "limit" && param.value === 'None') { return params; }
+        if (param.name === "keys") { keysParam = param; }
         params.push(param);
         return params;
       }, []);
+
+
+      if (keysParam && !this.validateKeys(keysParam)) { return false; }
 
       // Validate *key* params to ensure they're valid JSON
       var keyParams = ["keys","startkey","endkey"];
@@ -1235,11 +1250,15 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
     updateView: function (event) {
       event.preventDefault();
-      this.updateViewFn(event, this.queryParams());
+      var params = this.queryParams();
+      if (!params) { return;}
+      this.updateViewFn(event, params);
     },
 
     previewView: function (event) {
-      this.previewFn(event, this.queryParams());
+      var params = this.queryParams();
+      if (!params) { return;}
+      this.previewFn(event, params);
     },
 
     serialize: function () {
