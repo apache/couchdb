@@ -19,9 +19,13 @@
 ]).
 
 
+-include("mango.hrl").
+
+
 -record(st, {
     socket,
     transport,
+    context = #mango_ctx{},
     buffer = <<>>,
     errors = []
 }).
@@ -87,6 +91,8 @@ dispatch({Type, Props}, St) ->
             {noreply, St};
         {ok, Resp} ->
             send_resp(Resp, St);
+        {ok, Resp, NewCtx} ->
+            send_resp(Resp, St#st{context=NewCtx});
         Error ->
             {noreply, add_error(Error, St)}
     end.
