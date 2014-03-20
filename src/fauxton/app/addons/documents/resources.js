@@ -19,7 +19,7 @@ define([
 function(app, FauxtonAPI, PagingCollection) {
   var Documents = FauxtonAPI.addon();
 
-  Documents.QueryParams = (function () {
+  /*Documents.QueryParams = (function () {
     var _eachParams = function (params, action) {
       _.each(['startkey', 'endkey', 'key'], function (key) {
         if (_.has(params, key)) {
@@ -39,7 +39,7 @@ function(app, FauxtonAPI, PagingCollection) {
         return _eachParams(params, JSON.stringify);
       }
     };
-  })();
+  })();*/
 
   
   Documents.Doc = FauxtonAPI.Model.extend({
@@ -295,22 +295,6 @@ function(app, FauxtonAPI, PagingCollection) {
 
   });
 
-  var DefaultParametersMixin = function() {
-    // keep this variable private
-    var defaultParams;
-
-    return {
-      saveDefaultParameters: function() {
-        // store the default parameters so we can reset to the first page
-        defaultParams = _.clone(this.params);
-      },
-
-      restoreDefaultParameters: function() {
-        this.params = _.clone(defaultParams);
-      }
-    };
-  };
-
   //Documents.AllDocs = FauxtonAPI.Collection.extend(_.extend({}, DefaultParametersMixin(), {
   Documents.AllDocs = PagingCollection.extend({
     model: Documents.Doc,
@@ -330,7 +314,7 @@ function(app, FauxtonAPI, PagingCollection) {
       }
     },
 
-    url: function(context, params) {
+    urlRef: function(context, params) {
       var query = "";
 
       if (params) {
@@ -350,6 +334,10 @@ function(app, FauxtonAPI, PagingCollection) {
       } else {
         return app.host + "/" + this.database.safeID() + "/_all_docs" + query;
       }
+    },
+
+    url: function () {
+      return this.urlRef();
     },
 
     simple: function () {
@@ -423,7 +411,8 @@ function(app, FauxtonAPI, PagingCollection) {
     }
   });
 
-  Documents.IndexCollection = FauxtonAPI.Collection.extend(_.extend({}, DefaultParametersMixin(), {
+  //Documents.IndexCollection = FauxtonAPI.Collection.extend(_.extend({}, DefaultParametersMixin(), {
+  Documents.IndexCollection = PagingCollection.extend({
     model: Documents.ViewRow,
     documentation: function(){
       return "docs";
@@ -441,11 +430,9 @@ function(app, FauxtonAPI, PagingCollection) {
       if (!this.params.limit) {
         this.params.limit = this.perPageLimit;
       }
-
-      this.saveDefaultParameters();
     },
 
-    url: function(context, params) {
+    urlRef: function(context, params) {
       var query = "";
       if (params) {
         if (!_.isEmpty(params)) {
@@ -468,6 +455,10 @@ function(app, FauxtonAPI, PagingCollection) {
 
       var url = [startOfUrl, this.database.safeID(), "_design", design, this.idxType, view];
       return url.join("/") + query;
+    },
+
+    url: function () {
+      return this.urlRef();
     },
 
     updateParams: function (params) {
@@ -525,14 +516,8 @@ function(app, FauxtonAPI, PagingCollection) {
         offset: resp.offset,
         update_seq: resp.update_seq
       };
-      return _.map(rows, function(row) {
-        return {
-          value: row.value,
-          key: row.key,
-          doc: row.doc,
-          id: row.id
-        };
-      });
+
+      return PagingCollection.prototype.parse.apply(this, arguments);
     },
 
     buildAllDocs: function(){
@@ -543,7 +528,7 @@ function(app, FauxtonAPI, PagingCollection) {
     // we can get the request duration
     fetch: function () {
       this.startTime = new Date().getTime();
-      return FauxtonAPI.Collection.prototype.fetch.call(this);
+      return PagingCollection.prototype.fetch.call(this);
     },
 
     allDocs: function(){
@@ -582,10 +567,11 @@ function(app, FauxtonAPI, PagingCollection) {
       return timeString;
     }
 
-  }));
+  });
 
 
-  Documents.PouchIndexCollection = FauxtonAPI.Collection.extend(_.extend({}, DefaultParametersMixin(), {
+  //Documents.PouchIndexCollection = FauxtonAPI.Collection.extend(_.extend({}, DefaultParametersMixin(), {
+  Documents.PouchIndexCollection = PagingCollection.extend({
     model: Documents.ViewRow,
     documentation: function(){
       return "docs";
@@ -598,8 +584,6 @@ function(app, FauxtonAPI, PagingCollection) {
       this.params = _.extend({limit: 20, reduce: false}, options.params);
 
       this.idxType = "_view";
-
-      this.saveDefaultParameters();
     },
 
     url: function () {
@@ -654,7 +638,7 @@ function(app, FauxtonAPI, PagingCollection) {
     allDocs: function(){
       return this.models;
     }
-  }));
+  });
 
 
 

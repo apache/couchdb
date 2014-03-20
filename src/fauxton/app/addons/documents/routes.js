@@ -169,8 +169,8 @@ function(app, FauxtonAPI, Documents, Databases) {
       this.data.designDocs = new Documents.AllDocs(null, {
         database: this.data.database,
         params: {
-          startkey: '"_design"',
-          endkey: '"_design1"',
+          startkey: '_design',
+          endkey: '_design1',
           include_docs: true
         }
       });
@@ -240,9 +240,7 @@ function(app, FauxtonAPI, Documents, Databases) {
         {"name": this.data.database.id, "link": Databases.databaseUrl(this.data.database)}
       ];
 
-      this.apiUrl = [this.data.database.allDocs.url("apiurl", urlParams), this.data.database.allDocs.documentation() ];
-      //reset the pagination history - the history is used for pagination.previous
-      Documents.paginate.reset();
+      this.apiUrl = [this.data.database.allDocs.urlRef("apiurl", urlParams), this.data.database.allDocs.documentation() ];
     },
 
     viewFn: function (databaseName, ddoc, view) {
@@ -290,8 +288,7 @@ function(app, FauxtonAPI, Documents, Databases) {
         ];
       };
 
-      this.apiUrl = [this.data.indexedDocs.url("apiurl", urlParams), "docs"];
-      Documents.paginate.reset();
+      this.apiUrl = [this.data.indexedDocs.urlRef("apiurl", urlParams), "docs"];
     },
 
     ddocInfo: function (designDoc, designDocs, view) {
@@ -378,8 +375,7 @@ function(app, FauxtonAPI, Documents, Databases) {
       this.documentsView.setCollection(collection);
       this.documentsView.setParams(docParams, urlParams);
 
-      this.apiUrl = [collection.url("apiurl", urlParams), "docs"];
-      Documents.paginate.reset();
+      this.apiUrl = [collection.urlRef("apiurl", urlParams), "docs"];
     },
 
     updateAllDocsFromPreview: function (event) {
