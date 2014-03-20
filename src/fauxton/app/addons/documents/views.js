@@ -1135,21 +1135,15 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
     parseJSON: function (value) {
       try {
-        return {
-         value: JSON.parse(value),
-         error: null
-        };
+        return JSON.parse(value);
       } catch(e) {
-        return {
-          error: e,
-          value: null
-        };
+        return undefined;
       }
     },
 
     validateKeys:  function(param){
       var parsedValue = this.parseJSON(param.value);
-      if (parsedValue.error || !_.isArray(parsedValue.value)) {
+      if (_.isUndefined(parsedValue) || !_.isArray(parsedValue)) {
         this.$('.js-keys-error').empty();
         FauxtonAPI.addNotification({
           type: "error",
@@ -1179,11 +1173,11 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       // Validate *key* params to ensure they're valid JSON
       var keyParams = ["keys","startkey","endkey"];
       var errorParams = _.filter(params, function(param) {
-        if (_.contains(keyParams, param.name)) {
-          return !!this.parseJSON(param.value).error;
-        } else {
+        if (_.contains(keyParams, param.name) && _.isUndefined(this.parseJSON(param.value))) {
+            return true;
+          }
+
           return false;
-        }
       }, this);
 
       return {params: params, errorParams: errorParams};
