@@ -84,28 +84,18 @@ function(app, FauxtonAPI, ace, spin) {
     },
 
     canShowPreviousfn: function () {
-      if (this._pageStart === 1 || !this.enabled) {
-        return false;
-      }
-      return true;
+      if (!this.enabled) { return this.enabled; }
+      return this.collection.hasPrevious();
     },
 
     canShowNextfn: function () {
       if (!this.enabled) { return this.enabled; }
 
-      if (this.collection.length < (this.perPage -1)) {
-        return false;
-      }
-
       if ((this.pageStart() + this.perPage) >= this.docLimit) {
         return false;
       }
 
-      if (this.collection.viewMeta && this.collection.viewMeta.total_rows <= this.pageStart() + this.perPage) {
-        return false;
-      }
-
-      return true;
+      return this.collection.hasNext();
     },
 
     previousClicked: function (event) {

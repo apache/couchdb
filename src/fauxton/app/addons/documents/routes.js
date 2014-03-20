@@ -168,10 +168,14 @@ function(app, FauxtonAPI, Documents, Databases) {
 
       this.data.designDocs = new Documents.AllDocs(null, {
         database: this.data.database,
+        paging: {
+          pageSize: 500
+        },
         params: {
-          startkey: '"_design"',
-          endkey: '"_design1"',
-          include_docs: true
+          startkey: '_design',
+          endkey: '_design1',
+          include_docs: true,
+          limit: 500
         }
       });
 
@@ -182,11 +186,11 @@ function(app, FauxtonAPI, Documents, Databases) {
     },
 
     establish: function () {
-      return this.data.designDocs.fetch();
+      return this.data.designDocs.fetch({reset: true});
     },
 
     createParams: function (options) {
-      var urlParams = app.getParams(options);
+      var urlParams = Documents.QueryParams.parse(app.getParams(options));
       return {
         urlParams: urlParams,
         docParams: _.extend(_.clone(urlParams), {limit: this.getDocPerPageLimit(urlParams, 20)})
@@ -223,6 +227,8 @@ function(app, FauxtonAPI, Documents, Databases) {
         collection: this.data.database.allDocs
       }));
 
+      this.data.database.allDocs.paging.pageSize = this.getDocPerPageLimit(urlParams, parseInt(docParams.limit, 10));
+
       this.setView("#dashboard-upper-content", new Documents.Views.AllDocsLayout({
         database: this.data.database,
         collection: this.data.database.allDocs,
@@ -240,9 +246,7 @@ function(app, FauxtonAPI, Documents, Databases) {
         {"name": this.data.database.id, "link": Databases.databaseUrl(this.data.database)}
       ];
 
-      this.apiUrl = [this.data.database.allDocs.url("apiurl", urlParams), this.data.database.allDocs.documentation() ];
-      //reset the pagination history - the history is used for pagination.previous
-      Documents.paginate.reset();
+      this.apiUrl = [this.data.database.allDocs.urlRef("apiurl", urlParams), this.data.database.allDocs.documentation() ];
     },
 
     viewFn: function (databaseName, ddoc, view) {
@@ -257,7 +261,10 @@ function(app, FauxtonAPI, Documents, Databases) {
         database: this.data.database,
         design: decodeDdoc,
         view: view,
-        params: docParams
+        params: docParams,
+        paging: {
+          pageSize: this.getDocPerPageLimit(urlParams, parseInt(docParams.limit, 10))
+        }
       });
      
       this.viewEditor = this.setView("#dashboard-upper-content", new Documents.Views.ViewEditor({
@@ -290,8 +297,7 @@ function(app, FauxtonAPI, Documents, Databases) {
         ];
       };
 
-      this.apiUrl = [this.data.indexedDocs.url("apiurl", urlParams), "docs"];
-      Documents.paginate.reset();
+      this.apiUrl = [this.data.indexedDocs.urlRef("apiurl", urlParams), "docs"];
     },
 
     ddocInfo: function (designDoc, designDocs, view) {
@@ -344,22 +350,27 @@ function(app, FauxtonAPI, Documents, Databases) {
           urlParams = params.urlParams,
           docParams = params.docParams,
           ddoc = event.ddoc,
+          pageSize,
           collection;
 
-      docParams.limit = this.getDocPerPageLimit(urlParams, this.documentsView.perPage());
+      docParams.limit = pageSize = this.getDocPerPageLimit(urlParams, this.documentsView.perPage());
       this.documentsView.forceRender();
 
       if (event.allDocs) {
         this.eventAllDocs = true; // this is horrible. But I cannot get the trigger not to fire the route!
         this.data.database.buildAllDocs(docParams);
         collection = this.data.database.allDocs;
+        collection.paging.pageSize = pageSize;
 
       } else {
         collection = this.data.indexedDocs = new Documents.IndexCollection(null, {
           database: this.data.database,
           design: ddoc,
           view: view,
-          params: docParams
+          params: docParams,
+          paging: {
+            pageSize: pageSize
+          }
         });
 
         if (!this.documentsView) {
@@ -378,8 +389,7 @@ function(app, FauxtonAPI, Documents, Databases) {
       this.documentsView.setCollection(collection);
       this.documentsView.setParams(docParams, urlParams);
 
-      this.apiUrl = [collection.url("apiurl", urlParams), "docs"];
-      Documents.paginate.reset();
+      this.apiUrl = [collection.urlRef("apiurl", urlParams), "docs"];
     },
 
     updateAllDocsFromPreview: function (event) {
@@ -405,47 +415,18 @@ function(app, FauxtonAPI, Documents, Databases) {
     perPageChange: function (perPage) {
       // We need to restore the collection parameters to the defaults (1st page)
       // and update the page size
-      var params = this.documentsView.collection.restoreDefaultParameters();
       this.perPage = perPage;
-      this.documentsView.updatePerPage(perPage);
       this.documentsView.forceRender();
-      this.documentsView.collection.params.limit = perPage;
+      this.documentsView.collection.pageSizeReset(perPage, {fetch: false});
       this.setDocPerPageLimit(perPage);
     },
 
     paginate: function (options) {
-      var params = {},
-          urlParams = app.getParams(),
-          collection = this.documentsView.collection;
+      var collection = this.documentsView.collection;
 
       this.documentsView.forceRender();
-
-      // this is really ugly. But we basically need to make sure that
-      // all parameters are in the correct state and have been parsed before we
-      // calculate how to paginate the collection
-      collection.params = Documents.QueryParams.parse(collection.params);
-      urlParams = Documents.QueryParams.parse(urlParams);
-
-      if (options.direction === 'next') {
-          params = Documents.paginate.next(collection.toJSON(), 
-                                           collection.params,
-                                           options.perPage, 
-                                           !!collection.isAllDocs);
-      } else {
-          params = Documents.paginate.previous(collection.toJSON(), 
-                                               collection.params, 
-                                               options.perPage, 
-                                               !!collection.isAllDocs);
-      }
-
-      // use the perPage sent from IndexPagination as it calculates how many
-      // docs to fetch for next page
-      params.limit = options.perPage;
-
-      // again not pretty but need to make sure all the parameters can be correctly
-      // built into a query
-      params = Documents.QueryParams.stringify(params);
-      collection.updateParams(params);
+      collection.paging.pageSize = options.perPage;
+      var promise = collection[options.direction]({fetch: false});
     },
 
     reloadDesignDocs: function (event) {
@@ -476,9 +457,9 @@ function(app, FauxtonAPI, Documents, Databases) {
       } 
 
       if (!urlParams.limit || urlParams.limit > storedPerPage) {
-        return storedPerPage;
+        return parseInt(storedPerPage, 10);
       } else {
-        return urlParams.limit;
+        return parseInt(urlParams.limit, 10);
       }
     }
 
