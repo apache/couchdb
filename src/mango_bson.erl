@@ -4,7 +4,7 @@
 -export([
     to_ejson/1,
     to_ejson/2,
-    
+
     from_ejson/1
 ]).
 
@@ -259,44 +259,118 @@ render([Doc | Rest], Acc) ->
     render(Rest, NewAcc).
 
 
-render_doc({[{<<"$binary">>, Bin}, {<<"$type">>, Type}]}) ->
-    binary;
+render_doc({[{<<"$binary">>, Bin}, {<<"$type">>, Type}]=P}) ->
+    case is_binary(Bin) andalso is_integer(Type) of
+        true ->
+            Size = size(Bin),
+            {?V_BINARY, <<Size:4/little-integer, Type:1/integer, Bin/binary>>};
+        false ->
+            render_props(P, [])
+    end;
 render_doc({[{<<"$type">>, Type}, {<<"$binary">>, Bin}]}) ->
-    binary;
+    render_doc({[{<<"$binary">>, Bin}, {<<"$type">>, Type}]});
 render_doc({[{<<"$undefined">>, true}]}) ->
-    undefined;
-render_doc({[{<<"$id">>, ObjId}]}) ->
-    objid;
-render_doc({[{<<"$date">>, Date}]}) ->
-    datetime;
-render_doc({[{<<"$regex">>, Regex}, {<<"$options">>, Opts}]}) ->
-    regex;
+    {?V_UNDEFINED, <<>>};
+render_doc({[{<<"$id">>, ObjId}]=P}) ->
+    case is_binary(ObjId) andalso size(ObjId) == 24 of
+        true ->
+            {?V_OBJID, dehex(ObjId)};
+        false ->
+            render_props(P, [])
+    end;
+render_doc({[{<<"$date">>, Date}]=P}) ->
+    case is_integer(Date) of
+        true ->
+            {?V_DATETIME, <<Date:8/little-integer>>};
+        false ->
+            render_props(P, [])
+    end;
+render_doc({[{<<"$regex">>, Regex}, {<<"$options">>, Opts}]=P}) ->
+    case is_binary(Regex) andalso is_binary(Opts) of
+        true ->
+            RStr = render_cstring(Regex),
+            OStr = render_cstring(Opts),
+            {?V_REGEX, <<RStr/binary, OStr/binary>>};
+        false ->
+            render_props(P, [])
+    end;
 render_doc({[{<<"$options">>, Opts}, {<<"$regex">>, RegEx}]}) ->
-    regex;
-render_doc({[{<<"$ref">>, Ref}, {<<"$id">>, Id}]}) ->
-    dbref;
+    render_doc({[{<<"$regex">>, RegEx}, {<<"$options">>, Opts}]})
+render_doc({[{<<"$ref">>, Ref}, {<<"$id">>, Id}]=P}) ->
+    case is_binary(Ref) andalso is_binary(Id) of
+        true ->
+            RStr = render_string(Ref),
+            IDStr = dehex(Id),
+            {?V_DBREF, <<Ref/binary, IDStr/binary>>};
+        false ->
+            render_props(P, [])
+    end;
 render_doc({[{<<"$id">>, Id}, {<<"$ref">>, Ref}]}) ->
-    dbref;
-render_doc({[{<<"$timestamp">>, Doc}]}) ->
-    timestamp;
-render_doc({[{<<"$code">>, Code}]}) ->
-    code;
-render_doc({[{<<"$code">>, Code}, {<<"$scope">>, Scop}]}) ->
-    code_w_s;
+    render_doc({[{<<"$ref">>, Ref}, {<<"$id">>, Id}]});
+render_doc({[{<<"$timestamp">>, Doc}]=P}) ->
+    case Doc of
+        {[{<<"t">>, T0}, {<<"i">>, I0}]} when is_integer(T0), is_integer(I0) ->
+            {?V_TIMESTAMP, <<I:4/little-integer, T:4/little-integer>>};
+        {[{<<"i">>, I0}, {<<"t">>, T0}]} when is_integer(T0), is_integer(I0) ->
+            {?V_TIMESTAMP, <<I:4/little-integer, T:4/little-integer>>};
+        _ ->
+            parse_props(P, [])
+    end;
+render_doc({[{<<"$code">>, Code}]=P}) ->
+    case is_binary(Code) of
+        true ->
+            {?V_CODE, render_string(Code)};
+        false ->
+            parse_props(P, [])
+    end;
+render_doc({[{<<"$code">>, Code}, {<<"$scope">>, Scope}]=P}) ->
+    case is_binary(Code) andalso is_tuple(Scope) andalso size(Scope) == 1 of
+        true ->
+            CStr = render_string(Code)
+            SStr = render(Scope),
+            {?V_CODE_W_S, <<CStr/binary, SStr/binary>>};
+        false ->
+            render_props(P, [])
+    end;
 render_doc({[{<<"$scope">>, Scope}, {<<"$code">>, Code}]}) ->
-    code_w_s;
+    render_doc({[{<<"$code">>, Code}, {<<"$scope">>, Scope}]});
 render_doc({[{<<"$minKey">>, 1}]}) ->
-    minkey;
+    {?V_MINKEY, <<>>};
 render_doc({[{<<"$maxKey">>, 1}]}) ->
-    maxkey;
+    {?V_MAXKEY, <<>>};
 render_doc({Props}) ->
     render_props(Props, []).
 
 
+render_props([], Acc) ->
+    iolist_to_binary(lists:reverse(Acc));
 render_props([{Key, Val} | Rest], Acc) ->
     KeyBin = render_cstring(Key),
     {Type, ValBin} = render_val(Val),
-    
+    Entry = <<Type:1/integer, KeyBin/binary, ValBin/binary>>,
+    render_props(Rest, [Entry | Acc]).
+
+
+render_val(Num) when is_numer(Num) ->
+    % Handles ?V_FLOAT, ?V_INT32, ?V_INT64
+    render_number(Num);
+render_val(true) ->
+    {?V_BOOLEAN, <<1>>};
+render_val(false) ->
+    {?V_BOOLEAN, <<0>>};
+render_val(null) ->
+    {?V_NULL, <<>>};
+render_val(Bin) when is_binary(Bin) ->
+    {?V_STRING, render_string(Bin)};
+render_val({Props}) when is_list(Props) ->
+    {?V_DOC, render_doc({Props})};
+render_val(Vals) when is_list(Vals) ->
+    Keys = lists:map(fun(I) ->
+        list_to_binary(integer_to_list(I))
+    end, lists:seq(1, length(Vals) - 1)),
+    Props = lists:zip(Keys, Vals),
+    {?V_ARRAY, render_doc({Props})}.
+
 
 parse_cstring(Data, O) ->
     case Data of
@@ -310,7 +384,12 @@ parse_cstring(Data, O) ->
 
 
 render_cstring(Bin) when is_binary(Bin) ->
-    ok.
+    case check_embedded_null(Bin, 0) of
+        true ->
+            throw({invalid_cstring, embedded_null});
+        false ->
+            Bin;
+    end.
 
 
 parse_string(Data) ->
@@ -319,7 +398,13 @@ parse_string(Data) ->
             case Size =< size(Rest0) of
                 true ->
                     <<Val:Size/binary, Rest1/binary>> = Rest0,
-                    {ok, Val, Rest1};
+                    try
+                        % Assert that we got valid UTF-8
+                        xmerl_ucs:from_utf8(binary_to_list(Val)),
+                        {ok, Val, Rest1};
+                    catch exit:{ucs,_} ->
+                        {error, invalid_utf8}
+                    end;
                 false ->
                     {error, truncated_string}
             end;
@@ -328,8 +413,10 @@ parse_string(Data) ->
     end.
 
 
-render_string(Data) ->
-    ok.
+render_string(Data) when is_binary(Data) ->
+    % Assume UTF-8 here?
+    Size = size(Data),
+    <<Size:4/little-integer, Data/binary, 0:1/integer>>.
 
 
 parse_objid(Data) ->
@@ -343,8 +430,25 @@ parse_objid(Data) ->
     end.
 
 
-render_objid(ObjId) when is_binary(ObjId), size(ObjId) == 12 ->
-    ok.
+render_number(N) when is_float(N) ->
+    {?VAL_FLOAT, <<N/float>>};
+render_number(N) when N >= -2147483648, N =< 2147483647 ->
+    {?VAL_INT32, <<N:4/little-integer>>};
+render_number(N) when N >= −9223372036854775808, N =< 9223372036854775807 ->
+    {?VAL_INT64, <<N:8/little-integer>>};
+render_number(N) ->
+    throw({invalid_integer, N}).
+
+
+check_embedded_null(Bin, N) when N >= size(Bin) ->
+    false;
+check_embedded_null(Bin, N) ->
+    case Bin of
+        <<_:N/binary, 0, _/binary>> ->
+            true;
+        _ ->
+            check_embedded_null(Bin, N+1)
+    end.
 
 
 to_hex(<<>>, Acc) ->
@@ -354,7 +458,26 @@ to_hex(<<V:1/integer, Rest/binary>>, Acc) ->
     to_hex(Rest, NewAcc).
 
 
-hex_dig(N) when N < 10 ->
+hex_dig(N) when N >= 0, N < 10 ->
     $0 + N;
+hex_dig(N) when N >= 10, N < 16 ->
+    $A + (N - 10);
 hex_dig(N) ->
-    $A + (N - 10).
+    throw({invalid_hex_value, N}).
+
+
+dehex(<<>>, Acc) ->
+    list_to_binary(lists:reverse(Acc));
+dehex(<<A:1/integer, B:1/integer, Rest/binary>>, Acc) ->
+    Val = (hex_val(A) bsl 4) bor (hex_val(B)),
+    dehex(Rest, [Val | Acc]).
+
+
+hex_val(N) when N >= $A, N =< $F ->
+    (N - $A) + 10;
+hex_val(N) when N >= $a, N =< $f ->
+    (N - $a) + 10;
+hex_val(N) when N - $0 > 0, N - $0 < 10 ->
+    N - $0;
+hex_val(N) ->
+    throw({invalid_hex_character, N}).
