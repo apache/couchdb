@@ -1107,13 +1107,13 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
     showKeys: function(){
       this.$("#js-showKeys, .js-disabled-message").show();
-      this.$('[name="skip"],[name="startkey"],[name="limit"],[name="endkey"],[name="inclusive_end"]').attr("disabled","true");
+      this.$('[name="startkey"],[name="endkey"],[name="inclusive_end"]').attr("disabled","true");
       this.$('[name="keys"]').removeAttr("disabled");
     },
 
     showStartEnd: function(){
       this.$("#js-showStartEnd").show();
-      this.$('[name="skip"],[name="startkey"],[name="limit"],[name="endkey"],[name="inclusive_end"]').removeAttr("disabled");
+      this.$('[name="startkey"],[name="endkey"],[name="inclusive_end"]').removeAttr("disabled");
       this.$('.js-disabled-message').hide();
       this.$('[name="keys"]').attr("disabled","true");
     },
@@ -1132,33 +1132,62 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       this.hasReduce = hasReduce;
       this.render();
     },
-    validateKeys:  function(val){
-      return JSON.parse(val);
+
+    parseJSON: function (value) {
+      try {
+        return JSON.parse(value);
+      } catch(e) {
+        return undefined;
+      }
+    },
+
+    validateKeys:  function(param){
+      var errorMsg = false,
+          parsedValue = this.parseJSON(param.value);
+
+      if (_.isUndefined(parsedValue)) {
+        errorMsg = "Keys must be valid json.";
+      } else if (!_.isArray(parsedValue)) {
+        errorMsg =  "Keys values must be in an array. E.g [1,2,3]"; 
+      }
+
+      if (errorMsg) {
+        this.$('.js-keys-error').empty();
+        FauxtonAPI.addNotification({
+          type: "error",
+          msg: errorMsg,
+          clear:  false,
+          selector: '.js-keys-error'
+        });
+        return false;
+      }
+
+      return true; 
     },
     queryParams: function () {
-      var $form = this.$(".js-view-query-update");
+      var $form = this.$(".js-view-query-update"),
+          keysParam = false;
 
       var params = _.reduce($form.serializeArray(), function(params, param) {
         if (!param.value) { return params; }
         if (param.name === "limit" && param.value === 'None') { return params; }
+        if (param.name === "keys") { keysParam = param; }
         params.push(param);
         return params;
       }, []);
 
+
+      if (keysParam && !this.validateKeys(keysParam)) { return false; }
+
       // Validate *key* params to ensure they're valid JSON
       var keyParams = ["keys","startkey","endkey"];
       var errorParams = _.filter(params, function(param) {
-        if (_.contains(keyParams, param.name)) {
-          try {
-            JSON.parse(param.value);
-            return false;
-          } catch(e) {
+        if (_.contains(keyParams, param.name) && _.isUndefined(this.parseJSON(param.value))) {
             return true;
           }
-        } else {
+
           return false;
-        }
-      });
+      }, this);
 
       return {params: params, errorParams: errorParams};
     },
@@ -1222,6 +1251,10 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
           }
           this.updateFiltersFor(key, $ele);
           break;
+          case "key": 
+          case "keys": 
+            $form.find("textarea[name='"+key+"']").val(val);
+          break;
           default:
             $form.find("input[name='"+key+"']").val(val);
           break;
@@ -1231,11 +1264,15 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
     updateView: function (event) {
       event.preventDefault();
-      this.updateViewFn(event, this.queryParams());
+      var params = this.queryParams();
+      if (!params) { return;}
+      this.updateViewFn(event, params);
     },
 
     previewView: function (event) {
-      this.previewFn(event, this.queryParams());
+      var params = this.queryParams();
+      if (!params) { return;}
+      this.previewFn(event, params);
     },
 
     serialize: function () {
@@ -1615,6 +1652,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     },
 
     toggleIndexNav: function (event) {
+      $('#dashboard-content').scrollTop(0); //scroll up
+      
       var $targetId = this.$(event.target).attr('id'),
           $previousTab = this.$(this.$('li.active a').attr('href')),
           $targetTab = this.$(this.$(event.target).attr('href'));

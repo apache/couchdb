@@ -468,14 +468,21 @@ function(app, FauxtonAPI) {
       if (this.skipFirstItem) {
         rows = rows.splice(1);
       }
-      return _.map(rows, function(row) {
-        return {
-          _id: row.id,
-          _rev: row.value.rev,
-          value: row.value,
-          key: row.key,
-          doc: row.doc || undefined
-        };
+      
+      // remove any query errors that may return without doc info
+      // important for when querying keys on all docs
+      var noQueryErrors = _.filter(rows, function(row){
+        return row.value;
+      });
+
+      return _.map(noQueryErrors, function(row) {
+          return {
+            _id: row.id,
+            _rev: row.value.rev,
+            value: row.value,
+            key: row.key,
+            doc: row.doc || undefined
+          };
       });
     }
   }));
