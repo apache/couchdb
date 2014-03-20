@@ -405,47 +405,22 @@ function(app, FauxtonAPI, Documents, Databases) {
     perPageChange: function (perPage) {
       // We need to restore the collection parameters to the defaults (1st page)
       // and update the page size
-      var params = this.documentsView.collection.restoreDefaultParameters();
       this.perPage = perPage;
       this.documentsView.updatePerPage(perPage);
       this.documentsView.forceRender();
-      this.documentsView.collection.params.limit = perPage;
+      this.documentsView.collection.pageSizeReset(perPage);
       this.setDocPerPageLimit(perPage);
     },
 
     paginate: function (options) {
-      var params = {},
-          urlParams = app.getParams(),
-          collection = this.documentsView.collection;
+      var collection = this.documentsView.collection;
 
       this.documentsView.forceRender();
+      var promise = collection[options.direction]();
 
-      // this is really ugly. But we basically need to make sure that
-      // all parameters are in the correct state and have been parsed before we
-      // calculate how to paginate the collection
-      collection.params = Documents.QueryParams.parse(collection.params);
-      urlParams = Documents.QueryParams.parse(urlParams);
-
-      if (options.direction === 'next') {
-          params = Documents.paginate.next(collection.toJSON(), 
-                                           collection.params,
-                                           options.perPage, 
-                                           !!collection.isAllDocs);
-      } else {
-          params = Documents.paginate.previous(collection.toJSON(), 
-                                               collection.params, 
-                                               options.perPage, 
-                                               !!collection.isAllDocs);
-      }
-
-      // use the perPage sent from IndexPagination as it calculates how many
-      // docs to fetch for next page
-      params.limit = options.perPage;
-
-      // again not pretty but need to make sure all the parameters can be correctly
-      // built into a query
-      params = Documents.QueryParams.stringify(params);
-      collection.updateParams(params);
+      this.establish = function () {
+        return promise;
+      }; 
     },
 
     reloadDesignDocs: function (event) {

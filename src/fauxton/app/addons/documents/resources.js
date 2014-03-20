@@ -12,10 +12,11 @@
 
 define([
   "app",
-  "api"
+  "api",
+  "cloudant.pagingcollection"
 ],
 
-function(app, FauxtonAPI) {
+function(app, FauxtonAPI, PagingCollection) {
   var Documents = FauxtonAPI.addon();
 
   Documents.QueryParams = (function () {
@@ -40,70 +41,7 @@ function(app, FauxtonAPI) {
     };
   })();
 
-  Documents.paginate = {
-    history: [],
-    calculate: function (doc, defaultParams, currentParams, _isAllDocs) {
-      var docId = '',
-          lastId = '',
-          isView = !!!_isAllDocs,
-          key;
-
-      if (currentParams.keys) {
-        throw "Cannot paginate when keys is specfied";
-      }
-
-      if (_.isUndefined(doc)) {
-        throw "Require docs to paginate";
-      }
-
-      // defaultParams should always override the user-specified parameters
-      _.extend(currentParams, defaultParams);
-
-      lastId = doc.id || doc._id;
-
-      // If we are paginating on a view, we need to set a ``key`` and a ``docId``
-      // and expect that they are different values.
-      if (isView) {
-        key = doc.key;
-        docId = lastId;
-      } else {
-        docId = key = lastId;
-      }
-
-      // Set parameters to paginate
-      if (isView) {
-        currentParams.startkey_docid = docId;
-        currentParams.startkey = key;
-      } else if (currentParams.startkey) {
-        currentParams.startkey = key;
-      } else {
-        currentParams.startkey_docid = docId;
-      }
-
-      return currentParams;
-    },
-
-    next: function (docs, currentParams, perPage, _isAllDocs) {
-      var params = {limit: perPage, skip: 1},
-          doc = _.last(docs);
-
-      this.history.push(_.clone(currentParams));
-      return this.calculate(doc, params, currentParams, _isAllDocs);
-    },
-
-    previous: function (docs, currentParams, perPage, _isAllDocs) {
-      var params = this.history.pop(),
-          doc = _.first(docs);
-
-      params.limit = perPage;
-      return params;
-    },
-
-    reset: function () {
-      this.history = [];
-    }
-  };
-
+  
   Documents.Doc = FauxtonAPI.Model.extend({
     idAttribute: "_id",
     documentation: function(){
@@ -373,7 +311,8 @@ function(app, FauxtonAPI) {
     };
   };
 
-  Documents.AllDocs = FauxtonAPI.Collection.extend(_.extend({}, DefaultParametersMixin(), {
+  //Documents.AllDocs = FauxtonAPI.Collection.extend(_.extend({}, DefaultParametersMixin(), {
+  Documents.AllDocs = PagingCollection.extend({
     model: Documents.Doc,
     isAllDocs: true,
     documentation: function(){
@@ -389,8 +328,6 @@ function(app, FauxtonAPI) {
       if (!this.params.limit) {
         this.params.limit = this.perPageLimit;
       }
-
-      this.saveDefaultParameters();
     },
 
     url: function(context, params) {
@@ -484,7 +421,7 @@ function(app, FauxtonAPI) {
           };
       });
     }
-  }));
+  });
 
   Documents.IndexCollection = FauxtonAPI.Collection.extend(_.extend({}, DefaultParametersMixin(), {
     model: Documents.ViewRow,
