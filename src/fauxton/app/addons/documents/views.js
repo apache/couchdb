@@ -1142,17 +1142,26 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     },
 
     validateKeys:  function(param){
-      var parsedValue = this.parseJSON(param.value);
-      if (_.isUndefined(parsedValue) || !_.isArray(parsedValue)) {
+      var errorMsg = false,
+          parsedValue = this.parseJSON(param.value);
+
+      if (_.isUndefined(parsedValue)) {
+        errorMsg = "Keys must be valid json.";
+      } else if (!_.isArray(parsedValue)) {
+        errorMsg =  "Keys values must be in an array. E.g [1,2,3]"; 
+      }
+
+      if (errorMsg) {
         this.$('.js-keys-error').empty();
         FauxtonAPI.addNotification({
           type: "error",
-          msg: "Keys values must be in an array. E.g [1,2,3]",
+          msg: errorMsg,
           clear:  false,
           selector: '.js-keys-error'
         });
         return false;
       }
+
       return true; 
     },
     queryParams: function () {
