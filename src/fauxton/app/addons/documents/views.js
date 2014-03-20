@@ -1309,7 +1309,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
     changeLanguage: function() {
       var new_language = this.$('#design-doc-language').val() || this.defaultLang;
-      var langTemplate = _.filter(_.pluck(this.queryservers, new_language))[0];
+      var langTemplate = this.queryservers[new_language];
       var overwrite = true;
       // check if the editor is "dirty"
       if (this.mapEditor.edited || (this.reduceEditor && this.reduceEditor.edited)) {
@@ -1353,7 +1353,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     updateReduce: function(event) {
       var $ele = $("#reduce-function-selector");
       var $reduceContainer = $(".control-group.reduce-function");
-      var langTemplate = _.filter(_.pluck(this.queryservers, this.language))[0];
+      var langTemplate = this.queryservers[this.language];
 
       if ($ele.val() == "CUSTOM") {
         this.createReduceEditor();
@@ -1633,10 +1633,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     },
 
     serialize: function() {
-      this.queryservers = FauxtonAPI.getExtensions('queryservers:templates');
-      this.languages = _.map(this.queryservers, function(obj) {
-        return _.keys(obj)[0];
-      });
+      this.queryservers = _.extend.apply(_, FauxtonAPI.getExtensions('queryservers:templates'));
+      this.languages = _.keys(this.queryservers);
 
       return {
         ddocs: this.ddocs,
@@ -1646,7 +1644,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         reduceFunStr: this.reduceFunStr,
         isCustomReduce: this.hasCustomReduce(),
         newView: this.newView,
-        langTemplates: _.filter(_.pluck(this.queryservers, this.defaultLang))[0],
+        langTemplates: this.queryservers[this.defaultLang],
         languages: this.languages,
         language: this.language
       };
@@ -1760,9 +1758,9 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       }
 
       if (this.newView) {
-        this.mapEditor.setValue(_.filter(_.pluck(this.queryservers, this.defaultLang))[0].map);
+        this.mapEditor.setValue(this.queryservers[this.defaultLang].map);
         //Use a built in view by default
-        //this.reduceEditor.setValue(_.filter(_.pluck(this.queryservers, this.defaultLang))[0].reduce);
+        //this.reduceEditor.setValue(this.queryservers[this.defaultLang].reduce);
       }
 
       this.mapEditor.editSaved();
