@@ -261,9 +261,9 @@ updates, ensuring security and data validation in a shared, distributed system.
 Distributed Updates and Replication
 ===================================
 
-CouchDB is a peer-based distributed database system, it allows for users and
-servers to access and update the same shared data while disconnected and then
-bi-directionally replicate those changes later.
+CouchDB is a peer-based distributed database system. It allows users and servers
+to access and update the same shared data while disconnected. Those changes can
+then be replicated bi-directionally later.
 
 The CouchDB document storage, view and security models are designed to work
 together to make true bi-directional replication efficient and reliable.
