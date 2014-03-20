@@ -1135,15 +1135,21 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
     parseJSON: function (value) {
       try {
-        return JSON.parse(value);
+        return {
+         value: JSON.parse(value),
+         error: null
+        };
       } catch(e) {
-        return false;
+        return {
+          error: e,
+          value: null
+        };
       }
     },
 
     validateKeys:  function(param){
       var parsedValue = this.parseJSON(param.value);
-      if (!parsedValue || !_.isArray(parsedValue)) {
+      if (parsedValue.error || !_.isArray(parsedValue.value)) {
         this.$('.js-keys-error').empty();
         FauxtonAPI.addNotification({
           type: "error",
@@ -1174,7 +1180,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       var keyParams = ["keys","startkey","endkey"];
       var errorParams = _.filter(params, function(param) {
         if (_.contains(keyParams, param.name)) {
-          return !!!this.parseJSON(param.value);
+          return !!this.parseJSON(param.value).error;
         } else {
           return false;
         }
