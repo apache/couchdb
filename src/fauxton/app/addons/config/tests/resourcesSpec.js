@@ -28,7 +28,10 @@ define([
       });
 
       tabMenu = new Views.TableRow({
-        model: optionModel
+        model: optionModel,
+        uniqueName: function () {
+          return false;
+        }
       });
     });
 
@@ -47,8 +50,12 @@ define([
         var renderSpy = sinon.stub(tabMenu, 'render');
         var saveSpy = sinon.stub(optionModel, 'save');
 
-        tabMenu.$('.js-edit-value').trigger('dblclick');
-        tabMenu.$('.js-save-value').trigger('click');
+        var $fields = tabMenu.$('.js-edit-value').filter(function (el) {
+          return $(this).find('[name="value"]').length;
+        });
+
+        $fields.find('.js-edit-value').trigger('dblclick');
+        $fields.find('.js-save-value').trigger('click');
 
         assert.ok(renderSpy.calledOnce);
         assert.ok(saveSpy.calledOnce);
@@ -60,7 +67,12 @@ define([
 
         var e = $.Event("keyup");
         e.keyCode = 13;
-        tabMenu.$('.js-value-input').trigger(e);
+
+        var $fields = tabMenu.$('.js-edit-value').filter(function (el) {
+          return $(this).find('[name="value"]').length;
+        });
+
+        $fields.find('.js-value-input').trigger(e);
 
         assert.ok(renderSpy.calledOnce);
         assert.ok(saveSpy.calledOnce);
