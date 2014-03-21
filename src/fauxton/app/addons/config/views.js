@@ -80,7 +80,7 @@ function(app, FauxtonAPI, Config, Components) {
       return {option: this.model.toJSON()};
     },
     saveAndRender: function (event) {
-      var options = {};
+      var options = {},
           $input = this.$(event.currentTarget).parents('td').find(".js-value-input");
 
       options[$input.attr('name')] = $input.val();
