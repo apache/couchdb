@@ -58,8 +58,8 @@ function (app, FauxtonAPI, activetasks) {
     },
 
     requestByType: function(e){
-      var currentTarget = e.currentTarget;
-      datatype = this.$(currentTarget).attr("data-type");
+      var currentTarget = e.currentTarget,
+          datatype = this.$(currentTarget).attr("data-type");
 
       this.$('.task-tabs').find('li').removeClass('active');
       this.$(currentTarget).addClass('active');
@@ -119,8 +119,9 @@ function (app, FauxtonAPI, activetasks) {
       currentView = this.options.currentView;
     },
     sortByType:  function(e){
-      var currentTarget = e.currentTarget;
-      datatype = $(currentTarget).attr("data-type");
+      var currentTarget = e.currentTarget,
+          datatype = $(currentTarget).attr("data-type");
+
       this.collection.sortByColumn(datatype);
       this.render();
     },
