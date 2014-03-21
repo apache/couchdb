@@ -105,7 +105,7 @@ shape(?OP_QUERY) ->
         {flags, int32},
         {collection, cstring},
         {skip, int32},
-        {return, 32},
+        {return, int32},
         {query, doc},
         {fields, docs}
     ]};

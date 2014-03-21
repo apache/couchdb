@@ -26,8 +26,7 @@
     socket,
     transport,
     context = #mango_ctx{},
-    buffer = <<>>,
-    errors = []
+    buffer = <<>>
 }).
 
 
@@ -86,15 +85,11 @@ code_change(_OldVSn, St, _Extra) ->
 
 
 dispatch({Type, Props}, St) ->
-    case mango_handler:Type(Props) of
-        ok ->
+    case mango_handler:dispatch(Type, Props, St#st.context) of
+        {ok, #mango_ctx{}=NewCtx} ->
             {noreply, St};
-        {ok, Resp} ->
-            send_resp(Resp, St);
-        {ok, Resp, NewCtx} ->
-            send_resp(Resp, St#st{context=NewCtx});
-        Error ->
-            {noreply, add_error(Error, St)}
+        {ok, #mango_ctx{}=NewCtx, Resp} ->
+            send_resp(Resp, St#st{context=NewCtx})
     end.
 
 
