@@ -39,8 +39,10 @@ function(app, FauxtonAPI, Auth) {
       var deferred = $.Deferred();
 
       if (session.isAdminParty()) {
+        session.trigger("authenticated");
         deferred.resolve();
       } else if(session.matchesRoles(roles)) {
+        session.trigger("authenticated");
         deferred.resolve();
       } else {
         deferred.reject();
