@@ -28,7 +28,7 @@ property serves as the key, thus the result will be sorted by ``LastName``:
 
   function(doc) {
     if (doc.Type == "customer") {
-      emit(doc.LastName, {FirstName: doc.FirstName, Address: doc.Address});
+      emit(doc.LastName, null);
     }
   }
 
@@ -49,12 +49,17 @@ associated orders. The values 0 and 1 for the sorting token are arbitrary.
 
   function(doc) {
     if (doc.Type == "customer") {
-      emit([doc._id, 0], doc);
+      emit([doc._id, 0], null);
     } else if (doc.Type == "order") {
-      emit([doc.customer_id, 1], doc);
+      emit([doc.customer_id, 1], null);
     }
   }
 
+To list a specific customer with ``_id`` XYZ, and all of that customer's orders, limit the startkey and endkey ranges to cover only documents for that customer's ``_id``::
+
+  startkey=["XYZ"]&endkey=["XYZ", {}]
+
+It is not recommended to emit the document itself in the view. Instead, to include the bodies of the documents when requesting the view, request the view with ``?include_docs=true``.
 
 Sorting by Dates
 ================
@@ -67,14 +72,14 @@ the following emit function would sort by date:
 
 .. code-block:: javascript
 
-  emit(Date.parse(doc.created_at).getTime(), doc);
+  emit(Date.parse(doc.created_at).getTime(), null);
 
 Alternatively, if you use a date format which sorts lexicographically,
 such as ``"2013/06/09 13:52:11 +0000"`` you can just
 
 .. code-block:: javascript
 
-  emit(doc.created_at, doc);
+  emit(doc.created_at, null);
 
 and avoid the conversion. As a bonus, this date format is compatible with the
 JavaScript date parser, so you can use ``new Date(doc.created_at)`` in your
