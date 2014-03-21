@@ -30,7 +30,20 @@ the License.
         <div class="errors-container"></div>
         <form class="form-horizontal view-query-save">
 
-          <div class="control-group design-doc-group">
+          <div class="control-group">
+            <div class="design-doc-group pull-left"></div>
+            <div class="pull-right">
+              <label for="design-doc-language">Design Document Language</label>
+              <% if (newView && languages.length > 1) { %>
+              <select id="design-doc-language" class="pull-right">
+                <% _.each(languages, function(lang) { %>
+                <option<% if (lang == language) { %> selected<% } %>><%= lang %></option>
+                <% }) %>
+              </select>
+              <% } else { %>
+              <strong><%= language %></strong>
+              <% } %>
+            </div>
           </div>
 
           <div class="control-group">
@@ -38,9 +51,9 @@ the License.
             <input type="text" id="index-name" value="<%= viewName %>" placeholder="Index name" />
           </div>
 
-
           <div class="control-group">
-            <label for="map-function">Map function <a href="<%=getDocUrl('map_functions')%>" target="_blank"><i class="icon-question-sign"></i></a></label>
+            <label for="map-function" class="pull-left">
+              Map function <a href="<%=getDocUrl('map_functions')%>" target="_blank"><i class="icon-question-sign"></i></a></label>
             <% if (newView) { %>
             <div class="js-editor" id="map-function"><%= langTemplates.map %></div>
             <% } else { %>

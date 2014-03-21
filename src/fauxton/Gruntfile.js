@@ -321,6 +321,8 @@ module.exports = function(grunt) {
           {src: "assets/js/libs/ace/theme-crimson_editor.js", dest: "dist/release/js/ace/theme-crimson_editor.js"},
           {src: "assets/js/libs/ace/mode-javascript.js", dest: "dist/release/js/ace/mode-javascript.js"},
           {src: "assets/js/libs/ace/worker-javascript.js", dest: "dist/release/js/ace/worker-javascript.js"},
+          {src: "assets/js/libs/ace/mode-coffeescript.js", dest: "dist/release/js/ace/mode-coffeescript.js"},
+          {src: "assets/js/libs/ace/worker-coffeescript.js", dest: "dist/release/js/ace/worker-coffeescript.js"},
         ]
       },
 

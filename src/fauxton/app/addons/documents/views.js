@@ -30,6 +30,7 @@ define([
 
 function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColumns, beautify) {
   var Views = {};
+
   Views.Tabs = FauxtonAPI.View.extend({
     template: "addons/documents/templates/tabs",
     initialize: function(options){
@@ -1330,7 +1331,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         var doc = {
           _id: '_design/' + this.$('#new-ddoc').val(),
           views: {},
-          language: "javascript"
+          language: this.defaultLang
         };
         var ddoc = new this.DocModel(doc, {database: this.database});
         //this.collection.add(ddoc);
@@ -1356,14 +1357,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       "click #db-views-tabs-nav": 'toggleIndexNav',
       "click .beautify_map":  "beautifyCode",
       "click .beautify_reduce":  "beautifyCode",
-      "click #query-options-wrapper": 'toggleIndexNav'
-    },
-
-    langTemplates: {
-      "javascript": {
-        map: "function(doc) {\n  emit(doc._id, 1);\n}",
-        reduce: "function(keys, values, rereduce){\n  if (rereduce){\n    return sum(values);\n  } else {\n    return values.length;\n  }\n}"
-      }
+      "click #query-options-wrapper": 'toggleIndexNav',
+      "change #design-doc-language": "changeLanguage"
     },
 
     defaultLang: "javascript",
@@ -1373,6 +1368,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       this.ddocs = options.ddocs;
       this.params = options.params;
       this.database = options.database;
+      this.language = this.defaultLang;
+
       if (this.newView) {
         this.viewName = 'newView';
       } else {
@@ -1386,9 +1383,41 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     },
 
     establish: function () {
+      var that = this;
       if (this.ddocInfo) {
-        return this.ddocInfo.fetch();
+        return [this.ddocInfo.fetch()];
       }
+    },
+
+    changeLanguage: function() {
+      var new_language = this.$('#design-doc-language').val() || this.defaultLang;
+      var langTemplate = this.queryservers[new_language];
+      var overwrite = true;
+      // check if the editor is "dirty"
+      if (this.mapEditor.edited || (this.reduceEditor && this.reduceEditor.edited)) {
+        // ask the user if they want to overwrite the contents
+        overwrite = confirm('Do you want to replace the editor contents?');
+      }
+      // if they don't mind the overwrite, then
+      if (overwrite) {
+        // set the mode
+        this.mapEditor.setMode(new_language);
+        // and replace contents with template for the selected language
+        this.mapEditor.setValue(langTemplate.map);
+        // since this is a template, let's tell the editor it's new
+        this.mapEditor.editSaved();
+        // next do the same for the reduceEditor
+        if (this.reduceEditor) {
+          this.reduceEditor.setMode(new_language);
+          this.reduceEditor.setValue(langTemplate.reduce);
+          this.reduceEditor.editSaved();
+        }
+        // now set the language of the Design Doc to this new language choice
+        this.language = new_language;
+      }
+      // make sure the language in the select box matches the code in the
+      // editors
+      this.$('#design-doc-language').val(this.language);
     },
 
     updateValues: function() {
@@ -1406,9 +1435,13 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     updateReduce: function(event) {
       var $ele = $("#reduce-function-selector");
       var $reduceContainer = $(".control-group.reduce-function");
+      var langTemplate = this.queryservers[this.language];
+
       if ($ele.val() == "CUSTOM") {
         this.createReduceEditor();
-        this.reduceEditor.setValue(this.langTemplates.javascript.reduce);
+        this.reduceEditor.setValue(langTemplate.reduce);
+        // template-based edits don't count as edits
+        this.reduceEditor.edited = false;
         $reduceContainer.show();
       } else {
         $reduceContainer.hide();
@@ -1455,7 +1488,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         viewName = this.$('#index-name').val(),
         ddoc = this.getCurrentDesignDoc(),
         ddocName = ddoc.id,
-        viewNameChange = false;
+        viewNameChange = false,
+        language = this.$('#design-doc-language').val() || this.defaultLang;
 
         if (this.viewName !== viewName) {
           ddoc.removeDdocView(this.viewName);
@@ -1470,6 +1504,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         });
 
         ddoc.setDdocView(viewName, mapVal, reduceVal);
+        ddoc.set('language', language);
 
         ddoc.save().then(function () {
           that.ddocs.add(ddoc);
@@ -1682,6 +1717,9 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     },
 
     serialize: function() {
+      this.queryservers = _.extend.apply(_, FauxtonAPI.getExtensions('queryservers:templates'));
+      this.languages = _.keys(this.queryservers);
+
       return {
         ddocs: this.ddocs,
         ddoc: this.model,
@@ -1690,7 +1728,9 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         reduceFunStr: this.reduceFunStr,
         isCustomReduce: this.hasCustomReduce(),
         newView: this.newView,
-        langTemplates: this.langTemplates.javascript
+        langTemplates: this.queryservers[this.defaultLang],
+        languages: this.languages,
+        language: this.language
       };
     },
 
@@ -1709,8 +1749,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
       this.reduceEditor = new Components.Editor({
         editorId: "reduce-function",
-        mode: "javascript",
-        couchJSHINT: true
+        mode: this.language
       });
       this.reduceEditor.render();
 
@@ -1743,7 +1782,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         var ddocDecode = decodeURIComponent(this.ddocID);
         this.model = this.ddocs.get(ddocDecode).dDocModel();
         this.reduceFunStr = this.model.viewHasReduce(this.viewName);
-        
+        this.setView('#ddoc-info', new Views.DdocInfo({model: this.ddocInfo }));
+        this.language = this.model.get('language') || this.defaultLang;
       }
 
       this.designDocSelector = this.setView('.design-doc-group', new Views.DesignDocSelector({
@@ -1790,9 +1830,9 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     showEditors: function () {
       this.mapEditor = new Components.Editor({
         editorId: "map-function",
-        mode: "javascript",
-        couchJSHINT: true
+        mode: this.language
       });
+      mapEditor = this.mapEditor;
       this.mapEditor.render();
 
       if (this.hasCustomReduce()) {
@@ -1802,9 +1842,9 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       }
 
       if (this.newView) {
-        this.mapEditor.setValue(this.langTemplates[this.defaultLang].map);
+        this.mapEditor.setValue(this.queryservers[this.defaultLang].map);
         //Use a built in view by default
-        //this.reduceEditor.setValue(this.langTemplates[this.defaultLang].reduce);
+        //this.reduceEditor.setValue(this.queryservers[this.defaultLang].reduce);
       }
 
       this.mapEditor.editSaved();
