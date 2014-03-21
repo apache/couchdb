@@ -481,10 +481,10 @@ Response object
 +--------------------------------+---------------------------------------------+
 
 .. warning::
-   The ``body``, ``base64`` and ``json`` object keys overlapp each other
-   where in the last one wins. Since most implementations of key-value objects do
-   not preserve the key order, confusing situations can emerge. The same applies,
-   when they are mixed. Try to use only one of them.
+   The ``body``, ``base64`` and ``json`` object keys are overlapping each other
+   where the last one wins. Since most realizations of key-value objects do
+   not preserve the key order or if they are mixed, confusing situations can
+   occure. Try to use only one of them.
 
 .. note::
    Any custom property makes CouchDB raise an internal exception.
