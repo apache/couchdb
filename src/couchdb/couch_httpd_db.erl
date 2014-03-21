@@ -44,7 +44,7 @@ handle_request(#httpd{path_parts=[DbName|RestParts],method=Method,
         case couch_httpd:qs_value(Req, "rev", false) of
             false -> delete_db_req(Req, DbName);
             _Rev -> throw({bad_request,
-                "You tried to DELETE a database with a ?=rev parameter. "
+                "You tried to DELETE a database with a ?rev= parameter. "
                 ++ "Did you mean to DELETE a document instead?"})
         end;
     {_, []} ->
