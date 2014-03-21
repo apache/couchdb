@@ -25,7 +25,7 @@
 -record(st, {
     socket,
     transport,
-    context = #mango_ctx{},
+    context,
     buffer = <<>>
 }).
 
@@ -40,15 +40,20 @@ init(_) ->
     {ok, ignored}.
 
 
-init(Ref, Socket, Transport, Opts) ->
+init(Ref, Socket, Transport, _Opts) ->
     ok = proc_lib:init_ack({ok, self()}),
     ok = ranch:accept_ack(Ref),
     St = #st{
         socket = Socket,
-        transport = Transport
+        transport = Transport,
+        context = mango_ctx:new()
     },
     set_active(St),
     gen_server:enter_loop(?MODULE, [], St).
+
+
+terminate(_Reason, _St) ->
+    ok.
 
 
 handle_call(Msg, _From, St) ->
@@ -59,14 +64,15 @@ handle_cast(Msg, St) ->
     {error, {invalid_cast, Msg}, St}.
 
 
-handle_info({tcp, Socket, Data}, St) ->
+handle_info({tcp, _Socket, Data}, St) ->
     set_active(St),
     NewBuffer = <<(St#st.buffer)/binary, Data/binary>>,
     case mango_msg:new(NewBuffer) of
         undefined ->
             {noreply, St#st{buffer=NewBuffer}};
         {error, Reason} ->
-            {noreply, add_error(Reason, St)};
+            NewCtx = mango_ctx:add_error(St#st.context, Reason),
+            {noreply, St#st{context=NewCtx}};
         {Msg, Rest} ->
             dispatch(Msg, St#st{buffer=Rest})
     end;
@@ -86,9 +92,9 @@ code_change(_OldVSn, St, _Extra) ->
 
 dispatch({Type, Props}, St) ->
     case mango_handler:dispatch(Type, Props, St#st.context) of
-        {ok, #mango_ctx{}=NewCtx} ->
-            {noreply, St};
-        {ok, #mango_ctx{}=NewCtx, Resp} ->
+        {ok, NewCtx} ->
+            {noreply, St#st{context=NewCtx}};
+        {ok, NewCtx, Resp} ->
             send_resp(Resp, St#st{context=NewCtx})
     end.
 
@@ -105,7 +111,3 @@ send_resp(Resp, #st{socket=S, transport=T}=St) ->
         {error, Reason} ->
             {stop, Reason, St}
     end.
-            
-
-add_error(Error, #st{errors=Errors}=St) ->
-    St#st{errors = [Error | Errors]}.

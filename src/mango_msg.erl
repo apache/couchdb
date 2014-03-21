@@ -1,7 +1,7 @@
 -module(mango_msg).
 
 -export([
-    new/0
+    new/1
 ]).
 
 
@@ -31,7 +31,8 @@
 new(<<Size:4/?LI, Rest/binary>>=All) ->
     case (Size-4) =< size(Rest) of
         true ->
-            <<Msg:(Size-4)/binary, NonMsg/binary>> = Rest,
+            NumBytes = Size - 4,
+            <<Msg:NumBytes/binary, NonMsg/binary>> = Rest,
             {parse(Msg), NonMsg};
         false ->
             {undefined, All}
@@ -45,6 +46,7 @@ reply(Resp) ->
     CursorId = get_key(cursor, Resp, 0),
     Offset = get_key(offset, Resp, 0),
     DocsEJson = get_key(docs, Resp, []),
+    NumDocs = length(DocsEJson),
     DocsBinary = mango_bson:from_ejson(DocsEJson),
     Size = 36 + size(DocsBinary),
     <<
@@ -55,10 +57,10 @@ reply(Resp) ->
         Flags:4/little-integer,
         CursorId:8/little-integer,
         Offset:4/little-integer,
-        length(DocsEJson):4/little-integer,
+        NumDocs:4/little-integer,
         DocsBinary/binary
     >>.
-        
+
 
 
 parse(Data) ->
@@ -101,12 +103,12 @@ shape(?OP_INSERT) ->
         {docs, docs}
     ]};
 shape(?OP_QUERY) ->
-    {query, [
+    {'query', [
         {flags, int32},
         {collection, cstring},
         {skip, int32},
         {return, int32},
-        {query, doc},
+        {'query', doc},
         {fields, docs}
     ]};
 shape(?OP_GET_MORE) ->
@@ -132,7 +134,7 @@ shape(Op) ->
     {error, {invalid_opcode, Op}}.
 
 
-parse_bin([], <<>>, Acc) ->
+parse_bin([], Data, Acc) ->
     {ok, lists:reverse(Acc), Data};
 parse_bin([], _, _) ->
     {error, trailing_data};
@@ -159,15 +161,15 @@ parse_bin([{Name, cstring} | Rest], Data, Acc) ->
     end;
 parse_bin([{Name, doc} | Rest], Data, Acc) ->
     case mango_bson:to_ejson(Rest, [return_rest]) of
-        {ok, Value, R} ->
+        {ok, Val, R} ->
             parse_bin(Rest, R, [{Name, Val} | Acc]);
         {error, Reason} ->
             {error, {invalid_bson, Reason}}
     end;
-parse_bin([{Name, docs}], Data, Acc)
+parse_bin([{Name, docs}], Data, Acc) ->
     % This has to be the last element of the message
     % so we assert that in the pattern match.
-    case parse_docs(Data) of
+    case parse_docs(Data, []) of
         {ok, Docs} ->
             {ok, lists:reverse(Acc, [{docs, Docs}]), <<>>};
         Error ->
@@ -218,9 +220,26 @@ parse_cursors(_, _, _) ->
 
 
 get_key(Name, Data) ->
+    get_key(Name, Data, undefined).
+
+get_key(Name, Data, Default) ->
     case lists:keyfind(Name, 1, Data) of
         {Name, Value} ->
             Value;
         false ->
-            undefined
+            Default
+    end.
+
+
+req_id() ->
+    maybe_seed(),
+    random:uniform(16#FFFFFFFF) - 16#80000000.
+
+
+maybe_seed() ->
+    case get(random_seed) of
+        undefined ->
+            random:seed(os:timestamp());
+        _ ->
+            ok
     end.

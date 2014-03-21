@@ -8,5 +8,5 @@
 -include("mango.hrl").
 
 
-run(Props, Ctx) ->
+run(_Props, _Ctx) ->
     ok.

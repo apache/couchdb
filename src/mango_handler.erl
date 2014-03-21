@@ -2,25 +2,27 @@
 
 
 -export([
-    dispatch/2
+    dispatch/3
 ]).
 
 
 dispatch(Type, Props, Ctx) ->
     try
-        check_auth(Type, Props, Ctx)
+        check_auth(Type, Props, Ctx),
         Mod = get_handler_mod(Type, Props),
         Mod:run(Props, Ctx)
-    catch E:R ->
-        add_error(Ctx, Reason),
-        {ok, Ctx}
+    catch
+        throw:Reason ->
+            {ok, mango_ctx:add_error(Ctx, Reason)};
+        error:Reason ->
+            {ok, mango_ctx:add_error(Ctx, Reason)}
     end.
 
 
-check_auth(query, Props, Ctx) ->
+check_auth('query', Props, Ctx) ->
     case is_cmd(Props) of
         true ->
-            {query, Doc} = list:keyfind(query, 1, Props),
+            {'query', Doc} = list:keyfind('query', 1, Props),
             IsGetNonce = get_bool(<<"getnonce">>, Doc),
             IsAuthenticate = get_bool(<<"authenticate">>, Doc),
             case IsGetNonce orelse IsAuthenticate of
@@ -36,19 +38,23 @@ check_auth(_, _, Ctx) ->
     ensure_authed(Ctx).
 
 
-ensure_authed(#mango_ctx{user_ctx=UC}) when UC /= undefined ->
-    ok;
-ensure_authed(_) ->
-    throw(authorization_required).
+ensure_authed(Ctx) ->
+    case mango_ctx:is_authed(Ctx) of
+        true ->
+            ok;
+        false ->
+            throw(authorization_required)
+    end.
+
 
 get_handler_mod(update, _) ->
     mango_op_update;
 get_handler_mod(insert, _) ->
     mango_op_insert;
-get_handler_mod(query, Props) ->
+get_handler_mod('query', Props) ->
     case is_cmd(Props) of
         true ->
-            {query, {QProps}} = lists:keyfind(query, 1, Props),
+            {'query', {QProps}} = lists:keyfind('query', 1, Props),
             try
                 lists:foreach(fun({Member, Cmd}) ->
                     case lists:keyfind(Member, 1, QProps) of
@@ -63,13 +69,13 @@ get_handler_mod(query, Props) ->
 
             catch throw:{found, Cmd} ->
                 Cmd
-            end
+            end;
         false ->
             mango_op_query
     end;
-get_handler_mod(get_more, Props) ->
+get_handler_mod(get_more, _) ->
     mango_op_get_more;
-get_handler_mod(kill_cursors, Props) ->
+get_handler_mod(kill_cursors, _) ->
     mango_op_kill_cursors;
 get_handler_mod(_, _) ->
     throw(invalid_protocol_operation).
@@ -84,11 +90,6 @@ is_cmd(Props) ->
         _ ->
             false
     end.
-
-
-add_error(Ctx, Error) ->
-    Errors = [Error | Ctx#mango_ctx.errors],
-    Ctx#mango_ctx{errors=Errors}.
 
 
 get_bool(Name, {Props}) ->
