@@ -80,28 +80,29 @@ function(app, FauxtonAPI, Config, Components) {
       return {option: this.model.toJSON()};
     },
     saveAndRender: function (event) {
-      var options = {};
-        $input = this.$(event.currentTarget).parents('td').find(".js-value-input");
-        options[$input.attr('name')] = $input.val();
+      var options = {},
+          $input = this.$(event.currentTarget).parents('td').find(".js-value-input");
 
-        if ($input.attr('name')==='name'){
-          if (this.uniqueName($input.val())){
-            this.error = FauxtonAPI.addNotification({
-                msg: "This config already exists, enter a unique name",
-                type: "error",
-                clear: true
-            });
-          } else {
-            var newModel = this.model.clone();
-              newModel.save(options);
-              this.model.destroy();
-              this.model = newModel;
-              this.render();
-          }
+      options[$input.attr('name')] = $input.val();
+
+      if ($input.attr('name')==='name'){
+        if (this.uniqueName($input.val())){
+          this.error = FauxtonAPI.addNotification({
+            msg: "This config already exists, enter a unique name",
+            type: "error",
+            clear: true
+          });
         } else {
+          var newModel = this.model.clone();
+          newModel.save(options);
+          this.model.destroy();
+          this.model = newModel;
+          this.render();
+        }
+      } else {
         this.model.save(options);
         this.render();
-        }
+      }
     }
 
   });
