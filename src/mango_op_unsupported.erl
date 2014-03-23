@@ -8,5 +8,5 @@
 -include("mango.hrl").
 
 
-run(_Props, _Ctx) ->
-    ok.
+run(_Msg, _Ctx) ->
+    {ok, {[{<<"$err">>, <<"unsupported operation">>}]}}.

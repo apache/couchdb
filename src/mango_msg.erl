@@ -1,7 +1,21 @@
 -module(mango_msg).
 
 -export([
-    new/1
+    is_msg/1,
+
+    new/1,
+    reply/2,
+
+    set_reply/2,
+    set_reply/3,
+
+    type/1,
+    dbname/1,
+    collection/1,
+    prop/2,
+
+    is_cmd/1,
+    requires_auth/1
 ]).
 
 
@@ -15,58 +29,185 @@
 -define(OP_DELETE, 2006).
 -define(OP_KILL_CURSORS, 2007).
 
--define(LI, little-integer).
 
-
--record(mreq_update, {
+-record(mango_msg, {
+    type,
     req_id,
     resp_to,
+    dbname,
     collection,
-    flags,
-    selector,
-    update
+    reply,
+    props
+}).
+
+-record(mango_reply, {
+    flags = 0,
+    cursor_id = 0,
+    offset = 0,
+    docs = []
 }).
 
 
-new(<<Size:4/?LI, Rest/binary>>=All) ->
-    case (Size-4) =< size(Rest) of
+is_msg(#mango_msg{}) ->
+    true;
+is_msg(_) ->
+    false.
+
+
+new(<<Size:32/little-integer, Rest/binary>>) when Size - 4 =< size(Rest) ->
+    NumBytes = Size - 4,
+    <<Msg:NumBytes/binary, NonMsg/binary>> = Rest,
+    case parse(Msg) of
+        {ok, Type, ReqId, RespTo, Props} ->
+            {ok, new_msg(Type, ReqId, RespTo, Props), NonMsg};
+        Error ->
+            {error, Error}
+    end;
+new(_) ->
+    undefined.
+
+
+reply(#mango_msg{type='query', reply=undefined}=Msg, Ctx) ->
+    twig:log(error, "ERROR REPLY to QUERY", []),
+    ReqId = req_id(),
+    RespTo = Msg#mango_msg.req_id,
+    Flags = 16#00000002, % Query failure
+    CursorId = 0,
+    Offset = 0,
+    NumDocs = 1,
+    ErrorDoc = mango_error:format(mango_ctx:last_error(Ctx)),
+    DocBin = mango_bson:from_ejson(ErrorDoc),
+    Size = 36 + size(DocBin),
+    <<
+        Size:32/little-integer,
+        ReqId:32/little-integer,
+        RespTo:32/little-integer,
+        ?OP_REPLY:32/little-integer,
+        Flags:32/little-integer,
+        CursorId:64/little-integer,
+        Offset:32/little-integer,
+        NumDocs:32/little-integer,
+        DocBin/binary
+    >>;
+reply(#mango_msg{type=Type, reply=Reply}=Msg, _) when Reply /= undefined ->
+    twig:log(error, "RTYPE ~p", [Type]),
+    if Type /= 'query' andalso Type /= get_more -> undefined; true ->
+        twig:log(error, "Building reply", []),
+        ReqId = req_id(),
+        RespTo = Msg#mango_msg.req_id,
+        Flags = Reply#mango_reply.flags,
+        CursorId = Reply#mango_reply.cursor_id,
+        Offset = Reply#mango_reply.offset,
+        NumDocs = case Reply#mango_reply.docs of
+            Docs when is_list(Docs) ->
+                length(Docs);
+            Doc when tuple_size(Doc) == 1 ->
+                1
+        end,
+        DocsBinary = mango_bson:from_ejson(Reply#mango_reply.docs),
+        Size = 36 + size(DocsBinary),
+        <<
+            Size:32/little-integer,
+            ReqId:32/little-integer,
+            RespTo:32/little-integer,
+            ?OP_REPLY:32/little-integer,
+            Flags:32/little-integer,
+            CursorId:64/little-integer,
+            Offset:32/little-integer,
+            NumDocs:32/little-integer,
+            DocsBinary/binary
+        >>
+    end;
+reply(_, _) ->
+    undefined.
+
+
+set_reply(Msg, []) ->
+    Msg;
+set_reply(Msg, [{Key, Val} | Rest]) ->
+    NewMsg = set_reply(Msg, Key, Val),
+    set_reply(NewMsg, Rest).
+
+
+set_reply(Msg, flags, Val) ->
+    R0 = get_reply(Msg),
+    R1 = R0#mango_reply{flags=Val},
+    Msg#mango_msg{reply=R1};
+set_reply(Msg, cursor_id, Val) ->
+    R0 = get_reply(Msg),
+    R1 = R0#mango_reply{cursor_id=Val},
+    Msg#mango_msg{reply=R1};
+set_reply(Msg, offset, Val) ->
+    R0 = get_reply(Msg),
+    R1 = R0#mango_reply{offset=Val},
+    Msg#mango_msg{reply=R1};
+set_reply(Msg, docs, Val) ->
+    R0 = get_reply(Msg),
+    R1 = R0#mango_reply{docs=Val},
+    Msg#mango_msg{reply=R1}.
+
+
+type(#mango_msg{type=Type}) ->
+    Type.
+
+
+dbname(#mango_msg{dbname=DbName}) ->
+    DbName.
+
+
+collection(#mango_msg{collection=Collection}) ->
+    Collection.
+
+
+prop(Name, Msg) ->
+    {Name, Value} = lists:keyfind(Name, 1, Msg#mango_msg.props),
+    Value.
+
+
+is_cmd(#mango_msg{type='query', collection= <<"$cmd">>}) ->
+    true;
+is_cmd(_) ->
+    false.
+
+
+requires_auth(Msg) ->
+    case is_cmd(Msg) of
         true ->
-            NumBytes = Size - 4,
-            <<Msg:NumBytes/binary, NonMsg/binary>> = Rest,
-            {parse(Msg), NonMsg};
+            {QProps} = prop('query', Msg),
+            Keys = [mango_util:to_lower(K) || {K, _} <- QProps],
+            not has_authless_key(Keys);
         false ->
-            {undefined, All}
+            true
     end.
 
 
-reply(Resp) ->
-    ReqId = req_id(),
-    RespTo = get_key(resp_to, Resp),
-    Flags = get_key(flags, Resp),
-    CursorId = get_key(cursor, Resp, 0),
-    Offset = get_key(offset, Resp, 0),
-    DocsEJson = get_key(docs, Resp, []),
-    NumDocs = length(DocsEJson),
-    DocsBinary = mango_bson:from_ejson(DocsEJson),
-    Size = 36 + size(DocsBinary),
-    <<
-        Size:4/little-integer,
-        ReqId:4/little-integer,
-        RespTo:4/little-integer,
-        ?OP_REPLY:4/little-integer,
-        Flags:4/little-integer,
-        CursorId:8/little-integer,
-        Offset:4/little-integer,
-        NumDocs:4/little-integer,
-        DocsBinary/binary
-    >>.
-
+new_msg(Type, ReqId, RespTo, Props) ->
+    {collection, FullCollection} = lists:keyfind(collection, 1, Props),
+    Opts = [{capture, all_but_first, binary}],
+    case re:run(FullCollection, <<"^([^.]+)\\.(.*)$">>, Opts) of
+        {match, [DbName, Collection]} ->
+            #mango_msg{
+                type = Type,
+                req_id = ReqId,
+                resp_to = RespTo,
+                dbname = DbName,
+                collection = Collection,
+                props = Props
+            };
+        _ ->
+            throw({invalid_collection, FullCollection})
+    end.
 
 
 parse(Data) ->
     % Grab our values from the message header
     case Data of
-        <<ReqId:4/?LI, RespTo:4/?LI, OpCode:4/?LI, Body/binary>> ->
+        <<
+            ReqId:32/little-integer,
+            RespTo:32/little-integer,
+            OpCode:32/little-integer,
+            Body/binary
+        >> ->
             parse(ReqId, RespTo, OpCode, Body);
         _ ->
             {error, invalid_msg_header}
@@ -74,12 +215,11 @@ parse(Data) ->
 
 
 parse(ReqId, RespTo, OpCode, Body) ->
-    Base = [{resp_to, RespTo}, {req_id, ReqId}],
     case shape(OpCode) of
         {Type, Props} when is_list(Props) ->
-            case parse_bin(Props, Body, Base) of
-                {ok, Props} ->
-                    {ok, {Type, Props}};
+            case parse_bin(Props, Body, []) of
+                {ok, ParsedProps} ->
+                    {ok, Type, ReqId, RespTo, ParsedProps};
                 Error ->
                     Error
             end;
@@ -107,7 +247,7 @@ shape(?OP_QUERY) ->
         {flags, int32},
         {collection, cstring},
         {skip, int32},
-        {return, int32},
+        {limit, int32},
         {'query', doc},
         {fields, docs}
     ]};
@@ -115,7 +255,7 @@ shape(?OP_GET_MORE) ->
     {get_more, [
         {zero, int32},
         {collection, cstring},
-        {return, int32},
+        {limit, int32},
         {cursor_id, int64}
     ]};
 shape(?OP_DELETE) ->
@@ -134,33 +274,33 @@ shape(Op) ->
     {error, {invalid_opcode, Op}}.
 
 
-parse_bin([], Data, Acc) ->
-    {ok, lists:reverse(Acc), Data};
+parse_bin([], <<>>, Acc) ->
+    {ok, lists:reverse(Acc)};
 parse_bin([], _, _) ->
     {error, trailing_data};
 parse_bin([{Name, int32} | Rest], Data, Acc) ->
     case Data of
-        <<Val:4/?LI, R/binary>> ->
+        <<Val:32/little-integer, R/binary>> ->
             parse_bin(Rest, R, [{Name, Val} | Acc]);
         _ ->
             {error, {truncated_data, Name}}
     end;
 parse_bin([{Name, int64} | Rest], Data, Acc) ->
     case Data of
-        <<Val:8/?LI, R/binary>> ->
+        <<Val:64/little-integer, R/binary>> ->
             parse_bin(Rest, R, [{Name, Val} | Acc]);
         _ ->
             {error, {truncated_data, Name}}
     end;
 parse_bin([{Name, cstring} | Rest], Data, Acc) ->
-    case parse_cstring(Rest, 0) of
+    case parse_cstring(Data, 0) of
         {Val, R} ->
             parse_bin(Rest, R, [{Name, Val} | Acc]);
         _ ->
             {error, {unterminated_cstring, Name}}
     end;
 parse_bin([{Name, doc} | Rest], Data, Acc) ->
-    case mango_bson:to_ejson(Rest, [return_rest]) of
+    case mango_bson:to_ejson(Data, [return_rest]) of
         {ok, Val, R} ->
             parse_bin(Rest, R, [{Name, Val} | Acc]);
         {error, Reason} ->
@@ -171,16 +311,16 @@ parse_bin([{Name, docs}], Data, Acc) ->
     % so we assert that in the pattern match.
     case parse_docs(Data, []) of
         {ok, Docs} ->
-            {ok, lists:reverse(Acc, [{docs, Docs}]), <<>>};
+            {ok, lists:reverse(Acc, [{Name, Docs}])};
         Error ->
             Error
     end;
-parse_bin([{Name, cursors}], Data, Acc) ->
+parse_bin([{Name, cursors} | Rest], Data, Acc) ->
     case Data of
-        <<Num:4/?LI, Rest0/binary>> ->
-            case parse_cursors(Num, Rest0, []) of
-                {ok, Cursors, Rest1} ->
-                    {ok, lists:reverse(Acc, [{Name, Cursors}]), Rest1};
+        <<Num:32/little-integer, CursorData/binary>> ->
+            case parse_cursors(Num, CursorData, []) of
+                {ok, Cursors, R} ->
+                    parse_bin(Rest, R, [{Name, Cursors} | Acc]);
                 Error ->
                     Error
             end;
@@ -203,7 +343,7 @@ parse_cstring(Bin, O) ->
 parse_docs(<<>>, Acc) ->
     {ok, lists:reverse(Acc)};
 parse_docs(Data, Acc) ->
-    case mongo_bson:to_ejson(Data, [return_rest]) of
+    case mango_bson:to_ejson(Data, [return_rest]) of
         {ok, Doc, R} ->
             parse_docs(R, [Doc | Acc]);
         {error, Reason} ->
@@ -213,22 +353,16 @@ parse_docs(Data, Acc) ->
 
 parse_cursors(0, Rest, Acc) ->
     {ok, lists:reverse(Acc), Rest};
-parse_cursors(N, <<Cursor:8/little-integer, Rest/binary>>, Acc) ->
+parse_cursors(N, <<Cursor:64/little-integer, Rest/binary>>, Acc) ->
     parse_cursors(N-1, Rest, [Cursor | Acc]);
 parse_cursors(_, _, _) ->
     {error, truncated_cursors}.
 
 
-get_key(Name, Data) ->
-    get_key(Name, Data, undefined).
-
-get_key(Name, Data, Default) ->
-    case lists:keyfind(Name, 1, Data) of
-        {Name, Value} ->
-            Value;
-        false ->
-            Default
-    end.
+get_reply(#mango_msg{reply=undefined}) ->
+    #mango_reply{};
+get_reply(#mango_msg{reply=R}) ->
+    R.
 
 
 req_id() ->
@@ -243,3 +377,25 @@ maybe_seed() ->
         _ ->
             ok
     end.
+
+
+has_authless_key([]) ->
+    false;
+has_authless_key([K | Rest]) ->
+    twig:log(error, "Checking: ~s", [K]),
+    case lists:member(K, authless_keys()) of
+        true ->
+            true;
+        false ->
+            has_authless_key(Rest)
+    end.
+    
+
+authless_keys() ->
+    [
+        <<"ismaster">>,
+        <<"getnonce">>,
+        <<"authenticate">>,
+        <<"saslstart">>,
+        <<"getlasterror">>
+    ].

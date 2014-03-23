@@ -5,8 +5,5 @@
 ]).
 
 
--include("mango.hrl").
-
-
-run(_Props, _Ctx) ->
+run(_Msg, _Ctx) ->
     ok.

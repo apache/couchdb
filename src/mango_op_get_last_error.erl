@@ -5,8 +5,5 @@
 ]).
 
 
--include("mango.hrl").
-
-
-run(_Props, _Ctx) ->
-    ok.
+run(_Msg, Ctx) ->
+    {ok, mango_error:format(mango_ctx:last_error(Ctx))}.

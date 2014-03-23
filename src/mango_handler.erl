@@ -2,48 +2,54 @@
 
 
 -export([
-    dispatch/3
+    dispatch/2
 ]).
 
 
-dispatch(Type, Props, Ctx) ->
+dispatch(Msg, Ctx) ->
     try
-        check_auth(Type, Props, Ctx),
-        Mod = get_handler_mod(Type, Props),
-        Mod:run(Props, Ctx)
+        check_auth(Msg, Ctx),
+        Mod = get_handler_mod(mango_msg:type(Msg), Msg),
+        twig:log(error, "mango mod: ~p", [Mod]),
+        case Mod:run(Msg, Ctx) of
+            {ok, Reply} ->
+                {ok, to_msg(Msg, Reply), Ctx};
+            {ok, Reply, NewCtx} ->
+                {ok, to_msg(Msg, Reply), NewCtx};
+            {error, HandlerError} ->
+                NewCtx = mango_ctx:add_error(Ctx, HandlerError),
+                {ok, Msg, NewCtx}
+        end
     catch
         throw:Reason ->
-            {ok, mango_ctx:add_error(Ctx, Reason)};
+            Stack = erlang:get_stacktrace(),
+            {ok, Msg, mango_ctx:add_error(Ctx, Reason, Stack)};
         error:Reason ->
-            {ok, mango_ctx:add_error(Ctx, Reason)}
+            Stack = erlang:get_stacktrace(),
+            {ok, Msg, mango_ctx:add_error(Ctx, Reason, Stack)}
     end.
 
 
-check_auth('query', Props, Ctx) ->
-    case is_cmd(Props) of
+to_msg(Msg, Reply) ->
+    case mango_msg:is_msg(Reply) of
         true ->
-            {'query', Doc} = list:keyfind('query', 1, Props),
-            IsGetNonce = get_bool(<<"getnonce">>, Doc),
-            IsAuthenticate = get_bool(<<"authenticate">>, Doc),
-            case IsGetNonce orelse IsAuthenticate of
-                true ->
-                    true;
-                false ->
-                    ensure_authed(Ctx)
-            end;
+            Reply;
         false ->
-            ensure_authed(Ctx)
-    end;
-check_auth(_, _, Ctx) ->
-    ensure_authed(Ctx).
+            mango_msg:set_reply(Msg, docs, Reply)
+    end.
 
 
-ensure_authed(Ctx) ->
+check_auth(Msg, Ctx) ->
     case mango_ctx:is_authed(Ctx) of
         true ->
             ok;
         false ->
-            throw(authorization_required)
+            case mango_msg:requires_auth(Msg) of
+                true ->
+                    throw(authorization_required);
+                false ->
+                    ok
+            end
     end.
 
 
@@ -51,16 +57,17 @@ get_handler_mod(update, _) ->
     mango_op_update;
 get_handler_mod(insert, _) ->
     mango_op_insert;
-get_handler_mod('query', Props) ->
-    case is_cmd(Props) of
+get_handler_mod('query', Msg) ->
+    case mango_msg:is_cmd(Msg) of
         true ->
-            {'query', {QProps}} = lists:keyfind('query', 1, Props),
+            {QProps} = mango_msg:prop('query', Msg),
+            QKeys = [mango_util:to_lower(K) || {K, _} <- QProps],
             try
-                lists:foreach(fun({Member, Cmd}) ->
-                    case lists:keyfind(Member, 1, QProps) of
-                        {Member, _} ->
+                lists:foreach(fun({KeyName, Cmd}) ->
+                    case lists:member(KeyName, QKeys) of
+                        true ->
                             throw({found, Cmd});
-                        _ ->
+                        false ->
                             ok
                     end
                 end, cmd_list()),
@@ -81,27 +88,11 @@ get_handler_mod(_, _) ->
     throw(invalid_protocol_operation).
 
 
-is_cmd(Props) ->
-    {collection, C} = lists:keyfind(collection, 1, Props),
-    Opts = [{capture, all_but_first, binary}],
-    case re:run(C, <<"^[^.]+\\.(.*)$">>, Opts) of
-        {match, [<<"$cmd">>]} ->
-            true;
-        _ ->
-            false
-    end.
-
-
-get_bool(Name, {Props}) ->
-    case lists:keyfind(Name, 1, Props) of
-        {_, true} -> true;
-        {_, 1} -> true;
-        _ -> false
-    end.
-
-
 cmd_list() ->
     [
+        {<<"ismaster">>, mango_op_is_master},
+
+        {<<"saslstart">>, mango_op_auth_sasl_start},
         {<<"getnonce">>, mango_op_get_nonce},
         {<<"authenticate">>, mango_op_login},
         {<<"logout">>, mango_op_logout},
@@ -122,6 +113,6 @@ cmd_list() ->
         {<<"distinct">>, mango_op_distinct},
 
         {<<"findandmodify">>, mango_op_find_and_modify},
-    
+
         {<<"getlasterror">>, mango_op_get_last_error}
     ].

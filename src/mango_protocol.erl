@@ -41,6 +41,7 @@ init(_) ->
 
 
 init(Ref, Socket, Transport, _Opts) ->
+    twig:log(error, "Client connected: ~p", [Socket]),
     ok = proc_lib:init_ack({ok, self()}),
     ok = ranch:accept_ack(Ref),
     St = #st{
@@ -52,7 +53,8 @@ init(Ref, Socket, Transport, _Opts) ->
     gen_server:enter_loop(?MODULE, [], St).
 
 
-terminate(_Reason, _St) ->
+terminate(_Reason, St) ->
+    twig:log(error, "Client disconnected: ~p", [St#st.socket]),
     ok.
 
 
@@ -67,14 +69,13 @@ handle_cast(Msg, St) ->
 handle_info({tcp, _Socket, Data}, St) ->
     set_active(St),
     NewBuffer = <<(St#st.buffer)/binary, Data/binary>>,
-    case mango_msg:new(NewBuffer) of
-        undefined ->
-            {noreply, St#st{buffer=NewBuffer}};
-        {error, Reason} ->
-            NewCtx = mango_ctx:add_error(St#st.context, Reason),
-            {noreply, St#st{context=NewCtx}};
-        {Msg, Rest} ->
-            dispatch(Msg, St#st{buffer=Rest})
+    NewSt = St#st{buffer=NewBuffer},
+    try
+        FinalSt = maybe_handle_message(NewSt),
+        {noreply, FinalSt}
+    catch
+        throw:{stop, Reason} ->
+            {stop, Reason, NewSt}
     end;
 handle_info({tcp_closed, _Socket}, State) ->
     {stop, normal, State};
@@ -90,12 +91,40 @@ code_change(_OldVSn, St, _Extra) ->
     {ok, St}.
 
 
-dispatch({Type, Props}, St) ->
-    case mango_handler:dispatch(Type, Props, St#st.context) of
-        {ok, NewCtx} ->
-            {noreply, St#st{context=NewCtx}};
-        {ok, NewCtx, Resp} ->
-            send_resp(Resp, St#st{context=NewCtx})
+maybe_handle_message(St) ->
+    try
+        case mango_msg:new(St#st.buffer) of
+            {ok, Msg, Rest} ->
+                twig:log(err, "Message: ~p", [Msg]),
+                NewSt = dispatch(Msg, St#st{buffer=Rest}),
+                % Recurse incase the client sent us multiple
+                % messages.
+                maybe_handle_message(NewSt);
+            undefined ->
+                St;
+            {error, Error1} ->
+                NewCtx1 = mango_ctx:add_error(St#st.context, Error1),
+                St#st{context=NewCtx1}
+        end
+    catch
+        throw:Error2 ->
+            Stack = erlang:get_stacktrace(),
+            NewCtx2 = mango_ctx:add_error(St#st.context, Error2, Stack),
+            St#st{context=NewCtx2};
+        error:Error2 ->
+            Stack = erlang:get_stacktrace(),
+            NewCtx2 = mango_ctx:add_error(St#st.context, Error2, Stack),
+            St#st{context=NewCtx2}
+    end.
+
+
+dispatch(Msg, St) ->
+    case mango_handler:dispatch(Msg, St#st.context) of
+        {ok, NewMsg, NewCtx} ->
+            maybe_send_resp(NewMsg, St#st{context=NewCtx});
+        {error, Reason} ->
+            NewCtx = mango_ctx:add_error(St#st.context, Reason),
+            maybe_send_resp(Msg, St#st{context=NewCtx})
     end.
 
 
@@ -103,11 +132,19 @@ set_active(#st{socket=S, transport=T}) ->
     ok = T:setopts(S, [{active, once}]).
 
 
-send_resp(Resp, #st{socket=S, transport=T}=St) ->
-    Msg = mango_msg:reply(Resp),
-    case T:send(S, Msg) of
+maybe_send_resp(Msg, #st{context=Ctx}=St) ->
+    case mango_msg:reply(Msg, Ctx) of
+        Reply when is_binary(Reply) ->
+            send_resp(Reply, St);
+        undefined ->
+            St
+    end.
+
+
+send_resp(Reply, #st{socket=S, transport=T}=St) ->
+    case T:send(S, Reply) of
         ok ->
-            {noreply, St};
+            St;
         {error, Reason} ->
-            {stop, Reason, St}
+            throw({stop, Reason})
     end.

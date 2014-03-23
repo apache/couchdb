@@ -9,11 +9,13 @@
 
 
 start(_Type, []) ->
+    Port = list_to_integer(config:get("mongo", "port")),
+    Backlog = list_to_integer(config:get("mongo", "backlog")),
     {ok, _} = ranch:start_listener(
-            mango_protocol,
-            100,
+            mango_tcp,
+            Backlog,
         	ranch_tcp,
-        	[{port, 27017}],
+        	[{port, Port}],
         	mango_protocol,
         	[]
         ),

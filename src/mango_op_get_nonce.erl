@@ -9,4 +9,5 @@
 
 
 run(_Props, _Ctx) ->
+    twig:log(error, "GETTING NONCE", []),
     ok.
