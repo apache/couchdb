@@ -749,10 +749,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
     perPage: function () {
       return this.allDocsNumber.perPage();
-    },
-
-    updatePerPage: function (newPerPage) {
-      this.collection.updateLimit(newPerPage);
     }
   });
 

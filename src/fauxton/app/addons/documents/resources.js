@@ -298,7 +298,6 @@ function(app, FauxtonAPI, PagingCollection) {
   //Documents.AllDocs = FauxtonAPI.Collection.extend(_.extend({}, DefaultParametersMixin(), {
   Documents.AllDocs = PagingCollection.extend({
     model: Documents.Doc,
-    isAllDocs: true,
     documentation: function(){
       return "docs";
     },
@@ -337,7 +336,7 @@ function(app, FauxtonAPI, PagingCollection) {
     },
 
     url: function () {
-      return this.urlRef();
+      return this.urlRef.apply(this, arguments);
     },
 
     simple: function () {
@@ -352,15 +351,6 @@ function(app, FauxtonAPI, PagingCollection) {
         database: this.database,
         params: this.params
       });
-    },
-
-    updateLimit: function (limit) {
-      this.perPageLimit = limit;
-      this.params.limit = limit;
-    },
-
-    updateParams: function (params) {
-      this.params = params;
     },
 
     totalRows: function() {
@@ -381,37 +371,16 @@ function(app, FauxtonAPI, PagingCollection) {
     parse: function(resp) {
       var rows = resp.rows;
 
-      this.viewMeta = {
-        total_rows: resp.total_rows,
-        offset: resp.offset,
-        update_seq: resp.update_seq
-      };
-
-      //Paginating, don't show first item as it was the last
-      //item in the previous page
-      if (this.skipFirstItem) {
-        rows = rows.splice(1);
-      }
-
       // remove any query errors that may return without doc info
       // important for when querying keys on all docs
-      var noQueryErrors = _.filter(rows, function(row){
+      resp.rows = _.filter(rows, function(row){
         return row.value;
       });
 
-      return _.map(noQueryErrors, function(row) {
-          return {
-            _id: row.id,
-            _rev: row.value.rev,
-            value: row.value,
-            key: row.key,
-            doc: row.doc || undefined
-          };
-      });
+      return PagingCollection.prototype.parse.call(this, resp);
     }
   });
 
-  //Documents.IndexCollection = FauxtonAPI.Collection.extend(_.extend({}, DefaultParametersMixin(), {
   Documents.IndexCollection = PagingCollection.extend({
     model: Documents.ViewRow,
     documentation: function(){
@@ -424,7 +393,6 @@ function(app, FauxtonAPI, PagingCollection) {
       this.idxType = "_view";
       this.view = options.view;
       this.design = options.design.replace('_design/','');
-      this.skipFirstItem = false;
       this.perPageLimit = options.perPageLimit || 20;
 
       if (!this.params.limit) {
@@ -458,21 +426,7 @@ function(app, FauxtonAPI, PagingCollection) {
     },
 
     url: function () {
-      return this.urlRef();
-    },
-
-    updateParams: function (params) {
-      this.params = params;
-    },
-
-    updateLimit: function (limit) {
-      if (this.params.startkey_docid && this.params.startkey) {
-        //we are paginating so set limit + 1
-        this.params.limit = limit + 1;
-        return;
-      }
-
-      this.params.limit = limit;
+      return this.urlRef.apply(this, arguments);
     },
 
     totalRows: function() {
@@ -506,16 +460,6 @@ function(app, FauxtonAPI, PagingCollection) {
       var rows = resp.rows;
       this.endTime = new Date().getTime();
       this.requestDuration = (this.endTime - this.startTime);
-
-      if (this.skipFirstItem) {
-        rows = rows.splice(1);
-      }
-
-      this.viewMeta = {
-        total_rows: resp.total_rows,
-        offset: resp.offset,
-        update_seq: resp.update_seq
-      };
 
       return PagingCollection.prototype.parse.apply(this, arguments);
     },

@@ -60,10 +60,11 @@
       var querystring = _.result(this, "url").split("?")[1] || "";
       this.paging = _.defaults((options.paging || {}), {
         defaultParams: _.defaults({}, options.params, this._parseQueryString(querystring)),
-        hasNext: true,
+        hasNext: false,
         hasPrevious: false,
         params: {},
-        pageSize: 20
+        pageSize: 20,
+        direction: undefined
       });
 
       this.paging.params = _.clone(this.paging.defaultParams);
@@ -74,14 +75,13 @@
 
       var params = _.clone(currentParams);
       params.skip = (currentParams.skip || 0) + skipIncrement;
-      // request an extra row so we know that there are more results
-      params.limit = limitIncrement + 1;
 
       // guard against hard limits
       if(this.paging.defaultParams.limit) {
         params.limit = Math.min(this.paging.defaultParams.limit, params.limit);
       }
-
+      // request an extra row so we know that there are more results
+      params.limit = limitIncrement + 1;
       // prevent illegal skip values
       params.skip = Math.max(params.skip, 0);
 
@@ -89,8 +89,10 @@
     },
 
     pageSizeReset: function(pageSize) {
+      this.paging.direction = undefined;
       this.paging.pageSize = pageSize;
       this.paging.params = this.paging.defaultParams;
+      this.paging.params.limit = pageSize;
       this.updateUrlQuery(this.paging.params);
       return this.fetch();
     },
@@ -109,23 +111,24 @@
     },
 
     _iterate: function(offset) {
-
       this.paging.params = this.calculateParams(this.paging.params, offset, this.paging.pageSize);
 
       // Fetch the next page of documents
       this.updateUrlQuery(this.paging.params);
-      return this.fetch();
+      return this.fetch({reset: true});
     },
 
     // `next` is called with the number of items for the next page.
     // It returns the fetch promise.
     next: function(){
+      this.paging.direction = "next";
       return this._iterate(this.paging.pageSize);
     },
 
     // `previous` is called with the number of items for the previous page.
     // It returns the fetch promise.
     previous: function(){
+      this.paging.direction = "previous";
       return this._iterate(0 - this.paging.pageSize);
     },
 
@@ -143,13 +146,30 @@
       this.url = url + '?' + $param(params);
     },
 
+    fetch: function () {
+      // if this is a fetch for the first time, fetch one extra to see if there is a next
+      if (!this.paging.direction && this.paging.params.limit > 0) {
+        this.paging.direction = 'fetch';
+        this.paging.params.limit = this.paging.params.limit + 1;
+        this.updateUrlQuery(this.paging.params);
+      }
+
+      return Backbone.Collection.prototype.fetch.apply(this, arguments);
+    },
+
     parse: function (resp) {
       var rows = resp.rows;
 
       this.paging.hasNext = this.paging.hasPrevious = false;
 
-      var skipLimit = this.paging.defaultParams["skip"] || 0;
-      if(this.paging.params["skip"] > skipLimit) {
+      this.viewMeta = {
+        total_rows: resp.total_rows,
+        offset: resp.offset,
+        update_seq: resp.update_seq
+      };
+
+      var skipLimit = this.paging.defaultParams.skip || 0;
+      if(this.paging.params.skip > skipLimit) {
         this.paging.hasPrevious = true;
       }
 
@@ -158,6 +178,7 @@
 
         // remove the next page marker result
         rows.pop();
+        this.viewMeta.total_rows = this.viewMeta.total_rows - 1;
       }
 
       return rows;
