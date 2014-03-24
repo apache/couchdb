@@ -186,7 +186,7 @@ function(app, FauxtonAPI, Documents, Databases) {
     },
 
     establish: function () {
-      return this.data.designDocs.fetch();
+      return this.data.designDocs.fetch({reset: true});
     },
 
     createParams: function (options) {
@@ -371,7 +371,6 @@ function(app, FauxtonAPI, Documents, Databases) {
           paging: {
             pageSize: pageSize
           }
-
         });
 
         if (!this.documentsView) {

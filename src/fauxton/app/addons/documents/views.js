@@ -1737,9 +1737,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         this.ddocID = this.model.id;
       } else {
         var ddocDecode = decodeURIComponent(this.ddocID);
-        this.model = this.ddocs.get(ddocDecode).dDocModel();
+        this.model = this.ddocs.get(this.ddocID).dDocModel();
         this.reduceFunStr = this.model.viewHasReduce(this.viewName);
-        
       }
 
       this.designDocSelector = this.setView('.design-doc-group', new Views.DesignDocSelector({
@@ -1747,7 +1746,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         ddocName: this.model.id,
         database: this.database
       }));
-
 
       if (!this.newView) {
         this.eventer = _.extend({}, Backbone.Events);

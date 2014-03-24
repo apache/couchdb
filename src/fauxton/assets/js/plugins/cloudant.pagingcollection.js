@@ -180,7 +180,6 @@
         rows.pop();
         this.viewMeta.total_rows = this.viewMeta.total_rows - 1;
       }
-
       return rows;
     },
 
