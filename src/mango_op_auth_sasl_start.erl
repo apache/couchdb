@@ -12,7 +12,7 @@ run(Msg, Ctx) ->
     {Username, Password} = get_creds(Msg),
     case chttpd_auth:get_user(Username) of
         nil ->
-            throw({unauthorized, ?AUTH_FAIL});
+            throw({authorization_failure, ?AUTH_FAIL});
         Props ->
             Salt = get_bin(<<"salt">>, Props),
             ExpectedHash = get_bin(<<"password_sha">>, Props),
@@ -23,7 +23,7 @@ run(Msg, Ctx) ->
                     NewCtx = mango_ctx:set_auth(Ctx, Username, Roles),
                     {ok, {[{<<"ok">>, 1}]}, NewCtx};
                 false ->
-                    throw({unauthorized, ?AUTH_FAIL})
+                    throw({authorization_failure, ?AUTH_FAIL})
             end
     end.
 

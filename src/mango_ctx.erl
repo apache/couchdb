@@ -4,8 +4,12 @@
 
 -export([
     new/0,
+    
     is_authed/1,
     set_auth/3,
+    username/1,
+
+    clear_error/1,
     last_error/1,
     add_error/2,
     add_error/3
@@ -21,7 +25,8 @@
 
 -record(mango_ctx, {
     user_ctx,
-    errors = []
+    errors = [],
+    last_error
 }).
 
 
@@ -36,6 +41,7 @@ is_authed(#mango_ctx{}) ->
 
 
 set_auth(#mango_ctx{user_ctx=undefined}=Ctx, User, Roles) ->
+    twig:log(error, "User auth: ~s ~w", [User, Roles]),
     UC = #user_ctx{
         name = User,
         roles = Roles,
@@ -46,13 +52,18 @@ set_auth(_, _, _) ->
     throw(already_authenticated).
 
 
-last_error(#mango_ctx{errors=E}) ->
-    case E of
-        [] ->
-            undefined;
-        [Error | _] ->
-            Error
-    end.
+username(#mango_ctx{user_ctx=UC}) when UC /= undefined ->
+    UC#user_ctx.name;
+username(_) ->
+    throw(authorization_required).
+
+
+clear_error(Ctx) ->
+    Ctx#mango_ctx{last_error=undefined}.
+
+
+last_error(#mango_ctx{last_error=Error}) ->
+    Error.
 
 
 add_error(Ctx, Error) ->
@@ -61,4 +72,7 @@ add_error(Ctx, Error) ->
 
 add_error(#mango_ctx{errors=Errors}=Ctx, Error, Stack) ->
     twig:log(error, "Mango error: ~p~n    ~p", [Error, Stack]),
-    Ctx#mango_ctx{errors=[{Error, Stack} | Errors]}.
+    Ctx#mango_ctx{
+        errors=[{Error, Stack} | Errors],
+        last_error = {Error, Stack}
+    }.

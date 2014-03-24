@@ -6,11 +6,16 @@
 ]).
 
 
-dispatch(Msg, Ctx) ->
+dispatch(Msg, CtxIn) ->
     try
-        check_auth(Msg, Ctx),
+        check_auth(Msg, CtxIn),
         Mod = get_handler_mod(mango_msg:type(Msg), Msg),
-        twig:log(error, "mango mod: ~p", [Mod]),
+        Ctx = case Mod of
+            mango_op_get_last_error ->
+                CtxIn;
+            _ ->
+                mango_ctx:clear_error(CtxIn)
+        end,
         case Mod:run(Msg, Ctx) of
             {ok, Reply} ->
                 {ok, to_msg(Msg, Reply), Ctx};
@@ -23,10 +28,10 @@ dispatch(Msg, Ctx) ->
     catch
         throw:Reason ->
             Stack = erlang:get_stacktrace(),
-            {ok, Msg, mango_ctx:add_error(Ctx, Reason, Stack)};
+            {ok, Msg, mango_ctx:add_error(CtxIn, Reason, Stack)};
         error:Reason ->
             Stack = erlang:get_stacktrace(),
-            {ok, Msg, mango_ctx:add_error(Ctx, Reason, Stack)}
+            {ok, Msg, mango_ctx:add_error(CtxIn, Reason, Stack)}
     end.
 
 

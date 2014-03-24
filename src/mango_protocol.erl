@@ -95,7 +95,7 @@ maybe_handle_message(St) ->
     try
         case mango_msg:new(St#st.buffer) of
             {ok, Msg, Rest} ->
-                twig:log(err, "Message: ~p", [Msg]),
+                twig:log(err, "IN: ~p", [Msg]),
                 NewSt = dispatch(Msg, St#st{buffer=Rest}),
                 % Recurse incase the client sent us multiple
                 % messages.
@@ -133,6 +133,7 @@ set_active(#st{socket=S, transport=T}) ->
 
 
 maybe_send_resp(Msg, #st{context=Ctx}=St) ->
+    twig:log(error, "OUT: ~p", [Msg]),
     case mango_msg:reply(Msg, Ctx) of
         Reply when is_binary(Reply) ->
             send_resp(Reply, St);

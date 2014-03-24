@@ -68,14 +68,13 @@ new(_) ->
 
 
 reply(#mango_msg{type='query', reply=undefined}=Msg, Ctx) ->
-    twig:log(error, "ERROR REPLY to QUERY", []),
     ReqId = req_id(),
     RespTo = Msg#mango_msg.req_id,
     Flags = 16#00000002, % Query failure
     CursorId = 0,
     Offset = 0,
     NumDocs = 1,
-    ErrorDoc = mango_error:format(mango_ctx:last_error(Ctx)),
+    ErrorDoc = mango_error:as_doc(Ctx),
     DocBin = mango_bson:from_ejson(ErrorDoc),
     Size = 36 + size(DocBin),
     <<
@@ -90,9 +89,7 @@ reply(#mango_msg{type='query', reply=undefined}=Msg, Ctx) ->
         DocBin/binary
     >>;
 reply(#mango_msg{type=Type, reply=Reply}=Msg, _) when Reply /= undefined ->
-    twig:log(error, "RTYPE ~p", [Type]),
     if Type /= 'query' andalso Type /= get_more -> undefined; true ->
-        twig:log(error, "Building reply", []),
         ReqId = req_id(),
         RespTo = Msg#mango_msg.req_id,
         Flags = Reply#mango_reply.flags,

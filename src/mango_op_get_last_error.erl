@@ -6,4 +6,13 @@
 
 
 run(_Msg, Ctx) ->
-    {ok, mango_error:format(mango_ctx:last_error(Ctx))}.
+    Msg = case mango_ctx:last_error(Ctx) of
+        undefined ->
+            null;
+        {Error, _} ->
+            mango_error:format(Error)
+    end,
+    {ok, {[
+        {<<"ok">>, 1},
+        {<<"err">>, Msg}
+    ]}}.

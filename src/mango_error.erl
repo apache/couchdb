@@ -1,23 +1,36 @@
 -module(mango_error).
 
 -export([
-    format/1
+    format/1,
+    as_doc/1
 ]).
 
 
-format({authorization_required, Stack}) ->
-    fmterr(<<"Unauthorized: Not logged in">>, Stack);
-format({{unauthorized, Reason}, Stack}) ->
-    fmterr(<<"Unauthorized: ", Reason/binary>>, Stack);
+format(undefined) ->
+    null;
+format({bad_request, Reason}) ->
+    Reason;
+format({doc_update_error, Id, Error}) ->
+    {_Code, _Err, Msg} = chttpd:error_info(Error),
+    fmt("Error updating doc ~s :: ~s", [Id, Msg]);
+format(authorization_required) ->
+    <<"You must be logged in to perform this request">>;
+format({authorization_failure, Reason}) ->
+    fmt("Error authorizing request: ~s", [couch_util:to_binary(Reason)]);
 format(_E) ->
-    fmterr(<<"Unknown error">>, null).
+    fmt("Unknown error: ~p", [_E]).
 
 
-fmterr(Reason, null) ->
-    {[{<<"$err">>, Reason}]};
-fmterr(Reason, Stack) ->
+as_doc(Ctx) ->
+    {Error, Stack} = mango_ctx:last_error(Ctx),
+    Msg = format(Error),
     StackId = erlang:phash2(Stack),
     {[
-        {<<"$err">>, Reason},
-        {<<"$stackid">>, StackId}
+        {<<"ok">>, 0},
+        {<<"err">>, Msg},
+        {<<"code">>, StackId}
     ]}.
+
+
+fmt(Format, Args) ->
+    iolist_to_binary(io_lib:format(Format, Args)).

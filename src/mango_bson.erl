@@ -133,7 +133,7 @@ parse_val(?V_BINARY, Data) ->
                     <<Val0:Size/binary, Rest1/binary>> = Rest0,
                     Val = {[
                         {<<"$binary">>, base64:encode(Val0)},
-                        {<<"$type">>, to_hex(<<Type:8/integer>>)}
+                        {<<"$type">>, mango_util:enc_hex(<<Type:8/integer>>)}
                     ]},
                     {ok, Val, Rest1};
                 false ->
@@ -293,7 +293,7 @@ render_doc({[{<<"$undefined">>, true}]}) ->
 render_doc({[{<<"$id">>, ObjId}]=P}) ->
     case is_binary(ObjId) andalso size(ObjId) == 24 of
         true ->
-            {?V_OBJID, dehex(ObjId)};
+            {?V_OBJID, mango_util:dec_hex(ObjId)};
         false ->
             render_props(P, [])
     end;
@@ -319,7 +319,7 @@ render_doc({[{<<"$ref">>, Ref}, {<<"$id">>, Id}]=P}) ->
     case is_binary(Ref) andalso is_binary(Id) of
         true ->
             RStr = render_string(Ref),
-            IDStr = dehex(Id),
+            IDStr = mango_util:dec_hex(Id),
             {?V_DBPOINTER, <<RStr/binary, IDStr/binary>>};
         false ->
             render_props(P, [])
@@ -443,7 +443,7 @@ parse_objid(Data) ->
     case 12 =< size(Data) of
         true ->
             <<Id:12/binary, Rest/binary>> = Data,
-            Val = {[{<<"$id">>, to_hex(Id)}]},
+            Val = {[{<<"$id">>, mango_util:enc_hex(Id)}]},
             {ok, Val, Rest};
         false ->
             {error, truncated_object_id}
@@ -469,43 +469,3 @@ check_embedded_null(Bin, N) ->
         _ ->
             check_embedded_null(Bin, N+1)
     end.
-
-
-to_hex(Bin) ->
-    to_hex(Bin, []).
-
-
-to_hex(<<>>, Acc) ->
-    list_to_binary(lists:reverse(Acc));
-to_hex(<<V:8/integer, Rest/binary>>, Acc) ->
-    NewAcc = [hex_dig(V rem 16), hex_dig(V div 16) | Acc],
-    to_hex(Rest, NewAcc).
-
-
-hex_dig(N) when N >= 0, N < 10 ->
-    $0 + N;
-hex_dig(N) when N >= 10, N < 16 ->
-    $A + (N - 10);
-hex_dig(N) ->
-    throw({invalid_hex_value, N}).
-
-
-dehex(Bin) ->
-    dehex(Bin, []).
-
-
-dehex(<<>>, Acc) ->
-    list_to_binary(lists:reverse(Acc));
-dehex(<<A:8/integer, B:8/integer, Rest/binary>>, Acc) ->
-    Val = (hex_val(A) bsl 4) bor (hex_val(B)),
-    dehex(Rest, [Val | Acc]).
-
-
-hex_val(N) when N >= $A, N =< $F ->
-    (N - $A) + 10;
-hex_val(N) when N >= $a, N =< $f ->
-    (N - $a) + 10;
-hex_val(N) when N - $0 > 0, N - $0 < 10 ->
-    N - $0;
-hex_val(N) ->
-    throw({invalid_hex_character, N}).
