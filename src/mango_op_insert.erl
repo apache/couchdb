@@ -11,6 +11,9 @@
 run(Msg, Ctx) ->
     {ok, DbName} = maybe_create_db(Msg, Ctx),
     Docs = prepare_docs(mango_msg:prop(docs, Msg)),
+    % If ContinueOnError is set we can just use a bulk
+    % update. If not we have to try and insert one at
+    % a time so we can stop on the first error.
     NewCtx = case continue_on_error(Msg) of
         true ->
             batch_update(DbName, Docs, Ctx);
