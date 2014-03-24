@@ -5,6 +5,10 @@
     defer/3,
     do_defer/3,
 
+    cloudant_dbname/2,
+    maybe_create_db/2,
+    maybe_create_db/1,
+
     to_lower/1,
     
     enc_dbname/1,
@@ -41,7 +45,35 @@ do_defer(Mod, Fun, Args) ->
         exit:Error ->
             exit({mango_defer_exit, Error})
     end.
-        
+
+
+cloudant_dbname(Msg, Ctx) ->
+    Username = mango_ctx:username(Ctx),
+    Collection = mango_msg:prop(collection, Msg),
+    RawDbName = <<Username/binary, "/", Collection/binary>>,
+    enc_dbname(RawDbName).
+
+
+maybe_create_db(Msg, Ctx) ->
+    maybe_create_db(cloudant_dbname(Msg, Ctx)).
+
+
+maybe_create_db(DbName) ->
+    try
+        mem3:shards(DbName),
+        {ok, DbName}
+    catch
+        error:database_does_not_exist ->        
+            case mango_util:defer(fabric, create_db, [DbName]) of
+                ok ->
+                    {ok, DbName};
+                accepted ->
+                    {ok, DbName};
+                Error ->
+                    throw(Error)
+            end
+    end.
+
 
 to_lower(Key) when is_binary(Key) ->
     KStr = binary_to_list(Key),
