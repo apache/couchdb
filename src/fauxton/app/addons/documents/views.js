@@ -681,8 +681,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     },
 
     addPagination: function () {
-      var collection = this.collection;
-
       this.pagination = new Components.IndexPagination({
         collection: this.collection,
         scrollToSelector: '#dashboard-content',
@@ -703,9 +701,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         this.addPagination();
       }
 
-      if (!this.params.keys) { //cannot paginate with keys
-        this.insertView('#documents-pagination', this.pagination);
-      }
+      this.insertView('#documents-pagination', this.pagination);
 
       if (!this.allDocsNumber) {
         this.allDocsNumber = new Views.AllDocsNumber({

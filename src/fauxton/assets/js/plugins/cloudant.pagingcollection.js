@@ -74,7 +74,7 @@
     calculateParams: function(currentParams, skipIncrement, limitIncrement) {
 
       var params = _.clone(currentParams);
-      params.skip = (currentParams.skip || 0) + skipIncrement;
+      params.skip = (parseInt(currentParams.skip, 10) || 0) + skipIncrement;
 
       // guard against hard limits
       if(this.paging.defaultParams.limit) {

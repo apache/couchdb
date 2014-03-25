@@ -190,7 +190,7 @@ function(app, FauxtonAPI, Documents, Databases) {
     },
 
     createParams: function (options) {
-      var urlParams = app.getParams(options);
+      var urlParams = Documents.QueryParams.parse(app.getParams(options));
       return {
         urlParams: urlParams,
         docParams: _.extend(_.clone(urlParams), {limit: this.getDocPerPageLimit(urlParams, 20)})

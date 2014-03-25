@@ -19,7 +19,7 @@ define([
 function(app, FauxtonAPI, PagingCollection) {
   var Documents = FauxtonAPI.addon();
 
-  /*Documents.QueryParams = (function () {
+  Documents.QueryParams = (function () {
     var _eachParams = function (params, action) {
       _.each(['startkey', 'endkey', 'key'], function (key) {
         if (_.has(params, key)) {
@@ -39,7 +39,7 @@ function(app, FauxtonAPI, PagingCollection) {
         return _eachParams(params, JSON.stringify);
       }
     };
-  })();*/
+  })();
 
   
   Documents.Doc = FauxtonAPI.Model.extend({
