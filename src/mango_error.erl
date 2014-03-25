@@ -15,6 +15,10 @@ format(doc_not_found) ->
 format({doc_update_error, Id, Error}) ->
     {_Code, _Err, Msg} = chttpd:error_info(Error),
     fmt("Error updating doc ~s :: ~s", [Id, Msg]);
+format({invalid_conditional, Cond}) ->
+    fmt("Invalid conditional: ~s", [jiffy:encode(Cond)]);
+format({invalid_boolean, NotBool}) ->
+    fmt("Invalid boolean: ~w", [NotBool]);
 format(update_leaves_operators) ->
     <<"An update operation resulted in a document containg operators.">>;
 format(authorization_required) ->
