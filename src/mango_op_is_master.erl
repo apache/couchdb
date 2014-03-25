@@ -5,12 +5,12 @@
 ]).
 
 
-run(_Msg, _Ctx) ->
+run(_Msg, Ctx) ->
     Reply = {[
         {<<"ismaster">>, true},
         {<<"maxBsonObjectSize">>, 16777216},
         {<<"localTime">>, mango_bson:current_time()},
         {<<"ok">>, 1}
     ]},
-    {ok, Reply}.
+    {ok, Reply, Ctx}.
 

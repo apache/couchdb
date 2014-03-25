@@ -17,8 +17,6 @@ dispatch(Msg, CtxIn) ->
                 mango_ctx:clear_error(CtxIn)
         end,
         case Mod:run(Msg, Ctx) of
-            {ok, Reply} ->
-                {ok, to_msg(Msg, Reply), Ctx};
             {ok, Reply, NewCtx} ->
                 {ok, to_msg(Msg, Reply), NewCtx};
             {error, HandlerError} ->

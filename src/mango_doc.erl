@@ -2,8 +2,8 @@
 
 
 -export([
-    open/3,
-    save/4,
+    open/2,
+    save/2,
 
     from_bson/1,
 
@@ -32,9 +32,9 @@ open(DbName, DocId) ->
 
 
 save(DbName, #doc{}=Doc) ->
-    save(Ctx, DbName, [Doc]);
+    save(DbName, [Doc]);
 save(DbName, Docs) when is_list(Docs) ->
-    mango_util:defer(fabric, update_docs, [Dbname, Docs, []]).
+    mango_util:defer(fabric, update_docs, [DbName, Docs, []]).
 
 
 from_bson({Props}) ->

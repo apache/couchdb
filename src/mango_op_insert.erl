@@ -33,16 +33,20 @@ continue_on_error(Msg) ->
 
 
 batch_update(DbName, Docs, Ctx) ->
-    Results = case mango_util:defer(fabric, update_docs, [DbName, Docs, []]) of
+    Results = case mango_doc:save(Ctx, DbName, Docs) of
         {ok, Results0} ->
             Results0;
         {accepted, Results0} ->
             Results0;
-        {aborted, Errors} ->
+        {errors, Errors} ->
             Errors
     end,
-    Pairs = lists:zip(Docs, Results),
-    lists:foldl(fun handle_result/2, Ctx, Pairs).
+    lists:foldl(fun
+        ({_, {ok, _Rev}}, Acc) ->
+            Acc;
+        ({#doc{id=Id}, Error}, Acc) ->
+            mango_ctx:add_error(Ctx, {doc_update_error, Id, Error})
+    end, Ctx, Results).
 
 
 linear_update(_DbName, [], Ctx) ->
@@ -54,9 +58,3 @@ linear_update(DbName, [Doc | Rest], Ctx) ->
         NewCtx ->
             NewCtx
     end.
-
-
-handle_result({_Doc, {ok, _Rev}}, Ctx) ->
-    Ctx;
-handle_result({#doc{id=Id}, Error}, Ctx) ->
-    mango_ctx:add_error(Ctx, {doc_update_error, Id, Error}).

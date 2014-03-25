@@ -5,6 +5,7 @@
 ]).
 
 
+-include_lib("couch/include/couch_db.hrl").
 -include("mango.hrl").
 
 
@@ -27,7 +28,21 @@ run(Msg, Ctx) ->
         {#doc{}, _} ->
             mango_doc:apply_update(OldDoc, Update)
     end,
-    ok.
+    Results = case mango_doc:write(DbName, NewDoc) of
+        {ok, Results0} ->
+            Results0;
+        {accepted, Results0} ->
+            Results0;
+        {error, Errors} ->
+            Errors
+    end,
+    FinalCtx = lists:foldl(fun
+        ({_, {ok, _Rev}}, Acc) ->
+            Acc;
+        ({#doc{id=Id}, Error}, Acc) ->
+            mango_ctx:add_error(Acc, {doc_update_error, Id, Error})
+    end, Ctx, Results),
+    {ok, Msg, FinalCtx}.
 
 
 check_not_multi_update(Msg) ->
@@ -47,22 +62,10 @@ is_upsert(Msg) ->
 find_doc(DbName, Selector) ->
     case Selector of
         {[{<<"_id">>, DocId}]} ->
-            find_doc_by_id(DbName, DocId);
+            mango_doc:open(DbName, DocId);
         _ ->
             throw(unsupported_doc_selector)
     end.
 
 
-find_doc_by_id(DbName, DocId) ->
-    try mango_util:defer(fabric, open_doc, [DbName, DocId, []]) of
-        {ok, Doc} ->
-            {ok, Doc};
-        {not_found, _} ->
-            not_found;
-        {error, Reason} ->
-            throw(Reason)
-        Error ->
-            throw(Error)
-    catch error:database_does_not_exist ->
-        not_found
-    end.
+

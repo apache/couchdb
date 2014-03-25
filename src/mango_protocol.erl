@@ -120,11 +120,13 @@ maybe_handle_message(St) ->
 
 dispatch(Msg, St) ->
     case mango_handler:dispatch(Msg, St#st.context) of
+        {ok, undefined, NewCtx} ->
+            St#st{context = NewCtx};
         {ok, NewMsg, NewCtx} ->
-            maybe_send_resp(NewMsg, St#st{context=NewCtx});
+            maybe_send_resp(NewMsg, St#st{context = NewCtx});
         {error, Reason} ->
             NewCtx = mango_ctx:add_error(St#st.context, Reason),
-            maybe_send_resp(Msg, St#st{context=NewCtx})
+            maybe_send_resp(Msg, St#st{context = NewCtx})
     end.
 
 
