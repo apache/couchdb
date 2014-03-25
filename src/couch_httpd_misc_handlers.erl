@@ -116,7 +116,12 @@ handle_restart_req(Req) ->
 
 
 handle_uuids_req(#httpd{method='GET'}=Req) ->
+    Max = list_to_integer(config:get("uuids","max","1000")),
     Count = list_to_integer(couch_httpd:qs_value(Req, "count", "1")),
+    case Count > Max of
+        true -> throw({forbidden, <<"count parameter too large">>});
+        false -> ok
+    end,
     UUIDs = [couch_uuids:new() || _ <- lists:seq(1, Count)],
     Etag = couch_httpd:make_etag(UUIDs),
     couch_httpd:etag_respond(Req, Etag, fun() ->
