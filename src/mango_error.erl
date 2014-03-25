@@ -15,6 +15,8 @@ format(doc_not_found) ->
 format({doc_update_error, Id, Error}) ->
     {_Code, _Err, Msg} = chttpd:error_info(Error),
     fmt("Error updating doc ~s :: ~s", [Id, Msg]);
+format(update_leaves_operators) ->
+    <<"An update operation resulted in a document containg operators.">>;
 format(authorization_required) ->
     <<"You must be logged in to perform this request">>;
 format({authorization_failure, Reason}) ->
