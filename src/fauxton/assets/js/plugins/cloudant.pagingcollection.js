@@ -132,16 +132,25 @@
       return this._iterate(0 - this.paging.pageSize);
     },
 
+    shouldStringify: function (val) {
+      try {
+        JSON.parse(val);
+        return false;
+      } catch(e) {
+        return true;
+      }
+    },
+
     // Encodes the parameters so that couchdb will understand them
     // and then sets the url with the new url.
     updateUrlQuery: function (params) {
       var url = _.result(this, "url").split("?")[0];
 
       _.each(['startkey', 'endkey', 'key'], function (key) {
-        if (_.has(params, key)) {
+        if (_.has(params, key) && this.shouldStringify(params[key])) {
           params[key] = JSON.stringify(params[key]);
         }
-      });
+      }, this);
 
       this.url = url + '?' + $param(params);
     },
@@ -205,4 +214,3 @@
 
   return PagingCollection;
 }));
-
