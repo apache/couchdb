@@ -28,7 +28,7 @@ property serves as the key, thus the result will be sorted by ``LastName``:
 
   function(doc) {
     if (doc.Type == "customer") {
-      emit(doc.LastName, null);
+      emit(doc.LastName, {FirstName: doc.FirstName, Address: doc.Address});
     }
   }
 
