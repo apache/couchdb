@@ -53,6 +53,8 @@ require.config({
       deps: ["jquery"],
       exports: "Bootstrap"
     },
+    
+    "nv.d3": ["d3.global"],
 
     "plugins/prettify": [],
     "plugins/beautify": [],
@@ -60,3 +62,9 @@ require.config({
     "plugins/jquery.form": ["jquery"]
   }
 });
+
+define("d3.global", ["d3"], function(_) {
+  d3 = _;
+});
+
+require(["d3", "nv.d3"], function(d3, nvd3) {});
