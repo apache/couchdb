@@ -20,7 +20,7 @@ function (app, FauxtonAPI, CouchdbSession) {
 
   var Auth = new FauxtonAPI.addon();
 
-  var promiseErrorHandler = function (xhr, type, msg) {
+  var errorHandler = function (xhr, type, msg) {
     msg = xhr;
     if (arguments.length === 3) {
       msg = xhr.responseJSON.reason;
@@ -72,7 +72,8 @@ function (app, FauxtonAPI, CouchdbSession) {
           passwordsNotMatch:  'Passwords do not match.',
           loggedIn: 'You have been logged in.',
           adminCreated: 'CouchDB admin created',
-          changePassword: 'Your password has been updated.'
+          changePassword: 'Your password has been updated.',
+          adminCreationFailedPrefix: 'Could not create admin.'
         }, options.messages);
     },
 
@@ -245,7 +246,14 @@ function (app, FauxtonAPI, CouchdbSession) {
         }
       });
 
-      promise.fail(promiseErrorHandler);
+      promise.fail(function (xhr, type, msg) {
+        msg = xhr;
+        if (arguments.length === 3) {
+          msg = xhr.responseJSON.reason;
+        }
+        msg = FauxtonAPI.session.messages.adminCreationFailedPrefix + ' ' + msg;
+        errorHandler(msg);
+      });
     }
 
   });
@@ -279,7 +287,7 @@ function (app, FauxtonAPI, CouchdbSession) {
         FauxtonAPI.navigate('/');
       });
 
-      promise.fail(promiseErrorHandler);
+      promise.fail(errorHandler);
     }
 
   });
@@ -306,7 +314,7 @@ function (app, FauxtonAPI, CouchdbSession) {
         that.$('#password-confirm').val('');
       });
 
-      promise.fail(promiseErrorHandler);
+      promise.fail(errorHandler);
     }
   });
 
