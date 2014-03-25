@@ -252,6 +252,9 @@ function (app, FauxtonAPI, CouchdbSession) {
 
   Auth.LoginView = FauxtonAPI.View.extend({
     template: 'addons/auth/templates/login',
+    initialize: function (options) {
+      this.urlBack = options.urlBack || "";
+    },
 
     events: {
       "submit #login": "login"
@@ -263,10 +266,16 @@ function (app, FauxtonAPI, CouchdbSession) {
       var that = this,
           username = this.$('#username').val(),
           password = this.$('#password').val(),
+          urlBack = this.urlBack,
           promise = this.model.login(username, password);
 
       promise.then(function () {
         FauxtonAPI.addNotification({msg:  FauxtonAPI.session.messages.loggedIn });
+
+        if (urlBack) {
+          return FauxtonAPI.navigate(urlBack);
+        }
+
         FauxtonAPI.navigate('/');
       });
 
@@ -346,7 +355,17 @@ function (app, FauxtonAPI, CouchdbSession) {
   });
 
   Auth.NoAccessView = FauxtonAPI.View.extend({
-    template: "addons/auth/templates/noAccess"
+    template: "addons/auth/templates/noAccess",
+
+    initialize: function (options) {
+      this.urlBack = options.urlBack || "";
+    },
+
+    serialize: function () {
+      return {
+        urlBack: this.urlBack
+      };
+    }
   });
 
   return Auth;
