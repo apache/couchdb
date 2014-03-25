@@ -21,15 +21,21 @@ function(app, FauxtonAPI, Auth) {
     layout: 'one_pane',
 
     routes: {
+      'login?*extra': 'login',
       'login': 'login',
       'logout': 'logout',
       'createAdmin': 'createAdmin',
+      'noAccess?*extra': 'noAccess',
       'noAccess': 'noAccess'
     },
 
     login: function () {
+      var urlBack = app.getParams().urlback;
       this.crumbs = [{name: 'Login', link:"#"}];
-      this.setView('#dashboard-content', new Auth.LoginView({model: FauxtonAPI.session}));
+      this.setView('#dashboard-content', new Auth.LoginView({
+        model: FauxtonAPI.session,
+        urlBack: urlBack
+      }));
     },
 
     logout: function () {
@@ -50,8 +56,11 @@ function(app, FauxtonAPI, Auth) {
     },
 
     noAccess: function () {
+      var urlBack = app.getParams().urlback;
       this.crumbs = [{name: 'Access Denied', link:"#"}];
-      this.setView('#dashboard-content', new Auth.NoAccessView());
+      this.setView('#dashboard-content', new Auth.NoAccessView({
+        urlBack: urlBack
+      }));
       this.apiUrl = 'noAccess';
     },
   });
