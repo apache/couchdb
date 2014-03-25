@@ -32,8 +32,8 @@ property serves as the key, thus the result will be sorted by ``LastName``:
     }
   }
 
-CouchDB allows arbitrary JSON structures to be used as keys. You can use complex
-keys for fine-grained control over sorting and grouping.
+CouchDB allows arbitrary JSON structures to be used as keys. You can use JSON
+arrays as keys for fine-grained control over sorting and grouping.
 
 Examples
 ========
