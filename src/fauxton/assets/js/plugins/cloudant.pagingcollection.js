@@ -88,13 +88,16 @@
       return params;
     },
 
-    pageSizeReset: function(pageSize) {
+    pageSizeReset: function(pageSize, opts) {
+      var options = _.defaults((opts || {}), {fetch: true});
       this.paging.direction = undefined;
       this.paging.pageSize = pageSize;
       this.paging.params = this.paging.defaultParams;
       this.paging.params.limit = pageSize;
       this.updateUrlQuery(this.paging.params);
-      return this.fetch();
+      if (options.fetch) {
+        return this.fetch();
+      }
     },
 
     _parseQueryString: function(uri) {
@@ -110,26 +113,30 @@
       }, {});
     },
 
-    _iterate: function(offset) {
+    _iterate: function(offset, opts) {
+      var options = _.defaults((opts || {}), {fetch: true});
+
       this.paging.params = this.calculateParams(this.paging.params, offset, this.paging.pageSize);
 
       // Fetch the next page of documents
       this.updateUrlQuery(this.paging.params);
-      return this.fetch({reset: true});
+      if (options.fetch) {
+        return this.fetch({reset: true});
+      }
     },
 
     // `next` is called with the number of items for the next page.
     // It returns the fetch promise.
-    next: function(){
+    next: function(options){
       this.paging.direction = "next";
-      return this._iterate(this.paging.pageSize);
+      return this._iterate(this.paging.pageSize, options);
     },
 
     // `previous` is called with the number of items for the previous page.
     // It returns the fetch promise.
-    previous: function(){
+    previous: function(options){
       this.paging.direction = "previous";
-      return this._iterate(0 - this.paging.pageSize);
+      return this._iterate(0 - this.paging.pageSize, options);
     },
 
     shouldStringify: function (val) {
@@ -214,3 +221,4 @@
 
   return PagingCollection;
 }));
+

@@ -417,9 +417,8 @@ function(app, FauxtonAPI, Documents, Databases) {
       // and update the page size
       this.perPage = perPage;
       this.documentsView.forceRender();
-      var promise = this.documentsView.collection.pageSizeReset(perPage);
+      this.documentsView.collection.pageSizeReset(perPage, {fetch: false});
       this.setDocPerPageLimit(perPage);
-      this.establish = function () { return promise; };
     },
 
     paginate: function (options) {
@@ -427,9 +426,7 @@ function(app, FauxtonAPI, Documents, Databases) {
 
       this.documentsView.forceRender();
       collection.paging.pageSize = options.perPage;
-      var promise = collection[options.direction]();
-
-      this.establish = function () { return promise; }; 
+      var promise = collection[options.direction]({fetch: false});
     },
 
     reloadDesignDocs: function (event) {

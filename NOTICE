@@ -186,6 +186,6 @@ This product also includes the following third-party components:
 
    Copyright (c) 2010, Ajax.org B.V.
 
- * src/fauxton/asserts/js/plugins/backbone.fetch-cache.js
+ * src/fauxton/asserts/js/plugins/cloudant.pagingcollection.js
 
-   Copyright (c) 2012-2013 Andrew Appleton, http://floatleft.com
+   Copyright (c) 2014, Cloudant http://cloudant.com
