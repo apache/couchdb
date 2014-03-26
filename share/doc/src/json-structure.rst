@@ -357,7 +357,7 @@ Request object
 +--------------------------------+---------------------------------------------+
 | query                          | URL query parameters `object`.              |
 |                                | Note that multiple keys are not supported   |
-|                                | and teh last key value suppresses others.   |
+|                                | and the last key value suppresses others.   |
 +--------------------------------+---------------------------------------------+
 | requested_path                 | List of actual requested path section.      |
 +--------------------------------+---------------------------------------------+
