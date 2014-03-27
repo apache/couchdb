@@ -175,7 +175,9 @@ To check that everything has worked, point your web browser to::
 
     http://127.0.0.1:5984/_utils/index.html
 
-From here you should run the test suite in Firefox.
+From here you should verify your installation by pointing your web browser to::
+
+    http://localhost:5984/_utils/verify_install.html
 
 Security Considerations
 -----------------------
