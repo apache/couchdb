@@ -202,6 +202,17 @@ UUIDs Configuration
       [uuid]
       utc_id_suffix = my-awesome-suffix
 
+  .. config:option:: max_count :: Per-Request UUID Limit
+
+    .. versionadded:: 1.5.1
+
+    No more than this number of UUIDs will be sent in a single request. If
+    more UUIDs are requested, an HTTP error response will be thrown.
+
+    ::
+
+      [uuid]
+      max_count = 1000
 
 
 .. _config/vendor:
