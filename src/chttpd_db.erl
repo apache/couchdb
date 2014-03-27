@@ -12,6 +12,7 @@
 
 -module(chttpd_db).
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("couch_mrview/include/couch_mrview.hrl").
 
 -export([handle_request/1, handle_compact_req/2, handle_design_req/2,
     db_req/2, couch_doc_open/4,handle_changes_req/2,
@@ -162,10 +163,11 @@ handle_design_req(Req, Db) ->
 bad_action_req(#httpd{path_parts=[_, _, Name|FileNameParts]}=Req, Db, _DDoc) ->
     db_attachment_req(Req, Db, <<"_design/",Name/binary>>, FileNameParts).
 
-handle_design_info_req(#httpd{method='GET'}=Req, Db, #doc{id=Id} = DDoc) ->
+handle_design_info_req(#httpd{method='GET'}=Req, Db, #doc{} = DDoc) ->
+    [_, _, Name, _] = Req#httpd.path_parts,
     {ok, GroupInfoList} = fabric:get_view_group_info(Db, DDoc),
     send_json(Req, 200, {[
-        {name,  Id},
+        {name,  Name},
         {view_index, {GroupInfoList}}
     ]});
 
@@ -477,30 +479,19 @@ db_req(#httpd{path_parts=[_, DocId | FileNameParts]}=Req, Db) ->
     db_attachment_req(Req, Db, DocId, FileNameParts).
 
 all_docs_view(Req, Db, Keys) ->
-    % measure the time required to generate the etag, see if it's worth it
-    T0 = os:timestamp(),
-    {ok, Info} = fabric:get_db_info(Db),
-    Etag = couch_httpd:make_etag(Info),
-    DeltaT = timer:now_diff(os:timestamp(), T0) / 1000,
-    couch_stats_collector:record({couchdb, dbinfo}, DeltaT),
-    QueryArgs = chttpd_view:parse_view_params(Req, Keys, map),
-    chttpd:etag_respond(Req, Etag, fun() ->
-        {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, [{"Etag",Etag}]),
-        fabric:all_docs(Db, fun all_docs_callback/2, {nil, Resp}, QueryArgs)
-    end).
-
-all_docs_callback({total_and_offset, Total, Offset}, {_, Resp}) ->
-    Chunk = "{\"total_rows\":~p,\"offset\":~p,\"rows\":[\r\n",
-    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, io_lib:format(Chunk, [Total, Offset])),
-    {ok, {"", Resp1}};
-all_docs_callback({row, Row}, {Prepend, Resp}) ->
-    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, [Prepend, ?JSON_ENCODE(Row)]),
-    {ok, {",\r\n", Resp1}};
-all_docs_callback(complete, {_, Resp}) ->
-    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, "\r\n]}"),
-    chttpd:end_delayed_json_response(Resp1);
-all_docs_callback({error, Reason}, {_, Resp}) ->
-    chttpd:send_delayed_error(Resp, Reason).
+    Args0 = couch_mrview_http:parse_params(Req, Keys),
+    ETagFun = fun(Sig, Acc0) ->
+        couch_mrview_http:check_view_etag(Sig, Acc0, Req)
+    end,
+    Args = Args0#mrargs{preflight_fun=ETagFun},
+    {ok, Resp} = couch_httpd:etag_maybe(Req, fun() ->
+        VAcc0 = #vacc{db=Db, req=Req},
+        fabric:all_docs(Db, fun couch_mrview_http:view_cb/2, VAcc0, Args)
+    end),
+    case is_record(Resp, vacc) of
+        true -> {ok, Resp#vacc.resp};
+        _ -> {ok, Resp}
+    end.
 
 db_doc_req(#httpd{method='DELETE'}=Req, Db, DocId) ->
     % check for the existence of the doc to handle the 404 case.
