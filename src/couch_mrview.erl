@@ -127,6 +127,10 @@ query_view(Db, {Type, View, Ref}, Args, Callback, Acc) ->
     end.
 
 
+get_info(Db, DDocId) when is_binary(DDocId) ->
+    DbName = mem3:dbname(Db#db.name),
+    {ok, DDoc} = ddoc_cache:open(DbName, DDocId),
+    get_info(Db, DDoc);
 get_info(Db, DDoc) ->
     {ok, Pid} = couch_index_server:get_index(couch_mrview_index, Db, DDoc),
     couch_index:get_info(Pid).

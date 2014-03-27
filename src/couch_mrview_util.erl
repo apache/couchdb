@@ -24,6 +24,9 @@
 -export([calculate_data_size/2]).
 -export([validate_args/1]).
 -export([maybe_load_doc/3, maybe_load_doc/4]).
+-export([extract_view/4, extract_view_reduce/1]).
+-export([get_view_keys/1, get_view_queries/1]).
+-export([set_view_type/3]).
 
 -define(MOD, couch_mrview_index).
 
@@ -708,3 +711,31 @@ index_of(Key, [_ | Rest], Idx) ->
 
 mrverror(Mesg) ->
     throw({query_parse_error, Mesg}).
+
+
+extract_view_reduce({red, {N, _Lang, #mrview{reduce_funs=Reds}}, _Ref}) ->
+    {_Name, FunSrc} = lists:nth(N, Reds),
+    FunSrc.
+
+
+get_view_keys({Props}) ->
+    case couch_util:get_value(<<"keys">>, Props) of
+        undefined ->
+            ?LOG_DEBUG("POST with no keys member.", []),
+            undefined;
+        Keys when is_list(Keys) ->
+            Keys;
+        _ ->
+            throw({bad_request, "`keys` member must be a array."})
+    end.
+
+
+get_view_queries({Props}) ->
+    case couch_util:get_value(<<"queries">>, Props) of
+        undefined ->
+            undefined;
+        Queries when is_list(Queries) ->
+            Queries;
+        _ ->
+            throw({bad_request, "`queries` member must be a array."})
+    end.
