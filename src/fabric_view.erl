@@ -98,6 +98,7 @@ maybe_send_row(#collector{limit=0} = State) ->
         % we still need to send the total/offset header
         {ok, State};
     false ->
+        erase(meta_sent),
         {_, Acc} = Callback(complete, AccIn),
         {stop, State#collector{user_acc=Acc}}
     end;
@@ -124,6 +125,7 @@ maybe_send_row(State) ->
                 maybe_send_row(NewState#collector{user_acc=Acc, limit=Limit-1})
             end
         catch complete ->
+            erase(meta_sent),
             {_, Acc} = Callback(complete, AccIn),
             {stop, State#collector{user_acc=Acc}}
         end

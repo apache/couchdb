@@ -74,6 +74,30 @@ handle_message({rexi_EXIT, Reason}, Worker, State) ->
         {error, Resp}
     end;
 
+%% HACK: this just sends meta once. Instead we should move the counter logic
+%% from the #view_row handle_message below into this function and and pass the
+%% meta call through maybe_send_row. This will also be more efficient doing it
+%% here as it's one less worker round trip reply.
+%% Prior to switching to couch_mrview, the fabric_view_reduce implementation
+%% did not get a total_and_offset call, whereas now we do. We now use this
+%% message as a clean way to indicate to couch_mrview_http:view_cb that the
+%% reduce response is starting.
+handle_message({meta, Meta}, {_Worker, From}, State) ->
+    gen_server:reply(From, ok),
+    #collector{
+        callback = Callback,
+        user_acc = AccIn
+    } = State,
+
+    {Go, Acc} = case get(meta_sent) of
+        undefined ->
+            put(meta_sent, true),
+            Callback({meta, Meta}, AccIn);
+        _ ->
+            {ok, AccIn}
+    end,
+    {Go, State#collector{user_acc = Acc}};
+
 handle_message(#view_row{key=Key} = Row, {Worker, From}, State) ->
     #collector{counters = Counters0, rows = Rows0} = State,
     case fabric_dict:lookup_element(Worker, Counters0) of
