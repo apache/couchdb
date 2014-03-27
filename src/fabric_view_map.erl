@@ -66,7 +66,9 @@ handle_message({rexi_EXIT, Reason}, Worker, State) ->
         {error, Resp}
     end;
 
-handle_message({total_and_offset, Tot, Off}, {Worker, From}, State) ->
+handle_message({meta, Meta0}, {Worker, From}, State) ->
+    Tot = couch_util:get_value(total, Meta0, 0),
+    Off = couch_util:get_value(offset, Meta0, 0),
     #collector{
         callback = Callback,
         counters = Counters0,
@@ -94,7 +96,8 @@ handle_message({total_and_offset, Tot, Off}, {Worker, From}, State) ->
             }};
         false ->
             FinalOffset = erlang:min(Total, Offset+State#collector.skip),
-            {Go, Acc} = Callback({total_and_offset, Total, FinalOffset}, AccIn),
+            Meta = [{total, Total}, {offset, FinalOffset}],
+            {Go, Acc} = Callback({meta, Meta}, AccIn),
             {Go, State#collector{
                 counters = fabric_dict:decrement_all(Counters2),
                 total_rows = Total,
@@ -133,11 +136,11 @@ handle_message(complete, Worker, State) ->
 
 merge_row(fwd, undefined, Row, Rows) ->
     lists:merge(fun(#view_row{key=KeyA, id=IdA}, #view_row{key=KeyB, id=IdB}) ->
-        couch_view:less_json([KeyA, IdA], [KeyB, IdB])
+        couch_ejson_compare:less_json_ids({KeyA, IdA}, {KeyB, IdB})
     end, [Row], Rows);
 merge_row(rev, undefined, Row, Rows) ->
     lists:merge(fun(#view_row{key=KeyA, id=IdA}, #view_row{key=KeyB, id=IdB}) ->
-        couch_view:less_json([KeyB, IdB], [KeyA, IdA])
+        couch_ejson_compare:less_json_ids({KeyB, IdB}, {KeyA, IdA})
     end, [Row], Rows);
 merge_row(_, KeyDict, Row, Rows) ->
     lists:merge(fun(#view_row{key=A, id=IdA}, #view_row{key=B, id=IdB}) ->

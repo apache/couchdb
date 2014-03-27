@@ -22,10 +22,9 @@ go(DbName, GroupId) when is_binary(GroupId) ->
     {ok, DDoc} = fabric:open_doc(DbName, GroupId, []),
     go(DbName, DDoc);
 
-go(DbName, #doc{} = DDoc) ->
-    Group = couch_view_group:design_doc_to_view_group(DDoc),
+go(DbName, #doc{id=DDocId}) ->
     Shards = mem3:shards(DbName),
-    Workers = fabric_util:submit_jobs(Shards, group_info, [Group]),
+    Workers = fabric_util:submit_jobs(Shards, group_info, [DDocId]),
     RexiMon = fabric_util:create_monitors(Shards),
     Acc0 = {fabric_dict:init(Workers, nil), []},
     try

@@ -224,7 +224,10 @@ get_next_row(State) ->
     Counters1 = fabric_dict:update_counter(Worker, -1, Counters0),
     {Row, State#collector{rows = Rest, counters=Counters1}}.
 
+%% TODO: rectify nil <-> undefined discrepancies
 find_next_key(nil, Dir, RowDict) ->
+    find_next_key(undefined, Dir, RowDict);
+find_next_key(undefined, Dir, RowDict) ->
     case lists:sort(sort_fun(Dir), dict:fetch_keys(RowDict)) of
     [] ->
         throw(complete);
@@ -237,21 +240,21 @@ find_next_key([Key|Rest], _, _) ->
     {Key, Rest}.
 
 transform_row(#view_row{key=Key, id=reduced, value=Value}) ->
-    {row, {[{key,Key}, {value,Value}]}};
+    {row, [{key,Key}, {value,Value}]};
 transform_row(#view_row{key=Key, id=undefined}) ->
-    {row, {[{key,Key}, {error,not_found}]}};
+    {row, [{key,Key}, {id,error}, {value,not_found}]};
 transform_row(#view_row{key=Key, id=Id, value=Value, doc=undefined}) ->
-    {row, {[{id,Id}, {key,Key}, {value,Value}]}};
-transform_row(#view_row{key=Key, id=Id, value=Value, doc={error,Reason}}) ->
-    {row, {[{id,Id}, {key,Key}, {value,Value}, {error,Reason}]}};
+    {row, [{id,Id}, {key,Key}, {value,Value}]};
+transform_row(#view_row{key=Key, id=_Id, value=_Value, doc={error,Reason}}) ->
+    {row, [{id,error}, {key,Key}, {value,Reason}]};
 transform_row(#view_row{key=Key, id=Id, value=Value, doc=Doc}) ->
-    {row, {[{id,Id}, {key,Key}, {value,Value}, {doc,Doc}]}}.
+    {row, [{id,Id}, {key,Key}, {value,Value}, {doc,Doc}]}.
 
 
 sort_fun(fwd) ->
-    fun(A,A) -> true; (A,B) -> couch_view:less_json(A,B) end;
+    fun(A,A) -> true; (A,B) -> couch_ejson_compare:less_json(A,B) end;
 sort_fun(rev) ->
-    fun(A,A) -> true; (A,B) -> couch_view:less_json(B,A) end.
+    fun(A,A) -> true; (A,B) -> couch_ejson_compare:less_json(B,A) end.
 
 extract_view(Pid, ViewName, [], _ViewType) ->
     couch_log:error("missing_named_view ~p", [ViewName]),

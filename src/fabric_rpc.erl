@@ -24,18 +24,6 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
--record (view_acc, {
-    db,
-    limit,
-    include_docs,
-    conflicts,
-    doc_info = nil,
-    offset = nil,
-    total_rows,
-    reduce_fun = fun couch_db:enum_docs_reduce_to_count/1,
-    group_level = 0
-}).
-
 %% rpc endpoints
 %%  call to with_db will supply your M:F with a #db{} and then remaining args
 

@@ -278,15 +278,31 @@ query_view(DbName, DesignName, ViewName, QueryArgs) ->
 -spec query_view(dbname(), #doc{} | binary(), iodata(), callback(), any(),
         #mrargs{}) ->
     any().
-query_view(DbName, Design, ViewName, Callback, Acc0, QueryArgs) ->
+query_view(DbName, GroupId, ViewName, Callback, Acc0, QueryArgs)
+        when is_binary(GroupId) ->
+    {ok, DDoc} = ddoc_cache:open(DbName, <<"_design/", GroupId/binary>>),
+    query_view(DbName, DDoc, ViewName, Callback, Acc0, QueryArgs);
+query_view(DbName, DDoc, ViewName, Callback, Acc0, QueryArgs0) ->
     Db = dbname(DbName), View = name(ViewName),
-    case is_reduce_view(Db, Design, View, QueryArgs) of
-    true ->
-        Mod = fabric_view_reduce;
-    false ->
-        Mod = fabric_view_map
-    end,
-    Mod:go(Db, Design, View, QueryArgs, Callback, Acc0).
+    {ok, #mrst{views=Views, language=Lang}} =
+        couch_mrview_util:ddoc_to_mrst(Db, DDoc),
+    QueryArgs1 = couch_mrview_util:set_view_type(QueryArgs0, View, Views),
+    QueryArgs2 = couch_mrview_util:validate_args(QueryArgs1),
+    VInfo = couch_mrview_util:extract_view(Lang, QueryArgs2, View, Views),
+    case is_reduce_view(QueryArgs2) of
+        true ->
+            fabric_view_reduce:go(
+                Db,
+                DDoc,
+                View,
+                QueryArgs2,
+                Callback,
+                Acc0,
+                VInfo
+            );
+        false ->
+            fabric_view_map:go(Db, DDoc, View, QueryArgs2, Callback, Acc0)
+    end.
 
 %% @doc retrieve info about a view group, disk size, language, whether compaction
 %%      is running and so forth
@@ -313,9 +329,9 @@ design_docs(DbName) ->
         end_key = <<"_design0">>,
         include_docs=true
     },
-    Callback = fun({total_and_offset, _, _}, []) ->
+    Callback = fun({meta, _}, []) ->
         {ok, []};
-    ({row, {Props}}, Acc) ->
+    ({row, Props}, Acc) ->
         case couch_util:get_value(id, Props) of
         <<"_design/", _/binary>> ->
             {ok, [couch_util:get_value(doc, Props) | Acc]};
@@ -437,8 +453,10 @@ default_callback(complete, Acc) ->
 default_callback(Row, Acc) ->
     {ok, [Row | Acc]}.
 
-is_reduce_view(_, _, _, #mrargs{view_type=Reduce}) ->
-    Reduce =:= reduce.
+is_reduce_view(#mrargs{view_type=ViewType}) ->
+    ViewType =:= red;
+is_reduce_view({Reduce, _, _}) ->
+    Reduce =:= red.
 
 %% @doc convenience method for use in the shell, converts a keylist
 %%      to a `changes_args' record

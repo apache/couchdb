@@ -72,7 +72,7 @@ go(DbName, QueryArgs, Callback, Acc0) ->
         false -> Keys2
     end,
     receive {'DOWN', Ref0, _, _, {ok, TotalRows}} ->
-        {ok, Acc1} = Callback({total_and_offset, TotalRows, 0}, Acc0),
+        {ok, Acc1} = Callback({meta, [{total, TotalRows}]}, Acc0),
         {ok, Acc2} = doc_receive_loop(
             Keys3, queue:new(), SpawnFun, MaxJobs, Callback, Acc1
         ),
@@ -95,7 +95,9 @@ handle_message({rexi_EXIT, Reason}, Worker, State) ->
         {error, Resp}
     end;
 
-handle_message({total_and_offset, Tot, Off}, {Worker, From}, State) ->
+handle_message({meta, Meta0}, {Worker, From}, State) ->
+    Tot = couch_util:get_value(total, Meta0, 0),
+    Off = couch_util:get_value(offset, Meta0, 0),
     #collector{
         callback = Callback,
         counters = Counters0,
@@ -123,7 +125,8 @@ handle_message({total_and_offset, Tot, Off}, {Worker, From}, State) ->
             }};
         false ->
             FinalOffset = erlang:min(Total, Offset+State#collector.skip),
-            {Go, Acc} = Callback({total_and_offset, Total, FinalOffset}, AccIn),
+            Meta = [{total, Total}, {offset, FinalOffset}],
+            {Go, Acc} = Callback({meta, Meta}, AccIn),
             {Go, State#collector{
                 counters = fabric_dict:decrement_all(Counters2),
                 total_rows = Total,
