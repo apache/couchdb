@@ -80,3 +80,23 @@
     sorted = true,
     extra = []
 }).
+
+-record(vacc, {
+    db,
+    req,
+    resp,
+    prepend,
+    etag,
+    should_close = false
+}).
+
+-record(lacc, {
+    db,
+    req,
+    resp,
+    qserver,
+    lname,
+    etag,
+    code,
+    headers
+}).

@@ -27,15 +27,6 @@
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
 
--record(vacc, {
-    db,
-    req,
-    resp,
-    prepend,
-    etag
-}).
-
-
 handle_all_docs_req(#httpd{method='GET'}=Req, Db) ->
     all_docs_req(Req, Db, undefined);
 handle_all_docs_req(#httpd{method='POST'}=Req, Db) ->

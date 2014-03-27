@@ -21,17 +21,6 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
--record(lacc, {
-    db,
-    req,
-    resp,
-    qserver,
-    lname,
-    etag,
-    code,
-    headers
-}).
-
 % /db/_design/foo/_show/bar/docid
 % show converts a json doc to a response of any content-type.
 % it looks up the doc an then passes it to the query server.
