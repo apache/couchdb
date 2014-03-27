@@ -15,7 +15,8 @@
 -export([
     handle_doc_show_req/3,
     handle_doc_update_req/3,
-    handle_view_list_req/3
+    handle_view_list_req/3,
+    list_cb/2
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
@@ -182,7 +183,7 @@ handle_view_list_req(Req, _Db, _DDoc) ->
 
 
 handle_view_list(Req, Db, DDoc, LName, VDDoc, VName, Keys) ->
-    Args0 = couch_mrview_http:parse_qs(Req, Keys),
+    Args0 = couch_mrview_http:parse_params(Req, Keys),
     ETagFun = fun(BaseSig, Acc0) ->
         UserCtx = Req#httpd.user_ctx,
         Name = UserCtx#user_ctx.name,
@@ -240,7 +241,7 @@ list_cb(complete, Acc) ->
 
 start_list_resp(Head, Acc) ->
     #lacc{db=Db, req=Req, qserver=QServer, lname=LName} = Acc,
-    JsonReq = couch_httpd_external:json_req_obj(Req, Db),
+    JsonReq = json_req_obj(Req, Db),
 
     [<<"start">>,Chunk,JsonResp] = couch_query_servers:ddoc_proc_prompt(QServer,
         [<<"lists">>, LName], [Head, JsonReq]),
@@ -350,3 +351,13 @@ json_apply_field({Key, NewValue}, [], Acc) ->
     % end of list, add ours
     {[{Key, NewValue}|Acc]}.
 
+
+% This loads the db info if we have a fully loaded db record, but we might not
+% have the db locally on this node, so then load the info through fabric.
+json_req_obj(Req, #db{main_pid=Pid}=Db) when is_pid(Pid) ->
+    couch_httpd_external:json_req_obj(Req, Db);
+json_req_obj(Req, Db) ->
+    % use a separate process because we're already in a receive loop, and
+    % json_req_obj calls fabric:get_db_info()
+    spawn_monitor(fun() -> exit(chttpd_external:json_req_obj(Req, Db)) end),
+    receive {'DOWN', _, _, _, JsonReq} -> JsonReq end.
