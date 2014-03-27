@@ -12,29 +12,19 @@
 
 -module(fabric_view_reduce).
 
--export([go/6]).
+-export([go/7]).
 
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
-go(DbName, GroupId, View, Args, Callback, Acc0) when is_binary(GroupId) ->
-    {ok, DDoc} = fabric:open_doc(DbName, <<"_design/", GroupId/binary>>, []),
-    go(DbName, DDoc, View, Args, Callback, Acc0);
-
-go(DbName, DDoc, VName, Args, Callback, Acc0) ->
-    Group = couch_view_group:design_doc_to_view_group(DDoc),
-    Lang = couch_view_group:get_language(Group),
-    Views = couch_view_group:get_views(Group),
-    {NthRed, View} = fabric_view:extract_view(nil, VName, Views, reduce),
-    {VName, RedSrc} = lists:nth(NthRed, View#mrview.reduce_funs),
-    Workers = lists:map(fun(#shard{name=Name, node=N} = Shard) ->
-        Ref = rexi:cast(N, {fabric_rpc, reduce_view, [Name,DDoc,VName,Args]}),
-        Shard#shard{ref = Ref}
-    end, fabric_view:get_shards(DbName, Args)),
+go(DbName, DDoc, VName, Args, Callback, Acc0, {red, {_, Lang, _}, _}=VInfo) ->
+    Shards = fabric_view:get_shards(DbName, Args),
+    Workers = fabric_util:submit_jobs(Shards, reduce_view, [DDoc, VName, Args]),
+    RedSrc = couch_mrview_util:extract_view_reduce(VInfo),
     RexiMon = fabric_util:create_monitors(Workers),
-    #mrargs{limit = Limit, skip = Skip} = Args,
+    #mrargs{limit = Limit, skip = Skip, keys = Keys} = Args,
     OsProc = case os_proc_needed(RedSrc) of
         true -> couch_query_servers:get_os_process(Lang);
         _ -> nil
@@ -44,7 +34,7 @@ go(DbName, DDoc, VName, Args, Callback, Acc0) ->
         query_args = Args,
         callback = Callback,
         counters = fabric_dict:init(Workers, 0),
-        keys = Args#mrargs.keys,
+        keys = Keys,
         skip = Skip,
         limit = Limit,
         lang = Lang,
