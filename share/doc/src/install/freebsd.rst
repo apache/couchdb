@@ -37,7 +37,7 @@ supported by the start script (defaults shown)::
     couchdb_enablelogs="YES"
     couchdb_user="couchdb"
 
-After enabling couchdb rc service use the following to start CouchDB::
+After enabling the couchdb rc service use the following command to start CouchDB::
 
     /usr/local/etc/rc.d/couchdb start
 
