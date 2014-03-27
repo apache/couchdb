@@ -30,8 +30,7 @@ require.config({
     spin: "../assets/js/libs/spin.min",
     d3: "../assets/js/libs/d3",
     "nv.d3": "../assets/js/libs/nv.d3",
-    "ace":"../assets/js/libs/ace",
-    "d3.global": "../assets/js/libs/d3.global"
+    "ace":"../assets/js/libs/ace"
   },
 
   baseUrl: '/',
@@ -55,8 +54,6 @@ require.config({
       exports: "Bootstrap"
     },
     
-    "nv.d3": ["d3.global"],
-
     "plugins/prettify": [],
     "plugins/beautify": [],
 
