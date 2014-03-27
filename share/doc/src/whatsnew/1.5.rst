@@ -21,6 +21,15 @@
    :depth: 1
    :local:
 
+.. _release/1.5.1:
+
+Version 1.5.1
+=============
+
+* Add the ``max_count`` option (:ref:`config/uuids`) to allow rate-limiting
+  the amount of UUIDs that can be requested from the :ref:`api/server/uuids`
+  handler in a single request.
+
 .. _release/1.5.0:
 
 Version 1.5.0
