@@ -53,9 +53,24 @@ handle_view_req(#httpd{method='GET'}=Req, Db, DDoc) ->
     design_doc_view(Req, Db, DDoc, ViewName, undefined);
 handle_view_req(#httpd{method='POST'}=Req, Db, DDoc) ->
     [_, _, _, _, ViewName] = Req#httpd.path_parts,
-    Keys = get_view_keys(couch_httpd:json_body_obj(Req)),
-    couch_stats_collector:increment({httpd, view_reads}),
-    design_doc_view(Req, Db, DDoc, ViewName, Keys);
+    Props = couch_httpd:json_body_obj(Req),
+    Keys = couch_mrview_util:get_view_keys(Props),
+    Queries = couch_mrview_util:get_view_queries(Props),
+    case {Queries, Keys} of
+        {Queries, undefined} when is_list(Queries) ->
+            [couch_stats_collector:increment({httpd, view_reads}) || _I <- Queries],
+            multi_query_view(Req, Db, DDoc, ViewName, Queries);
+        {undefined, Keys} when is_list(Keys) ->
+            couch_stats_collector:increment({httpd, view_reads}),
+            design_doc_view(Req, Db, DDoc, ViewName, Keys);
+        {undefined, undefined} ->
+            throw({
+                bad_request,
+                "POST body must contain `keys` or `queries` field"
+            });
+        {_, _} ->
+            throw({bad_request, "`keys` and `queries` are mutually exclusive"})
+    end;
 handle_view_req(Req, _Db, _DDoc) ->
     couch_httpd:send_method_not_allowed(Req, "GET,POST,HEAD").
 
@@ -145,6 +160,35 @@ design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
     case is_record(Resp, vacc) of
         true -> {ok, Resp#vacc.resp};
         _ -> {ok, Resp}
+    end.
+
+
+multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
+    Args0 = parse_params(Req, undefined),
+    {ok, _, _, Args1} = couch_mrview_util:get_view(Db, DDoc, ViewName, Args0),
+    ArgQueries = lists:map(fun({Query}) ->
+        QueryArg = parse_params(Query, undefined, Args1),
+        couch_mrview_util:validate_args(QueryArg)
+    end, Queries),
+    {ok, Resp2} = couch_httpd:etag_maybe(Req, fun() ->
+        VAcc0 = #vacc{db=Db, req=Req, prepend="\r\n"},
+        %% TODO: proper calculation of etag
+        Etag = couch_uuids:new(),
+        Headers = [{"ETag", Etag}],
+        FirstChunk = "{\"results\":[",
+        {ok, Resp0} = chttpd:start_delayed_json_response(VAcc0#vacc.req, 200, Headers, FirstChunk),
+        VAcc1 = VAcc0#vacc{resp=Resp0},
+        VAcc2 = lists:foldl(fun(Args, Acc0) ->
+            {ok, Acc1} = couch_mrview:query_view(Db, DDoc, ViewName, Args, fun view_cb/2, Acc0),
+            Acc1
+        end, VAcc1, ArgQueries),
+        {ok, Resp1} = chttpd:send_delayed_chunk(VAcc2#vacc.resp, "\r\n]}"),
+        {ok, Resp2} = chttpd:end_delayed_json_response(Resp1),
+        {ok, VAcc2#vacc{resp=Resp2}}
+    end),
+    case is_record(Resp2, vacc) of
+        true -> {ok, Resp2#vacc.resp};
+        _ -> {ok, Resp2}
     end.
 
 
