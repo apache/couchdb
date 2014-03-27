@@ -1,3 +1,5 @@
+//this is a hacky fix because nv.d3 doesn't support requirejs
+define("nvd3", ["d3"], function (d3) {
 (function(){
 
 var nv = window.nv || {};
@@ -14367,3 +14369,6 @@ nv.models.stackedAreaChart = function() {
   return chart;
 }
 })();
+
+return window.nv;
+});
