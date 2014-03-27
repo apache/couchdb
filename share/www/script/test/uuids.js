@@ -82,7 +82,7 @@ couchTests.uuids = function(debug) {
 
   // test max_uuid_count
   var xhr = CouchDB.request("GET", "/_uuids?count=1001");
-  TEquals(401, xhr.status, "should error when count > max_count");
+  TEquals(403, xhr.status, "should error when count > max_count");
 
   run_on_modified_server([{
       "section": "uuids",
