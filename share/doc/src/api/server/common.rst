@@ -906,6 +906,8 @@ structure is as follows:
 ``/_uuids``
 ===========
 
+.. versionchanged:: 1.5.1
+
 .. http:get:: /_uuids
 
   Requests one or more Universally Unique Identifiers (UUIDs) from the
@@ -919,6 +921,8 @@ structure is as follows:
                          - :mimetype:`text/plain; charset=utf-8`
   :>header ETag: Response hash
   :code 200: Request completed successfully
+  :code 403: Requested more UUIDs than is :config:option:`allowed
+             <uuids/max_count>` to retrieve
 
   **Request**:
 
