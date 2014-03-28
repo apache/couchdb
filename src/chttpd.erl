@@ -591,7 +591,7 @@ send_chunk(Resp, Data) ->
 send_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers0, Body) ->
     couch_stats_collector:increment({httpd_status_codes, Code}),
     Headers = Headers0 ++ server_header() ++
-	couch_httpd_auth:cookie_auth_header(Req, Headers0),
+	[timing(), reqid() | couch_httpd_auth:cookie_auth_header(Req, Headers0)],
     {ok, MochiReq:respond({Code, Headers, Body})}.
 
 
