@@ -126,9 +126,9 @@ send_external_response(Req, Response) ->
     Headers1 = default_or_content_type(CType, Headers),
     case Json of
     nil ->
-        couch_httpd:send_response(Req, Code, Headers1, Data);
+        chttpd:send_response(Req, Code, Headers1, Data);
     Json ->
-        couch_httpd:send_json(Req, Code, Headers1, Json)
+        chttpd:send_json(Req, Code, Headers1, Json)
     end.
 
 parse_external_response({Response}) ->
