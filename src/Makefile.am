@@ -153,6 +153,7 @@ FAUXTON_FILES = \
     fauxton/app/addons/documents/routes.js \
     fauxton/app/addons/documents/tests/resourcesSpec.js \
     fauxton/app/addons/documents/views.js \
+    fauxton/app/addons/documents/assets/less/documents.less \
     fauxton/app/addons/fauxton/base.js \
     fauxton/app/addons/fauxton/components.js \
     fauxton/app/addons/fauxton/resizeColumns.js \
