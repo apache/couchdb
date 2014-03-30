@@ -27,7 +27,7 @@ define([
         FauxtonAPI.auth = new Auth();
         Base.initialize();
         FauxtonAPI.auth.authDeniedCb();
-        assert.ok(navigateSpy.withArgs('/noAccess', {replace: true}).calledOnce);
+        assert.ok(navigateSpy.withArgs('/noAccess?urlback=', {replace: true}).calledOnce);
       });
     });
   });
