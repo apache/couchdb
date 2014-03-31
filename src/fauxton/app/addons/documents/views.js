@@ -34,36 +34,6 @@ define([
 function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
          resizeColumns, beautify, prettify, ZeroClipboard) {
   var Views = {};
-  Views.Tabs = FauxtonAPI.View.extend({
-    template: "addons/documents/templates/tabs",
-    initialize: function(options){
-      this.collection = options.collection;
-      this.database = options.database;
-      this.active_id = options.active_id;
-    },
-
-    serialize: function () {
-      return {
-        // TODO make this not hard coded here
-        changes_url: '#' + this.database.url('changes'),
-        db_url: '#' + this.database.url('index') + '?limit=' + Databases.DocLimit,
-      };
-    },
-
-    beforeRender: function(manage) {
-      this.insertView("#search", new Views.SearchBox({
-        collection: this.collection,
-        database: this.database.id
-      }));
-    },
-
-    afterRender: function () {
-      if (this.active_id) {
-        this.$('.active').removeClass('active');
-        this.$('#'+this.active_id).addClass('active');
-      }
-    }
-  });
 
   Views.SearchBox = FauxtonAPI.View.extend({
     template: "addons/documents/templates/search",
