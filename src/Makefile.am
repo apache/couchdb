@@ -251,6 +251,7 @@ FAUXTON_FILES = \
     fauxton/assets/js/libs/backbone.js \
     fauxton/assets/js/libs/bootstrap.js \
     fauxton/assets/js/libs/d3.js \
+    fauxton/assets/js/libs/d3.global.js \
     fauxton/assets/js/libs/jquery.js \
     fauxton/assets/js/libs/lodash.js \
     fauxton/assets/js/libs/nv.d3.js \
