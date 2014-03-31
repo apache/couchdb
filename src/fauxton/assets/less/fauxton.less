@@ -279,6 +279,8 @@ table.databases {
 
 /* application specific stuff */
 #main > footer {
+  .box-shadow(-7px 0 15px -6px #000);
+  border-left: 1px solid #999;
   position: fixed;
   bottom: 0;
   font-size: 10px;
@@ -344,30 +346,15 @@ table.databases {
     font-size: 12px
   }
   .navbar {
-    .brand {
-      .box-sizing(content-box);
-      .hide-text;
-      .customTransition(left, 1s, 0.805, 0.005, 0.165, 0.985);
-      margin: 10px 0 6px;
-      width: 174px;
-      height: 40px;
-      padding: 10px;
-      .icon{
-        .box-sizing(content-box);
-        background: url(../img/couchdb-site.png) no-repeat 0 0;
-        display: block;
-        height: 100%;
-        width: 100%; 
-      }
-      .burger{
+     .burger{
         .transition(all @transitionSpeed @transitionEaseType);
-        padding-top: 6px;
-        left: -8px;
-        position: absolute;
+        padding: 6px 0;
+        margin-left: 16px;
+        /* position: absolute; */
         div{
           .transition(all @transitionSpeed @transitionEaseType);
-          height: 4px;
-          width: 8px;
+          height: 6px;
+          width: 28px;
           .border-radius(2);
           background-color: @navBG;
           margin: 4px 0px;
@@ -376,14 +363,28 @@ table.databases {
       &:hover .burger div{
         background-color: @orange;
       }
+    .brand {
+      .box-sizing(content-box);
+      .hide-text;
+      .customTransition(left, 1s, 0.805, 0.005, 0.165, 0.985);
+      margin: 10px 0 6px;
+      width: 174px;
+      height: 40px;
+      padding: 10px;
+      position: absolute;
+      bottom: 0;
+      .icon{
+        .box-sizing(content-box);
+        background: url(../img/couchdb-site.png) no-repeat 0 0;
+        display: block;
+        height: 100%;
+        width: 100%; 
+      }
       .closeMenu & {
         .icon {
           background: url(../img/minilogo.png) no-repeat 0 0;
         }
         width: 45px;
-        .burger{
-          left: 0;
-        }
       }
     }
     nav {
@@ -464,7 +465,7 @@ table.databases {
       ul#bottom-nav-links{
         margin-top: 0;
         li{
-          min-height: 46px;
+          min-height: 55px;
           background-color: @bottomNav;
           &.active{
             background-color:@linkRed;

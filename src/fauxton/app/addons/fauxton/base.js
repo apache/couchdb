@@ -202,21 +202,17 @@ function(app, FauxtonAPI, resizeColumns) {
     afterRender: function(){
       $('#primary-navbar li[data-nav-name="' + app.selectedHeader + '"]').addClass('active');
 
-      var menuOpen = true;
       var $selectorList = $('body');
-      $('.brand').off();
-      $('.brand').on({
+      this.$('.burger').off();
+      this.$('.burger').on({
         click: function(e){
-          if(!$(e.target).is('a')){
             toggleMenu();
-          }
-        }
+         }
       });
 
       function toggleMenu(){
         $selectorList.toggleClass('closeMenu');
-        menuOpen = $selectorList.hasClass('closeMenu');
-        this.resizeColumns.onResizeHandler();
+        app.windowResize.onResizeHandler();
       }
       
       var that = this;
