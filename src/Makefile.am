@@ -163,6 +163,7 @@ FAUXTON_FILES = \
     fauxton/app/addons/pouchdb/base.js \
     fauxton/app/addons/pouchdb/pouch.collate.js \
     fauxton/app/addons/pouchdb/pouchdb.mapreduce.js \
+    fauxton/app/addons/documents/assets/less/documents.less \
     fauxton/app/addons/databases/templates/item.html \
     fauxton/app/addons/databases/templates/list.html \
     fauxton/app/addons/databases/templates/newdatabase.html \
@@ -261,7 +262,9 @@ FAUXTON_FILES = \
     fauxton/assets/js/plugins/cloudant.pagingcollection.js \
     fauxton/assets/js/plugins/jquery.form.js \
     fauxton/assets/js/plugins/prettify.js \
-    fauxton/assets/js/plugins/beautify.js\
+    fauxton/assets/js/plugins/beautify.js \
+    fauxton/assets/js/plugins/zeroclipboard/ZeroClipboard.js \
+    fauxton/assets/js/plugins/zeroclipboard/ZeroClipboard.swf \
     fauxton/assets/less/bootstrap/accordion.less \
     fauxton/assets/less/bootstrap/alerts.less \
     fauxton/assets/less/bootstrap/bootstrap.less \
