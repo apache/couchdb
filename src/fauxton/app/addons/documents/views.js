@@ -26,9 +26,13 @@ define([
        // Plugins
        "plugins/beautify",
        "plugins/prettify",
+       // this should be never global available:
+       // https://github.com/zeroclipboard/zeroclipboard/blob/master/docs/security.md
+       "plugins/zeroclipboard/ZeroClipboard"
 ],
 
-function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColumns, beautify) {
+function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
+         resizeColumns, beautify, prettify, ZeroClipboard) {
   var Views = {};
   Views.Tabs = FauxtonAPI.View.extend({
     template: "addons/documents/templates/tabs",
@@ -1944,6 +1948,25 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       this.listenTo( this.model.changes, 'cachesync', this.render);
     },
 
+    events: {
+      "click button.js-toggle-json": "toggleJson"
+    },
+
+    toggleJson: function(event) {
+      event.preventDefault();
+
+      var $button = this.$(event.target),
+          $container = $button.closest('.change-box').find(".js-json-container");
+
+      if ($container.hasClass("js-hidden")) {
+        $button.text("Close JSON");
+      } else {
+        $button.text("View JSON");
+      }
+
+      $container.slideToggle();
+    },
+
     establish: function() {
       return [ this.model.changes.fetchOnce({prefill: true})];
     },
@@ -1957,6 +1980,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
     afterRender: function(){
       prettyPrint();
+      ZeroClipboard.config({ moviePath: "/assets/js/plugins/zeroclipboard/ZeroClipboard.swf" });
+      var client = new ZeroClipboard(this.$(".js-copy"));
     }
   });
 

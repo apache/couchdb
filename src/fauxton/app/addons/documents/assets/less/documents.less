@@ -80,14 +80,30 @@ button.beautify {
 }
 
 /** used in changes.html **/
-#changes-table {
+.change-box {
+  margin: 0 20px 20px 20px;
+}
 
-  #changes {
-    width: 50%;
+.change-wrapper {
+  margin-top: 57px;
+  border-bottom: 1px solid #dddddd;
+  &:last-child {
+    border-bottom: none;
   }
-
-  #seq, #deleted {
-    width: 5%;
+  .row-fluid {
+    padding: 10px 0 10px 0;
+  }
+  .row-fluid:first {
+    padding: 0px 0 10px 0;
+  }
+  a:hover.js-copy {
+    text-decoration: none;
+  }
+  .js-json-container {
+    display: none;
+  }
+  .span2 {
+    font-weight: bold;
   }
 }
 
