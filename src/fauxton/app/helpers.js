@@ -75,7 +75,7 @@ function(utils) {
     };
 
   Helpers.formatDate = function(timestamp){
-    format = d3.time.format("%b. %e at %H:%M%p");
+    var format = d3.time.format("%b. %e at %H:%M%p");
     return format(new Date(timestamp*1000));
   };
 
