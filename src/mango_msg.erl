@@ -54,7 +54,7 @@ is_msg(_) ->
     false.
 
 
-new(<<Size:32/little-integer, Rest/binary>>) when Size - 4 =< size(Rest) ->
+new(<<Size:32/little-signed-integer, Rest/binary>>) when Size-4 =< size(Rest) ->
     NumBytes = Size - 4,
     <<Msg:NumBytes/binary, NonMsg/binary>> = Rest,
     case parse(Msg) of
@@ -78,14 +78,14 @@ reply(#mango_msg{type='query', reply=undefined}=Msg, Ctx) ->
     DocBin = mango_bson:from_ejson(ErrorDoc),
     Size = 36 + size(DocBin),
     <<
-        Size:32/little-integer,
-        ReqId:32/little-integer,
-        RespTo:32/little-integer,
-        ?OP_REPLY:32/little-integer,
-        Flags:32/little-integer,
-        CursorId:64/little-integer,
-        Offset:32/little-integer,
-        NumDocs:32/little-integer,
+        Size:32/little-signed-integer,
+        ReqId:32/little-signed-integer,
+        RespTo:32/little-signed-integer,
+        ?OP_REPLY:32/little-signed-integer,
+        Flags:32/little-signed-integer,
+        CursorId:64/little-signed-integer,
+        Offset:32/little-signed-integer,
+        NumDocs:32/little-signed-integer,
         DocBin/binary
     >>;
 reply(#mango_msg{type=Type, reply=Reply}=Msg, _) when Reply /= undefined ->
@@ -104,14 +104,14 @@ reply(#mango_msg{type=Type, reply=Reply}=Msg, _) when Reply /= undefined ->
         DocsBinary = mango_bson:from_ejson(Reply#mango_reply.docs),
         Size = 36 + size(DocsBinary),
         <<
-            Size:32/little-integer,
-            ReqId:32/little-integer,
-            RespTo:32/little-integer,
-            ?OP_REPLY:32/little-integer,
-            Flags:32/little-integer,
-            CursorId:64/little-integer,
-            Offset:32/little-integer,
-            NumDocs:32/little-integer,
+            Size:32/little-signed-integer,
+            ReqId:32/little-signed-integer,
+            RespTo:32/little-signed-integer,
+            ?OP_REPLY:32/little-signed-integer,
+            Flags:32/little-signed-integer,
+            CursorId:64/little-signed-integer,
+            Offset:32/little-signed-integer,
+            NumDocs:32/little-signed-integer,
             DocsBinary/binary
         >>
     end;
@@ -200,9 +200,9 @@ parse(Data) ->
     % Grab our values from the message header
     case Data of
         <<
-            ReqId:32/little-integer,
-            RespTo:32/little-integer,
-            OpCode:32/little-integer,
+            ReqId:32/little-signed-integer,
+            RespTo:32/little-signed-integer,
+            OpCode:32/little-signed-integer,
             Body/binary
         >> ->
             parse(ReqId, RespTo, OpCode, Body);
@@ -277,14 +277,14 @@ parse_bin([], _, _) ->
     {error, trailing_data};
 parse_bin([{Name, int32} | Rest], Data, Acc) ->
     case Data of
-        <<Val:32/little-integer, R/binary>> ->
+        <<Val:32/little-signed-integer, R/binary>> ->
             parse_bin(Rest, R, [{Name, Val} | Acc]);
         _ ->
             {error, {truncated_data, Name}}
     end;
 parse_bin([{Name, int64} | Rest], Data, Acc) ->
     case Data of
-        <<Val:64/little-integer, R/binary>> ->
+        <<Val:64/little-signed-integer, R/binary>> ->
             parse_bin(Rest, R, [{Name, Val} | Acc]);
         _ ->
             {error, {truncated_data, Name}}
@@ -314,7 +314,7 @@ parse_bin([{Name, docs}], Data, Acc) ->
     end;
 parse_bin([{Name, cursors} | Rest], Data, Acc) ->
     case Data of
-        <<Num:32/little-integer, CursorData/binary>> ->
+        <<Num:32/little-signed-integer, CursorData/binary>> ->
             case parse_cursors(Num, CursorData, []) of
                 {ok, Cursors, R} ->
                     parse_bin(Rest, R, [{Name, Cursors} | Acc]);
@@ -350,7 +350,7 @@ parse_docs(Data, Acc) ->
 
 parse_cursors(0, Rest, Acc) ->
     {ok, lists:reverse(Acc), Rest};
-parse_cursors(N, <<Cursor:64/little-integer, Rest/binary>>, Acc) ->
+parse_cursors(N, <<Cursor:64/little-signed-integer, Rest/binary>>, Acc) ->
     parse_cursors(N-1, Rest, [Cursor | Acc]);
 parse_cursors(_, _, _) ->
     {error, truncated_cursors}.

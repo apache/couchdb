@@ -66,7 +66,7 @@ current_time() ->
 
 parse(Data) ->
     case Data of
-        <<Size:32/little-integer, Rest0/binary>> ->
+        <<Size:32/little-signed-integer, Rest0/binary>> ->
             case Size - 4 =< size(Rest0) of
                 true ->
                     case parse_props(Rest0, []) of
@@ -127,7 +127,7 @@ parse_val(?V_ARRAY, Data) ->
     end;
 parse_val(?V_BINARY, Data) ->
     case Data of
-        <<Size:32/little-integer, Type:8/integer, Rest0/binary>> ->
+        <<Size:32/little-signed-integer, Type:8/integer, Rest0/binary>> ->
             case Size =< size(Rest0) of
                 true ->
                     <<Val0:Size/binary, Rest1/binary>> = Rest0,
@@ -157,7 +157,7 @@ parse_val(?V_BOOLEAN, Data) ->
     end;
 parse_val(?V_DATETIME, Data) ->
     case Data of
-        <<Val0:64/little-integer, Rest/binary>> ->
+        <<Val0:64/little-signed-integer, Rest/binary>> ->
             Val = {[{<<"$date">>, Val0}]},
             {ok, Val, Rest};
         _ ->
@@ -209,7 +209,7 @@ parse_val(?V_SYMBOL, Data) ->
 parse_val(?V_CODE_W_S, Data) ->
     % Yuck...
     case Data of
-        <<_Size:32/little-integer, Rest0/binary>> ->
+        <<_Size:32/little-signed-integer, Rest0/binary>> ->
             case parse_string(Rest0) of
                 {ok, Code, Rest1} ->
                     case parse(Rest1) of
@@ -230,14 +230,15 @@ parse_val(?V_CODE_W_S, Data) ->
     end;
 parse_val(?V_INT32, Data) ->
     case Data of
-        <<Val:32/little-integer, Rest/binary>> ->
+        <<Val:32/little-signed-integer, Rest/binary>> ->
             {ok, Val, Rest};
         _ ->
             {error, truncated_int32}
     end;
 parse_val(?V_TIMESTAMP, Data) ->
     case Data of
-        <<TS:32/little-integer, Inc:32/little-integer, Rest/binary>> ->
+        <<TS:32/little-signed-integer, Inc:32/little-signed-integer,
+                Rest/binary>> ->
             Val = {[
                 {<<"$timestamp">>, {[
                     {<<"t">>, TS},
@@ -250,7 +251,7 @@ parse_val(?V_TIMESTAMP, Data) ->
     end;
 parse_val(?V_INT64, Data) ->
     case Data of
-        <<Val:32/little-integer, Rest/binary>> ->
+        <<Val:32/little-signed-integer, Rest/binary>> ->
             {ok, Val, Rest};
         _ ->
             {error, truncated_int64}
@@ -270,7 +271,7 @@ render([Doc | Rest], Acc) ->
     AsBin = <<AsBin0/binary, 0:8/integer>>,
     % We add 4 for the size value itself
     Size = 4 + size(AsBin),
-    render(Rest, [<<Size:32/little-integer, AsBin/binary>> | Acc]).
+    render(Rest, [<<Size:32/little-signed-integer, AsBin/binary>> | Acc]).
 
 
 render_doc({[{<<"$binary">>, Bin}, {<<"$type">>, Type}]=P}) ->
@@ -278,7 +279,7 @@ render_doc({[{<<"$binary">>, Bin}, {<<"$type">>, Type}]=P}) ->
         true ->
             Size = size(Bin),
             Data = <<
-                Size:32/little-integer,
+                Size:32/little-signed-integer,
                 Type:1/integer,
                 Bin/binary
             >>,
@@ -300,7 +301,7 @@ render_doc({[{<<"$id">>, ObjId}]=P}) ->
 render_doc({[{<<"$date">>, Date}]=P}) ->
     case is_integer(Date) of
         true ->
-            {?V_DATETIME, <<Date:64/little-integer>>};
+            {?V_DATETIME, <<Date:64/little-signed-integer>>};
         false ->
             render_props(P, [])
     end;
@@ -329,9 +330,11 @@ render_doc({[{<<"$id">>, Id}, {<<"$ref">>, Ref}]}) ->
 render_doc({[{<<"$timestamp">>, Doc}]=P}) ->
     case Doc of
         {[{<<"t">>, T}, {<<"i">>, I}]} when is_integer(T), is_integer(I) ->
-            {?V_TIMESTAMP, <<I:32/little-integer, T:32/little-integer>>};
+            {?V_TIMESTAMP,
+                <<I:32/little-signed-integer, T:32/little-signed-integer>>};
         {[{<<"i">>, I}, {<<"t">>, T}]} when is_integer(T), is_integer(I) ->
-            {?V_TIMESTAMP, <<I:32/little-integer, T:32/little-integer>>};
+            {?V_TIMESTAMP,
+                <<I:32/little-signed-integer, T:32/little-signed-integer>>};
         _ ->
             parse_props(P, [])
     end;
@@ -413,7 +416,7 @@ render_cstring(Bin) when is_binary(Bin) ->
 
 parse_string(Data) ->
     case Data of
-        <<Size:32/little-integer, Rest0/binary>> ->
+        <<Size:32/little-signed-integer, Rest0/binary>> ->
             case Size =< size(Rest0) of
                 true ->
                     ValSize = Size - 1, % Trailing null byte
@@ -436,7 +439,7 @@ parse_string(Data) ->
 render_string(Data) when is_binary(Data) ->
     % Assume UTF-8 here?
     Size = size(Data) + 1,
-    <<Size:32/little-integer, Data/binary, 0:8/integer>>.
+    <<Size:32/little-signed-integer, Data/binary, 0:8/integer>>.
 
 
 parse_objid(Data) ->
@@ -453,9 +456,9 @@ parse_objid(Data) ->
 render_number(N) when is_float(N) ->
     {?V_FLOAT, <<N/float>>};
 render_number(N) when N >= -2147483648, N =< 2147483647 ->
-    {?V_INT32, <<N:32/little-integer>>};
+    {?V_INT32, <<N:32/little-signed-integer>>};
 render_number(N) when N >= -9223372036854775808, N =< 9223372036854775807 ->
-    {?V_INT64, <<N:64/little-integer>>};
+    {?V_INT64, <<N:64/little-signed-integer>>};
 render_number(N) ->
     throw({invalid_integer, N}).
 
