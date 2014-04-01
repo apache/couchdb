@@ -86,7 +86,7 @@ function(app, FauxtonAPI) {
     next: function (docs, currentParams, perPage, _isAllDocs) {
       var params = {limit: perPage, skip: 1},
           doc = _.last(docs);
-          
+
       this.history.push(_.clone(currentParams));
       return this.calculate(doc, params, currentParams, _isAllDocs);
     },
@@ -101,7 +101,7 @@ function(app, FauxtonAPI) {
 
     reset: function () {
       this.history = [];
-    } 
+    }
   };
 
   Documents.Doc = FauxtonAPI.Model.extend({
@@ -211,7 +211,7 @@ function(app, FauxtonAPI) {
 
       if (doc) {
         return new Documents.Doc(doc, {database: this.database});
-      } 
+      }
 
       return this;
     },
@@ -253,7 +253,6 @@ function(app, FauxtonAPI) {
         if (typeof(this.id) === "undefined") {
           resp._id = resp.id;
         }
-        delete resp.id;
       }
       if (resp.ok) {
         delete resp.ok;
@@ -311,7 +310,7 @@ function(app, FauxtonAPI) {
   });
 
   Documents.ViewRow = FauxtonAPI.Model.extend({
-    // this is a hack so that backbone.collections doesn't group 
+    // this is a hack so that backbone.collections doesn't group
     // these by id and reduce the number of items returned.
     idAttribute: "_id",
 
@@ -468,7 +467,7 @@ function(app, FauxtonAPI) {
       if (this.skipFirstItem) {
         rows = rows.splice(1);
       }
-      
+
       // remove any query errors that may return without doc info
       // important for when querying keys on all docs
       var noQueryErrors = _.filter(rows, function(row){
@@ -505,7 +504,7 @@ function(app, FauxtonAPI) {
       if (!this.params.limit) {
         this.params.limit = this.perPageLimit;
       }
-      
+
       this.saveDefaultParameters();
     },
 
@@ -520,7 +519,7 @@ function(app, FauxtonAPI) {
       } else if (this.params) {
         query = "?" + $.param(this.params);
       }
-      
+
       var startOfUrl = app.host;
       if (context === 'app') {
         startOfUrl = 'database';
@@ -648,7 +647,7 @@ function(app, FauxtonAPI) {
 
   }));
 
-  
+
   Documents.PouchIndexCollection = FauxtonAPI.Collection.extend(_.extend({}, DefaultParametersMixin(), {
     model: Documents.ViewRow,
     documentation: function(){
