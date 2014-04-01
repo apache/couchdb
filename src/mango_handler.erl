@@ -112,6 +112,8 @@ cmd_list() ->
         {<<"iscapped">>, mango_op_coll_is_capped},
         {<<"collstats">>, mango_op_coll_stats},
 
+        {<<"createindexes">>, mango_op_idx_create},
+
         {<<"count">>, mango_op_count},
         {<<"distinct">>, mango_op_distinct},
 

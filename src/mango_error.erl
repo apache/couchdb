@@ -41,7 +41,7 @@ as_doc(Ctx) ->
     StackId = erlang:phash2(Stack),
     {[
         {<<"ok">>, 0},
-        {<<"err">>, Msg},
+        {<<"$err">>, Msg},
         {<<"code">>, StackId}
     ]}.
 

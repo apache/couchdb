@@ -12,7 +12,7 @@
 run(Msg, Ctx) ->
     ok = check_not_multi_update(Msg),
     DbName = mango_util:cloudant_dbname(Msg, Ctx),
-    OldDoc = find_doc(DbName, mango_msg:prop(selector, Msg)),
+    OldDoc = find_doc(DbName, mango_msg:prop(selector, Msg), Ctx),
     Update = mango_msg:prop(update, Msg),
     NewDoc = case {OldDoc, is_upsert(Msg)} of
         {not_found, true} ->
@@ -28,7 +28,7 @@ run(Msg, Ctx) ->
         {#doc{}, _} ->
             mango_doc:apply_update(OldDoc, Update)
     end,
-    Results = case mango_doc:write(DbName, NewDoc) of
+    Results = case mango_doc:save(DbName, NewDoc, Ctx) of
         {ok, Results0} ->
             Results0;
         {accepted, Results0} ->
@@ -59,10 +59,10 @@ is_upsert(Msg) ->
     Flags band 16#00000001.
 
 
-find_doc(DbName, Selector) ->
+find_doc(DbName, Selector, Ctx) ->
     case Selector of
         {[{<<"_id">>, DocId}]} ->
-            mango_doc:open(DbName, DocId);
+            mango_doc:open(DbName, DocId, Ctx);
         _ ->
             throw(unsupported_doc_selector)
     end.

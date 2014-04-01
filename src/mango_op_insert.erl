@@ -33,7 +33,7 @@ continue_on_error(Msg) ->
 
 
 batch_update(DbName, Docs, Ctx) ->
-    Results = case mango_doc:save(Ctx, DbName, Docs) of
+    Results = case mango_doc:save(DbName, Docs, Ctx) of
         {ok, Results0} ->
             Results0;
         {accepted, Results0} ->
@@ -45,8 +45,8 @@ batch_update(DbName, Docs, Ctx) ->
         ({_, {ok, _Rev}}, Acc) ->
             Acc;
         ({#doc{id=Id}, Error}, Acc) ->
-            mango_ctx:add_error(Ctx, {doc_update_error, Id, Error})
-    end, Ctx, Results).
+            mango_ctx:add_error(Acc, {doc_update_error, Id, Error})
+    end, Ctx, lists:zip(Docs, Results)).
 
 
 linear_update(_DbName, [], Ctx) ->

@@ -6,6 +6,7 @@
     new/0,
     
     is_authed/1,
+    get_auth/1,
     set_auth/3,
     username/1,
 
@@ -38,6 +39,10 @@ is_authed(#mango_ctx{user_ctx=UC}) when UC /= undefined ->
     true;
 is_authed(#mango_ctx{}) ->
     false.
+
+
+get_auth(#mango_ctx{user_ctx=Ctx}) ->
+    Ctx.
 
 
 set_auth(#mango_ctx{user_ctx=undefined}=Ctx, User, Roles) ->

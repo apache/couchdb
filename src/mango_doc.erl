@@ -2,22 +2,28 @@
 
 
 -export([
-    open/2,
-    save/2,
+    open/3,
+    save/3,
 
     from_bson/1,
 
     matches/2,
     apply_update/2,
-    has_operators/1
+    has_operators/1,
+
+    get_field/2,
+    get_field/3,
+    rem_field/2,
+    set_field/3
 ]).
 
 
 -include_lib("couch/include/couch_db.hrl").
 
 
-open(DbName, DocId) ->
-    try mango_util:defer(fabric, open_doc, [DbName, DocId, [deleted]]) of
+open(DbName, DocId, Ctx) ->
+    Opts = [deleted, {user_ctx, mango_ctx:get_auth(Ctx)}],
+    try mango_util:defer(fabric, open_doc, [DbName, DocId, Opts]) of
         {ok, Doc} ->
             {ok, Doc};
         {not_found, _} ->
@@ -31,10 +37,11 @@ open(DbName, DocId) ->
     end.
 
 
-save(DbName, #doc{}=Doc) ->
-    save(DbName, [Doc]);
-save(DbName, Docs) when is_list(Docs) ->
-    mango_util:defer(fabric, update_docs, [DbName, Docs, []]).
+save(DbName, #doc{}=Doc, Ctx) ->
+    save(DbName, [Doc], Ctx);
+save(DbName, Docs, Ctx) when is_list(Docs) ->
+    Opts = [{user_ctx, mango_ctx:get_auth(Ctx)}],
+    mango_util:defer(fabric, update_docs, [DbName, Docs, Opts]).
 
 
 from_bson({Props}) ->
