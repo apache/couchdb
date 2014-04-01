@@ -12,12 +12,25 @@
 
 define([
        "app",
-       "api"
+       "api",
+       "core/couchdbSession"
 ],
 
-function (app, FauxtonAPI) {
+function (app, FauxtonAPI, CouchdbSession) {
 
   var Auth = new FauxtonAPI.addon();
+
+  var errorHandler = function (xhr, type, msg) {
+    msg = xhr;
+    if (arguments.length === 3) {
+      msg = xhr.responseJSON.reason;
+    }
+
+    FauxtonAPI.addNotification({
+      msg: msg,
+      type: 'error'
+    });
+  };
 
   var Admin = Backbone.Model.extend({
 
@@ -46,19 +59,21 @@ function (app, FauxtonAPI) {
     }
   });
 
-  Auth.Session = FauxtonAPI.Session.extend({
-    url: '/_session',
+  Auth.Session = CouchdbSession.Session.extend({
+    url: app.host + '/_session',
 
     initialize: function (options) {
       if (!options) { options = {}; }
 
-      this.messages = _.extend({},  { 
+      _.bindAll(this);
+
+      this.messages = _.extend({},  {
           missingCredentials: 'Username or password cannot be blank.',
           passwordsNotMatch:  'Passwords do not match.',
-          incorrectCredentials: 'Incorrect username or password.',
           loggedIn: 'You have been logged in.',
-          adminCreated: 'Couchdb admin created',
-          changePassword: 'Your password has been updated.'
+          adminCreated: 'CouchDB admin created',
+          changePassword: 'Your password has been updated.',
+          adminCreationFailedPrefix: 'Could not create admin.'
         }, options.messages);
     },
 
@@ -85,7 +100,7 @@ function (app, FauxtonAPI) {
     userRoles: function () {
       var user = this.user();
 
-      if (user && user.roles) { 
+      if (user && user.roles) {
         return user.roles;
       }
 
@@ -154,8 +169,8 @@ function (app, FauxtonAPI) {
 
       return $.ajax({
         cache: false,
-        type: "POST", 
-        url: "/_session", 
+        type: "POST",
+        url: app.host + "/_session",
         dataType: "json",
         data: {name: username, password: password}
       }).then(function () {
@@ -167,10 +182,10 @@ function (app, FauxtonAPI) {
       var that = this;
 
       return $.ajax({
-        type: "DELETE", 
-        url: "/_session", 
+        type: "DELETE",
+        url: app.host + "/_session",
         dataType: "json",
-        username : "_", 
+        username : "_",
         password : "_"
       }).then(function () {
        return that.fetchUser({forceFetch: true });
@@ -231,11 +246,13 @@ function (app, FauxtonAPI) {
         }
       });
 
-      promise.fail(function (rsp) {
-        FauxtonAPI.addNotification({
-          msg: 'Could not create admin. Reason' + rsp + '.',
-          type: 'error'
-        });
+      promise.fail(function (xhr, type, msg) {
+        msg = xhr;
+        if (arguments.length === 3) {
+          msg = xhr.responseJSON.reason;
+        }
+        msg = FauxtonAPI.session.messages.adminCreationFailedPrefix + ' ' + msg;
+        errorHandler(msg);
       });
     }
 
@@ -243,6 +260,9 @@ function (app, FauxtonAPI) {
 
   Auth.LoginView = FauxtonAPI.View.extend({
     template: 'addons/auth/templates/login',
+    initialize: function (options) {
+      this.urlBack = options.urlBack || "";
+    },
 
     events: {
       "submit #login": "login"
@@ -254,25 +274,20 @@ function (app, FauxtonAPI) {
       var that = this,
           username = this.$('#username').val(),
           password = this.$('#password').val(),
+          urlBack = this.urlBack,
           promise = this.model.login(username, password);
 
       promise.then(function () {
         FauxtonAPI.addNotification({msg:  FauxtonAPI.session.messages.loggedIn });
+
+        if (urlBack) {
+          return FauxtonAPI.navigate(urlBack);
+        }
+
         FauxtonAPI.navigate('/');
       });
 
-      promise.fail(function (xhr, type, msg) {
-        if (arguments.length === 3) {
-          msg = FauxtonAPI.session.messages.incorrectCredentials;
-        } else {
-          msg = xhr;
-        }
-
-        FauxtonAPI.addNotification({
-          msg: msg,
-          type: 'error'
-        });
-      });
+      promise.fail(errorHandler);
     }
 
   });
@@ -299,20 +314,11 @@ function (app, FauxtonAPI) {
         that.$('#password-confirm').val('');
       });
 
-      promise.fail(function (xhr, error, msg) {
-        if (arguments.length < 3) {
-          msg = xhr;
-        }
-
-        FauxtonAPI.addNotification({
-          msg: xhr,
-          type: 'error'
-        });
-      });
+      promise.fail(errorHandler);
     }
   });
 
-  Auth.NavLink = FauxtonAPI.View.extend({ 
+  Auth.NavLink = FauxtonAPI.View.extend({
     template: 'addons/auth/templates/nav_link_title',
     tagName: 'li',
 
@@ -328,7 +334,7 @@ function (app, FauxtonAPI) {
     }
   });
 
-  Auth.NavDropDown = FauxtonAPI.View.extend({ 
+  Auth.NavDropDown = FauxtonAPI.View.extend({
     template: 'addons/auth/templates/nav_dropdown',
 
     beforeRender: function () {
@@ -357,7 +363,17 @@ function (app, FauxtonAPI) {
   });
 
   Auth.NoAccessView = FauxtonAPI.View.extend({
-    template: "addons/auth/templates/noAccess"
+    template: "addons/auth/templates/noAccess",
+
+    initialize: function (options) {
+      this.urlBack = options.urlBack || "";
+    },
+
+    serialize: function () {
+      return {
+        urlBack: this.urlBack
+      };
+    }
   });
 
   return Auth;

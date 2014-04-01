@@ -143,36 +143,32 @@ handle_rewrite_req(#httpd{
             DispatchList =  [make_rule(Rule) || {Rule} <- Rules],
             Method1 = couch_util:to_binary(Method),
 
-            %% get raw path by matching url to a rule.
-            RawPath = case try_bind_path(DispatchList, Method1, 
-                    PathParts, QueryList) of
-                no_dispatch_path ->
-                    throw(not_found);
-                {NewPathParts, Bindings} ->
-                    Parts = [quote_plus(X) || X <- NewPathParts],
+            % get raw path by matching url to a rule. Throws not_found.
+            {NewPathParts0, Bindings0} =
+                try_bind_path(DispatchList, Method1, PathParts, QueryList),
+            NewPathParts = [quote_plus(X) || X <- NewPathParts0],
+            Bindings = maybe_encode_bindings(Bindings0),
 
-                    % build new path, reencode query args, eventually convert
-                    % them to json
-                    Bindings1 = maybe_encode_bindings(Bindings),
-                    Path = binary_to_list(
-                        iolist_to_binary([
-                                string:join(Parts, [?SEPARATOR]),
-                                [["?", mochiweb_util:urlencode(Bindings1)] 
-                                    || Bindings1 =/= [] ]
-                            ])),
-                    
-                    % if path is relative detect it and rewrite path
-                    case mochiweb_util:safe_relative_path(Path) of
-                        undefined ->
-                            ?b2l(Prefix) ++ "/" ++ Path;
-                        P1 ->
-                            ?b2l(Prefix) ++ "/" ++ P1
-                    end
+            Path0 = string:join(NewPathParts, [?SEPARATOR]),
 
-                end,
+            % if path is relative detect it and rewrite path
+            Path1 = case mochiweb_util:safe_relative_path(Path0) of
+                undefined ->
+                    ?b2l(Prefix) ++ "/" ++ Path0;
+                P1 ->
+                    ?b2l(Prefix) ++ "/" ++ P1
+            end,
 
-            % normalize final path (fix levels "." and "..")
-            RawPath1 = ?b2l(iolist_to_binary(normalize_path(RawPath))),
+            Path2 = normalize_path(Path1),
+
+            Path3 = case Bindings of
+                [] ->
+                    Path2;
+                _ ->
+                    [Path2, "?", mochiweb_util:urlencode(Bindings)]
+            end,
+
+            RawPath1 = ?b2l(iolist_to_binary(Path3)),
 
             % In order to do OAuth correctly, we have to save the
             % requested path. We use default so chained rewriting
@@ -216,7 +212,7 @@ quote_plus(X) ->
 %% @doc Try to find a rule matching current url. If none is found
 %% 404 error not_found is raised
 try_bind_path([], _Method, _PathParts, _QueryList) ->
-    no_dispatch_path;
+    throw(not_found);
 try_bind_path([Dispatch|Rest], Method, PathParts, QueryList) ->
     [{PathParts1, Method1}, RedirectPath, QueryArgs, Formats] = Dispatch,
     case bind_method(Method1, Method) of

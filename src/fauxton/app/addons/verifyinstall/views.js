@@ -43,7 +43,7 @@ function(app, FauxtonAPI, VerifyInstall) {
 
     complete: function () {
       FauxtonAPI.addNotification({
-        msg: 'Success! You Couchdb install is working. Time to Relax',
+        msg: 'Success! You CouchDB install is working. Time to Relax',
         type: 'success',
         selector: '#error'
       });

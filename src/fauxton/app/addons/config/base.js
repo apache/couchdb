@@ -16,10 +16,12 @@ define([
   "api",
 
   // Modules
-  "addons/config/routes"
+  "addons/config/routes",
+  "addons/config/views"
 ],
 
-function(app, FauxtonAPI, Config) {
+function(app, FauxtonAPI, Config, Views) {
+	Config.Views = Views;
   Config.initialize = function() {
     FauxtonAPI.addHeaderLink({title: "Config", href: "#_config", icon:"fonticon-cog", className: 'config'});
   };

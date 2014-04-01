@@ -240,7 +240,7 @@ function $$(node) {
           if (userCtx.name) {
             $("#userCtx .name").text(userCtx.name).attr({href : $.couch.urlPrefix + "/_utils/document.html?"+encodeURIComponent(r.info.authentication_db)+"/org.couchdb.user%3A"+encodeURIComponent(userCtx.name)});
 
-            if (userCtx.roles.indexOf("_admin") != -1) {
+            if ($.inArray("_admin", userCtx.roles) != -1) {
               $("#userCtx .loggedin").show();
               $("#userCtx .loggedinadmin").show();
               $(".serverAdmin").removeAttr('disabled'); // user is a server admin
@@ -266,7 +266,7 @@ function $$(node) {
                 }); 
               }
             }
-          } else if (userCtx.roles.indexOf("_admin") != -1) {
+          } else if ($.inArray("_admin", userCtx.roles) != -1) {
             $("#userCtx .adminparty").show();
             $(".serverAdmin").removeAttr('disabled');
           } else {

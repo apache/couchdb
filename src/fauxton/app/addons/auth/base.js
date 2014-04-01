@@ -20,6 +20,7 @@ function(app, FauxtonAPI, Auth) {
 
   Auth.session = new Auth.Session();
   FauxtonAPI.setSession(Auth.session);
+  app.session = Auth.session;
 
   Auth.initialize = function() {
     Auth.navLink = new Auth.NavLink({model: Auth.session});
@@ -38,8 +39,10 @@ function(app, FauxtonAPI, Auth) {
       var deferred = $.Deferred();
 
       if (session.isAdminParty()) {
+        session.trigger("authenticated");
         deferred.resolve();
       } else if(session.matchesRoles(roles)) {
+        session.trigger("authenticated");
         deferred.resolve();
       } else {
         deferred.reject();
@@ -49,7 +52,8 @@ function(app, FauxtonAPI, Auth) {
     };
 
     var authDenied = function () {
-      FauxtonAPI.navigate('/noAccess');
+      var url = window.location.hash.replace('#','');
+      FauxtonAPI.navigate('/noAccess?urlback=' + url, {replace: true});
     };
 
     FauxtonAPI.auth.registerAuth(auth);

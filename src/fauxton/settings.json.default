@@ -1,5 +1,9 @@
 {
   "deps": [
+  { "name": "fauxton" },
+  { "name": "databases" },
+  { "name": "documents" },
+  { "name": "pouchdb" },
   { "name": "activetasks" },
   { "name": "config" },
   { "name": "logs" },
@@ -19,7 +23,8 @@
         "variables": {
           "requirejs": "/assets/js/libs/require.js",
           "css": "./css/index.css",
-          "base": null
+          "base": null,
+          "cachebuster": ""
         },
         "app": {
           "root": "/",
@@ -33,14 +38,31 @@
         "variables": {
           "requirejs": "./js/require.js",
           "css": "./css/index.css",
-          "base": null
+          "base": null,
+          "cachebuster": "?v1.0"
         },
         "app": {
           "root": "/_utils/fauxton/",
           "host": "../..",
           "version": "1.0"
         }
+      },
+      "couchapp": {
+        "src": "assets/index.underscore",
+        "dest": "dist/debug/index.html",
+        "variables": {
+          "requirejs": "./js/require.js",
+          "css": "./css/index.css",
+          "base": null,
+          "cachebuster": "?v1.0"
+        },
+        "app": {
+          "root": "/",
+          "host": "../../..",
+          "version": "1.0"
+        }
       }
+
     },
 
     "couch_config": {

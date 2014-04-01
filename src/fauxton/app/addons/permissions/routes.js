@@ -13,7 +13,7 @@
 define([
        "app",
        "api",
-       "modules/databases/base",
+       "addons/databases/base",
        "addons/permissions/views"
 ],
 function (app, FauxtonAPI, Databases, Permissions) {

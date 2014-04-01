@@ -419,7 +419,7 @@ The basic example that demonstrates all use-cases of update handlers below:
 
     function(doc, req){
         if (!doc){
-            if ('id' in req){
+            if ('id' in req && req['id']){
                 // create new document
                 return [{'_id': req['id']}, 'New World']
             }

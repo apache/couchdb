@@ -5,8 +5,13 @@ require.config(
 );
 
 require([
+        "app",
         <% _.each(testFiles, function (test) {%>
+           <% if (test[0] === '.') { %>
            '../<%= test %>',
+           <% } else { %>
+           '<%= test %>',
+           <% }  %>
         <% }) %>
 ], function() {
   if (window.mochaPhantomJS) { mochaPhantomJS.run(); }

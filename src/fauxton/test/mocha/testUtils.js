@@ -11,11 +11,12 @@
 // the License.
 
 define([
+       "api",
        "chai",
        "sinon-chai",
        "underscore"
 ],
-function(chai, sinonChai) {
+function(FauxtonAPI,chai, sinonChai) {
   chai.use(sinonChai);
 
   var ViewSandbox = function () {

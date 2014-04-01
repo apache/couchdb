@@ -64,10 +64,8 @@ suggesting improvements or submitting changes. Some of these people are:
  * David Rose <doppler@gmail.com>
  * Lim Yue Chuan <shasderias@gmail.com>
  * David Davis <xantus@xantus.org>
- * Klaus Trainer <klaus.trainer@web.de>
  * Juuso Väänänen <juuso@vaananen.org>
  * Jeff Zellner <jeff.zellner@gmail.com>
- * Benjamin Young <byoung@bigbluehat.com>
  * Gabriel Farrell <gsf747@gmail.com>
  * Mike Leddy <mike@loop.com.br>
  * Wayne Conrad <wayne@databill.com>
@@ -93,7 +91,6 @@ suggesting improvements or submitting changes. Some of these people are:
  * Tim Blair
  * Tady Walsh <hello@tady.me>
  * Sam Rijs <recv@awesam.de>
- * Robert Kowalski <rok@kowalski.gd>
 # Authors from commit 6c976bd and onwards are auto-inserted. If you are merging
 # a commit from a non-committer, you should not add an entry to this file. When
 # `bootstrap` is run, the actual THANKS file will be generated.

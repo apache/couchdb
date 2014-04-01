@@ -24,7 +24,7 @@
   <title>Project Fauxton</title>
 
   <!-- Application styles. -->
-  <link rel="stylesheet" href="<%= css %>">
+  <link rel="stylesheet" href="<%= css %><%=cachebuster%>">
   <% if (base) { %>
   <base href="<%= base %>"></base>
   <% } %>
@@ -42,6 +42,6 @@
   </div>
 
   <!-- Application source. -->
-  <script data-main="/config" src="<%= requirejs %>"></script>
+  <script data-main="/config" src="<%= requirejs %><%=cachebuster%>"></script>
 </body>
 </html>

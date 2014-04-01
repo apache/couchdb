@@ -39,57 +39,42 @@ start_link(http) ->
     start_link(?MODULE, [{port, Port}]);
 start_link(https) ->
     Port = couch_config:get("ssl", "port", "6984"),
-    CertFile = couch_config:get("ssl", "cert_file", nil),
-    KeyFile = couch_config:get("ssl", "key_file", nil),
-    Options = case CertFile /= nil andalso KeyFile /= nil of
+    ServerOpts0 =
+        [{cacertfile, couch_config:get("ssl", "cacert_file", nil)},
+         {keyfile, couch_config:get("ssl", "key_file", nil)},
+         {certfile, couch_config:get("ssl", "cert_file", nil)},
+         {password, couch_config:get("ssl", "password", nil)}],
+
+    case (couch_util:get_value(keyfile, ServerOpts0) == nil orelse
+        couch_util:get_value(certfile, ServerOpts0) == nil) of
         true ->
-            SslOpts = [{certfile, CertFile}, {keyfile, KeyFile}],
-
-            %% set password if one is needed for the cert
-            SslOpts1 = case couch_config:get("ssl", "password", nil) of
-                nil -> SslOpts;
-                Password ->
-                    SslOpts ++ [{password, Password}]
-            end,
-            % do we verify certificates ?
-            FinalSslOpts = case couch_config:get("ssl",
-                    "verify_ssl_certificates", "false") of
-                "false" -> SslOpts1;
-                "true" ->
-                    case couch_config:get("ssl",
-                            "cacert_file", nil) of
-                        nil ->
-                            io:format("Verify SSL certificate "
-                                ++"enabled but file containing "
-                                ++"PEM encoded CA certificates is "
-                                ++"missing", []),
-                            throw({error, missing_cacerts});
-                        CaCertFile ->
-                            Depth = list_to_integer(couch_config:get("ssl",
-                                    "ssl_certificate_max_depth",
-                                    "1")),
-                            FinalOpts = [
-                                {cacertfile, CaCertFile},
-                                {depth, Depth},
-                                {verify, verify_peer}],
-                            % allows custom verify fun.
-                            case couch_config:get("ssl",
-                                    "verify_fun", nil) of
-                                nil -> FinalOpts;
-                                SpecStr ->
-                                    FinalOpts
-                                    ++ [{verify_fun, make_arity_3_fun(SpecStr)}]
-                            end
-                    end
-            end,
-
-            [{port, Port},
-                {ssl, true},
-                {ssl_opts, FinalSslOpts}];
-        false ->
             io:format("SSL enabled but PEM certificates are missing.", []),
-            throw({error, missing_certs})
+            throw({error, missing_certs});
+        false ->
+            ok
     end,
+
+    ServerOpts = [Opt || {_, V}=Opt <- ServerOpts0, V /= nil],
+
+    ClientOpts = case couch_config:get("ssl", "verify_ssl_certificates", "false") of
+        "false" ->
+            [];
+        "true" ->
+            [{depth, list_to_integer(couch_config:get("ssl",
+                "ssl_certificate_max_depth", "1"))},
+             {verify, verify_peer}] ++
+            case couch_config:get("ssl", "verify_fun", nil) of
+                nil -> [];
+                SpecStr ->
+                    [{verify_fun, make_arity_3_fun(SpecStr)}]
+            end
+    end,
+    SslOpts = ServerOpts ++ ClientOpts,
+
+    Options =
+        [{port, Port},
+         {ssl, true},
+         {ssl_opts, SslOpts}],
     start_link(https, Options).
 start_link(Name, Options) ->
     % read config and register for configuration changes
@@ -325,6 +310,7 @@ handle_request_int(MochiReq, DefaultFun,
 
     {ok, Resp} =
     try
+        check_request_uri_length(RawUri),
         case couch_httpd_cors:is_preflight_request(HttpReq) of
         #httpd{} ->
             case authenticate_request(HttpReq, AuthHandlers) of
@@ -358,6 +344,8 @@ handle_request_int(MochiReq, DefaultFun,
             send_error(HttpReq, {bad_otp_release, ErrorReason});
         exit:{body_too_large, _} ->
             send_error(HttpReq, request_entity_too_large);
+        exit:{uri_too_long, _} ->
+            send_error(HttpReq, request_uri_too_long);
         throw:Error ->
             Stack = erlang:get_stacktrace(),
             ?LOG_DEBUG("Minor error in HTTP request: ~p",[Error]),
@@ -383,6 +371,19 @@ handle_request_int(MochiReq, DefaultFun,
     couch_stats_collector:record({couchdb, request_time}, RequestTime),
     couch_stats_collector:increment({httpd, requests}),
     {ok, Resp}.
+
+check_request_uri_length(Uri) ->
+    check_request_uri_length(Uri, couch_config:get("httpd", "max_uri_length")).
+
+check_request_uri_length(_Uri, undefined) ->
+    ok;
+check_request_uri_length(Uri, MaxUriLen) when is_list(MaxUriLen) ->
+    case length(Uri) > list_to_integer(MaxUriLen) of
+        true ->
+            throw(request_uri_too_long);
+        false ->
+            ok
+    end.
 
 % Try authentication handlers in order until one sets a user_ctx
 % the auth funs also have the option of returning a response
@@ -559,7 +560,7 @@ body(#httpd{req_body=ReqBody}) ->
     ReqBody.
 
 json_body(Httpd) ->
-    ?JSON_DECODE(body(Httpd)).
+    ?JSON_DECODE(maybe_decompress(Httpd, body(Httpd))).
 
 json_body_obj(Httpd) ->
     case json_body(Httpd) of
@@ -569,6 +570,15 @@ json_body_obj(Httpd) ->
     end.
 
 
+maybe_decompress(Httpd, Body) ->
+    case header_value(Httpd, "Content-Encoding", "identity") of
+    "gzip" ->
+        zlib:gunzip(Body);
+    "identity" ->
+        Body;
+    Else ->
+        throw({bad_ctype, [Else, " is not a supported content encoding."]})
+    end.
 
 doc_etag(#doc{revs={Start, [DiskRev|_]}}) ->
     "\"" ++ ?b2l(couch_doc:rev_to_str({Start, DiskRev})) ++ "\"".
@@ -832,6 +842,8 @@ error_info(file_exists) ->
         "created, the file already exists.">>};
 error_info(request_entity_too_large) ->
     {413, <<"too_large">>, <<"the request entity is too large">>};
+error_info(request_uri_too_long) ->
+    {414, <<"too_long">>, <<"the request entity is too long">>};
 error_info({bad_ctype, Reason}) ->
     {415, <<"bad_content_type">>, Reason};
 error_info(requested_range_not_satisfiable) ->

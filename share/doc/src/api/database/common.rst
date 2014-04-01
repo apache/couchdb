@@ -223,6 +223,12 @@
   Deletes the specified database, and all the documents and attachments
   contained within it.
 
+  .. note::
+
+    To avoid deleting a database, CouchDB will respond with the HTTP status code 400
+    when the request URL includes a ?rev= parameter. This suggests that one wants to delete
+    a document but forgot to add the document id to the URL.
+
   :param db: Database name
   :<header Accept: - :mimetype:`application/json`
                    - :mimetype:`text/plain`
@@ -230,7 +236,7 @@
                          - :mimetype:`text/plain; charset=utf-8`
   :>json boolean ok: Operation status
   :code 200: Database removed successfully
-  :code 400: Invalid database name
+  :code 400: Invalid database name or forgotten document id by accident
   :code 401: CouchDB Server Administrator privileges required
   :code 404: Database doesn't exist
 

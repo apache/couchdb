@@ -1,5 +1,4 @@
 #!/usr/bin/env escript
-%%! -pa ./deps/*/ebin -pa ./apps/*/ebin -pa ./test/etap
 %% -*- erlang -*-
 
 % Licensed under the Apache License, Version 2.0 (the "License"); you may not

@@ -198,9 +198,10 @@ simultaneous client readers, who can read and query the view while the index
 is concurrently being refreshed for other clients without causing problems
 for the readers.
 
-As documents are examined, their previous row values are removed from the
-view indexes, if they exist. If the document is selected by a view function,
-the function results are inserted into the view as a new row.
+As documents are processed by the view engine through your 'map' and 'reduce'
+functions, their previous row values are removed from the view indexes, if
+they exist. If the document is selected by a view function, the function results
+are inserted into the view as a new row.
 
 When view index changes are written to disk, the updates are always appended
 at the end of the file, serving to both reduce disk head seek times during
@@ -260,9 +261,9 @@ updates, ensuring security and data validation in a shared, distributed system.
 Distributed Updates and Replication
 ===================================
 
-CouchDB is a peer-based distributed database system, it allows for users and
-servers to access and update the same shared data while disconnected and then
-bi-directionally replicate those changes later.
+CouchDB is a peer-based distributed database system. It allows users and servers
+to access and update the same shared data while disconnected. Those changes can
+then be replicated bi-directionally later.
 
 The CouchDB document storage, view and security models are designed to work
 together to make true bi-directional replication efficient and reliable.

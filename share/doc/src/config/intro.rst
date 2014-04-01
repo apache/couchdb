@@ -23,6 +23,14 @@ Introduction Into Configuring
 Configuration files
 -------------------
 
+.. warning::
+   The following section covering load order of config files
+   applies only to UNIX-ish systems.
+   For Windows, only the provided ``default.ini`` and ``local.ini``
+   files are relevant. These can of course have content
+   appended, which achieves the same type of functionality
+   as outlined for UNIX-ish systems below.
+
 By default, CouchDB reads configuration files from the following locations,
 in the following order:
 
@@ -148,7 +156,7 @@ Setting parameters via the HTTP API
 
 Alternatively, configuration parameters could be set via the
 :ref:`HTTP API <api/config>`. This API allows to change CouchDB configuration
-on-fly without need for server restart::
+on-the-fly without requiring a server restart::
 
   curl -X PUT http://localhost:5984/_config/uuids/algorithm -d '"random"'
 
@@ -157,16 +165,17 @@ In the response the old parameter's value returns::
   "sequential"
 
 You should be careful with changing configuration via the HTTP API since it's
-easy to make CouchDB unavailable. For instance, you'd like to change the
-:option:`httpd/bind_address` for new one::
+easy to make CouchDB unavailable. For instance, if you'd like to change the
+:option:`httpd/bind_address` for a new one::
 
   curl -X PUT http://localhost:5984/_config/httpd/bind_address -d '"10.10.0.128"'
 
-However, if you would made a typo or the specified IP address is not available
-from your network, you'll make CouchDB unavailable for you in both cases and
-you will have the only way to fix the problem by edit the configuration file
-and restart the server. To protect yourself against such accidents you may
-setup the :option:`httpd/config_whitelist` of configuration parameters that
-are allowed to edit via the HTTP API. For others you'll need to directly edit
-the configuration file so you may quick fix any problems that had occurred due
-to misconfiguring.
+However, if you make a typo, or the specified IP address is not available
+from your network, CouchDB will be unavailable for you in both cases and
+the only way to resolve this will be by remoting into the server, correcting
+the errant file, and restarting CouchDB. To protect yourself against such
+accidents you may set the :option:`httpd/config_whitelist` of permitted
+configuration parameters for updates via the HTTP API. Once this option is set,
+further changes to non-whitelisted parameters must take place via the
+configuration file, and in most cases, also requires a server restart before
+hand-edited options take effect.

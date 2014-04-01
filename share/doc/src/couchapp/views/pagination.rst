@@ -125,12 +125,11 @@ Or in a pseudo-JavaScript snippet:
     page.display_link('next');
   }
 
-Slow Paging (Do Not Use)
-========================
+Paging
+======
 
-**Don’t use this method!** We just show it because it might seem natural to use,
-and you need to know why it is a bad idea. To get the first five rows from
-the view result, you use the ``?limit=5`` query parameter::
+To get the first five rows from the view result, you use the ``?limit=5``
+query parameter::
 
   curl -X GET http://127.0.0.1:5984/artists/_design/artists/_view/by-name?limit=5
 
@@ -194,34 +193,17 @@ straightforward:
     return page != last_page;
   }
 
-The dealbreaker
----------------
+Paging (Alternate Method)
+=========================
 
-This all looks easy and straightforward, but it has one fatal flaw. Remember
-how view results are generated from the underlying B-tree index: CouchDB
-jumps to the first row (or the first row that matches ``startkey``,
-if provided) and reads one row after the other from the index until there are
-no more rows (or ``limit`` or ``endkey`` match, if provided).
+The method described above performed poorly with large skip values until
+CouchDB 1.2. Additionally, some use cases may call for the following
+alternate method even with newer versions of CouchDB. One such case is when
+duplicate results should be prevented. Using skip alone it is possible for
+new documents to be inserted during pagination which could change the offset
+of the start of the subsequent page.
 
-The ``skip`` argument works like this: in addition to going to the first row and
-starting to read, skip will skip as many rows as specified, but CouchDB will
-still read from the first row; it just won’t return any values for the skipped
-rows. If you specify ``skip=100``, CouchDB will read 100 rows and not create
-output for them. This doesn’t sound too bad, but it is very bad, when you use
-1000 or even 10000 as skip values. CouchDB will have to look at a lot of rows
-unnecessarily.
-
-As a rule of thumb, skip should be used only with single digit values. While
-it’s possible that there are legitimate use cases where you specify a larger
-value, they are a good indicator for potential problems with your solution.
-Finally, for the calculations to work, you need to add a reduce function and
-make two calls to the view per page to get all the numbering right,
-and there’s still a potential for error.
-
-Fast Paging (Do Use)
-====================
-
-The correct solution is not much harder. Instead of slicing the result set
+A correct solution is not much harder. Instead of slicing the result set
 into equally sized pages, we look at 10 rows at a time and use ``startkey`` to
 jump to the next 10 rows. We even use skip, but only with the value 1.
 

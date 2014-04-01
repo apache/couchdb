@@ -52,7 +52,6 @@ function (app, FauxtonAPI, Compaction) {
           msg: 'Database compaction has started. Visit <a href="#activetasks">Active Tasks</a> to view the compaction progress.',
         });
       }, function (xhr, error, reason) {
-        console.log(arguments);
         FauxtonAPI.addNotification({
           type: 'error',
           msg: 'Error: ' + JSON.parse(xhr.responseText).reason
@@ -86,7 +85,7 @@ function (app, FauxtonAPI, Compaction) {
 
   Compaction.CompactView = FauxtonAPI.View.extend({
     template: 'addons/compaction/templates/compact_view',
-    className: 'btn btn-info btn-large pull-right',
+    className: 'btn btn-info pull-right',
     tagName: 'button',
 
     initialize: function () {

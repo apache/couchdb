@@ -70,21 +70,20 @@ function(app, FauxtonAPI,Stats) {
         series = _.sortBy(series, function(d){return -d.y;});
 
         nv.addGraph(function() {
-            var width = 550,
-                height = 400;
+            var width = 440,
+                height = 440;
 
             var chart = nv.models.pieChart()
                 .x(function(d) { return d.key; })
                 .y(function(d) { return d.y; })
                 .showLabels(true)
                 .showLegend(false)
-                .values(function(d) { return d; })
                 .color(d3.scale.category10().range())
                 .width(width)
                 .height(height);
 
               d3.select(chartelem)
-                  .datum([series])
+                  .datum(series)
                 .transition().duration(300)
                   .attr('width', width)
                   .attr('height', height)

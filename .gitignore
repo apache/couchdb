@@ -32,6 +32,7 @@ bin/couchjs_dev
 bin/couchpw
 build-aux/config.*
 build-aux/depcomp
+build-aux/compile
 build-aux/install-sh
 build-aux/ltmain.sh
 build-aux/missing
@@ -102,8 +103,14 @@ src/fauxton/app/addons/*
 !src/fauxton/app/addons/permissions
 !src/fauxton/app/addons/verifyinstall
 !src/fauxton/app/addons/compaction
+!src/fauxton/app/addons/fauxton
+!src/fauxton/app/addons/pouchdb
+!src/fauxton/app/addons/databases
+!src/fauxton/app/addons/documents
+!src/fauxton/app/addons/styletests
 src/fauxton/settings.json*
 !src/fauxton/settings.json.default
+!src/fauxton/settings.json.dev
 src/ibrowse/ibrowse.app
 src/ibrowse/ibrowse.app
 src/mochiweb/mochiweb.app

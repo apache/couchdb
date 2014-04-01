@@ -37,9 +37,9 @@ handle_req(#httpd{method='GET'}=Req) ->
 
     State = #state{resp=Resp, feed=Feed},
     couch_dbupdates:handle_dbupdates(fun handle_update/2,
-                                     State, Options).
+                                     State, Options);
 
-handle_req(Req, _Db) ->
+handle_req(Req) ->
     couch_httpd:send_method_not_allowed(Req, "GET").
 
 handle_update(stop, #state{resp=Resp}) ->

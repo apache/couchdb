@@ -12,14 +12,14 @@
 
 define([
        "app",
-
        "api",
 
        // Modules
-       "addons/config/resources"
+       "addons/config/resources",
+       "addons/config/views"
 ],
 
-function(app, FauxtonAPI, Config) {
+function(app, FauxtonAPI, Config, Views) {
 
   var ConfigRouteObject = FauxtonAPI.RouteObject.extend({
     layout: "one_pane",
@@ -45,7 +45,7 @@ function(app, FauxtonAPI, Config) {
     },
 
     config: function () {
-      this.setView("#dashboard-content", new Config.View({collection: this.configs}));
+      this.setView("#dashboard-content", new Views.Table({collection: this.configs}));
     },
 
     establish: function () {

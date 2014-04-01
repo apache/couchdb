@@ -49,29 +49,32 @@ FAUXTON_FILES = \
     fauxton/app/addons/activetasks/templates/tabs.html \
     fauxton/app/addons/activetasks/tests/viewsSpec.js \
     fauxton/app/addons/activetasks/views.js \
-    fauxton/app/addons/auth/assets/less/auth.less \
     fauxton/app/addons/auth/base.js \
     fauxton/app/addons/auth/resources.js \
     fauxton/app/addons/auth/routes.js \
+    fauxton/app/addons/auth/assets/less/auth.less \
     fauxton/app/addons/auth/templates/change_password.html \
     fauxton/app/addons/auth/templates/create_admin.html \
     fauxton/app/addons/auth/templates/login.html \
     fauxton/app/addons/auth/templates/nav_dropdown.html \
     fauxton/app/addons/auth/templates/nav_link_title.html \
     fauxton/app/addons/auth/templates/noAccess.html \
+    fauxton/app/addons/auth/test/baseSpec.js \
+    fauxton/app/addons/compaction/assets/less/compaction.less \
+    fauxton/app/addons/compaction/templates/compact_view.html \
+    fauxton/app/addons/compaction/templates/layout.html \
     fauxton/app/addons/compaction/base.js \
     fauxton/app/addons/compaction/resources.js \
     fauxton/app/addons/compaction/routes.js \
     fauxton/app/addons/compaction/views.js \
-    fauxton/app/addons/compaction/assets/less/compaction.less \
-    fauxton/app/addons/compaction/templates/compact_view.html \
-    fauxton/app/addons/compaction/templates/layout.html \
     fauxton/app/addons/config/base.js \
     fauxton/app/addons/config/resources.js \
+    fauxton/app/addons/config/views.js \
     fauxton/app/addons/config/routes.js \
-    fauxton/app/addons/config/assets/less/config.less \
+    fauxton/app/addons/config/templates/modal.html \
     fauxton/app/addons/config/templates/dashboard.html \
     fauxton/app/addons/config/templates/item.html \
+    fauxton/app/addons/config/tests/resourcesSpec.js \
     fauxton/app/addons/contribute/base.js \
     fauxton/app/addons/exampleAuth/base.js \
     fauxton/app/addons/exampleAuth/templates/noAccess.html \
@@ -113,73 +116,89 @@ FAUXTON_FILES = \
     fauxton/app/addons/stats/templates/stats.html \
     fauxton/app/addons/stats/templates/statselect.html \
     fauxton/app/addons/stats/views.js \
-    fauxton/app/addons/verifyinstall/base.js \
-    fauxton/app/addons/verifyinstall/resources.js \
-    fauxton/app/addons/verifyinstall/routes.js \
+    fauxton/app/addons/styletests/base.js \
+    fauxton/app/addons/styletests/resources.js \
+    fauxton/app/addons/styletests/routes.js \
+    fauxton/app/addons/styletests/views.js \
+    fauxton/app/addons/styletests/templates/theme.html \
     fauxton/app/addons/verifyinstall/views.js \
-    fauxton/app/addons/verifyinstall/assets/less/verifyinstall.less \
+    fauxton/app/addons/verifyinstall/resources.js \
+    fauxton/app/addons/verifyinstall/base.js \
+    fauxton/app/addons/verifyinstall/routes.js \
     fauxton/app/addons/verifyinstall/templates/main.html \
-    fauxton/app/api.js \
+    fauxton/app/addons/verifyinstall/assets/less/verifyinstall.less \
+    fauxton/app/core/api.js \
+    fauxton/app/core/auth.js \
+    fauxton/app/core/base.js \
+    fauxton/app/core/couchdbSession.js \
+    fauxton/app/core/layout.js \
+    fauxton/app/core/routeObject.js \
+    fauxton/app/core/router.js \
+    fauxton/app/core/utils.js \
+    fauxton/app/core/tests/layoutSpec.js \
+    fauxton/app/core/tests/routeObjectSpec.js \
     fauxton/app/app.js \
     fauxton/app/config.js \
     fauxton/app/helpers.js \
     fauxton/app/initialize.js.underscore \
     fauxton/app/load_addons.js.underscore \
     fauxton/app/main.js \
-    fauxton/app/mixins.js \
-    fauxton/app/modules/databases/base.js \
-    fauxton/app/modules/databases/resources.js \
-    fauxton/app/modules/databases/routes.js \
-    fauxton/app/modules/databases/views.js \
-    fauxton/app/modules/documents/base.js \
-    fauxton/app/modules/documents/resources.js \
-    fauxton/app/modules/documents/routes.js \
-    fauxton/app/modules/documents/tests/resourcesSpec.js \
-    fauxton/app/modules/documents/views.js \
-    fauxton/app/modules/fauxton/base.js \
-    fauxton/app/modules/fauxton/components.js \
-    fauxton/app/modules/fauxton/layout.js \
-    fauxton/app/modules/pouchdb/base.js \
-    fauxton/app/modules/pouchdb/pouch.collate.js \
-    fauxton/app/modules/pouchdb/pouchdb.mapreduce.js \
-    fauxton/app/resizeColumns.js \
-    fauxton/app/router.js \
-    fauxton/app/templates/databases/item.html \
-    fauxton/app/templates/databases/list.html \
-    fauxton/app/templates/databases/newdatabase.html \
-    fauxton/app/templates/documents/all_docs_item.html \
-    fauxton/app/templates/documents/all_docs_list.html \
-    fauxton/app/templates/documents/all_docs_layout.html \
-    fauxton/app/templates/documents/all_docs_number.html \
-    fauxton/app/templates/documents/advanced_options.html \
-    fauxton/app/templates/documents/changes.html \
-    fauxton/app/templates/documents/design_doc_selector.html \
-    fauxton/app/templates/documents/ddoc_info.html \
-    fauxton/app/templates/documents/doc.html \
-    fauxton/app/templates/documents/doc_field_editor.html \
-    fauxton/app/templates/documents/doc_field_editor_tabs.html \
-    fauxton/app/templates/documents/duplicate_doc_modal.html \
-    fauxton/app/templates/documents/edit_tools.html \
-    fauxton/app/templates/documents/index_menu_item.html \
-    fauxton/app/templates/documents/index_row_docular.html \
-    fauxton/app/templates/documents/index_row_tabular.html \
-    fauxton/app/templates/documents/jumpdoc.html \
-    fauxton/app/templates/documents/search.html \
-    fauxton/app/templates/documents/sidebar.html \
-    fauxton/app/templates/documents/tabs.html \
-    fauxton/app/templates/documents/upload_modal.html \
-    fauxton/app/templates/documents/view_editor.html \
-    fauxton/app/templates/fauxton/api_bar.html \
-    fauxton/app/templates/fauxton/breadcrumbs.html \
-    fauxton/app/templates/fauxton/footer.html \
-    fauxton/app/templates/fauxton/index_pagination.html \
-    fauxton/app/templates/fauxton/nav_bar.html \
-    fauxton/app/templates/fauxton/notification.html \
-    fauxton/app/templates/fauxton/pagination.html \
+    fauxton/app/addons/databases/base.js \
+    fauxton/app/addons/databases/resources.js \
+    fauxton/app/addons/databases/routes.js \
+    fauxton/app/addons/databases/views.js \
+    fauxton/app/addons/databases/tests/resourcesSpec.js \
+    fauxton/app/addons/documents/base.js \
+    fauxton/app/addons/documents/resources.js \
+    fauxton/app/addons/documents/routes.js \
+    fauxton/app/addons/documents/tests/resourcesSpec.js \
+    fauxton/app/addons/documents/views.js \
+    fauxton/app/addons/fauxton/base.js \
+    fauxton/app/addons/fauxton/components.js \
+    fauxton/app/addons/fauxton/resizeColumns.js \
+    fauxton/app/addons/fauxton/tests/baseSpec.js \
+    fauxton/app/addons/fauxton/tests/navbarSpec.js \
+    fauxton/app/addons/fauxton/tests/paginateSpec.js \
+    fauxton/app/addons/pouchdb/base.js \
+    fauxton/app/addons/pouchdb/pouch.collate.js \
+    fauxton/app/addons/pouchdb/pouchdb.mapreduce.js \
+    fauxton/app/addons/databases/templates/item.html \
+    fauxton/app/addons/databases/templates/list.html \
+    fauxton/app/addons/databases/templates/newdatabase.html \
+    fauxton/app/addons/databases/templates/sidebar.html \
+    fauxton/app/addons/documents/templates/advanced_options.html \
+    fauxton/app/addons/documents/templates/all_docs_item.html \
+    fauxton/app/addons/documents/templates/all_docs_layout.html \
+    fauxton/app/addons/documents/templates/all_docs_list.html \
+    fauxton/app/addons/documents/templates/all_docs_number.html \
+    fauxton/app/addons/documents/templates/changes.html \
+    fauxton/app/addons/documents/templates/ddoc_info.html \
+    fauxton/app/addons/documents/templates/delete_database_modal.html \
+    fauxton/app/addons/documents/templates/design_doc_selector.html \
+    fauxton/app/addons/documents/templates/doc.html \
+    fauxton/app/addons/documents/templates/doc_field_editor.html \
+    fauxton/app/addons/documents/templates/doc_field_editor_tabs.html \
+    fauxton/app/addons/documents/templates/duplicate_doc_modal.html \
+    fauxton/app/addons/documents/templates/edit_tools.html \
+    fauxton/app/addons/documents/templates/index_menu_item.html \
+    fauxton/app/addons/documents/templates/index_row_docular.html \
+    fauxton/app/addons/documents/templates/index_row_tabular.html \
+    fauxton/app/addons/documents/templates/jumpdoc.html \
+    fauxton/app/addons/documents/templates/search.html \
+    fauxton/app/addons/documents/templates/sidebar.html \
+    fauxton/app/addons/documents/templates/tabs.html \
+    fauxton/app/addons/documents/templates/upload_modal.html \
+    fauxton/app/addons/documents/templates/view_editor.html \
+    fauxton/app/addons/documents/tests/resourcesSpec.js \
+    fauxton/app/addons/fauxton/templates/api_bar.html \
+    fauxton/app/addons/fauxton/templates/breadcrumbs.html \
+    fauxton/app/addons/fauxton/templates/footer.html \
+    fauxton/app/addons/fauxton/templates/index_pagination.html \
+    fauxton/app/addons/fauxton/templates/nav_bar.html \
+    fauxton/app/addons/fauxton/templates/notification.html \
+    fauxton/app/addons/fauxton/templates/pagination.html \
     fauxton/app/templates/layouts/one_pane.html \
     fauxton/app/templates/layouts/two_pane.html \
-    fauxton/app/templates/layouts/one_pane_notabs.html \
-    fauxton/app/templates/layouts/with_right_sidebar.html \
     fauxton/app/templates/layouts/with_sidebar.html \
     fauxton/app/templates/layouts/with_tabs.html \
     fauxton/app/templates/layouts/with_tabs_sidebar.html \
@@ -240,6 +259,7 @@ FAUXTON_FILES = \
     fauxton/assets/js/plugins/backbone.layoutmanager.js \
     fauxton/assets/js/plugins/jquery.form.js \
     fauxton/assets/js/plugins/prettify.js \
+    fauxton/assets/js/plugins/beautify.js\
     fauxton/assets/less/bootstrap/accordion.less \
     fauxton/assets/less/bootstrap/alerts.less \
     fauxton/assets/less/bootstrap/bootstrap.less \
@@ -292,12 +312,12 @@ FAUXTON_FILES = \
     fauxton/assets/less/bootstrap/utilities.less \
     fauxton/assets/less/bootstrap/variables.less \
     fauxton/assets/less/bootstrap/wells.less \
-    fauxton/assets/less/config.less \
+    fauxton/app/addons/config/assets/less/config.less \
     fauxton/assets/less/couchdb.less \
-    fauxton/assets/less/database.less \
+    fauxton/app/addons/databases/assets/less/databases.less \
     fauxton/assets/less/fauxton.less \
     fauxton/assets/less/icons.less \
-    fauxton/assets/less/logs.less \
+    fauxton/app/addons/logs/assets/less/logs.less \
     fauxton/assets/less/prettyprint.less \
     fauxton/assets/less/variables.less \
     fauxton/bin/grunt \
@@ -317,10 +337,6 @@ FAUXTON_FILES = \
     fauxton/tasks/couchserver.js \
     fauxton/tasks/fauxton.js \
     fauxton/tasks/helper.js \
-    fauxton/test/core/layoutSpec.js \
-    fauxton/test/core/navbarSpec.js \
-    fauxton/test/core/paginateSpec.js \
-    fauxton/test/core/routeObjectSpec.js \
     fauxton/test/mocha/chai.js \
     fauxton/test/mocha/mocha.css \
     fauxton/test/mocha/mocha.js \
@@ -330,5 +346,5 @@ FAUXTON_FILES = \
     fauxton/test/runner.html \
     fauxton/test/test.config.underscore \
     fauxton/TODO.md \
-    fauxton/writing_addons.md \
-    fauxton/extensions.md
+    fauxton/CONTRIBUTING.md \
+    fauxton/writing_addons.md

@@ -39,7 +39,7 @@ function (app, FauxtonAPI ) {
     },
 
     url: function () {
-      return this.database.id + '/_security';
+      return window.location.origin +"/"+ this.database.safeID() + '/_security';
     },
 
     addItem: function (value, type, section) {

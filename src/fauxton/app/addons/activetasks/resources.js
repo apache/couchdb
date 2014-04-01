@@ -13,7 +13,7 @@
 define([
   "app",
   "backbone",
-  "modules/fauxton/base",
+  "addons/fauxton/base",
   "d3"
 ],
 
