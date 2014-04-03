@@ -12,13 +12,13 @@ License for the specific language governing permissions and limitations under
 the License.
 -->
 
-<nav id="main_navigation">
-  <div class="burger">
-    <div><!-- * --></div>
-    <div><!-- * --></div>
-    <div><!-- * --></div>
-  </div>
+<div class="burger">
+  <div><!-- * --></div>
+  <div><!-- * --></div>
+  <div><!-- * --></div>
+</div>
 
+<nav id="main_navigation">
   <ul id="nav-links" class="nav pull-right">
     <% _.each(navLinks, function(link) { %>
     <% if (link.view) {return;}  %>
@@ -65,8 +65,8 @@ the License.
       <% }); %>
     </ul>
   </div>
-  
-  <div class="brand">
-    <div class="icon">Apache Fauxton</div>
-  </div>
 </nav>
+
+<div class="brand">
+   <div class="icon">Apache Fauxton</div>
+</div>

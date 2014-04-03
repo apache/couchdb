@@ -337,6 +337,7 @@ table.databases {
   top: 0;
   bottom: 0;
   background-color: @primaryNav;
+  overflow-y: scroll;
   #footer-links{
     position: absolute;
     bottom: 0;
@@ -348,9 +349,12 @@ table.databases {
   .navbar {
      .burger{
         .transition(all @transitionSpeed @transitionEaseType);
-        padding: 6px 0;
-        margin-left: 16px;
-        /* position: absolute; */
+        padding: 6px 0 6px 16px;
+        position: fixed;
+        top: 0;
+        z-index: 100;
+        background-color: @primaryNav;
+        width: @navWidth;
         div{
           .transition(all @transitionSpeed @transitionEaseType);
           height: 6px;
@@ -367,11 +371,11 @@ table.databases {
       .box-sizing(content-box);
       .hide-text;
       .customTransition(left, 1s, 0.805, 0.005, 0.165, 0.985);
-      margin: 10px 0 6px;
+      margin: 10px 0 0 0;
       width: 200px;
       height: 40px;
       padding: 10px;
-      position: absolute;
+      position: fixed;
       bottom: 0;
       background: #3a2c2b;
       .icon{
@@ -389,6 +393,7 @@ table.databases {
       }
     }
     nav {
+      margin-top: 46px;
       .nav{
         margin: 0;
         li{
@@ -465,6 +470,7 @@ table.databases {
       }
       ul#bottom-nav-links{
         margin-top: 0;
+        padding-bottom: 70px;
         li{
           min-height: 55px;
           background-color: @bottomNav;
