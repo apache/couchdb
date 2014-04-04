@@ -4,10 +4,12 @@
 -export([
     to_ejson/1,
     to_ejson/2,
-
     from_ejson/1,
-    
-    current_time/0
+    current_time/0,
+
+    min/0,
+    max/0,
+    cmp/2
 ]).
 
 
@@ -31,6 +33,9 @@
 -define(V_INT64, 16#12).
 -define(V_MIN, 16#FF).
 -define(V_MAX, 16#7F).
+
+-define(MIN_VAL, {[{<<"$minKey">>, 1}]}).
+-define(MAX_VAL, {[{<<"$maxKey">>, 1}]}).
 
 
 to_ejson(Data) ->
@@ -62,6 +67,36 @@ current_time() ->
     InMicro = Mega * 1000000000000 + Secs * 1000000 + Micro,
     InMilli = InMicro div 1000,
     {[{<<"$date">>, InMilli}]}.
+
+
+min() ->
+    ?MIN_VAL.
+
+
+max() ->
+    ?MAX_VAL.
+
+
+cmp(?MIN_VAL, ?MIN_VAL) ->
+    0;
+cmp(?MIN_VAL, _) ->
+    -1;
+cmp(_, ?MIN_VAL) ->
+    1;
+cmp(?MAX_VAL, ?MAX_VAL) ->
+    0;
+cmp(?MAX_VAL, _) ->
+    1;
+cmp(_, ?MAX_VAL) ->
+    -1;
+cmp(undefined, undefined) ->
+    0;
+cmp(undefined, _) ->
+    -1;
+cmp(_, undefined) ->
+    1;
+cmp(A, B) ->
+    couch_view:cmp_json(A, B).
 
 
 parse(Data) ->

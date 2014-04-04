@@ -7,7 +7,6 @@
 
     from_bson/1,
 
-    matches/2,
     apply_update/2,
     has_operators/1,
 
@@ -66,21 +65,6 @@ from_bson({Props}) ->
     end.
 
 
-matches(#doc{body=Body}, FieldConditions) ->
-    matches(Body, FieldConditions);
-matches(_, {[]}) ->
-    true;
-matches(Value, {[{Field, Cond} | Rest]}) ->
-    case do_compare(Value, Field, Cond) of
-        true ->
-            matches(Value, {Rest});
-        false ->
-            false
-    end;
-matches(_, Cond) ->
-    throw({invalid_conditional, Cond}).
-
-
 apply_update(#doc{body={Props}}=Doc, {Update}) ->
     Result = do_update(Props, Update),
     case has_operators(Result) of
@@ -131,229 +115,6 @@ has_operators_arr([V | Rest]) ->
         false ->
             has_operators_arr(Rest)
     end.
-
-
-do_compare(Value, <<"$", _/binary>> = Op, Arg) ->
-    CompareFuns = [
-        % Comparison operators
-        {<<"$gt">>, fun do_compare_gt/2},
-        {<<"$gte">>, fun do_compare_gte/2},
-        {<<"$in">>, fun do_compare_in/2},
-        {<<"$lt">>, fun do_compare_lt/2},
-        {<<"$lte">>, fun do_compare_lte/2},
-        {<<"$ne">>, fun do_compare_ne/2},
-        {<<"$nin">>, fun do_compare_nin/2},
-
-        % Logical operators
-        {<<"$or">>, fun do_compare_or/2},
-        {<<"$and">>, fun do_compare_and/2},
-        {<<"$not">>, fun do_compare_not/2},
-        {<<"$nor">>, fun do_compare_nor/2},
-
-        % Element operators
-        {<<"$exists">>, fun do_compare_exists/2},
-        {<<"$type">>, fun do_compare_type/2},
-
-        % Evaluation operators
-        {<<"$mod">>, fun do_compare_mod/2},
-        {<<"$regex">>, fun do_compare_regex/2},
-        %{<<"$where">>, fun do_compare_where/2},
-
-        % Geospatial operators
-        %{<<"$geoWithin">>, fun do_compare_geo_within/2},
-        %{<<"$geoIntersects">>, fun do_compare_geo_intersects/2},
-        %{<<"$near">>, fun do_compare_near/2},
-        %{<<"$nearSphere">>, fun do_compare_near_sphere/2},
-
-        % Array operators
-        {<<"$all">>, fun do_compare_all/2},
-        {<<"$elemMatch">>, fun do_compare_elem_match/2},
-        {<<"$size">>, fun do_compare_size/2}
-    ],
-    case lists:keyfind(Op, 1, CompareFuns) of
-        {Op, Fun} ->
-            Fun(Value, Arg);
-        false ->
-            throw({comparison_operator_not_supported, Op})
-    end;
-do_compare(Value, Key, Arg) ->
-    SubValue = case get_field(Key, Value) of
-        not_found ->
-            undefined;
-        bad_path ->
-            % This doesn't seem right...
-            undefined;
-        Value ->
-            Value
-    end,
-    case Arg of
-        {_} ->
-            % If the argument is an object we
-            % have to recurse to apply all of our
-            % logic rules.
-            matches(SubValue, Arg);
-        Value ->
-            % If its not an object we can just do
-            % a straight up equality comparison.
-            cmp_json(SubValue, Arg) == 0
-    end.
-
-
-do_compare_gt(Value, Arg) ->
-    cmp_json(Value, Arg) == 1.
-
-
-do_compare_gte(Value, Arg) ->
-    cmp_json(Value, Arg) >= 0.
-
-
-do_compare_in(Value, Arg) when is_list(Arg) ->
-    lists:member(Value, Arg);
-do_compare_in(_, _) ->
-    false.
-
-
-do_compare_lt(Value, Arg) ->
-    cmp_json(Value, Arg) < 0.
-
-
-do_compare_lte(Value, Arg) ->
-    cmp_json(Value, Arg) =< 0.
-
-
-do_compare_ne(Value, Arg) ->
-    cmp_json(Value, Arg) /= 0.
-
-
-do_compare_nin(Value, Arg) when is_list(Arg) ->
-    not lists:member(Value, Arg);
-do_compare_nin(_, _) ->
-    false.
-
-
-do_compare_or(_, []) ->
-    false;
-do_compare_or(Value, [Cond | Rest]) ->
-    case matches(Value, Cond) of
-        true ->
-            true;
-        false ->
-            do_compare_or(Value, Rest)
-    end;
-do_compare_or(_, _) ->
-    false.
-
-
-do_compare_and(_, []) ->
-    true;
-do_compare_and(Value, [Cond | Rest]) ->
-    case matches(Value, Cond) of
-        true ->
-            do_compare_and(Value, Rest);
-        false ->
-            false
-    end;
-do_compare_and(_, _) ->
-    false.
-
-
-do_compare_not(Value, Cond) ->
-    not matches(Value, Cond).
-
-
-do_compare_nor(_, []) ->
-    true;
-do_compare_nor(Value, [Cond | Rest]) ->
-    case matches(Value, Cond) of
-        true ->
-            false;
-        false ->
-            do_compare_nor(Value, Rest)
-    end;
-do_compare_nor(_, _) ->
-    false.
-
-
-
-do_compare_exists(Value, ShouldExist) when is_boolean(ShouldExist) ->
-    Exists = Value /= undefined,
-    Exists == ShouldExist;
-do_compare_exists(_, _) ->
-    false.
-
-
-
-do_compare_type(_Value, _Arg) ->
-    % Fill this in later. Arg will be an integer
-    % referencing the BSON type so we'll need to
-    % write a mango_bson:type/1 function that takes
-    % EJSON and returns the integer.
-    throw(not_supported_yet_but_maybe_soon).
-
-
-do_compare_mod(Value, [Div, Rem])
-        when is_integer(Value), is_integer(Div), is_integer(Rem) ->
-    Value rem Div == Rem;
-do_compare_mod(_, _) ->
-    % Should this throw?
-    false.
-
-
-do_compare_regex(Value, {[{<<"$regex">>, R}, {<<"$options">>, O}]})
-        when is_binary(R), is_binary(O) ->
-    Opts = [{capture, none}], % TODO: write translate_options(O),
-    case is_binary(Value) of
-        true ->
-            try
-                match == re:run(Value, R, Opts)
-            catch _:_ ->
-                % Shoudl we raise here? Or not even bother
-                % catching this in the first place?
-                false
-            end;
-        false ->
-            false
-    end;
-do_compare_regex(Value, {[{<<"$options">>, O}, {<<"$regex">>, R}]}) ->
-    do_compare_regex(Value, {[{<<"$regex">>, R}, {<<"$options">>, O}]});
-do_compare_regex(Value, {[{<<"$regex">>, R}]}) ->
-    % Add this clause out of an overabundance of caution.
-    do_compare_regex(Value, {[{<<"$regex">>, R}, {<<"$options">>, <<>>}]});
-do_compare_regex(_, _) ->
-    % Shoudl this throw?
-    false.
-
-
-do_compare_all([], _) ->
-    true;
-do_compare_all([Value | Rest], Arg) ->
-    case matches(Value, Arg) of
-        true ->
-            do_compare_all(Rest, Arg);
-        false ->
-            false
-    end;
-do_compare_all(_, _) ->
-    false.
-
-
-do_compare_elem_match([], _) ->
-    false;
-do_compare_elem_match([Value | Rest], Arg) ->
-    case matches(Value, Arg) of
-        true ->
-            true;
-        false ->
-            do_compare_elem_match(Rest, Arg)
-    end;
-do_compare_elem_match(_, _) ->
-    false.
-
-
-do_compare_size(Values, Arg) when is_list(Values), is_integer(Arg) ->
-    length(Values) == Arg;
-do_compare_size(_, _) ->
-    false.
 
 
 do_update(Props, [{Op, Value} | Rest]) ->
@@ -506,7 +267,10 @@ do_update_pull_all(Props, [{Field, Values} | Rest]) ->
                 % return true for all elements we want to keep.
                 FilterFun = case has_operators(ValToRem) of
                     true ->
-                        fun(A) -> not matches(A, ValToRem) end;
+                        fun(A) ->
+                            Sel = mango_selector:normalize(ValToRem),
+                            not mango_selector:match(A, Sel)
+                        end;
                     false ->
                         fun(A) -> A /= ValToRem end
                 end,
@@ -773,12 +537,5 @@ set_elem(I, [Item | Rest], Value) when I > 1 ->
     [Item | set_elem(I-1, Rest, Value)].
 
 
-% Make sure anything compared to undefined returns
-% false. Kinda like nulls in SQL.
-cmp_json(undefined, _) ->
-    false;
-cmp_json(_, undefined) ->
-    false;
-cmp_json(A, B) ->
-    couch_view:cmp_json(A, B).
+
 

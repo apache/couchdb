@@ -2,7 +2,9 @@
 
 
 -export([
-    create/3
+    create/3,
+    list/2,
+    list/1
 ]).
 
 
@@ -36,6 +38,29 @@ create(DbName, {Opts0}, Ctx) ->
             end;
         Else ->
             Else
+    end.
+
+
+list(DbName, Ctx) ->
+    case mango_doc:open(DbName, ddoc_id([]), Ctx) of
+        {ok, DDoc} ->
+            list(DDoc);
+        not_found ->
+            []
+    end.
+
+
+list(#doc{body={Props}}) ->
+    case lists:keysearch(<<"language">>, 1, Props) of
+        {<<"language">>, <<"mongo">>} ->
+            case lists:keysearch(<<"views">>, 1, Props) of
+                {<<"views">>, Views} when is_list(Views) ->
+                    Views;
+                _ ->
+                    []
+            end;
+        _ ->
+            []
     end.
 
 
