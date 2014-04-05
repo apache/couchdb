@@ -23,7 +23,7 @@ define([
   "d3"
 ],
 
-function(utils) {
+function(utils, d3) {
 
   var Helpers = {};
 
