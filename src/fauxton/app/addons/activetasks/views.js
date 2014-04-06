@@ -74,7 +74,7 @@ function (app, FauxtonAPI, activetasks) {
       if (this.dataView) {
        this.dataView.update(currentData, this.model.get('currentView').replace('_',' '));
       } else {
-        this.dataView = this.insertView( new Views.TableData({ 
+        this.dataView = this.insertView( new Views.TableData({
           collection: currentData,
           currentView: this.model.get('currentView').replace('_',' ')
         }));
@@ -140,7 +140,7 @@ function (app, FauxtonAPI, activetasks) {
     beforeRender: function(){
       //iterate over the collection to add each
       this.collection.forEach(function(item) {
-        this.insertView("#tasks_go_here", new Views.TableDetail({ 
+        this.insertView("#tasks_go_here", new Views.TableDetail({
           model: item
         }));
       }, this);

@@ -21,34 +21,39 @@ function (app, FauxtonAPI, Activetasks, Views) {
 
   var  ActiveTasksRouteObject = FauxtonAPI.RouteObject.extend({
     layout: "with_sidebar",
+
     routes: {
       "activetasks/:id": "defaultView",
       "activetasks": "defaultView"
     },
+
     selectedHeader: 'Active Tasks',
+
     crumbs: [
-    {"name": "Active tasks", "link": "activetasks"}
+      {"name": "Active tasks", "link": "activetasks"}
     ],
-    apiUrl: function(){
+
+    apiUrl: function () {
       return [this.newtasks.url("apiurl"), this.newtasks.documentation];
-    }, 
+    },
 
     roles: ["_admin"],
 
-    defaultView: function(id){
+    defaultView: function (id) {
      this.newtasks = new Activetasks.Tasks({
-        currentView: "all", 
+        currentView: "all",
         id:'activeTasks'
       });
+
       this.setView("#sidebar-content", new Views.TabMenu({
         currentView: "all",
         model: this.newtasks
-      })); 
+      }));
 
       this.setView("#dashboard-content", new Views.DataSection({
         model: this.newtasks,
         currentView: "all"
-      })); 
+      }));
     }
   });
 

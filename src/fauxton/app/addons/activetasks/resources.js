@@ -23,7 +23,7 @@ function (app, backbone, Fauxton) {
       app.taskSortBy = 'type';
 
   Active.Task = Backbone.Model.extend({
-    initialize: function() { 
+    initialize: function () {
       this.set({"id": this.get('pid')});
     }
   });

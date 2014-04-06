@@ -17,13 +17,13 @@ define([
 ], function (FauxtonAPI, Views, Models, testUtils) {
   var assert = testUtils.assert,
       ViewSandbox = testUtils.ViewSandbox;
-  
+
   describe("TabMenu", function () {
     var tabMenu;
 
     beforeEach(function () {
       var newtasks = new Models.Tasks({
-        currentView: "all", 
+        currentView: "all",
         id:'activeTasks'
       });
 
@@ -37,7 +37,7 @@ define([
       var viewSandbox;
       beforeEach(function () {
         viewSandbox = new ViewSandbox();
-        viewSandbox.renderView(tabMenu); 
+        viewSandbox.renderView(tabMenu);
       });
 
       afterEach(function () {
@@ -76,7 +76,7 @@ define([
       var viewSandbox;
       beforeEach(function () {
         viewSandbox = new ViewSandbox();
-        viewSandbox.renderView(tabMenu); 
+        viewSandbox.renderView(tabMenu);
       });
 
       afterEach(function () {
@@ -105,7 +105,7 @@ define([
     var viewSandbox, dataSection;
     beforeEach(function () {
       var newtasks = new Models.Tasks({
-        currentView: "all", 
+        currentView: "all",
         id:'activeTasks'
       });
       newtasks.parse([]);
@@ -116,7 +116,7 @@ define([
       });
 
       viewSandbox = new ViewSandbox();
-      viewSandbox.renderView(dataSection); 
+      viewSandbox.renderView(dataSection);
     });
 
     afterEach(function () {
