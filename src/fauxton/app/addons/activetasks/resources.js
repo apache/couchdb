@@ -12,12 +12,10 @@
 
 define([
   "app",
-  "backbone",
   "addons/fauxton/base",
-  "d3"
 ],
 
-function (app, backbone, Fauxton) {
+function (app, Fauxton) {
   var Active = {},
       apiv = app.versionAPI;
       app.taskSortBy = 'type';
