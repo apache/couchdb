@@ -22,12 +22,12 @@
 
 %% legacy scheme, not used for new passwords.
 -spec simple(binary(), binary()) -> binary().
-simple(Password, Salt) ->
+simple(Password, Salt) when is_binary(Password), is_binary(Salt) ->
     ?l2b(couch_util:to_hex(crypto:sha(<<Password/binary, Salt/binary>>))).
 
 %% CouchDB utility functions
 -spec hash_admin_password(binary()) -> binary().
-hash_admin_password(ClearPassword) ->
+hash_admin_password(ClearPassword) when is_binary(ClearPassword) ->
     Iterations = config:get("couch_httpd_auth", "iterations", "10000"),
     Salt = couch_uuids:random(),
     DerivedKey = couch_passwords:pbkdf2(couch_util:to_binary(ClearPassword),
@@ -50,7 +50,10 @@ get_unhashed_admins() ->
 
 %% Current scheme, much stronger.
 -spec pbkdf2(binary(), binary(), integer()) -> binary().
-pbkdf2(Password, Salt, Iterations) ->
+pbkdf2(Password, Salt, Iterations) when is_binary(Password),
+                                        is_binary(Salt),
+                                        is_integer(Iterations),
+                                        Iterations > 0 ->
     {ok, Result} = pbkdf2(Password, Salt, Iterations, ?SHA1_OUTPUT_LENGTH),
     Result.
 
@@ -59,7 +62,11 @@ pbkdf2(Password, Salt, Iterations) ->
 pbkdf2(_Password, _Salt, _Iterations, DerivedLength)
     when DerivedLength > ?MAX_DERIVED_KEY_LENGTH ->
     {error, derived_key_too_long};
-pbkdf2(Password, Salt, Iterations, DerivedLength) ->
+pbkdf2(Password, Salt, Iterations, DerivedLength) when is_binary(Password),
+                                                       is_binary(Salt),
+                                                       is_integer(Iterations),
+                                                       Iterations > 0,
+                                                       is_integer(DerivedLength) ->
     L = ceiling(DerivedLength / ?SHA1_OUTPUT_LENGTH),
     <<Bin:DerivedLength/binary,_/binary>> =
         iolist_to_binary(pbkdf2(Password, Salt, Iterations, L, 1, [])),

@@ -368,10 +368,27 @@ authenticate(Pass, UserProps) ->
             couch_util:get_value(<<"password_sha">>, UserProps, nil)};
         <<"pbkdf2">> ->
             Iterations = couch_util:get_value(<<"iterations">>, UserProps, 10000),
+            verify_iterations(Iterations),
             {couch_passwords:pbkdf2(Pass, UserSalt, Iterations),
              couch_util:get_value(<<"derived_key">>, UserProps, nil)}
     end,
     couch_passwords:verify(PasswordHash, ExpectedHash).
+
+verify_iterations(Iterations) when is_integer(Iterations) ->
+    Min = list_to_integer(config:get("couch_httpd_auth", "min_iterations", "1")),
+    Max = list_to_integer(config:get("couch_httpd_auth", "max_iterations", "1000000000")),
+    case Iterations < Min of
+        true ->
+            throw({forbidden, <<"Iteration count is too low for this server">>});
+        false ->
+            ok
+    end,
+    case Iterations > Max of
+        true ->
+            throw({forbidden, <<"Iteration count is too high for this server">>});
+        false ->
+            ok
+    end.
 
 auth_name(String) when is_list(String) ->
     [_,_,_,_,_,Name|_] = re:split(String, "[\\W_]", [{return, list}]),
