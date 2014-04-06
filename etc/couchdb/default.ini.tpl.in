@@ -67,6 +67,8 @@ timeout = 600 ; number of seconds before automatic logout
 auth_cache_size = 50 ; size is number of cache entries
 allow_persistent_cookies = false ; set to true to allow persistent cookies
 iterations = 10000 ; iterations for password hashing
+; min_iterations = 1
+; max_iterations = 1000000000
 
 [cors]
 credentials = false
