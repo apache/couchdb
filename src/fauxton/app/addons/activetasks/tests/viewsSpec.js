@@ -10,11 +10,11 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 define([
-       'api',
-       'addons/activetasks/views',
-       'addons/activetasks/resources',
-      'testUtils'
-], function (FauxtonAPI, Views, Models, testUtils) {
+        'api',
+        'addons/activetasks/views',
+        'addons/activetasks/resources',
+        'testUtils'
+], function (FauxtonAPI, Views, Activetasks, testUtils) {
   var assert = testUtils.assert,
       ViewSandbox = testUtils.ViewSandbox;
 
@@ -22,15 +22,7 @@ define([
     var tabMenu;
 
     beforeEach(function () {
-      var newtasks = new Models.Tasks({
-        currentView: "all",
-        id:'activeTasks'
-      });
-
-      tabMenu = new Views.TabMenu({
-        currentView: "all",
-        model: newtasks
-      });
+      tabMenu = new Views.TabMenu({});
     });
 
     describe("on change polling rate", function () {
@@ -73,50 +65,48 @@ define([
     });
 
     describe('on request by type', function () {
-      var viewSandbox;
+      var viewSandbox, mainView;
       beforeEach(function () {
+
+        mainView = new Views.View({
+          collection: new Activetasks.AllTasks(),
+          currentView: "all"
+        });
+
         viewSandbox = new ViewSandbox();
         viewSandbox.renderView(tabMenu);
+        viewSandbox.renderView(mainView);
       });
 
       afterEach(function () {
         viewSandbox.remove();
       });
 
-      it("should change model view", function () {
-        var spy = sinon.spy(tabMenu.model, 'changeView');
+      it("should set the filter the main-view", function () {
         var $rep = tabMenu.$('li[data-type="replication"]');
         $rep.click();
-        assert.ok(spy.calledOnce);
+        assert.equal("replication", mainView.filter);
       });
 
       it("should set correct active tab", function () {
-        var spy = sinon.spy(tabMenu.model, 'changeView');
         var $rep = tabMenu.$('li[data-type="replication"]');
         $rep.click();
         assert.ok($rep.hasClass('active'));
       });
-
     });
 
   });
 
   describe('DataSection', function () {
-    var viewSandbox, dataSection;
+    var viewSandbox, mainView;
     beforeEach(function () {
-      var newtasks = new Models.Tasks({
-        currentView: "all",
-        id:'activeTasks'
-      });
-      newtasks.parse([]);
-
-      dataSection = new Views.DataSection({
-        currentView: "all",
-        model: newtasks
+      mainView = new Views.View({
+        collection: new Activetasks.AllTasks(),
+        currentView: "all"
       });
 
       viewSandbox = new ViewSandbox();
-      viewSandbox.renderView(dataSection);
+      viewSandbox.renderView(mainView);
     });
 
     afterEach(function () {
@@ -127,7 +117,7 @@ define([
 
       it('Should set polling interval', function () {
         var spy = sinon.spy(window, 'setInterval');
-        dataSection.setPolling();
+        mainView.setPolling();
         assert.ok(spy.calledOnce);
       });
 
