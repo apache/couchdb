@@ -11,16 +11,16 @@
 // the License.
 
 define([
-       "app",
-       "api",
-       "addons/activetasks/resources"
+        "app",
+        "api",
+        "addons/activetasks/resources"
 ],
 
-function (app, FauxtonAPI, activetasks) {
+function (app, FauxtonAPI, ActiveTasks) {
 
   var Views = {},
       Events = {},
-      pollingInfo ={
+      pollingInfo = {
         rate: "5",
         intervalId: null
       };
@@ -28,23 +28,105 @@ function (app, FauxtonAPI, activetasks) {
 
   Views.Events = _.extend(Events, Backbone.Events);
 
+  Views.View = FauxtonAPI.View.extend({
+    tagName: "table",
+
+    className: "table table-bordered table-striped active-tasks",
+
+    template: "addons/activetasks/templates/table",
+
+    events: {
+      "click th": "sortByType"
+    },
+
+    filter: "all",
+
+    initialize: function (options) {
+      ActiveTasks.events.on("tasks:filter", this.filterAndRender, this);
+      this.collection.bind("reset", _.bind(this.render, this));
+    },
+
+    beforeRender: function () {
+      this.filterAndRender(this.filter);
+    },
+
+    filterAndRender: function (view) {
+      var self = this;
+      this.filter = view;
+      this.removeView("#tasks_go_here");
+
+      this.collection.forEach(function (item) {
+        if (self.filter !== "all" && item.get("type") !== self.filter) {
+          return;
+        }
+        var view = new Views.TableDetail({
+          model: item
+        });
+        this.insertView("#tasks_go_here", view).render();
+      }, this);
+    },
+
+    afterRender: function () {
+      Events.bind("update:poll", this.setPolling, this);
+      this.setPolling();
+    },
+
+    establish: function () {
+      return [this.collection.fetch()];
+    },
+
+    serialize: function () {
+      return {
+        currentView: this.currentView,
+        collection: this.collection
+      };
+    },
+
+    sortByType: function (e) {
+      var currentTarget = e.currentTarget,
+          datatype = $(currentTarget).attr("data-type");
+
+      this.collection.sortByColumn(datatype);
+      this.render();
+    },
+
+    setPolling: function () {
+      var self = this;
+      clearInterval(pollingInfo.intervalId);
+      pollingInfo.intervalId = setInterval(function () {
+        self.collection.fetch({reset: true});
+      }, pollingInfo.rate * 1000);
+    },
+
+    cleanup: function () {
+      clearInterval(pollingInfo.intervalId);
+    }
+  });
+
   Views.TabMenu = FauxtonAPI.View.extend({
     template: "addons/activetasks/templates/tabs",
+
     events: {
       "click .task-tabs li": "requestByType",
       "change #pollingRange": "changePollInterval"
     },
-    establish: function(){
-      return [this.model.fetch({reset: true})];
-    },
-    serialize: function(){
+
+    serialize: function () {
       return {
-        filters: this.model.alltypes
+        filters: {
+          "all": "All tasks",
+          "replication": "Replication",
+          "database_compaction":" Database Compaction",
+          "indexer": "Indexer",
+          "view_compaction": "View Compaction"
+        }
       };
     },
+
     afterRender: function(){
       this.$('.task-tabs').find('li').eq(0).addClass('active');
     },
+
     changePollInterval: function(e){
       var range = this.$(e.currentTarget).val();
       this.$('label[for="pollingRange"] span').text(range);
@@ -63,96 +145,20 @@ function (app, FauxtonAPI, activetasks) {
 
       this.$('.task-tabs').find('li').removeClass('active');
       this.$(currentTarget).addClass('active');
-      this.model.changeView(datatype);
-    }
-  });
 
-  Views.DataSection = FauxtonAPI.View.extend({
-    showData: function(){
-      var currentData = this.model.getCurrentViewData();
-
-      if (this.dataView) {
-       this.dataView.update(currentData, this.model.get('currentView').replace('_',' '));
-      } else {
-        this.dataView = this.insertView( new Views.TableData({
-          collection: currentData,
-          currentView: this.model.get('currentView').replace('_',' ')
-        }));
-      }
-    },
-    showDataAndRender: function () {
-      this.showData();
-      this.dataView.render();
-    },
-
-    beforeRender: function () {
-      this.showData();
-    },
-    establish: function(){
-      return [this.model.fetch()];
-    },
-    setPolling: function(){
-      var that = this;
-      clearInterval(pollingInfo.intervalId);
-      pollingInfo.intervalId = setInterval(function() {
-        that.establish();
-      }, pollingInfo.rate*1000);
-    },
-    cleanup: function(){
-      clearInterval(pollingInfo.intervalId);
-    },
-    afterRender: function(){
-      this.listenTo(this.model, "change", this.showDataAndRender);
-      Events.bind('update:poll', this.setPolling, this);
-      this.setPolling();
-    }
-  });
-
-  Views.TableData = FauxtonAPI.View.extend({
-    tagName: "table",
-    className: "table table-bordered table-striped active-tasks",
-    template: "addons/activetasks/templates/table",
-    events: {
-      "click th": "sortByType"
-    },
-    initialize: function(){
-      currentView = this.options.currentView;
-    },
-    sortByType:  function(e){
-      var currentTarget = e.currentTarget,
-          datatype = $(currentTarget).attr("data-type");
-
-      this.collection.sortByColumn(datatype);
-      this.render();
-    },
-    serialize: function(){
-      return {
-        currentView: currentView,
-        collection: this.collection
-      };
-    },
-
-    update: function (collection, currentView) {
-      this.collection = collection;
-      this.currentView = currentView;
-    },
-
-    beforeRender: function(){
-      //iterate over the collection to add each
-      this.collection.forEach(function(item) {
-        this.insertView("#tasks_go_here", new Views.TableDetail({
-          model: item
-        }));
-      }, this);
+      ActiveTasks.events.trigger("tasks:filter", datatype);
     }
   });
 
   Views.TableDetail = FauxtonAPI.View.extend({
     tagName: 'tr',
+
     template: "addons/activetasks/templates/tabledetail",
+
     initialize: function(){
       this.type = this.model.get('type');
     },
+
     getObject: function(){
       var objectField = this.model.get('database');
       if (this.type === "replication"){
@@ -160,6 +166,7 @@ function (app, FauxtonAPI, activetasks) {
       }
       return objectField;
     },
+
     getProgress:  function(){
       var progress = "";
       if (this.type === "indexer"){
@@ -182,6 +189,7 @@ function (app, FauxtonAPI, activetasks) {
 
       return progress;
     },
+
     serialize: function(){
       return {
         model: this.model,
@@ -190,8 +198,6 @@ function (app, FauxtonAPI, activetasks) {
       };
     }
   });
-
-
 
   return Views;
 });
