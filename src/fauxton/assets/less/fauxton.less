@@ -367,30 +367,51 @@ table.databases {
       &:hover .burger div{
         background-color: @orange;
       }
-    .brand {
-      .box-sizing(content-box);
-      .hide-text;
-      .customTransition(left, 1s, 0.805, 0.005, 0.165, 0.985);
-      margin: 10px 0 0 0;
-      width: 200px;
-      height: 40px;
-      padding: 10px;
-      position: fixed;
-      bottom: 0;
-      background: #3a2c2b;
-      .icon{
-        .box-sizing(content-box);
-        background: url(../img/couchdb-site.png) no-repeat 0 0;
-        display: block;
-        height: 100%;
-        width: 100%; 
-      }
-      .closeMenu & {
-        .icon {
-          background: url(../img/minilogo.png) no-repeat 0 0;
-        }
-        width: 45px;
-      }
+      .bottom-container {
+	     height: 110px;
+	     position: fixed;
+	     bottom: 0;
+	     width: 220px;
+	     background: #3a2c2b;
+       .brand {
+         .box-sizing(content-box);
+         .hide-text;
+         .customTransition(left, 1s, 0.805, 0.005, 0.165, 0.985);
+         margin: 10px 0 0 0;
+         width: 200px;
+         height: 40px;
+         padding: 10px;
+         float: none;
+         background: #3a2c2b;
+         .icon {
+           .box-sizing(content-box);
+           background: url(../img/couchdb-site.png) no-repeat 0 0;
+           display: block;
+           height: 100%;
+           width: 100%; 
+         }
+         .closeMenu & {
+           .icon {
+              background: url(../img/minilogo.png) no-repeat 0 0;
+            }
+            width: 45px;
+          }
+       }
+       #footer-nav-links {
+	     li {
+		   a {
+		     font-size: 12px;
+		     color: @red;
+		     padding: 12px;
+		     text-shadow: none;
+		   }
+		   &.active, &:hover{
+             a {
+               text-decoration: underline;
+             }
+           }
+		 } 
+       }
     }
     nav {
       margin-top: 46px;
@@ -467,6 +488,7 @@ table.databases {
             color: @red;
           }
         }
+        
       }
       ul#bottom-nav-links{
         margin-top: 0;
