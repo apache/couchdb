@@ -43,6 +43,9 @@ function (app, FauxtonAPI, ActiveTasks) {
 
     initialize: function (options) {
       ActiveTasks.events.on("tasks:filter", this.filterAndRender, this);
+      ActiveTasks.events.on("tasks:sort", function (type) {
+        this.sortView(type);
+      }, this);
       this.collection.bind("reset", _.bind(this.render, this));
     },
 
@@ -86,6 +89,10 @@ function (app, FauxtonAPI, ActiveTasks) {
       var currentTarget = e.currentTarget,
           datatype = $(currentTarget).attr("data-type");
 
+      this.sortView(datatype);
+    },
+
+    sortView: function (datatype) {
       this.collection.sortByColumn(datatype);
       this.render();
     },
@@ -107,7 +114,8 @@ function (app, FauxtonAPI, ActiveTasks) {
     template: "addons/activetasks/templates/tabs",
 
     events: {
-      "click .task-tabs li": "requestByType",
+      "click .js-filter-tabs li": "requestByType",
+      "click .js-sort-tabs li": "sort",
       "change #pollingRange": "changePollInterval"
     },
 
@@ -119,7 +127,14 @@ function (app, FauxtonAPI, ActiveTasks) {
           "database_compaction":" Database Compaction",
           "indexer": "Indexer",
           "view_compaction": "View Compaction"
-        }
+        },
+        sorters: {
+          "target": "Target",
+          "type": "Type",
+          "source": "Source",
+          "progress": "Progress",
+          "database": "Database"
+        },
       };
     },
 
@@ -147,6 +162,18 @@ function (app, FauxtonAPI, ActiveTasks) {
       this.$(currentTarget).addClass('active');
 
       ActiveTasks.events.trigger("tasks:filter", datatype);
+    },
+
+    sort: function (e) {
+      e.preventDefault();
+
+      var currentTarget = e.currentTarget,
+          datatype = this.$(currentTarget).attr("data-type");
+
+      this.$('.js-sort-tabs').find('li').removeClass('active');
+      this.$(currentTarget).addClass('active');
+
+      ActiveTasks.events.trigger("tasks:sort", datatype);
     }
   });
 

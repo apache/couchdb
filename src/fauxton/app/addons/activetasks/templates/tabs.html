@@ -17,30 +17,47 @@ the License.
 
 
 <div id="sidenav">
-  <header class="row-fluid">
-    <h3>Filter by: </h3>
-  </header>
-
-  <nav>
-		<ul class="task-tabs nav nav-list">
-		  <% for (var filter in filters) { %>
-		      <li data-type="<%=filter%>">
-			      <a>
-			      		<%=filters[filter]%>
-			      </a>
-		    </li>
-		  <% } %>
-		</ul>
-		<ul class="nav nav-list views">
-			<li class="nav-header">Polling interval</li>
-			<li>
-				<input id="pollingRange" type="range"
-				       min="1"
-				       max="30"
-				       step="1"
-				       value="5"/>
-				<label for="pollingRange"><span>5</span> second(s)</label>
-			</li>
-		</ul>
-  </nav>
+  <section>
+    <header class="row-fluid">
+      <h3>Filter by: </h3>
+    </header>
+    <nav>
+      <ul class="js-filter-tabs task-tabs nav nav-list">
+        <% for (var filter in filters) { %>
+            <li data-type="<%=filter%>">
+              <a>
+                  <%=filters[filter]%>
+              </a>
+          </li>
+        <% } %>
+      </ul>
+    </nav>
+  </section>
+  <section>
+    <header class="row-fluid">
+      <h3>Sort: </h3>
+    </header>
+    <nav>
+      <ul class="js-sort-tabs task-tabs nav nav-list">
+        <% for (var sorter in sorters) { %>
+            <li data-type="<%= sorter %>">
+              <a>
+                <%=sorters[sorter]%>
+              </a>
+          </li>
+        <% } %>
+      </ul>
+      <ul class="nav nav-list views">
+        <li class="nav-header">Polling interval</li>
+        <li>
+          <input id="pollingRange" type="range"
+                 min="1"
+                 max="30"
+                 step="1"
+                 value="5"/>
+          <label for="pollingRange"><span>5</span> second(s)</label>
+        </li>
+      </ul>
+    </nav>
+  </section>
 </div>
