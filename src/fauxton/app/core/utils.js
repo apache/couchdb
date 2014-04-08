@@ -12,7 +12,7 @@
 
 
 // This file creates a set of helper functions that will be loaded for all html
-// templates. These functions should be self contained and not rely on any 
+// templates. These functions should be self contained and not rely on any
 // external dependencies as they are loaded prior to the application. We may
 // want to change this later, but for now this should be thought of as a
 // "purely functional" helper system.
@@ -58,7 +58,7 @@ function($, _ ) {
 
     addWindowResize: function(fun, key){
       onWindowResize[key]=fun;
-      // You shouldn't need to call it here. Just define it at startup and each time it will loop 
+      // You shouldn't need to call it here. Just define it at startup and each time it will loop
       // through all the functions in the hash.
       //app.initWindowResize();
     },
@@ -84,7 +84,7 @@ function($, _ ) {
 
     safeURLName: function(name){
       var testName = name || "";
-      var checkforBad = testName.match(/[\$\-/_,+-]/g);
+      var checkforBad = testName.match(/[\$\-/,+-]/g);
       return (checkforBad !== null)?encodeURIComponent(name):name;
     }
   };
