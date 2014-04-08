@@ -1,1 +1,2 @@
 
+-define(MAX_DOC_SIZE, 16#1000000). % 16M

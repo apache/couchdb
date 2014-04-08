@@ -60,11 +60,15 @@ is_upsert(Msg) ->
 
 
 find_doc(DbName, Selector, Ctx) ->
-    case Selector of
-        {[{<<"_id">>, DocId}]} ->
-            mango_doc:open(DbName, DocId, Ctx);
-        _ ->
-            throw(unsupported_doc_selector)
+    Opts = [{limit, 1}],
+    {ok, Cursor} = mango_cursor:create(DbName, Selector, Opts, Ctx),
+    case mango_cursor:next(Cursor) of
+        {ok, [Doc]} ->
+            Doc;
+        {ok, []} ->
+            not_found;
+        Error ->
+            throw(Error)
     end.
 
 

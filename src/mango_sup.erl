@@ -13,6 +13,15 @@ start_link() ->
 
 
 init(_Arg) ->
-    Children = [],
+    Children = [
+        {
+            mango_cursor_sup,
+            {mango_cursor_sup, start_link, []},
+            permanent,
+            infinity,
+            supervisor,
+            [mango_cursor_sup]
+        }
+    ],
     {ok, {{one_for_one, 10, 1}, Children}}.
 

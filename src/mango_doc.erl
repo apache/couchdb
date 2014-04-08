@@ -3,6 +3,7 @@
 
 -export([
     open/3,
+    open_ddocs/2,
     save/3,
 
     from_bson/1,
@@ -33,6 +34,19 @@ open(DbName, DocId, Ctx) ->
             throw(Error)
     catch error:database_does_not_exist ->
         not_found
+    end.
+
+
+open_ddocs(DbName, _Ctx) ->
+    try mango_util:defer(fabric, design_docs, [DbName]) of
+        {ok, Docs} ->
+            {ok, Docs};
+        {error, Reason} ->
+            throw(Reason);
+        Error ->
+            throw(Error)
+    catch error:database_does_not_exist ->
+        {ok, []}
     end.
 
 
@@ -535,7 +549,3 @@ set_elem(1, [_ | Rest], Value) ->
     [Value | Rest];
 set_elem(I, [Item | Rest], Value) when I > 1 ->
     [Item | set_elem(I-1, Rest, Value)].
-
-
-
-

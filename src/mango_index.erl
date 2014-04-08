@@ -1,40 +1,83 @@
 -module(mango_index).
 
+-export([
+    dbname/1,
+    ddoc/1,
+    name/1,
+    type/1,
+    cursor_mod/1,
+    columns/1
+]).
 
 -export([
     create/3,
-    list/2,
-    list/1
+    list/2
 ]).
 
 
 -include_lib("couch/include/couch_db.hrl").
 
 
+-record(idx, {
+    dbname,
+    ddoc,
+    name,
+    type,
+    def
+}).
+
+
+dbname(#idx{dbname=DbName}) ->
+    DbName.
+
+
+ddoc(#idx{ddoc=DDoc}) ->
+    DDoc.
+
+
+name(#idx{name=Name}) ->
+    Name.
+
+
+type(#idx{type=Type}) ->
+    Type.
+
+
+cursor_mod(#idx{type=view}) ->
+    mango_cursor_view.
+
+
+columns(#idx{type=view, def={Props}}) ->
+    {<<"map">>, {MapProps}} = lists:keysearch(<<"map">>, 1, Props),
+    {<<"key">>, {KeyProps}} = lists:keysearch(<<"key">>, 1, MapProps),
+    [Key || {Key, _Dir} <- KeyProps].
+
+
 create(DbName, {Opts0}, Ctx) ->
     Opts = validate_opts(Opts0),
-    twig:log(err, "Valid Opts: ~p", [Opts]),
     DDoc = case mango_doc:open(DbName, ddoc_id(Opts0), Ctx) of
         {ok, DDoc0} ->
             DDoc0;
         not_found ->
             #doc{id = ddoc_id(Opts0), body = {[]}}
     end,
-    twig:log(err, "DDoc: ~p", [DDoc]),
     case add_index(DDoc, Opts) of
         DDoc ->
             ok;
         #doc{}=NewDDoc ->
-            twig:log(err, "New DDoc: ~s ~p", [DbName, NewDDoc]),
-            case mango_doc:save(DbName, NewDDoc, Ctx) of
-                {ok, _} ->
+            Results = case mango_doc:save(DbName, NewDDoc, Ctx) of
+                {ok, Results0} ->
+                    Results0;
+                {accepted, Results0} ->
+                    Results0;
+                {error, Results0} ->
+                    Results0
+            end,
+            case Results of
+                [{ok, _Rev}] ->
                     ok;
-                {accepted, _} ->
-                    twig:log(err, "saved accepted", []),
-                    ok;
-                {error, [Error]} ->
-                    twig:log(err, "saved error ~p", [Error]),
-                    {error, {doc_update_error, NewDDoc#doc.id, Error}}
+                [Error] ->
+                    throw({error, {doc_update_error, NewDDoc#doc.id, Error}})
             end;
         Else ->
             Else
@@ -42,24 +85,12 @@ create(DbName, {Opts0}, Ctx) ->
 
 
 list(DbName, Ctx) ->
-    case mango_doc:open(DbName, ddoc_id([]), Ctx) of
-        {ok, DDoc} ->
-            list(DDoc);
+    case mango_doc:open_ddocs(DbName, Ctx) of
+        {ok, DDocs} ->
+            lists:foldl(fun(Doc, Acc) ->
+                list_doc_indexes(DbName, Doc) ++ Acc
+            end, [], DDocs);
         not_found ->
-            []
-    end.
-
-
-list(#doc{body={Props}}) ->
-    case lists:keysearch(<<"language">>, 1, Props) of
-        {<<"language">>, <<"mongo">>} ->
-            case lists:keysearch(<<"views">>, 1, Props) of
-                {<<"views">>, Views} when is_list(Views) ->
-                    Views;
-                _ ->
-                    []
-            end;
-        _ ->
             []
     end.
 
@@ -104,6 +135,40 @@ ddoc_id(Opts) ->
             <<"_design/", Id/binary>>;
         _ ->
             <<"_design/mongo">>
+    end.
+
+
+list_doc_indexes(DbName, Doc) ->
+    % This is a bit silly but I'm planning ahead for
+    % when we have Geo/Lucene based indices.
+    ListFuns = [
+        fun list_views/2
+    ],
+    lists:foldl(fun(Fun, Acc) ->
+        Fun(DbName, Doc) ++ Acc
+    end, ListFuns).
+
+
+list_views(DbName, #doc{body={Props}}=Doc) ->
+    case lists:keysearch(<<"language">>, 1, Props) of
+        {<<"language">>, <<"mongo">>} ->
+            case lists:keysearch(<<"views">>, 1, Props) of
+                {<<"views">>, {Views}} when is_list(Views) ->
+                    lists:foldl(fun({Name, View}, InAcc) ->
+                        I = #idx{
+                            dbname=DbName,
+                            ddoc = Doc,
+                            type = view,
+                            name = Name,
+                            def = View
+                        },
+                        [I | InAcc]
+                    end, [], Views);
+                _ ->
+                    []
+            end;
+        _ ->
+            []
     end.
 
 
