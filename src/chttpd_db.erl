@@ -851,7 +851,11 @@ update_doc(#httpd{user_ctx=Ctx} = Req, Db, DocId, #doc{deleted=Deleted}=Doc,
         _ ->
             [UpdateType, {user_ctx,Ctx}, {w,W}]
         end,
+    {HttpCode, ResponseHeaders, Body} = update_doc_int(Db, DocId,
+        #doc{deleted=Deleted}=Doc, Headers, Options),
+    send_json(Req, HttpCode, ResponseHeaders, Body).
 
+update_doc_int(Db, DocId, #doc{deleted=Deleted}=Doc, Headers, Options) ->
     {_, Ref} = spawn_monitor(fun() ->
         try fabric:update_doc(Db, Doc, Options) of
             Resp ->
@@ -892,11 +896,8 @@ update_doc(#httpd{user_ctx=Ctx} = Req, Db, DocId, #doc{deleted=Deleted}=Doc,
     {false, false} ->
         HttpCode = 201
     end,
-    send_json(Req, HttpCode, ResponseHeaders, {[
-        {ok, true},
-        {id, DocId},
-        {rev, NewRevStr}
-    ]}).
+    Body = {[{ok, true}, {id, DocId}, {rev, NewRevStr}]},
+    {HttpCode, ResponseHeaders, Body}.
 
 couch_doc_from_req(Req, DocId, #doc{revs=Revs} = Doc) ->
     validate_attachment_names(Doc),
