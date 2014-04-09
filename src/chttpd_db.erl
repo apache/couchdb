@@ -17,7 +17,8 @@
 -export([handle_request/1, handle_compact_req/2, handle_design_req/2,
     db_req/2, couch_doc_open/4,handle_changes_req/2,
     update_doc_result_to_json/1, update_doc_result_to_json/2,
-    handle_design_info_req/3, handle_view_cleanup_req/2]).
+    handle_design_info_req/3, handle_view_cleanup_req/2,
+    update_doc/4, http_code_from_status/1]).
 
 -import(chttpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
@@ -548,7 +549,7 @@ db_doc_req(#httpd{method='DELETE'}=Req, Db, DocId) ->
     Rev ->
         Body = {[{<<"_rev">>, ?l2b(Rev)},{<<"_deleted">>,true}]}
     end,
-    update_doc(Req, Db, DocId, couch_doc_from_req(Req, DocId, Body));
+    send_updated_doc(Req, Db, DocId, couch_doc_from_req(Req, DocId, Body));
 
 db_doc_req(#httpd{method='GET'}=Req, Db, DocId) ->
     #doc_query_args{
@@ -668,7 +669,7 @@ db_doc_req(#httpd{method='PUT', user_ctx=Ctx}=Req, Db, DocId) ->
                 fun() -> receive_request_data(Req) end),
         Doc = couch_doc_from_req(Req, DocId, Doc0),
         try
-            Result = update_doc(Req, Db, DocId, Doc, RespHeaders, UpdateType),
+            Result = send_updated_doc(Req, Db, DocId, Doc, RespHeaders, UpdateType),
             WaitFun(),
             Result
         catch throw:Err ->
@@ -698,7 +699,7 @@ db_doc_req(#httpd{method='PUT', user_ctx=Ctx}=Req, Db, DocId) ->
             % normal
             Body = chttpd:json_body(Req),
             Doc = couch_doc_from_req(Req, DocId, Body),
-            update_doc(Req, Db, DocId, Doc, RespHeaders, UpdateType)
+            send_updated_doc(Req, Db, DocId, Doc, RespHeaders, UpdateType)
         end
     end;
 
@@ -833,13 +834,13 @@ update_doc_result_to_json(DocId, Error) ->
     {[{id, DocId}, {error, ErrorStr}, {reason, Reason}]}.
 
 
-update_doc(Req, Db, DocId, Json) ->
-    update_doc(Req, Db, DocId, Json, []).
+send_updated_doc(Req, Db, DocId, Json) ->
+    send_updated_doc(Req, Db, DocId, Json, []).
 
-update_doc(Req, Db, DocId, Doc, Headers) ->
-    update_doc(Req, Db, DocId, Doc, Headers, interactive_edit).
+send_updated_doc(Req, Db, DocId, Doc, Headers) ->
+    send_updated_doc(Req, Db, DocId, Doc, Headers, interactive_edit).
 
-update_doc(#httpd{user_ctx=Ctx} = Req, Db, DocId, #doc{deleted=Deleted}=Doc,
+send_updated_doc(#httpd{user_ctx=Ctx} = Req, Db, DocId, #doc{deleted=Deleted}=Doc,
         Headers, UpdateType) ->
     W = couch_httpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
     Options =
@@ -851,11 +852,23 @@ update_doc(#httpd{user_ctx=Ctx} = Req, Db, DocId, #doc{deleted=Deleted}=Doc,
         _ ->
             [UpdateType, {user_ctx,Ctx}, {w,W}]
         end,
-    {HttpCode, ResponseHeaders, Body} = update_doc_int(Db, DocId,
-        #doc{deleted=Deleted}=Doc, Headers, Options),
+    {Status, {etag, Etag}, Body} = update_doc(Db, DocId,
+        #doc{deleted=Deleted}=Doc, Options),
+    HttpCode = http_code_from_status(Status),
+    ResponseHeaders = [{"Etag", Etag} | Headers],
     send_json(Req, HttpCode, ResponseHeaders, Body).
 
-update_doc_int(Db, DocId, #doc{deleted=Deleted}=Doc, Headers, Options) ->
+http_code_from_status(Status) ->
+    case Status of
+        accepted ->
+            202;
+        created ->
+            201;
+        ok ->
+            200
+    end.
+
+update_doc(Db, DocId, #doc{deleted=Deleted}=Doc, Options) ->
     {_, Ref} = spawn_monitor(fun() ->
         try fabric:update_doc(Db, Doc, Options) of
             Resp ->
@@ -887,17 +900,17 @@ update_doc_int(Db, DocId, #doc{deleted=Deleted}=Doc, Headers, Options) ->
         Accepted = true
     end,
     NewRevStr = couch_doc:rev_to_str(NewRev),
-    ResponseHeaders = [{"Etag", <<"\"", NewRevStr/binary, "\"">>} | Headers],
-    case {Accepted, Deleted} of
-    {true, _} ->
-        HttpCode = 202;
-    {false, true} ->
-        HttpCode = 200;
-    {false, false} ->
-        HttpCode = 201
+    Etag = <<"\"", NewRevStr/binary, "\"">>,
+    Status = case {Accepted, Deleted} of
+        {true, _} ->
+            accepted;
+        {false, true} ->
+            ok;
+        {false, false} ->
+            created
     end,
     Body = {[{ok, true}, {id, DocId}, {rev, NewRevStr}]},
-    {HttpCode, ResponseHeaders, Body}.
+    {Status, {etag, Etag}, Body}.
 
 couch_doc_from_req(Req, DocId, #doc{revs=Revs} = Doc) ->
     validate_attachment_names(Doc),
