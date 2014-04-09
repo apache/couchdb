@@ -42,27 +42,31 @@ function (app, FauxtonAPI, ActiveTasks) {
     filter: "all",
 
     initialize: function (options) {
-      ActiveTasks.events.on("tasks:filter", this.filterAndRender, this);
-      this.collection.bind("reset", _.bind(this.render, this));
+      this.listenTo(ActiveTasks.events, "tasks:filter", this.filterAndRender);
+      this.listenTo(this.collection, "reset", this.render);
     },
 
     beforeRender: function () {
-      this.filterAndRender(this.filter);
+      this.filterAndInsertView(this.filter);
     },
 
     filterAndRender: function (view) {
-      var self = this;
       this.filter = view;
-      this.removeView("#tasks_go_here");
+      this.render();
+    },
+
+    filterAndInsertView: function () {
+      var that = this;
+      this.removeView(".js-tasks-go-here");
 
       this.collection.forEach(function (item) {
-        if (self.filter !== "all" && item.get("type") !== self.filter) {
+        if (that.filter !== "all" && item.get("type") !== that.filter) {
           return;
         }
         var view = new Views.TableDetail({
           model: item
         });
-        this.insertView("#tasks_go_here", view).render();
+        this.insertView(".js-tasks-go-here", view);
       }, this);
     },
 
@@ -84,17 +88,18 @@ function (app, FauxtonAPI, ActiveTasks) {
 
     sortByType: function (e) {
       var currentTarget = e.currentTarget,
-          datatype = $(currentTarget).attr("data-type");
+          datatype = this.$(currentTarget).attr("data-type");
 
       this.collection.sortByColumn(datatype);
       this.render();
     },
 
     setPolling: function () {
-      var self = this;
+      var collection = this.collection;
+
       clearInterval(pollingInfo.intervalId);
       pollingInfo.intervalId = setInterval(function () {
-        self.collection.fetch({reset: true});
+        collection.fetch({reset: true});
       }, pollingInfo.rate * 1000);
     },
 

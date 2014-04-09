@@ -40,7 +40,7 @@ function (app, FauxtonAPI, Activetasks, Views) {
     roles: ["_admin"],
 
     initialize: function () {
-      this.allTasks = new Activetasks.AllTasks({currentView: "all"});
+      this.allTasks = new Activetasks.AllTasks();
     },
 
     defaultView: function () {

@@ -25,9 +25,7 @@ function (app, Fauxton) {
   _.extend(Active.events, Backbone.Events);
 
   Active.Task = Backbone.Model.extend({
-    initialize: function () {
-      this.set({"id": this.get('pid')});
-    }
+    idAttribute: "pid"
   });
 
   Active.AllTasks = Backbone.Collection.extend({

@@ -69,7 +69,7 @@ define([
       beforeEach(function () {
 
         mainView = new Views.View({
-          collection: new Activetasks.AllTasks({currentView: "all"}),
+          collection: new Activetasks.AllTasks(),
           currentView: "all"
         });
 
@@ -101,7 +101,7 @@ define([
     var viewSandbox, mainView;
     beforeEach(function () {
       mainView = new Views.View({
-        collection: new Activetasks.AllTasks({currentView: "all"}),
+        collection: new Activetasks.AllTasks(),
         currentView: "all"
       });
 
