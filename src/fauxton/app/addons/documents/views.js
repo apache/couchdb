@@ -1928,10 +1928,15 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       var $button = this.$(event.target),
           $container = $button.closest('.change-box').find(".js-json-container");
 
-      if ($container.hasClass("js-hidden")) {
-        $button.text("Close JSON");
+      if (!$container.is(":visible")) {
+        $button
+          .text("Close JSON")
+          .addClass("btn-secondary")
+          .removeClass("btn-primary");
       } else {
-        $button.text("View JSON");
+        $button.text("View JSON")
+          .addClass("btn-primary")
+          .removeClass("btn-secondary");
       }
 
       $container.slideToggle();
