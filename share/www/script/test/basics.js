@@ -267,7 +267,7 @@ couchTests.basics = function(debug) {
   TEquals(400, xhr.status, "should return a bad request");
   result = JSON.parse(xhr.responseText);
   TEquals("bad_request", result.error);
-  TEquals("You tried to DELETE a database with a ?=rev parameter. Did you mean to DELETE a document instead?", result.reason);
+  TEquals("You tried to DELETE a database with a ?rev= parameter. Did you mean to DELETE a document instead?", result.reason);
 
   // On restart, a request for creating a database that already exists can
   // not override the existing database file
