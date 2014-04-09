@@ -5,6 +5,7 @@
 
 -export([
     create/4,
+    close/1,
     next/1
 ]).
 
@@ -40,12 +41,19 @@
 
 create(DbName, NonNormSelector, Opts, Ctx) ->
     Selector = mango_selector:normalize(NonNormSelector),
-    IndexFields = mango_selector:index_fields(Selector, Opts),
-    ExistingIndexes = mango_index:list(DbName, Ctx),
+    twig:log(err, "Selector: ~p", [Selector]),
+    IndexFields = mango_selector:index_fields(Selector),
+    twig:log(err, "Index Fields: ~p", [IndexFields]),
+    ExistingIndexes = mango_index:list(DbName, Opts, Ctx),
+    twig:log(err, "Existing Indexes: ~p", [ExistingIndexes]),
     UsableIndexes = find_usable_indexes(IndexFields, ExistingIndexes),
-    FieldRanges = find_field_ranges(Selector, UsableIndexes),
+    twig:log(err, "Usable Indexes: ~p", [UsableIndexes]),
+    FieldRanges = find_field_ranges(Selector, IndexFields),
+    twig:log(err, "Field Ranges: ~p", [FieldRanges]),
     Composited = composite_indexes(UsableIndexes, FieldRanges),
+    twig:log(err, "Composited: ~p", [Composited]),
     {Index, Ranges} = choose_best_index(DbName, Composited),
+    twig:log(err, "Index: ~p~nRanges: ~p", [Index, Ranges]),
     St = #st{
         index = Index,
         ranges = Ranges,
@@ -53,14 +61,21 @@ create(DbName, NonNormSelector, Opts, Ctx) ->
         opts = Opts,
         ctx = Ctx
     },
-    supervisor:start_child(?SUPERVISOR, [St]).
+    {ok, Pid} = supervisor:start_child(?SUPERVISOR, [St]),
+    mango_cursor_id:register(Pid).
 
 
-next(Pid) ->
+close(Id) ->
+    {ok, Pid} = mango_cursor_id:lookup(Id),
+    gen_server:cast(Pid, close).
+
+
+next(Id) ->
     % This timeout shoudl be controlled by the opts
     % passed to create/4. We should pass infinity here
     % and then have the gen_server reply back with a
     % timeout if it doesn't get the next batch in time.
+    {ok, Pid} = mango_cursor_id:lookup(Id),
     gen_server:call(Pid, next, 600000).
 
 
@@ -72,7 +87,10 @@ init(#st{}=St) ->
     {ok, St}.
 
 
-terminate(_Reason, _St) ->
+terminate(_Reason, St) ->
+    if St#st.worker == undefined -> ok; true ->
+        exit(St#st.worker, closing)
+    end,
     ok.
 
 
@@ -91,6 +109,12 @@ handle_call(Msg, _From, St) ->
     {stop, {invalid_call, Msg}, {invalid_call, Msg}, St}.
 
 
+handle_cast(close, St) ->
+    if St#st.waiter == undefined -> ok; true ->
+        gen_server:reply(St#st.waiter, closing)
+    end,
+    {stop, normal, St#st{waiter=undefined}};
+    
 handle_cast(Msg, St) ->
     {stop, {invalid_cast, Msg}, St}.
 
@@ -102,9 +126,20 @@ handle_info({Pid, batch, Batch}, #st{worker=Pid, waiter=W, batch=B}=St) when
 handle_info({Pid, batch, Batch}, #st{worker=Pid, waiter=W, batch=B}=St) when
         W /= undefined, B == undefined ->
     gen_server:reply(W, {ok, Batch}),
-    {noreply, St#st{waiter=undefined}};
+    case St#st.worker of
+        undefined ->
+            {stop, normal, St#st{waiter=undefined}};
+        _ ->
+            St#st.worker ! {self(), next},
+            {noreply, St#st{waiter=undefined}}
+    end;
+
+handle_info({'DOWN', _, _, Pid, normal}, #st{worker=Pid, batch=B}=St) when
+        B /= undefined ->
+    {noreply, St#st{worker=undefined}};
 
 handle_info({'DOWN', _, _, Pid, Reason}, #st{worker=Pid}=St) ->
+    twig:log(err, "Cursor worker died: ~p ~p", [Reason, St]),
     {stop, Reason, St};
 
 handle_info(Msg, St) ->
@@ -162,14 +197,13 @@ composite_indexes(Indexes, FieldRanges) ->
         Cols = mango_index:columns(Idx),
         Prefix = composite_prefix(Cols, FieldRanges),
         [{Idx, Prefix} | Acc]
-    end, [], Indexes),
-    ok.
+    end, [], Indexes).
 
 
 composite_prefix([], _) ->
     [];
 composite_prefix([Col | Rest], Ranges) ->
-    case lists:keysearch(Col, 1, Ranges) of
+    case lists:keyfind(Col, 1, Ranges) of
         {Col, Range} ->
             [Range | composite_prefix(Rest, Ranges)];
         false ->

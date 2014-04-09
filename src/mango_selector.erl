@@ -345,7 +345,7 @@ norm_ops(Value) ->
 % operators but we can apply the same algorithm to the
 % arguments of those operators.
 norm_fields(Selector) ->
-    norm_fields(Selector, []).
+    norm_fields(Selector, <<>>).
 
 
 % Operators where we can push the field names further
@@ -379,8 +379,16 @@ norm_fields({[{<<"$", _/binary>>, _}]} = Cond, Path) ->
 % We've found a field name. Append it to the path
 % and skip this node as we unroll the stack as
 % the full path will be further down the branch.
+norm_fields({[{Field, Cond}]}, <<>>) ->
+    % Don't include the '.' for the first element of
+    % the path.
+    norm_fields(Cond, Field);
 norm_fields({[{Field, Cond}]}, Path) ->
-    norm_fields(Cond, <<Path/binary, ".", Field/binary>>).
+    norm_fields(Cond, <<Path/binary, ".", Field/binary>>);
+
+% Else we have an invalid selector
+norm_fields(BadSelector, _) ->
+    throw({invalid_selector, {bad_field, BadSelector}}).
 
 
 % Take all the negation operators and move the logic

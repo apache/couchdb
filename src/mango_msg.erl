@@ -178,6 +178,13 @@ requires_auth(Msg) ->
     end.
 
 
+new_msg(kill_cursors, ReqId, RespTo, Props) ->
+    #mango_msg{
+        type = kill_cursors,
+        req_id = ReqId,
+        resp_to = RespTo,
+        props = Props
+    };
 new_msg(Type, ReqId, RespTo, Props) ->
     {collection, FullCollection} = lists:keyfind(collection, 1, Props),
     Opts = [{capture, all_but_first, binary}],

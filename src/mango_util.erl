@@ -36,14 +36,14 @@ defer(Mod, Fun, Args) ->
 do_defer(Mod, Fun, Args) ->
     try erlang:apply(Mod, Fun, Args) of
         Resp ->
-            exit({mango_defer_ok, Resp})
+            erlang:exit({mango_defer_ok, Resp})
     catch
         throw:Error ->
-            exit({mango_defer_throw, Error});
+            erlang:exit({mango_defer_throw, Error});
         error:Error ->
-            exit({mango_defer_error, Error});
+            erlang:exit({mango_defer_error, Error});
         exit:Error ->
-            exit({mango_defer_exit, Error})
+            erlang:exit({mango_defer_exit, Error})
     end.
 
 

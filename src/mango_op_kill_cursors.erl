@@ -8,5 +8,9 @@
 -include("mango.hrl").
 
 
-run(_Props, _Ctx) ->
-    ok.
+run(Msg, Ctx) ->
+    CursorIds = mango_msg:prop(cursors, Msg),
+    lists:foreach(fun(CI) ->
+        catch mango_cursor:close(CI)
+    end, CursorIds),
+    {ok, Msg, Ctx}.

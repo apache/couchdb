@@ -11,7 +11,7 @@
 
 -export([
     create/3,
-    list/2
+    list/3
 ]).
 
 
@@ -48,8 +48,8 @@ cursor_mod(#idx{type=view}) ->
 
 
 columns(#idx{type=view, def={Props}}) ->
-    {<<"map">>, {MapProps}} = lists:keysearch(<<"map">>, 1, Props),
-    {<<"key">>, {KeyProps}} = lists:keysearch(<<"key">>, 1, MapProps),
+    {<<"map">>, {MapProps}} = lists:keyfind(<<"map">>, 1, Props),
+    {<<"key">>, {KeyProps}} = lists:keyfind(<<"key">>, 1, MapProps),
     [Key || {Key, _Dir} <- KeyProps].
 
 
@@ -84,7 +84,7 @@ create(DbName, {Opts0}, Ctx) ->
     end.
 
 
-list(DbName, Ctx) ->
+list(DbName, _Opts, Ctx) ->
     case mango_doc:open_ddocs(DbName, Ctx) of
         {ok, DDocs} ->
             lists:foldl(fun(Doc, Acc) ->
@@ -146,18 +146,22 @@ list_doc_indexes(DbName, Doc) ->
     ],
     lists:foldl(fun(Fun, Acc) ->
         Fun(DbName, Doc) ++ Acc
-    end, ListFuns).
+    end, [], ListFuns).
 
 
-list_views(DbName, #doc{body={Props}}=Doc) ->
-    case lists:keysearch(<<"language">>, 1, Props) of
+list_views(DbName, #doc{}=Doc) ->
+    list_views(DbName, couch_doc:to_json_obj(Doc, []));
+
+list_views(DbName, {Props}) ->
+    {<<"_id">>, DDocId} = lists:keyfind(<<"_id">>, 1, Props),
+    case lists:keyfind(<<"language">>, 1, Props) of
         {<<"language">>, <<"mongo">>} ->
-            case lists:keysearch(<<"views">>, 1, Props) of
+            case lists:keyfind(<<"views">>, 1, Props) of
                 {<<"views">>, {Views}} when is_list(Views) ->
                     lists:foldl(fun({Name, View}, InAcc) ->
                         I = #idx{
                             dbname=DbName,
-                            ddoc = Doc,
+                            ddoc = DDocId,
                             type = view,
                             name = Name,
                             def = View

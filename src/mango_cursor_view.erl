@@ -38,11 +38,19 @@ init(Index, Ranges, Selector, Opts, Ctx) ->
 
 
 run(#st{index=Idx}=St) ->
-    erlang:monitor(St#st.cursor),
-    DbName = couch_index:dbname(Idx),
-    DDoc = couch_index:ddoc(Idx),
-    Name = couch_index:name(Idx),
+    erlang:monitor(process, St#st.cursor),
+    DbName = mango_index:dbname(Idx),
+    DDoc = case mango_index:ddoc(Idx) of
+        <<"_design/", Rest/binary>> ->
+            Rest;
+        Else ->
+            Else
+    end,
+    Name = mango_index:name(Idx),
+    twig:log(err, "Query: ~s ~s :: ~p ~p", [
+        DbName, DDoc, start_key(St#st.ranges), end_key(St#st.ranges)]),
     Args = #view_query_args{
+        view_type = red_map,
         start_key = start_key(St#st.ranges),
         end_key = end_key(St#st.ranges),
         limit = limit(St#st.opts),
@@ -52,9 +60,11 @@ run(#st{index=Idx}=St) ->
     fabric:query_view(DbName, DDoc, Name, CB, St, Args).
 
 
-handle_message({total_and_offset, _, _}, St) ->
+handle_message({total_and_offset, _, _}=TO, St) ->
+    twig:log(err, "TOTAL AND OFFSET: ~p", [TO]),
     {ok, St};
 handle_message({row, {Props}}, St) ->
+    twig:log(err, "ROW: ~p", [Props]),
     Doc = couch_util:get_value(doc, Props),
     Acc = case mango_selector:match(St#st.selector, Doc) of
         true ->
@@ -69,13 +79,10 @@ handle_message({row, {Props}}, St) ->
             {ok, St#st{acc = Acc}}
     end;
 handle_message(complete, St) ->
-    case length(St#st.acc) > 0 of
-        true ->
-            send_batch(St, St#st.acc);
-        false ->
-            {ok, normal}
-    end;
+    twig:log(err, "COMPLETE", []),
+    send_batch(St, St#st.acc);
 handle_message({error, Reason}, _St) ->
+    twig:log(err, "ERROR: ~p", [Reason]),
     {error, Reason}.
 
 
@@ -135,7 +142,7 @@ start_key([{'$eq', Key, '$eq', Key} | Rest]) ->
 
 
 end_key([]) ->
-    [];
+    [{}];
 end_key([{_, _, '$lt', Key} | Rest]) ->
     [Key | end_key(Rest)];
 end_key([{_, _, '$lte', Key} | Rest]) ->
