@@ -505,12 +505,6 @@ function(app, FauxtonAPI, Documents, Databases) {
       var docParams = app.getParams();
 
       this.database.buildChanges(docParams);
-
-      this.setView("#tabs", new Documents.Views.Tabs({
-        collection: this.designDocs,
-        database: this.database,
-        active_id: 'changes'
-      }));
     },
 
     changes: function (event) {
