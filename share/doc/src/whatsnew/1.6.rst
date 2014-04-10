@@ -33,7 +33,6 @@ as deprecated and will be removed in future releases. It's strongly recommended
 to update :config:option:`httpd/authentication_handlers` option with new value
 in case if you had used such handler.
 
-
 .. _release/1.6.0:
 
 Version 1.6.0
@@ -42,9 +41,12 @@ Version 1.6.0
 * Fauxton: many improvements in our experimental new user interface, including
   switching the code editor from CodeMirror to Ace as well as better support
   for various browsers.
+* :issue:`1986`: increase socket buffer size to improve replication speed
+  for large documents and attachments, and fix tests on BSD-like systems.
+  :commit:`9a0e561b`
+* :issue:`1953`: improve performance of multipart/related requests.
+  :commit:`ce3e89dc`
 * :issue:`1922`: fix CORS exposed headers. :commit:`4f619833`
-* Rename ``proxy_authentification_handler`` to ``proxy_authentication_handler``.
-  :commit:`c66ac4a8`
 * :issue:`1795`: ensure the startup script clears the pid file on termination.
   :commit:`818ef4f9`
 * :issue:`1962`: replication can now be performed without having write access
@@ -57,7 +59,22 @@ Version 1.6.0
 * :issue:`1923`: add support for `attachments` and `att_encoding_info` options
   (formerly only available on the documents API) to the view API.
   :commit:`ca41964b`
+* :issue:`1780`: upgrade password hashes from SHA-1 to PBKDF2 scheme on
+  successful authentication. :commit:`34888938`
+* :issue:`2059`: allow run-time configuration of maximum URL length.
+  :commit:`f7ca266b`
+* :issue:`2054`: accept gzipped JSON request bodies. :commit:`4d893387`
+* Rename ``proxy_authentification_handler`` to ``proxy_authentication_handler``.
+  :commit:`c66ac4a8`
 * :issue:`1647`: for failed replications originating from a document in the
   `_replicator` database, store the failure reason in the document.
   :commit:`08cac68b`
-* A number of improvements for the documentation.
+* :issue:`2053`: send better error messages when both `key` and `keys`
+  parameters are specified in view requests. :commit:`2bc07840`
+* :issue:`2040`: send better error messages when incorrect checksums
+  are encountered during compaction. :commit:`e7fdc16a`
+* :issue:`2028`: allow intermedia certificates when using SSL/TLS.
+  :commit:`2d080449`
+* :issue:`2031`: fix rewriting of paths with query string parameters.
+  :commit:`37c84596`
+* Numerous improvements to the documentation.
