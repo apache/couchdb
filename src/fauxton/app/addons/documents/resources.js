@@ -295,7 +295,6 @@ function(app, FauxtonAPI, PagingCollection) {
 
   });
 
-  //Documents.AllDocs = FauxtonAPI.Collection.extend(_.extend({}, DefaultParametersMixin(), {
   Documents.AllDocs = PagingCollection.extend({
     model: Documents.Doc,
     documentation: function(){
@@ -514,7 +513,6 @@ function(app, FauxtonAPI, PagingCollection) {
   });
 
 
-  //Documents.PouchIndexCollection = FauxtonAPI.Collection.extend(_.extend({}, DefaultParametersMixin(), {
   Documents.PouchIndexCollection = PagingCollection.extend({
     model: Documents.ViewRow,
     documentation: function(){
