@@ -257,6 +257,7 @@ FAUXTON_FILES = \
     fauxton/assets/js/libs/require.js \
     fauxton/assets/js/libs/spin.min.js \
     fauxton/assets/js/plugins/backbone.layoutmanager.js \
+    fauxton/assets/js/plugins/cloudant.pagingcollection.js \
     fauxton/assets/js/plugins/jquery.form.js \
     fauxton/assets/js/plugins/prettify.js \
     fauxton/assets/js/plugins/beautify.js\
