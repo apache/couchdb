@@ -49,6 +49,8 @@ Version 1.6.0
   :commit:`9a0e561b`
 * :issue:`1953`: improve performance of multipart/related requests.
   :commit:`ce3e89dc`
+* :issue:`2221`: verify that authentication-related configuration settings
+  are well-formed. :commit:`dbe769c6`
 * :issue:`1922`: fix CORS exposed headers. :commit:`4f619833`
 * :issue:`1795`: ensure the startup script clears the pid file on termination.
   :commit:`818ef4f9`
