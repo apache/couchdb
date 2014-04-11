@@ -681,8 +681,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
     },
 
     addPagination: function () {
-      var collection = this.collection;
-
       this.pagination = new Components.IndexPagination({
         collection: this.collection,
         scrollToSelector: '#dashboard-content',
@@ -703,9 +701,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         this.addPagination();
       }
 
-      if (!this.params.keys) { //cannot paginate with keys
-        this.insertView('#documents-pagination', this.pagination);
-      }
+      this.insertView('#documents-pagination', this.pagination);
 
       if (!this.allDocsNumber) {
         this.allDocsNumber = new Views.AllDocsNumber({
@@ -749,10 +745,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
     perPage: function () {
       return this.allDocsNumber.perPage();
-    },
-
-    updatePerPage: function (newPerPage) {
-      this.collection.updateLimit(newPerPage);
     }
   });
 
@@ -1741,9 +1733,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         this.ddocID = this.model.id;
       } else {
         var ddocDecode = decodeURIComponent(this.ddocID);
-        this.model = this.ddocs.get(ddocDecode).dDocModel();
+        this.model = this.ddocs.get(this.ddocID).dDocModel();
         this.reduceFunStr = this.model.viewHasReduce(this.viewName);
-        
       }
 
       this.designDocSelector = this.setView('.design-doc-group', new Views.DesignDocSelector({
@@ -1751,7 +1742,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
         ddocName: this.model.id,
         database: this.database
       }));
-
 
       if (!this.newView) {
         this.eventer = _.extend({}, Backbone.Events);

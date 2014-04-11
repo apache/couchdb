@@ -106,7 +106,9 @@ html_additional_pages = {
     'index': 'pages/index.html'
 }
 
-html_context = {}
+html_context = {
+    "ga_code": "UA-658988-6"
+}
 
 html_sidebars = {
     "**": [
@@ -115,6 +117,7 @@ html_sidebars = {
         "relations.html",
         "utilities.html",
         "help.html",
+        "tracking.html",
     ]
 }
 

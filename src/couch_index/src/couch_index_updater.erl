@@ -35,7 +35,7 @@ start_link(Index, Module) ->
 
 
 run(Pid, IdxState) ->
-    gen_server:call(Pid, {update, IdxState}).
+    gen_server:call(Pid, {update, IdxState}, infinity).
 
 
 is_running(Pid) ->

@@ -12,19 +12,24 @@
 
 
 // This file creates a set of helper functions that will be loaded for all html
-// templates. These functions should be self contained and not rely on any 
+// templates. These functions should be self contained and not rely on any
 // external dependencies as they are loaded prior to the application. We may
 // want to change this later, but for now this should be thought of as a
 // "purely functional" helper system.
 
 
 define([
+  "core/utils",
   "d3"
 ],
 
-function() {
+function(utils, d3) {
 
   var Helpers = {};
+
+  Helpers.removeSpecialCharacters = utils.removeSpecialCharacters;
+
+  Helpers.safeURL = utils.safeURLName;
 
   Helpers.imageUrl = function(path) {
     // TODO: add dynamic path for different deploy targets
@@ -33,7 +38,7 @@ function() {
 
 
   // Get the URL for documentation, wiki, wherever we store it.
-  // update the URLs in documentation_urls.js 
+  // update the URLs in documentation_urls.js
   Helpers.docs =  {
     "docs": "http://docs.couchdb.org/en/latest/intro/api.html#documents",
     "all_dbs": "http://docs.couchdb.org/en/latest/api/server/common.html?highlight=all_dbs#get--_all_dbs",
@@ -50,8 +55,8 @@ function() {
     "config": "http://docs.couchdb.org/en/latest/config/index.html",
     "views": "http://docs.couchdb.org/en/latest/intro/overview.html#views",
     "changes": "http://docs.couchdb.org/en/latest/api/database/changes.html?highlight=changes#post--db-_changes"
-  }; 
-  
+  };
+
   Helpers.getDocUrl = function(docKey){
     return Helpers.docs[docKey] || '#';
   };
@@ -70,7 +75,7 @@ function() {
     };
 
   Helpers.formatDate = function(timestamp){
-    format = d3.time.format("%b. %e at %H:%M%p"); 
+    var format = d3.time.format("%b. %e at %H:%M%p");
     return format(new Date(timestamp*1000));
   };
 

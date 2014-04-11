@@ -166,6 +166,30 @@ Authentication Configuration
       [couch_httpd_auth]
       iterations = 10000
 
+  .. config:option:: min_iterations :: Minimum PBKDF2 iterations count
+
+    .. versionadded:: 1.6
+
+    The minimum number of iterations allowed for passwords hashed by
+    the PBKDF2 algorithm. Any user with fewer iterations is forbidden.
+
+    ::
+
+      [couch_httpd_auth]
+      min_iterations = 100
+
+  .. config:option:: max_iterations :: Maximum PBKDF2 iterations count
+
+    .. versionadded:: 1.6
+
+    The maximum number of iterations allowed for passwords hashed by
+    the PBKDF2 algorithm. Any user with greater iterations is forbidden.
+
+    ::
+
+      [couch_httpd_auth]
+      max_iterations = 100000
+
 
   .. config:option:: proxy_use_secret :: Force proxy auth use secret token
 
