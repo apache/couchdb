@@ -33,6 +33,9 @@ as deprecated and will be removed in future releases. It's strongly recommended
 to update :config:option:`httpd/authentication_handlers` option with new value
 in case if you had used such handler.
 
+Note that this release also contains the security fix for CVE-2014-2668 that
+was first fixed in :ref:`release/1.5.1`.
+
 .. _release/1.6.0:
 
 Version 1.6.0
