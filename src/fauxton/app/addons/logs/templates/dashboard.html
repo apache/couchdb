@@ -12,35 +12,37 @@ License for the specific language governing permissions and limitations under
 the License.
 -->
 
- <h2> CouchDB Logs </h2>
-  <table class="table table-bordered" >
-  <thead>
-    <tr>
-      <th class="Date">Date</th>
-      <th class="Log Level">Log Value</th>
-      <th class="Pid">Pid</th>
-      <th class="Args">Url</th>
-    </tr>
-  </thead>
+<div class="logs">
+  <h2>CouchDB Logs</h2>
+  <table class="table table-bordered log-table">
+    <thead>
+      <tr>
+        <th class="date">Date</th>
+        <th class="level">Log Value</th>
+        <th class="pid">Pid</th>
+        <th class="args">Url</th>
+      </tr>
+    </thead>
 
-  <tbody>
-    <% logs.each(function (log) { %>
-    <tr class="<%= log.logLevel() %>">
-      <td>
-        <!-- TODO: better format the date -->
-        <%= log.date() %>
-      </td>
-      <td>
-        <%= log.logLevel() %>
-      </td>
-      <td>
-        <%= log.pid() %>
-      </td>
-      <td>
-        <!-- TODO: split the line, maybe put method in it's own column -->
-        <%= log.args() %>
-      </td>
-    </tr>
-    <% }); %>
-  </tbody>
-</table>
+    <tbody>
+      <% logs.each(function (log) { %>
+      <tr class="<%= log.logLevel() %>">
+        <td>
+          <!-- TODO: better format the date -->
+          <%= log.date() %>
+        </td>
+        <td>
+          <%= log.logLevel() %>
+        </td>
+        <td class="pid">
+          <%= log.pid() %>
+        </td>
+        <td class="args">
+          <!-- TODO: split the line, maybe put method in it's own column -->
+          <%= log.args() %>
+        </td>
+      </tr>
+      <% }); %>
+    </tbody>
+  </table>
+</div>
