@@ -11,14 +11,26 @@
  *  the License.
  */
 
-#log-sidebar {
-  
-  ul {
-    margin-left: 0px;
-    list-style: none;
+.log {
+  padding: 0 15px;
+
+  #log-sidebar {
+    ul {
+      margin-left: 0px;
+      list-style: none;
+    }
+
+    .remove-filter {
+       opacity: 0.2;
+    }
   }
 
-  .remove-filter {
-     opacity: 0.2;
+  .log-table {
+    width: auto;
+    white-space: nowrap;
+    .args {
+      width: 100%;
+      white-space: normal;
+    }
   }
 }
