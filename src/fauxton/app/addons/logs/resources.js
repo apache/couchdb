@@ -67,7 +67,8 @@ function (app, FauxtonAPI, Backbone, d3) {
     },
 
     parse: function (resp) {
-      var lines =  resp.split(/\n/);
+      resp = resp.replace(/\n\s/g, '');
+      var lines = resp.split(/\n/);
       return _.foldr(lines, function (acc, logLine) {
         var match = logLine.match(/^\[(.*?)\]\s\[(.*?)\]\s\[(.*?)\]\s(.*)/);
 
@@ -77,7 +78,7 @@ function (app, FauxtonAPI, Backbone, d3) {
                   date: match[1],
                   log_level: match[2],
                   pid: match[3],
-                  args: match[4]
+                  args: match[4].replace(/\s\s+/g, '')
                  });
 
         return acc;
