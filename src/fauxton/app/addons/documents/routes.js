@@ -340,8 +340,6 @@ function(app, FauxtonAPI, Documents, Databases) {
           {"name": this.data.database.id, "link": Databases.databaseUrl(this.data.database)},
         ];
       };
-
-      Documents.paginate.reset();
     },
 
     updateAllDocsFromView: function (event) {
