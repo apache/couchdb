@@ -10,6 +10,8 @@
 ## License for the specific language governing permissions and limitations under
 ## the License.
 
+AUTOMAKE_OPTIONS = subdir-objects
+
 snappyebindir = $(localerlanglibdir)/snappy-1.0.5/ebin
 snappyprivdir = $(localerlanglibdir)/snappy-1.0.5/priv
 

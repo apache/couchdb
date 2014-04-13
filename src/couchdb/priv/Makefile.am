@@ -10,6 +10,8 @@
 ## License for the specific language governing permissions and limitations under
 ## the License.
 
+AUTOMAKE_OPTIONS = subdir-objects
+
 MAKE_SAFE = $(MAKE)
 
 couchlibdir = $(localerlanglibdir)/couch-$(version)

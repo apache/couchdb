@@ -10,6 +10,8 @@
 ## License for the specific language governing permissions and limitations under
 ## the License.
 
+AUTOMAKE_OPTIONS = subdir-objects
+
 ejsonebindir = $(localerlanglibdir)/ejson-0.1.0/ebin
 ejsonprivdir = $(localerlanglibdir)/ejson-0.1.0/priv
 
