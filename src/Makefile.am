@@ -84,7 +84,8 @@ FAUXTON_FILES = \
     fauxton/app/addons/logs/templates/dashboard.html \
     fauxton/app/addons/logs/templates/filterItem.html \
     fauxton/app/addons/logs/templates/sidebar.html \
-    fauxton/app/addons/logs/tests/logSpec.js \
+    fauxton/app/addons/logs/tests/baseSpec.js \
+    fauxton/app/addons/logs/tests/resourcesSpec.js \
     fauxton/app/addons/permissions/assets/less/permissions.less \
     fauxton/app/addons/permissions/base.js \
     fauxton/app/addons/permissions/resources.js \
