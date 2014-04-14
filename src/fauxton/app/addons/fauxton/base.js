@@ -145,7 +145,7 @@ function(app, FauxtonAPI, resizeColumns) {
     initialize: function () {
       _.bindAll(this);
       //resizeAnimation
-      this.resizeColumns = new resizeColumns({});
+      app.resizeColumns = this.resizeColumns = new resizeColumns({});
       this.resizeColumns.onResizeHandler();
       
       FauxtonAPI.extensions.on('add:navbar:addHeaderLink', this.addLink);

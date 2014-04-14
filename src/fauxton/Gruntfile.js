@@ -147,16 +147,6 @@ module.exports = function(grunt) {
       watch: cleanableAddons
     },
 
-    // The lint task will run the build configuration and the application
-    // JavaScript through JSHint and report any errors.  You can change the
-    // options for this task, by reading this:
-    // https://github.com/cowboy/grunt/blob/master/docs/task_lint.md
-    lint: {
-      files: [
-        "build/config.js", "app/**/*.js" 
-      ]
-    },
-
     less: {
       compile: {
         options: {
