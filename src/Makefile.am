@@ -43,7 +43,6 @@ FAUXTON_FILES = \
     fauxton/app/addons/activetasks/base.js \
     fauxton/app/addons/activetasks/resources.js \
     fauxton/app/addons/activetasks/routes.js \
-    fauxton/app/addons/activetasks/templates/detail.html \
     fauxton/app/addons/activetasks/templates/table.html \
     fauxton/app/addons/activetasks/templates/tabledetail.html \
     fauxton/app/addons/activetasks/templates/tabs.html \
