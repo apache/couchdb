@@ -19,10 +19,10 @@ the License.
         <div class="span2">
           seq
         </div>
-        <div class="span8">
+        <div class="span8 change-sequence">
           <%= change.seq %>
         </div>
-        <div class="span2">
+        <div class="span2 text-right">
           <a class="js-copy" data-clipboard-text="<%= change.seq %>" data-bypass="true" href="#">
             <i class="icon-share"></i>
           </a>
@@ -38,7 +38,7 @@ the License.
           <% } else { %>
             <a href="#<%= database.url('app') %>/<%= safeURL(change.id) %>"><%= change.id %></a>
           <% } %>    </div>
-        <div class="span2">
+        <div class="span2 text-right">
           <a class="js-copy" data-clipboard-text="<%= change.id %>" data-bypass="true" href="#">
             <i class="icon-share"></i>
           </a>
@@ -49,7 +49,7 @@ the License.
           changes
         </div>
         <div class="span10">
-          <button class="js-toggle-json btn-small btn-primary" type="button">View JSON</button>
+          <button class="js-toggle-json btn btn-small btn-primary" type="button">View JSON</button>
         </div>
       </div>
       <div class="js-json-container">
