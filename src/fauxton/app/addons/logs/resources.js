@@ -54,7 +54,7 @@ function (app, FauxtonAPI, Backbone, d3) {
     documentation: "log",
 
     url: function () {
-      query = "?" + $.param(this.params);
+      var query = "?" + $.param(this.params);
       return app.host + '/_log' + query;
     },
 
