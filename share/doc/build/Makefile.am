@@ -450,6 +450,7 @@ src_files_html = \
     ../templates/layout.html \
     ../templates/help.html \
     ../templates/searchbox.html \
+    ../templates/tracing.html \
     ../templates/utilities.html
 
 sphinx_extensions = \

@@ -326,12 +326,14 @@ FAUXTON_FILES = \
     fauxton/assets/less/variables.less \
     fauxton/bin/grunt \
     fauxton/couchapp.js \
+    fauxton/extensions.md \
     fauxton/favicon.ico \
     fauxton/Gruntfile.js \
     fauxton/index.html \
     fauxton/package.json \
     fauxton/readme.md \
     fauxton/settings.json.default \
+    fauxton/settings.json.dev \
     fauxton/settings.json.sample_external \
     fauxton/tasks/addon/rename.json \
     fauxton/tasks/addon/root/base.js.underscore \
