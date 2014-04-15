@@ -21,6 +21,10 @@
    :depth: 1
    :local:
 
+.. warning::
+
+   :ref:`release/1.3.x` is affected by the issue described in :ref:`cve/2014-2668`.
+   Upgrading to a more recent release is strongly recommended.
 
 .. _release/1.3.x/upgrade:
 

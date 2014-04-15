@@ -21,6 +21,11 @@
    :depth: 1
    :local:
 
+.. warning::
+
+   :ref:`release/1.5.1` contains important security fixes. Previous `1.5.x`
+   releases are not recommended for regular usage.
+
 .. _release/1.5.1:
 
 Version 1.5.1
@@ -28,7 +33,7 @@ Version 1.5.1
 
 * Add the ``max_count`` option (:ref:`config/uuids`) to allow rate-limiting
   the amount of UUIDs that can be requested from the :ref:`api/server/uuids`
-  handler in a single request.
+  handler in a single request (:ref:`CVE 2014-2668 <cve/2014-2668>`).
 
 .. _release/1.5.0:
 
