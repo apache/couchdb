@@ -390,6 +390,7 @@ src_files = \
     ../src/cve/2012-5641.rst \
     ../src/cve/2012-5649.rst \
     ../src/cve/2012-5650.rst \
+    ../src/cve/2014-2668.rst \
     ../src/cve/index.rst \
     ../src/fauxton/addons.rst \
     ../src/fauxton/index.rst \
