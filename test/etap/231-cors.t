@@ -32,7 +32,7 @@ server() ->
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(28),
+    etap:plan(25),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -58,10 +58,6 @@ cycle_db(DbName) ->
     Db.
 
 test() ->
-
-    ibrowse:start(),
-    crypto:start(),
-
     %% launch couchdb
     couch_server_sup:start_link(test_util:config_files()),
 
