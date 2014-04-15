@@ -131,6 +131,7 @@
 ^src/fauxton/assets/js/libs/ace/.*.js
 ^src/fauxton/assets/js/libs/ace/snippets/.*.js
 ^src/fauxton/assets/js/plugins/.*.js
+^src/fauxton/assets/js/plugins/zeroclipboard/ZeroClipboard.swf
 ^src/fauxton/assets/less/bootstrap/.*.less
 ^src/fauxton/assets/less/bootstrap/tests/css-tests.css
 ^src/fauxton/assets/less/bootstrap/tests/buttons.html

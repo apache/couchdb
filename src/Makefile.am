@@ -84,7 +84,8 @@ FAUXTON_FILES = \
     fauxton/app/addons/logs/templates/dashboard.html \
     fauxton/app/addons/logs/templates/filterItem.html \
     fauxton/app/addons/logs/templates/sidebar.html \
-    fauxton/app/addons/logs/tests/logSpec.js \
+    fauxton/app/addons/logs/tests/baseSpec.js \
+    fauxton/app/addons/logs/tests/resourcesSpec.js \
     fauxton/app/addons/permissions/assets/less/permissions.less \
     fauxton/app/addons/permissions/base.js \
     fauxton/app/addons/permissions/resources.js \
@@ -162,6 +163,7 @@ FAUXTON_FILES = \
     fauxton/app/addons/pouchdb/base.js \
     fauxton/app/addons/pouchdb/pouch.collate.js \
     fauxton/app/addons/pouchdb/pouchdb.mapreduce.js \
+    fauxton/app/addons/documents/assets/less/documents.less \
     fauxton/app/addons/databases/templates/item.html \
     fauxton/app/addons/databases/templates/list.html \
     fauxton/app/addons/databases/templates/newdatabase.html \
@@ -186,7 +188,6 @@ FAUXTON_FILES = \
     fauxton/app/addons/documents/templates/jumpdoc.html \
     fauxton/app/addons/documents/templates/search.html \
     fauxton/app/addons/documents/templates/sidebar.html \
-    fauxton/app/addons/documents/templates/tabs.html \
     fauxton/app/addons/documents/templates/upload_modal.html \
     fauxton/app/addons/documents/templates/view_editor.html \
     fauxton/app/addons/documents/tests/resourcesSpec.js \
@@ -260,7 +261,9 @@ FAUXTON_FILES = \
     fauxton/assets/js/plugins/cloudant.pagingcollection.js \
     fauxton/assets/js/plugins/jquery.form.js \
     fauxton/assets/js/plugins/prettify.js \
-    fauxton/assets/js/plugins/beautify.js\
+    fauxton/assets/js/plugins/beautify.js \
+    fauxton/assets/js/plugins/zeroclipboard/ZeroClipboard.js \
+    fauxton/assets/js/plugins/zeroclipboard/ZeroClipboard.swf \
     fauxton/assets/less/bootstrap/accordion.less \
     fauxton/assets/less/bootstrap/alerts.less \
     fauxton/assets/less/bootstrap/bootstrap.less \

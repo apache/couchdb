@@ -13,22 +13,21 @@
 define([
   "app",
   "api",
-  "backbone"
+  "backbone",
+  "d3"
 ],
 
-function (app, FauxtonAPI, Backbone) {
+function (app, FauxtonAPI, Backbone, d3) {
 
   var Log = FauxtonAPI.addon();
 
   Log.Model = Backbone.Model.extend({
 
     date: function () {
-      var date = new Date(this.get('date'));
+      var date = new Date(this.get('date')),
+          formatter = d3.time.format("%b %e %H:%M%:%S");
 
-      var formatted_time = date.getHours() + ":" + date.getMinutes() + ":" + date.getSeconds();
-      var formatted_date = date.toDateString().slice(4, 10);
-
-      return formatted_date + ' ' + formatted_time;
+      return formatter(date);
     },
 
     logLevel: function () {
@@ -51,11 +50,11 @@ function (app, FauxtonAPI, Backbone) {
     initialize: function (options) {
       this.params = {bytes: 5000};
     },
-    
+
     documentation: "log",
 
     url: function () {
-      query = "?" + $.param(this.params);
+      var query = "?" + $.param(this.params);
       return app.host + '/_log' + query;
     },
 

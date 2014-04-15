@@ -20,7 +20,8 @@ define([
 
 ],
 
-function(app, FauxtonAPI,Stats) {
+function(app, FauxtonAPI,Stats, d3, nv) {
+  console.log(nv);
   Views = {};
 
   datatypeEventer = {};

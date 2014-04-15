@@ -31,7 +31,7 @@ define([
         id:'myId2',
         doc: 'num2'
       }], {
-        database: {id: 'databaseId'},
+        database: {id: 'databaseId', safeID: function () { return this.id;}},
         design: '_design/myDoc'
       });
 

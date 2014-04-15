@@ -26,40 +26,14 @@ define([
        // Plugins
        "plugins/beautify",
        "plugins/prettify",
+       // this should be never global available:
+       // https://github.com/zeroclipboard/zeroclipboard/blob/master/docs/security.md
+       "plugins/zeroclipboard/ZeroClipboard"
 ],
 
-function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColumns, beautify) {
+function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
+         resizeColumns, beautify, prettify, ZeroClipboard) {
   var Views = {};
-  Views.Tabs = FauxtonAPI.View.extend({
-    template: "addons/documents/templates/tabs",
-    initialize: function(options){
-      this.collection = options.collection;
-      this.database = options.database;
-      this.active_id = options.active_id;
-    },
-
-    serialize: function () {
-      return {
-        // TODO make this not hard coded here
-        changes_url: '#' + this.database.url('changes'),
-        db_url: '#' + this.database.url('index') + '?limit=' + Databases.DocLimit,
-      };
-    },
-
-    beforeRender: function(manage) {
-      this.insertView("#search", new Views.SearchBox({
-        collection: this.collection,
-        database: this.database.id
-      }));
-    },
-
-    afterRender: function () {
-      if (this.active_id) {
-        this.$('.active').removeClass('active');
-        this.$('#'+this.active_id).addClass('active');
-      }
-    }
-  });
 
   Views.SearchBox = FauxtonAPI.View.extend({
     template: "addons/documents/templates/search",
@@ -1934,6 +1908,30 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
       this.listenTo( this.model.changes, 'cachesync', this.render);
     },
 
+    events: {
+      "click button.js-toggle-json": "toggleJson"
+    },
+
+    toggleJson: function(event) {
+      event.preventDefault();
+
+      var $button = this.$(event.target),
+          $container = $button.closest('.change-box').find(".js-json-container");
+
+      if (!$container.is(":visible")) {
+        $button
+          .text("Close JSON")
+          .addClass("btn-secondary")
+          .removeClass("btn-primary");
+      } else {
+        $button.text("View JSON")
+          .addClass("btn-primary")
+          .removeClass("btn-secondary");
+      }
+
+      $container.slideToggle();
+    },
+
     establish: function() {
       return [ this.model.changes.fetchOnce({prefill: true})];
     },
@@ -1947,6 +1945,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb, resizeColum
 
     afterRender: function(){
       prettyPrint();
+      ZeroClipboard.config({ moviePath: "/assets/js/plugins/zeroclipboard/ZeroClipboard.swf" });
+      var client = new ZeroClipboard(this.$(".js-copy"));
     }
   });
 

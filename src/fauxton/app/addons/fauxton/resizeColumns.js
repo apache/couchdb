@@ -75,6 +75,7 @@ function(FauxtonAPI) {
         }
 
         $(this.options.selectorElements).innerWidth(panelWidth);
+        
       }
       //if there is a callback, run that
       if(this.options.callback) {

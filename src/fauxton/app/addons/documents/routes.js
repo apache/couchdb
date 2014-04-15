@@ -340,8 +340,6 @@ function(app, FauxtonAPI, Documents, Databases) {
           {"name": this.data.database.id, "link": Databases.databaseUrl(this.data.database)},
         ];
       };
-
-      Documents.paginate.reset();
     },
 
     updateAllDocsFromView: function (event) {
@@ -353,8 +351,8 @@ function(app, FauxtonAPI, Documents, Databases) {
           pageSize,
           collection;
 
-      docParams.limit = pageSize = this.getDocPerPageLimit(urlParams, this.documentsView.perPage());
-      this.documentsView.forceRender();
+      var defaultPageSize = _.isUndefined(this.documentsView) ? 20 : this.documentsView.perPage();
+      docParams.limit = pageSize = this.getDocPerPageLimit(urlParams, defaultPageSize);
 
       if (event.allDocs) {
         this.eventAllDocs = true; // this is horrible. But I cannot get the trigger not to fire the route!
@@ -388,6 +386,7 @@ function(app, FauxtonAPI, Documents, Databases) {
 
       this.documentsView.setCollection(collection);
       this.documentsView.setParams(docParams, urlParams);
+      this.documentsView.forceRender();
 
       this.apiUrl = [collection.urlRef("apiurl", urlParams), "docs"];
     },
@@ -486,12 +485,6 @@ function(app, FauxtonAPI, Documents, Databases) {
       var docParams = app.getParams();
 
       this.database.buildChanges(docParams);
-
-      this.setView("#tabs", new Documents.Views.Tabs({
-        collection: this.designDocs,
-        database: this.database,
-        active_id: 'changes'
-      }));
     },
 
     changes: function (event) {
