@@ -32,7 +32,7 @@ server() ->
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(25),
+    etap:plan(26),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -87,6 +87,7 @@ test() ->
     test_db1_origin_request(),
     test_preflight_with_port1(),
     test_preflight_with_scheme1(),
+    test_if_none_match_header(),
 
     ok = couch_config:set("cors", "origins", "http://example.com:5984", false),
     test_preflight_with_port2(),
