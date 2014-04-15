@@ -39,30 +39,36 @@ function (app, FauxtonAPI, ActiveTasks) {
       "click th": "sortByType"
     },
 
-    filter: "all",
-
     initialize: function (options) {
-      this.listenTo(ActiveTasks.events, "tasks:filter", this.filterAndRender);
+      this.listenTo(this.searchModel, "change", this.render);
       this.listenTo(this.collection, "reset", this.render);
     },
 
     beforeRender: function () {
-      this.filterAndInsertView(this.filter);
-    },
-
-    filterAndRender: function (view) {
-      this.filter = view;
-      this.render();
+      this.filterAndInsertView();
     },
 
     filterAndInsertView: function () {
-      var that = this;
+      var that = this,
+          database = this.searchModel.get("filterDatabase"),
+          filter = this.searchModel.get("filterType"),
+          databaseRegex = new RegExp(database, "g");
+
       this.removeView(".js-tasks-go-here");
 
       this.collection.forEach(function (item) {
-        if (that.filter !== "all" && item.get("type") !== that.filter) {
+
+        if (filter && filter !== "all" && item.get("type") !== filter) {
           return;
         }
+
+        if (database &&
+            !databaseRegex.test(item.get("source")) &&
+            !databaseRegex.test(item.get("target")) &&
+            !databaseRegex.test(item.get("database"))) {
+          return;
+        }
+
         var view = new Views.TableDetail({
           model: item
         });
@@ -113,7 +119,8 @@ function (app, FauxtonAPI, ActiveTasks) {
 
     events: {
       "click .task-tabs li": "requestByType",
-      "change #pollingRange": "changePollInterval"
+      "change #pollingRange": "changePollInterval",
+      "keyup input": "searchDb"
     },
 
     serialize: function () {
@@ -146,12 +153,21 @@ function (app, FauxtonAPI, ActiveTasks) {
 
     requestByType: function(e){
       var currentTarget = e.currentTarget,
-          datatype = this.$(currentTarget).attr("data-type");
+          filter = this.$(currentTarget).attr("data-type");
 
       this.$('.task-tabs').find('li').removeClass('active');
       this.$(currentTarget).addClass('active');
 
-      ActiveTasks.events.trigger("tasks:filter", datatype);
+      this.searchModel.set('filterType', filter);
+    },
+
+    searchDb: function (event) {
+      event.preventDefault();
+
+      var $search = this.$('input[name="search"]'),
+          database = $search.val();
+
+      this.searchModel.set('filterDatabase', database);
     }
   });
 
