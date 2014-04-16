@@ -349,7 +349,7 @@ table.databases {
   .navbar {
      .burger{
         .transition(all @transitionSpeed @transitionEaseType);
-        padding: 22px 0 0 22px;
+        padding: 22px 0 0 18px;
         position: fixed;
         top: 0;
         z-index: 100;
@@ -357,11 +357,11 @@ table.databases {
         width: @navWidth;
         div{
           .transition(all @transitionSpeed @transitionEaseType);
-          height: 3px;
-          width: 20px;
+          height: 4px;
+          width: 24px;
           .border-radius(2);
           background-color: @navBG;
-          margin: 3px 0px;
+          margin: 2px 0px;
         }
         &:hover div{
           background-color: @orange;
@@ -420,7 +420,8 @@ table.databases {
         li{
           .transition(all @transitionSpeed @transitionEaseType);
           padding: 0;
-          font-size: 20px;
+          font-size: 16px;
+          letter-spacing: 1px;
           line-height: 23px;
           width: @navWidth;
           font-weight: normal;
@@ -428,7 +429,7 @@ table.databases {
           .box-sizing(border-box);
           background-color: @navBG;
           border-bottom:  1px solid @primaryNav;
-          min-height: 55px;
+          min-height: 48px;
           &.active, &:hover{
             a{
               .box-shadow(none);
@@ -445,7 +446,7 @@ table.databases {
             color: @NavIconActive;
           }
           a{
-            padding: 17px 25px 12px 60px;
+            padding: 12px 25px 12px 60px;
             background-color: transparent;
             color: #fff;
             text-shadow: @textShadowOff;
