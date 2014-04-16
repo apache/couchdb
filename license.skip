@@ -114,6 +114,8 @@
 ^src/couchdb/priv/couchjs
 ^src/couchdb/priv/couchspawnkillable
 ^src/couchdb/priv/stat_descriptions.cfg
+^src/couchdb/priv/icu_driver/.deps/.dirstamp
+^src/couchdb/priv/icu_driver/.dirstamp
 ^src/couchjs-node/package.json
 ^src/couchjs-node/sandbox.js
 ^src/couchjs-node/README.md
