@@ -523,3 +523,81 @@ Good news! Now we may read field ``name`` from *every user's document without
 need to be an administrator*. That's important note: don't publish sensitive
 information, especially without user's acknowledge - they may not like such
 actions from your side.
+
+
+==============
+Authorization
+==============
+
+Now that you have a few users who can log in, you probably want to set up some
+restrictions on what actions they can perform based on their identity and their
+roles.  Each database on a CouchDB server can contain its own set of
+authorization rules that specify which users are allowed to read and write
+documents, create design documents, and change certain database configuration
+parameters.  The authorization rules are set up by a server admin and can be
+modified at any time.
+
+Database authorization rules assign a user into one of two classes:
+
+- `members`, who are allowed to read all documents and create and modify any
+  document except for design documents.
+- `admins`, who can read and write all types of documents, modify which users
+  are members or admins, and set certain per-database configuration options.
+
+Note that a database admin is not the same as a server admin -- the actions
+of a database admin are restricted to a specific database.
+
+When a database is first created, there are no members or admins.  HTTP
+requests that have no authentication credentials or have credentials for a
+normal user are treated as members, and those with server admin credentials
+are treated as database admins.  To change the default permissions, you must
+create a :ref:`_security <api/db/security>` document in the database::
+
+  > curl -X PUT http://localhost:5984/mydatabase/_security \
+       -u anna:secret \
+       -H "Content-Type: application/json" \
+       -d '{"admins": { "names": [], "roles": [] }, "members": { "names": ["jan"], "roles": [] } }'
+
+The HTTP request to create the `_security` document must contain the
+credentials of a server admin.  CouchDB will respond with:
+
+.. code-block:: javascript
+
+  {"ok":true}
+
+The database is now secured against anonymous reads and writes::
+
+  > curl http://localhost:5984/mydatabase/
+
+.. code-block:: javascript
+
+  {"error":"unauthorized","reason":"You are not authorized to access this db."}
+
+You declared user "jan" as a member in this database, so he is able to read and
+write normal documents::
+
+  > curl -u jan:apple http://localhost:5984/mydatabase/
+
+.. code-block:: javascript
+
+  {"db_name":"mydatabase","doc_count":1,"doc_del_count":0,"update_seq":3,"purge_seq":0,
+  "compact_running":false,"disk_size":12376,"data_size":272,"instance_start_time":"1397672867731570",
+  "disk_format_version":6,"committed_update_seq":3}
+
+If Jan attempted to create a design doc, however, CouchDB would return a
+401 Unauthorized error because the username "jan" is not in the list of
+admin names and the `/_users/org.couchdb.user:jan` document doesn't contain
+a role that matches any of the declared admin roles.  If you want to promote
+Jan to an admin, you can update the security document to add `"jan"` to
+the `names` array under `admin`.  Keeping track of individual database
+admin usernames is tedious, though, so you would likely prefer to create a
+database admin role and assign that role to the `org.couchdb.user:jan` user
+document::
+
+  > curl -X PUT http://localhost:5984/mydatabase/_security \
+       -u anna:secret \
+       -H "Content-Type: application/json" \
+       -d '{"admins": { "names": [], "roles": ["mydatabase_admin"] }, "members": { "names": [], "roles": [] } }'
+
+See the :ref:`_security document reference page <api/db/security>` for
+additional details about specifying database members and admins.
