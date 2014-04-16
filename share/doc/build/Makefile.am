@@ -120,6 +120,7 @@ html_files = \
     html/_sources/cve/2012-5641.txt \
     html/_sources/cve/2012-5649.txt \
     html/_sources/cve/2012-5650.txt \
+    html/_sources/cve/2014-2668.txt \
     html/_sources/cve/index.txt \
     html/_sources/fauxton/addons.txt \
     html/_sources/fauxton/index.txt \
@@ -242,6 +243,7 @@ html_files = \
     html/cve/2012-5641.html \
     html/cve/2012-5649.html \
     html/cve/2012-5650.html \
+    html/cve/2014-2668.html \
     html/cve/index.html \
     html/fauxton/addons.html \
     html/fauxton/index.html \
