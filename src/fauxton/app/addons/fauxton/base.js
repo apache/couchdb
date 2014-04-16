@@ -134,6 +134,17 @@ function(app, FauxtonAPI, resizeColumns) {
   Fauxton.NavBar = FauxtonAPI.View.extend({
     className:"navbar",
     template: "addons/fauxton/templates/nav_bar",
+    
+    events:  {
+      "click .burger" : "toggleMenu"
+    },
+    
+    toggleMenu: function(){
+       var $selectorList = $('body');
+       $selectorList.toggleClass('closeMenu');
+       this.resizeColumns.onResizeHandler();
+    },
+    
     // TODO: can we generate this list from the router?
     navLinks: [
       {href:"#/_all_dbs", title:"Databases", icon: "fonticon-database", className: 'databases'}
@@ -202,23 +213,7 @@ function(app, FauxtonAPI, resizeColumns) {
     afterRender: function(){
       $('#primary-navbar li[data-nav-name="' + app.selectedHeader + '"]').addClass('active');
 
-      var menuOpen = true;
       var $selectorList = $('body');
-      $('.brand').off();
-      $('.brand').on({
-        click: function(e){
-          if(!$(e.target).is('a')){
-            toggleMenu();
-          }
-        }
-      });
-
-      function toggleMenu(){
-        $selectorList.toggleClass('closeMenu');
-        menuOpen = $selectorList.hasClass('closeMenu');
-        this.resizeColumns.onResizeHandler();
-      }
-      
       var that = this;
       $('#primary-navbar').on("click", ".nav a", function(){
         if (!($selectorList.hasClass('closeMenu'))){

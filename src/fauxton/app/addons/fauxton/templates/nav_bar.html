@@ -12,13 +12,10 @@ License for the specific language governing permissions and limitations under
 the License.
 -->
 
-<div class="brand">
-  <div class="burger">
-    <div><!-- * --></div>
-    <div><!-- * --></div>
-    <div><!-- * --></div>
-  </div>
-  <div class="icon">Apache Fauxton</div>
+<div class="burger">
+  <div><!-- * --></div>
+  <div><!-- * --></div>
+  <div><!-- * --></div>
 </div>
 
 <nav id="main_navigation">
@@ -33,18 +30,16 @@ the License.
         </li>
     <% }); %>
   </ul>
-
-  <div id="footer-links">
-
-    <ul id="bottom-nav-links" class="nav">
+  
+  <div id="bottom-nav">
+  	<ul id="bottom-nav-links" class="nav">
         <li data-nav-name= "Documentation">
             <a href="<%=getDocUrl('docs')%>" target="_blank">
               <i class="fonticon-bookmark fonticon"></i>
                 Documentation
             </a>
         </li>
-
-
+        
       <% _.each(bottomNavLinks, function(link) { %>
       <% if (link.view) {return;}  %>
         <li data-nav-name= "<%= link.title %>">
@@ -55,7 +50,14 @@ the License.
         </li>
       <% }); %>
     </ul>
+  </div>
+</nav>
 
+<div class="bottom-container">
+  <div class="brand">
+     <div class="icon">Apache Fauxton</div>
+  </div>
+  <div id="footer-links">
     <ul id="footer-nav-links" class="nav">
       <% _.each(footerNavLinks, function(link) { %>
       <% if (link.view) {return;}  %>
@@ -67,9 +69,5 @@ the License.
         </li>
       <% }); %>
     </ul>
-
   </div>
-</nav>
-
-
-
+</div>

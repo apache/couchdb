@@ -279,6 +279,8 @@ table.databases {
 
 /* application specific stuff */
 #main > footer {
+  .box-shadow(-7px 0 15px -6px #000);
+  border-left: 1px solid #999;
   position: fixed;
   bottom: 0;
   font-size: 10px;
@@ -335,6 +337,7 @@ table.databases {
   top: 0;
   bottom: 0;
   background-color: @primaryNav;
+  overflow-y: scroll;
   #footer-links{
     position: absolute;
     bottom: 0;
@@ -344,55 +347,81 @@ table.databases {
     font-size: 12px
   }
   .navbar {
-    .brand {
-      .box-sizing(content-box);
-      .hide-text;
-      .customTransition(left, 1s, 0.805, 0.005, 0.165, 0.985);
-      margin: 10px 0 6px;
-      width: 174px;
-      height: 40px;
-      padding: 10px;
-      .icon{
-        .box-sizing(content-box);
-        background: url(../img/couchdb-site.png) no-repeat 0 0;
-        display: block;
-        height: 100%;
-        width: 100%; 
-      }
-      .burger{
+     .burger{
         .transition(all @transitionSpeed @transitionEaseType);
-        padding-top: 6px;
-        left: -8px;
-        position: absolute;
+        padding: 22px 0 0 18px;
+        position: fixed;
+        top: 0;
+        z-index: 100;
+        background-color: @primaryNav;
+        width: @navWidth;
         div{
           .transition(all @transitionSpeed @transitionEaseType);
           height: 4px;
-          width: 8px;
+          width: 24px;
           .border-radius(2);
           background-color: @navBG;
-          margin: 4px 0px;
+          margin: 2px 0px;
+        }
+        &:hover div{
+          background-color: @orange;
         }
       }
-      &:hover .burger div{
-        background-color: @orange;
-      }
-      .closeMenu & {
-        .icon {
-          background: url(../img/minilogo.png) no-repeat 0 0;
-        }
-        width: 45px;
-        .burger{
-          left: 0;
-        }
-      }
+      .bottom-container {
+	     height: 110px;
+	     position: fixed;
+	     bottom: 0;
+	     width: 220px;
+	     background: #3a2c2b;
+       .brand {
+         .box-sizing(content-box);
+         .hide-text;
+         .customTransition(left, 1s, 0.805, 0.005, 0.165, 0.985);
+         margin: 10px 0 0 0;
+         width: 200px;
+         height: 40px;
+         padding: 10px;
+         float: none;
+         background: #3a2c2b;
+         .icon {
+           .box-sizing(content-box);
+           background: url(../img/couchdb-site.png) no-repeat 0 0;
+           display: block;
+           height: 100%;
+           width: 100%; 
+         }
+         .closeMenu & {
+           .icon {
+              background: url(../img/minilogo.png) no-repeat 0 0;
+            }
+            width: 45px;
+          }
+       }
+       #footer-nav-links {
+	     li {
+		   a {
+		     font-size: 12px;
+		     color: @red;
+		     padding: 12px;
+		     text-shadow: none;
+		   }
+		   &.active, &:hover{
+             a {
+               text-decoration: underline;
+             }
+           }
+		 } 
+       }
     }
     nav {
+      margin-top: 64px;
       .nav{
         margin: 0;
         li{
           .transition(all @transitionSpeed @transitionEaseType);
           padding: 0;
-          font-size: 20px;
+          font-size: 16px;
+          letter-spacing: 1px;
           line-height: 23px;
           width: @navWidth;
           font-weight: normal;
@@ -400,7 +429,7 @@ table.databases {
           .box-sizing(border-box);
           background-color: @navBG;
           border-bottom:  1px solid @primaryNav;
-          min-height: 55px;
+          min-height: 48px;
           &.active, &:hover{
             a{
               .box-shadow(none);
@@ -417,7 +446,7 @@ table.databases {
             color: @NavIconActive;
           }
           a{
-            padding: 17px 25px 12px 60px;
+            padding: 12px 25px 12px 60px;
             background-color: transparent;
             color: #fff;
             text-shadow: @textShadowOff;
@@ -429,8 +458,8 @@ table.databases {
               &:before {
                 position: absolute;
                 top: -5px;
-                left: -44px;
-                font-size: 28px;
+                left: -41px;
+                font-size: 24px;
                 color: @NavIcon;
                 text-shadow: @boxShadowOff;
               }
@@ -460,11 +489,13 @@ table.databases {
             color: @red;
           }
         }
+        
       }
       ul#bottom-nav-links{
         margin-top: 0;
+        padding-bottom: 70px;
         li{
-          min-height: 46px;
+          min-height: 55px;
           background-color: @bottomNav;
           &.active{
             background-color:@linkRed;
