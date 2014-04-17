@@ -90,7 +90,7 @@ function(app, FauxtonAPI, Documents, Databases) {
       database = this.database;
 
       doc.copy(newId).then(function () {
-        doc.set({_id: newId}); 
+        doc.set({_id: newId});
         docView.forceRender();
         FauxtonAPI.navigate('/database/' + database.safeID() + '/' + app.utils.safeURLName(newId), {trigger: true});
         FauxtonAPI.addNotification({
@@ -143,7 +143,11 @@ function(app, FauxtonAPI, Documents, Databases) {
     layout: "with_tabs_sidebar",
     selectedHeader: "Databases",
     routes: {
-      "database/:database/_all_docs(:extra)": "allDocs", 
+
+      "database/:database/_all_docs(:extra)": {
+        route: "allDocs",
+        roles: ["_reader","_writer","_admin"]
+      },
       "database/:database/_design/:ddoc/_view/:view": {
         route: "viewFn",
         roles: ['_admin']
@@ -198,7 +202,7 @@ function(app, FauxtonAPI, Documents, Databases) {
     },
 
     /*
-    * docParams are the options collection uses to fetch from the server 
+    * docParams are the options collection uses to fetch from the server
     * urlParams are what are shown in the url and to the user
     * They are not the same when paginating
     */
@@ -266,7 +270,7 @@ function(app, FauxtonAPI, Documents, Databases) {
           pageSize: this.getDocPerPageLimit(urlParams, parseInt(docParams.limit, 10))
         }
       });
-     
+
       this.viewEditor = this.setView("#dashboard-upper-content", new Documents.Views.ViewEditor({
         model: this.data.database,
         ddocs: this.data.designDocs,
@@ -281,7 +285,7 @@ function(app, FauxtonAPI, Documents, Databases) {
 
       this.documentsView = this.createViewDocumentsView({
         designDoc: decodeDdoc,
-        docParams: docParams, 
+        docParams: docParams,
         urlParams: urlParams,
         database: this.data.database,
         indexedDocs: this.data.indexedDocs,
@@ -308,7 +312,7 @@ function(app, FauxtonAPI, Documents, Databases) {
       };
     },
 
-    createViewDocumentsView: function (options) { 
+    createViewDocumentsView: function (options) {
 
       return this.setView("#dashboard-lower-content", new Documents.Views.AllDocsList({
         database: options.database,
@@ -374,7 +378,7 @@ function(app, FauxtonAPI, Documents, Databases) {
         if (!this.documentsView) {
           this.documentsView = this.createViewDocumentsView({
             designDoc: ddoc,
-            docParams: docParams, 
+            docParams: docParams,
             urlParams: urlParams,
             database: this.data.database,
             indexedDocs: this.indexedDocs,
@@ -453,7 +457,7 @@ function(app, FauxtonAPI, Documents, Databases) {
         } else {
           storedPerPage = parseInt(storedPerPage, 10);
         }
-      } 
+      }
 
       if (!urlParams.limit || urlParams.limit > storedPerPage) {
         return parseInt(storedPerPage, 10);
