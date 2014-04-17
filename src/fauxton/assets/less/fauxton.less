@@ -338,6 +338,11 @@ table.databases {
   bottom: 0;
   background-color: @primaryNav;
   overflow-y: scroll;
+  .version {
+    color: #fff;
+    font-size: 10px;
+    padding-left: 10px;
+  }
   #footer-links{
     position: absolute;
     bottom: 0;
@@ -388,7 +393,7 @@ table.databases {
            background: url(../img/couchdb-site.png) no-repeat 0 0;
            display: block;
            height: 100%;
-           width: 100%; 
+           width: 100%;
          }
          .closeMenu & {
            .icon {
@@ -410,7 +415,7 @@ table.databases {
                text-decoration: underline;
              }
            }
-		 } 
+		 }
        }
     }
     nav {
@@ -489,7 +494,7 @@ table.databases {
             color: @red;
           }
         }
-        
+
       }
       ul#bottom-nav-links{
         margin-top: 0;
@@ -499,7 +504,7 @@ table.databases {
           background-color: @bottomNav;
           &.active{
             background-color:@linkRed;
-          } 
+          }
           &:hover{
             background-color: @navBGHover;
           }
@@ -507,6 +512,7 @@ table.databases {
             &.fonticon {
               position: relative;
               &:before {
+                top: -5px;
                 left: -40px;
                 font-size: 22px;
               }
@@ -780,14 +786,14 @@ table.databases {
 
 .custom-inputs{
 
-  input[type=radio], 
-  input[type=checkbox] {  
-    display: none;  
-  } 
+  input[type=radio],
+  input[type=checkbox] {
+    display: none;
+  }
 
-  .checkbox label:before {  
-    border-radius: 3px;  
-  }  
+  .checkbox label:before {
+    border-radius: 3px;
+  }
 
   .controls > .radio:first-child, .controls > .checkbox:first-child {
     padding-top: 15px;
@@ -800,42 +806,42 @@ table.databases {
     vertical-align: middle;
   }
 
-  input[type=checkbox]:checked + label:before {  
+  input[type=checkbox]:checked + label:before {
     /*content: "\2713"; */
-    content: "\00d7"; 
-    text-shadow: 1px 1px 1px rgba(0, 0, 0, .2);  
+    content: "\00d7";
+    text-shadow: 1px 1px 1px rgba(0, 0, 0, .2);
     font-size: 16px;
-    background-color: @red;  
-    color: white;  
-    text-align: center;  
-    line-height: 15px;  
-  }  
+    background-color: @red;
+    color: white;
+    text-align: center;
+    line-height: 15px;
+  }
 
-  label:before {  
-    content: "";  
-    display: inline-block;  
+  label:before {
+    content: "";
+    display: inline-block;
 
-    width: 16px;  
-    height: 16px;  
+    width: 16px;
+    height: 16px;
 
-    margin-right: 10px;  
-    position: absolute;  
-    left: 0;  
-    bottom: 1px;  
-    background-color: #aaa;  
-    box-shadow: inset 0px 2px 3px 0px rgba(0, 0, 0, .3), 0px 1px 0px 0px rgba(255, 255, 255, .8);  
-  }  
+    margin-right: 10px;
+    position: absolute;
+    left: 0;
+    bottom: 1px;
+    background-color: #aaa;
+    box-shadow: inset 0px 2px 3px 0px rgba(0, 0, 0, .3), 0px 1px 0px 0px rgba(255, 255, 255, .8);
+  }
 
-  .radio label:before {  
-    border-radius: 8px;  
-  }  
+  .radio label:before {
+    border-radius: 8px;
+  }
 
-  input[type=radio]:checked + label:before {  
-    content: "\2022";  
-    color: #f3f3f3;  
-    font-size: 30px;  
-    text-align: center;  
-    line-height: 18px;  
+  input[type=radio]:checked + label:before {
+    content: "\2022";
+    color: #f3f3f3;
+    font-size: 30px;
+    text-align: center;
+    line-height: 18px;
   }
 
   label.drop-down{

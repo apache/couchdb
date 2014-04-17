@@ -46,17 +46,15 @@ function(app, FauxtonAPI, resizeColumns) {
   });
 
   Fauxton.initialize = function () {
-    app.footer = new Fauxton.Footer({el: "#footer-content"}),
+    // app.footer = new Fauxton.Footer({el: "#footer-content"}),
     app.navBar = new Fauxton.NavBar();
     app.apiBar = new Fauxton.ApiBar();
 
-    FauxtonAPI.when.apply(null, app.footer.establish()).done(function() {
+    FauxtonAPI.when.apply(null, app.navBar.establish()).done(function() {
       FauxtonAPI.masterLayout.setView("#primary-navbar", app.navBar, true);
       FauxtonAPI.masterLayout.setView("#api-navbar", app.apiBar, true);
       app.navBar.render();
       app.apiBar.render();
-
-      app.footer.render();
     });
 
     FauxtonAPI.masterLayout.navBar = app.navBar;
@@ -114,6 +112,7 @@ function(app, FauxtonAPI, resizeColumns) {
   });
 
   Fauxton.Footer = FauxtonAPI.View.extend({
+    tagName: "p",
     template: "addons/fauxton/templates/footer",
 
     initialize: function() {
@@ -134,17 +133,17 @@ function(app, FauxtonAPI, resizeColumns) {
   Fauxton.NavBar = FauxtonAPI.View.extend({
     className:"navbar",
     template: "addons/fauxton/templates/nav_bar",
-    
+
     events:  {
       "click .burger" : "toggleMenu"
     },
-    
+
     toggleMenu: function(){
        var $selectorList = $('body');
        $selectorList.toggleClass('closeMenu');
        this.resizeColumns.onResizeHandler();
     },
-    
+
     // TODO: can we generate this list from the router?
     navLinks: [
       {href:"#/_all_dbs", title:"Databases", icon: "fonticon-database", className: 'databases'}
@@ -158,9 +157,10 @@ function(app, FauxtonAPI, resizeColumns) {
       //resizeAnimation
       app.resizeColumns = this.resizeColumns = new resizeColumns({});
       this.resizeColumns.onResizeHandler();
-      
+
       FauxtonAPI.extensions.on('add:navbar:addHeaderLink', this.addLink);
       FauxtonAPI.extensions.on('removeItem:navbar:addHeaderLink', this.removeLink);
+      this.versionFooter = new Fauxton.Footer({});
     },
 
     serialize: function() {
@@ -169,6 +169,10 @@ function(app, FauxtonAPI, resizeColumns) {
         bottomNavLinks: this.bottomNavLinks,
         footerNavLinks: this.footerNavLinks
       };
+    },
+
+    establish: function(){
+      return [this.versionFooter.establish()];
     },
 
     addLink: function(link) {
@@ -230,6 +234,7 @@ function(app, FauxtonAPI, resizeColumns) {
     },
 
     beforeRender: function () {
+      this.insertView(".version", this.versionFooter);
       this.addLinkViews();
     },
 

@@ -30,7 +30,7 @@ the License.
         </li>
     <% }); %>
   </ul>
-  
+
   <div id="bottom-nav">
   	<ul id="bottom-nav-links" class="nav">
         <li data-nav-name= "Documentation">
@@ -39,7 +39,7 @@ the License.
                 Documentation
             </a>
         </li>
-        
+
       <% _.each(bottomNavLinks, function(link) { %>
       <% if (link.view) {return;}  %>
         <li data-nav-name= "<%= link.title %>">
@@ -70,4 +70,5 @@ the License.
       <% }); %>
     </ul>
   </div>
+  <div class="version"></div>
 </div>

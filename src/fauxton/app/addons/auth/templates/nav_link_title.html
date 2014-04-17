@@ -12,20 +12,20 @@ License for the specific language governing permissions and limitations under
 the License.
 -->
 <% if (admin_party) { %>
-  <a id="user-create-admin" class="alert_nav" href="#createAdmin"> 
+  <a id="user-create-admin" class="alert_nav" href="#createAdmin">
   	<span class="fonticon-user fonticon"></span>
-  	Admin Party! [FIX THIS] 
+  	Admin Party! <br>[FIX THIS]<br>
     <small>Everyone is an admin.</small>
   </a>
 <% } else if (user) { %>
   <a  href="#changePassword" >
-  	<span class="fonticon-user fonticon"></span> 
-  	<%= user.name %> 
+  	<span class="fonticon-user fonticon"></span>
+  	<%= user.name %>
 	</a>
 <% } else { %>
-  <a  href="#login" >  
-  	<span class="fonticon-user fonticon"></span> 
-  	Login 
+  <a  href="#login" >
+  	<span class="fonticon-user fonticon"></span>
+  	Login
   </a>
 <% } %>
 
