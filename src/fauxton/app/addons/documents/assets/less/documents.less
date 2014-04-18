@@ -84,9 +84,13 @@ button.beautify {
 .change-box {
   margin: 0 20px 20px 20px;
 }
+.searchbox-container {
+  position: fixed;
+  right: 15px;
+}
 
 .change-wrapper {
-  margin-top: 57px;
+  margin-top: 20px;
   border-bottom: 1px solid #dddddd;
   &:last-child {
     border-bottom: none;
@@ -132,6 +136,7 @@ button.beautify {
   word-wrap: break-word;
 }
 
+
 #dashboard-upper-content{
   .js-query-keys-wrapper{
     padding-top: 0;
@@ -147,6 +152,69 @@ button.beautify {
       #skipRows {
         margin-bottom: 0;
         padding: 6px;
+      }
+    }
+  }
+}
+
+.sidenav{
+  margin-bottom: 40px;
+  li.nav-header {
+    position: relative;
+    .accordion-body{
+      &.in {
+        border-bottom: 1px solid #d3d7db;
+      }
+      color: #eee;
+      margin-left: 0;
+      li a{
+        padding-left: 55px;
+        font-size: 14px;
+        &:hover {
+          text-decoration: none;
+          color: #af2d24;
+        }
+      }
+    }
+    > span{
+      display: block;
+      padding: 10px 13px 10px 30px;
+      color: #333333;
+      border-bottom: 1px solid #d3d7db;
+      &:before{
+        vertical-align: bottom;
+        font-size: 12px;
+        padding-right: 10px;
+        margin-bottom: 2px;
+      }
+      &.down:before {
+        margin-bottom: -2px;
+        transform:rotate(90deg);
+        -ms-transform:rotate(90deg); /* IE 9 */
+        -webkit-transform:rotate(90deg); /* Opera, Chrome, and Safari */
+      }
+    }
+    div.new-button {
+      position: absolute;
+      top: 2px;
+      right: 15px;
+      .dropdown-menu{
+        left: -82px;
+        padding-bottom: 0;
+        width: auto;
+        min-width: 0;
+        li a {
+          padding: 10px 15px 10px 12px;
+        }
+      }
+      .dropdown-toggle{
+        text-decoration: none;
+      }
+      > a {
+        border-bottom: none;
+        text-decoration: none;
+        font-size: 16px;
+
       }
     }
   }

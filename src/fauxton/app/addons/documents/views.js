@@ -345,25 +345,27 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       this.ddoc = options.ddoc;
       this.database = options.database;
       this.selected = !! options.selected;
+      this.selector = options.selector;
     },
 
     serialize: function() {
       return {
+        type:  this.selector,
         index: this.index,
         ddoc: this.ddoc,
         database: this.database,
-        index_clean: app.utils.removeSpecialCharacters(this.index),
-        ddoc_clean: app.utils.removeSpecialCharacters(this.ddoc),
-        index_encoded: app.utils.safeURLName(this.index),
-        ddoc_encoded: app.utils.safeURLName(this.ddoc),
-        database_encoded: app.utils.safeURLName(this.database),
+        // index_clean: app.utils.removeSpecialCharacters(this.index),
+        // ddoc_clean: app.utils.removeSpecialCharacters(this.ddoc),
+        // index_encoded: app.utils.safeURLName(this.index),
+        // ddoc_encoded: app.utils.safeURLName(this.ddoc),
+        // database_encoded: app.utils.safeURLName(this.database),
         selected: this.selected
       };
     },
 
     afterRender: function() {
       if (this.selected) {
-        $("#sidenav ul.nav-list li").removeClass("active");
+        $(".sidenav ul.nav-list li").removeClass("active");
         this.$el.addClass("active");
       }
     }
@@ -454,6 +456,11 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
         hasReduce: false,
         showPreview: false,
         database: this.database,
+      }));
+
+      this.toolsView = this.setView(".js-search", new Views.JumpToDoc({
+        database: this.database,
+        collection: this.database.allDocs
       }));
     },
 
@@ -1348,6 +1355,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       this.ddocs = options.ddocs;
       this.params = options.params;
       this.database = options.database;
+      this.currentDdoc = options.currentddoc;
       if (this.newView) {
         this.viewName = 'newView';
       } else {
@@ -1635,8 +1643,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       if ($targetTab.attr('id') !== $previousTab.attr('id')) {
         $previousTab.removeAttr('style');
       }
-      //stop polling
-      this.ddocInfoView.stopRefreshInterval();
 
       if ($targetId === 'index-nav') {
         if (this.newView) { return; }
@@ -1645,11 +1651,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
         $targetTab.toggle('slow', function(){
            that.showEditors();
         });
-      } else if ($targetId === "meta-nav"){
-        if (!$("#ddoc-info").is(":visible")){
-          this.ddocInfoView.startRefreshInterval();
-        }
-        $targetTab.toggle('slow');
       } else {
         $targetTab.toggle('slow');
       }
@@ -1693,16 +1694,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
         $('.beautify-tooltip').tooltip();
       }
     },
-    renderDdocInfo: function(){
-      if(this.ddocInfoView){
-        this.ddocInfoView.remove();
-      }
-
-      if (this.newView) { return; }
-      this.ddocInfoView = this.setView('#ddoc-info', new Views.DdocInfo({model: this.ddocInfo }));
-      this.ddocInfoView.render();
-
-    },
     beforeRender: function () {
 
       if (this.newView) {
@@ -1721,7 +1712,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
 
       this.designDocSelector = this.setView('.design-doc-group', new Views.DesignDocSelector({
         collection: this.ddocs,
-        ddocName: this.model.id,
+        ddocName: this.currentDdoc || this.model.id,
         database: this.database
       }));
 
@@ -1742,7 +1733,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
     },
 
     afterRender: function() {
-      this.renderDdocInfo();
 
       if (this.params && !this.newView) {
         this.advancedOptions.updateFromParams(this.params);
@@ -1824,6 +1814,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
 
   Views.Sidebar = FauxtonAPI.View.extend({
     template: "addons/documents/templates/sidebar",
+    className: "sidenav",
+    tagName: "nav",
     events: {
       "click button#delete-database": "showDeleteDatabaseModal"
     },
@@ -1857,17 +1849,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       };
     },
 
-    buildIndexList: function(collection, selector, design){
-      _.each(_.keys(collection), function(key){
-        var selected = this.ddocID == "_design/"+design;
-        this.insertView("ul.nav." + selector, new Views.IndexItem({
-          ddoc: design,
-          index: key,
-          database: this.collection.database.id,
-          selected: selected && key == this.currView
-        }));
-      }, this);
-    },
 
     beforeRender: function(manage) {
       this.deleteDBModal = this.setView(
@@ -1875,21 +1856,14 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
         new Views.DeleteDBModal({database: this.database})
       );
 
-      var sidebarListViews = FauxtonAPI.getExtensions('sidebar:list');
-      _.each(sidebarListViews, function (view) {
-        var extension = this.insertView('#extension-navs', view);
-        extension.update(this.database, this.collection, this.viewName);
-        extension.render();
-      }, this);
-
       this.collection.each(function(design) {
         if (design.has('doc')){
-          var ddoc = design.id.replace(/^_design\//,"");
-          if (design.get('doc').views){
-            this.buildIndexList(design.get('doc').views, "views", ddoc);
-          }
+          this.insertView(new Views.DdocSidenav({
+            model: design,
+            collection: this.collection
+          }));
         }
-      }, this);
+      },this);
     },
 
 
@@ -1901,8 +1875,88 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
 
     setSelectedTab: function (selectedTab) {
       this.selectedTab = selectedTab;
+      var $selectedTab = this.$('#' + selectedTab);
+
       this.$('li').removeClass('active');
-      this.$('#' + selectedTab).parent().addClass('active');
+      $selectedTab.parent().addClass('active');
+
+      if ($selectedTab.parents(".accordion-body").length !== 0){
+        $selectedTab
+        .parents(".accordion-body")
+        .addClass("in")
+        .parents(".nav-header")
+        .find(".js-collapse-toggle").addClass("down");
+      }
+
+    }
+  });
+
+
+  Views.DdocSidenav = FauxtonAPI.View.extend({
+    tagName: "ul",
+    className:  "nav nav-list",
+    template: "addons/documents/templates/design_doc_menu",
+    events: {
+      "click button": "no",
+      "click .js-collapse-toggle": "toggleArrow"
+    },
+    initialize: function(){
+
+    },
+    toggleArrow:  function(e){
+      this.$(e.currentTarget).toggleClass("down");
+    },
+    no: function(event){
+      event.preventDefault();
+      alert("no");
+    },
+    buildIndexList: function(collection, selector){
+      var design = this.model.id.replace(/^_design\//,"");
+      _.each(_.keys(collection[selector]), function(key){
+        this.insertView(".accordion-body", new Views.IndexItem({
+          selector: selector,
+          ddoc: design,
+          index: key,
+          database: this.model.collection.database.id
+        }));
+      }, this);
+    },
+
+    serialize: function(){
+      var ddocName = this.model.id.replace(/^_design\//,"");
+      return{
+        database: this.collection.database,
+        designDoc: ddocName,
+        ddoc_clean: app.utils.removeSpecialCharacters(ddocName),
+        ddoc_encoded: app.utils.safeURLName(ddocName),
+        database_encoded: app.utils.safeURLName(this.model.collection.database.id),
+      };
+    },
+    beforeRender: function(manage) {
+      var ddocDocs = this.model.get("doc");
+      var ddocName = this.model.id.replace(/^_design\//,"");
+
+      var sidebarListTypes = FauxtonAPI.getExtensions('sidebar:list');
+          if (ddocDocs){
+            //Views
+            this.buildIndexList(ddocDocs, "views");
+            //lists
+            // this.buildIndexList(ddocDocs, "lists");
+            // //show
+            // this.buildIndexList(ddocDocs, "show");
+            // //filters
+            // this.buildIndexList(ddocDocs, "filters");
+            //extensions
+            _.each(sidebarListTypes, function (type) {
+              this.buildIndexList(ddocDocs, type);
+            },this);
+          }
+      this.insertView(".new-button", new Views.newMenuDropdown({
+        database: this.collection.database,
+        ddocSafeName: app.utils.safeURLName(ddocName),
+        fullMenu: false
+      }));
+
     }
   });
 
@@ -1958,16 +2012,51 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
     }
   });
 
+
+  Views.newMenuDropdown = FauxtonAPI.View.extend({
+    template: "addons/documents/templates/add_new_ddoc_fn_dropdown",
+    tagName: "div",
+    className: "dropdown",
+    initialize: function(options){
+      this.database = options.database;
+      this.fullMenu = options.fullMenu;
+      this.ddocSafeName = options.ddocSafeName || "";
+    },
+    serialize: function(){
+      var sidebarItem = FauxtonAPI.getExtensions('sidebar:links');
+      return {
+        extensionLinks: sidebarItem,
+        database: this.database,
+        ddocSafe: this.ddocSafeName,
+        full:  this.fullMenu
+      };
+    }
+  });
+
+
+  Views.temp = FauxtonAPI.View.extend({
+  });
+
   Views.DdocInfo = FauxtonAPI.View.extend({
     template: "addons/documents/templates/ddoc_info",
 
     initialize: function (options) {
+      this.ddocName = options.ddocName;
       this.refreshTime = options.refreshTime || 5000;
       this.listenTo(this.model, 'change', this.render);
     },
 
+    establish: function () {
+      return this.model.fetch();
+    },
+
+    afterRender: function(){
+      this.startRefreshInterval();
+    },
+
     serialize: function () {
       return {
+        Ddoc: this.ddocName,
         view_index: this.model.get('view_index')
       };
     },

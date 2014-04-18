@@ -568,12 +568,15 @@ table.databases {
     padding: 0px;
     bottom: 0px;
     top: 60px;
-    position: absolute;
+    position: fixed;
     overflow-x: hidden;
     overflow-y: auto;
-    left: @sidebarWidth;
+    left: @sidebarWidth+@navWidth;
     right: 0;
     .box-sizing(border-box);
+    .closeMenu & {
+      left: @sidebarWidth+@collapsedNavWidth;
+    }
   }
   > div.inner {
     display: block;
@@ -650,15 +653,20 @@ table.databases {
 .topmenu-defaults {
   height: 70px;
   padding: 12px 10px 0;
-  border-bottom: 1px solid @darkRed;
   .box-sizing(border-box);
 }
 
-#dashboard-upper-menu{
+.dashboard-upper-menu{
+  right: 0;
+  left: @sidebarWidth+@navWidth;
   position: fixed;
   z-index: 11;
+  display: block;
   .topmenu-defaults;
   background-color: #CBCBCB;
+  .closeMenu & {
+    left: @sidebarWidth+@collapsedNavWidth;
+  }
 }
 
 #dashboard-lower-content{
@@ -677,54 +685,53 @@ table.databases {
   }
 }
 
-#sidenav{
+.sidenav {
   padding: 0;
   header {
     width: @sidebarWidth;
-    .box-shadow(inset -7px 0 15px -6px #000);
-    background: transparent url('../img/linen.png') repeat 0 0;
-    .topmenu-defaults;
   }
-  nav {
-    .nav-list{
-      .divider {
-        border: none;
+  .nav-list{
+    .divider {
+      border: none;
+    }
+    li.active a {
+      background-color: @darkRed;
+      color: #fff;
+    }
+    > li > a{
+      padding: 10px 13px 10px 30px;
+      border-bottom: 1px solid #d3d7db;
+    }
+    .dropdown-menu {
+      a {
+        color: #d9d9d9;
       }
-      li.active a {
-        background-color: @darkRed;
-        color: #fff;
-      }
-      a{
-        display: block;
-        padding: 10px 5px 10px 15px;
-        color: #333333;
-        border-bottom: 1px solid #989898;
-        .divider {
-          background: none;
-          color: #ccc;
-          padding: 0 2px;
-        }
-      }
-      .nav-header{
-        background-color: #B2B2B2;
-        padding: 5px;
-        text-shadow: none;
-        color: #333333;
-        border-bottom: 1px solid #989898;
-      }
+    }
+    a{
+      display: block;
+      padding: 10px 5px 10px 15px;
+      color: #333333;
 
+      .divider {
+        background: none;
+        color: #ccc;
+        padding: 0 2px;
+      }
+    }
+    .nav-header{
+      padding: 0px;
+      text-shadow: none;
+      color: #333333;
+      margin-bottom: -4px;
     }
   }
 }
+
 #sidebar-content {
-.box-shadow(-7px 0 15px -6px #000);
   position: absolute;
-  bottom: 0px;
   top: 60px;
   width: @sidebarWidth;
   left: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
   background-color: @secondarySidebar;
   > div.inner {
     display: block;
@@ -747,7 +754,7 @@ table.databases {
 #db-views-tabs-nav{
   position: fixed;
   z-index: 12;
-  margin-top: 31px;
+  margin-top: 19px;
   margin-bottom: 0;
   /*background-color: #f4f4f4;*/
   padding: 0 20px;

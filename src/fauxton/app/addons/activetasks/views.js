@@ -109,6 +109,8 @@ function (app, FauxtonAPI, ActiveTasks) {
   });
 
   Views.TabMenu = FauxtonAPI.View.extend({
+    tagName: "nav",
+    className: "sidenav",
     template: "addons/activetasks/templates/tabs",
 
     events: {

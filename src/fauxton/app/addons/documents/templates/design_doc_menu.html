@@ -11,19 +11,17 @@ WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 License for the specific language governing permissions and limitations under
 the License.
 -->
+<li class="nav-header">
+	<span  class="fonticon-play js-collapse-toggle" data-toggle="collapse" data-target="#<%= ddoc_clean %>">
+		<%= designDoc%>
+	</span>
+	<div class="new-button"></div>
+	<ul class="accordion-body collapse" id="<%= ddoc_clean %>">
+		<li>
+			<a id="<%= ddoc_clean %>_metadata" href="#database/<%= database_encoded %>/_design/<%= ddoc_encoded %>/metadata" class="toggle-view">
+			  Design Doc Metadata
+			</a>
+		</li>
 
-
-<div id="primary-navbar"></div>
-<div id="dashboard" class="container-fluid">
-  <div class="fixed-header">
-    <div id="breadcrumbs"></div>
-    <div id="api-navbar"></div>
-  </div>
-
-
-  <div class="row-fluid content-area">
-    <div id="left-content" class="span6"></div>
-    <div id="right-content" class="span6"></div>
-  </div>
-</div>
-
+	</ul>
+</li>

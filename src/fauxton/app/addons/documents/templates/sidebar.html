@@ -11,34 +11,17 @@ WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 License for the specific language governing permissions and limitations under
 the License.
 -->
-
-<div id="sidenav">
-  <header class="row-fluid">
+<!--   <header class="row-fluid">
     <div class="span12">
-      <div class="btn-group">
-        <button class="btn dropdown-toggle dropdown-toggle-btn" data-toggle="dropdown">
-          Docs
-          <span class="caret"></span>
-        </button>
-        <ul class="dropdown-menu">
-          <!-- dropdown menu links -->
-          <li><a href="<%= db_url %>"><i class="icon icon-file"></i> Docs</a></li>
-          <li><a href="<%= permissions_url %>"><i class="icon icon-lock"></i> Permissions</a></li>
-          <li><a href="<%= changes_url %>"><i class="icon icon-forward"></i> Changes</a></li>
-          <% _.each(docLinks, function (link) { %>
-          <li><a href="<%= database_url + '/' + link.url %>"><i class="icon <%= link.icon %>"></i> <%= link.title %></a></li>
-          <% }); %>
-        </ul>
-      </div>
 
       <div class="btn-group">
         <button class="btn dropdown-toggle dropdown-toggle-btn" data-toggle="dropdown">
-          New
+          Create New
           <span class="caret"></span>
         </button>
         <ul class="dropdown-menu">
           <!-- dropdown menu links -->
-          <li>
+<!--           <li>
           <a id="doc" href="#<%= database.url('app') %>/new">Document</a>
           </li>
           <li>
@@ -51,18 +34,17 @@ the License.
       </div>
         <button id="delete-database" class="btn pull-right"><i class="icon-trash"></i> Database</button>
     </div>
-  </header>
+  </header> -->
 
-  <nav>
+
     <ul class="nav nav-list">
+      <li><a id="permissions" href="<%= permissions_url %>">Permissions</a><li>
+      <li><a id="changes" href="<%= changes_url %>">Changes</a><li>
+      <% _.each(docLinks, function (link) { %>
+        <li><a href="<%= database_url + '/' + link.url %>"><%= link.title %></a></li>
+      <% }); %>
       <li class="active"><a id="all-docs" href="#<%= database.url('index') %>" class="toggle-view"> All documents</a></li>
       <li><a id="design-docs" href='#<%= database.url("index") %>?startkey="_design"&endkey="_e"'  class="toggle-view"> All design docs</a></li>
     </ul>
-    <ul class="nav nav-list views">
-      <li class="nav-header">Secondary Indexes</li>
-      <li><a id="new-view" href="#<%= database.url('app') %>/new_view" class="new"><i class="icon-plus"></i> New</a></li>
-    </ul>
-    <div id="extension-navs"></div>
-  </nav>
+
   <div id="delete-db-modal"> </div>
-</div>
