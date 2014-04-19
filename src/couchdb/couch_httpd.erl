@@ -46,7 +46,7 @@ start_link(https) ->
          {keyfile, couch_config:get("ssl", "key_file", nil)},
          {certfile, couch_config:get("ssl", "cert_file", nil)},
          {password, couch_config:get("ssl", "password", nil)},
-         {secure_renegotiate, couch_config:get("ssl", "secure_renegotiate", nil)},
+         {secure_renegotiate, couch_config:get("ssl", "secure_renegotiate", false)},
          {versions, Versions},
          {ciphers, Ciphers}],
 
