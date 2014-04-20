@@ -36,6 +36,10 @@ function(app, FauxtonAPI, Collate) {
   var Pouch = {};
   Pouch.collate = Collate.collate;
 
+  function sum(values) {
+    return values.reduce(function(a, b) { return a + b; }, 0);
+  }
+
   //var MapReduce = function(db) {
   var MapReduce = function() {
 
@@ -59,7 +63,7 @@ function(app, FauxtonAPI, Collate) {
           'max': Math.max.apply(null, values),
           'count': values.length,
           'sumsqr': (function(){
-            _sumsqr = 0;
+            var _sumsqr = 0;
             for(var idx in values){
               _sumsqr += values[idx] * values[idx];
             }
@@ -73,10 +77,6 @@ function(app, FauxtonAPI, Collate) {
       console.log("IN VIEW QUERY");
       if (!options.complete) {
         return;
-      }
-
-      function sum(values) {
-        return values.reduce(function(a, b) { return a + b; }, 0);
       }
 
       var results = [];
