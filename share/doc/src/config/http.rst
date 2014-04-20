@@ -387,6 +387,30 @@ Secure Socket Level Options
       [ssl]
       verify_ssl_certificates = false
 
+  .. config:option:: secure_renegotiate :: Enable secure renegotiation
+
+    Set to `true` to reject renegotiation attempt that does not live up to RFC 5746::
+
+      [ssl]
+      secure_renegotiate = true
+
+  .. config:option:: ciphers :: Specify permitted server cipher list
+
+    Set to the cipher suites that should be supported which can be
+    specified in erlang format "{ecdhe_ecdsa,aes_128_cbc,sha256}" or
+    in OpenSSL format "ECDHE-ECDSA-AES128-SHA256".
+
+      [ssl]
+      ciphers = ["ECDHE-ECDSA-AES128-SHA256", "ECDHE-ECDSA-AES128-SHA"]
+
+  .. config:option:: tls_versions :: Specify permitted server SSL/TLS
+                     protocol versions
+
+    Set to a list of permitted SSL/TLS protocol versions::
+
+      [ssl]
+      tls_versions = [sslv3 | tlsv1 | 'tlsv1.1' | 'tlsv1.2']
+
 
 .. _cors:
 .. _config/cors:
