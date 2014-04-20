@@ -883,6 +883,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
     },
 
     getDocFromEditor: function () {
+      var json;
+
       if (!this.hasValidCode()) {
         return false;
       }

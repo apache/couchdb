@@ -20,10 +20,10 @@ define([
 
 ],
 
-function(app, FauxtonAPI,Stats, d3, nv) {
-  Views = {};
+function(app, FauxtonAPI, Stats, d3, nv) {
+  var Views = {},
+      datatypeEventer = {};
 
-  datatypeEventer = {};
   _.extend(datatypeEventer, Backbone.Events);
 
   Views.Legend = FauxtonAPI.View.extend({
