@@ -270,6 +270,9 @@ start_couchdb () {
         echo "Apache CouchDB has started, time to relax."
     else
         if test "$RECURSED" = "true"; then
+            # close stdout / stderr
+            exec 1>&-
+            exec 2>&-
             while true; do
                 export HEART_COMMAND
                 export HEART_BEAT_TIMEOUT
