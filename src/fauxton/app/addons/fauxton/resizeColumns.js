@@ -81,8 +81,11 @@ function(FauxtonAPI) {
       if(this.options.callback) {
         this.options.callback();
       }
+      this.trigger('resize');
     } 
   };
+
+  _.extend(Resize.prototype, Backbone.Events);
 
   return Resize;
 });
