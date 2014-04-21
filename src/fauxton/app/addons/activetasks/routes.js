@@ -19,36 +19,37 @@ define([
 
 function (app, FauxtonAPI, Activetasks, Views) {
 
-  var  ActiveTasksRouteObject = FauxtonAPI.RouteObject.extend({
+  var ActiveTasksRouteObject = FauxtonAPI.RouteObject.extend({
     layout: "with_sidebar",
+
     routes: {
       "activetasks/:id": "defaultView",
       "activetasks": "defaultView"
     },
+
     selectedHeader: 'Active Tasks',
+
     crumbs: [
-    {"name": "Active tasks", "link": "activetasks"}
+      {"name": "Active tasks", "link": "activetasks"}
     ],
-    apiUrl: function(){
-      return [this.newtasks.url("apiurl"), this.newtasks.documentation];
-    }, 
+
+    apiUrl: function () {
+      return [this.allTasks.url("apiurl"), this.allTasks.documentation];
+    },
 
     roles: ["_admin"],
 
-    defaultView: function(id){
-     this.newtasks = new Activetasks.Tasks({
-        currentView: "all", 
-        id:'activeTasks'
-      });
-      this.setView("#sidebar-content", new Views.TabMenu({
-        currentView: "all",
-        model: this.newtasks
-      })); 
+    initialize: function () {
+      this.allTasks = new Activetasks.AllTasks();
+    },
 
-      this.setView("#dashboard-content", new Views.DataSection({
-        model: this.newtasks,
+    defaultView: function () {
+      this.setView("#dashboard-content", new Views.View({
+        collection: this.allTasks,
         currentView: "all"
-      })); 
+      }));
+
+      this.setView("#sidebar-content", new Views.TabMenu({}));
     }
   });
 
