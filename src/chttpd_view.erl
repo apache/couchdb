@@ -277,7 +277,7 @@ validate_view_query(start_key, Value, Args) ->
     case Args#mrargs.multi_get of
         true ->
             Msg = <<"Query parameter `start_key` is "
-                    "not compatiible with multi-get">>,
+                    "not compatible with multi-get">>,
             throw({query_parse_error, Msg});
         _ ->
             Args#mrargs{start_key=Value}
@@ -287,8 +287,8 @@ validate_view_query(start_key_docid, Value, Args) ->
 validate_view_query(end_key, Value, Args) ->
     case Args#mrargs.multi_get of
         true->
-            Msg = <<"Query paramter `end_key` is "
-                    "not compatibile with multi-get">>,
+            Msg = <<"Query parameter `end_key` is "
+                    "not compatible with multi-get">>,
             throw({query_parse_error, Msg});
         _ ->
             Args#mrargs{end_key=Value}
@@ -341,7 +341,7 @@ validate_view_query(reduce, _, Args) ->
 validate_view_query(include_docs, true, Args) ->
     case Args#mrargs.view_type of
         reduce ->
-            Msg = <<"Query paramter `include_docs` "
+            Msg = <<"Query parameter `include_docs` "
                     "is invalid for reduce views.">>,
             throw({query_parse_error, Msg});
         _ ->
