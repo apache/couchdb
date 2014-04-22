@@ -1,7 +1,6 @@
 {application, mango, [
     {description, "MongoDB API compatibility layer for Cloudant"},
     {vsn, git},
-    {mod, {mango_app, []}},
     {registered, []},
     {applications, [
         kernel,
