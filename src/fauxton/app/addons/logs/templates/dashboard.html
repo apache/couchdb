@@ -17,7 +17,7 @@ the License.
   <table class="table table-bordered log-table">
     <thead>
       <tr>
-        <th class="date">Date</th>
+        <th class="time">Date</th>
         <th class="level">Log Value</th>
         <th class="pid">Pid</th>
         <th class="args">Url</th>
@@ -25,23 +25,25 @@ the License.
     </thead>
 
     <tbody>
-      <% logs.each(function (log) { %>
-      <tr class="<%= log.logLevel() %>">
-        <td>
-          <!-- TODO: better format the date -->
-          <%= log.date() %>
-        </td>
-        <td>
-          <%= log.logLevel() %>
-        </td>
-        <td class="pid">
-          <%= log.pid() %>
-        </td>
-        <td class="args">
-          <!-- TODO: split the line, maybe put method in it's own column -->
-          <%= log.args() %>
-        </td>
-      </tr>
+      <%  _.forEach(days, function (logs, date) { %>
+        <tr><td class="day" colspan="4"><%= date %></td></tr>
+        <% _.forEach(logs, function (log) { %>
+          <tr class="<%= log.logLevel() %>">
+            <td>
+              <%= log.time() %>
+            </td>
+            <td>
+              <%= log.logLevel() %>
+            </td>
+            <td class="pid">
+              <%= log.pid() %>
+            </td>
+            <td class="args">
+              <!-- TODO: split the line, maybe put method in it's own column -->
+              <%= log.args() %>
+            </td>
+          </tr>
+        <% }); %>
       <% }); %>
     </tbody>
   </table>

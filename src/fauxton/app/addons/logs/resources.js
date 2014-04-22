@@ -23,11 +23,20 @@ function (app, FauxtonAPI, Backbone, d3) {
 
   Log.Model = Backbone.Model.extend({
 
-    date: function () {
-      var date = new Date(this.get('date')),
-          formatter = d3.time.format("%b %e %H:%M%:%S");
+    initialize: function () {
+      this.dateObject = new Date(this.get('date'));
+    },
 
-      return formatter(date);
+    date: function () {
+      var formatter = d3.time.format("%b %e");
+
+      return formatter(this.dateObject);
+    },
+
+    time: function () {
+      var formatter = d3.time.format("%H:%M%:%S");
+
+      return formatter(this.dateObject);
     },
 
     logLevel: function () {
@@ -64,6 +73,19 @@ function (app, FauxtonAPI, Backbone, d3) {
       options = options ? options : {};
 
       return Backbone.Collection.prototype.fetch.call(this, _.extend(options, {dataType: "html"}));
+    },
+
+    sortLogsIntoDays: function () {
+      return _.reduce(this.toArray(), function (sortedCollection, log, key) {
+        var date = log.date();
+
+        if (!sortedCollection[date]) {
+          sortedCollection[date] = [];
+        }
+
+        sortedCollection[date].push(log);
+        return sortedCollection;
+      }, {});
     },
 
     parse: function (resp) {
@@ -110,7 +132,11 @@ function (app, FauxtonAPI, Backbone, d3) {
     },
 
     serialize: function () {
-      return { logs: new Log.Collection(this.createFilteredCollection())};
+      var collection = new Log.Collection(this.createFilteredCollection());
+
+      return {
+        days: collection.sortLogsIntoDays()
+      };
     },
 
     afterRender: function () {

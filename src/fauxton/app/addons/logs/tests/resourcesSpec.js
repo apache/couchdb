@@ -14,7 +14,8 @@ define([
        'addons/logs/resources',
        'testUtils'
 ], function (Log, testUtils) {
-  var assert = testUtils.assert;
+  var assert = testUtils.assert,
+      ViewSandbox = testUtils.ViewSandbox;
 
   describe('Logs Resources', function () {
 
@@ -52,6 +53,64 @@ define([
         assert.equal(parsedLog[1].date, 'Sat, 12 Apr 2014 13:14:15 GMT');
         assert.equal(parsedLog[1].args, 'Replicator, request GET to "http://176.9.4.195/registry/google-openid?revs=true&open_revs=%5B%224-c8ba4809e2cacc1635f8887ec0d8d49a%22%5D&latest=true" failed due to error {error,connection_closing}');
         assert.equal(parsedLog[2].args, 'Retrying GET to http://176.9.4.195/registry/google-openid?revs=true&open_revs=%5B%2219-380884ba97e3d6fc48c8c7db3dc0e91b%22%5D&latest=true in 1.0 seconds due to error {error,{error,connection_closing}}');
+      });
+    });
+
+    describe('uses a heading for each date (COUCHDB-2136)', function () {
+      var collection,
+          view;
+
+      beforeEach(function () {
+        collection = new Log.Collection([
+          new Log.Model({
+            date: new Date('Fri Apr 19 2014 12:06:01 GMT+0200 (CEST)'),
+            log_level: 'info',
+            pid: 1337,
+            args: 'ente ente'
+          }),
+          new Log.Model({
+            date: new Date('Fri Apr 18 2014 12:06:01 GMT+0200 (CEST)'),
+            log_level: 'info',
+            pid: 1337,
+            args: 'ente ente'
+          }),
+          new Log.Model({
+            date: new Date('Thu Apr 17 2014 12:06:01 GMT+0200 (CEST)'),
+            log_level: 'info',
+            pid: 1337,
+            args: 'ente ente'
+          }),
+          new Log.Model({
+            date: new Date('Thu Apr 16 2014 12:06:01 GMT+0200 (CEST)'),
+            log_level: 'info',
+            pid: 1337,
+            args: 'ente ente'
+          })
+        ]);
+
+      });
+
+      it('sorts the data into an object', function () {
+        var sortedCollection = collection.sortLogsIntoDays();
+
+        assert.property(sortedCollection, 'Apr 18');
+        assert.property(sortedCollection, 'Apr 17');
+      });
+
+      it('creates headers with dates', function () {
+        var titles = [],
+            viewSandbox,
+            view;
+
+        view = new Log.Views.View({collection: collection});
+        viewSandbox = new ViewSandbox();
+        viewSandbox.renderView(view);
+
+        view.$('td[colspan="4"]').each(function (i, elem) {
+          titles.push($(elem).text());
+        });
+        assert.include(titles, 'Apr 18');
+        assert.include(titles, 'Apr 17');
       });
     });
   });
