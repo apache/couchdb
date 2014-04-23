@@ -131,7 +131,7 @@ handle_replicate_req(#httpd{method='POST', user_ctx=Ctx} = Req) ->
     couch_httpd:validate_ctype(Req, "application/json"),
     %% see HACK in chttpd.erl about replication
     PostBody = get(post_body),
-    try replicate(PostBody, Ctx, mem3_rep_manager) of
+    try replicate(PostBody, Ctx) of
     {ok, {continuous, RepId}} ->
         send_json(Req, 202, {[{ok, true}, {<<"_local_id">>, RepId}]});
     {ok, {cancelled, RepId}} ->
@@ -160,12 +160,12 @@ handle_replicate_req(#httpd{method='POST', user_ctx=Ctx} = Req) ->
 handle_replicate_req(Req) ->
     send_method_not_allowed(Req, "POST").
 
-replicate({Props} = PostBody, Ctx, Module) ->
+replicate({Props} = PostBody, Ctx) ->
     Node = choose_node([
         couch_util:get_value(<<"source">>, Props),
         couch_util:get_value(<<"target">>, Props)
     ]),
-    case rpc:call(Node, couch_rep, replicate, [PostBody, Ctx, Module]) of
+    case rpc:call(Node, couch_replicator, replicate, [PostBody, Ctx]) of
     {badrpc, Reason} ->
         erlang:error(Reason);
     Res ->
