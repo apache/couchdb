@@ -256,7 +256,7 @@ function(app, FauxtonAPI, Documents, Databases) {
     viewFn: function (databaseName, ddoc, view) {
       var params = this.createParams(),
           urlParams = params.urlParams,
-          docParams = params.docParams;
+          docParams = params.docParams,
           decodeDdoc = decodeURIComponent(ddoc);
 
       view = view.replace(/\?.*$/,'');

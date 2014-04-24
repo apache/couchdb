@@ -45,7 +45,7 @@ define([
       });
 
       it("Should set polling rate", function () {
-        $range = tabMenu.$('#pollingRange');
+        var $range = tabMenu.$('#pollingRange');
         $range.val(15);
         $range.trigger('change');
 
@@ -53,8 +53,8 @@ define([
       });
 
       it("Should clearInterval", function () {
-        $range = tabMenu.$('#pollingRange');
-        clearIntervalMock = sinon.spy(window,'clearInterval');
+        var $range = tabMenu.$('#pollingRange');
+        var clearIntervalMock = sinon.spy(window,'clearInterval');
         $range.trigger('change');
 
         assert.ok(clearIntervalMock.calledOnce);
@@ -64,7 +64,7 @@ define([
       it("Should trigger update:poll event", function () {
         var spy = sinon.spy();
         Views.Events.on('update:poll', spy);
-        $range = tabMenu.$('#pollingRange');
+        var $range = tabMenu.$('#pollingRange');
         $range.trigger('change');
 
         assert.ok(spy.calledOnce);

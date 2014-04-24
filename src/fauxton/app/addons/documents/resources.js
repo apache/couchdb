@@ -119,7 +119,7 @@ function(app, FauxtonAPI, PagingCollection) {
 
     setDdocView: function (view, map, reduce) {
       if (!this.isDdoc()) return false;
-      var views = this.get('views');
+      var views = this.get('views'),
           tempView = views[view] || {};
 
       if (reduce) {

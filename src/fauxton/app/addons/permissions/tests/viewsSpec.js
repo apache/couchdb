@@ -16,9 +16,10 @@ define([
        'testUtils'
 ], function (FauxtonAPI, Views, Models, testUtils) {
   var assert = testUtils.assert,
-  ViewSandbox = testUtils.ViewSandbox;
+      ViewSandbox = testUtils.ViewSandbox;
 
   describe('Permission View', function () {
+    var security, section, viewSandbox;
 
     beforeEach(function () {
       security = new Models.Security({'admins': {
@@ -62,7 +63,9 @@ define([
   });
 
   describe('PermissionsSection', function () {
-    var section, security;
+    var section,
+        security,
+        viewSandbox;
 
     beforeEach(function () {
       security = new Models.Security({'admins': {
@@ -124,7 +127,8 @@ define([
   });
 
   describe('PermissionItem', function () {
-    var item;
+    var item,
+        viewSandbox;
 
     beforeEach(function () {
       item = new Views.PermissionItem({

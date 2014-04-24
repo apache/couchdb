@@ -116,7 +116,7 @@ function (app, FauxtonAPI, activetasks) {
       "click th": "sortByType"
     },
     initialize: function(){
-      currentView = this.options.currentView;
+      this.currentView = this.options.currentView;
     },
     sortByType:  function(e){
       var currentTarget = e.currentTarget,
@@ -127,7 +127,7 @@ function (app, FauxtonAPI, activetasks) {
     },
     serialize: function(){
       return {
-        currentView: currentView,
+        currentView: this.currentView,
         collection: this.collection
       };
     },

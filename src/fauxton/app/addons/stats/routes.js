@@ -25,8 +25,8 @@ function(app, FauxtonAPI, Stats) {
       "stats":"showStats",
       "_stats": "showStats"
     },
-    
-    
+
+
     crumbs: [
       {"name": "Statistics", "link": "_stats"}
     ],
@@ -35,15 +35,14 @@ function(app, FauxtonAPI, Stats) {
 
     initialize: function () {
       this.stats = new Stats.Collection();
-
-      this.setView("#sidebar-content", new Views.StatSelect({
+      this.setView("#sidebar-content", new Stats.Views.StatSelect({
         collection: this.stats
       }));
 
     },
 
     showStats: function () {
-      this.setView("#dashboard-content", new Views.Statistics({
+      this.setView("#dashboard-content", new Stats.Views.Statistics({
         collection: this.stats
       }));
     },
@@ -53,7 +52,7 @@ function(app, FauxtonAPI, Stats) {
     },
 
     apiUrl: function(){
-      return [ this.stats.url, this.stats.documentation]; 
+      return [ this.stats.url, this.stats.documentation];
     }
   });
 

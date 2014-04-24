@@ -299,7 +299,7 @@ function (app, FauxtonAPI, CouchdbSession) {
       "submit #change-password": "changePassword"
     },
 
-    changePassword: function () {
+    changePassword: function (event) {
       event.preventDefault();
 
       var that = this,
