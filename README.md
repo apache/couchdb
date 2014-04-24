@@ -96,6 +96,7 @@ Keys:
 * upsert - (optional) (default: false) - boolean, Whether or not to create a new document if the selector does not match any documents in the database
 * limit (optional) (default: 1) - integer > 0, How many documents returned from the selector should be modified. Currently has a maximum value of 100
 * sort - (optional) (default: []) - JSON array following sort syntax, described below
+* r (optional) (default: 1) - integer > 0, read quorum constant
 * w (optional) (default: 2) - integer > 0, write quorum constant
 * async (optional) (default: false) - boolean, whether to wait for a response from the update. Overrides any value specified for `w`.
 
@@ -116,6 +117,7 @@ Keys:
 * force (optional) (default: false) - Delete all conflicted versions of the document as well
 * limit - (optional) (default: 1) - integer > 0, How many documents to delete from the database. Currently has a maximum value of 100
 * sort - (optional) (default: []) - JSON array following sort syntax, described below
+* r (optional) (default: 1) - integer > 1, read quorum constant
 * w (optional) (default: 2) - integer > 0, write quorum constant
 * async (optional) (default: false) boolean, whether to wait for a response from the delete. Overrides any value specified for `w`
 
@@ -133,9 +135,10 @@ Keys:
 
 * action - "create\_index"
 * index - JSON array following sort syntax, described below
+* missing\_is\_null (optional) (default: false) - When indexing documents that do not contain a field required by the index they are usually ignored for the purpose of that index, using `missing\_is\_null` adds an entry to the index for the document with a value of `null`
 * type (optional) (default: "json") - string, specifying the index type to create. Currently only "json" indexes are supported but in the future we will provide full-text indexes as well as Geo spatial indexes
 * name (optional) - string, optionally specify a name for the index. If a name is not provided one will be automatically generated
-* ddoc (optional) (default: null) - Indexes can be grouped into design documents underneath the hood for efficiency. This is an advanced feature. Don't specify a design document here unless you know the consequences of index invalidation. By default each index is placed in its own separate design document for isolation.
+* ddoc (optional) - Indexes can be grouped into design documents underneath the hood for efficiency. This is an advanced feature. Don't specify a design document here unless you know the consequences of index invalidation. By default each index is placed in its own separate design document for isolation.
 
 Anytime an operation is required to locate a document in the database it is required that an index must exist that can be used to locate it. By default the only two indices that exist are for the document "\_id" and the special "\_seq" index.
 
@@ -290,6 +293,12 @@ Misc related operators
 
 * "$mod" - [Divisor, Remainder], where Divisor and Remainder are both positive integers (ie, greater than 0). Matches documents where (field % Divisor == Remainder) is true. This is false for any non-integer field
 * "$regex" - string, a regular expression pattern to match against the document field. Only matches when the field is a string value and matches the supplied matches
+
+
+Update Syntax
+-------------
+
+Need to describe the syntax for update operators.
 
 
 Sort Syntax

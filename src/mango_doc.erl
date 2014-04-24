@@ -21,42 +21,6 @@
 -include_lib("couch/include/couch_db.hrl").
 
 
-open(DbName, DocId, Ctx) ->
-    Opts = [deleted, {user_ctx, mango_ctx:get_auth(Ctx)}],
-    try mango_util:defer(fabric, open_doc, [DbName, DocId, Opts]) of
-        {ok, Doc} ->
-            {ok, Doc};
-        {not_found, _} ->
-            not_found;
-        {error, Reason} ->
-            throw(Reason);
-        Error ->
-            throw(Error)
-    catch error:database_does_not_exist ->
-        not_found
-    end.
-
-
-open_ddocs(DbName, _Ctx) ->
-    try mango_util:defer(fabric, design_docs, [DbName]) of
-        {ok, Docs} ->
-            {ok, Docs};
-        {error, Reason} ->
-            throw(Reason);
-        Error ->
-            throw(Error)
-    catch error:database_does_not_exist ->
-        {ok, []}
-    end.
-
-
-save(DbName, #doc{}=Doc, Ctx) ->
-    save(DbName, [Doc], Ctx);
-save(DbName, Docs, Ctx) when is_list(Docs) ->
-    Opts = [{user_ctx, mango_ctx:get_auth(Ctx)}],
-    mango_util:defer(fabric, update_docs, [DbName, Docs, Opts]).
-
-
 from_bson({Props}) ->
     DocProps = case lists:keytake(<<"_id">>, 1, Props) of
         {value, {<<"_id">>, DocId0}, RestProps} ->

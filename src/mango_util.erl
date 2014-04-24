@@ -2,8 +2,14 @@
 
 
 -export([
+    open_doc/2,
+    open_ddocs/1,
+
     defer/3,
     do_defer/3,
+
+    format_error/1,
+    fmt/2,
 
     cloudant_dbname/2,
     maybe_create_db/2,
@@ -17,6 +23,27 @@
     enc_hex/1,
     dec_hex/1
 ]).
+
+
+open_doc(Db, DocId) ->
+    Opts = [deleted],
+    case mango_util:defer(fabric, open_doc, [DbName, DocId, Opts]) of
+        {ok, Doc} ->
+            {ok, Doc};
+        {not_found, _} ->
+            not_found;
+        _ ->
+            ?MANGO_ERROR({error_loading_doc, DocId})
+    end.
+
+
+open_ddocs(Db) ->
+    case mango_util:defer(fabric, design_docs, [Db]) of
+        {ok, Docs} ->
+            {ok, Docs};
+        _ ->
+            ?MANGO_ERROR(error_loading_ddocs)
+    end.
 
 
 defer(Mod, Fun, Args) ->
@@ -47,32 +74,12 @@ do_defer(Mod, Fun, Args) ->
     end.
 
 
-cloudant_dbname(Msg, Ctx) ->
-    Username = mango_ctx:username(Ctx),
-    Collection = mango_msg:prop(collection, Msg),
-    RawDbName = <<Username/binary, "/", Collection/binary>>,
-    enc_dbname(RawDbName).
+format_error({Module, Error}) ->
+    Module:format_error(Error).
 
 
-maybe_create_db(Msg, Ctx) ->
-    maybe_create_db(cloudant_dbname(Msg, Ctx)).
-
-
-maybe_create_db(DbName) ->
-    try
-        mem3:shards(DbName),
-        {ok, DbName}
-    catch
-        error:database_does_not_exist ->        
-            case mango_util:defer(fabric, create_db, [DbName]) of
-                ok ->
-                    {ok, DbName};
-                accepted ->
-                    {ok, DbName};
-                Error ->
-                    throw(Error)
-            end
-    end.
+fmt(Format, Args) ->
+    iolist_to_binary(io_lib:format(Format, Args)).
 
 
 to_lower(Key) when is_binary(Key) ->
@@ -139,3 +146,5 @@ dec_hex_byte(N) when N >= $0, N =< $9 -> (N - $0);
 dec_hex_byte(N) when N >= $a, N =< $f -> (N - $a) + 10;
 dec_hex_byte(N) when N >= $A, N =< $F -> (N - $A) + 10;
 dec_hex_byte(N) -> throw({invalid_hex_character, N}).
+
+
