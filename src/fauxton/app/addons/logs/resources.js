@@ -34,7 +34,7 @@ function (app, FauxtonAPI, Backbone, d3) {
     },
 
     time: function () {
-      var formatter = d3.time.format("%H:%M%:%S");
+      var formatter = d3.time.format("%H:%M:%S");
 
       return formatter(this.dateObject);
     },
