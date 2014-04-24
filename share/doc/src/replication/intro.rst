@@ -12,14 +12,14 @@
 
 .. _replication/intro:
 
-Introduction Into Replications
-==============================
+Introduction to Replication
+===========================
 
 One of CouchDB's strengths is the ability to synchronize two copies of the same
 database. This enables users to distribute data across several nodes or
 datacenters, but also to move data more closely to clients.
 
-Replication involves a source and a destination database, which can be one the
+Replication involves a source and a destination database, which can be on the
 same or on different CouchDB instances. The aim of the replication is that at
 the end of the process, all active documents on the source database are also in
 the destination database and all documents that were deleted in the source
