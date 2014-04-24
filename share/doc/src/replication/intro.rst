@@ -29,8 +29,8 @@ databases are also deleted on the destination database (if they even existed).
 Triggering Replication
 ----------------------
 
-Replication is controlled through documents in the :ref:`replicator`, where
-each document describes one replication process (see
+Replication is controlled through documents in the :ref:`_replicator <replicator>`
+database, where each document describes one replication process (see
 :ref:`replication-settings`).
 
 A replication is triggered by storing a replication document in the replicator
