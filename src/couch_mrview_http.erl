@@ -363,6 +363,8 @@ parse_boolean(true) ->
     true;
 parse_boolean(false) ->
     false;
+parse_boolean(Val) when is_binary(Val) ->
+    parse_boolean(?b2l(Val));
 parse_boolean(Val) ->
     case string:to_lower(Val) of
     "true" -> true;
