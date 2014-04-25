@@ -67,10 +67,10 @@ Master - Master replication
 ---------------------------
 
 One replication task will only transfer changes in one direction. To achieve
-master-master replication it is possible to set up two replication tasks in
-different directions. When a change is replication from database A to B by the
-first task, the second will discover that the new change on B already exists in
-A and will wait for further changes.
+master-master replication, it is possible to set up two replication tasks in
+opposite direction. When a change is replicated from database A to B by the
+first task, the second task from B to A will discover that the new change on
+B already exists in A and will wait for further changes.
 
 
 Controlling which Documents to Replicate
@@ -79,7 +79,7 @@ Controlling which Documents to Replicate
 There are two ways for controlling which documents are replicated, and which
 are skipped. *Local* documents are never replicated (see :ref:`api/local`).
 
-Additionally, :ref:`filterfun` can be used in a replication documents (see
+Additionally, :ref:`filterfun` can be used in a replication (see
 :ref:`replication-settings`). The replication task will then evaluate
 the filter function for each document in the changes feed. The document will
 only be replicated if the filter returns `true`.
