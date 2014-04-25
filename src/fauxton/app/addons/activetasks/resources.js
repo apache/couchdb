@@ -23,7 +23,7 @@ function (app, backbone, Fauxton) {
       app.taskSortBy = 'type';
 
   Active.Task = Backbone.Model.extend({
-    initialize: function() { 
+    initialize: function() {
       this.set({"id": this.get('pid')});
     }
   });
@@ -109,7 +109,19 @@ function (app, backbone, Fauxton) {
       this.sort();
     },
     comparator: function(item) {
-      return item.get(app.taskSortBy);
+      var value = app.taskSortBy,
+          values;
+
+      if (value.indexOf(',') !== -1) {
+        values = value.split(',');
+        _.each(values, function (val) {
+          if (item.get(val)) {
+            value = val;
+          }
+        });
+      }
+
+      return item.get(value);
     }
   });
 
