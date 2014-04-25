@@ -30,7 +30,7 @@ DepDescs = [
     {ibrowse, "couchdb-ibrowse", {branch,  "master"}},
     {jiffy, "couchdb-jiffy", {branch, "1843-feature-bigcouch"}},
     {mem3, "couchdb-mem3", {branch, "1843-feature-bigcouch"}},
-    {mochiweb, "couchdb-mochiweb", {branch, "1843-feature-bigcouch"}},
+    {mochiweb, "couchdb-mochiweb", {branch, "master"}},
     {oauth, "couchdb-oauth", {branch, "1843-feature-bigcouch"}},
     {rexi, "couchdb-rexi", {branch, "1843-feature-bigcouch"}},
     {snappy, "couchdb-snappy", {branch, "1994-merge-rcouch"}}
