@@ -18,11 +18,8 @@
 
 multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
     Args0 = couch_mrview_http:parse_params(Req, undefined),
-    DbName = mem3:dbname(Db#db.name),
-    Args1 = couch_util:with_db(DbName, fun(WDb) ->
-        {ok, _, _, Args} = couch_mrview_util:get_view(WDb, DDoc, ViewName, Args0),
-        Args
-    end),
+    {ok, #mrst{views=Views}} = couch_mrview_util:ddoc_to_mrst(Db, DDoc),
+    Args1 = couch_mrview_util:set_view_type(Args0, ViewName, Views),
     ArgQueries = lists:map(fun({Query}) ->
         QueryArg = couch_mrview_http:parse_params(Query, undefined, Args1),
         couch_mrview_util:validate_args(QueryArg)
