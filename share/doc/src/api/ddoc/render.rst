@@ -30,7 +30,6 @@
   :param ddoc: Design document name
   :param func: Show function name
   :>header ETag: Response signature
-  :query boolean details: Indicates whether details should be included
   :query string format: Format of the returned response.
     Used by :js:func:`provides` function
   :code 200: Request completed successfully
