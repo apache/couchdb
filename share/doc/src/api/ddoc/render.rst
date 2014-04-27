@@ -90,7 +90,6 @@
   :param func: Show function name
   :param docid: Document ID
   :>header ETag: Response signature
-  :query boolean details: Indicates whether details should be included
   :query string format: Format of the returned response.
     Used by :js:func:`provides` function
   :code 200: Request completed successfully
