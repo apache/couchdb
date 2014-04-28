@@ -11,9 +11,7 @@
     format_error/1,
     fmt/2,
 
-    cloudant_dbname/2,
-    maybe_create_db/2,
-    maybe_create_db/1,
+    assert_ejson/1,
 
     to_lower/1,
     
@@ -75,11 +73,55 @@ do_defer(Mod, Fun, Args) ->
 
 
 format_error({Module, Error}) ->
-    Module:format_error(Error).
+    Module:format_error(Error);
+format_error(Else) ->
+    fmt("Unknown error: ~w", [Else]).
 
 
 fmt(Format, Args) ->
     iolist_to_binary(io_lib:format(Format, Args)).
+
+
+assert_ejson({Props}) ->
+    assert_ejson_obj(Props);
+assert_ejson(Vals) when is_list(Vals) ->
+    assert_ejson_arr(Vals);
+assert_ejson(null) ->
+    true;
+assert_ejson(true) ->
+    true;
+assert_ejson(false) ->
+    true;
+assert_ejson(String) when is_binary(String) ->
+    true;
+assert_ejson(Number) when is_number(Number) ->
+    true;
+assert_ejson(_Else) ->
+    false.
+
+
+assert_ejson_obj([]) ->
+    true;
+assert_ejson_obj([{Key, Val} | Rest]) when is_binary(Key) ->
+    case assert_ejson(Val) of
+        true ->
+            assert_ejson_obj(Rest);
+        false ->
+            false
+    end;
+assert_ejson_obj(_Else) ->
+    false.
+
+
+assert_ejson_arr([]) ->
+    true;
+assert_ejson_arr([Val | Rest]) ->
+    case assert_ejson(Val) of
+        true ->
+            assert_ejson_arr(Rest);
+        false ->
+            false
+    end.
 
 
 to_lower(Key) when is_binary(Key) ->

@@ -6,23 +6,36 @@
     format_error/1
 ]).
 
+-export([
+    send_data/2
+]).
+
 
 -include_lib("couch/include/couch_db.hrl").
 -include("mango.hrl").
 
 
-handle_query_req(#httpd{method='POST'}=Req, Db) ->
+handle_query_req(#httpd{method='POST'}=Req, Db0) ->
+    Db = set_user_ctx(Req, Db0),
     couch_httpd:validate_ctype(Req, "application/json"),
     try
         {ok, Actions} = get_body_actions(Req),
     catch throw:Error ->
-        Reason = mango_error:fmt(Error),
+        Reason = mango_util:fmt(Error),
         throw({bad_request, Reason})
     end,
-    {ok, Resp} = chttpd:start_json_resp(Req, 200, [
-            {"Content-Type", "application/json"}
-        ]),
-    handle_actions(Resp, Db, Actions);
+    {ok, Writer, Resp} = create_writer(Req),
+    %% I think I may re-write this to be spawned off into
+    %% its own process to make error handlier less iffy.
+    try
+        {ok, LastWriter} = handle_actions(Writer, Db, Actions),
+        {ok, LastResp} = mango_writer:close(LastWriter),
+        chttpd:end_json_resp(LastResp)
+    catch
+        _:_ ->
+            % Send an error here?
+            chttpd:end_json_resp(Resp)
+    end;
 handle_query_req(Req, _Db) ->
     chttpd:send_method_not_allowed(Req, "POST").
 
@@ -42,9 +55,29 @@ get_body_actions(Req) ->
     end.
 
 
-handle_actions(Resp, _Db, []) ->
-    {ok, Resp};
-handle_actions(Resp, Db, [Action | Rest]) ->
-    mango_action:run(Resp, Db, Action),
-    handle_actions(Resp, Db, Rest).    
+handle_actions(Writer, _Db, []) ->
+    {ok, Writer};
+handle_actions(Writer, Db, [Action | Rest]) ->
+    {ok, NewWriter} = mango_action:run(Writer, Db, Action),
+    handle_actions(NewWriter, Db, Rest).    
 
+
+set_db_ctx(#httpd{user_ctx=Ctx}, Db) ->
+    Db#db{usert_ctx=Ctx}.
+
+
+create_writer(Req) ->
+    {ok, Resp} = chttpd:start_json_resp(Req, 200, [
+            {"Content-Type", "application/json"}
+        ]),
+    {ok, Writer0} = mango_writer:new(?MODULE, send_data, Resp),
+    {ok, Writer1} = mango_writer:arr_open(Writer0),
+    {ok, Writer1, Resp}.
+
+
+% Eventually we'll want to look into buffering data here so we're
+% sending as few chunks as possible.
+send_data(Resp, close) ->
+    {ok, Resp};
+send_data(Resp, Data) ->
+    chttpd:send_chunk(Resp, Data).

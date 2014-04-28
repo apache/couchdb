@@ -43,6 +43,8 @@ update(Db, Selector, Update, Options) ->
                 true ->
                     ?MANGO_ERROR(invalid_upsert_with_operators);
                 false ->
+                    % Probably need to catch and rethrow errors from
+                    % this function.
                     Doc = couch_doc:from_json_obj(Update),
                     NewDoc = case Doc#doc.id of
                         <<"">> ->
