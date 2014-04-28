@@ -18,8 +18,8 @@ os:putenv("COUCHDB_CONFIG", ConfigureEnv).
 
 DepDescs = [
     {couch_log, "couchdb-couch-log", {branch, "master"}},
-    {chttpd, "couchdb-chttpd", {branch, "1843-feature-bigcouch"}},
     {config, "couchdb-config", {branch, "1843-feature-bigcouch"}},
+    {chttpd, "couchdb-chttpd", {branch, "1843-feature-bigcouch"}},
     {couch, "couchdb-couch", {branch, "1843-feature-bigcouch"}},
     {couch_index, "couchdb-couch-index", {branch, "1843-feature-bigcouch"}},
     {couch_mrview, "couchdb-couch-mrview", {branch, "1843-feature-bigcouch"}},
