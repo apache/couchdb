@@ -1,1 +1,3 @@
 ebin/
+test/*.pyc
+venv/
