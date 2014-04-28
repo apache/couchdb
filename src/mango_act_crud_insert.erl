@@ -3,9 +3,13 @@
 -export([
     init/1,
     run/3,
-    
+
     format_error/1
 ]).
+
+
+-include_lib("couch/include/couch_db.hrl").
+-include("mango.hrl").
 
 
 -record(st, {
@@ -16,20 +20,22 @@
 
 
 init({Props}) ->
-    [<<"insert">>, Docs, W, Async] = mango_opts:validate(Props, opts()),
+    {ok, [<<"insert">>, Docs, W, Async]} = mango_opts:validate(Props, opts()),
     #st{docs = Docs, w = W, async = Async}.
 
 
 run(_Writer, Db, St) ->
+    % Fabric expects a string cause its silly
+    W = integer_to_list(St#st.w),
     Opts = [
         {user_ctx, Db#db.user_ctx},
-        {w, St#st.w}
+        {w, W}
     ],
     {Status, Resp} = mango_crud:insert(Db, St#st.docs, Opts),
-    {[
+    {ok, {[
         {ok, (Status == ok)},
         {result, Resp}
-    ]}.
+    ]}}.
 
 
 format_error({invalid_docs_value, Value}) ->
@@ -53,12 +59,12 @@ opts() ->
         {<<"w">>, [
             {optional, true},
             {default, 2},
-            {validator, fun mango_opt:pos_integer/1}
+            {validator, fun mango_opts:is_pos_integer/1}
         ]},
         {<<"async">>, [
             {optional, true},
             {default, false},
-            {validator, fun mango_opt:is_boolean/1}
+            {validator, fun mango_opts:is_boolean/1}
         ]}
     ].
 
@@ -66,7 +72,7 @@ opts() ->
 validate_docs([]) ->
     ?MANGO_ERROR(empty_insert);
 validate_docs(Docs) when is_list(Docs) ->
-    validate_docs0(Docs);
+    {ok, validate_docs0(Docs)};
 validate_docs(Else) ->
     ?MANGO_ERROR({invalid_docs_value, Else}).
 
@@ -82,9 +88,9 @@ validate_doc({Props}) ->
         true ->
             ok;
         false ->
-            ?MANGO_ERROR({invalid_doc_object, {Props}});
+            ?MANGO_ERROR({invalid_doc_object, {Props}})
     end,
-    try couch_doc:from_jsob_obj({Props}) of
+    try couch_doc:from_json_obj({Props}) of
         #doc{id = <<"">>} = Doc0 ->
             Doc0#doc{
                 id = couch_uuids:new(),

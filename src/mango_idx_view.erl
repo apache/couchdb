@@ -8,6 +8,8 @@
 ]).
 
 
+-include_lib("couch/include/couch_db.hrl").
+-include("mango.hrl").
 -include("mango_idx.hrl").
 
 
@@ -17,7 +19,7 @@ add(#doc{body={Props0}}=DDoc, Idx) ->
         _ -> []
     end,
     NewView = make_view(Idx),
-    Views2 = lists:keystore(element(1, NewView), 1, Props2, NewView),
+    Views2 = lists:keystore(element(1, NewView), 1, Props0, Views1),
     Props1 = lists:keystore(<<"views">>, 1, Props0, {<<"views">>, Views2}),
     {ok, DDoc#doc{body={Props1}}}.
 
@@ -25,14 +27,14 @@ add(#doc{body={Props0}}=DDoc, Idx) ->
 from_ddoc({Props}) ->
     case lists:keyfind(<<"views">>, 1, Props) of
         {<<"views">>, {Views}} when is_list(Views) ->
-            lists:flatmap(fun({Name, {Props}}) ->
-                Def = proplists:get_value(<<"map">>, Props),
-                {Opts0} = proplists:get_value(<<"options">>, Props),
+            lists:flatmap(fun({Name, {VProps}}) ->
+                Def = proplists:get_value(<<"map">>, VProps),
+                {Opts0} = proplists:get_value(<<"options">>, VProps),
                 Opts = lists:keydelete(<<"sort">>, 1, Opts0),
                 I = #idx{
                     type = view,
                     name = Name,
-                    def = View,
+                    def = Def,
                     opts = Opts
                 },
                 % TODO: Validate the index definition

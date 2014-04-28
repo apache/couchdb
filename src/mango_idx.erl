@@ -9,7 +9,7 @@
     new/3,
     add/2,
     from_ddoc/2,
-    
+
     dbname/1,
     ddoc/1,
     name/1,
@@ -22,6 +22,7 @@
 ]).
 
 
+-include_lib("couch/include/couch_db.hrl").
 -include("mango.hrl").
 -include("mango_idx.hrl").
 
@@ -48,13 +49,13 @@ add(DDoc, Idx) ->
 from_ddoc(Db, {Props}) ->
     DbName = db_to_name(Db),
     DDoc = proplists:get_value(<<"_id">>, Props),
-    
+
     case proplists:get_value(<<"language">>, Props) of
         <<"query">> -> ok;
         _ ->
             ?MANGO_ERROR(invalid_query_ddoc_language)
     end,
-    
+
     IdxMods = [mango_idx_view],
     Idxs = lists:flatmap(fun(Mod) -> Mod:from_ddoc({Props}) end, IdxMods),
     lists:map(fun(Idx) ->
@@ -62,7 +63,7 @@ from_ddoc(Db, {Props}) ->
             dbname = DbName,
             ddoc = DDoc
         }
-    end, Idxs)
+    end, Idxs).
 
 
 dbname(#idx{dbname=DbName}) ->

@@ -19,10 +19,10 @@ new(_) ->
 
 
 run(Writer, Db, {Mod, St}) ->
-    Result = Mod:run(Writer, Db, St),
+    {ok, Result} = Mod:run(Writer, Db, St),
     case mango_writer:is_writer(Result) of
         true ->
-            Result;
+            {ok, Result};
         false ->
             mango_writer:add_value(Writer, Result)
     end.

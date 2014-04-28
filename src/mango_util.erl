@@ -14,18 +14,21 @@
     assert_ejson/1,
 
     to_lower/1,
-    
+
     enc_dbname/1,
     dec_dbname/1,
-    
+
     enc_hex/1,
     dec_hex/1
 ]).
 
 
+-include("mango.hrl").
+
+
 open_doc(Db, DocId) ->
     Opts = [deleted],
-    case mango_util:defer(fabric, open_doc, [DbName, DocId, Opts]) of
+    case mango_util:defer(fabric, open_doc, [Db, DocId, Opts]) of
         {ok, Doc} ->
             {ok, Doc};
         {not_found, _} ->
@@ -45,6 +48,7 @@ open_ddocs(Db) ->
 
 
 defer(Mod, Fun, Args) ->
+    %twig:log(error, "MFA: ~p", [{Mod, Fun, Args}]),
     {Pid, Ref} = erlang:spawn_monitor(?MODULE, do_defer, [Mod, Fun, Args]),
     receive
         {'DOWN', Ref, process, Pid, {mango_defer_ok, Value}} ->
@@ -64,15 +68,21 @@ do_defer(Mod, Fun, Args) ->
             erlang:exit({mango_defer_ok, Resp})
     catch
         throw:Error ->
+            Stack = erlang:get_stacktrace(),
+            twig:log(err, "Defered error: ~w~n    ~p", [{throw, Error}, Stack]),
             erlang:exit({mango_defer_throw, Error});
         error:Error ->
+            Stack = erlang:get_stacktrace(),
+            twig:log(err, "Defered error: ~w~n    ~p", [{error, Error}, Stack]),
             erlang:exit({mango_defer_error, Error});
         exit:Error ->
+            Stack = erlang:get_stacktrace(),
+            twig:log(err, "Defered error: ~w~n    ~p", [{exit, Error}, Stack]),
             erlang:exit({mango_defer_exit, Error})
     end.
 
 
-format_error({Module, Error}) ->
+format_error({mango_error, Module, Error}) ->
     Module:format_error(Error);
 format_error(Else) ->
     fmt("Unknown error: ~w", [Else]).
@@ -144,7 +154,7 @@ enc_db_byte(N) when N == $/; N == $_; N == $- -> <<N>>;
 enc_db_byte(N) ->
     H = enc_hex_byte(N div 16),
     L = enc_hex_byte(N rem 16),
-    <<$$, H:8/integer, L:8/integer>>.    
+    <<$$, H:8/integer, L:8/integer>>.
 
 
 dec_dbname(<<>>) ->

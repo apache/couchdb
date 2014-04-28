@@ -14,6 +14,7 @@
 
 
 -include_lib("couch/include/couch_db.hrl").
+-include("mango.hrl").
 
 
 insert(Db, #doc{}=Doc, Opts) ->
@@ -52,7 +53,7 @@ update(Db, Selector, Update, Options) ->
                         _ ->
                             Doc
                     end,
-                    mango_doc:insert(Db, Doc, Options)
+                    mango_doc:insert(Db, NewDoc, Options)
             end;
         {ok, Docs} ->
             NewDocs = lists:map(fun(Doc) ->
@@ -81,7 +82,7 @@ delete(Db, Selector, Options) ->
 
 
 result_to_json(#doc{id=Id}, Result) ->
-    save_result_to_json(Id, Result);
+    result_to_json(Id, Result);
 result_to_json(DocId, {ok, NewRev}) ->
     {[
         {id, DocId},

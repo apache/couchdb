@@ -3,12 +3,13 @@
 
 -export([
     create/3,
-    delete/3,
-    list/3
+    list/1,
+    delete/3
 ]).
 
 
 -include_lib("couch/include/couch_db.hrl").
+-include("mango.hrl").
 
 
 create(Db, Index, Opts) ->
@@ -41,10 +42,14 @@ list(DbName) ->
     end, DDocs).
 
 
+delete(_Db, _DDocId, _IndexName) ->
+    ok.
+
+
 load_ddoc(Db, DDocId) ->
     case mango_util:open_doc(Db, DDocId) of
         {ok, Doc} ->
             {ok, Doc};
         not_found ->
-            {ok, #doc{id = ddoc_id(Opts0), body = {[]}}}
+            {ok, #doc{id = DDocId, body = {[]}}}
     end.

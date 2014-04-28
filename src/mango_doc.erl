@@ -2,10 +2,6 @@
 
 
 -export([
-    open/3,
-    open_ddocs/2,
-    save/3,
-
     from_bson/1,
 
     apply_update/2,

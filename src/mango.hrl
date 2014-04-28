@@ -1,2 +1,2 @@
 
--define(MANGO_ERROR(R), throw({?MODULE, R})).
+-define(MANGO_ERROR(R), throw({mango_error, ?MODULE, R})).

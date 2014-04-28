@@ -18,10 +18,10 @@
 handle_query_req(#httpd{method='POST'}=Req, Db0) ->
     Db = set_user_ctx(Req, Db0),
     couch_httpd:validate_ctype(Req, "application/json"),
-    try
-        {ok, Actions} = get_body_actions(Req),
-    catch throw:Error ->
-        Reason = mango_util:fmt(Error),
+    {ok, Actions} = try
+        get_body_actions(Req)
+    catch throw:{mango_error, _, _} = Error ->
+        Reason = mango_util:format_error(Error),
         throw({bad_request, Reason})
     end,
     {ok, Writer, Resp} = create_writer(Req),
@@ -30,11 +30,13 @@ handle_query_req(#httpd{method='POST'}=Req, Db0) ->
     try
         {ok, LastWriter} = handle_actions(Writer, Db, Actions),
         {ok, LastResp} = mango_writer:close(LastWriter),
-        chttpd:end_json_resp(LastResp)
+        end_resp(LastResp)
     catch
-        _:_ ->
+        T:E ->
+            Stack = erlang:get_stacktrace(),
+            twig:log(err, "Error handling request: ~p~n  ~p", [{T, E}, Stack]),
             % Send an error here?
-            chttpd:end_json_resp(Resp)
+            end_resp(Resp)
     end;
 handle_query_req(Req, _Db) ->
     chttpd:send_method_not_allowed(Req, "POST").
@@ -59,17 +61,15 @@ handle_actions(Writer, _Db, []) ->
     {ok, Writer};
 handle_actions(Writer, Db, [Action | Rest]) ->
     {ok, NewWriter} = mango_action:run(Writer, Db, Action),
-    handle_actions(NewWriter, Db, Rest).    
+    handle_actions(NewWriter, Db, Rest).
 
 
-set_db_ctx(#httpd{user_ctx=Ctx}, Db) ->
-    Db#db{usert_ctx=Ctx}.
+set_user_ctx(#httpd{user_ctx=Ctx}, Db) ->
+    Db#db{user_ctx=Ctx}.
 
 
 create_writer(Req) ->
-    {ok, Resp} = chttpd:start_json_resp(Req, 200, [
-            {"Content-Type", "application/json"}
-        ]),
+    {ok, Resp} = start_resp(Req),
     {ok, Writer0} = mango_writer:new(?MODULE, send_data, Resp),
     {ok, Writer1} = mango_writer:arr_open(Writer0),
     {ok, Writer1, Resp}.
@@ -81,3 +81,14 @@ send_data(Resp, close) ->
     {ok, Resp};
 send_data(Resp, Data) ->
     chttpd:send_chunk(Resp, Data).
+
+
+start_resp(Req) ->
+    chttpd:start_chunked_response(Req, 200, [
+            {"Content-Type", "application/json"}
+        ]).
+
+
+end_resp(Resp) ->
+    chttpd:send_chunk(Resp, [$\n]),
+    couch_httpd:last_chunk(Resp).
