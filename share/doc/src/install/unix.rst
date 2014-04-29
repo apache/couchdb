@@ -102,19 +102,20 @@ RedHat-based (Fedora, Centos, RHEL) Systems
 
 You can install the dependencies by running::
 
-    sudo yum groupinstall "Development Tools"
     sudo yum install autoconf
     sudo yum install autoconf-archive
     sudo yum install automake
+    sudo yum install curl-devel
+    sudo yum install erlang-asn1
+    sudo yum install erlang-erts
+    sudo yum install erlang-eunit
+    sudo yum install erlang-os_mon
+    sudo yum install erlang-xmerl
+    sudo yum install help2man
+    sudo yum install js-devel
+    sudo yum install libicu-devel
     sudo yum install libtool
     sudo yum install perl-Test-Harness
-    sudo yum install erlang-etap
-    sudo yum install erlang-erts
-    sudo yum install erlang-os_mon
-    sudo yum install erlang-eunit
-    sudo yum install libicu-devel
-    sudo yum install js-devel
-    sudo yum install curl-devel
 
 While CouchDB builds against the default js-devel-1.7.0 included in some
 distributions, it's recommended to use a more recent js-devel-1.8.5.
