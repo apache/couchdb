@@ -14,7 +14,7 @@
 
 -export([start/0, stop/0, restart/0, nodes/0, node_info/2, shards/1, shards/2,
     choose_shards/2, n/1, dbname/1, ushards/1]).
--export([get_shard/3, local_shards/1, fold_shards/2]).
+-export([get_shard/3, local_shards/1, shard_suffix/1, fold_shards/2]).
 -export([sync_security/0, sync_security/1]).
 -export([compare_nodelists/0, compare_shards/1]).
 -export([quorum/1, group_by_proximity/1]).
@@ -141,6 +141,14 @@ get_shard(DbName, Node, Range) ->
 
 local_shards(DbName) ->
     mem3_shards:local(DbName).
+
+shard_suffix(#db{name=DbName}) ->
+    shard_suffix(DbName);
+shard_suffix(DbName0) ->
+    Shard = hd(shards(DbName0)),
+    <<"shards/", _:8/binary, "-", _:8/binary, "/", DbName/binary>> =
+        Shard#shard.name,
+    filename:extension(binary_to_list(DbName)).
 
 fold_shards(Fun, Acc) ->
     mem3_shards:fold(Fun, Acc).
