@@ -1,7 +1,7 @@
 -module(mango_act_crud_find).
 
 -export([
-    init/1,
+    init/2,
     run/3,
 
     format_error/1
@@ -18,25 +18,30 @@
 }).
 
 
-init({Props}) ->
+init(Db, {Props}) ->
     {ok, Opts} = mango_opts:validate(Props, opts()),
     [<<"find">>, Selector, Limit, Skip, Sort, Fields, R, Conflicts] = Opts,
     #st{
         selector = Selector,
         opts = [
+            {user_ctx, Db#db.user_ctx},
             {limit, Limit},
             {skip, Skip},
             {sort, Sort},
             {fields, Fields},
-            {r, R},
+            {r, integer_to_list(R)},
             {conflicts, Conflicts}
         ]
     }.
 
 
-run(Writer, Db, #st{selector = Sel, opts = Opts}) ->
+run(Writer, Db, St) ->
+    #st{
+        selector = Selector,
+        opts = Opts
+    } = St,
     {ok, NewWriter} = resp_open(Writer),
-    {ok, LastWriter} = do_find(Db, Sel, Opts, NewWriter),
+    {ok, LastWriter} = do_find(Db, Selector, Opts, NewWriter),
     resp_close(LastWriter).
 
 
@@ -89,7 +94,7 @@ resp_open(Writer) ->
     mango_writer:script(Writer, [
         obj_open,
         {obj_pair, <<"ok">>, true},
-        {obj_key, <<"results">>},
+        {obj_key, <<"result">>},
         arr_open
     ]).
 

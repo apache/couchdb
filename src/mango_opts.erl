@@ -9,6 +9,7 @@
     is_boolean/1,
     is_pos_integer/1,
     is_non_neg_integer/1,
+    is_object/1,
     
     validate_selector/1,
     validate_sort/1,
@@ -54,6 +55,8 @@ format_error({invalid_pos_integer, Val}) ->
     mango_util:fmt("~w is not an integer greater than zero", [Val]);
 format_error({invalid_non_neg_integer, Val}) ->
     mango_util:fmt("~w is not an integer greater than or equal to zero", [Val]);
+format_error({invalid_object, BadObj}) ->
+    mango_util:fmt("~w is not a JSON object", [BadObj]);
 format_error({invalid_selector_json, BadSel}) ->
     mango_util:fmt("Selector must be a JSON object, not: ~w", [BadSel]);
 format_error(Else) ->
@@ -84,6 +87,13 @@ is_non_neg_integer(V) when is_integer(V), V >= 0 ->
     {ok, V};
 is_non_neg_integer(Else) ->
     ?MANGO_ERROR({invalid_non_neg_integer, Else}).
+
+
+is_object({Props}) ->
+    true = mango_util:assert_ejson({Props}),
+    {ok, {Props}};
+is_object(Else) ->
+    ?MANGO_ERROR({invalid_object, Else}).
 
 
 validate_selector({Props}) ->

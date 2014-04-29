@@ -53,7 +53,6 @@ Keys:
 * action - "insert"
 * docs - The JSON document to insert
 * w (optional) (default: 2) - An integer > 0 for the write quorum size
-* async (optional) (default: false) - A boolean, turns the write operation into a fire-and-forget. Specifying `"async": true` overrides any value specified for `"w"`
 
 If the provided document or documents do not contain an "\_id" field one will be added using an automatically generated UUID.
 
@@ -98,7 +97,6 @@ Keys:
 * sort - (optional) (default: []) - JSON array following sort syntax, described below
 * r (optional) (default: 1) - integer > 0, read quorum constant
 * w (optional) (default: 2) - integer > 0, write quorum constant
-* async (optional) (default: false) - boolean, whether to wait for a response from the update. Overrides any value specified for `w`.
 
 Updates are fairly straightforward other than to mention that the selector (like find) must be satisifiable using an existing index.
 
@@ -119,7 +117,6 @@ Keys:
 * sort - (optional) (default: []) - JSON array following sort syntax, described below
 * r (optional) (default: 1) - integer > 1, read quorum constant
 * w (optional) (default: 2) - integer > 0, write quorum constant
-* async (optional) (default: false) boolean, whether to wait for a response from the delete. Overrides any value specified for `w`
 
 Deletes behave quite similarly to update except they attempt to remove documents from the database. Its important to note that if a document has conflicts it may "appear" that delete's aren't having an effect. This is because the delete operation by default only removes a single revision. Specify `"force":true` if you would like to attempt to delete all live revisions.
 

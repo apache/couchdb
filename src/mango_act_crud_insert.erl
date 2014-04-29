@@ -1,7 +1,7 @@
 -module(mango_act_crud_insert).
 
 -export([
-    init/1,
+    init/2,
     run/3,
 
     format_error/1
@@ -14,24 +14,23 @@
 
 -record(st, {
     docs,
-    w,
-    async
+    opts
 }).
 
 
-init({Props}) ->
-    {ok, [<<"insert">>, Docs, W, Async]} = mango_opts:validate(Props, opts()),
-    #st{docs = Docs, w = W, async = Async}.
+init(Db, {Props}) ->
+    {ok, [<<"insert">>, Docs, W]} = mango_opts:validate(Props, opts()),
+    #st{
+        docs = Docs,
+        opts = [
+            {user_ctx, Db#db.user_ctx},
+            {w, integer_to_list(W)}
+        ]
+    }.
 
 
 run(_Writer, Db, St) ->
-    % Fabric expects a string cause its silly
-    W = integer_to_list(St#st.w),
-    Opts = [
-        {user_ctx, Db#db.user_ctx},
-        {w, W}
-    ],
-    {Status, Resp} = mango_crud:insert(Db, St#st.docs, Opts),
+    {Status, Resp} = mango_crud:insert(Db, St#st.docs, St#st.opts),
     {ok, {[
         {ok, (Status == ok)},
         {result, Resp}
@@ -60,11 +59,6 @@ opts() ->
             {optional, true},
             {default, 2},
             {validator, fun mango_opts:is_pos_integer/1}
-        ]},
-        {<<"async">>, [
-            {optional, true},
-            {default, false},
-            {validator, fun mango_opts:is_boolean/1}
         ]}
     ].
 

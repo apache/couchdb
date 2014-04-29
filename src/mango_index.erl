@@ -21,8 +21,7 @@ create(Db, Index, Opts) ->
             {ok, <<"exists">>};
         {ok, NewDDoc} ->
             case mango_crud:insert(Db, NewDDoc, Opts) of
-                {ok, _R} ->
-                    twig:log(err, "Create: ~p", [_R]),
+                {ok, _} ->
                     {ok, <<"created">>};
                 _ ->
                     ?MANGO_ERROR(error_saving_ddoc)

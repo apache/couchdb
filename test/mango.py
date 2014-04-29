@@ -65,7 +65,29 @@ class Database(object):
         result = r.json()[0]
         if not result["ok"]:
             raise RuntimeError(result["result"])
-        return result["results"]
+        return result["result"]
+
+    def update(self, selector, update, upsert=False, limit=1, sort=None,
+                r=1, w=2):
+        action = {
+            "action": "update",
+            "selector": selector,
+            "update": update,
+            "upsert": upsert,
+            "limit": limit,
+            "r": r,
+            "w": w
+        }
+        if sort is not None:
+            action["sort"] = sort
+        body = json.dumps([action])
+        r = self.sess.post(self.qurl, data=body)
+        print r.text
+        r.raise_for_status()
+        result = r.json()[0]
+        if not result["ok"]:
+            raise RuntimeError(result["result"])
+        return result["result"]
 
     def find_one(self, *args, **kwargs):
         results = self.find(*args, **kwargs)
@@ -95,7 +117,6 @@ class Database(object):
         if not result["ok"]:
             raise RuntimeError(result["result"])
         return result["result"] == "created"
-
 
 
 

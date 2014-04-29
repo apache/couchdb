@@ -19,10 +19,8 @@
 
 create(Db, Selector0, Opts) ->
     Selector = mango_selector:normalize(Selector0),
-    twig:log(err, "Selector: ~p", [Selector]),
     IndexFields = mango_selector:index_fields(Selector),
     ExistingIndexes = mango_index:list(Db#db.name),
-    twig:log(err, "Usable: ~p~nExist: ~p", [IndexFields, ExistingIndexes]),
     UsableIndexes = find_usable_indexes(IndexFields, ExistingIndexes),
     FieldRanges = find_field_ranges(Selector, IndexFields),
     Composited = composite_indexes(UsableIndexes, FieldRanges),

@@ -21,17 +21,12 @@
 % See the definition of each step below for more information
 % on what each one does.
 normalize(Selector) ->
-    twig:log(err, "SIN: ~p", [Selector]),
     Steps = [
         fun norm_ops/1,
         fun norm_fields/1,
         fun norm_negations/1
     ],
-    lists:foldl(fun(Step, Sel) ->
-        A = Step(Sel),
-        twig:log(err, "SN: ~p ~p", [Step, A]),
-        A
-    end, Selector, Steps).
+    lists:foldl(fun(Step, Sel) -> Step(Sel) end, Selector, Steps).
 
 
 % This function returns a list of indexes that

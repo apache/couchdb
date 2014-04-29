@@ -5,6 +5,7 @@
     from_bson/1,
 
     apply_update/2,
+    update_as_insert/1,
     has_operators/1,
 
     get_field/2,
@@ -39,15 +40,23 @@ from_bson({Props}) ->
     end.
 
 
-apply_update(#doc{body={Props}}=Doc, {Update}) ->
-    Result = do_update(Props, Update),
+apply_update(#doc{body={Props}}=Doc, Update) ->
+    NewProps = apply_update(Props, Update),
+    Doc#doc{body={NewProps}};
+apply_update({Props}, {Update}) ->
+    Result = do_update({Props}, Update),
     case has_operators(Result) of
         true ->
             throw(update_leaves_operators);
         false ->
             ok
     end,
-    Doc#doc{body={Result}}.
+    Result.
+
+
+update_as_insert({Update}) ->
+    NewProps = do_update_to_insert(Update, {[]}),
+    apply_update(NewProps, {Update}).
 
 
 has_operators(#doc{body=Body}) ->
@@ -91,6 +100,8 @@ has_operators_arr([V | Rest]) ->
     end.
 
 
+do_update(Props, []) ->
+    Props;
 do_update(Props, [{Op, Value} | Rest]) ->
     UpdateFun = update_operator_fun(Op),
     NewProps = case UpdateFun of
@@ -112,9 +123,9 @@ update_operator_fun(<<"$", _/binary>> = Op) ->
         % Object operators
         {<<"$inc">>, fun do_update_inc/2},
         {<<"$rename">>, fun do_update_rename/2},
-        %{<<"$setOnInsert">>, fun do_update_set_on_insert/2},
+        {<<"$setOnInsert">>, fun do_update_set_on_insert/2},
         {<<"$set">>, fun do_update_set/2},
-        {<<"$unsert">>, fun do_update_unset/2},
+        {<<"$unset">>, fun do_update_unset/2},
 
         % Array opereators
         {<<"$addToSet">>, fun do_update_add_to_set/2},
@@ -164,6 +175,13 @@ do_update_rename(Props, [{OldField, NewField} | Rest]) ->
             Props
     end,
     do_update_rename(NewProps, Rest).
+
+
+do_update_set_on_insert(Props, _) ->
+    % This is only called during calls to apply_update/2
+    % which means this isn't an insert, so drop it on
+    % the floor.
+    Props.
 
 
 do_update_set(Props, []) ->
@@ -324,6 +342,16 @@ do_update_bitwise(Props, [{Field, Value} | Rest]) ->
             Props
     end,
     do_update_bitwise(NewProps, Rest).
+
+
+do_update_to_insert([], Doc) ->
+    Doc;
+do_update_to_insert([{<<"$setOnInsert">>, {FieldProps}}], Doc) ->
+    lists:foldl(fun({Field, Value}, DocAcc) ->
+        set_field(DocAcc, Field, Value)
+    end, Doc, FieldProps);
+do_update_to_insert([{_, _} | Rest], Doc) ->
+    do_update_to_insert(Rest, Doc).
 
 
 get_field(Props, Field) ->

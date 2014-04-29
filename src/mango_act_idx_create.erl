@@ -1,9 +1,9 @@
 -module(mango_act_idx_create).
 
 -export([
-    init/1,
+    init/2,
     run/3,
-    
+
     format_error/1
 ]).
 
@@ -14,15 +14,17 @@
 }).
 
 
+-include_lib("couch/include/couch_db.hrl").
 -include("mango.hrl").
 
 
-init({Props}) ->
+init(Db, {Props}) ->
     {ok, Opts} = mango_opts:validate(Props, opts()),
     [<<"create_index">>, Def, Type, Name, DDoc] = Opts,
     #st{
         def = Def,
         opts = [
+            {user_ctx, Db#db.user_ctx},
             {type, Type},
             {name, Name},
             {ddoc, DDoc}

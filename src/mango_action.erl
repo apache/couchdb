@@ -1,7 +1,7 @@
 -module(mango_action).
 
 -export([
-    new/1,
+    new/2,
     run/3,
     
     format_error/1
@@ -11,10 +11,10 @@
 -include("mango.hrl").
 
 
-new({Props}) ->
+new(Db, {Props}) ->
     Mod = get_action_mod({Props}),
-    {Mod, Mod:init({Props})};
-new(_) ->
+    {Mod, Mod:init(Db, {Props})};
+new(_, _) ->
     ?MANGO_ERROR(action_must_be_an_object).
 
 

@@ -22,13 +22,8 @@ insert(Db, #doc{}=Doc, Opts) ->
     insert(Db, [Doc], Opts);
 insert(Db, {_}=Doc, Opts) ->
     insert(Db, [Doc], Opts);
-insert(Db, Docs, Opts0) when is_list(Docs) ->
-    Opts = case lists:keymember(user_ctx, 1, Opts0) of
-        false when is_record(Db, db) ->
-            [{user_ctx, Db#db.user_ctx} | Opts0];
-        _ ->
-            Opts0
-    end,
+insert(Db, Docs, Opts) when is_list(Docs) ->
+    twig:log(err, "Insert: ~p", [Docs]),
     case mango_util:defer(fabric, update_docs, [Db, Docs, Opts]) of
         {ok, Results0} ->
             {ok, lists:zipwith(fun result_to_json/2, Docs, Results0)};
@@ -54,20 +49,21 @@ update(Db, Selector, Update, Options) ->
     Upsert = proplists:get_value(upsert, Options),
     case collect_docs(Db, Selector, Options) of
         {ok, []} when Upsert ->
-            case mango_doc:has_operators(Update) of
+            InitDoc = mango_doc:update_as_insert(Update),
+            case mango_doc:has_operators(InitDoc) of
                 true ->
                     ?MANGO_ERROR(invalid_upsert_with_operators);
                 false ->
                     % Probably need to catch and rethrow errors from
                     % this function.
-                    Doc = couch_doc:from_json_obj(Update),
+                    Doc = couch_doc:from_json_obj(InitDoc),
                     NewDoc = case Doc#doc.id of
                         <<"">> ->
                             Doc#doc{id=couch_uuids:new(), revs={0, []}};
                         _ ->
                             Doc
                     end,
-                    mango_doc:insert(Db, NewDoc, Options)
+                    insert(Db, NewDoc, Options)
             end;
         {ok, Docs} ->
             NewDocs = lists:map(fun(Doc) ->
@@ -96,6 +92,9 @@ delete(Db, Selector, Options) ->
 
 
 result_to_json(#doc{id=Id}, Result) ->
+    result_to_json(Id, Result);
+result_to_json({Props}, Result) ->
+    Id = couch_util:get_value(<<"_id">>, Props),
     result_to_json(Id, Result);
 result_to_json(DocId, {ok, NewRev}) ->
     {[
@@ -141,6 +140,6 @@ collect_docs(Db, Selector, Options) ->
     end.
 
 
-collect_cb(Doc, Acc) ->
+collect_cb({row, Doc}, Acc) ->
     {ok, [Doc | Acc]}.
 

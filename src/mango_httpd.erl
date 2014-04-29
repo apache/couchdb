@@ -19,7 +19,7 @@ handle_query_req(#httpd{method='POST'}=Req, Db0) ->
     Db = set_user_ctx(Req, Db0),
     couch_httpd:validate_ctype(Req, "application/json"),
     {ok, Actions} = try
-        get_body_actions(Req)
+        get_body_actions(Db, Req)
     catch throw:{mango_error, _, _} = Error ->
         Reason = mango_util:format_error(Error),
         throw({bad_request, Reason})
@@ -52,10 +52,12 @@ format_error(Else) ->
     mango_util:fmt("Unknown error: ~p", [Else]).
 
 
-get_body_actions(Req) ->
+get_body_actions(Db, Req) ->
     case chttpd:json_body(Req) of
         Body0 when is_list(Body0) ->
-            {ok, lists:map(fun mango_action:new/1, Body0)};
+            {ok, lists:map(fun(Item) ->
+                mango_action:new(Db, Item)
+            end, Body0)};
         _ ->
             ?MANGO_ERROR(body_not_an_array)
     end.

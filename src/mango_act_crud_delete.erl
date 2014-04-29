@@ -1,14 +1,14 @@
 -module(mango_act_crud_delete).
 
 -export([
-    init/1,
+    init/2,
     run/3,
     
     format_error/1
 ]).
 
 
-init({_Props}) ->
+init(_Db, {_Props}) ->
     ok.
 
 
