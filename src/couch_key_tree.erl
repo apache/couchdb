@@ -76,7 +76,10 @@ stem/2
                 {revtree(), new_leaf | new_branch | internal_node}.
 merge(RevTree, Tree, StemDepth) ->
     {Merged, Result} = merge(RevTree, Tree),
-    {stem(Merged, StemDepth), Result}.
+    case config:get("couchdb", "stem_interactive_updates", "true") of
+        "true" -> {stem(Merged, StemDepth), Result};
+        _ -> {Merged, Result}
+    end.
 
 
 %% @doc Merge a path into a tree.
