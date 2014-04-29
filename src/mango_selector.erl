@@ -21,12 +21,17 @@
 % See the definition of each step below for more information
 % on what each one does.
 normalize(Selector) ->
+    twig:log(err, "SIN: ~p", [Selector]),
     Steps = [
         fun norm_ops/1,
         fun norm_fields/1,
         fun norm_negations/1
     ],
-    lists:foldl(fun(Step, Sel) -> Step(Sel) end, Selector, Steps).
+    lists:foldl(fun(Step, Sel) ->
+        A = Step(Sel),
+        twig:log(err, "SN: ~p ~p", [Step, A]),
+        A
+    end, Selector, Steps).
 
 
 % This function returns a list of indexes that
@@ -329,7 +334,7 @@ norm_ops({[{Field, Cond}]}) ->
 
 % An implicit $and
 norm_ops({Props}) when length(Props) > 1 ->
-    {[{<<"$and">>, [norm_ops(P) || P <- Props]}]};
+    {[{<<"$and">>, [norm_ops({[P]}) || P <- Props]}]};
 
 % A bare value condition means equality
 norm_ops(Value) ->

@@ -12,7 +12,13 @@ def setup():
     db = mkdb()
     db.recreate()
     time.sleep(0.25)
-    docs = [{"_id": str(i), "int": i} for i in range(1, 11)]
+    docs = []
+    for i in range(1, 11):
+        docs.append({
+            "_id": str(i),
+            "int": i,
+            "even": (i % 2) == 0
+        })
     assert db.idx_create(["int"]) == True
     db.insert(docs)
 
@@ -62,3 +68,11 @@ def test_secondary_idx_range():
     assert docs[2]["_id"] == "3"
     assert docs[3]["_id"] == "4"
 
+
+def test_secondary_idx_exclusion():
+    db = mkdb()
+    docs = db.find({"int": {"$gt": 5}, "even": True})
+    assert len(docs) == 3
+    assert docs[0]["_id"] == "6"
+    assert docs[1]["_id"] == "8"
+    assert docs[2]["_id"] == "10"

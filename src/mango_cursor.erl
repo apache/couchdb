@@ -19,6 +19,7 @@
 
 create(Db, Selector0, Opts) ->
     Selector = mango_selector:normalize(Selector0),
+    twig:log(err, "Selector: ~p", [Selector]),
     IndexFields = mango_selector:index_fields(Selector),
     ExistingIndexes = mango_index:list(Db#db.name),
     twig:log(err, "Usable: ~p~nExist: ~p", [IndexFields, ExistingIndexes]),
