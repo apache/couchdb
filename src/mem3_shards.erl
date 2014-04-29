@@ -107,6 +107,8 @@ get(DbName, Node, Range) ->
         [_|_] -> {error, duplicates}
     end.
 
+local(DbName) when is_list(DbName) ->
+    local(list_to_binary(DbName));
 local(DbName) ->
     Pred = fun(#shard{node=Node}) when Node == node() -> true; (_) -> false end,
     lists:filter(Pred, for_db(DbName)).
