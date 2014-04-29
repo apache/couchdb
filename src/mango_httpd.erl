@@ -32,6 +32,10 @@ handle_query_req(#httpd{method='POST'}=Req, Db0) ->
         {ok, LastResp} = mango_writer:close(LastWriter),
         end_resp(LastResp)
     catch
+        throw:{mango_error, _, _} = RuntimeError ->
+            RReason = mango_util:format_error(RuntimeError),
+            twig:log(err, "Mango runtime error: ~s", [RReason]),
+            end_resp(Resp);
         T:E ->
             Stack = erlang:get_stacktrace(),
             twig:log(err, "Error handling request: ~p~n  ~p", [{T, E}, Stack]),

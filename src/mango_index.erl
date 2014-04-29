@@ -13,14 +13,16 @@
 
 
 create(Db, Index, Opts) ->
-    Idx = mango_idx:new(Index, Opts),
+    {ok, Idx0} = mango_idx:new(Db, Index, Opts),
+    {ok, Idx} = mango_idx:validate(Idx0),
     {ok, DDoc} = load_ddoc(Db, mango_idx:ddoc(Idx)),
     case mango_idx:add(DDoc, Idx) of
         {ok, DDoc} ->
             {ok, <<"exists">>};
         {ok, NewDDoc} ->
             case mango_crud:insert(Db, NewDDoc, Opts) of
-                {ok, _} ->
+                {ok, _R} ->
+                    twig:log(err, "Create: ~p", [_R]),
                     {ok, <<"created">>};
                 _ ->
                     ?MANGO_ERROR(error_saving_ddoc)
@@ -32,7 +34,7 @@ list(Db) ->
     {ok, DDocs0} = mango_util:open_ddocs(Db),
     Pred = fun({Props}) ->
         case proplists:get_value(<<"language">>, Props) of
-            <<"mango">> -> true;
+            <<"query">> -> true;
             _ -> false
         end
     end,
@@ -52,5 +54,8 @@ load_ddoc(Db, DDocId) ->
         {ok, Doc} ->
             {ok, Doc};
         not_found ->
-            {ok, #doc{id = DDocId, body = {[]}}}
+            Body = {[
+                {<<"language">>, <<"query">>}
+            ]},
+            {ok, #doc{id = DDocId, body = Body}}
     end.

@@ -2,6 +2,7 @@
 
 
 -export([
+    validate/1,
     add/2,
     from_ddoc/1,
     columns/1,
@@ -11,6 +12,10 @@
 
 
 -include("mango_idx.hrl").
+
+
+validate(_) ->
+    erlang:exit(invalid_call).
 
 
 add(_, _) ->

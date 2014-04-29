@@ -3,11 +3,14 @@
 
 -export([
     create/3,
-    execute/3
+    execute/3,
+    
+    format_error/1
 ]).
 
 
 -include_lib("couch/include/couch_db.hrl").
+-include("mango.hrl").
 -include("mango_cursor.hrl").
 
 
@@ -18,6 +21,7 @@ create(Db, Selector0, Opts) ->
     Selector = mango_selector:normalize(Selector0),
     IndexFields = mango_selector:index_fields(Selector),
     ExistingIndexes = mango_index:list(Db#db.name),
+    twig:log(err, "Usable: ~p~nExist: ~p", [IndexFields, ExistingIndexes]),
     UsableIndexes = find_usable_indexes(IndexFields, ExistingIndexes),
     FieldRanges = find_field_ranges(Selector, IndexFields),
     Composited = composite_indexes(UsableIndexes, FieldRanges),
@@ -42,12 +46,26 @@ execute(#cursor{index=Idx}=Cursor, UserFun, UserAcc) ->
     Mod:execute(Cursor, UserFun, UserAcc).
 
 
+format_error({no_usable_index, query_unsupported}) ->
+    mango_util:fmt(
+            "Query unsupported because it would require multiple indices."
+        );
+format_error({no_usable_index, Possible}) ->
+    Strs = [binary_to_list(P) || P <- Possible],
+    PStr = string:join(Strs, ", "),
+    mango_util:fmt("No index exists for this selector, try indexing one of ~s",
+            [PStr]
+        );
+format_error(Else) ->
+    mango_util:fmt("Unknown error: ~w", [Else]).
+
+
 % Find the intersection between the Possible and Existing
 % indexes.
 find_usable_indexes([], _) ->
-    throw({no_usable_index, query_unsupported});
+    ?MANGO_ERROR({no_usable_index, query_unsupported});
 find_usable_indexes(Possible, []) ->
-    throw({no_usable_index, Possible});
+    ?MANGO_ERROR({no_usable_index, Possible});
 find_usable_indexes(Possible, Existing) ->
     Usable = lists:foldl(fun(Idx, Acc) ->
         [Col0 | _] = mango_idx:columns(Idx),
@@ -59,7 +77,7 @@ find_usable_indexes(Possible, Existing) ->
         end
     end, [], Existing),
     if length(Usable) > 0 -> ok; true ->
-        throw({no_usable_index, Possible})
+        ?MANGO_ERROR({no_usable_index, Possible})
     end,
     Usable.
 

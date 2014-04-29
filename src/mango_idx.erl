@@ -7,6 +7,7 @@
 
 -export([
     new/3,
+    validate/1,
     add/2,
     from_ddoc/2,
     special/1,
@@ -30,10 +31,15 @@
 -include("mango_idx.hrl").
 
 
+validate(Idx) ->
+    Mod = idx_mod(Idx),
+    Mod:validate(Idx).
+
+
 new(Db, Def, Opts) ->
-    DDoc = get_idx_ddoc(Def, Opts),
-    IdxName = get_idx_name(Def, Opts),
     Type = get_idx_type(Opts),
+    IdxName = get_idx_name(Def, Opts),
+    DDoc = get_idx_ddoc(Def, Opts),
     {ok, #idx{
         dbname = db_to_name(Db),
         ddoc = DDoc,
@@ -140,34 +146,35 @@ db_to_name(Name) when is_list(Name) ->
     iolist_to_binary(Name).
 
 
-get_idx_ddoc(Idx, Opts) ->
-    case proplists:get_value(<<"ddoc">>, Opts) of
-        <<"_design/", _Rest>> = Name ->
-            Name;
-        Name when is_binary(Name) ->
-            <<"_design/", Name/binary>>;
-        _ ->
-            gen_name(Idx, Opts)
-    end.
-
-
-get_idx_name(Idx, Opts) ->
-    case proplists:get_value(<<"name">>, Opts) of
-        Name when is_binary(Name) ->
-            Name;
-        _ ->
-            gen_name(Idx, Opts)
-    end.
-
-
 get_idx_type(Opts) ->
-    case proplists:get_value(<<"type">>, Opts) of
-        <<"plain">> -> view;
+    case proplists:get_value(type, Opts) of
+        <<"json">> -> view;
         <<"text">> -> lucene;
         <<"geo">> -> geo;
         undefined -> view;
         _ ->
             ?MANGO_ERROR(invalid_index_type)
+    end.
+
+
+get_idx_ddoc(Idx, Opts) ->
+    case proplists:get_value(ddoc, Opts) of
+        <<"_design/", _Rest>> = Name ->
+            Name;
+        Name when is_binary(Name) ->
+            <<"_design/", Name/binary>>;
+        _ ->
+            Bin = gen_name(Idx, Opts),
+            <<"_design/", Bin/binary>>
+    end.
+
+
+get_idx_name(Idx, Opts) ->
+    case proplists:get_value(name, Opts) of
+        Name when is_binary(Name) ->
+            Name;
+        _ ->
+            gen_name(Idx, Opts)
     end.
 
 
@@ -180,11 +187,11 @@ gen_name(Idx, Opts0) ->
 
 filter_opts([]) ->
     [];
-filter_opts([{<<"ddoc">>, _} | Rest]) ->
+filter_opts([{ddoc, _} | Rest]) ->
     filter_opts(Rest);
-filter_opts([{<<"name">>, _} | Rest]) ->
+filter_opts([{name, _} | Rest]) ->
     filter_opts(Rest);
-filter_opts([{<<"type">>, _} | Rest]) ->
+filter_opts([{type, _} | Rest]) ->
     filter_opts(Rest);
 filter_opts([Opt | Rest]) ->
     [Opt | filter_opts(Rest)].

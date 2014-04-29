@@ -92,32 +92,32 @@ map_doc(#st{indexes=Indexes}, Doc) ->
 
 
 get_index_entries({IdxProps}, Doc) ->
-    {Key} = couch_util:get_value(<<"key">>, IdxProps),
-    Sparse = couch_util:get_value(<<"sparse">>, IdxProps, false),
-    Values = lists:map(fun({Field, _Dir}) ->
+    {Fields} = couch_util:get_value(<<"fields">>, IdxProps),
+    MissingIsNull = couch_util:get_value(<<"missing_is_null">>, IdxProps),
+    Values0 = lists:map(fun({Field, _Dir}) ->
         mango_doc:get_field(Doc, Field)
-    end, Key),
-    case Sparse and lists:member(not_found, Values) of
+    end, Fields),
+    Values1 = set_nulls(Values0, MissingIsNull),
+    case lists:member(not_found, Values1) of
         true ->
             [];
         false ->
-            NewValues = set_nulls(Values),
-            case has_one_array(NewValues) of
+            case has_one_array(Values1) of
                 true ->
-                    Expanded = expand_array(NewValues),
+                    Expanded = expand_array(Values1),
                     [[K, null] || K <- Expanded];
                 false ->
-                    [[NewValues, null]]
+                    [[Values1, null]]
             end
     end.
 
 
-set_nulls([]) ->
+set_nulls([], _) ->
     [];
-set_nulls([not_found | Rest]) ->
-    [null | set_nulls(Rest)];
-set_nulls([Else | Rest]) ->
-    [Else | set_nulls(Rest)].
+set_nulls([not_found | Rest], true) ->
+    [null | set_nulls(Rest, true)];
+set_nulls([Else | Rest], false) ->
+    [Else | set_nulls(Rest, false)].
 
 
 has_one_array(Values) ->
