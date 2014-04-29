@@ -4,7 +4,9 @@
 -export([
     add/2,
     from_ddoc/1,
-    columns/1
+    columns/1,
+    start_key/1,
+    end_key/1
 ]).
 
 
@@ -49,6 +51,26 @@ columns(Idx) ->
     {Props} = Idx#idx.def,
     {<<"map">>, {Def}} = lists:keyfind(<<"map">>, 1, Props),
     [Key || {Key, _} <- Def].
+
+
+start_key([]) ->
+    [];
+start_key([{'$gt', Key, _, _} | Rest]) ->
+    [Key | start_key(Rest)];
+start_key([{'$gte', Key, _, _} | Rest]) ->
+    [Key | start_key(Rest)];
+start_key([{'$eq', Key, '$eq', Key} | Rest]) ->
+    [Key | start_key(Rest)].
+
+
+end_key([]) ->
+    [{}];
+end_key([{_, _, '$lt', Key} | Rest]) ->
+    [Key | end_key(Rest)];
+end_key([{_, _, '$lte', Key} | Rest]) ->
+    [Key | end_key(Rest)];
+end_key([{'$eq', Key, '$eq', Key} | Rest]) ->
+    [Key | end_key(Rest)].
 
 
 make_view(Idx) ->

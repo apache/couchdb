@@ -28,8 +28,8 @@ create(Db, Index, Opts) ->
     end.
 
 
-list(DbName) ->
-    {ok, DDocs0} = mango_util:open_ddocs(DbName),
+list(Db) ->
+    {ok, DDocs0} = mango_util:open_ddocs(Db),
     Pred = fun({Props}) ->
         case proplists:get_value(<<"language">>, Props) of
             <<"mango">> -> true;
@@ -37,8 +37,9 @@ list(DbName) ->
         end
     end,
     DDocs = lists:filter(Pred, DDocs0),
-    lists:flatmap(fun(Doc) ->
-        mango_idx:from_ddoc(DbName, Doc)
+    Special = mango_idx:special(Db),
+    Special ++ lists:flatmap(fun(Doc) ->
+        mango_idx:from_ddoc(Db, Doc)
     end, DDocs).
 
 

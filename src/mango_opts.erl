@@ -6,7 +6,12 @@
     format_error/1,
 
     is_boolean/1,
-    is_pos_integer/1
+    is_pos_integer/1,
+    is_non_neg_integer/1,
+    
+    validate_selector/1,
+    validate_sort/1,
+    validate_fields/1
 ]).
 
 
@@ -42,6 +47,12 @@ format_error({invalid_value, Name, Value}) ->
     mango_util:fmt("Invalid value for ~s: ~w", [Name, Value]);
 format_error({invalid_boolean, Val}) ->
     mango_util:fmt("Invalid boolean value: ~w", [Val]);
+format_error({invalid_pos_integer, Val}) ->
+    mango_util:fmt("~w is not an integer greater than zero", [Val]);
+format_error({invalid_non_neg_integer, Val}) ->
+    mango_util:fmt("~w is not an integer greater than or equal to zero", [Val]);
+format_error({invalid_selector_json, BadSel}) ->
+    mango_util:fmt("Selector must be a JSON object, not: ~w", [BadSel]);
 format_error(Else) ->
     mango_util:fmt("Unknown error: ~w", [Else]).
 
@@ -58,6 +69,27 @@ is_pos_integer(V) when is_integer(V), V > 0 ->
     {ok, V};
 is_pos_integer(Else) ->
     ?MANGO_ERROR({invalid_pos_integer, Else}).
+
+
+is_non_neg_integer(V) when is_integer(V), V >= 0 ->
+    {ok, V};
+is_non_neg_integer(Else) ->
+    ?MANGO_ERROR({invalid_non_neg_integer, Else}).
+
+
+validate_selector({Props}) ->
+    Norm = mango_selector:normalize({Props}),
+    {ok, Norm};
+validate_selector(Else) ->
+    ?MANGO_ERROR({invalid_selector_json, Else}).
+
+
+validate_sort(Value) ->
+    mango_sort:new(Value).
+
+
+validate_fields(Value) ->
+    mango_fields:new(Value).
 
 
 validate_opts([], Props, Acc) ->
@@ -84,6 +116,12 @@ validate_opt(Name, Desc0, undefined) ->
         _ ->
             ?MANGO_ERROR({missing_required_key, Name})
     end;
+validate_opt(Name, [{optional, _} | Rest], Value) ->
+    % A value was specified for an optional value
+    validate_opt(Name, Rest, Value);
+validate_opt(Name, [{default, _} | Rest], Value) ->
+    % A value was specified for an optional value
+    validate_opt(Name, Rest, Value);
 validate_opt(Name, [{assert, Value} | Rest], Value) ->
     validate_opt(Name, Rest, Value);
 validate_opt(Name, [{assert, Expect} | _], Found) ->

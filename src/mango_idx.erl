@@ -9,6 +9,7 @@
     new/3,
     add/2,
     from_ddoc/2,
+    special/1,
 
     dbname/1,
     ddoc/1,
@@ -17,6 +18,8 @@
     def/1,
     opts/1,
     columns/1,
+    start_key/2,
+    end_key/2,
     cursor_mod/1,
     idx_mod/1
 ]).
@@ -66,6 +69,18 @@ from_ddoc(Db, {Props}) ->
     end, Idxs).
 
 
+special(Db) ->
+    AllDocs = #idx{
+        dbname = db_to_name(Db),
+        name = <<"_all_docs">>,
+        type = special,
+        def = all_docs,
+        opts = []
+    },
+    % Add one for _update_seq
+    [AllDocs].
+
+
 dbname(#idx{dbname=DbName}) ->
     DbName.
 
@@ -90,17 +105,31 @@ opts(#idx{opts=Opts}) ->
     Opts.
 
 
+columns(#idx{}=Idx) ->
+    Mod = idx_mod(Idx),
+    Mod:columns(Idx).
+
+
+start_key(#idx{}=Idx, Ranges) ->
+    Mod = idx_mod(Idx),
+    Mod:start_key(Ranges).
+
+
+end_key(#idx{}=Idx, Ranges) ->
+    Mod = idx_mod(Idx),
+    Mod:end_key(Ranges).
+
+
 cursor_mod(#idx{type=view}) ->
+    mango_cursor_view;
+cursor_mod(#idx{def=all_docs, type=special}) ->
     mango_cursor_view.
 
 
 idx_mod(#idx{type=view}) ->
-    mango_idx_view.
-
-
-columns(#idx{}=Idx) ->
-    Mod = idx_mod(Idx),
-    Mod:columns(Idx).
+    mango_idx_view;
+idx_mod(#idx{type=special}) ->
+    mango_idx_special.
 
 
 db_to_name(#db{name=Name}) ->

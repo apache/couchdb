@@ -5,11 +5,14 @@
     normalize/1,
     index_fields/1,
     range/2,
-    match/2
+    match/2,
+    
+    format_error/1
 ]).
 
 
 -include_lib("couch/include/couch_db.hrl").
+-include("mango.hrl").
 
 
 % Validate and normalize each operator. This translates
@@ -198,53 +201,65 @@ match({Props} = Sel, _) when length(Props) > 1 ->
     erlang:error({unnormalized_selector, Sel}).
 
 
+format_error({bad_arg, Op, Arg}) ->
+    mango_util:fmt("Bad argument for operator ~s: ~w", [Op, Arg]);
+format_error({not_supported, Op}) ->
+    mango_util:fmt("Unsupported operator: ~s", [Op]);
+format_error({invalid_operator, Op}) ->
+    mango_util:fmt("Invalid operator: ~s", [Op]);
+format_error({bad_field, BadSel}) ->
+    mango_util:fmt("Invalid field normalization on selector: ~w", [BadSel]);
+format_error(Else) ->
+    mango_util:fmt("Unknown error: ~w", [Else]).
+
+
 % Convert each operator into a normalized version as well
 % as convert an implict operators into their explicit
 % versions.
 norm_ops({[{<<"$and">>, Args}]}) when is_list(Args) ->
     {[{<<"$and">>, [norm_ops(A) || A <- Args]}]};
 norm_ops({[{<<"$and">>, Arg}]}) ->
-    throw({invalid_selector, {bad_arg, '$and', Arg}});
+    ?MANGO_ERROR({bad_arg, '$and', Arg});
 
 norm_ops({[{<<"$or">>, Args}]}) when is_list(Args) ->
     {[{<<"$or">>, [norm_ops(A) || A <- Args]}]};
 norm_ops({[{<<"$or">>, Arg}]}) ->
-    throw({invalid_selector, {bad_arg, '$or', Arg}});
+    ?MANGO_ERROR({bad_arg, '$or', Arg});
 
 norm_ops({[{<<"$not">>, {_}=Arg}]}) ->
     {[{<<"$not">>, norm_ops(Arg)}]};
 norm_ops({[{<<"$not">>, Arg}]}) ->
-    throw({invalid_selector, {bad_arg, '$not', Arg}});
+    ?MANGO_ERROR({bad_arg, '$not', Arg});
 
 norm_ops({[{<<"$nor">>, Args}]}) when is_list(Args) ->
     {[{<<"$nor">>, [norm_ops(A) || A <- Args]}]};
 norm_ops({[{<<"$nor">>, Arg}]}) ->
-    throw({invalid_selector, {bad_arg, '$nor', Arg}});
+    ?MANGO_ERROR({bad_arg, '$nor', Arg});
 
 norm_ops({[{<<"$in">>, Args}]} = Cond) when is_list(Args) ->
     Cond;
 norm_ops({[{<<"$in">>, Arg}]}) ->
-    throw({invalid_selector, {bad_arg, '$in', Arg}});
+    ?MANGO_ERROR({bad_arg, '$in', Arg});
 
 norm_ops({[{<<"$nin">>, Args}]} = Cond) when is_list(Args) ->
     Cond;
 norm_ops({[{<<"$nin">>, Arg}]}) ->
-    throw({invalid_selector, {bad_arg, '$nin', Arg}});
+    ?MANGO_ERROR({bad_arg, '$nin', Arg});
 
 norm_ops({[{<<"$exists">>, Arg}]} = Cond) when is_boolean(Arg) ->
     Cond;
 norm_ops({[{<<"$exists">>, Arg}]}) ->
-    throw({invalid_selector, {bad_arg, '$exists', Arg}});
+    ?MANGO_ERROR({bad_arg, '$exists', Arg});
 
 norm_ops({[{<<"$type">>, Arg}]} = Cond) when Arg >= 0, Arg =< 127 ->
     Cond;
 norm_ops({[{<<"$type">>, Arg}]}) ->
-    throw({invalid_selector, {bad_arg, '$type', Arg}});
+    ?MANGO_ERROR({bad_arg, '$type', Arg});
 
 norm_ops({[{<<"$mod">>, [D, R]}]} = Cond) when is_integer(D), is_integer(R) ->
     Cond;
 norm_ops({[{<<"$mod">>, Arg}]}) ->
-    throw({invalid_selector, {bad_arg, '$mod', Arg}});
+    ?MANGO_ERROR({bad_arg, '$mod', Arg});
 
 norm_ops({[{<<"$regex">>, R}, {<<"$options">>, O}]} = Cond)
         when is_binary(R), is_binary(O) ->
@@ -254,7 +269,7 @@ norm_ops({[{<<"$regex">>, R}, {<<"$options">>, O}]} = Cond)
         {ok, _} ->
             Cond;
         _ ->
-            throw({invalid_selector, {bad_arg, '$regex', {R, O}}})
+            ?MANGO_ERROR({bad_arg, '$regex', {R, O}})
     end;
 norm_ops({[{<<"$options">>, O}, {<<"$regex">>, R}]}) ->
     norm_ops({[{<<"$regex">>, R}, {<<"$options">>, O}]});
@@ -265,17 +280,17 @@ norm_ops({[{<<"$regex">>, R}]}) ->
 norm_ops({[{<<"$all">>, Args}]}) when is_list(Args) ->
     {[{<<"$all">>, [norm_ops(A) || A <- Args]}]};
 norm_ops({[{<<"$all">>, Arg}]}) ->
-    throw({invalid_selector, {bad_arg, '$all', Arg}});
+    ?MANGO_ERROR({bad_arg, '$all', Arg});
 
 norm_ops({[{<<"$elemMatch">>, {_}=Arg}]}) ->
     {[{<<"$elemMatch">>, norm_ops(Arg)}]};
 norm_ops({[{<<"$elemMatch">>, Arg}]}) ->
-    throw({invalid_selector, {bad_arg, '$elemMatch', Arg}});
+    ?MANGO_ERROR({bad_arg, '$elemMatch', Arg});
 
 norm_ops({[{<<"$size">>, Arg}]}) when is_integer(Arg), Arg >= 0 ->
     {[{<<"$size">>, Arg}]};
 norm_ops({[{<<"$size">>, Arg}]}) ->
-    throw({invalid_selector, {bad_arg, '$size', Arg}});
+    ?MANGO_ERROR({bad_arg, '$size', Arg});
 
 % Terminals where we can't perform any validation
 % on the value because any value is acceptable.
@@ -294,19 +309,19 @@ norm_ops({[{<<"$gt">>, _}]} = Cond) ->
 
 % Known but unsupported operators
 norm_ops({[{<<"$where">>, _}]}) ->
-    throw({invalid_selector, {not_supported, '$where'}});
+    ?MANGO_ERROR({not_supported, '$where'});
 norm_ops({[{<<"$geoWithin">>, _}]}) ->
-    throw({invalid_selector, {not_supported, '$geoWithin'}});
+    ?MANGO_ERROR({not_supported, '$geoWithin'});
 norm_ops({[{<<"$geoIntersects">>, _}]}) ->
-    throw({invalid_selector, {not_supported, '$geoIntersects'}});
+    ?MANGO_ERROR({not_supported, '$geoIntersects'});
 norm_ops({[{<<"$near">>, _}]}) ->
-    throw({invalid_selector, {not_supported, '$near'}});
+    ?MANGO_ERROR({not_supported, '$near'});
 norm_ops({[{<<"$nearSphere">>, _}]}) ->
-    throw({invalid_selector, {not_supported, '$nearSphere'}});
+    ?MANGO_ERROR({not_supported, '$nearSphere'});
 
 % Unknown operator
 norm_ops({[{<<"$", _/binary>>=Op, _}]}) ->
-    throw({invalid_selector, {invalid_operator, Op}});
+    ?MANGO_ERROR({invalid_operator, Op});
 
 % A {Field: Cond} pair
 norm_ops({[{Field, Cond}]}) ->
@@ -388,7 +403,7 @@ norm_fields({[{Field, Cond}]}, Path) ->
 
 % Else we have an invalid selector
 norm_fields(BadSelector, _) ->
-    throw({invalid_selector, {bad_field, BadSelector}}).
+    ?MANGO_ERROR({bad_field, BadSelector}).
 
 
 % Take all the negation operators and move the logic

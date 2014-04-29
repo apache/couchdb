@@ -1,8 +1,7 @@
 -module(mango_cursor_view).
 
 -export([
-    init/5,
-    run/1
+    execute/3
 ]).
 
 -export([
@@ -11,141 +10,139 @@
 
 
 -include_lib("couch/include/couch_db.hrl").
+-include("mango_cursor.hrl").
 
 
--record(st, {
-    cursor,
-    index,
-    ranges,
-    selector,
-    opts,
-    ctx,
-    acc = []
-}).
-
-
-init(Index, Ranges, Selector, Opts, Ctx) ->
-    St = #st{
-        cursor = self(),
-        index = Index,
-        ranges = Ranges,
-        selector = Selector,
-        opts = Opts,
-        ctx = Ctx
+execute(#cursor{db = Db, index = Idx} = Cursor0, UserFun, UserAcc) ->
+    Cursor = Cursor0#cursor{
+        user_fun = UserFun,
+        user_acc = UserAcc
     },
-    {Pid, _Ref} = erlang:spawn_monitor(?MODULE, run, [St]),
-    {ok, Pid}.
-
-
-run(#st{index=Idx}=St) ->
-    erlang:monitor(process, St#st.cursor),
-    DbName = mango_index:dbname(Idx),
-    DDoc = case mango_index:ddoc(Idx) of
-        <<"_design/", Rest/binary>> ->
-            Rest;
-        Else ->
-            Else
-    end,
-    Name = mango_index:name(Idx),
-    twig:log(err, "Query: ~s ~s :: ~p ~p", [
-        DbName, DDoc, start_key(St#st.ranges), end_key(St#st.ranges)]),
-    Args = #view_query_args{
+    BaseArgs = #view_query_args{
         view_type = red_map,
-        start_key = start_key(St#st.ranges),
-        end_key = end_key(St#st.ranges),
-        limit = limit(St#st.opts),
+        start_key = mango_idx:start_key(Idx, Cursor#cursor.ranges),
+        end_key = mango_idx:end_key(Idx, Cursor#cursor.ranges),
         include_docs = true
     },
+    Args = apply_opts(Cursor#cursor.opts, BaseArgs),
     CB = fun ?MODULE:handle_message/2,
-    fabric:query_view(DbName, DDoc, Name, CB, St, Args).
-
-
-handle_message({total_and_offset, _, _}=TO, St) ->
-    twig:log(err, "TOTAL AND OFFSET: ~p", [TO]),
-    {ok, St};
-handle_message({row, {Props}}, St) ->
-    twig:log(err, "ROW: ~p", [Props]),
-    Doc = couch_util:get_value(doc, Props),
-    Acc = case mango_selector:match(St#st.selector, Doc) of
-        true ->
-            [Doc | St#st.acc];
-        false ->
-            St#st.acc
+    {ok, LastCursor} = case mango_idx:def(Idx) of
+        all_docs ->
+            twig:log(err, "Query: ~s all_docs~n  ~p", [Db#db.name, Args]),
+            fabric:all_docs(Db, CB, Cursor, Args);
+        _ ->
+            % Normal view
+            DDoc = ddocid(Idx),
+            Name = mango_idx:name(Idx),
+            twig:log(err, "Query: ~s ~s ~s~n  ~p", [Db#db.name, DDoc, Name, Args]),
+            fabric:query_view(Db, DDoc, Name, CB, Cursor, Args)
     end,
-    case length(Acc) >= batch_size(St#st.opts) of
-        true ->
-            send_batch(St, Acc);
-        false ->
-            {ok, St#st{acc = Acc}}
+    {ok, LastCursor#cursor.user_acc}.
+
+
+handle_message({total_and_offset, _, _}=TO, Cursor) ->
+    twig:log(err, "TOTAL AND OFFSET: ~p", [TO]),
+    {ok, Cursor};
+handle_message({row, {Props}}, Cursor) ->
+    twig:log(err, "ROW: ~p", [Props]),
+    case doc_member(Cursor#cursor.db, Props, Cursor#cursor.opts) of
+        {ok, Doc} ->
+            case mango_selector:match(Cursor#cursor.selector, Doc) of
+                true ->
+                    handle_doc(Cursor, Doc);
+                false ->
+                    {ok, Cursor}
+            end;
+        _ ->
+            {ok, Cursor}
     end;
-handle_message(complete, St) ->
-    twig:log(err, "COMPLETE", []),
-    send_batch(St, St#st.acc);
-handle_message({error, Reason}, _St) ->
+handle_message(complete, Cursor) ->
+    {ok, Cursor};
+handle_message({error, Reason}, _Cursor) ->
     twig:log(err, "ERROR: ~p", [Reason]),
     {error, Reason}.
 
 
-send_batch(#st{cursor=Cursor}=St, Batch) ->
-    Cursor ! {self(), batch, Batch},
-    Timeout = inactivity_timeout(St#st.opts),
-    receive
-        {Cursor, next} ->
-            {ok, St#st{acc = []}};
-        {Cursor, close} ->
-            erlang:exit(normal);
-        {'DOWN', _, _, Cursor, _} ->
-            erlang:exit(normal)
-        after Timeout ->
-            erlang:exit(timeout)
+handle_doc(#cursor{skip = N} = C, _) when N > 0 ->
+    {ok, C#cursor{skip = N - 1}};
+handle_doc(Cursor, Doc) ->
+    UserFun = Cursor#cursor.user_fun,
+    UserAcc = Cursor#cursor.user_acc,
+    {Go, NewAcc} = UserFun({row, Doc}, UserAcc),
+    NewCursor = Cursor#cursor{user_acc = NewAcc},
+    case Cursor#cursor.limit of
+        1 ->
+            {stop, NewCursor};
+        L when L > 1 ->
+            {Go, NewCursor}
     end.
 
 
-limit(Opts) ->
-    case lists:keyfind(limit, 1, Opts) of
-        {_, L} when is_integer(L), L > 0 ->
-            L;
-        _ ->
-            % Views just expect a big number for "no limit".
-            % A bit silly, but when in Rome...
-            10000000000
+ddocid(Idx) ->
+    case mango_idx:ddoc(Idx) of
+        <<"_design/", Rest/binary>> ->
+            Rest;
+        Else ->
+            Else
     end.
 
 
-batch_size(Opts) ->
-    case lists:keyfind(batch_size, 1, Opts) of
-        {_, Count} when is_integer(Count), Count > 0 ->
-            Count;
-        _ ->
-            25
+apply_opts([], Args) ->
+    Args;
+apply_opts([{limit, _} | Rest], Args) ->
+    % Handled in mango_cursor:create/3, ignored here
+    % to avoid function clause errors.
+    apply_opts(Rest, Args);
+apply_opts([{skip, _} | Rest], Args) ->
+    % Handled in mango_cursor:create/3
+    apply_opts(Rest, Args);
+apply_opts([{sort, _} | Rest], Args) ->
+    % Handled in mango_cursor:create/3
+    apply_opts(Rest, Args);
+apply_opts([{fields, _} | Rest], Args) ->
+    % Handled in mango_cursor:create/3
+    apply_opts(Rest, Args);
+apply_opts([{r, 1} | Rest], Args) ->
+    NewArgs = Args#view_query_args{include_docs = true},
+    apply_opts(Rest, NewArgs);
+apply_opts([{r, R} | Rest], Args) when R > 0 ->
+    % We don't load the doc in the view query because
+    % we have to do a quorum read in the coordinator
+    % so there's no point.
+    NewArgs = Args#view_query_args{include_docs = false},
+    apply_opts(Rest, NewArgs);
+apply_opts([{conflicts, true} | Rest], Args) ->
+    % I need to patch things so that views can specify
+    % parameters when loading the docs from disk
+    apply_opts(Rest, Args);
+apply_opts([{conflicts, false} | Rest], Args) ->
+    % Ignored cause default
+    apply_opts(Rest, Args).
+
+
+doc_member(Db, RowProps, Opts) ->
+    Fields = couch_util:get_value(fields, Opts),
+    case load_doc(Db, RowProps, Opts) of
+        {ok, Doc} when Fields /= all_fields ->
+            {ok, mango_fields:extract(Doc, Fields)};
+        Else ->
+            Else
     end.
 
 
-inactivity_timeout(Opts) ->
-    case lists:keyfind(timeout, 1, Opts) of
-        {_, TO} when is_integer(TO), TO > 0 ->
-            TO;
-        _ ->
-            % Mongo default of 10m
-            600000
+load_doc(Db, RowProps, Opts) ->
+    case couch_util:get_value(doc, RowProps) of
+        {DocProps} ->
+            {ok, {DocProps}};
+        undefined ->
+            Id = couch_util:get_value(id, RowProps),
+            R = case lists:keyfind(r, 1, Opts) of
+                undefined ->
+                    "2";
+                Else ->
+                    integer_to_list(Else)
+            end,
+            Opts = [{r, R}, {user_ctx, Db#db.user_ctx}],
+            mango_util:defer(fabric, open_doc, [Db, Id, Opts])
     end.
 
-
-start_key([]) ->
-    [];
-start_key([{'$gt', Key, _, _} | Rest]) ->
-    [Key | start_key(Rest)];
-start_key([{'$gte', Key, _, _} | Rest]) ->
-    [Key | start_key(Rest)];
-start_key([{'$eq', Key, '$eq', Key} | Rest]) ->
-    [Key | start_key(Rest)].
-
-
-end_key([]) ->
-    [{}];
-end_key([{_, _, '$lt', Key} | Rest]) ->
-    [Key | end_key(Rest)];
-end_key([{_, _, '$lte', Key} | Rest]) ->
-    [Key | end_key(Rest)];
-end_key([{'$eq', Key, '$eq', Key} | Rest]) ->
-    [Key | end_key(Rest)].

@@ -45,4 +45,36 @@ class Database(object):
 
         return r.json()
 
+    def find(self, selector, limit=25, skip=0, sort=None, fields=None,
+                r=1, conflicts=False):
+        action = {
+            "action": "find",
+            "selector": selector,
+            "limit": limit,
+            "skip": skip,
+            "r": r,
+            "conflicts": conflicts
+        }
+        if sort is not None:
+            action["sort"] = sort
+        if fields is not None:
+            action["fields"] = fields
+        body = json.dumps([action])
+        r = self.sess.post(self.qurl, data=body)
+        r.raise_for_status()
+        result = r.json()[0]
+        if not result["ok"]:
+            raise RuntimeError(result["result"])
+        return result["results"]
+
+    def find_one(self, *args, **kwargs):
+        results = self.find(*args, **kwargs)
+        if len(results) > 1:
+            raise RuntimeError("Multiple results for Database.find_one")
+        if len(results):
+            return results[0]
+        else:
+            return None
+
+
 

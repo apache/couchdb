@@ -5,9 +5,11 @@
     new/3,
     close/1,
     is_writer/1,
+    script/2,
 
     obj_open/1,
     obj_key/2,
+    obj_pair/3,
     obj_close/1,
 
     arr_open/1,
@@ -46,6 +48,19 @@ is_writer(_) ->
     false.
 
 
+script(#w{} = W, []) ->
+    {ok, W};
+script(#w{} = W, [Fun | Rest]) when is_atom(Fun) ->
+    {ok, NewW} = ?MODULE:Fun(W),
+    script(NewW, Rest);
+script(#w{} = W, [{Fun, Arg1} | Rest]) ->
+    {ok, NewW} = ?MODULE:Fun(W, Arg1),
+    script(NewW, Rest);
+script(#w{} = W, [{Fun, Arg1, Arg2} | Rest]) ->
+    {ok, NewW} = ?MODULE:Fun(W, Arg1, Arg2),
+    script(NewW, Rest).
+
+
 obj_open(#w{state = [value | Rest]} = W) ->
     NewW = W#w{state = [{obj, 0} | Rest]},
     write(NewW, "{").
@@ -53,16 +68,35 @@ obj_open(#w{state = [value | Rest]} = W) ->
 
 obj_key(#w{state=[{obj, N} | Rest]} = W, Key) when is_binary(Key) ->
     NewW = W#w{state=[value, {obj, N} | Rest]},
+    JsonKey = jiffy:encode(Key),
     case N > 0 of
         true ->
-            write(NewW, [",", Key]);
+            write(NewW, [",", JsonKey, ":"]);
         false ->
-            write(NewW, Key)
+            write(NewW, [JsonKey, ":"])
+    end.
+
+
+obj_pair(#w{state=[{obj, N} | Rest]} = W, Key, Val) when is_binary(Key) ->
+    NewW = W#w{state=[{obj, N+1} | Rest]},
+    JsonKey = jiffy:encode(Key),
+    JsonVal = jiffy:encode(Val),
+    case N > 0 of
+        true ->
+            write(NewW, [",", JsonKey, ":", JsonVal]);
+        false ->
+            write(NewW, [JsonKey, ":", JsonVal])
     end.
 
 
 obj_close(#w{state=[{obj, _N} | Rest]} = W) ->
-    write(W#w{state = Rest}, "}").
+    State = case Rest of
+        [{arr, _} | _] ->
+            [value | Rest];
+        Else ->
+            Else
+    end,
+    write(W#w{state = State}, "}").
 
 
 arr_open(#w{state=[value | Rest]} = W) ->
@@ -71,7 +105,13 @@ arr_open(#w{state=[value | Rest]} = W) ->
 
 
 arr_close(#w{state=[value, {arr, _N} | Rest]} = W) ->
-    NewW = W#w{state = Rest},
+    State = case Rest of
+        [{arr, _} | _] ->
+            [value | Rest];
+        Else ->
+            Else
+    end,
+    NewW = W#w{state = State},
     write(NewW, "]").
 
 
@@ -85,7 +125,7 @@ add_value(#w{state=[value, {arr, N} | Rest]} = W, Value) ->
     end;
 add_value(#w{state = [value, {obj, N} | Rest]} = W, Value) ->
     NewW = W#w{state = [{obj, N+1} | Rest]},
-    write(NewW, [":", jiffy:encode(Value)]);
+    write(NewW, [jiffy:encode(Value)]);
 add_value(#w{state = [value]} = W, Value) ->
     NewW = W#w{state = []},
     write(NewW, jiffy:encode(Value)).
@@ -93,5 +133,5 @@ add_value(#w{state = [value]} = W, Value) ->
 
 write(#w{mfa = {Mod, Fun, Arg}} = W, IoData) ->
     {ok, NewArg} = Mod:Fun(Arg, IoData),
-    twig:log(err, "WS: ~p", [W#w.state]),
+    %twig:log(err, "WS: ~p", [W#w.state]),
     {ok, W#w{mfa = {Mod, Fun, NewArg}}}.

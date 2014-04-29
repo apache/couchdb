@@ -4,6 +4,7 @@
 -export([
     insert/3,
     find/5,
+    find/3,
     update/4,
     delete/3
 ]).
@@ -33,7 +34,14 @@ insert(Db, Docs, Opts) when is_list(Docs) ->
 
 
 find(Db, Selector, Callback, UserAcc, Options) ->
-    mango_cursor:execute(Db, Selector, Callback, UserAcc, Options).
+    {ok, Cursor} = mango_cursor:create(Db, Selector, Options),
+    mango_util:defer(mango_cursor, execute, [
+            Cursor, Callback, UserAcc
+        ]).
+
+
+find(Cursor, Callback, UserAcc) ->
+    mango_util:defer(mango_cursor, execute, [Cursor, Callback, UserAcc]).
 
 
 update(Db, Selector, Update, Options) ->
@@ -119,7 +127,7 @@ result_to_json({{Id, Rev}, Error}) ->
 
 collect_docs(Db, Selector, Options) ->
     Cb = fun ?MODULE:collect_cb/2,
-    case mango_cursor:execute(Db, Selector, Cb, [], Options) of
+    case find(Db, Selector, Cb, [], Options) of
         {ok, Docs} ->
             {ok, lists:reverse(Docs)};
         Else ->
