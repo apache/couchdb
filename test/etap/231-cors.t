@@ -32,7 +32,7 @@ server() ->
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(26),
+    etap:plan(29),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -133,7 +133,7 @@ test() ->
     % test multiple per-host configuration
 
     %% do tests with auth
-    ok = set_admin_password("test", "test"),
+    ok = set_admin_password("test", <<"test">>),
 
     test_db_preflight_auth_request(),
     test_db_origin_auth_request(),
