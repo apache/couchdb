@@ -212,6 +212,7 @@ get_db_ref_counter() ->
 check_db_ref_count() ->
     {ok, #db{fd_ref_counter = Ref} = Db} = couch_db:open_int(test_db_name(), []),
     ok = couch_db:close(Db),
+    timer:sleep(200),  % sleep a bit to prevent race condition
     etap:is(couch_ref_counter:count(Ref), 2,
         "DB ref counter is only held by couch_db and couch_db_updater"),
     ok.
