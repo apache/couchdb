@@ -15,7 +15,7 @@ the License.
 <td>
   <a href="#/database/<%=encoded%>/_all_docs"><%= database.get("name") %></a>
 </td>
-<td><%= database.status.humanSize() %></td>
+<td><%= formatSize(database.status.dataSize()) %></td>
 <td>
   <%= database.status.numDocs() %>
   <% if (database.status.isGraveYard()) { %>
