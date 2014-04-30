@@ -326,6 +326,7 @@ Alternative HTTP API
 This is quick off the top of my head from discussions today. I'm not sure if we should include the \_mango component or use \_find and \_index at the top level.  These are trivial to change in the future though as long as we agree on the method and request/response bodies.
 
 POST /dbname/\_mango/find
+-------------------------
 
 Issue a query.
 
@@ -334,18 +335,21 @@ Request body is a JSON object that has the selector and the various options like
 Response is streamed out like a view. 
 
 POST /dbname/\_mango/index
+--------------------------
 
 Request body contains the index definition.
 
 Response body is empty and the result is returned as the status code (200 OK -> created, 3something for exists).
 
 GET /dbname/\_mango/index
+-------------------------
 
 Request body is empty.
 
 Response body is all of the indexes that are available for use by find.
 
 DELETE /dbname/\_mango/index/ddocid/viewname
+--------------------------------------------
 
 Remove the specified index.
 
