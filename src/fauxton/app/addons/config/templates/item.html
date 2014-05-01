@@ -13,13 +13,13 @@ the License.
 -->
 
 <% if (option.index === 0) {%>
-<th> <%= option.section %> </th>
+<th> <%- option.section %> </th>
 <% } else { %>
 <td></td>
 <% } %>
 <td class="js-edit-value"> 
   <div class="js-show-value">
-    <%= option.name %>
+    <%- option.name %>
   </div>
   <div class="js-edit-value-form js-hidden">
     <input class="js-value-input" type="text" name="name" value="<%- option.name %>" />
@@ -29,7 +29,7 @@ the License.
 </td>
 <td class="js-edit-value">
   <div class="js-show-value">
-    <%= option.value %>
+    <%- option.value %>
   </div>
   <div class="js-edit-value-form js-hidden">
     <input class="js-value-input" type="text" name="value" value="<%- option.value %>" />
