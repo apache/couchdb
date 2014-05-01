@@ -82,7 +82,6 @@ FAUXTON_FILES = \
     fauxton/app/addons/logs/resources.js \
     fauxton/app/addons/logs/routes.js \
     fauxton/app/addons/logs/templates/dashboard.html \
-    fauxton/app/addons/logs/templates/filterItem.html \
     fauxton/app/addons/logs/templates/sidebar.html \
     fauxton/app/addons/logs/tests/baseSpec.js \
     fauxton/app/addons/logs/tests/resourcesSpec.js \
@@ -160,6 +159,7 @@ FAUXTON_FILES = \
     fauxton/app/addons/fauxton/tests/baseSpec.js \
     fauxton/app/addons/fauxton/tests/navbarSpec.js \
     fauxton/app/addons/fauxton/tests/paginateSpec.js \
+    fauxton/app/addons/fauxton/tests/filterViewSpec.js \
     fauxton/app/addons/pouchdb/base.js \
     fauxton/app/addons/pouchdb/pouch.collate.js \
     fauxton/app/addons/pouchdb/pouchdb.mapreduce.js \
@@ -198,6 +198,8 @@ FAUXTON_FILES = \
     fauxton/app/addons/fauxton/templates/nav_bar.html \
     fauxton/app/addons/fauxton/templates/notification.html \
     fauxton/app/addons/fauxton/templates/pagination.html \
+    fauxton/app/addons/fauxton/templates/filter_item.html \
+    fauxton/app/addons/fauxton/templates/filter.html \
     fauxton/app/templates/layouts/one_pane.html \
     fauxton/app/templates/layouts/two_pane.html \
     fauxton/app/templates/layouts/with_sidebar.html \
