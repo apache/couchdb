@@ -31,8 +31,8 @@ the License.
       <ul class="dropdown-menu">
         <%_.each(attachments, function (att) { %>
         <li>
-        <a href="<%= att.url %>" target="_blank"> <strong> <%= att.fileName %> </strong> -
-          <span> <%= att.contentType %>, <%= formatSize(att.size)%> </span>
+        <a href="<%- att.url %>" target="_blank"> <strong> <%- att.fileName %> </strong> -
+          <span> <%- att.contentType %>, <%- formatSize(att.size)%> </span>
         </a>
         </li>
         <% }) %>

@@ -36,7 +36,7 @@ the License.
           <% if (change.deleted) { %>
             <%= change.id %>
           <% } else { %>
-            <a href="#<%= database.url('app') %>/<%= safeURL(change.id) %>"><%= change.id %></a>
+            <a href="#<%- database.url('app') %>/<%- safeURL(change.id) %>"><%= change.id %></a>
           <% } %>    </div>
         <div class="span2 text-right">
           <a class="js-copy" data-clipboard-text="<%= change.id %>" data-bypass="true" href="#">
