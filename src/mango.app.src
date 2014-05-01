@@ -7,7 +7,6 @@
         stdlib,
         config,
         twig,
-        fabric,
-        ranch
+        fabric
     ]}
 ]}.
