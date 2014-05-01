@@ -438,7 +438,7 @@ otp_release="`\
 AC_SUBST(otp_release)
 
 AM_CONDITIONAL([USE_OTP_NIFS],
-    [test x$otp_release \> xR14B -o $otp_release -ge 17 ])
+    [test x$otp_release \> xR14B])
 AM_CONDITIONAL([USE_EJSON_COMPARE_NIF],
     [test x$otp_release \> xR14B03])
 
