@@ -52,10 +52,10 @@ Dependencies
 
 You should have the following installed:
 
-* `Erlang OTP (>=R13B04, <R17)  <http://erlang.org/>`_
+* `Erlang OTP (>=R14B01, =<R17) <http://erlang.org/>`_
 * `ICU                          <http://icu-project.org/>`_
 * `OpenSSL                      <http://www.openssl.org/>`_
-* `Mozilla SpiderMonkey (1.7)   <http://www.mozilla.org/js/spidermonkey/>`_
+* `Mozilla SpiderMonkey (1.8.5) <http://www.mozilla.org/js/spidermonkey/>`_
 * `GNU Make                     <http://www.gnu.org/software/make/>`_
 * `GNU Compiler Collection      <http://gcc.gnu.org/>`_
 * `libcurl                      <http://curl.haxx.se/libcurl/>`_
