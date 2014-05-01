@@ -440,7 +440,7 @@ AC_SUBST(otp_release)
 AM_CONDITIONAL([USE_OTP_NIFS],
     [can_use_nifs=$(echo $otp_release | grep -E "^(R14B|R15|R16|17)")])
 AM_CONDITIONAL([USE_EJSON_COMPARE_NIF],
-    [can_use_ejson=$(echo $otp_release | grep -E "^(R14B03|R15|R16|17)")])
+    [can_use_ejson=$(echo $otp_release | grep -E "^(R14B0[[34]]|R15|R16|17)")])
 
 has_crypto=`\
     ${ERL} -eval "\
