@@ -105,6 +105,8 @@ handle_changes_req2(Req, Db) ->
                 io_lib:format("\n],\n\"last_seq\":~w}\n", [EndSeq])
             ),
             end_json_response(Resp);
+        (timeout, "eventsource") ->
+            send_chunk(Resp, "event: heartbeat\ndata: \n\n");
         (timeout, _) ->
             send_chunk(Resp, "\n")
         end
