@@ -123,7 +123,7 @@ couchTests.changes = function(debug) {
 
     xhr = CouchDB.newXhr();
 
-    //verify the hearbeat newlines are sent
+    //verify the heartbeat newlines are sent
     xhr.open("GET", CouchDB.proxyUrl("/test_suite_db/_changes?feed=continuous&heartbeat=10&timeout=500"), true);
     xhr.send("");
 
@@ -169,6 +169,25 @@ couchTests.changes = function(debug) {
       T(results[1].seq == 2);
       T(results[1].id == "bar");
       T(results[1].changes[0].rev == docBar._rev);
+    }
+
+    // test that we receive EventSource heartbeat events
+    if (!!window.EventSource) {
+      var source = new EventSource(
+              "/test_suite_db/_changes?feed=eventsource&heartbeat=10");
+
+      var count_heartbeats = 0;
+      source.addEventListener('heartbeat', function () { count_heartbeats = count_heartbeats + 1; } , false);
+
+      waitForSuccess(function() {
+        if (count_heartbeats < 3) {
+          throw "keep waiting";
+        }
+        return true;
+      }, "eventsource-heartbeat");
+
+      T(count_heartbeats >= 3);
+      source.close();
     }
 
     // test longpolling
