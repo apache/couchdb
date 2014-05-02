@@ -111,6 +111,8 @@ handle_changes_req1(Req, #db{name=DbName}=Db, ChangesArgs, ChangesFun) ->
                 io_lib:format("\n],\n\"last_seq\":~w}\n", [EndSeq])
             ),
             couch_httpd:end_json_response(Resp);
+        (timeout, "eventsource") ->
+            couch_httpd:send_chunk(Resp, "event: heartbeat\ndata: \n\n");
         (timeout, _) ->
             couch_httpd:send_chunk(Resp, "\n")
         end
