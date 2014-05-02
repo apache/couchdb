@@ -398,6 +398,16 @@ parameter.
 
     }
 
+If you set a heartbeat interval (using the ``heartbeat`` query argument), CouchDB will
+send a ``hearbeat`` event that you can subscribe to with:
+
+.. code-block:: javascript
+
+    source.addEventListener('heartbeat', function () {}, false);
+
+This can be monitored by the client application to restart the EventSource connection if
+needed (i.e. if the TCP connection gets stuck in a half-open state).
+
 .. note::
 
    EventSource connections are subject to cross-origin resource sharing
