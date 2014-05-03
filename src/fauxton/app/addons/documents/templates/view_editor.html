@@ -34,13 +34,13 @@ the License.
           </div>
 
           <div class="control-group">
-            <label for="index-name">Index name <a href="<%=getDocUrl('view_functions')%>" target="_blank"><i class="icon-question-sign"></i></a></label>
-            <input type="text" id="index-name" value="<%= viewName %>" placeholder="Index name" />
+            <label for="index-name">Index name <a class="help-link" href="<%-getDocUrl('view_functions')%>" target="_blank"><i class="icon-question-sign"></i></a></label>
+            <input type="text" id="index-name" value="<%- viewName %>" placeholder="Index name" />
           </div>
 
 
           <div class="control-group">
-            <label for="map-function">Map function <a href="<%=getDocUrl('map_functions')%>" target="_blank"><i class="icon-question-sign"></i></a></label>
+            <label for="map-function">Map function <a class="help-link" href="<%-getDocUrl('map_functions')%>" target="_blank"><i class="icon-question-sign"></i></a></label>
             <% if (newView) { %>
             <div class="js-editor" id="map-function"><%= langTemplates.map %></div>
             <% } else { %>
@@ -51,12 +51,12 @@ the License.
 
 
           <div class="control-group">
-            <label for="reduce-function-selector">Reduce (optional) <a href="<%=getDocUrl('reduce_functions')%>" target="_blank"><i class="icon-question-sign"></i></a></label>
+            <label for="reduce-function-selector">Reduce (optional) <a class="help-link" href="<%-getDocUrl('reduce_functions')%>" target="_blank"><i class="icon-question-sign"></i></a></label>
 
             <select id="reduce-function-selector">
-              <option value="" <%= !reduceFunStr ? 'selected="selected"' : '' %>>None</option>
+              <option value="" <%- !reduceFunStr ? 'selected="selected"' : '' %>>None</option>
               <% _.each(["_sum", "_count", "_stats"], function(reduce) { %>
-              <option value="<%= reduce %>" <% if (reduce == reduceFunStr) { %>selected<% } %>><%= reduce %></option>
+              <option value="<%- reduce %>" <% if (reduce == reduceFunStr) { %>selected<% } %>><%= reduce %></option>
               <% }) %>
               <option value="CUSTOM" <% if (isCustomReduce) { %>selected<% } %>>Custom Reduce function</option>
             </select>
@@ -65,7 +65,7 @@ the License.
           <div class="control-group reduce-function">
             <label for="reduce-function">Custom Reduce function</label>
             <% if (newView) { %>
-            <div class="js-editor" id="reduce-function"><%= langTemplates.reduce %></div>
+            <div class="js-editor" id="reduce-function"><%- langTemplates.reduce %></div>
             <% } else { %>
             <div class="js-editor" id="reduce-function"><%- ddoc.get('views')[viewName].reduce %></div>
             <button class="beautify beautify_reduce btn btn-primary btn-large hide beautify-tooltip" type="button" data-toggle="tooltip" title="Reformat your minified code to make edits to it.">beautify this code</button>

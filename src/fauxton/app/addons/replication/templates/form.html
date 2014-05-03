@@ -22,7 +22,7 @@ the License.
 			<div class="from_local local_option">
 				<select id="from_name" name="source">
 					<% _.each( databases, function( db, i ){ %>
-					   <option value="<%=db.name%>" <% if(selectedDB == db.name){%>selected<%}%> ><%=db.name%></option>
+					   <option value="<%- db.name %>" <% if(selectedDB == db.name){%>selected<%}%> ><%- db.name %></option>
 					<% }); %>
 				</select>
 			</div>
@@ -63,7 +63,7 @@ the License.
 
 			<label for="createTarget">
 				<input type="checkbox" name="create_target" value="true" id="createTarget">
-				Create Target <a href="<%-getDocUrl('replication_doc')%>" target="_blank"><i class="icon-question-sign" rel="tooltip" title="Create the target database"></i></a>
+				Create Target <a class="help-link" href="<%-getDocUrl('replication_doc')%>" target="_blank"><i class="icon-question-sign" rel="tooltip" title="Create the target database"></i></a>
 			</label>
 		</div>
 
