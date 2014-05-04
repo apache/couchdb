@@ -14,5 +14,5 @@ the License.
 
 <div class="alert alert-<%- type %>">
   <button type="button" class="close" data-dismiss="alert">×</button>
-  <%- msg %>
+  <%= htmlToRender %><!-- every caller has to escape on it's own -->
 </div>

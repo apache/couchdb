@@ -50,6 +50,7 @@ function (app, FauxtonAPI, Compaction) {
         FauxtonAPI.addNotification({
           type: 'success',
           msg: 'Database compaction has started. Visit <a href="#activetasks">Active Tasks</a> to view the compaction progress.',
+          escape: false // beware of possible XSS when the message changes
         });
       }, function (xhr, error, reason) {
         FauxtonAPI.addNotification({
@@ -70,7 +71,8 @@ function (app, FauxtonAPI, Compaction) {
       Compaction.cleanupViews(this.model).then(function () {
         FauxtonAPI.addNotification({
           type: 'success',
-          msg: 'View cleanup has started. Visit <a href="#activetasks">Active Tasks</a> to view progress.'
+          msg: 'View cleanup has started. Visit <a href="#activetasks">Active Tasks</a> to view progress.',
+          escape: false // beware of possible XSS when the message changes
         });
       }, function (xhr, error, reason) {
         FauxtonAPI.addNotification({
@@ -120,7 +122,8 @@ function (app, FauxtonAPI, Compaction) {
       Compaction.compactView(this.database, this.designDoc).then(function () {
         FauxtonAPI.addNotification({
           type: 'success',
-          msg: 'View compaction has started. Visit <a href="#activetasks">Active Tasks</a> to view progress.'
+          msg: 'View compaction has started. Visit <a href="#activetasks">Active Tasks</a> to view progress.',
+          escape: false // beware of possible XSS when the message changes
         });
       }, function (xhr, error, reason) {
         FauxtonAPI.addNotification({

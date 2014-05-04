@@ -111,8 +111,9 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       this.database.destroy().then(function () {
         FauxtonAPI.navigate('#/_all_dbs');
         FauxtonAPI.addNotification({
-          msg: 'The database <code>' + databaseName + '</code> has been deleted.',
-          clear: true
+          msg: 'The database <code>' + _.escape(databaseName) + '</code> has been deleted.',
+          clear: true,
+          escape: false // beware of possible XSS when the message changes
         });
       }).fail(function (rsp, error, msg) {
         FauxtonAPI.addNotification({
@@ -1594,7 +1595,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
         msg: "<strong>Warning!</strong> Preview executes the Map/Reduce functions in your browser, and may behave differently from CouchDB.",
         type: "warning",
         selector: ".advanced-options .errors-container",
-        fade: true
+        fade: true,
+        escape: false // beware of possible XSS when the message changes
       });
 
       var promise = FauxtonAPI.Deferred();
