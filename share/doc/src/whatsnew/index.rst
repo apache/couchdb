@@ -19,7 +19,6 @@ Release History
 .. toctree::
    :glob:
 
-   1.7
    1.6
    1.5
    1.4
