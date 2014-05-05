@@ -1590,8 +1590,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
         return params;
       }, {reduce: false});
 
-      event.preventDefault();
-
       FauxtonAPI.addNotification({
         msg: "<strong>Warning!</strong> Preview executes the Map/Reduce functions in your browser, and may behave differently from CouchDB.",
         type: "warning",
