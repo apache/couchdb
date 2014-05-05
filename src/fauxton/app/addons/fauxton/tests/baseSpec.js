@@ -49,7 +49,7 @@ define([
         hooks: [],
         setBreadcrumbs: sinon.spy(),
         apiBar: apiBar,
-        layout: { 
+        layout: {
           setView: function () {}
         }
       };
@@ -75,5 +75,42 @@ define([
 
   });
 
+describe('Fauxton Notifications', function () {
 
+    it('should escape by default', function () {
+      window.fauxton_xss_test_escaped = true;
+      var view = FauxtonAPI.addNotification({
+        msg: '<script>window.fauxton_xss_test_escaped = false;</script>',
+        selector: 'body'
+      });
+      view.$el.remove();
+      assert.ok(window.fauxton_xss_test_escaped);
+      delete window.fauxton_xss_test_escaped;
+    });
+
+    it('should be able to render unescaped', function () {
+      var view = FauxtonAPI.addNotification({
+        msg: '<script>window.fauxton_xss_test_unescaped = true;</script>',
+        selector: 'body',
+        escape: false
+      });
+      view.$el.remove();
+      assert.ok(window.fauxton_xss_test_unescaped);
+      delete window.fauxton_xss_test_unescaped;
+    });
+
+    it('should render escaped if the escape value is not explicitly false,' +
+        'e.g. was forgotten in a direct call', function () {
+
+      window.fauxton_xss_test2_escaped = true;
+      var view = new Base.Notification({
+        msg: '<script>window.fauxton_xss_test2_escaped = false;</script>',
+        selector: 'body'
+      }).render();
+      view.$el.remove();
+      assert.ok(window.fauxton_xss_test2_escaped);
+      delete window.fauxton_xss_test2_escaped;
+    });
+
+  });
 });

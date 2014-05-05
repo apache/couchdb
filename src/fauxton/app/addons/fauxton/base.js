@@ -23,7 +23,8 @@ function(app, FauxtonAPI, resizeColumns) {
     options = _.extend({
       msg: "Notification Event Triggered!",
       type: "info",
-      selector: "#global-notifications"
+      selector: "#global-notifications",
+      escape: true
     }, options);
 
     var view = new Fauxton.Notification(options);
@@ -304,7 +305,11 @@ function(app, FauxtonAPI, resizeColumns) {
     fadeTimer: 5000,
 
     initialize: function(options) {
-      this.msg = options.msg;
+      this.htmlToRender = options.msg;
+      // escape always, except the value is false
+      if (options.escape !== false) {
+        this.htmlToRender = _.escape(this.htmlToRender);
+      }
       this.type = options.type || "info";
       this.selector = options.selector;
       this.fade = options.fade === undefined ? true : options.fade;
@@ -316,7 +321,7 @@ function(app, FauxtonAPI, resizeColumns) {
     serialize: function() {
       return {
         data: this.data,
-        msg: this.msg,
+        htmlToRender: this.htmlToRender,
         type: this.type
       };
     },
