@@ -12,7 +12,7 @@ License for the specific language governing permissions and limitations under
 the License.
 -->
 <div class="span3">
-  <label for="ddoc">Save to Design Document <a href="<%-getDocUrl('design_doc')%>" target="_blank"><i class="icon-question-sign"></i></a></label>
+  <label for="ddoc">Save to Design Document <a class="help-link" href="<%-getDocUrl('design_doc')%>" target="_blank"><i class="icon-question-sign"></i></a></label>
   <select id="ddoc">
     <optgroup label="Select a document">
       <option value="new-doc">New document</option>
@@ -30,6 +30,6 @@ the License.
 <div id="new-ddoc-section" class="span5" style="display:none">
   <label class="control-label" for="new-ddoc"> _design/ </label>
   <div class="controls">
-    <input type="text" id="new-ddoc" placeholder="newDesignDoc">
+    <input type="text" id="new-ddoc" placeholder="newDesignDoc" />
   </div>
 </div>

@@ -12,35 +12,35 @@ License for the specific language governing permissions and limitations under
 the License.
 -->
 <header class="page-header">
-<h3> <%= (section) %> </h3>
-<p class="help"> <%= help %> <a href="<%-getDocUrl('database_permission')%>" target="_blank"><i class="icon-question-sign"> </i> </a></p>
+<h3> <%- section %> </h3>
+<p class="help"> <%- help %> <a class="help-link" href="<%-getDocUrl('database_permission')%>" target="_blank"><i class="icon-question-sign"> </i> </a></p>
 </header>
 
 <div class="row-fluid">
   <div class="span6">
     <header>
       <h4> Users </h4>
-      <p>Specify users who will have <%= section %> access to this database.</p>
+      <p>Specify users who will have <%- section %> access to this database.</p>
     </header>
     <form class="permission-item-form form-inline">
-      <input data-section="<%= section %>" data-type="names" type="text" class="item input-small" placeholder="Add Name">
+      <input data-section="<%- section %>" data-type="names" type="text" class="item input-small" placeholder="Add Name">
       <button type="submit" class="btn btn-success"><i class="icon fonticon-circle-plus"></i> Add Name</button>
     </form>
-    <ul class="clearfix unstyled permission-items span10" id="<%= (section) %>-items-names">
+    <ul class="clearfix unstyled permission-items span10" id="<%- section %>-items-names">
     </ul>
   </div>
   <div class="span6">
     <header>
       <h4> Roles </h4>
-      <p>All users under the following role(s) will have <%= section %> access.</p>
+      <p>All users under the following role(s) will have <%- section %> access.</p>
     </header>
 
 
     <form class="permission-item-form form-inline">
-      <input data-section="<%= section %>" data-type="roles" type="text" class="item input-small" placeholder="Add Role">
+      <input data-section="<%- section %>" data-type="roles" type="text" class="item input-small" placeholder="Add Role">
       <button type="submit" class="btn btn-success"><i class="icon fonticon-circle-plus"></i> Add Role</button>
     </form>
-    <ul class="unstyled permission-items span10" id="<%= (section) %>-items-roles">
+    <ul class="unstyled permission-items span10" id="<%- (section) %>-items-roles">
     </ul>
   </div>
 </div>
