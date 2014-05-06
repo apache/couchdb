@@ -18,28 +18,30 @@
     handle_temp_view_req/2,
     handle_info_req/3,
     handle_compact_req/3,
-    handle_cleanup_req/2,
-    parse_qs/2
+    handle_cleanup_req/2
 ]).
 
+-export([
+    parse_boolean/1,
+    parse_int/1,
+    parse_pos_int/1,
+    prepend_val/1,
+    parse_params/2,
+    parse_params/3,
+    view_cb/2,
+    row_to_json/1,
+    row_to_json/2,
+    check_view_etag/3
+]).
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
 
--record(vacc, {
-    db,
-    req,
-    resp,
-    prepend,
-    etag
-}).
-
-
 handle_all_docs_req(#httpd{method='GET'}=Req, Db) ->
     all_docs_req(Req, Db, undefined);
 handle_all_docs_req(#httpd{method='POST'}=Req, Db) ->
-    Keys = get_view_keys(couch_httpd:json_body_obj(Req)),
+    Keys = couch_mrview_util:get_view_keys(couch_httpd:json_body_obj(Req)),
     all_docs_req(Req, Db, Keys);
 handle_all_docs_req(Req, _Db) ->
     couch_httpd:send_method_not_allowed(Req, "GET,POST,HEAD").
@@ -51,9 +53,24 @@ handle_view_req(#httpd{method='GET'}=Req, Db, DDoc) ->
     design_doc_view(Req, Db, DDoc, ViewName, undefined);
 handle_view_req(#httpd{method='POST'}=Req, Db, DDoc) ->
     [_, _, _, _, ViewName] = Req#httpd.path_parts,
-    Keys = get_view_keys(couch_httpd:json_body_obj(Req)),
-    couch_stats_collector:increment({httpd, view_reads}),
-    design_doc_view(Req, Db, DDoc, ViewName, Keys);
+    Props = couch_httpd:json_body_obj(Req),
+    Keys = couch_mrview_util:get_view_keys(Props),
+    Queries = couch_mrview_util:get_view_queries(Props),
+    case {Queries, Keys} of
+        {Queries, undefined} when is_list(Queries) ->
+            [couch_stats_collector:increment({httpd, view_reads}) || _I <- Queries],
+            multi_query_view(Req, Db, DDoc, ViewName, Queries);
+        {undefined, Keys} when is_list(Keys) ->
+            couch_stats_collector:increment({httpd, view_reads}),
+            design_doc_view(Req, Db, DDoc, ViewName, Keys);
+        {undefined, undefined} ->
+            throw({
+                bad_request,
+                "POST body must contain `keys` or `queries` field"
+            });
+        {_, _} ->
+            throw({bad_request, "`keys` and `queries` are mutually exclusive"})
+    end;
 handle_view_req(Req, _Db, _DDoc) ->
     couch_httpd:send_method_not_allowed(Req, "GET,POST,HEAD").
 
@@ -63,7 +80,7 @@ handle_temp_view_req(#httpd{method='POST'}=Req, Db) ->
     ok = couch_db:check_is_admin(Db),
     {Body} = couch_httpd:json_body_obj(Req),
     DDoc = couch_mrview_util:temp_view_to_ddoc({Body}),
-    Keys = get_view_keys({Body}),
+    Keys = couch_mrview_util:get_view_keys({Body}),
     couch_stats_collector:increment({httpd, temporary_view_reads}),
     design_doc_view(Req, Db, DDoc, <<"temp">>, Keys);
 handle_temp_view_req(Req, _Db) ->
@@ -130,13 +147,9 @@ all_docs_req(Req, Db, Keys) ->
     end.
 
 do_all_docs_req(Req, Db, Keys) ->
-    Args0 = parse_qs(Req, Keys),
+    Args0 = parse_params(Req, Keys),
     ETagFun = fun(Sig, Acc0) ->
-        ETag = couch_httpd:make_etag(Sig),
-        case couch_httpd:etag_match(Req, ETag) of
-            true -> throw({etag_match, ETag});
-            false -> {ok, Acc0#vacc{etag=ETag}}
-        end
+        check_view_etag(Sig, Acc0, Req)
     end,
     Args = Args0#mrargs{preflight_fun=ETagFun},
     {ok, Resp} = couch_httpd:etag_maybe(Req, fun() ->
@@ -176,13 +189,9 @@ get_view_callback(_, _, _) ->
 
 
 design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
-    Args0 = parse_qs(Req, Keys),
+    Args0 = parse_params(Req, Keys),
     ETagFun = fun(Sig, Acc0) ->
-        ETag = couch_httpd:make_etag(Sig),
-        case couch_httpd:etag_match(Req, ETag) of
-            true -> throw({etag_match, ETag});
-            false -> {ok, Acc0#vacc{etag=ETag}}
-        end
+        check_view_etag(Sig, Acc0, Req)
     end,
     Args = Args0#mrargs{preflight_fun=ETagFun},
     {ok, Resp} = couch_httpd:etag_maybe(Req, fun() ->
@@ -208,11 +217,42 @@ filtered_view_cb({row, Row0}, Acc) ->
 filtered_view_cb(Obj, Acc) ->
     view_cb(Obj, Acc).
 
+multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
+    Args0 = parse_params(Req, undefined),
+    {ok, _, _, Args1} = couch_mrview_util:get_view(Db, DDoc, ViewName, Args0),
+    ArgQueries = lists:map(fun({Query}) ->
+        QueryArg = parse_params(Query, undefined, Args1),
+        couch_mrview_util:validate_args(QueryArg)
+    end, Queries),
+    {ok, Resp2} = couch_httpd:etag_maybe(Req, fun() ->
+        VAcc0 = #vacc{db=Db, req=Req, prepend="\r\n"},
+        %% TODO: proper calculation of etag
+        Etag = couch_uuids:new(),
+        Headers = [{"ETag", Etag}],
+        FirstChunk = "{\"results\":[",
+        {ok, Resp0} = chttpd:start_delayed_json_response(VAcc0#vacc.req, 200, Headers, FirstChunk),
+        VAcc1 = VAcc0#vacc{resp=Resp0},
+        VAcc2 = lists:foldl(fun(Args, Acc0) ->
+            {ok, Acc1} = couch_mrview:query_view(Db, DDoc, ViewName, Args, fun view_cb/2, Acc0),
+            Acc1
+        end, VAcc1, ArgQueries),
+        {ok, Resp1} = chttpd:send_delayed_chunk(VAcc2#vacc.resp, "\r\n]}"),
+        {ok, Resp2} = chttpd:end_delayed_json_response(Resp1),
+        {ok, VAcc2#vacc{resp=Resp2}}
+    end),
+    case is_record(Resp2, vacc) of
+        true -> {ok, Resp2#vacc.resp};
+        _ -> {ok, Resp2}
+    end.
+
 
 view_cb({meta, Meta}, #vacc{resp=undefined}=Acc) ->
-    Headers = [{"ETag", Acc#vacc.etag}],
-    {ok, Resp} = couch_httpd:start_json_response(Acc#vacc.req, 200, Headers),
     % Map function starting
+    Headers = [{"ETag", Acc#vacc.etag}],
+    {ok, Resp} = chttpd:start_delayed_json_response(Acc#vacc.req, 200, Headers),
+    view_cb({meta, Meta}, Acc#vacc{resp=Resp, should_close=true});
+view_cb({meta, Meta}, #vacc{resp=Resp}=Acc) ->
+    % Sending metadata
     Parts = case couch_util:get_value(total, Meta) of
         undefined -> [];
         Total -> [io_lib:format("\"total_rows\":~p", [Total])]
@@ -223,28 +263,41 @@ view_cb({meta, Meta}, #vacc{resp=undefined}=Acc) ->
         undefined -> [];
         UpdateSeq -> [io_lib:format("\"update_seq\":~p", [UpdateSeq])]
     end ++ ["\"rows\":["],
-    Chunk = lists:flatten("{" ++ string:join(Parts, ",") ++ "\r\n"),
-    couch_httpd:send_chunk(Resp, Chunk),
-    {ok, Acc#vacc{resp=Resp, prepend=""}};
-view_cb({row, Row}, #vacc{resp=undefined}=Acc) ->
-    % Reduce function starting
-    Headers = [{"ETag", Acc#vacc.etag}],
-    {ok, Resp} = couch_httpd:start_json_response(Acc#vacc.req, 200, Headers),
-    couch_httpd:send_chunk(Resp, ["{\"rows\":[\r\n", row_to_json(Row)]),
-    {ok, #vacc{resp=Resp, prepend=",\r\n"}};
+    Prepend = prepend_val(Acc),
+    Chunk = lists:flatten(Prepend ++ "{" ++ string:join(Parts, ",") ++ "\r\n"),
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, Chunk),
+    {ok, Acc#vacc{resp=Resp1, prepend=""}};
 view_cb({row, Row}, Acc) ->
     % Adding another row
-    couch_httpd:send_chunk(Acc#vacc.resp, [Acc#vacc.prepend, row_to_json(Row)]),
-    {ok, Acc#vacc{prepend=",\r\n"}};
+    Chunk = [prepend_val(Acc), row_to_json(Row)],
+    {ok, Resp1} = chttpd:send_delayed_chunk(Acc#vacc.resp, Chunk),
+    {ok, Acc#vacc{prepend=",\r\n", resp=Resp1}};
 view_cb(complete, #vacc{resp=undefined}=Acc) ->
     % Nothing in view
-    {ok, Resp} = couch_httpd:send_json(Acc#vacc.req, 200, {[{rows, []}]}),
+    {ok, Resp} = chttpd:send_json(Acc#vacc.req, 200, {[{rows, []}]}),
     {ok, Acc#vacc{resp=Resp}};
-view_cb(complete, Acc) ->
-    % Finish view output
-    couch_httpd:send_chunk(Acc#vacc.resp, "\r\n]}"),
-    couch_httpd:end_json_response(Acc#vacc.resp),
-    {ok, Acc}.
+view_cb(complete, #vacc{resp=Resp}=Acc) ->
+    % Finish view output and possibly end the response
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, "\r\n]}"),
+    case Acc#vacc.should_close of
+        true ->
+            {ok, Resp2} = chttpd:end_delayed_json_response(Resp1),
+            {ok, Acc#vacc{resp=Resp2}};
+        _ ->
+            {ok, Acc#vacc{resp=Resp1, prepend=",\r\n"}}
+    end;
+view_cb({error, Reason}, #vacc{resp=Resp}=Acc) ->
+    {ok, Resp1} = chttpd:send_delayed_error(Resp, Reason),
+    {ok, Acc#vacc{resp=Resp1}}.
+
+
+prepend_val(#vacc{prepend=Prepend}) ->
+    case Prepend of
+        undefined ->
+            "";
+        _ ->
+            Prepend
+    end.
 
 
 row_to_json(Row) ->
@@ -274,59 +327,56 @@ row_to_json(Id0, Row) ->
     ?JSON_ENCODE(Obj).
 
 
-get_view_keys({Props}) ->
-    case couch_util:get_value(<<"keys">>, Props) of
-        undefined ->
-            ?LOG_DEBUG("POST with no keys member.", []),
-            undefined;
-        Keys when is_list(Keys) ->
-            Keys;
-        _ ->
-            throw({bad_request, "`keys` member must be a array."})
-    end.
+parse_params(#httpd{}=Req, Keys) ->
+    parse_params(couch_httpd:qs(Req), Keys);
+parse_params(Props, Keys) ->
+    Args = #mrargs{},
+    parse_params(Props, Keys, Args).
 
 
-parse_qs(Req, Keys) ->
-    Args = #mrargs{keys=Keys},
+parse_params(Props, Keys, #mrargs{}=Args0) ->
+    Args = Args0#mrargs{keys=Keys},
     lists:foldl(fun({K, V}, Acc) ->
-        parse_qs(K, V, Acc)
-    end, Args, couch_httpd:qs(Req)).
+        parse_param(K, V, Acc)
+    end, Args, Props).
 
 
-parse_qs(Key, Val, Args) ->
+parse_param(Key, Val, Args) when is_binary(Key) ->
+    parse_param(binary_to_list(Key), Val, Args);
+parse_param(Key, Val, Args) ->
     case Key of
         "" ->
             Args;
         "reduce" ->
             Args#mrargs{reduce=parse_boolean(Val)};
         "key" ->
-            JsonKey = ?JSON_DECODE(Val),
+            JsonKey = parse_json(Val),
             Args#mrargs{start_key=JsonKey, end_key=JsonKey};
         "keys" ->
-            Args#mrargs{keys=?JSON_DECODE(Val)};
+            Args#mrargs{keys=parse_json(Val)};
         "startkey" ->
-            Args#mrargs{start_key=?JSON_DECODE(Val)};
+            Args#mrargs{start_key=parse_json(Val)};
         "start_key" ->
-            Args#mrargs{start_key=?JSON_DECODE(Val)};
+            Args#mrargs{start_key=parse_json(Val)};
         "startkey_docid" ->
-            Args#mrargs{start_key_docid=list_to_binary(Val)};
+            Args#mrargs{start_key_docid=couch_util:to_binary(Val)};
         "start_key_doc_id" ->
-            Args#mrargs{start_key_docid=list_to_binary(Val)};
+            Args#mrargs{start_key_docid=couch_util:to_binary(Val)};
         "endkey" ->
-            Args#mrargs{end_key=?JSON_DECODE(Val)};
+            Args#mrargs{end_key=parse_json(Val)};
         "end_key" ->
-            Args#mrargs{end_key=?JSON_DECODE(Val)};
+            Args#mrargs{end_key=parse_json(Val)};
         "endkey_docid" ->
-            Args#mrargs{end_key_docid=list_to_binary(Val)};
+            Args#mrargs{end_key_docid=couch_util:to_binary(Val)};
         "end_key_doc_id" ->
-            Args#mrargs{end_key_docid=list_to_binary(Val)};
+            Args#mrargs{end_key_docid=couch_util:to_binary(Val)};
         "limit" ->
             Args#mrargs{limit=parse_pos_int(Val)};
         "count" ->
             throw({query_parse_error, <<"QS param `count` is not `limit`">>});
-        "stale" when Val == "ok" ->
+        "stale" when Val == "ok" orelse Val == <<"ok">> ->
             Args#mrargs{stale=ok};
-        "stale" when Val == "update_after" ->
+        "stale" when Val == "update_after" orelse Val == "update_after" ->
             Args#mrargs{stale=update_after};
         "stale" ->
             throw({query_parse_error, <<"Invalid value for `stale`.">>});
@@ -369,16 +419,22 @@ parse_qs(Key, Val, Args) ->
         "conflicts" ->
             Args#mrargs{conflicts=parse_boolean(Val)};
         "list" ->
-            Args#mrargs{list=list_to_binary(Val)};
+            Args#mrargs{list=couch_util:to_binary(Val)};
         "callback" ->
-            Args#mrargs{callback=list_to_binary(Val)};
+            Args#mrargs{callback=couch_util:to_binary(Val)};
         _ ->
-            BKey = list_to_binary(Key),
-            BVal = list_to_binary(Val),
+            BKey = couch_util:to_binary(Key),
+            BVal = couch_util:to_binary(Val),
             Args#mrargs{extra=[{BKey, BVal} | Args#mrargs.extra]}
     end.
 
 
+parse_boolean(true) ->
+    true;
+parse_boolean(false) ->
+    false;
+parse_boolean(Val) when is_binary(Val) ->
+    parse_boolean(?b2l(Val));
 parse_boolean(Val) ->
     case string:to_lower(Val) of
     "true" -> true;
@@ -389,6 +445,8 @@ parse_boolean(Val) ->
     end.
 
 
+parse_int(Val) when is_integer(Val) ->
+    Val;
 parse_int(Val) ->
     case (catch list_to_integer(Val)) of
     IntVal when is_integer(IntVal) ->
@@ -408,3 +466,17 @@ parse_pos_int(Val) ->
         Msg = io_lib:format(Fmt, [Val]),
         throw({query_parse_error, ?l2b(Msg)})
     end.
+
+
+check_view_etag(Sig, Acc0, Req) ->
+    ETag = couch_httpd:make_etag(Sig),
+    case couch_httpd:etag_match(Req, ETag) of
+        true -> throw({etag_match, ETag});
+        false -> {ok, Acc0#vacc{etag=ETag}}
+    end.
+
+
+parse_json(V) when is_list(V) ->
+    ?JSON_DECODE(V);
+parse_json(V) ->
+    V.
