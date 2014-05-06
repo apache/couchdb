@@ -96,8 +96,7 @@ open(Db, State) ->
                 {ok, {OldSig, Header}} ->
                     % Matching view signatures.
                     NewSt = couch_mrview_util:init_state(Db, Fd, State, Header),
-                    {ok, RefCounter} = couch_ref_counter:start([Fd]),
-                    {ok, NewSt#mrst{refc=RefCounter}};
+                    {ok, NewSt#mrst{fd_monitor=erlang:monitor(process, Fd)}};
                 % end of upgrade code for <= 1.2.x
                 {ok, {Sig, Header}} ->
                     % Matching view signatures.
