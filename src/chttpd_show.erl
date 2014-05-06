@@ -15,15 +15,7 @@
 -export([handle_doc_show_req/3, handle_doc_update_req/3, handle_view_list_req/3]).
 
 -include_lib("couch/include/couch_db.hrl").
-
--record(lacc, {
-    req,
-    resp = nil,
-    qserver,
-    lname,
-    db,
-    etag
-}).
+-include_lib("couch_mrview/include/couch_mrview.hrl").
 
 % /db/_design/foo/_show/bar/docid
 % show converts a json doc to a response of any content-type. 
@@ -152,13 +144,13 @@ send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId) ->
 % view-list request with view and list from same design doc.
 handle_view_list_req(#httpd{method='GET',
         path_parts=[_, _, DesignName, _, ListName, ViewName]}=Req, Db, DDoc) ->
-    Keys = chttpd:qs_json_value(Req, "keys", nil),
+    Keys = chttpd:qs_json_value(Req, "keys", undefined),
     handle_view_list(Req, Db, DDoc, ListName, {DesignName, ViewName}, Keys);
 
 % view-list request with view and list from different design docs.
 handle_view_list_req(#httpd{method='GET',
         path_parts=[_, _, _, _, ListName, DesignName, ViewName]}=Req, Db, DDoc) ->
-    Keys = chttpd:qs_json_value(Req, "keys", nil),
+    Keys = chttpd:qs_json_value(Req, "keys", undefined),
     handle_view_list(Req, Db, DDoc, ListName, {DesignName, ViewName}, Keys);
 
 handle_view_list_req(#httpd{method='GET'}=Req, _Db, _DDoc) ->
@@ -168,7 +160,7 @@ handle_view_list_req(#httpd{method='POST',
         path_parts=[_, _, DesignName, _, ListName, ViewName]}=Req, Db, DDoc) ->
     ReqBody = chttpd:body(Req),
     {Props2} = ?JSON_DECODE(ReqBody),
-    Keys = proplists:get_value(<<"keys">>, Props2, nil),
+    Keys = proplists:get_value(<<"keys">>, Props2, undefined),
     handle_view_list(Req#httpd{req_body=ReqBody}, Db, DDoc, ListName,
         {DesignName, ViewName}, Keys);
 
@@ -176,7 +168,7 @@ handle_view_list_req(#httpd{method='POST',
         path_parts=[_, _, _, _, ListName, DesignName, ViewName]}=Req, Db, DDoc) ->
     ReqBody = chttpd:body(Req),
     {Props2} = ?JSON_DECODE(ReqBody),
-    Keys = proplists:get_value(<<"keys">>, Props2, nil),
+    Keys = proplists:get_value(<<"keys">>, Props2, undefined),
     handle_view_list(Req#httpd{req_body=ReqBody}, Db, DDoc, ListName,
         {DesignName, ViewName}, Keys);
 
@@ -189,14 +181,10 @@ handle_view_list_req(Req, _Db, _DDoc) ->
 handle_view_list(Req, Db, DDoc, LName, {ViewDesignName, ViewName}, Keys) ->
     %% Will throw an exception if the _list handler is missing
     couch_util:get_nested_json_value(DDoc#doc.body, [<<"lists">>, LName]),
-    {ok, VDoc} = fabric:open_doc(Db, <<"_design/", ViewDesignName/binary>>, []),
-    Group = couch_view_group:design_doc_to_view_group(VDoc),
-    IsReduce = chttpd_view:get_reduce_type(Req),
-    ViewType = chttpd_view:extract_view_type(ViewName,
-        couch_view_group:get_views(Group), IsReduce),
-    QueryArgs = chttpd_view:parse_view_params(Req, Keys, ViewType),
-    CB = fun list_callback/2,
+    {ok, VDoc} = ddoc_cache:open(Db#db.name, <<"_design/", ViewDesignName/binary>>),
+    CB = fun couch_mrview_show:list_cb/2,
     Etag = couch_uuids:new(),
+    QueryArgs = couch_mrview_http:parse_params(Req, Keys),
     chttpd:etag_respond(Req, Etag, fun() ->
         couch_query_servers:with_ddoc_proc(DDoc, fun(QServer) ->
             Acc0 = #lacc{
@@ -209,81 +197,6 @@ handle_view_list(Req, Db, DDoc, LName, {ViewDesignName, ViewName}, Keys) ->
             fabric:query_view(Db, VDoc, ViewName, CB, Acc0, QueryArgs)
         end)
     end).
-
-list_callback({total_and_offset, Total, Offset}, #lacc{resp=nil} = Acc) ->
-    start_list_resp({[{<<"total_rows">>, Total}, {<<"offset">>, Offset}]}, Acc);
-list_callback({total_and_offset, _, _}, Acc) ->
-    % a sorted=false view where the message came in late.  Ignore.
-    {ok, Acc};
-list_callback({row, Row}, #lacc{resp=nil} = Acc) ->
-    % first row of a reduce view, or a sorted=false view
-    {ok, NewAcc} = start_list_resp({[]}, Acc),
-    send_list_row(Row, NewAcc);
-list_callback({row, Row}, Acc) ->
-    send_list_row(Row, Acc);
-list_callback(complete, Acc) ->
-    #lacc{qserver = {Proc, _}, resp = Resp0} = Acc,
-    if Resp0 =:= nil ->
-        {ok, #lacc{resp = Resp}} = start_list_resp({[]}, Acc);
-    true ->
-        Resp = Resp0
-    end,
-    try couch_query_servers:proc_prompt(Proc, [<<"list_end">>]) of
-    [<<"end">>, Chunk] ->
-        {ok, Resp1} = send_non_empty_chunk(Resp, Chunk),
-        chttpd:send_delayed_last_chunk(Resp1)
-    catch Error ->
-        {ok, Resp1} = chttpd:send_delayed_error(Resp, Error),
-        {stop, Resp1}
-    end;
-list_callback({error, Reason}, #lacc{resp=Resp}) ->
-    chttpd:send_delayed_error(Resp, Reason).
-
-start_list_resp(Head, Acc) ->
-    #lacc{
-        req = Req,
-        db = Db,
-        qserver = QServer,
-        lname = LName,
-        etag = Etag
-    } = Acc,
-
-    % use a separate process because we're already in a receive loop, and
-    % json_req_obj calls fabric:get_db_info()
-    spawn_monitor(fun() -> exit(chttpd_external:json_req_obj(Req, Db)) end),
-    receive {'DOWN', _, _, _, JsonReq} -> ok end,
-
-    [<<"start">>,Chunk,JsonResp] = couch_query_servers:ddoc_proc_prompt(QServer,
-        [<<"lists">>, LName], [Head, JsonReq]),
-    JsonResp2 = apply_etag(JsonResp, Etag),
-    #extern_resp_args{
-        code = Code,
-        ctype = CType,
-        headers = ExtHeaders
-    } = couch_httpd_external:parse_external_response(JsonResp2),
-    JsonHeaders = couch_httpd_external:default_or_content_type(CType, ExtHeaders),
-    {ok, Resp} = chttpd:start_delayed_chunked_response(Req, Code,
-        JsonHeaders, Chunk),
-    {ok, Acc#lacc{resp=Resp}}.
-
-send_list_row(Row, #lacc{qserver = {Proc, _}, resp = Resp} = Acc) ->
-    try couch_query_servers:proc_prompt(Proc, [<<"list_row">>, Row]) of
-    [<<"chunks">>, Chunk] ->
-        {ok, Resp1} = send_non_empty_chunk(Resp, Chunk),
-        {ok, Acc#lacc{resp=Resp1}};
-    [<<"end">>, Chunk] ->
-        {ok, Resp1} = send_non_empty_chunk(Resp, Chunk),
-        {ok, Resp2} = chttpd:send_delayed_last_chunk(Resp1),
-        {stop, Resp2}
-    catch Error ->
-        {ok, Resp1} = chttpd:send_delayed_error(Resp, Error),
-        {stop, Resp1}
-    end.
-
-send_non_empty_chunk(Resp, []) ->
-    {ok, Resp};
-send_non_empty_chunk(Resp, Chunk) ->
-    chttpd:send_delayed_chunk(Resp, Chunk).
 
 % Maybe this is in the proplists API
 % todo move to couch_util

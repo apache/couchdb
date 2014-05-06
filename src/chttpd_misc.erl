@@ -89,34 +89,42 @@ handle_sleep_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
 handle_all_dbs_req(#httpd{method='GET'}=Req) ->
+    Args = couch_mrview_http:parse_params(Req, undefined),
     ShardDbName = config:get("mem3", "shard_db", "dbs"),
     %% shard_db is not sharded but mem3:shards treats it as an edge case
     %% so it can be pushed thru fabric
     {ok, Info} = fabric:get_db_info(ShardDbName),
     Etag = couch_httpd:make_etag({Info}),
-    chttpd:etag_respond(Req, Etag, fun() ->
+    {ok, Resp} = chttpd:etag_respond(Req, Etag, fun() ->
         {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, [{"Etag",Etag}]),
-        fabric:all_docs(ShardDbName, fun all_dbs_callback/2,
-            {nil, Resp}, #mrargs{})
-    end);
+        VAcc = #vacc{req=Req,resp=Resp},
+        fabric:all_docs(ShardDbName, fun all_dbs_callback/2, VAcc, Args)
+    end),
+    case is_record(Resp, vacc) of
+        true -> {ok, Resp#vacc.resp};
+        _ -> {ok, Resp}
+    end;
 handle_all_dbs_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
-all_dbs_callback({total_and_offset, _Total, _Offset}, {_, Resp}) ->
-    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, "["),
-    {ok, {"", Resp1}};
-all_dbs_callback({row, {Row}}, {Prepend, Resp}) ->
+all_dbs_callback({meta, _Meta}, #vacc{resp=Resp0}=Acc) ->
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, "["),
+    {ok, Acc#vacc{resp=Resp1}};
+all_dbs_callback({row, Row}, #vacc{resp=Resp0}=Acc) ->
+    Prepend = couch_mrview_http:prepend_val(Acc),
     case couch_util:get_value(id, Row) of <<"_design", _/binary>> ->
-        {ok, {Prepend, Resp}};
+        {ok, Acc};
     DbName ->
-        {ok, Resp1} = chttpd:send_delayed_chunk(Resp, [Prepend, ?JSON_ENCODE(DbName)]),
-        {ok, {",", Resp1}}
+        {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, [Prepend, ?JSON_ENCODE(DbName)]),
+        {ok, Acc#vacc{prepend=",", resp=Resp1}}
     end;
-all_dbs_callback(complete, {_, Resp}) ->
-    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, "]"),
-    chttpd:end_delayed_json_response(Resp1);
-all_dbs_callback({error, Reason}, {_, Resp}) ->
-    chttpd:send_delayed_error(Resp, Reason).
+all_dbs_callback(complete, #vacc{resp=Resp0}=Acc) ->
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, "]"),
+    {ok, Resp2} = chttpd:end_delayed_json_response(Resp1),
+    {ok, Acc#vacc{resp=Resp2}};
+all_dbs_callback({error, Reason}, #vacc{resp=Resp0}=Acc) ->
+    {ok, Resp1} = chttpd:send_delayed_error(Resp0, Reason),
+    {ok, Acc#vacc{resp=Resp1}}.
 
 handle_task_status_req(#httpd{method='GET'}=Req) ->
     {Replies, _BadNodes} = gen_server:multi_call(couch_task_status, all),
