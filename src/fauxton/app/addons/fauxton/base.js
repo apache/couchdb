@@ -136,7 +136,7 @@ function(app, FauxtonAPI, resizeColumns) {
     template: "addons/fauxton/templates/nav_bar",
 
     events:  {
-      "click .burger" : "toggleMenu"
+      "click .js-burger" : "toggleMenu"
     },
 
     toggleMenu: function(){

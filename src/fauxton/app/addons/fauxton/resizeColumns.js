@@ -30,7 +30,7 @@ function(FauxtonAPI) {
 
   Resize.prototype = {
     getPrimaryNavWidth: function(){
-      var primaryNavWidth  = $('body').hasClass('closeMenu')? 64:224;
+      var primaryNavWidth  = $('body').hasClass('closeMenu') ? 64 : 224;
       return primaryNavWidth;
     },
     getPanelWidth: function(){
@@ -38,7 +38,6 @@ function(FauxtonAPI) {
       return (this.getPrimaryNavWidth() + sidebarWidth);
     },
     initialize: function(){
-     // $(window).off('resize');
       var that = this;
       //add throttler :)
       this.lazyLayout = _.debounce(that.onResizeHandler, 300).bind(this);
