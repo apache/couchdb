@@ -124,12 +124,12 @@ all_docs_req(Req, Db, Keys) ->
             do_all_docs_req(Req, Db, Keys);
         _ ->
             DbName = ?b2l(Db#db.name),
-            case couch_config:get("couch_httpd_auth",
+            case config:get("couch_httpd_auth",
                                   "authentication_db",
                                   "_users") of
             DbName ->
-                UsersDbPublic = couch_config:get("couch_httpd_auth", "users_db_public", "false"),
-                PublicFields = couch_config:get("couch_httpd_auth", "public_fields"),
+                UsersDbPublic = config:get("couch_httpd_auth", "users_db_public", "false"),
+                PublicFields = config:get("couch_httpd_auth", "public_fields"),
                 case {UsersDbPublic, PublicFields} of
                 {"true", PublicFields} when PublicFields =/= undefined ->
                     do_all_docs_req(Req, Db, Keys);
@@ -155,9 +155,9 @@ do_all_docs_req(Req, Db, Keys) ->
     {ok, Resp} = couch_httpd:etag_maybe(Req, fun() ->
         VAcc0 = #vacc{db=Db, req=Req},
         DbName = ?b2l(Db#db.name),
-        UsersDbName = couch_config:get("couch_httpd_auth",
-                                         "authentication_db",
-                                         "_users"),
+        UsersDbName = config:get("couch_httpd_auth",
+                                 "authentication_db",
+                                 "_users"),
         IsAdmin = is_admin(Db),
         Callback = get_view_callback(DbName, UsersDbName, IsAdmin),
         couch_mrview:query_all_docs(Db, Args, Callback, VAcc0)
