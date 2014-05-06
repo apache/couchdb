@@ -317,7 +317,6 @@ make_proc(Pid, Lang, Mod) ->
         lang = Lang,
         pid = Pid,
         prompt_fun = {Mod, prompt},
-        prompt_many_fun = {Mod, prompt_many},
         set_timeout_fun = {Mod, set_timeout},
         stop_fun = {Mod, stop}
     },

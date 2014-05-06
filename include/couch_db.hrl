@@ -245,7 +245,6 @@
     client = nil,
     ddoc_keys = [],
     prompt_fun,
-    prompt_many_fun,
     set_timeout_fun,
     stop_fun
 }).
