@@ -16,7 +16,7 @@
 -export([default_authentication_handler/1,special_test_authentication_handler/1]).
 -export([cookie_authentication_handler/1]).
 -export([null_authentication_handler/1]).
--export([proxy_authentification_handler/1]).
+-export([proxy_authentication_handler/1, proxy_authentification_handler/1]).
 -export([cookie_auth_header/2]).
 -export([handle_session_req/1]).
 
@@ -111,11 +111,15 @@ null_authentication_handler(Req) ->
 %   ecret key is the secret key in couch_httpd_auth section of ini. This token is optional
 %   if value of proxy_use_secret key in couch_httpd_auth section of ini isn't true.
 %
-proxy_authentification_handler(Req) ->
+proxy_authentication_handler(Req) ->
     case proxy_auth_user(Req) of
         nil -> Req;
         Req2 -> Req2
     end.
+
+%% @deprecated
+proxy_authentification_handler(Req) ->
+    proxy_authentication_handler(Req).
     
 proxy_auth_user(Req) ->
     XHeaderUserName = config:get("couch_httpd_auth", "x_auth_username",

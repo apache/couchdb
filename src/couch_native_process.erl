@@ -42,7 +42,7 @@
 
 -export([start_link/0,init/1,terminate/2,handle_call/3,handle_cast/2,code_change/3,
          handle_info/2]).
--export([set_timeout/2, prompt/2, prompt_many/2]).
+-export([set_timeout/2, prompt/2]).
 
 -define(STATE, native_proc_state).
 -record(evstate, {ddocs, funs=[], query_config=[], list_pid=nil, timeout=5000}).
@@ -61,15 +61,6 @@ set_timeout(Pid, TimeOut) ->
 
 prompt(Pid, Data) when is_list(Data) ->
     gen_server:call(Pid, {prompt, Data}).
-
-prompt_many(Pid, DataList) ->
-    prompt_many(Pid, DataList, []).
-
-prompt_many(_Pid, [], Acc) ->
-    {ok, lists:reverse(Acc)};
-prompt_many(Pid, [Data | Rest], Acc) ->
-    Result = prompt(Pid, Data),
-    prompt_many(Pid, Rest, [Result | Acc]).
 
 % gen_server callbacks
 init([]) ->

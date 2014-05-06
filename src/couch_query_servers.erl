@@ -13,7 +13,7 @@
 -module(couch_query_servers).
 
 -export([try_compile/4]).
--export([start_doc_map/3, map_docs/2, map_docs_raw/2, stop_doc_map/1, raw_to_ejson/1]).
+-export([start_doc_map/3, map_docs/2, stop_doc_map/1, raw_to_ejson/1]).
 -export([reduce/3, rereduce/3,validate_doc_update/5]).
 -export([filter_docs/5]).
 -export([filter_view/3]).
@@ -111,15 +111,10 @@ map_docs(Proc, Docs) ->
         Docs),
     {ok, Results}.
 
-map_docs_raw(Proc, DocList) ->
-    {Mod, Fun} = Proc#proc.prompt_many_fun,
-    CommandList = lists:map(
-        fun(Doc) ->
-            EJson = couch_doc:to_json_obj(Doc, []),
-            [<<"map_doc">>, EJson]
-        end,
-        DocList),
-    Mod:Fun(Proc#proc.pid, CommandList).
+map_doc_raw(Proc, Doc) ->
+    Json = couch_doc:to_json_obj(Doc, []),
+    {ok, proc_prompt_raw(Proc, [<<"map_doc">>, Json])}.
+
 
 stop_doc_map(nil) ->
     ok;

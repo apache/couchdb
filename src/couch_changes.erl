@@ -38,6 +38,7 @@
     resp_type,
     limit,
     include_docs,
+    doc_options,
     conflicts,
     timeout,
     timeout_fun
@@ -307,6 +308,7 @@ start_sending_changes(Callback, UserAcc, ResponseType) ->
 build_acc(Args, Callback, UserAcc, Db, StartSeq, Prepend, Timeout, TimeoutFun) ->
     #changes_args{
         include_docs = IncludeDocs,
+        doc_options = DocOpts,
         conflicts = Conflicts,
         limit = Limit,
         feed = ResponseType,
@@ -322,6 +324,7 @@ build_acc(Args, Callback, UserAcc, Db, StartSeq, Prepend, Timeout, TimeoutFun) -
         resp_type = ResponseType,
         limit = Limit,
         include_docs = IncludeDocs,
+        doc_options = DocOpts,
         conflicts = Conflicts,
         timeout = Timeout,
         timeout_fun = TimeoutFun
@@ -514,7 +517,12 @@ changes_row(Results, DocInfo, Acc) ->
     #doc_info{
         id = Id, high_seq = Seq, revs = [#rev_info{deleted = Del} | _]
     } = DocInfo,
-    #changes_acc{db = Db, include_docs = IncDoc, conflicts = Conflicts} = Acc,
+    #changes_acc{
+        db = Db,
+        include_docs = IncDoc,
+        doc_options = DocOpts,
+        conflicts = Conflicts
+    } = Acc,
     {[{<<"seq">>, Seq}, {<<"id">>, Id}, {<<"changes">>, Results}] ++
         deleted_item(Del) ++ case IncDoc of
             true ->
@@ -524,8 +532,10 @@ changes_row(Results, DocInfo, Acc) ->
                 end,
                 Doc = couch_index_util:load_doc(Db, DocInfo, Opts),
                 case Doc of
-                    null -> [{doc, null}];
-                    _ ->  [{doc, couch_doc:to_json_obj(Doc, [])}]
+                    null ->
+                        [{doc, null}];
+                    _ ->
+                        [{doc, couch_doc:to_json_obj(Doc, DocOpts)}]
                 end;
             false ->
                 []

@@ -39,6 +39,12 @@
             throw({forbidden: 'doc.roles must be an array'});
         }
 
+        for (var idx = 0; idx < newDoc.roles.length; idx++) {
+            if (typeof newDoc.roles[idx] !== 'string') {
+                throw({forbidden: 'doc.roles can only contain strings'});
+            }
+        }
+
         if (newDoc._id !== ('org.couchdb.user:' + newDoc.name)) {
             throw({
                 forbidden: 'Doc ID must be of the form org.couchdb.user:name'
@@ -56,6 +62,15 @@
                 forbidden: 'Users with password_sha must have a salt.' +
                     'See /_utils/script/couch.js for example code.'
             });
+        }
+
+        if (newDoc.password_scheme === \"pbkdf2\") {
+            if (typeof(newDoc.iterations) !== \"number\") {
+               throw({forbidden: \"iterations must be a number.\"});
+            }
+            if (typeof(newDoc.derived_key) !== \"string\") {
+               throw({forbidden: \"derived_key must be a string.\"});
+            }
         }
 
         var is_server_or_database_admin = function(userCtx, secObj) {

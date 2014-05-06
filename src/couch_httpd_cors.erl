@@ -12,8 +12,10 @@
 
 %% @doc module to handle Cross-Origin Resource Sharing
 %%
-%% This module handles CROSS requests and preflight request for a
-%% couchdb Node. The config is done in the ini file.
+%% This module handles CORS requests and preflight request for
+%% CouchDB. The configuration is done in the ini file.
+%%
+%% This implements http://www.w3.org/TR/cors/
 
 
 -module(couch_httpd_cors).
@@ -33,6 +35,8 @@
 % as defined in http://www.w3.org/TR/cors/#terminology
 -define(SIMPLE_HEADERS, ["Cache-Control", "Content-Language",
         "Content-Type", "Expires", "Last-Modified", "Pragma"]).
+-define(ALLOWED_HEADERS, lists:sort(["Server", "Etag",
+        "Accept-Ranges" | ?SIMPLE_HEADERS])).
 -define(SIMPLE_CONTENT_TYPE_VALUES, ["application/x-www-form-urlencoded",
         "multipart/form-data", "text/plain"]).
 
@@ -210,16 +214,20 @@ maybe_apply_cors_headers(CorsHeaders, RequestHeaders0) ->
     % return: RequestHeaders ++ CorsHeaders ++ ACEH
 
     RequestHeaders = [K || {K,_V} <- RequestHeaders0],
-    ExposedHeaders0 = reduce_headers(RequestHeaders, ?SIMPLE_HEADERS),
+    ExposedHeaders0 = reduce_headers(RequestHeaders, ?ALLOWED_HEADERS),
 
     % here we may have not moved Content-Type into ExposedHeaders,
     % now we need to check whether the Content-Type valus is
     % in ?SIMPLE_CONTENT_TYPE_VALUES and if it isn’t add Content-
     % Type to to ExposedHeaders
-    ContentType = string:to_lower(
-        proplists:get_value("Content-Type", RequestHeaders0)),
-
-    IncludeContentType = lists:member(ContentType, ?SIMPLE_CONTENT_TYPE_VALUES),
+    ContentType =  proplists:get_value("Content-Type", RequestHeaders0),
+    IncludeContentType = case ContentType of
+    undefined ->
+        false;
+    _ ->
+        ContentType_ = string:to_lower(ContentType),
+        lists:member(ContentType_, ?SIMPLE_CONTENT_TYPE_VALUES)
+    end,
     ExposedHeaders = case IncludeContentType of
     false ->
         lists:umerge(ExposedHeaders0, ["Content-Type"]);
@@ -236,10 +244,10 @@ reduce_headers(A, B) ->
     reduce_headers0(A, B, []).
 
 reduce_headers0([], _B, Result) ->
-    Result;
+    lists:sort(Result);
 reduce_headers0([ElmA|RestA], B, Result) ->
     R = case member_nocase(ElmA, B) of
-    true -> Result;
+    false -> Result;
     _Else -> [ElmA | Result]
     end,
     reduce_headers0(RestA, B, R).

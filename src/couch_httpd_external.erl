@@ -120,17 +120,21 @@ json_query_keys([{<<"key">>, Value} | Rest], Acc) ->
 json_query_keys([Term | Rest], Acc) ->
     json_query_keys(Rest, [Term|Acc]).
 
-send_external_response(#httpd{mochi_req=MochiReq}=Req, Response) ->
+send_external_response(Req, Response) ->
     #extern_resp_args{
         code = Code,
         data = Data,
         ctype = CType,
-        headers = Headers
+        headers = Headers,
+        json = Json
     } = parse_external_response(Response),
-    couch_httpd:log_request(Req, Code),
-    Resp = MochiReq:respond({Code,
-        default_or_content_type(CType, Headers ++ couch_httpd:server_header()), Data}),
-    {ok, Resp}.
+    Headers1 = default_or_content_type(CType, Headers),
+    case Json of
+    nil ->
+        couch_httpd:send_response(Req, Code, Headers1, Data);
+    Json ->
+        couch_httpd:send_json(Req, Code, Headers1, Json)
+    end.
 
 parse_external_response({Response}) ->
     lists:foldl(fun({Key,Value}, Args) ->
@@ -143,7 +147,7 @@ parse_external_response({Response}) ->
                 Args#extern_resp_args{stop=true};
             {<<"json">>, Value} ->
                 Args#extern_resp_args{
-                    data=?JSON_ENCODE(Value),
+                    json=Value,
                     ctype="application/json"};
             {<<"body">>, Value} ->
                 Args#extern_resp_args{data=Value, ctype="text/html; charset=utf-8"};

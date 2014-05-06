@@ -31,6 +31,7 @@
 -export([with_db/2]).
 -export([rfc1123_date/0, rfc1123_date/1]).
 -export([integer_to_boolean/1, boolean_to_integer/1]).
+-export([find_in_binary/2]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -510,3 +511,34 @@ boolean_to_integer(true) ->
     1;
 boolean_to_integer(false) ->
     0.
+
+
+find_in_binary(_B, <<>>) ->
+    not_found;
+
+find_in_binary(B, Data) ->
+    case binary:match(Data, [B], []) of
+    nomatch ->
+        MatchLength = erlang:min(byte_size(B), byte_size(Data)),
+        match_prefix_at_end(binary:part(B, {0, MatchLength}),
+                            binary:part(Data, {byte_size(Data), -MatchLength}),
+                            MatchLength, byte_size(Data) - MatchLength);
+    {Pos, _Len} ->
+        {exact, Pos}
+    end.
+
+match_prefix_at_end(Prefix, Data, PrefixLength, N) ->
+    FirstCharMatches = binary:matches(Data, [binary:part(Prefix, {0, 1})], []),
+    match_rest_of_prefix(FirstCharMatches, Prefix, Data, PrefixLength, N).
+
+match_rest_of_prefix([], _Prefix, _Data, _PrefixLength, _N) ->
+    not_found;
+
+match_rest_of_prefix([{Pos, _Len} | Rest], Prefix, Data, PrefixLength, N) ->
+    case binary:match(binary:part(Data, {PrefixLength, Pos - PrefixLength}),
+                      [binary:part(Prefix, {0, PrefixLength - Pos})], []) of
+        nomatch ->
+            match_rest_of_prefix(Rest, Prefix, Data, PrefixLength, N);
+        {_Pos, _Len1} ->
+            {partial, N + Pos}
+    end.

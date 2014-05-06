@@ -631,7 +631,7 @@ send_doc_efficiently(#httpd{mochi_req = MochiReq} = Req,
                     [attachments, follows, att_encoding_info | Options])),
             {ContentType, Len} = couch_doc:len_doc_to_multi_part_stream(
                     Boundary,JsonBytes, Atts, true),
-            CType = {<<"Content-Type">>, ContentType},
+            CType = {"Content-Type", ?b2l(ContentType)},
             {ok, Resp} = start_response_length(Req, 200, [CType|Headers], Len),
             couch_doc:doc_to_multi_part_stream(Boundary,JsonBytes,Atts,
                     fun(Data) -> couch_httpd:send(Resp, Data) end, true)
@@ -677,7 +677,7 @@ send_ranges_multipart(Req, ContentType, Len, Att, Ranges) ->
     {ok, Resp} = start_chunked_response(Req, 206, [CType]),
     couch_httpd:send_chunk(Resp, <<"--", Boundary/binary>>),
     lists:foreach(fun({From, To}) ->
-        ContentRange = make_content_range(From, To, Len),
+        ContentRange = ?l2b(make_content_range(From, To, Len)),
         couch_httpd:send_chunk(Resp,
             <<"\r\nContent-Type: ", ContentType/binary, "\r\n",
             "Content-Range: ", ContentRange/binary, "\r\n",
@@ -701,7 +701,7 @@ receive_request_data(_Req, _) ->
     throw(<<"expected more data">>).
 
 make_content_range(From, To, Len) ->
-    ?l2b(io_lib:format("bytes ~B-~B/~B", [From, To, Len])).
+    io_lib:format("bytes ~B-~B/~B", [From, To, Len]).
 
 update_doc_result_to_json({{Id, Rev}, Error}) ->
         {_Code, Err, Msg} = couch_httpd:error_info(Error),
@@ -898,7 +898,7 @@ db_attachment_req(#httpd{method='GET',mochi_req=MochiReq}=Req, Db, DocId, FileNa
                     Ranges = parse_ranges(MochiReq:get(range), Len),
                     case {Enc, Ranges} of
                         {identity, [{From, To}]} ->
-                            Headers1 = [{<<"Content-Range">>, make_content_range(From, To, Len)}]
+                            Headers1 = [{"Content-Range", make_content_range(From, To, Len)}]
                                 ++ Headers,
                             {ok, Resp} = start_response_length(Req, 206, Headers1, To - From + 1),
                             couch_doc:range_att_foldl(Att, From, To + 1,
@@ -1118,7 +1118,7 @@ parse_doc_query(Req) ->
     end, #doc_query_args{}, couch_httpd:qs(Req)).
 
 parse_changes_query(Req, Db) ->
-    lists:foldl(fun({Key, Value}, Args) ->
+    ChangesArgs = lists:foldl(fun({Key, Value}, Args) ->
         case {string:to_lower(Key), Value} of
         {"feed", _} ->
             Args#changes_args{feed=Value};
@@ -1145,6 +1145,12 @@ parse_changes_query(Req, Db) ->
             Args#changes_args{timeout=list_to_integer(Value)};
         {"include_docs", "true"} ->
             Args#changes_args{include_docs=true};
+        {"attachments", "true"} ->
+            Opts = Args#changes_args.doc_options,
+            Args#changes_args{doc_options=[attachments|Opts]};
+        {"att_encoding_info", "true"} ->
+            Opts = Args#changes_args.doc_options,
+            Args#changes_args{doc_options=[att_encoding_info|Opts]};
         {"conflicts", "true"} ->
             Args#changes_args{conflicts=true};
         {"filter", _} ->
@@ -1152,7 +1158,21 @@ parse_changes_query(Req, Db) ->
         _Else -> % unknown key value pair, ignore.
             Args
         end
-    end, #changes_args{}, couch_httpd:qs(Req)).
+    end, #changes_args{}, couch_httpd:qs(Req)),
+    %% if it's an EventSource request with a Last-event-ID header
+    %% that should override the `since` query string, since it's
+    %% probably the browser reconnecting.
+    case ChangesArgs#changes_args.feed of
+        "eventsource" ->
+            case couch_httpd:header_value(Req, "last-event-id") of
+                undefined ->
+                    ChangesArgs;
+                Value ->
+                    ChangesArgs#changes_args{since=list_to_integer(Value)}
+            end;
+        _ ->
+            ChangesArgs
+    end.
 
 extract_header_rev(Req, ExplicitRev) when is_binary(ExplicitRev) or is_list(ExplicitRev)->
     extract_header_rev(Req, couch_doc:parse_rev(ExplicitRev));

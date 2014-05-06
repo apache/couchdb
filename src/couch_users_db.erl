@@ -12,7 +12,7 @@
 
 -module(couch_users_db).
 
--export([before_doc_update/2, after_doc_read/2]).
+-export([before_doc_update/2, after_doc_read/2, strip_non_public_fields/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -101,10 +101,21 @@ after_doc_read(Doc, #db{user_ctx = UserCtx} = Db) ->
     _ when Name =:= DocName ->
         Doc;
     _ ->
-        throw(not_found)
+        Doc1 = strip_non_public_fields(Doc),
+        case Doc1 of
+          #doc{body={[]}} ->
+              throw(not_found);
+          _ ->
+              Doc1
+        end
     end.
 
 get_doc_name(#doc{id= <<"org.couchdb.user:", Name/binary>>}) ->
     Name;
 get_doc_name(_) ->
     undefined.
+
+strip_non_public_fields(#doc{body={Props}}=Doc) ->
+    Public = re:split(config:get("couch_httpd_auth", "public_fields", ""),
+                      "\\s*,\\s*", [{return, binary}]),
+    Doc#doc{body={[{K, V} || {K, V} <- Props, lists:member(K, Public)]}}.

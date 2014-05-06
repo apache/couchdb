@@ -18,6 +18,8 @@
 -define(MIN_STR, <<"">>).
 -define(MAX_STR, <<255>>). % illegal utf string
 
+-define(REWRITE_COUNT, couch_rewrite_count).
+
 -define(JSON_ENCODE(V), couch_util:json_encode(V)).
 -define(JSON_DECODE(V), couch_util:json_decode(V)).
 
@@ -222,6 +224,7 @@
     filter_fun,
     filter_args = [],
     include_docs = false,
+    doc_options = [],
     conflicts = false,
     db_open_options = []
 }).

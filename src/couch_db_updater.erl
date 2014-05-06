@@ -853,14 +853,16 @@ copy_doc_attachments(#db{fd = SrcFd} = SrcDb, SrcSp, DestFd) ->
     end,
     % copy the bin values
     NewBinInfos = lists:map(
-        fun({Name, Type, BinSp, AttLen, RevPos, Md5}) ->
+        fun({Name, Type, BinSp, AttLen, RevPos, ExpectedMd5}) ->
             % 010 UPGRADE CODE
-            {NewBinSp, AttLen, AttLen, Md5, _IdentityMd5} =
+            {NewBinSp, AttLen, AttLen, ActualMd5, _IdentityMd5} =
                 couch_stream:copy_to_new_stream(SrcFd, BinSp, DestFd),
-            {Name, Type, NewBinSp, AttLen, AttLen, RevPos, Md5, identity};
-        ({Name, Type, BinSp, AttLen, DiskLen, RevPos, Md5, Enc1}) ->
-            {NewBinSp, AttLen, _, Md5, _IdentityMd5} =
+            check_md5(ExpectedMd5, ActualMd5),
+            {Name, Type, NewBinSp, AttLen, AttLen, RevPos, ExpectedMd5, identity};
+        ({Name, Type, BinSp, AttLen, DiskLen, RevPos, ExpectedMd5, Enc1}) ->
+            {NewBinSp, AttLen, _, ActualMd5, _IdentityMd5} =
                 couch_stream:copy_to_new_stream(SrcFd, BinSp, DestFd),
+            check_md5(ExpectedMd5, ActualMd5),
             Enc = case Enc1 of
             true ->
                 % 0110 UPGRADE CODE
@@ -871,7 +873,7 @@ copy_doc_attachments(#db{fd = SrcFd} = SrcDb, SrcSp, DestFd) ->
             _ ->
                 Enc1
             end,
-            {Name, Type, NewBinSp, AttLen, DiskLen, RevPos, Md5, Enc}
+            {Name, Type, NewBinSp, AttLen, DiskLen, RevPos, ExpectedMd5, Enc}
         end, BinInfos),
     {BodyData, NewBinInfos}.
 
@@ -887,6 +889,9 @@ merge_lookups([#doc_info{}=DI | RestInfos], [{ok, FDI} | RestLookups]) ->
     [FDI | merge_lookups(RestInfos, RestLookups)];
 merge_lookups([FDI | RestInfos], Lookups) ->
     [FDI | merge_lookups(RestInfos, Lookups)].
+
+check_md5(Md5, Md5) -> ok;
+check_md5(_, _) -> throw(md5_mismatch).
 
 copy_docs(Db, #db{fd = DestFd} = NewDb, MixedInfos, Retry) ->
     DocInfoIds = [Id || #doc_info{id=Id} <- MixedInfos],
@@ -1069,7 +1074,7 @@ open_compaction_files(DbName, DbFilePath, Options) ->
 
 
 open_compaction_file(FilePath) ->
-    case couch_file:open(FilePath) of
+    case couch_file:open(FilePath, [nologifmissing]) of
         {ok, Fd} ->
             case couch_file:read_header(Fd) of
                 {ok, Header} -> {ok, Fd, Header};
