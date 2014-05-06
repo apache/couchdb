@@ -210,7 +210,12 @@ handle_view_list(Req, Db, DDoc, LName, VDDoc, VName, Keys) ->
     couch_httpd:etag_maybe(Req, fun() ->
         couch_query_servers:with_ddoc_proc(DDoc, fun(QServer) ->
             Acc = #lacc{db=Db, req=Req, qserver=QServer, lname=LName},
-            couch_mrview:query_view(Db, VDDoc, VName, Args, fun list_cb/2, Acc)
+            case VName of
+              <<"_all_docs">> ->
+                couch_mrview:query_all_docs(Db, Args, fun list_cb/2, Acc);
+              _ ->
+                couch_mrview:query_view(Db, VDDoc, VName, Args, fun list_cb/2, Acc)
+            end
         end)
     end).
 

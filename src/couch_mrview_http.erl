@@ -87,7 +87,7 @@ handle_compact_req(#httpd{method='POST'}=Req, Db, DDoc) ->
     ok = couch_mrview:compact(Db, DDoc),
     couch_httpd:send_json(Req, 202, {[{ok, true}]});
 handle_compact_req(Req, _Db, _DDoc) ->
-    couch_httpd:send_method_not_allowd(Req, "POST").
+    couch_httpd:send_method_not_allowed(Req, "POST").
 
 
 handle_cleanup_req(#httpd{method='POST'}=Req, Db) ->
@@ -106,13 +106,28 @@ all_docs_req(Req, Db, Keys) ->
         ok ->
             do_all_docs_req(Req, Db, Keys);
         _ ->
-            throw({forbidden, <<"Only admins can access _all_docs",
-                " of system databases.">>})
+            DbName = ?b2l(Db#db.name),
+            case couch_config:get("couch_httpd_auth",
+                                  "authentication_db",
+                                  "_users") of
+            DbName ->
+                UsersDbPublic = couch_config:get("couch_httpd_auth", "users_db_public", "false"),
+                PublicFields = couch_config:get("couch_httpd_auth", "public_fields"),
+                case {UsersDbPublic, PublicFields} of
+                {"true", PublicFields} when PublicFields =/= undefined ->
+                    do_all_docs_req(Req, Db, Keys);
+                {_, _} ->
+                    throw({forbidden, <<"Only admins can access _all_docs",
+                                        " of system databases.">>})
+                end;
+            _ ->
+                throw({forbidden, <<"Only admins can access _all_docs",
+                                    " of system databases.">>})
+            end
         end;
     false ->
         do_all_docs_req(Req, Db, Keys)
     end.
-
 
 do_all_docs_req(Req, Db, Keys) ->
     Args0 = parse_qs(Req, Keys),
@@ -126,12 +141,38 @@ do_all_docs_req(Req, Db, Keys) ->
     Args = Args0#mrargs{preflight_fun=ETagFun},
     {ok, Resp} = couch_httpd:etag_maybe(Req, fun() ->
         VAcc0 = #vacc{db=Db, req=Req},
-        couch_mrview:query_all_docs(Db, Args, fun view_cb/2, VAcc0)
+        DbName = ?b2l(Db#db.name),
+        UsersDbName = couch_config:get("couch_httpd_auth",
+                                         "authentication_db",
+                                         "_users"),
+        IsAdmin = is_admin(Db),
+        Callback = get_view_callback(DbName, UsersDbName, IsAdmin),
+        couch_mrview:query_all_docs(Db, Args, Callback, VAcc0)
     end),
     case is_record(Resp, vacc) of
         true -> {ok, Resp#vacc.resp};
         _ -> {ok, Resp}
     end.
+
+is_admin(Db) ->
+    case catch couch_db:check_is_admin(Db) of
+    {unauthorized, _} ->
+        false;
+    ok ->
+        true
+    end.
+
+
+% admin users always get all fields
+get_view_callback(_, _, true) ->
+    fun view_cb/2;
+% if we are operating on the users db and we aren't
+% admin, filter the view
+get_view_callback(_DbName, _DbName, false) ->
+    fun filtered_view_cb/2;
+% non _users databases get all fields
+get_view_callback(_, _, _) ->
+    fun view_cb/2.
 
 
 design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
@@ -152,6 +193,20 @@ design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
         true -> {ok, Resp#vacc.resp};
         _ -> {ok, Resp}
     end.
+
+
+filtered_view_cb({row, Row0}, Acc) ->
+  Row1 = lists:map(fun({doc, null}) ->
+        {doc, null};
+    ({doc, Body}) ->
+        Doc = couch_users_db:strip_non_public_fields(#doc{body=Body}),
+        {doc, Doc#doc.body};
+    (KV) ->
+        KV
+    end, Row0),
+    view_cb({row, Row1}, Acc);
+filtered_view_cb(Obj, Acc) ->
+    view_cb(Obj, Acc).
 
 
 view_cb({meta, Meta}, #vacc{resp=undefined}=Acc) ->
@@ -293,6 +348,22 @@ parse_qs(Key, Val, Args) ->
             Args#mrargs{inclusive_end=parse_boolean(Val)};
         "include_docs" ->
             Args#mrargs{include_docs=parse_boolean(Val)};
+        "attachments" ->
+            case parse_boolean(Val) of
+            true ->
+                Opts = Args#mrargs.doc_options,
+                Args#mrargs{doc_options=[attachments|Opts]};
+            false ->
+                Args
+            end;
+        "att_encoding_info" ->
+            case parse_boolean(Val) of
+            true ->
+                Opts = Args#mrargs.doc_options,
+                Args#mrargs{doc_options=[att_encoding_info|Opts]};
+            false ->
+                Args
+            end;
         "update_seq" ->
             Args#mrargs{update_seq=parse_boolean(Val)};
         "conflicts" ->

@@ -130,40 +130,30 @@ map_docs(Parent, State0) ->
             couch_query_servers:stop_doc_map(State0#mrst.qserver),
             couch_work_queue:close(State0#mrst.write_queue);
         {ok, Dequeued} ->
+            % Run all the non deleted docs through the view engine and
+            % then pass the results on to the writer process.
             State1 = case State0#mrst.qserver of
                 nil -> start_query_server(State0);
                 _ -> State0
             end,
-            {ok, MapResults} = compute_map_results(State1, Dequeued),
-            couch_work_queue:queue(State1#mrst.write_queue, MapResults),
+            QServer = State1#mrst.qserver,
+            DocFun = fun
+                ({nil, Seq, _}, {SeqAcc, Results}) ->
+                    {erlang:max(Seq, SeqAcc), Results};
+                ({Id, Seq, deleted}, {SeqAcc, Results}) ->
+                    {erlang:max(Seq, SeqAcc), [{Id, []} | Results]};
+                ({Id, Seq, Doc}, {SeqAcc, Results}) ->
+                    {ok, Res} = couch_query_servers:map_doc_raw(QServer, Doc),
+                    {erlang:max(Seq, SeqAcc), [{Id, Res} | Results]}
+            end,
+            FoldFun = fun(Docs, Acc) ->
+                update_task(length(Docs)),
+                lists:foldl(DocFun, Acc, Docs)
+            end,
+            Results = lists:foldl(FoldFun, {0, []}, Dequeued),
+            couch_work_queue:queue(State1#mrst.write_queue, Results),
             map_docs(Parent, State1)
     end.
-
-
-compute_map_results(#mrst{qserver = Qs}, Dequeued) ->
-    % Run all the non deleted docs through the view engine and
-    % then pass the results on to the writer process.
-    DocFun = fun
-        ({nil, Seq, _}, {SeqAcc, AccDel, AccNotDel}) ->
-            {erlang:max(Seq, SeqAcc), AccDel, AccNotDel};
-        ({Id, Seq, deleted}, {SeqAcc, AccDel, AccNotDel}) ->
-            {erlang:max(Seq, SeqAcc), [{Id, []} | AccDel], AccNotDel};
-        ({_Id, Seq, Doc}, {SeqAcc, AccDel, AccNotDel}) ->
-            {erlang:max(Seq, SeqAcc), AccDel, [Doc | AccNotDel]}
-    end,
-    FoldFun = fun(Docs, Acc) ->
-        lists:foldl(DocFun, Acc, Docs)
-    end,
-    {MaxSeq, DeletedResults, Docs} =
-        lists:foldl(FoldFun, {0, [], []}, Dequeued),
-    {ok, MapResultList} = couch_query_servers:map_docs_raw(Qs, Docs),
-    NotDeletedResults = lists:zipwith(
-        fun(#doc{id = Id}, MapResults) -> {Id, MapResults} end,
-        Docs,
-        MapResultList),
-    AllMapResults = DeletedResults ++ NotDeletedResults,
-    update_task(length(AllMapResults)),
-    {ok, {MaxSeq, AllMapResults}}.
 
 
 write_results(Parent, State) ->

@@ -75,9 +75,30 @@ open(Db, State) ->
         sig=Sig
     } = State,
     IndexFName = couch_mrview_util:index_file(DbName, Sig),
+
+    % If we are upgrading from <=1.2.x, we upgrade the view
+    % index file on the fly, avoiding an index reset.
+    %
+    % OldSig is `ok` if no upgrade happened.
+    %
+    % To remove suppport for 1.2.x auto-upgrades in the
+    % future, just remove the next line and the code
+    % between "upgrade code for <= 1.2.x" and
+    % "end upgrade code for <= 1.2.x" and the corresponding
+    % code in couch_mrview_util
+
+    OldSig = couch_mrview_util:maybe_update_index_file(State),
+
     case couch_mrview_util:open_file(IndexFName) of
         {ok, Fd} ->
             case (catch couch_file:read_header(Fd)) of
+                % upgrade code for <= 1.2.x
+                {ok, {OldSig, Header}} ->
+                    % Matching view signatures.
+                    NewSt = couch_mrview_util:init_state(Db, Fd, State, Header),
+                    {ok, RefCounter} = couch_ref_counter:start([Fd]),
+                    {ok, NewSt#mrst{refc=RefCounter}};
+                % end of upgrade code for <= 1.2.x
                 {ok, {Sig, Header}} ->
                     % Matching view signatures.
                     NewSt = couch_mrview_util:init_state(Db, Fd, State, Header),

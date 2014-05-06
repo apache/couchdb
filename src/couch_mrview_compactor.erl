@@ -43,10 +43,15 @@ compact(State) ->
         views=Views
     } = State,
 
-    EmptyState = couch_util:with_db(DbName, fun(Db) ->
+    {EmptyState, NumDocIds} = couch_util:with_db(DbName, fun(Db) ->
         CompactFName = couch_mrview_util:compaction_file(DbName, Sig),
         {ok, Fd} = couch_mrview_util:open_file(CompactFName),
-        couch_mrview_util:reset_index(Db, Fd, State)
+        ESt = couch_mrview_util:reset_index(Db, Fd, State),
+
+        {ok, DbReduce} = couch_btree:full_reduce(Db#db.fulldocinfo_by_id_btree),
+        Count = element(1, DbReduce),
+
+        {ESt, Count}
     end),
 
     #mrst{
@@ -54,13 +59,12 @@ compact(State) ->
         views = EmptyViews
     } = EmptyState,
 
-    {ok, Count} = couch_btree:full_reduce(IdBtree),
     TotalChanges = lists:foldl(
         fun(View, Acc) ->
             {ok, Kvs} = couch_mrview_util:get_row_count(View),
             Acc + Kvs
         end,
-        Count, Views),
+        NumDocIds, Views),
     couch_task_status:add_task([
         {type, view_compaction},
         {database, DbName},
