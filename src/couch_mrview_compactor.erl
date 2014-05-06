@@ -48,7 +48,7 @@ compact(State) ->
         {ok, Fd} = couch_mrview_util:open_file(CompactFName),
         ESt = couch_mrview_util:reset_index(Db, Fd, State),
 
-        {ok, DbReduce} = couch_btree:full_reduce(Db#db.fulldocinfo_by_id_btree),
+        {ok, DbReduce} = couch_btree:full_reduce(Db#db.id_tree),
         Count = element(1, DbReduce),
 
         {ESt, Count}
