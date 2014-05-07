@@ -19,6 +19,7 @@
 -export([compare_nodelists/0, compare_shards/1]).
 -export([quorum/1, group_by_proximity/1]).
 -export([live_shards/2]).
+-export([belongs/2]).
 
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
@@ -191,6 +192,26 @@ dbname(DbName) when is_binary(DbName) ->
     DbName;
 dbname(_) ->
     erlang:error(badarg).
+
+%% @doc Determine if DocId belongs in shard (identified by record or filename)
+belongs(#shard{}=Shard, DocId) when is_binary(DocId) ->
+    [Begin, End] = range(Shard),
+    belongs(Begin, End, DocId);
+belongs(<<"shards/", _/binary>> = ShardName, DocId) when is_binary(DocId) ->
+    [Begin, End] = range(ShardName),
+    belongs(Begin, End, DocId);
+belongs(DbName, DocId) when is_binary(DbName), is_binary(DocId) ->
+    true.
+
+belongs(Begin, End, DocId) ->
+    HashKey = mem3_util:hash(DocId),
+    Begin =< HashKey andalso HashKey =< End.
+
+range(#shard{range = Range}) ->
+    Range;
+range(<<"shards/", Start:8/binary, "-", End:8/binary, "/", _/binary>>) ->
+    [httpd_util:hexlist_to_integer(binary_to_list(Start)),
+     httpd_util:hexlist_to_integer(binary_to_list(End))].
 
 nodes_in_zone(Nodes, Zone) ->
     [Node || Node <- Nodes, Zone == mem3:node_info(Node, <<"zone">>)].
