@@ -139,6 +139,10 @@ merge_at(Nodes, Pos, [{IK, IV, [NextINode]}]) when Pos > 0 ->
         {Merged, Result} -> {[{IK, IV, Merged}], Result};
         fail -> fail
     end;
+merge_at(_Nodes, Pos, [{_IK, _IV, []}]) when Pos > 0 ->
+    % We've run out of path on the insert side, there's no way we can
+    % merge with this branch
+    fail;
 merge_at([{K, V, SubTree} | Sibs], Pos, INodes) when Pos < 0 ->
     % When Pos is negative, Depth was less than IDepth, so we
     % need to discard from the revision tree path
