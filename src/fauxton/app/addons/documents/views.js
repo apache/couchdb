@@ -928,7 +928,9 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
     },
 
     afterRender: function() {
-      var saveDoc = this.saveDoc;
+      var saveDoc = this.saveDoc,
+          editor,
+          model;
 
       this.editor = new Components.Editor({
         editorId: "editor-container",
@@ -943,12 +945,9 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
         }]
       });
       this.editor.render();
-      this.model.on("sync", this.updateValues, this);
 
-      var editor = this.editor,
-          model = this.model;
-
-      editor.editor.on("change", function (event) {
+      this.listenTo(this.model, "sync", this.updateValues);
+      this.listenTo(editor.editor, "change", function (event) {
         var changedDoc;
         try {
           changedDoc = JSON.parse(editor.getValue());
@@ -974,6 +973,9 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
           clear:  true
         });
       });
+
+      editor = this.editor;
+      model = this.model;
     },
 
     cleanup: function () {
