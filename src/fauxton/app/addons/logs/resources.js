@@ -14,10 +14,11 @@ define([
   "app",
   "api",
   "backbone",
-  "d3"
+  "d3",
+  "addons/fauxton/components"
 ],
 
-function (app, FauxtonAPI, Backbone, d3) {
+function (app, FauxtonAPI, Backbone, d3, Components) {
 
   var Log = FauxtonAPI.addon();
 
@@ -195,56 +196,16 @@ function (app, FauxtonAPI, Backbone, d3) {
     }
   });
 
-  Log.Views.FilterView = FauxtonAPI.View.extend({
+  Log.Views.Sidebar = FauxtonAPI.View.extend({
     template: "addons/logs/templates/sidebar",
 
-    events: {
-      "submit #log-filter-form": "filterLogs"
-    },
-
-    filterLogs: function (event) {
-      event.preventDefault();
-      var $filter = this.$('input[name="filter"]'),
-          filter = $filter.val();
-
-      Log.events.trigger("log:filter", filter);
-
-      this.insertView("#filter-list", new Log.Views.FilterItemView({
-        filter: filter
-      })).render();
-
-      $filter.val('');
-    }
-
-  });
-
-  Log.Views.FilterItemView = FauxtonAPI.View.extend({
-    template: "addons/logs/templates/filterItem",
-    tagName: "li",
-
     initialize: function (options) {
-      this.filter = options.filter;
-    },
-
-    events: {
-      "click .remove-filter": "removeFilter"
-    },
-
-    serialize: function () {
-      return {
-        filter: this.filter
-      };
-    },
-
-    removeFilter: function (event) {
-      event.preventDefault();
-
-      Log.events.trigger("log:remove", this.filter);
-      this.remove();
+      this.setView(".js-filter", new Components.FilterView({
+        eventListener: Log.events,
+        eventNamespace: "log"
+      }));
     }
-
   });
-
 
   return Log;
 

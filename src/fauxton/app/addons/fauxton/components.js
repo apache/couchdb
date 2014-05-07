@@ -339,6 +339,65 @@ function(app, FauxtonAPI, ace, spin) {
     }
   });
 
+  Components.FilterView = FauxtonAPI.View.extend({
+    template: "addons/fauxton/templates/filter",
+
+    initialize: function (options) {
+      this.eventListener = options.eventListener;
+      this.eventNamespace = options.eventNamespace;
+    },
+
+    events: {
+      "submit .js-log-filter-form": "filterLogs"
+    },
+
+    filterLogs: function (event) {
+      event.preventDefault();
+      var $filter = this.$('input[name="filter"]'),
+          filter = $filter.val();
+
+      this.eventListener.trigger(this.eventNamespace + ":filter", filter);
+
+      this.insertView(".filter-list", new Components.FilterItemView({
+        filter: filter,
+        eventListener: this.eventListener,
+        eventNamespace: this.eventNamespace
+      })).render();
+
+      $filter.val('');
+    }
+
+  });
+
+  Components.FilterItemView = FauxtonAPI.View.extend({
+    template: "addons/fauxton/templates/filter_item",
+    tagName: "li",
+
+    initialize: function (options) {
+      this.filter = options.filter;
+      this.eventListener = options.eventListener;
+      this.eventNamespace = options.eventNamespace;
+    },
+
+    events: {
+      "click .js-remove-filter": "removeFilter"
+    },
+
+    serialize: function () {
+      return {
+        filter: this.filter
+      };
+    },
+
+    removeFilter: function (event) {
+      event.preventDefault();
+
+      this.eventListener.trigger(this.eventNamespace + ":remove", this.filter);
+      this.remove();
+    }
+
+  });
+
   Components.Editor = FauxtonAPI.View.extend({
     initialize: function (options) {
       this.editorId = options.editorId;

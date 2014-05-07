@@ -42,7 +42,7 @@ function(app, FauxtonAPI, Log) {
 
     initialize: function () {
       this.logs = new Log.Collection();
-      this.setView("#sidebar-content", new Log.Views.FilterView({}));
+      this.setView("#sidebar-content", new Log.Views.Sidebar({}));
     },
 
     showLog: function () {
