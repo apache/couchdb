@@ -204,19 +204,6 @@ design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
     end.
 
 
-filtered_view_cb({row, Row0}, Acc) ->
-  Row1 = lists:map(fun({doc, null}) ->
-        {doc, null};
-    ({doc, Body}) ->
-        Doc = couch_users_db:strip_non_public_fields(#doc{body=Body}),
-        {doc, Doc#doc.body};
-    (KV) ->
-        KV
-    end, Row0),
-    view_cb({row, Row1}, Acc);
-filtered_view_cb(Obj, Acc) ->
-    view_cb(Obj, Acc).
-
 multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
     Args0 = parse_params(Req, undefined),
     {ok, _, _, Args1} = couch_mrview_util:get_view(Db, DDoc, ViewName, Args0),
@@ -244,6 +231,20 @@ multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
         true -> {ok, Resp2#vacc.resp};
         _ -> {ok, Resp2}
     end.
+
+
+filtered_view_cb({row, Row0}, Acc) ->
+  Row1 = lists:map(fun({doc, null}) ->
+        {doc, null};
+    ({doc, Body}) ->
+        Doc = couch_users_db:strip_non_public_fields(#doc{body=Body}),
+        {doc, Doc#doc.body};
+    (KV) ->
+        KV
+    end, Row0),
+    view_cb({row, Row1}, Acc);
+filtered_view_cb(Obj, Acc) ->
+    view_cb(Obj, Acc).
 
 
 view_cb({meta, Meta}, #vacc{resp=undefined}=Acc) ->
