@@ -62,9 +62,43 @@ function(Backbone, LayoutManager) {
     manage: true,
     disableLoader: false,
 
+    filters: [],
+
     forceRender: function () {
       this.hasRendered = false;
+    },
+
+    filter: function (filter) {
+      this.filters.push(filter);
+      this.render();
+    },
+
+    createFilteredData: function (json) {
+      var that = this;
+
+      return _.reduce(this.filters, function (elements, filter) {
+
+        return _.filter(elements, function (element) {
+          var match = false;
+
+          _.each(element, function (value) {
+            if (new RegExp(filter).test(value.toString())) {
+              match = true;
+            }
+          });
+          return match;
+        });
+
+
+      }, json, this);
+
+    },
+
+    removeFilter: function (filter) {
+      this.filters.splice(this.filters.indexOf(filter), 1);
+      this.render();
     }
+
   });
 
   var caching = {

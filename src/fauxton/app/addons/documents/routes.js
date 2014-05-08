@@ -449,7 +449,7 @@ function(app, FauxtonAPI, Documents, Databases) {
   });
 
   var ChangesRouteObject = FauxtonAPI.RouteObject.extend({
-    layout: "with_tabs",
+    layout: "with_sidebar",
     selectedHeader: "Databases",
     crumbs: function () {
       return [
@@ -475,6 +475,8 @@ function(app, FauxtonAPI, Documents, Databases) {
       this.setView("#dashboard-content", new Documents.Views.Changes({
         model: this.database
       }));
+
+      this.setView("#sidebar-content", new Documents.Views.ChangesSidebar());
     },
 
     apiUrl: function() {

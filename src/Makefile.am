@@ -181,6 +181,7 @@ FAUXTON_FILES = \
     fauxton/app/addons/documents/templates/sidebar.html \
     fauxton/app/addons/documents/templates/upload_modal.html \
     fauxton/app/addons/documents/templates/view_editor.html \
+    fauxton/app/addons/documents/templates/changes_sidebar.html \
     fauxton/app/addons/documents/tests/resourcesSpec.js \
     fauxton/app/addons/fauxton/templates/api_bar.html \
     fauxton/app/addons/fauxton/templates/breadcrumbs.html \
