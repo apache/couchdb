@@ -361,13 +361,15 @@ table.databases {
     font-size: 12px
   }
   .navbar {
-     .js-burger {
+      .js-burger {
+        height: @collapsedNavWidth;
+        width: @navWidth;
+        z-index: 1;
         padding: 22px 0 0 18px;
         position: fixed;
         top: 0;
         background-color: @primaryNav;
-        width: @navWidth;
-        div{
+        div {
           height: 4px;
           width: 24px;
           .border-radius(2);
@@ -376,6 +378,11 @@ table.databases {
         }
         &:hover div{
           background-color: @orange;
+        }
+      }
+      .closeMenu & {
+        .js-burger {
+          width: @collapsedNavWidth;
         }
       }
       .bottom-container {
@@ -529,6 +536,7 @@ table.databases {
 
 
 #dashboard {
+  z-index: 2;
   max-width: 1500px;
   .box-shadow(-6px 0 rgba(0, 0, 0, 0.1));
   border-left: 1px solid #999;
