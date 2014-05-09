@@ -946,6 +946,9 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       });
       this.editor.render();
 
+      editor = this.editor;
+      model = this.model;
+
       this.listenTo(this.model, "sync", this.updateValues);
       this.listenTo(editor.editor, "change", function (event) {
         var changedDoc;
@@ -973,9 +976,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
           clear:  true
         });
       });
-
-      editor = this.editor;
-      model = this.model;
     },
 
     cleanup: function () {
