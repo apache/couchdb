@@ -235,7 +235,7 @@ function(app, FauxtonAPI, resizeColumns) {
     },
 
     beforeRender: function () {
-      this.insertView(".version", this.versionFooter);
+      this.insertView(".js-version", this.versionFooter);
       this.addLinkViews();
     },
 

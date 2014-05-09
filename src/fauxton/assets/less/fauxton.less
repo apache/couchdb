@@ -342,10 +342,15 @@ table.databases {
   bottom: 0;
   background-color: @primaryNav;
   overflow-y: scroll;
-  .version {
+  .js-version {
     color: #fff;
     font-size: 10px;
     padding-left: 10px;
+  }
+  .closeMenu & {
+    .js-version {
+      display: none;
+    }
   }
   #footer-links{
     position: absolute;
