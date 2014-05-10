@@ -333,15 +333,24 @@ table.databases {
   }
 }
 
+/* disable the scrollbar in the sidebar,
+   they look ugly in Linux and Windows
+   and are pressing the icons to the left */
+#primary-navbar::-webkit-scrollbar {
+  display: none;
+}
+#primary-navbar {
+  -ms-overflow-style: none;
+  overflow: hidden;
+}
+
 /* Fixed side navigation */
 #primary-navbar {
-  height: 100%;
   position: fixed;
   width: @navWidth;
   top: 0;
   bottom: 0;
   background-color: @primaryNav;
-  overflow-y: scroll;
   .js-version {
     color: #fff;
     font-size: 10px;
