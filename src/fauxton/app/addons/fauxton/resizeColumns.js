@@ -70,7 +70,7 @@ function(FauxtonAPI) {
         } else if (combinedWidth < smallWidthConstraint){
           panelWidth = smallWidthConstraint;
         } else if(combinedWidth > 1400){
-          panelWidth = 1400;
+          panelWidth = combinedWidth - parseInt($('#dashboard').css('border-left-width'), 10);
         }
 
         $(this.options.selectorElements).innerWidth(panelWidth);
