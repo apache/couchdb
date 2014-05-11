@@ -66,8 +66,13 @@ start_link(https) ->
         "false" ->
             [];
         "true" ->
+            FailIfNoPeerCert = case couch_config:get("ssl", "fail_if_no_peer_cert", "false") of
+            "false" -> false;
+            "true" -> true
+            end,
             [{depth, list_to_integer(couch_config:get("ssl",
                 "ssl_certificate_max_depth", "1"))},
+             {fail_if_no_peer_cert, FailIfNoPeerCert},
              {verify, verify_peer}] ++
             case couch_config:get("ssl", "verify_fun", nil) of
                 nil -> [];

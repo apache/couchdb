@@ -387,6 +387,17 @@ Secure Socket Level Options
       [ssl]
       verify_ssl_certificates = false
 
+  .. config:option:: fail_if_no_peer_cert :: Require presence of client certificate if certificate verification is enabled
+
+    Set to `true` to terminate the TLS/SSL handshake with a
+    `handshake_failure` alert message if the client does not send a
+    certificate. Only used if `verify_ssl_certificates` is `true`. If
+    set to `false` it will only fail if the client sends an invalid
+    certificate (an empty certificate is considered valid)::
+
+      [ssl]
+      fail_if_no_peer_cert = false
+
   .. config:option:: secure_renegotiate :: Enable secure renegotiation
 
     Set to `true` to reject renegotiation attempt that does not live up to RFC 5746::
