@@ -354,29 +354,27 @@ Delegations
 
 Replication documents can have a custom ``user_ctx`` property. This
 property defines the user context under which a replication runs. For
-the old way of triggering replications (POSTing to ``/_replicate/``),
-this property was not needed (it didn't exist in fact) - this is because
-at the moment of triggering the replication it has information about the
-authenticated user. With the replicator database, since it's a regular
-database, the information about the authenticated user is only present
-at the moment the replication document is written to the database - the
-replicator database implementation is like a ``_changes`` feed consumer
-(with ``?include_docs=true``) that reacts to what was written to the
-replicator database - in fact this feature could be implemented with an
-external script/program. This implementation detail implies that for non
-admin users, a ``user_ctx`` property, containing the user's name and a
-subset of their roles, must be defined in the replication document.
-This is ensured by the document update validation function present in
-the default design document of the replicator database. This validation
-function also ensure that a non admin user can set a user name property
-in the ``user_ctx`` property that doesn't match their own name (same
-principle applies for the roles).
+the old way of triggering a replication (POSTing to ``/_replicate/``),
+this property is not needed. That's because information about the
+authenticated user is readily available during the replication, which is
+not persistent in that case. Now, with the replicator database, the
+problem is that information about which user is starting a particular
+replication is only present when the replication document is written.
+The information in the replication document and the replication itself
+are persistent, however. This implementation detail implies that in the
+case of a non-admin user, a ``user_ctx`` property containing the user's
+name and a subset of their roles must be defined in the replication
+document. This is enforced by the document update validation function
+present in the default design document of the replicator database. The
+validation function also ensures that non-admin users are unable to set
+the value of the user context's ``name`` property to anything other than
+their own user name. The same principle applies for roles.
 
 For admins, the ``user_ctx`` property is optional, and if it's missing
-it defaults to a user context with name null and an empty list of roles
-- this mean design documents will not be written to local targets. If
-writing design documents to local targets is desired, the a user context
-with the roles ``_admin`` must be set explicitly.
+it defaults to a user context with name ``null`` and an empty list of
+roles, which means design documents won't be written to local targets.
+If writing design documents to local targets is desired, the role
+``_admin`` must be present in the user context's list of roles.
 
 Also, for admins the ``user_ctx`` property can be used to trigger a
 replication on behalf of another user. This is the user context that
@@ -400,6 +398,6 @@ Example delegated replication document:
          }
     }
 
-As stated before, for admins the ``user_ctx`` property is optional, while
-for regular (non admin) users it's mandatory. When the roles property of
-``user_ctx`` is missing, it defaults to the empty list ``[ ]``.
+As stated before, the ``user_ctx`` property is optional for admins, while
+being mandatory for regular (non-admin) users. When the roles property
+of ``user_ctx`` is missing, it defaults to the empty list ``[]``.
