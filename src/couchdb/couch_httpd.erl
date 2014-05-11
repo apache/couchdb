@@ -233,8 +233,6 @@ handle_request_int(MochiReq, DefaultFun,
     RawUri = MochiReq:get(raw_path),
     {"/" ++ Path, _, _} = mochiweb_util:urlsplit_path(RawUri),
 
-    Headers = MochiReq:get(headers),
-
     % get requested path
     RequestedPath = case MochiReq:get_header_value("x-couchdb-vhost-path") of
         undefined ->
