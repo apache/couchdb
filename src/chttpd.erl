@@ -249,7 +249,7 @@ handle_request(MochiReq) ->
         {aborted, Resp:get(code)}
     end,
     Host = MochiReq:get_header_value("Host"),
-    couch_log:notice("~s ~s ~s ~s ~B ~p ~B", [Peer, Host,
+    couch_log:notice("~s ~s ~s ~s ~s ~B ~p ~B", [get(nonce), Peer, Host,
         atom_to_list(Method1), RawUri, Code, Status, round(RequestTime)]),
     couch_stats_collector:record({couchdb, request_time}, RequestTime),
     case Result of
