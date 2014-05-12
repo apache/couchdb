@@ -54,8 +54,8 @@ main(_) ->
 
 test() ->
     test_util:start_couch(),
-    ibrowse:start(),
-    crypto:start(),
+    application:start(ibrowse),
+    application:start(crypto),
     config:set("attachments", "compressible_types", "text/*", false),
 
     Pairs = [

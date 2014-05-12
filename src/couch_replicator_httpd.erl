@@ -34,7 +34,7 @@ handle_req(#httpd{method = 'POST', user_ctx = UserCtx} = Req) ->
     case couch_replicator:replicate(RepDoc, UserCtx) of
     {error, {Error, Reason}} ->
         send_json(
-            Req, 404,
+            Req, 500,
             {[{error, to_binary(Error)}, {reason, to_binary(Reason)}]});
     {error, not_found} ->
         % Tried to cancel a replication that didn't exist.

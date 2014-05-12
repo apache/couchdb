@@ -72,6 +72,7 @@ replication_started(#rep{id = {BaseId, _} = RepId}) ->
     #rep_state{dbname = DbName, rep = #rep{doc_id = DocId}} ->
         update_rep_doc(DbName, DocId, [
             {<<"_replication_state">>, <<"triggered">>},
+            {<<"_replication_state_reason">>, undefined},
             {<<"_replication_id">>, ?l2b(BaseId)},
             {<<"_replication_stats">>, undefined}]),
         ok = gen_server:call(?MODULE, {rep_started, RepId}, infinity),
@@ -87,6 +88,7 @@ replication_completed(#rep{id = RepId}, Stats) ->
     #rep_state{dbname = DbName, rep = #rep{doc_id = DocId}} ->
         update_rep_doc(DbName, DocId, [
             {<<"_replication_state">>, <<"completed">>},
+            {<<"_replication_state_reason">>, undefined},
             {<<"_replication_stats">>, {Stats}}]),
         ok = gen_server:call(?MODULE, {rep_complete, RepId}, infinity),
         couch_log:notice("Replication `~s` finished (triggered by document `~s`)",
@@ -99,9 +101,9 @@ replication_error(#rep{id = {BaseId, _} = RepId}, Error) ->
     nil ->
         ok;
     #rep_state{dbname = DbName, rep = #rep{doc_id = DocId}} ->
-        % TODO: maybe add error reason to replication document
         update_rep_doc(DbName, DocId, [
             {<<"_replication_state">>, <<"error">>},
+            {<<"_replication_state_reason">>, to_binary(error_reason(Error))},
             {<<"_replication_id">>, ?l2b(BaseId)}]),
         ok = gen_server:call(?MODULE, {rep_error, RepId, Error}, infinity)
     end.
@@ -417,7 +419,8 @@ rep_db_update_error(Error, DbName, DocId) ->
     end,
     couch_log:error("Replication manager, error processing document `~s`: ~s",
         [DocId, Reason]),
-    update_rep_doc(DbName, DocId, [{<<"_replication_state">>, <<"error">>}]).
+    update_rep_doc(DbName, DocId, [{<<"_replication_state">>, <<"error">>},
+                           {<<"_replication_state_reason">>, Reason}]).
 
 
 rep_user_ctx({RepDoc}) ->
@@ -752,6 +755,9 @@ rep_state(RepId) ->
     end.
 
 
+error_reason({error, {Error, Reason}})
+  when is_atom(Error), is_binary(Reason) ->
+    io_lib:format("~s: ~s", [Error, Reason]);
 error_reason({error, Reason}) ->
     Reason;
 error_reason(Reason) ->
@@ -826,6 +832,9 @@ Body)),
         end
     end.
 
+
+strip_credentials(undefined) ->
+    undefined;
 strip_credentials(Url) when is_binary(Url) ->
     re:replace(Url,
         "http(s)?://(?:[^:]+):[^@]+@(.*)$",

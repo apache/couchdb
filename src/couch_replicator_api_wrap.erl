@@ -48,6 +48,10 @@
     get_value/3
     ]).
 
+-define(MAX_WAIT, 5 * 60 * 1000).
+
+-define(MAX_URL_LEN, 7000).
+-define(MIN_URL_LEN, 200).
 
 db_uri(#httpdb{url = Url}) ->
     couch_util:url_strip_password(Url);
@@ -157,48 +161,107 @@ get_missing_revs(Db, IdRevs) ->
 
 
 
+open_doc_revs(#httpdb{retries = 0} = HttpDb, Id, Revs, Options, _Fun, _Acc) ->
+    Path = encode_doc_id(Id),
+    QS = options_to_query_args(HttpDb, Path, [revs, {open_revs, Revs} | Options]),
+    Url = couch_util:url_strip_password(
+        couch_replicator_httpc:full_url(HttpDb, [{path,Path}, {qs,QS}])
+    ),
+    ?LOG_ERROR("Replication crashing because GET ~s failed", [Url]),
+    exit(kaboom);
 open_doc_revs(#httpdb{} = HttpDb, Id, Revs, Options, Fun, Acc) ->
     Path = encode_doc_id(Id),
-    QArgs = options_to_query_args(
-        HttpDb, Path, [revs, {open_revs, Revs} | Options]),
-    Self = self(),
-    Streamer = spawn_link(fun() ->
-            send_req(
-                HttpDb,
-                [{path, Path}, {qs, QArgs},
-                    {ibrowse_options, [{stream_to, {self(), once}}]},
-                    {headers, [{"Accept", "multipart/mixed"}]}],
-                fun(200, Headers, StreamDataFun) ->
-                    remote_open_doc_revs_streamer_start(Self),
-                    {<<"--">>, _, _} = couch_httpd:parse_multipart_request(
-                        get_value("Content-Type", Headers),
-                        StreamDataFun,
-                        fun mp_parse_mixed/1)
-                end),
-            unlink(Self)
+    QS = options_to_query_args(HttpDb, Path, [revs, {open_revs, Revs} | Options]),
+    {Pid, Ref} = spawn_monitor(fun() ->
+        Self = self(),
+        Callback = fun
+          (200, Headers, StreamDataFun) ->
+            remote_open_doc_revs_streamer_start(Self),
+            {<<"--">>, _, _} = couch_httpd:parse_multipart_request(
+                get_value("Content-Type", Headers),
+                StreamDataFun,
+                fun mp_parse_mixed/1
+            );
+          (414, _, _) ->
+            exit(request_uri_too_long)
+        end,
+        Streamer = spawn_link(fun() ->
+            Params = [
+                {path, Path},
+                {qs, QS},
+                {ibrowse_options, [{stream_to, {self(), once}}]},
+                {headers, [{"Accept", "multipart/mixed"}]}
+            ],
+            % We're setting retries to 0 here to avoid the case where the
+            % Streamer retries the request and ends up jumbling together two
+            % different response bodies.  Retries are handled explicitly by
+            % open_doc_revs itself.
+            send_req(HttpDb#httpdb{retries = 0}, Params, Callback)
         end),
-    % If this process dies normally we can leave
-    % the Streamer process hanging around keeping an
-    % HTTP connection open. This is a bit of a
-    % hammer approach to making sure it releases
-    % that connection back to the pool.
-    spawn(fun() ->
-        Ref = erlang:monitor(process, Self),
+        % If this process dies normally we can leave
+        % the Streamer process hanging around keeping an
+        % HTTP connection open. This is a bit of a
+        % hammer approach to making sure it releases
+        % that connection back to the pool.
+        spawn(fun() ->
+            Ref = erlang:monitor(process, Self),
+            receive
+                {'DOWN', Ref, process, Self, normal} ->
+                    exit(Streamer, {streamer_parent_died, Self});
+                {'DOWN', Ref, process, Self, _} ->
+                    ok
+                end
+        end),
         receive
-            {'DOWN', Ref, process, Self, normal} ->
-                exit(Streamer, {streamer_parent_died, Self});
-            {'DOWN', Ref, process, Self, _} ->
-                ok
-            end
+        {started_open_doc_revs, Ref} ->
+            Ret = receive_docs_loop(Streamer, Fun, Id, Revs, Ref, Acc),
+            exit({exit_ok, Ret})
+        end
     end),
     receive
-    {started_open_doc_revs, Ref} ->
-        receive_docs_loop(Streamer, Fun, Id, Revs, Ref, Acc)
+        {'DOWN', Ref, process, Pid, {exit_ok, Ret}} ->
+            Ret;
+        {'DOWN', Ref, process, Pid, {{nocatch, {missing_stub,_} = Stub}, _}} ->
+            throw(Stub);
+        {'DOWN', Ref, process, Pid, request_uri_too_long} ->
+            NewMaxLen = get_value(max_url_len, Options, ?MAX_URL_LEN) div 2,
+            case NewMaxLen < ?MIN_URL_LEN of
+                true ->
+                    throw(request_uri_too_long);
+                false ->
+                    ?LOG_INFO("Reducing url length to ~B because of 414 response", [NewMaxLen]),
+                    Options1 = lists:keystore(max_url_len, 1, Options,
+                                              {max_url_len, NewMaxLen}),
+                    open_doc_revs(HttpDb, Id, Revs, Options1, Fun, Acc)
+            end;
+        {'DOWN', Ref, process, Pid, Else} ->
+            Url = couch_util:url_strip_password(
+                couch_replicator_httpc:full_url(HttpDb, [{path,Path}, {qs,QS}])
+            ),
+            #httpdb{retries = Retries, wait = Wait0} = HttpDb,
+            Wait = 2 * erlang:min(Wait0 * 2, ?MAX_WAIT),
+            ?LOG_INFO("Retrying GET to ~s in ~p seconds due to error ~p",
+                [Url, Wait / 1000, error_reason(Else)]
+            ),
+            ok = timer:sleep(Wait),
+            RetryDb = HttpDb#httpdb{
+                retries = Retries - 1,
+                wait = Wait
+            },
+            open_doc_revs(RetryDb, Id, Revs, Options, Fun, Acc)
     end;
 open_doc_revs(Db, Id, Revs, Options, Fun, Acc) ->
     {ok, Results} = couch_db:open_doc_revs(Db, Id, Revs, Options),
     {ok, lists:foldl(fun(R, A) -> {_, A2} = Fun(R, A), A2 end, Acc, Results)}.
 
+error_reason({http_request_failed, "GET", _Url, {error, timeout}}) ->
+    timeout;
+error_reason({http_request_failed, "GET", _Url, {error, {_, req_timedout}}}) ->
+    req_timedout;
+error_reason({http_request_failed, "GET", _Url, Error}) ->
+    Error;
+error_reason(Else) ->
+    Else.
 
 open_doc(#httpdb{} = Db, Id, Options) ->
     send_req(
@@ -242,7 +305,11 @@ update_doc(#httpdb{} = HttpDb, #doc{id = DocId} = Doc, Options, Type) ->
     end ++ [{"Content-Type", ?b2l(ContentType)}, {"Content-Length", Len}],
     Body = {fun stream_doc/1, {JsonBytes, Doc#doc.atts, Boundary, Len}},
     send_req(
-        HttpDb,
+        % A crash here bubbles all the way back up to run_user_fun inside
+        % open_doc_revs, which will retry the whole thing.  That's the
+        % appropriate course of action, since we've already started streaming
+        % the response body from the GET request.
+        HttpDb#httpdb{retries = 0},
         [{method, put}, {path, encode_doc_id(DocId)},
             {qs, QArgs}, {headers, Headers}, {body, Body}],
         fun(Code, _, {Props}) when Code =:= 200 orelse Code =:= 201 orelse Code =:= 202 ->
@@ -451,7 +518,11 @@ changes_json_req(Db, FilterName, {QueryParams}, _Options) ->
     ]}.
 
 
-options_to_query_args(HttpDb, Path, Options) ->
+options_to_query_args(HttpDb, Path, Options0) ->
+    case lists:keytake(max_url_len, 1, Options0) of
+        false -> MaxLen = ?MAX_URL_LEN, Options = Options0;
+        {value, {max_url_len, MaxLen}, Options} -> ok
+    end,
     case lists:keytake(atts_since, 1, Options) of
     false ->
         options_to_query_args(Options, []);
@@ -464,7 +535,7 @@ options_to_query_args(HttpDb, Path, Options) ->
         RevList = atts_since_arg(
             length("GET " ++ FullUrl ++ " HTTP/1.1\r\n") +
             length("&atts_since=") + 6,  % +6 = % encoded [ and ]
-            PAs, []),
+            PAs, MaxLen, []),
         [{"atts_since", ?JSON_ENCODE(RevList)} | QueryArgs1]
     end.
 
@@ -485,12 +556,9 @@ options_to_query_args([{open_revs, Revs} | Rest], Acc) ->
     JsonRevs = ?b2l(iolist_to_binary(?JSON_ENCODE(couch_doc:revs_to_strs(Revs)))),
     options_to_query_args(Rest, [{"open_revs", JsonRevs} | Acc]).
 
-
--define(MAX_URL_LEN, 7000).
-
-atts_since_arg(_UrlLen, [], Acc) ->
+atts_since_arg(_UrlLen, [], _MaxLen, Acc) ->
     lists:reverse(Acc);
-atts_since_arg(UrlLen, [PA | Rest], Acc) ->
+atts_since_arg(UrlLen, [PA | Rest], MaxLen, Acc) ->
     RevStr = couch_doc:rev_to_str(PA),
     NewUrlLen = case Rest of
     [] ->
@@ -500,11 +568,11 @@ atts_since_arg(UrlLen, [PA | Rest], Acc) ->
         % plus 2 double quotes and a comma (% encoded)
         UrlLen + size(RevStr) + 9
     end,
-    case NewUrlLen >= ?MAX_URL_LEN of
+    case NewUrlLen >= MaxLen of
     true ->
         lists:reverse(Acc);
     false ->
-        atts_since_arg(NewUrlLen, Rest, [RevStr | Acc])
+        atts_since_arg(NewUrlLen, Rest, MaxLen, [RevStr | Acc])
     end.
 
 
@@ -535,7 +603,7 @@ receive_docs(Streamer, UserFun, Ref, UserAcc) ->
                 fun() -> receive_doc_data(Streamer, Ref) end,
                 Ref) of
             {ok, Doc, WaitFun, Parser} ->
-                case UserFun({ok, Doc}, UserAcc) of
+                case run_user_fun(UserFun, {ok, Doc}, UserAcc, Ref) of
                 {ok, UserAcc2} ->
                     ok;
                 {skip, UserAcc2} ->
@@ -547,17 +615,47 @@ receive_docs(Streamer, UserFun, Ref, UserAcc) ->
         {"application/json", []} ->
             Doc = couch_doc:from_json_obj(
                     ?JSON_DECODE(receive_all(Streamer, Ref, []))),
-            {_, UserAcc2} = UserFun({ok, Doc}, UserAcc),
+            {_, UserAcc2} = run_user_fun(UserFun, {ok, Doc}, UserAcc, Ref),
             receive_docs(Streamer, UserFun, Ref, UserAcc2);
         {"application/json", [{"error","true"}]} ->
             {ErrorProps} = ?JSON_DECODE(receive_all(Streamer, Ref, [])),
             Rev = get_value(<<"missing">>, ErrorProps),
             Result = {{not_found, missing}, couch_doc:parse_rev(Rev)},
-            {_, UserAcc2} = UserFun(Result, UserAcc),
+            {_, UserAcc2} = run_user_fun(UserFun, Result, UserAcc, Ref),
             receive_docs(Streamer, UserFun, Ref, UserAcc2)
         end;
     {done, Ref} ->
         {ok, UserAcc}
+    end.
+
+
+run_user_fun(UserFun, Arg, UserAcc, OldRef) ->
+    {Pid, Ref} = spawn_monitor(fun() ->
+        try UserFun(Arg, UserAcc) of
+            Resp ->
+                exit({exit_ok, Resp})
+        catch
+            throw:Reason ->
+                exit({exit_throw, Reason});
+            error:Reason ->
+                exit({exit_error, Reason});
+            exit:Reason ->
+                exit({exit_exit, Reason})
+        end
+    end),
+    receive
+        {started_open_doc_revs, NewRef} ->
+            erlang:demonitor(Ref, [flush]),
+            exit(Pid, kill),
+            restart_remote_open_doc_revs(OldRef, NewRef);
+        {'DOWN', Ref, process, Pid, {exit_ok, Ret}} ->
+            Ret;
+        {'DOWN', Ref, process, Pid, {exit_throw, Reason}} ->
+            throw(Reason);
+        {'DOWN', Ref, process, Pid, {exit_error, Reason}} ->
+            erlang:error(Reason);
+        {'DOWN', Ref, process, Pid, {exit_exit, Reason}} ->
+            erlang:exit(Reason)
     end.
 
 
@@ -629,43 +727,6 @@ receive_doc_data(Streamer, Ref) ->
         {Bytes, fun() -> receive_doc_data(Streamer, Ref) end};
     {body_done, Ref} ->
         {<<>>, fun() -> receive_doc_data(Streamer, Ref) end}
-    end.
-
-doc_from_multi_part_stream(ContentType, DataFun, Ref) ->
-    Self = self(),
-    Parser = spawn_link(fun() ->
-        {<<"--">>, _, _} = couch_httpd:parse_multipart_request(
-            ContentType, DataFun,
-            fun(Next) -> couch_replicator_utils:mp_parse_doc(Next, []) end),
-        unlink(Self)
-        end),
-    Parser ! {get_doc_bytes, Ref, self()},
-    receive
-    {started_open_doc_revs, NewRef} ->
-        unlink(Parser),
-        exit(Parser, kill),
-        restart_remote_open_doc_revs(Ref, NewRef);
-    {doc_bytes, Ref, DocBytes} ->
-        Doc = couch_doc:from_json_obj(?JSON_DECODE(DocBytes)),
-        ReadAttachmentDataFun = fun() ->
-            Parser ! {get_bytes, Ref, self()},
-            receive
-            {started_open_doc_revs, NewRef} ->
-                unlink(Parser),
-                exit(Parser, kill),
-                receive {bytes, Ref, _} -> ok after 0 -> ok end,
-                restart_remote_open_doc_revs(Ref, NewRef);
-            {bytes, Ref, Bytes} ->
-                Bytes
-            end
-        end,
-        Atts2 = lists:map(
-            fun(#att{data = follows} = A) ->
-                A#att{data = ReadAttachmentDataFun};
-            (A) ->
-                A
-            end, Doc#doc.atts),
-        {ok, Doc#doc{atts = Atts2}, Parser}
     end.
 
 
@@ -769,6 +830,12 @@ rev_to_str({_Pos, _Id} = Rev) ->
 rev_to_str(Rev) ->
     Rev.
 
+write_fun() ->
+    fun(Data) ->
+        receive {get_data, Ref, From} ->
+            From ! {data, Ref, Data}
+        end
+    end.
 
 stream_doc({JsonBytes, Atts, Boundary, Len}) ->
     case erlang:erase({doc_streamer, Boundary}) of
@@ -778,17 +845,11 @@ stream_doc({JsonBytes, Atts, Boundary, Len}) ->
     _ ->
         ok
     end,
-    Self = self(),
-    DocStreamer = spawn_link(fun() ->
-        couch_doc:doc_to_multi_part_stream(
-            Boundary, JsonBytes, Atts,
-            fun(Data) ->
-                receive {get_data, Ref, From} ->
-                    From ! {data, Ref, Data}
-                end
-            end, true),
-        unlink(Self)
-    end),
+    DocStreamer = spawn_link(
+        couch_doc,
+        doc_to_multi_part_stream,
+        [Boundary, JsonBytes, Atts, write_fun(), true]
+    ),
     erlang:put({doc_streamer, Boundary}, DocStreamer),
     {ok, <<>>, {Len, Boundary}};
 stream_doc({0, Id}) ->
