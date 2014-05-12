@@ -36,7 +36,6 @@
         kernel,
         stdlib,
         couch_log,
-        fabric,
         mem3,
         couch
     ]}
