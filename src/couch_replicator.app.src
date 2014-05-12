@@ -35,7 +35,7 @@
     {applications, [
         kernel,
         stdlib,
-        twig,
+        couch_log,
         fabric,
         mem3,
         couch

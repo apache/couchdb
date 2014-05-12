@@ -75,7 +75,7 @@ replication_started(#rep{id = {BaseId, _} = RepId}) ->
             {<<"_replication_id">>, ?l2b(BaseId)},
             {<<"_replication_stats">>, undefined}]),
         ok = gen_server:call(?MODULE, {rep_started, RepId}, infinity),
-        twig:log(notice, "Document `~s` triggered replication `~s`",
+        couch_log:notice("Document `~s` triggered replication `~s`",
             [DocId, pp_rep_id(RepId)])
     end.
 
@@ -89,7 +89,7 @@ replication_completed(#rep{id = RepId}, Stats) ->
             {<<"_replication_state">>, <<"completed">>},
             {<<"_replication_stats">>, {Stats}}]),
         ok = gen_server:call(?MODULE, {rep_complete, RepId}, infinity),
-        twig:log(notice, "Replication `~s` finished (triggered by document `~s`)",
+        couch_log:notice("Replication `~s` finished (triggered by document `~s`)",
             [pp_rep_id(RepId), DocId])
     end.
 
@@ -179,7 +179,7 @@ handle_call({resume_scan, DbName}, _From, State) ->
         [{DbName, EndSeq}] -> EndSeq
     end,
     Pid = changes_feed_loop(DbName, Since),
-    twig:log(debug, "Scanning ~s from update_seq ~p", [DbName, Since]),
+    couch_log:debug("Scanning ~s from update_seq ~p", [DbName, Since]),
     {reply, ok, State#state{rep_start_pids = [Pid | State#state.rep_start_pids]}};
 
 handle_call({rep_db_checkpoint, DbName, EndSeq}, _From, State) ->
@@ -190,7 +190,7 @@ handle_call(rep_db_changed, _From, State) ->
     {stop, shutdown, ok, State};
 
 handle_call(Msg, From, State) ->
-    twig:log(error, "Replication manager received unexpected call ~p from ~p",
+    couch_log:error("Replication manager received unexpected call ~p from ~p",
         [Msg, From]),
     {stop, {error, {unexpected_call, Msg}}, State}.
 
@@ -198,7 +198,7 @@ handle_cast({set_max_retries, MaxRetries}, State) ->
     {noreply, State#state{max_retries = MaxRetries}};
 
 handle_cast(Msg, State) ->
-    twig:log(error, "Replication manager received unexpected cast ~p", [Msg]),
+    couch_log:error("Replication manager received unexpected cast ~p", [Msg]),
     {stop, {error, {unexpected_cast, Msg}}, State}.
 
 handle_info({nodeup, _Node}, State) ->
@@ -208,15 +208,15 @@ handle_info({nodedown, _Node}, State) ->
     {noreply, rescan(State)};
 
 handle_info({'EXIT', From, normal}, #state{scan_pid = From} = State) ->
-    twig:log(debug, "Background scan has completed.", []),
+    couch_log:debug("Background scan has completed.", []),
     {noreply, State#state{scan_pid=nil}};
 
 handle_info({'EXIT', From, Reason}, #state{scan_pid = From} = State) ->
-    twig:log(error, "Background scanner died. Reason: ~p", [Reason]),
+    couch_log:error("Background scanner died. Reason: ~p", [Reason]),
     {stop, {scanner_died, Reason}, State};
 
 handle_info({'EXIT', From, Reason}, #state{db_notifier = From} = State) ->
-    twig:log(error, "Database update notifier died. Reason: ~p", [Reason]),
+    couch_log:error("Database update notifier died. Reason: ~p", [Reason]),
     {stop, {db_update_notifier_died, Reason}, State};
 
 handle_info({'EXIT', From, normal}, #state{rep_start_pids = Pids} = State) ->
@@ -239,7 +239,7 @@ handle_info(shutdown, State) ->
     {stop, shutdown, State};
 
 handle_info(Msg, State) ->
-    twig:log(error,"Replication manager received unexpected message ~p", [Msg]),
+    couch_log:error("Replication manager received unexpected message ~p", [Msg]),
     {stop, {unexpected_msg, Msg}, State}.
 
 
@@ -415,7 +415,7 @@ rep_db_update_error(Error, DbName, DocId) ->
     _ ->
         Reason = to_binary(Error)
     end,
-    twig:log(error,"Replication manager, error processing document `~s`: ~s",
+    couch_log:error("Replication manager, error processing document `~s`: ~s",
         [DocId, Reason]),
     update_rep_doc(DbName, DocId, [{<<"_replication_state">>, <<"error">>}]).
 
@@ -445,19 +445,19 @@ maybe_start_replication(State, DbName, DocId, RepDoc) ->
         },
         true = ets:insert(?REP_TO_STATE, {RepId, RepState}),
         true = ets:insert(?DOC_TO_REP, {{DbName, DocId}, RepId}),
-        twig:log(notice,"Attempting to start replication `~s` (document `~s`).",
+        couch_log:notice("Attempting to start replication `~s` (document `~s`).",
             [pp_rep_id(RepId), DocId]),
         Pid = spawn_link(fun() -> start_replication(Rep, 0) end),
         State#state{rep_start_pids = [Pid | State#state.rep_start_pids]};
     #rep_state{rep = #rep{doc_id = DocId}} ->
         State;
     #rep_state{starting = false, dbname = DbName, rep = #rep{doc_id = OtherDocId}} ->
-        twig:log(notice, "The replication specified by the document `~s` was already"
+        couch_log:notice("The replication specified by the document `~s` was already"
             " triggered by the document `~s`", [DocId, OtherDocId]),
         maybe_tag_rep_doc(DbName, DocId, RepDoc, ?l2b(BaseId)),
         State;
     #rep_state{starting = true, dbname = DbName, rep = #rep{doc_id = OtherDocId}} ->
-        twig:log(notice, "The replication specified by the document `~s` is already"
+        couch_log:notice("The replication specified by the document `~s` is already"
             " being triggered by the document `~s`", [DocId, OtherDocId]),
         maybe_tag_rep_doc(DbName, DocId, RepDoc, ?l2b(BaseId)),
         State
@@ -527,7 +527,7 @@ rep_doc_deleted(DbName, DocId) ->
         couch_replicator:cancel_replication(RepId),
         true = ets:delete(?REP_TO_STATE, RepId),
         true = ets:delete(?DOC_TO_REP, {DbName, DocId}),
-        twig:log(notice, "Stopped replication `~s` because replication document `~s`"
+        couch_log:notice("Stopped replication `~s` because replication document `~s`"
             " was deleted", [pp_rep_id(RepId), DocId]);
     [] ->
         ok
@@ -551,7 +551,7 @@ maybe_retry_replication(#rep_state{retries_left = 0} = RepState, Error, State) -
     couch_replicator:cancel_replication(RepId),
     true = ets:delete(?REP_TO_STATE, RepId),
     true = ets:delete(?DOC_TO_REP, {DbName, DocId}),
-    twig:log(error, "Error in replication `~s` (triggered by document `~s`): ~s"
+    couch_log:error("Error in replication `~s` (triggered by document `~s`): ~s"
         "~nReached maximum retry attempts (~p).",
         [pp_rep_id(RepId), DocId, to_binary(error_reason(Error)), MaxRetries]),
     State;
@@ -562,7 +562,7 @@ maybe_retry_replication(RepState, Error, State) ->
     } = RepState,
     #rep_state{wait = Wait} = NewRepState = state_after_error(RepState),
     true = ets:insert(?REP_TO_STATE, {RepId, NewRepState}),
-    twig:log(error, "Error in replication `~s` (triggered by document `~s`): ~s"
+    couch_log:error("Error in replication `~s` (triggered by document `~s`): ~s"
         "~nRestarting replication in ~p seconds.",
         [pp_rep_id(RepId), DocId, to_binary(error_reason(Error)), Wait]),
     Pid = spawn_link(fun() -> start_replication(Rep, Wait) end),
@@ -570,7 +570,7 @@ maybe_retry_replication(RepState, Error, State) ->
 
 
 stop_all_replications() ->
-    twig:log(notice, "Stopping all ongoing replications because the replicator"
+    couch_log:notice("Stopping all ongoing replications because the replicator"
         " database was deleted or changed", []),
     ets:foldl(
         fun({_, RepId}, _) ->
@@ -605,7 +605,7 @@ update_rep_doc(RepDbName, RepDocId, KVs) when is_binary(RepDocId) ->
     catch
         throw:conflict ->
             Msg = "Conflict when updating replication document `~s`. Retrying.",
-            twig:log(error, Msg, [RepDocId]),
+            couch_log:error(Msg, [RepDocId]),
             ok = timer:sleep(5),
             update_rep_doc(RepDbName, RepDocId, KVs)
     end;
