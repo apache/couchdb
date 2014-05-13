@@ -22,7 +22,7 @@ define([
   "api",
 
   // Modules
-  "addons/pouchdb/pouchdb.mapreduce.js"
+  "addons/pouchdb/pouchdb.mapreduce"
 ],
 
 function(app, FauxtonAPI, MapReduce) {

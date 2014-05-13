@@ -152,6 +152,7 @@ FAUXTON_FILES = \
     fauxton/app/addons/documents/resources.js \
     fauxton/app/addons/documents/routes.js \
     fauxton/app/addons/documents/tests/resourcesSpec.js \
+    fauxton/app/addons/documents/tests/viewsSpec.js \
     fauxton/app/addons/documents/views.js \
     fauxton/app/addons/fauxton/base.js \
     fauxton/app/addons/fauxton/components.js \

@@ -21,7 +21,7 @@ define([
   "api",
 
   // Modules
-  "addons/pouchdb/pouch.collate.js"
+  "addons/pouchdb/pouch.collate"
 ],
 
 function(app, FauxtonAPI, Collate) {

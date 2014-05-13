@@ -29,7 +29,7 @@ define([
   "api",
 
   // Modules
-  "addons/pouchdb/pouch.collate.js"
+  "addons/pouchdb/pouch.collate"
 ],
 
 function(app, FauxtonAPI, Collate) {
@@ -90,7 +90,7 @@ function(app, FauxtonAPI, Collate) {
           id: current.doc._id,
           key: key,
           value: val
-        }; 
+        };
         //console.log("VIEW ROW: ", viewRow);
 
         if (options.startkey && Pouch.collate(key, options.startkey) < 0) return;
