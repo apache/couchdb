@@ -29,7 +29,7 @@ DepDescs = [
     {fabric, "couchdb-fabric", {branch,  "master"}},
     {ibrowse, "couchdb-ibrowse", {tag,  "CouchDB-1.1.0"}},
     {jiffy, "couchdb-jiffy", {branch, "master"}},
-    {mem3, "couchdb-mem3", {branch, "1843-feature-bigcouch"}},
+    {mem3, "couchdb-mem3", {branch, "master"}},
     {mochiweb, "couchdb-mochiweb", {branch, "master"}},
     {oauth, "couchdb-oauth", {branch, "1843-feature-bigcouch"}},
     {rexi, "couchdb-rexi", {branch, "master"}},
