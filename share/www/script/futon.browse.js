@@ -131,7 +131,7 @@
       var urlParts = location.search.substr(1).split("/");
       var dbName = decodeURIComponent(urlParts.shift())
 
-      var dbNameRegExp = new RegExp("[^a-z0-9\_\$\(\)\+\/\-]", "g");
+      var dbNameRegExp = new RegExp("[^a-z0-9.\_\$\(\)\+\/\-]", "g");
       dbName = dbName.replace(dbNameRegExp, "");
 
       $.futon.storage.declareWithPrefix(dbName + ".", {
