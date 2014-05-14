@@ -23,7 +23,7 @@ DepDescs = [
     {couch, "couchdb-couch", {branch, "master"}},
     {couch_index, "couchdb-couch-index", {branch, "1843-feature-bigcouch"}},
     {couch_mrview, "couchdb-couch-mrview", {branch, "master"}},
-    {couch_replicator, "couchdb-couch-replicator", {branch,  "1843-feature-bigcouch"}},
+    {couch_replicator, "couchdb-couch-replicator", {branch,  "master"}},
     {ddoc_cache, "couchdb-ddoc-cache", {branch, "1843-feature-bigcouch"}},
     {ets_lru, "couchdb-ets-lru", {branch, "1843-feature-bigcouch"}},
     {fabric, "couchdb-fabric", {branch,  "master"}},
