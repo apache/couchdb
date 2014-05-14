@@ -21,7 +21,7 @@ DepDescs = [
     {config, "couchdb-config", {branch, "master"}},
     {chttpd, "couchdb-chttpd", {branch, "master"}},
     {couch, "couchdb-couch", {branch, "master"}},
-    {couch_index, "couchdb-couch-index", {branch, "1843-feature-bigcouch"}},
+    {couch_index, "couchdb-couch-index", {branch, "master"}},
     {couch_mrview, "couchdb-couch-mrview", {branch, "master"}},
     {couch_replicator, "couchdb-couch-replicator", {branch,  "master"}},
     {ddoc_cache, "couchdb-ddoc-cache", {branch, "1843-feature-bigcouch"}},
