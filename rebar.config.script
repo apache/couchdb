@@ -25,7 +25,7 @@ DepDescs = [
     {couch_mrview, "couchdb-couch-mrview", {branch, "master"}},
     {couch_replicator, "couchdb-couch-replicator", {branch,  "master"}},
     {ddoc_cache, "couchdb-ddoc-cache", {branch, "master"}},
-    {ets_lru, "couchdb-ets-lru", {branch, "1843-feature-bigcouch"}},
+    {ets_lru, "couchdb-ets-lru", {branch, "master"}},
     {fabric, "couchdb-fabric", {branch,  "master"}},
     {ibrowse, "couchdb-ibrowse", {tag,  "CouchDB-1.1.0"}},
     {jiffy, "couchdb-jiffy", {branch, "master"}},
