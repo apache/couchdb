@@ -17,7 +17,8 @@
 %% API
 -export([start_link/1, stop/1, get_state/2, get_info/1]).
 -export([trigger_update/2]).
--export([compact/1, compact/2]).
+-export([compact/1, compact/2, get_compactor_pid/1]).
+-export([config_change/3]).
 
 %% gen_server callbacks
 -export([init/1, terminate/2, code_change/3]).
@@ -72,6 +73,13 @@ compact(Pid, Options) ->
         true -> {ok, erlang:monitor(process, CPid)};
         false -> ok
     end.
+
+
+get_compactor_pid(Pid) ->
+    gen_server:call(Pid, get_compactor_pid).
+
+config_change("query_server_config", "commit_freq", NewValue) ->
+    ok = gen_server:cast(?MODULE, {config_update, NewValue}).
 
 
 init({Mod, IdxState}) ->

@@ -19,10 +19,7 @@
 
 
 root_dir() ->
-    case config:get("couchdb", "index_dir") of
-        undefined -> config:get("couchdb", "view_index_dir");
-        Value -> Value
-    end.
+  config:get("couchdb", "view_index_dir").
 
 
 index_dir(Module, DbName) when is_binary(DbName) ->
