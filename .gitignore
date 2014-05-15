@@ -129,6 +129,7 @@ stamp-h1
 test/.deps/
 test/bench/run
 test/couchdb/run
+test/couchdb/couch_eunit.hrl
 test/etap/.deps/
 test/etap/run
 test/etap/temp.*
