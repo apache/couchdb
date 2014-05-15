@@ -67,3 +67,6 @@ nodes DB. For example, executing\n\
 will cause node 1 to immediately connect to nodes 2 and 3 and form a cluster.\n\
 The content of the nodes database is continuously replicated throughout the\n\
 cluster, so this is a one-time operation.\n"
+
+docker:
+	@docker build --no-cache --rm -t couchdb/1843-feature-bigcouch .
