@@ -168,6 +168,8 @@
 ^test/Makefile.in
 ^test/bench/Makefile
 ^test/bench/Makefile.in
+^test/couchdb/Makefile
+^test/couchdb/Makefile.in
 ^test/etap/.*.beam
 ^test/etap/.*.o
 ^test/etap/.deps/.*
