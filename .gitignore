@@ -128,6 +128,7 @@ src/snappy/snappy.app
 stamp-h1
 test/.deps/
 test/couchdb/run
+test/couchdb/include/couch_eunit.hrl
 test/etap/.deps/
 test/etap/run
 test/etap/temp.*

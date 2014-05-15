@@ -17,8 +17,13 @@ all:
 	mkdir -p temp/
 	chmod +x run
 
+eunit_files = \
+    include/couch_eunit.hrl
+
 EXTRA_DIST = \
-    run.in
+    run.in \
+    eunit.ini \
+    $(eunit_files)
 
 clean-local:
 	rm -rf ebin/

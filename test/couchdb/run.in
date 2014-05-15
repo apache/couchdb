@@ -15,6 +15,7 @@
 %% the License.
 
 -define(BUILDDIR, "@abs_top_builddir@").
+-define(SOURCEDIR, "@abs_top_srcdir@").
 -define(TESTS_EBIN, filename:join([?BUILDDIR, "test", "couchdb", "ebin"])).
 -define(TESTS_TEMP, filename:join([?BUILDDIR, "test", "couchdb", "temp"])).
 
@@ -77,7 +78,10 @@ compile(Files) ->
     lists:map(
         fun(File)->
             io:fwrite("compile ~p~n", [File]),
-            Opts = [report, verbose, {outdir, ?TESTS_EBIN}],
+            Opts = [report, verbose, {outdir, ?TESTS_EBIN},
+                    {i, filename:join([?BUILDDIR, "test", "couchdb",
+                                       "include"])},
+                    {i, filename:join([?SOURCEDIR, "src"])}],
             {ok, Mod} = compile:file(File, Opts),
             Mod
         end,
