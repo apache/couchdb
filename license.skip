@@ -164,6 +164,8 @@
 ^stamp-h1
 ^test/Makefile
 ^test/Makefile.in
+^test/couchdb/Makefile
+^test/couchdb/Makefile.in
 ^test/etap/.*.beam
 ^test/etap/.*.o
 ^test/etap/.deps/.*

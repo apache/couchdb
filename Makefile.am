@@ -92,6 +92,11 @@ if TESTS
 	$(top_builddir)/test/etap/run $(top_srcdir)/test/etap
 endif
 
+check-eunit: dev
+if TESTS
+	$(top_builddir)/test/couchdb/run -v $(top_srcdir)/test/couchdb
+endif
+
 cover: dev
 if TESTS
 	rm -f cover/*.coverdata

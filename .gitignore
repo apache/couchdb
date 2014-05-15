@@ -127,8 +127,8 @@ src/snappy/priv
 src/snappy/snappy.app
 stamp-h1
 test/.deps/
+test/couchdb/run
 test/etap/.deps/
-test/etap/run
 test/etap/run
 test/etap/temp.*
 test/etap/test_cfg_register
