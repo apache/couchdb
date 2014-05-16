@@ -13,7 +13,7 @@
 -module(couch_query_servers).
 
 -export([try_compile/4]).
--export([start_doc_map/3, map_docs/2, stop_doc_map/1, raw_to_ejson/1]).
+-export([start_doc_map/3, map_docs/2, map_doc_raw/2, stop_doc_map/1, raw_to_ejson/1]).
 -export([reduce/3, rereduce/3,validate_doc_update/5]).
 -export([filter_docs/5]).
 -export([filter_view/3]).
