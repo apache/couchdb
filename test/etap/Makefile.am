@@ -36,8 +36,6 @@ fixture_files = \
     fixtures/test.couch
 
 tap_files = \
-    020-btree-basics.t \
-    021-btree-reductions.t \
     030-doc-from-json.t \
     031-doc-to-json.t \
     040-util.t \
