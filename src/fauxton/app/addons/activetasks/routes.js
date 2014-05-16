@@ -41,15 +41,19 @@ function (app, FauxtonAPI, Activetasks, Views) {
 
     initialize: function () {
       this.allTasks = new Activetasks.AllTasks();
+      this.search = new Activetasks.Search();
     },
 
     defaultView: function () {
       this.setView("#dashboard-content", new Views.View({
         collection: this.allTasks,
-        currentView: "all"
+        currentView: "all",
+        searchModel: this.search
       }));
 
-      this.setView("#sidebar-content", new Views.TabMenu({}));
+      this.setView("#sidebar-content", new Views.TabMenu({
+        searchModel: this.search
+      }));
     }
   });
 

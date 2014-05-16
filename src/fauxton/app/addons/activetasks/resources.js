@@ -63,6 +63,10 @@ function (app, Fauxton) {
     }
   });
 
+  Active.Search = Backbone.Model.extend({
+    filterDatabase: null,
+    filterType: "all"
+  });
 
   return Active;
 });

@@ -19,10 +19,13 @@ define([
       ViewSandbox = testUtils.ViewSandbox;
 
   describe("TabMenu", function () {
-    var tabMenu;
+    var tabMenu, searchModel;
 
     beforeEach(function () {
-      tabMenu = new Views.TabMenu({});
+      searchModel = new Activetasks.Search();
+      tabMenu = new Views.TabMenu({
+        searchModel: searchModel
+      });
     });
 
     describe("on change polling rate", function () {
@@ -70,7 +73,8 @@ define([
 
         mainView = new Views.View({
           collection: new Activetasks.AllTasks(),
-          currentView: "all"
+          currentView: "all",
+          searchModel: searchModel
         });
 
         viewSandbox = new ViewSandbox();
@@ -82,10 +86,15 @@ define([
         viewSandbox.remove();
       });
 
-      it("should set the filter the main-view", function () {
+      it("should set the filter 'type' for the main-view", function () {
         var $rep = tabMenu.$('li[data-type="replication"]');
         $rep.click();
-        assert.equal("replication", mainView.filter);
+        assert.equal("replication", mainView.searchModel.get('filterType'));
+      });
+
+      it("should set the filter 'database' for the main-view", function () {
+        var $rep = tabMenu.$("input").val("registry").trigger("keyup");
+        assert.equal("registry", mainView.searchModel.get('filterDatabase'));
       });
 
       it("should set correct active tab", function () {
@@ -102,7 +111,8 @@ define([
     beforeEach(function () {
       mainView = new Views.View({
         collection: new Activetasks.AllTasks(),
-        currentView: "all"
+        currentView: "all",
+        searchModel: new Activetasks.Search()
       });
 
       viewSandbox = new ViewSandbox();
