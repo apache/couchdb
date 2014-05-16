@@ -1048,11 +1048,11 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
         this.hasReduce = options.hasReduce;
       }
 
-      if (typeof(options.showPreview) === 'undefined') {
+      /*if (typeof(options.showPreview) === 'undefined') {
         this.showPreview = true;
       } else {
         this.showPreview = options.showPreview;
-      }
+      }*/
     },
 
     events: {
@@ -1188,20 +1188,12 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       return {params: params, errorParams: errorParams};
     },
 
-    //these are the saaaaameeeeeeee
     updateView: function (event) {
       event.preventDefault();
       var params = this.queryParams();
       if (!params) { return;}
       this.updateViewFn(event, params);
     },
-
-    // previewView: function (event) {
-    //   var params = this.queryParams();
-    //   if (!params) { return;}
-    //   this.previewFn(event, params);
-    // },
-
 
     updateFilters: function(event) {
       event.preventDefault();
@@ -1283,12 +1275,10 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       }, this);
     },
 
-
-
     serialize: function () {
       return {
         hasReduce: this.hasReduce,
-        showPreview: this.showPreview
+        showPreview: false
       };
     }
   });
