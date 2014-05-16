@@ -339,11 +339,34 @@ function(app, FauxtonAPI, ace, spin) {
     }
   });
 
+  Components.FilteredView = FauxtonAPI.View.extend({
+    filters: [],
+
+    createFilteredData: function (json) {
+      var that = this;
+
+      return _.reduce(this.filters, function (elements, filter) {
+
+        return _.filter(elements, function (element) {
+          var match = false;
+
+          _.each(element, function (value) {
+            if (new RegExp(filter).test(value.toString())) {
+              match = true;
+            }
+          });
+          return match;
+        });
+
+
+      }, json, this);
+    }
+  });
+
   Components.FilterView = FauxtonAPI.View.extend({
     template: "addons/fauxton/templates/filter",
 
     initialize: function (options) {
-      this.eventListener = options.eventListener;
       this.eventNamespace = options.eventNamespace;
     },
 
@@ -360,17 +383,15 @@ function(app, FauxtonAPI, ace, spin) {
         return;
       }
 
-      this.eventListener.trigger(this.eventNamespace + ":filter", filter);
+      FauxtonAPI.triggerRouteEvent(this.eventNamespace + "FilterAdd", filter);
 
       this.insertView(".filter-list", new Components.FilterItemView({
         filter: filter,
-        eventListener: this.eventListener,
         eventNamespace: this.eventNamespace
       })).render();
 
       $filter.val('');
     }
-
   });
 
   Components.FilterItemView = FauxtonAPI.View.extend({
@@ -379,7 +400,6 @@ function(app, FauxtonAPI, ace, spin) {
 
     initialize: function (options) {
       this.filter = options.filter;
-      this.eventListener = options.eventListener;
       this.eventNamespace = options.eventNamespace;
     },
 
@@ -395,8 +415,7 @@ function(app, FauxtonAPI, ace, spin) {
 
     removeFilter: function (event) {
       event.preventDefault();
-
-      this.eventListener.trigger(this.eventNamespace + ":remove", this.filter);
+      FauxtonAPI.triggerRouteEvent(this.eventNamespace + "FilterRemove", this.filter);
       this.remove();
     }
 

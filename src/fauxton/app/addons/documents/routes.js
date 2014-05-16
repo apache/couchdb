@@ -17,10 +17,11 @@ define([
 
        // Modules
        "addons/documents/views",
-       "addons/databases/base"
+       "addons/databases/base",
+       "addons/fauxton/components"
 ],
 
-function(app, FauxtonAPI, Documents, Databases) {
+function(app, FauxtonAPI, Documents, Databases, Components) {
 
   var DocEditorRouteObject = FauxtonAPI.RouteObject.extend({
     layout: "one_pane",
@@ -462,6 +463,11 @@ function(app, FauxtonAPI, Documents, Databases) {
       "database/:database/_changes(:params)": "changes"
     },
 
+    events: {
+      "route:changesFilterAdd": "addFilter",
+      "route:changesFilterRemove": "removeFilter"
+    },
+
     initialize: function (route, masterLayout, options) {
       this.databaseName = options[0];
       this.database = new Databases.Model({id: this.databaseName});
@@ -472,11 +478,27 @@ function(app, FauxtonAPI, Documents, Databases) {
     },
 
     changes: function (event) {
-      this.setView("#dashboard-content", new Documents.Views.Changes({
+      this.dashboardView = this.setView("#dashboard-content", new Documents.Views.Changes({
         model: this.database
       }));
 
-      this.setView("#sidebar-content", new Documents.Views.ChangesSidebar());
+      this.filterView = new Components.FilterView({
+        eventNamespace: "changes"
+      });
+
+      this.sideBarView = this.setView("#sidebar-content", new Documents.Views.ChangesSidebar({
+        filterView: this.filterView
+      }));
+    },
+
+    addFilter: function (filter) {
+      this.dashboardView.filters.push(filter);
+      this.dashboardView.render();
+    },
+
+    removeFilter: function (filter) {
+      this.dashboardView.filters.splice(this.dashboardView.filters.indexOf(filter), 1);
+      this.dashboardView.render();
     },
 
     apiUrl: function() {

@@ -17,18 +17,18 @@ define([
        'api'
 ], function (app, Components, testUtils, FauxtonAPI) {
   var assert = testUtils.assert,
-      ViewSandbox = testUtils.ViewSandbox,
-      myEvents = {};
-
-  _.extend(myEvents, Backbone.Events);
+      ViewSandbox = testUtils.ViewSandbox;
 
   describe('FilterView', function () {
     var viewSandbox,
         filterView;
 
+    if (!FauxtonAPI.router.triggerRouteEvent) {
+      FauxtonAPI.router.triggerRouteEvent = function () {};
+    }
+
     beforeEach(function () {
       filterView = new Components.FilterView({
-        eventListener: myEvents,
         eventNamespace: 'mynamespace'
       });
 
@@ -38,24 +38,6 @@ define([
 
     afterEach(function () {
       viewSandbox.remove();
-    });
-
-    it('should trigger an event on add', function () {
-      filterView.$('[name="filter"]').val('i am a lonely filter');
-      myEvents.listenToOnce(myEvents, 'ente:filter', function (msg) {
-        assert.equal('i am a lonely filter', msg);
-      });
-      filterView.$('.js-log-filter-form').submit();
-    });
-
-    it('should trigger an event on remove', function () {
-      myEvents.listenToOnce(myEvents, 'mynamespace:filter', function (msg) {
-        assert.equal('i am a lonely filter', msg);
-      });
-
-      filterView.$('[name="filter"]').val('i am a lonely filter');
-      filterView.$('.js-log-filter-form').submit();
-      filterView.$('.js-remove-filter').click();
     });
 
     it('should add filter markup', function () {

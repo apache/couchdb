@@ -1856,18 +1856,12 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
 
   Views.Indexed = FauxtonAPI.View.extend({});
 
-  Views.ChangesEvents = {};
-  _.extend(Views.ChangesEvents, Backbone.Events);
-
-  Views.Changes = FauxtonAPI.View.extend({
+  Views.Changes = Components.FilteredView.extend({
     template: "addons/documents/templates/changes",
 
     initialize: function () {
       this.listenTo(this.model.changes, 'sync', this.render);
       this.listenTo(this.model.changes, 'cachesync', this.render);
-
-      this.listenTo(Views.ChangesEvents, "changes:filter", this.filter);
-      this.listenTo(Views.ChangesEvents, "changes:remove", this.removeFilter);
     },
 
     events: {
@@ -1918,11 +1912,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
     template: "addons/documents/templates/changes_sidebar",
 
     initialize: function (options) {
-
-      this.setView(".js-filter", new Components.FilterView({
-        eventListener: Views.ChangesEvents,
-        eventNamespace: "changes"
-      }));
+      this.setView(".js-filter", options.filterView);
     }
   });
 
