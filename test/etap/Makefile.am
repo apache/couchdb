@@ -36,8 +36,6 @@ fixture_files = \
     fixtures/test.couch
 
 tap_files = \
-    030-doc-from-json.t \
-    031-doc-to-json.t \
     040-util.t \
     041-uuid-gen-id.ini \
     041-uuid-gen-seq.ini \
