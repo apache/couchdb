@@ -1361,12 +1361,27 @@ validate_attachment_name(Name) ->
 
 -spec monitor_attachments(couch_att:att() | [couch_att:att()]) -> [reference()].
 monitor_attachments(Atts) when is_list(Atts) ->
-    lists:map(fun(Att) ->
-        {Fd, _} = couch_att:fetch(data, Att),
-        monitor(process, Fd)
-    end, Atts);
+    lists:foldl(fun(Att, Monitors) ->
+        case couch_att:fetch(data, Att) of
+            {Fd, _} -> [monitor(process, Fd) | Monitors];
+            _ -> Monitors
+        end
+    end, [], Atts);
 monitor_attachments(Att) ->
     monitor_attachments([Att]).
 
 demonitor_refs(Refs) when is_list(Refs) ->
     [demonitor(Ref) || Ref <- Refs].
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+monitor_attachments_test_() ->
+    {"ignore stubs",
+        fun () ->
+            Atts = [couch_att:new([{data, stub}])],
+            ?_assertEqual([], monitor_attachments(Atts))
+        end
+    }.
+
+-endif.
