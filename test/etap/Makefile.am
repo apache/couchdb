@@ -36,7 +36,6 @@ fixture_files = \
     fixtures/test.couch
 
 tap_files = \
-    001-load.t \
     002-icu-driver.t \
     010-file-basics.t \
     011-file-headers.t \
