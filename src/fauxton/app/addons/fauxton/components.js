@@ -354,7 +354,11 @@ function(app, FauxtonAPI, ace, spin) {
     filterLogs: function (event) {
       event.preventDefault();
       var $filter = this.$('input[name="filter"]'),
-          filter = $filter.val();
+          filter = $.trim($filter.val());
+
+      if (!filter) {
+        return;
+      }
 
       this.eventListener.trigger(this.eventNamespace + ":filter", filter);
 

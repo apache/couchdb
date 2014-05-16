@@ -77,5 +77,11 @@ define([
 
       assert.equal(0, filterView.$('.js-remove-filter').length);
     });
+
+    it('should not add empty filters', function () {
+      filterView.$('[name="filter"]').val('');
+      filterView.$('.js-log-filter-form').submit();
+      assert.equal(0, filterView.$('.js-remove-filter').length);
+    });
   });
 });
