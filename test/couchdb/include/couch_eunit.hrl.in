@@ -21,3 +21,10 @@
 -define(TEMPDIR,
     filename:join([?BUILDDIR, "test", "couchdb", "temp"])).
 
+-define(tempfile,
+    fun() ->
+        {A, B, C} = erlang:now(),
+        N = node(),
+        FileName = lists:flatten(io_lib:format("~p-~p.~p.~p", [N, A, B, C])),
+        filename:join([?TEMPDIR, FileName])
+    end).
