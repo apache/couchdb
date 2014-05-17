@@ -55,3 +55,47 @@ should_collate_ascii() ->
 
 should_collate_non_ascii() ->
     ?_assertEqual(-1, couch_util:collate(<<"A">>, <<"aa">>)).
+
+to_existed_atom_test() ->
+    ?assert(couch_util:to_existing_atom(true)),
+    ?assertMatch(foo, couch_util:to_existing_atom(<<"foo">>)),
+    ?assertMatch(foobarbaz, couch_util:to_existing_atom("foobarbaz")).
+
+implode_test() ->
+    ?assertEqual([1, 38, 2, 38, 3], couch_util:implode([1, 2, 3], "&")).
+
+trim_test() ->
+    lists:map(fun(S) -> ?assertEqual("foo", couch_util:trim(S)) end,
+              [" foo", "foo ", "\tfoo", " foo ", "foo\t", "foo\n", "\nfoo"]).
+
+abs_pathname_test() ->
+    {ok, Cwd} = file:get_cwd(),
+    ?assertEqual(Cwd ++ "/foo", couch_util:abs_pathname("./foo")).
+
+flush_test() ->
+    ?assertNot(couch_util:should_flush()),
+    AcquireMem = fun() ->
+        _IntsToAGazillion = lists:seq(1, 200000),
+        _LotsOfData = lists:map(fun(_) -> <<"foobar">> end,
+                                lists:seq(1, 500000)),
+        _BigBin = list_to_binary(_LotsOfData),
+
+        %% Allocation 200K tuples puts us above the memory threshold
+        %% Originally, there should be:
+        %%      ?assertNot(should_flush())
+        %% however, unlike for etap test, GC collects all allocated bits
+        %% making this conditions fail. So we have to invert the condition
+        %% since GC works, cleans the memory and everything is fine.
+        ?assertNot(couch_util:should_flush())
+    end,
+    AcquireMem(),
+
+    %% Checking to flush invokes GC
+    ?assertNot(couch_util:should_flush()).
+
+verify_test() ->
+    ?assert(couch_util:verify("It4Vooya", "It4Vooya")),
+    ?assertNot(couch_util:verify("It4VooyaX", "It4Vooya")),
+    ?assert(couch_util:verify(<<"ahBase3r">>, <<"ahBase3r">>)),
+    ?assertNot(couch_util:verify(<<"ahBase3rX">>, <<"ahBase3r">>)),
+    ?assertNot(couch_util:verify(nil, <<"ahBase3r">>)).
