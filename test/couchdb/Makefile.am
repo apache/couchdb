@@ -22,6 +22,7 @@ eunit_files = \
     couch_doc_json_tests.erl \
     couch_file_tests.erl \
     couch_util_tests.erl \
+    couch_uuids_tests.erl \
     couchdb_modules_load_tests.erl \
     couch_eunit.hrl
 
