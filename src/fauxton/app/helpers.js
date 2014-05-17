@@ -36,25 +36,24 @@ function(utils, d3) {
     return path;
   };
 
-
   // Get the URL for documentation, wiki, wherever we store it.
   // update the URLs in documentation_urls.js
   Helpers.docs =  {
-    "docs": "http://docs.couchdb.org/en/latest/intro/api.html#documents",
-    "all_dbs": "http://docs.couchdb.org/en/latest/api/server/common.html?highlight=all_dbs#get--_all_dbs",
-    "replication_doc": "http://docs.couchdb.org/en/latest/replication/replicator.html#basics",
-    "design_doc": "http://docs.couchdb.org/en/latest/couchapp/ddocs.html#design-docs",
-    "view_functions": "http://docs.couchdb.org/en/latest/couchapp/ddocs.html#view-functions",
-    "map_functions": "http://docs.couchdb.org/en/latest/couchapp/ddocs.html#map-functions",
-    "reduce_functions": "http://docs.couchdb.org/en/latest/couchapp/ddocs.html#reduce-and-rereduce-functions",
-    "api_reference": "http://docs.couchdb.org/en/latest/http-api.html",
-    "database_permission": "http://docs.couchdb.org/en/latest/api/database/security.html#db-security",
-    "stats": "http://docs.couchdb.org/en/latest/api/server/common.html?highlight=stats#get--_stats",
-    "_active_tasks": "http://docs.couchdb.org/en/latest/api/server/common.html?highlight=stats#active-tasks",
-    "log": "http://docs.couchdb.org/en/latest/api/server/common.html?highlight=stats#log",
-    "config": "http://docs.couchdb.org/en/latest/config/index.html",
-    "views": "http://docs.couchdb.org/en/latest/intro/overview.html#views",
-    "changes": "http://docs.couchdb.org/en/latest/api/database/changes.html?highlight=changes#post--db-_changes"
+    "docs": "/_utils/docs/intro/api.html#documents",
+    "all_dbs": "/_utils/docs/api/server/common.html?highlight=all_dbs#get--_all_dbs",
+    "replication_doc": "/_utils/docs/replication/replicator.html#basics",
+    "design_doc": "/_utils/docs/couchapp/ddocs.html#design-docs",
+    "view_functions": "/_utils/docs/couchapp/ddocs.html#view-functions",
+    "map_functions": "/_utils/docs/couchapp/ddocs.html#map-functions",
+    "reduce_functions": "/_utils/docs/couchapp/ddocs.html#reduce-and-rereduce-functions",
+    "api_reference": "/_utils/docs/http-api.html",
+    "database_permission": "/_utils/docs/api/database/security.html#db-security",
+    "stats": "/_utils/docs/api/server/common.html?highlight=stats#get--_stats",
+    "_active_tasks": "/_utils/docs/api/server/common.html?highlight=stats#active-tasks",
+    "log": "/_utils/docs/api/server/common.html?highlight=stats#log",
+    "config": "/_utils/docs/config/index.html",
+    "views": "/_utils/docs/intro/overview.html#views",
+    "changes": "/_utils/docs/api/database/changes.html?highlight=changes#post--db-_changes"
   };
 
   Helpers.getDocUrl = function(docKey){

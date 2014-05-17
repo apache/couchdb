@@ -34,13 +34,13 @@ the License.
           </div>
 
           <div class="control-group">
-            <label for="index-name">Index name <a class="help-link" href="<%-getDocUrl('view_functions')%>" target="_blank"><i class="icon-question-sign"></i></a></label>
+            <label for="index-name">Index name <a class="help-link" data-bypass="true" href="<%-getDocUrl('view_functions')%>" target="_blank"><i class="icon-question-sign"></i></a></label>
             <input type="text" id="index-name" value="<%- viewName %>" placeholder="Index name" />
           </div>
 
 
           <div class="control-group">
-            <label for="map-function">Map function <a class="help-link" href="<%-getDocUrl('map_functions')%>" target="_blank"><i class="icon-question-sign"></i></a></label>
+            <label for="map-function">Map function <a class="help-link" data-bypass="true" href="<%-getDocUrl('map_functions')%>" target="_blank"><i class="icon-question-sign"></i></a></label>
             <% if (newView) { %>
             <div class="js-editor" id="map-function"><%= langTemplates.map %></div>
             <% } else { %>
@@ -51,7 +51,7 @@ the License.
 
 
           <div class="control-group">
-            <label for="reduce-function-selector">Reduce (optional) <a class="help-link" href="<%-getDocUrl('reduce_functions')%>" target="_blank"><i class="icon-question-sign"></i></a></label>
+            <label for="reduce-function-selector">Reduce (optional) <a class="help-link" data-bypass="true" href="<%-getDocUrl('reduce_functions')%>" target="_blank"><i class="icon-question-sign"></i></a></label>
 
             <select id="reduce-function-selector">
               <option value="" <%- !reduceFunStr ? 'selected="selected"' : '' %>>None</option>
