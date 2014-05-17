@@ -36,10 +36,6 @@ fixture_files = \
     fixtures/test.couch
 
 tap_files = \
-    041-uuid-gen-id.ini \
-    041-uuid-gen-seq.ini \
-    041-uuid-gen-utc.ini \
-    041-uuid-gen.t \
     042-work-queue.t \
     043-find-in-binary.t \
     050-stream.t \
