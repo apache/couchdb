@@ -36,7 +36,6 @@ fixture_files = \
     fixtures/test.couch
 
 tap_files = \
-    040-util.t \
     041-uuid-gen-id.ini \
     041-uuid-gen-seq.ini \
     041-uuid-gen-utc.ini \
