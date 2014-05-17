@@ -88,6 +88,10 @@ credentials = false
 ; List of accepted methods
 ; methods =
 
+; Experimental CSP (Content Security Policy) Support for _utils
+[csp]
+enable = false
+; header_value = default-src 'self'; img-src 'self'; font-src *; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline';
 
 ; Configuration for a vhost
 ;[cors:http://example.com]

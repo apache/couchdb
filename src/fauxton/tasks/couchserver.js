@@ -47,6 +47,10 @@ module.exports = function (grunt) {
           accept = req.headers.accept.split(','),
           filePath;
 
+      var headerValue = "default-src 'self'; img-src 'self'; font-src 'self'; " +
+                        "script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline';";
+      res.setHeader('Content-Security-Policy', headerValue);
+
       if (!!url.match(/^\/addons\/.*\/assets\/js/)) {
         filePath = path.join(app_dir, url.replace('/_utils/fauxton/',''));
       } else if (!!url.match(/assets/)) {

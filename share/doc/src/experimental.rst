@@ -81,3 +81,18 @@ Plugins
 See `src/couch_plugins/README.md`.
 
 
+Content-Security-Policy (CSP) Header Support for /_utils (Fauxton)
+==================================================================
+
+This will just work with Fauxton, and not Futon. You can enable it
+in your config: you can enable the feature in general and change
+the default header that is sent for everything in /_utils.
+
+    .. code-block:: ini
+
+      [csp]
+      enable = true
+
+Then restart CouchDB.
+
+Have fun!
