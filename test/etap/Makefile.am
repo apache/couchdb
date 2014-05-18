@@ -36,7 +36,6 @@ fixture_files = \
     fixtures/test.couch
 
 tap_files = \
-    042-work-queue.t \
     043-find-in-binary.t \
     050-stream.t \
     060-kt-merging.t \
