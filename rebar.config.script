@@ -27,7 +27,7 @@ DepDescs = [
     {ddoc_cache, "couchdb-ddoc-cache", {branch, "master"}},
     {ets_lru, "couchdb-ets-lru", {branch, "master"}},
     {fabric, "couchdb-fabric", {branch,  "master"}},
-    {ibrowse, "couchdb-ibrowse", {tag,  "CouchDB-1.1.0"}},
+    {ibrowse, "couchdb-ibrowse", {tag,  "master"}},
     {jiffy, "couchdb-jiffy", {branch, "master"}},
     {mem3, "couchdb-mem3", {branch, "master"}},
     {mochiweb, "couchdb-mochiweb", {branch, "master"}},
