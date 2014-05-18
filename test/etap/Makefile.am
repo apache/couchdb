@@ -36,12 +36,6 @@ fixture_files = \
     fixtures/test.couch
 
 tap_files = \
-    060-kt-merging.t \
-    061-kt-missing-leaves.t \
-    062-kt-remove-leaves.t \
-    063-kt-get-leaves.t \
-    064-kt-counting.t \
-    065-kt-stemming.t \
     070-couch-db.t \
     072-cleanup.t \
     073-changes.t \
