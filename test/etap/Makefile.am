@@ -36,7 +36,6 @@ fixture_files = \
     fixtures/test.couch
 
 tap_files = \
-    050-stream.t \
     060-kt-merging.t \
     061-kt-missing-leaves.t \
     062-kt-remove-leaves.t \
