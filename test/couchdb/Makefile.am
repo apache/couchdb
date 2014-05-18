@@ -23,6 +23,7 @@ eunit_files = \
     couch_file_tests.erl \
     couch_util_tests.erl \
     couch_uuids_tests.erl \
+    couch_work_queue_tests.erl \
     couchdb_modules_load_tests.erl \
     include/couch_eunit.hrl
 
