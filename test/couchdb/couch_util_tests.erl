@@ -99,3 +99,38 @@ verify_test() ->
     ?assert(couch_util:verify(<<"ahBase3r">>, <<"ahBase3r">>)),
     ?assertNot(couch_util:verify(<<"ahBase3rX">>, <<"ahBase3r">>)),
     ?assertNot(couch_util:verify(nil, <<"ahBase3r">>)).
+
+find_in_binary_test_() ->
+    Cases = [
+        {<<"foo">>, <<"foobar">>, {exact, 0}},
+        {<<"foo">>, <<"foofoo">>, {exact, 0}},
+        {<<"foo">>, <<"barfoo">>, {exact, 3}},
+        {<<"foo">>, <<"barfo">>, {partial, 3}},
+        {<<"f">>, <<"fobarfff">>, {exact, 0}},
+        {<<"f">>, <<"obarfff">>, {exact, 4}},
+        {<<"f">>, <<"obarggf">>, {exact, 6}},
+        {<<"f">>, <<"f">>, {exact, 0}},
+        {<<"f">>, <<"g">>, not_found},
+        {<<"foo">>, <<"f">>, {partial, 0}},
+        {<<"foo">>, <<"g">>, not_found},
+        {<<"foo">>, <<"">>, not_found},
+        {<<"fofo">>, <<"foofo">>, {partial, 3}},
+        {<<"foo">>, <<"gfobarfo">>, {partial, 6}},
+        {<<"foo">>, <<"gfobarf">>, {partial, 6}},
+        {<<"foo">>, <<"gfobar">>, not_found},
+        {<<"fog">>, <<"gbarfogquiz">>, {exact, 4}},
+        {<<"ggg">>, <<"ggg">>, {exact, 0}},
+        {<<"ggg">>, <<"ggggg">>, {exact, 0}},
+        {<<"ggg">>, <<"bggg">>, {exact, 1}},
+        {<<"ggg">>, <<"bbgg">>, {partial, 2}},
+        {<<"ggg">>, <<"bbbg">>, {partial, 3}},
+        {<<"ggg">>, <<"bgbggbggg">>, {exact, 6}},
+        {<<"ggg">>, <<"bgbggb">>, not_found}
+    ],
+    lists:map(
+        fun({Needle, Haystack, Result}) ->
+            Msg = lists:flatten(io_lib:format("Looking for ~s in ~s",
+                                              [Needle, Haystack])),
+            {Msg, ?_assertMatch(Result,
+                                couch_util:find_in_binary(Needle, Haystack))}
+        end, Cases).
