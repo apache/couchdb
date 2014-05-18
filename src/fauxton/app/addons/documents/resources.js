@@ -303,6 +303,8 @@ function(app, FauxtonAPI, PagingCollection) {
 
     model: Documents.BulkDeleteDoc,
 
+    sync: function() {},
+
     initialize: function (models, options) {
       this.databaseId = options.databaseId;
     },
@@ -322,7 +324,7 @@ function(app, FauxtonAPI, PagingCollection) {
         that.handleResponse(res);
       })
       .fail(function () {
-        var ids = _.reduce(this.toArray(), function (acc, doc) {
+        var ids = _.reduce(that.toArray(), function (acc, doc) {
           acc.push(doc.id);
           return acc;
         }, []);
@@ -331,80 +333,50 @@ function(app, FauxtonAPI, PagingCollection) {
     },
 
     handleResponse: function (res) {
-      var errorIds = [],
-          successIds = [],
-          doc;
-
-      for (doc in res) {
-        if (res[doc].error) {
-          errorIds.push(res[doc].id);
+      var ids = _.reduce(res, function (ids, doc) {
+        if (doc.error) {
+          ids.errorIds.push(doc.id);
         }
-        if (res[doc].ok === true) {
-          successIds.push(res[doc].id);
+
+        if (doc.ok === true) {
+          ids.successIds.push(doc.id);
         }
-      }
 
-      this.removeDocuments(successIds);
+        return ids;
+      }, {errorIds: [], successIds: []});
 
-      if (!errorIds.length) {
-        this.clear();
-      } else {
-        this.trigger('error', errorIds);
-        this.save();
+      this.removeDocuments(ids.successIds);
+
+      if (ids.errorIds.length) {
+        this.trigger('error', ids.errorIds);
       }
 
       this.trigger('updated');
     },
 
     removeDocuments: function (ids) {
+      var reloadDesignDocs = false;
       _.each(ids, function (id) {
         if (/_design/.test(id)) {
-          FauxtonAPI.triggerRouteEvent('reloadDesignDocs');
+          reloadDesignDocs = true;
         }
 
         this.remove(this.get(id));
       }, this);
 
+      if (reloadDesignDocs) {
+        FauxtonAPI.triggerRouteEvent('reloadDesignDocs');
+      }
+
       this.trigger('removed', ids);
     },
 
-    createList: function (documents) {
-      var documentList = [],
-          id;
-
-      for (id in documents) {
-        documentList.push(documents[id]);
-      }
-
-      return documentList;
-    },
-
     createPayload: function (documents) {
-      var documentList = this.createList(documents);
+      var documentList = documents;
 
       return {
         docs: documentList
       };
-    },
-
-    parse: function (resp) {
-      return this.createList(resp);
-    },
-
-    clear: function () {
-      window.sessionStorage.removeItem('couchdb:docsToDelete:' + this.databaseId);
-    },
-
-    save: function () {
-      var data = JSON.stringify(this.toJSON());
-      window.sessionStorage.setItem('couchdb:docsToDelete:' + this.databaseId, data);
-    },
-
-    sync: function (method, model, options) {
-      var storedData = window.sessionStorage.getItem('couchdb:docsToDelete:' + this.databaseId),
-          documents = JSON.parse(storedData) || {};
-
-      options.success(documents);
     }
   });
 

@@ -576,6 +576,9 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
     },
 
     removeDocument: function (id) {
+      if (!this.rows[id]) {
+        return;
+      }
       this.rows[id].$el.fadeOut(function () {
         $(this).remove();
       });
@@ -599,12 +602,10 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
           data = {_id: docId, _rev: rev, _deleted: true};
 
       if (this.$(event.target).is(':checked')) {
-        this.bulkDeleteDocsCollection.add(new Documents.BulkDeleteDoc(data));
+        this.bulkDeleteDocsCollection.add(data);
       } else {
         this.bulkDeleteDocsCollection.remove(this.bulkDeleteDocsCollection.get(docId));
       }
-
-      this.bulkDeleteDocsCollection.save();
     },
 
     toggleTrash: function () {
@@ -666,11 +667,11 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
 
     bulkDelete: function() {
       var that = this,
-          documents = this.bulkDeleteDocsCollection.toArray(),
+          documentsLength = this.bulkDeleteDocsCollection.length,
           msg;
 
-      msg = "Are you sure you want to delete these " + documents.length + " docs?";
-      if (documents.length === 0 || !window.confirm(msg)) {
+      msg = "Are you sure you want to delete these " + documentsLength + " docs?";
+      if (documentsLength === 0 || !window.confirm(msg)) {
         return false;
       }
 
