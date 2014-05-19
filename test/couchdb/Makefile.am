@@ -19,6 +19,7 @@ all:
 
 eunit_files = \
     couch_btree_tests.erl \
+    couch_db_tests.erl \
     couch_doc_json_tests.erl \
     couch_file_tests.erl \
     couch_key_tree_tests.erl \
