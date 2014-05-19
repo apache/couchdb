@@ -694,9 +694,14 @@ table.databases {
     .divider {
       border: none;
     }
-    li.active a {
+    > li > a:hover,
+    > li > a:focus{
       background-color: @darkRed;
       color: #fff;
+    }
+
+    li.active > a {
+      color: @darkRed;
     }
     > li > a{
       padding: 10px 13px 10px 30px;
@@ -723,6 +728,10 @@ table.databases {
       text-shadow: none;
       color: #333333;
       margin-bottom: -4px;
+
+      & > span:hover {
+        color: @red;
+      }
     }
   }
 }
@@ -918,5 +927,28 @@ div.spinner {
   }
   li {
     list-style-type: none;
+  }
+}
+
+div.add-dropdown { 
+
+ position: absolute;
+  right: 15px;
+  .dropdown-menu{
+    left: -82px;
+    padding-bottom: 0;
+    width: auto;
+    min-width: 0;
+    li a {
+      padding: 10px 15px 10px 12px;
+    }
+  }
+  .dropdown-toggle{
+    text-decoration: none;
+  }
+  > a {
+    border-bottom: none;
+    text-decoration: none;
+    font-size: 16px;
   }
 }

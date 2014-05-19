@@ -17,6 +17,7 @@ define([
        "addons/fauxton/components",
 
        "addons/documents/resources",
+       "addons/documents/sidebarviews",
        "addons/databases/resources",
        "addons/pouchdb/base",
 
@@ -31,7 +32,7 @@ define([
        "plugins/zeroclipboard/ZeroClipboard"
 ],
 
-function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
+function(app, FauxtonAPI, Components, Documents, Views, Databases, pouchdb,
          resizeColumns, beautify, prettify, ZeroClipboard) {
 
   function showError (msg) {
@@ -42,7 +43,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
     });
   }
 
-  var Views = {};
 
   Views.SearchBox = FauxtonAPI.View.extend({
     template: "addons/documents/templates/search",
@@ -336,41 +336,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
     }
   });
 
-  Views.IndexItem = FauxtonAPI.View.extend({
-    template: "addons/documents/templates/index_menu_item",
-    tagName: "li",
-
-    initialize: function(options){
-      this.index = options.index;
-      this.ddoc = options.ddoc;
-      this.database = options.database;
-      this.selected = !! options.selected;
-      this.selector = options.selector;
-    },
-
-    serialize: function() {
-      return {
-        type:  this.selector,
-        index: this.index,
-        ddoc: this.ddoc,
-        database: this.database,
-        // index_clean: app.utils.removeSpecialCharacters(this.index),
-        // ddoc_clean: app.utils.removeSpecialCharacters(this.ddoc),
-        // index_encoded: app.utils.safeURLName(this.index),
-        // ddoc_encoded: app.utils.safeURLName(this.ddoc),
-        // database_encoded: app.utils.safeURLName(this.database),
-        selected: this.selected
-      };
-    },
-
-    afterRender: function() {
-      if (this.selected) {
-        $(".sidenav ul.nav-list li").removeClass("active");
-        this.$el.addClass("active");
-      }
-    }
-  });
-
+  
   Views.AllDocsNumber = FauxtonAPI.View.extend({
     template: "addons/documents/templates/all_docs_number",
 
@@ -1812,156 +1778,9 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
     }
   });
 
-  Views.Sidebar = FauxtonAPI.View.extend({
-    template: "addons/documents/templates/sidebar",
-    className: "sidenav",
-    tagName: "nav",
-    events: {
-      "click button#delete-database": "showDeleteDatabaseModal"
-    },
+  
 
-    initialize: function(options) {
-      this.database = options.database;
-      if (options.ddocInfo) {
-        this.ddocID = options.ddocInfo.id;
-        this.currView = options.ddocInfo.currView;
-      }
-    },
-    showDeleteDatabaseModal: function(event){
-      this.deleteDBModal.showModal();
-    },
-
-    serialize: function() {
-      var docLinks = FauxtonAPI.getExtensions('docLinks'),
-          newLinks = FauxtonAPI.getExtensions('sidebar:newLinks'),
-          addLinks = FauxtonAPI.getExtensions('sidebar:links'),
-          extensionList = FauxtonAPI.getExtensions('sidebar:list');
-      return {
-        changes_url: '#' + this.database.url('changes'),
-        permissions_url: '#' + this.database.url('app') + '/permissions',
-        db_url: '#' + this.database.url('index'),
-        database: this.collection.database,
-        database_url: '#' + this.database.url('app'),
-        docLinks: docLinks,
-        addLinks: addLinks,
-        newLinks: newLinks,
-        extensionList: extensionList > 0
-      };
-    },
-
-
-    beforeRender: function(manage) {
-      this.deleteDBModal = this.setView(
-        '#delete-db-modal',
-        new Views.DeleteDBModal({database: this.database})
-      );
-
-      this.collection.each(function(design) {
-        if (design.has('doc')){
-          this.insertView(new Views.DdocSidenav({
-            model: design,
-            collection: this.collection
-          }));
-        }
-      },this);
-    },
-
-
-    afterRender: function () {
-      if (this.selectedTab) {
-        this.setSelectedTab(this.selectedTab);
-      }
-    },
-
-    setSelectedTab: function (selectedTab) {
-      this.selectedTab = selectedTab;
-      var $selectedTab = this.$('#' + selectedTab);
-
-      this.$('li').removeClass('active');
-      $selectedTab.parent().addClass('active');
-
-      if ($selectedTab.parents(".accordion-body").length !== 0){
-        $selectedTab
-        .parents(".accordion-body")
-        .addClass("in")
-        .parents(".nav-header")
-        .find(".js-collapse-toggle").addClass("down");
-      }
-
-    }
-  });
-
-
-  Views.DdocSidenav = FauxtonAPI.View.extend({
-    tagName: "ul",
-    className:  "nav nav-list",
-    template: "addons/documents/templates/design_doc_menu",
-    events: {
-      "click button": "no",
-      "click .js-collapse-toggle": "toggleArrow"
-    },
-    initialize: function(){
-
-    },
-    toggleArrow:  function(e){
-      this.$(e.currentTarget).toggleClass("down");
-    },
-    no: function(event){
-      event.preventDefault();
-      alert("no");
-    },
-    buildIndexList: function(collection, selector){
-      var design = this.model.id.replace(/^_design\//,"");
-      _.each(_.keys(collection[selector]), function(key){
-        this.insertView(".accordion-body", new Views.IndexItem({
-          selector: selector,
-          ddoc: design,
-          index: key,
-          database: this.model.collection.database.id
-        }));
-      }, this);
-    },
-
-    serialize: function(){
-      var ddocName = this.model.id.replace(/^_design\//,"");
-      return{
-        database: this.collection.database,
-        designDoc: ddocName,
-        ddoc_clean: app.utils.removeSpecialCharacters(ddocName),
-        ddoc_encoded: app.utils.safeURLName(ddocName),
-        database_encoded: app.utils.safeURLName(this.model.collection.database.id),
-      };
-    },
-    beforeRender: function(manage) {
-      var ddocDocs = this.model.get("doc");
-      var ddocName = this.model.id.replace(/^_design\//,"");
-
-      var sidebarListTypes = FauxtonAPI.getExtensions('sidebar:list');
-          if (ddocDocs){
-            //Views
-            this.buildIndexList(ddocDocs, "views");
-            //lists
-            // this.buildIndexList(ddocDocs, "lists");
-            // //show
-            // this.buildIndexList(ddocDocs, "show");
-            // //filters
-            // this.buildIndexList(ddocDocs, "filters");
-            //extensions
-            _.each(sidebarListTypes, function (type) {
-              this.buildIndexList(ddocDocs, type);
-            },this);
-          }
-      this.insertView(".new-button", new Views.newMenuDropdown({
-        database: this.collection.database,
-        ddocSafeName: app.utils.safeURLName(ddocName),
-        fullMenu: false
-      }));
-
-    }
-  });
-
-  Views.Indexed = FauxtonAPI.View.extend({});
-
+  
   Views.Changes = FauxtonAPI.View.extend({
     template: "addons/documents/templates/changes",
 
@@ -2010,31 +1829,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       ZeroClipboard.config({ moviePath: "/assets/js/plugins/zeroclipboard/ZeroClipboard.swf" });
       var client = new ZeroClipboard(this.$(".js-copy"));
     }
-  });
-
-
-  Views.newMenuDropdown = FauxtonAPI.View.extend({
-    template: "addons/documents/templates/add_new_ddoc_fn_dropdown",
-    tagName: "div",
-    className: "dropdown",
-    initialize: function(options){
-      this.database = options.database;
-      this.fullMenu = options.fullMenu;
-      this.ddocSafeName = options.ddocSafeName || "";
-    },
-    serialize: function(){
-      var sidebarItem = FauxtonAPI.getExtensions('sidebar:links');
-      return {
-        extensionLinks: sidebarItem,
-        database: this.database,
-        ddocSafe: this.ddocSafeName,
-        full:  this.fullMenu
-      };
-    }
-  });
-
-
-  Views.temp = FauxtonAPI.View.extend({
   });
 
   Views.DdocInfo = FauxtonAPI.View.extend({
