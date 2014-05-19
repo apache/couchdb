@@ -1363,8 +1363,13 @@ validate_attachment_name(Name) ->
 monitor_attachments(Atts) when is_list(Atts) ->
     lists:foldl(fun(Att, Monitors) ->
         case couch_att:fetch(data, Att) of
-            {Fd, _} -> [monitor(process, Fd) | Monitors];
-            _ -> Monitors
+            {Fd, _} ->
+                [monitor(process, Fd) | Monitors];
+            stub ->
+                Monitors;
+            Else ->
+                ?LOG_ERROR("~p from couch_att:fetch(data, ~p)", [Else, Att]),
+                Monitors
         end
     end, [], Atts);
 monitor_attachments(Att) ->
