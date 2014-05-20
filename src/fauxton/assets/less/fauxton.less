@@ -333,19 +333,33 @@ table.databases {
   }
 }
 
+/* disable the scrollbar in the sidebar,
+   they look ugly in Linux and Windows
+   and are pressing the icons to the left */
+#primary-navbar::-webkit-scrollbar {
+  display: none;
+}
+#primary-navbar {
+  -ms-overflow-style: none;
+  overflow: hidden;
+}
+
 /* Fixed side navigation */
 #primary-navbar {
-  height: 100%;
   position: fixed;
   width: @navWidth;
   top: 0;
   bottom: 0;
   background-color: @primaryNav;
-  overflow-y: scroll;
-  .version {
+  .js-version {
     color: #fff;
     font-size: 10px;
     padding-left: 10px;
+  }
+  .closeMenu & {
+    .js-version {
+      display: none;
+    }
   }
   #footer-links{
     position: absolute;
@@ -356,16 +370,15 @@ table.databases {
     font-size: 12px
   }
   .navbar {
-     .burger{
-        .transition(all @transitionSpeed @transitionEaseType);
+      .js-burger {
+        height: @collapsedNavWidth;
+        width: @navWidth;
+        z-index: 1;
         padding: 22px 0 0 18px;
         position: fixed;
         top: 0;
-        z-index: 100;
         background-color: @primaryNav;
-        width: @navWidth;
-        div{
-          .transition(all @transitionSpeed @transitionEaseType);
+        div {
           height: 4px;
           width: 24px;
           .border-radius(2);
@@ -376,11 +389,15 @@ table.databases {
           background-color: @orange;
         }
       }
+      .closeMenu & {
+        .js-burger {
+          width: @collapsedNavWidth;
+        }
+      }
       .bottom-container {
 	     height: 110px;
 	     position: fixed;
 	     bottom: 0;
-	     width: 220px;
 	     background: #3a2c2b;
        .brand {
          .box-sizing(content-box);
@@ -403,7 +420,6 @@ table.databases {
            .icon {
               background: url(../img/minilogo.png) no-repeat 0 0;
             }
-            width: 45px;
           }
        }
        #footer-nav-links {
@@ -427,7 +443,6 @@ table.databases {
       .nav{
         margin: 0;
         li{
-          .transition(all @transitionSpeed @transitionEaseType);
           padding: 0;
           font-size: 16px;
           letter-spacing: 1px;
@@ -502,7 +517,7 @@ table.databases {
       }
       ul#bottom-nav-links{
         margin-top: 0;
-        padding-bottom: 70px;
+        padding-bottom: 110px;
         li{
           min-height: 55px;
           background-color: @bottomNav;
@@ -530,7 +545,7 @@ table.databases {
 
 
 #dashboard {
-  max-width: 1500px;
+  z-index: 2;
   .box-shadow(-6px 0 rgba(0, 0, 0, 0.1));
   border-left: 1px solid #999;
   position: absolute;

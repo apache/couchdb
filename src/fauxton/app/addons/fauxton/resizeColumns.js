@@ -12,7 +12,7 @@
 
 
 // This file creates a set of helper functions that will be loaded for all html
-// templates. These functions should be self contained and not rely on any 
+// templates. These functions should be self contained and not rely on any
 // external dependencies as they are loaded prior to the application. We may
 // want to change this later, but for now this should be thought of as a
 // "purely functional" helper system.
@@ -30,17 +30,16 @@ function(FauxtonAPI) {
 
   Resize.prototype = {
     getPrimaryNavWidth: function(){
-      var primaryNavWidth  = $('body').hasClass('closeMenu')? 64:224;
+      var primaryNavWidth  = $('body').hasClass('closeMenu') ? 64 : 224;
       return primaryNavWidth;
     },
     getPanelWidth: function(){
       var sidebarWidth = $('#sidebar-content').length > 0 ? $('#sidebar-content').width(): 0;
-      return (this.getPrimaryNavWidth() + sidebarWidth); 
+      return (this.getPrimaryNavWidth() + sidebarWidth);
     },
     initialize: function(){
-     // $(window).off('resize');
       var that = this;
-      //add throttler :) 
+      //add throttler :)
       this.lazyLayout = _.debounce(that.onResizeHandler, 300).bind(this);
       FauxtonAPI.utils.addWindowResize(this.lazyLayout,"animation");
       FauxtonAPI.utils.initWindowResize();
@@ -64,25 +63,25 @@ function(FauxtonAPI) {
       } else {
         var combinedWidth = window.innerWidth - this.getPanelWidth(),
         smallWidthConstraint = ($('#sidebar-content').length > 0)? 470:800,
-        panelWidth; 
+        panelWidth;
 
         if( combinedWidth > smallWidthConstraint  && combinedWidth < 1400){
           panelWidth = window.innerWidth - this.getPanelWidth();
         } else if (combinedWidth < smallWidthConstraint){
           panelWidth = smallWidthConstraint;
         } else if(combinedWidth > 1400){
-          panelWidth = 1400;
+          panelWidth = combinedWidth - parseInt($('#dashboard').css('border-left-width'), 10);
         }
 
         $(this.options.selectorElements).innerWidth(panelWidth);
-        
+
       }
       //if there is a callback, run that
       if(this.options.callback) {
         this.options.callback();
       }
       this.trigger('resize');
-    } 
+    }
   };
 
   _.extend(Resize.prototype, Backbone.Events);

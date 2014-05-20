@@ -8,9 +8,11 @@
 
 // Base class and wrapper
 .navbar {
-  overflow: visible;
+  overflow-y: scroll;
+  overflow-x: none;
+  height: 100%;
   margin-bottom: @baseLineHeight;
-
+  position: absolute;
   // Fix for IE7's bad z-indexing so dropdowns don't appear below content that follows the navbar
   *position: relative;
   *z-index: 2;
