@@ -53,3 +53,6 @@ install.mk:
 
 docker:
 	@docker build --no-cache --rm -t couchdb/1843-feature-bigcouch .
+
+eunit:
+	@rebar eunit skip_deps=meck,mochiweb,lager
