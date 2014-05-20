@@ -46,8 +46,7 @@ test() ->
 
     test_default_header_value(),
 
-    ok = couch_config:set("csp", "header_value", "default-src 'self'; img-src http://example.com;" ++
-                                 "script-src 'self' 'unsafe-eval';", false),
+    ok = couch_config:set("csp", "header_value", "default-src 'http://ente.com';", false),
 
     test_custom_header_value(),
 
@@ -73,6 +72,5 @@ test_custom_header_value() ->
     Headers = [{"Origin", "http://127.0.0.1"}],
     {ok, _, Resp, _} = ibrowse:send_req(server(), Headers, get, []),
     etap:is(proplists:get_value("Content-Security-Policy", Resp),
-            "default-src 'self'; img-src http://example.com; font-src *; " ++
-            "script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline';",
+            "default-src 'http://ente.com';",
             "Custom CSP Headers possible").
