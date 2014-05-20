@@ -47,7 +47,7 @@ module.exports = function (grunt) {
           accept = req.headers.accept.split(','),
           filePath;
 
-      var headerValue = "default-src 'self'; img-src *; font-src *; " +
+      var headerValue = "default-src 'self'; img-src 'self'; font-src *; " +
                         "script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline';";
       res.setHeader('Content-Security-Policy', headerValue);
 
