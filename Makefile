@@ -26,6 +26,9 @@ clean:
 	@echo "==> couchjs (clean)"
 	@rebar clean
 
+check: compile
+	@rebar eunit skip_deps=ibrowse,meck,mochiweb,oauth,proper,lager,chttpd,couch
+
 dist: compile
 	@rm -rf rel/couchdb
 	@rebar generate
