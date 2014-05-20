@@ -26,7 +26,7 @@ function (app, FauxtonAPI) {
     documentation: "config",
 
     url: function () {
-      return app.host + '/_config/' + this.get("section") + '/' + this.get("name");
+      return app.host + '/_config/' + this.get("section") + '/' + encodeURIComponent(this.get("name"));
     },
 
     isNew: function () { return false; },
@@ -77,7 +77,7 @@ function (app, FauxtonAPI) {
     }
   });
 
- 
+
 
   return Config;
 });
