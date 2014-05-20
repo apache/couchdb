@@ -64,7 +64,7 @@ test_default_header_value() ->
     Headers = [{"Origin", "http://127.0.0.1"}],
     {ok, _, Resp, _} = ibrowse:send_req(server(), Headers, get, []),
     etap:is(proplists:get_value("Content-Security-Policy", Resp),
-            "default-src 'self'; img-src 'self'; font-src *; " ++
+            "default-src 'self'; img-src 'self'; font-src *; "
             "script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline';",
             "Default CSP Headers when enabled").
 

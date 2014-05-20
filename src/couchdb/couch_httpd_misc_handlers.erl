@@ -83,7 +83,7 @@ handle_utils_dir_req(Req, _) ->
 maybe_add_csp_headers(Headers, "false") ->
     Headers;
 maybe_add_csp_headers(Headers, "true") ->
-    DefaultValues = "default-src 'self'; img-src 'self'; font-src *; " ++
+    DefaultValues = "default-src 'self'; img-src 'self'; font-src *; "
                     "script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline';",
     Value = couch_config:get("csp", "header_value", DefaultValues),
     [{"Content-Security-Policy", Value} | Headers].
