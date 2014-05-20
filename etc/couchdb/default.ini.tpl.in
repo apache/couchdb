@@ -90,7 +90,7 @@ credentials = false
 
 ; Experimental CSP (Content Security Policy) Support for _utils
 [csp]
-; enable_csp = true
+enable_csp = false
 ; header_value = default-src 'self'; img-src *; font-src *; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline';"
 
 ; Configuration for a vhost
