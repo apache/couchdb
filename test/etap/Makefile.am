@@ -36,7 +36,6 @@ fixture_files = \
     fixtures/test.couch
 
 tap_files = \
-    072-cleanup.t \
     073-changes.t \
     074-doc-update-conflicts.t \
     075-auth-cache.t \

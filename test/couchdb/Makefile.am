@@ -15,6 +15,9 @@ noinst_SCRIPTS = run
 all:
 	mkdir -p ebin/
 	mkdir -p temp/
+	$(ERLC) -Wall -I$(top_srcdir)/src -I$(top_srcdir)/test/couchdb/include \
+			-o $(top_builddir)/test/couchdb/ebin/ $(ERLC_FLAGS) ${TEST} \
+			$(top_srcdir)/test/couchdb/test_request.erl
 	chmod +x run
 
 eunit_files = \
@@ -28,6 +31,8 @@ eunit_files = \
     couch_uuids_tests.erl \
     couch_work_queue_tests.erl \
     couchdb_modules_load_tests.erl \
+    couchdb_views_tests.erl \
+    test_request.erl \
     include/couch_eunit.hrl
 
 EXTRA_DIST = \
