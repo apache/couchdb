@@ -283,6 +283,7 @@ handle_request_int(MochiReq, DefaultFun,
 
     {ok, Resp} =
     try
+        check_request_uri_length(RawUri),
         case couch_httpd_cors:is_preflight_request(HttpReq) of
         #httpd{} ->
             case authenticate_request(HttpReq, AuthHandlers) of
@@ -316,6 +317,8 @@ handle_request_int(MochiReq, DefaultFun,
             send_error(HttpReq, {bad_otp_release, ErrorReason});
         exit:{body_too_large, _} ->
             send_error(HttpReq, request_entity_too_large);
+        exit:{uri_too_long, _} ->
+            send_error(HttpReq, request_uri_too_long);
         throw:Error ->
             Stack = erlang:get_stacktrace(),
             ?LOG_DEBUG("Minor error in HTTP request: ~p",[Error]),
@@ -341,6 +344,19 @@ handle_request_int(MochiReq, DefaultFun,
     couch_stats_collector:record({couchdb, request_time}, RequestTime),
     couch_stats_collector:increment({httpd, requests}),
     {ok, Resp}.
+
+check_request_uri_length(Uri) ->
+    check_request_uri_length(Uri, config:get("httpd", "max_uri_length")).
+
+check_request_uri_length(_Uri, undefined) ->
+    ok;
+check_request_uri_length(Uri, MaxUriLen) when is_list(MaxUriLen) ->
+    case length(Uri) > list_to_integer(MaxUriLen) of
+        true ->
+            throw(request_uri_too_long);
+        false ->
+            ok
+    end.
 
 % Try authentication handlers in order until one sets a user_ctx
 % the auth funs also have the option of returning a response
@@ -798,6 +814,8 @@ error_info(file_exists) ->
         "created, the file already exists.">>};
 error_info(request_entity_too_large) ->
     {413, <<"too_large">>, <<"the request entity is too large">>};
+error_info(request_uri_too_long) ->
+    {414, <<"too_long">>, <<"the request entity is too long">>};
 error_info({bad_ctype, Reason}) ->
     {415, <<"bad_content_type">>, Reason};
 error_info(requested_range_not_satisfiable) ->
