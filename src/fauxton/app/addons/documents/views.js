@@ -569,7 +569,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       // some doclists don't have an option to delete
       if (!this.viewList) {
         this.bulkDeleteDocsCollection = options.bulkDeleteDocsCollection;
-        this.bulkDeleteDocsCollection.fetch({reset: true});
       }
     },
 
