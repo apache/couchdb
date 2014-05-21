@@ -177,7 +177,7 @@ handle_call({fetch, UserName}, _From, State) ->
     [] ->
         couch_stats_collector:increment({couchdb, auth_cache_misses}),
         Creds = get_user_props_from_db(UserName),
-        State1 = add_cache_entry(UserName, Creds, erlang:now(), State),
+        State1 = add_cache_entry(UserName, Creds, os:timestamp(), State),
         {Creds, State1}
     end,
     {reply, Credentials, NewState};
@@ -271,7 +271,7 @@ free_mru_cache_entry() ->
 
 
 cache_hit(UserName, Credentials, ATime) ->
-    NewATime = erlang:now(),
+    NewATime = os:timestamp(),
     true = ets:delete(?BY_ATIME, ATime),
     true = ets:insert(?BY_ATIME, {NewATime, UserName}),
     true = ets:insert(?BY_USER, {UserName, {Credentials, NewATime}}).

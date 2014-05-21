@@ -82,7 +82,7 @@ get(Prop) ->
 
 maybe_persist(TaskProps0) ->
     {LastUpdateTime, Frequency} = erlang:get(task_status_update),
-    case timer:now_diff(Now = now(), LastUpdateTime) >= Frequency of
+    case timer:now_diff(Now = os:timestamp(), LastUpdateTime) >= Frequency of
     true ->
         put(task_status_update, {Now, Frequency}),
         TaskProps = ?set(TaskProps0, updated_on, timestamp(Now)),
@@ -145,7 +145,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 
 timestamp() ->
-    timestamp(now()).
+    timestamp(os:timestamp()).
 
 timestamp({Mega, Secs, _}) ->
     Mega * 1000000 + Secs.

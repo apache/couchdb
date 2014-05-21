@@ -285,7 +285,7 @@ maybe_close_lru_db(#server{lru=Lru}=Server) ->
 
 open_async(Server, From, DbName, Filepath, Options) ->
     Parent = self(),
-    put({async_open, DbName}, now()),
+    put({async_open, DbName}, os:timestamp()),
     Opener = spawn_link(fun() ->
         Res = couch_db:start_link(DbName, Filepath, Options),
         case {Res, lists:member(create, Options)} of
@@ -328,7 +328,7 @@ handle_call(get_server, _From, Server) ->
 handle_call({open_result, DbName, {ok, Db}}, _From, Server) ->
     link(Db#db.main_pid),
     case erase({async_open, DbName}) of undefined -> ok; T0 ->
-        ?LOG_INFO("needed ~p ms to open new ~s", [timer:now_diff(now(),T0)/1000,
+        ?LOG_INFO("needed ~p ms to open new ~s", [timer:now_diff(os:timestamp(),T0)/1000,
             DbName])
     end,
     % icky hack of field values - compactor_pid used to store clients

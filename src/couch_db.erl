@@ -141,7 +141,7 @@ wait_for_compaction(Db) ->
     wait_for_compaction(Db, infinity).
 
 wait_for_compaction(#db{main_pid=Pid}=Db, Timeout) ->
-    Start = erlang:now(),
+    Start = os:timestamp(),
     case gen_server:call(Pid, compactor_pid) of
         CPid when is_pid(CPid) ->
             Ref = erlang:monitor(process, CPid),
@@ -149,7 +149,7 @@ wait_for_compaction(#db{main_pid=Pid}=Db, Timeout) ->
                 {'DOWN', Ref, _, _, normal} when Timeout == infinity ->
                     wait_for_compaction(Db, Timeout);
                 {'DOWN', Ref, _, _, normal} ->
-                    Elapsed = timer:now_diff(now(), Start) div 1000,
+                    Elapsed = timer:now_diff(os:timestamp(), Start) div 1000,
                     wait_for_compaction(Db, Timeout - Elapsed);
                 {'DOWN', Ref, _, _, Reason} ->
                     {error, Reason}

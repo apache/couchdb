@@ -70,7 +70,7 @@ handle_changes(Args1, Req, Db0) ->
     undefined ->
         erlang:erase(last_changes_heartbeat);
     Val when is_integer(Val); Val =:= true ->
-        put(last_changes_heartbeat, now())
+        put(last_changes_heartbeat, os:timestamp())
     end,
 
     case lists:member(Feed, ["continuous", "longpoll", "eventsource"]) of
@@ -572,7 +572,7 @@ reset_heartbeat() ->
     undefined ->
         ok;
     _ ->
-        put(last_changes_heartbeat, now())
+        put(last_changes_heartbeat, os:timestamp())
     end.
 
 maybe_heartbeat(Timeout, TimeoutFun, Acc) ->
@@ -581,7 +581,7 @@ maybe_heartbeat(Timeout, TimeoutFun, Acc) ->
     undefined ->
         {ok, Acc};
     _ ->
-        Now = now(),
+        Now = os:timestamp(),
         case timer:now_diff(Now, Before) div 1000 >= Timeout of
         true ->
             Acc2 = TimeoutFun(Acc),

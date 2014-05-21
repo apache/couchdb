@@ -130,7 +130,7 @@ handle_info({Port, {exit_status, Status}}, Table) ->
         [D] ->
             % Port died for unknown reason. Check to see if it's
             % died too many times or if we should boot it back up.
-            case should_halt([now() | D#daemon.errors]) of
+            case should_halt([os:timestamp() | D#daemon.errors]) of
                 {true, _} ->
                     % Halting the process. We won't try and reboot
                     % until the configuration changes.
@@ -376,7 +376,7 @@ should_halt(Errors) ->
     RetryTimeCfg = config:get("os_daemon_settings", "retry_time", "5"),
     RetryTime = list_to_integer(RetryTimeCfg),
 
-    Now = now(),
+    Now = os:timestamp(),
     RecentErrors = lists:filter(fun(Time) ->
         timer:now_diff(Now, Time) =< RetryTime * 1000000
     end, Errors),

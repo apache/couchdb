@@ -141,7 +141,7 @@ handle_call(collect_sample, _, {OldTRef, SampleInterval}) ->
     end, couch_stats_collector:all(absolute)),
     
     Values = Incs ++ Abs,
-    Now = erlang:now(),
+    Now = os:timestamp(),
     lists:foreach(fun({{Key, Rate}, Agg}) ->
         NewAgg = case proplists:lookup(Key, Values) of
             none ->

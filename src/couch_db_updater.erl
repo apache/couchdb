@@ -494,7 +494,7 @@ init_db(DbName, Filepath, Fd, Header0, Options) ->
         {ok, Security} = couch_file:pread_term(Fd, SecurityPtr)
     end,
     % convert start time tuple to microsecs and store as a binary string
-    {MegaSecs, Secs, MicroSecs} = now(),
+    {MegaSecs, Secs, MicroSecs} = os:timestamp(),
     StartTime = ?l2b(io_lib:format("~p",
             [(MegaSecs*1000000*1000000) + (Secs*1000000) + MicroSecs])),
     ok = couch_file:set_db_pid(Fd, self()),

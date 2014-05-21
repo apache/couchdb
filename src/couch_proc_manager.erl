@@ -372,7 +372,7 @@ maybe_spawn_proc(State, Client) ->
     end.
 
 add_waiting_client(Tab, Client) ->
-    ets:insert(Tab, Client#client{timestamp=now()}).
+    ets:insert(Tab, Client#client{timestamp=os:timestamp()}).
 
 get_waiting_client(Tab, Lang) when is_list(Lang) ->
     get_waiting_client(Tab, couch_util:to_binary(Lang));

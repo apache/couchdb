@@ -200,7 +200,7 @@ handle_request(MochiReq, DefaultFun, UrlHandlers, DbUrlHandlers,
 
 handle_request_int(MochiReq, DefaultFun,
             UrlHandlers, DbUrlHandlers, DesignUrlHandlers) ->
-    Begin = now(),
+    Begin = os:timestamp(),
     % for the path, use the raw path with the query string and fragment
     % removed, but URL quoting left intact
     RawUri = MochiReq:get(raw_path),
@@ -346,7 +346,7 @@ handle_request_int(MochiReq, DefaultFun,
             ?LOG_INFO("Stacktrace: ~p",[Stack]),
             send_error(HttpReq, Error)
     end,
-    RequestTime = round(timer:now_diff(now(), Begin)/1000),
+    RequestTime = round(timer:now_diff(os:timestamp(), Begin)/1000),
     couch_stats_collector:record({couchdb, request_time}, RequestTime),
     couch_stats_collector:increment({httpd, requests}),
     {ok, Resp}.
