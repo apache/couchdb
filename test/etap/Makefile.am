@@ -36,7 +36,6 @@ fixture_files = \
     fixtures/test.couch
 
 tap_files = \
-    074-doc-update-conflicts.t \
     075-auth-cache.t \
     076-file-compression.t \
     077-couch-db-fast-db-delete-create.t \
