@@ -547,6 +547,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       "click button.js-bulk-delete": "bulkDelete",
       "click #collapse": "collapse",
       "change .js-row-select": "toggleDocument",
+      "click .js-row-document-container": "toggleDocument",
       "click #js-end-results": "scrollToQuery"
     },
 
@@ -599,20 +600,24 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
     toggleDocument: function (event) {
       this.toggleTrash();
 
-      var docId = this.$(event.target).closest('tr').attr('data-id'),
+      var $row = this.$(event.target).closest('tr'),
+          docId = $row.attr('data-id'),
           db = this.database.get('id'),
           rev = this.collection.get(docId).get('_rev'),
           data = {_id: docId, _rev: rev, _deleted: true};
 
-      if (this.$(event.target).is(':checked')) {
+      if (!$row.hasClass('js-to-delete')) {
         this.bulkDeleteDocsCollection.add(data);
       } else {
         this.bulkDeleteDocsCollection.remove(this.bulkDeleteDocsCollection.get(docId));
       }
+
+      $row.find('.js-row-select').prop('checked', !$row.hasClass('js-to-delete'));
+      $row.toggleClass('js-to-delete');
     },
 
     toggleTrash: function () {
-      if (this.$('.js-row-select:checked').length > 0) {
+      if (this.$('.js-to-delete').length > 0) {
         this.$('.js-bulk-delete').removeClass('disabled');
       } else {
         this.$('.js-bulk-delete').addClass('disabled');
