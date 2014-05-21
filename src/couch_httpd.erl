@@ -142,7 +142,7 @@ start_link(Name, Options) ->
 
 stop() ->
     mochiweb_http:stop(couch_httpd),
-    mochiweb_http:stop(https).
+    catch mochiweb_http:stop(https).
 
 
 set_auth_handlers() ->
