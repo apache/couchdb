@@ -18,19 +18,9 @@
 
 
 init() ->
-    LibDir = case config:get("couchdb", "util_driver_dir") of
-    undefined ->
-        filename:join(couch_util:priv_dir(), "lib");
-    LibDir0 ->
-        LibDir0
-    end,
     NumScheds = erlang:system_info(schedulers),
-    (catch erlang:load_nif(filename:join([LibDir, ?MODULE]), NumScheds)),
-    case erlang:system_info(otp_release) of
-    "R13B03" -> true;
-    _ -> ok
-    end.
-
+    Dir = code:priv_dir(couch),
+    ok = erlang:load_nif(filename:join(Dir, ?MODULE), NumScheds).
 
 less(A, B) ->
     try
