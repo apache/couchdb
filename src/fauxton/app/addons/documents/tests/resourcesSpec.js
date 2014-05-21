@@ -93,7 +93,7 @@ define([
         {"ok":true,"id":"2","rev":"6-da537822b9672a4b2f42adb1be04a5b1"}
       ]);
 
-      assert.equal(collection.length, 1)
+      assert.equal(collection.length, 1);
     });
 
     it("triggers a removed event with all ids", function () {
