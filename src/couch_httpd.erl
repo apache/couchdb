@@ -815,7 +815,7 @@ error_info(file_exists) ->
 error_info(request_entity_too_large) ->
     {413, <<"too_large">>, <<"the request entity is too large">>};
 error_info(request_uri_too_long) ->
-    {414, <<"too_long">>, <<"the request entity is too long">>};
+    {414, <<"too_long">>, <<"the request uri is too long">>};
 error_info({bad_ctype, Reason}) ->
     {415, <<"bad_content_type">>, Reason};
 error_info(requested_range_not_satisfiable) ->
