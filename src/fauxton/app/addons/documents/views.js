@@ -565,8 +565,11 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       this.expandDocs = true;
       this.perPageDefault = this.docParams.limit || 20;
 
-      this.bulkDeleteDocsCollection = options.bulkDeleteDocsCollection;
-      this.bulkDeleteDocsCollection.fetch({reset: true});
+      // some doclists don't have an option to delete
+      if (!this.viewList) {
+        this.bulkDeleteDocsCollection = options.bulkDeleteDocsCollection;
+        this.bulkDeleteDocsCollection.fetch({reset: true});
+      }
     },
 
     removeDocuments: function (ids) {
@@ -716,9 +719,13 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       docs = this.expandDocs ? this.collection : this.collection.simple();
 
       docs.each(function(doc) {
+        var isChecked;
+        if (this.bulkDeleteDocsCollection) {
+          isChecked = this.bulkDeleteDocsCollection.get(doc.id);
+        }
         this.rows[doc.id] = this.insertView("table.all-docs tbody", new this.nestedView({
           model: doc,
-          checked: this.bulkDeleteDocsCollection.get(doc.id)
+          checked: isChecked
         }));
       }, this);
     },
@@ -741,9 +748,12 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
 
     afterRender: function(){
       prettyPrint();
-      this.listenTo(this.bulkDeleteDocsCollection, 'error', this.showError);
-      this.listenTo(this.bulkDeleteDocsCollection, 'removed', this.removeDocuments);
-      this.listenTo(this.bulkDeleteDocsCollection, 'updated', this.toggleTrash);
+
+      if (this.bulkDeleteDocsCollection) {
+        this.listenTo(this.bulkDeleteDocsCollection, 'error', this.showError);
+        this.listenTo(this.bulkDeleteDocsCollection, 'removed', this.removeDocuments);
+        this.listenTo(this.bulkDeleteDocsCollection, 'updated', this.toggleTrash);
+      }
     },
 
     perPage: function () {
