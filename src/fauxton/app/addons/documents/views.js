@@ -576,6 +576,9 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       _.each(ids, function (id) {
         this.removeDocument(id);
       }, this);
+
+      this.pagination.updatePerPage(parseInt(this.$('#select-per-page :selected').val(), 10));
+      FauxtonAPI.triggerRouteEvent('perPageChange', this.pagination.documentsLeftToFetch());
     },
 
     removeDocument: function (id) {
