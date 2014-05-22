@@ -113,7 +113,6 @@ def write_configs(opts):
             "data_dir": os.path.join(DEV_PATH, "lib", node, "data"),
             "view_dir": os.path.join(DEV_PATH, "lib", node, "data"),
             "node_name": "-name %s@127.0.0.1" % node,
-            "clouseau_name": "clouseau%d@127.0.0.1" % i,
             "cluster_port": str((10000 * i) + 5984),
             "backend_port" : str((10000 * i) + 5986)
         }
