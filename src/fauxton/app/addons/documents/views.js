@@ -324,7 +324,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
 
       this.model.destroy().then(function(resp) {
         FauxtonAPI.addNotification({
-          msg: "Succesfully destroyed your doc",
+          msg: "Succesfully deleted your doc",
           clear:  true
         });
         that.$el.fadeOut(function () {
@@ -337,7 +337,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
         }
       }, function(resp) {
         FauxtonAPI.addNotification({
-          msg: "Failed to destroy your doc!",
+          msg: "Failed to deleted your doc!",
           type: "error",
           clear:  true
         });
@@ -592,11 +592,11 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
 
     showError: function (ids) {
       if (ids) {
-        showError('Failed to destroy: ' + ids.join(', '));
+        showError('Failed to delete: ' + ids.join(', '));
         return;
       }
 
-      showError('Failed to destroy your doc!');
+      showError('Failed to delete your doc!');
     },
 
     toggleDocument: function (event) {
@@ -803,13 +803,13 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
 
       this.model.destroy().then(function(resp) {
         FauxtonAPI.addNotification({
-          msg: "Succesfully destroyed your doc",
+          msg: "Succesfully deleted your doc",
           clear:  true
         });
         FauxtonAPI.navigate(database.url("index"));
       }, function(resp) {
         FauxtonAPI.addNotification({
-          msg: "Failed to destroy your doc!",
+          msg: "Failed to delete your doc!",
           type: "error",
           clear:  true
         });
