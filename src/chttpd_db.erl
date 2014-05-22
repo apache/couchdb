@@ -72,7 +72,7 @@ handle_changes_req(#httpd{method='GET'}=Req, Db) ->
                 ChangesArgs)
         end);
     Feed ->
-        % "longpoll" or "continuous"
+        % "longpoll" or "continuous" or "eventsource"
         fabric:changes(Db, fun changes_callback/2, {Feed, Req}, ChangesArgs)
     end;
 handle_changes_req(#httpd{path_parts=[_,<<"_changes">>]}=Req, _Db) ->
@@ -90,6 +90,26 @@ changes_callback({stop, EndSeq0}, {"continuous", Resp}) ->
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp,
         [?JSON_ENCODE({[{<<"last_seq">>, EndSeq}]}) | "\n"]),
     chttpd:end_delayed_json_response(Resp1);
+
+% callbacks for eventsource feed (newline-delimited eventsource Objects)
+changes_callback(start, {"eventsource", Req}) ->
+    Headers = [
+        {"Content-Type", "text/event-stream"},
+        {"Cache-Control", "no-cache"}
+    ],
+    {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, Headers),
+    {ok, {"eventsource", Resp}};
+changes_callback({change, {ChangeProp}=Change}, {"eventsource", Resp}) ->
+    Seq = proplists:get_value(seq, ChangeProp),
+    Chunk = [
+        "data: ", ?JSON_ENCODE(Change),
+        "\n", "id: ", ?JSON_ENCODE(Seq),
+        "\n\n"
+    ],
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, [Chunk]),
+    {ok, {"eventsource", Resp1}};
+changes_callback({stop, _EndSeq}, {"eventsource", Resp}) ->
+    chttpd:end_delayed_json_response(Resp);
 
 % callbacks for longpoll and normal (single JSON Object)
 changes_callback(start, {"normal", {"Etag", Etag}, Req}) ->
@@ -1190,12 +1210,14 @@ parse_doc_query(Req) ->
 
 parse_changes_query(Req) ->
     lists:foldl(fun({Key, Value}, Args) ->
-        case {Key, Value} of
+        case {string:to_lower(Key), Value} of
         {"feed", _} ->
             Args#changes_args{feed=Value};
         {"descending", "true"} ->
             Args#changes_args{dir=rev};
         {"since", _} ->
+            Args#changes_args{since=Value};
+        {"last-event-id", _} ->
             Args#changes_args{since=Value};
         {"limit", _} ->
             Args#changes_args{limit=list_to_integer(Value)};
