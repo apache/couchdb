@@ -13,7 +13,7 @@ the License.
 -->
 
 <td class="select"><input <%- checked ? 'checked="checked"' : '' %> type="checkbox" class="js-row-select"></td>
-<td class="js-row-document-container">
+<td>
   <div>
     <pre class="prettyprint"><%- doc.prettyJSON() %></pre>
     <% if (doc.isEditable()) { %>

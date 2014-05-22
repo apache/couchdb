@@ -546,8 +546,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       "click button.all": "selectAll",
       "click button.js-bulk-delete": "bulkDelete",
       "click #collapse": "collapse",
-      "change .js-row-select": "toggleDocument",
-      "click .js-row-document-container": "toggleDocument",
+      "click .all-docs-item": "toggleDocument",
       "click #js-end-results": "scrollToQuery"
     },
 
