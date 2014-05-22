@@ -232,3 +232,27 @@ Vendor information
     [vendor]
     name = The Apache Software Foundation
     version = 1.5.0
+
+.. _config/csp:
+
+Content-Security-Policy
+=======================
+
+.. config:section:: csp :: Content-Security-Policy
+
+  Experimental support of CSP Headers for ``/_utils`` (Fauxton).
+
+  .. config:option:: enable
+
+    Enable the sending of the Header ``Content-Security-Policy``::
+
+      [csp]
+      enable = true
+
+
+  .. config:option:: header_value
+
+    You can change the default value for the Header which is sent::
+
+      [csp]
+      header_value = default-src 'self'; img-src *; font-src *;
