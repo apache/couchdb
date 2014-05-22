@@ -203,6 +203,7 @@ handle_request(MochiReq) ->
 
     Result =
     try
+        check_request_uri_length(RawUri),
         case authenticate_request(HttpReq, AuthenticationFuns) of
         #httpd{} = Req ->
             HandlerFun = url_handler(HandlerKey),
@@ -220,6 +221,8 @@ handle_request(MochiReq) ->
         exit:{mochiweb_recv_error, E} ->
             couch_log:notice(LogForClosedSocket ++ " - ~p", [E]),
             exit(normal);
+        exit:{uri_too_long, _} ->
+            send_error(HttpReq, request_uri_too_long);
         throw:Error ->
             send_error(HttpReq, Error);
         error:database_does_not_exist ->
@@ -275,6 +278,19 @@ possibly_hack(#httpd{path_parts=[<<"_replicate">>]}=Req) ->
     Req;
 possibly_hack(Req) ->
     Req.
+
+check_request_uri_length(Uri) ->
+    check_request_uri_length(Uri, config:get("httpd", "max_uri_length")).
+
+check_request_uri_length(_Uri, undefined) ->
+    ok;
+check_request_uri_length(Uri, MaxUriLen) when is_list(MaxUriLen) ->
+    case length(Uri) > list_to_integer(MaxUriLen) of
+        true ->
+            throw(request_uri_too_long);
+        false ->
+            ok
+    end.
 
 fix_uri(Req, Props, Type) ->
     case is_http(replication_uri(Type, Props)) of
@@ -694,6 +710,8 @@ error_info({r_quorum_not_met, Reason}) ->
     {412, <<"read_quorum_not_met">>, Reason};
 error_info({w_quorum_not_met, Reason}) ->
     {500, <<"write_quorum_not_met">>, Reason};
+error_info(request_uri_too_long) ->
+    {414, <<"too_long">>, <<"the request uri is too long">>};
 error_info({bad_ctype, Reason}) ->
     {415, <<"bad_content_type">>, Reason};
 error_info(requested_range_not_satisfiable) ->
