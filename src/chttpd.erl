@@ -50,11 +50,17 @@ start_link(http) ->
 
 start_link(https) ->
     Port = config:get("ssl", "port", "6984"),
+    {ok, Ciphers} = couch_util:parse_term(config:get("ssl", "ciphers", "nil")),
+    {ok, Versions} = couch_util:parse_term(config:get("ssl", "tls_versions", "nil")),
+    {ok, SecureRenegotiate} = couch_util:parse_term(config:get("ssl", "secure_renegotiate", "nil")),
     ServerOpts0 =
         [{cacertfile, config:get("ssl", "cacert_file", nil)},
          {keyfile, config:get("ssl", "key_file", nil)},
          {certfile, config:get("ssl", "cert_file", nil)},
-         {password, config:get("ssl", "password", nil)}],
+         {password, config:get("ssl", "password", nil)},
+         {secure_renegotiate, SecureRenegotiate},
+         {versions, Versions},
+         {ciphers, Ciphers}],
 
     case (couch_util:get_value(keyfile, ServerOpts0) == nil orelse
         couch_util:get_value(certfile, ServerOpts0) == nil) of
