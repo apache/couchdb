@@ -49,58 +49,43 @@ start_link(http) ->
     start_link(?MODULE, [{port, Port}]);
 
 start_link(https) ->
-    Port = config:get("chttps", "port", "6984"),
-    CertFile = config:get("chttps", "cert_file", nil),
-    KeyFile = config:get("chttps", "key_file", nil),
-    Options = case CertFile /= nil andalso KeyFile /= nil of
+    Port = config:get("ssl", "port", "6984"),
+    ServerOpts0 =
+        [{cacertfile, config:get("ssl", "cacert_file", nil)},
+         {keyfile, config:get("ssl", "key_file", nil)},
+         {certfile, config:get("ssl", "cert_file", nil)},
+         {password, config:get("ssl", "password", nil)}],
+
+    case (couch_util:get_value(keyfile, ServerOpts0) == nil orelse
+        couch_util:get_value(certfile, ServerOpts0) == nil) of
         true ->
-            SslOpts = [{certfile, CertFile}, {keyfile, KeyFile}],
-
-            %% set password if one is needed for the cert
-            SslOpts1 = case config:get("chttps", "password", nil) of
-                nil -> SslOpts;
-                Password ->
-                    SslOpts ++ [{password, Password}]
-            end,
-            % do we verify certificates ?
-            FinalSslOpts = case config:get("chttps",
-                    "verify_ssl_certificates", "false") of
-                "false" -> SslOpts1;
-                "true" ->
-                    case config:get("chttps",
-                            "cacert_file", nil) of
-                        nil ->
-                            io:format("Verify SSL certificate "
-                                ++"enabled but file containing "
-                                ++"PEM encoded CA certificates is "
-                                ++"missing", []),
-                            throw({error, missing_cacerts});
-                        CaCertFile ->
-                            Depth = list_to_integer(config:get("chttps",
-                                    "ssl_certificate_max_depth",
-                                    "1")),
-                            FinalOpts = [
-                                {cacertfile, CaCertFile},
-                                {depth, Depth},
-                                {verify, verify_peer}],
-                            % allows custom verify fun.
-                            case config:get("chttps",
-                                    "verify_fun", nil) of
-                                nil -> FinalOpts;
-                                SpecStr ->
-                                    FinalOpts
-                                    ++ [{verify_fun, couch_httpd:make_arity_3_fun(SpecStr)}]
-                            end
-                    end
-            end,
-
-            [{port, Port},
-                {ssl, true},
-                {ssl_opts, FinalSslOpts}];
-        false ->
             io:format("SSL enabled but PEM certificates are missing.", []),
-            throw({error, missing_certs})
+            throw({error, missing_certs});
+        false ->
+            ok
     end,
+
+    ServerOpts = [Opt || {_, V}=Opt <- ServerOpts0, V /= nil],
+
+    ClientOpts = case config:get("ssl", "verify_ssl_certificates", "false") of
+        "false" ->
+            [];
+        "true" ->
+            [{depth, list_to_integer(config:get("ssl",
+                "ssl_certificate_max_depth", "1"))},
+             {verify, verify_peer}] ++
+            case config:get("ssl", "verify_fun", nil) of
+                nil -> [];
+                SpecStr ->
+                    [{verify_fun, couch_httpd:make_arity_3_fun(SpecStr)}]
+            end
+    end,
+    SslOpts = ServerOpts ++ ClientOpts,
+
+    Options =
+        [{port, Port},
+         {ssl, true},
+         {ssl_opts, SslOpts}],
     start_link(https, Options).
 
 start_link(Name, Options) ->
