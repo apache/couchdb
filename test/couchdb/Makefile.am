@@ -21,6 +21,7 @@ all:
 	chmod +x run
 
 eunit_files = \
+    couch_auth_cache_tests.erl \
     couch_btree_tests.erl \
     couch_changes_tests.erl \
     couch_db_tests.erl \
