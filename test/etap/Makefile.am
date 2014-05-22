@@ -36,7 +36,6 @@ fixture_files = \
     fixtures/test.couch
 
 tap_files = \
-    076-file-compression.t \
     077-couch-db-fast-db-delete-create.t \
     080-config-get-set.t \
     081-config-override.1.ini \
