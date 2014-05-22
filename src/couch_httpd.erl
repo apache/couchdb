@@ -44,7 +44,7 @@ start_link(https) ->
     ServerOpts0 =
         [{cacertfile, config:get("ssl", "cacert_file", nil)},
          {keyfile, config:get("ssl", "key_file", nil)},
-         {certfile, onfig:get("ssl", "cert_file", nil)},
+         {certfile, config:get("ssl", "cert_file", nil)},
          {password, config:get("ssl", "password", nil)},
          {secure_renegotiate, SecureRenegotiate},
          {versions, Versions},
