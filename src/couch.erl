@@ -27,7 +27,7 @@ deps() ->
         ibrowse,
         mochiweb,
         config,
-        twig
+        couch_log
     ].
 
 
