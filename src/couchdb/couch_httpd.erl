@@ -963,7 +963,7 @@ negotiate_content_type(Req) ->
     case get(jsonp) of
         no_jsonp -> negotiate_content_type1(Req);
         [] -> negotiate_content_type1(Req);
-        _Callback -> "text/javascript"
+        _Callback -> "application/javascript"
     end.
 
 negotiate_content_type1(#httpd{mochi_req=MochiReq}) ->
