@@ -22,7 +22,7 @@
 -import(fabric_db_update_listener, [wait_db_updated/1]).
 
 go(DbName, Feed, Options, Callback, Acc0) when Feed == "continuous" orelse
-        Feed == "longpoll" ->
+        Feed == "longpoll" orelse Feed == "eventsource" ->
     Args = make_changes_args(Options),
     Since = get_start_seq(DbName, Args),
     case validate_start_seq(DbName, Since) of
