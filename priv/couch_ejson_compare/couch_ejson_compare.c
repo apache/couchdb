@@ -14,7 +14,7 @@
 
 #include <stdio.h>
 #include <assert.h>
-#include "erl_nif_compat.h"
+#include "erl_nif.h"
 #include "unicode/ucol.h"
 #include "unicode/ucasemap.h"
 
@@ -164,7 +164,7 @@ less_json(int depth, ctx_t* ctx, ERL_NIF_TERM a, ERL_NIF_TERM b)
 
     if (aIsNumber) {
         if (bIsNumber) {
-            return enif_compare_compat(ctx->env, a, b);
+            return enif_compare(a, b);
         }
 
         return -1;
@@ -234,11 +234,11 @@ less_json(int depth, ctx_t* ctx, ERL_NIF_TERM a, ERL_NIF_TERM b)
 int
 atom_sort_order(ErlNifEnv* env, ERL_NIF_TERM a)
 {
-    if (enif_compare_compat(env, a, ATOM_NULL) == 0) {
+    if (enif_compare(a, ATOM_NULL) == 0) {
         return 1;
-    } else if (enif_compare_compat(env, a, ATOM_FALSE) == 0) {
+    } else if (enif_compare(a, ATOM_FALSE) == 0) {
         return 2;
-    } else if (enif_compare_compat(env, a, ATOM_TRUE) == 0) {
+    } else if (enif_compare(a, ATOM_TRUE) == 0) {
         return 3;
     }
 
