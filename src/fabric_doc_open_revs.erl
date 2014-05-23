@@ -187,7 +187,6 @@ unstrip_not_found_missing([Else | Rest]) ->
 all_revs_test() ->
     config:start_link([]),
     meck:new(fabric),
-    meck:expect(fabric, dbname, fun(Name) -> Name end),
     meck:expect(fabric, update_docs, fun(_, _, _) -> {ok, nil} end),
     State0 = #state{worker_count = 3, workers=[nil,nil,nil], r = 2, revs = all},
     Foo1 = {ok, #doc{revs = {1, [<<"foo">>]}}},
@@ -238,7 +237,6 @@ all_revs_test() ->
 specific_revs_test() ->
     config:start_link([]),
     meck:new(fabric),
-    meck:expect(fabric, dbname, fun(Name) -> Name end),
     meck:expect(fabric, update_docs, fun(_, _, _) -> {ok, nil} end),
     Revs = [{1,<<"foo">>}, {1,<<"bar">>}, {1,<<"baz">>}],
     State0 = #state{
