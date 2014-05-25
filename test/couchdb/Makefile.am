@@ -40,10 +40,15 @@ eunit_files = \
     test_request.erl \
     include/couch_eunit.hrl
 
+fixture_files = \
+    fixtures/couch_config_tests_1.ini \
+    fixtures/couch_config_tests_2.ini
+
 EXTRA_DIST = \
     run.in \
     eunit.ini \
-    $(eunit_files)
+    $(eunit_files) \
+    $(fixture_files)
 
 clean-local:
 	rm -rf ebin/

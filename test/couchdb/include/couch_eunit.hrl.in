@@ -18,6 +18,8 @@
     filename:join([?BUILDDIR, "etc", "couchdb", "default_dev.ini"]),
     filename:join([?BUILDDIR, "etc", "couchdb", "local_dev.ini"]),
     filename:join([?SOURCEDIR, "test", "couchdb", "eunit.ini"])]).
+-define(FIXTURESDIR,
+    filename:join([?SOURCEDIR, "test", "couchdb", "fixtures"])).
 -define(TEMPDIR,
     filename:join([?BUILDDIR, "test", "couchdb", "temp"])).
 
