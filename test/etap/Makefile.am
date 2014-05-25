@@ -36,9 +36,6 @@ fixture_files = \
     fixtures/test.couch
 
 tap_files = \
-    081-config-override.1.ini \
-    081-config-override.2.ini \
-    081-config-override.t \
     082-config-register.t \
     083-config-no-files.t \
     090-task-status.t \
