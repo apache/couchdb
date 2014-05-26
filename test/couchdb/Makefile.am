@@ -27,6 +27,7 @@ eunit_files = \
     couch_doc_json_tests.erl \
     couch_file_tests.erl \
     couch_key_tree_tests.erl \
+    couch_ref_counter_tests.erl \
     couch_stream_tests.erl \
     couch_task_status_tests.erl \
     couch_util_tests.erl \
