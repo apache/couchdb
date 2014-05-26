@@ -15,6 +15,7 @@
 -include("couch_eunit.hrl").
 -include_lib("couchdb/couch_db.hrl").
 
+-define(SHORT_TIMEOUT, 100).
 -define(TIMEOUT, 1000).
 
 -define(CONFIG_DEFAULT,
@@ -43,6 +44,32 @@ setup(Chain) ->
     {ok, Pid} = couch_config:start_link(Chain),
     Pid.
 
+setup_register() ->
+    ConfigPid = setup(),
+    SentinelFunc = fun() ->
+        % Ping/Pong to make sure we wait for this
+        % process to die
+        receive
+            {ping, From} ->
+                From ! pong
+        end
+    end,
+    SentinelPid = spawn(SentinelFunc),
+    {ConfigPid, SentinelPid}.
+
+teardown({ConfigPid, SentinelPid}) ->
+    teardown(ConfigPid),
+    case process_info(SentinelPid) of
+        undefined -> ok;
+        _ ->
+            SentinelPid ! {ping, self()},
+            receive
+                pong ->
+                    ok
+            after 100 ->
+                throw({timeout_error, registered_pid})
+            end
+    end;
 teardown(Pid) ->
     couch_config:stop(),
     erlang:monitor(process, Pid),
@@ -64,7 +91,8 @@ couch_config_test_() ->
             couch_config_set_tests(),
             couch_config_del_tests(),
             config_override_tests(),
-            config_persistent_changes_tests()
+            config_persistent_changes_tests(),
+            config_register_tests()
         ]
     }.
 
@@ -148,6 +176,21 @@ config_persistent_changes_tests() ->
                  fun should_ensure_that_default_wasnt_modified/2},
                 {{temporary, [?CONFIG_FIXTURE_TEMP]},
                  fun should_ensure_that_written_to_last_config_in_chain/2}
+            ]
+        }
+    }.
+
+config_register_tests() ->
+    {
+        "Config changes subscriber",
+        {
+            foreach,
+            fun setup_register/0, fun teardown/1,
+            [
+                fun should_handle_port_changes/1,
+                fun should_pass_persistent_flag/1,
+                fun should_not_trigger_handler_on_other_options_changes/1,
+                fun should_not_trigger_handler_after_related_process_death/1
             ]
         }
     }.
@@ -280,4 +323,106 @@ should_ensure_that_written_to_last_config_in_chain(_, _) ->
                      couch_config:get("httpd", "port")),
         ?assertEqual(undefined,
                      couch_config:get("httpd", "bind_address"))
+    end).
+
+should_handle_port_changes({_, SentinelPid}) ->
+    ?_assert(begin
+        MainProc = self(),
+        Port = "8080",
+
+        couch_config:register(
+            fun("httpd", "port", Value) ->
+                % couch_config catches every error raised from handler
+                % so it's not possible to just assert on wrong value.
+                % We have to return the result as message
+                MainProc ! (Value =:= Port)
+            end,
+            SentinelPid
+        ),
+        ok = couch_config:set("httpd", "port", Port, false),
+
+        receive
+            R ->
+                R
+        after ?TIMEOUT ->
+             erlang:error({assertion_failed,
+                           [{module, ?MODULE},
+                            {line, ?LINE},
+                            {reason, "Timeout"}]})
+        end
+    end).
+
+should_pass_persistent_flag({_, SentinelPid}) ->
+    ?_assert(begin
+        MainProc = self(),
+
+        couch_config:register(
+            fun("httpd", "port", _, Persist) ->
+                % couch_config catches every error raised from handler
+                % so it's not possible to just assert on wrong value.
+                % We have to return the result as message
+                MainProc ! Persist
+            end,
+            SentinelPid
+        ),
+        ok = couch_config:set("httpd", "port", "8080", false),
+
+        receive
+            false ->
+                true
+        after ?SHORT_TIMEOUT ->
+            false
+        end
+    end).
+
+should_not_trigger_handler_on_other_options_changes({_, SentinelPid}) ->
+    ?_assert(begin
+        MainProc = self(),
+
+        couch_config:register(
+            fun("httpd", "port", _) ->
+                MainProc ! ok
+            end,
+            SentinelPid
+        ),
+        ok = couch_config:set("httpd", "bind_address", "0.0.0.0", false),
+
+        receive
+            ok ->
+                false
+        after ?SHORT_TIMEOUT ->
+            true
+        end
+    end).
+
+should_not_trigger_handler_after_related_process_death({_, SentinelPid}) ->
+    ?_assert(begin
+        MainProc = self(),
+
+        couch_config:register(
+            fun("httpd", "port", _) ->
+                MainProc ! ok
+            end,
+            SentinelPid
+        ),
+
+        SentinelPid ! {ping, MainProc},
+        receive
+            pong ->
+                ok
+        after ?SHORT_TIMEOUT ->
+             erlang:error({assertion_failed,
+                           [{module, ?MODULE},
+                            {line, ?LINE},
+                            {reason, "Timeout"}]})
+        end,
+
+        ok = couch_config:set("httpd", "port", "12345", false),
+
+        receive
+            ok ->
+                false
+        after ?SHORT_TIMEOUT ->
+            true
+        end
     end).

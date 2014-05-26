@@ -36,7 +36,6 @@ fixture_files = \
     fixtures/test.couch
 
 tap_files = \
-    082-config-register.t \
     083-config-no-files.t \
     090-task-status.t \
     100-ref-counter.t \
