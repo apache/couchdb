@@ -36,7 +36,6 @@ fixture_files = \
     fixtures/test.couch
 
 tap_files = \
-    100-ref-counter.t \
     120-stats-collect.t \
     121-stats-aggregates.cfg \
     121-stats-aggregates.ini \
