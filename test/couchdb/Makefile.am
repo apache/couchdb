@@ -31,6 +31,7 @@ eunit_files = \
     couch_key_tree_tests.erl \
     couch_ref_counter_tests.erl \
     couch_stream_tests.erl \
+    couch_stats_tests.erl \
     couch_task_status_tests.erl \
     couch_util_tests.erl \
     couch_uuids_tests.erl \
