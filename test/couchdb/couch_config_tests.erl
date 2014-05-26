@@ -44,6 +44,9 @@ setup(Chain) ->
     {ok, Pid} = couch_config:start_link(Chain),
     Pid.
 
+setup_empty() ->
+    setup([]).
+
 setup_register() ->
     ConfigPid = setup(),
     SentinelFunc = fun() ->
@@ -92,7 +95,8 @@ couch_config_test_() ->
             couch_config_del_tests(),
             config_override_tests(),
             config_persistent_changes_tests(),
-            config_register_tests()
+            config_register_tests(),
+            config_no_files_tests()
         ]
     }.
 
@@ -191,6 +195,20 @@ config_register_tests() ->
                 fun should_pass_persistent_flag/1,
                 fun should_not_trigger_handler_on_other_options_changes/1,
                 fun should_not_trigger_handler_after_related_process_death/1
+            ]
+        }
+    }.
+
+config_no_files_tests() ->
+    {
+        "Test couch_config with no files",
+        {
+            foreach,
+            fun setup_empty/0, fun teardown/1,
+            [
+                should_ensure_that_no_ini_files_loaded(),
+                should_create_non_persistent_option(),
+                should_create_persistent_option()
             ]
         }
     }.
@@ -426,3 +444,20 @@ should_not_trigger_handler_after_related_process_death({_, SentinelPid}) ->
             true
         end
     end).
+
+should_ensure_that_no_ini_files_loaded() ->
+    ?_assertEqual(0, length(couch_config:all())).
+
+should_create_non_persistent_option() ->
+    ?_assertEqual("80",
+        begin
+            ok = couch_config:set("httpd", "port", "80", false),
+            couch_config:get("httpd", "port")
+        end).
+
+should_create_persistent_option() ->
+    ?_assertEqual("127.0.0.1",
+        begin
+            ok = couch_config:set("httpd", "bind_address", "127.0.0.1"),
+            couch_config:get("httpd", "bind_address")
+        end).
