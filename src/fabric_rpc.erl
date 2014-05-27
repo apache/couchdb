@@ -15,7 +15,7 @@
 -export([get_db_info/1, get_doc_count/1, get_update_seq/1]).
 -export([open_doc/3, open_revs/4, get_missing_revs/2, get_missing_revs/3,
     update_docs/3]).
--export([all_docs/2, changes/3, map_view/4, reduce_view/4, group_info/2]).
+-export([all_docs/3, changes/3, map_view/4, reduce_view/4, group_info/2]).
 -export([create_db/1, delete_db/1, reset_validation_funs/1, set_security/3,
     set_revs_limit/3, create_shard_db_doc/2, delete_shard_db_doc/2]).
 -export([get_all_security/2]).
@@ -48,8 +48,8 @@ changes(DbName, Options, StartSeq) ->
         rexi:reply(Error)
     end.
 
-all_docs(DbName, #mrargs{keys=undefined} = Args) ->
-    {ok, Db} = get_or_create_db(DbName, []),
+all_docs(DbName, Options, #mrargs{keys=undefined} = Args) ->
+    {ok, Db} = get_or_create_db(DbName, Options),
     VAcc0 = #vacc{db=Db},
     couch_mrview:query_all_docs(Db, Args, fun view_cb/2, VAcc0).
 

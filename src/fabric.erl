@@ -29,7 +29,7 @@
     update_doc/3, update_docs/3, purge_docs/2, att_receiver/2]).
 
 % Views
--export([all_docs/4, changes/4, query_view/3, query_view/4, query_view/6,
+-export([all_docs/5, changes/4, query_view/3, query_view/4, query_view/6,
     get_view_group_info/2]).
 
 % miscellany
@@ -238,16 +238,16 @@ att_receiver(Req, Length) ->
 %%      also be passed to further constrain the query. See <a href=
 %%      "http://wiki.apache.org/couchdb/HTTP_Document_API#All_Documents">
 %%      all_docs</a> for details
--spec all_docs(dbname(), callback(), [] | tuple(), #mrargs{}) ->
+-spec all_docs(dbname(), [{atom(), any()}], callback(), [] | tuple(), #mrargs{}) ->
     {ok, [any()]}.
-all_docs(DbName, Callback, Acc0, #mrargs{} = QueryArgs) when
+all_docs(DbName, Options, Callback, Acc0, #mrargs{} = QueryArgs) when
         is_function(Callback, 2) ->
-    fabric_view_all_docs:go(dbname(DbName), QueryArgs, Callback, Acc0);
+    fabric_view_all_docs:go(dbname(DbName), opts(Options), QueryArgs, Callback, Acc0);
 
 %% @doc convenience function that takes a keylist rather than a record
 %% @equiv all_docs(DbName, Callback, Acc0, kl_to_query_args(QueryArgs))
-all_docs(DbName, Callback, Acc0, QueryArgs) ->
-    all_docs(DbName, Callback, Acc0, kl_to_query_args(QueryArgs)).
+all_docs(DbName, Options, Callback, Acc0, QueryArgs) ->
+    all_docs(DbName, Options, Callback, Acc0, kl_to_query_args(QueryArgs)).
 
 
 -spec changes(dbname(), callback(), any(), #changes_args{} | [{atom(),any()}]) ->
@@ -343,7 +343,7 @@ design_docs(DbName) ->
     ({error, Reason}, _Acc) ->
         {error, Reason}
     end,
-    fabric:all_docs(dbname(DbName), Callback, [], QueryArgs).
+    fabric:all_docs(dbname(DbName), [?ADMIN_CTX], Callback, [], QueryArgs).
 
 %% @doc forces a reload of validation functions, this is performed after
 %%      design docs are update

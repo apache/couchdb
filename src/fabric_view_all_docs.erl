@@ -12,16 +12,16 @@
 
 -module(fabric_view_all_docs).
 
--export([go/4]).
--export([open_doc/3]). % exported for spawn
+-export([go/5]).
+-export([open_doc/4]). % exported for spawn
 
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
-go(DbName, #mrargs{keys=undefined} = QueryArgs, Callback, Acc0) ->
-    Workers = fabric_util:submit_jobs(mem3:shards(DbName),all_docs,[QueryArgs]),
+go(DbName, Options, #mrargs{keys=undefined} = QueryArgs, Callback, Acc0) ->
+    Workers = fabric_util:submit_jobs(mem3:shards(DbName),all_docs,[Options, QueryArgs]),
     #mrargs{limit = Limit, skip = Skip} = QueryArgs,
     State = #collector{
         query_args = QueryArgs,
@@ -46,7 +46,7 @@ go(DbName, #mrargs{keys=undefined} = QueryArgs, Callback, Acc0) ->
     end;
 
 
-go(DbName, QueryArgs, Callback, Acc0) ->
+go(DbName, Options, QueryArgs, Callback, Acc0) ->
     #mrargs{
         direction = Dir,
         include_docs = IncludeDocs,
@@ -56,7 +56,7 @@ go(DbName, QueryArgs, Callback, Acc0) ->
     } = QueryArgs,
     {_, Ref0} = spawn_monitor(fun() -> exit(fabric:get_doc_count(DbName)) end),
     SpawnFun = fun(Key) ->
-        spawn_monitor(?MODULE, open_doc, [DbName, Key, IncludeDocs])
+        spawn_monitor(?MODULE, open_doc, [DbName, Options, Key, IncludeDocs])
     end,
     MaxJobs = all_docs_concurrency(),
     Keys1 = case Dir of
@@ -186,8 +186,8 @@ doc_receive_loop(Keys, Pids, SpawnFun, MaxJobs, Callback, AccIn) ->
         end
     end.
 
-open_doc(DbName, Id, IncludeDocs) ->
-    Row = case fabric:open_doc(DbName, Id, [deleted]) of
+open_doc(DbName, Options, Id, IncludeDocs) ->
+    Row = case fabric:open_doc(DbName, Id, [deleted | Options]) of
     {not_found, missing} ->
         Doc = undefined,
         #view_row{key=Id};
