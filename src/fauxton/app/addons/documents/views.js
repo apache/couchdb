@@ -585,11 +585,14 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
     },
 
     removeDocument: function (id) {
+      var that = this;
+
       if (!this.rows[id]) {
         return;
       }
-      this.rows[id].$el.fadeOut(function () {
-        $(this).remove();
+
+      this.rows[id].$el.fadeOut('slow', function () {
+        that.rows[id].remove();
       });
     },
 
