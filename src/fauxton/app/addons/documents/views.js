@@ -602,8 +602,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
     },
 
     toggleDocument: function (event) {
-      this.toggleTrash();
-
       var $row = this.$(event.target).closest('tr'),
           docId = $row.attr('data-id'),
           db = this.database.get('id'),
@@ -618,13 +616,17 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
 
       $row.find('.js-row-select').prop('checked', !$row.hasClass('js-to-delete'));
       $row.toggleClass('js-to-delete');
+
+      this.toggleTrash();
     },
 
     toggleTrash: function () {
+      var $bulkdDeleteButton = this.$('.js-bulk-delete');
+
       if (this.$('.js-to-delete').length > 0) {
-        this.$('.js-bulk-delete').removeClass('disabled');
+        $bulkdDeleteButton.removeClass('disabled');
       } else {
-        this.$('.js-bulk-delete').addClass('disabled');
+        $bulkdDeleteButton.addClass('disabled');
       }
     },
 
