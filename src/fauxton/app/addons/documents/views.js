@@ -568,6 +568,10 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       // some doclists don't have an option to delete
       if (!this.viewList) {
         this.bulkDeleteDocsCollection = options.bulkDeleteDocsCollection;
+
+        this.bulkDeleteDocsCollection.on('error', this.showError, this);
+        this.bulkDeleteDocsCollection.on('removed', this.removeDocuments, this);
+        this.bulkDeleteDocsCollection.on('updated', this.toggleTrash, this);
       }
     },
 
@@ -700,6 +704,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       this.pagination && this.pagination.remove();
       this.allDocsNumber && this.allDocsNumber.remove();
       _.each(this.rows, function (row) {row.remove();});
+      this.bulkDeleteDocsCollection.off();
     },
 
     beforeRender: function() {
@@ -754,12 +759,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
 
     afterRender: function(){
       prettyPrint();
-
-      if (this.bulkDeleteDocsCollection) {
-        this.listenTo(this.bulkDeleteDocsCollection, 'error', this.showError);
-        this.listenTo(this.bulkDeleteDocsCollection, 'removed', this.removeDocuments);
-        this.listenTo(this.bulkDeleteDocsCollection, 'updated', this.toggleTrash);
-      }
     },
 
     perPage: function () {
