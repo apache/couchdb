@@ -106,7 +106,11 @@ changes_callback({change, {ChangeProp}=Change}, {"eventsource", Resp}) ->
         "\n", "id: ", ?JSON_ENCODE(Seq),
         "\n\n"
     ],
-    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, [Chunk]),
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, Chunk),
+    {ok, {"eventsource", Resp1}};
+changes_callback(timeout, {"eventsource", Resp}) ->
+    Chunk = "event: heartbeat\ndata: \n\n",
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, Chunk),
     {ok, {"eventsource", Resp1}};
 changes_callback({stop, _EndSeq}, {"eventsource", Resp}) ->
     chttpd:end_delayed_json_response(Resp);
