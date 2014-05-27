@@ -17,7 +17,7 @@ the License.
     <div class="row">
       <div class="btn-toolbar span6">
         <button type="button" class="btn btn-small all" data-toggle="button">✓ All</button>
-        <button class="btn btn-small disabled bulk-delete"><i class="icon-trash"></i></button>
+        <button class="btn btn-small disabled js-bulk-delete"><i class="icon-trash"></i></button>
         <% if (expandDocs) { %>
         <button id="collapse" class="btn btn-small"><i class="icon-minus"></i> Collapse</button>
         <% } else { %>
@@ -32,8 +32,8 @@ the License.
   <table class="all-docs table table-striped table-condensed">
     <tbody></tbody>
   </table>
-  
-  <% if (endOfResults) { %>  
+
+  <% if (endOfResults) { %>
   <div class="text-center well">
     <p class="muted">
       End of results - <a id="js-end-results" href="#query" data-bypass="true" data-toggle="tab">edit query</a>

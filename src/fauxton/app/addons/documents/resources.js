@@ -41,7 +41,7 @@ function(app, FauxtonAPI, PagingCollection) {
     };
   })();
 
-  
+
   Documents.Doc = FauxtonAPI.Model.extend({
     idAttribute: "_id",
     documentation: function(){
@@ -294,6 +294,92 @@ function(app, FauxtonAPI, PagingCollection) {
     }
 
   });
+
+  Documents.BulkDeleteDoc = FauxtonAPI.Model.extend({
+    idAttribute: "_id"
+  });
+
+  Documents.BulkDeleteDocCollection = FauxtonAPI.Collection.extend({
+
+    model: Documents.BulkDeleteDoc,
+
+    sync: function() {},
+
+    initialize: function (models, options) {
+      this.databaseId = options.databaseId;
+    },
+
+    bulkDelete: function () {
+      var payload = this.createPayload(this.toJSON()),
+          that = this;
+
+      $.ajax({
+        type: 'POST',
+        url: app.host + '/' + this.databaseId + '/_bulk_docs',
+        contentType: 'application/json',
+        dataType: 'json',
+        data: JSON.stringify(payload),
+      })
+      .then(function (res) {
+        that.handleResponse(res);
+      })
+      .fail(function () {
+        var ids = _.reduce(that.toArray(), function (acc, doc) {
+          acc.push(doc.id);
+          return acc;
+        }, []);
+        that.trigger('error', ids);
+      });
+    },
+
+    handleResponse: function (res) {
+      var ids = _.reduce(res, function (ids, doc) {
+        if (doc.error) {
+          ids.errorIds.push(doc.id);
+        }
+
+        if (doc.ok === true) {
+          ids.successIds.push(doc.id);
+        }
+
+        return ids;
+      }, {errorIds: [], successIds: []});
+
+      this.removeDocuments(ids.successIds);
+
+      if (ids.errorIds.length) {
+        this.trigger('error', ids.errorIds);
+      }
+
+      this.trigger('updated');
+    },
+
+    removeDocuments: function (ids) {
+      var reloadDesignDocs = false;
+      _.each(ids, function (id) {
+        if (/_design/.test(id)) {
+          reloadDesignDocs = true;
+        }
+
+        this.remove(this.get(id));
+      }, this);
+
+      if (reloadDesignDocs) {
+        FauxtonAPI.triggerRouteEvent('reloadDesignDocs');
+      }
+
+      this.trigger('removed', ids);
+    },
+
+    createPayload: function (documents) {
+      var documentList = documents;
+
+      return {
+        docs: documentList
+      };
+    }
+  });
+
 
   Documents.AllDocs = PagingCollection.extend({
     model: Documents.Doc,

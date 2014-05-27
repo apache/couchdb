@@ -12,13 +12,13 @@ License for the specific language governing permissions and limitations under
 the License.
 -->
 
-<td class="select"><input type="checkbox" class="row-select"></td>
+<td class="select"><input <%- checked ? 'checked="checked"' : '' %> type="checkbox" class="js-row-select"></td>
 <td>
   <div>
     <pre class="prettyprint"><%- doc.prettyJSON() %></pre>
     <% if (doc.isEditable()) { %>
       <div class="btn-group">
-        <a href="#<%= doc.url('web-index') %>" class="btn btn-small edits">Edit <%= doc.docType() %></a>
+        <a href="#<%= doc.url('web-index') %>" class="btn btn-small edits">Edit <%- doc.docType() %></a>
         <button href="#" class="btn btn-small btn-danger delete" title="Delete this document."><i class="icon icon-trash"></i></button>
       </div>
     <% } %>

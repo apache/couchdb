@@ -241,9 +241,11 @@ function(app, FauxtonAPI, Documents, Databases) {
       }));
 
       this.documentsView = this.setView("#dashboard-lower-content", new Documents.Views.AllDocsList({
+        database: this.data.database,
         collection: this.data.database.allDocs,
         docParams: docParams,
-        params: urlParams
+        params: urlParams,
+        bulkDeleteDocsCollection: new Documents.BulkDeleteDocCollection([], {databaseId: this.data.database.get('id')})
       }));
 
       this.crumbs = [
