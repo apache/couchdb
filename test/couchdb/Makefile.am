@@ -43,7 +43,9 @@ eunit_files = \
 
 fixture_files = \
     fixtures/couch_config_tests_1.ini \
-    fixtures/couch_config_tests_2.ini
+    fixtures/couch_config_tests_2.ini \
+    fixtures/couch_stats_aggregates.cfg \
+    fixtures/couch_stats_aggregates.ini
 
 EXTRA_DIST = \
     run.in \

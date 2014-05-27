@@ -15,16 +15,39 @@
 -include("couch_eunit.hrl").
 -include_lib("couchdb/couch_db.hrl").
 
+-define(STATS_CFG_FIXTURE,
+    filename:join([?FIXTURESDIR, "couch_stats_aggregates.cfg"])).
+-define(STATS_INI_FIXTURE,
+    filename:join([?FIXTURESDIR, "couch_stats_aggregates.ini"])).
 -define(TIMEOUT, 1000).
--define(SLEEPTIME, 100).
+-define(TIMEWAIT, 500).
 
 
 setup_collector() ->
     couch_stats_collector:start(),
     ok.
 
+setup_aggregator(_) ->
+    {ok, Pid} = couch_config:start_link([?STATS_INI_FIXTURE]),
+    {ok, _} = couch_stats_collector:start(),
+    {ok, _} = couch_stats_aggregator:start(?STATS_CFG_FIXTURE),
+    Pid.
+
 teardown_collector(_) ->
     couch_stats_collector:stop(),
+    ok.
+
+teardown_aggregator(_, Pid) ->
+    couch_stats_aggregator:stop(),
+    couch_stats_collector:stop(),
+    erlang:monitor(process, Pid),
+    couch_config:stop(),
+    receive
+        {'DOWN', _, _, Pid, _} ->
+            ok
+    after ?TIMEOUT ->
+        throw({timeout, config_stop})
+    end,
     ok.
 
 
@@ -49,6 +72,39 @@ couch_stats_collector_test_() ->
                 should_return_absolute_values()
             ]
         }
+    }.
+
+couch_stats_aggregator_test_() ->
+    Funs = [
+        fun should_init_empty_aggregate/2,
+        fun should_get_empty_aggregate/2,
+        fun should_change_stats_on_values_add/2,
+        fun should_change_stats_for_all_times_on_values_add/2,
+        fun should_change_stats_on_values_change/2,
+        fun should_change_stats_for_all_times_on_values_change/2,
+        fun should_not_remove_data_after_some_time_for_0_sample/2,
+        fun should_remove_data_after_some_time_for_other_samples/2
+    ],
+    {
+        "CouchDB stats aggregator tests",
+        [
+            {
+                "Absolute values",
+                {
+                    foreachx,
+                    fun setup_aggregator/1, fun teardown_aggregator/2,
+                    [{absolute, Fun} || Fun <- Funs]
+                }
+            },
+            {
+                "Counters",
+                {
+                    foreachx,
+                    fun setup_aggregator/1, fun teardown_aggregator/2,
+                    [{counter, Fun} || Fun <- Funs]
+                }
+            }
+        ]
     }.
 
 
@@ -122,7 +178,7 @@ should_decrement_counter_on_process_exit() ->
             end,
             % sleep for awhile to let collector handle the updates
             % suddenly, it couldn't notice process death instantly
-            timer:sleep(?SLEEPTIME),
+            timer:sleep(?TIMEWAIT),
             couch_stats_collector:get(hoopla)
         end).
 
@@ -138,7 +194,7 @@ should_decrement_for_each_track_process_count_call_on_exit() ->
             after ?TIMEOUT ->
                 throw(timeout)
             end,
-            timer:sleep(?SLEEPTIME),
+            timer:sleep(?TIMEWAIT),
             couch_stats_collector:get(hoopla)
         end).
 
@@ -170,6 +226,158 @@ should_return_absolute_values() ->
             lists:sort(couch_stats_collector:all(absolute))
         end).
 
+should_init_empty_aggregate(absolute, _) ->
+    {Aggs} = couch_stats_aggregator:all(),
+    ?_assertEqual({[{'11', make_agg(<<"randomosity">>,
+                                    null, null, null, null, null)}]},
+                  couch_util:get_value(number, Aggs));
+should_init_empty_aggregate(counter, _) ->
+    {Aggs} = couch_stats_aggregator:all(),
+    ?_assertEqual({[{stuff, make_agg(<<"yay description">>,
+                                     null, null, null, null, null)}]},
+                  couch_util:get_value(testing, Aggs)).
+
+should_get_empty_aggregate(absolute, _) ->
+    ?_assertEqual(make_agg(<<"randomosity">>, null, null, null, null, null),
+             couch_stats_aggregator:get_json({number, '11'}));
+should_get_empty_aggregate(counter, _) ->
+    ?_assertEqual(make_agg(<<"yay description">>, null, null, null, null, null),
+             couch_stats_aggregator:get_json({testing, stuff})).
+
+should_change_stats_on_values_add(absolute, _) ->
+    lists:foreach(fun(X) ->
+        couch_stats_collector:record({number, 11}, X)
+    end, lists:seq(0, 10)),
+    couch_stats_aggregator:collect_sample(),
+    ?_assertEqual(make_agg(<<"randomosity">>, 5.0, 5.0, null, 5.0, 5.0),
+                  couch_stats_aggregator:get_json({number, 11}));
+should_change_stats_on_values_add(counter, _) ->
+    lists:foreach(fun(_) ->
+        couch_stats_collector:increment({testing, stuff})
+    end, lists:seq(1, 100)),
+    couch_stats_aggregator:collect_sample(),
+    ?_assertEqual(make_agg(<<"yay description">>, 100.0, 100.0, null, 100, 100),
+                  couch_stats_aggregator:get_json({testing, stuff})).
+
+should_change_stats_for_all_times_on_values_add(absolute, _) ->
+    lists:foreach(fun(X) ->
+        couch_stats_collector:record({number, 11}, X)
+    end, lists:seq(0, 10)),
+    couch_stats_aggregator:collect_sample(),
+    ?_assertEqual(make_agg(<<"randomosity">>, 5.0, 5.0, null, 5.0, 5.0),
+                  couch_stats_aggregator:get_json({number, 11}, 1));
+should_change_stats_for_all_times_on_values_add(counter, _) ->
+    lists:foreach(fun(_) ->
+        couch_stats_collector:increment({testing, stuff})
+    end, lists:seq(1, 100)),
+    couch_stats_aggregator:collect_sample(),
+    ?_assertEqual(make_agg(<<"yay description">>, 100.0, 100.0, null, 100, 100),
+                  couch_stats_aggregator:get_json({testing, stuff}, 1)).
+
+should_change_stats_on_values_change(absolute, _) ->
+    ?_assertEqual(make_agg(<<"randomosity">>, 20.0, 10.0, 7.071, 5.0, 15.0),
+        begin
+            lists:foreach(fun(X) ->
+                couch_stats_collector:record({number, 11}, X)
+            end, lists:seq(0, 10)),
+            couch_stats_aggregator:collect_sample(),
+            timer:sleep(?TIMEWAIT),
+            couch_stats_collector:record({number, 11}, 15),
+            couch_stats_aggregator:collect_sample(),
+            couch_stats_aggregator:get_json({number, 11})
+        end);
+should_change_stats_on_values_change(counter, _) ->
+    ?_assertEqual(make_agg(<<"yay description">>, 100.0, 50.0, 70.711, 0, 100),
+        begin
+            lists:foreach(fun(_) ->
+                couch_stats_collector:increment({testing, stuff})
+            end, lists:seq(1, 100)),
+            couch_stats_aggregator:collect_sample(),
+            timer:sleep(?TIMEWAIT),
+            couch_stats_aggregator:collect_sample(),
+            couch_stats_aggregator:get_json({testing, stuff})
+        end).
+
+should_change_stats_for_all_times_on_values_change(absolute, _) ->
+    ?_assertEqual(make_agg(<<"randomosity">>, 20.0, 10.0, 7.071, 5.0, 15.0),
+        begin
+            lists:foreach(fun(X) ->
+                couch_stats_collector:record({number, 11}, X)
+            end, lists:seq(0, 10)),
+            couch_stats_aggregator:collect_sample(),
+            timer:sleep(?TIMEWAIT),
+            couch_stats_collector:record({number, 11}, 15),
+            couch_stats_aggregator:collect_sample(),
+            couch_stats_aggregator:get_json({number, 11}, 1)
+        end);
+should_change_stats_for_all_times_on_values_change(counter, _) ->
+    ?_assertEqual(make_agg(<<"yay description">>, 100.0, 50.0, 70.711, 0, 100),
+        begin
+            lists:foreach(fun(_) ->
+                couch_stats_collector:increment({testing, stuff})
+            end, lists:seq(1, 100)),
+            couch_stats_aggregator:collect_sample(),
+            timer:sleep(?TIMEWAIT),
+            couch_stats_aggregator:collect_sample(),
+            couch_stats_aggregator:get_json({testing, stuff}, 1)
+        end).
+
+should_not_remove_data_after_some_time_for_0_sample(absolute, _) ->
+    ?_assertEqual(make_agg(<<"randomosity">>, 20.0, 10.0, 7.071, 5.0, 15.0),
+        begin
+            lists:foreach(fun(X) ->
+                couch_stats_collector:record({number, 11}, X)
+            end, lists:seq(0, 10)),
+            couch_stats_aggregator:collect_sample(),
+            timer:sleep(?TIMEWAIT),
+            couch_stats_collector:record({number, 11}, 15),
+            couch_stats_aggregator:collect_sample(),
+            timer:sleep(?TIMEWAIT),
+            couch_stats_aggregator:collect_sample(),
+            couch_stats_aggregator:get_json({number, 11})
+        end);
+should_not_remove_data_after_some_time_for_0_sample(counter, _) ->
+    ?_assertEqual(make_agg(<<"yay description">>, 100.0, 33.333, 57.735, 0, 100),
+        begin
+            lists:foreach(fun(_) ->
+                couch_stats_collector:increment({testing, stuff})
+            end, lists:seq(1, 100)),
+            couch_stats_aggregator:collect_sample(),
+            timer:sleep(?TIMEWAIT),
+            couch_stats_aggregator:collect_sample(),
+            timer:sleep(?TIMEWAIT),
+            couch_stats_aggregator:collect_sample(),
+            couch_stats_aggregator:get_json({testing, stuff})
+        end).
+
+should_remove_data_after_some_time_for_other_samples(absolute, _) ->
+    ?_assertEqual(make_agg(<<"randomosity">>, 15.0, 15.0, null, 15.0, 15.0),
+        begin
+            lists:foreach(fun(X) ->
+                couch_stats_collector:record({number, 11}, X)
+            end, lists:seq(0, 10)),
+            couch_stats_aggregator:collect_sample(),
+            timer:sleep(?TIMEWAIT),
+            couch_stats_collector:record({number, 11}, 15),
+            couch_stats_aggregator:collect_sample(),
+            timer:sleep(?TIMEWAIT),
+            couch_stats_aggregator:collect_sample(),
+            couch_stats_aggregator:get_json({number, 11}, 1)
+        end);
+should_remove_data_after_some_time_for_other_samples(counter, _) ->
+    ?_assertEqual(make_agg(<<"yay description">>, 0, 0.0, 0.0, 0, 0),
+        begin
+            lists:foreach(fun(_) ->
+                couch_stats_collector:increment({testing, stuff})
+            end, lists:seq(1, 100)),
+            couch_stats_aggregator:collect_sample(),
+            timer:sleep(?TIMEWAIT),
+            couch_stats_aggregator:collect_sample(),
+            timer:sleep(?TIMEWAIT),
+            couch_stats_aggregator:collect_sample(),
+            couch_stats_aggregator:get_json({testing, stuff}, 1)
+        end).
+
 
 spawn_and_count(N) ->
     Self = self(),
@@ -191,3 +399,14 @@ repeat(_, 0) ->
 repeat(Fun, Count) ->
     Fun(),
     repeat(Fun, Count-1).
+
+make_agg(Desc, Sum, Mean, StdDev, Min, Max) ->
+    {[
+        {description, Desc},
+        {current, Sum},
+        {sum, Sum},
+        {mean, Mean},
+        {stddev, StdDev},
+        {min, Min},
+        {max, Max}
+    ]}.
