@@ -36,9 +36,6 @@ fixture_files = \
     fixtures/test.couch
 
 tap_files = \
-    121-stats-aggregates.cfg \
-    121-stats-aggregates.ini \
-    121-stats-aggregates.t \
     130-attachments-md5.t \
     140-attachment-comp.t \
     150-invalid-view-seq.t \
