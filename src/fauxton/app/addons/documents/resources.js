@@ -21,13 +21,16 @@ function(app, FauxtonAPI, PagingCollection) {
 
   Documents.QueryParams = (function () {
     var _eachParams = function (params, action) {
+      // clone to avoid in-place modification
+      var result = _.clone(params);
+
       _.each(['startkey', 'endkey', 'key'], function (key) {
-        if (_.has(params, key)) {
-          params[key] = action(params[key]);
+        if (_.has(result, key)) {
+          result[key] = action(result[key]);
         }
       });
 
-      return params;
+      return result;
     };
 
     return {

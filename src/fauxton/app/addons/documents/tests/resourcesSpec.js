@@ -10,7 +10,7 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 define([
-       'addons/documents/resources',
+      'addons/documents/resources',
       'testUtils'
 ], function (Models, testUtils) {
   var assert = testUtils.assert;
@@ -53,5 +53,100 @@ define([
 
   });
 
+  describe('QueryParams', function() {
+    describe('parse', function() {
+      it('should not parse arbitrary parameters', function() {
+        var params = {"foo":"[1]]"};
+        var result = Models.QueryParams.parse(params);
+
+        assert.deepEqual(result, params);
+      });
+
+      it('parses startkey, endkey', function() {
+        var params = {
+          "startkey":"[\"a\",\"b\"]",
+          "endkey":"[\"c\",\"d\"]"
+        };
+        var result = Models.QueryParams.parse(params);
+
+        assert.deepEqual(result, {
+          "startkey":["a","b"],
+          "endkey":["c","d"]
+        });
+      });
+
+      it('parses key', function() {
+        var params = {
+          "key":"[1,2]"
+        };
+        var result = Models.QueryParams.parse(params);
+
+        assert.deepEqual(result, {"key":[1,2]});
+      });
+
+      it('does not modify input', function() {
+        var params = {
+          "key":"[\"a\",\"b\"]"
+        };
+        var clone = _.clone(params);
+        var result = Models.QueryParams.parse(params);
+
+        assert.deepEqual(params, clone);
+      });
+    });
+
+    describe('stringify', function() {
+      it('should not stringify arbitrary parameters', function() {
+        var params = {"foo":[1,2,3]};
+        var result = Models.QueryParams.stringify(params);
+
+        assert.deepEqual(result, params);
+      });
+
+      it('stringifies startkey, endkey', function() {
+        var params = {
+          "startkey":["a","b"],
+          "endkey":["c","d"]
+        };
+
+        var result = Models.QueryParams.stringify(params);
+
+        assert.deepEqual(result, {
+          "startkey":"[\"a\",\"b\"]",
+          "endkey":"[\"c\",\"d\"]"
+        });
+      });
+
+      it('stringifies key', function() {
+        var params = {"key":["a","b"]};
+        var result = Models.QueryParams.stringify(params);
+
+        assert.deepEqual(result, { "key":"[\"a\",\"b\"]" });
+      });
+
+      it('does not modify input', function() {
+        var params = {"key":["a","b"]};
+        var clone = _.clone(params);
+        var result = Models.QueryParams.stringify(params);
+
+        assert.deepEqual(params, clone);
+      });
+
+      it('is symmetrical with parse', function() {
+        var params = {
+          "startkey":["a","b"],
+          "endkey":["c","d"],
+          "foo": "[1,2]",
+          "bar": "abc"
+        };
+
+        var clone = _.clone(params);
+        var json = Models.QueryParams.stringify(params);
+        var result = Models.QueryParams.parse(json);
+
+        assert.deepEqual(result, clone);
+      });
+    });
+  });
 });
 
