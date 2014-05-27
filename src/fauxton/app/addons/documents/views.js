@@ -752,14 +752,17 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       }
     },
 
-    afterRender: function(){
+    afterRender: function () {
       prettyPrint();
 
       if (this.bulkDeleteDocsCollection) {
+        this.stopListening(this.bulkDeleteDocsCollection);
         this.listenTo(this.bulkDeleteDocsCollection, 'error', this.showError);
         this.listenTo(this.bulkDeleteDocsCollection, 'removed', this.removeDocuments);
         this.listenTo(this.bulkDeleteDocsCollection, 'updated', this.toggleTrash);
       }
+
+      this.toggleTrash();
     },
 
     perPage: function () {
