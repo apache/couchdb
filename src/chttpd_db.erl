@@ -484,9 +484,10 @@ all_docs_view(Req, Db, Keys) ->
         couch_mrview_http:check_view_etag(Sig, Acc0, Req)
     end,
     Args = Args0#mrargs{preflight_fun=ETagFun},
+    Options = [{user_ctx, Req#httpd.user_ctx}],
     {ok, Resp} = couch_httpd:etag_maybe(Req, fun() ->
         VAcc0 = #vacc{db=Db, req=Req},
-        fabric:all_docs(Db, fun couch_mrview_http:view_cb/2, VAcc0, Args)
+        fabric:all_docs(Db, Options, fun couch_mrview_http:view_cb/2, VAcc0, Args)
     end),
     case is_record(Resp, vacc) of
         true -> {ok, Resp#vacc.resp};
@@ -508,9 +509,10 @@ db_doc_req(#httpd{method='GET'}=Req, Db, DocId) ->
     #doc_query_args{
         rev = Rev,
         open_revs = Revs,
-        options = Options,
+        options = Options0,
         atts_since = AttsSince
     } = parse_doc_query(Req),
+    Options = [{user_ctx, Req#httpd.user_ctx} | Options0],
     case Revs of
     [] ->
         Options2 =

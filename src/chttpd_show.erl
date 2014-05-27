@@ -185,6 +185,7 @@ handle_view_list(Req, Db, DDoc, LName, {ViewDesignName, ViewName}, Keys) ->
     CB = fun couch_mrview_show:list_cb/2,
     Etag = couch_uuids:new(),
     QueryArgs = couch_mrview_http:parse_params(Req, Keys),
+    Options = [{user_ctx, Req#httpd.user_ctx}],
     chttpd:etag_respond(Req, Etag, fun() ->
         couch_query_servers:with_ddoc_proc(DDoc, fun(QServer) ->
             Acc = #lacc{
@@ -196,7 +197,7 @@ handle_view_list(Req, Db, DDoc, LName, {ViewDesignName, ViewName}, Keys) ->
             },
             case ViewName of
                 <<"_all_docs">> ->
-                    fabric:all_docs(Db, CB, Acc, QueryArgs);
+                    fabric:all_docs(Db, Options, CB, Acc, QueryArgs);
                 _ ->
                     fabric:query_view(Db, VDoc, ViewName, CB, Acc, QueryArgs)
             end
