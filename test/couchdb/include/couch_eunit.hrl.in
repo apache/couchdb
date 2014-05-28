@@ -37,3 +37,8 @@
             Suffix = lists:concat([integer_to_list(Num) || Num <- Nums]),
             list_to_binary(Prefix ++ "-" ++ Suffix)
     end).
+-define(docid,
+    fun() ->
+        {A, B, C} = erlang:now(),
+        lists:flatten(io_lib:format("~p~p~p", [A, B, C]))
+    end).
