@@ -280,7 +280,7 @@ consistency between multiple database servers. If a client makes a write
 operation on server `A`, how do we make sure that this is consistent with
 server `B`, or `C`, or `D`? For relational databases, this is a very complex
 problem with entire books devoted to its solution. You could use
-multi-master, master/slave, partitioning, sharding, write-through caches,
+multi-master, single-master, partitioning, sharding, write-through caches,
 and all sorts of other complex techniques.
 
 
