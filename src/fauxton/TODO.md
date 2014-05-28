@@ -21,6 +21,4 @@ In no particular order
 - [ ] replicate UI
 - [x] delete database
 - [x] format dates better (e.g. in logs plugin)
-- [ ] format log entry better
-- [ ] filter logs by method
 - [ ] restore unfiltered data in logs UI

@@ -6,7 +6,6 @@
   { "name": "pouchdb" },
   { "name": "activetasks" },
   { "name": "config" },
-  { "name": "logs" },
   { "name": "stats" },
   { "name": "replication" },
   { "name": "plugins" },

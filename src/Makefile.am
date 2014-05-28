@@ -77,13 +77,6 @@ FAUXTON_FILES = \
     fauxton/app/addons/contribute/base.js \
     fauxton/app/addons/exampleAuth/base.js \
     fauxton/app/addons/exampleAuth/templates/noAccess.html \
-    fauxton/app/addons/logs/base.js \
-    fauxton/app/addons/logs/resources.js \
-    fauxton/app/addons/logs/routes.js \
-    fauxton/app/addons/logs/templates/dashboard.html \
-    fauxton/app/addons/logs/templates/sidebar.html \
-    fauxton/app/addons/logs/tests/baseSpec.js \
-    fauxton/app/addons/logs/tests/resourcesSpec.js \
     fauxton/app/addons/permissions/assets/less/permissions.less \
     fauxton/app/addons/permissions/base.js \
     fauxton/app/addons/permissions/resources.js \
@@ -323,7 +316,6 @@ FAUXTON_FILES = \
     fauxton/app/addons/databases/assets/less/databases.less \
     fauxton/assets/less/fauxton.less \
     fauxton/assets/less/icons.less \
-    fauxton/app/addons/logs/assets/less/logs.less \
     fauxton/assets/less/prettyprint.less \
     fauxton/assets/less/variables.less \
     fauxton/bin/grunt \
