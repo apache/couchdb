@@ -177,9 +177,7 @@ FAUXTON_FILES = \
     fauxton/app/addons/documents/templates/ddoc_info.html \
     fauxton/app/addons/documents/templates/delete_database_modal.html \
     fauxton/app/addons/documents/templates/design_doc_selector.html \
-    fauxton/app/addons/documents/templates/doc.html \
-    fauxton/app/addons/documents/templates/doc_field_editor.html \
-    fauxton/app/addons/documents/templates/doc_field_editor_tabs.html \
+    fauxton/app/addons/documents/templates/code_editor.html \
     fauxton/app/addons/documents/templates/duplicate_doc_modal.html \
     fauxton/app/addons/documents/templates/edit_tools.html \
     fauxton/app/addons/documents/templates/index_menu_item.html \

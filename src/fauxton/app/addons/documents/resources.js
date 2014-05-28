@@ -194,15 +194,19 @@ function(app, FauxtonAPI, PagingCollection) {
         if (typeof(this.id) === "undefined") {
           resp._id = resp.id;
         }
+
+        delete resp.id;
       }
+
       if (resp.ok) {
         delete resp.ok;
       }
+
       return resp;
     },
 
     prettyJSON: function() {
-      var data = this.get("doc") ? this.get("doc") : this;
+      var data = this.get("doc") ? this.get("doc") : this.attributes;
 
       return JSON.stringify(data, null, "  ");
     },

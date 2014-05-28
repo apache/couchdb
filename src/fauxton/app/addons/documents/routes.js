@@ -36,18 +36,9 @@ function(app, FauxtonAPI, Documents, Databases) {
       }, {
         database: this.database
       });
-
-      this.tabsView = this.setView("#tabs", new Documents.Views.FieldEditorTabs({
-        disableLoader: true,
-        selected: "code_editor",
-        model: this.doc
-      }));
-
     },
 
     routes: {
-      // We are hiding the field_editor for this first release
-      // "database/:database/:doc/field_editor": "field_editor",
       "database/:database/:doc/code_editor": "code_editor",
       "database/:database/:doc": "code_editor"
     },
@@ -65,9 +56,8 @@ function(app, FauxtonAPI, Documents, Databases) {
     },
 
     code_editor: function (database, doc) {
-      this.tabsView.updateSelected('code_editor');
 
-      this.docView = this.setView("#dashboard-content", new Documents.Views.Doc({
+      this.docView = this.setView("#dashboard-content", new Documents.Views.CodeEditor({
         model: this.doc,
         database: this.database
       }));
@@ -75,13 +65,6 @@ function(app, FauxtonAPI, Documents, Databases) {
 
     reRenderDoc: function () {
       this.docView.forceRender();
-    },
-
-    field_editor: function(events) {
-      this.tabsView.updateSelected('field_editor');
-      this.docView = this.setView("#dashboard-content", new Documents.Views.DocFieldEditor({
-        model: this.doc
-      }));
     },
 
     duplicateDoc: function (newId) {
@@ -119,11 +102,6 @@ function(app, FauxtonAPI, Documents, Databases) {
       this.doc = new Documents.NewDoc(null,{
         database: this.database
       });
-
-      this.tabsView = this.setView("#tabs", new Documents.Views.FieldEditorTabs({
-        selected: "code_editor",
-        model: this.doc
-      }));
 
     },
     crumbs: function() {

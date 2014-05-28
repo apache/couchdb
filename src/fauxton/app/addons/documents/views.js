@@ -238,37 +238,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
     }
   });
 
-  Views.FieldEditorTabs = FauxtonAPI.View.extend({
-    template: "addons/documents/templates/doc_field_editor_tabs",
-    disableLoader: true,
-    initialize: function(options) {
-      this.selected = options.selected;
-    },
-
-    events: {
-    },
-    updateSelected: function (selected) {
-      this.selected = selected;
-      this.$('.active').removeClass('active');
-      this.$('#'+this.selected).addClass('active');
-    },
-
-    serialize: function() {
-      var selected = this.selected;
-      return {
-        doc: this.model,
-        isNewDoc: this.model.isNewDoc(),
-        isSelectedClass: function(item) {
-          return item && item === selected ? "active" : "";
-        }
-      };
-    },
-
-    establish: function() {
-      return [this.model.fetch()];
-    }
-  });
-
   Views.Document = FauxtonAPI.View.extend({
     template: "addons/documents/templates/all_docs_item",
     tagName: "tr",
@@ -723,8 +692,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
     }
   });
 
-  Views.Doc = FauxtonAPI.View.extend({
-    template: "addons/documents/templates/doc",
+  Views.CodeEditor = FauxtonAPI.View.extend({
+    template: "addons/documents/templates/code_editor",
     events: {
       "click button.save-doc": "saveDoc",
       "click button.delete": "destroy",
@@ -732,14 +701,18 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       "click button.upload": "upload",
       "click button.cancel-button": "goback"
     },
+
     disableLoader: true,
+
     initialize: function (options) {
       this.database = options.database;
       _.bindAll(this);
     },
+
     goback: function(){
       FauxtonAPI.navigate(this.database.url("index") + "?limit=100");
     },
+
     destroy: function(event) {
       if (this.model.isNewDoc()) {
         FauxtonAPI.addNotification({
@@ -806,9 +779,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
     },
 
     updateValues: function() {
-      var notification;
       if (this.model.changedAttributes()) {
-        notification = FauxtonAPI.addNotification({
+        FauxtonAPI.addNotification({
           msg: "Document saved successfully.",
           type: "success",
           clear: true
@@ -841,7 +813,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
     },
 
     saveDoc: function(event) {
-      var json, notification,
+      var json,
       that = this,
       editor = this.editor,
       validDoc = this.getDocFromEditor();
@@ -849,15 +821,14 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       if (validDoc) {
         this.getDocFromEditor();
 
-        notification = FauxtonAPI.addNotification({msg: "Saving document."});
+        FauxtonAPI.addNotification({msg: "Saving document."});
 
         this.model.save().then(function () {
           editor.editSaved();
           FauxtonAPI.navigate('/database/' + that.database.safeID() + '/' + that.model.id);
         }).fail(function(xhr) {
-
           var responseText = JSON.parse(xhr.responseText).reason;
-          notification = FauxtonAPI.addNotification({
+          FauxtonAPI.addNotification({
             msg: "Save failed: " + responseText,
             type: "error",
             fade: false,
@@ -866,7 +837,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
           });
         });
       } else if(this.model.validationError && this.model.validationError === 'Cannot change a documents id.') {
-          notification = FauxtonAPI.addNotification({
+          FauxtonAPI.addNotification({
             msg: "Cannot save: " + 'Cannot change a documents _id, try Duplicate doc instead!',
             type: "error",
             selector: "#doc .errors-container",
@@ -874,7 +845,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
           });
         delete this.model.validationError;
       } else {
-        notification = FauxtonAPI.addNotification({
+        FauxtonAPI.addNotification({
           msg: "Please fix the JSON errors and try again.",
           type: "error",
           selector: "#doc .errors-container",
@@ -980,54 +951,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
 
     cleanup: function () {
       if (this.editor) this.editor.remove();
-    }
-  });
-
-  Views.DocFieldEditor = FauxtonAPI.View.extend({
-    template: "addons/documents/templates/doc_field_editor",
-    disableLoader: true,
-    events: {
-      "click button.save": "saveDoc"
-    },
-
-    saveDoc: function(event) {
-      FauxtonAPI.addNotification({
-        type: "warning",
-        msg: "Save functionality coming soon.",
-        clear:  true
-      });
-    },
-
-    serialize: function() {
-      return {
-        doc: this.getModelWithoutAttachments(),
-        attachments: this.getAttachments()
-      };
-    },
-
-    getModelWithoutAttachments: function() {
-      var model = this.model.toJSON();
-      delete model._attachments;
-      return model;
-    },
-
-    getAttachments: function () {
-      var attachments = this.model.get('_attachments');
-
-      if (!attachments) { return []; }
-
-      return _.map(attachments, function (att, key) {
-        return {
-          fileName: key,
-          size: att.length,
-          contentType: att.content_type,
-          url: this.model.url() + '/' + key
-        };
-      }, this);
-    },
-
-    establish: function() {
-      return [this.model.fetch()];
     }
   });
 
