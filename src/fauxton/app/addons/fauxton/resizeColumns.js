@@ -25,7 +25,6 @@ function(FauxtonAPI) {
 
   var Resize = function(options){
     this.options = options;
-    this.options.selectorElements = options.selectorElements || ".window-resizeable";
   };
 
   Resize.prototype = {
@@ -49,7 +48,6 @@ function(FauxtonAPI) {
     updateOptions:function(options){
       this.options = {};
       this.options = options;
-      this.options.selectorElements = options.selectorElements || ".window-resizeable";
     },
     turnOff:function(){
       FauxtonAPI.utils.removeWindowResize("animation");
@@ -74,7 +72,7 @@ function(FauxtonAPI) {
           panelWidth = 1400;
         }
 
-        $(this.options.selectorElements).innerWidth(panelWidth);
+        $('.window-resizeable').innerWidth(panelWidth);
 
       }
       //if there is a callback, run that
