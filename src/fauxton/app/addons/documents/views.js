@@ -1856,6 +1856,14 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
 
   Views.Indexed = FauxtonAPI.View.extend({});
 
+  Views.ChangesHeader = FauxtonAPI.View.extend({
+    template: "addons/documents/templates/changes_header",
+
+    initialize: function () {
+      this.setView(".js-filter", this.filterView);
+    }
+  });
+
   Views.Changes = Components.FilteredView.extend({
     template: "addons/documents/templates/changes",
 
@@ -1905,14 +1913,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       prettyPrint();
       ZeroClipboard.config({ moviePath: "/assets/js/plugins/zeroclipboard/ZeroClipboard.swf" });
       var client = new ZeroClipboard(this.$(".js-copy"));
-    }
-  });
-
-  Views.ChangesSidebar = FauxtonAPI.View.extend({
-    template: "addons/documents/templates/changes_sidebar",
-
-    initialize: function (options) {
-      this.setView(".js-filter", options.filterView);
     }
   });
 
