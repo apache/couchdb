@@ -42,18 +42,18 @@ define([
 
     it('should add filter markup', function () {
       filterView.$('[name="filter"]').val('i was a lonely filter');
-      filterView.$('.js-log-filter-form').submit();
+      filterView.$('.js-filter-form').submit();
 
       filterView.$('[name="filter"]').val('i am a filter');
-      filterView.$('.js-log-filter-form').submit();
+      filterView.$('.js-filter-form').submit();
       assert.equal(2, filterView.$('.js-remove-filter').length);
     });
 
     it('should remove filter markup', function () {
       filterView.$('[name="filter"]').val('i was a lonely filter');
-      filterView.$('.js-log-filter-form').submit();
+      filterView.$('.js-filter-form').submit();
       filterView.$('[name="filter"]').val('i am a filter');
-      filterView.$('.js-log-filter-form').submit();
+      filterView.$('.js-filter-form').submit();
 
       filterView.$('.js-remove-filter').click();
 
@@ -62,7 +62,7 @@ define([
 
     it('should not add empty filters', function () {
       filterView.$('[name="filter"]').val('');
-      filterView.$('.js-log-filter-form').submit();
+      filterView.$('.js-filter-form').submit();
       assert.equal(0, filterView.$('.js-remove-filter').length);
     });
   });

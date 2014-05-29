@@ -371,10 +371,10 @@ function(app, FauxtonAPI, ace, spin) {
     },
 
     events: {
-      "submit .js-log-filter-form": "filterLogs"
+      "submit .js-filter-form": "filterItems"
     },
 
-    filterLogs: function (event) {
+    filterItems: function (event) {
       event.preventDefault();
       var $filter = this.$('input[name="filter"]'),
           filter = $.trim($filter.val());
