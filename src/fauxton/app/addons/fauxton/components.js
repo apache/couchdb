@@ -351,7 +351,7 @@ function(app, FauxtonAPI, ace, spin) {
           var match = false;
 
           _.each(element, function (value) {
-            if (new RegExp(filter).test(value.toString())) {
+            if (new RegExp(filter, 'i').test(value.toString())) {
               match = true;
             }
           });

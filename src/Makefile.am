@@ -153,6 +153,7 @@ FAUXTON_FILES = \
     fauxton/app/addons/fauxton/tests/navbarSpec.js \
     fauxton/app/addons/fauxton/tests/paginateSpec.js \
     fauxton/app/addons/fauxton/tests/filterViewSpec.js \
+    fauxton/app/addons/fauxton/tests/filteredViewSpec.js \
     fauxton/app/addons/pouchdb/base.js \
     fauxton/app/addons/pouchdb/pouch.collate.js \
     fauxton/app/addons/pouchdb/pouchdb.mapreduce.js \
