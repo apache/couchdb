@@ -22,7 +22,7 @@ the License.
               seq
             </div>
             <div class="span8 change-sequence">
-              <%= change.seq %>
+              <%- change.seq %>
             </div>
             <div class="span2 text-right">
               <a class="js-copy" data-clipboard-text="<%= change.seq %>" data-bypass="true" href="#">
@@ -36,9 +36,9 @@ the License.
             </div>
             <div class="span8">
               <% if (change.deleted) { %>
-                <%= change.id %>
+                <%- change.id %>
               <% } else { %>
-                <a href="#<%- database.url('app') %>/<%- safeURL(change.id) %>"><%= change.id %></a>
+                <a href="#<%- database.url('app') %>/<%- safeURL(change.id) %>"><%- change.id %></a>
               <% } %>    </div>
             <div class="span2 text-right">
               <a class="js-copy" data-clipboard-text="<%= change.id %>" data-bypass="true" href="#">
@@ -62,7 +62,7 @@ the License.
               deleted
             </div>
             <div class="span10">
-              <%= change.deleted ? "True" : "False" %>
+              <%- change.deleted ? "True" : "False" %>
             </div>
           </div>
         </div>
