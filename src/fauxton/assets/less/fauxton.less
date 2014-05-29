@@ -699,12 +699,12 @@ table.databases {
       background-color: @darkRed;
       color: #fff;
     }
-
     li.active > a {
       color: @darkRed;
     }
     > li > a{
-      padding: 10px 13px 10px 30px;
+      color: @linkRed;
+      padding: 10px 13px 10px 36px;
       border-bottom: 1px solid #d3d7db;
     }
     .dropdown-menu {
@@ -715,8 +715,7 @@ table.databases {
     a{
       display: block;
       padding: 10px 5px 10px 15px;
-      color: #333333;
-
+      color: @subListGray;
       .divider {
         background: none;
         color: #ccc;
@@ -727,8 +726,6 @@ table.databases {
       padding: 0px;
       text-shadow: none;
       color: #333333;
-      margin-bottom: -4px;
-
       & > span:hover {
         color: @red;
       }
@@ -930,12 +927,12 @@ div.spinner {
   }
 }
 
-div.add-dropdown { 
-
- position: absolute;
-  right: 15px;
+div.add-dropdown {
+  position: absolute;
+  top: 0px;
+  right: 0px;
   .dropdown-menu{
-    left: -82px;
+    left: -90px;
     padding-bottom: 0;
     width: auto;
     min-width: 0;

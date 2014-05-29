@@ -10,6 +10,10 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 /*ALL DOCS TABLE*/
+
+@import "../../../style/assets/less/mixins.less";
+@import "../../../../../assets/less/variables.less";
+
 tr.all-docs-item {
   border: none;
   background: transparent;
@@ -20,7 +24,7 @@ tr.all-docs-item {
     }
 }
 button.beautify {
-	margin-top: 20px;
+  margin-top: 20px;
 }
 
 .toggle-btns {
@@ -159,6 +163,26 @@ button.beautify {
 
 .sidenav{
   margin-bottom: 40px;
+  .nav-list > .active > a{
+    text-shadow: none;
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+  .nav-list > .active > a:hover,
+  .nav-list > .active > a:focus{
+    color: white;
+  }
+  .nav-list > li > a:hover + div.add-dropdown .dropdown-toggle{
+    color: white;
+  }
+  .dropdown-toggle:hover {
+    color: @linkRed
+  }
+  li{
+    position: relative;
+    a{
+      text-shadow: none;
+    }
+  }
   li.nav-header {
     position: relative;
     .accordion-body{
@@ -167,34 +191,83 @@ button.beautify {
       }
       color: #eee;
       margin-left: 0;
+      li.active > a{
+        background-color: rgba(0, 0, 0, 0.05);
+      }
       li a{
         padding-left: 55px;
         font-size: 14px;
         &:hover {
-          background-color: #af2d24;
           color: #fff;
           text-decoration: none;
+          background-color: @darkRed;
         }
       }
     }
-    > span{
-      display: block;
-      padding: 10px 13px 10px 30px;
-      color: #333333;
-      border-bottom: 1px solid #d3d7db;
-      &:before{
+    .fonticon-play{
+        color: @subListGray;
+        position: absolute;
+        display: block;
         vertical-align: bottom;
-        font-size: 12px;
-        padding-right: 10px;
-        margin-bottom: 2px;
       }
-      &.down:before {
-        margin-bottom: -2px;
-        transform:rotate(90deg);
-        -ms-transform:rotate(90deg); /* IE 9 */
-        -webkit-transform:rotate(90deg); /* Opera, Chrome, and Safari */
+    > .js-collapse-toggle{
+      position: relative;
+      display: block;
+      border-bottom: 1px solid #d3d7db;
+      .accordion-list-item:hover {
+        p, .fonticon-play{
+          color: white;
+        }
+        p{
+          background-color: @darkRed;
+        }
+      }
+      .accordion-list-item:hover + div.add-dropdown .dropdown-toggle{
+        color: white;
+      }
+      .accordion-list-item p, .fonticon-play{
+        .transition(all 0.25s linear); 
+      }
+      .accordion-list-item p{
+        margin: 0;
+        padding: 10px 13px 10px 36px;
+        color: @linkRed;
+      }
+      .fonticon-play{
+        font-size: 12px;
+        top: 12px;
+        left: 12px; 
+      }
+      &.down .fonticon-play {
+        .rotate(90deg);
+      }
+      .add-dropdown{
+        right: 15px;
+      }
+      .dropdown-toggle:hover{
+        color: @linkRed
+      }
+    }
+    > ul.accordion-body{
+      > li {
+        a{
+          padding-left: 36px;
+        }
+        .fonticon-play{
+          font-size: 8px;
+          top: 11px;
+          left: 15px;
+        }
+        .fonticon:before{
+          margin-right: 6px;
+          font-size: 20px;
+        }
       }
     }
   }
+  
 }
+
+
+
 

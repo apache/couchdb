@@ -18,13 +18,13 @@ the License.
   <% _.each(docLinks, function (link) { %>
   <li><a href="<%= database_url + '/' + link.url %>"><%= link.title %></a></li>
   <% }); %>
-  <li class="active">
-      <div id="new-all-docs-button" class="add-dropdown"> </div> 
+  <li class="active"> 
       <a id="all-docs" href="#<%= database.url('index') %>" class="toggle-view"> All Documents</a> 
+      <div id="new-all-docs-button" class="add-dropdown"> </div>
    </li>
   <li>
-      <div id="new-design-docs-button" class="add-dropdown"> </div> 
       <a id="design-docs" href='#<%= database.url("index") %>?startkey="_design"&endkey="_e"'  class="toggle-view"> All Design Docs</a>
+      <div id="new-design-docs-button" class="add-dropdown"> </div>
     </li>
 </ul>
 

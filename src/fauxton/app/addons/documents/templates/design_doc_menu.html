@@ -12,13 +12,19 @@ License for the specific language governing permissions and limitations under
 the License.
 -->
 <li class="nav-header">
-	<div class="new-button add-dropdown"></div>
-	<span  class="fonticon-play js-collapse-toggle" data-toggle="collapse" data-target="#<%= ddoc_clean %>">
-		<%= designDoc%>
-	</span>
+	
+	<div  class="js-collapse-toggle" data-toggle="collapse" data-target="#<%= ddoc_clean %>">
+		<div class="accordion-list-item">
+			<div class="fonticon-play"></div>
+			<p><%= designDoc%></p>
+		</div>
+		<div class="new-button add-dropdown"></div>
+	</div>
 	<ul class="accordion-body collapse" id="<%= ddoc_clean %>">
 		<li>
 			<a id="<%= ddoc_clean %>_metadata" href="#/database/<%- database_encoded %>/_design/<%- ddoc_encoded %>/metadata" class="toggle-view">
+			<div class="fonticon-play"></div>
+			<span class="cloudant-sidenav-info fonticon"></span>
 			  Design Doc Metadata
 			</a>
 		</li>
