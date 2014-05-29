@@ -1903,10 +1903,35 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
     serialize: function () {
       var json = this.model.changes.toJSON(),
           filteredData = this.createFilteredData(json);
+
       return {
         changes: filteredData,
         database: this.model
       };
+    },
+
+    createFilteredData: function (json) {
+      var that = this;
+
+      return _.reduce(this.filters, function (elements, filter) {
+
+        return _.filter(elements, function (element) {
+          var match = false;
+
+          // make deleted searchable
+          if (!element.deleted) {
+            element.deleted = false;
+          }
+          _.each(element, function (value) {
+            if (new RegExp(filter, 'i').test(value.toString())) {
+              match = true;
+            }
+          });
+          return match;
+        });
+
+
+      }, json, this);
     },
 
     afterRender: function(){
