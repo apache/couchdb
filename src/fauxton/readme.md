@@ -1,19 +1,7 @@
 Fauxton
 =======
 
-This is the initial implementation of Fauxton, focused on fleshing out
-the various pieces of functionality and as a test bed for new ideas.
-Full functionality and design considerations will be added later.
-
-
-
-Current items of interest:
-
-  * Live JSON editor with dynamic JS Hinting and error popups
-  * Initial plugin system
-  * Minimal externally loadable plugin example
-  * Data popups for additional db info on \_all_dbs page
-  * CouchDB API compliant urls
+Fauxton is the new Web UI for CouchDB. To get it running in development on your machine. Follow the steps below.
 
 ## Setup Fauxton ##
 
@@ -39,17 +27,6 @@ developing for it. Copy or symlink the `settings.json.default` (or the
 And then...
 
     grunt dev
-
-#### (Optional) To avoid a npm global install
-    # Add node_modules/.bin to your path
-    # export PATH=./node_modules/.bin:$PATH
-		# Or just use the wrappers in ./bin/
-
-    # Development mode, non minified files
-    ./bin/grunt couchdebug
-
-    # Or fully compiled install
-    # ./bin/grunt couchdb
 
 ### Prepare Fauxton Release
     Follow the "Fauxton Setup" section,
@@ -81,3 +58,13 @@ Each module must have a `base.js` file, this is read and compile when Fauxton is
 
 Checkout [Jira](https://issues.apache.org/jira/browse/COUCHDB/component/12320406) for a list of items to do.
 
+## (Optional) To avoid a npm global install
+    # Add node_modules/.bin to your path
+    # export PATH=./node_modules/.bin:$PATH
+		# Or just use the wrappers in ./bin/
+
+    # Development mode, non minified files
+    ./bin/grunt couchdebug
+
+    # Or fully compiled install
+    # ./bin/grunt couchdb
