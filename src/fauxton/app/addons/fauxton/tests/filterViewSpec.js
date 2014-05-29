@@ -65,5 +65,18 @@ define([
       filterView.$('.js-filter-form').submit();
       assert.equal(0, filterView.$('.js-remove-filter').length);
     });
+
+    it('should not add tooltips by default', function () {
+      assert.equal(0, filterView.$('.js-filter-tooltip').length);
+    });
+
+    it('should add tooltips when a text for it is defined', function () {
+      filterView = new Components.FilterView({
+        eventNamespace: 'mynamespace',
+        tooltipText: 'ente ente'
+      });
+      viewSandbox.renderView(filterView);
+      assert.equal(1, filterView.$('.js-filter-tooltip').length);
+    });
   });
 });

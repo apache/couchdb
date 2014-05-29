@@ -368,10 +368,17 @@ function(app, FauxtonAPI, ace, spin) {
 
     initialize: function (options) {
       this.eventNamespace = options.eventNamespace;
+      this.tooltipText = options.tooltipText;
     },
 
     events: {
       "submit .js-filter-form": "filterItems"
+    },
+
+    serialize: function () {
+      return {
+        tooltipText: this.tooltipText
+      };
     },
 
     filterItems: function (event) {
@@ -391,6 +398,12 @@ function(app, FauxtonAPI, ace, spin) {
       })).render();
 
       $filter.val('');
+    },
+
+    afterRender: function () {
+      if (this.tooltipText) {
+        this.$el.find(".js-filter-tooltip").tooltip();
+      }
     }
   });
 

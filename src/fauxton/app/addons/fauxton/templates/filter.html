@@ -18,6 +18,10 @@ the License.
     <button type="submit" class="btn btn-primary">Filter</button>
     <div class="help-block">
       <strong> Eg. debug or <1.4.1> or any regex </strong>
+      <% if (tooltipText) { %>
+        <i class="js-filter-tooltip icon icon-question-sign" data-toggle="tooltip"
+          title="" data-original-title="<%- tooltipText %>"></i>
+      <% } %>
     </div>
   </fieldset>
 </form>
