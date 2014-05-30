@@ -339,19 +339,49 @@ function(app, FauxtonAPI, ace, spin) {
     }
   });
 
+  Components.FilteredView = FauxtonAPI.View.extend({
+    filters: [],
+
+    createFilteredData: function (json) {
+      var that = this;
+
+      return _.reduce(this.filters, function (elements, filter) {
+
+        return _.filter(elements, function (element) {
+          var match = false;
+
+          _.each(element, function (value) {
+            if (new RegExp(filter, 'i').test(value.toString())) {
+              match = true;
+            }
+          });
+          return match;
+        });
+
+
+      }, json, this);
+    }
+  });
+
   Components.FilterView = FauxtonAPI.View.extend({
     template: "addons/fauxton/templates/filter",
 
     initialize: function (options) {
-      this.eventListener = options.eventListener;
       this.eventNamespace = options.eventNamespace;
+      this.tooltipText = options.tooltipText;
     },
 
     events: {
-      "submit .js-log-filter-form": "filterLogs"
+      "submit .js-filter-form": "filterItems"
     },
 
-    filterLogs: function (event) {
+    serialize: function () {
+      return {
+        tooltipText: this.tooltipText
+      };
+    },
+
+    filterItems: function (event) {
       event.preventDefault();
       var $filter = this.$('input[name="filter"]'),
           filter = $.trim($filter.val());
@@ -360,17 +390,21 @@ function(app, FauxtonAPI, ace, spin) {
         return;
       }
 
-      this.eventListener.trigger(this.eventNamespace + ":filter", filter);
+      FauxtonAPI.triggerRouteEvent(this.eventNamespace + "FilterAdd", filter);
 
       this.insertView(".filter-list", new Components.FilterItemView({
         filter: filter,
-        eventListener: this.eventListener,
         eventNamespace: this.eventNamespace
       })).render();
 
       $filter.val('');
-    }
+    },
 
+    afterRender: function () {
+      if (this.tooltipText) {
+        this.$el.find(".js-filter-tooltip").tooltip();
+      }
+    }
   });
 
   Components.FilterItemView = FauxtonAPI.View.extend({
@@ -379,7 +413,6 @@ function(app, FauxtonAPI, ace, spin) {
 
     initialize: function (options) {
       this.filter = options.filter;
-      this.eventListener = options.eventListener;
       this.eventNamespace = options.eventNamespace;
     },
 
@@ -395,8 +428,7 @@ function(app, FauxtonAPI, ace, spin) {
 
     removeFilter: function (event) {
       event.preventDefault();
-
-      this.eventListener.trigger(this.eventNamespace + ":remove", this.filter);
+      FauxtonAPI.triggerRouteEvent(this.eventNamespace + "FilterRemove", this.filter);
       this.remove();
     }
 

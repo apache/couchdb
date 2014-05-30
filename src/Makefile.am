@@ -153,6 +153,7 @@ FAUXTON_FILES = \
     fauxton/app/addons/fauxton/tests/navbarSpec.js \
     fauxton/app/addons/fauxton/tests/paginateSpec.js \
     fauxton/app/addons/fauxton/tests/filterViewSpec.js \
+    fauxton/app/addons/fauxton/tests/filteredViewSpec.js \
     fauxton/app/addons/pouchdb/base.js \
     fauxton/app/addons/pouchdb/pouch.collate.js \
     fauxton/app/addons/pouchdb/pouchdb.mapreduce.js \
@@ -181,6 +182,7 @@ FAUXTON_FILES = \
     fauxton/app/addons/documents/templates/sidebar.html \
     fauxton/app/addons/documents/templates/upload_modal.html \
     fauxton/app/addons/documents/templates/view_editor.html \
+    fauxton/app/addons/documents/templates/changes_header.html \
     fauxton/app/addons/documents/tests/resourcesSpec.js \
     fauxton/app/addons/fauxton/templates/api_bar.html \
     fauxton/app/addons/fauxton/templates/breadcrumbs.html \

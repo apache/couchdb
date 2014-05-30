@@ -9,38 +9,33 @@
 // WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 // License for the specific language governing permissions and limitations under
 // the License.
+
 define([
-        'addons/documents/views',
-        'addons/databases/base',
-        'testUtils'
-], function (Views, Databases, testUtils) {
+       'app',
+       'addons/fauxton/components',
+       'testUtils'
+], function (app, Components, testUtils) {
   var assert = testUtils.assert;
 
-  describe('DocumentsViews', function () {
-    it('should load', function () {
-      assert.equal(typeof Views.Views.Changes, 'function');
-    });
-  });
-
-  describe('Changes', function () {
+  describe('FilteredView', function () {
     var filteredView;
+
+
     beforeEach(function () {
-      var database = new Databases.Model({id: 'bla'});
-      database.buildChanges({descending: 'true', limit: '100', include_docs: 'true'} );
-      filteredView = new Views.Views.Changes({
-        model: database
-      });
+      filteredView = new Components.FilteredView();
     });
 
-    it('filter false in case of deleted documents in the changes feed', function () {
-      filteredView.filters = [false];
+    afterEach(function () {
+    });
+
+    it('should be case insensitive', function () {
+      filteredView.filters = ['ente'];
       var res = filteredView.createFilteredData([
         {id: 'LALA', bar: 'ENTE'},
         {id: '1', bar: '1', deleted: true},
         {id: '2', bar: '2'}
       ]);
-
-      assert.equal(res.length, 2);
+      assert.equal(res.length, 1);
     });
   });
 });

@@ -12,57 +12,61 @@ License for the specific language governing permissions and limitations under
 the License.
 -->
 
-<% _.each(changes, function (change) { %>
-  <div class="change-wrapper">
-    <div class="change-box">
-      <div class="row-fluid">
-        <div class="span2">
-          seq
-        </div>
-        <div class="span8 change-sequence">
-          <%= change.seq %>
-        </div>
-        <div class="span2 text-right">
-          <a class="js-copy" data-clipboard-text="<%= change.seq %>" data-bypass="true" href="#">
-            <i class="icon-share"></i>
-          </a>
+<div class="changes">
+  <div class="items">
+    <% _.each(changes, function (change) { %>
+      <div class="change-wrapper">
+        <div class="change-box">
+          <div class="row-fluid">
+            <div class="span2">
+              seq
+            </div>
+            <div class="span8 change-sequence">
+              <%- change.seq %>
+            </div>
+            <div class="span2 text-right">
+              <a class="js-copy" data-clipboard-text="<%= change.seq %>" data-bypass="true" href="#">
+                <i class="icon-share"></i>
+              </a>
+            </div>
+          </div>
+          <div class="row-fluid">
+            <div class="span2">
+              id
+            </div>
+            <div class="span8">
+              <% if (change.deleted) { %>
+                <%- change.id %>
+              <% } else { %>
+                <a href="#<%- database.url('app') %>/<%- safeURL(change.id) %>"><%- change.id %></a>
+              <% } %>    </div>
+            <div class="span2 text-right">
+              <a class="js-copy" data-clipboard-text="<%= change.id %>" data-bypass="true" href="#">
+                <i class="icon-share"></i>
+              </a>
+            </div>
+          </div>
+          <div class="row-fluid">
+            <div class="span2">
+              changes
+            </div>
+            <div class="span10">
+              <button class="js-toggle-json btn btn-small btn-primary" type="button">View JSON</button>
+            </div>
+          </div>
+          <div class="js-json-container">
+            <pre class="prettyprint"><%- JSON.stringify({changes: change.changes, doc: change.doc}, null, " ") %></pre>
+          </div>
+          <div class="row-fluid">
+            <div class="span2">
+              deleted
+            </div>
+            <div class="span10">
+              <%- change.deleted ? "True" : "False" %>
+            </div>
+          </div>
         </div>
       </div>
-      <div class="row-fluid">
-        <div class="span2">
-          id
-        </div>
-        <div class="span8">
-          <% if (change.deleted) { %>
-            <%= change.id %>
-          <% } else { %>
-            <a href="#<%- database.url('app') %>/<%- safeURL(change.id) %>"><%= change.id %></a>
-          <% } %>    </div>
-        <div class="span2 text-right">
-          <a class="js-copy" data-clipboard-text="<%= change.id %>" data-bypass="true" href="#">
-            <i class="icon-share"></i>
-          </a>
-        </div>
-      </div>
-      <div class="row-fluid">
-        <div class="span2">
-          changes
-        </div>
-        <div class="span10">
-          <button class="js-toggle-json btn btn-small btn-primary" type="button">View JSON</button>
-        </div>
-      </div>
-      <div class="js-json-container">
-        <pre class="prettyprint"><%- JSON.stringify({changes: change.changes, doc: change.doc}, null, " ") %></pre>
-      </div>
-      <div class="row-fluid">
-        <div class="span2">
-          deleted
-        </div>
-        <div class="span10">
-          <%= change.deleted ? "True" : "False" %>
-        </div>
-      </div>
-    </div>
+    <% }); %>
   </div>
-<% }); %>
+</div>
