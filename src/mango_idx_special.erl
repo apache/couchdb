@@ -4,6 +4,7 @@
 -export([
     validate/1,
     add/2,
+    remove/2,
     from_ddoc/1,
     to_json/1,
     columns/1,
@@ -23,6 +24,10 @@ add(_, _) ->
     erlang:exit(invalid_call).
 
 
+remove(_, _) ->
+    erlang:exit(invalid_call).
+
+
 from_ddoc(_) ->
     erlang:exit(invalid_call).
 
@@ -31,7 +36,7 @@ to_json(#idx{def=all_docs}) ->
     {[
         {ddoc, null},
         {name, <<"_all_docs">>},
-        {type, special},
+        {type, <<"special">>},
         {def, {[
             {<<"fields">>, [{[
                 {<<"_id">>, <<"asc">>}

@@ -4,7 +4,6 @@
 -export([
     insert/3,
     find/5,
-    find/3,
     update/4,
     delete/3
 ]).
@@ -23,9 +22,9 @@ insert(Db, #doc{}=Doc, Opts) ->
 insert(Db, {_}=Doc, Opts) ->
     insert(Db, [Doc], Opts);
 insert(Db, Docs, Opts0) when is_list(Docs) ->
-    Opts = maybe_add_user_ctx(Db, Opts0),
-    twig:log(err, "Insert: ~p ~p", [Db, Docs]),
-    case mango_util:defer(fabric, update_docs, [Db, Docs, Opts]) of
+    Opts1 = maybe_add_user_ctx(Db, Opts0),
+    Opts2 = maybe_int_to_str(w, Opts1),
+    case fabric:update_docs(Db, Docs, Opts2) of
         {ok, Results0} ->
             {ok, lists:zipwith(fun result_to_json/2, Docs, Results0)};
         {accepted, Results0} ->
@@ -35,15 +34,11 @@ insert(Db, Docs, Opts0) when is_list(Docs) ->
     end.
 
 
-find(Db, Selector, Callback, UserAcc, Options) ->
-    {ok, Cursor} = mango_cursor:create(Db, Selector, Options),
-    mango_util:defer(mango_cursor, execute, [
-            Cursor, Callback, UserAcc
-        ]).
-
-
-find(Cursor, Callback, UserAcc) ->
-    mango_util:defer(mango_cursor, execute, [Cursor, Callback, UserAcc]).
+find(Db, Selector, Callback, UserAcc, Opts0) ->
+    Opts1 = maybe_add_user_ctx(Db, Opts0),
+    Opts2 = maybe_int_to_str(r, Opts1),
+    {ok, Cursor} = mango_cursor:create(Db, Selector, Opts2),
+    mango_cursor:execute(Cursor, Callback, UserAcc).
 
 
 update(Db, Selector, Update, Options) ->
@@ -99,6 +94,14 @@ maybe_add_user_ctx(Db, Opts) ->
         false ->
             [{user_ctx, Db#db.user_ctx} | Opts]
     end.
+
+
+maybe_int_to_str(_Key, []) ->
+    [];
+maybe_int_to_str(Key, [{Key, Val} | Rest]) when is_integer(Val) ->
+    [{Key, integer_to_list(Val)} | maybe_int_to_str(Key, Rest)];
+maybe_int_to_str(Key, [KV | Rest]) ->
+    [KV | maybe_int_to_str(Key, Rest)].
 
 
 result_to_json(#doc{id=Id}, Result) ->

@@ -11,6 +11,7 @@
     new/2,
     validate/1,
     add/2,
+    remove/2,
     from_ddoc/2,
     special/1,
 
@@ -71,7 +72,18 @@ validate(Idx) ->
 
 add(DDoc, Idx) ->
     Mod = idx_mod(Idx),
-    Mod:add(DDoc, Idx).
+    {ok, NewDDoc} = Mod:add(DDoc, Idx),
+    % Round trip through JSON for normalization
+    Body = ?JSON_DECODE(?JSON_ENCODE(NewDDoc#doc.body)),
+    {ok, NewDDoc#doc{body = Body}}.
+
+
+remove(DDoc, Idx) ->
+    Mod = idx_mod(Idx),
+    {ok, NewDDoc} = Mod:remove(DDoc, Idx),
+    % Round trip through JSON for normalization
+    Body = ?JSON_DECODE(?JSON_ENCODE(NewDDoc#doc.body)),
+    {ok, NewDDoc#doc{body = Body}}.
 
 
 from_ddoc(Db, {Props}) ->
@@ -98,7 +110,7 @@ special(Db) ->
     AllDocs = #idx{
         dbname = db_to_name(Db),
         name = <<"_all_docs">>,
-        type = special,
+        type = <<"special">>,
         def = all_docs,
         opts = []
     },
@@ -150,15 +162,15 @@ end_key(#idx{}=Idx, Ranges) ->
     Mod:end_key(Ranges).
 
 
-cursor_mod(#idx{type=view}) ->
+cursor_mod(#idx{type = <<"json">>}) ->
     mango_cursor_view;
-cursor_mod(#idx{def=all_docs, type=special}) ->
+cursor_mod(#idx{def = all_docs, type= <<"special">>}) ->
     mango_cursor_view.
 
 
-idx_mod(#idx{type=view}) ->
+idx_mod(#idx{type = <<"json">>}) ->
     mango_idx_view;
-idx_mod(#idx{type=special}) ->
+idx_mod(#idx{type = <<"special">>}) ->
     mango_idx_special.
 
 
@@ -181,10 +193,10 @@ get_idx_def(Opts) ->
 
 get_idx_type(Opts) ->
     case proplists:get_value(type, Opts) of
-        <<"json">> -> view;
-        <<"text">> -> lucene;
-        <<"geo">> -> geo;
-        undefined -> view;
+        <<"json">> -> <<"json">>;
+        <<"text">> -> <<"text">>;
+        <<"geo">> -> <<"geo">>;
+        undefined -> <<"json">>;
         _ ->
             ?MANGO_ERROR(invalid_index_type)
     end.

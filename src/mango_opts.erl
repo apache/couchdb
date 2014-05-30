@@ -1,7 +1,8 @@
 -module(mango_opts).
 
 -export([
-    validate_idx_create/1
+    validate_idx_create/1,
+    validate_find/1
 ]).
 
 -export([
@@ -47,6 +48,52 @@ validate_idx_create({Props}) ->
             {optional, true},
             {default, auto_name},
             {validator, fun validate_idx_name/1}
+        ]}
+    ],
+    validate(Props, Opts).
+
+
+validate_find({Props}) ->
+    Opts = [
+        {<<"selector">>, [
+            {tag, selector},
+            {validator, fun mango_opts:validate_selector/1}
+        ]},
+        {<<"limit">>, [
+            {tag, limit},
+            {optional, true},
+            {default, 25},
+            {validator, fun mango_opts:is_pos_integer/1}
+        ]},
+        {<<"skip">>, [
+            {tag, skip},
+            {optional, true},
+            {default, 0},
+            {validator, fun mango_opts:is_non_neg_integer/1}
+        ]},
+        {<<"sort">>, [
+            {tag, sort},
+            {optional, true},
+            {default, []},
+            {validator, fun mango_opts:validate_sort/1}
+        ]},
+        {<<"fields">>, [
+            {tag, fields},
+            {optional, true},
+            {default, []},
+            {validator, fun mango_opts:validate_fields/1}
+        ]},
+        {<<"r">>, [
+            {tag, r},
+            {optional, true},
+            {default, 1},
+            {validator, fun mango_opts:is_pos_integer/1}
+        ]},
+        {<<"conflicts">>, [
+            {tag, conflicts},
+            {optional, true},
+            {default, false},
+            {validator, fun mango_opts:is_boolean/1}
         ]}
     ],
     validate(Props, Opts).

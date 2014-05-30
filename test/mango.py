@@ -5,13 +5,23 @@ import requests
 
 
 class Database(object):
-    def __init__(self, url, auth=None):
-        self.url = url
-        self.qurl = url.rstrip("/") + "/_query"
+    def __init__(self, host, port, dbname, auth=None):
+        self.host = host
+        self.port = port
+        self.dbname = dbname
         self.sess = requests.session()
         if auth is not None:
             self.sess.auth = auth
         self.sess.headers["Content-Type"] = "application/json"
+
+    @property
+    def url(self):
+        return "http://{}:{}/{}".format(self.host, self.port, self.dbname)
+    
+    def path(self, parts):
+        if isinstance(parts, (str, unicode)):
+            parts = [parts]
+        return "/".join([self.url] + parts)
 
     def create(self):
         r = self.sess.get(self.url)
@@ -26,29 +36,58 @@ class Database(object):
         self.delete()
         self.create()
 
-    def insert(self, docs):
-        if isinstance(docs, dict):
-            docs = [docs]
-        action = {
-            "action": "insert",
-            "docs": docs
-        }
-        body = json.dumps([action])
-        r = self.sess.post(self.qurl, data=body)
+    def save_doc(self, doc):
+        self.save_docs([doc])
+
+    def save_docs(self, docs):
+        body = json.dumps({"docs": docs})
+        r = self.sess.post(self.path("_bulk_docs"), data=body)
         r.raise_for_status()
-        result = r.json()[0]
-        if not result["ok"]:
-            raise RuntimError(result["result"])
-        for doc, result in zip(docs, result["result"]):
+        for doc, result in zip(docs, r.json()):
             doc["_id"] = result["id"]
             doc["_rev"] = result["rev"]
 
+    def open_doc(self, docid):
+        r = self.sess.get(self.path(docid))
+        r.raise_for_status()
         return r.json()
+
+    def ddoc_info(self, ddocid):
+        r = self.sess.get(self.path([ddocid, "_info"]))
+        r.raise_for_status()
+        return r.json()
+
+    def create_index(self, fields, missing_is_null=False,
+                idx_type="json", name=None, ddoc=None):
+        body = {
+            "index": {
+                "fields": fields,
+                "missing_is_null": missing_is_null
+            },
+            "type": idx_type
+        }
+        if name is not None:
+            body["name"] = name
+        if ddoc is not None:
+            body["ddoc"] = ddoc
+        body = json.dumps(body)
+        r = self.sess.post(self.path("_index"), data=body)
+        r.raise_for_status()
+        return r.json()["result"] == "created"
+
+    def list_indexes(self):
+        r = self.sess.get(self.path("_index"))
+        r.raise_for_status()
+        return r.json()["indexes"]
+
+    def delete_index(self, ddocid, name, idx_type="json"):
+        path = ["_index", ddocid, idx_type, name]
+        r = self.sess.delete(self.path(path))
+        r.raise_for_status()
 
     def find(self, selector, limit=25, skip=0, sort=None, fields=None,
                 r=1, conflicts=False):
-        action = {
-            "action": "find",
+        body = {
             "selector": selector,
             "limit": limit,
             "skip": skip,
@@ -56,38 +95,13 @@ class Database(object):
             "conflicts": conflicts
         }
         if sort is not None:
-            action["sort"] = sort
+            body["sort"] = sort
         if fields is not None:
-            action["fields"] = fields
-        body = json.dumps([action])
-        r = self.sess.post(self.qurl, data=body)
+            body["fields"] = fields
+        body = json.dumps(body)
+        r = self.sess.post(self.path("_find"), data=body)
         r.raise_for_status()
-        result = r.json()[0]
-        if not result["ok"]:
-            raise RuntimeError(result["result"])
-        return result["result"]
-
-    def update(self, selector, update, upsert=False, limit=1, sort=None,
-                r=1, w=2):
-        action = {
-            "action": "update",
-            "selector": selector,
-            "update": update,
-            "upsert": upsert,
-            "limit": limit,
-            "r": r,
-            "w": w
-        }
-        if sort is not None:
-            action["sort"] = sort
-        body = json.dumps([action])
-        r = self.sess.post(self.qurl, data=body)
-        print r.text
-        r.raise_for_status()
-        result = r.json()[0]
-        if not result["ok"]:
-            raise RuntimeError(result["result"])
-        return result["result"]
+        return result["rows"]
 
     def find_one(self, *args, **kwargs):
         results = self.find(*args, **kwargs)
@@ -97,26 +111,3 @@ class Database(object):
             return results[0]
         else:
             return None
-
-    def idx_create(self, fields, missing_is_null=False,
-                idx_type="json", name=None, ddoc=None):
-        action = {
-            "action": "create_index",
-            "index": {"fields": fields, "missing_is_null": missing_is_null},
-            "type": idx_type
-        }
-        if name is not None:
-            action["name"] = name
-        if ddoc is not None:
-            action["ddoc"] = ddoc
-        body = json.dumps([action])
-        r = self.sess.post(self.qurl, data=body)
-        r.raise_for_status()
-        print r.text
-        result = r.json()[0]
-        if not result["ok"]:
-            raise RuntimeError(result["result"])
-        return result["result"] == "created"
-
-
-

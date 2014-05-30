@@ -7,10 +7,6 @@
     format_error/1
 ]).
 
--export([
-    send_data/2
-]).
-
 
 -include_lib("couch/include/couch_db.hrl").
 -include("mango.hrl").
@@ -18,14 +14,10 @@
 
 handle_index_req(#httpd{method='GET', path_parts=[_, _]}=Req, Db0) ->
     Db = set_user_ctx(Req, Db0),
-    Idxs = mango_idx:list(Db),
+    Idxs = lists:sort(mango_idx:list(Db)),
     JsonIdxs = lists:map(fun mango_idx:to_json/1, Idxs),
-    twig:log(err, "Json Idxs: ~p", [JsonIdxs]),
     % List indexes
-	chttpd:send_json(Req, {[
-	        {ok, true},
-	        {indexes, JsonIdxs}
-	    ]});
+	chttpd:send_json(Req, {[{indexes, JsonIdxs}]});
 
 handle_index_req(#httpd{method='POST', path_parts=[_, _]}=Req, Db0) ->
     Db = set_user_ctx(Req, Db0),
@@ -37,37 +29,62 @@ handle_index_req(#httpd{method='POST', path_parts=[_, _]}=Req, Db0) ->
         {ok, DDoc} ->
             <<"exists">>;
         {ok, NewDDoc} ->
-            case mango_crud:insert(Db, NewDDoc, Opts) of
-                {ok, Resp} ->
-                    twig:log(err, "Resp: ~p", [Resp]),
+            case mango_crud:insert(Db, NewDDoc, [{w, "3"} | Opts]) of
+                {ok, _} ->
                     <<"created">>;
                 _ ->
                     ?MANGO_ERROR(error_saving_ddoc)
             end
     end,
-	chttpd:send_json(Req, {[
-	        {ok, true},
-	        {result, Status}
-	    ]});
+	chttpd:send_json(Req, {[{result, Status}]});
 
 handle_index_req(#httpd{method='DELETE',
-        path_parts=[_, _, Type, DDoc, Name]}=Req, Db0) ->
-    % Delete index
-	chttpd:send_json(Req, {[{ok, true}]});
+        path_parts=[_, _, DDocId0, Type, Name]}=Req, Db0) ->
+    Db = set_user_ctx(Req, Db0),
+    DDocId = <<"_design/", DDocId0/binary>>,
+    Idxs = mango_idx:list(Db),
+    Filt = fun(Idx) ->
+        IsDDoc = mango_idx:ddoc(Idx) == DDocId,
+        IsType = mango_idx:type(Idx) == Type,
+        IsName = mango_idx:name(Idx) == Name,
+        IsDDoc andalso IsType andalso IsName
+    end,
+    case lists:filter(Filt, Idxs) of
+        [Idx] ->
+            {ok, DDoc} = mango_util:load_ddoc(Db, mango_idx:ddoc(Idx)),
+            {ok, NewDDoc} = mango_idx:remove(DDoc, Idx),
+            FinalDDoc = case NewDDoc#doc.body of
+                {[{<<"language">>, <<"query">>}]} ->
+                    NewDDoc#doc{deleted = true, body = {[]}};
+                _ ->
+                    NewDDoc
+            end,
+            case mango_crud:insert(Db, FinalDDoc, [{w, "3"}]) of
+                {ok, _} ->
+                    chttpd:send_json(Req, {[{ok, true}]});
+                _ ->
+                    ?MANGO_ERROR(error_saving_ddoc)
+            end;
+        [] ->
+            throw(not_found)
+    end;
 
 handle_index_req(Req, _Db) ->
     chttpd:send_method_not_allowed(Req, "GET,POST,DELETE").
 
 
-handle_find_req(#httpd{method='POST'}=Req, _Db) ->
-    % Execute query
-	chttpd:send_json(Req, {[{ok, true}]});
+handle_find_req(#httpd{method='POST'}=Req, Db0) ->
+    Db = set_user_ctx(Req, Db0),
+    {ok, Opts0} = mango_opts:validate_find(chttpd:json_body_obj(Req)),
+    {value, {selector, Sel}, Opts} = lists:keytake(selector, 1, Opts0),
+    {ok, Resp0} = start_find_resp(Req),
+    {ok, {Resp1, _}} = run_find(Resp0, Db, Sel, Opts),
+    end_find_resp(Resp1);
+
 handle_find_req(Req, _Db) ->
     chttpd:send_method_not_allowed(Req, "POST").
 
 
-format_error(body_not_an_array) ->
-    <<"The request body must be an array of action objects.">>;
 format_error(Else) ->
     mango_util:fmt("Unknown error: ~p", [Else]).
 
@@ -76,27 +93,20 @@ set_user_ctx(#httpd{user_ctx=Ctx}, Db) ->
     Db#db{user_ctx=Ctx}.
 
 
-create_writer(Req) ->
-    {ok, Resp} = start_resp(Req),
-    {ok, Writer0} = mango_writer:new(?MODULE, send_data, Resp),
-    {ok, Writer1} = mango_writer:arr_open(Writer0),
-    {ok, Writer1, Resp}.
+start_find_resp(Req) ->
+    chttpd:start_delayed_json_response(Req, 200, [], "{\"docs\":[").
 
 
-% Eventually we'll want to look into buffering data here so we're
-% sending as few chunks as possible.
-send_data(Resp, close) ->
-    {ok, Resp};
-send_data(Resp, Data) ->
-    chttpd:send_chunk(Resp, Data).
+end_find_resp(Resp) ->
+    chttpd:send_delayed_chunk(Resp, "\r\n]}\r\n"),
+    chttpd:end_delayed_json_response(Resp).
 
 
-start_resp(Req) ->
-    chttpd:start_chunked_response(Req, 200, [
-            {"Content-Type", "application/json"}
-        ]).
+run_find(Resp, Db, Sel, Opts) ->
+    mango_crud:find(Db, Sel, fun handle_doc/2, {Resp, "\r\n"}, Opts).
 
 
-end_resp(Resp) ->
-    chttpd:send_chunk(Resp, [$\n]),
-    couch_httpd:last_chunk(Resp).
+handle_doc({row, Doc}, {Resp0, Prepend}) ->
+    Chunk = [Prepend, ?JSON_ENCODE(Doc)],
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, Chunk),
+    {ok, {Resp1, ",\r\n"}}.
