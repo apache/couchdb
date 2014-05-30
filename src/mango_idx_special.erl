@@ -5,6 +5,7 @@
     validate/1,
     add/2,
     from_ddoc/1,
+    to_json/1,
     columns/1,
     start_key/1,
     end_key/1
@@ -24,6 +25,19 @@ add(_, _) ->
 
 from_ddoc(_) ->
     erlang:exit(invalid_call).
+
+
+to_json(#idx{def=all_docs}) ->
+    {[
+        {ddoc, null},
+        {name, <<"_all_docs">>},
+        {type, special},
+        {def, {[
+            {<<"fields">>, [{[
+                {<<"_id">>, <<"asc">>}
+            ]}]}
+        ]}}
+    ]}.
 
 
 columns(#idx{def=all_docs}) ->

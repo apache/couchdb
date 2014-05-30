@@ -22,8 +22,9 @@ insert(Db, #doc{}=Doc, Opts) ->
     insert(Db, [Doc], Opts);
 insert(Db, {_}=Doc, Opts) ->
     insert(Db, [Doc], Opts);
-insert(Db, Docs, Opts) when is_list(Docs) ->
-    twig:log(err, "Insert: ~p", [Docs]),
+insert(Db, Docs, Opts0) when is_list(Docs) ->
+    Opts = maybe_add_user_ctx(Db, Opts0),
+    twig:log(err, "Insert: ~p ~p", [Db, Docs]),
     case mango_util:defer(fabric, update_docs, [Db, Docs, Opts]) of
         {ok, Results0} ->
             {ok, lists:zipwith(fun result_to_json/2, Docs, Results0)};
@@ -88,6 +89,15 @@ delete(Db, Selector, Options) ->
             insert(Db, NewDocs, Options);
         Else ->
             Else
+    end.
+
+
+maybe_add_user_ctx(Db, Opts) ->
+    case lists:keyfind(user_ctx, 1, Opts) of
+        {user_ctx, _} ->
+            Opts;
+        false ->
+            [{user_ctx, Db#db.user_ctx} | Opts]
     end.
 
 

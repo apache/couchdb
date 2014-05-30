@@ -20,7 +20,7 @@
 create(Db, Selector0, Opts) ->
     Selector = mango_selector:normalize(Selector0),
     IndexFields = mango_selector:index_fields(Selector),
-    ExistingIndexes = mango_index:list(Db#db.name),
+    ExistingIndexes = mango_idx:list(Db),
     UsableIndexes = find_usable_indexes(IndexFields, ExistingIndexes),
     FieldRanges = find_field_ranges(Selector, IndexFields),
     Composited = composite_indexes(UsableIndexes, FieldRanges),

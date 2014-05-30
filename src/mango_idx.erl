@@ -6,7 +6,9 @@
 
 
 -export([
-    new/3,
+    list/1,
+
+    new/2,
     validate/1,
     add/2,
     from_ddoc/2,
@@ -22,7 +24,8 @@
     start_key/2,
     end_key/2,
     cursor_mod/1,
-    idx_mod/1
+    idx_mod/1,
+    to_json/1
 ]).
 
 
@@ -31,12 +34,23 @@
 -include("mango_idx.hrl").
 
 
-validate(Idx) ->
-    Mod = idx_mod(Idx),
-    Mod:validate(Idx).
+list(Db) ->
+    {ok, DDocs0} = mango_util:open_ddocs(Db),
+    Pred = fun({Props}) ->
+        case proplists:get_value(<<"language">>, Props) of
+            <<"query">> -> true;
+            _ -> false
+        end
+    end,
+    DDocs = lists:filter(Pred, DDocs0),
+    Special = special(Db),
+    Special ++ lists:flatmap(fun(Doc) ->
+        from_ddoc(Db, Doc)
+    end, DDocs).
 
 
-new(Db, Def, Opts) ->
+new(Db, Opts) ->
+    Def = get_idx_def(Opts),
     Type = get_idx_type(Opts),
     IdxName = get_idx_name(Def, Opts),
     DDoc = get_idx_ddoc(Def, Opts),
@@ -48,6 +62,11 @@ new(Db, Def, Opts) ->
         def = Def,
         opts = filter_opts(Opts)
     }}.
+
+
+validate(Idx) ->
+    Mod = idx_mod(Idx),
+    Mod:validate(Idx).
 
 
 add(DDoc, Idx) ->
@@ -111,6 +130,11 @@ opts(#idx{opts=Opts}) ->
     Opts.
 
 
+to_json(#idx{}=Idx) ->
+    Mod = idx_mod(Idx),
+    Mod:to_json(Idx).
+
+
 columns(#idx{}=Idx) ->
     Mod = idx_mod(Idx),
     Mod:columns(Idx).
@@ -144,6 +168,15 @@ db_to_name(Name) when is_binary(Name) ->
     Name;
 db_to_name(Name) when is_list(Name) ->
     iolist_to_binary(Name).
+
+
+get_idx_def(Opts) ->
+    case proplists:get_value(def, Opts) of
+        undefined ->
+            ?MANGO_ERROR(no_index_definition);
+        Def ->
+            Def
+    end.
 
 
 get_idx_type(Opts) ->

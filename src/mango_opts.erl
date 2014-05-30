@@ -1,6 +1,10 @@
 -module(mango_opts).
 
 -export([
+    validate_idx_create/1
+]).
+
+-export([
     validate/2,
 
     format_error/1,
@@ -11,6 +15,7 @@
     is_non_neg_integer/1,
     is_object/1,
     
+    validate_idx_name/1,
     validate_selector/1,
     validate_sort/1,
     validate_fields/1
@@ -18,6 +23,33 @@
 
 
 -include("mango.hrl").
+
+
+validate_idx_create({Props}) ->
+    Opts = [
+        {<<"index">>, [
+            {tag, def}
+        ]},
+        {<<"type">>, [
+            {tag, type},
+            {optional, true},
+            {default, <<"json">>},
+            {validator, fun is_string/1}
+        ]},
+        {<<"name">>, [
+            {tag, name},
+            {optional, true},
+            {default, auto_name},
+            {validator, fun validate_idx_name/1}
+        ]},
+        {<<"ddoc">>, [
+            {tag, ddoc},
+            {optional, true},
+            {default, auto_name},
+            {validator, fun validate_idx_name/1}
+        ]}
+    ],
+    validate(Props, Opts).
 
 
 validate(Props, Opts) ->
@@ -96,6 +128,12 @@ is_object(Else) ->
     ?MANGO_ERROR({invalid_object, Else}).
 
 
+validate_idx_name(auto_name) ->
+    {ok, auto_name};
+validate_idx_name(Else) ->
+    is_string(Else).
+
+
 validate_selector({Props}) ->
     Norm = mango_selector:normalize({Props}),
     {ok, Norm};
@@ -114,12 +152,13 @@ validate_fields(Value) ->
 validate_opts([], Props, Acc) ->
     {Props, lists:reverse(Acc)};
 validate_opts([{Name, Desc} | Rest], Props, Acc) ->
+    {tag, Tag} = lists:keyfind(tag, 1, Desc),
     case lists:keytake(Name, 1, Props) of
         {value, {Name, Prop}, RestProps} ->
-            NewAcc = [validate_opt(Name, Desc, Prop) | Acc],
+            NewAcc = [{Tag, validate_opt(Name, Desc, Prop)} | Acc],
             validate_opts(Rest, RestProps, NewAcc);
         false ->
-            NewAcc = [validate_opt(Name, Desc, undefined) | Acc],
+            NewAcc = [{Tag, validate_opt(Name, Desc, undefined)} | Acc],
             validate_opts(Rest, Props, NewAcc)
     end.
 
@@ -135,6 +174,9 @@ validate_opt(Name, Desc0, undefined) ->
         _ ->
             ?MANGO_ERROR({missing_required_key, Name})
     end;
+validate_opt(Name, [{tag, _} | Rest], Value) ->
+    % Tags aren't really validated
+    validate_opt(Name, Rest, Value);
 validate_opt(Name, [{optional, _} | Rest], Value) ->
     % A value was specified for an optional value
     validate_opt(Name, Rest, Value);

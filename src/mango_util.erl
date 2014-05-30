@@ -4,6 +4,7 @@
 -export([
     open_doc/2,
     open_ddocs/1,
+    load_ddoc/2,
 
     defer/3,
     do_defer/3,
@@ -23,6 +24,7 @@
 ]).
 
 
+-include_lib("couch/include/couch_db.hrl").
 -include("mango.hrl").
 
 
@@ -44,6 +46,18 @@ open_ddocs(Db) ->
             {ok, Docs};
         _ ->
             ?MANGO_ERROR(error_loading_ddocs)
+    end.
+
+
+load_ddoc(Db, DDocId) ->
+    case mango_util:open_doc(Db, DDocId) of
+        {ok, Doc} ->
+            {ok, Doc};
+        not_found ->
+            Body = {[
+                {<<"language">>, <<"query">>}
+            ]},
+            {ok, #doc{id = DDocId, body = Body}}
     end.
 
 

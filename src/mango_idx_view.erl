@@ -5,6 +5,7 @@
     validate/1,
     add/2,
     from_ddoc/1,
+    to_json/1,
     columns/1,
     start_key/1,
     end_key/1,
@@ -55,6 +56,15 @@ from_ddoc({Props}) ->
     end.
 
 
+to_json(Idx) ->
+    {[
+        {ddoc, Idx#idx.ddoc},
+        {name, Idx#idx.name},
+        {type, Idx#idx.type},
+        {def, {def_to_json(Idx#idx.def)}}
+    ]}.
+
+
 columns(Idx) ->
     {Props} = Idx#idx.def,
     {<<"fields">>, {Fields}} = lists:keyfind(<<"fields">>, 1, Props),
@@ -88,21 +98,32 @@ format_error(Else) ->
 
 
 do_validate({Props}) ->
-    {ok, [Fields, MissingIsNull]} = mango_opts:validate(Props, opts()),
-    {ok, {[
-        {<<"fields">>, Fields},
-        {<<"missing_is_null">>, MissingIsNull}
-    ]}};
+    {ok, Opts} = mango_opts:validate(Props, opts()),
+    {ok, {Opts}};
 do_validate(Else) ->
     ?MANGO_ERROR({invalid_index_json, Else}).
+
+
+def_to_json({Props}) ->
+    def_to_json(Props);
+def_to_json([]) ->
+    [];
+def_to_json([{fields, Fields} | Rest]) ->
+    [{<<"fields">>, mango_sort:to_json(Fields)} | def_to_json(Rest)];
+def_to_json([{<<"fields">>, Fields} | Rest]) ->
+    [{<<"fields">>, mango_sort:to_json(Fields)} | def_to_json(Rest)];
+def_to_json([{Key, Value} | Rest]) ->
+    [{Key, Value} | def_to_json(Rest)].
 
 
 opts() ->
     [
         {<<"fields">>, [
+            {tag, fields},
             {validator, fun mango_opts:validate_sort/1}
         ]},
         {<<"missing_is_null">>, [
+            {tag, missing_is_null},
             {optional, true},
             {default, false},
             {validator, fun mango_opts:is_boolean/1}

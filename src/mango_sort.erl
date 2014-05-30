@@ -2,8 +2,9 @@
 
 -export([
     new/1,
+    to_json/1,
     fields/1,
-    
+
     format_error/1
 ]).
 
@@ -15,6 +16,14 @@ new(Fields) when is_list(Fields) ->
     {ok, {[sort_field(Field) || Field <- Fields]}};
 new(Else) ->
     ?MANGO_ERROR({invalid_sort_json, Else}).
+
+
+to_json({Fields}) ->
+    to_json(Fields);
+to_json([]) ->
+    [];
+to_json([{Name, Dir} | Rest]) ->
+    [{[{Name, Dir}]} | to_json(Rest)].
 
 
 fields({Fields}) ->

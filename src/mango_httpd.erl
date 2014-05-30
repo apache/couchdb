@@ -16,15 +16,45 @@
 -include("mango.hrl").
 
 
-handle_index_req(#httpd{method='GET'}=Req, _Db) ->
+handle_index_req(#httpd{method='GET', path_parts=[_, _]}=Req, Db0) ->
+    Db = set_user_ctx(Req, Db0),
+    Idxs = mango_idx:list(Db),
+    JsonIdxs = lists:map(fun mango_idx:to_json/1, Idxs),
+    twig:log(err, "Json Idxs: ~p", [JsonIdxs]),
     % List indexes
-	chttpd:send_json(Req, {[{ok, true}]});
-handle_index_req(#httpd{method='POST'}=Req, _Db) ->
-    % Create index
-	chttpd:send_json(Req, {[{ok, true}]});
-handle_index_req(#httpd{method='DELETE'}=Req, _Db) ->
+	chttpd:send_json(Req, {[
+	        {ok, true},
+	        {indexes, JsonIdxs}
+	    ]});
+
+handle_index_req(#httpd{method='POST', path_parts=[_, _]}=Req, Db0) ->
+    Db = set_user_ctx(Req, Db0),
+    {ok, Opts} = mango_opts:validate_idx_create(chttpd:json_body_obj(Req)),
+    {ok, Idx0} = mango_idx:new(Db, Opts),
+    {ok, Idx} = mango_idx:validate(Idx0),
+    {ok, DDoc} = mango_util:load_ddoc(Db, mango_idx:ddoc(Idx)),
+    Status = case mango_idx:add(DDoc, Idx) of
+        {ok, DDoc} ->
+            <<"exists">>;
+        {ok, NewDDoc} ->
+            case mango_crud:insert(Db, NewDDoc, Opts) of
+                {ok, Resp} ->
+                    twig:log(err, "Resp: ~p", [Resp]),
+                    <<"created">>;
+                _ ->
+                    ?MANGO_ERROR(error_saving_ddoc)
+            end
+    end,
+	chttpd:send_json(Req, {[
+	        {ok, true},
+	        {result, Status}
+	    ]});
+
+handle_index_req(#httpd{method='DELETE',
+        path_parts=[_, _, Type, DDoc, Name]}=Req, Db0) ->
     % Delete index
 	chttpd:send_json(Req, {[{ok, true}]});
+
 handle_index_req(Req, _Db) ->
     chttpd:send_method_not_allowed(Req, "GET,POST,DELETE").
 
