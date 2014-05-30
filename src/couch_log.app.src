@@ -12,7 +12,7 @@
 
 {application, couch_log, [
     {description, "CouchDB Log API"},
-    {vsn, "@version@"},
+    {vsn, git},
     {modules, [couch_log]},
     {registered, []},
     {applications, [kernel, stdlib, lager]}
