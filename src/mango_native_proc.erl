@@ -1,4 +1,4 @@
--module(mango_index_updater).
+-module(mango_native_proc).
 -behavior(gen_server).
 
 
