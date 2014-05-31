@@ -29,12 +29,16 @@ function(FauxtonAPI) {
 
   Resize.prototype = {
     getPrimaryNavWidth: function(){
-      var primaryNavWidth  = $('body').hasClass('closeMenu')? 64:224;
+      var primaryNavWidth  = $('body').hasClass('closeMenu') ? 64 : 220;
       return primaryNavWidth;
     },
     getPanelWidth: function(){
-      var sidebarWidth = $('#sidebar-content').length > 0 ? $('#sidebar-content').width(): 0;
-      return (this.getPrimaryNavWidth() + sidebarWidth);
+      var sidebarWidth = $('#sidebar-content').length > 0 ? $('#sidebar-content').outerWidth() : 0,
+          borders = parseInt($('#dashboard').css('border-left-width'), 10) +
+                    parseInt($('#dashboard-content').css('border-left-width'), 10) +
+                    parseInt($('#dashboard-content').css('border-right-width'), 10);
+
+      return (this.getPrimaryNavWidth() + sidebarWidth + borders);
     },
     initialize: function(){
      // $(window).off('resize');
@@ -64,12 +68,10 @@ function(FauxtonAPI) {
         smallWidthConstraint = ($('#sidebar-content').length > 0)? 470:800,
         panelWidth;
 
-        if( combinedWidth > smallWidthConstraint  && combinedWidth < 1400){
+        if (combinedWidth > smallWidthConstraint) {
           panelWidth = window.innerWidth - this.getPanelWidth();
         } else if (combinedWidth < smallWidthConstraint){
           panelWidth = smallWidthConstraint;
-        } else if(combinedWidth > 1400){
-          panelWidth = 1400;
         }
 
         $('.window-resizeable').innerWidth(panelWidth);
