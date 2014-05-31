@@ -168,6 +168,8 @@ function (app, FauxtonAPI, ActiveTasks) {
       var objectField = this.model.get('database');
       if (this.type === "replication"){
         objectField = this.model.get('source') + " to " + this.model.get('target');
+      } else if (this.type === "indexer") {
+        objectField = this.model.get("database") + " / " + this.model.get("design_document");
       }
       return objectField;
     },
