@@ -623,7 +623,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
     toggleTrash: function () {
       var $bulkdDeleteButton = this.$('.js-bulk-delete');
 
-      if (this.$('.js-to-delete').length > 0) {
+      if (this.bulkDeleteDocsCollection.length > 0) {
         $bulkdDeleteButton.removeClass('disabled');
       } else {
         $bulkdDeleteButton.addClass('disabled');
