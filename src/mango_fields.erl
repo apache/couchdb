@@ -22,7 +22,6 @@ extract(Doc, undefined) ->
 extract(Doc, all_fields) ->
     Doc;
 extract(Doc, Fields) ->
-    twig:log(err, "DOC: ~p FIELDS: ~p", [Doc, Fields]),
     lists:foldl(fun(F, NewDoc) ->
         case mango_doc:get_field(Doc, F) of
             not_found ->

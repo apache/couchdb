@@ -28,13 +28,13 @@ execute(#cursor{db = Db, index = Idx} = Cursor0, UserFun, UserAcc) ->
     CB = fun ?MODULE:handle_message/2,
     {ok, LastCursor} = case mango_idx:def(Idx) of
         all_docs ->
-            twig:log(err, "Query: ~s all_docs~n  ~p", [Db#db.name, Args]),
+            %twig:log(err, "Query: ~s all_docs~n  ~p", [Db#db.name, Args]),
             fabric:all_docs(Db, CB, Cursor, Args);
         _ ->
             % Normal view
             DDoc = ddocid(Idx),
             Name = mango_idx:name(Idx),
-            twig:log(err, "Query: ~s ~s ~s~n  ~p", [Db#db.name, DDoc, Name, Args]),
+            %twig:log(err, "Query: ~s ~s ~s~n  ~p", [Db#db.name, DDoc, Name, Args]),
             fabric:query_view(Db, DDoc, Name, CB, Cursor, Args)
     end,
     {ok, LastCursor#cursor.user_acc}.
@@ -50,7 +50,6 @@ handle_message({row, {Props}}, Cursor) ->
             case mango_selector:match(Cursor#cursor.selector, Doc) of
                 true ->
                     FinalDoc = mango_fields:extract(Doc, Cursor#cursor.fields),
-                    twig:log(err, "FinalDoc: ~p", [FinalDoc]),
                     handle_doc(Cursor, FinalDoc);
                 false ->
                     {ok, Cursor}
