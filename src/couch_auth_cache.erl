@@ -15,7 +15,7 @@
 -behaviour(config_listener).
 
 % public API
--export([get_user_creds/1]).
+-export([get_user_creds/1, get_admin/1, add_roles/2]).
 
 % gen_server API
 -export([start_link/0, init/1, handle_call/3, handle_info/2, handle_cast/2]).
@@ -45,38 +45,47 @@ get_user_creds(UserName) when is_list(UserName) ->
     get_user_creds(?l2b(UserName));
 
 get_user_creds(UserName) ->
-    UserCreds = case config:get("admins", ?b2l(UserName)) of
+    UserCreds = case get_admin(UserName) of
+    nil ->
+        get_from_cache(UserName);
+    Props ->
+        case get_from_cache(UserName) of
+        nil ->
+            Props;
+        UserProps when is_list(UserProps) ->
+            add_roles(Props, couch_util:get_value(<<"roles">>, UserProps))
+        end
+    end,
+    validate_user_creds(UserCreds).
+
+add_roles(Props, ExtraRoles) ->
+    CurrentRoles = couch_util:get_value(<<"roles">>, Props),
+    lists:keyreplace(<<"roles">>, 1, Props, {<<"roles">>, CurrentRoles ++ ExtraRoles}).
+
+get_admin(UserName) when is_binary(UserName) ->
+    get_admin(?b2l(UserName));
+get_admin(UserName) when is_list(UserName) ->
+    case config:get("admins", UserName) of
     "-hashed-" ++ HashedPwdAndSalt ->
         % the name is an admin, now check to see if there is a user doc
         % which has a matching name, salt, and password_sha
         [HashedPwd, Salt] = string:tokens(HashedPwdAndSalt, ","),
-        case get_from_cache(UserName) of
-        nil ->
-            make_admin_doc(HashedPwd, Salt, []);
-        UserProps when is_list(UserProps) ->
-            make_admin_doc(HashedPwd, Salt, couch_util:get_value(<<"roles">>, UserProps))
-        end;
+        make_admin_doc(HashedPwd, Salt);
     "-pbkdf2-" ++ HashedPwdSaltAndIterations ->
         [HashedPwd, Salt, Iterations] = string:tokens(HashedPwdSaltAndIterations, ","),
-        case get_from_cache(UserName) of
-        nil ->
-            make_admin_doc(HashedPwd, Salt, Iterations, []);
-        UserProps when is_list(UserProps) ->
-            make_admin_doc(HashedPwd, Salt, Iterations, couch_util:get_value(<<"roles">>, UserProps))
-    end;
+        make_admin_doc(HashedPwd, Salt, Iterations);
     _Else ->
-        get_from_cache(UserName)
-    end,
-    validate_user_creds(UserCreds).
+	nil
+    end.
 
-make_admin_doc(HashedPwd, Salt, ExtraRoles) ->
-    [{<<"roles">>, [<<"_admin">>|ExtraRoles]},
+make_admin_doc(HashedPwd, Salt) ->
+    [{<<"roles">>, [<<"_admin">>]},
      {<<"salt">>, ?l2b(Salt)},
      {<<"password_scheme">>, <<"simple">>},
      {<<"password_sha">>, ?l2b(HashedPwd)}].
 
-make_admin_doc(DerivedKey, Salt, Iterations, ExtraRoles) ->
-    [{<<"roles">>, [<<"_admin">>|ExtraRoles]},
+make_admin_doc(DerivedKey, Salt, Iterations) ->
+    [{<<"roles">>, [<<"_admin">>]},
      {<<"salt">>, ?l2b(Salt)},
      {<<"iterations">>, list_to_integer(Iterations)},
      {<<"password_scheme">>, <<"pbkdf2">>},
