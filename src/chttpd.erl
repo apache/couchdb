@@ -132,8 +132,8 @@ handle_request(MochiReq) ->
     end,
 
     AuthenticationFuns = [
-        fun couch_httpd_auth:cookie_authentication_handler/1,
-        fun couch_httpd_auth:default_authentication_handler/1
+        fun chttpd_auth:cookie_authentication_handler/1,
+        fun chttpd_auth:default_authentication_handler/1
     ],
 
     % for the path, use the raw path with the query string and fragment
@@ -357,7 +357,7 @@ url_handler("_replicate") ->    fun chttpd_misc:handle_replicate_req/1;
 url_handler("_uuids") ->        fun chttpd_misc:handle_uuids_req/1;
 url_handler("_log") ->          fun chttpd_misc:handle_log_req/1;
 url_handler("_sleep") ->        fun chttpd_misc:handle_sleep_req/1;
-url_handler("_session") ->      fun couch_httpd_auth:handle_session_req/1;
+url_handler("_session") ->      fun chttpd_auth:handle_session_req/1;
 url_handler("_oauth") ->        fun couch_httpd_oauth:handle_oauth_req/1;
 url_handler("_up") ->           fun chttpd_misc:handle_up_req/1;
 url_handler("_membership") ->   fun mem3_httpd:handle_membership_req/1;

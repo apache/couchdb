@@ -16,6 +16,7 @@
     {modules, [
         chttpd,
         chttpd_app,
+        chttpd_auth_cache,
         chttpd_config_listener,
         chttpd_db,
         chttpd_external,
@@ -27,7 +28,9 @@
     ]},
     {registered, [
         chttpd_sup,
-        chttpd
+        chttpd,
+        chttpd_auth_cache,
+        chttpd_auth_cache_lru
     ]},
     {applications, [
         kernel,
@@ -35,6 +38,7 @@
         couch_log,
         config,
         couch,
+        ets_lru,
         fabric
     ]},
     {mod, {chttpd_app,[]}}

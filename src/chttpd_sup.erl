@@ -25,5 +25,29 @@ start_link(Args) ->
 init([]) ->
     {ok, {{one_for_one, 3, 10}, [
         ?CHILD(chttpd, worker),
-        ?CHILD(chttpd_config_listener, worker)
+        ?CHILD(chttpd_config_listener, worker),
+        ?CHILD(chttpd_auth_cache, worker),
+        {chttpd_auth_cache_lru,
+	 {ets_lru, start_link, [chttpd_auth_cache_lru, lru_opts()]},
+	 permanent, 5000, worker, [ets_lru]}
     ]}}.
+
+lru_opts() ->
+    case config:get("chttpd_auth_cache", "max_objects") of
+        MxObjs when is_integer(MxObjs), MxObjs > 0 ->
+            [{max_objects, MxObjs}];
+        _ ->
+            []
+    end ++
+    case config:get("chttpd_auth_cache", "max_size", "104857600") of
+        MxSize when is_integer(MxSize), MxSize > 0 ->
+            [{max_size, MxSize}];
+        _ ->
+            []
+    end ++
+    case config:get("chttpd_auth_cache", "max_lifetime", "600000") of
+        MxLT when is_integer(MxLT), MxLT > 0 ->
+            [{max_lifetime, MxLT}];
+        _ ->
+            []
+    end.
