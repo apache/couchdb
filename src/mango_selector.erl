@@ -81,122 +81,10 @@ match({[]}, _) ->
     true;
 
 match(Selector, #doc{body=Body}) ->
-    match(Selector, Body);
+    match(Selector, Body, fun mango_json:cmp/2);
 
-match({[{<<"$and">>, Args}]}, Value) ->
-    Pred = fun(SubSel) -> match(SubSel, Value) end,
-    lists:all(Pred, Args);
-
-match({[{<<"$or">>, Args}]}, Value) ->
-    Pred = fun(SubSel) -> match(SubSel, Value) end,
-    lists:any(Pred, Args);
-
-match({[{<<"$not">>, Arg}]}, Value) ->
-    not match(Arg, Value);
-
-% One of the elements in the array Value must
-% match all conditions in Args.
-match({[{<<"$all">>, Args}]}, Values) when is_list(Values) ->
-    Pred = fun
-        (Val, false) ->
-            SelPred = fun(A) -> match(A, Val) end,
-            lists:all(SelPred, Args);
-        (_, true) ->
-            % Short circuit
-            true
-    end,
-    lists:foldl(Pred, false, Values);
-
-% MongoDB docs also say we can use '$all' against
-% a non-array value. We just cheat by wrapping the
-% value in a list and recursing to use the logic
-% in the previous clause.
-match({[{<<"$all">>, _}]} = Cond, Value) ->
-    match(Cond, [Value]);
-
-% The '$elemMatch' seems like a silly operator. I'm
-% guessing it exists to mask over some previous behavior
-% that I haven't seen yet. I'm guessing that this is
-% probably wrong and that '$all' wraps objects with
-% the '$eq' operator. Hopefully any behavior disparity
-% will be caught during testing.
-match({[{<<"$elemMatch">>, Arg}]}, Value) ->
-    match(Arg, Value);
-
-% Our comparison operators are fairly straight forward
-match({[{<<"$lt">>, Arg}]}, Value) ->
-    mango_json:cmp(Value, Arg) < 0;
-match({[{<<"$lte">>, Arg}]}, Value) ->
-    mango_json:cmp(Value, Arg) =< 0;
-match({[{<<"$eq">>, Arg}]}, Value) ->
-    mango_json:cmp(Value, Arg) == 0;
-match({[{<<"$ne">>, Arg}]}, Value) ->
-    mango_json:cmp(Value, Arg) /= 0;
-match({[{<<"$gte">>, Arg}]}, Value) ->
-    mango_json:cmp(Value, Arg) >= 0;
-match({[{<<"$gt">>, Arg}]}, Value) ->
-    mango_json:cmp(Value, Arg) > 0;
-
-match({[{<<"$in">>, Args}]}, Value) ->
-    Pred = fun(Arg) -> mango_json:cmp(Value, Arg) == 0 end,
-    lists:any(Pred, Args);
-
-match({[{<<"$nin">>, Args}]}, Value) ->
-    Pred = fun(Arg) -> mango_json:cmp(Value, Arg) /= 0 end,
-    lists:all(Pred, Args);
-
-% This logic is a bit subtle. Basically, if value is
-% not undefined, then it exists.
-match({[{<<"$exists">>, ShouldExist}]}, Value) ->
-    Exists = Value /= undefined,
-    ShouldExist andalso Exists;
-
-match({[{<<"$type">>, Arg}]}, Value) when is_binary(Arg) ->
-    Arg == mango_json:type(Value);
-
-match({[{<<"$mod">>, [D, R]}]}, Value) when is_integer(Value) ->
-    Value rem D == R;
-match({[{<<"$mod">>, _}]}, _) ->
-    false;
-
-match({[{<<"$regex">>, R}, {<<"$options">>, _O}]}, Val) when is_binary(Val) ->
-    % TODO: write translate_options(O),
-    Opts = [{capture, none}],
-    try
-        match == re:run(Val, R, Opts)
-    catch _:_ ->
-        false
-    end;
-match({[{<<"$regex">>, _}, {<<"$options">>, _}]}, _) ->
-    false;
-
-match({[{<<"$size">>, Arg}]}, Values) when is_list(Values) ->
-    length(Values) == Arg;
-match({[{<<"$size">>, _}]}, _) ->
-    false;
-
-% All other operators are internal assertion errors for
-% matching because we either should've removed them during
-% normalization or something else broke.
-match({[{<<"$", _/binary>>=Op, _}]}, _) ->
-    erlang:error({bad_operator, Op});
-
-% We need to traverse value to find field. The call to
-% mango_doc:get_field/2 may return either not_found or
-% bad_path in which case matching fails.
-match({[{Field, Cond}]}, Value) ->
-    case mango_doc:get_field(Value, Field) of
-        not_found ->
-            false;
-        bad_path ->
-            false;
-        SubValue ->
-            match(Cond, SubValue)
-    end;
-
-match({Props} = Sel, _) when length(Props) > 1 ->
-    erlang:error({unnormalized_selector, Sel}).
-
+match(Selector, {Props}) ->
+    match(Selector, {Props}, fun mango_json:cmp/2).
 
 % Convert each operator into a normalized version as well
 % as convert an implict operators into their explicit
@@ -695,3 +583,121 @@ range_pos(Low, Arg, High) ->
                     max
             end
     end.
+
+
+match({[{<<"$and">>, Args}]}, Value, Cmp) ->
+    Pred = fun(SubSel) -> match(SubSel, Value, Cmp) end,
+    lists:all(Pred, Args);
+
+match({[{<<"$or">>, Args}]}, Value, Cmp) ->
+    Pred = fun(SubSel) -> match(SubSel, Value, Cmp) end,
+    lists:any(Pred, Args);
+
+match({[{<<"$not">>, Arg}]}, Value, Cmp) ->
+    not match(Arg, Value, Cmp);
+
+% One of the elements in the array Value must
+% match all conditions in Args.
+match({[{<<"$all">>, Args}]}, Values, Cmp) when is_list(Values) ->
+    Pred = fun
+        (Val, false) ->
+            SelPred = fun(A) -> match(A, Val, Cmp) end,
+            lists:all(SelPred, Args);
+        (_, true) ->
+            % Short circuit
+            true
+    end,
+    lists:foldl(Pred, false, Values);
+
+% MongoDB docs also say we can use '$all' against
+% a non-array value. We just cheat by wrapping the
+% value in a list and recursing to use the logic
+% in the previous clause.
+match({[{<<"$all">>, _}]} = Cond, Value, Cmp) ->
+    match(Cond, [Value], Cmp);
+
+% The '$elemMatch' seems like a silly operator. I'm
+% guessing it exists to mask over some previous behavior
+% that I haven't seen yet. I'm guessing that this is
+% probably wrong and that '$all' wraps objects with
+% the '$eq' operator. Hopefully any behavior disparity
+% will be caught during testing.
+match({[{<<"$elemMatch">>, Arg}]}, Value, Cmp) ->
+    match(Arg, Value, Cmp);
+
+% Our comparison operators are fairly straight forward
+match({[{<<"$lt">>, Arg}]}, Value, Cmp) ->
+    Cmp(Value, Arg) < 0;
+match({[{<<"$lte">>, Arg}]}, Value, Cmp) ->
+    Cmp(Value, Arg) =< 0;
+match({[{<<"$eq">>, Arg}]}, Value, Cmp) ->
+    Cmp(Value, Arg) == 0;
+match({[{<<"$ne">>, Arg}]}, Value, Cmp) ->
+    Cmp(Value, Arg) /= 0;
+match({[{<<"$gte">>, Arg}]}, Value, Cmp) ->
+    Cmp(Value, Arg) >= 0;
+match({[{<<"$gt">>, Arg}]}, Value, Cmp) ->
+    Cmp(Value, Arg) > 0;
+
+match({[{<<"$in">>, Args}]}, Value, Cmp) ->
+    Pred = fun(Arg) -> Cmp(Value, Arg) == 0 end,
+    lists:any(Pred, Args);
+
+match({[{<<"$nin">>, Args}]}, Value, Cmp) ->
+    Pred = fun(Arg) -> Cmp(Value, Arg) /= 0 end,
+    lists:all(Pred, Args);
+
+% This logic is a bit subtle. Basically, if value is
+% not undefined, then it exists.
+match({[{<<"$exists">>, ShouldExist}]}, Value, _Cmp) ->
+    Exists = Value /= undefined,
+    ShouldExist andalso Exists;
+
+match({[{<<"$type">>, Arg}]}, Value, _Cmp) when is_binary(Arg) ->
+    Arg == mango_json:type(Value);
+
+match({[{<<"$mod">>, [D, R]}]}, Value, _Cmp) when is_integer(Value) ->
+    Value rem D == R;
+match({[{<<"$mod">>, _}]}, _Value, _Cmp) ->
+    false;
+
+match({[{<<"$regex">>, Regex}, {<<"$options">>, _O}]}, Value, _Cmp)
+        when is_binary(Value) ->
+    % TODO: write translate_options(O),
+    Opts = [{capture, none}],
+    try
+        match == re:run(Value, Regex, Opts)
+    catch _:_ ->
+        false
+    end;
+match({[{<<"$regex">>, _}, {<<"$options">>, _}]}, _Value, _Cmp) ->
+    false;
+
+match({[{<<"$size">>, Arg}]}, Values, _Cmp) when is_list(Values) ->
+    length(Values) == Arg;
+match({[{<<"$size">>, _}]}, _Value, _Cmp) ->
+    false;
+
+% All other operators are internal assertion errors for
+% matching because we either should've removed them during
+% normalization or something else broke.
+match({[{<<"$", _/binary>>=Op, _}]}, _, _) ->
+    erlang:error({bad_operator, Op});
+
+% We need to traverse value to find field. The call to
+% mango_doc:get_field/2 may return either not_found or
+% bad_path in which case matching fails.
+match({[{Field, Cond}]}, Value, Cmp) ->
+    case mango_doc:get_field(Value, Field) of
+        not_found ->
+            false;
+        bad_path ->
+            false;
+        SubValue when Field == <<"_id">> ->
+            match(Cond, SubValue, fun mango_json:cmp_raw/2);
+        SubValue ->
+            match(Cond, SubValue, Cmp)
+    end;
+
+match({Props} = Sel, _Value, _Cmp) when length(Props) > 1 ->
+    erlang:error({unnormalized_selector, Sel}).

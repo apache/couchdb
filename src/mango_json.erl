@@ -5,6 +5,7 @@
     min/0,
     max/0,
     cmp/2,
+    cmp_raw/2,
     type/1,
     special/1
 ]).
@@ -36,6 +37,32 @@ cmp(_, ?MAX_VAL) ->
     -1;
 cmp(A, B) ->
     couch_view:cmp_json(A, B).
+
+
+cmp_raw(?MIN_VAL, ?MIN_VAL) ->
+    0;
+cmp_raw(?MIN_VAL, _) ->
+    -1;
+cmp_raw(_, ?MIN_VAL) ->
+    1;
+cmp_raw(?MAX_VAL, ?MAX_VAL) ->
+    0;
+cmp_raw(?MAX_VAL, _) ->
+    1;
+cmp_raw(_, ?MAX_VAL) ->
+    -1;
+cmp_raw(A, B) ->
+    case A < B of
+        true ->
+            -1;
+        false ->
+            case A > B of
+                true ->
+                    1;
+                false ->
+                    0
+            end
+    end.
 
 
 type(null) ->
