@@ -36,7 +36,6 @@ fixture_files = \
     fixtures/test.couch
 
 tap_files = \
-    140-attachment-comp.t \
     150-invalid-view-seq.t \
     160-vhosts.t \
     170-os-daemons.es \
