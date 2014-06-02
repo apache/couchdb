@@ -36,6 +36,20 @@ start_link() ->
 get_user_creds(UserName) when is_list(UserName) ->
     get_user_creds(?l2b(UserName));
 get_user_creds(UserName) when is_binary(UserName) ->
+    case couch_auth_cache:get_admin(UserName) of
+    nil ->
+        get_from_cache(UserName);
+    Props ->
+        case get_from_cache(UserName) of
+        nil ->
+            Props;
+        UserProps when is_list(UserProps) ->
+            couch_auth_cache:add_roles(Props,
+	        couch_util:get_value(<<"roles">>, UserProps))
+        end
+    end.
+
+get_from_cache(UserName) ->
     try ets_lru:lookup_d(?CACHE, UserName) of
 	{ok, Props} ->
 	    couch_stats_collector:increment({chttpd, auth_cache_hits}),
