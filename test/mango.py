@@ -57,12 +57,10 @@ class Database(object):
         r.raise_for_status()
         return r.json()
 
-    def create_index(self, fields, missing_is_null=False,
-                idx_type="json", name=None, ddoc=None):
+    def create_index(self, fields, idx_type="json", name=None, ddoc=None):
         body = {
             "index": {
-                "fields": fields,
-                "missing_is_null": missing_is_null
+                "fields": fields
             },
             "type": idx_type
         }

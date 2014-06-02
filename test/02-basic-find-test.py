@@ -27,11 +27,11 @@ def setup():
         ["company", "manager"],
         ["manager"],
         ["favorites"],
-        ["favorites.3"]
+        ["favorites.3"],
+        ["twitter"]
     ]
     for idx in indexes:
         assert db.create_index(idx) is True
-    assert db.create_index(["twitter"], missing_is_null = True) is True
 
 
 def test_bad_selector():
@@ -222,24 +222,33 @@ def test_multi_col_idx():
     assert docs[0]["user_id"] == 6
 
 
-def test_missing_not_null():
+def test_missing_not_indexed():
     db = mkdb()
     docs = db.find({"favorites.3": "C"})
     assert len(docs) == 2
     assert docs[0]["user_id"] == 8
     assert docs[1]["user_id"] == 6
+
     docs = db.find({"favorites.3": None})
     assert len(docs) == 0
 
-
-def test_missing_is_null():
-    db = mkdb()
     docs = db.find({"twitter": {"$gt": None}})
     assert len(docs) == 4
     assert docs[0]["user_id"] == 1
     assert docs[1]["user_id"] == 4
     assert docs[2]["user_id"] == 0
     assert docs[3]["user_id"] == 13
-    docs = db.find({"twitter": None})
-    assert len(docs) == 11
-    
+
+
+def test_limit():
+    db = mkdb()
+    docs = db.find({"age": {"$gt": 0}})
+    assert len(docs) == 15
+    for l in [0, 1, 5, 14]:
+        docs = db.find({"age": {"$gt": 0}}, limit=l)
+        assert len(docs) == l
+
+# skip
+# sort
+# fields
+# r

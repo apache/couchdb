@@ -93,26 +93,16 @@ map_doc(#st{indexes=Indexes}, Doc) ->
 
 get_index_entries({IdxProps}, Doc) ->
     {Fields} = couch_util:get_value(<<"fields">>, IdxProps),
-    MissingIsNull = couch_util:get_value(<<"missing_is_null">>, IdxProps),
-    Values0 = lists:map(fun({Field, _Dir}) ->
+    Values = lists:map(fun({Field, _Dir}) ->
         case mango_doc:get_field(Doc, Field) of
             not_found -> not_found;
             bad_path -> not_found;
             Else -> Else
         end
     end, Fields),
-    Values1 = set_nulls(Values0, MissingIsNull),
-    case lists:member(not_found, Values1) of
+    case lists:member(not_found, Values) of
         true ->
             [];
         false ->
-            [[Values1, null]]
+            [[Values, null]]
     end.
-
-
-set_nulls([], _) ->
-    [];
-set_nulls([not_found | Rest], true) ->
-    [null | set_nulls(Rest, true)];
-set_nulls([Else | Rest], SetNull) ->
-    [Else | set_nulls(Rest, SetNull)].

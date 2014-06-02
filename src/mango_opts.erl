@@ -61,7 +61,7 @@ validate_find({Props}) ->
             {tag, limit},
             {optional, true},
             {default, 25},
-            {validator, fun mango_opts:is_pos_integer/1}
+            {validator, fun mango_opts:is_non_neg_integer/1}
         ]},
         {<<"skip">>, [
             {tag, skip},

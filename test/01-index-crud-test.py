@@ -37,24 +37,6 @@ def test_bad_fields():
             raise AssertionError("bad create index")
 
 
-def test_bad_missing_is_null():
-    db = mkdb()
-    bad_mins = [
-        None,
-        "bing",
-        1,
-        {"foo":"bar"},
-        [2, None]
-    ]
-    for bm in bad_mins:
-        try:
-            db.create_index(["foo"], missing_is_null=bm)
-        except Exception, e:
-            assert e.response.status_code == 400
-        else:
-            raise AssertionError("bad create index")
-
-
 def test_bad_types():
     db = mkdb()
     bad_types = [
@@ -110,7 +92,6 @@ def test_create_idx_01():
         if idx["name"] != "idx_01":
             continue
         assert idx["def"]["fields"] == [{"foo": "asc"}, {"bar": "asc"}]
-        assert idx["def"]["missing_is_null"] == False
         return
     raise AssertionError("index not created")
 
@@ -125,13 +106,12 @@ def test_create_idx_01_exists():
 def test_create_idx_02():
     db = mkdb()
     fields = ["baz", "foo"]
-    ret = db.create_index(fields, missing_is_null=True, name="idx_02")
+    ret = db.create_index(fields, name="idx_02")
     assert ret is True
     for idx in db.list_indexes():
         if idx["name"] != "idx_02":
             continue
         assert idx["def"]["fields"] == [{"baz": "asc"}, {"foo": "asc"}]
-        assert idx["def"]["missing_is_null"] is True
         return
     raise AssertionError("index not created")
 
@@ -157,7 +137,6 @@ def test_delete_idx():
         if idx["name"] != "idx_del":
             continue
         assert idx["def"]["fields"] == [{"bing": "asc"}]
-        assert idx["def"]["missing_is_null"] is False
         db.delete_index(idx["ddoc"].split("/")[-1], idx["name"])
     post_indexes = db.list_indexes()
     assert pre_indexes == post_indexes
