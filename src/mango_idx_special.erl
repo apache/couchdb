@@ -13,6 +13,7 @@
 ]).
 
 
+-include_lib("couch/include/couch_db.hrl").
 -include("mango_idx.hrl").
 
 
@@ -50,16 +51,30 @@ columns(#idx{def=all_docs}) ->
 
 
 start_key([{'$gt', Key, _, _}]) ->
-    Key;
+    case mango_json:special(Key) of
+        true ->
+            ?MIN_STR;
+        false ->
+            Key
+    end;
 start_key([{'$gte', Key, _, _}]) ->
+    false = mango_json:special(Key),
     Key;
 start_key([{'$eq', Key, '$eq', Key}]) ->
+    false = mango_json:special(Key),
     Key.
 
 
 end_key([{_, _, '$lt', Key}]) ->
-    Key;
+    case mango_json:special(Key) of
+        true ->
+            ?MAX_STR;
+        false ->
+            Key
+    end;
 end_key([{_, _, '$lte', Key}]) ->
+    false = mango_json:special(Key),
     Key;
 end_key([{'$eq', Key, '$eq', Key}]) ->
+    false = mango_json:special(Key),
     Key.

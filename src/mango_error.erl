@@ -9,15 +9,29 @@
 info(mango_cursor, {no_usable_index, query_unsupported}) ->
     {
         400,
-        <<"unsupported_query">>,
+        <<"no_usable_index">>,
         <<"Query unsupported because it would require multiple indices.">>
     };
-info(mango_cursor, {no_usable_index, Possible}) ->
+info(mango_cursor, {no_usable_index, sort_field}) ->
+    {
+        400,
+        <<"no_usable_index">>,
+        <<"No index can satisfy both the selector and sort specified.">>
+    };
+info(mango_cursor, {no_usable_index, {sort, Fields}}) ->
+    S0 = [binary_to_list(F) || F <- Fields],
+    S1 = string:join(S0, ", "),
+    {
+        400,
+        <<"no_usable_index">>,
+        fmt("No index exists for this sort, try indexing: ~s", [S1])
+    };
+info(mango_cursor, {no_usable_index, {fields, Possible}}) ->
     S0 = [binary_to_list(P) || P <- Possible],
     S1 = string:join(S0, ", "),
     {
         400,
-        <<"no_index_exists">>,
+        <<"no_usable_index">>,
         fmt("No index exists for this selector, try indexing one of: ~s", [S1])
     };
 

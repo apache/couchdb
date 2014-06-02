@@ -18,10 +18,14 @@
 create(Db, Selector0, Opts) ->
     Selector = mango_selector:normalize(Selector0),
     IndexFields = mango_selector:index_fields(Selector),
-    ExistingIndexes = get_existing_indexes(Db, Opts),
-    UsableIndexes = find_usable_indexes(IndexFields, ExistingIndexes),
     FieldRanges = find_field_ranges(Selector, IndexFields),
-    Composited = composite_indexes(UsableIndexes, FieldRanges),
+
+    ExistingIndexes = mango_idx:list(Db),
+
+    UsableIndexes = find_usable_indexes(IndexFields, ExistingIndexes),
+    SortIndexes = get_sort_indexes(ExistingIndexes, UsableIndexes, Opts),
+
+    Composited = composite_indexes(SortIndexes, FieldRanges),
     {Index, Ranges} = choose_best_index(Db, Composited),
 
     Limit = couch_util:get_value(limit, Opts, 10000000000),
@@ -43,37 +47,12 @@ execute(#cursor{index=Idx}=Cursor, UserFun, UserAcc) ->
     Mod:execute(Cursor, UserFun, UserAcc).
 
 
-get_existing_indexes(Db, Opts) ->
-    Indexes = mango_idx:list(Db),
-    % If a sort was specified we have to find an index that
-    % can satisfy the request.
-    case lists:keyfind(sort, 1, Opts) of
-        {sort, {[_ | _]} = Sort} ->
-            limit_to_sort(Indexes, Sort);
-        _ ->
-            Indexes
-    end.
-
-
-limit_to_sort(Indexes, Sort) ->
-    Fields = mango_sort:fields(Sort),
-    Filt = fun(Idx) ->
-        Cols = mango_idx:columns(Idx),
-        lists:prefix(Fields, Cols)
-    end,
-    Possible = lists:filter(Filt, Indexes),
-    if Possible /= [] -> ok; true ->
-        ?MANGO_ERROR({no_usable_sort_index, Fields})
-    end,
-    Possible.
-
-
 % Find the intersection between the Possible and Existing
 % indexes.
 find_usable_indexes([], _) ->
     ?MANGO_ERROR({no_usable_index, query_unsupported});
 find_usable_indexes(Possible, []) ->
-    ?MANGO_ERROR({no_usable_index, Possible});
+    ?MANGO_ERROR({no_usable_index, {fields, Possible}});
 find_usable_indexes(Possible, Existing) ->
     Usable = lists:foldl(fun(Idx, Acc) ->
         [Col0 | _] = mango_idx:columns(Idx),
@@ -85,9 +64,46 @@ find_usable_indexes(Possible, Existing) ->
         end
     end, [], Existing),
     if length(Usable) > 0 -> ok; true ->
-        ?MANGO_ERROR({no_usable_index, Possible})
+        ?MANGO_ERROR({no_usable_index, {fields, Possible}})
     end,
     Usable.
+
+
+get_sort_indexes(ExistingIndexes, UsableIndexes, Opts) ->
+    % If a sort was specified we have to find an index that
+    % can satisfy the request.
+    case lists:keyfind(sort, 1, Opts) of
+        {sort, {[_ | _]} = Sort} ->
+            limit_to_sort(ExistingIndexes, UsableIndexes, Sort);
+        _ ->
+            UsableIndexes
+    end.
+
+
+limit_to_sort(ExistingIndexes, UsableIndexes, Sort) ->
+    Fields = mango_sort:fields(Sort),
+
+    % First make sure that we have an index that could
+    % answer this sort. We split like this so that the
+    % user error is more obvious.
+    SortFilt = fun(Idx) ->
+        Cols = mango_idx:columns(Idx),
+        lists:prefix(Fields, Cols)
+    end,
+    SortIndexes = lists:filter(SortFilt, ExistingIndexes),
+    if SortIndexes /= [] -> ok; true ->
+        ?MANGO_ERROR({no_usable_index, {sort, Fields}})
+    end,
+
+    % And then check if one or more of our SortIndexes
+    % is usable.
+    UsableFilt = fun(Idx) -> lists:member(Idx, UsableIndexes) end,
+    FinalIndexes = lists:filter(UsableFilt, SortIndexes),
+    if FinalIndexes /= [] -> ok; true ->
+        ?MANGO_ERROR({no_usable_index, sort_field})
+    end,
+
+    FinalIndexes.
 
 
 % For each field, return {Field, Range}

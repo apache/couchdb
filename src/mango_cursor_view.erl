@@ -28,7 +28,7 @@ execute(#cursor{db = Db, index = Idx} = Cursor0, UserFun, UserAcc) ->
     CB = fun ?MODULE:handle_message/2,
     {ok, LastCursor} = case mango_idx:def(Idx) of
         all_docs ->
-            %twig:log(err, "Query: ~s all_docs~n  ~p", [Db#db.name, Args]),
+            twig:log(err, "Query: ~s all_docs~n  ~p", [Db#db.name, Args]),
             fabric:all_docs(Db, CB, Cursor, Args);
         _ ->
             % Normal view
@@ -111,7 +111,13 @@ apply_opts([{conflicts, false} | Rest], Args) ->
     % Ignored cause default
     apply_opts(Rest, Args);
 apply_opts([{sort, Sort} | Rest], Args) ->
+    % We only support single direction sorts
+    % so nothing fancy here.
     case mango_sort:directions(Sort) of
+        [] ->
+            apply_opts(Rest, Args);
+        [<<"asc">> | _] ->
+            apply_opts(Rest, Args);
         [<<"desc">> | _] ->
             SK = Args#view_query_args.start_key,
             EK = Args#view_query_args.end_key,
@@ -120,9 +126,7 @@ apply_opts([{sort, Sort} | Rest], Args) ->
                 start_key = EK,
                 end_key = SK
             },
-            apply_opts(Rest, NewArgs);
-        _ ->
-            apply_opts(Rest, Args)
+            apply_opts(Rest, NewArgs)
     end;
 apply_opts([{_, _} | Rest], Args) ->
     % Ignore unknown options
