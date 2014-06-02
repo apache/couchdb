@@ -59,7 +59,7 @@ handle_call({prompt, [<<"add_fun">>, IndexInfo]}, _From, St) ->
     {reply, true, NewSt};
 
 handle_call({prompt, [<<"map_doc">>, Doc]}, _From, St) ->
-    {reply, map_doc(St, to_binary(Doc)), St};
+    {reply, map_doc(St, mango_json:to_binary(Doc)), St};
 
 handle_call({prompt, [<<"reduce">>, _, _]}, _From, St) ->
     {reply, null, St};
@@ -95,20 +95,18 @@ get_index_entries({IdxProps}, Doc) ->
     {Fields} = couch_util:get_value(<<"fields">>, IdxProps),
     MissingIsNull = couch_util:get_value(<<"missing_is_null">>, IdxProps),
     Values0 = lists:map(fun({Field, _Dir}) ->
-        mango_doc:get_field(Doc, Field)
+        case mango_doc:get_field(Doc, Field) of
+            not_found -> not_found;
+            bad_path -> not_found;
+            Else -> Else
+        end
     end, Fields),
     Values1 = set_nulls(Values0, MissingIsNull),
     case lists:member(not_found, Values1) of
         true ->
             [];
         false ->
-            case has_one_array(Values1) of
-                true ->
-                    Expanded = expand_array(Values1),
-                    [[K, null] || K <- Expanded];
-                false ->
-                    [[Values1, null]]
-            end
+            [[Values1, null]]
     end.
 
 
@@ -116,47 +114,5 @@ set_nulls([], _) ->
     [];
 set_nulls([not_found | Rest], true) ->
     [null | set_nulls(Rest, true)];
-set_nulls([Else | Rest], false) ->
-    [Else | set_nulls(Rest, false)].
-
-
-has_one_array(Values) ->
-    1 == lists:foldl(fun(V, Acc) ->
-        Acc + (if is_list(V) -> 1; true -> 0 end)
-    end, 0, Values).
-
-
-expand_array(Values) ->
-    {Prefix, Array, Tail} = split_array(Values),
-    lists:map(fun(V) ->
-        Prefix ++ [V] ++ Tail
-    end, Array).
-
-
-split_array([Values | Rest]) when is_list(Values) ->
-    {[], Values, Rest};
-split_array([Value | Rest]) ->
-    {Prefix, Values, Tail} = split_array(Rest),
-    {[Value | Prefix], Values, Tail}.
-
-
-
-to_binary({Props}) ->
-    Pred = fun({Key, Value}) ->
-        {to_binary(Key), to_binary(Value)}
-    end,
-    {lists:map(Pred, Props)};
-to_binary(Data) when is_list(Data) ->
-    [to_binary(D) || D <- Data];
-to_binary(null) ->
-    null;
-to_binary(true) ->
-    true;
-to_binary(false) ->
-    false;
-to_binary(Data) when is_atom(Data) ->
-    list_to_binary(atom_to_list(Data));
-to_binary(Data) when is_number(Data) ->
-    Data;
-to_binary(Data) when is_binary(Data) ->
-    Data.
+set_nulls([Else | Rest], SetNull) ->
+    [Else | set_nulls(Rest, SetNull)].
