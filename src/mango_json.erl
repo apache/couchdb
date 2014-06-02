@@ -7,7 +7,8 @@
     cmp/2,
     cmp_raw/2,
     type/1,
-    special/1
+    special/1,
+    to_binary/1
 ]).
 
 
@@ -85,3 +86,24 @@ special(?MAX_VAL) ->
     true;
 special(_) ->
     false.
+
+
+to_binary({Props}) ->
+    Pred = fun({Key, Value}) ->
+        {to_binary(Key), to_binary(Value)}
+    end,
+    {lists:map(Pred, Props)};
+to_binary(Data) when is_list(Data) ->
+    [to_binary(D) || D <- Data];
+to_binary(null) ->
+    null;
+to_binary(true) ->
+    true;
+to_binary(false) ->
+    false;
+to_binary(Data) when is_atom(Data) ->
+    list_to_binary(atom_to_list(Data));
+to_binary(Data) when is_number(Data) ->
+    Data;
+to_binary(Data) when is_binary(Data) ->
+    Data.

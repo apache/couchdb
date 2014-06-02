@@ -17,11 +17,10 @@
 
 create(Db, Selector0, Opts) ->
     Selector = mango_selector:normalize(Selector0),
-    IndexFields = mango_selector:index_fields(Selector),
+    IndexFields = mango_selector:index_fields(Selector),    
     FieldRanges = find_field_ranges(Selector, IndexFields),
 
     ExistingIndexes = mango_idx:list(Db),
-
     UsableIndexes = find_usable_indexes(IndexFields, ExistingIndexes),
     SortIndexes = get_sort_indexes(ExistingIndexes, UsableIndexes, Opts),
 

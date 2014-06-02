@@ -25,6 +25,7 @@ def test_bad_fields():
         2.0,
         {"foo": "bar"},
         [{"foo": 2}],
+        [{"foo": "asc", "bar": "desc"}],
         [{"foo": "asc"}, {"bar": "desc"}]
     ]
     for fields in bad_fields:

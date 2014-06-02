@@ -24,8 +24,15 @@ normalize(Selector) ->
         fun norm_fields/1,
         fun norm_negations/1
     ],
-    lists:foldl(fun(Step, Sel) -> Step(Sel) end, Selector, Steps).
-
+    {NProps} = lists:foldl(fun(Step, Sel) -> Step(Sel) end, Selector, Steps),
+    FieldNames = [Name || {Name, _} <- NProps],
+    case lists:member(<<>>, FieldNames) of
+        true ->
+            ?MANGO_ERROR({invalid_selector, missing_field_name});
+        false ->
+            ok
+    end,
+    {NProps}.
 
 % This function returns a list of indexes that
 % can be used to restrict this query. This works by

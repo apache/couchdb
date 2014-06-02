@@ -108,11 +108,11 @@ start_key([{'$eq', Key, '$eq', Key} | Rest]) ->
 
 
 end_key([]) ->
-    [{}];
+    [{[]}];
 end_key([{_, _, '$lt', Key} | Rest]) ->
     case mango_json:special(Key) of
         true ->
-            [{}];
+            [{[]}];
         false ->
             [Key | end_key(Rest)]
     end;
@@ -120,7 +120,7 @@ end_key([{_, _, '$lte', Key} | Rest]) ->
     false = mango_json:special(Key),
     [Key | end_key(Rest)];
 end_key([{'$eq', Key, '$eq', Key} | Rest]) ->
-    false = mango_json:special(),
+    false = mango_json:special(Key),
     [Key | end_key(Rest)].
 
 
@@ -148,12 +148,6 @@ opts() ->
         {<<"fields">>, [
             {tag, fields},
             {validator, fun mango_opts:validate_sort/1}
-        ]},
-        {<<"missing_is_null">>, [
-            {tag, missing_is_null},
-            {optional, true},
-            {default, false},
-            {validator, fun mango_opts:is_boolean/1}
         ]}
     ].
 

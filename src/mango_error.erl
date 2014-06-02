@@ -135,6 +135,12 @@ info(mango_opts, {invalid_selector_json, BadSel}) ->
         fmt("Selector must be a JSON object, not: ~w", [BadSel])
     };
 
+info(mango_selector, {invalid_selector, missing_field_name}) ->
+    {
+        400,
+        <<"invalid_selector">>,
+        <<"One or more conditions is missing a field name.">>
+    };
 info(mango_selector, {bad_arg, Op, Arg}) ->
     {
         400,

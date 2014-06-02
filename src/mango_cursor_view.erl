@@ -72,7 +72,6 @@ handle_doc(Cursor, Doc) ->
     UserAcc = Cursor#cursor.user_acc,
     {Go, NewAcc} = UserFun({row, Doc}, UserAcc),
     NewLimit = Cursor#cursor.limit - 1,
-    twig:log(err, "NewLimit: ~p", [NewLimit]),
     NewCursor = Cursor#cursor{user_acc = NewAcc, limit = NewLimit},
     case NewLimit of
         0 ->
@@ -122,11 +121,15 @@ apply_opts([{sort, Sort} | Rest], Args) ->
             apply_opts(Rest, Args);
         [<<"desc">> | _] ->
             SK = Args#view_query_args.start_key,
+            SKDI = Args#view_query_args.start_docid,
             EK = Args#view_query_args.end_key,
+            EKDI = Args#view_query_args.end_docid,
             NewArgs = Args#view_query_args{
                 direction = rev,
                 start_key = EK,
-                end_key = SK
+                start_docid = EKDI,
+                end_key = SK,
+                end_docid = SKDI
             },
             apply_opts(Rest, NewArgs)
     end;
