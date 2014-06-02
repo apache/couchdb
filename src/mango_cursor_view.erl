@@ -71,11 +71,13 @@ handle_doc(Cursor, Doc) ->
     UserFun = Cursor#cursor.user_fun,
     UserAcc = Cursor#cursor.user_acc,
     {Go, NewAcc} = UserFun({row, Doc}, UserAcc),
-    NewCursor = Cursor#cursor{user_acc = NewAcc},
-    case Cursor#cursor.limit of
-        1 ->
+    NewLimit = Cursor#cursor.limit - 1,
+    twig:log(err, "NewLimit: ~p", [NewLimit]),
+    NewCursor = Cursor#cursor{user_acc = NewAcc, limit = NewLimit},
+    case NewLimit of
+        0 ->
             {stop, NewCursor};
-        L when L > 1 ->
+        L when L > 0 ->
             {Go, NewCursor}
     end.
 
