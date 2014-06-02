@@ -85,7 +85,7 @@ handle_index_req(#httpd{method='DELETE',
                     ?MANGO_ERROR(error_saving_ddoc)
             end;
         [] ->
-            throw(not_found)
+            throw({not_found, missing})
     end;
 
 handle_index_req(Req, _Db) ->

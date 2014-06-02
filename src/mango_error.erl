@@ -48,6 +48,13 @@ info(mango_fields, {invalid_field_json, BadField}) ->
         fmt("Invalid JSON for field spec: ~w", [BadField])
     };
 
+info(mango_idx, {invalid_index_type, BadType}) ->
+    {
+        400,
+        <<"invalid_index_type">>,
+        fmt("Invalid type for index: ~s", [BadType])
+    };
+
 info(mango_idx_view, {invalid_index_json, BadIdx}) ->
     {
         400,

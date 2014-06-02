@@ -1,4 +1,5 @@
 
+import random
 import time
 
 import mango
@@ -12,6 +13,91 @@ def setup():
     db = mkdb()
     db.recreate()
     time.sleep(1)
+
+
+def test_bad_fields():
+    db = mkdb()
+    bad_fields = [
+        None,
+        True,
+        False,
+        "bing",
+        2.0,
+        {"foo": "bar"},
+        [{"foo": 2}],
+        [{"foo": "asc"}, {"bar": "desc"}]
+    ]
+    for fields in bad_fields:
+        try:
+            db.create_index(fields)
+        except Exception, e:
+            assert e.response.status_code == 400
+        else:
+            raise AssertionError("bad create index")
+
+
+def test_bad_missing_is_null():
+    db = mkdb()
+    bad_mins = [
+        None,
+        "bing",
+        1,
+        {"foo":"bar"},
+        [2, None]
+    ]
+    for bm in bad_mins:
+        try:
+            db.create_index(["foo"], missing_is_null=bm)
+        except Exception, e:
+            assert e.response.status_code == 400
+        else:
+            raise AssertionError("bad create index")
+
+
+def test_bad_types():
+    db = mkdb()
+    bad_types = [
+        None,
+        True,
+        False,
+        1.5,
+        "foo",
+        "text", # Future support
+        "geo", # Future support
+        {"foo": "bar"},
+        ["baz", 3.0]
+    ]
+    for bt in bad_types:
+        try:
+            db.create_index(["foo"], idx_type=bt)
+        except Exception, e:
+            assert e.response.status_code == 400, (bt, e.response.status_code)
+        else:
+            raise AssertionError("bad create index")
+
+
+def test_bad_names():
+    db = mkdb()
+    bad_names = [
+        True,
+        False,
+        1.5,
+        {"foo": "bar"},
+        [None, False]
+    ]
+    for bn in bad_names:
+        try:
+            db.create_index(["foo"], name=bn)
+        except Exception, e:
+            assert e.response.status_code == 400
+        else:
+            raise AssertionError("bad create index")
+        try:
+            db.create_index(["foo"], ddoc=bn)
+        except Exception, e:
+            assert e.response.status_code == 400
+        else:
+            raise AssertionError("bad create index")
 
 
 def test_create_idx_01():
@@ -74,3 +160,34 @@ def test_delete_idx():
         db.delete_index(idx["ddoc"].split("/")[-1], idx["name"])
     post_indexes = db.list_indexes()
     assert pre_indexes == post_indexes
+
+
+def test_delete_misisng():
+    db = mkdb()
+
+    # Missing design doc
+    try:
+        db.delete_index("this_is_not_a_design_doc_id", "foo")
+    except Exception, e:
+        assert e.response.status_code == 404
+    else:
+        raise AssertionError("bad index delete")
+
+    # Missing view name
+    indexes = db.list_indexes()
+    idx = random.choice([idx for idx in indexes if idx["type"] != "special"])
+    ddocid = idx["ddoc"].split("/")[-1]
+    try:
+        db.delete_index(ddocid, "this_is_not_an_index_name")
+    except Exception, e:
+        assert e.response.status_code == 404
+    else:
+        raise AssertionError("bad index delete")
+
+    # Bad view type
+    try:
+        db.delete_index(ddocid, idx["name"], idx_type="not_a_real_type")
+    except Exception, e:
+        assert e.response.status_code == 404
+    else:
+        raise AssertionError("bad index delete")
