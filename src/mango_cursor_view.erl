@@ -49,7 +49,9 @@ handle_message({row, {Props}}, Cursor) ->
         {ok, Doc} ->
             case mango_selector:match(Cursor#cursor.selector, Doc) of
                 true ->
-                    handle_doc(Cursor, Doc);
+                    FinalDoc = mango_fields:extract(Doc, Cursor#cursor.fields),
+                    twig:log(err, "FinalDoc: ~p", [FinalDoc]),
+                    handle_doc(Cursor, FinalDoc);
                 false ->
                     {ok, Cursor}
             end;
@@ -137,16 +139,6 @@ apply_opts([{_, _} | Rest], Args) ->
 
 
 doc_member(Db, RowProps, Opts) ->
-    Fields = couch_util:get_value(fields, Opts, all_fields),
-    case load_doc(Db, RowProps, Opts) of
-        {ok, Doc} when Fields /= all_fields ->
-            {ok, mango_fields:extract(Doc, Fields)};
-        Else ->
-            Else
-    end.
-
-
-load_doc(Db, RowProps, Opts) ->
     case couch_util:get_value(doc, RowProps) of
         {DocProps} ->
             {ok, {DocProps}};
@@ -159,4 +151,3 @@ load_doc(Db, RowProps, Opts) ->
                     Else
             end
     end.
-

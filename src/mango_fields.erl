@@ -17,7 +17,12 @@ new(Else) ->
     ?MANGO_ERROR({invalid_fields_json, Else}).
 
 
+extract(Doc, undefined) ->
+    Doc;
+extract(Doc, all_fields) ->
+    Doc;
 extract(Doc, Fields) ->
+    twig:log(err, "DOC: ~p FIELDS: ~p", [Doc, Fields]),
     lists:foldl(fun(F, NewDoc) ->
         case mango_doc:get_field(Doc, F) of
             not_found ->
@@ -25,7 +30,7 @@ extract(Doc, Fields) ->
             bad_path ->
                 NewDoc;
             Value ->
-                mango_doc:set_field(Doc, F, Value)
+                mango_doc:set_field(NewDoc, F, Value)
         end
     end, {[]}, Fields).
 

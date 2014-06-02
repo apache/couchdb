@@ -61,6 +61,7 @@ def test_bad_limit():
         None,
         True,
         False,
+        -1,
         1.2,
         "no limit!",
         {"foo": "bar"},
@@ -81,6 +82,7 @@ def test_bad_skip():
         None,
         True,
         False,
+        -3,
         1.2,
         "no limit!",
         {"foo": "bar"},
@@ -248,7 +250,37 @@ def test_limit():
         docs = db.find({"age": {"$gt": 0}}, limit=l)
         assert len(docs) == l
 
-# skip
-# sort
-# fields
-# r
+def test_skip():
+    db = mkdb()
+    docs = db.find({"age": {"$gt": 0}})
+    assert len(docs) == 15
+    for s in [0, 1, 5, 14]:
+        docs = db.find({"age": {"$gt": 0}}, skip=s)
+        assert len(docs) == (15 - s)
+
+
+def test_sort():
+    db = mkdb()
+
+    docs1 = db.find({"age": {"$gt": 0}}, sort=[{"age":"asc"}])
+    docs2 = list(sorted(docs1, key=lambda d: d["age"]))
+    assert docs1 is not docs2 and docs1 == docs2
+
+    docs1 = db.find({"age": {"$gt": 0}}, sort=[{"age":"desc"}])
+    docs2 = list(reversed(sorted(docs1, key=lambda d: d["age"])))
+    assert docs1 is not docs2 and docs1 == docs2
+
+
+def test_fields():
+    db = mkdb()
+    docs = db.find({"age": {"$gt": 0}}, fields=["user_id", "location.address"])
+    for d in docs:
+        assert sorted(d.keys()) == ["location", "user_id"]
+        assert sorted(d["location"].keys()) == ["address"]
+
+
+def test_r():
+    db = mkdb()
+    for r in [1, 2, 3]:
+        docs = db.find({"age": {"$gt": 0}}, r=r)
+        assert len(docs) == 15

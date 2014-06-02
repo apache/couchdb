@@ -484,7 +484,7 @@ set_field({Props}, [Name | Rest], Value) ->
             {lists:keystore(Name, 1, Props, {Name, Result})};
         false ->
             Nested = make_nested(Rest, Value),
-            {lists:keystore(Name, 1, Props, Nested)}
+            {lists:keystore(Name, 1, Props, {Name, Nested})}
     end;
 set_field(Values, [Name], Value) when is_list(Values) ->
     % Name might be an integer index into an array
