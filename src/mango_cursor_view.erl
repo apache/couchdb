@@ -65,20 +65,18 @@ handle_message({error, Reason}, _Cursor) ->
     {error, Reason}.
 
 
-handle_doc(#cursor{skip = N} = C, _) when N > 0 ->
-    {ok, C#cursor{skip = N - 1}};
-handle_doc(Cursor, Doc) ->
-    UserFun = Cursor#cursor.user_fun,
-    UserAcc = Cursor#cursor.user_acc,
+handle_doc(#cursor{skip = S} = C, _) when S > 0 ->
+    {ok, C#cursor{skip = S - 1}};
+handle_doc(#cursor{limit = L} = C, Doc) when L > 0 ->
+    UserFun = C#cursor.user_fun,
+    UserAcc = C#cursor.user_acc,
     {Go, NewAcc} = UserFun({row, Doc}, UserAcc),
-    NewLimit = Cursor#cursor.limit - 1,
-    NewCursor = Cursor#cursor{user_acc = NewAcc, limit = NewLimit},
-    case NewLimit of
-        0 ->
-            {stop, NewCursor};
-        L when L > 0 ->
-            {Go, NewCursor}
-    end.
+    {Go, C#cursor{
+        user_acc = NewAcc,
+        limit = L - 1
+    }};
+handle_doc(C, _Doc) ->
+    {stop, C}.
 
 
 ddocid(Idx) ->
