@@ -232,7 +232,7 @@ gen_name(Idx, Opts0) ->
 
 filter_opts([]) ->
     [];
-filter_opts([{user_ct, _} | Rest]) ->
+filter_opts([{user_ctx, _} | Rest]) ->
     filter_opts(Rest);
 filter_opts([{ddoc, _} | Rest]) ->
     filter_opts(Rest);

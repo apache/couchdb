@@ -4,8 +4,7 @@
     new/1,
     to_json/1,
     fields/1,
-
-    format_error/1
+    directions/1
 ]).
 
 
@@ -13,7 +12,9 @@
 
 
 new(Fields) when is_list(Fields) ->
-    {ok, {[sort_field(Field) || Field <- Fields]}};
+    Sort = {[sort_field(Field) || Field <- Fields]},
+    validate(Sort),
+    {ok, Sort};
 new(Else) ->
     ?MANGO_ERROR({invalid_sort_json, Else}).
 
@@ -26,16 +27,12 @@ to_json([{Name, Dir} | Rest]) ->
     [{[{Name, Dir}]} | to_json(Rest)].
 
 
-fields({Fields}) ->
-    Fields.
+fields({Props}) ->
+    [Name || {Name, _Dir} <- Props].
 
 
-format_error({invalid_sort_json, BadSort}) ->
-    mango_util:fmt("Sort must be an array of sort specs, not: ~w", [BadSort]);
-format_error({invalid_sort_field, BadField}) ->
-    mango_util:fmt("Invalid sort field: ~w", [BadField]);
-format_error(Else) ->
-    mango_util:fmt("Unknown error: ~w", [Else]).
+directions({Props}) ->
+    [Dir || {_Name, Dir} <- Props].
 
 
 sort_field(Field) when is_binary(Field) ->
@@ -44,5 +41,24 @@ sort_field({[{Name, <<"asc">>}]}) when is_binary(Name) ->
     {Name, <<"asc">>};
 sort_field({[{Name, <<"desc">>}]}) when is_binary(Name) ->
     {Name, <<"desc">>};
+sort_field({Name, BadDir}) when is_binary(Name) ->
+    ?MANGO_ERROR({invalid_sort_dir, BadDir});
 sort_field(Else) ->
     ?MANGO_ERROR({invalid_sort_field, Else}).
+
+
+validate({Props}) ->
+    % Assert each field is in the same direction
+    % until we support mixed direction sorts.
+    Dirs = [D || {_, D} <- Props],
+    case lists:usort(Dirs) of
+        [] ->
+            ok;
+        [_] ->
+            ok;
+        _ ->
+            ?MANGO_ERROR({unsupported, mixed_sort})
+    end.
+        
+    
+

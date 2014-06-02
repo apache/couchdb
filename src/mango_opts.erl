@@ -8,8 +8,6 @@
 -export([
     validate/2,
 
-    format_error/1,
-
     is_string/1,
     is_boolean/1,
     is_pos_integer/1,
@@ -114,32 +112,6 @@ validate(Props, Opts) ->
             ?MANGO_ERROR({invalid_key, BadKey})
     end,
     {ok, Acc}.
-
-
-format_error({invalid_ejson, Val}) ->
-    mango_util:fmt("Invalid JSON value: ~w", [Val]);
-format_error({invalid_option, Key}) ->
-    mango_util:fmt("Invalid or duplicate action key: ~s", [Key]);
-format_error({missing_required_key, Key}) ->
-    mango_util:fmt("Missing required key: ~s", [Key]);
-format_error({invalid_value, Name, Expect, Found}) ->
-    mango_util:fmt("Value for ~s is ~w, should be ~w", [Name, Found, Expect]);
-format_error({invalid_value, Name, Value}) ->
-    mango_util:fmt("Invalid value for ~s: ~w", [Name, Value]);
-format_error({invalid_string, Val}) ->
-    mango_util:fmt("Invalid string: ~w", [Val]);
-format_error({invalid_boolean, Val}) ->
-    mango_util:fmt("Invalid boolean value: ~w", [Val]);
-format_error({invalid_pos_integer, Val}) ->
-    mango_util:fmt("~w is not an integer greater than zero", [Val]);
-format_error({invalid_non_neg_integer, Val}) ->
-    mango_util:fmt("~w is not an integer greater than or equal to zero", [Val]);
-format_error({invalid_object, BadObj}) ->
-    mango_util:fmt("~w is not a JSON object", [BadObj]);
-format_error({invalid_selector_json, BadSel}) ->
-    mango_util:fmt("Selector must be a JSON object, not: ~w", [BadSel]);
-format_error(Else) ->
-    mango_util:fmt("Unknown error: ~w", [Else]).
 
 
 is_string(Val) when is_binary(Val) ->

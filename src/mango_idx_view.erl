@@ -9,9 +9,7 @@
     to_json/1,
     columns/1,
     start_key/1,
-    end_key/1,
-
-    format_error/1
+    end_key/1
 ]).
 
 
@@ -95,29 +93,35 @@ columns(Idx) ->
 start_key([]) ->
     [];
 start_key([{'$gt', Key, _, _} | Rest]) ->
-    [Key | start_key(Rest)];
+    case mango_json:special(Key) of
+        true ->
+            [];
+        false ->
+            [Key | start_key(Rest)]
+    end;
 start_key([{'$gte', Key, _, _} | Rest]) ->
+    false = mango_json:special(Key),
     [Key | start_key(Rest)];
 start_key([{'$eq', Key, '$eq', Key} | Rest]) ->
+    false = mango_json:special(Key),
     [Key | start_key(Rest)].
 
 
 end_key([]) ->
     [{}];
 end_key([{_, _, '$lt', Key} | Rest]) ->
-    [Key | end_key(Rest)];
+    case mango_json:special(Key) of
+        true ->
+            [{}];
+        false ->
+            [Key | end_key(Rest)]
+    end;
 end_key([{_, _, '$lte', Key} | Rest]) ->
+    false = mango_json:special(Key),
     [Key | end_key(Rest)];
 end_key([{'$eq', Key, '$eq', Key} | Rest]) ->
+    false = mango_json:special(),
     [Key | end_key(Rest)].
-
-
-format_error({invalid_index_json, BadIdx}) ->
-    mango_util:fmt("JSON indexes must be an object, not: ~w", [BadIdx]);
-format_error({index_not_found, BadIdx}) ->
-    mango_util:fmt("JSON index ~s not found in this design doc.", [BadIdx]);
-format_error(Else) ->
-    mango_util:fmt("Unknown error: ~w", [Else]).
 
 
 do_validate({Props}) ->

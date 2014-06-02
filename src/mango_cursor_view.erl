@@ -34,7 +34,7 @@ execute(#cursor{db = Db, index = Idx} = Cursor0, UserFun, UserAcc) ->
             % Normal view
             DDoc = ddocid(Idx),
             Name = mango_idx:name(Idx),
-            %twig:log(err, "Query: ~s ~s ~s~n  ~p", [Db#db.name, DDoc, Name, Args]),
+            twig:log(err, "Query: ~s ~s ~s~n  ~p", [Db#db.name, DDoc, Name, Args]),
             fabric:query_view(Db, DDoc, Name, CB, Cursor, Args)
     end,
     {ok, LastCursor#cursor.user_acc}.
@@ -110,6 +110,20 @@ apply_opts([{conflicts, true} | Rest], Args) ->
 apply_opts([{conflicts, false} | Rest], Args) ->
     % Ignored cause default
     apply_opts(Rest, Args);
+apply_opts([{sort, Sort} | Rest], Args) ->
+    case mango_sort:directions(Sort) of
+        [<<"desc">> | _] ->
+            SK = Args#view_query_args.start_key,
+            EK = Args#view_query_args.end_key,
+            NewArgs = Args#view_query_args{
+                direction = rev,
+                start_key = EK,
+                end_key = SK
+            },
+            apply_opts(Rest, NewArgs);
+        _ ->
+            apply_opts(Rest, Args)
+    end;
 apply_opts([{_, _} | Rest], Args) ->
     % Ignore unknown options
     apply_opts(Rest, Args).

@@ -26,6 +26,14 @@ def setup():
 def test_simple_find():
     db = mkdb()
     docs = db.find({"int": {"$gt": 9}})
-    print docs
+    assert len(docs) == 1
+    assert docs[0]["_id"] == "10"
 
+
+def test_multi_cond_find():
+    db = mkdb()
+    docs = db.find({"int": {"$lte":4}, "even": True})
+    assert len(docs) == 2
+    assert docs[0]["_id"] == "2"
+    assert docs[1]["_id"] == "4"
     

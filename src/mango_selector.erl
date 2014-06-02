@@ -5,9 +5,7 @@
     normalize/1,
     index_fields/1,
     range/2,
-    match/2,
-    
-    format_error/1
+    match/2
 ]).
 
 
@@ -71,7 +69,7 @@ index_fields({[{Field, Cond}]}) ->
 % Selector must have been normalized before calling
 % this function.
 range(Selector, Index) ->
-    range(Selector, Index, '$gte', mango_bson:min(), '$lte', mango_bson:max()).
+    range(Selector, Index, '$gt', mango_json:min(), '$lt', mango_json:max()).
 
 
 % Match a selector against a #doc{} or EJSON value.
@@ -127,24 +125,24 @@ match({[{<<"$elemMatch">>, Arg}]}, Value) ->
 
 % Our comparison operators are fairly straight forward
 match({[{<<"$lt">>, Arg}]}, Value) ->
-    mango_bson:cmp(Value, Arg) < 0;
+    mango_json:cmp(Value, Arg) < 0;
 match({[{<<"$lte">>, Arg}]}, Value) ->
-    mango_bson:cmp(Value, Arg) =< 0;
+    mango_json:cmp(Value, Arg) =< 0;
 match({[{<<"$eq">>, Arg}]}, Value) ->
-    mango_bson:cmp(Value, Arg) == 0;
+    mango_json:cmp(Value, Arg) == 0;
 match({[{<<"$ne">>, Arg}]}, Value) ->
-    mango_bson:cmp(Value, Arg) /= 0;
+    mango_json:cmp(Value, Arg) /= 0;
 match({[{<<"$gte">>, Arg}]}, Value) ->
-    mango_bson:cmp(Value, Arg) >= 0;
+    mango_json:cmp(Value, Arg) >= 0;
 match({[{<<"$gt">>, Arg}]}, Value) ->
-    mango_bson:cmp(Value, Arg) > 0;
+    mango_json:cmp(Value, Arg) > 0;
 
 match({[{<<"$in">>, Args}]}, Value) ->
-    Pred = fun(Arg) -> mango_bson:cmp(Value, Arg) == 0 end,
+    Pred = fun(Arg) -> mango_json:cmp(Value, Arg) == 0 end,
     lists:any(Pred, Args);
 
 match({[{<<"$nin">>, Args}]}, Value) ->
-    Pred = fun(Arg) -> mango_bson:cmp(Value, Arg) /= 0 end,
+    Pred = fun(Arg) -> mango_json:cmp(Value, Arg) /= 0 end,
     lists:all(Pred, Args);
 
 % This logic is a bit subtle. Basically, if value is
@@ -153,9 +151,8 @@ match({[{<<"$exists">>, ShouldExist}]}, Value) ->
     Exists = Value /= undefined,
     ShouldExist andalso Exists;
 
-% TODO: Actually write mango_bson:type/1
-match({[{<<"$type">>, Arg}]}, Value) ->
-    Arg == mango_bson:type(Value);
+match({[{<<"$type">>, Arg}]}, Value) when is_binary(Arg) ->
+    Arg == mango_json:type(Value);
 
 match({[{<<"$mod">>, [D, R]}]}, Value) when is_integer(Value) ->
     Value rem D == R;
@@ -201,18 +198,6 @@ match({Props} = Sel, _) when length(Props) > 1 ->
     erlang:error({unnormalized_selector, Sel}).
 
 
-format_error({bad_arg, Op, Arg}) ->
-    mango_util:fmt("Bad argument for operator ~s: ~w", [Op, Arg]);
-format_error({not_supported, Op}) ->
-    mango_util:fmt("Unsupported operator: ~s", [Op]);
-format_error({invalid_operator, Op}) ->
-    mango_util:fmt("Invalid operator: ~s", [Op]);
-format_error({bad_field, BadSel}) ->
-    mango_util:fmt("Invalid field normalization on selector: ~w", [BadSel]);
-format_error(Else) ->
-    mango_util:fmt("Unknown error: ~w", [Else]).
-
-
 % Convert each operator into a normalized version as well
 % as convert an implict operators into their explicit
 % versions.
@@ -251,7 +236,7 @@ norm_ops({[{<<"$exists">>, Arg}]} = Cond) when is_boolean(Arg) ->
 norm_ops({[{<<"$exists">>, Arg}]}) ->
     ?MANGO_ERROR({bad_arg, '$exists', Arg});
 
-norm_ops({[{<<"$type">>, Arg}]} = Cond) when Arg >= 0, Arg =< 127 ->
+norm_ops({[{<<"$type">>, Arg}]} = Cond) when is_binary(Arg) ->
     Cond;
 norm_ops({[{<<"$type">>, Arg}]}) ->
     ?MANGO_ERROR({bad_arg, '$type', Arg});
@@ -697,11 +682,11 @@ range({[{<<"$", _/binary>>, _}]}, LCmp, Low, HCmp, High) ->
 % Returns the value min | low | mid | high | max depending
 % on how Arg compares to Low and High.
 range_pos(Low, Arg, High) ->
-    case mango_bson:cmp(Arg, Low) of
+    case mango_json:cmp(Arg, Low) of
         N when N < 0 -> min;
         N when N == 0 -> low;
         _ ->
-            case mango_bson:cmp(Arg, High) of
+            case mango_json:cmp(Arg, High) of
                 X when X < 0 ->
                     mid;
                 X when X == 0 ->

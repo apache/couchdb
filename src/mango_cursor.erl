@@ -3,9 +3,7 @@
 
 -export([
     create/3,
-    execute/3,
-    
-    format_error/1
+    execute/3
 ]).
 
 
@@ -20,7 +18,7 @@
 create(Db, Selector0, Opts) ->
     Selector = mango_selector:normalize(Selector0),
     IndexFields = mango_selector:index_fields(Selector),
-    ExistingIndexes = mango_idx:list(Db),
+    ExistingIndexes = get_existing_indexes(Db, Opts),
     UsableIndexes = find_usable_indexes(IndexFields, ExistingIndexes),
     FieldRanges = find_field_ranges(Selector, IndexFields),
     Composited = composite_indexes(UsableIndexes, FieldRanges),
@@ -45,18 +43,29 @@ execute(#cursor{index=Idx}=Cursor, UserFun, UserAcc) ->
     Mod:execute(Cursor, UserFun, UserAcc).
 
 
-format_error({no_usable_index, query_unsupported}) ->
-    mango_util:fmt(
-            "Query unsupported because it would require multiple indices."
-        );
-format_error({no_usable_index, Possible}) ->
-    Strs = [binary_to_list(P) || P <- Possible],
-    PStr = string:join(Strs, ", "),
-    mango_util:fmt("No index exists for this selector, try indexing one of ~s",
-            [PStr]
-        );
-format_error(Else) ->
-    mango_util:fmt("Unknown error: ~w", [Else]).
+get_existing_indexes(Db, Opts) ->
+    Indexes = mango_idx:list(Db),
+    % If a sort was specified we have to find an index that
+    % can satisfy the request.
+    case lists:keyfind(sort, 1, Opts) of
+        {sort, {[_ | _]} = Sort} ->
+            limit_to_sort(Indexes, Sort);
+        _ ->
+            Indexes
+    end.
+
+
+limit_to_sort(Indexes, Sort) ->
+    Fields = mango_sort:fields(Sort),
+    Filt = fun(Idx) ->
+        Cols = mango_idx:columns(Idx),
+        lists:prefix(Fields, Cols)
+    end,
+    Possible = lists:filter(Filt, Indexes),
+    if Possible /= [] -> ok; true ->
+        ?MANGO_ERROR({no_usable_sort_index, Fields})
+    end,
+    Possible.
 
 
 % Find the intersection between the Possible and Existing

@@ -17,7 +17,7 @@ class Database(object):
     @property
     def url(self):
         return "http://{}:{}/{}".format(self.host, self.port, self.dbname)
-    
+
     def path(self, parts):
         if isinstance(parts, (str, unicode)):
             parts = [parts]
@@ -101,7 +101,7 @@ class Database(object):
         body = json.dumps(body)
         r = self.sess.post(self.path("_find"), data=body)
         r.raise_for_status()
-        return result["rows"]
+        return r.json()["docs"]
 
     def find_one(self, *args, **kwargs):
         results = self.find(*args, **kwargs)

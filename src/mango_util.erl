@@ -9,9 +9,6 @@
     defer/3,
     do_defer/3,
 
-    format_error/1,
-    fmt/2,
-
     assert_ejson/1,
 
     to_lower/1,
@@ -94,16 +91,6 @@ do_defer(Mod, Fun, Args) ->
             twig:log(err, "Defered error: ~w~n    ~p", [{exit, Error}, Stack]),
             erlang:exit({mango_defer_exit, Error})
     end.
-
-
-format_error({mango_error, Module, Error}) ->
-    Module:format_error(Error);
-format_error(Else) ->
-    fmt("Unknown error: ~w", [Else]).
-
-
-fmt(Format, Args) ->
-    iolist_to_binary(io_lib:format(Format, Args)).
 
 
 assert_ejson({Props}) ->
