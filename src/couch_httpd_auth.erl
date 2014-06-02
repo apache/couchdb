@@ -13,12 +13,13 @@
 -module(couch_httpd_auth).
 -include_lib("couch/include/couch_db.hrl").
 
--export([default_authentication_handler/1,special_test_authentication_handler/1]).
--export([cookie_authentication_handler/1]).
+-export([default_authentication_handler/1, default_authentication_handler/2,
+	 special_test_authentication_handler/1]).
+-export([cookie_authentication_handler/1, cookie_authentication_handler/2]).
 -export([null_authentication_handler/1]).
 -export([proxy_authentication_handler/1, proxy_authentification_handler/1]).
 -export([cookie_auth_header/2]).
--export([handle_session_req/1]).
+-export([handle_session_req/1, handle_session_req/2]).
 
 -import(couch_httpd, [header_value/2, send_json/2,send_json/4, send_method_not_allowed/2]).
 
@@ -62,9 +63,12 @@ basic_name_pw(Req) ->
     end.
 
 default_authentication_handler(Req) ->
+    default_authentication_handler(Req, couch_auth_cache).
+
+default_authentication_handler(Req, AuthModule) ->
     case basic_name_pw(Req) of
     {User, Pass} ->
-        case couch_auth_cache:get_user_creds(User) of
+        case AuthModule:get_user_creds(User) of
             nil ->
                 throw({unauthorized, <<"Name or password is incorrect.">>});
             UserProps ->
@@ -72,7 +76,8 @@ default_authentication_handler(Req) ->
                 Password = ?l2b(Pass),
                 case authenticate(Password, UserProps) of
                     true ->
-                        UserProps2 = maybe_upgrade_password_hash(UserName, Password, UserProps),
+                        UserProps2 = maybe_upgrade_password_hash(UserName, Password, UserProps,
+								 AuthModule),
                         Req#httpd{user_ctx=#user_ctx{
                             name=UserName,
                             roles=couch_util:get_value(<<"roles">>, UserProps2, [])
@@ -159,7 +164,10 @@ proxy_auth_user(Req) ->
     end.
 
 
-cookie_authentication_handler(#httpd{mochi_req=MochiReq}=Req) ->
+cookie_authentication_handler(Req) ->
+    cookie_authentication_handler(Req, couch_auth_cache).
+
+cookie_authentication_handler(#httpd{mochi_req=MochiReq}=Req, AuthModule) ->
     case MochiReq:get_cookie_value("AuthSession") of
     undefined -> Req;
     [] -> Req;
@@ -181,7 +189,7 @@ cookie_authentication_handler(#httpd{mochi_req=MochiReq}=Req) ->
             Req;
         SecretStr ->
             Secret = ?l2b(SecretStr),
-            case couch_auth_cache:get_user_creds(User) of
+            case AuthModule:get_user_creds(User) of
             nil -> Req;
             UserProps ->
                 UserSalt = couch_util:get_value(<<"salt">>, UserProps, <<"">>),
@@ -249,7 +257,10 @@ ensure_cookie_auth_secret() ->
 
 % session handlers
 % Login handler with user db
-handle_session_req(#httpd{method='POST', mochi_req=MochiReq}=Req) ->
+handle_session_req(Req) ->
+    handle_session_req(Req, couch_auth_cache).
+
+handle_session_req(#httpd{method='POST', mochi_req=MochiReq}=Req, AuthModule) ->
     ReqBody = MochiReq:recv_body(),
     Form = case MochiReq:get_primary_header_value("content-type") of
         % content type should be json
@@ -266,13 +277,13 @@ handle_session_req(#httpd{method='POST', mochi_req=MochiReq}=Req) ->
     UserName = ?l2b(couch_util:get_value("name", Form, "")),
     Password = ?l2b(couch_util:get_value("password", Form, "")),
     ?LOG_DEBUG("Attempt Login: ~s",[UserName]),
-    UserProps = case couch_auth_cache:get_user_creds(UserName) of
+    UserProps = case AuthModule:get_user_creds(UserName) of
         nil -> [];
         Result -> Result
     end,
     case authenticate(Password, UserProps) of
         true ->
-            UserProps2 = maybe_upgrade_password_hash(UserName, Password, UserProps),
+            UserProps2 = maybe_upgrade_password_hash(UserName, Password, UserProps, AuthModule),
             % setup the session cookie
             Secret = ?l2b(ensure_cookie_auth_secret()),
             UserSalt = couch_util:get_value(<<"salt">>, UserProps2),
@@ -304,7 +315,7 @@ handle_session_req(#httpd{method='POST', mochi_req=MochiReq}=Req) ->
     end;
 % get user info
 % GET /_session
-handle_session_req(#httpd{method='GET', user_ctx=UserCtx}=Req) ->
+handle_session_req(#httpd{method='GET', user_ctx=UserCtx}=Req, _AuthModule) ->
     Name = UserCtx#user_ctx.name,
     ForceLogin = couch_httpd:qs_value(Req, "basic", "false"),
     case {Name, ForceLogin} of
@@ -328,7 +339,7 @@ handle_session_req(#httpd{method='GET', user_ctx=UserCtx}=Req) ->
             ]})
     end;
 % logout by deleting the session
-handle_session_req(#httpd{method='DELETE'}=Req) ->
+handle_session_req(#httpd{method='DELETE'}=Req, _AuthModule) ->
     Cookie = mochiweb_cookies:cookie("AuthSession", "", [{path, "/"}] ++ cookie_scheme(Req)),
     {Code, Headers} = case couch_httpd:qs_value(Req, "next", nil) of
         nil ->
@@ -337,14 +348,14 @@ handle_session_req(#httpd{method='DELETE'}=Req) ->
             {302, [Cookie, {"Location", couch_httpd:absolute_uri(Req, Redirect)}]}
     end,
     send_json(Req, Code, Headers, {[{ok, true}]});
-handle_session_req(Req) ->
+handle_session_req(Req, _AuthModule) ->
     send_method_not_allowed(Req, "GET,HEAD,POST,DELETE").
 
 maybe_value(_Key, undefined, _Fun) -> [];
 maybe_value(Key, Else, Fun) ->
     [{Key, Fun(Else)}].
 
-maybe_upgrade_password_hash(UserName, Password, UserProps) ->
+maybe_upgrade_password_hash(UserName, Password, UserProps, AuthModule) ->
     case couch_util:get_value(<<"password_scheme">>, UserProps, <<"simple">>) of
     <<"simple">> ->
         DbName = ?l2b(config:get("couch_httpd_auth", "authentication_db", "_users")),
@@ -353,7 +364,7 @@ maybe_upgrade_password_hash(UserName, Password, UserProps) ->
             UserProps3 = [{<<"password">>, Password} | UserProps2],
             NewUserDoc = couch_doc:from_json_obj({UserProps3}),
             {ok, _NewRev} = couch_db:update_doc(UserDb, NewUserDoc, []),
-            couch_auth_cache:get_user_creds(UserName)
+            AuthModule:get_user_creds(UserName)
         end);
     _ ->
         UserProps
