@@ -28,6 +28,10 @@
 
 -define(DAEMON_CONFIGER, "os_daemon_configer.escript").
 -define(DAEMON_LOOPER, "os_daemon_looper.escript").
+-define(DAEMON_BAD_PERM, "os_daemon_bad_perm.sh").
+-define(DAEMON_CAN_REBOOT, "os_daemon_can_reboot.sh").
+-define(DAEMON_DIE_ON_BOOT, "os_daemon_die_on_boot.sh").
+-define(DAEMON_DIE_QUICKLY, "os_daemon_die_quickly.sh").
 -define(DELAY, 100).
 -define(TIMEOUT, 1000).
 
@@ -84,6 +88,20 @@ configuration_reader_test_() ->
             fun setup/1, fun teardown/2,
             [{?DAEMON_CONFIGER,
               fun should_read_write_config_settings_by_daemon/2}]
+
+        }
+    }.
+
+error_test_() ->
+    {
+        "OS Daemon process error tests",
+        {
+            foreachx,
+            fun setup/1, fun teardown/2,
+            [{?DAEMON_BAD_PERM, fun should_fail_due_to_lack_of_permissions/2},
+             {?DAEMON_DIE_ON_BOOT, fun should_die_on_boot/2},
+             {?DAEMON_DIE_QUICKLY, fun should_die_quickly/2},
+             {?DAEMON_CAN_REBOOT, fun should_not_being_halted/2}]
         }
     }.
 
@@ -154,13 +172,57 @@ should_read_write_config_settings_by_daemon(DName, _) ->
         check_daemon(D, DName)
     end).
 
+should_fail_due_to_lack_of_permissions(DName, _) ->
+    ?_test(should_halts(DName, 1000)).
+
+should_die_on_boot(DName, _) ->
+    ?_test(should_halts(DName, 1000)).
+
+should_die_quickly(DName, _) ->
+    ?_test(should_halts(DName, 4000)).
+
+should_not_being_halted(DName, _) ->
+    ?_test(begin
+        timer:sleep(1000),
+        {ok, [D1]} = couch_os_daemons:info([table]),
+        check_daemon(D1, DName, 0),
+
+        % Should reboot every two seconds. We're at 1s, so wait
+        % until 3s to be in the middle of the next invocation's
+        % life span.
+
+        timer:sleep(2000),
+        {ok, [D2]} = couch_os_daemons:info([table]),
+        check_daemon(D2, DName, 1),
+
+        % If the kill command changed, that means we rebooted the process.
+        ?assertNotEqual(D1#daemon.kill, D2#daemon.kill)
+    end).
+
+should_halts(DName, Time) ->
+    timer:sleep(Time),
+    {ok, [D]} = couch_os_daemons:info([table]),
+    check_dead(D, DName),
+    couch_config:delete("os_daemons", DName, false).
 
 check_daemon(D) ->
     check_daemon(D, D#daemon.name).
 
 check_daemon(D, Name) ->
+    check_daemon(D, Name, 0).
+
+check_daemon(D, Name, Errs) ->
     ?assert(is_port(D#daemon.port)),
     ?assertEqual(Name, D#daemon.name),
     ?assertNotEqual(undefined, D#daemon.kill),
-    ?assertEqual([], D#daemon.errors),
+    ?assertEqual(running, D#daemon.status),
+    ?assertEqual(Errs, length(D#daemon.errors)),
     ?assertEqual([], D#daemon.buf).
+
+check_dead(D, Name) ->
+    ?assert(is_port(D#daemon.port)),
+    ?assertEqual(Name, D#daemon.name),
+    ?assertNotEqual(undefined, D#daemon.kill),
+    ?assertEqual(halted, D#daemon.status),
+    ?assertEqual(nil, D#daemon.errors),
+    ?assertEqual(nil, D#daemon.buf).
