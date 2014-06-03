@@ -54,6 +54,10 @@ fixture_files = \
     fixtures/couch_stats_aggregates.ini \
     fixtures/os_daemon_looper.escript \
     fixtures/os_daemon_configer.escript \
+    fixtures/os_daemon_bad_perm.sh \
+    fixtures/os_daemon_can_reboot.sh \
+    fixtures/os_daemon_die_on_boot.sh \
+    fixtures/os_daemon_die_quickly.sh \
     fixtures/logo.png
 
 EXTRA_DIST = \
