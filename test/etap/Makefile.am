@@ -36,8 +36,6 @@ fixture_files = \
     fixtures/test.couch
 
 tap_files = \
-    171-os-daemons-config.es \
-    171-os-daemons-config.t \
     172-os-daemon-errors.1.sh \
     172-os-daemon-errors.2.sh \
     172-os-daemon-errors.3.sh \

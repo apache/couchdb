@@ -19,6 +19,7 @@ all:
 			-o $(top_builddir)/test/couchdb/ebin/ $(ERLC_FLAGS) ${TEST} \
 			$(top_srcdir)/test/couchdb/test_request.erl
 	chmod +x run
+	chmod +x $(top_builddir)/test/couchdb/fixtures/os_daemon_configer.escript
 
 eunit_files = \
     couch_auth_cache_tests.erl \
@@ -52,6 +53,7 @@ fixture_files = \
     fixtures/couch_stats_aggregates.cfg \
     fixtures/couch_stats_aggregates.ini \
     fixtures/os_daemon_looper.escript \
+    fixtures/os_daemon_configer.escript \
     fixtures/logo.png
 
 EXTRA_DIST = \

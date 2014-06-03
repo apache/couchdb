@@ -26,16 +26,24 @@
     buf=[]
 }).
 
+-define(DAEMON_CONFIGER, "os_daemon_configer.escript").
 -define(DAEMON_LOOPER, "os_daemon_looper.escript").
 -define(DELAY, 100).
+-define(FIXTURES_BUILDDIR,
+        filename:join([?BUILDDIR, "test", "couchdb", "fixtures"])).
 -define(TIMEOUT, 1000).
 
 
 setup(DName) ->
     {ok, CfgPid} = couch_config:start_link(?CONFIG_CHAIN),
     {ok, OsDPid} = couch_os_daemons:start_link(),
-    couch_config:set("os_daemons", DName,
-                     filename:join([?FIXTURESDIR, DName]), false),
+    Path = case DName of
+        ?DAEMON_CONFIGER ->
+            filename:join([?FIXTURES_BUILDDIR, DName]);
+        _ ->
+            filename:join([?FIXTURESDIR, DName])
+    end,
+    couch_config:set("os_daemons", DName, Path, false),
     timer:sleep(?DELAY),  % sleep a bit to let daemon set kill flag
     {CfgPid, OsDPid}.
 
@@ -72,6 +80,17 @@ os_daemons_test_() ->
                 fun should_spawn_multiple_daemons/2,
                 fun should_keep_alive_one_daemon_on_killing_other/2
             ]]
+        }
+    }.
+
+configuration_reader_test_() ->
+    {
+        "OS Daemon requests CouchDB configuration",
+        {
+            foreachx,
+            fun setup/1, fun teardown/2,
+            [{?DAEMON_CONFIGER,
+              fun should_read_write_config_settings_by_daemon/2}]
         }
     }.
 
@@ -131,6 +150,15 @@ should_keep_alive_one_daemon_on_killing_other(DName, _) ->
         {ok, Tab} = couch_os_daemons:info(),
         [T] = ets:tab2list(Tab),
         check_daemon(T, DName)
+    end).
+
+should_read_write_config_settings_by_daemon(DName, _) ->
+    ?_test(begin
+        % have to wait till daemon run all his tests
+        % see daemon's script for more info
+        timer:sleep(?TIMEOUT),
+        {ok, [D]} = couch_os_daemons:info([table]),
+        check_daemon(D, DName)
     end).
 
 
