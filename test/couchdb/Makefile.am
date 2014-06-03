@@ -17,6 +17,8 @@ all:
 	mkdir -p temp
 	${ERLC} -oebin test_request.erl
 	chmod +x run
+	chmod +x fixtures/*.sh
+	chmod -x fixtures/os_daemon_bad_perm.sh
 
 eunit_files = \
     couch_auth_cache_tests.erl \
@@ -51,6 +53,10 @@ fixture_files = \
     fixtures/couch_stats_aggregates.ini \
     fixtures/os_daemon_looper.escript \
     fixtures/os_daemon_configer.escript \
+    fixtures/os_daemon_bad_perm.sh \
+    fixtures/os_daemon_can_reboot.sh \
+    fixtures/os_daemon_die_on_boot.sh \
+    fixtures/os_daemon_die_quickly.sh \
     fixtures/logo.png
 
 EXTRA_DIST = \
