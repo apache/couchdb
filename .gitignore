@@ -130,6 +130,7 @@ test/.deps/
 test/bench/run
 test/couchdb/run
 test/couchdb/couch_eunit.hrl
+test/couchdb/fixtures/.deps/
 test/etap/.deps/
 test/etap/run
 test/etap/temp.*
