@@ -32,6 +32,7 @@
 -define(DAEMON_CAN_REBOOT, "os_daemon_can_reboot.sh").
 -define(DAEMON_DIE_ON_BOOT, "os_daemon_die_on_boot.sh").
 -define(DAEMON_DIE_QUICKLY, "os_daemon_die_quickly.sh").
+-define(DAEMON_CFGREG, "test_cfg_register").
 -define(DELAY, 100).
 -define(FIXTURES_BUILDDIR,
         filename:join([?BUILDDIR, "test", "couchdb", "fixtures"])).
@@ -43,6 +44,8 @@ setup(DName) ->
     {ok, OsDPid} = couch_os_daemons:start_link(),
     Path = case DName of
         ?DAEMON_CONFIGER ->
+            filename:join([?FIXTURES_BUILDDIR, DName]);
+        ?DAEMON_CFGREG ->
             filename:join([?FIXTURES_BUILDDIR, DName]);
         _ ->
             filename:join([?FIXTURESDIR, DName])
@@ -109,6 +112,21 @@ error_test_() ->
              {?DAEMON_DIE_ON_BOOT, fun should_die_on_boot/2},
              {?DAEMON_DIE_QUICKLY, fun should_die_quickly/2},
              {?DAEMON_CAN_REBOOT, fun should_not_being_halted/2}]
+        }
+    }.
+
+configuration_register_test_() ->
+    {
+        "OS daemon subscribed to config changes",
+        {
+            foreachx,
+            fun setup/1, fun teardown/2,
+            [{?DAEMON_CFGREG, Fun} || Fun <- [
+                fun should_start_daemon/2,
+                fun should_restart_daemon_on_section_change/2,
+                fun should_not_restart_daemon_on_changing_ignored_section_key/2,
+                fun should_restart_daemon_on_section_key_change/2
+            ]]
         }
     }.
 
@@ -192,7 +210,7 @@ should_not_being_halted(DName, _) ->
     ?_test(begin
         timer:sleep(1000),
         {ok, [D1]} = couch_os_daemons:info([table]),
-        check_daemon(D1, DName, 0),
+        check_daemon(D1, DName, running, 0),
 
         % Should reboot every two seconds. We're at 1s, so wait
         % until 3s to be in the middle of the next invocation's
@@ -200,7 +218,7 @@ should_not_being_halted(DName, _) ->
 
         timer:sleep(2000),
         {ok, [D2]} = couch_os_daemons:info([table]),
-        check_daemon(D2, DName, 1),
+        check_daemon(D2, DName, running, 1),
 
         % If the kill command changed, that means we rebooted the process.
         ?assertNotEqual(D1#daemon.kill, D2#daemon.kill)
@@ -212,17 +230,93 @@ should_halts(DName, Time) ->
     check_dead(D, DName),
     couch_config:delete("os_daemons", DName, false).
 
+should_start_daemon(DName, _) ->
+    ?_test(begin
+        wait_for_start(10),
+        {ok, [D]} = couch_os_daemons:info([table]),
+        check_daemon(D, DName, running, 0, [{"s1"}, {"s2", "k"}])
+    end).
+
+should_restart_daemon_on_section_change(DName, _) ->
+    ?_test(begin
+        wait_for_start(10),
+        {ok, [D1]} = couch_os_daemons:info([table]),
+        couch_config:set("s1", "k", "foo", false),
+        wait_for_restart(10),
+        {ok, [D2]} = couch_os_daemons:info([table]),
+        check_daemon(D2, DName, running, 0, [{"s1"}, {"s2", "k"}]),
+        ?assertNotEqual(D1, D2)
+    end).
+
+should_not_restart_daemon_on_changing_ignored_section_key(_, _) ->
+    ?_test(begin
+        wait_for_start(10),
+        {ok, [D1]} = couch_os_daemons:info([table]),
+        couch_config:set("s2", "k2", "baz", false),
+        timer:sleep(?DELAY),
+        {ok, [D2]} = couch_os_daemons:info([table]),
+        ?assertEqual(D1, D2)
+    end).
+
+should_restart_daemon_on_section_key_change(DName, _) ->
+    ?_test(begin
+        wait_for_start(10),
+        {ok, [D1]} = couch_os_daemons:info([table]),
+        couch_config:set("s2", "k", "bingo", false),
+        wait_for_restart(10),
+        {ok, [D2]} = couch_os_daemons:info([table]),
+        check_daemon(D2, DName, running, 0, [{"s1"}, {"s2", "k"}]),
+        ?assertNotEqual(D1, D2)
+    end).
+
+
+wait_for_start(0) ->
+    erlang:error({assertion_failed,
+                  [{module, ?MODULE},
+                   {line, ?LINE},
+                   {reason, "Timeout on waiting daemon for start"}]});
+wait_for_start(N) ->
+    case couch_os_daemons:info([table]) of
+        {ok, []} ->
+            timer:sleep(?DELAY),
+            wait_for_start(N - 1);
+        _ ->
+            timer:sleep(?TIMEOUT)
+    end.
+
+wait_for_restart(0) ->
+    erlang:error({assertion_failed,
+                  [{module, ?MODULE},
+                   {line, ?LINE},
+                   {reason, "Timeout on waiting daemon for restart"}]});
+wait_for_restart(N) ->
+    {ok, [D]} = couch_os_daemons:info([table]),
+    case D#daemon.status of
+        restarting ->
+            timer:sleep(?DELAY),
+            wait_for_restart(N - 1);
+        _ ->
+            timer:sleep(?TIMEOUT)
+    end.
+
 check_daemon(D) ->
     check_daemon(D, D#daemon.name).
 
 check_daemon(D, Name) ->
-    check_daemon(D, Name, 0).
+    check_daemon(D, Name, running).
 
-check_daemon(D, Name, Errs) ->
+check_daemon(D, Name, Status) ->
+    check_daemon(D, Name, Status, 0).
+
+check_daemon(D, Name, Status, Errs) ->
+    check_daemon(D, Name, Status, Errs, []).
+
+check_daemon(D, Name, Status, Errs, CfgPatterns) ->
     ?assert(is_port(D#daemon.port)),
     ?assertEqual(Name, D#daemon.name),
     ?assertNotEqual(undefined, D#daemon.kill),
-    ?assertEqual(running, D#daemon.status),
+    ?assertEqual(Status, D#daemon.status),
+    ?assertEqual(CfgPatterns, D#daemon.cfg_patterns),
     ?assertEqual(Errs, length(D#daemon.errors)),
     ?assertEqual([], D#daemon.buf).
 
