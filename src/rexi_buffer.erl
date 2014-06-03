@@ -58,37 +58,25 @@ handle_cast({deliver, Dest, Msg}, #state{buffer = Q, count = C} = State) ->
             {noreply, State#state{buffer = Q2, count = C+1}, 0}
     end.
 
-handle_info(timeout, #state{sender = nil} = State) ->
-    #state{buffer = Q, count = C} = State,
-    Sender = case queue:out_r(Q) of
-        {{value, {Dest, Msg}}, Q2} ->
-            case erlang:send(Dest, Msg, [noconnect, nosuspend]) of
-                ok ->
-                    nil;
-                _Else ->
-                    spawn_monitor(erlang, send, [Dest, Msg])
-            end;
-        {empty, Q2} ->
-            nil
-    end,
-    if Sender =:= nil, C > 1 ->
-        {noreply, State#state{buffer = Q2, count = C-1}, 0};
-    true ->
-        NewState = State#state{buffer = Q2, sender = Sender, count = C-1},
-        % When Sender is nil and C-1 == 0 we're reverting to an
-        % idle state with no outstanding or queued messages. We'll
-        % use this oppurtunity to hibernate this process and
-        % run a garbage collection.
-        case {Sender, C-1} of
-            {nil, 0} ->
-                {noreply, NewState, hibernate};
-            _ ->
-                {noreply, NewState, infinity}
-        end
-    end;
-handle_info(timeout, State) ->
-    % Waiting on a sender to return
+handle_info(timeout, #state{sender = nil, buffer = {[],[]}, count = 0}=State) ->
     {noreply, State};
+handle_info(timeout, #state{sender = nil, count = C} = State) when C > 0 ->
+    #state{buffer = Q, count = C} = State,
+    {{value, {Dest, Msg}}, Q2} = queue:out_r(Q),
+    NewState = State#state{buffer = Q2, count = C-1},
+    case erlang:send(Dest, Msg, [noconnect, nosuspend]) of
+        ok when C =:= 1 ->
+            % We just sent the last queued messsage, we'll use this opportunity
+            % to hibernate the process and run a garbage collection
+            {noreply, NewState, hibernate};
+        ok when C > 1 ->
+            % Use a zero timeout to recurse into this handler ASAP
+            {noreply, NewState, 0};
+        _Else ->
+            % We're experiencing delays, keep buffering internally
+            Sender = spawn_monitor(erlang, send, [Dest, Msg]),
+            {noreply, NewState#state{sender = Sender}}
+    end;
 
 handle_info({'DOWN', Ref, _, Pid, _}, #state{sender = {Pid, Ref}} = State) ->
     {noreply, State#state{sender = nil}, 0}.
