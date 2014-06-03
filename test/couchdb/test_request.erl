@@ -12,7 +12,7 @@
 
 -module(test_request).
 
--export([get/1, get/2, put/2, put/3]).
+-export([get/1, get/2, get/3, put/2, put/3]).
 -export([request/3, request/4]).
 
 get(Url) ->
@@ -20,6 +20,8 @@ get(Url) ->
 
 get(Url, Headers) ->
     request(get, Url, Headers).
+get(Url, Headers, Opts) ->
+    request(get, Url, Headers, [], Opts).
 
 
 put(Url, Body) ->
@@ -33,18 +35,21 @@ request(Method, Url, Headers) ->
     request(Method, Url, Headers, []).
 
 request(Method, Url, Headers, Body) ->
-    request(Method, Url, Headers, Body, 3).
+    request(Method, Url, Headers, Body, [], 3).
 
-request(_Method, _Url, _Headers, _Body, 0) ->
+request(Method, Url, Headers, Body, Opts) ->
+    request(Method, Url, Headers, Body, Opts, 3).
+
+request(_Method, _Url, _Headers, _Body, _Opts, 0) ->
     {error, request_failed};
-request(Method, Url, Headers, Body, N) ->
+request(Method, Url, Headers, Body, Opts, N) ->
     case code:is_loaded(ibrowse) of
         false ->
             {ok, _} = ibrowse:start();
         _ ->
             ok
     end,
-    case ibrowse:send_req(Url, Headers, Method, Body) of
+    case ibrowse:send_req(Url, Headers, Method, Body, Opts) of
         {ok, Code0, RespHeaders, RespBody0} ->
             Code = list_to_integer(Code0),
             RespBody = iolist_to_binary(RespBody0),

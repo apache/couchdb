@@ -40,6 +40,7 @@ eunit_files = \
     couchdb_file_compression_tests.erl \
     couchdb_modules_load_tests.erl \
     couchdb_update_conflicts_tests.erl \
+    couchdb_vhosts_tests.erl \
     couchdb_views_tests.erl \
     test_request.erl \
     include/couch_eunit.hrl
