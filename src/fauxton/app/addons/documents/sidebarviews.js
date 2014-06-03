@@ -129,31 +129,22 @@ function(app, FauxtonAPI, Components, Documents, Databases) {
     className:  "nav nav-list",
     template: "addons/documents/templates/design_doc_menu",
     events: {
-      "click button": "no",
       "click .js-collapse-toggle": "toggleArrow"
     },
-    initialize: function(){
 
-    },
     toggleArrow:  function(e){
       this.$(e.currentTarget).toggleClass("down");
-    },
-    no: function(event){
-      event.preventDefault();
-      alert("no");
     },
     buildIndexList: function(collection, selector, ddocType){
       var design = this.model.id.replace(/^_design\//,"");
 
-      _.each(_.keys(collection[selector]), function(key){
-        this.insertView(".accordion-body", new Views.IndexItem({
-          selector: selector,
-          ddoc: design,
-          index: key,
-          ddocType: ddocType,
-          database: this.model.collection.database.id
-        }));
-      }, this);
+      this.insertView(".accordion-body", new Views.IndexItem({
+        selector: selector,
+        ddoc: design,
+        collection: collection[selector],
+        ddocType: ddocType,
+        database: this.model.collection.database.id
+      }));
     },
 
     serialize: function(){
@@ -217,7 +208,7 @@ function(app, FauxtonAPI, Components, Documents, Databases) {
 
   Views.IndexItem = FauxtonAPI.View.extend({
     template: "addons/documents/templates/index_menu_item",
-    tagName: "li",
+    tagName: 'li',
 
     initialize: function(options){
       this.index = options.index;
@@ -231,11 +222,12 @@ function(app, FauxtonAPI, Components, Documents, Databases) {
     serialize: function() {
       return {
         icon: this.ddocType,
-        type:  this.ddocType,
+        ddocType:  this.ddocType,
         index: this.index,
         ddoc: this.ddoc,
         database: this.database,
-        selected: this.selected
+        selected: this.selected,
+        collection: this.collection
       };
     },
 

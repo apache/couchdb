@@ -11,10 +11,18 @@ WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 License for the specific language governing permissions and limitations under
 the License.
 -->
+<a class="js-collapse-toggle" data-toggle="collapse"  data-target="#<%- ddocType %>" >
+  <div class="fonticon-play"></div>
+  <span class="cloudant-sidenav-info fonticon"></span>
+  <%- ddocType %>
+  </a>
+  <ul class="accordion-body collapse" id="<%= ddocType %>">
+  <% _.each(collection, function (item, index) { %>
+  <li>
+  <a id="<%- removeSpecialCharacters(ddoc) %>_<%- removeSpecialCharacters(index) %>" href="#/database/<%- safeURL(database) %>/_design/<%= safeURL(ddoc)%>/_<%=ddocType%>/<%= safeURL(index) %>" class="toggle-view">
+    <%- index %>
+  </a>
+  </li>
+  <% }); %>
+</ul>
 
-<a id="<%- removeSpecialCharacters(ddoc) %>_<%- removeSpecialCharacters(index) %>" href="#/database/<%- safeURL(database) %>/_design/<%= safeURL(ddoc)%>/_<%=type%>/<%= safeURL(index) %>" class="toggle-view">
-  <% if (icon) { %>
-  <i class="fonticon-<%- icon %>"></i> 
-  <% } %>
-  <%- index %>
-</a>

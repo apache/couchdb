@@ -161,6 +161,7 @@ FAUXTON_FILES = \
     fauxton/app/addons/databases/templates/list.html \
     fauxton/app/addons/databases/templates/newdatabase.html \
     fauxton/app/addons/documents/templates/advanced_options.html \
+    fauxton/app/addons/documents/templates/attachments_footer.html \
     fauxton/app/addons/documents/templates/all_docs_item.html \
     fauxton/app/addons/documents/templates/all_docs_layout.html \
     fauxton/app/addons/documents/templates/all_docs_list.html \
@@ -168,6 +169,7 @@ FAUXTON_FILES = \
     fauxton/app/addons/documents/templates/changes.html \
     fauxton/app/addons/documents/templates/ddoc_info.html \
     fauxton/app/addons/documents/templates/delete_database_modal.html \
+    fauxton/app/addons/documents/templates/design_doc_menu.html \
     fauxton/app/addons/documents/templates/design_doc_selector.html \
     fauxton/app/addons/documents/templates/code_editor.html \
     fauxton/app/addons/documents/templates/duplicate_doc_modal.html \

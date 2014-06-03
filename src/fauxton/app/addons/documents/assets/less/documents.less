@@ -250,6 +250,7 @@ button.beautify {
     }
     > ul.accordion-body{
       > li {
+        cursor: pointer;
         a{
           padding-left: 36px;
         }
@@ -263,6 +264,21 @@ button.beautify {
           font-size: 20px;
         }
       }
+
+      li {
+        > a.down .fonticon-play {
+          .rotate(90deg);
+        }
+
+        &:hover {
+          .fonticon-play {
+            color: white;
+
+          }
+        }
+
+      }
+
     }
   }
   
