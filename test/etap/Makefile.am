@@ -36,7 +36,6 @@ fixture_files = \
     fixtures/test.couch
 
 tap_files = \
-    160-vhosts.t \
     170-os-daemons.es \
     170-os-daemons.t \
     171-os-daemons-config.es \
