@@ -12,8 +12,8 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-filename() ->
-    list_to_binary(test_util:source_file("test/etap/171-os-daemons-config.es")).
+-include("../couch_eunit.hrl").
+
 
 read() ->
     case io:get_line('') of
@@ -42,13 +42,16 @@ log(Mesg, Level) ->
     write([<<"log">>, Mesg, {[{<<"level">>, Level}]}]).
 
 test_get_cfg1() ->
-    FileName = filename(),
-    {[{<<"foo">>, FileName}]} = get_cfg(<<"os_daemons">>).
+    Path = list_to_binary(?FILE),
+    FileName = list_to_binary(filename:basename(?FILE)),
+    {[{FileName, Path}]} = get_cfg(<<"os_daemons">>).
 
 test_get_cfg2() ->
-    FileName = filename(),
-    FileName = get_cfg(<<"os_daemons">>, <<"foo">>),
+    Path = list_to_binary(?FILE),
+    FileName = list_to_binary(filename:basename(?FILE)),
+    Path = get_cfg(<<"os_daemons">>, FileName),
     <<"sequential">> = get_cfg(<<"uuids">>, <<"algorithm">>).
+
 
 test_get_unknown_cfg() ->
     {[]} = get_cfg(<<"aal;3p4">>),
@@ -79,7 +82,20 @@ loop({error, _Reason}) ->
     init:stop().
 
 main([]) ->
-    test_util:init_code_path(),
-    couch_config:start_link(test_util:config_files()),
+    init_code_path(),
+    couch_config:start_link(?CONFIG_CHAIN),
     couch_drv:start_link(),
     do_tests().
+
+init_code_path() ->
+    Paths = [
+        "couchdb",
+        "ejson",
+        "erlang-oauth",
+        "ibrowse",
+        "mochiweb",
+        "snappy"
+    ],
+    lists:foreach(fun(Name) ->
+        code:add_patha(filename:join([?BUILDDIR, "src", Name]))
+    end, Paths).

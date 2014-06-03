@@ -74,47 +74,43 @@ should_get_nil_on_missed_cache(_) ->
     ?_assertEqual(nil, couch_auth_cache:get_user_creds("joe")).
 
 should_get_right_password_hash(DbName) ->
-    ?_assert(begin
+    ?_test(begin
         PasswordHash = hash_password("pass1"),
         {ok, _} = update_user_doc(DbName, "joe", "pass1"),
         Creds = couch_auth_cache:get_user_creds("joe"),
         ?assertEqual(PasswordHash,
-                      couch_util:get_value(<<"password_sha">>, Creds)),
-        true
+                      couch_util:get_value(<<"password_sha">>, Creds))
     end).
 
 should_ensure_doc_hash_equals_cached_one(DbName) ->
-    ?_assert(begin
+    ?_test(begin
         {ok, _} = update_user_doc(DbName, "joe", "pass1"),
         Creds = couch_auth_cache:get_user_creds("joe"),
 
         CachedHash = couch_util:get_value(<<"password_sha">>, Creds),
         StoredHash = get_user_doc_password_sha(DbName, "joe"),
-        ?assertEqual(StoredHash, CachedHash),
-        true
+        ?assertEqual(StoredHash, CachedHash)
     end).
 
 should_update_password(DbName) ->
-    ?_assert(begin
+    ?_test(begin
         PasswordHash = hash_password("pass2"),
         {ok, Rev} = update_user_doc(DbName, "joe", "pass1"),
         {ok, _} = update_user_doc(DbName, "joe", "pass2", Rev),
         Creds = couch_auth_cache:get_user_creds("joe"),
         ?assertEqual(PasswordHash,
-                      couch_util:get_value(<<"password_sha">>, Creds)),
-        true
+                      couch_util:get_value(<<"password_sha">>, Creds))
     end).
 
 should_cleanup_cache_after_userdoc_deletion(DbName) ->
-    ?_assert(begin
+    ?_test(begin
         {ok, _} = update_user_doc(DbName, "joe", "pass1"),
         delete_user_doc(DbName, "joe"),
-        ?assertEqual(nil, couch_auth_cache:get_user_creds("joe")),
-        true
+        ?assertEqual(nil, couch_auth_cache:get_user_creds("joe"))
     end).
 
 should_restore_cache_after_userdoc_recreation(DbName) ->
-    ?_assert(begin
+    ?_test(begin
         PasswordHash = hash_password("pass5"),
         {ok, _} = update_user_doc(DbName, "joe", "pass1"),
         delete_user_doc(DbName, "joe"),
@@ -124,22 +120,20 @@ should_restore_cache_after_userdoc_recreation(DbName) ->
         Creds = couch_auth_cache:get_user_creds("joe"),
 
         ?assertEqual(PasswordHash,
-                      couch_util:get_value(<<"password_sha">>, Creds)),
-        true
+                      couch_util:get_value(<<"password_sha">>, Creds))
     end).
 
 should_drop_cache_on_auth_db_change(DbName) ->
-    ?_assert(begin
+    ?_test(begin
         {ok, _} = update_user_doc(DbName, "joe", "pass1"),
         full_commit(DbName),
         couch_config:set("couch_httpd_auth", "authentication_db",
                          ?b2l(?tempdb()), false),
-        ?assertEqual(nil, couch_auth_cache:get_user_creds("joe")),
-        true
+        ?assertEqual(nil, couch_auth_cache:get_user_creds("joe"))
     end).
 
 should_restore_cache_on_auth_db_change(DbName) ->
-    ?_assert(begin
+    ?_test(begin
         PasswordHash = hash_password("pass1"),
         {ok, _} = update_user_doc(DbName, "joe", "pass1"),
         Creds = couch_auth_cache:get_user_creds("joe"),
@@ -157,20 +151,18 @@ should_restore_cache_on_auth_db_change(DbName) ->
 
         Creds = couch_auth_cache:get_user_creds("joe"),
         ?assertEqual(PasswordHash,
-                      couch_util:get_value(<<"password_sha">>, Creds)),
-        true
+                      couch_util:get_value(<<"password_sha">>, Creds))
     end).
 
 should_recover_cache_after_shutdown(DbName) ->
-    ?_assert(begin
+    ?_test(begin
         PasswordHash = hash_password("pass2"),
         {ok, Rev0} = update_user_doc(DbName, "joe", "pass1"),
         {ok, Rev1} = update_user_doc(DbName, "joe", "pass2", Rev0),
         full_commit(DbName),
         shutdown_db(DbName),
         {ok, Rev1} = get_doc_rev(DbName, "joe"),
-        ?assertEqual(PasswordHash, get_user_doc_password_sha(DbName, "joe")),
-        true
+        ?assertEqual(PasswordHash, get_user_doc_password_sha(DbName, "joe"))
     end).
 
 

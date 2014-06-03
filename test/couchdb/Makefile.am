@@ -50,6 +50,7 @@ fixture_files = \
     fixtures/couch_stats_aggregates.cfg \
     fixtures/couch_stats_aggregates.ini \
     fixtures/os_daemon_looper.escript \
+    fixtures/os_daemon_configer.escript \
     fixtures/logo.png
 
 EXTRA_DIST = \
