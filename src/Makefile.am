@@ -160,7 +160,6 @@ FAUXTON_FILES = \
     fauxton/app/addons/databases/templates/item.html \
     fauxton/app/addons/databases/templates/list.html \
     fauxton/app/addons/databases/templates/newdatabase.html \
-    fauxton/app/addons/databases/templates/sidebar.html \
     fauxton/app/addons/documents/templates/advanced_options.html \
     fauxton/app/addons/documents/templates/all_docs_item.html \
     fauxton/app/addons/documents/templates/all_docs_layout.html \

@@ -12,7 +12,7 @@
 
 define([
   "app",
-  
+
   "addons/fauxton/components",
   "api",
   "addons/databases/resources"
@@ -28,7 +28,7 @@ function(app, Components, FauxtonAPI, Databases) {
       return [this.model.fetch()];
     },
     serialize: function() {
-      
+
       return {
         encoded: app.utils.safeURLName(this.model.get("name")),
         database: this.model
@@ -125,8 +125,8 @@ function(app, Components, FauxtonAPI, Databases) {
 
     afterRender: function() {
       var that = this,
-          AllDBsArray = _.map(this.collection.toJSON(), function(item, key){ 
-            return item.name; 
+          AllDBsArray = _.map(this.collection.toJSON(), function(item, key){
+            return item.name;
           });
 
       this.dbSearchTypeahead = new Components.Typeahead({
@@ -188,69 +188,6 @@ function(app, Components, FauxtonAPI, Databases) {
           clear: true
         });
       }
-      );
-    }
-  });
-
-  Views.Sidebar = FauxtonAPI.View.extend({
-    template: "addons/databases/templates/sidebar",
-    events: {
-      "click a#new": "newDatabase",
-      "click a#owned": "showMine",
-      "click a#shared": "showShared"
-    },
-
-    newDatabase: function() {
-      var notification;
-      var db;
-      // TODO: use a modal here instead of the prompt
-      var name = prompt('Name of database', 'newdatabase');
-      if (name === null) {
-        return;
-      } else if (name.length === 0) {
-        notification = FauxtonAPI.addNotification({
-          msg: "Please enter a valid database name",
-          type: "error",
-          clear: true
-        });
-        return;
-      }
-      db = new this.collection.model({
-        id: encodeURIComponent(name),
-        name: name
-      });
-      notification = FauxtonAPI.addNotification({msg: "Creating database."});
-      db.save().done(function() {
-        notification = FauxtonAPI.addNotification({
-          msg: "Database created successfully",
-          type: "success",
-          clear: true
-        });
-        var route = "#/database/" +  name + "/_all_docs?limit=" + Databases.DocLimit;
-        app.router.navigate(route, { trigger: true });
-      }
-      ).error(function(xhr) {
-        var responseText = JSON.parse(xhr.responseText).reason;
-        notification = FauxtonAPI.addNotification({
-          msg: "Create database failed: " + responseText,
-          type: "error",
-          clear: true
-        });
-      }
-      );
-    },
-
-    showMine: function(){
-      $.contribute(
-        'Show unshared databases',
-        'app/addons/databases/views.js'
-      );
-    },
-
-    showShared: function(){
-      $.contribute(
-        'Show shared databases (e.g. continuous replications to/from the database)',
-        'app/addons/databases/views.js'
       );
     }
   });
