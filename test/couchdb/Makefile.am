@@ -48,6 +48,7 @@ eunit_files = \
     couchdb_update_conflicts_tests.erl \
     couchdb_vhosts_tests.erl \
     couchdb_views_tests.erl \
+    json_stream_parse_tests.erl \
     test_request.erl \
     test_web.erl \
     include/couch_eunit.hrl

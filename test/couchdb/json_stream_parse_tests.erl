@@ -1,4 +1,3 @@
-#!/usr/bin/env escript
 % Licensed under the Apache License, Version 2.0 (the "License"); you may not
 % use this file except in compliance with the License. You may obtain a copy of
 % the License at
@@ -11,67 +10,11 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-main(_) ->
-    test_util:init_code_path(),
-    etap:plan(99),
-    case (catch test()) of
-        ok ->
-            etap:end_tests();
-        Other ->
-            etap:diag("Test died abnormally: ~p", [Other]),
-            etap:bail("Bad return value.")
-    end,
-    ok.
+-module(json_stream_parse_tests).
 
-test() ->
-    crypto:start(),
-    ok = test_raw_json_input(),
-    ok = test_1_byte_data_function(),
-    ok = test_multiple_bytes_data_function().
+-include("couch_eunit.hrl").
 
-
-test_raw_json_input() ->
-    etap:diag("Tests with raw JSON string as the input."),
-    lists:foreach(
-        fun({EJson, JsonString, Desc}) ->
-            etap:is(
-              equiv(EJson, json_stream_parse:to_ejson(JsonString)),
-              true,
-              Desc)
-        end,
-        cases()),
-    ok.
-
-
-test_1_byte_data_function() ->
-    etap:diag("Tests with a 1 byte output data function as the input."),
-    lists:foreach(
-        fun({EJson, JsonString, Desc}) ->
-            DataFun = fun() -> single_byte_data_fun(JsonString) end,
-            etap:is(
-              equiv(EJson, json_stream_parse:to_ejson(DataFun)),
-              true,
-              Desc)
-        end,
-        cases()),
-    ok.
-
-
-test_multiple_bytes_data_function() ->
-    etap:diag("Tests with a multiple bytes output data function as the input."),
-    lists:foreach(
-        fun({EJson, JsonString, Desc}) ->
-            DataFun = fun() -> multiple_bytes_data_fun(JsonString) end,
-            etap:is(
-              equiv(EJson, json_stream_parse:to_ejson(DataFun)),
-              true,
-              Desc)
-        end,
-        cases()),
-    ok.
-
-
-cases() ->
+-define(CASES,
     [
         {1, "1", "integer numeric literial"},
         {3.1416, "3.14160", "float numeric literal"},  % text representation may truncate, trail zeroes
@@ -117,7 +60,35 @@ cases() ->
         {[-123, <<"foo">>, {[{<<"bar">>, []}]}, null],
             "[-123,\"foo\",{\"bar\":[]},null]",
             "complex array literal"}
-    ].
+    ]
+).
+
+
+raw_json_input_test_() ->
+    Tests = lists:map(
+        fun({EJson, JsonString, Desc}) ->
+            {Desc,
+             ?_assert(equiv(EJson, json_stream_parse:to_ejson(JsonString)))}
+        end, ?CASES),
+    {"Tests with raw JSON string as the input", Tests}.
+
+one_byte_data_fun_test_() ->
+    Tests = lists:map(
+        fun({EJson, JsonString, Desc}) ->
+            DataFun = fun() -> single_byte_data_fun(JsonString) end,
+            {Desc,
+             ?_assert(equiv(EJson, json_stream_parse:to_ejson(DataFun)))}
+        end, ?CASES),
+    {"Tests with a 1 byte output data function as the input", Tests}.
+
+test_multiple_bytes_data_fun_test_() ->
+    Tests = lists:map(
+        fun({EJson, JsonString, Desc}) ->
+            DataFun = fun() -> multiple_bytes_data_fun(JsonString) end,
+            {Desc,
+             ?_assert(equiv(EJson, json_stream_parse:to_ejson(DataFun)))}
+        end, ?CASES),
+    {"Tests with a multiple bytes output data function as the input", Tests}.
 
 
 %% Test for equivalence of Erlang terms.
@@ -139,7 +110,6 @@ equiv(false, false) ->
 equiv(null, null) ->
     true.
 
-
 %% Object representation and traversal order is unknown.
 %% Use the sledgehammer and sort property lists.
 equiv_object(Props1, Props2) ->
@@ -152,19 +122,16 @@ equiv_object(Props1, Props2) ->
         end,
         Pairs).
 
-
 %% Recursively compare tuple elements for equivalence.
 equiv_list([], []) ->
     true;
 equiv_list([V1 | L1], [V2 | L2]) ->
     equiv(V1, V2) andalso equiv_list(L1, L2).
 
-
 single_byte_data_fun([]) ->
     done;
 single_byte_data_fun([H | T]) ->
     {<<H>>, fun() -> single_byte_data_fun(T) end}.
-
 
 multiple_bytes_data_fun([]) ->
     done;
