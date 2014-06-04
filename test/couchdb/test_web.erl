@@ -13,12 +13,15 @@
 -module(test_web).
 -behaviour(gen_server).
 
--export([start_link/0, loop/1, get_port/0, set_assert/1, check_last/0]).
+-include("couch_eunit.hrl").
+
+-export([start_link/0, stop/0, loop/1, get_port/0, set_assert/1, check_last/0]).
 -export([init/1, terminate/2, code_change/3]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
 
 -define(SERVER, test_web_server).
 -define(HANDLER, test_web_handler).
+-define(DELAY, 500).
 
 start_link() ->
     gen_server:start({local, ?HANDLER}, ?MODULE, [], []),
@@ -29,7 +32,7 @@ start_link() ->
     ]).
 
 loop(Req) ->
-    %etap:diag("Handling request: ~p", [Req]),
+    %?debugFmt("Handling request: ~p", [Req]),
     case gen_server:call(?HANDLER, {check_request, Req}) of
         {ok, RespInfo} ->
             {ok, Req:respond(RespInfo)};
@@ -40,12 +43,12 @@ loop(Req) ->
             {ok, Resp};
         {chunked, {Status, Headers, BodyChunks}} ->
             Resp = Req:respond({Status, Headers, chunked}),
-            timer:sleep(500),
+            timer:sleep(?DELAY),
             lists:foreach(fun(C) -> Resp:write_chunk(C) end, BodyChunks),
             Resp:write_chunk([]),
             {ok, Resp};
         {error, Reason} ->
-            etap:diag("Error: ~p", [Reason]),
+            ?debugFmt("Error: ~p", [Reason]),
             Body = lists:flatten(io_lib:format("Error: ~p", [Reason])),
             {ok, Req:respond({200, [], Body})}
     end.
@@ -54,7 +57,7 @@ get_port() ->
     mochiweb_socket_server:get(?SERVER, port).
 
 set_assert(Fun) ->
-    ok = gen_server:call(?HANDLER, {set_assert, Fun}).
+    ?assertEqual(ok, gen_server:call(?HANDLER, {set_assert, Fun})).
 
 check_last() ->
     gen_server:call(?HANDLER, last_status).
@@ -65,12 +68,20 @@ init(_) ->
 terminate(_Reason, _State) ->
     ok.
 
+stop() ->
+    gen_server:cast(?SERVER, stop).
+
+
 handle_call({check_request, Req}, _From, State) when is_function(State, 1) ->
     Resp2 = case (catch State(Req)) of
-        {ok, Resp} -> {reply, {ok, Resp}, was_ok};
-        {raw, Resp} -> {reply, {raw, Resp}, was_ok};
-        {chunked, Resp} -> {reply, {chunked, Resp}, was_ok};
-        Error -> {reply, {error, Error}, not_ok}
+        {ok, Resp} ->
+            {reply, {ok, Resp}, was_ok};
+        {raw, Resp} ->
+            {reply, {raw, Resp}, was_ok};
+        {chunked, Resp} ->
+            {reply, {chunked, Resp}, was_ok};
+        Error ->
+            {reply, {error, Error}, not_ok}
     end,
     Req:cleanup(),
     Resp2;
@@ -87,12 +98,14 @@ handle_call({set_assert, _}, _From, State) ->
 handle_call(Msg, _From, State) ->
     {reply, {ignored, Msg}, State}.
 
+handle_cast(stop, State) ->
+    {stop, normal, State};
 handle_cast(Msg, State) ->
-    etap:diag("Ignoring cast message: ~p", [Msg]),
+    ?debugFmt("Ignoring cast message: ~p", [Msg]),
     {noreply, State}.
 
 handle_info(Msg, State) ->
-    etap:diag("Ignoring info message: ~p", [Msg]),
+    ?debugFmt("Ignoring info message: ~p", [Msg]),
     {noreply, State}.
 
 code_change(_OldVsn, State, _Extra) ->

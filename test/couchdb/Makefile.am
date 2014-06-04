@@ -19,7 +19,8 @@ all:
 	mkdir -p temp/
 	$(ERLC) -Wall -I$(top_srcdir)/src -I$(top_srcdir)/test/couchdb/include \
 			-o $(top_builddir)/test/couchdb/ebin/ $(ERLC_FLAGS) ${TEST} \
-			$(top_srcdir)/test/couchdb/test_request.erl
+			$(top_srcdir)/test/couchdb/test_request.erl \
+			$(top_srcdir)/test/couchdb/test_web.erl
 	chmod +x run
 	chmod +x $(top_builddir)/test/couchdb/fixtures/os_daemon_configer.escript
 
@@ -41,12 +42,14 @@ eunit_files = \
     couch_work_queue_tests.erl \
     couchdb_attachments_tests.erl \
     couchdb_file_compression_tests.erl \
+    couchdb_http_proxy_tests.erl \
     couchdb_modules_load_tests.erl \
     couchdb_os_daemons_tests.erl \
     couchdb_update_conflicts_tests.erl \
     couchdb_vhosts_tests.erl \
     couchdb_views_tests.erl \
     test_request.erl \
+    test_web.erl \
     include/couch_eunit.hrl
 
 fixture_files = \
