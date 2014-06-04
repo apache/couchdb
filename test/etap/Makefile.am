@@ -32,7 +32,6 @@ fixture_files = \
     fixtures/test.couch
 
 tap_files = \
-    190-json-stream-parse.t \
     200-view-group-no-db-leaks.t \
     201-view-group-shutdown.t \
     210-os-proc-pool.t \
