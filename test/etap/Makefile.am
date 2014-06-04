@@ -11,7 +11,7 @@
 ## the License.
 
 noinst_SCRIPTS = run
-noinst_DATA = test_util.beam test_web.beam
+noinst_DATA = test_util.beam
 
 %.beam: %.erl
 	$(ERLC) $<
@@ -32,8 +32,6 @@ fixture_files = \
     fixtures/test.couch
 
 tap_files = \
-    180-http-proxy.ini \
-    180-http-proxy.t \
     190-json-stream-parse.t \
     200-view-group-no-db-leaks.t \
     201-view-group-shutdown.t \
@@ -45,6 +43,5 @@ tap_files = \
 
 EXTRA_DIST = \
     run.tpl \
-    test_web.erl \
     $(fixture_files) \
     $(tap_files)

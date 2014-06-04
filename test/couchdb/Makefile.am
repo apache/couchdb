@@ -17,7 +17,7 @@ noinst_SCRIPTS = run
 all:
 	mkdir -p ebin
 	mkdir -p temp
-	${ERLC} -oebin test_request.erl
+	${ERLC} -oebin test_request.erl test_web.erl
 	chmod +x run
 	chmod +x fixtures/*.sh
 	chmod -x fixtures/os_daemon_bad_perm.sh
@@ -40,12 +40,14 @@ eunit_files = \
     couch_work_queue_tests.erl \
     couchdb_attachments_tests.erl \
     couchdb_file_compression_tests.erl \
+    couchdb_http_proxy_tests.erl \
     couchdb_modules_load_tests.erl \
     couchdb_os_daemons_tests.erl \
     couchdb_update_conflicts_tests.erl \
     couchdb_vhosts_tests.erl \
     couchdb_views_tests.erl \
     test_request.erl \
+    test_web.erl \
     couch_eunit.hrl
 
 fixture_files = \
