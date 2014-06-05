@@ -1,0 +1,51 @@
+# --------------------------------------------------------------------------- #
+# Project Info
+#   Defaults shown. Learn more about these options by running
+#   `fontcustom help` or visiting <http://fontcustom.com>.
+# --------------------------------------------------------------------------- #
+
+font_name: fauxtonicon
+css_selector: .fonticon-{{glyph}}
+preprocessor_path: "../fonts/"
+autowidth: false
+no_hash: true
+force: false
+debug: true
+quiet: false
+
+
+# --------------------------------------------------------------------------- #
+# Input Paths
+# --------------------------------------------------------------------------- #
+
+input:
+  vectors: PUT_YOUR_PATH_HERE/fauxton/assets/icons         # required
+  templates: PUT_YOUR_PATH_HERE/fauxton/assets/fonts/templates
+
+
+# --------------------------------------------------------------------------- #
+# Output Paths
+# --------------------------------------------------------------------------- #
+
+output:
+  fonts: PUT_YOUR_PATH_HERE/fauxton/assets/fonts                              # required
+  # css: PUT_YOUR_PATH_HERE/fauxton/assets/less
+  preview: PUT_YOUR_PATH_HERE/fauxton/assets/fonts/styleguide
+  icons.less: PUT_YOUR_PATH_HERE/fauxton/assets/less 
+  #my-custom-template.yml: path/to/template/output
+
+
+# --------------------------------------------------------------------------- #
+# Templates
+#   Included in Font Custom: preview, css, scss, scss-rails
+#   Custom templates should be saved in the INPUT[:templates] directory and
+#   referenced by their baserame.
+# --------------------------------------------------------------------------- #
+
+templates:
+ # - css
+ - preview
+ - icons.less
+
+# FYI... KNOWN ISSUE: https://github.com/FontCustom/fontcustom/issues/172.
+# TEMP SOLUTION W/ PATH FIX: https://github.com/skirchmeier/fontcustom/tree/master

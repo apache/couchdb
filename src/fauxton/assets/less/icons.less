@@ -1,3 +1,7 @@
+/*
+*	Icon Font: fauxtonicon
+*/
+
 /*  Licensed under the Apache License, Version 2.0 (the "License"); you may not
  *  use this file except in compliance with the License. You may obtain a copy of
  *  the License at
@@ -11,101 +15,271 @@
  *  the License.
  */
 
+/* had to add a custom template to the generator to get this to compile to append the proper path and specify  "url" instead of "font-url":
+https://github.com/seanbarclay/fontcustom/blob/1c3ad3d2633d3a8add39e8827115394e9ec02d88/lib/fontcustom/generator/template.rb
+*/
 @font-face {
   font-family: "fauxtonicon";
-  src: url("../img/fontcustom_fauxton.eot");
-  src: url("../img/fontcustom_fauxton.eot?#iefix") format("embedded-opentype"),
-       url("../img/fontcustom_fauxton.woff") format("woff"),
-       url("../img/fontcustom_fauxton.ttf") format("truetype"),
-       url("../img/fontcustom_fauxton.svg#fontcustom_fauxton") format("svg");
+  src: url("../fonts/fauxtonicon.eot");
+  src: url("../fonts/fauxtonicon.eot?#iefix") format("embedded-opentype"),
+       url("../fonts/fauxtonicon.woff") format("woff"),
+       url("../fonts/fauxtonicon.ttf") format("truetype"),
+       url("../fonts/fauxtonicon.svg#fauxtonicon") format("svg");
   font-weight: normal;
   font-style: normal;
 }
 
+@media screen and (-webkit-min-device-pixel-ratio:0) {
+  @font-face {
+    font-family: "fauxtonicon";
+    src: url("../fonts/fauxtonicon.svg#fauxtonicon") format("svg");
+  }
+}
+
+[data-icon]:before { content: attr(data-icon); }
+
+[data-icon]:before,
 .fonticon-activetasks:before,
+.fonticon-arrow-box-down:before,
+.fonticon-arrow-box-up:before,
+.fonticon-arrow_left:before,
+.fonticon-arrow_right:before,
+.fonticon-arrows-cw:before,
+.fonticon-article:before,
+.fonticon-attention-alt:before,
+.fonticon-attention-circled:before,
+.fonticon-block:before,
 .fonticon-bookmark:before,
+.fonticon-bookmark-ribbon-wplus:before,
+.fonticon-burger:before,
+.fonticon-cancel:before,
+.fonticon-cancel-circled:before,
+.fonticon-cancel-circled2:before,
 .fonticon-carrot:before,
+.fonticon-check:before,
 .fonticon-circle-check:before,
+.fonticon-circle-empty:before,
 .fonticon-circle-minus:before,
 .fonticon-circle-plus:before,
 .fonticon-circle-x:before,
+.fonticon-clipboard:before,
+.fonticon-clock:before,
 .fonticon-cog:before,
 .fonticon-collapse:before,
+.fonticon-cw:before,
 .fonticon-dashboard:before,
 .fonticon-database:before,
 .fonticon-document:before,
 .fonticon-documents:before,
+.fonticon-dot-circled:before,
+.fonticon-down:before,
+.fonticon-down-1:before,
+.fonticon-down-circled:before,
+.fonticon-down-dir:before,
+.fonticon-down-open:before,
+.fonticon-drop-down-dots:before,
+.fonticon-exchange:before,
 .fonticon-expand:before,
 .fonticon-eye:before,
+.fonticon-help:before,
+.fonticon-help-circled:before,
+.fonticon-info-circled:before,
+.fonticon-json:before,
 .fonticon-key:before,
+.fonticon-left:before,
+.fonticon-left-1:before,
+.fonticon-left-circled:before,
+.fonticon-left-dir:before,
+.fonticon-left-open:before,
 .fonticon-link:before,
+.fonticon-list-alt:before,
+.fonticon-lock:before,
 .fonticon-log:before,
+.fonticon-mail:before,
+.fonticon-mail-alt:before,
+.fonticon-megaphone:before,
 .fonticon-minus:before,
+.fonticon-minus-circled:before,
+.fonticon-minus-squared:before,
+.fonticon-minus-squared-alt:before,
 .fonticon-mixer:before,
 .fonticon-new-database:before,
+.fonticon-ok:before,
+.fonticon-ok-circled:before,
+.fonticon-ok-circled-2:before,
 .fonticon-paperclip:before,
 .fonticon-pencil:before,
+.fonticon-picture:before,
 .fonticon-play:before,
 .fonticon-plus:before,
+.fonticon-plus-circled:before,
+.fonticon-plus-squared:before,
+.fonticon-plus-squared-alt:before,
+.fonticon-popin:before,
+.fonticon-popout:before,
 .fonticon-profile:before,
 .fonticon-replicate:before,
 .fonticon-reply:before,
+.fonticon-reply-all:before,
+.fonticon-resize-full:before,
+.fonticon-resize-full-reverse:before,
+.fonticon-resize-small:before,
+.fonticon-resize-small-reverse:before,
+.fonticon-right:before,
+.fonticon-right-1:before,
+.fonticon-right-circled:before,
+.fonticon-right-dir:before,
+.fonticon-right-open:before,
 .fonticon-save:before,
 .fonticon-search:before,
+.fonticon-sidenav-filter-function:before,
+.fonticon-sidenav-info:before,
+.fonticon-sidenav-list-function:before,
+.fonticon-sidenav-map-reduce:before,
+.fonticon-sidenav-search:before,
+.fonticon-sidenav-show-function:before,
+.fonticon-sidenav-update-function:before,
+.fonticon-sitemap:before,
 .fonticon-stats:before,
 .fonticon-support:before,
 .fonticon-swap-arrows:before,
+.fonticon-table:before,
 .fonticon-trash:before,
+.fonticon-up:before,
+.fonticon-up-1:before,
+.fonticon-up-circled:before,
+.fonticon-up-dir:before,
+.fonticon-up-open:before,
 .fonticon-user:before,
 .fonticon-users:before,
 .fonticon-wrench:before,
 .fonticon-x:before {
+  display: inline-block;
   font-family: "fauxtonicon";
   font-style: normal;
   font-weight: normal;
   font-variant: normal;
-  text-transform: none;
   line-height: 1;
-  -webkit-font-smoothing: antialiased;
-  display: inline-block;
   text-decoration: inherit;
+  text-rendering: optimizeLegibility;
+  text-transform: none;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-font-smoothing: antialiased;
+  font-smoothing: antialiased;
 }
 
-.fonticon-activetasks:before { content: "\f100"; }
-.fonticon-bookmark:before { content: "\f101"; }
-.fonticon-carrot:before { content: "\f102"; }
-.fonticon-circle-check:before { content: "\f103"; }
-.fonticon-circle-minus:before { content: "\f104"; }
-.fonticon-circle-plus:before { content: "\f105"; }
-.fonticon-circle-x:before { content: "\f106"; }
-.fonticon-cog:before { content: "\f107"; }
-.fonticon-collapse:before { content: "\f108"; }
-.fonticon-dashboard:before { content: "\f109"; }
-.fonticon-database:before { content: "\f10a"; }
-.fonticon-document:before { content: "\f10b"; }
-.fonticon-documents:before { content: "\f10c"; }
-.fonticon-expand:before { content: "\f10d"; }
-.fonticon-eye:before { content: "\f10e"; }
-.fonticon-key:before { content: "\f10f"; }
-.fonticon-link:before { content: "\f110"; }
-.fonticon-log:before { content: "\f111"; }
-.fonticon-minus:before { content: "\f112"; }
-.fonticon-mixer:before { content: "\f113"; }
-.fonticon-new-database:before { content: "\f114"; }
-.fonticon-paperclip:before { content: "\f115"; }
-.fonticon-pencil:before { content: "\f116"; }
-.fonticon-play:before { content: "\f117"; }
-.fonticon-plus:before { content: "\f118"; }
-.fonticon-profile:before { content: "\f119"; }
-.fonticon-replicate:before { content: "\f11a"; }
-.fonticon-reply:before { content: "\f11b"; }
-.fonticon-save:before { content: "\f11c"; }
-.fonticon-search:before { content: "\f11d"; }
-.fonticon-stats:before { content: "\f11e"; }
-.fonticon-support:before { content: "\f11f"; }
-.fonticon-swap-arrows:before { content: "\f120"; }
-.fonticon-trash:before { content: "\f121"; }
-.fonticon-user:before { content: "\f122"; }
-.fonticon-users:before { content: "\f123"; }
-.fonticon-wrench:before { content: "\f124"; }
-.fonticon-x:before { content: "\f125"; }
+.fonticon-activetasks:before { content: "\f173"; }
+.fonticon-arrow-box-down:before { content: "\f101"; }
+.fonticon-arrow-box-up:before { content: "\f102"; }
+.fonticon-arrow_left:before { content: "\f103"; }
+.fonticon-arrow_right:before { content: "\f104"; }
+.fonticon-arrows-cw:before { content: "\f105"; }
+.fonticon-article:before { content: "\f106"; }
+.fonticon-attention-alt:before { content: "\f107"; }
+.fonticon-attention-circled:before { content: "\f108"; }
+.fonticon-block:before { content: "\f109"; }
+.fonticon-bookmark:before { content: "\f10a"; }
+.fonticon-bookmark-ribbon-wplus:before { content: "\f10b"; }
+.fonticon-burger:before { content: "\f10c"; }
+.fonticon-cancel:before { content: "\f10d"; }
+.fonticon-cancel-circled:before { content: "\f10e"; }
+.fonticon-cancel-circled2:before { content: "\f10f"; }
+.fonticon-carrot:before { content: "\f110"; }
+.fonticon-check:before { content: "\f111"; }
+.fonticon-circle-check:before { content: "\f112"; }
+.fonticon-circle-empty:before { content: "\f113"; }
+.fonticon-circle-minus:before { content: "\f114"; }
+.fonticon-circle-plus:before { content: "\f115"; }
+.fonticon-circle-x:before { content: "\f116"; }
+.fonticon-clipboard:before { content: "\f117"; }
+.fonticon-clock:before { content: "\f118"; }
+.fonticon-cog:before { content: "\f119"; }
+.fonticon-collapse:before { content: "\f11a"; }
+.fonticon-cw:before { content: "\f11b"; }
+.fonticon-dashboard:before { content: "\f11c"; }
+.fonticon-database:before { content: "\f11d"; }
+.fonticon-document:before { content: "\f11e"; }
+.fonticon-documents:before { content: "\f11f"; }
+.fonticon-dot-circled:before { content: "\f120"; }
+.fonticon-down:before { content: "\f121"; }
+.fonticon-down-1:before { content: "\f122"; }
+.fonticon-down-circled:before { content: "\f123"; }
+.fonticon-down-dir:before { content: "\f124"; }
+.fonticon-down-open:before { content: "\f125"; }
+.fonticon-drop-down-dots:before { content: "\f126"; }
+.fonticon-exchange:before { content: "\f127"; }
+.fonticon-expand:before { content: "\f128"; }
+.fonticon-eye:before { content: "\f129"; }
+.fonticon-help:before { content: "\f12a"; }
+.fonticon-help-circled:before { content: "\f12b"; }
+.fonticon-info-circled:before { content: "\f12c"; }
+.fonticon-json:before { content: "\f12d"; }
+.fonticon-key:before { content: "\f12e"; }
+.fonticon-left:before { content: "\f12f"; }
+.fonticon-left-1:before { content: "\f130"; }
+.fonticon-left-circled:before { content: "\f131"; }
+.fonticon-left-dir:before { content: "\f132"; }
+.fonticon-left-open:before { content: "\f133"; }
+.fonticon-link:before { content: "\f134"; }
+.fonticon-list-alt:before { content: "\f135"; }
+.fonticon-lock:before { content: "\f136"; }
+.fonticon-log:before { content: "\f137"; }
+.fonticon-mail:before { content: "\f138"; }
+.fonticon-mail-alt:before { content: "\f139"; }
+.fonticon-megaphone:before { content: "\f13a"; }
+.fonticon-minus:before { content: "\f13b"; }
+.fonticon-minus-circled:before { content: "\f13c"; }
+.fonticon-minus-squared:before { content: "\f13d"; }
+.fonticon-minus-squared-alt:before { content: "\f13e"; }
+.fonticon-mixer:before { content: "\f13f"; }
+.fonticon-new-database:before { content: "\f140"; }
+.fonticon-ok:before { content: "\f141"; }
+.fonticon-ok-circled:before { content: "\f142"; }
+.fonticon-ok-circled-2:before { content: "\f143"; }
+.fonticon-paperclip:before { content: "\f144"; }
+.fonticon-pencil:before { content: "\f145"; }
+.fonticon-picture:before { content: "\f146"; }
+.fonticon-play:before { content: "\f147"; }
+.fonticon-plus:before { content: "\f148"; }
+.fonticon-plus-circled:before { content: "\f149"; }
+.fonticon-plus-squared:before { content: "\f14a"; }
+.fonticon-plus-squared-alt:before { content: "\f14b"; }
+.fonticon-popin:before { content: "\f14c"; }
+.fonticon-popout:before { content: "\f14d"; }
+.fonticon-profile:before { content: "\f14e"; }
+.fonticon-replicate:before { content: "\f14f"; }
+.fonticon-reply:before { content: "\f150"; }
+.fonticon-reply-all:before { content: "\f151"; }
+.fonticon-resize-full:before { content: "\f152"; }
+.fonticon-resize-full-reverse:before { content: "\f153"; }
+.fonticon-resize-small:before { content: "\f154"; }
+.fonticon-resize-small-reverse:before { content: "\f155"; }
+.fonticon-right:before { content: "\f156"; }
+.fonticon-right-1:before { content: "\f157"; }
+.fonticon-right-circled:before { content: "\f158"; }
+.fonticon-right-dir:before { content: "\f159"; }
+.fonticon-right-open:before { content: "\f15a"; }
+.fonticon-save:before { content: "\f15b"; }
+.fonticon-search:before { content: "\f15c"; }
+.fonticon-sidenav-filter-function:before { content: "\f15d"; }
+.fonticon-sidenav-info:before { content: "\f15e"; }
+.fonticon-sidenav-list-function:before { content: "\f15f"; }
+.fonticon-sidenav-map-reduce:before { content: "\f160"; }
+.fonticon-sidenav-search:before { content: "\f161"; }
+.fonticon-sidenav-show-function:before { content: "\f162"; }
+.fonticon-sidenav-update-function:before { content: "\f163"; }
+.fonticon-sitemap:before { content: "\f164"; }
+.fonticon-stats:before { content: "\f165"; }
+.fonticon-support:before { content: "\f166"; }
+.fonticon-swap-arrows:before { content: "\f167"; }
+.fonticon-table:before { content: "\f168"; }
+.fonticon-trash:before { content: "\f169"; }
+.fonticon-up:before { content: "\f16a"; }
+.fonticon-up-1:before { content: "\f16b"; }
+.fonticon-up-circled:before { content: "\f16c"; }
+.fonticon-up-dir:before { content: "\f16d"; }
+.fonticon-up-open:before { content: "\f16e"; }
+.fonticon-user:before { content: "\f16f"; }
+.fonticon-users:before { content: "\f170"; }
+.fonticon-wrench:before { content: "\f171"; }
+.fonticon-x:before { content: "\f172"; }

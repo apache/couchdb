@@ -162,7 +162,6 @@ button.beautify {
 }
 
 .sidenav{
-  margin-bottom: 40px;
   .nav-list > .active > a{
     text-shadow: none;
     background-color: rgba(0, 0, 0, 0.05);
@@ -185,10 +184,12 @@ button.beautify {
   }
   li.nav-header {
     position: relative;
-    .accordion-body{
+    > .accordion-body{
       &.in {
         border-bottom: 1px solid #d3d7db;
       }
+    }
+    .accordion-body{
       color: #eee;
       margin-left: 0;
       li.active > a{
@@ -256,12 +257,14 @@ button.beautify {
         }
         .fonticon-play{
           font-size: 8px;
-          top: 11px;
+          top: 7px;
           left: 15px;
         }
         .fonticon:before{
           margin-right: 6px;
           font-size: 20px;
+          top: 3px;
+          position: relative;
         }
       }
 

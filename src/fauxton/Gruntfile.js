@@ -64,6 +64,7 @@ module.exports = function(grunt) {
           "dist/debug/css/fauxton.css": "assets/less/fauxton.less"
         }
       },
+      fonts: ["assets/fonts/*"],
       img: ["assets/img/**"],
       // used in concat:index_css to keep file ordering intact
       // fauxton.css should load first
@@ -85,6 +86,10 @@ module.exports = function(grunt) {
       var imgPath = root + "/assets/img";
       if(fs.existsSync(imgPath)){
         theAssets.img.push(imgPath + "/**");
+      }
+      var fontsPath = root + "/assets/fonts";
+      if(fs.existsSync(fontsPath)){
+        theAssets.fonts.push(fontsPath + "/**");
       }
     });
     return theAssets;
@@ -324,6 +329,7 @@ module.exports = function(grunt) {
           {src: "dist/release/index.html", dest: "../../share/www/fauxton/index.html"},
           {src: ["**"], dest: "../../share/www/fauxton/js/", cwd:'dist/release/js/',  expand: true},
           {src: ["**"], dest: "../../share/www/fauxton/img/", cwd:'dist/release/img/', expand: true},
+          {src: ["**"], dest: "../../share/www/fauxton/fonts/", cwd:'dist/release/fonts/', expand: true},
           {src: ["**"], dest: "../../share/www/fauxton/css/", cwd:"dist/release/css/", expand: true}
         ]
       },
@@ -333,6 +339,7 @@ module.exports = function(grunt) {
           {src: "dist/debug/index.html", dest: "../../share/www/fauxton/index.html"},
           {src: ["**"], dest: "../../share/www/fauxton/js/", cwd:'dist/debug/js/',  expand: true},
           {src: ["**"], dest: "../../share/www/fauxton/img/", cwd:'dist/debug/img/', expand: true},
+          {src: ["**"], dest: "../../share/www/fauxton/fonts/", cwd:'dist/debug/fonts/', expand: true},
           {src: ["**"], dest: "../../share/www/fauxton/css/", cwd:"dist/debug/css/", expand: true}
         ]
       },
@@ -354,6 +361,7 @@ module.exports = function(grunt) {
       },
       debug:{
         files:[
+          {src: assets.fonts, dest: "dist/debug/fonts/", flatten: true, expand: true},
           {src: assets.img, dest: "dist/debug/img/", flatten: true, expand: true}
         ]
       }

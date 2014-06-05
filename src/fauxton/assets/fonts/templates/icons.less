@@ -1,0 +1,30 @@
+/*
+*	Icon Font: <%= font_name %>
+*/
+
+/*  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+ *  use this file except in compliance with the License. You may obtain a copy of
+ *  the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ *  WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ *  License for the specific language governing permissions and limitations under
+ *  the License.
+ */
+
+/* had to add a custom template to the generator to get this to compile to append the proper path and specify  "url" instead of "font-url":
+https://github.com/seanbarclay/fontcustom/blob/1c3ad3d2633d3a8add39e8827115394e9ec02d88/lib/fontcustom/generator/template.rb
+*/
+<%= font_face(:LESS) %>
+
+[data-icon]:before { content: attr(data-icon); }
+
+[data-icon]:before,
+<%= glyph_selectors %> {
+<%= glyph_properties %>
+}
+
+<%= glyphs %>
