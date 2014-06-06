@@ -94,6 +94,16 @@ view_group_db_leaks_test_() ->
         }
     }.
 
+view_group_shutdown_test_() ->
+    {
+        "View group shutdown",
+        {
+            setup,
+            fun start/0, fun stop/1,
+            [couchdb_1283()]
+        }
+    }.
+
 
 should_not_remember_docs_in_index_after_backup_restore_test() ->
     %% COUCHDB-640
@@ -229,6 +239,87 @@ couchdb_1309(DbName) ->
         end
     end).
 
+couchdb_1283() ->
+    ?_test(begin
+        ok = couch_config:set("couchdb", "max_dbs_open", "3", false),
+        ok = couch_config:set("couchdb", "delayed_commits", "false", false),
+
+        {ok, MDb1} = couch_db:create(?tempdb(), [?ADMIN_USER]),
+        DDoc = couch_doc:from_json_obj({[
+            {<<"_id">>, <<"_design/foo">>},
+            {<<"language">>, <<"javascript">>},
+            {<<"views">>, {[
+                {<<"foo">>, {[
+                    {<<"map">>, <<"function(doc) { emit(doc._id, null); }">>}
+                ]}},
+                {<<"foo2">>, {[
+                    {<<"map">>, <<"function(doc) { emit(doc._id, null); }">>}
+                ]}},
+                {<<"foo3">>, {[
+                    {<<"map">>, <<"function(doc) { emit(doc._id, null); }">>}
+                ]}},
+                {<<"foo4">>, {[
+                    {<<"map">>, <<"function(doc) { emit(doc._id, null); }">>}
+                ]}},
+                {<<"foo5">>, {[
+                    {<<"map">>, <<"function(doc) { emit(doc._id, null); }">>}
+                ]}}
+            ]}}
+        ]}),
+        {ok, _} = couch_db:update_doc(MDb1, DDoc, []),
+        ok = populate_db(MDb1, 100, 100),
+        query_view(MDb1#db.name, "foo", "foo"),
+        ok = couch_db:close(MDb1),
+
+        {ok, Db1} = couch_db:create(?tempdb(), [?ADMIN_USER]),
+        ok = couch_db:close(Db1),
+        {ok, Db2} = couch_db:create(?tempdb(), [?ADMIN_USER]),
+        ok = couch_db:close(Db2),
+        {ok, Db3} = couch_db:create(?tempdb(), [?ADMIN_USER]),
+        ok = couch_db:close(Db3),
+
+        Writer1 = spawn_writer(Db1#db.name),
+        Writer2 = spawn_writer(Db2#db.name),
+
+        ?assert(is_process_alive(Writer1)),
+        ?assert(is_process_alive(Writer2)),
+
+        ?assertEqual(ok, get_writer_status(Writer1)),
+        ?assertEqual(ok, get_writer_status(Writer2)),
+
+        {ok, MonRef} = couch_mrview:compact(MDb1#db.name, <<"_design/foo">>,
+                                            [monitor]),
+
+        Writer3 = spawn_writer(Db3#db.name),
+        ?assert(is_process_alive(Writer3)),
+        ?assertEqual({error, all_dbs_active}, get_writer_status(Writer3)),
+
+        ?assert(is_process_alive(Writer1)),
+        ?assert(is_process_alive(Writer2)),
+        ?assert(is_process_alive(Writer3)),
+
+        receive
+            {'DOWN', MonRef, process, _, Reason} ->
+                ?assertEqual(normal, Reason)
+        after ?TIMEOUT ->
+            erlang:error(
+                {assertion_failed,
+                 [{module, ?MODULE}, {line, ?LINE},
+                  {reason, "Failure compacting view group"}]})
+        end,
+
+        ?assertEqual(ok, writer_try_again(Writer3)),
+        ?assertEqual(ok, get_writer_status(Writer3)),
+
+        ?assert(is_process_alive(Writer1)),
+        ?assert(is_process_alive(Writer2)),
+        ?assert(is_process_alive(Writer3)),
+
+        ?assertEqual(ok, stop_writer(Writer1)),
+        ?assertEqual(ok, stop_writer(Writer2)),
+        ?assertEqual(ok, stop_writer(Writer3))
+    end).
+
 create_doc(DbName, DocId) when is_list(DocId) ->
     create_doc(DbName, ?l2b(DocId));
 create_doc(DbName, DocId) when is_binary(DocId) ->
@@ -261,6 +352,20 @@ create_docs(DbName) ->
     {ok, _} = couch_db:update_docs(Db, [Doc1, Doc2, Doc3]),
     couch_db:ensure_full_commit(Db),
     couch_db:close(Db).
+
+populate_db(Db, BatchSize, N) when N > 0 ->
+    Docs = lists:map(
+        fun(_) ->
+            couch_doc:from_json_obj({[
+                {<<"_id">>, couch_uuids:new()},
+                {<<"value">>, base64:encode(crypto:rand_bytes(1000))}
+            ]})
+        end,
+        lists:seq(1, BatchSize)),
+    {ok, _} = couch_db:update_docs(Db, Docs, []),
+    populate_db(Db, BatchSize, N - length(Docs));
+populate_db(_Db, _, _) ->
+    ok.
 
 create_design_doc(DbName, DDName, ViewName) ->
     {ok, Db} = couch_db:open(DbName, [?ADMIN_USER]),
@@ -422,4 +527,74 @@ wait_view_compact_done(DbName, DDocId, N) ->
         true ->
             ok = timer:sleep(?DELAY),
             wait_view_compact_done(DbName, DDocId, N - 1)
+    end.
+
+spawn_writer(DbName) ->
+    Parent = self(),
+    spawn(fun() ->
+        process_flag(priority, high),
+        writer_loop(DbName, Parent)
+    end).
+
+get_writer_status(Writer) ->
+    Ref = make_ref(),
+    Writer ! {get_status, Ref},
+    receive
+        {db_open, Ref} ->
+            ok;
+        {db_open_error, Error, Ref} ->
+            Error
+    after ?TIMEOUT ->
+        timeout
+    end.
+
+writer_try_again(Writer) ->
+    Ref = make_ref(),
+    Writer ! {try_again, Ref},
+    receive
+        {ok, Ref} ->
+            ok
+    after ?TIMEOUT ->
+        timeout
+    end.
+
+stop_writer(Writer) ->
+    Ref = make_ref(),
+    Writer ! {stop, Ref},
+    receive
+        {ok, Ref} ->
+            ok
+    after ?TIMEOUT ->
+        erlang:error({assertion_failed,
+                      [{module, ?MODULE},
+                       {line, ?LINE},
+                       {reason, "Timeout on stopping process"}]})
+    end.
+
+writer_loop(DbName, Parent) ->
+    case couch_db:open_int(DbName, []) of
+        {ok, Db} ->
+            writer_loop_1(Db, Parent);
+        Error ->
+            writer_loop_2(DbName, Parent, Error)
+    end.
+
+writer_loop_1(Db, Parent) ->
+    receive
+        {get_status, Ref} ->
+            Parent ! {db_open, Ref},
+            writer_loop_1(Db, Parent);
+        {stop, Ref} ->
+            ok = couch_db:close(Db),
+            Parent ! {ok, Ref}
+    end.
+
+writer_loop_2(DbName, Parent, Error) ->
+    receive
+        {get_status, Ref} ->
+            Parent ! {db_open_error, Error, Ref},
+            writer_loop_2(DbName, Parent, Error);
+        {try_again, Ref} ->
+            Parent ! {ok, Ref},
+            writer_loop(DbName, Parent)
     end.
