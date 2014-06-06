@@ -26,7 +26,9 @@ simple(Password, Salt) when is_binary(Password), is_binary(Salt) ->
     ?l2b(couch_util:to_hex(crypto:sha(<<Password/binary, Salt/binary>>))).
 
 %% CouchDB utility functions
--spec hash_admin_password(binary()) -> binary().
+-spec hash_admin_password(binary() | list()) -> binary().
+hash_admin_password(ClearPassword) when is_list(ClearPassword) ->
+    hash_admin_password(?l2b(ClearPassword));
 hash_admin_password(ClearPassword) when is_binary(ClearPassword) ->
     Iterations = couch_config:get("couch_httpd_auth", "iterations", "10000"),
     Salt = couch_uuids:random(),
