@@ -32,7 +32,6 @@ fixture_files = \
     fixtures/test.couch
 
 tap_files = \
-    201-view-group-shutdown.t \
     210-os-proc-pool.t \
     220-compaction-daemon.t \
     230-pbkfd2.t \
