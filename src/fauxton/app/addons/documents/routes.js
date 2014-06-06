@@ -71,6 +71,7 @@ function(app, FauxtonAPI, Documents, Databases) {
       var doc = this.doc,
       docView = this.docView,
       database = this.database;
+      this.docID = newId;
 
       doc.copy(newId).then(function () {
         doc.set({_id: newId});
