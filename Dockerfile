@@ -1,4 +1,4 @@
-FROM debian:7.4
+FROM debian:latest
 MAINTAINER Robert Newson <rnewson@apache.org>
 ENV DEBIAN_FRONTEND noninteractive
 
