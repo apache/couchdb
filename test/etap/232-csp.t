@@ -42,13 +42,16 @@ test() ->
     test_no_csp_headers_server(),
 
     % Now enable CSP
-    ok = couch_config:set("csp", "enable_csp", "true", false),
+    ok = couch_config:set("csp", "enable", "true", false),
 
     test_default_header_value(),
 
     ok = couch_config:set("csp", "header_value", "default-src 'http://ente.com';", false),
-
     test_custom_header_value(),
+
+    % Disabled on all other values than true
+    ok = couch_config:set("csp", "enable", "blerg", false),
+    test_all_other_values_for_enable(),
 
     timer:sleep(3000),
     couch_server_sup:stop(),
@@ -74,3 +77,9 @@ test_custom_header_value() ->
     etap:is(proplists:get_value("Content-Security-Policy", Resp),
             "default-src 'http://ente.com';",
             "Custom CSP Headers possible").
+
+test_all_other_values_for_enable() ->
+    Headers = [{"Origin", "http://127.0.0.1"}],
+    {ok, _, Resp, _} = ibrowse:send_req(server(), Headers, get, []),
+    etap:is(proplists:get_value("Content-Security-Policy", Resp),
+            undefined, "No CSP Headers when wrong value given").
