@@ -32,7 +32,6 @@ fixture_files = \
     fixtures/test.couch
 
 tap_files = \
-    210-os-proc-pool.t \
     220-compaction-daemon.t \
     230-pbkfd2.t \
     231-cors.t \

@@ -45,6 +45,7 @@ eunit_files = \
     couchdb_http_proxy_tests.erl \
     couchdb_modules_load_tests.erl \
     couchdb_os_daemons_tests.erl \
+    couchdb_os_proc_pool.erl \
     couchdb_update_conflicts_tests.erl \
     couchdb_vhosts_tests.erl \
     couchdb_views_tests.erl \
