@@ -46,7 +46,7 @@ test() ->
 
     test_default_header_value(),
 
-    ok = couch_config:set("csp", "header_value", "default-src 'http://ente.com';", false),
+    ok = couch_config:set("csp", "header_value", "default-src 'somedomainvalue';", false),
     test_custom_header_value(),
 
     % Disabled on all other values than true
@@ -75,7 +75,7 @@ test_custom_header_value() ->
     Headers = [{"Origin", "http://127.0.0.1"}],
     {ok, _, Resp, _} = ibrowse:send_req(server(), Headers, get, []),
     etap:is(proplists:get_value("Content-Security-Policy", Resp),
-            "default-src 'http://ente.com';",
+            "default-src 'somedomainvalue';",
             "Custom CSP Headers possible").
 
 test_all_other_values_for_enable() ->
