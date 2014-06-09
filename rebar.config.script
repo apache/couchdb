@@ -17,28 +17,29 @@ os:putenv("COUCHDB_CONFIG", ConfigureEnv).
 
 
 DepDescs = [
-    {couch_log, "couchdb-couch-log", {branch, "master"}},
-    {config, "couchdb-config", {branch, "master"}},
-    {chttpd, "couchdb-chttpd", {branch, "master"}},
-    {couch, "couchdb-couch", {branch, "master"}},
-    {couch_index, "couchdb-couch-index", {branch, "master"}},
-    {couch_mrview, "couchdb-couch-mrview", {branch, "master"}},
-    {couch_replicator, "couchdb-couch-replicator", {branch,  "master"}},
-    {ddoc_cache, "couchdb-ddoc-cache", {branch, "master"}},
-    {ets_lru, "couchdb-ets-lru", {branch, "master"}},
-    {fabric, "couchdb-fabric", {branch,  "master"}},
-    {ibrowse, "couchdb-ibrowse", {tag,  "master"}},
-    {jiffy, "couchdb-jiffy", {branch, "master"}},
-    {mem3, "couchdb-mem3", {branch, "master"}},
-    {mochiweb, "couchdb-mochiweb", {branch, "master"}},
-    {oauth, "couchdb-oauth", {branch, "master"}},
-    {rexi, "couchdb-rexi", {branch, "master"}},
-    {snappy, "couchdb-snappy", {branch, "1994-merge-rcouch"}}
+    {couch_log, "couchdb-couch-log", {branch, "master"}, []},
+    {config, "couchdb-config", {branch, "master"}, []},
+    {chttpd, "couchdb-chttpd", {branch, "master"}, []},
+    {couch, "couchdb-couch", {branch, "master"}, []},
+    {couch_index, "couchdb-couch-index", {branch, "master"}, []},
+    {couch_mrview, "couchdb-couch-mrview", {branch, "master"}, []},
+    {couch_replicator, "couchdb-couch-replicator", {branch,  "master"}, []},
+    {ddoc_cache, "couchdb-ddoc-cache", {branch, "master"}, []},
+    {ets_lru, "couchdb-ets-lru", {branch, "master"}, []},
+    {fabric, "couchdb-fabric", {branch,  "master"}, []},
+    {ibrowse, "couchdb-ibrowse", {tag,  "master"}, []},
+    {jiffy, "couchdb-jiffy", {branch, "master"}, []},
+    {mem3, "couchdb-mem3", {branch, "master"}, []},
+    {mochiweb, "couchdb-mochiweb", {branch, "master"}, []},
+    {oauth, "couchdb-oauth", {branch, "master"}, []},
+    {rexi, "couchdb-rexi", {branch, "master"}, []},
+    {snappy, "couchdb-snappy", {branch, "1994-merge-rcouch"}, []},
+    {fauxton, "couchdb-fauxton", {branch, "import-master"}, [raw]}
 ],
 
-MakeDep = fun({AppName, RepoName, Version}) ->
+MakeDep = fun({AppName, RepoName, Version, Options}) ->
     Url = "https://git-wip-us.apache.org/repos/asf/" ++ RepoName ++ ".git",
-    {AppName, ".*", {git, Url, Version}}
+    {AppName, ".*", {git, Url, Version}, Options}
 end,
 
 AddConfig = [
