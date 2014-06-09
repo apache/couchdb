@@ -32,7 +32,6 @@ fixture_files = \
     fixtures/test.couch
 
 tap_files = \
-    230-pbkfd2.t \
     231-cors.t \
     250-upgrade-legacy-view-files.t
 
