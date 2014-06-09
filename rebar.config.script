@@ -34,7 +34,7 @@ DepDescs = [
     {oauth, "couchdb-oauth", {branch, "master"}, []},
     {rexi, "couchdb-rexi", {branch, "master"}, []},
     {snappy, "couchdb-snappy", {branch, "1994-merge-rcouch"}, []},
-    {fauxton, "couchdb-fauxton", {branch, "import-master"}, [raw]}
+    {fauxton, "couchdb-fauxton", {branch, "master"}, [raw]}
 ],
 
 MakeDep = fun({AppName, RepoName, Version, Options}) ->
