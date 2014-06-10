@@ -167,8 +167,10 @@
 ^test/couchdb/Makefile
 ^test/couchdb/Makefile.in
 ^test/couchdb/fixtures/logo.png
+^test/couchdb/fixtures/3b835456c235b1827e012e25666152f3.view
 ^test/couchdb/fixtures/Makefile
 ^test/couchdb/fixtures/Makefile.in
+^test/couchdb/fixtures/test.couch
 ^test/couchdb/fixtures/.deps/test_cfg_register-test_cfg_register.Po
 ^test/couchdb/fixtures/test_cfg_register
 ^test/couchdb/fixtures/test_cfg_register.o

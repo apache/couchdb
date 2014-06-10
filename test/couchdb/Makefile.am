@@ -68,7 +68,9 @@ fixture_files = \
     fixtures/os_daemon_can_reboot.sh \
     fixtures/os_daemon_die_on_boot.sh \
     fixtures/os_daemon_die_quickly.sh \
-    fixtures/logo.png
+    fixtures/logo.png \
+    fixtures/3b835456c235b1827e012e25666152f3.view \
+    fixtures/test.couch
 
 EXTRA_DIST = \
     run.in \
