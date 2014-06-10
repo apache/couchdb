@@ -12,7 +12,9 @@
 
 -module(test_request).
 
--export([get/1, get/2, get/3, put/2, put/3]).
+-export([get/1, get/2, get/3]).
+-export([put/2, put/3]).
+-export([options/1, options/2, options/3]).
 -export([request/3, request/4]).
 
 get(Url) ->
@@ -29,6 +31,16 @@ put(Url, Body) ->
 
 put(Url, Headers, Body) ->
     request(put, Url, Headers, Body).
+
+
+options(Url) ->
+    request(options, Url, []).
+
+options(Url, Headers) ->
+    request(options, Url, Headers).
+
+options(Url, Headers, Opts) ->
+    request(options, Url, Headers, [], Opts).
 
 
 request(Method, Url, Headers) ->

@@ -32,7 +32,6 @@ fixture_files = \
     fixtures/test.couch
 
 tap_files = \
-    231-cors.t \
     250-upgrade-legacy-view-files.t
 
 EXTRA_DIST = \
