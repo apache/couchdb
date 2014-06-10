@@ -25,7 +25,8 @@ module.exports = function (grunt) {
     // Options
     var dist_dir = options.dist || './dist/debug/',
         app_dir = './app',
-        port = options.port || 8000;
+        port = options.port || 8000,
+        setContentSecurityPolicy = _.isUndefined(options.contentSecurityPolicy) ? true : options.contentSecurityPolicy;
 
     // Proxy options with default localhost
     var proxy_settings = options.proxy || {
@@ -47,9 +48,11 @@ module.exports = function (grunt) {
           accept = req.headers.accept.split(','),
           filePath;
 
-      var headerValue = "default-src 'self'; img-src 'self'; font-src 'self'; " +
-                        "script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline';";
-      res.setHeader('Content-Security-Policy', headerValue);
+      if (setContentSecurityPolicy) {
+        var headerValue = "default-src 'self'; img-src 'self'; font-src 'self'; " +
+                          "script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline';";
+        res.setHeader('Content-Security-Policy', headerValue);
+      }
 
       if (!!url.match(/^\/addons\/.*\/assets\/js/)) {
         filePath = path.join(app_dir, url.replace('/_utils/fauxton/',''));
