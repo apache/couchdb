@@ -14,6 +14,7 @@
 
 -include("couch_eunit.hrl").
 -include_lib("couchdb/couch_db.hrl").
+-include_lib("couch_mrview/include/couch_mrview.hrl").
 
 -define(ADMIN_USER, {user_ctx, #user_ctx{roles=[<<"_admin">>]}}).
 -define(DELAY, 100).
@@ -126,6 +127,68 @@ should_not_remember_docs_in_index_after_backup_restore_test() ->
     ?assert(has_doc("doc2", Rows1)),
     ?assert(has_doc("doc3", Rows1)),
     ?assertNot(has_doc("doc666", Rows1)),
+
+    teardown(DbName),
+    stop(whereis(couch_server_sup)).
+
+
+should_upgrade_legacy_view_files_test() ->
+    start(),
+
+    ok = couch_config:set("query_server_config", "commit_freq", "0", false),
+
+    DbName = <<"test">>,
+    DbFileName = "test.couch",
+    DbFilePath = filename:join([?FIXTURESDIR, DbFileName]),
+    OldViewName = "3b835456c235b1827e012e25666152f3.view",
+    FixtureViewFilePath = filename:join([?FIXTURESDIR, OldViewName]),
+    NewViewName = "a1c5929f912aca32f13446122cc6ce50.view",
+
+    DbDir = couch_config:get("couchdb", "database_dir"),
+    ViewDir = couch_config:get("couchdb", "view_index_dir"),
+    OldViewFilePath = filename:join([ViewDir, ".test_design", OldViewName]),
+    NewViewFilePath = filename:join([ViewDir, ".test_design", "mrview",
+                                     NewViewName]),
+
+    % cleanup
+    Files = [
+        filename:join([DbDir, DbFileName]),
+        OldViewFilePath,
+        NewViewFilePath
+    ],
+    lists:foreach(fun(File) -> file:delete(File) end, Files),
+
+    % copy old db file into db dir
+    {ok, _} = file:copy(DbFilePath, filename:join([DbDir, DbFileName])),
+
+    % copy old view file into view dir
+    ok = filelib:ensure_dir(filename:join([ViewDir, ".test_design"])),
+    {ok, _} = file:copy(FixtureViewFilePath, OldViewFilePath),
+
+    % ensure old header
+    OldHeader = read_header(OldViewFilePath),
+    ?assertMatch(#index_header{}, OldHeader),
+
+    % query view for expected results
+    Rows0 = query_view(DbName, "test", "test"),
+    ?assertEqual(2, length(Rows0)),
+
+    % ensure old file gone
+    ?assertNot(filelib:is_regular(OldViewFilePath)),
+
+    % add doc to trigger update
+    DocUrl = db_url(DbName) ++ "/boo",
+    {ok, _, _, _} = test_request:put(
+        DocUrl, [{"Content-Type", "application/json"}], <<"{\"a\":3}">>),
+
+    % query view for expected results
+    Rows1 = query_view(DbName, "test", "test"),
+    ?assertEqual(3, length(Rows1)),
+
+    % ensure new header
+    timer:sleep(2000),  % have to wait for awhile to upgrade the index
+    NewHeader = read_header(NewViewFilePath),
+    ?assertMatch(#mrheader{}, NewHeader),
 
     teardown(DbName),
     stop(whereis(couch_server_sup)).
@@ -598,3 +661,9 @@ writer_loop_2(DbName, Parent, Error) ->
             Parent ! {ok, Ref},
             writer_loop(DbName, Parent)
     end.
+
+read_header(File) ->
+    {ok, Fd} = couch_file:open(File),
+    {ok, {_Sig, Header}} = couch_file:read_header(Fd),
+    couch_file:close(Fd),
+    Header.
