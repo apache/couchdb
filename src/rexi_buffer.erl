@@ -26,7 +26,8 @@
 -record(state, {
     buffer = queue:new(),
     sender = nil,
-    count = 0
+    count = 0,
+    max_count
 }).
 
 start_link(ServerId) ->
