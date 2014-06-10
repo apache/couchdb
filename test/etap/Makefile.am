@@ -27,14 +27,5 @@ CLEANFILES = run *.beam
 
 DISTCLEANFILES = temp.*
 
-fixture_files = \
-    fixtures/3b835456c235b1827e012e25666152f3.view \
-    fixtures/test.couch
-
-tap_files = \
-    250-upgrade-legacy-view-files.t
-
 EXTRA_DIST = \
-    run.tpl \
-    $(fixture_files) \
-    $(tap_files)
+    run.tpl
