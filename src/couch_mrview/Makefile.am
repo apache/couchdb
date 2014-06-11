@@ -35,7 +35,7 @@ source_files = \
 test_files = \
     test/couch_mrview_map_views_tests.erl \
     test/couch_mrview_modules_load_tests.erl \
-    test/03-red-views.t \
+    test/couch_mrview_red_views_tests.erl \
     test/04-index-info.t \
     test/05-collation.t \
     test/06-all-docs.t \

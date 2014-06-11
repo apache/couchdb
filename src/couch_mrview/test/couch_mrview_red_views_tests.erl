@@ -1,6 +1,3 @@
-#!/usr/bin/env escript
-%% -*- erlang -*-
-
 % Licensed under the Apache License, Version 2.0 (the "License"); you may not
 % use this file except in compliance with the License. You may obtain a copy of
 % the License at
@@ -13,50 +10,83 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-main(_) ->
-    test_util:run(4, fun() -> test() end).
+-module(couch_mrview_red_views_tests).
 
-test() ->
-    couch_server_sup:start_link(test_util:config_files()),
+-include("couch_eunit.hrl").
+-include_lib("couchdb/couch_db.hrl").
 
-    {ok, Db} = couch_mrview_test_util:init_db(<<"foo">>, red),
-
-    test_basic(Db),
-    test_key_range(Db),
-    test_group_level(Db),
-    test_group_exact(Db),
-
-    ok.
+-define(TIMEOUT, 1000).
+-define(ADMIN_USER, {user_ctx, #user_ctx{roles=[<<"_admin">>]}}).
 
 
-test_basic(Db) ->
+start() ->
+    {ok, Pid} = couch_server_sup:start_link(?CONFIG_CHAIN),
+    Pid.
+
+stop(Pid) ->
+    erlang:monitor(process, Pid),
+    couch_server_sup:stop(),
+    receive
+        {'DOWN', _, _, Pid, _} ->
+            ok
+    after ?TIMEOUT ->
+        throw({timeout, server_stop})
+    end.
+
+setup() ->
+    {ok, Db} = couch_mrview_test_util:init_db(?tempdb(), red),
+    Db.
+
+teardown(Db) ->
+    ok = couch_db:close(Db).
+
+
+reduce_views_test_() ->
+    {
+        "Reduce views",
+        {
+            setup,
+            fun start/0, fun stop/1,
+            {
+                foreach,
+                fun setup/0, fun teardown/1,
+                [
+                    fun should_reduce_basic/1,
+                    fun should_reduce_key_range/1,
+                    fun should_reduce_with_group_level/1,
+                    fun should_reduce_with_group_exact/1
+                ]
+            }
+        }
+    }.
+
+
+should_reduce_basic(Db) ->
     Result = run_query(Db, []),
     Expect = {ok, [
         {meta, []},
         {row, [{key, null}, {value, 55}]}
     ]},
-    etap:is(Result, Expect, "Simple reduce view works.").
+    ?_assertEqual(Expect, Result).
 
-
-test_key_range(Db) ->
+should_reduce_key_range(Db) ->
     Result = run_query(Db, [{start_key, [0, 2]}, {end_key, [0, 4]}]),
     Expect = {ok, [
         {meta, []},
         {row, [{key, null}, {value, 6}]}
     ]},
-    etap:is(Result, Expect, "Reduce with key range works.").
+    ?_assertEqual(Expect, Result).
 
-
-test_group_level(Db) ->
+should_reduce_with_group_level(Db) ->
     Result = run_query(Db, [{group_level, 1}]),
     Expect = {ok, [
         {meta, []},
         {row, [{key, [0]}, {value, 30}]},
         {row, [{key, [1]}, {value, 25}]}
     ]},
-    etap:is(Result, Expect, "Group level works.").
+    ?_assertEqual(Expect, Result).
 
-test_group_exact(Db) ->
+should_reduce_with_group_exact(Db) ->
     Result = run_query(Db, [{group_level, exact}]),
     Expect = {ok, [
         {meta, []},
@@ -71,7 +101,7 @@ test_group_exact(Db) ->
         {row, [{key, [1, 7]}, {value, 7}]},
         {row, [{key, [1, 9]}, {value, 9}]}
     ]},
-    etap:is(Result, Expect, "Group exact works.").
+    ?_assertEqual(Expect, Result).
 
 
 run_query(Db, Opts) ->
