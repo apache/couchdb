@@ -36,7 +36,7 @@ source_files = \
 	src/couch_replicator.erl
 
 test_files = \
-	test/01-load.t \
+	test/couch_replicator_modules_load_tests.erl \
 	test/02-httpc-pool.t \
 	test/03-replication-compact.t \
 	test/04-replication-large-atts.t \
