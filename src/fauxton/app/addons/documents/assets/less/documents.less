@@ -161,6 +161,10 @@ button.beautify {
   }
 }
 
+.nav-list{
+    border-top: none;
+  }
+
 .sidenav{
   .nav-list > .active > a{
     text-shadow: none;
@@ -193,11 +197,11 @@ button.beautify {
       color: #eee;
       margin-left: 0;
       li.active > a{
-        background-color: rgba(0, 0, 0, 0.05);
+        background-color: rgba(0, 0, 0, 0.055);
       }
       li a{
-        padding-left: 55px;
         font-size: 14px;
+        background-color: rgba(0, 0, 0, 0.02);
         &:hover {
           color: #fff;
           text-decoration: none;
@@ -211,7 +215,13 @@ button.beautify {
         display: block;
         vertical-align: bottom;
       }
-    > .js-collapse-toggle{
+    .accordion-header:hover .fonticon-play {
+            color: white;
+     }
+    .fonticon-play{
+      .transition(all 0.25s linear); 
+    }
+    > .accordion-header{
       position: relative;
       display: block;
       border-bottom: 1px solid #d3d7db;
@@ -226,7 +236,7 @@ button.beautify {
       .accordion-list-item:hover + div.add-dropdown .dropdown-toggle{
         color: white;
       }
-      .accordion-list-item p, .fonticon-play{
+      .accordion-list-item p{
         .transition(all 0.25s linear); 
       }
       .accordion-list-item p{
@@ -253,11 +263,17 @@ button.beautify {
       > li {
         cursor: pointer;
         a{
-          padding-left: 36px;
+          border-top: none;
+          &.accordion-header{
+            padding: 8px 5px 8px 36px;
+          }
+        }
+        .toggle-view{
+          padding: 4px 5px 4px 36px;
         }
         .fonticon-play{
           font-size: 8px;
-          top: 7px;
+          top: 11px;
           left: 15px;
         }
         .fonticon:before{
@@ -272,19 +288,9 @@ button.beautify {
         > a.down .fonticon-play {
           .rotate(90deg);
         }
-
-        &:hover {
-          .fonticon-play {
-            color: white;
-
-          }
-        }
-
       }
-
     }
   }
-  
 }
 
 

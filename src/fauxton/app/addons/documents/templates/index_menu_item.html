@@ -11,15 +11,15 @@ WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 License for the specific language governing permissions and limitations under
 the License.
 -->
-<a class="js-collapse-toggle" data-toggle="collapse"  data-target="#<%- ddocType %>" >
+<a class="js-toggle-<%-ddocType%> accordion-header js-collapse-toggle" data-toggle="collapse"  data-target="#<%- removeSpecialCharacters(ddoc) + ddocType %>" id="nav-design-function-<%= removeSpecialCharacters(ddoc) + ddocType %>">
   <div class="fonticon-play"></div>
   <span class="<%- icon %> fonticon"></span>
   <%- ddocType %>
   </a>
-  <ul class="accordion-body collapse" id="<%= ddocType %>">
+  <ul class="accordion-body collapse" id="<%- removeSpecialCharacters(ddoc) + ddocType %>">
   <% _.each(collection, function (item, index) { %>
   <li>
-  <a id="<%- removeSpecialCharacters(ddoc) %>_<%- removeSpecialCharacters(index) %>" href="#/database/<%- safeURL(database) %>/_design/<%= safeURL(ddoc)%>/_<%=ddocType%>/<%= safeURL(index) %>" class="toggle-view">
+  <a data-ddoctype="<%- ddocType %>" id="<%- removeSpecialCharacters(ddoc) %>_<%- removeSpecialCharacters(index) %>" href="#/database/<%- safeURL(database) %>/_design/<%= safeURL(ddoc)%>/_<%=ddocType%>/<%= safeURL(index) %>" class="toggle-view">
     <%- index %>
   </a>
   </li>

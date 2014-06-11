@@ -13,7 +13,7 @@ the License.
 -->
 <li class="nav-header">
 	
-	<div  class="js-collapse-toggle" data-toggle="collapse" data-target="#<%= ddoc_clean %>">
+	<div  class="js-collapse-toggle accordion-header" data-toggle="collapse" data-target="#<%= ddoc_clean %>" id="nav-header-<%= ddoc_clean %>" >
 		<div class="accordion-list-item">
 			<div class="fonticon-play"></div>
 			<p><%= designDoc%></p>
@@ -22,7 +22,7 @@ the License.
 	</div>
 	<ul class="accordion-body collapse" id="<%= ddoc_clean %>">
 		<li>
-			<a id="<%= ddoc_clean %>_metadata" href="#/database/<%- database_encoded %>/_design/<%- ddoc_encoded %>/metadata" class="toggle-view">
+			<a id="<%= ddoc_clean %>_metadata" href="#/database/<%- database_encoded %>/_design/<%- ddoc_encoded %>/metadata" class="toggle-view accordion-header">
 			<span class="fonticon-sidenav-info fonticon"></span>
 			  Design Doc Metadata
 			</a>
