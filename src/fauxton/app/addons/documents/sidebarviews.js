@@ -217,11 +217,16 @@ function(app, FauxtonAPI, Components, Documents, Databases) {
       this.selected = !! options.selected;
       this.selector = options.selector;
       this.ddocType = options.ddocType || this.selector;
+      this.icons = {
+        "view": "fonticon-sidenav-map-reduce",
+        "indexes": "fonticon-sidenav-search"
+      };
+
     },
 
     serialize: function() {
       return {
-        icon: this.ddocType,
+        icon: this.icons[this.ddocType],
         ddocType:  this.ddocType,
         index: this.index,
         ddoc: this.ddoc,
