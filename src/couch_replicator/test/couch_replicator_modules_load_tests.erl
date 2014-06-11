@@ -1,6 +1,3 @@
-#!/usr/bin/env escript
-%% -*- erlang -*-
-
 % Licensed under the Apache License, Version 2.0 (the "License"); you may not
 % use this file except in compliance with the License. You may obtain a copy of
 % the License at
@@ -13,10 +10,19 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-% Test that we can load each module.
+-module(couch_replicator_modules_load_tests).
 
-main(_) ->
-    test_util:init_code_path(),
+-include("couch_eunit.hrl").
+
+
+modules_load_test_() ->
+    {
+        "Verify that all modules loads",
+        should_load_modules()
+    }.
+
+
+should_load_modules() ->
     Modules = [
         couch_replicator_api_wrap,
         couch_replicator_httpc,
@@ -28,10 +34,7 @@ main(_) ->
         couch_replicator_utils,
         couch_replicator_job_sup
     ],
+    [should_load_module(Mod) || Mod <- Modules].
 
-    etap:plan(length(Modules)),
-    lists:foreach(
-        fun(Module) ->
-            etap:loaded_ok(Module, lists:concat(["Loaded: ", Module]))
-        end, Modules),
-    etap:end_tests().
+should_load_module(Mod) ->
+    {atom_to_list(Mod), ?_assertMatch({module, _}, code:load_file(Mod))}.
