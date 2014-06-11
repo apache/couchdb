@@ -33,8 +33,8 @@ source_files = \
     src/couch_mrview_util.erl
 
 test_files = \
+    test/couch_mrview_map_views_tests.erl \
     test/couch_mrview_modules_load_tests.erl \
-    test/02-map-views.t \
     test/03-red-views.t \
     test/04-index-info.t \
     test/05-collation.t \
