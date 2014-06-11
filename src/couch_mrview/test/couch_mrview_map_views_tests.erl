@@ -1,6 +1,3 @@
-#!/usr/bin/env escript
-%% -*- erlang -*-
-
 % Licensed under the Apache License, Version 2.0 (the "License"); you may not
 % use this file except in compliance with the License. You may obtain a copy of
 % the License at
@@ -13,25 +10,61 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-main(_) ->
-    test_util:run(6, fun() -> test() end).
+-module(couch_mrview_map_views_tests).
 
-test() ->
-    test_util:start_couch(),
+-include("../../../test/couchdb/couch_eunit.hrl").
+-include_lib("couchdb/couch_db.hrl").
 
-    {ok, Db} = couch_mrview_test_util:init_db(<<"foo">>, map),
+-define(TIMEOUT, 1000).
+-define(ADMIN_USER, {user_ctx, #user_ctx{roles=[<<"_admin">>]}}).
 
-    test_basic(Db),
-    test_range(Db),
-    test_rev_range(Db),
-    test_limit_and_skip(Db),
-    test_include_docs(Db),
-    test_empty_view(Db),
 
+start() ->
+    {ok, Pid} = couch_server_sup:start_link(?CONFIG_CHAIN),
+    Pid.
+
+stop(Pid) ->
+    erlang:monitor(process, Pid),
+    couch_server_sup:stop(),
+    receive
+        {'DOWN', _, _, Pid, _} ->
+            ok
+    after ?TIMEOUT ->
+        throw({timeout, server_stop})
+    end.
+
+setup() ->
+    {ok, Db} = couch_mrview_test_util:init_db(?tempdb(), map),
+    Db.
+
+teardown(Db) ->
+    couch_db:close(Db),
+    couch_server:delete(Db#db.name, [?ADMIN_USER]),
     ok.
 
 
-test_basic(Db) ->
+map_views_test_() ->
+    {
+        "Map views",
+        {
+            setup,
+            fun start/0, fun stop/1,
+            {
+                foreach,
+                fun setup/0, fun teardown/1,
+                [
+                    fun should_map/1,
+                    fun should_map_with_range/1,
+                    fun should_map_with_limit_and_skip/1,
+                    fun should_map_with_include_docs/1,
+                    fun should_map_empty_views/1
+                ]
+            }
+        }
+    }.
+
+
+should_map(Db) ->
     Result = run_query(Db, []),
     Expect = {ok, [
         {meta, [{total, 10}, {offset, 0}]},
@@ -46,21 +79,9 @@ test_basic(Db) ->
         {row, [{id, <<"9">>}, {key, 9}, {value, 9}]},
         {row, [{id, <<"10">>}, {key, 10}, {value, 10}]}
     ]},
-    etap:is(Result, Expect, "Simple view query worked.").
+    ?_assertEqual(Expect, Result).
 
-
-test_range(Db) ->
-    Result = run_query(Db, [{start_key, 3}, {end_key, 5}]),
-    Expect = {ok, [
-        {meta, [{total, 10}, {offset, 2}]},
-        {row, [{id, <<"3">>}, {key, 3}, {value, 3}]},
-        {row, [{id, <<"4">>}, {key, 4}, {value, 4}]},
-        {row, [{id, <<"5">>}, {key, 5}, {value, 5}]}
-    ]},
-    etap:is(Result, Expect, "Query with range works.").
-
-
-test_rev_range(Db) ->
+should_map_with_range(Db) ->
     Result = run_query(Db, [
         {direction, rev},
         {start_key, 5}, {end_key, 3},
@@ -72,10 +93,9 @@ test_rev_range(Db) ->
         {row, [{id, <<"4">>}, {key, 4}, {value, 4}]},
         {row, [{id, <<"3">>}, {key, 3}, {value, 3}]}
     ]},
-    etap:is(Result, Expect, "Query with reversed range works.").
+    ?_assertEqual(Expect, Result).
 
-
-test_limit_and_skip(Db) ->
+should_map_with_limit_and_skip(Db) ->
     Result = run_query(Db, [
         {start_key, 2},
         {limit, 3},
@@ -87,10 +107,9 @@ test_limit_and_skip(Db) ->
         {row, [{id, <<"6">>}, {key, 6}, {value, 6}]},
         {row, [{id, <<"7">>}, {key, 7}, {value, 7}]}
     ]},
-    etap:is(Result, Expect, "Query with limit and skip works.").
+    ?_assertEqual(Expect, Result).
 
-
-test_include_docs(Db) ->
+should_map_with_include_docs(Db) ->
     Result = run_query(Db, [
         {start_key, 8},
         {end_key, 8},
@@ -105,15 +124,14 @@ test_include_docs(Db) ->
         {meta, [{total, 10}, {offset, 7}]},
         {row, [{id, <<"8">>}, {key, 8}, {value, 8}, {doc, Doc}]}
     ]},
-    etap:is(Result, Expect, "Query with include docs works.").
+    ?_assertEqual(Expect, Result).
 
-
-test_empty_view(Db) ->
+should_map_empty_views(Db) ->
     Result = couch_mrview:query_view(Db, <<"_design/bar">>, <<"bing">>),
     Expect = {ok, [
         {meta, [{total, 0}, {offset, 0}]}
     ]},
-    etap:is(Result, Expect, "Empty views are correct.").
+    ?_assertEqual(Expect, Result).
 
 
 run_query(Db, Opts) ->
