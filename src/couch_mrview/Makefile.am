@@ -35,11 +35,11 @@ source_files = \
 test_files = \
     test/couch_mrview_all_docs_tests.erl \
     test/couch_mrview_collation_tests.erl \
+    test/couch_mrview_compact_tests.erl \
     test/couch_mrview_index_info_tests.erl \
     test/couch_mrview_map_views_tests.erl \
     test/couch_mrview_modules_load_tests.erl \
-    test/couch_mrview_red_views_tests.erl \
-	test/07-compact-swap.t
+    test/couch_mrview_red_views_tests.erl
 
 compiled_files = \
     ebin/couch_mrview.app \
