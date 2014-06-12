@@ -67,8 +67,8 @@ server_authorization_check(#httpd{path_parts=[<<"_stats">>]}=Req) ->
     Req;
 server_authorization_check(#httpd{path_parts=[<<"_active_tasks">>]}=Req) ->
     Req;
-server_authorization_check(#httpd{method=Method, path_parts=[<<"_utils">>,
-    <<"script">>|_]}=Req) when Method =:= 'HEAD' orelse Method =:= 'GET' ->
+server_authorization_check(#httpd{method=Method, path_parts=[<<"_utils">>|_]}=Req)
+  when Method =:= 'HEAD' orelse Method =:= 'GET' ->
     Req;
 server_authorization_check(#httpd{path_parts=[<<"_", _/binary>>|_]}=Req) ->
     require_admin(Req).
