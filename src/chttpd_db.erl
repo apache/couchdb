@@ -402,7 +402,7 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_all_docs">>]}=Req, Db) ->
     Keys when is_list(Keys) ->
         all_docs_view(Req, Db, Keys);
     nil ->
-        all_docs_view(Req, Db, nil);
+        all_docs_view(Req, Db, undefined);
     _ ->
         throw({bad_request, "`keys` body member must be an array."})
     end;
