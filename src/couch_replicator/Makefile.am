@@ -36,9 +36,9 @@ source_files = \
 	src/couch_replicator.erl
 
 test_files = \
+	test/couch_replicator_compact_tests.erl \
 	test/couch_replicator_httpc_pool_tests.erl \
 	test/couch_replicator_modules_load_tests.erl \
-	test/03-replication-compact.t \
 	test/04-replication-large-atts.t \
 	test/05-replication-many-leaves.t \
 	test/06-doc-missing-stubs.t \
