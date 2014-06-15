@@ -247,6 +247,38 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
     }
   });
 
+  Views.StringEditModal = Components.ModalView.extend({
+    template: "addons/documents/templates/string_edit_modal",
+
+    initialize: function () {
+      _.bindAll(this);
+    },
+
+    events: {
+      "click #string-edit-save-btn":"saveString"
+    },
+
+    saveString: function (event) {
+      event.preventDefault();
+      // todo: here
+    },
+
+    _showModal: function () {
+      this.$('.bar').css({width: '0%'});
+      this.$('.progress').addClass('hide');
+      this.clear_error_msg();
+      this.$('.modal').modal();
+      // hack to get modal visible
+      $('.modal-backdrop').css('z-index',1025);
+    }, 
+
+    openWin: function(jsonString) {
+      this.$('#string-edit-area').text(JSON.parse(jsonString));
+      this.showModal();
+    }
+
+  });
+
   Views.Document = FauxtonAPI.View.extend({
     template: "addons/documents/templates/all_docs_item",
     tagName: "tr",
@@ -751,7 +783,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       "click button.delete": "destroy",
       "click button.duplicate": "duplicate",
       "click button.upload": "upload",
-      "click button.cancel-button": "goback"
+      "click button.cancel-button": "goback",
+      "click #editor-string-edit": "stringEditing"
     },
 
     disableLoader: true,
@@ -763,6 +796,27 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
 
     goback: function(){
       FauxtonAPI.navigate(this.database.url("index") + "?limit=100");
+    },
+
+    stringEditing: function(event) {
+      event.preventDefault();   
+      var selStart = this.editor.editor.getSelectionRange().start.row;
+      var selEnd = this.editor.editor.getSelectionRange().end.row;
+      if (selStart >=0 && selEnd >= 0 && selStart == selEnd) {
+        var editLine = this.editor.editor.session.getLine(selStart);
+	var editMatch = editLine.match(/^([ \t])*("[a-zA-Z0-9_]*": )?(".*",?)$/);
+	if (editMatch) {
+          var indent = editMatch[1] || "";
+          var hashKey = editMatch[2] || "";
+          var editText = editMatch[3];
+	  var comma = "";
+	  if (editText.substring(editText.length - 1) === ",") {
+            editText = editText.substring(0, editText.length - 1); 
+            comma = ",";
+	  }
+	  this.stringEditModal.openWin(editText);
+	}
+      }
     },
 
     destroy: function(event) {
@@ -802,6 +856,9 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
 
       this.duplicateModal = this.setView('#duplicate-modal', new Views.DuplicateDocModal({model: this.model}));
       this.duplicateModal.render();
+
+      this.stringEditModal = this.setView('#string-edit-modal', new Views.StringEditModal());
+      this.stringEditModal.render();
     },
 
     upload: function (event) {
