@@ -10,6 +10,6 @@
 ## License for the specific language governing permissions and limitations under
 ## the License.
 
-SUBDIRS = bench couchdb etap javascript view_server
+SUBDIRS = bench couchdb javascript view_server
 EXTRA_DIST = random_port.ini
 

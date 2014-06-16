@@ -131,11 +131,6 @@ test/bench/run
 test/couchdb/run
 test/couchdb/couch_eunit.hrl
 test/couchdb/fixtures/.deps/
-test/etap/.deps/
-test/etap/run
-test/etap/temp.*
-test/etap/test_cfg_register
-test/etap/test_util.erl
 test/javascript/run
 test/javascript/run_js_tests.sh
 test/local.ini

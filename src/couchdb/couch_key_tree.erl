@@ -418,5 +418,5 @@ value_pref(Last, _) ->
     Last.
 
 
-% Tests moved to test/etap/06?-*.t
+% Tests moved to test/couchdb/couch_key_tree_tests.erl
 
