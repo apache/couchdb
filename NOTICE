@@ -42,10 +42,6 @@ This product also includes the following third-party components:
 
    Copyright 2012, the authors and contributors
 
- * ETap (http://github.com/ngerakines/etap/)
-
-   Copyright 2009, Nick Gerakines <nick@gerakines.net>
-
  * mimeparse.js (http://code.google.com/p/mimeparse/)
 
    Copyright 2009, Chris Anderson <jchris@apache.org>

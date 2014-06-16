@@ -174,14 +174,6 @@
 ^test/couchdb/fixtures/.deps/test_cfg_register-test_cfg_register.Po
 ^test/couchdb/fixtures/test_cfg_register
 ^test/couchdb/fixtures/test_cfg_register.o
-^test/etap/.*.beam
-^test/etap/.*.o
-^test/etap/.deps/.*
-^test/etap/test_cfg_register
-^test/etap/Makefile
-^test/etap/Makefile.in
-^test/etap/temp..*
-^test/etap/fixtures/*
 ^test/javascript/Makefile
 ^test/javascript/Makefile.in
 ^test/local.ini
