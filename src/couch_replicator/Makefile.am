@@ -39,8 +39,8 @@ test_files = \
 	test/couch_replicator_compact_tests.erl \
 	test/couch_replicator_httpc_pool_tests.erl \
 	test/couch_replicator_large_atts_tests.erl \
+	test/couch_replicator_many_leaves_tests.erl \
 	test/couch_replicator_modules_load_tests.erl \
-	test/05-replication-many-leaves.t \
 	test/06-doc-missing-stubs.t \
 	test/07-use-checkpoints.t
 
