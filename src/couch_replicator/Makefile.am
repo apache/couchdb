@@ -42,7 +42,7 @@ test_files = \
 	test/couch_replicator_many_leaves_tests.erl \
 	test/couch_replicator_missing_stubs_tests.erl \
 	test/couch_replicator_modules_load_tests.erl \
-	test/07-use-checkpoints.t
+	test/couch_replicator_use_checkpoints_tests.erl
 
 compiled_files = \
 	ebin/couch_replicator_api_wrap.beam \
