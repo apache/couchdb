@@ -77,7 +77,7 @@ THANKS.gz: THANKS
 
 check: dev check-js
 if TESTS
-	$(top_builddir)/test/etap/run $(top_srcdir)/test/etap
+	$(top_builddir)/test/couchdb/run -v $(top_srcdir)/test/couchdb
 endif
 
 check-js: dev
