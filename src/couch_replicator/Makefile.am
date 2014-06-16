@@ -62,7 +62,7 @@ CLEANFILES = $(compiled_files)
 
 check:
 if TESTS
-	$(abs_top_builddir)/test/etap/run $(abs_top_srcdir)/src/couch_replicator/test
+	$(abs_top_builddir)/test/couchdb/run -v $(abs_top_srcdir)/src/couch_replicator/test
 endif
 
 ebin/%.app: src/%.app.src
