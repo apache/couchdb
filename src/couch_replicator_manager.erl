@@ -380,7 +380,7 @@ rescan(#state{scan_pid = ScanPid} = State) ->
 process_update(State, DbName, {Change}) ->
     {RepProps} = JsonRepDoc = get_json_value(doc, Change),
     DocId = get_json_value(<<"_id">>, RepProps),
-    case {is_owner(DbName, DocId), get_json_value(deleted, Change, false)} of
+    case {owner(DbName, DocId), get_json_value(deleted, Change, false)} of
     {_, true} ->
         rep_doc_deleted(DbName, DocId),
         State;
@@ -405,12 +405,11 @@ process_update(State, DbName, {Change}) ->
         end
     end.
 
-
-is_owner(<<"shards/", _/binary>>=DbName, DocId) ->
-    mem3_util:owner(mem3:dbname(DbName), DocId);
-is_owner(_, _) ->
-    true.
-
+owner(DbName, DocId) ->
+    Live = [node()|nodes()],
+    Nodes = lists:sort([N || #shard{node=N} <- mem3:shards(DbName, DocId),
+			     lists:member(N, Live)]),
+    node() =:= hd(mem3_util:rotate_list({DbName, DocId}, Nodes)).
 
 rep_db_update_error(Error, DbName, DocId) ->
     case Error of
