@@ -15,7 +15,7 @@
 -export([hash/1, name_shard/2, create_partition_map/5, build_shards/2,
     n_val/2, to_atom/1, to_integer/1, write_db_doc/1, delete_db_doc/1,
     shard_info/1, ensure_exists/1, open_db_doc/1]).
--export([owner/2, is_deleted/1, rotate_list/2]).
+-export([is_deleted/1, rotate_list/2]).
 
 %% do not use outside mem3.
 -export([build_ordered_shards/2, downcast/1]).
@@ -222,10 +222,6 @@ ensure_exists(DbName) ->
         couch_server:create(DbName, Options)
     end.
 
-
-owner(DbName, DocId) ->
-    Nodes = lists:sort([N || #shard{node=N} <- mem3:shards(DbName, DocId)]),
-    node() =:= hd(rotate_list({DbName, DocId}, Nodes)).
 
 is_deleted(Change) ->
     case couch_util:get_value(<<"deleted">>, Change) of
