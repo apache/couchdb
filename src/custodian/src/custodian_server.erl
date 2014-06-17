@@ -138,12 +138,14 @@ send_sensu_event({_, Count} = Item) ->
             twig:log(warn, "~s", [describe(Item)]),
             "--warning"
     end,
-    Cmd = lists:concat(["send-sensu-event --standalone ",
-                        Level,
-                        " --output=\"",
-                        describe(Item),
-                        "\" ",
-                        check_name(Item)]),
+    Cmd = lists:concat([
+        "send-sensu-event --standalone ",
+        Level,
+        " --output=\"",
+        describe(Item),
+        "\" ",
+        check_name(Item)
+    ]),
     os:cmd(Cmd).
 
 describe({{safe, N}, Count}) ->
