@@ -128,19 +128,23 @@ check_shards() ->
     [send_sensu_event(Item) || Item <- custodian:summary()].
 
 send_sensu_event({_, Count} = Item) ->
-    if Count > 0 -> twig:log(crit, "~s", [describe(Item)]); true -> ok end,
+    Level = case Count of
+        0 ->
+            "--ok";
+        1 ->
+            twig:log(crit, "~s", [describe(Item)]),
+            "--critical";
+        _ ->
+            twig:log(warn, "~s", [describe(Item)]),
+            "--warning"
+    end,
     Cmd = lists:concat(["send-sensu-event --standalone ",
-                        level(Item),
+                        Level,
                         " --output=\"",
                         describe(Item),
                         "\" ",
                         check_name(Item)]),
     os:cmd(Cmd).
-
-level({_, 0}) ->
-    "--ok";
-level(_) ->
-    "--critical".
 
 describe({{safe, N}, Count}) ->
     lists:concat([Count, " ", shards(Count), " in cluster with only ", N,
