@@ -281,7 +281,7 @@ browsers will display the JSON as text.
   .. _JSONView: http://jsonview.com/
 
 Do you remember the :header:`Accept` request header and how it is set to 
-``\*/\* -> */*`` to express interest in any MIME type? If you send ``Accept:
+``*/*`` to express interest in any MIME type? If you send ``Accept:
 application/json`` in your request, CouchDB knows that you can deal with a pure 
 JSON response with the proper :header:`Content-Type` header and will 
 use it instead of :mimetype:`text/plain`.
