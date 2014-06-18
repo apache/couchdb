@@ -664,7 +664,7 @@ match({[{<<"$size">>, _}]}, _Value, _Cmp) ->
 % matching because we either should've removed them during
 % normalization or something else broke.
 match({[{<<"$", _/binary>>=Op, _}]}, _, _) ->
-    erlang:error({bad_operator, Op});
+    ?MANGO_ERROR({invalid_operator, Op});
 
 % We need to traverse value to find field. The call to
 % mango_doc:get_field/2 may return either not_found or
