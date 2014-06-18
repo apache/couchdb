@@ -28,7 +28,8 @@
     localid,
     source,
     target,
-    filter
+    filter,
+    db
 }).
 
 go(Source, Target) ->
@@ -60,9 +61,10 @@ go(#shard{} = Source, #shard{} = Target, Opts) ->
     },
     go(Acc).
 
-go(#acc{source=Source, batch_count=BC}=Acc) ->
+go(#acc{source=Source, batch_count=BC}=Acc0) ->
     case couch_db:open(Source#shard.name, [{user_ctx,?CTX}]) of
     {ok, Db} ->
+        Acc = Acc0#acc{db=Db},
         Resp = try
             repl(Db, Acc)
         catch error:{not_found, no_db_file} ->
@@ -107,7 +109,11 @@ make_local_id(#shard{node=SourceNode}, #shard{node=TargetNode}, Filter) ->
     end,
     <<"_local/shard-sync-", S/binary, "-", T/binary, F/binary>>.
 
-changes_enumerator(FDI, _, #acc{revcount=C, infos=Infos}=Acc0) ->
+changes_enumerator(#doc_info{id=DocId}, Reds, #acc{db=Db}=Acc) ->
+    {ok, FDI} = couch_db:get_full_doc_info(Db, DocId),
+    changes_enumerator(FDI, Reds, Acc);
+changes_enumerator(#full_doc_info{}=FDI, _,
+  #acc{revcount=C, infos=Infos}=Acc0) ->
     #doc_info{
         high_seq=Seq,
         revs=Revs
