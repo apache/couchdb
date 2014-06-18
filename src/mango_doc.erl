@@ -16,6 +16,7 @@
 
 
 -include_lib("couch/include/couch_db.hrl").
+-include("mango.hrl").
 
 
 from_bson({Props}) ->
@@ -47,7 +48,7 @@ apply_update({Props}, {Update}) ->
     Result = do_update({Props}, Update),
     case has_operators(Result) of
         true ->
-            throw(update_leaves_operators);
+            ?MANGO_ERROR(update_leaves_operators);
         false ->
             ok
     end,
@@ -112,7 +113,7 @@ do_update(Props, [{Op, Value} | Rest]) ->
                 {ValueProps} ->
                     Fun(Props, ValueProps);
                 _ ->
-                    throw({invalid_operand, Op, Value})
+                    ?MANGO_ERROR({invalid_operand, Op, Value})
             end
     end,
     do_update(NewProps, Rest).
@@ -142,7 +143,7 @@ update_operator_fun(<<"$", _/binary>> = Op) ->
         {Op, Fun} ->
             Fun;
         false ->
-            throw({update_operator_not_supported, Op})
+            ?MANGO_ERROR({update_operator_not_supported, Op})
     end;
 update_operator_fun(_) ->
     undefined.
@@ -152,7 +153,7 @@ do_update_inc(Props, []) ->
     Props;
 do_update_inc(Props, [{Field, Incr} | Rest]) ->
     if is_number(Incr) -> ok; true ->
-        throw({invalid_increment, Incr})
+        ?MANGO_ERROR({invalid_increment, Incr})
     end,
     NewProps = case get_field(Props, Field, fun is_number/1) of
         Value when is_number(Value) ->
@@ -362,7 +363,7 @@ get_field(Props, Field, Validator) when is_binary(Field) ->
     Path = re:split(Field, <<"\\.">>),
     lists:foreach(fun(P) ->
         if P /= <<>> -> ok; true ->
-            throw({invalid_field_name, Field})
+            ?MANGO_ERROR({invalid_field_name, Field})
         end
     end, Path),
     get_field(Props, Path, Validator);
@@ -405,7 +406,7 @@ rem_field(Props, Field) when is_binary(Field) ->
     Path = re:split(Field, <<"\\.">>),
     lists:foreach(fun(P) ->
         if P /= <<>> -> ok; true ->
-            throw({invalid_field_name, Field})
+            ?MANGO_ERROR({invalid_field_name, Field})
         end
     end, Path),
     rem_field(Props, Path);
@@ -471,7 +472,7 @@ set_field(Props, Field, Value) when is_binary(Field) ->
     Path = re:split(Field, <<"\\.">>),
     lists:foreach(fun(P) ->
         if P /= <<>> -> ok; true ->
-            throw({invalid_field_name, Field})
+            ?MANGO_ERROR({invalid_field_name, Field})
         end
     end, Path),
     set_field(Props, Path, Value);
