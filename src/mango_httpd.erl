@@ -59,8 +59,16 @@ handle_index_req(#httpd{method='POST', path_parts=[_, _]}=Req, Db) ->
 	chttpd:send_json(Req, {[{result, Status}]});
 
 handle_index_req(#httpd{method='DELETE',
+        path_parts=[A, B, <<"_design">>, DDocId0, Type, Name]}=Req, Db) ->
+    PathParts = [A, B, <<"_design/", DDocId0/binary>>, Type, Name],
+    handle_index_req(Req#httpd{path_parts=PathParts}, Db);
+
+handle_index_req(#httpd{method='DELETE',
         path_parts=[_, _, DDocId0, Type, Name]}=Req, Db) ->
-    DDocId = <<"_design/", DDocId0/binary>>,
+    DDocId = case DDocId0 of
+        <<"_design/", _/binary>> -> DDocId0;
+        _ -> <<"_design/", DDocId0/binary>>
+    end,
     Idxs = mango_idx:list(Db),
     Filt = fun(Idx) ->
         IsDDoc = mango_idx:ddoc(Idx) == DDocId,

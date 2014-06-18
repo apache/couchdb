@@ -128,13 +128,41 @@ def test_read_idx_doc():
         assert info["name"] == ddocid
 
 
-def test_delete_idx():
+def test_delete_idx_escaped():
     db = mkdb()
     pre_indexes = db.list_indexes()
-    ret = db.create_index(["bing"], name="idx_del")
+    ret = db.create_index(["bing"], name="idx_del_1")
     assert ret is True
     for idx in db.list_indexes():
-        if idx["name"] != "idx_del":
+        if idx["name"] != "idx_del_1":
+            continue
+        assert idx["def"]["fields"] == [{"bing": "asc"}]
+        db.delete_index(idx["ddoc"].replace("/", "%2F"), idx["name"])
+    post_indexes = db.list_indexes()
+    assert pre_indexes == post_indexes
+
+
+def test_delete_idx_unescaped():
+    db = mkdb()
+    pre_indexes = db.list_indexes()
+    ret = db.create_index(["bing"], name="idx_del_2")
+    assert ret is True
+    for idx in db.list_indexes():
+        if idx["name"] != "idx_del_2":
+            continue
+        assert idx["def"]["fields"] == [{"bing": "asc"}]
+        db.delete_index(idx["ddoc"], idx["name"])
+    post_indexes = db.list_indexes()
+    assert pre_indexes == post_indexes
+
+
+def test_delete_idx_no_design():
+    db = mkdb()
+    pre_indexes = db.list_indexes()
+    ret = db.create_index(["bing"], name="idx_del_3")
+    assert ret is True
+    for idx in db.list_indexes():
+        if idx["name"] != "idx_del_3":
             continue
         assert idx["def"]["fields"] == [{"bing": "asc"}]
         db.delete_index(idx["ddoc"].split("/")[-1], idx["name"])
