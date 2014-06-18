@@ -6,6 +6,12 @@
 ]).
 
 
+info(mango_cursor, {no_usable_index, operator_unsupported}) ->
+    {
+        400,
+        <<"no_usable_index">>,
+        <<"No operator in this selector can used with an index.">>
+    };
 info(mango_cursor, {no_usable_index, query_unsupported}) ->
     {
         400,

@@ -20,6 +20,10 @@ create(Db, Selector0, Opts) ->
     IndexFields = mango_selector:index_fields(Selector),    
     FieldRanges = find_field_ranges(Selector, IndexFields),
 
+    if IndexFields /= [] -> ok; true ->
+        ?MANGO_ERROR({no_usable_index, operator_unsupported})
+    end,
+
     ExistingIndexes = mango_idx:list(Db),
     UsableIndexes = find_usable_indexes(IndexFields, ExistingIndexes),
     SortIndexes = get_sort_indexes(ExistingIndexes, UsableIndexes, Opts),
