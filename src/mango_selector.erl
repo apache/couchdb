@@ -41,7 +41,7 @@ normalize(Selector) ->
 %
 % Operators that can be seen through are '$and' and any of
 % the logical comparisons ('$lt', '$eq', etc). Things like
-% '$regexp', '$in', '$nin', and '$or' can't be serviced by
+% '$regex', '$in', '$nin', and '$or' can't be serviced by
 % a single index scan so we disallow them. In the future
 % we may become more clever and increase our ken such that
 % we will be able to see through these with crafty indexes
@@ -141,21 +141,13 @@ norm_ops({[{<<"$mod">>, [D, R]}]} = Cond) when is_integer(D), is_integer(R) ->
 norm_ops({[{<<"$mod">>, Arg}]}) ->
     ?MANGO_ERROR({bad_arg, '$mod', Arg});
 
-norm_ops({[{<<"$regex">>, R}, {<<"$options">>, O}]} = Cond)
-        when is_binary(R), is_binary(O) ->
-    % TODO: write translate_options(O),
-    Opts = [{capture, none}],
-    case re:compile(R, Opts) of
+norm_ops({[{<<"$regex">>, Regex}]} = Cond) when is_binary(Regex) ->
+    case re:compile(Regex) of
         {ok, _} ->
             Cond;
         _ ->
-            ?MANGO_ERROR({bad_arg, '$regex', {R, O}})
+            ?MANGO_ERROR({bad_arg, '$regex', Regex})
     end;
-norm_ops({[{<<"$options">>, O}, {<<"$regex">>, R}]}) ->
-    norm_ops({[{<<"$regex">>, R}, {<<"$options">>, O}]});
-norm_ops({[{<<"$regex">>, R}]}) ->
-    % Add this clause out of an overabundance of caution.
-    norm_ops({[{<<"$regex">>, R}, {<<"$options">>, <<>>}]});
 
 norm_ops({[{<<"$all">>, Args}]}) when is_list(Args) ->
     {[{<<"$all">>, [norm_ops(A) || A <- Args]}]};
@@ -668,16 +660,13 @@ match({[{<<"$mod">>, [D, R]}]}, Value, _Cmp) when is_integer(Value) ->
 match({[{<<"$mod">>, _}]}, _Value, _Cmp) ->
     false;
 
-match({[{<<"$regex">>, Regex}, {<<"$options">>, _O}]}, Value, _Cmp)
-        when is_binary(Value) ->
-    % TODO: write translate_options(O),
-    Opts = [{capture, none}],
+match({[{<<"$regex">>, Regex}]}, Value, _Cmp) when is_binary(Value) ->
     try
-        match == re:run(Value, Regex, Opts)
+        match == re:run(Value, Regex, [{capture, none}])
     catch _:_ ->
         false
     end;
-match({[{<<"$regex">>, _}, {<<"$options">>, _}]}, _Value, _Cmp) ->
+match({[{<<"$regex">>, _}]}, _Value, _Cmp) ->
     false;
 
 match({[{<<"$size">>, Arg}]}, Values, _Cmp) when is_list(Values) ->
