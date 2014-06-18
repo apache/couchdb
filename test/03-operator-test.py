@@ -18,6 +18,16 @@ def test_all():
     assert docs[2]["user_id"] == 9
 
 
+def test_all_non_array():
+    db = user_docs.mkdb()
+    docs = db.find({
+            "manager": True,
+            "location": {"$all": ["Ohai"]}
+        })
+    assert len(docs) == 0
+
+
+
 def test_regex():
     db = user_docs.mkdb()
     

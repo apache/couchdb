@@ -601,6 +601,8 @@ match({[{<<"$all">>, Args}]}, Values, _Cmp) when is_list(Values) ->
             false
     end,
     HasArgs orelse IsArgs;
+match({[{<<"$all">>, _Args}]}, _Values, _Cmp) ->
+    false;
 
 % The '$elemMatch' seems like a silly operator. I'm
 % guessing it exists to mask over some previous behavior
