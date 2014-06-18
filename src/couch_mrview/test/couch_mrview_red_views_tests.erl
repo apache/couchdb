@@ -12,7 +12,7 @@
 
 -module(couch_mrview_red_views_tests).
 
--include("../../../test/couchdb/couch_eunit.hrl").
+-include("couch_eunit.hrl").
 -include_lib("couchdb/couch_db.hrl").
 
 -define(TIMEOUT, 1000).

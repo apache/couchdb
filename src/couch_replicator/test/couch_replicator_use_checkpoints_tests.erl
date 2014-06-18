@@ -12,7 +12,7 @@
 
 -module(couch_replicator_use_checkpoints_tests).
 
--include("../../../test/couchdb/couch_eunit.hrl").
+-include("couch_eunit.hrl").
 -include_lib("couchdb/couch_db.hrl").
 
 -define(ADMIN_ROLE, #user_ctx{roles=[<<"_admin">>]}).
