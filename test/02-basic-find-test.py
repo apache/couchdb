@@ -1,41 +1,13 @@
 
-import time
-
-import mango
 import user_docs
 
 
-def mkdb():
-    return mango.Database("127.0.0.1", "5984", "mango_test")
-
-
 def setup():
-    db = mkdb()
-    db.recreate()
-    time.sleep(1)
-    db.save_docs(user_docs.DOCS)
-    indexes = [
-        ["user_id"],
-        ["name.last", "name.first"],
-        ["age"],
-        [
-            "location.state",
-            "location.city",
-            "location.address.street",
-            "location.address.number"
-        ],
-        ["company", "manager"],
-        ["manager"],
-        ["favorites"],
-        ["favorites.3"],
-        ["twitter"]
-    ]
-    for idx in indexes:
-        assert db.create_index(idx) is True
+    user_docs.create_db_and_indexes()
 
 
 def test_bad_selector():
-    db = mkdb()
+    db = user_docs.mkdb()
     bad_selectors = [
         None,
         True,
@@ -56,7 +28,7 @@ def test_bad_selector():
 
 
 def test_bad_limit():
-    db = mkdb()
+    db = user_docs.mkdb()
     bad_limits = [
         None,
         True,
@@ -77,7 +49,7 @@ def test_bad_limit():
 
 
 def test_bad_skip():
-    db = mkdb()
+    db = user_docs.mkdb()
     bad_skips = [
         None,
         True,
@@ -98,7 +70,7 @@ def test_bad_skip():
 
 
 def test_bad_sort():
-    db = mkdb()
+    db = user_docs.mkdb()
     bad_sorts = [
         None,
         True,
@@ -120,7 +92,7 @@ def test_bad_sort():
 
 
 def test_bad_fields():
-    db = mkdb()
+    db = user_docs.mkdb()
     bad_fields = [
         None,
         True,
@@ -142,7 +114,7 @@ def test_bad_fields():
 
 
 def test_bad_r():
-    db = mkdb()
+    db = user_docs.mkdb()
     bad_rs = [
         None,
         True,
@@ -162,7 +134,7 @@ def test_bad_r():
 
 
 def test_bad_conflicts():
-    db = mkdb()
+    db = user_docs.mkdb()
     bad_conflicts = [
         None,
         1.2,
@@ -180,7 +152,7 @@ def test_bad_conflicts():
 
 
 def test_simple_find():
-    db = mkdb()
+    db = user_docs.mkdb()
     docs = db.find({"age": {"$lt": 35}})
     assert len(docs) == 3
     assert docs[0]["user_id"] == 9
@@ -189,14 +161,14 @@ def test_simple_find():
 
 
 def test_multi_cond_and():
-    db = mkdb()
+    db = user_docs.mkdb()
     docs = db.find({"manager": True, "location.city": "Longbranch"})
     assert len(docs) == 1
     assert docs[0]["user_id"] == 7
 
 
 def test_multi_cond_or():
-    db = mkdb()
+    db = user_docs.mkdb()
     docs = db.find({
             "$and":[
                 {"age":{"$gte": 75}},
@@ -212,7 +184,7 @@ def test_multi_cond_or():
 
 
 def test_multi_col_idx():
-    db = mkdb()
+    db = user_docs.mkdb()
     docs = db.find({
         "location.state": {"$and": [
             {"$gt": "Hawaii"},
@@ -225,7 +197,7 @@ def test_multi_col_idx():
 
 
 def test_missing_not_indexed():
-    db = mkdb()
+    db = user_docs.mkdb()
     docs = db.find({"favorites.3": "C"})
     assert len(docs) == 2
     assert docs[0]["user_id"] == 8
@@ -243,7 +215,7 @@ def test_missing_not_indexed():
 
 
 def test_limit():
-    db = mkdb()
+    db = user_docs.mkdb()
     docs = db.find({"age": {"$gt": 0}})
     assert len(docs) == 15
     for l in [0, 1, 5, 14]:
@@ -251,7 +223,7 @@ def test_limit():
         assert len(docs) == l
 
 def test_skip():
-    db = mkdb()
+    db = user_docs.mkdb()
     docs = db.find({"age": {"$gt": 0}})
     assert len(docs) == 15
     for s in [0, 1, 5, 14]:
@@ -260,7 +232,7 @@ def test_skip():
 
 
 def test_sort():
-    db = mkdb()
+    db = user_docs.mkdb()
 
     docs1 = db.find({"age": {"$gt": 0}}, sort=[{"age":"asc"}])
     docs2 = list(sorted(docs1, key=lambda d: d["age"]))
@@ -272,7 +244,7 @@ def test_sort():
 
 
 def test_fields():
-    db = mkdb()
+    db = user_docs.mkdb()
     docs = db.find({"age": {"$gt": 0}}, fields=["user_id", "location.address"])
     for d in docs:
         assert sorted(d.keys()) == ["location", "user_id"]
@@ -280,7 +252,7 @@ def test_fields():
 
 
 def test_r():
-    db = mkdb()
+    db = user_docs.mkdb()
     for r in [1, 2, 3]:
         docs = db.find({"age": {"$gt": 0}}, r=r)
         assert len(docs) == 15

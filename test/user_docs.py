@@ -37,6 +37,39 @@ With this pattern:
 ]
 """
 
+import time
+
+import mango
+
+
+def mkdb():
+    return mango.Database("127.0.0.1", "5984", "mango_test")
+
+
+def create_db_and_indexes():
+    db = mkdb()
+    db.recreate()
+    time.sleep(1)
+    db.save_docs(DOCS)
+    indexes = [
+        ["user_id"],
+        ["name.last", "name.first"],
+        ["age"],
+        [
+            "location.state",
+            "location.city",
+            "location.address.street",
+            "location.address.number"
+        ],
+        ["company", "manager"],
+        ["manager"],
+        ["favorites"],
+        ["favorites.3"],
+        ["twitter"]
+    ]
+    for idx in indexes:
+        assert db.create_index(idx) is True
+
 
 DOCS = [
     {
