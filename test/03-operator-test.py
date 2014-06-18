@@ -27,6 +27,35 @@ def test_all_non_array():
     assert len(docs) == 0
 
 
+def test_elem_match():
+    db = user_docs.mkdb()
+    emdocs = [
+        {
+            "user_id": "a",
+            "bang": [{
+                "foo": 1,
+                "bar": 2
+            }]
+        },
+        {
+            "user_id": "b",
+            "bang": [{
+                "foo": 2,
+                "bam": True
+            }]
+        }
+    ]
+    db.save_docs(emdocs)
+    docs = db.find({
+        "_id": {"$gt": None},
+        "bang": {"$elemMatch": {
+            "foo": {"$gte": 1},
+            "bam": True
+        }}
+    })
+    assert len(docs) == 1
+    assert docs[0]["user_id"] == "b"
+
 
 def test_regex():
     db = user_docs.mkdb()

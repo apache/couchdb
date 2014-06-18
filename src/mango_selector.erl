@@ -250,8 +250,9 @@ norm_fields({[{<<"$nor">>, Args}]}, Path) ->
 
 % Fields where we can normalize fields in the
 % operator arguments independently.
-norm_fields({[{<<"$elemMatch">>, Arg}]}, _Path) ->
-    {[{<<"$elemMatch">>, norm_fields(Arg)}]};
+norm_fields({[{<<"$elemMatch">>, Arg}]}, Path) ->
+    Cond = {[{<<"$elemMatch">>, norm_fields(Arg)}]},
+    {[{Path, Cond}]};
 
 % Any other operator is a terminal below which no
 % field names should exist. Set the path to this
@@ -604,11 +605,25 @@ match({[{<<"$all">>, Args}]}, Values, _Cmp) when is_list(Values) ->
 match({[{<<"$all">>, _Args}]}, _Values, _Cmp) ->
     false;
 
-% The '$elemMatch' seems like a silly operator. I'm
-% guessing it exists to mask over some previous behavior
-% that I haven't seen yet.
-match({[{<<"$elemMatch">>, Arg}]}, Value, Cmp) ->
-    match(Arg, Value, Cmp);
+% Matches when any element in values matches the
+% sub-selector Arg.
+match({[{<<"$elemMatch">>, Arg}]}, Values, Cmp) when is_list(Values) ->
+    try
+        lists:foreach(fun(V) ->
+            case match(Arg, V, Cmp) of
+                true -> throw(matched);
+                _ -> ok
+            end
+        end, Values),
+        false
+    catch
+        throw:matched ->
+            true;
+        _:_ ->
+            false
+    end;
+match({[{<<"$elemMatch">>, _Arg}]}, _Value, _Cmp) ->
+    false;
 
 % Our comparison operators are fairly straight forward
 match({[{<<"$lt">>, Arg}]}, Value, Cmp) ->
