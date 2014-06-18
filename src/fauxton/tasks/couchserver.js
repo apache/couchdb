@@ -63,7 +63,7 @@ module.exports = function (grunt) {
       } else if (!!url.match(/mocha|\/test\/core\/|test\.config/)) {
         filePath = path.join('./test', url.replace('/test/',''));
       } else if (!!url.match(/fonts/)) {
-        filePath = path.join(dist_dir,url);
+        filePath = path.join(dist_dir,url.split('?v=')[0]);
       } else if (!!url.match(/\.css|img/)) {
         url = url.replace(/\?.*/, '');
         filePath = path.join(dist_dir,url);
