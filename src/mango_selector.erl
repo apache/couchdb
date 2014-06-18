@@ -150,7 +150,7 @@ norm_ops({[{<<"$regex">>, Regex}]} = Cond) when is_binary(Regex) ->
     end;
 
 norm_ops({[{<<"$all">>, Args}]}) when is_list(Args) ->
-    {[{<<"$all">>, [norm_ops(A) || A <- Args]}]};
+    {[{<<"$all">>, Args}]};
 norm_ops({[{<<"$all">>, Arg}]}) ->
     ?MANGO_ERROR({bad_arg, '$all', Arg});
 
@@ -228,9 +228,8 @@ norm_ops(Value) ->
 % Its important to note that we can only normalize
 % field names like this through boolean operators where
 % we can gaurantee commutativity. We can't necessarily
-% do the same through the '$all' and '$elemMatch'
-% operators but we can apply the same algorithm to the
-% arguments of those operators.
+% do the same through the '$elemMatch' operators but we
+% can apply the same algorithm to its arguments.
 norm_fields(Selector) ->
     norm_fields(Selector, <<>>).
 
@@ -251,9 +250,6 @@ norm_fields({[{<<"$nor">>, Args}]}, Path) ->
 
 % Fields where we can normalize fields in the
 % operator arguments independently.
-norm_fields({[{<<"$all">>, Args}]}, _Path) ->
-    {[{<<"$all">>, [norm_fields(A) || A <- Args]}]};
-
 norm_fields({[{<<"$elemMatch">>, Arg}]}, _Path) ->
     {[{<<"$elemMatch">>, norm_fields(Arg)}]};
 
@@ -316,9 +312,6 @@ norm_negations({[{<<"$and">>, Args}]}) ->
 
 norm_negations({[{<<"$or">>, Args}]}) ->
     {[{<<"$or">>, [norm_negations(A) || A <- Args]}]};
-
-norm_negations({[{<<"$all">>, Args}]}) ->
-    {[{<<"$all">>, [norm_negations(A) || A <- Args]}]};
 
 norm_negations({[{<<"$elemMatch">>, Arg}]}) ->
     {[{<<"$elemMatch">>, norm_negations(Arg)}]};
@@ -595,32 +588,23 @@ match({[{<<"$or">>, Args}]}, Value, Cmp) ->
 match({[{<<"$not">>, Arg}]}, Value, Cmp) ->
     not match(Arg, Value, Cmp);
 
-% One of the elements in the array Value must
-% match all conditions in Args.
-match({[{<<"$all">>, Args}]}, Values, Cmp) when is_list(Values) ->
-    Pred = fun
-        (Val, false) ->
-            SelPred = fun(A) -> match(A, Val, Cmp) end,
-            lists:all(SelPred, Args);
-        (_, true) ->
-            % Short circuit
-            true
+% All of the values in Args must exist in Values or
+% Values == hd(Args) if Args is a single element list
+% that contains a list.
+match({[{<<"$all">>, Args}]}, Values, _Cmp) when is_list(Values) ->
+    Pred = fun(A) -> lists:member(A, Values) end,
+    HasArgs = lists:all(Pred, Args),
+    IsArgs = case Args of
+        [A] when is_list(A) ->
+            A == Values;
+        _ ->
+            false
     end,
-    lists:foldl(Pred, false, Values);
-
-% MongoDB docs also say we can use '$all' against
-% a non-array value. We just cheat by wrapping the
-% value in a list and recursing to use the logic
-% in the previous clause.
-match({[{<<"$all">>, _}]} = Cond, Value, Cmp) ->
-    match(Cond, [Value], Cmp);
+    HasArgs orelse IsArgs;
 
 % The '$elemMatch' seems like a silly operator. I'm
 % guessing it exists to mask over some previous behavior
-% that I haven't seen yet. I'm guessing that this is
-% probably wrong and that '$all' wraps objects with
-% the '$eq' operator. Hopefully any behavior disparity
-% will be caught during testing.
+% that I haven't seen yet.
 match({[{<<"$elemMatch">>, Arg}]}, Value, Cmp) ->
     match(Arg, Value, Cmp);
 
