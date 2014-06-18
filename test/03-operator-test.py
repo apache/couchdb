@@ -30,7 +30,7 @@ def test_all_non_array():
 
 def test_regex():
     db = user_docs.mkdb()
-    
+
     docs = db.find({
             "age": {"$gt": 40},
             "location.state": {"$regex": "(?i)new.*"}
