@@ -193,7 +193,7 @@ def test_multi_cond_and():
     docs = db.find({"manager": True, "location.city": "Longbranch"})
     assert len(docs) == 1
     assert docs[0]["user_id"] == 7
-    
+
 
 def test_multi_cond_or():
     db = mkdb()
