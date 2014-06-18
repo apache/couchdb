@@ -18,6 +18,8 @@
 % we can then rely on for all other selector functions.
 % See the definition of each step below for more information
 % on what each one does.
+normalize({[]}) ->
+    {[]};
 normalize(Selector) ->
     Steps = [
         fun norm_ops/1,
@@ -66,7 +68,11 @@ index_fields({[{Field, Cond}]}) ->
             [Field];
         false ->
             []
-    end.
+    end;
+
+% An empty selector
+index_fields({[]}) ->
+    [].
 
 % Find the complete range for a given index in this
 % selector. This works by AND'ing logical comparisons
@@ -230,6 +236,8 @@ norm_ops(Value) ->
 % we can gaurantee commutativity. We can't necessarily
 % do the same through the '$elemMatch' operators but we
 % can apply the same algorithm to its arguments.
+norm_fields({[]}) ->
+    {[]};
 norm_fields(Selector) ->
     norm_fields(Selector, <<>>).
 
@@ -269,6 +277,10 @@ norm_fields({[{Field, Cond}]}, <<>>) ->
     norm_fields(Cond, Field);
 norm_fields({[{Field, Cond}]}, Path) ->
     norm_fields(Cond, <<Path/binary, ".", Field/binary>>);
+
+% An empty selector
+norm_fields({[]}, Path) ->
+    {Path, {[]}};
 
 % Else we have an invalid selector
 norm_fields(BadSelector, _) ->
