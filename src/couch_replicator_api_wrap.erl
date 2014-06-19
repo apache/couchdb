@@ -262,6 +262,8 @@ open_doc_revs(#httpdb{} = HttpDb, Id, Revs, Options, Fun, Acc) ->
     receive
         {'DOWN', Ref, process, Pid, {exit_ok, Ret}} ->
             Ret;
+        {'DOWN', Ref, process, Pid, {{nocatch, missing_doc}, _}} ->
+            throw(missing_doc);
         {'DOWN', Ref, process, Pid, {{nocatch, {missing_stub,_} = Stub}, _}} ->
             throw(Stub);
         {'DOWN', Ref, process, Pid, request_uri_too_long} ->

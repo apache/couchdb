@@ -295,6 +295,11 @@ fetch_doc(Source, {Id, Revs, PAs}, DocHandler, Acc) ->
         couch_replicator_api_wrap:open_doc_revs(
             Source, Id, Revs, [{atts_since, PAs}, latest], DocHandler, Acc)
     catch
+    throw:missing_doc ->
+        couch_log:error("Retrying fetch and update of document `~s` as it is "
+            "unexpectedly missing. Missing revisions are: ~s",
+            [Id, couch_doc:revs_to_strs(Revs)]),
+        couch_replicator_api_wrap:open_doc_revs(Source, Id, Revs, [latest], DocHandler, Acc);
     throw:{missing_stub, _} ->
         couch_log:error("Retrying fetch and update of document `~s` due to out of "
             "sync attachment stubs. Missing revisions are: ~s",
@@ -347,8 +352,8 @@ remote_doc_handler({ok, Doc}, {Parent, Target} = Acc) ->
     end,
     ok = gen_server:call(Parent, {add_stats, Stats2}, infinity),
     Result;
-remote_doc_handler(_, Acc) ->
-    {ok, Acc}.
+remote_doc_handler({{not_found, missing}, _}, _Acc) ->
+    throw(missing_doc).
 
 
 spawn_writer(Target, #batch{docs = DocList, size = Size}) ->
