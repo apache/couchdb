@@ -272,7 +272,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       $('.modal-backdrop').css('z-index',1025);
     }, 
 
-    openWin: function(jsonString) {
+    openWin: function(hashKey, jsonString) {
+// hashkey here
       this.$('#string-edit-area').text(JSON.parse(jsonString));
       this.showModal();
     }
@@ -784,7 +785,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       "click button.duplicate": "duplicate",
       "click button.upload": "upload",
       "click button.cancel-button": "goback",
-      "click #editor-string-edit": "stringEditing"
+      "click button.string-edit": "stringEditing"
     },
 
     disableLoader: true,
@@ -798,24 +799,43 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       FauxtonAPI.navigate(this.database.url("index") + "?limit=100");
     },
 
-    stringEditing: function(event) {
-      event.preventDefault();   
+    determineStringEditMatch: function(event) {
       var selStart = this.editor.editor.getSelectionRange().start.row;
       var selEnd = this.editor.editor.getSelectionRange().end.row;
       if (selStart >=0 && selEnd >= 0 && selStart == selEnd) {
         var editLine = this.editor.editor.session.getLine(selStart);
 	var editMatch = editLine.match(/^([ \t])*("[a-zA-Z0-9_]*": )?(".*",?)$/);
 	if (editMatch) {
-          var indent = editMatch[1] || "";
-          var hashKey = editMatch[2] || "";
-          var editText = editMatch[3];
-	  var comma = "";
-	  if (editText.substring(editText.length - 1) === ",") {
-            editText = editText.substring(0, editText.length - 1); 
-            comma = ",";
-	  }
-	  this.stringEditModal.openWin(editText);
+          return editMatch;
+	} else {
+          return null;
 	}
+      } else {
+        return null;
+      }
+    }, 
+
+    isStringEditingPossible: function (event) {
+      var editMatch = this.determineStringEditMatch(event);
+      if (editMatch) {
+        return true;
+      }
+      return false;
+    },
+
+    stringEditing: function(event) {
+      event.preventDefault();   
+      var editMatch = this.determineStringEditMatch(event);
+      if (editMatch) {
+        var indent = editMatch[1] || "";
+        var hashKey = editMatch[2] || "";
+        var editText = editMatch[3];
+        var comma = "";
+        if (editText.substring(editText.length - 1) === ",") {
+          editText = editText.substring(0, editText.length - 1); 
+          comma = ",";
+        }
+        this.stringEditModal.openWin(hashKey, editText);
       }
     },
 
@@ -1055,6 +1075,15 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
           msg: "Cannot remove a documents Id or Revision.",
           clear:  true
         });
+      });
+
+      var that = this;
+      this.listenTo(editor.editor, "changeSelection", function (event) {
+        if (that.isStringEditingPossible(event)) {
+          that.$("button.string-edit").removeAttr("disabled");
+	} else {
+          that.$("button.string-edit").attr("disabled", "true");
+	}
       });
     },
 
