@@ -255,12 +255,14 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
     },
 
     events: {
-      "click #string-edit-save-btn":"saveString"
+      "click #string-edit-save-btn":"saveString",
     },
-
+  
     saveString: function (event) {
       event.preventDefault();
-      // todo: here
+      this.editor.editor.getSelection().selectLine();
+      this.editor.editor.insert(this.indent + this.hashKey + JSON.stringify(this.$('#string-edit-area').val()) + this.comma + "\n");
+      this.hideModal();
     },
 
     _showModal: function () {
@@ -272,9 +274,13 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       $('.modal-backdrop').css('z-index',1025);
     }, 
 
-    openWin: function(hashKey, jsonString) {
-// hashkey here
-      this.$('#string-edit-area').text(JSON.parse(jsonString));
+    openWin: function(editor, indent, hashKey, jsonString, comma) {
+      this.editor = editor;
+      this.indent = indent;
+      this.hashKey = hashKey;      
+      this.$('#string-edit-header').text(hashKey);
+      this.$('#string-edit-area').val(JSON.parse(jsonString));
+      this.comma = comma;
       this.showModal();
     }
 
@@ -804,7 +810,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       var selEnd = this.editor.editor.getSelectionRange().end.row;
       if (selStart >=0 && selEnd >= 0 && selStart == selEnd) {
         var editLine = this.editor.editor.session.getLine(selStart);
-	var editMatch = editLine.match(/^([ \t])*("[a-zA-Z0-9_]*": )?(".*",?)$/);
+	var editMatch = editLine.match(/^([ \t]*)("[a-zA-Z0-9_]*": )?(".*",?[ \t]*)$/);
 	if (editMatch) {
           return editMatch;
 	} else {
@@ -835,7 +841,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
           editText = editText.substring(0, editText.length - 1); 
           comma = ",";
         }
-        this.stringEditModal.openWin(hashKey, editText);
+        this.stringEditModal.openWin(this.editor, indent, hashKey, editText, comma);
       }
     },
 

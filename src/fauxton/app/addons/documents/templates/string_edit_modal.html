@@ -15,15 +15,15 @@ the License.
 <div class="modal hide fade">
   <div class="modal-header">
     <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
-    <h3>Edit text</h3>
+    <h3>Edit text <span id="string-edit-header"></span></h3>
   </div>
   <div class="modal-body">
     <div id="modal-error" class="hide alert alert-error"/>
     <textarea rows="20" style="width: 100%; font-family: monospace; " id="string-edit-area"></textarea>
   </div>
   <div class="modal-footer">
-    <button href="#" data-dismiss="modal" data-bypass="true" class="btn cancel-button"><i class="icon fonticon-circle-x"></i> Cancel</button>
-    <button href="#" id="string-edit-save-btn" data-bypass="true" class="btn btn-success save"><i class="fonticon-circle-check"></i> Save</button>
+    <button data-dismiss="modal" class="btn"><i class="icon fonticon-circle-x"></i> Cancel</button>
+    <button id="string-edit-save-btn" class="btn btn-success save"><i class="fonticon-circle-check"></i> Save</button>
   </div>
 </div>
 
