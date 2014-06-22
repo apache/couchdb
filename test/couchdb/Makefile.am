@@ -14,15 +14,6 @@ SUBDIRS = fixtures
 
 noinst_SCRIPTS = run
 
-all:
-	mkdir -p ebin
-	mkdir -p temp
-	${ERLC} -Wall -I$(top_srcdir)/src -I$(top_srcdir)/test/couchdb/include \
-             -o ebin/ test_request.erl test_web.erl
-	chmod +x run
-	chmod +x fixtures/*.sh
-	chmod -x fixtures/os_daemon_bad_perm.sh
-
 eunit_files = \
     couch_auth_cache_tests.erl \
     couch_btree_tests.erl \
@@ -78,6 +69,15 @@ EXTRA_DIST = \
     $(eunit_files) \
     $(fixture_files)
 
+all:
+	@mkdir -p ebin/
+	@mkdir -p temp/
+	$(ERLC) -Wall -I$(top_srcdir)/src -I$(top_srcdir)/test/couchdb/include \
+            -o $(top_builddir)/test/couchdb/ebin/ $(ERLC_FLAGS) ${TEST} \
+            $(top_srcdir)/test/couchdb/test_request.erl \
+            $(top_srcdir)/test/couchdb/test_web.erl
+	chmod +x run
+
 clean-local:
-	rm -rf ebin
-	rm -rf temp
+	rm -rf ebin/
+	rm -rf temp/
