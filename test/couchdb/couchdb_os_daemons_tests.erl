@@ -40,8 +40,13 @@
 setup(DName) ->
     {ok, CfgPid} = couch_config:start_link(?CONFIG_CHAIN),
     {ok, OsDPid} = couch_os_daemons:start_link(),
-    couch_config:set("os_daemons", DName,
-                     filename:join([?FIXTURESDIR, DName]), false),
+    Path = case DName of
+        ?DAEMON_CFGREG ->
+            filename:join([?BUILDDIR, "test", "couchdb", "fixtures", DName]);
+        _ ->
+            filename:join([?FIXTURESDIR, DName])
+    end,
+    couch_config:set("os_daemons", DName, Path, false),
     timer:sleep(?DELAY),  % sleep a bit to let daemon set kill flag
     {CfgPid, OsDPid}.
 
