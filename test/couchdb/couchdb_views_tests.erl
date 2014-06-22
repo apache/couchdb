@@ -162,7 +162,7 @@ should_upgrade_legacy_view_files_test() ->
     {ok, _} = file:copy(DbFilePath, filename:join([DbDir, DbFileName])),
 
     % copy old view file into view dir
-    ok = filelib:ensure_dir(filename:join([ViewDir, ".test_design"])),
+    ok = filelib:ensure_dir(filename:join([ViewDir, ".test_design"]) ++ "/"),
     {ok, _} = file:copy(FixtureViewFilePath, OldViewFilePath),
 
     % ensure old header
