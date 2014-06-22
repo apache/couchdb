@@ -34,6 +34,8 @@
 -define(DAEMON_DIE_QUICKLY, "os_daemon_die_quickly.sh").
 -define(DAEMON_CFGREG, "test_cfg_register").
 -define(DELAY, 100).
+-define(FIXTURES_BUILDDIR,
+        filename:join([?BUILDDIR, "test", "couchdb", "fixtures"])).
 -define(TIMEOUT, 1000).
 
 
@@ -42,7 +44,9 @@ setup(DName) ->
     {ok, OsDPid} = couch_os_daemons:start_link(),
     Path = case DName of
         ?DAEMON_CFGREG ->
-            filename:join([?BUILDDIR, "test", "couchdb", "fixtures", DName]);
+            filename:join([?FIXTURES_BUILDDIR, DName]);
+        ?DAEMON_CONFIGER ->
+            filename:join([?FIXTURES_BUILDDIR, DName]);
         _ ->
             filename:join([?FIXTURESDIR, DName])
     end,

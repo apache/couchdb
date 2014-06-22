@@ -13,3 +13,8 @@
 noinst_PROGRAMS = test_cfg_register
 test_cfg_register_SOURCES = test_cfg_register.c
 test_cfg_register_CFLAGS = -D_BSD_SOURCE
+
+noinst_SCRIPTS = os_daemon_configer.escript
+
+all:
+	chmod +x os_daemon_configer.escript
