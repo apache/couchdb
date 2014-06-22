@@ -129,7 +129,7 @@ stamp-h1
 test/.deps/
 test/bench/run
 test/couchdb/run
-test/couchdb/couch_eunit.hrl
+test/couchdb/include/couch_eunit.hrl
 test/couchdb/fixtures/.deps/
 test/javascript/run
 test/javascript/run_js_tests.sh

@@ -17,7 +17,8 @@ noinst_SCRIPTS = run
 all:
 	mkdir -p ebin
 	mkdir -p temp
-	${ERLC} -oebin test_request.erl test_web.erl
+	${ERLC} -Wall -I$(top_srcdir)/src -I$(top_srcdir)/test/couchdb/include \
+             -o ebin/ test_request.erl test_web.erl
 	chmod +x run
 	chmod +x fixtures/*.sh
 	chmod -x fixtures/os_daemon_bad_perm.sh
@@ -54,7 +55,7 @@ eunit_files = \
     json_stream_parse_tests.erl \
     test_request.erl \
     test_web.erl \
-    couch_eunit.hrl
+    include/couch_eunit.hrl
 
 fixture_files = \
     fixtures/couch_config_tests_1.ini \
