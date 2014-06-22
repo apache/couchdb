@@ -21,7 +21,7 @@
 -define(FIXTURESDIR,
     filename:join([?SOURCEDIR, "test", "couchdb", "fixtures"])).
 -define(TEMPDIR,
-    filename:join([?SOURCEDIR, "test", "couchdb", "temp"])).
+    filename:join([?BUILDDIR, "test", "couchdb", "temp"])).
 
 -define(tempfile,
     fun() ->
