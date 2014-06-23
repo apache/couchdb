@@ -71,7 +71,7 @@ function(app, FauxtonAPI, Auth) {
     routes: {
       'changePassword': {
         route: 'changePassword',
-        roles: ['_admin', '_reader', '_replicator']
+        roles: ['fx_loggedIn']
       },
       'addAdmin': {
         roles: ['_admin'],
