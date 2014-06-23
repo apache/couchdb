@@ -529,8 +529,24 @@ function(app, FauxtonAPI, ace, spin) {
 
     isIgnorableError: function(msg) {
       return _.contains(this.excludedViewErrors, msg);
-    }
+    },
 
+    replaceCurrentLine: function(replacement) {
+      this.editor.getSelection().selectLine();
+      this.editor.insert(replacement);
+    },
+
+    getLine: function(lineNum) {
+      return this.editor.session.getLine(lineNum);
+    },
+
+    getSelectionStart: function() {
+      return this.editor.getSelectionRange().start;
+    },
+
+    getSelectionEnd: function() {
+      return this.editor.getSelectionRange().end;
+    }
   });
 
   //need to make this into a backbone view...

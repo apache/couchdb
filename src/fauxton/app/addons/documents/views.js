@@ -260,8 +260,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
   
     saveString: function (event) {
       event.preventDefault();
-      this.editor.editor.getSelection().selectLine();
-      this.editor.editor.insert(this.indent + this.hashKey + JSON.stringify(this.$('#string-edit-area').val()) + this.comma + "\n");
+      this.editor.replaceCurrentLine(this.indent + this.hashKey + JSON.stringify(this.$('#string-edit-area').val()) + this.comma + "\n");
       this.hideModal();
     },
 
@@ -806,10 +805,11 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
     },
 
     determineStringEditMatch: function(event) {
-      var selStart = this.editor.editor.getSelectionRange().start.row;
-      var selEnd = this.editor.editor.getSelectionRange().end.row;
-      if (selStart >=0 && selEnd >= 0 && selStart == selEnd) {
-        var editLine = this.editor.editor.session.getLine(selStart);
+      var selStart = this.editor.getSelectionStart().row;
+      var selEnd = this.editor.getSelectionEnd().row;
+      /* one JS(ON) string can't span more than one line - we edit one string, so ensure we don't select several lines */
+      if (selStart >=0 && selEnd >= 0 && selStart === selEnd) {    
+        var editLine = this.editor.getLine(selStart);
 	var editMatch = editLine.match(/^([ \t]*)("[a-zA-Z0-9_]*": )?(".*",?[ \t]*)$/);
 	if (editMatch) {
           return editMatch;
@@ -821,7 +821,10 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       }
     }, 
 
-    isStringEditingPossible: function (event) {
+    canEditDocString: function (event) {
+      if (!this.hasValidCode()) {
+        return false;
+      }
       var editMatch = this.determineStringEditMatch(event);
       if (editMatch) {
         return true;
@@ -831,12 +834,15 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
 
     stringEditing: function(event) {
       event.preventDefault();   
+      if (!this.hasValidCode()) {
+        return;	      
+      }
       var editMatch = this.determineStringEditMatch(event);
       if (editMatch) {
-        var indent = editMatch[1] || "";
-        var hashKey = editMatch[2] || "";
-        var editText = editMatch[3];
-        var comma = "";
+        var indent = editMatch[1] || "",
+              hashKey = editMatch[2] || "",
+              editText = editMatch[3],
+              comma = "";
         if (editText.substring(editText.length - 1) === ",") {
           editText = editText.substring(0, editText.length - 1); 
           comma = ",";
@@ -1085,7 +1091,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
 
       var that = this;
       this.listenTo(editor.editor, "changeSelection", function (event) {
-        if (that.isStringEditingPossible(event)) {
+        if (that.canEditDocString(event)) {
           that.$("button.string-edit").removeAttr("disabled");
 	} else {
           that.$("button.string-edit").attr("disabled", "true");

@@ -178,6 +178,7 @@ FAUXTON_FILES = \
     fauxton/app/addons/documents/templates/jumpdoc.html \
     fauxton/app/addons/documents/templates/search.html \
     fauxton/app/addons/documents/templates/sidebar.html \
+    fauxton/app/addons/documents/templates/string_edit_modal.html \
     fauxton/app/addons/documents/templates/upload_modal.html \
     fauxton/app/addons/documents/templates/view_editor.html \
     fauxton/app/addons/documents/tests/resourcesSpec.js \
