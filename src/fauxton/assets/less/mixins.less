@@ -1,0 +1,21 @@
+.translate-origin(@x, @y) {
+  -webkit-transform-origin: @x @y;
+     -moz-transform-origin: @x @y;
+      -ms-transform-origin: @x @y;
+       -o-transform-origin: @x @y;
+          transform-origin: @x @y;
+}
+
+.customTransition(@prop, @delay, @a, @b, @c, @d){
+-webkit-transition: @prop, @delay cubic-bezier(@a, @b, @c, @d); 
+   -moz-transition: @prop, @delay cubic-bezier(@a, @b, @c, @d); 
+    -ms-transition: @prop, @delay cubic-bezier(@a, @b, @c, @d); 
+     -o-transition: @prop, @delay cubic-bezier(@a, @b, @c, @d); 
+        transition: @prop, @delay cubic-bezier(@a, @b, @c, @d); /* custom */
+
+-webkit-transition-timing-function: cubic-bezier(@a, @b, @c, @d); 
+   -moz-transition-timing-function: cubic-bezier(@a, @b, @c, @d); 
+    -ms-transition-timing-function: cubic-bezier(@a, @b, @c, @d); 
+     -o-transition-timing-function: cubic-bezier(@a, @b, @c, @d); 
+        transition-timing-function: cubic-bezier(@a, @b, @c, @d); /* custom */
+}
