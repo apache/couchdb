@@ -135,7 +135,7 @@ assert_ejson_arr([Val | Rest]) ->
     end.
 
 
-check_lang(#doc{id = Id, deleted = true} = Doc) ->
+check_lang(#doc{id = Id, deleted = true}) ->
     Body = {[
         {<<"language">>, <<"query">>}
     ]},
