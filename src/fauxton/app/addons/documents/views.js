@@ -827,6 +827,13 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       }
       var editMatch = this.determineStringEditMatch(event);
       if (editMatch) {
+        /* hacky - move! */
+        this.$("button.string-edit").css("position", "absolute");
+        this.$("button.string-edit").css("padding", "0");
+        this.$("button.string-edit").css("z-index", "1000");
+        this.$("button.string-edit").css("width", "16px");
+        this.$("button.string-edit").css("left", "22px");
+        this.$("button.string-edit").css("top", (138+19*this.editor.editor.getSession().documentToScreenRow(this.editor.getSelectionStart().row, 0))+"px");
         return true;
       }
       return false;
@@ -835,7 +842,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
     stringEditing: function(event) {
       event.preventDefault();   
       if (!this.hasValidCode()) {
-        return;	      
+        return;
       }
       var editMatch = this.determineStringEditMatch(event);
       if (editMatch) {
