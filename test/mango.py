@@ -1,5 +1,6 @@
 
 import json
+import time
 
 import requests
 
@@ -34,7 +35,9 @@ class Database(object):
 
     def recreate(self):
         self.delete()
+        time.sleep(1)
         self.create()
+        time.sleep(1)
 
     def save_doc(self, doc):
         self.save_docs([doc])

@@ -37,6 +37,7 @@ With this pattern:
 ]
 """
 
+import copy
 import time
 
 import mango
@@ -49,8 +50,7 @@ def mkdb():
 def create_db_and_indexes():
     db = mkdb()
     db.recreate()
-    time.sleep(1)
-    db.save_docs(DOCS)
+    db.save_docs(copy.deepcopy(DOCS))
     indexes = [
         ["user_id"],
         ["name.last", "name.first"],
