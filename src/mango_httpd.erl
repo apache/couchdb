@@ -50,8 +50,13 @@ handle_index_req(#httpd{method='POST', path_parts=[_, _]}=Req, Db) ->
             <<"exists">>;
         {ok, NewDDoc} ->
             case mango_crud:insert(Db, NewDDoc, [{w, "3"} | Opts]) of
-                {ok, _} ->
-                    <<"created">>;
+                {ok, [{RespProps}]} ->
+                    case lists:keyfind(error, 1, RespProps) of
+                        {error, Reason} ->
+                            ?MANGO_ERROR({error_saving_ddoc, Reason});
+                        _ ->
+                            <<"created">>
+                    end;
                 _ ->
                     ?MANGO_ERROR(error_saving_ddoc)
             end
