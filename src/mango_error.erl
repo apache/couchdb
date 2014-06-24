@@ -54,6 +54,25 @@ info(mango_fields, {invalid_field_json, BadField}) ->
         fmt("Invalid JSON for field spec: ~w", [BadField])
     };
 
+info(mango_httpd, error_saving_ddoc) ->
+    {
+        500,
+        <<"error_saving_ddoc">>,
+        <<"Unknown error while saving the design document.">>
+    };
+info(mango_httpd, {error_saving_ddoc, <<"conflict">>}) ->
+    {
+        500,
+        <<"error_saving_ddoc">>,
+        <<"Encountered a conflict while saving the design document.">>
+    };
+info(mango_httpd, {error_saving_ddoc, Reason}) ->
+    {
+        500,
+        <<"error_saving_ddoc">>,
+        fmt("Unknown error while saving the design document: ~s", [Reason])
+    };
+
 info(mango_idx, {invalid_index_type, BadType}) ->
     {
         400,
