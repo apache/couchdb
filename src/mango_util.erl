@@ -49,7 +49,7 @@ open_ddocs(Db) ->
 load_ddoc(Db, DDocId) ->
     case mango_util:open_doc(Db, DDocId) of
         {ok, Doc} ->
-            {ok, Doc};
+            {ok, check_lang(Doc)};
         not_found ->
             Body = {[
                 {<<"language">>, <<"query">>}
@@ -132,6 +132,20 @@ assert_ejson_arr([Val | Rest]) ->
             assert_ejson_arr(Rest);
         false ->
             false
+    end.
+
+
+check_lang(#doc{id = Id, deleted = true} = Doc) ->
+    Body = {[
+        {<<"language">>, <<"query">>}
+    ]},
+    #doc{id = Id, body = Body};
+check_lang(#doc{body = {Props}} = Doc) ->
+    case lists:keyfind(<<"language">>, 1, Props) of
+        {<<"language">>, <<"query">>} ->
+            Doc;
+        Else ->
+            ?MANGO_ERROR({invalid_ddoc_lang, Else})
     end.
 
 

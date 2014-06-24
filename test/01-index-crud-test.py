@@ -170,6 +170,22 @@ def test_delete_idx_no_design():
     assert pre_indexes == post_indexes
 
 
+def test_recreate_index():
+    db = mkdb()
+    pre_indexes = db.list_indexes()
+    for i in range(5):
+        ret = db.create_index(["bing"], name="idx_recreate")
+        assert ret is True
+        for idx in db.list_indexes():
+            if idx["name"] != "idx_recreate":
+                continue
+            assert idx["def"]["fields"] == [{"bing": "asc"}]
+            db.delete_index(idx["ddoc"], idx["name"])
+            break
+        post_indexes = db.list_indexes()
+        assert pre_indexes == post_indexes
+
+
 def test_delete_misisng():
     db = mkdb()
 

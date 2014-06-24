@@ -216,6 +216,13 @@ info(mango_sort, {unsupported, mixed_sort}) ->
         <<"Sorts currently only support a single direction for all fields.">>
     };
 
+info(mango_util, {invalid_ddoc_lang, Lang}) ->
+    {
+        400,
+        <<"invalid_ddoc_lang">>,
+        fmt("Existing design doc has an invalid language: ~w", [Lang])
+    };
+
 info(Module, Reason) ->
     {
         500,
