@@ -49,7 +49,7 @@ handle_index_req(#httpd{method='POST', path_parts=[_, _]}=Req, Db) ->
         {ok, DDoc} ->
             <<"exists">>;
         {ok, NewDDoc} ->
-            case mango_crud:insert(Db, NewDDoc, [{w, "3"} | Opts]) of
+            case mango_crud:insert(Db, NewDDoc, Opts) of
                 {ok, [{RespProps}]} ->
                     case lists:keyfind(error, 1, RespProps) of
                         {error, Reason} ->
@@ -91,7 +91,7 @@ handle_index_req(#httpd{method='DELETE',
                 _ ->
                     NewDDoc
             end,
-            case mango_crud:insert(Db, FinalDDoc, [{w, "3"}]) of
+            case mango_crud:insert(Db, FinalDDoc, []) of
                 {ok, _} ->
                     chttpd:send_json(Req, {[{ok, true}]});
                 _ ->
