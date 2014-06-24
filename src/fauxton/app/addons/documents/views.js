@@ -1104,6 +1104,13 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
           that.$("button.string-edit").attr("disabled", "true");
 	}
       });
+      this.listenTo(editor.editor.session, "changeBackMarker", function (event) {
+        if (that.canEditDocString(event)) {
+          that.$("button.string-edit").removeAttr("disabled");
+	} else {
+          that.$("button.string-edit").attr("disabled", "true");
+	}
+      });
     },
 
     cleanup: function () {
