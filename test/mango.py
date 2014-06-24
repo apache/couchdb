@@ -65,7 +65,8 @@ class Database(object):
             "index": {
                 "fields": fields
             },
-            "type": idx_type
+            "type": idx_type,
+            "w": 3
         }
         if name is not None:
             body["name"] = name
@@ -83,7 +84,7 @@ class Database(object):
 
     def delete_index(self, ddocid, name, idx_type="json"):
         path = ["_index", ddocid, idx_type, name]
-        r = self.sess.delete(self.path(path))
+        r = self.sess.delete(self.path(path), params={"w":"3"})
         r.raise_for_status()
 
     def find(self, selector, limit=25, skip=0, sort=None, fields=None,

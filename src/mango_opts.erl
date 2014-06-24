@@ -51,7 +51,7 @@ validate_idx_create({Props}) ->
             {tag, w},
             {optional, true},
             {default, 2},
-            {validator, fun is_non_neg_integer/1}
+            {validator, fun is_pos_integer/1}
         ]}
     ],
     validate(Props, Opts).

@@ -49,7 +49,8 @@ handle_index_req(#httpd{method='POST', path_parts=[_, _]}=Req, Db) ->
         {ok, DDoc} ->
             <<"exists">>;
         {ok, NewDDoc} ->
-            case mango_crud:insert(Db, NewDDoc, Opts) of
+            CreateOpts = get_idx_create_opts(Opts),
+            case mango_crud:insert(Db, NewDDoc, CreateOpts) of
                 {ok, [{RespProps}]} ->
                     case lists:keyfind(error, 1, RespProps) of
                         {error, Reason} ->
@@ -91,7 +92,8 @@ handle_index_req(#httpd{method='DELETE',
                 _ ->
                     NewDDoc
             end,
-            case mango_crud:insert(Db, FinalDDoc, []) of
+            DelOpts = get_idx_del_opts(Req),
+            case mango_crud:insert(Db, FinalDDoc, DelOpts) of
                 {ok, _} ->
                     chttpd:send_json(Req, {[{ok, true}]});
                 _ ->
@@ -118,6 +120,25 @@ handle_find_req(Req, _Db) ->
 
 set_user_ctx(#httpd{user_ctx=Ctx}, Db) ->
     Db#db{user_ctx=Ctx}.
+
+
+get_idx_create_opts(Opts) ->
+    case lists:keyfind(w, 1, Opts) of
+        {w, N} when is_integer(N), N > 0 ->
+            [{w, integer_to_list(N)}];
+        _ ->
+            [{w, "2"}]
+    end.
+
+
+get_idx_del_opts(Req) ->
+    try
+        WStr = chttpd:qs_value(Req, "w", "2"),
+        _ = list_to_integer(WStr),
+        [{w, WStr}]
+    catch _:_ ->
+        [{w, "2"}]
+    end.
 
 
 start_find_resp(Req) ->
