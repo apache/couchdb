@@ -1099,7 +1099,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       });
 
       var that = this;
-      /* TODO: improve: do disabled within function */
       this.listenTo(editor.editor, "changeSelection", function (event) {
         that.showHideEditDocString(event);
       });
