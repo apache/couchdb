@@ -26,6 +26,7 @@
     update_seq/1,
     id_tree_state/1,
     seq_tree_state/1,
+    latest/1,
     local_tree_state/1,
     purge_seq/1,
     purged_docs/1,
@@ -283,6 +284,12 @@ upgrade_compacted_seq(#db_header{}=Header) ->
             Header
     end.
 
+latest(?LATEST_DISK_VERSION) ->
+    true;
+latest(N) when is_integer(N), N < ?LATEST_DISK_VERSION ->
+    false;
+latest(_Else) ->
+    undefined.
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
