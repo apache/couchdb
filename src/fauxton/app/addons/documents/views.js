@@ -808,7 +808,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       var selStart = this.editor.getSelectionStart().row;
       var selEnd = this.editor.getSelectionEnd().row;
       /* one JS(ON) string can't span more than one line - we edit one string, so ensure we don't select several lines */
-      if (selStart >=0 && selEnd >= 0 && selStart === selEnd) {    
+      if (selStart >=0 && selEnd >= 0 && selStart === selEnd && this.editor.isRowExpanded(selStart)) {    
         var editLine = this.editor.getLine(selStart);
 	var editMatch = editLine.match(/^([ \t]*)("[a-zA-Z0-9_]*": )?(".*",?[ \t]*)$/);
 	if (editMatch) {
@@ -835,7 +835,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
         this.$("button.string-edit").css("z-index", "1000");
         this.$("button.string-edit").css("width", "16px");
         this.$("button.string-edit").css("left", "22px");
-        this.$("button.string-edit").css("top", (this.$("#editor-container").offset().top - 2 + this.editor.getRowHeight() * this.editor.documentToScreenRow(this.editor.getSelectionStart().row)) + "px");
+        this.$("button.string-edit").css("top", (this.$("#editor-container")[0].offsetTop - 2 + this.editor.getRowHeight() * this.editor.documentToScreenRow(this.editor.getSelectionStart().row)) + "px");
         return true;
       }
       return false;

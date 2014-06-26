@@ -552,6 +552,10 @@ function(app, FauxtonAPI, ace, spin) {
       return this.editor.renderer.layerConfig.lineHeight;
     },
 
+    isRowExpanded: function(row) {
+      return !this.editor.getSession().isRowFolded(row);
+    },
+
     documentToScreenRow: function(row) {
       return this.editor.getSession().documentToScreenRow(row, 0);
     }
