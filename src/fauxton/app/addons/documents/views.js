@@ -821,19 +821,21 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       }
     }, 
 
-    canEditDocString: function (event) {
+    showHideEditDocString: function (event) {
+      this.$("button.string-edit").attr("disabled", "true");
       if (!this.hasValidCode()) {
         return false;
       }
       var editMatch = this.determineStringEditMatch(event);
       if (editMatch) {
-        /* hacky - move! */
+        this.$("button.string-edit").removeAttr("disabled");
+	/* remove the following lines (along with CSS) to go back to the toolbar */
         this.$("button.string-edit").css("position", "absolute");
         this.$("button.string-edit").css("padding", "0");
         this.$("button.string-edit").css("z-index", "1000");
         this.$("button.string-edit").css("width", "16px");
         this.$("button.string-edit").css("left", "22px");
-        this.$("button.string-edit").css("top", (138+19*this.editor.editor.getSession().documentToScreenRow(this.editor.getSelectionStart().row, 0))+"px");
+        this.$("button.string-edit").css("top", (this.$("#editor-container").offset().top - 2 + this.editor.getRowHeight() * this.editor.documentToScreenRow(this.editor.getSelectionStart().row)) + "px");
         return true;
       }
       return false;
@@ -1097,19 +1099,12 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       });
 
       var that = this;
+      /* TODO: improve: do disabled within function */
       this.listenTo(editor.editor, "changeSelection", function (event) {
-        if (that.canEditDocString(event)) {
-          that.$("button.string-edit").removeAttr("disabled");
-	} else {
-          that.$("button.string-edit").attr("disabled", "true");
-	}
+        that.showHideEditDocString(event);
       });
       this.listenTo(editor.editor.session, "changeBackMarker", function (event) {
-        if (that.canEditDocString(event)) {
-          that.$("button.string-edit").removeAttr("disabled");
-	} else {
-          that.$("button.string-edit").attr("disabled", "true");
-	}
+        that.showHideEditDocString(event);
       });
     },
 

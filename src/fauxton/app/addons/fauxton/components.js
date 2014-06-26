@@ -546,6 +546,14 @@ function(app, FauxtonAPI, ace, spin) {
 
     getSelectionEnd: function() {
       return this.editor.getSelectionRange().end;
+    },
+
+    getRowHeight: function() {
+      return this.editor.renderer.layerConfig.lineHeight;
+    },
+
+    documentToScreenRow: function(row) {
+      return this.editor.getSession().documentToScreenRow(row, 0);
     }
   });
 
