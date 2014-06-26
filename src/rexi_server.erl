@@ -32,7 +32,7 @@
     workers = ets:new(workers, [private, {keypos, #job.worker}]),
     clients = ets:new(clients, [private, {keypos, #job.client}]),
     errors = queue:new(),
-    error_limit = 20,
+    error_limit = 0,
     error_count = 0
 }).
 
@@ -151,6 +151,8 @@ init_p(From, {M,F,A}, Nonce) ->
 
 %% internal
 
+save_error(_E, #st{error_limit = 0} = St) ->
+    St;
 save_error(E, #st{errors=Q, error_limit=L, error_count=C} = St) when C >= L ->
     St#st{errors = queue:in(E, queue:drop(Q))};
 save_error(E, #st{errors=Q, error_count=C} = St) ->
