@@ -42,8 +42,8 @@ install: dist
 	@cp -R rel/couchdb/* $(prefix)
 	@mkdir -p $(data_dir)
 	@chown $(user) $(data_dir)
-	@mkdir -p $(view_dir)
-	@chown $(user) $(view_dir)
+	@mkdir -p $(view_index_dir)
+	@chown $(user) $(view_index_dir)
 	@touch $(prefix)/var/log/couchdb.log
 	@chown $(user) $(prefix)/var/log/couchdb.log
 
