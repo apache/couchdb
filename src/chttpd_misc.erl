@@ -35,26 +35,16 @@ handle_welcome_req(Req) ->
 handle_welcome_req(#httpd{method='GET'}=Req, WelcomeMessage) ->
     send_json(Req, {[
         {couchdb, WelcomeMessage},
-        {version, list_to_binary(couch_server:get_version())},
-        {bigcouch, get_version()}
-    ]});
+        {version, list_to_binary(couch_server:get_version())}
+        ] ++ case config:get("vendor") of
+        [] ->
+            [];
+        Properties ->
+            [{vendor, {[{?l2b(K), ?l2b(V)} || {K, V} <- Properties]}}]
+        end
+    });
 handle_welcome_req(Req, _) ->
     send_method_not_allowed(Req, "GET,HEAD").
-
-get_version() ->
-    Releases = release_handler:which_releases(),
-    Version = case [V || {"bigcouch", V, _, current} <- Releases] of
-    [] ->
-        case [V || {"bigcouch", V, _, permanent} <- Releases] of
-        [] ->
-            "dev";
-        [Permanent] ->
-            Permanent
-        end;
-    [Current] ->
-        Current
-    end,
-    list_to_binary(Version).
 
 handle_favicon_req(Req) ->
     handle_favicon_req(Req, config:get("chttpd", "docroot")).
