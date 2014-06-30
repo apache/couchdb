@@ -16,13 +16,13 @@ the License.
 	<div  class="js-collapse-toggle accordion-header" data-toggle="collapse" data-target="#<%= ddoc_clean %>" id="nav-header-<%= ddoc_clean %>" >
 		<div class="accordion-list-item">
 			<div class="fonticon-play"></div>
-			<p><%= designDoc%></p>
+			<p><%- designDoc%></p>
 		</div>
 		<div class="new-button add-dropdown"></div>
 	</div>
 	<ul class="accordion-body collapse" id="<%= ddoc_clean %>">
 		<li>
-			<a id="<%= ddoc_clean %>_metadata" href="#/database/<%- database_encoded %>/_design/<%- ddoc_encoded %>/metadata" class="toggle-view accordion-header">
+			<a id="<%- ddoc_clean %>_metadata" href="#/database/<%- database_encoded %>/_design/<%- ddoc_encoded %>/metadata" class="toggle-view accordion-header">
 			<span class="fonticon-sidenav-info fonticon"></span>
 			  Design Doc Metadata
 			</a>

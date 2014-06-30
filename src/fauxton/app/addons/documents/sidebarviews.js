@@ -166,15 +166,7 @@ function(app, FauxtonAPI, Components, Documents, Databases) {
 
       var sidebarListTypes = FauxtonAPI.getExtensions('sidebar:list');
           if (ddocDocs){
-            //Views
             this.buildIndexList(ddocDocs, "views", "view");
-            //lists
-            // this.buildIndexList(ddocDocs, "lists");
-            // //show
-            // this.buildIndexList(ddocDocs, "show");
-            // //filters
-            // this.buildIndexList(ddocDocs, "filters");
-            //extensions
             _.each(sidebarListTypes, function (type) {
               this.buildIndexList(ddocDocs, type);
             },this);
