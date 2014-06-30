@@ -1395,36 +1395,50 @@ monitor_attachments(Att) ->
 demonitor_refs(Refs) when is_list(Refs) ->
     [demonitor(Ref) || Ref <- Refs].
 
+%% This function should exist in cassim, but its depedence on the #httpd{}
+%% record makes it difficult to separate. This function should be refactored and
+%% moved into cassim once couch_doc_from_req and update_doc are reworked.
 put_security(#httpd{user_ctx=Ctx}=Req, Db, FetchRev) ->
-    DbName = Db#db.name,
-    DocId = cassim_metadata_cache:security_meta_id(DbName),
-    {SecObj0} = chttpd:json_body(Req),
-    {OldSecDoc} = cassim:get_security(DbName),
-    OldRev = couch_util:get_value(<<"_rev">>, OldSecDoc, undefined),
-    %% Maybe update the security doc with the rev when hiding mvcc logic
-    SecObj = case {FetchRev, OldRev} of
-        %% User supplied rev, just use the req body
-        {false, _} ->
-            SecObj0;
-        %% User did not supply rev, but new security doc
-        {true, undefined} ->
-            SecObj0;
-        %% User did not supply rev, use the old rev
-        {true, OldRev} ->
-            [{<<"_rev">>, OldRev} | proplists:delete(<<"_rev">>, SecObj0)]
-    end,
-    SecDoc = couch_doc_from_req(Req, DocId, {SecObj}),
-    Options = [
-        delay_commit,
-        interactive_edit,
-        {user_ctx, Ctx},
-        {w, integer_to_list(mem3:quorum(Db))}
-    ],
-    {Status, {etag, Etag}, Body} =
-        cassim:set_security(Db, SecDoc, Options),
-    HttpCode = http_code_from_status(Status),
-    ResponseHeaders = [{"Etag", Etag}],
-    send_json(Req, HttpCode, ResponseHeaders, Body).
+    case cassim:is_enabled() of
+        true ->
+            DbName = Db#db.name,
+            DocId = cassim_metadata_cache:security_meta_id(DbName),
+            {SecObj0} = chttpd:json_body(Req),
+            {OldSecDoc} = cassim:get_security(DbName),
+            OldRev = couch_util:get_value(<<"_rev">>, OldSecDoc, undefined),
+            %% Maybe update the security doc with the rev when hiding mvcc logic
+            SecObj = case {FetchRev, OldRev} of
+                %% User supplied rev, just use the req body
+                {false, _} ->
+                    SecObj0;
+                %% User did not supply rev, but new security doc
+                {true, undefined} ->
+                    SecObj0;
+                %% User did not supply rev, use the old rev
+                {true, OldRev} ->
+                    [{<<"_rev">>, OldRev}|proplists:delete(<<"_rev">>, SecObj0)]
+            end,
+            SecDoc = couch_doc_from_req(Req, DocId, {SecObj}),
+            Options = [
+                delay_commit,
+                interactive_edit,
+                {user_ctx, Ctx},
+                {w, integer_to_list(mem3:quorum(Db))}
+            ],
+            {Status, {etag, Etag}, Body} =
+                cassim:set_security(Db, SecDoc, Options),
+            HttpCode = http_code_from_status(Status),
+            ResponseHeaders = [{"Etag", Etag}],
+            send_json(Req, HttpCode, ResponseHeaders, Body);
+        false ->
+            SecObj = chttpd:json_body(Req),
+            case fabric:set_security(Db, SecObj, [{user_ctx, Ctx}]) of
+                ok ->
+                    send_json(Req, {[{<<"ok">>, true}]});
+                Else ->
+                    throw(Else)
+            end
+    end.
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
