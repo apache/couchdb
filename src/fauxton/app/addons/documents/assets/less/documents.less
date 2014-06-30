@@ -10,6 +10,11 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 /*ALL DOCS TABLE*/
+
+@import "../../../../../assets/less/variables.less";
+@import "../../../../../assets/less/bootstrap/variables.less";
+@import "../../../../../assets/less/bootstrap/mixins.less";
+
 tr.all-docs-item {
   border: none;
   background: transparent;
@@ -20,7 +25,7 @@ tr.all-docs-item {
     }
 }
 button.beautify {
-	margin-top: 20px;
+  margin-top: 20px;
 }
 
 .toggle-btns {
@@ -84,9 +89,13 @@ button.beautify {
 .change-box {
   margin: 0 20px 20px 20px;
 }
+.searchbox-container {
+  position: fixed;
+  right: 15px;
+}
 
 .change-wrapper {
-  margin-top: 57px;
+  margin-top: 20px;
   border-bottom: 1px solid #dddddd;
   &:last-child {
     border-bottom: none;
@@ -132,6 +141,7 @@ button.beautify {
   word-wrap: break-word;
 }
 
+
 #dashboard-upper-content{
   .js-query-keys-wrapper{
     padding-top: 0;
@@ -151,5 +161,139 @@ button.beautify {
     }
   }
 }
+
+.nav-list{
+    border-top: none;
+  }
+
+.sidenav{
+  .nav-list > .active > a{
+    text-shadow: none;
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+  .nav-list > .active > a:hover,
+  .nav-list > .active > a:focus{
+    color: white;
+  }
+  .nav-list > li > a:hover + div.add-dropdown .dropdown-toggle{
+    color: white;
+  }
+  .dropdown-toggle:hover {
+    color: @linkRed
+  }
+  li{
+    position: relative;
+    a{
+      text-shadow: none;
+    }
+  }
+  li.nav-header {
+    position: relative;
+    > .accordion-body{
+      &.in {
+        border-bottom: 1px solid #d3d7db;
+      }
+    }
+    .accordion-body{
+      color: #eee;
+      margin-left: 0;
+      li.active > a{
+        background-color: rgba(0, 0, 0, 0.055);
+      }
+      li a{
+        font-size: 14px;
+        background-color: rgba(0, 0, 0, 0.02);
+        &:hover {
+          color: #fff;
+          text-decoration: none;
+          background-color: @darkRed;
+        }
+      }
+    }
+    .fonticon-play{
+        color: @subListGray;
+        position: absolute;
+        display: block;
+        vertical-align: bottom;
+      }
+    .accordion-header:hover .fonticon-play {
+            color: white;
+     }
+    .fonticon-play{
+      .transition(all 0.25s linear); 
+    }
+    > .accordion-header{
+      position: relative;
+      display: block;
+      border-bottom: 1px solid #d3d7db;
+      .accordion-list-item:hover {
+        p, .fonticon-play{
+          color: white;
+        }
+        p{
+          background-color: @darkRed;
+        }
+      }
+      .accordion-list-item:hover + div.add-dropdown .dropdown-toggle{
+        color: white;
+      }
+      .accordion-list-item p{
+        .transition(all 0.25s linear); 
+      }
+      .accordion-list-item p{
+        margin: 0;
+        padding: 10px 13px 10px 36px;
+        color: @linkRed;
+      }
+      .fonticon-play{
+        font-size: 12px;
+        top: 12px;
+        left: 12px; 
+      }
+      &.down .fonticon-play {
+        .rotate(90deg);
+      }
+      .add-dropdown{
+        right: 15px;
+      }
+      .dropdown-toggle:hover{
+        color: @linkRed
+      }
+    }
+    > ul.accordion-body{
+      > li {
+        cursor: pointer;
+        a{
+          border-top: none;
+          &.accordion-header{
+            padding: 8px 5px 8px 36px;
+          }
+        }
+        .toggle-view{
+          padding: 4px 5px 4px 36px;
+        }
+        .fonticon-play{
+          font-size: 8px;
+          top: 11px;
+          left: 15px;
+        }
+        .fonticon:before{
+          margin-right: 6px;
+          font-size: 20px;
+          top: 3px;
+          position: relative;
+        }
+      }
+
+      li {
+        > a.down .fonticon-play {
+          .rotate(90deg);
+        }
+      }
+    }
+  }
+}
+
+
 
 

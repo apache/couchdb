@@ -39,6 +39,7 @@
 // The dropdown menu (ul)
 // ----------------------
 .dropdown-menu {
+
   position: absolute;
   top: 100%;
   left: 0;
@@ -46,7 +47,6 @@
   display: none; // none by default, but block on "open" of the menu
   float: left;
   min-width: 160px;
-  padding: 5px 0;
   margin: 2px 0 0; // override default ul
   list-style: none;
   background-color: @dropdownBackground;
@@ -54,8 +54,6 @@
   border: 1px solid @dropdownBorder;
   *border-right-width: 2px;
   *border-bottom-width: 2px;
-  .border-radius(6px);
-  .box-shadow(0 5px 10px rgba(0,0,0,.2));
   -webkit-background-clip: padding-box;
      -moz-background-clip: padding;
           background-clip: padding-box;
@@ -65,7 +63,29 @@
     right: 0;
     left: auto;
   }
-
+  li.header-label{
+    background-color: #1A1A1A;
+    color: #676767;
+    padding: 3px 20px;
+    font-size: 13px;
+  }
+  &.arrow {
+    &:before{
+      content: "";
+      display: block;
+      position: absolute;
+      border-style: solid;
+      top: -20px;
+      right: 10%;
+      width: 0;
+      height: 0;
+      margin-left: -10px;
+      border-left: 10px solid transparent;
+      border-right: 10px solid transparent;
+      border-bottom: 10px solid #2b2f33;
+      border-top: 10px solid transparent;
+    }
+  }
   // Dividers (basically an hr) within the dropdown
   .divider {
     .nav-divider(@dropdownDividerTop, @dropdownDividerBottom);
@@ -73,6 +93,10 @@
 
   // Links within the dropdown menu
   > li > a {
+    &.icon:before{
+      padding-right: 5px;
+    }
+    font-size: 12px;
     display: block;
     padding: 3px 20px;
     clear: both;
@@ -80,6 +104,7 @@
     line-height: @baseLineHeight;
     color: @dropdownLinkColor;
     white-space: nowrap;
+    border-bottom: 1px solid #1A1A1A;
   }
 }
 
@@ -90,8 +115,8 @@
 .dropdown-submenu:hover > a,
 .dropdown-submenu:focus > a {
   text-decoration: none;
-  color: @dropdownLinkColorHover;
-  #gradient > .vertical(@dropdownLinkBackgroundHover, darken(@dropdownLinkBackgroundHover, 5%));
+  color: #fff;
+  //#gradient > .vertical(@dropdownLinkBackgroundHover, darken(@dropdownLinkBackgroundHover, 5%));
 }
 
 // Active state

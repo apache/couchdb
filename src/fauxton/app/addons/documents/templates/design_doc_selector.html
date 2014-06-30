@@ -16,7 +16,10 @@ the License.
   <select id="ddoc">
     <optgroup label="Select a document">
       <option value="new-doc">New document</option>
+
       <% ddocs.each(function(ddoc) { %>
+      <%= ddoc.id %>
+      <%= ddocName %>
       <% if (ddoc.id === ddocName) { %>
       <option selected="selected" value="<%- ddoc.id %>"><%- ddoc.id %></option>
       <% } else { %>

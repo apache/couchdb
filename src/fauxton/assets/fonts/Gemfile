@@ -1,0 +1,5 @@
+source 'https://rubygems.org'
+
+gem 'fontcustom', 
+:git => 'https://github.com/seanbarclay/fontcustom.git', 
+:branch => 'master'
