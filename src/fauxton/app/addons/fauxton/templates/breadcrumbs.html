@@ -16,7 +16,7 @@ the License.
   <% _.each(_.initial(crumbs), function(crumb) { %>
     <li>
       <a href="#<%- crumb.link %>"><%- crumb.name %></a>
-      <span class="divider fonticon fonticon-carrot"> </span>
+      <span class="divider fonticon fonticon-right-open"> </span>
     </li>
   <% }); %>
   <% var last = _.last(crumbs) || {name: ''} %>

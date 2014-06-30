@@ -21,7 +21,7 @@ function(app, FauxtonAPI, VerifyInstall) {
     FauxtonAPI.addHeaderLink({
         title: "Verify", 
         href: "#verifyinstall",
-        icon: "fonticon-circle-check",
+        icon: "fonticon-ok-circled",
         bottomNav: true,
       });
   };

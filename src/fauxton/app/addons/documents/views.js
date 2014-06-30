@@ -17,6 +17,7 @@ define([
        "addons/fauxton/components",
 
        "addons/documents/resources",
+       "addons/documents/sidebarviews",
        "addons/databases/resources",
        "addons/pouchdb/base",
 
@@ -31,7 +32,7 @@ define([
        "plugins/zeroclipboard/ZeroClipboard"
 ],
 
-function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
+function(app, FauxtonAPI, Components, Documents, Views, Databases, pouchdb,
          resizeColumns, beautify, prettify, ZeroClipboard) {
 
   function showError (msg) {
@@ -42,7 +43,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
     });
   }
 
-  var Views = {};
 
   Views.SearchBox = FauxtonAPI.View.extend({
     template: "addons/documents/templates/search",
@@ -336,39 +336,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
     }
   });
 
-  Views.IndexItem = FauxtonAPI.View.extend({
-    template: "addons/documents/templates/index_menu_item",
-    tagName: "li",
-
-    initialize: function(options){
-      this.index = options.index;
-      this.ddoc = options.ddoc;
-      this.database = options.database;
-      this.selected = !! options.selected;
-    },
-
-    serialize: function() {
-      return {
-        index: this.index,
-        ddoc: this.ddoc,
-        database: this.database,
-        index_clean: app.utils.removeSpecialCharacters(this.index),
-        ddoc_clean: app.utils.removeSpecialCharacters(this.ddoc),
-        index_encoded: app.utils.safeURLName(this.index),
-        ddoc_encoded: app.utils.safeURLName(this.ddoc),
-        database_encoded: app.utils.safeURLName(this.database),
-        selected: this.selected
-      };
-    },
-
-    afterRender: function() {
-      if (this.selected) {
-        $("#sidenav ul.nav-list li").removeClass("active");
-        this.$el.addClass("active");
-      }
-    }
-  });
-
+  
   Views.AllDocsNumber = FauxtonAPI.View.extend({
     template: "addons/documents/templates/all_docs_number",
 
@@ -454,6 +422,11 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
         hasReduce: false,
         showPreview: false,
         database: this.database,
+      }));
+
+      this.toolsView = this.setView(".js-search", new Views.JumpToDoc({
+        database: this.database,
+        collection: this.database.allDocs
       }));
     },
 
@@ -1348,6 +1321,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       this.ddocs = options.ddocs;
       this.params = options.params;
       this.database = options.database;
+      this.currentDdoc = options.currentddoc;
       if (this.newView) {
         this.viewName = 'newView';
       } else {
@@ -1635,8 +1609,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       if ($targetTab.attr('id') !== $previousTab.attr('id')) {
         $previousTab.removeAttr('style');
       }
-      //stop polling
-      this.ddocInfoView.stopRefreshInterval();
 
       if ($targetId === 'index-nav') {
         if (this.newView) { return; }
@@ -1645,11 +1617,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
         $targetTab.toggle('slow', function(){
            that.showEditors();
         });
-      } else if ($targetId === "meta-nav"){
-        if (!$("#ddoc-info").is(":visible")){
-          this.ddocInfoView.startRefreshInterval();
-        }
-        $targetTab.toggle('slow');
       } else {
         $targetTab.toggle('slow');
       }
@@ -1693,16 +1660,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
         $('.beautify-tooltip').tooltip();
       }
     },
-    renderDdocInfo: function(){
-      if(this.ddocInfoView){
-        this.ddocInfoView.remove();
-      }
-
-      if (this.newView) { return; }
-      this.ddocInfoView = this.setView('#ddoc-info', new Views.DdocInfo({model: this.ddocInfo }));
-      this.ddocInfoView.render();
-
-    },
     beforeRender: function () {
 
       if (this.newView) {
@@ -1721,7 +1678,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
 
       this.designDocSelector = this.setView('.design-doc-group', new Views.DesignDocSelector({
         collection: this.ddocs,
-        ddocName: this.model.id,
+        ddocName: this.currentDdoc || this.model.id,
         database: this.database
       }));
 
@@ -1742,7 +1699,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
     },
 
     afterRender: function() {
-      this.renderDdocInfo();
 
       if (this.params && !this.newView) {
         this.advancedOptions.updateFromParams(this.params);
@@ -1822,92 +1778,9 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
     }
   });
 
-  Views.Sidebar = FauxtonAPI.View.extend({
-    template: "addons/documents/templates/sidebar",
-    events: {
-      "click button#delete-database": "showDeleteDatabaseModal"
-    },
+  
 
-    initialize: function(options) {
-      this.database = options.database;
-      if (options.ddocInfo) {
-        this.ddocID = options.ddocInfo.id;
-        this.currView = options.ddocInfo.currView;
-      }
-    },
-    showDeleteDatabaseModal: function(event){
-      this.deleteDBModal.showModal();
-    },
-
-    serialize: function() {
-      var docLinks = FauxtonAPI.getExtensions('docLinks'),
-          newLinks = FauxtonAPI.getExtensions('sidebar:newLinks'),
-          addLinks = FauxtonAPI.getExtensions('sidebar:links'),
-          extensionList = FauxtonAPI.getExtensions('sidebar:list');
-      return {
-        changes_url: '#' + this.database.url('changes'),
-        permissions_url: '#' + this.database.url('app') + '/permissions',
-        db_url: '#' + this.database.url('index'),
-        database: this.collection.database,
-        database_url: '#' + this.database.url('app'),
-        docLinks: docLinks,
-        addLinks: addLinks,
-        newLinks: newLinks,
-        extensionList: extensionList > 0
-      };
-    },
-
-    buildIndexList: function(collection, selector, design){
-      _.each(_.keys(collection), function(key){
-        var selected = this.ddocID == "_design/"+design;
-        this.insertView("ul.nav." + selector, new Views.IndexItem({
-          ddoc: design,
-          index: key,
-          database: this.collection.database.id,
-          selected: selected && key == this.currView
-        }));
-      }, this);
-    },
-
-    beforeRender: function(manage) {
-      this.deleteDBModal = this.setView(
-        '#delete-db-modal',
-        new Views.DeleteDBModal({database: this.database})
-      );
-
-      var sidebarListViews = FauxtonAPI.getExtensions('sidebar:list');
-      _.each(sidebarListViews, function (view) {
-        var extension = this.insertView('#extension-navs', view);
-        extension.update(this.database, this.collection, this.viewName);
-        extension.render();
-      }, this);
-
-      this.collection.each(function(design) {
-        if (design.has('doc')){
-          var ddoc = design.id.replace(/^_design\//,"");
-          if (design.get('doc').views){
-            this.buildIndexList(design.get('doc').views, "views", ddoc);
-          }
-        }
-      }, this);
-    },
-
-
-    afterRender: function () {
-      if (this.selectedTab) {
-        this.setSelectedTab(this.selectedTab);
-      }
-    },
-
-    setSelectedTab: function (selectedTab) {
-      this.selectedTab = selectedTab;
-      this.$('li').removeClass('active');
-      this.$('#' + selectedTab).parent().addClass('active');
-    }
-  });
-
-  Views.Indexed = FauxtonAPI.View.extend({});
-
+  
   Views.Changes = FauxtonAPI.View.extend({
     template: "addons/documents/templates/changes",
 
@@ -1962,12 +1835,22 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
     template: "addons/documents/templates/ddoc_info",
 
     initialize: function (options) {
+      this.ddocName = options.ddocName;
       this.refreshTime = options.refreshTime || 5000;
       this.listenTo(this.model, 'change', this.render);
     },
 
+    establish: function () {
+      return this.model.fetch();
+    },
+
+    afterRender: function(){
+      this.startRefreshInterval();
+    },
+
     serialize: function () {
       return {
+        Ddoc: this.ddocName,
         view_index: this.model.get('view_index')
       };
     },
