@@ -592,7 +592,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
     toggleTrash: function () {
       var $bulkdDeleteButton = this.$('.js-bulk-delete');
 
-      if (this.bulkDeleteDocsCollection.length > 0) {
+      if (this.bulkDeleteDocsCollection && this.bulkDeleteDocsCollection.length > 0) {
         $bulkdDeleteButton.removeClass('disabled');
       } else {
         $bulkdDeleteButton.addClass('disabled');
@@ -1016,18 +1016,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       this.viewName = options.viewName;
       this.updateViewFn = options.updateViewFn;
       this.previewFn = options.previewFn;
-
-      if (typeof(options.hasReduce) === 'undefined') {
-        this.hasReduce = true;
-      } else {
-        this.hasReduce = options.hasReduce;
-      }
-
-      /*if (typeof(options.showPreview) === 'undefined') {
-        this.showPreview = true;
-      } else {
-        this.showPreview = options.showPreview;
-      }*/
+      this.showStale = _.isUndefined(options.showStale) ? false : options.showStale;
+      this.hasReduce = _.isUndefined(options.hasReduce) ? true : options.hasReduce;
     },
 
     events: {
@@ -1253,7 +1243,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
     serialize: function () {
       return {
         hasReduce: this.hasReduce,
-        showPreview: false
+        showPreview: false,
+        showStale: this.showStale
       };
     }
   });
@@ -1735,7 +1726,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
           viewName: this.viewName,
           ddocName: this.model.id,
           hasReduce: this.hasReduce(),
-          eventer: this.eventer
+          eventer: this.eventer,
+          showStale: true
         }));
       }
 
