@@ -64,7 +64,7 @@ module.exports = function(grunt) {
           "dist/debug/css/fauxton.css": "assets/less/fauxton.less"
         }
       },
-      fonts: ["assets/fonts/*"],
+      fonts: ["assets/fonts/*.eot", "assets/fonts/*.svg", "assets/fonts/*.ttf", "assets/fonts/*.woff",],
       img: ["assets/img/**"],
       // used in concat:index_css to keep file ordering intact
       // fauxton.css should load first
@@ -356,7 +356,8 @@ module.exports = function(grunt) {
       dist:{
         files:[
           {src: "dist/debug/index.html", dest: "dist/release/index.html"},
-          {src: assets.img, dest: "dist/release/img/", flatten: true, expand: true}
+          {src: assets.img, dest: "dist/release/img/", flatten: true, expand: true},
+          {src: assets.fonts, dest: "dist/release/fonts/", flatten: true, expand: true}
         ]
       },
       debug:{
