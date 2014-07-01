@@ -26,7 +26,7 @@ define([
        // Plugins
        "plugins/beautify",
        "plugins/prettify",
-       // this should be never global available:
+       // this should never be global available:
        // https://github.com/zeroclipboard/zeroclipboard/blob/master/docs/security.md
        "plugins/zeroclipboard/ZeroClipboard"
 ],
@@ -1874,7 +1874,16 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
         extension.render();
       }, this);
 
-      this.collection.each(function(design) {
+      var viewFilters = FauxtonAPI.getExtensions('sidebar:viewFilters'),
+          collection = this.collection;
+
+      if (!_.isEmpty(viewFilters)) {
+        _.each(viewFilters, function (filter) {
+          collection = collection.filter(filter);
+        });
+      }
+
+      _.each(collection, function(design) {
         if (design.has('doc')){
           var ddoc = design.id.replace(/^_design\//,"");
           if (design.get('doc').views){
