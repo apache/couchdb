@@ -26,7 +26,7 @@ define([
        // Plugins
        "plugins/beautify",
        "plugins/prettify",
-       // this should be never global available:
+       // this should never be global available:
        // https://github.com/zeroclipboard/zeroclipboard/blob/master/docs/security.md
        "plugins/zeroclipboard/ZeroClipboard"
 ],
@@ -1710,8 +1710,19 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
         this.reduceFunStr = this.model.viewHasReduce(this.viewName);
       }
 
+      var viewFilters = FauxtonAPI.getExtensions('sidebar:viewFilters'),
+          filteredModels = this.ddocs.models,
+          designDocs = this.ddocs.clone();
+
+      if (!_.isEmpty(viewFilters)) {
+        _.each(viewFilters, function (filter) {
+          filteredModels = _.filter(filteredModels, filter);
+        });
+        designDocs.reset(filteredModels, {silent: true});
+      }
+
       this.designDocSelector = this.setView('.design-doc-group', new Views.DesignDocSelector({
-        collection: this.ddocs,
+        collection: designDocs,
         ddocName: this.model.id,
         database: this.database
       }));
@@ -1874,7 +1885,16 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
         extension.render();
       }, this);
 
-      this.collection.each(function(design) {
+      var viewFilters = FauxtonAPI.getExtensions('sidebar:viewFilters'),
+          collection = this.collection.models;
+
+      if (!_.isEmpty(viewFilters)) {
+        _.each(viewFilters, function (filter) {
+          collection = _.filter(collection, filter);
+        });
+      }
+
+      _.each(collection, function(design) {
         if (design.has('doc')){
           var ddoc = design.id.replace(/^_design\//,"");
           if (design.get('doc').views){
