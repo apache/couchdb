@@ -247,6 +247,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
     }
   });
 
+  // TODO: limit height, stabilize
   Views.StringEditModal = Components.ModalView.extend({
     template: "addons/documents/templates/string_edit_modal",
 
@@ -260,7 +261,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
   
     saveString: function (event) {
       event.preventDefault();
-      this.editor.replaceCurrentLine(this.indent + this.hashKey + JSON.stringify(this.$('#string-edit-area').val()) + this.comma + "\n");
+      var newStr = this.subEditor.getValue();
+      this.editor.replaceCurrentLine(this.indent + this.hashKey + JSON.stringify(newStr) + this.comma + "\n");
       this.hideModal();
     },
 
@@ -278,9 +280,21 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       this.indent = indent;
       this.hashKey = hashKey;      
       this.$('#string-edit-header').text(hashKey);
-      this.$('#string-edit-area').val(JSON.parse(jsonString));
+      this.subEditor.setValue(JSON.parse(jsonString));
       this.comma = comma;
       this.showModal();
+    },
+
+    afterRender: function() {
+      this.subEditor = new Components.Editor({
+        editorId: "string-editor-container",
+        mode: "plain"
+      });
+      this.subEditor.render();
+    },
+
+    cleanup: function () {
+      if (this.subEditor) this.subEditor.remove();
     }
 
   });

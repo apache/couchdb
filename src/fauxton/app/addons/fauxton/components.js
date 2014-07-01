@@ -420,7 +420,9 @@ function(app, FauxtonAPI, ace, spin) {
 
       this.editor.setTheme("ace/theme/" + this.theme);
 
-      this.editor.getSession().setMode("ace/mode/" + this.mode);
+      if (this.mode != "plain") {
+        this.editor.getSession().setMode("ace/mode/" + this.mode);
+      }
       this.editor.setShowPrintMargin(false);
       this.addCommands();
 
