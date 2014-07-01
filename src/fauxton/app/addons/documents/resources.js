@@ -482,6 +482,14 @@ function(app, FauxtonAPI, PagingCollection) {
       });
 
       return PagingCollection.prototype.parse.call(this, resp);
+    },
+
+    clone: function () {
+      return new this.constructor(this.models, {
+        database: this.database,
+        params: this.params,
+        paging: this.paging
+      });
     }
   });
 

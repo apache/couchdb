@@ -1710,8 +1710,19 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
         this.reduceFunStr = this.model.viewHasReduce(this.viewName);
       }
 
+      var viewFilters = FauxtonAPI.getExtensions('sidebar:viewFilters'),
+          filteredModels = this.ddocs.models,
+          designDocs = this.ddocs.clone();
+
+      if (!_.isEmpty(viewFilters)) {
+        _.each(viewFilters, function (filter) {
+          filteredModels = _.filter(filteredModels, filter);
+        });
+        designDocs.reset(filteredModels, {silent: true});
+      }
+
       this.designDocSelector = this.setView('.design-doc-group', new Views.DesignDocSelector({
-        collection: this.ddocs,
+        collection: designDocs,
         ddocName: this.model.id,
         database: this.database
       }));
@@ -1875,11 +1886,11 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       }, this);
 
       var viewFilters = FauxtonAPI.getExtensions('sidebar:viewFilters'),
-          collection = this.collection;
+          collection = this.collection.models;
 
       if (!_.isEmpty(viewFilters)) {
         _.each(viewFilters, function (filter) {
-          collection = collection.filter(filter);
+          collection = _.filter(collection, filter);
         });
       }
 
