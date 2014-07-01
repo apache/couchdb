@@ -843,12 +843,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       var editMatch = this.determineStringEditMatch(event);
       if (editMatch) {
         this.$("button.string-edit").removeAttr("disabled");
-	/* remove the following lines (along with CSS) to go back to the toolbar */
-        this.$("button.string-edit").css("position", "absolute");
-        this.$("button.string-edit").css("padding", "0");
-        this.$("button.string-edit").css("z-index", "1000");
-        this.$("button.string-edit").css("width", "16px");
-        this.$("button.string-edit").css("left", "22px");
+	/* remove the following line (along with CSS) to go back to the toolbar */
         this.$("button.string-edit").css("top", (this.$("#editor-container")[0].offsetTop - 2 + this.editor.getRowHeight() * this.editor.documentToScreenRow(this.editor.getSelectionStart().row)) + "px");
         return true;
       }
