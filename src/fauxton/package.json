@@ -27,7 +27,7 @@
     "underscore": "~1.4.2",
     "url": "~0.7.9",
     "urls": "~0.0.3",
-    "http-proxy": "~0.10.2",
+    "http-proxy": "~1.1.4",
     "send": "~0.1.1",
     "grunt-mocha-phantomjs": "~0.3.0"
   },
