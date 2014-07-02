@@ -124,14 +124,7 @@ module.exports = function(grunt) {
       dist: './dist/debug/',
       port: 8000,
       proxy: {
-        target: {
-          host: 'localhost',
-          port: 5984,
-          https: false
-        },
-        // This sets the Host header in the proxy so that you can use external
-        // CouchDB instances and not have the Host set to 'localhost'
-        changeOrigin: true
+        target: "http://localhost:5984/"
       }
     };
 

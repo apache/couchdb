@@ -19,6 +19,7 @@ module.exports = function (grunt) {
         http = require("http"),
         httpProxy = require('http-proxy'),
         send = require('send'),
+        urlLib = require('url'),
         options = grunt.config('couchserver'),
         _ = grunt.util._;
 
@@ -30,18 +31,14 @@ module.exports = function (grunt) {
 
     // Proxy options with default localhost
     var proxy_settings = options.proxy || {
-      target: {
-        host: 'localhost',
-        port: 5984,
-        https: false
-      }
+      target: "http://localhost:5984/"
     };
 
     // inform grunt that this task is async
     var done = this.async();
 
     // create proxy to couch for all couch requests
-    var proxy = new httpProxy.HttpProxy(proxy_settings);
+    var proxy = httpProxy.createServer(proxy_settings);
 
     http.createServer(function (req, res) {
       var url = req.url.replace('app/',''),
@@ -96,8 +93,13 @@ module.exports = function (grunt) {
           })
           .pipe(res);
       }
-
-      proxy.proxyRequest(req, res);
+      
+      // This sets the Host header in the proxy so that one can use external
+      // CouchDB instances and not have the Host set to 'localhost'
+      var urlObj = urlLib.parse(req.url);
+      req.headers['host'] = urlObj.host;
+      
+      proxy.web(req, res);
     }).listen(port);
 
     // Fail this task if any errors have been logged
