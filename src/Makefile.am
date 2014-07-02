@@ -324,7 +324,6 @@ FAUXTON_FILES = \
     fauxton/package.json \
     fauxton/readme.md \
     fauxton/settings.json.default \
-    fauxton/settings.json.dev \
     fauxton/settings.json.sample_external \
     fauxton/tasks/addon/rename.json \
     fauxton/tasks/addon/root/base.js.underscore \

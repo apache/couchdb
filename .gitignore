@@ -110,7 +110,6 @@ src/fauxton/app/addons/*
 !src/fauxton/app/addons/styletests
 src/fauxton/settings.json*
 !src/fauxton/settings.json.default
-!src/fauxton/settings.json.dev
 !src/fauxton/assets/js/plugins/zeroclipboard/ZeroClipboard.swf
 src/ibrowse/ibrowse.app
 src/ibrowse/ibrowse.app
