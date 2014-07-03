@@ -839,19 +839,27 @@ json_to_doc_info({Props}) ->
     undefined ->
         {last_seq, get_value(<<"last_seq">>, Props)};
     Changes ->
-        RevsInfo = lists:map(
+        RevsInfo0 = lists:map(
             fun({Change}) ->
                 Rev = couch_doc:parse_rev(get_value(<<"rev">>, Change)),
                 Del = couch_replicator_utils:is_deleted(Change),
                 #rev_info{rev=Rev, deleted=Del}
             end, Changes),
+
+        RevsInfo = case get_value(<<"removed">>, Props) of
+            true ->
+                [_ | RevsInfo1] = RevsInfo0,
+                RevsInfo1;
+            _ ->
+                RevsInfo0
+        end,
+
         #doc_info{
             id = get_value(<<"id">>, Props),
             high_seq = get_value(<<"seq">>, Props),
             revs = RevsInfo
         }
     end.
-
 
 bulk_results_to_errors(Docs, {ok, Results}, interactive_edit) ->
     lists:reverse(lists:foldl(

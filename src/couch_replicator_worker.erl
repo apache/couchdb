@@ -491,12 +491,15 @@ flush_doc(Target, #doc{id = Id, revs = {Pos, [RevId | _]}} = Doc) ->
 
 
 find_missing(DocInfos, Target) ->
-    {IdRevs, AllRevsCount} = lists:foldr(
-        fun(#doc_info{id = Id, revs = RevsInfo}, {IdRevAcc, CountAcc}) ->
-            Revs = [Rev || #rev_info{rev = Rev} <- RevsInfo],
-            {[{Id, Revs} | IdRevAcc], CountAcc + length(Revs)}
-        end,
-        {[], 0}, DocInfos),
+    {IdRevs, AllRevsCount} = lists:foldr(fun
+                (#doc_info{revs = []}, {IdRevAcc, CountAcc}) ->
+                    {IdRevAcc, CountAcc};
+                (#doc_info{id = Id, revs = RevsInfo}, {IdRevAcc, CountAcc}) ->
+                    Revs = [Rev || #rev_info{rev = Rev} <- RevsInfo],
+                    {[{Id, Revs} | IdRevAcc], CountAcc + length(Revs)}
+            end, {[], 0}, DocInfos),
+
+
     {ok, Missing} = couch_replicator_api_wrap:get_missing_revs(Target, IdRevs),
     MissingRevsCount = lists:foldl(
         fun({_Id, MissingRevs, _PAs}, Acc) -> Acc + length(MissingRevs) end,
