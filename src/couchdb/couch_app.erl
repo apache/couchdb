@@ -42,7 +42,7 @@ get_ini_files(Default) ->
 		fun (V, AccIn) ->
 			  case file:read_file_info(V) of
 				  {ok, #file_info{type = regular}} -> AccIn ++ [V];
-				  {ok, #file_info{type = directory}} -> AccIn ++ filelib:wildcard(V ++ "/*.ini");
+				  {ok, #file_info{type = directory}} -> AccIn ++ filelib:wildcard(filename:join([V,"*.ini"]));
 				  _ -> AccIn
 			  end
 		end,
