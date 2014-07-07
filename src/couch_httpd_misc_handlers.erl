@@ -69,7 +69,7 @@ handle_utils_dir_req(#httpd{method='GET'}=Req, DocumentRoot) ->
     {_ActionKey, "/", RelativePath} ->
         % GET /_utils/path or GET /_utils/
         CachingHeaders = [{"Cache-Control", "private, must-revalidate"}],
-        EnableCsp = couch_config:get("csp", "enable", "false"),
+        EnableCsp = config:get("csp", "enable", "false"),
         Headers = maybe_add_csp_headers(CachingHeaders, EnableCsp),
         couch_httpd:serve_file(Req, RelativePath, DocumentRoot, Headers);
     {_ActionKey, "", _RelativePath} ->
@@ -83,7 +83,7 @@ handle_utils_dir_req(Req, _) ->
 maybe_add_csp_headers(Headers, "true") ->
     DefaultValues = "default-src 'self'; img-src 'self'; font-src 'self'; "
                     "script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline';",
-    Value = couch_config:get("csp", "header_value", DefaultValues),
+    Value = config:get("csp", "header_value", DefaultValues),
     [{"Content-Security-Policy", Value} | Headers];
 maybe_add_csp_headers(Headers, _) ->
     Headers.
