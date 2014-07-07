@@ -247,7 +247,6 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
     }
   });
 
-  // TODO: limit height, stabilize
   Views.StringEditModal = Components.ModalView.extend({
     template: "addons/documents/templates/string_edit_modal",
 
