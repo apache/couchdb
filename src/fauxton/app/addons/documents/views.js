@@ -291,15 +291,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
         mode: "plain"
       });
       this.subEditor.render();
-      this.subEditor.editor.renderer.setVScrollBarAlwaysVisible(true);
-      this.subEditor.editor.renderer.setHScrollBarAlwaysVisible(true);
-      /* customize the ace scrolling for static edit width */
-      this.subEditor.editor.renderer.$autosize = function() {
-        this.desiredHeight = 35 * this.lineHeight;
-	this.container.style.height = this.desiredHeight + "px";
-	this.scrollBarV.setVisible(true);
-	this.scrollBarH.setVisible(true);
-      };
+      /* optimize by disabling auto sizing (35 is the lines fitting into the pop-up) */
+      this.subEditor.configureFixedHeightEditor(35);
     },
 
     cleanup: function () {

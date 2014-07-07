@@ -533,9 +533,22 @@ function(app, FauxtonAPI, ace, spin) {
       return _.contains(this.excludedViewErrors, msg);
     },
 
+    configureFixedHeightEditor: function(numLines) {
+      this.editor.renderer.setVScrollBarAlwaysVisible(true);
+      this.editor.renderer.setHScrollBarAlwaysVisible(true);
+      /* customize the ace scrolling for static edit height */
+      this.editor.renderer.$autosize = function() {
+        this.desiredHeight = numLines * this.lineHeight;
+        this.container.style.height = this.desiredHeight + "px";
+        this.scrollBarV.setVisible(true);
+        this.scrollBarH.setVisible(true);
+      };
+    },
+
     replaceCurrentLine: function(replacement) {
       this.editor.getSelection().selectLine();
       this.editor.insert(replacement);
+      this.editor.getSelection().moveCursorUp();
     },
 
     getLine: function(lineNum) {
