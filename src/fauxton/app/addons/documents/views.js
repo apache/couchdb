@@ -280,7 +280,7 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       this.indent = indent;
       this.hashKey = hashKey;      
       this.$('#string-edit-header').text(hashKey);
-      this.subEditor.setValue(JSON.parse(jsonString));
+      this.subEditor.setValue(JSON.parse(jsonString)); 
       this.comma = comma;
       this.showModal();
     },
@@ -291,6 +291,15 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
         mode: "plain"
       });
       this.subEditor.render();
+      this.subEditor.editor.renderer.setVScrollBarAlwaysVisible(true);
+      this.subEditor.editor.renderer.setHScrollBarAlwaysVisible(true);
+      /* customize the ace scrolling for static edit width */
+      this.subEditor.editor.renderer.$autosize = function() {
+        this.desiredHeight = 35 * this.lineHeight;
+	this.container.style.height = this.desiredHeight + "px";
+	this.scrollBarV.setVisible(true);
+	this.scrollBarH.setVisible(true);
+      };
     },
 
     cleanup: function () {
