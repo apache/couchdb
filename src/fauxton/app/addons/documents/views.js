@@ -247,6 +247,59 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
     }
   });
 
+  Views.StringEditModal = Components.ModalView.extend({
+    template: "addons/documents/templates/string_edit_modal",
+
+    initialize: function () {
+      _.bindAll(this);
+    },
+
+    events: {
+      "click #string-edit-save-btn":"saveString",
+    },
+  
+    saveString: function (event) {
+      event.preventDefault();
+      var newStr = this.subEditor.getValue();
+      this.editor.replaceCurrentLine(this.indent + this.hashKey + JSON.stringify(newStr) + this.comma + "\n");
+      this.hideModal();
+    },
+
+    _showModal: function () {
+      this.$('.bar').css({width: '0%'});
+      this.$('.progress').addClass('hide');
+      this.clear_error_msg();
+      this.$('.modal').modal();
+      // hack to get modal visible
+      $('.modal-backdrop').css('z-index',1025);
+    }, 
+
+    openWin: function(editor, indent, hashKey, jsonString, comma) {
+      this.editor = editor;
+      this.indent = indent;
+      this.hashKey = hashKey;      
+      this.$('#string-edit-header').text(hashKey);
+      this.subEditor.setValue(JSON.parse(jsonString)); 
+      this.comma = comma;
+      this.showModal();
+    },
+
+    afterRender: function() {
+      this.subEditor = new Components.Editor({
+        editorId: "string-editor-container",
+        mode: "plain"
+      });
+      this.subEditor.render();
+      /* optimize by disabling auto sizing (35 is the lines fitting into the pop-up) */
+      this.subEditor.configureFixedHeightEditor(35);
+    },
+
+    cleanup: function () {
+      if (this.subEditor) this.subEditor.remove();
+    }
+
+  });
+
   Views.Document = FauxtonAPI.View.extend({
     template: "addons/documents/templates/all_docs_item",
     tagName: "tr",
@@ -751,7 +804,8 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
       "click button.delete": "destroy",
       "click button.duplicate": "duplicate",
       "click button.upload": "upload",
-      "click button.cancel-button": "goback"
+      "click button.cancel-button": "goback",
+      "click button.string-edit": "stringEditing"
     },
 
     disableLoader: true,
@@ -763,6 +817,57 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
 
     goback: function(){
       FauxtonAPI.navigate(this.database.url("index") + "?limit=100");
+    },
+
+    determineStringEditMatch: function(event) {
+      var selStart = this.editor.getSelectionStart().row;
+      var selEnd = this.editor.getSelectionEnd().row;
+      /* one JS(ON) string can't span more than one line - we edit one string, so ensure we don't select several lines */
+      if (selStart >=0 && selEnd >= 0 && selStart === selEnd && this.editor.isRowExpanded(selStart)) {    
+        var editLine = this.editor.getLine(selStart);
+	var editMatch = editLine.match(/^([ \t]*)("[a-zA-Z0-9_]*": )?(".*",?[ \t]*)$/);
+	if (editMatch) {
+          return editMatch;
+	} else {
+          return null;
+	}
+      } else {
+        return null;
+      }
+    }, 
+
+    showHideEditDocString: function (event) {
+      this.$("button.string-edit").attr("disabled", "true");
+      if (!this.hasValidCode()) {
+        return false;
+      }
+      var editMatch = this.determineStringEditMatch(event);
+      if (editMatch) {
+        this.$("button.string-edit").removeAttr("disabled");
+	/* remove the following line (along with CSS) to go back to the toolbar */
+        this.$("button.string-edit").css("top", (this.$("#editor-container")[0].offsetTop - 2 + this.editor.getRowHeight() * this.editor.documentToScreenRow(this.editor.getSelectionStart().row)) + "px");
+        return true;
+      }
+      return false;
+    },
+
+    stringEditing: function(event) {
+      event.preventDefault();   
+      if (!this.hasValidCode()) {
+        return;
+      }
+      var editMatch = this.determineStringEditMatch(event);
+      if (editMatch) {
+        var indent = editMatch[1] || "",
+              hashKey = editMatch[2] || "",
+              editText = editMatch[3],
+              comma = "";
+        if (editText.substring(editText.length - 1) === ",") {
+          editText = editText.substring(0, editText.length - 1); 
+          comma = ",";
+        }
+        this.stringEditModal.openWin(this.editor, indent, hashKey, editText, comma);
+      }
     },
 
     destroy: function(event) {
@@ -802,6 +907,9 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
 
       this.duplicateModal = this.setView('#duplicate-modal', new Views.DuplicateDocModal({model: this.model}));
       this.duplicateModal.render();
+
+      this.stringEditModal = this.setView('#string-edit-modal', new Views.StringEditModal());
+      this.stringEditModal.render();
     },
 
     upload: function (event) {
@@ -998,6 +1106,14 @@ function(app, FauxtonAPI, Components, Documents, Databases, pouchdb,
           msg: "Cannot remove a documents Id or Revision.",
           clear:  true
         });
+      });
+
+      var that = this;
+      this.listenTo(editor.editor, "changeSelection", function (event) {
+        that.showHideEditDocString(event);
+      });
+      this.listenTo(editor.editor.session, "changeBackMarker", function (event) {
+        that.showHideEditDocString(event);
       });
     },
 

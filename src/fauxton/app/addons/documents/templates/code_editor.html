@@ -22,6 +22,7 @@ the License.
   </div>
 
   <div class="span7">
+    <button class="btn string-edit" title="Edit line" disabled="true"><i class="icon icon-edit"></i></button>
     <% if (attachments) { %>
     <div class="btn-group">
       <button class="dropdown-toggle btn" data-bypass="true" data-toggle="dropdown">
@@ -48,6 +49,7 @@ the License.
 
 <div id="upload-modal"> </div>
 <div id="duplicate-modal"> </div> 
+<div id="string-edit-modal"> </div> 
 </div>
 
   <div id="editor-container" class="doc-code"><%- JSON.stringify(doc.attributes, null, "  ") %></div>

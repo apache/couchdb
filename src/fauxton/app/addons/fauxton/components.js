@@ -420,7 +420,9 @@ function(app, FauxtonAPI, ace, spin) {
 
       this.editor.setTheme("ace/theme/" + this.theme);
 
-      this.editor.getSession().setMode("ace/mode/" + this.mode);
+      if (this.mode != "plain") {
+        this.editor.getSession().setMode("ace/mode/" + this.mode);
+      }
       this.editor.setShowPrintMargin(false);
       this.addCommands();
 
@@ -529,8 +531,49 @@ function(app, FauxtonAPI, ace, spin) {
 
     isIgnorableError: function(msg) {
       return _.contains(this.excludedViewErrors, msg);
-    }
+    },
 
+    configureFixedHeightEditor: function(numLines) {
+      this.editor.renderer.setVScrollBarAlwaysVisible(true);
+      this.editor.renderer.setHScrollBarAlwaysVisible(true);
+      /* customize the ace scrolling for static edit height */
+      this.editor.renderer.$autosize = function() {
+        this.desiredHeight = numLines * this.lineHeight;
+        this.container.style.height = this.desiredHeight + "px";
+        this.scrollBarV.setVisible(true);
+        this.scrollBarH.setVisible(true);
+      };
+    },
+
+    replaceCurrentLine: function(replacement) {
+      this.editor.getSelection().selectLine();
+      this.editor.insert(replacement);
+      this.editor.getSelection().moveCursorUp();
+    },
+
+    getLine: function(lineNum) {
+      return this.editor.session.getLine(lineNum);
+    },
+
+    getSelectionStart: function() {
+      return this.editor.getSelectionRange().start;
+    },
+
+    getSelectionEnd: function() {
+      return this.editor.getSelectionRange().end;
+    },
+
+    getRowHeight: function() {
+      return this.editor.renderer.layerConfig.lineHeight;
+    },
+
+    isRowExpanded: function(row) {
+      return !this.editor.getSession().isRowFolded(row);
+    },
+
+    documentToScreenRow: function(row) {
+      return this.editor.getSession().documentToScreenRow(row, 0);
+    }
   });
 
   //need to make this into a backbone view...
