@@ -19,7 +19,6 @@ SUBDIRS = \
     couchdb \
     ejson \
     erlang-oauth \
-    etap \
     ibrowse \
     mochiweb \
     snappy \

@@ -1,0 +1,111 @@
+#!/usr/bin/env escript
+%% -*- erlang -*-
+%%! -DTEST -env ERL_LIBS @abs_top_builddir@/src:$ERL_LIBS -pa @abs_top_builddir@/test/couchdb/ebin
+%%
+%% Licensed under the Apache License, Version 2.0 (the "License"); you may not
+%% use this file except in compliance with the License. You may obtain a copy of
+%% the License at
+%%
+%%   http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing, software
+%% distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+%% WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+%% License for the specific language governing permissions and limitations under
+%% the License.
+
+-define(BUILDDIR, "@abs_top_builddir@").
+-define(SOURCEDIR, "@abs_top_srcdir@").
+-define(TESTS_EBIN, filename:join([?BUILDDIR, "test", "couchdb", "ebin", ""])).
+-define(TESTS_TEMP, filename:join([?BUILDDIR, "test", "couchdb", "temp", ""])).
+
+main([]) ->
+    io:fwrite("Path to test file or directory wasn't specified.~n"),
+    erlang:halt(1);
+main(["-v"]) ->
+    io:fwrite("Path to test file or directory wasn't specified.~n"),
+    erlang:halt(1);
+main(["-v", Path]) ->
+    run(Path, [verbose]);
+main(["-v", _ | _]) ->
+    io:fwrite("Only single tests source path is supported.~n"),
+    erlang:halt(1);
+main([Path]) ->
+    run(Path, []),
+    ok;
+main([_|_]) ->
+    io:fwrite("Only single tests source path is supported.~n"),
+    erlang:halt(1).
+
+
+run(Path, Options) ->
+    ensure_dirs(),
+    Mask = "*_tests.erl",
+    Files = list_files(Path, Mask),
+    init_code_path(),
+    Mods = compile(Files),
+    run_tests(Mods, Options).
+
+ensure_dirs() ->
+    ok = filelib:ensure_dir(?TESTS_EBIN),
+    ok = filelib:ensure_dir(?TESTS_TEMP),
+    ok.
+
+list_files(Path, Mask)->
+    AbsPath = filename:absname(Path),
+    case filelib:is_file(AbsPath) of
+        true ->
+            ok;
+        false ->
+            io:fwrite("File or directory not found: ~p~n", [AbsPath]),
+            erlang:halt(1)
+    end,
+    case filelib:is_dir(AbsPath) of
+        true ->
+            case filelib:wildcard(filename:join([AbsPath, Mask])) of
+                [] ->
+                    io:fwrite("No test files was found at ~p by mask ~p ~n",
+                              [AbsPath, Mask]),
+                    erlang:halt(1);
+                Files ->
+                    Files
+            end;
+        false -> [AbsPath]
+    end.
+
+
+compile(Files) ->
+    lists:map(
+        fun(File)->
+            io:fwrite("compile ~p~n", [File]),
+            Opts = [report, verbose, {outdir, ?TESTS_EBIN},
+                    {i, filename:join([?BUILDDIR, "test", "couchdb",
+                                       "include"])},
+                    {i, filename:join([?SOURCEDIR, "src"])}],
+            {ok, Mod} = compile:file(File, Opts),
+            Mod
+        end,
+    Files).
+
+
+run_tests(Mods, Options) ->
+    %% disable error_logger to reduce noise in stdout
+    error_logger:tty(false),
+    case eunit:test(Mods, Options) of
+        error -> erlang:halt(1);
+        _ -> ok
+    end.
+
+
+init_code_path() ->
+    Paths = [
+        "couchdb",
+        "ejson",
+        "erlang-oauth",
+        "ibrowse",
+        "mochiweb",
+        "snappy"
+    ],
+    lists:foreach(fun(Name) ->
+        code:add_patha(filename:join([?BUILDDIR, "src", Name]))
+    end, Paths).

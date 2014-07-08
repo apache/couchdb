@@ -10,6 +10,11 @@
 ## License for the specific language governing permissions and limitations under
 ## the License.
 
-SUBDIRS = bench couchdb javascript view_server
-EXTRA_DIST = random_port.ini
+noinst_PROGRAMS = test_cfg_register
+test_cfg_register_SOURCES = test_cfg_register.c
+test_cfg_register_CFLAGS = -D_BSD_SOURCE
 
+noinst_SCRIPTS = os_daemon_configer.escript
+
+all:
+	chmod +x os_daemon_configer.escript

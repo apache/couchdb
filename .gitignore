@@ -127,12 +127,10 @@ src/snappy/snappy.app
 stamp-h1
 test/.deps/
 test/bench/run
-test/etap/.deps/
-test/etap/run
-test/etap/run
-test/etap/temp.*
-test/etap/test_cfg_register
-test/etap/test_util.erl
+test/couchdb/run
+test/couchdb/include/couch_eunit.hrl
+test/couchdb/fixtures/.deps/
+test/couchdb/fixtures/os_daemon_configer.escript
 test/javascript/run
 test/javascript/run_js_tests.sh
 test/local.ini

@@ -77,7 +77,7 @@ THANKS.gz: THANKS
 
 check: dev check-js
 if TESTS
-	$(top_builddir)/test/etap/run $(top_srcdir)/test/etap
+	$(top_builddir)/test/couchdb/run -v $(top_srcdir)/test/couchdb
 endif
 
 check-js: dev
@@ -87,20 +87,9 @@ if USE_CURL
 endif
 endif
 
-check-etap: dev
+check-eunit: dev
 if TESTS
-	$(top_builddir)/test/etap/run $(top_srcdir)/test/etap
-endif
-
-cover: dev
-if TESTS
-	rm -f cover/*.coverdata
-	COVER=1 COVER_BIN=./src/couchdb/ $(top_builddir)/test/etap/run
-	SRC=./src/couchdb/ \
-	    $(ERL) -noshell \
-	    -pa src/etap \
-	    -eval 'etap_report:create()' \
-	    -s init stop > /dev/null 2>&1
+	$(top_builddir)/test/couchdb/run -v $(top_srcdir)/test/couchdb
 endif
 
 dev: all
@@ -137,7 +126,6 @@ local-clean: maintainer-clean
 	rm -f $(top_srcdir)/aclocal.m4
 	rm -f $(top_srcdir)/config.h.in
 	rm -f $(top_srcdir)/configure
-	rm -f $(top_srcdir)/test/etap/temp.*
 	rm -f $(top_srcdir)/*.tar.gz
 	rm -f $(top_srcdir)/*.tar.gz.*
 	find $(top_srcdir) -name Makefile.in -exec rm -f {} \;
