@@ -378,7 +378,7 @@ B-trees are structured, we can cache the intermediate reduce results in the
 non-leaf nodes of the tree, so reduce queries can be computed along arbitrary
 key ranges in logarithmic time. See Figure 1, “Comments map function”.
 
-In the blog app, we use ``group_leve``l reduce queries to compute the count of
+In the blog app, we use ``group_leve`` reduce queries to compute the count of
 comments both on a per-post and total basis, achieved by querying the same view
 index with different methods. With some array keys, and assuming each key has
 the value ``1``:
