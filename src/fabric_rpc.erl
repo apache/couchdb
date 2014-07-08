@@ -53,15 +53,21 @@ all_docs(DbName, Options, #mrargs{keys=undefined} = Args) ->
     VAcc0 = #vacc{db=Db},
     couch_mrview:query_all_docs(Db, Args, fun view_cb/2, VAcc0).
 
-map_view(DbName, DDoc, ViewName, Args) ->
+map_view(DbName, DDoc, ViewName, Args0) ->
+    Args = fix_skip_and_limit(Args0),
     {ok, Db} = get_or_create_db(DbName, []),
     VAcc0 = #vacc{db=Db},
     couch_mrview:query_view(Db, DDoc, ViewName, Args, fun view_cb/2, VAcc0).
 
-reduce_view(DbName, DDoc, ViewName, Args) ->
+reduce_view(DbName, DDoc, ViewName, Args0) ->
+    Args = fix_skip_and_limit(Args0),
     {ok, Db} = get_or_create_db(DbName, []),
     VAcc0 = #vacc{db=Db},
     couch_mrview:query_view(Db, DDoc, ViewName, Args, fun reduce_cb/2, VAcc0).
+
+fix_skip_and_limit(Args) ->
+    #mrargs{skip=Skip, limit=Limit}=Args,
+    Args#mrargs{skip=0, limit=Skip+Limit}.
 
 create_db(DbName) ->
     rexi:reply(case couch_server:create(DbName, []) of
