@@ -33,6 +33,10 @@ AC_DISABLE_STATIC
 AC_PROG_CC
 LT_INIT([win32-dll])
 LT_INIT
+AS_IF([test x"${enable_shared}" = "xno"], [
+  AC_MSG_ERROR([System as configured cannot build shared libraries.])
+])
+
 AC_PROG_LN_S
 
 PKG_PROG_PKG_CONFIG
