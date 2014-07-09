@@ -530,7 +530,6 @@ table.databases {
 
 
 #dashboard {
-  max-width: 1500px;
   .box-shadow(-6px 0 rgba(0, 0, 0, 0.1));
   border-left: 1px solid #999;
   position: absolute;
@@ -547,7 +546,7 @@ table.databases {
   &.one-pane{
     min-width: 800px;
     margin-top: 0;
-    overflow: auto;
+    overflow-x: hidden;
   }
 }
 
@@ -619,8 +618,8 @@ table.databases {
 }
 
 #breadcrumbs {
-   padding: 15px 20px;
    .breadcrumb {
+    margin: 15px 20px;
     margin-bottom: 0;
     background-color: transparent;
     padding: 0;
@@ -872,12 +871,12 @@ div.spinner {
 
 #api-navbar{
   position: relative;
+  padding-right: 5px;
 }
 
 .api-url-btn {
-  position: absolute;
-  right: 15px;
-  top: -50px;
+  margin-top: 5px;
+  margin-bottom: 5px;
   .icon {
     font-size: 11px;
   }
@@ -885,7 +884,7 @@ div.spinner {
 
 .api-navbar {
   border-top: 1px solid @red;
-  padding: 20px 20px 15px;
+  padding: 20px;
   .input-append.input-prepend {
     margin-bottom: 0px;
     .add-on {
