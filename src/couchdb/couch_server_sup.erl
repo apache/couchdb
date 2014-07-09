@@ -106,6 +106,7 @@ start_server(IniFiles) ->
 
     Ip = couch_config:get("httpd", "bind_address"),
     io:format("Apache CouchDB has started. Time to relax.~n"),
+    {module, sd_notify} == code:load_file(sd_notify) andalso sd_notify:sd_notify(0, "READY=1"),
     Uris = [get_uri(Name, Ip) || Name <- [couch_httpd, https]],
     [begin
         case Uri of
