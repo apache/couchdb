@@ -68,12 +68,12 @@ var Views = (function() {
     if (doc) message += " with doc._id " + doc._id;
     log(message);
   };
-
+  function emit(key, value) {
+    map_results.push([key, value]);
+  }
   return {
     // view helper functions
-    emit : function(key, value) {
-      map_results.push([key, value]);
-    },
+    emit : emit,
     sum : function(values) {
       var rv = 0;
       for (var i in values) {
@@ -112,7 +112,7 @@ var Views = (function() {
       for (var i = 0; i < State.funs.length; i++) {
         map_results = [];
         try {
-          State.funs[i](doc);
+          State.funs[i](doc, emit);
           buf.push(Couch.toJSON(map_results));
         } catch (err) {
           handleViewError(err, doc);
