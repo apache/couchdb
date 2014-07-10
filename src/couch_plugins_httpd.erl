@@ -13,7 +13,7 @@
 
 -export([handle_req/1]).
 
--include_lib("couch_db.hrl").
+-include_lib("couch/include/couch_db.hrl").
 
 handle_req(#httpd{method='POST'}=Req) ->
     ok = couch_httpd:verify_is_server_admin(Req),
