@@ -7,7 +7,7 @@ before_install:
    - sudo apt-get -y install python-pygments python-docutils python-sphinx
 before_script: ./configure
 script:
-   - make distcheck
+   - make check
    - cd src/fauxton
    - npm install
    - grunt test
