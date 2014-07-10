@@ -15,6 +15,7 @@
 -behaviour(application).
 
 -include("couch_db.hrl").
+-include_lib("kernel/include/file.hrl").
 
 -export([start/2, stop/1]).
 
@@ -37,7 +38,17 @@ get_ini_files(Default) ->
     {ok, [[]]} ->
         Default;
     {ok, [Values]} ->
-        Values
+        lists:foldl(
+		fun (V, AccIn) ->
+			  case file:read_file_info(V) of
+				  {ok, #file_info{type = regular}} -> AccIn ++ [V];
+				  {ok, #file_info{type = directory}} -> AccIn ++ filelib:wildcard(filename:join([V,"*.ini"]));
+				  _ -> AccIn
+			  end
+		end,
+		[],
+		Values
+	)
     end.
 
 start_apps([]) ->
