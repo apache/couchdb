@@ -335,6 +335,8 @@ table.databases {
 
 /* Fixed side navigation */
 #primary-navbar {
+  /* hack for the scrollbar that shines through from the sidebar */
+  -webkit-transform: translate3d(0, 0, 0);
   height: 100%;
   position: fixed;
   width: @navWidth;
