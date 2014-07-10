@@ -1,0 +1,10 @@
+CouchDB 2.0 TODO
+
+The remaining work after the merge of 1843-feature-bigcouch for the
+bigcouch side of things;
+
+1) Restore documentation (couchdb-documentation and build scripts)
+2) Restore couch-plugins
+3) Restore my-first-couchdb-plugin (to couchdb-examples)
+4) Restore _db_updates
+5) Sundries (AUTHORS, INSTALL.*, LICENSE, NOTICE, etc)
