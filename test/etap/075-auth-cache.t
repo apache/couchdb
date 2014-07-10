@@ -20,17 +20,15 @@
 
 -record(db, {
     main_pid = nil,
-    update_pid = nil,
     compactor_pid = nil,
     instance_start_time, % number of microsecs since jan 1 1970 as a binary string
     fd,
-    updater_fd,
-    fd_ref_counter,
+    fd_monitor,
     header,
     committed_update_seq,
-    fulldocinfo_by_id_btree,
-    docinfo_by_seq_btree,
-    local_docs_btree,
+    id_tree,
+    seq_tree,
+    local_tree,
     update_seq,
     name,
     filepath,
@@ -67,9 +65,9 @@ main(_) ->
 
 
 test() ->
-    couch_server_sup:start_link(test_util:config_files()),
-    OrigName = couch_config:get("couch_httpd_auth", "authentication_db"),
-    couch_config:set(
+    test_util:start_couch(),
+    OrigName = config:get("couch_httpd_auth", "authentication_db"),
+    config:set(
         "couch_httpd_auth", "authentication_db",
         binary_to_list(auth_db_name()), false),
     delete_db(auth_db_name()),
@@ -77,7 +75,7 @@ test() ->
 
     test_auth_db_crash(),
 
-    couch_config:set("couch_httpd_auth", "authentication_db", OrigName, false),
+    config:set("couch_httpd_auth", "authentication_db", OrigName, false),
     delete_db(auth_db_name()),
     delete_db(auth_db_2_name()),
     couch_server_sup:stop(),
@@ -140,7 +138,7 @@ test_auth_db_crash() ->
     full_commit(auth_db_name()),
 
     etap:diag("Changing the auth database"),
-    couch_config:set(
+    config:set(
         "couch_httpd_auth", "authentication_db",
         binary_to_list(auth_db_2_name()), false),
     ok = timer:sleep(500),
@@ -175,7 +173,7 @@ test_auth_db_crash() ->
             "Cached credentials have the new password"),
 
     etap:diag("Changing the auth database again"),
-    couch_config:set(
+    config:set(
         "couch_httpd_auth", "authentication_db",
         binary_to_list(auth_db_name()), false),
     ok = timer:sleep(500),

@@ -38,8 +38,8 @@ main(_) ->
     ok.
 
 test() ->
-    couch_server_sup:start_link(test_util:config_files()),
-    Addr = couch_config:get("httpd", "bind_address", any),
+    ok = test_util:start_couch(),
+    Addr = config:get("httpd", "bind_address", any),
     put(addr, Addr),
     put(port, mochiweb_socket_server:get(couch_httpd, port)),
     timer:sleep(1000),
@@ -59,7 +59,7 @@ test() ->
     test_chunked_with_invalid_md5_trailer(),
 
     couch_server:delete(test_db_name(), []),
-    couch_server_sup:stop(),
+    ok = test_util:stop_couch(),
     ok.
 
 test_identity_without_md5() ->

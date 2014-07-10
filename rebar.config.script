@@ -1,0 +1,60 @@
+% Licensed under the Apache License, Version 2.0 (the "License"); you may not
+% use this file except in compliance with the License. You may obtain a copy of
+% the License at
+%
+%   http://www.apache.org/licenses/LICENSE-2.0
+%
+% Unless required by applicable law or agreed to in writing, software
+% distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+% WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+% License for the specific language governing permissions and limitations under
+% the License.
+
+% Set the path to the configuration environment generated
+% by `./configure`.
+ConfigureEnv = filename:join(filename:dirname(SCRIPT), "config.erl"),
+os:putenv("COUCHDB_CONFIG", ConfigureEnv).
+
+
+DepDescs = [
+    {couch_log, "couchdb-couch-log", {branch, "master"}, []},
+    {config, "couchdb-config", {branch, "master"}, []},
+    {chttpd, "couchdb-chttpd", {branch, "master"}, []},
+    {couch, "couchdb-couch", {branch, "master"}, []},
+    {couch_index, "couchdb-couch-index", {branch, "master"}, []},
+    {couch_mrview, "couchdb-couch-mrview", {branch, "master"}, []},
+    {couch_replicator, "couchdb-couch-replicator", {branch,  "master"}, []},
+    {couch_dbupdates, "couchdb-couch-dbupdates", {branch, "master"}, []},
+    {couch_plugins, "couchdb-couch-plugins", {branch, "master"}, []},
+    {ddoc_cache, "couchdb-ddoc-cache", {branch, "master"}, []},
+    {ets_lru, "couchdb-ets-lru", {branch, "master"}, []},
+    {fabric, "couchdb-fabric", {branch,  "master"}, []},
+    {ibrowse, "couchdb-ibrowse", {tag,  "master"}, []},
+    {jiffy, "couchdb-jiffy", {branch, "master"}, []},
+    {mem3, "couchdb-mem3", {branch, "master"}, []},
+    {mochiweb, "couchdb-mochiweb", {branch, "master"}, []},
+    {oauth, "couchdb-oauth", {branch, "master"}, []},
+    {rexi, "couchdb-rexi", {branch, "master"}, []},
+    {snappy, "couchdb-snappy", {branch, "1994-merge-rcouch"}, []},
+    {fauxton, "couchdb-fauxton", {branch, "master"}, [raw]},
+    {docs, "couchdb-documentation", {branch, "master"}, [raw]}
+],
+
+MakeDep = fun({AppName, RepoName, Version, Options}) ->
+    Url = "https://git-wip-us.apache.org/repos/asf/" ++ RepoName ++ ".git",
+    {AppName, ".*", {git, Url, Version}, Options}
+end,
+
+AddConfig = [
+    {require_otp_vsn, "R14B01|R14B03|R14B04|R16B02|R16B03-1|17"},
+    {deps_dir, "src"},
+    {deps, lists:map(MakeDep, DepDescs)},
+    {sub_dirs, ["rel"]},
+    {lib_dirs, ["src/"]},
+    {erl_opts, [debug_info]},
+    {post_hooks, [{compile, "escript support/build_js.escript"}]}
+],
+
+C = lists:foldl(fun({K, V}, CfgAcc) ->
+    lists:keystore(K, 1, CfgAcc, {K, V})
+end, CONFIG, AddConfig).

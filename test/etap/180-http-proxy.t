@@ -26,17 +26,7 @@ proxy() ->
 external() -> "https://www.google.com/".
 
 main(_) ->
-    test_util:init_code_path(),
-
-    etap:plan(61),
-    case (catch test()) of
-        ok ->
-            etap:end_tests();
-        Other ->
-            etap:diag("Test died abnormally: ~p", [Other]),
-            etap:bail("Bad return value.")
-    end,
-    ok.
+    test_util:run(61, fun() -> test() end).
 
 check_request(Name, Req, Remote, Local) ->
     case Remote of
@@ -68,7 +58,7 @@ check_request(Name, Req, Remote, Local) ->
 
 test() ->
     ExtraConfig = [test_util:source_file("test/etap/180-http-proxy.ini")],
-    couch_server_sup:start_link(test_util:config_files() ++ ExtraConfig),
+    ok = test_util:start_couch(test_util:config_files() ++ ExtraConfig),
     ibrowse:start(),
     crypto:start(),
 
@@ -79,7 +69,7 @@ test() ->
         test_web:get_port(),
         "/\">>}"
     ]),
-    couch_config:set("httpd_global_handlers", "_test", Url, false),
+    config:set("httpd_global_handlers", "_test", Url, false),
 
     % let couch_httpd restart
     timer:sleep(100),

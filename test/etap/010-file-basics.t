@@ -27,6 +27,7 @@ main(_) ->
             etap:end_tests();
         Other ->
             etap:diag(io_lib:format("Test died abnormally: ~p", [Other])),
+            timer:sleep(1000),
             etap:bail()
     end,
     ok.

@@ -93,7 +93,7 @@
                   $("#databases tbody.content tr:eq(" + idx + ")")
                     .find("td.size").text($.futon.formatSize(info.disk_size)).end()
                     .find("td.count").text(info.doc_count).end()
-                    .find("td.seq").text(info.update_seq);
+                    .find("td.seq").text(info.update_seq.split("-")[0]);
                 },
                 error : function() {}
               });
@@ -131,7 +131,7 @@
       var urlParts = location.search.substr(1).split("/");
       var dbName = decodeURIComponent(urlParts.shift())
 
-      var dbNameRegExp = new RegExp("[^a-z0-9\_\$\(\)\+\/\-]", "g");
+      var dbNameRegExp = new RegExp("[^a-z0-9.\_\$\(\)\+\/\-]", "g");
       dbName = dbName.replace(dbNameRegExp, "");
 
       $.futon.storage.declareWithPrefix(dbName + ".", {

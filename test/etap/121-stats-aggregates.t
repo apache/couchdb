@@ -20,19 +20,10 @@ cfg_file() ->
     test_util:source_file("test/etap/121-stats-aggregates.cfg").
 
 main(_) ->
-    test_util:init_code_path(),
-    etap:plan(17),
-    case (catch test()) of
-        ok ->
-            etap:end_tests();
-        Other ->
-            etap:diag(io_lib:format("Test died abnormally: ~p", [Other])),
-            etap:bail()
-    end,
-    ok.
+    test_util:run(17, fun() -> test() end).
 
 test() ->
-    couch_config:start_link([ini_file()]),
+    config_sup:start_link([ini_file()]),
     couch_stats_collector:start(),
     couch_stats_aggregator:start(cfg_file()),
     ok = test_all_empty(),

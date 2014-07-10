@@ -16,6 +16,7 @@
 -export([source_file/1, build_file/1, config_files/0]).
 -export([run/2]).
 -export([request/3, request/4]).
+-export([start_couch/0, start_couch/1, stop_couch/0]).
 
 srcdir() ->
     "@abs_top_srcdir@".
@@ -28,7 +29,7 @@ init_code_path() ->
         "etap",
         "couchdb",
         "ejson",
-        "erlang-oauth",
+        "oauth",
         "ibrowse",
         "mochiweb",
         "snappy"
@@ -54,13 +55,18 @@ config_files() ->
 run(Plan, Fun) ->
     test_util:init_code_path(),
     etap:plan(Plan),
-    case (catch Fun()) of
+    try Fun() of
         ok ->
             etap:end_tests();
-        Other ->
-            etap:diag(io_lib:format("Test died abnormally:~n~p", [Other])),
-            timer:sleep(500),
-            etap:bail(Other)
+        Else ->
+            etap:diag("Bad return:~n~p", [Else]),
+            timer:sleep(100),
+            etap:bail(Else)
+    catch Type:Reason ->
+        etap:diag("Test died: ~p~n  ~p~n  ~p~n",
+                [Type, Reason, erlang:get_stacktrace()]),
+        timer:sleep(1000),
+        etap:bail({Type, Reason})
     end,
     ok.
 
@@ -92,3 +98,18 @@ request(Url, Headers, Method, Body, N) ->
     Error ->
         Error
     end.
+
+start_couch() ->
+    start_couch(config_files()).
+
+start_couch(IniFiles) ->
+    ok = application:set_env(config, ini_files, IniFiles),
+    ok = application:start(config),
+    ok = application:start(twig),
+    ok = application:start(couch),
+    ok.
+
+stop_couch() ->
+    ok = application:stop(couch),
+    ok = application:stop(twig),
+    ok = application:stop(config).

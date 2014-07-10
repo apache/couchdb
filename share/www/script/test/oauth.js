@@ -23,12 +23,14 @@ couchTests.oauth = function(debug) {
   var dbA = new CouchDB("test_suite_db_a", {"X-Couch-Full-Commit":"false"});
   var dbB = new CouchDB("test_suite_db_b", {"X-Couch-Full-Commit":"false"});
   var dbC = new CouchDB("test_suite_db_c", {"X-Couch-Full-Commit":"false"});
+  var dbD = new CouchDB("test_suite_users", {"X-Couch-Full-Commit":"false"});
   dbA.deleteDb();
   dbA.createDb();
   dbB.deleteDb();
   dbB.createDb();
   dbC.deleteDb();
   dbC.createDb();
+  dbD.deleteDb();
 
   // Simple secret key generator
   function generateSecret(length) {
@@ -125,7 +127,6 @@ couchTests.oauth = function(debug) {
         "X-Couch-Full-Commit":"false",
         "Authorization": adminBasicAuthHeaderValue()
       });
-      usersDb.deleteDb();
         
       // Create a user
       var jasonUserDoc = CouchDB.prepareUserDoc({

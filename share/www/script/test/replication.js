@@ -1359,17 +1359,24 @@ couchTests.replication = function(debug) {
   TEquals(true, repResult.ok);
   TEquals('string', typeof repResult._local_id);
 
-  var xhr = CouchDB.request("GET", "/_active_tasks");
-  var tasks = JSON.parse(xhr.responseText);
-
   TEquals(true, sourceDb.compact().ok);
   while (sourceDb.info().compact_running) {};
 
   TEquals(true, sourceDb.save(makeDocs(30, 31)[0]).ok);
   xhr = CouchDB.request("GET", "/_active_tasks");
 
-  var tasksAfter = JSON.parse(xhr.responseText);
-  TEquals(tasks.length, tasksAfter.length);
+  var xhr = CouchDB.request("GET", "/_active_tasks");
+  var tasks = JSON.parse(xhr.responseText);
+
+  var found_task = false;
+  for(var i = 0; i < tasks.length; i++) {
+    if(tasks[i].replication_id == repResult._local_id) {
+      found_task = true;
+      break;
+    }
+  }
+  TEquals(true, found_task);
+
   waitForSeq(sourceDb, targetDb);
   T(sourceDb.open("30") !== null);
 
@@ -1694,6 +1701,9 @@ couchTests.replication = function(debug) {
   );
   TEquals(true, repResult.ok);
   TEquals('string', typeof repResult._local_id);
+
+  // Race conditions are awesome
+  wait(500);
 
   xhr = CouchDB.request("GET", "/_active_tasks");
   tasks = JSON.parse(xhr.responseText);

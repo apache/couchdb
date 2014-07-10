@@ -44,32 +44,32 @@ main(_) ->
     ok.
 
 test() ->
-    couch_config:start_link(test_util:config_files()),
+    application:start(config),
     couch_os_daemons:start_link(),
     
     DaemonCmd = daemon_cmd() ++ " 2> /dev/null",
     
     etap:diag("Booting the daemon"),
-    couch_config:set("os_daemons", daemon_name(), DaemonCmd, false),
+    config:set("os_daemons", daemon_name(), DaemonCmd, false),
     wait_for_start(10),
     {ok, [D1]} = couch_os_daemons:info([table]),
     check_daemon(D1, running),
     
     etap:diag("Daemon restarts when section changes."),
-    couch_config:set("s1", "k", "foo", false),
+    config:set("s1", "k", "foo", false),
     wait_for_restart(10),
     {ok, [D2]} = couch_os_daemons:info([table]),
     check_daemon(D2, running),
     etap:isnt(D2#daemon.kill, D1#daemon.kill, "Kill command shows restart."),
 
     etap:diag("Daemon doesn't restart for ignored section key."),
-    couch_config:set("s2", "k2", "baz", false),
+    config:set("s2", "k2", "baz", false),
     timer:sleep(1000), % Message travel time.
     {ok, [D3]} = couch_os_daemons:info([table]),
     etap:is(D3, D2, "Same daemon info after ignored config change."),
     
     etap:diag("Daemon restarts for specific section/key pairs."),
-    couch_config:set("s2", "k", "bingo", false),
+    config:set("s2", "k", "bingo", false),
     wait_for_restart(10),
     {ok, [D4]} = couch_os_daemons:info([table]),
     check_daemon(D4, running),

@@ -115,6 +115,8 @@ couchTests.security_validation = function(debug) {
         {"WWW-Authenticate": "X-Couch-Test-Auth Jan Lehnardt:apple"}
       );
       // Attempt to save the design as a non-admin (in replication scenario)
+      designDoc.foo = "bar";
+      designDoc._rev = "2-642e20f96624a0aae6025b4dba0c6fb2";
       try {
         user2Db.save(designDoc, {new_edits : false});
         T(false && "Can't get here. Should have thrown an error on design doc");

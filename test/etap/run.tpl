@@ -26,7 +26,7 @@ else
 fi
 
 if test -f $TGT; then
-    prove $OPTS $TGT
+    prove $OPTS -v $TGT
 else
     prove $OPTS $TGT/*.t
 fi

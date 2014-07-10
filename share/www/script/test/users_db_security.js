@@ -79,7 +79,6 @@ couchTests.users_db_security = function(debug) {
 
   var testFun = function()
   {
-    usersDb.deleteDb();
 
     // _users db
     // a doc with a field 'password' should be hashed to 'derived_key'

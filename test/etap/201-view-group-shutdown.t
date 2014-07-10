@@ -21,17 +21,15 @@
 
 -record(db, {
     main_pid = nil,
-    update_pid = nil,
     compactor_pid = nil,
     instance_start_time, % number of microsecs since jan 1 1970 as a binary string
     fd,
-    updater_fd,
-    fd_ref_counter,
+    fd_monitor,
     header = nil,
     committed_update_seq,
-    fulldocinfo_by_id_btree,
-    docinfo_by_seq_btree,
-    local_docs_btree,
+    id_tree,
+    seq_tree,
+    local_tree,
     update_seq,
     name,
     filepath,
@@ -66,16 +64,16 @@ main(_) ->
 
 
 test() ->
-    couch_server_sup:start_link(test_util:config_files()),
-    ok = couch_config:set("couchdb", "max_dbs_open", "3", false),
-    ok = couch_config:set("couchdb", "delayed_commits", "false", false),
+    ok = test_util:start_couch(),
+    ok = config:set("couchdb", "max_dbs_open", "3", false),
+    ok = config:set("couchdb", "delayed_commits", "false", false),
     crypto:start(),
 
     % Test that while a view group is being compacted its database can not
     % be closed by the database LRU system.
     test_view_group_compaction(),
 
-    couch_server_sup:stop(),
+    ok = test_util:stop_couch(),
     ok.
 
 

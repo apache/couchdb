@@ -21,17 +21,15 @@
 
 -record(db, {
     main_pid = nil,
-    update_pid = nil,
     compactor_pid = nil,
     instance_start_time, % number of microsecs since jan 1 1970 as a binary string
     fd,
-    updater_fd,
-    fd_ref_counter,
+    fd_monitor,
     header = nil,
     committed_update_seq,
-    fulldocinfo_by_id_btree,
-    docinfo_by_seq_btree,
-    local_docs_btree,
+    id_tree,
+    seq_tree,
+    local_tree,
     update_seq,
     name,
     filepath,
@@ -54,7 +52,7 @@ ddoc_name() -> <<"foo">>.
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(28),
+    etap:plan(25),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -65,9 +63,9 @@ main(_) ->
     ok.
 
 test() ->
-    couch_server_sup:start_link(test_util:config_files()),
+    ok = test_util:start_couch(),
     timer:sleep(1000),
-    put(addr, couch_config:get("httpd", "bind_address", "127.0.0.1")),
+    put(addr, config:get("httpd", "bind_address", "127.0.0.1")),
     put(port, integer_to_list(mochiweb_socket_server:get(couch_httpd, port))),
 
     delete_db(),
@@ -83,31 +81,25 @@ test() ->
     etap:is(is_process_alive(IndexerPid), true, "view group pid is alive"),
 
     query_view(3, null, false),
-    check_db_ref_count(),
+    check_db_monitor(),
     etap:is(is_process_alive(IndexerPid), true, "view group pid is alive"),
 
     create_new_doc(<<"doc1000">>),
     query_view(4, null, false),
-    check_db_ref_count(),
+    check_db_monitor(),
     etap:is(is_process_alive(IndexerPid), true, "view group pid is alive"),
 
-    Ref1 = get_db_ref_counter(),
     compact_db(),
-    check_db_ref_count(),
-    Ref2 = get_db_ref_counter(),
-    etap:isnt(Ref1, Ref2,  "DB ref counter changed"),
-    etap:is(false, is_process_alive(Ref1), "old DB ref counter is not alive"),
+    check_db_monitor(),
     etap:is(is_process_alive(IndexerPid), true, "view group pid is alive"),
 
     compact_view_group(),
-    check_db_ref_count(),
-    Ref3 = get_db_ref_counter(),
-    etap:is(Ref3, Ref2,  "DB ref counter didn't change"),
+    check_db_monitor(),
     etap:is(is_process_alive(IndexerPid), true, "view group pid is alive"),
 
     create_new_doc(<<"doc1001">>),
     query_view(5, null, false),
-    check_db_ref_count(),
+    check_db_monitor(),
     etap:is(is_process_alive(IndexerPid), true, "view group pid is alive"),
 
     etap:diag("updating the design document with a new view definition"),
@@ -143,7 +135,7 @@ test() ->
 
     ok = timer:sleep(1000),
     delete_db(),
-    couch_server_sup:stop(),
+    ok = test_util:stop_couch(),
     ok.
 
 admin_user_ctx() ->
@@ -161,60 +153,31 @@ delete_db() ->
 compact_db() ->
     {ok, Db} = couch_db:open_int(test_db_name(), []),
     {ok, _} = couch_db:start_compact(Db),
-    ok = couch_db:close(Db),
-    wait_db_compact_done(10).
-
-wait_db_compact_done(0) ->
-    etap:bail("DB compaction failed to finish.");
-wait_db_compact_done(N) ->
-    {ok, Db} = couch_db:open_int(test_db_name(), []),
-    ok = couch_db:close(Db),
-    case is_pid(Db#db.compactor_pid) of
-    false ->
-        ok;
-    true ->
-        ok = timer:sleep(500),
-        wait_db_compact_done(N - 1)
-    end.
+    couch_db:wait_for_compaction(Db, 5000),
+    ok = couch_db:close(Db).
 
 compact_view_group() ->
     DDoc = list_to_binary("_design/" ++ binary_to_list(ddoc_name())),
-    ok = couch_mrview:compact(test_db_name(), DDoc),
-    wait_view_compact_done(10).
-
-wait_view_compact_done(0) ->
-    etap:bail("View group compaction failed to finish.");
-wait_view_compact_done(N) ->
-    {ok, Code, _Headers, Body} = test_util:request(
-        db_url() ++ "/_design/" ++ binary_to_list(ddoc_name()) ++ "/_info",
-        [],
-        get),
-    case Code of
-        200 -> ok;
-        _ -> etap:bail("Invalid view group info.")
-    end,
-    {Info} = ejson:decode(Body),
-    {IndexInfo} = couch_util:get_value(<<"view_index">>, Info),
-    CompactRunning = couch_util:get_value(<<"compact_running">>, IndexInfo),
-    case CompactRunning of
-    false ->
-        ok;
-    true ->
-        ok = timer:sleep(500),
-        wait_view_compact_done(N - 1)
+    {ok, Ref} = couch_mrview:compact(test_db_name(), DDoc, [monitor]),
+    receive {'DOWN', Ref, _, _, _} ->
+        ok
+    after 5000 ->
+        etap:bail("View group compaction failed to finish.")
     end.
 
-get_db_ref_counter() ->
-    {ok, #db{fd_ref_counter = Ref} = Db} = couch_db:open_int(test_db_name(), []),
+check_db_monitor() ->
+    {ok, #db{fd=Fd} = Db} = couch_db:open_int(test_db_name(), []),
     ok = couch_db:close(Db),
-    Ref.
-
-check_db_ref_count() ->
-    {ok, #db{fd_ref_counter = Ref} = Db} = couch_db:open_int(test_db_name(), []),
-    ok = couch_db:close(Db),
-    timer:sleep(200),  % sleep a bit to prevent race condition
-    etap:is(couch_ref_counter:count(Ref), 2,
-        "DB ref counter is only held by couch_db and couch_db_updater"),
+    {monitored_by, Monitors} = process_info(Fd, monitored_by),
+    if length(Monitors) == 2 -> ok; true ->
+        etap:diag("Monitors: ~p ~p", [self(), Monitors]),
+        lists:foreach(fun(P) ->
+            etap:diag("~n~n======~n~p~n-----", [P]),
+            etap:diag("Stack:~n~s", [element(2, process_info(P, backtrace))])
+        end, Monitors)
+    end,
+    etap:is(length(Monitors), 2,
+        "DB fd is only monitored by couch_db_updater and couch_stats_collector"),
     ok.
 
 create_docs() ->
@@ -290,7 +253,7 @@ query_view(ExpectedRowCount, ExpectedRowValue, Stale) ->
                  false -> [];
                  _ -> "?stale=" ++ atom_to_list(Stale)
              end,
-        [],
+        [{"Connection", "close"}],
         get),
     etap:is(Code, 200, "got view response"),
     {Props} = ejson:decode(Body),

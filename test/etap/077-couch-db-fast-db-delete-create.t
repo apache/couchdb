@@ -14,19 +14,8 @@
 % the License.
 
 main(_) ->
+    test_util:run(1, fun() -> test() end).
 
-    test_util:init_code_path(),
-
-    etap:plan(unknown),
-    case (catch test()) of
-        ok ->
-            etap:end_tests();
-        Other ->
-            Msg = io_lib:format("Test died abnormally: ~p", [Other]),
-            etap:diag(Msg),
-            etap:bail(Msg)
-        end,
-    ok.
 
 loop(0) ->
     ok;
@@ -34,15 +23,17 @@ loop(N) ->
     ok = cycle(),
     loop(N - 1).
 
+
 cycle() ->
-    ok = couch_server:delete(<<"etap-test-db">>, []),
-    {ok, _Db} = couch_db:create(<<"etap-test-db">>, []),
+    {ok, Db} = couch_db:create(<<"etap-test-db">>, []),
+    % Dirty but only less dirty than importing the #db{} record
+    couch_file:close(element(5, Db)),
+    ok = couch_server:delete(<<"etap-test-db">>, [sync]),
     ok.
 
-test() ->
-    couch_server_sup:start_link(test_util:config_files()),
 
-    {ok, _Db} = couch_db:create(<<"etap-test-db">>, []),
+test() ->
+    test_util:start_couch(),
 
     ok = loop(1),
     ok = loop(10),
@@ -54,8 +45,6 @@ test() ->
     % ok = loop(100000),
     % ok = loop(1000000),
     % ok = loop(10000000),
-
-    ok = couch_server:delete(<<"etap-test-db">>, []),
 
     etap:is(true, true, "lots of creating and deleting of a database"),
     ok.

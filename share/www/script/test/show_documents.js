@@ -409,7 +409,7 @@ couchTests.show_documents = function(debug) {
 
       function() {
         T(db.setDbProperty("_security", {foo: true}).ok);
-        T(db.save(doc).ok);
+        T(db.save({_id:"testdoc",foo:1}).ok);
 
         xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/secObj");
         var resp = JSON.parse(xhr.responseText);

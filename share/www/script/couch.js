@@ -36,7 +36,7 @@ function CouchDB(name, httpHeaders) {
 
   // Deletes the database on the server
   this.deleteDb = function() {
-    this.last_req = this.request("DELETE", this.uri);
+    this.last_req = this.request("DELETE", this.uri + "?sync=true");
     if (this.last_req.status == 404) {
       return false;
     }
@@ -354,6 +354,12 @@ CouchDB.getVersion = function() {
   CouchDB.last_req = CouchDB.request("GET", "/");
   CouchDB.maybeThrowError(CouchDB.last_req);
   return JSON.parse(CouchDB.last_req.responseText).version;
+};
+
+CouchDB.reloadConfig = function() {
+  CouchDB.last_req = CouchDB.request("POST", "/_config/_reload");
+  CouchDB.maybeThrowError(CouchDB.last_req);
+  return JSON.parse(CouchDB.last_req.responseText);
 };
 
 CouchDB.replicate = function(source, target, rep_options) {

@@ -16,6 +16,8 @@
 % target of a replication doesn't affect the replication and that the
 % replication doesn't hold their reference counters forever.
 
+-mode(compile).
+
 -record(user_ctx, {
     name = null,
     roles = [],
@@ -50,21 +52,11 @@ test_db_name() -> <<"couch_test_changes">>.
 
 
 main(_) ->
-    test_util:init_code_path(),
-
-    etap:plan(43),
-    case (catch test()) of
-        ok ->
-            etap:end_tests();
-        Other ->
-            etap:diag(io_lib:format("Test died abnormally: ~p", [Other])),
-            etap:bail(Other)
-    end,
-    ok.
+    test_util:run(43, fun() -> test() end).
 
 
 test() ->
-    couch_server_sup:start_link(test_util:config_files()),
+    test_util:start_couch(),
 
     test_by_doc_ids(),
     test_by_doc_ids_with_since(),
@@ -72,22 +64,21 @@ test() ->
     test_design_docs_only(),
     test_heartbeat(),
 
-    couch_server_sup:stop(),
     ok.
 
 
 test_by_doc_ids() ->
-    {ok, Db} = create_db(test_db_name()),
+    create_db(test_db_name()),
 
-    {ok, _Rev1} = save_doc(Db, {[{<<"_id">>, <<"doc1">>}]}),
-    {ok, _Rev2} = save_doc(Db, {[{<<"_id">>, <<"doc2">>}]}),
-    {ok, Rev3} = save_doc(Db, {[{<<"_id">>, <<"doc3">>}]}),
-    {ok, _Rev4} = save_doc(Db, {[{<<"_id">>, <<"doc4">>}]}),
-    {ok, _Rev5} = save_doc(Db, {[{<<"_id">>, <<"doc5">>}]}),
-    {ok, _Rev3_2} = save_doc(Db, {[{<<"_id">>, <<"doc3">>}, {<<"_rev">>, Rev3}]}),
-    {ok, _Rev6} = save_doc(Db, {[{<<"_id">>, <<"doc6">>}]}),
-    {ok, _Rev7} = save_doc(Db, {[{<<"_id">>, <<"doc7">>}]}),
-    {ok, _Rev8} = save_doc(Db, {[{<<"_id">>, <<"doc8">>}]}),
+    {ok, _Rev1} = save_doc({[{<<"_id">>, <<"doc1">>}]}),
+    {ok, _Rev2} = save_doc({[{<<"_id">>, <<"doc2">>}]}),
+    {ok, Rev3} = save_doc({[{<<"_id">>, <<"doc3">>}]}),
+    {ok, _Rev4} = save_doc({[{<<"_id">>, <<"doc4">>}]}),
+    {ok, _Rev5} = save_doc({[{<<"_id">>, <<"doc5">>}]}),
+    {ok, _Rev3_2} = save_doc({[{<<"_id">>, <<"doc3">>}, {<<"_rev">>, Rev3}]}),
+    {ok, _Rev6} = save_doc({[{<<"_id">>, <<"doc6">>}]}),
+    {ok, _Rev7} = save_doc({[{<<"_id">>, <<"doc7">>}]}),
+    {ok, _Rev8} = save_doc({[{<<"_id">>, <<"doc8">>}]}),
 
     etap:diag("Folding changes in ascending order with _doc_ids filter"),
     ChangesArgs = #changes_args{
@@ -127,21 +118,21 @@ test_by_doc_ids() ->
     etap:is(Seq2_2, 4, "Second row has seq 6"),
 
     stop(Consumer2),
-    delete_db(Db).
+    delete_db().
 
 
 test_by_doc_ids_with_since() ->
-    {ok, Db} = create_db(test_db_name()),
+    create_db(test_db_name()),
 
-    {ok, _Rev1} = save_doc(Db, {[{<<"_id">>, <<"doc1">>}]}),
-    {ok, _Rev2} = save_doc(Db, {[{<<"_id">>, <<"doc2">>}]}),
-    {ok, Rev3} = save_doc(Db, {[{<<"_id">>, <<"doc3">>}]}),
-    {ok, _Rev4} = save_doc(Db, {[{<<"_id">>, <<"doc4">>}]}),
-    {ok, _Rev5} = save_doc(Db, {[{<<"_id">>, <<"doc5">>}]}),
-    {ok, Rev3_2} = save_doc(Db, {[{<<"_id">>, <<"doc3">>}, {<<"_rev">>, Rev3}]}),
-    {ok, _Rev6} = save_doc(Db, {[{<<"_id">>, <<"doc6">>}]}),
-    {ok, _Rev7} = save_doc(Db, {[{<<"_id">>, <<"doc7">>}]}),
-    {ok, _Rev8} = save_doc(Db, {[{<<"_id">>, <<"doc8">>}]}),
+    {ok, _Rev1} = save_doc({[{<<"_id">>, <<"doc1">>}]}),
+    {ok, _Rev2} = save_doc({[{<<"_id">>, <<"doc2">>}]}),
+    {ok, Rev3} = save_doc({[{<<"_id">>, <<"doc3">>}]}),
+    {ok, _Rev4} = save_doc({[{<<"_id">>, <<"doc4">>}]}),
+    {ok, _Rev5} = save_doc({[{<<"_id">>, <<"doc5">>}]}),
+    {ok, Rev3_2} = save_doc({[{<<"_id">>, <<"doc3">>}, {<<"_rev">>, Rev3}]}),
+    {ok, _Rev6} = save_doc({[{<<"_id">>, <<"doc6">>}]}),
+    {ok, _Rev7} = save_doc({[{<<"_id">>, <<"doc7">>}]}),
+    {ok, _Rev8} = save_doc({[{<<"_id">>, <<"doc8">>}]}),
 
     ChangesArgs = #changes_args{
         filter = "_doc_ids",
@@ -179,7 +170,6 @@ test_by_doc_ids_with_since() ->
     stop(Consumer2),
 
     {ok, _Rev3_3} = save_doc(
-        Db,
         {[{<<"_id">>, <<"doc3">>}, {<<"_deleted">>, true}, {<<"_rev">>, Rev3_2}]}),
 
     ChangesArgs3 = #changes_args{
@@ -201,21 +191,21 @@ test_by_doc_ids_with_since() ->
 
     stop(Consumer3),
 
-    delete_db(Db).
+    delete_db().
 
 
 test_by_doc_ids_continuous() ->
-    {ok, Db} = create_db(test_db_name()),
+    create_db(test_db_name()),
 
-    {ok, _Rev1} = save_doc(Db, {[{<<"_id">>, <<"doc1">>}]}),
-    {ok, _Rev2} = save_doc(Db, {[{<<"_id">>, <<"doc2">>}]}),
-    {ok, Rev3} = save_doc(Db, {[{<<"_id">>, <<"doc3">>}]}),
-    {ok, Rev4} = save_doc(Db, {[{<<"_id">>, <<"doc4">>}]}),
-    {ok, _Rev5} = save_doc(Db, {[{<<"_id">>, <<"doc5">>}]}),
-    {ok, Rev3_2} = save_doc(Db, {[{<<"_id">>, <<"doc3">>}, {<<"_rev">>, Rev3}]}),
-    {ok, _Rev6} = save_doc(Db, {[{<<"_id">>, <<"doc6">>}]}),
-    {ok, _Rev7} = save_doc(Db, {[{<<"_id">>, <<"doc7">>}]}),
-    {ok, _Rev8} = save_doc(Db, {[{<<"_id">>, <<"doc8">>}]}),
+    {ok, _Rev1} = save_doc({[{<<"_id">>, <<"doc1">>}]}),
+    {ok, _Rev2} = save_doc({[{<<"_id">>, <<"doc2">>}]}),
+    {ok, Rev3} = save_doc({[{<<"_id">>, <<"doc3">>}]}),
+    {ok, Rev4} = save_doc({[{<<"_id">>, <<"doc4">>}]}),
+    {ok, _Rev5} = save_doc({[{<<"_id">>, <<"doc5">>}]}),
+    {ok, Rev3_2} = save_doc({[{<<"_id">>, <<"doc3">>}, {<<"_rev">>, Rev3}]}),
+    {ok, _Rev6} = save_doc({[{<<"_id">>, <<"doc6">>}]}),
+    {ok, _Rev7} = save_doc({[{<<"_id">>, <<"doc7">>}]}),
+    {ok, _Rev8} = save_doc({[{<<"_id">>, <<"doc8">>}]}),
 
     ChangesArgs = #changes_args{
         filter = "_doc_ids",
@@ -236,17 +226,17 @@ test_by_doc_ids_continuous() ->
     etap:is(Seq2, 6, "Second row has seq 6"),
 
     clear_rows(Consumer),
-    {ok, _Rev9} = save_doc(Db, {[{<<"_id">>, <<"doc9">>}]}),
-    {ok, _Rev10} = save_doc(Db, {[{<<"_id">>, <<"doc10">>}]}),
+    {ok, _Rev9} = save_doc({[{<<"_id">>, <<"doc9">>}]}),
+    {ok, _Rev10} = save_doc({[{<<"_id">>, <<"doc10">>}]}),
     unpause(Consumer),
     pause(Consumer),
     etap:is(get_rows(Consumer), [], "No new rows"),
 
-    {ok, Rev4_2} = save_doc(Db, {[{<<"_id">>, <<"doc4">>}, {<<"_rev">>, Rev4}]}),
-    {ok, _Rev11} = save_doc(Db, {[{<<"_id">>, <<"doc11">>}]}),
-    {ok, _Rev4_3} = save_doc(Db, {[{<<"_id">>, <<"doc4">>}, {<<"_rev">>, Rev4_2}]}),
-    {ok, _Rev12} = save_doc(Db, {[{<<"_id">>, <<"doc12">>}]}),
-    {ok, Rev3_3} = save_doc(Db, {[{<<"_id">>, <<"doc3">>}, {<<"_rev">>, Rev3_2}]}),
+    {ok, Rev4_2} = save_doc({[{<<"_id">>, <<"doc4">>}, {<<"_rev">>, Rev4}]}),
+    {ok, _Rev11} = save_doc({[{<<"_id">>, <<"doc11">>}]}),
+    {ok, _Rev4_3} = save_doc({[{<<"_id">>, <<"doc4">>}, {<<"_rev">>, Rev4_2}]}),
+    {ok, _Rev12} = save_doc({[{<<"_id">>, <<"doc12">>}]}),
+    {ok, Rev3_3} = save_doc({[{<<"_id">>, <<"doc3">>}, {<<"_rev">>, Rev3_2}]}),
     unpause(Consumer),
     pause(Consumer),
 
@@ -259,7 +249,7 @@ test_by_doc_ids_continuous() ->
     etap:is(Row16#row.id, <<"doc3">>, "Second row is for doc doc3"),
 
     clear_rows(Consumer),
-    {ok, _Rev3_4} = save_doc(Db, {[{<<"_id">>, <<"doc3">>}, {<<"_rev">>, Rev3_3}]}),
+    {ok, _Rev3_4} = save_doc({[{<<"_id">>, <<"doc3">>}, {<<"_rev">>, Rev3_3}]}),
     unpause(Consumer),
     pause(Consumer),
     etap:is(get_rows(Consumer), [#row{seq = 17, id = <<"doc3">>}],
@@ -267,15 +257,15 @@ test_by_doc_ids_continuous() ->
 
     unpause(Consumer),
     stop(Consumer),
-    delete_db(Db).
+    delete_db().
 
 
 test_design_docs_only() ->
-    {ok, Db} = create_db(test_db_name()),
+    create_db(test_db_name()),
 
-    {ok, _Rev1} = save_doc(Db, {[{<<"_id">>, <<"doc1">>}]}),
-    {ok, _Rev2} = save_doc(Db, {[{<<"_id">>, <<"doc2">>}]}),
-    {ok, Rev3} = save_doc(Db, {[{<<"_id">>, <<"_design/foo">>}]}),
+    {ok, _Rev1} = save_doc({[{<<"_id">>, <<"doc1">>}]}),
+    {ok, _Rev2} = save_doc({[{<<"_id">>, <<"doc2">>}]}),
+    {ok, Rev3} = save_doc({[{<<"_id">>, <<"_design/foo">>}]}),
 
     ChangesArgs = #changes_args{
         filter = "_design"
@@ -293,10 +283,7 @@ test_design_docs_only() ->
 
     stop(Consumer),
 
-    {ok, Db3} = couch_db:open_int(
-        test_db_name(), [{user_ctx, #user_ctx{roles = [<<"_admin">>]}}]),
     {ok, _Rev3_2} = save_doc(
-        Db3,
         {[{<<"_id">>, <<"_design/foo">>}, {<<"_rev">>, Rev3},
             {<<"_deleted">>, true}]}),
 
@@ -304,7 +291,6 @@ test_design_docs_only() ->
 
     {Rows2, LastSeq2} = wait_finished(Consumer2),
     UpSeq2 = UpSeq + 1,
-    couch_db:close(Db3),
 
     etap:is(LastSeq2, UpSeq2, "LastSeq is same as database update seq number"),
     etap:is(length(Rows2), 1, "Received 1 changes rows"),
@@ -314,12 +300,12 @@ test_design_docs_only() ->
         "Received row with deleted ddoc"),
 
     stop(Consumer2),
-    delete_db(Db).
+    delete_db().
 
 test_heartbeat() ->
-    {ok, Db} = create_db(test_db_name()),
+    create_db(test_db_name()),
 
-    {ok, _} = save_doc(Db, {[
+    {ok, _} = save_doc({[
         {<<"_id">>, <<"_design/foo">>},
         {<<"language">>, <<"javascript">>},
             {<<"filters">>, {[
@@ -341,49 +327,53 @@ test_heartbeat() ->
     },
     Consumer = spawn_consumer(test_db_name(), ChangesArgs, {json_req, null}),
 
-    {ok, _Rev1} = save_doc(Db, {[{<<"_id">>, <<"doc1">>}]}),
+    {ok, _Rev1} = save_doc({[{<<"_id">>, <<"doc1">>}]}),
     timer:sleep(200),
-    {ok, _Rev2} = save_doc(Db, {[{<<"_id">>, <<"doc2">>}]}),
+    {ok, _Rev2} = save_doc({[{<<"_id">>, <<"doc2">>}]}),
     timer:sleep(200),
-    {ok, _Rev3} = save_doc(Db, {[{<<"_id">>, <<"doc3">>}]}),
+    {ok, _Rev3} = save_doc({[{<<"_id">>, <<"doc3">>}]}),
     timer:sleep(200),
-    {ok, _Rev4} = save_doc(Db, {[{<<"_id">>, <<"doc4">>}]}),
+    {ok, _Rev4} = save_doc({[{<<"_id">>, <<"doc4">>}]}),
     timer:sleep(200),
-    {ok, _Rev5} = save_doc(Db, {[{<<"_id">>, <<"doc5">>}]}),
+    {ok, _Rev5} = save_doc({[{<<"_id">>, <<"doc5">>}]}),
     timer:sleep(200),
-    {ok, _Rev6} = save_doc(Db, {[{<<"_id">>, <<"doc6">>}]}),
+    {ok, _Rev6} = save_doc({[{<<"_id">>, <<"doc6">>}]}),
     timer:sleep(200),
-    {ok, _Rev7} = save_doc(Db, {[{<<"_id">>, <<"doc7">>}]}),
+    {ok, _Rev7} = save_doc({[{<<"_id">>, <<"doc7">>}]}),
     timer:sleep(200),
-    {ok, _Rev8} = save_doc(Db, {[{<<"_id">>, <<"doc8">>}]}),
+    {ok, _Rev8} = save_doc({[{<<"_id">>, <<"doc8">>}]}),
     timer:sleep(200),
-    {ok, _Rev9} = save_doc(Db, {[{<<"_id">>, <<"doc9">>}]}),
+    {ok, _Rev9} = save_doc({[{<<"_id">>, <<"doc9">>}]}),
     Heartbeats = get_heartbeats(Consumer),
     etap:is(Heartbeats, 2, "Received 2 heartbeats now"),
-    {ok, _Rev10} = save_doc(Db, {[{<<"_id">>, <<"doc10">>}]}),
+    {ok, _Rev10} = save_doc({[{<<"_id">>, <<"doc10">>}]}),
     timer:sleep(200),
-    {ok, _Rev11} = save_doc(Db, {[{<<"_id">>, <<"doc11">>}]}),
+    {ok, _Rev11} = save_doc({[{<<"_id">>, <<"doc11">>}]}),
     timer:sleep(200),
-    {ok, _Rev12} = save_doc(Db, {[{<<"_id">>, <<"doc12">>}]}),
+    {ok, _Rev12} = save_doc({[{<<"_id">>, <<"doc12">>}]}),
     Heartbeats2 = get_heartbeats(Consumer),
     etap:is(Heartbeats2, 3, "Received 3 heartbeats now"),
     Rows = get_rows(Consumer),
     etap:is(length(Rows), 3, "Received 3 changes rows"),
 
-    {ok, _Rev13} = save_doc(Db, {[{<<"_id">>, <<"doc13">>}]}),
+    {ok, _Rev13} = save_doc({[{<<"_id">>, <<"doc13">>}]}),
     timer:sleep(200),
-    {ok, _Rev14} = save_doc(Db, {[{<<"_id">>, <<"doc14">>}]}),
+    {ok, _Rev14} = save_doc({[{<<"_id">>, <<"doc14">>}]}),
     timer:sleep(200),
     Heartbeats3 = get_heartbeats(Consumer),
     etap:is(Heartbeats3, 6, "Received 6 heartbeats now"),
     stop(Consumer),
-    couch_db:close(Db),
-    delete_db(Db).
+    delete_db().
 
 
-save_doc(Db, Json) ->
+db() ->
+    {ok, Db} = couch_db:reopen(get(current_db)),
+    Db.
+
+
+save_doc(Json) ->
     Doc = couch_doc:from_json_obj(Json),
-    {ok, Rev} = couch_db:update_doc(Db, Doc, []),
+    {ok, Rev} = couch_db:update_doc(db(), Doc, []),
     {ok, couch_doc:rev_to_str(Rev)}.
 
 
@@ -548,11 +538,13 @@ stop_loop(Parent, Acc) ->
 
 
 create_db(DbName) ->
-    couch_db:create(
-        DbName,
-        [{user_ctx, #user_ctx{roles = [<<"_admin">>]}}, overwrite]).
+    Options = [{user_ctx, #user_ctx{roles = [<<"_admin">>]}}, overwrite],
+    {ok, Db} = couch_db:create(DbName, Options),
+    put(current_db, Db).
 
 
-delete_db(Db) ->
-    ok = couch_server:delete(
-        couch_db:name(Db), [{user_ctx, #user_ctx{roles = [<<"_admin">>]}}]).
+delete_db() ->
+    Db = db(),
+    Options = [{user_ctx, #user_ctx{roles = [<<"_admin">>]}}],
+    ok = couch_server:delete(couch_db:name(Db), Options),
+    put(current_db, undefined).

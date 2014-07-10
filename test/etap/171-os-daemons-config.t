@@ -46,13 +46,11 @@ main(_) ->
     ok.
 
 test() ->
-    couch_config:start_link(config_files()),
-    couch_config:set("log", "level", "debug", false),
-    couch_log:start_link(),
-    couch_os_daemons:start_link(),
+    test_util:start_couch(),
+    config:set("log", "level", "debug", false),
 
     % "foo" is a required name by this test.
-    couch_config:set("os_daemons", "foo", daemon_cmd(), false),
+    config:set("os_daemons", "foo", daemon_cmd(), false),
     timer:sleep(1000),
     
     {ok, [D1]} = couch_os_daemons:info([table]),

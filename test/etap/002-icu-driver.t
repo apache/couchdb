@@ -13,7 +13,7 @@
 
 main(_) ->
     test_util:init_code_path(),
-    couch_config:start_link(test_util:config_files()),
+    application:start(config),
     etap:plan(3),
     etap:is(
         element(1, couch_drv:start_link()),

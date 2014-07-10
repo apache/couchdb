@@ -24,30 +24,19 @@ test_db_name() -> <<"couch_test_update_conflicts">>.
 
 
 main(_) ->
-    test_util:init_code_path(),
-
-    etap:plan(35),
-    case (catch test()) of
-        ok ->
-            etap:end_tests();
-        Other ->
-            etap:diag(io_lib:format("Test died abnormally: ~p", [Other])),
-            etap:bail(Other)
-    end,
-    ok.
+    test_util:run(25, fun() -> test() end).
 
 
 test() ->
-    couch_server_sup:start_link(test_util:config_files()),
-    couch_config:set("couchdb", "delayed_commits", "true", false),
+    test_util:start_couch(),
+    config:set("couchdb", "delayed_commits", "true", false),
 
     lists:foreach(
         fun(NumClients) -> test_concurrent_doc_update(NumClients) end,
-        [100, 500, 1000, 2000, 5000]),
+        [100, 500, 1000]),
 
     test_bulk_delete_create(),
 
-    couch_server_sup:stop(),
     ok.
 
 
@@ -120,9 +109,9 @@ test_concurrent_doc_update(NumClients) ->
 
     ok = timer:sleep(1000),
     etap:diag("Restarting the server"),
-    couch_server_sup:stop(),
+    ok = test_util:stop_couch(),
     ok = timer:sleep(1000),
-    couch_server_sup:start_link(test_util:config_files()),
+    ok = test_util:start_couch(),
 
     {ok, Db3} = couch_db:open_int(test_db_name(), []),
     {ok, Leaves2} = couch_db:open_doc_revs(Db3, <<"foobar">>, all, []),
@@ -153,20 +142,21 @@ test_bulk_delete_create() ->
         {<<"value">>, 666}
     ]}),
 
-    {ok, Results} = couch_db:update_docs(Db, [DeletedDoc, NewDoc], []),
-    ok = couch_db:close(Db),
+    {ok, Db2} = couch_db:reopen(Db),
+    {ok, Results} = couch_db:update_docs(Db2, [DeletedDoc, NewDoc], []),
+    ok = couch_db:close(Db2),
 
     etap:is(length([ok || {ok, _} <- Results]), 2,
         "Deleted and non-deleted versions got an ok reply"),
 
     [{ok, Rev1}, {ok, Rev2}] = Results,
-    {ok, Db2} = couch_db:open_int(test_db_name(), []),
+    {ok, Db3} = couch_db:open_int(test_db_name(), []),
 
     {ok, [{ok, Doc1}]} = couch_db:open_doc_revs(
-        Db2, <<"foobar">>, [Rev1], [conflicts, deleted_conflicts]),
+        Db3, <<"foobar">>, [Rev1], [conflicts, deleted_conflicts]),
     {ok, [{ok, Doc2}]} = couch_db:open_doc_revs(
-        Db2, <<"foobar">>, [Rev2], [conflicts, deleted_conflicts]),
-    ok = couch_db:close(Db2),
+        Db3, <<"foobar">>, [Rev2], [conflicts, deleted_conflicts]),
+    ok = couch_db:close(Db3),
 
     {Doc1Props} = couch_doc:to_json_obj(Doc1, []),
     {Doc2Props} = couch_doc:to_json_obj(Doc2, []),

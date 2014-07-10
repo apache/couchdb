@@ -36,9 +36,9 @@ main(_) ->
     ok.
 
 test() ->
-    couch_server_sup:start_link(test_util:config_files()),
+    ok = test_util:start_couch(),
     timer:sleep(1000),
-    put(addr, couch_config:get("httpd", "bind_address", "127.0.0.1")),
+    put(addr, config:get("httpd", "bind_address", "127.0.0.1")),
     put(port, integer_to_list(mochiweb_socket_server:get(couch_httpd, port))),
 
     disable_compact_daemon(),
@@ -54,9 +54,9 @@ test() ->
     {_, ViewFileSize} = get_view_frag(),
 
     % enable automatic compaction
-    ok = couch_config:set("compaction_daemon", "check_interval", "3", false),
-    ok = couch_config:set("compaction_daemon", "min_file_size", "100000", false),
-    ok = couch_config:set(
+    ok = config:set("compaction_daemon", "check_interval", "3", false),
+    ok = config:set("compaction_daemon", "min_file_size", "100000", false),
+    ok = config:set(
         "compactions",
         binary_to_list(test_db_name()),
         "[{db_fragmentation, \"70%\"}, {view_fragmentation, \"70%\"}]",
@@ -81,7 +81,7 @@ test() ->
     {_, ViewFileSize3} = get_view_frag(),
 
     % enable automatic compaction
-    ok = couch_config:set(
+    ok = config:set(
         "compactions",
         "_default",
         "[{db_fragmentation, \"70%\"}, {view_fragmentation, \"70%\"}]",
@@ -102,14 +102,14 @@ test() ->
     etap:is(couch_db:is_idle(Db), true, "Database is idle"),
 
     delete_db(),
-    couch_server_sup:stop(),
+    ok = test_util:stop_couch(),
     ok.
 
 disable_compact_daemon() ->
-    Configs = couch_config:get("compactions"),
+    Configs = config:get("compactions"),
     lists:foreach(
         fun({DbName, _}) ->
-            ok = couch_config:delete("compactions", DbName, false)
+            ok = config:delete("compactions", DbName, false)
         end,
         Configs).
 

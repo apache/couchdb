@@ -27,16 +27,12 @@ local_config_write() ->
 
 % Run tests and wait for the config gen_server to shutdown.
 run_tests(IniFiles, Tests) ->
-    {ok, Pid} = couch_config:start_link(IniFiles),
-    erlang:monitor(process, Pid),
+    application:set_env(config, ini_files, IniFiles),
+    ok = application:start(config),
     Tests(),
-    couch_config:stop(),
-    receive
-        {'DOWN', _, _, Pid, _} -> ok;
-        _Other -> etap:diag("OTHER: ~p~n", [_Other])
-    after
-        1000 -> throw({timeout_error, config_stop})
-    end.
+    timer:sleep(1000),
+    ok = application:stop(config),
+    ok.
 
 main(_) ->
     test_util:init_code_path(),
@@ -58,19 +54,19 @@ test() ->
 
     CheckDefaults = fun() ->
         etap:is(
-            couch_config:get("couchdb", "max_dbs_open"),
+            config:get("couchdb", "max_dbs_open"),
             "100",
             "{couchdb, max_dbs_open} is 100 by defualt."
         ),
 
         etap:is(
-            couch_config:get("httpd","port"),
+            config:get("httpd","port"),
             "5984",
             "{httpd, port} is 5984 by default"
         ),
 
         etap:is(
-            couch_config:get("fizbang", "unicode"),
+            config:get("fizbang", "unicode"),
             undefined,
             "{fizbang, unicode} is undefined by default"
         )
@@ -83,13 +79,13 @@ test() ->
 
     CheckOverride = fun() ->
         etap:is(
-            couch_config:get("couchdb", "max_dbs_open"),
+            config:get("couchdb", "max_dbs_open"),
             "10",
             "{couchdb, max_dbs_open} was overriden with the value 10"
         ),
 
         etap:is(
-            couch_config:get("httpd", "port"),
+            config:get("httpd", "port"),
             "4895",
             "{httpd, port} was overriden with the value 4895"
         )
@@ -102,13 +98,13 @@ test() ->
 
     CheckOverride2 = fun() ->
         etap:is(
-            couch_config:get("httpd", "port"),
+            config:get("httpd", "port"),
             "80",
             "{httpd, port} is overriden with the value 80"
         ),
 
         etap:is(
-            couch_config:get("fizbang", "unicode"),
+            config:get("fizbang", "unicode"),
             "normalized",
             "{fizbang, unicode} was created by override INI file"
         )
@@ -121,7 +117,7 @@ test() ->
 
     CheckOverride3 = fun() ->
         etap:is(
-            couch_config:get("httpd", "port"),
+            config:get("httpd", "port"),
             "80",
             "{httpd, port} value was taken from the last specified INI file."
         )
@@ -142,31 +138,31 @@ test() ->
     % Open and write a value
     CheckCanWrite = fun() ->
         etap:is(
-            couch_config:get("httpd", "port"),
+            config:get("httpd", "port"),
             "5984",
             "{httpd, port} is still 5984 by default"
         ),
 
         etap:is(
-            couch_config:set("httpd", "port", "8080"),
+            config:set("httpd", "port", "8080"),
             ok,
             "Writing {httpd, port} is kosher."
         ),
 
         etap:is(
-            couch_config:get("httpd", "port"),
+            config:get("httpd", "port"),
             "8080",
             "{httpd, port} was updated to 8080 successfully."
         ),
 
         etap:is(
-            couch_config:delete("httpd", "bind_address"),
+            config:delete("httpd", "bind_address"),
             ok,
             "Deleting {httpd, bind_address} succeeds"
         ),
 
         etap:is(
-            couch_config:get("httpd", "bind_address"),
+            config:get("httpd", "bind_address"),
             undefined,
             "{httpd, bind_address} was actually deleted."
         )
@@ -178,13 +174,13 @@ test() ->
 
     CheckDidntWrite = fun() ->
         etap:is(
-            couch_config:get("httpd", "port"),
+            config:get("httpd", "port"),
             "5984",
             "{httpd, port} was not persisted to the primary INI file."
         ),
 
         etap:is(
-            couch_config:get("httpd", "bind_address"),
+            config:get("httpd", "bind_address"),
             "127.0.0.1",
             "{httpd, bind_address} was not deleted form the primary INI file."
         )
@@ -195,13 +191,13 @@ test() ->
     % Open and check we have only the persistence we expect.
     CheckDidWrite = fun() ->
         etap:is(
-            couch_config:get("httpd", "port"),
+            config:get("httpd", "port"),
             "8080",
             "{httpd, port} is still 8080 after reopening the config."
         ),
 
         etap:is(
-            couch_config:get("httpd", "bind_address"),
+            config:get("httpd", "bind_address"),
             undefined,
             "{httpd, bind_address} is still \"\" after reopening."
         )

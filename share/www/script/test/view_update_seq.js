@@ -31,7 +31,7 @@ couchTests.view_update_seq = function(debug) {
         map: "function(doc) { emit(doc.integer, doc.string) }"
       },
       summate: {
-        map:"function (doc) {emit(doc.integer, doc.integer)};",
+        map:"function (doc) { if (typeof doc.integer === 'number') { emit(doc.integer, doc.integer)}; }",
         reduce:"function (keys, values) { return sum(values); };"
       }
     }
@@ -68,12 +68,12 @@ couchTests.view_update_seq = function(debug) {
   T(resp.rows.length == 1);
   T(resp.update_seq == 101);
 
-  db.save({"id":"0"});
+  db.save({"id":"0", "integer": 1});
   resp = db.view('test/all_docs', {limit: 1,stale: "ok", update_seq:true});
   T(resp.rows.length == 1);
   T(resp.update_seq == 101);
 
-  db.save({"id":"00"});
+  db.save({"id":"00", "integer": 2});
   resp = db.view('test/all_docs',
     {limit: 1, stale: "update_after", update_seq: true});
   T(resp.rows.length == 1);
@@ -100,7 +100,7 @@ couchTests.view_update_seq = function(debug) {
   resp = db.view('test/all_docs',{update_seq:true},["0","1"]);
   T(resp.update_seq == 103);
 
-  resp = db.view('test/summate',{group:true, update_seq:true},["0","1"]);
-  T(resp.update_seq == 103);
+  resp = db.view('test/summate',{group:true, update_seq:true},[0,1]);
+  TEquals(103, resp.update_seq);
 
 };

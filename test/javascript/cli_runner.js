@@ -18,6 +18,7 @@
  * test object, return an error.
  */
 function runTest() {
+  CouchDB.reloadConfig();
   var count = 0;
   var start = new Date().getTime();
 
@@ -34,11 +35,11 @@ function runTest() {
     // Add artificial wait for each test of 1 sec
     while (new Date().getTime() < start + 1200);
     couchTests[name]();
-    print('OK');
+    quit(0);
   } catch(e) {
-    console.log("FAIL\nReason: " + e.message);
+    console.log("\nError: " + e.message);
     fmtStack(e.stack);
-    quit(1);
+    quit(1)
   }
 }
 

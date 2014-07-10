@@ -44,7 +44,10 @@ couchTests.erlang_views = function(debug) {
       // check simple reduction - another doc with same key.
       var doc = {_id: "2", integer: 1, string: "str2"};
       T(db.save(doc).ok);
-      rfun = "fun(Keys, Values, ReReduce) -> length(Values) end.";
+      rfun = 'fun' +
+              ' (_, Values, false) -> length(Values); ' +
+              ' (_, Values, true) -> lists:sum(Values) ' +
+              ' end.';
       results = db.query(mfun, rfun, null, null, "erlang");
       T(results.rows[0].value == 2);
 

@@ -19,7 +19,9 @@ couchTests.proxyauth = function(debug) {
   var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
   
   if (debug) debugger;
-  
+ 
+  usersDb.deleteDb();
+
   // Simple secret key generator
   function generateSecret(length) {
     var tab = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -33,7 +35,6 @@ couchTests.proxyauth = function(debug) {
   var secret = generateSecret(64);
   
   function TestFun() {
-    usersDb.deleteDb();
     db.deleteDb();
     db.createDb();
     
