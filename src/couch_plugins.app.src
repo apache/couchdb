@@ -18,6 +18,5 @@
                   kernel,
                   stdlib
                  ]},
-  {mod, { couch_plugins_app, []}},
   {env, []}
  ]}.
