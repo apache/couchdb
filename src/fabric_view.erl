@@ -196,7 +196,7 @@ get_next_row(#collector{reducer = RedSrc} = St) when RedSrc =/= undefined ->
         query_args = #mrargs{direction=Dir},
         keys = Keys,
         rows = RowDict,
-        os_proc = Proc,
+        lang = Lang,
         counters = Counters0
     } = St,
     {Key, RestKeys} = find_next_key(Keys, Dir, RowDict),
@@ -213,7 +213,7 @@ get_next_row(#collector{reducer = RedSrc} = St) when RedSrc =/= undefined ->
             fabric_dict:update_counter(Worker, -1, CntrsAcc)
         end, Counters0, Records),
         Wrapped = [[V] || #view_row{value=V} <- Records],
-        {ok, [Reduced]} = couch_query_servers:rereduce(Proc, [RedSrc], Wrapped),
+        {ok, [Reduced]} = couch_query_servers:rereduce(Lang, [RedSrc], Wrapped),
         NewSt = St#collector{keys=RestKeys, rows=NewRowDict, counters=Counters},
         {#view_row{key=Key, id=reduced, value=Reduced}, NewSt};
     error ->
