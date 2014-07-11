@@ -12,7 +12,7 @@
 {application, couch_plugins,
  [
   {description, "A CouchDB Plugin Installer"},
-  {vsn, "1"},
+  {vsn, git},
   {registered, []},
   {applications, [
                   kernel,
