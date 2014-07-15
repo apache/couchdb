@@ -48,7 +48,8 @@ changes(DbName, Options, StartSeq) ->
         rexi:reply(Error)
     end.
 
-all_docs(DbName, Options, #mrargs{keys=undefined} = Args) ->
+all_docs(DbName, Options, #mrargs{keys=undefined} = Args0) ->
+    Args = fix_skip_and_limit(Args0),
     {ok, Db} = get_or_create_db(DbName, Options),
     VAcc0 = #vacc{db=Db},
     couch_mrview:query_all_docs(Db, Args, fun view_cb/2, VAcc0).
