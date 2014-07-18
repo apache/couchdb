@@ -78,6 +78,9 @@ handle_info(timeout, #state{sender = nil, count = C} = State) when C > 0 ->
             Sender = spawn_monitor(erlang, send, [Dest, Msg]),
             {noreply, NewState#state{sender = Sender}}
     end;
+handle_info(timeout, State) ->
+    % Waiting on a sender to return
+    {noreply, State};
 
 handle_info({'DOWN', Ref, _, Pid, _}, #state{sender = {Pid, Ref}} = State) ->
     {noreply, State#state{sender = nil}, 0}.
