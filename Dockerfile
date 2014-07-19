@@ -14,10 +14,7 @@ USER couchdb
 # Get the source
 WORKDIR /home/couchdb
 RUN git clone https://git-wip-us.apache.org/repos/asf/couchdb.git
-
-# Switch branches
 WORKDIR /home/couchdb/couchdb
-RUN git checkout 1843-feature-bigcouch
 
 # We don't to be so strict for simple testing.
 RUN sed -i'' '/require_otp_vsn/d' rebar.config.script
