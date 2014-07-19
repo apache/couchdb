@@ -5,14 +5,26 @@ ENV DEBIAN_FRONTEND noninteractive
 # Install prereqs
 RUN echo "deb http://http.debian.net/debian wheezy-backports main" >> /etc/apt/sources.list
 RUN apt-get -qq update
-RUN apt-get -y install build-essential git libmozjs185-dev libicu-dev erlang-nox rebar
+RUN apt-get -y install build-essential git libmozjs185-dev libicu-dev erlang-nox erlang-dev python wget
 
-# Set up user for the build
+# Set up user for the builds
 RUN useradd -m couchdb
-USER couchdb
 
-# Get the source
+# Build rebar
+USER couchdb
 WORKDIR /home/couchdb
+
+RUN wget https://github.com/rebar/rebar/archive/2.5.0.tar.gz
+RUN tar xzf 2.5.0.tar.gz
+WORKDIR /home/couchdb/rebar-2.5.0
+RUN ./bootstrap
+USER root
+RUN cp rebar /usr/local/bin/
+
+# Build couchdb
+USER couchdb
+WORKDIR /home/couchdb
+
 RUN git clone https://git-wip-us.apache.org/repos/asf/couchdb.git
 WORKDIR /home/couchdb/couchdb
 
