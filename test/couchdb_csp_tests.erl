@@ -57,7 +57,7 @@ should_not_return_any_csp_headers_when_disabled(Url) ->
 
 should_apply_default_policy(Url) ->
     ?_assertEqual(
-        "default-src 'self'; img-src 'self'; font-src 'self'; "
+        "default-src 'self'; img-src 'self' data:; font-src 'self'; "
         "script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline';",
         begin
             {ok, _, Headers, _} = test_request:get(Url),
