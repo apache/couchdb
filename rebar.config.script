@@ -17,6 +17,7 @@ os:putenv("COUCHDB_CONFIG", ConfigureEnv).
 
 
 DepDescs = [
+    {cassim, "couchdb-cassim", {branch, "windsor-merge"}, []},
     {couch_log, "couchdb-couch-log", {branch, "master"}, []},
     {config, "couchdb-config", {branch, "master"}, []},
     {chttpd, "couchdb-chttpd", {branch, "master"}, []},
@@ -26,16 +27,19 @@ DepDescs = [
     {couch_replicator, "couchdb-couch-replicator", {branch,  "master"}, []},
     {couch_dbupdates, "couchdb-couch-dbupdates", {branch, "master"}, []},
     {couch_plugins, "couchdb-couch-plugins", {branch, "master"}, []},
+    {couch_event, "couchdb-couch-event", {branch, "windsor-merge"}, []},
     {ddoc_cache, "couchdb-ddoc-cache", {branch, "master"}, []},
     {ets_lru, "couchdb-ets-lru", {branch, "master"}, []},
     {fabric, "couchdb-fabric", {branch,  "master"}, []},
     {ibrowse, "couchdb-ibrowse", {tag,  "master"}, []},
     {jiffy, "couchdb-jiffy", {branch, "master"}, []},
+    {khash, "couchdb-khash", {branch, "windsor-merge"}, []},
     {mem3, "couchdb-mem3", {branch, "master"}, []},
     {mochiweb, "couchdb-mochiweb", {branch, "master"}, []},
     {oauth, "couchdb-oauth", {branch, "master"}, []},
     {rexi, "couchdb-rexi", {branch, "master"}, []},
     {snappy, "couchdb-snappy", {branch, "1994-merge-rcouch"}, []},
+    {b64url, "couchdb-b64url", {branch, "windsor-merge"}, []},
     {fauxton, "couchdb-fauxton", {branch, "master"}, [raw]},
     {docs, "couchdb-documentation", {branch, "master"}, [raw]}
 ],
