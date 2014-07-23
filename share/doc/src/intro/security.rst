@@ -260,64 +260,64 @@ with the timeout (in seconds) setting in the :ref:`couch_httpd_auth
 Authentication Database
 =======================
 
-You may already note, that CouchDB administrators are defined within config file
-and you now wondering does regular users are also stored there. No, they don't.
-CouchDB has special `authentication database` -- ``_users`` by default -- that
-stores all registered users as JSON documents.
+You may already know that CouchDB administrators are defined within a config
+file and you now wondering does regular users are also stored there. No, they
+don't. CouchDB has special `authentication database` -- ``_users`` by default
+-- that stores all registered users as JSON documents.
 
-CouchDB uses special database (called ``_users`` by default) to store
-information about registered users. This is a `system database` -- this means
-that while it shares common :ref:`database API <api/database>`, there are some
-special security-related constraints applied and used agreements on documents
-structure. So how `authentication database` is different from others?
+This ``_users`` database is a `system database` -- this means that while it
+shares common :ref:`database API <api/database>`, there are some special
+security-related constraints applied and agreements on documents structure in
+place. So how is the `authentication database` different from others?
 
 - Only administrators may browse list of all documents
   (:get:`GET /_users/_all_docs </{db}/_all_docs>`)
-- Only administrators may listen :ref:`changes feed
+- Only administrators may listen to the :ref:`changes feed
   <changes>` (:get:`GET /_users/_changes </{db}/_changes>`)
 - Only administrators may execute design functions like :ref:`views <viewfun>`,
   :ref:`shows <showfun>` and :ref:`others <ddocs>`
 - Only administrators may :method:`GET`, :method:`PUT` or :method:`DELETE`
-  any document (to be honest, that they always can do)
-- There is special design document ``_auth`` that cannot be modified
+  any document (to be honest, they can always do that)
+- There is a special design document called ``_auth`` that cannot be modified
 - Every document (of course, except `design documents`) represents registered
-  CouchDB users and belong to them
+  CouchDB users and belongs to them
 - Users may only access (:get:`GET /_users/org.couchdb.user:Jan
   </{db}/{docid}>`) or modify (:put:`PUT /_users/org.couchdb.user:Jan
-  </{db}/{docid}>`) documents that they owns
+  </{db}/{docid}>`) documents that they own
 
 These draconian rules are reasonable: CouchDB cares about user's personal
-information and doesn't discloses it for everyone. Often, users documents are
-contains not only system information like `login`, `password hash` and `roles`,
-but also sensitive personal information like: real name, email, phone, special
-internal identifications and more - this is not right information that you
-want to share with the World.
+information and doesn't discloses it for everyone. Often, user documents
+contain not only system information like `login`, `password hash` and `roles`,
+but also sensitive personal information like real names, emails, phones, special
+internal identifications and more -- this is not information that you want to
+share with the world.
 
 
 Users Documents
 ===============
 
-Each CouchDB user is stored in document format. These documents are contains
-several *mandatory* fields, that CouchDB handles for correct authentication
+Each CouchDB user is stored as an individual document. These documents contain
+several *mandatory* fields, that CouchDB handles for the authentication
 process:
 
 - **_id** (*string*): Document ID. Contains user's login with special prefix
   :ref:`org.couchdb.user`
 - **derived_key** (*string*): `PBKDF2`_ key
-- **name** (*string*): User's name aka login. **Immutable** e.g. you cannot
-  rename existed user - you have to create new one
-- **roles** (*array* of *string*): List of user roles. CouchDB doesn't provides
+- **name** (*string*): User's name aka login. **Immutable**, i.e. you cannot
+  rename existed user -- you have to create new ones. This must be the same as
+  in the document ID after the special prefix.
+- **roles** (*array* of *string*): List of user roles. CouchDB doesn't provide
   any builtin roles, so you're free to define your own depending on your needs.
   However, you cannot set system roles like ``_admin`` there. Also, only
-  administrators may assign roles to users - by default all users have no roles
+  administrators may assign roles to users -- by default all users have no roles
 - **password_sha** (*string*): Hashed password with salt. Used for ``simple``
   `password_scheme`
 - **password_scheme** (*string*): Password hashing scheme. May be ``simple`` or
   ``pbkdf2``
 - **salt** (*string*): Hash salt. Used for ``simple`` `password_scheme`
-- **type** (*string*): Document type. Constantly have value ``user``
+- **type** (*string*): Document type. Must have the value ``user``
 
-Additionally, you may specify any custom fields that are relates to the target
+Additionally, you may specify any custom fields that are related to the target
 user. This is good place to store user's private information because only the
 target user and CouchDB administrators may browse it.
 
@@ -326,21 +326,21 @@ target user and CouchDB administrators may browse it.
 Why ``org.couchdb.user:`` prefix?
 ---------------------------------
 
-The reason to have special prefix before user's login name is to have
-namespaces which users are belongs to. This prefix is designed to prevent
-replication conflicts when you'll try to merge two `_user` databases or more.
+The reason to have a special prefix before user's login name is to have
+namespaces to which users belong. This prefix is designed to prevent replication
+conflicts when you'll try to merge two `_user` databases or more.
 
-For current CouchDB releases, all users are belongs to the same
-``org.couchdb.user`` namespace and this cannot be changed, but we'd made
-such design decision for future releases.
+For current CouchDB releases, all users belong to the same ``org.couchdb.user``
+namespace and this cannot be changed, but we'd made such design decision for
+future releases.
 
 
 Creating New User
 =================
 
-Creating new user is a very trivial operation. You need just to send single
-:method:`PUT` request with user's data to CouchDB. Let's create user with login
-`jan` and password `apple`::
+Creating new user is a trivial operation. You need just to send a single
+:method:`PUT` request with the user's data to CouchDB. Let's create user with
+login `jan` and password `apple`::
 
   curl -X PUT http://localhost:5984/_users/org.couchdb.user:jan \
        -H "Accept: application/json" \
@@ -373,8 +373,8 @@ And CouchDB responds with:
 
   {"ok":true,"id":"org.couchdb.user:jan","rev":"1-e0ebfb84005b920488fc7a8cc5470cc0"}
 
-Document successfully created what also means that user `jan` have created too!
-Let's check is this true::
+Success! We have just created the user `jan`. Let's check if we can use this new
+user to perform a simple login::
 
   curl -X POST http://localhost:5984/_session -d 'name=jan&password=apple'
 
@@ -396,16 +396,16 @@ the next error message:
 Password Changing
 =================
 
-This is quite common situation: user had forgot their password, it was leaked
+This is a quite common situation: user had forgot their password, it was leaked
 somehow (via copy-paste, screenshot, or by typing in wrong chat window) or
 something else. Let's change password for our user `jan`.
 
-First of all, let's define what is the password changing from the point of
-CouchDB and the authentication database. Since "users" are "documents", this
-operation is nothing, but updating the document with special field ``password``
+First of all, let's define what password changing is from the point of
+CouchDB and the authentication database. Since users are "documents", this
+operation is nothing but updating the document with special field ``password``
 which contains the *plain text password*. Scared? No need to: the authentication
-database has special internal hook on  document update which looks for this
-field and replaces it with the *secured hash*, depending on chosen
+database has special internal hook on document update which looks for this
+field and replaces it with the *secure hash*, depending on chosen
 ``password_scheme``.
 
 Summarizing above, we need to get document content, add ``password`` field
@@ -431,7 +431,8 @@ database.
   }
 
 Here is our user's document. We may strip hashes from stored document to reduce
-amount of posted data::
+amount of posted data (and because they will be updated by CouchDB itself
+anyway)::
 
   curl -X PUT http://localhost:5984/_users/org.couchdb.user:jan \
        -H "Accept: application/json" \
@@ -443,7 +444,7 @@ amount of posted data::
 
   {"ok":true,"id":"org.couchdb.user:jan","rev":"2-ed293d3a0ae09f0c624f10538ef33c6f"}
 
-Updated! Now let's check that password was really changed::
+Updated! Now let's check that the password was really changed::
 
   curl -X POST http://localhost:5984/_session -d 'name=jan&password=apple'
 
@@ -465,11 +466,11 @@ CouchDB should respond with:
 
   {"ok":true,"name":"jan","roles":[]}
 
-Hooray! You may wonder why so complex: need to retrieve user's document, add
-special field to it, post it back - where is one big button that changes the
-password without worry about document's content? Actually, :ref:`Futon
-<intro/futon>` has such at the right bottom corner if you have logged in -
-all implementation details are hidden from your sight.
+Hooray! You may wonder why this is so complex: need to retrieve user's document,
+add special field to it, post it back -- where is one big button that changes
+the password without worrying about the document's content? Actually,
+:ref:`Futon <intro/futon>` has such a function at the right bottom corner if are
+have logged in -- all implementation details are hidden from your sight.
 
 .. note::
 
@@ -482,7 +483,7 @@ Users Public Information
 
 .. versionadded:: 1.4
 
-Sometimes users *wants* to share some information with the World. For instance,
+Sometimes users *want* to share some information with the world. For instance,
 their contact email to let other users get in touch with them. To solve this
 problem, but still keep sensitive and private information secured there is
 special :ref:`configuration <config>` option :config:option:`public_fields
@@ -498,20 +499,20 @@ this document owner, CouchDB will respond with :statuscode:`404`::
 
   {"error":"not_found","reason":"missing"}
 
-This response is constant for both cases when user exists or not exists - by
-security reasons.
+This response is identical for both cases when user exists or not exists to
+prevent leaking sensitive information (like what users actually exist).
 
-Now let's share field ``name``. First, setup the ``public_fields`` configuration
-option. Remember, that this action requires administrator's privileges and
-the next command will ask for password for user `admin`, assuming that they are
-the server administrator::
+Now let's share the field ``name``. First, setup the ``public_fields``
+configuration option. Remember, that this action requires administrator's
+privileges and the next command will ask for password for user `admin`, assuming
+that they are the server administrator::
 
   curl -X PUT http://localhost:5984/_config/couch_http_auth/public_fields \
        -H "Content-Type: application/json" \
        -d '"name"' \
        -u admin
 
-What have changed? Let's check Robert's document once again::
+What has changed? Let's check Robert's document once again::
 
   curl http://localhost:5984/_users/org.couchdb.user:robert
 
@@ -519,10 +520,10 @@ What have changed? Let's check Robert's document once again::
 
   {"_id":"org.couchdb.user:robert","_rev":"6-869e2d3cbd8b081f9419f190438ecbe7","name":"robert"}
 
-Good news! Now we may read field ``name`` from *every user's document without
-need to be an administrator*. That's important note: don't publish sensitive
-information, especially without user's acknowledge - they may not like such
-actions from your side.
+Good news! Now we may read the field ``name`` from *every user's document
+without need to be an administrator*. That's important note: don't publish
+sensitive information, especially without user's consent -- they may not like
+such actions from your side.
 
 
 ==============
@@ -531,10 +532,10 @@ Authorization
 
 Now that you have a few users who can log in, you probably want to set up some
 restrictions on what actions they can perform based on their identity and their
-roles.  Each database on a CouchDB server can contain its own set of
+roles. Each database on a CouchDB server can contain its own set of
 authorization rules that specify which users are allowed to read and write
 documents, create design documents, and change certain database configuration
-parameters.  The authorization rules are set up by a server admin and can be
+parameters. The authorization rules are set up by a server admin and can be
 modified at any time.
 
 Database authorization rules assign a user into one of two classes:
@@ -547,10 +548,10 @@ Database authorization rules assign a user into one of two classes:
 Note that a database admin is not the same as a server admin -- the actions
 of a database admin are restricted to a specific database.
 
-When a database is first created, there are no members or admins.  HTTP
+When a database is first created, there are no members or admins. HTTP
 requests that have no authentication credentials or have credentials for a
 normal user are treated as members, and those with server admin credentials
-are treated as database admins.  To change the default permissions, you must
+are treated as database admins. To change the default permissions, you must
 create a :ref:`_security <api/db/security>` document in the database::
 
   > curl -X PUT http://localhost:5984/mydatabase/_security \
@@ -559,7 +560,7 @@ create a :ref:`_security <api/db/security>` document in the database::
        -d '{"admins": { "names": [], "roles": [] }, "members": { "names": ["jan"], "roles": [] } }'
 
 The HTTP request to create the `_security` document must contain the
-credentials of a server admin.  CouchDB will respond with:
+credentials of a server admin. CouchDB will respond with:
 
 .. code-block:: javascript
 
@@ -587,9 +588,9 @@ write normal documents::
 If Jan attempted to create a design doc, however, CouchDB would return a
 401 Unauthorized error because the username "jan" is not in the list of
 admin names and the `/_users/org.couchdb.user:jan` document doesn't contain
-a role that matches any of the declared admin roles.  If you want to promote
+a role that matches any of the declared admin roles. If you want to promote
 Jan to an admin, you can update the security document to add `"jan"` to
-the `names` array under `admin`.  Keeping track of individual database
+the `names` array under `admin`. Keeping track of individual database
 admin usernames is tedious, though, so you would likely prefer to create a
 database admin role and assign that role to the `org.couchdb.user:jan` user
 document::
