@@ -1,4 +1,4 @@
-# Riaknostic [![Build Status](https://secure.travis-ci.org/basho/riaknostic.png?branch=master)](http://travis-ci.org/basho/riaknostic)
+# Riaknostic
 
 `riaknostic` is an escript and set of tools that diagnoses common problems which could affect a Riak node or cluster. When experiencing any problem with Riak, `riaknostic` should be the first thing run during troubleshooting. The tool is integrated with Riak via the `riak-admin` script.
 
