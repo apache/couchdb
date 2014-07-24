@@ -21,7 +21,8 @@
 %% -------------------------------------------------------------------
 %%
 %% File renamed from riaknostic_check_ring_membership.erl to
-%% weatherreport_check_membership.erl
+%% weatherreport_check_membership.erl and modified to work with Apache
+%% CouchDB
 %%
 %% Copyright (c) 2014 Cloudant
 %%
@@ -30,8 +31,8 @@
 %% @doc Diagnostic that checks whether the local node is a member of
 %% the ring. This might arise when the node name in vm.args has
 %% changed but the node has not been renamed in the ring.
--module(riaknostic_check_ring_membership).
--behaviour(riaknostic_check).
+-module(weatherreport_check_membership).
+-behaviour(weatherreport_check).
 
 -export([description/0,
          valid/0,
@@ -46,14 +47,13 @@ description() ->
 
 -spec valid() -> boolean().
 valid() ->
-    riaknostic_node:can_connect().
+    weatherreport_node:can_connect().
 
--spec check() -> [{lager:log_level(), term()}].
+-spec check() -> [{atom(), term()}].
 check() ->
-    Stats = riaknostic_node:stats(),
-    {ring_members, RingMembers} = lists:keyfind(ring_members, 1, Stats),
-    {nodename, NodeName} = lists:keyfind(nodename, 1, Stats),
-    case lists:member(NodeName, RingMembers) of
+    NodeName = weatherreport_node:nodename(),
+    Members = weatherreport_node:local_command(mem3, nodes, []),
+    case lists:member(NodeName, Members) of
         true ->
             [];
         false ->
@@ -61,12 +61,12 @@ check() ->
     end.
 
 check_test() ->
-    meck:new(riaknostic_node, [passthrough]),
-    meck:expect(riaknostic_node, stats, fun() -> [{ring_members, ["riak@127.0.0.1"]}, {nodename, ["notmember@127.0.0.1"]}] end),
-    ?assert(meck:validate(riaknostic_node)),
+    meck:new(weatherreport_node, [passthrough]),
+    meck:expect(weatherreport_node, stats, fun() -> [{ring_members, ["dev@127.0.0.1"]}, {nodename, ["notmember@127.0.0.1"]}] end),
+    ?assert(meck:validate(weatherreport_node)),
     ?assertEqual([{warning, {not_ring_member, ["notmember@127.0.0.1"]}}], check()),
     ?assertNotEqual([{warning, {not_ring_member, ["notequal@127.0.0.1"]}}], check()),
-    meck:unload(riaknostic_node).
+    meck:unload(weatherreport_node).
 
 -spec format(term()) -> {io:format(), [term()]}.
 format({not_ring_member, Nodename}) ->

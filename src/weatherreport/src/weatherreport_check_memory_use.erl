@@ -21,7 +21,8 @@
 %% -------------------------------------------------------------------
 %%
 %% File renamed from riaknostic_check_memory_use.erl to
-%% weatherreport_check_memory_use.erl
+%% weatherreport_check_memory_use.erl and modified to work with Apache
+%% CouchDB
 %%
 %% Copyright (c) 2014 Cloudant
 %%
@@ -30,8 +31,8 @@
 %% @doc Diagnostic that checks Riak's current memory usage. If memory
 %% usage is high, a warning message will be sent, otherwise only
 %% informational messages.
--module(riaknostic_check_memory_use).
--behaviour(riaknostic_check).
+-module(weatherreport_check_memory_use).
+-behaviour(weatherreport_check).
 
 -export([description/0,
          valid/0,
@@ -44,17 +45,15 @@ description() ->
 
 -spec valid() -> boolean().
 valid() ->
-    riaknostic_node:can_connect().
+    weatherreport_node:can_connect().
 
--spec check() -> [{lager:log_level(), term()}].
+-spec check() -> [{atom(), term()}].
 check() ->
-    Pid = riaknostic_node:pid(),
-    Output = riaknostic_util:run_command("ps -o pmem,rss -p " ++ Pid),
+    Pid = weatherreport_node:pid(),
+    Output = weatherreport_util:run_command("ps -o pmem,rss -p " ++ Pid),
     [_,_,Percent, RealSize| _] = string:tokens(Output, "/n \n"),
-    Messages = [
-                {info, {process_usage, Percent, RealSize}}
-               ],
-    case riaknostic_util:binary_to_float(list_to_binary(Percent)) >= 90 of
+    Messages = [{info, {process_usage, Percent, RealSize}}],
+    case weatherreport_util:binary_to_float(list_to_binary(Percent)) >= 90 of
         false ->
             Messages;
         true ->
@@ -63,6 +62,6 @@ check() ->
 
 -spec format(term()) -> {io:format(), [term()]}.
 format({high_memory, Percent}) ->
-    {"Riak memory usage is HIGH: ~s% of available RAM", [Percent]};
+    {"Memory usage is HIGH: ~s% of available RAM", [Percent]};
 format({process_usage, Percent, Real}) ->
-    {"Riak process is using ~s% of available RAM, totalling ~s KB of real memory.", [Percent, Real]}.
+    {"Process is using ~s% of available RAM, totalling ~s KB of real memory.", [Percent, Real]}.

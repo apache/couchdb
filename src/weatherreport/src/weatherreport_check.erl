@@ -21,6 +21,8 @@
 %% -------------------------------------------------------------------
 %%
 %% File renamed from riaknostic_check.erl to weatherreport_check.erl
+%% and modified to work with Apache CouchDB
+%%
 %% Copyright (c) 2014 Cloudant
 %%
 %% -------------------------------------------------------------------
@@ -54,7 +56,7 @@
 %% you would pass to {@link io:format/2. io:format/2}.</p>
 %% @end
 
--module(riaknostic_check).
+-module(weatherreport_check).
 -export([behaviour_info/1]).
 -export([check/1,
          modules/0,
@@ -72,7 +74,7 @@ behaviour_info(_) ->
 
 %% @doc Runs the diagnostic in the given module, if it is valid. Returns a
 %% list of messages that will be printed later using print/1.
--spec check(Module::module()) -> [{lager:log_level(), module(), term()}].
+-spec check(Module::module()) -> [{atom(), module(), term()}].
 check(Module) ->
     case Module:valid() of
         true ->
@@ -85,7 +87,7 @@ check(Module) ->
 %% riaknostic application.
 -spec modules() -> [module()].
 modules() ->
-    {ok, Mods} = application:get_key(riaknostic, modules),
+    {ok, Mods} = application:get_key(weatherreport, modules),
     [ M || M <- Mods,
            Attr <- M:module_info(attributes),
            {behaviour, [?MODULE]} =:= Attr orelse {behavior, [?MODULE]} =:= Attr ].
@@ -95,13 +97,11 @@ modules() ->
 %% module's format/1 function will be called to provide a
 %% human-readable message. It should return an iolist() or a 2-tuple
 %% consisting of a format string and a list of terms.
--spec print({Level::lager:log_level(), Module::module(), Data::term()}) -> ok.
+-spec print({Level::atom(), Module::module(), Data::term()}) -> ok.
 print({Level, Mod, Data}) ->
     case Mod:format(Data) of
         {Format, Terms} ->
-            riaknostic_util:log(Level, Format, Terms);
+            weatherreport_util:log(Level, Format, Terms);
         String ->
-            riaknostic_util:log(Level, String)
+            weatherreport_util:log(Level, String)
     end.
-
-

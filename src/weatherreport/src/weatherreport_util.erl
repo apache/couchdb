@@ -27,31 +27,32 @@
 
 %% @doc Utility functions for riaknostic.
 %% @end
--module(riaknostic_util).
+-module(weatherreport_util).
 -export([short_name/1,
          run_command/1,
          log/2,log/3,
-         binary_to_float/1]).
+         binary_to_float/1,
+         should_log/1]).
 
 %% @doc Converts a check module name into a short name that can be
 %% used to refer to a check on the command line.  For example,
 %% <code>riaknostic_check_disk becomes</code> <code>"disk"</code>.
 -spec short_name(module()) -> iodata() | unicode:charlist().
 short_name(Mod) when is_atom(Mod) ->
-    re:replace(atom_to_list(Mod), "riaknostic_check_", "", [{return, list}]).
+    re:replace(atom_to_list(Mod), "weatherreport_check_", "", [{return, list}]).
 
 %% @doc Runs a shell command and returns the output. stderr is
 %% redirected to stdout so its output will be included.
 -spec run_command(Command::iodata()) -> StdOut::iodata().
 run_command(Command) ->
-    riaknostic_util:log(debug, "Running shell command: ~s", [Command]),
+    weatherreport_util:log(debug, "Running shell command: ~s", [Command]),
     Port = erlang:open_port({spawn,Command},[exit_status, stderr_to_stdout]),
     do_read(Port, []).
 
 do_read(Port, Acc) ->
     receive
         {Port, {data, StdOut}} ->
-            riaknostic_util:log(debug, "Shell command output: ~n~s~n",[StdOut]),
+            weatherreport_util:log(debug, "Shell command output: ~n~s~n",[StdOut]),
             do_read(Port, Acc ++ StdOut);
         {Port, {exit_status, _}} -> 
             %%port_close(Port),
@@ -74,7 +75,7 @@ log(Level, Format, Terms) ->
         false ->
             ok
     end,
-    lager:log(Level, self(), Format, Terms).
+    twig:log(Level, Format, Terms).
 
 log(Level, String) ->
     case should_log(Level) of
@@ -83,12 +84,11 @@ log(Level, String) ->
         false ->
             ok
     end,
-    lager:log(Level, self(), String).
+    twig:log(Level, String).
 
 should_log(Level) ->
-    AppLevel = case application:get_env(riaknostic, log_level) of
+    AppLevel = case application:get_env(weatherreport, log_level) of
         undefined -> info;
         {ok, L0} -> L0
     end,
-    lager_util:level_to_num(AppLevel) >= lager_util:level_to_num(Level).
-
+    twig_util:level(AppLevel) >= twig_util:level(Level).

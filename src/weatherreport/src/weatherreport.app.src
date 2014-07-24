@@ -20,21 +20,22 @@
 %%
 %% -------------------------------------------------------------------
 %%
-%% File renamed from riaknostic.app.src to weatherreport.app.src
+%% File renamed from riaknostic.app.src to weatherreport.app.src and
+%% modified to work with Apache CouchDB.
+%%
 %% Copyright (c) 2014 Cloudant
 %%
 %% -------------------------------------------------------------------
 
-{application, riaknostic,
- [
-  {description, "Diagnostic tools for Riak"},
-  {vsn, "1.2.1"},
-  {registered, []},
-  {applications, [
-                  kernel,
-                  stdlib,
-                  inets,
-                  lager
-                 ]},
-  {mod, { riaknostic_app, []}}
+{application, weatherreport, [
+    {description, "Diagnostic tools for Apache CouchDB"},
+    {vsn, git},
+    {registered, []},
+    {applications, [
+        kernel,
+        stdlib,
+        inets,
+        twig
+    ]},
+    {mod, {weatherreport_app, []}}
  ]}.

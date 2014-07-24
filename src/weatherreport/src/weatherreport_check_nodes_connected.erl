@@ -21,15 +21,16 @@
 %% -------------------------------------------------------------------
 %%
 %% File renamed from riaknostic_check_nodes_connected.erl to
-%% weatherreport_check_nodes_connected.erl
+%% weatherreport_check_nodes_connected.erl and modified to work with
+%% Apache CouchDB
 %%
 %% Copyright (c) 2014 Cloudant
 %%
 %% -------------------------------------------------------------------
 
 %% @doc Diagnostic check that detects cluster members that are down.
--module(riaknostic_check_nodes_connected).
--behaviour(riaknostic_check).
+-module(weatherreport_check_nodes_connected).
+-behaviour(weatherreport_check).
 
 -export([description/0,
          valid/0,
@@ -42,18 +43,16 @@ description() ->
 
 -spec valid() -> boolean().
 valid() ->
-    riaknostic_node:can_connect().
+    weatherreport_node:can_connect().
 
--spec check() -> [{lager:log_level(), term()}].
+-spec check() -> [{atom(), term()}].
 check() ->
-    Stats = riaknostic_node:stats(),
-    {connected_nodes, ConnectedNodes} = lists:keyfind(connected_nodes, 1, Stats),
-    {ring_members, RingMembers} = lists:keyfind(ring_members, 1, Stats),
-    {nodename, NodeName} = lists:keyfind(nodename, 1, Stats),
-
-    [ {warning, {node_disconnected, N}} || N <- RingMembers,
-                                           N =/= NodeName,
-                                           lists:member(N, ConnectedNodes) == false].
+    NodeName = weatherreport_node:nodename(),
+    ConnectedNodes = [NodeName | weatherreport_node:local_command(erlang, nodes, [])],
+    Members = weatherreport_node:local_command(mem3, nodes, []),
+    [{warning, {node_disconnected, N}} || N <- Members,
+                                          N =/= NodeName,
+                                          lists:member(N, ConnectedNodes) == false].
 
 -spec format(term()) -> {io:format(), [term()]}.
 format({node_disconnected, Node}) ->

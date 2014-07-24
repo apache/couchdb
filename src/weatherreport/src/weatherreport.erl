@@ -20,7 +20,9 @@
 %%
 %% -------------------------------------------------------------------
 %%
-%% File renamed from riaknostic.erl to weatherreport.erl
+%% File renamed from riaknostic.erl to weatherreport.erl and modified
+%% to work with Apache CouchDB
+%%
 %% Copyright (c) 2014 Cloudant
 %%
 %% -------------------------------------------------------------------
@@ -56,86 +58,88 @@
 %%   check or list of checks to run</td></tr>
 %% </table>
 %% @end
--module(riaknostic).
+-module(weatherreport).
 -export([main/1]).
 
 -define(OPTS, [
                {etc,   undefined, "etc",   string,         undefined                                         },
-               {base,  undefined, "base",  string,         undefined                                         },
-               {user,  undefined, "user",  string,         undefined                                         },
                {level, $d,        "level", {atom, notice}, "Minimum message severity level (default: notice)"},
-               {list,  $l,        "list",  undefined,      "Describe available diagnostic tasks"             },
-               % should we calc and interpolate the actual cwd for the below?
-               {export,undefined, "export",undefined,      "Package system info in '$CWD/export.zip'"        }
+               {usage, $h,        "help",  undefined,      "Display help/usage"                              },
+               {list,  $l,        "list",  undefined,      "Describe available diagnostic tasks"             }
               ]).
+
+-define(USAGE_OPTS, [ O || O <- ?OPTS,
+                           element(5,O) =/= undefined]).
 
 %% @doc The main entry point for the riaknostic escript.
 -spec main(CommandLineArguments::[string()]) -> any().
 main(Args) ->
-    application:load(riaknostic),
+    application:load(weatherreport),
 
     case getopt:parse(?OPTS, Args) of
         {ok, {Opts, NonOptArgs}} ->
             case process_opts(Opts) of
                 list -> list_checks();
-                run -> run(NonOptArgs);
-                export -> riaknostic_export:export()
+                usage -> usage();
+                run -> run(NonOptArgs)
             end;
         {error, Error} ->
-            io:format("Invalid option sequence given: ~w~n", [Error])
+            io:format("Invalid option sequence given: ~w~n", [Error]),
+            usage()
     end.
 
 list_checks() ->
-    Descriptions = [ {riaknostic_util:short_name(Mod), Mod:description()} ||
-                       Mod <- riaknostic_check:modules() ],
+    Descriptions = [ {weatherreport_util:short_name(Mod), Mod:description()} ||
+                       Mod <- weatherreport_check:modules() ],
     io:format("Available diagnostic checks:~n~n"),
     lists:foreach(fun({Mod, Desc}) ->
                           io:format("  ~.20s ~s~n", [Mod, Desc])
                   end, lists:sort(Descriptions)).
 
+usage() ->
+    getopt:usage(?USAGE_OPTS, "weatherreport ", "[check_name ...]", [{"check_name", "A specific check to run"}]).
+
 run(InputChecks) ->
-    case riaknostic_config:prepare() of
+    case weatherreport_config:prepare() of
         {error, Reason} ->
-            io:format("Fatal error: ~s~n", [Reason]);
+            io:format("Fatal error: ~s~n", [Reason]),
+            halt(1);
         _ ->
             ok
     end,
     Checks = case InputChecks of
-                 [] ->
-                     riaknostic_check:modules();
-                 _ ->
-                     ShortNames = [{riaknostic_util:short_name(Mod), Mod} || Mod <- riaknostic_check:modules() ],
-                     element(1, lists:foldr(fun validate_checks/2, {[], ShortNames}, InputChecks))
-             end,
-    Messages = lists:foldl(fun(Mod, Acc) ->
-                                   Acc ++ riaknostic_check:check(Mod)
-                           end, [], Checks),
+    [] ->
+        weatherreport_check:modules();
+    _ ->
+        ShortNames = [{weatherreport_util:short_name(Mod), Mod} || Mod <- weatherreport_check:modules() ],
+        element(1, lists:foldr(fun validate_checks/2, {[], ShortNames}, InputChecks))
+    end,
+    Messages = lists:foldl(
+        fun(Mod, Acc) -> Acc ++ weatherreport_check:check(Mod) end,
+        [],
+        Checks
+    ),
     case Messages of
-        [] ->
-            io:format("No diagnostic messages to report.~n");
-        _ ->
-            %% Print the most critical messages first
-            LogLevelNum = lists:foldl(
-              fun({mask, Mask}, Acc) ->
-                    Mask bor Acc;
-                (Level, Acc) when is_integer(Level) ->
-                    {mask, Mask} = lager_util:config_to_mask(lager_util:num_to_level(Level)),
-                    Mask bor Acc;
-                (_, Acc) ->
-                    Acc
-              end, 0, lager:get_loglevels()),
-            FilteredMessages = lists:filter(fun({Level,_,_}) ->
-                                                    lager_util:level_to_num(Level) =< LogLevelNum
-                                            end, Messages),
-            SortedMessages = lists:sort(fun({ALevel, _, _}, {BLevel, _, _}) ->
-                                                lager_util:level_to_num(ALevel) =< lager_util:level_to_num(BLevel)
-                                        end, FilteredMessages),
-            case SortedMessages of
-                [] ->
-                    io:format("No diagnostic messages to report.~n");
-                _ ->
-                    lists:foreach(fun riaknostic_check:print/1, SortedMessages)
-            end
+    [] ->
+        io:format("No diagnostic messages to report.~n"),
+        halt(0);
+    _ ->
+        %% Print the most critical messages first
+        FilteredMessages = lists:filter(fun({Level,_,_}) ->
+            weatherreport_util:should_log(Level)
+        end, Messages),
+        SortedMessages = lists:sort(fun({ALevel, _, _}, {BLevel, _, _}) ->
+            twig_util:level(ALevel) =< twig_util:level(BLevel)
+        end, FilteredMessages),
+        case SortedMessages of
+            [] ->
+                io:format("No diagnostic messages to report.~n"),
+                halt(0);
+            _ ->
+                lists:foreach(fun weatherreport_check:print/1, SortedMessages),
+                halt(1)
+        end,
+        halt(1)
     end.
 
 validate_checks(Check, {Mods, SNames}) ->
@@ -156,22 +160,14 @@ process_opts([H|T], Result) ->
     process_opts(T, process_option(H, Result)).
 
 process_option({etc,Path}, Result) ->
-    application:set_env(riaknostic, etc, filename:absname(Path)),
-    Result;
-process_option({base, Path}, Result) ->
-    application:set_env(riaknostic, base, filename:absname(Path)),
-    Result;
-process_option({user, User}, Result) ->
-    application:set_env(riaknostic, user, User),
+    application:set_env(weatherreport, etc, filename:absname(Path)),
     Result;
 process_option({level, Level}, Result) ->
-    application:set_env(riaknostic, log_level, Level),
+    application:set_env(weatherreport, log_level, Level),
     Result;
 process_option(list, usage) -> %% Help should have precedence over listing checks
     usage;
 process_option(list, _) ->
     list;
 process_option(usage, _) ->
-    usage;
-process_option(export, _) ->
-    export.
+    usage.

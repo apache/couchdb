@@ -21,7 +21,8 @@
 %% -------------------------------------------------------------------
 %%
 %% File renamed from riaknostic_check_disk.erl to
-%% weatherreport_check_disk.erl
+%% weatherreport_check_disk.erl and modified to work with Apache
+%% CouchDB
 %%
 %% Copyright (c) 2014 Cloudant
 %%
@@ -30,11 +31,11 @@
 %% @doc Diagnostic that checks permissions on data directories and
 %% whether noatime is set.  It will only check data directories of
 %% known storage backends.
--module(riaknostic_check_disk).
--behaviour(riaknostic_check).
+-module(weatherreport_check_disk).
+-behaviour(weatherreport_check).
 
 %% The file that we will attempt to create and read under each data directory.
--define(TEST_FILE, "riaknostic.tmp").
+-define(TEST_FILE, "weatherreport.tmp").
 
 %% A dependent chain of permissions checking functions.
 -define(CHECKPERMFUNS, [fun check_is_dir/1,
@@ -58,9 +59,9 @@ description() ->
 valid() ->
     true.
 
--spec check() -> [{lager:log_level(), term()}].
+-spec check() -> [{atom(), term()}].
 check() ->
-    DataDirs = riaknostic_config:data_directories(),
+    DataDirs = weatherreport_config:data_directories(),
     %% Add additional disk checks in the function below
     lists:flatmap(fun(Dir) ->
                           check_directory_permissions(Dir)
@@ -75,10 +76,10 @@ format({disk_full, DataDir}) ->
 format({no_data_dir, DataDir}) ->
     {"Data directory ~s does not exist. Please create it.", [DataDir]};
 format({no_write, DataDir}) ->
-    User = riaknostic_config:user(),
+    User = weatherreport_config:user(),
     {"No write access to data directory ~s. Please make it writeable by the '~s' user.", [DataDir, User]};
 format({no_read, DataDir}) ->
-    User = riaknostic_config:user(),
+    User = weatherreport_config:user(),
     {"No read access to data directory ~s. Please make it readable by the '~s' user.", [DataDir, User]};
 format({write_check, File}) ->
     {"Write-test file ~s is a directory! Please remove it so this test can continue.", [File]};
@@ -169,4 +170,3 @@ check_atime(Directory) ->
         _ ->
             ok
     end.
-
