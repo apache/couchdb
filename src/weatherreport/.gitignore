@@ -4,7 +4,7 @@ ebin/*
 log/
 edoc/
 index.html
-riaknostic
+weatherreport
 *.png
 pkg/
 erl_crash.dump
