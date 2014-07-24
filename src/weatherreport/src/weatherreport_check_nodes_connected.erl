@@ -19,6 +19,13 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
+%%
+%% File renamed from riaknostic_check_nodes_connected.erl to
+%% weatherreport_check_nodes_connected.erl
+%%
+%% Copyright (c) 2014 Cloudant
+%%
+%% -------------------------------------------------------------------
 
 %% @doc Diagnostic check that detects cluster members that are down.
 -module(riaknostic_check_nodes_connected).

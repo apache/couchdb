@@ -19,6 +19,13 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
+%%
+%% File renamed from riaknostic_check_ring_membership.erl to
+%% weatherreport_check_membership.erl
+%%
+%% Copyright (c) 2014 Cloudant
+%%
+%% -------------------------------------------------------------------
 
 %% @doc Diagnostic that checks whether the local node is a member of
 %% the ring. This might arise when the node name in vm.args has

@@ -19,6 +19,11 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
+%%
+%% File renamed from riaknostic_config.erl to weatherreport_config.erl
+%% Copyright (c) 2014 Cloudant
+%%
+%% -------------------------------------------------------------------
 
 %% @doc Provides convenient access to Riak configuration values.  When
 %% the {@link riaknostic. riaknostic} module calls {@link

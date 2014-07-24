@@ -19,6 +19,13 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
+%%
+%% File renamed from riaknostic_check_memory_use.erl to
+%% weatherreport_check_memory_use.erl
+%%
+%% Copyright (c) 2014 Cloudant
+%%
+%% -------------------------------------------------------------------
 
 %% @doc Diagnostic that checks Riak's current memory usage. If memory
 %% usage is high, a warning message will be sent, otherwise only

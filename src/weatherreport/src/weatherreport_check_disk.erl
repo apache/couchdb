@@ -19,6 +19,13 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
+%%
+%% File renamed from riaknostic_check_disk.erl to
+%% weatherreport_check_disk.erl
+%%
+%% Copyright (c) 2014 Cloudant
+%%
+%% -------------------------------------------------------------------
 
 %% @doc Diagnostic that checks permissions on data directories and
 %% whether noatime is set.  It will only check data directories of

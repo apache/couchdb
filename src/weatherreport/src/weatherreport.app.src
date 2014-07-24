@@ -19,6 +19,12 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
+%%
+%% File renamed from riaknostic.app.src to weatherreport.app.src
+%% Copyright (c) 2014 Cloudant
+%%
+%% -------------------------------------------------------------------
+
 {application, riaknostic,
  [
   {description, "Diagnostic tools for Riak"},

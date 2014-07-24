@@ -19,6 +19,11 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
+%%
+%% File renamed from riaknostic_util.erl to weatherreport_util.erl
+%% Copyright (c) 2014 Cloudant
+%%
+%% -------------------------------------------------------------------
 
 %% @doc Utility functions for riaknostic.
 %% @end

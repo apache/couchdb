@@ -19,6 +19,11 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
+%%
+%% File renamed from riaknostic_node.erl to weatherreport_node.erl
+%% Copyright (c) 2014 Cloudant
+%%
+%% -------------------------------------------------------------------
 
 %% @doc Functions that help diagnostics interact with the local Riak
 %% node or other members of the cluster.

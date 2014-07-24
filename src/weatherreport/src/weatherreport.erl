@@ -19,6 +19,11 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
+%%
+%% File renamed from riaknostic.erl to weatherreport.erl
+%% Copyright (c) 2014 Cloudant
+%%
+%% -------------------------------------------------------------------
 
 %% @doc <p>The <code>riaknostic</code> module is the entry point for
 %% the escript. It is responsible for parsing command-line arguments

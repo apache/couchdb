@@ -19,6 +19,11 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
+%%
+%% File renamed from riaknostic_check.erl to weatherreport_check.erl
+%% Copyright (c) 2014 Cloudant
+%%
+%% -------------------------------------------------------------------
 
 %% @doc <p>Enforces a common API among all diagnostic modules and
 %% provides some automation around their execution.</p>
