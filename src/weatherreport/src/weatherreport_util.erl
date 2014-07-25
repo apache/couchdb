@@ -25,7 +25,7 @@
 %%
 %% -------------------------------------------------------------------
 
-%% @doc Utility functions for riaknostic.
+%% @doc Utility functions for weatherreport.
 %% @end
 -module(weatherreport_util).
 -export([short_name/1,
@@ -36,7 +36,8 @@
 
 %% @doc Converts a check module name into a short name that can be
 %% used to refer to a check on the command line.  For example,
-%% <code>riaknostic_check_disk becomes</code> <code>"disk"</code>.
+%% <code>weatherreport_check_memory_use becomes</code>
+%% <code>"memory_use"</code>.
 -spec short_name(module()) -> iodata() | unicode:charlist().
 short_name(Mod) when is_atom(Mod) ->
     re:replace(atom_to_list(Mod), "weatherreport_check_", "", [{return, list}]).

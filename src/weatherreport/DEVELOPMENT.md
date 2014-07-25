@@ -1,65 +1,82 @@
-# Riaknostic Development
+# WeatherReport Development
 
-Riaknostic requires a sane GNU build system and a recent version of
-Erlang.  It has `lager` and `getopt` as dependencies, so those must be
+WeatherReport requires a sane GNU build system and a recent version of
+Erlang.  It has `twig` and `getopt` as dependencies, so those must be
 compatible with your version of Erlang. Release versions are currently
 built with Erlang version R14B03, while development versions are targeted at Erlang version R14B04.
 
 See the `rebar.config` file for more details.
 
-To build Riaknostic, simply run `make`:
+To build WeatherReport, simply run `make`:
 
 ```bash
 $ make
 ./rebar get-deps
-==> riaknostic (get-deps)
-Pulling lager from {git,"git://github.com/basho/lager",{branch,"master"}}
-Cloning into lager...
-Pulling getopt from {git,"git://github.com/jcomellas/getopt.git","2981dfe"}
-Cloning into getopt...
-==> lager (get-deps)
+==> weatherreport (get-deps)
+Pulling getopt from {git,"git://github.com/jcomellas/getopt.git",
+                         {tag,"v0.4.3"}}
+Cloning into 'getopt'...
+Pulling meck from {git,"git://github.com/basho/meck.git",{tag,"0.8.1"}}
+Cloning into 'meck'...
+Pulling twig from {git,"https://github.com/cloudant/twig.git",master}
+Cloning into 'twig'...
+Pulling config from {git,"git://github.com/cloudant/config.git",{tag,"0.2.5"}}
+Cloning into 'config'...
 ==> getopt (get-deps)
+==> meck (get-deps)
+==> twig (get-deps)
+==> config (get-deps)
 ./rebar compile
-==> lager (compile)
-Compiled src/lager_util.erl
-Compiled src/lager_transform.erl
-Compiled src/lager_sup.erl
-Compiled src/lager_mochiglobal.erl
-Compiled src/lager_stdlib.erl
-Compiled src/lager_handler_watcher_sup.erl
-Compiled src/lager_handler_watcher.erl
-Compiled src/lager_trunc_io.erl
-Compiled src/lager_crash_log.erl
-Compiled src/lager_file_backend.erl
-Compiled src/lager_app.erl
-Compiled src/lager.erl
-Compiled src/lager_console_backend.erl
-Compiled src/lager_format.erl
-Compiled src/error_logger_lager_h.erl
 ==> getopt (compile)
 Compiled src/getopt.erl
-==> riaknostic (compile)
-Compiled src/riaknostic_check.erl
-Compiled src/riaknostic_util.erl
-Compiled src/riaknostic_node.erl
-Compiled src/riaknostic_check_ring_size.erl
-Compiled src/riaknostic_check_ring_membership.erl
-Compiled src/riaknostic_config.erl
-Compiled src/riaknostic_check_memory_use.erl
-Compiled src/riaknostic_check_nodes_connected.erl
-Compiled src/riaknostic_check_dumps.erl
-Compiled src/riaknostic.erl
-Compiled src/riaknostic_check_disk.erl
+==> meck (compile)
+Compiled src/meck_util.erl
+Compiled src/meck_ret_spec.erl
+Compiled src/meck_matcher.erl
+Compiled src/meck_history.erl
+Compiled src/meck_expect.erl
+Compiled src/meck_cover.erl
+Compiled src/meck_code.erl
+Compiled src/meck_args_matcher.erl
+Compiled src/meck_code_gen.erl
+Compiled src/meck.erl
+Compiled src/meck_proc.erl
+==> twig (compile)
+Compiled src/twig_sup.erl
+Compiled src/twig_util.erl
+Compiled src/twig_app.erl
+Compiled src/twig_event_handler.erl
+Compiled src/twig.erl
+Compiled src/twig_monitor.erl
+Compiled src/trunc_io.erl
+==> config (compile)
+Compiled src/config_listener.erl
+Compiled src/config_sup.erl
+Compiled src/config_app.erl
+Compiled src/config_util.erl
+Compiled src/config_writer.erl
+Compiled src/config.erl
+==> weatherreport (compile)
+Compiled src/weatherreport_check.erl
+Compiled src/weatherreport_config.erl
+Compiled src/weatherreport_util.erl
+Compiled src/weatherreport_node.erl
+Compiled src/weatherreport_check_nodes_connected.erl
+Compiled src/weatherreport_check_memory_use.erl
+Compiled src/weatherreport_check_membership.erl
+Compiled src/weatherreport.erl
 ./rebar escriptize
-==> lager (escriptize)
 ==> getopt (escriptize)
-==> riaknostic (escriptize)
+==> meck (escriptize)
+==> twig (escriptize)
+==> config (escriptize)
+==> weatherreport (escriptize)
 ```
 
 Now you can invoke the script manually via the below command:
 
 ```bash
-$ ./riaknostic --etc ~/code/riak/rel/riak/etc --base ~/code/riak/rel/riak --user `whoami` [other options]
+$ ./weatherreport --etc /path/to/etc [other options]
 ```
 
 To generate the edoc reference, use `make docs` and then open the
@@ -69,18 +86,4 @@ in the edocs.
 
 ## Contributing
 
-Have an idea for a diagnostic? Want to improve the way Riaknostic works? Fork the [github repository](https://github.com/basho/riaknostic) and send us a pull-request with your changes! The code is documented with `edoc`, so give the [API Docs](http://riaknostic.basho.com/edoc/index.html) a read before you contribute.
-
-### Developing for Riaknostic Without a Riak Instance
-
-If you want to run the `riaknostic` script while developing, and you don't have it hooked up to your local Riak, you can invoke it directly like so:
-
-```bash
-./riaknostic --etc ~/code/riak/rel/riak/etc --base ~/code/riak/rel/riak --user `whoami` [other options]
-```
-
-The extra options are usually assigned by the `riak-admin` script for you, but here's how to set them:
-
-* `--etc`:	Where your Riak configuration directory is, in the example above it's in the generated directory of a source checkout of Riak.
-* `--base`:	The "base" directory of Riak, usually the root of the generated directory or `/usr/lib/riak` on Linux, for example. Scan the `riak-admin` script for how the `RUNNER_BASE_DIR` variable is assigned on your platform.
-* `--user`:	What user/UID the Riak node runs as. In a source checkout, it's the current user, on most systems, it's `riak`.
+We want your code! Fork the [github repository](https://github.com/cloudant/weatherreport) and send a pull request if you'd like to add a new check, contribute improvements to existing checks or improve the way WeatherReport works.

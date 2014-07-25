@@ -70,4 +70,4 @@ check_test() ->
 
 -spec format(term()) -> {io:format(), [term()]}.
 format({not_ring_member, Nodename}) ->
-    {"Local node ~w is not a member of the ring. Please check that the -name setting in vm.args is correct.", [Nodename]}.
+    {"Local node ~w is not a member of the cluster. Please check that the -name setting in vm.args is correct.", [Nodename]}.

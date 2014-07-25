@@ -28,7 +28,7 @@
 %%
 %% -------------------------------------------------------------------
 
-%% @doc Diagnostic that checks Riak's current memory usage. If memory
+%% @doc Diagnostic that checks the current memory usage. If memory
 %% usage is high, a warning message will be sent, otherwise only
 %% informational messages.
 -module(weatherreport_check_memory_use).

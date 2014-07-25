@@ -25,11 +25,12 @@
 %%
 %% -------------------------------------------------------------------
 
-%% @doc Provides convenient access to Riak configuration values.  When
-%% the {@link riaknostic. riaknostic} module calls {@link
-%% prepare/0. prepare/0}, Riak's <code>app.config</code> and
-%% <code>vm.args</code> files will be parsed and memoized, and lager
-%% will be started on the console at the configured severity level.
+%% @doc Provides convenient access to configuration values.  When
+%% the {@link weatherreport. weatherreport} module calls {@link
+%% prepare/0. prepare/0}, CouchDB's <code>default.ini</code>,
+%% <code>local.ini</code> and <code>vm.args</code> files will be
+%% parsed and memoized, and twig will be started on the console at the
+%% configured severity level.
 %% @end
 
 -module(weatherreport_config).
@@ -42,8 +43,8 @@
          cookie/0,
          user/0]).
 
-%% @doc Prepares appropriate configuration so the riaknostic script
-%%      can run.  This is called by the riaknostic module and you do
+%% @doc Prepares appropriate configuration to the weatherreport script
+%%      can run.  This is called by the weaterreport module and you do
 %%      not need to invoke it.
 -spec prepare() -> ok | {error, iodata()}.
 prepare() ->
@@ -59,7 +60,7 @@ prepare([Fun|T]) ->
             prepare(T)
     end.
 
-%% @doc Determines where Riak is configured to store data. Returns a
+%% @doc Determines where CouchDB is configured to store data. Returns a
 %%      list of paths to directories defined by storage backends.
 -spec data_directories() -> [ file:filename() ].
 data_directories() ->
@@ -75,7 +76,7 @@ get_vm_env(Key) ->
             proplists:get_value(Key, PList)
     end.
 
-%% @doc Determines the user/uid that the installed Riak runs as.
+%% @doc Determines the user/uid that the script is running as.
 -spec user() -> string().
 user() ->
     case weatherreport_util:run_command("whoami") of
@@ -86,7 +87,7 @@ user() ->
             lists:reverse(Resp1)
     end.
 
-%% @doc The Riak configuration directory.
+%% @doc The CouchDB configuration directory.
 -spec etc_dir() -> file:filename().
 etc_dir() ->
     case application:get_env(weatherreport, etc) of
@@ -96,7 +97,7 @@ etc_dir() ->
             filename:absname(Path, "/")
     end.
 
-%% @doc The local Riak node name. Includes whether the node uses short
+%% @doc The local node name. Includes whether the node uses short
 %% or long nodenames for distributed Erlang.
 -spec node_name() -> {shortnames | longnames, Name::string()}.
 node_name() ->
@@ -107,7 +108,7 @@ node_name() ->
             Node
     end.
 
-%% @doc The Riak node's distributed Erlang cookie.
+%% @doc The node's distributed Erlang cookie.
 -spec cookie() -> atom().
 cookie() ->
     case application:get_env(weatherreport, cookie) of

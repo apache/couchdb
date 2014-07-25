@@ -39,11 +39,11 @@
 %% <h3>valid/0</h3>
 %% <pre>-spec valid() -> boolean().</pre>
 %% <p>Whether the diagnostic is valid to run. For example, some checks
-%% require connectivity to the Riak node and hence call {@link
-%% riaknostic_node:can_connect/0. riaknostic_node:can_connect()}.</p>
+%% require connectivity to the cluster node and hence call {@link
+%% weatherreport_node:can_connect/0. weatherreport_node:can_connect()}.</p>
 %%
 %% <h3>check/0</h3>
-%% <pre>-spec check() -> [{lager:log_level(), term()}].</pre>
+%% <pre>-spec check() -> [{atom(), term()}].</pre>
 %% <p>Runs the diagnostic, returning a list of pairs, where the first
 %% is a severity level and the second is any term that is understood
 %% by the <code>format/1</code> callback.</p>
@@ -84,7 +84,7 @@ check(Module) ->
     end.
 
 %% @doc Collects a list of diagnostic modules included in the
-%% riaknostic application.
+%% weatherreport application.
 -spec modules() -> [module()].
 modules() ->
     {ok, Mods} = application:get_key(weatherreport, modules),
@@ -93,7 +93,7 @@ modules() ->
            {behaviour, [?MODULE]} =:= Attr orelse {behavior, [?MODULE]} =:= Attr ].
 
 
-%% @doc Formats and prints the given message via lager:log/3,4. The diagnostic
+%% @doc Formats and prints the given message. The diagnostic
 %% module's format/1 function will be called to provide a
 %% human-readable message. It should return an iolist() or a 2-tuple
 %% consisting of a format string and a list of terms.
