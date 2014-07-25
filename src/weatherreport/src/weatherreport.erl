@@ -58,6 +58,7 @@
 -define(OPTS, [
                {etc,   undefined, "etc",   string,         undefined                                         },
                {level, $d,        "level", {atom, notice}, "Minimum message severity level (default: notice)"},
+               {expert, $e,       "expert", undefined,     "Perform more detailed diagnostics"               },
                {usage, $h,        "help",  undefined,      "Display help/usage"                              },
                {list,  $l,        "list",  undefined,      "Describe available diagnostic tasks"             }
               ]).
@@ -158,6 +159,9 @@ process_option({etc,Path}, Result) ->
     Result;
 process_option({level, Level}, Result) ->
     application:set_env(weatherreport, log_level, Level),
+    Result;
+process_option(expert, Result) ->
+    application:set_env(weatherreport, expert_mode, true),
     Result;
 process_option(list, usage) -> %% Help should have precedence over listing checks
     usage;

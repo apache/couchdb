@@ -23,10 +23,11 @@ For most cases, you can just run the `weatherreport` command as given at the top
 
 ```bash
 weatherreport --help
-Usage: weatherreport [-d <level>] [-l] [-h] [check_name ...]
+Usage: weatherreport [-d <level>] [-e] [-h] [-l] [check_name ...]
 
   -d, --level		Minimum message severity level (default: notice)
   -l, --list		Describe available diagnostic tasks
+  -e, --expert		Perform more detailed diagnostics
   -h, --help		Display help/usage
   check_name		A specific check to run
 ```
