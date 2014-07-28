@@ -211,11 +211,6 @@ index is generated, not when it's accessed:
 - **include_design** (*boolean*): Allows map functions to be called on design
   documents as well as regular documents
 
-In additional to these options, you may specify :ref:`any other <api/ddoc/view>`
-with their default value. E.g. having option ``"include_docs": true`` will
-automatically includes document body for view results response. You still may
-override such by explicitly defining same query parameter name with other value.
-
 .. _api/ddoc/view/indexing:
 
 Querying Views and Indexes
