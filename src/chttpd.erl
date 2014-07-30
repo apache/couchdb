@@ -200,10 +200,15 @@ handle_request(MochiReq) ->
     Result =
     try
         check_request_uri_length(RawUri),
-        case authenticate_request(HttpReq, AuthenticationFuns) of
-        #httpd{} = Req ->
-            HandlerFun = url_handler(HandlerKey),
-            HandlerFun(chttpd_auth_request:authorize_request(possibly_hack(Req)));
+        case chttpd_cors:is_preflight_request(HttpReq) of
+        #httpd{} ->
+            case authenticate_request(HttpReq, AuthenticationFuns) of
+            #httpd{} = Req ->
+                HandlerFun = url_handler(HandlerKey),
+                HandlerFun(chttpd_auth_request:authorize_request(possibly_hack(Req)));
+            Response ->
+                Response
+            end;
         Response ->
             Response
         end
@@ -407,8 +412,10 @@ primary_header_value(#httpd{mochi_req=MochiReq}, Key) ->
     MochiReq:get_primary_header_value(Key).
 
 serve_file(#httpd{mochi_req=MochiReq}=Req, RelativePath, DocumentRoot) ->
+    Headers = server_header() ++
+	couch_httpd_auth:cookie_auth_header(Req, []),
     {ok, MochiReq:serve_file(RelativePath, DocumentRoot,
-        server_header() ++ couch_httpd_auth:cookie_auth_header(Req, []))}.
+        chttpd_cors:headers(Req, Headers))}.
 
 qs_value(Req, Key) ->
     qs_value(Req, Key, undefined).
@@ -536,7 +543,8 @@ etag_respond(Req, CurrentEtag, RespFun) ->
     case etag_match(Req, CurrentEtag) of
     true ->
         % the client has this in their cache.
-        chttpd:send_response(Req, 304, [{"Etag", CurrentEtag}], <<>>);
+        Headers = chttpd_cors:headers(Req, [{"Etag", CurrentEtag}]),
+        chttpd:send_response(Req, 304, Headers, <<>>);
     false ->
         % Run the function.
         RespFun()
@@ -548,10 +556,12 @@ verify_is_server_admin(#httpd{user_ctx=#user_ctx{roles=Roles}}) ->
     false -> throw({unauthorized, <<"You are not a server admin.">>})
     end.
 
-start_response_length(#httpd{mochi_req=MochiReq}=Req, Code, Headers, Length) ->
+start_response_length(#httpd{mochi_req=MochiReq}=Req, Code, Headers0, Length) ->
     couch_stats_collector:increment({httpd_status_codes, Code}),
-    Resp = MochiReq:start_response_length({Code, Headers ++ server_header() ++
-        couch_httpd_auth:cookie_auth_header(Req, Headers), Length}),
+    Headers = Headers0 ++ server_header() ++
+	couch_httpd_auth:cookie_auth_header(Req, Headers0),
+    Resp = MochiReq:start_response_length({Code,
+        chttpd_cors:headers(Req, Headers), Length}),
     case MochiReq:get(method) of
     'HEAD' -> throw({http_head_abort, Resp});
     _ -> ok
@@ -562,10 +572,12 @@ send(Resp, Data) ->
     Resp:send(Data),
     {ok, Resp}.
 
-start_chunked_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers) ->
+start_chunked_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers0) ->
     couch_stats_collector:increment({httpd_status_codes, Code}),
-    Resp = MochiReq:respond({Code, Headers ++ server_header() ++
-        couch_httpd_auth:cookie_auth_header(Req, Headers), chunked}),
+    Headers = Headers0 ++ server_header() ++
+        couch_httpd_auth:cookie_auth_header(Req, Headers0),
+    Resp = MochiReq:respond({Code, chttpd_cors:headers(Req, Headers),
+        chunked}),
     case MochiReq:get(method) of
     'HEAD' -> throw({http_head_abort, Resp});
     _ -> ok
@@ -576,10 +588,12 @@ send_chunk(Resp, Data) ->
     Resp:write_chunk(Data),
     {ok, Resp}.
 
-send_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers, Body) ->
+send_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers0, Body) ->
     couch_stats_collector:increment({httpd_status_codes, Code}),
-    {ok, MochiReq:respond({Code, Headers ++ server_header() ++
-        couch_httpd_auth:cookie_auth_header(Req, Headers), Body})}.
+    Headers = Headers0 ++ server_header() ++
+	couch_httpd_auth:cookie_auth_header(Req, Headers0),
+    {ok, MochiReq:respond({Code, Headers, Body})}.
+
 
 send_method_not_allowed(Req, Methods) ->
     send_error(Req, 405, [{"Allow", Methods}], <<"method_not_allowed">>,
@@ -591,13 +605,15 @@ send_json(Req, Value) ->
 send_json(Req, Code, Value) ->
     send_json(Req, Code, [], Value).
 
-send_json(Req, Code, Headers, Value) ->
+send_json(Req, Code, Headers0, Value) ->
+    Headers = chttpd_cors:headers(Req, Headers0),
     couch_httpd:send_json(Req, Code, [timing(), reqid() | Headers], Value).
 
 start_json_response(Req, Code) ->
     start_json_response(Req, Code, []).
 
-start_json_response(Req, Code, Headers) ->
+start_json_response(Req, Code, Headers0) ->
+    Headers = chttpd_cors:headers(Req, Headers0),
     couch_httpd:start_json_response(Req, Code, [timing(), reqid() | Headers]).
 
 end_json_response(Resp) ->
@@ -840,7 +856,8 @@ send_chunked_error(Resp, Error) ->
     send_chunk(Resp, []).
 
 send_redirect(Req, Path) ->
-     Headers = [{"Location", chttpd:absolute_uri(Req, Path)}],
+     Headers = chttpd_cors:headers(Req,
+         [{"Location", chttpd:absolute_uri(Req, Path)}]),
      send_response(Req, 301, Headers, <<>>).
 
 server_header() ->
