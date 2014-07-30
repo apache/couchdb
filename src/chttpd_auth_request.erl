@@ -74,7 +74,7 @@ server_authorization_check(#httpd{path_parts=[<<"_", _/binary>>|_]}=Req) ->
     require_admin(Req).
 
 db_authorization_check(#httpd{path_parts=[DbName|_],user_ctx=Ctx}=Req) ->
-    {_} = fabric:get_security(DbName, [{user_ctx, Ctx}]),
+    {_} = cassim:get_security(DbName, [{user_ctx, Ctx}]),
     Req.
 
 require_admin(Req) ->

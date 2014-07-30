@@ -39,7 +39,8 @@
         config,
         couch,
         ets_lru,
-        fabric
+        fabric,
+        cassim
     ]},
     {mod, {chttpd_app,[]}}
 ]}.
