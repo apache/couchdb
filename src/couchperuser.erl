@@ -90,6 +90,7 @@ ensure_security(User, {ok, Db}, Acc) ->
         false ->
             update_security(Db, SecProps, Admins, [User | Names])
     end,
+    couch_db:close(Db),
     Acc.
 
 update_security(Db, SecProps, Admins, Names) ->
