@@ -83,7 +83,7 @@ user() ->
         [] ->
             undefined;
         Resp ->
-            [Newline | Resp1] = lists:reverse(Resp),
+            [_Newline | Resp1] = lists:reverse(Resp),
             lists:reverse(Resp1)
     end.
 
