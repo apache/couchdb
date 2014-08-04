@@ -69,10 +69,16 @@ do_read(Port, Acc) ->
 binary_to_float(Bin) ->
     list_to_float(binary_to_list(Bin)).
 
+get_prefix(Level) ->
+    {_, NodeName} = weatherreport_config:node_name(),
+    io_lib:format("[~s] [~w]", [NodeName, Level]).
+
 log(Level, Format, Terms) ->
     case should_log(Level) of
         true ->
-            io:format(lists:concat(["[", Level, "] ", Format, "~n"]), Terms);
+            Prefix = get_prefix(Level),
+            Message = io_lib:format(Format, Terms),
+            io:format("~s ~s~n", [Prefix, Message]);
         false ->
             ok
     end,
@@ -81,7 +87,8 @@ log(Level, Format, Terms) ->
 log(Level, String) ->
     case should_log(Level) of
         true ->
-            io:format(lists:concat(["[", Level, "] ", String, "~n"]));
+            Prefix = get_prefix(Level),
+            io:format("~s ~s~n", [Prefix, String]);
         false ->
             ok
     end,
