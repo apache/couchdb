@@ -92,7 +92,8 @@ user() ->
 etc_dir() ->
     case application:get_env(weatherreport, etc) of
         undefined ->
-            filename:absname("./etc", ".");
+            ExecDir = filename:absname(filename:dirname(escript:script_name())),
+            filename:join(ExecDir, "../etc");
         {ok, Path} ->
             filename:absname(Path, "/")
     end.
