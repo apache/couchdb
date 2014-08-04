@@ -60,14 +60,6 @@ check() ->
             [{warning, {not_ring_member, NodeName}}]
     end.
 
-check_test() ->
-    meck:new(weatherreport_node, [passthrough]),
-    meck:expect(weatherreport_node, stats, fun() -> [{ring_members, ["dev@127.0.0.1"]}, {nodename, ["notmember@127.0.0.1"]}] end),
-    ?assert(meck:validate(weatherreport_node)),
-    ?assertEqual([{warning, {not_ring_member, ["notmember@127.0.0.1"]}}], check()),
-    ?assertNotEqual([{warning, {not_ring_member, ["notequal@127.0.0.1"]}}], check()),
-    meck:unload(weatherreport_node).
-
 -spec format(term()) -> {io:format(), [term()]}.
 format({not_ring_member, Nodename}) ->
     {"Local node ~w is not a member of the cluster. Please check that the -name setting in vm.args is correct.", [Nodename]}.

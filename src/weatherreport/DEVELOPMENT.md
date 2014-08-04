@@ -16,31 +16,16 @@ $ make
 Pulling getopt from {git,"git://github.com/jcomellas/getopt.git",
                          {tag,"v0.4.3"}}
 Cloning into 'getopt'...
-Pulling meck from {git,"git://github.com/basho/meck.git",{tag,"0.8.1"}}
-Cloning into 'meck'...
 Pulling twig from {git,"https://github.com/cloudant/twig.git",master}
 Cloning into 'twig'...
 Pulling config from {git,"git://github.com/cloudant/config.git",{tag,"0.2.5"}}
 Cloning into 'config'...
 ==> getopt (get-deps)
-==> meck (get-deps)
 ==> twig (get-deps)
 ==> config (get-deps)
 ./rebar compile
 ==> getopt (compile)
 Compiled src/getopt.erl
-==> meck (compile)
-Compiled src/meck_util.erl
-Compiled src/meck_ret_spec.erl
-Compiled src/meck_matcher.erl
-Compiled src/meck_history.erl
-Compiled src/meck_expect.erl
-Compiled src/meck_cover.erl
-Compiled src/meck_code.erl
-Compiled src/meck_args_matcher.erl
-Compiled src/meck_code_gen.erl
-Compiled src/meck.erl
-Compiled src/meck_proc.erl
 ==> twig (compile)
 Compiled src/twig_sup.erl
 Compiled src/twig_util.erl
@@ -67,7 +52,6 @@ Compiled src/weatherreport_check_membership.erl
 Compiled src/weatherreport.erl
 ./rebar escriptize
 ==> getopt (escriptize)
-==> meck (escriptize)
 ==> twig (escriptize)
 ==> config (escriptize)
 ==> weatherreport (escriptize)
