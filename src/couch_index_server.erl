@@ -15,13 +15,13 @@
 -behaviour(config_listener).
 
 -export([start_link/0, validate/2, get_index/4, get_index/3, get_index/2]).
--export([update_notify/1]).
 
 -export([init/1, terminate/2, code_change/3]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
 
 % config_listener api
 -export([handle_config_change/5]).
+-export([handle_db_event/3]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -115,7 +115,7 @@ init([]) ->
     ets:new(?BY_SIG, [protected, set, named_table]),
     ets:new(?BY_PID, [private, set, named_table]),
     ets:new(?BY_DB, [protected, bag, named_table]),
-    couch_db_update_notifier:start_link(fun ?MODULE:update_notify/1),
+    couch_event:link_listener(?MODULE, handle_db_event, nil, [all_dbs]),
     RootDir = couch_index_util:root_dir(),
     couch_file:init_delete_dir(RootDir),
     {ok, #st{root_dir=RootDir}}.
@@ -239,21 +239,11 @@ rem_from_ets(DbName, Sig, DDocId, Pid) ->
     ets:delete_object(?BY_DB, {DbName, {DDocId, Sig}}).
 
 
-update_notify({deleted, DbName}) ->
-    gen_server:cast(?MODULE, {reset_indexes, DbName});
-update_notify({created, DbName}) ->
-    gen_server:cast(?MODULE, {reset_indexes, DbName});
-update_notify({ddoc_updated, {DbName, DDocId}}) ->
-    lists:foreach(
-        fun({_DbName, {_DDocId, Sig}}) ->
-            case ets:lookup(?BY_SIG, {DbName, Sig}) of
-                [{_, IndexPid}] ->
-                    (catch gen_server:cast(IndexPid, ddoc_updated));
-                [] ->
-                    ok
-            end
-        end,
-        ets:match_object(?BY_DB, {DbName, {DDocId, '$1'}}));
-update_notify(_) ->
-    ok.
-
+handle_db_event(DbName, created, St) ->
+    gen_server:cast(?MODULE, {reset_indexes, DbName}),
+    {ok, St};
+handle_db_event(DbName, deleted, St) ->
+    gen_server:cast(?MODULE, {reset_indexes, DbName}),
+    {ok, St};
+handle_db_event(_DbName, _Event, St) ->
+    {ok, St}.
