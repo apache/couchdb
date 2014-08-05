@@ -500,22 +500,22 @@ update_docs(Db, Docs) ->
 % group_alike_docs groups the sorted documents into sublist buckets, by id.
 % ([DocA, DocA, DocB, DocC], []) -> [[DocA, DocA], [DocB], [DocC]]
 group_alike_docs(Docs) ->
-    Sorted = lists:sort(fun({#doc{id=A},_},{#doc{id=B},_})-> A < B end, Docs),
+    Sorted = lists:sort(fun(#doc{id=A},#doc{id=B})-> A < B end, Docs),
     group_alike_docs(Sorted, []).
 
 group_alike_docs([], Buckets) ->
-    lists:reverse(lists:map(fun lists:reverse/1, Buckets));
+    lists:reverse(Buckets);
 group_alike_docs([Doc|Rest], []) ->
     group_alike_docs(Rest, [[Doc]]);
-group_alike_docs([{Doc,Ref}|Rest], [Bucket|RestBuckets]) ->
-    [{#doc{id=BucketId},_Ref}|_] = Bucket,
+group_alike_docs([Doc|Rest], [Bucket|RestBuckets]) ->
+    [#doc{id=BucketId}|_] = Bucket,
     case Doc#doc.id == BucketId of
     true ->
         % add to existing bucket
-        group_alike_docs(Rest, [[{Doc,Ref}|Bucket]|RestBuckets]);
+        group_alike_docs(Rest, [[Doc|Bucket]|RestBuckets]);
     false ->
         % add to new bucket
-       group_alike_docs(Rest, [[{Doc,Ref}]|[Bucket|RestBuckets]])
+       group_alike_docs(Rest, [[Doc]|[Bucket|RestBuckets]])
     end.
 
 validate_doc_update(#db{}=Db, #doc{id= <<"_design/",_/binary>>}=Doc, _GetDiskDocFun) ->
@@ -630,8 +630,10 @@ prep_and_validate_updates(_Db, [], [], _AllowConflict, AccPrepped,
    {AccPrepped, AccFatalErrors};
 prep_and_validate_updates(Db, [DocBucket|RestBuckets], [not_found|RestLookups],
         AllowConflict, AccPrepped, AccErrors) ->
+    [#doc{id=Id}|_]=DocBucket,
+    % no existing revs are known,
     {PreppedBucket, AccErrors3} = lists:foldl(
-        fun({#doc{revs=Revs}=Doc,Ref}, {AccBucket, AccErrors2}) ->
+        fun(#doc{revs=Revs}=Doc, {AccBucket, AccErrors2}) ->
             case couch_doc:has_stubs(Doc) of
             true ->
                 couch_doc:merge_stubs(Doc, #doc{}); % will throw exception
@@ -641,19 +643,19 @@ prep_and_validate_updates(Db, [DocBucket|RestBuckets], [not_found|RestLookups],
             {0, []} ->
                 case validate_doc_update(Db, Doc, fun() -> nil end) of
                 ok ->
-                    {[{Doc, Ref} | AccBucket], AccErrors2};
+                    {[Doc | AccBucket], AccErrors2};
                 Error ->
-                    {AccBucket, [{Ref, Error} | AccErrors2]}
+                    {AccBucket, [{{Id, {0, []}}, Error} | AccErrors2]}
                 end;
             _ ->
                 % old revs specified but none exist, a conflict
-                {AccBucket, [{Ref, conflict} | AccErrors2]}
+                {AccBucket, [{{Id, Revs}, conflict} | AccErrors2]}
             end
         end,
         {[], AccErrors}, DocBucket),
 
     prep_and_validate_updates(Db, RestBuckets, RestLookups, AllowConflict,
-            [lists:reverse(PreppedBucket) | AccPrepped], AccErrors3);
+            [PreppedBucket | AccPrepped], AccErrors3);
 prep_and_validate_updates(Db, [DocBucket|RestBuckets],
         [{ok, #full_doc_info{rev_tree=OldRevTree}=OldFullDocInfo}|RestLookups],
         AllowConflict, AccPrepped, AccErrors) ->
@@ -663,14 +665,14 @@ prep_and_validate_updates(Db, [DocBucket|RestBuckets],
         {Leaf, {Start, [RevId | _]} = Revs} <- Leafs
     ]),
     {PreppedBucket, AccErrors3} = lists:foldl(
-        fun({Doc, Ref}, {Docs2Acc, AccErrors2}) ->
+        fun(Doc, {Docs2Acc, AccErrors2}) ->
             case prep_and_validate_update(Db, Doc, OldFullDocInfo,
                     LeafRevsDict, AllowConflict) of
             {ok, Doc2} ->
-                {[{Doc2, Ref} | Docs2Acc], AccErrors2};
-            {Error, #doc{}} ->
+                {[Doc2 | Docs2Acc], AccErrors2};
+            {Error, #doc{id=Id,revs=Revs}} ->
                 % Record the error
-                {Docs2Acc, [{Ref, Error} |AccErrors2]}
+                {Docs2Acc, [{{Id, Revs}, Error} |AccErrors2]}
             end
         end,
         {[], AccErrors}, DocBucket),
@@ -690,7 +692,7 @@ prep_and_validate_replicated_updates(Db, [Bucket|RestBuckets], [OldInfo|RestOldI
     case OldInfo of
     not_found ->
         {ValidatedBucket, AccErrors3} = lists:foldl(
-            fun({Doc, Ref}, {AccPrepped2, AccErrors2}) ->
+            fun(Doc, {AccPrepped2, AccErrors2}) ->
                 case couch_doc:has_stubs(Doc) of
                 true ->
                     couch_doc:merge_stubs(Doc, #doc{}); % will throw exception
@@ -698,7 +700,7 @@ prep_and_validate_replicated_updates(Db, [Bucket|RestBuckets], [OldInfo|RestOldI
                 end,
                 case validate_doc_update(Db, Doc, fun() -> nil end) of
                 ok ->
-                    {[{Doc, Ref} | AccPrepped2], AccErrors2};
+                    {[Doc | AccPrepped2], AccErrors2};
                 Error ->
                     {AccPrepped2, [{Doc, Error} | AccErrors2]}
                 end
@@ -709,7 +711,7 @@ prep_and_validate_replicated_updates(Db, [Bucket|RestBuckets], [OldInfo|RestOldI
         OldLeafs = couch_key_tree:get_all_leafs_full(OldTree),
         OldLeafsLU = [{Start, RevId} || {Start, [{RevId, _}|_]} <- OldLeafs],
         NewRevTree = lists:foldl(
-            fun({NewDoc, _Ref}, AccTree) ->
+            fun(NewDoc, AccTree) ->
                 {NewTree, _} = couch_key_tree:merge(AccTree,
                     couch_doc:to_path(NewDoc), Db#db.revs_limit),
                 NewTree
@@ -719,7 +721,7 @@ prep_and_validate_replicated_updates(Db, [Bucket|RestBuckets], [OldInfo|RestOldI
         LeafRevsFullDict = dict:from_list( [{{Start, RevId}, FullPath} || {Start, [{RevId, _}|_]}=FullPath <- Leafs]),
         {ValidatedBucket, AccErrors3} =
         lists:foldl(
-            fun({#doc{id=Id,revs={Pos, [RevId|_]}}=Doc, Ref}, {AccValidated, AccErrors2}) ->
+            fun(#doc{id=Id,revs={Pos, [RevId|_]}}=Doc, {AccValidated, AccErrors2}) ->
                 IsOldLeaf = lists:member({Pos, RevId}, OldLeafsLU),
                 case dict:find({Pos, RevId}, LeafRevsFullDict) of
                 {ok, {Start, Path}} when not IsOldLeaf ->
@@ -748,7 +750,7 @@ prep_and_validate_replicated_updates(Db, [Bucket|RestBuckets], [OldInfo|RestOldI
 
                     case validate_doc_update(Db, Doc2, GetDiskDocFun) of
                     ok ->
-                        {[{Doc2, Ref} | AccValidated], AccErrors2};
+                        {[Doc2 | AccValidated], AccErrors2};
                     Error ->
                         {AccValidated, [{Doc, Error} | AccErrors2]}
                     end;
@@ -780,10 +782,10 @@ new_revs([], OutBuckets, IdRevsAcc) ->
     {lists:reverse(OutBuckets), IdRevsAcc};
 new_revs([Bucket|RestBuckets], OutBuckets, IdRevsAcc) ->
     {NewBucket, IdRevsAcc3} = lists:mapfoldl(
-        fun({#doc{revs={Start, RevIds}}=Doc, Ref}, IdRevsAcc2)->
+        fun(#doc{id=Id,revs={Start, RevIds}}=Doc, IdRevsAcc2)->
         NewRevId = new_revid(Doc),
-        {{Doc#doc{revs={Start+1, [NewRevId | RevIds]}}, Ref},
-            [{Ref, {ok, {Start+1, NewRevId}}} | IdRevsAcc2]}
+        {Doc#doc{revs={Start+1, [NewRevId | RevIds]}},
+            [{{Id, {Start, RevIds}}, {ok, {Start+1, NewRevId}}} | IdRevsAcc2]}
     end, IdRevsAcc, Bucket),
     new_revs(RestBuckets, [NewBucket|OutBuckets], IdRevsAcc3).
 
@@ -802,17 +804,15 @@ check_dup_atts2(_) ->
 
 update_docs(Db, Docs, Options, replicated_changes) ->
     increment_stat(Db, {couchdb, database_writes}),
-    % associate reference with each doc in order to track duplicates
-    Docs2 = lists:map(fun(Doc) -> {Doc, make_ref()} end, Docs),
-    DocBuckets = before_docs_update(Db, group_alike_docs(Docs2)),
+    DocBuckets = before_docs_update(Db, group_alike_docs(Docs)),
     case (Db#db.validate_doc_funs /= []) orelse
         lists:any(
-            fun({#doc{id= <<?DESIGN_DOC_PREFIX, _/binary>>}, _Ref}) -> true;
-            ({#doc{atts=Atts}, _Ref}) ->
+            fun(#doc{id= <<?DESIGN_DOC_PREFIX, _/binary>>}) -> true;
+            (#doc{atts=Atts}) ->
                 Atts /= []
-            end, Docs2) of
+            end, Docs) of
     true ->
-        Ids = [Id || [{#doc{id=Id}, _Ref}|_] <- DocBuckets],
+        Ids = [Id || [#doc{id=Id}|_] <- DocBuckets],
         ExistingDocs = get_full_doc_infos(Db, Ids),
 
         {DocBuckets2, DocErrors} =
@@ -822,8 +822,8 @@ update_docs(Db, Docs, Options, replicated_changes) ->
         DocErrors = [],
         DocBuckets3 = DocBuckets
     end,
-    DocBuckets4 = [[{doc_flush_atts(check_dup_atts(Doc), Db#db.fd), Ref}
-            || {Doc, Ref} <- Bucket] || Bucket <- DocBuckets3],
+    DocBuckets4 = [[doc_flush_atts(check_dup_atts(Doc), Db#db.fd)
+            || Doc <- Bucket] || Bucket <- DocBuckets3],
     {ok, []} = write_and_commit(Db, DocBuckets4, [], [merge_conflicts | Options]),
     {ok, DocErrors};
 
@@ -833,30 +833,28 @@ update_docs(Db, Docs, Options, interactive_edit) ->
     % go ahead and generate the new revision ids for the documents.
     % separate out the NonRep documents from the rest of the documents
 
-    % associate reference with each doc in order to track duplicates
-    Docs2 = lists:map(fun(Doc) -> {Doc, make_ref()} end,Docs),
-    {Docs3, NonRepDocs} = lists:foldl(
-         fun({#doc{id=Id},_Ref}=Doc, {DocsAcc, NonRepDocsAcc}) ->
+    {Docs2, NonRepDocs} = lists:foldl(
+         fun(#doc{id=Id}=Doc, {DocsAcc, NonRepDocsAcc}) ->
             case Id of
             <<?LOCAL_DOC_PREFIX, _/binary>> ->
                 {DocsAcc, [Doc | NonRepDocsAcc]};
             Id->
                 {[Doc | DocsAcc], NonRepDocsAcc}
             end
-        end, {[], []}, Docs2),
+        end, {[], []}, Docs),
 
-    DocBuckets = before_docs_update(Db, group_alike_docs(Docs3)),
+    DocBuckets = before_docs_update(Db, group_alike_docs(Docs2)),
 
     case (Db#db.validate_doc_funs /= []) orelse
         lists:any(
-            fun({#doc{id= <<?DESIGN_DOC_PREFIX, _/binary>>}, _Ref}) ->
+            fun(#doc{id= <<?DESIGN_DOC_PREFIX, _/binary>>}) ->
                 true;
-            ({#doc{atts=Atts}, _Ref}) ->
+            (#doc{atts=Atts}) ->
                 Atts /= []
-            end, Docs3) of
+            end, Docs2) of
     true ->
         % lookup the doc by id and get the most recent
-        Ids = [Id || [{#doc{id=Id}, _Ref}|_] <- DocBuckets],
+        Ids = [Id || [#doc{id=Id}|_] <- DocBuckets],
         ExistingDocInfos = get_full_doc_infos(Db, Ids),
 
         {DocBucketsPrepped, PreCommitFailures} = prep_and_validate_updates(Db,
@@ -870,38 +868,29 @@ update_docs(Db, Docs, Options, interactive_edit) ->
     end,
 
     if (AllOrNothing) and (PreCommitFailures /= []) ->
-        {aborted,
-         lists:foldl(fun({#doc{id=Id,revs=Revs}, Ref},Acc) ->
-                         case lists:keyfind(Ref,1,PreCommitFailures) of
-                         {Ref, Error} ->
-                             case Revs of
-                             {Pos, [RevId|_]} ->
-                                 [{{Id,{Pos, RevId}}, Error} | Acc];
-                             {0, []} ->
-                                 [{{Id,{0, <<>>}}, Error} | Acc]
-                             end;
-                         false ->
-                             Acc
-                         end
-                     end,[],Docs3)};
-
+        {aborted, lists:map(
+            fun({{Id,{Pos, [RevId|_]}}, Error}) ->
+                {{Id, {Pos, RevId}}, Error};
+            ({{Id,{0, []}}, Error}) ->
+                {{Id, {0, <<>>}}, Error}
+            end, PreCommitFailures)};
     true ->
         Options2 = if AllOrNothing -> [merge_conflicts];
                 true -> [] end ++ Options,
         DocBuckets3 = [[
-                {doc_flush_atts(set_new_att_revpos(
-                        check_dup_atts(Doc)), Db#db.fd), Ref}
-                || {Doc, Ref} <- B] || B <- DocBuckets2],
+                doc_flush_atts(set_new_att_revpos(
+                        check_dup_atts(Doc)), Db#db.fd)
+                || Doc <- B] || B <- DocBuckets2],
         {DocBuckets4, IdRevs} = new_revs(DocBuckets3, [], []),
 
         {ok, CommitResults} = write_and_commit(Db, DocBuckets4, NonRepDocs, Options2),
 
         ResultsDict = dict:from_list(IdRevs ++ CommitResults ++ PreCommitFailures),
         {ok, lists:map(
-            fun({#doc{}, Ref}) ->
-                {ok, Result} = dict:find(Ref, ResultsDict),
+            fun(#doc{id=Id,revs={Pos, RevIds}}) ->
+                {ok, Result} = dict:find({Id, {Pos, RevIds}}, ResultsDict),
                 Result
-            end, Docs2)}
+            end, Docs)}
     end.
 
 % Returns the first available document on disk. Input list is a full rev path
@@ -962,7 +951,7 @@ write_and_commit(#db{main_pid=Pid, user_ctx=Ctx}=Db, DocBuckets1,
             % compaction. Retry by reopening the db and writing to the current file
             {ok, Db2} = open(Db#db.name, [{user_ctx, Ctx}]),
             DocBuckets2 = [
-                [{doc_flush_atts(Doc, Db2#db.fd), Ref} || {Doc, Ref} <- Bucket] ||
+                [doc_flush_atts(Doc, Db2#db.fd) || Doc <- Bucket] ||
                 Bucket <- DocBuckets1
             ],
             % We only retry once
@@ -981,7 +970,7 @@ write_and_commit(#db{main_pid=Pid, user_ctx=Ctx}=Db, DocBuckets1,
 
 prepare_doc_summaries(Db, BucketList) ->
     [lists:map(
-        fun({#doc{body = Body, atts = Atts} = Doc, Ref}) ->
+        fun(#doc{body = Body, atts = Atts} = Doc) ->
             DiskAtts = [{N, T, P, AL, DL, R, M, E} ||
                 #att{name = N, type = T, data = {_, P}, md5 = M, revpos = R,
                     att_len = AL, disk_len = DL, encoding = E} <- Atts],
@@ -992,7 +981,7 @@ prepare_doc_summaries(Db, BucketList) ->
                 nil
             end,
             SummaryChunk = couch_db_updater:make_doc_summary(Db, {Body, DiskAtts}),
-            {Doc#doc{body = {summary, SummaryChunk, AttsFd}}, Ref}
+            Doc#doc{body = {summary, SummaryChunk, AttsFd}}
         end,
         Bucket) || Bucket <- BucketList].
 
@@ -1001,9 +990,8 @@ before_docs_update(#db{before_doc_update = nil}, BucketList) ->
     BucketList;
 before_docs_update(#db{before_doc_update = Fun} = Db, BucketList) ->
     [lists:map(
-        fun({Doc, Ref}) ->
-            NewDoc = Fun(couch_doc:with_ejson_body(Doc), Db),
-            {NewDoc, Ref}
+        fun(Doc) ->
+            Fun(couch_doc:with_ejson_body(Doc), Db)
         end,
         Bucket) || Bucket <- BucketList].
 
