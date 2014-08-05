@@ -217,7 +217,7 @@ handle_info({gen_event_EXIT, {config_listener, ?MODULE}, _Reason}, State) ->
     erlang:send_after(5000, self(), restart_config_listener),
     {noreply, State};
 
-handle_info(restart_config_lister, State) ->
+handle_info(restart_config_listener, State) ->
     ok = config:listen_for_changes(?MODULE, nil),
     {noreply, State};
 
