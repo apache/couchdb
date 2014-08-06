@@ -42,6 +42,15 @@
 
 
 validate(DbName, DDoc) ->
+    {Fields} = DDoc#doc.body,
+    case couch_util:get_value(<<"options">>, Fields, {[]}) of
+        {_} -> ok;
+        _ -> throw({invalid_design_doc, <<"`options` parameter must be an object.">>})
+    end,
+    case couch_util:get_value(<<"views">>, Fields, {[]}) of
+        {_} -> ok;
+        _ -> throw({invalid_design_doc, <<"`views` parameter must be an object.">>})
+    end,
     GetName = fun
         (#mrview{map_names = [Name | _]}) -> Name;
         (#mrview{reduce_funs = [{Name, _} | _]}) -> Name;
