@@ -36,7 +36,7 @@
 
 -export([description/0,
          valid/0,
-         check/0,
+         check/1,
          format/1]).
 
 -include_lib("eunit/include/eunit.hrl").
@@ -49,8 +49,8 @@ description() ->
 valid() ->
     weatherreport_node:can_connect().
 
--spec check() -> [{atom(), term()}].
-check() ->
+-spec check(list()) -> [{atom(), term()}].
+check(_Opts) ->
     NodeName = weatherreport_node:nodename(),
     Members = weatherreport_node:local_command(mem3, nodes, []),
     case lists:member(NodeName, Members) of

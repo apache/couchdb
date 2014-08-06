@@ -36,7 +36,7 @@
 
 -export([description/0,
          valid/0,
-         check/0,
+         check/1,
          format/1]).
 
 -spec description() -> string().
@@ -47,8 +47,8 @@ description() ->
 valid() ->
     weatherreport_node:can_connect().
 
--spec check() -> [{atom(), term()}].
-check() ->
+-spec check(list()) -> [{atom(), term()}].
+check(_Opts) ->
     Pid = weatherreport_node:pid(),
     Output = weatherreport_util:run_command("ps -o pmem,rss -p " ++ Pid),
     [_,_,Percent, RealSize| _] = string:tokens(Output, "/n \n"),

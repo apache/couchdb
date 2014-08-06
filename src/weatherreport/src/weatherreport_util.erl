@@ -30,7 +30,7 @@
 -module(weatherreport_util).
 -export([short_name/1,
          run_command/1,
-         log/2,log/3,
+         log/3,log/4,
          binary_to_float/1,
          should_log/1]).
 
@@ -46,14 +46,24 @@ short_name(Mod) when is_atom(Mod) ->
 %% redirected to stdout so its output will be included.
 -spec run_command(Command::iodata()) -> StdOut::iodata().
 run_command(Command) ->
-    weatherreport_util:log(debug, "Running shell command: ~s", [Command]),
+    weatherreport_util:log(
+        node(),
+        debug,
+        "Running shell command: ~s",
+        [Command]
+    ),
     Port = erlang:open_port({spawn,Command},[exit_status, stderr_to_stdout]),
     do_read(Port, []).
 
 do_read(Port, Acc) ->
     receive
         {Port, {data, StdOut}} ->
-            weatherreport_util:log(debug, "Shell command output: ~n~s~n",[StdOut]),
+            weatherreport_util:log(
+                node(),
+                debug,
+                "Shell command output: ~n~s~n",
+                [StdOut]
+            ),
             do_read(Port, Acc ++ StdOut);
         {Port, {exit_status, _}} -> 
             %%port_close(Port),
@@ -69,14 +79,13 @@ do_read(Port, Acc) ->
 binary_to_float(Bin) ->
     list_to_float(binary_to_list(Bin)).
 
-get_prefix(Level) ->
-    {_, NodeName} = weatherreport_config:node_name(),
-    io_lib:format("[~s] [~w]", [NodeName, Level]).
+get_prefix(Node, Level) ->
+    io_lib:format("[~w] [~w]", [Node, Level]).
 
-log(Level, Format, Terms) ->
+log(Node, Level, Format, Terms) ->
     case should_log(Level) of
         true ->
-            Prefix = get_prefix(Level),
+            Prefix = get_prefix(Node, Level),
             Message = io_lib:format(Format, Terms),
             io:format("~s ~s~n", [Prefix, Message]);
         false ->
@@ -84,10 +93,10 @@ log(Level, Format, Terms) ->
     end,
     twig:log(Level, Format, Terms).
 
-log(Level, String) ->
+log(Node, Level, String) ->
     case should_log(Level) of
         true ->
-            Prefix = get_prefix(Level),
+            Prefix = get_prefix(Node, Level),
             io:format("~s ~s~n", [Prefix, String]);
         false ->
             ok

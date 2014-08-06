@@ -48,7 +48,7 @@
 
 -export([description/0,
          valid/0,
-         check/0,
+         check/1,
          format/1]).
 
 -spec description() -> string().
@@ -59,8 +59,8 @@ description() ->
 valid() ->
     true.
 
--spec check() -> [{atom(), term()}].
-check() ->
+-spec check(list()) -> [{atom(), term()}].
+check(_Opts) ->
     DataDirs = weatherreport_config:data_directories(),
     %% Add additional disk checks in the function below
     lists:flatmap(fun(Dir) ->

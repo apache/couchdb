@@ -58,7 +58,7 @@
 
 -module(weatherreport_check).
 -export([behaviour_info/1]).
--export([check/1,
+-export([check/2,
          modules/0,
          print/1]).
 
@@ -67,18 +67,18 @@
 behaviour_info(callbacks) ->
     [{description, 0},
      {valid, 0},
-     {check, 0},
+     {check, 1},
      {format, 1}];
 behaviour_info(_) ->
     undefined.
 
 %% @doc Runs the diagnostic in the given module, if it is valid. Returns a
 %% list of messages that will be printed later using print/1.
--spec check(Module::module()) -> [{atom(), module(), term()}].
-check(Module) ->
+-spec check(Module::module(), list()) -> [{atom(), module(), term()}].
+check(Module, Opts) ->
     case Module:valid() of
         true ->
-            [ {Level, Module, Message} || {Level, Message} <- Module:check() ];
+            [ {Level, Module, Message} || {Level, Message} <- Module:check(Opts) ];
         _ ->
             []
     end.
@@ -97,11 +97,11 @@ modules() ->
 %% module's format/1 function will be called to provide a
 %% human-readable message. It should return an iolist() or a 2-tuple
 %% consisting of a format string and a list of terms.
--spec print({Level::atom(), Module::module(), Data::term()}) -> ok.
-print({Level, Mod, Data}) ->
+-spec print({Node::atom(), Level::atom(), Module::module(), Data::term()}) -> ok.
+print({Node, Level, Mod, Data}) ->
     case Mod:format(Data) of
         {Format, Terms} ->
-            weatherreport_util:log(Level, Format, Terms);
+            weatherreport_util:log(Node, Level, Format, Terms);
         String ->
-            weatherreport_util:log(Level, String)
+            weatherreport_util:log(Node, Level, String)
     end.

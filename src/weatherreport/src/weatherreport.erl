@@ -60,7 +60,8 @@
                {level, $d,        "level", {atom, notice}, "Minimum message severity level (default: notice)"},
                {expert, $e,       "expert", undefined,     "Perform more detailed diagnostics"               },
                {usage, $h,        "help",  undefined,      "Display help/usage"                              },
-               {list,  $l,        "list",  undefined,      "Describe available diagnostic tasks"             }
+               {list,  $l,        "list",  undefined,      "Describe available diagnostic tasks"             },
+               {all_nodes, $a,    "all-nodes", undefined,  "Run weatherreport on all cluster nodes"          }
               ]).
 
 -define(USAGE_OPTS, [ O || O <- ?OPTS,
@@ -109,21 +110,23 @@ run(InputChecks) ->
         ShortNames = [{weatherreport_util:short_name(Mod), Mod} || Mod <- weatherreport_check:modules() ],
         element(1, lists:foldr(fun validate_checks/2, {[], ShortNames}, InputChecks))
     end,
-    Messages = lists:foldl(
-        fun(Mod, Acc) -> Acc ++ weatherreport_check:check(Mod) end,
-        [],
-        Checks
-    ),
+    Messages = case application:get_env(weatherreport, all_nodes) of
+        {ok, true} ->
+            weatherreport_runner:run(Checks, all);
+        _ ->
+            weatherreport_runner:run(Checks)
+            
+    end,
     case Messages of
     [] ->
         io:format("No diagnostic messages to report.~n"),
         halt(0);
     _ ->
         %% Print the most critical messages first
-        FilteredMessages = lists:filter(fun({Level,_,_}) ->
+        FilteredMessages = lists:filter(fun({_,Level,_,_}) ->
             weatherreport_util:should_log(Level)
         end, Messages),
-        SortedMessages = lists:sort(fun({ALevel, _, _}, {BLevel, _, _}) ->
+        SortedMessages = lists:sort(fun({_, ALevel, _, _}, {_, BLevel, _, _}) ->
             twig_util:level(ALevel) =< twig_util:level(BLevel)
         end, FilteredMessages),
         case SortedMessages of
@@ -161,7 +164,10 @@ process_option({level, Level}, Result) ->
     application:set_env(weatherreport, log_level, Level),
     Result;
 process_option(expert, Result) ->
-    application:set_env(weatherreport, expert_mode, true),
+    application:set_env(weatherreport, expert, true),
+    Result;
+process_option(all_nodes, Result) ->
+    application:set_env(weatherreport, all_nodes, true),
     Result;
 process_option(list, usage) -> %% Help should have precedence over listing checks
     usage;

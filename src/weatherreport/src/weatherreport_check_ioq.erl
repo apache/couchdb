@@ -28,7 +28,7 @@
 
 -export([description/0,
          valid/0,
-         check/0,
+         check/1,
          format/1]).
 
 -define(THRESHOLD, 500).
@@ -61,8 +61,8 @@ sum_queues([{channels, {Channels}} | Rest], Acc) ->
 sum_queues([{_Name, Value} | Rest], Acc) ->
     sum_queues(Rest, Acc + Value).
 
--spec check() -> [{atom(), term()}].
-check() ->
+-spec check(list()) -> [{atom(), term()}].
+check(_Opts) ->
     case weatherreport_node:local_command(ioq, get_disk_queues, []) of
         Queues when is_list(Queues) ->
             Total = sum_queues(Queues, 0),

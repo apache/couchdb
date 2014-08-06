@@ -29,7 +29,7 @@
 
 -export([description/0,
          valid/0,
-         check/0,
+         check/1,
          format/1]).
 
 -spec description() -> string().
@@ -40,8 +40,8 @@ description() ->
 valid() ->
     weatherreport_node:can_connect().
 
--spec check() -> [{atom(), term()}].
-check() ->
+-spec check(list()) -> [{atom(), term()}].
+check(_Opts) ->
     SearchNode = 'clouseau@127.0.0.1',
     case weatherreport_node:local_command(net_adm, ping, [SearchNode]) of
         pong ->

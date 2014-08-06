@@ -67,8 +67,24 @@ local_command(Module, Function, Args) ->
 %% @see can_connect/0
 -spec local_command(Module::atom(), Function::atom(), Args::[term()], Timeout::integer()) -> term().
 local_command(Module, Function, Args, Timeout) ->
-    weatherreport_util:log(debug, "Local RPC: ~p:~p(~p) [~p]", [Module, Function, Args, Timeout]),
-    rpc:call(nodename(), Module, Function, Args, Timeout).
+    case is_cluster_node() of
+        true ->
+            weatherreport_util:log(
+                node(),
+                debug,
+                "Local function call: ~p:~p(~p)",
+                [Module, Function, Args]
+            ),
+            erlang:apply(Module, Function, Args);
+        _ ->
+            weatherreport_util:log(
+                node(),
+                debug,
+                "Local RPC: ~p:~p(~p) [~p]",
+                [Module, Function, Args, Timeout]
+            ),
+            rpc:call(nodename(), Module, Function, Args, Timeout)
+    end.
 
 %% @doc Calls the given 0-arity module and function on all members of
 %% the cluster.
@@ -109,10 +125,15 @@ pid() ->
 %% already, and returns whether connection was successful.
 -spec can_connect() -> true | false.
 can_connect() ->
-    case is_connected() of
+    case is_connected() or is_cluster_node() of
         true -> true;
         false ->
-            weatherreport_util:log(debug, "Not connected to the local cluster node, trying to connect. alive:~p connect_failed:~p", [is_alive(), connect_failed()]),
+            weatherreport_util:log(
+                node(),
+                debug,
+                "Not connected to the local cluster node, trying to connect. alive:~p connect_failed:~p",
+                [is_alive(), connect_failed()]
+            ),
             maybe_connect()
     end.
 
@@ -128,7 +149,12 @@ can_connect_all() ->
     end.
 
 nodename() ->
-    {_, Name} = weatherreport_config:node_name(),
+    Name = case weatherreport_config:node_name() of
+        undefined ->
+            atom_to_list(node());
+        {_, NodeName} ->
+            NodeName
+    end,
     case string:tokens(Name, "@") of
         [_Node, _Host] ->
             list_to_atom(Name);
@@ -138,6 +164,9 @@ nodename() ->
     end.
 
 %% Private functions
+is_cluster_node() ->
+    nodename() =:= node().
+
 is_connected() ->
     is_alive() andalso connect_failed() =/= true.
 
@@ -156,11 +185,21 @@ try_connect() ->
     case {net_kernel:hidden_connect_node(TargetNode), net_adm:ping(TargetNode)} of
         {true, pong} ->
             application:set_env(weatherreport, connect_failed, false),
-            weatherreport_util:log(debug, "Connected to local cluster node ~p.", [TargetNode]),
+            weatherreport_util:log(
+                node(),
+                debug,
+                "Connected to local cluster node ~p.",
+                [TargetNode]
+            ),
             true;
         _ ->
             application:set_env(weatherreport, connect_failed, true),
-            weatherreport_util:log(warning, "Could not connect to the local cluster node ~p, some checks will not run.", [TargetNode]),
+            weatherreport_util:log(
+                node(),
+                warning,
+                "Could not connect to the local cluster node ~p, some checks will not run.",
+                [TargetNode]
+            ),
             false
     end.
 
@@ -172,7 +211,7 @@ connect_failed() ->
     end.
 
 start_net() ->
-    weatherreport_util:log(debug, "Starting distributed Erlang."),
+    weatherreport_util:log(node(), debug, "Starting distributed Erlang."),
     {Type, NodeName} = weatherreport_config:node_name(),
     ThisNode = append_node_suffix(NodeName, "_diag"),
     {ok, _} = net_kernel:start([ThisNode, Type]),

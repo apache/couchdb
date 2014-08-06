@@ -33,7 +33,7 @@
 
 -export([description/0,
          valid/0,
-         check/0,
+         check/1,
          format/1]).
 
 -include_lib("eunit/include/eunit.hrl").
@@ -58,8 +58,8 @@ n_to_level(_) ->
 report_to_message({DbName, ShardRange, {Type, N}}, NodeName) ->
     {n_to_level(N), {Type, N, DbName, ShardRange, NodeName}}.
 
--spec check() -> [{atom(), term()}].
-check() ->
+-spec check(list()) -> [{atom(), term()}].
+check(_Opts) ->
     NodeName = weatherreport_node:nodename(),
     case weatherreport_node:local_command(custodian, report, []) of
         [] ->

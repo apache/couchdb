@@ -28,7 +28,7 @@
 
 -export([description/0,
          valid/0,
-         check/0,
+         check/1,
          format/1]).
 
 -define(THRESHOLD, 1000).
@@ -41,32 +41,33 @@ description() ->
 valid() ->
     weatherreport_node:can_connect().
 
-fold_processes([], Acc) ->
+fold_processes([], Acc, _Opts) ->
     Acc;
-fold_processes([{Pid, MBoxSize, Info} | T], Acc) when MBoxSize < ?THRESHOLD ->
+fold_processes([{Pid, MBoxSize, Info} | T], Acc, Opts) when MBoxSize < ?THRESHOLD ->
     Message = {info, {mbox_ok, {Pid, MBoxSize, Info}}},
-    fold_processes(T, [Message | Acc]);
-fold_processes([{Pid, MBoxSize, Info} | T], Acc) ->
-    case application:get_env(weatherreport, expert_mode) of
-        {ok, true} ->
+    fold_processes(T, [Message | Acc], Opts);
+fold_processes([{Pid, MBoxSize, Info} | T], Acc, Opts) ->
+    Message = case proplists:get_value(expert, Opts) of
+        true ->
             Pinfo = weatherreport_node:local_command(recon, info, [Pid]),
-            weatherreport_util:log(warning, "Process info for ~w:~n~p", [Pid, Pinfo]);
+            {warning, {mbox_large, {Pid, MBoxSize, Info, Pinfo}}};
         _ ->
-            ok
+            {warning, {mbox_large, {Pid, MBoxSize, Info}}}
     end,
-    Message = {warning, {mbox_large, {Pid, MBoxSize, Info}}},
-    fold_processes(T, [Message | Acc]).
+    fold_processes(T, [Message | Acc], Opts).
 
--spec check() -> [{atom(), term()}].
-check() ->
+-spec check(list()) -> [{atom(), term()}].
+check(Opts) ->
     Processes = weatherreport_node:local_command(
         recon,
         proc_count,
         [message_queue_len, 10]
     ),
-    fold_processes(Processes, []).
+    fold_processes(Processes, [], Opts).
 
 -spec format(term()) -> {io:format(), [term()]}.
+format({mbox_large, {Pid, MBoxSize, Info, Pinfo}}) ->
+    {"Process ~w has excessive mailbox size of ~w: ~w ~w", [Pid, MBoxSize, Info, Pinfo]};
 format({mbox_large, {Pid, MBoxSize, Info}}) ->
     {"Process ~w has excessive mailbox size of ~w: ~w", [Pid, MBoxSize, Info]};
 format({mbox_ok, {Pid, MBoxSize, Info}}) ->

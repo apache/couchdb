@@ -135,9 +135,9 @@ load_app_config() ->
         filename:join(Etc, "default.ini"),
         filename:join(Etc, "local.ini")
     ],
-    weatherreport_util:log(debug, "Reading config from files: ~p", [IniFiles]),
+    weatherreport_util:log(node(), debug, "Reading config from files: ~p", [IniFiles]),
     config:start_link(IniFiles),
-    weatherreport_util:log(debug, "Local node config: ~p~n", [config:all()]).
+    weatherreport_util:log(node(), debug, "Local node config: ~p~n", [config:all()]).
 
 load_vm_args() ->
     VmArgs = case init:get_argument(vm_args) of 
