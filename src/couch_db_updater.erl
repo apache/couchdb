@@ -289,6 +289,13 @@ handle_info({update_docs, Client, GroupedDocs, NonRepDocs, MergeConflicts,
         [catch(ClientPid ! {done, self()}) || ClientPid <- Clients],
         Db3 = case length(UpdatedDDocIds) > 0 of
             true ->
+                % Ken and ddoc_cache are the only things that
+                % use the unspecified ddoc_updated message. We
+                % should update them to use the new message per
+                % ddoc.
+                lists:foreach(fun(DDocId) ->
+                    couch_event:notify(Db2#db.name, {ddoc_updated, DDocId})
+                end, UpdatedDDocIds),
                 couch_event:notify(Db2#db.name, ddoc_updated),
                 ddoc_cache:evict(Db2#db.name, UpdatedDDocIds),
                 refresh_validate_doc_funs(Db2);
