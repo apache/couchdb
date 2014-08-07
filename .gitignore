@@ -5,3 +5,5 @@ ebin/
 priv/couch_js/config.h
 priv/couchjs
 priv/couchspawnkillable
+
+.rebar/
