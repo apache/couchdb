@@ -24,7 +24,7 @@ compile: config.erl
 
 clean:
 	@echo "==> couchjs (clean)"
-	@rebar clean
+	@rebar -r clean
 
 check: eunit
 
