@@ -253,7 +253,7 @@ get_or_create_db(DbName, Options) ->
 
 view_cb({meta, Meta}, Acc) ->
     % Map function starting
-    case rexi:sync_reply({meta, Meta}) of
+    case rexi:stream2({meta, Meta}) of
         ok ->
             {ok, Acc};
         stop ->
@@ -269,7 +269,7 @@ view_cb({row, Row}, Acc) ->
         value = couch_util:get_value(value, Row),
         doc = couch_util:get_value(doc, Row)
     },
-    case rexi:stream(ViewRow) of
+    case rexi:stream2(ViewRow) of
         ok ->
             {ok, Acc};
         timeout ->
@@ -305,7 +305,7 @@ reduce_cb(complete, Acc) ->
 send(Key, Value, Acc) ->
     case put(fabric_sent_first_row, true) of
     undefined ->
-        case rexi:sync_reply(#view_row{key=Key, value=Value}) of
+        case rexi:stream2(#view_row{key=Key, value=Value}) of
         ok ->
             {ok, Acc};
         stop ->
@@ -314,7 +314,7 @@ send(Key, Value, Acc) ->
             exit(timeout)
         end;
     true ->
-        case rexi:stream(#view_row{key=Key, value=Value}) of
+        case rexi:stream2(#view_row{key=Key, value=Value}) of
         ok ->
             {ok, Acc};
         timeout ->
@@ -347,7 +347,7 @@ changes_enumerator(DocInfo, Acc) ->
             {deleted, Del} |
             if IncludeDocs -> [doc_member(Db, DocInfo, Opts)]; true -> [] end
         ]},
-        Go = rexi:sync_reply(ChangesRow),
+        Go = rexi:stream2(ChangesRow),
         {Go, Acc#cacc{seq = Seq, pending = Pending-1}}
     end.
 
