@@ -17,37 +17,43 @@ os:putenv("COUCHDB_CONFIG", ConfigureEnv).
 
 
 DepDescs = [
-    {cassim, "couchdb-cassim", {branch, "windsor-merge"}, []},
-    {couch_log, "couchdb-couch-log", {branch, "master"}, []},
-    {config, "couchdb-config", {branch, "master"}, []},
-    {chttpd, "couchdb-chttpd", {branch, "windsor-merge"}, []},
-    {couch, "couchdb-couch", {branch, "windsor-merge"}, []},
-    {couch_index, "couchdb-couch-index", {branch, "windsor-merge"}, []},
-    {couch_mrview, "couchdb-couch-mrview", {branch, "windsor-merge"}, []},
-    {couch_replicator, "couchdb-couch-replicator", {branch,  "windsor-merge"}, []},
-    {couch_dbupdates, "couchdb-couch-dbupdates", {branch, "master"}, []},
-    {couch_plugins, "couchdb-couch-plugins", {branch, "master"}, []},
-    {couch_event, "couchdb-couch-event", {branch, "windsor-merge"}, []},
-    {ddoc_cache, "couchdb-ddoc-cache", {branch, "windsor-merge"}, []},
-    {ets_lru, "couchdb-ets-lru", {branch, "windsor-merge"}, []},
-    {fabric, "couchdb-fabric", {branch,  "windsor-merge"}, []},
-    {ibrowse, "couchdb-ibrowse", {tag,  "master"}, []},
-    {jiffy, "couchdb-jiffy", {branch, "master"}, []},
-    {khash, "couchdb-khash", {branch, "windsor-merge"}, []},
-    {mem3, "couchdb-mem3", {branch, "windsor-merge"}, []},
-    {mochiweb, "couchdb-mochiweb", {branch, "master"}, []},
-    {oauth, "couchdb-oauth", {branch, "master"}, []},
-    {rexi, "couchdb-rexi", {branch, "windsor-merge"}, []},
-    {snappy, "couchdb-snappy", {branch, "1994-merge-rcouch"}, []},
-    {b64url, "couchdb-b64url", {branch, "windsor-merge"}, []},
-    {global_changes, "couchdb-global-changes", {branch, "windsor-merge"}, []},
-    {fauxton, "couchdb-fauxton", {branch, "master"}, [raw]},
-    {docs, "couchdb-documentation", {branch, "master"}, [raw]}
+    {b64url,            "b64url",           {branch, "windsor-merge"}},
+    {cassim,            "cassim",           {branch, "windsor-merge"}},
+    {couch_log,         "couch-log",        {branch, "master"}},
+    {config,            "config",           {branch, "master"}},
+    {chttpd,            "chttpd",           {branch, "windsor-merge"}},
+    {couch,             "couch",            {branch, "windsor-merge"}},
+    {couch_index,       "couch-index",      {branch, "windsor-merge"}},
+    {couch_mrview,      "couch-mrview",     {branch, "windsor-merge"}},
+    {couch_replicator,  "couch-replicator", {branch, "windsor-merge"}},
+    {couch_dbupdates,   "couch-dbupdates",  {branch, "master"}},
+    {couch_plugins,     "couch-plugins",    {branch, "master"}},
+    {couch_event,       "couch-event",      {branch, "windsor-merge"}},
+    {docs,              "documentation",    {branch, "master"}, [raw]},
+    {ddoc_cache,        "ddoc-cache",       {branch, "windsor-merge"}},
+    {ets_lru,           "ets-lru",          {branch, "windsor-merge"}},
+    {fabric,            "fabric",           {branch, "windsor-merge"}},
+    {fauxton,           "fauxton",          {branch, "master"}, [raw]},
+    {global_changes,    "global-changes",   {branch, "windsor-merge"}},
+    {ibrowse,           "ibrowse",          {branch, "master"}},
+    {jiffy,             "jiffy",            {branch, "master"}},
+    {khash,             "khash",            {branch, "windsor-merge"}},
+    {mem3,              "mem3",             {branch, "windsor-merge"}},
+    {mochiweb,          "mochiweb",         {branch, "master"}},
+    {oauth,             "oauth",            {branch, "master"}},
+    {rexi,              "rexi",             {branch, "windsor-merge"}},
+    {snappy,            "snappy",           {branch, "1994-merge-rcouch"}}
 ],
 
-MakeDep = fun({AppName, RepoName, Version, Options}) ->
-    Url = "https://git-wip-us.apache.org/repos/asf/" ++ RepoName ++ ".git",
-    {AppName, ".*", {git, Url, Version}, Options}
+BaseUrl = "https://git-wip-us.apache.org/repos/asf/",
+
+MakeDep = fun
+    ({AppName, RepoName, Version}) ->
+        Url = BaseUrl ++ "couchdb-" ++ RepoName ++ ".git",
+        {AppName, ".*", {git, Url, Version}};
+    ({AppName, RepoName, Version, Options}) ->
+        Url = BaseUrl ++ "couchdb-" ++ RepoName ++ ".git",
+        {AppName, ".*", {git, Url, Version}, Options}
 end,
 
 AddConfig = [
