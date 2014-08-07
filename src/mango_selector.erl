@@ -348,6 +348,9 @@ negate({[{<<"$and">>, Args}]}) ->
 negate({[{<<"$or">>, Args}]}) ->
     {[{<<"$and">>, [negate(A) || A <- Args]}]};
 
+negate({[{<<"$default">>, _}]} = Arg) ->
+    ?MANGO_ERROR({bad_arg, '$not', Arg});
+
 % Negating comparison operators is straight forward
 negate({[{<<"$lt">>, Arg}]}) ->
     {[{<<"$gte">>, Arg}]};

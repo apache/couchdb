@@ -17,7 +17,9 @@ import uuid
 
 import requests
 
+import friend_docs
 import user_docs
+import limit_docs
 
 
 def random_db_name():
@@ -96,6 +98,31 @@ class Database(object):
         r.raise_for_status()
         return r.json()["result"] == "created"
 
+    def create_text_index(self, analyzer=None, selector=None, idx_type="text",
+        default_field=None, fields=None, name=None, ddoc=None):
+        body = {
+            "index": {
+            },
+            "type": idx_type,
+            "w": 3,
+        }
+        if name is not None:
+            body["name"] = name
+        if analyzer is not None:
+            body["index"]["default_analyzer"] = analyzer
+        if default_field is not None:
+            body["index"]["default_field"] = default_field
+        if selector is not None:
+            body["selector"] = selector
+        if fields is not None:
+            body["index"]["fields"] = fields
+        if ddoc is not None:
+            body["ddoc"] = ddoc
+        body = json.dumps(body)
+        r = self.sess.post(self.path("_index"), data=body)
+        r.raise_for_status()
+        return r.json()["result"] == "created"
+
     def list_indexes(self):
         r = self.sess.get(self.path("_index"))
         r.raise_for_status()
@@ -107,7 +134,8 @@ class Database(object):
         r.raise_for_status()
 
     def find(self, selector, limit=25, skip=0, sort=None, fields=None,
-                r=1, conflicts=False, explain=False, use_index=None):
+                r=1, conflicts=False, use_index=None, explain=False,
+                bookmark=None, return_raw=False):
         body = {
             "selector": selector,
             "use_index": use_index,
@@ -120,6 +148,8 @@ class Database(object):
             body["sort"] = sort
         if fields is not None:
             body["fields"] = fields
+        if bookmark is not None:
+            body["bookmark"] = bookmark
         body = json.dumps(body)
         if explain:
             path = self.path("_explain")
@@ -127,7 +157,7 @@ class Database(object):
             path = self.path("_find")
         r = self.sess.post(path, data=body)
         r.raise_for_status()
-        if explain:
+        if explain or return_raw:
             return r.json()
         else:
             return r.json()["docs"]
@@ -183,3 +213,10 @@ class FriendDocsTextTests(DbPerClass):
     def setUpClass(klass):
         super(FriendDocsTextTests, klass).setUpClass()
         friend_docs.setup(klass.db, index_type="text")
+
+class LimitDocsTextTests(DbPerClass):
+
+    @classmethod
+    def setUpClass(klass):
+        super(LimitDocsTextTests, klass).setUpClass()
+        limit_docs.setup(klass.db, index_type="text")

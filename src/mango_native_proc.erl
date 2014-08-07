@@ -36,6 +36,12 @@
 }).
 
 
+-record(tacc, {
+    fields = all_fields,
+    path = []
+}).
+
+
 start_link() ->
     gen_server:start_link(?MODULE, [], []).
 
@@ -79,6 +85,9 @@ handle_call({prompt, [<<"reduce">>, _, _]}, _From, St) ->
 handle_call({prompt, [<<"rereduce">>, _, _]}, _From, St) ->
     {reply, null, St};
 
+handle_call({prompt, [<<"index_doc">>, Doc]}, _From, St) ->
+    {reply, index_doc(St, mango_json:to_binary(Doc)), St};
+
 handle_call(Msg, _From, St) ->
     {stop, {invalid_call, Msg}, {invalid_call, Msg}, St}.
 
@@ -103,6 +112,10 @@ map_doc(#st{indexes=Indexes}, Doc) ->
     lists:map(fun(Idx) -> get_index_entries(Idx, Doc) end, Indexes).
 
 
+index_doc(#st{indexes=Indexes}, Doc) ->
+    lists:map(fun(Idx) -> get_text_entries(Idx, Doc) end, Indexes).
+
+
 get_index_entries({IdxProps}, Doc) ->
     {Fields} = couch_util:get_value(<<"fields">>, IdxProps),
     Values = lists:map(fun({Field, _Dir}) ->
@@ -118,3 +131,172 @@ get_index_entries({IdxProps}, Doc) ->
         false ->
             [[Values, null]]
     end.
+
+
+get_text_entries({IdxProps}, Doc) ->
+    Selector = case couch_util:get_value(<<"selector">>, IdxProps) of
+        [] -> {[]};
+        Else -> Else
+    end,
+    case should_index(Selector, Doc) of
+        true ->
+            get_text_entries0(IdxProps, Doc);
+        false ->
+            []
+    end.
+
+
+get_text_entries0(IdxProps, Doc) ->
+    DefaultEnabled = get_default_enabled(IdxProps),
+    FieldsList = get_text_field_list(IdxProps),
+    TAcc = #tacc{fields = FieldsList},
+    Fields0 = get_text_field_values(Doc, TAcc),
+    Fields = if not DefaultEnabled -> Fields0; true ->
+        add_default_text_field(Fields0)
+    end,
+    FieldNames = get_field_names(Fields, []),
+    Converted = convert_text_fields(Fields),
+    FieldNames ++ Converted.
+
+
+get_text_field_values({Props}, TAcc) when is_list(Props) ->
+    get_text_field_values_obj(Props, TAcc, []);
+
+get_text_field_values(Values, TAcc) when is_list(Values) ->
+    NewPath = ["[]" | TAcc#tacc.path],
+    NewTAcc = TAcc#tacc{path = NewPath},
+    % We bypass make_text_field and directly call make_text_field_name
+    % because the length field name is not part of the path.
+    LengthFieldName = make_text_field_name(NewTAcc#tacc.path, <<"length">>),
+    EncLFN = mango_util:lucene_escape_field(LengthFieldName),
+    LengthField = [{EncLFN, <<"length">>, length(Values)}],
+    get_text_field_values_arr(Values, NewTAcc, LengthField);
+
+get_text_field_values(Bin, TAcc) when is_binary(Bin) ->
+    make_text_field(TAcc, <<"string">>, Bin);
+
+get_text_field_values(Num, TAcc) when is_number(Num) ->
+    make_text_field(TAcc, <<"number">>, Num);
+
+get_text_field_values(Bool, TAcc) when is_boolean(Bool) ->
+    make_text_field(TAcc, <<"boolean">>, Bool);
+
+get_text_field_values(null, TAcc) ->
+    make_text_field(TAcc, <<"null">>, true).
+
+
+get_text_field_values_obj([], _, FAcc) ->
+    FAcc;
+get_text_field_values_obj([{Key, Val} | Rest], TAcc, FAcc) ->
+    NewPath = [Key | TAcc#tacc.path],
+    NewTAcc = TAcc#tacc{path = NewPath},
+    Fields = get_text_field_values(Val, NewTAcc),
+    get_text_field_values_obj(Rest, TAcc, Fields ++ FAcc).
+
+
+get_text_field_values_arr([], _, FAcc) ->
+    FAcc;
+get_text_field_values_arr([Value | Rest], TAcc, FAcc) ->
+    Fields = get_text_field_values(Value, TAcc),
+    get_text_field_values_arr(Rest, TAcc, Fields ++ FAcc).
+
+
+get_default_enabled(Props) ->
+    case couch_util:get_value(<<"default_field">>, Props, {[]}) of
+        Bool when is_boolean(Bool) ->
+            Bool;
+        {[]} ->
+            true;
+        {Opts}->
+            couch_util:get_value(<<"enabled">>, Opts, true)
+    end.
+
+
+add_default_text_field(Fields) ->
+    DefaultFields = add_default_text_field(Fields, []),
+    DefaultFields ++ Fields.
+
+
+add_default_text_field([], Acc) ->
+    Acc;
+add_default_text_field([{_Name, <<"string">>, Value} | Rest], Acc) ->
+    NewAcc = [{<<"$default">>, <<"string">>, Value} | Acc],
+    add_default_text_field(Rest, NewAcc);
+add_default_text_field([_ | Rest], Acc) ->
+    add_default_text_field(Rest, Acc).
+
+
+%% index of all field names
+get_field_names([], FAcc) ->
+    FAcc;
+get_field_names([{Name, _Type, _Value} | Rest], FAcc) ->
+    case lists:member([<<"$fieldnames">>, Name, []], FAcc) of
+        true ->
+            get_field_names(Rest, FAcc);
+        false ->
+            get_field_names(Rest, [[<<"$fieldnames">>, Name, []] | FAcc])
+    end.
+
+
+convert_text_fields([]) ->
+    [];
+convert_text_fields([{Name, _Type, Value} | Rest]) ->
+    [[Name, Value, []] | convert_text_fields(Rest)].
+
+
+should_index(Selector, Doc) ->
+    % We should do this
+    NormSelector = mango_selector:normalize(Selector),
+    Matches = mango_selector:match(NormSelector, Doc),
+    IsDesign = case mango_doc:get_field(Doc, <<"_id">>) of
+        <<"_design/", _/binary>> -> true;
+        _ -> false
+    end,
+    Matches and not IsDesign.
+
+
+get_text_field_list(IdxProps) ->
+    case couch_util:get_value(<<"fields">>, IdxProps) of
+        Fields when is_list(Fields) ->
+            lists:flatmap(fun get_text_field_info/1, Fields);
+        _ ->
+            all_fields
+    end.
+
+
+get_text_field_info({Props}) ->
+    Name = couch_util:get_value(<<"name">>, Props),
+    Type0 = couch_util:get_value(<<"type">>, Props),
+    if not is_binary(Name) -> []; true ->
+        Type = get_text_field_type(Type0),
+        [iolist_to_binary([Name, ":", Type])]
+    end.
+
+
+get_text_field_type(<<"number">>) ->
+    <<"number">>;
+get_text_field_type(<<"boolean">>) ->
+    <<"boolean">>;
+get_text_field_type(_) ->
+    <<"string">>.
+
+
+make_text_field(TAcc, Type, Value) ->
+    FieldName = make_text_field_name(TAcc#tacc.path, Type),
+    Fields = TAcc#tacc.fields,
+    case Fields == all_fields orelse lists:member(FieldName, Fields) of
+        true ->
+            [{mango_util:lucene_escape_field(FieldName), Type,
+            Value}];
+        false ->
+            []
+    end.
+
+
+make_text_field_name([P | Rest], Type) ->
+    make_text_field_name0(Rest, [P, ":", Type]).
+
+make_text_field_name0([], Name) ->
+    iolist_to_binary(Name);
+make_text_field_name0([P | Rest], Name) ->
+    make_text_field_name0(Rest, [P, "." | Name]).

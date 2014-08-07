@@ -29,6 +29,7 @@
     validate_idx_name/1,
     validate_selector/1,
     validate_use_index/1,
+    validate_bookmark/1,
     validate_sort/1,
     validate_fields/1
 ]).
@@ -81,6 +82,12 @@ validate_find({Props}) ->
             {optional, true},
             {default, []},
             {validator, fun validate_use_index/1}
+        ]},
+        {<<"bookmark">>, [
+            {tag, bookmark},
+            {optional, true},
+            {default, <<>>},
+            {validator, fun validate_bookmark/1}
         ]},
         {<<"limit">>, [
             {tag, limit},
@@ -209,6 +216,16 @@ validate_use_index([DesignId, ViewName])
     {ok, [DesignId, ViewName]};
 validate_use_index(Else) ->
     ?MANGO_ERROR({invalid_index_name, Else}).
+
+
+validate_bookmark(null) ->
+    {ok, nil};
+validate_bookmark(<<>>) ->
+    {ok, nil};
+validate_bookmark(Bin) when is_binary(Bin) ->
+    {ok, Bin};
+validate_bookmark(Else) ->
+    ?MANGO_ERROR({invalid_bookmark, Else}).
 
 
 validate_sort(Value) ->

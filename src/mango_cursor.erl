@@ -119,8 +119,13 @@ group_indexes_by_type(Indexes) ->
     IdxDict = lists:foldl(fun(I, D) ->
         dict:append(mango_idx:cursor_mod(I), I, D)
     end, dict:new(), Indexes),
+    % The first cursor module that has indexes will be
+    % used to service this query. This is so that we
+    % don't suddenly switch indexes for existing client
+    % queries.
     CursorModules = [
-        mango_cursor_view
+        mango_cursor_view,
+        mango_cursor_text
     ],
     lists:flatmap(fun(CMod) ->
         case dict:find(CMod, IdxDict) of
