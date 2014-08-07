@@ -19,9 +19,11 @@
 -export([init/1, terminate/2, code_change/3]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
 
-% config_listener api
--export([handle_config_change/5]).
--export([handle_db_event/3]).
+% Exported for callbacks
+-export([
+    handle_config_change/5,
+    handle_db_event/3
+]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -244,6 +246,16 @@ handle_db_event(DbName, created, St) ->
     {ok, St};
 handle_db_event(DbName, deleted, St) ->
     gen_server:cast(?MODULE, {reset_indexes, DbName}),
+    {ok, St};
+handle_db_event(DbName, {ddoc_updated, DDocId}, St) ->
+    lists:foreach(fun({_DbName, {_DDocId, Sig}}) ->
+        case ets:lookup(?BY_SIG, {DbName, Sig}) of
+            [{_, IndexPid}] ->
+                (catch gen_server:cast(IndexPid, ddoc_updated));
+            [] ->
+                ok
+        end
+    end, ets:match_object(?BY_DB, {DbName, {DDocId, '$1'}})),
     {ok, St};
 handle_db_event(_DbName, _Event, St) ->
     {ok, St}.
