@@ -25,7 +25,7 @@
 -export([code_change/3, terminate/2]).
 
 % changes callbacks
--export([changes_reader/3, changes_reader_cb/2]).
+-export([changes_reader/3, changes_reader_cb/3]).
 
 % config_listener callback
 -export([handle_config_change/5]).
@@ -306,9 +306,9 @@ changes_reader(Server, DbName, Since) ->
         {json_req, null},
         Db
     ),
-    ChangesFeedFun({fun ?MODULE:changes_reader_cb/2, {Server, DbName}}).
+    ChangesFeedFun({fun ?MODULE:changes_reader_cb/3, {Server, DbName}}).
 
-changes_reader_cb({change, Change}, {Server, DbName}) ->
+changes_reader_cb({change, Change}, _, {Server, DbName}) ->
     case has_valid_rep_id(Change) of
         true ->
             Msg = {rep_db_update, DbName, Change},
@@ -317,11 +317,11 @@ changes_reader_cb({change, Change}, {Server, DbName}) ->
             ok
     end,
     {ok, {Server, DbName}};
-changes_reader_cb({stop, EndSeq, _Pending}, {Server, DbName}) ->
+changes_reader_cb({stop, EndSeq, _Pending}, _, {Server, DbName}) ->
     Msg = {rep_db_checkpoint, DbName, EndSeq},
     ok = gen_server:call(Server, Msg, infinity),
     {ok, {Server, DbName}};
-changes_reader_cb(_, Acc) ->
+changes_reader_cb(_, _, Acc) ->
     {ok, Acc}.
 
 has_valid_rep_id({Change}) ->
