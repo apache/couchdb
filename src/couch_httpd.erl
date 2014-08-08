@@ -413,7 +413,7 @@ validate_ctype(Req, Ctype) ->
     ReqCtype ->
         case string:tokens(ReqCtype, ";") of
         [Ctype] -> ok;
-        [Ctype, _Rest] -> ok;
+        [Ctype | _Rest] -> ok;
         _Else ->
             throw({bad_ctype, "Content-Type must be "++Ctype})
         end
