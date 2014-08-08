@@ -64,7 +64,7 @@ changes(DbName, Options, StartVector, DbOptions) ->
         try
             {ok, #cacc{seq=LastSeq, pending=Pending}} =
                 couch_db:changes_since(Db, StartSeq, Enum, Opts, Acc0),
-            rexi:reply({complete, [
+            rexi:stream_last({complete, [
                 {seq, {LastSeq, uuid(Db)}},
                 {pending, Pending}
             ]})
@@ -72,7 +72,7 @@ changes(DbName, Options, StartVector, DbOptions) ->
             couch_db:close(Db)
         end;
     Error ->
-        rexi:reply(Error)
+        rexi:stream_last(Error)
     end.
 
 all_docs(DbName, Options, #mrargs{keys=undefined} = Args0) ->
