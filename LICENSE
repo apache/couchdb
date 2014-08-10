@@ -398,6 +398,12 @@ For the share/www/script/json2.js component:
 
   No warranty expressed or implied. Use at your own risk.
 
+For the share/www/favicon.ico component from https://github.com/BigBlueHat/futon2:
+
+                                 Apache License
+                           Version 2.0, January 2004
+                        http://www.apache.org/licenses/
+
 For the src/mochiweb component:
 
   Copyright (c) 2007 Mochi Media, Inc.
