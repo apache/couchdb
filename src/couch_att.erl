@@ -527,6 +527,24 @@ flush_data(Fd, Fun, Att) when is_function(Fun) ->
             couch_db:with_stream(Fd, Att, fun(OutputStream) ->
                 write_streamed_attachment(OutputStream, Fun, AttLen)
             end)
+    end;
+flush_data(Fd, {follows, Parser, Ref}, Att) ->
+    ParserRef = erlang:monitor(process, Parser),
+    Fun = fun() ->
+        Parser ! {get_bytes, Ref, self()},
+        receive
+            {started_open_doc_revs, NewRef} ->
+                couch_doc:restart_open_doc_revs(Parser, Ref, NewRef);
+            {bytes, Ref, Bytes} ->
+                Bytes;
+            {'DOWN', ParserRef, _, _, Reason} ->
+                throw({mp_parser_died, Reason})
+        end
+    end,
+    try
+        flush_data(Fd, Fun, store(data, Fun, Att))
+    after
+        erlang:demonitor(ParserRef, [flush])
     end.
 
 
@@ -564,7 +582,25 @@ foldl({Fd, Sp}, Att, Fun, Acc) ->
     couch_stream:foldl(Fd, Sp, Md5, Fun, Acc);
 foldl(DataFun, Att, Fun, Acc) when is_function(DataFun) ->
     Len = fetch(att_len, Att),
-    fold_streamed_data(DataFun, Len, Fun, Acc).
+    fold_streamed_data(DataFun, Len, Fun, Acc);
+foldl({follows, Parser, Ref}, Att, Fun, Acc) ->
+    ParserRef = erlang:monitor(process, Parser),
+    DataFun = fun() ->
+        Parser ! {get_bytes, Ref, self()},
+        receive
+            {started_open_doc_revs, NewRef} ->
+                couch_doc:restart_open_doc_revs(Parser, Ref, NewRef);
+            {bytes, Ref, Bytes} ->
+                Bytes;
+            {'DOWN', ParserRef, _, _, Reason} ->
+                throw({mp_parser_died, Reason})
+        end
+    end,
+    try
+        foldl(DataFun, store(data, DataFun, Att), Fun, Acc)
+    after
+        erlang:demonitor(ParserRef, [flush])
+    end.
 
 
 range_foldl(Att, From, To, Fun, Acc) ->
