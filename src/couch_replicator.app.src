@@ -13,6 +13,7 @@
 {application, couch_replicator, [
     {description, "CouchDB replicator"},
     {vsn, git},
+    {mod, {couch_replicator_app, []}},
     {modules, [
         couch_replicator,
         couch_replicator_api_wrap,
