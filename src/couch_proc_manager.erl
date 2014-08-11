@@ -355,7 +355,7 @@ teach_ddoc(DDoc, {DDocId, _Rev}=DDocKey, #proc_int{ddoc_keys=Keys}=Proc) ->
 
 make_proc(Pid, Lang, Mod) ->
     Proc = #proc_int{
-        lang = Lang,
+        lang = couch_util:to_binary(Lang),
         pid = Pid,
         prompt_fun = {Mod, prompt},
         set_timeout_fun = {Mod, set_timeout},
