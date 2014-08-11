@@ -351,7 +351,7 @@ teach_ddoc(DDoc, {DDocId, _Rev}=DDocKey, #proc_int{ddoc_keys=Keys}=Proc) ->
     % because the query server overwrites without the rev
     Keys2 = [{D,R} || {D,R} <- Keys, D /= DDocId],
     % add ddoc to the proc
-    {ok, Proc#proc{ddoc_keys=[DDocKey|Keys2]}}.
+    {ok, Proc#proc_int{ddoc_keys=[DDocKey|Keys2]}}.
 
 make_proc(Pid, Lang, Mod) ->
     Proc = #proc_int{
