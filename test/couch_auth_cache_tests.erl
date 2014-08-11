@@ -12,27 +12,13 @@
 
 -module(couch_auth_cache_tests).
 
--include("couch_eunit.hrl").
--include_lib("couchdb/couch_db.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
+-include_lib("couch/include/couch_db.hrl").
 
 -define(ADMIN_USER, {user_ctx, #user_ctx{roles=[<<"_admin">>]}}).
 -define(SALT, <<"SALT">>).
 -define(TIMEOUT, 1000).
 
-
-start() ->
-    {ok, Pid} = couch_server_sup:start_link(?CONFIG_CHAIN),
-    Pid.
-
-stop(Pid) ->
-    erlang:monitor(process, Pid),
-    couch_server_sup:stop(),
-    receive
-        {'DOWN', _, _, Pid, _} ->
-            ok
-    after ?TIMEOUT ->
-        throw({timeout, server_stop})
-    end.
 
 setup() ->
     DbName = ?tempdb(),

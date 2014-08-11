@@ -12,7 +12,7 @@
 
 -module(couchdb_os_daemons_tests).
 
--include("couch_eunit.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
 
 %% keep in sync with couchdb/couch_os_daemons.erl
 -record(daemon, {

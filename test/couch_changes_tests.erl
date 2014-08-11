@@ -12,8 +12,8 @@
 
 -module(couch_changes_tests).
 
--include("couch_eunit.hrl").
--include_lib("couchdb/couch_db.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
+-include_lib("couch/include/couch_db.hrl").
 
 -define(ADMIN_USER, {user_ctx, #user_ctx{roles = [<<"_admin">>]}}).
 -define(TIMEOUT, 3000).

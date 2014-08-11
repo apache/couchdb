@@ -12,7 +12,7 @@
 
 -module(json_stream_parse_tests).
 
--include("couch_eunit.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
 
 -define(CASES,
     [

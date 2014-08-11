@@ -12,8 +12,8 @@
 
 -module(couchdb_update_conflicts_tests).
 
--include("couch_eunit.hrl").
--include_lib("couchdb/couch_db.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
+-include_lib("couch/include/couch_db.hrl").
 
 -define(i2l(I), integer_to_list(I)).
 -define(ADMIN_USER, {userctx, #user_ctx{roles=[<<"_admin">>]}}).

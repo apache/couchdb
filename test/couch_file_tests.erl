@@ -12,7 +12,7 @@
 
 -module(couch_file_tests).
 
--include("couch_eunit.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
 
 -define(BLOCK_SIZE, 4096).
 -define(setup(F), {setup, fun setup/0, fun teardown/1, F}).

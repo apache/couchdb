@@ -12,8 +12,8 @@
 
 -module(couchdb_attachments_tests).
 
--include("couch_eunit.hrl").
--include_lib("couchdb/couch_db.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
+-include_lib("couch/include/couch_db.hrl").
 
 -define(COMPRESSION_LEVEL, 8).
 -define(ATT_BIN_NAME, <<"logo.png">>).

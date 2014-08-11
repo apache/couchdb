@@ -12,7 +12,7 @@
 
 -module(couch_uuids_tests).
 
--include("couch_eunit.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
 
 -define(TIMEOUT_S, 20).
 

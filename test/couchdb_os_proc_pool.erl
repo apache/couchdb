@@ -12,8 +12,8 @@
 
 -module(couchdb_os_proc_pool).
 
--include("couch_eunit.hrl").
--include_lib("couchdb/couch_db.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
+-include_lib("couch/include/couch_db.hrl").
 
 -define(TIMEOUT, 3000).
 

@@ -12,7 +12,7 @@
 
 -module(couchdb_http_proxy_tests).
 
--include("couch_eunit.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
 
 -record(req, {method=get, path="", headers=[], body="", opts=[]}).
 

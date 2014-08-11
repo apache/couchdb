@@ -12,7 +12,7 @@
 
 -module(couch_passwords_tests).
 
--include("couch_eunit.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
 
 
 pbkdf2_test_()->

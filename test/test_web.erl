@@ -13,7 +13,7 @@
 -module(test_web).
 -behaviour(gen_server).
 
--include("couch_eunit.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
 
 -export([start_link/0, stop/0, loop/1, get_port/0, set_assert/1, check_last/0]).
 -export([init/1, terminate/2, code_change/3]).

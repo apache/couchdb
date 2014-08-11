@@ -12,8 +12,8 @@
 
 -module(couch_stats_tests).
 
--include("couch_eunit.hrl").
--include_lib("couchdb/couch_db.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
+-include_lib("couch/include/couch_db.hrl").
 
 -define(STATS_CFG_FIXTURE,
     filename:join([?FIXTURESDIR, "couch_stats_aggregates.cfg"])).
