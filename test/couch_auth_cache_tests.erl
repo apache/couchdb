@@ -36,7 +36,7 @@ couch_auth_cache_test_() ->
         "CouchDB auth cache tests",
         {
             setup,
-            fun start/0, fun stop/1,
+            fun test_util:start_couch/0, fun test_util:stop_couch/1,
             {
                 foreach,
                 fun setup/0, fun teardown/1,

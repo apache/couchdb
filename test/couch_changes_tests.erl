@@ -26,20 +26,6 @@
 }).
 
 
-start() ->
-    {ok, Pid} = couch_server_sup:start_link(?CONFIG_CHAIN),
-    Pid.
-
-stop(Pid) ->
-    erlang:monitor(process, Pid),
-    couch_server_sup:stop(),
-    receive
-        {'DOWN', _, _, Pid, _} ->
-            ok
-    after ?TIMEOUT ->
-        throw({timeout, server_stop})
-    end.
-
 setup() ->
     DbName = ?tempdb(),
     {ok, Db} = create_db(DbName),
@@ -71,7 +57,7 @@ changes_test_() ->
         "Changes feeed",
         {
             setup,
-            fun start/0, fun stop/1,
+            fun test_util:start_couch/0, fun test_util:stop_couch/1,
             [
                 filter_by_doc_id(),
                 filter_by_design(),

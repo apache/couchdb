@@ -19,19 +19,9 @@
 
 
 start() ->
-    {ok, Pid} = couch_server_sup:start_link(?CONFIG_CHAIN),
+    ok = test_util:start_couch(),
     couch_config:set("query_server_config", "os_process_limit", "3", false),
-    Pid.
-
-stop(Pid) ->
-    couch_server_sup:stop(),
-    erlang:monitor(process, Pid),
-    receive
-        {'DOWN', _, _, Pid, _} ->
-            ok
-    after ?TIMEOUT ->
-        throw({timeout, server_stop})
-    end.
+    ok.
 
 
 os_proc_pool_test_() ->
@@ -39,7 +29,7 @@ os_proc_pool_test_() ->
         "OS processes pool tests",
         {
             setup,
-            fun start/0, fun stop/1,
+            fun start/0, fun test_util:stop_couch/1,
             [
                 should_block_new_proc_on_full_pool(),
                 should_free_slot_on_proc_unexpected_exit()

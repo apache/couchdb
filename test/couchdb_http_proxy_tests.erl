@@ -31,15 +31,11 @@ start() ->
     % we have to write any config changes to temp ini file to not loose them
     % when supervisor will kill all children due to reaching restart threshold
     % (each httpd_global_handlers changes causes couch_httpd restart)
-    couch_server_sup:start_link(?CONFIG_CHAIN ++ [?CONFIG_FIXTURE_TEMP]),
+    ok = test_util:start_couch(test_util:config_files() ++ [?CONFIG_FIXTURE_TEMP]),
     % 49151 is IANA Reserved, let's assume no one is listening there
     couch_config:set("httpd_global_handlers", "_error",
         "{couch_httpd_proxy, handle_proxy_req, <<\"http://127.0.0.1:49151/\">>}"
     ),
-    ok.
-
-stop(_) ->
-    couch_server_sup:stop(),
     ok.
 
 setup() ->
@@ -68,7 +64,7 @@ http_proxy_test_() ->
         "HTTP Proxy handler tests",
         {
             setup,
-            fun start/0, fun stop/1,
+            fun start/0, fun test_util:stop_couch/1,
             {
                 foreach,
                 fun setup/0, fun teardown/1,

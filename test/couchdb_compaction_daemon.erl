@@ -22,20 +22,10 @@
 
 
 start() ->
-    {ok, Pid} = couch_server_sup:start_link(?CONFIG_CHAIN),
+    ok = test_util:start_couch(),
     couch_config:set("compaction_daemon", "check_interval", "3", false),
     couch_config:set("compaction_daemon", "min_file_size", "100000", false),
-    Pid.
-
-stop(Pid) ->
-    erlang:monitor(process, Pid),
-    couch_server_sup:stop(),
-    receive
-        {'DOWN', _, _, Pid, _} ->
-            ok
-    after ?TIMEOUT ->
-        throw({timeout, server_stop})
-    end.
+    ok.
 
 setup() ->
     DbName = ?tempdb(),
@@ -60,7 +50,7 @@ compaction_daemon_test_() ->
         "Compaction daemon tests",
         {
             setup,
-            fun start/0, fun stop/1,
+            fun start/0, fun test_util:stop_couch/1,
             {
                 foreach,
                 fun setup/0, fun teardown/1,

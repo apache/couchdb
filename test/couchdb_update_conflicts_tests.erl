@@ -23,19 +23,9 @@
 
 
 start() ->
-    {ok, Pid} = couch_server_sup:start_link(?CONFIG_CHAIN),
+    ok = test_util:start_couch(),
     couch_config:set("couchdb", "delayed_commits", "true", false),
-    Pid.
-
-stop(Pid) ->
-    erlang:monitor(process, Pid),
-    couch_server_sup:stop(),
-    receive
-        {'DOWN', _, _, Pid, _} ->
-            ok
-    after ?TIMEOUT ->
-        throw({timeout, server_stop})
-    end.
+    ok.
 
 setup() ->
     DbName = ?tempdb(),
@@ -61,7 +51,7 @@ view_indexes_cleanup_test_() ->
         "Update conflicts",
         {
             setup,
-            fun start/0, fun stop/1,
+            fun start/0, fun test_util:stop_couch/1,
             [
                 concurrent_updates(),
                 couchdb_188()

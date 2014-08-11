@@ -21,20 +21,6 @@
 -define(TIMEOUT, 1000).
 
 
-start() ->
-    {ok, Pid} = couch_server_sup:start_link(?CONFIG_CHAIN),
-    Pid.
-
-stop(Pid) ->
-    erlang:monitor(process, Pid),
-    couch_server_sup:stop(),
-    receive
-        {'DOWN', _, _, Pid, _} ->
-            ok
-    after ?TIMEOUT ->
-        throw({timeout, server_stop})
-    end.
-
 setup() ->
     DbName = ?tempdb(),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_USER]),
@@ -65,7 +51,7 @@ view_indexes_cleanup_test_() ->
         "View indexes cleanup",
         {
             setup,
-            fun start/0, fun stop/1,
+            fun test_util:start_couch/0, fun test_util:stop_couch/1,
             {
                 foreach,
                 fun setup/0, fun teardown/1,
@@ -83,7 +69,7 @@ view_group_db_leaks_test_() ->
         "View group db leaks",
         {
             setup,
-            fun start/0, fun stop/1,
+            fun test_util:start_couch/0, fun test_util:stop_couch/1,
             {
                 foreach,
                 fun setup_with_docs/0, fun teardown/1,
@@ -100,7 +86,7 @@ view_group_shutdown_test_() ->
         "View group shutdown",
         {
             setup,
-            fun start/0, fun stop/1,
+            fun test_util:start_couch/0, fun test_util:stop_couch/1,
             [couchdb_1283()]
         }
     }.

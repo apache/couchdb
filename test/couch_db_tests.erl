@@ -18,12 +18,9 @@
 
 
 setup() ->
-    {ok, _} = couch_server_sup:start_link(?CONFIG_CHAIN),
+    ok = test_util:start_couch(),
     couch_config:set("log", "include_sasl", "false", false),
     ok.
-
-teardown(_) ->
-    couch_server_sup:stop().
 
 
 create_delete_db_test_()->
@@ -31,7 +28,7 @@ create_delete_db_test_()->
         "Database create/delete tests",
         {
             setup,
-            fun setup/0, fun teardown/1,
+            fun setup/0, fun test_util:stop_couch/1,
             fun(_) ->
                 [should_create_db(),
                  should_delete_db(),

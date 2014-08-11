@@ -27,22 +27,12 @@
 
 
 start() ->
-    {ok, Pid} = couch_server_sup:start_link(?CONFIG_CHAIN),
+    ok = test_util:start_couch(),
     % ensure in default compression settings for attachments_compression_tests
     couch_config:set("attachments", "compression_level",
                      ?i2l(?COMPRESSION_LEVEL), false),
     couch_config:set("attachments", "compressible_types", "text/*", false),
-    Pid.
-
-stop(Pid) ->
-    erlang:monitor(process, Pid),
-    couch_server_sup:stop(),
-    receive
-        {'DOWN', _, _, Pid, _} ->
-            ok
-    after ?TIMEOUT ->
-        throw({timeout, server_stop})
-    end.
+    ok.
 
 setup() ->
     DbName = ?tempdb(),
@@ -91,7 +81,7 @@ attachments_test_() ->
         "Attachments tests",
         {
             setup,
-            fun start/0, fun stop/1,
+            fun start/0, fun test_util:stop_couch/1,
             [
                 attachments_md5_tests(),
                 attachments_compression_tests()
