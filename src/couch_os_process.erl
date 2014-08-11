@@ -207,6 +207,9 @@ handle_cast({send, Data}, #os_proc{writer=Writer, idle=Idle}=OsProc) ->
             ?LOG_ERROR("Failed sending data: ~p -> ~p", [Data, OsError]),
             {stop, normal, OsProc}
     end;
+handle_cast(garbage_collect, #os_proc{idle=Idle}=OsProc) ->
+    erlang:garbage_collect(),
+    {noreply, OsProc, Idle};
 handle_cast(stop, OsProc) ->
     {stop, normal, OsProc};
 handle_cast(Msg, #os_proc{idle=Idle}=OsProc) ->
