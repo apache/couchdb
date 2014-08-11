@@ -273,7 +273,7 @@ merge_stubs([Att | Rest], OnDisk, Merged) ->
             merge_stubs(Rest, OnDisk, [Att | Merged])
     end;
 merge_stubs([], _, Merged) ->
-    {ok, Merged}.
+    {ok, lists:reverse(Merged)}.
 
 
 disk_info(_, []) ->
