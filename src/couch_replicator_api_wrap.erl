@@ -159,9 +159,9 @@ get_pending_count(#httpdb{} = Db, Seq) ->
         {ok, couch_util:get_value(<<"pending">>, Props, null)}
     end);
 get_pending_count(#db{name=DbName}=Db, Seq) when is_number(Seq) ->
-    {ok, Db} = couch_db:open(DbName, [{user_ctx, Db#db.user_ctx}]),
-    Pending = couch_db:count_changes_since(Db, Seq),
-    couch_db:close(Db),
+    {ok, CountDb} = couch_db:open(DbName, [{user_ctx, Db#db.user_ctx}]),
+    Pending = couch_db:count_changes_since(CountDb, Seq),
+    couch_db:close(CountDb),
     {ok, Pending}.
 
 
