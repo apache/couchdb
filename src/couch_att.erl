@@ -406,8 +406,9 @@ stub_from_json(Att, Props) ->
 follow_from_json(Att, Props) ->
     {DiskLen, EncodedLen, Encoding} = encoded_lengths_from_json(Props),
     Digest = digest_from_json(Props),
+    RevPos = couch_util:get_value(<<"revpos">>, Props, 0),
     store([
-        {md5, Digest}, {data, follows}, {disk_len, DiskLen},
+        {md5, Digest}, {revpos, RevPos}, {data, follows}, {disk_len, DiskLen},
         {att_len, EncodedLen}, {encoding, Encoding}
     ], Att).
 
@@ -416,7 +417,11 @@ inline_from_json(Att, Props) ->
     B64Data = couch_util:get_value(<<"data">>, Props),
     Data = base64:decode(B64Data),
     Length = size(Data),
-    store([{data, Data}, {disk_len, Length}, {att_len, Length}], Att).
+    RevPos = couch_util:get_value(<<"revpos">>, Props, 0),
+    store([
+        {data, Data}, {revpos, RevPos}, {disk_len, Length},
+        {att_len, Length}
+    ], Att).
 
 
 encoded_lengths_from_json(Props) ->
