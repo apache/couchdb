@@ -425,11 +425,6 @@ export_proc(#proc_int{} = ProcInt) ->
     [_ | Data] = lists:sublist(tuple_to_list(ProcInt), record_info(size, proc)),
     list_to_tuple([proc | Data]).
 
-import_proc(#proc{} = P) ->
-    lists:foldl(fun(Idx, ProcInt) ->
-        setelement(Idx, ProcInt, element(Idx, P))
-    end, #proc_int{}, lists:seq(2, tuple_size(P))).
-
 maybe_spawn_proc(State, Client) ->
     #state{proc_counts=Counts, waiting=Waiting} = State,
     #client{lang=Lang} = Client,
