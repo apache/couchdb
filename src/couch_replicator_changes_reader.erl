@@ -28,17 +28,17 @@
 
 start_link(StartSeq, #httpdb{} = Db, ChangesQueue, Options) ->
     Parent = self(),
-    spawn_link(fun() ->
+    {ok, spawn_link(fun() ->
         put(last_seq, StartSeq),
         put(retries_left, Db#httpdb.retries),
         ?MODULE:read_changes(Parent, StartSeq, Db#httpdb{retries = 0},
             ChangesQueue, Options, 1)
-    end);
+    end)};
 start_link(StartSeq, Db, ChangesQueue, Options) ->
     Parent = self(),
-    spawn_link(fun() ->
+    {ok, spawn_link(fun() ->
         ?MODULE:read_changes(Parent, StartSeq, Db, ChangesQueue, Options, 1)
-    end).
+    end)}.
 
 read_changes(Parent, StartSeq, Db, ChangesQueue, Options, Ts) ->
     Continuous = couch_util:get_value(continuous, Options),
