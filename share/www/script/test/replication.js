@@ -700,11 +700,24 @@ couchTests.replication = function(debug) {
 
     TEquals(true, repResult.history instanceof Array);
     TEquals(1, repResult.history.length);
-    // NOT 31 (31 is db seq for last doc - the ddoc, which was not replicated)
-    TEquals(30, repResult.source_last_seq);
+    // We (incorrectly) don't record update sequences for things
+    // that don't pass the changse feed filter. Historically the
+    // last document to pass was the second to last doc which has
+    // an update sequence of 30. Work that has been applied to avoid
+    // conflicts from duplicate IDs breaking _bulk_docs updates added
+    // a sort to the logic which changes this. Now the last document
+    // to pass has an doc id of "8" and is at update_seq 29 (because only
+    // "9" and the design doc are after it).
+    //
+    // In the future the fix ought to be that we record that update
+    // sequence of the database. BigCouch has some existing work on
+    // this in the clustered case because if you have very few documents
+    // that pass the filter then (given single node's behavior) you end
+    // up having to rescan a large portion of the database.
+    TEquals(29, repResult.source_last_seq);
     TEquals(0, repResult.history[0].start_last_seq);
-    TEquals(30, repResult.history[0].end_last_seq);
-    TEquals(30, repResult.history[0].recorded_seq);
+    TEquals(29, repResult.history[0].end_last_seq);
+    TEquals(29, repResult.history[0].recorded_seq);
     // 16 => 15 docs with even integer field  + 1 doc with string field "7"
     TEquals(16, repResult.history[0].missing_checked);
     TEquals(16, repResult.history[0].missing_found);
@@ -750,7 +763,7 @@ couchTests.replication = function(debug) {
     TEquals(36, repResult.source_last_seq);
     TEquals(true, repResult.history instanceof Array);
     TEquals(2, repResult.history.length);
-    TEquals(30, repResult.history[0].start_last_seq);
+    TEquals(29, repResult.history[0].start_last_seq);
     TEquals(36, repResult.history[0].end_last_seq);
     TEquals(36, repResult.history[0].recorded_seq);
     TEquals(3, repResult.history[0].missing_checked);
