@@ -36,19 +36,7 @@ init([]) ->
             permanent,
             brutal_kill,
             worker,
-            [couch_server]},
-        {couch_replication_event,
-            {gen_event, start_link, [{local, couch_replication}]},
-            permanent,
-            brutal_kill,
-            worker,
-            dynamic},
-        {couch_replicator_job_sup,
-            {couch_replicator_job_sup, start_link, []},
-            permanent,
-            infinity,
-            supervisor,
-            [couch_replicator_job_sup]}
+            [couch_server]}
     ],
     {ok, {{one_for_one, 10, 3600}, Children}}.
 
