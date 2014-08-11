@@ -7,3 +7,4 @@ priv/couchjs
 priv/couchspawnkillable
 
 .rebar/
+.eunit
