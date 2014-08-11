@@ -121,7 +121,7 @@ should_not_remember_docs_in_index_after_backup_restore_test() ->
 should_upgrade_legacy_view_files_test() ->
     start(),
 
-    ok = couch_config:set("query_server_config", "commit_freq", "0", false),
+    ok = config:set("query_server_config", "commit_freq", "0", false),
 
     DbName = <<"test">>,
     DbFileName = "test.couch",
@@ -130,8 +130,8 @@ should_upgrade_legacy_view_files_test() ->
     FixtureViewFilePath = filename:join([?FIXTURESDIR, OldViewName]),
     NewViewName = "a1c5929f912aca32f13446122cc6ce50.view",
 
-    DbDir = couch_config:get("couchdb", "database_dir"),
-    ViewDir = couch_config:get("couchdb", "view_index_dir"),
+    DbDir = config:get("couchdb", "database_dir"),
+    ViewDir = config:get("couchdb", "view_index_dir"),
     OldViewFilePath = filename:join([ViewDir, ".test_design", OldViewName]),
     NewViewFilePath = filename:join([ViewDir, ".test_design", "mrview",
                                      NewViewName]),
@@ -290,8 +290,8 @@ couchdb_1309(DbName) ->
 
 couchdb_1283() ->
     ?_test(begin
-        ok = couch_config:set("couchdb", "max_dbs_open", "3", false),
-        ok = couch_config:set("couchdb", "delayed_commits", "false", false),
+        ok = config:set("couchdb", "max_dbs_open", "3", false),
+        ok = config:set("couchdb", "delayed_commits", "false", false),
 
         {ok, MDb1} = couch_db:create(?tempdb(), [?ADMIN_USER]),
         DDoc = couch_doc:from_json_obj({[
@@ -463,7 +463,7 @@ delete_design_doc(DbName, DDName, Rev) ->
     couch_db:close(Db).
 
 db_url(DbName) ->
-    Addr = couch_config:get("httpd", "bind_address", "127.0.0.1"),
+    Addr = config:get("httpd", "bind_address", "127.0.0.1"),
     Port = integer_to_list(mochiweb_socket_server:get(couch_httpd, port)),
     "http://" ++ Addr ++ ":" ++ Port ++ "/" ++ ?b2l(DbName).
 
@@ -507,7 +507,7 @@ count_db_refs(DbName) ->
 
 count_index_files(DbName) ->
     % call server to fetch the index files
-    RootDir = couch_config:get("couchdb", "view_index_dir"),
+    RootDir = config:get("couchdb", "view_index_dir"),
     length(filelib:wildcard(RootDir ++ "/." ++
         binary_to_list(DbName) ++ "_design"++"/mrview/*")).
 
@@ -516,13 +516,13 @@ has_doc(DocId1, Rows) ->
     lists:any(fun({R}) -> lists:member({<<"id">>, DocId}, R) end, Rows).
 
 backup_db_file(DbName) ->
-    DbDir = couch_config:get("couchdb", "database_dir"),
+    DbDir = config:get("couchdb", "database_dir"),
     DbFile = filename:join([DbDir, ?b2l(DbName) ++ ".couch"]),
     {ok, _} = file:copy(DbFile, DbFile ++ ".backup"),
     ok.
 
 restore_backup_db_file(DbName) ->
-    DbDir = couch_config:get("couchdb", "database_dir"),
+    DbDir = config:get("couchdb", "database_dir"),
     stop(whereis(couch_server_sup)),
     DbFile = filename:join([DbDir, ?b2l(DbName) ++ ".couch"]),
     ok = file:delete(DbFile),

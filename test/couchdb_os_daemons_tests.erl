@@ -37,16 +37,16 @@
 
 
 setup(DName) ->
-    {ok, CfgPid} = couch_config:start_link(?CONFIG_CHAIN),
+    {ok, CfgPid} = config:start_link(?CONFIG_CHAIN),
     {ok, OsDPid} = couch_os_daemons:start_link(),
-    couch_config:set("os_daemons", DName,
+    config:set("os_daemons", DName,
                      filename:join([?FIXTURESDIR, DName]), false),
     timer:sleep(?DELAY),  % sleep a bit to let daemon set kill flag
     {CfgPid, OsDPid}.
 
 teardown(_, {CfgPid, OsDPid}) ->
     erlang:monitor(process, CfgPid),
-    couch_config:stop(),
+    config:stop(),
     receive
         {'DOWN', _, _, CfgPid, _} ->
             ok
@@ -121,16 +121,16 @@ should_check_daemon_table_form(DName, _) ->
 
 should_clean_tables_on_daemon_remove(DName, _) ->
     ?_test(begin
-        couch_config:delete("os_daemons", DName, false),
+        config:delete("os_daemons", DName, false),
         {ok, Tab2} = couch_os_daemons:info(),
         ?_assertEqual([], ets:tab2list(Tab2))
     end).
 
 should_spawn_multiple_daemons(DName, _) ->
     ?_test(begin
-        couch_config:set("os_daemons", "bar",
+        config:set("os_daemons", "bar",
                          filename:join([?FIXTURESDIR, DName]), false),
-        couch_config:set("os_daemons", "baz",
+        config:set("os_daemons", "baz",
                          filename:join([?FIXTURESDIR, DName]), false),
         timer:sleep(?DELAY),
         {ok, Daemons} = couch_os_daemons:info([table]),
@@ -145,7 +145,7 @@ should_spawn_multiple_daemons(DName, _) ->
 
 should_keep_alive_one_daemon_on_killing_other(DName, _) ->
     ?_test(begin
-        couch_config:set("os_daemons", "bar",
+        config:set("os_daemons", "bar",
                          filename:join([?FIXTURESDIR, DName]), false),
         timer:sleep(?DELAY),
         {ok, Daemons} = couch_os_daemons:info([table]),
@@ -153,7 +153,7 @@ should_keep_alive_one_daemon_on_killing_other(DName, _) ->
             check_daemon(D)
         end, Daemons),
 
-        couch_config:delete("os_daemons", "bar", false),
+        config:delete("os_daemons", "bar", false),
         timer:sleep(?DELAY),
         {ok, [D2]} = couch_os_daemons:info([table]),
         check_daemon(D2, DName),
@@ -203,7 +203,7 @@ should_halts(DName, Time) ->
     timer:sleep(Time),
     {ok, [D]} = couch_os_daemons:info([table]),
     check_dead(D, DName),
-    couch_config:delete("os_daemons", DName, false).
+    config:delete("os_daemons", DName, false).
 
 check_daemon(D) ->
     check_daemon(D, D#daemon.name).

@@ -23,8 +23,8 @@
 
 start() ->
     ok = test_util:start_couch(),
-    couch_config:set("compaction_daemon", "check_interval", "3", false),
-    couch_config:set("compaction_daemon", "min_file_size", "100000", false),
+    config:set("compaction_daemon", "check_interval", "3", false),
+    config:set("compaction_daemon", "min_file_size", "100000", false),
     ok.
 
 setup() ->
@@ -35,10 +35,10 @@ setup() ->
     DbName.
 
 teardown(DbName) ->
-    Configs = couch_config:get("compactions"),
+    Configs = config:get("compactions"),
     lists:foreach(
         fun({Key, _}) ->
-            ok = couch_config:delete("compactions", Key, false)
+            ok = config:delete("compactions", Key, false)
         end,
         Configs),
     couch_server:delete(DbName, [?ADMIN_USER]),
@@ -71,13 +71,13 @@ should_compact_by_default_rule(DbName) ->
         {_, DbFileSize} = get_db_frag(DbName),
         {_, ViewFileSize} = get_view_frag(DbName),
 
-        ok = couch_config:set("compactions", "_default",
+        ok = config:set("compactions", "_default",
             "[{db_fragmentation, \"70%\"}, {view_fragmentation, \"70%\"}]",
             false),
 
         ok = timer:sleep(4000), % something >= check_interval
         wait_compaction_finished(DbName),
-        ok = couch_config:delete("compactions", "_default", false),
+        ok = config:delete("compactions", "_default", false),
 
         {DbFrag2, DbFileSize2} = get_db_frag(DbName),
         {ViewFrag2, ViewFileSize2} = get_view_frag(DbName),
@@ -100,13 +100,13 @@ should_compact_by_dbname_rule(DbName) ->
         {_, DbFileSize} = get_db_frag(DbName),
         {_, ViewFileSize} = get_view_frag(DbName),
 
-        ok = couch_config:set("compactions", ?b2l(DbName),
+        ok = config:set("compactions", ?b2l(DbName),
             "[{db_fragmentation, \"70%\"}, {view_fragmentation, \"70%\"}]",
             false),
 
         ok = timer:sleep(4000), % something >= check_interval
         wait_compaction_finished(DbName),
-        ok = couch_config:delete("compactions", ?b2l(DbName), false),
+        ok = config:delete("compactions", ?b2l(DbName), false),
 
         {DbFrag2, DbFileSize2} = get_db_frag(DbName),
         {ViewFrag2, ViewFileSize2} = get_view_frag(DbName),
@@ -168,7 +168,7 @@ update(DbName) ->
     couch_db:close(Db).
 
 db_url(DbName) ->
-    Addr = couch_config:get("httpd", "bind_address", "127.0.0.1"),
+    Addr = config:get("httpd", "bind_address", "127.0.0.1"),
     Port = integer_to_list(mochiweb_socket_server:get(couch_httpd, port)),
     "http://" ++ Addr ++ ":" ++ Port ++ "/" ++ ?b2l(DbName).
 

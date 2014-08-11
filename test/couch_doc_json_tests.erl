@@ -17,12 +17,12 @@
 
 
 setup() ->
-    couch_config:start_link(?CONFIG_CHAIN),
-    couch_config:set("attachments", "compression_level", "0", false),
+    config:start_link(?CONFIG_CHAIN),
+    config:set("attachments", "compression_level", "0", false),
     ok.
 
 teardown(_) ->
-    couch_config:stop().
+    config:stop().
 
 
 json_doc_test_() ->

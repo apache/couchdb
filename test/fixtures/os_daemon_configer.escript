@@ -83,7 +83,7 @@ loop({error, _Reason}) ->
 
 main([]) ->
     init_code_path(),
-    couch_config:start_link(?CONFIG_CHAIN),
+    config:start_link(?CONFIG_CHAIN),
     couch_drv:start_link(),
     do_tests().
 

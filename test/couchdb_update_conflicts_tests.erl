@@ -24,7 +24,7 @@
 
 start() ->
     ok = test_util:start_couch(),
-    couch_config:set("couchdb", "delayed_commits", "true", false),
+    config:set("couchdb", "delayed_commits", "true", false),
     ok.
 
 setup() ->

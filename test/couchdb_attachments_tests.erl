@@ -29,16 +29,16 @@
 start() ->
     ok = test_util:start_couch(),
     % ensure in default compression settings for attachments_compression_tests
-    couch_config:set("attachments", "compression_level",
+    config:set("attachments", "compression_level",
                      ?i2l(?COMPRESSION_LEVEL), false),
-    couch_config:set("attachments", "compressible_types", "text/*", false),
+    config:set("attachments", "compressible_types", "text/*", false),
     ok.
 
 setup() ->
     DbName = ?tempdb(),
     {ok, Db} = couch_db:create(DbName, []),
     ok = couch_db:close(Db),
-    Addr = couch_config:get("httpd", "bind_address", any),
+    Addr = config:get("httpd", "bind_address", any),
     Port = mochiweb_socket_server:get(couch_httpd, port),
     Host = Addr ++ ":" ++ ?i2l(Port),
     {Host, ?b2l(DbName)}.
@@ -540,7 +540,7 @@ chunked_body([Chunk | Rest], Acc) ->
 
 get_socket() ->
     Options = [binary, {packet, 0}, {active, false}],
-    Addr = couch_config:get("httpd", "bind_address", any),
+    Addr = config:get("httpd", "bind_address", any),
     Port = mochiweb_socket_server:get(couch_httpd, port),
     {ok, Sock} = gen_tcp:connect(Addr, Port, Options),
     Sock.

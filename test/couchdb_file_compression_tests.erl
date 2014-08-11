@@ -22,7 +22,7 @@
 
 
 setup() ->
-    couch_config:set("couchdb", "file_compression", "none", false),
+    config:set("couchdb", "file_compression", "none", false),
     DbName = ?tempdb(),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_USER]),
     ok = populate_db(Db, ?DOCS_COUNT),
@@ -68,7 +68,7 @@ couch_auth_cache_test_() ->
 
 
 should_use_none(DbName) ->
-    couch_config:set("couchdb", "file_compression", "none", false),
+    config:set("couchdb", "file_compression", "none", false),
     {
         "Use no compression",
         [
@@ -78,7 +78,7 @@ should_use_none(DbName) ->
     }.
 
 should_use_deflate_1(DbName) ->
-    couch_config:set("couchdb", "file_compression", "deflate_1", false),
+    config:set("couchdb", "file_compression", "deflate_1", false),
     {
         "Use deflate compression at level 1",
         [
@@ -88,7 +88,7 @@ should_use_deflate_1(DbName) ->
     }.
 
 should_use_deflate_9(DbName) ->
-    couch_config:set("couchdb", "file_compression", "deflate_9", false),
+    config:set("couchdb", "file_compression", "deflate_9", false),
     {
         "Use deflate compression at level 9",
         [
@@ -98,7 +98,7 @@ should_use_deflate_9(DbName) ->
     }.
 
 should_use_snappy(DbName) ->
-    couch_config:set("couchdb", "file_compression", "snappy", false),
+    config:set("couchdb", "file_compression", "snappy", false),
     {
         "Use snappy compression",
         [
@@ -112,13 +112,13 @@ should_compare_compression_methods(DbName) ->
      {timeout, ?TIMEOUT div 1000, ?_test(compare_compression_methods(DbName))}}.
 
 compare_compression_methods(DbName) ->
-    couch_config:set("couchdb", "file_compression", "none", false),
+    config:set("couchdb", "file_compression", "none", false),
     compact_db(DbName),
     compact_view(DbName),
     DbSizeNone = db_disk_size(DbName),
     ViewSizeNone = view_disk_size(DbName),
 
-    couch_config:set("couchdb", "file_compression", "snappy", false),
+    config:set("couchdb", "file_compression", "snappy", false),
     compact_db(DbName),
     compact_view(DbName),
     DbSizeSnappy = db_disk_size(DbName),
@@ -127,7 +127,7 @@ compare_compression_methods(DbName) ->
     ?assert(DbSizeNone > DbSizeSnappy),
     ?assert(ViewSizeNone > ViewSizeSnappy),
 
-    couch_config:set("couchdb", "file_compression", "deflate_1", false),
+    config:set("couchdb", "file_compression", "deflate_1", false),
     compact_db(DbName),
     compact_view(DbName),
     DbSizeDeflate1 = db_disk_size(DbName),
@@ -136,7 +136,7 @@ compare_compression_methods(DbName) ->
     ?assert(DbSizeSnappy > DbSizeDeflate1),
     ?assert(ViewSizeSnappy > ViewSizeDeflate1),
 
-    couch_config:set("couchdb", "file_compression", "deflate_9", false),
+    config:set("couchdb", "file_compression", "deflate_9", false),
     compact_db(DbName),
     compact_view(DbName),
     DbSizeDeflate9 = db_disk_size(DbName),

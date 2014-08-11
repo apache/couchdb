@@ -24,13 +24,13 @@ setup() ->
     %% {error, not_loaded_by_this_process} while it is. Any ideas is welcome.
     %%
     ok = test_util:start_couch(),
-    %% couch_config:start_link(?CONFIG_CHAIN),
+    %% config:start_link(?CONFIG_CHAIN),
     %% {ok, _} = couch_drv:start_link(),
     ok.
 
 teardown(_) ->
     ok = test_util:stop_couch(),
-    %% couch_config:stop(),
+    %% config:stop(),
     %% erl_ddll:unload_driver(couch_icu_driver),
     ok.
 

@@ -24,8 +24,8 @@
 
 start() ->
     ok = test_util:start_couch(),
-    ok = couch_config:set("httpd", "enable_cors", "true", false),
-    ok = couch_config:set("vhosts", "example.com", "/", false),
+    ok = config:set("httpd", "enable_cors", "true", false),
+    ok = config:set("vhosts", "example.com", "/", false),
     ok.
 
 setup() ->
@@ -33,10 +33,10 @@ setup() ->
     {ok, Db} = couch_db:create(DbName, [?ADMIN_USER]),
     couch_db:close(Db),
 
-    couch_config:set("cors", "credentials", "false", false),
-    couch_config:set("cors", "origins", "http://example.com", false),
+    config:set("cors", "credentials", "false", false),
+    config:set("cors", "origins", "http://example.com", false),
 
-    Addr = couch_config:get("httpd", "bind_address", "127.0.0.1"),
+    Addr = config:get("httpd", "bind_address", "127.0.0.1"),
     Port = integer_to_list(mochiweb_socket_server:get(couch_httpd, port)),
     Host = "http://" ++ Addr ++ ":" ++ Port,
     {Host, ?b2l(DbName)}.
@@ -136,7 +136,7 @@ make_test_case(Mod, UseVhost, Funs) ->
 should_not_allow_origin(_, {_, _, Url, Headers0}) ->
     ?_assertEqual(undefined,
         begin
-            couch_config:delete("cors", "origins", false),
+            config:delete("cors", "origins", false),
             Headers1 = proplists:delete("Origin", Headers0),
             Headers = [{"Origin", "http://127.0.0.1"}]
                       ++ Headers1,
@@ -200,7 +200,7 @@ should_make_preflight_request(_, {_, _, Url, DefaultHeaders}) ->
 should_make_prefligh_request_with_port({_, VHost}, {_, _, Url, _}) ->
     ?_assertEqual("http://example.com:5984",
         begin
-            couch_config:set("cors", "origins", "http://example.com:5984",
+            config:set("cors", "origins", "http://example.com:5984",
                              false),
             Headers = [{"Origin", "http://example.com:5984"},
                        {"Access-Control-Request-Method", "GET"}]
@@ -212,7 +212,7 @@ should_make_prefligh_request_with_port({_, VHost}, {_, _, Url, _}) ->
 should_make_prefligh_request_with_scheme({_, VHost}, {_, _, Url, _}) ->
     ?_assertEqual("https://example.com:5984",
         begin
-            couch_config:set("cors", "origins", "https://example.com:5984",
+            config:set("cors", "origins", "https://example.com:5984",
                              false),
             Headers = [{"Origin", "https://example.com:5984"},
                        {"Access-Control-Request-Method", "GET"}]
@@ -224,7 +224,7 @@ should_make_prefligh_request_with_scheme({_, VHost}, {_, _, Url, _}) ->
 should_make_prefligh_request_with_wildcard_origin({_, VHost}, {_, _, Url, _}) ->
     ?_assertEqual("https://example.com:5984",
         begin
-            couch_config:set("cors", "origins", "*", false),
+            config:set("cors", "origins", "*", false),
             Headers = [{"Origin", "https://example.com:5984"},
                        {"Access-Control-Request-Method", "GET"}]
                       ++ maybe_append_vhost(VHost),
@@ -235,7 +235,7 @@ should_make_prefligh_request_with_wildcard_origin({_, VHost}, {_, _, Url, _}) ->
 should_make_request_with_credentials(_, {_, _, Url, DefaultHeaders}) ->
     ?_assertEqual("true",
         begin
-            ok = couch_config:set("cors", "credentials", "true", false),
+            ok = config:set("cors", "credentials", "true", false),
             {ok, _, Resp, _} = test_request:options(Url, DefaultHeaders),
             proplists:get_value("Access-Control-Allow-Credentials", Resp)
         end).
@@ -244,10 +244,10 @@ should_make_origin_request_with_auth(_, {_, _, Url, DefaultHeaders}) ->
     ?_assertEqual("http://example.com",
         begin
             Hashed = couch_passwords:hash_admin_password(<<"test">>),
-            couch_config:set("admins", "test", Hashed, false),
+            config:set("admins", "test", Hashed, false),
             {ok, _, Resp, _} = test_request:get(
                 Url, DefaultHeaders, [{basic_auth, {"test", "test"}}]),
-            couch_config:delete("admins", "test", false),
+            config:delete("admins", "test", false),
             proplists:get_value("Access-Control-Allow-Origin", Resp)
         end).
 
@@ -255,12 +255,12 @@ should_make_preflight_request_with_auth(_, {_, _, Url, DefaultHeaders}) ->
     ?_assertEqual(?SUPPORTED_METHODS,
         begin
             Hashed = couch_passwords:hash_admin_password(<<"test">>),
-            couch_config:set("admins", "test", Hashed, false),
+            config:set("admins", "test", Hashed, false),
             Headers = DefaultHeaders
                       ++ [{"Access-Control-Request-Method", "GET"}],
             {ok, _, Resp, _} = test_request:options(
                 Url, Headers, [{basic_auth, {"test", "test"}}]),
-            couch_config:delete("admins", "test", false),
+            config:delete("admins", "test", false),
             proplists:get_value("Access-Control-Allow-Methods", Resp)
         end).
 

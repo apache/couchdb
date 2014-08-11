@@ -33,7 +33,7 @@ start() ->
     % (each httpd_global_handlers changes causes couch_httpd restart)
     ok = test_util:start_couch(test_util:config_files() ++ [?CONFIG_FIXTURE_TEMP]),
     % 49151 is IANA Reserved, let's assume no one is listening there
-    couch_config:set("httpd_global_handlers", "_error",
+    config:set("httpd_global_handlers", "_error",
         "{couch_httpd_proxy, handle_proxy_req, <<\"http://127.0.0.1:49151/\">>}"
     ),
     ok.
@@ -43,7 +43,7 @@ setup() ->
     Value = lists:flatten(io_lib:format(
         "{couch_httpd_proxy, handle_proxy_req, ~p}",
         [list_to_binary(proxy_url())])),
-    couch_config:set("httpd_global_handlers", "_test", Value),
+    config:set("httpd_global_handlers", "_test", Value),
     % let couch_httpd restart
     timer:sleep(100),
     Pid.
@@ -381,7 +381,7 @@ server_url() ->
     server_url("/_test").
 
 server_url(Resource) ->
-    Addr = couch_config:get("httpd", "bind_address"),
+    Addr = config:get("httpd", "bind_address"),
     Port = integer_to_list(mochiweb_socket_server:get(couch_httpd, port)),
     lists:concat(["http://", Addr, ":", Port, Resource]).
 

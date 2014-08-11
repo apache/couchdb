@@ -18,7 +18,7 @@
 
 
 setup() ->
-    {ok, Pid} = couch_config:start_link(?CONFIG_CHAIN),
+    {ok, Pid} = config:start_link(?CONFIG_CHAIN),
     erlang:monitor(process, Pid),
     couch_uuids:start(),
     Pid.
@@ -27,13 +27,13 @@ setup(Opts) ->
     Pid = setup(),
     lists:foreach(
         fun({Option, Value}) ->
-            couch_config:set("uuids", Option, Value, false)
+            config:set("uuids", Option, Value, false)
         end, Opts),
     Pid.
 
 teardown(Pid) ->
     couch_uuids:stop(),
-    couch_config:stop(),
+    config:stop(),
     receive
         {'DOWN', _, _, Pid, _} -> ok
     after

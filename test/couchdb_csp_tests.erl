@@ -18,8 +18,8 @@
 
 
 setup() ->
-    ok = couch_config:set("csp", "enable", "true", false),
-    Addr = couch_config:get("httpd", "bind_address", "127.0.0.1"),
+    ok = config:set("csp", "enable", "true", false),
+    Addr = config:get("httpd", "bind_address", "127.0.0.1"),
     Port = integer_to_list(mochiweb_socket_server:get(couch_httpd, port)),
     lists:concat(["http://", Addr, ":", Port, "/_utils/"]).
 
@@ -50,7 +50,7 @@ csp_test_() ->
 should_not_return_any_csp_headers_when_disabled(Url) ->
     ?_assertEqual(undefined,
         begin
-            ok = couch_config:set("csp", "enable", "false", false),
+            ok = config:set("csp", "enable", "false", false),
             {ok, _, Headers, _} = test_request:get(Url),
             proplists:get_value("Content-Security-Policy", Headers)
         end).
@@ -67,7 +67,7 @@ should_apply_default_policy(Url) ->
 should_return_custom_policy(Url) ->
     ?_assertEqual("default-src 'http://example.com';",
         begin
-            ok = couch_config:set("csp", "header_value",
+            ok = config:set("csp", "header_value",
                                   "default-src 'http://example.com';", false),
             {ok, _, Headers, _} = test_request:get(Url),
             proplists:get_value("Content-Security-Policy", Headers)
@@ -76,7 +76,7 @@ should_return_custom_policy(Url) ->
 should_only_enable_csp_when_true(Url) ->
     ?_assertEqual(undefined,
         begin
-            ok = couch_config:set("csp", "enable", "tru", false),
+            ok = config:set("csp", "enable", "tru", false),
             {ok, _, Headers, _} = test_request:get(Url),
             proplists:get_value("Content-Security-Policy", Headers)
         end).

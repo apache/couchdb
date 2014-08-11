@@ -20,7 +20,7 @@
 
 start() ->
     ok = test_util:start_couch(),
-    couch_config:set("query_server_config", "os_process_limit", "3", false),
+    config:set("query_server_config", "os_process_limit", "3", false),
     ok.
 
 

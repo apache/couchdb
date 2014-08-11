@@ -22,7 +22,7 @@
 
 setup() ->
     DbName = ?tempdb(),
-    couch_config:set("couch_httpd_auth", "authentication_db",
+    config:set("couch_httpd_auth", "authentication_db",
                      ?b2l(DbName), false),
     DbName.
 
@@ -113,7 +113,7 @@ should_drop_cache_on_auth_db_change(DbName) ->
     ?_test(begin
         {ok, _} = update_user_doc(DbName, "joe", "pass1"),
         full_commit(DbName),
-        couch_config:set("couch_httpd_auth", "authentication_db",
+        config:set("couch_httpd_auth", "authentication_db",
                          ?b2l(?tempdb()), false),
         ?assertEqual(nil, couch_auth_cache:get_user_creds("joe"))
     end).
@@ -126,13 +126,13 @@ should_restore_cache_on_auth_db_change(DbName) ->
         full_commit(DbName),
 
         DbName1 = ?tempdb(),
-        couch_config:set("couch_httpd_auth", "authentication_db",
+        config:set("couch_httpd_auth", "authentication_db",
                          ?b2l(DbName1), false),
 
         {ok, _} = update_user_doc(DbName1, "joe", "pass5"),
         full_commit(DbName1),
 
-        couch_config:set("couch_httpd_auth", "authentication_db",
+        config:set("couch_httpd_auth", "authentication_db",
                          ?b2l(DbName), false),
 
         Creds = couch_auth_cache:get_user_creds("joe"),

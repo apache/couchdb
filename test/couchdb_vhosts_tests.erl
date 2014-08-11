@@ -47,7 +47,7 @@ setup() ->
     couch_db:ensure_full_commit(Db),
     couch_db:close(Db),
 
-    Addr = couch_config:get("httpd", "bind_address", "127.0.0.1"),
+    Addr = config:get("httpd", "bind_address", "127.0.0.1"),
     Port = integer_to_list(mochiweb_socket_server:get(couch_httpd, port)),
     Url = "http://" ++ Addr ++ ":" ++ Port,
     {Url, ?b2l(DbName)}.
@@ -56,14 +56,14 @@ setup_oauth() ->
     DbName = ?tempdb(),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_USER]),
 
-    couch_config:set("couch_httpd_auth", "authentication_db",
+    config:set("couch_httpd_auth", "authentication_db",
                      ?b2l(?tempdb()), false),
-    couch_config:set("oauth_token_users", "otoksec1", "joe", false),
-    couch_config:set("oauth_consumer_secrets", "consec1", "foo", false),
-    couch_config:set("oauth_token_secrets", "otoksec1", "foobar", false),
-    couch_config:set("couch_httpd_auth", "require_valid_user", "true", false),
+    config:set("oauth_token_users", "otoksec1", "joe", false),
+    config:set("oauth_consumer_secrets", "consec1", "foo", false),
+    config:set("oauth_token_secrets", "otoksec1", "foobar", false),
+    config:set("couch_httpd_auth", "require_valid_user", "true", false),
 
-    ok = couch_config:set(
+    ok = config:set(
         "vhosts", "oauth-example.com",
         "/" ++ ?b2l(DbName) ++ "/_design/test/_rewrite/foobar", false),
 
@@ -82,7 +82,7 @@ setup_oauth() ->
     couch_db:ensure_full_commit(Db),
     couch_db:close(Db),
 
-    Addr = couch_config:get("httpd", "bind_address", "127.0.0.1"),
+    Addr = config:get("httpd", "bind_address", "127.0.0.1"),
     Port = integer_to_list(mochiweb_socket_server:get(couch_httpd, port)),
     Url = "http://" ++ Addr ++ ":" ++ Port,
     {Url, ?b2l(DbName)}.
@@ -140,7 +140,7 @@ oauth_test_() ->
 
 should_return_database_info({Url, DbName}) ->
     ?_test(begin
-        ok = couch_config:set("vhosts", "example.com", "/" ++ DbName, false),
+        ok = config:set("vhosts", "example.com", "/" ++ DbName, false),
         case test_request:get(Url, [], [{host_header, "example.com"}]) of
             {ok, _, _, Body} ->
                 {JsonBody} = ejson:decode(Body),
@@ -155,7 +155,7 @@ should_return_database_info({Url, DbName}) ->
 
 should_return_revs_info({Url, DbName}) ->
     ?_test(begin
-        ok = couch_config:set("vhosts", "example.com", "/" ++ DbName, false),
+        ok = config:set("vhosts", "example.com", "/" ++ DbName, false),
         case test_request:get(Url ++ "/doc1?revs_info=true", [],
                               [{host_header, "example.com"}]) of
             {ok, _, _, Body} ->
@@ -171,7 +171,7 @@ should_return_revs_info({Url, DbName}) ->
 
 should_serve_utils_for_vhost({Url, DbName}) ->
     ?_test(begin
-        ok = couch_config:set("vhosts", "example.com", "/" ++ DbName, false),
+        ok = config:set("vhosts", "example.com", "/" ++ DbName, false),
         case test_request:get(Url ++ "/_utils/index.html", [],
                               [{host_header, "example.com"}]) of
             {ok, _, _, Body} ->
@@ -186,7 +186,7 @@ should_serve_utils_for_vhost({Url, DbName}) ->
 
 should_return_virtual_request_path_field_in_request({Url, DbName}) ->
     ?_test(begin
-        ok = couch_config:set("vhosts", "example1.com",
+        ok = config:set("vhosts", "example1.com",
                               "/" ++ DbName ++ "/_design/doc1/_rewrite/",
                               false),
         case test_request:get(Url, [], [{host_header, "example1.com"}]) of
@@ -204,7 +204,7 @@ should_return_virtual_request_path_field_in_request({Url, DbName}) ->
 
 should_return_real_request_path_field_in_request({Url, DbName}) ->
     ?_test(begin
-        ok = couch_config:set("vhosts", "example1.com",
+        ok = config:set("vhosts", "example1.com",
                               "/" ++ DbName ++ "/_design/doc1/_rewrite/",
                               false),
         case test_request:get(Url, [], [{host_header, "example1.com"}]) of
@@ -222,7 +222,7 @@ should_return_real_request_path_field_in_request({Url, DbName}) ->
 
 should_match_wildcard_vhost({Url, DbName}) ->
     ?_test(begin
-        ok = couch_config:set("vhosts", "*.example.com",
+        ok = config:set("vhosts", "*.example.com",
                               "/" ++ DbName ++ "/_design/doc1/_rewrite", false),
         case test_request:get(Url, [], [{host_header, "test.example.com"}]) of
             {ok, _, _, Body} ->
@@ -239,7 +239,7 @@ should_match_wildcard_vhost({Url, DbName}) ->
 
 should_return_db_info_for_wildcard_vhost_for_custom_db({Url, DbName}) ->
     ?_test(begin
-        ok = couch_config:set("vhosts", ":dbname.example1.com",
+        ok = config:set("vhosts", ":dbname.example1.com",
                               "/:dbname", false),
         Host = DbName ++ ".example1.com",
         case test_request:get(Url, [], [{host_header, Host}]) of
@@ -256,7 +256,7 @@ should_return_db_info_for_wildcard_vhost_for_custom_db({Url, DbName}) ->
 
 should_replace_rewrite_variables_for_db_and_doc({Url, DbName}) ->
     ?_test(begin
-        ok = couch_config:set("vhosts",":appname.:dbname.example1.com",
+        ok = config:set("vhosts",":appname.:dbname.example1.com",
                               "/:dbname/_design/:appname/_rewrite/", false),
         Host = "doc1." ++ DbName ++ ".example1.com",
         case test_request:get(Url, [], [{host_header, Host}]) of
@@ -274,7 +274,7 @@ should_replace_rewrite_variables_for_db_and_doc({Url, DbName}) ->
 
 should_return_db_info_for_vhost_with_resource({Url, DbName}) ->
     ?_test(begin
-        ok = couch_config:set("vhosts",
+        ok = config:set("vhosts",
                               "example.com/test", "/" ++ DbName, false),
         ReqUrl = Url ++ "/test",
         case test_request:get(ReqUrl, [], [{host_header, "example.com"}]) of
@@ -292,7 +292,7 @@ should_return_db_info_for_vhost_with_resource({Url, DbName}) ->
 
 should_return_revs_info_for_vhost_with_resource({Url, DbName}) ->
     ?_test(begin
-        ok = couch_config:set("vhosts",
+        ok = config:set("vhosts",
                               "example.com/test", "/" ++ DbName, false),
         ReqUrl = Url ++ "/test/doc1?revs_info=true",
         case test_request:get(ReqUrl, [], [{host_header, "example.com"}]) of
@@ -309,7 +309,7 @@ should_return_revs_info_for_vhost_with_resource({Url, DbName}) ->
 
 should_return_db_info_for_vhost_with_wildcard_resource({Url, DbName}) ->
     ?_test(begin
-        ok = couch_config:set("vhosts", "*.example2.com/test", "/*", false),
+        ok = config:set("vhosts", "*.example2.com/test", "/*", false),
         ReqUrl = Url ++ "/test",
         Host = DbName ++ ".example2.com",
         case test_request:get(ReqUrl, [], [{host_header, Host}]) of
@@ -326,7 +326,7 @@ should_return_db_info_for_vhost_with_wildcard_resource({Url, DbName}) ->
 
 should_return_path_for_vhost_with_wildcard_host({Url, DbName}) ->
     ?_test(begin
-        ok = couch_config:set("vhosts", "*/test1",
+        ok = config:set("vhosts", "*/test1",
                               "/" ++ DbName ++ "/_design/doc1/_show/test",
                               false),
         case test_request:get(Url ++ "/test1") of
@@ -360,7 +360,7 @@ should_require_auth({Url, _}) ->
 
 should_succeed_oauth({Url, _}) ->
     ?_test(begin
-        AuthDbName = couch_config:get("couch_httpd_auth", "authentication_db"),
+        AuthDbName = config:get("couch_httpd_auth", "authentication_db"),
         JoeDoc = couch_doc:from_json_obj({[
             {<<"_id">>, <<"org.couchdb.user:joe">>},
             {<<"type">>, <<"user">>},
@@ -394,7 +394,7 @@ should_succeed_oauth({Url, _}) ->
 
 should_fail_oauth_with_wrong_credentials({Url, _}) ->
     ?_test(begin
-        AuthDbName = couch_config:get("couch_httpd_auth", "authentication_db"),
+        AuthDbName = config:get("couch_httpd_auth", "authentication_db"),
         JoeDoc = couch_doc:from_json_obj({[
             {<<"_id">>, <<"org.couchdb.user:joe">>},
             {<<"type">>, <<"user">>},

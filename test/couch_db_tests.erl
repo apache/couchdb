@@ -19,7 +19,7 @@
 
 setup() ->
     ok = test_util:start_couch(),
-    couch_config:set("log", "include_sasl", "false", false),
+    config:set("log", "include_sasl", "false", false),
     ok.
 
 

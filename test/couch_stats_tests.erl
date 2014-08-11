@@ -28,7 +28,7 @@ setup_collector() ->
     ok.
 
 setup_aggregator(_) ->
-    {ok, Pid} = couch_config:start_link([?STATS_INI_FIXTURE]),
+    {ok, Pid} = config:start_link([?STATS_INI_FIXTURE]),
     {ok, _} = couch_stats_collector:start(),
     {ok, _} = couch_stats_aggregator:start(?STATS_CFG_FIXTURE),
     Pid.
@@ -41,7 +41,7 @@ teardown_aggregator(_, Pid) ->
     couch_stats_aggregator:stop(),
     couch_stats_collector:stop(),
     erlang:monitor(process, Pid),
-    couch_config:stop(),
+    config:stop(),
     receive
         {'DOWN', _, _, Pid, _} ->
             ok
