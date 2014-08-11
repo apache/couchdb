@@ -50,6 +50,7 @@
     downgrade/1
 ]).
 
+-compile(nowarn_deprecated_type).
 -export_type([att/0]).
 
 -include_lib("couch/include/couch_db.hrl").
@@ -247,7 +248,7 @@ merge_stubs(MemAtts, DiskAtts) ->
     merge_stubs(MemAtts, OnDisk, []).
 
 
--spec merge_stubs([att()], dict:dict(), [att()]) -> [att()].
+-spec merge_stubs([att()], dict(), [att()]) -> [att()].
 merge_stubs([Att | Rest], OnDisk, Merged) ->
     case fetch(data, Att) of
         stub ->
