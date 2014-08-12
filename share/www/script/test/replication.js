@@ -151,16 +151,23 @@ couchTests.replication = function(debug) {
 
 
   function waitForSeq(sourceDb, targetDb) {
-    var targetSeq,
-        sourceSeq = sourceDb.info().update_seq,
+    var sourceSeq = sourceDb.info().update_seq,
         t0 = new Date(),
         t1,
         ms = 3000;
 
     do {
-      targetSeq = targetDb.info().update_seq;
+      var xhr = CouchDB.request("GET", "/_active_tasks");
+      var tasks = JSON.parse(xhr.responseText);
+      for(var i = 0; i < tasks.length; i++) {
+        if(tasks[i].replication_id == repResult._local_id) {
+          if(tasks[i]["source_seq"] == sourceSeq) {
+            return;
+          }
+        }
+      }
       t1 = new Date();
-    } while (((t1 - t0) <= ms) && targetSeq < sourceSeq);
+    } while (((t1 - t0) <= ms));
   }
 
 
@@ -1166,7 +1173,7 @@ couchTests.replication = function(debug) {
 
     var rep_id = repResult._local_id;
 
-    waitForSeq(sourceDb, targetDb);
+    waitForSeq(sourceDb, targetDb, rep_id);
 
     for (j = 0; j < docs.length; j++) {
       doc = docs[j];
@@ -1204,7 +1211,7 @@ couchTests.replication = function(debug) {
     var ddoc = docs[docs.length - 1]; // design doc
     addAtt(sourceDb, ddoc, "readme.txt", att1_data, "text/plain");
 
-    waitForSeq(sourceDb, targetDb);
+    waitForSeq(sourceDb, targetDb, rep_id);
 
     var modifDocs = docs.slice(10, 15).concat([ddoc]);
     for (j = 0; j < modifDocs.length; j++) {
@@ -1249,7 +1256,7 @@ couchTests.replication = function(debug) {
     // add another attachment to the ddoc on source
     addAtt(sourceDb, ddoc, "data.dat", att2_data, "application/binary");
 
-    waitForSeq(sourceDb, targetDb);
+    waitForSeq(sourceDb, targetDb, rep_id);
 
     copy = targetDb.open(ddoc._id);
     var atts = copy._attachments;
@@ -1286,7 +1293,7 @@ couchTests.replication = function(debug) {
     var newDocs = makeDocs(25, 35);
     populateDb(sourceDb, newDocs, true);
 
-    waitForSeq(sourceDb, targetDb);
+    waitForSeq(sourceDb, targetDb, rep_id);
 
     for (j = 0; j < newDocs.length; j++) {
       doc = newDocs[j];
@@ -1306,7 +1313,7 @@ couchTests.replication = function(debug) {
     wait(1000);
     TEquals(true, sourceDb.deleteDoc(newDocs[6]).ok);
 
-    waitForSeq(sourceDb, targetDb);
+    waitForSeq(sourceDb, targetDb, rep_id);
 
     copy = targetDb.open(newDocs[0]._id);
     TEquals(null, copy);
@@ -1390,7 +1397,7 @@ couchTests.replication = function(debug) {
   }
   TEquals(true, found_task);
 
-  waitForSeq(sourceDb, targetDb);
+  waitForSeq(sourceDb, targetDb, repResult._local_id);
   T(sourceDb.open("30") !== null);
 
   // cancel replication
