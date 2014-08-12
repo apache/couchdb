@@ -37,6 +37,7 @@ SCRIPTS = """
     share/www/script/sha1.js
     share/www/script/oauth.js
     share/www/script/couch.js
+    share/www/script/replicator_db_inc.js
     share/www/script/couch_test_runner.js
     test/javascript/couch_http.js
     test/javascript/test_setup.js
