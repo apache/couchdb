@@ -316,13 +316,13 @@ changes_reader_cb({change, Change, _}, _, {Server, DbName}) ->
         false ->
             ok
     end,
-    {ok, {Server, DbName}};
+    {Server, DbName};
 changes_reader_cb({stop, EndSeq, _Pending}, _, {Server, DbName}) ->
     Msg = {rep_db_checkpoint, DbName, EndSeq},
     ok = gen_server:call(Server, Msg, infinity),
-    {ok, {Server, DbName}};
+    {Server, DbName};
 changes_reader_cb(_, _, Acc) ->
-    {ok, Acc}.
+    Acc.
 
 has_valid_rep_id({Change}) ->
     has_valid_rep_id(get_json_value(<<"id">>, Change));
