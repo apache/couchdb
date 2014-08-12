@@ -54,6 +54,13 @@ couchTests.replicator_db_identical_continuous = function(debug) {
       T(copy.value === doc.value);
     }
 
+    // Rather than a timeout we're just waiting to hear the
+    // fourth change to the database. Changes 1 and 2 were
+    // us storing repDoc1 and repDoc2. Changes 3 and 4 are
+    // the replicator manager updating each document. This
+    // just waits until the fourth change before continuing.
+    repDb.changes({"feed":"longpoll", "since":3});
+
     repDoc1 = repDb.open("foo_dup_cont_rep_doc_1");
     T(repDoc1 !== null);
     T(repDoc1._replication_state === "triggered");
