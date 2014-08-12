@@ -912,11 +912,13 @@ get_pending_count_int(#rep_state{source = Db}=St) ->
 
 update_task(State) ->
     #rep_state{
+        current_through_seq = {_, ThroughSeq},
         highest_seq_done = {_, HighestSeq}
     } = State,
     couch_task_status:update(
         rep_stats(State) ++ [
-        {source_seq, HighestSeq}
+        {source_seq, HighestSeq},
+        {through_seq, ThroughSeq}
     ]).
 
 
