@@ -308,7 +308,7 @@ changes_reader(Server, DbName, Since) ->
     ),
     ChangesFeedFun({fun ?MODULE:changes_reader_cb/3, {Server, DbName}}).
 
-changes_reader_cb({change, Change}, _, {Server, DbName}) ->
+changes_reader_cb({change, Change, _}, _, {Server, DbName}) ->
     case has_valid_rep_id(Change) of
         true ->
             Msg = {rep_db_update, DbName, Change},
