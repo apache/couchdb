@@ -39,5 +39,5 @@ init(_Args) ->
             supervisor,
             [couch_replicator_job_sup]}
     ],
-    {ok, {{one_for_one,10,3600}, Children}}.
+    {ok, {{one_for_one,10,1}, Children}}.
 
