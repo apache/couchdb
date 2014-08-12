@@ -175,7 +175,7 @@ couchTests.replication = function(debug) {
 
     do {
       var task = getTask(rep_id, 0);
-      if(task && task["source_seq"] == sourceSeq) {
+      if(task && task["through_seq"] == sourceSeq) {
         return;
       }
       t1 = new Date();
@@ -1385,19 +1385,9 @@ couchTests.replication = function(debug) {
   while (sourceDb.info().compact_running) {};
 
   TEquals(true, sourceDb.save(makeDocs(30, 31)[0]).ok);
-  xhr = CouchDB.request("GET", "/_active_tasks");
 
-  var xhr = CouchDB.request("GET", "/_active_tasks");
-  var tasks = JSON.parse(xhr.responseText);
-
-  var found_task = false;
-  for(var i = 0; i < tasks.length; i++) {
-    if(tasks[i].replication_id == repResult._local_id) {
-      found_task = true;
-      break;
-    }
-  }
-  TEquals(true, found_task);
+  var task = getTask(repResult._local_id, 1000);
+  T(task != null);
 
   waitForSeq(sourceDb, targetDb, repResult._local_id);
   T(sourceDb.open("30") !== null);
