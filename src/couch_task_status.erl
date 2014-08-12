@@ -68,9 +68,14 @@ set_update_frequency(Msecs) ->
 
 update(Props) ->
     MergeProps = lists:ukeysort(1, Props),
-    TaskProps = lists:ukeymerge(1, MergeProps, erlang:get(task_status_props)),
-    put(task_status_props, TaskProps),
-    maybe_persist(TaskProps).
+    CurrProps = erlang:get(task_status_props),
+    TaskProps = lists:ukeymerge(1, MergeProps, CurrProps),
+    case TaskProps == CurrProps of
+        true ->
+            maybe_persist(TaskProps);
+        false ->
+            persist(TaskProps)
+    end.
 
 
 get(Props) when is_list(Props) ->
@@ -81,16 +86,20 @@ get(Prop) ->
     couch_util:get_value(Prop, TaskProps).
 
 
-maybe_persist(TaskProps0) ->
+maybe_persist(TaskProps) ->
     {LastUpdateTime, Frequency} = erlang:get(task_status_update),
     case timer:now_diff(Now = os:timestamp(), LastUpdateTime) >= Frequency of
     true ->
         put(task_status_update, {Now, Frequency}),
-        TaskProps = ?set(TaskProps0, updated_on, timestamp(Now)),
-        gen_server:cast(?MODULE, {update_status, self(), TaskProps});
+        persist(TaskProps);
     false ->
         ok
     end.
+
+
+persist(TaskProps0) ->
+    TaskProps = ?set(TaskProps0, updated_on, timestamp(os:timestamp())),
+    gen_server:cast(?MODULE, {update_status, self(), TaskProps}).
 
 
 init([]) ->
