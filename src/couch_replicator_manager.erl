@@ -405,11 +405,13 @@ process_update(State, DbName, {Change}) ->
         end
     end.
 
-owner(DbName, DocId) ->
+owner(<<"shards/", _/binary>> = DbName, DocId) ->
     Live = [node()|nodes()],
     Nodes = lists:sort([N || #shard{node=N} <- mem3:shards(DbName, DocId),
 			     lists:member(N, Live)]),
-    node() =:= hd(mem3_util:rotate_list({DbName, DocId}, Nodes)).
+    node() =:= hd(mem3_util:rotate_list({DbName, DocId}, Nodes));
+owner(_DbName, _DocId) ->
+    true.
 
 rep_db_update_error(Error, DbName, DocId) ->
     case Error of
