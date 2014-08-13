@@ -332,8 +332,8 @@ maybe_stop(#collector{offset = Offset} = State) ->
             {ok, State}
     end.
 
-make_changes_args(#changes_args{style=Style, filter=undefined}=Args) ->
-    Args#changes_args{filter = Style};
+make_changes_args(#changes_args{style=Style, filter_fun=undefined}=Args) ->
+    Args#changes_args{filter_fun = {default, Style}};
 make_changes_args(Args) ->
     Args.
 

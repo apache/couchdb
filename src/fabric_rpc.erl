@@ -327,7 +327,7 @@ changes_enumerator(#doc_info{id= <<"_local/", _/binary>>, high_seq=Seq}, Acc) ->
 changes_enumerator(DocInfo, Acc) ->
     #cacc{
         db = Db,
-        args = #changes_args{include_docs = IncludeDocs, filter = Filter},
+        args = #changes_args{include_docs = IncludeDocs, filter_fun = Filter},
         options = Options,
         pending = Pending,
         epochs = Epochs
