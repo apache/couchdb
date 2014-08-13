@@ -18,7 +18,7 @@ m4_define([LOCAL_PACKAGE_NAME], [Apache CouchDB])
 m4_define([LOCAL_BUG_URI], [https://issues.apache.org/jira/browse/COUCHDB])
 m4_define([LOCAL_VERSION_MAJOR], [1])
 m4_define([LOCAL_VERSION_MINOR], [6])
-m4_define([LOCAL_VERSION_REVISION], [0])
+m4_define([LOCAL_VERSION_REVISION], [1])
 m4_define([LOCAL_VERSION_STAGE], [])
 m4_define([LOCAL_VERSION_RELEASE], [])
 m4_define([LOCAL_VERSION_PRIMARY],
