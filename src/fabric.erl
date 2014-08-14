@@ -29,8 +29,8 @@
     update_doc/3, update_docs/3, purge_docs/2, att_receiver/2]).
 
 % Views
--export([all_docs/5, changes/4, query_view/3, query_view/4, query_view/6,
-    get_view_group_info/2]).
+-export([all_docs/4, all_docs/5, changes/4, query_view/3, query_view/4,
+    query_view/6, get_view_group_info/2]).
 
 % miscellany
 -export([design_docs/1, reset_validation_funs/1, cleanup_index_files/0,
@@ -232,6 +232,10 @@ purge_docs(_DbName, _IdsRevs) ->
     function() | binary().
 att_receiver(Req, Length) ->
     fabric_doc_attachments:receiver(Req, Length).
+
+%% @equiv all_docs(DbName, [], Callback, Acc0, QueryArgs)
+all_docs(DbName, Callback, Acc, QueryArgs) ->
+    all_docs(DbName, [], Callback, Acc, QueryArgs).
 
 %% @doc retrieves all docs. Additional query parameters, such as `limit',
 %%      `start_key' and `end_key', `descending', and `include_docs', can
