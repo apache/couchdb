@@ -253,14 +253,8 @@ get_or_create_db(DbName, Options) ->
 
 view_cb({meta, Meta}, Acc) ->
     % Map function starting
-    case rexi:stream2({meta, Meta}) of
-        ok ->
-            {ok, Acc};
-        stop ->
-            exit(normal);
-        timeout ->
-            exit(timeout)
-    end;
+    ok = rexi:stream2({meta, Meta}),
+    {ok, Acc};
 view_cb({row, Row}, Acc) ->
     % Adding another row
     ViewRow = #view_row{
@@ -269,58 +263,30 @@ view_cb({row, Row}, Acc) ->
         value = couch_util:get_value(value, Row),
         doc = couch_util:get_value(doc, Row)
     },
-    case rexi:stream2(ViewRow) of
-        ok ->
-            {ok, Acc};
-        timeout ->
-            exit(timeout)
-    end;
+    ok = rexi:stream2(ViewRow),
+    {ok, Acc};
 view_cb(complete, Acc) ->
     % Finish view output
-    rexi:reply(complete),
+    ok = rexi:stream_last(complete),
     {ok, Acc}.
 
 
 reduce_cb({meta, Meta}, Acc) ->
     % Map function starting
-    case rexi:sync_reply({meta, Meta}) of
-        ok ->
-            {ok, Acc};
-        stop ->
-            exit(normal);
-        timeout ->
-            exit(timeout)
-    end;
+    ok = rexi:stream2({meta, Meta}),
+    {ok, Acc};
 reduce_cb({row, Row}, Acc) ->
     % Adding another row
-    Key = couch_util:get_value(key, Row),
-    Value = couch_util:get_value(value, Row),
-    send(Key, Value, Acc);
+    ok = rexi:stream2(#view_row{
+        key = couch_util:get_value(key, Row),
+        value = couch_util:get_value(value, Row)
+    }),
+    {ok, Acc};
 reduce_cb(complete, Acc) ->
     % Finish view output
-    rexi:reply(complete),
+    ok = rexi:stream_last(complete),
     {ok, Acc}.
 
-
-send(Key, Value, Acc) ->
-    case put(fabric_sent_first_row, true) of
-    undefined ->
-        case rexi:stream2(#view_row{key=Key, value=Value}) of
-        ok ->
-            {ok, Acc};
-        stop ->
-            exit(normal);
-        timeout ->
-            exit(timeout)
-        end;
-    true ->
-        case rexi:stream2(#view_row{key=Key, value=Value}) of
-        ok ->
-            {ok, Acc};
-        timeout ->
-            exit(timeout)
-        end
-    end.
 
 changes_enumerator(#doc_info{id= <<"_local/", _/binary>>, high_seq=Seq}, Acc) ->
     {ok, Acc#cacc{seq = Seq, pending = Acc#cacc.pending-1}};
@@ -347,8 +313,8 @@ changes_enumerator(DocInfo, Acc) ->
             {deleted, Del} |
             if IncludeDocs -> [doc_member(Db, DocInfo, Opts)]; true -> [] end
         ]},
-        Go = rexi:stream2(ChangesRow),
-        {Go, Acc#cacc{seq = Seq, pending = Pending-1}}
+        ok = rexi:stream2(ChangesRow),
+        {ok, Acc#cacc{seq = Seq, pending = Pending-1}}
     end.
 
 doc_member(Shard, DocInfo, Opts) ->

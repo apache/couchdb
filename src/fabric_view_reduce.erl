@@ -107,7 +107,8 @@ handle_message({rexi_EXIT, Reason}, Worker, State) ->
 %% message as a clean way to indicate to couch_mrview_http:view_cb that the
 %% reduce response is starting.
 handle_message({meta, Meta}, {_Worker, From}, State) ->
-    gen_server:reply(From, ok),
+    rexi:stream_ack(From),
+
     #collector{
         callback = Callback,
         user_acc = AccIn
