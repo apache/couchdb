@@ -33,6 +33,15 @@ as deprecated and will be removed in future releases. It's strongly recommended
 to update :config:option:`httpd/authentication_handlers` option with new value
 in case if you had used such handler.
 
+.. _release/1.6.1:
+
+Version 1.6.1
+=============
+
+bugfix release:
+
+* Hash admin passwords stored in ``local.ini`` on startup :commit:`d43f69d`.
+
 .. _release/1.6.0:
 
 Version 1.6.0
