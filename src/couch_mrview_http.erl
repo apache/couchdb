@@ -287,6 +287,9 @@ view_cb(complete, #vacc{resp=Resp}=Acc) ->
         _ ->
             {ok, Acc#vacc{resp=Resp1, prepend=",\r\n"}}
     end;
+view_cb({error, Reason}, #vacc{resp=undefined}=Acc) ->
+    {ok, Resp} = chttpd:send_error(Acc#vacc.req, Reason),
+    {ok, Acc#vacc{resp=Resp}};
 view_cb({error, Reason}, #vacc{resp=Resp}=Acc) ->
     {ok, Resp1} = chttpd:send_delayed_error(Resp, Reason),
     {ok, Acc#vacc{resp=Resp1}}.
