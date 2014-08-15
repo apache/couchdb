@@ -16,7 +16,6 @@
 -include_lib("couch/include/couch_db.hrl").
 
 -define(i2l(I), integer_to_list(I)).
--define(ADMIN_USER, {userctx, #user_ctx{roles=[<<"_admin">>]}}).
 -define(DOC_ID, <<"foobar">>).
 -define(NUM_CLIENTS, [100, 500, 1000, 2000, 5000, 10000]).
 -define(TIMEOUT, 10000).

@@ -16,7 +16,6 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
--define(ADMIN_USER, {user_ctx, #user_ctx{roles=[<<"_admin">>]}}).
 -define(DELAY, 100).
 -define(TIMEOUT, 1000).
 

@@ -15,7 +15,6 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
--define(ADMIN_USER, {user_ctx, #user_ctx{roles=[<<"_admin">>]}}).
 -define(DDOC_ID, <<"_design/test">>).
 -define(DOCS_COUNT, 5000).
 -define(TIMEOUT, 30000).

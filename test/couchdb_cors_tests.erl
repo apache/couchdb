@@ -16,7 +16,6 @@
 -include_lib("couch/include/couch_db.hrl").
 
 
--define(ADMIN_USER, {user_ctx, #user_ctx{roles=[<<"_admin">>]}}).
 -define(SUPPORTED_METHODS,
         "GET, HEAD, POST, PUT, DELETE, TRACE, CONNECT, COPY, OPTIONS").
 -define(TIMEOUT, 1000).
