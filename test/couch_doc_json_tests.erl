@@ -17,12 +17,12 @@
 
 
 setup() ->
-    config:start_link(?CONFIG_CHAIN),
+    {ok, Pid} = test_util:start_config(?CONFIG_CHAIN),
     config:set("attachments", "compression_level", "0", false),
-    ok.
+    Pid.
 
 teardown(_) ->
-    config:stop().
+    test_util:stop_config().
 
 
 json_doc_test_() ->
