@@ -244,7 +244,7 @@ should_make_origin_request_with_auth(_, {_, _, Url, DefaultHeaders}) ->
     ?_assertEqual("http://example.com",
         begin
             Hashed = couch_passwords:hash_admin_password(<<"test">>),
-            config:set("admins", "test", Hashed, false),
+            config:set("admins", "test", ?b2l(Hashed), false),
             {ok, _, Resp, _} = test_request:get(
                 Url, DefaultHeaders, [{basic_auth, {"test", "test"}}]),
             config:delete("admins", "test", false),
@@ -255,7 +255,7 @@ should_make_preflight_request_with_auth(_, {_, _, Url, DefaultHeaders}) ->
     ?_assertEqual(?SUPPORTED_METHODS,
         begin
             Hashed = couch_passwords:hash_admin_password(<<"test">>),
-            config:set("admins", "test", Hashed, false),
+            config:set("admins", "test", ?b2l(Hashed), false),
             Headers = DefaultHeaders
                       ++ [{"Access-Control-Request-Method", "GET"}],
             {ok, _, Resp, _} = test_request:options(
