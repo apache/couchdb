@@ -17,3 +17,5 @@ otp_release:
    - R16B03-1
    - R15B03
    - R14B04
+git:
+  depth: 10
