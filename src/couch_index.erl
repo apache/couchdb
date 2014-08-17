@@ -31,6 +31,9 @@
 -include_lib("couch/include/couch_db.hrl").
 
 
+-define(CHECK_INTERVAL, 600000). % 10 minutes
+
+
 -record(st, {
     mod,
     idx_state,
@@ -85,6 +88,7 @@ config_change("query_server_config", "commit_freq", NewValue) ->
 init({Mod, IdxState}) ->
     ok = config:listen_for_changes(?MODULE, nil),
     DbName = Mod:get(db_name, IdxState),
+    erlang:send_after(?CHECK_INTERVAL, self(), maybe_close),
     Resp = couch_util:with_db(DbName, fun(Db) ->
         case Mod:open(Db, IdxState) of
             {ok, IdxSt} ->
@@ -322,6 +326,29 @@ handle_info(commit, State) ->
             % commit these changes, no big deal, we only lose incremental
             % changes since last committal.
             erlang:send_after(Delay, self(), commit),
+            {noreply, State}
+    end;
+handle_info(maybe_close, State) ->
+    % We need to periodically check if our index file still
+    % exists on disk because index cleanups don't notify
+    % the couch_index process when a file has been deleted. If
+    % we don't check for this condition then the index can
+    % remain open indefinitely wasting disk space.
+    %
+    % We make sure that we're idle before closing by looking
+    % to see if we have any clients waiting for an update.
+    Mod = State#st.mod,
+    case State#st.waiters of
+        [] ->
+            case Mod:index_file_exists(State#st.idx_state) of
+                true ->
+                    erlang:send_after(?CHECK_INTERVAL, self(), maybe_close),
+                    {noreply, State};
+                false ->
+                    {stop, normal, State}
+            end;
+        _ ->
+            erlang:send_after(?CHECK_INTERVAL, self, maybe_close),
             {noreply, State}
     end;
 handle_info({'DOWN', _, _, _Pid, _}, #st{mod=Mod, idx_state=IdxState}=State) ->
