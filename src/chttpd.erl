@@ -878,7 +878,7 @@ reqid() ->
 
 json_stack({bad_request, _, _}) ->
     [];
-json_stack({_Error, _Reason, Stack}) ->
+json_stack({_Error, _Reason, Stack}) when is_list(Stack) ->
     lists:map(fun json_stack_item/1, Stack);
 json_stack(_) ->
     [].
