@@ -305,12 +305,14 @@ handle_info(commit, #st{committed=true}=State) ->
 handle_info(commit, State) ->
     #st{mod=Mod, idx_state=IdxState, commit_delay=Delay} = State,
     DbName = Mod:get(db_name, IdxState),
+    IdxName = Mod:get(idx_name, IdxState),
     GetCommSeq = fun(Db) -> couch_db:get_committed_update_seq(Db) end,
     CommittedSeq = couch_util:with_db(DbName, GetCommSeq),
     case CommittedSeq >= Mod:get(update_seq, IdxState) of
         true ->
             % Commit the updates
             ok = Mod:commit(IdxState),
+            couch_event:notify(DbName, {index_commit, IdxName}),
             {noreply, State#st{committed=true}};
         _ ->
             % We can't commit the header because the database seq that's
