@@ -90,7 +90,7 @@ handle_cast({kill, FromRef}, #st{clients = Clients} = St) ->
     end;
 
 handle_cast(_, St) ->
-    couch_log:notice("rexi_server ignored_cast"),
+    couch_log:notice("rexi_server ignored_cast", []),
     {noreply, St}.
 
 handle_info({'DOWN', Ref, process, _, normal}, #st{workers=Workers} = St) ->
