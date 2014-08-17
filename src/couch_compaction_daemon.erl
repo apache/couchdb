@@ -143,8 +143,6 @@ compact_loop(Parent) ->
 
 
 maybe_compact_db(DbName, Config) ->
-    etap:diag("~n~n~n~n################~nCOMPACTING: ~p~n#############~n~n",
-        [DbName]),
     case (catch couch_db:open_int(DbName, [{user_ctx, #user_ctx{roles=[<<"_admin">>]}}])) of
     {ok, Db} ->
         DDocNames = db_ddoc_names(Db),
