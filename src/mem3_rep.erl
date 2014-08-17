@@ -336,7 +336,7 @@ find_repl_doc(SrcDb, TgtUUIDPrefix) ->
         {ok, _, not_found} ->
             {not_found, missing};
         Else ->
-            twig:log(err, "Error finding replication doc: ~w", [Else]),
+            couch_log:error("Error finding replication doc: ~w", [Else]),
             {not_found, missing}
     end.
 
