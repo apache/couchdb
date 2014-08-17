@@ -458,23 +458,22 @@ shard_count_by_node(PrevMoves) ->
 shard_count_view() ->
     %% TODO rewrite CouchDB's internal view API.  Wow!
     {ok, Db} = couch_db:open(<<"dbs">>, []),
-    {ok, DDoc} = couch_db:open_doc(Db, <<"_design/rebalance">>, []),
-    Group0 = couch_view_group:design_doc_to_view_group(DDoc),
-    {ok, Pid} = gen_server:call(couch_view, {get_group_server, <<"dbs">>, Group0}),
-    {ok, Group} = couch_view_group:request_group(Pid, 0),
-    Lang = couch_view_group:get_language(Group),
-    Views = couch_view_group:get_views(Group),
-    Ref = erlang:monitor(process, couch_view_group:get_fd(Group)),
-    {IRed, View} = fabric_view:extract_view(Pid, <<"count_by_node">>, Views, reduce),
-    ReduceView = {reduce, IRed, Lang, View},
-    Options = [{key_group_level, exact}],
-    Fold = fun(Node, Count, Acc) -> {ok, [{Node, Count} | Acc]} end,
-    %% Workaround for problems where we hold onto bad collators in the shell
-    erlang:erase(couch_drv_port),
-    {ok, Map} = couch_view:fold_reduce(ReduceView, Fold, [], Options),
+    DDocId = <<"_design/rebalance">>,
+    Fold = fun view_cb/2,
+    Args = [{group_level, exact}],
+    {ok, Map} = couch_mrview:query_view(
+            Db, DDocId, <<"count_by_node">>, Fold, [], Args),
     erlang:put(shard_count_by_node, {os:timestamp(), Map}),
-    erlang:demonitor(Ref),
     Map.
+
+view_cb({meta, _}, Acc) ->
+    {ok, Acc};
+view_cb({row, Row}, Acc) ->
+    {key, Node} = lists:keyfind(key, 1, Row),
+    {value, Count} = lists:keyfind(value, 1, Row),
+    {ok, [{Node, Count} | Acc]};
+view_cb(complete, Acc) ->
+    {ok, lists:reverse(Acc)}.
 
 print({Op, Shard, TargetNode} = Operation) ->
     {match, [SourceId, Cluster]} = re:run(
