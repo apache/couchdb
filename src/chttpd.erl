@@ -725,6 +725,8 @@ error_info({error, {nodedown, Reason}}) ->
     {412, <<"nodedown">>, Reason};
 error_info({maintenance_mode, Node}) ->
     {412, <<"nodedown">>, Node};
+error_info({maintenance_mode, nil, Node}) ->
+    {412, <<"nodedown">>, Node};
 error_info({w_quorum_not_met, Reason}) ->
     {500, <<"write_quorum_not_met">>, Reason};
 error_info(request_uri_too_long) ->
