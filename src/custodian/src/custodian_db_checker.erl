@@ -63,7 +63,7 @@ handle_info({'EXIT', Pid, normal}, #st{checker=Pid}=St) ->
     {noreply, St#st{checker=undefined}};
 
 handle_info({'EXIT', Pid, Reason}, #st{checker=Pid}=St) ->
-    twig:log(notice, "custodian db checker died ~p", [Reason]),
+    couch_log:notice("custodian db checker died ~p", [Reason]),
     {noreply, restart_checker(St#st{checker=undefined})};
 
 handle_info(Msg, St) ->
@@ -138,7 +138,7 @@ get_stats_db() ->
 
 
 send_missing_db_alert(DbName) ->
-    twig:log(notice, "Missing system database ~s", [DbName]),
+    couch_log:notice("Missing system database ~s", [DbName]),
     Command = [
         "send-sensu-event --standalone --critical",
         " --output=\"Missing system database ",
@@ -147,7 +147,7 @@ send_missing_db_alert(DbName) ->
     os:cmd(lists:concat(Command)).
 
 clear_missing_dbs_alert() ->
-    twig:log(notice, "All system databases exist.", []),
+    couch_log:notice("All system databases exist.", []),
     Command = [
         "send-sensu-event --standalone --ok",
         " --output=\"All system databases exist\"",

@@ -8,10 +8,10 @@
   {applications, [
                   kernel,
                   stdlib,
+                  couch_log,
                   config,
                   couch_event,
                   couch,
-                  twig,
                   mem3
                  ]},
   {mod, { custodian_app, []}},

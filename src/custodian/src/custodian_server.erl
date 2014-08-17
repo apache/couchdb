@@ -81,12 +81,12 @@ handle_info({'EXIT', Pid, normal}, #state{shard_checker=Pid}=State) ->
     end;
 
 handle_info({'EXIT', Pid, Reason}, #state{shard_checker=Pid}=State) ->
-    twig:log(notice, "custodian shard checker died ~p", [Reason]),
+    couch_log:notice("custodian shard checker died ~p", [Reason]),
     NewState = State#state{shard_checker=undefined},
     {noreply, start_shard_checker(NewState)};
 
 handle_info({'EXIT', Pid, Reason}, #state{event_listener=Pid}=State) ->
-    twig:log(notice, "custodian update notifier died ~p", [Reason]),
+    couch_log:notice("custodian update notifier died ~p", [Reason]),
     {ok, Pid1} = start_event_listener(),
     {noreply, State#state{event_listener=Pid1}}.
 
@@ -132,10 +132,10 @@ send_sensu_event({_, Count} = Item) ->
         0 ->
             "--ok";
         1 ->
-            twig:log(crit, "~s", [describe(Item)]),
+            couch_log:critical("~s", [describe(Item)]),
             "--critical";
         _ ->
-            twig:log(warn, "~s", [describe(Item)]),
+            couch_log:warning("~s", [describe(Item)]),
             "--warning"
     end,
     Cmd = lists:concat([
