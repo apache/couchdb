@@ -64,12 +64,12 @@ handle_call(status, _From, ChildMod) ->
     end;
 
 handle_call(Msg, _From, St) ->
-    twig:log(notice, "~s ignored_call ~w", [?MODULE, Msg]),
+    couch_log:notice("~s ignored_call ~w", [?MODULE, Msg]),
     {reply, ignored, St}.
 
 
 handle_cast(Msg, St) ->
-    twig:log(notice, "~s ignored_cast ~w", [?MODULE, Msg]),
+    couch_log:notice("~s ignored_cast ~w", [?MODULE, Msg]),
     {noreply, St}.
 
 
@@ -86,7 +86,7 @@ handle_info(check_nodes, ChildMod) ->
     {noreply, ChildMod};
 
 handle_info(Msg, St) ->
-    twig:log(notice, "~s ignored_info ~w", [?MODULE, Msg]),
+    couch_log:notice("~s ignored_info ~w", [?MODULE, Msg]),
     {noreply, St}.
 
 

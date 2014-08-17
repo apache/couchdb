@@ -30,6 +30,7 @@
     {applications, [
         kernel,
         stdlib,
+        couch_log,
         config
     ]},
     {mod, {rexi_app,[]}}
