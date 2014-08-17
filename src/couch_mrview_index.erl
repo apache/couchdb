@@ -40,6 +40,8 @@ get(Property, State) ->
             LocalSeq = couch_util:get_value(<<"local_seq">>, Opts, false),
             if IncDesign -> [include_design]; true -> [] end
                 ++ if LocalSeq -> [local_seq]; true -> [] end;
+        fd ->
+            State#mrst.fd;
         language ->
             State#mrst.language;
         views ->
