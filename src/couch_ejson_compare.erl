@@ -73,6 +73,8 @@ atom_sort(null) -> 1;
 atom_sort(false) -> 2;
 atom_sort(true) -> 3.
 
+less_props([], []) ->
+    0;
 less_props([], [_|_]) ->
     -1;
 less_props(_, []) ->
@@ -90,6 +92,8 @@ less_props([{AKey, AValue}|RestA], [{BKey, BValue}|RestB]) ->
         Result
     end.
 
+less_list([], []) ->
+    0;
 less_list([], [_|_]) ->
     -1;
 less_list(_, []) ->
