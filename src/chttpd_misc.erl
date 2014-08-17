@@ -19,7 +19,6 @@
     handle_favicon_req/2,
     handle_replicate_req/1,
     handle_reload_query_servers_req/1,
-    handle_restart_req/1,
     handle_sleep_req/1,
     handle_system_req/1,
     handle_task_status_req/1,
@@ -212,12 +211,6 @@ choose_node(Key) when is_binary(Key) ->
     lists:nth(1 + Checksum rem length(Nodes), Nodes);
 choose_node(Key) ->
     choose_node(term_to_binary(Key)).
-
-handle_restart_req(#httpd{method='POST'}=Req) ->
-    couch_server_sup:restart_core_server(),
-    send_json(Req, 200, {[{ok, true}]});
-handle_restart_req(Req) ->
-    send_method_not_allowed(Req, "POST").
 
 handle_reload_query_servers_req(#httpd{method='POST'}=Req) ->
     ok = couch_proc_manager:reload(),
