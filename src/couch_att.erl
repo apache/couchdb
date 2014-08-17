@@ -579,10 +579,6 @@ foldl(Att, Fun, Acc) ->
 
 foldl(Bin, _Att, Fun, Acc) when is_binary(Bin) ->
     Fun(Bin, Acc);
-foldl({Fd, Sp}, Att, Fun, Acc) when is_tuple(Sp) orelse Sp == null ->
-    % 09 UPGRADE CODE
-    Len = fetch(att_len, Att),
-    couch_stream:old_foldl(Fd, Sp, Len, Fun, Acc);
 foldl({Fd, Sp}, Att, Fun, Acc) ->
     Md5 = fetch(md5, Att),
     couch_stream:foldl(Fd, Sp, Md5, Fun, Acc);
