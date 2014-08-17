@@ -50,7 +50,6 @@ handle_call(get_buffered_count, _From, State) ->
     {reply, State#state.count, State, 0}.
 
 handle_cast({deliver, Dest, Msg}, #state{buffer = Q, count = C} = State) ->
-    margaret_counter:increment([erlang, rexi, buffered]),
     Q2 = queue:in({Dest, Msg}, Q),
     case should_drop(State) of
     true ->
