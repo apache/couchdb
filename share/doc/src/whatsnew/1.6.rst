@@ -40,7 +40,7 @@ Version 1.6.1
 
 bugfix release:
 
-* Hash admin passwords stored in ``local.ini`` on startup :commit:`d43f69d`.
+* Hash admin passwords stored in ``local.ini`` on startup :commit:`ed825d3`.
 
 .. _release/1.6.0:
 
