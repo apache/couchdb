@@ -63,15 +63,29 @@ run(Checks, Nodes) ->
             weatherreport_util:log(
                 node(),
                 error,
-                io_lib:format("Could not run checks on cluster node ~w", [Node])
+                io_lib:format(
+                    "Could not run check ~w on cluster node ~w",
+                    [Mod, Node]
+                )
             )
         end, BadNodes),
+        LogBadRpc = fun({badrpc, Error}) ->
+            weatherreport_util:log(
+                node(),
+                error,
+                io_lib:format(
+                    "Bad rpc call executing check ~w: ~w",
+                    [Mod, Error]
+                )
+            )
+        end,
+        [LogBadRpc(Resp) || {badrpc, _Error}=Resp <- Resps],
         TransformResponse = fun({Node, Messages}) ->
             [{Node, Lvl, Module, Msg} || {Lvl, Module, Msg} <- Messages]
         end,
         ResponsesWithNode = [
             TransformResponse({Node, Messages}) || {Node, Messages} <- Resps,
-            Node =/= bad_rpc
+            Node =/= badrpc
         ],
         [lists:concat(ResponsesWithNode) | Acc]
     end, [], Checks)).

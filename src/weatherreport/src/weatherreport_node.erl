@@ -88,7 +88,12 @@ local_command(Module, Function, Args, Timeout) ->
 %% escript.
 -spec multicall([node()], Module::atom(), Function::atom(), Args::[term()], Timeout::integer()) -> term().
 multicall(Nodes, Module, Function, Args, Timeout) ->
-    local_command(rpc, multicall, [Nodes, Module, Function, Args, Timeout]).
+    case local_command(rpc, multicall, [Nodes, Module, Function, Args, Timeout]) of
+        {badrpc, Reason} ->
+            {[{badrpc, Reason}], []};
+        Resp ->
+            Resp
+    end.
 
 %% @doc Retrieves the operating system's process ID of the local
 %% node.
