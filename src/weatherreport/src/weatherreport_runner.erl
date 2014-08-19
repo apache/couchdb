@@ -52,7 +52,7 @@ run(Checks, all) ->
 run(Checks, Nodes) ->
     CheckOpts = get_check_options(),
     lists:flatten(lists:foldl(fun(Mod, Acc) ->
-        {Resps, BadNodes} = rpc:multicall(
+        {Resps, BadNodes} = weatherreport_node:multicall(
             Nodes,
             erlang,
             apply,

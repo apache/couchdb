@@ -37,6 +37,7 @@
          local_command/2,
          local_command/3,
          local_command/4,
+         multicall/5,
          nodename/0
         ]).
 
@@ -82,6 +83,12 @@ local_command(Module, Function, Args, Timeout) ->
             ),
             rpc:call(nodename(), Module, Function, Args, Timeout)
     end.
+
+%% @doc Call rpc:multicall/5 from the local cluster node rather than the
+%% escript.
+-spec multicall([node()], Module::atom(), Function::atom(), Args::[term()], Timeout::integer()) -> term().
+multicall(Nodes, Module, Function, Args, Timeout) ->
+    local_command(rpc, multicall, [Nodes, Module, Function, Args, Timeout]).
 
 %% @doc Retrieves the operating system's process ID of the local
 %% node.
