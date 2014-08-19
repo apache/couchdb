@@ -217,7 +217,8 @@ stream_last(Msg) ->
 %% the worker pid and doesn't wait for a response from the controller.
 stream_last(Msg, Timeout) ->
     maybe_init_stream(Timeout),
-    rexi:reply(Msg).
+    rexi:reply(Msg),
+    ok.
 
 %% @equiv stream_ack(Client, 1)
 stream_ack(Client) ->
