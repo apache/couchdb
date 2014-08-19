@@ -115,7 +115,6 @@ run(InputChecks) ->
             weatherreport_runner:run(Checks, all);
         _ ->
             weatherreport_runner:run(Checks)
-            
     end,
     case Messages of
     [] ->
