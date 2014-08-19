@@ -40,17 +40,22 @@ description() ->
 valid() ->
     weatherreport_node:can_connect().
 
+-spec total_to_level(integer()) -> atom().
+total_to_level(Total) when Total > ?THRESHOLD ->
+    warning;
+total_to_level(_Total) ->
+    info.
+
 fold_processes([], Acc, _Lim, _CallType, _Opts) ->
     Acc;
 fold_processes(_, Acc, 0, _CallType, _Opts) ->
     Acc;
+fold_processes([{Count, undefined} | T], Acc, Lim, CallType, Opts) ->
+    Level = total_to_level(Count),
+    Message = {Level, {process_count, {CallType, Count, undefined}}},
+    fold_processes(T, [Message | Acc], Lim - 1, CallType, Opts);
 fold_processes([{Count, {M, F, A}} | T], Acc, Lim, CallType, Opts) ->
-    Level = case Count > ?THRESHOLD of
-        true ->
-            warning;
-        _ ->
-            info
-    end,
+    Level = total_to_level(Count),
     Message = case proplists:get_value(expert, Opts) of
         true ->
             PidFun = list_to_atom("find_by_" ++ CallType ++ "_call"),
@@ -93,6 +98,8 @@ check(Opts) ->
     )).
 
 -spec format(term()) -> {io:format(), [term()]}.
+format({process_count, {CallType, Count, undefined}}) ->
+    {"~w processes with ~s call ~w", [Count, CallType, undefined]};
 format({process_count, {CallType, Count, M, F, A}}) ->
     {"~w processes with ~s call ~w:~w/~w", [Count, CallType, M, F, A]};
 format({process_count, {CallType, Count, M, F, A, Pinfos}}) ->
