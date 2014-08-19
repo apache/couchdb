@@ -55,7 +55,7 @@ local_command(Module, Function) ->
 %% @see can_connect/0
 -spec local_command(Module::atom(), Function::atom(), Args::[term()]) -> term().
 local_command(Module, Function, Args) ->
-    local_command(Module, Function, Args, 5000).
+    local_command(Module, Function, Args, weatherreport_config:timeout()).
 
 %% @doc Calls the given module and function with the given arguments
 %% on the local node and returns the result of that call,

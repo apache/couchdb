@@ -39,6 +39,7 @@
          data_directories/0,
          get_vm_env/1,
          etc_dir/0,
+         timeout/0,
          node_name/0,
          cookie/0,
          user/0]).
@@ -85,6 +86,16 @@ user() ->
         Resp ->
             [_Newline | Resp1] = lists:reverse(Resp),
             lists:reverse(Resp1)
+    end.
+
+%% @doc The specified timeout value for diagnostic checks run via RPC
+-spec timeout() -> integer().
+timeout() ->
+    case application:get_env(weatherreport, timeout) of
+        {ok, Timeout} ->
+            Timeout;
+        _ ->
+            300000
     end.
 
 %% @doc The CouchDB configuration directory.

@@ -57,7 +57,7 @@ run(Checks, Nodes) ->
             erlang,
             apply,
             [fun() -> {node(), weatherreport_check:check(Mod, CheckOpts)} end, []],
-            5000
+            weatherreport_config:timeout()
         ),
         lists:map(fun(Node) ->
             weatherreport_util:log(
