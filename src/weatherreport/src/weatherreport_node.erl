@@ -37,9 +37,6 @@
          local_command/2,
          local_command/3,
          local_command/4,
-         cluster_command/2,
-         cluster_command/3,
-         cluster_command/4,
          nodename/0
         ]).
 
@@ -85,33 +82,6 @@ local_command(Module, Function, Args, Timeout) ->
             ),
             rpc:call(nodename(), Module, Function, Args, Timeout)
     end.
-
-%% @doc Calls the given 0-arity module and function on all members of
-%% the cluster.
-%% @equiv cluster_command(Module, Function, [])
-%% @see can_connect/0
--spec cluster_command(Module::atom(), Function::atom()) -> term().
-cluster_command(Module, Function) ->
-    cluster_command(Module, Function, []).
-
-%% @doc Calls the given module and function with the given arguments
-%% on all members of the cluster.
-%% @equiv cluster_command(Module, Function, Args, 5000)
-%% @see can_connect/0
--spec cluster_command(Module::atom(), Function::atom(), Args::[term()]) -> term().
-cluster_command(Module, Function, Args) ->
-    cluster_command(Module, Function, Args, 5000).
-
-%% @doc Calls the given module and function with the given arguments
-%% on all members for the cluster, returning an error if the call
-%% doesn't complete within the given timeout.
-%% @equiv rpc:multicall(ClusterMembers, Module, Function, Args, Timeout)
-%% @see can_connect/0
--spec cluster_command(Module::atom(), Function::atom(), Args::[term()], Timeout::integer()) -> term().
-cluster_command(Module, Function, Args, Timeout) ->
-    weatherreport_util:log(debug, "Cluster RPC: ~p:~p(~p) [~p]", [Module, Function, Args, Timeout]),
-    Members = local_command(mem3, nodes, []),
-    rpc:multicall(Members, Module, Function, Args, Timeout).
 
 %% @doc Retrieves the operating system's process ID of the local
 %% node.
