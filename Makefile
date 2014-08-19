@@ -36,6 +36,9 @@ dist: compile
 distclean: clean
 	@rm -rf rel/couchdb
 
+devclean:
+	@rm -rf dev/lib/*/data
+
 include install.mk
 install: dist
 	@mkdir -p $(prefix)
