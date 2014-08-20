@@ -31,13 +31,8 @@
 %% @doc Run the supplied list of checks on the local node
 -spec run([Module::atom()]) -> [tuple()].
 run(Checks) ->
-    lists:flatten(lists:foldl(fun(Mod, Acc) ->
-        Node = weatherreport_node:nodename(),
-        MessagesWithNode = lists:map(fun({Level, Module, Message}) ->
-            {Node, Level, Module, Message}
-        end, weatherreport_check:check(Mod, get_check_options())),
-        [MessagesWithNode | Acc]
-    end, [], Checks)).
+    weatherreport_node:can_connect(),
+    run(Checks, [weatherreport_node:nodename()]).
 
 %% @doc Run the supplied list of checks on the supplied list of cluster nodes
 -spec run([Module::atom()], [node()] | all) -> [tuple()].
