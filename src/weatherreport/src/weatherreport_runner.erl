@@ -54,42 +54,29 @@ run(Checks, Nodes) ->
             [fun() -> {node(), weatherreport_check:check(Mod, CheckOpts)} end, []],
             weatherreport_config:timeout()
         ),
-        lists:map(fun(Node) ->
-            weatherreport_util:log(
-                node(),
-                error,
-                io_lib:format(
-                    "Could not run check ~w on cluster node ~w",
-                    [Mod, Node]
-                )
-            )
-        end, BadNodes),
-        LogBadRpc = fun({badrpc, Error}) ->
-            weatherreport_util:log(
-                node(),
-                error,
-                io_lib:format(
-                    "Bad rpc call executing check ~w: ~w",
-                    [Mod, Error]
-                )
-            )
+        TransformFailedCheck = fun(Node) ->
+            {node(), crit, weatherreport_runner, {check_failed, Mod, Node}}
         end,
-        [LogBadRpc(Resp) || {badrpc, _Error}=Resp <- Resps],
-        TransformResponse = fun({Node, Messages}) ->
-            [{Node, Lvl, Module, Msg} || {Lvl, Module, Msg} <- Messages]
+        FailedChecks = [TransformFailedCheck(Node) || Node <- BadNodes],
+        TransformResponse = fun
+            ({badrpc, Error}) ->
+                [{node(), crit, weatherreport_runner, {badrpc, Mod, Error}}];
+            ({Node, Messages}) ->
+                [{Node, Lvl, Module, Msg} || {Lvl, Module, Msg} <- Messages]
         end,
-        ResponsesWithNode = [
-            TransformResponse({Node, Messages}) || {Node, Messages} <- Resps,
-            Node =/= badrpc
-        ],
-        [lists:concat(ResponsesWithNode) | Acc]
+        Responses = [TransformResponse(Resp) || Resp <- Resps],
+        [Responses ++ FailedChecks | Acc]
     end, [], Checks)).
 
 %% @doc Part of the weatherreport_check behaviour. This means that any messages
 %% returned by this module can be handled via the existing message reporting
 %% code.
 format({checks_failed, Error}) ->
-    {"Could not run checks - received error: ~w", [Error]}.
+    {"Could not run checks - received error: ~w", [Error]};
+format({check_failed, Check, Node}) ->
+    {"Could not run check ~w on cluster node ~w", [Check, Node]};
+format({badrpc, Check, Error}) ->
+    {"Bad rpc call executing check ~w: ~w", [Check, Error]}.
 
 %% Private functions
 get_check_options() ->
