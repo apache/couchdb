@@ -41,35 +41,17 @@ description() ->
 valid() ->
     weatherreport_node:can_connect().
 
-fold_processes([], Acc, _Opts) ->
-    Acc;
-fold_processes([{Pid, MBoxSize, Info} | T], Acc, Opts) when MBoxSize < ?THRESHOLD ->
-    Message = {info, {mbox_ok, {Pid, MBoxSize, Info}}},
-    fold_processes(T, [Message | Acc], Opts);
-fold_processes([{Pid, MBoxSize, Info} | T], Acc, Opts) ->
-    Message = case proplists:get_value(expert, Opts) of
-        true ->
-            Pinfo = weatherreport_node:local_command(recon, info, [Pid]),
-            {warning, {mbox_large, {Pid, MBoxSize, Info, Pinfo}}};
-        _ ->
-            {warning, {mbox_large, {Pid, MBoxSize, Info}}}
-    end,
-    fold_processes(T, [Message | Acc], Opts).
-
 -spec check(list()) -> [{atom(), term()}].
 check(Opts) ->
-    Processes = weatherreport_node:local_command(
-        recon,
-        proc_count,
-        [message_queue_len, 10]
-    ),
-    fold_processes(Processes, [], Opts).
+    weatherreport_util:check_proc_count(
+        message_queue_len,
+        ?THRESHOLD,
+        Opts).
 
 -spec format(term()) -> {io:format(), [term()]}.
-format({mbox_large, {Pid, MBoxSize, Info, Pinfo}}) ->
+format({high, {Pid, MBoxSize, Info, Pinfo}}) ->
     {"Process ~w has excessive mailbox size of ~w: ~w ~w", [Pid, MBoxSize, Info, Pinfo]};
-format({mbox_large, {Pid, MBoxSize, Info}}) ->
+format({high, {Pid, MBoxSize, Info}}) ->
     {"Process ~w has excessive mailbox size of ~w: ~w", [Pid, MBoxSize, Info]};
-format({mbox_ok, {Pid, MBoxSize, Info}}) ->
+format({ok, {Pid, MBoxSize, Info}}) ->
     {"Process ~w has mailbox size of ~w: ~w", [Pid, MBoxSize, Info]}.
-

@@ -33,7 +33,8 @@
          log/3,log/4,
          binary_to_float/1,
          should_log/1,
-         flush_stdout/0]).
+         flush_stdout/0,
+         check_proc_count/3]).
 
 %% @doc Converts a check module name into a short name that can be
 %% used to refer to a check on the command line.  For example,
@@ -113,3 +114,31 @@ should_log(Level) ->
 
 flush_stdout() ->
     timer:sleep(1000).
+
+%% @doc Utility function to check processes based on an attribute returned
+%% by recon:proc_count/2.
+-spec check_proc_count(atom(), integer(), list()) -> [{atom(), term()}].
+check_proc_count(Key, Threshold, Opts) ->
+    Processes = weatherreport_node:local_command(recon, proc_count, [Key, 10]),
+    procs_to_messages(Processes, Threshold, [], Opts).
+
+%% @doc Utility function to convert the list of process info returned by
+%% recon:proc_count/2 into a list of diagnostic messages.
+-spec procs_to_messages(list(), integer(), list(), list()) -> [{atom(), term()}].
+procs_to_messages([], _Threshold, Acc, _Opts) ->
+    Acc;
+procs_to_messages([{Pid, Value, Info} | T], Threshold, Acc, Opts) ->
+    Level = case Value > Threshold of
+        true -> warning;
+        _ -> info
+    end,
+    Message = case {Level, proplists:get_value(expert, Opts)} of
+        {warning, true} ->
+            Pinfo = weatherreport_node:local_command(recon, info, [Pid]),
+            {warning, {high, {Pid, Value, Info, Pinfo}}};
+        {warning, _} ->
+            {warning, {high, {Pid, Value, Info}}};
+        {info, _} ->
+            {info, {ok, {Pid, Value, Info}}}
+    end,
+    procs_to_messages(T, Threshold, [Message | Acc], Opts).
