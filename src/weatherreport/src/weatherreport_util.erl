@@ -32,7 +32,8 @@
          run_command/1,
          log/3,log/4,
          binary_to_float/1,
-         should_log/1]).
+         should_log/1,
+         flush_stdout/0]).
 
 %% @doc Converts a check module name into a short name that can be
 %% used to refer to a check on the command line.  For example,
@@ -109,3 +110,6 @@ should_log(Level) ->
         {ok, L0} -> L0
     end,
     twig_util:level(AppLevel) >= twig_util:level(Level).
+
+flush_stdout() ->
+    timer:sleep(1000).

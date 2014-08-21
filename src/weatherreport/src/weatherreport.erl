@@ -135,6 +135,7 @@ run(InputChecks) ->
                 halt(0);
             _ ->
                 lists:foreach(fun weatherreport_check:print/1, SortedMessages),
+                weatherreport_util:flush_stdout(),
                 halt(1)
         end,
         halt(1)
