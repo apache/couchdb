@@ -44,6 +44,7 @@
         couch,
         rexi,
         mem3,
-        couch_log
+        couch_log,
+        couch_stats
     ]}
 ]}.
