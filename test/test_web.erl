@@ -69,7 +69,7 @@ terminate(_Reason, _State) ->
     ok.
 
 stop() ->
-    gen_server:cast(?SERVER, stop).
+    mochiweb_http:stop(?SERVER).
 
 
 handle_call({check_request, Req}, _From, State) when is_function(State, 1) ->
