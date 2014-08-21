@@ -241,6 +241,7 @@ insert_results(DocId, [KVs | RKVs], [{Id, VKVs} | RVKVs], VKVAcc, VIdKeys) ->
             {[KV | Rest], [{Id, Key} | IdKeys]}
     end,
     InitAcc = {[], VIdKeys},
+    couch_stats:increment_counter([couchdb, couchjs, emits], length(KVs)),
     {Duped, VIdKeys0} = lists:foldl(CombineDupesFun, InitAcc, lists:sort(KVs)),
     FinalKVs = [{{Key, DocId}, Val} || {Key, Val} <- Duped] ++ VKVs,
     insert_results(DocId, RKVs, RVKVs, [{Id, FinalKVs} | VKVAcc], VIdKeys0).

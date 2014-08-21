@@ -49,7 +49,7 @@ handle_all_docs_req(Req, _Db) ->
 
 handle_view_req(#httpd{method='GET'}=Req, Db, DDoc) ->
     [_, _, _, _, ViewName] = Req#httpd.path_parts,
-    couch_stats_collector:increment({httpd, view_reads}),
+    couch_stats:increment_counter([httpd, view_reads]),
     design_doc_view(Req, Db, DDoc, ViewName, undefined);
 handle_view_req(#httpd{method='POST'}=Req, Db, DDoc) ->
     [_, _, _, _, ViewName] = Req#httpd.path_parts,
@@ -58,10 +58,11 @@ handle_view_req(#httpd{method='POST'}=Req, Db, DDoc) ->
     Queries = couch_mrview_util:get_view_queries(Props),
     case {Queries, Keys} of
         {Queries, undefined} when is_list(Queries) ->
-            [couch_stats_collector:increment({httpd, view_reads}) || _I <- Queries],
+            IncrBy = length(Queries),
+            couch_stats:increment_counter([couchdb, httpd, view_reads], IncrBy),
             multi_query_view(Req, Db, DDoc, ViewName, Queries);
         {undefined, Keys} when is_list(Keys) ->
-            couch_stats_collector:increment({httpd, view_reads}),
+            couch_stats:increment_counter([couchdb, httpd, view_reads]),
             design_doc_view(Req, Db, DDoc, ViewName, Keys);
         {undefined, undefined} ->
             throw({
@@ -81,7 +82,7 @@ handle_temp_view_req(#httpd{method='POST'}=Req, Db) ->
     {Body} = couch_httpd:json_body_obj(Req),
     DDoc = couch_mrview_util:temp_view_to_ddoc({Body}),
     Keys = couch_mrview_util:get_view_keys({Body}),
-    couch_stats_collector:increment({httpd, temporary_view_reads}),
+    couch_stats:increment_counter([couchdb, httpd, temporary_view_reads]),
     design_doc_view(Req, Db, DDoc, <<"temp">>, Keys);
 handle_temp_view_req(Req, _Db) ->
     couch_httpd:send_method_not_allowed(Req, "POST").
