@@ -100,7 +100,7 @@ maintenance_nodes(Nodes) ->
     [N || {N, Mode} <- lists:zip(Nodes, Modes), Mode =:= "true"].
 
 load_shards(Db, #full_doc_info{id = Id} = FDI) ->
-    case couch_db:open_doc(Db, FDI, []) of
+    case couch_db:open_doc(Db, FDI, [ejson_body]) of
         {ok, #doc{body = {Props}}} ->
             mem3_util:build_shards(Id, Props);
         {not_found, _} ->
@@ -125,7 +125,7 @@ count_conflicts(#full_doc_info{rev_tree = T}) ->
     length(Leafs) - 1.
 
 ensure_custodian_ddoc_exists(Db) ->
-    case couch_db:open_doc(Db, ?CUSTODIAN_ID) of
+    case couch_db:open_doc(Db, ?CUSTODIAN_ID, [ejson_body]) of
         {not_found, _Reason} ->
             try couch_db:update_doc(Db, custodian_ddoc(), []) of
             {ok, _} ->
