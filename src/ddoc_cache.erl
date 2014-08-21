@@ -37,10 +37,13 @@ open_doc(DbName, DocId) ->
     Key = {DbName, DocId, '_'},
     case ddoc_cache_opener:match_newest(Key) of
         {ok, _} = Resp ->
+            couch_stats:increment_counter([ddoc_cache, hit]),
             Resp;
         missing ->
+            couch_stats:increment_counter([ddoc_cache, miss]),
             ddoc_cache_opener:open_doc(DbName, DocId);
         recover ->
+            couch_stats:increment_counter([ddoc_cache, recovery]),
             ddoc_cache_opener:recover_doc(DbName, DocId)
     end.
 
@@ -48,10 +51,13 @@ open_doc(DbName, DocId, RevId) ->
     Key = {DbName, DocId, RevId},
     case ddoc_cache_opener:lookup(Key) of
         {ok, _} = Resp ->
+            couch_stats:increment_counter([ddoc_cache, hit]),
             Resp;
         missing ->
+            couch_stats:increment_counter([ddoc_cache, miss]),
             ddoc_cache_opener:open_doc(DbName, DocId, RevId);
         recover ->
+            couch_stats:increment_counter([ddoc_cache, recovery]),
             ddoc_cache_opener:recover_doc(DbName, DocId, RevId)
     end.
 
@@ -59,10 +65,13 @@ open_validation_funs(DbName) ->
     Key = {DbName, validation_funs},
     case ddoc_cache_opener:lookup(Key) of
         {ok, _} = Resp ->
+            couch_stats:increment_counter([ddoc_cache, hit]),
             Resp;
         missing ->
+            couch_stats:increment_counter([ddoc_cache, mis]),
             ddoc_cache_opener:open_validation_funs(DbName);
         recover ->
+            couch_stats:increment_counter([ddoc_cache, recovery]),
             ddoc_cache_opener:recover_validation_funs(DbName)
     end.
 
