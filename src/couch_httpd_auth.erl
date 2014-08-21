@@ -356,8 +356,9 @@ maybe_value(Key, Else, Fun) ->
     [{Key, Fun(Else)}].
 
 maybe_upgrade_password_hash(UserName, Password, UserProps, AuthModule) ->
-    case couch_util:get_value(<<"password_scheme">>, UserProps, <<"simple">>) of
-    <<"simple">> ->
+    IsAdmin = lists:member(<<"_admin">>, couch_util:get_value(<<"roles">>, UserProps, [])),
+    case {IsAdmin, couch_util:get_value(<<"password_scheme">>, UserProps, <<"simple">>)} of
+    {false, <<"simple">>} ->
         DbName = ?l2b(config:get("couch_httpd_auth", "authentication_db", "_users")),
         couch_util:with_db(DbName, fun(UserDb) ->
             UserProps2 = proplists:delete(<<"password_sha">>, UserProps),
