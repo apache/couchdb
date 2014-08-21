@@ -52,7 +52,7 @@ should_load_modules() ->
         couch_os_process,
         couch_query_servers,
         couch_server,
-        couch_server_sup,
+        couch_sup,
         couch_stats_aggregator,
         couch_stats_collector,
         couch_stream,
