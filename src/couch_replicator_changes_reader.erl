@@ -53,6 +53,9 @@ read_changes(Parent, StartSeq, Db, ChangesQueue, Options, Ts) ->
             LS = get(last_seq),
             read_changes(Parent, LS, Db, ChangesQueue, Options, Ts+1);
         exit:{http_request_failed, _, _, _} = Error ->
+        couch_stats:increment_counter(
+            [couch_replicator, changes_read_failures]
+        ),
         case get(retries_left) of
         N when N > 0 ->
             put(retries_left, N - 1),

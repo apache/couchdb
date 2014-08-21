@@ -39,7 +39,8 @@
         couch_log,
         mem3,
         couch,
-        couch_event
+        couch_event,
+        couch_stats
     ]}
 ]}.
 

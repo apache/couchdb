@@ -35,6 +35,7 @@ setup(#httpdb{httpc_pool = nil, url = Url, http_connections = MaxConns} = Db) ->
 
 
 send_req(HttpDb, Params1, Callback) ->
+    couch_stats:increment_counter([couch_replicator, requests]),
     Params2 = ?replace(Params1, qs,
         [{K, ?b2l(iolist_to_binary(V))} || {K, V} <- get_value(qs, Params1, [])]),
     Params = ?replace(Params2, ibrowse_options,
@@ -102,6 +103,7 @@ process_response({ibrowse_req_id, ReqId}, Worker, HttpDb, Params, Callback) ->
 process_response({ok, Code, Headers, Body}, Worker, HttpDb, Params, Callback) ->
     case list_to_integer(Code) of
     Ok when (Ok >= 200 andalso Ok < 300) ; (Ok >= 400 andalso Ok < 500) ->
+        couch_stats:increment_counter([couch_replicator, responses, success]),
         EJson = case Body of
         <<>> ->
             null;
@@ -112,6 +114,7 @@ process_response({ok, Code, Headers, Body}, Worker, HttpDb, Params, Callback) ->
     R when R =:= 301 ; R =:= 302 ; R =:= 303 ->
         do_redirect(Worker, R, Headers, HttpDb, Params, Callback);
     Error ->
+        couch_stats:increment_counter([couch_replicator, responses, failure]),
         maybe_retry({code, Error}, Worker, HttpDb, Params)
     end;
 
@@ -138,9 +141,15 @@ process_stream_response(ReqId, Worker, HttpDb, Params, Callback) ->
         R when R =:= 301 ; R =:= 302 ; R =:= 303 ->
             do_redirect(Worker, R, Headers, HttpDb, Params, Callback);
         Error ->
+            couch_stats:increment_counter(
+                [couch_replicator, stream_responses, failure]
+            ),
             report_error(Worker, HttpDb, Params, {code, Error})
         end;
     {ibrowse_async_response, ReqId, {error, _} = Error} ->
+        couch_stats:increment_counter(
+            [couch_replicator, stream_responses, failure]
+        ),
         maybe_retry(Error, Worker, HttpDb, Params)
     after HttpDb#httpdb.timeout + 500 ->
         % Note: ibrowse should always reply with timeouts, but this doesn't
