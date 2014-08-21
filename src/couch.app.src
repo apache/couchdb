@@ -23,11 +23,27 @@
         couch_secondary_services,
         couch_server,
         couch_sup,
-        couch_stats_aggregator,
-        couch_stats_collector,
         couch_task_status
     ]},
     {mod, {couch_app, []}},
-    {applications, [kernel, stdlib, crypto, sasl, inets, oauth, ibrowse,
-        mochiweb, ssl, couch_log, couch_event, b64url]}
+    {applications, [
+        % stdlib
+        kernel,
+        stdlib,
+        crypto,
+        sasl,
+        inets,
+        ssl,
+
+        % Upstream deps
+        ibrowse,
+        mochiweb,
+        oauth,
+
+        % ASF deps
+        b64url,
+        couch_log,
+        couch_event,
+        couch_stats
+    ]}
 ]}.

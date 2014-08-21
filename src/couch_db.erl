@@ -125,7 +125,8 @@ is_idle(#db{compactor_pid=nil, waiting_delayed_commit=nil} = Db) ->
     undefined ->
         true;
     {monitored_by, Pids} ->
-        (Pids -- [Db#db.main_pid, whereis(couch_stats_collector)]) =:= []
+        PidTracker = whereis(couch_stats_process_tracker),
+        (Pids -- [Db#db.main_pid, PidTracker]) =:= []
     end;
 is_idle(_Db) ->
     false.
@@ -172,7 +173,7 @@ open_doc(Db, IdOrDocInfo) ->
     open_doc(Db, IdOrDocInfo, []).
 
 open_doc(Db, Id, Options) ->
-    increment_stat(Db, {couchdb, database_reads}),
+    increment_stat(Db, [couchdb, database_reads]),
     case open_doc_int(Db, Id, Options) of
     {ok, #doc{deleted=true}=Doc} ->
         case lists:member(deleted, Options) of
@@ -221,7 +222,7 @@ find_ancestor_rev_pos({RevPos, [RevId|Rest]}, AttsSinceRevs) ->
     end.
 
 open_doc_revs(Db, Id, Revs, Options) ->
-    increment_stat(Db, {couchdb, database_reads}),
+    increment_stat(Db, [couchdb, database_reads]),
     [{ok, Results}] = open_doc_revs_int(Db, [{Id, Revs}], Options),
     {ok, [apply_open_options(Result, Options) || Result <- Results]}.
 
@@ -840,7 +841,7 @@ doc_tag(#doc{meta=Meta}) ->
     end.
 
 update_docs(Db, Docs0, Options, replicated_changes) ->
-    increment_stat(Db, {couchdb, database_writes}),
+    increment_stat(Db, [couchdb, database_writes]),
     Docs = tag_docs(Docs0),
     DocBuckets = before_docs_update(Db, group_alike_docs(Docs)),
 
@@ -867,7 +868,7 @@ update_docs(Db, Docs0, Options, replicated_changes) ->
     {ok, DocErrors};
 
 update_docs(Db, Docs0, Options, interactive_edit) ->
-    increment_stat(Db, {couchdb, database_writes}),
+    increment_stat(Db, [couchdb, database_writes]),
     AllOrNothing = lists:member(all_or_nothing, Options),
     Docs = tag_docs(Docs0),
 
@@ -960,6 +961,18 @@ set_commit_option(Options) ->
         [full_commit|Options]
     end.
 
+collect_results_with_metrics(Pid, MRef, []) ->
+    Begin = os:timestamp(),
+    try
+        collect_results(Pid, MRef, [])
+    after
+        ResultsTime = timer:now_diff(os:timestamp(), Begin) div 1000,
+        couch_stats:update_histogram(
+            [couchdb, collect_results_time],
+            ResultsTime
+        )
+    end.
+
 collect_results(Pid, MRef, ResultsAcc) ->
     receive
     {result, Pid, Result} ->
@@ -981,7 +994,7 @@ write_and_commit(#db{main_pid=Pid, user_ctx=Ctx}=Db, DocBuckets1,
     MRef = erlang:monitor(process, Pid),
     try
         Pid ! {update_docs, self(), DocBuckets, NonRepDocs, MergeConflicts, FullCommit},
-        case collect_results(Pid, MRef, []) of
+        case collect_results_with_metrics(Pid, MRef, []) of
         {ok, Results} -> {ok, Results};
         retry ->
             % This can happen if the db file we wrote to was swapped out by
@@ -995,7 +1008,7 @@ write_and_commit(#db{main_pid=Pid, user_ctx=Ctx}=Db, DocBuckets1,
             DocBuckets3 = prepare_doc_summaries(Db2, DocBuckets2),
             close(Db2),
             Pid ! {update_docs, self(), DocBuckets3, NonRepDocs, MergeConflicts, FullCommit},
-            case collect_results(Pid, MRef, []) of
+            case collect_results_with_metrics(Pid, MRef, []) of
             {ok, Results} -> {ok, Results};
             retry -> throw({update_error, compaction_retry})
             end
@@ -1338,7 +1351,7 @@ increment_stat(#db{options = Options}, Stat) ->
     true ->
         ok;
     false ->
-        couch_stats_collector:increment(Stat)
+        couch_stats:increment_counter(Stat)
     end.
 
 skip_deleted(FoldFun) ->

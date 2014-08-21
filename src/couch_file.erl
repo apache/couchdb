@@ -347,7 +347,7 @@ file_open_options(Options) ->
 maybe_track_open_os_files(Options) ->
     case not lists:member(sys_db, Options) of
         true ->
-            couch_stats_collector:track_process_count({couchdb, open_os_files});
+            couch_stats_process_tracker:track([couchdb, open_os_files]);
         false ->
             ok
     end.
@@ -574,7 +574,7 @@ split_iolist([Byte | Rest], SplitAt, BeginAcc) when is_integer(Byte) ->
     split_iolist(Rest, SplitAt - 1, [Byte | BeginAcc]).
 
 
-% System dbs aren't monitored by couch_stats_collector
+% System dbs aren't monitored by couch_stats_process_tracker
 is_idle(#file{is_sys=true}) ->
     case process_info(self(), monitored_by) of
         {monitored_by, []} -> true;

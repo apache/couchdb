@@ -52,6 +52,7 @@ close_int({Lru, DbName, Iter}, {Tree, Dict} = Cache) ->
             {gb_trees:delete(Lru, Tree), dict:erase(DbName, Dict)};
         false ->
             true = ets:update_element(couch_dbs, DbName, {#db.fd_monitor, nil}),
+            couch_stats:increment_counter([couchdb, couch_server, lru_skip]),
             close_int(gb_trees:next(Iter), update(DbName, Cache))
         end;
     false ->

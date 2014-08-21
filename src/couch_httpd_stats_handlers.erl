@@ -11,46 +11,43 @@
 % the License.
 
 -module(couch_httpd_stats_handlers).
--include_lib("couch/include/couch_db.hrl").
+-include("couch_db.hrl").
 
 -export([handle_stats_req/1]).
--import(couch_httpd, [
-    send_json/2, send_json/3, send_json/4, send_method_not_allowed/2,
-    start_json_response/2, send_chunk/2, end_json_response/1,
-    start_chunked_response/3, send_error/4
-]).
 
 handle_stats_req(#httpd{method='GET', path_parts=[_]}=Req) ->
-    flush(Req),
-    send_json(Req, couch_stats_aggregator:all(range(Req)));
+    Stats = couch_stats:fetch(),
+    Nested = nest(Stats),
+    EJSON = to_ejson(Nested),
+    couch_httpd:send_json(Req, EJSON).
 
-handle_stats_req(#httpd{method='GET', path_parts=[_, _Mod]}) ->
-    throw({bad_request, <<"Stat names must have exactly two parts.">>});
+nest(Proplist) ->
+    nest(Proplist, []).
 
-handle_stats_req(#httpd{method='GET', path_parts=[_, Mod, Key]}=Req) ->
-    flush(Req),
-    Stats = couch_stats_aggregator:get_json({list_to_atom(binary_to_list(Mod)),
-        list_to_atom(binary_to_list(Key))}, range(Req)),
-    send_json(Req, {[{Mod, {[{Key, Stats}]}}]});
+nest([], Acc) ->
+    Acc;
+nest([{[Key|Keys], Value}|Rest], Acc) ->
+    Acc1 = case proplists:lookup(Key, Acc) of
+        {Key, Old} ->
+            [{Key, nest([{Keys, Value}], Old)}|proplists:delete(Key, Acc)];
+        none ->
+            Term = lists:foldr(fun(K, A) -> [{K, A}] end, Value, Keys),
+            [{Key, Term}|Acc]
+    end,
+    nest(Rest, Acc1).
 
-handle_stats_req(#httpd{method='GET', path_parts=[_, _Mod, _Key | _Extra]}) ->
-    throw({bad_request, <<"Stat names must have exactly two parts.">>});
+to_ejson([{_, _}|_]=Proplist) ->
+    EJSONProps = lists:map(
+       fun({Key, Value}) -> {maybe_format_key(Key), to_ejson(Value)} end,
+       Proplist
+    ),
+    {EJSONProps};
+to_ejson(NotAProplist) ->
+    NotAProplist.
 
-handle_stats_req(Req) ->
-    send_method_not_allowed(Req, "GET").
-
-range(Req) ->
-    case couch_util:get_value("range", couch_httpd:qs(Req)) of
-        undefined ->
-            0;
-        Value ->
-            list_to_integer(Value)
-    end.
-
-flush(Req) ->
-    case couch_util:get_value("flush", couch_httpd:qs(Req)) of
-        "true" ->
-            couch_stats_aggregator:collect_sample();
-        _Else ->
-            ok
-    end.
+maybe_format_key(Key) when is_integer(Key) ->
+    maybe_format_key(integer_to_list(Key));
+maybe_format_key(Key) when is_list(Key) ->
+    list_to_binary(Key);
+maybe_format_key(Key) ->
+    Key.

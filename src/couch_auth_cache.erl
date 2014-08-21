@@ -102,7 +102,7 @@ get_from_cache(UserName) ->
             [] ->
                 gen_server:call(?MODULE, {fetch, UserName}, infinity);
             [{UserName, {Credentials, _ATime}}] ->
-                couch_stats_collector:increment({couchdb, auth_cache_hits}),
+                couch_stats:increment_counter([couchdb, auth_cache_hits]),
                 gen_server:cast(?MODULE, {cache_hit, UserName}),
                 Credentials
             end
@@ -182,11 +182,11 @@ handle_call({new_max_cache_size, NewSize}, _From, State) ->
 handle_call({fetch, UserName}, _From, State) ->
     {Credentials, NewState} = case ets:lookup(?BY_USER, UserName) of
     [{UserName, {Creds, ATime}}] ->
-        couch_stats_collector:increment({couchdb, auth_cache_hits}),
+        couch_stats:increment_counter([couchdb, auth_cache_hits]),
         cache_hit(UserName, Creds, ATime),
         {Creds, State};
     [] ->
-        couch_stats_collector:increment({couchdb, auth_cache_misses}),
+        couch_stats:increment_counter([couchdb, auth_cache_misses]),
         Creds = get_user_props_from_db(UserName),
         State1 = add_cache_entry(UserName, Creds, erlang:now(), State),
         {Creds, State1}

@@ -76,6 +76,7 @@ map_docs(Proc, Docs) ->
             FunsResults)
         end,
         Docs),
+    couch_stats:increment_counter([couchdb, couchjs, map_doc], length(Docs)),
     {ok, Results}.
 
 map_doc_raw(Proc, Doc) ->

@@ -345,8 +345,8 @@ handle_call({open_result, DbName, {ok, Db}}, {FromPid, _Tag}, Server) ->
     link(Db#db.main_pid),
     true = ets:delete(couch_dbs_pid_to_name, FromPid),
     case erase({async_open, DbName}) of undefined -> ok; T0 ->
-        ?LOG_INFO("needed ~p ms to open new ~s", [timer:now_diff(os:timestamp(),T0)/1000,
-            DbName])
+        OpenTime = timer:now_diff(os:timestamp(), T0) / 1000,
+        couch_stats:update_histogram([couchdb, db_open_time], OpenTime)
     end,
     % icky hack of field values - compactor_pid used to store clients
     % and fd used to possibly store a creation request
@@ -363,8 +363,6 @@ handle_call({open_result, DbName, {ok, Db}}, {FromPid, _Tag}, Server) ->
     true = ets:insert(couch_dbs_pid_to_name, {Db#db.main_pid, DbName}),
     Lru = case couch_db:is_system_db(Db) of
         false ->
-            Stat = {couchdb, open_databases},
-            couch_stats_collector:track_process_count(Db#db.main_pid, Stat),
             couch_lru:insert(DbName, Server#server.lru);
         true ->
             Server#server.lru

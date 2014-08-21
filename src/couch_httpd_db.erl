@@ -145,16 +145,8 @@ handle_changes_req2(Req, Db) ->
             FeedChangesFun(MakeCallback(Resp))
         end
     end,
-    couch_stats_collector:increment(
-        {httpd, clients_requesting_changes}
-    ),
-    try
-        WrapperFun(ChangesFun)
-    after
-    couch_stats_collector:decrement(
-        {httpd, clients_requesting_changes}
-    )
-    end.
+    couch_stats_process_tracker:track([httpd, clients_requesting_changes]),
+    WrapperFun(ChangesFun).
 
 handle_compact_req(#httpd{method='POST'}=Req, Db) ->
     case Req#httpd.path_parts of
@@ -293,7 +285,7 @@ db_req(#httpd{path_parts=[_,<<"_ensure_full_commit">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "POST");
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>]}=Req, Db) ->
-    couch_stats_collector:increment({httpd, bulk_requests}),
+    couch_stats:increment_counter([httpd, bulk_requests]),
     couch_httpd:validate_ctype(Req, "application/json"),
     {JsonProps} = couch_httpd:json_body_obj(Req),
     case couch_util:get_value(<<"docs">>, JsonProps) of

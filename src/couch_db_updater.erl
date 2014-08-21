@@ -60,6 +60,7 @@ init({DbName, Filepath, Fd, Options}) ->
         end
     end,
     Db = init_db(DbName, Filepath, Fd, Header, Options),
+    couch_stats_process_tracker:track([couchdb, open_databases]),
     % we don't load validation funs here because the fabric query is liable to
     % race conditions.  Instead see couch_db:validate_doc_update, which loads
     % them lazily
@@ -783,6 +784,16 @@ update_docs_int(Db, DocsList, NonRepDocs, MergeConflicts, FullCommit) ->
     % and the indexes
     {ok, DocInfoByIdBTree2} = couch_btree:add_remove(DocInfoByIdBTree, IndexFullDocInfos, []),
     {ok, DocInfoBySeqBTree2} = couch_btree:add_remove(DocInfoBySeqBTree, IndexFullDocInfos, RemoveSeqs),
+
+
+    WriteCount = length(IndexFullDocInfos),
+    couch_stats:increment_counter([couchdb, document_inserts],
+         WriteCount - length(RemoveSeqs)),
+    couch_stats:increment_counter([couchdb, document_writes], WriteCount),
+    couch_stats:increment_counter(
+        [couchdb, local_doc_writes],
+        length(NonRepDocs)
+    ),
 
     Db3 = Db2#db{
         id_tree = DocInfoByIdBTree2,
