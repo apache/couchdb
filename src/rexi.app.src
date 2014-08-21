@@ -31,6 +31,7 @@
         kernel,
         stdlib,
         couch_log,
+        couch_stats,
         config
     ]},
     {mod, {rexi_app,[]}}

@@ -40,6 +40,7 @@ stop(MonitoringPid) ->
 %% internal functions %%
 
 notify_parent(Parent, Pid, Reason) ->
+    couch_stats:increment_counter([rexi, down]),
     erlang:send(Parent, {rexi_DOWN, self(), Pid, Reason}).
 
 should_monitor(Pid, Nodes) when is_pid(Pid) ->

@@ -134,6 +134,9 @@ stream_init(Timeout) ->
         rexi_STREAM_CANCEL ->
             exit(normal);
         timeout ->
+            couch_stats:increment_counter(
+                [rexi, streams, timeout, init_stream]
+            ),
             exit(timeout);
         Else ->
             exit({invalid_stream_message, Else})
@@ -179,6 +182,7 @@ stream(Msg, Limit, Timeout) ->
             erlang:send(Caller, {Ref, self(), Msg}),
             ok
     catch throw:timeout ->
+        couch_stats:increment_counter([rexi, streams, timeout, stream]),
         exit(timeout)
     end.
 
@@ -205,6 +209,7 @@ stream2(Msg, Limit, Timeout) ->
             erlang:send(Caller, {Ref, self(), Msg}),
             ok
     catch throw:timeout ->
+        couch_stats:increment_counter([rexi, streams, timeout, stream]),
         exit(timeout)
     end.
 
@@ -267,6 +272,7 @@ wait_for_ack(Count, Timeout) ->
     receive
         {rexi_ack, N} -> drain_acks(Count-N)
     after Timeout ->
+        couch_stats:increment_counter([rexi, streams, timeout, wait_for_ack]),
         throw(timeout)
     end.
 

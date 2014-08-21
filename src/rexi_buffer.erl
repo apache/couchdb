@@ -50,9 +50,11 @@ handle_call(get_buffered_count, _From, State) ->
     {reply, State#state.count, State, 0}.
 
 handle_cast({deliver, Dest, Msg}, #state{buffer = Q, count = C} = State) ->
+    couch_stats:increment_counter([rexi, buffered]),
     Q2 = queue:in({Dest, Msg}, Q),
     case should_drop(State) of
     true ->
+        couch_stats:increment_counter([rexi, dropped]),
             {noreply, State#state{buffer = queue:drop(Q2)}, 0};
     false ->
             {noreply, State#state{buffer = Q2, count = C+1}, 0}
