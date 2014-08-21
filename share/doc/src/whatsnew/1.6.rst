@@ -21,26 +21,36 @@
    :depth: 1
    :local:
 
+.. warning::
+
+   :ref:`release/1.6.1` contains important patches to hash of passwords on
+   restart. The previous :ref:`release/1.6.0` release is not recommended for
+   usage as certain edge cases with admin passwords may prevent CouchDB from
+   starting.
+
 .. _release/1.6.x/upgrade:
 
-Upgrade Notes
-=============
+Deprecations
+============
 
 The :ref:`Proxy Authentication <api/auth/proxy>` handler was renamed to
-``proxy_authentication_handler`` to follow the ``*_authentication_handler`` form
+``proxy_authentication_handler`` to follow the ``*_authentication_handler`` from
 of all other handlers. The old ``proxy_authentification_handler`` name is marked
-as deprecated and will be removed in future releases. It's strongly recommended
-to update :config:option:`httpd/authentication_handlers` option with new value
-in case if you had used such handler.
+as deprecated and will be removed in future releases. It's highly recommended
+to update :config:option:`httpd/authentication_handlers` option with the new
+value if you have used such a handler.
 
 .. _release/1.6.1:
 
 Version 1.6.1
 =============
 
-bugfix release:
+A bugfix release to handle various edge cases related to admin password hashing.
 
-* Hash admin passwords stored in ``local.ini`` on startup :commit:`ed825d3`.
+* :issue:`2298`: Hash plaintext admin passwords stored in ``local.ini`` on startup
+  :commit:`ed825d3`.
+* :issue:`2299`: Filter out local admin users before updating password hash in
+  ``_users`` db :commit:`5e46f3b`.
 
 .. _release/1.6.0:
 
