@@ -87,9 +87,14 @@ handle_cast(_Msg, #state{update_db=false}=State) ->
     {noreply, State};
 handle_cast({update_docs, DocIds}, State) ->
     Pending = sets:union(sets:from_list(DocIds), State#state.pending_updates),
+    PendingCount = sets:size(Pending),
+    couch_stats:update_gauge(
+        [global_changes, server_pending_updates],
+        PendingCount
+    ),
     NewState = State#state{
         pending_updates=Pending,
-        pending_update_count=sets:size(Pending)
+        pending_update_count=PendingCount
     },
     {noreply, NewState};
 
@@ -157,10 +162,20 @@ flush_updates(State) ->
 
         spawn(fun() ->
             fabric:update_docs(State#state.dbname, Docs, [])
-        end)
+        end),
+
+        Count = State#state.pending_update_count,
+        couch_stats:increment_counter(
+            [global_changes, db_writes],
+            Count
+        )
     catch error:database_does_not_exist ->
         {noreply, State}
     end,
+    couch_stats:update_gauge(
+        [global_changes, server_pending_updates],
+        0
+    ),
     {noreply, State#state{
         pending_updates=sets:new(),
         pending_update_count=0
@@ -203,5 +218,6 @@ get_rev({ok, #doc_info{revs=[RevInfo|_]}}) ->
     % global_changes should never encounter a conflict by design
     % but we should record if it happens in case our design isn't
     % quite right.
+    couch_stats:increment_counter([global_changes, event_doc_conflict]),
     {Pos, Rev} = RevInfo#rev_info.rev,
     {Pos, [Rev]}.

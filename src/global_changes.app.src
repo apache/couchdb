@@ -19,6 +19,7 @@
         stdlib,
         config,
         couch_log,
+        couch_stats,
         couch,
         mem3,
         fabric

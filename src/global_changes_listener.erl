@@ -80,6 +80,10 @@ handle_event(ShardName, Event, State0)
             EventBin = erlang:atom_to_binary(Event, latin1),
             Key = <<EventBin/binary, <<":">>/binary, DbName/binary>>,
             Pending = sets:add_element(Key, State0#state.pending_updates),
+            couch_stats:update_gauge(
+                [global_changes, listener_pending_updates],
+                Count + 1
+            ),
             State0#state{pending_updates=Pending, pending_update_count=Count+1}
     end,
     maybe_send_updates(State);
@@ -122,11 +126,16 @@ maybe_send_updates(#state{update_db=true}=State) ->
             try group_updates_by_node(State#state.dbname, Updates) of
                 Grouped ->
                     dict:map(fun(Node, Docs) ->
+                        couch_stats:increment_counter([global_changes, rpcs]),
                         global_changes_server:update_docs(Node, Docs)
                     end, Grouped)
             catch error:database_does_not_exist ->
                 ok
             end,
+            couch_stats:update_gauge(
+                [global_changes, listener_pending_updates],
+                0
+            ),
             State1 = State#state{
                 pending_updates=sets:new(),
                 pending_update_count=0,
