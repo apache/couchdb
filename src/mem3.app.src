@@ -46,6 +46,7 @@
         couch,
         rexi,
         couch_log,
-        couch_event
+        couch_event,
+        couch_stats
     ]}
 ]}.
