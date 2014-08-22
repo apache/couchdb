@@ -14,6 +14,7 @@
 
 -export([
     handle_all_docs_req/2,
+    handle_view_changes_req/3,
     handle_reindex_req/3,
     handle_view_req/3,
     handle_temp_view_req/2,
@@ -59,6 +60,12 @@ handle_reindex_req(#httpd{method='POST',
     couch_httpd:send_json(Req, 201, {[{<<"ok">>, true}]});
 handle_reindex_req(Req, _Db, _DDoc) ->
     couch_httpd:send_method_not_allowed(Req, "POST").
+
+
+handle_view_changes_req(#httpd{path_parts=[_,<<"_design">>,DDocName,<<"_view_changes">>,ViewName]}=Req, Db, _DDoc) ->
+    ChangesArgs = couch_httpd_changes:parse_changes_query(Req, Db, true),
+    ChangesFun = couch_mrview_changes:handle_view_changes(ChangesArgs, Req, Db, DDocName, ViewName),
+    couch_httpd_changes:handle_changes_req(Req, Db, ChangesArgs, ChangesFun).
 
 
 handle_view_req(#httpd{method='GET',

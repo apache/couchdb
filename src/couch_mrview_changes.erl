@@ -12,7 +12,7 @@
 %
 -module(couch_mrview_changes).
 
--export([handle_changes/6]).
+-export([handle_changes/6, handle_view_changes/5]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -41,6 +41,16 @@
 
 -export_type([changes_stream/0]).
 -export_type([changes_options/0]).
+
+handle_view_changes(Args, Req, Db, DDocId, ViewName) ->
+%    couch_index_server:acquire_indexer(couch_mrview_index, Db#db.name, DDocId),
+%    try
+    couch_changes:handle_changes(Args, Req, Db, {view, DDocId, ViewName}).
+%    after
+%        couch_index_server:release_indexer(couch_mrview_index, Db#db.name, DDocId)
+%    end.
+
+
 
 %% @doc function returning changes in a streaming fashion if needed.
 -spec handle_changes(binary(), binary(), binary(), function(), term(),
