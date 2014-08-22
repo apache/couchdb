@@ -178,7 +178,9 @@ finish_update(State) ->
 
 commit(State) ->
     Header = {State#mrst.sig, couch_mrview_util:make_header(State)},
-    couch_file:write_header(State#mrst.fd, Header).
+    Resp = couch_file:write_header(State#mrst.fd, Header),
+    couch_mrview_update_notifier:notify({index_update, State#mrst.db_name, State#mrst.idx_name}),
+    Resp.
 
 
 compact(Db, State, Opts) ->

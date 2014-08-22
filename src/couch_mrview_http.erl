@@ -64,7 +64,7 @@ handle_reindex_req(Req, _Db, _DDoc) ->
 
 handle_view_changes_req(#httpd{path_parts=[_,<<"_design">>,DDocName,<<"_view_changes">>,ViewName]}=Req, Db, _DDoc) ->
     ChangesArgs = couch_httpd_changes:parse_changes_query(Req, Db, true),
-    ChangesFun = couch_mrview_changes:handle_view_changes(ChangesArgs, Req, Db, DDocName, ViewName),
+    ChangesFun = couch_mrview_changes:handle_view_changes(ChangesArgs, Req, Db, <<"_design/", DDocName/binary>>, ViewName),
     couch_httpd_changes:handle_changes_req(Req, Db, ChangesArgs, ChangesFun).
 
 
