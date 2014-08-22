@@ -29,6 +29,7 @@ DepDescs = [
     {couch_dbupdates,   "couch-dbupdates",  {branch, "master"}},
     {couch_plugins,     "couch-plugins",    {branch, "master"}},
     {couch_event,       "couch-event",      {branch, "windsor-merge"}},
+    {couch_stats,       "couch-stats",      {branch, "master"}},
     {docs,              "documentation",    {branch, "master"}, [raw]},
     {ddoc_cache,        "ddoc-cache",       {branch, "windsor-merge"}},
     {ets_lru,           "ets-lru",          {branch, "windsor-merge"}},
