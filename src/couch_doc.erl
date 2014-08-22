@@ -447,7 +447,7 @@ doc_from_multi_part_stream(ContentType, DataFun, Ref) ->
     {Parser, ParserRef} = spawn_monitor(fun() ->
         ParentRef = erlang:monitor(process, Parent),
         put(mp_parent_ref, ParentRef),
-        put(num_mp_writers, NumMpWriters),
+        num_mp_writers(NumMpWriters),
         {<<"--",_/binary>>, _, _} = couch_httpd:parse_multipart_request(
             ContentType, DataFun,
             fun(Next) -> mp_parse_doc(Next, []) end),
@@ -592,6 +592,10 @@ maybe_send_data({Ref, Chunks, Offset, Counters, Waiting}) ->
             end
         end
     end.
+
+
+num_mp_writers(N) ->
+    erlang:put(mp_att_writers, N).
 
 
 num_mp_writers() ->
