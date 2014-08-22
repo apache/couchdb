@@ -36,10 +36,6 @@
     check_view_etag/3
 ]).
 
--export([parse_boolean/1,
-         parse_int/1,
-         parse_pos_int/1]).
-
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
@@ -76,7 +72,7 @@ handle_view_changes_req(#httpd{path_parts=[_,<<"_design">>,DDocName,<<"_view_cha
             throw({bad_request, "view changes not enabled"})
     end,
 
-    ChangesArgs = couch_httpd_changes:parse_changes_query(Req, Db, true),
+    ChangesArgs = couch_httpd_changes:parse_changes_query(Req, Db),
     ChangesFun = couch_mrview_changes:handle_view_changes(ChangesArgs, Req, Db, <<"_design/", DDocName/binary>>, ViewName),
     couch_httpd_changes:handle_changes_req(Req, Db, ChangesArgs, ChangesFun).
 
