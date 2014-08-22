@@ -62,7 +62,20 @@ handle_reindex_req(Req, _Db, _DDoc) ->
     couch_httpd:send_method_not_allowed(Req, "POST").
 
 
-handle_view_changes_req(#httpd{path_parts=[_,<<"_design">>,DDocName,<<"_view_changes">>,ViewName]}=Req, Db, _DDoc) ->
+handle_view_changes_req(#httpd{path_parts=[_,<<"_design">>,DDocName,<<"_view_changes">>,ViewName]}=Req, Db, DDoc) ->
+    {DDocBody} = DDoc#doc.body,
+    case lists:keyfind(<<"options">>, 1, DDocBody) of
+        {<<"options">>, {Options}} when is_list(Options) ->
+            case lists:keyfind(<<"seq_indexed">>, 1, Options) of
+                {<<"seq_indexed">>, true} ->
+                    ok;
+                _ ->
+                    throw({bad_request, "view changes not enabled"})
+            end;
+        _ ->
+            throw({bad_request, "view changes not enabled"})
+    end,
+
     ChangesArgs = couch_httpd_changes:parse_changes_query(Req, Db, true),
     ChangesFun = couch_mrview_changes:handle_view_changes(ChangesArgs, Req, Db, <<"_design/", DDocName/binary>>, ViewName),
     couch_httpd_changes:handle_changes_req(Req, Db, ChangesArgs, ChangesFun).
