@@ -57,13 +57,19 @@ get(Property, State) ->
                 purge_seq = PurgeSeq,
                 views = Views
             } = State,
-            {ok, Size} = couch_file:bytes(Fd),
-            {ok, DataSize} = couch_mrview_util:calculate_data_size(Btree,Views),
+            {ok, FileSize} = couch_file:bytes(Fd),
+            {ok, ExternalSize} = couch_mrview_util:calculate_external_size(Views),
+            ActiveSize = ExternalSize + couch_btree:size(Btree),
             {ok, [
                 {signature, list_to_binary(couch_index_util:hexsig(Sig))},
                 {language, Lang},
-                {disk_size, Size},
-                {data_size, DataSize},
+                {disk_size, FileSize}, % legacy
+                {data_size, ExternalSize}, % legacy
+                {sizes, {[
+                    {file, FileSize},
+                    {active, ActiveSize},
+                    {external, ExternalSize}
+                ]}},
                 {update_seq, UpdateSeq},
                 {purge_seq, PurgeSeq}
             ]};

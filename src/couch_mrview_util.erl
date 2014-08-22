@@ -21,7 +21,7 @@
 -export([all_docs_key_opts/1, all_docs_key_opts/2, key_opts/1, key_opts/2]).
 -export([fold/4, fold_reduce/4]).
 -export([temp_view_to_ddoc/1]).
--export([calculate_data_size/2]).
+-export([calculate_external_size/1]).
 -export([validate_args/1]).
 -export([maybe_load_doc/3, maybe_load_doc/4]).
 -export([maybe_update_index_file/1]).
@@ -635,11 +635,11 @@ reverse_key_default(<<255>>) -> <<>>;
 reverse_key_default(Key) -> Key.
 
 
-calculate_data_size(IdBt, Views) ->
+calculate_external_size(Views) ->
     SumFun = fun(#mrview{btree=Bt}, Acc) ->
         sum_btree_sizes(Acc, couch_btree:size(Bt))
     end,
-    Size = lists:foldl(SumFun, couch_btree:size(IdBt), Views),
+    Size = lists:foldl(SumFun, 0, Views),
     {ok, Size}.
 
 
