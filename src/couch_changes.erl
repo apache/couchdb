@@ -225,9 +225,9 @@ check_docids(_) ->
     throw({bad_request, Msg}).
 
 
-open_ddoc(#db{name= <<"shards/", _/binary>> =ShardName}, DDocId) ->
+open_ddoc(#db{name=DbName, id_tree=undefined}, DDocId) ->
     {_, Ref} = spawn_monitor(fun() ->
-        exit(fabric:open_doc(mem3:dbname(ShardName), DDocId, []))
+        exit(fabric:open_doc(mem3:dbname(DbName), DDocId, [ejson_body]))
     end),
     receive
         {'DOWN', Ref, _, _, {ok, _}=Response} ->
