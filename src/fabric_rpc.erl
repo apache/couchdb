@@ -48,7 +48,8 @@ changes(DbName, #changes_args{} = Args, StartSeq, DbOptions) ->
 changes(DbName, Options, StartVector, DbOptions) ->
     set_io_priority(DbName, DbOptions),
     #changes_args{dir=Dir} = Args = lists:keyfind(changes_args, 1, Options),
-    case get_or_create_db(DbName, DbOptions) of
+    DbOpenOptions = Args#changes_args.db_open_options ++ DbOptions,
+    case get_or_create_db(DbName, DbOpenOptions) of
     {ok, Db} ->
         StartSeq = calculate_start_seq(Db, node(), StartVector),
         Enum = fun changes_enumerator/2,
