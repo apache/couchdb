@@ -12,22 +12,33 @@
 
 -module(couch_httpd_changes).
 
--export([handle_changes_req/2,
-         handle_changes/3,
-         handle_view_changes/3]).
+-export([handle_db_changes_req/2,
+         handle_changes_req/4,
+         handle_view_filtered_changes/3,
+         parse_changes_query/3]).
 
 -include_lib("couch/include/couch_db.hrl").
 
-handle_changes_req(#httpd{method='POST'}=Req, Db) ->
+handle_db_changes_req(Req, Db) ->
+    ChangesArgs = parse_changes_query(Req, Db, false),
+    ChangesFun = case ChangesArgs#changes_args.filter of
+        "_view" ->
+            handle_view_filtered_changes(ChangesArgs, Req, Db);
+        _ ->
+            couch_changes:handle_db_changes(ChangesArgs, Req, Db)
+    end,
+    handle_changes_req(Req, Db, ChangesArgs, ChangesFun).
+
+handle_changes_req(#httpd{method='POST'}=Req, Db, ChangesArgs, ChangesFun) ->
     couch_httpd:validate_ctype(Req, "application/json"),
-    handle_changes_req1(Req, Db);
-handle_changes_req(#httpd{method='GET'}=Req, Db) ->
-    handle_changes_req1(Req, Db);
-handle_changes_req(#httpd{path_parts=[_,<<"_changes">>]}=Req, _Db) ->
+    handle_changes_req1(Req, Db, ChangesArgs, ChangesFun);
+handle_changes_req(#httpd{method='GET'}=Req, Db, ChangesArgs, ChangesFun) ->
+    handle_changes_req1(Req, Db, ChangesArgs, ChangesFun);
+handle_changes_req(#httpd{}=Req, _Db, _ChangesArgs, _ChangesFun) ->
     couch_httpd:send_method_not_allowed(Req, "GET,HEAD,POST").
 
-handle_changes_req1(Req, #db{name=DbName}=Db) ->
-    AuthDbName = ?l2b(couch_config:get("couch_httpd_auth", "authentication_db")),
+handle_changes_req1(Req, #db{name=DbName}=Db, ChangesArgs, ChangesFun) ->
+    AuthDbName = ?l2b(config:get("couch_httpd_auth", "authentication_db")),
     case AuthDbName of
     DbName ->
         % in the authentication database, _changes is admin-only.
@@ -71,8 +82,6 @@ handle_changes_req1(Req, #db{name=DbName}=Db) ->
             couch_httpd:send_chunk(Resp, "\n")
         end
     end,
-    ChangesArgs = parse_changes_query(Req, Db),
-    ChangesFun = handle_changes(ChangesArgs, Req, Db),
     WrapperFun = case ChangesArgs#changes_args.feed of
     "normal" ->
         {ok, Info} = couch_db:get_db_info(Db),
@@ -117,21 +126,13 @@ handle_changes_req1(Req, #db{name=DbName}=Db) ->
     end.
 
 
-handle_changes(ChangesArgs, Req, Db) ->
-    case ChangesArgs#changes_args.filter of
-        "_view" ->
-            handle_view_changes(ChangesArgs, Req, Db);
-        _ ->
-            couch_changes:handle_changes(ChangesArgs, Req, Db)
-    end.
-
 %% wrapper around couch_mrview_changes.
-%% This wrapper mimic couch_changes:handle_changes/3 and return a
+%% This wrapper mimic couch_changes:handle_db_changes/3 and return a
 %% Changefun that can be used by the handle_changes_req function. Also
 %% while couch_mrview_changes:handle_changes/6 is returning tha view
 %% changes this function return docs corresponding to the changes
 %% instead so it can be used to replace the _view filter.
-handle_view_changes(ChangesArgs, Req, Db) ->
+handle_view_filtered_changes(ChangesArgs, Req, Db) ->
     %% parse view parameter
     {DDocId, VName} = parse_view_param(Req),
 
@@ -149,7 +150,7 @@ handle_view_changes(ChangesArgs, Req, Db) ->
     case lists:member(<<"seq_indexed">>,
                       proplists:get_value(update_options, Infos, [])) of
         true ->
-            handle_view_changes(Db, DDocId, VName, ViewOptions, ChangesArgs,
+            handle_view_filtered_changes(Db, DDocId, VName, ViewOptions, ChangesArgs,
                                 Req);
         false when ViewOptions /= [] ->
             ?LOG_ERROR("Tried to filter a non sequence indexed view~n",[]),
@@ -158,10 +159,10 @@ handle_view_changes(ChangesArgs, Req, Db) ->
             %% old method we are getting changes using the btree instead
             %% which is not efficient, log it
             ?LOG_WARN("Get view changes with seq_indexed=false.~n", []),
-            couch_changes:handle_changes(ChangesArgs, Req, Db)
+            couch_changes:handle_db_changes(ChangesArgs, Req, Db)
     end.
 
-handle_view_changes(#db{name=DbName}=Db0, DDocId, VName, ViewOptions,
+handle_view_filtered_changes(#db{name=DbName}=Db0, DDocId, VName, ViewOptions,
                     ChangesArgs, Req) ->
     #changes_args{
         feed = ResponseType,
@@ -288,7 +289,7 @@ view_change_row(Db, DocInfo, Args) ->
                 []
     end}}.
 
-parse_changes_query(Req, Db) ->
+parse_changes_query(Req, Db, IsViewChanges) ->
     ChangesArgs = lists:foldl(fun({Key, Value}, Args) ->
         case {string:to_lower(Key), Value} of
         {"feed", _} ->

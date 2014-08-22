@@ -1173,7 +1173,9 @@ enum_docs_reduce_to_count(Reds) ->
 changes_since(Db, StartSeq, Fun, Acc) ->
     changes_since(Db, StartSeq, Fun, [], Acc).
 
-changes_since(Db, StartSeq, Fun, Options, Acc) ->
+changes_since(Db, StartSeq, Fun, Options, Acc) when is_record(Db, db) ->
+    changes_since(Db#db.seq_tree, StartSeq, Fun, Options, Acc);
+changes_since(SeqTree, StartSeq, Fun, Options, Acc) ->
     Wrapper = fun(FullDocInfo, _Offset, Acc2) ->
         DocInfo = case FullDocInfo of
             #full_doc_info{} ->
@@ -1183,7 +1185,7 @@ changes_since(Db, StartSeq, Fun, Options, Acc) ->
         end,
         Fun(DocInfo, Acc2)
     end,
-    {ok, _LastReduction, AccOut} = couch_btree:fold(Db#db.seq_tree,
+    {ok, _LastReduction, AccOut} = couch_btree:fold(SeqTree,
         Wrapper, Acc, [{start_key, StartSeq + 1}] ++ Options),
     {ok, AccOut}.
 

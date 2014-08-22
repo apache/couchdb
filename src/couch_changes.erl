@@ -12,15 +12,19 @@
 
 -module(couch_changes).
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("couch_mrview/include/couch_mrview.hrl").
 
 -export([
-    handle_changes/3,
+    handle_db_changes/3,
+    handle_changes/4,
     get_changes_timeout/2,
-    wait_db_updated/3,
-    get_rest_db_updated/1,
+    wait_updated/3,
+    get_rest_updated/1,
     configure_filter/4,
     filter/3,
-    handle_db_event/3
+    handle_db_event/3,
+    handle_view_event/3,
+    view_filter/3
 ]).
 
 -export([changes_enumerator/2]).
@@ -31,6 +35,9 @@
 
 -record(changes_acc, {
     db,
+    view_name,
+    ddoc_name,
+    view,
     seq,
     prepend,
     filter,
@@ -45,8 +52,10 @@
     timeout_fun
 }).
 
-%% @type Req -> #httpd{} | {json_req, JsonObj()}
-handle_changes(Args1, Req, Db0) ->
+handle_db_changes(Args, Req, Db) ->
+    handle_changes(Args, Req, Db, db).
+
+handle_changes(Args1, Req, Db0, Type) ->
     #changes_args{
         style = Style,
         filter = FilterName,
@@ -54,6 +63,23 @@ handle_changes(Args1, Req, Db0) ->
         dir = Dir,
         since = Since
     } = Args1,
+    {StartListenerFun, DDocName, ViewName, View} = case Type of
+        {view, DDocName0, ViewName0} ->
+            SNFun = fun() ->
+                couch_event:link_listener(
+                     ?MODULE, handle_view_event, self(), [{dbname, Db0#db.name}]
+                )
+            end,
+            {ok, {_, View0, _}, _, _} = couch_mrview_util:get_view(Db0#db.name, DDocName0, ViewName0, #mrargs{}),
+            {SNFun, DDocName0, ViewName0, View0};
+        db ->
+            SNFun = fun() ->
+                couch_event:link_listener(
+                     ?MODULE, handle_db_event, self(), [{dbname, Db0#db.name}]
+                )
+            end,
+            {SNFun, undefined, undefined, undefined}
+    end,
     Filter = configure_filter(FilterName, Style, Req, Db0),
     Args = Args1#changes_args{filter_fun = Filter},
     Start = fun() ->
@@ -78,14 +104,14 @@ handle_changes(Args1, Req, Db0) ->
     true ->
         fun(CallbackAcc) ->
             {Callback, UserAcc} = get_callback_acc(CallbackAcc),
-            {ok, Listener} = couch_event:link_listener(
-                 ?MODULE, handle_db_event, self(), [{dbname, Db0#db.name}]
-            ),
+            {ok, Listener} = StartListenerFun(),
+
             {Db, StartSeq} = Start(),
             UserAcc2 = start_sending_changes(Callback, UserAcc, Feed),
             {Timeout, TimeoutFun} = get_changes_timeout(Args, Callback),
             Acc0 = build_acc(Args, Callback, UserAcc2, Db, StartSeq,
-                             <<"">>, Timeout, TimeoutFun),
+                             <<"">>, Timeout, TimeoutFun, DDocName, ViewName,
+                             View),
             try
                 keep_sending_changes(
                     Args#changes_args{dir=fwd},
@@ -93,7 +119,7 @@ handle_changes(Args1, Req, Db0) ->
                     true)
             after
                 couch_event:stop_listener(Listener),
-                get_rest_db_updated(ok) % clean out any remaining update messages
+                get_rest_updated(ok) % clean out any remaining update messages
             end
         end;
     false ->
@@ -103,11 +129,12 @@ handle_changes(Args1, Req, Db0) ->
             {Timeout, TimeoutFun} = get_changes_timeout(Args, Callback),
             {Db, StartSeq} = Start(),
             Acc0 = build_acc(Args#changes_args{feed="normal"}, Callback,
-                             UserAcc2, Db, StartSeq, <<>>, Timeout, TimeoutFun),
+                             UserAcc2, Db, StartSeq, <<>>, Timeout, TimeoutFun,
+                             DDocName, ViewName, View),
             {ok, #changes_acc{seq = LastSeq, user_acc = UserAcc3}} =
                 send_changes(
-                    Args#changes_args{feed="normal"},
                     Acc0,
+                    Dir,
                     true),
             end_sending_changes(Callback, UserAcc3, LastSeq, Feed)
         end
@@ -115,12 +142,23 @@ handle_changes(Args1, Req, Db0) ->
 
 
 handle_db_event(_DbName, updated, Parent) ->
-    Parent ! db_updated,
+    Parent ! updated,
     {ok, Parent};
 
 handle_db_event(_DbName, _Event, Parent) ->
     {ok, Parent}.
 
+
+handle_view_event(_DbName, Msg, {Parent, DDocId}) ->
+    case Msg of
+        {index_commit, DDocId} ->
+            Parent ! updated;
+        {index_delete, DDocId} ->
+            Parent ! deleted;
+        _ ->
+            ok
+    end,
+    {ok, {Parent, DDocId}}.
 
 get_callback_acc({Callback, _UserAcc} = Pair) when is_function(Callback, 3) ->
     Pair;
@@ -133,7 +171,7 @@ configure_filter("_doc_ids", Style, Req, _Db) ->
 configure_filter("_design", Style, _Req, _Db) ->
     {design_docs, Style};
 configure_filter("_view", Style, Req, Db) ->
-    ViewName = couch_httpd:qs_value(Req, "view", ""),
+    ViewName = get_view_qs(Req),
     if ViewName /= "" -> ok; true ->
         throw({bad_request, "`view` filter parameter is not provided."})
     end,
@@ -199,6 +237,11 @@ filter(Db, DocInfo, {custom, Style, Req0, DDoc, FName}) ->
     {ok, Passes} = couch_query_servers:filter_docs(Req, Db, DDoc, FName, Docs),
     filter_revs(Passes, Docs).
 
+get_view_qs({json_req, {Props}}) ->
+    {Query} = couch_util:get_value(<<"query">>, Props, {[]}),
+    binary_to_list(couch_util:get_value(<<"view">>, Query, ""));
+get_view_qs(Req) ->
+    couch_httpd:qs_value(Req, "view", "").
 
 get_doc_ids({json_req, {Props}}) ->
     check_docids(couch_util:get_value(<<"doc_ids">>, Props));
@@ -310,7 +353,7 @@ start_sending_changes(_Callback, UserAcc, ResponseType)
 start_sending_changes(Callback, UserAcc, ResponseType) ->
     Callback(start, ResponseType, UserAcc).
 
-build_acc(Args, Callback, UserAcc, Db, StartSeq, Prepend, Timeout, TimeoutFun) ->
+build_acc(Args, Callback, UserAcc, Db, StartSeq, Prepend, Timeout, TimeoutFun, DDocName, ViewName, View) ->
     #changes_args{
         include_docs = IncludeDocs,
         doc_options = DocOpts,
@@ -332,24 +375,30 @@ build_acc(Args, Callback, UserAcc, Db, StartSeq, Prepend, Timeout, TimeoutFun) -
         doc_options = DocOpts,
         conflicts = Conflicts,
         timeout = Timeout,
-        timeout_fun = TimeoutFun
+        timeout_fun = TimeoutFun,
+        ddoc_name = DDocName,
+        view_name = ViewName,
+        view = View
     }.
 
-send_changes(Args, Acc0, FirstRound) ->
-    #changes_args{
-        dir = Dir
-    } = Args,
+send_changes(Acc, Dir, FirstRound) ->
     #changes_acc{
         db = Db,
         seq = StartSeq,
-        filter = Filter
-    } = Acc0,
-    EnumFun = fun ?MODULE:changes_enumerator/2,
+        filter = Filter,
+        view = View
+    } = Acc,
+    EnumFun = fun changes_enumerator/2,
     case can_optimize(FirstRound, Filter) of
         {true, Fun} ->
-            Fun(Db, StartSeq, Dir, EnumFun, Acc0, Filter);
+            Fun(Db, StartSeq, Dir, EnumFun, Acc, Filter);
         _ ->
-            couch_db:changes_since(Db, StartSeq, EnumFun, [{dir, Dir}], Acc0)
+            case View of
+                undefined ->
+                    couch_db:changes_since(Db, StartSeq, EnumFun, [{dir, Dir}], Acc);
+                #mrview{} ->
+                    couch_mrview:view_changes_since(View, StartSeq, EnumFun, [{dir, Dir}], Acc)
+            end
     end.
 
 
@@ -422,20 +471,20 @@ keep_sending_changes(Args, Acc0, FirstRound) ->
         db_open_options = DbOptions
     } = Args,
 
-    {ok, ChangesAcc} = send_changes(
-        Args#changes_args{dir=fwd},
-        Acc0,
-        FirstRound),
+    {ok, ChangesAcc} = send_changes(Acc0, fwd, FirstRound),
+
     #changes_acc{
-        db = Db, callback = Callback, timeout = Timeout, timeout_fun = TimeoutFun,
-        seq = EndSeq, prepend = Prepend2, user_acc = UserAcc2, limit = NewLimit
+        db = Db, callback = Callback,
+        timeout = Timeout, timeout_fun = TimeoutFun, seq = EndSeq,
+        prepend = Prepend2, user_acc = UserAcc2, limit = NewLimit,
+        ddoc_name = DDocName, view_name = ViewName, view = View
     } = ChangesAcc,
 
     couch_db:close(Db),
     if Limit > NewLimit, ResponseType == "longpoll" ->
         end_sending_changes(Callback, UserAcc2, EndSeq, ResponseType);
     true ->
-        case wait_db_updated(Timeout, TimeoutFun, UserAcc2) of
+        case wait_updated(Timeout, TimeoutFun, UserAcc2) of
         {updated, UserAcc4} ->
             DbOptions1 = [{user_ctx, Db#db.user_ctx} | DbOptions],
             case couch_db:open(Db#db.name, DbOptions1) of
@@ -444,6 +493,7 @@ keep_sending_changes(Args, Acc0, FirstRound) ->
                   Args#changes_args{limit=NewLimit},
                   ChangesAcc#changes_acc{
                     db = Db2,
+                    view = maybe_refresh_view(Db2, DDocName, ViewName),
                     user_acc = UserAcc4,
                     seq = EndSeq,
                     prepend = Prepend2,
@@ -458,19 +508,31 @@ keep_sending_changes(Args, Acc0, FirstRound) ->
         end
     end.
 
+maybe_refresh_view(_, undefined, undefined) ->
+    undefined;
+maybe_refresh_view(Db, DDocName, ViewName) ->
+    {ok, {_, View, _}, _, _} = couch_mrview_util:get_view(Db#db.name, DDocName, ViewName, #mrargs{}),
+    View.
+
 end_sending_changes(Callback, UserAcc, EndSeq, ResponseType) ->
     Callback({stop, EndSeq}, ResponseType, UserAcc).
 
-changes_enumerator(DocInfo, #changes_acc{resp_type = ResponseType} = Acc)
+changes_enumerator(Value, #changes_acc{resp_type = ResponseType} = Acc)
         when ResponseType =:= "continuous"
         orelse ResponseType =:= "eventsource" ->
     #changes_acc{
         filter = Filter, callback = Callback,
         user_acc = UserAcc, limit = Limit, db = Db,
-        timeout = Timeout, timeout_fun = TimeoutFun
+        timeout = Timeout, timeout_fun = TimeoutFun,
+        view = View
     } = Acc,
-    #doc_info{high_seq = Seq} = DocInfo,
-    Results0 = filter(Db, DocInfo, Filter),
+    {Seq, Results0} = case View of
+        undefined ->
+            {Value#doc_info.high_seq, filter(Db, Value, Filter)};
+        #mrview{} ->
+            {{Seq0, _}, _} = Value,
+            {Seq0, [ok]} % TODO
+    end,
     Results = [Result || Result <- Results0, Result /= null],
     %% TODO: I'm thinking this should be < 1 and not =< 1
     Go = if Limit =< 1 -> stop; true -> ok end,
@@ -484,19 +546,24 @@ changes_enumerator(DocInfo, #changes_acc{resp_type = ResponseType} = Acc)
             {Go, Acc#changes_acc{seq = Seq, user_acc = UserAcc2}}
         end;
     _ ->
-        ChangesRow = changes_row(Results, DocInfo, Acc),
+        ChangesRow = changes_row(Results, Value, Acc),
         UserAcc2 = Callback({change, ChangesRow, <<>>}, ResponseType, UserAcc),
         reset_heartbeat(),
         {Go, Acc#changes_acc{seq = Seq, user_acc = UserAcc2, limit = Limit - 1}}
     end;
-changes_enumerator(DocInfo, Acc) ->
+changes_enumerator(Value, Acc) ->
     #changes_acc{
         filter = Filter, callback = Callback, prepend = Prepend,
         user_acc = UserAcc, limit = Limit, resp_type = ResponseType, db = Db,
-        timeout = Timeout, timeout_fun = TimeoutFun
+        timeout = Timeout, timeout_fun = TimeoutFun, view = View
     } = Acc,
-    #doc_info{high_seq = Seq} = DocInfo,
-    Results0 = filter(Db, DocInfo, Filter),
+    {Seq, Results0} = case View of
+        undefined ->
+            {Value#doc_info.high_seq, filter(Db, Value, Filter)};
+        #mrview{} ->
+            {{Seq0,_}, _} = Value,
+            {Seq0, [ok]} % TODO view filter
+    end,
     Results = [Result || Result <- Results0, Result /= null],
     Go = if (Limit =< 1) andalso Results =/= [] -> stop; true -> ok end,
     case Results of
@@ -509,7 +576,7 @@ changes_enumerator(DocInfo, Acc) ->
             {Go, Acc#changes_acc{seq = Seq, user_acc = UserAcc2}}
         end;
     _ ->
-        ChangesRow = changes_row(Results, DocInfo, Acc),
+        ChangesRow = changes_row(Results, Value, Acc),
         UserAcc2 = Callback({change, ChangesRow, Prepend}, ResponseType, UserAcc),
         reset_heartbeat(),
         {Go, Acc#changes_acc{
@@ -518,7 +585,11 @@ changes_enumerator(DocInfo, Acc) ->
     end.
 
 
-changes_row(Results, DocInfo, Acc) ->
+
+changes_row(Results, SeqStuff, #changes_acc{view=#mrview{}}) ->
+    {{Seq, Key}, {Id, Value}} = SeqStuff,
+    {[{<<"seq">>, Seq}, {<<"id">>, Id}, {<<"key">>, Key}, {<<"value">>, Value}, {<<"changes">>, Results}]};
+changes_row(Results, #doc_info{}=DocInfo, #changes_acc{view=undefined}=Acc) ->
     #doc_info{
         id = Id, high_seq = Seq, revs = [#rev_info{deleted = Del} | _]
     } = DocInfo,
@@ -549,25 +620,27 @@ changes_row(Results, DocInfo, Acc) ->
 deleted_item(true) -> [{<<"deleted">>, true}];
 deleted_item(_) -> [].
 
-% waits for a db_updated msg, if there are multiple msgs, collects them.
-wait_db_updated(Timeout, TimeoutFun, UserAcc) ->
+% waits for a updated msg, if there are multiple msgs, collects them.
+wait_updated(Timeout, TimeoutFun, UserAcc) ->
     receive
-    db_updated ->
-        get_rest_db_updated(UserAcc)
+    updated ->
+        get_rest_updated(UserAcc);
+    deleted ->
+        {stop, UserAcc}
     after Timeout ->
         {Go, UserAcc2} = TimeoutFun(UserAcc),
         case Go of
         ok ->
-            wait_db_updated(Timeout, TimeoutFun, UserAcc2);
+            wait_updated(Timeout, TimeoutFun, UserAcc2);
         stop ->
             {stop, UserAcc2}
         end
     end.
 
-get_rest_db_updated(UserAcc) ->
+get_rest_updated(UserAcc) ->
     receive
-    db_updated ->
-        get_rest_db_updated(UserAcc)
+    updated ->
+        get_rest_updated(UserAcc)
     after 0 ->
         {updated, UserAcc}
     end.

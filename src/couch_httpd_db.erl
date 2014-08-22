@@ -112,7 +112,7 @@ handle_changes_req2(Req, Db) ->
         end
     end,
     ChangesArgs = parse_changes_query(Req, Db),
-    ChangesFun = couch_changes:handle_changes(ChangesArgs, Req, Db),
+    ChangesFun = couch_changes:handle_db_changes(ChangesArgs, Req, Db),
     WrapperFun = case ChangesArgs#changes_args.feed of
     "normal" ->
         {ok, Info} = couch_db:get_db_info(Db),
