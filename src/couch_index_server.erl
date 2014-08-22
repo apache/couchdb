@@ -65,7 +65,7 @@ validate(DbName, DDoc) ->
 
 get_index(Module, <<"shards/", _/binary>>=DbName, DDoc) ->
     {Pid, Ref} = spawn_monitor(fun() ->
-        exit(fabric:open_doc(mem3:dbname(DbName), DDoc, []))
+        exit(fabric:open_doc(mem3:dbname(DbName), DDoc, [ejson_body]))
     end),
     receive {'DOWN', Ref, process, Pid, {ok, Doc}} ->
         get_index(Module, DbName, Doc, nil);
