@@ -123,7 +123,7 @@ listen_for_changes(Since) ->
         heartbeat = true,
         include_docs = true
     },
-    ChangesFun = couch_changes:handle_changes(Args, nil, Db),
+    ChangesFun = couch_changes:handle_db_changes(Args, nil, Db),
     ChangesFun(fun changes_callback/2).
 
 changes_callback(start, _) ->
