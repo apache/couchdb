@@ -94,9 +94,13 @@ merge_results(Info) ->
             [{purge_seq, lists:sum(X)} | Acc];
         (compact_running, X, Acc) ->
             [{compact_running, lists:member(true, X)} | Acc];
-        (disk_size, X, Acc) ->
+        (disk_size, X, Acc) -> % legacy
             [{disk_size, lists:sum(X)} | Acc];
-        (other, X, Acc) ->
+        (data_size, X, Acc) -> % legacy
+            [{data_size, lists:sum(X)} | Acc];
+        (sizes, X, Acc) ->
+            [{sizes, {merge_object(X)}} | Acc];
+        (other, X, Acc) -> % legacy
             [{other, {merge_other_results(X)}} | Acc];
         (disk_format_version, X, Acc) ->
             [{disk_format_version, lists:max(X)} | Acc];
@@ -113,4 +117,13 @@ merge_other_results(Results) ->
             [{data_size, lists:sum(X)} | Acc];
         (_, _, Acc) ->
             Acc
+    end, [], Dict).
+
+merge_object(Objects) ->
+    Dict = lists:foldl(fun({Props}, D) ->
+        lists:foldl(fun({K,V},D0) -> orddict:append(K,V,D0) end, D, Props)
+    end, orddict:new(), Objects),
+    orddict:fold(fun
+        (Key, X, Acc) ->
+            [{Key, lists:sum(X)} | Acc]
     end, [], Dict).
