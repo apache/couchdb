@@ -14,19 +14,13 @@
 
 -export([handle_db_changes_req/2,
          handle_changes_req/4,
-         handle_view_filtered_changes/3,
-         parse_changes_query/3]).
+         parse_changes_query/2]).
 
 -include_lib("couch/include/couch_db.hrl").
 
 handle_db_changes_req(Req, Db) ->
-    ChangesArgs = parse_changes_query(Req, Db, false),
-    ChangesFun = case ChangesArgs#changes_args.filter of
-        "_view" ->
-            handle_view_filtered_changes(ChangesArgs, Req, Db);
-        _ ->
-            couch_changes:handle_db_changes(ChangesArgs, Req, Db)
-    end,
+    ChangesArgs = parse_changes_query(Req, Db),
+    ChangesFun = couch_changes:handle_db_changes(ChangesArgs, Req, Db),
     handle_changes_req(Req, Db, ChangesArgs, ChangesFun).
 
 handle_changes_req(#httpd{method='POST'}=Req, Db, ChangesArgs, ChangesFun) ->
@@ -126,170 +120,7 @@ handle_changes_req1(Req, #db{name=DbName}=Db, ChangesArgs, ChangesFun) ->
     end.
 
 
-%% wrapper around couch_mrview_changes.
-%% This wrapper mimic couch_changes:handle_db_changes/3 and return a
-%% Changefun that can be used by the handle_changes_req function. Also
-%% while couch_mrview_changes:handle_changes/6 is returning tha view
-%% changes this function return docs corresponding to the changes
-%% instead so it can be used to replace the _view filter.
-handle_view_filtered_changes(ChangesArgs, Req, Db) ->
-    %% parse view parameter
-    {DDocId, VName} = parse_view_param(Req),
-
-    %% get view options
-    Query = case Req of
-        {json_req, {Props}} ->
-            {Q} = couch_util:get_value(<<"query">>, Props, {[]}),
-            Q;
-        _ ->
-            couch_httpd:qs(Req)
-    end,
-    ViewOptions = parse_view_options(Query, []),
-
-    {ok, Infos} = couch_mrview:get_info(Db, DDocId),
-    case lists:member(<<"seq_indexed">>,
-                      proplists:get_value(update_options, Infos, [])) of
-        true ->
-            handle_view_filtered_changes(Db, DDocId, VName, ViewOptions, ChangesArgs,
-                                Req);
-        false when ViewOptions /= [] ->
-            ?LOG_ERROR("Tried to filter a non sequence indexed view~n",[]),
-            throw({bad_request, seqs_not_indexed});
-        false ->
-            %% old method we are getting changes using the btree instead
-            %% which is not efficient, log it
-            ?LOG_WARN("Get view changes with seq_indexed=false.~n", []),
-            couch_changes:handle_db_changes(ChangesArgs, Req, Db)
-    end.
-
-handle_view_filtered_changes(#db{name=DbName}=Db0, DDocId, VName, ViewOptions,
-                    ChangesArgs, Req) ->
-    #changes_args{
-        feed = ResponseType,
-        since = Since,
-        db_open_options = DbOptions} = ChangesArgs,
-
-    Options0 = [{since, Since},
-                {view_options, ViewOptions}],
-    Options = case ResponseType of
-        "continuous" -> [stream | Options0];
-        "eventsource" -> [stream | Options0];
-        "longpoll" -> [{stream, once} | Options0];
-        _ -> Options0
-    end,
-
-    %% reopen the db with the db options given to the changes args
-    couch_db:close(Db0),
-    DbOptions1 = [{user_ctx, Db0#db.user_ctx} | DbOptions],
-    {ok, Db} = couch_db:open(DbName, DbOptions1),
-
-
-    %% initialise the changes fun
-    ChangesFun = fun(Callback) ->
-            Callback(start, ResponseType),
-
-            Acc0 = {"", 0, Db, Callback, ChangesArgs},
-            couch_mrview_changes:handle_changes(DbName, DDocId, VName,
-                                               fun view_changes_cb/2,
-                                               Acc0, Options)
-    end,
-    ChangesFun.
-
-
-view_changes_cb(stop, {LastSeq, {_, _, _, Callback, Args}}) ->
-    Callback({stop, LastSeq}, Args#changes_args.feed);
-
-view_changes_cb(heartbeat, {_, _, _, Callback, Args}=Acc) ->
-    Callback(timeout, Args#changes_args.feed),
-    {ok, Acc};
-view_changes_cb({{Seq, _Key, DocId}, Val},
-                {Prepend, OldLimit, Db0, Callback, Args}=Acc) ->
-
-    %% is the key removed from the index?
-    Removed = case Val of
-        {[{<<"_removed">>, true}]} -> true;
-        _ -> false
-    end,
-
-    #changes_args{
-        feed = ResponseType,
-        limit = Limit} = Args,
-
-    %% if the doc sequence is > to the one in the db record, reopen the
-    %% database since it means we don't have the latest db value.
-    Db = case Db0#db.update_seq >= Seq of
-        true -> Db0;
-        false ->
-            {ok, Db1} = couch_db:reopen_db(Db0),
-            Db1
-    end,
-
-    case couch_db:get_doc_info(Db, DocId) of
-        {ok, DocInfo} ->
-            %% get change row
-            {Deleted, ChangeRow} = view_change_row(Db, DocInfo, Args),
-
-            case Removed of
-                true when Deleted /= true ->
-                    %% the key has been removed from the view but the
-                    %% document hasn't been deleted so ignore it.
-                    {ok, Acc};
-                _ ->
-                    %% emit change row
-                    Callback({change, ChangeRow, Prepend}, ResponseType),
-
-                    %% if we achieved the limit, stop here, else continue.
-                    NewLimit = OldLimit + 1,
-                    if Limit > NewLimit ->
-                            {ok, {<<",\n">>, NewLimit, Db, Callback, Args}};
-                        true ->
-                            {stop, {<<"">>, NewLimit, Db, Callback, Args}}
-                    end
-            end;
-        {error, not_found} ->
-            %% doc not found, continue
-            {ok, Acc};
-        Error ->
-            throw(Error)
-    end.
-
-
-view_change_row(Db, DocInfo, Args) ->
-    #doc_info{id = Id, high_seq = Seq, revs = Revs} = DocInfo,
-    [#rev_info{rev=Rev, deleted=Del} | _] = Revs,
-
-    #changes_args{style=Style,
-                  include_docs=InDoc,
-                  doc_options = DocOpts,
-                  conflicts=Conflicts}=Args,
-
-    Changes = case Style of
-        main_only ->
-            [{[{<<"rev">>, couch_doc:rev_to_str(Rev)}]}];
-        all_docs ->
-            [{[{<<"rev">>, couch_doc:rev_to_str(R)}]}
-                || #rev_info{rev=R} <- Revs]
-    end,
-
-    {Del, {[{<<"seq">>, Seq}, {<<"id">>, Id}, {<<"changes">>, Changes}] ++
-     deleted_item(Del) ++ case InDoc of
-            true ->
-                Opts = case Conflicts of
-                    true -> [deleted, conflicts];
-                    false -> [deleted]
-                end,
-                Doc = couch_index_util:load_doc(Db, DocInfo, Opts),
-                case Doc of
-                    null ->
-                        [{doc, null}];
-                    _ ->
-                        [{doc, couch_doc:to_json_obj(Doc, DocOpts)}]
-                end;
-            false ->
-                []
-    end}}.
-
-parse_changes_query(Req, Db, IsViewChanges) ->
+parse_changes_query(Req, Db) ->
     ChangesArgs = lists:foldl(fun({Key, Value}, Args) ->
         case {string:to_lower(Key), Value} of
         {"feed", _} ->
@@ -426,6 +257,3 @@ parse_json(V) when is_list(V) ->
     ?JSON_DECODE(V);
 parse_json(V) ->
     V.
-
-deleted_item(true) -> [{<<"deleted">>, true}];
-deleted_item(_) -> [].

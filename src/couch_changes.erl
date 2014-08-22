@@ -63,25 +63,45 @@ handle_changes(Args1, Req, Db0, Type) ->
         dir = Dir,
         since = Since
     } = Args1,
-    {StartListenerFun, DDocName, ViewName, View} = case Type of
-        {view, DDocName0, ViewName0} ->
-            SNFun = fun() ->
-                couch_event:link_listener(
-                     ?MODULE, handle_view_event, self(), [{dbname, Db0#db.name}]
-                )
-            end,
-            {ok, {_, View0, _}, _, _} = couch_mrview_util:get_view(Db0#db.name, DDocName0, ViewName0, #mrargs{}),
-            {SNFun, DDocName0, ViewName0, View0};
-        db ->
-            SNFun = fun() ->
-                couch_event:link_listener(
-                     ?MODULE, handle_db_event, self(), [{dbname, Db0#db.name}]
-                )
-            end,
-            {SNFun, undefined, undefined, undefined}
-    end,
     Filter = configure_filter(FilterName, Style, Req, Db0),
     Args = Args1#changes_args{filter_fun = Filter},
+    UseViewChanges = case {Type, Filter} of
+        {{view, _, _}, _} ->
+            true;
+        {_, {fast_view, _, _, _}} ->
+            true;
+        _ ->
+            false
+    end,
+    {StartListenerFun, DDocName, ViewName, View} = if UseViewChanges ->
+        {DDocName0, ViewName0} = case {Type, Filter} of
+            {{view, DDocName1, ViewName1}, _} ->
+                {DDocName1, ViewName1};
+            {_, {fast_view, _, DDoc, ViewName1}} ->
+                {DDoc#doc.id, ViewName1}
+        end,
+        {ok, {_, View0, _}, _, _} = couch_mrview_util:get_view(
+                Db0#db.name, DDocName0, ViewName0, #mrargs{}),
+        case View0#mrview.seq_btree of
+            #btree{} ->
+                ok;
+            _ ->
+                throw({bad_request, "view changes not enabled"})
+        end,
+        SNFun = fun() ->
+            couch_event:link_listener(
+                 ?MODULE, handle_view_event, {self(), DDocName0}, [{dbname, Db0#db.name}]
+            )
+        end,
+        {SNFun, DDocName0, ViewName0, View0};
+    true ->
+        SNFun = fun() ->
+            couch_event:link_listener(
+                 ?MODULE, handle_db_event, self(), [{dbname, Db0#db.name}]
+            )
+        end,
+        {SNFun, undefined, undefined, undefined}
+    end,
     Start = fun() ->
         {ok, Db} = couch_db:reopen(Db0),
         StartSeq = case Dir of
@@ -180,7 +200,15 @@ configure_filter("_view", Style, Req, Db) ->
         [DName, VName] ->
             {ok, DDoc} = open_ddoc(Db, <<"_design/", DName/binary>>),
             check_member_exists(DDoc, [<<"views">>, VName]),
-            {view, Style, DDoc, VName};
+            try
+                true = couch_util:get_nested_json_value(
+                        DDoc#doc.body,
+                        [<<"options">>, <<"seq_indexed">>]
+                ),
+                {fast_view, Style, DDoc, VName}
+            catch _:_ ->
+                {view, Style, DDoc, VName}
+            end;
         [] ->
             Msg = "`view` must be of the form `designname/viewname`",
             throw({bad_request, Msg})
@@ -236,6 +264,36 @@ filter(Db, DocInfo, {custom, Style, Req0, DDoc, FName}) ->
     Docs = open_revs(Db, DocInfo, Style),
     {ok, Passes} = couch_query_servers:filter_docs(Req, Db, DDoc, FName, Docs),
     filter_revs(Passes, Docs).
+
+fast_view_filter(Db, {{Seq, _}, {ID, _}}, {fast_view, Style, _, _}) ->
+    case couch_db:get_doc_info(Db, ID) of
+        {ok, #doc_info{high_seq=Seq}=DocInfo} ->
+            Docs = open_revs(Db, DocInfo, Style),
+            Changes = lists:map(fun(#doc{revs={RevPos, [RevId | _]}}) ->
+                RevStr = couch_doc:rev_to_str({RevPos, RevId}),
+                {[{<<"rev">>, RevStr}]}
+            end, Docs),
+            {DocInfo, Changes};
+        {ok, #doc_info{high_seq=HighSeq}} when Seq > HighSeq ->
+            % If the view seq tree is out of date (or if the view seq tree
+            % was opened before the db) seqs may come by from the seq tree
+            % which correspond to the not-most-current revision of a document.
+            % The proper thing to do is to not send this old revision, but wait
+            % until we reopen the up-to-date view seq tree and continue the
+            % fold.
+            % I left the Seq > HighSeq guard in so if (for some godforsaken
+            % reason) the seq in the view is more current than the database,
+            % we'll throw an error.
+            {ok, []};
+        {error, not_found} ->
+            {ok, []}
+    end.
+
+
+
+view_filter(_Db, _KV, {default, _Style}) ->
+    [ok]. % TODO: make a real thing
+
 
 get_view_qs({json_req, {Props}}) ->
     {Query} = couch_util:get_value(<<"query">>, Props, {[]}),
@@ -477,7 +535,7 @@ keep_sending_changes(Args, Acc0, FirstRound) ->
         db = Db, callback = Callback,
         timeout = Timeout, timeout_fun = TimeoutFun, seq = EndSeq,
         prepend = Prepend2, user_acc = UserAcc2, limit = NewLimit,
-        ddoc_name = DDocName, view_name = ViewName, view = View
+        ddoc_name = DDocName, view_name = ViewName
     } = ChangesAcc,
 
     couch_db:close(Db),
@@ -517,54 +575,27 @@ maybe_refresh_view(Db, DDocName, ViewName) ->
 end_sending_changes(Callback, UserAcc, EndSeq, ResponseType) ->
     Callback({stop, EndSeq}, ResponseType, UserAcc).
 
-changes_enumerator(Value, #changes_acc{resp_type = ResponseType} = Acc)
-        when ResponseType =:= "continuous"
-        orelse ResponseType =:= "eventsource" ->
-    #changes_acc{
-        filter = Filter, callback = Callback,
-        user_acc = UserAcc, limit = Limit, db = Db,
-        timeout = Timeout, timeout_fun = TimeoutFun,
-        view = View
-    } = Acc,
-    {Seq, Results0} = case View of
-        undefined ->
-            {Value#doc_info.high_seq, filter(Db, Value, Filter)};
-        #mrview{} ->
-            {{Seq0, _}, _} = Value,
-            {Seq0, [ok]} % TODO
-    end,
-    Results = [Result || Result <- Results0, Result /= null],
-    %% TODO: I'm thinking this should be < 1 and not =< 1
-    Go = if Limit =< 1 -> stop; true -> ok end,
-    case Results of
-    [] ->
-        {Done, UserAcc2} = maybe_heartbeat(Timeout, TimeoutFun, UserAcc),
-        case Done of
-        stop ->
-            {stop, Acc#changes_acc{seq = Seq, user_acc = UserAcc2}};
-        ok ->
-            {Go, Acc#changes_acc{seq = Seq, user_acc = UserAcc2}}
-        end;
-    _ ->
-        ChangesRow = changes_row(Results, Value, Acc),
-        UserAcc2 = Callback({change, ChangesRow, <<>>}, ResponseType, UserAcc),
-        reset_heartbeat(),
-        {Go, Acc#changes_acc{seq = Seq, user_acc = UserAcc2, limit = Limit - 1}}
-    end;
-changes_enumerator(Value, Acc) ->
+changes_enumerator(Value0, Acc) ->
     #changes_acc{
         filter = Filter, callback = Callback, prepend = Prepend,
         user_acc = UserAcc, limit = Limit, resp_type = ResponseType, db = Db,
         timeout = Timeout, timeout_fun = TimeoutFun, view = View
     } = Acc,
-    {Seq, Results0} = case View of
-        undefined ->
-            {Value#doc_info.high_seq, filter(Db, Value, Filter)};
-        #mrview{} ->
-            {{Seq0,_}, _} = Value,
-            {Seq0, [ok]} % TODO view filter
+    {Value, Results0} = case {View, Filter} of
+        {_, {fast_view, _, _, _}} ->
+            fast_view_filter(Db, Value0, Filter);
+        {#mrview{}, _} ->
+            {Value0, view_filter(Db, Value0, Filter)};
+        {_, _} ->
+            {Value0, filter(Db, Value0, Filter)}
     end,
     Results = [Result || Result <- Results0, Result /= null],
+    Seq = case Value of
+        #doc_info{} ->
+            Value#doc_info.high_seq;
+        {{Seq0, _}, _} ->
+            Seq0
+    end,
     Go = if (Limit =< 1) andalso Results =/= [] -> stop; true -> ok end,
     case Results of
     [] ->
@@ -576,20 +607,32 @@ changes_enumerator(Value, Acc) ->
             {Go, Acc#changes_acc{seq = Seq, user_acc = UserAcc2}}
         end;
     _ ->
-        ChangesRow = changes_row(Results, Value, Acc),
-        UserAcc2 = Callback({change, ChangesRow, Prepend}, ResponseType, UserAcc),
-        reset_heartbeat(),
-        {Go, Acc#changes_acc{
-            seq = Seq, prepend = <<",\n">>,
-            user_acc = UserAcc2, limit = Limit - 1}}
+        if ResponseType =:= "continuous" orelse ResponseType =:= "eventsource" ->
+            ChangesRow = changes_row(Results, Value, Acc),
+            UserAcc2 = Callback({change, ChangesRow, <<>>}, ResponseType, UserAcc),
+            reset_heartbeat(),
+            {Go, Acc#changes_acc{seq = Seq, user_acc = UserAcc2, limit = Limit - 1}};
+        true ->
+            ChangesRow = changes_row(Results, Value, Acc),
+            UserAcc2 = Callback({change, ChangesRow, Prepend}, ResponseType, UserAcc),
+            reset_heartbeat(),
+            {Go, Acc#changes_acc{
+                seq = Seq, prepend = <<",\n">>,
+                user_acc = UserAcc2, limit = Limit - 1}}
+        end
     end.
 
 
 
-changes_row(Results, SeqStuff, #changes_acc{view=#mrview{}}) ->
-    {{Seq, Key}, {Id, Value}} = SeqStuff,
+changes_row(Results, DocInfo, #changes_acc{filter={fast_view,_,_,_}}=Acc) ->
+    format_doc_info_change(Results, DocInfo, Acc);
+changes_row(Results, KV, #changes_acc{view=#mrview{}}) ->
+    {{Seq, Key}, {Id, Value}} = KV,
     {[{<<"seq">>, Seq}, {<<"id">>, Id}, {<<"key">>, Key}, {<<"value">>, Value}, {<<"changes">>, Results}]};
-changes_row(Results, #doc_info{}=DocInfo, #changes_acc{view=undefined}=Acc) ->
+changes_row(Results, #doc_info{}=DocInfo, Acc) ->
+    format_doc_info_change(Results, DocInfo, Acc).
+
+format_doc_info_change(Results, #doc_info{}=DocInfo, Acc) ->
     #doc_info{
         id = Id, high_seq = Seq, revs = [#rev_info{deleted = Del} | _]
     } = DocInfo,
