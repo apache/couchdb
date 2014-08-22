@@ -36,6 +36,7 @@
         kernel,
         stdlib,
         couch_log,
+        couch_stats,
         config,
         couch,
         ets_lru,

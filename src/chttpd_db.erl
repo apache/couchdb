@@ -67,7 +67,7 @@ handle_changes_req(#httpd{method='GET'}=Req, Db) ->
         {ok, Info} = fabric:get_db_info(Db),
         Etag = chttpd:make_etag(Info),
         DeltaT = timer:now_diff(os:timestamp(), T0) / 1000,
-        couch_stats_collector:record({couchdb, dbinfo}, DeltaT),
+        couch_stats:update_histogram([couchdb, dbinfo], DeltaT),
         chttpd:etag_respond(Req, Etag, fun() ->
             fabric:changes(Db, fun changes_callback/2, {"normal", {"Etag",Etag}, Req},
                 ChangesArgs)
@@ -252,7 +252,7 @@ db_req(#httpd{method='GET',path_parts=[DbName]}=Req, _Db) ->
     T0 = os:timestamp(),
     {ok, DbInfo} = fabric:get_db_info(DbName),
     DeltaT = timer:now_diff(os:timestamp(), T0) / 1000,
-    couch_stats_collector:record({couchdb, dbinfo}, DeltaT),
+    couch_stats:update_histogram([couchdb, dbinfo], DeltaT),
     send_json(Req, {DbInfo});
 
 db_req(#httpd{method='POST', path_parts=[DbName], user_ctx=Ctx}=Req, Db) ->
@@ -314,7 +314,7 @@ db_req(#httpd{path_parts=[_,<<"_ensure_full_commit">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "POST");
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, Db) ->
-    couch_stats_collector:increment({httpd, bulk_requests}),
+    couch_stats:increment_counter([httpd, bulk_requests]),
     couch_httpd:validate_ctype(Req, "application/json"),
     {JsonProps} = chttpd:json_body_obj(Req),
     DocsArray = case couch_util:get_value(<<"docs">>, JsonProps) of

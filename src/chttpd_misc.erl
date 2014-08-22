@@ -307,7 +307,7 @@ handle_system_req(Req) ->
     ]}).
 
 db_pid_stats() ->
-    {monitors, M} = process_info(whereis(couch_stats_collector), monitors),
+    {monitors, M} = process_info(whereis(couch_stats_process_tracker), monitors),
     Candidates = [Pid || {process, Pid} <- M],
     CouchFiles = db_pid_stats(couch_file, Candidates),
     CouchDbUpdaters = db_pid_stats(couch_db_updater, Candidates),

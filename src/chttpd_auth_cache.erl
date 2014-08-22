@@ -52,18 +52,18 @@ get_user_creds(UserName) when is_binary(UserName) ->
 get_from_cache(UserName) ->
     try ets_lru:lookup_d(?CACHE, UserName) of
 	{ok, Props} ->
-	    couch_stats_collector:increment({chttpd, auth_cache_hits}),
+	    couch_stats:increment_counter([chttpd, auth_cache_hits]),
 	    couch_log:debug("cache hit for ~s", [UserName]),
 	    Props;
 	_ ->
 	    Props = load_user_from_db(UserName),
-	    couch_stats_collector:increment({chttpd, auth_cache_misses}),
+	    couch_stats:increment_counter([chttpd, auth_cache_misses]),
 	    couch_log:debug("cache miss for ~s", [UserName]),
 	    ets_lru:insert(?CACHE, UserName, Props),
 	    Props
     catch
 	error:badarg ->
-	    couch_stats_collector:increment({chttpd, auth_cache_misses}),
+	    couch_stats:increment_counter([chttpd, auth_cache_misses]),
 	    couch_log:debug("cache miss for ~s", [UserName]),
 	    load_user_from_db(UserName)
     end.
