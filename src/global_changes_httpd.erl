@@ -39,7 +39,8 @@ handle_global_changes_req(#httpd{method='GET'}=Req) ->
     % Limit is handled in the changes callback, since the limit count needs to
     % only account for changes which happen after the filter.
     Limit = couch_util:get_value(limit, Options),
-    Options1 = lists:keydelete(limit, 1, Options),
+    %Options1 = lists:keydelete(limit, 1, Options),
+    Options1 = Options,
     chttpd:verify_is_server_admin(Req),
     Acc = #acc{
         username=admin,
