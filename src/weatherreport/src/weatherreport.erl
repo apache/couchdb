@@ -73,7 +73,7 @@
 main(Args) ->
     application:load(weatherreport),
 
-    case getopt:parse(?OPTS, Args) of
+    case weatherreport_getopt:parse(?OPTS, Args) of
         {ok, {Opts, NonOptArgs}} ->
             case process_opts(Opts) of
                 list -> list_checks();
@@ -94,7 +94,7 @@ list_checks() ->
                   end, lists:sort(Descriptions)).
 
 usage() ->
-    getopt:usage(?USAGE_OPTS, "weatherreport ", "[check_name ...]", [{"check_name", "A specific check to run"}]).
+    weatherreport_getopt:usage(?USAGE_OPTS, "weatherreport ", "[check_name ...]", [{"check_name", "A specific check to run"}]).
 
 run(InputChecks) ->
     case weatherreport_config:prepare() of
