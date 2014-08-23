@@ -36,16 +36,16 @@ transform_stats([{Key, Props} | Rest], Acc) ->
 transform_stat(counter, Props) ->
     Props;
 transform_stat(histogram, Props) ->
-    lists:map(
-      fun({value, Value}) ->
-              {value, lists:map(
-                fun({Key, List}) when Key == percentile; Key == histogram ->
-                        {Key, [tuple_to_list(Item) || Item <- List]};
-                   (Else) ->
-                        Else
-                end, Value)};
-         (Else) ->
-              Else
+    lists:map(fun
+        ({value, Value}) ->
+            {value, lists:map(fun
+                ({Key, List}) when Key == percentile; Key == histogram ->
+                    {Key, [tuple_to_list(Item) || Item <- List]};
+                (Else) ->
+                    Else
+            end, Value)};
+        (Else) ->
+            Else
       end, Props).
 
 
