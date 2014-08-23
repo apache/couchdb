@@ -124,10 +124,10 @@ run(InputChecks) ->
     _ ->
         %% Print the most critical messages first
         FilteredMessages = lists:filter(fun({_,Level,_,_}) ->
-            weatherreport_util:should_log(Level)
+            weatherreport_log:should_log(Level)
         end, Messages),
         SortedMessages = lists:sort(fun({_, ALevel, _, _}, {_, BLevel, _, _}) ->
-            twig_util:level(ALevel) =< twig_util:level(BLevel)
+            weatherreport_log:level(ALevel) =< weatherreport_log:level(BLevel)
         end, FilteredMessages),
         case SortedMessages of
             [] ->

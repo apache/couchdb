@@ -34,8 +34,7 @@
     {applications, [
         kernel,
         stdlib,
-        inets,
-        twig
+        inets
     ]},
     {mod, {weatherreport_app, []}}
  ]}.

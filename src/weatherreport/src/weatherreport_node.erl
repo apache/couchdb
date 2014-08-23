@@ -67,7 +67,7 @@ local_command(Module, Function, Args) ->
 local_command(Module, Function, Args, Timeout) ->
     case is_cluster_node() of
         true ->
-            weatherreport_util:log(
+            weatherreport_log:log(
                 node(),
                 debug,
                 "Local function call: ~p:~p(~p)",
@@ -75,7 +75,7 @@ local_command(Module, Function, Args, Timeout) ->
             ),
             erlang:apply(Module, Function, Args);
         _ ->
-            weatherreport_util:log(
+            weatherreport_log:log(
                 node(),
                 debug,
                 "Local RPC: ~p:~p(~p) [~p]",
@@ -110,7 +110,7 @@ can_connect() ->
     case is_connected() or is_cluster_node() of
         true -> true;
         false ->
-            weatherreport_util:log(
+            weatherreport_log:log(
                 node(),
                 debug,
                 "Not connected to the local cluster node, trying to connect. alive:~p connect_failed:~p",
@@ -167,7 +167,7 @@ try_connect() ->
     case {net_kernel:hidden_connect_node(TargetNode), net_adm:ping(TargetNode)} of
         {true, pong} ->
             application:set_env(weatherreport, connect_failed, false),
-            weatherreport_util:log(
+            weatherreport_log:log(
                 node(),
                 debug,
                 "Connected to local cluster node ~p.",
@@ -176,7 +176,7 @@ try_connect() ->
             true;
         _ ->
             application:set_env(weatherreport, connect_failed, true),
-            weatherreport_util:log(
+            weatherreport_log:log(
                 node(),
                 warning,
                 "Could not connect to the local cluster node ~p, some checks will not run.",
@@ -193,7 +193,7 @@ connect_failed() ->
     end.
 
 start_net() ->
-    weatherreport_util:log(node(), debug, "Starting distributed Erlang."),
+    weatherreport_log:log(node(), debug, "Starting distributed Erlang."),
     {Type, NodeName} = weatherreport_config:node_name(),
     ThisNode = append_node_suffix(NodeName, "_diag"),
     {ok, _} = net_kernel:start([ThisNode, Type]),

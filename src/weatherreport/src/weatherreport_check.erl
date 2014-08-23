@@ -101,7 +101,7 @@ modules() ->
 print({Node, Level, Mod, Data}) ->
     case Mod:format(Data) of
         {Format, Terms} ->
-            weatherreport_util:log(Node, Level, Format, Terms);
+            weatherreport_log:log(Node, Level, Format, Terms);
         String ->
-            weatherreport_util:log(Node, Level, String)
+            weatherreport_log:log(Node, Level, String)
     end.

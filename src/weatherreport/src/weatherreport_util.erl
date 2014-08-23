@@ -30,9 +30,7 @@
 -module(weatherreport_util).
 -export([short_name/1,
          run_command/1,
-         log/3,log/4,
          binary_to_float/1,
-         should_log/1,
          flush_stdout/0,
          check_proc_count/3]).
 
@@ -48,7 +46,7 @@ short_name(Mod) when is_atom(Mod) ->
 %% redirected to stdout so its output will be included.
 -spec run_command(Command::iodata()) -> StdOut::iodata().
 run_command(Command) ->
-    weatherreport_util:log(
+    weatherreport_log:log(
         node(),
         debug,
         "Running shell command: ~s",
@@ -60,7 +58,7 @@ run_command(Command) ->
 do_read(Port, Acc) ->
     receive
         {Port, {data, StdOut}} ->
-            weatherreport_util:log(
+            weatherreport_log:log(
                 node(),
                 debug,
                 "Shell command output: ~n~s~n",
@@ -80,37 +78,6 @@ do_read(Port, Acc) ->
 -spec binary_to_float(binary()) -> float().
 binary_to_float(Bin) ->
     list_to_float(binary_to_list(Bin)).
-
-get_prefix(Node, Level) ->
-    io_lib:format("[~w] [~w]", [Node, Level]).
-
-log(Node, Level, Format, Terms) ->
-    case should_log(Level) of
-        true ->
-            Prefix = get_prefix(Node, Level),
-            Message = io_lib:format(Format, Terms),
-            io:format("~s ~s~n", [Prefix, Message]);
-        false ->
-            ok
-    end,
-    twig:log(Level, Format, Terms).
-
-log(Node, Level, String) ->
-    case should_log(Level) of
-        true ->
-            Prefix = get_prefix(Node, Level),
-            io:format("~s ~s~n", [Prefix, String]);
-        false ->
-            ok
-    end,
-    twig:log(Level, String).
-
-should_log(Level) ->
-    AppLevel = case application:get_env(weatherreport, log_level) of
-        undefined -> info;
-        {ok, L0} -> L0
-    end,
-    twig_util:level(AppLevel) >= twig_util:level(Level).
 
 flush_stdout() ->
     timer:sleep(1000).

@@ -29,8 +29,7 @@
 %% the {@link weatherreport. weatherreport} module calls {@link
 %% prepare/0. prepare/0}, CouchDB's <code>default.ini</code>,
 %% <code>local.ini</code> and <code>vm.args</code> files will be
-%% parsed and memoized, and twig will be started on the console at the
-%% configured severity level.
+%% parsed and memoized.
 %% @end
 
 -module(weatherreport_config).
@@ -49,7 +48,7 @@
 %%      not need to invoke it.
 -spec prepare() -> ok | {error, iodata()}.
 prepare() ->
-    prepare([fun start_twig/0, fun load_app_config/0, fun load_vm_args/0]).
+    prepare([fun load_app_config/0, fun load_vm_args/0]).
 
 prepare([]) ->
     ok;
@@ -130,25 +129,15 @@ cookie() ->
             list_to_atom(Cookie)
     end.
 
-%% Private functions
-start_twig() ->
-    application:load(twig),
-    case application:get_env(weatherreport, log_level) of
-        undefined ->
-            {error, "Log level not set!"};
-        {ok, _Level} ->
-            ok
-    end.
-
 load_app_config() ->
     Etc = ?MODULE:etc_dir(),
     IniFiles = [
         filename:join(Etc, "default.ini"),
         filename:join(Etc, "local.ini")
     ],
-    weatherreport_util:log(node(), debug, "Reading config from files: ~p", [IniFiles]),
+    weatherreport_log:log(node(), debug, "Reading config from files: ~p", [IniFiles]),
     config:start_link(IniFiles),
-    weatherreport_util:log(node(), debug, "Local node config: ~p~n", [config:all()]).
+    weatherreport_log:log(node(), debug, "Local node config: ~p~n", [config:all()]).
 
 load_vm_args() ->
     VmArgs = case init:get_argument(vm_args) of 
