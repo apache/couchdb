@@ -15,12 +15,13 @@
 
 -export([handle_stats_req/1]).
 
-handle_stats_req(#httpd{method='GET', path_parts=[_]}=Req) ->
+handle_stats_req(#httpd{method='GET', path_parts=[_ | Path]}=Req) ->
     Stats0 = couch_stats:fetch(),
     Stats = transform_stats(Stats0),
     Nested = nest(Stats),
-    EJSON = to_ejson(Nested),
-    couch_httpd:send_json(Req, EJSON).
+    EJSON0 = to_ejson(Nested),
+    EJSON1 = extract_path(Path, EJSON0),
+    couch_httpd:send_json(Req, EJSON1).
 
 
 transform_stats(Stats) ->
@@ -75,7 +76,22 @@ to_ejson(NotAProplist) ->
     NotAProplist.
 
 
+extract_path([], EJSON) ->
+    EJSON;
+extract_path([Key | Rest], {Props}) ->
+    case proplists:lookup(Key, Props) of
+        {Key, SubEJSON} ->
+            extract_path(Rest, SubEJSON);
+        none ->
+            null
+    end;
+extract_path([_ | _], _NotAnObject) ->
+    null.
+
+
 maybe_format_key(Key) when is_list(Key) ->
     list_to_binary(Key);
-maybe_format_key(Key) ->
+maybe_format_key(Key) when is_atom(Key) ->
+    list_to_binary(atom_to_list(Key));
+maybe_format_key(Key) when is_binary(Key) ->
     Key.
