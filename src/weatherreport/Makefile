@@ -3,25 +3,25 @@
 all: deps compile escriptize
 
 compile:
-	./rebar compile
+	rebar compile
 
 deps:
-	./rebar get-deps
+	rebar get-deps
 
 clean:
-	./rebar clean
+	rebar clean
 
 distclean: clean
-	./rebar delete-deps
+	rebar delete-deps
 
 test:
-	./rebar compile eunit
+	rebar compile eunit
 
 escriptize:
-	./rebar escriptize
+	rebar escriptize
 
 ##
 ## Doc targets
 ##
 docs:
-	./rebar doc skip_deps=true
+	rebar doc skip_deps=true
