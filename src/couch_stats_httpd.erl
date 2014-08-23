@@ -18,7 +18,6 @@
 handle_stats_req(#httpd{method='GET', path_parts=[_]}=Req) ->
     Stats0 = couch_stats:fetch(),
     Stats = transform_stats(Stats0),
-    couch_log:notice("poo ~p", [Stats0]),
     Nested = nest(Stats),
     EJSON = to_ejson(Nested),
     couch_httpd:send_json(Req, EJSON).
