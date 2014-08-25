@@ -124,11 +124,13 @@ process_doc(Doc, Seq, #mrst{doc_acc=Acc}=State) when length(Acc) > 100 ->
     couch_work_queue:queue(State#mrst.doc_queue, lists:reverse(Acc)),
     process_doc(Doc, Seq, State#mrst{doc_acc=[]});
 process_doc(nil, Seq, #mrst{doc_acc=Acc}=State) ->
-    {ok, State#mrst{doc_acc=[{nil, Seq, nil} | Acc]}};
-process_doc(#doc{id=Id, deleted=true}, Seq, #mrst{doc_acc=Acc}=State) ->
-    {ok, State#mrst{doc_acc=[{Id, Seq, deleted} | Acc]}};
+    {ok, State#mrst{doc_acc=[{nil, Seq, nil, nil} | Acc]}};
+process_doc(#doc{id=Id, deleted=true}=Doc, Seq, #mrst{doc_acc=Acc}=State) ->
+    {RevPos, [Rev | _]} = Doc#doc.revs,
+    {ok, State#mrst{doc_acc=[{Id, Seq, {RevPos, Rev}, deleted} | Acc]}};
 process_doc(#doc{id=Id}=Doc, Seq, #mrst{doc_acc=Acc}=State) ->
-    {ok, State#mrst{doc_acc=[{Id, Seq, Doc} | Acc]}}.
+    {RevPos, [Rev | _]} = Doc#doc.revs,
+    {ok, State#mrst{doc_acc=[{Id, Seq, {RevPos, Rev}, Doc} | Acc]}}.
 
 
 finish_update(#mrst{doc_acc=Acc}=State) ->
@@ -164,15 +166,15 @@ map_docs(Parent, State0) ->
             end,
             QServer = State1#mrst.qserver,
             DocFun = fun
-                ({nil, Seq, _}, {SeqAcc, Results}) ->
+                ({nil, Seq, _, _}, {SeqAcc, Results}) ->
                     {erlang:max(Seq, SeqAcc), Results};
-                ({Id, Seq, deleted}, {SeqAcc, Results}) ->
-                    {erlang:max(Seq, SeqAcc), [{Id, Seq, []} | Results]};
-                ({Id, Seq, Doc}, {SeqAcc, Results}) ->
+                ({Id, Seq, Rev, deleted}, {SeqAcc, Results}) ->
+                    {erlang:max(Seq, SeqAcc), [{Id, Seq, Rev, []} | Results]};
+                ({Id, Seq, Rev, Doc}, {SeqAcc, Results}) ->
                     couch_stats:increment_counter([couchdb, mrview, map_docs],
                                                   1),
                     {ok, Res} = couch_query_servers:map_doc_raw(QServer, Doc),
-                    {erlang:max(Seq, SeqAcc), [{Id, Seq, Res} | Results]}
+                    {erlang:max(Seq, SeqAcc), [{Id, Seq, Rev, Res} | Results]}
             end,
             FoldFun = fun(Docs, Acc) ->
                 update_task(length(Docs)),
@@ -250,27 +252,27 @@ merge_results([{Seq, Results} | Rest], SeqAcc, ViewKVs, DocIdKeys, Log) ->
                   Log1).
 
 
-merge_results({DocId, _Seq, []}, ViewKVs, DocIdKeys, Log) ->
-    {ViewKVs, [{DocId, []} | DocIdKeys], dict:store(DocId, [], Log)};
-merge_results({DocId, Seq, RawResults}, ViewKVs, DocIdKeys, Log) ->
+merge_results({DocId, _Seq, Rev, []}, ViewKVs, DocIdKeys, Log) ->
+    {ViewKVs, [{DocId, Rev, []} | DocIdKeys], dict:store(DocId, [], Log)};
+merge_results({DocId, Seq, Rev, RawResults}, ViewKVs, DocIdKeys, Log) ->
     JsonResults = couch_query_servers:raw_to_ejson(RawResults),
     Results = [[list_to_tuple(Res) || Res <- FunRs] || FunRs <- JsonResults],
-    {ViewKVs1, ViewIdKeys, Log1} = insert_results(DocId, Seq, Results, ViewKVs, [],
+    {ViewKVs1, ViewIdKeys, Log1} = insert_results(DocId, Seq, Rev, Results, ViewKVs, [],
                                             [], Log),
     {ViewKVs1, [ViewIdKeys | DocIdKeys], Log1}.
 
 
-insert_results(DocId, _Seq, [], [], ViewKVs, ViewIdKeys, Log) ->
+insert_results(DocId, _Seq, _Rev, [], [], ViewKVs, ViewIdKeys, Log) ->
     {lists:reverse(ViewKVs), {DocId, ViewIdKeys}, Log};
-insert_results(DocId, Seq, [KVs | RKVs], [{Id, {VKVs, SKVs}} | RVKVs], VKVAcc,
+insert_results(DocId, Seq, Rev, [KVs | RKVs], [{Id, {VKVs, SKVs}} | RVKVs], VKVAcc,
                VIdKeys, Log) ->
     CombineDupesFun = fun
         ({Key, Val}, {[{Key, {dups, Vals}} | Rest], IdKeys, Log2}) ->
             {[{Key, {dups, [Val | Vals]}} | Rest], IdKeys, Log2};
         ({Key, Val1}, {[{Key, Val2} | Rest], IdKeys, Log2}) ->
             {[{Key, {dups, [Val1, Val2]}} | Rest], IdKeys, Log2};
-        ({Key, _}=KV, {Rest, IdKeys, Log2}) ->
-            {[KV | Rest], [{Id, Key} | IdKeys],
+        ({Key, Value}, {Rest, IdKeys, Log2}) ->
+            {[{Key, Value} | Rest], [{Id, Key} | IdKeys],
              dict:append(DocId, {Id, {Key, Seq, add}}, Log2)}
     end,
     InitAcc = {[], VIdKeys, Log},
@@ -278,8 +280,8 @@ insert_results(DocId, Seq, [KVs | RKVs], [{Id, {VKVs, SKVs}} | RVKVs], VKVAcc,
     {Duped, VIdKeys0, Log1} = lists:foldl(CombineDupesFun, InitAcc,
                                           lists:sort(KVs)),
     FinalKVs = [{{Key, DocId}, Val} || {Key, Val} <- Duped] ++ VKVs,
-    FinalSKVs = [{{Seq, Key}, {DocId, Val}} || {Key, Val} <- Duped] ++ SKVs,
-    insert_results(DocId, Seq, RKVs, RVKVs,
+    FinalSKVs = [{{Seq, Key}, {DocId, Val, Rev}} || {Key, Val} <- Duped] ++ SKVs,
+    insert_results(DocId, Seq, Rev, RKVs, RVKVs,
                   [{Id, {FinalKVs, FinalSKVs}} | VKVAcc], VIdKeys0, Log1).
 
 

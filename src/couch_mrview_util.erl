@@ -854,7 +854,7 @@ mrverror(Mesg) ->
 
 
 to_key_seq(L) ->
-    [{{[Key, Seq], DocId}, Val} || {{Seq, Key}, {DocId, Val}} <- L].
+    [{{[Key, Seq], DocId}, {Val, Rev}} || {{Seq, Key}, {DocId, Val, Rev}} <- L].
 
 %% Updates 1.2.x or earlier view files to 1.3.x or later view files
 %% transparently, the first time the 1.2.x view file is opened by
