@@ -17,9 +17,7 @@
     level/1,
     log/3,
     log/4,
-    should_log/1,
-    iso8601_timestamp/0,
-    format/2
+    should_log/1
 ]).
 
 
