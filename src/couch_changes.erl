@@ -265,7 +265,7 @@ filter(Db, DocInfo, {custom, Style, Req0, DDoc, FName}) ->
     {ok, Passes} = couch_query_servers:filter_docs(Req, Db, DDoc, FName, Docs),
     filter_revs(Passes, Docs).
 
-fast_view_filter(Db, {{Seq, _}, {ID, _}}, {fast_view, Style, _, _}) ->
+fast_view_filter(Db, {{Seq, _}, {ID, _, _}}, {fast_view, Style, _, _}) ->
     case couch_db:get_doc_info(Db, ID) of
         {ok, #doc_info{high_seq=Seq}=DocInfo} ->
             Docs = open_revs(Db, DocInfo, Style),
@@ -284,15 +284,15 @@ fast_view_filter(Db, {{Seq, _}, {ID, _}}, {fast_view, Style, _, _}) ->
             % I left the Seq > HighSeq guard in so if (for some godforsaken
             % reason) the seq in the view is more current than the database,
             % we'll throw an error.
-            {ok, []};
+            {undefined, []};
         {error, not_found} ->
-            {ok, []}
+            {undefined, []}
     end.
 
 
 
-view_filter(_Db, _KV, {default, _Style}) ->
-    [ok]. % TODO: make a real thing
+view_filter(Db, KV, {default, Style}) ->
+    apply_view_style(Db, KV, Style).
 
 
 get_view_qs({json_req, {Props}}) ->
@@ -352,6 +352,16 @@ apply_style(#doc_info{revs=Revs}, main_only) ->
     [{[{<<"rev">>, couch_doc:rev_to_str(Rev)}]}];
 apply_style(#doc_info{revs=Revs}, all_docs) ->
     [{[{<<"rev">>, couch_doc:rev_to_str(R)}]} || #rev_info{rev=R} <- Revs].
+
+apply_view_style(_Db, {{_Seq, _Key}, {_ID, _Value, Rev}}, main_only) ->
+    [{[{<<"rev">>, couch_doc:rev_to_str(Rev)}]}];
+apply_view_style(Db, {{_Seq, _Key}, {ID, _Value, _Rev}}, all_docs) ->
+    case couch_db:get_doc_info(Db, ID) of
+        {ok, DocInfo} ->
+            apply_style(DocInfo, all_docs);
+        {error, not_found} ->
+            []
+    end.
 
 
 open_revs(Db, DocInfo, Style) ->
@@ -627,7 +637,7 @@ changes_enumerator(Value0, Acc) ->
 changes_row(Results, DocInfo, #changes_acc{filter={fast_view,_,_,_}}=Acc) ->
     format_doc_info_change(Results, DocInfo, Acc);
 changes_row(Results, KV, #changes_acc{view=#mrview{}}) ->
-    {{Seq, Key}, {Id, Value}} = KV,
+    {{Seq, Key}, {Id, Value, _Rev}} = KV,
     {[{<<"seq">>, Seq}, {<<"id">>, Id}, {<<"key">>, Key}, {<<"value">>, Value}, {<<"changes">>, Results}]};
 changes_row(Results, #doc_info{}=DocInfo, Acc) ->
     format_doc_info_change(Results, DocInfo, Acc).
