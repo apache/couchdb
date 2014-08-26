@@ -17,7 +17,7 @@
 -export([init/2, open/2, close/1, reset/1, delete/1]).
 -export([start_update/3, purge/4, process_doc/3, finish_update/1, commit/1]).
 -export([compact/3, swap_compacted/2]).
--export([check_index_file/1]).
+-export([index_file_exists/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
@@ -172,7 +172,7 @@ swap_compacted(OldState, NewState) ->
     couch_mrview_compactor:swap_compacted(OldState, NewState).
 
 
-check_index_file(State) ->
+index_file_exists(State) ->
     #mrst{
         db_name=DbName,
         sig=Sig
