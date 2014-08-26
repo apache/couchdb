@@ -643,9 +643,9 @@ changes_enumerator(Value0, Acc) ->
 
 changes_row(Results, DocInfo, #changes_acc{filter={fast_view,_,_,_}}=Acc) ->
     format_doc_info_change(Results, DocInfo, Acc);
-changes_row(Results, KV, #changes_acc{view=#mrview{}}) ->
-    {{Seq, Key}, {Id, Value, _Rev}} = KV,
-    {[{<<"seq">>, Seq}, {<<"id">>, Id}, {<<"key">>, Key}, {<<"value">>, Value}, {<<"changes">>, Results}]};
+changes_row(Results, KV, #changes_acc{view=#mrview{}}=Acc) ->
+    {{Seq, Key}, {Id, Value, Rev}} = KV,
+    {[{<<"seq">>, Seq}, {<<"id">>, Id}, {<<"key">>, Key}, {<<"value">>, Value}, {<<"changes">>, Results}] ++ maybe_get_changes_doc({Id, Rev}, Acc)};
 changes_row(Results, #doc_info{}=DocInfo, Acc) ->
     format_doc_info_change(Results, DocInfo, Acc).
 
@@ -653,29 +653,35 @@ format_doc_info_change(Results, #doc_info{}=DocInfo, Acc) ->
     #doc_info{
         id = Id, high_seq = Seq, revs = [#rev_info{deleted = Del} | _]
     } = DocInfo,
+    {[{<<"seq">>, Seq}, {<<"id">>, Id}, {<<"changes">>, Results}] ++
+        deleted_item(Del) ++ maybe_get_changes_doc(DocInfo, Acc)}.
+
+maybe_get_changes_doc(Value, #changes_acc{include_docs=true}=Acc) ->
     #changes_acc{
         db = Db,
         include_docs = IncDoc,
         doc_options = DocOpts,
         conflicts = Conflicts
     } = Acc,
-    {[{<<"seq">>, Seq}, {<<"id">>, Id}, {<<"changes">>, Results}] ++
-        deleted_item(Del) ++ case IncDoc of
-            true ->
-                Opts = case Conflicts of
-                    true -> [deleted, conflicts];
-                    false -> [deleted]
-                end,
-                Doc = couch_index_util:load_doc(Db, DocInfo, Opts),
-                case Doc of
-                    null ->
-                        [{doc, null}];
-                    _ ->
-                        [{doc, couch_doc:to_json_obj(Doc, DocOpts)}]
-                end;
-            false ->
-                []
-        end}.
+    case IncDoc of
+        true ->
+            Opts = case Conflicts of
+                true -> [deleted, conflicts];
+                false -> [deleted]
+            end,
+            Doc = couch_index_util:load_doc(Db, Value, Opts),
+            case Doc of
+                null ->
+                    [{doc, null}];
+                _ ->
+                    [{doc, couch_doc:to_json_obj(Doc, DocOpts)}]
+            end;
+        false ->
+            []
+    end;
+maybe_get_changes_doc(_Value, _Acc) ->
+    [].
+
 
 deleted_item(true) -> [{<<"deleted">>, true}];
 deleted_item(_) -> [].
