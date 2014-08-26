@@ -97,12 +97,13 @@ ddoc_to_mrst(DbName, #doc{id=Id, body={Fields}}) ->
     end,
     {DesignOpts} = proplists:get_value(<<"options">>, Fields, {[]}),
     SeqIndexed = proplists:get_value(<<"seq_indexed">>, DesignOpts, false),
+    KeySeqIndexed = proplists:get_value(<<"keyseq_indexed">>, DesignOpts, false),
 
     {RawViews} = couch_util:get_value(<<"views">>, Fields, {[]}),
     BySrc = lists:foldl(MakeDict, dict:new(), RawViews),
 
     NumViews = fun({_, View}, N) ->
-            {View#mrview{id_num=N, seq_indexed=SeqIndexed}, N+1}
+            {View#mrview{id_num=N, seq_indexed=SeqIndexed, keyseq_indexed=KeySeqIndexed}, N+1}
     end,
     {Views, _} = lists:mapfoldl(NumViews, 0, lists:sort(dict:to_list(BySrc))),
 
@@ -116,7 +117,8 @@ ddoc_to_mrst(DbName, #doc{id=Id, body={Fields}}) ->
         views=Views,
         language=Language,
         design_opts=DesignOpts,
-        seq_indexed=SeqIndexed
+        seq_indexed=SeqIndexed,
+        keyseq_indexed=KeySeqIndexed
     },
     SigInfo = {Views, Language, DesignOpts, couch_index_util:sort_lib(Lib)},
     {ok, IdxState#mrst{sig=couch_util:md5(term_to_binary(SigInfo))}}.
@@ -161,7 +163,7 @@ view_sig(Db, State, View, #mrargs{include_docs=true}=Args) ->
     UpdateSeq = couch_db:get_update_seq(Db),
     PurgeSeq = couch_db:get_purge_seq(Db),
     Bin = term_to_binary({BaseSig, UpdateSeq, PurgeSeq,
-                          State#mrst.seq_indexed}),
+                          State#mrst.seq_indexed, State#mrst.keyseq_indexed}),
     couch_index_util:hexsig(couch_util:md5(Bin));
 view_sig(Db, State, {_Nth, _Lang, View}, Args) ->
     view_sig(Db, State, View, Args);
@@ -170,11 +172,12 @@ view_sig(_Db, State, View, Args0) ->
     UpdateSeq = View#mrview.update_seq,
     PurgeSeq = View#mrview.purge_seq,
     SeqIndexed = View#mrview.seq_indexed,
+    KeySeqIndexed = View#mrview.keyseq_indexed,
     Args = Args0#mrargs{
         preflight_fun=undefined,
         extra=[]
     },
-    Bin = term_to_binary({Sig, UpdateSeq, PurgeSeq, SeqIndexed, Args}),
+    Bin = term_to_binary({Sig, UpdateSeq, PurgeSeq, KeySeqIndexed, SeqIndexed, Args}),
     couch_index_util:hexsig(couch_util:md5(Bin)).
 
 
@@ -202,7 +205,12 @@ init_state(Db, Fd, State, #index_header{
         view_states=[{Bt, nil, nil, USeq, PSeq} || {Bt, USeq, PSeq} <- ViewStates]
         });
 init_state(Db, Fd, State, Header) ->
-    #mrst{language=Lang, views=Views, seq_indexed=SeqIndexed} = State,
+    #mrst{
+        language=Lang,
+        views=Views,
+        seq_indexed=SeqIndexed,
+        keyseq_indexed=KeySeqIndexed
+    } = State,
     #mrheader{
         seq=Seq,
         purge_seq=PurgeSeq,
@@ -219,7 +227,7 @@ init_state(Db, Fd, State, Header) ->
 
     IdBtOpts = [{compression, couch_db:compression(Db)}],
     {ok, IdBtree} = couch_btree:open(IdBtreeState, Fd, IdBtOpts),
-    {ok, LogBtree} = case SeqIndexed of
+    {ok, LogBtree} = case SeqIndexed orelse KeySeqIndexed of
         true -> couch_btree:open(LogBtreeState, Fd, IdBtOpts);
         false -> {ok, nil}
     end,
@@ -266,20 +274,23 @@ open_view(Db, Fd, Lang, {BTState, SeqBTState, KSeqBTState, USeq, PSeq}, View) ->
     ],
     {ok, Btree} = couch_btree:open(BTState, Fd, ViewBtOpts),
 
-    {SeqBtree, KeyBySeqBtree} = case View#mrview.seq_indexed of
-        true ->
-            BySeqReduceFun = fun couch_db_updater:btree_by_seq_reduce/2,
-            ViewSeqBtOpts = [{less, fun less_json_seqs/2},
-                             {reduce, BySeqReduceFun},
-                             {compression, couch_db:compression(Db)}],
-            KeyBySeqBtOpts = [{less, Less},
-                              {reduce, BySeqReduceFun},
-                              {compression, couch_db:compression(Db)}],
-            {ok, SBt} = couch_btree:open(SeqBTState, Fd, ViewSeqBtOpts),
-            {ok, KSBt} = couch_btree:open(KSeqBTState, Fd, KeyBySeqBtOpts),
-            {SBt, KSBt};
-        false ->
-            {nil, nil}
+    BySeqReduceFun = fun couch_db_updater:btree_by_seq_reduce/2,
+    {ok, SeqBtree} = if View#mrview.seq_indexed ->
+        ViewSeqBtOpts = [{less, fun less_json_seqs/2},
+                         {reduce, BySeqReduceFun},
+                         {compression, couch_db:compression(Db)}],
+
+        couch_btree:open(SeqBTState, Fd, ViewSeqBtOpts);
+    true ->
+        {ok, nil}
+    end,
+    {ok, KeyBySeqBtree} = if View#mrview.keyseq_indexed ->
+        KeyBySeqBtOpts = [{less, Less},
+                          {reduce, BySeqReduceFun},
+                          {compression, couch_db:compression(Db)}],
+        couch_btree:open(KSeqBTState, Fd, KeyBySeqBtOpts);
+    true ->
+        {ok, nil}
     end,
 
     View#mrview{btree=Btree,
@@ -335,11 +346,25 @@ reduce_to_count(Reductions) ->
     Count.
 
 %% @doc get all changes for a view
-get_view_changes_count(#mrview{seq_btree=Btree}) ->
-    couch_btree:fold_reduce(
-            Btree, fun(_SeqStart, PartialReds, 0) ->
-                    {ok, couch_btree:final_reduce(Btree, PartialReds)}
-            end,0, []).
+get_view_changes_count(View) ->
+    #mrview{seq_btree=SBtree, key_byseq_btree=KSBtree} = View,
+    CountFun = fun(_SeqStart, PartialReds, 0) ->
+        {ok, couch_btree:final_reduce(SBtree, PartialReds)}
+    end,
+    {ok, Count} = case {SBtree, KSBtree} of
+        {nil, nil} ->
+            {ok, 0};
+        {#btree{}, nil} ->
+            couch_btree:fold_reduce(SBtree, CountFun, 0, []);
+        {nil, #btree{}} ->
+            couch_btree:fold_reduce(KSBtree, CountFun, 0, [])
+    end,
+    case {SBtree, KSBtree} of
+        {#btree{}, #btree{}} ->
+            {ok, Count*2};
+        _ ->
+            {ok, Count}
+    end.
 
 fold(#mrview{btree=Bt}, Fun, Acc, Opts) ->
     WrapperFun = fun(KV, Reds, Acc2) ->
@@ -563,11 +588,17 @@ make_header(State) ->
     } = State,
 
     ViewStates = lists:foldr(fun(V, Acc) ->
-                    {SeqBtState, KSeqBtState} = case V#mrview.seq_indexed of
+                    SeqBtState = case V#mrview.seq_indexed of
                         true ->
-                            {couch_btree:get_state(V#mrview.seq_btree),
-                             couch_btree:get_state(V#mrview.key_byseq_btree)};
-                        _ -> {nil, nil}
+                            couch_btree:get_state(V#mrview.seq_btree);
+                        _ ->
+                            nil
+                    end,
+                    KSeqBtState = case V#mrview.keyseq_indexed of
+                        true ->
+                            couch_btree:get_state(V#mrview.key_byseq_btree);
+                        _ ->
+                            nil
                     end,
                     [{couch_btree:get_state(V#mrview.btree),
                       SeqBtState,
@@ -642,12 +673,14 @@ reset_state(State) ->
         fd=nil,
         qserver=nil,
         seq_indexed=State#mrst.seq_indexed,
+        keyseq_indexed=State#mrst.keyseq_indexed,
         update_seq=0,
         id_btree=nil,
         log_btree=nil,
         views=[View#mrview{btree=nil, seq_btree=nil,
                            key_byseq_btree=nil,
-                           seq_indexed=View#mrview.seq_indexed}
+                           seq_indexed=View#mrview.seq_indexed,
+                           keyseq_indexed=View#mrview.keyseq_indexed}
                || View <- State#mrst.views]
     }.
 
@@ -757,14 +790,18 @@ changes_ekey_opts(_StartSeq, #mrargs{end_key=EKey,
 
 
 
+
 calculate_external_size(IdBt, LogBt, Views) ->
-    SumFun = fun
-        (#mrview{btree=Bt, seq_btree=nil}, Acc) ->
-            sum_btree_sizes(Acc, couch_btree:size(Bt));
-        (#mrview{btree=Bt, seq_btree=SBt, key_byseq_btree=KSBt}, Acc) ->
-            Acc1 = sum_btree_sizes(Acc, couch_btree:size(Bt)),
-            Acc2 = sum_btree_sizes(Acc1, couch_btree:size(SBt)),
-            sum_btree_sizes(Acc2, couch_btree:size(KSBt))
+    SumFun = fun(#mrview{btree=Bt, seq_btree=SBt, key_byseq_btree=KSBt}, Acc) ->
+        Size0 = sum_btree_sizes(Acc, couch_btree:size(Bt)),
+        Size1 = case SBt of
+            nil -> Size0;
+            _ -> sum_btree_sizes(Size0, couch_btree:size(SBt))
+        end,
+        case KSBt of
+            nil -> Size1;
+            _ -> sum_btree_sizes(Size1, couch_btree:size(KSBt))
+        end
     end,
     Size = case LogBt of
         nil ->

@@ -155,21 +155,22 @@ view_changes_since(Db, DDoc, VName, StartSeq, Fun, Options, Acc) ->
     Args0 = make_view_changes_args(Options),
     {ok, {_, View, _}, _, Args} = couch_mrview_util:get_view(Db, DDoc, VName,
                                                              Args0),
-    case View#mrview.seq_indexed of
-        true ->
-            OptList = make_view_changes_opts(StartSeq, Options, Args),
-            Btree = case is_key_byseq(Options) of
-                true -> View#mrview.key_byseq_btree;
-                _ -> View#mrview.seq_btree
-            end,
-            AccOut = lists:foldl(fun(Opts, Acc0) ->
-                {ok, _R, A} = couch_mrview_util:fold_changes(
-                    Btree, Fun, Acc0, Opts),
-                A
-            end, Acc, OptList),
-            {ok, AccOut};
-        _ ->
-            {error, seqs_not_indexed}
+    #mrview{seq_indexed=SIndexed, keyseq_indexed=KSIndexed} = View,
+    IsKSQuery = is_key_byseq(Options),
+    if (SIndexed andalso not IsKSQuery) orelse (KSIndexed andalso IsKSQuery) ->
+        OptList = make_view_changes_opts(StartSeq, Options, Args),
+        Btree = case IsKSQuery of
+            true -> View#mrview.key_byseq_btree;
+            _ -> View#mrview.seq_btree
+        end,
+        AccOut = lists:foldl(fun(Opts, Acc0) ->
+            {ok, _R, A} = couch_mrview_util:fold_changes(
+                Btree, Fun, Acc0, Opts),
+            A
+        end, Acc, OptList),
+        {ok, AccOut};
+    true ->
+        {error, seqs_not_indexed}
     end.
 
 count_view_changes_since(Db, DDoc, VName, SinceSeq) ->

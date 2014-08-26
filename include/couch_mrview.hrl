@@ -19,6 +19,7 @@
     language,
     design_opts=[],
     seq_indexed=false,
+    keyseq_indexed=false,
     lib,
     views,
     id_btree=nil,
@@ -45,6 +46,7 @@
     seq_btree=nil,
     key_byseq_btree=nil,
     seq_indexed=false,
+    keyseq_indexed=false,
     options=[]
 }).
 

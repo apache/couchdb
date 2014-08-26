@@ -86,27 +86,37 @@ purge(_Db, PurgeSeq, PurgedIdRevs, State) ->
     SeqsToRemove = lists:foldl(MakeDictFun, dict:new(), LLookups),
 
     RemKeysFun = fun(#mrview{id_num=ViewId}=View) ->
+        #mrview{seq_indexed=SIndexed, keyseq_indexed=KSIndexed} = View,
         ToRem = couch_util:dict_find(ViewId, KeysToRemove, []),
         {ok, VBtree2} = couch_btree:add_remove(View#mrview.btree, [], ToRem),
         NewPurgeSeq = case VBtree2 =/= View#mrview.btree of
             true -> PurgeSeq;
             _ -> View#mrview.purge_seq
         end,
-        {SeqBtree2, KeyBySeqBtree2} = case View#mrview.seq_indexed of
-            true ->
-                SToRem = couch_util:dict_find(ViewId, SeqsToRemove, []),
+        {SeqBtree3, KeyBySeqBtree3} = if SIndexed orelse KSIndexed ->
+            SToRem = couch_util:dict_find(ViewId, SeqsToRemove, []),
+            {ok, SeqBtree2} = if SIndexed ->
                 SKs = [{Seq, Key} || {Key, Seq, _} <- SToRem],
+                couch_btree:add_remove(View#mrview.seq_btree,
+                                       [], SKs);
+            true ->
+                {ok, nil}
+            end,
+            {ok, KeyBySeqBtree2} = if KSIndexed ->
                 KSs = [{[Seq, Key], DocId} || {Key, Seq, DocId} <- SToRem],
-                {ok, SBt} = couch_btree:add_remove(View#mrview.seq_btree,
-                                                   [], SKs),
-                {ok, KSbt} = couch_btree:add_remove(View#mrview.key_byseq_btree,
-                                                    [], KSs),
-                {SBt, KSbt};
-            _ -> {nil, nil}
+                couch_btree:add_remove(View#mrview.key_byseq_btree,
+                                       [], KSs);
+            true ->
+                {ok, nil}
+            end,
+            {SeqBtree2, KeyBySeqBtree2};
+        true ->
+            {nil, nil}
         end,
+
         View#mrview{btree=VBtree2,
-                    seq_btree=SeqBtree2,
-                    key_byseq_btree=KeyBySeqBtree2,
+                    seq_btree=SeqBtree3,
+                    key_byseq_btree=KeyBySeqBtree3,
                     purge_seq=NewPurgeSeq}
 
     end,
@@ -301,6 +311,7 @@ write_kvs(State, UpdateSeq, ViewKVs, DocIdKeys, Log) ->
     end,
 
     UpdateView = fun(#mrview{id_num=ViewId}=View, {ViewId, {KVs, SKVs}}) ->
+        #mrview{seq_indexed=SIndexed, keyseq_indexed=KSIndexed} = View,
         ToRem = couch_util:dict_find(ViewId, ToRemByView, []),
         {ok, VBtree2} = couch_btree:add_remove(View#mrview.btree, KVs, ToRem),
         NewUpdateSeq = case VBtree2 =/= View#mrview.btree of
@@ -309,25 +320,33 @@ write_kvs(State, UpdateSeq, ViewKVs, DocIdKeys, Log) ->
         end,
 
         %% store the view changes.
-        {SeqBtree2, KeyBySeqBtree2} = case View#mrview.seq_indexed of
-            true ->
-                SToRem = couch_util:dict_find(ViewId, SeqsToRemove, []),
-                SToAdd = couch_util:dict_find(ViewId, SeqsToAdd, []),
-                RemSKs = [{Seq, Key} || {Key, Seq, _} <- SToRem],
-                RemKSs = [{[Key, Seq], DocId} || {Key, Seq, DocId} <- SToRem],
-                SKVs1 = SKVs ++ SToAdd,
-                {ok, SBt} = couch_btree:add_remove(View#mrview.seq_btree,
-                                                   SKVs1, RemSKs),
+        {SeqBtree3, KeyBySeqBtree3} = if SIndexed orelse KSIndexed ->
+            SToRem = couch_util:dict_find(ViewId, SeqsToRemove, []),
+            SToAdd = couch_util:dict_find(ViewId, SeqsToAdd, []),
+            SKVs1 = SKVs ++ SToAdd,
 
-                {ok, KSbt} = couch_btree:add_remove(View#mrview.key_byseq_btree,
-                                                    couch_mrview_util:to_key_seq(SKVs1),
-                                                    RemKSs),
-                {SBt, KSbt};
-            _ -> {nil, nil}
+            {ok, SeqBtree2} = if SIndexed ->
+                RemSKs = [{Seq, Key} || {Key, Seq, _} <- SToRem],
+                couch_btree:add_remove(View#mrview.seq_btree,
+                                       SKVs1, RemSKs);
+            true ->
+                {ok, nil}
+            end,
+            {ok, KeyBySeqBtree2} = if KSIndexed ->
+                RemKSs = [{[Key, Seq], DocId} || {Key, Seq, DocId} <- SToRem],
+                couch_btree:add_remove(View#mrview.key_byseq_btree,
+                                       couch_mrview_util:to_key_seq(SKVs1),
+                                       RemKSs);
+            true ->
+                {ok, nil}
+            end,
+            {SeqBtree2, KeyBySeqBtree2};
+        true ->
+            {nil, nil}
         end,
         View#mrview{btree=VBtree2,
-                    seq_btree=SeqBtree2,
-                    key_byseq_btree=KeyBySeqBtree2,
+                    seq_btree=SeqBtree3,
+                    key_byseq_btree=KeyBySeqBtree3,
                     update_seq=NewUpdateSeq}
     end,
 
