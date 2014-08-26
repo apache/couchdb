@@ -20,6 +20,8 @@
 -define(TIMEOUT, 30000).
 
 
+-ifdef(run_broken_tests).
+
 setup() ->
     config:set("couchdb", "file_compression", "none", false),
     DbName = ?tempdb(),
@@ -222,3 +224,5 @@ view_disk_size(DbName) ->
     {ok, Info} = couch_mrview:get_info(Db, DDoc),
     ok = couch_db:close(Db),
     couch_util:get_value(disk_size, Info).
+
+-endif.

@@ -19,6 +19,8 @@
 -define(TIMEOUT, 1000).
 
 
+-ifdef(run_broken_tests).
+
 setup() ->
     DbName = ?tempdb(),
     config:set("couch_httpd_auth", "authentication_db",
@@ -221,3 +223,5 @@ full_commit(DbName) ->
     {ok, AuthDb} = couch_db:open_int(DbName, [?ADMIN_USER]),
     {ok, _} = couch_db:ensure_full_commit(AuthDb),
     ok = couch_db:close(AuthDb).
+
+-endif.

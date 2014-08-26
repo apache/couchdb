@@ -25,6 +25,8 @@
 }).
 
 
+-ifdef(run_broken_tests).
+
 setup() ->
     DbName = ?tempdb(),
     {ok, Db} = create_db(DbName),
@@ -595,3 +597,5 @@ create_db(DbName) ->
 
 delete_db(DbName) ->
     ok = couch_server:delete(DbName, [?ADMIN_USER]).
+
+-endif.

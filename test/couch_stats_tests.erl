@@ -23,6 +23,8 @@
 -define(TIMEWAIT, 500).
 
 
+-ifdef(run_broken_tests).
+
 setup_collector() ->
     couch_stats_collector:start(),
     ok.
@@ -410,3 +412,5 @@ make_agg(Desc, Sum, Mean, StdDev, Min, Max) ->
         {min, Min},
         {max, Max}
     ]}.
+
+-endif.

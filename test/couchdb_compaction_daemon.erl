@@ -20,6 +20,8 @@
 -define(TIMEOUT_S, ?TIMEOUT div 1000).
 
 
+-ifdef(run_broken_tests).
+
 start() ->
     ok = test_util:start_couch(),
     config:set("compaction_daemon", "check_interval", "3", false),
@@ -218,3 +220,5 @@ wait_loop(DbName, Parent) ->
             ok = timer:sleep(?DELAY),
             wait_loop(DbName, Parent)
     end.
+
+-endif.

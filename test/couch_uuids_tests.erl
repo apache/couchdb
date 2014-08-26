@@ -17,6 +17,8 @@
 -define(TIMEOUT_S, 20).
 
 
+-ifdef(run_broken_tests).
+
 setup() ->
     {ok, Pid} = config:start_link(?CONFIG_CHAIN),
     erlang:monitor(process, Pid),
@@ -159,3 +161,5 @@ test_same_suffix(N, Suffix) ->
         Suffix -> test_same_suffix(N - 1, Suffix);
         _ -> false
     end.
+
+-endif.

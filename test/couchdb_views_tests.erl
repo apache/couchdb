@@ -20,6 +20,8 @@
 -define(TIMEOUT, 1000).
 
 
+-ifdef(run_broken_tests).
+
 setup() ->
     DbName = ?tempdb(),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_USER]),
@@ -652,3 +654,5 @@ read_header(File) ->
     {ok, {_Sig, Header}} = couch_file:read_header(Fd),
     couch_file:close(Fd),
     Header.
+
+-endif.

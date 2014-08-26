@@ -19,6 +19,8 @@
 -define(iofmt(S, A), lists:flatten(io_lib:format(S, A))).
 
 
+-ifdef(run_broken_tests).
+
 setup() ->
     DbName = ?tempdb(),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_USER]),
@@ -424,3 +426,5 @@ should_fail_oauth_with_wrong_credentials({Url, _}) ->
                               {reason, ?iofmt("Request failed: ~p", [Else])}]})
         end
     end).
+
+-endif.

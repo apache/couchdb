@@ -36,6 +36,8 @@
 -define(TIMEOUT, 1000).
 
 
+-ifdef(run_broken_tests).
+
 setup(DName) ->
     {ok, CfgPid} = config:start_link(?CONFIG_CHAIN),
     {ok, OsDPid} = couch_os_daemons:start_link(),
@@ -226,3 +228,5 @@ check_dead(D, Name) ->
     ?assertEqual(halted, D#daemon.status),
     ?assertEqual(nil, D#daemon.errors),
     ?assertEqual(nil, D#daemon.buf).
+
+-endif.

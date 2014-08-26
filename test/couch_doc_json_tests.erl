@@ -16,6 +16,8 @@
 -include_lib("couch/include/couch_db.hrl").
 
 
+-ifdef(run_broken_tests).
+
 setup() ->
     {ok, Pid} = test_util:start_config(?CONFIG_CHAIN),
     config:set("attachments", "compression_level", "0", false),
@@ -389,3 +391,6 @@ to_json_success_cases() ->
         ({Options, Doc, EJson, Msg}) ->
             {Msg, ?_assertMatch(EJson, couch_doc:to_json_obj(Doc, Options))}
     end, Cases).
+
+-endif.
+

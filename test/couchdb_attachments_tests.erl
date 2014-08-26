@@ -26,6 +26,8 @@
 -define(i2l(I), integer_to_list(I)).
 
 
+-ifdef(run_broken_tests).
+
 start() ->
     ok = test_util:start_couch(),
     % ensure in default compression settings for attachments_compression_tests
@@ -626,3 +628,5 @@ gzip(Data) ->
     ok = zlib:deflateEnd(Z),
     ok = zlib:close(Z),
     Last.
+
+-endif.

@@ -18,6 +18,8 @@
 -define(TIMEOUT, 3000).
 
 
+-ifdef(run_broken_tests).
+
 start() ->
     ok = test_util:start_couch(),
     config:set("query_server_config", "os_process_limit", "3", false),
@@ -167,3 +169,5 @@ loop(Parent, Ref, Proc) ->
             Parent ! {die, Ref},
             exit(some_error)
     end.
+
+-endif.
