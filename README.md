@@ -20,6 +20,14 @@ have a string value indicating the action to be performed. For each action there
 
 For convenience, the HTTP API will accept a JSON body that is either a single JSON object which specifies a single action or a JSON array that specifies a list of actions that will then be invoked serially. While multiple commands can be batched into a single HTTP request, there are no guarantees about atomicity or isolation for a batch of commands.
 
+Activating Mango/Cloudant Query on a cluster
+--------------------------------------------
+
+Cloudant Query can be enabled by setting the following config:
+
+```
+rpc:multicall(config, set, ["native_query_servers", "query", "{mango_native_proc, start_link, []}"]).
+```
 
 HTTP API
 ========
