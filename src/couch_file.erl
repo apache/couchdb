@@ -585,5 +585,6 @@ is_idle(#file{is_sys=false}) ->
     case process_info(self(), monitored_by) of
         {monitored_by, []} -> true;
         {monitored_by, [Tracker]} -> true;
+        {monitored_by, [_]} -> exit(tracker_monitoring_failed);
         _ -> false
     end.
