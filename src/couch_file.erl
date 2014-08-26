@@ -581,8 +581,9 @@ is_idle(#file{is_sys=true}) ->
         _ -> false
     end;
 is_idle(#file{is_sys=false}) ->
+    Tracker = whereis(couch_stats_process_tracker),
     case process_info(self(), monitored_by) of
         {monitored_by, []} -> true;
-        {monitored_by, [_]} -> true;
+        {monitored_by, [Tracker]} -> true;
         _ -> false
     end.
