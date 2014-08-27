@@ -31,7 +31,7 @@ setup(local) ->
 setup(remote) ->
     {remote, setup()};
 setup({A, B}) ->
-    {ok, _} = couch_server_sup:start_link(?CONFIG_CHAIN),
+    ok = test_util:start_couch(),
     Source = setup(A),
     Target = setup(B),
     {Source, Target}.
@@ -46,16 +46,7 @@ teardown(_, {Source, Target}) ->
     teardown(Source),
     teardown(Target),
 
-    Pid = whereis(couch_server_sup),
-    erlang:monitor(process, Pid),
-    couch_server_sup:stop(),
-    receive
-        {'DOWN', _, _, Pid, _} ->
-            ok
-    after ?TIMEOUT_STOP ->
-        throw({timeout, server_stop})
-    end.
-
+    ok = test_util:stop_couch().
 
 missing_stubs_test_() ->
     Pairs = [{local, local}, {local, remote},

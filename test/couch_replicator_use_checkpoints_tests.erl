@@ -52,7 +52,7 @@ setup(local) ->
 setup(remote) ->
     {remote, setup()};
 setup({_, Fun, {A, B}}) ->
-    {ok, _} = couch_server_sup:start_link(?CONFIG_CHAIN),
+    ok = test_util:start_couch(),
     {ok, Listener} = couch_replicator_notifier:start_link(Fun),
     Source = setup(A),
     Target = setup(B),
@@ -69,16 +69,7 @@ teardown(_, {Source, Target, Listener}) ->
     teardown(Target),
 
     couch_replicator_notifier:stop(Listener),
-    Pid = whereis(couch_server_sup),
-    erlang:monitor(process, Pid),
-    couch_server_sup:stop(),
-    receive
-        {'DOWN', _, _, Pid, _} ->
-            ok
-    after ?TIMEOUT_STOP ->
-        throw({timeout, server_stop})
-    end.
-
+    ok = test_util:stop_couch().
 
 use_checkpoints_test_() ->
     {
