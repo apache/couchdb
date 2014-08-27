@@ -189,3 +189,7 @@ This product also includes the following third-party components:
  * src/fauxton/asserts/js/plugins/cloudant.pagingcollection.js
 
    Copyright (c) 2014, Cloudant http://cloudant.com
+
+ * velocity.js (https://github.com/julianshapiro/velocity)
+
+   Copyright (c) 2014 Julian Shapiro
