@@ -86,7 +86,7 @@ flush_stdout() ->
 %% by recon:proc_count/2.
 -spec check_proc_count(atom(), integer(), list()) -> [{atom(), term()}].
 check_proc_count(Key, Threshold, Opts) ->
-    Processes = weatherreport_node:local_command(recon, proc_count, [Key, 10]),
+    Processes = recon:proc_count(Key, 10),
     procs_to_messages(Processes, Threshold, [], Opts).
 
 %% @doc Utility function to convert the list of process info returned by
@@ -101,7 +101,7 @@ procs_to_messages([{Pid, Value, Info} | T], Threshold, Acc, Opts) ->
     end,
     Message = case {Level, proplists:get_value(expert, Opts)} of
         {warning, true} ->
-            Pinfo = weatherreport_node:local_command(recon, info, [Pid]),
+            Pinfo = recon:info(Pid),
             {warning, {high, {Pid, Value, Info, Pinfo}}};
         {warning, _} ->
             {warning, {high, {Pid, Value, Info}}};

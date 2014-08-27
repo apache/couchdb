@@ -60,8 +60,8 @@ report_to_message({DbName, ShardRange, {Type, N}}, NodeName) ->
 
 -spec check(list()) -> [{atom(), term()}].
 check(_Opts) ->
-    NodeName = weatherreport_node:nodename(),
-    case weatherreport_node:local_command(custodian, report, []) of
+    NodeName = node(),
+    case custodian:report() of
         [] ->
             [{info, {ok, NodeName}}];
         Report ->

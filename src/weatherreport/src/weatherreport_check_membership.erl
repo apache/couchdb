@@ -51,8 +51,8 @@ valid() ->
 
 -spec check(list()) -> [{atom(), term()}].
 check(_Opts) ->
-    NodeName = weatherreport_node:nodename(),
-    Members = weatherreport_node:local_command(mem3, nodes, []),
+    NodeName = node(),
+    Members = mem3:nodes(),
     case lists:member(NodeName, Members) of
         true ->
             [];

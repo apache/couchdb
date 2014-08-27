@@ -59,9 +59,9 @@ fold_processes([{Count, {M, F, A}} | T], Acc, Lim, CallType, Opts) ->
     Message = case proplists:get_value(expert, Opts) of
         true ->
             PidFun = list_to_atom("find_by_" ++ CallType ++ "_call"),
-            Pids = weatherreport_node:local_command(recon, PidFun, [M, F]),
+            Pids = erlang:apply(recon, PidFun, [M, F]),
             Pinfos = lists:map(fun(Pid) ->
-                Pinfo = weatherreport_node:local_command(recon, info, [Pid]),
+                Pinfo = recon:info(Pid),
                 {Pid, Pinfo}
             end, lists:sublist(Pids, 10)),
             {Level, {process_count, {CallType, Count, M, F, A, Pinfos}}};
@@ -72,11 +72,7 @@ fold_processes([{Count, {M, F, A}} | T], Acc, Lim, CallType, Opts) ->
 
 -spec check(list()) -> [{atom(), term()}].
 check(Opts) ->
-    CurrentCallCounts = weatherreport_node:local_command(
-        recon,
-        show_current_call_counts,
-        []
-    ),
+    CurrentCallCounts = recon:show_current_call_counts(),
     CurrentCallMessages = fold_processes(
         CurrentCallCounts,
         [],
@@ -84,11 +80,7 @@ check(Opts) ->
         "current",
         Opts
     ),
-    FirstCallCounts = weatherreport_node:local_command(
-        recon,
-        show_first_call_counts,
-        []
-    ),
+    FirstCallCounts = recon:show_first_call_counts(),
     lists:reverse(fold_processes(
         FirstCallCounts,
         CurrentCallMessages,

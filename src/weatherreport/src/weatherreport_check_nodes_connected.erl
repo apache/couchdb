@@ -47,9 +47,9 @@ valid() ->
 
 -spec check(list()) -> [{atom(), term()}].
 check(_Opts) ->
-    NodeName = weatherreport_node:nodename(),
-    ConnectedNodes = [NodeName | weatherreport_node:local_command(erlang, nodes, [])],
-    Members = weatherreport_node:local_command(mem3, nodes, []),
+    NodeName = node(),
+    ConnectedNodes = [NodeName | erlang:nodes()],
+    Members = mem3:nodes(),
     [{warning, {node_disconnected, N}} || N <- Members,
                                           N =/= NodeName,
                                           lists:member(N, ConnectedNodes) == false].

@@ -41,8 +41,8 @@ valid() ->
 
 -spec check(list()) -> [{atom(), term()}].
 check(_Opts) ->
-    NodeName = weatherreport_node:nodename(),
-    case weatherreport_node:local_command(erlang, whereis, [mem3_sync]) of
+    NodeName = node(),
+    case erlang:whereis(mem3_sync) of
         undefined ->
             [{warning, {mem3_sync_not_found, NodeName}}];
         Pid ->

@@ -63,7 +63,7 @@ sum_queues([{_Name, Value} | Rest], Acc) ->
 
 -spec check(list()) -> [{atom(), term()}].
 check(_Opts) ->
-    case weatherreport_node:local_command(ioq, get_disk_queues, []) of
+    case ioq:get_disk_queues() of
         Queues when is_list(Queues) ->
             Total = sum_queues(Queues, 0),
             [{total_to_level(Total), {ioq_requests, Total, Queues}}];

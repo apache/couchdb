@@ -43,7 +43,7 @@ valid() ->
 -spec check(list()) -> [{atom(), term()}].
 check(_Opts) ->
     SearchNode = 'clouseau@127.0.0.1',
-    case weatherreport_node:local_command(net_adm, ping, [SearchNode]) of
+    case net_adm:ping(SearchNode) of
         pong ->
             [{info, {clouseau_ok, SearchNode}}];
         Error ->
