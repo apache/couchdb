@@ -15,8 +15,6 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
--define(ADMIN_ROLE, #user_ctx{roles=[<<"_admin">>]}).
--define(ADMIN_USER, {user_ctx, ?ADMIN_ROLE}).
 -define(DOCS_CONFLICTS, [
     {<<"doc1">>, 10},
     {<<"doc2">>, 100},

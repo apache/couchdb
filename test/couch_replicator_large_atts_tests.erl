@@ -15,8 +15,6 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
--define(ADMIN_ROLE, #user_ctx{roles=[<<"_admin">>]}).
--define(ADMIN_USER, {user_ctx, ?ADMIN_ROLE}).
 -define(ATT_SIZE_1, 2 * 1024 * 1024).
 -define(ATT_SIZE_2, round(6.6 * 1024 * 1024)).
 -define(DOCS_COUNT, 11).

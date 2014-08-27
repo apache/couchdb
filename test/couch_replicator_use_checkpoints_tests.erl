@@ -15,8 +15,6 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
--define(ADMIN_ROLE, #user_ctx{roles=[<<"_admin">>]}).
--define(ADMIN_USER, {user_ctx, ?ADMIN_ROLE}).
 -define(DOCS_COUNT, 100).
 -define(TIMEOUT_STOP, 1000).
 -define(TIMEOUT_EUNIT, 30).

@@ -16,8 +16,6 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_replicator/src/couch_replicator.hrl").
 
--define(ADMIN_ROLE, #user_ctx{roles=[<<"_admin">>]}).
--define(ADMIN_USER, {user_ctx, ?ADMIN_ROLE}).
 -define(ATTFILE, filename:join([?FIXTURESDIR, "logo.png"])).
 -define(DELAY, 100).
 -define(TIMEOUT, 30000).
