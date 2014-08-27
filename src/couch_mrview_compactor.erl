@@ -174,6 +174,7 @@ swap_compacted(OldState, NewState) ->
     } = NewState,
 
     link(NewState#mrst.fd),
+    Ref = erlang:monitor(process, NewState#mrst.fd),
 
     RootDir = couch_index_util:root_dir(),
     IndexFName = couch_mrview_util:index_file(DbName, Sig),
@@ -184,4 +185,4 @@ swap_compacted(OldState, NewState) ->
     unlink(OldState#mrst.fd),
     erlang:demonitor(OldState#mrst.fd_monitor, [flush]),
     
-    {ok, NewState}.
+    {ok, NewState#mrst{fd_monitor=Ref}}.
