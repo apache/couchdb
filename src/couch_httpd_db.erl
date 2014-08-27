@@ -14,9 +14,10 @@
 -include_lib("couch/include/couch_db.hrl").
 
 -export([handle_request/1, handle_compact_req/2, handle_design_req/2,
-    db_req/2, couch_doc_open/4,handle_changes_req/2,
+    db_req/2, couch_doc_open/4, handle_db_changes_req/2,
     update_doc_result_to_json/1, update_doc_result_to_json/2,
-    handle_design_info_req/3, parse_copy_destination_header/1]).
+    handle_design_info_req/3, parse_copy_destination_header/1,
+    parse_changes_query/2, handle_changes_req/4]).
 
 -import(couch_httpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
@@ -54,15 +55,22 @@ handle_request(#httpd{path_parts=[DbName|RestParts],method=Method,
         do_db_req(Req, Handler)
     end.
 
-handle_changes_req(#httpd{method='POST'}=Req, Db) ->
-    couch_httpd:validate_ctype(Req, "application/json"),
-    handle_changes_req1(Req, Db);
-handle_changes_req(#httpd{method='GET'}=Req, Db) ->
-    handle_changes_req1(Req, Db);
-handle_changes_req(#httpd{path_parts=[_,<<"_changes">>]}=Req, _Db) ->
-    send_method_not_allowed(Req, "GET,HEAD,POST").
 
-handle_changes_req1(Req, #db{name=DbName}=Db) ->
+handle_db_changes_req(Req, Db) ->
+    ChangesArgs = parse_changes_query(Req, Db),
+    ChangesFun = couch_changes:handle_db_changes(ChangesArgs, Req, Db),
+    handle_changes_req(Req, Db, ChangesArgs, ChangesFun).
+
+
+handle_changes_req(#httpd{method='POST'}=Req, Db, ChangesArgs, ChangesFun) ->
+    couch_httpd:validate_ctype(Req, "application/json"),
+    handle_changes_req1(Req, Db, ChangesArgs, ChangesFun);
+handle_changes_req(#httpd{method='GET'}=Req, Db, ChangesArgs, ChangesFun) ->
+    handle_changes_req1(Req, Db, ChangesArgs, ChangesFun);
+handle_changes_req(#httpd{}=Req, _Db, _ChangesArgs, _ChangesFun) ->
+    couch_httpd:send_method_not_allowed(Req, "GET,HEAD,POST").
+
+handle_changes_req1(Req, #db{name=DbName}=Db, ChangesArgs, ChangesFun) ->
     AuthDbName = ?l2b(config:get("couch_httpd_auth", "authentication_db")),
     case AuthDbName of
     DbName ->
@@ -72,47 +80,41 @@ handle_changes_req1(Req, #db{name=DbName}=Db) ->
         % on other databases, _changes is free for all.
         ok
     end,
-    handle_changes_req2(Req, Db).
 
-handle_changes_req2(Req, Db) ->
     MakeCallback = fun(Resp) ->
         fun({change, {ChangeProp}=Change, _}, "eventsource") ->
             Seq = proplists:get_value(<<"seq">>, ChangeProp),
-            send_chunk(Resp, ["data: ", ?JSON_ENCODE(Change),
+            couch_httpd:send_chunk(Resp, ["data: ", ?JSON_ENCODE(Change),
                               "\n", "id: ", ?JSON_ENCODE(Seq),
                               "\n\n"]);
         ({change, Change, _}, "continuous") ->
-            send_chunk(Resp, [?JSON_ENCODE(Change) | "\n"]);
+            couch_httpd:send_chunk(Resp, [?JSON_ENCODE(Change) | "\n"]);
         ({change, Change, Prepend}, _) ->
-            send_chunk(Resp, [Prepend, ?JSON_ENCODE(Change)]);
+            couch_httpd:send_chunk(Resp, [Prepend, ?JSON_ENCODE(Change)]);
         (start, "eventsource") ->
             ok;
         (start, "continuous") ->
             ok;
         (start, _) ->
-            send_chunk(Resp, "{\"results\":[\n");
+            couch_httpd:send_chunk(Resp, "{\"results\":[\n");
         ({stop, _EndSeq}, "eventsource") ->
-            end_json_response(Resp);
+            couch_httpd:end_json_response(Resp);
         ({stop, EndSeq}, "continuous") ->
-            send_chunk(
+            couch_httpd:send_chunk(
                 Resp,
                 [?JSON_ENCODE({[{<<"last_seq">>, EndSeq}]}) | "\n"]
             ),
-            end_json_response(Resp);
+            couch_httpd:end_json_response(Resp);
         ({stop, EndSeq}, _) ->
-            send_chunk(
+            couch_httpd:send_chunk(
                 Resp,
                 io_lib:format("\n],\n\"last_seq\":~w}\n", [EndSeq])
             ),
-            end_json_response(Resp);
-        (timeout, "eventsource") ->
-            send_chunk(Resp, "event: heartbeat\ndata: \n\n");
+            couch_httpd:end_json_response(Resp);
         (timeout, _) ->
-            send_chunk(Resp, "\n")
+            couch_httpd:send_chunk(Resp, "\n")
         end
     end,
-    ChangesArgs = parse_changes_query(Req, Db),
-    ChangesFun = couch_changes:handle_db_changes(ChangesArgs, Req, Db),
     WrapperFun = case ChangesArgs#changes_args.feed of
     "normal" ->
         {ok, Info} = couch_db:get_db_info(Db),
@@ -153,6 +155,8 @@ handle_changes_req2(Req, Db) ->
         couch_stats:decrement_counter(
             [couchdb, httpd, clients_requesting_changes])
     end.
+
+
 
 handle_compact_req(#httpd{method='POST'}=Req, Db) ->
     case Req#httpd.path_parts of
