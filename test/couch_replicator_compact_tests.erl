@@ -12,8 +12,8 @@
 
 -module(couch_replicator_compact_tests).
 
--include("../../../test/couchdb/couch_eunit.hrl").
--include_lib("couchdb/couch_db.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
+-include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_replicator/src/couch_replicator.hrl").
 
 -define(ADMIN_ROLE, #user_ctx{roles=[<<"_admin">>]}).

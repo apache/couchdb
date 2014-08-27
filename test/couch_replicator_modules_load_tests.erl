@@ -12,7 +12,7 @@
 
 -module(couch_replicator_modules_load_tests).
 
--include("../../../test/couchdb/couch_eunit.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
 
 
 modules_load_test_() ->
