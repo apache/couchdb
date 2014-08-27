@@ -72,9 +72,9 @@ handle_view_changes_req(#httpd{path_parts=[_,<<"_design">>,DDocName,<<"_view_cha
             throw({bad_request, "view changes not enabled"})
     end,
 
-    ChangesArgs = couch_httpd_changes:parse_changes_query(Req, Db),
+    ChangesArgs = couch_httpd_db:parse_changes_query(Req, Db),
     ChangesFun = couch_mrview_changes:handle_view_changes(ChangesArgs, Req, Db, <<"_design/", DDocName/binary>>, ViewName),
-    couch_httpd_changes:handle_changes_req(Req, Db, ChangesArgs, ChangesFun).
+    couch_httpd_db:handle_changes_req(Req, Db, ChangesArgs, ChangesFun).
 
 
 handle_view_req(#httpd{method='GET',
