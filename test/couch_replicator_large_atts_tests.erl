@@ -33,8 +33,8 @@ setup(local) ->
 setup(remote) ->
     {remote, setup()};
 setup({A, B}) ->
-    couch_config:set("attachments", "compressible_types", "text/*", false),
     ok = test_util:start_couch(),
+    config:set("attachments", "compressible_types", "text/*", false),
     Source = setup(A),
     Target = setup(B),
     {Source, Target}.
@@ -191,7 +191,7 @@ att_decoded_md5(Att) ->
 
 db_url(DbName) ->
     iolist_to_binary([
-        "http://", couch_config:get("httpd", "bind_address", "127.0.0.1"),
+        "http://", config:get("httpd", "bind_address", "127.0.0.1"),
         ":", integer_to_list(mochiweb_socket_server:get(couch_httpd, port)),
         "/", DbName
     ]).

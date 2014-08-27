@@ -164,8 +164,8 @@ loop(Parent, Ref, Worker, Pool) ->
     end.
 
 spawn_pool() ->
-    Host = couch_config:get("httpd", "bind_address", "127.0.0.1"),
-    Port = couch_config:get("httpd", "port", "5984"),
+    Host = config:get("httpd", "bind_address", "127.0.0.1"),
+    Port = config:get("httpd", "port", "5984"),
     {ok, Pool} = couch_replicator_httpc_pool:start_link(
         "http://" ++ Host ++ ":" ++ Port, [{max_connections, 3}]),
     Pool.
