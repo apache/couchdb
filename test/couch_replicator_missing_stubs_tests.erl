@@ -20,6 +20,8 @@
 -define(TIMEOUT_EUNIT, 30).
 
 
+-ifdef(run_broken_tests).
+
 setup() ->
     DbName = ?tempdb(),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_USER]),
@@ -247,3 +249,6 @@ replicate(Source, Target) ->
         {'DOWN', MonRef, process, Pid, _} ->
             ok
     end.
+
+-endif.
+

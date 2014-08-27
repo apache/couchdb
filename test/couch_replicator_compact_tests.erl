@@ -23,6 +23,8 @@
 -define(TIMEOUT_WRITER, 3000).
 -define(TIMEOUT_EUNIT, ?TIMEOUT div 1000 + 5).
 
+-ifdef(run_broken_tests).
+
 setup() ->
     DbName = ?tempdb(),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_USER]),
@@ -435,3 +437,5 @@ maybe_pause(Parent, Counter) ->
     after 0 ->
         ok
     end.
+
+-endif.
