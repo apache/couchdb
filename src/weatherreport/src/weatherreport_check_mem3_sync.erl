@@ -41,16 +41,15 @@ valid() ->
 
 -spec check(list()) -> [{atom(), term()}].
 check(_Opts) ->
-    NodeName = node(),
     case erlang:whereis(mem3_sync) of
         undefined ->
-            [{warning, {mem3_sync_not_found, NodeName}}];
+            [{warning, mem3_sync_not_found}];
         Pid ->
-            [{info, {mem3_sync_found, NodeName, Pid}}]
+            [{info, {mem3_sync_found, Pid}}]
     end.
 
 -spec format(term()) -> {io:format(), [term()]}.
-format({mem3_sync_not_found, NodeName}) ->
-    {"No mem3_sync process found on local node ~w", [NodeName]};
-format({mem3_sync_found, NodeName, Pid}) ->
-    {"mem3_sync process found on local node ~w with pid ~w", [NodeName, Pid]}.
+format(mem3_sync_not_found) ->
+    {"No mem3_sync process found on local node.", []};
+format({mem3_sync_found, Pid}) ->
+    {"mem3_sync process found on local node with pid ~w", [Pid]}.

@@ -55,22 +55,20 @@ n_to_level(0) ->
 n_to_level(_) ->
     info.
 
-report_to_message({DbName, ShardRange, {Type, N}}, NodeName) ->
-    {n_to_level(N), {Type, N, DbName, ShardRange, NodeName}}.
+report_to_message({DbName, ShardRange, {Type, N}}) ->
+    {n_to_level(N), {Type, N, DbName, ShardRange}}.
 
 -spec check(list()) -> [{atom(), term()}].
 check(_Opts) ->
-    NodeName = node(),
     case custodian:report() of
         [] ->
-            [{info, {ok, NodeName}}];
+            [{info, ok}];
         Report ->
-            lists:map(fun(R) -> report_to_message(R, NodeName) end, Report)
+            lists:map(fun(R) -> report_to_message(R) end, Report)
     end.
 
 -spec format(term()) -> {io:format(), [term()]}.
-format({ok, NodeName}) ->
-    {"All shards available and alive according to node ~w.", [NodeName]};
-format({Type, N, DbName, ShardRange, NodeName}) ->
-    {"~w ~w shards for Db: ~s Range: ~w according to node ~w.",
-        [N, Type, DbName, ShardRange, NodeName]}.
+format(ok) ->
+    {"All shards available and alive.", []};
+format({Type, N, DbName, ShardRange}) ->
+    {"~w ~w shards for Db: ~s Range: ~w.", [N, Type, DbName, ShardRange]}.
