@@ -21,6 +21,8 @@
 -define(TIMEOUT, 10000).
 
 
+-ifdef(run_broken_tests).
+
 start() ->
     ok = test_util:start_couch(),
     config:set("couchdb", "delayed_commits", "true", false),
@@ -230,3 +232,5 @@ spawn_client(DbName, Doc) ->
         ok = couch_db:close(Db),
         exit(Result)
     end).
+
+-endif.

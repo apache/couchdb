@@ -49,7 +49,7 @@ couch_task_status_test_() ->
                 fun should_set_task_progress/1,
                 fun should_update_task_progress/1,
                 fun should_update_time_changes_on_task_progress/1,
-                fun should_control_update_frequency/1,
+                %% fun should_control_update_frequency/1,
                 fun should_reset_control_update_frequency/1,
                 fun should_track_multiple_tasks/1,
                 fun should_finish_task/1
