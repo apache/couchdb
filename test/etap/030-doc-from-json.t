@@ -14,11 +14,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-%% XXX: Figure out how to -include("couch_db.hrl")
--record(doc, {id= <<"">>, revs={0, []}, body={[]},
-            atts=[], deleted=false, meta=[]}).
--record(att, {name, type, att_len, disk_len, md5= <<>>, revpos=0, data,
-            encoding=identity}).
+-include_lib("couch/include/couch_db.hrl").
 
 main(_) ->
     test_util:init_code_path(),
@@ -84,22 +80,22 @@ test_from_json_success() ->
                 ]}}
             ]}}]},
             #doc{atts=[
-                #att{
-                    name = <<"my_attachment.fu">>,
-                    data = stub,
-                    type = <<"application/awesome">>,
-                    att_len = 45,
-                    disk_len = 45,
-                    revpos = nil
-                },
-                #att{
-                    name = <<"noahs_private_key.gpg">>,
-                    data = <<"I have a pet fish!">>,
-                    type = <<"application/pgp-signature">>,
-                    att_len = 18,
-                    disk_len = 18,
-                    revpos = 0
-                }
+                couch_att:new([
+                    {name, <<"my_attachment.fu">>},
+                    {data, stub},
+                    {type, <<"application/awesome">>},
+                    {att_len, 45},
+                    {disk_len, 45},
+                    {revpos, undefined}
+                ]),
+                couch_att:new([
+                    {name, <<"noahs_private_key.gpg">>},
+                    {data, <<"I have a pet fish!">>},
+                    {type, <<"application/pgp-signature">>},
+                    {att_len, 18},
+                    {disk_len, 18},
+                    {revpos, 0}
+                ])
             ]},
             "Attachments are parsed correctly."
         },

@@ -24,7 +24,7 @@ compile: config.erl
 
 clean:
 	@echo "==> couchjs (clean)"
-	@rebar clean
+	@rebar -r clean
 
 check: eunit
 
@@ -35,6 +35,9 @@ dist: compile
 
 distclean: clean
 	@rm -rf rel/couchdb
+
+devclean:
+	@rm -rf dev/lib/*/data
 
 include install.mk
 install: dist

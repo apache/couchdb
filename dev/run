@@ -151,6 +151,7 @@ def boot_node(node):
     cmd = [
         "erl",
         "-args_file", os.path.join(DEV_PATH, "lib", node, "etc", "vm.args"),
+        "-config", os.path.join(COUCHDB, "rel", "files", "sys"),
         "-couch_ini",
             os.path.join(DEV_PATH, "lib", node, "etc", "default.ini"),
             os.path.join(DEV_PATH, "lib", node, "etc", "local.ini"),

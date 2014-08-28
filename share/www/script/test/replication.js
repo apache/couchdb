@@ -97,7 +97,6 @@ couchTests.replication = function(debug) {
   function populateDb(db, docs, dontRecreateDb) {
     if (dontRecreateDb !== true) {
       db.deleteDb();
-      wait(100);
       db.createDb();
     }
     for (var i = 0; i < docs.length; i++) {
@@ -150,26 +149,37 @@ couchTests.replication = function(debug) {
   }
 
 
-  function waitForSeq(sourceDb, targetDb) {
-    var targetSeq,
-        sourceSeq = sourceDb.info().update_seq,
+  function getTask(rep_id, delay) {
+    var t0 = new Date();
+    var t1;
+    do {
+      var xhr = CouchDB.request("GET", "/_active_tasks");
+      var tasks = JSON.parse(xhr.responseText);
+      for(var i = 0; i < tasks.length; i++) {
+        if(tasks[i].replication_id == repResult._local_id) {
+          return tasks[i];
+        }
+      }
+      t1 = new Date();
+    } while((t1 - t0) <= delay);
+
+    return null;
+  }
+
+
+  function waitForSeq(sourceDb, targetDb, rep_id) {
+    var sourceSeq = sourceDb.info().update_seq,
         t0 = new Date(),
         t1,
         ms = 3000;
 
     do {
-      targetSeq = targetDb.info().update_seq;
+      var task = getTask(rep_id, 0);
+      if(task && task["through_seq"] == sourceSeq) {
+        return;
+      }
       t1 = new Date();
-    } while (((t1 - t0) <= ms) && targetSeq < sourceSeq);
-  }
-
-
-  function wait(ms) {
-    var t0 = new Date(), t1;
-    do {
-      CouchDB.request("GET", "/");
-      t1 = new Date();
-    } while ((t1 - t0) <= ms);
+    } while (((t1 - t0) <= ms));
   }
 
 
@@ -700,11 +710,24 @@ couchTests.replication = function(debug) {
 
     TEquals(true, repResult.history instanceof Array);
     TEquals(1, repResult.history.length);
-    // NOT 31 (31 is db seq for last doc - the ddoc, which was not replicated)
-    TEquals(30, repResult.source_last_seq);
+    // We (incorrectly) don't record update sequences for things
+    // that don't pass the changse feed filter. Historically the
+    // last document to pass was the second to last doc which has
+    // an update sequence of 30. Work that has been applied to avoid
+    // conflicts from duplicate IDs breaking _bulk_docs updates added
+    // a sort to the logic which changes this. Now the last document
+    // to pass has an doc id of "8" and is at update_seq 29 (because only
+    // "9" and the design doc are after it).
+    //
+    // In the future the fix ought to be that we record that update
+    // sequence of the database. BigCouch has some existing work on
+    // this in the clustered case because if you have very few documents
+    // that pass the filter then (given single node's behavior) you end
+    // up having to rescan a large portion of the database.
+    TEquals(29, repResult.source_last_seq);
     TEquals(0, repResult.history[0].start_last_seq);
-    TEquals(30, repResult.history[0].end_last_seq);
-    TEquals(30, repResult.history[0].recorded_seq);
+    TEquals(29, repResult.history[0].end_last_seq);
+    TEquals(29, repResult.history[0].recorded_seq);
     // 16 => 15 docs with even integer field  + 1 doc with string field "7"
     TEquals(16, repResult.history[0].missing_checked);
     TEquals(16, repResult.history[0].missing_found);
@@ -750,7 +773,7 @@ couchTests.replication = function(debug) {
     TEquals(36, repResult.source_last_seq);
     TEquals(true, repResult.history instanceof Array);
     TEquals(2, repResult.history.length);
-    TEquals(30, repResult.history[0].start_last_seq);
+    TEquals(29, repResult.history[0].start_last_seq);
     TEquals(36, repResult.history[0].end_last_seq);
     TEquals(36, repResult.history[0].recorded_seq);
     TEquals(3, repResult.history[0].missing_checked);
@@ -1153,7 +1176,7 @@ couchTests.replication = function(debug) {
 
     var rep_id = repResult._local_id;
 
-    waitForSeq(sourceDb, targetDb);
+    waitForSeq(sourceDb, targetDb, rep_id);
 
     for (j = 0; j < docs.length; j++) {
       doc = docs[j];
@@ -1191,7 +1214,7 @@ couchTests.replication = function(debug) {
     var ddoc = docs[docs.length - 1]; // design doc
     addAtt(sourceDb, ddoc, "readme.txt", att1_data, "text/plain");
 
-    waitForSeq(sourceDb, targetDb);
+    waitForSeq(sourceDb, targetDb, rep_id);
 
     var modifDocs = docs.slice(10, 15).concat([ddoc]);
     for (j = 0; j < modifDocs.length; j++) {
@@ -1236,7 +1259,7 @@ couchTests.replication = function(debug) {
     // add another attachment to the ddoc on source
     addAtt(sourceDb, ddoc, "data.dat", att2_data, "application/binary");
 
-    waitForSeq(sourceDb, targetDb);
+    waitForSeq(sourceDb, targetDb, rep_id);
 
     copy = targetDb.open(ddoc._id);
     var atts = copy._attachments;
@@ -1273,7 +1296,7 @@ couchTests.replication = function(debug) {
     var newDocs = makeDocs(25, 35);
     populateDb(sourceDb, newDocs, true);
 
-    waitForSeq(sourceDb, targetDb);
+    waitForSeq(sourceDb, targetDb, rep_id);
 
     for (j = 0; j < newDocs.length; j++) {
       doc = newDocs[j];
@@ -1290,10 +1313,9 @@ couchTests.replication = function(debug) {
 
     // delete docs from source
     TEquals(true, sourceDb.deleteDoc(newDocs[0]).ok);
-    wait(1000);
     TEquals(true, sourceDb.deleteDoc(newDocs[6]).ok);
 
-    waitForSeq(sourceDb, targetDb);
+    waitForSeq(sourceDb, targetDb, rep_id);
 
     copy = targetDb.open(newDocs[0]._id);
     TEquals(null, copy);
@@ -1328,7 +1350,7 @@ couchTests.replication = function(debug) {
     };
     TEquals(true, sourceDb.save(doc).ok);
 
-    wait(2000);
+    waitForSeq(sourceDb, targetDb, rep_id);
     copy = targetDb.open(doc._id);
     TEquals(null, copy);
   }
@@ -1363,21 +1385,11 @@ couchTests.replication = function(debug) {
   while (sourceDb.info().compact_running) {};
 
   TEquals(true, sourceDb.save(makeDocs(30, 31)[0]).ok);
-  xhr = CouchDB.request("GET", "/_active_tasks");
 
-  var xhr = CouchDB.request("GET", "/_active_tasks");
-  var tasks = JSON.parse(xhr.responseText);
+  var task = getTask(repResult._local_id, 1000);
+  T(task != null);
 
-  var found_task = false;
-  for(var i = 0; i < tasks.length; i++) {
-    if(tasks[i].replication_id == repResult._local_id) {
-      found_task = true;
-      break;
-    }
-  }
-  TEquals(true, found_task);
-
-  waitForSeq(sourceDb, targetDb);
+  waitForSeq(sourceDb, targetDb, repResult._local_id);
   T(sourceDb.open("30") !== null);
 
   // cancel replication
@@ -1701,21 +1713,12 @@ couchTests.replication = function(debug) {
   );
   TEquals(true, repResult.ok);
   TEquals('string', typeof repResult._local_id);
+  var repId = repResult._local_id;
 
-  // Race conditions are awesome
-  wait(500);
+  var task = getTask(repId, 3000);
+  T(task != null);
 
-  xhr = CouchDB.request("GET", "/_active_tasks");
-  tasks = JSON.parse(xhr.responseText);
-
-  var repId;
-  for (j = 0; j < tasks.length; j++) {
-    if (tasks[j].replication_id === repResult._local_id) {
-      repId = tasks[j].replication_id;
-    }
-  }
-
-  TEquals(repResult._local_id, repId, "Replication found in _active_tasks");
+  TEquals(task["replication_id"], repId, "Replication found in _active_tasks");
   xhr = CouchDB.request(
     "POST", "/_replicate", {
       body: JSON.stringify({"replication_id": repId, "cancel": true}),
@@ -1723,19 +1726,12 @@ couchTests.replication = function(debug) {
   });
   TEquals(200, xhr.status, "Replication cancel request success");
 
-  xhr = CouchDB.request("GET", "/_active_tasks");
-  tasks = JSON.parse(xhr.responseText);
-  repId = null;
-  for (j = 0; j < tasks.length; j++) {
-    if (tasks[j].replication_id === repResult._local_id) {
-      repId = tasks[j].replication_id;
-    }
-  }
-  TEquals(null, repId, "Replication was canceled");
+  task = getTask(repId);
+  TEquals(null, task, "Replication was canceled");
 
   xhr = CouchDB.request(
     "POST", "/_replicate", {
-      body: JSON.stringify({"replication_id": repResult._local_id, "cancel": true}),
+      body: JSON.stringify({"replication_id": repId, "cancel": true}),
       headers: {"Content-Type": "application/json"}
   });
   TEquals(404, xhr.status, "2nd replication cancel failed");

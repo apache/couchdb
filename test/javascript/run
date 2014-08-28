@@ -37,6 +37,7 @@ SCRIPTS = """
     share/www/script/sha1.js
     share/www/script/oauth.js
     share/www/script/couch.js
+    share/www/script/replicator_db_inc.js
     share/www/script/couch_test_runner.js
     test/javascript/couch_http.js
     test/javascript/test_setup.js
@@ -94,7 +95,10 @@ def run_couchjs(test, fmt):
 
 
 def options():
-    return []
+    return [
+        op.make_option("-s", "--start", metavar="FILENAME", default=None,
+            help="Start from the given filename if multiple files are passed")
+    ]
 
 
 def main():
@@ -118,6 +122,14 @@ def main():
             else:
                 sys.stderr.write("Unknown test: " + name + os.linesep)
                 exit(1)
+
+    if opts.start is not None:
+        tmp = []
+        for name in tests:
+            if name >= opts.start:
+                tmp.append(name)
+        tests = tmp
+
     fmt = mkformatter(tests)
     for test in tests:
         run_couchjs(test, fmt)
