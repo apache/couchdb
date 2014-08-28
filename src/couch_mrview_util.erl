@@ -22,7 +22,7 @@
 -export([all_docs_key_opts/1, all_docs_key_opts/2, key_opts/1, key_opts/2]).
 -export([fold/4, fold_reduce/4]).
 -export([temp_view_to_ddoc/1]).
--export([calculate_external_size/3]).
+-export([calculate_external_size/1]).
 -export([validate_args/1]).
 -export([maybe_load_doc/3, maybe_load_doc/4]).
 -export([maybe_update_index_file/1]).
@@ -791,7 +791,7 @@ changes_ekey_opts(_StartSeq, #mrargs{end_key=EKey,
 
 
 
-calculate_external_size(IdBt, LogBt, Views) ->
+calculate_external_size(Views) ->
     SumFun = fun(#mrview{btree=Bt, seq_btree=SBt, key_byseq_btree=KSBt}, Acc) ->
         Size0 = sum_btree_sizes(Acc, couch_btree:size(Bt)),
         Size1 = case SBt of
@@ -803,14 +803,7 @@ calculate_external_size(IdBt, LogBt, Views) ->
             _ -> sum_btree_sizes(Size1, couch_btree:size(KSBt))
         end
     end,
-    Size = case LogBt of
-        nil ->
-            lists:foldl(SumFun, couch_btree:size(IdBt), Views);
-        _ ->
-            lists:foldl(SumFun, couch_btree:size(IdBt) +
-                        couch_btree:size(LogBt), Views)
-    end,
-    {ok, Size}.
+    {ok, lists:foldl(SumFun, 0, Views)}.
 
 
 sum_btree_sizes(nil, _) ->

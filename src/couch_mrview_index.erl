@@ -64,10 +64,14 @@ get(Property, State) ->
                 design_opts = Opts
             } = State,
             {ok, FileSize} = couch_file:bytes(Fd),
-            {ok, ExternalSize} = couch_mrview_util:calculate_external_size(IdBtree,
-                                                                           LogBtree,
-                                                                           Views),
-            ActiveSize = ExternalSize + couch_btree:size(Btree),
+            {ok, ExternalSize} = couch_mrview_util:calculate_external_size(Views),
+            LogBtSize = case LogBtree of
+                nil ->
+                    0;
+                _ ->
+                    couch_btree:size(LogBtree)
+            end,
+            ActiveSize = couch_btree:size(IdBtree) + LogBtSize + ExternalSize,
 
             IncDesign = couch_util:get_value(<<"include_design">>, Opts, false),
             LocalSeq = couch_util:get_value(<<"local_seq">>, Opts, false),
@@ -183,7 +187,7 @@ finish_update(State) ->
 commit(State) ->
     Header = {State#mrst.sig, couch_mrview_util:make_header(State)},
     Resp = couch_file:write_header(State#mrst.fd, Header),
-    couch_mrview_update_notifier:notify({index_update, State#mrst.db_name, State#mrst.idx_name}),
+    couch_event:notify(State#mrst.db_name, {index_update, State#mrst.idx_name}),
     Resp.
 
 
