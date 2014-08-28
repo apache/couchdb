@@ -265,13 +265,17 @@ merge_results([{Seq, Results} | Rest], SeqAcc, ViewKVs, DocIdKeys, Log) ->
 
 
 merge_results({DocId, _Seq, Rev, []}, ViewKVs, DocIdKeys, Log) ->
-    {ViewKVs, [{DocId, Rev, []} | DocIdKeys], dict:store(DocId, [], Log)};
+    {ViewKVs, [{DocId, []} | DocIdKeys], dict:store({DocId, Rev}, [], Log)};
 merge_results({DocId, Seq, Rev, RawResults}, ViewKVs, DocIdKeys, Log) ->
     JsonResults = couch_query_servers:raw_to_ejson(RawResults),
     Results = [[list_to_tuple(Res) || Res <- FunRs] || FunRs <- JsonResults],
-    {ViewKVs1, ViewIdKeys, Log1} = insert_results(DocId, Seq, Rev, Results, ViewKVs, [],
-                                            [], Log),
-    {ViewKVs1, [ViewIdKeys | DocIdKeys], Log1}.
+    case Results of
+        [[],[]] ->
+            {ViewKVs, [{DocId, []} | DocIdKeys], dict:store({DocId, Rev}, [], Log)};
+        _ ->
+            {ViewKVs1, ViewIdKeys, Log1} = insert_results(DocId, Seq, Rev, Results, ViewKVs, [], [], Log),
+            {ViewKVs1, [ViewIdKeys | DocIdKeys], Log1}
+    end.
 
 
 insert_results(DocId, _Seq, _Rev, [], [], ViewKVs, ViewIdKeys, Log) ->
@@ -285,7 +289,7 @@ insert_results(DocId, Seq, Rev, [KVs | RKVs], [{Id, {VKVs, SKVs}} | RVKVs], VKVA
             {[{Key, {dups, [Val1, Val2]}} | Rest], IdKeys, Log2};
         ({Key, Value}, {Rest, IdKeys, Log2}) ->
             {[{Key, Value} | Rest], [{Id, Key} | IdKeys],
-             dict:append(DocId, {Id, {Key, Seq, add}}, Log2)}
+             dict:append({DocId, Rev}, {Id, {Key, Seq, add}}, Log2)}
     end,
     InitAcc = {[], VIdKeys, Log},
     couch_stats:increment_counter([couchdb, mrview, emits], length(KVs)),
@@ -375,12 +379,16 @@ update_log(Btree, Log, _UpdatedSeq, true) ->
     {ok, dict:new(), dict:new(), LogBtree2};
 update_log(Btree, Log, UpdatedSeq, _) ->
     %% build list of updated keys and Id
+    Revs = dict:from_list(dict:fetch_keys(Log)),
+    Log0 = dict:fold(fun({Id, _Rev}, DIKeys, Acc) ->
+        dict:store(Id, DIKeys, Acc)
+    end, dict:new(), Log),
     {ToLook, Updated} = dict:fold(fun(Id, DIKeys, {IdsAcc, KeysAcc}) ->
         KeysAcc1 = lists:foldl(fun({ViewId, {Key, _Seq, _Op}}, KeysAcc2) ->
             [{Id, ViewId, Key} | KeysAcc2]
         end, KeysAcc, DIKeys),
         {[Id | IdsAcc], KeysAcc1}
-    end, {[], []}, Log),
+    end, {[], []}, Log0),
 
     MapFun = fun({ok, KV}) -> [KV]; (not_found) -> [] end,
     KVsToLook = lists:flatmap(MapFun, couch_btree:lookup(Btree, ToLook)),
@@ -399,7 +407,8 @@ update_log(Btree, Log, UpdatedSeq, _) ->
                     LogValue = {ViewId, {Key, UpdatedSeq, del}},
                     Log5 = dict:append(DocId, LogValue, Log4),
                     DelAcc5 = dict:append(ViewId, {Key, Seq, DocId}, DelAcc4),
-                    AddValue = {{UpdatedSeq, Key}, {DocId, ?REM_VAL}},
+                    Rev = dict:fetch(DocId, Revs),
+                    AddValue = {{UpdatedSeq, Key}, {DocId, ?REM_VAL, Rev}},
                     AddAcc5 = dict:append(ViewId, AddValue, AddAcc4),
                     {Log5, AddAcc5, DelAcc5};
                 false ->
@@ -409,7 +418,7 @@ update_log(Btree, Log, UpdatedSeq, _) ->
                     {Log5, AddAcc4, DelAcc4}
             end
         end, Acc, VIdKeys)
-    end, {Log, dict:new(), dict:new()}, KVsToLook),
+    end, {Log0, dict:new(), dict:new()}, KVsToLook),
 
     ToAdd = [{Id, DIKeys} || {Id, DIKeys} <- dict:to_list(Log1), DIKeys /= []],
     % store the new logs
