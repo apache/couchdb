@@ -12,8 +12,8 @@
 
 -module(couch_mrview_map_views_tests).
 
--include("../../../test/couchdb/couch_eunit.hrl").
--include_lib("couchdb/couch_db.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
+-include_lib("couch/include/couch_db.hrl").
 
 -define(TIMEOUT, 1000).
 -define(ADMIN_USER, {user_ctx, #user_ctx{roles=[<<"_admin">>]}}).
