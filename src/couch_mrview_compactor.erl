@@ -34,6 +34,7 @@ compact(_Db, State, Opts) ->
     end.
 
 compact(State) ->
+    erlang:put(io_class, compaction),
     #mrst{
         db_name=DbName,
         idx_name=IdxName,
