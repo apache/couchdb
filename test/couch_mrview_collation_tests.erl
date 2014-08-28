@@ -50,20 +50,6 @@
 ]).
 
 
-start() ->
-    {ok, Pid} = couch_server_sup:start_link(?CONFIG_CHAIN),
-    Pid.
-
-stop(Pid) ->
-    erlang:monitor(process, Pid),
-    couch_server_sup:stop(),
-    receive
-        {'DOWN', _, _, Pid, _} ->
-            ok
-    after ?TIMEOUT ->
-        throw({timeout, server_stop})
-    end.
-
 setup() ->
     {ok, Db1} = couch_mrview_test_util:new_db(?tempdb(), map),
     {ok, Db2} = couch_mrview_test_util:save_docs(Db1, make_docs()),
@@ -80,7 +66,7 @@ collation_test_() ->
         "Collation tests",
         {
             setup,
-            fun start/0, fun stop/1,
+            fun test_util:start_couch/0, fun test_util:stop_couch/1,
             {
                 foreach,
                 fun setup/0, fun teardown/1,
