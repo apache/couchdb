@@ -26,7 +26,7 @@ clean:
 	@echo "==> couchjs (clean)"
 	@rebar -r clean
 
-check: eunit
+check: javascript eunit
 
 
 dist: compile
@@ -59,3 +59,6 @@ docker:
 
 eunit:
 	@rebar eunit skip_deps=meck,mochiweb,lager
+
+javascript:
+	@dev/run test/javascript/run
