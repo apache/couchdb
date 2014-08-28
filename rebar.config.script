@@ -37,6 +37,7 @@ DepDescs = [
     {fauxton,           "fauxton",          {branch, "master"}, [raw]},
     {global_changes,    "global-changes",   {branch, "master"}},
     {ibrowse,           "ibrowse",          {branch, "master"}},
+    {ioq,               "ioq",              {branch, "master"}},
     {jiffy,             "jiffy",            {branch, "master"}},
     {khash,             "khash",            {branch, "master"}},
     {mem3,              "mem3",             {branch, "master"}},
