@@ -18,6 +18,8 @@
 -define(TIMEOUT, 1000).
 
 
+-ifdef(run_broken_tests).
+
 setup() ->
     {ok, Db} = couch_mrview_test_util:init_db(?tempdb(), map),
     couch_mrview:query_view(Db, <<"_design/bar">>, <<"baz">>),
@@ -70,3 +72,4 @@ getval(Key, PL) ->
     Val.
 
 
+-endif.
