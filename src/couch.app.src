@@ -44,6 +44,7 @@
         b64url,
         couch_log,
         couch_event,
-        couch_stats
+        couch_stats,
+        ioq
     ]}
 ]}.

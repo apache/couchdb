@@ -118,14 +118,14 @@ append_term_md5(Fd, Term, Options) ->
 %%----------------------------------------------------------------------
 
 append_binary(Fd, Bin) ->
-    gen_server:call(Fd, {append_bin, assemble_file_chunk(Bin)}, infinity).
+    ioq:call(Fd, {append_bin, assemble_file_chunk(Bin)}).
     
 append_binary_md5(Fd, Bin) ->
-    gen_server:call(Fd,
-        {append_bin, assemble_file_chunk(Bin, couch_util:md5(Bin))}, infinity).
+    ioq:call(Fd,
+        {append_bin, assemble_file_chunk(Bin, couch_util:md5(Bin))}).
 
 append_raw_chunk(Fd, Chunk) ->
-    gen_server:call(Fd, {append_bin, Chunk}, infinity).
+    ioq:call(Fd, {append_bin, Chunk}).
 
 
 assemble_file_chunk(Bin) ->
@@ -160,7 +160,7 @@ pread_binary(Fd, Pos) ->
 
 
 pread_iolist(Fd, Pos) ->
-    case gen_server:call(Fd, {pread_iolist, Pos}, infinity) of
+    case ioq:call(Fd, {pread_iolist, Pos}) of
     {ok, IoList, <<>>} ->
         {ok, IoList};
     {ok, IoList, Md5} ->
@@ -266,7 +266,7 @@ init_delete_dir(RootDir) ->
 
 
 read_header(Fd) ->
-    case gen_server:call(Fd, find_header, infinity) of
+    case ioq:call(Fd, find_header) of
     {ok, Bin} ->
         {ok, binary_to_term(Bin)};
     Else ->
@@ -278,7 +278,7 @@ write_header(Fd, Data) ->
     Md5 = couch_util:md5(Bin),
     % now we assemble the final header binary and write to disk
     FinalBin = <<Md5/binary, Bin/binary>>,
-    gen_server:call(Fd, {write_header, FinalBin}, infinity).
+    ioq:call(Fd, {write_header, FinalBin}).
 
 
 init_status_error(ReturnPid, Ref, Error) ->
