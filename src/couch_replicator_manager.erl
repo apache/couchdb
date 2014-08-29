@@ -296,7 +296,7 @@ changes_reader(Server, DbName, Since) ->
     UserCtx = #user_ctx{roles = [<<"_admin">>, <<"_replicator">>]},
     DbOpenOptions = [{user_ctx, UserCtx}, sys_db],
     {ok, Db} = couch_db:open_int(DbName, DbOpenOptions),
-    ChangesFeedFun = couch_changes:handle_changes(
+    ChangesFeedFun = couch_changes:handle_db_changes(
         #changes_args{
             include_docs = true,
             since = Since,

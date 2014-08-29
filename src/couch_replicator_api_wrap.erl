@@ -502,7 +502,7 @@ changes_since(Db, Style, StartSeq, UserFun, Options) ->
     },
     QueryParams = get_value(query_params, Options, {[]}),
     Req = changes_json_req(Db, Filter, QueryParams, Options),
-    ChangesFeedFun = couch_changes:handle_changes(Args, {json_req, Req}, Db),
+    ChangesFeedFun = couch_changes:handle_db_changes(Args, {json_req, Req}, Db),
     ChangesFeedFun(fun({change, Change, _}, _) ->
             UserFun(json_to_doc_info(Change));
         (_, _) ->
