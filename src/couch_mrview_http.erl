@@ -49,7 +49,7 @@ handle_all_docs_req(Req, _Db) ->
 
 handle_view_req(#httpd{method='GET'}=Req, Db, DDoc) ->
     [_, _, _, _, ViewName] = Req#httpd.path_parts,
-    couch_stats:increment_counter([httpd, view_reads]),
+    couch_stats:increment_counter([couchdb, httpd, view_reads]),
     design_doc_view(Req, Db, DDoc, ViewName, undefined);
 handle_view_req(#httpd{method='POST'}=Req, Db, DDoc) ->
     [_, _, _, _, ViewName] = Req#httpd.path_parts,
