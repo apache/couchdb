@@ -57,6 +57,7 @@ install.mk:
 docker:
 	@docker build --no-cache --rm -t couchdb/dev-cluster .
 
+eunit: export BUILDDIR = $(shell pwd)
 eunit:
 	@rebar setup_eunit
 	@rebar eunit skip_deps=meck,mochiweb,lager
