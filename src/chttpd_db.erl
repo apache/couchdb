@@ -73,6 +73,7 @@ handle_changes_req(#httpd{method='GET'}=Req, Db) ->
                 ChangesArgs)
         end);
     Feed when Feed =:= "continuous"; Feed =:= "longpoll"; Feed =:= "eventsource"  ->
+        couch_stats_process_tracker:track([chttpd, clients_requesting_changes]),
         fabric:changes(Db, fun changes_callback/2, {Feed, Req}, ChangesArgs);
     _ ->
         Msg = <<"Supported `feed` types: normal, continuous, longpoll, eventsource">>,
@@ -314,7 +315,7 @@ db_req(#httpd{path_parts=[_,<<"_ensure_full_commit">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "POST");
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, Db) ->
-    couch_stats:increment_counter([httpd, bulk_requests]),
+    couch_stats:increment_counter([chttpd, bulk_requests]),
     couch_httpd:validate_ctype(Req, "application/json"),
     {JsonProps} = chttpd:json_body_obj(Req),
     DocsArray = case couch_util:get_value(<<"docs">>, JsonProps) of
