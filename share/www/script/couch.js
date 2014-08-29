@@ -432,13 +432,13 @@ CouchDB.request = function(method, uri, options) {
   return req;
 };
 
-CouchDB.requestStats = function(module, key, test) {
+CouchDB.requestStats = function(path, test) {
   var query_arg = "";
   if(test !== null) {
     query_arg = "?flush=true";
   }
 
-  var url = "/_stats/" + module + "/" + key + query_arg;
+  var url = "/_stats/" + path.join("/") + query_arg;
   var stat = CouchDB.request("GET", url).responseText;
   return JSON.parse(stat);
 };

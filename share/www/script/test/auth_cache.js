@@ -51,13 +51,13 @@ couchTests.auth_cache = function(debug) {
 
 
   function hits() {
-    var hits = CouchDB.requestStats("couchdb", "auth_cache_hits", true);
+    var hits = CouchDB.requestStats(["couchdb", "auth_cache_hits"], true);
     return hits.current || 0;
   }
 
 
   function misses() {
-    var misses = CouchDB.requestStats("couchdb", "auth_cache_misses", true);
+    var misses = CouchDB.requestStats(["couchdb", "auth_cache_misses"], true);
     return misses.current || 0;
   }
 
