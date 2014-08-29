@@ -12,8 +12,10 @@
 
 -module(test_util).
 
+-include_lib("couch/include/couch_eunit.hrl").
+
 -export([init_code_path/0]).
--export([source_file/1, build_file/1, config_files/0]).
+-export([source_file/1, build_file/1]).
 %% -export([run/2]).
 -export([request/3, request/4]).
 -export([start_couch/0, start_couch/1, stop_couch/0, stop_couch/1]).
@@ -46,13 +48,6 @@ source_file(Name) ->
 build_file(Name) ->
     filename:join([builddir(), Name]).
 
-config_files() ->
-    [
-        build_file("etc/couchdb/default_dev.ini"),
-        build_file("test/random_port.ini"),
-        build_file("etc/couchdb/local_dev.ini")
-    ].
-
 
 request(Url, Headers, Method) ->
     request(Url, Headers, Method, []).
@@ -84,7 +79,7 @@ request(Url, Headers, Method, Body, N) ->
 
 
 start_couch() ->
-    start_couch(config_files()).
+    start_couch(?CONFIG_CHAIN).
 
 
 start_couch(IniFiles) ->

@@ -24,14 +24,16 @@
                 Dir
         end
     end).
+-define(CONFIG_DEFAULT,
+    filename:join([?BUILDDIR(), "tmp", "etc", "default_eunit.ini"])).
 -define(CONFIG_CHAIN, [
-    filename:join([?BUILDDIR(), "etc", "couchdb", "default_dev.ini"]),
-    filename:join([?BUILDDIR(), "etc", "couchdb", "local_dev.ini"]),
-    filename:join([?BUILDDIR(), "etc", "couchdb", "eunit.ini"])]).
+    ?CONFIG_DEFAULT,
+    filename:join([?BUILDDIR(), "tmp", "etc", "local_eunit.ini"]),
+    filename:join([?BUILDDIR(), "tmp", "etc", "eunit.ini"])]).
 -define(FIXTURESDIR,
     filename:join([?BUILDDIR(), "src", "couch", "test", "fixtures"])).
 -define(TEMPDIR,
-    filename:join([?BUILDDIR(), "test", "temp"])).
+    filename:join([?BUILDDIR(), "tmp", "tmp_data"])).
 
 -define(tempfile,
     fun() ->
