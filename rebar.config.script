@@ -65,6 +65,7 @@ AddConfig = [
     {sub_dirs, ["rel"]},
     {lib_dirs, ["src/"]},
     {erl_opts, [debug_info]},
+    {eunit_opts, [verbose]},
     {plugins, [eunit_plugin]},
     {post_hooks, [{compile, "escript support/build_js.escript"}]}
 ],
