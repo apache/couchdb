@@ -16,6 +16,7 @@
 -export([handle_stats_req/1]).
 
 handle_stats_req(#httpd{method='GET', path_parts=[_ | Path]}=Req) ->
+    flush(Req),
     Stats0 = couch_stats:fetch(),
     Stats = transform_stats(Stats0),
     Nested = nest(Stats),
@@ -95,3 +96,11 @@ maybe_format_key(Key) when is_atom(Key) ->
     list_to_binary(atom_to_list(Key));
 maybe_format_key(Key) when is_binary(Key) ->
     Key.
+
+flush(Req) ->
+    case couch_util:get_value("flush", couch_httpd:qs(Req)) of
+        "true" ->
+            couch_stats_aggregator:flush();
+        _Else ->
+            ok
+    end.

@@ -15,7 +15,8 @@
 -behaviour(gen_server).
 
 -export([
-    fetch/0
+    fetch/0,
+    flush/0
 ]).
 
 -export([
@@ -39,6 +40,9 @@ fetch() ->
     {ok, Stats} = gen_server:call(?MODULE, fetch),
     Stats.
 
+flush() ->
+    gen_server:call(?MODULE, flush).
+
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
@@ -53,20 +57,16 @@ init([]) ->
 
 handle_call(fetch, _from, #st{stats = Stats}=State) ->
     {reply, {ok, Stats}, State};
+handle_call(flush, _From, State) ->
+    {reply, ok, collect(State)};
 handle_call(Msg, _From, State) ->
     {stop, {unknown_call, Msg}, error, State}.
 
 handle_cast(Msg, State) ->
     {stop, {unknown_cast, Msg}, State}.
 
-handle_info(collect, #st{descriptions=Descriptions}=State) ->
-    Stats = lists:map(
-        fun({Name, Props}) ->
-            {Name, [{value, couch_stats:sample(Name)}|Props]}
-        end,
-        Descriptions
-    ),
-    {noreply, State#st{stats=Stats}};
+handle_info(collect, State) ->
+    {noreply, collect(State)};
 handle_info(reload, State) ->
     {ok, Descriptions} = reload_metrics(),
     {noreply, State#st{descriptions=Descriptions}};
@@ -126,3 +126,12 @@ load_metrics_for_application(AppName) ->
                     error
             end
     end.
+
+collect(State) ->
+    Stats = lists:map(
+        fun({Name, Props}) ->
+            {Name, [{value, couch_stats:sample(Name)}|Props]}
+        end,
+        State#st.descriptions
+    ),
+    State#st{stats=Stats}.
