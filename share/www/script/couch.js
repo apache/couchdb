@@ -440,7 +440,7 @@ CouchDB.requestStats = function(module, key, test) {
 
   var url = "/_stats/" + module + "/" + key + query_arg;
   var stat = CouchDB.request("GET", url).responseText;
-  return JSON.parse(stat)[module][key];
+  return JSON.parse(stat);
 };
 
 CouchDB.uuids_cache = [];
