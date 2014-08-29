@@ -65,23 +65,20 @@ handle_changes(Args1, Req, Db0, Type) ->
     } = Args1,
     Filter = configure_filter(FilterName, Style, Req, Db0),
     Args = Args1#changes_args{filter_fun = Filter},
-    UseViewChanges = case {Type, Filter} of
-        {{view, _, _}, _} ->
-            true;
-        {_, {fast_view, _, _, _}} ->
-            true;
+    % The type of changes feed depends on the supplied filter. If the query is
+    % for an optimized view-filtered db changes, we need to use the view
+    % sequence tree.
+    {UseViewChanges, DDocName, ViewName} = case {Type, Filter} of
+        {{view, DDocName0, ViewName0}, _} ->
+            {true, DDocName0, ViewName0};
+        {_, {fast_view, _, DDoc, ViewName0}} ->
+            {true, DDoc#doc.id, ViewName0};
         _ ->
-            false
+            {false, undefined, undefined}
     end,
-    {StartListenerFun, DDocName, ViewName} = if UseViewChanges ->
-        {DDocName0, ViewName0} = case {Type, Filter} of
-            {{view, DDocName1, ViewName1}, _} ->
-                {DDocName1, ViewName1};
-            {_, {fast_view, _, DDoc, ViewName1}} ->
-                {DDoc#doc.id, ViewName1}
-        end,
+    {StartListenerFun, View} = if UseViewChanges ->
         {ok, {_, View0, _}, _, _} = couch_mrview_util:get_view(
-                Db0#db.name, DDocName0, ViewName0, #mrargs{}),
+                Db0#db.name, DDocName, ViewName, #mrargs{}),
         case View0#mrview.seq_btree of
             #btree{} ->
                 ok;
@@ -90,17 +87,17 @@ handle_changes(Args1, Req, Db0, Type) ->
         end,
         SNFun = fun() ->
             couch_event:link_listener(
-                 ?MODULE, handle_view_event, {self(), DDocName0}, [{dbname, Db0#db.name}]
+                 ?MODULE, handle_view_event, {self(), DDocName}, [{dbname, Db0#db.name}]
             )
         end,
-        {SNFun, DDocName0, ViewName0};
-     true ->
+        {SNFun, View0};
+    true ->
         SNFun = fun() ->
             couch_event:link_listener(
                  ?MODULE, handle_db_event, self(), [{dbname, Db0#db.name}]
             )
         end,
-        {SNFun, undefined, undefined}
+        {SNFun, undefined}
     end,
     Start = fun() ->
         {ok, Db} = couch_db:reopen(Db0),
