@@ -94,6 +94,8 @@ maybe_format_key(Key) when is_list(Key) ->
     list_to_binary(Key);
 maybe_format_key(Key) when is_atom(Key) ->
     list_to_binary(atom_to_list(Key));
+maybe_format_key(Key) when is_integer(Key) ->
+    list_to_binary(integer_to_list(Key));
 maybe_format_key(Key) when is_binary(Key) ->
     Key.
 
