@@ -58,6 +58,7 @@ docker:
 	@docker build --no-cache --rm -t couchdb/dev-cluster .
 
 eunit:
+	@rebar setup_eunit
 	@rebar eunit skip_deps=meck,mochiweb,lager
 
 javascript:

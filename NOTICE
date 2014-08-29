@@ -193,3 +193,7 @@ This product also includes the following third-party components:
  * velocity.js (https://github.com/julianshapiro/velocity)
 
    Copyright (c) 2014 Julian Shapiro
+
+* is_base_dir function in eunit_plugin.erl (https://github.com/ChicagoBoss/ChicagoBoss/blob/master/skel/priv/rebar/boss_plugin.erl)
+
+   Copyright (c) 2009-2011 Evan Miller
