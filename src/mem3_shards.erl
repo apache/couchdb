@@ -158,14 +158,14 @@ handle_call(_Call, _From, St) ->
     {noreply, St}.
 
 handle_cast({cache_hit, DbName}, St) ->
-    couch_stats:increment_counter([dbcore, mem3, shard_cache, hit]),
+    couch_stats:increment_counter([mem3, shard_cache, hit]),
     cache_hit(DbName),
     {noreply, St};
 handle_cast({cache_insert, DbName, Shards}, St) ->
-    couch_stats:increment_counter([dbcore, mem3, shard_cache, miss]),
+    couch_stats:increment_counter([mem3, shard_cache, miss]),
     {noreply, cache_free(cache_insert(St, DbName, Shards))};
 handle_cast({cache_remove, DbName}, St) ->
-    couch_stats:increment_counter([dbcore, mem3, shard_cache, eviction]),
+    couch_stats:increment_counter([mem3, shard_cache, eviction]),
     {noreply, cache_remove(St, DbName)};
 handle_cast(_Msg, St) ->
     {noreply, St}.
