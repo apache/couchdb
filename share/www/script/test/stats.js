@@ -101,7 +101,7 @@ couchTests.stats = function(debug) {
       
       var open_dbs = getStat("couchdb", "open_databases").value;
       TEquals(open_dbs > 0, true, "We actually opened some dbs.");
-      TEquals(open_dbs, max, "We only have max db's open.");
+      TEquals(max, open_dbs, "We only have max db's open.");
       
       for(var i = 0; i < max * 2; i++) {
         newDb("test_suite_db_" + i).deleteDb();
