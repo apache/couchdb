@@ -26,7 +26,7 @@ clean:
 	@echo "==> couchjs (clean)"
 	@rebar -r clean
 
-check: javascript eunit
+check: compile javascript eunit
 
 
 dist: compile
