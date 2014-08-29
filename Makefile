@@ -60,7 +60,7 @@ docker:
 eunit: export BUILDDIR = $(shell pwd)
 eunit:
 	@rebar setup_eunit
-	@rebar eunit skip_deps=meck,mochiweb,lager
+	@rebar -r eunit skip_deps=meck,mochiweb,lager,snappy,couch_replicator,fabric
 
 javascript:
 	@dev/run test/javascript/run
