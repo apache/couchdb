@@ -22,7 +22,7 @@ couchTests.stats = function(debug) {
   };
 
   function getStat(mod, key) {
-    return CouchDB.requestStats(mod, key, true);
+    return CouchDB.requestStats([mod, key], true);
   };
 
   function doView(db) {
@@ -40,9 +40,9 @@ couchTests.stats = function(debug) {
   function runTest(mod, key, funcs) {
     var db = newDb("test_suite_db", true);
     if(funcs.setup) funcs.setup(db);
-    var before = getStat(mod, key).current;
+    var before = getStat(mod, key).value;
     if(funcs.run) funcs.run(db);
-    var after = getStat(mod, key).current;
+    var after = getStat(mod, key).value;
     if(funcs.test) funcs.test(before, after);
   }
 
@@ -52,9 +52,9 @@ couchTests.stats = function(debug) {
     var db = newDb("test_suite_db");
     db.deleteDb();
   
-    var before = getStat("couchdb", "open_databases").current;
+    var before = getStat("couchdb", "open_databases").value;
     db.createDb();
-    var after = getStat("couchdb", "open_databases").current;
+    var after = getStat("couchdb", "open_databases").value;
     TEquals(before+1, after, "Creating a db increments open db count.");
   })();
   
@@ -78,8 +78,8 @@ couchTests.stats = function(debug) {
     var max = 5;
     
     var testFun = function() {
-      var pre_dbs = getStat("couchdb", "open_databases").current || 0;
-      var pre_files = getStat("couchdb", "open_os_files").current || 0;
+      var pre_dbs = getStat("couchdb", "open_databases").value || 0;
+      var pre_files = getStat("couchdb", "open_os_files").value || 0;
      
       var triggered = false;
       var db = null;
@@ -99,7 +99,7 @@ couchTests.stats = function(debug) {
       }
       T(triggered, "We managed to force a all_dbs_active error.");
       
-      var open_dbs = getStat("couchdb", "open_databases").current;
+      var open_dbs = getStat("couchdb", "open_databases").value;
       TEquals(open_dbs > 0, true, "We actually opened some dbs.");
       TEquals(open_dbs, max, "We only have max db's open.");
       
@@ -107,8 +107,8 @@ couchTests.stats = function(debug) {
         newDb("test_suite_db_" + i).deleteDb();
       }
       
-      var post_dbs = getStat("couchdb", "open_databases").current;
-      var post_files = getStat("couchdb", "open_os_files").current;
+      var post_dbs = getStat("couchdb", "open_databases").value;
+      var post_files = getStat("couchdb", "open_os_files").value;
       TEquals(pre_dbs, post_dbs, "We have the same number of open dbs.");
       TEquals(pre_files, post_files, "We have the same number of open files.");
     };
