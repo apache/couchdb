@@ -73,8 +73,12 @@ handle_changes_req(#httpd{method='GET'}=Req, Db) ->
                 ChangesArgs)
         end);
     Feed when Feed =:= "continuous"; Feed =:= "longpoll"; Feed =:= "eventsource"  ->
-        couch_stats_process_tracker:track([chttpd, clients_requesting_changes]),
-        fabric:changes(Db, fun changes_callback/2, {Feed, Req}, ChangesArgs);
+        couch_stats:increment_counter([chttpd, clients_requesting_changes]),
+        try
+            fabric:changes(Db, fun changes_callback/2, {Feed, Req}, ChangesArgs)
+        after
+            couch_stats:decrement_counter([chttpd, clients_requesting_changes])
+        end;
     _ ->
         Msg = <<"Supported `feed` types: normal, continuous, longpoll, eventsource">>,
         throw({bad_request, Msg})
