@@ -145,8 +145,14 @@ handle_changes_req2(Req, Db) ->
             FeedChangesFun(MakeCallback(Resp))
         end
     end,
-    couch_stats_process_tracker:track([couchdb, httpd, clients_requesting_changes]),
-    WrapperFun(ChangesFun).
+    couch_stats:increment_counter(
+        [couchdb, httpd, clients_requesting_changes]),
+    try
+        WrapperFun(ChangesFun)
+    after
+        couch_stats:decrement_counter(
+            [couchdb, httpd, clients_requesting_changes])
+    end.
 
 handle_compact_req(#httpd{method='POST'}=Req, Db) ->
     case Req#httpd.path_parts of
