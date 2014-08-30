@@ -303,29 +303,44 @@ couchTests.stats = function(debug) {
     }
   });
 
+  var test_metric = function(metric, expected_fields) {
+    for (var k in metric) {
+      T(expected_fields.indexOf(k) >= 0, "Unknown property name: " + k);
+    }
+    for (var k in expected_fields) {
+      T(metric[expected_fields[k]] !== undefined, "Missing required property: " + k);
+    }
+  };
+
+  var test_histogram = function(histo) {
+    test_metric(histo, ["value", "type", "desc"]);
+    test_metric(histo.value, ["min", "max", "arithmetic_mean",
+      "geometric_mean", "harmonic_mean", "median", "variance",
+       "standard_deviation", "skewness", "kurtosis", "percentile",
+       "histogram", "n"]);
+  };
+
+  var test_counter = function(counter) {
+    test_metric(counter, ["value", "desc", "type"]);
+  };
+
+  var test_metrics = function(metrics) {
+    if (metrics.type === "counter") {
+      test_counter(metrics);
+    } else if (metrics.type === "histogram") {
+      test_histogram(metrics);
+    } else {
+      for (var k in metrics) {
+        test_metrics(metrics[k]);
+      }
+    }
+  };
+
   (function() {
-    var aggregates = [
-      "current",
-      "description",
-      "mean",
-      "min",
-      "max",
-      "stddev",
-      "sum"
-    ];
     var summary = JSON.parse(CouchDB.request("GET", "/_stats", {
       headers: {"Accept": "application/json"}
     }).responseText);
-    for(var i in summary) {
-      for(var j in summary[i]) {
-        for(var k in summary[i][j]) {
-          T(aggregates.indexOf(k) >= 0, "Unknown property name: " + j);
-        }
-        for(var k in aggregates) {
-          var mesg = "Missing required property: " + aggregates[k];
-          T(summary[i][j][aggregates[k]] !== undefined, mesg);
-        }
-      }
-    }
+    T(typeof(summary) === 'object');
+    test_metrics(summary);
   })();
 };
