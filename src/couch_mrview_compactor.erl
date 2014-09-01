@@ -34,7 +34,6 @@ compact(_Db, State, Opts) ->
     end.
 
 compact(State) ->
-    erlang:put(io_class, compaction),
     #mrst{
         db_name=DbName,
         idx_name=IdxName,
@@ -43,6 +42,7 @@ compact(State) ->
         id_btree=IdBtree,
         views=Views
     } = State,
+    erlang:put(io_priority, {view_compact, DbName, IdxName}),
 
     {EmptyState, NumDocIds} = couch_util:with_db(DbName, fun(Db) ->
         CompactFName = couch_mrview_util:compaction_file(DbName, Sig),
