@@ -150,22 +150,21 @@ cluster.
 
 Assuming you have Docker installed and running;
 
-
     make docker-image
 
 This will create a docker image (tagged 'couchdb/dev-cluster') capable
 of running a joined three node cluster.
 
-To start it up;
+To start it up:
 
     make docker-start
 
-A three node cluster shoud now be running (you can now use `docker ps`
+A three node cluster should now be running (you can now use `docker ps`
 to find the exposed ports of the nodes).
 
-To stop it;
+To stop it:
 
-   make docker-stop
+    make docker-stop
 
 Releasing
 ---------
