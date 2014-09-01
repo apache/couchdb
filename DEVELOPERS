@@ -14,11 +14,7 @@ Dependencies
 
 You will need the following installed:
 
- * GNU Libtool            (http://www.gnu.org/software/libtool/)
- * GNU Automake (>=1.6.3) (http://www.gnu.org/software/automake/)
- * GNU Autoconf (>=2.63)  (http://www.gnu.org/software/autoconf/)
- * GNU Autoconf Archive   (http://www.gnu.org/software/autoconf-archive/)
- * pkg-config             (http://www.freedesktop.org/wiki/Software/pkg-config)
+ * Rebar (>=2.5.0)        (https://github.com/rebar/bar)
 
 You may also need:
 
@@ -118,15 +114,6 @@ Windows
 Follow the instructions in INSTALL.Windows and build all components from
 source, using the same Visual C++ compiler and runtime.
 
-Bootstrapping
--------------
-
-Bootstrap the pristine source by running:
-
-    ./bootstrap
-
-You must repeat this step every time you update your source checkout.
-
 Configuring
 -----------
 
@@ -134,21 +121,9 @@ Configure the source by running:
 
     ./configure
 
-Note that this will not fail when the optional dependencies are missing.
+If you intend to run the test suites:
 
-To ensure the optional dependencies are installed, run:
-
-    ./configure --enable-strictness
-
-If you don't care about docs and want to skip the whole thing, run:
-
-    ./configure --disable-docs
-
-If you're working on the build system itself, you can run:
-
-    ./configure --disable-tests
-
-This skips the tests allowing quicker `make' cycles.
+    ./configure -c
 
 If you want to build it into different destination than `/usr/local`.
 
