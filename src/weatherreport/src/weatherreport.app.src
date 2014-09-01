@@ -35,6 +35,5 @@
         kernel,
         stdlib,
         inets
-    ]},
-    {mod, {weatherreport_app, []}}
+    ]}
  ]}.
