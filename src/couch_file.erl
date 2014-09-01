@@ -118,14 +118,15 @@ append_term_md5(Fd, Term, Options) ->
 %%----------------------------------------------------------------------
 
 append_binary(Fd, Bin) ->
-    ioq:call(Fd, {append_bin, assemble_file_chunk(Bin)}).
+    ioq:call(Fd, {append_bin, assemble_file_chunk(Bin)}, erlang:get(io_priority)).
     
 append_binary_md5(Fd, Bin) ->
     ioq:call(Fd,
-        {append_bin, assemble_file_chunk(Bin, couch_util:md5(Bin))}).
+        {append_bin, assemble_file_chunk(Bin, couch_util:md5(Bin))},
+        erlang:get(io_priority)).
 
 append_raw_chunk(Fd, Chunk) ->
-    ioq:call(Fd, {append_bin, Chunk}).
+    ioq:call(Fd, {append_bin, Chunk}, erlang:get(io_priority)).
 
 
 assemble_file_chunk(Bin) ->
@@ -160,7 +161,7 @@ pread_binary(Fd, Pos) ->
 
 
 pread_iolist(Fd, Pos) ->
-    case ioq:call(Fd, {pread_iolist, Pos}) of
+    case ioq:call(Fd, {pread_iolist, Pos}, erlang:get(io_priority)) of
     {ok, IoList, <<>>} ->
         {ok, IoList};
     {ok, IoList, Md5} ->
@@ -266,7 +267,7 @@ init_delete_dir(RootDir) ->
 
 
 read_header(Fd) ->
-    case ioq:call(Fd, find_header) of
+    case ioq:call(Fd, find_header, erlang:get(io_priority)) of
     {ok, Bin} ->
         {ok, binary_to_term(Bin)};
     Else ->
@@ -278,7 +279,7 @@ write_header(Fd, Data) ->
     Md5 = couch_util:md5(Bin),
     % now we assemble the final header binary and write to disk
     FinalBin = <<Md5/binary, Bin/binary>>,
-    ioq:call(Fd, {write_header, FinalBin}).
+    ioq:call(Fd, {write_header, FinalBin}, erlang:get(io_priority)).
 
 
 init_status_error(ReturnPid, Ref, Error) ->

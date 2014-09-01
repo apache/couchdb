@@ -35,7 +35,7 @@
 }).
 
 init({DbName, Filepath, Fd, Options}) ->
-    erlang:put(io_class, compaction),
+    erlang:put(io_priority, {db_update, DbName}),
     case lists:member(create, Options) of
     true ->
         % create a new header and writes it to the file
@@ -1180,7 +1180,7 @@ copy_compact(Db, NewDb0, Retry) ->
 
 
 start_copy_compact(#db{}=Db) ->
-    erlang:put(io_class, compaction),
+    erlang:put(io_priority, {db_compact, Db#db.name}),
     #db{name=Name, filepath=Filepath, options=Options, header=Header} = Db,
     ?LOG_DEBUG("Compaction process spawned for db \"~s\"", [Name]),
 
