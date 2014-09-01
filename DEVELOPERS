@@ -14,7 +14,7 @@ Dependencies
 
 You will need the following installed:
 
- * Rebar (>=2.5.0)        (https://github.com/rebar/bar)
+ * Rebar (>=2.5.0)        (https://github.com/rebar/rebar)
 
 You may also need:
 
