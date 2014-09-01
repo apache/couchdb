@@ -300,11 +300,11 @@ describe 'CouchDB class'
       
       it 'should add flush true to the request when there is a test argument'
         CouchDB.should.receive("request", "once").with_args("GET", "/_stats/httpd/requests?flush=true")
-        CouchDB.requestStats(['httpd', 'requests'], 'test');
+        CouchDB.requestStats(['couchdb', 'httpd', 'requests'], 'test');
       end
       
       it 'should still work when there is a test argument'
-        var stats = CouchDB.requestStats(['httpd_status_codes', '200'], 'test');
+        var stats = CouchDB.requestStats(['couchdb', 'httpd_status_codes', 200], 'test');
         stats.description.should.eql 'number of HTTP 200 OK responses'
         stats.sum.should.be_a Number
       end
