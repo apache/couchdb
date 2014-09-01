@@ -13,7 +13,7 @@
 -module(ioq).
 -behaviour(gen_server).
 
--export([start_link/0, call/2]).
+-export([start_link/0, call/3]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, code_change/3, terminate/2]).
 
 -record(state, {
@@ -27,7 +27,7 @@
 -record(request, {
     fd,
     msg,
-    class,
+    priority,
     from,
     ref
 }).
@@ -35,8 +35,8 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-call(Fd, Msg) ->
-    Request = #request{fd=Fd, msg=Msg, class=get(io_class), from=self()},
+call(Fd, Msg, Priority) ->
+    Request = #request{fd=Fd, msg=Msg, priority=Priority, from=self()},
     gen_server:call(?MODULE, Request, infinity).
 
 init(_) ->
@@ -77,7 +77,9 @@ code_change(_Vsn, State, _Extra) ->
 terminate(_Reason, _State) ->
     ok.
 
-enqueue_request(#request{class=compaction}=Request, #state{}=State) ->
+enqueue_request(#request{priority={db_compact, _}}=Request, #state{}=State) ->
+    State#state{compaction=queue:in(Request, State#state.compaction)};
+enqueue_request(#request{priority={view_compact, _, _}}=Request, #state{}=State) ->
     State#state{compaction=queue:in(Request, State#state.compaction)};
 enqueue_request(#request{}=Request, #state{}=State) ->
     State#state{interactive=queue:in(Request, State#state.interactive)}.
