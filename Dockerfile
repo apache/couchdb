@@ -1,32 +1,42 @@
-FROM debian:latest
+FROM debian:wheezy
 MAINTAINER Robert Newson <rnewson@apache.org>
 ENV DEBIAN_FRONTEND noninteractive
 
-# Install prereqs
+# Configure backports
 RUN echo "deb http://http.debian.net/debian wheezy-backports main" >> /etc/apt/sources.list
 RUN apt-get -qq update
-RUN apt-get -y install build-essential git libmozjs185-dev libicu-dev erlang-nox erlang-dev python wget
 
-# Set up user for the builds
-RUN useradd -m couchdb
+# Install prereqs
+RUN apt-get --no-install-recommends -y install \
+    build-essential \
+    ca-certificates \
+    curl \
+    erlang-dev \
+    erlang-nox \
+    git \
+    libicu-dev \
+    libmozjs185-dev \
+    python
 
 # Build rebar
-USER couchdb
-WORKDIR /home/couchdb
-
-RUN wget https://github.com/rebar/rebar/archive/2.5.0.tar.gz
-RUN tar xzf 2.5.0.tar.gz
-WORKDIR /home/couchdb/rebar-2.5.0
+RUN useradd -m rebar
+USER rebar
+WORKDIR /home/rebar
+RUN curl -L https://github.com/rebar/rebar/archive/2.5.0.tar.gz | tar zxf -
+WORKDIR /home/rebar/rebar-2.5.0
 RUN ./bootstrap
 USER root
 RUN cp rebar /usr/local/bin/
+RUN chmod 755 /usr/local/bin/rebar
 
 # Build couchdb
+RUN useradd -m couchdb
+RUN mkdir -p /home/couchdb
+ADD . /home/couchdb
+USER root
+RUN chown -R couchdb:couchdb /home/couchdb
 USER couchdb
 WORKDIR /home/couchdb
-
-RUN git clone https://git-wip-us.apache.org/repos/asf/couchdb.git
-WORKDIR /home/couchdb/couchdb
 
 # We don't to be so strict for simple testing.
 RUN sed -i'' '/require_otp_vsn/d' rebar.config.script
@@ -39,4 +49,4 @@ RUN ./configure
 RUN make
 
 EXPOSE 15984 25984 35984 15986 25986 35986
-ENTRYPOINT ["/home/couchdb/couchdb/dev/run"]
+ENTRYPOINT ["/home/couchdb/dev/run"]

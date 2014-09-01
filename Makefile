@@ -54,8 +54,14 @@ install.mk:
 	@echo "No install.mk found. Run ./configure"
 	@exit 1
 
-docker:
-	@docker build --no-cache --rm -t couchdb/dev-cluster .
+docker-image:
+	@docker build --rm -t couchdb/dev-cluster .
+
+docker-start:
+	@docker run -d -P -t couchdb/dev-cluster > .docker-id
+
+docker-stop:
+	@docker stop `cat .docker-id`
 
 eunit:
 	@rebar eunit skip_deps=meck,mochiweb,lager
