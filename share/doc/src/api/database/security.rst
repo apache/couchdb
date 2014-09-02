@@ -34,10 +34,10 @@
     :ref:`temporary views <api/db/temp_view>` against the database.
     They can not create a database nor delete a database.
 
-  Both ``members`` and ``admins`` objects are contains two array-typed fields:
+  Both ``members`` and ``admins`` objects contain two array-typed fields:
 
-  - ``users``: List of CouchDB user names
-  - ``roles``: List of users roles
+  - ``names``: List of CouchDB user names as strings
+  - ``roles``: List of roles as strings
 
   Any other additional fields in the security object are optional.
   The entire security object is made available to validation and other
