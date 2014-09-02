@@ -27,6 +27,8 @@
 %% Shard liveness is similar but also requires nodes containing copies
 %% to be actively participating in the cluster. If one or more nodes
 %% containing copies are in maintenance mode then liveness is impaired.
+%% Messages are also returned for any databases where there are
+%% conflicting shard maps.
 
 -module(weatherreport_check_custodian).
 -behaviour(weatherreport_check).
@@ -56,7 +58,9 @@ n_to_level(_) ->
     info.
 
 report_to_message({DbName, ShardRange, {Type, N}}) ->
-    {n_to_level(N), {Type, N, DbName, ShardRange}}.
+    {n_to_level(N), {Type, N, DbName, ShardRange}};
+report_to_message({DbName, {conflicted, N}}) ->
+    {warning, {conflicted, N, DbName}}.
 
 -spec check(list()) -> [{atom(), term()}].
 check(_Opts) ->
@@ -71,4 +75,8 @@ check(_Opts) ->
 format(ok) ->
     {"All shards available and alive.", []};
 format({Type, N, DbName, ShardRange}) ->
-    {"~w ~w shards for Db: ~s Range: ~w.", [N, Type, DbName, ShardRange]}.
+    {"~w ~w shards for Db: ~s Range: ~w.", [N, Type, DbName, ShardRange]};
+format({conflicted, 1, DbName}) ->
+    {"1 conflicted shard map for Db: ~s", [DbName]};
+format({conflicted, N, DbName}) ->
+    {"~w conflicted shard maps for Db: ~s", [N, DbName]}.
