@@ -37,6 +37,8 @@ transform_stats([{Key, Props} | Rest], Acc) ->
 
 transform_stat(counter, Props) ->
     Props;
+transform_stat(gauge, Props) ->
+    Props;
 transform_stat(histogram, Props) ->
     lists:map(fun
         ({value, Value}) ->
