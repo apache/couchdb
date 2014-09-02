@@ -119,7 +119,7 @@ load_metrics_for_application(AppName) ->
         {error, _Error} ->
             error;
         Dir ->
-            case file:consult(Dir ++ "/stat_descriptions.cfg") of
+            case file:consult(Dir ++ "/stats_descriptions.cfg") of
                 {ok, Descriptions} ->
                     Descriptions;
                 {error, _Error} ->
