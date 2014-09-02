@@ -868,7 +868,7 @@ update_docs_int(Db, DocsList, NonRepDocs, MergeConflicts, FullCommit) ->
          WriteCount - length(RemoveSeqs)),
     couch_stats:increment_counter([couchdb, document_writes], WriteCount),
     couch_stats:increment_counter(
-        [couchdb, local_doc_writes],
+        [couchdb, local_document_writes],
         length(NonRepDocs)
     ),
 
