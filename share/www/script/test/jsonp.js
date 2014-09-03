@@ -48,7 +48,7 @@ couchTests.jsonp = function(debug) {
 
     // Test unchunked callbacks.
     var xhr = CouchDB.request("GET", "/test_suite_db/0?callback=jsonp_no_chunk");
-    TEquals("text/javascript", xhr.getResponseHeader("Content-Type"));
+    TEquals("application/javascript", xhr.getResponseHeader("Content-Type"));
     T(xhr.status == 200);
     jsonp_flag = 0;
     eval(xhr.responseText);
@@ -71,7 +71,7 @@ couchTests.jsonp = function(debug) {
 
     var url = "/test_suite_db/_design/test/_view/all_docs?callback=jsonp_chunk";
     xhr = CouchDB.request("GET", url);
-    TEquals("text/javascript", xhr.getResponseHeader("Content-Type"));
+    TEquals("application/javascript", xhr.getResponseHeader("Content-Type"));
     T(xhr.status == 200);
     jsonp_flag = 0;
     eval(xhr.responseText);
