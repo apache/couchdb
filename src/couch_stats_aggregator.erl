@@ -79,14 +79,10 @@ terminate(_Reason, _State) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-props_to_type({Name, Props}) ->
-    {Name, proplists:get_value(type, Props)}.
-
 reload_metrics() ->
-    Current = lists:map(fun props_to_type/1, load_metrics_for_applications()),
+    Current = load_metrics_for_applications(),
     CurrentSet = sets:from_list(Current),
-    Existing = lists:map(fun props_to_type/1, couch_stats:list()),
-    ExistingSet = sets:from_list(Existing),
+    ExistingSet = sets:from_list(couch_stats:list()),
     ToDelete = sets:subtract(ExistingSet, CurrentSet),
     ToCreate = sets:subtract(CurrentSet, ExistingSet),
     sets:fold(
@@ -95,7 +91,8 @@ reload_metrics() ->
         ToDelete
     ),
     sets:fold(
-        fun({Name, Type}, _) ->
+        fun({Name, Props}, _) ->
+            Type = proplists:get_value(type, Props),
             couch_stats:new(Type, Name),
             nil
         end,
