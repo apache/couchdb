@@ -327,9 +327,11 @@ couchTests.stats = function(debug) {
   var test_metrics = function(metrics) {
     if (metrics.type === "counter") {
       test_counter(metrics);
+    } else if (metrics.type === "gauge") {
+      test_counter(metrics);
     } else if (metrics.type === "histogram") {
       test_histogram(metrics);
-    } else {
+    } else if (metrics.type === undefined) {
       for (var k in metrics) {
         test_metrics(metrics[k]);
       }
