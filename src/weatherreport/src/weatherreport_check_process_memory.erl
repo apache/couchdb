@@ -35,7 +35,7 @@
 
 -spec description() -> string().
 description() ->
-    "Check for processes with large mailboxes".
+    "Check for processes with high memory usage".
 
 -spec valid() -> boolean().
 valid() ->
