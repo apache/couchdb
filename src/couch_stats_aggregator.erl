@@ -79,10 +79,16 @@ terminate(_Reason, _State) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
+comparison_set(Metrics) ->
+    sets:from_list(
+        [{Name, proplists:get_value(type, Props)} || {Name, Props} <- Metrics]
+    ).
+
 reload_metrics() ->
     Current = load_metrics_for_applications(),
-    CurrentSet = sets:from_list(Current),
-    ExistingSet = sets:from_list(couch_stats:list()),
+    CurrentSet = comparison_set(Current),
+    Existing = couch_stats:list(),
+    ExistingSet = comparison_set(Existing),
     ToDelete = sets:subtract(ExistingSet, CurrentSet),
     ToCreate = sets:subtract(CurrentSet, ExistingSet),
     sets:fold(
@@ -91,8 +97,7 @@ reload_metrics() ->
         ToDelete
     ),
     sets:fold(
-        fun({Name, Props}, _) ->
-            Type = proplists:get_value(type, Props),
+        fun({Name, Type}, _) ->
             couch_stats:new(Type, Name),
             nil
         end,
