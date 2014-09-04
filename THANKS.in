@@ -91,6 +91,7 @@ suggesting improvements or submitting changes. Some of these people are:
  * Tim Blair
  * Tady Walsh <hello@tady.me>
  * Sam Rijs <recv@awesam.de>
+ * Benjamin Anderson <b@banjiewen.net>
 # Authors from commit 6c976bd and onwards are auto-inserted. If you are merging
 # a commit from a non-committer, you should not add an entry to this file. When
 # `bootstrap` is run, the actual THANKS file will be generated.
