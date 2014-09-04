@@ -255,13 +255,13 @@ handle_request(MochiReq) ->
     Host = MochiReq:get_header_value("Host"),
     couch_log:notice("~s ~s ~s ~s ~s ~B ~p ~B", [get(nonce), Peer, Host,
         atom_to_list(Method1), RawUri, Code, Status, round(RequestTime)]),
-    couch_stats:update_histogram([chttpd, request_time], RequestTime),
+    couch_stats:update_histogram([couchdb, request_time], RequestTime),
     case Result of
     {ok, _} ->
-        couch_stats:increment_counter([chttpd, requests]),
+        couch_stats:increment_counter([couchdb, httpd, requests]),
         {ok, Resp};
     {aborted, _, Reason} ->
-        couch_stats:increment_counter([chttpd, aborted_requests]),
+        couch_stats:increment_counter([couchdb, httpd, aborted_requests]),
         couch_log:error("Response abnormally terminated: ~p", [Reason]),
         exit(normal)
     end.
@@ -355,7 +355,7 @@ authenticate_request(Response, _AuthFuns) ->
     Response.
 
 increment_method_stats(Method) ->
-    couch_stats:increment_counter([chttpd, request_methods, Method]).
+    couch_stats:increment_counter([couchdb, httpd_request_methods, Method]).
 
 url_handler("") ->              fun chttpd_misc:handle_welcome_req/1;
 url_handler("favicon.ico") ->   fun chttpd_misc:handle_favicon_req/1;
@@ -557,7 +557,7 @@ verify_is_server_admin(#httpd{user_ctx=#user_ctx{roles=Roles}}) ->
     end.
 
 start_response_length(#httpd{mochi_req=MochiReq}=Req, Code, Headers0, Length) ->
-    couch_stats:increment_counter([chttpd, status_codes, Code]),
+    couch_stats:increment_counter([couchdb, httpd_status_codes, Code]),
     Headers = Headers0 ++ server_header() ++
 	couch_httpd_auth:cookie_auth_header(Req, Headers0),
     Resp = MochiReq:start_response_length({Code,
@@ -573,7 +573,7 @@ send(Resp, Data) ->
     {ok, Resp}.
 
 start_chunked_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers0) ->
-    couch_stats:increment_counter([chttpd, status_codes, Code]),
+    couch_stats:increment_counter([couchdb, httpd_status_codes, Code]),
     Headers = Headers0 ++ server_header() ++
         couch_httpd_auth:cookie_auth_header(Req, Headers0),
     Resp = MochiReq:respond({Code, chttpd_cors:headers(Req, Headers),
@@ -589,7 +589,7 @@ send_chunk(Resp, Data) ->
     {ok, Resp}.
 
 send_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers0, Body) ->
-    couch_stats:increment_counter([chttpd, status_codes, Code]),
+    couch_stats:increment_counter([couchdb, httpd_status_codes, Code]),
     Headers = Headers0 ++ server_header() ++
 	[timing(), reqid() | couch_httpd_auth:cookie_auth_header(Req, Headers0)],
     {ok, MochiReq:respond({Code, Headers, Body})}.

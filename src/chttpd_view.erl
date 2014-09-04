@@ -63,7 +63,7 @@ design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
 
 handle_view_req(#httpd{method='GET',
         path_parts=[_, _, _, _, ViewName]}=Req, Db, DDoc) ->
-    couch_stats:increment_counter([chttpd, view_reads]),
+    couch_stats:increment_counter([couchdb, httpd, view_reads]),
     Keys = chttpd:qs_json_value(Req, "keys", undefined),
     design_doc_view(Req, Db, DDoc, ViewName, Keys);
 
@@ -74,10 +74,10 @@ handle_view_req(#httpd{method='POST',
     Queries = couch_mrview_util:get_view_queries(Props),
     case {Queries, Keys} of
         {Queries, undefined} when is_list(Queries) ->
-            [couch_stats:increment_counter([chttpd, view_reads]) || _I <- Queries],
+            [couch_stats:increment_counter([couchdb, httpd, view_reads]) || _I <- Queries],
             multi_query_view(Req, Db, DDoc, ViewName, Queries);
         {undefined, Keys} when is_list(Keys) ->
-            couch_stats:increment_counter([chttpd, view_reads]),
+            couch_stats:increment_counter([couchdb, httpd, view_reads]),
             design_doc_view(Req, Db, DDoc, ViewName, Keys);
         {undefined, undefined} ->
             throw({
