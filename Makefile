@@ -26,7 +26,7 @@ clean:
 	@echo "==> couchjs (clean)"
 	@rebar -r clean
 
-check: compile javascript eunit
+check: javascript eunit
 
 
 dist: compile
@@ -64,9 +64,9 @@ docker-stop:
 	@docker stop `cat .docker-id`
 
 eunit: export BUILDDIR = $(shell pwd)
-eunit:
+eunit: compile
 	@rebar setup_eunit
 	@rebar -r eunit skip_deps=meck,mochiweb,lager,snappy,couch_replicator,fabric,folsom
 
-javascript:
+javascript: compile
 	@dev/run test/javascript/run
