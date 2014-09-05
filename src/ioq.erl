@@ -37,7 +37,12 @@ start_link() ->
 
 call(Fd, Msg, Priority) ->
     Request = #request{fd=Fd, msg=Msg, priority=Priority, from=self()},
-    gen_server:call(?MODULE, Request, infinity).
+    try
+        gen_server:call(?MODULE, Request, infinity)
+    catch
+        exit:{noproc,_} ->
+            gen_server:call(Fd, Msg, infinity)
+    end.
 
 init(_) ->
     Ratio = list_to_float(config:get("ioq", "ratio", "0.01")),
