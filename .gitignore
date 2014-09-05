@@ -5,6 +5,7 @@ rel/dev*
 rel/tmpdata
 src/
 /log
+tmp/
 
 *.o
 *.so
