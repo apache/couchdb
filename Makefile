@@ -21,6 +21,7 @@ config.erl:
 compile: config.erl
 	@echo "==> couchjs (compile)"
 	@rebar compile
+	@cp src/couch/priv/couchjs bin/
 
 clean:
 	@echo "==> couchjs (clean)"

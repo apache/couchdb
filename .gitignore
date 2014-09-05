@@ -21,3 +21,5 @@ share/server/main.js
 src/couch/priv/couch_js/config.h
 src/couch/priv/couchjs
 src/couch/priv/couchspawnkillable
+
+bin/
