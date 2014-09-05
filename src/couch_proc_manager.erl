@@ -15,9 +15,6 @@
 -behaviour(config_listener).
 -vsn(1).
 
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, 
-    code_change/3]).
-
 -export([
     start_link/0,
     get_proc_count/0,
@@ -27,8 +24,18 @@
     terminate_stale_procs/0
 ]).
 
-% config_listener api
--export([handle_config_change/5]).
+-export([
+    init/1,
+    terminate/2,
+    handle_call/3,
+    handle_cast/2,
+    handle_info/2,
+    code_change/3
+]).
+
+-export([
+    handle_config_change/5
+]).
 
 -include_lib("couch/include/couch_db.hrl").
 
