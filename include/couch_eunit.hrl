@@ -54,3 +54,23 @@
         {A, B, C} = erlang:now(),
         lists:flatten(io_lib:format("~p~p~p", [A, B, C]))
     end).
+
+%% Borrowed from https://github.com/richcarl/eunit/blob/master/include/eunit.hrl#L200-L219
+%% TODO: get rid of this once R14* is no longer supported
+-ifndef(assertNotMatch).
+-define(assertNotMatch(Guard, Expr),
+    begin
+        ((fun () ->
+            __V = (Expr),
+            case __V of
+                Guard -> erlang:error({assertNotMatch_failed,
+                    [{module, ?MODULE},
+                    {line, ?LINE},
+                    {expression, (??Expr)},
+                    {pattern, (??Guard)},
+                    {value, __V}]});
+                _ -> ok
+            end
+        end)())
+    end).
+-endif.
