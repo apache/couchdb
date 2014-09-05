@@ -15,7 +15,7 @@
 -compile(export_all).
 
 -include_lib("couch/include/couch_db.hrl").
--define(ADMIN, #user_ctx{roles=[<<"_admin">>]}).
+-include_lib("couch/include/couch_eunit.hrl").
 
 
 init_db(Name, Type) ->
@@ -29,8 +29,8 @@ init_db(Name, Type, Count) ->
 
 
 new_db(Name, Type) ->
-    couch_server:delete(Name, [{user_ctx, ?ADMIN}]),
-    {ok, Db} = couch_db:create(Name, [{user_ctx, ?ADMIN}]),
+    couch_server:delete(Name, [?ADMIN_USER]),
+    {ok, Db} = couch_db:create(Name, [?ADMIN_USER]),
     save_docs(Db, [ddoc(Type)]).
 
 
