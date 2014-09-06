@@ -50,6 +50,10 @@ DepDescs = [
 BaseUrl = "https://git-wip-us.apache.org/repos/asf/",
 
 MakeDep = fun
+    ({AppName, {url, Url}, Version}) ->
+        {AppName, ".*", {git, Url, Version}};
+    ({AppName, {url, Url}, Version, Options}) ->
+        {AppName, ".*", {git, Url, Version}, Options};
     ({AppName, RepoName, Version}) ->
         Url = BaseUrl ++ "couchdb-" ++ RepoName ++ ".git",
         {AppName, ".*", {git, Url, Version}};
