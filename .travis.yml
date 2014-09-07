@@ -13,9 +13,9 @@ script:
    - grunt test
 language: erlang
 otp_release:
+   - 17.1
    - 17.0
    - R16B03-1
-   - R15B03
    - R14B04
 git:
   depth: 10
