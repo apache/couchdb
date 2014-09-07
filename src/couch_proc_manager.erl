@@ -123,7 +123,7 @@ handle_call(get_proc_count, _From, State) ->
 
 handle_call(get_stale_proc_count, _From, State) ->
     #state{threshold_ts = T0} = State,
-    MatchSpec = [{#proc_int{t0='$1', _='_'}, [{'<', '$1', T0}], [true]}],
+    MatchSpec = [{#proc_int{t0='$1', _='_'}, [{'<', '$1', {T0}}], [true]}],
     {reply, ets:select_count(?PROCS, MatchSpec), State};
 
 handle_call({get_proc, #doc{body={Props}}=DDoc, DDocKey}, From, State) ->
