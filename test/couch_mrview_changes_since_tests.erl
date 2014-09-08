@@ -1,6 +1,3 @@
-#!/usr/bin/env escript
-%% -*- erlang -*-
-
 % Licensed under the Apache License, Version 2.0 (the "License"); you may not
 % use this file except in compliance with the License. You may obtain a copy of
 % the License at
@@ -13,36 +10,49 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-main(_) ->
-    etap:plan(14),
-    case (catch test()) of
-        ok ->
-            etap:end_tests();
-        Other ->
-            etap:diag(io_lib:format("Test died abnormally: ~p", [Other])),
-            etap:bail(Other)
-    end,
-    timer:sleep(300),
+-module(couch_mrview_changes_since_tests).
+
+-include_lib("couch/include/couch_eunit.hrl").
+-include_lib("couch/include/couch_db.hrl").
+
+-define(TIMEOUT, 1000).
+
+
+
+setup() ->
+    {ok, Db} = couch_mrview_test_util:init_db(?tempdb(), changes),
+    Db.
+
+teardown(Db) ->
+    couch_db:close(Db),
+    couch_server:delete(Db#db.name, [?ADMIN_USER]),
     ok.
 
-test() ->
-    test_util:start_couch(),
 
-    {ok, Db} = couch_mrview_test_util:init_db(<<"foo">>, changes),
-
-    test_basic(Db),
-    test_range(Db),
-    test_basic_since(Db),
-    test_range_since(Db),
-    test_basic_count(Db),
-    test_range_count(Db),
-    test_basic_count_since(Db),
-    test_range_count_since(Db),
-    test_compact(Db),
-    test_remove_key(Db),
-    catch test_util:stop_couch(),
-    ok.
-
+changes_since_test() ->
+    {
+        "changes_since tests",
+        {
+            setup,
+            fun test_util:start_couch/0, fun test_util:stop_couch/1,
+            {
+                foreach,
+                fun setup/0, fun teardown/1,
+                [
+                    test_basic/1,
+                    test_range/1,
+                    test_basic_since/1,
+                    test_range_since/1,
+                    test_basic_count/1,
+                    test_range_count/1,
+                    test_basic_count_since/1,
+                    test_range_count_since/1,
+                    test_compact/1,
+                    test_remove_key/1
+                ]
+            }
+        }
+    }.
 
 test_basic(Db) ->
     Result = run_query(Db, 0, []),
@@ -58,7 +68,7 @@ test_basic(Db) ->
                 {{10, 8, <<"8">>}, 8},
                 {{11, 9, <<"9">>}, 9}
     ]},
-    etap:is(Result, Expect, "Simple view query worked.").
+    ?_assertEqual(Result, Expect).
 
 
 test_range(Db) ->
@@ -68,7 +78,7 @@ test_range(Db) ->
                 {{6, 4, <<"4">>}, 4},
                 {{7, 5, <<"5">>}, 5}
     ]},
-    etap:is(Result, Expect, "Query with range works.").
+    ?_assertEqual(Result, Expect).
 
 test_basic_since(Db) ->
     Result = run_query(Db, 5, []),
@@ -80,7 +90,7 @@ test_basic_since(Db) ->
                 {{10, 8, <<"8">>}, 8},
                 {{11, 9, <<"9">>}, 9}
     ]},
-    etap:is(Result, Expect, "Simple view query since 5 worked.").
+    ?_assertEqual(Result, Expect).
 
 test_range_since(Db) ->
     Result = run_query(Db, 5, [{start_key, 3}, {end_key, 5}]),
@@ -88,29 +98,29 @@ test_range_since(Db) ->
                 {{6, 4, <<"4">>}, 4},
                 {{7, 5, <<"5">>}, 5}
     ]},
-    etap:is(Result, Expect, "Query with range since 5 works.").
+    ?_assertEqual(Result, Expect).
 
 test_basic_count(Db) ->
     Result = run_count_query(Db, 0, []),
-    etap:is(Result, 10, "Simple view count worked.").
+    ?_assertEqual(Result, 10).
 
 test_range_count(Db) ->
     Result = run_count_query(Db, 0, [{start_key, 3}, {end_key, 5}]),
-    etap:is(Result, 3, "Count with range works.").
+    ?_assertEqual(Result, 3).
 
 test_basic_count_since(Db) ->
     Result = run_count_query(Db, 5, []),
-    etap:is(Result, 6, "Simple view count since 5 worked.").
+    ?_assertEqual(Result, 6).
 
 test_range_count_since(Db) ->
     Result = run_count_query(Db, 5, [{start_key, 3}, {end_key, 5}]),
-    etap:is(Result, 2, "Count with range since 5 works.").
+    ?_assertEqual(Result, 2).
 
 test_compact(Db) ->
     Result = couch_mrview:compact(Db, <<"_design/bar">>),
-    etap:is(Result, ok, "compact view is OK"),
+    ?_assertEqual(Result, ok),
     Count = run_count_query(Db, 0, []),
-    etap:is(Count, 10, "compact view worked.").
+    ?_assertEqual(Count, 10).
 
 test_remove_key(Db) ->
     %% add new doc
@@ -120,13 +130,13 @@ test_remove_key(Db) ->
     {ok, _} =  couch_db:ensure_full_commit(Db),
     {ok, Db1} = couch_db:reopen(Db),
     Result = run_count_query(Db1, 0, []),
-    etap:is(Result, 11, "Add new doc worked."),
+    ?_assertEqual(Result, 11),
     %% check new view key
     Result1 = run_query(Db1, 0, [{start_key, 11}, {end_key, 11}]),
     Expect = {ok, [
                 {{12, 11, <<"11">>}, 11}
     ]},
-    etap:is(Result1, Expect, "added key OK."),
+    ?_assertEqual(Result1, Expect),
 
     %% delete doc
     Doc2 = couch_doc:from_json_obj({[
@@ -137,13 +147,13 @@ test_remove_key(Db) ->
     {ok, _} = couch_db:update_doc(Db1, Doc2, []),
     {ok, Db2} = couch_db:reopen(Db1),
     Result2 = run_count_query(Db2, 0, []),
-    etap:is(Result2, 11, "removed key saved."),
+    ?_assertEqual(Result2, 11),
     %% check new view key
     Result3 = run_query(Db2, 0, [{start_key, 11}, {end_key, 11}]),
     Expect2 = {ok, [
                 {{13, 11, <<"11">>}, {[{<<"_removed">>, true}]}}
     ]},
-    etap:is(Result3, Expect2, "removed key OK.").
+    ?_assertEqual(Result3, Expect2).
 
 run_query(Db, Since, Opts) ->
     Fun = fun(KV, Acc) -> {ok, [KV | Acc]} end,

@@ -1,6 +1,3 @@
-#!/usr/bin/env escript
-%% -*- erlang -*-
-
 % Licensed under the Apache License, Version 2.0 (the "License"); you may not
 % use this file except in compliance with the License. You may obtain a copy of
 % the License at
@@ -13,30 +10,34 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-main(_) ->
-    etap:plan(8),
-    case (catch test()) of
-        ok ->
-            etap:end_tests();
-        Other ->
-            etap:diag(io_lib:format("Test died abnormally: ~p", [Other])),
-            etap:bail(Other)
-    end,
-    timer:sleep(300),
-    ok.
+-module(couch_mrview_all_docs_tests).
 
-test() ->
-    test_util:start_couch(),
-    {ok, Db} = couch_mrview_test_util:init_db(<<"foo">>, changes),
-    test_normal_changes(Db),
-    test_stream_once(Db),
-    test_stream_once_since(Db),
-    test_stream_once_timeout(Db),
-    test_stream_once_heartbeat(Db),
-    test_stream(Db),
-    test_indexer(Db),
-    test_util:stop_couch(),
-    ok.
+-include_lib("couch/include/couch_eunit.hrl").
+-include_lib("couch/include/couch_db.hrl").
+
+
+changes_index_test() ->
+    {
+        "changes index tests",
+        {
+            setup,
+            fun test_util:start_couch/0, fun test_util:stop_couch/1,
+            {
+                foreach,
+                fun setup/0, fun teardown/1,
+                [
+                    fun test_normal_changes/1,
+                    fun test_stream_once/1,
+                    fun test_stream_once_since/1,
+                    fun test_stream_once_timeout/1,
+                    fun test_stream_once_heartbeat/1,
+                    fun test_stream/1,
+                    fun test_indexer/1
+                ]
+            }
+        }
+    }.
+
 
 test_normal_changes(Db) ->
     Result = run_query(Db, []),
@@ -52,7 +53,7 @@ test_normal_changes(Db) ->
                 {{10, 8, <<"8">>}, 8},
                 {{11, 9, <<"9">>}, 9}
     ]},
-    etap:is(Result, Expect, "normal changes worked.").
+    ?_assertEqual(Result, Expect).
 
 test_stream_once(Db) ->
     Result = run_query(Db, [{stream, once}]),
@@ -68,7 +69,7 @@ test_stream_once(Db) ->
                 {{10, 8, <<"8">>}, 8},
                 {{11, 9, <<"9">>}, 9}
     ]},
-    etap:is(Result, Expect, "stream once since 0 worked.").
+    ?_assertEqual(Result, Expect).
 
 
 test_stream_once_since(Db) ->
@@ -89,7 +90,7 @@ test_stream_once_since(Db) ->
 
     receive
         {result, Result} ->
-            etap:is(Result, Expect, "normal changes worked.")
+            ?_assertEqual(Result, Expect)
     after 5000 ->
             io:format("never got the change", [])
     end.
@@ -110,7 +111,7 @@ test_stream_once_timeout(Db) ->
 
     receive
         {result, Result} ->
-            etap:is(Result, Expect, "got timeout.")
+            ?_assertEqual(Result, Expect)
     after 5000 ->
             io:format("never got the change", [])
     end.
@@ -139,7 +140,7 @@ test_stream_once_heartbeat(Db) ->
 
     receive
         {result, Result} ->
-            etap:is(Result, Expect, "heartbeat OK.")
+            ?_assertEqual(Result, Expect)
     after 5000 ->
             io:format("never got the change", [])
     end.
@@ -167,7 +168,7 @@ test_stream(Db) ->
 
     receive
         {result, Result} ->
-            etap:is(Result, Expect, "stream OK.")
+            ?_assertEqual(Result, Expect)
     after 5000 ->
             io:format("never got the change", [])
     end.
@@ -176,14 +177,14 @@ test_stream(Db) ->
 test_indexer(Db) ->
     Result = run_query(Db, [{since, 14}, refresh]),
     Expect = {ok, 15, [{{15,14,<<"14">>},14}]},
-    etap:is(Result, Expect, "refresh index by hand OK."),
+    ?_assertEqual(Result, Expect),
 
     {ok, Db1} = save_doc(Db, 15),
     timer:sleep(1500),
     Result1 = run_query(Db1, [{since, 14}], false),
     Expect1 = {ok, 16, [{{15,14,<<"14">>},14},
                        {{16,15,<<"15">>},15}]},
-    etap:is(Result1, Expect1, "changes indexed in background OK."),
+    ?_assertEqual(Result1, Expect1),
     ok.
 
 
