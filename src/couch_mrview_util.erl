@@ -162,9 +162,12 @@ view_sig(Db, State, View, #mrargs{include_docs=true}=Args) ->
     BaseSig = view_sig(Db, State, View, Args#mrargs{include_docs=false}),
     UpdateSeq = couch_db:get_update_seq(Db),
     PurgeSeq = couch_db:get_purge_seq(Db),
-    Bin = term_to_binary({BaseSig, UpdateSeq, PurgeSeq,
-                          State#mrst.seq_indexed, State#mrst.keyseq_indexed}),
-    couch_index_util:hexsig(couch_util:md5(Bin));
+    #mrst{
+        seq_indexed=SeqIndexed,
+        keyseq_indexed=KeySeqIndexed
+    } = State,
+    Term = view_sig_term(BaseSig, UpdateSeq, PurgeSeq, KeySeqIndexed, SeqIndexed),
+    couch_index_util:hexsig(couch_util:md5(term_to_binary(Term)));
 view_sig(Db, State, {_Nth, _Lang, View}, Args) ->
     view_sig(Db, State, View, Args);
 view_sig(_Db, State, View, Args0) ->
@@ -177,8 +180,18 @@ view_sig(_Db, State, View, Args0) ->
         preflight_fun=undefined,
         extra=[]
     },
-    Bin = term_to_binary({Sig, UpdateSeq, PurgeSeq, KeySeqIndexed, SeqIndexed, Args}),
-    couch_index_util:hexsig(couch_util:md5(Bin)).
+    Term = view_sig_term(Sig, UpdateSeq, PurgeSeq, KeySeqIndexed, SeqIndexed, Args),
+    couch_index_util:hexsig(couch_util:md5(term_to_binary(Term))).
+
+view_sig_term(BaseSig, UpdateSeq, PurgeSeq, false, false) ->
+    {BaseSig, UpdateSeq, PurgeSeq};
+view_sig_term(BaseSig, UpdateSeq, PurgeSeq, KeySeqIndexed, SeqIndexed) ->
+    {BaseSig, UpdateSeq, PurgeSeq, KeySeqIndexed, SeqIndexed}.
+
+view_sig_term(BaseSig, UpdateSeq, PurgeSeq, false, false, Args) ->
+    {BaseSig, UpdateSeq, PurgeSeq, Args};
+view_sig_term(BaseSig, UpdateSeq, PurgeSeq, KeySeqIndexed, SeqIndexed, Args) ->
+    {BaseSig, UpdateSeq, PurgeSeq, KeySeqIndexed, SeqIndexed, Args}.
 
 
 init_state(Db, Fd, #mrst{views=Views}=State, nil) ->
