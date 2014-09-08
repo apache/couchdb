@@ -19,7 +19,7 @@
     qs_value/3, qs/1, qs_json_value/3, path/1, absolute_uri/2, body_length/1,
     verify_is_server_admin/1, unquote/1, quote/1, recv/2, recv_chunked/4,
     error_info/1, parse_form/1, json_body/1, json_body_obj/1, body/1,
-    doc_etag/1, make_etag/1, etag_respond/3, partition/1, serve_file/3,
+    doc_etag/1, make_etag/1, etag_respond/3, partition/1, serve_file/3, serve_file/4,
     server_header/0, start_chunked_response/3,send_chunk/2,
     start_response_length/4, send/2, start_json_response/2,
     start_json_response/3, end_json_response/1, send_response/4,
@@ -411,9 +411,14 @@ header_value(#httpd{mochi_req=MochiReq}, Key, Default) ->
 primary_header_value(#httpd{mochi_req=MochiReq}, Key) ->
     MochiReq:get_primary_header_value(Key).
 
-serve_file(#httpd{mochi_req=MochiReq}=Req, RelativePath, DocumentRoot) ->
+serve_file(Req, RelativePath, DocumentRoot) ->
+    serve_file(Req, RelativePath, DocumentRoot, []).
+
+serve_file(#httpd{mochi_req=MochiReq}=Req, RelativePath, DocumentRoot,
+           ExtraHeaders) ->
     Headers = server_header() ++
-	couch_httpd_auth:cookie_auth_header(Req, []),
+	couch_httpd_auth:cookie_auth_header(Req, []) ++
+	ExtraHeaders,
     {ok, MochiReq:serve_file(RelativePath, DocumentRoot,
         chttpd_cors:headers(Req, Headers))}.
 
