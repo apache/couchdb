@@ -99,6 +99,7 @@ maybe_persist(TaskProps) ->
 
 persist(TaskProps0) ->
     TaskProps = ?set(TaskProps0, updated_on, timestamp(os:timestamp())),
+    put(task_status_props, TaskProps),
     gen_server:cast(?MODULE, {update_status, self(), TaskProps}).
 
 
