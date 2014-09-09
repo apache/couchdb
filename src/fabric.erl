@@ -282,8 +282,9 @@ query_view(DbName, DesignName, ViewName, QueryArgs) ->
 -spec query_view(dbname(), #doc{} | binary(), iodata(), callback(), any(),
         #mrargs{}) ->
     any().
-query_view(DbName, GroupId, ViewName, Callback, Acc0, QueryArgs)
+query_view(Db, GroupId, ViewName, Callback, Acc0, QueryArgs)
         when is_binary(GroupId) ->
+    DbName = dbname(Db),
     {ok, DDoc} = ddoc_cache:open(DbName, <<"_design/", GroupId/binary>>),
     query_view(DbName, DDoc, ViewName, Callback, Acc0, QueryArgs);
 query_view(DbName, DDoc, ViewName, Callback, Acc0, QueryArgs0) ->
