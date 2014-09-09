@@ -66,7 +66,7 @@ get_view(Db, DDoc, ViewName, Args0) ->
 ddoc_to_mrst(DbName, #doc{id=Id, body={Fields}}) ->
     MakeDict = fun({Name, {MRFuns}}, DictBySrcAcc) ->
         case couch_util:get_value(<<"map">>, MRFuns) of
-            MapSrc when is_binary(MapSrc) ->
+            MapSrc when MapSrc /= undefined ->
                 RedSrc = couch_util:get_value(<<"reduce">>, MRFuns, null),
                 {ViewOpts} = couch_util:get_value(<<"options">>, MRFuns, {[]}),
                 View = case dict:find({MapSrc, ViewOpts}, DictBySrcAcc) of
