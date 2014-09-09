@@ -39,16 +39,16 @@ changes_since_test() ->
                 foreach,
                 fun setup/0, fun teardown/1,
                 [
-                    test_basic/1,
-                    test_range/1,
-                    test_basic_since/1,
-                    test_range_since/1,
-                    test_basic_count/1,
-                    test_range_count/1,
-                    test_basic_count_since/1,
-                    test_range_count_since/1,
-                    test_compact/1,
-                    test_remove_key/1
+                    fun test_basic/1,
+                    fun test_range/1,
+                    fun test_basic_since/1,
+                    fun test_range_since/1,
+                    fun test_basic_count/1,
+                    fun test_range_count/1,
+                    fun test_basic_count_since/1,
+                    fun test_range_count_since/1,
+                    fun test_compact/1,
+                    fun test_remove_key/1
                 ]
             }
         }

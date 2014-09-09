@@ -10,11 +10,20 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(couch_mrview_all_docs_tests).
+-module(couch_mrview_index_changes_tests).
 
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
+
+setup() ->
+    {ok, Db} = couch_mrview_test_util:init_db(?tempdb(), map),
+    Db.
+
+teardown(Db) ->
+    couch_db:close(Db),
+    couch_server:delete(Db#db.name, [?ADMIN_USER]),
+    ok.
 
 changes_index_test() ->
     {
