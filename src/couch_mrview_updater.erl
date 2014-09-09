@@ -138,12 +138,16 @@ process_doc(Doc, Seq, #mrst{doc_acc=Acc}=State) when length(Acc) > 100 ->
 process_doc(nil, Seq, #mrst{doc_acc=Acc}=State) ->
     {ok, State#mrst{doc_acc=[{nil, Seq, nil, nil} | Acc]}};
 process_doc(#doc{id=Id, deleted=true}=Doc, Seq, #mrst{doc_acc=Acc}=State) ->
-    {RevPos, [Rev | _]} = Doc#doc.revs,
-    {ok, State#mrst{doc_acc=[{Id, Seq, {RevPos, Rev}, deleted} | Acc]}};
+    Rev= extract_rev(Doc#doc.revs),
+    {ok, State#mrst{doc_acc=[{Id, Seq, Rev, deleted} | Acc]}};
 process_doc(#doc{id=Id}=Doc, Seq, #mrst{doc_acc=Acc}=State) ->
-    {RevPos, [Rev | _]} = Doc#doc.revs,
-    {ok, State#mrst{doc_acc=[{Id, Seq, {RevPos, Rev}, Doc} | Acc]}}.
+    Rev = extract_rev(Doc#doc.revs),
+    {ok, State#mrst{doc_acc=[{Id, Seq, Rev, Doc} | Acc]}}.
 
+extract_rev({0, []}) ->
+    {0, []};
+extract_rev({RevPos, [Rev | _]}) ->
+    {RevPos, Rev}.
 
 finish_update(#mrst{doc_acc=Acc}=State) ->
     if Acc /= [] ->
