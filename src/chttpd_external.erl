@@ -153,7 +153,7 @@ parse_external_response({Response}) ->
                 };
             {<<"headers">>, {Headers}} ->
                 NewHeaders = lists:map(fun({Header, HVal}) ->
-                    {binary_to_list(Header), binary_to_list(HVal)}
+                    {couch_util:to_list(Header), couch_util:to_list(HVal)}
                 end, Headers),
                 Args#extern_resp_args{headers=NewHeaders};
             _ -> % unknown key
