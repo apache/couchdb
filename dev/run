@@ -31,7 +31,7 @@ USAGE = "%prog [options] [command to run...]"
 DEV_PATH = os.path.dirname(os.path.abspath(__file__))
 COUCHDB = os.path.dirname(DEV_PATH)
 
-N = 3
+DEFAULT_N = 3
 PROCESSES = []
 
 
@@ -106,7 +106,7 @@ def write_configs(opts):
     datadir = os.path.join(DEV_PATH, "data")
     if not os.path.exists(datadir):
         os.makedirs(datadir)
-    for i in range(1,4):
+    for i in range(1, N+1):
         node = "node%d" % i
         args = {
             "prefix": COUCHDB,
@@ -234,13 +234,18 @@ def wait_for_procs():
 def options():
     return [
         op.make_option("-a", "--admin", metavar="USER:PASS", default=None,
-            help="Add an admin account to the development cluster")
+            help="Add an admin account to the development cluster"),
+        op.make_option("-n", "--nodes", metavar="N", default=DEFAULT_N,
+            type="int", help="Number of development nodes to be spun up")
     ]
 
 
 def main():
     parser = op.OptionParser(usage=USAGE, option_list=options())
     opts, args = parser.parse_args()
+
+    global N
+    N = opts.nodes
 
     init_log_dir()
     init_beams()
