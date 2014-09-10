@@ -68,7 +68,7 @@ start_update_notifiers(DbName) ->
 % rexi endpoint
 start_update_notifier(DbNames) ->
     {Caller, Ref} = get(rexi_from),
-    Notify = config:get("cloudant", "maintenance_mode", "false") /= "true",
+    Notify = config:get("couchdb", "maintenance_mode", "false") /= "true",
     State = #cb_state{client_pid = Caller, client_ref = Ref, notify = Notify},
     Options = [{parent, Caller}, {dbnames, DbNames}],
     couch_event:listen(?MODULE, handle_db_event, State, Options).

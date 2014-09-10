@@ -386,7 +386,7 @@ set_io_priority(DbName, Options) ->
     end,
     case erlang:get(io_priority) of
         {interactive, _} ->
-            case config:get("cloudant", "maintenance_mode", "false") of
+            case config:get("couchdb", "maintenance_mode", "false") of
                 "true" ->
                     % Done to silence error logging by rexi_server
                     rexi:reply({rexi_EXIT, {maintenance_mode, node()}}),

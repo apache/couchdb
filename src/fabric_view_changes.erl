@@ -85,7 +85,7 @@ keep_sending_changes(DbName, Args, Callback, Seqs, AccIn, Timeout, UpListen, T0)
         user_acc = AccOut
     } = Collector,
     LastSeq = pack_seqs(NewSeqs),
-    MaintenanceMode = config:get("cloudant", "maintenance_mode"),
+    MaintenanceMode = config:get("couchdb", "maintenance_mode"),
     if Limit > Limit2, Feed == "longpoll";
       MaintenanceMode == "true"; MaintenanceMode == "nolb" ->
         Callback({stop, LastSeq, pending_count(Offset)}, AccOut);
