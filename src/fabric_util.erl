@@ -176,15 +176,21 @@ get_db(DbName, Options) ->
 get_shard([], _Opts, _Timeout, _Factor) ->
     erlang:error({internal_server_error, "No DB shards could be opened."});
 get_shard([#shard{node = Node, name = Name} | Rest], Opts, Timeout, Factor) ->
-    case rpc:call(Node, couch_db, open, [Name, [{timeout, Timeout} | Opts]]) of
-    {ok, Db} ->
-        {ok, Db};
-    {unauthorized, _} = Error ->
-        throw(Error);
-    {badrpc, {'EXIT', {timeout, _}}} ->
-        get_shard(Rest, Opts, Factor * Timeout, Factor);
-    _Else ->
-        get_shard(Rest, Opts, Timeout, Factor)
+    Mon = rexi_monitor:start([rexi_utils:server_pid(Node)]),
+    MFA = {fabric_rpc, open_shard, [Name, [{timeout, Timeout} | Opts]]},
+    Ref = rexi:cast(Node, self(), MFA, [sync]),
+    try
+        receive {Ref, {ok, {ok, Db}}} ->
+            {ok, Db};
+        {Ref, {ok, {unauthorized, _} = Error}} ->
+            throw(Error);
+        _Else ->
+            get_shard(Rest, Opts, Timeout, Factor)
+        after Timeout ->
+            get_shard(Rest, Opts, Factor * Timeout, Factor)
+        end
+    after
+        rexi_monitor:stop(Mon)
     end.
 
 error_info({{<<"reduce_overflow_error">>, _} = Error, _Stack}) ->
