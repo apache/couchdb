@@ -378,7 +378,14 @@ update_id_btree(Btree, DocIdKeys, _) ->
     couch_btree:query_modify(Btree, ToFind, ToAdd, ToRem).
 
 update_log(Btree, Log, _UpdatedSeq, true) ->
-    ToAdd = lists:filter(fun({_, Keys}) -> Keys =/= [] end, dict:to_list(Log)),
+    ToAdd = lists:flatmap(fun({{Id, _Rev}, Keys}) ->
+        case Keys of
+            [] ->
+                [];
+            _ ->
+                [{Id, Keys}]
+        end
+    end, dict:to_list(Log)),
     {ok, LogBtree2} = couch_btree:add_remove(Btree, ToAdd, []),
     {ok, dict:new(), dict:new(), LogBtree2};
 update_log(Btree, Log, UpdatedSeq, _) ->
@@ -387,39 +394,44 @@ update_log(Btree, Log, UpdatedSeq, _) ->
     Log0 = dict:fold(fun({Id, _Rev}, DIKeys, Acc) ->
         dict:store(Id, DIKeys, Acc)
     end, dict:new(), Log),
-    {ToLook, Updated} = dict:fold(fun(Id, DIKeys, {IdsAcc, KeysAcc}) ->
-        KeysAcc1 = lists:foldl(fun({ViewId, {Key, _Seq, _Op}}, KeysAcc2) ->
-            [{Id, ViewId, Key} | KeysAcc2]
-        end, KeysAcc, DIKeys),
-        {[Id | IdsAcc], KeysAcc1}
-    end, {[], []}, Log0),
+    {ToLook, Updated, Removed} = dict:fold(fun(Id, DIKeys, {IdsAcc, KeysAcc, RemAcc}) ->
+        {KeysAcc1, RemAcc1} = lists:foldl(fun({ViewId, {Key, _Seq, Op}}, Acc) ->
+            {KeysAcc2, RemAcc2} = Acc,
+            case Op of
+                add ->
+                    {[{Id, ViewId, Key} | KeysAcc2], RemAcc2};
+                del ->
+                    {KeysAcc2, [{Id, ViewId, Key} | RemAcc2]}
+            end
+        end, {KeysAcc, RemAcc}, DIKeys),
+        {[Id | IdsAcc], KeysAcc1, RemAcc1}
+    end, {[], [], []}, Log0),
 
     MapFun = fun({ok, KV}) -> [KV]; (not_found) -> [] end,
     KVsToLook = lists:flatmap(MapFun, couch_btree:lookup(Btree, ToLook)),
     {Log1, AddAcc, DelAcc} = lists:foldl(fun({DocId, VIdKeys}, Acc) ->
-        lists:foldl(fun({ViewId, {Key, Seq, Op}}, {Log4, AddAcc4, DelAcc4}) ->
+        lists:foldl(fun({ViewId, {Key, Seq, _Op}}, {Log4, AddAcc4, DelAcc4}) ->
             case lists:member({DocId, ViewId, Key}, Updated) of
                 true ->
                     % the log is updated, deleted old record from the view
                     DelAcc5 = dict:append(ViewId, {Key, Seq, DocId}, DelAcc4),
                     {Log4, AddAcc4, DelAcc5};
-                false when Op /= del ->
+                false ->
                     % an update operation has been logged for this key. We must
-                    % now record it as deleted in the log, remove the old
-                    % record in the view and update the view with a removed
-                    % record.
-                    LogValue = {ViewId, {Key, UpdatedSeq, del}},
-                    Log5 = dict:append(DocId, LogValue, Log4),
+                    % now record it as deleted in the log, remove the old record
+                    % in the view and update the view with a removed record.
+                    Log5 = case lists:member({DocId, ViewId, Key}, Removed) of
+                        false ->
+                            LogValue = {ViewId, {Key, UpdatedSeq, del}},
+                            dict:append(DocId, LogValue, Log4);
+                        true ->
+                            Log4
+                    end,
                     DelAcc5 = dict:append(ViewId, {Key, Seq, DocId}, DelAcc4),
                     Rev = dict:fetch(DocId, Revs),
                     AddValue = {{UpdatedSeq, Key}, {DocId, ?REM_VAL, Rev}},
                     AddAcc5 = dict:append(ViewId, AddValue, AddAcc4),
-                    {Log5, AddAcc5, DelAcc5};
-                false ->
-                    % the key has already been registered in the view as
-                    % deleted, make sure to add it to the new log.
-                    Log5 = dict:append(DocId, {ViewId, {Key, Seq, del}}, Log4),
-                    {Log5, AddAcc4, DelAcc4}
+                    {Log5, AddAcc5, DelAcc5}
             end
         end, Acc, VIdKeys)
     end, {Log0, dict:new(), dict:new()}, KVsToLook),
