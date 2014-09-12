@@ -184,7 +184,7 @@ get_shard([#shard{node = Node, name = Name} | Rest], Opts, Timeout, Factor) ->
             {ok, Db};
         {Ref, {ok, {unauthorized, _} = Error}} ->
             throw(Error);
-        _Else ->
+        {Ref, _Else} ->
             get_shard(Rest, Opts, Timeout, Factor)
         after Timeout ->
             get_shard(Rest, Opts, Factor * Timeout, Factor)
