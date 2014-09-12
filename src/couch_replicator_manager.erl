@@ -407,7 +407,7 @@ process_update(State, DbName, {Change}) ->
 
 owner(<<"shards/", _/binary>> = DbName, DocId) ->
     Live = [node()|nodes()],
-    Nodes = lists:sort([N || #shard{node=N} <- mem3:shards(DbName, DocId),
+    Nodes = lists:sort([N || #shard{node=N} <- mem3:shards(mem3:dbname(DbName), DocId),
 			     lists:member(N, Live)]),
     node() =:= hd(mem3_util:rotate_list({DbName, DocId}, Nodes));
 owner(_DbName, _DocId) ->
