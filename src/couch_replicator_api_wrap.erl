@@ -154,7 +154,7 @@ get_pending_count(#httpdb{} = Db, Seq) when is_number(Seq) ->
         end
     end);
 get_pending_count(#httpdb{} = Db, Seq) ->
-    Options = [{path, "_changes"}, {qs, [{"since", Seq}, {"limit", "0"}]}],
+    Options = [{path, "_changes"}, {qs, [{"since", ?JSON_ENCODE(Seq)}, {"limit", "0"}]}],
     send_req(Db, Options, fun(200, _, {Props}) ->
         {ok, couch_util:get_value(<<"pending">>, Props, null)}
     end);
