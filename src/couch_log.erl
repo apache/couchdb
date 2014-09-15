@@ -15,25 +15,33 @@
 -export([debug/2, info/2, notice/2, warning/2, error/2, critical/2, alert/2, emergency/2]).
 
 debug(Fmt, Args) ->
+    couch_stats:increment_counter([couch_log, level, debug]),
     lager:debug(Fmt, Args).
 
 info(Fmt, Args) ->
+    couch_stats:increment_counter([couch_log, level, info]),
     lager:info(Fmt, Args).
 
 notice(Fmt, Args) ->
+    couch_stats:increment_counter([couch_log, level, notice]),
     lager:notice(Fmt, Args).
 
 warning(Fmt, Args) ->
+    couch_stats:increment_counter([couch_log, level, warning]),
     lager:warning(Fmt, Args).
 
 error(Fmt, Args) ->
+    couch_stats:increment_counter([couch_log, level, error]),
     lager:error(Fmt, Args).
 
 critical(Fmt, Args) ->
+    couch_stats:increment_counter([couch_log, level, critical]),
     lager:critical(Fmt, Args).
 
 alert(Fmt, Args) ->
+    couch_stats:increment_counter([couch_log, level, alert]),
     lager:alert(Fmt, Args).
 
 emergency(Fmt, Args) ->
+    couch_stats:increment_counter([couch_log, level, emergency]),
     lager:emergency(Fmt, Args).
