@@ -129,6 +129,8 @@ force_reply(Doc, [FirstReply|_] = Replies, {Health, W, Acc}) ->
                 {error, W, [{Doc, FirstReply} | Acc]}
             end;
         [AcceptedRev | _] ->
+            CounterKey = [fabric, doc_update, write_quorum_errors],
+            couch_stats:increment_counter(CounterKey),
             NewHealth = case Health of ok -> accepted; _ -> Health end,
             {NewHealth, W, [{Doc, {accepted,AcceptedRev}} | Acc]}
         end
