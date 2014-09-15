@@ -13,7 +13,7 @@
 -module(mem3).
 
 -export([start/0, stop/0, restart/0, nodes/0, node_info/2, shards/1, shards/2,
-    choose_shards/2, n/1, dbname/1, ushards/1]).
+    choose_shards/2, n/1, n/2, dbname/1, ushards/1]).
 -export([get_shard/3, local_shards/1, shard_suffix/1, fold_shards/2]).
 -export([sync_security/0, sync_security/1]).
 -export([compare_nodelists/0, compare_shards/1]).
@@ -68,7 +68,10 @@ compare_shards(DbName) ->
 
 -spec n(DbName::iodata()) -> integer().
 n(DbName) ->
-    length(mem3:shards(DbName, <<"foo">>)).
+    n(DbName, <<"foo">>).
+
+n(DbName, DocId) ->
+    length(mem3:shards(DbName, DocId)).
 
 -spec nodes() -> [node()].
 nodes() ->
