@@ -22,6 +22,7 @@
 -export([mp_parse_doc/2]).
 -export([with_ejson_body/1]).
 -export([is_deleted/1]).
+-export([num_mp_writers/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 
