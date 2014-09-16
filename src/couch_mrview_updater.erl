@@ -17,7 +17,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
--define(REM_VAL,  {[{<<"_removed">>, true}]}).
+-define(REM_VAL, removed).
 
 
 start_update(Partial, State, NumChanges) ->
