@@ -273,8 +273,8 @@ merge_results({DocId, _Seq, Rev, []}, ViewKVs, DocIdKeys, Log) ->
 merge_results({DocId, Seq, Rev, RawResults}, ViewKVs, DocIdKeys, Log) ->
     JsonResults = couch_query_servers:raw_to_ejson(RawResults),
     Results = [[list_to_tuple(Res) || Res <- FunRs] || FunRs <- JsonResults],
-    case Results of
-        [[],[]] ->
+    case lists:flatten(Results) of
+        [] ->
             {ViewKVs, [{DocId, []} | DocIdKeys], dict:store({DocId, Rev}, [], Log)};
         _ ->
             {ViewKVs1, ViewIdKeys, Log1} = insert_results(DocId, Seq, Rev, Results, ViewKVs, [], [], Log),
