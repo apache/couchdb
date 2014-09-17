@@ -1,8 +1,10 @@
-Apache CouchDB AUTHORS
-======================
+Apache CouchDB COMMITTERS
+=========================
 
-A number of people have contributed directly to Apache CouchDB by writing
-documentation or developing software. Some of these people are:
+Committers are given a binding vote in certain project decsions, as well as
+write access to public project infrastructure. The following people were
+elected as a committer in recognition of their commitment to the project. We
+mean this in the sense of being loyal to the project and its interests.
 
  * Damien Katz <damien@apache.org>
  * Jan Lehnardt <jan@apache.org>
