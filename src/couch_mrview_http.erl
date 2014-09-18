@@ -381,7 +381,7 @@ parse_param(Key, Val, Args) ->
             throw({query_parse_error, <<"QS param `count` is not `limit`">>});
         "stale" when Val == "ok" orelse Val == <<"ok">> ->
             Args#mrargs{stale=ok};
-        "stale" when Val == "update_after" orelse Val == "update_after" ->
+        "stale" when Val == "update_after" orelse Val == <<"update_after">> ->
             Args#mrargs{stale=update_after};
         "stale" ->
             throw({query_parse_error, <<"Invalid value for `stale`.">>});
