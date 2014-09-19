@@ -84,7 +84,6 @@
     update_seq=false,
     conflicts,
     callback,
-    list,
     sorted = true,
     extra = []
 }).

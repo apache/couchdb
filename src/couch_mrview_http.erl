@@ -455,8 +455,6 @@ parse_param(Key, Val, Args) ->
             Args#mrargs{end_key_docid=couch_util:to_binary(Val)};
         "limit" ->
             Args#mrargs{limit=parse_pos_int(Val)};
-        "count" ->
-            throw({query_parse_error, <<"QS param `count` is not `limit`">>});
         "stale" when Val == "ok" orelse Val == <<"ok">> ->
             Args#mrargs{stale=ok};
         "stale" when Val == "update_after" orelse Val == <<"update_after">> ->
@@ -501,8 +499,6 @@ parse_param(Key, Val, Args) ->
             Args#mrargs{update_seq=parse_boolean(Val)};
         "conflicts" ->
             Args#mrargs{conflicts=parse_boolean(Val)};
-        "list" ->
-            Args#mrargs{list=couch_util:to_binary(Val)};
         "callback" ->
             Args#mrargs{callback=couch_util:to_binary(Val)};
         _ ->
