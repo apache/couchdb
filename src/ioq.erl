@@ -12,9 +12,13 @@
 
 -module(ioq).
 -behaviour(gen_server).
+-behaviour(config_listener).
 
 -export([start_link/0, call/3]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, code_change/3, terminate/2]).
+
+% config_listener api
+-export([handle_config_change/5]).
 
 -record(state, {
     concurrency=10,
@@ -45,12 +49,19 @@ call(Fd, Msg, Priority) ->
     end.
 
 init(_) ->
+    ok = config:listen_for_changes(?MODULE, nil),
+    State = #state{},
+    {ok, read_config(State)}.
+
+read_config(State) ->
     Ratio = list_to_float(config:get("ioq", "ratio", "0.01")),
-    {ok, #state{ratio=Ratio}}.
+    State#state{ratio=Ratio}.
 
 handle_call(#request{}=Request, From, State) ->
     {noreply, enqueue_request(Request#request{from=From}, State), 0}.
 
+handle_cast(change, State) ->
+    {noreply, read_config(State)};
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
@@ -75,6 +86,11 @@ handle_info({'DOWN', Ref, _, _, Reason}, State) ->
 
 handle_info(timeout, State) ->
     {noreply, maybe_submit_request(State)}.
+
+handle_config_change("ioq", _, _, _, _) ->
+    {ok, gen_server:cast(?MODULE, change)};
+handle_config_change(_, _, _, _, _) ->
+    {ok, nil}.
 
 code_change(_Vsn, State, _Extra) ->
     {ok, State}.
