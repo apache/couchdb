@@ -557,7 +557,7 @@ write_streamed_attachment(Stream, F, LenLeft) when LenLeft > 0 ->
             throw({bad_request, <<"attachment shorter than expected">>})
     end,
     ok = couch_stream:write(Stream, Bin),
-    write_streamed_attachment(Stream, F, LenLeft - size(Bin)).
+    write_streamed_attachment(Stream, F, LenLeft - iolist_size(Bin)).
 
 read_next_chunk(F, _) when is_function(F, 0) ->
     F();
