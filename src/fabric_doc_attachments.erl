@@ -38,7 +38,7 @@ receiver(Req, Length) when is_integer(Length) ->
         receive
             {Middleman, Data} ->
                 rexi:reply(attachment_chunk_received),
-                iolist_to_binary(Data)
+                Data
         after Timeout ->
             exit(timeout)
         end
