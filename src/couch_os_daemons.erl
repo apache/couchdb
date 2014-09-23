@@ -65,7 +65,8 @@ handle_call({daemon_info, Options}, _From, Table) when is_list(Options) ->
             {reply, {ok, Table}, Table}
     end;
 handle_call(Msg, From, Table) ->
-    ?LOG_ERROR("Unknown call message to ~p from ~p: ~p", [?MODULE, From, Msg]),
+    couch_log:error("Unknown call message to ~p from ~p: ~p",
+                    [?MODULE, From, Msg]),
     {stop, error, Table}.
 
 handle_cast({config_change, Sect, Key}, Table) ->
@@ -78,7 +79,7 @@ handle_cast({config_change, Sect, Key}, Table) ->
 handle_cast(stop, Table) ->
     {stop, normal, Table};
 handle_cast(Msg, Table) ->
-    ?LOG_ERROR("Unknown cast message to ~p: ~p", [?MODULE, Msg]),
+    couch_log:error("Unknown cast message to ~p: ~p", [?MODULE, Msg]),
     {stop, error, Table}.
 
 handle_info({gen_event_EXIT, {config_listener, ?MODULE}, _Reason}, State) ->
@@ -90,20 +91,21 @@ handle_info(restart_config_listener, State) ->
 handle_info({'EXIT', Port, Reason}, Table) ->
     case ets:lookup(Table, Port) of
         [] ->
-            ?LOG_INFO("Port ~p exited after stopping: ~p~n", [Port, Reason]);
+            couch_log:info("Port ~p exited after stopping: ~p~n",
+                           [Port, Reason]);
         [#daemon{status=stopping}] ->
             true = ets:delete(Table, Port);
         [#daemon{name=Name, status=restarting}=D] ->
-            ?LOG_INFO("Daemon ~p restarting after config change.", [Name]),
+            couch_log:info("Daemon ~p restarting after config change.", [Name]),
             true = ets:delete(Table, Port),
             {ok, Port2} = start_port(D#daemon.cmd),
             true = ets:insert(Table, D#daemon{
                 port=Port2, status=running, kill=undefined, buf=[]
             });
         [#daemon{name=Name, status=halted}] ->
-            ?LOG_ERROR("Halted daemon process: ~p", [Name]);
+            couch_log:error("Halted daemon process: ~p", [Name]);
         [D] ->
-            ?LOG_ERROR("Invalid port state at exit: ~p", [D])
+            couch_log:error("Invalid port state at exit: ~p", [D])
     end,
     {noreply, Table};
 handle_info({Port, closed}, Table) ->
@@ -111,10 +113,10 @@ handle_info({Port, closed}, Table) ->
 handle_info({Port, {exit_status, Status}}, Table) ->
     case ets:lookup(Table, Port) of
         [] ->
-            ?LOG_ERROR("Unknown port ~p exiting ~p", [Port, Status]),
+            couch_log:error("Unknown port ~p exiting ~p", [Port, Status]),
             {stop, {error, unknown_port_died, Status}, Table};
         [#daemon{name=Name, status=restarting}=D] ->
-            ?LOG_INFO("Daemon ~p restarting after config change.", [Name]),
+            couch_log:info("Daemon ~p restarting after config change.", [Name]),
             true = ets:delete(Table, Port),
             {ok, Port2} = start_port(D#daemon.cmd),
             true = ets:insert(Table, D#daemon{
@@ -124,7 +126,7 @@ handle_info({Port, {exit_status, Status}}, Table) ->
         [#daemon{status=stopping}=D] ->
             % The configuration changed and this daemon is no
             % longer needed.
-            ?LOG_DEBUG("Port ~p shut down.", [D#daemon.name]),
+            couch_log:debug("Port ~p shut down.", [D#daemon.name]),
             true = ets:delete(Table, Port),
             {noreply, Table};
         [D] ->
@@ -135,7 +137,7 @@ handle_info({Port, {exit_status, Status}}, Table) ->
                     % Halting the process. We won't try and reboot
                     % until the configuration changes.
                     Fmt = "Daemon ~p halted with exit_status ~p",
-                    ?LOG_ERROR(Fmt, [D#daemon.name, Status]),
+                    couch_log:error(Fmt, [D#daemon.name, Status]),
                     D2 = D#daemon{status=halted, errors=nil, buf=nil},
                     true = ets:insert(Table, D2),
                     {noreply, Table};
@@ -143,7 +145,7 @@ handle_info({Port, {exit_status, Status}}, Table) ->
                     % We're guessing it was a random error, this daemon
                     % has behaved so we'll give it another chance.
                     Fmt = "Daemon ~p is being rebooted after exit_status ~p",
-                    ?LOG_INFO(Fmt, [D#daemon.name, Status]),
+                    couch_log:info(Fmt, [D#daemon.name, Status]),
                     true = ets:delete(Table, Port),
                     {ok, Port2} = start_port(D#daemon.cmd),
                     true = ets:insert(Table, D#daemon{
@@ -171,7 +173,8 @@ handle_info({Port, {data, {eol, Data}}}, Table) ->
         _Else ->
             D2 = case (catch ?JSON_DECODE(Line)) of
                 {invalid_json, Rejected} ->
-                    ?LOG_ERROR("Ignoring OS daemon request: ~p", [Rejected]),
+                    couch_log:error("Ignoring OS daemon request: ~p",
+                                    [Rejected]),
                     D;
                 JSON ->
                     {ok, D3} = handle_port_message(D, JSON),
@@ -181,13 +184,13 @@ handle_info({Port, {data, {eol, Data}}}, Table) ->
     end,
     {noreply, Table};
 handle_info({Port, Error}, Table) ->
-    ?LOG_ERROR("Unexpectd message from port ~p: ~p", [Port, Error]),
+    couch_log:error("Unexpectd message from port ~p: ~p", [Port, Error]),
     stop_port(Port),
     [D] = ets:lookup(Table, Port),
     true = ets:insert(Table, D#daemon{status=restarting, buf=nil}),
     {noreply, Table};
 handle_info(Msg, Table) ->
-    ?LOG_ERROR("Unexpected info message to ~p: ~p", [?MODULE, Msg]),
+    couch_log:error("Unexpected info message to ~p: ~p", [?MODULE, Msg]),
     {stop, error, Table}.
 
 code_change(_OldVsn, State, _Extra) ->
@@ -223,10 +226,11 @@ start_port(Command, EnvPairs) ->
 
 
 stop_port(#daemon{port=Port, kill=undefined}=D) ->
-    ?LOG_ERROR("Stopping daemon without a kill command: ~p", [D#daemon.name]),
+    couch_log:error("Stopping daemon without a kill command: ~p",
+                    [D#daemon.name]),
     catch port_close(Port);
 stop_port(#daemon{port=Port}=D) ->
-    ?LOG_DEBUG("Stopping daemon: ~p", [D#daemon.name]),
+    couch_log:debug("Stopping daemon: ~p", [D#daemon.name]),
     os:cmd(D#daemon.kill),
     catch port_close(Port).
 
@@ -261,21 +265,21 @@ handle_port_message(#daemon{name=Name}=Daemon, [<<"log">>, Msg, {Opts}]) ->
     handle_log_message(Name, Msg, Level),
     {ok, Daemon};
 handle_port_message(#daemon{name=Name}=Daemon, Else) ->
-    ?LOG_ERROR("Daemon ~p made invalid request: ~p", [Name, Else]),
+    couch_log:error("Daemon ~p made invalid request: ~p", [Name, Else]),
     {ok, Daemon}.
 
 
 handle_log_message(Name, Msg, _Level) when not is_binary(Msg) ->
-    ?LOG_ERROR("Invalid log message from daemon ~p: ~p", [Name, Msg]);
+    couch_log:error("Invalid log message from daemon ~p: ~p", [Name, Msg]);
 handle_log_message(Name, Msg, <<"debug">>) ->
-    ?LOG_DEBUG("Daemon ~p :: ~s", [Name, ?b2l(Msg)]);
+    couch_log:debug("Daemon ~p :: ~s", [Name, ?b2l(Msg)]);
 handle_log_message(Name, Msg, <<"info">>) ->
-    ?LOG_INFO("Daemon ~p :: ~s", [Name, ?b2l(Msg)]);
+    couch_log:info("Daemon ~p :: ~s", [Name, ?b2l(Msg)]);
 handle_log_message(Name, Msg, <<"error">>) ->
-    ?LOG_ERROR("Daemon: ~p :: ~s", [Name, ?b2l(Msg)]);
+    couch_log:error("Daemon: ~p :: ~s", [Name, ?b2l(Msg)]);
 handle_log_message(Name, Msg, Level) ->
-    ?LOG_ERROR("Invalid log level from daemon: ~p", [Level]),
-    ?LOG_INFO("Daemon: ~p :: ~s", [Name, ?b2l(Msg)]).
+    couch_log:error("Invalid log level from daemon: ~p", [Level]),
+    couch_log:info("Daemon: ~p :: ~s", [Name, ?b2l(Msg)]).
 
 %
 % Daemon management helpers

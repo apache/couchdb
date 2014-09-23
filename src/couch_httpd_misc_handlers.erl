@@ -212,8 +212,10 @@ handle_config_req(#httpd{method=Method, path_parts=[_, Section, Key]}=Req)
                     FallbackWhitelist;
                 {error, _} ->
                     [{WhitelistSection, WhitelistKey}] = FallbackWhitelist,
-                    ?LOG_ERROR("Only whitelisting ~s/~s due to error parsing: ~p",
-                               [WhitelistSection, WhitelistKey, WhitelistValue]),
+                    couch_log:error("Only whitelisting ~s/~s due to error"
+                                    " parsing: ~p",
+                                    [WhitelistSection, WhitelistKey,
+                                     WhitelistValue]),
                     FallbackWhitelist
             end,
 

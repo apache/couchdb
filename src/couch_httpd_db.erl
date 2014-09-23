@@ -748,7 +748,7 @@ update_doc(Req, Db, DocId, #doc{deleted=Deleted}=Doc, Headers, UpdateType) ->
                 case catch(couch_db:update_doc(Db, Doc, Options, UpdateType)) of
                 {ok, _} -> ok;
                 Error ->
-                    ?LOG_INFO("Batch doc error (~s): ~p",[DocId, Error])
+                    couch_log:info("Batch doc error (~s): ~p",[DocId, Error])
                 end
             end),
         send_json(Req, 202, Headers, {[

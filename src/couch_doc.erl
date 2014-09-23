@@ -167,7 +167,7 @@ validate_docid(Id) when is_binary(Id) ->
     _Else -> ok
     end;
 validate_docid(Id) ->
-    ?LOG_DEBUG("Document id is not a string: ~p", [Id]),
+    couch_log:debug("Document id is not a string: ~p", [Id]),
     throw({bad_request, <<"Document id must be a string">>}).
 
 transfer_fields([], #doc{body=Fields}=Doc) ->
@@ -472,12 +472,12 @@ doc_from_multi_part_stream(ContentType, DataFun, Ref) ->
     {'DOWN', ParserRef, _, _, normal} ->
         ok;
     {'DOWN', ParserRef, process, Parser, {{nocatch, {Error, Msg}}, _}} ->
-        ?LOG_ERROR("Multipart streamer ~p died with reason ~p",
-                    [ParserRef, Msg]),
+        couch_log:error("Multipart streamer ~p died with reason ~p",
+                        [ParserRef, Msg]),
         throw({Error, Msg});
     {'DOWN', ParserRef, _, _, Reason} ->
-        ?LOG_ERROR("Multipart streamer ~p died with reason ~p",
-                    [ParserRef, Reason]),
+        couch_log:error("Multipart streamer ~p died with reason ~p",
+                        [ParserRef, Reason]),
         throw({error, Reason})
     end.
 

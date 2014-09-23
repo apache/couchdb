@@ -211,8 +211,9 @@ init([]) ->
                 start_time=couch_util:rfc1123_date()}}.
 
 terminate(Reason, Srv) ->
-    ?LOG_ERROR("couch_server terminating with ~p, state ~2048p", [Reason,
-         Srv#server{dbname_regexp = redacted, lru = redacted}]),
+    couch_log:error("couch_server terminating with ~p, state ~2048p",
+                    [Reason,
+                     Srv#server{dbname_regexp = redacted, lru = redacted}]),
     ets:foldl(fun(#db{main_pid=Pid}, _) -> couch_util:shutdown_sync(Pid) end,
         nil, couch_dbs),
     ok.
@@ -374,7 +375,7 @@ handle_call({open_result, DbName, Error}, {FromPid, _Tag}, Server) ->
     % icky hack of field values - compactor_pid used to store clients
     [#db{fd=ReqType, compactor_pid=Froms}=Db] = ets:lookup(couch_dbs, DbName),
     [gen_server:reply(From, Error) || From <- Froms],
-    ?LOG_INFO("open_result error ~p for ~s", [Error, DbName]),
+    couch_log:info("open_result error ~p for ~s", [Error, DbName]),
     true = ets:delete(couch_dbs, DbName),
     true = ets:delete(couch_dbs_pid_to_name, FromPid),
     NewServer = case ReqType of
@@ -405,7 +406,7 @@ handle_call({open, DbName, Options}, From, Server) ->
         true = ets:insert(couch_dbs, Db#db{compactor_pid = [From|Froms]}),
         if length(Froms) =< 10 -> ok; true ->
             Fmt = "~b clients waiting to open db ~s",
-            ?LOG_INFO(Fmt, [length(Froms), DbName])
+            couch_log:info(Fmt, [length(Froms), DbName])
         end,
         {noreply, Server};
     [#db{} = Db] ->
@@ -520,9 +521,9 @@ handle_info({'EXIT', Pid, Reason}, Server) ->
         if Reason /= snappy_nif_not_loaded -> ok; true ->
             Msg = io_lib:format("To open the database `~s`, Apache CouchDB "
                 "must be built with Erlang OTP R13B04 or higher.", [DbName]),
-            ?LOG_ERROR(Msg, [])
+            couch_log:error(Msg, [])
         end,
-        ?LOG_INFO("db ~s died with reason ~p", [DbName, Reason]),
+        couch_log:info("db ~s died with reason ~p", [DbName, Reason]),
         % icky hack of field values - compactor_pid used to store clients
         if is_list(Froms) ->
             [gen_server:reply(From, Reason) || From <- Froms];

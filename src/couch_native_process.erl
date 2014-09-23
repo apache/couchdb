@@ -71,7 +71,7 @@ handle_call({set_timeout, TimeOut}, _From, State) ->
     {reply, ok, State#evstate{timeout=TimeOut}};
 
 handle_call({prompt, Data}, _From, State) ->
-    ?LOG_DEBUG("Prompt native qs: ~s",[?JSON_ENCODE(Data)]),
+    couch_log:debug("Prompt native qs: ~s",[?JSON_ENCODE(Data)]),
     {NewState, Resp} = try run(State, to_binary(Data)) of
         {S, R} -> {S, R}
         catch
@@ -171,7 +171,7 @@ run(#evstate{ddocs=DDocs}=State, [<<"ddoc">>, DDocId | Rest]) ->
     DDoc = load_ddoc(DDocs, DDocId),
     ddoc(State, DDoc, Rest);
 run(_, Unknown) ->
-    ?LOG_ERROR("Native Process: Unknown command: ~p~n", [Unknown]),
+    couch_log:error("Native Process: Unknown command: ~p~n", [Unknown]),
     throw({error, unknown_command}).
     
 ddoc(State, {DDoc}, [FunPath, Args]) ->
@@ -195,7 +195,7 @@ ddoc(State, {_, Fun}, [<<"filters">>|_], [Docs, Req]) ->
         case catch Fun(Doc, Req) of
         true -> true;
         false -> false;
-        {'EXIT', Error} -> ?LOG_ERROR("~p", [Error])
+        {'EXIT', Error} -> couch_log:error("~p", [Error])
         end
     end,
     Resp = lists:map(FilterFunWrapper, Docs),
@@ -264,7 +264,7 @@ bindings(State, Sig, DDoc) ->
     Self = self(),
 
     Log = fun(Msg) ->
-        ?LOG_INFO(Msg, [])
+        couch_log:info(Msg, [])
     end,
 
     Emit = fun(Id, Value) ->
@@ -339,8 +339,8 @@ makefun(_State, Source, BindFuns) when is_list(BindFuns) ->
         {ok, [ParsedForm]} ->
             ParsedForm;
         {error, {LineNum, _Mod, [Mesg, Params]}}=Error ->
-            io:format(standard_error, "Syntax error on line: ~p~n", [LineNum]),
-            io:format(standard_error, "~s~p~n", [Mesg, Params]),
+            couch_log:error("Syntax error on line: ~p~n~s~p~n",
+                            [LineNum, Mesg, Params]),
             throw(Error)
     end,
     Bindings = lists:foldl(fun({Name, Fun}, Acc) ->

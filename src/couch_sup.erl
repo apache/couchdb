@@ -92,7 +92,7 @@ notify_error(Error) ->
 
 notify_uris() ->
     lists:foreach(fun(Uri) ->
-        ?LOG_INFO("Apache CouchDB has started on ~s", [Uri])
+        couch_log:info("Apache CouchDB has started on ~s", [Uri])
     end, get_uris()).
 
 

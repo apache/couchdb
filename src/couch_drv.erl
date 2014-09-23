@@ -29,7 +29,7 @@ init([]) ->
     ok ->
         {ok, nil};
     {error, already_loaded} ->
-        ?LOG_INFO("~p reloading couch_icu_driver", [?MODULE]),
+        couch_log:info("~p reloading couch_icu_driver", [?MODULE]),
         ok = erl_ddll:reload(LibDir, "couch_icu_driver"),
         {ok, nil};
     {error, Error} ->

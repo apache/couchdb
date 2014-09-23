@@ -204,7 +204,7 @@ handle_cast({os_proc_idle, Pid}, #state{counts=Counts}=State) ->
         [#proc_int{client=undefined, lang=Lang}=Proc] ->
             case dict:find(Lang, Counts) of
                 {ok, Count} when Count >= State#state.soft_limit ->
-                    ?LOG_INFO("Closing idle OS Process: ~p", [Pid]),
+                    couch_log:info("Closing idle OS Process: ~p", [Pid]),
                     remove_proc(State, Proc);
                 {ok, _} ->
                     State
@@ -245,7 +245,7 @@ handle_info({'EXIT', Pid, spawn_error}, State) ->
     {noreply, flush_waiters(NewState, Lang)};
 
 handle_info({'EXIT', Pid, Reason}, State) ->
-    ?LOG_INFO("~p ~p died ~p", [?MODULE, Pid, Reason]),
+    couch_log:info("~p ~p died ~p", [?MODULE, Pid, Reason]),
     case ets:lookup(?PROCS, Pid) of
         [#proc_int{} = Proc] ->
             NewState = remove_proc(State, Proc),
@@ -294,7 +294,7 @@ find_proc(State, Client, [Fun | FindFuns]) ->
         {ok, Proc} ->
             {reply, {ok, Proc, State#state.config}, State}
     catch error:Reason ->
-        ?LOG_ERROR("~p ~p ~p", [?MODULE, Reason, erlang:get_stacktrace()]),
+        couch_log:error("~p ~p ~p", [?MODULE, Reason, erlang:get_stacktrace()]),
         {reply, {error, Reason}, State}
     end;
 find_proc(State, Client, []) ->

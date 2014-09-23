@@ -53,7 +53,7 @@ start_link(https) ->
     case (couch_util:get_value(keyfile, ServerOpts0) == nil orelse
         couch_util:get_value(certfile, ServerOpts0) == nil) of
         true ->
-            io:format("SSL enabled but PEM certificates are missing.", []),
+            couch_log:error("SSL enabled but PEM certificates are missing", []),
             throw({error, missing_certs});
         false ->
             ok
@@ -146,7 +146,7 @@ start_link(Name, Options) ->
         {ok, MochiPid} ->
             {ok, MochiPid};
         {error, Reason} ->
-            io:format("Failure to start Mochiweb: ~s~n",[Reason]),
+            couch_log:error("Failure to start Mochiweb: ~s~n", [Reason]),
             throw({error, Reason})
     end.
 
@@ -228,7 +228,7 @@ handle_request_int(MochiReq, DefaultFun,
     {FirstPart, _, _} ->
         list_to_binary(FirstPart)
     end,
-    ?LOG_DEBUG("~p ~s ~p from ~p~nHeaders: ~p", [
+    couch_log:debug("~p ~s ~p from ~p~nHeaders: ~p", [
         MochiReq:get(method),
         RawUri,
         MochiReq:get(version),
@@ -254,7 +254,8 @@ handle_request_int(MochiReq, DefaultFun,
                                                  "TRACE", "CONNECT",
                                                  "COPY"]) of
     true ->
-        ?LOG_INFO("MethodOverride: ~s (real method was ~s)", [MethodOverride, Method1]),
+        couch_log:info("MethodOverride: ~s (real method was ~s)",
+                       [MethodOverride, Method1]),
         case Method1 of
         'POST' -> couch_util:to_existing_atom(MethodOverride);
         _ ->
@@ -308,21 +309,22 @@ handle_request_int(MochiReq, DefaultFun,
         throw:{http_head_abort, Resp0} ->
             {ok, Resp0};
         throw:{invalid_json, S} ->
-            ?LOG_ERROR("attempted upload of invalid JSON (set log_level to debug to log it)", []),
-            ?LOG_DEBUG("Invalid JSON: ~p",[S]),
+            couch_log:error("attempted upload of invalid JSON"
+                            " (set log_level to debug to log it)", []),
+            couch_log:debug("Invalid JSON: ~p",[S]),
             send_error(HttpReq, {bad_request, invalid_json});
         throw:unacceptable_encoding ->
-            ?LOG_ERROR("unsupported encoding method for the response", []),
+            couch_log:error("unsupported encoding method for the response", []),
             send_error(HttpReq, {not_acceptable, "unsupported encoding"});
         throw:bad_accept_encoding_value ->
-            ?LOG_ERROR("received invalid Accept-Encoding header", []),
+            couch_log:error("received invalid Accept-Encoding header", []),
             send_error(HttpReq, bad_request);
         exit:normal ->
             exit(normal);
         exit:snappy_nif_not_loaded ->
             ErrorReason = "To access the database or view index, Apache CouchDB"
-                " must be built with Erlang OTP R13B04 or higher.",
-            ?LOG_ERROR("~s", [ErrorReason]),
+                          " must be built with Erlang OTP R13B04 or higher.",
+            couch_log:error("~s", [ErrorReason]),
             send_error(HttpReq, {bad_otp_release, ErrorReason});
         exit:{body_too_large, _} ->
             send_error(HttpReq, request_entity_too_large);
@@ -330,23 +332,24 @@ handle_request_int(MochiReq, DefaultFun,
             send_error(HttpReq, request_uri_too_long);
         throw:Error ->
             Stack = erlang:get_stacktrace(),
-            ?LOG_DEBUG("Minor error in HTTP request: ~p",[Error]),
-            ?LOG_DEBUG("Stacktrace: ~p",[Stack]),
+            couch_log:debug("Minor error in HTTP request: ~p",[Error]),
+            couch_log:debug("Stacktrace: ~p",[Stack]),
             send_error(HttpReq, Error);
         error:badarg ->
             Stack = erlang:get_stacktrace(),
-            ?LOG_ERROR("Badarg error in HTTP request",[]),
-            ?LOG_INFO("Stacktrace: ~p",[Stack]),
+            couch_log:error("Badarg error in HTTP request",[]),
+            couch_log:info("Stacktrace: ~p",[Stack]),
             send_error(HttpReq, badarg);
         error:function_clause ->
             Stack = erlang:get_stacktrace(),
-            ?LOG_ERROR("function_clause error in HTTP request",[]),
-            ?LOG_INFO("Stacktrace: ~p",[Stack]),
+            couch_log:error("function_clause error in HTTP request",[]),
+            couch_log:info("Stacktrace: ~p",[Stack]),
             send_error(HttpReq, function_clause);
         Tag:Error ->
             Stack = erlang:get_stacktrace(),
-            ?LOG_ERROR("Uncaught error in HTTP request: ~p",[{Tag, Error}]),
-            ?LOG_INFO("Stacktrace: ~p",[Stack]),
+            couch_log:error("Uncaught error in HTTP request: ~p",
+                            [{Tag, Error}]),
+            couch_log:info("Stacktrace: ~p",[Stack]),
             send_error(HttpReq, Error)
     end,
     RequestTime = round(timer:now_diff(os:timestamp(), Begin)/1000),
@@ -694,9 +697,9 @@ send_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers, Body) ->
     couch_stats:increment_counter([couchdb, httpd_status_codes, Code]),
     Headers1 = http_1_0_keep_alive(MochiReq, Headers),
     if Code >= 500 ->
-        ?LOG_ERROR("httpd ~p error response:~n ~s", [Code, Body]);
+        couch_log:error("httpd ~p error response:~n ~s", [Code, Body]);
     Code >= 400 ->
-        ?LOG_DEBUG("httpd ~p error response:~n ~s", [Code, Body]);
+        couch_log:debug("httpd ~p error response:~n ~s", [Code, Body]);
     true -> ok
     end,
     Headers2 = Headers1 ++ server_header() ++

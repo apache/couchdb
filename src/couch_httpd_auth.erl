@@ -188,7 +188,7 @@ cookie_authentication_handler(#httpd{mochi_req=MochiReq}=Req, AuthModule) ->
         CurrentTime = make_cookie_time(),
         case config:get("couch_httpd_auth", "secret", nil) of
         nil ->
-            ?LOG_DEBUG("cookie auth secret is not set",[]),
+            couch_log:debug("cookie auth secret is not set",[]),
             Req;
         SecretStr ->
             Secret = ?l2b(SecretStr),
@@ -201,13 +201,14 @@ cookie_authentication_handler(#httpd{mochi_req=MochiReq}=Req, AuthModule) ->
                 Hash = ?l2b(HashStr),
                 Timeout = list_to_integer(
                     config:get("couch_httpd_auth", "timeout", "600")),
-                ?LOG_DEBUG("timeout ~p", [Timeout]),
+                couch_log:debug("timeout ~p", [Timeout]),
                 case (catch erlang:list_to_integer(TimeStr, 16)) of
                     TimeStamp when CurrentTime < TimeStamp + Timeout ->
                         case couch_passwords:verify(ExpectedHash, Hash) of
                             true ->
                                 TimeLeft = TimeStamp + Timeout - CurrentTime,
-                                ?LOG_DEBUG("Successful cookie auth as: ~p", [User]),
+                                couch_log:debug("Successful cookie auth as: ~p",
+                                                [User]),
                                 Req#httpd{user_ctx=#user_ctx{
                                     name=?l2b(User),
                                     roles=couch_util:get_value(<<"roles">>, UserProps, [])
@@ -279,7 +280,7 @@ handle_session_req(#httpd{method='POST', mochi_req=MochiReq}=Req, AuthModule) ->
     end,
     UserName = ?l2b(couch_util:get_value("name", Form, "")),
     Password = ?l2b(couch_util:get_value("password", Form, "")),
-    ?LOG_DEBUG("Attempt Login: ~s",[UserName]),
+    couch_log:debug("Attempt Login: ~s",[UserName]),
     UserProps = case AuthModule:get_user_creds(UserName) of
         nil -> [];
         Result -> Result

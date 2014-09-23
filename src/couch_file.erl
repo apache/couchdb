@@ -69,8 +69,8 @@ open(Filepath, Options) ->
             case {lists:member(nologifmissing, Options), Reason} of
             {true, enoent} -> ok;
             _ ->
-            ?LOG_ERROR("Could not open file ~s: ~s",
-                [Filepath, file:format_error(Reason)])
+            couch_log:error("Could not open file ~s: ~s",
+                            [Filepath, file:format_error(Reason)])
             end,
             Error
         end;

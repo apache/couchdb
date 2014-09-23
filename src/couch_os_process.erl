@@ -55,7 +55,7 @@ prompt(Pid, Data) ->
         {ok, Result} ->
             Result;
         Error ->
-            ?LOG_ERROR("OS Process Error ~p :: ~p",[Pid,Error]),
+            couch_log:error("OS Process Error ~p :: ~p",[Pid,Error]),
             throw(Error)
     end.
 
@@ -91,12 +91,13 @@ readline(#os_proc{port = Port} = OsProc, Acc) ->
 % Standard JSON functions
 writejson(OsProc, Data) when is_record(OsProc, os_proc) ->
     JsonData = ?JSON_ENCODE(Data),
-    ?LOG_DEBUG("OS Process ~p Input  :: ~s", [OsProc#os_proc.port, JsonData]),
+    couch_log:debug("OS Process ~p Input  :: ~s",
+                    [OsProc#os_proc.port, JsonData]),
     true = writeline(OsProc, JsonData).
 
 readjson(OsProc) when is_record(OsProc, os_proc) ->
     Line = iolist_to_binary(readline(OsProc)),
-    ?LOG_DEBUG("OS Process ~p Output :: ~s", [OsProc#os_proc.port, Line]),
+    couch_log:debug("OS Process ~p Output :: ~s", [OsProc#os_proc.port, Line]),
     try
         % Don't actually parse the whole JSON. Just try to see if it's
         % a command or a doc map/reduce/filter/show/list/update output.
@@ -110,12 +111,13 @@ readjson(OsProc) when is_record(OsProc, os_proc) ->
         case ?JSON_DECODE(Line) of
         [<<"log">>, Msg] when is_binary(Msg) ->
             % we got a message to log. Log it and continue
-            ?LOG_INFO("OS Process ~p Log :: ~s", [OsProc#os_proc.port, Msg]),
+            couch_log:info("OS Process ~p Log :: ~s",
+                           [OsProc#os_proc.port, Msg]),
             readjson(OsProc);
         [<<"error">>, Id, Reason] ->
             throw({error, {couch_util:to_existing_atom(Id),Reason}});
         [<<"fatal">>, Id, Reason] ->
-            ?LOG_INFO("OS Process ~p Fatal Error :: ~s ~p",
+            couch_log:info("OS Process ~p Fatal Error :: ~s ~p",
                 [OsProc#os_proc.port, Id, Reason]),
             throw({couch_util:to_existing_atom(Id),Reason});
         _Result ->
@@ -156,7 +158,7 @@ init([Command, Options, PortOptions]) ->
     },
     KillCmd = iolist_to_binary(readline(BaseProc)),
     Pid = self(),
-    ?LOG_DEBUG("OS Process Start :: ~p", [BaseProc#os_proc.port]),
+    couch_log:debug("OS Process Start :: ~p", [BaseProc#os_proc.port]),
     spawn(fun() ->
             % this ensure the real os process is killed when this process dies.
             erlang:monitor(process, Pid),
@@ -204,7 +206,7 @@ handle_cast({send, Data}, #os_proc{writer=Writer, idle=Idle}=OsProc) ->
         {noreply, OsProc, Idle}
     catch
         throw:OsError ->
-            ?LOG_ERROR("Failed sending data: ~p -> ~p", [Data, OsError]),
+            couch_log:error("Failed sending data: ~p -> ~p", [Data, OsError]),
             {stop, normal, OsProc}
     end;
 handle_cast(garbage_collect, #os_proc{idle=Idle}=OsProc) ->
@@ -213,7 +215,7 @@ handle_cast(garbage_collect, #os_proc{idle=Idle}=OsProc) ->
 handle_cast(stop, OsProc) ->
     {stop, normal, OsProc};
 handle_cast(Msg, #os_proc{idle=Idle}=OsProc) ->
-    ?LOG_DEBUG("OS Proc: Unknown cast: ~p", [Msg]),
+    couch_log:debug("OS Proc: Unknown cast: ~p", [Msg]),
     {noreply, OsProc, Idle}.
 
 handle_info(timeout, #os_proc{idle=Idle}=OsProc) ->
@@ -221,13 +223,13 @@ handle_info(timeout, #os_proc{idle=Idle}=OsProc) ->
     erlang:garbage_collect(),
     {noreply, OsProc, Idle};
 handle_info({Port, {exit_status, 0}}, #os_proc{port=Port}=OsProc) ->
-    ?LOG_INFO("OS Process terminated normally", []),
+    couch_log:info("OS Process terminated normally", []),
     {stop, normal, OsProc};
 handle_info({Port, {exit_status, Status}}, #os_proc{port=Port}=OsProc) ->
-    ?LOG_ERROR("OS Process died with status: ~p", [Status]),
+    couch_log:error("OS Process died with status: ~p", [Status]),
     {stop, {exit_status, Status}, OsProc};
 handle_info(Msg, #os_proc{idle=Idle}=OsProc) ->
-    ?LOG_DEBUG("OS Proc: Unknown info: ~p", [Msg]),
+    couch_log:debug("OS Proc: Unknown info: ~p", [Msg]),
     {noreply, OsProc, Idle}.
 
 code_change(_, {os_proc, Cmd, Port, W, R, Timeout} , _) ->

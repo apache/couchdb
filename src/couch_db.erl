@@ -57,7 +57,8 @@ open_db_file(Filepath, Options) ->
         % crashed during the file switch.
         case couch_file:open(Filepath ++ ".compact", [nologifmissing]) of
         {ok, Fd} ->
-            ?LOG_INFO("Found ~s~s compaction file, using as primary storage.", [Filepath, ".compact"]),
+            couch_log:info("Found ~s~s compaction file, using as primary"
+                           " storage.", [Filepath, ".compact"]),
             ok = file:rename(Filepath ++ ".compact", Filepath),
             ok = couch_file:sync(Fd),
             {ok, Fd};
@@ -430,7 +431,9 @@ check_is_member(#db{user_ctx=#user_ctx{name=Name,roles=Roles}=UserCtx}=Db) ->
             WithAdminRoles -> % same list, not an reader role
                 case ReaderNames -- [Name] of
                 ReaderNames -> % same names, not a reader
-                    ?LOG_DEBUG("Not a reader: UserCtx ~p vs Names ~p Roles ~p",[UserCtx, ReaderNames, WithAdminRoles]),
+                    couch_log:debug("Not a reader: UserCtx ~p"
+                                    " vs Names ~p Roles ~p",
+                                    [UserCtx, ReaderNames, WithAdminRoles]),
                     throw({unauthorized, <<"You are not authorized to access this db.">>});
                 _ ->
                     ok
@@ -603,7 +606,7 @@ load_validation_funs(#db{main_pid=Pid, name = <<"shards/", _/binary>>}=Db) ->
             gen_server:cast(Pid, {load_validation_funs, Funs}),
             Funs;
         {'DOWN', Ref, _, _, Reason} ->
-            ?LOG_ERROR("could not load validation funs ~p", [Reason]),
+            couch_log:error("could not load validation funs ~p", [Reason]),
             throw(internal_server_error)
     end;
 load_validation_funs(#db{main_pid=Pid}=Db) ->
@@ -966,8 +969,8 @@ set_commit_option(Options) ->
     {_, "false"} ->
         [full_commit|Options];
     {_, Else} ->
-        ?LOG_ERROR("[couchdb] delayed_commits setting must be true/false, not ~p",
-            [Else]),
+        couch_log:error("[couchdb] delayed_commits setting must be true/false,"
+                        " not ~p", [Else]),
         [full_commit|Options]
     end.
 

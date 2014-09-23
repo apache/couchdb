@@ -209,7 +209,7 @@ handle_cast({load_validation_funs, ValidationFuns}, Db) ->
 handle_cast(start_compact, Db) ->
     case Db#db.compactor_pid of
     nil ->
-        ?LOG_INFO("Starting compaction for db \"~s\"", [Db#db.name]),
+        couch_log:info("Starting compaction for db \"~s\"", [Db#db.name]),
         Pid = spawn_link(fun() -> start_copy_compact(Db) end),
         Db2 = Db#db{compactor_pid=Pid},
         ok = gen_server:call(couch_server, {db_updated, Db2}, infinity),
@@ -242,8 +242,8 @@ handle_cast({compact_done, CompactFilepath}, #db{filepath=Filepath}=Db) ->
             revs_limit = Db#db.revs_limit
         }),
 
-        ?LOG_DEBUG("CouchDB swapping files ~s and ~s.",
-                [Filepath, CompactFilepath]),
+        couch_log:debug("CouchDB swapping files ~s and ~s.",
+                        [Filepath, CompactFilepath]),
         ok = file:rename(CompactFilepath, Filepath ++ ".compact"),
         RootDir = config:get("couchdb", "database_dir", "."),
         couch_file:delete(RootDir, Filepath),
@@ -255,12 +255,12 @@ handle_cast({compact_done, CompactFilepath}, #db{filepath=Filepath}=Db) ->
         NewDb3 = refresh_validate_doc_funs(NewDb2),
         ok = gen_server:call(couch_server, {db_updated, NewDb3}, infinity),
         couch_event:notify(NewDb3#db.name, compacted),
-        ?LOG_INFO("Compaction for db \"~s\" completed.", [Db#db.name]),
+        couch_log:info("Compaction for db \"~s\" completed.", [Db#db.name]),
         {noreply, NewDb3#db{compactor_pid=nil}};
     false ->
-        ?LOG_INFO("Compaction file still behind main file "
-            "(update seq=~p. compact update seq=~p). Retrying.",
-            [Db#db.update_seq, NewSeq]),
+        couch_log:info("Compaction file still behind main file "
+                       "(update seq=~p. compact update seq=~p). Retrying.",
+                       [Db#db.update_seq, NewSeq]),
         close_db(NewDb),
         Pid = spawn_link(fun() -> start_copy_compact(Db) end),
         Db2 = Db#db{compactor_pid=Pid},
@@ -269,7 +269,8 @@ handle_cast({compact_done, CompactFilepath}, #db{filepath=Filepath}=Db) ->
     end;
 
 handle_cast(Msg, #db{name = Name} = Db) ->
-    ?LOG_ERROR("Database `~s` updater received unexpected cast: ~p", [Name, Msg]),
+    couch_log:error("Database `~s` updater received unexpected cast: ~p",
+                    [Name, Msg]),
     {stop, Msg, Db}.
 
 
@@ -331,7 +332,7 @@ handle_info({'EXIT', _Pid, normal}, Db) ->
 handle_info({'EXIT', _Pid, Reason}, Db) ->
     {stop, Reason, Db};
 handle_info({'DOWN', Ref, _, _, Reason}, #db{fd_monitor=Ref, name=Name} = Db) ->
-    ?LOG_ERROR("DB ~s shutting down - Fd ~p", [Name, Reason]),
+    couch_log:error("DB ~s shutting down - Fd ~p", [Name, Reason]),
     {stop, normal, Db#db{fd=undefined, fd_monitor=closed}}.
 
 code_change(_OldVsn, State, _Extra) ->
@@ -652,8 +653,8 @@ flush_trees(#db{fd = Fd} = Db,
                     % Fd where the attachments were written to is not the same
                     % as our Fd. This can happen when a database is being
                     % switched out during a compaction.
-                    ?LOG_DEBUG("File where the attachments are written has"
-                            " changed. Possibly retrying.", []),
+                    couch_log:debug("File where the attachments are written has"
+                                    " changed. Possibly retrying.", []),
                     throw(retry)
                 end,
                 ExternalSize = ?term_size(Summary),
@@ -1182,7 +1183,7 @@ copy_compact(Db, NewDb0, Retry) ->
 start_copy_compact(#db{}=Db) ->
     erlang:put(io_priority, {db_compact, Db#db.name}),
     #db{name=Name, filepath=Filepath, options=Options, header=Header} = Db,
-    ?LOG_DEBUG("Compaction process spawned for db \"~s\"", [Name]),
+    couch_log:debug("Compaction process spawned for db \"~s\"", [Name]),
 
     {ok, NewDb, DName, DFd, MFd, Retry} =
         open_compaction_files(Name, Header, Filepath, Options),
