@@ -1391,7 +1391,7 @@ monitor_attachments(Atts) when is_list(Atts) ->
             stub ->
                 Monitors;
             Else ->
-                ?LOG_ERROR("~p from couch_att:fetch(data, ~p)", [Else, Att]),
+                couch_log:error("~p from couch_att:fetch(data, ~p)", [Else, Att]),
                 Monitors
         end
     end, [], Atts);
