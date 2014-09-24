@@ -153,7 +153,7 @@ timeout(Type, Default) ->
 log_timeout(Workers, EndPoint) ->
     lists:map(fun(#shard{node=Dest, name=Name}) ->
         Fmt = "fabric_worker_timeout ~s,~p,~p",
-        ?LOG_ERROR(Fmt, [EndPoint, Dest, Name])
+        couch_log:error(Fmt, [EndPoint, Dest, Name])
     end, Workers).
 
 remove_done_workers(Workers, WaitingIndicator) ->
