@@ -40,14 +40,17 @@ send_req(HttpDb, Params1, Callback) ->
         [{K, ?b2l(iolist_to_binary(V))} || {K, V} <- get_value(qs, Params1, [])]),
     Params = ?replace(Params2, ibrowse_options,
         lists:keysort(1, get_value(ibrowse_options, Params2, []))),
-    {Worker, Response, IsChanges} = send_ibrowse_req(HttpDb, Params),
+    {Worker, Response} = send_ibrowse_req(HttpDb, Params),
     Ret = try
         process_response(Response, Worker, HttpDb, Params, Callback)
     catch
         throw:{retry, NewHttpDb0, NewParams0} ->
             {retry, NewHttpDb0, NewParams0}
     after
-        release_worker(Worker, HttpDb, IsChanges),
+        ok = couch_replicator_httpc_pool:release_worker(
+            HttpDb#httpdb.httpc_pool,
+            Worker
+        ),
         clean_mailbox(Response)
     end,
     % This is necessary to keep this tail-recursive. Calling
@@ -68,17 +71,16 @@ send_ibrowse_req(#httpdb{headers = BaseHeaders} = HttpDb, Params) ->
     Headers2 = oauth_header(HttpDb, Params) ++ Headers1,
     Url = full_url(HttpDb, Params),
     Body = get_value(body, Params, []),
-    IsChanges = get_value(path, Params) == "_changes",
-    if IsChanges ->
-        {ok, Worker} = ibrowse:spawn_link_worker_process(Url),
-        Timeout = infinity;
+    case get_value(path, Params) == "_changes" of
     true ->
-        {ok, Worker} = couch_replicator_httpc_pool:get_worker(HttpDb#httpdb.httpc_pool),
+        Timeout = infinity;
+    false ->
         Timeout = case config:get("replicator", "request_timeout", "infinity") of
             "infinity" -> infinity;
             Milliseconds -> list_to_integer(Milliseconds)
         end
     end,
+    {ok, Worker} = couch_replicator_httpc_pool:get_worker(HttpDb#httpdb.httpc_pool),
     IbrowseOptions = [
         {response_format, binary}, {inactivity_timeout, HttpDb#httpdb.timeout} |
         lists:ukeymerge(1, get_value(ibrowse_options, Params, []),
@@ -86,7 +88,7 @@ send_ibrowse_req(#httpdb{headers = BaseHeaders} = HttpDb, Params) ->
     ],
     Response = ibrowse:send_req_direct(
         Worker, Url, Headers2, Method, Body, IbrowseOptions, Timeout),
-    {Worker, Response, IsChanges}.
+    {Worker, Response}.
 
 
 process_response({error, sel_conn_closed}, _Worker, HttpDb, Params, _Cb) ->
@@ -175,17 +177,6 @@ clean_mailbox({ibrowse_req_id, ReqId}) ->
     end;
 clean_mailbox(_) ->
     ok.
-
-
-release_worker(Worker, _, true) ->
-    true = unlink(Worker),
-    ibrowse_http_client:stop(Worker),
-    receive
-        {'EXIT', Worker, _} -> ok
-        after 0 -> ok
-    end;
-release_worker(Worker, #httpdb{httpc_pool = Pool}, false) ->
-    ok = couch_replicator_httpc_pool:release_worker(Pool, Worker).
 
 
 maybe_retry(Error, Worker, #httpdb{retries = 0} = HttpDb, Params) ->
