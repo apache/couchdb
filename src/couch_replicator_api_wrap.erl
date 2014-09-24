@@ -208,7 +208,7 @@ open_doc_revs(#httpdb{retries = 0} = HttpDb, Id, Revs, Options, _Fun, _Acc) ->
     Url = couch_util:url_strip_password(
         couch_replicator_httpc:full_url(HttpDb, [{path,Path}, {qs,QS}])
     ),
-    ?LOG_ERROR("Replication crashing because GET ~s failed", [Url]),
+    couch_log:error("Replication crashing because GET ~s failed", [Url]),
     exit(kaboom);
 open_doc_revs(#httpdb{} = HttpDb, Id, Revs, Options, Fun, Acc) ->
     Path = encode_doc_id(Id),
@@ -272,7 +272,8 @@ open_doc_revs(#httpdb{} = HttpDb, Id, Revs, Options, Fun, Acc) ->
                 true ->
                     throw(request_uri_too_long);
                 false ->
-                    ?LOG_INFO("Reducing url length to ~B because of 414 response", [NewMaxLen]),
+                    couch_log:info("Reducing url length to ~B because of"
+                                   " 414 response", [NewMaxLen]),
                     Options1 = lists:keystore(max_url_len, 1, Options,
                                               {max_url_len, NewMaxLen}),
                     open_doc_revs(HttpDb, Id, Revs, Options1, Fun, Acc)
