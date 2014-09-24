@@ -20,7 +20,7 @@ plugin_dir() ->
   couch_config:get("couchdb", "plugin_dir").
 
 log(T) ->
-  ?LOG_DEBUG("[couch_plugins] ~p ~n", [T]).
+  couch_log:debug("[couch_plugins] ~p ~n", [T]).
 
 %% "geocouch", "http://localhost:8000/dist", "1.0.0"
 -type plugin() :: {string(), string(), string(), list()}.
@@ -142,7 +142,7 @@ add_code_path(Name, Version) ->
   case code:add_path(PluginPath) of
     true -> ok;
     Else ->
-      ?LOG_ERROR("Failed to add PluginPath: '~s'", [PluginPath]),
+      couch_log:error("Failed to add PluginPath: '~s'", [PluginPath]),
       Else
   end.
 
@@ -152,7 +152,8 @@ del_code_path(Name, Version) ->
   case code:del_path(PluginPath) of
     true -> ok;
     _Else ->
-      ?LOG_DEBUG("Failed to delete PluginPath: '~s', ignoring", [PluginPath]),
+      couch_log:debug("Failed to delete PluginPath: '~s', ignoring",
+                      [PluginPath]),
       ok
   end.
 
@@ -210,13 +211,15 @@ verify_checksum(Filename, Checksums) ->
   CouchDBVersion = couchdb_version(),
   case proplists:get_value(CouchDBVersion, Checksums) of
   undefined ->
-    ?LOG_ERROR("[couch_plugins] Can't find checksum for CouchDB Version '~s'", [CouchDBVersion]),
+    couch_log:error("[couch_plugins] Can't find checksum for CouchDB Version"
+                    " '~s'", [CouchDBVersion]),
     {error, no_couchdb_checksum};
   OTPChecksum ->
     OTPRelease = erlang:system_info(otp_release),
     case proplists:get_value(OTPRelease, OTPChecksum) of
     undefined ->
-      ?LOG_ERROR("[couch_plugins] Can't find checksum for Erlang Version '~s'", [OTPRelease]),
+      couch_log:error("[couch_plugins] Can't find checksum for Erlang Version"
+                      " '~s'", [OTPRelease]),
       {error, no_erlang_checksum};
     Checksum ->
       do_verify_checksum(Filename, Checksum)
@@ -225,14 +228,15 @@ verify_checksum(Filename, Checksums) ->
 
 -spec do_verify_checksum(string(), string()) -> ok | {error, string()}.
 do_verify_checksum(Filename, Checksum) ->
-  ?LOG_DEBUG("Checking Filename: ~s", [Filename]),
+  couch_log:debug("Checking Filename: ~s", [Filename]),
   case file:read_file(Filename) of
   {ok, Data} ->
     ComputedChecksum = binary_to_list(base64:encode(crypto:sha(Data))),
     case ComputedChecksum of
     Checksum -> ok;
     _Else ->
-      ?LOG_ERROR("Checksum mismatch. Wanted: '~p'. Got '~p'", [Checksum, ComputedChecksum]),
+      couch_log:error("Checksum mismatch. Wanted: '~p'. Got '~p'",
+                      [Checksum, ComputedChecksum]),
       {error, checksum_mismatch}
     end;
   Error -> Error
