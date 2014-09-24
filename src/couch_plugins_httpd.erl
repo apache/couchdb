@@ -32,7 +32,7 @@ handle_req(#httpd{method='POST'}=Req) ->
     ok ->
         couch_httpd:send_json(Req, 202, {[{ok, true}]});
     Error ->
-        ?LOG_DEBUG("Plugin Spec: ~p", [PluginSpec]),
+        couch_log:debug("Plugin Spec: ~p", [PluginSpec]),
         couch_httpd:send_error(Req, {bad_request, Error})
     end;
 % handles /_plugins/<pluginname>/<file>
@@ -45,7 +45,7 @@ handle_req(#httpd{method='GET',path_parts=[_, Name0 | Path0]}=Req) ->
     CouchDBVersion = couch_server:get_version(short),
     FullName = string:join([Name, PluginVersion, OTPRelease, CouchDBVersion], "-"),
     FullPath = filename:join([FullName, "priv", "www", string:join(Path, "/")]) ++ "/",
-    ?LOG_DEBUG("Serving ~p from ~p", [FullPath, plugin_dir()]),
+    couch_log:debug("Serving ~p from ~p", [FullPath, plugin_dir()]),
     couch_httpd:serve_file(Req, FullPath, plugin_dir());
 handle_req(Req) ->
     couch_httpd:send_method_not_allowed(Req, "POST").
