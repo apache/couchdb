@@ -37,11 +37,6 @@
 
 -define(DEFAULT_ATTACHMENT_CONTENT_TYPE, <<"application/octet-stream">>).
 
--define(LOG_DEBUG(Format, Args), couch_log:debug(Format, Args)).
--define(LOG_INFO(Format, Args), couch_log:info(Format, Args)).
--define(LOG_WARN(Format, Args), couch_log:warning(Format, Args)).
--define(LOG_ERROR(Format, Args), couch_log:error(Format, Args)).
-
 -type branch() :: {Key::term(), Value::term(), Tree::term()}.
 -type path() :: {Start::pos_integer(), branch()}.
 
