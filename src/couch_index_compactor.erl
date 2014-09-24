@@ -99,16 +99,16 @@ compact(Parent, Mod, IdxState) ->
 compact(Idx, Mod, IdxState, Opts) ->
     DbName = Mod:get(db_name, IdxState),
     Args = [DbName, Mod:get(idx_name, IdxState)],
-    ?LOG_INFO("Compaction started for db: ~s idx: ~s", Args),
+    couch_log:info("Compaction started for db: ~s idx: ~s", Args),
     {ok, NewIdxState} = couch_util:with_db(DbName, fun(Db) ->
         Mod:compact(Db, IdxState, Opts)
     end),
     ok = Mod:commit(NewIdxState),
     case gen_server:call(Idx, {compacted, NewIdxState}) of
         recompact ->
-            ?LOG_INFO("Compaction restarting for db: ~s idx: ~s", Args),
+            couch_log:info("Compaction restarting for db: ~s idx: ~s", Args),
             compact(Idx, Mod, NewIdxState, [recompact]);
         _ ->
-            ?LOG_INFO("Compaction finished for db: ~s idx: ~s", Args),
+            couch_log:info("Compaction finished for db: ~s idx: ~s", Args),
             ok
     end.
