@@ -927,7 +927,7 @@ log_error_with_stack_trace(_) ->
     ok.
 
 stack_trace_id(Stack) ->
-    {"X-Cloudant-Stack-Hash", stack_hash(Stack)}.
+    {"X-Couch-Stack-Hash", stack_hash(Stack)}.
 
 stack_hash(Stack) ->
     erlang:crc32(term_to_binary(Stack)).
