@@ -87,7 +87,8 @@ ddoc_to_mrst(DbName, #doc{id=Id, body={Fields}}) ->
                 DictBySrcAcc
         end;
         ({Name, Else}, DictBySrcAcc) ->
-            ?LOG_ERROR("design_doc_to_view_group ~s views ~p", [Name, Else]),
+            couch_log:error("design_doc_to_view_group ~s views ~p",
+                            [Name, Else]),
             DictBySrcAcc
     end,
     {RawViews} = couch_util:get_value(<<"views">>, Fields, {[]}),
@@ -768,11 +769,11 @@ update_index_file(State) ->
         % If the target exists, e.g. the next request will find the
         % new file and we are good. We might need to catch this
         % further up to avoid a full server crash.
-        ?LOG_INFO("Attempting to update legacy view index file.", []),
+        couch_log:info("Attempting to update legacy view index file.", []),
         NewIndexFile = index_file(DbName, State#mrst.sig),
         ok = filelib:ensure_dir(NewIndexFile),
         ok = file:rename(IndexFile, NewIndexFile),
-        ?LOG_INFO("Successfully updated legacy view index file.", []),
+        couch_log:info("Successfully updated legacy view index file.", []),
         Sig;
     _ ->
         % Ignore missing index file
@@ -811,7 +812,7 @@ extract_view_reduce({red, {N, _Lang, #mrview{reduce_funs=Reds}}, _Ref}) ->
 get_view_keys({Props}) ->
     case couch_util:get_value(<<"keys">>, Props) of
         undefined ->
-            ?LOG_DEBUG("POST with no keys member.", []),
+            couch_log:debug("POST with no keys member.", []),
             undefined;
         Keys when is_list(Keys) ->
             Keys;

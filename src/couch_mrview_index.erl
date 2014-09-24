@@ -120,8 +120,8 @@ open(Db, State) ->
                     {ok, NewSt#mrst{fd_monitor=erlang:monitor(process, Fd)}}
             end;
         {error, Reason} = Error ->
-            ?LOG_ERROR("Failed to open view file '~s': ~s",
-                       [IndexFName, file:format_error(Reason)]),
+            couch_log:error("Failed to open view file '~s': ~s",
+                            [IndexFName, file:format_error(Reason)]),
             Error
     end.
 

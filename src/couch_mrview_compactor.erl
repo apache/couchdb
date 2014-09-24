@@ -82,7 +82,8 @@ compact(State) ->
         #acc{btree = Bt, kvs = Kvs, kvs_size = KvsSize} = Acc,
         NewKvs = case Kvs of
             [{DocId, OldViewIdKeys} | Rest] ->
-                ?LOG_ERROR("Dupes of ~s in ~s ~s", [DocId, DbName, IdxName]),
+                couch_log:error("Dupes of ~s in ~s ~s",
+                                [DocId, DbName, IdxName]),
                 [{DocId, ViewIdKeys ++ OldViewIdKeys} | Rest];
             _ ->
                 [KV | Kvs]
