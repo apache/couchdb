@@ -10,6 +10,21 @@
 %% License for the specific language governing permissions and limitations under
 %% the License.
 
+CopyIfDifferent = fun(Path, Contents) ->
+    case filelib:is_file(Path) of
+        true ->
+            case file:read_file(Path) of
+                {ok, Contents} ->
+                    ok;
+                _ ->
+                    file:write_file(Path, Contents)
+            end;
+        false ->
+            file:write_file(Path, Contents)
+    end
+end,
+
+
 CouchJSName = case os:type() of
     {win32, _} ->
         "couchjs.exe";
@@ -39,8 +54,10 @@ ConfigH = [
     {"PACKAGE_VERSION", "\"" ++ Version ++ "\""}
 ],
 
+CouchJSConfig = "priv/couch_js/config.h",
 ConfigSrc = [["#define ", K, " ", V, $\n] || {K, V} <- ConfigH],
-ok = file:write_file("priv/couch_js/config.h", ConfigSrc),
+ConfigBin = iolist_to_binary(ConfigSrc),
+ok = CopyIfDifferent(CouchJSConfig, ConfigBin),
 
 {JS_CFLAGS, JS_LDFLAGS} = case lists:keyfind(with_curl, 1, CouchConfig) of
     {with_curl, true} ->
@@ -87,8 +104,8 @@ PortSpecs = case os:type() of
     {win32, _} ->
         BaseSpecs ++ SpawnSpec;
     _ ->
-        {ok, _} = file:copy("priv/spawnkillable/couchspawnkillable.sh",
-                            "priv/couchspawnkillable"),
+        {ok, CSK} = file:read_file("priv/spawnkillable/couchspawnkillable.sh"),
+        ok = CopyIfDifferent("priv/couchspawnkillable", CSK),
         os:cmd("chmod +x priv/couchspawnkillable"),
         BaseSpecs
 end,
