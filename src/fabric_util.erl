@@ -180,9 +180,9 @@ get_shard([#shard{node = Node, name = Name} | Rest], Opts, Timeout, Factor) ->
     MFA = {fabric_rpc, open_shard, [Name, [{timeout, Timeout} | Opts]]},
     Ref = rexi:cast(Node, self(), MFA, [sync]),
     try
-        receive {Ref, {ok, {ok, Db}}} ->
+        receive {Ref, {ok, Db}} ->
             {ok, Db};
-        {Ref, {ok, {unauthorized, _} = Error}} ->
+        {Ref, {'rexi_EXIT', {{unauthorized, _} = Error, _}}} ->
             throw(Error);
         {Ref, _Else} ->
             get_shard(Rest, Opts, Timeout, Factor)
