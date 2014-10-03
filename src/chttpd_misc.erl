@@ -283,6 +283,11 @@ db_pid_stats(Mod, Candidates) ->
             end
         end, [], Candidates
     ),
+    format_pid_stats(Mailboxes).
+
+format_pid_stats([]) ->
+    [];
+format_pid_stats(Mailboxes) ->
     Sorted = lists:sort(Mailboxes),
     Count = length(Sorted),
     [
