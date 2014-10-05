@@ -74,7 +74,8 @@ IcuEnv = [{"DRV_CFLAGS",  "$DRV_CFLAGS -DPIC -O2 -fno-common"},
           {"DRV_LDFLAGS", "$DRV_LDFLAGS -lm -licuuc -licudata -licui18n -lpthread"}],
 IcuDarwinEnv = [{"CFLAGS", "-DXP_UNIX -I/usr/local/opt/icu4c/include"},
                 {"LDFLAGS", "-L/usr/local/opt/icu4c/lib"}],
-
+IcuBsdEnv = [{"CFLAGS", "-DXP_UNIX -I/usr/local/include"},
+             {"LDFLAGS", "-L/usr/local/lib"}],
 ComparePath = "priv/couch_ejson_compare.so",
 CompareSrc = ["priv/couch_ejson_compare/*.c"],
 
@@ -82,17 +83,17 @@ BaseSpecs = [
         %% couchjs
         {"darwin", CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", JS_CFLAGS ++ "-DXP_UNIX -I/usr/local/include/js"}, {"LDFLAGS", JS_LDFLAGS}]}]},
         {"linux",  CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", JS_CFLAGS ++ "-DXP_UNIX -I/usr/include/js"}, {"LDFLAGS", JS_LDFLAGS ++ " -lm"}]}]},
-        {"unix",   CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", JS_CFLAGS ++ "-DXP_UNIX -I/usr/local/include/js}"}, {"LDFLAGS", JS_LDFLAGS ++ " -lm"}]}]},
+        {"bsd",   CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", JS_CFLAGS ++ "-DXP_UNIX -I/usr/local/include/js"}, {"LDFLAGS", JS_LDFLAGS ++ " -L/usr/local/lib -lm"}]}]},
         {"win32",  CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", JS_CFLAGS ++ "-DXP_WIN -I/usr/include/js"}, {"LDFLAGS", JS_LDFLAGS}]}]},
         % ICU
         {"darwin", IcuPath, IcuSrc, [{env, IcuEnv ++ IcuDarwinEnv}]},
         {"linux",  IcuPath, IcuSrc, [{env, IcuEnv}]},
-        {"unix",   IcuPath, IcuSrc, [{env, IcuEnv}]},
+        {"bsd",   IcuPath, IcuSrc, [{env, IcuEnv ++ IcuBsdEnv}]},
         {"win32",  IcuPath, IcuSrc, [{env, IcuEnv}]},
         % ejson_compare
         {"darwin", ComparePath, CompareSrc, [{env, IcuEnv ++ IcuDarwinEnv}]},
         {"linux",  ComparePath, CompareSrc, [{env, IcuEnv}]},
-        {"unix",   ComparePath, CompareSrc, [{env, IcuEnv}]},
+        {"bsd",   ComparePath, CompareSrc, [{env, IcuEnv ++ IcuBsdEnv}]},
         {"win32",  ComparePath, CompareSrc, [{env, IcuEnv}]}
 ],
 
