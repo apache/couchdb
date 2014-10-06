@@ -203,32 +203,6 @@ Some common network configurations cause the replication test to fail when
 accessed via the localhost address. You can fix this by accessing CouchDB via
 127.0.0.1, e.g. http://127.0.0.1:5984/_utils/.
 
-Navigate to the test suite by clicking "Test Suite" on the Futon sidebar,
-then click "run all" at the top to kick things off. :ref:`intro/tour-02`
-shows the Futon test suite running some tests.
-
-
-.. _intro/tour-02:
-
-.. figure:: ../../images/intro-tour-02.png
-   :align: center
-   :alt: The Futon test suite running some tests
-
-   Figure 2. The Futon test suite running some tests
-
-
-Because the test suite is run from the browser, not only does it test that
-CouchDB is functioning properly, it also verifies that your browser's
-connection to the database is properly configured, which can be very handy
-for diagnosing misbehaving proxies or other HTTP middleware.
-
-If the test suite has an inordinate number of failures,
-you'll need to see the troubleshooting section in Appendix D,
-Installing from Source for the next steps to fix your installation.
-
-Now that the test suite is finished, you've verified that your CouchDB
-installation is successful and you're ready to see what else Futon has to offer.
-
 
 Your First Database and Document
 ================================
