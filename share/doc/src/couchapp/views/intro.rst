@@ -454,7 +454,7 @@ And at ``group_level=2``:
   ["b","a"]   2
 
 Using the parameter ``group=true`` makes it behave as though it were
-``group_level=exact``, so in the case of our current example, it would give the
+``group_level=999``, so in the case of our current example, it would give the
 number ``1`` for each key, as there are no exactly duplicated keys.
 
 Reduce/Rereduce
