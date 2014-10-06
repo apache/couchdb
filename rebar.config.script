@@ -42,6 +42,7 @@ DepDescs = [
     {ioq,               "ioq",              {branch, "master"}},
     {jiffy,             "jiffy",            {branch, "master"}},
     {khash,             "khash",            {branch, "master"}},
+    {lager,             "lager",            {branch, "master"}},
     {mem3,              "mem3",             {branch, "master"}},
     {mochiweb,          "mochiweb",         {branch, "master"}},
     {oauth,             "oauth",            {branch, "master"}},
