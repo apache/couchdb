@@ -180,7 +180,7 @@ delete_files(Name, Version) ->
 % downloads a pluygin .tar.gz into a local plugins directory
 -spec download(string()) -> ok | {error, string()}.
 download({Name, _BaseUrl, Version, _Checksums}=Plugin) ->
-  TargetFile = "/tmp/" ++ get_filename(Name, Version),
+  TargetFile = filename:join(mochitemp:gettempdir(), get_filename(Name, Version)),
   case file_exists(TargetFile) of
     %% wipe and redownload
     true -> file:delete(TargetFile);
