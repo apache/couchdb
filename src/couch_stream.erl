@@ -29,6 +29,7 @@
 
 -record(stream,
     {fd = 0,
+    opener_monitor,
     written_pointers=[],
     buffer_list = [],
     buffer_len = 0,
@@ -50,7 +51,7 @@ open(Fd) ->
     open(Fd, []).
 
 open(Fd, Options) ->
-    gen_server:start_link(couch_stream, {Fd, Options}, []).
+    gen_server:start_link(couch_stream, {Fd, self(), Options}, []).
 
 close(Pid) ->
     gen_server:call(Pid, close, infinity).
@@ -197,7 +198,7 @@ write(Pid, Bin) ->
     gen_server:call(Pid, {write, Bin}, infinity).
 
 
-init({Fd, Options}) ->
+init({Fd, OpenerPid, Options}) ->
     {EncodingFun, EndEncodingFun} =
     case couch_util:get_value(encoding, Options, identity) of
     identity ->
@@ -207,6 +208,7 @@ init({Fd, Options}) ->
     end,
     {ok, #stream{
             fd=Fd,
+            opener_monitor=erlang:monitor(process, OpenerPid),
             md5=couch_util:md5_init(),
             identity_md5=couch_util:md5_init(),
             encoding_fun=EncodingFun,
@@ -266,6 +268,7 @@ handle_call({write, Bin}, _From, Stream) ->
 handle_call(close, _From, Stream) ->
     #stream{
         fd = Fd,
+        opener_monitor = MonRef,
         written_len = WrittenLen,
         written_pointers = Written,
         buffer_list = Buffer,
@@ -288,6 +291,7 @@ handle_call(close, _From, Stream) ->
         StreamLen = WrittenLen + iolist_size(WriteBin2),
         {StreamInfo, StreamLen, IdenLen, Md5Final, IdenMd5Final}
     end,
+    erlang:demonitor(MonRef),
     {stop, normal, Result, Stream}.
 
 handle_cast(_Msg, State) ->
@@ -296,5 +300,7 @@ handle_cast(_Msg, State) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
+handle_info({'DOWN', Ref, _, _, _}, #stream{opener_monitor=Ref} = State) ->
+    {stop, normal, State};
 handle_info(_Info, State) ->
     {noreply, State}.

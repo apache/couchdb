@@ -38,7 +38,8 @@ stream_test_() ->
                 fun should_return_stream_size_on_close/1,
                 fun should_return_valid_pointers/1,
                 fun should_recall_last_pointer_position/1,
-                fun should_stream_more_with_4K_chunk_size/1
+                fun should_stream_more_with_4K_chunk_size/1,
+                fun should_stop_on_normal_exit_of_stream_opener/1
             ]
         }
     }.
@@ -93,6 +94,21 @@ should_stream_more_with_4K_chunk_size({Fd, _}) ->
         end, [], lists:seq(1, 1024)),
     ?_assertMatch({[{0, 4100}, {4106, 1020}], 5120, _, _, _},
                   couch_stream:close(Stream)).
+
+should_stop_on_normal_exit_of_stream_opener({Fd, _}) ->
+    RunnerPid = self(),
+    OpenerPid = spawn(
+        fun() ->
+            {ok, StreamPid} = couch_stream:open(Fd),
+            RunnerPid ! {pid, StreamPid}
+        end),
+    StreamPid = receive
+        {pid, StreamPid0} -> StreamPid0
+    end,
+    % Confirm the validity of the test by verifying the stream opener has died
+    ?_assertNot(is_process_alive(OpenerPid)),
+    % Verify the stream itself has also died
+    ?_assertNot(is_process_alive(StreamPid)).
 
 
 read_all(Fd, PosList) ->
