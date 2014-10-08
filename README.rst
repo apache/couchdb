@@ -67,8 +67,24 @@ Read more about JSpec here:
 When you change the specs, but your changes have no effect, manually reload
 the changed spec file in the browser. When the spec that tests Erlang views
 fails, make sure you have enabled Erlang views as described here:
-   
+
        http://wiki.apache.org/couchdb/EnableErlangViews
+
+Getting started with developing
+-------------------------------
+
+Basically you just have to install the needed dependencies which are
+documented in the install docs and then run `./configure && make`.
+
+You don't need to run `make install` after compiling, just use
+`./dev/run` to spin up three nodes. There is a haproxy config file in `./rel`.
+Just run: `cd rel && haproxy -f haproxy.cfg`. You will now have a local
+cluster listening on port `5984`.
+
+For Fauxton developers fixing the admin-party does not work via the button in
+Fauxton. To fix the admin party you have to run `./dev/run` with the `admin`
+flag, e.g. `./dev/run --admin=username:password`. If you want to have an
+admin-party, just omit the flag.
 
 Cryptographic Software Notice
 -----------------------------
