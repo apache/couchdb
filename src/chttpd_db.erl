@@ -59,7 +59,7 @@ handle_request(#httpd{path_parts=[DbName|RestParts],method=Method,
 handle_changes_req(#httpd{method='GET'}=Req, Db) ->
     #changes_args{filter=Raw, style=Style} = Args0 = parse_changes_query(Req),
     ChangesArgs = Args0#changes_args{
-        filter = couch_changes:configure_filter(Raw, Style, Req, Db)
+        filter_fun = couch_changes:configure_filter(Raw, Style, Req, Db)
     },
     case ChangesArgs#changes_args.feed of
     "normal" ->
