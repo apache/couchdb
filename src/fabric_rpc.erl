@@ -407,7 +407,7 @@ calculate_start_seq(_Db, _Node, Seq) when is_integer(Seq) ->
 calculate_start_seq(Db, Node, {Seq, Uuid}) ->
     % Treat the current node as the epoch node
     calculate_start_seq(Db, Node, {Seq, Uuid, Node});
-calculate_start_seq(Db, Node, {Seq, Uuid, EpochNode}) ->
+calculate_start_seq(Db, _Node, {Seq, Uuid, EpochNode}) ->
     case is_prefix(Uuid, couch_db:get_uuid(Db)) of
         true ->
             case is_owner(EpochNode, Seq, couch_db:get_epochs(Db)) of
