@@ -33,12 +33,12 @@ N = 3
 COUCHJS = "src/couch/priv/couchjs"
 
 SCRIPTS = """
-    share/www/script/json2.js
-    share/www/script/sha1.js
-    share/www/script/oauth.js
-    share/www/script/couch.js
-    share/www/script/replicator_db_inc.js
-    share/www/script/couch_test_runner.js
+    test/javascript/json2.js
+    test/javascript/sha1.js
+    test/javascript/oauth.js
+    test/javascript/couch.js
+    test/javascript/replicator_db_inc.js
+    test/javascript/couch_test_runner.js
     test/javascript/couch_http.js
     test/javascript/test_setup.js
 """.split()
@@ -107,14 +107,14 @@ def main():
 
     tests = []
     if not len(args):
-        args = ["share/www/script/test"]
+        args = ["test/javascript/tests"]
     for name in args:
         if os.path.isdir(name):
             tests.extend(glob.glob(os.path.join(name, "*.js")))
         elif os.path.isfile(name):
             tests.append(name)
         else:
-            pname = os.path.join("share/www/script/test", name)
+            pname = os.path.join("test/javascript/tests", name)
             if os.path.isfile(pname):
                 tests.append(pname)
             elif os.path.isfile(pname + ".js"):
