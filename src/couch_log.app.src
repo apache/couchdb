@@ -15,5 +15,5 @@
     {vsn, git},
     {modules, [couch_log]},
     {registered, []},
-    {applications, [kernel, stdlib, lager, couch_stats]}
+    {applications, [kernel, stdlib, lager]}
 ]}.
