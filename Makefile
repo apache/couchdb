@@ -18,7 +18,7 @@ config.erl:
 	@echo
 	@false
 
-compile: config.erl
+compile: config.erl fauxton
 	@rebar compile
 	@cp src/couch/priv/couchjs bin/
 
@@ -34,6 +34,7 @@ dist: compile
 
 distclean: clean
 	@rm -rf rel/couchdb
+	@rm -rf share/www
 
 devclean:
 	@rm -rf dev/lib/*/data
@@ -69,3 +70,7 @@ eunit: compile
 
 javascript: compile
 	@dev/run test/javascript/run
+
+fauxton:
+# This next line so Noah throws his arms up in dispair and teaches me proper Make again -- Love, Jan
+	@if [ ! -d share/www ]; then echo "Building Fauxton" &&  cd src/fauxton && npm install && grunt couchdb; fi
