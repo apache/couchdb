@@ -140,7 +140,13 @@ parse_rev(Rev) when is_binary(Rev) ->
 parse_rev(Rev) when is_list(Rev) ->
     SplitRev = lists:splitwith(fun($-) -> false; (_) -> true end, Rev),
     case SplitRev of
-        {Pos, [$- | RevId]} -> {list_to_integer(Pos), parse_revid(RevId)};
+        {Pos, [$- | RevId]} ->
+            IntPos = try list_to_integer(Pos) of
+                Val -> Val
+            catch
+                error:badarg -> throw({bad_request, <<"Invalid rev format">>})
+            end,
+            {IntPos, parse_revid(RevId)};
         _Else -> throw({bad_request, <<"Invalid rev format">>})
     end;
 parse_rev(_BadRev) ->
