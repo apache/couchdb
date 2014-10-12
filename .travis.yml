@@ -13,6 +13,7 @@ script:
    - grunt test
 language: erlang
 otp_release:
+   - 17.3
    - 17.1
    - 17.0
    - R16B03-1
