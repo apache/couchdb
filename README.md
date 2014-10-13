@@ -19,3 +19,29 @@ correctly implement in just about any language, especially JavaScript
 and Erlang. Other encodings would be possible, but would require
 additional client and server-side code to support that encoding. This
 is the simplest scheme that is obviously correct.
+
+Installation
+----
+
+Install any dependencies. `couchperuser` requires `rebar`, e.g.
+
+    $ brew install rebar
+
+Ensure the `plugins` directory exists, e.g.
+
+    $ mkdir /usr/local/Cellar/couchdb/1.6.0_1/lib/couchdb/plugins
+
+Clone (download) the repo:
+
+    $ git clone https://github.com/etrepum/couchperuser.git
+
+Move the plugin files:
+
+    $ mv couchperuser /usr/local/Cellar/couchdb/1.6.0_1/lib/couchdb/plugins
+
+Build the plugin files:
+
+    $ cd /usr/local/Cellar/couchdb/1.6.0_1/lib/couchdb/plugins
+    $ make
+
+Restart couchdb
