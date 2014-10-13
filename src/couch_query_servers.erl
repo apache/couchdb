@@ -13,7 +13,7 @@
 -module(couch_query_servers).
 
 -export([try_compile/4]).
--export([start_doc_map/3, map_docs/2, map_doc_raw/2, stop_doc_map/1, raw_to_ejson/1]).
+-export([start_doc_map/3, map_doc_raw/2, stop_doc_map/1, raw_to_ejson/1]).
 -export([reduce/3, rereduce/3,validate_doc_update/5]).
 -export([filter_docs/5]).
 -export([filter_view/3]).
@@ -55,29 +55,6 @@ start_doc_map(Lang, Functions, Lib) ->
         true = proc_prompt(Proc, [<<"add_fun">>, FunctionSource])
     end, Functions),
     {ok, Proc}.
-
-map_docs(Proc, Docs) ->
-    % send the documents
-    Results = lists:map(
-        fun(Doc) ->
-            Json = couch_doc:to_json_obj(Doc, []),
-
-            FunsResults = proc_prompt(Proc, [<<"map_doc">>, Json]),
-            % the results are a json array of function map yields like this:
-            % [FunResults1, FunResults2 ...]
-            % where funresults is are json arrays of key value pairs:
-            % [[Key1, Value1], [Key2, Value2]]
-            % Convert the key, value pairs to tuples like
-            % [{Key1, Value1}, {Key2, Value2}]
-            lists:map(
-                fun(FunRs) ->
-                    [list_to_tuple(FunResult) || FunResult <- FunRs]
-                end,
-            FunsResults)
-        end,
-        Docs),
-    couch_stats:increment_counter([couchdb, couchjs, map_doc], length(Docs)),
-    {ok, Results}.
 
 map_doc_raw(Proc, Doc) ->
     Json = couch_doc:to_json_obj(Doc, []),
