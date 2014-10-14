@@ -147,7 +147,10 @@ map_docs(Parent, State0) ->
                     {erlang:max(Seq, SeqAcc), [{Id, Res} | Results]}
             end,
             FoldFun = fun(Docs, Acc) ->
-                update_task(length(Docs)),
+                LenDocs = length(Docs),
+                couch_stats:increment_counter([couchdb, couchjs, map_docs], 
+                                              LenDocs),
+                update_task(LenDocs),
                 lists:foldl(DocFun, Acc, Docs)
             end,
             Results = lists:foldl(FoldFun, {0, []}, Dequeued),
