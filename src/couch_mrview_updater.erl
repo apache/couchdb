@@ -143,14 +143,13 @@ map_docs(Parent, State0) ->
                 ({Id, Seq, deleted}, {SeqAcc, Results}) ->
                     {erlang:max(Seq, SeqAcc), [{Id, []} | Results]};
                 ({Id, Seq, Doc}, {SeqAcc, Results}) ->
+                    couch_stats:increment_counter([couchdb, mrview, map_docs],
+                                                  1),
                     {ok, Res} = couch_query_servers:map_doc_raw(QServer, Doc),
                     {erlang:max(Seq, SeqAcc), [{Id, Res} | Results]}
             end,
             FoldFun = fun(Docs, Acc) ->
-                LenDocs = length(Docs),
-                couch_stats:increment_counter([couchdb, mrview, map_docs],
-                                              LenDocs),
-                update_task(LenDocs),
+                update_task(length(Docs)),
                 lists:foldl(DocFun, Acc, Docs)
             end,
             Results = lists:foldl(FoldFun, {0, []}, Dequeued),
