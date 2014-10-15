@@ -41,7 +41,7 @@ Move the plugin files:
 
 Build the plugin files:
 
-    $ cd /usr/local/Cellar/couchdb/1.6.0_1/lib/couchdb/plugins
+    $ cd /usr/local/Cellar/couchdb/1.6.0_1/lib/couchdb/plugins/couchperuser
     $ make
 
 Restart couchdb
