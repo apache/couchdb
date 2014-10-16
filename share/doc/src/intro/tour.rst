@@ -369,7 +369,7 @@ And finally, the document for bananas:
 Imagine we're catering a big luncheon, but the client is very price-sensitive.
 To find the lowest prices, we're going to create our first view,
 which shows each fruit sorted by price. Click "hello-world" to return to the
-hello-world overview, and then from the "select view" menu choose "Temporary
+hello-world overview, and then from the "View" select field choose "Temporary
 view…" to create a new view.
 
 
