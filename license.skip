@@ -64,17 +64,6 @@
 ^rel/overlay/etc/local.*
 ^share/Makefile
 ^share/Makefile.in
-^share/doc/Makefile
-^share/doc/Makefile.in
-^share/doc/build/.*
-^share/doc/ext/__pycache__/.*
-^share/doc/ext/.*.pyc
-^share/doc/ext/httpdomain.py
-^share/doc/ext/http-api-descr.json
-^share/doc/images/.*
-^share/doc/src/conf.pyc
-^share/doc/static/rtd.css
-^share/doc/templates/couchdb/domainindex.html
 ^share/server/json2.js
 ^share/server/mimeparse.js
 ^share/server/coffee-script.js

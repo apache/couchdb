@@ -150,30 +150,6 @@ This product also includes the following third-party components:
 
    Copyright (c) 2013 Dave Gandy
 
- * httpdomain.py (https://bitbucket.org/birkenfeld/sphinx-contrib/src/6a3a8ca714cfce957530890d0431d9a7b88c930f/httpdomain/sphinxcontrib/httpdomain.py?at=httpdomain-1.1.9)
-
-   Copyright (c) 2010, Hong Minhee <minhee@dahlia.kr>
-
- * externals.rst (http://davispj.com/2010/09/26/new-couchdb-externals-api.html)
-
-   Copyright 2008-2010, Paul Joseph Davis <paul.joseph.davis@gmail.com>
-
- * protocol.rst (http://www.dataprotocols.org/en/latest/couchdb_replication.html)
-
-   Copyright 2011-2013, Benoît Chesneau <benoitc@refuge.io>
-
- * views/intro.rst views/nosql.rst views/pagination.rst
-
-   Copyright 2013, Creative Commons Attribution license
-
- * share/doc/src/couchapp/views/joins.rst (Using View Collation)
-
-   Copyright 2007, Christopher Lenz <cmlenz@gmail.com>
-
- * share/doc/src/templates/couchdb/domainindex.html
-
-   Copyright 2007-2011 by the Sphinx team
-
  * sandbox.js https://github.com/KlausTrainer/sandbox.js
 
    (c) 2013 Klaus Trainer
