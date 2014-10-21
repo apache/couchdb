@@ -42,7 +42,7 @@ handle_call(_Request, State) ->
     {reply, ok, State}.
 
 handle_info({'EXIT', Pid, Reason}, Pid) ->
-    ?LOG_ERROR("View update notification process ~p died: ~p", [Pid, Reason]),
+    couch_log:error("View update notification process ~p died: ~p", [Pid, Reason]),
     remove_handler.
 
 code_change(_OldVsn, State, _Extra) ->
