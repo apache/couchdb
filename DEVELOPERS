@@ -146,9 +146,9 @@ Testing a cluster
 -----------------
 
 We use Docker (https://docker.io) to safely run a local three node
-cluster.
+cluster all inside a single docker container.
 
-Assuming you have Docker installed and running;
+Assuming you have Docker installed and running:
 
     make docker-image
 
