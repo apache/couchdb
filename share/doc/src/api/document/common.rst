@@ -46,7 +46,7 @@
 
   .. code-block:: http
 
-    GET /db/SpaghettiWithMeatballs HTTP/1.1
+    HEAD /db/SpaghettiWithMeatballs HTTP/1.1
     Accept: application/json
     Host: localhost:5984
 
