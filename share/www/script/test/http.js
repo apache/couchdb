@@ -25,7 +25,7 @@ couchTests.http = function(debug) {
   var xhr = CouchDB.request("PUT", "/test_suite_db/test", {body: "{}"});
   var host = CouchDB.host;
 
-  TEquals(CouchDB.protocol + host + "/test_suite_db/test", 
+  TEquals(CouchDB.protocol + host + "/test_suite_db/test",
     xhr.getResponseHeader("Location"),
     "should include ip address");
 
@@ -51,4 +51,29 @@ couchTests.http = function(debug) {
         xhr.getResponseHeader("Location"),
         "should include X-Host");
     });
+
+  // COUCHDB-708: newlines document names
+  xhr = CouchDB.request("PUT", "/test_suite_db/docid%0A/attachment.txt", {
+    headers: {"Content-Type": "text/plain;charset=utf-8"},
+    body: ""
+  });
+  TEquals(CouchDB.protocol + host + "/test_suite_db/docid%0A/attachment.txt",
+    xhr.getResponseHeader("Location"),
+    "should work with newlines in document names for attachments");
+
+  xhr = CouchDB.request("PUT", "/test_suite_db/docidtest%0A", {
+    body: JSON.stringify({"foo": "bar"}),
+    headers: {"Content-Type": "application/json"}
+  });
+  TEquals(CouchDB.protocol + host + "/test_suite_db/docidtest%0A",
+    xhr.getResponseHeader("Location"),
+    "should work with newlines in document names");
+
+  xhr = CouchDB.request("POST", "/test_suite_db/", {
+    body: JSON.stringify({"_id": "docidtestpost%0A"}),
+    headers: {"Content-Type": "application/json"}
+  });
+  TEquals(CouchDB.protocol + host + "/test_suite_db/docidtestpost%250A",
+    xhr.getResponseHeader("Location"),
+    "should work with newlines in document names");
 }
