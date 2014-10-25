@@ -721,7 +721,7 @@ update_doc_result_to_json(DocId, Error) ->
 
 
 update_doc(Req, Db, DocId, #doc{deleted=false}=Doc) ->
-    Loc = absolute_uri(Req, "/" ++ ?b2l(Db#db.name) ++ "/" ++ ?b2l(DocId)),
+    Loc = absolute_uri(Req, "/" ++ ?b2l(Db#db.name) ++ "/" ++ couch_util:url_encode(DocId)),
     update_doc(Req, Db, DocId, Doc, [{"Location", Loc}]);
 update_doc(Req, Db, DocId, Doc) ->
     update_doc(Req, Db, DocId, Doc, []).
@@ -1022,7 +1022,7 @@ db_attachment_req(#httpd{method=Method,mochi_req=MochiReq}=Req, Db, DocId, FileN
     _ ->
         [{"Location", absolute_uri(Req, "/" ++
             ?b2l(Db#db.name) ++ "/" ++
-            ?b2l(DocId) ++ "/" ++
+            couch_util:url_encode(DocId) ++ "/" ++
             ?b2l(FileName)
         )}]
     end,
@@ -1233,4 +1233,3 @@ validate_attachment_name(Name) ->
         true -> Name;
         false -> throw({bad_request, <<"Attachment name is not UTF-8 encoded">>})
     end.
-
