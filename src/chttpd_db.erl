@@ -669,7 +669,7 @@ db_doc_req(#httpd{method='PUT', user_ctx=Ctx}=Req, Db, DocId) ->
     W = couch_httpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
     Options = [{user_ctx,Ctx}, {w,W}],
 
-    Loc = absolute_uri(Req, [$/, Db#db.name, $/, DocId]),
+    Loc = absolute_uri(Req, [$/, Db#db.name, $/, couch_util:url_encode(DocId)]),
     RespHeaders = [{"Location", Loc}],
     case couch_util:to_list(couch_httpd:header_value(Req, "Content-Type")) of
     ("multipart/related;" ++ _) = ContentType ->
@@ -1155,7 +1155,7 @@ db_attachment_req(#httpd{method=Method, user_ctx=Ctx}=Req, Db, DocId, FileNamePa
         'DELETE' ->
             {200, []};
         _ ->
-            {HttpCode, [{"Location", absolute_uri(Req, [$/, DbName, $/, DocId, $/,
+            {HttpCode, [{"Location", absolute_uri(Req, [$/, DbName, $/, couch_util:url_encode(DocId), $/,
                 FileName])}]}
         end,
     send_json(Req,Status, Headers, {[
