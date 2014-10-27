@@ -329,9 +329,12 @@ Secure Socket Level Options
 
   .. config:option:: cacert_file :: CA Certificate file
 
-    Path to file containing PEM encoded CA certificates (trusted certificates
-    used for verifying a peer certificate). May be omitted if you do not want
-    to verify the peer::
+    The path to a file containing PEM encoded CA certificates. The CA
+    certificates are used to build the server certificate chain, and for client
+    authentication. Also the CAs are used in the list of acceptable client CAs
+    passed to the client when a certificate is requested. May be omitted if
+    there is no need to verify the client and if there are not any intermediate
+    CAs for the server certificate::
 
       [ssl]
       cacert_file = /etc/ssl/certs/ca-certificates.crt
