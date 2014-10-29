@@ -734,6 +734,16 @@
          */
         copyDoc: function(docId, options, ajaxOptions) {
           ajaxOptions = $.extend(ajaxOptions, {
+            beforeSend: function(XMLHttpRequest) {
+              if (!options || !options.docid) {
+                  throw "Target docid required";
+              }
+              var header = options.docid;
+              if (options.rev) {
+                  header += '?rev=' + options.rev
+              }
+              XMLHttpRequest.setRequestHeader("Destination", header);
+            },
             complete: function(req) {
               var resp = $.parseJSON(req.responseText);
               if (req.status == 201) {
