@@ -252,8 +252,10 @@ replicate_batch(#acc{target = #shard{node=Node, name=Name}} = Acc) ->
     [] ->
         ok;
     Missing ->
-        Docs = open_docs(Acc, Missing),
-        ok = save_on_target(Node, Name, Docs)
+        lists:map(fun(Chunk) ->
+            Docs = open_docs(Acc, Chunk),
+            ok = save_on_target(Node, Name, Docs)
+        end, chunk_revs(Missing))
     end,
     update_locals(Acc),
     {ok, Acc#acc{revcount=0, infos=[]}}.
@@ -269,6 +271,32 @@ find_missing_revs(Acc) ->
         {io_priority, {internal_repl, Name}},
         ?ADMIN_CTX
     ]).
+
+
+chunk_revs(Revs) ->
+    Limit = list_to_integer(config:get("mem3", "rev_chunk_size", "5000")),
+    chunk_revs(Revs, Limit).
+
+chunk_revs(Revs, Limit) ->
+    chunk_revs(Revs, {0, []}, [], Limit).
+
+chunk_revs([], {_Count, Chunk}, Chunks, _Limit) ->
+    [Chunk|Chunks];
+chunk_revs([{Id, R, A}|Revs], {Count, Chunk}, Chunks, Limit) when length(R) =< Limit - Count ->
+    chunk_revs(
+        Revs,
+        {Count + length(R), [{Id, R, A}|Chunk]},
+        Chunks,
+        Limit
+    );
+chunk_revs([{Id, R, A}|Revs], {Count, Chunk}, Chunks, Limit) ->
+    {This, Next} = lists:split(Limit - Count, R),
+    chunk_revs(
+        [{Id, Next, A}|Revs],
+        {0, []},
+        [[{Id, This, A}|Chunk]|Chunks],
+        Limit
+    ).
 
 
 open_docs(#acc{source=Source, infos=Infos}, Missing) ->
