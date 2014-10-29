@@ -32,9 +32,9 @@
     Ignored if `include_docs` isn't ``true``. Default is ``false``
   :query boolean descending: Return the documents in descending by key order.
     Default is ``false``
-  :query string endkey: Stop returning records when the specified key is
+  :query json endkey: Stop returning records when the specified key is
     reached. *Optional*
-  :query string end_key: Alias for `endkey` param
+  :query json end_key: Alias for `endkey` param
   :query string endkey_docid: Stop returning records when the specified
     document ID is reached. *Optional*
   :query string end_key_doc_id: Alias for `endkey_docid` param
@@ -52,7 +52,7 @@
     compressed. Ignored if `include_docs` isn't ``true``. Default is ``false``.
   :query boolean inclusive_end: Specifies whether the specified end key should
     be included in the result. Default is ``true``
-  :query string key: Return only documents that match the specified key.
+  :query json key: Return only documents that match the specified key.
     *Optional*
   :query number limit: Limit the number of the returned documents to the
     specified number. *Optional*
@@ -61,9 +61,9 @@
     the results. Default is ``0``
   :query string stale: Allow the results from a stale view to be used.
     Supported values: ``ok`` and ``update_after``. *Optional*
-  :query string startkey: Return records starting with the specified key.
+  :query json startkey: Return records starting with the specified key.
     *Optional*
-  :query string start_key: Alias for `startkey` param
+  :query json start_key: Alias for `startkey` param
   :query string startkey_docid: Return records starting with the specified
     document ID. *Optional*
   :query string start_key_doc_id: Alias for `startkey_docid` param
