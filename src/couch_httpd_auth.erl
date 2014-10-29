@@ -23,6 +23,8 @@
 
 -import(couch_httpd, [header_value/2, send_json/2,send_json/4, send_method_not_allowed/2]).
 
+-compile({no_auto_import,[integer_to_binary/1]}).
+
 special_test_authentication_handler(Req) ->
     case header_value(Req, "WWW-Authenticate") of
     "X-Couch-Test-Auth " ++ NamePass ->
@@ -75,6 +77,7 @@ default_authentication_handler(Req, AuthModule) ->
             nil ->
                 throw({unauthorized, <<"Name or password is incorrect.">>});
             UserProps ->
+                reject_if_totp(UserProps),
                 UserName = ?l2b(User),
                 Password = ?l2b(Pass),
                 case authenticate(Password, UserProps) of
@@ -287,6 +290,7 @@ handle_session_req(#httpd{method='POST', mochi_req=MochiReq}=Req, AuthModule) ->
     end,
     case authenticate(Password, UserProps) of
         true ->
+            verify_totp(UserProps, Form),
             UserProps2 = maybe_upgrade_password_hash(UserName, Password, UserProps, AuthModule),
             % setup the session cookie
             Secret = ?l2b(ensure_cookie_auth_secret()),
@@ -429,4 +433,54 @@ max_age() ->
             Timeout = list_to_integer(
                 config:get("couch_httpd_auth", "timeout", "600")),
             [{max_age, Timeout}]
+    end.
+
+reject_if_totp(User) ->
+    case get_totp_config(User) of
+        undefined ->
+            ok;
+        _ ->
+            throw({unauthorized, <<"Name or password is incorrect.">>})
+    end.
+
+verify_totp(User, Form) ->
+    case get_totp_config(User) of
+        undefined ->
+            ok;
+        {Props} ->
+            Key = couch_util:get_value(<<"key">>, Props),
+            Alg = couch_util:to_existing_atom(
+                couch_util:get_value(<<"algorithm">>, Props, <<"sha">>)),
+            Len = couch_util:get_value(<<"length">>, Props, 6),
+            Token = ?l2b(couch_util:get_value("token", Form, "")),
+            verify_token(Alg, Key, Len, Token)
+    end.
+
+get_totp_config(User) ->
+    couch_util:get_value(<<"totp">>, User).
+
+verify_token(Alg, Key, Len, Token) ->
+    Now = make_cookie_time(),
+    Tokens = [generate_token(Alg, Key, Len, Now - 30),
+              generate_token(Alg, Key, Len, Now),
+              generate_token(Alg, Key, Len, Now + 30)],
+    %% evaluate all tokens in constant time
+    Match = lists:foldl(fun(T, Acc) -> couch_util:verify(T, Token) or Acc end,
+                        false, Tokens),
+    case Match of
+        true ->
+            ok;
+        _ ->
+            throw({unauthorized, <<"Name or password is incorrect.">>})
+    end.
+
+generate_token(Alg, Key, Len, Timestamp) ->
+    integer_to_binary(couch_totp:generate(Alg, Key, Timestamp, 30, Len)).
+
+integer_to_binary(Int) when is_integer(Int) ->
+    case erlang:function_exported(erlang, integer_to_binary, 1) of
+        true ->
+            erlang:integer_to_binary(Int);
+        false ->
+            ?l2b(integer_to_list(Int))
     end.
