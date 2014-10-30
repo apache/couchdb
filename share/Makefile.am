@@ -142,7 +142,7 @@ nobase_dist_localdata_DATA = \
     www/script/jquery.editinline.js \
     www/script/jquery.form.js \
     www/script/jquery.js \
-    www/script/jquery-ui-1.8.11.custom.min.js \
+    www/script/jquery-ui-1.9.2.custom.min.js \
     www/script/jquery.resizer.js \
     www/script/jquery.suggest.js \
     www/script/json2.js \
