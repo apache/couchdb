@@ -215,8 +215,8 @@ trigger_update(Db, DDoc, UpdateSeq) ->
 
 %% get informations on a view
 get_view_info(Db, DDoc, VName) ->
-    {ok, {_, View}, _, _Args} = couch_mrview_util:get_view(Db, DDoc, VName,
-                                                          #mrargs{}),
+    {ok, {_, View, _}, _, _Args} = couch_mrview_util:get_view(Db, DDoc, VName,
+                                                              #mrargs{}),
 
     %% get the total number of rows
     {ok, TotalRows} =  couch_mrview_util:get_row_count(View),
