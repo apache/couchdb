@@ -1,3 +1,5 @@
+.DS_Store
+
 config.erl
 install.mk
 rel/*.config
