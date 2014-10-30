@@ -1,8 +1,8 @@
-Apache CouchDB THANKS
-=====================
+Apache CouchDB CONTRIBUTORS
+===========================
 
-A number of people have contributed to Apache CouchDB by reporting problems,
-suggesting improvements or submitting changes. Some of these people are:
+A number of people have made contributions to the Apache CouchDB community,
+project, documentation, or code. Some of these people are listed here.
 
  * William Beh <willbeh@gmail.com>
  * Dirk Schalge <dirk@epd-me.net>
@@ -94,4 +94,4 @@ suggesting improvements or submitting changes. Some of these people are:
  * Benjamin Anderson <b@banjiewen.net>
 # Authors from commit 6c976bd and onwards are auto-inserted. If you are merging
 # a commit from a non-committer, you should not add an entry to this file. When
-# `bootstrap` is run, the actual THANKS file will be generated.
+# `bootstrap` is run, the actual CONTRIBUTORS file will be generated.
