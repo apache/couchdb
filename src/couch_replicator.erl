@@ -646,61 +646,6 @@ fold_replication_logs([Db | Rest] = Dbs, Vsn, LogId, NewId, Rep, Acc) ->
     end.
 
 
-spawn_changes_reader(StartSeq, #httpdb{} = Db, ChangesQueue, Options) ->
-    spawn_link(fun() ->
-        put(last_seq, StartSeq),
-        put(retries_left, Db#httpdb.retries),
-        read_changes(StartSeq, Db#httpdb{retries = 0}, ChangesQueue, Options)
-    end);
-spawn_changes_reader(StartSeq, Db, ChangesQueue, Options) ->
-    spawn_link(fun() ->
-        read_changes(StartSeq, Db, ChangesQueue, Options)
-    end).
-
-read_changes(StartSeq, Db, ChangesQueue, Options) ->
-    try
-        couch_replicator_api_wrap:changes_since(Db, all_docs, StartSeq, fun
-            (#doc_info{high_seq = Seq, revs = []}) ->
-                put(last_seq, Seq);
-            (#doc_info{high_seq = Seq, id = Id} = DocInfo) ->
-                case Id of
-                <<>> ->
-                    % Previous CouchDB releases had a bug which allowed a doc
-                    % with an empty ID to be inserted into databases. Such doc
-                    % is impossible to GET.
-                    ?LOG_ERROR("Replicator: ignoring document with empty ID in "
-                        "source database `~s` (_changes sequence ~p)",
-                        [couch_replicator_api_wrap:db_uri(Db), Seq]);
-                _ ->
-                    ok = couch_work_queue:queue(ChangesQueue, DocInfo)
-                end,
-                put(last_seq, Seq)
-            end, Options),
-        couch_work_queue:close(ChangesQueue)
-    catch exit:{http_request_failed, _, _, _} = Error ->
-        case get(retries_left) of
-        N when N > 0 ->
-            put(retries_left, N - 1),
-            LastSeq = get(last_seq),
-            Db2 = case LastSeq of
-            StartSeq ->
-                ?LOG_INFO("Retrying _changes request to source database ~s"
-                    " with since=~p in ~p seconds",
-                    [couch_replicator_api_wrap:db_uri(Db), LastSeq, Db#httpdb.wait / 1000]),
-                ok = timer:sleep(Db#httpdb.wait),
-                Db#httpdb{wait = 2 * Db#httpdb.wait};
-            _ ->
-                ?LOG_INFO("Retrying _changes request to source database ~s"
-                    " with since=~p", [couch_replicator_api_wrap:db_uri(Db), LastSeq]),
-                Db
-            end,
-            read_changes(LastSeq, Db2, ChangesQueue, Options);
-        _ ->
-            exit(Error)
-        end
-    end.
-
-
 spawn_changes_manager(Parent, ChangesQueue, BatchSize) ->
     spawn_link(fun() ->
         changes_manager_loop_open(Parent, ChangesQueue, BatchSize, 1)
@@ -952,21 +897,6 @@ db_monitor(#db{} = Db) ->
     couch_db:monitor(Db);
 db_monitor(_HttpDb) ->
     nil.
-
-source_cur_seq(#rep_state{source = #httpdb{} = Db, source_seq = Seq,
-                          type = view, view = {DDoc, VName}}) ->
-    case (catch couch_replicator_api_wrap:get_view_info(
-                Db#httpdb{retries = 3}, DDoc, VName)) of
-    {ok, Info} ->
-        get_value(<<"update_seq">>, Info, Seq);
-    _ ->
-        Seq
-    end;
-
-source_cur_seq(#rep_state{source = Db, source_seq = Seq,
-                          type = view, view = {DDoc, VName}}) ->
-    {ok, Info} = couch_replicator_api_wrap:get_view_info(Db, DDoc, VName),
-    get_value(<<"update_seq">>, Info, Seq);
 
 get_pending_count(St) ->
     Rep = St#rep_state.rep_details,
