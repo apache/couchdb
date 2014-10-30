@@ -1094,6 +1094,37 @@
         });
       }
 
+      this.copyDocument = function() {
+        if (page.isDirty) {
+          alert("You need to save or revert any changes you have made to the " +
+                "document before you can copy it.");
+            return false;
+        }
+        $.showDialog("dialog/_copy_document.html", {
+          submit: function (data, callback) {
+            if (!data.docid || data.docid.length == 0) {
+              callback({docid: "Please enter a document ID."});
+              return;
+            }
+            db.copyDoc(
+              page.doc._id,
+              {
+                docid: data.docid
+              },
+              {
+                error: function (status, error, reason) {
+                  callback({docid: reason});
+              },
+                success: function (resp) {
+                  location.href = "document.html?"
+                                + encodeURIComponent(dbName)
+                                + "/" + $.couch.encodeDocId(resp.id);
+              }
+            });
+          }
+        });
+      };
+
       window.onbeforeunload = function() {
         if (page.isDirty) {
           return "You've made changes to this document that have not been " +

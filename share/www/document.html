@@ -55,6 +55,7 @@ specific language governing permissions and limitations under the License.
         $("#toolbar button.save").click(page.saveDocument);
         $("#toolbar button.add").click(page.addField);
         $("#toolbar button.load").click(page.uploadAttachment);
+        $("#toolbar button.copy").click(page.copyDocument);
         if (page.isNew) {
           $("#toolbar button.delete").hide();
         } else {
@@ -76,6 +77,7 @@ specific language governing permissions and limitations under the License.
         <li><button class="save">Save Document</button></li>
         <li><button class="add">Add Field</button></li>
         <li><button class="load">Upload Attachment…</button></li>
+        <li><button class="copy">Copy Document…</button></li>
         <li><button class="delete">Delete Document…</button></li>
       </ul>
 

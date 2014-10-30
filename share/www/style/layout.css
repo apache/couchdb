@@ -246,6 +246,7 @@ body.fullwidth #wrap { margin-right: 0; }
 #toolbar button.run { background-image: url(../image/run.png); }
 #toolbar button.save { background-image: url(../image/save.png); }
 #toolbar button.share { background-image: url(../image/compact.png); }
+#toolbar button.copy { background-image: url(../image/copy.png); }
 
 /* Dialogs */
 
@@ -282,7 +283,9 @@ body.loading #dialog h2 {
   -webkit-border-bottom-right-radius: 7px;
 }
 #dialog p.help { color: #bbb; font-size: 95%; margin: 0 0 1em; }
+#dialog p.help-copy { margin-top: 1em; margin-bottom: 0; padding-left: 0.6em; }
 #dialog fieldset table { margin-top: 1em; }
+#dialog fieldset table.help-copy { margin-top: 0; }
 #dialog fieldset th, #dialog fieldset td { padding: .5em;
   vertical-align: top;
 }

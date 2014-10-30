@@ -59,6 +59,7 @@ nobase_dist_localdata_DATA = \
     www/dialog/_admin_party.html \
     www/dialog/_change_password.html \
     www/dialog/_compact_cleanup.html \
+    www/dialog/_copy_document.html \
     www/dialog/_create_admin.html \
     www/dialog/_login.html \
     www/dialog/_signup.html \
@@ -101,6 +102,7 @@ nobase_dist_localdata_DATA = \
     www/image/bg.png \
     www/image/cancel.gif \
     www/image/compact.png \
+    www/image/copy.png \
     www/image/delete-mini.png \
     www/image/delete.png \
     www/image/grippie.gif \
