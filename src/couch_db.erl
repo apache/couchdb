@@ -582,18 +582,23 @@ validate_ddoc(DbName, DDoc) ->
     end.
 
 validate_doc_update_int(Db, Doc, GetDiskDocFun) ->
-    DiskDoc = GetDiskDocFun(),
-    JsonCtx = couch_util:json_user_ctx(Db),
-    SecObj = get_security(Db),
-    try [case Fun(Doc, DiskDoc, JsonCtx, SecObj) of
-            ok -> ok;
-            Error -> throw(Error)
-        end || Fun <- Db#db.validate_doc_funs],
-        ok
-    catch
-        throw:Error ->
-            Error
-    end.
+    Fun = fun() ->
+        DiskDoc = GetDiskDocFun(),
+        JsonCtx = couch_util:json_user_ctx(Db),
+        SecObj = get_security(Db),
+        try
+            [case Fun(Doc, DiskDoc, JsonCtx, SecObj) of
+                ok -> ok;
+                Error -> throw(Error)
+             end || Fun <- Db#db.validate_doc_funs],
+            ok
+        catch
+            throw:Error ->
+                Error
+        end
+    end,
+    couch_stats:update_histogram([couchdb, query_server, vdu_process_time],
+                                 Fun).
 
 
 % to be safe, spawn a middleman here
