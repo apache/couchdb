@@ -25,7 +25,7 @@ couchTests.http = function(debug) {
   var xhr = CouchDB.request("PUT", "/test_suite_db/test", {body: "{}"});
   var host = CouchDB.host;
 
-  TEquals(CouchDB.protocol + host + "/test_suite_db/test", 
+  TEquals(CouchDB.protocol + host + "/test_suite_db/test",
     xhr.getResponseHeader("Location"),
     "should include ip address");
 
