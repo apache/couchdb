@@ -26,6 +26,7 @@ is no need to ask for admin credentials here. If the bind_address is !=
 UI right away.
 
 - POST to /_setup with
+```
   {
     "action": "enable_cluster",
     "admin": {
@@ -35,6 +36,7 @@ UI right away.
     ["bind_address": "xxxx",]
     ["port": yyyy]
   }
+```
 
 This sets up the admin user on the current node and binds to 0.0.0.0:5984
 or the specified ip:port. Logs admin user into Fauxton automatically.
