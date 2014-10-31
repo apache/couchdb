@@ -335,7 +335,7 @@ function $$(node) {
           name = encodeURIComponent(name);
           $("#dbs").append("<li>" +
             "<button class='remove' title='Remove from list' value='" + name + "'></button>" +
-            "<a href='database.html?" + name + "' title='" + name + "'>" + name +
+            "<a href='database.html?" + name + "' title='" + name + "'>" + decodeURIComponent(name) +
             "</a></li>");
         }
       });
