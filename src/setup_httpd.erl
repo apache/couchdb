@@ -31,8 +31,19 @@ handle_setup_req(Req) ->
 
 handle_action("enable_cluster", Setup) ->
     io:format("~nenable_cluster: ~p~n", [Setup]);
+    % if admin.username && admin.password
+    %   create admin
+    % if bind_address
+    %   set bind_address
+    % else
+    %   bind_address to 0.0.0.0
+    % if port
+    %   set port
+    % set cluster_state to cluster_enabled
 handle_action("finish_cluster", Setup) ->
     io:format("~nfinish_cluster: ~p~n", [Setup]);
+    % create clustered databases (_users, _replicator, _cassim/_metadata
+
 handle_action("add_node", Setup) ->
     io:format("~nadd_node: ~p~n", [Setup]);
 handle_action("remove_node", Setup) ->
