@@ -58,7 +58,8 @@ UI shows an “Add Node” interface with the fields admin, and node:
 - POST to /_setup with
   {
     "action": "add_node",
-    "admin": { // should be auto-filled from Fauxton
+    "admin": { // should be auto-filled from Fauxton, store plaintext PW in
+               // localStorage until we finish_cluster or timeout.
       "user": "username",
       "pass": "password"
     },
@@ -135,6 +136,8 @@ POST /_setup {"action":"add_node"...} -> Stay in State 2, but return "nodes":["n
 POST /_setup {"action":"add_node"...} -> if target node not available, Error
 POST /_setup {"action":"finish_cluster"} with no nodes set up -> Error
 POST /_setup {"action":"finish_cluster"} -> Transition to State 3
+POST /_setup {"action":"delete_node"...} -> Stay in State 2, but delete node from /nodes, reflect the change in GET /_setup
+POST /_setup {"action":"delete_node","node":"unknown"} -> Error Unknown Node
 
 
 ### State 3: Cluster set up, all nodes operational
@@ -146,5 +149,7 @@ POST /_setup {"action":"enable_cluster"...} -> Error
 POST /_setup {"action":"finish_cluster"...} -> Stay in State 3, do nothing
 POST /_setup {"action":"add_node"...} -> Error
 POST /_setup?i_know_what_i_am_doing=true {"action":"add_node"...} -> Add node, stay in State 3.
+POST /_setup {"action":"delete_node"...} -> Stay in State 3, but delete node from /nodes, reflect the change in GET /_setup
+POST /_setup {"action":"delete_node","node":"unknown"} -> Error Unknown Node
 
 // TBD: we need to persist the setup state somewhere.
