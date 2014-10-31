@@ -20,6 +20,11 @@ to the tab and get presented with a form that asks you to enter an admin
 username, admin password and optionally a bind_address and port to bind
 to publicly. Submit the form with the [Enable Cluster] button.
 
+If this is a single node install that already has an admin set up, there
+is no need to ask for admin credentials here. If the bind_address is !=
+127.0.0.1, we can skip this entirely and Fauxton can show the add_node
+UI right away.
+
 - POST to /_setup with
   {
     "action": "enable_cluster",
