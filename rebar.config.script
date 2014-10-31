@@ -46,6 +46,7 @@ DepDescs = [
     {mochiweb,          "mochiweb",         {branch, "master"}},
     {oauth,             "oauth",            {branch, "master"}},
     {rexi,              "rexi",             {branch, "master"}},
+    {setup,             "setup",            {branch, "master"}},
     {snappy,            "snappy",           {branch, "1994-merge-rcouch"}}
 ],
 
