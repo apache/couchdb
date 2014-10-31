@@ -117,16 +117,18 @@ by HTTP POST with JSON bodies that have an `action` field.
 This is right after starting a node for the first time, and any time
 before the cluster is enabled as outlined above.
 
+```
 GET /_setup
 {"state": "cluster_disabled"}
 
 POST /_setup {"action":"enable_cluster"...} -> Transition to State 2
 POST /_setup {"action":"enable_cluster"...} with empty admin user/pass or invalid host/post or host/port not available -> Error
 POST /_setup {"action":"anything_but_enable_cluster"...} -> Error
-
+```
 
 ### State 2: Cluster enabled, admin user set, waiting for nodes to be added.
 
+```
 GET /_setup
 {"state":"cluster_enabled","nodes":[]}
 
@@ -137,10 +139,11 @@ POST /_setup {"action":"finish_cluster"} with no nodes set up -> Error
 POST /_setup {"action":"finish_cluster"} -> Transition to State 3
 POST /_setup {"action":"delete_node"...} -> Stay in State 2, but delete node from /nodes, reflect the change in GET /_setup
 POST /_setup {"action":"delete_node","node":"unknown"} -> Error Unknown Node
-
+```
 
 ### State 3: Cluster set up, all nodes operational
 
+```
 GET /_setup
 {"state":"cluster_finished","nodes":["node a", "node b", ...]}
 
@@ -150,5 +153,6 @@ POST /_setup {"action":"add_node"...} -> Error
 POST /_setup?i_know_what_i_am_doing=true {"action":"add_node"...} -> Add node, stay in State 3.
 POST /_setup {"action":"delete_node"...} -> Stay in State 3, but delete node from /nodes, reflect the change in GET /_setup
 POST /_setup {"action":"delete_node","node":"unknown"} -> Error Unknown Node
+```
 
 // TBD: we need to persist the setup state somewhere.
