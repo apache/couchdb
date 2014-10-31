@@ -372,6 +372,7 @@ url_handler("_oauth") ->        fun couch_httpd_oauth:handle_oauth_req/1;
 url_handler("_up") ->           fun chttpd_misc:handle_up_req/1;
 url_handler("_membership") ->   fun mem3_httpd:handle_membership_req/1;
 url_handler("_db_updates") ->   fun global_changes_httpd:handle_global_changes_req/1;
+url_handler("_cluster_setup") -> fun setup_httpd:handle_setup_req/1;
 url_handler(_) ->               fun chttpd_db:handle_request/1.
 
 db_url_handlers() ->
