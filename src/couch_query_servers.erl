@@ -260,7 +260,16 @@ get_number(Key, Props) ->
 validate_doc_update(DDoc, EditDoc, DiskDoc, Ctx, SecObj) ->
     JsonEditDoc = couch_doc:to_json_obj(EditDoc, [revs]),
     JsonDiskDoc = json_doc(DiskDoc),
-    case ddoc_prompt(DDoc, [<<"validate_doc_update">>], [JsonEditDoc, JsonDiskDoc, Ctx, SecObj]) of
+    Resp = ddoc_prompt(DDoc,
+                       [<<"validate_doc_update">>],
+                       [JsonEditDoc, JsonDiskDoc, Ctx, SecObj]),
+    case Resp of
+        _ when Resp /= 1 ->
+            couch_stats:increment_counter(
+                [couchdb, query_server, vdu_rejects], 1);
+        _ -> ok
+    end,
+    case Resp of
         1 ->
             ok;
         {[{<<"forbidden">>, Message}]} ->
