@@ -56,6 +56,7 @@ Repeat on all nodes.
 a. Go to Fauxton / Cluster Setup, once we have enabled the cluster, the
 UI shows an “Add Node” interface with the fields admin, and node:
 - POST to /_setup with
+```
   {
     "action": "add_node",
     "admin": { // should be auto-filled from Fauxton, store plaintext PW in
@@ -68,6 +69,7 @@ UI shows an “Add Node” interface with the fields admin, and node:
       ["port": 5984]
     }
   }
+```
 
 b. as in a, but without the Fauxton bits, just POST to /_setup
 - this request will do this:
@@ -78,10 +80,12 @@ b. as in a, but without the Fauxton bits, just POST to /_setup
   - make a POST request to the node specified in the body above
     using the admin credentials in the body above:
     POST to http://username:password@node_b:5984/_setup with:
+```
     {
       "action": "receive_cookie",
       "cookie": "<secretcookie>",
     }
+```
 
   - when the request to node B returns, we know the Erlang-level
     inter-cluster communication is enabled and we can start adding
@@ -96,15 +100,17 @@ b. as in a, but without the Fauxton bits, just POST to /_setup
 4.a. When all nodes are added, click the [Finish Cluster Setup] button
 in Fauxton.
 - this does POST /_setup
+```
   {
     "action": "finish_setup"
   }
+```
 
 b. Same as in a.
 
 - this manages the final setup bits, like creating the _users,
-  _replicator and _db_updates endpoints and whatever else is needed.
-  // TBD: collect what else is needed.
+  _replicator and _cassim/_metadata, _db_updates endpoints and
+  whatever else is needed. // TBD: collect what else is needed.
 
 
 ## The Setup Endpoint
