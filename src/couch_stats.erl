@@ -98,8 +98,11 @@ update_gauge(Name, Value) ->
 -spec notify(any(), any()) -> response().
 notify(Name, Op) ->
     case folsom_metrics:notify(Name, Op) of
-        ok -> ok;
-        _ -> {error, unknown_metric}
+        ok ->
+            ok;
+        _ ->
+            couch_log:notice("unknown metric: ~p", [Name]),
+            {error, unknown_metric}
     end.
 
 -spec sample_type(any(), atom()) -> stat().
