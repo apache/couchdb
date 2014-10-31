@@ -392,7 +392,8 @@ Secure Socket Level Options
 
   .. config:option:: secure_renegotiate :: Enable secure renegotiation
 
-    Set to `true` to reject renegotiation attempt that does not live up to RFC 5746::
+    Set to `true` to reject renegotiation attempt that does not live up to
+    :rfc:`5746`::
 
       [ssl]
       secure_renegotiate = true
@@ -408,8 +409,7 @@ Secure Socket Level Options
 
     .. versionadded:: 1.7
 
-  .. config:option:: tls_versions :: Specify permitted server SSL/TLS
-                     protocol versions
+  .. config:option:: tls_versions :: Specify permitted server SSL/TLS protocol versions
 
     Set to a list of permitted SSL/TLS protocol versions::
 
