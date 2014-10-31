@@ -82,7 +82,6 @@ b. as in a, but without the Fauxton bits, just POST to /_setup
       "action": "receive_cookie",
       "cookie": "<secretcookie>",
     }
-    // TBD: persist the cookie on node B, so it survives restarts
 
   - when the request to node B returns, we know the Erlang-level
     inter-cluster communication is enabled and we can start adding
