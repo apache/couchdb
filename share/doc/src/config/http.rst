@@ -401,10 +401,12 @@ Secure Socket Level Options
 
     Set to the cipher suites that should be supported which can be
     specified in erlang format "{ecdhe_ecdsa,aes_128_cbc,sha256}" or
-    in OpenSSL format "ECDHE-ECDSA-AES128-SHA256".
+    in OpenSSL format "ECDHE-ECDSA-AES128-SHA256"::
 
       [ssl]
       ciphers = ["ECDHE-ECDSA-AES128-SHA256", "ECDHE-ECDSA-AES128-SHA"]
+
+    .. versionadded:: 1.7
 
   .. config:option:: tls_versions :: Specify permitted server SSL/TLS
                      protocol versions
@@ -413,6 +415,8 @@ Secure Socket Level Options
 
       [ssl]
       tls_versions = [sslv3 | tlsv1 | 'tlsv1.1' | 'tlsv1.2']
+
+    .. versionadded:: 1.7
 
 
 .. _cors:
