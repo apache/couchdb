@@ -398,6 +398,8 @@ Secure Socket Level Options
       [ssl]
       secure_renegotiate = true
 
+    .. versionadded:: 1.7
+
   .. config:option:: ciphers :: Specify permitted server cipher list
 
     Set to the cipher suites that should be supported which can be
