@@ -74,7 +74,7 @@ b. as in a, but without the Fauxton bits, just POST to /_setup
  - on the “setup coordination node”:
   - check if we have an Erlang Cookie Secret. If not, generate
     a UUID and set the erlang cookie to to that UUID.
-    // TBD: persist the cookie, so it survives restarts
+    - store the cookie in config.ini, re-set_cookie() on startup.
   - make a POST request to the node specified in the body above
     using the admin credentials in the body above:
     POST to http://username:password@node_b:5984/_setup with:
