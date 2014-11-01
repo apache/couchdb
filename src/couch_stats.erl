@@ -87,8 +87,19 @@ decrement_counter(Name) ->
 decrement_counter(Name, Value) ->
     notify(Name, {dec, Value}).
 
--spec update_histogram(any(), number()) -> response().
-update_histogram(Name, Value) ->
+-spec update_histogram(any(), number()) -> response();
+                      (any(), function()) -> any().
+update_histogram(Name, Fun) when is_function(Fun, 0) ->
+    Begin = os:timestamp(),
+    Result = Fun(),
+    Duration = timer:now_diff(os:timestamp(), Begin) div 1000,
+    case notify(Name, Duration) of
+        ok ->
+            Result;
+        {error, unknown_metric} ->
+            throw({unknown_metric, Name})
+    end;
+update_histogram(Name, Value) when is_number(Value) ->
     notify(Name, Value).
 
 -spec update_gauge(any(), number()) -> response().
