@@ -103,6 +103,7 @@ You can install the dependencies by running:
     sudo yum install erlang-eunit
     sudo yum install erlang-os_mon
     sudo yum install erlang-xmerl
+    sudo yum install erlang-rebar
     sudo yum install help2man
     sudo yum install js-devel
     sudo yum install libicu-devel
