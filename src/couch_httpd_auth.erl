@@ -475,12 +475,15 @@ verify_token(Alg, Key, Len, Token) ->
     end.
 
 generate_token(Alg, Key, Len, Timestamp) ->
-    integer_to_binary(couch_totp:generate(Alg, Key, Timestamp, 30, Len)).
+    integer_to_binary(couch_totp:generate(Alg, Key, Timestamp, 30, Len), Len).
 
-integer_to_binary(Int) when is_integer(Int) ->
-    case erlang:function_exported(erlang, integer_to_binary, 1) of
+integer_to_binary(Int, Len) when is_integer(Int), is_integer(Len) ->
+    Unpadded = case erlang:function_exported(erlang, integer_to_binary, 1) of
         true ->
             erlang:integer_to_binary(Int);
         false ->
-            ?l2b(integer_to_list(Int))
-    end.
+           ?l2b(integer_to_list(Int))
+    end,
+    Padding = binary:copy(<<"0">>, Len),
+    Padded = <<Padding/binary, Unpadded/binary>>,
+    binary:part(Padded, byte_size(Padded), -Len).
