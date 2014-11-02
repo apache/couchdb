@@ -448,7 +448,7 @@ verify_totp(User, Form) ->
         undefined ->
             ok;
         {Props} ->
-            Key = couch_util:get_value(<<"key">>, Props),
+            Key = couch_base32:decode(couch_util:get_value(<<"key">>, Props)),
             Alg = couch_util:to_existing_atom(
                 couch_util:get_value(<<"algorithm">>, Props, <<"sha">>)),
             Len = couch_util:get_value(<<"length">>, Props, 6),
