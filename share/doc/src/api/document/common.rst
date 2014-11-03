@@ -247,13 +247,13 @@
   (latest) revision, either by using the ``rev`` parameter or by using the
   :header:`If-Match` header to specify the revision.
 
-  .. seealso::
-    :ref:`Retrieving Deleted Documents <api/doc/retrieving-deleted-documents>`
-
   .. note::
     CouchDB doesn't actually delete documents. The reason is the need to track
     them correctly during the replication process between databases to prevent
     accidental document recovery for any previous state.
+
+  .. seealso::
+    :ref:`Retrieving Deleted Documents <api/doc/retrieving-deleted-documents>`
 
   :param db: Database name
   :param docid: Document ID
