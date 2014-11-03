@@ -248,9 +248,9 @@
   :header:`If-Match` header to specify the revision.
 
   .. note::
-    CouchDB doesn't actually delete documents. The reason is the need to track
-    them correctly during the replication process between databases to prevent
-    accidental document recovery for any previous state.
+    CouchDB doesn't completely delete the specified document. Instead, it leaves
+    a tombstone with very basic information about the document. The tombstone
+    is required so that the delete action can be replicated across databases.
 
   .. seealso::
     :ref:`Retrieving Deleted Documents <api/doc/retrieving-deleted-documents>`
