@@ -360,12 +360,7 @@ get_field(Props, Field) ->
 
 
 get_field(Props, Field, Validator) when is_binary(Field) ->
-    Path = re:split(Field, <<"\\.">>),
-    lists:foreach(fun(P) ->
-        if P /= <<>> -> ok; true ->
-            ?MANGO_ERROR({invalid_field_name, Field})
-        end
-    end, Path),
+    {ok, Path} = parse_field(Field),
     get_field(Props, Path, Validator);
 get_field(Props, [], no_validation) ->
     Props;
@@ -403,12 +398,7 @@ get_field(_, [_|_], _) ->
 
 
 rem_field(Props, Field) when is_binary(Field) ->
-    Path = re:split(Field, <<"\\.">>),
-    lists:foreach(fun(P) ->
-        if P /= <<>> -> ok; true ->
-            ?MANGO_ERROR({invalid_field_name, Field})
-        end
-    end, Path),
+    {ok, Path} = parse_field(Field),
     rem_field(Props, Path);
 rem_field({Props}, [Name]) ->
     case lists:keytake(Name, 1, Props) of
@@ -469,12 +459,7 @@ rem_field(_, [_|_]) ->
 
 
 set_field(Props, Field, Value) when is_binary(Field) ->
-    Path = re:split(Field, <<"\\.">>),
-    lists:foreach(fun(P) ->
-        if P /= <<>> -> ok; true ->
-            ?MANGO_ERROR({invalid_field_name, Field})
-        end
-    end, Path),
+    {ok, Path} = parse_field(Field),
     set_field(Props, Path, Value);
 set_field({Props}, [Name], Value) ->
     {lists:keystore(Name, 1, Props, {Name, Value})};
@@ -538,3 +523,26 @@ set_elem(1, [_ | Rest], Value) ->
     [Value | Rest];
 set_elem(I, [Item | Rest], Value) when I > 1 ->
     [Item | set_elem(I-1, Rest, Value)].
+
+parse_field(Field) ->
+    Path = lists:map(fun
+        (P) when P =:= <<>> ->
+            ?MANGO_ERROR({invalid_field_name, Field});
+        (P) ->
+            re:replace(P, <<"\\\\">>, <<>>, [global, {return, binary}])
+    end, re:split(Field, <<"(?<!\\\\)\\.">>)),
+    {ok, Path}.
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+parse_field_test() ->
+    ?assertEqual({ok, [<<"ab">>]}, parse_field(<<"ab">>)),
+    ?assertEqual({ok, [<<"a">>, <<"b">>]}, parse_field(<<"a.b">>)),
+    ?assertEqual({ok, [<<"a.b">>]}, parse_field(<<"a\\.b">>)),
+    ?assertEqual({ok, [<<"a">>, <<"b">>, <<"c">>]}, parse_field(<<"a.b.c">>)),
+    ?assertEqual({ok, [<<"a">>, <<"b.c">>]}, parse_field(<<"a.b\\.c">>)),
+    Exception = {mango_error, ?MODULE, {invalid_field_name, <<"a..b">>}},
+    ?assertThrow(Exception, parse_field(<<"a..b">>)).
+
+-endif.

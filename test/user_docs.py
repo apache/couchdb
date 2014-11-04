@@ -1,3 +1,4 @@
+# -*- coding: latin-1 -*-
 """
 Generated with http://www.json-generator.com/
 
@@ -65,7 +66,8 @@ def create_db_and_indexes():
         ["manager"],
         ["favorites"],
         ["favorites.3"],
-        ["twitter"]
+        ["twitter"],
+        ["type"]
     ]
     for idx in indexes:
         assert db.create_index(idx) is True
@@ -455,5 +457,30 @@ DOCS = [
             "Lisp",
             "Lisp"
         ]
+    },
+    {
+        "type": "complex_key",
+        "title": "normal key"
+    },
+    {
+        "type": "complex_key",
+        "title": "key with dot",
+        "dot.key": "dot's value",
+        "none": {
+            "dot": "none dot's value"
+        }
+    },
+    {
+        "type": "complex_key",
+        "title": "key with peso",
+        "$key": "peso",
+        "deep": {
+            "$key": "deep peso"
+        }
+    },
+    {
+        "type": "complex_key",
+        "title": "unicode key",
+        "": "apple"
     }
 ]

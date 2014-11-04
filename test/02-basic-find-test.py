@@ -1,6 +1,5 @@
-
+# -*- coding: latin-1 -*-
 import user_docs
-
 
 def setup():
     user_docs.create_db_and_indexes()
@@ -213,6 +212,33 @@ def test_missing_not_indexed():
     assert docs[2]["user_id"] == 0
     assert docs[3]["user_id"] == 13
 
+def test_dot_key():
+    db = user_docs.mkdb()
+    fields = ["title", "dot\\.key", "none.dot"]
+    docs = db.find({"type": "complex_key"}, fields = fields)
+    assert len(docs) == 4
+    assert docs[1].has_key("dot.key")
+    assert docs[1]["dot.key"] == "dot's value"
+    assert docs[1].has_key("none")
+    assert docs[1]["none"]["dot"] == "none dot's value"
+
+def test_peso_key():
+    db = user_docs.mkdb()
+    fields = ["title", "$key", "deep.$key"]
+    docs = db.find({"type": "complex_key"}, fields = fields)
+    assert len(docs) == 4
+    assert docs[2].has_key("$key")
+    assert docs[2]["$key"] == "peso"
+    assert docs[2].has_key("deep")
+    assert docs[2]["deep"]["$key"] == "deep peso"
+
+def test_unicode_key():
+    db = user_docs.mkdb()
+    docs = db.find({"type": "complex_key"}, fields = ["title", ""])
+    assert len(docs) == 4
+    # note:  == \uf8ff
+    assert docs[3].has_key(u'\uf8ff')
+    assert docs[3][u'\uf8ff'] == "apple"
 
 def test_limit():
     db = user_docs.mkdb()
