@@ -221,6 +221,12 @@ There are two special syntax elements for the object keys in a selector. The fir
     {"location": {"city": "Omaha"}}
     {"location.city": "Omaha"}
 
+If the object's key contains the period it could be escaped with backslash, i.e.
+
+    {"location\\.city": "Omaha"}
+
+Note that the double backslash here is necessary to encode an actual single backslash.
+
 The second important syntax element is the use of a dollar sign (`$`) prefix to denote operators. For example:
 
     {"age": {"$gt": 21}}
@@ -229,7 +235,7 @@ In this example, we have created the boolean expression `age > 21`.
 
 There are two core types of operators in the selector syntax: combination operators and condition operators. In general, combination operators contain groups of condition operators. We'll describe the list of each below.
 
-=== Implicit Operators ===
+### Implicit Operators
 
 For the most part every operator must be of the form `{"$operator": argument}`. Though there are two implicit operators for selectors.
 
@@ -253,7 +259,7 @@ Although, the previous example would actually be normalized internally to this:
     {"foo.bar": {"$eq": "baz"}}
 
 
-=== Combination Operators ===
+### Combination Operators
 
 These operators are responsible for combining groups of condition operators. Most familiar are the standard boolean operators plus a few extra for working with JSON arrays.
 
@@ -268,7 +274,7 @@ The list of combining characters:
 * "$all" - array argument (special operator for array values)
 * "$elemMatch" - single argument (special operator for array values)
 
-=== Condition Operators ===
+### Condition Operators
 
 Condition operators are specified on a per field basis and apply to the value indexed for that field. For instance, the basic "$eq" operator matches when the indexed field is equal to its argument. There is currently support for the basic equality and inequality operators as well as a number of meta operators. Some of these operators will accept any JSON argument while some require a specific JSON formatted argument. Each is noted below.
 

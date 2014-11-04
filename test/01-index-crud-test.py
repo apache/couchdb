@@ -186,7 +186,7 @@ def test_recreate_index():
         assert pre_indexes == post_indexes
 
 
-def test_delete_misisng():
+def test_delete_missing():
     db = mkdb()
 
     # Missing design doc
