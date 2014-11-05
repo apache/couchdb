@@ -67,3 +67,15 @@ def test_regex():
     assert len(docs) == 2
     assert docs[0]["user_id"] == 2
     assert docs[1]["user_id"] == 10
+
+
+def test_in_operator_array():
+    db = user_docs.mkdb()
+
+    docs = db.find({
+            "manager": True,
+            "favorites": {"$in": ["Ruby", "Python"]}
+        })
+    assert len(docs) == 7
+    assert docs[0]["user_id"] == 2
+    assert docs[1]["user_id"] == 12

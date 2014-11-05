@@ -651,6 +651,13 @@ match({[{<<"$gte">>, Arg}]}, Value, Cmp) ->
 match({[{<<"$gt">>, Arg}]}, Value, Cmp) ->
     Cmp(Value, Arg) > 0;
 
+match({[{<<"$in">>, Args}]}, Values, Cmp) when is_list(Values)->
+    Pred = fun(Arg) ->
+        lists:foldl(fun(Value,Match) ->
+            (Cmp(Value, Arg) == 0) or Match
+        end, false, Values)
+    end,
+    lists:any(Pred, Args);
 match({[{<<"$in">>, Args}]}, Value, Cmp) ->
     Pred = fun(Arg) -> Cmp(Value, Arg) == 0 end,
     lists:any(Pred, Args);
