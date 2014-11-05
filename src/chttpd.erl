@@ -203,8 +203,8 @@ handle_request(MochiReq) ->
     Result =
     try
         check_request_uri_length(RawUri),
-        case chttpd_cors:is_preflight_request(HttpReq) of
-        #httpd{} ->
+        case chttpd_cors:maybe_handle_preflight_request(HttpReq) of
+        not_preflight ->
             case authenticate_request(HttpReq, AuthenticationFuns) of
             #httpd{} = Req ->
                 HandlerFun = url_handler(HandlerKey),
