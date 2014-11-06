@@ -288,6 +288,12 @@ get_cors_config(_Req) ->
 
 
 is_cors_enabled(Config) ->
+    case get(disable_couch_httpd_cors) of
+        undefined ->
+            put(disable_couch_httpd_cors, true);
+        _ ->
+            ok
+    end,
     couch_util:get_value(<<"enable_cors">>, Config, false).
 
 
