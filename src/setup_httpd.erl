@@ -29,25 +29,72 @@ handle_setup_req(Req) ->
     end.
 
 
+get_options(Options, Setup) ->
+    ExtractValues = fun({Tag, Option}, OptionsAcc) ->
+        case couch_util:get_value(Option, Setup) of
+            undefined -> OptionsAcc;
+            Value -> [{Tag, Value} | OptionsAcc]
+        end
+    end,
+    lists:foldl(ExtractValues, [], Options).
+
 handle_action("enable_cluster", Setup) ->
-    io:format("~nenable_cluster: ~p~n", [Setup]);
-    % if admin.username && admin.password
-    %   create admin
-    % if bind_address
-    %   set bind_address
-    % else
-    %   bind_address to 0.0.0.0
-    % if port
-    %   set port
-    % set cluster_state to cluster_enabled
+    Options = get_options([
+        {username, <<"username">>},
+        {password, <<"password">>},
+        {bind_address, <<"bind_address">>},
+        {port, <<"port">>}
+    ], Setup),
+    case setup:enable_cluster(Options) of
+        {error, cluster_enabled} ->
+            {error, <<"Cluster is already enabled">>};
+        _ -> ok
+    end;
+
+
 handle_action("finish_cluster", Setup) ->
-    io:format("~nfinish_cluster: ~p~n", [Setup]);
-    % create clustered databases (_users, _replicator, _cassim/_metadata
+    io:format("~nfinish_cluster: ~p~n", [Setup]),
+    case etup:finish_cluster() of
+        {error, cluster_finished} ->
+            {error, <<"Cluster is already finished">>};
+        _ -> ok
+    end;
 
 handle_action("add_node", Setup) ->
-    io:format("~nadd_node: ~p~n", [Setup]);
+    io:format("~nadd_node: ~p~n", [Setup]),
+
+    Options = get_options([
+        {username, <<"username">>},
+        {password, <<"password">>},
+        {host, <<"host">>},
+        {port, <<"port">>}
+    ], Setup),
+    case setup:add_node(Options) of
+        {error, cluster_not_enabled} ->
+            {error, <<"Cluster is not enabled.">>};
+        {error, {conn_failed, {error, econnrefused}}} ->
+            {error, <<"Add node failed. Invalid Host and/or Port.">>};
+        {error, wrong_credentials} ->
+            {error, <<"Add node failed. Invalid admin credentials,">>};
+        {error, Message} ->
+            {error, Message};
+        _ -> ok
+    end;
+
 handle_action("remove_node", Setup) ->
     io:format("~nremove_node: ~p~n", [Setup]);
+
+handle_action("receive_cookie", Setup) ->
+    io:format("~nreceive_cookie: ~p~n", [Setup]),
+    Options = get_options([
+       {cookue, <<"cookie">>}
+    ], Setup),
+    case setup:receive_cookie(Options) of
+        {error, Error} ->
+            {error, Error};
+        _ -> ok
+    end;
+
 handle_action(_, _) ->
     io:format("~ninvalid_action: ~n", []),
     {error, <<"Invalid Action'">>}.
