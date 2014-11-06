@@ -309,7 +309,12 @@ cors_section(Host0) ->
     "cors:" ++ Host.
 
 enable_cors() ->
-    get_bool_config("httpd", "enable_cors", false).
+    case get('disable_couch_httpd_cors') of
+        undefined ->
+            get_bool_config("httpd", "enable_cors", false);
+        _ ->
+            false
+    end.
 
 get_bool_config(Section, Key, Default) ->
     case config:get(Section, Key) of
