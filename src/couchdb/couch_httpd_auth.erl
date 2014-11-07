@@ -188,8 +188,12 @@ cookie_authentication_handler(#httpd{mochi_req=MochiReq}=Req) ->
                 FullSecret = <<Secret/binary, UserSalt/binary>>,
                 ExpectedHash = crypto:sha_mac(FullSecret, User ++ ":" ++ TimeStr),
                 Hash = ?l2b(HashStr),
-                Timeout = list_to_integer(
+                ConfiguredTimeout = list_to_integer(
                     couch_config:get("couch_httpd_auth", "timeout", "600")),
+                Timeout = case ConfiguredTimeout < 60 of
+                    true -> 60;
+                    false -> ConfiguredTimeout
+                end,
                 ?LOG_DEBUG("timeout ~p", [Timeout]),
                 case (catch erlang:list_to_integer(TimeStr, 16)) of
                     TimeStamp when CurrentTime < TimeStamp + Timeout ->
