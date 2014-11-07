@@ -52,11 +52,13 @@ handle_action("enable_cluster", Setup) ->
 
 
 handle_action("finish_cluster", Setup) ->
-    io:format("~nfinish_cluster: ~p~n", [Setup]),
-    case etup:finish_cluster() of
+    io:format("~nffinish_cluster: ~p~n", [Setup]),
+    case setup:finish_cluster() of
         {error, cluster_finished} ->
             {error, <<"Cluster is already finished">>};
-        _ -> ok
+        Else ->
+            io:format("~nElse: ~p~n", [Else]),
+            ok
     end;
 
 handle_action("add_node", Setup) ->

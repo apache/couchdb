@@ -46,12 +46,12 @@ is_cluster_enabled() ->
 has_cluster_system_dbs() ->
     % GET /_users /_replicator /_cassim
 
-    Users = fabric:get_db_info("_users"),
-    Replicator = fabric:get_db_info("_replicator"),
-    Cassim = fabric:get_db_info("_cassim"),
-    case {Users, Replicator, Cassim} of
+    case catch {
+    fabric:get_db_info("_users"),
+    fabric:get_db_info("_replicator"),
+    fabric:get_db_info("_cassim")} of
         {{ok, _}, {ok, _}, {ok, _}} -> ok;
-        _Else -> no
+        _ -> no
     end.
 
 enable_cluster(Options) ->
@@ -101,12 +101,12 @@ enable_cluster_int(Options, no) ->
 
 finish_cluster() ->
     finish_cluster_int(has_cluster_system_dbs()).
-finish_cluster_int(no) ->
-    {error, cluster_finished};
 finish_cluster_int(ok) ->
-    io:format("~nFinish Cluster~n").
+    {error, cluster_finished};
+finish_cluster_int(no) ->
     % create clustered databases (_users, _replicator, _cassim/_metadata
-    % am I in enabled mode, are there nodes?
+    Databases = ["_users", "_replicator", "_cassim"],
+    lists:foreach(fun fabric:create_db/1, Databases).
 
 
 add_node(Options) ->
