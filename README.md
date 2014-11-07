@@ -1,5 +1,23 @@
 This module implements /_cluster_setup and manages the setting up, duh, of a CouchDB cluster.
 
+### Testing
+
+```
+git clone https://git-wip-us.apache.org/repos/asf/couchdb.git
+cd couchdb
+git checkout setup
+./configure
+make
+
+# in dev/run comment out the line `connect_nodes("127.0.0.1", 15984)`
+
+dev/run --admin a:b
+
+# in a new terminal
+src/setup/test/t.sh
+
+```
+
 The Plan:
 
 N. End User Action
