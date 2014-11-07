@@ -16,8 +16,7 @@
 
 handle_setup_req(Req) ->
     ok = chttpd:verify_is_server_admin(Req),
-    % TBD uncomment after devving
-    %couch_httpd:validate_ctype(Req, "application/json"),
+    couch_httpd:validate_ctype(Req, "application/json"),
     Setup = get_body(Req),
     io:format("~nSetup: ~p~n", [Setup]),
     Action = binary_to_list(couch_util:get_value(<<"action">>, Setup, <<"missing">>)),
@@ -87,7 +86,7 @@ handle_action("remove_node", Setup) ->
 handle_action("receive_cookie", Setup) ->
     io:format("~nreceive_cookie: ~p~n", [Setup]),
     Options = get_options([
-       {cookue, <<"cookie">>}
+       {cookie, <<"cookie">>}
     ], Setup),
     case setup:receive_cookie(Options) of
         {error, Error} ->

@@ -12,7 +12,7 @@
 
 -module(setup).
 
--export([enable_cluster/1, finish_cluster/0, add_node/1]).
+-export([enable_cluster/1, finish_cluster/0, add_node/1, receive_cookie/1]).
 -include_lib("../couch/include/couch_db.hrl").
 
 
@@ -121,8 +121,8 @@ add_node_int(Options, ok) ->
     % POST to nodeB/_setup
     RequestOptions = [
         {basic_auth, {
-            proplists:get_value(username, Options),
-            proplists:get_value(password, Options)
+            binary_to_list(proplists:get_value(username, Options)),
+            binary_to_list(proplists:get_value(password, Options))
         }}
     ],
 
@@ -136,14 +136,11 @@ add_node_int(Options, ok) ->
     ],
 
     Host = proplists:get_value(host, Options),
-    Port = proplists:get_value(port, Options, <<"5984">>),
-    Url = binary_to_list(<<"http://", Host/binary, ":", Port/binary, "/_setup">>),
-
-    io:format("~nUrl: ~p~n", [Url]),
-    io:format("~nBody: ~p~n", [Body]),
+    Port = integer_to_binary(proplists:get_value(port, Options, 5984)),
+    Url = binary_to_list(<<"http://", Host/binary, ":", Port/binary, "/_cluster_setup">>),
 
     case ibrowse:send_req(Url, Headers, post, Body, RequestOptions) of
-        {ok, 200, _, _} ->
+        {ok, "201", _, _} ->
             % when done, PUT :5986/nodes/nodeB
             create_node_doc(Host, Port);
         Else ->
@@ -151,9 +148,29 @@ add_node_int(Options, ok) ->
             Else
     end.
 
-
 create_node_doc(Host, Port) ->
-    {ok, Db} = couch_db:open_int("nodes"),
-    Doc = {[{<<"_id">>, <<Host/binary, ":", Port/binary>>}]},
+    {ok, Db} = couch_db:open_int(<<"nodes">>, []),
+    Name = get_name(Port),
+    Doc = {[{<<"_id">>, <<Name/binary, "@", Host/binary>>}]},
     Options = [],
-    couch_db:update_doc(Db, Doc, Options).
+    CouchDoc = couch_doc:from_json_obj(Doc),
+
+    couch_db:update_doc(Db, CouchDoc, Options).
+
+get_name(Port) ->
+    case Port of
+        % shortcut for easier development
+        <<"15984">> ->
+            <<"node1">>;
+        <<"25984">> ->
+            <<"node2">>;
+        <<"35984">> ->
+            <<"node3">>;
+        % by default, all nodes have the user `couchdb`
+        _ ->
+            <<"couchdb">>
+    end.
+
+receive_cookie(Options) ->
+    Cookie = proplists:get_value(cookie, Options),
+    erlang:set_cookie(node(), binary_to_atom(Cookie, latin1)).
