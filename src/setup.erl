@@ -105,7 +105,7 @@ finish_cluster_int(ok) ->
     {error, cluster_finished};
 finish_cluster_int(no) ->
     % create clustered databases (_users, _replicator, _cassim/_metadata
-    Databases = ["_users", "_replicator", "_cassim"],
+    Databases = ["_users", "_replicator", "cassim"],
     lists:foreach(fun fabric:create_db/1, Databases).
 
 
