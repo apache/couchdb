@@ -49,8 +49,7 @@ allow_jsonp = false
 ; Options for the MochiWeb HTTP server.
 ;server_options = [{backlog, 128}, {acceptor_pool_size, 16}]
 ; For more socket options, consult Erlang's module 'inet' man page.
-;socket_options = [{recbuf, 262144}, {sndbuf, 262144}, {nodelay, true}]
-socket_options = [{recbuf, 262144}, {sndbuf, 262144}]
+socket_options = [{recbuf, 262144}, {sndbuf, 262144}, {nodelay, true}]
 log_max_chunk_size = 1000000
 enable_cors = false
 ; CouchDB can optionally enforce a maximum uri length;
