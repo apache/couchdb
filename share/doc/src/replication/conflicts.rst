@@ -166,9 +166,7 @@ However there is another mode of working, whereby you specify
 equivalent of a "transaction", but it's not the same as a database transaction
 which can fail and roll back. Rather, it means that all of the changes in the
 request will be forcibly applied to the database, even if that introduces
-conflicts. The only guarantee you are given is that they will either all be
-applied to the database, or none of them (e.g. if the power is pulled out before
-the update is finished writing to disk).
+conflicts.
 
 So this gives you a way to introduce conflicts within a single database
 instance. If you choose to do this instead of PUT, it means you don't have to
