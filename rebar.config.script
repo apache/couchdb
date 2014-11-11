@@ -21,7 +21,7 @@ DepDescs = [
     {cassim,            "cassim",           {branch, "master"}},
     {couch_log,         "couch-log",        {branch, "master"}},
     {config,            "config",           {branch, "master"}},
-    {chttpd,            "chttpd",           {branch, "master"}},
+    {chttpd,            "chttpd",           {branch, "setup"}},
     {couch,             "couch",            {branch, "master"}},
     {couch_index,       "couch-index",      {branch, "master"}},
     {couch_mrview,      "couch-mrview",     {branch, "master"}},
