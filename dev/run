@@ -25,7 +25,12 @@ import sys
 import time
 import traceback
 import urllib
+import uuid
 
+from pbkdf2 import pbkdf2_hex
+
+# clipped down from e.g. '0x594fc30efe7746318d7d79684a15cfd0L'
+COMMON_SALT = hex(uuid.uuid4().int)[2:-1]
 
 USAGE = "%prog [options] [command to run...]"
 DEV_PATH = os.path.dirname(os.path.abspath(__file__))
@@ -73,11 +78,33 @@ def hack_default_ini(opts, node, args, contents):
     return contents
 
 
+def hashify(pwd, salt=COMMON_SALT):
+    """
+    Implements password hasshing according to:
+      - https://issues.apache.org/jira/browse/COUCHDB-1060
+      - https://issues.apache.org/jira/secure/attachment/12492631/0001-Integrate-PBKDF2.patch
+
+    This test uses 'candeira:candeira'
+
+    >>> hashify(candeira)
+    -pbkdf2-99eb34d97cdaa581e6ba7b5386e112c265c5c670,d1d2d4d8909c82c81b6c8184429a0739,10
+    """
+    iterations = 10
+    keylen = 20
+    derived_key = pbkdf2_hex(pwd, salt, iterations, keylen)
+    return "-pbkdf2-%s,%s,%s" % (derived_key, salt, iterations)
+
 def hack_local_ini(opts, node, args, contents):
+    # make sure all three nodes have the same secret
+    secret_line = "secret = %s\n" % COMMON_SALT
+    previous_line = "; require_valid_user = false\n"
+    contents = contents.replace(previous_line, previous_line + secret_line)
+    # if --admin user:password on invocation, make sure all three nodes
+    # have the same hashed password
     if opts.admin is None:
         return contents
     usr, pwd = opts.admin.split(":", 1)
-    return contents + "\n[admins]\n%s = %s" % (usr, pwd)
+    return contents + "\n%s = %s" % (usr, hashify(pwd))
 
 
 def write_config(opts, node, args):
