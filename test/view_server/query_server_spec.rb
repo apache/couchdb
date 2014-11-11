@@ -11,7 +11,7 @@
 # the License.
 
 # to run (requires ruby and rspec):
-# spec test/view_server/query_server_spec.rb -f specdoc --color
+# rspec test/view_server/query_server_spec.rb
 # 
 # environment options:
 #   QS_TRACE=true
@@ -116,7 +116,7 @@ end
 class QueryServerRunner < OSProcessRunner
 
   COMMANDS = {
-    "js" => "#{COUCH_ROOT}/bin/couchjs_dev #{COUCH_ROOT}/share/server/main.js",
+    "js" => "#{COUCH_ROOT}/bin/couchjs #{COUCH_ROOT}/share/server/main.js",
     "erlang" => "#{COUCH_ROOT}/test/view_server/run_native_process.es"
   }
 
