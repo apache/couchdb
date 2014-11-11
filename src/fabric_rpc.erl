@@ -13,8 +13,8 @@
 -module(fabric_rpc).
 
 -export([get_db_info/1, get_doc_count/1, get_update_seq/1]).
--export([open_doc/3, open_revs/4, get_missing_revs/2, get_missing_revs/3,
-    update_docs/3]).
+-export([open_doc/3, open_revs/4, get_doc_info/3, get_full_doc_info/3,
+    get_missing_revs/2, get_missing_revs/3, update_docs/3]).
 -export([all_docs/3, changes/3, map_view/4, reduce_view/4, group_info/2]).
 -export([create_db/1, delete_db/1, reset_validation_funs/1, set_security/3,
     set_revs_limit/3, create_shard_db_doc/2, delete_shard_db_doc/2]).
@@ -173,6 +173,12 @@ open_doc(DbName, DocId, Options) ->
 
 open_revs(DbName, Id, Revs, Options) ->
     with_db(DbName, Options, {couch_db, open_doc_revs, [Id, Revs, Options]}).
+
+get_full_doc_info(DbName, DocId, Options) ->
+    with_db(DbName, Options, {couch_db, get_full_doc_info, [DocId]}).
+
+get_doc_info(DbName, DocId, Options) ->
+    with_db(DbName, Options, {couch_db, get_doc_info, [DocId]}).
 
 get_missing_revs(DbName, IdRevsList) ->
     get_missing_revs(DbName, IdRevsList, []).

@@ -30,7 +30,12 @@
 
 
 go(DbName, Id, Options) ->
-    Workers = fabric_util:submit_jobs(mem3:shards(DbName,Id), open_doc,
+    Handler = case proplists:get_value(doc_info, Options) of
+    true -> get_doc_info;
+    full -> get_full_doc_info;
+    undefined -> open_doc
+    end,
+    Workers = fabric_util:submit_jobs(mem3:shards(DbName,Id), Handler,
         [Id, [deleted|Options]]),
     SuppressDeletedDoc = not lists:member(deleted, Options),
     N = mem3:n(DbName),
@@ -44,11 +49,15 @@ go(DbName, Id, Options) ->
     },
     RexiMon = fabric_util:create_monitors(Workers),
     try fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0) of
-    {ok, #acc{}=Acc} ->
+    {ok, #acc{}=Acc} when Handler =:= open_doc ->
         Reply = handle_response(Acc),
         format_reply(Reply, SuppressDeletedDoc);
+    {ok, #acc{state = r_not_met}} ->
+        {error, quorum_not_met};
+    {ok, #acc{q_reply = QuorumReply}} ->
+        format_reply(QuorumReply, SuppressDeletedDoc);
     {timeout, #acc{workers=DefunctWorkers}} ->
-        fabric_util:log_timeout(DefunctWorkers, "open_doc"),
+        fabric_util:log_timeout(DefunctWorkers, atom_to_list(Handler)),
         {error, timeout};
     Error ->
         Error
@@ -156,11 +165,14 @@ choose_reply(Docs) ->
     end, Docs),
     {ok, Winner}.
 
+format_reply({ok, #full_doc_info{deleted=true}}, true) ->
+    {not_found, deleted};
 format_reply({ok, #doc{deleted=true}}, true) ->
     {not_found, deleted};
+format_reply(not_found, _) ->
+    {not_found, missing};
 format_reply(Else, _) ->
     Else.
-
 
 is_r_met_test() ->
     Workers0 = [],
@@ -472,6 +484,54 @@ handle_response_quorum_met_test() ->
     stop_meck_(),
     ok.
 
+get_doc_info_test() ->
+    start_meck_(),
+    meck:new([mem3, rexi_monitor, fabric_util]),
+    meck:expect(twig, log, fun(_, _, _) -> ok end),
+    meck:expect(fabric, update_docs, fun(_, _, _) -> {ok, []} end),
+    meck:expect(couch_stats, increment_counter, fun(_) -> ok end),
+    meck:expect(fabric_util, submit_jobs, fun(_, _, _) -> ok end),
+    meck:expect(fabric_util, create_monitors, fun(_) -> ok end),
+    meck:expect(rexi_monitor, stop, fun(_) -> ok end),
+    meck:expect(mem3, shards, fun(_, _) -> ok end),
+    meck:expect(mem3, n, fun(_) -> 3 end),
+    meck:expect(mem3, quorum, fun(_) -> 2 end),
+
+    meck:expect(fabric_util, recv, fun(_, _, _, _) ->
+        {ok, #acc{state = r_not_met}}
+    end),
+    Rsp1 = fabric_doc_open:go("test", "one", [doc_info]),
+    ?assertEqual({error, quorum_not_met}, Rsp1),
+
+    Rsp2 = fabric_doc_open:go("test", "one", [{doc_info, full}]),
+    ?assertEqual({error, quorum_not_met}, Rsp2),
+
+    meck:expect(fabric_util, recv, fun(_, _, _, _) ->
+        {ok, #acc{state = r_met, q_reply = not_found}}
+    end),
+    MissingRsp1 = fabric_doc_open:go("test", "one", [doc_info]),
+    ?assertEqual({not_found, missing}, MissingRsp1),
+    MissingRsp2 = fabric_doc_open:go("test", "one", [{doc_info, full}]),
+    ?assertEqual({not_found, missing}, MissingRsp2),
+
+    meck:expect(fabric_util, recv, fun(_, _, _, _) ->
+        A = #doc_info{},
+        {ok, #acc{state = r_met, q_reply = {ok, A}}}
+    end),
+    {ok, Rec1} = fabric_doc_open:go("test", "one", [doc_info]),
+    ?assert(is_record(Rec1, doc_info)),
+
+    meck:expect(fabric_util, recv, fun(_, _, _, _) ->
+        A = #full_doc_info{deleted = true},
+        {ok, #acc{state = r_met, q_reply = {ok, A}}}
+    end),
+    Rsp3 = fabric_doc_open:go("test", "one", [{doc_info, full}]),
+    ?assertEqual({not_found, deleted}, Rsp3),
+    {ok, Rec2} = fabric_doc_open:go("test", "one", [{doc_info, full},deleted]),
+    ?assert(is_record(Rec2, full_doc_info)),
+
+    meck:unload([mem3, rexi_monitor, fabric_util]),
+    stop_meck_().
 
 start_meck_() ->
     meck:new([couch_log, rexi, fabric, couch_stats]).
