@@ -258,9 +258,6 @@ init_state(Db, Fd, State, Header) ->
         views=Views2
     }.
 
-less_json_seqs({SeqA, _JsonA}, {SeqB, _JsonB}) ->
-    couch_ejson_compare:less(SeqA, SeqB) < 0.
-
 open_view(Db, Fd, Lang, {BTState, SeqBTState, KSeqBTState, USeq, PSeq}, View) ->
     FunSrcs = [FunSrc || {_Name, FunSrc} <- View#mrview.reduce_funs],
     ReduceFun =

@@ -50,7 +50,7 @@ handle_all_docs_req(Req, _Db) ->
 
 handle_reindex_req(#httpd{method='POST',
                           path_parts=[_, _, DName,<<"_reindex">>]}=Req,
-                   Db, DDoc) ->
+                   Db, _DDoc) ->
     ok = couch_db:check_is_admin(Db),
     couch_mrview:trigger_update(Db, <<"_design/", DName/binary>>),
     couch_httpd:send_json(Req, 201, {[{<<"ok">>, true}]});
