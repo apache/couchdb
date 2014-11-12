@@ -68,7 +68,7 @@ open_validation_funs(DbName) ->
             couch_stats:increment_counter([ddoc_cache, hit]),
             Resp;
         missing ->
-            couch_stats:increment_counter([ddoc_cache, mis]),
+            couch_stats:increment_counter([ddoc_cache, miss]),
             ddoc_cache_opener:open_validation_funs(DbName);
         recover ->
             couch_stats:increment_counter([ddoc_cache, recovery]),
