@@ -154,7 +154,7 @@ extlinks = {
 
 github_project = 'apache/couchdb'
 
-html_context['git_branch'] = github_branch = 'master'
+html_context['git_branch'] = github_branch = '1.x.x'
 
 github_docs_path = 'share/doc/src'
 
