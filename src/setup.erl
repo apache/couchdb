@@ -78,8 +78,7 @@ enable_cluster_int(Options, no) ->
         {undefined, undefined} ->
             ok;
         {Username, Password} ->
-            % TODO check if this gets hashed
-            config:set("admins", binary_to_list(Username), binary_to_list(Password))
+            maybe_set_admin(Username, Password)
     end,
 
     case NewBindAddress of
@@ -98,6 +97,16 @@ enable_cluster_int(Options, no) ->
     end,
     io:format("~nEnable Cluster: ~p~n", [Options]).
     %cluster_state:set(enabled).
+
+maybe_set_admin(Username, Password) ->
+    case couch_auth_cache:get_admin(Username) of
+        nil ->
+            HashedPassword = couch_passwords:hash_admin_password(Password),
+            config:set("admins", binary_to_list(Username), binary_to_list(HashedPassword));
+        _Else ->
+            ok
+    end.
+
 
 finish_cluster() ->
     finish_cluster_int(has_cluster_system_dbs()).
@@ -136,7 +145,8 @@ add_node_int(Options, ok) ->
     ],
 
     Host = proplists:get_value(host, Options),
-    Port = integer_to_binary(proplists:get_value(port, Options, 5984)),
+    Port = get_port(proplists:get_value(port, Options, 5984)),
+
     Url = binary_to_list(<<"http://", Host/binary, ":", Port/binary, "/_cluster_setup">>),
 
     case ibrowse:send_req(Url, Headers, post, Body, RequestOptions) of
@@ -147,6 +157,16 @@ add_node_int(Options, ok) ->
             io:format("~nsend_req: ~p~n", [Else]),
             Else
     end.
+
+get_port(Port) when is_integer(Port) ->
+    integer_to_binary(Port);
+get_port(Port) when is_list(Port) ->
+    list_to_binary(Port);
+get_port(Port) when is_binary(Port) ->
+    Port;
+get_port(Port) ->
+    {error, <<"invalid type for port">>}.
+
 
 create_node_doc(Host, Port) ->
     {ok, Db} = couch_db:open_int(<<"nodes">>, []),
