@@ -11,10 +11,11 @@
 % the License.
 
 -module(setup_httpd).
+-include_lib("couch/include/couch_db.hrl").
 
 -export([handle_setup_req/1]).
 
-handle_setup_req(Req) ->
+handle_setup_req(#httpd{method='POST'}=Req) ->
     ok = chttpd:verify_is_server_admin(Req),
     couch_httpd:validate_ctype(Req, "application/json"),
     Setup = get_body(Req),
@@ -25,8 +26,15 @@ handle_setup_req(Req) ->
         chttpd:send_json(Req, 201, {[{ok, true}]});
     {error, Message} ->
         couch_httpd:send_error(Req, 400, <<"bad_request">>, Message)
+    end;
+handle_setup_req(#httpd{method='GET'}=Req) ->
+    ok = chttpd:verify_is_server_admin(Req),
+    case setup:is_cluster_enabled() of
+        no ->
+            chttpd:send_json(Req, 201, {[{state, cluster_disabled}]});
+        ok ->
+            chttpd:send_json(Req, 201, {[{state, cluster_enabled}]})
     end.
-
 
 get_options(Options, Setup) ->
     ExtractValues = fun({Tag, Option}, OptionsAcc) ->
