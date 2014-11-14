@@ -53,7 +53,6 @@ html_files = \
     html/_images/intro-consistency-06.png \
     html/_images/intro-consistency-07.png \
     html/_images/intro-tour-01.png \
-    html/_images/intro-tour-02.png \
     html/_images/intro-tour-03.png \
     html/_images/intro-tour-04.png \
     html/_images/intro-tour-05.png \
@@ -320,7 +319,6 @@ image_files = \
     ../images/intro-consistency-06.png \
     ../images/intro-consistency-07.png \
     ../images/intro-tour-01.png \
-    ../images/intro-tour-02.png \
     ../images/intro-tour-03.png \
     ../images/intro-tour-04.png \
     ../images/intro-tour-05.png \
