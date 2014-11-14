@@ -1474,16 +1474,23 @@ couchTests.replication = function(debug) {
   //
 
   // case 1) user triggering the replication is not a DB admin of the target DB
-  var joeUserDoc = CouchDB.prepareUserDoc({
-    name: "joe",
-    roles: ["erlanger"]
-  }, "erly");
   var usersDb = new CouchDB("test_suite_auth", {"X-Couch-Full-Commit":"false"});
+  var joeUserDoc = CouchDB.prepareUserDoc({ name: "joe" }, "erly");
   var server_config = [
     {
       section: "couch_httpd_auth",
       key: "authentication_db",
       value: usersDb.name
+    },
+    {
+      section: "couch_httpd_auth",
+      key: "iterations",
+      value: "1"
+    },
+    {
+      section: "admins",
+      key: "karl",
+      value: "secret"
     }
   ];
 
@@ -1539,6 +1546,8 @@ couchTests.replication = function(debug) {
       TEquals(docs.length, repResult.history[0].docs_read);
       TEquals((docs.length - 1), repResult.history[0].docs_written); // 1 ddoc
       TEquals(1, repResult.history[0].doc_write_failures);
+
+      TEquals(true, CouchDB.login("karl", "secret").ok);
     });
 
     for (j = 0; j < docs.length; j++) {
@@ -1606,6 +1615,8 @@ couchTests.replication = function(debug) {
       }
 
       TEquals(true, CouchDB.logout().ok);
+
+      TEquals(true, CouchDB.login("karl", "secret").ok);
     });
 
     for (j = 0; j < docs.length; j++) {
