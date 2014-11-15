@@ -19,6 +19,7 @@ dev/logs/
 
 share/server/main-coffee.js
 share/server/main.js
+share/www
 
 src/couch/priv/couch_js/config.h
 src/couch/priv/couchjs
