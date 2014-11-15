@@ -13,7 +13,7 @@
 -module(setup).
 
 -export([enable_cluster/1, finish_cluster/0, add_node/1, receive_cookie/1]).
--export([is_cluster_enabled/0]).
+-export([is_cluster_enabled/0, has_cluster_system_dbs/0]).
 
 -include_lib("../couch/include/couch_db.hrl").
 
@@ -51,7 +51,7 @@ has_cluster_system_dbs() ->
     case catch {
     fabric:get_db_info("_users"),
     fabric:get_db_info("_replicator"),
-    fabric:get_db_info("_cassim")} of
+    fabric:get_db_info("cassim")} of
         {{ok, _}, {ok, _}, {ok, _}} -> ok;
         _ -> no
     end.

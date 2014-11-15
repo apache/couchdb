@@ -33,7 +33,12 @@ handle_setup_req(#httpd{method='GET'}=Req) ->
         no ->
             chttpd:send_json(Req, 201, {[{state, cluster_disabled}]});
         ok ->
-            chttpd:send_json(Req, 201, {[{state, cluster_enabled}]})
+            case setup:has_cluster_system_dbs() of
+                no ->
+                    chttpd:send_json(Req, 201, {[{state, cluster_enabled}]});
+                ok ->
+                    chttpd:send_json(Req, 201, {[{state, cluster_finished}]})
+            end
     end.
 
 get_options(Options, Setup) ->
