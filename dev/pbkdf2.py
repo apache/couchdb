@@ -40,19 +40,51 @@
     :copyright: (c) Copyright 2011 by Armin Ronacher.
     :license: BSD, see LICENSE for more details.
 """
+from binascii import hexlify
 import hmac
 import hashlib
+import sys
 from struct import Struct
 from operator import xor
-from itertools import izip, starmap
+from itertools import starmap
+
+PY3 = sys.version_info[0] == 3
+
+if not PY3:
+    from itertools import izip as zip
+
+if PY3:
+    text_type = str
+else:
+    text_type = unicode
 
 
 _pack_int = Struct('>I').pack
 
 
+def bytes_(s, encoding='utf8', errors='strict'):
+    if isinstance(s, text_type):
+        return s.encode(encoding, errors)
+    return s
+
+
+def hexlify_(s):
+    if PY3:
+        return str(hexlify(s), encoding="utf8")
+    else:
+        return s.encode('hex')
+
+
+def range_(*args):
+    if PY3:
+        return range(*args)
+    else:
+        return xrange(*args)
+
+
 def pbkdf2_hex(data, salt, iterations=1000, keylen=24, hashfunc=None):
     """Like :func:`pbkdf2_bin` but returns a hex encoded string."""
-    return pbkdf2_bin(data, salt, iterations, keylen, hashfunc).encode('hex')
+    return hexlify_(pbkdf2_bin(data, salt, iterations, keylen, hashfunc))
 
 
 def pbkdf2_bin(data, salt, iterations=1000, keylen=24, hashfunc=None):
@@ -62,34 +94,44 @@ def pbkdf2_bin(data, salt, iterations=1000, keylen=24, hashfunc=None):
     a different hashlib `hashfunc` can be provided.
     """
     hashfunc = hashfunc or hashlib.sha1
-    mac = hmac.new(data, None, hashfunc)
+    mac = hmac.new(bytes_(data), None, hashfunc)
+
     def _pseudorandom(x, mac=mac):
         h = mac.copy()
-        h.update(x)
-        return map(ord, h.digest())
+        h.update(bytes_(x))
+        if PY3:
+            return [x for x in h.digest()]
+        else:
+            return map(ord, h.digest())
     buf = []
-    for block in xrange(1, -(-keylen // mac.digest_size) + 1):
-        rv = u = _pseudorandom(salt + _pack_int(block))
-        for i in xrange(iterations - 1):
-            u = _pseudorandom(''.join(map(chr, u)))
-            rv = starmap(xor, izip(rv, u))
+    for block in range_(1, -(-keylen // mac.digest_size) + 1):
+        rv = u = _pseudorandom(bytes_(salt) + _pack_int(block))
+        for i in range_(iterations - 1):
+            if PY3:
+                u = _pseudorandom(bytes(u))
+            else:
+                u = _pseudorandom(''.join(map(chr, u)))
+            rv = starmap(xor, zip(rv, u))
         buf.extend(rv)
-    return ''.join(map(chr, buf))[:keylen]
+    if PY3:
+        return bytes(buf)[:keylen]
+    else:
+        return ''.join(map(chr, buf))[:keylen]
 
 
 def test():
     failed = []
+
     def check(data, salt, iterations, keylen, expected):
         rv = pbkdf2_hex(data, salt, iterations, keylen)
         if rv != expected:
-            print 'Test failed:'
-            print '  Expected:   %s' % expected
-            print '  Got:        %s' % rv
-            print '  Parameters:'
-            print '    data=%s' % data
-            print '    salt=%s' % salt
-            print '    iterations=%d' % iterations
-            print
+            print('Test failed:')
+            print('  Expected:   %s' % expected)
+            print('  Got:        %s' % rv)
+            print('  Parameters:')
+            print('    data=%s' % data)
+            print('    salt=%s' % salt)
+            print('    iterations=%d' % iterations)
             failed.append(1)
 
     # From RFC 6070
