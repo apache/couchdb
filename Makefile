@@ -68,4 +68,4 @@ eunit: compile
 	@rebar -r eunit skip_deps=meck,mochiweb,lager,snappy,couch_replicator,fabric,folsom
 
 javascript: compile
-	@dev/run test/javascript/run
+	@dev/run -q test/javascript/run

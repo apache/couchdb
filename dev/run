@@ -44,22 +44,26 @@ def log(msg):
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
+            def print_(chars):
+                if log.verbose:
+                    sys.stdout.write(chars)
+                    sys.stdout.flush()
             callargs = dict(zip(inspect.getargspec(func).args, args))
             callargs.update(kwargs)
-            sys.stdout.write(msg.format(**callargs) + '... ')
-            sys.stdout.flush()
+            print_(msg.format(**callargs) + '... ')
             try:
                 res = func(*args, **kwargs)
+            except KeyboardInterrupt:
+                print_('ok\n')
             except:
-                sys.stdout.write('failed\n')
+                print_('failed\n')
                 raise
             else:
-                sys.stdout.write('ok\n')
+                print_('ok\n')
                 return res
-            finally:
-                sys.stdout.flush()
         return wrapper
     return decorator
+log.verbose = True
 
 
 def main():
@@ -74,10 +78,15 @@ def main():
 def setup():
     opts, args = setup_argparse()
     ctx = setup_context(opts, args)
+    setup_logging(ctx)
     setup_dirs(ctx)
     check_beams(ctx)
     setup_configs(ctx)
     return ctx
+
+
+def setup_logging(ctx):
+    log.verbose = ctx['verbose']
 
 
 def setup_argparse():
@@ -87,6 +96,9 @@ def setup_argparse():
     parser.add_option("-n", "--nodes", metavar="nodes", default=3,
                       type=int,
                       help="Number of development nodes to be spun up")
+    parser.add_option("-q", "--quite",
+                      action="store_false", dest="verbose", default=True,
+                      help="Don't print anything to STDOUT")
     return parser.parse_args()
 
 
@@ -98,6 +110,7 @@ def setup_context(opts, args):
             'devdir': os.path.dirname(fpath),
             'rootdir': os.path.dirname(os.path.dirname(fpath)),
             'cmd': ' '.join(args),
+            'verbose': opts.verbose,
             'procs': []}
 
 
@@ -314,6 +327,7 @@ def run_command(ctx, cmd):
     exit(p.returncode)
 
 
+@log('Restart all nodes')
 def reboot_nodes(ctx):
     kill_processes(ctx)
     boot_nodes(ctx)
