@@ -66,7 +66,7 @@ def main():
     ctx = setup()
     startup(ctx)
     if ctx['cmd']:
-        run_command(ctx['cmd'])
+        run_command(ctx, ctx['cmd'])
     else:
         join(ctx)
 
@@ -303,7 +303,7 @@ def join(ctx):
 
 
 @log('Exec command {cmd}')
-def run_command(cmd):
+def run_command(ctx, cmd):
     p = sp.Popen(cmd, shell=True, stdout=sp.PIPE, stderr=sys.stderr)
     while True:
         line = p.stdout.readline()
@@ -312,6 +312,11 @@ def run_command(cmd):
         eval(line)
     p.wait()
     exit(p.returncode)
+
+
+def reboot_nodes(ctx):
+    kill_processes(ctx)
+    boot_nodes(ctx)
 
 
 if __name__ == "__main__":
