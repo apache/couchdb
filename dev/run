@@ -13,61 +13,166 @@
 # the License.
 
 import atexit
-import contextlib as ctx
+import contextlib
+import functools
 import glob
-import httplib
-import optparse as op
+import inspect
+import optparse
 import os
 import re
-import select
 import subprocess as sp
 import sys
 import time
-import traceback
-import urllib
 import uuid
 
 from pbkdf2 import pbkdf2_hex
 
-# clipped down from e.g. '0x594fc30efe7746318d7d79684a15cfd0L'
-COMMON_SALT = hex(uuid.uuid4().int)[2:-1]
+COMMON_SALT = uuid.uuid4().hex
 
-USAGE = "%prog [options] [command to run...]"
-DEV_PATH = os.path.dirname(os.path.abspath(__file__))
-COUCHDB = os.path.dirname(DEV_PATH)
+try:
+    from urllib import urlopen
+except ImportError:
+    from urllib.request import urlopen
 
-DEFAULT_N = 3
-PROCESSES = []
-
-
-def init_log_dir():
-    logdir = os.path.join(DEV_PATH, "logs")
-    if not os.path.exists(logdir):
-        os.makedirs(logdir)
+try:
+    import httplib as httpclient
+except ImportError:
+    import http.client as httpclient
 
 
-def init_beams():
-    # Including this for people that forget to run
-    # make dev.
-    for fname in glob.glob(os.path.join(DEV_PATH, "*.erl")):
-        cmd = [
-            "erlc",
-            "-o", DEV_PATH + os.sep,
-            fname
-        ]
-        sp.check_call(cmd)
+def log(msg):
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            callargs = dict(zip(inspect.getargspec(func).args, args))
+            callargs.update(kwargs)
+            sys.stdout.write(msg.format(**callargs) + '... ')
+            sys.stdout.flush()
+            try:
+                res = func(*args, **kwargs)
+            except:
+                sys.stdout.write('failed\n')
+                raise
+            else:
+                sys.stdout.write('ok\n')
+                return res
+            finally:
+                sys.stdout.flush()
+        return wrapper
+    return decorator
 
 
-def hack_default_ini(opts, node, args, contents):
+def main():
+    ctx = setup()
+    startup(ctx)
+    if ctx['cmd']:
+        run_command(ctx['cmd'])
+    else:
+        join(ctx)
+
+
+def setup():
+    opts, args = setup_argparse()
+    ctx = setup_context(opts, args)
+    setup_dirs(ctx)
+    check_beams(ctx)
+    setup_configs(ctx)
+    return ctx
+
+
+def setup_argparse():
+    parser = optparse.OptionParser(description='Runs CouchDB 2.0 dev cluster')
+    parser.add_option('-a', '--admin', metavar='USER:PASS', default=None,
+                      help="Add an admin account to the development cluster")
+    parser.add_option("-n", "--nodes", metavar="nodes", default=3,
+                      type=int,
+                      help="Number of development nodes to be spun up")
+    return parser.parse_args()
+
+
+def setup_context(opts, args):
+    fpath = os.path.abspath(__file__)
+    return {'N': opts.nodes,
+            'admin': opts.admin,
+            'nodes': ['node%d' % (i + 1) for i in range(opts.nodes)],
+            'devdir': os.path.dirname(fpath),
+            'rootdir': os.path.dirname(os.path.dirname(fpath)),
+            'cmd': ' '.join(args),
+            'procs': []}
+
+
+@log('Setup environment')
+def setup_dirs(ctx):
+    ensure_dir_exists(ctx['devdir'], 'data')
+    ensure_dir_exists(ctx['devdir'], 'logs')
+
+
+def ensure_dir_exists(root, *segments):
+    path = os.path.join(root, *segments)
+    if not os.path.exists(path):
+        os.makedirs(path)
+    return path
+
+
+@log('Ensure CouchDB is built')
+def check_beams(ctx):
+    for fname in glob.glob(os.path.join(ctx['devdir'], "*.erl")):
+        sp.check_call(["erlc", "-o", ctx['devdir'] + os.sep, fname])
+
+
+@log('Prepare configuration files')
+def setup_configs(ctx):
+    for idx, node in enumerate(ctx['nodes']):
+        cluster_port, backend_port = get_ports(idx)
+        env = {
+            "prefix": ctx['rootdir'],
+            "package_author_name": "The Apache Software Foundation",
+            "data_dir": ensure_dir_exists("lib", node, "data"),
+            "view_index_dir": ensure_dir_exists("lib", node, "data"),
+            "node_name": "-name %s@127.0.0.1" % node,
+            "cluster_port": cluster_port,
+            "backend_port": backend_port
+        }
+        write_config(ctx, node, env)
+
+
+def get_ports(idnode):
+    return ((10000 * idnode) + 5984, (10000 * idnode) + 5986)
+
+
+def write_config(ctx, node, env):
+    etc_src = os.path.join(ctx['rootdir'], "rel", "overlay", "etc")
+    etc_tgt = ensure_dir_exists(ctx['devdir'], "lib", node, "etc")
+
+    for fname in glob.glob(os.path.join(etc_src, "*")):
+        base = os.path.basename(fname)
+        tgt = os.path.join(etc_tgt, base)
+
+        with open(fname) as handle:
+            content = handle.read()
+
+        for key in env:
+            content = re.sub("{{%s}}" % key, str(env[key]), content)
+
+        if base == "default.ini":
+            content = hack_default_ini(ctx, node, content)
+        elif base == "local.ini":
+            content = hack_local_ini(ctx, content)
+
+        with open(tgt, "w") as handle:
+            handle.write(content)
+
+
+def hack_default_ini(ctx, node, content):
     # Replace log file
-    logfile = os.path.join(DEV_PATH, "logs", "%s.log" % node)
+    logfile = os.path.join(ctx['devdir'], "logs", "%s.log" % node)
     repl = "file = %s" % logfile
-    contents = re.sub("(?m)^file.*$", repl, contents)
+    contents = re.sub("(?m)^file.*$", repl, content)
 
     # Replace couchjs command
-    couchjs = os.path.join(COUCHDB, "src", "couch", "priv", "couchjs")
-    mainjs = os.path.join(COUCHDB, "share", "server", "main.js")
-    coffeejs = os.path.join(COUCHDB, "share", "server", "main-coffee.js")
+    couchjs = os.path.join(ctx['rootdir'], "src", "couch", "priv", "couchjs")
+    mainjs = os.path.join(ctx['rootdir'], "share", "server", "main.js")
+    coffeejs = os.path.join(ctx['rootdir'], "share", "server", "main-coffee.js")
 
     repl = "javascript = %s %s" % (couchjs, mainjs)
     contents = re.sub("(?m)^javascript.*$", repl, contents)
@@ -78,9 +183,22 @@ def hack_default_ini(opts, node, args, contents):
     return contents
 
 
-def hashify(pwd, salt=COMMON_SALT):
+def hack_local_ini(ctx, contents):
+    # make sure all three nodes have the same secret
+    secret_line = "secret = %s\n" % COMMON_SALT
+    previous_line = "; require_valid_user = false\n"
+    contents = contents.replace(previous_line, previous_line + secret_line)
+    # if --admin user:password on invocation, make sure all three nodes
+    # have the same hashed password
+    if ctx['admin'] is None:
+        return contents
+    usr, pwd = ctx['admin'].split(":", 1)
+    return contents + "\n%s = %s" % (usr, hashify(pwd))
+
+
+def hashify(pwd, salt=COMMON_SALT, iterations=10, keylen=20):
     """
-    Implements password hasshing according to:
+    Implements password hashing according to:
       - https://issues.apache.org/jira/browse/COUCHDB-1060
       - https://issues.apache.org/jira/secure/attachment/12492631/0001-Integrate-PBKDF2.patch
 
@@ -89,72 +207,44 @@ def hashify(pwd, salt=COMMON_SALT):
     >>> hashify(candeira)
     -pbkdf2-99eb34d97cdaa581e6ba7b5386e112c265c5c670,d1d2d4d8909c82c81b6c8184429a0739,10
     """
-    iterations = 10
-    keylen = 20
     derived_key = pbkdf2_hex(pwd, salt, iterations, keylen)
     return "-pbkdf2-%s,%s,%s" % (derived_key, salt, iterations)
 
-def hack_local_ini(opts, node, args, contents):
-    # make sure all three nodes have the same secret
-    secret_line = "secret = %s\n" % COMMON_SALT
-    previous_line = "; require_valid_user = false\n"
-    contents = contents.replace(previous_line, previous_line + secret_line)
-    # if --admin user:password on invocation, make sure all three nodes
-    # have the same hashed password
-    if opts.admin is None:
-        return contents
-    usr, pwd = opts.admin.split(":", 1)
-    return contents + "\n%s = %s" % (usr, hashify(pwd))
+
+def startup(ctx):
+    atexit.register(kill_processes, ctx)
+    boot_nodes(ctx)
+    join_nodes("127.0.0.1", 15986, ctx)
 
 
-def write_config(opts, node, args):
-    etc_src = os.path.join(COUCHDB, "rel", "overlay", "etc")
-    etc_tgt = os.path.join(DEV_PATH, "lib", node, "etc")
-    if not os.path.exists(etc_tgt):
-        os.makedirs(etc_tgt)
-
-    etc_files = glob.glob(os.path.join(etc_src, "*"))
-    for fname in etc_files:
-        base = os.path.basename(fname)
-        tgt = os.path.join(etc_tgt, base)
-        with open(fname) as handle:
-            contents = handle.read()
-        for key in args:
-            contents = re.sub("{{%s}}" % key, args[key], contents)
-        if base == "default.ini":
-            contents = hack_default_ini(opts, node, args, contents)
-        elif base == "local.ini":
-            contents = hack_local_ini(opts, node, args, contents)
-        with open(tgt, "w") as handle:
-            handle.write(contents)
+def kill_processes(ctx):
+    for proc in ctx['procs']:
+        if proc.returncode is None:
+            proc.kill()
 
 
-def write_configs(opts):
-    datadir = os.path.join(DEV_PATH, "data")
-    if not os.path.exists(datadir):
-        os.makedirs(datadir)
-    for i in range(1, N+1):
-        node = "node%d" % i
-        args = {
-            "prefix": COUCHDB,
-            "package_author_name": "The Apache Software Foundation",
-            "data_dir": os.path.join(DEV_PATH, "lib", node, "data"),
-            "view_index_dir": os.path.join(DEV_PATH, "lib", node, "data"),
-            "node_name": "-name %s@127.0.0.1" % node,
-            "cluster_port": str((10000 * i) + 5984),
-            "backend_port" : str((10000 * i) + 5986)
-        }
-        if not os.path.exists(args["data_dir"]):
-            os.makedirs(args["data_dir"])
-        write_config(opts, node, args)
+def boot_nodes(ctx):
+    for node in ctx['nodes']:
+        ctx['procs'].append(boot_node(node, ctx))
+
+    ensure_nodes_stated(ctx)
 
 
-def all_nodes_alive(n):
-    for i in range(1, n+1):
-        url = "http://127.0.0.1:{0}/".format(local_port(i))
+@log('Ensure all nodes are run')
+def ensure_nodes_stated(ctx):
+    for _ in range(30):
+        if all_nodes_alive(ctx):
+            break
+        time.sleep(1)
+
+
+def all_nodes_alive(ctx):
+    for num in range(ctx['N']):
+        local_port, _ = get_ports(num)
+        url = "http://127.0.0.1:{0}/".format(local_port)
         while True:
             try:
-                with ctx.closing(urllib.urlopen(url)) as resp:
+                with contextlib.closing(urlopen(url)):
                     pass
             except IOError:
                 time.sleep(0.25)
@@ -163,130 +253,63 @@ def all_nodes_alive(n):
     return True
 
 
-def local_port(n):
-    return 10000 * n + 5986
-
-
-def node_port(n):
-    return 10000 * n + 5984
-
-
-def boot_node(node):
-    apps = os.path.join(COUCHDB, "src")
+@log('Start node {node}')
+def boot_node(node, ctx):
+    erl_libs = os.path.join(ctx['rootdir'], "src")
     env = os.environ.copy()
-    env["ERL_LIBS"] = os.pathsep.join([apps])
+    env["ERL_LIBS"] = os.pathsep.join([erl_libs])
+
+    node_etcdir = os.path.join(ctx['devdir'], "lib", node, "etc")
+    reldir = os.path.join(ctx['rootdir'], "rel")
     cmd = [
         "erl",
-        "-args_file", os.path.join(DEV_PATH, "lib", node, "etc", "vm.args"),
-        "-config", os.path.join(COUCHDB, "rel", "files", "sys"),
+        "-args_file", os.path.join(node_etcdir, "vm.args"),
+        "-config", os.path.join(reldir, "files", "sys"),
         "-couch_ini",
-            os.path.join(DEV_PATH, "lib", node, "etc", "default.ini"),
-            os.path.join(DEV_PATH, "lib", node, "etc", "local.ini"),
-        "-reltool_config", os.path.join(COUCHDB, "rel", "reltool.config"),
+        os.path.join(node_etcdir, "default.ini"),
+        os.path.join(node_etcdir, "local.ini"),
+        "-reltool_config", os.path.join(reldir, "reltool.config"),
         "-parent_pid", str(os.getpid()),
-        "-pa", DEV_PATH,
-        "-pa", os.path.join(COUCHDB, "src", "*"),
+        "-pa", ctx['devdir'],
+        "-pa", os.path.join(erl_libs, "*"),
         "-s", "boot_node"
     ]
-    logfname = os.path.join(DEV_PATH, "logs", "%s.log" % node)
-    log = open(logfname, "w")
-    return sp.Popen(
-            cmd,
-            stdin=sp.PIPE,
-            stdout=log,
-            stderr=sp.STDOUT,
-            env=env)
+    logfname = os.path.join(ctx['devdir'], "logs", "%s.log" % node)
+    log = open(logfname, "wb")
+    return sp.Popen(cmd, stdin=sp.PIPE, stdout=log, stderr=sp.STDOUT, env=env)
 
 
-def connect_nodes(host, port):
-    global N
-    for i in range(1, N+1):
+@log('Join nodes into cluster')
+def join_nodes(host, port, ctx):
+    for node in ctx['nodes']:
         body = "{}"
-        conn = httplib.HTTPConnection(host, port)
-        conn.request("PUT", "/nodes/node%d@127.0.0.1" % i, body)
+        conn = httpclient.HTTPConnection(host, port)
+        conn.request("PUT", "/nodes/%s@127.0.0.1" % node, body)
         resp = conn.getresponse()
         if resp.status not in (200, 201, 202, 409):
-            print resp.reason
+            print('Failed to join %s into cluster' % node, resp.reason)
             exit(1)
 
 
-def kill_processes():
-    global PROCESSES
-    for p in PROCESSES:
-        if p.returncode is None:
-            p.kill()
+@log('Developers cluster is set up at http://127.0.0.1:15984. Time to hack!')
+def join(ctx):
+    while True:
+        for proc in ctx['procs']:
+            if proc.returncode is not None:
+                exit(1)
+        time.sleep(2)
 
 
-def boot_nodes():
-    global N, PROCESSES
-    for i in range(1, N+1):
-        p = boot_node("node%d" % i)
-        PROCESSES.append(p)
-
-    for i in range(30):
-        if all_nodes_alive(N):
-            break
-        time.sleep(1)
-
-
-def reboot_nodes():
-    kill_processes()
-    boot_nodes()
-
-
+@log('Exec command {cmd}')
 def run_command(cmd):
     p = sp.Popen(cmd, shell=True, stdout=sp.PIPE, stderr=sys.stderr)
     while True:
         line = p.stdout.readline()
         if not line:
             break
-        try:
-            eval(line)
-        except:
-            traceback.print_exc()
-            exit(1)
+        eval(line)
     p.wait()
     exit(p.returncode)
-
-
-def wait_for_procs():
-    global PROCESSES
-    while True:
-        for p in PROCESSES:
-            if p.returncode is not None:
-                exit(1)
-        time.sleep(2)
-
-
-def options():
-    return [
-        op.make_option("-a", "--admin", metavar="USER:PASS", default=None,
-            help="Add an admin account to the development cluster"),
-        op.make_option("-n", "--nodes", metavar="N", default=DEFAULT_N,
-            type="int", help="Number of development nodes to be spun up")
-    ]
-
-
-def main():
-    parser = op.OptionParser(usage=USAGE, option_list=options())
-    opts, args = parser.parse_args()
-
-    global N
-    N = opts.nodes
-
-    init_log_dir()
-    init_beams()
-    write_configs(opts)
-
-    atexit.register(kill_processes)
-
-    boot_nodes()
-    connect_nodes("127.0.0.1", 15986)
-
-    if len(args):
-        run_command(" ".join(args))
-    else:
-        wait_for_procs()
 
 
 if __name__ == "__main__":

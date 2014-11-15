@@ -12,17 +12,11 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-import atexit
-import contextlib as ctx
 import glob
 import optparse as op
 import os
-import re
-import select
 import subprocess as sp
 import sys
-import time
-import urllib
 
 
 USAGE = "%prog [options] [command to run...]"
@@ -53,13 +47,15 @@ def mkformatter(tests):
     clear = "\033[0m"
     if not sys.stderr.isatty():
         green, read, clear = "", "", ""
+
     def _colorized(passed):
         if passed:
             return green + "pass" + clear
         else:
             return red + "fail" + clear
+
     def _fmt(test):
-        if isinstance(test, basestring):
+        if isinstance(test, str):
             padding = (longest - len(test)) * " "
             sys.stderr.write(test + "   " + padding)
             sys.stderr.flush()
@@ -69,6 +65,7 @@ def mkformatter(tests):
             else:
                 sys.stderr.write(_colorized(test) + os.linesep)
             sys.stderr.flush()
+
     return _fmt
 
 
@@ -76,11 +73,11 @@ def run_couchjs(test, fmt):
     fmt(test)
     cmd = [COUCHJS, "-H"] + SCRIPTS + [test, RUNNER]
     p = sp.Popen(
-            cmd,
-            stdin = sp.PIPE,
-            stdout = sp.PIPE,
-            stderr = sys.stderr
-        )
+        cmd,
+        stdin=sp.PIPE,
+        stdout=sp.PIPE,
+        stderr=sys.stderr
+    )
     while True:
         line = p.stdout.readline()
         if not line:
@@ -97,7 +94,8 @@ def run_couchjs(test, fmt):
 def options():
     return [
         op.make_option("-s", "--start", metavar="FILENAME", default=None,
-            help="Start from the given filename if multiple files are passed")
+                       help="Start from the given filename if multiple files "
+                            "are passed")
     ]
 
 
@@ -133,7 +131,6 @@ def main():
     fmt = mkformatter(tests)
     for test in tests:
         run_couchjs(test, fmt)
-
 
 
 if __name__ == "__main__":
