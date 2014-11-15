@@ -214,7 +214,7 @@ def hashify(pwd, salt=COMMON_SALT, iterations=10, keylen=20):
 def startup(ctx):
     atexit.register(kill_processes, ctx)
     boot_nodes(ctx)
-    join_nodes("127.0.0.1", 15986, ctx)
+    join_nodes(ctx, "127.0.0.1", 15986)
 
 
 def kill_processes(ctx):
@@ -225,7 +225,7 @@ def kill_processes(ctx):
 
 def boot_nodes(ctx):
     for node in ctx['nodes']:
-        ctx['procs'].append(boot_node(node, ctx))
+        ctx['procs'].append(boot_node(ctx, node))
 
     ensure_nodes_stated(ctx)
 
@@ -254,7 +254,7 @@ def all_nodes_alive(ctx):
 
 
 @log('Start node {node}')
-def boot_node(node, ctx):
+def boot_node(ctx, node):
     erl_libs = os.path.join(ctx['rootdir'], "src")
     env = os.environ.copy()
     env["ERL_LIBS"] = os.pathsep.join([erl_libs])
@@ -280,7 +280,7 @@ def boot_node(node, ctx):
 
 
 @log('Join nodes into cluster')
-def join_nodes(host, port, ctx):
+def join_nodes(ctx, host, port):
     for node in ctx['nodes']:
         body = "{}"
         conn = httpclient.HTTPConnection(host, port)
