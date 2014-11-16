@@ -225,6 +225,7 @@ def boot_nodes():
 
     for i in range(30):
         if all_nodes_alive(N):
+            print "Cluster is up, go to http://127.0.0.1:15984/_utils"
             break
         time.sleep(1)
 
