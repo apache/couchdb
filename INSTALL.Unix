@@ -103,6 +103,7 @@ You can install the dependencies by running:
     sudo yum install erlang-eunit
     sudo yum install erlang-os_mon
     sudo yum install erlang-xmerl
+    sudo yum install erlang-rebar
     sudo yum install help2man
     sudo yum install js-devel
     sudo yum install libicu-devel
@@ -130,6 +131,7 @@ You can install the other dependencies by running:
     brew install spidermonkey
     brew install curl
     brew install pkg-config
+    brew install rebar
 
 You will need Homebrew installed to use the `brew` command.
 
