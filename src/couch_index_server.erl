@@ -63,7 +63,9 @@ validate(DbName, DDoc) ->
     lists:foldl(ValidateFun, ok, EnabledIndexers).
 
 
-get_index(Module, <<"shards/", _/binary>>=DbName, DDoc) ->
+get_index(Module, #db{name = <<"shards/", _/binary>> = DbName}, DDoc) ->
+    get_index(Module, DbName, DDoc);
+get_index(Module, <<"shards/", _/binary>> = DbName, DDoc) ->
     {Pid, Ref} = spawn_monitor(fun() ->
         exit(fabric:open_doc(mem3:dbname(DbName), DDoc, [ejson_body]))
     end),
