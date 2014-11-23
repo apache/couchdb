@@ -28,6 +28,7 @@ Version 1.7.0
 API Changes
 -----------
 
+- :issue:`1356`: Return username on :http:post:`/_session`.
 - :issue:`1876`: Fix duplicated Content-Type for show/update functions.
 
 Build

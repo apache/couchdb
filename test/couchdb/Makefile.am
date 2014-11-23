@@ -42,6 +42,7 @@ eunit_files = \
     couch_uuids_tests.erl \
     couch_work_queue_tests.erl \
     couchdb_attachments_tests.erl \
+    couchdb_auth_tests.erl \
     couchdb_compaction_daemon.erl \
     couchdb_cors_tests.erl \
     couchdb_file_compression_tests.erl \
