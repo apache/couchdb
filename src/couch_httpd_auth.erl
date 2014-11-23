@@ -314,7 +314,7 @@ handle_session_req(#httpd{method='POST', mochi_req=MochiReq}=Req, AuthModule) ->
             send_json(Req#httpd{req_body=ReqBody}, Code, Headers,
                 {[
                     {ok, true},
-                    {name, couch_util:get_value(<<"name">>, UserProps2, null)},
+                    {name, UserName},
                     {roles, couch_util:get_value(<<"roles">>, UserProps2, [])}
                 ]});
         _Else ->
