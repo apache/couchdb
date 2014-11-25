@@ -161,7 +161,7 @@ add_node_int(Options, ok) ->
     end.
 
 get_port(Port) when is_integer(Port) ->
-    integer_to_binary(Port);
+    list_to_binary(integer_to_list(Port));
 get_port(Port) when is_list(Port) ->
     list_to_binary(Port);
 get_port(Port) when is_binary(Port) ->
