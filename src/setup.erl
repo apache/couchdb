@@ -165,10 +165,7 @@ get_port(Port) when is_integer(Port) ->
 get_port(Port) when is_list(Port) ->
     list_to_binary(Port);
 get_port(Port) when is_binary(Port) ->
-    Port;
-get_port(Port) ->
-    {error, <<"invalid type for port">>}.
-
+    Port.
 
 create_node_doc(Host, Port) ->
     {ok, Db} = couch_db:open_int(<<"nodes">>, []),
