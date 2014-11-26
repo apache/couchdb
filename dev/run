@@ -17,6 +17,7 @@ import contextlib
 import functools
 import glob
 import inspect
+import json
 import optparse
 import os
 import re
@@ -230,6 +231,7 @@ def hashify(pwd, salt=COMMON_SALT, iterations=10, keylen=20):
 def startup(ctx):
     atexit.register(kill_processes, ctx)
     boot_nodes(ctx)
+    reset_nodes_db(ctx, "127.0.0.1")
     join_nodes(ctx, "127.0.0.1", 15986)
 
 
@@ -293,6 +295,27 @@ def boot_node(ctx, node):
     logfname = os.path.join(ctx['devdir'], "logs", "%s.log" % node)
     log = open(logfname, "wb")
     return sp.Popen(cmd, stdin=sp.PIPE, stdout=log, stderr=sp.STDOUT, env=env)
+
+
+@log('Reset nodes DB')
+def reset_nodes_db(ctx, host):
+    _, port = get_ports(1)
+    conn = httpclient.HTTPConnection(host, port)
+    conn.request('GET', '/nodes/_all_docs')
+    resp = conn.getresponse()
+    if not resp.status == 200:
+        print('Could not read nodes DB documents', resp.reason)
+        exit(1)
+    nodes = json.loads(resp.read())['rows']
+    for node in nodes:
+        node_id = node['id']
+        rev = node['value']['rev']
+        conn = httpclient.HTTPConnection(host, port)
+        conn.request('DELETE', '/nodes/{0}?rev={1}'.format(node_id, rev))
+        resp = conn.getresponse()
+        if not resp.status == 200:
+            print('Failed to reset nodes DB', resp.reason)
+            exit(1)
 
 
 @log('Join nodes into cluster')
