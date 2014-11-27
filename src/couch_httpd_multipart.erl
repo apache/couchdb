@@ -11,6 +11,24 @@ doc_from_multi_part_stream(ContentType, DataFun) ->
 
 
 doc_from_multi_part_stream(ContentType, DataFun, Ref) ->
+    case parse_multipart_stream(ContentType, DataFun, Ref) of
+    {{started_open_doc_revs, NewRef}, Parser, _ParserRef} ->
+        couch_doc:restart_open_doc_revs(Parser, Ref, NewRef);
+    {{doc_bytes, Ref, DocBytes}, Parser, ParserRef} ->
+        Doc = couch_doc:from_json_obj(?JSON_DECODE(DocBytes)),
+        % we'll send the Parser process ID to the remote nodes so they can
+        % retrieve their own copies of the attachment data
+        WithParser = fun(follows) -> {follows, Parser, Ref}; (D) -> D end,
+        Atts = [couch_att:transform(data, WithParser, A) || A <- Doc#doc.atts],
+        WaitFun = fun() ->
+            receive {'DOWN', ParserRef, _, _, _} -> ok end,
+            erlang:put(mochiweb_request_recv, true)
+        end,
+        {ok, Doc#doc{atts=Atts}, WaitFun, Parser};
+    ok -> ok
+    end.
+
+parse_multipart_stream(ContentType, DataFun, Ref) ->
     Parent = self(),
     NumMpWriters = num_mp_writers(),
     {Parser, ParserRef} = spawn_monitor(fun() ->
@@ -25,18 +43,10 @@ doc_from_multi_part_stream(ContentType, DataFun, Ref) ->
     Parser ! {get_doc_bytes, Ref, self()},
     receive
     {started_open_doc_revs, NewRef} ->
-        couch_doc:restart_open_doc_revs(Parser, Ref, NewRef);
-    {doc_bytes, Ref, DocBytes} ->
-        Doc = couch_doc:from_json_obj(?JSON_DECODE(DocBytes)),
-        % we'll send the Parser process ID to the remote nodes so they can
-        % retrieve their own copies of the attachment data
-        WithParser = fun(follows) -> {follows, Parser, Ref}; (D) -> D end,
-        Atts = [couch_att:transform(data, WithParser, A) || A <- Doc#doc.atts],
-        WaitFun = fun() ->
-            receive {'DOWN', ParserRef, _, _, _} -> ok end,
-            erlang:put(mochiweb_request_recv, true)
-        end,
-        {ok, Doc#doc{atts=Atts}, WaitFun, Parser};
+        %% FIXME: How to remove the knowledge about this message?
+        {{started_open_doc_revs, NewRef}, Parser, ParserRef};
+    {doc_bytes, Ref, DocBytes}  ->
+        {{doc_bytes, Ref, DocBytes}, Parser, ParserRef};
     {'DOWN', ParserRef, _, _, normal} ->
         ok;
     {'DOWN', ParserRef, process, Parser, {{nocatch, {Error, Msg}}, _}} ->
