@@ -9,100 +9,111 @@
 // WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 // License for the specific language governing permissions and limitations under
 // the License.
-
 couchTests.users_db_security = function(debug) {
-  var usersDb = new CouchDB("test_suite_users", {"X-Couch-Full-Commit":"false"});
-  if (debug) debugger;
+  function run_test_against_url(url) {
+    CouchDB.urlPrefix = url;
+    var usersDb = new CouchDB("test_suite_users", {"X-Couch-Full-Commit":"false"});
+    if (debug) debugger;
 
-  function wait(ms) {
-    var t0 = new Date(), t1;
-    do {
-      CouchDB.request("GET", "/");
-      t1 = new Date();
-    } while ((t1 - t0) <= ms);
-  }
-
-  var loginUser = function(username) {
-    var pws = {
-      jan: "apple",
-      jchris: "mp3",
-      jchris1: "couch",
-      fdmanana: "foobar",
-      benoitc: "test"
-    };
-    var username1 = username.replace(/[0-9]$/, "");
-    var password = pws[username];
-    T(CouchDB.login(username1, pws[username]).ok);
-  };
-
-  var open_as = function(db, docId, username) {
-    loginUser(username);
-    try {
-      return db.open(docId, {"anti-cache": Math.round(Math.random() * 100000)});
-    } finally {
-      CouchDB.logout();
+    function wait(ms) {
+      var t0 = new Date(), t1;
+      do {
+        CouchDB.request("GET", "/");
+        t1 = new Date();
+      } while ((t1 - t0) <= ms);
     }
-  };
 
-  var view_as = function(db, viewname, username) {
-    loginUser(username);
-    try {
-      return db.view(viewname);
-    } finally {
-      CouchDB.logout();
-    }
-  };
-
-  var save_as = function(db, doc, username)
-  {
-    loginUser(username);
-    try {
-      return db.save(doc);
-    } catch (ex) {
-      return ex;
-    } finally {
-      CouchDB.logout();
-    }
-  };
-
-  var changes_as = function(db, username)
-  {
-    loginUser(username);
-    try {
-      return db.changes();
-    } catch(ex) {
-      return ex;
-    } finally {
-      CouchDB.logout();
-    }
-  };
-
-  var testFun = function()
-  {
-
-    // _users db
-    // a doc with a field 'password' should be hashed to 'derived_key'
-    //  with salt and salt stored in 'salt', 'password' is set to null.
-    //  Exising 'derived_key' and 'salt' fields are overwritten with new values
-    //  when a non-null 'password' field exists.
-    // anonymous should be able to create a user document
-    var userDoc = {
-      _id: "org.couchdb.user:jchris",
-      type: "user",
-      name: "jchris",
-      password: "mp3",
-      roles: []
+    var loginUser = function(username) {
+      var pws = {
+        jan: "apple",
+        jchris: "mp3",
+        jchris1: "couch",
+        fdmanana: "foobar",
+        benoitc: "test"
+      };
+      var username1 = username.replace(/[0-9]$/, "");
+      var password = pws[username];
+      T(CouchDB.login(username1, pws[username]).ok);
     };
 
-    // jan's gonna be admin as he's the first user
-    TEquals(true, usersDb.save(userDoc).ok, "should save document");
-    userDoc = usersDb.open("org.couchdb.user:jchris");
-    TEquals(undefined, userDoc.password, "password field should be null 1");
-    TEquals(40, userDoc.derived_key.length, "derived_key should exist");
-    TEquals(32, userDoc.salt.length, "salt should exist");
+    var open_as = function(db, docId, username) {
+      loginUser(username);
+      try {
+        return db.open(docId, {"anti-cache": Math.round(Math.random() * 100000)});
+      } finally {
+        CouchDB.logout();
+      }
+    };
 
-    // create server admin
-    run_on_modified_server([
+    var view_as = function(db, viewname, username) {
+      loginUser(username);
+      try {
+        return db.view(viewname);
+      } finally {
+        CouchDB.logout();
+      }
+    };
+
+    var save_as = function(db, doc, username)
+    {
+      loginUser(username);
+      try {
+        return db.save(doc);
+      } catch (ex) {
+        return ex;
+      } finally {
+        CouchDB.logout();
+      }
+    };
+
+    var changes_as = function(db, username)
+    {
+      loginUser(username);
+      try {
+        return db.changes();
+      } catch(ex) {
+        return ex;
+      } finally {
+        CouchDB.logout();
+      }
+    };
+
+    var testFun = function()
+    {
+
+      // _users db
+      // a doc with a field 'password' should be hashed to 'derived_key'
+      //  with salt and salt stored in 'salt', 'password' is set to null.
+      //  Exising 'derived_key' and 'salt' fields are overwritten with new values
+      //  when a non-null 'password' field exists.
+      // anonymous should be able to create a user document
+      var userDoc = {
+        _id: "org.couchdb.user:jchris",
+        type: "user",
+        name: "jchris",
+        password: "mp3",
+        roles: []
+      };
+
+      CouchDB.urlPrefix = url;
+      // The users DB may or may not exist at this point depending on whether
+      // the test is being run against the cluster or admin port so use allDocs
+      // to check
+      try {
+        usersDb.allDocs();
+      } catch(e) {
+        usersDb.createDb();
+      }
+      // jan's gonna be admin as he's the first user
+      TEquals(true, usersDb.save(userDoc).ok, "should save document");
+      userDoc = usersDb.open("org.couchdb.user:jchris");
+      TEquals(undefined, userDoc.password, "password field should be null 1");
+      TEquals(40, userDoc.derived_key.length, "derived_key should exist");
+      TEquals(32, userDoc.salt.length, "salt should exist");
+
+      CouchDB.urlPrefix = '';
+      // create server admin
+      run_on_modified_server([
         {
           section: "couch_httpd_auth",
           key: "iterations",
@@ -115,205 +126,208 @@ couchTests.users_db_security = function(debug) {
         }
       ], function() {
 
-      // anonymous should not be able to read an existing user's user document
-      var res = usersDb.open("org.couchdb.user:jchris");
-      TEquals(null, res, "anonymous user doc read should be not found");
+        CouchDB.urlPrefix = url;
+        // anonymous should not be able to read an existing user's user document
+        var res = usersDb.open("org.couchdb.user:jchris");
+        TEquals(null, res, "anonymous user doc read should be not found");
 
-      // anonymous should not be able to read /_users/_changes
-      try {
-        var ch = usersDb.changes();
-        T(false, "anonymous can read _changes");
-      } catch(e) {
-        TEquals("unauthorized", e.error, "anoymous can't read _changes");
-      }
+        // anonymous should not be able to read /_users/_changes
+        try {
+          var ch = usersDb.changes();
+          T(false, "anonymous can read _changes");
+        } catch(e) {
+          TEquals("unauthorized", e.error, "anoymous can't read _changes");
+        }
 
-      // user should be able to read their own document
-      var jchrisDoc = open_as(usersDb, "org.couchdb.user:jchris", "jchris");
-      TEquals("org.couchdb.user:jchris", jchrisDoc._id);
+        // user should be able to read their own document
+        var jchrisDoc = open_as(usersDb, "org.couchdb.user:jchris", "jchris");
+        TEquals("org.couchdb.user:jchris", jchrisDoc._id);
 
-      // user should not be able to read /_users/_changes
-      var changes = changes_as(usersDb, "jchris");
-      TEquals("unauthorized", changes.error, "user can't read _changes");
+        // user should not be able to read /_users/_changes
+        var changes = changes_as(usersDb, "jchris");
+        TEquals("unauthorized", changes.error, "user can't read _changes");
 
-      // new 'password' fields should trigger new hashing routine
-      jchrisDoc.password = "couch";
+        // new 'password' fields should trigger new hashing routine
+        jchrisDoc.password = "couch";
 
-      TEquals(true, save_as(usersDb, jchrisDoc, "jchris").ok);
-      wait(100);
-      var jchrisDoc = open_as(usersDb, "org.couchdb.user:jchris", "jchris1");
+        TEquals(true, save_as(usersDb, jchrisDoc, "jchris").ok);
+        wait(5000); // chttpd_auth_cache may not have started listening for changes
+        var jchrisDoc = open_as(usersDb, "org.couchdb.user:jchris", "jchris1");
 
-      TEquals(undefined, jchrisDoc.password, "password field should be null 2");
-      TEquals(40, jchrisDoc.derived_key.length, "derived_key should exist");
-      TEquals(32, jchrisDoc.salt.length, "salt should exist");
+        TEquals(undefined, jchrisDoc.password, "password field should be null 2");
+        TEquals(40, jchrisDoc.derived_key.length, "derived_key should exist");
+        TEquals(32, jchrisDoc.salt.length, "salt should exist");
 
-      TEquals(true, userDoc.salt != jchrisDoc.salt, "should have new salt");
-      TEquals(true, userDoc.derived_key != jchrisDoc.derived_key,
-        "should have new derived_key");
+        TEquals(true, userDoc.salt != jchrisDoc.salt, "should have new salt");
+        TEquals(true, userDoc.derived_key != jchrisDoc.derived_key,
+                "should have new derived_key");
 
-      // SHA-1 password hashes are upgraded to PBKDF2 on successful
-      // authentication
-      var rnewsonDoc = {
-        _id: "org.couchdb.user:rnewson",
-        type: "user",
-        name: "rnewson",
-        // password: "plaintext_password",
-        password_sha: "e29dc3aeed5abf43185c33e479f8998558c59474",
-        salt: "24f1e0a87c2e374212bda1073107e8ae",
-        roles: []
-      };
+        // SHA-1 password hashes are upgraded to PBKDF2 on successful
+        // authentication
+        var rnewsonDoc = {
+          _id: "org.couchdb.user:rnewson",
+          type: "user",
+          name: "rnewson",
+          // password: "plaintext_password",
+          password_sha: "e29dc3aeed5abf43185c33e479f8998558c59474",
+          salt: "24f1e0a87c2e374212bda1073107e8ae",
+          roles: []
+        };
 
-      var password_sha = rnewsonDoc.password_sha,
+        var password_sha = rnewsonDoc.password_sha,
         salt = rnewsonDoc.salt,
         derived_key,
         iterations;
 
-      usersDb.save(rnewsonDoc);
-      rnewsonDoc = open_as(usersDb, rnewsonDoc._id, "jan");
-      T(!rnewsonDoc.password_scheme);
-      T(!rnewsonDoc.derived_key);
-      T(!rnewsonDoc.iterations);
+        usersDb.save(rnewsonDoc);
+        rnewsonDoc = open_as(usersDb, rnewsonDoc._id, "jan");
+        T(!rnewsonDoc.password_scheme);
+        T(!rnewsonDoc.derived_key);
+        T(!rnewsonDoc.iterations);
 
-      // check that we don't upgrade when the password is wrong
-      TEquals("unauthorized", CouchDB.login("rnewson", "wrong_password").error);
-      rnewsonDoc = open_as(usersDb, rnewsonDoc._id, "jan");
-      TEquals(salt, rnewsonDoc.salt);
-      TEquals(password_sha, rnewsonDoc.password_sha);
-      T(!rnewsonDoc.password_scheme);
-      T(!rnewsonDoc.derived_key);
-      T(!rnewsonDoc.iterations);
+        // check that we don't upgrade when the password is wrong
+        TEquals("unauthorized", CouchDB.login("rnewson", "wrong_password").error);
+        rnewsonDoc = open_as(usersDb, rnewsonDoc._id, "jan");
+        TEquals(salt, rnewsonDoc.salt);
+        TEquals(password_sha, rnewsonDoc.password_sha);
+        T(!rnewsonDoc.password_scheme);
+        T(!rnewsonDoc.derived_key);
+        T(!rnewsonDoc.iterations);
 
-      TEquals(true, CouchDB.login("rnewson", "plaintext_password").ok);
-      rnewsonDoc = usersDb.open(rnewsonDoc._id);
-      TEquals("pbkdf2", rnewsonDoc.password_scheme);
-      T(rnewsonDoc.salt != salt);
-      T(!rnewsonDoc.password_sha);
-      T(rnewsonDoc.derived_key);
-      T(rnewsonDoc.iterations);
+        TEquals(true, CouchDB.login("rnewson", "plaintext_password").ok);
+        rnewsonDoc = usersDb.open(rnewsonDoc._id);
+        TEquals("pbkdf2", rnewsonDoc.password_scheme);
+        T(rnewsonDoc.salt != salt);
+        T(!rnewsonDoc.password_sha);
+        T(rnewsonDoc.derived_key);
+        T(rnewsonDoc.iterations);
 
-      salt = rnewsonDoc.salt,
-      derived_key = rnewsonDoc.derived_key,
-      iterations = rnewsonDoc.iterations;
+        salt = rnewsonDoc.salt,
+        derived_key = rnewsonDoc.derived_key,
+        iterations = rnewsonDoc.iterations;
 
-      // check that authentication is still working
-      // and everything is staying the same now
-      CouchDB.logout();
-      TEquals(true, CouchDB.login("rnewson", "plaintext_password").ok);
-      rnewsonDoc = usersDb.open(rnewsonDoc._id);
-      TEquals("pbkdf2", rnewsonDoc.password_scheme);
-      TEquals(salt, rnewsonDoc.salt);
-      T(!rnewsonDoc.password_sha);
-      TEquals(derived_key, rnewsonDoc.derived_key);
-      TEquals(iterations, rnewsonDoc.iterations);
+        // check that authentication is still working
+        // and everything is staying the same now
+        CouchDB.logout();
+        wait(5000); // Increased because change seems to take a while to propagate to auth cache
+        TEquals(true, CouchDB.login("rnewson", "plaintext_password").ok);
+        rnewsonDoc = usersDb.open(rnewsonDoc._id);
+        TEquals("pbkdf2", rnewsonDoc.password_scheme);
+        TEquals(salt, rnewsonDoc.salt);
+        T(!rnewsonDoc.password_sha);
+        TEquals(derived_key, rnewsonDoc.derived_key);
+        TEquals(iterations, rnewsonDoc.iterations);
 
-      CouchDB.logout();
+        CouchDB.logout();
 
-      // user should not be able to read another user's user document
-      var fdmananaDoc = {
-        _id: "org.couchdb.user:fdmanana",
-        type: "user",
-        name: "fdmanana",
-        password: "foobar",
-        roles: []
-      };
+        // user should not be able to read another user's user document
+        var fdmananaDoc = {
+          _id: "org.couchdb.user:fdmanana",
+          type: "user",
+          name: "fdmanana",
+          password: "foobar",
+          roles: []
+        };
 
-      usersDb.save(fdmananaDoc);
+        usersDb.save(fdmananaDoc);
 
-      var fdmananaDocAsReadByjchris =
-        open_as(usersDb, "org.couchdb.user:fdmanana", "jchris1");
-      TEquals(null, fdmananaDocAsReadByjchris,
-        "should not_found opening another user's user doc");
+        var fdmananaDocAsReadByjchris =
+          open_as(usersDb, "org.couchdb.user:fdmanana", "jchris1");
+        TEquals(null, fdmananaDocAsReadByjchris,
+                "should not_found opening another user's user doc");
 
 
-      // save a db admin
-      var benoitcDoc = {
-        _id: "org.couchdb.user:benoitc",
-        type: "user",
-        name: "benoitc",
-        password: "test",
-        roles: ["user_admin"]
-      };
-      save_as(usersDb, benoitcDoc, "jan");
+        // save a db admin
+        var benoitcDoc = {
+          _id: "org.couchdb.user:benoitc",
+          type: "user",
+          name: "benoitc",
+          password: "test",
+          roles: ["user_admin"]
+        };
+        save_as(usersDb, benoitcDoc, "jan");
 
-      TEquals(true, CouchDB.login("jan", "apple").ok);
-      T(usersDb.setSecObj({
-        "admins" : {
-          roles : [],
-          names : ["benoitc"]
-        }
-      }).ok);
-      CouchDB.logout();
-
-      // user should not be able to read from any view
-      var ddoc = {
-        _id: "_design/user_db_auth",
-        views: {
-          test: {
-            map: "function(doc) { emit(doc._id, null); }"
+        TEquals(true, CouchDB.login("jan", "apple").ok);
+        T(usersDb.setSecObj({
+          "admins" : {
+            roles : [],
+            names : ["benoitc"]
           }
+        }).ok);
+        CouchDB.logout();
+
+        // user should not be able to read from any view
+        var ddoc = {
+          _id: "_design/user_db_auth",
+          views: {
+            test: {
+              map: "function(doc) { emit(doc._id, null); }"
+            }
+          }
+        };
+
+        save_as(usersDb, ddoc, "jan");
+
+        try {
+          usersDb.view("user_db_auth/test");
+          T(false, "user had access to view in admin db");
+        } catch(e) {
+          TEquals("forbidden", e.error,
+                  "non-admins should not be able to read a view");
         }
-      };
 
-      save_as(usersDb, ddoc, "jan");
+        // admin should be able to read from any view
+        var result = view_as(usersDb, "user_db_auth/test", "jan");
+        TEquals(4, result.total_rows, "should allow access and list four users to admin");
 
-      try {
-        usersDb.view("user_db_auth/test");
-        T(false, "user had access to view in admin db");
-      } catch(e) {
-        TEquals("forbidden", e.error,
-        "non-admins should not be able to read a view");
-      }
-
-      // admin should be able to read from any view
-      var result = view_as(usersDb, "user_db_auth/test", "jan");
-      TEquals(4, result.total_rows, "should allow access and list four users to admin");
-
-      // db admin should be able to read from any view
-      var result = view_as(usersDb, "user_db_auth/test", "benoitc");
-      TEquals(4, result.total_rows, "should allow access and list four users to db admin");
+        // db admin should be able to read from any view
+        var result = view_as(usersDb, "user_db_auth/test", "benoitc");
+        TEquals(4, result.total_rows, "should allow access and list four users to db admin");
 
 
-      // non-admins can't read design docs
-      try {
-        open_as(usersDb, "_design/user_db_auth", "jchris1");
-        T(false, "non-admin read design doc, should not happen");
-      } catch(e) {
-        TEquals("forbidden", e.error, "non-admins can't read design docs");
-      }
-
-      // admin should be able to read and edit any user doc
-      fdmananaDoc.password = "mobile";
-      var result = save_as(usersDb, fdmananaDoc, "jan");
-      TEquals(true, result.ok, "admin should be able to update any user doc");
-
-      // admin should be able to read and edit any user doc
-      fdmananaDoc.password = "mobile1";
-      var result = save_as(usersDb, fdmananaDoc, "benoitc");
-      TEquals(true, result.ok, "db admin by role should be able to update any user doc");
-
-      TEquals(true, CouchDB.login("jan", "apple").ok);
-      T(usersDb.setSecObj({
-        "admins" : {
-          roles : ["user_admin"],
-          names : []
+        // non-admins can't read design docs
+        try {
+          open_as(usersDb, "_design/user_db_auth", "jchris1");
+          T(false, "non-admin read design doc, should not happen");
+        } catch(e) {
+          TEquals("forbidden", e.error, "non-admins can't read design docs");
         }
-      }).ok);
-      CouchDB.logout();
 
-      // db admin should be able to read and edit any user doc
-      fdmananaDoc.password = "mobile2";
-      var result = save_as(usersDb, fdmananaDoc, "benoitc");
-      TEquals(true, result.ok, "db admin should be able to update any user doc");
+        // admin should be able to read and edit any user doc
+        fdmananaDoc.password = "mobile";
 
-      // ensure creation of old-style docs still works
-      var robertDoc = CouchDB.prepareUserDoc({ name: "robert" }, "anchovy");
-      var result = usersDb.save(robertDoc);
-      TEquals(true, result.ok, "old-style user docs should still be accepted");
+        var result = save_as(usersDb, fdmananaDoc, "jan");
+        TEquals(true, result.ok, "admin should be able to update any user doc");
 
-      // log in one last time so run_on_modified_server can clean up the admin account
-      TEquals(true, CouchDB.login("jan", "apple").ok);
-    });
+        // admin should be able to read and edit any user doc
+        fdmananaDoc.password = "mobile1";
+        var result = save_as(usersDb, fdmananaDoc, "benoitc");
+        TEquals(true, result.ok, "db admin by role should be able to update any user doc");
 
-    run_on_modified_server([
+        TEquals(true, CouchDB.login("jan", "apple").ok);
+        T(usersDb.setSecObj({
+          "admins" : {
+            roles : ["user_admin"],
+            names : []
+          }
+        }).ok);
+        CouchDB.logout();
+
+        // db admin should be able to read and edit any user doc
+        fdmananaDoc.password = "mobile2";
+        var result = save_as(usersDb, fdmananaDoc, "benoitc");
+        TEquals(true, result.ok, "db admin should be able to update any user doc");
+
+        // ensure creation of old-style docs still works
+        var robertDoc = CouchDB.prepareUserDoc({ name: "robert" }, "anchovy");
+        var result = usersDb.save(robertDoc);
+        TEquals(true, result.ok, "old-style user docs should still be accepted");
+
+        // log in one last time so run_on_modified_server can clean up the admin account
+        TEquals(true, CouchDB.login("jan", "apple").ok);
+      });
+
+      run_on_modified_server([
         {
           section: "couch_httpd_auth",
           key: "iterations",
@@ -326,6 +340,21 @@ couchTests.users_db_security = function(debug) {
         },
         {
           section: "couch_httpd_auth",
+          key: "users_db_public",
+          value: "true"
+        },
+        {
+          section: "chttpd_auth",
+          key: "iterations",
+          value: "1"
+        },
+        {
+          section: "chttpd_auth",
+          key: "public_fields",
+          value: "name,type"
+        },
+        {
+          section: "chttpd_auth",
           key: "users_db_public",
           value: "true"
         },
@@ -363,61 +392,83 @@ couchTests.users_db_security = function(debug) {
             }
           }));
         }
-      // log in one last time so run_on_modified_server can clean up the admin account
-      TEquals(true, CouchDB.login("jan", "apple").ok);
-    });
+        // log in one last time so run_on_modified_server can clean up the admin account
+        TEquals(true, CouchDB.login("jan", "apple").ok);
+      });
 
-    run_on_modified_server([
-      {
-        section: "couch_httpd_auth",
-        key: "iterations",
-        value: "1"
-      },
-      {
-        section: "couch_httpd_auth",
-        key: "public_fields",
-        value: "name"
-      },
-      {
-        section: "couch_httpd_auth",
-        key: "users_db_public",
-        value: "false"
-      },
-      {
-        section: "admins",
-        key: "jan",
-        value: "apple"
-      }
-    ], function() {
-      TEquals(true, CouchDB.login("jchris", "couch").ok);
+      run_on_modified_server([
+        {
+          section: "couch_httpd_auth",
+          key: "iterations",
+          value: "1"
+        },
+        {
+          section: "couch_httpd_auth",
+          key: "public_fields",
+          value: "name"
+        },
+        {
+          section: "couch_httpd_auth",
+          key: "users_db_public",
+          value: "false"
+        },
+        {
+          section: "chttpd_auth",
+          key: "iterations",
+          value: "1"
+        },
+        {
+          section: "chttpd_auth",
+          key: "public_fields",
+          value: "name"
+        },
+        {
+          section: "chttpd_auth",
+          key: "users_db_public",
+          value: "false"
+        },
+        {
+          section: "admins",
+          key: "jan",
+          value: "apple"
+        }
+      ], function() {
+        TEquals(true, CouchDB.login("jchris", "couch").ok);
 
-      try {
-        var all = usersDb.allDocs({ include_docs: true });
-        T(false); // should never hit
-      } catch(e) {
-        TEquals("forbidden", e.error, "should throw");
-      }
+        try {
+          var all = usersDb.allDocs({ include_docs: true });
+          T(false); // should never hit
+        } catch(e) {
+          TEquals("forbidden", e.error, "should throw");
+        }
 
-      // COUCHDB-1888 make sure admins always get all fields
-      TEquals(true, CouchDB.login("jan", "apple").ok);
-      var all_admin = usersDb.allDocs({ include_docs: "true" });
-      TEquals("user", all_admin.rows[2].doc.type,
-          "should return type");
+        // COUCHDB-1888 make sure admins always get all fields
+        TEquals(true, CouchDB.login("jan", "apple").ok);
+        var all_admin = usersDb.allDocs({ include_docs: "true" });
+        TEquals("user", all_admin.rows[2].doc.type,
+                "should return type");
 
 
-      // log in one last time so run_on_modified_server can clean up the admin account
-      TEquals(true, CouchDB.login("jan", "apple").ok);
-    });
-  };
+        // log in one last time so run_on_modified_server can clean up the admin account
+        TEquals(true, CouchDB.login("jan", "apple").ok);
+      });
+    };
 
-  usersDb.deleteDb();
-  run_on_modified_server(
-    [{section: "couch_httpd_auth",
-      key: "iterations", value: "1"},
-     {section: "couch_httpd_auth",
-      key: "authentication_db", value: usersDb.name}],
-    testFun
-  );
-  usersDb.deleteDb(); // cleanup
+    usersDb.deleteDb();
+    run_on_modified_server(
+      [{section: "couch_httpd_auth",
+        key: "iterations", value: "1"},
+       {section: "couch_httpd_auth",
+        key: "authentication_db", value: usersDb.name},
+       {section: "chttpd_auth",
+        key: "authentication_db", value: usersDb.name}],
+      testFun
+    );
+    usersDb.deleteDb(); // cleanup
+  }
 
+  // Run the test suite against the admin port
+  run_test_against_url("http://127.0.0.1:15986");
+  // Run the test suite against the cluster port
+  run_test_against_url("http://127.0.0.1:15984");
 };
