@@ -416,7 +416,7 @@ Secure Socket Level Options
     Set to a list of permitted SSL/TLS protocol versions::
 
       [ssl]
-      tls_versions = [sslv3 | tlsv1 | 'tlsv1.1' | 'tlsv1.2']
+      tls_versions = [tlsv1 | 'tlsv1.1' | 'tlsv1.2']
 
     .. versionadded:: 1.7
 
