@@ -1,32 +1,9 @@
 -module(couch_httpd_multipart).
 
--export([doc_from_multi_part_stream/2, doc_from_multi_part_stream/3]).
-
+-export([parse_multipart_stream/3]).
 -export([abort_multi_part_stream/1]).
 
 -include_lib("couch/include/couch_db.hrl").
-
-doc_from_multi_part_stream(ContentType, DataFun) ->
-    doc_from_multi_part_stream(ContentType, DataFun, make_ref()).
-
-
-doc_from_multi_part_stream(ContentType, DataFun, Ref) ->
-    case parse_multipart_stream(ContentType, DataFun, Ref) of
-    {{started_open_doc_revs, NewRef}, Parser, _ParserRef} ->
-        couch_doc:restart_open_doc_revs(Parser, Ref, NewRef);
-    {{doc_bytes, Ref, DocBytes}, Parser, ParserRef} ->
-        Doc = couch_doc:from_json_obj(?JSON_DECODE(DocBytes)),
-        % we'll send the Parser process ID to the remote nodes so they can
-        % retrieve their own copies of the attachment data
-        WithParser = fun(follows) -> {follows, Parser, Ref}; (D) -> D end,
-        Atts = [couch_att:transform(data, WithParser, A) || A <- Doc#doc.atts],
-        WaitFun = fun() ->
-            receive {'DOWN', ParserRef, _, _, _} -> ok end,
-            erlang:put(mochiweb_request_recv, true)
-        end,
-        {ok, Doc#doc{atts=Atts}, WaitFun, Parser};
-    ok -> ok
-    end.
 
 parse_multipart_stream(ContentType, DataFun, Ref) ->
     Parent = self(),

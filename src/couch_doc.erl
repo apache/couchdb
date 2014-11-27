@@ -15,7 +15,7 @@
 -export([to_doc_info/1,to_doc_info_path/1,parse_rev/1,parse_revs/1,rev_to_str/1,revs_to_strs/1]).
 -export([from_json_obj/1,to_json_obj/2,has_stubs/1, merge_stubs/2]).
 -export([validate_docid/1, get_validate_doc_fun/1]).
-
+-export([doc_from_multi_part_stream/2, doc_from_multi_part_stream/3]).
 -export([doc_to_multi_part_stream/5, len_doc_to_multi_part_stream/4]).
 -export([abort_multi_part_stream/1]).
 -export([restart_open_doc_revs/3]).
@@ -451,6 +451,27 @@ atts_to_mp([Att | RestAtts], Boundary, WriteFun, SendEncodedAtts)  ->
             AttFun(Att, fun(Data, _) -> WriteFun(Data) end, ok),
             WriteFun(<<"\r\n--", Boundary/binary>>),
             atts_to_mp(RestAtts, Boundary, WriteFun, SendEncodedAtts)
+    end.
+
+doc_from_multi_part_stream(ContentType, DataFun) ->
+    doc_from_multi_part_stream(ContentType, DataFun, make_ref()).
+
+doc_from_multi_part_stream(ContentType, DataFun, Ref) ->
+    case couch_httpd_multipart:parse_multipart_stream(ContentType, DataFun, Ref) of
+    {{started_open_doc_revs, NewRef}, Parser, _ParserRef} ->
+        restart_open_doc_revs(Parser, Ref, NewRef);
+    {{doc_bytes, Ref, DocBytes}, Parser, ParserRef} ->
+        Doc = from_json_obj(?JSON_DECODE(DocBytes)),
+        % we'll send the Parser process ID to the remote nodes so they can
+        % retrieve their own copies of the attachment data
+        WithParser = fun(follows) -> {follows, Parser, Ref}; (D) -> D end,
+        Atts = [couch_att:transform(data, WithParser, A) || A <- Doc#doc.atts],
+        WaitFun = fun() ->
+            receive {'DOWN', ParserRef, _, _, _} -> ok end,
+            erlang:put(mochiweb_request_recv, true)
+        end,
+        {ok, Doc#doc{atts=Atts}, WaitFun, Parser};
+    ok -> ok
     end.
 
 abort_multi_part_stream(Parser) ->

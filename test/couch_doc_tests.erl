@@ -30,7 +30,7 @@ doc_from_multi_part_stream_test() ->
     DataFun = fun() -> request(start) end,
 
     {ok, #doc{id = <<"doc0">>, atts = [_]} = Doc, _Fun, _Parser} =
-        couch_httpd_multipart:doc_from_multi_part_stream(ContentType, DataFun),
+        couch_doc:doc_from_multi_part_stream(ContentType, DataFun),
     ok.
 
 request(start) ->
