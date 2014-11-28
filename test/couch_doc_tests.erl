@@ -60,6 +60,19 @@ doc_to_multi_part_stream_test() ->
     ] = collected(),
     ok.
 
+len_doc_to_multi_part_stream_test() ->
+    Boundary = <<"simple_boundary">>,
+    JsonBytes = <<"{\n \"_id\": \"our document goes here\"\n}\n\n">>,
+    ContentType = <<"multipart/related; boundary=\"", Boundary/binary, "\"">>,
+    AttData = <<"Hello my important document">>,
+    AttLength = size(AttData),
+    Atts = [couch_att:new([
+       {name, <<"test">>}, {data, AttData}, {type, <<"text/plain">>},
+       {att_len, AttLength}, {disk_len, AttLength}])],
+    {ContentType, 258} = %% 258 is expected size of the document
+        couch_doc:len_doc_to_multi_part_stream(Boundary, JsonBytes, Atts, true),
+    ok.
+
 request(start) ->
     {ok, Doc} = file:read_file(?REQUEST_FIXTURE),
     {Doc, fun() -> request(stop) end};
