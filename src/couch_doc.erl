@@ -352,12 +352,13 @@ merge_stubs(#doc{id=Id,atts=MemBins}=StubsDoc, #doc{atts=DiskBins}) ->
     end.
 
 len_doc_to_multi_part_stream(Boundary, JsonBytes, Atts, SendEncodedAtts) ->
+    AttsToInclude = lists:filter(fun(Att) -> not couch_att:is_stub(Att) end, Atts),
     AttsSize = lists:foldl(fun(Att, AccAttsSize) ->
             [Data, Name, AttLen, DiskLen, Type, Encoding] =
                  couch_att:fetch([data, name, att_len, disk_len, type, encoding], Att),
             case Data of
             stub ->
-                AccAttsSize;
+                not_reachable = AccAttsSize;
             _ ->
                 AccAttsSize +
                 4 + % "\r\n\r\n"
@@ -389,7 +390,7 @@ len_doc_to_multi_part_stream(Boundary, JsonBytes, Atts, SendEncodedAtts) ->
                     length("\r\nContent-Encoding: ")
                 end
             end
-        end, 0, Atts),
+        end, 0, AttsToInclude),
     if AttsSize == 0 ->
         {<<"application/json">>, iolist_size(JsonBytes)};
     true ->
