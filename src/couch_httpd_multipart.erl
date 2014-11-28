@@ -2,7 +2,7 @@
 
 -export([encode_multipart_stream/5]).
 -export([decode_multipart_stream/3]).
--export([abort_multi_part_stream/1]).
+-export([abort_multipart_stream/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -191,7 +191,7 @@ atts_to_mp([{Att, Name, LengthBin, Type, Encoding} | RestAtts], Boundary, WriteF
     WriteFun(<<"\r\n--", Boundary/binary>>),
     atts_to_mp(RestAtts, Boundary, WriteFun, AttFun).
 
-abort_multi_part_stream(Parser) ->
+abort_multipart_stream(Parser) ->
     MonRef = erlang:monitor(process, Parser),
     Parser ! abort_parsing,
     receive
