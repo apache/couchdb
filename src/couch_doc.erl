@@ -408,7 +408,16 @@ len_doc_to_multi_part_stream(Boundary, JsonBytes, Atts, SendEncodedAtts) ->
 doc_to_multi_part_stream(Boundary, JsonBytes, Atts, WriteFun,
     SendEncodedAtts) ->
     AttsToInclude = lists:filter(fun(Att)-> couch_att:fetch(data, Att) /= stub end, Atts),
-    AttsDecoded = lists:map(fun(Att) ->
+    AttsDecoded = decode_attributes(AttsToInclude, SendEncodedAtts),
+    AttFun = case SendEncodedAtts of
+        false -> fun couch_att:foldl_decode/3;
+        true  -> fun couch_att:foldl/3
+    end,
+    couch_httpd_multipart:encode_multipart_stream(
+      Boundary, JsonBytes, AttsDecoded, WriteFun, AttFun).
+
+decode_attributes(Atts, SendEncodedAtts) ->
+    lists:map(fun(Att) ->
         [Name, AttLen, DiskLen, Type, Encoding] =
            couch_att:fetch([name, att_len, disk_len, type, encoding], Att),
         Len = case SendEncodedAtts of
@@ -416,13 +425,7 @@ doc_to_multi_part_stream(Boundary, JsonBytes, Atts, WriteFun,
             false -> list_to_binary(integer_to_list(DiskLen))
           end,
         {Att, Name, Len, Type, Encoding}
-      end, AttsToInclude),
-    AttFun = case SendEncodedAtts of
-        false -> fun couch_att:foldl_decode/3;
-        true  -> fun couch_att:foldl/3
-    end,
-    couch_httpd_multipart:encode_multipart_stream(
-      Boundary, JsonBytes, AttsDecoded, WriteFun, AttFun).
+      end, Atts).
 
 doc_from_multi_part_stream(ContentType, DataFun) ->
     doc_from_multi_part_stream(ContentType, DataFun, make_ref()).
