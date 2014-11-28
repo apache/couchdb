@@ -33,8 +33,46 @@ doc_from_multi_part_stream_test() ->
         couch_doc:doc_from_multi_part_stream(ContentType, DataFun),
     ok.
 
+doc_to_multi_part_stream_test() ->
+    Boundary = <<"multipart_related_boundary~~~~~~~~~~~~~~~~~~~~">>,
+    JsonBytes = <<"{\n \"_id\": \"our document goes here\"\n}\n\n">>,
+    ContentType = "multipart/related;boundary=multipart_related_boundary~~~~~~~~~~~~~~~~~~~~",
+    AttData = <<"Hello my important document">>,
+    AttLength = size(AttData),
+    Atts = [couch_att:new([
+       {name, <<"test">>}, {data, AttData}, {type, <<"text/plain">>},
+       {att_len, AttLength}, {disk_len, AttLength}])],
+    couch_doc:doc_to_multi_part_stream(Boundary, JsonBytes, Atts, fun send/1, true),
+    AttLengthStr = integer_to_binary(AttLength),
+    BoundaryLen = size(Boundary),
+    [
+     <<"--", Boundary/binary>>,
+     <<"Content-Type: application/json">>,
+     <<>>,
+     JsonBytes,
+     <<"--", Boundary/binary>>,
+     <<"Content-Disposition: attachment; filename=\"test\"">>,
+     <<"Content-Type: text/plain">>,
+     <<"Content-Length: ", AttLengthStr/binary>>,
+     <<>>,
+     AttData,
+     <<"--", Boundary:BoundaryLen/binary, "--">>
+    ] = collected(),
+    ok.
+
 request(start) ->
     {ok, Doc} = file:read_file(?REQUEST_FIXTURE),
     {Doc, fun() -> request(stop) end};
 request(stop) ->
     {"", fun() -> request(stop) end}.
+
+send(Data) ->
+    send(Data, get(data)).
+send(Data, undefined) ->
+    send(Data, []);
+send(Data, Acc) ->
+    put(data, [Acc|Data]).
+
+collected() ->
+    B = binary:replace(iolist_to_binary(get(data)), <<"\r\n">>, <<0>>, [global]),
+    binary:split(B, [<<0>>], [global]).
