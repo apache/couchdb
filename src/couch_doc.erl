@@ -407,22 +407,15 @@ len_doc_to_multi_part_stream(Boundary, JsonBytes, Atts, SendEncodedAtts) ->
 
 doc_to_multi_part_stream(Boundary, JsonBytes, Atts, WriteFun,
     SendEncodedAtts) ->
-    case lists:any(fun(Att)-> couch_att:fetch(data, Att) /= stub end, Atts) of
-    true ->
-        WriteFun([<<"--", Boundary/binary,
-                "\r\nContent-Type: application/json\r\n\r\n">>,
-                JsonBytes, <<"\r\n--", Boundary/binary>>]),
-        atts_to_mp(Atts, Boundary, WriteFun, SendEncodedAtts);
-    false ->
-        WriteFun(JsonBytes)
-    end.
+    AttsToInclude = lists:filter(fun(Att)-> couch_att:fetch(data, Att) /= stub end, Atts),
+    encode_multipart_stream(Boundary, JsonBytes, AttsToInclude, WriteFun, SendEncodedAtts).
 
 atts_to_mp([], _Boundary, WriteFun, _SendEncAtts) ->
     WriteFun(<<"--">>);
 atts_to_mp([Att | RestAtts], Boundary, WriteFun, SendEncodedAtts)  ->
     case couch_att:is_stub(Att) of
         true ->
-            atts_to_mp(RestAtts, Boundary, WriteFun, SendEncodedAtts);
+            unreacheable = atts_to_mp(RestAtts, Boundary, WriteFun, SendEncodedAtts);
         false ->
             [Name, AttLen, DiskLen, Type, Encoding] =
                 couch_att:fetch([name, att_len, disk_len, type, encoding], Att),
@@ -452,6 +445,14 @@ atts_to_mp([Att | RestAtts], Boundary, WriteFun, SendEncodedAtts)  ->
             WriteFun(<<"\r\n--", Boundary/binary>>),
             atts_to_mp(RestAtts, Boundary, WriteFun, SendEncodedAtts)
     end.
+
+encode_multipart_stream(_Boundary, JsonBytes, [], WriteFun, _SendEncodedAtts) ->
+    WriteFun(JsonBytes);
+encode_multipart_stream(Boundary, JsonBytes, Atts, WriteFun, SendEncodedAtts) ->
+    WriteFun([<<"--", Boundary/binary,
+                "\r\nContent-Type: application/json\r\n\r\n">>,
+              JsonBytes, <<"\r\n--", Boundary/binary>>]),
+    atts_to_mp(Atts, Boundary, WriteFun, SendEncodedAtts).
 
 doc_from_multi_part_stream(ContentType, DataFun) ->
     doc_from_multi_part_stream(ContentType, DataFun, make_ref()).
