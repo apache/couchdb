@@ -408,22 +408,26 @@ len_doc_to_multi_part_stream(Boundary, JsonBytes, Atts, SendEncodedAtts) ->
 doc_to_multi_part_stream(Boundary, JsonBytes, Atts, WriteFun,
     SendEncodedAtts) ->
     AttsToInclude = lists:filter(fun(Att)-> couch_att:fetch(data, Att) /= stub end, Atts),
-    encode_multipart_stream(Boundary, JsonBytes, AttsToInclude, WriteFun, SendEncodedAtts).
+    AttsDecoded = lists:map(fun(Att) ->
+        [Name, AttLen, DiskLen, Type, Encoding] =
+           couch_att:fetch([name, att_len, disk_len, type, encoding], Att),
+        Len = case SendEncodedAtts of
+            true -> list_to_binary(integer_to_list(AttLen));
+            false -> list_to_binary(integer_to_list(DiskLen))
+          end,
+        {Att, Name, Len, Type, Encoding}
+      end, AttsToInclude),
+    encode_multipart_stream(Boundary, JsonBytes, AttsDecoded, WriteFun, SendEncodedAtts).
 
 atts_to_mp([], _Boundary, WriteFun, _SendEncAtts) ->
     WriteFun(<<"--">>);
-atts_to_mp([Att | RestAtts], Boundary, WriteFun, SendEncodedAtts)  ->
+atts_to_mp([{Att, Name, LengthBin, Type, Encoding} | RestAtts], Boundary, WriteFun,
+    SendEncodedAtts)  ->
     case couch_att:is_stub(Att) of
         true ->
             unreacheable = atts_to_mp(RestAtts, Boundary, WriteFun, SendEncodedAtts);
         false ->
-            [Name, AttLen, DiskLen, Type, Encoding] =
-                couch_att:fetch([name, att_len, disk_len, type, encoding], Att),
             % write headers
-            LengthBin = case SendEncodedAtts of
-                true  -> list_to_binary(integer_to_list(AttLen));
-                false -> list_to_binary(integer_to_list(DiskLen))
-            end,
             WriteFun(<<"\r\nContent-Disposition: attachment; filename=\"", Name/binary, "\"">>),
             WriteFun(<<"\r\nContent-Type: ", Type/binary>>),
             WriteFun(<<"\r\nContent-Length: ", LengthBin/binary>>),
