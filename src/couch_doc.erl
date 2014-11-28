@@ -421,37 +421,8 @@ doc_to_multi_part_stream(Boundary, JsonBytes, Atts, WriteFun,
         false -> fun couch_att:foldl_decode/3;
         true  -> fun couch_att:foldl/3
     end,
-    encode_multipart_stream(Boundary, JsonBytes, AttsDecoded, WriteFun, AttFun).
-
-atts_to_mp([], _Boundary, WriteFun, _AttFun) ->
-    WriteFun(<<"--">>);
-atts_to_mp([{Att, Name, LengthBin, Type, Encoding} | RestAtts], Boundary, WriteFun,
-    AttFun)  ->
-    % write headers
-    WriteFun(<<"\r\nContent-Disposition: attachment; filename=\"", Name/binary, "\"">>),
-    WriteFun(<<"\r\nContent-Type: ", Type/binary>>),
-    WriteFun(<<"\r\nContent-Length: ", LengthBin/binary>>),
-    case Encoding of
-        identity ->
-            ok;
-        _ ->
-            EncodingBin = atom_to_binary(Encoding, latin1),
-            WriteFun(<<"\r\nContent-Encoding: ", EncodingBin/binary>>)
-    end,
-
-    % write data
-    WriteFun(<<"\r\n\r\n">>),
-    AttFun(Att, fun(Data, _) -> WriteFun(Data) end, ok),
-    WriteFun(<<"\r\n--", Boundary/binary>>),
-    atts_to_mp(RestAtts, Boundary, WriteFun, AttFun).
-
-encode_multipart_stream(_Boundary, JsonBytes, [], WriteFun, _AttFun) ->
-    WriteFun(JsonBytes);
-encode_multipart_stream(Boundary, JsonBytes, Atts, WriteFun, AttFun) ->
-    WriteFun([<<"--", Boundary/binary,
-                "\r\nContent-Type: application/json\r\n\r\n">>,
-              JsonBytes, <<"\r\n--", Boundary/binary>>]),
-    atts_to_mp(Atts, Boundary, WriteFun, AttFun).
+    couch_httpd_multipart:encode_multipart_stream(
+      Boundary, JsonBytes, AttsDecoded, WriteFun, AttFun).
 
 doc_from_multi_part_stream(ContentType, DataFun) ->
     doc_from_multi_part_stream(ContentType, DataFun, make_ref()).

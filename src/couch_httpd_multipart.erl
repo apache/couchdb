@@ -1,5 +1,6 @@
 -module(couch_httpd_multipart).
 
+-export([encode_multipart_stream/5]).
 -export([parse_multipart_stream/3]).
 -export([abort_multi_part_stream/1]).
 
@@ -160,6 +161,35 @@ num_mp_writers() ->
         Count -> Count
     end.
 
+encode_multipart_stream(_Boundary, JsonBytes, [], WriteFun, _AttFun) ->
+    WriteFun(JsonBytes);
+encode_multipart_stream(Boundary, JsonBytes, Atts, WriteFun, AttFun) ->
+    WriteFun([<<"--", Boundary/binary,
+                "\r\nContent-Type: application/json\r\n\r\n">>,
+              JsonBytes, <<"\r\n--", Boundary/binary>>]),
+    atts_to_mp(Atts, Boundary, WriteFun, AttFun).
+
+atts_to_mp([], _Boundary, WriteFun, _AttFun) ->
+    WriteFun(<<"--">>);
+atts_to_mp([{Att, Name, LengthBin, Type, Encoding} | RestAtts], Boundary, WriteFun,
+    AttFun)  ->
+    % write headers
+    WriteFun(<<"\r\nContent-Disposition: attachment; filename=\"", Name/binary, "\"">>),
+    WriteFun(<<"\r\nContent-Type: ", Type/binary>>),
+    WriteFun(<<"\r\nContent-Length: ", LengthBin/binary>>),
+    case Encoding of
+        identity ->
+            ok;
+        _ ->
+            EncodingBin = atom_to_binary(Encoding, latin1),
+            WriteFun(<<"\r\nContent-Encoding: ", EncodingBin/binary>>)
+    end,
+
+    % write data
+    WriteFun(<<"\r\n\r\n">>),
+    AttFun(Att, fun(Data, _) -> WriteFun(Data) end, ok),
+    WriteFun(<<"\r\n--", Boundary/binary>>),
+    atts_to_mp(RestAtts, Boundary, WriteFun, AttFun).
 
 abort_multi_part_stream(Parser) ->
     MonRef = erlang:monitor(process, Parser),
