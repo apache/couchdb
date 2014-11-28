@@ -21,7 +21,7 @@ DepDescs = [
     {cassim,            "cassim",           {branch, "master"}},
     {couch_log,         "couch-log",        {branch, "master"}},
     {config,            "config",           {branch, "master"}},
-    {chttpd,            "chttpd",           {branch, "master"}},
+    {chttpd,            "chttpd",           {branch, "27037-5-dynamic-endpoint-handlers"}, fork},
     {couch,             "couch",            {branch, "master"}},
     {couch_index,       "couch-index",      {branch, "master"}},
     {couch_mrview,      "couch-mrview",     {branch, "master"}},
@@ -36,13 +36,13 @@ DepDescs = [
     {fabric,            "fabric",           {branch, "master"}},
     {fauxton,           "fauxton",          {branch, "master"}, [raw]},
     {folsom,            "folsom",           {branch, "master"}},
-    {global_changes,    "global-changes",   {branch, "master"}},
+    {global_changes,    "global-changes",   {branch, "27037-5-dynamic-endpoint-handlers"}, fork},
     {goldrush,          "goldrush",         {tag, "0.1.6"}},
     {ibrowse,           "ibrowse",          {branch, "master"}},
     {ioq,               "ioq",              {branch, "master"}},
     {jiffy,             "jiffy",            {branch, "master"}},
     {khash,             "khash",            {branch, "master"}},
-    {mem3,              "mem3",             {branch, "master"}},
+    {mem3,              "mem3",             {branch, "27037-5-dynamic-endpoint-handlers"}, fork},
     {mochiweb,          "mochiweb",         {branch, "master"}},
     {oauth,             "oauth",            {branch, "master"}},
     {rexi,              "rexi",             {branch, "master"}},
@@ -50,6 +50,7 @@ DepDescs = [
 ],
 
 BaseUrl = "https://git-wip-us.apache.org/repos/asf/",
+ForkUrl = "https://github.com/hdiedrich/",
 
 MakeDep = fun
     ({AppName, {url, Url}, Version}) ->
@@ -58,6 +59,9 @@ MakeDep = fun
         {AppName, ".*", {git, Url, Version}, Options};
     ({AppName, RepoName, Version}) ->
         Url = BaseUrl ++ "couchdb-" ++ RepoName ++ ".git",
+        {AppName, ".*", {git, Url, Version}};
+    ({AppName, RepoName, Version, fork}) ->
+        Url = ForkUrl ++ "couchdb-" ++ RepoName ++ ".git",
         {AppName, ".*", {git, Url, Version}};
     ({AppName, RepoName, Version, Options}) ->
         Url = BaseUrl ++ "couchdb-" ++ RepoName ++ ".git",
