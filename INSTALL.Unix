@@ -118,9 +118,11 @@ Mac OS X
 ~~~~~~~~
 
 To build CouchDB from source on Mac OS X, you will need to install
-Xcode.
+the Command Line Tools:
 
-You can install the other dependencies by running:
+    xcode-select --install
+
+You can then install the other dependencies by running:
 
     brew install autoconf
     brew install autoconf-archive
