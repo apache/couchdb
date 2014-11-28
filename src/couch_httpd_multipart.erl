@@ -1,12 +1,12 @@
 -module(couch_httpd_multipart).
 
 -export([encode_multipart_stream/5]).
--export([parse_multipart_stream/3]).
+-export([decode_multipart_stream/3]).
 -export([abort_multi_part_stream/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 
-parse_multipart_stream(ContentType, DataFun, Ref) ->
+decode_multipart_stream(ContentType, DataFun, Ref) ->
     Parent = self(),
     NumMpWriters = num_mp_writers(),
     {Parser, ParserRef} = spawn_monitor(fun() ->

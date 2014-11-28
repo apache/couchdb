@@ -428,7 +428,7 @@ doc_from_multi_part_stream(ContentType, DataFun) ->
     doc_from_multi_part_stream(ContentType, DataFun, make_ref()).
 
 doc_from_multi_part_stream(ContentType, DataFun, Ref) ->
-    case couch_httpd_multipart:parse_multipart_stream(ContentType, DataFun, Ref) of
+    case couch_httpd_multipart:decode_multipart_stream(ContentType, DataFun, Ref) of
     {{started_open_doc_revs, NewRef}, Parser, _ParserRef} ->
         restart_open_doc_revs(Parser, Ref, NewRef);
     {{doc_bytes, Ref, DocBytes}, Parser, ParserRef} ->
