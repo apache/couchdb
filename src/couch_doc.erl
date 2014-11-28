@@ -422,8 +422,8 @@ decode_attributes(Atts, SendEncodedAtts) ->
         [Name, AttLen, DiskLen, Type, Encoding] =
            couch_att:fetch([name, att_len, disk_len, type, encoding], Att),
         Len = case SendEncodedAtts of
-            true -> list_to_binary(integer_to_list(AttLen));
-            false -> list_to_binary(integer_to_list(DiskLen))
+            true -> AttLen;
+            false -> DiskLen
           end,
         {Att, Name, Len, Type, Encoding}
       end, Atts).

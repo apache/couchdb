@@ -171,8 +171,9 @@ encode_multipart_stream(Boundary, JsonBytes, Atts, WriteFun, AttFun) ->
 
 atts_to_mp([], _Boundary, WriteFun, _AttFun) ->
     WriteFun(<<"--">>);
-atts_to_mp([{Att, Name, LengthBin, Type, Encoding} | RestAtts], Boundary, WriteFun,
+atts_to_mp([{Att, Name, Len, Type, Encoding} | RestAtts], Boundary, WriteFun,
     AttFun)  ->
+    LengthBin = list_to_binary(integer_to_list(Len)),
     % write headers
     WriteFun(<<"\r\nContent-Disposition: attachment; filename=\"", Name/binary, "\"">>),
     WriteFun(<<"\r\nContent-Type: ", Type/binary>>),
