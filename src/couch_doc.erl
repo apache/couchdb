@@ -427,28 +427,23 @@ atts_to_mp([], _Boundary, WriteFun, _AttFun) ->
     WriteFun(<<"--">>);
 atts_to_mp([{Att, Name, LengthBin, Type, Encoding} | RestAtts], Boundary, WriteFun,
     AttFun)  ->
-    case couch_att:is_stub(Att) of
-        true ->
-            unreacheable = atts_to_mp(RestAtts, Boundary, WriteFun, AttFun);
-        false ->
-            % write headers
-            WriteFun(<<"\r\nContent-Disposition: attachment; filename=\"", Name/binary, "\"">>),
-            WriteFun(<<"\r\nContent-Type: ", Type/binary>>),
-            WriteFun(<<"\r\nContent-Length: ", LengthBin/binary>>),
-            case Encoding of
-                identity ->
-                    ok;
-                _ ->
-                    EncodingBin = atom_to_binary(Encoding, latin1),
-                    WriteFun(<<"\r\nContent-Encoding: ", EncodingBin/binary>>)
-            end,
+    % write headers
+    WriteFun(<<"\r\nContent-Disposition: attachment; filename=\"", Name/binary, "\"">>),
+    WriteFun(<<"\r\nContent-Type: ", Type/binary>>),
+    WriteFun(<<"\r\nContent-Length: ", LengthBin/binary>>),
+    case Encoding of
+        identity ->
+            ok;
+        _ ->
+            EncodingBin = atom_to_binary(Encoding, latin1),
+            WriteFun(<<"\r\nContent-Encoding: ", EncodingBin/binary>>)
+    end,
 
-            % write data
-            WriteFun(<<"\r\n\r\n">>),
-            AttFun(Att, fun(Data, _) -> WriteFun(Data) end, ok),
-            WriteFun(<<"\r\n--", Boundary/binary>>),
-            atts_to_mp(RestAtts, Boundary, WriteFun, AttFun)
-    end.
+    % write data
+    WriteFun(<<"\r\n\r\n">>),
+    AttFun(Att, fun(Data, _) -> WriteFun(Data) end, ok),
+    WriteFun(<<"\r\n--", Boundary/binary>>),
+    atts_to_mp(RestAtts, Boundary, WriteFun, AttFun).
 
 encode_multipart_stream(_Boundary, JsonBytes, [], WriteFun, _AttFun) ->
     WriteFun(JsonBytes);
