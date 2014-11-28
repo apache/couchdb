@@ -417,15 +417,19 @@ doc_to_multi_part_stream(Boundary, JsonBytes, Atts, WriteFun,
           end,
         {Att, Name, Len, Type, Encoding}
       end, AttsToInclude),
-    encode_multipart_stream(Boundary, JsonBytes, AttsDecoded, WriteFun, SendEncodedAtts).
+    AttFun = case SendEncodedAtts of
+        false -> fun couch_att:foldl_decode/3;
+        true  -> fun couch_att:foldl/3
+    end,
+    encode_multipart_stream(Boundary, JsonBytes, AttsDecoded, WriteFun, AttFun).
 
-atts_to_mp([], _Boundary, WriteFun, _SendEncAtts) ->
+atts_to_mp([], _Boundary, WriteFun, _AttFun) ->
     WriteFun(<<"--">>);
 atts_to_mp([{Att, Name, LengthBin, Type, Encoding} | RestAtts], Boundary, WriteFun,
-    SendEncodedAtts)  ->
+    AttFun)  ->
     case couch_att:is_stub(Att) of
         true ->
-            unreacheable = atts_to_mp(RestAtts, Boundary, WriteFun, SendEncodedAtts);
+            unreacheable = atts_to_mp(RestAtts, Boundary, WriteFun, AttFun);
         false ->
             % write headers
             WriteFun(<<"\r\nContent-Disposition: attachment; filename=\"", Name/binary, "\"">>),
@@ -441,22 +445,18 @@ atts_to_mp([{Att, Name, LengthBin, Type, Encoding} | RestAtts], Boundary, WriteF
 
             % write data
             WriteFun(<<"\r\n\r\n">>),
-            AttFun = case SendEncodedAtts of
-                false -> fun couch_att:foldl_decode/3;
-                true  -> fun couch_att:foldl/3
-            end,
             AttFun(Att, fun(Data, _) -> WriteFun(Data) end, ok),
             WriteFun(<<"\r\n--", Boundary/binary>>),
-            atts_to_mp(RestAtts, Boundary, WriteFun, SendEncodedAtts)
+            atts_to_mp(RestAtts, Boundary, WriteFun, AttFun)
     end.
 
-encode_multipart_stream(_Boundary, JsonBytes, [], WriteFun, _SendEncodedAtts) ->
+encode_multipart_stream(_Boundary, JsonBytes, [], WriteFun, _AttFun) ->
     WriteFun(JsonBytes);
-encode_multipart_stream(Boundary, JsonBytes, Atts, WriteFun, SendEncodedAtts) ->
+encode_multipart_stream(Boundary, JsonBytes, Atts, WriteFun, AttFun) ->
     WriteFun([<<"--", Boundary/binary,
                 "\r\nContent-Type: application/json\r\n\r\n">>,
               JsonBytes, <<"\r\n--", Boundary/binary>>]),
-    atts_to_mp(Atts, Boundary, WriteFun, SendEncodedAtts).
+    atts_to_mp(Atts, Boundary, WriteFun, AttFun).
 
 doc_from_multi_part_stream(ContentType, DataFun) ->
     doc_from_multi_part_stream(ContentType, DataFun, make_ref()).
