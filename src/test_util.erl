@@ -20,6 +20,7 @@
 -export([request/3, request/4]).
 -export([start_couch/0, start_couch/1, stop_couch/0, stop_couch/1]).
 -export([start_config/1, stop_config/1]).
+-export([start_applications/1]).
 
 
 srcdir() ->
