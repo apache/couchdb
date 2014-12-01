@@ -4,5 +4,6 @@
 /deps
 /.rebar
 /couchperuser-*
+erl_crash.dump
 TEST-*.xml
 *.beam
