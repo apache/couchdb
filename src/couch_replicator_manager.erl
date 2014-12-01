@@ -596,11 +596,14 @@ clean_up_replications(DbName) ->
     ets:delete(?DB_TO_SEQ,DbName).
 
 
-update_rep_doc(RepDbName, RepDocId, KVs) when is_binary(RepDocId) ->
+update_rep_doc(RepDbName, RepDocId, KVs) ->
+    update_rep_doc(RepDbName, RepDocId, KVs, 1).
+
+update_rep_doc(RepDbName, RepDocId, KVs, Wait) when is_binary(RepDocId) ->
     try
         case open_rep_doc(RepDbName, RepDocId) of
             {ok, LastRepDoc} ->
-                update_rep_doc(RepDbName, LastRepDoc, KVs);
+                update_rep_doc(RepDbName, LastRepDoc, KVs, Wait * 2);
             _ ->
                 ok
         end
@@ -608,10 +611,10 @@ update_rep_doc(RepDbName, RepDocId, KVs) when is_binary(RepDocId) ->
         throw:conflict ->
             Msg = "Conflict when updating replication document `~s`. Retrying.",
             couch_log:error(Msg, [RepDocId]),
-            ok = timer:sleep(5),
-            update_rep_doc(RepDbName, RepDocId, KVs)
+            ok = timer:sleep(random:uniform(erlang:min(128, Wait)) * 100),
+            update_rep_doc(RepDbName, RepDocId, KVs, Wait * 2)
     end;
-update_rep_doc(RepDbName, #doc{body = {RepDocBody}} = RepDoc, KVs) ->
+update_rep_doc(RepDbName, #doc{body = {RepDocBody}} = RepDoc, KVs, _Try) ->
     NewRepDocBody = lists:foldl(
         fun({K, undefined}, Body) ->
                 lists:keydelete(K, 1, Body);
