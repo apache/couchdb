@@ -12,6 +12,9 @@ all: compile
 compile:
 	rebar compile
 
+test:
+	./end-to-end-test.sh
+
 plugin: compile
 	mkdir -p $(PLUGIN_DIST)
 	cp -r $(PLUGIN_DIRS) $(PLUGIN_DIST)

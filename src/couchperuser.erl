@@ -58,7 +58,13 @@ change_filter({change, {Doc}, _Prepend}, _ResType, Acc=#filter{}) ->
                     %% TODO: Let's not complicate this with GC for now!
                     Acc;
                 false ->
-                    ensure_security(User, ensure_user_db(User), Acc)
+                    {ok, Db} = ensure_user_db(User),
+                    try
+                        ensure_security(User, Db)
+                    after
+                        couch_db:close(Db)
+                    end,
+                    Acc
             end;
         _ ->
             Acc
@@ -80,27 +86,33 @@ ensure_user_db(User) ->
             couch_db:create(User_Db, [admin_ctx()])
     end.
 
-ensure_security(User, {ok, Db}, Acc) ->
-    {SecProps} = couch_db:get_security(Db),
-    {Admins} = couch_util:get_value(<<"admins">>, SecProps, {[]}),
-    Names = couch_util:get_value(<<"names">>, Admins, []),
+add_user(User, Prop, {Modified, SecProps}) ->
+    {PropValue} = couch_util:get_value(Prop, SecProps, {[]}),
+    Names = couch_util:get_value(<<"names">>, PropValue, []),
     case lists:member(User, Names) of
         true ->
-            ok;
+            {Modified, SecProps};
         false ->
-            update_security(Db, SecProps, Admins, [User | Names])
-    end,
-    couch_db:close(Db),
-    Acc.
+            {true,
+             lists:keystore(
+               Prop, 1, SecProps,
+               {Prop,
+                {lists:keystore(
+                   <<"names">>, 1, PropValue,
+                   {<<"names">>, [User | Names]})}})}
+    end.
 
-update_security(Db, SecProps, Admins, Names) ->
-    couch_db:set_security(
-      Db,
-      {lists:keystore(
-         <<"admins">>, 1, SecProps,
-         {<<"admins">>,
-          {lists:keystore(
-             <<"names">>, 1, Admins, {<<"names">>, Names})}})}).
+ensure_security(User, Db) ->
+    {SecProps} = couch_db:get_security(Db),
+    case lists:foldl(
+           fun (Prop, SAcc) -> add_user(User, Prop, SAcc) end,
+           {false, SecProps},
+           [<<"admins">>, <<"members">>]) of
+        {false, _} ->
+            ok;
+        {true, SecProps1} ->
+            couch_db:set_security(Db, {SecProps1})
+    end.
 
 user_db_name(User) ->
     <<"userdb-", (iolist_to_binary(mochihex:to_hex(User)))/binary>>.

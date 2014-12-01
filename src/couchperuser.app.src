@@ -1,7 +1,7 @@
 %% -*- mode: erlang -*-
 {application, couchperuser, [
     {description, "couchperuser - maintains per-user databases in CouchDB"},
-    {vsn, "1.0.1"},
+    {vsn, "1.1.0"},
     {modules, []},
     {registered, [couchperuser]},
     {applications, [kernel, stdlib]},
