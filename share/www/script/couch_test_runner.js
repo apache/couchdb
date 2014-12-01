@@ -363,6 +363,14 @@ function makeDocs(start, end, templateDoc) {
 }
 
 function run_on_modified_server(settings, fun) {
+  // Clone settings so we don't overwrite oldValue when making nested run_on_modified_server calls
+  var settings = settings.map(function(s) {
+    return {
+      section: s.section,
+      key: s.key,
+      value: s.value
+    };
+  });
   try {
     // set the settings
     for(var i=0; i < settings.length; i++) {

@@ -69,3 +69,4 @@ eunit: compile
 
 javascript: compile
 	@dev/run -q test/javascript/run
+	@dev/run -n 1 -q test/javascript/run share/www/script/test/users_db_security.js

@@ -10,7 +10,34 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 couchTests.users_db_security = function(debug) {
+  var clusterVars = [{
+      section: "cluster",
+      key: "q",
+      value: "1"
+    },
+    {
+      section: "cluster",
+      key: "n",
+      value: "1"
+    },
+    {
+      section: "cluster",
+      key: "w",
+      value: "1"
+    },
+    {
+      section: "cluster",
+      key: "r",
+      value: "1"
+    }
+  ];
   function run_test_against_url(url) {
+    // Ensure users DB is created with desired Q/N
+    run_on_modified_server(clusterVars, function() {
+      CouchDB.urlPrefix = url;
+      new CouchDB("test_suite_users", {"X-Couch-Full-Commit":"false"});
+    });
+
     CouchDB.urlPrefix = url;
     var usersDb = new CouchDB("test_suite_users", {"X-Couch-Full-Commit":"false"});
     if (debug) debugger;
@@ -113,7 +140,7 @@ couchTests.users_db_security = function(debug) {
 
       CouchDB.urlPrefix = '';
       // create server admin
-      run_on_modified_server([
+      run_on_modified_server(clusterVars.concat([
         {
           section: "couch_httpd_auth",
           key: "iterations",
@@ -124,7 +151,7 @@ couchTests.users_db_security = function(debug) {
           key: "jan",
           value: "apple"
         }
-      ], function() {
+      ]), function() {
 
         CouchDB.urlPrefix = url;
         // anonymous should not be able to read an existing user's user document
@@ -327,7 +354,7 @@ couchTests.users_db_security = function(debug) {
         TEquals(true, CouchDB.login("jan", "apple").ok);
       });
 
-      run_on_modified_server([
+      run_on_modified_server(clusterVars.concat([
         {
           section: "couch_httpd_auth",
           key: "iterations",
@@ -363,7 +390,7 @@ couchTests.users_db_security = function(debug) {
           key: "jan",
           value: "apple"
         }
-      ], function() {
+      ]), function() {
         var res = usersDb.open("org.couchdb.user:jchris");
         TEquals("jchris", res.name);
         TEquals("user", res.type);
@@ -396,7 +423,7 @@ couchTests.users_db_security = function(debug) {
         TEquals(true, CouchDB.login("jan", "apple").ok);
       });
 
-      run_on_modified_server([
+      run_on_modified_server(clusterVars.concat([
         {
           section: "couch_httpd_auth",
           key: "iterations",
@@ -432,7 +459,7 @@ couchTests.users_db_security = function(debug) {
           key: "jan",
           value: "apple"
         }
-      ], function() {
+      ]), function() {
         TEquals(true, CouchDB.login("jchris", "couch").ok);
 
         try {
@@ -455,13 +482,13 @@ couchTests.users_db_security = function(debug) {
     };
 
     usersDb.deleteDb();
-    run_on_modified_server(
+    run_on_modified_server(clusterVars.concat(
       [{section: "couch_httpd_auth",
         key: "iterations", value: "1"},
        {section: "couch_httpd_auth",
         key: "authentication_db", value: usersDb.name},
        {section: "chttpd_auth",
-        key: "authentication_db", value: usersDb.name}],
+        key: "authentication_db", value: usersDb.name}]),
       testFun
     );
     usersDb.deleteDb(); // cleanup

@@ -37,6 +37,10 @@ SCRIPTS = """
     test/javascript/test_setup.js
 """.split()
 
+EXCLUDE = """
+    share/www/script/test/users_db_security.js
+""".split()
+
 RUNNER = "test/javascript/cli_runner.js"
 
 
@@ -109,7 +113,8 @@ def main():
         args = ["share/www/script/test"]
     for name in args:
         if os.path.isdir(name):
-            tests.extend(glob.glob(os.path.join(name, "*.js")))
+            tests_in_dir = glob.glob(os.path.join(name, "*.js"))
+            tests.extend([t for t in tests_in_dir if not t in EXCLUDE])
         elif os.path.isfile(name):
             tests.append(name)
         else:
