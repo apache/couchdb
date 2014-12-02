@@ -354,42 +354,8 @@ merge_stubs(#doc{id=Id,atts=MemBins}=StubsDoc, #doc{atts=DiskBins}) ->
 len_doc_to_multi_part_stream(Boundary, JsonBytes, Atts, SendEncodedAtts) ->
     AttsToInclude = lists:filter(fun(Att) -> not couch_att:is_stub(Att) end, Atts),
     AttsDecoded = decode_attributes(AttsToInclude, SendEncodedAtts),
-    AttsSize = lists:foldl(fun({_Att, Name, Len, Type, Encoding}, AccAttsSize) ->
-          AccAttsSize +
-          4 + % "\r\n\r\n"
-          length(integer_to_list(Len)) +
-          Len +
-          4 + % "\r\n--"
-          size(Boundary) +
-          % attachment headers
-          % (the length of the Content-Length has already been set)
-          size(Name) +
-          size(Type) +
-          length("\r\nContent-Disposition: attachment; filename=\"\"") +
-          length("\r\nContent-Type: ") +
-          length("\r\nContent-Length: ") +
-          case Encoding of
-          identity ->
-              0;
-           _ ->
-              length(atom_to_list(Encoding)) +
-              length("\r\nContent-Encoding: ")
-          end
-        end, 0, AttsDecoded),
-    if AttsSize == 0 ->
-        {<<"application/json">>, iolist_size(JsonBytes)};
-    true ->
-        {<<"multipart/related; boundary=\"", Boundary/binary, "\"">>,
-            2 + % "--"
-            size(Boundary) +
-            36 + % "\r\ncontent-type: application/json\r\n\r\n"
-            iolist_size(JsonBytes) +
-            4 + % "\r\n--"
-            size(Boundary) +
-            + AttsSize +
-            2 % "--"
-            }
-    end.
+    couch_httpd_multipart:length_multipart_stream(Boundary, JsonBytes, AttsDecoded).
+
 
 doc_to_multi_part_stream(Boundary, JsonBytes, Atts, WriteFun,
     SendEncodedAtts) ->

@@ -2,6 +2,7 @@
 
 -export([encode_multipart_stream/5]).
 -export([decode_multipart_stream/3]).
+-export([length_multipart_stream/3]).
 -export([abort_multipart_stream/1]).
 
 -include_lib("couch/include/couch_db.hrl").
@@ -191,6 +192,44 @@ atts_to_mp([{Att, Name, Len, Type, Encoding} | RestAtts], Boundary, WriteFun,
     AttFun(Att, fun(Data, _) -> WriteFun(Data) end, ok),
     WriteFun(<<"\r\n--", Boundary/binary>>),
     atts_to_mp(RestAtts, Boundary, WriteFun, AttFun).
+
+length_multipart_stream(Boundary, JsonBytes, Atts) ->
+    AttsSize = lists:foldl(fun({_Att, Name, Len, Type, Encoding}, AccAttsSize) ->
+          AccAttsSize +
+          4 + % "\r\n\r\n"
+          length(integer_to_list(Len)) +
+          Len +
+          4 + % "\r\n--"
+          size(Boundary) +
+          % attachment headers
+          % (the length of the Content-Length has already been set)
+          size(Name) +
+          size(Type) +
+          length("\r\nContent-Disposition: attachment; filename=\"\"") +
+          length("\r\nContent-Type: ") +
+          length("\r\nContent-Length: ") +
+          case Encoding of
+          identity ->
+              0;
+           _ ->
+              length(atom_to_list(Encoding)) +
+              length("\r\nContent-Encoding: ")
+          end
+        end, 0, Atts),
+    if AttsSize == 0 ->
+        {<<"application/json">>, iolist_size(JsonBytes)};
+    true ->
+        {<<"multipart/related; boundary=\"", Boundary/binary, "\"">>,
+            2 + % "--"
+            size(Boundary) +
+            36 + % "\r\ncontent-type: application/json\r\n\r\n"
+            iolist_size(JsonBytes) +
+            4 + % "\r\n--"
+            size(Boundary) +
+            + AttsSize +
+            2 % "--"
+            }
+    end.
 
 abort_multipart_stream(Parser) ->
     MonRef = erlang:monitor(process, Parser),
