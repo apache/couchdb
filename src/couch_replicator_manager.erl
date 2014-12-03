@@ -32,6 +32,9 @@
 
 -export([handle_db_event/3]).
 
+%% exported but private
+-export([start_replication/2]).
+
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("mem3/include/mem3.hrl").
 -include("couch_replicator.hrl").
@@ -451,7 +454,7 @@ maybe_start_replication(State, DbName, DocId, RepDoc) ->
         true = ets:insert(?DOC_TO_REP, {{DbName, DocId}, RepId}),
         couch_log:notice("Attempting to start replication `~s` (document `~s`).",
             [pp_rep_id(RepId), DocId]),
-        Pid = spawn_link(fun() -> start_replication(Rep, 0) end),
+        Pid = spawn_link(?MODULE, start_replication, [Rep, 0]),
         State#state{rep_start_pids = [Pid | State#state.rep_start_pids]};
     #rep_state{rep = #rep{doc_id = DocId}} ->
         State;
@@ -568,7 +571,7 @@ maybe_retry_replication(RepState, Error, State) ->
     couch_log:error("Error in replication `~s` (triggered by document `~s`): ~s"
         "~nRestarting replication in ~p seconds.",
         [pp_rep_id(RepId), DocId, to_binary(error_reason(Error)), Wait]),
-    Pid = spawn_link(fun() -> start_replication(Rep, Wait) end),
+    Pid = spawn_link(?MODULE, start_replication, [Rep, Wait]),
     State#state{rep_start_pids = [Pid | State#state.rep_start_pids]}.
 
 
