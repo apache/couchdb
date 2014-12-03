@@ -17,7 +17,6 @@
 -export([validate_docid/1, get_validate_doc_fun/1]).
 -export([doc_from_multi_part_stream/2, doc_from_multi_part_stream/3]).
 -export([doc_to_multi_part_stream/5, len_doc_to_multi_part_stream/4]).
--export([abort_multi_part_stream/1]).
 -export([restart_open_doc_revs/3]).
 -export([to_path/1]).
 
@@ -25,6 +24,7 @@
 -export([is_deleted/1]).
 
 %% deprecated
+-export([abort_multi_part_stream/1]).
 -export([num_mp_writers/1]).
 
 -include_lib("couch/include/couch_db.hrl").
@@ -402,10 +402,6 @@ doc_from_multi_part_stream(ContentType, DataFun, Ref) ->
     ok -> ok
     end.
 
-abort_multi_part_stream(Parser) ->
-    couch_log:warning("couch_doc:abort_multi_part_stream/1 is deprecated use couch_httpd_multipart:abort_multipart_stream/1", []),
-    couch_httpd_multipart:abort_multipart_stream(Parser).
-
 restart_open_doc_revs(Parser, Ref, NewRef) ->
     unlink(Parser),
     exit(Parser, kill),
@@ -434,6 +430,10 @@ with_ejson_body(#doc{body = {_}} = Doc) ->
     Doc.
 
 %% deprecated
+abort_multi_part_stream(Parser) ->
+    couch_log:warning("couch_doc:abort_multi_part_stream/1 is deprecated use couch_httpd_multipart:abort_multipart_stream/1", []),
+    couch_httpd_multipart:abort_multipart_stream(Parser).
+
 num_mp_writers(N) ->
     couch_log:warning("couch_doc:num_mp_writers/1 is deprecated use couch_httpd_multipart:num_mp_writers/1", []),
     couch_httpd_multipart:num_mp_writers(N).
