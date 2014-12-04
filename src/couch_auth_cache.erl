@@ -16,7 +16,8 @@
 -behaviour(config_listener).
 
 % public API
--export([get_user_creds/1, get_admin/1, add_roles/2]).
+-export([get_user_creds/1, get_user_creds/2, update_user_creds/3]).
+-export([get_admin/1, add_roles/2]).
 
 % gen_server API
 -export([start_link/0, init/1, handle_call/3, handle_info/2, handle_cast/2]).
@@ -42,12 +43,18 @@
 
 
 -spec get_user_creds(UserName::string() | binary()) ->
-    Credentials::list() | nil.
-
-get_user_creds(UserName) when is_list(UserName) ->
-    get_user_creds(?l2b(UserName));
+    {ok, Credentials::list(), term()} | nil.
 
 get_user_creds(UserName) ->
+    get_user_creds(nil, UserName).
+
+-spec get_user_creds(Req::#httpd{}, UserName::string() | binary()) ->
+    {ok, Credentials::list(), term()} | nil.
+
+get_user_creds(Req, UserName) when is_list(UserName) ->
+    get_user_creds(Req, ?l2b(UserName));
+
+get_user_creds(_Req, UserName) ->
     UserCreds = case get_admin(UserName) of
     nil ->
         get_from_cache(UserName);
@@ -60,6 +67,13 @@ get_user_creds(UserName) ->
         end
     end,
     validate_user_creds(UserCreds).
+
+update_user_creds(_Req, UserDoc, _AuthCtx) ->
+    DbNameList = config:get("couch_httpd_auth", "authentication_db", "_users"),
+    couch_util:with_db(?l2b(DbNameList), fun(UserDb) ->
+        {ok, _NewRev} = couch_db:update_doc(UserDb, UserDoc, []),
+        ok
+    end).
 
 add_roles(Props, ExtraRoles) ->
     CurrentRoles = couch_util:get_value(<<"roles">>, Props),
@@ -123,7 +137,7 @@ validate_user_creds(UserCreds) ->
               " is used for authentication purposes.">>
         })
     end,
-    UserCreds.
+    {ok, UserCreds, nil}.
 
 
 start_link() ->
