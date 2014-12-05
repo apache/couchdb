@@ -21,6 +21,11 @@
 -export([cookie_auth_header/2]).
 -export([handle_session_req/1, handle_session_req/2]).
 
+-export([authenticate/2, verify_totp/2, maybe_upgrade_password_hash/6]).
+-export([ensure_cookie_auth_secret/0, make_cookie_time/0]).
+-export([cookie_auth_cookie/4, cookie_scheme/1]).
+-export([auth_name/1, maybe_value/3]).
+
 -import(couch_httpd, [header_value/2, send_json/2,send_json/4, send_method_not_allowed/2]).
 
 -compile({no_auto_import,[integer_to_binary/1]}).
