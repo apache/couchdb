@@ -453,7 +453,11 @@
           options.error = function() {
             if (active) {
               setTimeout(getChangesSince, timeout);
-              timeout = timeout * 2;
+              
+              if (timeout < 5000)
+                {
+                timeout = timeout * 2;
+                }
             }
           };
           // actually make the changes request
