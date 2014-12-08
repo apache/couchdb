@@ -173,3 +173,7 @@ This product also includes the following third-party components:
 * ?assertNotMatch in couch_eunit.hrl (https://github.com/richcarl/eunit/blob/master/include/eunit.hrl#L200-L219)
 
    Copyright (C) 2004-2006 Mickaël Rémond, Richard Carlsson
+
+* src/fauxton/test/nightwatch_tests/custom-commands/waitForAttribute.js
+
+   Copyright (c) 2014 Dave Koo
