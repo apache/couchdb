@@ -582,6 +582,10 @@ db_doc_req(#httpd{method='GET'}=Req, Db, DocId) ->
             undefined       -> [];
             AcceptHeader    -> string:tokens(AcceptHeader, ", ")
         end,
+        case Results of
+            [] when Revs == all ->
+                chttpd:send_error(Req, {not_found, missing});
+            _Else ->
         case lists:member("multipart/mixed", AcceptedTypes) of
         false ->
             {ok, Resp} = start_json_response(Req, 200),
@@ -607,6 +611,7 @@ db_doc_req(#httpd{method='GET'}=Req, Db, DocId) ->
             end_json_response(Resp);
         true ->
             send_docs_multipart(Req, Results, Options)
+        end
         end
     end;
 
