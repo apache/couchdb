@@ -34,7 +34,7 @@ DepDescs = [
     {ddoc_cache,        "ddoc-cache",       {branch, "master"}},
     {ets_lru,           "ets-lru",          {branch, "master"}},
     {fabric,            "fabric",           {branch, "master"}},
-    {fauxton,           "fauxton",          {branch, "goodbye-futon"}, [raw]},
+    {fauxton,           "fauxton",          {branch, "master"}, [raw]},
     {folsom,            "folsom",           {branch, "master"}},
     {global_changes,    "global-changes",   {branch, "master"}},
     {goldrush,          "goldrush",         {tag, "0.1.6"}},
