@@ -75,12 +75,28 @@ open_validation_funs(DbName) ->
             ddoc_cache_opener:recover_validation_funs(DbName)
     end.
 
+open_custom(DbName, Mod) ->
+    Key = {DbName, Mod},
+    case ddoc_cache_opener:lookup(Key) of
+        {ok, _} = Resp ->
+            couch_stats:increment_counter([ddoc_cache, hit]),
+            Resp;
+        missing ->
+            couch_stats:increment_counter([ddoc_cache, miss]),
+            ddoc_cache_opener:open_doc(DbName, Mod);
+        recover ->
+            couch_stats:increment_counter([ddoc_cache, recovery]),
+            Mod:recover(DbName)
+    end.
+
 evict(ShardDbName, DDocIds) ->
     DbName = mem3:dbname(ShardDbName),
     ddoc_cache_opener:evict_docs(DbName, DDocIds).
 
 open(DbName, validation_funs) ->
     open_validation_funs(DbName);
+open(DbName, Module) when is_atom(Module) ->
+    open_custom(DbName, Module);
 open(DbName, <<"_design/", _/binary>>=DDocId) when is_binary(DbName) ->
     open_doc(DbName, DDocId);
 open(DbName, DDocId) when is_binary(DDocId) ->

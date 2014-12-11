@@ -187,7 +187,10 @@ handle_cast({do_evict, DbName}, St) ->
     handle_cast({do_evict, DbName, DDocIds}, St);
 
 handle_cast({do_evict, DbName, DDocIds}, St) ->
-    ets_lru:remove(?CACHE, {DbName, validation_funs}),
+    CustomKeys = lists:flatten(ets_lru:match(?CACHE, {DbName, '$1'}, '_')),
+    lists:foreach(fun(Mod) ->
+        ets_lru:remove(?CACHE, {DbName, Mod})
+    end, CustomKeys),
     lists:foreach(fun(DDocId) ->
         Revs = ets_lru:match(?CACHE, {DbName, DDocId, '$1'}, '_'),
         lists:foreach(fun([Rev]) ->
@@ -230,12 +233,26 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 -spec fetch_doc_data({dbname(), validation_funs}) -> no_return();
+                    ({dbname(), atom()}) -> no_return();
                     ({dbname(), docid()}) -> no_return();
                     ({dbname(), docid(), revision()}) -> no_return().
 fetch_doc_data({DbName, validation_funs}=OpenerKey) ->
     {ok, Funs} = recover_validation_funs(DbName),
     ok = ets_lru:insert(?CACHE, OpenerKey, Funs),
     exit({open_ok, OpenerKey, {ok, Funs}});
+fetch_doc_data({DbName, Mod}=OpenerKey) when is_atom(Mod) ->
+    % This is not actually a docid but rather a custom cache key.
+    % Treat the argument as a code module and invoke its recover function.
+    try Mod:recover(DbName) of
+        {ok, Result} ->
+            ok = ets_lru:insert(?CACHE, OpenerKey, Result),
+            exit({open_ok, OpenerKey, {ok, Result}});
+        Else ->
+            exit({open_ok, OpenerKey, Else})
+    catch
+        Type:Reason ->
+            exit({open_error, OpenerKey, Type, Reason})
+    end;
 fetch_doc_data({DbName, DocId}=OpenerKey) ->
     try recover_doc(DbName, DocId) of
         {ok, Doc} ->
