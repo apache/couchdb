@@ -7,6 +7,7 @@
 
 -export([
     list/1,
+    recover/1,
 
     new/2,
     validate/1,
@@ -36,6 +37,10 @@
 
 
 list(Db) ->
+    {ok, Indexes} = ddoc_cache:open(Db, ?MODULE),
+    Indexes.
+
+recover(Db) ->
     {ok, DDocs0} = mango_util:open_ddocs(Db),
     Pred = fun({Props}) ->
         case proplists:get_value(<<"language">>, Props) of
@@ -45,9 +50,9 @@ list(Db) ->
     end,
     DDocs = lists:filter(Pred, DDocs0),
     Special = special(Db),
-    Special ++ lists:flatmap(fun(Doc) ->
+    {ok, Special ++ lists:flatmap(fun(Doc) ->
         from_ddoc(Db, Doc)
-    end, DDocs).
+    end, DDocs)}.
 
 
 new(Db, Opts) ->
