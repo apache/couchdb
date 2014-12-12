@@ -13,7 +13,7 @@
 -module(chttpd_auth_cache).
 -behaviour(gen_server).
 
--export([start_link/0, get_user_creds/1]).
+-export([start_link/0, get_user_creds/2, update_user_creds/3]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
 	 code_change/3]).
 -export([listen_for_changes/1, changes_callback/2]).
@@ -33,10 +33,10 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-get_user_creds(UserName) when is_list(UserName) ->
-    get_user_creds(?l2b(UserName));
-get_user_creds(UserName) when is_binary(UserName) ->
-    case couch_auth_cache:get_admin(UserName) of
+get_user_creds(Req, UserName) when is_list(UserName) ->
+    get_user_creds(Req, ?l2b(UserName));
+get_user_creds(_Req, UserName) when is_binary(UserName) ->
+    Resp = case couch_auth_cache:get_admin(UserName) of
     nil ->
         get_from_cache(UserName);
     Props ->
@@ -47,6 +47,26 @@ get_user_creds(UserName) when is_binary(UserName) ->
             couch_auth_cache:add_roles(Props,
 	        couch_util:get_value(<<"roles">>, UserProps))
         end
+    end,
+    case Resp of
+        nil -> nil;
+        _ -> {ok, Resp, nil}
+    end.
+
+update_user_creds(_Req, UserDoc, _Ctx) ->
+    {_, Ref} = spawn_monitor(fun() ->
+        case fabric:update_doc(dbname(), UserDoc, []) of
+            {ok, _} ->
+                exit(ok);
+            Else ->
+                exit(Else)
+        end
+    end),
+    receive
+        {'DOWN', Ref, _, _, ok} ->
+            ok;
+        {'DOWN', Ref, _, _, Else} ->
+            Else
     end.
 
 get_from_cache(UserName) ->
