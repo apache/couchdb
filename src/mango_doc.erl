@@ -10,6 +10,7 @@
 
     get_field/2,
     get_field/3,
+    parse_field/1,
     rem_field/2,
     set_field/3
 ]).
