@@ -23,6 +23,8 @@
 -define(JSON_ENCODE(V), couch_util:json_encode(V)).
 -define(JSON_DECODE(V), couch_util:json_decode(V)).
 
+-define(IS_OLD_RECORD(V, R), (tuple_size(V) /= tuple_size(R))).
+
 -define(b2l(V), binary_to_list(V)).
 -define(l2b(V), list_to_binary(V)).
 -define(i2b(V), couch_util:integer_to_boolean(V)).
