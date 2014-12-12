@@ -78,7 +78,7 @@ set_user_ctx(Req, Name) ->
             couch_log:debug("OAuth handler: user `~p` credentials not found",
                             [Name]),
             Req;
-        User ->
+        {ok, User, _AuthCtx} ->
             Roles = couch_util:get_value(<<"roles">>, User, []),
             Req#httpd{user_ctx=#user_ctx{name=Name, roles=Roles}}
     end.
