@@ -21,7 +21,8 @@
 go(_, [], _) ->
     {ok, []};
 go(DbName, AllDocs0, Opts) ->
-    AllDocs = tag_docs(AllDocs0),
+    AllDocs1 = before_doc_update(DbName, AllDocs0),
+    AllDocs = tag_docs(AllDocs1),
     validate_atomic_update(DbName, AllDocs, lists:member(all_or_nothing, Opts)),
     Options = lists:delete(all_or_nothing, Opts),
     GroupedDocs = lists:map(fun({#shard{name=Name, node=Node} = Shard, Docs}) ->
@@ -96,6 +97,28 @@ handle_message({not_found, no_db_file} = X, Worker, Acc0) ->
     handle_message({ok, [X || _D <- Docs]}, Worker, Acc0);
 handle_message({bad_request, Msg}, _, _) ->
     throw({bad_request, Msg}).
+
+before_doc_update(DbName, Docs) ->
+    case {is_replicator_db(DbName), is_users_db(DbName)} of
+        {true, _} ->
+            lists:map(fun couch_replicator_manager:before_doc_update/1, Docs);
+        {_, true} ->
+            lists:map(fun couch_users_db:before_doc_update/1, Docs);
+        _ ->
+            Docs
+    end.
+
+is_replicator_db(DbName) ->
+    ConfigName = list_to_binary(config:get("replicator", "db", "_replicator")),
+    DbName == ConfigName orelse path_ends_with(DbName, <<"_replicator">>).
+
+is_users_db(DbName) ->
+    ConfigName = list_to_binary(config:get(
+        "couch_httpd_auth", "authentication_db", "_users")),
+    DbName == ConfigName orelse path_ends_with(DbName, <<"_users">>).
+
+path_ends_with(Path, Suffix) ->
+    Suffix == lists:last(binary:split(mem3:dbname(Path), <<"/">>, [global])).
 
 tag_docs([]) ->
     [];
