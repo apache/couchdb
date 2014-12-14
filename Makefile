@@ -71,6 +71,8 @@ eunit: compile
 javascript: compile
 	@dev/run -q test/javascript/run
 
-fauxton:
-# This next line so Noah throws his arms up in dispair and teaches me proper Make again -- Love, Jan
-	@if [ ! -d share/www ]; then echo "Building Fauxton" &&  cd src/fauxton && npm install && grunt couchdb; fi
+fauxton: share/www
+
+share/www:
+	@echo "Building Fauxton"
+	@cd src/fauxton && npm install && grunt couchdb
