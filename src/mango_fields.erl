@@ -23,13 +23,14 @@ extract(Doc, all_fields) ->
     Doc;
 extract(Doc, Fields) ->
     lists:foldl(fun(F, NewDoc) ->
-        case mango_doc:get_field(Doc, F) of
+        {ok, Path} = mango_doc:parse_field(F),
+        case mango_doc:get_field(Doc, Path) of
             not_found ->
                 NewDoc;
             bad_path ->
                 NewDoc;
             Value ->
-                mango_doc:set_field(NewDoc, F, Value)
+                mango_doc:set_field(NewDoc, Path, Value)
         end
     end, {[]}, Fields).
 

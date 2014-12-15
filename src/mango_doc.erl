@@ -10,6 +10,7 @@
 
     get_field/2,
     get_field/3,
+    parse_field/1,
     rem_field/2,
     set_field/3
 ]).
@@ -525,6 +526,15 @@ set_elem(I, [Item | Rest], Value) when I > 1 ->
     [Item | set_elem(I-1, Rest, Value)].
 
 parse_field(Field) ->
+    case binary:match(Field, <<"\\">>, []) of
+        nomatch ->
+            % Fast path, no regex required
+            {ok, check_non_empty(Field, binary:split(Field, <<".">>, [global]))};
+        _ ->
+            parse_field_slow(Field)
+    end.
+
+parse_field_slow(Field) ->
     Path = lists:map(fun
         (P) when P =:= <<>> ->
             ?MANGO_ERROR({invalid_field_name, Field});
@@ -532,6 +542,14 @@ parse_field(Field) ->
             re:replace(P, <<"\\\\">>, <<>>, [global, {return, binary}])
     end, re:split(Field, <<"(?<!\\\\)\\.">>)),
     {ok, Path}.
+
+check_non_empty(Field, Parts) ->
+    case lists:member(<<>>, Parts) of
+        true ->
+            ?MANGO_ERROR({invalid_field_name, Field});
+        false ->
+            Parts
+    end.
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
