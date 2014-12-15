@@ -159,11 +159,14 @@ handle_cleanup_req(Req, _Db) ->
 
 
 all_docs_req(Req, Db, Keys) ->
+    all_docs_req(Req, Db, Keys, undefined).
+
+all_docs_req(Req, Db, Keys, NS) ->
     case couch_db:is_system_db(Db) of
     true ->
         case (catch couch_db:check_is_admin(Db)) of
         ok ->
-            do_all_docs_req(Req, Db, Keys);
+            do_all_docs_req(Req, Db, Keys, NS);
         _ ->
             DbName = ?b2l(Db#db.name),
             case config:get("couch_httpd_auth",
@@ -174,7 +177,7 @@ all_docs_req(Req, Db, Keys) ->
                 PublicFields = config:get("couch_httpd_auth", "public_fields"),
                 case {UsersDbPublic, PublicFields} of
                 {"true", PublicFields} when PublicFields =/= undefined ->
-                    do_all_docs_req(Req, Db, Keys);
+                    do_all_docs_req(Req, Db, Keys, NS);
                 {_, _} ->
                     throw({forbidden, <<"Only admins can access _all_docs",
                                         " of system databases.">>})
@@ -185,10 +188,10 @@ all_docs_req(Req, Db, Keys) ->
             end
         end;
     false ->
-        do_all_docs_req(Req, Db, Keys)
+        do_all_docs_req(Req, Db, Keys, NS)
     end.
 
-do_all_docs_req(Req, Db, Keys) ->
+do_all_docs_req(Req, Db, Keys, _NS) ->
     Args0 = parse_params(Req, Keys),
     ETagFun = fun(Sig, Acc0) ->
         check_view_etag(Sig, Acc0, Req)
