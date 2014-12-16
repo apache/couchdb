@@ -582,31 +582,36 @@ db_doc_req(#httpd{method='GET'}=Req, Db, DocId) ->
             undefined       -> [];
             AcceptHeader    -> string:tokens(AcceptHeader, ", ")
         end,
-        case lists:member("multipart/mixed", AcceptedTypes) of
-        false ->
-            {ok, Resp} = start_json_response(Req, 200),
-            send_chunk(Resp, "["),
-            % We loop through the docs. The first time through the separator
-            % is whitespace, then a comma on subsequent iterations.
-            lists:foldl(
-                fun(Result, AccSeparator) ->
-                    case Result of
-                    {ok, Doc} ->
-                        JsonDoc = couch_doc:to_json_obj(Doc, Options),
-                        Json = ?JSON_ENCODE({[{ok, JsonDoc}]}),
-                        send_chunk(Resp, AccSeparator ++ Json);
-                    {{not_found, missing}, RevId} ->
-                        RevStr = couch_doc:rev_to_str(RevId),
-                        Json = ?JSON_ENCODE({[{<<"missing">>, RevStr}]}),
-                        send_chunk(Resp, AccSeparator ++ Json)
-                    end,
-                    "," % AccSeparator now has a comma
-                end,
-                "", Results),
-            send_chunk(Resp, "]"),
-            end_json_response(Resp);
-        true ->
-            send_docs_multipart(Req, Results, Options)
+        case Results of
+            [] when Revs == all ->
+                chttpd:send_error(Req, {not_found, missing});
+            _Else ->
+                case lists:member("multipart/mixed", AcceptedTypes) of
+                false ->
+                    {ok, Resp} = start_json_response(Req, 200),
+                    send_chunk(Resp, "["),
+                    % We loop through the docs. The first time through the separator
+                    % is whitespace, then a comma on subsequent iterations.
+                    lists:foldl(
+                        fun(Result, AccSeparator) ->
+                            case Result of
+                            {ok, Doc} ->
+                                JsonDoc = couch_doc:to_json_obj(Doc, Options),
+                                Json = ?JSON_ENCODE({[{ok, JsonDoc}]}),
+                                send_chunk(Resp, AccSeparator ++ Json);
+                            {{not_found, missing}, RevId} ->
+                                RevStr = couch_doc:rev_to_str(RevId),
+                                Json = ?JSON_ENCODE({[{<<"missing">>, RevStr}]}),
+                                send_chunk(Resp, AccSeparator ++ Json)
+                            end,
+                            "," % AccSeparator now has a comma
+                        end,
+                        "", Results),
+                    send_chunk(Resp, "]"),
+                    end_json_response(Resp);
+                true ->
+                    send_docs_multipart(Req, Results, Options)
+                end
         end
     end;
 
