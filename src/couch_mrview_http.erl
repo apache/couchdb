@@ -191,12 +191,13 @@ all_docs_req(Req, Db, Keys, NS) ->
         do_all_docs_req(Req, Db, Keys, NS)
     end.
 
-do_all_docs_req(Req, Db, Keys, _NS) ->
+do_all_docs_req(Req, Db, Keys, NS) ->
     Args0 = parse_params(Req, Keys),
+    Args1 = set_namespace(NS, Args0),
     ETagFun = fun(Sig, Acc0) ->
         check_view_etag(Sig, Acc0, Req)
     end,
-    Args = Args0#mrargs{preflight_fun=ETagFun},
+    Args = Args1#mrargs{preflight_fun=ETagFun},
     {ok, Resp} = couch_httpd:etag_maybe(Req, fun() ->
         VAcc0 = #vacc{db=Db, req=Req},
         DbName = ?b2l(Db#db.name),
@@ -211,6 +212,9 @@ do_all_docs_req(Req, Db, Keys, _NS) ->
         true -> {ok, Resp#vacc.resp};
         _ -> {ok, Resp}
     end.
+
+set_namespace(NS, #mrargs{extra = Extra} = Args) ->
+    Args#mrargs{extra = [{namespace, NS} | Extra]}.
 
 is_admin(Db) ->
     case catch couch_db:check_is_admin(Db) of
