@@ -131,6 +131,8 @@ skip(#state{revs=Revs} = State) ->
 
 maybe_reply(_, [], false, _, _) ->
     noreply;
+maybe_reply(_, [], true, _, _) ->
+    {reply, {ok, []}};
 maybe_reply(DbName, ReplyDict, Complete, RepairDocs, R) ->
     case Complete orelse lists:all(fun({_,{_, C}}) -> C >= R end, ReplyDict) of
     true ->
