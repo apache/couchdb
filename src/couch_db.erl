@@ -1210,12 +1210,28 @@ enum_docs_since(Db, SinceSeq, InFun, Acc, Options) ->
             [{start_key, SinceSeq + 1} | Options]),
     {ok, enum_docs_since_reduce_to_count(LastReduction), AccOut}.
 
-enum_docs(Db, InFun, InAcc, Options) ->
+enum_docs(Db, InFun, InAcc, Options0) ->
+    {NS, Options} = extract_namespace(Options0),
+    enum_docs(Db, NS, InFun, InAcc, Options).
+
+enum_docs(Db, undefined, InFun, InAcc, Options) ->
     FoldFun = skip_deleted(InFun),
     {ok, LastReduce, OutAcc} = couch_btree:fold(
         Db#db.id_tree, FoldFun, InAcc, Options),
-    {ok, enum_docs_reduce_to_count(LastReduce), OutAcc}.
+    {ok, enum_docs_reduce_to_count(LastReduce), OutAcc};
+enum_docs(Db, <<"_local">>, InFun, InAcc, Options) ->
+    FoldFun = skip_deleted(InFun),
+    {ok, _LastReduce, OutAcc} = couch_btree:fold(
+        Db#db.local_tree, FoldFun, InAcc, Options),
+    {ok, 0, OutAcc}.
 
+extract_namespace(Options0) ->
+    case proplists:split(Options0, [namespace]) of
+        {[[{namespace, NS}]], Options} ->
+            {NS, Options};
+        {_, Options} ->
+            {undefined, Options}
+    end.
 
 %%% Internal function %%%
 open_doc_revs_int(Db, IdRevs, Options) ->
