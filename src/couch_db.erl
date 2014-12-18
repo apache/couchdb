@@ -1223,7 +1223,15 @@ enum_docs(Db, <<"_local">>, InFun, InAcc, Options) ->
     FoldFun = pipe([fun skip_deleted/4], InFun),
     {ok, _LastReduce, OutAcc} = couch_btree:fold(
         Db#db.local_tree, FoldFun, InAcc, Options),
-    {ok, 0, OutAcc}.
+    {ok, 0, OutAcc};
+enum_docs(Db, NS, InFun, InAcc, Options0) ->
+    FoldFun = pipe([
+        fun skip_deleted/4,
+        stop_on_leaving_namespace(NS)], InFun),
+    Options = set_namespace_range(Options0, NS),
+    {ok, LastReduce, OutAcc} = couch_btree:fold(
+        Db#db.id_tree, FoldFun, InAcc, Options),
+    {ok, enum_docs_reduce_to_count(LastReduce), OutAcc}.
 
 extract_namespace(Options0) ->
     case proplists:split(Options0, [namespace]) of
@@ -1396,6 +1404,28 @@ skip_deleted(traverse, LK, {Undeleted, _, _} = Reds, Acc) when Undeleted == 0 ->
 skip_deleted(Case, A, B, C) ->
     {Case, A, B, C}.
 
+stop_on_leaving_namespace(NS) ->
+    fun
+        (visit, #full_doc_info{id = Key} = FullInfo, Reds, Acc) ->
+            case has_prefix(Key, NS) of
+                true ->
+                    {visit, FullInfo, Reds, Acc};
+                false ->
+                    {stop, FullInfo, Reds, Acc}
+            end;
+        (Case, KV, Reds, Acc) ->
+            {Case, KV, Reds, Acc}
+    end.
+
+has_prefix(Bin, Prefix) ->
+    S = byte_size(Prefix),
+    case Bin of
+        <<Prefix:S/binary, "/", _/binary>> ->
+            true;
+        _Else ->
+            false
+    end.
+
 pipe(Filters, Final) ->
     Wrap =
         fun
@@ -1417,3 +1447,20 @@ do_pipe([Filter|Rest], F0) ->
         F0(C, KV, Reds, Acc)
     end,
     do_pipe(Rest, F1).
+
+set_namespace_range(Options, undefined) -> Options;
+set_namespace_range(Options, NS) ->
+    %% FIXME depending on order we might need to swap keys
+    SK = select_gt(
+           proplists:get_value(start_key, Options, <<"">>),
+           <<NS/binary, "/">>),
+    EK = select_lt(
+           proplists:get_value(end_key, Options, <<NS/binary, "0">>),
+           <<NS/binary, "0">>),
+    [{start_key, SK}, {end_key_gt, EK}].
+
+select_gt(V1, V2) when V1 < V2 -> V2;
+select_gt(V1, _V2) -> V1.
+
+select_lt(V1, V2) when V1 > V2 -> V2;
+select_lt(V1, _V2) -> V1.
