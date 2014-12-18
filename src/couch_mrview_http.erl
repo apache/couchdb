@@ -15,6 +15,7 @@
 -export([
     handle_all_docs_req/2,
     handle_local_docs_req/2,
+    handle_design_docs_req/2,
     handle_view_changes_req/3,
     handle_reindex_req/3,
     handle_view_req/3,
@@ -55,6 +56,14 @@ handle_local_docs_req(#httpd{method='POST'}=Req, Db) ->
     Keys = couch_mrview_util:get_view_keys(couch_httpd:json_body_obj(Req)),
     all_docs_req(Req, Db, Keys, <<"_local">>);
 handle_local_docs_req(Req, _Db) ->
+    couch_httpd:send_method_not_allowed(Req, "GET,POST,HEAD").
+
+handle_design_docs_req(#httpd{method='GET'}=Req, Db) ->
+    all_docs_req(Req, Db, undefined, <<"_design">>);
+handle_design_docs_req(#httpd{method='POST'}=Req, Db) ->
+    Keys = couch_mrview_util:get_view_keys(couch_httpd:json_body_obj(Req)),
+    all_docs_req(Req, Db, Keys, <<"_design">>);
+handle_design_docs_req(Req, _Db) ->
     couch_httpd:send_method_not_allowed(Req, "GET,POST,HEAD").
 
 handle_reindex_req(#httpd{method='POST',
