@@ -388,7 +388,7 @@ get_design_docs(#db{name = <<"shards/", _:18/binary, DbName/binary>>}) ->
         Response
     end;
 get_design_docs(#db{id_tree = IdBtree}) ->
-    FoldFun = skip_deleted(fun
+    FoldFun = pipe([fun skip_deleted/4], fun
         (#full_doc_info{deleted = true}, _Reds, Acc) ->
             {ok, Acc};
         (#full_doc_info{id= <<"_design/",_/binary>>}=FullDocInfo, _Reds, Acc) ->
@@ -1215,12 +1215,12 @@ enum_docs(Db, InFun, InAcc, Options0) ->
     enum_docs(Db, NS, InFun, InAcc, Options).
 
 enum_docs(Db, undefined, InFun, InAcc, Options) ->
-    FoldFun = skip_deleted(InFun),
+    FoldFun = pipe([fun skip_deleted/4], InFun),
     {ok, LastReduce, OutAcc} = couch_btree:fold(
         Db#db.id_tree, FoldFun, InAcc, Options),
     {ok, enum_docs_reduce_to_count(LastReduce), OutAcc};
 enum_docs(Db, <<"_local">>, InFun, InAcc, Options) ->
-    FoldFun = skip_deleted(InFun),
+    FoldFun = pipe([fun skip_deleted/4], InFun),
     {ok, _LastReduce, OutAcc} = couch_btree:fold(
         Db#db.local_tree, FoldFun, InAcc, Options),
     {ok, 0, OutAcc}.
@@ -1391,12 +1391,29 @@ increment_stat(#db{options = Options}, Stat) ->
         couch_stats:increment_counter(Stat)
     end.
 
-skip_deleted(FoldFun) ->
-    fun
-        (visit, KV, Reds, Acc) ->
-            FoldFun(KV, Reds, Acc);
-        (traverse, _LK, {Undeleted, _Del, _Size}, Acc) when Undeleted == 0 ->
-            {skip, Acc};
-        (traverse, _, _, Acc) ->
-            {ok, Acc}
-    end.
+skip_deleted(traverse, LK, {Undeleted, _, _} = Reds, Acc) when Undeleted == 0 ->
+    {skip, LK, Reds, Acc};
+skip_deleted(Case, A, B, C) ->
+    {Case, A, B, C}.
+
+pipe(Filters, Final) ->
+    Wrap =
+        fun
+            (visit, KV, Reds, Acc) ->
+                Final(KV, Reds, Acc);
+            (skip, _KV, _Reds, Acc) ->
+                {skip, Acc};
+            (stop, _KV, _Reds, Acc) ->
+                {stop, Acc};
+            (traverse, _, _, Acc) ->
+                {ok, Acc}
+        end,
+    do_pipe(Filters, Wrap).
+
+do_pipe([], Fun) -> Fun;
+do_pipe([Filter|Rest], F0) ->
+    F1 = fun(C0, KV0, Reds0, Acc0) ->
+        {C, KV, Reds, Acc} = Filter(C0, KV0, Reds0, Acc0),
+        F0(C, KV, Reds, Acc)
+    end,
+    do_pipe(Rest, F1).
