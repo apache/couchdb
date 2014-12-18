@@ -437,6 +437,54 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_all_docs">>]}=Req, Db) ->
 db_req(#httpd{path_parts=[_,<<"_all_docs">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "GET,HEAD,POST");
 
+db_req(#httpd{method='GET',path_parts=[_,<<"_local_docs">>]}=Req, Db) ->
+    case chttpd:qs_json_value(Req, "keys", nil) of
+    Keys when is_list(Keys) ->
+        all_docs_view(Req, Db, Keys, <<"_local">>);
+    nil ->
+        all_docs_view(Req, Db, undefined, <<"_local">>);
+    _ ->
+        throw({bad_request, "`keys` parameter must be an array."})
+    end;
+
+db_req(#httpd{method='POST',path_parts=[_,<<"_local_docs">>]}=Req, Db) ->
+    {Fields} = chttpd:json_body_obj(Req),
+    case couch_util:get_value(<<"keys">>, Fields, nil) of
+    Keys when is_list(Keys) ->
+        all_docs_view(Req, Db, Keys, <<"_local">>);
+    nil ->
+        all_docs_view(Req, Db, undefined, <<"_local">>);
+    _ ->
+        throw({bad_request, "`keys` body member must be an array."})
+    end;
+
+db_req(#httpd{path_parts=[_,<<"_local_docs">>]}=Req, _Db) ->
+    send_method_not_allowed(Req, "GET,HEAD,POST");
+
+db_req(#httpd{method='GET',path_parts=[_,<<"_design_docs">>]}=Req, Db) ->
+    case chttpd:qs_json_value(Req, "keys", nil) of
+    Keys when is_list(Keys) ->
+        all_docs_view(Req, Db, Keys, <<"_design">>);
+    nil ->
+        all_docs_view(Req, Db, undefined, <<"_design">>);
+    _ ->
+        throw({bad_request, "`keys` parameter must be an array."})
+    end;
+
+db_req(#httpd{method='POST',path_parts=[_,<<"_design_docs">>]}=Req, Db) ->
+    {Fields} = chttpd:json_body_obj(Req),
+    case couch_util:get_value(<<"keys">>, Fields, nil) of
+    Keys when is_list(Keys) ->
+        all_docs_view(Req, Db, Keys, <<"_design">>);
+    nil ->
+        all_docs_view(Req, Db, undefined, <<"_design">>);
+    _ ->
+        throw({bad_request, "`keys` body member must be an array."})
+    end;
+
+db_req(#httpd{path_parts=[_,<<"_design_docs">>]}=Req, _Db) ->
+    send_method_not_allowed(Req, "GET,HEAD,POST");
+
 db_req(#httpd{method='POST',path_parts=[_,<<"_missing_revs">>]}=Req, Db) ->
     {JsonDocIdRevs} = chttpd:json_body_obj(Req),
     {ok, Results} = fabric:get_missing_revs(Db, JsonDocIdRevs),
@@ -533,11 +581,14 @@ db_req(#httpd{path_parts=[_, DocId | FileNameParts]}=Req, Db) ->
     db_attachment_req(Req, Db, DocId, FileNameParts).
 
 all_docs_view(Req, Db, Keys) ->
+    all_docs_view(Req, Db, Keys, undefined).
+all_docs_view(Req, Db, Keys, NS) ->
     Args0 = couch_mrview_http:parse_params(Req, Keys),
+    Args1 = set_namespace(NS, Args0),
     ETagFun = fun(Sig, Acc0) ->
         couch_mrview_http:check_view_etag(Sig, Acc0, Req)
     end,
-    Args = Args0#mrargs{preflight_fun=ETagFun},
+    Args = Args1#mrargs{preflight_fun=ETagFun},
     Options = [{user_ctx, Req#httpd.user_ctx}],
     {ok, Resp} = couch_httpd:etag_maybe(Req, fun() ->
         VAcc0 = #vacc{db=Db, req=Req},
@@ -1445,6 +1496,9 @@ put_security(#httpd{user_ctx=Ctx}=Req, Db, FetchRev) ->
                     throw(Else)
             end
     end.
+
+set_namespace(NS, #mrargs{extra = Extra} = Args) ->
+    Args#mrargs{extra = [{namespace, NS} | Extra]}.
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
