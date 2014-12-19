@@ -418,28 +418,28 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_purge">>]}=Req, Db) ->
 db_req(#httpd{path_parts=[_,<<"_purge">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "POST");
 
-db_req(#httpd{method='GET',path_parts=[_,NS]}=Req, Db) when ?IS_ALL_DOCS(NS) ->
+db_req(#httpd{method='GET',path_parts=[_,OP]}=Req, Db) when ?IS_ALL_DOCS(OP) ->
     case chttpd:qs_json_value(Req, "keys", nil) of
     Keys when is_list(Keys) ->
-        all_docs_view(Req, Db, Keys, NS);
+        all_docs_view(Req, Db, Keys, OP);
     nil ->
-        all_docs_view(Req, Db, undefined, NS);
+        all_docs_view(Req, Db, undefined, OP);
     _ ->
         throw({bad_request, "`keys` parameter must be an array."})
     end;
 
-db_req(#httpd{method='POST',path_parts=[_,NS]}=Req, Db) when ?IS_ALL_DOCS(NS) ->
+db_req(#httpd{method='POST',path_parts=[_,OP]}=Req, Db) when ?IS_ALL_DOCS(OP) ->
     {Fields} = chttpd:json_body_obj(Req),
     case couch_util:get_value(<<"keys">>, Fields, nil) of
     Keys when is_list(Keys) ->
-        all_docs_view(Req, Db, Keys, NS);
+        all_docs_view(Req, Db, Keys, OP);
     nil ->
-        all_docs_view(Req, Db, undefined, NS);
+        all_docs_view(Req, Db, undefined, OP);
     _ ->
         throw({bad_request, "`keys` body member must be an array."})
     end;
 
-db_req(#httpd{path_parts=[_,NS]}=Req, _Db) when ?IS_ALL_DOCS(NS) ->
+db_req(#httpd{path_parts=[_,OP]}=Req, _Db) when ?IS_ALL_DOCS(OP) ->
     send_method_not_allowed(Req, "GET,HEAD,POST");
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_missing_revs">>]}=Req, Db) ->
@@ -537,9 +537,9 @@ db_req(#httpd{path_parts=[_, DocId]}=Req, Db) ->
 db_req(#httpd{path_parts=[_, DocId | FileNameParts]}=Req, Db) ->
     db_attachment_req(Req, Db, DocId, FileNameParts).
 
-all_docs_view(Req, Db, Keys, NS) ->
+all_docs_view(Req, Db, Keys, OP) ->
     Args0 = couch_mrview_http:parse_params(Req, Keys),
-    Args1 = set_namespace(NS, Args0),
+    Args1 = set_namespace(OP, Args0),
     ETagFun = fun(Sig, Acc0) ->
         couch_mrview_http:check_view_etag(Sig, Acc0, Req)
     end,
