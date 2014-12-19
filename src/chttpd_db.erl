@@ -34,6 +34,11 @@
     atts_since = nil
 }).
 
+-define(IS_ALL_DOCS(T), (
+    T == <<"_all_docs">>
+    orelse T == <<"_local_docs">>
+    orelse T == <<"_design_docs">>)).
+
 % Database request handlers
 handle_request(#httpd{path_parts=[DbName|RestParts],method=Method,
         db_url_handlers=DbUrlHandlers}=Req)->
@@ -413,76 +418,28 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_purge">>]}=Req, Db) ->
 db_req(#httpd{path_parts=[_,<<"_purge">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "POST");
 
-db_req(#httpd{method='GET',path_parts=[_,<<"_all_docs">>]}=Req, Db) ->
+db_req(#httpd{method='GET',path_parts=[_,NS]}=Req, Db) when ?IS_ALL_DOCS(NS) ->
     case chttpd:qs_json_value(Req, "keys", nil) of
     Keys when is_list(Keys) ->
-        all_docs_view(Req, Db, Keys);
+        all_docs_view(Req, Db, Keys, NS);
     nil ->
-        all_docs_view(Req, Db, undefined);
+        all_docs_view(Req, Db, undefined, NS);
     _ ->
         throw({bad_request, "`keys` parameter must be an array."})
     end;
 
-db_req(#httpd{method='POST',path_parts=[_,<<"_all_docs">>]}=Req, Db) ->
+db_req(#httpd{method='POST',path_parts=[_,NS]}=Req, Db) when ?IS_ALL_DOCS(NS) ->
     {Fields} = chttpd:json_body_obj(Req),
     case couch_util:get_value(<<"keys">>, Fields, nil) of
     Keys when is_list(Keys) ->
-        all_docs_view(Req, Db, Keys);
+        all_docs_view(Req, Db, Keys, NS);
     nil ->
-        all_docs_view(Req, Db, undefined);
+        all_docs_view(Req, Db, undefined, NS);
     _ ->
         throw({bad_request, "`keys` body member must be an array."})
     end;
 
-db_req(#httpd{path_parts=[_,<<"_all_docs">>]}=Req, _Db) ->
-    send_method_not_allowed(Req, "GET,HEAD,POST");
-
-db_req(#httpd{method='GET',path_parts=[_,<<"_local_docs">>]}=Req, Db) ->
-    case chttpd:qs_json_value(Req, "keys", nil) of
-    Keys when is_list(Keys) ->
-        all_docs_view(Req, Db, Keys, <<"_local">>);
-    nil ->
-        all_docs_view(Req, Db, undefined, <<"_local">>);
-    _ ->
-        throw({bad_request, "`keys` parameter must be an array."})
-    end;
-
-db_req(#httpd{method='POST',path_parts=[_,<<"_local_docs">>]}=Req, Db) ->
-    {Fields} = chttpd:json_body_obj(Req),
-    case couch_util:get_value(<<"keys">>, Fields, nil) of
-    Keys when is_list(Keys) ->
-        all_docs_view(Req, Db, Keys, <<"_local">>);
-    nil ->
-        all_docs_view(Req, Db, undefined, <<"_local">>);
-    _ ->
-        throw({bad_request, "`keys` body member must be an array."})
-    end;
-
-db_req(#httpd{path_parts=[_,<<"_local_docs">>]}=Req, _Db) ->
-    send_method_not_allowed(Req, "GET,HEAD,POST");
-
-db_req(#httpd{method='GET',path_parts=[_,<<"_design_docs">>]}=Req, Db) ->
-    case chttpd:qs_json_value(Req, "keys", nil) of
-    Keys when is_list(Keys) ->
-        all_docs_view(Req, Db, Keys, <<"_design">>);
-    nil ->
-        all_docs_view(Req, Db, undefined, <<"_design">>);
-    _ ->
-        throw({bad_request, "`keys` parameter must be an array."})
-    end;
-
-db_req(#httpd{method='POST',path_parts=[_,<<"_design_docs">>]}=Req, Db) ->
-    {Fields} = chttpd:json_body_obj(Req),
-    case couch_util:get_value(<<"keys">>, Fields, nil) of
-    Keys when is_list(Keys) ->
-        all_docs_view(Req, Db, Keys, <<"_design">>);
-    nil ->
-        all_docs_view(Req, Db, undefined, <<"_design">>);
-    _ ->
-        throw({bad_request, "`keys` body member must be an array."})
-    end;
-
-db_req(#httpd{path_parts=[_,<<"_design_docs">>]}=Req, _Db) ->
+db_req(#httpd{path_parts=[_,NS]}=Req, _Db) when ?IS_ALL_DOCS(NS) ->
     send_method_not_allowed(Req, "GET,HEAD,POST");
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_missing_revs">>]}=Req, Db) ->
@@ -580,8 +537,6 @@ db_req(#httpd{path_parts=[_, DocId]}=Req, Db) ->
 db_req(#httpd{path_parts=[_, DocId | FileNameParts]}=Req, Db) ->
     db_attachment_req(Req, Db, DocId, FileNameParts).
 
-all_docs_view(Req, Db, Keys) ->
-    all_docs_view(Req, Db, Keys, undefined).
 all_docs_view(Req, Db, Keys, NS) ->
     Args0 = couch_mrview_http:parse_params(Req, Keys),
     Args1 = set_namespace(NS, Args0),
@@ -1497,6 +1452,12 @@ put_security(#httpd{user_ctx=Ctx}=Req, Db, FetchRev) ->
             end
     end.
 
+set_namespace(<<"_all_docs">>, Args) ->
+    set_namespace(undefined, Args);
+set_namespace(<<"_local_docs">>, Args) ->
+    set_namespace(<<"_local">>, Args);
+set_namespace(<<"_design_docs">>, Args) ->
+    set_namespace(<<"_design">>, Args);
 set_namespace(NS, #mrargs{extra = Extra} = Args) ->
     Args#mrargs{extra = [{namespace, NS} | Extra]}.
 
