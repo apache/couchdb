@@ -37,7 +37,7 @@
 
 
 list(Db) ->
-    {ok, Indexes} = ddoc_cache:open(Db, ?MODULE),
+    {ok, Indexes} = ddoc_cache:open(db_to_name(Db), ?MODULE),
     Indexes.
 
 recover(Db) ->
