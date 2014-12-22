@@ -157,14 +157,20 @@ handle_call({get_state, ReqSeq}, From, State) ->
     end;
 handle_call(get_info, _From, State) ->
     #st{mod=Mod} = State,
-    {ok, Info0} = Mod:get(info, State#st.idx_state),
+    IdxState = State#st.idx_state,
+    {ok, Info0} = Mod:get(info, IdxState),
     IsUpdating = couch_index_updater:is_running(State#st.updater),
     IsCompacting = couch_index_compactor:is_running(State#st.compactor),
+    IdxSeq = Mod:get(update_seq, IdxState),
+    GetCommSeq = fun(Db) -> couch_db:get_committed_update_seq(Db) end,
+    DbName = Mod:get(db_name, IdxState),
+    CommittedSeq = couch_util:with_db(DbName, GetCommSeq),
     Info = Info0 ++ [
         {updater_running, IsUpdating},
         {compact_running, IsCompacting},
         {waiting_commit, State#st.committed == false},
-        {waiting_clients, length(State#st.waiters)}
+        {waiting_clients, length(State#st.waiters)},
+        {pending_updates, max(CommittedSeq - IdxSeq, 0)}
     ],
     {reply, {ok, Info}, State};
 handle_call(reset, _From, State) ->
