@@ -230,7 +230,7 @@ open_doc_revs(#httpdb{} = HttpDb, Id, Revs, Options, Fun, Acc) ->
           (200, Headers, StreamDataFun) ->
             remote_open_doc_revs_streamer_start(Self),
             {<<"--">>, _, _} = couch_httpd:parse_multipart_request(
-                get_value("Content-Type", Headers),
+                header_value("Content-Type", Headers),
                 StreamDataFun,
                 fun mp_parse_mixed/1
             );
@@ -663,7 +663,7 @@ receive_docs(Streamer, UserFun, Ref, UserAcc) ->
     {started_open_doc_revs, NewRef} ->
         restart_remote_open_doc_revs(Ref, NewRef);
     {headers, Ref, Headers} ->
-        case get_value("content-type", Headers) of
+        case header_value("content-type", Headers) of
         {"multipart/related", _} = ContentType ->
             case couch_doc:doc_from_multi_part_stream(
                 ContentType,
@@ -935,4 +935,16 @@ stream_doc({LenLeft, Id}) when LenLeft > 0 ->
     erlang:get({doc_streamer, Id}) ! {get_data, Ref, self()},
     receive {data, Ref, Data} ->
         {ok, Data, {LenLeft - iolist_size(Data), Id}}
+    end.
+
+header_value(Key, Headers) ->
+    header_value(Key, Headers, undefined).
+
+header_value(Key, Headers, Default) ->
+    Headers1 = [{string:to_lower(K), V} || {K, V} <- Headers],
+    case lists:keyfind(string:to_lower(Key), 1, Headers1) of
+        {_, Value} ->
+            Value;
+        _ ->
+            Default
     end.
