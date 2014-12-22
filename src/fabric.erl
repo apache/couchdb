@@ -326,6 +326,11 @@ query_view(DbName, DDoc, ViewName, Callback, Acc0, QueryArgs0) ->
             {active, non_neg_integer()} |
             {external, non_neg_integer()} |
             {file, non_neg_integer()}
+        ]} |
+        {updates_pending, [
+            {minimum, non_neg_integer()} |
+            {preferred, non_neg_integer()} |
+            {total, non_neg_integer()}
         ]}
     ]}.
 get_view_group_info(DbName, DesignId) ->
