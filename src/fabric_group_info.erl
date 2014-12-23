@@ -39,29 +39,30 @@ go(DbName, #doc{id=DDocId}) ->
         rexi_monitor:stop(RexiMon)
     end.
 
-handle_message({rexi_DOWN, _, {_,NodeRef},_}, _Shard, {Counters, Acc, U}) ->
+handle_message({rexi_DOWN, _, {_,NodeRef},_}, _Shard,
+        {Counters, Acc, Ushards}) ->
     case fabric_util:remove_down_workers(Counters, NodeRef) of
     {ok, NewCounters} ->
-        {ok, {NewCounters, Acc, U}};
+        {ok, {NewCounters, Acc, Ushards}};
     error ->
         {error, {nodedown, <<"progress not possible">>}}
     end;
 
-handle_message({rexi_EXIT, Reason}, Shard, {Counters, Acc, U}) ->
+handle_message({rexi_EXIT, Reason}, Shard, {Counters, Acc, Ushards}) ->
     NewCounters = lists:keydelete(Shard, #shard.ref, Counters),
     case fabric_view:is_progress_possible(NewCounters) of
     true ->
-        {ok, {NewCounters, Acc, U}};
+        {ok, {NewCounters, Acc, Ushards}};
     false ->
         {error, Reason}
     end;
 
-handle_message({ok, Info}, Shard, {Counters0, Acc, U}) ->
-    NewAcc = append_result(Info, Shard, Acc, U),
+handle_message({ok, Info}, Shard, {Counters0, Acc, Ushards}) ->
+    NewAcc = append_result(Info, Shard, Acc, Ushards),
     Counters = fabric_dict:store(Shard, ok, Counters0),
     case is_complete(Counters) of
     false ->
-        {ok, {Counters, NewAcc, U}};
+        {ok, {Counters, NewAcc, Ushards}};
     true ->
         Pending = aggregate_pending(NewAcc),
         Infos = get_infos(NewAcc),
