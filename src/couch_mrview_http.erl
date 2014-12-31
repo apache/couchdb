@@ -180,7 +180,7 @@ all_docs_req(Req, Db, Keys) ->
     all_docs_req(Req, Db, Keys, undefined).
 
 all_docs_req(Req, Db, Keys, NS) ->
-    case couch_db:is_system_db(Db) of
+    case is_restricted(Db, NS) of
     true ->
         case (catch couch_db:check_is_admin(Db)) of
         ok ->
@@ -199,6 +199,11 @@ all_docs_req(Req, Db, Keys, NS) ->
     false ->
         do_all_docs_req(Req, Db, Keys, NS)
     end.
+
+is_restricted(_Db, <<"_local">>) ->
+    true;
+is_restricted(Db, _) ->
+    couch_db:is_system_db(Db).
 
 is_public_fields_configured(Db) ->
     DbName = ?b2l(Db#db.name),
