@@ -185,6 +185,8 @@ all_docs_req(Req, Db, Keys, NS) ->
         case (catch couch_db:check_is_admin(Db)) of
         ok ->
             do_all_docs_req(Req, Db, Keys, NS);
+        _ when NS == <<"_local">> ->
+            throw({forbidden, <<"Only admins can access _local_docs">>});
         _ ->
             case is_public_fields_configured(Db) of
                 true ->
