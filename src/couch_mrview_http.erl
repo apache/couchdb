@@ -186,27 +186,34 @@ all_docs_req(Req, Db, Keys, NS) ->
         ok ->
             do_all_docs_req(Req, Db, Keys, NS);
         _ ->
-            DbName = ?b2l(Db#db.name),
-            case config:get("couch_httpd_auth",
-                                  "authentication_db",
-                                  "_users") of
-            DbName ->
-                UsersDbPublic = config:get("couch_httpd_auth", "users_db_public", "false"),
-                PublicFields = config:get("couch_httpd_auth", "public_fields"),
-                case {UsersDbPublic, PublicFields} of
-                {"true", PublicFields} when PublicFields =/= undefined ->
+            case is_public_fields_configured(Db) of
+                true ->
                     do_all_docs_req(Req, Db, Keys, NS);
-                {_, _} ->
+                false ->
                     throw({forbidden, <<"Only admins can access _all_docs",
                                         " of system databases.">>})
-                end;
-            _ ->
-                throw({forbidden, <<"Only admins can access _all_docs",
-                                    " of system databases.">>})
             end
         end;
     false ->
         do_all_docs_req(Req, Db, Keys, NS)
+    end.
+
+is_public_fields_configured(Db) ->
+    DbName = ?b2l(Db#db.name),
+    case config:get("couch_httpd_auth",
+                          "authentication_db",
+                          "_users") of
+    DbName ->
+        UsersDbPublic = config:get("couch_httpd_auth", "users_db_public", "false"),
+        PublicFields = config:get("couch_httpd_auth", "public_fields"),
+        case {UsersDbPublic, PublicFields} of
+        {"true", PublicFields} when PublicFields =/= undefined ->
+            true;
+        {_, _} ->
+            false
+        end;
+    _ ->
+        false
     end.
 
 do_all_docs_req(Req, Db, Keys, NS) ->
