@@ -207,9 +207,7 @@ is_restricted(Db, _) ->
 
 is_public_fields_configured(Db) ->
     DbName = ?b2l(Db#db.name),
-    case config:get("couch_httpd_auth",
-                          "authentication_db",
-                          "_users") of
+    case config:get("couch_httpd_auth", "authentication_db", "_users") of
     DbName ->
         UsersDbPublic = config:get("couch_httpd_auth", "users_db_public", "false"),
         PublicFields = config:get("couch_httpd_auth", "public_fields"),
