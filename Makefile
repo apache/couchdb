@@ -10,7 +10,7 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-all:  compile
+all:  config.erl couch fauxton
 
 config.erl:
 	@echo "Apache CouchDB has not been configured."
@@ -18,7 +18,7 @@ config.erl:
 	@echo
 	@false
 
-compile: config.erl fauxton
+couch:
 	@rebar compile
 	@cp src/couch/priv/couchjs bin/
 
