@@ -10,7 +10,7 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-all:  config.erl couch fauxton
+all: couch fauxton
 
 config.erl:
 	@echo "Apache CouchDB has not been configured."
@@ -18,7 +18,7 @@ config.erl:
 	@echo
 	@false
 
-couch:
+couch: config.erl
 	@rebar compile
 	@cp src/couch/priv/couchjs bin/
 
@@ -28,7 +28,7 @@ clean:
 check: javascript eunit
 
 
-dist: compile
+dist: all
 	@rm -rf rel/couchdb
 	@rebar generate
 
@@ -64,11 +64,11 @@ docker-stop:
 	@docker stop `cat .docker-id`
 
 eunit: export BUILDDIR = $(shell pwd)
-eunit: compile
+eunit: couch
 	@rebar setup_eunit
 	@rebar -r eunit skip_deps=meck,mochiweb,lager,snappy,couch_replicator,fabric,folsom
 
-javascript: compile
+javascript: all
 	@dev/run -q test/javascript/run
 
 fauxton: share/www
