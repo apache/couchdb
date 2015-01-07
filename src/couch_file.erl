@@ -260,10 +260,13 @@ init_delete_dir(RootDir) ->
     % note: ensure_dir requires an actual filename companent, which is the
     % reason for "foo".
     filelib:ensure_dir(filename:join(Dir,"foo")),
-    filelib:fold_files(Dir, ".*", true,
-        fun(Filename, _) ->
-            ok = file:delete(Filename)
-        end, ok).
+    spawn(fun() ->
+        filelib:fold_files(Dir, ".*", true,
+            fun(Filename, _) ->
+                ok = file:delete(Filename)
+            end, ok)
+    end),
+    ok.
 
 
 read_header(Fd) ->
