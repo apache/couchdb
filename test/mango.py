@@ -12,8 +12,16 @@
 
 import json
 import time
+import unittest
+import uuid
 
 import requests
+
+import user_docs
+
+
+def random_db_name():
+    return "mango_test_" + uuid.uuid4().hex
 
 
 class Database(object):
@@ -35,10 +43,10 @@ class Database(object):
             parts = [parts]
         return "/".join([self.url] + parts)
 
-    def create(self):
+    def create(self, q=1, n=3):
         r = self.sess.get(self.url)
         if r.status_code == 404:
-            r = self.sess.put(self.url)
+            r = self.sess.put(self.url, params={"q":q, "n": n})
             r.raise_for_status()
 
     def delete(self):
@@ -53,9 +61,9 @@ class Database(object):
     def save_doc(self, doc):
         self.save_docs([doc])
 
-    def save_docs(self, docs):
+    def save_docs(self, docs, **kwargs):
         body = json.dumps({"docs": docs})
-        r = self.sess.post(self.path("_bulk_docs"), data=body)
+        r = self.sess.post(self.path("_bulk_docs"), data=body, params=kwargs)
         r.raise_for_status()
         for doc, result in zip(docs, r.json()):
             doc["_id"] = result["id"]
@@ -124,3 +132,46 @@ class Database(object):
             return results[0]
         else:
             return None
+
+
+class DbPerClass(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(klass):
+        klass.db = Database("127.0.0.1", "5984", random_db_name())
+        klass.db.create(q=1, n=3)
+
+    def setUp(self):
+        self.db = self.__class__.db
+
+
+class UserDocsTests(DbPerClass):
+
+    @classmethod
+    def setUpClass(klass):
+        super(UserDocsTests, klass).setUpClass()
+        user_docs.setup(klass.db)
+
+
+class UserDocsTextTests(DbPerClass):
+
+    DEFAULT_FIELD = None
+    FIELDS = None
+
+    @classmethod
+    def setUpClass(klass):
+        super(UserDocsTextTests, klass).setUpClass()
+        user_docs.setup(
+                klass.db,
+                index_type="text",
+                default_field=klass.DEFAULT_FIELD,
+                fields=klass.FIELDS
+            )
+
+
+class FriendDocsTextTests(DbPerClass):
+
+    @classmethod
+    def setUpClass(klass):
+        super(FriendDocsTextTests, klass).setUpClass()
+        friend_docs.setup(klass.db, index_type="text")
