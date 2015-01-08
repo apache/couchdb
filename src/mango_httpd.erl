@@ -123,8 +123,8 @@ handle_find_req(#httpd{method='POST'}=Req, Db) ->
     {ok, Opts0} = mango_opts:validate_find(chttpd:json_body_obj(Req)),
     {value, {selector, Sel}, Opts} = lists:keytake(selector, 1, Opts0),
     {ok, Resp0} = start_find_resp(Req),
-    {ok, {Resp1, _}} = run_find(Resp0, Db, Sel, Opts),
-    end_find_resp(Resp1);
+    {ok, {Resp1, _, KVs}} = run_find(Resp0, Db, Sel, Opts),
+    end_find_resp(Resp1, KVs);
 
 handle_find_req(Req, _Db) ->
     chttpd:send_method_not_allowed(Req, "POST").
@@ -157,16 +157,25 @@ start_find_resp(Req) ->
     chttpd:start_delayed_json_response(Req, 200, [], "{\"docs\":[").
 
 
-end_find_resp(Resp0) ->
-    {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, "\r\n]}"),
+end_find_resp(Resp0, KVs) ->
+    FinalAcc = lists:foldl(fun({K, V}, Acc) ->
+        JK = ?JSON_ENCODE(K),
+        JV = ?JSON_ENCODE(V),
+        [JV, ": ", JK, ",\r\n" | Acc]
+    end, ["\r\n]"], KVs),
+    Chunk = lists:reverse(FinalAcc, ["}\r\n"]),
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, Chunk),
     chttpd:end_delayed_json_response(Resp1).
 
 
 run_find(Resp, Db, Sel, Opts) ->
-    mango_crud:find(Db, Sel, fun handle_doc/2, {Resp, "\r\n"}, Opts).
+    mango_crud:find(Db, Sel, fun handle_doc/2, {Resp, "\r\n", []}, Opts).
 
 
-handle_doc({row, Doc}, {Resp0, Prepend}) ->
+handle_doc({add_key, Key, Value}, {Resp, Prepend, KVs}) ->
+    NewKVs = lists:keystore(Key, 1, KVs, {Key, Value}),
+    {ok, {Resp, Prepend, NewKVs}};
+handle_doc({row, Doc}, {Resp0, Prepend, KVs}) ->
     Chunk = [Prepend, ?JSON_ENCODE(Doc)],
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, Chunk),
-    {ok, {Resp1, ",\r\n"}}.
+    {ok, {Resp1, ",\r\n", KVs}}.
