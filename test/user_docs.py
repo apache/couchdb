@@ -78,8 +78,7 @@ def add_view_indexes(db, kwargs):
         ["manager"],
         ["favorites"],
         ["favorites.3"],
-        ["twitter"],
-        ["type"]
+        ["twitter"]
     ]
     for idx in indexes:
         assert db.create_index(idx) is True
@@ -488,30 +487,5 @@ DOCS = [
             "Python",
             "Lisp"
         ]
-    },
-    {
-        "type": "complex_key",
-        "title": "normal key"
-    },
-    {
-        "type": "complex_key",
-        "title": "key with dot",
-        "dot.key": "dot's value",
-        "none": {
-            "dot": "none dot's value"
-        }
-    },
-    {
-        "type": "complex_key",
-        "title": "key with peso",
-        "$key": "peso",
-        "deep": {
-            "$key": "deep peso"
-        }
-    },
-    {
-        "type": "complex_key",
-        "title": "unicode key",
-        "": "apple"
     }
 ]
