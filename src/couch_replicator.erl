@@ -25,6 +25,8 @@
 -export([init/1, terminate/2, code_change/3]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
 
+-export([details/1]).
+
 -include_lib("couch/include/couch_db.hrl").
 -include("couch_replicator_api_wrap.hrl").
 -include("couch_replicator.hrl").
@@ -210,24 +212,39 @@ cancel_replication(RepId, #user_ctx{name = Name, roles = Roles}) ->
     true ->
         cancel_replication(RepId);
     false ->
-        {BaseId, Ext} = RepId,
-        case lists:keysearch(
-            BaseId ++ Ext, 1, supervisor:which_children(couch_replicator_job_sup)) of
-        {value, {_, Pid, _, _}} when is_pid(Pid) ->
-            case (catch gen_server:call(Pid, get_details, infinity)) of
+        case find_replicator(RepId) of
+        {ok, Pid} ->
+            case details(Pid) of
             {ok, #rep{user_ctx = #user_ctx{name = Name}}} ->
                 cancel_replication(RepId);
             {ok, _} ->
                 throw({unauthorized,
                     <<"Can't cancel a replication triggered by another user">>});
-            {'EXIT', {noproc, {gen_server, call, _}}} ->
-                {error, not_found};
             Error ->
-                throw(Error)
+                Error
             end;
-        _ ->
-            {error, not_found}
+        Error ->
+            Error
         end
+    end.
+
+find_replicator({BaseId, Ext} = _RepId) ->
+    case lists:keysearch(
+        BaseId ++ Ext, 1, supervisor:which_children(couch_replicator_job_sup)) of
+    {value, {_, Pid, _, _}} when is_pid(Pid) ->
+            {ok, Pid};
+    _ ->
+            {error, not_found}
+    end.
+
+details(Pid) ->
+    case (catch gen_server:call(Pid, get_details, infinity)) of
+    {ok, Rep} ->
+        {ok, Rep};
+    {'EXIT', {noproc, {gen_server, call, _}}} ->
+        {error, not_found};
+    Error ->
+        throw(Error)
     end.
 
 init(InitArgs) ->

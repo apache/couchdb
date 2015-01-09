@@ -38,7 +38,7 @@ setup(local) ->
 setup(remote) ->
     {remote, setup()};
 setup({A, B}) ->
-    ok = test_util:start_couch(),
+    ok = test_util:start_couch([couch_replicator]),
     Source = setup(A),
     Target = setup(B),
     {Source, Target}.
@@ -52,7 +52,7 @@ teardown(DbName) ->
 teardown(_, {Source, Target}) ->
     teardown(Source),
     teardown(Target),
-
+    ok = application:stop(couch_replicator),
     ok = test_util:stop_couch().
 
 docs_with_many_leaves_test_() ->
@@ -183,13 +183,13 @@ add_attachments(SourceDb, NumAtts,  [{DocId, NumConflicts} | Rest]) ->
         fun(#doc{atts = Atts, revs = {Pos, [Rev | _]}} = Doc, Acc) ->
             NewAtts = lists:foldl(fun(I, AttAcc) ->
                 AttData = crypto:rand_bytes(100),
-                NewAtt = #att{
-                    name = ?io2b(["att_", ?i2l(I), "_",
-                                  couch_doc:rev_to_str({Pos, Rev})]),
-                    type = <<"application/foobar">>,
-                    att_len = byte_size(AttData),
-                    data = AttData
-                },
+                NewAtt = couch_att:new([
+                    {name, ?io2b(["att_", ?i2l(I), "_",
+                        couch_doc:rev_to_str({Pos, Rev})])},
+                    {type, <<"application/foobar">>},
+                    {att_len, byte_size(AttData)},
+                    {data, AttData}
+                ]),
                 [NewAtt | AttAcc]
             end, [], lists:seq(1, NumAtts)),
             [Doc#doc{atts = Atts ++ NewAtts} | Acc]

@@ -52,7 +52,7 @@ setup(local) ->
 setup(remote) ->
     {remote, setup()};
 setup({_, Fun, {A, B}}) ->
-    ok = test_util:start_couch(),
+    ok = test_util:start_couch([couch_replicator]),
     {ok, Listener} = couch_replicator_notifier:start_link(Fun),
     Source = setup(A),
     Target = setup(B),
@@ -69,6 +69,7 @@ teardown(_, {Source, Target, Listener}) ->
     teardown(Target),
 
     couch_replicator_notifier:stop(Listener),
+    ok = application:stop(couch_replicator),
     ok = test_util:stop_couch().
 
 use_checkpoints_test_() ->
