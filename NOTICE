@@ -177,3 +177,7 @@ This product also includes the following third-party components:
 * src/fauxton/test/nightwatch_tests/custom-commands/waitForAttribute.js
 
    Copyright (c) 2014 Dave Koo
+
+* moment.js
+
+   Copyright (c) 2011-2014 Tim Wood, Iskren Chernev, moment.js contributors
