@@ -16,6 +16,7 @@
     start/0,
     stop/0,
     fetch/0,
+    reload/0,
     sample/1,
     new/2,
     delete/1,
@@ -39,6 +40,9 @@ stop() ->
 
 fetch() ->
     couch_stats_aggregator:fetch().
+
+reload() ->
+    couch_stats_aggregator:reload().
 
 -spec sample(any()) -> stat().
 sample(Name) ->
