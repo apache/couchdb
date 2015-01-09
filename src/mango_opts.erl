@@ -28,6 +28,7 @@
 
     validate_idx_name/1,
     validate_selector/1,
+    validate_use_index/1,
     validate_sort/1,
     validate_fields/1
 ]).
@@ -74,6 +75,12 @@ validate_find({Props}) ->
         {<<"selector">>, [
             {tag, selector},
             {validator, fun validate_selector/1}
+        ]},
+        {<<"use_index">>, [
+            {tag, use_index},
+            {optional, true},
+            {default, []},
+            {validator, fun validate_use_index/1}
         ]},
         {<<"limit">>, [
             {tag, limit},
@@ -176,6 +183,32 @@ validate_selector({Props}) ->
     {ok, Norm};
 validate_selector(Else) ->
     ?MANGO_ERROR({invalid_selector_json, Else}).
+
+
+validate_use_index(IndexName) when is_binary(IndexName) ->
+    case binary:split(IndexName, <<"/">>) of
+        [DesignId] ->
+            {ok, [DesignId]};
+        [<<"_design">>, DesignId] ->
+            {ok, [DesignId]};
+        [DesignId, ViewName] ->
+            {ok, [DesignId, ViewName]};
+        [<<"_design">>, DesignId, ViewName] ->
+            {ok, [DesignId, ViewName]};
+        _ ->
+            ?MANGO_ERROR({invalid_index_name, IndexName})
+    end;
+validate_use_index(null) ->
+    {ok, []};
+validate_use_index([]) ->
+    {ok, []};
+validate_use_index([DesignId]) when is_binary(DesignId) ->
+    {ok, [DesignId]};
+validate_use_index([DesignId, ViewName])
+        when is_binary(DesignId), is_binary(ViewName) ->
+    {ok, [DesignId, ViewName]};
+validate_use_index(Else) ->
+    ?MANGO_ERROR({invalid_index_name, Else}).
 
 
 validate_sort(Value) ->

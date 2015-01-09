@@ -107,9 +107,10 @@ class Database(object):
         r.raise_for_status()
 
     def find(self, selector, limit=25, skip=0, sort=None, fields=None,
-                r=1, conflicts=False, explain=False):
+                r=1, conflicts=False, explain=False, use_index=None):
         body = {
             "selector": selector,
+            "use_index": use_index,
             "limit": limit,
             "skip": skip,
             "r": r,
