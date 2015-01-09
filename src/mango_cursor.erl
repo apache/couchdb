@@ -15,6 +15,7 @@
 
 -export([
     create/3,
+    explain/1,
     execute/3
 ]).
 
@@ -47,6 +48,28 @@ create(Db, Selector0, Opts) ->
     end,
 
     create_cursor(Db, UsableIndexes, Selector, Opts).
+
+
+explain(#cursor{}=Cursor) ->
+    #cursor{
+        index = Idx,
+        selector = Selector,
+        opts = Opts0,
+        limit = Limit,
+        skip = Skip,
+        fields = Fields
+    } = Cursor,
+    Mod = mango_idx:cursor_mod(Idx),
+    Opts = lists:keydelete(user_ctx, 1, Opts0),
+    {[
+        {dbname, mango_idx:dbname(Idx)},
+        {index, mango_idx:to_json(Idx)},
+        {selector, Selector},
+        {opts, {Opts}},
+        {limit, Limit},
+        {skip, Skip},
+        {fields, Fields}
+    ] ++ Mod:explain(Cursor)}.
 
 
 execute(#cursor{index=Idx}=Cursor, UserFun, UserAcc) ->

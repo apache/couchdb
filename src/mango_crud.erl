@@ -16,7 +16,8 @@
     insert/3,
     find/5,
     update/4,
-    delete/3
+    delete/3,
+    explain/3
 ]).
 
 -export([
@@ -96,6 +97,13 @@ delete(Db, Selector, Options) ->
         Else ->
             Else
     end.
+
+
+explain(Db, Selector, Opts0) ->
+    Opts1 = maybe_add_user_ctx(Db, Opts0),
+    Opts2 = maybe_int_to_str(r, Opts1),
+    {ok, Cursor} = mango_cursor:create(Db, Selector, Opts2),
+    mango_cursor:explain(Cursor).
 
 
 maybe_add_user_ctx(Db, Opts) ->

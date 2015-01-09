@@ -14,6 +14,7 @@
 
 -export([
     create/4,
+    explain/1,
     execute/3
 ]).
 
@@ -45,6 +46,17 @@ create(Db, Indexes, Selector, Opts) ->
         skip = Skip,
         fields = Fields
     }}.
+
+
+explain(Cursor) ->
+    #cursor{
+        index = Idx,
+        ranges = Ranges
+    } = Cursor,
+    [{range, {[
+        {start_key, mango_idx:start_key(Idx, Ranges)},
+        {end_key, mango_idx:end_key(Idx, Ranges)}
+    ]}}].
 
 
 execute(#cursor{db = Db, index = Idx} = Cursor0, UserFun, UserAcc) ->

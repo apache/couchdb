@@ -41,6 +41,8 @@ handle_req(#httpd{} = Req, Db0) ->
 
 handle_req_int(#httpd{path_parts=[_, <<"_index">> | _]} = Req, Db) ->
     handle_index_req(Req, Db);
+handle_req_int(#httpd{path_parts=[_, <<"_explain">> | _]} = Req, Db) ->
+    handle_explain_req(Req, Db);
 handle_req_int(#httpd{path_parts=[_, <<"_find">> | _]} = Req, Db) ->
     handle_find_req(Req, Db);
 handle_req_int(_, _) ->
@@ -117,6 +119,16 @@ handle_index_req(#httpd{method='DELETE',
 
 handle_index_req(Req, _Db) ->
     chttpd:send_method_not_allowed(Req, "GET,POST,DELETE").
+
+
+handle_explain_req(#httpd{method='POST'}=Req, Db) ->
+    {ok, Opts0} = mango_opts:validate_find(chttpd:json_body_obj(Req)),
+    {value, {selector, Sel}, Opts} = lists:keytake(selector, 1, Opts0),
+    Resp = mango_crud:explain(Db, Sel, Opts),
+    chttpd:send_json(Req, Resp);
+
+handle_explain_req(Req, _Db) ->
+    chttpd:send_method_not_allowed(Req, "POST").
 
 
 handle_find_req(#httpd{method='POST'}=Req, Db) ->

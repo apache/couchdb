@@ -107,7 +107,7 @@ class Database(object):
         r.raise_for_status()
 
     def find(self, selector, limit=25, skip=0, sort=None, fields=None,
-                r=1, conflicts=False):
+                r=1, conflicts=False, explain=False):
         body = {
             "selector": selector,
             "limit": limit,
@@ -120,9 +120,16 @@ class Database(object):
         if fields is not None:
             body["fields"] = fields
         body = json.dumps(body)
-        r = self.sess.post(self.path("_find"), data=body)
+        if explain:
+            path = self.path("_explain")
+        else:
+            path = self.path("_find")
+        r = self.sess.post(path, data=body)
         r.raise_for_status()
-        return r.json()["docs"]
+        if explain:
+            return r.json()
+        else:
+            return r.json()["docs"]
 
     def find_one(self, *args, **kwargs):
         results = self.find(*args, **kwargs)
