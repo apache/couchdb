@@ -46,7 +46,8 @@ DepDescs = [
     {mochiweb,          "mochiweb",         {branch, "master"}},
     {oauth,             "oauth",            {branch, "master"}},
     {rexi,              "rexi",             {branch, "master"}},
-    {snappy,            "snappy",           {branch, "master"}}
+    {snappy,            "snappy",           {branch, "master"}},
+    {meck,              "meck",             {branch, "master"}}
 ],
 
 BaseUrl = "https://git-wip-us.apache.org/repos/asf/",
