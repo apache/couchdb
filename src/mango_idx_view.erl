@@ -19,6 +19,7 @@
     remove/2,
     from_ddoc/1,
     to_json/1,
+    is_usable/2,
     columns/1,
     start_key/1,
     end_key/1,
@@ -104,6 +105,14 @@ columns(Idx) ->
     {Props} = Idx#idx.def,
     {<<"fields">>, {Fields}} = lists:keyfind(<<"fields">>, 1, Props),
     [Key || {Key, _} <- Fields].
+
+
+is_usable(Idx, Selector) ->
+    % This index is usable if at least the first column is
+    % a member of the indexable fields of the selector.
+    Columns = columns(Idx),
+    Fields = indexable_fields(Selector),
+    lists:member(hd(Columns), Fields).
 
 
 start_key([]) ->

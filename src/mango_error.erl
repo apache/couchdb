@@ -24,11 +24,11 @@ info(mango_cursor, {no_usable_index, operator_unsupported}) ->
         <<"no_usable_index">>,
         <<"There is no operator in this selector can used with an index.">>
     };
-info(mango_cursor, {no_usable_index, query_unsupported}) ->
+info(mango_cursor, {no_usable_index, selector_unsupported}) ->
     {
         400,
         <<"no_usable_index">>,
-        <<"Query unsupported because it would require multiple indices.">>
+        <<"There is no index available for this selector.">>
     };
 info(mango_cursor, {no_usable_index, sort_field}) ->
     {
