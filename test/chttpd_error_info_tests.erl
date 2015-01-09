@@ -137,7 +137,7 @@ error_info_test() ->
         },
         {
             {Error, null},
-            {500, Error, null}
+            {500, <<"unknown_error">>, Error}
         },
         {
             {Error, Reason},
@@ -145,7 +145,7 @@ error_info_test() ->
         },
         {
             {Error, nil, [{}]},
-            {500, Error, null}
+            {500, <<"unknown_error">>, Error}
         },
         {
             {Error, Reason, [{}]},
@@ -153,7 +153,7 @@ error_info_test() ->
         },
         {
             Error,
-            {500, Error, null}
+            {500, <<"unknown_error">>, Error}
         }
     ],
 

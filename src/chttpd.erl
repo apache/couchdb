@@ -750,19 +750,19 @@ error_info(request_entity_too_large) ->
     {413, <<"too_large">>, <<"the request entity is too large">>};
 error_info(not_implemented) ->
     {501, <<"not_implemented">>, <<"this feature is not yet implemented">>};
-error_info({Error, null}) ->
-    {500, couch_util:to_binary(Error), null};
 error_info(timeout) ->
     {500, <<"timeout">>, <<"The request could not be processed in a reasonable"
         " amount of time.">>};
+error_info({Error, null}) ->
+    error_info(Error);
 error_info({Error, Reason}) ->
     {500, couch_util:to_binary(Error), couch_util:to_binary(Reason)};
 error_info({Error, nil, _Stack}) ->
     error_info(Error);
 error_info({Error, Reason, _Stack}) ->
-    error_info({Error, Reason});
+    {500, couch_util:to_binary(Error), couch_util:to_binary(Reason)};
 error_info(Error) ->
-    {500, couch_util:to_binary(Error), null}.
+    {500, <<"unknown_error">>, couch_util:to_binary(Error)}.
 
 error_headers(#httpd{mochi_req=MochiReq}=Req, 401=Code, ErrorStr, ReasonStr) ->
     % this is where the basic auth popup is triggered
