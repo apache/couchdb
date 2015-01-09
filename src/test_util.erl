@@ -18,7 +18,7 @@
 -export([source_file/1, build_file/1]).
 %% -export([run/2]).
 -export([request/3, request/4]).
--export([start_couch/0, start_couch/1, stop_couch/0, stop_couch/1]).
+-export([start_couch/0, start_couch/1, start_couch/2, stop_couch/0, stop_couch/1]).
 -export([start_config/1, stop_config/1]).
 -export([start_applications/1]).
 
@@ -80,13 +80,16 @@ request(Url, Headers, Method, Body, N) ->
 
 
 start_couch() ->
-    start_couch(?CONFIG_CHAIN).
+    start_couch(?CONFIG_CHAIN, []).
 
+start_couch(ExtraApps) ->
+    start_couch(?CONFIG_CHAIN, ExtraApps).
 
-start_couch(IniFiles) ->
+start_couch(IniFiles, ExtraApps) ->
     ok = application:set_env(config, ini_files, IniFiles),
     ok = lager:start(),
-    ok = start_applications([inets, ibrowse, ssl, config, couch]),
+    ok = start_applications([inets, ibrowse, ssl, config, couch] ++ ExtraApps),
+    couch_stats:reload(),
     ok.
 
 
