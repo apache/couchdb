@@ -29,8 +29,8 @@
 
 create(Db, Selector0, Opts) ->
     Selector = mango_selector:normalize(Selector0),
-    IndexFields = mango_selector:index_fields(Selector),    
-    FieldRanges = find_field_ranges(Selector, IndexFields),
+    IndexFields = mango_idx_view:indexable_fields(Selector),    
+    FieldRanges = mango_idx_view:field_ranges(Selector, IndexFields),
 
     if IndexFields /= [] -> ok; true ->
         ?MANGO_ERROR({no_usable_index, operator_unsupported})
@@ -121,21 +121,6 @@ limit_to_sort(ExistingIndexes, UsableIndexes, Sort) ->
     end,
 
     FinalIndexes.
-
-
-% For each field, return {Field, Range}
-find_field_ranges(Selector, Fields) ->
-    find_field_ranges(Selector, Fields, []).
-
-find_field_ranges(_Selector, [], Acc) ->
-    lists:reverse(Acc);
-find_field_ranges(Selector, [Field | Rest], Acc) ->
-    case mango_selector:range(Selector, Field) of
-        empty ->
-            [{Field, empty}];
-        Range ->
-            find_field_ranges(Selector, Rest, [{Field, Range} | Acc])
-    end.
 
 
 % Any of these indexes may be a composite index. For each
