@@ -501,6 +501,8 @@ match({[{<<"$", _/binary>>=Op, _}]}, _, _) ->
 % bad_path in which case matching fails.
 match({[{Field, Cond}]}, Value, Cmp) ->
     case mango_doc:get_field(Value, Field) of
+        not_found when Cond == {[{<<"$exists">>, false}]} ->
+            true;
         not_found ->
             false;
         bad_path ->

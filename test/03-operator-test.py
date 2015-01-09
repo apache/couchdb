@@ -80,3 +80,13 @@ class OperatorTests(mango.UserDocsTests):
         assert len(docs) == 2
         assert docs[0]["user_id"] == 2
         assert docs[1]["user_id"] == 10
+
+    def test_exists_false(self):
+        docs = self.db.find({
+                "age": {"$gt": 0},
+                "twitter": {"$exists": False}
+            })
+        user_ids = [2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 14]
+        assert len(docs) == len(user_ids)
+        for doc in docs:
+            assert doc["user_id"] in user_ids
