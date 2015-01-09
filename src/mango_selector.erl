@@ -132,6 +132,19 @@ norm_ops({[{<<"$size">>, Arg}]}) when is_integer(Arg), Arg >= 0 ->
 norm_ops({[{<<"$size">>, Arg}]}) ->
     ?MANGO_ERROR({bad_arg, '$size', Arg});
 
+norm_ops({[{<<"$text">>, Arg}]}) when is_binary(Arg); is_number(Arg);
+        is_boolean(Arg) ->
+    {[{<<"$default">>, {[{<<"$text">>, Arg}]}}]};
+norm_ops({[{<<"$text">>, Arg}]}) ->
+    ?MANGO_ERROR({bad_arg, '$text', Arg});
+
+% Not technically an operator but we pass it through here
+% so that this function accepts its own output. This exists
+% so that $text can have a field name value which simplifies
+% logic elsewhere.
+norm_ops({[{<<"$default">>, _}]} = Selector) ->
+    Selector;
+
 % Terminals where we can't perform any validation
 % on the value because any value is acceptable.
 norm_ops({[{<<"$lt">>, _}]} = Cond) ->
@@ -223,6 +236,17 @@ norm_fields({[{<<"$nor">>, Args}]}, Path) ->
 norm_fields({[{<<"$elemMatch">>, Arg}]}, Path) ->
     Cond = {[{<<"$elemMatch">>, norm_fields(Arg)}]},
     {[{Path, Cond}]};
+
+
+% The text operator operates against the internal
+% $default field. This also asserts that the $default
+% field is at the root as well as that it only has
+% a $text operator applied.
+norm_fields({[{<<"$default">>, {[{<<"$text">>, _Arg}]}}]}=Sel, <<>>) ->
+    Sel;
+norm_fields({[{<<"$default">>, _}]} = Selector, _) ->
+    ?MANGO_ERROR({bad_field, Selector});
+
 
 % Any other operator is a terminal below which no
 % field names should exist. Set the path to this
@@ -460,6 +484,11 @@ match({[{<<"$size">>, Arg}]}, Values, _Cmp) when is_list(Values) ->
     length(Values) == Arg;
 match({[{<<"$size">>, _}]}, _Value, _Cmp) ->
     false;
+
+% We don't have any choice but to believe that the text
+% index returned valid matches
+match({[{<<"$default">>, _}]}, _Value, _Cmp) ->
+    true;
 
 % All other operators are internal assertion errors for
 % matching because we either should've removed them during
