@@ -16,7 +16,8 @@
 
 -export([
     fetch/0,
-    flush/0
+    flush/0,
+    reload/0
 ]).
 
 -export([
@@ -43,6 +44,9 @@ fetch() ->
 flush() ->
     gen_server:call(?MODULE, flush).
 
+reload() ->
+    gen_server:call(?MODULE, reload).
+
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
@@ -59,6 +63,9 @@ handle_call(fetch, _from, #st{stats = Stats}=State) ->
     {reply, {ok, Stats}, State};
 handle_call(flush, _From, State) ->
     {reply, ok, collect(State)};
+handle_call(reload, _from, #st{stats = Stats}=State) ->
+    {ok, Descriptions} = reload_metrics(),
+    {reply, ok, State#st{descriptions=Descriptions}};
 handle_call(Msg, _From, State) ->
     {stop, {unknown_call, Msg}, error, State}.
 
