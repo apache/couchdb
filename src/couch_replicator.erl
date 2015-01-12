@@ -238,7 +238,7 @@ find_replicator({BaseId, Ext} = _RepId) ->
     end.
 
 details(Pid) ->
-    case (catch gen_server:call(Pid, get_details, infinity)) of
+    case (catch gen_server:call(Pid, get_details)) of
     {ok, Rep} ->
         {ok, Rep};
     {'EXIT', {noproc, {gen_server, call, _}}} ->
