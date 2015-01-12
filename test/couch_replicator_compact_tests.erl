@@ -23,8 +23,6 @@
 -define(TIMEOUT_WRITER, 3000).
 -define(TIMEOUT_EUNIT, ?TIMEOUT div 1000 + 5).
 
--ifdef(run_broken_tests).
-
 setup() ->
     DbName = ?tempdb(),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_USER]),
@@ -36,7 +34,7 @@ setup(local) ->
 setup(remote) ->
     {remote, setup()};
 setup({A, B}) ->
-    ok = test_util:start_couch(),
+    ok = test_util:start_couch([couch_replicator]),
     Source = setup(A),
     Target = setup(B),
     {Source, Target}.
@@ -50,7 +48,7 @@ teardown(DbName) ->
 teardown(_, {Source, Target}) ->
     teardown(Source),
     teardown(Target),
-
+    ok = application:stop(couch_replicator),
     ok = test_util:stop_couch().
 
 compact_test_() ->
@@ -110,6 +108,7 @@ check_active_tasks(RepPid, {BaseId, Ext} = _RepId, Src, Tgt) ->
     end,
     FullRepId = ?l2b(BaseId ++ Ext),
     Pid = ?l2b(pid_to_list(RepPid)),
+    ok = wait_for_replicator(RepPid),
     [RepTask] = couch_task_status:all(),
     ?assertEqual(Pid, couch_util:get_value(pid, RepTask)),
     ?assertEqual(FullRepId, couch_util:get_value(replication_id, RepTask)),
@@ -123,9 +122,15 @@ check_active_tasks(RepPid, {BaseId, Ext} = _RepId, Src, Tgt) ->
     ?assert(is_integer(couch_util:get_value(missing_revisions_found, RepTask))),
     ?assert(is_integer(couch_util:get_value(checkpointed_source_seq, RepTask))),
     ?assert(is_integer(couch_util:get_value(source_seq, RepTask))),
-    Progress = couch_util:get_value(progress, RepTask),
-    ?assert(is_integer(Progress)),
-    ?assert(Progress =< 100).
+    Pending = couch_util:get_value(changes_pending, RepTask),
+    ?assert(is_integer(Pending)).
+
+wait_for_replicator(Pid) ->
+    %% since replicator started asynchronously
+    %% we need to wait when it would be in couch_task_status
+    %% we query replicator:details to ensure that do_init happen
+    ?assertMatch({ok, _}, couch_replicator:details(Pid)),
+    ok.
 
 should_cancel_replication(RepId, RepPid) ->
     ?_assertNot(begin
@@ -146,12 +151,12 @@ should_populate_and_compact(RepPid, Source, Target, BatchSize, Rounds) ->
                 compact_db("source", SourceDb),
                 ?assert(is_process_alive(RepPid)),
                 ?assert(is_process_alive(SourceDb#db.main_pid)),
-                check_ref_counter("source", SourceDb),
+                wait_for_compaction("source", SourceDb),
 
                 compact_db("target", TargetDb),
                 ?assert(is_process_alive(RepPid)),
                 ?assert(is_process_alive(TargetDb#db.main_pid)),
-                check_ref_counter("target", TargetDb),
+                wait_for_compaction("target", TargetDb),
 
                 {ok, SourceDb2} = reopen_db(SourceDb),
                 {ok, TargetDb2} = reopen_db(TargetDb),
@@ -163,14 +168,14 @@ should_populate_and_compact(RepPid, Source, Target, BatchSize, Rounds) ->
                 ?assert(is_process_alive(RepPid)),
                 ?assert(is_process_alive(SourceDb2#db.main_pid)),
                 pause_writer(Writer),
-                check_ref_counter("source", SourceDb2),
+                wait_for_compaction("source", SourceDb2),
                 resume_writer(Writer),
 
                 compact_db("target", TargetDb2),
                 ?assert(is_process_alive(RepPid)),
                 ?assert(is_process_alive(TargetDb2#db.main_pid)),
                 pause_writer(Writer),
-                check_ref_counter("target", TargetDb2),
+                wait_for_compaction("target", TargetDb2),
                 resume_writer(Writer)
             end, lists:seq(1, Rounds)),
         stop_writer(Writer)
@@ -275,22 +280,17 @@ compact_db(Type, #db{name = Name}) ->
     end,
     ok = couch_db:close(Db).
 
-check_ref_counter(Type, #db{name = Name, fd_ref_counter = OldRefCounter}) ->
-    MonRef = erlang:monitor(process, OldRefCounter),
-    receive
-        {'DOWN', MonRef, process, OldRefCounter, _} ->
-            ok
-        after ?TIMEOUT ->
+wait_for_compaction(Type, Db) ->
+    case couch_db:wait_for_compaction(Db) of
+        ok ->
+            ok;
+        {error, Reason} ->
             erlang:error(
                 {assertion_failed,
                  [{module, ?MODULE}, {line, ?LINE},
-                  {reason, lists:concat(["Old ", Type,
-                                         " database ref counter didn't"
-                                         " terminate"])}]})
-    end,
-    {ok, #db{fd_ref_counter = NewRefCounter} = Db} = couch_db:open_int(Name, []),
-    ok = couch_db:close(Db),
-    ?assertNotEqual(OldRefCounter, NewRefCounter).
+                  {reason, lists:concat(["Compaction of", Type,
+                                         " database failed with: ", Reason])}]})
+    end.
 
 db_url(DbName) ->
     iolist_to_binary([
@@ -437,5 +437,3 @@ maybe_pause(Parent, Counter) ->
     after 0 ->
         ok
     end.
-
--endif.
