@@ -25,7 +25,7 @@
     is_pos_integer/1,
     is_non_neg_integer/1,
     is_object/1,
-    
+
     validate_idx_name/1,
     validate_selector/1,
     validate_sort/1,
