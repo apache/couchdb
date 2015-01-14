@@ -342,9 +342,12 @@ proc_set_timeout(Proc, Timeout) ->
     {Mod, Func} = Proc#proc.set_timeout_fun,
     apply(Mod, Func, [Proc#proc.pid, Timeout]).
 
+get_os_process_timeout() ->
+    list_to_integer(config:get("couchdb", "os_process_timeout", "5000")).
+
 get_ddoc_process(#doc{} = DDoc, DDocKey) ->
     % remove this case statement
-    case gen_server:call(couch_proc_manager, {get_proc, DDoc, DDocKey}, infinity) of
+    case gen_server:call(couch_proc_manager, {get_proc, DDoc, DDocKey}, get_os_process_timeout()) of
     {ok, Proc, {QueryConfig}} ->
         % process knows the ddoc
         case (catch proc_prompt(Proc, [<<"reset">>, {QueryConfig}])) of
@@ -360,7 +363,7 @@ get_ddoc_process(#doc{} = DDoc, DDocKey) ->
     end.
 
 get_os_process(Lang) ->
-    case gen_server:call(couch_proc_manager, {get_proc, Lang}, infinity) of
+    case gen_server:call(couch_proc_manager, {get_proc, Lang}, get_os_process_timeout()) of
     {ok, Proc, {QueryConfig}} ->
         case (catch proc_prompt(Proc, [<<"reset">>, {QueryConfig}])) of
         true ->
