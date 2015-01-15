@@ -753,6 +753,8 @@ error_info(not_implemented) ->
 error_info(timeout) ->
     {500, <<"timeout">>, <<"The request could not be processed in a reasonable"
         " amount of time.">>};
+error_info({timeout, _Reason}) ->
+    error_info(timeout);
 error_info({Error, null}) ->
     error_info(Error);
 error_info({Error, Reason}) ->

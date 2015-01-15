@@ -136,6 +136,12 @@ error_info_test() ->
                " amount of time.">>}
         },
         {
+            {timeout, Error},
+            {500, <<"timeout">>,
+             <<"The request could not be processed in a reasonable"
+               " amount of time.">>}
+        },
+        {
             {Error, null},
             {500, <<"unknown_error">>, Error}
         },
