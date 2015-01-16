@@ -29,7 +29,12 @@
     dec_dbname/1,
 
     enc_hex/1,
-    dec_hex/1
+    dec_hex/1,
+
+    lucene_escape_field/1,
+    lucene_escape_query_value/1,
+
+    has_suffix/2
 ]).
 
 
@@ -227,3 +232,64 @@ dec_hex_byte(N) when N >= $A, N =< $F -> (N - $A) + 10;
 dec_hex_byte(N) -> throw({invalid_hex_character, N}).
 
 
+
+lucene_escape_field(Bin) when is_binary(Bin) ->
+    Str = binary_to_list(Bin),
+    Enc = lucene_escape_field(Str),
+    iolist_to_binary(Enc);
+lucene_escape_field([H | T]) when is_number(H), H >= 0, H =< 255 ->
+    if
+        H >= $a, $z >= H ->
+            [H | lucene_escape_field(T)];
+        H >= $A, $Z >= H ->
+            [H | lucene_escape_field(T)];
+        H >= $0, $9 >= H ->
+            [H | lucene_escape_field(T)];
+        true ->
+            Hi = enc_hex_byte(H div 16),
+            Lo = enc_hex_byte(H rem 16),
+            [$_, Hi, Lo | lucene_escape_field(T)]
+        end;
+lucene_escape_field([]) ->
+    [].
+
+
+lucene_escape_query_value(IoList) when is_list(IoList) ->
+    lucene_escape_query_value(iolist_to_binary(IoList));
+lucene_escape_query_value(Bin) when is_binary(Bin) ->
+    IoList = lucene_escape_qv(Bin),
+    iolist_to_binary(IoList).
+
+
+% This escapes the special Lucene query characters
+% listed below as well as any whitespace.
+%
+%   + - && || ! ( ) { } [ ] ^ ~ * ? : \ " /
+%
+
+lucene_escape_qv(<<>>) -> [];
+lucene_escape_qv(<<"&&", Rest/binary>>) ->
+    ["\\&&" | lucene_escape_qv(Rest)];
+lucene_escape_qv(<<"||", Rest/binary>>) ->
+    ["\\||" | lucene_escape_qv(Rest)];
+lucene_escape_qv(<<C, Rest/binary>>) ->
+    NeedsEscape = "+-(){}[]!^~*?:/\\\" \t\r\n",
+    Out = case lists:member(C, NeedsEscape) of
+        true -> ["\\", C];
+        false -> [C]
+    end,
+    Out ++ lucene_escape_qv(Rest).
+
+
+has_suffix(Bin, Suffix) when is_binary(Bin), is_binary(Suffix) ->
+    SBin = size(Bin),
+    SSuffix = size(Suffix),
+    if SBin < SSuffix -> false; true ->
+        PSize = SBin - SSuffix,
+        case Bin of
+            <<_:PSize/binary, Suffix/binary>> ->
+                true;
+            _ ->
+                false
+        end
+    end.

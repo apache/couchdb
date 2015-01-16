@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not
 # use this file except in compliance with the License. You may obtain a copy of
 # the License at
@@ -10,7 +11,6 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-# -*- coding: latin-1 -*-
 """
 Generated with http://www.json-generator.com/
 
@@ -50,20 +50,20 @@ With this pattern:
 ]
 """
 
+
 import copy
-import time
-
-import mango
 
 
-def mkdb():
-    return mango.Database("127.0.0.1", "5984", "mango_test")
-
-
-def create_db_and_indexes():
-    db = mkdb()
+def setup(db, index_type="view", **kwargs):
     db.recreate()
     db.save_docs(copy.deepcopy(DOCS))
+    if index_type == "view":
+        add_view_indexes(db, kwargs)
+    elif index_type == "text":
+        add_text_indexes(db, kwargs)
+
+
+def add_view_indexes(db, kwargs):
     indexes = [
         ["user_id"],
         ["name.last", "name.first"],
@@ -78,11 +78,14 @@ def create_db_and_indexes():
         ["manager"],
         ["favorites"],
         ["favorites.3"],
-        ["twitter"],
-        ["type"]
+        ["twitter"]
     ]
     for idx in indexes:
         assert db.create_index(idx) is True
+
+
+def add_text_indexes(db, kwargs):
+    db.create_text_index(**kwargs)
 
 
 DOCS = [
@@ -110,7 +113,8 @@ DOCS = [
             "Ruby",
             "C",
             "Python"
-        ]
+        ],
+        "test" : [{"a":1}, {"b":2}]
     },
     {
         "_id": "12a2800c-4fe2-45a8-8d78-c084f4e242a9",
@@ -136,8 +140,9 @@ DOCS = [
             "Ruby",
             "Python",
             "C",
-            "Python"
-        ]
+            {"Versions": {"Alpha": "Beta"}}
+        ],
+        "test" : [{"a":1, "b":2}]
     },
     {
         "_id": "48ca0455-8bd0-473f-9ae2-459e42e3edd1",
@@ -162,7 +167,8 @@ DOCS = [
             "Lisp",
             "Python",
             "Erlang"
-        ]
+        ],
+        "test_in": {"val1" : 1, "val2": "val2"}
     },
     {
         "_id": "0461444c-e60a-457d-a4bb-b8d811853f21",
@@ -183,7 +189,11 @@ DOCS = [
         "company": "Tasmania",
         "email": "madelynsoto@tasmania.com",
         "manager": True,
-        "favorites": [
+        "favorites": [[
+                "Lisp",
+                "Erlang",
+                "Python"
+            ],
             "Erlang",
             "C",
             "Erlang"
@@ -291,7 +301,9 @@ DOCS = [
             "Ruby",
             "Ruby",
             "Erlang"
-        ]
+        ],
+        "exists_field" : "should_exist1"
+
     },
     {
         "_id": "6c0afcf1-e57e-421d-a03d-0c0717ebf843",
@@ -312,12 +324,8 @@ DOCS = [
         "company": "Globoil",
         "email": "jamesmcdaniel@globoil.com",
         "manager": True,
-        "favorites": [
-            "Lisp",
-            "C",
-            "Ruby",
-            "C"
-        ]
+        "favorites": None,
+        "exists_field" : "should_exist2"
     },
     {
         "_id": "954272af-d5ed-4039-a5eb-8ed57e9def01",
@@ -342,7 +350,9 @@ DOCS = [
             "Lisp",
             "Erlang",
             "Python"
-        ]
+        ],
+        "exists_array" : ["should", "exist", "array1"],
+        "complex_field_value" : "+-(){}[]^~&&*||\"\\/?:!"
     },
     {
         "_id": "e900001d-bc48-48a6-9b1a-ac9a1f5d1a03",
@@ -366,7 +376,8 @@ DOCS = [
         "favorites": [
             "Erlang",
             "Erlang"
-        ]
+        ],
+        "exists_array" : ["should", "exist", "array2"]
     },
     {
         "_id": "b06aadcf-cd0f-4ca6-9f7e-2c993e48d4c4",
@@ -393,7 +404,8 @@ DOCS = [
             "C",
             "C++",
             "C++"
-        ]
+        ],
+        "exists_object" : {"should": "object"}
     },
     {
         "_id": "5b61abc1-a3d3-4092-b9d7-ced90e675536",
@@ -418,7 +430,8 @@ DOCS = [
             "C",
             "Python",
             "Lisp"
-        ]
+        ],
+        "exists_object" : {"another": "object"}
     },
     {
         "_id": "b1e70402-8add-4068-af8f-b4f3d0feb049",
@@ -436,7 +449,7 @@ DOCS = [
                 "number": 8766
             }
         },
-        "company": "Fangold",
+        "company": None,
         "email": "whitleyharvey@fangold.com",
         "manager": False,
         "twitter": "@whitleyharvey",
@@ -466,33 +479,9 @@ DOCS = [
         "email": "faithhess@pharmex.com",
         "manager": True,
         "favorites": [
-            "Lisp",
+            "Erlang",
+            "Python",
             "Lisp"
         ]
-    },
-    {
-        "type": "complex_key",
-        "title": "normal key"
-    },
-    {
-        "type": "complex_key",
-        "title": "key with dot",
-        "dot.key": "dot's value",
-        "none": {
-            "dot": "none dot's value"
-        }
-    },
-    {
-        "type": "complex_key",
-        "title": "key with peso",
-        "$key": "peso",
-        "deep": {
-            "$key": "deep peso"
-        }
-    },
-    {
-        "type": "complex_key",
-        "title": "unicode key",
-        "": "apple"
     }
 ]

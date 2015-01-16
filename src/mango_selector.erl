@@ -15,8 +15,6 @@
 
 -export([
     normalize/1,
-    index_fields/1,
-    range/2,
     match/2
 ]).
 
@@ -47,54 +45,6 @@ normalize(Selector) ->
             ok
     end,
     {NProps}.
-
-% This function returns a list of indexes that
-% can be used to restrict this query. This works by
-% searching the selector looking for field names that
-% can be "seen".
-%
-% Operators that can be seen through are '$and' and any of
-% the logical comparisons ('$lt', '$eq', etc). Things like
-% '$regex', '$in', '$nin', and '$or' can't be serviced by
-% a single index scan so we disallow them. In the future
-% we may become more clever and increase our ken such that
-% we will be able to see through these with crafty indexes
-% or new uses for existing indexes. For instance, I could
-% see an '$or' between comparisons on the same field becoming
-% the equivalent of a multi-query. But that's for another
-% day.
-
-% We can see through '$and' trivially
-index_fields({[{<<"$and">>, Args}]}) ->
-    lists:usort(lists:flatten([index_fields(A) || A <- Args]));
-
-% So far we can't see through any other operator
-index_fields({[{<<"$", _/binary>>, _}]}) ->
-    [];
-
-% If we have a field with a terminator that is locatable
-% using an index then the field is a possible index
-index_fields({[{Field, Cond}]}) ->
-    case indexable(Cond) of
-        true ->
-            [Field];
-        false ->
-            []
-    end;
-
-% An empty selector
-index_fields({[]}) ->
-    [].
-
-% Find the complete range for a given index in this
-% selector. This works by AND'ing logical comparisons
-% together so that we can define the start and end
-% keys for a given index.
-%
-% Selector must have been normalized before calling
-% this function.
-range(Selector, Index) ->
-    range(Selector, Index, '$gt', mango_json:min(), '$lt', mango_json:max()).
 
 
 % Match a selector against a #doc{} or EJSON value.
@@ -181,6 +131,19 @@ norm_ops({[{<<"$size">>, Arg}]}) when is_integer(Arg), Arg >= 0 ->
     {[{<<"$size">>, Arg}]};
 norm_ops({[{<<"$size">>, Arg}]}) ->
     ?MANGO_ERROR({bad_arg, '$size', Arg});
+
+norm_ops({[{<<"$text">>, Arg}]}) when is_binary(Arg); is_number(Arg);
+        is_boolean(Arg) ->
+    {[{<<"$default">>, {[{<<"$text">>, Arg}]}}]};
+norm_ops({[{<<"$text">>, Arg}]}) ->
+    ?MANGO_ERROR({bad_arg, '$text', Arg});
+
+% Not technically an operator but we pass it through here
+% so that this function accepts its own output. This exists
+% so that $text can have a field name value which simplifies
+% logic elsewhere.
+norm_ops({[{<<"$default">>, _}]} = Selector) ->
+    Selector;
 
 % Terminals where we can't perform any validation
 % on the value because any value is acceptable.
@@ -273,6 +236,17 @@ norm_fields({[{<<"$nor">>, Args}]}, Path) ->
 norm_fields({[{<<"$elemMatch">>, Arg}]}, Path) ->
     Cond = {[{<<"$elemMatch">>, norm_fields(Arg)}]},
     {[{Path, Cond}]};
+
+
+% The text operator operates against the internal
+% $default field. This also asserts that the $default
+% field is at the root as well as that it only has
+% a $text operator applied.
+norm_fields({[{<<"$default">>, {[{<<"$text">>, _Arg}]}}]}=Sel, <<>>) ->
+    Sel;
+norm_fields({[{<<"$default">>, _}]} = Selector, _) ->
+    ?MANGO_ERROR({bad_field, Selector});
+
 
 % Any other operator is a terminal below which no
 % field names should exist. Set the path to this
@@ -374,6 +348,9 @@ negate({[{<<"$and">>, Args}]}) ->
 negate({[{<<"$or">>, Args}]}) ->
     {[{<<"$and">>, [negate(A) || A <- Args]}]};
 
+negate({[{<<"$default">>, _}]} = Arg) ->
+    ?MANGO_ERROR({bad_arg, '$not', Arg});
+
 % Negating comparison operators is straight forward
 negate({[{<<"$lt">>, Arg}]}) ->
     {[{<<"$gte">>, Arg}]};
@@ -405,201 +382,6 @@ negate({[{<<"$", _/binary>>, _}]} = Cond) ->
 % condition.
 negate({[{Field, Cond}]}) ->
     {[{Field, negate(Cond)}]}.
-
-
-% Check if a condition is indexable. The logical
-% comparisons are mostly straight forward. We
-% currently don't understand '$in' which is
-% theoretically supportable. '$nin' and '$ne'
-% aren't currently supported because they require
-% multiple index scans.
-indexable({[{<<"$lt">>, _}]}) ->
-    true;
-indexable({[{<<"$lte">>, _}]}) ->
-    true;
-indexable({[{<<"$eq">>, _}]}) ->
-    true;
-indexable({[{<<"$gt">>, _}]}) ->
-    true;
-indexable({[{<<"$gte">>, _}]}) ->
-    true;
-
-% All other operators are currently not indexable.
-% This is also a subtle assertion that we don't
-% call indexable/1 on a field name.
-indexable({[{<<"$", _/binary>>, _}]}) ->
-    false.
-
-
-% Adjust Low and High based on values found for the
-% givend Index in Selector.
-range({[{<<"$and">>, Args}]}, Index, LCmp, Low, HCmp, High) ->
-    lists:foldl(fun
-        (Arg, {LC, L, HC, H}) ->
-            range(Arg, Index, LC, L, HC, H);
-        (_Arg, empty) ->
-            empty
-    end, {LCmp, Low, HCmp, High}, Args);
-
-% We can currently only traverse '$and' operators
-range({[{<<"$", _/binary>>}]}, _Index, LCmp, Low, HCmp, High) ->
-    {LCmp, Low, HCmp, High};
-
-% If the field name matches the index see if we can narrow
-% the acceptable range.
-range({[{Index, Cond}]}, Index, LCmp, Low, HCmp, High) ->
-    range(Cond, LCmp, Low, HCmp, High);
-
-% Else we have a field unrelated to this index so just
-% return the current values.
-range(_, _, LCmp, Low, HCmp, High) ->
-    {LCmp, Low, HCmp, High}.
-
-
-% The comments below are a bit cryptic at first but they show
-% where the Arg cand land in the current range.
-%
-% For instance, given:
-%
-%     {$lt: N}
-%     Low = 1
-%     High = 5
-%
-% Depending on the value of N we can have one of five locations
-% in regards to a given Low/High pair:
-%
-%     min low mid high max
-%
-%   That is:
-%       min = (N < Low)
-%       low = (N == Low)
-%       mid = (Low < N < High)
-%       high = (N == High)
-%       max = (High < N)
-%
-% If N < 1, (min) then the effective range is empty.
-%
-% If N == 1, (low) then we have to set the range to empty because
-% N < 1 && N >= 1 is an empty set. If the operator had been '$lte'
-% and LCmp was '$gte' or '$eq' then we could keep around the equality
-% check on Arg by setting LCmp == HCmp = '$eq' and Low == High == Arg.
-%
-% If 1 < N < 5 (mid), then we set High to Arg and Arg has just
-% narrowed our range. HCmp is set the the '$lt' operator that was
-% part of the input.
-%
-% If N == 5 (high), We just set HCmp to '$lt' since its guaranteed
-% to be equally or more restrictive than the current possible values
-% of '$lt' or '$lte'.
-%
-% If N > 5 (max), nothing changes as our current range is already
-% more narrow than the current condition.
-%
-% Obviously all of that logic gets tweaked for the other logical
-% operators but its all straight forward once you figure out how
-% we're basically just narrowing our logical ranges.
-
-range({[{<<"$lt">>, Arg}]}, LCmp, Low, HCmp, High) ->
-    case range_pos(Low, Arg, High) of
-        min ->
-            empty;
-        low ->
-            empty;
-        mid ->
-            {LCmp, Low, '$lt', Arg};
-        high ->
-            {LCmp, Low, '$lt', Arg};
-        max ->
-            {LCmp, Low, HCmp, High}
-    end;
-
-range({[{<<"$lte">>, Arg}]}, LCmp, Low, HCmp, High) ->
-    case range_pos(Low, Arg, High) of
-        min ->
-            empty;
-        low when LCmp == '$gte'; LCmp == '$eq' ->
-            {'$eq', Arg, '$eq', Arg};
-        low ->
-            empty;
-        mid ->
-            {LCmp, Low, '$lte', Arg};
-        high ->
-            {LCmp, Low, HCmp, High};
-        max ->
-            {LCmp, Low, HCmp, High}
-    end;
-
-range({[{<<"$eq">>, Arg}]}, LCmp, Low, HCmp, High) ->
-    case range_pos(Low, Arg, High) of
-        min ->
-            empty;
-        low when LCmp == '$gte'; LCmp == '$eq' ->
-            {'$eq', Arg, '$eq', Arg};
-        low ->
-            empty;
-        mid ->
-            {'$eq', Arg, '$eq', Arg};
-        high when HCmp == '$lte'; HCmp == '$eq' ->
-            {'$eq', Arg, '$eq', Arg};
-        high ->
-            empty;
-        max ->
-            empty
-    end;
-
-range({[{<<"$gte">>, Arg}]}, LCmp, Low, HCmp, High) ->
-    case range_pos(Low, Arg, High) of
-        min ->
-            {LCmp, Low, HCmp, High};
-        low ->
-            {LCmp, Low, HCmp, High};
-        mid ->
-            {'$gte', Arg, HCmp, High};
-        high when HCmp == '$lte'; HCmp == '$eq' ->
-            {'$eq', Arg, '$eq', Arg};
-        high ->
-            empty;
-        max ->
-            empty
-    end;
-
-range({[{<<"$gt">>, Arg}]}, LCmp, Low, HCmp, High) ->
-    case range_pos(Low, Arg, High) of
-        min ->
-            {LCmp, Low, HCmp, High};
-        low ->
-            {'$gt', Arg, HCmp, High};
-        mid ->
-            {'$gt', Arg, HCmp, High};
-        high ->
-            empty;
-        max ->
-            empty
-    end;
-
-% There's some other un-indexable restriction on the index
-% that will be applied as a post-filter. Ignore it and
-% carry on our merry way.
-range({[{<<"$", _/binary>>, _}]}, LCmp, Low, HCmp, High) ->
-    {LCmp, Low, HCmp, High}.
-
-
-% Returns the value min | low | mid | high | max depending
-% on how Arg compares to Low and High.
-range_pos(Low, Arg, High) ->
-    case mango_json:cmp(Arg, Low) of
-        N when N < 0 -> min;
-        N when N == 0 -> low;
-        _ ->
-            case mango_json:cmp(Arg, High) of
-                X when X < 0 ->
-                    mid;
-                X when X == 0 ->
-                    high;
-                _ ->
-                    max
-            end
-    end.
 
 
 match({[{<<"$and">>, Args}]}, Value, Cmp) ->
@@ -706,6 +488,11 @@ match({[{<<"$size">>, Arg}]}, Values, _Cmp) when is_list(Values) ->
 match({[{<<"$size">>, _}]}, _Value, _Cmp) ->
     false;
 
+% We don't have any choice but to believe that the text
+% index returned valid matches
+match({[{<<"$default">>, _}]}, _Value, _Cmp) ->
+    true;
+
 % All other operators are internal assertion errors for
 % matching because we either should've removed them during
 % normalization or something else broke.
@@ -717,6 +504,8 @@ match({[{<<"$", _/binary>>=Op, _}]}, _, _) ->
 % bad_path in which case matching fails.
 match({[{Field, Cond}]}, Value, Cmp) ->
     case mango_doc:get_field(Value, Field) of
+        not_found when Cond == {[{<<"$exists">>, false}]} ->
+            true;
         not_found ->
             false;
         bad_path ->

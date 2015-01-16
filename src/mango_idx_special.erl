@@ -20,6 +20,7 @@
     from_ddoc/1,
     to_json/1,
     columns/1,
+    is_usable/2,
     start_key/1,
     end_key/1
 ]).
@@ -60,6 +61,11 @@ to_json(#idx{def=all_docs}) ->
 
 columns(#idx{def=all_docs}) ->
     [<<"_id">>].
+
+
+is_usable(#idx{def=all_docs}, Selector) ->
+    Fields = mango_idx_view:indexable_fields(Selector),
+    lists:member(<<"_id">>, Fields).
 
 
 start_key([{'$gt', Key, _, _}]) ->

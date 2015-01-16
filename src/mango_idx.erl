@@ -20,6 +20,7 @@
 -export([
     list/1,
     recover/1,
+    for_sort/2,
 
     new/2,
     validate/1,
@@ -35,6 +36,7 @@
     def/1,
     opts/1,
     columns/1,
+    is_usable/2,
     start_key/2,
     end_key/2,
     cursor_mod/1,
@@ -65,6 +67,35 @@ recover(Db) ->
     {ok, Special ++ lists:flatmap(fun(Doc) ->
         from_ddoc(Db, Doc)
     end, DDocs)}.
+
+
+for_sort(Indexes, Opts) ->
+    % If a sort was specified we have to find an index that
+    % can satisfy the request.
+    case lists:keyfind(sort, 1, Opts) of
+        {sort, {SProps}} when is_list(SProps) ->
+            for_sort_int(Indexes, {SProps});
+        _ ->
+            Indexes
+    end.
+
+
+for_sort_int(Indexes, Sort) ->
+    Fields = mango_sort:fields(Sort),
+    FilterFun = fun(Idx) ->
+        Cols = mango_idx:columns(Idx),
+        case {mango_idx:type(Idx), Cols} of
+            {_, all_fields} ->
+                true;
+            {<<"text">>, _} ->
+                sets:is_subset(sets:from_list(Fields), sets:from_list(Cols));
+            {<<"json">>, _} ->
+                lists:prefix(Fields, Cols);
+            {<<"special">>, _} ->
+                lists:prefix(Fields, Cols)
+        end
+    end,
+    lists:filter(FilterFun, Indexes).
 
 
 new(Db, Opts) ->
@@ -113,7 +144,7 @@ from_ddoc(Db, {Props}) ->
             ?MANGO_ERROR(invalid_query_ddoc_language)
     end,
 
-    IdxMods = [mango_idx_view],
+    IdxMods = [mango_idx_view, mango_idx_text],
     Idxs = lists:flatmap(fun(Mod) -> Mod:from_ddoc({Props}) end, IdxMods),
     lists:map(fun(Idx) ->
         Idx#idx{
@@ -169,6 +200,11 @@ columns(#idx{}=Idx) ->
     Mod:columns(Idx).
 
 
+is_usable(#idx{}=Idx, Selector) ->
+    Mod = idx_mod(Idx),
+    Mod:is_usable(Idx, Selector).
+
+
 start_key(#idx{}=Idx, Ranges) ->
     Mod = idx_mod(Idx),
     Mod:start_key(Ranges).
@@ -182,13 +218,17 @@ end_key(#idx{}=Idx, Ranges) ->
 cursor_mod(#idx{type = <<"json">>}) ->
     mango_cursor_view;
 cursor_mod(#idx{def = all_docs, type= <<"special">>}) ->
-    mango_cursor_view.
+    mango_cursor_view;
+cursor_mod(#idx{type = <<"text">>}) ->
+    mango_cursor_text.
 
 
 idx_mod(#idx{type = <<"json">>}) ->
     mango_idx_view;
 idx_mod(#idx{type = <<"special">>}) ->
-    mango_idx_special.
+    mango_idx_special;
+idx_mod(#idx{type = <<"text">>}) ->
+    mango_idx_text.
 
 
 db_to_name(#db{name=Name}) ->
@@ -211,7 +251,7 @@ get_idx_def(Opts) ->
 get_idx_type(Opts) ->
     case proplists:get_value(type, Opts) of
         <<"json">> -> <<"json">>;
-        %<<"text">> -> <<"text">>;
+        <<"text">> -> <<"text">>;
         %<<"geo">> -> <<"geo">>;
         undefined -> <<"json">>;
         BadType ->

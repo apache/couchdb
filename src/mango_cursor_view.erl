@@ -13,6 +13,8 @@
 -module(mango_cursor_view).
 
 -export([
+    create/4,
+    explain/1,
     execute/3
 ]).
 
@@ -23,6 +25,38 @@
 
 -include_lib("couch/include/couch_db.hrl").
 -include("mango_cursor.hrl").
+
+
+create(Db, Indexes, Selector, Opts) ->
+    FieldRanges = mango_idx_view:field_ranges(Selector),
+    Composited = composite_indexes(Indexes, FieldRanges),
+    {Index, IndexRanges} = choose_best_index(Db, Composited),
+
+    Limit = couch_util:get_value(limit, Opts, 10000000000),
+    Skip = couch_util:get_value(skip, Opts, 0),
+    Fields = couch_util:get_value(fields, Opts, all_fields),
+
+    {ok, #cursor{
+        db = Db,
+        index = Index,
+        ranges = IndexRanges,
+        selector = Selector,
+        opts = Opts,
+        limit = Limit,
+        skip = Skip,
+        fields = Fields
+    }}.
+
+
+explain(Cursor) ->
+    #cursor{
+        index = Idx,
+        ranges = Ranges
+    } = Cursor,
+    [{range, {[
+        {start_key, mango_idx:start_key(Idx, Ranges)},
+        {end_key, mango_idx:end_key(Idx, Ranges)}
+    ]}}].
 
 
 execute(#cursor{db = Db, index = Idx} = Cursor0, UserFun, UserAcc) ->
@@ -50,6 +84,55 @@ execute(#cursor{db = Db, index = Idx} = Cursor0, UserFun, UserAcc) ->
             fabric:query_view(Db, DDoc, Name, CB, Cursor, Args)
     end,
     {ok, LastCursor#cursor.user_acc}.
+
+
+% Any of these indexes may be a composite index. For each
+% index find the most specific set of fields for each
+% index. Ie, if an index has columns a, b, c, d, then
+% check FieldRanges for a, b, c, and d and return
+% the longest prefix of columns found.
+composite_indexes(Indexes, FieldRanges) ->
+    lists:foldl(fun(Idx, Acc) ->
+        Cols = mango_idx:columns(Idx),
+        Prefix = composite_prefix(Cols, FieldRanges),
+        [{Idx, Prefix} | Acc]
+    end, [], Indexes).
+
+
+composite_prefix([], _) ->
+    [];
+composite_prefix([Col | Rest], Ranges) ->
+    case lists:keyfind(Col, 1, Ranges) of
+        {Col, Range} ->
+            [Range | composite_prefix(Rest, Ranges)];
+        false ->
+            []
+    end.
+
+
+% Low and behold our query planner. Or something.
+% So stupid, but we can fix this up later. First
+% pass: Sort the IndexRanges by (num_columns, idx_name)
+% and return the first element. Yes. Its going to
+% be that dumb for now.
+%
+% In the future we can look into doing a cached parallel
+% reduce view read on each index with the ranges to find
+% the one that has the fewest number of rows or something.
+choose_best_index(_DbName, IndexRanges) ->
+    Cmp = fun({A1, A2}, {B1, B2}) ->
+        case length(A2) - length(B2) of
+            N when N < 0 -> true;
+            N when N == 0 ->
+                % This is a really bad sort and will end
+                % up preferring indices based on the
+                % (dbname, ddocid, view_name) triple
+                A1 =< B1;
+            _ ->
+                false
+        end
+    end,
+    hd(lists:sort(Cmp, IndexRanges)).
 
 
 handle_message({total_and_offset, _, _} = _TO, Cursor) ->
