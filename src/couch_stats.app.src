@@ -14,7 +14,7 @@
     {description, "Simple statistics collection"},
     {vsn, git},
     {registered, [couch_stats_aggregator, couch_stats_process_tracker]},
-    {applications, [kernel, stdlib, folsom]},
+    {applications, [kernel, stdlib, folsom, couch_log]},
     {mod, {couch_stats_app, []}},
     {env, [
         {collection_interval, 10}
