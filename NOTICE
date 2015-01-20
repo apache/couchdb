@@ -181,3 +181,15 @@ This product also includes the following third-party components:
 * moment.js
 
    Copyright (c) 2011-2014 Tim Wood, Iskren Chernev, moment.js contributors
+
+* React.js
+
+  Copyright (c) 2013-2015, Facebook, Inc.
+
+* Flux.js
+
+  Copyright (c) 2014, Facebook, Inc. All rights reserved.
+
+* es5-shim.js
+
+  Copyright (C) 2009-2014 Kristopher Michael Kowal and contributors
