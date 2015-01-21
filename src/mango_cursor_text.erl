@@ -204,12 +204,18 @@ apply_user_fun(CAcc, Doc) ->
 sort_query(Opts, Selector) ->
     {sort, {Sort}} = lists:keyfind(sort, 1, Opts),
     SortList = lists:map(fun(SortField) ->
-        RawSortField = case SortField of
-            {Field, <<"asc">>} -> Field;
-            {Field, <<"desc">>} -> <<"-", Field/binary>>;
-            Field when is_binary(Field) -> Field
+        {Dir, RawSortField}  = case SortField of
+            {Field, <<"asc">>} -> {asc, Field};
+            {Field, <<"desc">>} -> {desc, Field};
+            Field when is_binary(Field) -> {asc, Field}
         end,
-        mango_selector_text:append_sort_type(RawSortField, Selector)
+        SField = mango_selector_text:append_sort_type(RawSortField, Selector),
+        case Dir of
+            asc ->
+                SField;
+            desc ->
+                <<"-", SField/binary>>
+        end
     end, Sort),
     case SortList of
         [] -> relevance;

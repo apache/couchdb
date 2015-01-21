@@ -21,6 +21,17 @@ class SortTests(mango.UserDocsTextTests):
         assert len(docs) == 15
         assert docs[0]["age"] == 22
 
+    def test_number_sort_desc(self):
+        q = {"age": {"$gt": 0}}
+        docs = self.db.find(q, sort=[{"age": "desc"}])
+        assert len(docs) == 15
+        assert docs[0]["age"] == 79
+
+        q = {"manager": True}
+        docs = self.db.find(q, sort=[{"age:number": "desc"}])
+        assert len(docs) == 11
+        assert docs[0]["age"] == 79
+
     def test_string_sort(self):
         q = {"email": {"$gt": None}}
         docs = self.db.find(q, sort=["email:string"])
