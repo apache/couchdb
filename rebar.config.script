@@ -47,7 +47,7 @@ DepDescs = [
     {oauth,             "oauth",            {branch, "master"}},
     {rexi,              "rexi",             {branch, "master"}},
     {snappy,            "snappy",           {branch, "master"}},
-    {meck,              "meck",             {branch, "master"}}
+    {meck,              "meck",             {tag, "0.8.2"}}
 ],
 
 BaseUrl = "https://git-wip-us.apache.org/repos/asf/",
