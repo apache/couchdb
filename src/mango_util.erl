@@ -34,7 +34,9 @@
     lucene_escape_field/1,
     lucene_escape_query_value/1,
 
-    has_suffix/2
+    has_suffix/2,
+
+    join/2
 ]).
 
 
@@ -293,3 +295,9 @@ has_suffix(Bin, Suffix) when is_binary(Bin), is_binary(Suffix) ->
                 false
         end
     end.
+
+
+join(_Sep, [Item]) ->
+    [Item];
+join(Sep, [Item | Rest]) ->
+    [Item, Sep | join(Sep, Rest)].
