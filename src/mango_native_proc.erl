@@ -168,8 +168,7 @@ get_text_field_values(Values, TAcc) when is_list(Values) ->
     % We bypass make_text_field and directly call make_text_field_name
     % because the length field name is not part of the path.
     LengthFieldName = make_text_field_name(NewTAcc#tacc.path, <<"length">>),
-    LengthField = [{escape_name_parts(LengthFieldName), <<"length">>,
-        length(Values)}],
+    LengthField = [{LengthFieldName, <<"length">>, length(Values)}],
     get_text_field_values_arr(Values, NewTAcc, LengthField);
 
 get_text_field_values(Bin, TAcc) when is_binary(Bin) ->
@@ -258,7 +257,8 @@ should_index(Selector, Doc) ->
 get_text_field_list(IdxProps) ->
     case couch_util:get_value(<<"fields">>, IdxProps) of
         Fields when is_list(Fields) ->
-            lists:flatmap(fun get_text_field_info/1, Fields);
+            RawList = lists:flatmap(fun get_text_field_info/1, Fields),
+            [mango_util:lucene_escape_user(Field) || Field <- RawList];
         _ ->
             all_fields
     end.
@@ -283,41 +283,16 @@ get_text_field_type(_) ->
 
 make_text_field(TAcc, Type, Value) ->
     FieldName = make_text_field_name(TAcc#tacc.path, Type),
-    Fields = case TAcc#tacc.fields of
-        Fields0 when is_list(Fields0) ->
-            % for field names such as "name\\.first"
-            PFields = [mango_doc:parse_field(F) || F <- Fields0],
-            [iolist_to_binary(mango_util:join(".", P)) || {ok, P} <- PFields];
-        _ ->
-            all_fields
-    end,
-    % need to convert the fieldname to binary but not escape it in order
-    % to compare with the user field names.
-    BName = iolist_to_binary(FieldName),
-    case Fields == all_fields orelse lists:member(BName, Fields) of
+    Fields = TAcc#tacc.fields,
+    case Fields == all_fields orelse lists:member(FieldName, Fields) of
         true ->
-            [{escape_name_parts(FieldName), Type, Value}];
+            [{FieldName, Type, Value}];
         false ->
             []
     end.
 
 
 make_text_field_name([P | Rest], Type) ->
-    make_text_field_name0(Rest, [P, ":", Type]).
-
-make_text_field_name0([], Name) ->
-    Name;
-make_text_field_name0([P | Rest], Name) ->
-    make_text_field_name0(Rest, [P, "." | Name]).
-
-
-escape_name_parts(Name) ->
-    EscapedName = lists:map(fun(N) ->
-        case N of
-            "." ->
-                ".";
-            Else ->
-                mango_util:lucene_escape_field(Else)
-        end
-    end, Name),
-    iolist_to_binary(EscapedName).
+    Parts = lists:reverse(Rest, [iolist_to_binary([P, ":", Type])]),
+    Escaped = [mango_util:lucene_escape_field(N) || N <- Parts],
+    iolist_to_binary(mango_util:join(".", Escaped)).
