@@ -36,6 +36,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("mem3/include/mem3.hrl").
 
+-define(ADMIN_CTX, {user_ctx, #user_ctx{roles = [<<"_admin">>]}}).
 
 -record(state, {
     update_db,
@@ -151,7 +152,7 @@ flush_updates(State) ->
     try group_ids_by_shard(State#state.dbname, DocIds) of
     GroupedIds ->
         Docs = dict:fold(fun(ShardName, Ids, DocInfoAcc) ->
-            {ok, Shard} = couch_db:open(ShardName, []),
+            {ok, Shard} = couch_db:open(ShardName, [?ADMIN_CTX]),
             try
                 GroupedDocs = get_docs_locally(Shard, Ids),
                 GroupedDocs ++ DocInfoAcc
