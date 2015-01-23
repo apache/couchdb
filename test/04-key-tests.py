@@ -26,7 +26,8 @@ TEST_DOCS = [
         "dot.key": "dot's value",
         "none": {
             "dot": "none dot's value"
-        }
+        },
+        "name.first" : "Kvothe"
     },
     {
         "type": "complex_key",
@@ -34,7 +35,8 @@ TEST_DOCS = [
         "$key": "peso",
         "deep": {
             "$key": "deep peso"
-        }
+        },
+        "name": {"first" : "Master Elodin"}
     },
     {
         "type": "complex_key",
@@ -121,3 +123,27 @@ class KeyTests(mango.DbPerClass):
             assert docs[0]["title"] == "internal_fields_format"
         for query in queries:
             self.run_check(query, check, indexes=["text"])
+
+    def test_escape_period(self):
+        query = {"name\\.first" : "Kvothe"}
+        def check(docs):
+            assert len(docs) == 1
+            assert docs[0]["name.first"] == "Kvothe"
+        self.run_check(query, check, indexes=["text"])
+
+        query = {"name.first" : "Kvothe"}
+        def check_empty(docs):
+            assert len(docs) == 0
+        self.run_check(query, check_empty, indexes=["text"])
+
+    def test_object_period(self):
+        query = {"name.first" : "Master Elodin"}
+        def check(docs):
+            assert len(docs) == 1
+            assert docs[0]["title"] == "key with peso"
+        self.run_check(query, check, indexes=["text"])
+
+        query = {"name\\.first" : "Master Elodin"}
+        def check_empty(docs):
+            assert len(docs) == 0
+        self.run_check(query, check_empty, indexes=["text"])

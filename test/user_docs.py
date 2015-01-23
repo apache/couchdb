@@ -224,7 +224,8 @@ DOCS = [
             "C",
             "Ruby",
             "Ruby"
-        ]
+        ],
+        "name.first" : "name dot first"
     },
     {
         "_id": "a33d5457-741a-4dce-a217-3eab28b24e3e",

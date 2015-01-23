@@ -26,7 +26,8 @@ class CustomFieldsTest(mango.UserDocsTextTests):
         {
             "name": "location.address.street",
             "type": "string"
-        }
+        },
+        {"name": "name\\.first", "type": "string"}
     ]
 
     def test_basic(self):
@@ -60,3 +61,17 @@ class CustomFieldsTest(mango.UserDocsTextTests):
         docs = self.db.find({"location.state": "New Hampshire"})
         assert len(docs) == 1
         assert docs[0]["user_id"] == 10
+    
+    # Since our FIELDS list only includes "name\\.first", we should
+    # get an error when we try to search for "name.first", since the index
+    # for that field does not exist.
+    def test_escaped_field(self):
+        docs = self.db.find({"name\\.first": "name dot first"})
+        assert len(docs) == 1
+        assert docs[0]["name.first"] == "name dot first"
+
+        try:
+            self.db.find({"name.first": "name dot first"})
+            raise Exception("Should have thrown an HTTPError")
+        except:
+            return

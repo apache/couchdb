@@ -33,8 +33,11 @@
 
     lucene_escape_field/1,
     lucene_escape_query_value/1,
+    lucene_escape_user/1,
 
-    has_suffix/2
+    has_suffix/2,
+
+    join/2
 ]).
 
 
@@ -281,6 +284,12 @@ lucene_escape_qv(<<C, Rest/binary>>) ->
     Out ++ lucene_escape_qv(Rest).
 
 
+lucene_escape_user(Field) ->
+    {ok, Path} = mango_doc:parse_field(Field),
+    Escaped = [mango_util:lucene_escape_field(P) || P <- Path],
+    iolist_to_binary(join(".", Escaped)).
+
+
 has_suffix(Bin, Suffix) when is_binary(Bin), is_binary(Suffix) ->
     SBin = size(Bin),
     SSuffix = size(Suffix),
@@ -293,3 +302,9 @@ has_suffix(Bin, Suffix) when is_binary(Bin), is_binary(Suffix) ->
                 false
         end
     end.
+
+
+join(_Sep, [Item]) ->
+    [Item];
+join(Sep, [Item | Rest]) ->
+    [Item, Sep | join(Sep, Rest)].

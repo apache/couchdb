@@ -171,11 +171,11 @@ convert(_Path, {Props} = Sel) when length(Props) > 1 ->
 
 
 to_query({op_and, Args}) when is_list(Args) ->
-    Res = ["(", join(<<" AND ">>, lists:map(fun to_query/1, Args)), ")"],
-    Res;
+    QueryArgs = lists:map(fun to_query/1, Args),
+    ["(", mango_util:join(<<" AND ">>, QueryArgs), ")"];
 
 to_query({op_or, Args}) when is_list(Args) ->
-    ["(", join(" OR ", lists:map(fun to_query/1, Args)), ")"];
+    ["(", mango_util:join(" OR ", lists:map(fun to_query/1, Args)), ")"];
 
 to_query({op_not, {ExistsQuery, Arg}}) when is_tuple(Arg) ->
     ["(", to_query(ExistsQuery), " AND NOT (", to_query(Arg), "))"];
@@ -191,25 +191,19 @@ to_query({op_insert, Arg}) when is_binary(Arg) ->
 %% This needs to be resolved.
 to_query({op_field, {Name, Value}}) ->
     NameBin = iolist_to_binary(Name),
-    ["(", mango_util:lucene_escape_field(NameBin), ":", Value, ")"];
+    ["(", mango_util:lucene_escape_user(NameBin), ":", Value, ")"];
 
 %% This is for indexable_fields
 to_query({op_null, {Name, Value}}) ->
     NameBin = iolist_to_binary(Name),
-    ["(", mango_util:lucene_escape_field(NameBin), ":", Value, ")"];
+    ["(", mango_util:lucene_escape_user(NameBin), ":", Value, ")"];
 
 to_query({op_fieldname, {Name, Wildcard}}) ->
     NameBin = iolist_to_binary(Name),
-    ["($fieldnames:", mango_util:lucene_escape_field(NameBin), Wildcard, ")"];
+    ["($fieldnames:", mango_util:lucene_escape_user(NameBin), Wildcard, ")"];
 
 to_query({op_default, Value}) ->
     ["($default:", Value, ")"].
-
-
-join(_Sep, [Item]) ->
-    [Item];
-join(Sep, [Item | Rest]) ->
-    [Item, Sep | join(Sep, Rest)].
 
 
 %% We match on fieldname and fieldname.[]
@@ -255,8 +249,11 @@ field_exists_query(Path) ->
     % match a path foo.name against foo.name_first (if were to just
     % appened * isntead).
     Parts = [
+        % We need to remove the period from the path list to indicate that it is
+        % a path separator. We escape the colon because it is not used as a
+        % separator and we escape colons in field names.
         {op_fieldname, {[path_str(Path), ":"], "*"}},
-        {op_fieldname, {[path_str(Path), "."], "*"}}
+        {op_fieldname, {[path_str(Path)], ".*"}}
     ],
     {op_or, Parts}.
 
@@ -304,7 +301,7 @@ value_str(null) ->
 
 
 append_sort_type(RawSortField, Selector) ->
-    EncodeField = mango_util:lucene_escape_field(RawSortField),
+    EncodeField = mango_util:lucene_escape_user(RawSortField),
     String = mango_util:has_suffix(EncodeField, <<"_3astring">>),
     Number = mango_util:has_suffix(EncodeField, <<"_3anumber">>),
     case {String, Number} of
