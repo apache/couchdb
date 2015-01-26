@@ -29,12 +29,12 @@ init_db(Name, Type, Count) ->
 
 
 new_db(Name, Type) ->
-    couch_server:delete(Name, [?ADMIN_USER]),
-    {ok, Db} = couch_db:create(Name, [?ADMIN_USER]),
+    couch_server:delete(Name, [?ADMIN_CTX]),
+    {ok, Db} = couch_db:create(Name, [?ADMIN_CTX]),
     save_docs(Db, [ddoc(Type)]).
 
 delete_db(Name) ->
-    couch_server:delete(Name, [?ADMIN_USER]).
+    couch_server:delete(Name, [?ADMIN_CTX]).
 
 save_docs(Db, Docs) ->
     {ok, _} = couch_db:update_docs(Db, Docs, []),

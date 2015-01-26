@@ -25,7 +25,7 @@ setup() ->
 
 teardown(Db) ->
     couch_db:close(Db),
-    couch_server:delete(Db#db.name, [?ADMIN_USER]),
+    couch_server:delete(Db#db.name, [?ADMIN_CTX]),
     ok.
 
 
