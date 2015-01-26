@@ -20,7 +20,7 @@
 
 setup() ->
     DbName = ?tempdb(),
-    {ok, Db} = couch_db:create(DbName, [?ADMIN_USER]),
+    {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     couch_db:close(Db),
 
     Addr = config:get("httpd", "bind_address", "127.0.0.1"),
@@ -29,7 +29,7 @@ setup() ->
     {Host, ?b2l(DbName)}.
 
 teardown({_, DbName}) ->
-    ok = couch_server:delete(?l2b(DbName), [?ADMIN_USER]),
+    ok = couch_server:delete(?l2b(DbName), [?ADMIN_CTX]),
     ok.
 
 

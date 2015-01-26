@@ -25,7 +25,7 @@
 setup() ->
     config:set("couchdb", "file_compression", "none", false),
     DbName = ?tempdb(),
-    {ok, Db} = couch_db:create(DbName, [?ADMIN_USER]),
+    {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     ok = populate_db(Db, ?DOCS_COUNT),
     DDoc = couch_doc:from_json_obj({[
         {<<"_id">>, ?DDOC_ID},
@@ -43,7 +43,7 @@ setup() ->
     DbName.
 
 teardown(DbName) ->
-    ok = couch_server:delete(DbName, [?ADMIN_USER]),
+    ok = couch_server:delete(DbName, [?ADMIN_CTX]),
     ok.
 
 

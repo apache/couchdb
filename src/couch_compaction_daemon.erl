@@ -143,7 +143,7 @@ compact_loop(Parent) ->
 
 
 maybe_compact_db(DbName, Config) ->
-    case (catch couch_db:open_int(DbName, [{user_ctx, #user_ctx{roles=[<<"_admin">>]}}])) of
+    case (catch couch_db:open_int(DbName, [?ADMIN_CTX])) of
     {ok, Db} ->
         DDocNames = db_ddoc_names(Db),
         case can_db_compact(Config, Db) of

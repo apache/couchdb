@@ -24,7 +24,7 @@
 
 setup() ->
     DbName = ?tempdb(),
-    {ok, Db} = couch_db:create(DbName, [?ADMIN_USER]),
+    {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     ok = couch_db:close(Db),
     FooRev = create_design_doc(DbName, <<"_design/foo">>, <<"bar">>),
     query_view(DbName, "foo", "bar"),
@@ -34,7 +34,7 @@ setup() ->
 
 setup_with_docs() ->
     DbName = ?tempdb(),
-    {ok, Db} = couch_db:create(DbName, [?ADMIN_USER]),
+    {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     ok = couch_db:close(Db),
     create_docs(DbName),
     create_design_doc(DbName, <<"_design/foo">>, <<"bar">>),
@@ -43,7 +43,7 @@ setup_with_docs() ->
 teardown({DbName, _}) ->
     teardown(DbName);
 teardown(DbName) when is_binary(DbName) ->
-    couch_server:delete(DbName, [?ADMIN_USER]),
+    couch_server:delete(DbName, [?ADMIN_CTX]),
     ok.
 
 
@@ -277,7 +277,7 @@ couchdb_1309(DbName) ->
         end,
 
         MonRef1 = erlang:monitor(process, NewIndexerPid),
-        ok = couch_server:delete(DbName, [?ADMIN_USER]),
+        ok = couch_server:delete(DbName, [?ADMIN_CTX]),
         receive
             {'DOWN', MonRef1, _, _, _} ->
                 ok
@@ -294,7 +294,7 @@ couchdb_1283() ->
         ok = config:set("couchdb", "max_dbs_open", "3", false),
         ok = config:set("couchdb", "delayed_commits", "false", false),
 
-        {ok, MDb1} = couch_db:create(?tempdb(), [?ADMIN_USER]),
+        {ok, MDb1} = couch_db:create(?tempdb(), [?ADMIN_CTX]),
         DDoc = couch_doc:from_json_obj({[
             {<<"_id">>, <<"_design/foo">>},
             {<<"language">>, <<"javascript">>},
@@ -321,11 +321,11 @@ couchdb_1283() ->
         query_view(MDb1#db.name, "foo", "foo"),
         ok = couch_db:close(MDb1),
 
-        {ok, Db1} = couch_db:create(?tempdb(), [?ADMIN_USER]),
+        {ok, Db1} = couch_db:create(?tempdb(), [?ADMIN_CTX]),
         ok = couch_db:close(Db1),
-        {ok, Db2} = couch_db:create(?tempdb(), [?ADMIN_USER]),
+        {ok, Db2} = couch_db:create(?tempdb(), [?ADMIN_CTX]),
         ok = couch_db:close(Db2),
-        {ok, Db3} = couch_db:create(?tempdb(), [?ADMIN_USER]),
+        {ok, Db3} = couch_db:create(?tempdb(), [?ADMIN_CTX]),
         ok = couch_db:close(Db3),
 
         Writer1 = spawn_writer(Db1#db.name),
@@ -373,7 +373,7 @@ couchdb_1283() ->
 create_doc(DbName, DocId) when is_list(DocId) ->
     create_doc(DbName, ?l2b(DocId));
 create_doc(DbName, DocId) when is_binary(DocId) ->
-    {ok, Db} = couch_db:open(DbName, [?ADMIN_USER]),
+    {ok, Db} = couch_db:open(DbName, [?ADMIN_CTX]),
     Doc666 = couch_doc:from_json_obj({[
         {<<"_id">>, DocId},
         {<<"value">>, 999}
@@ -383,7 +383,7 @@ create_doc(DbName, DocId) when is_binary(DocId) ->
     couch_db:close(Db).
 
 create_docs(DbName) ->
-    {ok, Db} = couch_db:open(DbName, [?ADMIN_USER]),
+    {ok, Db} = couch_db:open(DbName, [?ADMIN_CTX]),
     Doc1 = couch_doc:from_json_obj({[
         {<<"_id">>, <<"doc1">>},
         {<<"value">>, 1}
@@ -418,7 +418,7 @@ populate_db(_Db, _, _) ->
     ok.
 
 create_design_doc(DbName, DDName, ViewName) ->
-    {ok, Db} = couch_db:open(DbName, [?ADMIN_USER]),
+    {ok, Db} = couch_db:open(DbName, [?ADMIN_CTX]),
     DDoc = couch_doc:from_json_obj({[
         {<<"_id">>, DDName},
         {<<"language">>, <<"javascript">>},
@@ -434,8 +434,8 @@ create_design_doc(DbName, DDName, ViewName) ->
     Rev.
 
 update_design_doc(DbName, DDName, ViewName) ->
-    {ok, Db} = couch_db:open(DbName, [?ADMIN_USER]),
-    {ok, Doc} = couch_db:open_doc(Db, DDName, [?ADMIN_USER]),
+    {ok, Db} = couch_db:open(DbName, [?ADMIN_CTX]),
+    {ok, Doc} = couch_db:open_doc(Db, DDName, [?ADMIN_CTX]),
     {Props} = couch_doc:to_json_obj(Doc, []),
     Rev = couch_util:get_value(<<"_rev">>, Props),
     DDoc = couch_doc:from_json_obj({[
@@ -448,13 +448,13 @@ update_design_doc(DbName, DDName, ViewName) ->
             ]}}
         ]}}
     ]}),
-    {ok, NewRev} = couch_db:update_doc(Db, DDoc, [?ADMIN_USER]),
+    {ok, NewRev} = couch_db:update_doc(Db, DDoc, [?ADMIN_CTX]),
     couch_db:ensure_full_commit(Db),
     couch_db:close(Db),
     NewRev.
 
 delete_design_doc(DbName, DDName, Rev) ->
-    {ok, Db} = couch_db:open(DbName, [?ADMIN_USER]),
+    {ok, Db} = couch_db:open(DbName, [?ADMIN_CTX]),
     DDoc = couch_doc:from_json_obj({[
         {<<"_id">>, DDName},
         {<<"_rev">>, couch_doc:rev_to_str(Rev)},
@@ -489,7 +489,7 @@ check_rows_value(Rows, Value) ->
         end, Rows).
 
 view_cleanup(DbName) ->
-    {ok, Db} = couch_db:open(DbName, [?ADMIN_USER]),
+    {ok, Db} = couch_db:open(DbName, [?ADMIN_CTX]),
     couch_mrview:cleanup(Db),
     couch_db:close(Db).
 

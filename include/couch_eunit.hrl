@@ -12,9 +12,6 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
--define(ADMIN_ROLE, #user_ctx{roles=[<<"_admin">>]}).
--define(ADMIN_USER, {user_ctx, ?ADMIN_ROLE}).
-
 -define(BUILDDIR,
     fun() ->
         case os:getenv("BUILDDIR") of

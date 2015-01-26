@@ -48,7 +48,7 @@ special_test_authentication_handler(Req) ->
     _ ->
         % No X-Couch-Test-Auth credentials sent, give admin access so the
         % previous authentication can be restored after the test
-        Req#httpd{user_ctx=#user_ctx{roles=[<<"_admin">>]}}
+        Req#httpd{user_ctx=?ADMIN_USER}
     end.
 
 basic_name_pw(Req) ->
@@ -107,13 +107,13 @@ default_authentication_handler(Req, AuthModule) ->
                 "true" -> Req;
                 % If no admins, and no user required, then everyone is admin!
                 % Yay, admin party!
-                _ -> Req#httpd{user_ctx=#user_ctx{roles=[<<"_admin">>]}}
+                _ -> Req#httpd{user_ctx=?ADMIN_USER}
             end
         end
     end.
 
 null_authentication_handler(Req) ->
-    Req#httpd{user_ctx=#user_ctx{roles=[<<"_admin">>]}}.
+    Req#httpd{user_ctx=?ADMIN_USER}.
 
 %% @doc proxy auth handler.
 %

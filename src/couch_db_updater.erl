@@ -614,7 +614,7 @@ refresh_validate_doc_funs(#db{name = <<"shards/", _/binary>> = Name} = Db) ->
     spawn(fabric, reset_validation_funs, [mem3:dbname(Name)]),
     Db#db{validate_doc_funs = undefined};
 refresh_validate_doc_funs(Db0) ->
-    Db = Db0#db{user_ctx = #user_ctx{roles=[<<"_admin">>]}},
+    Db = Db0#db{user_ctx=?ADMIN_USER},
     {ok, DesignDocs} = couch_db:get_design_docs(Db),
     ProcessDocFuns = lists:flatmap(
         fun(DesignDocInfo) ->

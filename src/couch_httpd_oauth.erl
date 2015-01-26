@@ -344,8 +344,7 @@ use_auth_db() ->
 
 open_auth_db() ->
     DbName = ?l2b(config:get("couch_httpd_auth", "authentication_db")),
-    DbOptions = [{user_ctx, #user_ctx{roles = [<<"_admin">>]}}],
-    {ok, AuthDb} = couch_db:open_int(DbName, DbOptions),
+    {ok, AuthDb} = couch_db:open_int(DbName, [?ADMIN_CTX]),
     AuthDb.
 
 

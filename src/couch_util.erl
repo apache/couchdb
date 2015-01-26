@@ -445,7 +445,7 @@ encode_doc_id(Id) ->
 with_db(Db, Fun) when is_record(Db, db) ->
     Fun(Db);
 with_db(DbName, Fun) ->
-    case couch_db:open_int(DbName, [{user_ctx, #user_ctx{roles=[<<"_admin">>]}}]) of
+    case couch_db:open_int(DbName, [?ADMIN_CTX]) of
         {ok, Db} ->
             try
                 Fun(Db)

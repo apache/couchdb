@@ -30,7 +30,7 @@ start() ->
 
 setup() ->
     DbName = ?tempdb(),
-    {ok, Db} = couch_db:create(DbName, [?ADMIN_USER, overwrite]),
+    {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX, overwrite]),
     Doc = couch_doc:from_json_obj({[{<<"_id">>, ?DOC_ID},
                                     {<<"value">>, 0}]}),
     {ok, Rev} = couch_db:update_doc(Db, Doc, []),

@@ -23,7 +23,7 @@
 
 setup() ->
     DbName = ?tempdb(),
-    {ok, Db} = couch_db:create(DbName, [?ADMIN_USER]),
+    {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     Doc = couch_doc:from_json_obj({[
         {<<"_id">>, <<"doc1">>},
         {<<"value">>, 666}
@@ -55,7 +55,7 @@ setup() ->
 
 setup_oauth() ->
     DbName = ?tempdb(),
-    {ok, Db} = couch_db:create(DbName, [?ADMIN_USER]),
+    {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
 
     config:set("couch_httpd_auth", "authentication_db",
                      ?b2l(?tempdb()), false),
@@ -370,8 +370,8 @@ should_succeed_oauth({Url, _}) ->
             {<<"password_sha">>, <<"fe95df1ca59a9b567bdca5cbaf8412abd6e06121">>},
             {<<"salt">>, <<"4e170ffeb6f34daecfd814dfb4001a73">>}
         ]}),
-        {ok, AuthDb} = couch_db:open_int(?l2b(AuthDbName), [?ADMIN_USER]),
-        {ok, _} = couch_db:update_doc(AuthDb, JoeDoc, [?ADMIN_USER]),
+        {ok, AuthDb} = couch_db:open_int(?l2b(AuthDbName), [?ADMIN_CTX]),
+        {ok, _} = couch_db:update_doc(AuthDb, JoeDoc, [?ADMIN_CTX]),
 
         Host = "oauth-example.com",
         Consumer = {"consec1", "foo", hmac_sha1},
@@ -404,8 +404,8 @@ should_fail_oauth_with_wrong_credentials({Url, _}) ->
             {<<"password_sha">>, <<"fe95df1ca59a9b567bdca5cbaf8412abd6e06121">>},
             {<<"salt">>, <<"4e170ffeb6f34daecfd814dfb4001a73">>}
         ]}),
-        {ok, AuthDb} = couch_db:open_int(?l2b(AuthDbName), [?ADMIN_USER]),
-        {ok, _} = couch_db:update_doc(AuthDb, JoeDoc, [?ADMIN_USER]),
+        {ok, AuthDb} = couch_db:open_int(?l2b(AuthDbName), [?ADMIN_CTX]),
+        {ok, _} = couch_db:update_doc(AuthDb, JoeDoc, [?ADMIN_CTX]),
 
         Host = "oauth-example.com",
         Consumer = {"consec1", "bad_secret", hmac_sha1},

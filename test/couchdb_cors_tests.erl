@@ -29,7 +29,7 @@ start() ->
 
 setup() ->
     DbName = ?tempdb(),
-    {ok, Db} = couch_db:create(DbName, [?ADMIN_USER]),
+    {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     couch_db:close(Db),
 
     config:set("cors", "credentials", "false", false),
@@ -53,7 +53,7 @@ setup({Mod, VHost}) ->
     {Host, DbName, Url, DefaultHeaders}.
 
 teardown(DbName) when is_list(DbName) ->
-    ok = couch_server:delete(?l2b(DbName), [?ADMIN_USER]),
+    ok = couch_server:delete(?l2b(DbName), [?ADMIN_CTX]),
     ok;
 teardown({_, DbName}) ->
     teardown(DbName).

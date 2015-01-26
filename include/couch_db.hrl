@@ -37,6 +37,10 @@
 
 -define(DEFAULT_ATTACHMENT_CONTENT_TYPE, <<"application/octet-stream">>).
 
+-define(ADMIN_USER, #user_ctx{roles=[<<"_admin">>]}).
+-define(ADMIN_CTX, {user_ctx, ?ADMIN_USER}).
+
+
 -type branch() :: {Key::term(), Value::term(), Tree::term()}.
 -type path() :: {Start::pos_integer(), branch()}.
 

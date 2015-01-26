@@ -329,7 +329,7 @@ should_emit_only_design_documents({DbName, Revs}) ->
 
             stop_consumer(Consumer),
 
-            {ok, Db2} = couch_db:open_int(DbName, [?ADMIN_USER]),
+            {ok, Db2} = couch_db:open_int(DbName, [?ADMIN_CTX]),
             {ok, _} = save_doc(Db2, {[{<<"_id">>, <<"_design/foo">>},
                                       {<<"_rev">>, element(8, Revs)},
                                       {<<"_deleted">>, true}]}),
@@ -593,9 +593,9 @@ stop_loop(Parent, Acc) ->
     end.
 
 create_db(DbName) ->
-    couch_db:create(DbName, [?ADMIN_USER, overwrite]).
+    couch_db:create(DbName, [?ADMIN_CTX, overwrite]).
 
 delete_db(DbName) ->
-    ok = couch_server:delete(DbName, [?ADMIN_USER]).
+    ok = couch_server:delete(DbName, [?ADMIN_CTX]).
 
 -endif.

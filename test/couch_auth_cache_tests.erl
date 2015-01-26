@@ -28,7 +28,7 @@ setup() ->
     DbName.
 
 teardown(DbName) ->
-    ok = couch_server:delete(DbName, [?ADMIN_USER]),
+    ok = couch_server:delete(DbName, [?ADMIN_CTX]),
     ok.
 
 
@@ -170,7 +170,7 @@ update_user_doc(DbName, UserName, Password, Rev) ->
             _ ->   [{<<"_rev">>, Rev}]
          end
     }),
-    {ok, AuthDb} = couch_db:open_int(DbName, [?ADMIN_USER]),
+    {ok, AuthDb} = couch_db:open_int(DbName, [?ADMIN_CTX]),
     {ok, NewRev} = couch_db:update_doc(AuthDb, Doc, []),
     ok = couch_db:close(AuthDb),
     {ok, couch_doc:rev_to_str(NewRev)}.
@@ -179,14 +179,14 @@ hash_password(Password) ->
     ?l2b(couch_util:to_hex(crypto:sha(iolist_to_binary([Password, ?SALT])))).
 
 shutdown_db(DbName) ->
-    {ok, AuthDb} = couch_db:open_int(DbName, [?ADMIN_USER]),
+    {ok, AuthDb} = couch_db:open_int(DbName, [?ADMIN_CTX]),
     ok = couch_db:close(AuthDb),
     couch_util:shutdown_sync(AuthDb#db.main_pid),
     ok = timer:sleep(1000).
 
 get_doc_rev(DbName, UserName) ->
     DocId = iolist_to_binary([<<"org.couchdb.user:">>, UserName]),
-    {ok, AuthDb} = couch_db:open_int(DbName, [?ADMIN_USER]),
+    {ok, AuthDb} = couch_db:open_int(DbName, [?ADMIN_CTX]),
     UpdateRev =
     case couch_db:open_doc(AuthDb, DocId, []) of
     {ok, Doc} ->
@@ -200,7 +200,7 @@ get_doc_rev(DbName, UserName) ->
 
 get_user_doc_password_sha(DbName, UserName) ->
     DocId = iolist_to_binary([<<"org.couchdb.user:">>, UserName]),
-    {ok, AuthDb} = couch_db:open_int(DbName, [?ADMIN_USER]),
+    {ok, AuthDb} = couch_db:open_int(DbName, [?ADMIN_CTX]),
     {ok, Doc} = couch_db:open_doc(AuthDb, DocId, []),
     ok = couch_db:close(AuthDb),
     {Props} = couch_doc:to_json_obj(Doc, []),
@@ -208,7 +208,7 @@ get_user_doc_password_sha(DbName, UserName) ->
 
 delete_user_doc(DbName, UserName) ->
     DocId = iolist_to_binary([<<"org.couchdb.user:">>, UserName]),
-    {ok, AuthDb} = couch_db:open_int(DbName, [?ADMIN_USER]),
+    {ok, AuthDb} = couch_db:open_int(DbName, [?ADMIN_CTX]),
     {ok, Doc} = couch_db:open_doc(AuthDb, DocId, []),
     {Props} = couch_doc:to_json_obj(Doc, []),
     DeletedDoc = couch_doc:from_json_obj({[
@@ -220,7 +220,7 @@ delete_user_doc(DbName, UserName) ->
     ok = couch_db:close(AuthDb).
 
 full_commit(DbName) ->
-    {ok, AuthDb} = couch_db:open_int(DbName, [?ADMIN_USER]),
+    {ok, AuthDb} = couch_db:open_int(DbName, [?ADMIN_CTX]),
     {ok, _} = couch_db:ensure_full_commit(AuthDb),
     ok = couch_db:close(AuthDb).
 

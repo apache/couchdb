@@ -30,7 +30,7 @@ start() ->
 
 setup() ->
     DbName = ?tempdb(),
-    {ok, Db} = couch_db:create(DbName, [?ADMIN_USER]),
+    {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     create_design_doc(Db),
     ok = couch_db:close(Db),
     DbName.
@@ -42,7 +42,7 @@ teardown(DbName) ->
             ok = config:delete("compactions", Key, false)
         end,
         Configs),
-    couch_server:delete(DbName, [?ADMIN_USER]),
+    couch_server:delete(DbName, [?ADMIN_CTX]),
     ok.
 
 
