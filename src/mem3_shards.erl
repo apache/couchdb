@@ -297,8 +297,7 @@ create_if_missing(Name) ->
     true ->
         ok;
     false ->
-        Options = [{user_ctx, #user_ctx{roles=[<<"_admin">>]}}],
-        case couch_server:create(Name, Options) of
+        case couch_server:create(Name, [?ADMIN_CTX]) of
         {ok, Db} ->
             couch_db:close(Db);
         Error ->

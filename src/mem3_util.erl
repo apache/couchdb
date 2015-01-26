@@ -214,12 +214,11 @@ shard_info(DbName) ->
 ensure_exists(DbName) when is_list(DbName) ->
     ensure_exists(list_to_binary(DbName));
 ensure_exists(DbName) ->
-    Options = [{user_ctx, #user_ctx{roles=[<<"_admin">>]}}],
-    case couch_db:open(DbName, [nologifmissing, sys_db | Options]) of
+    case couch_db:open(DbName, [nologifmissing, sys_db | [?ADMIN_CTX]]) of
     {ok, Db} ->
         {ok, Db};
     _ ->
-        couch_server:create(DbName, Options)
+        couch_server:create(DbName, [?ADMIN_CTX])
     end.
 
 

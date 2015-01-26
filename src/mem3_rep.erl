@@ -28,10 +28,6 @@
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
-
--define(CTX, #user_ctx{roles = [<<"_admin">>]}).
-
-
 -record(acc, {
     batch_size,
     batch_count,
@@ -78,7 +74,7 @@ go(#shard{} = Source, #shard{} = Target, Opts) ->
 
 
 go(#acc{source=Source, batch_count=BC}=Acc0) ->
-    case couch_db:open(Source#shard.name, [{user_ctx,?CTX}]) of
+    case couch_db:open(Source#shard.name, [?ADMIN_CTX]) of
     {ok, Db} ->
         Acc = Acc0#acc{db=Db},
         Resp = try
@@ -271,7 +267,7 @@ find_missing_revs(Acc) ->
     end, Infos),
     mem3_rpc:get_missing_revs(Node, Name, IdsRevs, [
         {io_priority, {internal_repl, Name}},
-        {user_ctx, ?CTX}
+        ?ADMIN_CTX
     ]).
 
 
@@ -290,7 +286,7 @@ save_on_target(Node, Name, Docs) ->
     mem3_rpc:update_docs(Node, Name, Docs, [
         replicated_changes,
         full_commit,
-        {user_ctx, ?CTX},
+        ?ADMIN_CTX,
         {io_priority, {internal_repl, Name}}
     ]),
     ok.
