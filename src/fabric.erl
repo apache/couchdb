@@ -16,8 +16,6 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
--define(ADMIN_CTX, {user_ctx, #user_ctx{roles = [<<"_admin">>]}}).
-
 % DBs
 -export([all_dbs/0, all_dbs/1, create_db/1, create_db/2, delete_db/1,
     delete_db/2, get_db_info/1, get_doc_count/1, set_revs_limit/3,

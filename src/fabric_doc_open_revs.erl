@@ -170,8 +170,7 @@ maybe_execute_read_repair(_Db, false) ->
     ok;
 maybe_execute_read_repair(Db, Docs) ->
     [#doc{id=Id} | _] = Docs,
-    Ctx = #user_ctx{roles=[<<"_admin">>]},
-    Res = fabric:update_docs(Db, Docs, [replicated_changes, {user_ctx,Ctx}]),
+    Res = fabric:update_docs(Db, Docs, [replicated_changes, ?ADMIN_CTX]),
     case Res of
         {ok, []} ->
             couch_stats:increment_counter([fabric, read_repairs, success]);
