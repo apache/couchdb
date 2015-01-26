@@ -20,7 +20,6 @@
 
 -include_lib("couch/include/couch_db.hrl").
 
--define(ADMIN_CTX, {user_ctx, #user_ctx{roles = [<<"_admin">>]}}).
 -define(CACHE, chttpd_auth_cache_lru).
 
 -record(state, {
