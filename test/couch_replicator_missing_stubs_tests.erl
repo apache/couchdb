@@ -27,7 +27,7 @@
 
 setup() ->
     DbName = ?tempdb(),
-    {ok, Db} = couch_db:create(DbName, [?ADMIN_USER]),
+    {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     ok = couch_db:close(Db),
     DbName.
 
@@ -44,7 +44,7 @@ setup({A, B}) ->
 teardown({remote, DbName}) ->
     teardown(DbName);
 teardown(DbName) ->
-    ok = couch_server:delete(DbName, [?ADMIN_USER]),
+    ok = couch_server:delete(DbName, [?ADMIN_CTX]),
     ok.
 
 teardown(_, {Source, Target}) ->
@@ -95,7 +95,7 @@ should_set_target_revs_limit({remote, Target}, RevsLimit) ->
     should_set_target_revs_limit(Target, RevsLimit);
 should_set_target_revs_limit(Target, RevsLimit) ->
     ?_test(begin
-        {ok, Db} = couch_db:open_int(Target, [?ADMIN_USER]),
+        {ok, Db} = couch_db:open_int(Target, [?ADMIN_CTX]),
         ?assertEqual(ok, couch_db:set_revs_limit(Db, RevsLimit)),
         ok = couch_db:close(Db)
     end).

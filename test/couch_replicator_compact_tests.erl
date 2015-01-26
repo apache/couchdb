@@ -25,7 +25,7 @@
 
 setup() ->
     DbName = ?tempdb(),
-    {ok, Db} = couch_db:create(DbName, [?ADMIN_USER]),
+    {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     ok = couch_db:close(Db),
     DbName.
 
@@ -42,7 +42,7 @@ setup({A, B}) ->
 teardown({remote, DbName}) ->
     teardown(DbName);
 teardown(DbName) ->
-    ok = couch_server:delete(DbName, [?ADMIN_USER]),
+    ok = couch_server:delete(DbName, [?ADMIN_CTX]),
     ok.
 
 teardown(_, {Source, Target}) ->
@@ -311,7 +311,7 @@ replicate(Source, Target) ->
         {<<"target">>, Target},
         {<<"continuous">>, true}
     ]},
-    {ok, Rep} = couch_replicator_utils:parse_rep_doc(RepObject, ?ADMIN_ROLE),
+    {ok, Rep} = couch_replicator_utils:parse_rep_doc(RepObject, ?ADMIN_USER),
     {ok, Pid} = couch_replicator:async_replicate(Rep),
     {ok, Pid, Rep#rep.id}.
 

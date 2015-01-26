@@ -43,7 +43,7 @@ stop(_, _) ->
 
 setup() ->
     DbName = ?tempdb(),
-    {ok, Db} = couch_db:create(DbName, [?ADMIN_USER]),
+    {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     ok = couch_db:close(Db),
     DbName.
 
@@ -61,7 +61,7 @@ setup({_, Fun, {A, B}}) ->
 teardown({remote, DbName}) ->
     teardown(DbName);
 teardown(DbName) ->
-    ok = couch_server:delete(DbName, [?ADMIN_USER]),
+    ok = couch_server:delete(DbName, [?ADMIN_CTX]),
     ok.
 
 teardown(_, {Source, Target, Listener}) ->
@@ -181,7 +181,7 @@ replicate(Source, Target, UseCheckpoints) ->
         {<<"target">>, Target},
         {<<"use_checkpoints">>, UseCheckpoints}
     ]},
-    {ok, Rep} = couch_replicator_utils:parse_rep_doc(RepObject, ?ADMIN_ROLE),
+    {ok, Rep} = couch_replicator_utils:parse_rep_doc(RepObject, ?ADMIN_USER),
     {ok, Pid} = couch_replicator:async_replicate(Rep),
     MonRef = erlang:monitor(process, Pid),
     receive

@@ -98,7 +98,7 @@ replicate(Source, Target) ->
         {<<"source">>, Source},
         {<<"target">>, Target}
     ]},
-    {ok, Rep} = couch_replicator_utils:parse_rep_doc(RepObject, ?ADMIN_ROLE),
+    {ok, Rep} = couch_replicator_utils:parse_rep_doc(RepObject, ?ADMIN_USER),
     {ok, Pid} = couch_replicator:async_replicate(Rep),
     MonRef = erlang:monitor(process, Pid),
     receive
