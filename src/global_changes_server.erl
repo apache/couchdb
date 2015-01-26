@@ -36,8 +36,6 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("mem3/include/mem3.hrl").
 
--define(ADMIN_CTX, {user_ctx, #user_ctx{roles = [<<"_admin">>]}}).
-
 -record(state, {
     update_db,
     pending_update_count,
