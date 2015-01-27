@@ -47,15 +47,7 @@ setup(DName) ->
     {CfgPid, OsDPid}.
 
 teardown(_, {CfgPid, OsDPid}) ->
-    erlang:monitor(process, CfgPid),
-    config:stop(),
-    receive
-        {'DOWN', _, _, CfgPid, _} ->
-            ok
-    after ?TIMEOUT ->
-        throw({timeout, config_stop})
-    end,
-
+    test_util:stop_config(CfgPid),
     test_util:stop_sync_throw(OsPid, fun() ->
         exit(OsDPid, shutdown)
     end, {timeout, os_daemon_stop}, ?TIMEOUT).

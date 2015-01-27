@@ -21,7 +21,6 @@
 
 setup() ->
     {ok, Pid} = config:start_link(?CONFIG_CHAIN),
-    erlang:monitor(process, Pid),
     couch_uuids:start(),
     Pid.
 
@@ -35,12 +34,7 @@ setup(Opts) ->
 
 teardown(Pid) ->
     couch_uuids:stop(),
-    config:stop(),
-    receive
-        {'DOWN', _, _, Pid, _} -> ok
-    after
-        1000 -> throw({timeout_error, config_stop})
-    end.
+    test_util:stop_config(Pid).
 
 teardown(_, Pid) ->
     teardown(Pid).

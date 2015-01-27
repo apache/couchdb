@@ -42,15 +42,7 @@ teardown_collector(_) ->
 teardown_aggregator(_, Pid) ->
     couch_stats_aggregator:stop(),
     couch_stats_collector:stop(),
-    erlang:monitor(process, Pid),
-    config:stop(),
-    receive
-        {'DOWN', _, _, Pid, _} ->
-            ok
-    after ?TIMEOUT ->
-        throw({timeout, config_stop})
-    end,
-    ok.
+    test_util:stop_config(Pid).
 
 
 couch_stats_collector_test_() ->
