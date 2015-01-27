@@ -300,14 +300,9 @@ should_be_closed({Q, _, Consumer}) ->
 
 
 close_queue(Q) ->
-    ok = couch_work_queue:close(Q),
-    MonRef = erlang:monitor(process, Q),
-    receive
-        {'DOWN', MonRef, process, Q, _Reason} -> ok
-    after ?TIMEOUT ->
-        erlang:demonitor(MonRef),
-        timeout
-    end.
+    test_util:stop_sync(Q, fun() ->
+        ok = couch_work_queue:close(Q)
+    end, ?TIMEOUT).
 
 spawn_consumer(Q) ->
     Parent = self(),

@@ -51,15 +51,9 @@ setup() ->
     Pid.
 
 teardown(Pid) ->
-    erlang:monitor(process, Pid),
-    test_web:stop(),
-    receive
-        {'DOWN', _, _, Pid, _} ->
-            ok
-    after ?TIMEOUT ->
-        throw({timeout, test_web_stop})
-    end.
-
+    test_util:stop_sync_throw(Pid, fun() ->
+        test_web:stop()
+    end, {timeout, test_web_stop}, ?TIMEOUT).
 
 http_proxy_test_() ->
     {

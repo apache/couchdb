@@ -24,15 +24,9 @@ setup() ->
     {TaskStatusPid, TaskUpdaterPid}.
 
 teardown({TaskStatusPid, _}) ->
-    erlang:monitor(process, TaskStatusPid),
-    couch_task_status:stop(),
-    receive
-        {'DOWN', _, _, TaskStatusPid, _} ->
-            ok
-    after ?TIMEOUT ->
-        throw(timeout_error)
-    end.
-
+    test_util:stop_sync_throw(TaskStatusPid, fun() ->
+        couch_task_status:stop()
+    end, timeout_error, ?TIMEOUT).
 
 couch_task_status_test_() ->
     {
