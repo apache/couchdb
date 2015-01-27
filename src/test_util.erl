@@ -106,22 +106,23 @@ stop_couch() ->
 stop_couch(_) ->
     stop_couch().
 
+start_applications(Apps) ->
+    start_applications(Apps, []).
 
-start_applications([]) ->
-    ok;
-start_applications([App|Apps]) ->
-    case application:start(App) of
+start_applications([], Acc) ->
+    lists:reverse(Acc);
+start_applications([App|Apps], Acc) ->
+    NewAcc =
+        case application:start(App) of
         {error, {already_started, _}} ->
-            ok;
+            start_applications(Apps, Acc);
         {error, {not_started, Dep}} ->
-            start_applications([Dep, App | Apps]);
+            start_applications([Dep, App | Apps], Acc);
         {error, {not_running, Dep}} ->
-            start_applications([Dep, App | Apps]);
+            start_applications([Dep, App | Apps], Acc);
         ok ->
-            ok
-    end,
-    start_applications(Apps).
-
+            start_applications(Apps, [App|Acc])
+    end.
 
 start_config(Chain) ->
     case config:start_link(Chain) of
