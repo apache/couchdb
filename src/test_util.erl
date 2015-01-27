@@ -26,6 +26,9 @@
 
 -export([stop_sync_throw/2, stop_sync_throw/3, stop_sync_throw/4]).
 
+-export([with_process_restart/1, with_process_restart/2, with_process_restart/3]).
+-export([wait_process/1, wait_process/2]).
+
 srcdir() ->
     code:priv_dir(couch) ++ "/../../".
 
@@ -155,3 +158,40 @@ stop_sync_throw(Pid, Fun, Error, Timeout) ->
         Else ->
             Else
     end.
+
+with_process_restart(Name) ->
+    {Pid, true} = with_process_restart(
+        fun() -> exit(whereis(Name), shutdown) end, Name),
+    Pid.
+
+with_process_restart(Name, Fun) ->
+    with_process_restart(Name, Fun, 5000).
+
+with_process_restart(Name, Fun, Timeout) ->
+    ok = stop_sync(Name, Fun),
+    case wait_process(Name, Timeout) of
+    timeout ->
+        timeout;
+    Pid ->
+        Pid
+    end.
+
+wait_process(Name) ->
+    wait_process(Name, 5000).
+wait_process(Name, Timeout) ->
+    Now = now_us(),
+    wait_process(Name, Timeout * 1000, Now, Now).
+
+wait_process(_Name, Timeout, Started, Prev) when Prev - Started > Timeout ->
+    timeout;
+wait_process(Name, Timeout, Started, _Prev) ->
+    case whereis(Name) of
+    undefined ->
+        wait_process(Name, Timeout, Started, now_us());
+    Pid ->
+        Pid
+    end.
+
+now_us() ->
+    {MegaSecs, Secs, MicroSecs} = now(),
+    (MegaSecs * 1000000 + Secs) * 1000000 + MicroSecs.
