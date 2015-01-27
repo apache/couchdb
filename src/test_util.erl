@@ -22,6 +22,8 @@
 -export([start_config/1, stop_config/1]).
 -export([start_applications/1]).
 
+-export([stop_sync/1, stop_sync/2, stop_sync/3]).
+
 
 srcdir() ->
     code:priv_dir(couch) ++ "/../../".
@@ -114,3 +116,30 @@ stop_config(Pid) ->
     after Timeout ->
         throw({timeout_error, config_stop})
     end.
+
+stop_sync(Name) ->
+    stop_sync(Name, shutdown).
+stop_sync(Name, Reason) ->
+    stop_sync(Name, Reason, 5000).
+
+stop_sync(Name, Reason, Timeout) when is_atom(Name) ->
+    stop_sync(whereis(Name), Reason, Timeout);
+stop_sync(Pid, Reason, Timeout) when is_atom(Reason) and is_pid(Pid) ->
+    stop_sync(Pid, fun() -> exit(Pid, Reason) end, Timeout);
+stop_sync(Pid, Fun, Timeout) when is_function(Fun) and is_pid(Pid) ->
+    MRef = erlang:monitor(process, Pid),
+    try
+        begin
+            catch unlink(Pid),
+            Res = (catch Fun()),
+            receive
+            {'DOWN', MRef, _, _, _} ->
+                Res
+            after Timeout ->
+                timeout
+            end
+        end
+    after
+        erlang:demonitor(MRef, [flush])
+    end;
+stop_sync(_, _, _) -> error(badarg).
