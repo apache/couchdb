@@ -24,6 +24,7 @@
 
 -export([stop_sync/1, stop_sync/2, stop_sync/3]).
 
+-export([stop_sync_throw/2, stop_sync_throw/3, stop_sync_throw/4]).
 
 srcdir() ->
     code:priv_dir(couch) ++ "/../../".
@@ -141,3 +142,16 @@ stop_sync(Pid, Fun, Timeout) when is_function(Fun) and is_pid(Pid) ->
         erlang:demonitor(MRef, [flush])
     end;
 stop_sync(_, _, _) -> error(badarg).
+
+stop_sync_throw(Name, Error) ->
+    stop_sync_throw(Name, shutdown, Error).
+stop_sync_throw(Name, Reason, Error) ->
+    stop_sync_throw(Name, Reason, Error, 5000).
+
+stop_sync_throw(Pid, Fun, Error, Timeout) ->
+    case stop_sync(Pid, Fun, Timeout) of
+        timeout ->
+            throw(Error);
+        Else ->
+            Else
+    end.
