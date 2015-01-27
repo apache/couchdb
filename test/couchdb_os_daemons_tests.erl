@@ -57,7 +57,7 @@ teardown(_, {CfgPid, OsDPid}) ->
     end,
 
     test_util:stop_sync_throw(OsPid, fun() ->
-        exit(OsDPid, normal)
+        exit(OsDPid, shutdown)
     end, {timeout, os_daemon_stop}, ?TIMEOUT).
 
 
