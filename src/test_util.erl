@@ -108,13 +108,11 @@ start_config(Chain) ->
 
 stop_config(Pid) ->
     Timeout = 1000,
-    erlang:monitor(process, Pid),
-    config:stop(),
-    receive
-        {'DOWN', _, _, Pid, _} ->
+    case stop_sync(Pid, fun() -> config:stop() end, Timeout) of
+        timeout ->
+            throw({timeout_error, config_stop});
+        _Else ->
             ok
-    after Timeout ->
-        throw({timeout_error, config_stop})
     end.
 
 stop_sync(Name) ->
