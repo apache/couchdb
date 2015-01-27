@@ -29,12 +29,12 @@
 -ifdef(run_broken_tests).
 
 start() ->
-    ok = test_util:start_couch(),
+    Ctx = test_util:start_couch(),
     % ensure in default compression settings for attachments_compression_tests
     config:set("attachments", "compression_level",
                      ?i2l(?COMPRESSION_LEVEL), false),
     config:set("attachments", "compressible_types", "text/*", false),
-    ok.
+    Ctx.
 
 setup() ->
     DbName = ?tempdb(),

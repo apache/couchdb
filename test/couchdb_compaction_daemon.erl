@@ -23,10 +23,10 @@
 -ifdef(run_broken_tests).
 
 start() ->
-    ok = test_util:start_couch(),
+    Ctx = test_util:start_couch(),
     config:set("compaction_daemon", "check_interval", "3", false),
     config:set("compaction_daemon", "min_file_size", "100000", false),
-    ok.
+    Ctx.
 
 setup() ->
     DbName = ?tempdb(),

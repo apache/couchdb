@@ -21,9 +21,9 @@
 -ifdef(run_broken_tests).
 
 start() ->
-    ok = test_util:start_couch(),
+    Ctx = test_util:start_couch(),
     config:set("query_server_config", "os_process_limit", "3", false),
-    ok.
+    Ctx.
 
 
 os_proc_pool_test_() ->

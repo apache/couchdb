@@ -24,9 +24,9 @@
 -ifdef(run_broken_tests).
 
 start() ->
-    ok = test_util:start_couch(),
+    Ctx = test_util:start_couch(),
     config:set("couchdb", "delayed_commits", "true", false),
-    ok.
+    Ctx.
 
 setup() ->
     DbName = ?tempdb(),

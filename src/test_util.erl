@@ -88,10 +88,9 @@ start_couch(ExtraApps) ->
 start_couch(IniFiles, ExtraApps) ->
     ok = application:set_env(config, ini_files, IniFiles),
     ok = lager:start(),
-    ok = start_applications([inets, ibrowse, ssl, config, couch] ++ ExtraApps),
+    Ctx = start_applications([inets, ibrowse, ssl, config, couch] ++ ExtraApps),
     couch_stats:reload(),
-    ok.
-
+    Ctx.
 
 stop_couch() ->
     ok = application:stop(couch),
