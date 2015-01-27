@@ -52,11 +52,11 @@ setup(local) ->
 setup(remote) ->
     {remote, setup()};
 setup({_, Fun, {A, B}}) ->
-    ok = test_util:start_couch([couch_replicator]),
+    Ctx = test_util:start_couch([couch_replicator]),
     {ok, Listener} = couch_replicator_notifier:start_link(Fun),
     Source = setup(A),
     Target = setup(B),
-    {Source, Target, Listener}.
+    {Ctx, {Source, Target, Listener}}.
 
 teardown({remote, DbName}) ->
     teardown(DbName);
@@ -64,13 +64,13 @@ teardown(DbName) ->
     ok = couch_server:delete(DbName, [?ADMIN_CTX]),
     ok.
 
-teardown(_, {Source, Target, Listener}) ->
+teardown(_, {Ctx, {Source, Target, Listener}}) ->
     teardown(Source),
     teardown(Target),
 
     couch_replicator_notifier:stop(Listener),
     ok = application:stop(couch_replicator),
-    ok = test_util:stop_couch().
+    ok = test_util:stop_couch(Ctx).
 
 use_checkpoints_test_() ->
     {
@@ -96,7 +96,7 @@ use_checkpoints_tests(UseCheckpoints, Fun) ->
         }
     }.
 
-should_test_checkpoints({UseCheckpoints, _, {From, To}}, {Source, Target, _}) ->
+should_test_checkpoints({UseCheckpoints, _, {From, To}}, {_Ctx, {Source, Target, _}}) ->
     should_test_checkpoints(UseCheckpoints, {From, To}, {Source, Target}).
 should_test_checkpoints(UseCheckpoints, {From, To}, {Source, Target}) ->
     {lists:flatten(io_lib:format("~p -> ~p", [From, To])),
