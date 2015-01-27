@@ -365,7 +365,7 @@ should_get_doc_with_att_data(compressed, {Data, {_, DocUrl, _}}) ->
         {ok, Code, _, Body} = test_request:get(
             Url, [{"Accept", "application/json"}]),
         ?assertEqual(200, Code),
-        Json = ejson:decode(Body),
+        Json = jiffy:decode(Body),
         AttJson = couch_util:get_nested_json_value(
             Json, [<<"_attachments">>, ?ATT_TXT_NAME]),
         AttData = couch_util:get_nested_json_value(
@@ -381,7 +381,7 @@ should_get_doc_with_att_data({text, _}, {Data, {_, DocUrl, _}}) ->
         {ok, Code, _, Body} = test_request:get(
             Url, [{"Accept", "application/json"}]),
         ?assertEqual(200, Code),
-        Json = ejson:decode(Body),
+        Json = jiffy:decode(Body),
         AttJson = couch_util:get_nested_json_value(
             Json, [<<"_attachments">>, ?ATT_TXT_NAME]),
         AttData = couch_util:get_nested_json_value(
@@ -397,7 +397,7 @@ should_get_doc_with_att_data({binary, _}, {Data, {_, DocUrl, _}}) ->
         {ok, Code, _, Body} = test_request:get(
             Url, [{"Accept", "application/json"}]),
         ?assertEqual(200, Code),
-        Json = ejson:decode(Body),
+        Json = jiffy:decode(Body),
         AttJson = couch_util:get_nested_json_value(
             Json, [<<"_attachments">>, ?ATT_BIN_NAME]),
         AttData = couch_util:get_nested_json_value(
@@ -414,7 +414,7 @@ should_get_doc_with_att_data_stub(compressed, {Data, {_, DocUrl, _}}) ->
         {ok, Code, _, Body} = test_request:get(
             Url, [{"Accept", "application/json"}]),
         ?assertEqual(200, Code),
-        Json = ejson:decode(Body),
+        Json = jiffy:decode(Body),
         {AttJson} = couch_util:get_nested_json_value(
             Json, [<<"_attachments">>, ?ATT_TXT_NAME]),
         ?assertEqual(<<"gzip">>,
@@ -430,7 +430,7 @@ should_get_doc_with_att_data_stub({text, _}, {Data, {_, DocUrl, _}}) ->
         {ok, Code, _, Body} = test_request:get(
             Url, [{"Accept", "application/json"}]),
         ?assertEqual(200, Code),
-        Json = ejson:decode(Body),
+        Json = jiffy:decode(Body),
         {AttJson} = couch_util:get_nested_json_value(
             Json, [<<"_attachments">>, ?ATT_TXT_NAME]),
         ?assertEqual(<<"gzip">>,
@@ -447,7 +447,7 @@ should_get_doc_with_att_data_stub({binary, _}, {Data, {_, DocUrl, _}}) ->
         {ok, Code, _, Body} = test_request:get(
             Url, [{"Accept", "application/json"}]),
         ?assertEqual(200, Code),
-        Json = ejson:decode(Body),
+        Json = jiffy:decode(Body),
         {AttJson} = couch_util:get_nested_json_value(
             Json, [<<"_attachments">>, ?ATT_BIN_NAME]),
         ?assertEqual(undefined,
@@ -504,7 +504,7 @@ should_create_compressible_att_with_ctype_params({Host, DbName}) ->
         {ok, Code1, _, Body} = test_request:get(
             DocUrl ++ "?att_encoding_info=true"),
         ?assertEqual(200, Code1),
-        Json = ejson:decode(Body),
+        Json = jiffy:decode(Body),
         {AttJson} = couch_util:get_nested_json_value(
             Json, [<<"_attachments">>, ?ATT_TXT_NAME]),
         ?assertEqual(<<"gzip">>,
@@ -565,7 +565,7 @@ request(Method, Url, Headers, Body) ->
     [Header, Body1] = re:split(R, "\r\n\r\n", [{return, binary}]),
     {ok, {http_response, _, Code, _}, _} =
         erlang:decode_packet(http, Header, []),
-    Json = ejson:decode(Body1),
+    Json = jiffy:decode(Body1),
     {ok, Code, Json}.
 
 create_standalone_text_att(Host, DbName) ->
@@ -596,7 +596,7 @@ create_inline_text_att(Host, DbName) ->
         }]}}
     ]},
     {ok, Code, _Headers, _Body} = test_request:put(
-        Url, [{"Content-Type", "application/json"}], ejson:encode(Doc)),
+        Url, [{"Content-Type", "application/json"}], jiffy:encode(Doc)),
     ?assertEqual(201, Code),
     string:join([Url, ?b2l(?ATT_TXT_NAME)], "/").
 
@@ -612,7 +612,7 @@ create_inline_png_att(Host, DbName) ->
         }]}}
     ]},
     {ok, Code, _Headers, _Body} = test_request:put(
-        Url, [{"Content-Type", "application/json"}], ejson:encode(Doc)),
+        Url, [{"Content-Type", "application/json"}], jiffy:encode(Doc)),
     ?assertEqual(201, Code),
     string:join([Url, ?b2l(?ATT_BIN_NAME)], "/").
 

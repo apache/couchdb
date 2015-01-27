@@ -479,7 +479,7 @@ query_view(DbName, DDoc, View, Stale) ->
                _ -> "?stale=" ++ atom_to_list(Stale)
            end),
     ?assertEqual(200, Code),
-    {Props} = ejson:decode(Body),
+    {Props} = jiffy:decode(Body),
     couch_util:get_value(<<"rows">>, Props, []).
 
 check_rows_value(Rows, Value) ->
@@ -568,7 +568,7 @@ wait_view_compact_done(DbName, DDocId, N) ->
     {ok, Code, _Headers, Body} = test_request:get(
         db_url(DbName) ++ "/" ++ ?b2l(DDocId) ++ "/_info"),
     ?assertEqual(200, Code),
-    {Info} = ejson:decode(Body),
+    {Info} = jiffy:decode(Body),
     {IndexInfo} = couch_util:get_value(<<"view_index">>, Info),
     CompactRunning = couch_util:get_value(<<"compact_running">>, IndexInfo),
     case CompactRunning of

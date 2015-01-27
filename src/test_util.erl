@@ -39,7 +39,7 @@ init_code_path() ->
     Paths = [
         "etap",
         "couchdb",
-        "ejson",
+        "jiffy",
         "oauth",
         "ibrowse",
         "mochiweb",
