@@ -17,7 +17,7 @@
 -export([init_code_path/0]).
 -export([source_file/1, build_file/1]).
 %% -export([run/2]).
--export([request/3, request/4]).
+
 -export([start_couch/0, start_couch/1, start_couch/2, stop_couch/0, stop_couch/1]).
 -export([start_config/1, stop_config/1]).
 -export([start_applications/1]).
@@ -48,36 +48,6 @@ source_file(Name) ->
 
 build_file(Name) ->
     filename:join([builddir(), Name]).
-
-
-request(Url, Headers, Method) ->
-    request(Url, Headers, Method, []).
-
-request(Url, Headers, Method, Body) ->
-    request(Url, Headers, Method, Body, 3).
-
-request(_Url, _Headers, _Method, _Body, 0) ->
-    {error, request_failed};
-request(Url, Headers, Method, Body, N) ->
-    case code:is_loaded(ibrowse) of
-    false ->
-        {ok, _} = ibrowse:start();
-    _ ->
-        ok
-    end,
-    case ibrowse:send_req(Url, Headers, Method, Body) of
-    {ok, Code0, RespHeaders, RespBody0} ->
-        Code = list_to_integer(Code0),
-        RespBody = iolist_to_binary(RespBody0),
-        {ok, Code, RespHeaders, RespBody};
-    {error, {'EXIT', {normal, _}}} ->
-        % Connection closed right after a successful request that
-        % used the same connection.
-        request(Url, Headers, Method, Body, N - 1);
-    Error ->
-        Error
-    end.
-
 
 start_couch() ->
     start_couch(?CONFIG_CHAIN, []).
