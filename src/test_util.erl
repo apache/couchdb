@@ -29,6 +29,10 @@
 -export([with_process_restart/1, with_process_restart/2, with_process_restart/3]).
 -export([wait_process/1, wait_process/2]).
 
+-export([start/1, start/2, start/3, stop/1]).
+
+-record(test_context, {mocked = [], started = [], module}).
+
 srcdir() ->
     code:priv_dir(couch) ++ "/../../".
 
@@ -189,6 +193,39 @@ wait_process(Name, Timeout, Started, _Prev) ->
         Pid
     end.
 
+start(Module) ->
+    start(Module, [], []).
+
+start(Module, ExtraApps) ->
+    start(Module, ExtraApps, []).
+
+start(Module, ExtraApps, Options) ->
+    Apps = start_applications([config, ioq|ExtraApps]),
+    ToMock = [config, couch_stats] -- proplists:get_value(dont_mock, Options, []),
+    mock(ToMock),
+    #test_context{module = Module, mocked = ToMock, started = Apps}.
+
+stop(#test_context{mocked = Mocked, started = Apps}) ->
+    meck:unload(Mocked),
+    stop_applications(Apps).
+
 now_us() ->
     {MegaSecs, Secs, MicroSecs} = now(),
     (MegaSecs * 1000000 + Secs) * 1000000 + MicroSecs.
+
+mock(Modules) when is_list(Modules) ->
+    [mock(Module) || Module <- Modules];
+mock(config) ->
+    meck:new(config, [passthrough]),
+    meck:expect(config, get, fun(_, _) -> undefined end),
+    meck:expect(config, get, fun(_, _, Default) -> Default end),
+    ok;
+mock(couch_stats) ->
+    meck:new(couch_stats, [passthrough]),
+    meck:expect(couch_stats, increment_counter, fun(_) -> ok end),
+    meck:expect(couch_stats, increment_counter, fun(_, _) -> ok end),
+    meck:expect(couch_stats, decrement_counter, fun(_) -> ok end),
+    meck:expect(couch_stats, decrement_counter, fun(_, _) -> ok end),
+    meck:expect(couch_stats, update_histogram, fun(_, _) -> ok end),
+    meck:expect(couch_stats, update_gauge, fun(_, _) -> ok end),
+    ok.
