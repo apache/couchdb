@@ -54,6 +54,8 @@
     be included in the result. Default is ``true``
   :query json key: Return only documents that match the specified key.
     *Optional*
+  :query json-array keys: Return only documents where the key matches one of the
+    keys specified in the array. *Optional*
   :query number limit: Limit the number of the returned documents to the
     specified number. *Optional*
   :query boolean reduce: Use the reduction function. Default is ``true``
