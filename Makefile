@@ -31,6 +31,7 @@ check: javascript eunit
 dist: all
 	@rm -rf rel/couchdb
 	@rebar generate
+	@cp -r share/www rel/couchdb/share/www
 
 distclean: clean
 	@rm -rf rel/couchdb
