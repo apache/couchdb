@@ -54,6 +54,7 @@ create(Db, Indexes, Selector, Opts0) ->
     Limit = erlang:min(DreyfusLimit, couch_util:get_value(limit, Opts, 50)),
     Skip = couch_util:get_value(skip, Opts, 0),
     Fields = couch_util:get_value(fields, Opts, all_fields),
+
     {ok, #cursor{
         db = Db,
         index = Index,

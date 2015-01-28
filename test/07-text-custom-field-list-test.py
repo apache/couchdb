@@ -118,3 +118,24 @@ class CustomFieldsTest(mango.UserDocsTextTests):
             raise Exception("Should have thrown an HTTPError")
         except:
             return
+
+    def test_filtered_search_fields(self):
+        docs = self.db.find({"age": 22}, fields = ["age", "location.state"])
+        assert len(docs) == 1
+        assert docs == [{"age": 22, "location": {"state": "Missouri"}}]
+
+        docs = self.db.find({"age": 22}, fields = ["age", "Random Garbage"])
+        assert len(docs) == 1
+        assert docs == [{"age": 22}]
+
+        docs = self.db.find({"age": 22}, fields = ["favorites"])
+        assert len(docs) == 1
+        assert docs == [{"favorites": ["Lisp", "Erlang", "Python"]}]
+
+        docs = self.db.find({"age": 22}, fields = ["favorites.[]"])
+        assert len(docs) == 1
+        assert docs == [{}]
+
+        docs = self.db.find({"age": 22}, fields = ["all_fields"])
+        assert len(docs) == 1
+        assert docs == [{}]
