@@ -29,7 +29,8 @@
 ]).
 
 -export([
-    handle_config_change/5
+    handle_config_change/5,
+    handle_config_terminate/3
 ]).
 
 
@@ -54,13 +55,17 @@ handle_config_change("update_notification", Id, deleted, _, _) ->
     supervisor:delete_child(?MODULE, Id),
     {ok, nil};
 handle_config_change("update_notification", Id, Exe, _, _) when is_list(Exe) ->
-    supervisor:terminate_child(?MODULE, Id),
-    supervisor:delete_child(?MODULE, Id),
     supervisor:start_child(?MODULE, child(Id, Exe)),
     {ok, nil};
 handle_config_change(_, _, _, _, _) ->
     {ok, nil}.
 
+handle_config_terminate(_, _, _) ->
+    spawn(fun() ->
+        timer:sleep(5000),
+        config:listen_for_changes(?MODULE, nil)
+    end),
+    ok.
 
 child(Id, Arg) ->
     {
