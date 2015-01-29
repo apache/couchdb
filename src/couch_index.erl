@@ -25,7 +25,7 @@
 -export([handle_call/3, handle_cast/2, handle_info/2]).
 
 % config_listener api
--export([handle_config_change/5]).
+-export([handle_config_change/5, handle_config_terminate/3]).
 
 
 -include_lib("couch/include/couch_db.hrl").
@@ -297,13 +297,6 @@ handle_cast(ddoc_updated, State) ->
 handle_cast(_Mesg, State) ->
     {stop, unhandled_cast, State}.
 
-
-handle_info({gen_event_EXIT, {config_listener, ?MODULE}, _Reason}, State) ->
-    erlang:send_after(5000, self(), restart_config_listener),
-    {noreply, State};
-handle_info(restart_config_listener, State) ->
-    ok = config:listen_for_changes(?MODULE, nil),
-    {noreply, State};
 handle_info(commit, #st{committed=true}=State) ->
     {noreply, State};
 handle_info(commit, State) ->
@@ -367,6 +360,11 @@ handle_config_change("query_server_config", "commit_freq", Val, _, _) ->
 handle_config_change(_, _, _, _, _) ->
     {ok, nil}.
 
+handle_config_terminate(_Server, _Reason, _State) ->
+    spawn(fun() ->
+        timer:sleep(5000),
+        config:listen_for_changes(?MODULE, nil)
+    end).
 
 maybe_restart_updater(#st{waiters=[]}) ->
     ok;
