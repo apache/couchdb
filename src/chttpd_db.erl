@@ -534,11 +534,12 @@ db_req(#httpd{path_parts=[_, DocId | FileNameParts]}=Req, Db) ->
 
 all_docs_view(Req, Db, Keys) ->
     Args0 = couch_mrview_http:parse_params(Req, Keys),
-    Args1 = couch_mrview_util:validate_args(Args0),
+    Args1 = Args0#mrargs{view_type=map},
+    Args2 = couch_mrview_util:validate_args(Args1),
     ETagFun = fun(Sig, Acc0) ->
         couch_mrview_http:check_view_etag(Sig, Acc0, Req)
     end,
-    Args = Args1#mrargs{preflight_fun=ETagFun},
+    Args = Args2#mrargs{preflight_fun=ETagFun},
     Options = [{user_ctx, Req#httpd.user_ctx}],
     {ok, Resp} = couch_httpd:etag_maybe(Req, fun() ->
         VAcc0 = #vacc{db=Db, req=Req},
