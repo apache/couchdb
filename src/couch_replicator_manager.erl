@@ -12,7 +12,7 @@
 
 -module(couch_replicator_manager).
 -behaviour(gen_server).
--vsn(1).
+-vsn(2).
 -behaviour(config_listener).
 
 % public API
@@ -28,7 +28,7 @@
 -export([changes_reader/3, changes_reader_cb/3]).
 
 % config_listener callback
--export([handle_config_change/5]).
+-export([handle_config_change/5, handle_config_terminate/3]).
 
 -export([handle_db_event/3]).
 
@@ -125,6 +125,11 @@ handle_config_change("replicator", "max_replication_retry_count", V, _, S) ->
 handle_config_change(_, _, _, _, S) ->
     {ok, S}.
 
+handle_config_terminate(Self, _, _) ->
+    spawn(fun() ->
+        timer:sleep(5000),
+        config:listen_for_changes(?MODULE, Self)
+    end).
 
 init(_) ->
     process_flag(trap_exit, true),
@@ -248,14 +253,6 @@ handle_info({'EXIT', From, Reason}, #state{rep_start_pids = Pids} = State) ->
 
 handle_info({'DOWN', _Ref, _, _, _}, State) ->
     % From a db monitor created by a replication process. Ignore.
-    {noreply, State};
-
-handle_info({gen_event_EXIT, {config_listener, ?MODULE}, _Reason}, State) ->
-    erlang:send_after(5000, self(), restart_config_listener),
-    {noreply, State};
-
-handle_info(restart_config_listener, State) ->
-    ok = config:listen_for_changes(?MODULE, self()),
     {noreply, State};
 
 handle_info(shutdown, State) ->
