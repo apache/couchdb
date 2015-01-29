@@ -345,14 +345,14 @@ ssl_params(Url) ->
             config:get("replicator", "ssl_certificate_max_depth", "3")
         ),
         VerifyCerts = config:get("replicator", "verify_ssl_certificates"),
-        CertFile = config:get("replicator", "cert_file", nil),
-        KeyFile = config:get("replicator", "key_file", nil),
-        Password = config:get("replicator", "password", nil),
+        CertFile = config:get("replicator", "cert_file", undefined),
+        KeyFile = config:get("replicator", "key_file", undefined),
+        Password = config:get("replicator", "password", undefined),
         SslOpts = [{depth, Depth} | ssl_verify_options(VerifyCerts =:= "true")],
-        SslOpts1 = case CertFile /= nil andalso KeyFile /= nil of
+        SslOpts1 = case CertFile /= undefined andalso KeyFile /= undefined of
             true ->
                 case Password of
-                    nil ->
+                    undefined ->
                         [{certfile, CertFile}, {keyfile, KeyFile}] ++ SslOpts;
                     _ ->
                         [{certfile, CertFile}, {keyfile, KeyFile},
