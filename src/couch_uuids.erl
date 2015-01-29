@@ -13,7 +13,7 @@
 -include_lib("couch/include/couch_db.hrl").
 
 -behaviour(gen_server).
--vsn(1).
+-vsn(2).
 -behaviour(config_listener).
 
 -export([start/0, stop/0]).
@@ -23,7 +23,7 @@
 -export([handle_call/3, handle_cast/2, handle_info/2]).
 
 % config_listener api
--export([handle_config_change/5]).
+-export([handle_config_change/5, handle_config_terminate/3]).
 
 start() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -77,12 +77,6 @@ handle_cast(stop, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info({gen_event_EXIT, {config_listener, ?MODULE}, _Reason}, State) ->
-    erlang:send_after(5000, self(), restart_config_listener),
-    {noreply, State};
-handle_info(restart_config_listener, State) ->
-    ok = config:listen_for_changes(?MODULE, nil),
-    {noreply, State};
 handle_info(_Info, State) ->
     {noreply, State}.
 
@@ -93,6 +87,15 @@ handle_config_change("uuids", _, _, _, _) ->
     {ok, gen_server:cast(?MODULE, change)};
 handle_config_change(_, _, _, _, _) ->
     {ok, nil}.
+
+handle_config_terminate(Pid, _, _) ->
+    spawn(fun() ->
+        timer:sleep(5000),
+        config:listen_for_changes(?MODULE, undefined),
+        % Reload our config in case it changed in the last
+        % five seconds.
+        gen_server:cast(?MODULE, change)
+    end).
 
 new_prefix() ->
     couch_util:to_hex((crypto:rand_bytes(13))).

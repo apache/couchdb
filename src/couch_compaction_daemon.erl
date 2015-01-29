@@ -22,7 +22,7 @@
 -export([code_change/3, terminate/2]).
 
 % config_listener api
--export([handle_config_change/5]).
+-export([handle_config_change/5, handle_config_terminate/3]).
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("kernel/include/file.hrl").
@@ -86,12 +86,6 @@ handle_call(Msg, _From, State) ->
     {stop, {unexpected_call, Msg}, State}.
 
 
-handle_info({gen_event_EXIT, {config_listener, ?MODULE}, _Reason}, State) ->
-    erlang:send_after(5000, self(), restart_config_listener),
-    {noreply, State};
-handle_info(restart_config_listener, State) ->
-    ok = config:listen_for_changes(?MODULE, nil),
-    {noreply, State};
 handle_info({'EXIT', Pid, Reason}, #state{loop_pid = Pid} = State) ->
     {stop, {compaction_loop_died, Reason}, State}.
 
@@ -109,6 +103,11 @@ handle_config_change("compactions", DbName, Value, _, _) ->
 handle_config_change(_, _, _, _, _) ->
     {ok, nil}.
 
+handle_config_terminate(_, _, _) ->
+    spawn(fun() ->
+        timer:sleep(5000),
+        config:listen_for_changes(?MODULE, nil)
+    end).
 
 compact_loop(Parent) ->
     {ok, _} = couch_server:all_databases(
