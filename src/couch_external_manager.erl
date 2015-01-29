@@ -65,8 +65,8 @@ terminate(_Reason, Handlers) ->
 handle_call({get, UrlName}, _From, Handlers) ->
     case ets:lookup(Handlers, UrlName) of
     [] ->
-        case config:get("external", UrlName, nil) of
-        nil ->
+        case config:get("external", UrlName, undefined) of
+        undefined ->
             Msg = lists:flatten(
                 io_lib:format("No server configured for ~p.", [UrlName])),
             {reply, {error, {unknown_external_server, ?l2b(Msg)}}, Handlers};

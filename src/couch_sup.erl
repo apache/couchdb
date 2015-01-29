@@ -112,8 +112,8 @@ write_pidfile() ->
 
 
 write_uris() ->
-    case config:get("couchdb", "uri_file", null) of
-        null ->
+    case config:get("couchdb", "uri_file", undefined) of
+        undefined ->
             ok;
         UriFile ->
             Lines = [io_lib:format("~s~n", [Uri]) || Uri <- get_uris()],

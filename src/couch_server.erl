@@ -59,8 +59,8 @@ get_version(short) ->
 
 
 get_uuid() ->
-    case config:get("couchdb", "uuid", nil) of
-        nil ->
+    case config:get("couchdb", "uuid", undefined) of
+        undefined ->
             UUID = couch_uuids:random(),
             config:set("couchdb", "uuid", ?b2l(UUID)),
             UUID;

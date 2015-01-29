@@ -241,8 +241,8 @@ handle_port_message(#daemon{port=Port}=Daemon, [<<"get">>, Section]) ->
     port_command(Port, <<Json/binary, "\n">>),
     {ok, Daemon};
 handle_port_message(#daemon{port=Port}=Daemon, [<<"get">>, Section, Key]) ->
-    Value = case config:get(Section, Key, null) of
-        null -> null;
+    Value = case config:get(Section, Key, undefined) of
+        undefined -> null;
         String -> ?l2b(String)
     end,
     Json = iolist_to_binary(?JSON_ENCODE(Value)),

@@ -177,8 +177,8 @@ handle_config_req(#httpd{method='GET', path_parts=[_,Section]}=Req) ->
 % GET /_config/Section/Key
 handle_config_req(#httpd{method='GET', path_parts=[_, Section, Key]}=Req) ->
     ok = couch_httpd:verify_is_server_admin(Req),
-    case config:get(Section, Key, null) of
-    null ->
+    case config:get(Section, Key, undefined) of
+    undefined ->
         throw({not_found, unknown_config_value});
     Value ->
         send_json(Req, 200, list_to_binary(Value))
@@ -193,8 +193,8 @@ handle_config_req(#httpd{method=Method, path_parts=[_, Section, Key]}=Req)
       when (Method == 'PUT') or (Method == 'DELETE') ->
     ok = couch_httpd:verify_is_server_admin(Req),
     Persist = couch_httpd:header_value(Req, "X-Couch-Persist") /= "false",
-    case config:get(<<"httpd">>, <<"config_whitelist">>, null) of
-        null ->
+    case config:get("httpd", "config_whitelist", undefined) of
+        undefined ->
             % No whitelist; allow all changes.
             handle_approved_config_req(Req, Persist);
         WhitelistValue ->
@@ -295,8 +295,8 @@ handle_approved_config_req(#httpd{method='PUT'}=Req, _Persist, UseRawValue) ->
 % DELETE /_config/Section/Key
 handle_approved_config_req(#httpd{method='DELETE',path_parts=[_,Section,Key]}=Req,
                            Persist, _UseRawValue) ->
-    case config:get(Section, Key, null) of
-    null ->
+    case config:get(Section, Key, undefined) of
+    undefined ->
         throw({not_found, unknown_config_value});
     OldValue ->
         config:delete(Section, Key, Persist),

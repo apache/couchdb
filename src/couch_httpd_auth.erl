@@ -158,8 +158,8 @@ proxy_auth_user(Req) ->
             end,
             case config:get("couch_httpd_auth", "proxy_use_secret", "false") of
                 "true" ->
-                    case config:get("couch_httpd_auth", "secret", nil) of
-                        nil ->
+                    case config:get("couch_httpd_auth", "secret", undefined) of
+                        undefined ->
                             Req#httpd{user_ctx=#user_ctx{name=?l2b(UserName), roles=Roles}};
                         Secret ->
                             ExpectedToken = couch_util:to_hex(crypto:sha_mac(Secret, UserName)),
@@ -195,8 +195,8 @@ cookie_authentication_handler(#httpd{mochi_req=MochiReq}=Req, AuthModule) ->
         end,
         % Verify expiry and hash
         CurrentTime = make_cookie_time(),
-        case config:get("couch_httpd_auth", "secret", nil) of
-        nil ->
+        case config:get("couch_httpd_auth", "secret", undefined) of
+        undefined ->
             couch_log:debug("cookie auth secret is not set",[]),
             Req;
         SecretStr ->
@@ -260,8 +260,8 @@ cookie_auth_cookie(Req, User, Secret, TimeStamp) ->
         [{path, "/"}] ++ cookie_scheme(Req) ++ max_age()).
 
 ensure_cookie_auth_secret() ->
-    case config:get("couch_httpd_auth", "secret", nil) of
-        nil ->
+    case config:get("couch_httpd_auth", "secret", undefined) of
+        undefined ->
             NewSecret = ?b2l(couch_uuids:random()),
             config:set("couch_httpd_auth", "secret", NewSecret),
             NewSecret;
