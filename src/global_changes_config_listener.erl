@@ -11,67 +11,26 @@
 % the License.
 
 -module(global_changes_config_listener).
--behaviour(gen_server).
--vsn(1).
+
+-vsn(2).
 -behavior(config_listener).
 
 
 -export([
-    start_link/0
+    subscribe/0
 ]).
 
 -export([
-    init/1,
-    terminate/2,
-    handle_call/3,
-    handle_cast/2,
-    handle_info/2,
-    code_change/3
-]).
-
--export([
-    handle_config_change/5
+    handle_config_change/5,
+    handle_config_terminate/3
 ]).
 
 
 -define(LISTENER, global_changes_listener).
 -define(SERVER, global_changes_server).
 
-
-start_link() ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
-
-
-init([]) ->
-    ok = config:listen_for_changes(?MODULE, nil),
-    {ok, nil}.
-
-
-terminate(_, _St) ->
-    ok.
-
-
-handle_call(Msg, _From, St) ->
-    {stop, {invalid_call, Msg}, {invalid_call, Msg}, St}.
-
-
-handle_cast(Msg, St) ->
-    {stop, {invalid_cast, Msg}, St}.
-
-
-handle_info({gen_event_EXIT, {config_listener, ?MODULE}, _Reason}, St) ->
-    erlang:send_after(5000, self(), restart_config_listener),
-    {noreply, St};
-handle_info(restart_config_listener, St) ->
-    ok = config:listen_for_changes(?MODULE, St),
-    {noreply, St};
-handle_info(_Msg, St) ->
-    {noreply, St}.
-
-
-code_change(_, St, _) ->
-    {ok, St}.
-
+subscribe() ->
+    config:listen_for_changes(?MODULE, nil).
 
 handle_config_change("global_changes", "max_event_delay", MaxDelayStr, _, _) ->
     try list_to_integer(MaxDelayStr) of
@@ -103,3 +62,9 @@ handle_config_change("global_changes", "update_db", _, _, _) ->
 
 handle_config_change(_, _, _, _, _) ->
     {ok, nil}.
+
+handle_config_terminate(_, _, _) ->
+    spawn(fun() ->
+        timer:sleep(5000),
+        config:listen_for_changes(?MODULE, nil)
+    end).

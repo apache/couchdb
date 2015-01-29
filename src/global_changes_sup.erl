@@ -24,6 +24,7 @@ start_link() ->
 
 
 init([]) ->
+    global_changes_config_listener:subscribe(),
     {ok, {
         {one_for_one, 5, 10}, [
             {
@@ -33,13 +34,5 @@ init([]) ->
                 5000,
                 worker,
                 [global_changes_server]
-            },
-            {
-                global_changes_config_listener,
-                {global_changes_config_listener, start_link, []},
-                permanent,
-                5000,
-                worker,
-                [global_changes_config_listener]
             }
     ]}}.
