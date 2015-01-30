@@ -331,21 +331,15 @@ design_docs(DbName) ->
         undefined -> [];
         Else -> [{io_priority, Else}]
     end,
-    QueryArgs = #mrargs{
-        start_key = <<"_design/">>,
-        end_key = <<"_design0">>,
+    QueryArgs0 = #mrargs{
         include_docs=true,
         extra=Extra
     },
+    QueryArgs = set_namespace(<<"_design">>, QueryArgs0),
     Callback = fun({meta, _}, []) ->
         {ok, []};
     ({row, Props}, Acc) ->
-        case couch_util:get_value(id, Props) of
-        <<"_design/", _/binary>> ->
-            {ok, [couch_util:get_value(doc, Props) | Acc]};
-        _ ->
-            {stop, Acc}
-        end;
+        {ok, [couch_util:get_value(doc, Props) | Acc]};
     (complete, Acc) ->
         {ok, lists:reverse(Acc)};
     ({error, Reason}, _Acc) ->
@@ -503,3 +497,6 @@ kl_to_record(KeyList,RecName) ->
                     Index = lookup_index(couch_util:to_existing_atom(Key),RecName),
                     setelement(Index, Acc, Value)
                         end, Acc0, KeyList).
+
+set_namespace(NS, #mrargs{extra = Extra} = Args) ->
+    Args#mrargs{extra = [{namespace, NS} | Extra]}.
