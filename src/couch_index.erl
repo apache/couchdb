@@ -360,6 +360,7 @@ handle_config_change("query_server_config", "commit_freq", Val, _, _) ->
 handle_config_change(_, _, _, _, _) ->
     {ok, nil}.
 
+handle_config_terminate(_Server, stop, _State) -> ok;
 handle_config_terminate(_Server, _Reason, _State) ->
     spawn(fun() ->
         timer:sleep(5000),

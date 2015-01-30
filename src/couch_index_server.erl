@@ -198,6 +198,7 @@ handle_config_change("couchdb", "view_index_dir", _, _, _) ->
 handle_config_change(_, _, _, _, RootDir) ->
     {ok, RootDir}.
 
+handle_config_terminate(_Server, stop, _State) -> ok;
 handle_config_terminate(_Server, _Reason, _State) ->
     State = couch_index_util:root_dir(),
     spawn(fun() ->
