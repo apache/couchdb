@@ -60,6 +60,7 @@ handle_config_change("update_notification", Id, Exe, _, _) when is_list(Exe) ->
 handle_config_change(_, _, _, _, _) ->
     {ok, nil}.
 
+handle_config_terminate(_, stop, _) -> ok;
 handle_config_terminate(_, _, _) ->
     spawn(fun() ->
         timer:sleep(5000),
