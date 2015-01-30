@@ -22,6 +22,7 @@
 -behaviour(supervisor).
 -behaviour(config_listener).
 
+-vsn(1).
 
 -export([
     start_link/0,
