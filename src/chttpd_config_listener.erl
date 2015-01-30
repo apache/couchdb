@@ -41,6 +41,7 @@ handle_config_change("chttpd", "server_options", Value, _, Settings) ->
 handle_config_change(_, _, _, _, Settings) ->
     {ok, Settings}.
 
+handle_config_terminate(_, stop, _) -> ok;
 handle_config_terminate(_Server, _Reason, State) ->
     spawn(fun() ->
         timer:sleep(5000),
