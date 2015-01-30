@@ -270,6 +270,7 @@ handle_info(_Msg, State) ->
 code_change(_OldVsn, #state{}=State, _Extra) ->
     {ok, State}.
 
+handle_config_terminate(_, stop, _) -> ok;
 handle_config_terminate(_, _, _) ->
     spawn(fun() ->
         timer:sleep(5000),

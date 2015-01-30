@@ -76,6 +76,7 @@ handle_config_change("couchdb", "util_driver_dir", _, _, _) ->
 handle_config_change(_, _, _, _, _) ->
     {ok, nil}.
 
+handle_config_terminate(_, stop, _) -> ok;
 handle_config_terminate(_, _, _) ->
     spawn(fun() ->
         timer:sleep(5000),

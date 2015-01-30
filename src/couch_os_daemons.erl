@@ -195,6 +195,7 @@ handle_config_change(Section, Key, _, _, _) ->
     gen_server:cast(?MODULE, {config_change, Section, Key}),
     {ok, nil}.
 
+handle_config_terminate(_, stop, _) -> ok;
 handle_config_terminate(_, _, _) ->
     spawn(fun() ->
         timer:sleep(5000),

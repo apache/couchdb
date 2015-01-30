@@ -78,6 +78,7 @@ handle_config_change("couchdb", "os_process_timeout", NewTimeout, _, Pid) ->
 handle_config_change(_, _, _, _, Pid) ->
     {ok, Pid}.
 
+handle_config_terminate(_, stop, _) -> ok;
 handle_config_terminate(_, _, _) ->
     spawn(fun() ->
         timer:sleep(5000),
