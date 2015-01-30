@@ -409,8 +409,24 @@ map_fold({{Key, Id}, Val}, _Offset, Acc) ->
         doc_info=undefined,
         user_acc=UAcc1,
         last_go=Go
+    }};
+map_fold({<<"_local/",_/binary>> = DocId, {Rev0, _Body}}, _Offset, #mracc{} = Acc) ->
+    #mracc{
+        limit=Limit,
+        callback=Callback,
+        user_acc=UAcc0
+    } = Acc,
+    Rev = {0, list_to_binary(integer_to_list(Rev0))},
+    Value = {[{rev, couch_doc:rev_to_str(Rev)}]},
+    Row = [{id, DocId}, {key, DocId}, {value, Value}],
+    {Go, UAcc1} = Callback({row, Row}, UAcc0),
+    {Go, Acc#mracc{
+        limit=Limit-1,
+        reduce_fun=undefined,
+        doc_info=undefined,
+        user_acc=UAcc1,
+        last_go=Go
     }}.
-
 
 red_fold(Db, {_Nth, _Lang, View}=RedView, Args, Callback, UAcc) ->
     Acc = #mracc{

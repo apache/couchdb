@@ -694,9 +694,8 @@ reset_state(State) ->
     }.
 
 
-all_docs_key_opts(Args) ->
-    all_docs_key_opts(Args, []).
-
+all_docs_key_opts(#mrargs{extra = Extra} = Args) ->
+    all_docs_key_opts(Args, Extra).
 
 all_docs_key_opts(#mrargs{keys=undefined}=Args, Extra) ->
     all_docs_key_opts(Args#mrargs{keys=[]}, Extra);

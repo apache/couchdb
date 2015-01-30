@@ -14,6 +14,8 @@
 
 -export([
     handle_all_docs_req/2,
+    handle_local_docs_req/2,
+    handle_design_docs_req/2,
     handle_view_changes_req/3,
     handle_reindex_req/3,
     handle_view_req/3,
@@ -46,6 +48,22 @@ handle_all_docs_req(#httpd{method='POST'}=Req, Db) ->
     Keys = couch_mrview_util:get_view_keys(couch_httpd:json_body_obj(Req)),
     all_docs_req(Req, Db, Keys);
 handle_all_docs_req(Req, _Db) ->
+    couch_httpd:send_method_not_allowed(Req, "GET,POST,HEAD").
+
+handle_local_docs_req(#httpd{method='GET'}=Req, Db) ->
+    all_docs_req(Req, Db, undefined, <<"_local">>);
+handle_local_docs_req(#httpd{method='POST'}=Req, Db) ->
+    Keys = couch_mrview_util:get_view_keys(couch_httpd:json_body_obj(Req)),
+    all_docs_req(Req, Db, Keys, <<"_local">>);
+handle_local_docs_req(Req, _Db) ->
+    couch_httpd:send_method_not_allowed(Req, "GET,POST,HEAD").
+
+handle_design_docs_req(#httpd{method='GET'}=Req, Db) ->
+    all_docs_req(Req, Db, undefined, <<"_design">>);
+handle_design_docs_req(#httpd{method='POST'}=Req, Db) ->
+    Keys = couch_mrview_util:get_view_keys(couch_httpd:json_body_obj(Req)),
+    all_docs_req(Req, Db, Keys, <<"_design">>);
+handle_design_docs_req(Req, _Db) ->
     couch_httpd:send_method_not_allowed(Req, "GET,POST,HEAD").
 
 handle_reindex_req(#httpd{method='POST',
@@ -159,41 +177,57 @@ handle_cleanup_req(Req, _Db) ->
 
 
 all_docs_req(Req, Db, Keys) ->
-    case couch_db:is_system_db(Db) of
+    all_docs_req(Req, Db, Keys, undefined).
+
+all_docs_req(Req, Db, Keys, NS) ->
+    case is_restricted(Db, NS) of
     true ->
         case (catch couch_db:check_is_admin(Db)) of
         ok ->
-            do_all_docs_req(Req, Db, Keys);
+            do_all_docs_req(Req, Db, Keys, NS);
+        _ when NS == <<"_local">> ->
+            throw({forbidden, <<"Only admins can access _local_docs">>});
         _ ->
-            DbName = ?b2l(Db#db.name),
-            case config:get("couch_httpd_auth",
-                                  "authentication_db",
-                                  "_users") of
-            DbName ->
-                UsersDbPublic = config:get("couch_httpd_auth", "users_db_public", "false"),
-                PublicFields = config:get("couch_httpd_auth", "public_fields"),
-                case {UsersDbPublic, PublicFields} of
-                {"true", PublicFields} when PublicFields =/= undefined ->
-                    do_all_docs_req(Req, Db, Keys);
-                {_, _} ->
+            case is_public_fields_configured(Db) of
+                true ->
+                    do_all_docs_req(Req, Db, Keys, NS);
+                false ->
                     throw({forbidden, <<"Only admins can access _all_docs",
                                         " of system databases.">>})
-                end;
-            _ ->
-                throw({forbidden, <<"Only admins can access _all_docs",
-                                    " of system databases.">>})
             end
         end;
     false ->
-        do_all_docs_req(Req, Db, Keys)
+        do_all_docs_req(Req, Db, Keys, NS)
     end.
 
-do_all_docs_req(Req, Db, Keys) ->
+is_restricted(_Db, <<"_local">>) ->
+    true;
+is_restricted(Db, _) ->
+    couch_db:is_system_db(Db).
+
+is_public_fields_configured(Db) ->
+    DbName = ?b2l(Db#db.name),
+    case config:get("couch_httpd_auth", "authentication_db", "_users") of
+    DbName ->
+        UsersDbPublic = config:get("couch_httpd_auth", "users_db_public", "false"),
+        PublicFields = config:get("couch_httpd_auth", "public_fields"),
+        case {UsersDbPublic, PublicFields} of
+        {"true", PublicFields} when PublicFields =/= undefined ->
+            true;
+        {_, _} ->
+            false
+        end;
+    _ ->
+        false
+    end.
+
+do_all_docs_req(Req, Db, Keys, NS) ->
     Args0 = parse_params(Req, Keys),
+    Args1 = set_namespace(NS, Args0),
     ETagFun = fun(Sig, Acc0) ->
         check_view_etag(Sig, Acc0, Req)
     end,
-    Args = Args0#mrargs{preflight_fun=ETagFun},
+    Args = Args1#mrargs{preflight_fun=ETagFun},
     {ok, Resp} = couch_httpd:etag_maybe(Req, fun() ->
         VAcc0 = #vacc{db=Db, req=Req},
         DbName = ?b2l(Db#db.name),
@@ -208,6 +242,9 @@ do_all_docs_req(Req, Db, Keys) ->
         true -> {ok, Resp#vacc.resp};
         _ -> {ok, Resp}
     end.
+
+set_namespace(NS, #mrargs{extra = Extra} = Args) ->
+    Args#mrargs{extra = [{namespace, NS} | Extra]}.
 
 is_admin(Db) ->
     case catch couch_db:check_is_admin(Db) of
