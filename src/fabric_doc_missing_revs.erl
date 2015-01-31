@@ -20,6 +20,8 @@
 go(DbName, AllIdsRevs) ->
     go(DbName, AllIdsRevs, []).
 
+go(_, [], _) ->
+    {ok, []};
 go(DbName, AllIdsRevs, Options) ->
     Workers = lists:map(fun({#shard{name=Name, node=Node} = Shard, IdsRevs}) ->
         Ref = rexi:cast(Node, {fabric_rpc, get_missing_revs, [Name, IdsRevs,
