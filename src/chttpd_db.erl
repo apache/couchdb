@@ -61,7 +61,15 @@ handle_request(#httpd{path_parts=[DbName|RestParts],method=Method,
         do_db_req(Req, Handler)
     end.
 
+handle_changes_req(#httpd{method='POST'}=Req, Db) ->
+    couch_httpd:validate_ctype(Req, "application/json"),
+    handle_changes_req1(Req, Db);
 handle_changes_req(#httpd{method='GET'}=Req, Db) ->
+    handle_changes_req1(Req, Db);
+handle_changes_req(#httpd{path_parts=[_,<<"_changes">>]}=Req, _Db) ->
+    send_method_not_allowed(Req, "GET,POST,HEAD").
+
+handle_changes_req1(#httpd{}=Req, Db) ->
     #changes_args{filter=Raw, style=Style} = Args0 = parse_changes_query(Req),
     ChangesArgs = Args0#changes_args{
         filter_fun = couch_changes:configure_filter(Raw, Style, Req, Db)
@@ -87,9 +95,7 @@ handle_changes_req(#httpd{method='GET'}=Req, Db) ->
     _ ->
         Msg = <<"Supported `feed` types: normal, continuous, longpoll, eventsource">>,
         throw({bad_request, Msg})
-    end;
-handle_changes_req(#httpd{path_parts=[_,<<"_changes">>]}=Req, _Db) ->
-    send_method_not_allowed(Req, "GET,HEAD").
+    end.
 
 % callbacks for continuous feed (newline-delimited JSON Objects)
 changes_callback(start, {"continuous", Req}) ->
