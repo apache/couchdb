@@ -13,7 +13,6 @@
 -module(rexi_monitor).
 -export([start/1, stop/1]).
 
--include_lib("eunit/include/eunit.hrl").
 
 %% @doc spawn_links a process which monitors the supplied list of items and
 %% returns the process ID.  If a monitored process exits, the caller will

@@ -19,7 +19,6 @@
 -export([start_link/1, init_p/2, init_p/3]).
 
 -include_lib("rexi/include/rexi.hrl").
--include_lib("eunit/include/eunit.hrl").
 
 -record(job, {
     client::reference(),
