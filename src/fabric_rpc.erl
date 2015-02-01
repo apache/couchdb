@@ -298,12 +298,14 @@ changes_enumerator(#doc_info{id= <<"_local/", _/binary>>, high_seq=Seq}, Acc) ->
 changes_enumerator(DocInfo, Acc) ->
     #cacc{
         db = Db,
-        args = #changes_args{include_docs = IncludeDocs, filter_fun = Filter},
-        options = Options,
+        args = #changes_args{
+            include_docs = IncludeDocs,
+            conflicts = Conflicts,
+            filter_fun = Filter
+        },
         pending = Pending,
         epochs = Epochs
     } = Acc,
-    Conflicts = proplists:get_value(conflicts, Options, false),
     #doc_info{id=Id, high_seq=Seq, revs=[#rev_info{deleted=Del}|_]} = DocInfo,
     case [X || X <- couch_changes:filter(Db, DocInfo, Filter), X /= null] of
     [] ->
