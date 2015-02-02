@@ -86,9 +86,13 @@ sorted_kvs_test_() ->
     {
         "BTree with sorted keys",
         {
-            foreachx,
-            fun setup_kvs/1, fun teardown/2,
-            [{Sorted, Fun} || Fun <- Funs]
+            setup,
+            fun() -> test_util:start(?MODULE, [ioq]) end, fun test_util:stop/1,
+            {
+                foreachx,
+                fun setup_kvs/1, fun teardown/2,
+                [{Sorted, Fun} || Fun <- Funs]
+            }
         }
     }.
 
@@ -99,9 +103,13 @@ rsorted_kvs_test_() ->
     {
         "BTree with backward sorted keys",
         {
-            foreachx,
-            fun setup_kvs/1, fun teardown/2,
-            [{Reversed, Fun} || Fun <- Funs]
+            setup,
+            fun() -> test_util:start(?MODULE, [ioq]) end, fun test_util:stop/1,
+            {
+                foreachx,
+                fun setup_kvs/1, fun teardown/2,
+                [{Reversed, Fun} || Fun <- Funs]
+            }
         }
     }.
 
@@ -112,50 +120,58 @@ shuffled_kvs_test_() ->
     {
         "BTree with shuffled keys",
         {
-            foreachx,
-            fun setup_kvs/1, fun teardown/2,
-            [{Shuffled, Fun} || Fun <- Funs]
+            setup,
+            fun() -> test_util:start(?MODULE, [ioq]) end, fun test_util:stop/1,
+            {
+                foreachx,
+                fun setup_kvs/1, fun teardown/2,
+                [{Shuffled, Fun} || Fun <- Funs]
+            }
         }
     }.
 
 reductions_test_() ->
     {
         "BTree reductions",
-        [
-            {
-                "Common tests",
+        {
+            setup,
+            fun() -> test_util:start(?MODULE, [ioq]) end, fun test_util:stop/1,
+            [
                 {
-                    foreach,
-                    fun setup_red/0, fun teardown/1,
+                    "Common tests",
+                    {
+                        foreach,
+                        fun setup_red/0, fun teardown/1,
+                        [
+                            fun should_reduce_without_specified_direction/1,
+                            fun should_reduce_forward/1,
+                            fun should_reduce_backward/1
+                        ]
+                    }
+                },
+                {
+                    "Range requests",
                     [
-                        fun should_reduce_without_specified_direction/1,
-                        fun should_reduce_forward/1,
-                        fun should_reduce_backward/1
+                        {
+                            "Forward direction",
+                            {
+                                foreachx,
+                                fun setup_red/1, fun teardown/2,
+                                [{fwd, F} || F <- red_test_funs()]
+                            }
+                        },
+                        {
+                            "Backward direction",
+                            {
+                                foreachx,
+                                fun setup_red/1, fun teardown/2,
+                                [{rev, F} || F <- red_test_funs()]
+                            }
+                        }
                     ]
                 }
-            },
-            {
-                "Range requests",
-                [
-                    {
-                        "Forward direction",
-                        {
-                            foreachx,
-                            fun setup_red/1, fun teardown/2,
-                            [{fwd, F} || F <- red_test_funs()]
-                        }
-                    },
-                    {
-                        "Backward direction",
-                        {
-                            foreachx,
-                            fun setup_red/1, fun teardown/2,
-                            [{rev, F} || F <- red_test_funs()]
-                        }
-                    }
-                ]
-            }
-        ]
+            ]
+        }
     }.
 
 
