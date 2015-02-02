@@ -301,7 +301,8 @@ changes_enumerator(DocInfo, Acc) ->
         args = #changes_args{
             include_docs = IncludeDocs,
             conflicts = Conflicts,
-            filter_fun = Filter
+            filter_fun = Filter,
+            doc_options = DocOptions
         },
         pending = Pending,
         epochs = Epochs
@@ -311,7 +312,7 @@ changes_enumerator(DocInfo, Acc) ->
     [] ->
         {ok, Acc#cacc{seq = Seq, pending = Pending-1}};
     Results ->
-        Opts = if Conflicts -> [conflicts]; true -> [] end,
+        Opts = if Conflicts -> [conflicts | DocOptions]; true -> DocOptions end,
         ChangesRow = {change, [
 	    {pending, Pending-1},
             {seq, {Seq, uuid(Db), owner_of(Seq, Epochs)}},
@@ -327,7 +328,7 @@ changes_enumerator(DocInfo, Acc) ->
 doc_member(Shard, DocInfo, Opts) ->
     case couch_db:open_doc(Shard, DocInfo, [deleted | Opts]) of
     {ok, Doc} ->
-        {doc, couch_doc:to_json_obj(Doc, [])};
+        {doc, couch_doc:to_json_obj(Doc, Opts)};
     Error ->
         Error
     end.
