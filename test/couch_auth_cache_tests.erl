@@ -51,7 +51,8 @@ couch_auth_cache_test_() ->
                     fun should_restore_cache_after_userdoc_recreation/1,
                     fun should_drop_cache_on_auth_db_change/1,
                     fun should_restore_cache_on_auth_db_change/1,
-                    fun should_recover_cache_after_shutdown/1
+                    fun should_recover_cache_after_shutdown/1,
+                    fun should_close_old_db_on_auth_db_change/1
                 ]
             }
         }
@@ -153,6 +154,13 @@ should_recover_cache_after_shutdown(DbName) ->
         ?assertEqual(PasswordHash, get_user_doc_password_sha(DbName, "joe"))
     end).
 
+should_close_old_db_on_auth_db_change(DbName) ->
+    ?_test(begin
+        ?assert(is_opened(DbName)),
+        config:set("couch_httpd_auth", "authentication_db",
+                         ?b2l(?tempdb()), false),
+        ?assertNot(is_opened(DbName))
+    end).
 
 update_user_doc(DbName, UserName, Password) ->
     update_user_doc(DbName, UserName, Password, nil).
@@ -224,3 +232,9 @@ full_commit(DbName) ->
     {ok, AuthDb} = couch_db:open_int(DbName, [?ADMIN_CTX]),
     {ok, _} = couch_db:ensure_full_commit(AuthDb),
     ok = couch_db:close(AuthDb).
+
+is_opened(DbName) ->
+    {ok, AuthDb} = couch_db:open_int(DbName, [?ADMIN_CTX]),
+    Monitors = couch_db:monitored_by(AuthDb) -- [self()],
+    ok = couch_db:close(AuthDb),
+    Monitors /= [].
