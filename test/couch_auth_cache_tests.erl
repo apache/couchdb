@@ -18,8 +18,9 @@
 -define(SALT, <<"SALT">>).
 -define(TIMEOUT, 1000).
 
+start() ->
+    test_util:start_couch([ioq]).
 
--ifdef(run_broken_tests).
 
 setup() ->
     DbName = ?tempdb(),
@@ -37,7 +38,7 @@ couch_auth_cache_test_() ->
         "CouchDB auth cache tests",
         {
             setup,
-            fun test_util:start_couch/0, fun test_util:stop_couch/1,
+            fun start/0, fun test_util:stop_couch/1,
             {
                 foreach,
                 fun setup/0, fun teardown/1,
@@ -64,7 +65,7 @@ should_get_right_password_hash(DbName) ->
     ?_test(begin
         PasswordHash = hash_password("pass1"),
         {ok, _} = update_user_doc(DbName, "joe", "pass1"),
-        Creds = couch_auth_cache:get_user_creds("joe"),
+        {ok, Creds, _} = couch_auth_cache:get_user_creds("joe"),
         ?assertEqual(PasswordHash,
                       couch_util:get_value(<<"password_sha">>, Creds))
     end).
@@ -72,7 +73,7 @@ should_get_right_password_hash(DbName) ->
 should_ensure_doc_hash_equals_cached_one(DbName) ->
     ?_test(begin
         {ok, _} = update_user_doc(DbName, "joe", "pass1"),
-        Creds = couch_auth_cache:get_user_creds("joe"),
+        {ok, Creds, _} = couch_auth_cache:get_user_creds("joe"),
 
         CachedHash = couch_util:get_value(<<"password_sha">>, Creds),
         StoredHash = get_user_doc_password_sha(DbName, "joe"),
@@ -84,7 +85,7 @@ should_update_password(DbName) ->
         PasswordHash = hash_password("pass2"),
         {ok, Rev} = update_user_doc(DbName, "joe", "pass1"),
         {ok, _} = update_user_doc(DbName, "joe", "pass2", Rev),
-        Creds = couch_auth_cache:get_user_creds("joe"),
+        {ok, Creds, _} = couch_auth_cache:get_user_creds("joe"),
         ?assertEqual(PasswordHash,
                       couch_util:get_value(<<"password_sha">>, Creds))
     end).
@@ -104,7 +105,7 @@ should_restore_cache_after_userdoc_recreation(DbName) ->
         ?assertEqual(nil, couch_auth_cache:get_user_creds("joe")),
 
         {ok, _} = update_user_doc(DbName, "joe", "pass5"),
-        Creds = couch_auth_cache:get_user_creds("joe"),
+        {ok, Creds, _} = couch_auth_cache:get_user_creds("joe"),
 
         ?assertEqual(PasswordHash,
                       couch_util:get_value(<<"password_sha">>, Creds))
@@ -123,7 +124,7 @@ should_restore_cache_on_auth_db_change(DbName) ->
     ?_test(begin
         PasswordHash = hash_password("pass1"),
         {ok, _} = update_user_doc(DbName, "joe", "pass1"),
-        Creds = couch_auth_cache:get_user_creds("joe"),
+        {ok, Creds, _} = couch_auth_cache:get_user_creds("joe"),
         full_commit(DbName),
 
         DbName1 = ?tempdb(),
@@ -136,7 +137,7 @@ should_restore_cache_on_auth_db_change(DbName) ->
         config:set("couch_httpd_auth", "authentication_db",
                          ?b2l(DbName), false),
 
-        Creds = couch_auth_cache:get_user_creds("joe"),
+        {ok, Creds, _} = couch_auth_cache:get_user_creds("joe"),
         ?assertEqual(PasswordHash,
                       couch_util:get_value(<<"password_sha">>, Creds))
     end).
@@ -223,5 +224,3 @@ full_commit(DbName) ->
     {ok, AuthDb} = couch_db:open_int(DbName, [?ADMIN_CTX]),
     {ok, _} = couch_db:ensure_full_commit(AuthDb),
     ok = couch_db:close(AuthDb).
-
--endif.
