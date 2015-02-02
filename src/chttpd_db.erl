@@ -1336,6 +1336,12 @@ parse_changes_query(Req) ->
             Args#changes_args{include_docs=true};
         {"conflicts", "true"} ->
             Args#changes_args{conflicts=true};
+        {"attachments", "true"} ->
+            Options = [attachments | Args#changes_args.doc_options],
+            Args#changes_args{doc_options=Options};
+        {"att_encoding_info", "true"} ->
+            Options = [att_encoding_info | Args#changes_args.doc_options],
+            Args#changes_args{doc_options=Options};
         {"filter", _} ->
             Args#changes_args{filter=Value};
         {"seq_interval", _} ->
