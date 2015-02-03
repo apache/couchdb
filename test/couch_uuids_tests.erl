@@ -17,12 +17,10 @@
 -define(TIMEOUT_S, 20).
 
 
--ifdef(run_broken_tests).
-
 setup() ->
-    {ok, Pid} = config:start_link(?CONFIG_CHAIN),
+    Ctx = test_util:start(?MODULE, [], [{dont_mock, [config]}]),
     couch_uuids:start(),
-    Pid.
+    Ctx.
 
 setup(Opts) ->
     Pid = setup(),
@@ -32,12 +30,12 @@ setup(Opts) ->
         end, Opts),
     Pid.
 
-teardown(Pid) ->
+teardown(Ctx) ->
     couch_uuids:stop(),
-    test_util:stop_config(Pid).
+    test_util:stop(Ctx).
 
-teardown(_, Pid) ->
-    teardown(Pid).
+teardown(_, Ctx) ->
+    teardown(Ctx).
 
 
 default_test_() ->
@@ -155,5 +153,3 @@ test_same_suffix(N, Suffix) ->
         Suffix -> test_same_suffix(N - 1, Suffix);
         _ -> false
     end.
-
--endif.
