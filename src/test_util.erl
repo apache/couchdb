@@ -28,6 +28,7 @@
 
 -export([with_process_restart/1, with_process_restart/2, with_process_restart/3]).
 -export([wait_process/1, wait_process/2]).
+-export([wait/1, wait/2, wait/3]).
 
 -export([start/1, start/2, start/3, stop/1]).
 
@@ -183,20 +184,38 @@ with_process_restart(Name, Fun, Timeout) ->
         Pid
     end.
 
+
 wait_process(Name) ->
     wait_process(Name, 5000).
 wait_process(Name, Timeout) ->
-    Now = now_us(),
-    wait_process(Name, Timeout * 1000, Now, Now).
+    wait(fun() ->
+       case whereis(Name) of
+       undefined ->
+          wait;
+       Pid ->
+          Pid
+       end
+    end, Timeout).
 
-wait_process(_Name, Timeout, Started, Prev) when Prev - Started > Timeout ->
+wait(Fun) ->
+    wait(Fun, 5000, 50).
+
+wait(Fun, Timeout) ->
+    wait(Fun, Timeout, 50).
+
+wait(Fun, Timeout, Delay) ->
+    Now = now_us(),
+    wait(Fun, Timeout * 1000, Delay, Now, Now).
+
+wait(_Fun, Timeout, _Delay, Started, Prev) when Prev - Started > Timeout ->
     timeout;
-wait_process(Name, Timeout, Started, _Prev) ->
-    case whereis(Name) of
-    undefined ->
-        wait_process(Name, Timeout, Started, now_us());
-    Pid ->
-        Pid
+wait(Fun, Timeout, Delay, Started, _Prev) ->
+    case Fun() of
+    wait ->
+        ok = timer:sleep(Delay),
+        wait(Fun, Timeout, Delay, Started, now_us());
+    Else ->
+        Else
     end.
 
 start(Module) ->
