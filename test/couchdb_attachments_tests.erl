@@ -19,14 +19,12 @@
 -define(ATT_BIN_NAME, <<"logo.png">>).
 -define(ATT_TXT_NAME, <<"file.erl">>).
 -define(FIXTURE_PNG, filename:join([?FIXTURESDIR, "logo.png"])).
--define(FIXTURE_TXT, ?FILE).
+-define(FIXTURE_TXT, ?ABS_PATH(?FILE)).
 -define(TIMEOUT, 1000).
 -define(TIMEOUT_EUNIT, 10).
 -define(TIMEWAIT, 100).
 -define(i2l(I), integer_to_list(I)).
 
-
--ifdef(run_broken_tests).
 
 start() ->
     Ctx = test_util:start_couch(),
@@ -191,7 +189,7 @@ should_upload_attachment_by_chunks_without_md5({Host, DbName}) ->
         AttUrl = string:join(["", DbName, ?docid(), "readme.txt"], "/"),
         AttData = <<"We all live in a yellow submarine!">>,
         <<Part1:21/binary, Part2:13/binary>> = AttData,
-        Body = chunked_body([Part1, Part2]),
+        Body = [chunked_body([Part1, Part2]), "\r\n"],
         Headers = [
             {"Content-Type", "text/plain"},
             {"Transfer-Encoding", "chunked"},
@@ -222,7 +220,7 @@ should_upload_attachment_by_chunks_with_valid_md5_header({Host, DbName}) ->
         AttUrl = string:join(["", DbName, ?docid(), "readme.txt"], "/"),
         AttData = <<"We all live in a yellow submarine!">>,
         <<Part1:21/binary, Part2:13/binary>> = AttData,
-        Body = chunked_body([Part1, Part2]),
+        Body = [chunked_body([Part1, Part2]), "\r\n"],
         Headers = [
             {"Content-Type", "text/plain"},
             {"Content-MD5", ?b2l(base64:encode(couch_util:md5(AttData)))},
@@ -241,7 +239,7 @@ should_upload_attachment_by_chunks_with_valid_md5_trailer({Host, DbName}) ->
         <<Part1:21/binary, Part2:13/binary>> = AttData,
         Body = [chunked_body([Part1, Part2]),
                 "Content-MD5: ", base64:encode(couch_util:md5(AttData)),
-                "\r\n"],
+                "\r\n\r\n"],
         Headers = [
             {"Content-Type", "text/plain"},
             {"Host", Host},
@@ -275,7 +273,7 @@ should_reject_chunked_attachment_with_invalid_md5({Host, DbName}) ->
         AttUrl = string:join(["", DbName, ?docid(), "readme.txt"], "/"),
         AttData = <<"We all live in a yellow submarine!">>,
         <<Part1:21/binary, Part2:13/binary>> = AttData,
-        Body = chunked_body([Part1, Part2]),
+        Body = [chunked_body([Part1, Part2]), "\r\n"],
         Headers = [
             {"Content-Type", "text/plain"},
             {"Content-MD5", ?b2l(base64:encode(<<"foobar!">>))},
@@ -295,7 +293,7 @@ should_reject_chunked_attachment_with_invalid_md5_trailer({Host, DbName}) ->
         <<Part1:21/binary, Part2:13/binary>> = AttData,
         Body = [chunked_body([Part1, Part2]),
                 "Content-MD5: ", base64:encode(<<"foobar!">>),
-                "\r\n"],
+                "\r\n\r\n"],
         Headers = [
             {"Content-Type", "text/plain"},
             {"Host", Host},
@@ -556,7 +554,7 @@ request(Method, Url, Headers, Body) ->
     RequestHead = [Method, " ", Url, " HTTP/1.1"],
     RequestHeaders = [[string:join([Key, Value], ": "), "\r\n"]
                       || {Key, Value} <- Headers],
-    Request = [RequestHead, "\r\n", RequestHeaders, "\r\n", Body, "\r\n"],
+    Request = [RequestHead, "\r\n", RequestHeaders, "\r\n", Body],
     Sock = get_socket(),
     gen_tcp:send(Sock, list_to_binary(lists:flatten(Request))),
     timer:sleep(?TIMEWAIT),  % must wait to receive complete response
@@ -633,5 +631,3 @@ gzip(Data) ->
     ok = zlib:deflateEnd(Z),
     ok = zlib:close(Z),
     Last.
-
--endif.

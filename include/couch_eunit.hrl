@@ -31,6 +31,11 @@
     filename:join([?BUILDDIR(), "src", "couch", "test", "fixtures"])).
 -define(TEMPDIR,
     filename:join([?BUILDDIR(), "tmp", "tmp_data"])).
+-define(ABS_PATH(File),
+    filename:join([
+        filename:dirname(
+            filename:dirname(
+                filename:dirname(filename:absname(File)))), File])).
 
 -define(tempfile,
     fun() ->
