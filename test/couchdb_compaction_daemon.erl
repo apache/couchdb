@@ -20,8 +20,6 @@
 -define(TIMEOUT_S, ?TIMEOUT div 1000).
 
 
--ifdef(run_broken_tests).
-
 start() ->
     Ctx = test_util:start_couch(),
     config:set("compaction_daemon", "check_interval", "3", false),
@@ -76,9 +74,11 @@ should_compact_by_default_rule(DbName) ->
             "[{db_fragmentation, \"70%\"}, {view_fragmentation, \"70%\"}]",
             false),
 
-        ok = timer:sleep(4000), % something >= check_interval
+        ok = timer:sleep(5000), % something >= check_interval
         wait_compaction_finished(DbName),
+
         ok = config:delete("compactions", "_default", false),
+        ok = timer:sleep(1000), % need to wait so gen_server:cast would complete
 
         {DbFrag2, DbFileSize2} = get_db_frag(DbName),
         {ViewFrag2, ViewFileSize2} = get_view_frag(DbName),
@@ -89,7 +89,7 @@ should_compact_by_default_rule(DbName) ->
         ?assert(DbFileSize > DbFileSize2),
         ?assert(ViewFileSize > ViewFileSize2),
 
-        ?assert(couch_db:is_idle(Db)),
+        ?assert(is_idle(DbName)),
         ok = couch_db:close(Db)
     end)}.
 
@@ -108,6 +108,7 @@ should_compact_by_dbname_rule(DbName) ->
         ok = timer:sleep(4000), % something >= check_interval
         wait_compaction_finished(DbName),
         ok = config:delete("compactions", ?b2l(DbName), false),
+        ok = timer:sleep(1000), % need to wait so gen_server:cast would complete
 
         {DbFrag2, DbFileSize2} = get_db_frag(DbName),
         {ViewFrag2, ViewFileSize2} = get_view_frag(DbName),
@@ -118,7 +119,7 @@ should_compact_by_dbname_rule(DbName) ->
         ?assert(DbFileSize > DbFileSize2),
         ?assert(ViewFileSize > ViewFileSize2),
 
-        ?assert(couch_db:is_idle(Db)),
+        ?assert(is_idle(DbName)),
         ok = couch_db:close(Db)
     end)}.
 
@@ -182,43 +183,48 @@ get_db_frag(DbName) ->
     {ok, Db} = couch_db:open_int(DbName, []),
     {ok, Info} = couch_db:get_db_info(Db),
     couch_db:close(Db),
-    FileSize = couch_util:get_value(disk_size, Info),
-    DataSize = couch_util:get_value(data_size, Info),
+    FileSize = get_size(file, Info),
+    DataSize = get_size(external, Info),
     {round((FileSize - DataSize) / FileSize * 100), FileSize}.
 
 get_view_frag(DbName) ->
     {ok, Db} = couch_db:open_int(DbName, []),
     {ok, Info} = couch_mrview:get_info(Db, <<"_design/foo">>),
     couch_db:close(Db),
-    FileSize = couch_util:get_value(disk_size, Info),
-    DataSize = couch_util:get_value(data_size, Info),
+    FileSize = get_size(file, Info),
+    DataSize = get_size(external, Info),
     {round((FileSize - DataSize) / FileSize * 100), FileSize}.
 
+get_size(Kind, Info) ->
+    couch_util:get_nested_json_value({Info}, [sizes, Kind]).
+
 wait_compaction_finished(DbName) ->
-    Parent = self(),
-    Loop = spawn_link(fun() -> wait_loop(DbName, Parent) end),
-    receive
-        {done, Loop} ->
+    WaitFun = fun() ->
+       case is_compaction_running(DbName) of
+           true -> wait;
+           false -> ok
+       end
+    end,
+    case test_util:wait(WaitFun, 10000) of
+        timeout ->
+            erlang:error({assertion_failed,
+                          [{module, ?MODULE},
+                           {line, ?LINE},
+                           {reason, "Compaction timeout"}]});
+        _ ->
             ok
-    after ?TIMEOUT ->
-        erlang:error(
-            {assertion_failed,
-             [{module, ?MODULE}, {line, ?LINE},
-              {reason, "Compaction timeout"}]})
     end.
 
-wait_loop(DbName, Parent) ->
+is_compaction_running(DbName) ->
     {ok, Db} = couch_db:open_int(DbName, []),
     {ok, DbInfo} = couch_db:get_db_info(Db),
     {ok, ViewInfo} = couch_mrview:get_info(Db, <<"_design/foo">>),
     couch_db:close(Db),
-    case (couch_util:get_value(compact_running, ViewInfo) =:= true) orelse
-        (couch_util:get_value(compact_running, DbInfo) =:= true) of
-        false ->
-            Parent ! {done, self()};
-        true ->
-            ok = timer:sleep(?DELAY),
-            wait_loop(DbName, Parent)
-    end.
+    (couch_util:get_value(compact_running, ViewInfo) =:= true)
+        orelse (couch_util:get_value(compact_running, DbInfo) =:= true).
 
--endif.
+is_idle(DbName) ->
+    {ok, Db} = couch_db:open_int(DbName, [?ADMIN_CTX]),
+    Monitors = couch_db:monitored_by(Db),
+    ok = couch_db:close(Db),
+    not lists:any(fun(M) -> M /= self() end, Monitors).
