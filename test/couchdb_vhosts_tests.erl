@@ -19,8 +19,6 @@
 -define(iofmt(S, A), lists:flatten(io_lib:format(S, A))).
 
 
--ifdef(run_broken_tests).
-
 setup() ->
     DbName = ?tempdb(),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
@@ -47,6 +45,14 @@ setup() ->
     {ok, _} = couch_db:update_docs(Db, [Doc, Doc1]),
     couch_db:ensure_full_commit(Db),
     couch_db:close(Db),
+
+    test_util:with_process_restart(couch_httpd, fun() ->
+        config:set("httpd_global_handlers", "_utils",
+            "{couch_httpd_misc_handlers, handle_utils_dir_req, <<\""
+                ++ ?TEMPDIR
+                ++ "\">>}"
+        )
+    end),
 
     Addr = config:get("httpd", "bind_address", "127.0.0.1"),
     Port = integer_to_list(mochiweb_socket_server:get(couch_httpd, port)),
@@ -173,6 +179,7 @@ should_return_revs_info({Url, DbName}) ->
 should_serve_utils_for_vhost({Url, DbName}) ->
     ?_test(begin
         ok = config:set("vhosts", "example.com", "/" ++ DbName, false),
+        ensure_index_file(),
         case test_request:get(Url ++ "/_utils/index.html", [],
                               [{host_header, "example.com"}]) of
             {ok, _, _, Body} ->
@@ -427,4 +434,6 @@ should_fail_oauth_with_wrong_credentials({Url, _}) ->
         end
     end).
 
--endif.
+ensure_index_file() ->
+    Body = <<"<!DOCTYPE html>\n<html>\n<body>\nHello world\n</body>\n</html>">>,
+    file:write_file(filename:join([?TEMPDIR, "index.html"]), Body).
