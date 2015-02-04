@@ -23,9 +23,9 @@ start_link(Args) ->
     supervisor:start_link({local,?MODULE}, ?MODULE, Args).
 
 init([]) ->
+    chttp_config_listener:subscribe(),
     {ok, {{one_for_one, 3, 10}, [
         ?CHILD(chttpd, worker),
-        ?CHILD(chttpd_config_listener, worker),
         ?CHILD(chttpd_auth_cache, worker),
         {chttpd_auth_cache_lru,
 	 {ets_lru, start_link, [chttpd_auth_cache_lru, lru_opts()]},

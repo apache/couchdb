@@ -11,24 +11,16 @@
 % the License.
 
 -module(chttpd_config_listener).
--behaviour(gen_server).
--vsn(1).
+-vsn(2).
 -behaviour(config_listener).
 
 % public interface
--export([start_link/0]).
-
-% gen_server callbacks
--export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-    code_change/3, terminate/2]).
+-export([subscribe/0]).
 
 % config_listener callback
--export([handle_config_change/5]).
+-export([handle_config_change/5, handle_config_terminate/3]).
 
-start_link() ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
-
-init([]) ->
+subscribe() ->
     Settings = [
         {bind_address, config:get("chttpd", "bind_address")},
         {port, config:get("chttpd", "port")},
@@ -36,7 +28,7 @@ init([]) ->
         {server_options, config:get("chttpd", "server_options")}
     ],
     ok = config:listen_for_changes(?MODULE, Settings),
-    {ok, Settings}.
+    ok.
 
 handle_config_change("chttpd", "bind_address", Value, _, Settings) ->
     maybe_replace(bind_address, Value, Settings);
@@ -49,26 +41,12 @@ handle_config_change("chttpd", "server_options", Value, _, Settings) ->
 handle_config_change(_, _, _, _, Settings) ->
     {ok, Settings}.
 
-handle_call(_, _, State) ->
-    {reply, ignored, State}.
-
-handle_cast(_, State) ->
-    {noreply, State}.
-
-handle_info({gen_event_EXIT, {config_listener, ?MODULE}, _Reason}, State) ->
-    erlang:send_after(5000, self(), restart_config_listener),
-    {noreply, State};
-handle_info(restart_config_listener, State) ->
-    ok = config:listen_for_changes(?MODULE, State),
-    {noreply, State};
-handle_info(_Msg, State) ->
-    {noreply, State}.
-
-terminate(_, _State) ->
-    ok.
-
-code_change(_, State, _) ->
-    {ok, State}.
+handle_config_terminate(_, stop, _) -> ok;
+handle_config_terminate(_Server, _Reason, State) ->
+    spawn(fun() ->
+        timer:sleep(5000),
+        config:listen_for_changes(?MODULE, State)
+    end).
 
 % private
 maybe_replace(Key, Value, Settings) ->

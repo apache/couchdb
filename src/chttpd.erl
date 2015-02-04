@@ -50,20 +50,20 @@ start_link(http) ->
 
 start_link(https) ->
     Port = config:get("ssl", "port", "6984"),
-    {ok, Ciphers} = couch_util:parse_term(config:get("ssl", "ciphers", "nil")),
-    {ok, Versions} = couch_util:parse_term(config:get("ssl", "tls_versions", "nil")),
-    {ok, SecureRenegotiate} = couch_util:parse_term(config:get("ssl", "secure_renegotiate", "nil")),
+    {ok, Ciphers} = couch_util:parse_term(config:get("ssl", "ciphers", undefined)),
+    {ok, Versions} = couch_util:parse_term(config:get("ssl", "tls_versions", undefined)),
+    {ok, SecureRenegotiate} = couch_util:parse_term(config:get("ssl", "secure_renegotiate", undefined)),
     ServerOpts0 =
-        [{cacertfile, config:get("ssl", "cacert_file", nil)},
-         {keyfile, config:get("ssl", "key_file", nil)},
-         {certfile, config:get("ssl", "cert_file", nil)},
-         {password, config:get("ssl", "password", nil)},
+        [{cacertfile, config:get("ssl", "cacert_file", undefined)},
+         {keyfile, config:get("ssl", "key_file", undefined)},
+         {certfile, config:get("ssl", "cert_file", undefined)},
+         {password, config:get("ssl", "password", undefined)},
          {secure_renegotiate, SecureRenegotiate},
          {versions, Versions},
          {ciphers, Ciphers}],
 
-    case (couch_util:get_value(keyfile, ServerOpts0) == nil orelse
-        couch_util:get_value(certfile, ServerOpts0) == nil) of
+    case (couch_util:get_value(keyfile, ServerOpts0) == undefined orelse
+        couch_util:get_value(certfile, ServerOpts0) == undefined) of
         true ->
             io:format("SSL enabled but PEM certificates are missing.", []),
             throw({error, missing_certs});
@@ -71,7 +71,7 @@ start_link(https) ->
             ok
     end,
 
-    ServerOpts = [Opt || {_, V}=Opt <- ServerOpts0, V /= nil],
+    ServerOpts = [Opt || {_, V}=Opt <- ServerOpts0, V /= undefined],
 
     ClientOpts = case config:get("ssl", "verify_ssl_certificates", "false") of
         "false" ->
@@ -85,8 +85,8 @@ start_link(https) ->
                 "ssl_certificate_max_depth", "1"))},
              {fail_if_no_peer_cert, FailIfNoPeerCert},
              {verify, verify_peer}] ++
-            case config:get("ssl", "verify_fun", nil) of
-                nil -> [];
+            case config:get("ssl", "verify_fun", undefined) of
+                undefined -> [];
                 SpecStr ->
                     [{verify_fun, couch_httpd:make_arity_3_fun(SpecStr)}]
             end
@@ -100,10 +100,12 @@ start_link(https) ->
     start_link(https, Options).
 
 start_link(Name, Options) ->
+    IP = with_default(config:get("chttpd", "bind_address"), any),
+
     Options1 = Options ++ [
         {loop, fun ?MODULE:handle_request/1},
         {name, Name},
-        {ip, config:get("chttpd", "bind_address", any)}
+        {ip, IP}
     ],
     ServerOptsCfg = config:get("chttpd", "server_options", "[]"),
     {ok, ServerOpts} = couch_util:parse_term(ServerOptsCfg),
@@ -771,14 +773,14 @@ error_headers(#httpd{mochi_req=MochiReq}=Req, 401=Code, ErrorStr, ReasonStr) ->
     % this is where the basic auth popup is triggered
     case MochiReq:get_header_value("X-CouchDB-WWW-Authenticate") of
     undefined ->
-        case config:get("httpd", "WWW-Authenticate", nil) of
-        nil ->
+        case config:get("httpd", "WWW-Authenticate", undefined) of
+        undefined ->
             % If the client is a browser and the basic auth popup isn't turned on
             % redirect to the session page.
             case ErrorStr of
             <<"unauthorized">> ->
-                case config:get("couch_httpd_auth", "authentication_redirect", nil) of
-                nil -> {Code, []};
+                case config:get("couch_httpd_auth", "authentication_redirect", undefined) of
+                undefined -> {Code, []};
                 AuthRedirect ->
                     case config:get("couch_httpd_auth", "require_valid_user", "false") of
                     "true" ->
@@ -934,3 +936,6 @@ stack_trace_id(Stack) ->
 
 stack_hash(Stack) ->
     erlang:crc32(term_to_binary(Stack)).
+
+with_default(undefined, Default) -> Default;
+with_default(Value, _) -> Value.
