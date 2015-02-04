@@ -12,19 +12,18 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--include("../couch_eunit.hrl").
-
+-include("../../include/couch_eunit.hrl").
 
 read() ->
     case io:get_line('') of
         eof ->
             stop;
         Data ->
-            ejson:decode(Data)
+            jiffy:decode(Data)
     end.
 
 write(Mesg) ->
-    Data = iolist_to_binary(ejson:encode(Mesg)),
+    Data = iolist_to_binary(jiffy:encode(Mesg)),
     io:format(binary_to_list(Data) ++ "\n", []).
 
 get_cfg(Section) ->
@@ -83,19 +82,17 @@ loop({error, _Reason}) ->
 
 main([]) ->
     init_code_path(),
-    config:start_link(?CONFIG_CHAIN),
-    couch_drv:start_link(),
     do_tests().
 
 init_code_path() ->
     Paths = [
         "couchdb",
-        "ejson",
+        "jiffy",
         "erlang-oauth",
         "ibrowse",
         "mochiweb",
         "snappy"
     ],
     lists:foreach(fun(Name) ->
-        code:add_patha(filename:join([?BUILDDIR, "src", Name]))
+        code:add_patha(filename:join([?BUILDDIR(), "src", Name, "ebin"]))
     end, Paths).
