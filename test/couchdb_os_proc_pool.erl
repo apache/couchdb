@@ -18,11 +18,10 @@
 -define(TIMEOUT, 3000).
 
 
--ifdef(run_broken_tests).
-
 start() ->
     Ctx = test_util:start_couch(),
     config:set("query_server_config", "os_process_limit", "3", false),
+    timer:sleep(100), %% we need to wait to let gen_server:cast finish
     Ctx.
 
 
@@ -65,12 +64,15 @@ should_block_new_proc_on_full_pool() ->
         ?assertEqual(ok, ping_client(Client4)),
 
         Proc4 = get_client_proc(Client4, "4"),
-        ?assertEqual(Proc1, Proc4),
+
+        ?assertEqual(Proc1#proc.pid, Proc4#proc.pid),
+        ?assertNotEqual(Proc1#proc.client, Proc4#proc.client),
 
         lists:map(fun(C) ->
             ?assertEqual(ok, stop_client(C))
         end, [Client2, Client3, Client4])
     end).
+
 
 should_free_slot_on_proc_unexpected_exit() ->
     ?_test(begin
@@ -86,9 +88,12 @@ should_free_slot_on_proc_unexpected_exit() ->
         Proc2 = get_client_proc(Client2, "2"),
         Proc3 = get_client_proc(Client3, "3"),
 
-        ?assertNotEqual(Proc1, Proc2),
-        ?assertNotEqual(Proc2, Proc3),
-        ?assertNotEqual(Proc3, Proc1),
+        ?assertNotEqual(Proc1#proc.pid, Proc2#proc.pid),
+        ?assertNotEqual(Proc1#proc.client, Proc2#proc.client),
+        ?assertNotEqual(Proc2#proc.pid, Proc3#proc.pid),
+        ?assertNotEqual(Proc2#proc.client, Proc3#proc.client),
+        ?assertNotEqual(Proc3#proc.pid, Proc1#proc.pid),
+        ?assertNotEqual(Proc3#proc.client, Proc1#proc.client),
 
         ?assertEqual(ok, kill_client(Client1)),
 
@@ -96,9 +101,13 @@ should_free_slot_on_proc_unexpected_exit() ->
         ?assertEqual(ok, ping_client(Client4)),
 
         Proc4 = get_client_proc(Client4, "4"),
-        ?assertNotEqual(Proc4, Proc1),
-        ?assertNotEqual(Proc2, Proc4),
-        ?assertNotEqual(Proc3, Proc4),
+
+        ?assertEqual(Proc4#proc.pid, Proc1#proc.pid),
+        ?assertNotEqual(Proc4#proc.client, Proc1#proc.client),
+        ?assertNotEqual(Proc2#proc.pid, Proc4#proc.pid),
+        ?assertNotEqual(Proc2#proc.client, Proc4#proc.client),
+        ?assertNotEqual(Proc3#proc.pid, Proc4#proc.pid),
+        ?assertNotEqual(Proc3#proc.client, Proc4#proc.client),
 
         lists:map(fun(C) ->
             ?assertEqual(ok, stop_client(C))
@@ -169,5 +178,3 @@ loop(Parent, Ref, Proc) ->
             Parent ! {die, Ref},
             exit(some_error)
     end.
-
--endif.
