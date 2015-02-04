@@ -12,12 +12,12 @@
 
 -module(mem3_shards).
 -behaviour(gen_server).
--vsn(1).
+-vsn(2).
 -behaviour(config_listener).
 
 -export([init/1, terminate/2, code_change/3]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
--export([handle_config_change/5]).
+-export([handle_config_change/5, handle_config_terminate/3]).
 
 -export([start_link/0]).
 -export([for_db/1, for_db/2, for_docid/2, for_docid/3, get/3, local/1, fold/2]).
@@ -136,6 +136,13 @@ handle_config_change("mem3", "shard_db", _DbName, _, _) ->
 handle_config_change(_, _, _, _, _) ->
     {ok, nil}.
 
+handle_config_terminate(_, stop, _) -> ok;
+handle_config_terminate(_, _, _) ->
+    spawn(fun() ->
+        timer:sleep(5000),
+        config:listen_for_changes(?MODULE, nil)
+    end).
+
 init([]) ->
     ets:new(?SHARDS, [bag, protected, named_table, {keypos,#shard.dbname}]),
     ets:new(?DBS, [set, protected, named_table]),
@@ -185,12 +192,6 @@ handle_info({'DOWN', _, _, Pid, Reason}, #st{changes_pid=Pid}=St) ->
 handle_info({start_listener, Seq}, St) ->
     {NewPid, _} = spawn_monitor(fun() -> listen_for_changes(Seq) end),
     {noreply, St#st{changes_pid=NewPid}};
-handle_info({gen_event_EXIT, {config_listener, ?MODULE}, _Reason}, State) ->
-    erlang:send_after(5000, self(), restart_config_listener),
-    {noreply, State};
-handle_info(restart_config_listener, State) ->
-    ok = config:listen_for_changes(?MODULE, nil),
-    {noreply, State};
 handle_info(_Msg, St) ->
     {noreply, St}.
 
