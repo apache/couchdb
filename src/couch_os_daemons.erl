@@ -19,7 +19,7 @@
 -export([handle_call/3, handle_cast/2, handle_info/2]).
 
 % config_listener api
--export([handle_config_change/5]).
+-export([handle_config_change/5, handle_config_terminate/3]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -82,12 +82,6 @@ handle_cast(Msg, Table) ->
     couch_log:error("Unknown cast message to ~p: ~p", [?MODULE, Msg]),
     {stop, error, Table}.
 
-handle_info({gen_event_EXIT, {config_listener, ?MODULE}, _Reason}, State) ->
-    erlang:send_after(5000, self(), restart_config_listener),
-    {noreply, State};
-handle_info(restart_config_listener, State) ->
-    ok = config:listen_for_changes(?MODULE, nil),
-    {noreply, State};
 handle_info({'EXIT', Port, Reason}, Table) ->
     case ets:lookup(Table, Port) of
         [] ->
@@ -201,6 +195,12 @@ handle_config_change(Section, Key, _, _, _) ->
     gen_server:cast(?MODULE, {config_change, Section, Key}),
     {ok, nil}.
 
+handle_config_terminate(_, stop, _) -> ok;
+handle_config_terminate(_, _, _) ->
+    spawn(fun() ->
+        timer:sleep(5000),
+        config:listen_for_changes(?MODULE, nil)
+    end).
 
 % Internal API
 
@@ -242,8 +242,8 @@ handle_port_message(#daemon{port=Port}=Daemon, [<<"get">>, Section]) ->
     port_command(Port, <<Json/binary, "\n">>),
     {ok, Daemon};
 handle_port_message(#daemon{port=Port}=Daemon, [<<"get">>, Section, Key]) ->
-    Value = case config:get(Section, Key, null) of
-        null -> null;
+    Value = case config:get(Section, Key, undefined) of
+        undefined -> null;
         String -> ?l2b(String)
     end,
     Json = iolist_to_binary(?JSON_ENCODE(Value)),

@@ -18,7 +18,8 @@
 -export([
     start_link/0,
     init/1,
-    handle_config_change/5
+    handle_config_change/5,
+    handle_config_terminate/3
 ]).
 
 
@@ -75,6 +76,12 @@ handle_config_change("couchdb", "util_driver_dir", _, _, _) ->
 handle_config_change(_, _, _, _, _) ->
     {ok, nil}.
 
+handle_config_terminate(_, stop, _) -> ok;
+handle_config_terminate(_, _, _) ->
+    spawn(fun() ->
+        timer:sleep(5000),
+        config:listen_for_changes(?MODULE, undefined)
+    end).
 
 notify_starting() ->
     io:format("Apache CouchDB ~s is starting.~n", [
@@ -106,8 +113,8 @@ write_pidfile() ->
 
 
 write_uris() ->
-    case config:get("couchdb", "uri_file", null) of
-        null ->
+    case config:get("couchdb", "uri_file", undefined) of
+        undefined ->
             ok;
         UriFile ->
             Lines = [io_lib:format("~s~n", [Uri]) || Uri <- get_uris()],

@@ -12,14 +12,14 @@
 
 -module(couch_external_server).
 -behaviour(gen_server).
--vsn(1).
+-vsn(2).
 -behaviour(config_listener).
 
 -export([start_link/2, stop/1, execute/2]).
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2, code_change/3]).
 
 % config_listener api
--export([handle_config_change/5]).
+-export([handle_config_change/5, handle_config_terminate/3]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -54,12 +54,6 @@ terminate(_Reason, {_Name, _Command, Pid}) ->
 handle_call({execute, JsonReq}, _From, {Name, Command, Pid}) ->
     {reply, couch_os_process:prompt(Pid, JsonReq), {Name, Command, Pid}}.
 
-handle_info({gen_event_EXIT, {config_listener, ?MODULE}, _Reason}, State) ->
-    erlang:send_after(5000, self(), restart_config_listener),
-    {noreply, State};
-handle_info(restart_config_listener, State) ->
-    ok = config:listen_for_changes(?MODULE, State),
-    {noreply, State};
 handle_info({'EXIT', _Pid, normal}, State) ->
     {noreply, State};
 handle_info({'EXIT', Pid, Reason}, {Name, Command, Pid}) ->
@@ -84,3 +78,9 @@ handle_config_change("couchdb", "os_process_timeout", NewTimeout, _, Pid) ->
 handle_config_change(_, _, _, _, Pid) ->
     {ok, Pid}.
 
+handle_config_terminate(_, stop, _) -> ok;
+handle_config_terminate(_, _, _) ->
+    spawn(fun() ->
+        timer:sleep(5000),
+        config:listen_for_changes(?MODULE, nil)
+    end).

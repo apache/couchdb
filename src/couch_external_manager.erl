@@ -12,14 +12,14 @@
 
 -module(couch_external_manager).
 -behaviour(gen_server).
--vsn(1).
+-vsn(2).
 -behaviour(config_listener).
 
 -export([start_link/0, execute/2]).
 -export([init/1, terminate/2, code_change/3, handle_call/3, handle_cast/2, handle_info/2]).
 
 % config_listener api
--export([handle_config_change/5]).
+-export([handle_config_change/5, handle_config_terminate/3]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -41,6 +41,13 @@ handle_config_change("external", UrlName, _, _, _) ->
 handle_config_change(_, _, _, _, _) ->
     {ok, nil}.
 
+handle_config_terminate(_, stop, _) -> ok;
+handle_config_terminate(_, _, _) ->
+    spawn(fun() ->
+        timer:sleep(5000),
+        config:listen_for_changes(?MODULE, nil)
+    end).
+
 % gen_server API
 
 init([]) ->
@@ -59,8 +66,8 @@ terminate(_Reason, Handlers) ->
 handle_call({get, UrlName}, _From, Handlers) ->
     case ets:lookup(Handlers, UrlName) of
     [] ->
-        case config:get("external", UrlName, nil) of
-        nil ->
+        case config:get("external", UrlName, undefined) of
+        undefined ->
             Msg = lists:flatten(
                 io_lib:format("No server configured for ~p.", [UrlName])),
             {reply, {error, {unknown_external_server, ?l2b(Msg)}}, Handlers};
@@ -101,16 +108,7 @@ handle_info({'EXIT', Pid, Reason}, Handlers) ->
     % Remove Pid from the handlers table so we don't try closing
     % it a second time in terminate/2.
     ets:match_delete(Handlers, {'_', Pid}),
-    {stop, normal, Handlers};
-
-handle_info({gen_event_EXIT, {config_listener, ?MODULE}, _Reason}, State) ->
-    erlang:send_after(5000, self(), restart_config_listener),
-    {noreply, State};
-
-handle_info(restart_config_listener, State) ->
-    ok = config:listen_for_changes(?MODULE, nil),
-    {noreply, State}.
+    {stop, normal, Handlers}.
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
-

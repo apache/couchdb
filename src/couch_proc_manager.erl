@@ -13,7 +13,7 @@
 -module(couch_proc_manager).
 -behaviour(gen_server).
 -behaviour(config_listener).
--vsn(1).
+-vsn(2).
 
 -export([
     start_link/0,
@@ -34,7 +34,8 @@
 ]).
 
 -export([
-    handle_config_change/5
+    handle_config_change/5,
+    handle_config_terminate/3
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
@@ -262,16 +263,6 @@ handle_info({'DOWN', Ref, _, _, _Reason}, State0) ->
             {noreply, State0}
     end;
 
-handle_info({gen_event_EXIT, {config_listener, ?MODULE}, _Reason}, State) ->
-    erlang:send_after(5000, self(), restart_config_listener),
-    {noreply, State};
-
-handle_info(restart_config_listener, State) ->
-    ok = config:listen_for_changes(?MODULE, undefined),
-    % Reload our config in case it changed in the last
-    % five seconds.
-    handle_cast(reload, State);
-
 handle_info(_Msg, State) ->
     {noreply, State}.
 
@@ -279,6 +270,15 @@ handle_info(_Msg, State) ->
 code_change(_OldVsn, #state{}=State, _Extra) ->
     {ok, State}.
 
+handle_config_terminate(_, stop, _) -> ok;
+handle_config_terminate(_, _, _) ->
+    spawn(fun() ->
+        timer:sleep(5000),
+        config:listen_for_changes(?MODULE, undefined),
+        % Reload our config in case it changed in the last
+        % five seconds.
+        gen_server:cast(?MODULE, reload_config)
+    end).
 
 handle_config_change("query_server_config", _, _, _, _) ->
     gen_server:cast(?MODULE, reload_config),
