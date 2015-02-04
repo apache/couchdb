@@ -14,6 +14,8 @@
 -behaviour(gen_server).
 -behaviour(config_listener).
 
+-vsn(1).
+
 -export([start_link/0, validate/2, get_index/4, get_index/3, get_index/2]).
 
 -export([init/1, terminate/2, code_change/3]).
@@ -22,6 +24,7 @@
 % Exported for callbacks
 -export([
     handle_config_change/5,
+    handle_config_terminate/3,
     handle_db_event/3
 ]).
 
@@ -163,13 +166,6 @@ handle_cast({reset_indexes, DbName}, State) ->
     reset_indexes(DbName, State#st.root_dir),
     {noreply, State}.
 
-
-handle_info({gen_event_EXIT, {config_listener, ?MODULE}, _Reason}, State) ->
-    erlang:send_after(5000, self(), restart_config_listener),
-    {noreply, State};
-handle_info(restart_config_listener, State) ->
-    ok = config:listen_for_changes(?MODULE, State#st.root_dir),
-    {noreply, State};
 handle_info({'EXIT', Pid, Reason}, Server) ->
     case ets:lookup(?BY_PID, Pid) of
         [{Pid, {DbName, Sig}}] ->
@@ -203,6 +199,14 @@ handle_config_change("couchdb", "view_index_dir", _, _, _) ->
     remove_handler;
 handle_config_change(_, _, _, _, RootDir) ->
     {ok, RootDir}.
+
+handle_config_terminate(_Server, stop, _State) -> ok;
+handle_config_terminate(_Server, _Reason, _State) ->
+    State = couch_index_util:root_dir(),
+    spawn(fun() ->
+        timer:sleep(5000),
+        config:listen_for_changes(?MODULE, State)
+    end).
 
 new_index({Mod, IdxState, DbName, Sig}) ->
     DDocId = Mod:get(idx_name, IdxState),
