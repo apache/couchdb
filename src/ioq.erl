@@ -18,7 +18,7 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, code_change/3, terminate/2]).
 
 % config_listener api
--export([handle_config_change/5]).
+-export([handle_config_change/5, handle_config_terminate/3]).
 
 -record(state, {
     concurrency,
@@ -83,12 +83,6 @@ handle_info({'DOWN', Ref, _, _, Reason}, State) ->
         false ->
             {noreply, State, 0}
     end;
-handle_info({gen_event_EXIT, {config_listener, ?MODULE}, _Reason}, State) ->
-    erlang:send_after(5000, self(), restart_config_listener),
-    {noreply, State};
-handle_info(restart_config_listener, State) ->
-    ok = config:listen_for_changes(?MODULE, nil),
-    {noreply, State};
 handle_info(timeout, State) ->
     {noreply, maybe_submit_request(State)}.
 
@@ -96,6 +90,14 @@ handle_config_change("ioq", _, _, _, _) ->
     {ok, gen_server:cast(?MODULE, change)};
 handle_config_change(_, _, _, _, _) ->
     {ok, nil}.
+
+handle_config_terminate(_, stop, _) -> ok;
+handle_config_terminate(_, _, _) ->
+    spawn(fun() ->
+        timer:sleep(5000),
+        config:listen_for_changes(?MODULE, nil)
+    end),
+    ok.
 
 code_change(_Vsn, State, _Extra) ->
     {ok, State}.
