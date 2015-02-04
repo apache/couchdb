@@ -27,8 +27,6 @@
 -define(TIMEOUT, 5000).
 
 
--ifdef(run_broken_tests).
-
 start() ->
     % we have to write any config changes to temp ini file to not loose them
     % when supervisor will kill all children due to reaching restart threshold
@@ -454,6 +452,3 @@ recv_body(ReqId, Acc) ->
     after ?TIMEOUT ->
         throw({error, timeout})
     end.
-
--endif.
-
