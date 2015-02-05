@@ -66,7 +66,7 @@ init(_Args) ->
 
 
 handle_config_change("daemons", _, _, _, _) ->
-    exit(whereis(couch_server_sup), shutdown),
+    exit(whereis(?MODULE), shutdown),
     remove_handler;
 handle_config_change("couchdb", "util_driver_dir", _, _, _) ->
     [Pid] = [P || {collation_driver, P, _, _}
