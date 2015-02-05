@@ -23,7 +23,7 @@ start_link(Args) ->
     supervisor:start_link({local,?MODULE}, ?MODULE, Args).
 
 init([]) ->
-    chttp_config_listener:subscribe(),
+    chttpd_config_listener:subscribe(),
     {ok, {{one_for_one, 3, 10}, [
         ?CHILD(chttpd, worker),
         ?CHILD(chttpd_auth_cache, worker),
