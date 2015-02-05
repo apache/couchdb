@@ -126,7 +126,7 @@ get_all_security(DbName, Options) ->
         _ -> mem3:shards(DbName)
     end,
     RexiMon = fabric_util:create_monitors(Shards),
-    Workers = fabric_util:submit_jobs(Shards, get_all_security, [?ADMIN_CTX]),
+    Workers = fabric_util:submit_jobs(Shards, get_all_security, [[?ADMIN_CTX]]),
     Handler = fun handle_get_message/3,
     Acc = #acc{
         workers=Workers,
