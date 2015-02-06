@@ -54,13 +54,14 @@ go(DbName, Options, QueryArgs, Callback, Acc0) ->
     #mrargs{
         direction = Dir,
         include_docs = IncludeDocs,
+        doc_options = Doc_Options,
         limit = Limit,
         skip = Skip,
         keys = Keys0
     } = QueryArgs,
     {_, Ref0} = spawn_monitor(fun() -> exit(fabric:get_doc_count(DbName)) end),
     SpawnFun = fun(Key) ->
-        spawn_monitor(?MODULE, open_doc, [DbName, Options, Key, IncludeDocs])
+        spawn_monitor(?MODULE, open_doc, [DbName, Doc_Options, Key, IncludeDocs])
     end,
     MaxJobs = all_docs_concurrency(),
     Keys1 = case Dir of
@@ -234,7 +235,7 @@ open_doc_int(DbName, Options, Id, IncludeDocs) ->
         Value = {[{rev,couch_doc:rev_to_str({RevPos, RevId})}, {deleted,true}]},
         #view_row{key=Id, id=Id, value=Value};
     {ok, #doc{revs=Revs} = Doc0} ->
-        Doc = couch_doc:to_json_obj(Doc0, []),
+        Doc = couch_doc:to_json_obj(Doc0, Options),
         {RevPos, [RevId|_]} = Revs,
         Value = {[{rev,couch_doc:rev_to_str({RevPos, RevId})}]},
         #view_row{key=Id, id=Id, value=Value}
