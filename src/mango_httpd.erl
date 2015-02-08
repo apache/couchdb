@@ -29,7 +29,6 @@ handle_req(#httpd{} = Req, Db0) ->
     catch
         throw:{mango_error, Module, Reason} ->
             %Stack = erlang:get_stacktrace(),
-            %twig:log(err, "Error: ~s :: ~w~n~p", [Module, Reason, Stack]),
             {Code, ErrorStr, ReasonStr} = mango_error:info(Module, Reason),
             Resp = {[
                 {<<"error">>, ErrorStr},

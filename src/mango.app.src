@@ -18,7 +18,7 @@
         kernel,
         stdlib,
         config,
-        twig,
+        couch_log,
         fabric
     ]}
 ]}.

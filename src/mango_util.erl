@@ -79,7 +79,6 @@ load_ddoc(Db, DDocId) ->
 
 
 defer(Mod, Fun, Args) ->
-    %twig:log(error, "MFA: ~p", [{Mod, Fun, Args}]),
     {Pid, Ref} = erlang:spawn_monitor(?MODULE, do_defer, [Mod, Fun, Args]),
     receive
         {'DOWN', Ref, process, Pid, {mango_defer_ok, Value}} ->
@@ -100,15 +99,15 @@ do_defer(Mod, Fun, Args) ->
     catch
         throw:Error ->
             Stack = erlang:get_stacktrace(),
-            twig:log(err, "Defered error: ~w~n    ~p", [{throw, Error}, Stack]),
+            couch_log:error("Defered error: ~w~n    ~p", [{throw, Error}, Stack]),
             erlang:exit({mango_defer_throw, Error});
         error:Error ->
             Stack = erlang:get_stacktrace(),
-            twig:log(err, "Defered error: ~w~n    ~p", [{error, Error}, Stack]),
+            couch_log:error("Defered error: ~w~n    ~p", [{error, Error}, Stack]),
             erlang:exit({mango_defer_error, Error});
         exit:Error ->
             Stack = erlang:get_stacktrace(),
-            twig:log(err, "Defered error: ~w~n    ~p", [{exit, Error}, Stack]),
+            couch_log:error("Defered error: ~w~n    ~p", [{exit, Error}, Stack]),
             erlang:exit({mango_defer_exit, Error})
     end.
 
