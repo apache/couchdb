@@ -124,8 +124,7 @@ group_indexes_by_type(Indexes) ->
     % don't suddenly switch indexes for existing client
     % queries.
     CursorModules = [
-        mango_cursor_view,
-        mango_cursor_text
+        mango_cursor_view
     ],
     lists:flatmap(fun(CMod) ->
         case dict:find(CMod, IdxDict) of

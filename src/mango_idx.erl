@@ -144,7 +144,7 @@ from_ddoc(Db, {Props}) ->
             ?MANGO_ERROR(invalid_query_ddoc_language)
     end,
 
-    IdxMods = [mango_idx_view, mango_idx_text],
+    IdxMods = [mango_idx_view],
     Idxs = lists:flatmap(fun(Mod) -> Mod:from_ddoc({Props}) end, IdxMods),
     lists:map(fun(Idx) ->
         Idx#idx{
@@ -218,17 +218,13 @@ end_key(#idx{}=Idx, Ranges) ->
 cursor_mod(#idx{type = <<"json">>}) ->
     mango_cursor_view;
 cursor_mod(#idx{def = all_docs, type= <<"special">>}) ->
-    mango_cursor_view;
-cursor_mod(#idx{type = <<"text">>}) ->
-    mango_cursor_text.
+    mango_cursor_view.
 
 
 idx_mod(#idx{type = <<"json">>}) ->
     mango_idx_view;
 idx_mod(#idx{type = <<"special">>}) ->
-    mango_idx_special;
-idx_mod(#idx{type = <<"text">>}) ->
-    mango_idx_text.
+    mango_idx_special.
 
 
 db_to_name(#db{name=Name}) ->
