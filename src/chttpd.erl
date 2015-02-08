@@ -384,7 +384,10 @@ db_url_handlers() ->
         {<<"_design">>,         fun chttpd_db:handle_design_req/2},
         {<<"_temp_view">>,      fun chttpd_view:handle_temp_view_req/2},
         {<<"_changes">>,        fun chttpd_db:handle_changes_req/2},
-        {<<"_shards">>,         fun mem3_httpd:handle_shards_req/2}
+        {<<"_shards">>,         fun mem3_httpd:handle_shards_req/2},
+        {<<"_index">>,          fun mango_httpd:handle_req/2},
+        {<<"_explain">>,        fun mango_httpd:handle_req/2},
+        {<<"_find">>,           fun mango_httpd:handle_req/2}
     ].
 
 design_url_handlers() ->
