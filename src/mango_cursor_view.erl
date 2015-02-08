@@ -24,6 +24,7 @@
 
 
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("couch_mrview/include/couch_mrview.hrl").
 -include("mango_cursor.hrl").
 
 
@@ -64,7 +65,7 @@ execute(#cursor{db = Db, index = Idx} = Cursor0, UserFun, UserAcc) ->
         user_fun = UserFun,
         user_acc = UserAcc
     },
-    BaseArgs = #view_query_args{
+    BaseArgs = #mrargs{
         view_type = red_map,
         start_key = mango_idx:start_key(Idx, Cursor#cursor.ranges),
         end_key = mango_idx:end_key(Idx, Cursor#cursor.ranges),
@@ -196,7 +197,7 @@ apply_opts([{r, RStr} | Rest], Args) ->
             % so there's no point.
             false
     end,
-    NewArgs = Args#view_query_args{include_docs = IncludeDocs},
+    NewArgs = Args#mrargs{include_docs = IncludeDocs},
     apply_opts(Rest, NewArgs);
 apply_opts([{conflicts, true} | Rest], Args) ->
     % I need to patch things so that views can specify
@@ -214,16 +215,16 @@ apply_opts([{sort, Sort} | Rest], Args) ->
         [<<"asc">> | _] ->
             apply_opts(Rest, Args);
         [<<"desc">> | _] ->
-            SK = Args#view_query_args.start_key,
-            SKDI = Args#view_query_args.start_docid,
-            EK = Args#view_query_args.end_key,
-            EKDI = Args#view_query_args.end_docid,
-            NewArgs = Args#view_query_args{
+            SK = Args#mrargs.start_key,
+            SKDI = Args#mrargs.start_key_docid,
+            EK = Args#mrargs.end_key,
+            EKDI = Args#mrargs.end_key_docid,
+            NewArgs = Args#mrargs{
                 direction = rev,
                 start_key = EK,
-                start_docid = EKDI,
+                start_key_docid = EKDI,
                 end_key = SK,
-                end_docid = SKDI
+                end_key_docid = SKDI
             },
             apply_opts(Rest, NewArgs)
     end;
