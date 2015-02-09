@@ -9,7 +9,7 @@ Community installation guides are available on the wiki:
 
 If you are trying to build CouchDB from a git checkout rather than
 a .tar.gz, see the `DEVELOPERS` file.
-    
+
 This document is the canonical source of installation
 information. However, many systems have gotchas that you need to be
 aware of. In addition, dependencies frequently change as distributions
@@ -68,7 +68,7 @@ You can install the dependencies by running:
     sudo apt-get install erlang-eunit
     sudo apt-get install erlang-nox
     sudo apt-get install libicu-dev
-    sudo apt-get install libmozjs-dev
+    sudo apt-get install libmozjs185-dev
     sudo apt-get install libcurl4-openssl-dev
     sudo apt-get install pkg-config
 
