@@ -19,9 +19,6 @@
 -define(DELAY, 100).
 -define(TIMEOUT, 1000).
 
-
--ifdef(run_broken_tests).
-
 setup() ->
     DbName = ?tempdb(),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
@@ -40,12 +37,45 @@ setup_with_docs() ->
     create_design_doc(DbName, <<"_design/foo">>, <<"bar">>),
     DbName.
 
+setup_legacy() ->
+    DbName = <<"test">>,
+    DbFileName = "test.couch",
+    OldDbFilePath = filename:join([?FIXTURESDIR, DbFileName]),
+    OldViewName = "3b835456c235b1827e012e25666152f3.view",
+    FixtureViewFilePath = filename:join([?FIXTURESDIR, OldViewName]),
+    NewViewName = "6cf2c2f766f87b618edf6630b00f8736.view",
+
+    DbDir = config:get("couchdb", "database_dir"),
+    ViewDir = config:get("couchdb", "view_index_dir"),
+    OldViewFilePath = filename:join([ViewDir, ".test_design", OldViewName]),
+    NewViewFilePath = filename:join([ViewDir, ".test_design", "mrview",
+                                     NewViewName]),
+
+    NewDbFilePath = filename:join([DbDir, DbFileName]),
+
+    Files = [NewDbFilePath, OldViewFilePath, NewViewFilePath],
+
+    %% make sure there is no left over
+    lists:foreach(fun(File) -> file:delete(File) end, Files),
+
+    % copy old db file into db dir
+    {ok, _} = file:copy(OldDbFilePath, NewDbFilePath),
+
+    % copy old view file into view dir
+    ok = filelib:ensure_dir(OldViewFilePath),
+
+    {ok, _} = file:copy(FixtureViewFilePath, OldViewFilePath),
+
+    {DbName, Files}.
+
 teardown({DbName, _}) ->
     teardown(DbName);
 teardown(DbName) when is_binary(DbName) ->
     couch_server:delete(DbName, [?ADMIN_CTX]),
     ok.
 
+teardown_legacy({_DbName, Files}) ->
+    lists:foreach(fun(File) -> file:delete(File) end, Files).
 
 view_indexes_cleanup_test_() ->
     {
@@ -92,93 +122,91 @@ view_group_shutdown_test_() ->
         }
     }.
 
-
-should_not_remember_docs_in_index_after_backup_restore_test() ->
-    %% COUCHDB-640
-    start(),
-    DbName = setup_with_docs(),
-
-    ok = backup_db_file(DbName),
-    create_doc(DbName, "doc666"),
-
-    Rows0 = query_view(DbName, "foo", "bar"),
-    ?assert(has_doc("doc1", Rows0)),
-    ?assert(has_doc("doc2", Rows0)),
-    ?assert(has_doc("doc3", Rows0)),
-    ?assert(has_doc("doc666", Rows0)),
-
-    restore_backup_db_file(DbName),
-
-    Rows1 = query_view(DbName, "foo", "bar"),
-    ?assert(has_doc("doc1", Rows1)),
-    ?assert(has_doc("doc2", Rows1)),
-    ?assert(has_doc("doc3", Rows1)),
-    ?assertNot(has_doc("doc666", Rows1)),
-
-    teardown(DbName),
-    stop(whereis(couch_server_sup)).
+backup_restore_test_() ->
+    {
+        "Upgrade and bugs related tests",
+        {
+            setup,
+            fun test_util:start_couch/0, fun test_util:stop_couch/1,
+            {
+                foreach,
+                fun setup_with_docs/0, fun teardown/1,
+                [
+                    fun should_not_remember_docs_in_index_after_backup_restore/1
+                ]
+            }
+        }
+    }.
 
 
-should_upgrade_legacy_view_files_test() ->
-    start(),
+upgrade_test_() ->
+    {
+        "Upgrade tests",
+        {
+            setup,
+            fun test_util:start_couch/0, fun test_util:stop_couch/1,
+            {
+                foreach,
+                fun setup_legacy/0, fun teardown_legacy/1,
+                [
+                    fun should_upgrade_legacy_view_files/1
+                ]
+            }
+        }
+    }.
 
-    ok = config:set("query_server_config", "commit_freq", "0", false),
+should_not_remember_docs_in_index_after_backup_restore(DbName) ->
+    ?_test(begin
+        %% COUCHDB-640
 
-    DbName = <<"test">>,
-    DbFileName = "test.couch",
-    DbFilePath = filename:join([?FIXTURESDIR, DbFileName]),
-    OldViewName = "3b835456c235b1827e012e25666152f3.view",
-    FixtureViewFilePath = filename:join([?FIXTURESDIR, OldViewName]),
-    NewViewName = "a1c5929f912aca32f13446122cc6ce50.view",
+        ok = backup_db_file(DbName),
+        create_doc(DbName, "doc666"),
 
-    DbDir = config:get("couchdb", "database_dir"),
-    ViewDir = config:get("couchdb", "view_index_dir"),
-    OldViewFilePath = filename:join([ViewDir, ".test_design", OldViewName]),
-    NewViewFilePath = filename:join([ViewDir, ".test_design", "mrview",
-                                     NewViewName]),
+        Rows0 = query_view(DbName, "foo", "bar"),
+        ?assert(has_doc("doc1", Rows0)),
+        ?assert(has_doc("doc2", Rows0)),
+        ?assert(has_doc("doc3", Rows0)),
+        ?assert(has_doc("doc666", Rows0)),
 
-    % cleanup
-    Files = [
-        filename:join([DbDir, DbFileName]),
-        OldViewFilePath,
-        NewViewFilePath
-    ],
-    lists:foreach(fun(File) -> file:delete(File) end, Files),
+        restore_backup_db_file(DbName),
 
-    % copy old db file into db dir
-    {ok, _} = file:copy(DbFilePath, filename:join([DbDir, DbFileName])),
+        Rows1 = query_view(DbName, "foo", "bar"),
+        ?assert(has_doc("doc1", Rows1)),
+        ?assert(has_doc("doc2", Rows1)),
+        ?assert(has_doc("doc3", Rows1)),
+        ?assertNot(has_doc("doc666", Rows1))
+      end).
 
-    % copy old view file into view dir
-    ok = filelib:ensure_dir(filename:join([ViewDir, ".test_design"])),
-    {ok, _} = file:copy(FixtureViewFilePath, OldViewFilePath),
+should_upgrade_legacy_view_files({DbName, Files}) ->
+    ?_test(begin
+        [_NewDbFilePath, OldViewFilePath, NewViewFilePath] = Files,
+        ok = config:set("query_server_config", "commit_freq", "0", false),
 
-    % ensure old header
-    OldHeader = read_header(OldViewFilePath),
-    ?assertMatch(#index_header{}, OldHeader),
+        % ensure old header
+        OldHeader = read_header(OldViewFilePath),
+        ?assertMatch(#index_header{}, OldHeader),
 
-    % query view for expected results
-    Rows0 = query_view(DbName, "test", "test"),
-    ?assertEqual(2, length(Rows0)),
+        % query view for expected results
+        Rows0 = query_view(DbName, "test", "test"),
+        ?assertEqual(2, length(Rows0)),
 
-    % ensure old file gone
-    ?assertNot(filelib:is_regular(OldViewFilePath)),
+        % ensure old file gone
+        ?assertNot(filelib:is_regular(OldViewFilePath)),
 
-    % add doc to trigger update
-    DocUrl = db_url(DbName) ++ "/boo",
-    {ok, _, _, _} = test_request:put(
-        DocUrl, [{"Content-Type", "application/json"}], <<"{\"a\":3}">>),
+        % add doc to trigger update
+        DocUrl = db_url(DbName) ++ "/boo",
+        {ok, _, _, _} = test_request:put(
+            DocUrl, [{"Content-Type", "application/json"}], <<"{\"a\":3}">>),
 
-    % query view for expected results
-    Rows1 = query_view(DbName, "test", "test"),
-    ?assertEqual(3, length(Rows1)),
+        % query view for expected results
+        Rows1 = query_view(DbName, "test", "test"),
+        ?assertEqual(3, length(Rows1)),
 
-    % ensure new header
-    timer:sleep(2000),  % have to wait for awhile to upgrade the index
-    NewHeader = read_header(NewViewFilePath),
-    ?assertMatch(#mrheader{}, NewHeader),
-
-    teardown(DbName),
-    stop(whereis(couch_server_sup)).
+        % ensure new header
+        timer:sleep(2000),  % have to wait for awhile to upgrade the index
+        NewHeader = read_header(NewViewFilePath),
+        ?assertMatch(#mrheader{}, NewHeader)
+    end).
 
 
 should_have_two_indexes_alive_before_deletion({DbName, _}) ->
@@ -202,37 +230,35 @@ couchdb_1138(DbName) ->
             couch_mrview_index, DbName, <<"_design/foo">>),
         ?assert(is_pid(IndexerPid)),
         ?assert(is_process_alive(IndexerPid)),
-        ?assertEqual(2, count_db_refs(DbName)),
+        ?assertEqual(2, count_users(DbName)),
+
+        wait_indexer(IndexerPid),
 
         Rows0 = query_view(DbName, "foo", "bar"),
         ?assertEqual(3, length(Rows0)),
-        ?assertEqual(2, count_db_refs(DbName)),
+        ?assertEqual(2, count_users(DbName)),
         ?assert(is_process_alive(IndexerPid)),
 
         create_doc(DbName, "doc1000"),
         Rows1 = query_view(DbName, "foo", "bar"),
         ?assertEqual(4, length(Rows1)),
-        ?assertEqual(2, count_db_refs(DbName)),
+        ?assertEqual(2, count_users(DbName)),
+
         ?assert(is_process_alive(IndexerPid)),
 
-        Ref1 = get_db_ref_counter(DbName),
         compact_db(DbName),
-        Ref2 = get_db_ref_counter(DbName),
-        ?assertEqual(2, couch_ref_counter:count(Ref2)),
-        ?assertNotEqual(Ref2, Ref1),
-        ?assertNot(is_process_alive(Ref1)),
         ?assert(is_process_alive(IndexerPid)),
 
         compact_view_group(DbName, "foo"),
-        ?assertEqual(2, count_db_refs(DbName)),
-        Ref3 = get_db_ref_counter(DbName),
-        ?assertEqual(Ref3, Ref2),
+        ?assertEqual(2, count_users(DbName)),
+
         ?assert(is_process_alive(IndexerPid)),
 
         create_doc(DbName, "doc1001"),
         Rows2 = query_view(DbName, "foo", "bar"),
         ?assertEqual(5, length(Rows2)),
-        ?assertEqual(2, count_db_refs(DbName)),
+        ?assertEqual(2, count_users(DbName)),
+
         ?assert(is_process_alive(IndexerPid))
     end).
 
@@ -242,13 +268,16 @@ couchdb_1309(DbName) ->
             couch_mrview_index, DbName, <<"_design/foo">>),
         ?assert(is_pid(IndexerPid)),
         ?assert(is_process_alive(IndexerPid)),
-        ?assertEqual(2, count_db_refs(DbName)),
+        ?assertEqual(2, count_users(DbName)),
+
+        wait_indexer(IndexerPid),
 
         create_doc(DbName, "doc1001"),
         Rows0 = query_view(DbName, "foo", "bar"),
         check_rows_value(Rows0, null),
         ?assertEqual(4, length(Rows0)),
-        ?assertEqual(2, count_db_refs(DbName)),
+        ?assertEqual(2, count_users(DbName)),
+
         ?assert(is_process_alive(IndexerPid)),
 
         update_design_doc(DbName,  <<"_design/foo">>, <<"bar">>),
@@ -257,7 +286,7 @@ couchdb_1309(DbName) ->
         ?assert(is_pid(NewIndexerPid)),
         ?assert(is_process_alive(NewIndexerPid)),
         ?assertNotEqual(IndexerPid, NewIndexerPid),
-        ?assertEqual(2, count_db_refs(DbName)),
+        ?assertEqual(2, count_users(DbName)),
 
         Rows1 = query_view(DbName, "foo", "bar", ok),
         ?assertEqual(0, length(Rows1)),
@@ -265,28 +294,15 @@ couchdb_1309(DbName) ->
         check_rows_value(Rows2, 1),
         ?assertEqual(4, length(Rows2)),
 
-        MonRef0 = erlang:monitor(process, IndexerPid),
-        receive
-            {'DOWN', MonRef0, _, _, _} ->
-                ok
-        after ?TIMEOUT ->
-            erlang:error(
-                {assertion_failed,
-                 [{module, ?MODULE}, {line, ?LINE},
-                  {reason, "old view group is not dead after ddoc update"}]})
-        end,
+        ok = stop_indexer( %% FIXME we need to grab monitor earlier
+               fun() -> ok end,
+               IndexerPid, ?LINE,
+               "old view group is not dead after ddoc update"),
 
-        MonRef1 = erlang:monitor(process, NewIndexerPid),
-        ok = couch_server:delete(DbName, [?ADMIN_CTX]),
-        receive
-            {'DOWN', MonRef1, _, _, _} ->
-                ok
-        after ?TIMEOUT ->
-            erlang:error(
-                {assertion_failed,
-                 [{module, ?MODULE}, {line, ?LINE},
-                  {reason, "new view group did not die after DB deletion"}]})
-        end
+        ok = stop_indexer(
+               fun() -> couch_server:delete(DbName, [?ADMIN_USER]) end,
+               NewIndexerPid, ?LINE,
+               "new view group did not die after DB deletion")
     end).
 
 couchdb_1283() ->
@@ -493,18 +509,11 @@ view_cleanup(DbName) ->
     couch_mrview:cleanup(Db),
     couch_db:close(Db).
 
-get_db_ref_counter(DbName) ->
-    {ok, #db{fd_ref_counter = Ref} = Db} = couch_db:open_int(DbName, []),
+count_users(DbName) ->
+    {ok, Db} = couch_db:open_int(DbName, [?ADMIN_CTX]),
+    {monitored_by, Monitors} = erlang:process_info(Db#db.main_pid, monitored_by),
     ok = couch_db:close(Db),
-    Ref.
-
-count_db_refs(DbName) ->
-    Ref = get_db_ref_counter(DbName),
-    % have to sleep a bit to let couchdb cleanup all refs and leave only
-    % active ones. otherwise the related tests will randomly fail due to
-    % count number mismatch
-    timer:sleep(200),
-    couch_ref_counter:count(Ref).
+    length(lists:usort(Monitors) -- [self()]).
 
 count_index_files(DbName) ->
     % call server to fetch the index files
@@ -524,11 +533,14 @@ backup_db_file(DbName) ->
 
 restore_backup_db_file(DbName) ->
     DbDir = config:get("couchdb", "database_dir"),
-    stop(whereis(couch_server_sup)),
+
+    {ok, Db} = couch_db:open_int(DbName, []),
+    ok = couch_db:close(Db),
+    exit(Db#db.main_pid, shutdown),
+
     DbFile = filename:join([DbDir, ?b2l(DbName) ++ ".couch"]),
     ok = file:delete(DbFile),
     ok = file:rename(DbFile ++ ".backup", DbFile),
-    start(),
     ok.
 
 compact_db(DbName) ->
@@ -655,4 +667,24 @@ read_header(File) ->
     couch_file:close(Fd),
     Header.
 
--endif.
+stop_indexer(StopFun, Pid, Line, Reason) ->
+    case test_util:stop_sync(Pid, StopFun) of
+    timeout ->
+        erlang:error(
+            {assertion_failed,
+             [{module, ?MODULE}, {line, Line},
+              {reason, Reason}]});
+    ok ->
+        ok
+    end.
+
+wait_indexer(IndexerPid) ->
+    test_util:wait(fun() ->
+        {ok, Info} = couch_index:get_info(IndexerPid),
+        case couch_util:get_value(compact_running, Info) of
+            true ->
+                wait;
+            false ->
+                ok
+        end
+    end).
