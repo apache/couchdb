@@ -75,4 +75,4 @@ fauxton: share/www
 
 share/www:
 	@echo "Building Fauxton"
-	@cd src/fauxton && npm install && grunt couchdb
+	@cd src/fauxton && npm install && ./node_modules/grunt-cli/bin/grunt couchdb
