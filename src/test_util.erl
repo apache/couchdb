@@ -67,6 +67,7 @@ start_couch(ExtraApps) ->
     start_couch(?CONFIG_CHAIN, ExtraApps).
 
 start_couch(IniFiles, ExtraApps) ->
+    load_applications_with_stats(),
     ok = application:set_env(config, ini_files, IniFiles),
     ok = lager:start(),
 
@@ -74,7 +75,6 @@ start_couch(IniFiles, ExtraApps) ->
         [inets, ibrowse, ssl, config, couch_event, couch]
         ++ ExtraApps),
 
-    couch_stats:reload(),
     #test_context{started = Apps}.
 
 stop_couch() ->
@@ -254,3 +254,12 @@ mock(couch_stats) ->
     meck:expect(couch_stats, update_histogram, fun(_, _) -> ok end),
     meck:expect(couch_stats, update_gauge, fun(_, _) -> ok end),
     ok.
+
+load_applications_with_stats() ->
+    Wildcard = filename:join([?BUILDDIR(), "src/*/priv/stats_descriptions.cfg"]),
+    [application:load(stats_file_to_app(File)) || File <- filelib:wildcard(Wildcard)],
+    ok.
+
+stats_file_to_app(File) ->
+    [_Desc, _Priv, App|_] = lists:reverse(filename:split(File)),
+    erlang:list_to_atom(App).
