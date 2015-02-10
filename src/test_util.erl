@@ -20,7 +20,7 @@
 
 -export([start_couch/0, start_couch/1, start_couch/2, stop_couch/0, stop_couch/1]).
 -export([start_config/1, stop_config/1]).
--export([start_applications/1]).
+-export([start_applications/1, stop_applications/1]).
 
 -export([stop_sync/1, stop_sync/2, stop_sync/3]).
 
@@ -69,15 +69,8 @@ start_couch(IniFiles, ExtraApps) ->
     Ctx.
 
 stop_couch() ->
-    ok = application:stop(couch),
-    ok = application:stop(lager),
-    ok = application:stop(goldrush),
-    ok = application:stop(config),
-    ok = application:stop(ssl),
-    ok = application:stop(ibrowse),
-    ok = application:stop(inets),
+    ok = stop_applications([inets, ibrowse, ssl, config, goldrush, lager, couch]),
     ok.
-
 
 stop_couch(_) ->
     stop_couch().
@@ -99,6 +92,10 @@ start_applications([App|Apps], Acc) ->
         ok ->
             start_applications(Apps, [App|Acc])
     end.
+
+stop_applications(Apps) ->
+    [application:stop(App) || App <- lists:reverse(Apps)],
+    ok.
 
 start_config(Chain) ->
     case config:start_link(Chain) of
