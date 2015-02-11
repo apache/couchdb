@@ -13,6 +13,8 @@ tmp/
 *.so
 ebin/
 
+erl_crash.dump
+
 dev/boot_node.beam
 dev/lib/
 dev/logs/
