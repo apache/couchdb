@@ -10,6 +10,8 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
+IN_RELEASE = $(shell if [ ! -d .git ]; then echo true; fi)
+
 all: couch fauxton
 
 config.erl:
@@ -24,23 +26,51 @@ couch: config.erl
 
 clean:
 	@rebar -r clean
+	@rm -f bin/couchjs
+	@rm -rf src/*/ebin
+	@rm -rf src/*/.rebar
+	@rm -rf src/{jiffy,khash,snappy,b64url}/priv
+	@rm -rf share/server/main.js share/server/main-coffee.js
+	@rm -f src/couch/priv/couchspawnkillable
+	@rm -f src/couch/priv/couch_js/config.h
 
 check: javascript eunit
 
-
+# creates a a full erlang release
 dist: all
 	@rm -rf rel/couchdb
 	@rebar generate
 	@cp -r share/www rel/couchdb/share/www
 
+# creates a source tarball
+release:
+	./build-aux/couchdb-build-release.sh
+
+	# build fauxton
+	$(MAKE) fauxton
+	cp -r share/www apache-couchdb/share/
+	#
+	# # build docs
+	# cd src/docs; make
+	# mkdir apache-couchdb/share/docs
+	# cp -r src/docs/build/html apache-couchdb/share/docs/html
+
 distclean: clean
+	@rm install.mk
+	@rm config.erl
+	@rm rel/couchdb.config
+ifneq ($(IN_RELEASE), true)
+	# when we are in a release, don’t delete the
+	# copied sources, generated docs, or fauxton
 	@rm -rf rel/couchdb
 	@rm -rf share/www
+	@rm -rf src/docs
+endif
 
 devclean:
 	@rm -rf dev/lib/*/data
 
-include install.mk
+-include install.mk
 install: dist
 	@mkdir -p $(prefix)
 	@cp -R rel/couchdb/* $(prefix)
@@ -52,8 +82,12 @@ install: dist
 	@chown $(user) $(prefix)/var/log/couchdb.log
 
 install.mk:
+# ignore install.mk missing if we are running
+# `make clean` without having run ./configure first
+ifneq ($(MAKECMDGOALS), clean)
 	@echo "No install.mk found. Run ./configure"
 	@exit 1
+endif
 
 docker-image:
 	@docker build --rm -t couchdb/dev-cluster .

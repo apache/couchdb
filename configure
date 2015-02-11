@@ -134,5 +134,8 @@ cat > $rootdir/config.erl << EOF
 {with_curl, $WITH_CURL}.
 EOF
 
-echo "==> updating dependencies"
-rebar get-deps update-deps
+# only update dependencies, when we are not in a release tarball
+if [ -d .git ]; then
+  echo "==> updating dependencies"
+  rebar get-deps update-deps
+fi
