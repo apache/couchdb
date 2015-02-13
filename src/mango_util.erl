@@ -46,8 +46,11 @@
 
 
 open_doc(Db, DocId) ->
-    Opts = [deleted],
-    case mango_util:defer(fabric, open_doc, [Db, DocId, Opts]) of
+    open_doc(Db, DocId, [deleted]).
+
+
+open_doc(Db, DocId, Options) ->
+    case mango_util:defer(fabric, open_doc, [Db, DocId, Options]) of
         {ok, Doc} ->
             {ok, Doc};
         {not_found, _} ->
@@ -67,7 +70,7 @@ open_ddocs(Db) ->
 
 
 load_ddoc(Db, DDocId) ->
-    case mango_util:open_doc(Db, DDocId) of
+    case open_doc(Db, DDocId, [deleted, ejson_body]) of
         {ok, Doc} ->
             {ok, check_lang(Doc)};
         not_found ->
