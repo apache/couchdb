@@ -159,6 +159,7 @@ handle_compact_req(#httpd{method='POST'}=Req, Db) ->
         [_DbName, <<"_compact">>] ->
             ok = couch_db:check_is_admin(Db),
             couch_httpd:validate_ctype(Req, "application/json"),
+            _ = couch_httpd:body(Req),
             {ok, _} = couch_db:start_compact(Db),
             send_json(Req, 202, {[{ok, true}]});
         [_DbName, <<"_compact">>, DesignName | _] ->
@@ -261,6 +262,7 @@ db_req(#httpd{path_parts=[_DbName]}=Req, _Db) ->
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_ensure_full_commit">>]}=Req, Db) ->
     couch_httpd:validate_ctype(Req, "application/json"),
+    _ = couch_httpd:body(Req),
     UpdateSeq = couch_db:get_update_seq(Db),
     CommittedSeq = couch_db:get_committed_update_seq(Db),
     {ok, StartTime} =
