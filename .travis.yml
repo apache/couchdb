@@ -20,3 +20,4 @@ otp_release:
    - R14B04
 git:
   depth: 10
+cache: apt
