@@ -31,11 +31,12 @@
     filename:join([?BUILDDIR(), "src", "couch", "test", "fixtures"])).
 -define(TEMPDIR,
     filename:join([?BUILDDIR(), "tmp", "tmp_data"])).
--define(ABS_PATH(File),
-    filename:join([
-        filename:dirname(
-            filename:dirname(
-                filename:dirname(filename:absname(File)))), File])).
+
+-define(APPDIR, filename:dirname(element(2, file:get_cwd()))).
+%% Account for the fact that source files are in src/<app>/.eunit/<module>.erl
+%% when run from eunit
+-define(ABS_PATH(File), %% src/<app>/.eunit/<module>.erl
+    filename:join([?APPDIR, File])).
 
 -define(tempfile,
     fun() ->
