@@ -250,10 +250,11 @@ to_non_neg_int(Value) ->
     end.
 
 allowed_owner(Req) ->
-    case application:get_env(global_changes, allowed_owner) of
+    case config:get("global_changes", "allowed_owner", undefined) of
     undefined ->
         chttpd:verify_is_server_admin(Req),
         admin;
-    {ok, {M, F, A}} ->
+    SpecStr ->
+        {ok, {M, F, A}} = couch_util:parse_term(SpecStr),
         M:F(Req, A)
     end.

@@ -5,6 +5,8 @@
 
 -export([allowed_owner/2]).
 
+-define(t2l(V), lists:flatten(io_lib:format("~p", [V]))).
+
 start() ->
     Ctx = test_util:start_couch([chttpd]),
     DbName = ?tempdb(),
@@ -24,13 +26,13 @@ setup(default) ->
     get_host();
 setup(A) ->
     Host = setup(default),
-    ok = application:set_env(global_changes, allowed_owner,
-        {?MODULE, allowed_owner, A}),
+    ok = config:set("global_changes", "allowed_owner",
+        ?t2l({?MODULE, allowed_owner, A}), false),
     Host.
 
 teardown(_) ->
     delete_admin("admin"),
-    application:unset_env(global_changes, allowed_owner),
+    config:delete("global_changes", "allowed_owner", false),
     ok.
 
 allowed_owner(Req, "throw") ->
