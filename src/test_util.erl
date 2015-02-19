@@ -92,16 +92,15 @@ start_applications(Apps) ->
 start_applications([], Acc) ->
     lists:reverse(Acc);
 start_applications([App|Apps], Acc) ->
-    NewAcc =
-        case application:start(App) of
-        {error, {already_started, _}} ->
-            start_applications(Apps, Acc);
-        {error, {not_started, Dep}} ->
-            start_applications([Dep, App | Apps], Acc);
-        {error, {not_running, Dep}} ->
-            start_applications([Dep, App | Apps], Acc);
-        ok ->
-            start_applications(Apps, [App|Acc])
+    case application:start(App) of
+    {error, {already_started, _}} ->
+        start_applications(Apps, Acc);
+    {error, {not_started, Dep}} ->
+        start_applications([Dep, App | Apps], Acc);
+    {error, {not_running, Dep}} ->
+        start_applications([Dep, App | Apps], Acc);
+    ok ->
+        start_applications(Apps, [App|Acc])
     end.
 
 stop_applications(Apps) ->

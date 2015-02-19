@@ -232,7 +232,7 @@ handle_info(restart_event_listener, State) ->
             ?MODULE, handle_db_event, nil, [{dbname, AuthDbName}]
         ),
     {noreply, State#state{event_listener=NewListener}};
-handle_info({'DOWN', Ref, _, _, shutdown}, State) ->
+handle_info({'DOWN', _Ref, _, _, shutdown}, State) ->
     {stop, shutdown, State};
 handle_info({'DOWN', Ref, _, _, _Reason}, #state{db_mon_ref = Ref} = State) ->
     {noreply, reinit_cache(State)};

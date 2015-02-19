@@ -457,7 +457,7 @@ return_proc(#state{} = State, #proc_int{} = ProcInt) ->
     flush_waiters(NewState, Lang).
 
 maybe_assign_proc(#state{} = State, ProcInt) ->
-    #proc_int{pid = Pid, lang = Lang} = ProcInt,
+    #proc_int{lang = Lang} = ProcInt,
     case get_waiting_client(Lang) of
         #client{from = From} = Client ->
             Proc = assign_proc(Client, ProcInt#proc_int{client=undefined}),

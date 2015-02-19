@@ -38,8 +38,6 @@ setup() ->
     couch_db:ensure_full_commit(Db),
     {ok, Db1} = couch_db:reopen(Db),
 
-    Doc = couch_db:open_doc(Db1, <<"doc3">>),
-
     {ok, Rev1} = save_doc(Db1, {[{<<"_id">>, <<"doc3">>}, {<<"_rev">>, Rev}]}),
     Revs1 = Revs ++ [Rev1],
     Revs2 = Revs1 ++ [R || {ok, R} <- [
