@@ -110,7 +110,7 @@ should_stop_on_normal_exit_of_stream_opener({Fd, _}) ->
         {pid, StreamPid0} -> StreamPid0
     end,
     % Confirm the validity of the test by verifying the stream opener has died
-    ?_assertNot(is_process_alive(OpenerPid)),
+    ?assertNot(is_process_alive(OpenerPid)),
     % Verify the stream itself has also died
     ?_assertNot(is_process_alive(StreamPid)).
 
