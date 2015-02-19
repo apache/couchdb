@@ -14,7 +14,6 @@
 
 -export([
     handle_all_dbs_req/1,
-    handle_config_req/1,
     handle_favicon_req/1,
     handle_favicon_req/2,
     handle_replicate_req/1,
@@ -232,58 +231,6 @@ handle_reload_query_servers_req(Req) ->
 handle_uuids_req(Req) ->
     couch_httpd_misc_handlers:handle_uuids_req(Req).
 
-
-% Config request handler
-
-
-% GET /_config/
-% GET /_config
-handle_config_req(#httpd{method='GET', path_parts=[_]}=Req) ->
-    Grouped = lists:foldl(fun({{Section, Key}, Value}, Acc) ->
-        case dict:is_key(Section, Acc) of
-        true ->
-            dict:append(Section, {list_to_binary(Key), list_to_binary(Value)}, Acc);
-        false ->
-            dict:store(Section, [{list_to_binary(Key), list_to_binary(Value)}], Acc)
-        end
-    end, dict:new(), config:all()),
-    KVs = dict:fold(fun(Section, Values, Acc) ->
-        [{list_to_binary(Section), {Values}} | Acc]
-    end, [], Grouped),
-    send_json(Req, 200, {KVs});
-% GET /_config/Section
-handle_config_req(#httpd{method='GET', path_parts=[_,Section]}=Req) ->
-    KVs = [{list_to_binary(Key), list_to_binary(Value)}
-            || {Key, Value} <- config:get(Section)],
-    send_json(Req, 200, {KVs});
-% PUT /_config/Section/Key
-% "value"
-handle_config_req(#httpd{method='PUT', path_parts=[_, Section, Key]}=Req) ->
-    Value = chttpd:json_body(Req),
-    Persist = chttpd:header_value(Req, "X-Couch-Persist") /= "false",
-    OldValue = config:get(Section, Key, ""),
-    ok = config:set(Section, Key, ?b2l(Value), Persist),
-    send_json(Req, 200, list_to_binary(OldValue));
-% GET /_config/Section/Key
-handle_config_req(#httpd{method='GET', path_parts=[_, Section, Key]}=Req) ->
-    case config:get(Section, Key, undefined) of
-    undefined ->
-        throw({not_found, unknown_config_value});
-    Value ->
-        send_json(Req, 200, list_to_binary(Value))
-    end;
-% DELETE /_config/Section/Key
-handle_config_req(#httpd{method='DELETE',path_parts=[_,Section,Key]}=Req) ->
-    Persist = chttpd:header_value(Req, "X-Couch-Persist") /= "false",
-    case config:get(Section, Key, undefined) of
-    undefined ->
-        throw({not_found, unknown_config_value});
-    OldValue ->
-        config:delete(Section, Key, Persist),
-        send_json(Req, 200, list_to_binary(OldValue))
-    end;
-handle_config_req(Req) ->
-    send_method_not_allowed(Req, "GET,PUT,DELETE").
 
 % Note: this resource is exposed on the backdoor interface, but it's in chttpd
 % because it's not couch trunk
