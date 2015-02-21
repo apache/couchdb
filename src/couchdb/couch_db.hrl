@@ -38,6 +38,8 @@
 
 -define(DEFAULT_ATTACHMENT_CONTENT_TYPE, <<"application/octet-stream">>).
 
+-define(AUTH_SESSION_COOKIE_KEY, "AuthSession").
+
 -define(LOG_DEBUG(Format, Args),
     case couch_log:debug_on(?MODULE) of
         true ->

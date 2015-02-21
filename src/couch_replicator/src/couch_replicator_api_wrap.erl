@@ -164,9 +164,7 @@ get_missing_revs(Db, IdRevs) ->
 open_doc_revs(#httpdb{retries = 0} = HttpDb, Id, Revs, Options, _Fun, _Acc) ->
     Path = encode_doc_id(Id),
     QS = options_to_query_args(HttpDb, Path, [revs, {open_revs, Revs} | Options]),
-    Url = couch_util:url_strip_password(
-        couch_replicator_httpc:full_url(HttpDb, [{path,Path}, {qs,QS}])
-    ),
+    Url = couch_replicator_httpc:full_url(HttpDb, [{path,Path}, {qs,QS}]),
     ?LOG_ERROR("Replication crashing because GET ~s failed", [Url]),
     exit(kaboom);
 open_doc_revs(#httpdb{} = HttpDb, Id, Revs, Options, Fun, Acc) ->
@@ -235,9 +233,7 @@ open_doc_revs(#httpdb{} = HttpDb, Id, Revs, Options, Fun, Acc) ->
                     open_doc_revs(HttpDb, Id, Revs, Options1, Fun, Acc)
             end;
         {'DOWN', Ref, process, Pid, Else} ->
-            Url = couch_util:url_strip_password(
-                couch_replicator_httpc:full_url(HttpDb, [{path,Path}, {qs,QS}])
-            ),
+            Url = couch_replicator_httpc:full_url(HttpDb, [{path,Path}, {qs,QS}]),
             #httpdb{retries = Retries, wait = Wait0} = HttpDb,
             Wait = 2 * erlang:min(Wait0 * 2, ?MAX_WAIT),
             ?LOG_INFO("Retrying GET to ~s in ~p seconds due to error ~p",
