@@ -18,6 +18,10 @@ RUN apt-get --no-install-recommends -y install \
     libmozjs185-dev \
     python
 
+# Install Nodejs
+RUN curl -sL https://deb.nodesource.com/setup | bash -	
+RUN apt-get install -y nodejs
+
 # Build rebar
 RUN useradd -m rebar
 USER rebar
