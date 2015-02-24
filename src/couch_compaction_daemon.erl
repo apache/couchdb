@@ -15,7 +15,7 @@
 -behaviour(config_listener).
 
 % public API
--export([start_link/0]).
+-export([start_link/0, in_progress/0]).
 
 % gen_server callbacks
 -export([init/1, handle_call/3, handle_info/2, handle_cast/2]).
@@ -30,7 +30,8 @@
 -define(CONFIG_ETS, couch_compaction_daemon_config).
 
 -record(state, {
-    loop_pid
+    loop_pid,
+    in_progress = []
 }).
 
 -record(config, {
@@ -50,6 +51,8 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
+in_progress() ->
+    gen_server:call(?MODULE, in_progress).
 
 init(_) ->
     process_flag(trap_exit, true),
@@ -82,6 +85,14 @@ handle_cast({config_update, DbName, Config}, #state{loop_pid = Loop} = State) ->
     {noreply, State}.
 
 
+handle_call({start, DbName}, {Pid, _},
+        #state{loop_pid = Pid, in_progress = InProgress} = State) ->
+    {reply, ok, State#state{in_progress = [DbName|InProgress]}};
+handle_call({stop, DbName}, {Pid, _},
+        #state{loop_pid = Pid, in_progress = InProgress} = State) ->
+    {reply, ok, State#state{in_progress = InProgress -- [DbName]}};
+handle_call(in_progress, _From, #state{in_progress = InProgress} = State) ->
+    {reply, InProgress, State};
 handle_call(Msg, _From, State) ->
     {stop, {unexpected_call, Msg}, State}.
 
@@ -123,7 +134,7 @@ compact_loop(Parent) ->
                 {ok, Config} ->
                     case check_period(Config) of
                     true ->
-                        maybe_compact_db(DbName, Config);
+                        maybe_compact_db(Parent, DbName, Config);
                     false ->
                         ok
                     end
@@ -142,12 +153,13 @@ compact_loop(Parent) ->
     compact_loop(Parent).
 
 
-maybe_compact_db(DbName, Config) ->
+maybe_compact_db(Parent, DbName, Config) ->
     case (catch couch_db:open_int(DbName, [?ADMIN_CTX])) of
     {ok, Db} ->
         DDocNames = db_ddoc_names(Db),
         case can_db_compact(Config, Db) of
         true ->
+            gen_server:call(Parent, {start, DbName}),
             {ok, _} = couch_db:start_compact(Db),
             TimeLeft = compact_time_left(Config),
             case Config#config.parallel_view_compact of
@@ -192,7 +204,8 @@ maybe_compact_db(DbName, Config) ->
                     unlink(ViewsCompactPid),
                     exit(ViewsCompactPid, kill)
                 end
-            end;
+            end,
+            gen_server:call(Parent, {stop, DbName});
         false ->
             couch_db:close(Db),
             maybe_compact_views(DbName, DDocNames, Config)

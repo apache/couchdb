@@ -15,7 +15,6 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
--define(DELAY, 100).
 -define(TIMEOUT, 30000).
 -define(TIMEOUT_S, ?TIMEOUT div 1000).
 
@@ -70,15 +69,18 @@ should_compact_by_default_rule(DbName) ->
         {_, DbFileSize} = get_db_frag(DbName),
         {_, ViewFileSize} = get_view_frag(DbName),
 
-        ok = config:set("compactions", "_default",
-            "[{db_fragmentation, \"70%\"}, {view_fragmentation, \"70%\"}]",
-            false),
+        with_config_change(DbName, fun() ->
+            ok = config:set("compactions", "_default",
+                "[{db_fragmentation, \"70%\"}, {view_fragmentation, \"70%\"}]",
+                false)
+        end),
 
-        ok = timer:sleep(5000), % something >= check_interval
+        wait_compaction_started(DbName),
         wait_compaction_finished(DbName),
 
-        ok = config:delete("compactions", "_default", false),
-        ok = timer:sleep(1000), % need to wait so gen_server:cast would complete
+        with_config_change(DbName, fun() ->
+            ok = config:delete("compactions", "_default", false)
+        end),
 
         {DbFrag2, DbFileSize2} = get_db_frag(DbName),
         {ViewFrag2, ViewFileSize2} = get_view_frag(DbName),
@@ -101,14 +103,18 @@ should_compact_by_dbname_rule(DbName) ->
         {_, DbFileSize} = get_db_frag(DbName),
         {_, ViewFileSize} = get_view_frag(DbName),
 
-        ok = config:set("compactions", ?b2l(DbName),
-            "[{db_fragmentation, \"70%\"}, {view_fragmentation, \"70%\"}]",
-            false),
+        with_config_change(DbName, fun() ->
+            ok = config:set("compactions", ?b2l(DbName),
+                "[{db_fragmentation, \"70%\"}, {view_fragmentation, \"70%\"}]",
+                false)
+        end),
 
-        ok = timer:sleep(4000), % something >= check_interval
+        wait_compaction_started(DbName),
         wait_compaction_finished(DbName),
-        ok = config:delete("compactions", ?b2l(DbName), false),
-        ok = timer:sleep(1000), % need to wait so gen_server:cast would complete
+
+        with_config_change(DbName, fun() ->
+            ok = config:delete("compactions", ?b2l(DbName), false)
+        end),
 
         {DbFrag2, DbFileSize2} = get_db_frag(DbName),
         {ViewFrag2, ViewFileSize2} = get_view_frag(DbName),
@@ -198,12 +204,29 @@ get_view_frag(DbName) ->
 get_size(Kind, Info) ->
     couch_util:get_nested_json_value({Info}, [sizes, Kind]).
 
+wait_compaction_started(DbName) ->
+    WaitFun = fun() ->
+        case is_compaction_running(DbName) of
+            false -> wait;
+            true ->  ok
+        end
+    end,
+    case test_util:wait(WaitFun, 10000) of
+        timeout ->
+            erlang:error({assertion_failed,
+                          [{module, ?MODULE},
+                           {line, ?LINE},
+                           {reason, "Compaction starting timeout"}]});
+        _ ->
+            ok
+    end.
+
 wait_compaction_finished(DbName) ->
     WaitFun = fun() ->
-       case is_compaction_running(DbName) of
-           true -> wait;
-           false -> ok
-       end
+        case is_compaction_running(DbName) of
+            true -> wait;
+            false -> ok
+        end
     end,
     case test_util:wait(WaitFun, 10000) of
         timeout ->
@@ -215,16 +238,21 @@ wait_compaction_finished(DbName) ->
             ok
     end.
 
-is_compaction_running(DbName) ->
-    {ok, Db} = couch_db:open_int(DbName, []),
-    {ok, DbInfo} = couch_db:get_db_info(Db),
-    {ok, ViewInfo} = couch_mrview:get_info(Db, <<"_design/foo">>),
-    couch_db:close(Db),
-    (couch_util:get_value(compact_running, ViewInfo) =:= true)
-        orelse (couch_util:get_value(compact_running, DbInfo) =:= true).
+is_compaction_running(_DbName) ->
+    couch_compaction_daemon:in_progress() /= [].
 
 is_idle(DbName) ->
     {ok, Db} = couch_db:open_int(DbName, [?ADMIN_CTX]),
     Monitors = couch_db:monitored_by(Db),
     ok = couch_db:close(Db),
     not lists:any(fun(M) -> M /= self() end, Monitors).
+
+with_config_change(DbName, Fun) ->
+    Current = ets:info(couch_compaction_daemon_config, size),
+    Fun(),
+    test_util:wait(fun() ->
+        case ets:info(couch_compaction_daemon_config, size) == Current of
+            false -> ok;
+            true -> wait
+        end
+    end).
