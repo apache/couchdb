@@ -50,6 +50,15 @@ collation_test_() ->
         ]
     }.
 
+validate_callback_exists_test_() ->
+    {
+        "validate_callback_exists tests",
+        [
+            fun should_succeed_for_existent_cb/0,
+            should_fail_for_missing_cb()
+        ]
+    }.
+
 should_collate_ascii() ->
     ?_assertEqual(1, couch_util:collate(<<"foo">>, <<"bar">>)).
 
@@ -133,4 +142,21 @@ find_in_binary_test_() ->
                                               [Needle, Haystack])),
             {Msg, ?_assertMatch(Result,
                                 couch_util:find_in_binary(Needle, Haystack))}
+        end, Cases).
+
+should_succeed_for_existent_cb() ->
+    ?_assert(couch_util:validate_callback_exists(lists, any, 2)).
+
+should_fail_for_missing_cb() ->
+    Cases = [
+        {unknown_module, any, 1},
+        {erlang, unknown_function, 1},
+        {erlang, whereis, 100}
+    ],
+    lists:map(
+        fun({M, F, A} = MFA) ->
+            Name = lists:flatten(io_lib:format("~w:~w/~w", [M, F, A])),
+            {Name, ?_assertThrow(
+                {error, {undefined_callback, Name, MFA}},
+                couch_util:validate_callback_exists(M, F, A))}
         end, Cases).

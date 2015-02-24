@@ -32,6 +32,7 @@
 -export([rfc1123_date/0, rfc1123_date/1]).
 -export([integer_to_boolean/1, boolean_to_integer/1]).
 -export([find_in_binary/2]).
+-export([callback_exists/3, validate_callback_exists/3]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -537,3 +538,34 @@ match_rest_of_prefix([{Pos, _Len} | Rest], Prefix, Data, PrefixLength, N) ->
         {_Pos, _Len1} ->
             {partial, N + Pos}
     end.
+
+callback_exists(Module, Function, Arity) ->
+    case ensure_loaded(Module) of
+    true ->
+        InfoList = Module:module_info(exports),
+        lists:member({Function, Arity}, InfoList);
+    false ->
+        false
+    end.
+
+validate_callback_exists(Module, Function, Arity) ->
+    case callback_exists(Module, Function, Arity) of
+    true ->
+        ok;
+    false ->
+        CallbackStr = lists:flatten(
+            io_lib:format("~w:~w/~w", [Module, Function, Arity])),
+        throw({error,
+            {undefined_callback, CallbackStr, {Module, Function, Arity}}})
+    end.
+
+ensure_loaded(Module) when is_atom(Module) ->
+    case code:ensure_loaded(Module) of
+    {module, Module} ->
+        true;
+    {error, embedded} ->
+        true;
+    {error, _} ->
+        false
+    end;
+ensure_loaded(_Module) -> false.
