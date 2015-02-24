@@ -258,3 +258,12 @@ class BasicFindTests(mango.UserDocsTests):
             })
         assert len(docs) == 1
         assert docs[0]["user_id"] == "eo"
+
+    def test_unsatisfiable_range(self):
+        docs = self.db.find({
+                "$and":[
+                    {"age":{"$gt": 0}},
+                    {"age":{"$lt": 0}}
+                ]
+            })
+        assert len(docs) == 0
