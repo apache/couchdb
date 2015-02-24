@@ -256,5 +256,6 @@ allowed_owner(Req) ->
         admin;
     SpecStr ->
         {ok, {M, F, A}} = couch_util:parse_term(SpecStr),
+        couch_util:validate_callback_exists(M, F, 2),
         M:F(Req, A)
     end.
