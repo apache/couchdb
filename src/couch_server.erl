@@ -153,7 +153,7 @@ check_dbname(#server{dbname_regexp=RegExp}, DbName) ->
             "_replicator" -> ok;
             "_dbs" -> ok;
             "_nodes" -> ok;
-            "_cassim" -> ok;
+            "_metadata" -> ok;
             _Else ->
                 {error, illegal_database_name, DbName}
             end;
