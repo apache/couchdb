@@ -45,12 +45,11 @@ validate_dbname(DbName, Options) ->
         case re:run(DbName, ?DBNAME_REGEX, [{capture,none}, dollar_endonly]) of
         match ->
             ok;
-        nomatch when DbName =:= <<"_users">> ->
-            ok;
-        nomatch when DbName =:= <<"_replicator">> ->
-            ok;
         nomatch ->
-            {error, illegal_database_name}
+            case lists:member(?b2l(DbName), ?SYSTEM_DATABASES) of
+            true -> ok;
+            false -> {error, illegal_database_name}
+            end
         end
     end.
 
