@@ -300,7 +300,7 @@ def join_nodes(ctx, host, port):
     for node in ctx['nodes']:
         body = "{}"
         conn = httpclient.HTTPConnection(host, port)
-        conn.request("PUT", "/nodes/%s@127.0.0.1" % node, body)
+        conn.request("PUT", "/_nodes/%s@127.0.0.1" % node, body)
         resp = conn.getresponse()
         if resp.status not in (200, 201, 202, 409):
             print('Failed to join %s into cluster' % node, resp.reason)
