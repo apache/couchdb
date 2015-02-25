@@ -40,6 +40,14 @@
 -define(ADMIN_USER, #user_ctx{roles=[<<"_admin">>]}).
 -define(ADMIN_CTX, {user_ctx, ?ADMIN_USER}).
 
+-define(SYSTEM_DATABASES, [
+    "_dbs",
+    "_metadata",
+    "_nodes",
+    "_replicator",
+    "_users"
+]).
+
 
 -type branch() :: {Key::term(), Value::term(), Tree::term()}.
 -type path() :: {Start::pos_integer(), branch()}.

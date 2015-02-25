@@ -148,15 +148,10 @@ path_ends_with(Path, Suffix) ->
 check_dbname(#server{dbname_regexp=RegExp}, DbName) ->
     case re:run(DbName, RegExp, [{capture, none}]) of
     nomatch ->
-        case DbName of
-            "_users" -> ok;
-            "_replicator" -> ok;
-            "_dbs" -> ok;
-            "_nodes" -> ok;
-            "_metadata" -> ok;
-            _Else ->
-                {error, illegal_database_name, DbName}
-            end;
+        case lists:member(DbName, ?SYSTEM_DATABASES) of
+            true -> ok;
+            false -> {error, illegal_database_name, DbName}
+        end;
     match ->
         ok
     end.
