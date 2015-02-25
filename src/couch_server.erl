@@ -119,8 +119,8 @@ delete(DbName, Options) ->
 maybe_add_sys_db_callbacks(DbName, Options) when is_binary(DbName) ->
     maybe_add_sys_db_callbacks(?b2l(DbName), Options);
 maybe_add_sys_db_callbacks(DbName, Options) ->
-    DbsDbName = config:get("mem3", "shard_db", "dbs"),
-    NodesDbName = config:get("mem3", "node_db", "nodes"),
+    DbsDbName = config:get("mem3", "shard_db", "_dbs"),
+    NodesDbName = config:get("mem3", "node_db", "_nodes"),
     IsReplicatorDb = DbName == config:get("replicator", "db", "_replicator") orelse
 	path_ends_with(DbName, <<"_replicator">>),
     IsUsersDb = DbName ==config:get("couch_httpd_auth", "authentication_db", "_users") orelse
@@ -151,6 +151,9 @@ check_dbname(#server{dbname_regexp=RegExp}, DbName) ->
         case DbName of
             "_users" -> ok;
             "_replicator" -> ok;
+            "_dbs" -> ok;
+            "_nodes" -> ok;
+            "_cassim" -> ok;
             _Else ->
                 {error, illegal_database_name, DbName}
             end;
