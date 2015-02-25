@@ -100,7 +100,7 @@ handle_sleep_req(Req) ->
 
 handle_all_dbs_req(#httpd{method='GET'}=Req) ->
     Args = couch_mrview_http:parse_params(Req, undefined),
-    ShardDbName = config:get("mem3", "shard_db", "dbs"),
+    ShardDbName = config:get("mem3", "shard_db", "_dbs"),
     %% shard_db is not sharded but mem3:shards treats it as an edge case
     %% so it can be pushed thru fabric
     {ok, Info} = fabric:get_db_info(ShardDbName),
