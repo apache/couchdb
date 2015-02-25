@@ -49,7 +49,7 @@ cmp(?MAX_VAL, _) ->
 cmp(_, ?MAX_VAL) ->
     -1;
 cmp(A, B) ->
-    couch_ejson_compare:less_json(A, B).
+    couch_ejson_compare:less(A, B).
 
 
 cmp_raw(?MIN_VAL, ?MIN_VAL) ->
