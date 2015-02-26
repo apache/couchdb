@@ -48,11 +48,11 @@ curl a:b@127.0.0.1:15984/_cluster_setup -d '{"action":"finish_cluster"}' $HEADER
 # Show system dbs exist on node A
 curl a:b@127.0.0.1:15984/_users
 curl a:b@127.0.0.1:15984/_replicator
-curl a:b@127.0.0.1:15984/cassim
+curl a:b@127.0.0.1:15984/_metadata
 
 # Show system dbs exist on node B
 curl a:b@127.0.0.1:25984/_users
 curl a:b@127.0.0.1:25984/_replicator
-curl a:b@127.0.0.1:25984/cassim
+curl a:b@127.0.0.1:25984/_metadata
 
 echo "YAY ALL GOOD"

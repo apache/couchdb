@@ -46,12 +46,12 @@ is_cluster_enabled() ->
         
 
 has_cluster_system_dbs() ->
-    % GET /_users /_replicator /_cassim
+    % GET /_users /_replicator /_metadata
 
     case catch {
     fabric:get_db_info("_users"),
     fabric:get_db_info("_replicator"),
-    fabric:get_db_info("cassim")} of
+    fabric:get_db_info("_metadata")} of
         {{ok, _}, {ok, _}, {ok, _}} -> ok;
         _ -> no
     end.
@@ -75,7 +75,7 @@ enable_cluster_int(Options, no) ->
     NewBindAddress = proplists:get_value(bind_address, Options),
     ok = require_admins(CurrentAdmins, NewCredentials),
     ok = require_bind_address(CurrentBindAddress, NewBindAddress),
-    
+
     case NewCredentials of
         {undefined, undefined} ->
             ok;
@@ -89,7 +89,7 @@ enable_cluster_int(Options, no) ->
         NewBindAddress ->
             config:set("httpd", "bind_address", binary_to_list(NewBindAddress))
     end,
-    
+
     Port = proplists:get_value(port, Options),
     case Port of
         undefined ->
@@ -115,8 +115,8 @@ finish_cluster() ->
 finish_cluster_int(ok) ->
     {error, cluster_finished};
 finish_cluster_int(no) ->
-    % create clustered databases (_users, _replicator, _cassim/_metadata
-    Databases = ["_users", "_replicator", "cassim"],
+    % create clustered databases (_users, _replicator, _metadata)
+    Databases = ["_users", "_replicator", "_metadata"],
     lists:foreach(fun fabric:create_db/1, Databases).
 
 

@@ -129,7 +129,7 @@ in Fauxton.
 b. Same as in a.
 
 - this manages the final setup bits, like creating the _users,
-  _replicator and _cassim/_metadata, _db_updates endpoints and
+  _replicator and _metadata, _db_updates endpoints and
   whatever else is needed. // TBD: collect what else is needed.
 
 
