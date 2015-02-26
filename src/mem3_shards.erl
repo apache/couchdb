@@ -114,7 +114,7 @@ local(DbName) ->
     lists:filter(Pred, for_db(DbName)).
 
 fold(Fun, Acc) ->
-    DbName = config:get("mem3", "shards_db", "dbs"),
+    DbName = config:get("mem3", "shards_db", "_dbs"),
     {ok, Db} = mem3_util:ensure_exists(DbName),
     FAcc = {Db, Fun, Acc},
     try
@@ -219,13 +219,13 @@ fold_fun(#doc_info{}=DI, _, {Db, UFun, UAcc}) ->
     end.
 
 get_update_seq() ->
-    DbName = config:get("mem3", "shards_db", "dbs"),
+    DbName = config:get("mem3", "shards_db", "_dbs"),
     {ok, Db} = mem3_util:ensure_exists(DbName),
     couch_db:close(Db),
     Db#db.update_seq.
 
 listen_for_changes(Since) ->
-    DbName = config:get("mem3", "shards_db", "dbs"),
+    DbName = config:get("mem3", "shards_db", "_dbs"),
     {ok, Db} = mem3_util:ensure_exists(DbName),
     Args = #changes_args{
         feed = "continuous",
@@ -264,7 +264,7 @@ changes_callback(timeout, _) ->
     ok.
 
 load_shards_from_disk(DbName) when is_binary(DbName) ->
-    X = ?l2b(config:get("mem3", "shards_db", "dbs")),
+    X = ?l2b(config:get("mem3", "shards_db", "_dbs")),
     {ok, Db} = mem3_util:ensure_exists(X),
     try
         load_shards_from_db(Db, DbName)

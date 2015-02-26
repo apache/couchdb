@@ -77,12 +77,12 @@ attach_nodes([S | Rest], Acc, [Node | Nodes], UsedNodes) ->
     attach_nodes(Rest, [S#shard{node=Node} | Acc], Nodes, [Node | UsedNodes]).
 
 open_db_doc(DocId) ->
-    DbName = ?l2b(config:get("mem3", "shards_db", "dbs")),
+    DbName = ?l2b(config:get("mem3", "shards_db", "_dbs")),
     {ok, Db} = couch_db:open(DbName, []),
     try couch_db:open_doc(Db, DocId, [ejson_body]) after couch_db:close(Db) end.
 
 write_db_doc(Doc) ->
-    DbName = ?l2b(config:get("mem3", "shards_db", "dbs")),
+    DbName = ?l2b(config:get("mem3", "shards_db", "_dbs")),
     write_db_doc(DbName, Doc, true).
 
 write_db_doc(DbName, #doc{id=Id, body=Body} = Doc, ShouldMutate) ->
@@ -108,7 +108,7 @@ write_db_doc(DbName, #doc{id=Id, body=Body} = Doc, ShouldMutate) ->
 
 delete_db_doc(DocId) ->
     gen_server:cast(mem3_shards, {cache_remove, DocId}),
-    DbName = ?l2b(config:get("mem3", "shards_db", "dbs")),
+    DbName = ?l2b(config:get("mem3", "shards_db", "_dbs")),
     delete_db_doc(DbName, DocId, true).
 
 delete_db_doc(DbName, DocId, ShouldMutate) ->
