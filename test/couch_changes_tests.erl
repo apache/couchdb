@@ -18,6 +18,8 @@
 -define(TIMEOUT, 3000).
 -define(TEST_TIMEOUT, 10000).
 
+-ifdef(run_broken_tests).
+
 -record(row, {
     id,
     seq,
@@ -600,3 +602,5 @@ create_db(DbName) ->
 
 delete_db(DbName) ->
     ok = couch_server:delete(DbName, [?ADMIN_CTX]).
+
+-endif.

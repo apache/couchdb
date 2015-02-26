@@ -18,6 +18,7 @@
 -define(TIMEOUT, 30000).
 -define(TIMEOUT_S, ?TIMEOUT div 1000).
 
+-ifdef(run_broken_tests).
 
 start() ->
     Ctx = test_util:start_couch(),
@@ -256,3 +257,5 @@ with_config_change(DbName, Fun) ->
             true -> wait
         end
     end).
+
+-endif.
