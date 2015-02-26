@@ -131,7 +131,7 @@ set_max_size(Size) when is_integer(Size), Size > 0 ->
 handle_config_change("mem3", "shard_cache_size", SizeList, _, _) ->
     Size = list_to_integer(SizeList),
     {ok, gen_server:call(?MODULE, {set_max_size, Size}, infinity)};
-handle_config_change("mem3", "shard_db", _DbName, _, _) ->
+handle_config_change("mem3", "shards_db", _DbName, _, _) ->
     {ok, gen_server:call(?MODULE, shard_db_changed, infinity)};
 handle_config_change(_, _, _, _, _) ->
     {ok, nil}.
@@ -264,7 +264,7 @@ changes_callback(timeout, _) ->
     ok.
 
 load_shards_from_disk(DbName) when is_binary(DbName) ->
-    X = ?l2b(config:get("mem3", "shard_db", "dbs")),
+    X = ?l2b(config:get("mem3", "shards_db", "dbs")),
     {ok, Db} = mem3_util:ensure_exists(X),
     try
         load_shards_from_db(Db, DbName)

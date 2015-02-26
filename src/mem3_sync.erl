@@ -345,10 +345,10 @@ local_dbs() ->
     [nodes_db(), shards_db(), users_db()].
 
 nodes_db() ->
-    ?l2b(config:get("mem3", "node_db", "nodes")).
+    ?l2b(config:get("mem3", "nodes_db", "nodes")).
 
 shards_db() ->
-    ?l2b(config:get("mem3", "shard_db", "dbs")).
+    ?l2b(config:get("mem3", "shards_db", "dbs")).
 
 users_db() ->
     ?l2b(config:get("couch_httpd_auth", "authentication_db", "_users")).
