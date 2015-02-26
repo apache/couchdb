@@ -89,7 +89,7 @@ shards_int(DbName, Options) when is_list(DbName) ->
 shards_int(DbName, Options) ->
     Ordered = lists:member(ordered, Options),
     ShardDbName =
-        list_to_binary(config:get("mem3", "shard_db", "dbs")),
+        list_to_binary(config:get("mem3", "shards_db", "_dbs")),
     case DbName of
     ShardDbName when Ordered ->
         %% shard_db is treated as a single sharded db to support calls to db_info
