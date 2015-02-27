@@ -41,9 +41,9 @@ handle_global_changes_req(#httpd{method='GET'}=Req) ->
     Limit = couch_util:get_value(limit, Options),
     %Options1 = lists:keydelete(limit, 1, Options),
     Options1 = Options,
-    chttpd:verify_is_server_admin(Req),
+    Owner = allowed_owner(Req),
     Acc = #acc{
-        username=admin,
+        username=Owner,
         feed=Feed,
         resp=Req,
         heartbeat_interval=Heartbeat,
@@ -247,4 +247,15 @@ to_non_neg_int(Value) ->
             throw({bad_request, invalid_integer})
     catch error:badarg ->
         throw({bad_request, invalid_integer})
+    end.
+
+allowed_owner(Req) ->
+    case config:get("global_changes", "allowed_owner", undefined) of
+    undefined ->
+        chttpd:verify_is_server_admin(Req),
+        admin;
+    SpecStr ->
+        {ok, {M, F, A}} = couch_util:parse_term(SpecStr),
+        couch_util:validate_callback_exists(M, F, 2),
+        M:F(Req, A)
     end.
