@@ -50,7 +50,7 @@ go(DbName, Options, #mrargs{keys=undefined} = QueryArgs, Callback, Acc) ->
     end;
 
 
-go(DbName, Options, QueryArgs, Callback, Acc0) ->
+go(DbName, _Options, QueryArgs, Callback, Acc0) ->
     #mrargs{
         direction = Dir,
         include_docs = IncludeDocs,
