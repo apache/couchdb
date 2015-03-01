@@ -1131,6 +1131,9 @@ parse_doc_query(Req) ->
 parse_changes_query(Req, Db) ->
     ChangesArgs = lists:foldl(fun({Key, Value}, Args) ->
         case {string:to_lower(Key), Value} of
+        {"feed", "live"} ->
+            %% sugar for continuous
+            Args#changes_args{feed="continuous"};
         {"feed", _} ->
             Args#changes_args{feed=Value};
         {"descending", "true"} ->
