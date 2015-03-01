@@ -93,7 +93,7 @@ handle_changes_req1(#httpd{}=Req, Db) ->
             couch_stats:decrement_counter([couchdb, httpd, clients_requesting_changes])
         end;
     _ ->
-        Msg = <<"Supported `feed` types: normal, continuous, longpoll, eventsource">>,
+        Msg = <<"Supported `feed` types: normal, continuous, live, longpoll, eventsource">>,
         throw({bad_request, Msg})
     end.
 
@@ -1317,6 +1317,9 @@ parse_changes_query(Req) ->
     erlang:erase(changes_seq_interval),
     ChangesArgs = lists:foldl(fun({Key, Value}, Args) ->
         case {string:to_lower(Key), Value} of
+        {"feed", "live"} ->
+            %% sugar for continuous
+            Args#changes_args{feed="continuous"};
         {"feed", _} ->
             Args#changes_args{feed=Value};
         {"descending", "true"} ->

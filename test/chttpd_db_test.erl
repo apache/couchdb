@@ -31,6 +31,11 @@ create_db(Url) ->
     {ok, _, _, _} = test_request:put(Url,
                 [{"Content-Type", "application/json"}], "{}").
 
+
+create_doc(Url, Id) ->
+    test_request:put(Url ++ "/" ++ Id,
+        [{"Content-Type", "application/json"}], "{\"mr\": \"rockoartischocko\"}").
+
 delete_db(Url) ->
     {ok, _, _, _} = test_request:delete(Url).
 
@@ -44,7 +49,8 @@ all_test_() ->
                 foreach,
                 fun setup/0, fun teardown/1,
                 [
-                    fun should_return_ok_true_on_bulk_update/1
+                    fun should_return_ok_true_on_bulk_update/1,
+                    fun should_accept_live_as_an_alias_for_continuous/1
                 ]
             }
         }
@@ -54,8 +60,7 @@ all_test_() ->
 should_return_ok_true_on_bulk_update(Url) ->
     ?_assertEqual(true,
         begin
-            {ok, _, _, Body} = test_request:put(Url ++ "/testdoc",
-                [{"Content-Type", "application/json"}], "{}"),
+            {ok, _, _, Body} = create_doc(Url, "testdoc"),
             {Json} = ?JSON_DECODE(Body),
             Ref = couch_util:get_value(<<"rev">>, Json, undefined),
             NewDoc = "{\"docs\": [{\"_rev\": \"" ++ ?b2l(Ref) ++ "\", \"_id\": \"testdoc\"}]}",
@@ -64,4 +69,19 @@ should_return_ok_true_on_bulk_update(Url) ->
             ResultJson = ?JSON_DECODE(ResultBody),
             {InnerJson} = lists:nth(1, ResultJson),
             couch_util:get_value(<<"ok">>, InnerJson, undefined)
+        end).
+
+
+should_accept_live_as_an_alias_for_continuous(Url) ->
+    {ok, _, _, ResultBody} = test_request:get(Url ++ "/_changes?feed=live&timeout=1"),
+    {ResultJson} = ?JSON_DECODE(ResultBody),
+    [Last_Seq, _] = couch_util:get_value(<<"last_seq">>, ResultJson, undefined),
+    {ok, _, _, _} = create_doc(Url, "testdoc2"),
+
+    ?_assertEqual(Last_Seq + 1,
+        begin
+            {ok, _, _, ResultBody2} = test_request:get(Url ++ "/_changes?feed=live&timeout=1"),
+            [_, CleanedResult] = binary:split(ResultBody2, <<"\n">>),
+            {[{_, [Seq, _]}, _]} = ?JSON_DECODE(CleanedResult),
+            Seq
         end).
