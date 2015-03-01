@@ -17,131 +17,140 @@ function jsonp(obj) {
 }
 
 couchTests.changes = function(debug) {
-  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"true"});
-  db.deleteDb();
-  db.createDb();
+  var db;
   if (debug) debugger;
-
-  var req = CouchDB.request("GET", "/test_suite_db/_changes");
-  var resp = JSON.parse(req.responseText);
-
-  T(resp.results.length == 0 && resp.last_seq == 0, "empty db");
-  var docFoo = {_id:"foo", bar:1};
-  T(db.save(docFoo).ok);
-  T(db.ensureFullCommit().ok);
-  T(db.open(docFoo._id)._id == docFoo._id);
-
-  req = CouchDB.request("GET", "/test_suite_db/_changes");
-  var resp = JSON.parse(req.responseText);
-
-  T(resp.last_seq == 1);
-  T(resp.results.length == 1, "one doc db");
-  T(resp.results[0].changes[0].rev == docFoo._rev);
-
-  // test with callback
-
-  run_on_modified_server(
-    [{section: "httpd",
-      key: "allow_jsonp",
-      value: "true"}],
-  function() {
-    var xhr = CouchDB.request("GET", "/test_suite_db/_changes?callback=jsonp");
-    T(xhr.status == 200);
-    jsonp_flag = 0;
-    eval(xhr.responseText);
-    T(jsonp_flag == 1);
-  });
-
-  req = CouchDB.request("GET", "/test_suite_db/_changes?feed=continuous&timeout=10");
-  var lines = req.responseText.split("\n");
-  T(JSON.parse(lines[0]).changes[0].rev == docFoo._rev);
-  T(JSON.parse(lines[1]).last_seq == 1);
-
-  var xhr;
-
-  try {
-    xhr = CouchDB.newXhr();
-  } catch (err) {
-  }
 
   // poor man's browser detection
   var is_safari = false;
-  if(typeof(navigator) == "undefined") {
+  if (typeof (navigator) == "undefined") {
     is_safari = true; // For CouchHTTP based runners
-  } else if(navigator.userAgent.match(/AppleWebKit/)) {
+  } else if (navigator.userAgent.match(/AppleWebKit/)) {
     is_safari = true;
-  };
-  if (!is_safari && xhr) {
-    // Only test the continuous stuff if we have a real XHR object
-    // with real async support.
+  }
 
-    // WebKit (last checked on nightly #47686) does fail on processing
-    // the async-request properly while javascript is executed.
+  testChanges("live");
+  testChanges("continuous");
+  function testChanges(feed) {
+    db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"true"});
+    db.deleteDb();
+    db.createDb();
 
-    xhr.open("GET", CouchDB.proxyUrl("/test_suite_db/_changes?feed=continuous&timeout=500"), true);
-    xhr.send("");
+    var req = CouchDB.request("GET", "/test_suite_db/_changes");
+    var resp = JSON.parse(req.responseText);
 
-    var docBar = {_id:"bar", bar:1};
-    db.save(docBar);
+    T(resp.results.length == 0 && resp.last_seq == 0, "empty db");
+    var docFoo = {_id:"foo", bar:1};
+    T(db.save(docFoo).ok);
+    T(db.ensureFullCommit().ok);
+    T(db.open(docFoo._id)._id == docFoo._id);
 
-    var lines, change1, change2;
-    waitForSuccess(function() {
-      lines = xhr.responseText.split("\n");
-      change1 = JSON.parse(lines[0]);
-      change2 = JSON.parse(lines[1]);
-      if (change2.seq != 2) {
-          throw "bad seq, try again";
-      }
-      return true;
-    }, "bar-only");
+    req = CouchDB.request("GET", "/test_suite_db/_changes");
+    var resp = JSON.parse(req.responseText);
 
-    T(change1.seq == 1);
-    T(change1.id == "foo");
+    T(resp.last_seq == 1);
+    T(resp.results.length == 1, "one doc db");
+    T(resp.results[0].changes[0].rev == docFoo._rev);
 
-    T(change2.seq == 2);
-    T(change2.id == "bar");
-    T(change2.changes[0].rev == docBar._rev);
+    // test with callback
 
-
-    var docBaz = {_id:"baz", baz:1};
-    db.save(docBaz);
-
-    var change3;
-    waitForSuccess(function() {
-      lines = xhr.responseText.split("\n");
-      change3 = JSON.parse(lines[2]);
-      if (change3.seq != 3) {
-        throw "bad seq, try again";
-      }
-      return true;
+    run_on_modified_server(
+      [{section: "httpd",
+        key: "allow_jsonp",
+        value: "true"}],
+    function() {
+      var xhr = CouchDB.request("GET", "/test_suite_db/_changes?callback=jsonp");
+      T(xhr.status == 200);
+      jsonp_flag = 0;
+      eval(xhr.responseText);
+      T(jsonp_flag == 1);
     });
 
-    T(change3.seq == 3);
-    T(change3.id == "baz");
-    T(change3.changes[0].rev == docBaz._rev);
+    req = CouchDB.request("GET", "/test_suite_db/_changes?feed=" + feed + "&timeout=10");
+    var lines = req.responseText.split("\n");
+    T(JSON.parse(lines[0]).changes[0].rev == docFoo._rev);
+    T(JSON.parse(lines[1]).last_seq == 1);
+
+    var xhr;
+
+    try {
+      xhr = CouchDB.newXhr();
+    } catch (err) {
+    }
+
+    if (!is_safari && xhr) {
+      // Only test the continuous stuff if we have a real XHR object
+      // with real async support.
+
+      // WebKit (last checked on nightly #47686) does fail on processing
+      // the async-request properly while javascript is executed.
+
+      xhr.open("GET", CouchDB.proxyUrl("/test_suite_db/_changes?feed=" + feed + "&timeout=500"), true);
+      xhr.send("");
+
+      var docBar = {_id:"bar", bar:1};
+      db.save(docBar);
+
+      var lines, change1, change2;
+      waitForSuccess(function() {
+        lines = xhr.responseText.split("\n");
+        change1 = JSON.parse(lines[0]);
+        change2 = JSON.parse(lines[1]);
+        if (change2.seq != 2) {
+            throw "bad seq, try again";
+        }
+        return true;
+      }, "bar-only");
+
+      T(change1.seq == 1);
+      T(change1.id == "foo");
+
+      T(change2.seq == 2);
+      T(change2.id == "bar");
+      T(change2.changes[0].rev == docBar._rev);
 
 
-    xhr = CouchDB.newXhr();
+      var docBaz = {_id:"baz", baz:1};
+      db.save(docBaz);
 
-    //verify the heartbeat newlines are sent
-    xhr.open("GET", CouchDB.proxyUrl("/test_suite_db/_changes?feed=continuous&heartbeat=10&timeout=500"), true);
-    xhr.send("");
+      var change3;
+      waitForSuccess(function() {
+        lines = xhr.responseText.split("\n");
+        change3 = JSON.parse(lines[2]);
+        if (change3.seq != 3) {
+          throw "bad seq, try again";
+        }
+        return true;
+      });
 
-    var str;
-    waitForSuccess(function() {
-      str = xhr.responseText;
-      if (str.charAt(str.length - 1) != "\n" || str.charAt(str.length - 2) != "\n") {
-        throw("keep waiting");
-      }
-      return true;
-    }, "heartbeat");
+      T(change3.seq == 3);
+      T(change3.id == "baz");
+      T(change3.changes[0].rev == docBaz._rev);
 
-    T(str.charAt(str.length - 1) == "\n");
-    T(str.charAt(str.length - 2) == "\n");
 
-    // otherwise we'll continue to receive heartbeats forever
-    xhr.abort();
+      xhr = CouchDB.newXhr();
 
+      //verify the heartbeat newlines are sent
+      xhr.open("GET", CouchDB.proxyUrl("/test_suite_db/_changes?feed=" + feed + "&heartbeat=10&timeout=500"), true);
+      xhr.send("");
+
+      var str;
+      waitForSuccess(function() {
+        str = xhr.responseText;
+        if (str.charAt(str.length - 1) != "\n" || str.charAt(str.length - 2) != "\n") {
+          throw("keep waiting");
+        }
+        return true;
+      }, "heartbeat");
+
+      T(str.charAt(str.length - 1) == "\n");
+      T(str.charAt(str.length - 2) == "\n");
+
+      // otherwise we'll continue to receive heartbeats forever
+      xhr.abort();
+    }
+  }
+
+  if (!is_safari && xhr) {
     // test Server Sent Event (eventsource)
     if (!!window.EventSource) {
       var source = new EventSource(
