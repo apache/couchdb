@@ -63,7 +63,7 @@ handle_call(fetch, _from, #st{stats = Stats}=State) ->
     {reply, {ok, Stats}, State};
 handle_call(flush, _From, State) ->
     {reply, ok, collect(State)};
-handle_call(reload, _from, #st{stats = Stats}=State) ->
+handle_call(reload, _from, State) ->
     {ok, Descriptions} = reload_metrics(),
     {reply, ok, State#st{descriptions=Descriptions}};
 handle_call(Msg, _From, State) ->
