@@ -28,7 +28,7 @@
 
 -import(couch_httpd, [header_value/2, send_json/2,send_json/4, send_method_not_allowed/2]).
 
--compile({no_auto_import,[integer_to_binary/1]}).
+-compile({no_auto_import,[integer_to_binary/1, integer_to_binary/2]}).
 
 special_test_authentication_handler(Req) ->
     case header_value(Req, "WWW-Authenticate") of
