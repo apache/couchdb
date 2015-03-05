@@ -96,7 +96,7 @@ def setup_argparse():
     parser.add_option("-n", "--nodes", metavar="nodes", default=3,
                       type=int,
                       help="Number of development nodes to be spun up")
-    parser.add_option("-q", "--quite",
+    parser.add_option("-q", "--quiet",
                       action="store_false", dest="verbose", default=True,
                       help="Don't print anything to STDOUT")
     return parser.parse_args()
