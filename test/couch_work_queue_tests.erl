@@ -157,17 +157,17 @@ should_block_consumer_on_dequeue_from_empty_queue({_, _, Consumer}) ->
 should_consume_right_item({Q, Producer, Consumers}) when is_list(Consumers) ->
     [consume(C, 3) || C <- Consumers],
 
-    Item1 = produce(Producer, 10),
+    Item1 = produce(Q, Producer, 10, false),
     ok = ping(Producer),
     ?assertEqual(0, couch_work_queue:item_count(Q)),
     ?assertEqual(0, couch_work_queue:size(Q)),
 
-    Item2 = produce(Producer, 10),
+    Item2 = produce(Q, Producer, 10, false),
     ok = ping(Producer),
     ?assertEqual(0, couch_work_queue:item_count(Q)),
     ?assertEqual(0, couch_work_queue:size(Q)),
 
-    Item3 = produce(Producer, 10),
+    Item3 = produce(Q, Producer, 10, false),
     ok = ping(Producer),
     ?assertEqual(0, couch_work_queue:item_count(Q)),
     ?assertEqual(0, couch_work_queue:size(Q)),
@@ -176,60 +176,60 @@ should_consume_right_item({Q, Producer, Consumers}) when is_list(Consumers) ->
          || {C, Item} <- lists:zip(Consumers, [Item1, Item2, Item3])],
 
     ?_assertEqual([{ok, Item1}, {ok, Item2}, {ok, Item3}], R);
-should_consume_right_item({_, Producer, Consumer}) ->
+should_consume_right_item({Q, Producer, Consumer}) ->
     consume(Consumer, 1),
-    Item = produce(Producer, 10),
-    produce(Producer, 20),
+    Item = produce(Q, Producer, 10, false),
+    produce(Q, Producer, 20, true),
     ok = ping(Producer),
     ok = ping(Consumer),
     {ok, Items} = last_consumer_items(Consumer),
     ?_assertEqual([Item], Items).
 
 should_increase_queue_size_on_produce({Q, Producer, _}) ->
-    produce(Producer, 50),
+    produce(Q, Producer, 50, true),
     ok = ping(Producer),
     Count1 = couch_work_queue:item_count(Q),
     Size1 = couch_work_queue:size(Q),
 
-    produce(Producer, 10),
+    produce(Q, Producer, 10, true),
     Count2 = couch_work_queue:item_count(Q),
     Size2 = couch_work_queue:size(Q),
 
     ?_assertEqual([{Count1, Size1}, {Count2, Size2}], [{1, 50}, {2, 60}]).
 
 should_block_producer_on_full_queue_count({Q, Producer, _}) ->
-    produce(Producer, 10),
+    produce(Q, Producer, 10, true),
     ?assertEqual(1, couch_work_queue:item_count(Q)),
     ok = ping(Producer),
 
-    produce(Producer, 15),
+    produce(Q, Producer, 15, true),
     ?assertEqual(2, couch_work_queue:item_count(Q)),
     ok = ping(Producer),
 
-    produce(Producer, 20),
+    produce(Q, Producer, 20, false),
     ?assertEqual(3, couch_work_queue:item_count(Q)),
     Pong = ping(Producer),
 
     ?_assertEqual(timeout, Pong).
 
 should_block_producer_on_full_queue_size({Q, Producer, _}) ->
-    produce(Producer, 100),
+    produce(Q, Producer, 100, true),
     ok = ping(Producer),
     ?assertEqual(1, couch_work_queue:item_count(Q)),
     ?assertEqual(100, couch_work_queue:size(Q)),
 
-    produce(Producer, 110),
+    produce(Q, Producer, 110, false),
     Pong = ping(Producer),
     ?assertEqual(2, couch_work_queue:item_count(Q)),
     ?assertEqual(210, couch_work_queue:size(Q)),
 
     ?_assertEqual(timeout, Pong).
 
-should_consume_multiple_items({_, Producer, Consumer}) ->
-    Item1 = produce(Producer, 10),
+should_consume_multiple_items({Q, Producer, Consumer}) ->
+    Item1 = produce(Q, Producer, 10, true),
     ok = ping(Producer),
 
-    Item2 = produce(Producer, 15),
+    Item2 = produce(Q, Producer, 15, true),
     ok = ping(Producer),
 
     consume(Consumer, 2),
@@ -241,7 +241,7 @@ should_receive_first_queued_item({Q, Producer, Consumer}) ->
     consume(Consumer, 100),
     timeout = ping(Consumer),
 
-    Item = produce(Producer, 11),
+    Item = produce(Q, Producer, 11, false),
     ok = ping(Producer),
 
     ok = ping(Consumer),
@@ -250,10 +250,10 @@ should_receive_first_queued_item({Q, Producer, Consumer}) ->
     {ok, Items} = last_consumer_items(Consumer),
     ?_assertEqual([Item], Items).
 
-should_consume_all({_, Producer, Consumer}) ->
-    Item1 = produce(Producer, 10),
-    Item2 = produce(Producer, 15),
-    Item3 = produce(Producer, 20),
+should_consume_all({Q, Producer, Consumer}) ->
+    Item1 = produce(Q, Producer, 10, true),
+    Item2 = produce(Q, Producer, 15, true),
+    Item3 = produce(Q, Producer, 20, true),
 
     consume(Consumer, all),
 
@@ -261,13 +261,13 @@ should_consume_all({_, Producer, Consumer}) ->
     ?_assertEqual([Item1, Item2, Item3], Items).
 
 should_timeout_on_close_non_empty_queue({Q, Producer, _}) ->
-    produce(Producer, 1),
+    produce(Q, Producer, 1, true),
     Status = close_queue(Q),
 
     ?_assertEqual(timeout, Status).
 
 should_not_block_producer_for_non_empty_queue_after_close({Q, Producer, _}) ->
-    produce(Producer, 1),
+    produce(Q, Producer, 1, true),
     close_queue(Q),
     Pong = ping(Producer),
     Size = couch_work_queue:size(Q),
@@ -354,10 +354,14 @@ last_consumer_items(Consumer) ->
         timeout
     end.
 
-produce(Producer, Size) ->
+produce(Q, Producer, Size, Wait) ->
     Ref = make_ref(),
+    ItemsCount = couch_work_queue:item_count(Q),
     Producer ! {produce, Ref, Size},
     receive
+        {item, Ref, Item} when Wait ->
+            ok = wait_increment(Q, ItemsCount),
+            Item;
         {item, Ref, Item} ->
             Item
     after ?TIMEOUT ->
@@ -386,3 +390,13 @@ stop(Pid, Name) ->
         ?debugMsg("Timeout stopping " ++ Name),
         timeout
     end.
+
+wait_increment(Q, ItemsCount) ->
+    test_util:wait(fun() ->
+       case couch_work_queue:item_count(Q) > ItemsCount of
+           true ->
+               ok;
+           false ->
+               wait
+       end
+    end).
