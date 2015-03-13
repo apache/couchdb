@@ -1,10 +1,15 @@
 -module(couchperuser).
 -behaviour(gen_server).
+-behaviour(config_listener).
 
 -include_lib("couch/include/couch_db.hrl").
 
+% gen_server callbacks
 -export([start_link/0, init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
+
+% config_listener callbacks
+-export([handle_config_change/5, handle_config_terminate/3]).
 
 -export([init_changes/2, change_filter/3]).
 
@@ -19,24 +24,29 @@ start_link() ->
     gen_server:start_link({local, ?NAME}, ?MODULE, [], []).
 
 init([]) ->
-    ?LOG_DEBUG("couchperuser daemon: starting link.", []),
-    Db_Name = ?l2b(couch_config:get(
+    couch_log:debug("couchperuser daemon: starting link.", []),
+    Db_Name = ?l2b(config:get(
                      "couch_httpd_auth", "authentication_db", "_users")),
-    ok = watch_config_changes(),
-    {Pid, Ref} = spawn_opt(?MODULE, init_changes, [self(), Db_Name],
+    Server = self(),
+    ok = config:listen_for_changes(?MODULE, Server),
+    {Pid, Ref} = spawn_opt(?MODULE, init_changes, [Server, Db_Name],
                            [link, monitor]),
     {ok, #state{db_name=Db_Name,
                 changes_pid=Pid,
                 changes_ref=Ref}}.
 
-watch_config_changes() ->
-    Server = self(),
-    couch_config:register(
-      fun ("couch_httpd_auth", "authentication_db", _Value, _Persist) ->
-              gen_server:cast(Server, stop);
-          (_Section, _Key, _Value, _Persist) ->
-              ok
-      end).
+handle_config_change("couch_httpd_auth", "authentication_db", _Value, _Persist, State) ->
+   gen_server:cast(State, stop),
+   remove_handler;
+handle_config_change(_Section, _Key, _Value, _Persist, State) ->
+    {ok, State}.
+
+handle_config_terminate(_, stop, _) -> ok;
+handle_config_terminate(Self, _, _) ->
+    spawn(fun() ->
+        timer:sleep(5000),
+        config:listen_for_changes(?MODULE, Self)
+    end).
 
 admin_ctx() ->
     {user_ctx, #user_ctx{roles=[<<"_admin">>]}}.
@@ -44,7 +54,7 @@ admin_ctx() ->
 init_changes(Parent, Db_Name) ->
     {ok, Db} = couch_db:open_int(Db_Name, [admin_ctx(), sys_db]),
     FunAcc = {fun ?MODULE:change_filter/3, #filter{server=Parent}},
-    (couch_changes:handle_changes(
+    (couch_changes:handle_db_changes(
        #changes_args{feed="continuous", timeout=infinity},
        {json_req, null},
        Db))(FunAcc).
@@ -58,12 +68,8 @@ change_filter({change, {Doc}, _Prepend}, _ResType, Acc=#filter{}) ->
                     %% TODO: Let's not complicate this with GC for now!
                     Acc;
                 false ->
-                    {ok, Db} = ensure_user_db(User),
-                    try
-                        ensure_security(User, Db)
-                    after
-                        couch_db:close(Db)
-                    end,
+                    UserDb = ensure_user_db(User),
+                    ensure_security(User, UserDb),
                     Acc
             end;
         _ ->
@@ -78,13 +84,13 @@ terminate(_Reason, _State) ->
     ok.
 
 ensure_user_db(User) ->
-    User_Db = user_db_name(User),
-    case couch_db:open_int(User_Db, [admin_ctx(), nologifmissing]) of
-        Ok={ok, _Db} ->
-            Ok;
-        _Err ->
-            couch_db:create(User_Db, [admin_ctx()])
-    end.
+    UserDb = user_db_name(User),
+    try
+        fabric_db_info:go(UserDb)
+    catch error:database_does_not_exist ->
+        fabric_db_create:go(UserDb, [admin_ctx()])
+    end,
+    UserDb.
 
 add_user(User, Prop, {Modified, SecProps}) ->
     {PropValue} = couch_util:get_value(Prop, SecProps, {[]}),
@@ -102,8 +108,11 @@ add_user(User, Prop, {Modified, SecProps}) ->
                    {<<"names">>, [User | Names]})}})}
     end.
 
-ensure_security(User, Db) ->
-    {SecProps} = couch_db:get_security(Db),
+ensure_security(User, UserDb) ->
+    {ok, Shards} = fabric_db_meta:get_all_security(UserDb, [admin_ctx()]),
+    % We assume that all shards have the same security object, and
+    % therefore just pick the first one.
+    {_ShardInfo, {SecProps}} = hd(Shards),
     case lists:foldl(
            fun (Prop, SAcc) -> add_user(User, Prop, SAcc) end,
            {false, SecProps},
@@ -111,7 +120,7 @@ ensure_security(User, Db) ->
         {false, _} ->
             ok;
         {true, SecProps1} ->
-            couch_db:set_security(Db, {SecProps1})
+            fabric_db_meta:set_security(UserDb, {SecProps1}, [admin_ctx()])
     end.
 
 user_db_name(User) ->
