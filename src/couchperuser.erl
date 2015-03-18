@@ -124,7 +124,8 @@ ensure_security(User, UserDb) ->
     end.
 
 user_db_name(User) ->
-    <<"userdb-", (iolist_to_binary(mochihex:to_hex(User)))/binary>>.
+    HexUser = list_to_binary([integer_to_list(X, 16) || <<X>> <= User]),
+    <<"userdb-", HexUser/binary>>.
 
 handle_call(_Msg, _From, State) ->
     {reply, error, State}.
