@@ -180,30 +180,7 @@ If everything was successful you should see the following message:
 
 Relax.
 
-First Run
----------
-
-You can start the CouchDB server by running:
-
-    sudo -i -u couchdb couchdb
-
-This uses the `sudo` command to run the `couchdb` command as the
-`couchdb` user.
-
-When CouchDB starts it should eventually display the following
-message:
-
-    Apache CouchDB has started, time to relax.
-
-Relax.
-
-To check that everything has worked, point your web browser to:
-
-    http://127.0.0.1:5984/_utils/index.html
-
-From here you should run the test suite in Firefox.
-
-Security Considerations
+User Registration
 -----------------------
 
 You should create a special `couchdb` user for CouchDB.
@@ -250,6 +227,29 @@ Change the permission of the CouchDB directories by running:
 Update the permissions for your `default.ini` file:
 
     chmod 0644 /usr/local/etc/couchdb/default.ini
+
+First Run
+---------
+
+You can start the CouchDB server by running:
+
+    sudo -i -u couchdb couchdb
+
+This uses the `sudo` command to run the `couchdb` command as the
+`couchdb` user.
+
+When CouchDB starts it should eventually display the following
+message:
+
+    Apache CouchDB has started, time to relax.
+
+Relax.
+
+To check that everything has worked, point your web browser to:
+
+    http://127.0.0.1:5984/_utils/index.html
+
+From here you should run the test suite in Firefox.
 
 Running as a Daemon
 -------------------
