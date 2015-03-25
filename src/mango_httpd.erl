@@ -20,6 +20,7 @@
 
 -include_lib("couch/include/couch_db.hrl").
 -include("mango.hrl").
+-include("mango_idx.hrl").
 
 
 handle_req(#httpd{} = Req, Db0) ->
@@ -58,6 +59,8 @@ handle_index_req(#httpd{method='POST', path_parts=[_, _]}=Req, Db) ->
     {ok, Idx0} = mango_idx:new(Db, Opts),
     {ok, Idx} = mango_idx:validate(Idx0),
     {ok, DDoc} = mango_util:load_ddoc(Db, mango_idx:ddoc(Idx)),
+    Id = Idx#idx.ddoc,
+    Name = Idx#idx.name,
     Status = case mango_idx:add(DDoc, Idx) of
         {ok, DDoc} ->
             <<"exists">>;
@@ -75,7 +78,7 @@ handle_index_req(#httpd{method='POST', path_parts=[_, _]}=Req, Db) ->
                     ?MANGO_ERROR(error_saving_ddoc)
             end
     end,
-	chttpd:send_json(Req, {[{result, Status}]});
+	chttpd:send_json(Req, {[{result, Status}, {id, Id}, {name, Name}]});
 
 handle_index_req(#httpd{method='DELETE',
         path_parts=[A, B, <<"_design">>, DDocId0, Type, Name]}=Req, Db) ->

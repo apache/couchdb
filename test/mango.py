@@ -96,6 +96,8 @@ class Database(object):
         body = json.dumps(body)
         r = self.sess.post(self.path("_index"), data=body)
         r.raise_for_status()
+        assert r.json()["id"] is not None
+        assert r.json()["name"] is not None
         return r.json()["result"] == "created"
 
     def create_text_index(self, analyzer=None, selector=None, idx_type="text",
@@ -176,7 +178,7 @@ class DbPerClass(unittest.TestCase):
 
     @classmethod
     def setUpClass(klass):
-        klass.db = Database("127.0.0.1", "5984", random_db_name())
+        klass.db = Database("127.0.0.1", "15984", random_db_name())
         klass.db.create(q=1, n=3)
 
     def setUp(self):
