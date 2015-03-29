@@ -76,4 +76,37 @@ couchTests.http = function(debug) {
   TEquals(CouchDB.protocol + host + "/test_suite_db/docidtestpost%250A",
     xhr.getResponseHeader("Location"),
     "should work with newlines in document names");
+
+  // COUCHDB-2433: download views with Content-Disposition: attachment
+  xhr = CouchDB.request("POST", "/test_suite_db/", {
+    body: JSON.stringify({"_id": "doc_i_want_to_download"}),
+    headers: {"Content-Type": "application/json"}
+  });
+  xhr = CouchDB.request("GET", "/test_suite_db/doc_i_want_to_download?download=true", {
+    headers: {"Content-Type": "application/json"}
+  });
+  TEquals("attachment", xhr.getResponseHeader("Content-Disposition"),
+    "sends the right Content-Disposition header");
+  xhr = CouchDB.request("GET", "/test_suite_db/doc_i_want_to_download", {
+    headers: {"Content-Type": "application/json"}
+  });
+  TEquals(null, xhr.getResponseHeader("Content-Disposition"),
+    "does not send the Content-Disposition header");
+
+  xhr = CouchDB.request("POST", "/test_suite_db/", {
+    body: JSON.stringify({"_id": "_design/foo"}),
+    headers: {"Content-Type": "application/json"}
+  });
+  xhr = CouchDB.request("GET", "/test_suite_db/doc_i_want_to_download?download=true", {
+    headers: {"Content-Type": "application/json"}
+  });
+  TEquals("attachment", xhr.getResponseHeader("Content-Disposition"),
+    "sends the right Content-Disposition header for design docs");
+  xhr = CouchDB.request("GET", "/test_suite_db/doc_i_want_to_download", {
+    headers: {"Content-Type": "application/json"}
+  });
+  TEquals(null, xhr.getResponseHeader("Content-Disposition"),
+    "does not send the Content-Disposition header");
+
+
 }
