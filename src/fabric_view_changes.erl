@@ -13,6 +13,7 @@
 -module(fabric_view_changes).
 
 -export([go/5, pack_seqs/1, unpack_seqs/2]).
+-export([increment_changes_epoch/0]).
 
 %% exported for upgrade purposes.
 -export([keep_sending_changes/8]).
@@ -37,6 +38,7 @@ go(DbName, Feed, Options, Callback, Acc0) when Feed == "continuous" orelse
         UpdateListener = {spawn_link(fabric_db_update_listener, go,
                                      [Parent, Ref, DbName, Timeout]),
                           Ref},
+        put(changes_epoch, get_changes_epoch()),
         try
             keep_sending_changes(
                 DbName,
@@ -86,8 +88,9 @@ keep_sending_changes(DbName, Args, Callback, Seqs, AccIn, Timeout, UpListen, T0)
     } = Collector,
     LastSeq = pack_seqs(NewSeqs),
     MaintenanceMode = config:get("couchdb", "maintenance_mode"),
+    NewEpoch = get_changes_epoch() > erlang:get(changes_epoch),
     if Limit > Limit2, Feed == "longpoll";
-      MaintenanceMode == "true"; MaintenanceMode == "nolb" ->
+      MaintenanceMode == "true"; MaintenanceMode == "nolb"; NewEpoch ->
         Callback({stop, LastSeq, pending_count(Offset)}, AccOut);
     true ->
         WaitForUpdate = wait_db_updated(UpListen),
@@ -458,6 +461,18 @@ validate_start_seq(DbName, Seq) ->
             Reason = <<"Malformed sequence supplied in 'since' parameter.">>,
             {error, {bad_request, Reason}}
     end.
+
+get_changes_epoch() ->
+    case application:get_env(fabric, changes_epoch) of
+        undefined ->
+            increment_changes_epoch(),
+            get_changes_epoch();
+        {ok, Epoch} ->
+            Epoch
+    end.
+
+increment_changes_epoch() ->
+    application:set_env(fabric, changes_epoch, os:timestamp()).
 
 unpack_seqs_test() ->
     meck:new(mem3),

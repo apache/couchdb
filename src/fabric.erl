@@ -29,7 +29,7 @@
 
 % Views
 -export([all_docs/4, all_docs/5, changes/4, query_view/3, query_view/4,
-    query_view/6, get_view_group_info/2]).
+    query_view/6, get_view_group_info/2, end_changes/0]).
 
 % miscellany
 -export([design_docs/1, reset_validation_funs/1, cleanup_index_files/0,
@@ -361,6 +361,10 @@ query_view(DbName, DDoc, ViewName, Callback, Acc0, QueryArgs0) ->
     ]}.
 get_view_group_info(DbName, DesignId) ->
     fabric_group_info:go(dbname(DbName), design_doc(DesignId)).
+
+-spec end_changes() -> ok.
+end_changes() ->
+    fabric_view_changes:increment_changes_epoch().
 
 %% @doc retrieve all the design docs from a database
 -spec design_docs(dbname()) -> {ok, [json_obj()]}.
