@@ -21,7 +21,7 @@
 go(_, [], _) ->
     {ok, []};
 go(DbName, AllDocs0, Opts) ->
-    AllDocs1 = before_doc_update(DbName, AllDocs0),
+    AllDocs1 = before_doc_update(DbName, AllDocs0, Opts),
     AllDocs = tag_docs(AllDocs1),
     validate_atomic_update(DbName, AllDocs, lists:member(all_or_nothing, Opts)),
     Options = lists:delete(all_or_nothing, Opts),
@@ -98,12 +98,13 @@ handle_message({not_found, no_db_file} = X, Worker, Acc0) ->
 handle_message({bad_request, Msg}, _, _) ->
     throw({bad_request, Msg}).
 
-before_doc_update(DbName, Docs) ->
+before_doc_update(DbName, Docs, Opts) ->
+    Db = fake_db(Opts),
     case {is_replicator_db(DbName), is_users_db(DbName)} of
         {true, _} ->
-            lists:map(fun couch_replicator_manager:before_doc_update/1, Docs);
+            [couch_replicator_manager:before_doc_update(Doc, Db) || Doc <- Docs];
         {_, true} ->
-            lists:map(fun couch_users_db:before_doc_update/1, Docs);
+            [couch_users_db:before_doc_update(Doc, Db) || Doc <- Docs];
         _ ->
             Docs
     end.
@@ -119,6 +120,10 @@ is_users_db(DbName) ->
 
 path_ends_with(Path, Suffix) ->
     Suffix == lists:last(binary:split(mem3:dbname(Path), <<"/">>, [global])).
+
+fake_db(Opts) ->
+    {user_ctx, UserCtx} = lists:keyfind(user_ctx, 1, Opts),
+    #db{user_ctx = UserCtx}.
 
 tag_docs([]) ->
     [];
