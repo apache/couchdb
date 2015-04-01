@@ -42,7 +42,7 @@ valid() ->
 %% that no shard would end up with N<Threshold when the node is offline
 -spec safe_to_rebuild(atom(), integer()) -> [list()].
 safe_to_rebuild(Node, RawThreshold) ->
-    Threshold = case config:get("cloudant", "maintenance_mode") of
+    Threshold = case config:get("couchdb", "maintenance_mode") of
         "true" ->
             RawThreshold - 1;
         _ ->
