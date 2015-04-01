@@ -70,6 +70,8 @@ eunit: couch
 	@rebar -r eunit skip_deps=meck,mochiweb,lager,snappy,couch_replicator,fabric,folsom
 
 javascript: all
+	@mkdir -p share/www/script/test
+	@cp test/javascript/tests/lorem*.txt share/www/script/test/
 	@dev/run -q test/javascript/run
 
 fauxton: share/www
