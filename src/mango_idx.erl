@@ -41,7 +41,8 @@
     end_key/2,
     cursor_mod/1,
     idx_mod/1,
-    to_json/1
+    to_json/1,
+    delete/4
 ]).
 
 
@@ -132,6 +133,28 @@ remove(DDoc, Idx) ->
     % Round trip through JSON for normalization
     Body = ?JSON_DECODE(?JSON_ENCODE(NewDDoc#doc.body)),
     {ok, NewDDoc#doc{body = Body}}.
+
+
+delete(Filt, Db, Indexes, DelOpts) ->
+    case lists:filter(Filt, Indexes) of
+        [Idx] ->
+            {ok, DDoc} = mango_util:load_ddoc(Db, mango_idx:ddoc(Idx)),
+            {ok, NewDDoc} = mango_idx:remove(DDoc, Idx),
+            FinalDDoc = case NewDDoc#doc.body of
+                {[{<<"language">>, <<"query">>}]} ->
+                    NewDDoc#doc{deleted = true, body = {[]}};
+                _ ->
+                    NewDDoc
+            end,
+            case mango_crud:insert(Db, FinalDDoc, DelOpts) of
+                {ok, _} ->
+                    {ok, true};
+                Error ->
+                    {error, Error}
+            end;
+        [] ->
+            {error, not_found}
+    end.
 
 
 from_ddoc(Db, {Props}) ->

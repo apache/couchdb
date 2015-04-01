@@ -65,7 +65,7 @@ handle_index_req(#httpd{method='POST', path_parts=[_, _]}=Req, Db) ->
         {ok, DDoc} ->
             <<"exists">>;
         {ok, NewDDoc} ->
-            CreateOpts = get_idx_create_opts(Opts),
+            CreateOpts = get_idx_w_opts(Opts),
             case mango_crud:insert(Db, NewDDoc, CreateOpts) of
                 {ok, [{RespProps}]} ->
                     case lists:keyfind(error, 1, RespProps) of
@@ -80,6 +80,28 @@ handle_index_req(#httpd{method='POST', path_parts=[_, _]}=Req, Db) ->
     end,
 	chttpd:send_json(Req, {[{result, Status}, {id, Id}, {name, Name}]});
 
+%% Essentially we just iterate through the list of ddoc ids passed in and
+%% delete one by one. If an error occurs, all previous documents will be
+%% deleted, but an error will be thrown for the current ddoc id.
+handle_index_req(#httpd{method='POST', path_parts=[_, <<"_index">>,
+        <<"_bulk_delete">>]}=Req, Db) ->
+    {ok, Opts} = mango_opts:validate_bulk_delete(chttpd:json_body_obj(Req)),
+    Idxs = mango_idx:list(Db),
+    DDocs = get_bulk_delete_ddocs(Opts),
+    DelOpts = get_idx_w_opts(Opts),
+    {Success, Fail} = lists:foldl(fun(DDocId0, {Success0, Fail0}) ->
+        DDocId = convert_to_design_id(DDocId0),
+        Filt = fun(Idx) -> mango_idx:ddoc(Idx) == DDocId end,
+        Id = {<<"id">>, DDocId},
+        case mango_idx:delete(Filt, Db, Idxs, DelOpts) of
+            {ok, true} ->
+                {[{[Id, {<<"ok">>, true}]} | Success0], Fail0};
+            {error, Error} ->
+                {Success0, [{[Id, {<<"error">>, Error}]} | Fail0]}
+        end
+    end, {[], []}, DDocs),
+    chttpd:send_json(Req, {[{<<"success">>, Success}, {<<"fail">>, Fail}]});
+
 handle_index_req(#httpd{method='DELETE',
         path_parts=[A, B, <<"_design">>, DDocId0, Type, Name]}=Req, Db) ->
     PathParts = [A, B, <<"_design/", DDocId0/binary>>, Type, Name],
@@ -87,36 +109,22 @@ handle_index_req(#httpd{method='DELETE',
 
 handle_index_req(#httpd{method='DELETE',
         path_parts=[_, _, DDocId0, Type, Name]}=Req, Db) ->
-    DDocId = case DDocId0 of
-        <<"_design/", _/binary>> -> DDocId0;
-        _ -> <<"_design/", DDocId0/binary>>
-    end,
     Idxs = mango_idx:list(Db),
+    DDocId = convert_to_design_id(DDocId0),
+    DelOpts = get_idx_del_opts(Req),
     Filt = fun(Idx) ->
         IsDDoc = mango_idx:ddoc(Idx) == DDocId,
         IsType = mango_idx:type(Idx) == Type,
         IsName = mango_idx:name(Idx) == Name,
         IsDDoc andalso IsType andalso IsName
     end,
-    case lists:filter(Filt, Idxs) of
-        [Idx] ->
-            {ok, DDoc} = mango_util:load_ddoc(Db, mango_idx:ddoc(Idx)),
-            {ok, NewDDoc} = mango_idx:remove(DDoc, Idx),
-            FinalDDoc = case NewDDoc#doc.body of
-                {[{<<"language">>, <<"query">>}]} ->
-                    NewDDoc#doc{deleted = true, body = {[]}};
-                _ ->
-                    NewDDoc
-            end,
-            DelOpts = get_idx_del_opts(Req),
-            case mango_crud:insert(Db, FinalDDoc, DelOpts) of
-                {ok, _} ->
-                    chttpd:send_json(Req, {[{ok, true}]});
-                _ ->
-                    ?MANGO_ERROR(error_saving_ddoc)
-            end;
-        [] ->
-            throw({not_found, missing})
+    case mango_idx:delete(Filt, Db, Idxs, DelOpts) of
+        {ok, true} ->
+            chttpd:send_json(Req, {[{ok, true}]});
+        {error, not_found} ->
+            throw({not_found, missing});
+        {error, Error} ->
+            ?MANGO_ERROR({error_saving_ddoc, Error})
     end;
 
 handle_index_req(Req, _Db) ->
@@ -148,12 +156,21 @@ set_user_ctx(#httpd{user_ctx=Ctx}, Db) ->
     Db#db{user_ctx=Ctx}.
 
 
-get_idx_create_opts(Opts) ->
+get_idx_w_opts(Opts) ->
     case lists:keyfind(w, 1, Opts) of
         {w, N} when is_integer(N), N > 0 ->
             [{w, integer_to_list(N)}];
         _ ->
             [{w, "2"}]
+    end.
+
+
+get_bulk_delete_ddocs(Opts) ->
+    case lists:keyfind(docids, 1, Opts) of
+        {docids, DDocs} when is_list(DDocs) ->
+            DDocs;
+        _ ->
+            []
     end.
 
 
@@ -164,6 +181,13 @@ get_idx_del_opts(Req) ->
         [{w, WStr}]
     catch _:_ ->
         [{w, "2"}]
+    end.
+
+
+convert_to_design_id(DDocId) ->
+    case DDocId of
+        <<"_design/", _/binary>> -> DDocId;
+        _ -> <<"_design/", DDocId/binary>>
     end.
 
 

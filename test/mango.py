@@ -135,6 +135,15 @@ class Database(object):
         r = self.sess.delete(self.path(path), params={"w":"3"})
         r.raise_for_status()
 
+    def bulk_delete(self, docs):
+        body = {
+            "docids" : docs,
+            "w": 3
+        }
+        body = json.dumps(body)
+        r = self.sess.post(self.path("_index/_bulk_delete"), data=body)
+        return r.json()
+
     def find(self, selector, limit=25, skip=0, sort=None, fields=None,
                 r=1, conflicts=False, use_index=None, explain=False,
                 bookmark=None, return_raw=False):

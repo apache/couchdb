@@ -150,6 +150,36 @@ class IndexCrudTests(mango.DbPerClass):
         post_indexes = self.db.list_indexes()
         assert pre_indexes == post_indexes
 
+    def test_bulk_delete(self):
+        fields = ["field1"]
+        ret = self.db.create_index(fields, name="idx_01")
+        assert ret is True
+
+        fields = ["field2"]
+        ret = self.db.create_index(fields, name="idx_02")
+        assert ret is True
+
+        fields = ["field3"]
+        ret = self.db.create_index(fields, name="idx_03")
+        assert ret is True
+
+        docids = []
+
+        for idx in self.db.list_indexes():
+            if idx["ddoc"] is not None:
+                docids.append(idx["ddoc"])
+
+        docids.append("_design/this_is_not_an_index_name")
+
+        ret = self.db.bulk_delete(docids)
+
+        assert ret["fail"][0]["id"] == "_design/this_is_not_an_index_name"
+        assert len(ret["success"]) == 3
+
+        for idx in self.db.list_indexes():
+            assert idx["type"] != "json"
+            assert idx["type"] != "text"
+
     def test_recreate_index(self):
         pre_indexes = self.db.list_indexes()
         for i in range(5):

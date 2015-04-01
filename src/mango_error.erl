@@ -110,6 +110,13 @@ info(mango_idx_view, {index_not_found, BadIdx}) ->
         fmt("JSON index ~s not found in this design doc.", [BadIdx])
     };
 
+info(mango_opts, {invalid_bulk_docs, Val}) ->
+    {
+        400,
+        <<"invalid_bulk_docs">>,
+        fmt("Bulk Delete requires an array of non-null docids. Docids: ~w",
+            [Val])
+    };
 info(mango_opts, {invalid_ejson, Val}) ->
     {
         400,
