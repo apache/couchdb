@@ -96,7 +96,7 @@ cluster_n() ->
     list_to_integer(config:get("cluster", "n", "3")).
 
 maintenance_nodes(Nodes) ->
-    {Modes, _} = rpc:multicall(Nodes, config, get, ["cloudant", "maintenance_mode"]),
+    {Modes, _} = rpc:multicall(Nodes, config, get, ["couchdb", "maintenance_mode"]),
     [N || {N, Mode} <- lists:zip(Nodes, Modes), Mode =:= "true"].
 
 load_shards(Db, #full_doc_info{id = Id} = FDI) ->
