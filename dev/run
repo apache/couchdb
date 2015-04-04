@@ -52,7 +52,7 @@ def log(msg):
                     sys.stdout.flush()
             callargs = dict(zip(inspect.getargspec(func).args, args))
             callargs.update(kwargs)
-            print_(msg.format(**callargs) + ' ... ')
+            print_('[ * ] ' + msg.format(**callargs) + ' ... ')
             try:
                 res = func(*args, **kwargs)
             except KeyboardInterrupt:
