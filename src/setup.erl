@@ -168,7 +168,7 @@ get_port(Port) when is_binary(Port) ->
     Port.
 
 create_node_doc(Host, Port) ->
-    {ok, Db} = couch_db:open_int(<<"nodes">>, []),
+    {ok, Db} = couch_db:open_int(<<"_nodes">>, []),
     Name = get_name(Port),
     Doc = {[{<<"_id">>, <<Name/binary, "@", Host/binary>>}]},
     Options = [],
