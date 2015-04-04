@@ -77,3 +77,20 @@
         end)())
     end).
 -endif.
+-ifndef(assertNotEqual).
+-define(assertNotEqual(Unexpected, Expr),
+    begin
+    ((fun (__X) ->
+        case (Expr) of
+        __X -> erlang:error({assertNotEqual_failed,
+                     [{module, ?MODULE},
+                      {line, ?LINE},
+                      {expression, (??Expr)},
+                      {value, __X}]});
+        _ -> ok
+        end
+      end)(Unexpected))
+    end).
+-define(_assertNotEqual(Unexpected, Expr),
+    ?_test(?assertNotEqual(Unexpected, Expr))).
+-endif.
