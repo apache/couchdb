@@ -50,13 +50,13 @@ def log(msg):
                     sys.stdout.flush()
             callargs = dict(zip(inspect.getargspec(func).args, args))
             callargs.update(kwargs)
-            print_(msg.format(**callargs) + '... ')
+            print_(msg.format(**callargs) + ' ... ')
             try:
                 res = func(*args, **kwargs)
             except KeyboardInterrupt:
                 print_('ok\n')
-            except:
-                print_('failed\n')
+            except Exception as err:
+                print_('failed: %s\n' % err)
                 raise
             else:
                 print_('ok\n')
@@ -230,6 +230,7 @@ def hashify(pwd, salt=COMMON_SALT, iterations=10, keylen=20):
 def startup(ctx):
     atexit.register(kill_processes, ctx)
     boot_nodes(ctx)
+    ensure_all_nodes_alive(ctx)
     join_nodes(ctx, "127.0.0.1", 15986)
 
 
@@ -243,30 +244,44 @@ def boot_nodes(ctx):
     for node in ctx['nodes']:
         ctx['procs'].append(boot_node(ctx, node))
 
-    ensure_nodes_stated(ctx)
 
-
-@log('Ensure all nodes are run')
-def ensure_nodes_stated(ctx):
-    for _ in range(30):
-        if all_nodes_alive(ctx):
-            break
-        time.sleep(1)
-
-
-def all_nodes_alive(ctx):
-    for num in range(ctx['N']):
-        local_port, _ = get_ports(num + 1)
-        url = "http://127.0.0.1:{0}/".format(local_port)
-        while True:
-            try:
-                with contextlib.closing(urlopen(url)):
-                    pass
-            except IOError:
-                time.sleep(0.25)
+def ensure_all_nodes_alive(ctx):
+    status = dict((num, False) for num in range(ctx['N']))
+    for _ in range(10):
+        for num in range(ctx['N']):
+            if status[num]:
                 continue
+            local_port, _ = get_ports(num + 1)
+            url = "http://127.0.0.1:{0}/".format(local_port)
+            try:
+                check_node_alive(url)
+            except:
+                pass
+            else:
+                status[num] = True
+        if all(status.values()):
+            return
+        time.sleep(1)
+    if not all(status.values()):
+        print('Failed to start all the nodes.'
+              ' Check the dev/logs/*.log for errors.')
+        sys.exit(1)
+
+
+@log('Check node at {url}')
+def check_node_alive(url):
+    error = None
+    for _ in range(10):
+        try:
+            with contextlib.closing(urlopen(url)):
+                pass
+        except Exception as exc:
+            error = exc
+            time.sleep(1)
+        else:
             break
-    return True
+    if error is not None:
+        raise error
 
 
 @log('Start node {node}')
@@ -332,6 +347,7 @@ def run_command(ctx, cmd):
 def reboot_nodes(ctx):
     kill_processes(ctx)
     boot_nodes(ctx)
+    ensure_all_nodes_alive(ctx)
 
 
 if __name__ == "__main__":
