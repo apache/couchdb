@@ -16,107 +16,131 @@
 
 -define(DEPTH, 10).
 
-
--ifdef(fix_broken_tests).
+setup() ->
+    test_util:start(?MODULE, [], [{dont_mock, [config]}]).
 
 key_tree_merge_test_()->
     {
         "Key tree merge",
-        [
-            should_merge_with_empty_tree(),
-            should_merge_reflexive(),
-            should_merge_prefix_of_a_tree_with_tree(),
-            should_produce_conflict_on_merge_with_unrelated_branch(),
-            should_merge_reflexive_for_child_nodes(),
-            should_merge_tree_to_itself(),
-            should_merge_tree_of_odd_length(),
-            should_merge_tree_with_stem(),
-            should_merge_with_stem_at_deeper_level(),
-            should_merge_with_stem_at_deeper_level_with_deeper_paths(),
-            should_merge_single_tree_with_deeper_stem(),
-            should_merge_tree_with_large_stem(),
-            should_merge_stems(),
-            should_create_conflicts_on_merge(),
-            should_create_no_conflicts_on_merge(),
-            should_ignore_conflicting_branch()
-        ]
+        {
+            setup,
+            fun setup/0, fun test_util:stop/1,
+            [
+                should_merge_with_empty_tree(),
+                should_merge_reflexive(),
+                should_merge_prefix_of_a_tree_with_tree(),
+                should_produce_conflict_on_merge_with_unrelated_branch(),
+                should_merge_reflexive_for_child_nodes(),
+                should_merge_tree_to_itself(),
+                should_merge_tree_of_odd_length(),
+                should_merge_tree_with_stem(),
+                should_merge_with_stem_at_deeper_level(),
+                should_merge_with_stem_at_deeper_level_with_deeper_paths(),
+                should_merge_single_tree_with_deeper_stem(),
+                should_merge_tree_with_large_stem(),
+                should_merge_stems(),
+                should_create_conflicts_on_merge(),
+                should_create_no_conflicts_on_merge(),
+                should_ignore_conflicting_branch()
+            ]
+        }
     }.
 
 key_tree_missing_leaves_test_()->
     {
         "Missing tree leaves",
-        [
-            should_not_find_missing_leaves(),
-            should_find_missing_leaves()
-        ]
+        {
+            setup,
+            fun setup/0, fun test_util:stop/1,
+            [
+                should_not_find_missing_leaves(),
+                should_find_missing_leaves()
+            ]
+        }
     }.
 
 key_tree_remove_leaves_test_()->
     {
         "Remove tree leaves",
-        [
-            should_have_no_effect_on_removing_no_leaves(),
-            should_have_no_effect_on_removing_non_existant_branch(),
-            should_remove_leaf(),
-            should_produce_empty_tree_on_removing_all_leaves(),
-            should_have_no_effect_on_removing_non_existant_node(),
-            should_produce_empty_tree_on_removing_last_leaf()
-        ]
+        {
+            setup,
+            fun setup/0, fun test_util:stop/1,
+            [
+                should_have_no_effect_on_removing_no_leaves(),
+                should_have_no_effect_on_removing_non_existant_branch(),
+                should_remove_leaf(),
+                should_produce_empty_tree_on_removing_all_leaves(),
+                should_have_no_effect_on_removing_non_existant_node(),
+                should_produce_empty_tree_on_removing_last_leaf()
+            ]
+        }
     }.
 
 key_tree_get_leaves_test_()->
     {
         "Leaves retrieving",
-        [
-            should_extract_subtree(),
-            should_extract_subsubtree(),
-            should_gather_non_existant_leaf(),
-            should_gather_leaf(),
-            shoul_gather_multiple_leaves(),
-            should_retrieve_full_key_path(),
-            should_retrieve_full_key_path_for_node(),
-            should_retrieve_leaves_with_parent_node(),
-            should_retrieve_all_leaves()
-        ]
+        {
+            setup,
+            fun setup/0, fun test_util:stop/1,
+            [
+                should_extract_subtree(),
+                should_extract_subsubtree(),
+                should_gather_non_existant_leaf(),
+                should_gather_leaf(),
+                shoul_gather_multiple_leaves(),
+                should_retrieve_full_key_path(),
+                should_retrieve_full_key_path_for_node(),
+                should_retrieve_leaves_with_parent_node(),
+                should_retrieve_all_leaves()
+            ]
+        }
     }.
 
 key_tree_leaf_counting_test_()->
     {
         "Leaf counting",
-        [
-            should_have_no_leaves_for_empty_tree(),
-            should_have_single_leaf_for_tree_with_single_node(),
-            should_have_two_leaves_for_tree_with_chindler_siblings(),
-            should_not_affect_on_leaf_counting_for_stemmed_tree()
-        ]
+        {
+            setup,
+            fun setup/0, fun test_util:stop/1,
+            [
+                should_have_no_leaves_for_empty_tree(),
+                should_have_single_leaf_for_tree_with_single_node(),
+                should_have_two_leaves_for_tree_with_chindler_siblings(),
+                should_not_affect_on_leaf_counting_for_stemmed_tree()
+            ]
+        }
     }.
 
 key_tree_stemming_test_()->
     {
         "Stemming",
-        [
-            should_have_no_effect_for_stemming_more_levels_than_exists(),
-            should_return_one_deepest_node(),
-            should_return_two_deepest_nodes()
-        ]
+        {
+            setup,
+            fun setup/0, fun test_util:stop/1,
+            [
+                should_have_no_effect_for_stemming_more_levels_than_exists(),
+                should_return_one_deepest_node(),
+                should_return_two_deepest_nodes()
+            ]
+        }
     }.
 
 
 should_merge_with_empty_tree()->
     One = {1, {"1","foo",[]}},
-    ?_assertEqual({[One], no_conflicts},
+    ?_assertEqual({[One], new_leaf},
                   couch_key_tree:merge([], One, ?DEPTH)).
 
 should_merge_reflexive()->
     One = {1, {"1","foo",[]}},
-    ?_assertEqual({[One], no_conflicts},
+    ?_assertEqual({[One], internal_node},
                   couch_key_tree:merge([One], One, ?DEPTH)).
 
 should_merge_prefix_of_a_tree_with_tree()->
     One = {1, {"1","foo",[]}},
     TwoSibs = [{1, {"1","foo",[]}},
                {1, {"2","foo",[]}}],
-    ?_assertEqual({TwoSibs, no_conflicts},
+    ?_assertEqual({TwoSibs, internal_node},
                   couch_key_tree:merge(TwoSibs, One, ?DEPTH)).
 
 should_produce_conflict_on_merge_with_unrelated_branch()->
@@ -126,18 +150,18 @@ should_produce_conflict_on_merge_with_unrelated_branch()->
     ThreeSibs = [{1, {"1","foo",[]}},
                  {1, {"2","foo",[]}},
                  {1, {"3","foo",[]}}],
-    ?_assertEqual({ThreeSibs, conflicts},
+    ?_assertEqual({ThreeSibs, new_branch},
                   couch_key_tree:merge(TwoSibs, Three, ?DEPTH)).
 
 should_merge_reflexive_for_child_nodes()->
     TwoChild = {1, {"1","foo", [{"1a", "bar", [{"1aa", "bar", []}]}]}},
-    ?_assertEqual({[TwoChild], no_conflicts},
+    ?_assertEqual({[TwoChild], internal_node},
                   couch_key_tree:merge([TwoChild], TwoChild, ?DEPTH)).
 
 should_merge_tree_to_itself()->
     TwoChildSibs = {1, {"1","foo", [{"1a", "bar", []},
                                     {"1b", "bar", []}]}},
-    ?_assertEqual({[TwoChildSibs], no_conflicts},
+    ?_assertEqual({[TwoChildSibs], new_branch},
                   couch_key_tree:merge([TwoChildSibs], TwoChildSibs, ?DEPTH)).
 
 should_merge_tree_of_odd_length()->
@@ -147,7 +171,7 @@ should_merge_tree_of_odd_length()->
     TwoChildPlusSibs = {1, {"1","foo", [{"1a", "bar", [{"1aa", "bar", []}]},
                                         {"1b", "bar", []}]}},
 
-    ?_assertEqual({[TwoChildPlusSibs], no_conflicts},
+    ?_assertEqual({[TwoChildPlusSibs], new_branch},
                   couch_key_tree:merge([TwoChild], TwoChildSibs, ?DEPTH)).
 
 should_merge_tree_with_stem()->
@@ -155,52 +179,52 @@ should_merge_tree_with_stem()->
     TwoChildSibs = {1, {"1","foo", [{"1a", "bar", []},
                                     {"1b", "bar", []}]}},
 
-    ?_assertEqual({[TwoChildSibs], no_conflicts},
+    ?_assertEqual({[TwoChildSibs], internal_node},
                   couch_key_tree:merge([TwoChildSibs], Stemmed, ?DEPTH)).
 
 should_merge_with_stem_at_deeper_level()->
     Stemmed = {3, {"1bb", "boo", []}},
     TwoChildSibs = {1, {"1","foo", [{"1a", "bar", []},
                                     {"1b", "bar", [{"1bb", "boo", []}]}]}},
-    ?_assertEqual({[TwoChildSibs], no_conflicts},
+    ?_assertEqual({[TwoChildSibs], internal_node},
                   couch_key_tree:merge([TwoChildSibs], Stemmed, ?DEPTH)).
 
 should_merge_with_stem_at_deeper_level_with_deeper_paths()->
     Stemmed = {3, {"1bb", "boo", []}},
     StemmedTwoChildSibs = [{2,{"1a", "bar", []}},
                            {2,{"1b", "bar", [{"1bb", "boo", []}]}}],
-    ?_assertEqual({StemmedTwoChildSibs, no_conflicts},
+    ?_assertEqual({StemmedTwoChildSibs, internal_node},
                   couch_key_tree:merge(StemmedTwoChildSibs, Stemmed, ?DEPTH)).
 
 should_merge_single_tree_with_deeper_stem()->
     Stemmed = {3, {"1aa", "bar", []}},
     TwoChild = {1, {"1","foo", [{"1a", "bar", [{"1aa", "bar", []}]}]}},
-    ?_assertEqual({[TwoChild], no_conflicts},
+    ?_assertEqual({[TwoChild], internal_node},
                   couch_key_tree:merge([TwoChild], Stemmed, ?DEPTH)).
 
 should_merge_tree_with_large_stem()->
     Stemmed = {2, {"1a", "bar", [{"1aa", "bar", []}]}},
     TwoChild = {1, {"1","foo", [{"1a", "bar", [{"1aa", "bar", []}]}]}},
-    ?_assertEqual({[TwoChild], no_conflicts},
+    ?_assertEqual({[TwoChild], internal_node},
                   couch_key_tree:merge([TwoChild], Stemmed, ?DEPTH)).
 
 should_merge_stems()->
     StemmedA = {2, {"1a", "bar", [{"1aa", "bar", []}]}},
     StemmedB = {3, {"1aa", "bar", []}},
-    ?_assertEqual({[StemmedA], no_conflicts},
+    ?_assertEqual({[StemmedA], internal_node},
                   couch_key_tree:merge([StemmedA], StemmedB, ?DEPTH)).
 
 should_create_conflicts_on_merge()->
     OneChild = {1, {"1","foo",[{"1a", "bar", []}]}},
     Stemmed = {3, {"1aa", "bar", []}},
-    ?_assertEqual({[OneChild, Stemmed], conflicts},
+    ?_assertEqual({[OneChild, Stemmed], new_branch},
                   couch_key_tree:merge([OneChild], Stemmed, ?DEPTH)).
 
 should_create_no_conflicts_on_merge()->
     OneChild = {1, {"1","foo",[{"1a", "bar", []}]}},
     Stemmed = {3, {"1aa", "bar", []}},
     TwoChild = {1, {"1","foo", [{"1a", "bar", [{"1aa", "bar", []}]}]}},
-    ?_assertEqual({[TwoChild], no_conflicts},
+    ?_assertEqual({[TwoChild], new_leaf},
                   couch_key_tree:merge([OneChild, Stemmed], TwoChild, ?DEPTH)).
 
 should_ignore_conflicting_branch()->
@@ -229,7 +253,7 @@ should_ignore_conflicting_branch()->
                ]}},
     {
         "COUCHDB-902",
-        ?_assertEqual({[FooBar], no_conflicts},
+        ?_assertEqual({[FooBar], new_leaf},
                       couch_key_tree:merge([Foo], Bar, ?DEPTH))
     }.
 
@@ -380,5 +404,3 @@ should_return_two_deepest_nodes()->
     TwoChild = [{0, {"1","foo", [{"1a", "bar", [{"1aa", "bar", []}]}]}}],
     Stemmed = [{1, {"1a", "bar", [{"1aa", "bar", []}]}}],
     ?_assertEqual(Stemmed, couch_key_tree:stem(TwoChild, 2)).
-
--endif.

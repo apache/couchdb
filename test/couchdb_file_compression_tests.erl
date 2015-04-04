@@ -19,9 +19,6 @@
 -define(DOCS_COUNT, 5000).
 -define(TIMEOUT, 30000).
 
-
--ifdef(run_broken_tests).
-
 setup() ->
     config:set("couchdb", "file_compression", "none", false),
     DbName = ?tempdb(),
@@ -170,45 +167,16 @@ refresh_index(DbName) ->
 compact_db(DbName) ->
     DiskSizeBefore = db_disk_size(DbName),
     {ok, Db} = couch_db:open_int(DbName, []),
-    {ok, CompactPid} = couch_db:start_compact(Db),
-    MonRef = erlang:monitor(process, CompactPid),
-    receive
-        {'DOWN', MonRef, process, CompactPid, normal} ->
-            ok;
-        {'DOWN', MonRef, process, CompactPid, Reason} ->
-            erlang:error({assertion_failed,
-                          [{module, ?MODULE},
-                           {line, ?LINE},
-                           {reason, "Error compacting database: "
-                                    ++ couch_util:to_list(Reason)}]})
-    after ?TIMEOUT ->
-        erlang:error({assertion_failed,
-                      [{module, ?MODULE},
-                       {line, ?LINE},
-                       {reason, "Timeout waiting for database compaction"}]})
-    end,
+    {ok, _CompactPid} = couch_db:start_compact(Db),
+    wait_compaction(DbName, "database", ?LINE),
     ok = couch_db:close(Db),
     DiskSizeAfter = db_disk_size(DbName),
     ?assert(DiskSizeBefore > DiskSizeAfter).
 
 compact_view(DbName) ->
     DiskSizeBefore = view_disk_size(DbName),
-    {ok, MonRef} = couch_mrview:compact(DbName, ?DDOC_ID, [monitor]),
-    receive
-        {'DOWN', MonRef, process, _CompactPid, normal} ->
-            ok;
-        {'DOWN', MonRef, process, _CompactPid, Reason} ->
-            erlang:error({assertion_failed,
-                          [{module, ?MODULE},
-                           {line, ?LINE},
-                           {reason, "Error compacting view group: "
-                                    ++ couch_util:to_list(Reason)}]})
-    after ?TIMEOUT ->
-        erlang:error({assertion_failed,
-                      [{module, ?MODULE},
-                       {line, ?LINE},
-                       {reason, "Timeout waiting for view group compaction"}]})
-    end,
+    {ok, _MonRef} = couch_mrview:compact(DbName, ?DDOC_ID, [monitor]),
+    wait_compaction(DbName, "view group", ?LINE),
     DiskSizeAfter = view_disk_size(DbName),
     ?assert(DiskSizeBefore > DiskSizeAfter).
 
@@ -216,13 +184,41 @@ db_disk_size(DbName) ->
     {ok, Db} = couch_db:open_int(DbName, []),
     {ok, Info} = couch_db:get_db_info(Db),
     ok = couch_db:close(Db),
-    couch_util:get_value(disk_size, Info).
+    active_size(Info).
 
 view_disk_size(DbName) ->
     {ok, Db} = couch_db:open_int(DbName, []),
     {ok, DDoc} = couch_db:open_doc(Db, ?DDOC_ID, [ejson_body]),
     {ok, Info} = couch_mrview:get_info(Db, DDoc),
     ok = couch_db:close(Db),
-    couch_util:get_value(disk_size, Info).
+    active_size(Info).
 
--endif.
+active_size(Info) ->
+    couch_util:get_nested_json_value({Info}, [sizes, active]).
+
+wait_compaction(DbName, Kind, Line) ->
+    WaitFun = fun() ->
+       case is_compaction_running(DbName) of
+           true -> wait;
+           false -> ok
+       end
+    end,
+    case test_util:wait(WaitFun, 10000) of
+        timeout ->
+            erlang:error({assertion_failed,
+                          [{module, ?MODULE},
+                           {line, Line},
+                           {reason, "Timeout waiting for "
+                                    ++ Kind
+                                    ++ " database compaction"}]});
+        _ ->
+            ok
+    end.
+
+is_compaction_running(DbName) ->
+    {ok, Db} = couch_db:open_int(DbName, []),
+    {ok, DbInfo} = couch_db:get_db_info(Db),
+    {ok, ViewInfo} = couch_mrview:get_info(Db, ?DDOC_ID),
+    couch_db:close(Db),
+    (couch_util:get_value(compact_running, ViewInfo) =:= true)
+        orelse (couch_util:get_value(compact_running, DbInfo) =:= true).

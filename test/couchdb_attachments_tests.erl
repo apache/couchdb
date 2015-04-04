@@ -19,22 +19,20 @@
 -define(ATT_BIN_NAME, <<"logo.png">>).
 -define(ATT_TXT_NAME, <<"file.erl">>).
 -define(FIXTURE_PNG, filename:join([?FIXTURESDIR, "logo.png"])).
--define(FIXTURE_TXT, ?FILE).
+-define(FIXTURE_TXT, ?ABS_PATH(?FILE)).
 -define(TIMEOUT, 1000).
 -define(TIMEOUT_EUNIT, 10).
 -define(TIMEWAIT, 100).
 -define(i2l(I), integer_to_list(I)).
 
 
--ifdef(run_broken_tests).
-
 start() ->
-    ok = test_util:start_couch(),
+    Ctx = test_util:start_couch(),
     % ensure in default compression settings for attachments_compression_tests
     config:set("attachments", "compression_level",
                      ?i2l(?COMPRESSION_LEVEL), false),
     config:set("attachments", "compressible_types", "text/*", false),
-    ok.
+    Ctx.
 
 setup() ->
     DbName = ?tempdb(),
@@ -191,7 +189,7 @@ should_upload_attachment_by_chunks_without_md5({Host, DbName}) ->
         AttUrl = string:join(["", DbName, ?docid(), "readme.txt"], "/"),
         AttData = <<"We all live in a yellow submarine!">>,
         <<Part1:21/binary, Part2:13/binary>> = AttData,
-        Body = chunked_body([Part1, Part2]),
+        Body = [chunked_body([Part1, Part2]), "\r\n"],
         Headers = [
             {"Content-Type", "text/plain"},
             {"Transfer-Encoding", "chunked"},
@@ -222,7 +220,7 @@ should_upload_attachment_by_chunks_with_valid_md5_header({Host, DbName}) ->
         AttUrl = string:join(["", DbName, ?docid(), "readme.txt"], "/"),
         AttData = <<"We all live in a yellow submarine!">>,
         <<Part1:21/binary, Part2:13/binary>> = AttData,
-        Body = chunked_body([Part1, Part2]),
+        Body = [chunked_body([Part1, Part2]), "\r\n"],
         Headers = [
             {"Content-Type", "text/plain"},
             {"Content-MD5", ?b2l(base64:encode(couch_util:md5(AttData)))},
@@ -241,7 +239,7 @@ should_upload_attachment_by_chunks_with_valid_md5_trailer({Host, DbName}) ->
         <<Part1:21/binary, Part2:13/binary>> = AttData,
         Body = [chunked_body([Part1, Part2]),
                 "Content-MD5: ", base64:encode(couch_util:md5(AttData)),
-                "\r\n"],
+                "\r\n\r\n"],
         Headers = [
             {"Content-Type", "text/plain"},
             {"Host", Host},
@@ -275,7 +273,7 @@ should_reject_chunked_attachment_with_invalid_md5({Host, DbName}) ->
         AttUrl = string:join(["", DbName, ?docid(), "readme.txt"], "/"),
         AttData = <<"We all live in a yellow submarine!">>,
         <<Part1:21/binary, Part2:13/binary>> = AttData,
-        Body = chunked_body([Part1, Part2]),
+        Body = [chunked_body([Part1, Part2]), "\r\n"],
         Headers = [
             {"Content-Type", "text/plain"},
             {"Content-MD5", ?b2l(base64:encode(<<"foobar!">>))},
@@ -295,7 +293,7 @@ should_reject_chunked_attachment_with_invalid_md5_trailer({Host, DbName}) ->
         <<Part1:21/binary, Part2:13/binary>> = AttData,
         Body = [chunked_body([Part1, Part2]),
                 "Content-MD5: ", base64:encode(<<"foobar!">>),
-                "\r\n"],
+                "\r\n\r\n"],
         Headers = [
             {"Content-Type", "text/plain"},
             {"Host", Host},
@@ -365,7 +363,7 @@ should_get_doc_with_att_data(compressed, {Data, {_, DocUrl, _}}) ->
         {ok, Code, _, Body} = test_request:get(
             Url, [{"Accept", "application/json"}]),
         ?assertEqual(200, Code),
-        Json = ejson:decode(Body),
+        Json = jiffy:decode(Body),
         AttJson = couch_util:get_nested_json_value(
             Json, [<<"_attachments">>, ?ATT_TXT_NAME]),
         AttData = couch_util:get_nested_json_value(
@@ -381,7 +379,7 @@ should_get_doc_with_att_data({text, _}, {Data, {_, DocUrl, _}}) ->
         {ok, Code, _, Body} = test_request:get(
             Url, [{"Accept", "application/json"}]),
         ?assertEqual(200, Code),
-        Json = ejson:decode(Body),
+        Json = jiffy:decode(Body),
         AttJson = couch_util:get_nested_json_value(
             Json, [<<"_attachments">>, ?ATT_TXT_NAME]),
         AttData = couch_util:get_nested_json_value(
@@ -397,7 +395,7 @@ should_get_doc_with_att_data({binary, _}, {Data, {_, DocUrl, _}}) ->
         {ok, Code, _, Body} = test_request:get(
             Url, [{"Accept", "application/json"}]),
         ?assertEqual(200, Code),
-        Json = ejson:decode(Body),
+        Json = jiffy:decode(Body),
         AttJson = couch_util:get_nested_json_value(
             Json, [<<"_attachments">>, ?ATT_BIN_NAME]),
         AttData = couch_util:get_nested_json_value(
@@ -414,7 +412,7 @@ should_get_doc_with_att_data_stub(compressed, {Data, {_, DocUrl, _}}) ->
         {ok, Code, _, Body} = test_request:get(
             Url, [{"Accept", "application/json"}]),
         ?assertEqual(200, Code),
-        Json = ejson:decode(Body),
+        Json = jiffy:decode(Body),
         {AttJson} = couch_util:get_nested_json_value(
             Json, [<<"_attachments">>, ?ATT_TXT_NAME]),
         ?assertEqual(<<"gzip">>,
@@ -430,7 +428,7 @@ should_get_doc_with_att_data_stub({text, _}, {Data, {_, DocUrl, _}}) ->
         {ok, Code, _, Body} = test_request:get(
             Url, [{"Accept", "application/json"}]),
         ?assertEqual(200, Code),
-        Json = ejson:decode(Body),
+        Json = jiffy:decode(Body),
         {AttJson} = couch_util:get_nested_json_value(
             Json, [<<"_attachments">>, ?ATT_TXT_NAME]),
         ?assertEqual(<<"gzip">>,
@@ -447,7 +445,7 @@ should_get_doc_with_att_data_stub({binary, _}, {Data, {_, DocUrl, _}}) ->
         {ok, Code, _, Body} = test_request:get(
             Url, [{"Accept", "application/json"}]),
         ?assertEqual(200, Code),
-        Json = ejson:decode(Body),
+        Json = jiffy:decode(Body),
         {AttJson} = couch_util:get_nested_json_value(
             Json, [<<"_attachments">>, ?ATT_BIN_NAME]),
         ?assertEqual(undefined,
@@ -504,7 +502,7 @@ should_create_compressible_att_with_ctype_params({Host, DbName}) ->
         {ok, Code1, _, Body} = test_request:get(
             DocUrl ++ "?att_encoding_info=true"),
         ?assertEqual(200, Code1),
-        Json = ejson:decode(Body),
+        Json = jiffy:decode(Body),
         {AttJson} = couch_util:get_nested_json_value(
             Json, [<<"_attachments">>, ?ATT_TXT_NAME]),
         ?assertEqual(<<"gzip">>,
@@ -556,7 +554,7 @@ request(Method, Url, Headers, Body) ->
     RequestHead = [Method, " ", Url, " HTTP/1.1"],
     RequestHeaders = [[string:join([Key, Value], ": "), "\r\n"]
                       || {Key, Value} <- Headers],
-    Request = [RequestHead, "\r\n", RequestHeaders, "\r\n", Body, "\r\n"],
+    Request = [RequestHead, "\r\n", RequestHeaders, "\r\n", Body],
     Sock = get_socket(),
     gen_tcp:send(Sock, list_to_binary(lists:flatten(Request))),
     timer:sleep(?TIMEWAIT),  % must wait to receive complete response
@@ -565,7 +563,7 @@ request(Method, Url, Headers, Body) ->
     [Header, Body1] = re:split(R, "\r\n\r\n", [{return, binary}]),
     {ok, {http_response, _, Code, _}, _} =
         erlang:decode_packet(http, Header, []),
-    Json = ejson:decode(Body1),
+    Json = jiffy:decode(Body1),
     {ok, Code, Json}.
 
 create_standalone_text_att(Host, DbName) ->
@@ -596,7 +594,7 @@ create_inline_text_att(Host, DbName) ->
         }]}}
     ]},
     {ok, Code, _Headers, _Body} = test_request:put(
-        Url, [{"Content-Type", "application/json"}], ejson:encode(Doc)),
+        Url, [{"Content-Type", "application/json"}], jiffy:encode(Doc)),
     ?assertEqual(201, Code),
     string:join([Url, ?b2l(?ATT_TXT_NAME)], "/").
 
@@ -612,7 +610,7 @@ create_inline_png_att(Host, DbName) ->
         }]}}
     ]},
     {ok, Code, _Headers, _Body} = test_request:put(
-        Url, [{"Content-Type", "application/json"}], ejson:encode(Doc)),
+        Url, [{"Content-Type", "application/json"}], jiffy:encode(Doc)),
     ?assertEqual(201, Code),
     string:join([Url, ?b2l(?ATT_BIN_NAME)], "/").
 
@@ -633,5 +631,3 @@ gzip(Data) ->
     ok = zlib:deflateEnd(Z),
     ok = zlib:close(Z),
     Last.
-
--endif.

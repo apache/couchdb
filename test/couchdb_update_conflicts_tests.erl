@@ -20,13 +20,10 @@
 -define(NUM_CLIENTS, [100, 500, 1000, 2000, 5000, 10000]).
 -define(TIMEOUT, 10000).
 
-
--ifdef(run_broken_tests).
-
 start() ->
-    ok = test_util:start_couch(),
+    Ctx = test_util:start_couch(),
     config:set("couchdb", "delayed_commits", "true", false),
-    ok.
+    Ctx.
 
 setup() ->
     DbName = ?tempdb(),
@@ -213,8 +210,8 @@ bulk_delete_create(DbName, InitRev) ->
 
     %% Deleted revision has position 2
     ?assertEqual(2, element(1, Rev1)),
-    %% New leaf revision has position 1
-    ?assertEqual(1, element(1, Rev2)).
+    %% New leaf revision has position 3
+    ?assertEqual(3, element(1, Rev2)).
 
 
 spawn_client(DbName, Doc) ->
@@ -232,5 +229,3 @@ spawn_client(DbName, Doc) ->
         ok = couch_db:close(Db),
         exit(Result)
     end).
-
--endif.

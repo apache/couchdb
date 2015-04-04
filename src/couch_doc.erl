@@ -273,12 +273,7 @@ max_seq(Tree, UpdateSeq) ->
 
 to_doc_info_path(#full_doc_info{id=Id,rev_tree=Tree,update_seq=FDISeq}) ->
     RevInfosAndPath = [
-        {#rev_info{
-            deleted = Leaf#leaf.deleted,
-            body_sp = Leaf#leaf.ptr,
-            seq = Leaf#leaf.seq,
-            rev = {Pos, RevId}
-        }, Path} || {Leaf, {Pos, [RevId | _]} = Path} <-
+        {rev_info(Node), Path} || {_Leaf, Path} = Node <-
             couch_key_tree:get_all_leafs(Tree)
     ],
     SortedRevInfosAndPath = lists:sort(
@@ -291,6 +286,20 @@ to_doc_info_path(#full_doc_info{id=Id,rev_tree=Tree,update_seq=FDISeq}) ->
     RevInfos = [RevInfo || {RevInfo, _Path} <- SortedRevInfosAndPath],
     {#doc_info{id=Id, high_seq=max_seq(Tree, FDISeq), revs=RevInfos}, WinPath}.
 
+rev_info({#leaf{} = Leaf, {Pos, [RevId | _]}}) ->
+    #rev_info{
+        deleted = Leaf#leaf.deleted,
+        body_sp = Leaf#leaf.ptr,
+        seq = Leaf#leaf.seq,
+        rev = {Pos, RevId}
+    };
+rev_info({#doc{} = Doc, {Pos, [RevId | _]}}) ->
+    #rev_info{
+        deleted = Doc#doc.deleted,
+        body_sp = undefined,
+        seq = undefined,
+        rev = {Pos, RevId}
+    }.
 
 is_deleted(#full_doc_info{rev_tree=Tree}) ->
     is_deleted(Tree);

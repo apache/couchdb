@@ -28,19 +28,23 @@ stream_test_() ->
     {
         "CouchDB stream tests",
         {
-            foreach,
-            fun setup/0, fun teardown/1,
-            [
-                fun should_write/1,
-                fun should_write_consecutive/1,
-                fun should_write_empty_binary/1,
-                fun should_return_file_pointers_on_close/1,
-                fun should_return_stream_size_on_close/1,
-                fun should_return_valid_pointers/1,
-                fun should_recall_last_pointer_position/1,
-                fun should_stream_more_with_4K_chunk_size/1,
-                fun should_stop_on_normal_exit_of_stream_opener/1
-            ]
+            setup,
+            fun() -> test_util:start(?MODULE, [ioq]) end, fun test_util:stop/1,
+            {
+                foreach,
+                fun setup/0, fun teardown/1,
+                [
+                    fun should_write/1,
+                    fun should_write_consecutive/1,
+                    fun should_write_empty_binary/1,
+                    fun should_return_file_pointers_on_close/1,
+                    fun should_return_stream_size_on_close/1,
+                    fun should_return_valid_pointers/1,
+                    fun should_recall_last_pointer_position/1,
+                    fun should_stream_more_with_4K_chunk_size/1,
+                    fun should_stop_on_normal_exit_of_stream_opener/1
+                ]
+            }
         }
     }.
 
@@ -106,7 +110,7 @@ should_stop_on_normal_exit_of_stream_opener({Fd, _}) ->
         {pid, StreamPid0} -> StreamPid0
     end,
     % Confirm the validity of the test by verifying the stream opener has died
-    ?_assertNot(is_process_alive(OpenerPid)),
+    ?assertNot(is_process_alive(OpenerPid)),
     % Verify the stream itself has also died
     ?_assertNot(is_process_alive(StreamPid)).
 

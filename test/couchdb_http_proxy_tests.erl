@@ -27,39 +27,33 @@
 -define(TIMEOUT, 5000).
 
 
--ifdef(run_broken_tests).
-
 start() ->
     % we have to write any config changes to temp ini file to not loose them
     % when supervisor will kill all children due to reaching restart threshold
     % (each httpd_global_handlers changes causes couch_httpd restart)
-    ok = test_util:start_couch(?CONFIG_CHAIN ++ [?CONFIG_FIXTURE_TEMP], []),
+    Ctx = test_util:start_couch(?CONFIG_CHAIN ++ [?CONFIG_FIXTURE_TEMP], []),
     % 49151 is IANA Reserved, let's assume no one is listening there
-    config:set("httpd_global_handlers", "_error",
-        "{couch_httpd_proxy, handle_proxy_req, <<\"http://127.0.0.1:49151/\">>}"
-    ),
-    ok.
+    test_util:with_process_restart(couch_httpd, fun() ->
+        config:set("httpd_global_handlers", "_error",
+            "{couch_httpd_proxy, handle_proxy_req, <<\"http://127.0.0.1:49151/\">>}"
+        )
+    end),
+    Ctx.
 
 setup() ->
     {ok, Pid} = test_web:start_link(),
     Value = lists:flatten(io_lib:format(
         "{couch_httpd_proxy, handle_proxy_req, ~p}",
         [list_to_binary(proxy_url())])),
-    config:set("httpd_global_handlers", "_test", Value),
-    % let couch_httpd restart
-    timer:sleep(100),
+    test_util:with_process_restart(couch_httpd, fun() ->
+        config:set("httpd_global_handlers", "_test", Value)
+    end),
     Pid.
 
 teardown(Pid) ->
-    erlang:monitor(process, Pid),
-    test_web:stop(),
-    receive
-        {'DOWN', _, _, Pid, _} ->
-            ok
-    after ?TIMEOUT ->
-        throw({timeout, test_web_stop})
-    end.
-
+    test_util:stop_sync_throw(Pid, fun() ->
+        test_web:stop()
+    end, {timeout, test_web_stop}, ?TIMEOUT).
 
 http_proxy_test_() ->
     {
@@ -458,6 +452,3 @@ recv_body(ReqId, Acc) ->
     after ?TIMEOUT ->
         throw({error, timeout})
     end.
-
--endif.
-

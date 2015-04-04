@@ -24,15 +24,9 @@ setup() ->
     {TaskStatusPid, TaskUpdaterPid}.
 
 teardown({TaskStatusPid, _}) ->
-    erlang:monitor(process, TaskStatusPid),
-    couch_task_status:stop(),
-    receive
-        {'DOWN', _, _, TaskStatusPid, _} ->
-            ok
-    after ?TIMEOUT ->
-        throw(timeout_error)
-    end.
-
+    test_util:stop_sync_throw(TaskStatusPid, fun() ->
+        couch_task_status:stop()
+    end, timeout_error, ?TIMEOUT).
 
 couch_task_status_test_() ->
     {
@@ -99,16 +93,16 @@ should_update_time_changes_on_task_progress({_, Pid}) ->
             get_task_prop(Pid, updated_on) > get_task_prop(Pid, started_on)
         end).
 
-should_control_update_frequency({_, Pid}) ->
-    ?_assertEqual(66,
-        begin
-            ok = call(Pid, add, [{type, replication}, {progress, 0}]),
-            call(Pid, update, [{progress, 50}]),
-            call(Pid, update_frequency, 500),
-            call(Pid, update, [{progress, 66}]),
-            call(Pid, update, [{progress, 77}]),
-            get_task_prop(Pid, progress)
-        end).
+%%should_control_update_frequency({_, Pid}) ->
+%%    ?_assertEqual(66,
+%%        begin
+%%            ok = call(Pid, add, [{type, replication}, {progress, 0}]),
+%%            call(Pid, update, [{progress, 50}]),
+%%            call(Pid, update_frequency, 500),
+%%            call(Pid, update, [{progress, 66}]),
+%%            call(Pid, update, [{progress, 77}]),
+%%            get_task_prop(Pid, progress)
+%%        end).
 
 should_reset_control_update_frequency({_, Pid}) ->
     ?_assertEqual(87,

@@ -26,17 +26,20 @@ setup() ->
 teardown(Fd) ->
     ok = couch_file:close(Fd).
 
-
 open_close_test_() ->
     {
         "Test for proper file open and close",
-        [
-            should_return_enoent_if_missed(),
-            should_ignore_invalid_flags_with_open(),
-            ?setup(fun should_return_pid_on_file_open/1),
-            should_close_file_properly(),
-            ?setup(fun should_create_empty_new_files/1)
-        ]
+        {
+            setup,
+            fun() -> test_util:start(?MODULE, [ioq]) end, fun test_util:stop/1,
+            [
+                should_return_enoent_if_missed(),
+                should_ignore_invalid_flags_with_open(),
+                ?setup(fun should_return_pid_on_file_open/1),
+                should_close_file_properly(),
+                ?setup(fun should_create_empty_new_files/1)
+            ]
+        }
     }.
 
 should_return_enoent_if_missed() ->
@@ -61,19 +64,23 @@ should_create_empty_new_files(Fd) ->
 read_write_test_() ->
     {
         "Common file read/write tests",
-        ?foreach([
-            fun should_increase_file_size_on_write/1,
-            fun should_return_current_file_size_on_write/1,
-            fun should_write_and_read_term/1,
-            fun should_write_and_read_binary/1,
-            fun should_write_and_read_large_binary/1,
-            fun should_return_term_as_binary_for_reading_binary/1,
-            fun should_read_term_written_as_binary/1,
-            fun should_read_iolist/1,
-            fun should_fsync/1,
-            fun should_not_read_beyond_eof/1,
-            fun should_truncate/1
-        ])
+        {
+            setup,
+            fun() -> test_util:start(?MODULE, [ioq]) end, fun test_util:stop/1,
+            ?foreach([
+                fun should_increase_file_size_on_write/1,
+                fun should_return_current_file_size_on_write/1,
+                fun should_write_and_read_term/1,
+                fun should_write_and_read_binary/1,
+                fun should_write_and_read_large_binary/1,
+                fun should_return_term_as_binary_for_reading_binary/1,
+                fun should_read_term_written_as_binary/1,
+                fun should_read_iolist/1,
+                fun should_fsync/1,
+                fun should_not_read_beyond_eof/1,
+                fun should_truncate/1
+            ])
+        }
     }.
 
 
@@ -134,20 +141,24 @@ should_truncate(Fd) ->
 header_test_() ->
     {
         "File header read/write tests",
-        [
-            ?foreach([
-                fun should_write_and_read_atom_header/1,
-                fun should_write_and_read_tuple_header/1,
-                fun should_write_and_read_second_header/1,
-                fun should_truncate_second_header/1,
-                fun should_produce_same_file_size_on_rewrite/1,
-                fun should_save_headers_larger_than_block_size/1
-            ]),
-            should_recover_header_marker_corruption(),
-            should_recover_header_size_corruption(),
-            should_recover_header_md5sig_corruption(),
-            should_recover_header_data_corruption()
-        ]
+        {
+            setup,
+            fun() -> test_util:start(?MODULE, [ioq]) end, fun test_util:stop/1,
+            [
+                ?foreach([
+                    fun should_write_and_read_atom_header/1,
+                    fun should_write_and_read_tuple_header/1,
+                    fun should_write_and_read_second_header/1,
+                    fun should_truncate_second_header/1,
+                    fun should_produce_same_file_size_on_rewrite/1,
+                    fun should_save_headers_larger_than_block_size/1
+                ]),
+                should_recover_header_marker_corruption(),
+                should_recover_header_size_corruption(),
+                should_recover_header_md5sig_corruption(),
+                should_recover_header_data_corruption()
+            ]
+        }
     }.
 
 

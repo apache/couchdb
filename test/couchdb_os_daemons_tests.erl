@@ -36,34 +36,19 @@
 -define(TIMEOUT, 1000).
 
 
--ifdef(run_broken_tests).
-
 setup(DName) ->
-    {ok, CfgPid} = config:start_link(?CONFIG_CHAIN),
+    Ctx = test_util:start(?MODULE, [], [{dont_mock, [config]}]),
     {ok, OsDPid} = couch_os_daemons:start_link(),
     config:set("os_daemons", DName,
                      filename:join([?FIXTURESDIR, DName]), false),
     timer:sleep(?DELAY),  % sleep a bit to let daemon set kill flag
-    {CfgPid, OsDPid}.
+    {Ctx, OsDPid}.
 
-teardown(_, {CfgPid, OsDPid}) ->
-    erlang:monitor(process, CfgPid),
-    config:stop(),
-    receive
-        {'DOWN', _, _, CfgPid, _} ->
-            ok
-    after ?TIMEOUT ->
-        throw({timeout, config_stop})
-    end,
-
-    erlang:monitor(process, OsDPid),
-    exit(OsDPid, normal),
-    receive
-        {'DOWN', _, _, OsDPid, _} ->
-            ok
-    after ?TIMEOUT ->
-        throw({timeout, os_daemon_stop})
-    end.
+teardown(_, {Ctx, OsDPid}) ->
+    test_util:stop(Ctx),
+    test_util:stop_sync_throw(OsDPid, fun() ->
+        exit(OsDPid, shutdown)
+    end, {timeout, os_daemon_stop}, ?TIMEOUT).
 
 
 os_daemons_test_() ->
@@ -228,5 +213,3 @@ check_dead(D, Name) ->
     ?assertEqual(halted, D#daemon.status),
     ?assertEqual(nil, D#daemon.errors),
     ?assertEqual(nil, D#daemon.buf).
-
--endif.

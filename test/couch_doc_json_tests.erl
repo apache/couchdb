@@ -16,21 +16,10 @@
 -include_lib("couch/include/couch_db.hrl").
 
 
--ifdef(run_broken_tests).
-
-setup() ->
-    {ok, Pid} = test_util:start_config(?CONFIG_CHAIN),
-    config:set("attachments", "compression_level", "0", false),
-    Pid.
-
-teardown(_) ->
-    test_util:stop_config().
-
-
 json_doc_test_() ->
     {
         setup,
-        fun setup/0, fun teardown/1,
+        fun() -> test_util:start(?MODULE) end, fun test_util:stop/1,
         [
             {
                 "Document from JSON",
@@ -93,22 +82,22 @@ from_json_success_cases() ->
                 ]}}
             ]}}]},
             #doc{atts = [
-                #att{
-                    name = <<"my_attachment.fu">>,
-                    data = stub,
-                    type = <<"application/awesome">>,
-                    att_len = 45,
-                    disk_len = 45,
-                    revpos = nil
-                },
-                #att{
-                    name = <<"noahs_private_key.gpg">>,
-                    data = <<"I have a pet fish!">>,
-                    type = <<"application/pgp-signature">>,
-                    att_len = 18,
-                    disk_len = 18,
-                    revpos = 0
-                }
+                couch_att:new([
+                    {name, <<"my_attachment.fu">>},
+                    {data, stub},
+                    {type, <<"application/awesome">>},
+                    {att_len, 45},
+                    {disk_len, 45},
+                    {revpos, undefined}
+                ]),
+                couch_att:new([
+                    {name, <<"noahs_private_key.gpg">>},
+                    {data, <<"I have a pet fish!">>},
+                    {type, <<"application/pgp-signature">>},
+                    {att_len, 18},
+                    {disk_len, 18},
+                    {revpos, 0}
+                ])
             ]},
             "Attachments are parsed correctly."
         },
@@ -312,22 +301,22 @@ to_json_success_cases() ->
         },
         {
             #doc{atts = [
-                #att{
-                    name = <<"big.xml">>,
-                    type = <<"xml/sucks">>,
-                    data = fun() -> ok end,
-                    revpos = 1,
-                    att_len = 400,
-                    disk_len = 400
-                },
-                #att{
-                    name = <<"fast.json">>,
-                    type = <<"json/ftw">>,
-                    data = <<"{\"so\": \"there!\"}">>,
-                    revpos = 1,
-                    att_len = 16,
-                    disk_len = 16
-                }
+                couch_att:new([
+                    {name, <<"big.xml">>},
+                    {type, <<"xml/sucks">>},
+                    {data, fun() -> ok end},
+                    {revpos, 1},
+                    {att_len, 400},
+                    {disk_len, 400}
+                ]),
+                couch_att:new([
+                    {name, <<"fast.json">>},
+                    {type, <<"json/ftw">>},
+                    {data, <<"{\"so\": \"there!\"}">>},
+                    {revpos, 1},
+                    {att_len, 16},
+                    {disk_len, 16}
+                ])
             ]},
             {[
                  {<<"_id">>, <<>>},
@@ -351,20 +340,20 @@ to_json_success_cases() ->
         {
             [attachments],
             #doc{atts = [
-                #att{
-                    name = <<"stuff.txt">>,
-                    type = <<"text/plain">>,
-                    data = fun() -> <<"diet pepsi">> end,
-                    revpos = 1,
-                    att_len = 10,
-                    disk_len = 10
-                },
-                #att{
-                    name = <<"food.now">>,
-                    type = <<"application/food">>,
-                    revpos = 1,
-                    data = <<"sammich">>
-                }
+                couch_att:new([
+                    {name, <<"stuff.txt">>},
+                    {type, <<"text/plain">>},
+                    {data, fun() -> <<"diet pepsi">> end},
+                    {revpos, 1},
+                    {att_len, 10},
+                    {disk_len, 10}
+                ]),
+                couch_att:new([
+                    {name, <<"food.now">>},
+                    {type, <<"application/food">>},
+                    {revpos, 1},
+                    {data, <<"sammich">>}
+                ])
             ]},
             {[
                 {<<"_id">>, <<>>},
@@ -391,6 +380,3 @@ to_json_success_cases() ->
         ({Options, Doc, EJson, Msg}) ->
             {Msg, ?_assertMatch(EJson, couch_doc:to_json_obj(Doc, Options))}
     end, Cases).
-
--endif.
-

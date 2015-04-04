@@ -18,9 +18,9 @@
 
 
 setup() ->
-    ok = test_util:start_couch(),
+    Ctx = test_util:start_couch(),
     config:set("log", "include_sasl", "false", false),
-    ok.
+    Ctx.
 
 
 create_delete_db_test_()->

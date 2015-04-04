@@ -19,8 +19,6 @@
 -define(iofmt(S, A), lists:flatten(io_lib:format(S, A))).
 
 
--ifdef(run_broken_tests).
-
 setup() ->
     DbName = ?tempdb(),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
@@ -47,6 +45,14 @@ setup() ->
     {ok, _} = couch_db:update_docs(Db, [Doc, Doc1]),
     couch_db:ensure_full_commit(Db),
     couch_db:close(Db),
+
+    test_util:with_process_restart(couch_httpd, fun() ->
+        config:set("httpd_global_handlers", "_utils",
+            "{couch_httpd_misc_handlers, handle_utils_dir_req, <<\""
+                ++ ?TEMPDIR
+                ++ "\">>}"
+        )
+    end),
 
     Addr = config:get("httpd", "bind_address", "127.0.0.1"),
     Port = integer_to_list(mochiweb_socket_server:get(couch_httpd, port)),
@@ -144,7 +150,7 @@ should_return_database_info({Url, DbName}) ->
         ok = config:set("vhosts", "example.com", "/" ++ DbName, false),
         case test_request:get(Url, [], [{host_header, "example.com"}]) of
             {ok, _, _, Body} ->
-                {JsonBody} = ejson:decode(Body),
+                {JsonBody} = jiffy:decode(Body),
                 ?assert(proplists:is_defined(<<"db_name">>, JsonBody));
             Else ->
                 erlang:error({assertion_failed,
@@ -160,7 +166,7 @@ should_return_revs_info({Url, DbName}) ->
         case test_request:get(Url ++ "/doc1?revs_info=true", [],
                               [{host_header, "example.com"}]) of
             {ok, _, _, Body} ->
-                {JsonBody} = ejson:decode(Body),
+                {JsonBody} = jiffy:decode(Body),
                 ?assert(proplists:is_defined(<<"_revs_info">>, JsonBody));
             Else ->
                 erlang:error({assertion_failed,
@@ -173,6 +179,7 @@ should_return_revs_info({Url, DbName}) ->
 should_serve_utils_for_vhost({Url, DbName}) ->
     ?_test(begin
         ok = config:set("vhosts", "example.com", "/" ++ DbName, false),
+        ensure_index_file(),
         case test_request:get(Url ++ "/_utils/index.html", [],
                               [{host_header, "example.com"}]) of
             {ok, _, _, Body} ->
@@ -192,7 +199,7 @@ should_return_virtual_request_path_field_in_request({Url, DbName}) ->
                               false),
         case test_request:get(Url, [], [{host_header, "example1.com"}]) of
             {ok, _, _, Body} ->
-                {Json} = ejson:decode(Body),
+                {Json} = jiffy:decode(Body),
                 ?assertEqual(<<"/">>,
                              proplists:get_value(<<"requested_path">>, Json));
             Else ->
@@ -210,7 +217,7 @@ should_return_real_request_path_field_in_request({Url, DbName}) ->
                               false),
         case test_request:get(Url, [], [{host_header, "example1.com"}]) of
             {ok, _, _, Body} ->
-                {Json} = ejson:decode(Body),
+                {Json} = jiffy:decode(Body),
                 Path = ?l2b("/" ++ DbName ++ "/_design/doc1/_show/test"),
                 ?assertEqual(Path, proplists:get_value(<<"path">>, Json));
             Else ->
@@ -227,7 +234,7 @@ should_match_wildcard_vhost({Url, DbName}) ->
                               "/" ++ DbName ++ "/_design/doc1/_rewrite", false),
         case test_request:get(Url, [], [{host_header, "test.example.com"}]) of
             {ok, _, _, Body} ->
-                {Json} = ejson:decode(Body),
+                {Json} = jiffy:decode(Body),
                 Path = ?l2b("/" ++ DbName ++ "/_design/doc1/_show/test"),
                 ?assertEqual(Path, proplists:get_value(<<"path">>, Json));
             Else ->
@@ -245,7 +252,7 @@ should_return_db_info_for_wildcard_vhost_for_custom_db({Url, DbName}) ->
         Host = DbName ++ ".example1.com",
         case test_request:get(Url, [], [{host_header, Host}]) of
             {ok, _, _, Body} ->
-                {JsonBody} = ejson:decode(Body),
+                {JsonBody} = jiffy:decode(Body),
                 ?assert(proplists:is_defined(<<"db_name">>, JsonBody));
             Else ->
                 erlang:error({assertion_failed,
@@ -262,7 +269,7 @@ should_replace_rewrite_variables_for_db_and_doc({Url, DbName}) ->
         Host = "doc1." ++ DbName ++ ".example1.com",
         case test_request:get(Url, [], [{host_header, Host}]) of
             {ok, _, _, Body} ->
-                {Json} = ejson:decode(Body),
+                {Json} = jiffy:decode(Body),
                 Path = ?l2b("/" ++ DbName ++ "/_design/doc1/_show/test"),
                 ?assertEqual(Path, proplists:get_value(<<"path">>, Json));
             Else ->
@@ -280,7 +287,7 @@ should_return_db_info_for_vhost_with_resource({Url, DbName}) ->
         ReqUrl = Url ++ "/test",
         case test_request:get(ReqUrl, [], [{host_header, "example.com"}]) of
             {ok, _, _, Body} ->
-                {JsonBody} = ejson:decode(Body),
+                {JsonBody} = jiffy:decode(Body),
                 ?assert(proplists:is_defined(<<"db_name">>, JsonBody));
             Else ->
                 erlang:error({assertion_failed,
@@ -298,7 +305,7 @@ should_return_revs_info_for_vhost_with_resource({Url, DbName}) ->
         ReqUrl = Url ++ "/test/doc1?revs_info=true",
         case test_request:get(ReqUrl, [], [{host_header, "example.com"}]) of
             {ok, _, _, Body} ->
-                {JsonBody} = ejson:decode(Body),
+                {JsonBody} = jiffy:decode(Body),
                 ?assert(proplists:is_defined(<<"_revs_info">>, JsonBody));
             Else ->
                 erlang:error({assertion_failed,
@@ -315,7 +322,7 @@ should_return_db_info_for_vhost_with_wildcard_resource({Url, DbName}) ->
         Host = DbName ++ ".example2.com",
         case test_request:get(ReqUrl, [], [{host_header, Host}]) of
             {ok, _, _, Body} ->
-                {JsonBody} = ejson:decode(Body),
+                {JsonBody} = jiffy:decode(Body),
                 ?assert(proplists:is_defined(<<"db_name">>, JsonBody));
             Else ->
                 erlang:error({assertion_failed,
@@ -332,7 +339,7 @@ should_return_path_for_vhost_with_wildcard_host({Url, DbName}) ->
                               false),
         case test_request:get(Url ++ "/test1") of
             {ok, _, _, Body} ->
-                {Json} = ejson:decode(Body),
+                {Json} = jiffy:decode(Body),
                 Path = ?l2b("/" ++ DbName ++ "/_design/doc1/_show/test"),
                 ?assertEqual(Path, proplists:get_value(<<"path">>, Json));
             Else ->
@@ -348,7 +355,7 @@ should_require_auth({Url, _}) ->
         case test_request:get(Url, [], [{host_header, "oauth-example.com"}]) of
             {ok, Code, _, Body} ->
                 ?assertEqual(401, Code),
-                {JsonBody} = ejson:decode(Body),
+                {JsonBody} = jiffy:decode(Body),
                 ?assertEqual(<<"unauthorized">>,
                              couch_util:get_value(<<"error">>, JsonBody));
             Else ->
@@ -382,7 +389,7 @@ should_succeed_oauth({Url, _}) ->
         case test_request:get(OAuthUrl, [], [{host_header, Host}]) of
             {ok, Code, _, Body} ->
                 ?assertEqual(200, Code),
-                {JsonBody} = ejson:decode(Body),
+                {JsonBody} = jiffy:decode(Body),
                 ?assertEqual(<<"test">>,
                              couch_util:get_value(<<"name">>, JsonBody));
             Else ->
@@ -416,7 +423,7 @@ should_fail_oauth_with_wrong_credentials({Url, _}) ->
         case test_request:get(OAuthUrl, [], [{host_header, Host}]) of
             {ok, Code, _, Body} ->
                 ?assertEqual(401, Code),
-                {JsonBody} = ejson:decode(Body),
+                {JsonBody} = jiffy:decode(Body),
                 ?assertEqual(<<"unauthorized">>,
                              couch_util:get_value(<<"error">>, JsonBody));
             Else ->
@@ -427,4 +434,6 @@ should_fail_oauth_with_wrong_credentials({Url, _}) ->
         end
     end).
 
--endif.
+ensure_index_file() ->
+    Body = <<"<!DOCTYPE html>\n<html>\n<body>\nHello world\n</body>\n</html>">>,
+    file:write_file(filename:join([?TEMPDIR, "index.html"]), Body).

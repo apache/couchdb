@@ -42,15 +42,7 @@ teardown_collector(_) ->
 teardown_aggregator(_, Pid) ->
     couch_stats_aggregator:stop(),
     couch_stats_collector:stop(),
-    erlang:monitor(process, Pid),
-    config:stop(),
-    receive
-        {'DOWN', _, _, Pid, _} ->
-            ok
-    after ?TIMEOUT ->
-        throw({timeout, config_stop})
-    end,
-    ok.
+    test_util:stop_config(Pid).
 
 
 couch_stats_collector_test_() ->
@@ -171,13 +163,8 @@ should_decrement_counter_on_process_exit() ->
         begin
             {Pid, 1} = spawn_and_count(1),
             spawn_and_count(2),
-            RefMon = erlang:monitor(process, Pid),
-            Pid ! sepuku,
-            receive
-                {'DOWN', RefMon, _, _, _} -> ok
-            after ?TIMEOUT ->
-                throw(timeout)
-            end,
+            test_util:stop_sync_throw(Pid,
+                fun() -> Pid ! sepuku end, timeout, ?TIMEOUT),
             % sleep for awhile to let collector handle the updates
             % suddenly, it couldn't notice process death instantly
             timer:sleep(?TIMEWAIT),
@@ -189,13 +176,8 @@ should_decrement_for_each_track_process_count_call_on_exit() ->
         begin
             {_, 2} = spawn_and_count(2),
             {Pid, 6} = spawn_and_count(4),
-            RefMon = erlang:monitor(process, Pid),
-            Pid ! sepuku,
-            receive
-                {'DOWN', RefMon, _, _, _} -> ok
-            after ?TIMEOUT ->
-                throw(timeout)
-            end,
+            test_util:stop_sync_throw(Pid,
+                fun() -> Pid ! sepuku end, timeout, ?TIMEOUT),
             timer:sleep(?TIMEWAIT),
             couch_stats_collector:get(hoopla)
         end).

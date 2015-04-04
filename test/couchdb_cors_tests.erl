@@ -22,10 +22,10 @@
 
 
 start() ->
-    ok = test_util:start_couch(),
+    Ctx = test_util:start_couch([ioq]),
     ok = config:set("httpd", "enable_cors", "true", false),
     ok = config:set("vhosts", "example.com", "/", false),
-    ok.
+    Ctx.
 
 setup() ->
     DbName = ?tempdb(),

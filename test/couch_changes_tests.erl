@@ -18,14 +18,13 @@
 -define(TIMEOUT, 3000).
 -define(TEST_TIMEOUT, 10000).
 
+-ifdef(run_broken_tests).
+
 -record(row, {
     id,
     seq,
     deleted = false
 }).
-
-
--ifdef(run_broken_tests).
 
 setup() ->
     DbName = ?tempdb(),
@@ -38,13 +37,16 @@ setup() ->
         save_doc(Db, {[{<<"_id">>, <<"doc5">>}]})
     ]],
     Rev = lists:nth(3, Revs),
-    {ok, Rev1} = save_doc(Db, {[{<<"_id">>, <<"doc3">>}, {<<"_rev">>, Rev}]}),
+    couch_db:ensure_full_commit(Db),
+    {ok, Db1} = couch_db:reopen(Db),
+
+    {ok, Rev1} = save_doc(Db1, {[{<<"_id">>, <<"doc3">>}, {<<"_rev">>, Rev}]}),
     Revs1 = Revs ++ [Rev1],
     Revs2 = Revs1 ++ [R || {ok, R} <- [
-        save_doc(Db, {[{<<"_id">>, <<"doc6">>}]}),
-        save_doc(Db, {[{<<"_id">>, <<"_design/foo">>}]}),
-        save_doc(Db, {[{<<"_id">>, <<"doc7">>}]}),
-        save_doc(Db, {[{<<"_id">>, <<"doc8">>}]})
+        save_doc(Db1, {[{<<"_id">>, <<"doc6">>}]}),
+        save_doc(Db1, {[{<<"_id">>, <<"_design/foo">>}]}),
+        save_doc(Db1, {[{<<"_id">>, <<"doc7">>}]}),
+        save_doc(Db1, {[{<<"_id">>, <<"doc8">>}]})
     ]],
     {DbName, list_to_tuple(Revs2)}.
 
@@ -258,7 +260,7 @@ should_filter_continuous_feed_by_specific_doc_ids({DbName, Revs}) ->
             DocIds = [<<"doc3">>, <<"doc4">>, <<"doc9999">>],
             Req = {json_req, {[{<<"doc_ids">>, DocIds}]}},
             Consumer = spawn_consumer(DbName, ChangesArgs, Req),
-            pause(Consumer),
+            ok = pause(Consumer),
 
             Rows = get_rows(Consumer),
             ?assertEqual(2, length(Rows)),
@@ -271,8 +273,9 @@ should_filter_continuous_feed_by_specific_doc_ids({DbName, Revs}) ->
             clear_rows(Consumer),
             {ok, _Rev9} = save_doc(Db, {[{<<"_id">>, <<"doc9">>}]}),
             {ok, _Rev10} = save_doc(Db, {[{<<"_id">>, <<"doc10">>}]}),
-            unpause(Consumer),
-            pause(Consumer),
+            ok = unpause(Consumer),
+            timer:sleep(100),
+            ok = pause(Consumer),
             ?assertEqual([], get_rows(Consumer)),
 
             Rev4 = element(4, Revs),
@@ -285,8 +288,9 @@ should_filter_continuous_feed_by_specific_doc_ids({DbName, Revs}) ->
             {ok, _} = save_doc(Db, {[{<<"_id">>, <<"doc12">>}]}),
             {ok, Rev3_3} = save_doc(Db, {[{<<"_id">>, <<"doc3">>},
                                           {<<"_rev">>, Rev3_2}]}),
-            unpause(Consumer),
-            pause(Consumer),
+            ok = unpause(Consumer),
+            timer:sleep(100),
+            ok = pause(Consumer),
 
             NewRows = get_rows(Consumer),
             ?assertEqual(2, length(NewRows)),
@@ -299,12 +303,13 @@ should_filter_continuous_feed_by_specific_doc_ids({DbName, Revs}) ->
             clear_rows(Consumer),
             {ok, _Rev3_4} = save_doc(Db, {[{<<"_id">>, <<"doc3">>},
                                            {<<"_rev">>, Rev3_3}]}),
-            unpause(Consumer),
-            pause(Consumer),
+            ok = unpause(Consumer),
+            timer:sleep(100),
+            ok = pause(Consumer),
 
             FinalRows = get_rows(Consumer),
 
-            unpause(Consumer),
+            ok = unpause(Consumer),
             stop_consumer(Consumer),
 
             ?assertMatch([#row{seq = 18, id = <<"doc3">>}], FinalRows)
@@ -530,7 +535,7 @@ spawn_consumer(DbName, ChangesArgs0, Req) ->
             false ->
                 ChangesArgs0
         end,
-        FeedFun = couch_changes:handle_changes(ChangesArgs, Req, Db),
+        FeedFun = couch_changes:handle_db_changes(ChangesArgs, Req, Db),
         try
             FeedFun({Callback, []})
         catch throw:{stop, _} ->
@@ -556,7 +561,7 @@ maybe_pause(Parent, Acc) ->
         {stop, Ref} ->
             Parent ! {ok, Ref},
             throw({stop, Acc});
-        V ->
+        V when V /= updated ->
             erlang:error({assertion_failed,
                       [{module, ?MODULE},
                        {line, ?LINE},

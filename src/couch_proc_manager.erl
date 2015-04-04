@@ -449,13 +449,23 @@ return_proc(#state{} = State, #proc_int{} = ProcInt) ->
                 true = ets:update_element(?PROCS, Pid, [
                     {#proc_int.client, undefined}
                 ]),
-                State
+                maybe_assign_proc(State, ProcInt)
         end;
     false ->
         remove_proc(State, ProcInt)
     end,
     flush_waiters(NewState, Lang).
 
+maybe_assign_proc(#state{} = State, ProcInt) ->
+    #proc_int{lang = Lang} = ProcInt,
+    case get_waiting_client(Lang) of
+        #client{from = From} = Client ->
+            Proc = assign_proc(Client, ProcInt#proc_int{client=undefined}),
+            gen_server:reply(From, {ok, Proc, State#state.config}),
+            State;
+        undefined ->
+            State
+    end.
 
 remove_proc(State, #proc_int{}=Proc) ->
     ets:delete(?PROCS, Proc#proc_int.pid),

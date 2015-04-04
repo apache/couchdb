@@ -32,6 +32,7 @@
 -export([reopen/1, is_system_db/1, compression/1, make_doc/5]).
 -export([load_validation_funs/1]).
 -export([check_md5/2, with_stream/3]).
+-export([monitored_by/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -117,20 +118,24 @@ ensure_full_commit(Db, RequiredSeq) ->
     ok = gen_server:call(Pid, {full_commit, RequiredSeq}, infinity),
     {ok, StartTime}.
 
-close(#db{fd_monitor=RefCntr}) ->
-    erlang:demonitor(RefCntr, [flush]),
+close(#db{fd_monitor=Ref}) ->
+    erlang:demonitor(Ref, [flush]),
     ok.
 
 is_idle(#db{compactor_pid=nil, waiting_delayed_commit=nil} = Db) ->
-    case erlang:process_info(Db#db.fd, monitored_by) of
-    undefined ->
-        true;
-    {monitored_by, Pids} ->
-        PidTracker = whereis(couch_stats_process_tracker),
-        (Pids -- [Db#db.main_pid, PidTracker]) =:= []
-    end;
+    monitored_by(Db) == [];
 is_idle(_Db) ->
     false.
+
+monitored_by(Db) ->
+    case erlang:process_info(Db#db.fd, monitored_by) of
+    undefined ->
+        [];
+    {monitored_by, Pids} ->
+        PidTracker = whereis(couch_stats_process_tracker),
+        Pids -- [Db#db.main_pid, PidTracker]
+    end.
+
 
 monitor(#db{main_pid=MainPid}) ->
     erlang:monitor(process, MainPid).
