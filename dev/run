@@ -101,12 +101,17 @@ def setup_argparse():
     parser.add_option("-q", "--quiet",
                       action="store_false", dest="verbose", default=True,
                       help="Don't print anything to STDOUT")
+    parser.add_option('--with-admin-party-please',
+                      dest='with_admin_party', default=False,
+                      action='store_true',
+                      help='Runs a dev cluster with admin party mode on')
     return parser.parse_args()
 
 
 def setup_context(opts, args):
     fpath = os.path.abspath(__file__)
     return {'N': opts.nodes,
+            'with_admin_party': opts.with_admin_party,
             'admin': opts.admin.split(':', 1) if opts.admin else None,
             'nodes': ['node%d' % (i + 1) for i in range(opts.nodes)],
             'devdir': os.path.dirname(fpath),
@@ -207,6 +212,10 @@ def hack_local_ini(ctx, contents):
     previous_line = "; require_valid_user = false\n"
     contents = contents.replace(previous_line, previous_line + secret_line)
 
+    if ctx['with_admin_party']:
+        ctx['admin'] = ('Admin Party!', 'You do not need any password.')
+        return contents
+
     # handle admin credentials passed from cli or generate own one
     if ctx['admin'] is None:
         ctx['admin'] = user, pswd = 'root', gen_password()
@@ -240,7 +249,10 @@ def startup(ctx):
     atexit.register(kill_processes, ctx)
     boot_nodes(ctx)
     ensure_all_nodes_alive(ctx)
-    cluster_setup(ctx)
+    if ctx['with_admin_party']:
+        cluster_setup_with_admin_party(ctx)
+    else:
+        cluster_setup(ctx)
 
 
 def kill_processes(ctx):
@@ -392,6 +404,31 @@ def basic_auth_header(user, pswd):
 
 def generate_cookie():
     return base64.b64encode(os.urandom(12)).decode()
+
+
+def cluster_setup_with_admin_party(ctx):
+    host, port = '127.0.0.1', 15986
+    for node in ctx['nodes']:
+        body = '{}'
+        conn = httpclient.HTTPConnection(host, port)
+        conn.request('PUT', "/_nodes/%s@127.0.0.1" % node, body)
+        resp = conn.getresponse()
+        if resp.status not in (200, 201, 202, 409):
+            print('Failed to join %s into cluster: %s' % (node, resp.read()))
+            sys.exit(1)
+    create_system_databases(host, 15984)
+
+
+def create_system_databases(host, port):
+    for dbname in ['_users', '_replicator', '_metadata']:
+        conn = httpclient.HTTPConnection(host, port)
+        conn.request('HEAD', '/' + dbname)
+        resp = conn.getresponse()
+        if resp.status == 404:
+            conn = httpclient.HTTPConnection(host, port)
+            conn.request('PUT', '/' + dbname)
+            resp = conn.getresponse()
+            assert resp.status == 201, resp.read()
 
 
 @log('Developers cluster is set up at http://127.0.0.1:{lead_port}.\n'
