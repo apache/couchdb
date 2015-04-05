@@ -13,6 +13,8 @@
 include version.mk
 
 IN_RELEASE = $(shell if [ ! -d .git ]; then echo true; fi)
+COUCHDB_VERSION_SUFFIX = $(shell if [ -d .git ]; then echo '-`git rev-parse --short --verify HEAD`'; fi)
+COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)$(COUCHDB_VERSION_SUFFIX)
 
 all: couch fauxton
 
@@ -47,20 +49,20 @@ dist: all
 
 # creates a source tarball
 release:
-	./build-aux/couchdb-build-release.sh $(vsn_major).$(vsn_minor).$(vsn_patch)
+	./build-aux/couchdb-build-release.sh $(COUCHDB_VERSION)
 
 	# build fauxton
 	$(MAKE) fauxton
 	cp -r share/www apache-couchdb/share/
 
 	# build docs
-	cd src/docs; make
+	cd src/docs; $(MAKE)
 	mkdir apache-couchdb/share/docs
 	cp -r src/docs/build/html apache-couchdb/share/docs/html
 
 	# Tar!
-	tar czf apache-couchdb.tar.gz apache-couchdb
-	echo "Done: apache-couchdb.tar.gz"
+	tar czf apache-couchdb-$(COUCHDB_VERSION).tar.gz apache-couchdb
+	echo "Done: apache-couchdb-$(COUCHDB_VERSION).tar.gz"
 
 distclean: clean
 	@rm install.mk

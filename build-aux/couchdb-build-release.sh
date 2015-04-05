@@ -9,7 +9,7 @@ fi
 
 echo "Building Apache CouchDB $VERSION"
 
-RELDIR=apache-couchdb
+RELDIR=apache-couchdb-$VERSION
 # make release dir
 rm -rf $RELDIR
 mkdir $RELDIR
