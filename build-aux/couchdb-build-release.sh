@@ -1,4 +1,13 @@
-#!/bin/sh -ex
+#!/bin/sh -e
+
+VERSION=$1
+
+if [ -z "$VERSION" ]; then
+  echo "NO VERSION"
+  exit 1
+fi
+
+echo "Building Apache CouchDB $VERSION"
 
 RELDIR=apache-couchdb
 # make release dir

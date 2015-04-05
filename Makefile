@@ -10,6 +10,8 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
+include version.mk
+
 IN_RELEASE = $(shell if [ ! -d .git ]; then echo true; fi)
 
 all: couch fauxton
@@ -45,7 +47,7 @@ dist: all
 
 # creates a source tarball
 release:
-	./build-aux/couchdb-build-release.sh
+	./build-aux/couchdb-build-release.sh $(vsn_major).$(vsn_minor).$(vsn_patch)
 
 	# build fauxton
 	$(MAKE) fauxton
