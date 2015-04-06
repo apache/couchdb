@@ -94,7 +94,7 @@ install: all
 	@chown $(user) $(log_file)
 
 uninstall:
-	@rm -rf $(installdir)
+	@rm -rf $(install_dir)
 
 install.mk:
 # ignore install.mk missing if we are running
