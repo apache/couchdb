@@ -89,7 +89,7 @@ install: all
 	@chown $(user) $(data_dir)
 	@mkdir -p $(view_index_dir)
 	@chown $(user) $(view_index_dir)
-	@mkdir `dirname $(log_file)`
+	@mkdir -p `dirname $(log_file)`
 	@touch $(log_file)
 	@chown $(user) $(log_file)
 
