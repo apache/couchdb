@@ -33,7 +33,7 @@ cd ..
 
 # update version
 # actual version detection TBD
-perl -pi -e 's/\{vsn, git\}/\{vsn, "version"\}/' $RELDIR/src/*/src/*.app.src
+perl -pi -e "s/\{vsn, git\}/\{vsn, \"$VERSION\"\}/" $RELDIR/src/*/src/*.app.src
 
 # create THANKS file
 if test -e .git; then
