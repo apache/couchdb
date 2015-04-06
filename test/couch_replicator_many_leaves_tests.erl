@@ -38,10 +38,10 @@ setup(local) ->
 setup(remote) ->
     {remote, setup()};
 setup({A, B}) ->
-    ok = test_util:start_couch([couch_replicator]),
+    Ctx = test_util:start_couch([couch_replicator]),
     Source = setup(A),
     Target = setup(B),
-    {Source, Target}.
+    {Ctx, {Source, Target}}.
 
 teardown({remote, DbName}) ->
     teardown(DbName);
@@ -49,11 +49,11 @@ teardown(DbName) ->
     ok = couch_server:delete(DbName, [?ADMIN_CTX]),
     ok.
 
-teardown(_, {Source, Target}) ->
+teardown(_, {Ctx, {Source, Target}}) ->
     teardown(Source),
     teardown(Target),
     ok = application:stop(couch_replicator),
-    ok = test_util:stop_couch().
+    ok = test_util:stop_couch(Ctx).
 
 docs_with_many_leaves_test_() ->
     Pairs = [{local, local}, {local, remote},
@@ -69,7 +69,7 @@ docs_with_many_leaves_test_() ->
     }.
 
 
-should_populate_replicate_compact({From, To}, {Source, Target}) ->
+should_populate_replicate_compact({From, To}, {_Ctx, {Source, Target}}) ->
     {lists:flatten(io_lib:format("~p -> ~p", [From, To])),
      {inorder, [
         should_populate_source(Source),
