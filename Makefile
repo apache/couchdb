@@ -53,15 +53,15 @@ release:
 
 	# build fauxton
 	$(MAKE) fauxton
-	cp -r share/www apache-couchdb/share/
+	cp -r share/www apache-couchdb-$(COUCHDB_VERSION)/share/
 
 	# build docs
 	cd src/docs; $(MAKE)
-	mkdir apache-couchdb/share/docs
-	cp -r src/docs/build/html apache-couchdb/share/docs/html
+	mkdir apache-couchdb-$(COUCHDB_VERSION)/share/docs
+	cp -r src/docs/build/html apache-couchdb-$(COUCHDB_VERSION)/share/docs/html
 
 	# Tar!
-	tar czf apache-couchdb-$(COUCHDB_VERSION).tar.gz apache-couchdb
+	tar czf apache-couchdb-$(COUCHDB_VERSION).tar.gz apache-couchdb-$(COUCHDB_VERSION)
 	echo "Done: apache-couchdb-$(COUCHDB_VERSION).tar.gz"
 
 distclean: clean
@@ -80,7 +80,7 @@ devclean:
 	@rm -rf dev/lib/*/data
 
 -include install.mk
-install:
+install: all
 	@rm -rf rel/couchdb
 	@rebar generate # make full erlang release
 	@mkdir -p $(install_dir)
