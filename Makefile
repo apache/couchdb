@@ -40,7 +40,7 @@ clean:
 
 check: javascript eunit
 
-# creates a a full erlang release
+# creates a full erlang release
 dist: all
 	@rm -rf rel/couchdb
 	@rebar generate
@@ -80,18 +80,21 @@ devclean:
 	@rm -rf dev/lib/*/data
 
 -include install.mk
-install: dist
-	@mkdir -p $(prefix)
-	@cp -R rel/couchdb/* $(prefix)
+install:
+	@rm -rf rel/couchdb
+	@rebar generate # make full erlang release
+	@mkdir -p $(install_dir)
+	@cp -R rel/couchdb/* $(install_dir)
 	@mkdir -p $(data_dir)
 	@chown $(user) $(data_dir)
 	@mkdir -p $(view_index_dir)
 	@chown $(user) $(view_index_dir)
-	@touch $(prefix)/var/log/couchdb.log
-	@chown $(user) $(prefix)/var/log/couchdb.log
+	@mkdir `dirname $(log_file)`
+	@touch $(log_file)
+	@chown $(user) $(log_file)
 
 uninstall:
-	@rm -rf $(prefix)
+	@rm -rf $(installdir)
 
 install.mk:
 # ignore install.mk missing if we are running
