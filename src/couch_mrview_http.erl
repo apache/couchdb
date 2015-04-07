@@ -45,35 +45,35 @@
 handle_all_docs_req(#httpd{method='GET'}=Req, Db) ->
     all_docs_req(Req, Db, undefined);
 handle_all_docs_req(#httpd{method='POST'}=Req, Db) ->
-    Keys = couch_mrview_util:get_view_keys(couch_httpd:json_body_obj(Req)),
+    Keys = couch_mrview_util:get_view_keys(chttpd:json_body_obj(Req)),
     all_docs_req(Req, Db, Keys);
 handle_all_docs_req(Req, _Db) ->
-    couch_httpd:send_method_not_allowed(Req, "GET,POST,HEAD").
+    chttpd:send_method_not_allowed(Req, "GET,POST,HEAD").
 
 handle_local_docs_req(#httpd{method='GET'}=Req, Db) ->
     all_docs_req(Req, Db, undefined, <<"_local">>);
 handle_local_docs_req(#httpd{method='POST'}=Req, Db) ->
-    Keys = couch_mrview_util:get_view_keys(couch_httpd:json_body_obj(Req)),
+    Keys = couch_mrview_util:get_view_keys(chttpd:json_body_obj(Req)),
     all_docs_req(Req, Db, Keys, <<"_local">>);
 handle_local_docs_req(Req, _Db) ->
-    couch_httpd:send_method_not_allowed(Req, "GET,POST,HEAD").
+    chttpd:send_method_not_allowed(Req, "GET,POST,HEAD").
 
 handle_design_docs_req(#httpd{method='GET'}=Req, Db) ->
     all_docs_req(Req, Db, undefined, <<"_design">>);
 handle_design_docs_req(#httpd{method='POST'}=Req, Db) ->
-    Keys = couch_mrview_util:get_view_keys(couch_httpd:json_body_obj(Req)),
+    Keys = couch_mrview_util:get_view_keys(chttpd:json_body_obj(Req)),
     all_docs_req(Req, Db, Keys, <<"_design">>);
 handle_design_docs_req(Req, _Db) ->
-    couch_httpd:send_method_not_allowed(Req, "GET,POST,HEAD").
+    chttpd:send_method_not_allowed(Req, "GET,POST,HEAD").
 
 handle_reindex_req(#httpd{method='POST',
                           path_parts=[_, _, DName,<<"_reindex">>]}=Req,
                    Db, _DDoc) ->
     ok = couch_db:check_is_admin(Db),
     couch_mrview:trigger_update(Db, <<"_design/", DName/binary>>),
-    couch_httpd:send_json(Req, 201, {[{<<"ok">>, true}]});
+    chttpd:send_json(Req, 201, {[{<<"ok">>, true}]});
 handle_reindex_req(Req, _Db, _DDoc) ->
-    couch_httpd:send_method_not_allowed(Req, "POST").
+    chttpd:send_method_not_allowed(Req, "POST").
 
 
 handle_view_changes_req(#httpd{path_parts=[_,<<"_design">>,DDocName,<<"_view_changes">>,ViewName]}=Req, Db, DDoc) ->
@@ -105,14 +105,14 @@ handle_view_req(#httpd{method='GET',
     FinalInfo = [{db_name, Db#db.name},
                  {ddoc, DDocId},
                  {view, VName}] ++ Info,
-    couch_httpd:send_json(Req, 200, {FinalInfo});
+    chttpd:send_json(Req, 200, {FinalInfo});
 handle_view_req(#httpd{method='GET'}=Req, Db, DDoc) ->
     [_, _, _, _, ViewName] = Req#httpd.path_parts,
     couch_stats:increment_counter([couchdb, httpd, view_reads]),
     design_doc_view(Req, Db, DDoc, ViewName, undefined);
 handle_view_req(#httpd{method='POST'}=Req, Db, DDoc) ->
     [_, _, _, _, ViewName] = Req#httpd.path_parts,
-    Props = couch_httpd:json_body_obj(Req),
+    Props = chttpd:json_body_obj(Req),
     Keys = couch_mrview_util:get_view_keys(Props),
     Queries = couch_mrview_util:get_view_queries(Props),
     case {Queries, Keys} of
@@ -132,48 +132,48 @@ handle_view_req(#httpd{method='POST'}=Req, Db, DDoc) ->
             throw({bad_request, "`keys` and `queries` are mutually exclusive"})
     end;
 handle_view_req(Req, _Db, _DDoc) ->
-    couch_httpd:send_method_not_allowed(Req, "GET,POST,HEAD").
+    chttpd:send_method_not_allowed(Req, "GET,POST,HEAD").
 
 
 handle_temp_view_req(#httpd{method='POST'}=Req, Db) ->
     couch_httpd:validate_ctype(Req, "application/json"),
     ok = couch_db:check_is_admin(Db),
-    {Body} = couch_httpd:json_body_obj(Req),
+    {Body} = chttpd:json_body_obj(Req),
     DDoc = couch_mrview_util:temp_view_to_ddoc({Body}),
     Keys = couch_mrview_util:get_view_keys({Body}),
     couch_stats:increment_counter([couchdb, httpd, temporary_view_reads]),
     design_doc_view(Req, Db, DDoc, <<"temp">>, Keys);
 handle_temp_view_req(Req, _Db) ->
-    couch_httpd:send_method_not_allowed(Req, "POST").
+    chttpd:send_method_not_allowed(Req, "POST").
 
 
 handle_info_req(#httpd{method='GET'}=Req, Db, DDoc) ->
     [_, _, Name, _] = Req#httpd.path_parts,
     {ok, Info} = couch_mrview:get_info(Db, DDoc),
-    couch_httpd:send_json(Req, 200, {[
+    chttpd:send_json(Req, 200, {[
         {name, Name},
         {view_index, {Info}}
     ]});
 handle_info_req(Req, _Db, _DDoc) ->
-    couch_httpd:send_method_not_allowed(Req, "GET").
+    chttpd:send_method_not_allowed(Req, "GET").
 
 
 handle_compact_req(#httpd{method='POST'}=Req, Db, DDoc) ->
     ok = couch_db:check_is_admin(Db),
     couch_httpd:validate_ctype(Req, "application/json"),
     ok = couch_mrview:compact(Db, DDoc),
-    couch_httpd:send_json(Req, 202, {[{ok, true}]});
+    chttpd:send_json(Req, 202, {[{ok, true}]});
 handle_compact_req(Req, _Db, _DDoc) ->
-    couch_httpd:send_method_not_allowed(Req, "POST").
+    chttpd:send_method_not_allowed(Req, "POST").
 
 
 handle_cleanup_req(#httpd{method='POST'}=Req, Db) ->
     ok = couch_db:check_is_admin(Db),
     couch_httpd:validate_ctype(Req, "application/json"),
     ok = couch_mrview:cleanup(Db),
-    couch_httpd:send_json(Req, 202, {[{ok, true}]});
+    chttpd:send_json(Req, 202, {[{ok, true}]});
 handle_cleanup_req(Req, _Db) ->
-    couch_httpd:send_method_not_allowed(Req, "POST").
+    chttpd:send_method_not_allowed(Req, "POST").
 
 
 all_docs_req(Req, Db, Keys) ->
@@ -411,7 +411,7 @@ row_to_json(Id0, Row) ->
 
 
 parse_params(#httpd{}=Req, Keys) ->
-    parse_params(couch_httpd:qs(Req), Keys);
+    parse_params(chttpd:qs(Req), Keys);
 parse_params(Props, Keys) ->
     Args = #mrargs{},
     parse_params(Props, Keys, Args).
@@ -548,8 +548,8 @@ parse_pos_int(Val) ->
 
 
 check_view_etag(Sig, Acc0, Req) ->
-    ETag = couch_httpd:make_etag(Sig),
-    case couch_httpd:etag_match(Req, ETag) of
+    ETag = chttpd:make_etag(Sig),
+    case chttpd:etag_match(Req, ETag) of
         true -> throw({etag_match, ETag});
         false -> {ok, Acc0#vacc{etag=ETag}}
     end.

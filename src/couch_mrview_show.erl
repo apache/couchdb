@@ -65,7 +65,7 @@ handle_doc_show_req(#httpd{
     handle_doc_show(Req, Db, DDoc, ShowName, nil);
 
 handle_doc_show_req(Req, _Db, _DDoc) ->
-    couch_httpd:send_error(Req, 404, <<"show_error">>, <<"Invalid path.">>).
+    chttpd:send_error(Req, 404, <<"show_error">>, <<"Invalid path.">>).
 
 handle_doc_show(Req, Db, DDoc, ShowName, Doc) ->
     handle_doc_show(Req, Db, DDoc, ShowName, Doc, null).
@@ -73,24 +73,24 @@ handle_doc_show(Req, Db, DDoc, ShowName, Doc) ->
 handle_doc_show(Req, Db, DDoc, ShowName, Doc, DocId) ->
     % get responder for ddoc/showname
     CurrentEtag = show_etag(Req, Doc, DDoc, []),
-    couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
-        JsonReq = couch_httpd_external:json_req_obj(Req, Db, DocId),
+    chttpd:etag_respond(Req, CurrentEtag, fun() ->
+        JsonReq = chttpd_external:json_req_obj(Req, Db, DocId),
         JsonDoc = couch_query_servers:json_doc(Doc),
         [<<"resp">>, ExternalResp] =
             couch_query_servers:ddoc_prompt(DDoc, [<<"shows">>, ShowName],
                 [JsonDoc, JsonReq]),
         JsonResp = apply_etag(ExternalResp, CurrentEtag),
-        couch_httpd_external:send_external_response(Req, JsonResp)
+        chttpd_external:send_external_response(Req, JsonResp)
     end).
 
 
 show_etag(#httpd{user_ctx=UserCtx}=Req, Doc, DDoc, More) ->
-    Accept = couch_httpd:header_value(Req, "Accept"),
+    Accept = chttpd:header_value(Req, "Accept"),
     DocPart = case Doc of
         nil -> nil;
-        Doc -> couch_httpd:doc_etag(Doc)
+        Doc -> chttpd:doc_etag(Doc)
     end,
-    couch_httpd:make_etag({couch_httpd:doc_etag(DDoc), DocPart, Accept,
+    chttpd:make_etag({chttpd:doc_etag(DDoc), DocPart, Accept,
         {UserCtx#user_ctx.name, UserCtx#user_ctx.roles}, More}).
 
 % updates a doc based on a request
@@ -116,16 +116,16 @@ handle_doc_update_req(#httpd{
 
 
 handle_doc_update_req(Req, _Db, _DDoc) ->
-    couch_httpd:send_error(Req, 404, <<"update_error">>, <<"Invalid path.">>).
+    chttpd:send_error(Req, 404, <<"update_error">>, <<"Invalid path.">>).
 
 send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId) ->
-    JsonReq = couch_httpd_external:json_req_obj(Req, Db, DocId),
+    JsonReq = chttpd_external:json_req_obj(Req, Db, DocId),
     JsonDoc = couch_query_servers:json_doc(Doc),
     Cmd = [<<"updates">>, UpdateName],
     UpdateResp = couch_query_servers:ddoc_prompt(DDoc, Cmd, [JsonDoc, JsonReq]),
     JsonResp = case UpdateResp of
         [<<"up">>, {NewJsonDoc}, {JsonResp0}] ->
-            case couch_httpd:header_value(
+            case chttpd:header_value(
                     Req, "X-Couch-Full-Commit", "false") of
                 "true" ->
                     Options = [full_commit, {user_ctx, Req#httpd.user_ctx}];
@@ -147,7 +147,7 @@ send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId) ->
             {[{<<"code">>, 200} | JsonResp0]}
     end,
     % todo set location field
-    couch_httpd_external:send_external_response(Req, JsonResp).
+    chttpd_external:send_external_response(Req, JsonResp).
 
 
 handle_view_list_req(#httpd{method=Method}=Req, Db, DDoc)
@@ -162,10 +162,10 @@ handle_view_list_req(#httpd{method=Method}=Req, Db, DDoc)
             {ok, VDDoc} = couch_db:open_doc(Db, VDocId, [ejson_body]),
             handle_view_list(Req, Db, DDoc, LName, VDDoc, VName, undefined);
         _ ->
-            couch_httpd:send_error(Req, 404, <<"list_error">>, <<"Bad path.">>)
+            chttpd:send_error(Req, 404, <<"list_error">>, <<"Bad path.">>)
     end;
 handle_view_list_req(#httpd{method='POST'}=Req, Db, DDoc) ->
-    {Props} = couch_httpd:json_body_obj(Req),
+    {Props} = chttpd:json_body_obj(Req),
     Keys = proplists:get_value(<<"keys">>, Props),
     case Req#httpd.path_parts of
         [_, _, _DName, _, LName, VName] ->
@@ -176,10 +176,10 @@ handle_view_list_req(#httpd{method='POST'}=Req, Db, DDoc) ->
             {ok, VDDoc} = couch_db:open_doc(Db, VDocId, [ejson_body]),
             handle_view_list(Req, Db, DDoc, LName, VDDoc, VName, Keys);
         _ ->
-            couch_httpd:send_error(Req, 404, <<"list_error">>, <<"Bad path.">>)
+            chttpd:send_error(Req, 404, <<"list_error">>, <<"Bad path.">>)
     end;
 handle_view_list_req(Req, _Db, _DDoc) ->
-    couch_httpd:send_method_not_allowed(Req, "GET,POST,HEAD").
+    chttpd:send_method_not_allowed(Req, "GET,POST,HEAD").
 
 
 handle_view_list(Req, Db, DDoc, LName, VDDoc, VName, Keys) ->
@@ -188,10 +188,10 @@ handle_view_list(Req, Db, DDoc, LName, VDDoc, VName, Keys) ->
         UserCtx = Req#httpd.user_ctx,
         Name = UserCtx#user_ctx.name,
         Roles = UserCtx#user_ctx.roles,
-        Accept = couch_httpd:header_value(Req, "Accept"),
-        Parts = {couch_httpd:doc_etag(DDoc), Accept, {Name, Roles}},
-        ETag = couch_httpd:make_etag({BaseSig, Parts}),
-        case couch_httpd:etag_match(Req, ETag) of
+        Accept = chttpd:header_value(Req, "Accept"),
+        Parts = {chttpd:doc_etag(DDoc), Accept, {Name, Roles}},
+        ETag = chttpd:make_etag({BaseSig, Parts}),
+        case chttpd:etag_match(Req, ETag) of
             true -> throw({etag_match, ETag});
             false -> {ok, Acc0#lacc{etag=ETag}}
         end
@@ -241,7 +241,7 @@ list_cb(complete, Acc) ->
         [<<"end">>, Data] ->
             #lacc{resp = Resp2} = send_non_empty_chunk(Acc#lacc{resp=Resp}, Data)
     end,
-    couch_httpd:last_chunk(Resp2),
+    last_chunk(Resp2),
     {ok, Resp2}.
 
 start_list_resp(Head, Acc) ->
@@ -259,8 +259,8 @@ fixup_headers(Headers, #lacc{etag=ETag} = Acc) ->
         code = Code,
         ctype = CType,
         headers = ExtHeaders
-    } = couch_httpd_external:parse_external_response(Headers2),
-    Headers3 = couch_httpd_external:default_or_content_type(CType, ExtHeaders),
+    } = chttpd_external:parse_external_response(Headers2),
+    Headers3 = chttpd_external:default_or_content_type(CType, ExtHeaders),
     Acc#lacc{code=Code, headers=Headers3}.
 
 send_list_row(Row, #lacc{qserver = {Proc, _}, resp = Resp} = Acc) ->
@@ -287,23 +287,23 @@ send_list_row(Row, #lacc{qserver = {Proc, _}, resp = Resp} = Acc) ->
     [<<"end">>, Chunk, Headers] ->
         Acc2 = send_non_empty_chunk(fixup_headers(Headers, Acc), Chunk),
         #lacc{resp = Resp2} = Acc2,
-        couch_httpd:last_chunk(Resp2),
+        last_chunk(Resp2),
         {stop, Acc2};
     [<<"end">>, Chunk] ->
         Acc2 = send_non_empty_chunk(Acc, Chunk),
         #lacc{resp = Resp2} = Acc2,
-        couch_httpd:last_chunk(Resp2),
+        last_chunk(Resp2),
         {stop, Acc2}
     catch Error ->
         case Resp of
             undefined ->
-                {Code, _, _} = couch_httpd:error_info(Error),
+                {Code, _, _} = chttpd:error_info(Error),
                 #lacc{req=Req, headers=Headers} = Acc,
-                {ok, Resp2} = couch_httpd:start_chunked_response(Req, Code, Headers),
+                {ok, Resp2} = chttpd:start_chunked_response(Req, Code, Headers),
                 Acc2 = Acc#lacc{resp=Resp2, code=Code};
             _ -> Resp2 = Resp, Acc2 = Acc
         end,
-        couch_httpd:send_chunked_error(Resp2, Error),
+        chttpd:send_chunked_error(Resp2, Error),
         {stop, Acc2}
     end.
 
@@ -311,10 +311,10 @@ send_non_empty_chunk(Acc, []) ->
     Acc;
 send_non_empty_chunk(#lacc{resp=undefined} = Acc, Chunk) ->
     #lacc{req=Req, code=Code, headers=Headers} = Acc,
-    {ok, Resp} = couch_httpd:start_chunked_response(Req, Code, Headers),
+    {ok, Resp} = chttpd:start_chunked_response(Req, Code, Headers),
     send_non_empty_chunk(Acc#lacc{resp = Resp}, Chunk);
 send_non_empty_chunk(#lacc{resp=Resp} = Acc, Chunk) ->
-    couch_httpd:send_chunk(Resp, Chunk),
+    chttpd:send_chunk(Resp, Chunk),
     Acc.
 
 
@@ -360,9 +360,12 @@ json_apply_field({Key, NewValue}, [], Acc) ->
 % This loads the db info if we have a fully loaded db record, but we might not
 % have the db locally on this node, so then load the info through fabric.
 json_req_obj(Req, #db{main_pid=Pid}=Db) when is_pid(Pid) ->
-    couch_httpd_external:json_req_obj(Req, Db);
+    chttpd_external:json_req_obj(Req, Db);
 json_req_obj(Req, Db) ->
     % use a separate process because we're already in a receive loop, and
     % json_req_obj calls fabric:get_db_info()
     spawn_monitor(fun() -> exit(chttpd_external:json_req_obj(Req, Db)) end),
     receive {'DOWN', _, _, _, JsonReq} -> JsonReq end.
+
+last_chunk(Resp) ->
+    chttpd:send_chunk(Resp, []).
