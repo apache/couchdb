@@ -122,7 +122,7 @@ path_ends_with(Path, Suffix) ->
     Suffix == lists:last(binary:split(mem3:dbname(Path), <<"/">>, [global])).
 
 fake_db(Opts) ->
-    {user_ctx, UserCtx} = lists:keyfind(user_ctx, 1, Opts),
+    UserCtx = couch_util:get_value(user_ctx, Opts, #user_ctx{}),
     #db{user_ctx = UserCtx}.
 
 tag_docs([]) ->
