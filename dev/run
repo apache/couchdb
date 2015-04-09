@@ -358,6 +358,7 @@ def enable_cluster(port, user, pswd):
         return False
     assert resp.status == 201, resp.read()
     resp.close()
+    return True
 
 
 def add_node(lead_port, node_port, user, pswd):
