@@ -33,7 +33,7 @@
 
 % miscellany
 -export([design_docs/1, reset_validation_funs/1, cleanup_index_files/0,
-    cleanup_index_files/1]).
+    cleanup_index_files/1, dbname/1]).
 
 -include_lib("fabric/include/fabric.hrl").
 
