@@ -395,7 +395,8 @@ def finish_cluster(port, user, pswd):
                  {'Authorization': basic_auth_header(user, pswd),
                   'Content-Type': 'application/json'})
     resp = conn.getresponse()
-    assert resp.status == 201, resp.read()
+    # 400 for already set up'ed cluster
+    assert resp.status in (201, 400), resp.read()
     resp.close()
 
 
