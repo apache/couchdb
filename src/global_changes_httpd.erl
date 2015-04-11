@@ -229,6 +229,8 @@ parse_global_changes_query(Req) ->
             [{limit, to_non_neg_int(Value)} | Args];
         {"heartbeat", "true"} ->
             [{heartbeat, true} | Args];
+        {"heartbeat", "false"} ->
+	    Args;
         {"heartbeat", _} ->
             [{heartbeat, to_non_neg_int(Value)} | Args];
         {"timeout", _} ->
