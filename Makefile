@@ -50,7 +50,7 @@ dist: all
 
 # creates a source tarball
 release:
-	./build-aux/couchdb-build-release.sh $(COUCHDB_VERSION)
+	@./build-aux/couchdb-build-release.sh $(COUCHDB_VERSION)
 
 	# build fauxton
 	$(MAKE) fauxton
