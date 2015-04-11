@@ -37,6 +37,7 @@ clean:
 	@rm -rf share/server/main.js share/server/main-coffee.js
 	@rm -f src/couch/priv/couchspawnkillable
 	@rm -f src/couch/priv/couch_js/config.h
+	@rm -f tmp/ dev/boot_node.beam dev/data dev/lib dev/pbkdf2.pyc log/crash.log dev/logs
 
 check: javascript eunit
 
