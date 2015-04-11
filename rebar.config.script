@@ -26,7 +26,6 @@ DepDescs = [
     {couch_index,       "couch-index",      {branch, "master"}},
     {couch_mrview,      "couch-mrview",     {branch, "master"}},
     {couch_replicator,  "couch-replicator", {branch, "master"}},
-    {couch_dbupdates,   "couch-dbupdates",  {branch, "master"}},
     {couch_plugins,     "couch-plugins",    {branch, "master"}},
     {couch_event,       "couch-event",      {branch, "master"}},
     {couch_stats,       "couch-stats",      {branch, "master"}},

@@ -126,10 +126,6 @@ This product also includes the following third-party components:
 
    Copyright 2006-2013 (c) M. Alsup
 
- * couch_dbupdates
-   
-   Copyright 2012, Benoît Chesneau <benoitc@refuge.io>
- 
  * mocha.js (https://github.com/visionmedia/mocha)
   
    Copyright (c) 2011-2013 TJ Holowaychuk <tj@vision-media.ca>
