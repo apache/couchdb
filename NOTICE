@@ -189,3 +189,7 @@ This product also includes the following third-party components:
 * es5-shim.js
 
   Copyright (C) 2009-2014 Kristopher Michael Kowal and contributors
+
+* CSS.escape (https://github.com/mathiasbynens/CSS.escape/)
+
+  Copyright Mathias Bynens
