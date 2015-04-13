@@ -18,7 +18,6 @@
     handle_favicon_req/2,
     handle_replicate_req/1,
     handle_reload_query_servers_req/1,
-    handle_sleep_req/1,
     handle_system_req/1,
     handle_task_status_req/1,
     handle_up_req/1,
@@ -90,13 +89,6 @@ maybe_add_csp_headers(Headers, "true") ->
     [{"Content-Security-Policy", Value} | Headers];
 maybe_add_csp_headers(Headers, _) ->
     Headers.
-
-handle_sleep_req(#httpd{method='GET'}=Req) ->
-    Time = list_to_integer(chttpd:qs_value(Req, "time")),
-    receive snicklefart -> ok after Time -> ok end,
-    send_json(Req, {[{ok, true}]});
-handle_sleep_req(Req) ->
-    send_method_not_allowed(Req, "GET,HEAD").
 
 handle_all_dbs_req(#httpd{method='GET'}=Req) ->
     Args = couch_mrview_http:parse_params(Req, undefined),

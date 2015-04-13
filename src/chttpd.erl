@@ -367,7 +367,6 @@ url_handler("_active_tasks") -> fun chttpd_misc:handle_task_status_req/1;
 url_handler("_reload_query_servers") -> fun chttpd_misc:handle_reload_query_servers_req/1;
 url_handler("_replicate") ->    fun chttpd_misc:handle_replicate_req/1;
 url_handler("_uuids") ->        fun chttpd_misc:handle_uuids_req/1;
-url_handler("_sleep") ->        fun chttpd_misc:handle_sleep_req/1;
 url_handler("_session") ->      fun chttpd_auth:handle_session_req/1;
 url_handler("_oauth") ->        fun couch_httpd_oauth:handle_oauth_req/1;
 url_handler("_up") ->           fun chttpd_misc:handle_up_req/1;
