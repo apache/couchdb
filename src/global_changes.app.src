@@ -26,6 +26,6 @@
     ]},
     {mod, {global_changes_app, []}},
     {env, [
-        {dbname, <<"global_changes">>}
+        {dbname, <<"_global_changes">>}
     ]}
 ]}.

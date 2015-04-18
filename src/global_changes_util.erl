@@ -23,5 +23,5 @@ get_dbname() ->
         {ok, DbName} when is_list(DbName) ->
             iolist_to_binary(DbName);
         _ ->
-            <<"global_changes">>
+            <<"_global_changes">>
     end.
