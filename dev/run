@@ -422,7 +422,7 @@ def cluster_setup_with_admin_party(ctx):
 
 
 def create_system_databases(host, port):
-    for dbname in ['_users', '_replicator', '_metadata']:
+    for dbname in ['_users', '_replicator', '_metadata', '_global_changes']:
         conn = httpclient.HTTPConnection(host, port)
         conn.request('HEAD', '/' + dbname)
         resp = conn.getresponse()
