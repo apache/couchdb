@@ -42,6 +42,7 @@
 
 -define(SYSTEM_DATABASES, [
     "_dbs",
+    "_global_changes",
     "_metadata",
     "_nodes",
     "_replicator",
