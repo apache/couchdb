@@ -43,16 +43,20 @@ is_cluster_enabled() ->
         {_,[]} -> no;
         {_,_} -> ok
     end.
+
+
+cluster_system_dbs() ->
+    ["_users", "_replicator", "_metadata", "_global_changes"].
         
 
 has_cluster_system_dbs() ->
-    % GET /_users /_replicator /_metadata
+    has_cluster_system_dbs(cluster_system_dbs()).
 
-    case catch {
-    fabric:get_db_info("_users"),
-    fabric:get_db_info("_replicator"),
-    fabric:get_db_info("_metadata")} of
-        {{ok, _}, {ok, _}, {ok, _}} -> ok;
+has_cluster_system_dbs([]) ->
+    ok;
+has_cluster_system_dbs([Db|Dbs]) ->
+    case catch fabric:get_db_info(Db) of
+        {ok, _} -> has_cluster_system_dbs(Dbs);
         _ -> no
     end.
 
@@ -115,9 +119,7 @@ finish_cluster() ->
 finish_cluster_int(ok) ->
     {error, cluster_finished};
 finish_cluster_int(no) ->
-    % create clustered databases (_users, _replicator, _metadata)
-    Databases = ["_users", "_replicator", "_metadata"],
-    lists:foreach(fun fabric:create_db/1, Databases).
+    lists:foreach(fun fabric:create_db/1, cluster_system_dbs()).
 
 
 add_node(Options) ->
