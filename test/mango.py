@@ -125,8 +125,12 @@ class Database(object):
         r.raise_for_status()
         return r.json()["result"] == "created"
 
-    def list_indexes(self):
-        r = self.sess.get(self.path("_index"))
+    def list_indexes(self, limit="", skip=""):
+        if limit != "":
+            limit = "limit=" + str(limit)
+        if skip != "":
+            skip = "skip=" + str(skip)
+        r = self.sess.get(self.path("_index?"+limit+";"+skip))
         r.raise_for_status()
         return r.json()["indexes"]
 

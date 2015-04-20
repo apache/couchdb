@@ -222,3 +222,33 @@ class IndexCrudTests(mango.DbPerClass):
             assert e.response.status_code == 404
         else:
             raise AssertionError("bad index delete")
+
+    def test_limit_skip_index(self):
+        fields = ["field1"]
+        ret = self.db.create_index(fields, name="idx_01")
+        assert ret is True
+
+        fields = ["field2"]
+        ret = self.db.create_index(fields, name="idx_02")
+        assert ret is True
+
+        fields = ["field3"]
+        ret = self.db.create_index(fields, name="idx_03")
+        assert ret is True
+
+        assert len(self.db.list_indexes(limit=2)) == 2
+        assert len(self.db.list_indexes(limit=5,skip=4)) == 2
+        assert len(self.db.list_indexes(skip=5)) == 1
+        assert len(self.db.list_indexes(skip=6)) == 0
+        assert len(self.db.list_indexes(skip=100)) == 0
+        assert len(self.db.list_indexes(limit=10000000)) == 6
+
+        try:
+            self.db.list_indexes(skip=-1)
+        except Exception, e:
+            assert e.response.status_code == 500
+
+        try:
+            self.db.list_indexes(limit=0)
+        except Exception, e:
+            assert e.response.status_code == 500

@@ -50,9 +50,27 @@ handle_req_int(_, _) ->
 
 
 handle_index_req(#httpd{method='GET', path_parts=[_, _]}=Req, Db) ->
+    Params = lists:flatmap(fun({K, V}) -> parse_index_param(K, V) end,
+        chttpd:qs(Req)),
     Idxs = lists:sort(mango_idx:list(Db)),
-    JsonIdxs = lists:map(fun mango_idx:to_json/1, Idxs),
-	chttpd:send_json(Req, {[{indexes, JsonIdxs}]});
+    JsonIdxs0 = lists:map(fun mango_idx:to_json/1, Idxs),
+    TotalRows = length(JsonIdxs0),
+    Limit = case couch_util:get_value(limit, Params, TotalRows) of
+        Limit0 when Limit0 < 1 ->
+            ?MANGO_ERROR(invalid_list_index_params);
+        Limit0 ->
+            Limit0
+    end,
+    Skip = case couch_util:get_value(skip, Params, 0) of
+        Skip0 when Skip0 < 0 ->
+            ?MANGO_ERROR(invalid_list_index_params);
+        Skip0 when Skip0 > TotalRows ->
+            TotalRows;
+        Skip0 ->
+            Skip0
+    end,
+    JsonIdxs = lists:sublist(JsonIdxs0, Skip+1, Limit),
+	chttpd:send_json(Req, {[{total_rows, TotalRows}, {indexes, JsonIdxs}]});
 
 handle_index_req(#httpd{method='POST', path_parts=[_, _]}=Req, Db) ->
     {ok, Opts} = mango_opts:validate_idx_create(chttpd:json_body_obj(Req)),
@@ -217,3 +235,19 @@ handle_doc({row, Doc}, {Resp0, Prepend, KVs}) ->
     Chunk = [Prepend, ?JSON_ENCODE(Doc)],
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, Chunk),
     {ok, {Resp1, ",\r\n", KVs}}.
+
+
+parse_index_param("limit", Value) ->
+    [{limit, parse_val(Value)}];
+parse_index_param("skip", Value) ->
+    [{skip, parse_val(Value)}];
+parse_index_param(_Key, _Value) ->
+     [].
+
+parse_val(Value) ->
+    case (catch list_to_integer(Value)) of
+    IntVal when is_integer(IntVal) ->
+        IntVal;
+    _ ->
+        ?MANGO_ERROR(invalid_list_index_params)
+    end.

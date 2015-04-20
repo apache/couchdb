@@ -77,6 +77,12 @@ info(mango_httpd, {error_saving_ddoc, Reason}) ->
         <<"error_saving_ddoc">>,
         fmt("Unknown error while saving the design document: ~s", [Reason])
     };
+info(mango_httpd, invalid_list_index_params) ->
+    {
+        500,
+        <<"invalid_list_index_params">>,
+        <<"Index parameter ranges: limit > 1, skip > 0" >>
+    };
 
 info(mango_idx, {invalid_index_type, BadType}) ->
     {
