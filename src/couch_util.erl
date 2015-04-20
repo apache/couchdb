@@ -33,6 +33,7 @@
 -export([integer_to_boolean/1, boolean_to_integer/1]).
 -export([find_in_binary/2]).
 -export([callback_exists/3, validate_callback_exists/3]).
+-export([with_proc/4]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -569,3 +570,20 @@ ensure_loaded(Module) when is_atom(Module) ->
         false
     end;
 ensure_loaded(_Module) -> false.
+
+
+%% This is especially useful in gen_servers when you need to call
+%% a function that does a receive as it would hijack incoming messages.
+with_proc(M, F, A, Timeout) ->
+    {Pid, Ref} = spawn_monitor(fun() ->
+        exit(erlang:apply(M, F, A))
+    end),
+    receive
+        {'DOWN', Ref, process, Pid, Resp} ->
+            {ok, Resp};
+        {'DOWN', Ref, process, Pid, Error} ->
+            {error, Error}
+    after Timeout ->
+        erlang:demonitor(Ref, [flush]),
+        {error, timeout}
+    end.
