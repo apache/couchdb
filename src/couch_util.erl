@@ -576,10 +576,10 @@ ensure_loaded(_Module) -> false.
 %% a function that does a receive as it would hijack incoming messages.
 with_proc(M, F, A, Timeout) ->
     {Pid, Ref} = spawn_monitor(fun() ->
-        exit(erlang:apply(M, F, A))
+        exit({reply, erlang:apply(M, F, A)})
     end),
     receive
-        {'DOWN', Ref, process, Pid, Resp} ->
+        {'DOWN', Ref, process, Pid, {reply, Resp}} ->
             {ok, Resp};
         {'DOWN', Ref, process, Pid, Error} ->
             {error, Error}
