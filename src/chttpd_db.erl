@@ -438,6 +438,36 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, 
 db_req(#httpd{path_parts=[_,<<"_bulk_docs">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "POST");
 
+
+db_req(#httpd{method='POST', path_parts=[_, <<"_bulk_get">>]}=Req, Db) ->
+    couch_stats:increment_counter([couchdb, httpd, bulk_requests]),
+    couch_httpd:validate_ctype(Req, "application/json"),
+    {JsonProps} = chttpd:json_body_obj(Req),
+    case couch_util:get_value(<<"docs">>, JsonProps) of
+        undefined ->
+            throw({bad_request, <<"Missing JSON list of 'docs'.">>});
+        Docs ->
+            #doc_query_args{
+                options = Options
+            } = bulk_get_parse_doc_query(Req),
+
+            {ok, Resp} = start_json_response(Req, 200),
+            send_chunk(Resp, <<"{\"results\": [">>),
+
+            lists:foldl(fun(Doc, Sep) ->
+                {DocId, Results, Options1} = bulk_get_open_doc_revs(Db, Doc,
+                                                                    Options),
+                bulk_get_send_docs_json(Resp, DocId, Results, Options1, Sep),
+                <<",">>
+            end, <<"">>, Docs),
+
+            send_chunk(Resp, <<"]}">>),
+            end_json_response(Resp)
+    end;
+db_req(#httpd{path_parts=[_, <<"_bulk_get">>]}=Req, _Db) ->
+    send_method_not_allowed(Req, "POST");
+
+
 db_req(#httpd{method='POST',path_parts=[_,<<"_purge">>]}=Req, Db) ->
     chttpd:validate_ctype(Req, "application/json"),
     {IdsRevs} = chttpd:json_body_obj(Req),
@@ -1291,8 +1321,10 @@ get_md5_header(Req) ->
     end.
 
 parse_doc_query(Req) ->
-    lists:foldl(fun({Key,Value}, Args) ->
-        case {Key, Value} of
+    lists:foldl(fun parse_doc_query/2, #doc_query_args{}, chttpd:qs(Req)).
+
+parse_doc_query({Key, Value}, Args) ->
+    case {Key, Value} of
         {"attachments", "true"} ->
             Options = [attachments | Args#doc_query_args.options],
             Args#doc_query_args{options=Options};
@@ -1345,8 +1377,7 @@ parse_doc_query(Req) ->
             Args#doc_query_args{options=Options};
         _Else -> % unknown key value pair, ignore.
             Args
-        end
-    end, #doc_query_args{}, chttpd:qs(Req)).
+    end.
 
 parse_changes_query(Req) ->
     erlang:erase(changes_seq_interval),
@@ -1524,6 +1555,163 @@ set_namespace(<<"_design_docs">>, Args) ->
     set_namespace(<<"_design">>, Args);
 set_namespace(NS, #mrargs{extra = Extra} = Args) ->
     Args#mrargs{extra = [{namespace, NS} | Extra]}.
+
+
+%% /db/_bulk_get stuff
+
+bulk_get_parse_doc_query(Req) ->
+    lists:foldl(fun({Key, Value}, Args) ->
+        ok = validate_query_param(Key),
+        parse_doc_query({Key, Value}, Args)
+    end, #doc_query_args{}, chttpd:qs(Req)).
+
+
+validate_query_param("open_revs"=Key) ->
+    throw_bad_query_param(Key);
+validate_query_param("new_edits"=Key) ->
+    throw_bad_query_param(Key);
+validate_query_param("w"=Key) ->
+    throw_bad_query_param(Key);
+validate_query_param("rev"=Key) ->
+    throw_bad_query_param(Key);
+validate_query_param("atts_since"=Key) ->
+    throw_bad_query_param(Key);
+validate_query_param(_) ->
+    ok.
+
+throw_bad_query_param(Key) when is_list(Key) ->
+    throw_bad_query_param(?l2b(Key));
+throw_bad_query_param(Key) when is_binary(Key) ->
+    Msg = <<"\"", Key/binary, "\" query parameter is not acceptable">>,
+    throw({bad_request, Msg}).
+
+
+bulk_get_open_doc_revs(Db, {Props}, Options) ->
+    bulk_get_open_doc_revs1(Db, Props, Options, {}).
+
+
+bulk_get_open_doc_revs1(Db, Props, Options, {}) ->
+    case parse_field(<<"id">>, couch_util:get_value(<<"id">>, Props)) of
+        {error, {DocId, Error, Reason}} ->
+            {DocId, {error, {null, Error, Reason}}, Options};
+
+        {ok, undefined} ->
+            Error = {null, bad_request, <<"document id missed">>},
+            {null, {error, Error}, Options};
+
+        {ok, DocId} ->
+            bulk_get_open_doc_revs1(Db, Props, Options, {DocId})
+    end;
+bulk_get_open_doc_revs1(Db, Props, Options, {DocId}) ->
+    RevStr = couch_util:get_value(<<"rev">>, Props),
+
+    case parse_field(<<"rev">>, RevStr) of
+        {error, {RevStr, Error, Reason}} ->
+            {DocId, {error, {RevStr, Error, Reason}}, Options};
+
+        {ok, undefined} ->
+            bulk_get_open_doc_revs1(Db, Props, Options, {DocId, all});
+
+        {ok, Rev} ->
+            bulk_get_open_doc_revs1(Db, Props, Options, {DocId, [Rev]})
+    end;
+bulk_get_open_doc_revs1(Db, Props, Options, {DocId, Revs}) ->
+    AttsSinceStr = couch_util:get_value(<<"atts_since">>, Props),
+
+    case parse_field(<<"atts_since">>, AttsSinceStr) of
+        {error, {BadAttsSinceRev, Error, Reason}} ->
+            {DocId, {error, {BadAttsSinceRev, Error, Reason}}, Options};
+
+        {ok, []} ->
+            bulk_get_open_doc_revs1(Db, Props, Options, {DocId, Revs, Options});
+
+        {ok, RevList} ->
+            Options1 = [{atts_since, RevList}, attachments | Options],
+            bulk_get_open_doc_revs1(Db, Props, Options, {DocId, Revs, Options1})
+    end;
+bulk_get_open_doc_revs1(Db, Props, _, {DocId, Revs, Options}) ->
+    case fabric:open_revs(Db, DocId, Revs, Options) of
+        {ok, []} ->
+            RevStr = couch_util:get_value(<<"rev">>, Props),
+            Error = {RevStr, <<"not_found">>, <<"missing">>},
+            {DocId, {error, Error}, Options};
+        Results ->
+            {DocId, Results, Options}
+    end.
+
+
+parse_field(<<"id">>, undefined) ->
+    {ok, undefined};
+parse_field(<<"id">>, Value) ->
+    try
+        ok = couch_doc:validate_docid(Value),
+        {ok, Value}
+    catch
+        throw:{Error, Reason} ->
+            {error, {Value, Error, Reason}}
+    end;
+parse_field(<<"rev">>, undefined) ->
+    {ok, undefined};
+parse_field(<<"rev">>, Value) ->
+    try
+        Rev = couch_doc:parse_rev(Value),
+        {ok, Rev}
+    catch
+        throw:{bad_request=Error, Reason} ->
+            {error, {Value, Error, Reason}}
+    end;
+parse_field(<<"atts_since">>, undefined) ->
+    {ok, []};
+parse_field(<<"atts_since">>, []) ->
+    {ok, []};
+parse_field(<<"atts_since">>, Value) when is_list(Value) ->
+    parse_atts_since(Value, []);
+parse_field(<<"atts_since">>, Value) ->
+    {error, {Value, bad_request, <<"att_since value must be array of revs.">>}}.
+
+
+parse_atts_since([], Acc) ->
+    {ok, lists:reverse(Acc)};
+parse_atts_since([RevStr | Rest], Acc) ->
+    case parse_field(<<"rev">>, RevStr) of
+        {ok, Rev} ->
+            parse_atts_since(Rest, [Rev | Acc]);
+        {error, _}=Error ->
+            Error
+    end.
+
+
+bulk_get_send_docs_json(Resp, DocId, Results, Options, Sep) ->
+    Id = ?JSON_ENCODE(DocId),
+    send_chunk(Resp, [Sep, <<"{\"id\": ">>, Id, <<", \"docs\": [">>]),
+    bulk_get_send_docs_json1(Resp, DocId, Results, Options),
+    send_chunk(Resp, <<"]}">>).
+
+bulk_get_send_docs_json1(Resp, DocId, {error, {Rev, Error, Reason}}, _) ->
+    send_chunk(Resp, [bulk_get_json_error(DocId, Rev, Error, Reason)]);
+bulk_get_send_docs_json1(_Resp, _DocId, {ok, []}, _) ->
+    ok;
+bulk_get_send_docs_json1(Resp, DocId, {ok, Docs}, Options) ->
+    lists:foldl(fun(Result, AccSeparator) ->
+        case Result of
+            {ok, Doc} ->
+                JsonDoc = couch_doc:to_json_obj(Doc, Options),
+                Json = ?JSON_ENCODE({[{ok, JsonDoc}]}),
+                send_chunk(Resp, [AccSeparator, Json]);
+            {{Error, Reason}, RevId} ->
+                RevStr = couch_doc:rev_to_str(RevId),
+                Json = bulk_get_json_error(DocId, RevStr, Error, Reason),
+                send_chunk(Resp, [AccSeparator, Json])
+        end,
+        <<",">>
+    end, <<"">>, Docs).
+
+bulk_get_json_error(DocId, Rev, Error, Reason) ->
+    ?JSON_ENCODE({[{error, {[{<<"id">>, DocId},
+                             {<<"rev">>, Rev},
+                             {<<"error">>, Error},
+                             {<<"reason">>, Reason}]}}]}).
+
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
