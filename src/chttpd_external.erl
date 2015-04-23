@@ -57,6 +57,7 @@ process_external_req(HttpReq, Db, Name) ->
 json_req_obj(Req, Db) -> json_req_obj(Req, Db, null).
 json_req_obj(#httpd{mochi_req=Req,
                method=Method,
+               requested_path_parts=RequestedPath,
                path_parts=Path,
                req_body=ReqBody
             }, Db, DocId) ->
@@ -75,21 +76,29 @@ json_req_obj(#httpd{mochi_req=Req,
     end,
     Headers = Req:get(headers),
     Hlist = mochiweb_headers:to_list(Headers),
-    {ok, Info} = fabric:get_db_info(Db),
+    {ok, Info} = get_db_info(Db),
 
     % add headers...
     {[{<<"info">>, {Info}},
         {<<"uuid">>, couch_uuids:new()},
         {<<"id">>, DocId},
         {<<"method">>, Method},
+        {<<"requested_path">>, RequestedPath},
         {<<"path">>, Path},
+        {<<"raw_path">>, ?l2b(Req:get(raw_path))},
         {<<"query">>, json_query_keys(to_json_terms(Req:parse_qs()))},
         {<<"headers">>, to_json_terms(Hlist)},
         {<<"body">>, Body},
         {<<"peer">>, ?l2b(Req:get(peer))},
         {<<"form">>, to_json_terms(ParsedForm)},
         {<<"cookie">>, to_json_terms(Req:parse_cookie())},
-        {<<"userCtx">>, couch_util:json_user_ctx(Db)}]}.
+        {<<"userCtx">>, couch_util:json_user_ctx(Db)},
+        {<<"secObj">>, couch_db:get_security(Db)}]}.
+
+get_db_info(#db{main_pid = nil} = Db) ->
+    fabric:get_db_info(Db);
+get_db_info(#db{} = Db) ->
+    couch_db:get_db_info(Db).
 
 to_json_terms(Data) ->
     to_json_terms(Data, []).
