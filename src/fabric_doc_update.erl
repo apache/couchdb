@@ -231,7 +231,7 @@ validate_atomic_update(_DbName, AllDocs, true) ->
 % eunits
 doc_update1_test() ->
     meck:new(couch_stats),
-    meck:expect(couch_stats, incrememnt_counter, fun(_) -> ok end),
+    meck:expect(couch_stats, increment_counter, fun(_) -> ok end),
 
     Doc1 = #doc{revs = {1,[<<"foo">>]}},
     Doc2 = #doc{revs = {1,[<<"bar">>]}},
