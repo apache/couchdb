@@ -716,7 +716,7 @@ update_doc_result_to_json(DocId, Error) ->
 
 
 update_doc(Req, Db, DocId, #doc{deleted=false}=Doc) ->
-    Loc = absolute_uri(Req, "/" ++ ?b2l(Db#db.name) ++ "/" ++ ?b2l(DocId)),
+    Loc = absolute_uri(Req, "/" ++ couch_util:url_encode(Db#db.name) ++ "/" ++ couch_util:url_encode(DocId)),
     update_doc(Req, Db, DocId, Doc, [{"Location", Loc}]);
 update_doc(Req, Db, DocId, Doc) ->
     update_doc(Req, Db, DocId, Doc, []).
@@ -1014,9 +1014,9 @@ db_attachment_req(#httpd{method=Method,mochi_req=MochiReq}=Req, Db, DocId, FileN
         [];
     _ ->
         [{"Location", absolute_uri(Req, "/" ++
-            ?b2l(Db#db.name) ++ "/" ++
-            ?b2l(DocId) ++ "/" ++
-            ?b2l(FileName)
+            couch_util:url_encode(Db#db.name) ++ "/" ++
+            couch_util:url_encode(DocId) ++ "/" ++
+            couch_util:url_encode(FileName)
         )}]
     end,
     update_doc(Req, Db, DocId, DocEdited, Headers);
