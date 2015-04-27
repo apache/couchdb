@@ -105,12 +105,17 @@ def setup_argparse():
                       dest='with_admin_party', default=False,
                       action='store_true',
                       help='Runs a dev cluster with admin party mode on')
+    parser.add_option('--no-join',
+                      dest='no_join', default=False,
+                      action='store_true',
+                      help='Do not join nodes on boot')
     return parser.parse_args()
 
 
 def setup_context(opts, args):
     fpath = os.path.abspath(__file__)
     return {'N': opts.nodes,
+            'no_join': opts.no_join,
             'with_admin_party': opts.with_admin_party,
             'admin': opts.admin.split(':', 1) if opts.admin else None,
             'nodes': ['node%d' % (i + 1) for i in range(opts.nodes)],
@@ -249,6 +254,8 @@ def startup(ctx):
     atexit.register(kill_processes, ctx)
     boot_nodes(ctx)
     ensure_all_nodes_alive(ctx)
+    if ctx['no_join']:
+        return
     if ctx['with_admin_party']:
         cluster_setup_with_admin_party(ctx)
     else:
