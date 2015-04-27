@@ -70,30 +70,17 @@ transform_change(Username, _Resp, {Props}) ->
     {id, Id} = lists:keyfind(id, 1, Props),
     {seq, Seq} = lists:keyfind(seq, 1, Props),
     Info = case binary:split(Id, <<":">>) of
-        [Event0, DbNameAndUsername] ->
-            case binary:split(DbNameAndUsername, <<"/">>) of
-                [AccountName0, DbName0] ->
-                    {Event0, AccountName0, DbName0};
-                [DbName0] ->
-                    {Event0, '_admin', DbName0}
-            end;
+        [Event0, DbName0] ->
+            {Event0, DbName0};
         _ ->
             skip
     end,
     case Info of
-        % Matches the client's username
-        {Event, Username, DbName} when Username /= admin ->
-            {[
-                {dbname, DbName},
-                {type, Event},
-                {seq, Seq}
-            ]};
         % Client is an admin, show them everything.
-        {Event, AccountName, DbName} when Username == admin ->
+        {Event, DbName} when Username == admin ->
             {[
-                {dbname, DbName},
+                {db_name, DbName},
                 {type, Event},
-                {account, AccountName},
                 {seq, Seq}
             ]};
         _ ->
