@@ -952,7 +952,7 @@ structure is as follows:
     Content-Type: application/json
     Date: Sat, 10 Aug 2013 11:46:25 GMT
     ETag: "DGRWWQFLUDWN5MRKSLKQ425XV"
-    Expires: Fri, 01 Jan 1990 00:00:00 GMT
+    Expires: Mon, 01 Jan 1990 00:00:00 GMT
     Pragma: no-cache
     Server: CouchDB (Erlang/OTP)
 
