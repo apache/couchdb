@@ -139,7 +139,7 @@ handle_uuids_req(#httpd{method='GET'}=Req) ->
             {"Date", couch_util:rfc1123_date()},
             {"Cache-Control", "no-cache"},
             % Past date, ON PURPOSE!
-            {"Expires", "Fri, 01 Jan 1990 00:00:00 GMT"},
+            {"Expires", "Mon, 01 Jan 1990 00:00:00 GMT"},
             {"Pragma", "no-cache"},
             {"ETag", Etag}
         ],
