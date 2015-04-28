@@ -79,3 +79,8 @@ fauxton: share/www
 share/www:
 	@echo "Building Fauxton"
 	@cd src/fauxton && npm install && ./node_modules/grunt-cli/bin/grunt couchdb
+
+update: clean
+	@git pull https://git-wip-us.apache.org/repos/asf/couchdb.git master
+	@./configure
+	make
