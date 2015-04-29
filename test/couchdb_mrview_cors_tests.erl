@@ -25,10 +25,10 @@
 ]}).
 
 start() ->
-    ok = test_util:start_couch([chttpd]),
+    Ctx = test_util:start_couch([chttpd]),
     ok = config:set("httpd", "enable_cors", "true", false),
     ok = config:set("vhosts", "example.com", "/", false),
-    ok.
+    Ctx.
 
 setup(PortType) ->
     DbName = ?tempdb(),
