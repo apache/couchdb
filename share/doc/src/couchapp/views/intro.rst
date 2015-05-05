@@ -470,8 +470,8 @@ Consider the map result are:
 
 .. code-block:: javascript
 
-  "afrikan", 1
-  "afrikan", 1
+  "afrikaans", 1
+  "afrikaans", 1
   "chinese", 1
   "chinese", 1
   "chinese", 1
@@ -560,8 +560,8 @@ want to get a list of all the unique labels in our view:
 
 .. code-block:: javascript
 
-  "abc", "afrikan"
-  "cef", "afrikan"
+  "abc", "afrikaans"
+  "cef", "afrikaans"
   "fhi", "chinese"
   "hkl", "chinese"
   "ino", "chinese"
