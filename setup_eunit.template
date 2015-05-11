@@ -14,5 +14,5 @@
 {dir, "tmp/tmp_data"}.
 {template, "rel/overlay/etc/default.ini", "tmp/etc/default_eunit.ini"}.
 {template, "rel/overlay/etc/local.ini", "tmp/etc/local_eunit.ini"}.
-{template, "rel/overlay/etc/eunit.ini", "tmp/etc/eunit.ini"}.
+{template, "rel/files/eunit.ini", "tmp/etc/eunit.ini"}.
 {template, "rel/overlay/etc/vm.args", "tmp/etc/vm.args"}.
