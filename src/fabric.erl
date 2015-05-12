@@ -319,7 +319,17 @@ query_view(DbName, DDoc, ViewName, Callback, Acc0, QueryArgs0) ->
         {waiting_commit, boolean()} |
         {waiting_clients, non_neg_integer()} |
         {update_seq, pos_integer()} |
-        {purge_seq, non_neg_integer()}
+        {purge_seq, non_neg_integer()} |
+        {sizes, [
+            {active, non_neg_integer()} |
+            {external, non_neg_integer()} |
+            {file, non_neg_integer()}
+        ]} |
+        {updates_pending, [
+            {minimum, non_neg_integer()} |
+            {preferred, non_neg_integer()} |
+            {total, non_neg_integer()}
+        ]}
     ]}.
 get_view_group_info(DbName, DesignId) ->
     fabric_group_info:go(dbname(DbName), design_doc(DesignId)).

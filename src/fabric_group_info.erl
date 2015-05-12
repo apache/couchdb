@@ -24,11 +24,12 @@ go(DbName, GroupId) when is_binary(GroupId) ->
 
 go(DbName, #doc{id=DDocId}) ->
     Shards = mem3:shards(DbName),
+    Ushards = mem3:ushards(DbName),
     Workers = fabric_util:submit_jobs(Shards, group_info, [DDocId]),
     RexiMon = fabric_util:create_monitors(Shards),
-    Acc0 = {fabric_dict:init(Workers, nil), []},
-    try fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0) of
-    {timeout, {WorkersDict, _}} ->
+    Acc = acc_init(Workers, Ushards),
+    try fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc) of
+    {timeout, {WorkersDict, _, _}} ->
         DefunctWorkers = fabric_util:remove_done_workers(WorkersDict, nil),
         fabric_util:log_timeout(DefunctWorkers, "group_info"),
         {error, timeout};
@@ -38,48 +39,83 @@ go(DbName, #doc{id=DDocId}) ->
         rexi_monitor:stop(RexiMon)
     end.
 
-handle_message({rexi_DOWN, _, {_,NodeRef},_}, _Shard, {Counters, Acc}) ->
+handle_message({rexi_DOWN, _, {_,NodeRef},_}, _Shard,
+        {Counters, Acc, Ushards}) ->
     case fabric_util:remove_down_workers(Counters, NodeRef) of
     {ok, NewCounters} ->
-        {ok, {NewCounters, Acc}};
+        {ok, {NewCounters, Acc, Ushards}};
     error ->
         {error, {nodedown, <<"progress not possible">>}}
     end;
 
-handle_message({rexi_EXIT, Reason}, Shard, {Counters, Acc}) ->
+handle_message({rexi_EXIT, Reason}, Shard, {Counters, Acc, Ushards}) ->
     NewCounters = lists:keydelete(Shard, #shard.ref, Counters),
     case fabric_view:is_progress_possible(NewCounters) of
     true ->
-        {ok, {NewCounters, Acc}};
+        {ok, {NewCounters, Acc, Ushards}};
     false ->
         {error, Reason}
     end;
 
-handle_message({ok, Info}, Shard, {Counters, Acc}) ->
-    case fabric_dict:lookup_element(Shard, Counters) of
-    undefined ->
-        % already heard from someone else in this range
-        {ok, {Counters, Acc}};
-    nil ->
-        C1 = fabric_dict:store(Shard, ok, Counters),
-        C2 = fabric_view:remove_overlapping_shards(Shard, C1),
-        case fabric_dict:any(nil, C2) of
-        true ->
-            {ok, {C2, [Info|Acc]}};
-        false ->
-            {stop, merge_results(lists:flatten([Info|Acc]))}
-        end
+handle_message({ok, Info}, Shard, {Counters0, Acc, Ushards}) ->
+    NewAcc = append_result(Info, Shard, Acc, Ushards),
+    Counters = fabric_dict:store(Shard, ok, Counters0),
+    case is_complete(Counters) of
+    false ->
+        {ok, {Counters, NewAcc, Ushards}};
+    true ->
+        Pending = aggregate_pending(NewAcc),
+        Infos = get_infos(NewAcc),
+        Results = [{updates_pending, {Pending}} | merge_results(Infos)],
+        {stop, Results}
     end;
 handle_message(_, _, Acc) ->
     {ok, Acc}.
+
+acc_init(Workers, Ushards) ->
+    Set = sets:from_list([{Id, N} || #shard{name = Id, node = N} <- Ushards]),
+    {fabric_dict:init(Workers, nil), dict:new(), Set}.
+
+is_complete(Counters) ->
+    not fabric_dict:any(nil, Counters).
+
+append_result(Info, #shard{name = Name, node = Node}, Acc, Ushards) ->
+    IsPreferred = sets:is_element({Name, Node}, Ushards),
+    dict:append(Name, {Node, IsPreferred, Info}, Acc).
+
+get_infos(Acc) ->
+    Values = [V || {_, V} <- dict:to_list(Acc)],
+    lists:flatten([Info || {_Node, _Pref, Info} <- lists:flatten(Values)]).
+
+aggregate_pending(Dict) ->
+    {Preferred, Total, Minimum} =
+        dict:fold(fun(_Name, Results, {P, T, M}) ->
+            {Preferred, Total, Minimum} = calculate_pending(Results),
+            {P + Preferred, T + Total, M + Minimum}
+        end, {0, 0, 0}, Dict),
+    [
+        {minimum, Minimum},
+        {preferred, Preferred},
+        {total, Total}
+    ].
+
+calculate_pending(Results) ->
+    lists:foldl(fun
+    ({_Node, true, Info}, {P, T, V}) ->
+       Pending = couch_util:get_value(pending_updates, Info),
+       {P + Pending, T + Pending, min(Pending, V)};
+    ({_Node, false, Info}, {P, T, V}) ->
+       Pending = couch_util:get_value(pending_updates, Info),
+       {P, T + Pending, min(Pending, V)}
+    end, {0, 0, infinity}, Results).
 
 merge_results(Info) ->
     Dict = lists:foldl(fun({K,V},D0) -> orddict:append(K,V,D0) end,
         orddict:new(), Info),
     orddict:fold(fun
-        (signature, [X|_], Acc) ->
+        (signature, [X | _], Acc) ->
             [{signature, X} | Acc];
-        (language, [X|_], Acc) ->
+        (language, [X | _], Acc) ->
             [{language, X} | Acc];
         (disk_size, X, Acc) -> % legacy
             [{disk_size, lists:sum(X)} | Acc];
