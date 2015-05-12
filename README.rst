@@ -4,10 +4,6 @@ Apache CouchDB README
 Installation
 ------------
 
-For a low-level guide, see:
-
-    INSTALL
-
 For a high-level guide to Unix-like systems, inc. Mac OS X and Ubuntu, see:
 
     INSTALL.Unix
