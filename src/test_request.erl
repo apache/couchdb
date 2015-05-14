@@ -13,9 +13,9 @@
 -module(test_request).
 
 -export([get/1, get/2, get/3]).
--export([post/2, post/3]).
--export([put/2, put/3]).
--export([delete/1]).
+-export([post/2, post/3, post/4]).
+-export([put/2, put/3, put/4]).
+-export([delete/1, delete/2]).
 -export([options/1, options/2, options/3]).
 -export([request/3, request/4]).
 
@@ -33,14 +33,23 @@ post(Url, Body) ->
 post(Url, Headers, Body) ->
     request(post, Url, Headers, Body).
 
+post(Url, Headers, Body, Opts) ->
+    request(post, Url, Headers, Body, Opts).
+
 put(Url, Body) ->
     request(put, Url, [], Body).
 
 put(Url, Headers, Body) ->
     request(put, Url, Headers, Body).
 
+put(Url, Headers, Body, Opts) ->
+    request(put, Url, Headers, Body, Opts).
+
 delete(Url) ->
     request(delete, Url, []).
+
+delete(Url, Opts) ->
+    request(delete, Url, [], [], Opts).
 
 options(Url) ->
     request(options, Url, []).
