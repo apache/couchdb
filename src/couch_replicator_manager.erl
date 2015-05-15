@@ -237,10 +237,12 @@ handle_cast(Msg, State) ->
     {stop, {error, {unexpected_cast, Msg}}, State}.
 
 handle_info({nodeup, Node}, State) ->
+    couch_log:notice("Rescanning replicator dbs as ~s came up.", [Node]),
     Live = lists:usort([Node | State#state.live]),
     {noreply, rescan(State#state{live=Live})};
 
 handle_info({nodedown, Node}, State) ->
+    couch_log:notice("Rescanning replicator dbs ~s went down.", [Node]),
     Live = State#state.live -- [Node],
     {noreply, rescan(State#state{live=Live})};
 
