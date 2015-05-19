@@ -115,7 +115,7 @@ is_replicator_db(DbName) ->
 
 is_users_db(DbName) ->
     ConfigName = list_to_binary(config:get(
-        "couch_httpd_auth", "authentication_db", "_users")),
+        "chttpd_auth", "authentication_db", "_users")),
     DbName == ConfigName orelse path_ends_with(DbName, <<"_users">>).
 
 path_ends_with(Path, Suffix) ->
