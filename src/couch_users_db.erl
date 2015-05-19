@@ -64,7 +64,7 @@ save_doc(#doc{body={Body}} = Doc) ->
         Doc;
     ClearPassword ->
         Iterations = list_to_integer(config:get("couch_httpd_auth", "iterations", "1000")),
-        Salt = couch_uuids:random(),
+        Salt = couch_util:get_value(?SALT, Body, couch_uuids:random()),
         DerivedKey = couch_passwords:pbkdf2(ClearPassword, Salt, Iterations),
         Body0 = [{?PASSWORD_SCHEME, ?PBKDF2}, {?ITERATIONS, Iterations}|Body],
         Body1 = ?replace(Body0, ?DERIVED_KEY, DerivedKey),
