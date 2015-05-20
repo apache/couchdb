@@ -36,7 +36,7 @@ setup(#httpdb{httpc_pool = nil, url = Url, http_connections = MaxConns} = Db) ->
 
 
 send_req(HttpDb, Params1, Callback) ->
-    put(STREAM_STATUS, init),
+    put(?STREAM_STATUS, init),
     couch_stats:increment_counter([couch_replicator, requests]),
     Params2 = ?replace(Params1, qs,
         [{K, ?b2l(iolist_to_binary(V))} || {K, V} <- get_value(qs, Params1, [])]),
@@ -134,7 +134,7 @@ process_stream_response(ReqId, Worker, HttpDb, Params, Callback) ->
             StreamDataFun = fun() ->
                 stream_data_self(HttpDb, Params, Worker, ReqId, Callback)
             end,
-            put(STREAM_STATUS, streaming),
+            put(?STREAM_STATUS, streaming),
             ibrowse:stream_next(ReqId),
             try
                 Ret = Callback(Ok, Headers, StreamDataFun),
@@ -170,22 +170,22 @@ process_stream_response(ReqId, Worker, HttpDb, Params, Callback) ->
 % messages for the given ReqId on the floor since we're
 % no longer in the HTTP request.
 clean_mailbox({ibrowse_req_id, ReqId}) ->
-    case get(STREAM_STATUS) of
+    case get(?STREAM_STATUS) of
         streaming ->
             ibrowse:stream_next(ReqId),
             receive
                 {ibrowse_async_response, ReqId, _} ->
                     clean_mailbox({ibrowse_req_id, ReqId});
                 {ibrowse_async_response_end, ReqId} ->
-                    put(STREAM_STATUS, ended),
+                    put(?STREAM_STATUS, ended),
                     ok
             end;
-        _ ->
+        Status when Status == init; Status == ended ->
             receive
                 {ibrowse_async_response, ReqId, _} ->
                     clean_mailbox({ibrowse_req_id, ReqId});
                 {ibrowse_async_response_end, ReqId} ->
-                    put(STREAM_STATUS, ended),
+                    put(?STREAM_STATUS, ended),
                     ok
             end
     end;
@@ -236,7 +236,7 @@ stream_data_self(#httpdb{timeout = T} = HttpDb, Params, Worker, ReqId, Cb) ->
         ibrowse:stream_next(ReqId),
         {Data, fun() -> stream_data_self(HttpDb, Params, Worker, ReqId, Cb) end};
     {Data, ibrowse_async_response_end} ->
-        put(STREAM_STATUS, ended),
+        put(?STREAM_STATUS, ended),
         {Data, fun() -> throw({maybe_retry_req, more_data_expected}) end}
     end.
 
