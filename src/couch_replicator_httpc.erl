@@ -179,6 +179,8 @@ clean_mailbox({ibrowse_req_id, ReqId}) ->
                 {ibrowse_async_response_end, ReqId} ->
                     put(?STREAM_STATUS, ended),
                     ok
+                after 30000 ->
+                    exit({timeout, ibrowse_stream_cleanup})
             end;
         Status when Status == init; Status == ended ->
             receive
@@ -186,6 +188,8 @@ clean_mailbox({ibrowse_req_id, ReqId}) ->
                     clean_mailbox({ibrowse_req_id, ReqId});
                 {ibrowse_async_response_end, ReqId} ->
                     put(?STREAM_STATUS, ended),
+                    ok
+                after 0 ->
                     ok
             end
     end;
