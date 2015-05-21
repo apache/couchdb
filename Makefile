@@ -35,9 +35,10 @@ clean:
 	@rm -rf src/*/.rebar
 	@rm -rf src/{jiffy,khash,snappy,b64url}/priv
 	@rm -rf share/server/main.js share/server/main-coffee.js
+	@rm -rf tmp dev/data dev/lib dev/logs
 	@rm -f src/couch/priv/couchspawnkillable
 	@rm -f src/couch/priv/couch_js/config.h
-	@rm -f tmp/ dev/boot_node.beam dev/data dev/lib dev/pbkdf2.pyc log/crash.log dev/logs
+	@rm -f dev/boot_node.beam dev/pbkdf2.pyc log/crash.log
 
 check: javascript eunit
 
