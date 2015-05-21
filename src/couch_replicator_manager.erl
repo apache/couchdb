@@ -17,7 +17,7 @@
 
 % public API
 -export([replication_started/1, replication_completed/2, replication_error/2]).
--export([owner/1, replication_usurped/2]).
+-export([continue/1, replication_usurped/2]).
 
 -export([before_doc_update/2, after_doc_read/2]).
 
@@ -131,9 +131,11 @@ replication_error(#rep{id = {BaseId, _} = RepId}, Error) ->
         ok = gen_server:call(?MODULE, {rep_error, RepId, Error}, infinity)
     end.
 
-
-owner(RepId) ->
-    gen_server:call(?MODULE, {owner, RepId}).
+continue(#rep{doc_id = null}) ->
+    {true, no_owner};
+continue(#rep{id = RepId}) ->
+    Owner = gen_server:call(?MODULE, {owner, RepId}),
+    {node() == Owner, Owner}.
 
 
 handle_config_change("replicator", "db", _, _, S) ->
@@ -178,7 +180,7 @@ init(_) ->
 handle_call({owner, RepId}, _From, State) ->
     case rep_state(RepId) of
     nil ->
-        false;
+        {reply, nonode, State};
     #rep_state{dbname = DbName, rep = #rep{doc_id = DocId}} ->
         {reply, owner(DbName, DocId, State#state.live), State}
     end;

@@ -475,9 +475,9 @@ handle_cast({db_compacted, DbName},
     {noreply, State#rep_state{target = NewTarget}};
 
 handle_cast(checkpoint, State) ->
-    #rep_state{rep_details = #rep{id = RepId} = Rep} = State,
-    case couch_replicator_manager:owner(RepId) of
-    Owner when Owner == node() ->
+    #rep_state{rep_details = #rep{} = Rep} = State,
+    case couch_replicator_manager:continue(Rep) of
+    {true, _} ->
         case do_checkpoint(State) of
         {ok, NewState} ->
             couch_stats:increment_counter([couch_replicator, checkpoints, success]),
@@ -486,7 +486,7 @@ handle_cast(checkpoint, State) ->
             couch_stats:increment_counter([couch_replicator, checkpoints, failure]),
             {stop, Error, State}
         end;
-    Owner ->
+    {false, Owner} ->
         couch_replicator_manager:replication_usurped(Rep, Owner),
         {stop, shutdown, State}
     end;
