@@ -7,12 +7,14 @@ setup() ->
     Host = get_host(),
     add_admin("admin", <<"pass">>),
     DbName = "foo/" ++ ?b2l(?tempdb()),
-    fabric:create_db(DbName, [?ADMIN_CTX]),
+    [fabric:create_db(Name, [?ADMIN_CTX])
+        || Name <- ["_global_changes", DbName]],
     {Host, DbName}.
 
 teardown({_, DbName}) ->
     delete_admin("admin"),
-    ok = fabric:delete_db(?l2b(DbName), [?ADMIN_CTX]),
+    [fabric:delete_db(Name, [?ADMIN_CTX])
+        || Name <- ["_global_changes", DbName]],
     ok.
 
 global_changes_test_() ->
