@@ -72,7 +72,6 @@ You can install the dependencies by running:
     sudo apt-get install libcurl4-openssl-dev
     sudo apt-get install pkg-config
     sudo apt-get install rebar
-    sudo apt-get install libkjsapi4
 
 There are lots of Erlang packages. If there is a problem with your
 install, try a different mix. There is more information on the
