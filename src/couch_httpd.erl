@@ -747,23 +747,17 @@ send_json(Req, Code, Value) ->
 
 send_json(Req, Code, Headers, Value) ->
     initialize_jsonp(Req),
-    DefaultHeaders = [
-        {"Content-Type", negotiate_content_type(Req)},
-        {"Cache-Control", "must-revalidate"}
-    ],
+    AllHeaders = maybe_add_default_headers(Req, Headers),
     Body = [start_jsonp(), ?JSON_ENCODE(Value), end_jsonp(), $\n],
-    send_response(Req, Code, DefaultHeaders ++ Headers, Body).
+    send_response(Req, Code, AllHeaders, Body).
 
 start_json_response(Req, Code) ->
     start_json_response(Req, Code, []).
 
 start_json_response(Req, Code, Headers) ->
     initialize_jsonp(Req),
-    DefaultHeaders = [
-        {"Content-Type", negotiate_content_type(Req)},
-        {"Cache-Control", "must-revalidate"}
-    ],
-    {ok, Resp} = start_chunked_response(Req, Code, DefaultHeaders ++ Headers),
+    AllHeaders = maybe_add_default_headers(Req, Headers),
+    {ok, Resp} = start_chunked_response(Req, Code, AllHeaders),
     case start_jsonp() of
         [] -> ok;
         Start -> send_chunk(Resp, Start)
@@ -773,6 +767,19 @@ start_json_response(Req, Code, Headers) ->
 end_json_response(Resp) ->
     send_chunk(Resp, end_jsonp() ++ [$\n]),
     last_chunk(Resp).
+
+maybe_add_default_headers(ForRequest, ToHeaders) ->
+    DefaultHeaders = [
+        {"Content-Type", negotiate_content_type(ForRequest)},
+        {"Cache-Control", "must-revalidate"}
+    ],
+    lists:foldl(fun maybe_add_header/2, ToHeaders, DefaultHeaders).
+
+maybe_add_header({HeaderName, HeaderValue}, ToHeaders) ->
+    case lists:keyfind(HeaderName, 1, ToHeaders) of
+        false -> ToHeaders ++ [{HeaderName, HeaderValue}];
+        _Found -> ToHeaders
+    end.
 
 initialize_jsonp(Req) ->
     case get(jsonp) of
@@ -1120,3 +1127,79 @@ validate_bind_address(Address) ->
         {ok, _} -> ok;
         _ -> throw({error, invalid_bind_address})
     end.
+
+
+%%%%%%%% module tests below %%%%%%%%
+
+-ifdef(TEST).
+-include_lib("couch/include/couch_eunit.hrl").
+
+maybe_add_header_test_() ->
+    Cases = [
+        {[],                    % initial headers
+         {"K1", "V1"},          % header to add
+          [{"K1", "V1"}],       % expected result
+           "Adding to empty headers"},
+
+        {[{"K1", "V1"}],
+         {"K2", "V2"},
+          [{"K1", "V1"}, {"K2", "V2"}],
+           "Adding header to 1 element headers list"},
+
+        {[{"K1", "V1"}],
+         {"K1", "V2"},
+          [{"K1", "V1"}],
+           "Trying to add same header to 1 element headers list"},
+
+        {[{"K1", "V1"}, {"K2", "V2"}],
+         {"K1", "V2"},
+          [{"K1", "V1"}, {"K2", "V2"}],
+           "Trying to add same header to 2 element headers list"},
+
+        {[{"K1", "V1"}, {"K2", "V2"}],
+         {"K3", "V3"},
+          [{"K1", "V1"}, {"K2", "V2"}, {"K3", "V3"}],
+           "Adding header to 2 elements headers list"}
+    ],
+    Tests = lists:map(fun({InitialHeaders, HeaderToAdd, ProperResult, Desc}) ->
+        {Desc,
+        ?_assertEqual(ProperResult,
+            maybe_add_header(HeaderToAdd, InitialHeaders))}
+    end, Cases),
+    {"Tests adding a header to a list of headers", Tests}.
+
+maybe_add_default_headers_test_() ->
+    DummyRequest = [],
+    NoCache = {"Cache-Control", "no-cache"},
+    ApplicationJson = {"Content-Type", "application/json"},
+    % couch_httpd uses process dictionary to check if currently in a
+    % json serving method. Defaults to 'application/javascript' otherwise.
+    % Therefore must-revalidate and application/javascript should be added
+    % by chttpd if such headers are not present
+    MustRevalidate = {"Cache-Control", "must-revalidate"},
+    ApplicationJavascript = {"Content-Type", "application/javascript"},
+    Cases = [
+        {[],
+         [ApplicationJavascript, MustRevalidate],
+          "Should add Content-Type and Cache-Control to empty heaeders"},
+
+        {[NoCache],
+         [NoCache, ApplicationJavascript],
+          "Should add Content-Type only if Cache-Control is present"},
+
+        {[ApplicationJson],
+         [ApplicationJson, MustRevalidate],
+          "Should add Cache-Control if Content-Type is present"},
+
+        {[NoCache, ApplicationJson],
+         [NoCache, ApplicationJson],
+          "Should not add headers if Cache-Control and Content-Type are there"}
+    ],
+    Tests = lists:map(fun({InitialHeaders, ProperResult, Desc}) ->
+        {Desc,
+        ?_assertEqual(ProperResult,
+         maybe_add_default_headers(DummyRequest, InitialHeaders))}
+    end, Cases),
+    {"Tests adding default headers", Tests}.
+
+-endif.
