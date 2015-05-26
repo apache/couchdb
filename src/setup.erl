@@ -47,7 +47,7 @@ is_cluster_enabled() ->
 
 cluster_system_dbs() ->
     ["_users", "_replicator", "_metadata", "_global_changes"].
-        
+
 
 has_cluster_system_dbs() ->
     has_cluster_system_dbs(cluster_system_dbs()).
