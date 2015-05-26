@@ -11,6 +11,7 @@ tmp/
 
 *.o
 *.so
+*.pyc
 ebin/
 
 erl_crash.dump
