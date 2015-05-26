@@ -333,8 +333,13 @@ get_db_info(Db) ->
     {ok, FileSize} = couch_file:bytes(Fd),
     {ok, DbReduction} = couch_btree:full_reduce(IdBtree),
     SizeInfo0 = element(3, DbReduction),
-    SizeInfo = if is_record(SizeInfo0, size_info) -> SizeInfo0; true ->
-        #size_info{active=SizeInfo0}
+    SizeInfo = case SizeInfo0 of
+        SI when is_record(SI, size_info) ->
+            SI;
+        {AS, ES} ->
+            #size_info{active=AS, external=ES};
+        SI ->
+            #size_info{active=SI}
     end,
     ActiveSize = active_size(Db, SizeInfo),
     DiskVersion = couch_db_header:disk_version(Header),
