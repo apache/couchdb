@@ -61,7 +61,47 @@ has_cluster_system_dbs([Db|Dbs]) ->
     end.
 
 enable_cluster(Options) ->
-    enable_cluster_int(Options, is_cluster_enabled()).
+
+    case couch_util:get_value(remote_node, Options, undefined) of
+        undefined ->
+            enable_cluster_int(Options, is_cluster_enabled());
+        _ ->
+            enable_cluster_http(Options)
+    end.
+
+enable_cluster_http(Options) ->
+    % POST to nodeB/_setup
+    RequestOptions = [
+        {basic_auth, {
+            binary_to_list(couch_util:get_value(remote_current_user, Options)),
+            binary_to_list(couch_util:get_value(remote_current_password, Options))
+        }}
+    ],
+
+    Body = ?JSON_ENCODE({[
+        {<<"action">>, <<"enable_cluster">>},
+        {<<"username">>, couch_util:get_value(username, Options)},
+        {<<"password">>, couch_util:get_value(password, Options)},
+        {<<"bind_address">>, couch_util:get_value(bind_address, Options)},
+        {<<"port">>, couch_util:get_value(port, Options)}
+    ]}),
+
+    Headers = [
+        {"Content-Type","application/json"}
+    ],
+
+    RemoteNode = couch_util:get_value(remote_node, Options),
+    Port = get_port(couch_util:get_value(port, Options, 5984)),
+
+    Url = binary_to_list(<<"http://", RemoteNode/binary, ":", Port/binary, "/_cluster_setup">>),
+
+    case ibrowse:send_req(Url, Headers, post, Body, RequestOptions) of
+        {ok, "201", _, _} ->
+            ok;
+        Else ->
+            io:format("~nsend_req: ~p~n", [Else]),
+            {error, Else}
+    end.
 
 enable_cluster_int(_Options, ok) ->
     {error, cluster_enabled};
