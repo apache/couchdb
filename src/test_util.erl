@@ -69,10 +69,9 @@ start_couch(ExtraApps) ->
 start_couch(IniFiles, ExtraApps) ->
     load_applications_with_stats(),
     ok = application:set_env(config, ini_files, IniFiles),
-    ok = lager:start(),
 
     Apps = start_applications(
-        [inets, ibrowse, ssl, config, couch_event, couch]
+        [goldrush, lager, inets, ibrowse, ssl, config, couch_event, couch]
         ++ ExtraApps),
 
     #test_context{started = Apps}.
