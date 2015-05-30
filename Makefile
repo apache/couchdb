@@ -67,9 +67,9 @@ release:
 	echo "Done: apache-couchdb-$(COUCHDB_VERSION).tar.gz"
 
 distclean: clean
-	@rm install.mk
-	@rm config.erl
-	@rm rel/couchdb.config
+	@rm -f install.mk
+	@rm -f config.erl
+	@rm -f rel/couchdb.config
 ifneq ($(IN_RELEASE), true)
 	# when we are in a release, don’t delete the
 	# copied sources, generated docs, or fauxton
