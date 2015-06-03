@@ -16,6 +16,8 @@ IN_RELEASE = $(shell if [ ! -d .git ]; then echo true; fi)
 COUCHDB_VERSION_SUFFIX = $(shell if [ -d .git ]; then echo '-`git rev-parse --short --verify HEAD`'; fi)
 COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)$(COUCHDB_VERSION_SUFFIX)
 
+DESTDIR=
+
 all: couch fauxton
 
 config.erl:
@@ -83,20 +85,22 @@ devclean:
 
 -include install.mk
 install: all
+	@echo "Installing CouchDB into $(DESTDIR)/$(install_dir)..." | sed -e 's,///,/,'
 	@rm -rf rel/couchdb
 	@rebar generate # make full erlang release
-	@mkdir -p $(install_dir)
-	@cp -R rel/couchdb/* $(install_dir)
-	@mkdir -p $(data_dir)
-	@chown $(user) $(data_dir)
-	@mkdir -p $(view_index_dir)
-	@chown $(user) $(view_index_dir)
-	@mkdir -p `dirname $(log_file)`
-	@touch $(log_file)
-	@chown $(user) $(log_file)
+	@mkdir -p $(DESTDIR)/$(install_dir)
+	@cp -R rel/couchdb/* $(DESTDIR)/$(install_dir)
+	@mkdir -p $(DESTDIR)/$(data_dir)
+	@chown $(user) $(DESTDIR)/$(data_dir)
+	@mkdir -p $(DESTDIR)/$(view_index_dir)
+	@chown $(user) $(DESTDIR)/$(view_index_dir)
+	@mkdir -p $(DESTDIR)/`dirname $(log_file)`
+	@touch $(DESTDIR)/$(log_file)
+	@chown $(user) $(DESTDIR)/$(log_file)
+	@echo "...done"
 
 uninstall:
-	@rm -rf $(install_dir)
+	@rm -rf $(DESTDIR)/$(install_dir)
 
 install.mk:
 # ignore install.mk missing if we are running
