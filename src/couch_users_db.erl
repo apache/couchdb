@@ -66,11 +66,12 @@ save_doc(#doc{body={Body}} = Doc) ->
         Iterations = list_to_integer(config:get("couch_httpd_auth", "iterations", "1000")),
         Salt = couch_uuids:random(),
         DerivedKey = couch_passwords:pbkdf2(ClearPassword, Salt, Iterations),
-        Body0 = [{?PASSWORD_SCHEME, ?PBKDF2}, {?ITERATIONS, Iterations}|Body],
-        Body1 = ?replace(Body0, ?DERIVED_KEY, DerivedKey),
-        Body2 = ?replace(Body1, ?SALT, Salt),
-        Body3 = proplists:delete(?PASSWORD, Body2),
-        Doc#doc{body={Body3}}
+        Body0 = ?replace(Body, ?PASSWORD_SCHEME, ?PBKDF2),
+        Body1 = ?replace(Body0, ?ITERATIONS, Iterations),
+        Body2 = ?replace(Body1, ?DERIVED_KEY, DerivedKey),
+        Body3 = ?replace(Body2, ?SALT, Salt),
+        Body4 = proplists:delete(?PASSWORD, Body3),
+        Doc#doc{body={Body4}}
     end.
 
 % If the doc is a design doc
