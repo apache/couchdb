@@ -162,7 +162,7 @@ get_all_security(DbName, Options) ->
     {error, any()} |
     {error, any() | any()}.
 open_doc(DbName, Id, Options) ->
-    case proplists:get_value(doc_info, Options) of
+    case couch_util:get_value(doc_info, Options) of
     undefined ->
         fabric_doc_open:go(dbname(DbName), docid(Id), opts(Options));
     Else ->

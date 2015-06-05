@@ -121,7 +121,7 @@ check_sec_set_int(NumWorkers, SetWorkers) ->
 
 
 get_all_security(DbName, Options) ->
-    Shards = case proplists:get_value(shards, Options) of
+    Shards = case couch_util:get_value(shards, Options) of
         Shards0 when is_list(Shards0) -> Shards0;
         _ -> mem3:shards(DbName)
     end,

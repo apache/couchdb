@@ -203,7 +203,7 @@ get_missing_revs(DbName, IdRevsList, Options) ->
     end).
 
 update_docs(DbName, Docs0, Options) ->
-    case proplists:get_value(replicated_changes, Options) of
+    case couch_util:get_value(replicated_changes, Options) of
     true ->
         X = replicated_changes;
     _ ->
