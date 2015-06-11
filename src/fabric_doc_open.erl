@@ -30,7 +30,7 @@
 
 
 go(DbName, Id, Options) ->
-    Handler = case couch_util:get_value(doc_info, Options) of
+    Handler = case proplists:get_value(doc_info, Options) of
     true -> get_doc_info;
     full -> get_full_doc_info;
     undefined -> open_doc
