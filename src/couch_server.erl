@@ -140,7 +140,7 @@ maybe_add_sys_db_callbacks(DbName, Options) ->
     end.
 
 path_ends_with(Path, Suffix) ->
-    Suffix == lists:last(binary:split(mem3:dbname(Path), <<"/">>, [global])).
+    Suffix == couch_db:normalize_dbname(Path).
 
 check_dbname(#server{dbname_regexp=RegExp}, DbName) ->
     case re:run(DbName, RegExp, [{capture, none}]) of
