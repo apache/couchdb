@@ -119,7 +119,7 @@ is_users_db(DbName) ->
     DbName == ConfigName orelse path_ends_with(DbName, <<"_users">>).
 
 path_ends_with(Path, Suffix) ->
-    Suffix == lists:last(binary:split(mem3:dbname(Path), <<"/">>, [global])).
+    Suffix == couch_db:normalize_dbname(Path).
 
 fake_db(Opts) ->
     UserCtx = couch_util:get_value(user_ctx, Opts, #user_ctx{}),
