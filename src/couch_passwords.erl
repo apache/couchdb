@@ -30,6 +30,15 @@ simple(Password, Salt) when is_binary(Password), is_binary(Salt) ->
 hash_admin_password(ClearPassword) when is_list(ClearPassword) ->
     hash_admin_password(?l2b(ClearPassword));
 hash_admin_password(ClearPassword) when is_binary(ClearPassword) ->
+    %% Support both schemes to smooth migration from legacy scheme
+    Scheme = config:get("couch_httpd_auth", "password_scheme", "pbkdf2"),
+    hash_admin_password(Scheme, ClearPassword).
+
+hash_admin_password("simple", ClearPassword) -> % deprecated
+    Salt = couch_uuids:random(),
+    Hash = crypto:sha(<<ClearPassword/binary, Salt/binary>>),
+    ?l2b("-hashed-" ++ couch_util:to_hex(Hash) ++ "," ++ ?b2l(Salt));
+hash_admin_password("pbkdf2", ClearPassword) ->
     Iterations = config:get("couch_httpd_auth", "iterations", "10000"),
     Salt = couch_uuids:random(),
     DerivedKey = couch_passwords:pbkdf2(couch_util:to_binary(ClearPassword),

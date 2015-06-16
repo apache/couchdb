@@ -20,6 +20,8 @@
 -define(PASSWORD, <<"password">>).
 -define(DERIVED_KEY, <<"derived_key">>).
 -define(PASSWORD_SCHEME, <<"password_scheme">>).
+-define(SIMPLE, <<"simple">>).
+-define(PASSWORD_SHA, <<"password_sha">>).
 -define(PBKDF2, <<"pbkdf2">>).
 -define(ITERATIONS, <<"iterations">>).
 -define(SALT, <<"salt">>).
@@ -57,12 +59,22 @@ before_doc_update(Doc, #db{user_ctx = UserCtx} = Db) ->
 %    newDoc.salt = salt
 %    newDoc.password = null
 save_doc(#doc{body={Body}} = Doc) ->
-    case couch_util:get_value(?PASSWORD, Body) of
-    null -> % server admins don't have a user-db password entry
+    %% Support both schemes to smooth migration from legacy scheme
+    Scheme = config:get("couch_httpd_auth", "password_scheme", "pbkdf2"),
+    case {couch_util:get_value(?PASSWORD, Body), Scheme} of
+    {null, _} -> % server admins don't have a user-db password entry
         Doc;
-    undefined ->
+    {undefined, _} ->
         Doc;
-    ClearPassword ->
+    {ClearPassword, "simple"} -> % deprecated
+        Salt = couch_uuids:random(),
+        PasswordSha = couch_passwords:simple(ClearPassword, Salt),
+        Body0 = ?replace(Body, ?PASSWORD_SCHEME, ?SIMPLE),
+        Body1 = ?replace(Body0, ?SALT, Salt),
+        Body2 = ?replace(Body1, ?PASSWORD_SHA, PasswordSha),
+        Body3 = proplists:delete(?PASSWORD, Body2),
+        Doc#doc{body={Body3}};
+    {ClearPassword, "pbkdf2"} ->
         Iterations = list_to_integer(config:get("couch_httpd_auth", "iterations", "1000")),
         Salt = couch_uuids:random(),
         DerivedKey = couch_passwords:pbkdf2(ClearPassword, Salt, Iterations),
@@ -71,7 +83,10 @@ save_doc(#doc{body={Body}} = Doc) ->
         Body2 = ?replace(Body1, ?DERIVED_KEY, DerivedKey),
         Body3 = ?replace(Body2, ?SALT, Salt),
         Body4 = proplists:delete(?PASSWORD, Body3),
-        Doc#doc{body={Body4}}
+        Doc#doc{body={Body4}};
+    {_ClearPassword, Scheme} ->
+        couch_log:error("[couch_httpd_auth] password_scheme value of '~p' is invalid.", [Scheme]),
+        throw({forbidden, "Server cannot hash passwords at this time."})
     end.
 
 % If the doc is a design doc

@@ -372,9 +372,11 @@ maybe_value(Key, Else, Fun) ->
 
 maybe_upgrade_password_hash(Req, UserName, Password, UserProps,
         AuthModule, AuthCtx) ->
+    Upgrade = config:get_boolean("couch_httpd_auth", "upgrade_password_on_auth", true),
     IsAdmin = lists:member(<<"_admin">>, couch_util:get_value(<<"roles">>, UserProps, [])),
-    case {IsAdmin, couch_util:get_value(<<"password_scheme">>, UserProps, <<"simple">>)} of
-    {false, <<"simple">>} ->
+    case {IsAdmin, Upgrade,
+         couch_util:get_value(<<"password_scheme">>, UserProps, <<"simple">>)} of
+    {false, true, <<"simple">>} ->
         UserProps2 = proplists:delete(<<"password_sha">>, UserProps),
         UserProps3 = [{<<"password">>, Password} | UserProps2],
         NewUserDoc = couch_doc:from_json_obj({UserProps3}),
