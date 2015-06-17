@@ -123,8 +123,9 @@ stop() ->
     catch mochiweb_http:stop(https),
     mochiweb_http:stop(?MODULE).
 
-handle_request(MochiReq) ->
+handle_request(MochiReq0) ->
     Begin = os:timestamp(),
+    MochiReq = couch_httpd_vhost:dispatch_host(MochiReq0),
 
     case config:get("chttpd", "socket_options") of
     undefined ->
