@@ -487,7 +487,6 @@ handle_response_quorum_met_test() ->
 get_doc_info_test() ->
     start_meck_(),
     meck:new([mem3, rexi_monitor, fabric_util]),
-    meck:expect(twig, log, fun(_, _, _) -> ok end),
     meck:expect(fabric, update_docs, fun(_, _, _) -> {ok, []} end),
     meck:expect(couch_stats, increment_counter, fun(_) -> ok end),
     meck:expect(fabric_util, submit_jobs, fun(_, _, _) -> ok end),
