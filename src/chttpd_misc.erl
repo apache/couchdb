@@ -228,8 +228,7 @@ handle_uuids_req(Req) ->
 % Node-specific request handler (_config and _stats)
 
 
-% GET /_node/$node/config/
-% GET /_node/$node/config
+% GET /_node/$node/_config
 handle_node_req(#httpd{method='GET', path_parts=[_, Node, <<"_config">>]}=Req) ->
     Grouped = lists:foldl(fun({{Section, Key}, Value}, Acc) ->
         case dict:is_key(Section, Acc) of
@@ -243,12 +242,12 @@ handle_node_req(#httpd{method='GET', path_parts=[_, Node, <<"_config">>]}=Req) -
         [{list_to_binary(Section), {Values}} | Acc]
     end, [], Grouped),
     send_json(Req, 200, {KVs});
-% GET /_node/$node/config/Section
+% GET /_node/$node/_config/Section
 handle_node_req(#httpd{method='GET', path_parts=[_, Node, <<"_config">>, Section]}=Req) ->
     KVs = [{list_to_binary(Key), list_to_binary(Value)}
             || {Key, Value} <- call_node(Node, config, get, [Section])],
     send_json(Req, 200, {KVs});
-% PUT /_node/$node/config/Section/Key
+% PUT /_node/$node/_config/Section/Key
 % "value"
 handle_node_req(#httpd{method='PUT', path_parts=[_, Node, <<"_config">>, Section, Key]}=Req) ->
     Value = chttpd:json_body(Req),
@@ -256,7 +255,7 @@ handle_node_req(#httpd{method='PUT', path_parts=[_, Node, <<"_config">>, Section
     OldValue = call_node(Node, config, get, [Section, Key, ""]),
     ok = call_node(Node, config, set, [Section, Key, ?b2l(Value), Persist]),
     send_json(Req, 200, list_to_binary(OldValue));
-% GET /_node/$node/config/Section/Key
+% GET /_node/$node/_config/Section/Key
 handle_node_req(#httpd{method='GET', path_parts=[_, Node, <<"_config">>, Section, Key]}=Req) ->
     case call_node(Node, config, get, [Section, Key, undefined]) of
     undefined ->
@@ -264,7 +263,7 @@ handle_node_req(#httpd{method='GET', path_parts=[_, Node, <<"_config">>, Section
     Value ->
         send_json(Req, 200, list_to_binary(Value))
     end;
-% DELETE /_node/$node/config/Section/Key
+% DELETE /_node/$node/_config/Section/Key
 handle_node_req(#httpd{method='DELETE',path_parts=[_, Node, <<"_config">>, Section, Key]}=Req) ->
     Persist = chttpd:header_value(Req, "X-Couch-Persist") /= "false",
     case call_node(Node, config, get, [Section, Key, undefined]) of
@@ -274,6 +273,7 @@ handle_node_req(#httpd{method='DELETE',path_parts=[_, Node, <<"_config">>, Secti
         call_node(Node, config, delete, [Section, Key, Persist]),
         send_json(Req, 200, list_to_binary(OldValue))
     end;
+% GET /_node/$node/_stats
 handle_node_req(#httpd{path_parts=[_, Node, <<"_stats">> | Path]}=Req) ->
     flush(Node, Req),
     Stats0 = call_node(Node, couch_stats, fetch, []),
