@@ -366,7 +366,7 @@ url_handler("favicon.ico") ->   fun chttpd_misc:handle_favicon_req/1;
 url_handler("_utils") ->        fun chttpd_misc:handle_utils_dir_req/1;
 url_handler("_all_dbs") ->      fun chttpd_misc:handle_all_dbs_req/1;
 url_handler("_active_tasks") -> fun chttpd_misc:handle_task_status_req/1;
-url_handler("_node_config") ->  fun chttpd_misc:handle_node_config_req/1;
+url_handler("_node") ->         fun chttpd_misc:handle_node_req/1;
 url_handler("_reload_query_servers") -> fun chttpd_misc:handle_reload_query_servers_req/1;
 url_handler("_replicate") ->    fun chttpd_misc:handle_replicate_req/1;
 url_handler("_uuids") ->        fun chttpd_misc:handle_uuids_req/1;

@@ -14,7 +14,7 @@
 
 -export([
     handle_all_dbs_req/1,
-    handle_node_config_req/1,
+    handle_node_req/1,
     handle_favicon_req/1,
     handle_favicon_req/2,
     handle_replicate_req/1,
@@ -225,12 +225,12 @@ handle_uuids_req(Req) ->
     couch_httpd_misc_handlers:handle_uuids_req(Req).
 
 
-% Config request handler
+% Node-specific request handler (_config and _stats)
 
 
-% GET /_config/
-% GET /_config
-handle_node_config_req(#httpd{method='GET', path_parts=[_, Node]}=Req) ->
+% GET /_node/$node/config/
+% GET /_node/$node/config
+handle_node_req(#httpd{method='GET', path_parts=[_, Node, <<"_config">>]}=Req) ->
     Grouped = lists:foldl(fun({{Section, Key}, Value}, Acc) ->
         case dict:is_key(Section, Acc) of
         true ->
@@ -238,60 +238,76 @@ handle_node_config_req(#httpd{method='GET', path_parts=[_, Node]}=Req) ->
         false ->
             dict:store(Section, [{list_to_binary(Key), list_to_binary(Value)}], Acc)
         end
-    end, dict:new(), rpc_config(Node, all, [])),
+    end, dict:new(), call_node(Node, config, all, [])),
     KVs = dict:fold(fun(Section, Values, Acc) ->
         [{list_to_binary(Section), {Values}} | Acc]
     end, [], Grouped),
     send_json(Req, 200, {KVs});
-% GET /_config/Section
-handle_node_config_req(#httpd{method='GET', path_parts=[_, Node, Section]}=Req) ->
+% GET /_node/$node/config/Section
+handle_node_req(#httpd{method='GET', path_parts=[_, Node, <<"_config">>, Section]}=Req) ->
     KVs = [{list_to_binary(Key), list_to_binary(Value)}
-            || {Key, Value} <- rpc_config(Node, get, [Section])],
+            || {Key, Value} <- call_node(Node, config, get, [Section])],
     send_json(Req, 200, {KVs});
-% PUT /_config/Section/Key
+% PUT /_node/$node/config/Section/Key
 % "value"
-handle_node_config_req(#httpd{method='PUT', path_parts=[_, Node, Section, Key]}=Req) ->
+handle_node_req(#httpd{method='PUT', path_parts=[_, Node, <<"_config">>, Section, Key]}=Req) ->
     Value = chttpd:json_body(Req),
     Persist = chttpd:header_value(Req, "X-Couch-Persist") /= "false",
-    OldValue = rpc_config(Node, get, [Section, Key, ""]),
-    ok = rpc_config(Node, set, [Section, Key, ?b2l(Value), Persist]),
+    OldValue = call_node(Node, config, get, [Section, Key, ""]),
+    ok = call_node(Node, config, set, [Section, Key, ?b2l(Value), Persist]),
     send_json(Req, 200, list_to_binary(OldValue));
-% GET /_config/Section/Key
-handle_node_config_req(#httpd{method='GET', path_parts=[_, Node, Section, Key]}=Req) ->
-    case rpc_config(Node, get, [Section, Key, undefined]) of
+% GET /_node/$node/config/Section/Key
+handle_node_req(#httpd{method='GET', path_parts=[_, Node, <<"_config">>, Section, Key]}=Req) ->
+    case call_node(Node, config, get, [Section, Key, undefined]) of
     undefined ->
         throw({not_found, unknown_config_value});
     Value ->
         send_json(Req, 200, list_to_binary(Value))
     end;
-% DELETE /_config/Section/Key
-handle_node_config_req(#httpd{method='DELETE',path_parts=[_, Node, Section, Key]}=Req) ->
+% DELETE /_node/$node/config/Section/Key
+handle_node_req(#httpd{method='DELETE',path_parts=[_, Node, <<"_config">>, Section, Key]}=Req) ->
     Persist = chttpd:header_value(Req, "X-Couch-Persist") /= "false",
-    case rpc_config(Node, get, [Section, Key, undefined]) of
+    case call_node(Node, config, get, [Section, Key, undefined]) of
     undefined ->
         throw({not_found, unknown_config_value});
     OldValue ->
-        rpc_config(Node, delete, [Section, Key, Persist]),
+        call_node(Node, config, delete, [Section, Key, Persist]),
         send_json(Req, 200, list_to_binary(OldValue))
     end;
-handle_node_config_req(Req) ->
+handle_node_req(#httpd{path_parts=[_, Node, <<"_stats">> | Path]}=Req) ->
+    flush(Node, Req),
+    Stats0 = call_node(Node, couch_stats, fetch, []),
+    Stats = couch_stats_httpd:transform_stats(Stats0),
+    Nested = couch_stats_httpd:nest(Stats),
+    EJSON0 = couch_stats_httpd:to_ejson(Nested),
+    EJSON1 = couch_stats_httpd:extract_path(Path, EJSON0),
+    chttpd:send_json(Req, EJSON1);
+handle_node_req(Req) ->
     send_method_not_allowed(Req, "GET,PUT,DELETE").
 
-rpc_config(Node0, Fun, Args) when is_binary(Node0) ->
+call_node(Node0, Mod, Fun, Args) when is_binary(Node0) ->
     Node1 = try
                 list_to_existing_atom(?b2l(Node0))
             catch
                 error:badarg ->
                     throw({not_found, <<"no such node: ", Node0/binary>>})
             end,
-    rpc_config(Node1, Fun, Args);
-rpc_config(Node, Fun, Args) when is_atom(Node) ->
-    case rpc:call(Node, config, Fun,Args) of
+    call_node(Node1, Mod, Fun, Args);
+call_node(Node, Mod, Fun, Args) when is_atom(Node) ->
+    case rpc:call(Node, Mod, Fun, Args) of
         {badrpc, nodedown} ->
             Reason = ?l2b(io_lib:format("~s is down", [Node])),
             throw({error, {nodedown, Reason}});
         Else ->
             Else
+    end.
+
+flush(Node, Req) ->
+    case couch_util:get_value("flush", couch_httpd:qs(Req)) of
+        "true" ->
+            call_node(Node, couch_stats_aggregator, flush, []);
+        _Else ->
+            ok
     end.
 
 % Note: this resource is exposed on the backdoor interface, but it's in chttpd
