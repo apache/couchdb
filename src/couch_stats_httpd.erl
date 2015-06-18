@@ -15,6 +15,9 @@
 
 -export([handle_stats_req/1]).
 
+%% exported for use by chttpd_misc
+-export([transform_stats/1, nest/1, to_ejson/1, extract_path/2]).
+
 handle_stats_req(#httpd{method='GET', path_parts=[_ | Path]}=Req) ->
     flush(Req),
     Stats0 = couch_stats:fetch(),
