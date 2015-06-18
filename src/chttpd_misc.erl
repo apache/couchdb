@@ -242,11 +242,15 @@ handle_node_req(#httpd{method='GET', path_parts=[_, Node, <<"_config">>]}=Req) -
         [{list_to_binary(Section), {Values}} | Acc]
     end, [], Grouped),
     send_json(Req, 200, {KVs});
+handle_node_req(#httpd{path_parts=[_, _Node, <<"_config">>]}=Req) ->
+    send_method_not_allowed(Req, "GET");
 % GET /_node/$node/_config/Section
 handle_node_req(#httpd{method='GET', path_parts=[_, Node, <<"_config">>, Section]}=Req) ->
     KVs = [{list_to_binary(Key), list_to_binary(Value)}
             || {Key, Value} <- call_node(Node, config, get, [Section])],
     send_json(Req, 200, {KVs});
+handle_node_req(#httpd{path_parts=[_, _Node, <<"_config">>, _Section]}=Req) ->
+    send_method_not_allowed(Req, "GET");
 % PUT /_node/$node/_config/Section/Key
 % "value"
 handle_node_req(#httpd{method='PUT', path_parts=[_, Node, <<"_config">>, Section, Key]}=Req) ->
@@ -273,8 +277,12 @@ handle_node_req(#httpd{method='DELETE',path_parts=[_, Node, <<"_config">>, Secti
         call_node(Node, config, delete, [Section, Key, Persist]),
         send_json(Req, 200, list_to_binary(OldValue))
     end;
+handle_node_req(#httpd{path_parts=[_, _Node, <<"_config">>, _Section, _Key]}=Req) ->
+    send_method_not_allowed(Req, "GET,PUT,DELETE");
+handle_node_req(#httpd{path_parts=[_, _Node, <<"_config">>, _Section, _Key | _]}=Req) ->
+    chttpd:send_error(Req, not_found);
 % GET /_node/$node/_stats
-handle_node_req(#httpd{path_parts=[_, Node, <<"_stats">> | Path]}=Req) ->
+handle_node_req(#httpd{method='GET', path_parts=[_, Node, <<"_stats">> | Path]}=Req) ->
     flush(Node, Req),
     Stats0 = call_node(Node, couch_stats, fetch, []),
     Stats = couch_stats_httpd:transform_stats(Stats0),
@@ -282,8 +290,15 @@ handle_node_req(#httpd{path_parts=[_, Node, <<"_stats">> | Path]}=Req) ->
     EJSON0 = couch_stats_httpd:to_ejson(Nested),
     EJSON1 = couch_stats_httpd:extract_path(Path, EJSON0),
     chttpd:send_json(Req, EJSON1);
+handle_node_req(#httpd{path_parts=[_, _Node, <<"_stats">>]}=Req) ->
+    send_method_not_allowed(Req, "GET");
+handle_node_req(#httpd{path_parts=[_]}=Req) ->
+    chttpd:send_error(Req, {bad_request, <<"Incomplete path to _node request">>});
+handle_node_req(#httpd{path_parts=[_, _Node]}=Req) ->
+    chttpd:send_error(Req, {bad_request, <<"Incomplete path to _node request">>});
 handle_node_req(Req) ->
-    send_method_not_allowed(Req, "GET,PUT,DELETE").
+    chttpd:send_error(Req, not_found).
+
 
 call_node(Node0, Mod, Fun, Args) when is_binary(Node0) ->
     Node1 = try
