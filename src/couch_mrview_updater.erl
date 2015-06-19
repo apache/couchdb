@@ -358,10 +358,12 @@ write_kvs(State, UpdateSeq, ViewKVs, DocIdKeys, Seqs, Log0) ->
         true ->
             {nil, nil}
         end,
-        View#mrview{btree=VBtree2,
+        View2 = View#mrview{btree=VBtree2,
                     seq_btree=SeqBtree3,
                     key_byseq_btree=KeyBySeqBtree3,
-                    update_seq=NewUpdateSeq}
+                    update_seq=NewUpdateSeq},
+        maybe_notify(State, View2, KVs, ToRem),
+        View2
     end,
 
     State#mrst{
@@ -467,3 +469,9 @@ update_task(NumChanges) ->
             (Changes2 * 100) div Total
     end,
     couch_task_status:update([{progress, Progress}, {changes_done, Changes2}]).
+
+
+maybe_notify(State, View, KVs, ToRem) ->
+    Updated = [Key || {{Key, _}, _} <- KVs],
+    Removed = [Key || {Key, _DocId} <- ToRem],
+    couch_index_plugin:index_update(State, View, Updated, Removed).
