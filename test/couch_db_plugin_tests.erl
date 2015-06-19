@@ -15,7 +15,8 @@
 -export([
     validate_dbname/2,
     before_doc_update/2,
-    after_doc_read/2
+    after_doc_read/2,
+    validate_docid/1
 ]).
 
 -include_lib("couch/include/couch_eunit.hrl").
@@ -50,6 +51,10 @@ after_doc_read({fail, _Doc}, _Db) -> throw(after_doc_read);
 after_doc_read({true, Doc}, Db) -> [{true, [after_doc_read|Doc]}, Db];
 after_doc_read({false, Doc}, Db) -> [{false, Doc}, Db].
 
+validate_docid({true, _Id}) -> true;
+validate_docid({false, _Id}) -> false;
+validate_docid({fail, _Id}) -> throw(validate_docid).
+
 callback_test_() ->
     {
         "callback tests",
@@ -66,7 +71,11 @@ callback_test_() ->
 
                 fun after_doc_read_match/0,
                 fun after_doc_read_no_match/0,
-                fun after_doc_read_throw/0
+                fun after_doc_read_throw/0,
+
+                fun validate_docid_match/0,
+                fun validate_docid_no_match/0,
+                fun validate_docid_throw/0
             ]
         }
     }.
@@ -117,3 +126,19 @@ after_doc_read_throw() ->
     ?_assertThrow(
         after_doc_read,
         couch_db_plugin:after_doc_read(#db{}, {fail, [doc]})).
+
+
+validate_docid_match() ->
+    ?_assertMatch(
+        {true, [validate_docid, doc]},
+        couch_db_plugin:validate_docid({true, [doc]})).
+
+validate_docid_no_match() ->
+    ?_assertMatch(
+        {false, [doc]},
+        couch_db_plugin:validate_docid({false, [doc]})).
+
+validate_docid_throw() ->
+    ?_assertThrow(
+        validate_docid,
+        couch_db_plugin:validate_docid({fail, [doc]})).

@@ -169,7 +169,14 @@ validate_docid(Id) when is_binary(Id) ->
     <<"_design/", _/binary>> -> ok;
     <<"_local/", _/binary>> -> ok;
     <<"_", _/binary>> ->
-        throw({bad_request, <<"Only reserved document ids may start with underscore.">>});
+        case couch_db_plugin:validate_docid(Id) of
+            true ->
+                ok;
+            false ->
+                throw(
+                  {bad_request,
+                      <<"Only reserved document ids may start with underscore.">>})
+        end;
     _Else -> ok
     end;
 validate_docid(Id) ->
