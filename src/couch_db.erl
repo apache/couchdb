@@ -415,7 +415,23 @@ get_design_docs(#db{id_tree = IdBtree}) ->
     {ok, _, Docs} = couch_btree:fold(IdBtree, FoldFun, [], KeyOpts),
     {ok, Docs}.
 
-check_is_admin(#db{user_ctx=#user_ctx{name=Name,roles=Roles}}=Db) ->
+check_is_admin(#db{} = Db) ->
+    case is_admin(Db) of
+        true ->
+            ok;
+        false ->
+            throw({unauthorized, <<"You are not a db or server admin.">>})
+    end.
+
+is_admin(Db) ->
+    case couch_db_plugin:check_is_admin(Db) of
+        true ->
+            true;
+        false ->
+            is_admin_int(Db)
+    end.
+
+is_admin_int(#db{user_ctx = #user_ctx{name = Name, roles = Roles}} = Db) ->
     {Admins} = get_admins(Db),
     AdminRoles = [<<"_admin">> | couch_util:get_value(<<"roles">>, Admins, [])],
     AdminNames = couch_util:get_value(<<"names">>, Admins,[]),
@@ -423,12 +439,12 @@ check_is_admin(#db{user_ctx=#user_ctx{name=Name,roles=Roles}}=Db) ->
     AdminRoles -> % same list, not an admin role
         case AdminNames -- [Name] of
         AdminNames -> % same names, not an admin
-            throw({unauthorized, <<"You are not a db or server admin.">>});
+            false;
         _ ->
-            ok
+            true
         end;
     _ ->
-        ok
+        true
     end.
 
 check_is_member(#db{user_ctx=#user_ctx{name=Name,roles=Roles}=UserCtx}=Db) ->

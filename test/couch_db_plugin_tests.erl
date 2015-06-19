@@ -16,7 +16,8 @@
     validate_dbname/2,
     before_doc_update/2,
     after_doc_read/2,
-    validate_docid/1
+    validate_docid/1,
+    check_is_admin/1
 ]).
 
 -include_lib("couch/include/couch_eunit.hrl").
@@ -55,6 +56,10 @@ validate_docid({true, _Id}) -> true;
 validate_docid({false, _Id}) -> false;
 validate_docid({fail, _Id}) -> throw(validate_docid).
 
+check_is_admin({true, _Db}) -> true;
+check_is_admin({false, _Db}) -> false;
+check_is_admin({fail, _Db}) -> throw(check_is_admin).
+
 callback_test_() ->
     {
         "callback tests",
@@ -75,7 +80,11 @@ callback_test_() ->
 
                 fun validate_docid_match/0,
                 fun validate_docid_no_match/0,
-                fun validate_docid_throw/0
+                fun validate_docid_throw/0,
+
+                fun check_is_admin_match/0,
+                fun check_is_admin_no_match/0,
+                fun check_is_admin_throw/0
             ]
         }
     }.
@@ -142,3 +151,19 @@ validate_docid_throw() ->
     ?_assertThrow(
         validate_docid,
         couch_db_plugin:validate_docid({fail, [doc]})).
+
+
+check_is_admin_match() ->
+    ?_assertMatch(
+        true,
+        couch_db_plugin:check_is_admin({true, [db]})).
+
+check_is_admin_no_match() ->
+    ?assertMatch(
+        false,
+        couch_db_plugin:check_is_admin({false, [db]})).
+
+check_is_admin_throw() ->
+    ?assertThrow(
+        check_is_admin,
+        couch_db_plugin:check_is_admin({fail, [db]})).
