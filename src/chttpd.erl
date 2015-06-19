@@ -149,8 +149,6 @@ handle_request_int(MochiReq) ->
     % removed, but URL quoting left intact
     RawUri = MochiReq:get(raw_path),
     {"/" ++ Path, _, _} = mochiweb_util:urlsplit_path(RawUri),
-    {HandlerKeyStr, _, _} = mochiweb_util:partition(Path, "/"),
-    HandlerKey = ?l2b(HandlerKeyStr),
 
     Peer = MochiReq:get(peer),
     LogForClosedSocket = io_lib:format("mochiweb_recv_error for ~s - ~p ~s", [
@@ -198,6 +196,12 @@ handle_request_int(MochiReq) ->
         path_parts = [list_to_binary(chttpd:unquote(Part))
                 || Part <- string:tokens(Path, "/")]
     },
+
+    HandlerKey =
+        case HttpReq#httpd.path_parts of
+            [] -> <<>>;
+            [Key|_] -> ?l2b(quote(Key))
+        end,
 
     % put small token on heap to keep requests synced to backend calls
     erlang:put(nonce, couch_util:to_hex(crypto:rand_bytes(5))),
