@@ -1069,13 +1069,12 @@ prepare_doc_summaries(Db, BucketList) ->
         Bucket) || Bucket <- BucketList].
 
 
-before_docs_update(#db{before_doc_update = nil}, BucketList) ->
-    BucketList;
-before_docs_update(#db{before_doc_update = Fun} = Db, BucketList) ->
+before_docs_update(#db{} = Db, BucketList) ->
     [lists:map(
-        fun(Doc) ->
-            Fun(couch_doc:with_ejson_body(Doc), Db)
-        end,
+            fun(Doc) ->
+                DocWithBody = couch_doc:with_ejson_body(Doc),
+                couch_db_plugin:before_doc_update(Db, DocWithBody)
+            end,
         Bucket) || Bucket <- BucketList].
 
 
