@@ -31,7 +31,6 @@
 
 -record(server,{
     root_dir = [],
-    dbname_regexp,
     max_dbs_open=?MAX_DBS_OPEN,
     dbs_open=0,
     start_time="",
@@ -142,16 +141,8 @@ maybe_add_sys_db_callbacks(DbName, Options) ->
 path_ends_with(Path, Suffix) ->
     Suffix == couch_db:normalize_dbname(Path).
 
-check_dbname(#server{dbname_regexp=RegExp}, DbName) ->
-    case re:run(DbName, RegExp, [{capture, none}]) of
-    nomatch ->
-        case lists:member(DbName, ?SYSTEM_DATABASES) of
-            true -> ok;
-            false -> {error, illegal_database_name, DbName}
-        end;
-    match ->
-        ok
-    end.
+check_dbname(#server{}, DbName) ->
+    couch_db:validate_dbname(DbName).
 
 is_admin(User, ClearPwd) ->
     case config:get("admins", User) of
@@ -192,15 +183,10 @@ init([]) ->
     ok = config:listen_for_changes(?MODULE, nil),
     ok = couch_file:init_delete_dir(RootDir),
     hash_admin_passwords(),
-    {ok, RegExp} = re:compile(
-        "^[a-z][a-z0-9\\_\\$()\\+\\-\\/]*" % use the stock CouchDB regex
-        "(\\.[0-9]{10,})?$" % but allow an optional shard timestamp at the end
-    ),
     ets:new(couch_dbs, [set, protected, named_table, {keypos, #db.name}]),
     ets:new(couch_dbs_pid_to_name, [set, protected, named_table]),
     process_flag(trap_exit, true),
     {ok, #server{root_dir=RootDir,
-                dbname_regexp=RegExp,
                 max_dbs_open=MaxDbsOpen,
                 update_lru_on_read=UpdateLruOnRead,
                 start_time=couch_util:rfc1123_date()}}.
@@ -208,7 +194,7 @@ init([]) ->
 terminate(Reason, Srv) ->
     couch_log:error("couch_server terminating with ~p, state ~2048p",
                     [Reason,
-                     Srv#server{dbname_regexp = redacted, lru = redacted}]),
+                     Srv#server{lru = redacted}]),
     ets:foldl(fun(#db{main_pid=Pid}, _) -> couch_util:shutdown_sync(Pid) end,
         nil, couch_dbs),
     ok.

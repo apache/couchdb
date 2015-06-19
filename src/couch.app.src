@@ -42,6 +42,7 @@
         oauth,
 
         % ASF deps
+        couch_epi,
         b64url,
         couch_log,
         couch_event,

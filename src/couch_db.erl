@@ -34,10 +34,14 @@
 -export([check_md5/2, with_stream/3]).
 -export([monitored_by/1]).
 -export([normalize_dbname/1]).
+-export([validate_dbname/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 
--define(VALID_DB_NAME, "^[a-z][a-z0-9\\_\\$()\\+\\-\\/]*$").
+-define(DBNAME_REGEX,
+    "^[a-z][a-z0-9\\_\\$()\\+\\-\\/]*" % use the stock CouchDB regex
+    "(\\.[0-9]{10,})?$" % but allow an optional shard timestamp at the end
+).
 
 start_link(DbName, Filepath, Options) ->
     case open_db_file(Filepath, Options) of
@@ -1480,3 +1484,32 @@ normalize_dbname(<<"shards/", _/binary>> = Path) ->
     lists:last(binary:split(mem3:dbname(Path), <<"/">>, [global]));
 normalize_dbname(DbName) ->
     DbName.
+
+validate_dbname(DbName) when is_list(DbName) ->
+    validate_dbname(?l2b(DbName));
+validate_dbname(DbName) when is_binary(DbName) ->
+    Normalized = normalize_dbname(DbName),
+    case couch_db_plugin:validate_dbname(DbName, Normalized) of
+        true ->
+            ok;
+        false ->
+            validate_dbname_int(DbName, Normalized)
+    end.
+
+validate_dbname_int(DbName, Normalized) when is_binary(DbName) ->
+    case re:run(DbName, ?DBNAME_REGEX, [{capture,none}, dollar_endonly]) of
+        match ->
+            ok;
+        nomatch ->
+            case is_systemdb(Normalized) of
+                true -> ok;
+                false -> {error, {illegal_database_name, DbName}}
+            end
+    end.
+
+is_systemdb(DbName) when is_list(DbName) ->
+    is_systemdb(?l2b(DbName));
+is_systemdb(<<"shards/", _/binary>> = Path) when is_binary(Path) ->
+    is_systemdb(normalize_dbname(Path));
+is_systemdb(DbName) when is_binary(DbName) ->
+    lists:member(?b2l(DbName), ?SYSTEM_DATABASES).
