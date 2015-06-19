@@ -11,15 +11,29 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-PREFIX="/usr/local"
-PACKAGE_AUTHOR_NAME="The Apache Software Foundation"
-COUCHDB_USER=`whoami`
-WITH_CURL="false"
-
 # cd into this script’s directory
 rootdir="$(cd "${0%/*}" 2>/dev/null; echo "$PWD")"
 basename=`basename $0`
 
+TEST=0
+WITH_CURL="false"
+
+PREFIX=
+DEFAULT_PREFIX=/usr/local
+EXEC_PREFIX=
+BINDIR=
+LIBEXECDIR=
+SYSCONFDIR=
+DATAROOTDIR=
+DATADIR=
+LOCALSTATEDIR=
+RUNSTATEDIR=
+DOCDIR=
+LIBDIR=
+
+DATABASEDIR=
+VIEWDIR=
+LOGDIR=
 
 display_help () {
     cat << EOF
@@ -30,66 +44,383 @@ system for Apache CouchDB.
 
 Options:
 
-  -h            display a short help message and exit
-  -u USER       set the username to run as (defaults to $COUCHDB_USER)
-  -p DIRECTORY  set the prefix for installation (defaults to $PREFIX)
-  -d DIRECTORY  specify the data directory (defaults to /var/lib/couchdb)
-  -v DIRECTORY  specify the view directory (defaults to /var/lib/couchdb)
-  -l FILE       specify the log file (defaults to /var/log/couchdb.log)
-  -c            request that couchjs is linked to cURL (default false)
+  -h | --help                 display a short help message and exit
+  # -u USER       set the username to run as (defaults to $COUCHDB_USER)
+  --prefix=DIRECTORY          set the installation prefix (defaults to $DEFAIULT_PREFIX)
+  --databasedir DIRECTORY     specify the data directory (defaults to /var/lib/couchdb)
+  --viewindexdir DIRECTORY         specify the view directory (defaults to /var/lib/couchdb)
+  --logdir DIRECTORY          specify the log file (defaults to /var/log/couchdb.log)
+  -c | --with-curl            request that couchjs is linked to cURL (default false)
 
+  Installation directories:
+    --prefix=PREFIX         install architecture-independent files in PREFIX
+                            [/usr/local]
+    --exec-prefix=EPREFIX   install architecture-dependent files in EPREFIX
+                            [PREFIX]
+
+  Fine tuning of the installation directories:
+    --bindir=DIR            user executables [EPREFIX/bin]
+    --libexecdir=DIR        program executables [EPREFIX/libexec]
+    --sysconfdir=DIR        read-only single-machine data [PREFIX/etc]
+    --localstatedir=DIR     modifiable single-machine data [PREFIX/var]
+    --libdir=DIR            object code libraries [EPREFIX/lib]
+    --datarootdir=DIR       read-only arch.-independent data root [PREFIX/share]
+    --datadir=DIR           read-only architecture-independent data [DATAROOTDIR]
+    # --infodir=DIR           info documentation [DATAROOTDIR/info]
+    # --mandir=DIR            man documentation [DATAROOTDIR/man]
+    # --docdir=DIR            documentation root [DATAROOTDIR/doc/apache-couchdb]
+    # --htmldir=DIR           html documentation [DOCDIR]
+    # --dvidir=DIR            dvi documentation [DOCDIR]
+    # --pdfdir=DIR            pdf documentation [DOCDIR]
+    # --psdir=DIR             ps documentation [DOCDIR]
 EOF
 }
 
+parse_opts() {
+    while :; do
+        case $1 in
+            -h|--help)
+                display_help
+                exit
+                ;;
 
-display_error () {
-    if test -n "$1"; then
-        echo $1 >&2
-    fi
-    echo >&2
-    echo "Try \"$basename -h\" for more information." >&2
-    false
-}
+            --test)
+                TEST=1
+                shift 1
+                continue
+                ;;
 
+            --with-curl|-c)
+                WITH_CURL="true"
+                shift 1
+                continue
+                ;;
 
-parse_opts () {
-    set +e
-    options=`getopt hu:p:d:v:l:c $@`
-    if test ! $? -eq 0; then
-        display_error
-    fi
-    set -e
-    eval set -- $options
-    while [ $# -gt 0 ]; do
-        case "$1" in
-            -h) shift; display_help; exit;;
-            -u) shift; COUCHDB_USER=$1; shift;;
-            -p) shift; PREFIX=$1; shift;;
-            -d) shift; DATA_DIR=$1; shift;;
-            -v) shift; VIEW_DIR=$1; shift;;
-            -l) shift; LOG_FILE=$1; shift;;
-            -c) shift; WITH_CURL="true";;
-            --) shift; break;;
-            *) display_error "Unknown option: $1" >&2;;
+            --prefix)
+                if [ -n "$2" ]; then
+                    PREFIX=$2
+                    shift 2
+                    continue
+                else
+                    printf 'ERROR: "--prefix" requires a non-empty argument.\n' >&2
+                    exit 1
+                fi
+                ;;
+            --prefix=?*)
+                PREFIX=${1#*=}
+                ;;
+            --prefix=)
+                printf 'ERROR: "--prefix" requires a non-empty argument.\n' >&2
+                exit 1
+                ;;
+
+            --exec-prefix)
+                if [ -n "$2" ]; then
+                    EXEC_PREFIX=$2
+                    shift 2
+                    continue
+                else
+                    printf 'ERROR: "--exec-prefix" requires a non-empty argument.\n' >&2
+                    exit 1
+                fi
+                ;;
+            --exec-prefix=?*)
+                EXEC_PREFIX=${1#*=}
+                ;;
+            --exec-prefix=)
+                printf 'ERROR: "--exec-prefix" requires a non-empty argument.\n' >&2
+                exit 1
+                ;;
+
+            --bindir)
+                if [ -n "$2" ]; then
+                    BINDIR=$2
+                    shift 2
+                    continue
+                else
+                    printf 'ERROR: "--bindir" requires a non-empty argument.\n' >&2
+                    exit 1
+                fi
+                ;;
+            --bindir=?*)
+                BINDIR=${1#*=}
+                ;;
+            --bindir=)
+                printf 'ERROR: "--bindir" requires a non-empty argument.\n' >&2
+                exit 1
+                ;;
+
+            --libexecdir)
+                if [ -n "$2" ]; then
+                    LIBEXECDIR=$2
+                    shift 2
+                    continue
+                else
+                    printf 'ERROR: "--libexecdir" requires a non-empty argument.\n' >&2
+                    exit 1
+                fi
+                ;;
+            --libexecdir=?*)
+                LIBEXECDIR=${1#*=}
+                ;;
+            --libexecdir=)
+                printf 'ERROR: "--libexecdir" requires a non-empty argument.\n' >&2
+                exit 1
+                ;;
+
+            --sysconfdir)
+                if [ -n "$2" ]; then
+                    SYSCONFDIR=$2
+                    shift 2
+                    continue
+                else
+                    printf 'ERROR: "--sysconfdir" requires a non-empty argument.\n' >&2
+                    exit 1
+                fi
+                ;;
+            --sysconfdir=?*)
+                SYSCONFDIR=${1#*=}
+                ;;
+            --sysconfdir=)
+                printf 'ERROR: "--sysconfdir" requires a non-empty argument.\n' >&2
+                exit 1
+                ;;
+
+            --datarootdir)
+                if [ -n "$2" ]; then
+                    DATAROOTDIR=$2
+                    shift 2
+                    continue
+                else
+                    printf 'ERROR: "--datarootdir" requires a non-empty argument.\n' >&2
+                    exit 1
+                fi
+                ;;
+            --datarootdir=?*)
+                DATAROOTDIR=${1#*=}
+                ;;
+            --datarootdir=)
+                printf 'ERROR: "--datarootdir" requires a non-empty argument.\n' >&2
+                exit 1
+                ;;
+
+            --datadir)
+                if [ -n "$2" ]; then
+                    DATADIR=$2
+                    shift 2
+                    continue
+                else
+                    printf 'ERROR: "--datadir" requires a non-empty argument.\n' >&2
+                    exit 1
+                fi
+                ;;
+            --datadir=?*)
+                DATADIR=${1#*=}
+                ;;
+            --datadir=)
+                printf 'ERROR: "--datadir" requires a non-empty argument.\n' >&2
+                exit 1
+                ;;
+
+            --localstatedir)
+                if [ -n "$2" ]; then
+                    LOCALSTATEDIR=$2
+                    shift 2
+                    continue
+                else
+                    printf 'ERROR: "--localstatedir" requires a non-empty argument.\n' >&2
+                    exit 1
+                fi
+                ;;
+            --localstatedir=?*)
+                LOCALSTATEDIR=${1#*=}
+                ;;
+            --localstatedir=)
+                printf 'ERROR: "--localstatedir" requires a non-empty argument.\n' >&2
+                exit 1
+                ;;
+
+            --runstatedir)
+                if [ -n "$2" ]; then
+                    RUNSTATEDIR=$2
+                    shift 2
+                    continue
+                else
+                    printf 'ERROR: "--runstatedir" requires a non-empty argument.\n' >&2
+                    exit 1
+                fi
+                ;;
+            --runstatedir=?*)
+                RUNSTATEDIR=${1#*=}
+                ;;
+            --runstatedir=)
+                printf 'ERROR: "--runstatedir" requires a non-empty argument.\n' >&2
+                exit 1
+                ;;
+
+            --docdir)
+                if [ -n "$2" ]; then
+                    DOCDIR=$2
+                    shift 2
+                    continue
+                else
+                    printf 'ERROR: "--docdir" requires a non-empty argument.\n' >&2
+                    exit 1
+                fi
+                ;;
+            --docdir=?*)
+                DOCDIR=${1#*=}
+                ;;
+            --docdir=)
+                printf 'ERROR: "--docdir" requires a non-empty argument.\n' >&2
+                exit 1
+                ;;
+
+            --libdir)
+                if [ -n "$2" ]; then
+                    LIBDIR=$2
+                    shift 2
+                    continue
+                else
+                    printf 'ERROR: "--libdir" requires a non-empty argument.\n' >&2
+                    exit 1
+                fi
+                ;;
+            --libdir=?*)
+                LIBDIR=${1#*=}
+                ;;
+            --libdir=)
+                printf 'ERROR: "--libdir" requires a non-empty argument.\n' >&2
+                exit 1
+                ;;
+
+            --databasedir)
+                if [ -n "$2" ]; then
+                    DATABASEDIR=$2
+                    shift 2
+                    continue
+                else
+                    printf 'ERROR: "--databasedir" requires a non-empty argument.\n' >&2
+                    exit 1
+                fi
+                ;;
+            --databasedir=?*)
+                DATABASEDIR=${1#*=}
+                ;;
+            --databasedir=)
+                printf 'ERROR: "--databasedir" requires a non-empty argument.\n' >&2
+                exit 1
+                ;;
+
+            --viewindexdir)
+                if [ -n "$2" ]; then
+                    VIEWDIR=$2
+                    shift 2
+                    continue
+                else
+                    printf 'ERROR: "--viewindexdir" requires a non-empty argument.\n' >&2
+                    exit 1
+                fi
+                ;;
+            --viewindexdir=?*)
+                VIEWDIR=${1#*=}
+                ;;
+            --viewindexdir=)
+                printf 'ERROR: "--viewindexdir" requires a non-empty argument.\n' >&2
+                exit 1
+                ;;
+
+            --logdir)
+                if [ -n "$2" ]; then
+                    LOGDIR=$2
+                    shift 2
+                    continue
+                else
+                    printf 'ERROR: "--logdir" requires a non-empty argument.\n' >&2
+                    exit 1
+                fi
+                ;;
+            --logdir=?*)
+                LOGDIR=${1#*=}
+                ;;
+            --logdir=)
+                printf 'ERROR: "--logdir" requires a non-empty argument.\n' >&2
+                exit 1
+                ;;
+
+            --) # End of options
+                shift
+                break
+                ;;
+            *) # Done
+                break
         esac
+        shift
     done
 
     # defaults
-    if test -z "$DATA_DIR"; then
-        DATA_DIR="/var/lib/couchdb";
+    if test -z "$PREFIX"; then
+        PREFIX="$DEFAULT_PREFIX";
     fi
-    if test -z "$VIEW_DIR"; then
-        VIEW_DIR="/var/lib/couchdb";
+    if test -z "$EXEC_PREFIX"; then
+        EXEC_PREFIX="$PREFIX";
     fi
-    if test -z "$LOG_FILE"; then
-        LOG_FILE="/var/log/couchdb.log";
+    if test -z "$BINDIR"; then
+        BINDIR="$EXEC_PREFIX/bin";
+    fi
+    if test -z "$LIBEXECDIR"; then
+        LIBEXECDIR="$EXEC_PREFIX/libexec";
+    fi
+    if test -z "$SYSCONFDIR"; then
+        SYSCONFDIR="$PREFIX/etc";
+    fi
+    if test -z "$DATAROOTDIR"; then
+        DATAROOTDIR="$PREFIX/share";
+    fi
+    if test -z "$DATADIR"; then
+        DATADIR="$DATAROOTDIR";
+    fi
+    if test -z "$LOCALSTATEDIR"; then
+        LOCALSTATEDIR="$PREFIX/var";
+    fi
+    if test -z "$RUNSTATEDIR"; then
+        RUNSTATEDIR="$LOCALSTATEDIR/run";
+    fi
+    if test -z "$DOCDIR"; then
+        DOCDIR="$DATAROOTDIR/doc";
+    fi
+    if test -z "$LIBDIR"; then
+        LIBDIR="$EXEC_PREFIX/lib";
+    fi
+    if test -z "$DATABASEDIR"; then
+        DATABASEDIR="$LOCALSTATEDIR/lib";
+    fi
+    if test -z "$VIEWDIR"; then
+        VIEWDIR="$LOCALSTATEDIR/lib";
+    fi
+    if test -z "$LOGDIR"; then
+        LOGDIR="$LOCALSTATEDIR/log";
     fi
 }
 
-
 parse_opts $@
 
-INSTALL_DIR="$PREFIX/couchdb"
+# We use this for testing this script
+# The test script lives in test/build/test-configure.sh
+if [ "$TEST" = "1" ]; then
+    echo $PREFIX $EXEC_PREFIX $BINDIR $LIBEXECDIR $SYSCONFDIR $DATAROOTDIR \
+         $DATADIR $LOCALSTATEDIR $RUNSTATEDIR $DOCDIR $LIBDIR $DATABASEDIR \
+         $VIEWDIR $LOGDIR
+    exit 0
+fi
+
+# Translate ./configure variables to CouchDB variables
+
+INSTALL_DIR=$LIBDIR/couchdb
+LOG_FILE=$LOGDIR/couch.log
+
+DATBASE_DIR=$DATABASE_DIR/couchdb
+VIEW_DIR=$VIEW_DIR/couchdb
 
 
 echo "==> configuring couchdb in rel/couchdb.config"
@@ -109,8 +440,8 @@ cat > rel/couchdb.config << EOF
 % The contents of this file are auto-generated by configure
 %
 {package_author_name, "$PACKAGE_AUTHOR_NAME"}.
-{prefix, "INSTALLDIR"}.
-{data_dir, "$DATA_DIR"}.
+{prefix, "$INSTALL_DIR"}.
+{data_dir, "$DATABASE_DIR"}.
 {view_index_dir, "$VIEW_DIR"}.
 {log_file, "$LOG_FILE"}.
 {user, "$COUCHDB_USER"}.
@@ -136,7 +467,14 @@ cat > install.mk << EOF
 #
 package_author_name = $PACKAGE_AUTHOR_NAME
 install_dir = $INSTALL_DIR
-data_dir = $DATA_DIR
+
+bin_dir = $BINDIR
+libexec_dir = $LIBEXECDIR/couchdb
+doc_dir = $DOCDIR/couchdb
+sysconf_dir = $SYSCONFDIR/couchdb
+data_dir = $DATADIR/couchdb
+
+database_dir = $DATABASE_DIR
 view_index_dir = $VIEW_DIR
 log_file = $LOG_FILE
 user = $COUCHDB_USER
@@ -145,6 +483,7 @@ EOF
 cat > $rootdir/config.erl << EOF
 {with_curl, $WITH_CURL}.
 EOF
+
 
 # only update dependencies, when we are not in a release tarball
 if [ -d .git ]; then

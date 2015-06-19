@@ -88,19 +88,47 @@ install: all
 	@echo "Installing CouchDB into $(DESTDIR)/$(install_dir)..." | sed -e 's,///,/,'
 	@rm -rf rel/couchdb
 	@rebar generate # make full erlang release
+
 	@mkdir -p $(DESTDIR)/$(install_dir)
 	@cp -R rel/couchdb/* $(DESTDIR)/$(install_dir)
+
 	@mkdir -p $(DESTDIR)/$(data_dir)
 	@chown $(user) $(DESTDIR)/$(data_dir)
+
 	@mkdir -p $(DESTDIR)/$(view_index_dir)
 	@chown $(user) $(DESTDIR)/$(view_index_dir)
+
 	@mkdir -p $(DESTDIR)/`dirname $(log_file)`
 	@touch $(DESTDIR)/$(log_file)
 	@chown $(user) $(DESTDIR)/$(log_file)
+
+	@mkdir -p $(DESTDIR)/$(bin_dir)
+	@cp rel/couchdb/bin/couchdb $(DESTDIR)/$(bin_dir)
+
+	@mkdir -p $(DESTDIR)/$(libexec_dir)
+	@cp rel/couchdb/bin/couchjs $(DESTDIR)/$(libexec_dir)
+
+	@mkdir -p $(DESTDIR)/$(sysconf_dir)
+	@mkdir -p $(DESTDIR)/$(sysconf_dir)/default.d
+	@mkdir -p $(DESTDIR)/$(sysconf_dir)/local.d
+	@cp rel/overlay/etc/default.ini rel/overlay/etc/local.ini $(DESTDIR)/$(sysconf_dir)
+
+	@mkdir -p $(DESTDIR)/$(data_dir)
+	@cp -R share/server share/www $(DESTDIR)/$(data_dir)
+
+	# TODO: copy over man, pdf, info etc. files
+	#       after including them in the release tarball in `make release`
+	#@mkdir -p $(DESTDIR)/$(doc_dir)
+	#@cp -R
+
 	@echo "...done"
 
 uninstall:
 	@rm -rf $(DESTDIR)/$(install_dir)
+	@rm -f $(DESTDIR)/$(bin_dir)/couchdb
+	@rm -f $(DESTDIR)/$(libexec_dir)
+	@rm -rf $(DESTDIR)/$(sysconf_dir)
+	@rm -rf $(DESTDIR)/$(data_dir)
 
 install.mk:
 # ignore install.mk missing if we are running
