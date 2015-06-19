@@ -14,7 +14,8 @@
 
 -export([
     validate_dbname/2,
-    before_doc_update/2
+    before_doc_update/2,
+    after_doc_read/2
 ]).
 
 -define(SERVICE_ID, couch_db).
@@ -33,6 +34,12 @@ validate_dbname(DbName, Normalized) ->
 
 before_doc_update(#db{before_doc_update = Fun} = Db, Doc0) ->
     case with_pipe(before_doc_update, [Doc0, Db]) of
+        [Doc1, _Db] when is_function(Fun) -> Fun(Doc1, Db);
+        [Doc1, _Db] -> Doc1
+    end.
+
+after_doc_read(#db{after_doc_read = Fun} = Db, Doc0) ->
+    case with_pipe(after_doc_read, [Doc0, Db]) of
         [Doc1, _Db] when is_function(Fun) -> Fun(Doc1, Db);
         [Doc1, _Db] -> Doc1
     end.

@@ -1399,11 +1399,9 @@ make_doc(#db{fd=Fd}=Db, Id, Deleted, Bp, RevisionPath) ->
     after_doc_read(Db, Doc).
 
 
-after_doc_read(#db{after_doc_read = nil}, Doc) ->
-    Doc;
-after_doc_read(#db{after_doc_read = Fun} = Db, Doc) ->
-    Fun(couch_doc:with_ejson_body(Doc), Db).
-
+after_doc_read(#db{} = Db, Doc) ->
+    DocWithBody = couch_doc:with_ejson_body(Doc),
+    couch_db_plugin:after_doc_read(Db, DocWithBody).
 
 increment_stat(#db{options = Options}, Stat) ->
     case lists:member(sys_db, Options) of

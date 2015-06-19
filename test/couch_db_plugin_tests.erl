@@ -14,7 +14,8 @@
 
 -export([
     validate_dbname/2,
-    before_doc_update/2
+    before_doc_update/2,
+    after_doc_read/2
 ]).
 
 -include_lib("couch/include/couch_eunit.hrl").
@@ -45,6 +46,10 @@ before_doc_update({fail, _Doc}, _Db) -> throw(before_doc_update);
 before_doc_update({true, Doc}, Db) -> [{true, [before_doc_update|Doc]}, Db];
 before_doc_update({false, Doc}, Db) -> [{false, Doc}, Db].
 
+after_doc_read({fail, _Doc}, _Db) -> throw(after_doc_read);
+after_doc_read({true, Doc}, Db) -> [{true, [after_doc_read|Doc]}, Db];
+after_doc_read({false, Doc}, Db) -> [{false, Doc}, Db].
+
 callback_test_() ->
     {
         "callback tests",
@@ -57,7 +62,11 @@ callback_test_() ->
 
                 fun before_doc_update_match/0,
                 fun before_doc_update_no_match/0,
-                fun before_doc_update_throw/0
+                fun before_doc_update_throw/0,
+
+                fun after_doc_read_match/0,
+                fun after_doc_read_no_match/0,
+                fun after_doc_read_throw/0
             ]
         }
     }.
@@ -92,3 +101,19 @@ before_doc_update_throw() ->
     ?_assertThrow(
         before_doc_update,
         couch_db_plugin:before_doc_update(#db{}, {fail, [doc]})).
+
+
+after_doc_read_match() ->
+    ?_assertMatch(
+        {true, [after_doc_read, doc]},
+        couch_db_plugin:after_doc_read(#db{}, {true, [doc]})).
+
+after_doc_read_no_match() ->
+    ?_assertMatch(
+        {false, [doc]},
+        couch_db_plugin:after_doc_read(#db{}, {false, [doc]})).
+
+after_doc_read_throw() ->
+    ?_assertThrow(
+        after_doc_read,
+        couch_db_plugin:after_doc_read(#db{}, {fail, [doc]})).
