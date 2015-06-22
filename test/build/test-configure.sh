@@ -13,6 +13,8 @@
 
 # requires shunit2 to be in $PATH
 # http://shunit2.googlecode.com/
+# uses `checkbashisms` if in $PATH
+
 
 SHUNIT2=`which shunit2`
 
@@ -25,7 +27,29 @@ if [ -z "$SHUNIT2" -o ! -x "$SHUNIT2" ]; then
     exit 1
 fi
 
-CMD="./configure2 --test "
+CHECKBASHISMS=`which checkbashisms`
+
+if [ -n "$CHECKBASHISMS" -a -x "$CHECKBASHISMS" ]; then
+    echo "Checking for bash-isms"
+
+    echo "  in ./configure"
+    `$CHECKBASHISMS -npfx configure`
+    if [ $? -ne 0 ]; then
+        echo "./configure includes bashisms, do not release"
+    fi
+    echo "  done"
+
+    echo "  in ./build-aux/couchdb-build-release.sh"
+    `$CHECKBASHISMS -npfx ./build-aux/couchdb-build-release.sh`
+    if [ $? -ne 0 ]; then
+        echo "./build-aux/couchdb-build-release.sh includes bashisms, do not release"
+    fi
+    echo "  done"
+fi
+
+
+# shunit2 tests
+CMD="./configure --test "
 
 test_defaults() {
     EXPECT="/usr/local /usr/local /usr/local/bin /usr/local/libexec /usr/local/etc /usr/local/share /usr/local/share /usr/local/var /usr/local/var/run /usr/local/share/doc /usr/local/lib /usr/local/var/lib /usr/local/var/lib /usr/local/var/log"
