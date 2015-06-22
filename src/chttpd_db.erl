@@ -104,9 +104,6 @@ changes_callback(start, {"continuous", Req}) ->
 changes_callback({change, Change}, {"continuous", Resp}) ->
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp, [?JSON_ENCODE(Change) | "\n"]),
     {ok, {"continuous", Resp1}};
-changes_callback({stop, EndSeq0}, {"continuous", Resp}) ->
-    % Temporary upgrade clause - Case 24236
-    changes_callback({stop, EndSeq0, null}, {"continuous", Resp});
 changes_callback({stop, EndSeq0, Pending}, {"continuous", Resp}) ->
     EndSeq = case is_old_couch(Resp) of true -> 0; false -> EndSeq0 end,
     Row = {[
@@ -153,9 +150,6 @@ changes_callback(start, {_, Req}) ->
 changes_callback({change, Change}, {Prepend, Resp}) ->
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp, [Prepend, ?JSON_ENCODE(Change)]),
     {ok, {",\r\n", Resp1}};
-changes_callback({stop, EndSeq}, Acc) ->
-    % Temporary upgrade clause - Case 24236
-    changes_callback({stop, EndSeq, null}, Acc);
 changes_callback({stop, EndSeq, Pending}, {_, Resp}) ->
     {ok, Resp1} = case is_old_couch(Resp) of
     true ->
