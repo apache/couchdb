@@ -154,9 +154,11 @@ eunit: couch
 	@rebar -r eunit skip_deps=meck,mochiweb,lager,snappy,couch_replicator,fabric,folsom
 
 javascript: all
+	# TODO: Fix tests to look for these files in their new path
 	@mkdir -p share/www/script/test
 	@cp test/javascript/tests/lorem*.txt share/www/script/test/
 	@dev/run -q --with-admin-party-please test/javascript/run
+	@rm -rf share/www/script
 
 fauxton: share/www
 
