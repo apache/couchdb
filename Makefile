@@ -35,7 +35,8 @@ clean:
 	@rm -f bin/couchjs
 	@rm -rf src/*/ebin
 	@rm -rf src/*/.rebar
-	@rm -rf src/*/priv
+	@rm -rf src/*/priv/*.so
+	@rm -rf src/couch/priv/{couchspawnkillable,couchjs}
 	@rm -rf share/server/main.js share/server/main-coffee.js
 	@rm -rf tmp dev/data dev/lib dev/logs
 	@rm -f src/couch/priv/couchspawnkillable
