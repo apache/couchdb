@@ -46,7 +46,7 @@ Options:
 
   -h | --help                 display a short help message and exit
   # -u USER       set the username to run as (defaults to $COUCHDB_USER)
-  --prefix=DIRECTORY          set the installation prefix (defaults to $DEFAIULT_PREFIX)
+  --prefix=DIRECTORY          set the installation prefix (defaults to $DEFAULT_PREFIX)
   --databasedir DIRECTORY     specify the data directory (defaults to /var/lib/couchdb)
   --viewindexdir DIRECTORY    specify the view directory (defaults to /var/lib/couchdb)
   --logdir DIRECTORY          specify the log file (defaults to /var/log/couchdb.log)
