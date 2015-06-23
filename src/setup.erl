@@ -99,7 +99,7 @@ enable_cluster_http(Options) ->
         {ok, "201", _, _} ->
             ok;
         Else ->
-            io:format("~nsend_req: ~p~n", [Else]),
+            couch_log:notice("send_req: ~p~n", [Else]),
             {error, Else}
     end.
 
@@ -141,7 +141,7 @@ enable_cluster_int(Options, no) ->
         Port ->
             config:set("httpd", "port", integer_to_list(Port))
     end,
-    io:format("~nEnable Cluster: ~p~n", [Options]).
+    couch_log:notice("Enable Cluster: ~p~n", [Options]).
     %cluster_state:set(enabled).
 
 maybe_set_admin(Username, Password) ->
@@ -168,7 +168,7 @@ add_node(Options) ->
 add_node_int(_Options, no) ->
     {error, cluster_not_enabled};
 add_node_int(Options, ok) ->
-    io:format("~nadd node: ~p~n", [Options]),
+    couch_log:notice("add node: ~p~n", [Options]),
     ErlangCookie = erlang:get_cookie(),
 
     % POST to nodeB/_setup
@@ -198,7 +198,7 @@ add_node_int(Options, ok) ->
             % when done, PUT :5986/nodes/nodeB
             create_node_doc(Host, Port);
         Else ->
-            io:format("~nsend_req: ~p~n", [Else]),
+            couch_log:notice("send_req: ~p~n", [Else]),
             Else
     end.
 

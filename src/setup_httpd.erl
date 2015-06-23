@@ -19,7 +19,7 @@ handle_setup_req(#httpd{method='POST'}=Req) ->
     ok = chttpd:verify_is_server_admin(Req),
     couch_httpd:validate_ctype(Req, "application/json"),
     Setup = get_body(Req),
-    io:format("~nSetup: ~p~n", [Setup]),
+    couch_log:notice("Setup: ~p~n", [Setup]),
     Action = binary_to_list(couch_util:get_value(<<"action">>, Setup, <<"missing">>)),
     case handle_action(Action, Setup) of
     ok ->
@@ -68,17 +68,17 @@ handle_action("enable_cluster", Setup) ->
 
 
 handle_action("finish_cluster", Setup) ->
-    io:format("~nffinish_cluster: ~p~n", [Setup]),
+    couch_log:notice("finish_cluster: ~p~n", [Setup]),
     case setup:finish_cluster() of
         {error, cluster_finished} ->
             {error, <<"Cluster is already finished">>};
         Else ->
-            io:format("~nElse: ~p~n", [Else]),
+            couch_log:notice("Else: ~p~n", [Else]),
             ok
     end;
 
 handle_action("add_node", Setup) ->
-    io:format("~nadd_node: ~p~n", [Setup]),
+    couch_log:notice("add_node: ~p~n", [Setup]),
 
     Options = get_options([
         {username, <<"username">>},
@@ -99,10 +99,10 @@ handle_action("add_node", Setup) ->
     end;
 
 handle_action("remove_node", Setup) ->
-    io:format("~nremove_node: ~p~n", [Setup]);
+    couch_log:notice("remove_node: ~p~n", [Setup]);
 
 handle_action("receive_cookie", Setup) ->
-    io:format("~nreceive_cookie: ~p~n", [Setup]),
+    couch_log:notice("receive_cookie: ~p~n", [Setup]),
     Options = get_options([
        {cookie, <<"cookie">>}
     ], Setup),
@@ -113,7 +113,7 @@ handle_action("receive_cookie", Setup) ->
     end;
 
 handle_action(_, _) ->
-    io:format("~ninvalid_action: ~n", []),
+    couch_log:notice("invalid_action: ~n", []),
     {error, <<"Invalid Action'">>}.
 
 
@@ -122,6 +122,6 @@ get_body(Req) ->
     {Body} ->
         Body;
     Else ->
-        io:format("~nBody Fail: ~p~n", [Else]),
+        couch_log:notice("Body Fail: ~p~n", [Else]),
         couch_httpd:send_error(Req, 400, <<"bad_request">>, <<"Missing JSON body'">>)
     end.
