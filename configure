@@ -48,7 +48,7 @@ Options:
   # -u USER       set the username to run as (defaults to $COUCHDB_USER)
   --prefix=DIRECTORY          set the installation prefix (defaults to $DEFAIULT_PREFIX)
   --databasedir DIRECTORY     specify the data directory (defaults to /var/lib/couchdb)
-  --viewindexdir DIRECTORY         specify the view directory (defaults to /var/lib/couchdb)
+  --viewindexdir DIRECTORY    specify the view directory (defaults to /var/lib/couchdb)
   --logdir DIRECTORY          specify the log file (defaults to /var/log/couchdb.log)
   -c | --with-curl            request that couchjs is linked to cURL (default false)
 
