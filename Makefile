@@ -93,8 +93,8 @@ install: all
 	@mkdir -p $(DESTDIR)/$(install_dir)
 	@cp -R rel/couchdb/* $(DESTDIR)/$(install_dir)
 
-	@mkdir -p $(DESTDIR)/$(data_dir)
-	@chown $(user) $(DESTDIR)/$(data_dir)
+	@mkdir -p $(DESTDIR)/$(database_dir)
+	@chown $(user) $(DESTDIR)/$(database_dir)
 
 	@mkdir -p $(DESTDIR)/$(view_index_dir)
 	@chown $(user) $(DESTDIR)/$(view_index_dir)
