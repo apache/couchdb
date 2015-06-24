@@ -13,7 +13,6 @@
 -module(couch_epi_functions).
 
 -behaviour(gen_server).
--define(MONITOR_INTERVAL, 5000).
 
 %% ------------------------------------------------------------------
 %% API Function Exports
@@ -70,10 +69,8 @@ stop(Server) ->
 %% gen_server Function Definitions
 %% ------------------------------------------------------------------
 
-init([Provider, ServiceId, Modules, Options]) ->
+init([Provider, ServiceId, Modules, _Options]) ->
     gen_server:cast(self(), init),
-    Interval = proplists:get_value(interval, Options, ?MONITOR_INTERVAL),
-    {ok, _Timer} = timer:send_interval(Interval, self(), tick),
     {ok, #state{
         provider = Provider,
         modules = Modules,
@@ -99,9 +96,6 @@ handle_cast(init, #state{pending = Pending} = State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info(tick, State) ->
-    {_Res, NewState} = reload_if_updated(State),
-    {noreply, NewState};
 handle_info(_Info, State) ->
     {noreply, State}.
 
@@ -110,7 +104,8 @@ terminate(_Reason, State) ->
     ok.
 
 code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
+    {_, NewState} = reload_if_updated(State),
+    {ok, NewState}.
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions

@@ -86,7 +86,7 @@ handle_cast({notify, App, Key, OldData, Data},
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info({'DOWN', MonitorRef, Type, Object, Info},
+handle_info({'DOWN', MonitorRef, _Type, _Object, _Info},
         #epi_server_state{subscriptions = Subscriptions0} = State0) ->
     Subscriptions1 = remove(Subscriptions0, MonitorRef),
     State1 = State0#epi_server_state{subscriptions = Subscriptions1},

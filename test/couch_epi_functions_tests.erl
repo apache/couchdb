@@ -47,9 +47,8 @@ setup(Opts) ->
     ok = couch_epi_functions:wait(Pid),
     {Pid, Module, ServiceId, couch_epi_functions_gen:get_handle(ServiceId)}.
 
-teardown({Pid, Module, _, Handle}) ->
+teardown({Pid, Module, _, _Handle}) ->
     code:purge(Module),
-    %%code:purge(Handle), %% FIXME temporary hack
     couch_epi_functions:stop(Pid),
     catch meck:unload(compile),
     ok.
@@ -58,10 +57,11 @@ generate_module(Name, Body) ->
     Tokens = couch_epi_codegen:scan(Body),
     couch_epi_codegen:generate(Name, Tokens).
 
-temp_atom() ->
-    {A, B, C} = erlang:now(),
-    list_to_atom(lists:flatten(io_lib:format("module~p~p~p", [A, B, C]))).
-
+upgrade_release(Pid) ->
+    sys:suspend(Pid),
+    'ok' = sys:change_code(Pid, couch_epi_functions, 'undefined', []),
+    sys:resume(Pid),
+    ok.
 
 epi_functions_test_() ->
     {
@@ -99,19 +99,19 @@ ensure_reload_if_manually_triggered({Pid, Module, _ServiceId, _Handle}) ->
         ?assertMatch({error,{badmatch,{error,reload}}}, Result)
     end).
 
-ensure_reload_if_changed({_Pid, Module, ServiceId, Handle}) ->
+ensure_reload_if_changed({Pid, Module, ServiceId, _Handle}) ->
     ?_test(begin
         ?assertMatch(
             [{1, 2}],
             couch_epi_functions_gen:apply(ServiceId, foo, [1, 2], [])),
         ok = generate_module(Module, ?MODULE2(Module)),
-        timer:sleep(150),
+        upgrade_release(Pid),
         ?assertMatch(
             [3],
             couch_epi_functions_gen:apply(ServiceId, baz, [3], []))
     end).
 
-ensure_no_reload_when_no_change({_Pid, Module, ServiceId, Handle}) ->
+ensure_no_reload_when_no_change({Pid, _Module, ServiceId, _Handle}) ->
     ok = meck:new(compile, [passthrough, unstick]),
     ok = meck:expect(compile, forms, fun(_, _) ->
         {error, compile_should_not_be_called} end),
@@ -119,7 +119,7 @@ ensure_no_reload_when_no_change({_Pid, Module, ServiceId, Handle}) ->
         ?assertMatch(
             [{1, 2}],
             couch_epi_functions_gen:apply(ServiceId, foo, [1, 2], [])),
-        timer:sleep(200),
+        upgrade_release(Pid),
         ?assertMatch(
             [],
             couch_epi_functions_gen:apply(ServiceId, baz, [3], []))
