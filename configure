@@ -86,13 +86,13 @@ parse_opts() {
 
             --test)
                 TEST=1
-                shift 1
+                shift
                 continue
                 ;;
 
             --with-curl|-c)
                 WITH_CURL="true"
-                shift 1
+                shift
                 continue
                 ;;
 
@@ -351,6 +351,10 @@ parse_opts() {
             --) # End of options
                 shift
                 break
+                ;;
+            -?*)
+                echo "WARNING: Unkonwn option '$1', ignoring" >&2
+                shift
                 ;;
             *) # Done
                 break
