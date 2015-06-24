@@ -12,7 +12,8 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-ERTS_BIN_DIR=$(cd ${0%/*} && pwd)
+$COUCHDB_BIN_DIR=$(cd ${0%/*} && pwd)
+ERTS_BIN_DIR=$COUCHDB_BIN_DIR/../lib/couchdb/
 
 export ROOTDIR=${ERTS_BIN_DIR%/*}
 
