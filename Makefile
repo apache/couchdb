@@ -56,26 +56,33 @@ dist: all
 release:
 	@./build-aux/couchdb-build-release.sh $(COUCHDB_VERSION)
 
-	# build fauxton
-	$(MAKE) fauxton
-	cp -r share/www apache-couchdb-$(COUCHDB_VERSION)/share/
+# build fauxton
+	@$(MAKE) fauxton
+	@cp -r share/www apache-couchdb-$(COUCHDB_VERSION)/share/
 
-	# build docs
-	cd src/docs; $(MAKE)
-	mkdir apache-couchdb-$(COUCHDB_VERSION)/share/docs
-	cp -r src/docs/build/html apache-couchdb-$(COUCHDB_VERSION)/share/docs/html
+# build docs
+	@cd src/docs; $(MAKE)
+	@mkdir -p apache-couchdb-$(COUCHDB_VERSION)/share/docs/html
+	@cp -r src/docs/build/html apache-couchdb-$(COUCHDB_VERSION)/share/docs/html
+	@mkdir -p apache-couchdb-$(COUCHDB_VERSION)/share/docs/pdf
+	@cp src/docs/build/latex/CouchDB.pdf apache-couchdb-$(COUCHDB_VERSION)/share/docs/pdf/
 
-	# Tar!
-	tar czf apache-couchdb-$(COUCHDB_VERSION).tar.gz apache-couchdb-$(COUCHDB_VERSION)
-	echo "Done: apache-couchdb-$(COUCHDB_VERSION).tar.gz"
+	@mkdir -p apache-couchdb-$(COUCHDB_VERSION)/share/docs/man
+	@cp src/docs/build/man/apachecouchdb.1 apache-couchdb-$(COUCHDB_VERSION)/share/docs/man/
+	@mkdir -p apache-couchdb-$(COUCHDB_VERSION)/share/docs/info
+	@cp src/docs/build/texinfo/CouchDB.info apache-couchdb-$(COUCHDB_VERSION)/share/docs/info/
+
+# Tar!
+	@tar czf apache-couchdb-$(COUCHDB_VERSION).tar.gz apache-couchdb-$(COUCHDB_VERSION)
+	@echo "Done: apache-couchdb-$(COUCHDB_VERSION).tar.gz"
 
 distclean: clean
 	@rm -f install.mk
 	@rm -f config.erl
 	@rm -f rel/couchdb.config
 ifneq ($(IN_RELEASE), true)
-	# when we are in a release, don’t delete the
-	# copied sources, generated docs, or fauxton
+# when we are in a release, don’t delete the
+# copied sources, generated docs, or fauxton
 	@rm -rf rel/couchdb
 	@rm -rf share/www
 	@rm -rf src/docs
@@ -117,10 +124,15 @@ install: all
 	@mkdir -p $(DESTDIR)/$(data_dir)
 	@cp -R share/server share/www $(DESTDIR)/$(data_dir)
 
-	# TODO: copy over man, pdf, info etc. files
-	#       after including them in the release tarball in `make release`
-	#@mkdir -p $(DESTDIR)/$(doc_dir)
-	#@cp -R
+	@mkdir -p $(DESTDIR)/$(doc_dir)
+	@mkdir -p $(DESTDIR)/$(html_dir)
+	@mkdir -p $(DESTDIR)/$(pdf_dir)
+	@mkdir -p $(DESTDIR)/$(man_dir)
+	@mkdir -p $(DESTDIR)/$(info_dir)
+	@cp -R share/docs/html $(DESTDIR)/$(html_dir)/html
+	@cp share/docs/pdf/CouchDB.pdf $(DESTDIR)/$(pdf_dir)/CouchDB.pdf
+	@cp share/docs/info/CouchDB.info $(DESTDIR)/$(info_dir)/CouchDB.info
+	@cp share/docs/man/apachecouchdb.1 $(DESTDIR)/$(man_dir)/couchdb.1
 
 	@echo "...done"
 

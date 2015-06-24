@@ -28,8 +28,14 @@ DATAROOTDIR=
 DATADIR=
 LOCALSTATEDIR=
 RUNSTATEDIR=
-DOCDIR=
 LIBDIR=
+
+INFODIR=
+MANDIR=
+DOCDIR=
+
+HTMLDIR=
+PDFDIR=
 
 DATABASEDIR=
 VIEWDIR=
@@ -67,13 +73,13 @@ Options:
     --libdir=DIR            object code libraries [EPREFIX/lib]
     --datarootdir=DIR       read-only arch.-independent data root [PREFIX/share]
     --datadir=DIR           read-only architecture-independent data [DATAROOTDIR]
-    # --infodir=DIR           info documentation [DATAROOTDIR/info]
-    # --mandir=DIR            man documentation [DATAROOTDIR/man]
-    # --docdir=DIR            documentation root [DATAROOTDIR/doc/apache-couchdb]
-    # --htmldir=DIR           html documentation [DOCDIR]
-    # --dvidir=DIR            dvi documentation [DOCDIR]
-    # --pdfdir=DIR            pdf documentation [DOCDIR]
-    # --psdir=DIR             ps documentation [DOCDIR]
+    --infodir=DIR           info documentation [DATAROOTDIR/info]
+    --mandir=DIR            man documentation [DATAROOTDIR/man]
+    --docdir=DIR            documentation root [DATAROOTDIR/doc/apache-couchdb]
+    --htmldir=DIR           html documentation [DOCDIR]
+    --dvidir=DIR            dvi documentation [DOCDIR]
+    --pdfdir=DIR            pdf documentation [DOCDIR]
+    --psdir=DIR             ps documentation [DOCDIR]
 EOF
 }
 
@@ -295,6 +301,42 @@ parse_opts() {
                 exit 1
                 ;;
 
+            --mandir)
+                if [ -n "$2" ]; then
+                    eval MANDIR=$2
+                    shift 2
+                    continue
+                else
+                    printf 'ERROR: "--mandir" requires a non-empty argument.\n' >&2
+                    exit 1
+                fi
+                ;;
+            --mandir=?*)
+                eval MANDIR=${1#*=}
+                ;;
+            --mandir=)
+                printf 'ERROR: "--mandir" requires a non-empty argument.\n' >&2
+                exit 1
+                ;;
+
+            --infodir)
+                if [ -n "$2" ]; then
+                    eval INFODIR=$2
+                    shift 2
+                    continue
+                else
+                    printf 'ERROR: "--infodir" requires a non-empty argument.\n' >&2
+                    exit 1
+                fi
+                ;;
+            --infodir=?*)
+                eval INFODIR=${1#*=}
+                ;;
+            --infodir=)
+                printf 'ERROR: "--infodir" requires a non-empty argument.\n' >&2
+                exit 1
+                ;;
+
             --libdir)
                 if [ -n "$2" ]; then
                     eval LIBDIR=$2
@@ -367,6 +409,42 @@ parse_opts() {
                 exit 1
                 ;;
 
+            --htmldir)
+                if [ -n "$2" ]; then
+                    eval HTMLDIR=$2
+                    shift 2
+                    continue
+                else
+                    printf 'ERROR: "--htmldir" requires a non-empty argument.\n' >&2
+                    exit 1
+                fi
+                ;;
+            --htmldir=?*)
+                eval HTMLDIR=${1#*=}
+                ;;
+            --htmldir=)
+                printf 'ERROR: "--htmldir" requires a non-empty argument.\n' >&2
+                exit 1
+                ;;
+
+            --pdfdir)
+                if [ -n "$2" ]; then
+                    eval PDFDIR=$2
+                    shift 2
+                    continue
+                else
+                    printf 'ERROR: "--pdfdir" requires a non-empty argument.\n' >&2
+                    exit 1
+                fi
+                ;;
+            --pdfdir=?*)
+                eval PDFDIR=${1#*=}
+                ;;
+            --pdfdir=)
+                printf 'ERROR: "--pdfdir" requires a non-empty argument.\n' >&2
+                exit 1
+                ;;
+
             --) # End of options
                 shift
                 break
@@ -410,7 +488,13 @@ parse_opts() {
         RUNSTATEDIR="$LOCALSTATEDIR/run";
     fi
     if test -z "$DOCDIR"; then
-        DOCDIR="$DATAROOTDIR/doc";
+        DOCDIR="$DATAROOTDIR/doc/apache-couchdb";
+    fi
+    if test -z "$INFODIR"; then
+        INFODIR="$DATAROOTDIR/info";
+    fi
+    if test -z "$MANDIR"; then
+        MANDIR="$DATAROOTDIR/man";
     fi
     if test -z "$LIBDIR"; then
         LIBDIR="$EXEC_PREFIX/lib";
@@ -424,6 +508,12 @@ parse_opts() {
     if test -z "$LOGDIR"; then
         LOGDIR="$LOCALSTATEDIR/log";
     fi
+    if test -z "$HTMLDIR"; then
+        HTMLDIR="$DOCDIR/html";
+    fi
+    if test -z "$PDFDIR"; then
+        PDFDIR="$DOCDIR/pdf";
+    fi
 }
 
 parse_opts $@
@@ -433,7 +523,7 @@ parse_opts $@
 if [ "$TEST" = "1" ]; then
     echo $PREFIX $EXEC_PREFIX $BINDIR $LIBEXECDIR $SYSCONFDIR $DATAROOTDIR \
          $DATADIR $LOCALSTATEDIR $RUNSTATEDIR $DOCDIR $LIBDIR $DATABASEDIR \
-         $VIEWDIR $LOGDIR
+         $VIEWDIR $LOGDIR $MANDIR $INFODIR $HTMLDIR $PDFDIR
     exit 0
 fi
 
@@ -497,6 +587,12 @@ data_dir = $DATADIR/couchdb
 database_dir = $DATABASEDIR
 view_index_dir = $VIEWDIR
 log_file = $LOG_FILE
+
+html_dir = $HTMLDIR
+pdf_dir = $PDFDIR
+man_dir = $MANDIR
+info_dir = $INFODIR
+
 user = $COUCHDB_USER
 EOF
 
