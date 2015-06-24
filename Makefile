@@ -140,6 +140,11 @@ uninstall:
 	@rm -f $(DESTDIR)/$(libexec_dir)
 	@rm -rf $(DESTDIR)/$(sysconf_dir)
 	@rm -rf $(DESTDIR)/$(data_dir)
+	@rm -rf $(DESTDIR)/$(doc_dir)
+	@rm -rf $(DESTDIR)/$(html_dir)
+	@rm -rf $(DESTDIR)/$(pdf_dir)
+	@rm -rf $(DESTDIR)/$(man_dir)
+	@rm -rf $(DESTDIR)/$(info_dir)
 
 install.mk:
 # ignore install.mk missing if we are running
