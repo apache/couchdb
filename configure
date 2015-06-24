@@ -34,6 +34,7 @@ LIBDIR=
 DATABASEDIR=
 VIEWDIR=
 LOGDIR=
+COUCHDB_USER=`whoami`
 
 display_help () {
     cat << EOF
@@ -45,7 +46,7 @@ system for Apache CouchDB.
 Options:
 
   -h | --help                 display a short help message and exit
-  # -u USER       set the username to run as (defaults to $COUCHDB_USER)
+  -u | --user USER            set the username to run as (defaults to $COUCHDB_USER)
   --prefix=DIRECTORY          set the installation prefix (defaults to $DEFAULT_PREFIX)
   --databasedir DIRECTORY     specify the data directory (defaults to /var/lib/couchdb)
   --viewindexdir DIRECTORY    specify the view directory (defaults to /var/lib/couchdb)
@@ -94,6 +95,24 @@ parse_opts() {
                 WITH_CURL="true"
                 shift
                 continue
+                ;;
+
+            --user|-u)
+                if [ -n "$2" ]; then
+                    eval COUCHDB_USER=$2
+                    shift 2
+                    continue
+                else
+                    printf 'ERROR: "--user" requires a non-empty argument.\n' >&2
+                    exit 1
+                fi
+                ;;
+            --user=?*)
+                eval COUCHDB_USER=${1#*=}
+                ;;
+            --user=)
+                printf 'ERROR: "--user" requires a non-empty argument.\n' >&2
+                exit 1
                 ;;
 
             --prefix)
