@@ -338,8 +338,8 @@ get_db_info(Db) ->
             SI;
         {AS, ES} ->
             #size_info{active=AS, external=ES};
-        SI ->
-            #size_info{active=SI}
+        AS ->
+            #size_info{active=AS}
     end,
     ActiveSize = active_size(Db, SizeInfo),
     DiskVersion = couch_db_header:disk_version(Header),
