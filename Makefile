@@ -18,7 +18,7 @@ COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)$(COUCHDB_VERSION_SUFFIX
 
 DESTDIR=
 
-all: couch fauxton
+all: couch fauxton docs
 
 config.erl:
 	@echo "Apache CouchDB has not been configured."
@@ -60,8 +60,6 @@ release:
 	@$(MAKE) fauxton
 	@cp -r share/www apache-couchdb-$(COUCHDB_VERSION)/share/
 
-# build docs
-	@cd src/docs; $(MAKE)
 	@mkdir -p apache-couchdb-$(COUCHDB_VERSION)/share/docs/html
 	@cp -r src/docs/build/html apache-couchdb-$(COUCHDB_VERSION)/share/docs/html
 	@mkdir -p apache-couchdb-$(COUCHDB_VERSION)/share/docs/pdf
@@ -172,8 +170,20 @@ javascript: all
 	@dev/run -q --with-admin-party-please test/javascript/run
 	@rm -rf share/www/script
 
+
+# build docs
+docs: src/docs/build
+
+src/docs/build:
+ifeq ($(with_docs), 1)
+	@cd src/docs; $(MAKE)
+endif
+
+# build fauxton
 fauxton: share/www
 
 share/www:
+ifeq ($(with_fauxton), 1)
 	@echo "Building Fauxton"
 	@cd src/fauxton && npm install && ./node_modules/grunt-cli/bin/grunt couchdb
+endif

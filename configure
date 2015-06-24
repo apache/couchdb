@@ -17,6 +17,8 @@ basename=`basename $0`
 
 TEST=0
 WITH_CURL="false"
+WITH_FAUXTON=1
+WITH_DOCS=1
 
 PREFIX=
 DEFAULT_PREFIX=/usr/local
@@ -58,6 +60,9 @@ Options:
   --viewindexdir DIRECTORY    specify the view directory (defaults to /var/lib/couchdb)
   --logdir DIRECTORY          specify the log file (defaults to /var/log/couchdb.log)
   -c | --with-curl            request that couchjs is linked to cURL (default false)
+  --disable-fauxton           do not build Fauxton
+  --disable-docs              do not build any documentation or manpages
+
 
   Installation directories:
     --prefix=PREFIX         install architecture-independent files in PREFIX
@@ -99,6 +104,18 @@ parse_opts() {
 
             --with-curl|-c)
                 WITH_CURL="true"
+                shift
+                continue
+                ;;
+
+            --disable-fauxton)
+                WITH_FAUXTON=0
+                shift
+                continue
+                ;;
+
+            --disable-docs)
+                WITH_DOCS=0
                 shift
                 continue
                 ;;
@@ -593,6 +610,9 @@ html_dir = $HTMLDIR
 pdf_dir = $PDFDIR
 man_dir = $MANDIR
 info_dir = $INFODIR
+
+with_fauxton = $WITH_FAUXTON
+with_docs = $WITH_DOCS
 
 user = $COUCHDB_USER
 EOF
