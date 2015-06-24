@@ -554,6 +554,7 @@ cat > rel/couchdb.config << EOF
 {data_dir, "$DATABASEDIR"}.
 {view_index_dir, "$VIEWDIR"}.
 {log_file, "$LOG_FILE"}.
+{fauxton_root, "$DATAROOTDIR/couchdb/www"}.
 {user, "$COUCHDB_USER"}.
 {node_name, "-name couchdb"}.
 {cluster_port, 5984}.
