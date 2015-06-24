@@ -47,19 +47,9 @@ check: javascript eunit build-test
 
 # creates a full erlang release
 dist: all
-	@rm -rf rel/couchdb
-	@rebar generate
-	@cp -r share/www rel/couchdb/share/www
-	@cp -r share/docs rel/couchdb/share/docs
-
-# creates a source tarball
-release:
 	@./build-aux/couchdb-build-release.sh $(COUCHDB_VERSION)
 
-# build fauxton
-	@$(MAKE) fauxton
 	@cp -r share/www apache-couchdb-$(COUCHDB_VERSION)/share/
-
 	@mkdir -p apache-couchdb-$(COUCHDB_VERSION)/share/docs/html
 	@cp -r src/docs/build/html apache-couchdb-$(COUCHDB_VERSION)/share/docs/html
 	@mkdir -p apache-couchdb-$(COUCHDB_VERSION)/share/docs/pdf
