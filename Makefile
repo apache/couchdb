@@ -119,7 +119,7 @@ install: all
 	@mkdir -p $(DESTDIR)/$(sysconf_dir)
 	@mkdir -p $(DESTDIR)/$(sysconf_dir)/default.d
 	@mkdir -p $(DESTDIR)/$(sysconf_dir)/local.d
-	@cp rel/overlay/etc/default.ini rel/overlay/etc/local.ini $(DESTDIR)/$(sysconf_dir)
+	@cp rel/couchdb/etc/default.ini rel/couchdb/etc/local.ini $(DESTDIR)/$(sysconf_dir)
 
 	@mkdir -p $(DESTDIR)/$(data_dir)
 	@cp -R share/server share/www $(DESTDIR)/$(data_dir)
