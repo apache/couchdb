@@ -21,6 +21,7 @@ TEST=0
 WITH_CURL="false"
 WITH_FAUXTON=1
 WITH_DOCS=1
+SKIP_DEPS=0
 
 PREFIX=
 DEFAULT_PREFIX=/usr/local
@@ -64,6 +65,7 @@ Options:
   -c | --with-curl            request that couchjs is linked to cURL (default false)
   --disable-fauxton           do not build Fauxton
   --disable-docs              do not build any documentation or manpages
+  --skip-deps                 do not update erlang dependencies
 
 
   Installation directories:
@@ -118,6 +120,12 @@ parse_opts() {
 
             --disable-docs)
                 WITH_DOCS=0
+                shift
+                continue
+                ;;
+
+            --skip-deps)
+                SKIP_DEPS=1
                 shift
                 continue
                 ;;
@@ -625,7 +633,7 @@ EOF
 
 
 # only update dependencies, when we are not in a release tarball
-if [ -d .git ]; then
+if [ -d .git  -a $SKIP_DEPS -ne 1 ]; then
   echo "==> updating dependencies"
   rebar get-deps update-deps
 fi
