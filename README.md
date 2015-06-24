@@ -35,28 +35,17 @@ The function would be called with following arguments
 
 The `notification()` is either `{data, term()}` or `{modules, [module()]}`
 
+## data example
 
-
-## data_source example
-
-Any application that wants to register some configuration data for a service
+Any application that wants to register some configuration data for a service using module
 could add an entry in its supervision tree with something like:
 
-    {
-        appname_stats,
-        {couch_epi_data_source, start_link, [
-            appname,
-            {epi_key, {couch_stats, definitions}},
-            {priv_file, "couch_stats.cfg"},
-            [{interval, 100}]
-        ]},
-        permanent,
-        5000,
-        worker,
-        dynamic
-    }
-
-Note we also support `{file, FilePath}` instead of `{priv_file, File}`
+    Spec = couch_epi_data:childspec(
+        appname_stats, %% Id
+        appname, %% CurrentApp
+        {epi_key, {couch_stats, definitions}},
+        appname_stats_config %% Module
+    ).
 
 When service provider wants to learn about all the installed config data for it to use
 it would then just do something like:
@@ -75,24 +64,36 @@ There are also additional functions to get the same data in various formats
 - `couch_epi:keys(Handle)` - returns list of configured keys
 - `couch_epi:subscribers(Handle)` - return list of known subscribers
 
+
+
+## data_source example
+
+Any application that wants to register some configuration data for a service
+could add an entry in its supervision tree with something like:
+
+    Spec = couch_epi_data_source:childspec(
+        appname_stats, %% Id
+        appname, %% CurrentApp
+        {epi_key, {couch_stats, definitions}},
+        {priv_file, "couch_stats.cfg"},
+        [{interval, 5000}]
+    ).
+
+Note we also support `{file, FilePath}` instead of `{priv_file, File}`
+
+The query API is the same as for `data` (see `data example`)
+
 # Function dispatch example
 
 Any application that wants to register some functions for a service
 could add an entry in its supervision tree with something like:
 
-    {
-        appname_stats,
-        {couch_epi_functions, start_link, [
-            appname,
-            {epi_key, my_service},
-            {modules, [my_module]},
-            [{interval, 100}]
-        ]},
-        permanent,
-        5000,
-        worker,
-        dynamic
-    }
+    Spec = couch_epi_functions:childspec(
+        appname_stats, %% Id
+        appname, %% CurrentApp
+        {epi_key, my_service},
+        my_module %% Module
+    ).
 
 Adding the entry would generate a dispatch methods for any exported function of modules passed.
 
