@@ -29,4 +29,4 @@ src/couch/priv/couchjs
 src/couch/priv/couchspawnkillable
 
 bin/
-release/
+apache-couchdb-*/

@@ -43,7 +43,7 @@ clean:
 	@rm -f src/couch/priv/couch_js/config.h
 	@rm -f dev/boot_node.beam dev/pbkdf2.pyc log/crash.log
 
-check: javascript eunit
+check: javascript eunit build-test
 
 # creates a full erlang release
 dist: all
@@ -170,6 +170,8 @@ javascript: all
 	@dev/run -q --with-admin-party-please test/javascript/run
 	@rm -rf share/www/script
 
+build-test:
+	@test/build/test-configure.sh
 
 # build docs
 docs: src/docs/build
