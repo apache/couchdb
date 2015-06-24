@@ -88,6 +88,16 @@ test_exec_prefix() {
     assertEquals "test exec_prefix" "$EXPECT" "$RESULT"
 }
 
+test_exec_prefix_eval() {
+    EXPECT="/horse/local /horse/local /horse/local/bin /horse/local/libexec /horse/local/etc /horse/local/share /horse/local/share /horse/local/var /horse/local/var/run /horse/local/share/doc /horse/local/lib /horse/local/var/lib /horse/local/var/lib /horse/local/var/log"
+
+    RESULT=`$CMD --prefix=/horse/local --exec-prefix=\\${prefix}`
+    assertEquals "test exec_prefix" "$EXPECT" "$RESULT"
+
+    RESULT=`$CMD --prefix /horse/local --exec-prefix \\${prefix}`
+    assertEquals "test exec_prefix" "$EXPECT" "$RESULT"
+}
+
 test_exec_prefix_error() {
     EXPECT='ERROR: "--exec-prefix" requires a non-empty argument.'
 

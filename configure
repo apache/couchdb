@@ -98,7 +98,7 @@ parse_opts() {
 
             --prefix)
                 if [ -n "$2" ]; then
-                    PREFIX=$2
+                    eval PREFIX=$2
                     shift 2
                     continue
                 else
@@ -107,7 +107,7 @@ parse_opts() {
                 fi
                 ;;
             --prefix=?*)
-                PREFIX=${1#*=}
+                eval PREFIX=${1#*=}
                 ;;
             --prefix=)
                 printf 'ERROR: "--prefix" requires a non-empty argument.\n' >&2
@@ -116,7 +116,7 @@ parse_opts() {
 
             --exec-prefix)
                 if [ -n "$2" ]; then
-                    EXEC_PREFIX=$2
+                    eval EXEC_PREFIX=$2
                     shift 2
                     continue
                 else
@@ -125,7 +125,7 @@ parse_opts() {
                 fi
                 ;;
             --exec-prefix=?*)
-                EXEC_PREFIX=${1#*=}
+                eval EXEC_PREFIX=${1#*=}
                 ;;
             --exec-prefix=)
                 printf 'ERROR: "--exec-prefix" requires a non-empty argument.\n' >&2
@@ -134,7 +134,7 @@ parse_opts() {
 
             --bindir)
                 if [ -n "$2" ]; then
-                    BINDIR=$2
+                    eval BINDIR=$2
                     shift 2
                     continue
                 else
@@ -143,7 +143,7 @@ parse_opts() {
                 fi
                 ;;
             --bindir=?*)
-                BINDIR=${1#*=}
+                eval BINDIR=${1#*=}
                 ;;
             --bindir=)
                 printf 'ERROR: "--bindir" requires a non-empty argument.\n' >&2
@@ -152,7 +152,7 @@ parse_opts() {
 
             --libexecdir)
                 if [ -n "$2" ]; then
-                    LIBEXECDIR=$2
+                    eval LIBEXECDIR=$2
                     shift 2
                     continue
                 else
@@ -161,7 +161,7 @@ parse_opts() {
                 fi
                 ;;
             --libexecdir=?*)
-                LIBEXECDIR=${1#*=}
+                eval LIBEXECDIR=${1#*=}
                 ;;
             --libexecdir=)
                 printf 'ERROR: "--libexecdir" requires a non-empty argument.\n' >&2
@@ -170,7 +170,7 @@ parse_opts() {
 
             --sysconfdir)
                 if [ -n "$2" ]; then
-                    SYSCONFDIR=$2
+                    eval SYSCONFDIR=$2
                     shift 2
                     continue
                 else
@@ -179,7 +179,7 @@ parse_opts() {
                 fi
                 ;;
             --sysconfdir=?*)
-                SYSCONFDIR=${1#*=}
+                eval SYSCONFDIR=${1#*=}
                 ;;
             --sysconfdir=)
                 printf 'ERROR: "--sysconfdir" requires a non-empty argument.\n' >&2
@@ -188,7 +188,7 @@ parse_opts() {
 
             --datarootdir)
                 if [ -n "$2" ]; then
-                    DATAROOTDIR=$2
+                    eval DATAROOTDIR=$2
                     shift 2
                     continue
                 else
@@ -197,7 +197,7 @@ parse_opts() {
                 fi
                 ;;
             --datarootdir=?*)
-                DATAROOTDIR=${1#*=}
+                eval DATAROOTDIR=${1#*=}
                 ;;
             --datarootdir=)
                 printf 'ERROR: "--datarootdir" requires a non-empty argument.\n' >&2
@@ -206,7 +206,7 @@ parse_opts() {
 
             --datadir)
                 if [ -n "$2" ]; then
-                    DATADIR=$2
+                    eval DATADIR=$2
                     shift 2
                     continue
                 else
@@ -215,7 +215,7 @@ parse_opts() {
                 fi
                 ;;
             --datadir=?*)
-                DATADIR=${1#*=}
+                eval DATADIR=${1#*=}
                 ;;
             --datadir=)
                 printf 'ERROR: "--datadir" requires a non-empty argument.\n' >&2
@@ -224,7 +224,7 @@ parse_opts() {
 
             --localstatedir)
                 if [ -n "$2" ]; then
-                    LOCALSTATEDIR=$2
+                    eval LOCALSTATEDIR=$2
                     shift 2
                     continue
                 else
@@ -233,7 +233,7 @@ parse_opts() {
                 fi
                 ;;
             --localstatedir=?*)
-                LOCALSTATEDIR=${1#*=}
+                eval LOCALSTATEDIR=${1#*=}
                 ;;
             --localstatedir=)
                 printf 'ERROR: "--localstatedir" requires a non-empty argument.\n' >&2
@@ -242,7 +242,7 @@ parse_opts() {
 
             --runstatedir)
                 if [ -n "$2" ]; then
-                    RUNSTATEDIR=$2
+                    eval RUNSTATEDIR=$2
                     shift 2
                     continue
                 else
@@ -251,7 +251,7 @@ parse_opts() {
                 fi
                 ;;
             --runstatedir=?*)
-                RUNSTATEDIR=${1#*=}
+                eval RUNSTATEDIR=${1#*=}
                 ;;
             --runstatedir=)
                 printf 'ERROR: "--runstatedir" requires a non-empty argument.\n' >&2
@@ -260,7 +260,7 @@ parse_opts() {
 
             --docdir)
                 if [ -n "$2" ]; then
-                    DOCDIR=$2
+                    eval DOCDIR=$2
                     shift 2
                     continue
                 else
@@ -269,7 +269,7 @@ parse_opts() {
                 fi
                 ;;
             --docdir=?*)
-                DOCDIR=${1#*=}
+                eval DOCDIR=${1#*=}
                 ;;
             --docdir=)
                 printf 'ERROR: "--docdir" requires a non-empty argument.\n' >&2
@@ -278,7 +278,7 @@ parse_opts() {
 
             --libdir)
                 if [ -n "$2" ]; then
-                    LIBDIR=$2
+                    eval LIBDIR=$2
                     shift 2
                     continue
                 else
@@ -287,7 +287,7 @@ parse_opts() {
                 fi
                 ;;
             --libdir=?*)
-                LIBDIR=${1#*=}
+                eval LIBDIR=${1#*=}
                 ;;
             --libdir=)
                 printf 'ERROR: "--libdir" requires a non-empty argument.\n' >&2
@@ -296,7 +296,7 @@ parse_opts() {
 
             --databasedir)
                 if [ -n "$2" ]; then
-                    DATABASEDIR=$2
+                    eval DATABASEDIR=$2
                     shift 2
                     continue
                 else
@@ -305,7 +305,7 @@ parse_opts() {
                 fi
                 ;;
             --databasedir=?*)
-                DATABASEDIR=${1#*=}
+                eval DATABASEDIR=${1#*=}
                 ;;
             --databasedir=)
                 printf 'ERROR: "--databasedir" requires a non-empty argument.\n' >&2
@@ -314,7 +314,7 @@ parse_opts() {
 
             --viewindexdir)
                 if [ -n "$2" ]; then
-                    VIEWDIR=$2
+                    eval VIEWDIR=$2
                     shift 2
                     continue
                 else
@@ -323,7 +323,7 @@ parse_opts() {
                 fi
                 ;;
             --viewindexdir=?*)
-                VIEWDIR=${1#*=}
+                eval VIEWDIR=${1#*=}
                 ;;
             --viewindexdir=)
                 printf 'ERROR: "--viewindexdir" requires a non-empty argument.\n' >&2
@@ -332,7 +332,7 @@ parse_opts() {
 
             --logdir)
                 if [ -n "$2" ]; then
-                    LOGDIR=$2
+                    eval LOGDIR=$2
                     shift 2
                     continue
                 else
@@ -341,7 +341,7 @@ parse_opts() {
                 fi
                 ;;
             --logdir=?*)
-                LOGDIR=${1#*=}
+                eval LOGDIR=${1#*=}
                 ;;
             --logdir=)
                 printf 'ERROR: "--logdir" requires a non-empty argument.\n' >&2
