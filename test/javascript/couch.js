@@ -71,9 +71,10 @@ function CouchDB(name, httpHeaders) {
   };
 
   // Deletes a document from the database
-  this.deleteDoc = function(doc) {
+  this.deleteDoc = function(doc, request_options) {
+    request_options = request_options || "";
     this.last_req = this.request("DELETE", this.uri + encodeURIComponent(doc._id)
-      + "?rev=" + doc._rev);
+      + "?rev=" + doc._rev + request_options);
     CouchDB.maybeThrowError(this.last_req);
     var result = JSON.parse(this.last_req.responseText);
     doc._rev = result.rev; //record rev in input document
@@ -357,6 +358,8 @@ CouchDB.getVersion = function() {
 };
 
 CouchDB.reloadConfig = function() {
+  // diabled until cluser port gets /_config
+  return {};
   CouchDB.last_req = CouchDB.request("POST", "/_config/_reload");
   CouchDB.maybeThrowError(CouchDB.last_req);
   return JSON.parse(CouchDB.last_req.responseText);
