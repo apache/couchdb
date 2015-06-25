@@ -13,7 +13,7 @@
 {application, couch_epi,
  [
   {description, "extensible plugin interface"},
-  {vsn, "1"},
+  {vsn, git},
   {registered, [couch_epi_sup, couch_epi_server]},
   {applications, [
                   kernel,
