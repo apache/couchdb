@@ -23,6 +23,7 @@ DepDescs = [
     {config,            "config",           {branch, "master"}},
     {chttpd,            "chttpd",           {branch, "master"}},
     {couch,             "couch",            {branch, "master"}},
+    {couch_epi,         "couch-epi",        {branch, "master"}},
     {couch_index,       "couch-index",      {branch, "master"}},
     {couch_mrview,      "couch-mrview",     {branch, "master"}},
     {couch_replicator,  "couch-replicator", {branch, "master"}},
