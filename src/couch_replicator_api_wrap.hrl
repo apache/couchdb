@@ -17,7 +17,7 @@
     oauth = nil,
     headers = [
         {"Accept", "application/json"},
-        {"User-Agent", "CouchDB/" ++ couch_server:get_version()}
+        {"User-Agent", "CouchDB-Replicator/" ++ couch_server:get_version()}
     ],
     timeout,            % milliseconds
     ibrowse_options = [],
