@@ -158,7 +158,8 @@ def setup_configs(ctx):
                                                 "lib", node, "data"),
             "node_name": "-name %s@127.0.0.1" % node,
             "cluster_port": cluster_port,
-            "backend_port": backend_port
+            "backend_port": backend_port,
+            "fauxton_root": "src/fauxton/dist/release"
         }
         write_config(ctx, node, env)
 
