@@ -214,8 +214,11 @@ couchTests.attachments= function(debug) {
 
 
   // test large attachments - COUCHDB-366
-  var lorem = CouchDB.request("GET", "/_utils/script/test/lorem.txt").responseText;
-
+  var lorem = CouchDB.request("GET", "/_utils/test/lorem.txt").responseText;
+  console.log('lorem');
+  console.log(lorem);
+  console.log('end lorem');
+  
   var xhr = CouchDB.request("PUT", "/test_suite_db/bin_doc5/lorem.txt", {
     headers:{"Content-Type":"text/plain;charset=utf-8"},
     body:lorem
@@ -228,9 +231,13 @@ couchTests.attachments= function(debug) {
   TEqualsIgnoreCase("text/plain;charset=utf-8", xhr.getResponseHeader("Content-Type"));
 
   // test large inline attachment too
-  var lorem_b64 = CouchDB.request("GET", "/_utils/script/test/lorem_b64.txt").responseText;
+  var lorem_b64 = CouchDB.request("GET", "/_utils/test/lorem_b64.txt");
+  console.log(JSON.stringify(lorem_b64, null, 2));
+  console.log(lorem_b64.status);
+  console.log(lorem_b64.responseText);
+  lorem_b64 = lorem_b64.responseText;
   var doc = db.open("bin_doc5", {attachments:true});
-  T(doc._attachments["lorem.txt"].data == lorem_b64);
+  TEquals(lorem_b64, doc._attachments["lorem.txt"].data, 'binary attachment data should match');
 
   // test etags for attachments.
   var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc5/lorem.txt");
