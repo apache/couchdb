@@ -39,6 +39,11 @@ However, you do not need them if:
  * You are building from a distribution archive, or
  * You don't care about building the documentation
 
+If you intend to build Fauxton, you will also need to install its
+dependencies. After running ./configure to download all of the
+dependent repositories, you can read about required dependencies in
+`src/fauxton/readme.md`. Typically, installing npm and node.js are
+sufficient to enable a Fauxton build.
 
 Here is a list of *optional* dependencies for various operating systems.
 Installation will be easiest, when you install them all.
@@ -46,36 +51,21 @@ Installation will be easiest, when you install them all.
 Debian-based (inc. Ubuntu) Systems
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    sudo apt-get install help2man
-    sudo apt-get install python-sphinx
-    sudo apt-get install texlive-latex-base
-    sudo apt-get install texlive-latex-recommended
-    sudo apt-get install texlive-latex-extra
-    sudo apt-get install texlive-fonts-recommended
-    sudo apt-get install texinfo
-    sudo apt-get install gnupg
+    sudo apt-get install help2man python-sphinx \
+        texlive-latex-base texlive-latex-recommended \
+        texlive-latex-extra texlive-fonts-recommended texinfo gnupg
 
 Gentoo-based Systems
 ~~~~~~~~~~~~~~~~~~~~
 
-    sudo emerge texinfo
-    sudo emerge gnupg
-    sudo emerge coreutils
-    sudo emerge pkgconfig
-    sudo emerge help2man
+    sudo emerge texinfo gnupg coreutils pkgconfig help2man
     sudo USE=latex emerge sphinx
 
 RedHat-based (Fedora, Centos, RHEL) Systems
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    sudo yum install help2man
-    sudo yum install python-sphinx
-    sudo yum install python-docutils
-    sudo yum install python-pygments
-    sudo yum install texlive-latex
-    sudo yum install texlive-latex-fonts
-    sudo yum install texinfo
-    sudo yum install gnupg
+    sudo yum install help2man python-sphinx python-docutils \
+        python-pygments texlive-latex texlive-latex-fonts texinfo gnupg
 
 Mac OS X
 ~~~~~~~~
@@ -88,9 +78,7 @@ Unless you want to install the optional dependencies, skip to the next section.
 
 Install what else we can with Homebrew:
 
-    brew install help2man
-    brew install gnupg
-    brew install md5sha1sum
+    brew install help2man gnupg md5sha1sum
 
 If you don't already have pip installed, install it:
 
@@ -107,6 +95,12 @@ Download MaxTeX from here:
     http://www.tug.org/mactex/
 
 Follow the instructions to get a working LaTeX install on your system.
+
+FreeBSD
+-------
+
+
+    pkg install help2man texinfo gnupg py27-sphinx texlive-full tex-formats
 
 Windows
 ~~~~~~~
