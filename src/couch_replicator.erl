@@ -624,7 +624,7 @@ init_state(Rep) ->
         committed_seq = StartSeq,
         source_log = SourceLog,
         target_log = TargetLog,
-        rep_starttime = couch_util:rfc1123_date(),
+        rep_starttime = httpd_util:rfc1123_date(),
         src_starttime = get_value(<<"instance_start_time">>, SourceInfo),
         tgt_starttime = get_value(<<"instance_start_time">>, TargetInfo),
         session_id = couch_uuids:random(),
@@ -727,7 +727,7 @@ do_checkpoint(State) ->
         couch_log:notice("recording a checkpoint for `~s` -> `~s` at source update_seq ~p",
             [SourceName, TargetName, NewSeq]),
         StartTime = ?l2b(ReplicationStartTime),
-        EndTime = ?l2b(couch_util:rfc1123_date()),
+        EndTime = ?l2b(httpd_util:rfc1123_date()),
         NewHistoryEntry = {[
             {<<"session_id">>, SessionId},
             {<<"start_time">>, StartTime},
