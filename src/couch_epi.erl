@@ -25,6 +25,8 @@
 -export([apply/5]).
 -export([any/5, all/5]).
 
+-export([is_configured/3]).
+
 -export_type([service_id/0, app/0, key/0, handle/0, notify_cb/0]).
 
 -type app() :: atom().
@@ -156,3 +158,9 @@ any(Handle, ServiceId, Function, Args, Opts) ->
 all(Handle, ServiceId, Function, Args, Opts) ->
     Replies = apply(Handle, ServiceId, Function, Args, Opts),
     [] == [Reply || Reply <- Replies, Reply == false].
+
+-spec is_configured(
+    Handle :: handle(), Function :: atom(), Arity :: pos_integer()) -> boolean().
+
+is_configured(Handle, Function, Arity) ->
+    [] /= couch_epi_functions_gen:modules(Handle, Function, Arity).

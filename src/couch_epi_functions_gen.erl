@@ -12,7 +12,7 @@
 
 -module(couch_epi_functions_gen).
 
--export([add/3, remove/3, get_handle/1, hash/1, apply/4, apply/5]).
+-export([add/3, remove/3, get_handle/1, hash/1, apply/4, apply/5, modules/3]).
 
 -export([save/3]).
 
@@ -311,6 +311,11 @@ remove_from_definitions(Defs, Source) ->
             {[], Defs}
     end.
 
+-spec modules(Handle :: atom(), Function :: atom(), Arity :: pos_integer()) ->
+    list().
+modules(Handle, Function, Arity) ->
+    providers(Handle, Function, Arity, #opts{ignore_providers = true}).
+
 %% ------------------------------------------------------------------
 %% Tests
 %% ------------------------------------------------------------------
@@ -327,6 +332,8 @@ bar() ->
 basic_test() ->
     Module = foo_bar_dispatcher,
     add(Module, app1, [?MODULE]),
+
+    ?assertMatch([?MODULE], modules(Module, foo, 2)),
 
     ?assert(is_list(Module:version(app1))),
 
