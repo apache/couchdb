@@ -423,6 +423,8 @@ CouchDB.request = function(method, uri, options) {
   options.headers["Accept"] = options.headers["Accept"] || options.headers["accept"] || "application/json";
   var req = CouchDB.newXhr();
   uri = CouchDB.proxyUrl(uri);
+  console.log(uri);
+  console.log(JSON.stringify(options, null, 2));
   req.open(method, uri, false);
   if (options.headers) {
     var headers = options.headers;

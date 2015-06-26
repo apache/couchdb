@@ -463,3 +463,11 @@ CouchDB.prepareUserDoc = function(user_doc, new_password) {
   }
   return user_doc;
 };
+
+function get_random_db_name() {
+  return "test_suite_db_"
+   + Math.random()
+    .toString(36)
+    .replace(/[^a-z]+/g, '')
+    .substr(0, 8);
+}

@@ -11,8 +11,8 @@
 // the License.
 
 couchTests.attachment_names = function(debug) {
-  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
-  db.deleteDb();
+  var db_name = get_random_db_name();
+  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
   if (debug) debugger;
 
@@ -29,7 +29,7 @@ couchTests.attachment_names = function(debug) {
   var save_response = db.save(goodDoc);
   T(save_response.ok);
 
-  var xhr = CouchDB.request("GET", "/test_suite_db/good_doc/Колян.txt");
+  var xhr = CouchDB.request("GET", "/" + db_name + "/good_doc/Колян.txt");
   T(xhr.responseText == "This is a base64 encoded text");
   T(xhr.getResponseHeader("Content-Type") == "application/octet-stream");
   TEquals("\"aEI7pOYCRBLTRQvvqYrrJQ==\"", xhr.getResponseHeader("Etag"));
@@ -37,7 +37,7 @@ couchTests.attachment_names = function(debug) {
   var binAttDoc = {
     _id: "bin_doc",
     _attachments:{
-      "foo\x80txt": {
+      "footxt": {
         content_type:"text/plain",
         data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
       }
@@ -53,7 +53,7 @@ couchTests.attachment_names = function(debug) {
   var bin_data = "JHAPDO*AU£PN ){(3u[d 93DQ9¡€])}    ææøo'∂ƒæ≤çæππ•¥∫¶®#†π¶®¥π€ª®˙π8np";
 
 
-  var xhr = (CouchDB.request("PUT", "/test_suite_db/bin_doc3/attachment\x80txt", {
+  var xhr = (CouchDB.request("PUT", "/" + db_name + "/bin_doc3/attachmenttxt", {
     headers:{"Content-Type":"text/plain;charset=utf-8"},
     body:bin_data
   }));
@@ -64,10 +64,14 @@ couchTests.attachment_names = function(debug) {
 
   // bulk docs
   var docs = { docs: [binAttDoc] };
-
-  var xhr = CouchDB.request("POST", "/test_suite_db/_bulk_docs", {
+  console.log(JSON.stringify(docs, null, 2));
+  var xhr = CouchDB.request("POST", "/" + db_name + "/_bulk_docs", {
     body: JSON.stringify(docs)
   });
+  console.log(JSON.stringify(xhr.status, null, 2));
+  console.log(JSON.stringify(xhr.responseText, null, 2));
+  console.log(JSON.stringify(xhr.headers, null, 2));
+  
 
   TEquals(201, xhr.status, "attachment_name: bulk docs");
 
