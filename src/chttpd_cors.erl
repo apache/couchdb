@@ -217,9 +217,13 @@ maybe_apply_headers(CorsHeaders, RequestHeaders) ->
 
 
 simple_headers(Headers) ->
-    LCHeaders = [string:to_lower(H) || H <- Headers],
+    LCHeaders = [to_lower(H) || H <- Headers],
     lists:filter(fun(H) -> lists:member(H, ?SIMPLE_HEADERS) end, LCHeaders).
 
+to_lower(String) when is_binary(String) ->
+    to_lower(?b2l(String));
+to_lower(String) ->
+    string:to_lower(String).
 
 handle_headers(_Config, _Origin, []) ->
     [];
