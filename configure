@@ -86,9 +86,7 @@ Options:
     --mandir=DIR            man documentation [DATAROOTDIR/man]
     --docdir=DIR            documentation root [DATAROOTDIR/doc/apache-couchdb]
     --htmldir=DIR           html documentation [DOCDIR]
-    --dvidir=DIR            dvi documentation [DOCDIR]
     --pdfdir=DIR            pdf documentation [DOCDIR]
-    --psdir=DIR             ps documentation [DOCDIR]
 EOF
 }
 
