@@ -87,17 +87,13 @@ collation_test_() ->
 
 should_collate_fwd(Db) ->
     {ok, Results} = run_query(Db, []),
-    Expect = [{meta, [{total, 26}, {offset, 0}]}] ++ rows(),
-    %% cannot use _assertEqual since mrview converts
-    %% value 3.0 to 3 making assertion fail
-    ?_assert(Expect == Results).
+    Expect = [{meta, [{total, length(?VALUES)}, {offset, 0}]}] ++ rows(),
+    ?_assertEquiv(Expect, Results).
 
 should_collate_rev(Db) ->
     {ok, Results} = run_query(Db, [{direction, rev}]),
-    Expect = [{meta, [{total, 26}, {offset, 0}]}] ++ lists:reverse(rows()),
-    %% cannot use _assertEqual since mrview converts
-    %% value 3.0 to 3 making assertion fail
-    ?_assert(Expect == Results).
+    Expect = [{meta, [{total, length(?VALUES)}, {offset, 0}]}] ++ lists:reverse(rows()),
+    ?_assertEquiv(Expect, Results).
 
 should_collate_range(Db) ->
     ?_assertNot(
@@ -106,7 +102,7 @@ should_collate_range(Db) ->
                 {ok, Results} = run_query(Db, [{start_key, V}, {end_key, V}]),
                 Id = list_to_binary(integer_to_list(Count)),
                 Expect = [
-                    {meta, [{total, 26}, {offset, Count}]},
+                    {meta, [{total, length(?VALUES)}, {offset, Count}]},
                     {row, [{id, Id}, {key, V}, {value, 0}]}
                 ],
                 case Results == Expect of
