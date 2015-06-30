@@ -58,6 +58,23 @@
         lists:flatten(io_lib:format("~p~p~p", [A, B, C]))
     end).
 
+%% Like assertEqual, but using == instead of =:=
+-ifndef(assertEquiv).
+-define(assertEquiv(Expect, Expr),
+	((fun (__X) ->
+        case (Expr) of
+        __V when __V == __X -> ok;
+        __Y -> erlang:error({assertEquiv_failed,
+				      [{module, ?MODULE},
+				       {line, ?LINE},
+				       {expression, (??Expr)},
+				       {expected, __X},
+				       {value, __Y}]})
+	    end
+	  end)(Expect))).
+-endif.
+-define(_assertEquiv(Expect, Expr), ?_test(?assertEquiv(Expect, Expr))).
+
 %% Borrowed from https://github.com/richcarl/eunit/blob/master/include/eunit.hrl#L200-L219
 %% TODO: get rid of this once R14* is no longer supported
 -ifndef(assertNotMatch).
