@@ -58,7 +58,8 @@
 
 setup() ->
     {ok, Db1} = couch_mrview_test_util:new_db(?tempdb(), map),
-    {ok, Db2} = couch_mrview_test_util:save_docs(Db1, make_docs()),
+    Docs = [couch_mrview_test_util:ddoc(red) | make_docs()],
+    {ok, Db2} = couch_mrview_test_util:save_docs(Db1, Docs),
     Db2.
 
 teardown(Db) ->
@@ -84,7 +85,8 @@ collation_test_() ->
                     fun should_collate_with_inclusive_end_rev/1,
                     fun should_collate_without_inclusive_end_fwd/1,
                     fun should_collate_without_inclusive_end_rev/1,
-                    fun should_collate_with_endkey_docid/1
+                    fun should_collate_with_endkey_docid/1,
+                    fun should_use_collator_for_reduce_grouping/1
                 ]
             }
         }
@@ -173,6 +175,12 @@ should_collate_with_endkey_docid(Db) ->
         ?assertEqual(Expect1, Result1)
     end).
 
+should_use_collator_for_reduce_grouping(Db) ->
+    UniqueKeys = lists:usort(fun(A, B) ->
+        not couch_ejson_compare:less_json(B, A)
+    end, ?VALUES),
+    {ok, [{meta,_} | Rows]} = reduce_query(Db, [{group_level, exact}]),
+    ?_assertEqual(length(UniqueKeys), length(Rows)).
 
 make_docs() ->
     {Docs, _} = lists:foldl(fun(V, {Docs0, Count}) ->
@@ -194,3 +202,6 @@ rows() ->
 
 run_query(Db, Opts) ->
     couch_mrview:query_view(Db, <<"_design/bar">>, <<"zing">>, Opts).
+
+reduce_query(Db, Opts) ->
+    couch_mrview:query_view(Db, <<"_design/red">>, <<"zing">>, Opts).

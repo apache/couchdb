@@ -89,7 +89,7 @@ ddoc(map) ->
     ]});
 ddoc(red) ->
     couch_doc:from_json_obj({[
-        {<<"_id">>, <<"_design/bar">>},
+        {<<"_id">>, <<"_design/red">>},
         {<<"views">>, {[
             {<<"baz">>, {[
                 {<<"map">>, <<
@@ -98,6 +98,15 @@ ddoc(red) ->
                     "}\n"
                 >>},
                 {<<"reduce">>, <<"function(keys, vals) {return sum(vals);}">>}
+            ]}},
+            {<<"zing">>, {[
+                {<<"map">>, <<
+                    "function(doc) {\n"
+                    "  if(doc.foo !== undefined)\n"
+                    "    emit(doc.foo, null);\n"
+                    "}"
+                >>},
+                {<<"reduce">>, <<"_count">>}
             ]}}
         ]}}
     ]}).
