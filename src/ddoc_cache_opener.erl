@@ -117,10 +117,10 @@ match_newest(Key) ->
     end.
 
 recover_doc(DbName, DDocId) ->
-    fabric:open_doc(DbName, DDocId, [ejson_body]).
+    fabric:open_doc(DbName, DDocId, [ejson_body, ?ADMIN_CTX]).
 
 recover_doc(DbName, DDocId, Rev) ->
-    {ok, [Resp]} = fabric:open_revs(DbName, DDocId, [Rev], [ejson_body]),
+    {ok, [Resp]} = fabric:open_revs(DbName, DDocId, [Rev], [ejson_body, ?ADMIN_CTX]),
     Resp.
 
 recover_validation_funs(DbName) ->
