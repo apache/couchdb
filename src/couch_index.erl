@@ -283,7 +283,7 @@ handle_cast(ddoc_updated, State) ->
     DbName = Mod:get(db_name, IdxState),
     DDocId = Mod:get(idx_name, IdxState),
     Shutdown = couch_util:with_db(DbName, fun(Db) ->
-        case couch_db:open_doc(Db, DDocId, [ejson_body]) of
+        case couch_db:open_doc(Db, DDocId, [ejson_body, ?ADMIN_CTX]) of
             {not_found, deleted} ->
                 true;
             {ok, DDoc} ->

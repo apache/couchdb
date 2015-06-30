@@ -73,7 +73,7 @@ get_index(Module, #db{name = <<"shards/", _/binary>> = DbName}, DDoc) ->
     end;
 get_index(Module, <<"shards/", _/binary>> = DbName, DDoc) ->
     {Pid, Ref} = spawn_monitor(fun() ->
-        exit(fabric:open_doc(mem3:dbname(DbName), DDoc, [ejson_body]))
+        exit(fabric:open_doc(mem3:dbname(DbName), DDoc, [ejson_body, ?ADMIN_CTX]))
     end),
     receive {'DOWN', Ref, process, Pid, {ok, Doc}} ->
         get_index(Module, DbName, Doc, nil);
@@ -93,7 +93,7 @@ get_index(Module, DbName, DDoc, Fun) when is_binary(DbName) ->
         get_index(Module, Db, DDoc, Fun)
     end);
 get_index(Module, Db, DDoc, Fun) when is_binary(DDoc) ->
-    case couch_db:open_doc(Db, DDoc, [ejson_body]) of
+    case couch_db:open_doc(Db, DDoc, [ejson_body, ?ADMIN_CTX]) of
         {ok, Doc} -> get_index(Module, Db, Doc, Fun);
         Error -> Error
     end;
