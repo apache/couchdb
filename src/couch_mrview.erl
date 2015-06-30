@@ -440,8 +440,8 @@ red_fold(Db, {_Nth, _Lang, View}=RedView, Args, Callback, UAcc) ->
         update_seq=View#mrview.update_seq,
         args=Args
     },
-    GroupFun = group_rows_fun(Args#mrargs.group_level),
-    OptList = couch_mrview_util:key_opts(Args, [{key_group_fun, GroupFun}]),
+    Grouping = {key_group_level, Args#mrargs.group_level},
+    OptList = couch_mrview_util:key_opts(Args, [Grouping]),
     Acc2 = lists:foldl(fun(Opts, Acc0) ->
         {ok, Acc1} =
             couch_mrview_util:fold_reduce(RedView, fun red_fold/3,  Acc0, Opts),
@@ -527,18 +527,6 @@ make_meta(Args, UpdateSeq, Base) ->
     case Args#mrargs.update_seq of
         true -> {meta, Base ++ [{update_seq, UpdateSeq}]};
         _ -> {meta, Base}
-    end.
-
-
-group_rows_fun(exact) ->
-    fun({Key1,_}, {Key2,_}) -> Key1 == Key2 end;
-group_rows_fun(0) ->
-    fun(_A, _B) -> true end;
-group_rows_fun(GroupLevel) when is_integer(GroupLevel) ->
-    fun({[_|_] = Key1,_}, {[_|_] = Key2,_}) ->
-        lists:sublist(Key1, GroupLevel) == lists:sublist(Key2, GroupLevel);
-    ({Key1,_}, {Key2,_}) ->
-        Key1 == Key2
     end.
 
 

@@ -92,4 +92,4 @@ should_reduce_with_group_exact(Db) ->
 
 
 run_query(Db, Opts) ->
-    couch_mrview:query_view(Db, <<"_design/bar">>, <<"baz">>, Opts).
+    couch_mrview:query_view(Db, <<"_design/red">>, <<"baz">>, Opts).
