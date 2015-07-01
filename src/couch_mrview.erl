@@ -64,8 +64,15 @@ validate(DbName, DDoc) ->
     ValidateView = fun(Proc, #mrview{def=MapSrc, reduce_funs=Reds}=View) ->
         couch_query_servers:try_compile(Proc, map, GetName(View), MapSrc),
         lists:foreach(fun
-            ({_RedName, <<"_", _/binary>>}) ->
+            ({_RedName, <<"_sum", _/binary>>}) ->
                 ok;
+            ({_RedName, <<"_count", _/binary>>}) ->
+                ok;
+            ({_RedName, <<"_stats", _/binary>>}) ->
+                ok;
+            ({_RedName, <<"_", _/binary>> = Bad}) ->
+                Msg = ["`", Bad, "` is not a supported reduce function."],
+                throw({invalid_design_doc, Msg});
             ({RedName, RedSrc}) ->
                 couch_query_servers:try_compile(Proc, reduce, RedName, RedSrc)
         end, Reds)
