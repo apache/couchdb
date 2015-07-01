@@ -42,7 +42,7 @@ valid() ->
 
 -spec total_to_level(integer()) -> atom().
 total_to_level(Total) when Total > ?THRESHOLD ->
-    warning;
+    notice;
 total_to_level(_Total) ->
     info.
 
