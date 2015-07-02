@@ -248,7 +248,8 @@ merge_stubs(MemAtts, DiskAtts) ->
     merge_stubs(MemAtts, OnDisk, []).
 
 
--spec merge_stubs([att()], dict(), [att()]) -> [att()].
+%% restore spec when R14 support is dropped
+%% -spec merge_stubs([att()], dict:dict(), [att()]) -> [att()].
 merge_stubs([Att | Rest], OnDisk, Merged) ->
     case fetch(data, Att) of
         stub ->
