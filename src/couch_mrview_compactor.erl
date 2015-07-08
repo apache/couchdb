@@ -235,12 +235,13 @@ update_task(Acc, ChangesInc) ->
 update_task(VID, #acc{changes=Changes, total_changes=Total}=Acc, ChangesInc) ->
     Phase = if is_integer(VID) -> view; true -> ids end,
     Changes2 = Changes + ChangesInc,
+    Progress = if Total == 0 -> 0; true -> (Changes2 * 100) div Total end,
     couch_task_status:update([
         {phase, Phase},
         {view, VID},
         {changes_done, Changes2},
         {total_changes, Total},
-        {progress, (Changes2 * 100) div Total}
+        {progress, Progress}
     ]),
     Acc#acc{changes = Changes2}.
 
