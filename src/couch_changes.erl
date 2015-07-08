@@ -309,6 +309,10 @@ get_view_qs(Req) ->
 
 get_doc_ids({json_req, {Props}}) ->
     check_docids(couch_util:get_value(<<"doc_ids">>, Props));
+get_doc_ids(#httpd{method='POST', req_body=undefined}) ->
+    throw({bad_request,
+           "`_doc_ids` filter requires JSON object body with field \"doc_ids\" "
+           "containing array of ids."});
 get_doc_ids(#httpd{method='POST'}=Req) ->
     {Props} = couch_httpd:json_body_obj(Req),
     check_docids(couch_util:get_value(<<"doc_ids">>, Props));
