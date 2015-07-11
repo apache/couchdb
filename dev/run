@@ -438,7 +438,7 @@ def create_system_databases(host, port):
             conn = httpclient.HTTPConnection(host, port)
             conn.request('PUT', '/' + dbname)
             resp = conn.getresponse()
-            assert resp.status == 201, resp.read()
+            assert resp.status in (201, 202), resp.read()
 
 
 @log('Developers cluster is set up at http://127.0.0.1:{lead_port}.\n'
