@@ -322,13 +322,13 @@ get_doc_ids(_) ->
 check_docids(DocIds) when is_list(DocIds) ->
     lists:foreach(fun
         (DocId) when not is_binary(DocId) ->
-            Msg = "`doc_ids` filter parameter is not a list of binaries.",
+            Msg = "`doc_ids` filter parameter is not a list of doc ids.",
             throw({bad_request, Msg});
         (_) -> ok
     end, DocIds),
     DocIds;
 check_docids(_) ->
-    Msg = "`doc_ids` filter parameter is not a list of binaries.",
+    Msg = "`doc_ids` filter parameter is not a list of doc ids.",
     throw({bad_request, Msg}).
 
 
