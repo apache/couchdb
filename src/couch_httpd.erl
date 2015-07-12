@@ -545,7 +545,12 @@ body(#httpd{req_body=ReqBody}) ->
     ReqBody.
 
 json_body(Httpd) ->
-    ?JSON_DECODE(maybe_decompress(Httpd, body(Httpd))).
+    case body(Httpd) of
+        undefined ->
+            throw({bad_request, "Missing request body"});
+        Body ->
+            ?JSON_DECODE(maybe_decompress(Httpd, Body))
+    end.
 
 json_body_obj(Httpd) ->
     case json_body(Httpd) of
