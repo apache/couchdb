@@ -37,13 +37,13 @@
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
-childspec(Id, App, EpiKey, Module) ->
+childspec(Id, App, Key, Module) ->
     {
         Id,
         {?MODULE, start_link, [
             App,
-            EpiKey,
-            Module,
+            {epi_key, Key},
+            {modules, [Module]},
             []
         ]},
         permanent,

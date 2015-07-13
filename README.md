@@ -89,9 +89,9 @@ Any application that wants to register some functions for a service
 could add an entry in its supervision tree with something like:
 
     Spec = couch_epi_functions:childspec(
-        appname_stats, %% Id
+        appname_stats, %% child id
         appname, %% CurrentApp
-        {epi_key, my_service},
+        my_service,
         my_module %% Module
     ).
 
