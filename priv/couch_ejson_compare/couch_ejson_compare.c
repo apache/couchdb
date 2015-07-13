@@ -41,9 +41,10 @@ typedef struct {
     UCollator* coll;
 } ctx_t;
 
+static __thread UCollator* collator = NULL;
 static UCollator** collators = NULL;
-static int collStackTop = 0;
 static int numCollators = 0;
+static int numSchedulers = 0;
 static ErlNifMutex* collMutex = NULL;
 
 static ERL_NIF_TERM less_json_nif(ErlNifEnv*, int, const ERL_NIF_TERM []);
@@ -54,35 +55,34 @@ static __inline int atom_sort_order(ErlNifEnv*, ERL_NIF_TERM);
 static __inline int compare_strings(ctx_t*, ErlNifBinary, ErlNifBinary);
 static __inline int compare_lists(int, ctx_t*, ERL_NIF_TERM, ERL_NIF_TERM);
 static __inline int compare_props(int, ctx_t*, ERL_NIF_TERM, ERL_NIF_TERM);
-static __inline void reserve_coll(ctx_t*);
-static __inline void release_coll(ctx_t*);
+static __inline UCollator* get_collator();
 
 
-void
-reserve_coll(ctx_t *ctx)
+UCollator*
+get_collator()
 {
-    if (ctx->coll == NULL) {
-        enif_mutex_lock(collMutex);
-        assert(collStackTop < numCollators);
-        ctx->coll = collators[collStackTop];
-        collStackTop += 1;
-        enif_mutex_unlock(collMutex);
+    UErrorCode status = U_ZERO_ERROR;
+
+    if(collator != NULL) {
+        return collator;
     }
-}
 
+    collator = ucol_open("", &status);
 
-void
-release_coll(ctx_t *ctx)
-{
-    if (ctx->coll != NULL) {
-        enif_mutex_lock(collMutex);
-        collStackTop -= 1;
-        assert(collStackTop >= 0);
-        enif_mutex_unlock(collMutex);
+    if (U_FAILURE(status)) {
+        ucol_close(collator);
+        return NULL;
     }
+
+    enif_mutex_lock(collMutex);
+    collators[numCollators] = collator;
+    numCollators++;
+    enif_mutex_unlock(collMutex);
+
+    assert(numCollators <= numSchedulers && "Number of schedulers shrank.");
+
+    return collator;
 }
-
-
 
 ERL_NIF_TERM
 less_json_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
@@ -92,10 +92,9 @@ less_json_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 
     ctx.env = env;
     ctx.error = 0;
-    ctx.coll = NULL;
+    ctx.coll = get_collator();
 
     result = less_json(1, &ctx, argv[0], argv[1]);
-    release_coll(&ctx);
 
     /*
      * There are 2 possible failure reasons:
@@ -357,7 +356,6 @@ compare_strings(ctx_t* ctx, ErlNifBinary a, ErlNifBinary b)
     uiter_setUTF8(&iterA, (const char *) a.data, (uint32_t) a.size);
     uiter_setUTF8(&iterB, (const char *) b.data, (uint32_t) b.size);
 
-    reserve_coll(ctx);
     result = ucol_strcollIter(ctx->coll, &iterA, &iterB, &status);
 
     if (U_FAILURE(status)) {
@@ -375,14 +373,11 @@ compare_strings(ctx_t* ctx, ErlNifBinary a, ErlNifBinary b)
 int
 on_load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
 {
-    UErrorCode status = U_ZERO_ERROR;
-    int i, j;
-
-    if (!enif_get_int(env, info, &numCollators)) {
+    if (!enif_get_int(env, info, &numSchedulers)) {
         return 1;
     }
 
-    if (numCollators < 1) {
+    if (numSchedulers < 1) {
         return 2;
     }
 
@@ -392,26 +387,11 @@ on_load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
         return 3;
     }
 
-    collators = enif_alloc(sizeof(UCollator*) * numCollators);
+    collators = enif_alloc(sizeof(UCollator*) * numSchedulers);
 
     if (collators == NULL) {
         enif_mutex_destroy(collMutex);
         return 4;
-    }
-
-    for (i = 0; i < numCollators; i++) {
-        collators[i] = ucol_open("", &status);
-
-        if (U_FAILURE(status)) {
-            for (j = 0; j < i; j++) {
-                ucol_close(collators[j]);
-            }
-
-            enif_free(collators);
-            enif_mutex_destroy(collMutex);
-
-            return 5;
-        }
     }
 
     ATOM_TRUE = enif_make_atom(env, "true");
