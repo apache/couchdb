@@ -302,7 +302,7 @@ maybe_close_lru_db(#server{lru=Lru}=Server) ->
 
 open_async(Server, From, DbName, Filepath, Options) ->
     Parent = self(),
-    put({async_open, DbName}, os:timestamp()),
+    T0 = os:timestamp(),
     Opener = spawn_link(fun() ->
         Res = couch_db:start_link(DbName, Filepath, Options),
         case {Res, lists:member(create, Options)} of
@@ -311,7 +311,7 @@ open_async(Server, From, DbName, Filepath, Options) ->
             _ ->
                 ok
         end,
-        gen_server:call(Parent, {open_result, DbName, Res}, infinity),
+        gen_server:call(Parent, {open_result, T0, DbName, Res}, infinity),
         unlink(Parent)
     end),
     ReqType = case lists:member(create, Options) of
@@ -345,13 +345,11 @@ handle_call({set_max_dbs_open, Max}, _From, Server) ->
     {reply, ok, Server#server{max_dbs_open=Max}};
 handle_call(get_server, _From, Server) ->
     {reply, {ok, Server}, Server};
-handle_call({open_result, DbName, {ok, Db}}, {FromPid, _Tag}, Server) ->
+handle_call({open_result, T0, DbName, {ok, Db}}, {FromPid, _Tag}, Server) ->
     link(Db#db.main_pid),
     true = ets:delete(couch_dbs_pid_to_name, FromPid),
-    case erase({async_open, DbName}) of undefined -> ok; T0 ->
-        OpenTime = timer:now_diff(os:timestamp(), T0) / 1000,
-        couch_stats:update_histogram([couchdb, db_open_time], OpenTime)
-    end,
+    OpenTime = timer:now_diff(os:timestamp(), T0) / 1000,
+    couch_stats:update_histogram([couchdb, db_open_time], OpenTime),
     % icky hack of field values - compactor_pid used to store clients
     % and fd used to possibly store a creation request
     [#db{fd=ReqType, compactor_pid=Froms}] = ets:lookup(couch_dbs, DbName),
@@ -372,9 +370,9 @@ handle_call({open_result, DbName, {ok, Db}}, {FromPid, _Tag}, Server) ->
             Server#server.lru
     end,
     {reply, ok, Server#server{lru = Lru}};
-handle_call({open_result, DbName, {error, eexist}}, From, Server) ->
-    handle_call({open_result, DbName, file_exists}, From, Server);
-handle_call({open_result, DbName, Error}, {FromPid, _Tag}, Server) ->
+handle_call({open_result, T0, DbName, {error, eexist}}, From, Server) ->
+    handle_call({open_result, T0, DbName, file_exists}, From, Server);
+handle_call({open_result, _T0, DbName, Error}, {FromPid, _Tag}, Server) ->
     % icky hack of field values - compactor_pid used to store clients
     [#db{fd=ReqType, compactor_pid=Froms}=Db] = ets:lookup(couch_dbs, DbName),
     [gen_server:reply(From, Error) || From <- Froms],
