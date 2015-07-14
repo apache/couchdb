@@ -23,12 +23,14 @@
 -export([by_source/1, by_source/2]).
 -export([keys/1, subscribers/1]).
 
+-export([save/3]).
+
 set(Handle, Source, Data) ->
     case is_updated(Handle, Source, Data) of
         false ->
             ok;
         true ->
-            save(Handle, Source, Data)
+            couch_epi_module_keeper:save(Handle, Source, Data)
     end.
 
 get(Handle) ->

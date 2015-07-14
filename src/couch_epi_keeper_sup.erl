@@ -10,20 +10,26 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(couch_epi_sup).
+-module(couch_epi_keeper_sup).
 
 -behaviour(supervisor).
 
-%% API
+%% ------------------------------------------------------------------
+%% API Function Exports
+%% ------------------------------------------------------------------
+
 -export([start_link/0]).
 
-%% Supervisor callbacks
+-export([start_child/2, terminate_child/1]).
+
+%% ------------------------------------------------------------------
+%% supervisor Function Exports
+%% ------------------------------------------------------------------
+
 -export([init/1]).
 
 %% Helper macro for declaring children of supervisor
 -define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 5000, Type, [I]}).
--define(SUP(I, A),
-        {I, {I, start_link, A}, permanent, infinity, supervisor, [I]}).
 
 %% ===================================================================
 %% API functions
@@ -32,13 +38,21 @@
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
+start_child(Codegen, Module) ->
+    supervisor:start_child(?MODULE, [Codegen, Module]).
+
+terminate_child(undefined) -> ok;
+terminate_child(Child) when is_atom(Child) ->
+    terminate_child(whereis(Child));
+terminate_child(ChildPid) ->
+    supervisor:terminate_child(?MODULE, ChildPid).
+
 %% ===================================================================
 %% Supervisor callbacks
 %% ===================================================================
 
 init([]) ->
     Children = [
-        ?CHILD(couch_epi_server, worker),
-        ?SUP(couch_epi_keeper_sup, [])
+        ?CHILD(couch_epi_module_keeper, worker)
     ],
-    {ok, { {one_for_one, 5, 10}, Children} }.
+    {ok, { {simple_one_for_one, 5, 10}, Children} }.

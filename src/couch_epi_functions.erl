@@ -53,6 +53,7 @@ childspec(Id, App, Key, Module) ->
     }.
 
 start_link(ProviderApp, {epi_key, ServiceId}, {modules, Modules}, Options) ->
+    maybe_start_keeper(ServiceId),
     gen_server:start_link(
         ?MODULE, [ProviderApp, ServiceId, Modules, Options], []).
 
@@ -148,3 +149,7 @@ safe_remove(#state{} = State) ->
     catch Class:Reason ->
         {{Class, Reason}, State}
     end.
+
+maybe_start_keeper(ServiceId) ->
+    Handle = couch_epi_functions_gen:get_handle(ServiceId),
+    couch_epi_module_keeper:maybe_start_keeper(couch_epi_functions_gen, Handle).

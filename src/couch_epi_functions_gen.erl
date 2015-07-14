@@ -14,6 +14,8 @@
 
 -export([add/3, remove/3, get_handle/1, hash/1, apply/4, apply/5]).
 
+-export([save/3]).
+
 -ifdef(TEST).
 
 -export([foo/2, bar/0]).
@@ -32,7 +34,7 @@ add(Handle, Source, Modules) ->
         false ->
             ok;
         true ->
-            save(Handle, Source, Modules)
+            couch_epi_module_keeper:save(Handle, Source, Modules)
     end.
 
 remove(Handle, Source, Modules) ->

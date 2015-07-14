@@ -53,6 +53,7 @@ childspec(Id, App, EpiKey, Module) ->
     }.
 
 start_link(SubscriberApp, {epi_key, Key}, Module, Options) ->
+    maybe_start_keeper(Key),
     gen_server:start_link(?MODULE, [SubscriberApp, Module, Key, Options], []).
 
 reload(Server) ->
@@ -149,3 +150,7 @@ current(Handle, Subscriber) ->
     catch error:undef ->
         []
     end.
+
+maybe_start_keeper(Key) ->
+    Handle = couch_epi_data_gen:get_handle(Key),
+    couch_epi_module_keeper:maybe_start_keeper(couch_epi_data_gen, Handle).
