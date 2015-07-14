@@ -289,6 +289,8 @@ convert_options([{<<"query_params">>, V} | R]) ->
     [{query_params, V} | convert_options(R)];
 convert_options([{<<"doc_ids">>, null} | R]) ->
     convert_options(R);
+convert_options([{<<"doc_ids">>, V} | _R]) when not is_list(V) ->
+    throw({bad_request, <<"parameter `doc_ids` must be an array">>});
 convert_options([{<<"doc_ids">>, V} | R]) ->
     % Ensure same behaviour as old replicator: accept a list of percent
     % encoded doc IDs.
