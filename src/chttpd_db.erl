@@ -40,8 +40,7 @@
     orelse T == <<"_design_docs">>)).
 
 % Database request handlers
-handle_request(#httpd{path_parts=[DbName|RestParts],method=Method,
-        db_url_handlers=DbUrlHandlers}=Req)->
+handle_request(#httpd{path_parts=[DbName|RestParts],method=Method}=Req)->
     case {Method, RestParts} of
     {'PUT', []} ->
         create_db_req(Req, DbName);
@@ -57,7 +56,7 @@ handle_request(#httpd{path_parts=[DbName|RestParts],method=Method,
     {_, []} ->
         do_db_req(Req, fun db_req/2);
     {_, [SecondPart|_]} ->
-        Handler = couch_util:get_value(SecondPart, DbUrlHandlers, fun db_req/2),
+        Handler = chttpd_handlers:db_handler(SecondPart, fun db_req/2),
         do_db_req(Req, Handler)
     end.
 
@@ -201,14 +200,12 @@ handle_view_cleanup_req(Req, Db) ->
     send_json(Req, 202, {[{ok, true}]}).
 
 handle_design_req(#httpd{
-        path_parts=[_DbName, _Design, Name, <<"_",_/binary>> = Action | _Rest],
-        design_url_handlers = DesignUrlHandlers
+        path_parts=[_DbName, _Design, Name, <<"_",_/binary>> = Action | _Rest]
     }=Req, Db) ->
     DbName = mem3:dbname(Db#db.name),
     case ddoc_cache:open(DbName, <<"_design/", Name/binary>>) of
     {ok, DDoc} ->
-        Handler = couch_util:get_value(Action, DesignUrlHandlers,
-            fun bad_action_req/3),
+        Handler = chttpd_handlers:design_handler(Action, fun bad_action_req/3),
         Handler(Req, Db, DDoc);
     Error ->
         throw(Error)
