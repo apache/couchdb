@@ -10,17 +10,15 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(mango_sup).
--behaviour(supervisor).
--export([init/1]).
+-module(mango_httpd_handlers).
 
--export([start_link/1]).
+-export([url_handler/1, db_handler/1, design_handler/1]).
 
+url_handler(_) -> no_match.
 
-start_link(Args) ->
-    supervisor:start_link({local,?MODULE}, ?MODULE, Args).
+db_handler(<<"_index">>)        -> fun mango_httpd:handle_req/2;
+db_handler(<<"_explain">>)      -> fun mango_httpd:handle_req/2;
+db_handler(<<"_find">>)         -> fun mango_httpd:handle_req/2;
+db_handler(_) -> no_match.
 
-init([]) ->
-    {ok, {{one_for_one, 3, 10}, [
-        chttpd_handlers:provider(mango, mango_httpd_handlers)
-    ]}}.
+design_handler(_) -> no_match.

@@ -17,6 +17,7 @@
     {applications, [
         kernel,
         stdlib,
+        couch_epi,
         config,
         couch_log,
         fabric
