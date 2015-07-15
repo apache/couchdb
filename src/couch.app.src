@@ -46,6 +46,7 @@
         couch_log,
         couch_event,
         ioq,
+        couch_epi,
         couch_stats
     ]}
 ]}.
