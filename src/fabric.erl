@@ -315,6 +315,14 @@ query_view(Db, GroupId, ViewName, Callback, Acc0, QueryArgs)
     query_view(DbName, DDoc, ViewName, Callback, Acc0, QueryArgs);
 query_view(DbName, DDoc, ViewName, Callback, Acc0, QueryArgs0) ->
     Db = dbname(DbName), View = name(ViewName),
+    case fabric_util:is_users_db(Db) of
+    true ->
+        Req = Acc0#vacc.req,
+        FakeDb = fabric_util:fake_db([{user_ctx, Req#httpd.user_ctx}]),
+        couch_users_db:after_doc_read(DDoc, FakeDb);
+    false ->
+        ok
+    end,
     {ok, #mrst{views=Views, language=Lang}} =
         couch_mrview_util:ddoc_to_mrst(Db, DDoc),
     QueryArgs1 = couch_mrview_util:set_view_type(QueryArgs0, View, Views),
