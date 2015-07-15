@@ -43,6 +43,7 @@
         sasl,
         crypto,
         mochiweb,
+        couch_epi,
         couch,
         rexi,
         couch_log,
