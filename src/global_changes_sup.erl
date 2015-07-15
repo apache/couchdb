@@ -34,5 +34,7 @@ init([]) ->
                 5000,
                 worker,
                 [global_changes_server]
-            }
+            },
+            chttpd_handlers:provider(
+                global_changes, global_changes_httpd_handlers)
     ]}}.
