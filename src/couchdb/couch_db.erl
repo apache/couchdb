@@ -517,7 +517,8 @@ prep_and_validate_update(Db, #doc{id=Id,revs={RevStart, Revs}}=Doc,
 
 prep_and_validate_updates(_Db, [], [], _AllowConflict, AccPrepped,
         AccFatalErrors) ->
-   {AccPrepped, AccFatalErrors};
+   AccPrepped2 = lists:reverse(lists:map(fun lists:reverse/1, AccPrepped)),
+   {AccPrepped2, AccFatalErrors};
 prep_and_validate_updates(Db, [DocBucket|RestBuckets], [not_found|RestLookups],
         AllowConflict, AccPrepped, AccErrors) ->
     {PreppedBucket, AccErrors3} = lists:foldl(
@@ -543,7 +544,7 @@ prep_and_validate_updates(Db, [DocBucket|RestBuckets], [not_found|RestLookups],
         {[], AccErrors}, DocBucket),
 
     prep_and_validate_updates(Db, RestBuckets, RestLookups, AllowConflict,
-            [lists:reverse(PreppedBucket) | AccPrepped], AccErrors3);
+            [PreppedBucket | AccPrepped], AccErrors3);
 prep_and_validate_updates(Db, [DocBucket|RestBuckets],
         [{ok, #full_doc_info{rev_tree=OldRevTree}=OldFullDocInfo}|RestLookups],
         AllowConflict, AccPrepped, AccErrors) ->
@@ -579,7 +580,8 @@ update_docs(Db, Docs, Options) ->
 prep_and_validate_replicated_updates(_Db, [], [], AccPrepped, AccErrors) ->
     Errors2 = [{{Id, {Pos, Rev}}, Error} ||
             {#doc{id=Id,revs={Pos,[Rev|_]}}, Error} <- AccErrors],
-    {lists:reverse(AccPrepped), lists:reverse(Errors2)};
+    AccPrepped2 = lists:reverse(lists:map(fun lists:reverse/1, AccPrepped)),
+    {AccPrepped2, lists:reverse(Errors2)};
 prep_and_validate_replicated_updates(Db, [Bucket|RestBuckets], [OldInfo|RestOldInfo], AccPrepped, AccErrors) ->
     case OldInfo of
     not_found ->
