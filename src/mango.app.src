@@ -20,5 +20,6 @@
         config,
         couch_log,
         fabric
-    ]}
+    ]},
+    {mod, {mango_app, []}}
 ]}.
