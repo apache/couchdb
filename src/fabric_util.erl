@@ -18,6 +18,7 @@
 -export([request_timeout/0, attachments_timeout/0, all_docs_timeout/0]).
 -export([stream_start/2, stream_start/4]).
 -export([log_timeout/2, remove_done_workers/2]).
+-export([is_users_db/1, is_replicator_db/1, fake_db/1]).
 
 -compile({inline, [{doc_id_and_rev,1}]}).
 
@@ -280,6 +281,22 @@ remove_ancestors_test() ->
         [kv(Bar1,2)],
         remove_ancestors([kv(Bar2,1), kv(Bar1,1)], [])
     ).
+
+is_replicator_db(DbName) ->
+    ConfigName = list_to_binary(config:get("replicator", "db", "_replicator")),
+    DbName == ConfigName orelse path_ends_with(DbName, <<"_replicator">>).
+
+is_users_db(DbName) ->
+    ConfigName = list_to_binary(config:get(
+        "chttpd_auth", "authentication_db", "_users")),
+    DbName == ConfigName orelse path_ends_with(DbName, <<"_users">>).
+
+path_ends_with(Path, Suffix) ->
+    Suffix == couch_db:normalize_dbname(Path).
+
+fake_db(Opts) ->
+    UserCtx = couch_util:get_value(user_ctx, Opts, #user_ctx{}),
+    #db{user_ctx = UserCtx}.
 
 %% test function
 kv(Item, Count) ->

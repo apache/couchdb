@@ -99,8 +99,8 @@ handle_message({bad_request, Msg}, _, _) ->
     throw({bad_request, Msg}).
 
 before_doc_update(DbName, Docs, Opts) ->
-    Db = fake_db(Opts),
-    case {is_replicator_db(DbName), is_users_db(DbName)} of
+    Db = fabric_util:fake_db(Opts),
+    case {fabric_util:is_replicator_db(DbName), fabric_util:is_users_db(DbName)} of
         {true, _} ->
             [couch_replicator_manager:before_doc_update(Doc, Db) || Doc <- Docs];
         {_, true} ->
@@ -108,22 +108,6 @@ before_doc_update(DbName, Docs, Opts) ->
         _ ->
             Docs
     end.
-
-is_replicator_db(DbName) ->
-    ConfigName = list_to_binary(config:get("replicator", "db", "_replicator")),
-    DbName == ConfigName orelse path_ends_with(DbName, <<"_replicator">>).
-
-is_users_db(DbName) ->
-    ConfigName = list_to_binary(config:get(
-        "chttpd_auth", "authentication_db", "_users")),
-    DbName == ConfigName orelse path_ends_with(DbName, <<"_users">>).
-
-path_ends_with(Path, Suffix) ->
-    Suffix == couch_db:normalize_dbname(Path).
-
-fake_db(Opts) ->
-    UserCtx = couch_util:get_value(user_ctx, Opts, #user_ctx{}),
-    #db{user_ctx = UserCtx}.
 
 tag_docs([]) ->
     [];
