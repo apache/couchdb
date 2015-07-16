@@ -2,7 +2,7 @@
 
 -module(custodian_server).
 -behaviour(gen_server).
--vsn(1).
+-vsn(2).
 -behaviour(config_listener).
 
 % public api.
@@ -19,7 +19,7 @@
 ]).
 
 % config_listener callback
--export([handle_config_change/5]).
+-export([handle_config_change/5, handle_config_terminate/3]).
 
 % private records.
 -record(state, {
@@ -35,11 +35,18 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-handle_config_change("cloudant", "maintenance_mode", _, _, S) ->
+handle_config_change("couchdb", "maintenance_mode", _, _, S) ->
     ok = gen_server:cast(S, refresh),
     {ok, S};
 handle_config_change(_, _, _, _, S) ->
     {ok, S}.
+
+handle_config_terminate(_, _, _) -> ok;
+handle_config_terminate(Self, _, _) ->
+    spawn(fun() ->
+        timer:sleep(5000),
+        config:listen_for_changes(?MODULE, Self)
+    end).
 
 % gen_server functions.
 init(_) ->
@@ -57,14 +64,6 @@ handle_call(_Msg, _From, State) ->
 handle_cast(refresh, State) ->
     {noreply, start_shard_checker(State)}.
 
-handle_info({gen_event_EXIT, {config_listener, ?MODULE}, _Reason}, State) ->
-    erlang:send_after(5000, self(), restart_config_listener),
-    {noreply, State};
-
-handle_info(restart_config_listener, State) ->
-    ok = config:listen_for_changes(?MODULE, self()),
-    {noreply, State};
-
 handle_info({nodeup, _}, State) ->
     {noreply, start_shard_checker(State)};
 
@@ -81,12 +80,12 @@ handle_info({'EXIT', Pid, normal}, #state{shard_checker=Pid}=State) ->
     end;
 
 handle_info({'EXIT', Pid, Reason}, #state{shard_checker=Pid}=State) ->
-    twig:log(notice, "custodian shard checker died ~p", [Reason]),
+    couch_log:notice("custodian shard checker died ~p", [Reason]),
     NewState = State#state{shard_checker=undefined},
     {noreply, start_shard_checker(NewState)};
 
 handle_info({'EXIT', Pid, Reason}, #state{event_listener=Pid}=State) ->
-    twig:log(notice, "custodian update notifier died ~p", [Reason]),
+    couch_log:notice("custodian update notifier died ~p", [Reason]),
     {ok, Pid1} = start_event_listener(),
     {noreply, State#state{event_listener=Pid1}}.
 
@@ -132,10 +131,10 @@ send_sensu_event({_, Count} = Item) ->
         0 ->
             "--ok";
         1 ->
-            twig:log(crit, "~s", [describe(Item)]),
+            couch_log:critical("~s", [describe(Item)]),
             "--critical";
         _ ->
-            twig:log(warn, "~s", [describe(Item)]),
+            couch_log:warning("~s", [describe(Item)]),
             "--warning"
     end,
     Cmd = lists:concat([
