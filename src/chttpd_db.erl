@@ -789,7 +789,7 @@ send_doc_efficiently(Req, #doc{atts=Atts}=Doc, Headers, Options) ->
                     [attachments, follows, att_encoding_info | Options])),
             {ContentType, Len} = couch_doc:len_doc_to_multi_part_stream(
                     Boundary,JsonBytes, Atts, true),
-            CType = {<<"Content-Type">>, ContentType},
+            CType = {"Content-Type", ContentType},
             {ok, Resp} = start_response_length(Req, 200, [CType|Headers], Len),
             couch_doc:doc_to_multi_part_stream(Boundary,JsonBytes,Atts,
                     fun(Data) -> couch_httpd:send(Resp, Data) end, true)
@@ -1077,7 +1077,7 @@ db_attachment_req(#httpd{method='GET',mochi_req=MochiReq}=Req, Db, DocId, FileNa
                     Ranges = parse_ranges(MochiReq:get(range), Len),
                     case {Enc, Ranges} of
                         {identity, [{From, To}]} ->
-                            Headers1 = [{<<"Content-Range">>, make_content_range(From, To, Len)}]
+                            Headers1 = [{"Content-Range", make_content_range(From, To, Len)}]
                                 ++ Headers,
                             {ok, Resp} = start_response_length(Req, 206, Headers1, To - From + 1),
                             couch_att:range_foldl(Att, From, To + 1,
