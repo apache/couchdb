@@ -5,6 +5,9 @@ ebin/
 priv/couch_js/config.h
 priv/couchjs
 priv/couchspawnkillable
+priv/*.exp
+priv/*.lib
+vc120.pdb
 
 .rebar/
 .eunit
