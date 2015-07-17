@@ -222,7 +222,7 @@ handle_cast(Msg, #db{name = Name} = Db) ->
 
 handle_info({update_docs, Client, GroupedDocs, NonRepDocs, MergeConflicts,
         FullCommit}, Db) ->
-    GroupedDocs2 = [[{Client, D} || D <- DocGroup] || DocGroup <- GroupedDocs],
+    GroupedDocs2 = sort_and_tag_groups(Client, GroupedDocs),
     if NonRepDocs == [] ->
         {GroupedDocs3, Clients, FullCommit2} = collect_updates(GroupedDocs2,
                 [Client], MergeConflicts, FullCommit);
@@ -291,8 +291,7 @@ collect_updates(GroupedDocsAcc, ClientsAcc, MergeConflicts, FullCommit) ->
         % updaters than deal with their possible conflicts, and local docs
         % writes are relatively rare. Can be optmized later if really needed.
         {update_docs, Client, GroupedDocs, [], MergeConflicts, FullCommit2} ->
-            GroupedDocs2 = [[{Client, Doc} || Doc <- DocGroup]
-                    || DocGroup <- GroupedDocs],
+            GroupedDocs2 = sort_and_tag_groups(Client, GroupedDocs),
             GroupedDocsAcc2 =
                 merge_updates(GroupedDocsAcc, GroupedDocs2, []),
             collect_updates(GroupedDocsAcc2, [Client | ClientsAcc],
@@ -301,6 +300,15 @@ collect_updates(GroupedDocsAcc, ClientsAcc, MergeConflicts, FullCommit) ->
         {GroupedDocsAcc, ClientsAcc, FullCommit}
     end.
 
+
+sort_and_tag_groups(Client, GroupedDocs) ->
+    % These groups should already be sorted but sometimes clients misbehave.
+    % The merge_updates function will fail and the database can end up with
+    % duplicate documents if the incoming groups are not sorted, so as a sanity
+    % check we sort them again here. See COUCHDB-2735.
+    Cmp = fun([{#doc{id=A}, _}|_], [{#doc{id=B}, _}|_]) -> A < B end,
+    SortedGroups = lists:sort(Cmp, GroupedDocs),
+    [[{Client, D} || D <- DocGroup] || DocGroup <- SortedGroups].
 
 btree_by_seq_split(#doc_info{id=Id, high_seq=KeySeq, revs=Revs}) ->
     {RevInfos, DeletedRevInfos} = lists:foldl(
