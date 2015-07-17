@@ -30,6 +30,7 @@
 -export([send_json/2,send_json/3,send_json/4,last_chunk/1,parse_multipart_request/3]).
 -export([accepted_encodings/1,handle_request_int/5,validate_referer/1,validate_ctype/2]).
 -export([http_1_0_keep_alive/2]).
+-export([validate_host/1]).
 
 start_link() ->
     start_link(http).
@@ -293,6 +294,7 @@ handle_request_int(MochiReq, DefaultFun,
 
     {ok, Resp} =
     try
+        validate_host(HttpReq),
         check_request_uri_length(RawUri),
         case couch_httpd_cors:is_preflight_request(HttpReq) of
         #httpd{} ->
@@ -356,6 +358,38 @@ handle_request_int(MochiReq, DefaultFun,
     couch_stats:update_histogram([couchdb, request_time], RequestTime),
     couch_stats:increment_counter([couchdb, httpd, requests]),
     {ok, Resp}.
+
+validate_host(#httpd{} = Req) ->
+    case config:get_boolean("httpd", "validate_host", true) of
+        true ->
+            Host = hostname(Req),
+            ValidHosts = valid_hosts(),
+            case lists:member(Host, ValidHosts) of
+                true ->
+                    ok;
+                false ->
+                    throw({bad_request, <<"Invalid host header">>})
+            end;
+        false ->
+            ok
+    end.
+
+hostname(#httpd{} = Req) ->
+    case header_value(Req, "Host") of
+        undefined ->
+            undefined;
+        Host ->
+            [Name | _] = re:split(Host, ":[0-9]+$", [{parts, 2}, {return, list}]),
+            Name
+    end.
+
+valid_hosts() ->
+    case config:get("httpd", "valid_hosts") of
+        undefined ->
+            ["localhost", "127.0.0.1", "[::1]", net_adm:localhost()];
+        List ->
+            re:split(List, ",", [{return, list}])
+    end.
 
 check_request_uri_length(Uri) ->
     check_request_uri_length(Uri, config:get("httpd", "max_uri_length")).
