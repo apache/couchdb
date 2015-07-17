@@ -203,6 +203,7 @@ handle_request(MochiReq0) ->
 
     Result =
     try
+        couch_httpd:validate_host(HttpReq),
         check_request_uri_length(RawUri),
         case chttpd_cors:maybe_handle_preflight_request(HttpReq) of
         not_preflight ->
