@@ -276,7 +276,7 @@ handle_cast(Msg, #db{name = Name} = Db) ->
 
 handle_info({update_docs, Client, GroupedDocs, NonRepDocs, MergeConflicts,
         FullCommit}, Db) ->
-    GroupedDocs2 = maybe_tag_grouped_docs(Client, GroupedDocs),
+    GroupedDocs2 = sort_and_tag_grouped_docs(Client, GroupedDocs),
     if NonRepDocs == [] ->
         {GroupedDocs3, Clients, FullCommit2} = collect_updates(GroupedDocs2,
                 [Client], MergeConflicts, FullCommit);
@@ -338,10 +338,15 @@ handle_info({'DOWN', Ref, _, _, Reason}, #db{fd_monitor=Ref, name=Name} = Db) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-maybe_tag_grouped_docs(Client, GroupedDocs) ->
+sort_and_tag_grouped_docs(Client, GroupedDocs) ->
+    % These groups should already be sorted but sometimes clients misbehave.
+    % The merge_updates function will fail and the database can end up with
+    % duplicate documents if the incoming groups are not sorted, so as a sanity
+    % check we sort them again here. See COUCHDB-2735.
+    Cmp = fun([#doc{id=A}|_], [#doc{id=B}|_]) -> A < B end,
     lists:map(fun(DocGroup) ->
         [{Client, maybe_tag_doc(D)} || D <- DocGroup]
-    end, GroupedDocs).
+    end, lists:sort(Cmp, GroupedDocs)).
 
 maybe_tag_doc(#doc{id=Id, revs={Pos,[_Rev|PrevRevs]}, meta=Meta0}=Doc) ->
     case lists:keymember(ref, 1, Meta0) of
@@ -370,7 +375,7 @@ collect_updates(GroupedDocsAcc, ClientsAcc, MergeConflicts, FullCommit) ->
         % updaters than deal with their possible conflicts, and local docs
         % writes are relatively rare. Can be optmized later if really needed.
         {update_docs, Client, GroupedDocs, [], MergeConflicts, FullCommit2} ->
-            GroupedDocs2 = maybe_tag_grouped_docs(Client, GroupedDocs),
+            GroupedDocs2 = sort_and_tag_grouped_docs(Client, GroupedDocs),
             GroupedDocsAcc2 =
                 merge_updates(GroupedDocsAcc, GroupedDocs2),
             collect_updates(GroupedDocsAcc2, [Client | ClientsAcc],
