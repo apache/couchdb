@@ -415,7 +415,7 @@ esac
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking Erlang version compatibility" >&5
 $as_echo_n "checking Erlang version compatibility... " >&6; }
-erlang_version_error="The installed Erlang version must be >= R14B (erts-5.8.1) and =< 17 (erts-6.0)"
+erlang_version_error="The installed Erlang version must be >= R14B (erts-5.8.1) and =< 18 (erts-7.0)"
 
 version="`${ERL} -version 2>&1 | ${SED} 's/[[^0-9]]/ /g'` 0 0 0"
 major_version=`echo $version | ${AWK} "{print \\$1}"`
@@ -423,7 +423,7 @@ minor_version=`echo $version | ${AWK} "{print \\$2}"`
 patch_version=`echo $version | ${AWK} "{print \\$3}"`
 echo -n "detected Erlang version: $major_version.$minor_version.$patch_version..."
 
-if test $major_version -lt 5 -o $major_version -gt 6; then
+if test $major_version -lt 5 -o $major_version -gt 7; then
     as_fn_error $? "$erlang_version_error major_version does not match" "$LINENO" 5
 fi
 
@@ -442,9 +442,9 @@ otp_release="`\
 AC_SUBST(otp_release)
 
 AM_CONDITIONAL([USE_OTP_NIFS],
-    [can_use_nifs=$(echo $otp_release | grep -E "^(R14B|R15|R16|17)")])
+    [can_use_nifs=$(echo $otp_release | grep -E "^(R14B|R15|R16|17|18)")])
 AM_CONDITIONAL([USE_EJSON_COMPARE_NIF],
-    [can_use_ejson=$(echo $otp_release | grep -E "^(R14B03|R15|R16|17)")])
+    [can_use_ejson=$(echo $otp_release | grep -E "^(R14B03|R15|R16|17|18)")])
 
 has_crypto=`\
     ${ERL} -eval "\
