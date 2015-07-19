@@ -31,6 +31,12 @@
      !enif_is_tuple(env, t))
 #endif
 
+#ifdef _MSC_VER
+#define threadlocal __declspec(thread)
+#else
+#define threadlocal __thread
+#endif
+
 static ERL_NIF_TERM ATOM_TRUE;
 static ERL_NIF_TERM ATOM_FALSE;
 static ERL_NIF_TERM ATOM_NULL;
@@ -41,7 +47,7 @@ typedef struct {
     UCollator* coll;
 } ctx_t;
 
-static __thread UCollator* collator = NULL;
+static threadlocal UCollator* collator = NULL;
 static UCollator** collators = NULL;
 static int numCollators = 0;
 static int numSchedulers = 0;
