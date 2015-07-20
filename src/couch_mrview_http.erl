@@ -343,8 +343,7 @@ view_cb({meta, Meta}, #vacc{resp=Resp}=Acc) ->
         undefined -> [];
         UpdateSeq -> [io_lib:format("\"update_seq\":~p", [UpdateSeq])]
     end ++ ["\"rows\":["],
-    Prepend = prepend_val(Acc),
-    Chunk = lists:flatten(Prepend ++ "{" ++ string:join(Parts, ",") ++ "\r\n"),
+    Chunk = [prepend_val(Acc), "{", string:join(Parts, ","), "\r\n"],
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp, Chunk),
     {ok, Acc#vacc{resp=Resp1, prepend=""}};
 view_cb({row, Row}, Acc) ->
