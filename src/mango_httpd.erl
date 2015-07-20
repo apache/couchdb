@@ -22,6 +22,11 @@
 -include("mango.hrl").
 -include("mango_idx.hrl").
 
+-record(vacc, {
+    resp,
+    prepend,
+    kvs
+}).
 
 handle_req(#httpd{} = Req, Db0) ->
     try
@@ -163,8 +168,8 @@ handle_find_req(#httpd{method='POST'}=Req, Db) ->
     {ok, Opts0} = mango_opts:validate_find(chttpd:json_body_obj(Req)),
     {value, {selector, Sel}, Opts} = lists:keytake(selector, 1, Opts0),
     {ok, Resp0} = start_find_resp(Req),
-    {ok, {Resp1, _, KVs}} = run_find(Resp0, Db, Sel, Opts),
-    end_find_resp(Resp1, KVs);
+    {ok, AccOut} = run_find(Resp0, Db, Sel, Opts),
+    end_find_resp(AccOut);
 
 handle_find_req(Req, _Db) ->
     chttpd:send_method_not_allowed(Req, "POST").
@@ -213,7 +218,8 @@ start_find_resp(Req) ->
     chttpd:start_delayed_json_response(Req, 200, [], "{\"docs\":[").
 
 
-end_find_resp(Resp0, KVs) ->
+end_find_resp(Acc) ->
+    #vacc{resp=Resp0, kvs=KVs} = Acc,
     FinalAcc = lists:foldl(fun({K, V}, Acc) ->
         JK = ?JSON_ENCODE(K),
         JV = ?JSON_ENCODE(V),
@@ -225,13 +231,20 @@ end_find_resp(Resp0, KVs) ->
 
 
 run_find(Resp, Db, Sel, Opts) ->
-    mango_crud:find(Db, Sel, fun handle_doc/2, {Resp, "\r\n", []}, Opts).
+    Acc0 = #vacc{
+        resp = Resp,
+        prepend = "\r\n",
+        kvs = []
+    },
+    mango_crud:find(Db, Sel, fun handle_doc/2, Acc0, Opts).
 
 
-handle_doc({add_key, Key, Value}, {Resp, Prepend, KVs}) ->
+handle_doc({add_key, Key, Value}, Acc0) ->
+    #vacc{resp=Resp, prepend=Prepend, kvs=KVs} = Acc0,
     NewKVs = lists:keystore(Key, 1, KVs, {Key, Value}),
     {ok, {Resp, Prepend, NewKVs}};
-handle_doc({row, Doc}, {Resp0, Prepend, KVs}) ->
+handle_doc({row, Doc}, Acc0) ->
+    #vacc{resp=Resp0, prepend=Prepend, kvs=KVs} = Acc0,
     Chunk = [Prepend, ?JSON_ENCODE(Doc)],
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, Chunk),
     {ok, {Resp1, ",\r\n", KVs}}.
