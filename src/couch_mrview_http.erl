@@ -229,7 +229,8 @@ do_all_docs_req(Req, Db, Keys, NS) ->
     end,
     Args = Args1#mrargs{preflight_fun=ETagFun},
     {ok, Resp} = couch_httpd:etag_maybe(Req, fun() ->
-        VAcc0 = #vacc{db=Db, req=Req},
+        Max = chttpd:chunked_response_buffer_size(),
+        VAcc0 = #vacc{db=Db, req=Req, threshold=Max},
         DbName = ?b2l(Db#db.name),
         UsersDbName = config:get("couch_httpd_auth",
                                  "authentication_db",
@@ -274,7 +275,8 @@ design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
     end,
     Args = Args0#mrargs{preflight_fun=ETagFun},
     {ok, Resp} = couch_httpd:etag_maybe(Req, fun() ->
-        VAcc0 = #vacc{db=Db, req=Req},
+        Max = chttpd:chunked_response_buffer_size(),
+        VAcc0 = #vacc{db=Db, req=Req, threshold=Max},
         couch_mrview:query_view(Db, DDoc, ViewName, Args, fun view_cb/2, VAcc0)
     end),
     case is_record(Resp, vacc) of
@@ -291,7 +293,8 @@ multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
         couch_mrview_util:validate_args(QueryArg)
     end, Queries),
     {ok, Resp2} = couch_httpd:etag_maybe(Req, fun() ->
-        VAcc0 = #vacc{db=Db, req=Req, prepend="\r\n"},
+        Max = chttpd:chunked_response_buffer_size(),
+        VAcc0 = #vacc{db=Db, req=Req, prepend="\r\n", threshold=Max},
         %% TODO: proper calculation of etag
         Etag = couch_uuids:new(),
         Headers = [{"ETag", Etag}],
@@ -331,7 +334,7 @@ view_cb({meta, Meta}, #vacc{resp=undefined}=Acc) ->
     Headers = [{"ETag", Acc#vacc.etag}],
     {ok, Resp} = chttpd:start_delayed_json_response(Acc#vacc.req, 200, Headers),
     view_cb({meta, Meta}, Acc#vacc{resp=Resp, should_close=true});
-view_cb({meta, Meta}, #vacc{resp=Resp}=Acc) ->
+view_cb({meta, Meta}, #vacc{}=Acc) ->
     % Sending metadata
     Parts = case couch_util:get_value(total, Meta) of
         undefined -> [];
@@ -344,26 +347,25 @@ view_cb({meta, Meta}, #vacc{resp=Resp}=Acc) ->
         UpdateSeq -> [io_lib:format("\"update_seq\":~p", [UpdateSeq])]
     end ++ ["\"rows\":["],
     Chunk = [prepend_val(Acc), "{", string:join(Parts, ","), "\r\n"],
-    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, Chunk),
-    {ok, Acc#vacc{resp=Resp1, prepend=""}};
+    {ok, AccOut} = maybe_flush_response(Acc, Chunk, iolist_size(Chunk)),
+    {ok, AccOut#vacc{prepend=""}};
 view_cb({row, Row}, Acc) ->
     % Adding another row
     Chunk = [prepend_val(Acc), row_to_json(Row)],
-    {ok, Resp1} = chttpd:send_delayed_chunk(Acc#vacc.resp, Chunk),
-    {ok, Acc#vacc{prepend=",\r\n", resp=Resp1}};
+    maybe_flush_response(Acc, Chunk, iolist_size(Chunk));
 view_cb(complete, #vacc{resp=undefined}=Acc) ->
     % Nothing in view
     {ok, Resp} = chttpd:send_json(Acc#vacc.req, 200, {[{rows, []}]}),
     {ok, Acc#vacc{resp=Resp}};
-view_cb(complete, #vacc{resp=Resp}=Acc) ->
+view_cb(complete, #vacc{resp=Resp, buffer=Buf, threshold=Max}=Acc) ->
     % Finish view output and possibly end the response
-    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, "\r\n]}"),
+    {ok, Resp1} = chttpd:close_delayed_json_object(Resp, Buf, "\r\n]}", Max),
     case Acc#vacc.should_close of
         true ->
             {ok, Resp2} = chttpd:end_delayed_json_response(Resp1),
             {ok, Acc#vacc{resp=Resp2}};
         _ ->
-            {ok, Acc#vacc{resp=Resp1, prepend=",\r\n"}}
+            {ok, Acc#vacc{resp=Resp1, prepend=",\r\n", buffer=[], bufsize=0}}
     end;
 view_cb({error, Reason}, #vacc{resp=undefined}=Acc) ->
     {ok, Resp} = chttpd:send_error(Acc#vacc.req, Reason),
@@ -372,6 +374,19 @@ view_cb({error, Reason}, #vacc{resp=Resp}=Acc) ->
     {ok, Resp1} = chttpd:send_delayed_error(Resp, Reason),
     {ok, Acc#vacc{resp=Resp1}}.
 
+maybe_flush_response(#vacc{bufsize=Size, threshold=Max} = Acc, Data, Len)
+        when Size > 0 andalso (Size + Len) > Max ->
+    #vacc{buffer = Buffer, resp = Resp} = Acc,
+    {ok, R1} = chttpd:send_delayed_chunk(Resp, Buffer),
+    {ok, Acc#vacc{prepend = ",\r\n", buffer = Data, bufsize = Len, resp = R1}};
+maybe_flush_response(Acc0, Data, Len) ->
+    #vacc{buffer = Buf, bufsize = Size} = Acc0,
+    Acc = Acc0#vacc{
+        prepend = ",\r\n",
+        buffer = [Buf | Data],
+        bufsize = Size + Len
+    },
+    {ok, Acc}.
 
 prepend_val(#vacc{prepend=Prepend}) ->
     case Prepend of
