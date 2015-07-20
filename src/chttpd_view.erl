@@ -53,7 +53,8 @@ design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
     end,
     Args = Args0#mrargs{preflight_fun=ETagFun},
     {ok, Resp} = couch_httpd:etag_maybe(Req, fun() ->
-        VAcc0 = #vacc{db=Db, req=Req},
+        Max = config:get_integer("httpd", "chunked_response_buffer", 1490),
+        VAcc0 = #vacc{db=Db, req=Req, threshold=Max},
         fabric:query_view(Db, DDoc, ViewName, fun couch_mrview_http:view_cb/2, VAcc0, Args)
     end),
     case is_record(Resp, vacc) of

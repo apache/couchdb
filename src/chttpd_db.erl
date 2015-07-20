@@ -604,7 +604,8 @@ all_docs_view(Req, Db, Keys, OP) ->
     Args = Args3#mrargs{preflight_fun=ETagFun},
     Options = [{user_ctx, Req#httpd.user_ctx}],
     {ok, Resp} = couch_httpd:etag_maybe(Req, fun() ->
-        VAcc0 = #vacc{db=Db, req=Req},
+        Max = config:get_integer("httpd", "chunked_response_buffer", 1490),
+        VAcc0 = #vacc{db=Db, req=Req, threshold=Max},
         fabric:all_docs(Db, Options, fun couch_mrview_http:view_cb/2, VAcc0, Args)
     end),
     case is_record(Resp, vacc) of
