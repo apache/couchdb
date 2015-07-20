@@ -25,7 +25,10 @@
 -record(vacc, {
     resp,
     prepend,
-    kvs
+    kvs,
+    buffer = [],
+    bufsize = 0,
+    threshold = 1490
 }).
 
 handle_req(#httpd{} = Req, Db0) ->
@@ -218,13 +221,14 @@ start_find_resp(Req) ->
     chttpd:start_delayed_json_response(Req, 200, [], "{\"docs\":[").
 
 
-end_find_resp(Acc) ->
-    #vacc{resp=Resp0, kvs=KVs} = Acc,
+end_find_resp(Acc0) ->
+    #vacc{resp=Resp00, buffer=Buf, kvs=KVs, threshold=Max} = Acc0,
+    {ok, Resp0} = chttpd:close_delayed_json_object(Resp00, Buf, "\r\n]}", Max),
     FinalAcc = lists:foldl(fun({K, V}, Acc) ->
         JK = ?JSON_ENCODE(K),
         JV = ?JSON_ENCODE(V),
         [JV, ": ", JK, ",\r\n" | Acc]
-    end, ["\r\n]"], KVs),
+    end, [], KVs),
     Chunk = lists:reverse(FinalAcc, ["}\r\n"]),
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, Chunk),
     chttpd:end_delayed_json_response(Resp1).
@@ -234,20 +238,34 @@ run_find(Resp, Db, Sel, Opts) ->
     Acc0 = #vacc{
         resp = Resp,
         prepend = "\r\n",
-        kvs = []
+        kvs = [],
+        threshold = chttpd:chunked_response_buffer_size()
     },
     mango_crud:find(Db, Sel, fun handle_doc/2, Acc0, Opts).
 
 
 handle_doc({add_key, Key, Value}, Acc0) ->
-    #vacc{resp=Resp, prepend=Prepend, kvs=KVs} = Acc0,
+    #vacc{kvs=KVs} = Acc0,
     NewKVs = lists:keystore(Key, 1, KVs, {Key, Value}),
-    {ok, {Resp, Prepend, NewKVs}};
+    {ok, Acc0#vacc{kvs = NewKVs}};
 handle_doc({row, Doc}, Acc0) ->
-    #vacc{resp=Resp0, prepend=Prepend, kvs=KVs} = Acc0,
+    #vacc{prepend=Prepend} = Acc0,
     Chunk = [Prepend, ?JSON_ENCODE(Doc)],
-    {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, Chunk),
-    {ok, {Resp1, ",\r\n", KVs}}.
+    maybe_flush_response(Acc0, Chunk, iolist_size(Chunk)).
+
+maybe_flush_response(#vacc{bufsize=Size, threshold=Max} = Acc, Data, Len)
+        when Size > 0 andalso (Size + Len) > Max ->
+    #vacc{buffer = Buffer, resp = Resp} = Acc,
+    {ok, R1} = chttpd:send_delayed_chunk(Resp, Buffer),
+    {ok, Acc#vacc{prepend = ",\r\n", buffer = Data, bufsize = Len, resp = R1}};
+maybe_flush_response(Acc0, Data, Len) ->
+    #vacc{buffer = Buf, bufsize = Size} = Acc0,
+    Acc = Acc0#vacc{
+        prepend = ",\r\n",
+        buffer = [Buf | Data],
+        bufsize = Size + Len
+    },
+    {ok, Acc}.
 
 
 parse_index_param("limit", Value) ->
