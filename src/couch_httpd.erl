@@ -360,7 +360,7 @@ handle_request_int(MochiReq, DefaultFun,
     {ok, Resp}.
 
 validate_host(#httpd{} = Req) ->
-    case config:get_boolean("httpd", "validate_host", true) of
+    case config:get_boolean("httpd", "validate_host", false) of
         true ->
             Host = hostname(Req),
             ValidHosts = valid_hosts(),
@@ -384,12 +384,8 @@ hostname(#httpd{} = Req) ->
     end.
 
 valid_hosts() ->
-    case config:get("httpd", "valid_hosts") of
-        undefined ->
-            ["localhost", "127.0.0.1", "[::1]", net_adm:localhost()];
-        List ->
-            re:split(List, ",", [{return, list}])
-    end.
+    List = config:get("httpd", "valid_hosts", ""),
+    re:split(List, ",", [{return, list}]).
 
 check_request_uri_length(Uri) ->
     check_request_uri_length(Uri, config:get("httpd", "max_uri_length")).
