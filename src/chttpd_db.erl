@@ -86,8 +86,7 @@ handle_changes_req1(#httpd{}=Req, Db) ->
     ChangesArgs = Args0#changes_args{
         filter_fun = couch_changes:configure_filter(Raw, Style, Req, Db)
     },
-    % Default to ~filling the payload of a standard Ethernet frame
-    Max = config:get_integer("httpd", "chunked_response_buffer", 1490),
+    Max = chttpd:chunked_response_buffer_size(),
     case ChangesArgs#changes_args.feed of
     "normal" ->
         T0 = os:timestamp(),
@@ -604,7 +603,7 @@ all_docs_view(Req, Db, Keys, OP) ->
     Args = Args3#mrargs{preflight_fun=ETagFun},
     Options = [{user_ctx, Req#httpd.user_ctx}],
     {ok, Resp} = couch_httpd:etag_maybe(Req, fun() ->
-        Max = config:get_integer("httpd", "chunked_response_buffer", 1490),
+        Max = chttpd:chunked_response_buffer_size(),
         VAcc0 = #vacc{db=Db, req=Req, threshold=Max},
         fabric:all_docs(Db, Options, fun couch_mrview_http:view_cb/2, VAcc0, Args)
     end),

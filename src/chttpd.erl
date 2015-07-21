@@ -34,6 +34,10 @@
     send_delayed_error/2, end_delayed_json_response/1,
     get_delayed_req/1]).
 
+-export([
+    chunked_response_buffer_size/0
+]).
+
 -record(delayed_resp, {
     start_fun,
     req,
@@ -994,3 +998,15 @@ stack_hash(Stack) ->
 
 with_default(undefined, Default) -> Default;
 with_default(Value, _) -> Value.
+
+%% @doc CouchDB uses a chunked transfer-encoding to stream responses to
+%% _all_docs, _changes, _view and other similar requests. This configuration
+%% value sets the maximum size of a chunk; the system will buffer rows in the
+%% response until it reaches this threshold and then send all the rows in one
+%% chunk to improve network efficiency. The default value is chosen so that
+%% the assembled chunk fits into the default Ethernet frame size (some reserved
+%% padding is necessary to accommodate the reporting of the chunk length). Set
+%% this value to 0 to restore the older behavior of sending each row in a
+%% dedicated chunk.
+chunked_response_buffer_size() ->
+    config:get_integer("httpd", "chunked_response_buffer", 1490).
