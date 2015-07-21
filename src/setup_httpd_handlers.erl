@@ -14,7 +14,8 @@
 
 -export([url_handler/1, db_handler/1, design_handler/1]).
 
-url_handler(<<"_cluster_setup">>) -> fun setup_httpd:handle_setup_req/1.
+url_handler(<<"_cluster_setup">>) -> fun setup_httpd:handle_setup_req/1;
+url_handler(_) -> no_match.
 
 db_handler(_) -> no_match.
 
