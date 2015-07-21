@@ -26,7 +26,10 @@ init([]) ->
             worker,
             dynamic}
     ],
-    Children = SecondarySupervisors ++ [
+    ServiceProviders = [
+        chttpd_handlers:provider(couch, couch_httpd_handlers)
+    ],
+    Children = SecondarySupervisors ++ ServiceProviders ++ [
         begin
             {ok, {Module, Fun, Args}} = couch_util:parse_term(SpecStr),
 
