@@ -767,6 +767,9 @@ error_info({missing_stub, Reason}) ->
     {412, <<"missing_stub">>, Reason};
 error_info(request_entity_too_large) ->
     {413, <<"too_large">>, <<"the request entity is too large">>};
+error_info({error, security_migration_updates_disabled}) ->
+    {503, <<"security_migration">>, <<"Updates to security docs are disabled during "
+        "security migration.">>};
 error_info(not_implemented) ->
     {501, <<"not_implemented">>, <<"this feature is not yet implemented">>};
 error_info(timeout) ->

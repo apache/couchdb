@@ -1433,8 +1433,8 @@ demonitor_refs(Refs) when is_list(Refs) ->
 %% record makes it difficult to separate. This function should be refactored and
 %% moved into cassim once couch_doc_from_req and update_doc are reworked.
 put_security(#httpd{user_ctx=Ctx}=Req, Db, FetchRev) ->
-    case cassim:is_enabled() of
-        true ->
+    case {cassim:is_enabled(), cassim:metadata_db_exists()} of
+        {true, true} ->
             DbName = Db#db.name,
             DocId = cassim_metadata_cache:security_meta_id(DbName),
             {SecObj0} = chttpd:json_body(Req),
@@ -1464,7 +1464,11 @@ put_security(#httpd{user_ctx=Ctx}=Req, Db, FetchRev) ->
             HttpCode = http_code_from_status(Status),
             ResponseHeaders = [{"Etag", Etag}],
             send_json(Req, HttpCode, ResponseHeaders, Body);
-        false ->
+        {false, true} ->
+            throw({error, security_migration_updates_disabled});
+        %% handle completely disabled case and also cassim setting enabled but
+        %% metadata db does not exist.
+        _ ->
             SecObj = chttpd:json_body(Req),
             case fabric:set_security(Db, SecObj, [{user_ctx, Ctx}]) of
                 ok ->
