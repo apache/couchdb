@@ -27,6 +27,7 @@ init([]) ->
     {ok, {{one_for_one, 3, 10}, [
         ?CHILD(chttpd, worker),
         ?CHILD(chttpd_auth_cache, worker),
+        chttpd_handlers:provider(chttpd, chttpd_httpd_handlers),
         {chttpd_auth_cache_lru,
 	 {ets_lru, start_link, [chttpd_auth_cache_lru, lru_opts()]},
 	 permanent, 5000, worker, [ets_lru]}
