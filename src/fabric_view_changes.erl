@@ -84,15 +84,16 @@ keep_sending_changes(DbName, Args, Callback, Seqs, AccIn, Timeout, UpListen, T0)
         limit = Limit2,
         counters = NewSeqs,
         offset = Offset,
-        user_acc = AccOut
+        user_acc = AccOut0
     } = Collector,
     LastSeq = pack_seqs(NewSeqs),
     MaintenanceMode = config:get("couchdb", "maintenance_mode"),
     NewEpoch = get_changes_epoch() > erlang:get(changes_epoch),
     if Limit > Limit2, Feed == "longpoll";
       MaintenanceMode == "true"; MaintenanceMode == "nolb"; NewEpoch ->
-        Callback({stop, LastSeq, pending_count(Offset)}, AccOut);
+        Callback({stop, LastSeq, pending_count(Offset)}, AccOut0);
     true ->
+        {ok, AccOut} = Callback(waiting_for_updates, AccOut0),
         WaitForUpdate = wait_db_updated(UpListen),
         AccumulatedTime = timer:now_diff(os:timestamp(), T0) div 1000,
         Max = case config:get("fabric", "changes_duration") of
