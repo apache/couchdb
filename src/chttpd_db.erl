@@ -34,6 +34,18 @@
     atts_since = nil
 }).
 
+% Accumulator for changes_callback function
+-record(cacc, {
+    etag,
+    feed,
+    mochi,
+    prepend = "",
+    responding = false,
+    buffer = [],
+    bufsize = 0,
+    threshold
+}).
+
 -define(IS_ALL_DOCS(T), (
     T == <<"_all_docs">>
     orelse T == <<"_local_docs">>
@@ -73,6 +85,7 @@ handle_changes_req1(#httpd{}=Req, Db) ->
     ChangesArgs = Args0#changes_args{
         filter_fun = couch_changes:configure_filter(Raw, Style, Req, Db)
     },
+    Max = chttpd:chunked_response_buffer_size(),
     case ChangesArgs#changes_args.feed of
     "normal" ->
         T0 = os:timestamp(),
@@ -81,13 +94,23 @@ handle_changes_req1(#httpd{}=Req, Db) ->
         DeltaT = timer:now_diff(os:timestamp(), T0) / 1000,
         couch_stats:update_histogram([couchdb, dbinfo], DeltaT),
         chttpd:etag_respond(Req, Etag, fun() ->
-            fabric:changes(Db, fun changes_callback/2, {"normal", {"Etag",Etag}, Req},
-                ChangesArgs)
+            Acc0 = #cacc{
+                feed = normal,
+                etag = Etag,
+                mochi = Req,
+                threshold = Max
+            },
+            fabric:changes(Db, fun changes_callback/2, Acc0, ChangesArgs)
         end);
     Feed when Feed =:= "continuous"; Feed =:= "longpoll"; Feed =:= "eventsource"  ->
         couch_stats:increment_counter([couchdb, httpd, clients_requesting_changes]),
+        Acc0 = #cacc{
+            feed = list_to_atom(Feed),
+            mochi = Req,
+            threshold = Max
+        },
         try
-            fabric:changes(Db, fun changes_callback/2, {Feed, Req}, ChangesArgs)
+            fabric:changes(Db, fun changes_callback/2, Acc0, ChangesArgs)
         after
             couch_stats:decrement_counter([couchdb, httpd, clients_requesting_changes])
         end;
@@ -97,99 +120,108 @@ handle_changes_req1(#httpd{}=Req, Db) ->
     end.
 
 % callbacks for continuous feed (newline-delimited JSON Objects)
-changes_callback(start, {"continuous", Req}) ->
-    {ok, Resp} = chttpd:start_delayed_json_response(Req, 200),
-    {ok, {"continuous", Resp}};
-changes_callback({change, Change}, {"continuous", Resp}) ->
-    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, [?JSON_ENCODE(Change) | "\n"]),
-    {ok, {"continuous", Resp1}};
-changes_callback({stop, EndSeq0}, {"continuous", Resp}) ->
-    % Temporary upgrade clause - Case 24236
-    changes_callback({stop, EndSeq0, null}, {"continuous", Resp});
-changes_callback({stop, EndSeq0, Pending}, {"continuous", Resp}) ->
-    EndSeq = case is_old_couch(Resp) of true -> 0; false -> EndSeq0 end,
+changes_callback(start, #cacc{feed = continuous} = Acc) ->
+    {ok, Resp} = chttpd:start_delayed_json_response(Acc#cacc.mochi, 200),
+    {ok, Acc#cacc{mochi = Resp, responding = true}};
+changes_callback({change, Change}, #cacc{feed = continuous} = Acc) ->
+    Data = [?JSON_ENCODE(Change) | "\n"],
+    Len = iolist_size(Data),
+    maybe_flush_changes_feed(Acc, Data, Len);
+changes_callback({stop, EndSeq, Pending}, #cacc{feed = continuous} = Acc) ->
+    #cacc{mochi = Resp, buffer = Buf} = Acc,
     Row = {[
         {<<"last_seq">>, EndSeq},
         {<<"pending">>, Pending}
     ]},
-    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, [?JSON_ENCODE(Row) | "\n"]),
+    Data = [Buf, ?JSON_ENCODE(Row) | "\n"],
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, Data),
     chttpd:end_delayed_json_response(Resp1);
 
 % callbacks for eventsource feed (newline-delimited eventsource Objects)
-changes_callback(start, {"eventsource", Req}) ->
+changes_callback(start, #cacc{feed = eventsource} = Acc) ->
+    #cacc{mochi = Req} = Acc,
     Headers = [
         {"Content-Type", "text/event-stream"},
         {"Cache-Control", "no-cache"}
     ],
     {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, Headers),
-    {ok, {"eventsource", Resp}};
-changes_callback({change, {ChangeProp}=Change}, {"eventsource", Resp}) ->
+    {ok, Acc#cacc{mochi = Resp, responding = true}};
+changes_callback({change, {ChangeProp}=Change}, #cacc{feed = eventsource} = Acc) ->
     Seq = proplists:get_value(seq, ChangeProp),
     Chunk = [
         "data: ", ?JSON_ENCODE(Change),
         "\n", "id: ", ?JSON_ENCODE(Seq),
         "\n\n"
     ],
-    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, Chunk),
-    {ok, {"eventsource", Resp1}};
-changes_callback(timeout, {"eventsource", Resp}) ->
+    Len = iolist_size(Chunk),
+    maybe_flush_changes_feed(Acc, Chunk, Len);
+changes_callback(timeout, #cacc{feed = eventsource} = Acc) ->
+    #cacc{mochi = Resp} = Acc,
     Chunk = "event: heartbeat\ndata: \n\n",
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp, Chunk),
     {ok, {"eventsource", Resp1}};
-changes_callback({stop, _EndSeq}, {"eventsource", Resp}) ->
-    chttpd:end_delayed_json_response(Resp);
+changes_callback({stop, _EndSeq}, #cacc{feed = eventsource} = Acc) ->
+    #cacc{mochi = Resp, buffer = Buf} = Acc,
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, Buf),
+    chttpd:end_delayed_json_response(Resp1);
 
 % callbacks for longpoll and normal (single JSON Object)
-changes_callback(start, {"normal", {"Etag", Etag}, Req}) ->
+changes_callback(start, #cacc{feed = normal} = Acc) ->
+    #cacc{etag = Etag, mochi = Req} = Acc,
     FirstChunk = "{\"results\":[\n",
     {ok, Resp} = chttpd:start_delayed_json_response(Req, 200,
         [{"Etag",Etag}], FirstChunk),
-    {ok, {"", Resp}};
-changes_callback(start, {_, Req}) ->
+    {ok, Acc#cacc{mochi = Resp, responding = true}};
+changes_callback(start, Acc) ->
+    #cacc{mochi = Req} = Acc,
     FirstChunk = "{\"results\":[\n",
     {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, [], FirstChunk),
-    {ok, {"", Resp}};
-changes_callback({change, Change}, {Prepend, Resp}) ->
-    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, [Prepend, ?JSON_ENCODE(Change)]),
-    {ok, {",\r\n", Resp1}};
-changes_callback({stop, EndSeq}, Acc) ->
-    % Temporary upgrade clause - Case 24236
-    changes_callback({stop, EndSeq, null}, Acc);
-changes_callback({stop, EndSeq, Pending}, {_, Resp}) ->
-    {ok, Resp1} = case is_old_couch(Resp) of
-    true ->
-        chttpd:send_delayed_chunk(Resp, "\n],\n\"last_seq\":0}\n");
-    false ->
-        chttpd:send_delayed_chunk(Resp, [
-            "\n],\n\"last_seq\":",
-            ?JSON_ENCODE(EndSeq),
-            ",\"pending\":",
-            ?JSON_ENCODE(Pending),
-            "}\n"
-        ])
-    end,
+    {ok, Acc#cacc{mochi = Resp, responding = true}};
+changes_callback({change, Change}, Acc) ->
+    Data = [Acc#cacc.prepend, ?JSON_ENCODE(Change)],
+    Len = iolist_size(Data),
+    maybe_flush_changes_feed(Acc, Data, Len);
+changes_callback({stop, EndSeq, Pending}, Acc) ->
+    #cacc{buffer = Buf, mochi = Resp, threshold = Max} = Acc,
+    Terminator = [
+        "\n],\n\"last_seq\":",
+        ?JSON_ENCODE(EndSeq),
+        ",\"pending\":",
+        ?JSON_ENCODE(Pending),
+        "}\n"
+    ],
+    {ok, Resp1} = chttpd:close_delayed_json_object(Resp, Buf, Terminator, Max),
     chttpd:end_delayed_json_response(Resp1);
 
-changes_callback(timeout, {Prepend, Resp}) ->
-    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, "\n"),
-    {ok, {Prepend, Resp1}};
-changes_callback({error, Reason}, {_, #httpd{}=Req}) ->
+changes_callback(waiting_for_updates, Acc) ->
+    #cacc{buffer = Buf, mochi = Resp} = Acc,
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, Buf),
+    {ok, Acc#cacc{buffer = [], bufsize = 0, mochi = Resp1}};
+changes_callback(timeout, Acc) ->
+    {ok, Resp1} = chttpd:send_delayed_chunk(Acc#cacc.mochi, "\n"),
+    {ok, Acc#cacc{mochi = Resp1}};
+changes_callback({error, Reason}, #cacc{mochi = #httpd{}} = Acc) ->
+    #cacc{mochi = Req} = Acc,
     chttpd:send_error(Req, Reason);
-changes_callback({error, Reason}, {"normal", {"Etag", _Etag}, Req}) ->
+changes_callback({error, Reason}, #cacc{feed = normal, responding = false} = Acc) ->
+    #cacc{mochi = Req} = Acc,
     chttpd:send_error(Req, Reason);
-changes_callback({error, Reason}, {_, Resp}) ->
-    chttpd:send_delayed_error(Resp, Reason).
+changes_callback({error, Reason}, Acc) ->
+    chttpd:send_delayed_error(Acc#cacc.mochi, Reason).
 
-is_old_couch(Resp) ->
-    MochiReq = chttpd:get_delayed_req(Resp),
-    case MochiReq:get_header_value("user-agent") of
-    undefined ->
-        false;
-    "CouchDB/1.0.0" ->
-        true;
-    UserAgent ->
-        string:str(UserAgent, "CouchDB/0") > 0
-    end.
+maybe_flush_changes_feed(#cacc{bufsize=Size, threshold=Max} = Acc, Data, Len)
+         when Size > 0 andalso (Size + Len) > Max ->
+    #cacc{buffer = Buffer, mochi = Resp} = Acc,
+    {ok, R1} = chttpd:send_delayed_chunk(Resp, Buffer),
+    {ok, Acc#cacc{prepend = ",\r\n", buffer = Data, bufsize=Len, mochi = R1}};
+maybe_flush_changes_feed(Acc0, Data, Len) ->
+    #cacc{buffer = Buf, bufsize = Size} = Acc0,
+    Acc = Acc0#cacc{
+        prepend = ",\r\n",
+        buffer = [Buf | Data],
+        bufsize = Size + Len
+    },
+    {ok, Acc}.
 
 handle_compact_req(Req, _) ->
     Msg = <<"Compaction must be triggered on a per-shard basis in CouchDB">>,
@@ -551,7 +583,8 @@ all_docs_view(Req, Db, Keys, OP) ->
     Args = Args3#mrargs{preflight_fun=ETagFun},
     Options = [{user_ctx, Req#httpd.user_ctx}],
     {ok, Resp} = couch_httpd:etag_maybe(Req, fun() ->
-        VAcc0 = #vacc{db=Db, req=Req},
+        Max = chttpd:chunked_response_buffer_size(),
+        VAcc0 = #vacc{db=Db, req=Req, threshold=Max},
         fabric:all_docs(Db, Options, fun couch_mrview_http:view_cb/2, VAcc0, Args)
     end),
     case is_record(Resp, vacc) of

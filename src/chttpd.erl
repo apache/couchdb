@@ -34,6 +34,11 @@
     send_delayed_error/2, end_delayed_json_response/1,
     get_delayed_req/1]).
 
+-export([
+    chunked_response_buffer_size/0,
+    close_delayed_json_object/4
+]).
+
 -record(delayed_resp, {
     start_fun,
     req,
@@ -685,6 +690,14 @@ send_delayed_error(#delayed_resp{resp=Resp}, Reason) ->
     log_error_with_stack_trace(Reason),
     throw({http_abort, Resp, Reason}).
 
+close_delayed_json_object(Resp, Buffer, Terminator, 0) ->
+    % Use a separate chunk to close the streamed array to maintain strict
+    % compatibility with earlier versions. See COUCHDB-2724
+    {ok, R1} = chttpd:send_delayed_chunk(Resp, Buffer),
+    send_delayed_chunk(R1, Terminator);
+close_delayed_json_object(Resp, Buffer, Terminator, _Threshold) ->
+    send_delayed_chunk(Resp, [Buffer | Terminator]).
+
 end_delayed_json_response(#delayed_resp{}=DelayedResp) ->
     {ok, #delayed_resp{resp=Resp}} =
         start_delayed_response(DelayedResp),
@@ -958,3 +971,15 @@ stack_hash(Stack) ->
 
 with_default(undefined, Default) -> Default;
 with_default(Value, _) -> Value.
+
+%% @doc CouchDB uses a chunked transfer-encoding to stream responses to
+%% _all_docs, _changes, _view and other similar requests. This configuration
+%% value sets the maximum size of a chunk; the system will buffer rows in the
+%% response until it reaches this threshold and then send all the rows in one
+%% chunk to improve network efficiency. The default value is chosen so that
+%% the assembled chunk fits into the default Ethernet frame size (some reserved
+%% padding is necessary to accommodate the reporting of the chunk length). Set
+%% this value to 0 to restore the older behavior of sending each row in a
+%% dedicated chunk.
+chunked_response_buffer_size() ->
+    config:get_integer("httpd", "chunked_response_buffer", 1490).
