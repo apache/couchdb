@@ -178,7 +178,7 @@ read({file, FilePath}) ->
 
 hash_of_file(FilePath) ->
     {ok, Data} = file:read_file(FilePath),
-    crypto:hash(md5, Data).
+    couch_epi_util:md5(Data).
 
 current(Handle, Subscriber) ->
     try
