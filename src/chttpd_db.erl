@@ -128,9 +128,8 @@ changes_callback({change, Change}, #cacc{feed = continuous} = Acc) ->
     Data = [?JSON_ENCODE(Change) | "\n"],
     Len = iolist_size(Data),
     maybe_flush_changes_feed(Acc, Data, Len);
-changes_callback({stop, EndSeq0, Pending}, #cacc{feed = continuous} = Acc) ->
+changes_callback({stop, EndSeq, Pending}, #cacc{feed = continuous} = Acc) ->
     #cacc{mochi = Resp, buffer = Buf} = Acc,
-    EndSeq = case is_old_couch(Resp) of true -> 0; false -> EndSeq0 end,
     Row = {[
         {<<"last_seq">>, EndSeq},
         {<<"pending">>, Pending}
@@ -185,11 +184,7 @@ changes_callback({change, Change}, Acc) ->
     maybe_flush_changes_feed(Acc, Data, Len);
 changes_callback({stop, EndSeq, Pending}, Acc) ->
     #cacc{buffer = Buf, mochi = Resp} = Acc,
-    {ok, Resp1} = case is_old_couch(Resp) of
-    true ->
-        chttpd:send_delayed_chunk(Resp, [Buf | "\n],\n\"last_seq\":0}\n"]);
-    false ->
-        chttpd:send_delayed_chunk(Resp, [
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, [
             Buf,
             "\n],\n\"last_seq\":",
             ?JSON_ENCODE(EndSeq),
@@ -229,17 +224,6 @@ maybe_flush_changes_feed(Acc0, Data, Len) ->
         bufsize = Size + Len
     },
     {ok, Acc}.
-
-is_old_couch(Resp) ->
-    MochiReq = chttpd:get_delayed_req(Resp),
-    case MochiReq:get_header_value("user-agent") of
-    undefined ->
-        false;
-    "CouchDB/1.0.0" ->
-        true;
-    UserAgent ->
-        string:str(UserAgent, "CouchDB/0") > 0
-    end.
 
 handle_compact_req(Req, _) ->
     Msg = <<"Compaction must be triggered on a per-shard basis in CouchDB">>,
