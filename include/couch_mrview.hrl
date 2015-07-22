@@ -94,7 +94,10 @@
     resp,
     prepend,
     etag,
-    should_close = false
+    should_close = false,
+    buffer = [],
+    bufsize = 0,
+    threshold = 1490
 }).
 
 -record(lacc, {
