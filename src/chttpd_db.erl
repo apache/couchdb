@@ -183,16 +183,15 @@ changes_callback({change, Change}, Acc) ->
     Len = iolist_size(Data),
     maybe_flush_changes_feed(Acc, Data, Len);
 changes_callback({stop, EndSeq, Pending}, Acc) ->
-    #cacc{buffer = Buf, mochi = Resp} = Acc,
-    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, [
-            Buf,
-            "\n],\n\"last_seq\":",
-            ?JSON_ENCODE(EndSeq),
-            ",\"pending\":",
-            ?JSON_ENCODE(Pending),
-            "}\n"
-        ])
-    end,
+    #cacc{buffer = Buf, mochi = Resp, threshold = Max} = Acc,
+    Terminator = [
+        "\n],\n\"last_seq\":",
+        ?JSON_ENCODE(EndSeq),
+        ",\"pending\":",
+        ?JSON_ENCODE(Pending),
+        "}\n"
+    ],
+    {ok, Resp1} = chttpd:close_delayed_json_object(Resp, Buf, Terminator, Max),
     chttpd:end_delayed_json_response(Resp1);
 
 changes_callback(waiting_for_updates, Acc) ->

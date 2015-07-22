@@ -35,7 +35,8 @@
     get_delayed_req/1]).
 
 -export([
-    chunked_response_buffer_size/0
+    chunked_response_buffer_size/0,
+    close_delayed_json_object/4
 ]).
 
 -record(delayed_resp, {
@@ -727,6 +728,14 @@ send_delayed_error(#delayed_resp{req=Req,resp=nil}=DelayedResp, Reason) ->
 send_delayed_error(#delayed_resp{resp=Resp}, Reason) ->
     log_error_with_stack_trace(Reason),
     throw({http_abort, Resp, Reason}).
+
+close_delayed_json_object(Resp, Buffer, Terminator, 0) ->
+    % Use a separate chunk to close the streamed array to maintain strict
+    % compatibility with earlier versions. See COUCHDB-2724
+    {ok, R1} = chttpd:send_delayed_chunk(Resp, Buffer),
+    send_delayed_chunk(R1, Terminator);
+close_delayed_json_object(Resp, Buffer, Terminator, _Threshold) ->
+    send_delayed_chunk(Resp, [Buffer | Terminator]).
 
 end_delayed_json_response(#delayed_resp{}=DelayedResp) ->
     {ok, #delayed_resp{resp=Resp}} =
