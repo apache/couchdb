@@ -59,7 +59,7 @@ handle_request(#httpd{path_parts=[DbName|RestParts],method=Method}=Req)->
     {'DELETE', []} ->
          % if we get ?rev=... the user is using a faulty script where the
          % document id is empty by accident. Let them recover safely.
-         case couch_httpd:qs_value(Req, "rev", false) of
+         case chttpd:qs_value(Req, "rev", false) of
              false -> delete_db_req(Req, DbName);
              _Rev -> throw({bad_request,
                  "You tried to DELETE a database with a ?=rev parameter. "
@@ -262,9 +262,9 @@ handle_design_info_req(Req, _Db, _DDoc) ->
 
 create_db_req(#httpd{}=Req, DbName) ->
     couch_httpd:verify_is_server_admin(Req),
-    N = couch_httpd:qs_value(Req, "n", config:get("cluster", "n", "3")),
-    Q = couch_httpd:qs_value(Req, "q", config:get("cluster", "q", "8")),
-    P = couch_httpd:qs_value(Req, "placement", config:get("cluster", "placement")),
+    N = chttpd:qs_value(Req, "n", config:get("cluster", "n", "3")),
+    Q = chttpd:qs_value(Req, "q", config:get("cluster", "q", "8")),
+    P = chttpd:qs_value(Req, "placement", config:get("cluster", "placement")),
     DocUrl = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName)),
     case fabric:create_db(DbName, [{n,N}, {q,Q}, {placement,P}]) of
     ok ->
@@ -303,7 +303,7 @@ db_req(#httpd{method='GET',path_parts=[DbName]}=Req, _Db) ->
 db_req(#httpd{method='POST', path_parts=[DbName], user_ctx=Ctx}=Req, Db) ->
     couch_httpd:validate_ctype(Req, "application/json"),
 
-    W = couch_httpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
+    W = chttpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
     Options = [{user_ctx,Ctx}, {w,W}],
 
     Doc = couch_doc:from_json_obj(chttpd:json_body(Req)),
@@ -314,7 +314,7 @@ db_req(#httpd{method='POST', path_parts=[DbName], user_ctx=Ctx}=Req, Db) ->
             Doc
     end,
     DocId = Doc2#doc.id,
-    case couch_httpd:qs_value(Req, "batch") of
+    case chttpd:qs_value(Req, "batch") of
     "ok" ->
         % async_batching
         spawn(fun() ->
@@ -374,7 +374,7 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, 
     Value when is_integer(Value) ->
         integer_to_list(Value);
     _ ->
-        couch_httpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db)))
+        chttpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db)))
     end,
     case chttpd:header_value(Req, "X-Couch-Full-Commit") of
     "true" ->
@@ -664,7 +664,7 @@ db_doc_req(#httpd{method='POST', user_ctx=Ctx}=Req, Db, DocId) ->
     couch_doc:validate_docid(DocId),
     couch_httpd:validate_ctype(Req, "multipart/form-data"),
 
-    W = couch_httpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
+    W = chttpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
     Options = [{user_ctx,Ctx}, {w,W}],
 
     Form = couch_httpd:parse_form(Req),
@@ -715,7 +715,7 @@ db_doc_req(#httpd{method='PUT', user_ctx=Ctx}=Req, Db, DocId) ->
     } = parse_doc_query(Req),
     couch_doc:validate_docid(DocId),
 
-    W = couch_httpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
+    W = chttpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
     Options = [{user_ctx,Ctx}, {w,W}],
 
     Loc = absolute_uri(Req, [$/, Db#db.name, $/, couch_util:url_encode(DocId)]),
@@ -736,7 +736,7 @@ db_doc_req(#httpd{method='PUT', user_ctx=Ctx}=Req, Db, DocId) ->
             throw(Err)
         end;
     _Else ->
-        case couch_httpd:qs_value(Req, "batch") of
+        case chttpd:qs_value(Req, "batch") of
         "ok" ->
             % batch
             Doc = couch_doc_from_req(Req, DocId, chttpd:json_body(Req)),
@@ -763,7 +763,7 @@ db_doc_req(#httpd{method='PUT', user_ctx=Ctx}=Req, Db, DocId) ->
 
 db_doc_req(#httpd{method='COPY', user_ctx=Ctx}=Req, Db, SourceDocId) ->
     SourceRev =
-    case extract_header_rev(Req, couch_httpd:qs_value(Req, "rev")) of
+    case extract_header_rev(Req, chttpd:qs_value(Req, "rev")) of
         missing_rev -> nil;
         Rev -> Rev
     end,
@@ -900,7 +900,7 @@ send_updated_doc(Req, Db, DocId, Doc, Headers) ->
 
 send_updated_doc(#httpd{user_ctx=Ctx} = Req, Db, DocId, #doc{deleted=Deleted}=Doc,
         Headers, UpdateType) ->
-    W = couch_httpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
+    W = chttpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
     Options =
         case couch_httpd:header_value(Req, "X-Couch-Full-Commit") of
         "true" ->
@@ -972,7 +972,7 @@ update_doc(Db, DocId, #doc{deleted=Deleted}=Doc, Options) ->
 
 couch_doc_from_req(Req, DocId, #doc{revs=Revs} = Doc) ->
     validate_attachment_names(Doc),
-    Rev = case couch_httpd:qs_value(Req, "rev") of
+    Rev = case chttpd:qs_value(Req, "rev") of
     undefined ->
         undefined;
     QSRev ->
@@ -1179,7 +1179,7 @@ db_attachment_req(#httpd{method=Method, user_ctx=Ctx}=Req, Db, DocId, FileNamePa
             ])]
     end,
 
-    Doc = case extract_header_rev(Req, couch_httpd:qs_value(Req, "rev")) of
+    Doc = case extract_header_rev(Req, chttpd:qs_value(Req, "rev")) of
         missing_rev -> % make the new doc
             couch_doc:validate_docid(DocId),
             #doc{id=DocId};
@@ -1393,7 +1393,7 @@ parse_changes_query(Req) ->
         _Else -> % unknown key value pair, ignore.
             Args
         end
-    end, #changes_args{}, couch_httpd:qs(Req)),
+    end, #changes_args{}, chttpd:qs(Req)),
     %% if it's an EventSource request with a Last-event-ID header
     %% that should override the `since` query string, since it's
     %% probably the browser reconnecting.
