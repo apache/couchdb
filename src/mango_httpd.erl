@@ -223,7 +223,7 @@ start_find_resp(Req) ->
 
 end_find_resp(Acc0) ->
     #vacc{resp=Resp00, buffer=Buf, kvs=KVs, threshold=Max} = Acc0,
-    {ok, Resp0} = chttpd:close_delayed_json_object(Resp00, Buf, "\r\n]}", Max),
+    {ok, Resp0} = chttpd:close_delayed_json_object(Resp00, Buf, "\r\n]", Max),
     FinalAcc = lists:foldl(fun({K, V}, Acc) ->
         JK = ?JSON_ENCODE(K),
         JV = ?JSON_ENCODE(V),
