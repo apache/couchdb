@@ -29,7 +29,7 @@
 
 handle_global_changes_req(#httpd{method='GET'}=Req) ->
     Db = global_changes_util:get_dbname(),
-    Feed = couch_httpd:qs_value(Req, "feed", "normal"),
+    Feed = chttpd:qs_value(Req, "feed", "normal"),
     Options = parse_global_changes_query(Req),
     Heartbeat = case lists:keyfind(heartbeat, 1, Options) of
         {heartbeat, true} -> 60000;
@@ -225,7 +225,7 @@ parse_global_changes_query(Req) ->
         _Else -> % unknown key value pair, ignore.
             Args
         end
-    end, [], couch_httpd:qs(Req)).
+    end, [], chttpd:qs(Req)).
 
 
 to_non_neg_int(Value) ->
