@@ -105,7 +105,7 @@ maybe_format_key(Key) when is_binary(Key) ->
     Key.
 
 flush(Req) ->
-    case couch_util:get_value("flush", couch_httpd:qs(Req)) of
+    case couch_util:get_value("flush", chttpd:qs(Req)) of
         "true" ->
             couch_stats_aggregator:flush();
         _Else ->
