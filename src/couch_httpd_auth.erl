@@ -287,7 +287,7 @@ handle_session_req(#httpd{method='POST', mochi_req=MochiReq}=Req, AuthModule) ->
         _ ->
             []
     end,
-    UserName = ?l2b(couch_util:get_value("name", Form, "")),
+    UserName = ?l2b(extract_username(Form)),
     Password = ?l2b(couch_util:get_value("password", Form, "")),
     couch_log:debug("Attempt Login: ~s",[UserName]),
     {ok, UserProps, AuthCtx} = case AuthModule:get_user_creds(Req, UserName) of
@@ -365,6 +365,19 @@ handle_session_req(#httpd{method='DELETE'}=Req, _AuthModule) ->
     send_json(Req, Code, Headers, {[{ok, true}]});
 handle_session_req(Req, _AuthModule) ->
     send_method_not_allowed(Req, "GET,HEAD,POST,DELETE").
+
+extract_username(Form) ->
+    CouchFormat = couch_util:get_value("name", Form),
+    case couch_util:get_value("username", Form, CouchFormat) of
+        undefined ->
+            throw({bad_request, <<"request body must contain a username">>});
+        CouchFormat ->
+            CouchFormat;
+        Else1 when CouchFormat == undefined ->
+            Else1;
+        _Else2 ->
+            throw({bad_request, <<"request body contains different usernames">>})
+    end.
 
 maybe_value(_Key, undefined, _Fun) -> [];
 maybe_value(Key, Else, Fun) ->
