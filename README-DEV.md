@@ -12,11 +12,7 @@ If you're unsure what this means, ignore this document.
 Dependencies
 ------------
 
-You will need the following installed:
-
- * Rebar (>=2.5.0)        (https://github.com/rebar/rebar)
-
-You may also need:
+You may need:
 
  * Sphinx                 (http://sphinx.pocoo.org/)
  * LaTex                  (http://www.latex-project.org/)

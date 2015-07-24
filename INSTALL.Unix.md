@@ -64,7 +64,7 @@ You can install the dependencies by running:
     sudo apt-get install build-essential erlang-base-hipe \
         erlang-dev erlang-manpages erlang-eunit erlang-nox \
         libicu-dev libmozjs185-dev libcurl4-openssl-dev \
-        pkg-config rebar
+        pkg-config
 
 There are lots of Erlang packages. If there is a problem with your
 install, try a different mix. There is more information on the
@@ -90,7 +90,7 @@ You can install the dependencies by running:
 
     sudo yum install autoconf autoconf-archive automake \
         curl-devel erlang-asn1 erlang-erts erlang-eunit \
-        erlang-os_mon erlang-xmerl erlang-rebar help2man \
+        erlang-os_mon erlang-xmerl help2man \
         js-devel libicu-devel libtool perl-Test-Harness
 
 While CouchDB builds against the default js-devel-1.7.0 included in
@@ -108,7 +108,7 @@ the Command Line Tools:
 You can then install the other dependencies by running:
 
     brew install autoconf autoconf-archive automake libtool \
-        erlang icu4c spidermonkey curl pkg-config rebar
+        erlang icu4c spidermonkey curl pkg-config
 
 You will need Homebrew installed to use the `brew` command.
 

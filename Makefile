@@ -12,6 +12,7 @@
 
 include version.mk
 
+REBAR?=$(shell echo `pwd`/bin/rebar)
 IN_RELEASE = $(shell if [ ! -d .git ]; then echo true; fi)
 COUCHDB_VERSION_SUFFIX = $(shell if [ -d .git ]; then echo '-`git rev-parse --short --verify HEAD`'; fi)
 COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)$(COUCHDB_VERSION_SUFFIX)
@@ -27,11 +28,11 @@ config.erl:
 	@false
 
 couch: config.erl
-	@rebar compile
+	@${REBAR} compile
 	@cp src/couch/priv/couchjs bin/
 
 clean:
-	@rebar -r clean
+	@${REBAR} -r clean
 	@rm -f bin/couchjs
 	@rm -rf src/*/ebin
 	@rm -rf src/*/.rebar
@@ -83,7 +84,7 @@ devclean:
 install: all
 	@echo "Installing CouchDB into $(DESTDIR)/$(install_dir)..." | sed -e 's,///,/,'
 	@rm -rf rel/couchdb
-	@rebar generate # make full erlang release
+	@${REBAR} generate # make full erlang release
 
 	@mkdir -p $(DESTDIR)/$(install_dir)
 	@cp -R rel/couchdb/* $(DESTDIR)/$(install_dir)
@@ -155,8 +156,8 @@ docker-stop:
 
 eunit: export BUILDDIR = $(shell pwd)
 eunit: couch
-	@rebar setup_eunit
-	@rebar -r eunit skip_deps=meck,mochiweb,lager,snappy,folsom
+	@${REBAR} setup_eunit
+	@${REBAR} -r eunit skip_deps=meck,mochiweb,lager,snappy,folsom
 
 javascript: all
 	# TODO: Fix tests to look for these files in their new path
