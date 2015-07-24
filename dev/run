@@ -407,22 +407,23 @@ def boot_node(ctx, node):
 @log('Running cluster setup')
 def cluster_setup(ctx):
     lead_port, _ = get_ports(1)
-    if enable_cluster(lead_port, *ctx['admin']):
+    if enable_cluster(ctx['N'], lead_port, *ctx['admin']):
         for num in range(1, ctx['N']):
             node_port, _ = get_ports(num + 1)
-            enable_cluster(node_port, *ctx['admin'])
+            enable_cluster(ctx['N'], node_port, *ctx['admin'])
             add_node(lead_port, node_port, *ctx['admin'])
         finish_cluster(lead_port, *ctx['admin'])
     return lead_port
 
 
-def enable_cluster(port, user, pswd):
+def enable_cluster(node_count, port, user, pswd):
     conn = httpclient.HTTPConnection('127.0.0.1', port)
     conn.request('POST', '/_cluster_setup',
                  json.dumps({'action': 'enable_cluster',
                              'bind_address': '0.0.0.0',
                              'username': user,
-                             'password': pswd}),
+                             'password': pswd,
+                             'node_count': node_count}),
                  {'Authorization': basic_auth_header(user, pswd),
                   'Content-Type': 'application/json'})
     resp = conn.getresponse()
