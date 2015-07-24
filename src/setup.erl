@@ -24,9 +24,9 @@ require_admins(undefined, {undefined, undefined}) ->
 require_admins(_,_) ->
     ok.
 
-require_clustersize(undefined) ->
+require_node_count(undefined) ->
     throw({error, "Cluster setup requires node_count to be configured"});
-require_clustersize(_) ->
+require_node_count(_) ->
     ok.
 
 error_bind_address() ->
@@ -141,7 +141,7 @@ enable_cluster_int(Options, no) ->
     end,
 
     NodeCount = couch_util:get_value(node_count, Options),
-    ok = require_clustersize(NodeCount),
+    ok = require_node_count(NodeCount),
     config:set_integer("cluster", "n", NodeCount),
 
     Port = proplists:get_value(port, Options),
