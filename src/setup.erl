@@ -142,7 +142,7 @@ enable_cluster_int(Options, no) ->
 
     NodeCount = couch_util:get_value(node_count, Options),
     ok = require_clustersize(NodeCount),
-    config:set("cluster", "n", integer_to_list(NodeCount)),
+    config:set_integer("cluster", "n", NodeCount),
 
     Port = proplists:get_value(port, Options),
     case Port of
