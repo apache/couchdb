@@ -7,13 +7,17 @@ before_install:
 before_script:
    - virtualenv venv
    - source venv/bin/activate
-   - pip install sphinx
+   - pip install sphinx nose requests
    - ./configure -c
 script:
    - make check
    - cd src/fauxton
    - npm install
    - grunt test
+   - cd ../..
+   - dev/run --with-admin-party-please &
+   - sleep 10
+   - nosetests src/mango
 language: erlang
 otp_release:
    - 18.0
