@@ -24,6 +24,11 @@ require_admins(undefined, {undefined, undefined}) ->
 require_admins(_,_) ->
     ok.
 
+require_clustersize(undefined) ->
+    throw({error, "Cluster setup requires node_count to be configured"});
+require_clustersize(_) ->
+    ok.
+
 error_bind_address() ->
     throw({error, "Cluster setup requires bind_addres != 127.0.0.1"}).
 
@@ -83,7 +88,8 @@ enable_cluster_http(Options) ->
         {<<"username">>, couch_util:get_value(username, Options)},
         {<<"password">>, couch_util:get_value(password, Options)},
         {<<"bind_address">>, couch_util:get_value(bind_address, Options)},
-        {<<"port">>, couch_util:get_value(port, Options)}
+        {<<"port">>, couch_util:get_value(port, Options)},
+        {<<"node_count">>, couch_util:get_value(node_count, Options)}
     ]}),
 
     Headers = [
@@ -134,6 +140,10 @@ enable_cluster_int(Options, no) ->
             config:set("httpd", "bind_address", binary_to_list(NewBindAddress))
     end,
 
+    NodeCount = couch_util:get_value(node_count, Options),
+    ok = require_clustersize(NodeCount),
+    config:set("cluster", "n", integer_to_list(NodeCount)),
+
     Port = proplists:get_value(port, Options),
     case Port of
         undefined ->
@@ -142,7 +152,6 @@ enable_cluster_int(Options, no) ->
             config:set("httpd", "port", integer_to_list(Port))
     end,
     couch_log:notice("Enable Cluster: ~p~n", [Options]).
-    %cluster_state:set(enabled).
 
 maybe_set_admin(Username, Password) ->
     case couch_auth_cache:get_admin(Username) of
