@@ -251,8 +251,6 @@ handle_request(MochiReq0) ->
                 _Else ->
                     send_error(HttpReq, {Error, nil, Stack})
             end
-    after
-        maybe_discard_body(HttpReq)
     end,
 
     RequestTime = timer:now_diff(os:timestamp(), Begin)/1000,
@@ -502,55 +500,6 @@ json_body_obj(Httpd) ->
         _Else ->
             throw({bad_request, "Request body must be a JSON object"})
     end.
-
-
-maybe_discard_body(#httpd{mochi_req=MochiReq}=Req) ->
-    case erlang:get(mochiweb_request_body) of
-        undefined ->
-            Expect = case MochiReq:get_header_value("expect") of
-                undefined ->
-                    undefined;
-                Value when is_list(Value) ->
-                    string:to_lower(Value)
-                end,
-            case Expect of
-                "100-continue" ->
-                    ok;
-                _Else  ->
-                    discard_body(Req)
-            end;
-        _Body ->
-            ok % already consumed.
-    end.
-
-
-discard_body(#httpd{}=Req) ->
-    case body_length(Req) of
-        undefined ->
-            ok;
-        {unknown_transfer_encoding, Unknown} ->
-            exit({unknown_transfer_encoding, Unknown});
-        chunked ->
-            discard(Req);
-        0 ->
-            ok;
-        Length when is_integer(Length) ->
-            discard(Req);
-        Length ->
-            exit({length_not_integer, Length})
-    end.
-
-discard(#httpd{mochi_req=MochiReq}) ->
-    Discarded = MochiReq:stream_body(8192,
-        fun ({Len, _}, Acc) -> Len + Acc end, 0),
-    case Discarded of
-        undefined ->
-            ok;
-        Length when is_integer(Length) ->
-            couch_log:notice("Discarded ~B bytes of request body.",
-                     [Discarded])
-    end,
-    ok.
 
 
 doc_etag(#doc{revs={Start, [DiskRev|_]}}) ->
