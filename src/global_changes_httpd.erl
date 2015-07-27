@@ -87,6 +87,8 @@ transform_change(Username, _Resp, {Props}) ->
             skip
     end.
 
+changes_callback(waiting_for_updates, Acc) ->
+    {ok, Acc};
 
 % This clause is only hit when _db_updates is queried with limit=0. For
 % limit>0, the request is stopped by maybe_finish/1.
