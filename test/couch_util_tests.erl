@@ -160,3 +160,11 @@ should_fail_for_missing_cb() ->
                 {error, {undefined_callback, Name, MFA}},
                 couch_util:validate_callback_exists(M, F, A))}
         end, Cases).
+
+to_hex_test_() ->
+    [
+        ?_assertEqual("", couch_util:to_hex([])),
+        ?_assertEqual("010203faff", couch_util:to_hex([1, 2, 3, 250, 255])),
+        ?_assertEqual("", couch_util:to_hex(<<>>)),
+        ?_assertEqual("010203faff", couch_util:to_hex(<<1, 2, 3, 250, 255>>))
+    ].

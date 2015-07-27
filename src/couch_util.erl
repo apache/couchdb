@@ -133,15 +133,30 @@ validate_utf8_fast(B, O) ->
             false
     end.
 
-to_hex([]) ->
-    [];
-to_hex(Bin) when is_binary(Bin) ->
-    to_hex(binary_to_list(Bin));
-to_hex([H|T]) ->
-    [to_digit(H div 16), to_digit(H rem 16) | to_hex(T)].
 
-to_digit(N) when N < 10 -> $0 + N;
-to_digit(N)             -> $a + N-10.
+to_hex(<<Hi:4, Lo:4, Rest/binary>>) ->
+    [nibble_to_hex(Hi), nibble_to_hex(Lo) | to_hex(Rest)];
+to_hex(<<>>) ->
+    [];
+to_hex(List) when is_list(List) ->
+    to_hex(list_to_binary(List)).
+
+nibble_to_hex(0) -> $0;
+nibble_to_hex(1) -> $1;
+nibble_to_hex(2) -> $2;
+nibble_to_hex(3) -> $3;
+nibble_to_hex(4) -> $4;
+nibble_to_hex(5) -> $5;
+nibble_to_hex(6) -> $6;
+nibble_to_hex(7) -> $7;
+nibble_to_hex(8) -> $8;
+nibble_to_hex(9) -> $9;
+nibble_to_hex(10) -> $a;
+nibble_to_hex(11) -> $b;
+nibble_to_hex(12) -> $c;
+nibble_to_hex(13) -> $d;
+nibble_to_hex(14) -> $e;
+nibble_to_hex(15) -> $f.
 
 
 parse_term(Bin) when is_binary(Bin) ->
