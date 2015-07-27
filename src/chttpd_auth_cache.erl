@@ -135,6 +135,8 @@ listen_for_changes(Since) ->
     },
     fabric:changes(dbname(), CBFun, Since, Args).
 
+changes_callback(waiting_for_updates, Acc) ->
+    {ok, Acc};
 changes_callback(start, Since) ->
     {ok, Since};
 changes_callback({stop, EndSeq, _Pending}, _) ->
