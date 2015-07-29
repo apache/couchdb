@@ -92,8 +92,16 @@
     auth,
     default_fun,
     url_handlers,
-    authentication_handlers = []
+    authentication_handlers = [],
+    absolute_uri,
+    auth_module,
+    begin_ts,
+    original_method,
+    nonce,
+    cors_config,
+    qs
 }).
+
 
 -record(doc, {
     id = <<"">>,
