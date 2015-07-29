@@ -14,7 +14,7 @@
 -include_lib("couch/include/couch_db.hrl").
 
 -export([start_link/0, start_link/1, start_link/2,
-    stop/0, handle_request/1,
+    stop/0, handle_request/1, handle_request_int/1,
     primary_header_value/2, header_value/2, header_value/3, qs_value/2,
     qs_value/3, qs/1, qs_json_value/3, path/1, absolute_uri/2, body_length/1,
     verify_is_server_admin/1, unquote/1, quote/1, recv/2, recv_chunked/4,
@@ -129,10 +129,12 @@ stop() ->
     mochiweb_http:stop(?MODULE).
 
 handle_request(MochiReq0) ->
-    Begin = os:timestamp(),
     erlang:put(?REWRITE_COUNT, 0),
     MochiReq = couch_httpd_vhost:dispatch_host(MochiReq0),
+    handle_request_int(MochiReq).
 
+handle_request_int(MochiReq) ->
+    Begin = os:timestamp(),
     case config:get("chttpd", "socket_options") of
     undefined ->
         ok;

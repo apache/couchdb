@@ -186,7 +186,7 @@ handle_rewrite_req(#httpd{
             % cleanup, It force mochiweb to reparse raw uri.
             MochiReq1:cleanup(),
 
-            chttpd:handle_request(MochiReq1)
+            chttpd:handle_request_int(MochiReq1)
         end.
 
 quote_plus({bind, X}) ->
