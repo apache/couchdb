@@ -270,7 +270,8 @@ get_idx_def(Opts) ->
 get_idx_type(Opts) ->
     case proplists:get_value(type, Opts) of
         <<"json">> -> <<"json">>;
-        <<"text">> -> <<"text">>;
+        <<"text">> ->
+            ?MANGO_ERROR({index_not_implemented, <<"text">>});
         %<<"geo">> -> <<"geo">>;
         undefined -> <<"json">>;
         BadType ->

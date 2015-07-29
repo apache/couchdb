@@ -10,11 +10,31 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
+import json
 import mango
+import unittest
 import user_docs
 
 
+class TextIndexCheckTests(mango.DbPerClass):
+
+    def test_create_text_index(self):
+        body = json.dumps({
+            'index': {
+                'fields': 'test'
+            },
+            'type': 'text'
+        })
+        resp = self.db.sess.post(self.db.path("_index"), data=body)
+        assert resp.status_code == 501, resp
+
+
 class BasicTextTests(mango.UserDocsTextTests):
+
+    @classmethod
+    def setUpClass(klass):
+        raise unittest.SkipTest('text index is not supported yet')
+
     def test_simple(self):
         docs = self.db.find({"$text": "Stephanie"})
         assert len(docs) == 1
@@ -378,6 +398,11 @@ class BasicTextTests(mango.UserDocsTextTests):
 
 
 class ElemMatchTests(mango.FriendDocsTextTests):
+
+    @classmethod
+    def setUpClass(klass):
+        raise unittest.SkipTest('text index is not supported yet')
+
     def test_elem_match(self):
         q = {"friends": {
                 "$elemMatch":

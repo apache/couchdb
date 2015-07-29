@@ -102,6 +102,12 @@ info(mango_idx, no_index_definition) ->
         <<"invalid_index">>,
         <<"Index is missing its definition.">>
     };
+info(mango_idx, {index_not_implemented, IndexName}) ->
+    {
+        501,
+        <<"index_not_implemented">>,
+        fmt("~s", [IndexName])
+    };
 
 info(mango_idx_view, {invalid_index_json, BadIdx}) ->
     {

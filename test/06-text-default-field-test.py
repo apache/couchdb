@@ -11,12 +11,16 @@
 # the License.
 
 import mango
-
+import unittest
 
 
 class NoDefaultFieldTest(mango.UserDocsTextTests):
 
     DEFAULT_FIELD = False
+
+    @classmethod
+    def setUpClass(klass):
+        raise unittest.SkipTest('text not supported')
 
     def test_basic(self):
         docs = self.db.find({"$text": "Ramona"})
@@ -36,6 +40,10 @@ class NoDefaultFieldWithAnalyzer(mango.UserDocsTextTests):
         "analyzer": "keyword"
     }
 
+    @classmethod
+    def setUpClass(klass):
+        raise unittest.SkipTest('text not supported')
+
     def test_basic(self):
         docs = self.db.find({"$text": "Ramona"})
         assert len(docs) == 0
@@ -52,6 +60,10 @@ class DefaultFieldWithCustomAnalyzer(mango.UserDocsTextTests):
         "enabled": True,
         "analyzer": "keyword"
     }
+
+    @classmethod
+    def setUpClass(klass):
+        raise unittest.SkipTest('text not supported')
 
     def test_basic(self):
         docs = self.db.find({"$text": "Ramona"})

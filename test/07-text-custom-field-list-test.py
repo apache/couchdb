@@ -11,10 +11,14 @@
 # the License.
 
 import mango
-
+import unittest
 
 
 class CustomFieldsTest(mango.UserDocsTextTests):
+
+    @classmethod
+    def setUpClass(klass):
+        raise unittest.SkipTest('text index is not supported yet')
 
     FIELDS = [
         {"name": "favorites.[]", "type": "string"},

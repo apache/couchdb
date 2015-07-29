@@ -12,13 +12,14 @@
 
 import mango
 import user_docs
+import unittest
 
 
 class IndexSelectionTests(mango.UserDocsTests):
     @classmethod
     def setUpClass(klass):
         super(IndexSelectionTests, klass).setUpClass()
-        user_docs.add_text_indexes(klass.db, {})
+        # user_docs.add_text_indexes(klass.db, {})
 
     def test_basic(self):
         resp = self.db.find({"name.last": "A last name"}, explain=True)
@@ -31,10 +32,12 @@ class IndexSelectionTests(mango.UserDocsTests):
             }, explain=True)
         assert resp["index"]["type"] == "json"
 
+    @unittest.skip
     def test_no_view_index(self):
         resp = self.db.find({"name.first": "Ohai!"}, explain=True)
         assert resp["index"]["type"] == "text"
 
+    @unittest.skip
     def test_with_or(self):
         resp = self.db.find({
                 "$or": [
@@ -65,6 +68,7 @@ class IndexSelectionTests(mango.UserDocsTests):
 class MultiTextIndexSelectionTests(mango.UserDocsTests):
     @classmethod
     def setUpClass(klass):
+        raise unittest.SkipTest('text index is not supported yet')
         super(MultiTextIndexSelectionTests, klass).setUpClass()
         klass.db.create_text_index(ddoc="foo", analyzer="keyword")
         klass.db.create_text_index(ddoc="bar", analyzer="email")
