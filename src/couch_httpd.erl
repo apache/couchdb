@@ -32,6 +32,8 @@
 -export([http_1_0_keep_alive/2]).
 -export([validate_host/1]).
 
+-define(HANDLER_NAME_IN_MODULE_POS, 6).
+
 start_link() ->
     start_link(http).
 start_link(http) ->
@@ -161,8 +163,14 @@ set_auth_handlers() ->
     AuthenticationSrcs = make_fun_spec_strs(
         config:get("httpd", "authentication_handlers", "")),
     AuthHandlers = lists:map(
-        fun(A) -> {make_arity_1_fun(A), ?l2b(A)} end, AuthenticationSrcs),
-    ok = application:set_env(couch, auth_handlers, AuthHandlers).
+        fun(A) -> {auth_handler_name(A), make_arity_1_fun(A)} end, AuthenticationSrcs),
+    AuthenticationFuns = AuthHandlers ++ [
+        {<<"local">>, fun couch_httpd_auth:party_mode_handler/1} %% should be last
+    ],
+    ok = application:set_env(couch, auth_handlers, AuthenticationFuns).
+
+auth_handler_name(SpecStr) ->
+    lists:nth(?HANDLER_NAME_IN_MODULE_POS, re:split(SpecStr, "[\\W_]", [])).
 
 % SpecStr is a string like "{my_module, my_fun}"
 %  or "{my_module, my_fun, <<"my_arg">>}"
@@ -290,7 +298,6 @@ handle_request_int(MochiReq, DefaultFun,
     },
 
     HandlerFun = couch_util:dict_find(HandlerKey, UrlHandlers, DefaultFun),
-    {ok, AuthHandlers} = application:get_env(couch, auth_handlers),
 
     {ok, Resp} =
     try
@@ -299,7 +306,7 @@ handle_request_int(MochiReq, DefaultFun,
         check_request_uri_length(RawUri),
         case couch_httpd_cors:is_preflight_request(HttpReq) of
         #httpd{} ->
-            case authenticate_request(HttpReq, AuthHandlers) of
+            case authenticate_request(HttpReq) of
             #httpd{} = Req ->
                 HandlerFun(Req);
             Response ->
@@ -401,27 +408,9 @@ check_request_uri_length(Uri, MaxUriLen) when is_list(MaxUriLen) ->
             ok
     end.
 
-% Try authentication handlers in order until one sets a user_ctx
-% the auth funs also have the option of returning a response
-% move this to couch_httpd_auth?
-authenticate_request(#httpd{user_ctx=#user_ctx{}} = Req, _AuthHandlers) ->
-    Req;
-authenticate_request(#httpd{} = Req, []) ->
-    case config:get("couch_httpd_auth", "require_valid_user", "false") of
-    "true" ->
-        throw({unauthorized, <<"Authentication required.">>});
-    "false" ->
-        Req#httpd{user_ctx=#user_ctx{}}
-    end;
-authenticate_request(#httpd{} = Req, [{AuthFun, AuthSrc} | RestAuthHandlers]) ->
-    R = case AuthFun(Req) of
-        #httpd{user_ctx=#user_ctx{}=UserCtx}=Req2 ->
-            Req2#httpd{user_ctx=UserCtx#user_ctx{handler=AuthSrc}};
-        Else -> Else
-    end,
-    authenticate_request(R, RestAuthHandlers);
-authenticate_request(Response, _AuthSrcs) ->
-    Response.
+authenticate_request(Req) ->
+    {ok, AuthenticationFuns} = application:get_env(couch, auth_handlers),
+    chttpd:authenticate_request(Req, couch_auth_cache, AuthenticationFuns).
 
 increment_method_stats(Method) ->
     couch_stats:increment_counter([couchdb, httpd_request_methods, Method]).

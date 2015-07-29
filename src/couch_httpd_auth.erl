@@ -13,6 +13,8 @@
 -module(couch_httpd_auth).
 -include_lib("couch/include/couch_db.hrl").
 
+-export([party_mode_handler/1]).
+
 -export([default_authentication_handler/1, default_authentication_handler/2,
 	 special_test_authentication_handler/1]).
 -export([cookie_authentication_handler/1, cookie_authentication_handler/2]).
@@ -24,11 +26,19 @@
 -export([authenticate/2, verify_totp/2, maybe_upgrade_password_hash/6]).
 -export([ensure_cookie_auth_secret/0, make_cookie_time/0]).
 -export([cookie_auth_cookie/4, cookie_scheme/1]).
--export([auth_name/1, maybe_value/3]).
+-export([maybe_value/3]).
 
 -import(couch_httpd, [header_value/2, send_json/2,send_json/4, send_method_not_allowed/2]).
 
 -compile({no_auto_import,[integer_to_binary/1, integer_to_binary/2]}).
+
+party_mode_handler(Req) ->
+    case config:get("couch_httpd_auth", "require_valid_user", "false") of
+    "true" ->
+        throw({unauthorized, <<"Authentication required.">>});
+    "false" ->
+        Req#httpd{user_ctx=#user_ctx{}}
+    end.
 
 special_test_authentication_handler(Req) ->
     case header_value(Req, "WWW-Authenticate") of
@@ -346,10 +356,10 @@ handle_session_req(#httpd{method='GET', user_ctx=UserCtx}=Req, _AuthModule) ->
                 ]}},
                 {info, {[
                     {authentication_db, ?l2b(config:get("couch_httpd_auth", "authentication_db"))},
-                    {authentication_handlers, [auth_name(H) || H <- couch_httpd:make_fun_spec_strs(
-                            config:get("httpd", "authentication_handlers"))]}
+                    {authentication_handlers, [
+                       N || {N, _Fun} <- Req#httpd.authentication_handlers]}
                 ] ++ maybe_value(authenticated, UserCtx#user_ctx.handler, fun(Handler) ->
-                        auth_name(?b2l(Handler))
+                        Handler
                     end)}}
             ]})
     end;
@@ -417,10 +427,6 @@ verify_iterations(Iterations) when is_integer(Iterations) ->
         false ->
             ok
     end.
-
-auth_name(String) when is_list(String) ->
-    [_,_,_,_,_,Name|_] = re:split(String, "[\\W_]", [{return, list}]),
-    ?l2b(Name).
 
 make_cookie_time() ->
     {NowMS, NowS, _} = os:timestamp(),

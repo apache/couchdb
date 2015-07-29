@@ -91,9 +91,9 @@
     design_url_handlers,
     auth,
     default_fun,
-    url_handlers
+    url_handlers,
+    authentication_handlers = []
 }).
-
 
 -record(doc, {
     id = <<"">>,
