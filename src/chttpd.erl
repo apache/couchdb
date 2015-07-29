@@ -27,6 +27,8 @@
     send_method_not_allowed/2, send_error/2, send_error/4, send_redirect/2,
     send_chunked_error/2, send_json/2,send_json/3,send_json/4]).
 
+-export([authenticate_request/3]).
+
 -export([start_delayed_json_response/2, start_delayed_json_response/3,
     start_delayed_json_response/4,
     start_delayed_chunked_response/3, start_delayed_chunked_response/4,
@@ -143,11 +145,6 @@ handle_request_int(MochiReq) ->
         ok = mochiweb_socket:setopts(MochiReq:get(socket), SocketOpts)
     end,
 
-    AuthenticationFuns = [
-        fun chttpd_auth:cookie_authentication_handler/1,
-        fun chttpd_auth:default_authentication_handler/1
-    ],
-
     % for the path, use the raw path with the query string and fragment
     % removed, but URL quoting left intact
     RawUri = MochiReq:get(raw_path),
@@ -215,7 +212,7 @@ handle_request_int(MochiReq) ->
         check_request_uri_length(RawUri),
         case chttpd_cors:maybe_handle_preflight_request(HttpReq) of
         not_preflight ->
-            case authenticate_request(HttpReq, AuthenticationFuns) of
+            case chttpd_auth:authenticate(HttpReq, fun authenticate_request/1) of
             #httpd{} = Req ->
                 HandlerFun = chttpd_handlers:url_handler(
                     HandlerKey, fun chttpd_db:handle_request/1),
@@ -346,27 +343,32 @@ make_uri(Req, Raw) ->
     {[{<<"url">>,Url}, {<<"headers">>,{Headers}}]}.
 %%% end hack
 
+authenticate_request(Req) ->
+    AuthenticationFuns = [
+        {<<"cookie">>, fun chttpd_auth:cookie_authentication_handler/1},
+        {<<"default">>, fun chttpd_auth:default_authentication_handler/1},
+        {<<"local">>, fun chttpd_auth:party_mode_handler/1} %% should be last
+    ],
+    authenticate_request(Req, chttpd_auth_cache, AuthenticationFuns).
+
+authenticate_request(#httpd{} = Req0, AuthModule, AuthFuns) ->
+    Req = Req0#httpd{
+        auth_module = AuthModule,
+        authentication_handlers = AuthFuns},
+    authenticate_request(Req, AuthFuns).
 
 % Try authentication handlers in order until one returns a result
 authenticate_request(#httpd{user_ctx=#user_ctx{}} = Req, _AuthFuns) ->
     Req;
-authenticate_request(#httpd{} = Req, [AuthFun|Rest]) ->
-    authenticate_request(AuthFun(Req), Rest);
-authenticate_request(#httpd{} = Req, []) ->
-    case config:get("chttpd", "require_valid_user", "false") of
-    "true" ->
-        throw({unauthorized, <<"Authentication required.">>});
-    "false" ->
-        case config:get("admins") of
-        [] ->
-            Ctx = #user_ctx{roles=[<<"_reader">>, <<"_writer">>, <<"_admin">>]},
-            Req#httpd{user_ctx = Ctx};
-        _ ->
-            Req#httpd{user_ctx=#user_ctx{}}
-        end
-    end;
+authenticate_request(#httpd{} = Req, [{Name, AuthFun}|Rest]) ->
+    authenticate_request(maybe_set_handler(AuthFun(Req), Name), Rest);
 authenticate_request(Response, _AuthFuns) ->
     Response.
+
+maybe_set_handler(#httpd{user_ctx=#user_ctx{} = UserCtx} = Req, Name) ->
+    Req#httpd{user_ctx = UserCtx#user_ctx{handler = Name}};
+maybe_set_handler(Else, _) ->
+    Else.
 
 increment_method_stats(Method) ->
     couch_stats:increment_counter([couchdb, httpd_request_methods, Method]).

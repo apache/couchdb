@@ -12,9 +12,30 @@
 
 -module(chttpd_auth).
 
+-export([authenticate/2]).
+
 -export([default_authentication_handler/1]).
 -export([cookie_authentication_handler/1]).
+-export([party_mode_handler/1]).
+
 -export([handle_session_req/1]).
+
+-include_lib("couch/include/couch_db.hrl").
+
+-define(SERVICE_ID, chttpd_auth).
+
+
+%% ------------------------------------------------------------------
+%% API Function Definitions
+%% ------------------------------------------------------------------
+
+authenticate(HttpReq, Default) ->
+    maybe_handle(authenticate, [HttpReq], Default).
+
+
+%% ------------------------------------------------------------------
+%% Default callbacks
+%% ------------------------------------------------------------------
 
 default_authentication_handler(Req) ->
     couch_httpd_auth:default_authentication_handler(Req, chttpd_auth_cache).
@@ -22,5 +43,35 @@ default_authentication_handler(Req) ->
 cookie_authentication_handler(Req) ->
     couch_httpd_auth:cookie_authentication_handler(Req, chttpd_auth_cache).
 
+party_mode_handler(Req) ->
+    case config:get("chttpd", "require_valid_user", "false") of
+    "true" ->
+        throw({unauthorized, <<"Authentication required.">>});
+    "false" ->
+        case config:get("admins") of
+        [] ->
+            Ctx = #user_ctx{roles=[<<"_reader">>, <<"_writer">>, <<"_admin">>]},
+            Req#httpd{user_ctx = Ctx};
+        _ ->
+            Req#httpd{user_ctx=#user_ctx{}}
+        end
+    end.
+
 handle_session_req(Req) ->
     couch_httpd_auth:handle_session_req(Req, chttpd_auth_cache).
+
+
+%% ------------------------------------------------------------------
+%% Internal Function Definitions
+%% ------------------------------------------------------------------
+
+maybe_handle(Func, Args, Default) ->
+    Handle = couch_epi:get_handle(?SERVICE_ID),
+    case couch_epi:apply(Handle, ?SERVICE_ID, Func, Args, [ignore_providers]) of
+        [] when is_function(Default) ->
+            apply(Default, Args);
+        [] ->
+            Default;
+        [Result] ->
+            Result
+    end.

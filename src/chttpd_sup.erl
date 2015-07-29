@@ -26,7 +26,7 @@ init([]) ->
     chttpd_config_listener:subscribe(),
     {ok, {{one_for_one, 3, 10}, [
         ?CHILD(chttpd, worker),
-        ?CHILD(chttpd_auth_cache, worker),
+        ?CHILD(auth_cache_handler(), worker),
         chttpd_handlers:provider(chttpd, chttpd_httpd_handlers),
         {chttpd_auth_cache_lru,
 	 {ets_lru, start_link, [chttpd_auth_cache_lru, lru_opts()]},
@@ -51,4 +51,12 @@ lru_opts() ->
             [{max_lifetime, MxLT}];
         _ ->
             []
+    end.
+
+auth_cache_handler() ->
+    case application:get_env(chttpd, auth_cache) of
+        {ok, Module} ->
+            Module;
+        _ ->
+            chttpd_auth_cache
     end.
