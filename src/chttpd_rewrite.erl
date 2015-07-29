@@ -119,6 +119,15 @@ handle_rewrite_req(#httpd{
     Prefix = <<"/", DbName/binary, "/", DesignId/binary>>,
     QueryList = lists:map(fun decode_query_value/1, chttpd:qs(Req)),
 
+    RewritesSoFar = erlang:get(?REWRITE_COUNT),
+    MaxRewrites = config:get_integer("httpd", "rewrite_limit", 100),
+    case RewritesSoFar >= MaxRewrites of
+        true ->
+            throw({bad_request, <<"Exceeded rewrite recursion limit">>});
+        false ->
+            erlang:put(?REWRITE_COUNT, RewritesSoFar + 1)
+    end,
+
     #doc{body={Props}} = DDoc,
 
     % get rules from ddoc

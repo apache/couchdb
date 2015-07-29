@@ -130,6 +130,7 @@ stop() ->
 
 handle_request(MochiReq0) ->
     Begin = os:timestamp(),
+    erlang:put(?REWRITE_COUNT, 0),
     MochiReq = couch_httpd_vhost:dispatch_host(MochiReq0),
 
     case config:get("chttpd", "socket_options") of
