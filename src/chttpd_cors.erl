@@ -130,7 +130,7 @@ handle_preflight_request(Req, Config, Origin) ->
                         %% transform header list in something we
                         %% could check. make sure everything is a
                         %% list
-                        RH = [string:to_lower(H)
+                        RH = [to_lower(H)
                               || H <- split_headers(Headers)],
                         {Headers, RH}
                 end,
@@ -346,7 +346,7 @@ get_origin(Req) ->
         undefined ->
             undefined;
         Origin ->
-            list_to_binary(string:to_lower(Origin))
+            ?l2b(to_lower(Origin))
     end.
 
 
