@@ -318,7 +318,7 @@ call_node(Node, Mod, Fun, Args) when is_atom(Node) ->
     end.
 
 flush(Node, Req) ->
-    case couch_util:get_value("flush", couch_httpd:qs(Req)) of
+    case couch_util:get_value("flush", chttpd:qs(Req)) of
         "true" ->
             call_node(Node, couch_stats_aggregator, flush, []);
         _Else ->

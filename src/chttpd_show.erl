@@ -118,7 +118,7 @@ send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId) ->
     JsonReq = chttpd_external:json_req_obj(Req, Db, DocId),
     JsonDoc = couch_query_servers:json_doc(Doc),
     Cmd = [<<"updates">>, UpdateName],
-    W = couch_httpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
+    W = chttpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
     UpdateResp = couch_query_servers:ddoc_prompt(DDoc, Cmd, [JsonDoc, JsonReq]),
     JsonResp = case UpdateResp of
         [<<"up">>, {NewJsonDoc}, {JsonResp0}] ->

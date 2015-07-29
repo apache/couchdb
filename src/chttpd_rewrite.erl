@@ -117,7 +117,7 @@ handle_rewrite_req(#httpd{
     % we are in a design handler
     DesignId = <<"_design/", DesignName/binary>>,
     Prefix = <<"/", DbName/binary, "/", DesignId/binary>>,
-    QueryList = lists:map(fun decode_query_value/1, couch_httpd:qs(Req)),
+    QueryList = lists:map(fun decode_query_value/1, chttpd:qs(Req)),
 
     #doc{body={Props}} = DDoc,
 
