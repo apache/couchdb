@@ -220,7 +220,9 @@ handle_request_int(MochiReq) ->
             #httpd{} = Req ->
                 HandlerFun = chttpd_handlers:url_handler(
                     HandlerKey, fun chttpd_db:handle_request/1),
-                HandlerFun(chttpd_auth_request:authorize_request(possibly_hack(Req)));
+                AuthorizedReq = chttpd_auth:authorize(possibly_hack(Req),
+                    fun chttpd_auth_request:authorize_request/1),
+                HandlerFun(AuthorizedReq);
             Response ->
                 Response
             end;

@@ -13,6 +13,7 @@
 -module(chttpd_auth).
 
 -export([authenticate/2]).
+-export([authorize/2]).
 
 -export([default_authentication_handler/1]).
 -export([cookie_authentication_handler/1]).
@@ -31,6 +32,9 @@
 
 authenticate(HttpReq, Default) ->
     maybe_handle(authenticate, [HttpReq], Default).
+
+authorize(HttpReq, Default) ->
+    maybe_handle(authorize, [HttpReq], Default).
 
 
 %% ------------------------------------------------------------------
