@@ -193,7 +193,7 @@ handle_request_int(MochiReq) ->
 
     Nonce = couch_util:to_hex(crypto:rand_bytes(5)),
 
-    HttpReq = #httpd{
+    HttpReq0 = #httpd{
         mochi_req = MochiReq,
         begin_ts = Begin,
         peer = Peer,
@@ -203,6 +203,8 @@ handle_request_int(MochiReq) ->
         path_parts = [list_to_binary(chttpd:unquote(Part))
                 || Part <- string:tokens(Path, "/")]
     },
+
+    {ok, HttpReq} = chttpd_plugin:before_request(HttpReq0),
 
     HandlerKey =
         case HttpReq#httpd.path_parts of
@@ -229,7 +231,7 @@ handle_request_int(MochiReq) ->
                     HandlerKey, fun chttpd_db:handle_request/1),
                 AuthorizedReq = chttpd_auth:authorize(possibly_hack(Req),
                     fun chttpd_auth_request:authorize_request/1),
-                HandlerFun(AuthorizedReq);
+                {AuthorizedReq, HandlerFun(AuthorizedReq)};
             Response ->
                 Response
             end;
@@ -268,11 +270,12 @@ handle_request_int(MochiReq) ->
     end,
 
     {HttpReq1, HttpResp0} = result(Result0, HttpReq),
+    {ok, HttpResp1} = chttpd_plugin:after_request(HttpReq1, HttpResp0),
 
-    HttpResp1 = update_stats(HttpReq1, HttpResp0),
-    maybe_log(HttpReq1, HttpResp1),
+    HttpResp2 = update_stats(HttpReq1, HttpResp1),
+    maybe_log(HttpReq1, HttpResp2),
 
-    case HttpResp1 of
+    case HttpResp2 of
         #httpd_resp{status = ok, response = Resp} ->
             {ok, Resp};
         #httpd_resp{status = aborted, reason = Reason} ->
@@ -280,6 +283,8 @@ handle_request_int(MochiReq) ->
             exit(normal)
     end.
 
+result({#httpd{} = Req, Result}, _) ->
+    result(Result, Req);
 result(Result, #httpd{nonce = Nonce} = Req) ->
     {Status, Code, Reason} = case Result of
         {ok, #delayed_resp{resp=Resp}} ->
@@ -817,14 +822,25 @@ error_info({timeout, _Reason}) ->
     error_info(timeout);
 error_info({Error, null}) ->
     error_info(Error);
-error_info({Error, Reason}) ->
-    {500, couch_util:to_binary(Error), couch_util:to_binary(Reason)};
+error_info({_Error, _Reason} = Error) ->
+    maybe_handle_error(Error);
 error_info({Error, nil, _Stack}) ->
     error_info(Error);
 error_info({Error, Reason, _Stack}) ->
     {500, couch_util:to_binary(Error), couch_util:to_binary(Reason)};
 error_info(Error) ->
-    {500, <<"unknown_error">>, couch_util:to_binary(Error)}.
+    maybe_handle_error({<<"unknown_error">>, Error}).
+
+maybe_handle_error(Error) ->
+    case chttpd_plugin:handle_error(Error) of
+        {_Code, _Reason, _Description} = Result ->
+            Result;
+        {Err, Reason} ->
+            {500, couch_util:to_binary(Err), couch_util:to_binary(Reason)};
+        Error ->
+            {500, couch_util:to_binary(Error), null}
+    end.
+
 
 error_headers(#httpd{mochi_req=MochiReq}=Req, 401=Code, ErrorStr, ReasonStr) ->
     % this is where the basic auth popup is triggered
