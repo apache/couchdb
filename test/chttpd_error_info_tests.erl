@@ -110,11 +110,11 @@ error_info_test() ->
              <<"Requested range not satisfiable">>}
         },
         {
-            {error, illegal_database_name},
+            {error, {illegal_database_name, <<"foo">>}},
             {400, <<"illegal_database_name">>,
-             <<"Only lowercase letters (a-z), digits (0-9), and any of"
+             <<"Name: 'foo'. Only lowercase characters (a-z), digits (0-9), and any of"
                " the characters _, $, (, ), +, -, and / are allowed."
-               " Moreover, the database name must begin with a letter.">>}
+               " Must begin with a letter.">>}
         },
         {
             {missing_stub, Reason},

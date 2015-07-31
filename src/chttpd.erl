@@ -804,10 +804,11 @@ error_info({bad_ctype, Reason}) ->
     {415, <<"bad_content_type">>, Reason};
 error_info(requested_range_not_satisfiable) ->
     {416, <<"requested_range_not_satisfiable">>, <<"Requested range not satisfiable">>};
-error_info({error, illegal_database_name}) ->
-    {400, <<"illegal_database_name">>, <<"Only lowercase letters (a-z), "
-        "digits (0-9), and any of the characters _, $, (, ), +, -, and / are "
-        "allowed. Moreover, the database name must begin with a letter.">>};
+error_info({error, {illegal_database_name, Name}}) ->
+    Message = <<"Name: '", Name/binary, "'. Only lowercase characters (a-z), ",
+        "digits (0-9), and any of the characters _, $, (, ), +, -, and / ",
+        "are allowed. Must begin with a letter.">>,
+    {400, <<"illegal_database_name">>, Message};
 error_info({missing_stub, Reason}) ->
     {412, <<"missing_stub">>, Reason};
 error_info(request_entity_too_large) ->
