@@ -13,6 +13,7 @@
 -module(global_changes_httpd).
 
 -export([handle_global_changes_req/1]).
+-export([default_transform_change/2]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -65,8 +66,11 @@ handle_global_changes_req(#httpd{method='GET'}=Req) ->
 handle_global_changes_req(Req) ->
     chttpd:send_method_not_allowed(Req, "GET").
 
+transform_change(Username, Change) ->
+    global_changes_plugin:transform_change(Username, Change,
+        fun default_transform_change/2).
 
-transform_change(Username, _Resp, {Props}) ->
+default_transform_change(Username, {Props}) ->
     {id, Id} = lists:keyfind(id, 1, Props),
     {seq, Seq} = lists:keyfind(seq, 1, Props),
     Info = case binary:split(Id, <<":">>) of
@@ -100,7 +104,7 @@ changes_callback(start, #acc{feed="continuous"}=Acc) ->
     {ok, Acc#acc{resp=Resp, last_data_sent_time=os:timestamp()}};
 changes_callback({change, Change0}, #acc{feed="continuous"}=Acc) ->
     #acc{resp=Resp, username=Username} = Acc,
-    case transform_change(Username, Resp, Change0) of
+    case transform_change(Username, Change0) of
         skip ->
             {ok, maybe_send_heartbeat(Acc)};
         Change ->
@@ -140,7 +144,7 @@ changes_callback(start, Acc) ->
     }};
 changes_callback({change, Change0}, Acc) ->
     #acc{resp=Resp, prepend=Prepend, username=Username} = Acc,
-    case transform_change(Username, Resp, Change0) of
+    case transform_change(Username, Change0) of
         skip ->
             {ok, maybe_send_heartbeat(Acc)};
         Change ->
