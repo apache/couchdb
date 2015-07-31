@@ -17,7 +17,6 @@
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
--define(DBNAME_REGEX, "^[a-z][a-z0-9\\_\\$()\\+\\-\\/]*$").
 
 %% @doc Create a new database, and all its partition files across the cluster
 %%      Options is proplist with user_ctx, n, q, validate_name
@@ -42,15 +41,7 @@ validate_dbname(DbName, Options) ->
     false ->
         ok;
     true ->
-        case re:run(DbName, ?DBNAME_REGEX, [{capture,none}, dollar_endonly]) of
-        match ->
-            ok;
-        nomatch ->
-            case lists:member(?b2l(DbName), ?SYSTEM_DATABASES) of
-            true -> ok;
-            false -> {error, illegal_database_name}
-            end
-        end
+        couch_db:validate_dbname(DbName)
     end.
 
 generate_shard_map(DbName, Options) ->
