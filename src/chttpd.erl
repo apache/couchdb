@@ -211,6 +211,7 @@ handle_request_int(MochiReq) ->
     Result =
     try
         couch_httpd:validate_host(HttpReq),
+        chttpd_csrf:validate(HttpReq),
         check_request_uri_length(RawUri),
         case chttpd_cors:maybe_handle_preflight_request(HttpReq) of
         not_preflight ->
@@ -395,8 +396,9 @@ serve_file(#httpd{mochi_req=MochiReq}=Req, RelativePath, DocumentRoot,
     Headers = server_header() ++
 	couch_httpd_auth:cookie_auth_header(Req, []) ++
 	ExtraHeaders,
-    {ok, MochiReq:serve_file(RelativePath, DocumentRoot,
-        chttpd_cors:headers(Req, Headers))}.
+    Headers1 = chttpd_cors:headers(Req, Headers),
+    Headers2 = chttpd_csrf:headers(Req, Headers1),
+    {ok, MochiReq:serve_file(RelativePath, DocumentRoot, Headers2)}.
 
 qs_value(Req, Key) ->
     qs_value(Req, Key, undefined).
@@ -524,8 +526,10 @@ etag_respond(Req, CurrentEtag, RespFun) ->
     case etag_match(Req, CurrentEtag) of
     true ->
         % the client has this in their cache.
-        Headers = chttpd_cors:headers(Req, [{"Etag", CurrentEtag}]),
-        chttpd:send_response(Req, 304, Headers, <<>>);
+        Headers0 = [{"Etag", CurrentEtag}],
+        Headers1 = chttpd_cors:headers(Req, Headers0),
+        Headers2 = chttpd_csrf:headers(Req, Headers1),
+        chttpd:send_response(Req, 304, Headers2, <<>>);
     false ->
         % Run the function.
         RespFun()
@@ -539,10 +543,11 @@ verify_is_server_admin(#httpd{user_ctx=#user_ctx{roles=Roles}}) ->
 
 start_response_length(#httpd{mochi_req=MochiReq}=Req, Code, Headers0, Length) ->
     couch_stats:increment_counter([couchdb, httpd_status_codes, Code]),
-    Headers = Headers0 ++ server_header() ++
+    Headers1 = Headers0 ++ server_header() ++
 	couch_httpd_auth:cookie_auth_header(Req, Headers0),
-    Resp = MochiReq:start_response_length({Code,
-        chttpd_cors:headers(Req, Headers), Length}),
+    Headers2 = chttpd_cors:headers(Req, Headers1),
+    Headers3 = chttpd_csrf:headers(Req, Headers2),
+    Resp = MochiReq:start_response_length({Code, Headers3, Length}),
     case MochiReq:get(method) of
     'HEAD' -> throw({http_head_abort, Resp});
     _ -> ok
@@ -555,10 +560,11 @@ send(Resp, Data) ->
 
 start_chunked_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers0) ->
     couch_stats:increment_counter([couchdb, httpd_status_codes, Code]),
-    Headers = Headers0 ++ server_header() ++
+    Headers1 = Headers0 ++ server_header() ++
         couch_httpd_auth:cookie_auth_header(Req, Headers0),
-    Resp = MochiReq:respond({Code, chttpd_cors:headers(Req, Headers),
-        chunked}),
+    Headers2 = chttpd_cors:headers(Req, Headers1),
+    Headers3 = chttpd_csrf:headers(Req, Headers2),
+    Resp = MochiReq:respond({Code, Headers3, chunked}),
     case MochiReq:get(method) of
     'HEAD' -> throw({http_head_abort, Resp});
     _ -> ok
@@ -587,15 +593,19 @@ send_json(Req, Code, Value) ->
     send_json(Req, Code, [], Value).
 
 send_json(Req, Code, Headers0, Value) ->
-    Headers = chttpd_cors:headers(Req, Headers0),
-    couch_httpd:send_json(Req, Code, [timing(), reqid() | Headers], Value).
+    Headers1 = [timing(), reqid() | Headers0],
+    Headers2 = chttpd_cors:headers(Req, Headers1),
+    Headers3 = chttpd_csrf:headers(Req, Headers2),
+    couch_httpd:send_json(Req, Code, Headers3, Value).
 
 start_json_response(Req, Code) ->
     start_json_response(Req, Code, []).
 
 start_json_response(Req, Code, Headers0) ->
-    Headers = chttpd_cors:headers(Req, Headers0),
-    couch_httpd:start_json_response(Req, Code, [timing(), reqid() | Headers]).
+    Headers1 = [timing(), reqid() | Headers0],
+    Headers2 = chttpd_cors:headers(Req, Headers1),
+    Headers3 = chttpd_csrf:headers(Req, Headers2),
+    couch_httpd:start_json_response(Req, Code, Headers3).
 
 end_json_response(Resp) ->
     couch_httpd:end_json_response(Resp).
@@ -852,9 +862,10 @@ send_chunked_error(Resp, Error) ->
     send_chunk(Resp, []).
 
 send_redirect(Req, Path) ->
-     Headers = chttpd_cors:headers(Req,
-         [{"Location", chttpd:absolute_uri(Req, Path)}]),
-     send_response(Req, 301, Headers, <<>>).
+    Headers0 = [{"Location", chttpd:absolute_uri(Req, Path)}],
+    Headers1 = chttpd_cors:headers(Req, Headers0),
+    Headers2 = chttpd_csrf:headers(Req, Headers1),
+    send_response(Req, 301, Headers2, <<>>).
 
 server_header() ->
     couch_httpd:server_header().
