@@ -480,8 +480,10 @@ qs_json_value(Req, Key, Default) ->
             ?JSON_DECODE(Result)
     end.
 
-qs(#httpd{mochi_req=MochiReq}) ->
-    MochiReq:parse_qs().
+qs(#httpd{mochi_req = MochiReq, qs = undefined}) ->
+    MochiReq:parse_qs();
+qs(#httpd{qs = QS}) ->
+    QS.
 
 path(#httpd{mochi_req=MochiReq}) ->
     MochiReq:get(path).
