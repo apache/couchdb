@@ -112,7 +112,7 @@ class IndexCrudTests(mango.DbPerClass):
             doc = self.db.open_doc(ddocid)
             assert doc["_id"] == ddocid
             info = self.db.ddoc_info(ddocid)
-            assert info["name"] == ddocid
+            assert info["name"] == ddocid.split('_design/')[-1]
 
     def test_delete_idx_escaped(self):
         pre_indexes = self.db.list_indexes()

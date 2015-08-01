@@ -12,8 +12,13 @@
 
 import mango
 import limit_docs
+import unittest
 
 class LimitTests(mango.LimitDocsTextTests):
+
+    @classmethod
+    def setUpClass(klass):
+        raise unittest.SkipTest('text index is not supported yet')
 
     def test_limit_field(self):
         q = {"$or": [{"user_id" : {"$lt" : 10}}, {"filtered_array.[]": 1}]}

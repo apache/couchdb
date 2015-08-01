@@ -13,7 +13,7 @@
 
 
 import mango
-
+import unittest
 
 TEST_DOCS = [
     {
@@ -56,6 +56,7 @@ TEST_DOCS = [
 class KeyTests(mango.DbPerClass):
     @classmethod
     def setUpClass(klass):
+        raise unittest.SkipTest('text index is not supported yet')
         super(KeyTests, klass).setUpClass()
         klass.db.save_docs(TEST_DOCS, w=3)
         klass.db.create_index(["type"], ddoc="view")
@@ -124,6 +125,7 @@ class KeyTests(mango.DbPerClass):
         for query in queries:
             self.run_check(query, check, indexes=["text"])
 
+    @unittest.skip
     def test_escape_period(self):
         query = {"name\\.first" : "Kvothe"}
         def check(docs):
@@ -136,6 +138,7 @@ class KeyTests(mango.DbPerClass):
             assert len(docs) == 0
         self.run_check(query, check_empty, indexes=["text"])
 
+    @unittest.skip
     def test_object_period(self):
         query = {"name.first" : "Master Elodin"}
         def check(docs):
