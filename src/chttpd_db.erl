@@ -193,6 +193,8 @@ changes_callback({stop, EndSeq, Pending}, Acc) ->
     {ok, Resp1} = chttpd:close_delayed_json_object(Resp, Buf, Terminator, Max),
     chttpd:end_delayed_json_response(Resp1);
 
+changes_callback(waiting_for_updates, #cacc{buffer = []} = Acc) ->
+    {ok, Acc};
 changes_callback(waiting_for_updates, Acc) ->
     #cacc{buffer = Buf, mochi = Resp} = Acc,
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp, Buf),
