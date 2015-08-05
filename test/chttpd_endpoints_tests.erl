@@ -81,7 +81,7 @@ endpoints_test_() ->
         "Checking dynamic endpoints",
         {
             setup,
-            fun() -> test_util:start_couch([chttpd, mem3, global_changes, mango]) end,
+            fun() -> test_util:start_couch([chttpd, mem3, global_changes, mango, setup]) end,
             fun test_util:stop/1,
             [
                 check_dynamic_endpoints(
