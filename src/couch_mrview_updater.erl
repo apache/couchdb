@@ -472,6 +472,10 @@ update_task(NumChanges) ->
 
 
 maybe_notify(State, View, KVs, ToRem) ->
-    Updated = [Key || {{Key, _}, _} <- KVs],
-    Removed = [Key || {Key, _DocId} <- ToRem],
+    Updated = fun() ->
+        [Key || {{Key, _}, _} <- KVs]
+    end,
+    Removed = fun() ->
+        [Key || {Key, _DocId} <- ToRem]
+    end,
     couch_index_plugin:index_update(State, View, Updated, Removed).
