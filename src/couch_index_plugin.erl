@@ -24,5 +24,22 @@
 
 index_update(State, View, Updated, Removed) ->
     Handle = couch_epi:get_handle(?SERVICE_ID),
-    Args = [State, View, Updated, Removed],
+    case couch_epi:is_configured(Handle, index_update, 4) of
+        true ->
+            update(Handle, State, View, Updated, Removed);
+        false ->
+            ok
+    end.
+
+%% ------------------------------------------------------------------
+%% Internal Function Definitions
+%% ------------------------------------------------------------------
+
+maybe_transform(Fun) when is_function(Fun) ->
+    Fun();
+maybe_transform(Items) ->
+    Items.
+
+update(Handle, State, View, Updated, Removed) ->
+    Args = [State, View, maybe_transform(Updated), maybe_transform(Removed)],
     couch_epi:apply(Handle, ?SERVICE_ID, index_update, Args, [ignore_providers]).
