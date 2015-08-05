@@ -41,12 +41,12 @@
 -define(ADMIN_CTX, {user_ctx, ?ADMIN_USER}).
 
 -define(SYSTEM_DATABASES, [
-    "_dbs",
-    "_global_changes",
-    "_metadata",
-    "_nodes",
-    "_replicator",
-    "_users"
+    <<"_dbs">>,
+    <<"_global_changes">>,
+    <<"_metadata">>,
+    <<"_nodes">>,
+    <<"_replicator">>,
+    <<"_users">>
 ]).
 
 

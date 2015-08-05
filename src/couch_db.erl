@@ -1525,4 +1525,4 @@ is_systemdb(DbName) when is_list(DbName) ->
 is_systemdb(<<"shards/", _/binary>> = Path) when is_binary(Path) ->
     is_systemdb(normalize_dbname(Path));
 is_systemdb(DbName) when is_binary(DbName) ->
-    lists:member(?b2l(DbName), ?SYSTEM_DATABASES).
+    lists:member(DbName, ?SYSTEM_DATABASES).
