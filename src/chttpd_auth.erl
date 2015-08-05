@@ -50,8 +50,7 @@ party_mode_handler(Req) ->
     "false" ->
         case config:get("admins") of
         [] ->
-            Ctx = #user_ctx{roles=[<<"_reader">>, <<"_writer">>, <<"_admin">>]},
-            Req#httpd{user_ctx = Ctx};
+            Req#httpd{user_ctx = ?ADMIN_USER};
         _ ->
             Req#httpd{user_ctx=#user_ctx{}}
         end
