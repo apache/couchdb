@@ -156,6 +156,16 @@ handle_request_int(MochiReq) ->
     RawUri = MochiReq:get(raw_path),
     {"/" ++ Path, _, _} = mochiweb_util:urlsplit_path(RawUri),
 
+    % get requested path
+    RequestedPath = case MochiReq:get_header_value("x-couchdb-vhost-path") of
+        undefined ->
+            case MochiReq:get_header_value("x-couchdb-requested-path") of
+                undefined -> RawUri;
+                R -> R
+            end;
+        P -> P
+    end,
+
     Peer = MochiReq:get(peer),
 
     Method1 =
@@ -201,7 +211,9 @@ handle_request_int(MochiReq) ->
         nonce = Nonce,
         method = Method,
         path_parts = [list_to_binary(chttpd:unquote(Part))
-                || Part <- string:tokens(Path, "/")]
+                || Part <- string:tokens(Path, "/")],
+        requested_path_parts = [?l2b(unquote(Part))
+                || Part <- string:tokens(RequestedPath, "/")]
     },
 
     % put small token on heap to keep requests synced to backend calls
