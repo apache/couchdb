@@ -137,10 +137,10 @@ is_csrf_header(_) ->
 
 
 ensure_csrf_secret() ->
-    case config:get("couch_httpd_csrf", "secret", undefined) of
+    case config:get("csrf", "secret", undefined) of
         undefined ->
             NewSecret = ?b2l(couch_uuids:random()),
-            config:set("couch_httpd_csrf", "secret", NewSecret),
+            config:set("csrf", "secret", NewSecret),
             NewSecret;
         Secret -> Secret
     end.
@@ -172,7 +172,7 @@ refresh_cookie({_, Timestamp, _}) ->
 
 
 max_age() ->
-    config:get_integer("couch_httpd_csrf", "timeout", 3600).
+    config:get_integer("csrf", "timeout", 3600).
 
 
 timestamp() ->
