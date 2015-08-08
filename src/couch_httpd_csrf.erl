@@ -37,11 +37,11 @@ validate(#httpd{} = Req) ->
     Header = couch_httpd:header_value(Req, "X-CouchDB-CSRF"),
     case {Cookie, Header} of
         {undefined, undefined} ->
-            ok;
+            throw_if_mandatory(Req);
         {undefined, "true"} ->
-            ok;
+            throw_if_mandatory(Req);
         {"deleted", "true"} ->
-            ok;
+            throw_if_mandatory(Req);
         {undefined, _} ->
             throw({forbidden, <<"CSRF header sent without Cookie">>});
         {Csrf, Csrf} ->
@@ -61,6 +61,16 @@ validate(Csrf) when is_list(Csrf) ->
                 false ->
                     throw({forbidden, <<"CSRF Cookie invalid or expired">>})
             end
+    end.
+
+throw_if_mandatory(#httpd{path_parts = []}) ->
+    ok; %% Welcome message is public / entrypoint
+throw_if_mandatory(_) ->
+    case csrf_mandatory() of
+        true ->
+            throw({forbidden, <<"CSRF Cookie/Header is mandatory">>});
+        false ->
+            ok
     end.
 
 
@@ -177,3 +187,6 @@ max_age() ->
 
 timestamp() ->
     couch_httpd_auth:make_cookie_time().
+
+csrf_mandatory() ->
+    config:get_boolean("csrf", "mandatory", false).
