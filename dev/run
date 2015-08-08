@@ -219,7 +219,7 @@ def hack_local_ini(ctx, contents):
     previous_line = "; require_valid_user = false\n"
     contents = contents.replace(previous_line, previous_line + secret_line)
 
-    csrf_secret = '\n\n[couch_httpd_csrf]\nsecret = %s\n' % COMMON_CSRF_SECRET
+    csrf_secret = '\n\n[csrf]\nsecret = %s\n' % COMMON_CSRF_SECRET
 
     if ctx['with_admin_party']:
         ctx['admin'] = ('Admin Party!', 'You do not need any password.')
