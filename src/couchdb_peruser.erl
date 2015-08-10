@@ -16,6 +16,8 @@
 
 -include_lib("couch/include/couch_db.hrl").
 
+-define(USERDB_PREFIX, "userdb-").
+
 % gen_server callbacks
 -export([start_link/0, init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
@@ -137,7 +139,7 @@ ensure_security(User, UserDb) ->
 
 user_db_name(User) ->
     HexUser = list_to_binary([integer_to_list(X, 16) || <<X>> <= User]),
-    <<"userdb-", HexUser/binary>>.
+    <<?USERDB_PREFIX, HexUser/binary>>.
 
 handle_call(_Msg, _From, State) ->
     {reply, error, State}.
