@@ -125,11 +125,11 @@ add_user(User, Prop, {Modified, SecProps}) ->
 
 ensure_security(User, UserDb) ->
     {ok, Shards} = fabric_db_meta:get_all_security(UserDb, [admin_ctx()]),
-    % We assume that all shards have the same security object, and
-    % therefore just pick the first one.
     {_ShardInfo, {SecProps}} = hd(Shards),
+    % assert that shards have the same security object
+    true = lists:all(fun(Shard) -> {_, {SecProps}} =:= Shard end, Shards),
     case lists:foldl(
-           fun (Prop, SAcc) -> add_user(User, Prop, SAcc) end,
+           fun(Prop, SAcc) -> add_user(User, Prop, SAcc) end,
            {false, SecProps},
            [<<"admins">>, <<"members">>]) of
         {false, _} ->
