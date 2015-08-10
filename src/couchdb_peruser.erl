@@ -25,78 +25,91 @@
 % config_listener callbacks
 -export([handle_config_change/5, handle_config_terminate/3]).
 
--export([init_changes/2, change_filter/3]).
+-export([init_changes_handler/1, changes_handler/3]).
 
-%% db_name and changes_pid are useful information to have, but unused
--record(state, {db_name, changes_pid, changes_ref}).
-%% the entire filter state is currently unused, but may be useful later
--record(filter, {server}).
+-record(state, {parent, db_name, delete_dbs, changes_pid, changes_ref}).
 
 start_link() ->
     gen_server:start_link(?MODULE, [], []).
 
 init([]) ->
-    couch_log:debug("couchdb_peruser daemon: starting link.", []),
-    DbName = ?l2b(config:get(
-                     "couch_httpd_auth", "authentication_db", "_users")),
     Server = self(),
     ok = config:listen_for_changes(?MODULE, Server),
-    {Pid, Ref} = spawn_opt(?MODULE, init_changes, [Server, DbName],
-                           [link, monitor]),
-    {ok, #state{db_name=DbName,
-                changes_pid=Pid,
-                changes_ref=Ref}}.
+    case config:get_boolean("couchdb_peruser", "enable", false) of
+    false ->
+        {ok, #state{parent = Server}};
+    true ->
+        DbName = ?l2b(config:get(
+                         "couch_httpd_auth", "authentication_db", "_users")),
+        DeleteDbs = config:get_boolean("couchdb_peruser", "delete_dbs", false),
+        State = #state{parent = Server,
+                       db_name = DbName,
+                       delete_dbs = DeleteDbs},
+        {Pid, Ref} = spawn_opt(
+            ?MODULE, init_changes_handler, [State], [link, monitor]),
+        {ok, State#state{changes_pid=Pid, changes_ref=Ref}}
+    end.
 
-handle_config_change("couch_httpd_auth", "authentication_db", _Value, _Persist, State) ->
-   gen_server:cast(State, stop),
-   remove_handler;
-handle_config_change("couchdb_peruser", _Key, _Value, _Persist, State) ->
-   gen_server:cast(State, stop),
-   remove_handler;
-handle_config_change(_Section, _Key, _Value, _Persist, State) ->
-    {ok, State}.
+handle_config_change("couch_httpd_auth", "authentication_db", _Value, _Persist, Server) ->
+    gen_server:cast(Server, stop),
+    remove_handler;
+handle_config_change("couchdb_peruser", _Key, _Value, _Persist, Server) ->
+    gen_server:cast(Server, stop),
+    remove_handler;
+handle_config_change(_Section, _Key, _Value, _Persist, Server) ->
+    {ok, Server}.
 
-handle_config_terminate(_, stop, _) -> ok;
-handle_config_terminate(Self, _, _) ->
-    spawn(fun() ->
-        timer:sleep(5000),
-        config:listen_for_changes(?MODULE, Self)
-    end).
+handle_config_terminate(_Self, Reason, _Server) ->
+    {stop, Reason}.
 
 admin_ctx() ->
     {user_ctx, #user_ctx{roles=[<<"_admin">>]}}.
 
-init_changes(Parent, DbName) ->
-    {ok, Db} = couch_db:open_int(DbName, [admin_ctx(), sys_db]),
-    FunAcc = {fun ?MODULE:change_filter/3, #filter{server=Parent}},
+init_changes_handler(State) ->
+    {ok, Db} = couch_db:open_int(State#state.db_name, [admin_ctx(), sys_db]),
+    FunAcc = {fun ?MODULE:changes_handler/3, State},
     (couch_changes:handle_db_changes(
        #changes_args{feed="continuous", timeout=infinity},
        {json_req, null},
        Db))(FunAcc).
 
-change_filter({change, {Doc}, _Prepend}, _ResType, Acc=#filter{}) ->
+changes_handler({change, {Doc}, _Prepend}, _ResType, State=#state{}) ->
     Deleted = couch_util:get_value(<<"deleted">>, Doc, false),
     case lists:keyfind(<<"id">>, 1, Doc) of
         {_Key, <<"org.couchdb.user:", User/binary>>} ->
             case Deleted of
                 true ->
-                    %% TODO: Let's not complicate this with GC for now!
-                    Acc;
+                    case State#state.delete_dbs of
+                    true ->
+                        _UserDb = delete_user_db(User),
+                        State;
+                    false ->
+                        State
+                    end;
                 false ->
                     UserDb = ensure_user_db(User),
                     ensure_security(User, UserDb),
-                    Acc
+                    State
             end;
         _ ->
-            Acc
+            State
     end;
-change_filter(_Event, _ResType, Acc) ->
-    Acc.
+changes_handler(_Event, _ResType, State) ->
+    State.
 
 terminate(_Reason, _State) ->
     %% Everything should be linked or monitored, let nature
     %% take its course.
     ok.
+
+delete_user_db(User) ->
+    UserDb = user_db_name(User),
+    try
+        fabric_db_delete:go(UserDb, [admin_ctx()])
+    catch error:database_does_not_exist ->
+        ok
+    end,
+    UserDb.
 
 ensure_user_db(User) ->
     UserDb = user_db_name(User),
@@ -127,7 +140,9 @@ ensure_security(User, UserDb) ->
     {ok, Shards} = fabric_db_meta:get_all_security(UserDb, [admin_ctx()]),
     {_ShardInfo, {SecProps}} = hd(Shards),
     % assert that shards have the same security object
-    true = lists:all(fun(Shard) -> {_, {SecProps}} =:= Shard end, Shards),
+    true = lists:all(fun({_, {SecProps1}}) ->
+        SecProps =:= SecProps1
+    end, Shards),
     case lists:foldl(
            fun(Prop, SAcc) -> add_user(User, Prop, SAcc) end,
            {false, SecProps},
@@ -147,6 +162,8 @@ handle_call(_Msg, _From, State) ->
     {reply, error, State}.
 
 handle_cast(stop, State) ->
+    % we don't want to have multiple changes handler at the same time
+    exit(State#state.changes_pid, kill),
     {stop, normal, State};
 handle_cast(_Msg, State) ->
     {noreply, State}.
