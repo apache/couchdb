@@ -1,7 +1,7 @@
-couchperuser
-============
+couchdb_peruser
+===============
 
-couchperuser is a CouchDB daemon that ensures that a private per-user
+couchdb_peruser is a CouchDB daemon that ensures that a private per-user
 database exists for each document in _users. These databases are
 writable only by the corresponding user.
 

@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(couchperuser).
+-module(couchdb_peruser).
 -behaviour(gen_server).
 -behaviour(config_listener).
 
@@ -36,7 +36,7 @@ start_link() ->
     gen_server:start_link({local, ?NAME}, ?MODULE, [], []).
 
 init([]) ->
-    couch_log:debug("couchperuser daemon: starting link.", []),
+    couch_log:debug("couchdb_peruser daemon: starting link.", []),
     Db_Name = ?l2b(config:get(
                      "couch_httpd_auth", "authentication_db", "_users")),
     Server = self(),
