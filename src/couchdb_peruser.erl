@@ -138,7 +138,8 @@ ensure_security(User, UserDb) ->
     end.
 
 user_db_name(User) ->
-    HexUser = list_to_binary([integer_to_list(X, 16) || <<X>> <= User]),
+    HexUser = list_to_binary(
+        [string:to_lower(integer_to_list(X, 16)) || <<X>> <= User]),
     <<?USERDB_PREFIX, HexUser/binary>>.
 
 handle_call(_Msg, _From, State) ->
