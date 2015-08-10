@@ -3,10 +3,7 @@ couchdb_peruser
 
 couchdb_peruser is a CouchDB daemon that ensures that a private per-user
 database exists for each document in _users. These databases are
-writable only by the corresponding user.
-
-Currently this is very much purpose-built for CodeCosmos. Databases are
-in the form:
+writable only by the corresponding user. Databases are in the form:
 
   userdb-{hex encoded username}
 
