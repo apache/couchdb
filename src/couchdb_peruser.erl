@@ -69,30 +69,30 @@ init_changes_handler(State) ->
     {ok, Db} = couch_db:open_int(State#state.db_name, [admin_ctx(), sys_db]),
     FunAcc = {fun ?MODULE:changes_handler/3, State},
     (couch_changes:handle_db_changes(
-       #changes_args{feed="continuous", timeout=infinity},
-       {json_req, null},
-       Db))(FunAcc).
+         #changes_args{feed="continuous", timeout=infinity},
+         {json_req, null},
+         Db))(FunAcc).
 
 changes_handler({change, {Doc}, _Prepend}, _ResType, State=#state{}) ->
     Deleted = couch_util:get_value(<<"deleted">>, Doc, false),
     case lists:keyfind(<<"id">>, 1, Doc) of
-        {_Key, <<"org.couchdb.user:", User/binary>>} ->
-            case Deleted of
-                true ->
-                    case State#state.delete_dbs of
-                    true ->
-                        _UserDb = delete_user_db(User),
-                        State;
-                    false ->
-                        State
-                    end;
-                false ->
-                    UserDb = ensure_user_db(User),
-                    ensure_security(User, UserDb),
-                    State
+    {_Key, <<"org.couchdb.user:", User/binary>>} ->
+        case Deleted of
+        true ->
+            case State#state.delete_dbs of
+            true ->
+                _UserDb = delete_user_db(User),
+                State;
+            false ->
+                State
             end;
-        _ ->
+        false ->
+            UserDb = ensure_user_db(User),
+            ensure_security(User, UserDb),
             State
+        end;
+    _ ->
+        State
     end;
 changes_handler(_Event, _ResType, State) ->
     State.
@@ -124,14 +124,14 @@ add_user(User, Prop, {Modified, SecProps}) ->
     {PropValue} = couch_util:get_value(Prop, SecProps, {[]}),
     Names = couch_util:get_value(<<"names">>, PropValue, []),
     case lists:member(User, Names) of
-        true ->
-            {Modified, SecProps};
-        false ->
-            {true,
-             lists:keystore(
-               Prop, 1, SecProps,
-               {Prop,
-                {lists:keystore(
+    true ->
+        {Modified, SecProps};
+    false ->
+        {true,
+         lists:keystore(
+             Prop, 1, SecProps,
+             {Prop,
+              {lists:keystore(
                    <<"names">>, 1, PropValue,
                    {<<"names">>, [User | Names]})}})}
     end.
@@ -147,10 +147,10 @@ ensure_security(User, UserDb) ->
            fun(Prop, SAcc) -> add_user(User, Prop, SAcc) end,
            {false, SecProps},
            [<<"admins">>, <<"members">>]) of
-        {false, _} ->
-            ok;
-        {true, SecProps1} ->
-            fabric_db_meta:set_security(UserDb, {SecProps1}, [admin_ctx()])
+    {false, _} ->
+        ok;
+    {true, SecProps1} ->
+        fabric_db_meta:set_security(UserDb, {SecProps1}, [admin_ctx()])
     end.
 
 user_db_name(User) ->
