@@ -50,6 +50,9 @@ init([]) ->
 handle_config_change("couch_httpd_auth", "authentication_db", _Value, _Persist, State) ->
    gen_server:cast(State, stop),
    remove_handler;
+handle_config_change("couchdb_peruser", _Key, _Value, _Persist, State) ->
+   gen_server:cast(State, stop),
+   remove_handler;
 handle_config_change(_Section, _Key, _Value, _Persist, State) ->
     {ok, State}.
 
