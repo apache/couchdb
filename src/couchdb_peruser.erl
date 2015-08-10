@@ -27,15 +27,13 @@
 
 -export([init_changes/2, change_filter/3]).
 
-%% Note that this doesn't actually depend on having a registered name
--define(NAME, ?MODULE).
 %% db_name and changes_pid are useful information to have, but unused
 -record(state, {db_name, changes_pid, changes_ref}).
 %% the entire filter state is currently unused, but may be useful later
 -record(filter, {server}).
 
 start_link() ->
-    gen_server:start_link({local, ?NAME}, ?MODULE, [], []).
+    gen_server:start_link(?MODULE, [], []).
 
 init([]) ->
     couch_log:debug("couchdb_peruser daemon: starting link.", []),
