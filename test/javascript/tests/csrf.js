@@ -11,12 +11,17 @@
 // the License.
 
 couchTests.csrf = function(debug) {
+  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
+  db.deleteDb();
+  db.createDb();
+
   if (debug) debugger;
 
   // Handy function to cause CouchDB to delete the CSRF cookie
   var deleteCsrf = function() {
-    var xhr = CouchDB.request("GET", "/",
-                              {headers: {'X-CouchDB-CSRF': 'foo', 'Cookie': 'CouchDB-CSRF=foo'}});
+    var xhr = CouchDB.request("POST", "/test_suite_db/_all_docs", {
+                              body: '{"keys": []}',
+                              headers: {'X-CouchDB-CSRF': 'foo', 'Cookie': 'CouchDB-CSRF=foo'}});
     TEquals(403, xhr.status);
   };
 
@@ -26,7 +31,9 @@ couchTests.csrf = function(debug) {
   TEquals(200, xhr.status);
 
   // Matching but invalid cookie/header should 403
-  xhr = CouchDB.request("GET", "/", {headers: {'X-CouchDB-CSRF': 'foo', 'Cookie': 'CouchDB-CSRF=foo'}});
+  xhr = CouchDB.request("POST", "/test_suite_db/_all_docs", {
+                        body: '{"keys": []}',
+                        headers: {'X-CouchDB-CSRF': 'foo', 'Cookie': 'CouchDB-CSRF=foo'}});
   TEquals(403, xhr.status);
   TEquals(null, xhr.getResponseHeader("X-CouchDB-CSRF-Valid"), "We sent invalid cookie and header");
 
@@ -36,17 +43,19 @@ couchTests.csrf = function(debug) {
   T(cookie, "Should receive cookie");
 
   // If I have a cookie, do I get a 403 if I don't send the header?
-  xhr = CouchDB.request("GET", "/");
+  xhr = CouchDB.request("POST", "/test_suite_db/_all_docs", {body: '{"keys": []}'});
   TEquals(403, xhr.status);
   TEquals(null, xhr.getResponseHeader("X-CouchDB-CSRF-Valid"), "We didn't send the header");
 
   // If I have a cookie, do I get a 200 if I send a matching header?
-  xhr = CouchDB.request("GET", "/", {headers: {"X-CouchDB-CSRF": cookie[1]}});
+  xhr = CouchDB.request("POST", "/test_suite_db/_all_docs", {body: '{"keys": []}',
+                                                             headers: {"X-CouchDB-CSRF": cookie[1]}});
   TEquals(200, xhr.status);
   TEquals("true", xhr.getResponseHeader("X-CouchDB-CSRF-Valid"), "Server should have sent this");
 
   // How about the wrong header?
-  xhr = CouchDB.request("GET", "/", {headers: {'X-CouchDB-CSRF': 'foo'}});
+  xhr = CouchDB.request("POST", "/test_suite_db/_all_docs", {body: '{"keys": []}',
+                                                             headers: {'X-CouchDB-CSRF': 'foo'}});
   TEquals(403, xhr.status);
   TEquals(null, xhr.getResponseHeader("X-CouchDB-CSRF-Valid"), "We sent a mismatched header");
 
