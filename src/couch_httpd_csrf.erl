@@ -32,6 +32,12 @@
 
 -include_lib("couch/include/couch_db.hrl").
 
+validate(#httpd{method = 'GET'}) ->
+    ok;
+validate(#httpd{method = 'HEAD'}) ->
+    ok;
+validate(#httpd{method = 'OPTIONS'}) ->
+    ok;
 validate(#httpd{} = Req) ->
     Cookie = csrf_from_req(Req),
     Header = couch_httpd:header_value(Req, "X-CouchDB-CSRF"),
