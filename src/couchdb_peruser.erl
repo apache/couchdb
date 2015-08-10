@@ -37,13 +37,13 @@ start_link() ->
 
 init([]) ->
     couch_log:debug("couchdb_peruser daemon: starting link.", []),
-    Db_Name = ?l2b(config:get(
+    DbName = ?l2b(config:get(
                      "couch_httpd_auth", "authentication_db", "_users")),
     Server = self(),
     ok = config:listen_for_changes(?MODULE, Server),
-    {Pid, Ref} = spawn_opt(?MODULE, init_changes, [Server, Db_Name],
+    {Pid, Ref} = spawn_opt(?MODULE, init_changes, [Server, DbName],
                            [link, monitor]),
-    {ok, #state{db_name=Db_Name,
+    {ok, #state{db_name=DbName,
                 changes_pid=Pid,
                 changes_ref=Ref}}.
 
@@ -66,8 +66,8 @@ handle_config_terminate(Self, _, _) ->
 admin_ctx() ->
     {user_ctx, #user_ctx{roles=[<<"_admin">>]}}.
 
-init_changes(Parent, Db_Name) ->
-    {ok, Db} = couch_db:open_int(Db_Name, [admin_ctx(), sys_db]),
+init_changes(Parent, DbName) ->
+    {ok, Db} = couch_db:open_int(DbName, [admin_ctx(), sys_db]),
     FunAcc = {fun ?MODULE:change_filter/3, #filter{server=Parent}},
     (couch_changes:handle_db_changes(
        #changes_args{feed="continuous", timeout=infinity},
