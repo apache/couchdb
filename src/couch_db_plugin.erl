@@ -17,7 +17,8 @@
     before_doc_update/2,
     after_doc_read/2,
     validate_docid/1,
-    check_is_admin/1
+    check_is_admin/1,
+    on_delete/2
 ]).
 
 -define(SERVICE_ID, couch_db).
@@ -55,6 +56,11 @@ check_is_admin(Db) ->
     Handle = couch_epi:get_handle(?SERVICE_ID),
     %% callbacks return true only if it specifically allow the given Id
     couch_epi:any(Handle, ?SERVICE_ID, check_is_admin, [Db], [ignore_providers]).
+
+on_delete(DbName, Options) ->
+    Handle = couch_epi:get_handle(?SERVICE_ID),
+    couch_epi:apply(Handle, ?SERVICE_ID, on_delete, [DbName, Options],
+        [ignore_providers]).
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions

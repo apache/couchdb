@@ -17,7 +17,8 @@
     before_doc_update/2,
     after_doc_read/2,
     validate_docid/1,
-    check_is_admin/1
+    check_is_admin/1,
+    on_delete/2
 ]).
 
 -include_lib("couch/include/couch_eunit.hrl").
@@ -60,6 +61,10 @@ check_is_admin({true, _Db}) -> true;
 check_is_admin({false, _Db}) -> false;
 check_is_admin({fail, _Db}) -> throw(check_is_admin).
 
+on_delete(true, _Opts) -> true;
+on_delete(false, _Opts) -> false;
+on_delete(fail, _Opts) -> throw(on_delete).
+
 callback_test_() ->
     {
         "callback tests",
@@ -84,7 +89,11 @@ callback_test_() ->
 
                 fun check_is_admin_match/0,
                 fun check_is_admin_no_match/0,
-                fun check_is_admin_throw/0
+                fun check_is_admin_throw/0,
+
+                fun on_delete_match/0,
+                fun on_delete_no_match/0,
+                fun on_delete_throw/0
             ]
         }
     }.
@@ -167,3 +176,18 @@ check_is_admin_throw() ->
     ?assertThrow(
         check_is_admin,
         couch_db_plugin:check_is_admin({fail, [db]})).
+
+on_delete_match() ->
+    ?_assertMatch(
+        true,
+        couch_db_plugin:on_delete(true, [])).
+
+on_delete_no_match() ->
+    ?_assertMatch(
+        false,
+        couch_db_plugin:on_delete(false, [])).
+
+on_delete_throw() ->
+    ?assertThrow(
+        on_delete,
+        couch_db_plugin:on_delete(fail, [])).

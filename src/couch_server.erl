@@ -458,6 +458,8 @@ handle_call({delete, DbName, Options}, _From, Server) ->
         end, [".compact", ".compact.data", ".compact.meta"]),
         couch_file:delete(Server#server.root_dir, FullFilepath ++ ".compact"),
 
+        couch_db_plugin:on_delete(DbName, Options),
+
         Async = not lists:member(sync, Options),
 
         case couch_file:delete(Server#server.root_dir, FullFilepath, Async) of
