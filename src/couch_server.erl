@@ -460,9 +460,7 @@ handle_call({delete, DbName, Options}, _From, Server) ->
 
         couch_db_plugin:on_delete(DbName, Options),
 
-        Async = not lists:member(sync, Options),
-
-        case couch_file:delete(Server#server.root_dir, FullFilepath, Async) of
+        case delete_db_file(Server#server.root_dir, FullFilepath, Options) of
         ok ->
             couch_event:notify(DbName, deleted),
             {reply, ok, Server2};
@@ -539,3 +537,21 @@ db_closed(Server, Options) ->
         false -> Server#server{dbs_open=Server#server.dbs_open - 1};
         true -> Server
     end.
+
+delete_db_file(RootDir, FullFilePath, Options) ->
+    Async = not lists:member(sync, Options),
+    RenameOnDelete = config:get_boolean("couchdb", "rename_on_delete", false),
+    case {Async, RenameOnDelete} of
+        {_, true} ->
+            rename_on_delete(FullFilePath);
+        {Async, false} ->
+            couch_file:delete(RootDir, FullFilePath, Async)
+    end.
+
+rename_on_delete(Original) ->
+    {{Y,Mon,D}, {H,Min,S}} = calendar:universal_time(),
+    Suffix = lists:flatten(
+        io_lib:format(".~w~2.10.0B~2.10.0B." ++
+            "~2.10.0B~2.10.0B~2.10.0B.deleted.couch", [Y,Mon,D,H,Min,S])),
+    Rename = filename:rootname(Original) ++ Suffix,
+    file:rename(Original, Rename).
