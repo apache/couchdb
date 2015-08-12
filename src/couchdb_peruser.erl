@@ -62,11 +62,8 @@ handle_config_change(_Section, _Key, _Value, _Persist, Server) ->
 handle_config_terminate(_Self, Reason, _Server) ->
     {stop, Reason}.
 
-admin_ctx() ->
-    {user_ctx, #user_ctx{roles=[<<"_admin">>]}}.
-
 init_changes_handler(State) ->
-    {ok, Db} = couch_db:open_int(State#state.db_name, [admin_ctx(), sys_db]),
+    {ok, Db} = couch_db:open_int(State#state.db_name, [?ADMIN_CTX, sys_db]),
     FunAcc = {fun ?MODULE:changes_handler/3, State},
     (couch_changes:handle_db_changes(
          #changes_args{feed="continuous", timeout=infinity},
@@ -105,7 +102,7 @@ terminate(_Reason, _State) ->
 delete_user_db(User) ->
     UserDb = user_db_name(User),
     try
-        fabric_db_delete:go(UserDb, [admin_ctx()])
+        fabric_db_delete:go(UserDb, [?ADMIN_CTX])
     catch error:database_does_not_exist ->
         ok
     end,
@@ -116,7 +113,7 @@ ensure_user_db(User) ->
     try
         fabric_db_info:go(UserDb)
     catch error:database_does_not_exist ->
-        fabric_db_create:go(UserDb, [admin_ctx()])
+        fabric_db_create:go(UserDb, [?ADMIN_CTX])
     end,
     UserDb.
 
@@ -137,7 +134,7 @@ add_user(User, Prop, {Modified, SecProps}) ->
     end.
 
 ensure_security(User, UserDb) ->
-    {ok, Shards} = fabric_db_meta:get_all_security(UserDb, [admin_ctx()]),
+    {ok, Shards} = fabric_db_meta:get_all_security(UserDb, [?ADMIN_CTX]),
     {_ShardInfo, {SecProps}} = hd(Shards),
     % assert that shards have the same security object
     true = lists:all(fun({_, {SecProps1}}) ->
@@ -150,7 +147,7 @@ ensure_security(User, UserDb) ->
     {false, _} ->
         ok;
     {true, SecProps1} ->
-        fabric_db_meta:set_security(UserDb, {SecProps1}, [admin_ctx()])
+        fabric_db_meta:set_security(UserDb, {SecProps1}, [?ADMIN_CTX])
     end.
 
 user_db_name(User) ->
