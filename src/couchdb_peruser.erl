@@ -62,19 +62,26 @@ handle_config_change(_Section, _Key, _Value, _Persist, Server) ->
 handle_config_terminate(_Self, Reason, _Server) ->
     {stop, Reason}.
 
-init_changes_handler(State) ->
-    {ok, Db} = couch_db:open_int(State#state.db_name, [?ADMIN_CTX, sys_db]),
-    FunAcc = {fun ?MODULE:changes_handler/3, State},
-    (couch_changes:handle_db_changes(
-         #changes_args{feed="continuous", timeout=infinity},
-         {json_req, null},
-         Db))(FunAcc).
+init_changes_handler(#state{db_name=DbName} = State) ->
+    try
+        {ok, Db} = couch_db:open_int(DbName, [?ADMIN_CTX, sys_db]),
+        FunAcc = {fun ?MODULE:changes_handler/3, State},
+        (couch_changes:handle_db_changes(
+             #changes_args{feed="continuous", timeout=infinity},
+             {json_req, null},
+             Db))(FunAcc)
+    catch error:database_does_not_exist ->
+        ok
+    end.
 
 changes_handler({change, {Doc}, _Prepend}, _ResType, State=#state{}) ->
-    Deleted = couch_util:get_value(<<"deleted">>, Doc, false),
-    case lists:keyfind(<<"id">>, 1, Doc) of
-    {_Key, <<"org.couchdb.user:", User/binary>>} ->
-        case Deleted of
+    case couch_util:get_value(<<"id">>, Doc) of
+    <<"org.couchdb.user:",User/binary>> ->
+        case couch_util:get_value(<<"deleted">>, Doc, false) of
+        false ->
+            UserDb = ensure_user_db(User),
+            ensure_security(User, UserDb),
+            State;
         true ->
             case State#state.delete_dbs of
             true ->
@@ -82,11 +89,7 @@ changes_handler({change, {Doc}, _Prepend}, _ResType, State=#state{}) ->
                 State;
             false ->
                 State
-            end;
-        false ->
-            UserDb = ensure_user_db(User),
-            ensure_security(User, UserDb),
-            State
+            end
         end;
     _ ->
         State
@@ -102,7 +105,7 @@ terminate(_Reason, _State) ->
 delete_user_db(User) ->
     UserDb = user_db_name(User),
     try
-        fabric_db_delete:go(UserDb, [?ADMIN_CTX])
+        fabric:delete_db(UserDb, [?ADMIN_CTX])
     catch error:database_does_not_exist ->
         ok
     end,
@@ -111,9 +114,9 @@ delete_user_db(User) ->
 ensure_user_db(User) ->
     UserDb = user_db_name(User),
     try
-        fabric_db_info:go(UserDb)
+        fabric:get_db_info(UserDb)
     catch error:database_does_not_exist ->
-        fabric_db_create:go(UserDb, [?ADMIN_CTX])
+        fabric:create_db(UserDb, [?ADMIN_CTX])
     end,
     UserDb.
 
@@ -134,7 +137,7 @@ add_user(User, Prop, {Modified, SecProps}) ->
     end.
 
 ensure_security(User, UserDb) ->
-    {ok, Shards} = fabric_db_meta:get_all_security(UserDb, [?ADMIN_CTX]),
+    {ok, Shards} = fabric:get_all_security(UserDb, [?ADMIN_CTX]),
     {_ShardInfo, {SecProps}} = hd(Shards),
     % assert that shards have the same security object
     true = lists:all(fun({_, {SecProps1}}) ->
@@ -147,20 +150,24 @@ ensure_security(User, UserDb) ->
     {false, _} ->
         ok;
     {true, SecProps1} ->
-        fabric_db_meta:set_security(UserDb, {SecProps1}, [?ADMIN_CTX])
+        fabric:set_security(UserDb, {SecProps1}, [?ADMIN_CTX])
     end.
 
 user_db_name(User) ->
     HexUser = list_to_binary(
         [string:to_lower(integer_to_list(X, 16)) || <<X>> <= User]),
-    <<?USERDB_PREFIX, HexUser/binary>>.
+    <<?USERDB_PREFIX,HexUser/binary>>.
 
 handle_call(_Msg, _From, State) ->
     {reply, error, State}.
 
-handle_cast(stop, State) ->
+handle_cast(stop, State) when State#state.changes_pid =/= undefined ->
     % we don't want to have multiple changes handler at the same time
     exit(State#state.changes_pid, kill),
+    {Pid, Ref} = spawn_opt(
+        ?MODULE, init_changes_handler, [State], [link, monitor]),
+    {noreply, State#state{changes_pid=Pid, changes_ref=Ref}};
+handle_cast(stop, State) ->
     {stop, normal, State};
 handle_cast(_Msg, State) ->
     {noreply, State}.
