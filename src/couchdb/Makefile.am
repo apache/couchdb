@@ -50,6 +50,7 @@ source_files = \
     couch_httpd_db.erl \
     couch_httpd_auth.erl \
     couch_httpd_cors.erl \
+    couch_httpd_csrf.erl \
     couch_httpd_oauth.erl \
     couch_httpd_external.erl \
     couch_httpd_misc_handlers.erl \
@@ -108,6 +109,7 @@ compiled_files = \
     couch_httpd_auth.beam \
     couch_httpd_oauth.beam \
     couch_httpd_cors.beam \
+    couch_httpd_csrf.beam \
     couch_httpd_proxy.beam \
     couch_httpd_external.beam \
     couch_httpd_misc_handlers.beam \

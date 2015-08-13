@@ -27,7 +27,7 @@
 -define(SUPPORTED_HEADERS, "Accept, Accept-Language, Content-Type," ++
         "Expires, Last-Modified, Pragma, Origin, Content-Length," ++
         "If-Match, Destination, X-Requested-With, " ++
-        "X-Http-Method-Override, Content-Range").
+        "X-Http-Method-Override, Content-Range, X-CouchDB-CSRF").
 
 -define(SUPPORTED_METHODS, "GET, HEAD, POST, PUT, DELETE," ++
         "TRACE, CONNECT, COPY, OPTIONS").
@@ -36,7 +36,7 @@
 -define(SIMPLE_HEADERS, ["Cache-Control", "Content-Language",
         "Content-Type", "Expires", "Last-Modified", "Pragma"]).
 -define(ALLOWED_HEADERS, lists:sort(["Server", "Etag",
-        "Accept-Ranges" | ?SIMPLE_HEADERS])).
+        "Accept-Ranges", "X-CouchDB-CSRF-Valid" | ?SIMPLE_HEADERS])).
 -define(SIMPLE_CONTENT_TYPE_VALUES, ["application/x-www-form-urlencoded",
         "multipart/form-data", "text/plain"]).
 
