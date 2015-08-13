@@ -29,38 +29,25 @@
 
 -record(state, {parent, db_name, delete_dbs, changes_pid, changes_ref}).
 
+
 start_link() ->
     gen_server:start_link(?MODULE, [], []).
 
-init([]) ->
-    Server = self(),
-    ok = config:listen_for_changes(?MODULE, Server),
+init() ->
     case config:get_boolean("couchdb_peruser", "enable", false) of
     false ->
-        {ok, #state{parent = Server}};
+        #state{};
     true ->
         DbName = ?l2b(config:get(
                          "couch_httpd_auth", "authentication_db", "_users")),
         DeleteDbs = config:get_boolean("couchdb_peruser", "delete_dbs", false),
-        State = #state{parent = Server,
+        State = #state{parent = self(),
                        db_name = DbName,
                        delete_dbs = DeleteDbs},
         {Pid, Ref} = spawn_opt(
             ?MODULE, init_changes_handler, [State], [link, monitor]),
-        {ok, State#state{changes_pid=Pid, changes_ref=Ref}}
+        State#state{changes_pid=Pid, changes_ref=Ref}
     end.
-
-handle_config_change("couch_httpd_auth", "authentication_db", _Value, _Persist, Server) ->
-    gen_server:cast(Server, stop),
-    remove_handler;
-handle_config_change("couchdb_peruser", _Key, _Value, _Persist, Server) ->
-    gen_server:cast(Server, stop),
-    remove_handler;
-handle_config_change(_Section, _Key, _Value, _Persist, Server) ->
-    {ok, Server}.
-
-handle_config_terminate(_Self, Reason, _Server) ->
-    {stop, Reason}.
 
 init_changes_handler(#state{db_name=DbName} = State) ->
     try
@@ -96,11 +83,6 @@ changes_handler({change, {Doc}, _Prepend}, _ResType, State=#state{}) ->
     end;
 changes_handler(_Event, _ResType, State) ->
     State.
-
-terminate(_Reason, _State) ->
-    %% Everything should be linked or monitored, let nature
-    %% take its course.
-    ok.
 
 delete_user_db(User) ->
     UserDb = user_db_name(User),
@@ -158,24 +140,52 @@ user_db_name(User) ->
         [string:to_lower(integer_to_list(X, 16)) || <<X>> <= User]),
     <<?USERDB_PREFIX,HexUser/binary>>.
 
+
+%% gen_server callbacks
+
+init([]) ->
+    ok = config:listen_for_changes(?MODULE, self()),
+    {ok, init()}.
+
 handle_call(_Msg, _From, State) ->
     {reply, error, State}.
 
-handle_cast(stop, State) when State#state.changes_pid =/= undefined ->
+handle_cast(update_config, State) when State#state.changes_pid =/= undefined ->
     % we don't want to have multiple changes handler at the same time
+    demonitor(State#state.changes_ref, [flush]),
     exit(State#state.changes_pid, kill),
-    {Pid, Ref} = spawn_opt(
-        ?MODULE, init_changes_handler, [State], [link, monitor]),
-    {noreply, State#state{changes_pid=Pid, changes_ref=Ref}};
+    {noreply, init()};
+handle_cast(update_config, _State) ->
+    {noreply, init()};
 handle_cast(stop, State) ->
     {stop, normal, State};
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info({'DOWN', Ref, _, _, _Reason}, State=#state{changes_ref=Ref}) ->
+handle_info({'DOWN', Ref, _, _, _Reason}, #state{changes_ref=Ref} = State) ->
     {stop, normal, State};
 handle_info(_Msg, State) ->
     {noreply, State}.
 
+terminate(_Reason, _State) ->
+    %% Everything should be linked or monitored, let nature
+    %% take its course.
+    ok.
+
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+
+%% config_listener callbacks
+
+handle_config_change("couch_httpd_auth", "authentication_db", _Value, _Persist, Server) ->
+    gen_server:cast(Server, update_config),
+    {ok, Server};
+handle_config_change("couchdb_peruser", _Key, _Value, _Persist, Server) ->
+    gen_server:cast(Server, update_config),
+    {ok, Server};
+handle_config_change(_Section, _Key, _Value, _Persist, Server) ->
+    {ok, Server}.
+
+handle_config_terminate(_Self, Reason, _Server) ->
+    {stop, Reason}.

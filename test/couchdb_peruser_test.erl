@@ -19,13 +19,7 @@
 -define(ADMIN_PASSWORD, "secret").
 
 start_couch() ->
-    Deps = [
-        couchdb_peruser,
-        jiffy,
-        mochiweb,
-        chttpd
-    ],
-    test_util:start_couch(Deps).
+    test_util:start_couch([chttpd]).
 
 stop_couch(TestCtx) ->
     test_util:stop_couch(TestCtx).
@@ -65,7 +59,9 @@ create_user(AuthDb, Name) ->
         "\",\"type\":\"user\",\"roles\":[],\"password\":\"secret\"}",
     Url = lists:concat([
         get_base_url(), "/", ?b2l(AuthDb), "/org.couchdb.user:", Name]),
-    do_request(put, Url, Body).
+    {ok, 201, _, _} = do_request(put, Url, Body),
+    % let's proceed after giving couchdb_peruser some time to create the user db
+    timer:sleep(50).
 
 delete_user(AuthDb, Name) ->
     Url = lists:concat([get_base_url(), "/", ?b2l(AuthDb),
@@ -73,7 +69,9 @@ delete_user(AuthDb, Name) ->
     {ok, 200, _, Body} = do_request(get, Url),
     {DocProps} = jiffy:decode(Body),
     Rev = proplists:get_value(<<"_rev">>, DocProps),
-    {ok, 200, _, _} = do_request(delete, Url ++ "?rev=" ++ ?b2l(Rev)).
+    {ok, 200, _, _} = do_request(delete, Url ++ "?rev=" ++ ?b2l(Rev)),
+    % let's proceed after giving couchdb_peruser some time to delete the user db
+    timer:sleep(50).
 
 all_dbs() ->
     {ok, 200, _, Body} = do_request(get, get_cluster_base_url() ++ "/_all_dbs"),
@@ -102,8 +100,8 @@ should_not_delete_user_db(TestAuthDb) ->
     ?_assert(lists:member(UserDbName, all_dbs())).
 
 should_delete_user_db(TestAuthDb) ->
-    User = "foo",
-    UserDbName = <<"userdb-666f6f">>,
+    User = "bar",
+    UserDbName = <<"userdb-626172">>,
     set_config("couchdb_peruser", "delete_dbs", "true"),
     create_user(TestAuthDb, User),
     ?assert(lists:member(UserDbName, all_dbs())),
@@ -111,15 +109,14 @@ should_delete_user_db(TestAuthDb) ->
     ?_assert(not lists:member(UserDbName, all_dbs())).
 
 should_reflect_config_changes(TestAuthDb) ->
-    User = "foo",
-    UserDbName = <<"userdb-666f6f">>,
+    User = "baz",
+    UserDbName = <<"userdb-62617a">>,
     set_config("couchdb_peruser", "delete_dbs", "true"),
     create_user(TestAuthDb, User),
     ?assert(lists:member(UserDbName, all_dbs())),
     delete_user(TestAuthDb, User),
     ?assert(not lists:member(UserDbName, all_dbs())),
     create_user(TestAuthDb, User),
-    timer:sleep(100),
     ?assert(lists:member(UserDbName, all_dbs())),
     set_config("couchdb_peruser", "delete_dbs", "false"),
     delete_user(TestAuthDb, User),
