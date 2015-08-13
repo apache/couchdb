@@ -30,22 +30,13 @@ provider(App, Module) ->
        App, chttpd_handlers, Module).
 
 url_handler(HandlerKey, DefaultFun) ->
-    case collect(url_handler, [HandlerKey]) of
-        [HandlerFun] -> HandlerFun;
-        [] -> DefaultFun
-    end.
+    select(collect(url_handler, [HandlerKey]), DefaultFun).
 
 db_handler(HandlerKey, DefaultFun) ->
-    case collect(db_handler, [HandlerKey]) of
-        [HandlerFun] -> HandlerFun;
-        [] -> DefaultFun
-    end.
+    select(collect(db_handler, [HandlerKey]), DefaultFun).
 
 design_handler(HandlerKey, DefaultFun) ->
-    case collect(design_handler, [HandlerKey]) of
-        [HandlerFun] -> HandlerFun;
-        [] -> DefaultFun
-    end.
+    select(collect(design_handler, [HandlerKey]), DefaultFun).
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
@@ -58,3 +49,17 @@ collect(Func, Args) ->
 do_apply(Func, Args, Opts) ->
     Handle = couch_epi:get_handle(?MODULE),
     couch_epi:apply(Handle, chttpd, Func, Args, Opts).
+
+select([], Default) ->
+    Default;
+select([{default, OverrideDefault}], _Default) ->
+    OverrideDefault;
+select(Handlers, _Default) ->
+    select(Handlers).
+
+select([Handler]) ->
+    Handler;
+select([{override, Handler}|_]) ->
+    Handler;
+select([_Handler | Rest]) ->
+    select(Rest).
