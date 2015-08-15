@@ -184,7 +184,7 @@ validate_cookie({Token, Timestamp, ActualHmac}) ->
 refresh_cookie({_, Timestamp, _}) ->
     MaxAge = max_age(),
     TimeLeft = Timestamp + MaxAge - timestamp(),
-    TimeLeft < MaxAge * 0.5.
+    TimeLeft < MaxAge * 0.9.
 
 
 max_age() ->
