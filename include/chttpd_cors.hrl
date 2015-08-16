@@ -64,7 +64,8 @@
     "server",
     "x-couch-request-id",
     "x-couch-update-newrev",
-    "x-couchdb-body-time"
+    "x-couchdb-body-time",
+    "x-couchdb-csrf"
 ]).
 
 
