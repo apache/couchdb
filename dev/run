@@ -203,7 +203,7 @@ def find_haproxy():
     )
     (res, _) = p.communicate()
     if res.strip():
-        return res.strip()
+        return res.strip().decode()
     return "/usr/sbin/haproxy"
 
 
