@@ -26,7 +26,8 @@
     start_response_length/4, send/2, start_json_response/2,
     start_json_response/3, end_json_response/1, send_response/4,
     send_method_not_allowed/2, send_error/2, send_error/4, send_redirect/2,
-    send_chunked_error/2, send_json/2,send_json/3,send_json/4]).
+    send_chunked_error/2, send_json/2,send_json/3,send_json/4,
+    validate_ctype/2]).
 
 -export([authenticate_request/3]).
 
@@ -560,6 +561,9 @@ body(#httpd{mochi_req=MochiReq, req_body=ReqBody}) ->
         _Else ->
             ReqBody
     end.
+
+validate_ctype(Req, Ctype) ->
+    couch_httpd:validate_ctype(Req, Ctype).
 
 json_body(Httpd) ->
     case body(Httpd) of

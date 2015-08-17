@@ -169,6 +169,7 @@ handle_view_list_req(#httpd{method='GET'}=Req, _Db, _DDoc) ->
 
 handle_view_list_req(#httpd{method='POST',
         path_parts=[_, _, DesignName, _, ListName, ViewName]}=Req, Db, DDoc) ->
+    chttpd:validate_ctype(Req, "application/json"),
     ReqBody = chttpd:body(Req),
     {Props2} = ?JSON_DECODE(ReqBody),
     Keys = proplists:get_value(<<"keys">>, Props2, undefined),
@@ -177,6 +178,7 @@ handle_view_list_req(#httpd{method='POST',
 
 handle_view_list_req(#httpd{method='POST',
         path_parts=[_, _, _, _, ListName, DesignName, ViewName]}=Req, Db, DDoc) ->
+    chttpd:validate_ctype(Req, "application/json"),
     ReqBody = chttpd:body(Req),
     {Props2} = ?JSON_DECODE(ReqBody),
     Keys = proplists:get_value(<<"keys">>, Props2, undefined),

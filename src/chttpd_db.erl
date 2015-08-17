@@ -73,7 +73,7 @@ handle_request(#httpd{path_parts=[DbName|RestParts],method=Method}=Req)->
     end.
 
 handle_changes_req(#httpd{method='POST'}=Req, Db) ->
-    couch_httpd:validate_ctype(Req, "application/json"),
+    chttpd:validate_ctype(Req, "application/json"),
     handle_changes_req1(Req, Db);
 handle_changes_req(#httpd{method='GET'}=Req, Db) ->
     handle_changes_req1(Req, Db);
@@ -303,7 +303,7 @@ db_req(#httpd{method='GET',path_parts=[DbName]}=Req, _Db) ->
     send_json(Req, {DbInfo});
 
 db_req(#httpd{method='POST', path_parts=[DbName], user_ctx=Ctx}=Req, Db) ->
-    couch_httpd:validate_ctype(Req, "application/json"),
+    chttpd:validate_ctype(Req, "application/json"),
 
     W = chttpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
     Options = [{user_ctx,Ctx}, {w,W}],
@@ -352,6 +352,7 @@ db_req(#httpd{path_parts=[_DbName]}=Req, _Db) ->
     send_method_not_allowed(Req, "DELETE,GET,HEAD,POST");
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_ensure_full_commit">>]}=Req, _Db) ->
+    chttpd:validate_ctype(Req, "application/json"),
     send_json(Req, 201, {[
         {ok, true},
         {instance_start_time, <<"0">>}
@@ -362,7 +363,7 @@ db_req(#httpd{path_parts=[_,<<"_ensure_full_commit">>]}=Req, _Db) ->
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, Db) ->
     couch_stats:increment_counter([couchdb, httpd, bulk_requests]),
-    couch_httpd:validate_ctype(Req, "application/json"),
+    chttpd:validate_ctype(Req, "application/json"),
     {JsonProps} = chttpd:json_body_obj(Req),
     DocsArray = case couch_util:get_value(<<"docs">>, JsonProps) of
     undefined ->
@@ -437,7 +438,7 @@ db_req(#httpd{path_parts=[_,<<"_bulk_docs">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "POST");
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_purge">>]}=Req, Db) ->
-    couch_httpd:validate_ctype(Req, "application/json"),
+    chttpd:validate_ctype(Req, "application/json"),
     {IdsRevs} = chttpd:json_body_obj(Req),
     IdsRevs2 = [{Id, couch_doc:parse_revs(Revs)} || {Id, Revs} <- IdsRevs],
     case fabric:purge_docs(Db, IdsRevs2) of
@@ -466,6 +467,7 @@ db_req(#httpd{method='GET',path_parts=[_,OP]}=Req, Db) when ?IS_ALL_DOCS(OP) ->
     end;
 
 db_req(#httpd{method='POST',path_parts=[_,OP]}=Req, Db) when ?IS_ALL_DOCS(OP) ->
+    chttpd:validate_ctype(Req, "application/json"),
     {Fields} = chttpd:json_body_obj(Req),
     case couch_util:get_value(<<"keys">>, Fields, nil) of
     Keys when is_list(Keys) ->
@@ -480,6 +482,7 @@ db_req(#httpd{path_parts=[_,OP]}=Req, _Db) when ?IS_ALL_DOCS(OP) ->
     send_method_not_allowed(Req, "GET,HEAD,POST");
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_missing_revs">>]}=Req, Db) ->
+    chttpd:validate_ctype(Req, "application/json"),
     {JsonDocIdRevs} = chttpd:json_body_obj(Req),
     {ok, Results} = fabric:get_missing_revs(Db, JsonDocIdRevs),
     Results2 = [{Id, couch_doc:revs_to_strs(Revs)} || {Id, Revs, _} <- Results],
@@ -491,6 +494,7 @@ db_req(#httpd{path_parts=[_,<<"_missing_revs">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "POST");
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_revs_diff">>]}=Req, Db) ->
+    chttpd:validate_ctype(Req, "application/json"),
     {JsonDocIdRevs} = chttpd:json_body_obj(Req),
     {ok, Results} = fabric:get_missing_revs(Db, JsonDocIdRevs),
     Results2 =
@@ -664,7 +668,7 @@ db_doc_req(#httpd{method='GET'}=Req, Db, DocId) ->
 db_doc_req(#httpd{method='POST', user_ctx=Ctx}=Req, Db, DocId) ->
     couch_httpd:validate_referer(Req),
     couch_doc:validate_docid(DocId),
-    couch_httpd:validate_ctype(Req, "multipart/form-data"),
+    chttpd:validate_ctype(Req, "multipart/form-data"),
 
     W = chttpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
     Options = [{user_ctx,Ctx}, {w,W}],
