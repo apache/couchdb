@@ -104,7 +104,8 @@ default_authentication_handler(Req, AuthModule) ->
                             name=UserName,
                             roles=couch_util:get_value(<<"roles">>, UserProps2, [])
                         }};
-                    _Else ->
+                    false ->
+                        authentication_warning(Req, UserName),
                         throw({unauthorized, <<"Name or password is incorrect.">>})
                 end
         end;
@@ -327,7 +328,8 @@ handle_session_req(#httpd{method='POST', mochi_req=MochiReq}=Req, AuthModule) ->
                     {name, UserName},
                     {roles, couch_util:get_value(<<"roles">>, UserProps2, [])}
                 ]});
-        _Else ->
+        false ->
+            authentication_warning(Req, UserName),
             % clear the session
             Cookie = mochiweb_cookies:cookie("AuthSession", "", [{path, "/"}] ++ cookie_scheme(Req)),
             {Code, Headers} = case couch_httpd:qs_value(Req, "fail", nil) of
@@ -514,3 +516,8 @@ integer_to_binary(Int, Len) when is_integer(Int), is_integer(Len) ->
     Padding = binary:copy(<<"0">>, Len),
     Padded = <<Padding/binary, Unpadded/binary>>,
     binary:part(Padded, byte_size(Padded), -Len).
+
+authentication_warning(#httpd{mochi_req = Req}, User) ->
+    Peer = Req:get(peer),
+    couch_log:warning("~p: Authentication failed for user ~s from ~s",
+        [?MODULE, User, Peer]).
