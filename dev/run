@@ -31,6 +31,7 @@ from pbkdf2 import pbkdf2_hex
 
 COMMON_SALT = uuid.uuid4().hex
 COMMON_CSRF_SECRET = uuid.uuid4().hex
+HAPROXY_PORT = os.environ.get("HAPROXY_PORT", "5984")
 
 try:
     from urllib import urlopen
@@ -193,6 +194,41 @@ def write_config(ctx, node, env):
             handle.write(content)
 
 
+def find_haproxy():
+    p = sp.Popen(
+        ["which", "haproxy"],
+        stdin=sp.PIPE,
+        stdout=sp.PIPE,
+        stderr=sp.STDOUT
+    )
+    (res, _) = p.communicate()
+    if res.strip():
+        return res.strip()
+    return "/usr/sbin/haproxy"
+
+
+def boot_haproxy(ctx):
+    config = os.path.join(ctx['rootdir'], "rel", "haproxy.cfg")
+    cmd = [
+        find_haproxy(),
+        "-f",
+        config
+    ]
+    logfname = os.path.join(ctx['devdir'], "logs", "haproxy.log")
+    log = open(logfname, "w")
+    env = os.environ.copy()
+    if "HAPROXY_PORT" not in env:
+        env["HAPROXY_PORT"] = HAPROXY_PORT
+    return sp.Popen(
+            " ".join(cmd),
+            shell=True,
+            stdin=sp.PIPE,
+            stdout=log,
+            stderr=sp.STDOUT,
+            env=env
+        )
+
+
 def hack_default_ini(ctx, node, content):
     # Replace log file
     logfile = os.path.join(ctx['devdir'], "logs", "%s.log" % node)
@@ -275,6 +311,7 @@ def kill_processes(ctx):
 def boot_nodes(ctx):
     for node in ctx['nodes']:
         ctx['procs'].append(boot_node(ctx, node))
+    ctx['procs'].append(boot_haproxy(ctx))
 
 
 def ensure_all_nodes_alive(ctx):
