@@ -12,9 +12,7 @@
 
 {application, couchdb_peruser, [
     {description, "couchdb_peruser - maintains per-user databases in CouchDB"},
-    {vsn, "1.1.0"},
-    {modules, []},
-    {registered, [couchdb_peruser]},
-    {applications, [kernel, stdlib, config, couch, fabric]},
-    {env, []}
+    {vsn, git},
+    {registered, []},
+    {applications, [kernel, stdlib, config, couch, fabric]}
 ]}.
