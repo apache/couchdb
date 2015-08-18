@@ -37,6 +37,9 @@ teardown(TestAuthDb) ->
     set_config("couchdb_peruser", "enable", "false"),
     set_config("couchdb_peruser", "delete_dbs", "false"),
     do_request(delete, get_base_url() ++ "/" ++ ?b2l(TestAuthDb)),
+    lists:foreach(fun (DbName) ->
+        delete_db(DbName)
+    end, all_dbs()),
     config:delete("admins", ?ADMIN_USERNAME).
 
 set_config(Section, Key, Value) ->
@@ -54,6 +57,12 @@ do_request(Method, Url, Body) ->
         {"Content-Type", "application/json"}],
     {ok, _, _, _} = test_request:request(Method, Url, Headers, Body).
 
+create_db(DbName) ->
+    {ok, _, _, _} = do_request(put, get_cluster_base_url() ++ "/" ++ ?b2l(DbName)).
+
+delete_db(DbName) ->
+    {ok, _, _, _} = do_request(delete, get_cluster_base_url() ++ "/" ++ ?b2l(DbName)).
+
 create_user(AuthDb, Name) ->
     Body = "{\"name\":\"" ++ Name ++
         "\",\"type\":\"user\",\"roles\":[],\"password\":\"secret\"}",
@@ -61,7 +70,7 @@ create_user(AuthDb, Name) ->
         get_base_url(), "/", ?b2l(AuthDb), "/org.couchdb.user:", Name]),
     {ok, 201, _, _} = do_request(put, Url, Body),
     % let's proceed after giving couchdb_peruser some time to create the user db
-    timer:sleep(50).
+    timer:sleep(1000).
 
 delete_user(AuthDb, Name) ->
     Url = lists:concat([get_base_url(), "/", ?b2l(AuthDb),
@@ -71,7 +80,20 @@ delete_user(AuthDb, Name) ->
     Rev = proplists:get_value(<<"_rev">>, DocProps),
     {ok, 200, _, _} = do_request(delete, Url ++ "?rev=" ++ ?b2l(Rev)),
     % let's proceed after giving couchdb_peruser some time to delete the user db
-    timer:sleep(50).
+    timer:sleep(1000).
+
+get_security(DbName) ->
+    Url = lists:concat([
+        get_cluster_base_url(), "/", ?b2l(DbName), "/_security"]),
+    {ok, 200, _, Body} = do_request(get, Url),
+    {SecurityProperties} = jiffy:decode(Body),
+    SecurityProperties.
+
+set_security(DbName, SecurityProperties) ->
+    Url = lists:concat([
+        get_cluster_base_url(), "/", ?b2l(DbName), "/_security"]),
+    Body = jiffy:encode({SecurityProperties}),
+    {ok, 200, _, _} = do_request(put, Url, Body).
 
 all_dbs() ->
     {ok, 200, _, Body} = do_request(get, get_cluster_base_url() ++ "/_all_dbs"),
@@ -129,6 +151,56 @@ should_reflect_config_changes(TestAuthDb) ->
     create_user(TestAuthDb, User),
     ?_assert(not lists:member(UserDbName, all_dbs())).
 
+should_assign_user_to_db_admins(TestAuthDb) ->
+    User = "qux",
+    UserDbName = <<"userdb-717578">>,
+    create_user(TestAuthDb, User),
+    ?_assertEqual(
+        {[{<<"names">>,[<<"qux">>]}]},
+        proplists:get_value(<<"admins">>, get_security(UserDbName))).
+
+should_assign_user_to_db_members(TestAuthDb) ->
+    User = "qux",
+    UserDbName = <<"userdb-717578">>,
+    create_user(TestAuthDb, User),
+    ?_assertEqual(
+        {[{<<"names">>,[<<"qux">>]}]},
+        proplists:get_value(<<"members">>, get_security(UserDbName))).
+
+should_not_remove_existing_db_admins(TestAuthDb) ->
+    User = "qux",
+    UserDbName = <<"userdb-717578">>,
+    SecurityProperties = [
+        {<<"admins">>,{[{<<"names">>,[<<"foo">>,<<"bar">>]}]}},
+        {<<"members">>,{[{<<"names">>,[<<"baz">>,<<"pow">>]}]}}
+    ],
+    create_db(UserDbName),
+    set_security(UserDbName, SecurityProperties),
+    create_user(TestAuthDb, User),
+    {AdminProperties} = proplists:get_value(<<"admins">>,
+        get_security(UserDbName)),
+    AdminNames = proplists:get_value(<<"names">>, AdminProperties),
+    ?_assert(lists:member(<<"foo">>, AdminNames)),
+    ?_assert(lists:member(<<"bar">>, AdminNames)),
+    ?_assert(lists:member(<<"qux">>, AdminNames)).
+
+should_not_remove_existing_db_members(TestAuthDb) ->
+    User = "qux",
+    UserDbName = <<"userdb-717578">>,
+    SecurityProperties = [
+        {<<"admins">>,{[{<<"names">>,[<<"pow">>,<<"wow">>]}]}},
+        {<<"members">>,{[{<<"names">>,[<<"pow">>,<<"wow">>]}]}}
+    ],
+    create_db(UserDbName),
+    set_security(UserDbName, SecurityProperties),
+    create_user(TestAuthDb, User),
+    {MemberProperties} = proplists:get_value(<<"members">>,
+        get_security(UserDbName)),
+    MemberNames = proplists:get_value(<<"names">>, MemberProperties),
+    ?_assert(lists:member(<<"pow">>, MemberNames)),
+    ?_assert(lists:member(<<"wow">>, MemberNames)),
+    ?_assert(lists:member(<<"qux">>, MemberNames)).
+
 couchdb_peruser_test_() ->
     {
         "couchdb_peruser test",
@@ -142,7 +214,11 @@ couchdb_peruser_test_() ->
                     fun should_create_user_db/1,
                     fun should_not_delete_user_db/1,
                     fun should_delete_user_db/1,
-                    fun should_reflect_config_changes/1
+                    fun should_reflect_config_changes/1,
+                    fun should_assign_user_to_db_admins/1,
+                    fun should_assign_user_to_db_members/1,
+                    fun should_not_remove_existing_db_admins/1,
+                    fun should_not_remove_existing_db_members/1
                 ]
             }
         }
