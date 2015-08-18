@@ -30,7 +30,8 @@
     "x-couchdb-www-authenticate",
     "x-http-method-override",
     "x-requested-with",
-    "x-couchdb-vhost-path"
+    "x-couchdb-vhost-path",
+    "x-couchdb-csrf"
 ]).
 
 
@@ -65,7 +66,7 @@
     "x-couch-request-id",
     "x-couch-update-newrev",
     "x-couchdb-body-time",
-    "x-couchdb-csrf"
+    "x-couchdb-csrf-valid"
 ]).
 
 
