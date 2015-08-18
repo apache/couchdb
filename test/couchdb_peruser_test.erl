@@ -201,6 +201,54 @@ should_not_remove_existing_db_members(TestAuthDb) ->
     ?_assert(lists:member(<<"wow">>, MemberNames)),
     ?_assert(lists:member(<<"qux">>, MemberNames)).
 
+should_remove_user_from_db_admins(TestAuthDb) ->
+    User = "qux",
+    UserDbName = <<"userdb-717578">>,
+    SecurityProperties = [
+        {<<"admins">>,{[{<<"names">>,[<<"foo">>,<<"bar">>]}]}},
+        {<<"members">>,{[{<<"names">>,[<<"baz">>,<<"pow">>]}]}}
+    ],
+    create_db(UserDbName),
+    set_security(UserDbName, SecurityProperties),
+    create_user(TestAuthDb, User),
+    {AdminProperties} = proplists:get_value(<<"admins">>,
+        get_security(UserDbName)),
+    AdminNames = proplists:get_value(<<"names">>, AdminProperties),
+    ?assert(lists:member(<<"foo">>, AdminNames)),
+    ?assert(lists:member(<<"bar">>, AdminNames)),
+    ?assert(lists:member(<<"qux">>, AdminNames)),
+    delete_user(TestAuthDb, User),
+    {NewAdminProperties} = proplists:get_value(<<"admins">>,
+        get_security(UserDbName)),
+    NewAdminNames = proplists:get_value(<<"names">>, NewAdminProperties),
+    ?_assert(lists:member(<<"foo">>, NewAdminNames)),
+    ?_assert(lists:member(<<"bar">>, NewAdminNames)),
+    ?_assert(not lists:member(<<"qux">>, NewAdminNames)).
+
+should_remove_user_from_db_members(TestAuthDb) ->
+    User = "qux",
+    UserDbName = <<"userdb-717578">>,
+    SecurityProperties = [
+        {<<"admins">>,{[{<<"names">>,[<<"pow">>,<<"wow">>]}]}},
+        {<<"members">>,{[{<<"names">>,[<<"pow">>,<<"wow">>]}]}}
+    ],
+    create_db(UserDbName),
+    set_security(UserDbName, SecurityProperties),
+    create_user(TestAuthDb, User),
+    {MemberProperties} = proplists:get_value(<<"members">>,
+        get_security(UserDbName)),
+    MemberNames = proplists:get_value(<<"names">>, MemberProperties),
+    ?assert(lists:member(<<"pow">>, MemberNames)),
+    ?assert(lists:member(<<"wow">>, MemberNames)),
+    ?assert(lists:member(<<"qux">>, MemberNames)),
+    delete_user(TestAuthDb, User),
+    {NewMemberProperties} = proplists:get_value(<<"members">>,
+        get_security(UserDbName)),
+    NewMemberNames = proplists:get_value(<<"names">>, NewMemberProperties),
+    ?_assert(lists:member(<<"foo">>, NewMemberNames)),
+    ?_assert(lists:member(<<"bar">>, NewMemberNames)),
+    ?_assert(not lists:member(<<"qux">>, NewMemberNames)).
+
 couchdb_peruser_test_() ->
     {
         "couchdb_peruser test",
@@ -218,7 +266,9 @@ couchdb_peruser_test_() ->
                     fun should_assign_user_to_db_admins/1,
                     fun should_assign_user_to_db_members/1,
                     fun should_not_remove_existing_db_admins/1,
-                    fun should_not_remove_existing_db_members/1
+                    fun should_not_remove_existing_db_members/1,
+                    fun should_remove_user_from_db_admins/1,
+                    fun should_remove_user_from_db_members/1
                 ]
             }
         }

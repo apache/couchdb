@@ -67,7 +67,7 @@ changes_handler({change, {Doc}, _Prepend}, _ResType, State=#state{}) ->
         case couch_util:get_value(<<"deleted">>, Doc, false) of
         false ->
             UserDb = ensure_user_db(User),
-            ensure_security(User, UserDb),
+            ensure_security(User, UserDb, fun add_user/3),
             State;
         true ->
             case State#state.delete_dbs of
@@ -75,6 +75,7 @@ changes_handler({change, {Doc}, _Prepend}, _ResType, State=#state{}) ->
                 _UserDb = delete_user_db(User),
                 State;
             false ->
+                ensure_security(User, user_db_name(User), fun remove_user/3),
                 State
             end
         end;
@@ -118,15 +119,31 @@ add_user(User, Prop, {Modified, SecProps}) ->
                    {<<"names">>, [User | Names]})}})}
     end.
 
-ensure_security(User, UserDb) ->
+remove_user(User, Prop, {Modified, SecProps}) ->
+    {PropValue} = couch_util:get_value(Prop, SecProps, {[]}),
+    Names = couch_util:get_value(<<"names">>, PropValue, []),
+    case lists:member(User, Names) of
+    false ->
+        {Modified, SecProps};
+    true ->
+        {true,
+         lists:keystore(
+             Prop, 1, SecProps,
+             {Prop,
+              {lists:keystore(
+                   <<"names">>, 1, PropValue,
+                   {<<"names">>, lists:delete(User, Names)})}})}
+    end.
+
+ensure_security(User, UserDb, TransformFun) ->
     {ok, Shards} = fabric:get_all_security(UserDb, [?ADMIN_CTX]),
     {_ShardInfo, {SecProps}} = hd(Shards),
     % assert that shards have the same security object
-    true = lists:all(fun({_, {SecProps1}}) ->
+    true = lists:all(fun ({_, {SecProps1}}) ->
         SecProps =:= SecProps1
     end, Shards),
     case lists:foldl(
-           fun(Prop, SAcc) -> add_user(User, Prop, SAcc) end,
+           fun (Prop, SAcc) -> TransformFun(User, Prop, SAcc) end,
            {false, SecProps},
            [<<"admins">>, <<"members">>]) of
     {false, _} ->
