@@ -40,7 +40,10 @@ teardown(TestAuthDb) ->
     set_config("couchdb_peruser", "delete_dbs", "false"),
     do_request(delete, get_base_url() ++ "/" ++ ?b2l(TestAuthDb)),
     lists:foreach(fun (DbName) ->
-        delete_db(DbName)
+        case DbName of
+        <<"userdb-",_/binary>> -> delete_db(DbName);
+        _ -> ok
+        end
     end, all_dbs()).
 
 set_config(Section, Key, Value) ->
