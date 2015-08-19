@@ -151,7 +151,7 @@ should_reflect_config_changes(TestAuthDb) ->
     create_user(TestAuthDb, User),
     ?_assert(not lists:member(UserDbName, all_dbs())).
 
-should_assign_user_to_db_admins(TestAuthDb) ->
+should_add_user_to_db_admins(TestAuthDb) ->
     User = "qux",
     UserDbName = <<"userdb-717578">>,
     create_user(TestAuthDb, User),
@@ -159,7 +159,7 @@ should_assign_user_to_db_admins(TestAuthDb) ->
         {[{<<"names">>,[<<"qux">>]}]},
         proplists:get_value(<<"admins">>, get_security(UserDbName))).
 
-should_assign_user_to_db_members(TestAuthDb) ->
+should_add_user_to_db_members(TestAuthDb) ->
     User = "qux",
     UserDbName = <<"userdb-717578">>,
     create_user(TestAuthDb, User),
@@ -263,8 +263,8 @@ couchdb_peruser_test_() ->
                     fun should_not_delete_user_db/1,
                     fun should_delete_user_db/1,
                     fun should_reflect_config_changes/1,
-                    fun should_assign_user_to_db_admins/1,
-                    fun should_assign_user_to_db_members/1,
+                    fun should_add_user_to_db_admins/1,
+                    fun should_add_user_to_db_members/1,
                     fun should_not_remove_existing_db_admins/1,
                     fun should_not_remove_existing_db_members/1,
                     fun should_remove_user_from_db_admins/1,
