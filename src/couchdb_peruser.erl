@@ -67,7 +67,7 @@ changes_handler({change, {Doc}, _Prepend}, _ResType, State=#state{}) ->
         case couch_util:get_value(<<"deleted">>, Doc, false) of
         false ->
             UserDb = ensure_user_db(User),
-            ensure_security(User, UserDb, fun add_user/3),
+            ok = ensure_security(User, UserDb, fun add_user/3),
             State;
         true ->
             case State#state.delete_dbs of
@@ -75,7 +75,8 @@ changes_handler({change, {Doc}, _Prepend}, _ResType, State=#state{}) ->
                 _UserDb = delete_user_db(User),
                 State;
             false ->
-                ensure_security(User, user_db_name(User), fun remove_user/3),
+                UserDb = user_db_name(User),
+                ok = ensure_security(User, UserDb, fun remove_user/3),
                 State
             end
         end;
@@ -88,7 +89,10 @@ changes_handler(_Event, _ResType, State) ->
 delete_user_db(User) ->
     UserDb = user_db_name(User),
     try
-        fabric:delete_db(UserDb, [?ADMIN_CTX])
+        case fabric:delete_db(UserDb, [?ADMIN_CTX]) of
+        ok -> ok;
+        accepted -> ok
+        end
     catch error:database_does_not_exist ->
         ok
     end,
@@ -97,9 +101,12 @@ delete_user_db(User) ->
 ensure_user_db(User) ->
     UserDb = user_db_name(User),
     try
-        fabric:get_db_info(UserDb)
+        {ok, _DbInfo} = fabric:get_db_info(UserDb)
     catch error:database_does_not_exist ->
-        fabric:create_db(UserDb, [?ADMIN_CTX])
+        case fabric:create_db(UserDb, [?ADMIN_CTX]) of
+        ok -> ok;
+        accepted -> ok
+        end
     end,
     UserDb.
 
@@ -149,7 +156,7 @@ ensure_security(User, UserDb, TransformFun) ->
     {false, _} ->
         ok;
     {true, SecProps1} ->
-        fabric:set_security(UserDb, {SecProps1}, [?ADMIN_CTX])
+        ok = fabric:set_security(UserDb, {SecProps1}, [?ADMIN_CTX])
     end.
 
 user_db_name(User) ->
@@ -196,10 +203,10 @@ code_change(_OldVsn, State, _Extra) ->
 %% config_listener callbacks
 
 handle_config_change("couch_httpd_auth", "authentication_db", _Value, _Persist, Server) ->
-    gen_server:cast(Server, update_config),
+    ok = gen_server:cast(Server, update_config),
     {ok, Server};
 handle_config_change("couchdb_peruser", _Key, _Value, _Persist, Server) ->
-    gen_server:cast(Server, update_config),
+    ok = gen_server:cast(Server, update_config),
     {ok, Server};
 handle_config_change(_Section, _Key, _Value, _Persist, Server) ->
     {ok, Server}.
