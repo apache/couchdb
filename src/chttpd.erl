@@ -402,9 +402,17 @@ make_uri(Req, Raw) ->
                          ":", config:get("chttpd", "port"), "/", Raw]),
     Headers = [
         {<<"authorization">>, ?l2b(header_value(Req,"authorization",""))},
-        {<<"cookie">>, ?l2b(header_value(Req,"cookie",""))}
+        {<<"cookie">>, ?l2b(extract_cookie(Req))}
     ],
     {[{<<"url">>,Url}, {<<"headers">>,{Headers}}]}.
+
+extract_cookie(#httpd{mochi_req = MochiReq}) ->
+    case MochiReq:get_cookie_value("AuthSession") of
+        undefined ->
+            "";
+        AuthSession ->
+            "AuthSession=" ++ AuthSession
+    end.
 %%% end hack
 
 authenticate_request(Req) ->
