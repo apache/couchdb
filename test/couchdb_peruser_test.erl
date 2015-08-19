@@ -18,15 +18,17 @@
 -define(ADMIN_USERNAME, "admin").
 -define(ADMIN_PASSWORD, "secret").
 
-start_couch() ->
-    test_util:start_couch([chttpd]).
+setup_all() ->
+    TestCtx = test_util:start_couch([chttpd]),
+    config:set("admins", ?ADMIN_USERNAME, ?ADMIN_PASSWORD),
+    TestCtx.
 
-stop_couch(TestCtx) ->
+teardown_all(TestCtx) ->
+    config:delete("admins", ?ADMIN_USERNAME),
     test_util:stop_couch(TestCtx).
 
 setup() ->
     TestAuthDb = ?tempdb(),
-    config:set("admins", ?ADMIN_USERNAME, ?ADMIN_PASSWORD),
     do_request(put, get_base_url() ++ "/" ++ ?b2l(TestAuthDb)),
     set_config("couch_httpd_auth", "authentication_db", ?b2l(TestAuthDb)),
     set_config("couchdb_peruser", "enable", "true"),
@@ -39,8 +41,7 @@ teardown(TestAuthDb) ->
     do_request(delete, get_base_url() ++ "/" ++ ?b2l(TestAuthDb)),
     lists:foreach(fun (DbName) ->
         delete_db(DbName)
-    end, all_dbs()),
-    config:delete("admins", ?ADMIN_USERNAME).
+    end, all_dbs()).
 
 set_config(Section, Key, Value) ->
     Url = lists:concat([
@@ -254,7 +255,7 @@ couchdb_peruser_test_() ->
         "couchdb_peruser test",
         {
             setup,
-            fun start_couch/0, fun stop_couch/1,
+            fun setup_all/0, fun teardown_all/1,
             {
                 foreach,
                 fun setup/0, fun teardown/1,
