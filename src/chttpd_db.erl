@@ -230,7 +230,7 @@ handle_compact_req(Req, _) ->
     couch_httpd:send_error(Req, 403, forbidden, Msg).
 
 handle_view_cleanup_req(Req, Db) ->
-    ok = fabric:cleanup_index_files(Db),
+    ok = fabric:cleanup_index_files_all_nodes(Db),
     send_json(Req, 202, {[{ok, true}]}).
 
 handle_design_req(#httpd{
