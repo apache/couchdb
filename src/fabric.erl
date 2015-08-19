@@ -143,12 +143,18 @@ get_security(DbName, Options) ->
     try couch_db:get_security(Db) after catch couch_db:close(Db) end.
 
 %% @doc retrieve the security object for all shards of a database
--spec get_all_security(dbname()) -> json_obj() | no_return().
+-spec get_all_security(dbname()) ->
+    {ok, json_obj()} |
+    {error, no_majority | timeout} |
+    {error, atom(), any()}.
 get_all_security(DbName) ->
     get_all_security(DbName, []).
 
 %% @doc retrieve the security object for all shards of a database
--spec get_all_security(dbname(), [option()]) -> json_obj() | no_return().
+-spec get_all_security(dbname(), [option()]) ->
+    {ok, json_obj()} |
+    {error, no_majority | timeout} |
+    {error, atom(), any()}.
 get_all_security(DbName, Options) ->
     fabric_db_meta:get_all_security(dbname(DbName), opts(Options)).
 
