@@ -46,5 +46,6 @@ mean this in the sense of being loyal to the project and its interests.
  * Benjamin Bastian <bbastian@apache.org>
  * Ben Keen <benkeen@apache.org>
  * Maria Andersson <mia@apache.org>
+ * Michelle Phung <michellep@apache.org>
 
 For a list of other credits see the `THANKS` file.
