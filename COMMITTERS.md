@@ -1,7 +1,7 @@
 Apache CouchDB COMMITTERS
 =========================
 
-Committers are given a binding vote in certain project decsions, as well as
+Committers are given a binding vote in certain project decisions, as well as
 write access to public project infrastructure. The following people were
 elected as a committer in recognition of their commitment to the project. We
 mean this in the sense of being loyal to the project and its interests.
