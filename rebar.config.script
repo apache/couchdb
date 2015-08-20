@@ -30,7 +30,7 @@ DepDescs = [
     {couch_plugins,     "couch-plugins",    {branch, "master"}},
     {couch_event,       "couch-event",      {branch, "master"}},
     {couch_stats,       "couch-stats",      {branch, "master"}},
-    {couchdb_peruser,   "peruser",          {branch, "master"}},
+    {couch_peruser,     "peruser",          {branch, "master"}},
     {docs,              "documentation",    {branch, "master"}, [raw]},
     {ddoc_cache,        "ddoc-cache",       {branch, "master"}},
     {ets_lru,           "ets-lru",          {branch, "master"}},
