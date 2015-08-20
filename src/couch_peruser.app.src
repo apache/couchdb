@@ -10,8 +10,8 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-{application, couchdb_peruser, [
-    {description, "couchdb_peruser - maintains per-user databases in CouchDB"},
+{application, couch_peruser, [
+    {description, "couch_peruser - maintains per-user databases in CouchDB"},
     {vsn, git},
     {registered, []},
     {applications, [kernel, stdlib, config, couch, fabric]}

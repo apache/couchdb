@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(couchdb_peruser_test).
+-module(couch_peruser_test).
 
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
@@ -31,13 +31,13 @@ setup() ->
     TestAuthDb = ?tempdb(),
     do_request(put, get_base_url() ++ "/" ++ ?b2l(TestAuthDb)),
     set_config("couch_httpd_auth", "authentication_db", ?b2l(TestAuthDb)),
-    set_config("couchdb_peruser", "enable", "true"),
+    set_config("couch_peruser", "enable", "true"),
     TestAuthDb.
 
 teardown(TestAuthDb) ->
     set_config("couch_httpd_auth", "authentication_db", "_users"),
-    set_config("couchdb_peruser", "enable", "false"),
-    set_config("couchdb_peruser", "delete_dbs", "false"),
+    set_config("couch_peruser", "enable", "false"),
+    set_config("couch_peruser", "delete_dbs", "false"),
     do_request(delete, get_base_url() ++ "/" ++ ?b2l(TestAuthDb)),
     lists:foreach(fun (DbName) ->
         case DbName of
@@ -73,7 +73,7 @@ create_user(AuthDb, Name) ->
     Url = lists:concat([
         get_base_url(), "/", ?b2l(AuthDb), "/org.couchdb.user:", Name]),
     {ok, 201, _, _} = do_request(put, Url, Body),
-    % let's proceed after giving couchdb_peruser some time to create the user db
+    % let's proceed after giving couch_peruser some time to create the user db
     timer:sleep(1000).
 
 delete_user(AuthDb, Name) ->
@@ -83,7 +83,7 @@ delete_user(AuthDb, Name) ->
     {DocProps} = jiffy:decode(Body),
     Rev = proplists:get_value(<<"_rev">>, DocProps),
     {ok, 200, _, _} = do_request(delete, Url ++ "?rev=" ++ ?b2l(Rev)),
-    % let's proceed after giving couchdb_peruser some time to delete the user db
+    % let's proceed after giving couch_peruser some time to delete the user db
     timer:sleep(1000).
 
 get_security(DbName) ->
@@ -128,7 +128,7 @@ should_not_delete_user_db(TestAuthDb) ->
 should_delete_user_db(TestAuthDb) ->
     User = "bar",
     UserDbName = <<"userdb-626172">>,
-    set_config("couchdb_peruser", "delete_dbs", "true"),
+    set_config("couch_peruser", "delete_dbs", "true"),
     create_user(TestAuthDb, User),
     ?assert(lists:member(UserDbName, all_dbs())),
     delete_user(TestAuthDb, User),
@@ -137,21 +137,21 @@ should_delete_user_db(TestAuthDb) ->
 should_reflect_config_changes(TestAuthDb) ->
     User = "baz",
     UserDbName = <<"userdb-62617a">>,
-    set_config("couchdb_peruser", "delete_dbs", "true"),
+    set_config("couch_peruser", "delete_dbs", "true"),
     create_user(TestAuthDb, User),
     ?assert(lists:member(UserDbName, all_dbs())),
     delete_user(TestAuthDb, User),
     ?assert(not lists:member(UserDbName, all_dbs())),
     create_user(TestAuthDb, User),
     ?assert(lists:member(UserDbName, all_dbs())),
-    set_config("couchdb_peruser", "delete_dbs", "false"),
+    set_config("couch_peruser", "delete_dbs", "false"),
     delete_user(TestAuthDb, User),
     ?assert(lists:member(UserDbName, all_dbs())),
     create_user(TestAuthDb, User),
-    set_config("couchdb_peruser", "delete_dbs", "true"),
+    set_config("couch_peruser", "delete_dbs", "true"),
     delete_user(TestAuthDb, User),
     ?assert(not lists:member(UserDbName, all_dbs())),
-    set_config("couchdb_peruser", "enable", "false"),
+    set_config("couch_peruser", "enable", "false"),
     create_user(TestAuthDb, User),
     ?_assert(not lists:member(UserDbName, all_dbs())).
 
@@ -253,9 +253,9 @@ should_remove_user_from_db_members(TestAuthDb) ->
     ?_assert(lists:member(<<"bar">>, NewMemberNames)),
     ?_assert(not lists:member(<<"qux">>, NewMemberNames)).
 
-couchdb_peruser_test_() ->
+couch_peruser_test_() ->
     {
-        "couchdb_peruser test",
+        "couch_peruser test",
         {
             setup,
             fun setup_all/0, fun teardown_all/1,

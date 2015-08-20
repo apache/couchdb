@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(couchdb_peruser).
+-module(couch_peruser).
 -behaviour(gen_server).
 -behaviour(config_listener).
 
@@ -34,13 +34,13 @@ start_link() ->
     gen_server:start_link(?MODULE, [], []).
 
 init() ->
-    case config:get_boolean("couchdb_peruser", "enable", false) of
+    case config:get_boolean("couch_peruser", "enable", false) of
     false ->
         #state{};
     true ->
         DbName = ?l2b(config:get(
                          "couch_httpd_auth", "authentication_db", "_users")),
-        DeleteDbs = config:get_boolean("couchdb_peruser", "delete_dbs", false),
+        DeleteDbs = config:get_boolean("couch_peruser", "delete_dbs", false),
         State = #state{parent = self(),
                        db_name = DbName,
                        delete_dbs = DeleteDbs},
@@ -205,7 +205,7 @@ code_change(_OldVsn, State, _Extra) ->
 handle_config_change("couch_httpd_auth", "authentication_db", _Value, _Persist, Server) ->
     ok = gen_server:cast(Server, update_config),
     {ok, Server};
-handle_config_change("couchdb_peruser", _Key, _Value, _Persist, Server) ->
+handle_config_change("couch_peruser", _Key, _Value, _Persist, Server) ->
     ok = gen_server:cast(Server, update_config),
     {ok, Server};
 handle_config_change(_Section, _Key, _Value, _Persist, Server) ->
