@@ -109,7 +109,11 @@ start_link(https) ->
     start_link(https, Options).
 
 start_link(Name, Options) ->
-    IP = with_default(config:get("chttpd", "bind_address"), any),
+    IP = case config:get("chttpd", "bind_address", "any") of
+             "any" -> any;
+             Else -> Else
+         end,
+    ok = couch_httpd:validate_bind_address(IP),
 
     Options1 = Options ++ [
         {loop, fun ?MODULE:handle_request/1},
@@ -1021,9 +1025,6 @@ stack_trace_id(Stack) ->
 
 stack_hash(Stack) ->
     erlang:crc32(term_to_binary(Stack)).
-
-with_default(undefined, Default) -> Default;
-with_default(Value, _) -> Value.
 
 %% @doc CouchDB uses a chunked transfer-encoding to stream responses to
 %% _all_docs, _changes, _view and other similar requests. This configuration
