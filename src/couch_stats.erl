@@ -77,19 +77,19 @@ list() ->
 
 -spec increment_counter(any()) -> response().
 increment_counter(Name) ->
-    notify(Name, {inc, 1}).
+    notify_existing_metric(Name, {inc, 1}, counter).
 
 -spec increment_counter(any(), pos_integer()) -> response().
 increment_counter(Name, Value) ->
-    notify(Name, {inc, Value}).
+    notify_existing_metric(Name, {inc, Value}, counter).
 
 -spec decrement_counter(any()) -> response().
 decrement_counter(Name) ->
-    notify(Name, {dec, 1}).
+    notify_existing_metric(Name, {dec, 1}, counter).
 
 -spec decrement_counter(any(), pos_integer()) -> response().
 decrement_counter(Name, Value) ->
-    notify(Name, {dec, Value}).
+    notify_existing_metric(Name, {dec, Value}, counter).
 
 -spec update_histogram(any(), number()) -> response();
                       (any(), function()) -> any().
@@ -97,27 +97,26 @@ update_histogram(Name, Fun) when is_function(Fun, 0) ->
     Begin = os:timestamp(),
     Result = Fun(),
     Duration = timer:now_diff(os:timestamp(), Begin) div 1000,
-    case notify(Name, Duration) of
+    case notify_existing_metric(Name, Duration, histogram) of
         ok ->
             Result;
         {error, unknown_metric} ->
             throw({unknown_metric, Name})
     end;
 update_histogram(Name, Value) when is_number(Value) ->
-    notify(Name, Value).
+    notify_existing_metric(Name, Value, histogram).
 
 -spec update_gauge(any(), number()) -> response().
 update_gauge(Name, Value) ->
-    notify(Name, Value).
+    notify_existing_metric(Name, Value, gauge).
 
--spec notify(any(), any()) -> response().
-notify(Name, Op) ->
-    case folsom_metrics:notify(Name, Op) of
-        ok ->
-            ok;
-        _ ->
-            couch_log:notice("unknown metric: ~p", [Name]),
-            {error, unknown_metric}
+-spec notify_existing_metric(any(), any(), any()) -> response().
+notify_existing_metric(Name, Op, Type) ->
+    try
+        ok = folsom_metrics:notify_existing_metric(Name, Op, Type)
+    catch _:_ ->
+        couch_log:notice("unknown metric: ~p", [Name]),
+        {error, unknown_metric}
     end.
 
 -spec sample_type(any(), atom()) -> stat().
