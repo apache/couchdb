@@ -225,9 +225,20 @@ maybe_flush_changes_feed(Acc0, Data, Len) ->
     },
     {ok, Acc}.
 
-handle_compact_req(Req, _) ->
-    Msg = <<"Compaction must be triggered on a per-shard basis in CouchDB">>,
-    couch_httpd:send_error(Req, 403, forbidden, Msg).
+handle_compact_req(#httpd{method='POST', path_parts=[_DbName, <<"_compact">>, _DesignName | _]}=Req, _Db) ->
+    Msg = <<"Compactions for views must be triggered on a per-shard basis in CouchDB">>,
+    couch_httpd:send_error(Req, 403, forbidden, Msg);
+
+handle_compact_req(#httpd{method='POST', path_parts=[_DbName, <<"_compact">>]}=Req, Db) ->
+    couch_httpd:validate_ctype(Req, "application/json"),
+    ok = couch_db:check_is_admin(Db),
+    couch_httpd:body(Req),
+    fabric:compact_db(Db#db.name),
+    send_json(Req, 202, {[{ok, true}]});
+
+handle_compact_req(Req, _Db) ->
+    send_method_not_allowed(Req, "POST").
+
 
 handle_view_cleanup_req(Req, Db) ->
     ok = fabric:cleanup_index_files(Db),
