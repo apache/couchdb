@@ -292,6 +292,12 @@ handle_node_req(#httpd{method='GET', path_parts=[_, Node, <<"_stats">> | Path]}=
     chttpd:send_json(Req, EJSON1);
 handle_node_req(#httpd{path_parts=[_, _Node, <<"_stats">>]}=Req) ->
     send_method_not_allowed(Req, "GET");
+% GET /_node/$node/_system
+handle_node_req(#httpd{method='GET', path_parts=[_, Node, <<"_system">>]}=Req) ->
+    Stats = call_node(Node, chttpd_misc, handle_system_req, [Req]),
+    chttpd:send_json(Req, Stats);
+handle_node_req(#httpd{path_parts=[_, _Node, <<"_system">>]}=Req) ->
+    send_method_not_allowed(Req, "GET");
 handle_node_req(#httpd{path_parts=[_]}=Req) ->
     chttpd:send_error(Req, {bad_request, <<"Incomplete path to _node request">>});
 handle_node_req(#httpd{path_parts=[_, _Node]}=Req) ->
