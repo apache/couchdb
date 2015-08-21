@@ -33,7 +33,7 @@
 
 % miscellany
 -export([design_docs/1, reset_validation_funs/1, cleanup_index_files/0,
-    cleanup_index_files/1, dbname/1]).
+    cleanup_index_files/1, dbname/1, compact_db/1]).
 
 -include_lib("fabric/include/fabric.hrl").
 
@@ -410,6 +410,10 @@ design_docs(DbName) ->
 reset_validation_funs(DbName) ->
     [rexi:cast(Node, {fabric_rpc, reset_validation_funs, [Name]}) ||
         #shard{node=Node, name=Name} <-  mem3:shards(DbName)].
+
+compact_db(DbName) ->
+    [rexi:cast(Node, {fabric_rpc, compact_db, [Name]}) ||
+        #shard{node=Node, name=Name} <- mem3:shards(DbName)].
 
 %% @doc clean up index files for all Dbs
 -spec cleanup_index_files() -> [ok].
