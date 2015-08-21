@@ -31,6 +31,7 @@
 -export([accepted_encodings/1,handle_request_int/5,validate_referer/1,validate_ctype/2]).
 -export([http_1_0_keep_alive/2]).
 -export([validate_host/1]).
+-export([validate_bind_address/1]).
 
 -define(HANDLER_NAME_IN_MODULE_POS, 6).
 
@@ -90,8 +91,11 @@ start_link(https) ->
          {ssl_opts, SslOpts}],
     start_link(https, Options).
 start_link(Name, Options) ->
-    BindAddress = with_default(config:get("httpd", "bind_address"), any),
-    validate_bind_address(BindAddress),
+    BindAddress = case config:get("httpd", "bind_address", "any") of
+                      "any" -> any;
+                      Else -> Else
+                  end,
+    ok = validate_bind_address(BindAddress),
     DefaultSpec = "{couch_httpd_db, handle_request}",
     DefaultFun = make_arity_1_fun(
         config:get("httpd", "default_handler", DefaultSpec)
@@ -1116,11 +1120,9 @@ check_for_last(#mp{buffer=Buffer, data_fun=DataFun}=Mp) ->
                 data_fun = DataFun2})
     end.
 
+validate_bind_address(any) -> ok;
 validate_bind_address(Address) ->
     case inet_parse:address(Address) of
         {ok, _} -> ok;
         _ -> throw({error, invalid_bind_address})
     end.
-
-with_default(undefined, Default) -> Default;
-with_default(Value, _) -> Value.
