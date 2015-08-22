@@ -1,0 +1,24 @@
+language: erlang
+
+otp_release:
+  - 18.0
+  - 17.5
+  - R16B03-1
+  - R14B04
+
+before_install:
+  - sudo apt-get update -qq
+  - sudo apt-get -y install libmozjs-dev
+  - git clone https://github.com/apache/couchdb
+
+before_script:
+  - cd couchdb
+  - ./configure --disable-docs --disable-fauxton
+  - cp -r ../!(couchdb) ./src/chttpd
+  - make
+
+script:
+  - rebar setup_eunit
+  - BUILDDIR=`pwd` rebar -r eunit apps=chttpd
+
+cache: apt
