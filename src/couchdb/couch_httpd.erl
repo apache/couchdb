@@ -31,6 +31,7 @@
 -export([send_json/2,send_json/3,send_json/4,last_chunk/1,parse_multipart_request/3]).
 -export([accepted_encodings/1,handle_request_int/5,validate_referer/1,validate_ctype/2]).
 -export([http_1_0_keep_alive/2]).
+-export([validate_bind_address/1]).
 
 start_link() ->
     start_link(http).
@@ -88,8 +89,11 @@ start_link(Name, Options) ->
     % just stop if one of the config settings change. couch_server_sup
     % will restart us and then we will pick up the new settings.
 
-    BindAddress = couch_config:get("httpd", "bind_address", any),
-    validate_bind_address(BindAddress),
+    BindAddress = case config:get("httpd", "bind_address", "any") of
+                      "any" -> any;
+                      Else -> Else
+                  end,
+    ok = validate_bind_address(BindAddress),
     DefaultSpec = "{couch_httpd_db, handle_request}",
     DefaultFun = make_arity_1_fun(
         couch_config:get("httpd", "default_handler", DefaultSpec)
@@ -1097,6 +1101,7 @@ check_for_last(#mp{buffer=Buffer, data_fun=DataFun}=Mp) ->
                 data_fun = DataFun2})
     end.
 
+validate_bind_address(any) -> ok;
 validate_bind_address(Address) ->
     case inet_parse:address(Address) of
         {ok, _} -> ok;
