@@ -44,7 +44,7 @@ couchprivlib_LTLIBRARIES = couch_icu_driver.la
 if USE_EJSON_COMPARE_NIF
 couchprivlib_LTLIBRARIES += couch_ejson_compare.la
 couch_ejson_compare_la_SOURCES = couch_ejson_compare/couch_ejson_compare.c
-couch_ejson_compare_la_CPPFLAGS = -D_BSD_SOURCE $(ICU_CPPFLAGS) $(ERLANG_FLAGS)
+couch_ejson_compare_la_CPPFLAGS = -D_DEFAULT_SOURCE -D_BSD_SOURCE $(ICU_CPPFLAGS) $(ERLANG_FLAGS)
 couch_ejson_compare_la_LDFLAGS = -module -avoid-version
 couch_ejson_compare_la_LIBADD = $(ICU_LIBS)
 if WINDOWS
@@ -72,7 +72,7 @@ COUCHJS_SRCS = \
 
 locallibbin_PROGRAMS = couchjs
 couchjs_SOURCES = $(COUCHJS_SRCS)
-couchjs_CFLAGS = -g -Wall -Werror -D_BSD_SOURCE $(CURL_CFLAGS) $(JS_CFLAGS)
+couchjs_CFLAGS = -g -Wall -Werror -D_DEFAULT_SOURCE -D_BSD_SOURCE $(CURL_CFLAGS) $(JS_CFLAGS)
 couchjs_LDADD = $(CURL_LIBS) $(JS_LIBS)
 
 couchpriv_DATA = stat_descriptions.cfg
