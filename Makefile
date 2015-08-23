@@ -156,7 +156,7 @@ docker-stop:
 eunit: export BUILDDIR = $(shell pwd)
 eunit: couch
 	@rebar setup_eunit
-	@rebar -r eunit skip_deps=meck,mochiweb,lager,snappy,couch_replicator,fabric,folsom
+	@rebar -r eunit skip_deps=meck,mochiweb,lager,snappy,folsom
 
 javascript: all
 	# TODO: Fix tests to look for these files in their new path
