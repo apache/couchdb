@@ -42,7 +42,6 @@ builddir() ->
 
 init_code_path() ->
     Paths = [
-        "etap",
         "couchdb",
         "jiffy",
         "oauth",
