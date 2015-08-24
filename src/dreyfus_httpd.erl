@@ -127,7 +127,7 @@ handle_cleanup_req(Req, _Db) ->
 handle_analyze_req(#httpd{method='GET'}=Req) ->
     Analyzer = couch_httpd:qs_value(Req, "analyzer"),
     Text = couch_httpd:qs_value(Req, "text"),
-    analyze(Req, ?l2b(Analyzer), ?l2b(Text));
+    analyze(Req, Analyzer, Text);
 handle_analyze_req(#httpd{method='POST'}=Req) ->
     couch_httpd:validate_ctype(Req, "application/json"),
     {Fields} = chttpd:json_body_obj(Req),
@@ -141,7 +141,7 @@ analyze(Req, Analyzer, Text) ->
     case Analyzer of
         undefined ->
             throw({bad_request, "analyzer parameter is mandatory"});
-        _ when is_binary(Analyzer) ->
+        _ when is_list(Analyzer) ->
             ok;
         {[_|_]} ->
             ok;
@@ -151,12 +151,12 @@ analyze(Req, Analyzer, Text) ->
     case Text of
         undefined ->
             throw({bad_request, "text parameter is mandatory"});
-        _ when is_binary(Text) ->
+        _ when is_list(Text) ->
             ok;
         _ ->
             throw({bad_request, "text parameter must be a string"})
     end,
-    case clouseau_rpc:analyze(Analyzer, Text) of
+    case clouseau_rpc:analyze(?l2b(Analyzer), ?l2b(Text)) of
         {ok, Tokens} ->
             send_json(Req, 200, {[{tokens, Tokens}]});
         {error, Reason} ->
