@@ -46,6 +46,32 @@ info(mango_cursor, {no_usable_index, selector_unsupported}) ->
         <<"There is no index available for this selector.">>
     };
 
+info(mango_cursor_text, {invalid_bookmark, BadBookmark}) ->
+    {
+        400,
+        <<"invalid_bookmark">>,
+        fmt("Invalid boomkark value: ~s", [?JSON_ENCODE(BadBookmark)])
+    };
+info(mango_cursor_text, multiple_text_indexes) ->
+    {
+        400,
+        <<"multiple_text_indexes">>,
+        <<"You must specify an index with the `use_index` parameter.">>
+    };
+info(mango_cursor_text, {text_search_error, {error, {bad_request, Msg}}}) 
+        when is_binary(Msg) ->
+    {
+        400,
+        <<"text_search_error">>,
+        Msg
+    };
+info(mango_cursor_text, {text_search_error, {error, Error}}) ->
+    {
+        400,
+        <<"text_search_error">>,
+        fmt("Error performing text search: ~p", [Error])
+    };
+
 info(mango_fields, {invalid_fields_json, BadFields}) ->
     {
         400,
@@ -120,6 +146,19 @@ info(mango_idx_view, {index_not_found, BadIdx}) ->
         404,
         <<"invalid_index">>,
         fmt("JSON index ~s not found in this design doc.", [BadIdx])
+    };
+
+info(mango_idx_text, {invalid_index_text, BadIdx}) ->
+    {
+        400,
+        <<"invalid_index">>,
+        fmt("Text indexes must be an object, not: ~w", [BadIdx])
+    };
+info(mango_idx_text, {index_not_found, BadIdx}) ->
+    {
+        404,
+        <<"index_not_found">>,
+        fmt("Text index ~s not found in this design doc.", [BadIdx])
     };
 
 info(mango_opts, {invalid_bulk_docs, Val}) ->
