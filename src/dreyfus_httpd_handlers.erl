@@ -13,19 +13,16 @@
 
 %% -*- erlang-indent-level: 4;indent-tabs-mode: nil -*-
 
--module(dreyfus_sup).
--behaviour(supervisor).
--export([start_link/0, init/1]).
+-module(dreyfus_httpd_handlers).
 
-start_link() ->
-    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+-export([url_handler/1, db_handler/1, design_handler/1]).
 
-init(_Args) ->
-    Children = [
-        child(dreyfus_index_manager),
-        chttpd_handlers:provider(dreyfus, dreyfus_httpd_handlers)
-    ],
-    {ok, {{one_for_one,10,1}, Children}}.
+url_handler(<<"_search_analyze">>) -> fun dreyfus_httpd:handle_analyze_req/1;
+url_handler(_) -> no_match.
 
-child(Child) ->
-    {Child, {Child, start_link, []}, permanent, 1000, worker, [Child]}.
+db_handler(<<"_search_cleanup">>)  -> fun dreyfus_httpd:handle_cleanup_req/2;
+db_handler(_) -> no_match.
+
+design_handler(<<"_search">>)      -> fun dreyfus_httpd:handle_search_req/3;
+design_handler(<<"_search_info">>) -> fun dreyfus_httpd:handle_info_req/3;
+design_handler(_) -> no_match.

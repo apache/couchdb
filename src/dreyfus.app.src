@@ -18,5 +18,5 @@
     {vsn, git},
     {mod, {dreyfus_app, []}},
     {registered, [dreyfus_index_manager, dreyfus_sup]},
-    {applications, [kernel, stdlib, couch_log, config, couch_event, mem3, ioq]}
+    {applications, [kernel, stdlib, couch_log, config, couch_event, mem3, ioq, couch_epi]}
 ]}.
