@@ -58,7 +58,8 @@ json_req_obj(#httpd{mochi_req=Req,
                method=Method,
                requested_path_parts=RequestedPath,
                path_parts=Path,
-               req_body=ReqBody
+               req_body=ReqBody,
+               peer=Peer
             }, Db, DocId) ->
     Body = case ReqBody of
         undefined ->
@@ -91,7 +92,7 @@ json_req_obj(#httpd{mochi_req=Req,
         {<<"query">>, json_query_keys(to_json_terms(Req:parse_qs()))},
         {<<"headers">>, to_json_terms(Hlist)},
         {<<"body">>, Body},
-        {<<"peer">>, ?l2b(Req:get(peer))},
+        {<<"peer">>, ?l2b(Peer)},
         {<<"form">>, to_json_terms(ParsedForm)},
         {<<"cookie">>, to_json_terms(Req:parse_cookie())},
         {<<"userCtx">>, couch_util:json_user_ctx(Db)},
