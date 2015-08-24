@@ -360,7 +360,7 @@ pack_seqs(Workers) ->
     SeqList = [{N,R,S} || {#shard{node=N, range=R}, S} <- Workers],
     SeqSum = lists:sum([seq(S) || {_,_,S} <- SeqList]),
     Opaque = couch_util:encodeBase64Url(term_to_binary(SeqList, [compressed])),
-    [SeqSum, Opaque].
+    ?l2b([integer_to_list(SeqSum), $-, Opaque]).
 
 seq({Seq, _Uuid, _Node}) -> Seq;
 seq({Seq, _Uuid}) -> Seq;
@@ -372,7 +372,7 @@ unpack_seqs(0, DbName) ->
 unpack_seqs("0", DbName) ->
     fabric_dict:init(mem3:shards(DbName), 0);
 
-unpack_seqs([_SeqNum, Opaque], DbName) ->
+unpack_seqs([_SeqNum, Opaque], DbName) -> % deprecated
     do_unpack_seqs(Opaque, DbName);
 
 unpack_seqs(Packed, DbName) ->
