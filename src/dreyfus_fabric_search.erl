@@ -31,7 +31,7 @@
 }).
 
 go(DbName, GroupId, IndexName, QueryArgs) when is_binary(GroupId) ->
-    {ok, DDoc} = fabric:open_doc(DbName, <<"_design/", GroupId/binary>>, []),
+    {ok, DDoc} = fabric:open_doc(DbName, <<"_design/", GroupId/binary>>, [ejson_body]),
     go(DbName, DDoc, IndexName, QueryArgs);
 
 go(DbName, DDoc, IndexName, #index_query_args{bookmark=nil}=QueryArgs) ->
