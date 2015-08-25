@@ -73,7 +73,7 @@ AddConfig = [
     {deps, lists:map(MakeDep, DepDescs)},
     {sub_dirs, ["rel"]},
     {lib_dirs, ["src/"]},
-    {erl_opts, [debug_info]},
+    {erl_opts, [debug_info, bin_opt_info]},
     {eunit_opts, [verbose]},
     {plugins, [eunit_plugin]},
     {post_hooks, [{compile, "escript support/build_js.escript"}]}
