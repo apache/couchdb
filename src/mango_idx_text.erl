@@ -15,6 +15,7 @@
 
 -export([
     validate/1,
+    validate_fields/1,
     add/2,
     remove/2,
     from_ddoc/1,
@@ -148,10 +149,29 @@ def_to_json([{Key, Value} | Rest]) ->
 
 fields_to_json([]) ->
     [];
-fields_to_json([{[{<<"name">>, Name}, {<<"type">>, Type}]} | Rest]) ->
+fields_to_json([{[{<<"name">>, Name}, {<<"type">>, Type0}]} | Rest]) ->
+    Type = validate_field_type(Type0),
     [{[{Name, Type}]} | fields_to_json(Rest)];
-fields_to_json([{[{<<"type">>, Type}, {<<"name">>, Name}]} | Rest]) ->
+fields_to_json([{[{<<"type">>, Type0}, {<<"name">>, Name}]} | Rest]) ->
+    Type = validate_field_type(Type0),
     [{[{Name, Type}]} | fields_to_json(Rest)].
+
+
+validate_field_type(<<"string">>) ->
+    <<"string">>;
+validate_field_type(<<"number">>) ->
+    <<"number">>;
+validate_field_type(<<"boolean">>) ->
+    <<"boolean">>.
+
+
+validate_fields(Fields) ->
+    try fields_to_json(Fields) of
+        _ ->
+            mango_fields:new(Fields)
+    catch error:function_clause ->
+        ?MANGO_ERROR({invalid_index_fields_definition, Fields})
+    end.
 
 
 opts() ->
@@ -176,7 +196,7 @@ opts() ->
             {tag, fields},
             {optional, true},
             {default, []},
-            {validator, fun mango_opts:validate_fields/1}
+            {validator, fun ?MODULE:validate_fields/1}
         ]}
     ].
 

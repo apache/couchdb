@@ -141,6 +141,14 @@ info(mango_idx_view, {invalid_index_json, BadIdx}) ->
         <<"invalid_index">>,
         fmt("JSON indexes must be an object, not: ~w", [BadIdx])
     };
+info(mango_idx_text, {invalid_index_fields_definition, Def}) ->
+    {
+        400,
+        <<"invalid_index_fields_definition">>,
+        fmt("Text Index field definitions must be of the form
+            {\"name\": \"fieldname\", \"type\":
+                \"boolean,number, or string\"}. Def: ~p", [Def])
+    };
 info(mango_idx_view, {index_not_found, BadIdx}) ->
     {
         404,
