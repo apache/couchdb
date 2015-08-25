@@ -139,11 +139,19 @@ def_to_json([]) ->
 def_to_json([{<<"fields">>, <<"all_fields">>} | Rest]) ->
     [{<<"fields">>, []} | def_to_json(Rest)];
 def_to_json([{fields, Fields} | Rest]) ->
-    [{<<"fields">>, mango_sort:to_json(Fields)} | def_to_json(Rest)];
+    [{<<"fields">>, fields_to_json(Fields)} | def_to_json(Rest)];
 def_to_json([{<<"fields">>, Fields} | Rest]) ->
-    [{<<"fields">>, mango_sort:to_json(Fields)} | def_to_json(Rest)];
+    [{<<"fields">>, fields_to_json(Fields)} | def_to_json(Rest)];
 def_to_json([{Key, Value} | Rest]) ->
     [{Key, Value} | def_to_json(Rest)].
+
+
+fields_to_json([]) ->
+    [];
+fields_to_json([{[{<<"name">>, Name}, {<<"type">>, Type}]} | Rest]) ->
+    [{[{Name, Type}]} | fields_to_json(Rest)];
+fields_to_json([{[{<<"type">>, Type}, {<<"name">>, Name}]} | Rest]) ->
+    [{[{Name, Type}]} | fields_to_json(Rest)].
 
 
 opts() ->

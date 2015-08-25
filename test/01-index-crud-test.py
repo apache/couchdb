@@ -223,6 +223,24 @@ class IndexCrudTests(mango.DbPerClass):
         else:
             raise AssertionError("bad index delete")
 
+    def test_create_text_idx(self):
+        fields = [
+            {"name":"stringidx", "type" : "string"},
+            {"name":"booleanidx", "type": "boolean"}
+        ]
+        ret = self.db.create_text_index(fields=fields, name="text_idx_01")
+        assert ret is True
+        for idx in self.db.list_indexes():
+            if idx["name"] != "text_idx_01":
+                continue
+            print idx["def"]
+            assert idx["def"]["fields"] == [
+                {"stringidx": "string"},
+                {"booleanidx": "boolean"}
+            ]
+            return
+        raise AssertionError("index not created")
+
     def test_limit_skip_index(self):
         fields = ["field1"]
         ret = self.db.create_index(fields, name="idx_01")
