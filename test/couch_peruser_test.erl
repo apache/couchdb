@@ -74,7 +74,7 @@ create_user(AuthDb, Name) ->
         get_base_url(), "/", ?b2l(AuthDb), "/org.couchdb.user:", Name]),
     {ok, 201, _, _} = do_request(put, Url, Body),
     % let's proceed after giving couch_peruser some time to create the user db
-    timer:sleep(1000).
+    timer:sleep(2000).
 
 delete_user(AuthDb, Name) ->
     Url = lists:concat([get_base_url(), "/", ?b2l(AuthDb),
@@ -84,7 +84,7 @@ delete_user(AuthDb, Name) ->
     Rev = proplists:get_value(<<"_rev">>, DocProps),
     {ok, 200, _, _} = do_request(delete, Url ++ "?rev=" ++ ?b2l(Rev)),
     % let's proceed after giving couch_peruser some time to delete the user db
-    timer:sleep(1000).
+    timer:sleep(2000).
 
 get_security(DbName) ->
     Url = lists:concat([
