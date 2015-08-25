@@ -71,7 +71,7 @@ convert(Path, {[{<<"$all">>, Args}]}) ->
         _ ->
             % Otherwise the $all operator is equivalent to an $and
             % operator so we treat it as such.
-            convert(Path, {[{<<"$eq">> , Args}]})
+            convert([<<"[]">>| Path], {[{<<"$and">>, Args}]})
     end;
 
 % The $elemMatch Lucene query is not an exact translation
