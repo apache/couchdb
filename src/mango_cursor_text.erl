@@ -49,10 +49,8 @@ create(Db, Indexes, Selector, Opts0) ->
 
     Opts = unpack_bookmark(Db#db.name, Opts0),
 
-    % Limit the result set size to 50 for Clouseau's
-    % sake. We may want to revisit this.
-    Limit0 = couch_util:get_value(limit, Opts, 50),
-    Limit = if Limit0 < 50 -> Limit0; true -> 50 end,
+    DreyfusLimit = get_dreyfus_limit(),
+    Limit = erlang:min(DreyfusLimit, couch_util:get_value(limit, Opts, 50)),
     Skip = couch_util:get_value(skip, Opts, 0),
     Fields = couch_util:get_value(fields, Opts, all_fields),
 
@@ -282,12 +280,11 @@ update_query_args(CAcc) ->
 
 
 get_limit(CAcc) ->
-    Total = CAcc#cacc.limit + CAcc#cacc.skip,
-    if
-        Total < 25 -> 25;
-        Total > 100 -> 100;
-        true -> Total
-    end.
+    erlang:min(get_dreyfus_limit(), CAcc#cacc.limit + CAcc#cacc.skip).
+
+
+get_dreyfus_limit() ->
+    list_to_integer(config:get("dreyfus", "max_limit", "200")).
 
 
 get_json_docs(DbName, Hits) ->

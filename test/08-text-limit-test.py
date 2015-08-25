@@ -48,11 +48,12 @@ class LimitTests(mango.LimitDocsTextTests):
 
     # We reach our cap here of 50
     def test_limit_field5(self):
-        q = {"$or": [{"user_id" : {"$lt" : 100}}, {"filtered_array.[]": 1}]}
-        docs = self.db.find(q, limit=55)
-        assert len(docs) == 50
+        q = {"age": {"$exists": True}}
+        docs = self.db.find(q, limit=250)
+        print len(docs)
+        assert len(docs) == 75
         for d in docs:
-            assert d["user_id"] < 100
+            assert d["age"] < 100
 
     def test_limit_skip_field1(self):
         q = {"$or": [{"user_id" : {"$lt" : 100}}, {"filtered_array.[]": 1}]}
