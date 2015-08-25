@@ -71,7 +71,7 @@ convert(Path, {[{<<"$all">>, Args}]}) ->
         _ ->
             % Otherwise the $all operator is equivalent to an $and
             % operator so we treat it as such.
-            convert([<<"[]">>| Path], {[{<<"$and">>, Args}]})
+            convert([<<"[]">> | Path], {[{<<"$and">>, Args}]})
     end;
 
 % The $elemMatch Lucene query is not an exact translation
@@ -151,7 +151,7 @@ convert(Path, {[{<<"$regex">>, _}]}) ->
     field_exists_query(Path, "string");
 
 convert(Path, {[{<<"$size">>, Arg}]}) ->
-    {op_field, {make_field(Path, length), value_str(Arg)}};
+    {op_field, {make_field([<<"[]">> | Path], length), value_str(Arg)}};
 
 % All other operators are internal assertion errors for
 % matching because we either should've removed them during
