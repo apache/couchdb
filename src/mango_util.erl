@@ -34,7 +34,7 @@
     lucene_escape_field/1,
     lucene_escape_query_value/1,
     lucene_escape_user/1,
-    append_quotes/1,
+    is_number_string/1,
 
     has_suffix/2,
 
@@ -46,7 +46,33 @@
 -include("mango.hrl").
 
 
-%% https://gist.github.com/cad2d2456c518d878d08
+%% Regex for Floating Point, Hex Floating Point, Nan, and Infinity
+%% Digits = "(\\p{N}+)",
+%% HexDigits = "([0-9a-fA-F]+)",
+%% Exp = "[eE][+-]?" ++ Digits,
+%% FpRegexStr = "[\\x00-\\x20]*" ++ "[+-]?(" ++ "NaN|"
+%%     ++ "Infinity|" ++ "((("
+%%     ++ Digits
+%%     ++ "(\\.)?("
+%%     ++ Digits
+%%     ++ "?)("
+%%     ++ Exp
+%%     ++ ")?)|"
+%%     ++ "(\\.("
+%%     ++ Digits
+%%     ++ ")("
+%%     ++ Exp
+%%     ++ ")?)|"
+%%     ++ "(("
+%%     ++ "(0[xX]"
+%%     ++ HexDigits
+%%     ++ "(\\.)?)|"
+%%     ++ "(0[xX]"
+%%     ++ HexDigits
+%%     ++ "?(\\.)"
+%%     ++ HexDigits
+%%     ++ ")"
+%%     ++ ")[pP][+-]?" ++ Digits ++ "))" ++ "[fFdD]?))" ++ "[\\x00-\\x20]*"
 -define(NUMSTRING, {re_pattern,25,0,<<69,82,67,80,71,3,0,0,0,0,0,0,1,0,0,0,25,0,
 0,0,0,0,0,0,48,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,93,3,19,77,255,255,
 255,255,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,69,77,0,0,0,0,0,
@@ -342,19 +368,12 @@ join(Sep, [Item | Rest]) ->
     [Item, Sep | join(Sep, Rest)].
 
 
-is_number_string(Subject) ->
+is_number_string(Value) when is_binary(Value) ->
+    is_number_string(binary_to_list(Value));
+is_number_string(Value) when is_list(Value)->
     case re:run(Subject, ?NUMSTRING) of
         nomatch ->
             false;
         _ ->
             true
-    end.
-
-
-append_quotes(TextValue) ->
-    case is_number_string(binary_to_list(TextValue)) of
-        true ->
-            <<"\"", TextValue/binary, "\"">>;
-        false ->
-            TextValue
     end.

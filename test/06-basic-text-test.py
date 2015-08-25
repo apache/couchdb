@@ -14,6 +14,7 @@ import json
 import mango
 import unittest
 import user_docs
+import num_string_docs
 
 
 class TextIndexCheckTests(mango.DbPerClass):
@@ -511,3 +512,32 @@ class ElemMatchTests(mango.FriendDocsTextTests):
         assert len(docs) == 3
         for d in docs:
             assert d["user_id"] in (10, 11,12)
+
+
+# Test numeric strings for $text
+class NumStringTests(mango.NumStringDocsTextTests):
+    def test_floating_point_val(self):
+        float_point_string = num_string_docs.DOCS[2]["number_string"]
+        q = {"$text": float_point_string}
+        docs = self.db.find(q)
+        assert len(docs) == 1
+        assert docs[0]["number_string"] == float_point_string
+
+    def test_hex_floating_point_val(self):
+        hex_float_point_string = num_string_docs.DOCS[3]["number_string"]
+        q = {"$text": hex_float_point_string}
+        docs = self.db.find(q)
+        assert len(docs) == 1
+        assert docs[0]["number_string"] == hex_float_point_string
+
+    def test_nan_val(self):
+        q = {"$text": "NaN"}
+        docs = self.db.find(q)
+        assert len(docs) == 1
+        assert docs[0]["number_string"] == "NaN"
+
+    def test_infinity_val(self):
+        q = {"$text": "Infinity"}
+        docs = self.db.find(q)
+        assert len(docs) == 1
+        assert docs[0]["number_string"] == "Infinity"
