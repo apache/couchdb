@@ -1,5 +1,4 @@
-couch_peruser
-===============
+# couch_peruser [![Build Status](https://travis-ci.org/apache/couchdb-peruser.svg?branch=master)](https://travis-ci.org/apache/couchdb-peruser)
 
 couch_peruser is a CouchDB daemon that ensures that a private per-user
 database exists for each document in _users. These databases are
