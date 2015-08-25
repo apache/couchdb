@@ -371,7 +371,7 @@ join(Sep, [Item | Rest]) ->
 is_number_string(Value) when is_binary(Value) ->
     is_number_string(binary_to_list(Value));
 is_number_string(Value) when is_list(Value)->
-    case re:run(Subject, ?NUMSTRING) of
+    case re:run(Value, ?NUMSTRING) of
         nomatch ->
             false;
         _ ->
