@@ -395,6 +395,15 @@ class BasicTextTests(mango.UserDocsTextTests):
         docs = self.db.find(q)
         assert len(docs) == 1
 
+    def test_regex(self):
+        docs = self.db.find({
+                "age": {"$gt": 40},
+                "location.state": {"$regex": "(?i)new.*"}
+            })
+        assert len(docs) == 2
+        assert docs[0]["user_id"] == 2
+        assert docs[1]["user_id"] == 10
+
     # test lucene syntax in $text
 
 

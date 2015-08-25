@@ -143,6 +143,10 @@ convert(Path, {[{<<"$type">>, _}]}) ->
 convert(Path, {[{<<"$mod">>, _}]}) ->
     field_exists_query(Path, "number");
 
+% The lucene regular expression engine does not use java's regex engine but
+% instead a custom implementation. The syntax is therefore different, so we do
+% would get different behavior than our view indexes. To be consistent, we will
+% simply return docs for fields that exist and then run our match filter.
 convert(Path, {[{<<"$regex">>, _}]}) ->
     field_exists_query(Path, "string");
 
@@ -260,7 +264,7 @@ field_exists_query(Path) ->
 
 
 field_exists_query(Path, Type) ->
-    {op_fieldname, [path_str(Path), ":", Type]}.
+    {op_fieldname, {[path_str(Path), ":"], Type}}.
 
 
 path_str(Path) ->
