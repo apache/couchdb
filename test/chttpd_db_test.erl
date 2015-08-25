@@ -73,15 +73,19 @@ should_return_ok_true_on_bulk_update(Url) ->
 
 
 should_accept_live_as_an_alias_for_continuous(Url) ->
-    {ok, _, _, ResultBody} = test_request:get(Url ++ "/_changes?feed=live&timeout=1"),
-    {ResultJson} = ?JSON_DECODE(ResultBody),
-    [Last_Seq, _] = couch_util:get_value(<<"last_seq">>, ResultJson, undefined),
-    {ok, _, _, _} = create_doc(Url, "testdoc2"),
+    ?_test(begin
+        {ok, _, _, ResultBody} = test_request:get(Url ++ "/_changes?feed=live&timeout=1"),
+        {ResultJson} = ?JSON_DECODE(ResultBody),
+        <<LastSeqNum0:1/binary, "-", _/binary>> = couch_util:get_value(
+            <<"last_seq">>, ResultJson, undefined),
+        LastSeqNum = binary_to_integer(LastSeqNum0),
 
-    ?_assertEqual(Last_Seq + 1,
-        begin
-            {ok, _, _, ResultBody2} = test_request:get(Url ++ "/_changes?feed=live&timeout=1"),
-            [_, CleanedResult] = binary:split(ResultBody2, <<"\n">>),
-            {[{_, [Seq, _]}, _]} = ?JSON_DECODE(CleanedResult),
-            Seq
-        end).
+        {ok, _, _, _} = create_doc(Url, "testdoc2"),
+        {ok, _, _, ResultBody2} = test_request:get(Url ++ "/_changes?feed=live&timeout=1"),
+        [_, CleanedResult] = binary:split(ResultBody2, <<"\n">>),
+        {[{_, Seq}, _]} = ?JSON_DECODE(CleanedResult),
+        <<SeqNum0:1/binary, "-", _/binary>> = Seq,
+        SeqNum = binary_to_integer(SeqNum0),
+
+        ?assertEqual(LastSeqNum + 1, SeqNum)
+    end).
