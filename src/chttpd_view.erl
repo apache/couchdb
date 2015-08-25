@@ -27,7 +27,7 @@ multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
     {ok, Resp2} = couch_httpd:etag_maybe(Req, fun() ->
         VAcc0 = #vacc{db=Db, req=Req, prepend="\r\n"},
         %% TODO: proper calculation of etag
-        Etag = couch_uuids:new(),
+        Etag = [$", couch_uuids:new(), $"],
         Headers = [{"ETag", Etag}],
         FirstChunk = "{\"results\":[",
         {ok, Resp0} = chttpd:start_delayed_json_response(VAcc0#vacc.req, 200, Headers, FirstChunk),
