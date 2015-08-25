@@ -31,7 +31,7 @@ multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
         Headers = [{"ETag", Etag}],
         FirstChunk = "{\"results\":[",
         {ok, Resp0} = chttpd:start_delayed_json_response(VAcc0#vacc.req, 200, Headers, FirstChunk),
-        VAcc1 = VAcc0#vacc{resp=Resp0},
+        VAcc1 = VAcc0#vacc{resp=Resp0, etag=Etag},
         VAcc2 = lists:foldl(fun(Args, Acc0) ->
             {ok, Acc1} = fabric:query_view(Db, DDoc, ViewName, fun couch_mrview_http:view_cb/2, Acc0, Args),
             Acc1
@@ -47,14 +47,12 @@ multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
 
 
 design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
-    Args0 = couch_mrview_http:parse_params(Req, Keys),
-    ETagFun = fun(Sig, Acc0) ->
-        couch_mrview_http:check_view_etag(Sig, Acc0, Req)
-    end,
-    Args = Args0#mrargs{preflight_fun=ETagFun},
+    Args = couch_mrview_http:parse_params(Req, Keys),
+    %% TODO: proper calculation of etag
+    Etag = [$", couch_uuids:new(), $"],
     {ok, Resp} = couch_httpd:etag_maybe(Req, fun() ->
         Max = chttpd:chunked_response_buffer_size(),
-        VAcc0 = #vacc{db=Db, req=Req, threshold=Max},
+        VAcc0 = #vacc{db=Db, req=Req, threshold=Max, etag=Etag},
         fabric:query_view(Db, DDoc, ViewName, fun couch_mrview_http:view_cb/2, VAcc0, Args)
     end),
     case is_record(Resp, vacc) of
