@@ -461,7 +461,8 @@ DOCS =  [
                 },
                 "type": "personal"
             }
-        ]
+        ],
+        "bestfriends" : ["Wolverine", "Cyclops"]
     },
     {
         "_id": "54a431719faa420a5b4fbeb0",
@@ -530,6 +531,7 @@ DOCS =  [
                 "type": "work"
             }
         ]
+        "results": [ 82, 85, 88 ]
     },
     {
         "_id": "54a4317132f2c81561833259",

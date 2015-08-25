@@ -411,6 +411,21 @@ match({[{<<"$all">>, Args}]}, Values, _Cmp) when is_list(Values) ->
 match({[{<<"$all">>, _Args}]}, _Values, _Cmp) ->
     false;
 
+%% This is for $elemMatch and possibly $in because of our normalizer.
+%% A selector such as {"field_name": {"$elemMatch": {"$gte": 80, "$lt": 85}}}
+%% gets normalized to:
+%% {[{<<"field_name">>,
+%%     {[{<<"$elemMatch">>,
+%%         {[{<<"$and">>, [
+%%             {[{<<>>,{[{<<"$gte">>,80}]}}]},
+%%             {[{<<>>,{[{<<"$lt">>,85}]}}]}
+%%         ]}]}
+%%     }]}
+%% }]}.
+%% So we filter out the <<>>.
+match({[{<<>>, Arg}]}, Values, Cmp) ->
+    match(Arg, Values, Cmp);
+
 % Matches when any element in values matches the
 % sub-selector Arg.
 match({[{<<"$elemMatch">>, Arg}]}, Values, Cmp) when is_list(Values) ->

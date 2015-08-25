@@ -404,6 +404,24 @@ class ElemMatchTests(mango.FriendDocsTextTests):
     def setUpClass(klass):
         raise unittest.SkipTest('text index is not supported yet')
 
+    def test_elem_match_non_object(self):
+        q = {"bestfriends":{
+                "$elemMatch":
+                    {"$eq":"Wolverine", "$eq":"Cyclops"}
+            }
+        }
+        docs = self.db.find(q)
+        print len(docs)
+        assert len(docs) == 1
+        assert docs[0]["bestfriends"] == ["Wolverine", "Cyclops"]
+
+        q = {"results": {"$elemMatch": {"$gte": 80, "$lt": 85}}}
+
+        docs = self.db.find(q)
+        print len(docs)
+        assert len(docs) == 1
+        assert docs[0]["results"] == [82, 85, 88]
+
     def test_elem_match(self):
         q = {"friends": {
                 "$elemMatch":

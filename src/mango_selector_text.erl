@@ -274,7 +274,13 @@ path_str([Part], Acc) ->
     % during recursion of convert.
     [Part | Acc];
 path_str([Part | Rest], Acc) ->
-    path_str(Rest, [<<".">>, Part | Acc]).
+    case Part of
+        % do not append a period if Part is blank
+        <<>> ->
+            path_str(Rest, [Acc]);
+        _ ->
+            path_str(Rest, [<<".">>, Part | Acc])
+    end.
 
 
 type_str(Value) when is_number(Value) ->
