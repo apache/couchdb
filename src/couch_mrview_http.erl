@@ -296,7 +296,7 @@ multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
         Max = chttpd:chunked_response_buffer_size(),
         VAcc0 = #vacc{db=Db, req=Req, prepend="\r\n", threshold=Max},
         %% TODO: proper calculation of etag
-        Etag = couch_uuids:new(),
+        Etag = [$", couch_uuids:new(), $"],
         Headers = [{"ETag", Etag}],
         FirstChunk = "{\"results\":[",
         {ok, Resp0} = chttpd:start_delayed_json_response(VAcc0#vacc.req, 200, Headers, FirstChunk),
