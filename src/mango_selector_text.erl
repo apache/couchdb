@@ -45,7 +45,8 @@ convert(Path, {[{<<"$default">>, Arg}]}) ->
 % The $text operator specifies a Lucene syntax query
 % so we just pull it in directly.
 convert(Path, {[{<<"$text">>, Query}]}) when is_binary(Query) ->
-    {op_field, {make_field(Path, Query), value_str(Query)}};
+    Term = mango_util:append_quotes(value_str(Query)),
+    {op_field, {make_field(Path, Query), Term}};
 
 % The MongoDB docs for $all are super confusing and read more
 % like they screwed up the implementation of this operator
