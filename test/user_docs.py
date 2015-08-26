@@ -197,7 +197,9 @@ DOCS = [
             "Erlang",
             "C",
             "Erlang"
-        ]
+        ],
+        "11111": "number_field",
+        "22222": {"33333" : "nested_number_field"}
     },
     {
         "_id": "8e1c90c0-ac18-4832-8081-40d14325bde0",

@@ -59,6 +59,28 @@ class BasicTextTests(mango.UserDocsTextTests):
         assert docs[0]["name"]["first"] == "Stephanie"
         assert docs[0]["favorites"] == faves
 
+    def test_array_ref(self):
+        docs = self.db.find({"favorites.1": "Python"})
+        assert len(docs) == 4
+        for d in docs:
+            assert "Python" in d["favorites"]
+
+        # Nested Level
+        docs = self.db.find({"favorites.0.2": "Python"})
+        print len(docs)
+        assert len(docs) == 1
+        for d in docs:
+            assert "Python" in d["favorites"][0][2]
+
+    def test_number_ref(self):
+        docs = self.db.find({"11111": "number_field"})
+        assert len(docs) == 1
+        assert docs[0]["11111"] == "number_field"
+
+        docs = self.db.find({"22222.33333": "nested_number_field"})
+        assert len(docs) == 1
+        assert docs[0]["22222"]["33333"] == "nested_number_field"
+
     def test_lt(self):
         docs = self.db.find({"age": {"$lt": 22}})
         assert len(docs) == 0

@@ -35,7 +35,7 @@ extract(Doc, all_fields) ->
     Doc;
 extract(Doc, Fields) ->
     lists:foldl(fun(F, NewDoc) ->
-        {ok, Path} = mango_doc:parse_field(F),
+        {ok, Path} = mango_util:parse_field(F),
         case mango_doc:get_field(Doc, Path) of
             not_found ->
                 NewDoc;

@@ -25,6 +25,12 @@
 -include("mango.hrl").
 
 
+%% Regex for <<"\\.">>
+-define(PERIOD, {re_pattern,0,0,<<69,82,67,80,57,0,0,0,0,0,0,0,2,0,0,0,
+0,0,0,0,46,0,0,0,48,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,93,0,
+5,27,46,84,0,5,0>>}).
+
+
 convert(Object) ->
     TupleTree = convert([], Object),
     iolist_to_binary(to_query(TupleTree)).
@@ -159,12 +165,35 @@ convert(Path, {[{<<"$size">>, Arg}]}) ->
 convert(_Path, {[{<<"$", _/binary>>=Op, _}]}) ->
     ?MANGO_ERROR({invalid_operator, Op});
 
-% We've hit a field name specifier. We need to break the name
-% into path parts and continue our conversion.
-convert(Path, {[{Field, Cond}]}) ->
-    NewPathParts = re:split(Field, <<"\\.">>),
-    NewPath = lists:reverse(NewPathParts) ++ Path,
-    convert(NewPath, Cond);
+% We've hit a field name specifier. Check if the field name is accessing
+% arrays. Convert occurrences of element position references to .[]. Then we
+% need to break the name into path parts and continue our conversion.
+convert(Path, {[{Field0, Cond}]}) ->
+    {ok, PP0} = case Field0 of
+        <<>> ->
+            {ok, []};
+        _ ->
+            mango_util:parse_field(Field0)
+    end,
+    % Later on, we perform a lucene_escape_user call on the
+    % final Path, which calls parse_field again. Calling the function
+    % twice converts <<"a\\.b">> to [<<"a">>,<<"b">>]. This leads to
+    % an incorrect query since we need [<<"a.b">>]. Without breaking
+    % our escaping mechanism, we simply revert this first parse_field
+    % effect and replace instances of "." to "\\.".
+    PP1 = [re:replace(P, ?PERIOD, <<"\\\\.">>,
+        [global,{return,binary}]) || P <- PP0],
+    {PP2, HasInteger} = replace_array_indexes(PP1, [], false),
+    NewPath = PP2 ++ Path,
+    case HasInteger of
+        true ->
+            OldPath = lists:reverse(PP1, Path),
+            OldParts = convert(OldPath, Cond),
+            NewParts = convert(NewPath, Cond),
+            {op_or, [OldParts, NewParts]};
+        false ->
+            convert(NewPath, Cond)
+    end;
 
 %% For $in
 convert(Path, Val) when is_binary(Val); is_number(Val); is_boolean(Val) ->
@@ -362,3 +391,16 @@ get_sort_types(Field, {[{_, Cond}]}, Acc)  when is_tuple(Cond)->
 
 get_sort_types(_Field, _, Acc)  ->
     Acc.
+
+
+replace_array_indexes([], NewPartsAcc, HasIntAcc) ->
+    {NewPartsAcc, HasIntAcc};
+replace_array_indexes([Part | Rest], NewPartsAcc, HasIntAcc) ->
+    {NewPart, HasInt} = try
+        _ = list_to_integer(binary_to_list(Part)),
+        {<<"[]">>, true}
+    catch _:_ ->
+        {Part, false}
+    end,
+    replace_array_indexes(Rest, [NewPart | NewPartsAcc],
+         HasInt or HasIntAcc).
