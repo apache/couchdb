@@ -417,6 +417,6 @@ is_number_string_test() ->
     ?assert(is_number_string("-1.0")),
     ?assertNot(is_number_string("hello")),
     ?assertNot(is_number_string("")),
-    ?assertMatch({re_pattern, _, _, _, _}, mochiglobal:get(mango_numstring_re)).
+    ?assertMatch({match, _}, re:run("1.0", mochiglobal:get(mango_numstring_re))).
 
 -endif.
