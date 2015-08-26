@@ -80,7 +80,7 @@
 
 
 open_doc(Db, DocId) ->
-    open_doc(Db, DocId, [deleted]).
+    open_doc(Db, DocId, [deleted, ejson_body]).
 
 
 open_doc(Db, DocId, Options) ->
