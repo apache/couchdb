@@ -9,7 +9,7 @@ otp_release:
 before_install:
   - sudo apt-get update -qq
   - sudo apt-get -y install libmozjs-dev
-  - git clone -b couchdb-peruser https://github.com/apache/couchdb
+  - git clone https://github.com/apache/couchdb
 
 before_script:
   - cd couchdb
