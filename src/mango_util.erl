@@ -407,4 +407,16 @@ parse_field_test() ->
     Exception = {mango_error, ?MODULE, {invalid_field_name, <<"a..b">>}},
     ?assertThrow(Exception, parse_field(<<"a..b">>)).
 
+is_number_string_test() ->
+    ?assert(is_number_string("0")),
+    ?assert(is_number_string("1")),
+    ?assert(is_number_string("1.0")),
+    ?assert(is_number_string("1.0E10")),
+    ?assert(is_number_string("0d")),
+    ?assert(is_number_string("-1")),
+    ?assert(is_number_string("-1.0")),
+    ?assertNot(is_number_string("hello")),
+    ?assertNot(is_number_string("")),
+    ?assertMatch({re_pattern, _, _, _, _}, mochiglobal:get(mango_numstring_re)).
+
 -endif.
