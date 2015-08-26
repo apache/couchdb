@@ -41,7 +41,7 @@ handle_config_change("couchdb", "maintenance_mode", _, _, S) ->
 handle_config_change(_, _, _, _, S) ->
     {ok, S}.
 
-handle_config_terminate(_, _, _) -> ok;
+handle_config_terminate(_, stop, _) -> ok;
 handle_config_terminate(Self, _, _) ->
     spawn(fun() ->
         timer:sleep(5000),
