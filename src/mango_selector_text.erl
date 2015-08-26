@@ -26,9 +26,7 @@
 
 
 %% Regex for <<"\\.">>
--define(PERIOD, {re_pattern,0,0,<<69,82,67,80,57,0,0,0,0,0,0,0,2,0,0,0,
-0,0,0,0,46,0,0,0,48,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,93,0,
-5,27,46,84,0,5,0>>}).
+-define(PERIOD, "\\.").
 
 
 convert(Object) ->
@@ -181,7 +179,8 @@ convert(Path, {[{Field0, Cond}]}) ->
     % an incorrect query since we need [<<"a.b">>]. Without breaking
     % our escaping mechanism, we simply revert this first parse_field
     % effect and replace instances of "." to "\\.".
-    PP1 = [re:replace(P, ?PERIOD, <<"\\\\.">>,
+    MP = mango_util:cached_re(mango_period, ?PERIOD),
+    PP1 = [re:replace(P, MP, <<"\\\\.">>,
         [global,{return,binary}]) || P <- PP0],
     {PP2, HasInteger} = replace_array_indexes(PP1, [], false),
     NewPath = PP2 ++ Path,
