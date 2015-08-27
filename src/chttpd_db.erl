@@ -383,6 +383,7 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, 
     DocsArray0 ->
         DocsArray0
     end,
+    couch_stats:update_histogram([couchdb, httpd, bulk_docs], length(DocsArray)),
     W = case couch_util:get_value(<<"w">>, JsonProps) of
     Value when is_integer(Value) ->
         integer_to_list(Value);
