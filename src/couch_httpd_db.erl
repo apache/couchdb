@@ -304,6 +304,7 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>]}=Req, Db) ->
     undefined ->
         send_error(Req, 400, <<"bad_request">>, <<"Missing JSON list of 'docs'">>);
     DocsArray ->
+        couch_stats:update_histogram([couchdb, httpd, bulk_docs], length(DocsArray)),
         case couch_httpd:header_value(Req, "X-Couch-Full-Commit") of
         "true" ->
             Options = [full_commit];
