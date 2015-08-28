@@ -55,11 +55,35 @@ select([], Default) ->
 select([{default, OverrideDefault}], _Default) ->
     OverrideDefault;
 select(Handlers, _Default) ->
-    select(Handlers).
+    [Handler] = do_select(Handlers, []),
+    Handler.
 
-select([Handler]) ->
-    Handler;
-select([{override, Handler}|_]) ->
-    Handler;
-select([_Handler | Rest]) ->
-    select(Rest).
+do_select([], Acc) ->
+    Acc;
+do_select([{override, Handler}|_], _Acc) ->
+    [Handler];
+do_select([{default, _}|Rest], Acc) ->
+    do_select(Rest, Acc);
+do_select([Handler], Acc) ->
+    [Handler | Acc];
+do_select([Handler | Rest], Acc) ->
+    do_select(Rest, [Handler | Acc]).
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+select_override_test() ->
+    ?assertEqual(selected, select([{override, selected}, foo], default)),
+    ?assertEqual(selected, select([foo, {override, selected}], default)),
+    ?assertEqual(selected, select([{override, selected}, {override, bar}], default)),
+    ?assertError({badmatch,[bar, foo]}, select([foo, bar], default)).
+
+select_default_override_test() ->
+    ?assertEqual(selected, select([{default, new_default}, selected], old_default)),
+    ?assertEqual(selected, select([selected, {default, new_default}], old_default)),
+    ?assertEqual(selected, select([{default, selected}], old_default)),
+    ?assertEqual(selected, select([], selected)),
+    ?assertEqual(selected,
+        select([{default, new_default}, {override, selected}, bar], old_default)).
+
+-endif.
