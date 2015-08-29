@@ -31,7 +31,6 @@ from pbkdf2 import pbkdf2_hex
 
 COMMON_SALT = uuid.uuid4().hex
 COMMON_CSRF_SECRET = uuid.uuid4().hex
-HAPROXY_PORT = os.environ.get("HAPROXY_PORT", "5984")
 
 try:
     from urllib import urlopen
@@ -111,6 +110,12 @@ def setup_argparse():
                       dest='no_join', default=False,
                       action='store_true',
                       help='Do not join nodes on boot')
+    parser.add_option('--with-haproxy', dest='with_haproxy', default=False,
+                      action='store_true', help='Use HAProxy')
+    parser.add_option('--haproxy', dest='haproxy', default='haproxy',
+                      help='HAProxy executable path')
+    parser.add_option('--haproxy-port', dest='haproxy_port', default='5984',
+                      help='HAProxy port')
     return parser.parse_args()
 
 
@@ -125,6 +130,9 @@ def setup_context(opts, args):
             'rootdir': os.path.dirname(os.path.dirname(fpath)),
             'cmd': ' '.join(args),
             'verbose': opts.verbose,
+            'with_haproxy': opts.with_haproxy,
+            'haproxy': opts.haproxy,
+            'haproxy_port': opts.haproxy_port,
             'procs': []}
 
 
@@ -163,6 +171,10 @@ def setup_configs(ctx):
             "backend_port": backend_port,
             "fauxton_root": "src/fauxton/dist/release"
         }
+        if os.name == 'nt':
+            # Erlang always wants UNIX-style paths
+            env["data_dir"] = env["data_dir"].replace("\\", "/")
+            env["view_index_dir"] = env["view_index_dir"].replace("\\", "/")
         write_config(ctx, node, env)
 
 
@@ -194,23 +206,12 @@ def write_config(ctx, node, env):
             handle.write(content)
 
 
-def find_haproxy():
-    p = sp.Popen(
-        ["which", "haproxy"],
-        stdin=sp.PIPE,
-        stdout=sp.PIPE,
-        stderr=sp.STDOUT
-    )
-    (res, _) = p.communicate()
-    if res.strip():
-        return res.strip().decode()
-    return "/usr/sbin/haproxy"
-
-
 def boot_haproxy(ctx):
+    if not ctx['with_haproxy']:
+        return
     config = os.path.join(ctx['rootdir'], "rel", "haproxy.cfg")
     cmd = [
-        find_haproxy(),
+        ctx['haproxy'],
         "-f",
         config
     ]
@@ -218,7 +219,7 @@ def boot_haproxy(ctx):
     log = open(logfname, "w")
     env = os.environ.copy()
     if "HAPROXY_PORT" not in env:
-        env["HAPROXY_PORT"] = HAPROXY_PORT
+        env["HAPROXY_PORT"] = ctx['haproxy_port']
     return sp.Popen(
             " ".join(cmd),
             shell=True,
@@ -232,6 +233,9 @@ def boot_haproxy(ctx):
 def hack_default_ini(ctx, node, content):
     # Replace log file
     logfile = os.path.join(ctx['devdir'], "logs", "%s.log" % node)
+    if os.name == 'nt':
+        # Erlang always wants UNIX-style paths
+        logfile = logfile.replace("\\", "/")
     repl = "file = %s" % logfile
     contents = re.sub("(?m)^file.*$", repl, content)
 
@@ -304,7 +308,7 @@ def startup(ctx):
 
 def kill_processes(ctx):
     for proc in ctx['procs']:
-        if proc.returncode is None:
+        if proc and proc.returncode is None:
             proc.kill()
 
 
@@ -376,6 +380,9 @@ def boot_node(ctx, node):
     ]
     logfname = os.path.join(ctx['devdir'], "logs", "%s.log" % node)
     log = open(logfname, "wb")
+    if os.name == 'nt':
+        # Erlang always wants UNIX-style paths
+        cmd = [x.replace("\\", "/") for x in cmd]
     return sp.Popen(cmd, stdin=sp.PIPE, stdout=log, stderr=sp.STDOUT, env=env)
 
 
@@ -488,7 +495,7 @@ def create_system_databases(host, port):
 def join(ctx, lead_port, user, password):
     while True:
         for proc in ctx['procs']:
-            if proc.returncode is not None:
+            if proc is not None and proc.returncode is not None:
                 exit(1)
         time.sleep(2)
 
