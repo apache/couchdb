@@ -32,8 +32,7 @@
 validate_dbname(DbName, Normalized) ->
     Handle = couch_epi:get_handle(?SERVICE_ID),
     %% callbacks return true only if it specifically allow the given Id
-    couch_epi:any(Handle, ?SERVICE_ID, validate_dbname, [DbName, Normalized],
-        [ignore_providers]).
+    couch_epi:any(Handle, ?SERVICE_ID, validate_dbname, [DbName, Normalized], []).
 
 before_doc_update(#db{before_doc_update = Fun} = Db, Doc0) ->
     case with_pipe(before_doc_update, [Doc0, Db]) of
@@ -50,24 +49,23 @@ after_doc_read(#db{after_doc_read = Fun} = Db, Doc0) ->
 validate_docid(Id) ->
     Handle = couch_epi:get_handle(?SERVICE_ID),
     %% callbacks return true only if it specifically allow the given Id
-    couch_epi:any(Handle, ?SERVICE_ID, validate_docid, [Id], [ignore_providers]).
+    couch_epi:any(Handle, ?SERVICE_ID, validate_docid, [Id], []).
 
 check_is_admin(Db) ->
     Handle = couch_epi:get_handle(?SERVICE_ID),
     %% callbacks return true only if it specifically allow the given Id
-    couch_epi:any(Handle, ?SERVICE_ID, check_is_admin, [Db], [ignore_providers]).
+    couch_epi:any(Handle, ?SERVICE_ID, check_is_admin, [Db], []).
 
 on_delete(DbName, Options) ->
     Handle = couch_epi:get_handle(?SERVICE_ID),
-    couch_epi:apply(Handle, ?SERVICE_ID, on_delete, [DbName, Options],
-        [ignore_providers]).
+    couch_epi:apply(Handle, ?SERVICE_ID, on_delete, [DbName, Options], []).
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
 
 with_pipe(Func, Args) ->
-    do_apply(Func, Args, [ignore_providers, pipe]).
+    do_apply(Func, Args, [pipe]).
 
 do_apply(Func, Args, Opts) ->
     Handle = couch_epi:get_handle(?SERVICE_ID),
