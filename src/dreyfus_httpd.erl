@@ -143,6 +143,8 @@ analyze(Req, Analyzer, Text) ->
             throw({bad_request, "analyzer parameter is mandatory"});
         _ when is_list(Analyzer) ->
             ok;
+        _ when is_binary(Analyzer) ->
+            ok;
         {[_|_]} ->
             ok;
         _ ->
@@ -153,10 +155,13 @@ analyze(Req, Analyzer, Text) ->
             throw({bad_request, "text parameter is mandatory"});
         _ when is_list(Text) ->
             ok;
+        _ when is_binary(Text) ->
+            ok;
         _ ->
             throw({bad_request, "text parameter must be a string"})
     end,
-    case clouseau_rpc:analyze(?l2b(Analyzer), ?l2b(Text)) of
+    case clouseau_rpc:analyze(couch_util:to_binary(Analyzer),
+                              couch_util:to_binary(Text)) of
         {ok, Tokens} ->
             send_json(Req, 200, {[{tokens, Tokens}]});
         {error, Reason} ->
