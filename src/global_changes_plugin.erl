@@ -32,7 +32,7 @@ transform_change(Username, Change, Default) ->
 
 maybe_handle(Func, Args, Default) ->
     Handle = couch_epi:get_handle(?SERVICE_ID),
-    case couch_epi:apply(Handle, ?SERVICE_ID, Func, Args, [ignore_providers]) of
+    case couch_epi:apply(Handle, ?SERVICE_ID, Func, Args, []) of
         [] ->
             apply(Default, Args);
         [Result] ->
