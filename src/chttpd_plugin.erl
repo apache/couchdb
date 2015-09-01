@@ -41,7 +41,7 @@ handle_error(Error) ->
 %% ------------------------------------------------------------------
 
 with_pipe(Func, Args) ->
-    do_apply(Func, Args, [ignore_providers, pipe]).
+    do_apply(Func, Args, [pipe]).
 
 do_apply(Func, Args, Opts) ->
     Handle = couch_epi:get_handle(chttpd),

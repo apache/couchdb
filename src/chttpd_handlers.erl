@@ -43,7 +43,7 @@ design_handler(HandlerKey, DefaultFun) ->
 %% ------------------------------------------------------------------
 
 collect(Func, Args) ->
-    Results = do_apply(Func, Args, [ignore_providers]),
+    Results = do_apply(Func, Args, []),
     [HandlerFun || HandlerFun <- Results, HandlerFun /= no_match].
 
 do_apply(Func, Args, Opts) ->

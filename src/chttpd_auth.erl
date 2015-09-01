@@ -70,7 +70,7 @@ handle_session_req(Req) ->
 
 maybe_handle(Func, Args, Default) ->
     Handle = couch_epi:get_handle(?SERVICE_ID),
-    case couch_epi:apply(Handle, ?SERVICE_ID, Func, Args, [ignore_providers]) of
+    case couch_epi:apply(Handle, ?SERVICE_ID, Func, Args, []) of
         [] when is_function(Default) ->
             apply(Default, Args);
         [] ->
