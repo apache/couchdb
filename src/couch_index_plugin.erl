@@ -42,4 +42,4 @@ maybe_transform(Items) ->
 
 update(Handle, State, View, Updated, Removed) ->
     Args = [State, View, maybe_transform(Updated), maybe_transform(Removed)],
-    couch_epi:apply(Handle, ?SERVICE_ID, index_update, Args, [ignore_providers]).
+    couch_epi:apply(Handle, ?SERVICE_ID, index_update, Args, []).
