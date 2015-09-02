@@ -24,6 +24,7 @@ start_link() ->
 
 
 init([]) ->
+    couch_epi:register_service(global_changes),
     global_changes_config_listener:subscribe(),
     {ok, {
         {one_for_one, 5, 10}, [
