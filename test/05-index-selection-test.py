@@ -32,6 +32,7 @@ class IndexSelectionTests(mango.UserDocsTests):
             }, explain=True)
         assert resp["index"]["type"] == "json"
 
+    @unittest.skip
     def test_with_text(self):
         resp = self.db.find({
                 "$text" : "Stephanie",
@@ -76,7 +77,7 @@ class IndexSelectionTests(mango.UserDocsTests):
 class MultiTextIndexSelectionTests(mango.UserDocsTests):
     @classmethod
     def setUpClass(klass):
-        raise unittest.SkipTest('text index is not supported yet')
+        raise unittest.SkipTest('text index service is not available')
         super(MultiTextIndexSelectionTests, klass).setUpClass()
         klass.db.create_text_index(ddoc="foo", analyzer="keyword")
         klass.db.create_text_index(ddoc="bar", analyzer="email")

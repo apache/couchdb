@@ -565,6 +565,11 @@ class ElemMatchTests(mango.FriendDocsTextTests):
 
 # Test numeric strings for $text
 class NumStringTests(mango.NumStringDocsTextTests):
+
+    @classmethod
+    def setUpClass(klass):
+        raise unittest.SkipTest('text index is not supported yet')
+
     def test_floating_point_val(self):
         float_point_string = num_string_docs.DOCS[2]["number_string"]
         q = {"$text": float_point_string}

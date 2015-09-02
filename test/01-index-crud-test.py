@@ -13,9 +13,14 @@
 import random
 
 import mango
-
+import unittest
 
 class IndexCrudTests(mango.DbPerClass):
+    @classmethod
+    def setUpClass(klass):
+        raise unittest.SkipTest('text index is not supported yet')
+        super(KeyTests, klass).setUpClass()
+
     def test_bad_fields(self):
         bad_fields = [
             None,
@@ -222,7 +227,8 @@ class IndexCrudTests(mango.DbPerClass):
             assert e.response.status_code == 404
         else:
             raise AssertionError("bad index delete")
-
+    
+    @unittest.skip
     def test_create_text_idx(self):
         fields = [
             {"name":"stringidx", "type" : "string"},
@@ -240,7 +246,8 @@ class IndexCrudTests(mango.DbPerClass):
             ]
             return
         raise AssertionError("index not created")
-
+    
+    @unittest.skip
     def test_create_bad_text_idx(self):
         bad_fields = [
             True,
