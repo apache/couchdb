@@ -165,6 +165,7 @@ handle_view_list_req(#httpd{method=Method}=Req, Db, DDoc)
             chttpd:send_error(Req, 404, <<"list_error">>, <<"Bad path.">>)
     end;
 handle_view_list_req(#httpd{method='POST'}=Req, Db, DDoc) ->
+    chttpd:validate_ctype(Req, "application/json"),
     {Props} = chttpd:json_body_obj(Req),
     Keys = proplists:get_value(<<"keys">>, Props),
     case Req#httpd.path_parts of

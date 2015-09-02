@@ -45,6 +45,7 @@
 handle_all_docs_req(#httpd{method='GET'}=Req, Db) ->
     all_docs_req(Req, Db, undefined);
 handle_all_docs_req(#httpd{method='POST'}=Req, Db) ->
+    chttpd:validate_ctype(Req, "application/json"),
     Keys = couch_mrview_util:get_view_keys(chttpd:json_body_obj(Req)),
     all_docs_req(Req, Db, Keys);
 handle_all_docs_req(Req, _Db) ->
@@ -53,6 +54,7 @@ handle_all_docs_req(Req, _Db) ->
 handle_local_docs_req(#httpd{method='GET'}=Req, Db) ->
     all_docs_req(Req, Db, undefined, <<"_local">>);
 handle_local_docs_req(#httpd{method='POST'}=Req, Db) ->
+    chttpd:validate_ctype(Req, "application/json"),
     Keys = couch_mrview_util:get_view_keys(chttpd:json_body_obj(Req)),
     all_docs_req(Req, Db, Keys, <<"_local">>);
 handle_local_docs_req(Req, _Db) ->
@@ -61,6 +63,7 @@ handle_local_docs_req(Req, _Db) ->
 handle_design_docs_req(#httpd{method='GET'}=Req, Db) ->
     all_docs_req(Req, Db, undefined, <<"_design">>);
 handle_design_docs_req(#httpd{method='POST'}=Req, Db) ->
+    chttpd:validate_ctype(Req, "application/json"),
     Keys = couch_mrview_util:get_view_keys(chttpd:json_body_obj(Req)),
     all_docs_req(Req, Db, Keys, <<"_design">>);
 handle_design_docs_req(Req, _Db) ->
@@ -69,6 +72,7 @@ handle_design_docs_req(Req, _Db) ->
 handle_reindex_req(#httpd{method='POST',
                           path_parts=[_, _, DName,<<"_reindex">>]}=Req,
                    Db, _DDoc) ->
+    chttpd:validate_ctype(Req, "application/json"),
     ok = couch_db:check_is_admin(Db),
     couch_mrview:trigger_update(Db, <<"_design/", DName/binary>>),
     chttpd:send_json(Req, 201, {[{<<"ok">>, true}]});
@@ -111,6 +115,7 @@ handle_view_req(#httpd{method='GET'}=Req, Db, DDoc) ->
     couch_stats:increment_counter([couchdb, httpd, view_reads]),
     design_doc_view(Req, Db, DDoc, ViewName, undefined);
 handle_view_req(#httpd{method='POST'}=Req, Db, DDoc) ->
+    chttpd:validate_ctype(Req, "application/json"),
     [_, _, _, _, ViewName] = Req#httpd.path_parts,
     Props = chttpd:json_body_obj(Req),
     Keys = couch_mrview_util:get_view_keys(Props),
@@ -136,7 +141,7 @@ handle_view_req(Req, _Db, _DDoc) ->
 
 
 handle_temp_view_req(#httpd{method='POST'}=Req, Db) ->
-    couch_httpd:validate_ctype(Req, "application/json"),
+    chttpd:validate_ctype(Req, "application/json"),
     ok = couch_db:check_is_admin(Db),
     {Body} = chttpd:json_body_obj(Req),
     DDoc = couch_mrview_util:temp_view_to_ddoc({Body}),
@@ -159,8 +164,8 @@ handle_info_req(Req, _Db, _DDoc) ->
 
 
 handle_compact_req(#httpd{method='POST'}=Req, Db, DDoc) ->
+    chttpd:validate_ctype(Req, "application/json"),
     ok = couch_db:check_is_admin(Db),
-    couch_httpd:validate_ctype(Req, "application/json"),
     ok = couch_mrview:compact(Db, DDoc),
     chttpd:send_json(Req, 202, {[{ok, true}]});
 handle_compact_req(Req, _Db, _DDoc) ->
@@ -168,8 +173,8 @@ handle_compact_req(Req, _Db, _DDoc) ->
 
 
 handle_cleanup_req(#httpd{method='POST'}=Req, Db) ->
+    chttpd:validate_ctype(Req, "application/json"),
     ok = couch_db:check_is_admin(Db),
-    couch_httpd:validate_ctype(Req, "application/json"),
     ok = couch_mrview:cleanup(Db),
     chttpd:send_json(Req, 202, {[{ok, true}]});
 handle_cleanup_req(Req, _Db) ->
