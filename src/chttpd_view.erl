@@ -68,6 +68,7 @@ handle_view_req(#httpd{method='GET',
 
 handle_view_req(#httpd{method='POST',
         path_parts=[_, _, _, _, ViewName]}=Req, Db, DDoc) ->
+    chttpd:validate_ctype(Req, "application/json"),
     Props = couch_httpd:json_body_obj(Req),
     Keys = couch_mrview_util:get_view_keys(Props),
     Queries = couch_mrview_util:get_view_queries(Props),
