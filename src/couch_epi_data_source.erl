@@ -161,7 +161,7 @@ safe_set(Hash, Data, #state{} = State) ->
         key = Key} = State,
 
     try
-        OldData = current(Handle, Subscriber),
+        OldData = couch_epi_data_gen:current_data(Handle, Subscriber),
         ok = couch_epi_data_gen:set(Handle, Subscriber, Data),
         couch_epi_server:notify(Subscriber, Key, {data, OldData}, {data, Data}),
         {ok, State#state{hash = Hash}}
@@ -180,16 +180,6 @@ read({file, FilePath}) ->
 hash_of_file(FilePath) ->
     {ok, Data} = file:read_file(FilePath),
     couch_epi_util:md5(Data).
-
-current(Handle, Subscriber) ->
-    try
-        case couch_epi_data_gen:by_source(Handle, Subscriber) of
-            undefined -> [];
-            Data -> Data
-        end
-    catch error:undef ->
-        []
-    end.
 
 maybe_start_keeper(Key) ->
     Handle = couch_epi_data_gen:get_handle(Key),

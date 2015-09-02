@@ -24,6 +24,7 @@
 -export([keys/1, subscribers/1]).
 
 -export([save/3]).
+-export([current_data/2]).
 
 set(Handle, Source, Data) ->
     case is_updated(Handle, Source, Data) of
@@ -174,32 +175,43 @@ module_name({Service, Key}) when is_list(Service) andalso is_list(Key) ->
 
 is_updated(Handle, Source, Data) ->
     Sig = couch_epi_util:hash(Data),
-    try Handle:version(Source) of
-        {error, {unknown, Source}} -> true;
-        {error, Reason} -> throw(Reason);
-        Sig -> false;
-        _ -> true
-    catch
-        error:undef -> true;
-        Class:Reason ->
-            throw({Class, {Source, Reason}})
-    end.
+    if_exists(Handle, version, 1, true, fun() ->
+        try Handle:version(Source) of
+            {error, {unknown, Source}} -> true;
+            {error, Reason} -> throw(Reason);
+            Sig -> false;
+            _ -> true
+        catch
+            Class:Reason ->
+                throw({Class, {Source, Reason}})
+        end
+    end).
 
 save(Handle, undefined, []) ->
-    case get_current_data(Handle) of
+    case current_data(Handle) of
         [] -> generate(Handle, []);
         _Else -> ok
     end;
 save(Handle, Source, Data) ->
-    CurrentData = get_current_data(Handle),
+    CurrentData = current_data(Handle),
     NewDefs = lists:keystore(Source, 1, CurrentData, {Source, Data}),
     generate(Handle, NewDefs).
 
-get_current_data(Handle) ->
-    try Handle:by_source()
-    catch error:undef -> []
-    end.
+current_data(Handle, Subscriber) ->
+    if_exists(Handle, by_source, 1, [], fun() ->
+        Handle:by_source(Subscriber)
+    end).
 
+current_data(Handle) ->
+    if_exists(Handle, by_source, 0, [], fun() ->
+        Handle:by_source()
+    end).
+
+if_exists(Handle, Func, Arity, Default, Fun) ->
+    case erlang:function_exported(Handle, Func, Arity) of
+        true -> Fun();
+        false -> Default
+    end.
 
 defined_keys(Defs) ->
     Keys = fold_defs(Defs, [], fun({_Source, Key, _Data}, Acc) ->
