@@ -185,6 +185,8 @@ handle_config_req(#httpd{method='GET', path_parts=[_, Section, Key]}=Req) ->
     end;
 % POST /_config/_reload - Flushes unpersisted config values from RAM
 handle_config_req(#httpd{method='POST', path_parts=[_, <<"_reload">>]}=Req) ->
+    couch_httpd:validate_ctype(Req, "application/json"),
+    _ = couch_httpd:body(Req),
     ok = couch_httpd:verify_is_server_admin(Req),
     ok = config:reload(),
     send_json(Req, 200, {[{ok, true}]});
