@@ -19,6 +19,8 @@
     design_handler/2
 ]).
 
+-define(SERVICE_ID, chttpd_handlers).
+
 -include_lib("couch/include/couch_db.hrl").
 
 %% ------------------------------------------------------------------
@@ -27,7 +29,7 @@
 
 provider(App, Module) ->
     couch_epi_functions:childspec(chttpd_handlers_subscription,
-       App, chttpd_handlers, Module).
+       App, ?SERVICE_ID, Module).
 
 url_handler(HandlerKey, DefaultFun) ->
     select(collect(url_handler, [HandlerKey]), DefaultFun).
@@ -43,12 +45,12 @@ design_handler(HandlerKey, DefaultFun) ->
 %% ------------------------------------------------------------------
 
 collect(Func, Args) ->
-    Results = do_apply(Func, Args, [ignore_providers]),
+    Results = do_apply(Func, Args, []),
     [HandlerFun || HandlerFun <- Results, HandlerFun /= no_match].
 
 do_apply(Func, Args, Opts) ->
-    Handle = couch_epi:get_handle(?MODULE),
-    couch_epi:apply(Handle, chttpd, Func, Args, Opts).
+    Handle = couch_epi:get_handle(?SERVICE_ID),
+    couch_epi:apply(Handle, ?SERVICE_ID, Func, Args, Opts).
 
 select([], Default) ->
     Default;
