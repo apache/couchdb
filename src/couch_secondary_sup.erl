@@ -18,6 +18,7 @@ start_link() ->
     supervisor:start_link({local,couch_secondary_services}, ?MODULE, []).
 
 init([]) ->
+    couch_epi:register_service(couch_db),
     SecondarySupervisors = [
         {couch_plugin_event,
             {gen_event, start_link, [{local, couch_plugin}]},
