@@ -23,6 +23,10 @@ start_link(Args) ->
     supervisor:start_link({local,?MODULE}, ?MODULE, Args).
 
 init([]) ->
+    couch_epi:register_service(chttpd_auth),
+    couch_epi:register_service(chttpd_handlers),
+    couch_epi:register_service(chttpd),
+
     chttpd_config_listener:subscribe(),
     {ok, {{one_for_one, 3, 10}, [
         ?CHILD(chttpd, worker),
