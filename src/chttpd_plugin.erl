@@ -18,6 +18,8 @@
     handle_error/1
 ]).
 
+-define(SERVICE_ID, chttpd).
+
 -include_lib("couch/include/couch_db.hrl").
 
 %% ------------------------------------------------------------------
@@ -44,5 +46,5 @@ with_pipe(Func, Args) ->
     do_apply(Func, Args, [pipe]).
 
 do_apply(Func, Args, Opts) ->
-    Handle = couch_epi:get_handle(chttpd),
-    couch_epi:apply(Handle, chttpd, Func, Args, Opts).
+    Handle = couch_epi:get_handle(?SERVICE_ID),
+    couch_epi:apply(Handle, ?SERVICE_ID, Func, Args, Opts).
