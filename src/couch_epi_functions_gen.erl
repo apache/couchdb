@@ -301,13 +301,9 @@ parse_opts([pipe|Rest], #opts{} = Acc) ->
     parse_opts(Rest, Acc#opts{pipe = true});
 parse_opts([concurrent|Rest], #opts{} = Acc) ->
     parse_opts(Rest, Acc#opts{concurrent = true});
-parse_opts([ignore_providers|Rest], #opts{} = Acc) ->
-    parse_opts(Rest, Acc#opts{ignore_providers = true});
 parse_opts([], Acc) ->
     Acc.
 
-providers(Handle, Function, Arity, #opts{ignore_providers = true}) ->
-    Handle:providers(Function, Arity);
 providers(Handle, Function, Arity, #opts{}) ->
     Handle:providers(Function, Arity).
 

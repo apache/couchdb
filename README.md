@@ -107,7 +107,6 @@ There are multiple ways of doing the apply which is controlled by Opts
   - ignore_errors - the call is wrapped into try/catch
   - concurrent - spawn a new process for every service provider
   - pipe - use output of one service provider as an input for the next one
-  - ignore_providers - do not fail if there are no providers for the service are available
 
 Notes:
 
