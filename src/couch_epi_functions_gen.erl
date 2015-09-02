@@ -330,26 +330,36 @@ bar() ->
     [].
 
 basic_test() ->
-    Module = foo_bar_dispatcher,
-    add(Module, app1, [?MODULE]),
+    try
+        Module = foo_bar_dispatcher,
+        meck:new(couch_epi_module_keeper, [passthrough]),
+        meck:expect(couch_epi_module_keeper, save, fun
+            (Handle, Source, Modules) -> save(Handle, Source, Modules)
+        end),
 
-    ?assertMatch([?MODULE], modules(Module, foo, 2)),
+        add(Module, app1, [?MODULE]),
 
-    ?assert(is_list(Module:version(app1))),
+        ?assertMatch([?MODULE], modules(Module, foo, 2)),
 
-    Defs1 = lists:usort(Module:definitions()),
-    ?assertMatch([{app1, [{?MODULE, _}]}], Defs1),
-    [{app1, [{?MODULE, Exports}]}] = Defs1,
-    ?assert(lists:member({bar, 0}, Exports)),
+        ?assert(is_list(Module:version(app1))),
 
-    add(Module, app2, [?MODULE]),
-    Defs2 = lists:usort(Module:definitions()),
-    ?assertMatch([{app1, [{?MODULE, _}]}, {app2, [{?MODULE, _}]}], Defs2),
+        Defs1 = lists:usort(Module:definitions()),
+        ?assertMatch([{app1, [{?MODULE, _}]}], Defs1),
+        [{app1, [{?MODULE, Exports}]}] = Defs1,
+        ?assert(lists:member({bar, 0}, Exports)),
 
-    ?assertMatch([{app1, Hash}, {app2, Hash}], Module:version()),
+        add(Module, app2, [?MODULE]),
+        Defs2 = lists:usort(Module:definitions()),
+        ?assertMatch([{app1, [{?MODULE, _}]}, {app2, [{?MODULE, _}]}], Defs2),
 
-    ?assertMatch([], Module:dispatch(?MODULE, bar, [])),
-    ?assertMatch({1, 2}, Module:dispatch(?MODULE, foo, [1, 2])),
+        ?assertMatch([{app1, Hash}, {app2, Hash}], Module:version()),
+
+        ?assertMatch([], Module:dispatch(?MODULE, bar, [])),
+        ?assertMatch({1, 2}, Module:dispatch(?MODULE, foo, [1, 2])),
+        ok
+    after
+        meck:unload(couch_epi_module_keeper)
+    end,
 
     ok.
 

@@ -229,15 +229,21 @@ epi_reload_test_() ->
         couch_epi_data_source,
         couch_epi_functions
     ],
+    Funs = [
+        fun ensure_reload_if_manually_triggered/2,
+        fun ensure_reload_if_changed/2,
+        fun ensure_no_reload_when_no_change/2
+    ],
     {
         "epi reload tests",
         {
             foreachx,
             fun setup/1,
             fun teardown/2,
-            [{M, fun ensure_reloaded/2} || M <- Modules]
+            [{M, Fun} || M <- Modules, Fun <- Funs]
         }
     }.
+
 
 apply_options_test_() ->
     Funs = [fun ensure_apply_is_called/2],
@@ -416,14 +422,58 @@ check_subscribers(_Module, #ctx{handle = Handle}) ->
     ?_assertMatch([test_app], couch_epi:subscribers(Handle)).
 
 
-ensure_reloaded(Module, #ctx{pid = Pid, key = Key} = Ctx) ->
+ensure_reload_if_manually_triggered(Module, #ctx{pid = Pid, key = Key} = Ctx) ->
     ?_test(begin
         subscribe(Ctx, test_app, Key),
         update_definitions(Module, Ctx),
         Module:reload(Pid),
-        timer:sleep(200),
+        timer:sleep(50),
         Result = get(Ctx, is_called),
         ?assertNotMatch(error, Result)
+    end).
+
+ensure_reload_if_changed(couch_epi_data_source =  Module,
+        #ctx{key = Key, handle = Handle} = Ctx) ->
+    ?_test(begin
+        Version = Handle:version(),
+        subscribe(Ctx, test_app, Key),
+        update_definitions(Module, Ctx),
+        timer:sleep(250),
+        ?assertNotEqual(Version, Handle:version()),
+        Result = get(Ctx, is_called),
+        ?assertNotMatch(error, Result)
+    end);
+ensure_reload_if_changed(Module,
+        #ctx{key = Key, handle = Handle} = Ctx) ->
+    ?_test(begin
+        Version = Handle:version(),
+        subscribe(Ctx, test_app, Key),
+        update(Module, Ctx),
+        ?assertNotEqual(Version, Handle:version()),
+        timer:sleep(100), %% Allow some time for notify to be called
+        Result = get(Ctx, is_called),
+        ?assertNotMatch(error, Result)
+    end).
+
+ensure_no_reload_when_no_change(couch_epi_functions = Module,
+        #ctx{pid = Pid, key = Key, handle = Handle} = Ctx) ->
+    ?_test(begin
+        Version = Handle:version(),
+        subscribe(Ctx, test_app, Key),
+        upgrade_release(Pid, Module),
+        ?assertEqual(Version, Handle:version()),
+        Result = get(Ctx, is_called),
+        ?assertMatch(error, Result)
+    end);
+ensure_no_reload_when_no_change(Module,
+        #ctx{key = Key, handle = Handle} = Ctx) ->
+    ?_test(begin
+        Version = Handle:version(),
+        subscribe(Ctx, test_app, Key),
+        timer:sleep(450),
+        ?assertEqual(Version, Handle:version()),
+        Result = get(Ctx, is_called),
+        ?assertMatch(error, Result)
     end).
 
 
