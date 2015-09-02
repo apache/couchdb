@@ -91,6 +91,7 @@ setup(couch_epi_data_source) ->
         test_app, {epi_key, Key}, {file, File}, [{interval, 100}]),
     ok = couch_epi_data_source:wait(Pid),
     KV = state_storage(),
+    ok = couch_epi:register_service(Key),
     #ctx{
         file = File,
         key = Key,
@@ -108,6 +109,7 @@ setup(couch_epi_data) ->
         test_app, {epi_key, Key}, provider, []),
     ok = couch_epi_data:wait(Pid),
     KV = state_storage(),
+    ok = couch_epi:register_service(Key),
     #ctx{
         key = Key,
         handle = couch_epi:get_handle(Key),
@@ -126,6 +128,7 @@ setup(couch_epi_functions) ->
         [{interval, 100}]),
     ok = couch_epi_functions:wait(Pid),
     KV = state_storage(),
+    ok = couch_epi:register_service(Key),
     #ctx{
         key = Key,
         handle = couch_epi:get_handle(Key),

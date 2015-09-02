@@ -185,6 +185,11 @@ is_updated(Handle, Source, Data) ->
             throw({Class, {Source, Reason}})
     end.
 
+save(Handle, undefined, []) ->
+    case get_current_data(Handle) of
+        [] -> generate(Handle, []);
+        _Else -> ok
+    end;
 save(Handle, Source, Data) ->
     CurrentData = get_current_data(Handle),
     NewDefs = lists:keystore(Source, 1, CurrentData, {Source, Data}),

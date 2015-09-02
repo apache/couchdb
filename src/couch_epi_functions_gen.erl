@@ -201,6 +201,11 @@ is_updated(Handle, Source, Modules) ->
             throw({Class, {Source, Reason}})
     end.
 
+save(Handle, undefined, []) ->
+    case get_current_definitions(Handle) of
+        [] -> generate(Handle, []);
+        _Else -> ok
+    end;
 save(Handle, Source, Modules) ->
     CurrentDefs = get_current_definitions(Handle),
     Definitions = definitions(Source, Modules),

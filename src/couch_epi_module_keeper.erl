@@ -19,6 +19,8 @@
 %% ------------------------------------------------------------------
 
 -export([maybe_start_keeper/2]).
+-export([register_service/2]).
+
 -export([start_link/2, save/3]).
 -export([stop/1]).
 
@@ -35,8 +37,17 @@
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
+register_service(Codegen, Module) ->
+    {ok, Server} = maybe_start_keeper(Codegen, Module),
+    compile_dummy_module(Server).
+
 maybe_start_keeper(Codegen, Module) ->
-    catch couch_epi_keeper_sup:start_child(Codegen, Module).
+    case couch_epi_keeper_sup:start_child(Codegen, Module) of
+        {ok, Pid} ->
+            {ok, Pid};
+        {error, {already_started, Pid}} ->
+            {ok, Pid}
+    end.
 
 start_link(Codegen, Module) ->
     gen_server:start_link({local, Module}, ?MODULE, [Codegen, Module], []).
@@ -76,3 +87,6 @@ code_change(_OldVsn, State, _Extra) ->
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
+
+compile_dummy_module(Server) ->
+    save(Server, undefined, []).

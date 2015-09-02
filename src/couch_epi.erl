@@ -14,6 +14,7 @@
 
 %% subscribtion management
 -export([subscribe/5, unsubscribe/1, get_handle/1]).
+-export([register_service/1]).
 
 %% queries and introspection
 -export([
@@ -164,3 +165,16 @@ all(Handle, ServiceId, Function, Args, Opts) ->
 
 is_configured(Handle, Function, Arity) ->
     [] /= couch_epi_functions_gen:modules(Handle, Function, Arity).
+
+
+-spec register_service({ServiceId :: service_id(), Key :: key()}) -> ok;
+                (ServiceId :: service_id()) -> ok.
+
+register_service({_ServiceId, _Key} = EPIKey) ->
+    register_service(couch_epi_data_gen, EPIKey);
+register_service(ServiceId) when is_atom(ServiceId) ->
+    register_service(couch_epi_functions_gen, ServiceId).
+
+register_service(Codegen, Key) ->
+    Handle = Codegen:get_handle(Key),
+    couch_epi_module_keeper:register_service(Codegen, Handle).
