@@ -84,7 +84,7 @@ handle_utils_dir_req(Req, _) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
 maybe_add_csp_headers(Headers, "true") ->
-    DefaultValues = "default-src 'self'; img-src 'self'; font-src 'self'; "
+    DefaultValues = "default-src 'self'; img-src 'self' data:; font-src 'self'; "
                     "script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline';",
     Value = config:get("csp", "header_value", DefaultValues),
     [{"Content-Security-Policy", Value} | Headers];
