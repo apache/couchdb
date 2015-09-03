@@ -112,7 +112,7 @@ is_usable(Idx, Selector) ->
     % a member of the indexable fields of the selector.
     Columns = columns(Idx),
     Fields = indexable_fields(Selector),
-    lists:member(hd(Columns), Fields) and not is_text_search(Selector).
+    lists:member(hd(Columns), Fields) andalso not is_text_search(Selector).
 
 
 is_text_search({[]}) ->
@@ -121,7 +121,7 @@ is_text_search({[{<<"$default">>, _}]}) ->
     true;
 is_text_search({[{_Field, Cond}]}) when is_list(Cond) ->
     lists:foldl(fun(C, Exists) ->
-        Exists or is_text_search(C)
+        Exists orelse is_text_search(C)
     end, false, Cond);
 is_text_search({[{_Field, Cond}]}) when is_tuple(Cond) ->
     is_text_search(Cond);
