@@ -16,10 +16,10 @@ import mango
 import unittest
 
 class IndexCrudTests(mango.DbPerClass):
-    @classmethod
-    def setUpClass(klass):
-        raise unittest.SkipTest('text index service not available')
-        super(KeyTests, klass).setUpClass()
+    # @classmethod
+    # def setUpClass(klass):
+    #     raise unittest.SkipTest('text index service not available')
+    #     super(KeyTests, klass).setUpClass()
 
     def test_bad_fields(self):
         bad_fields = [

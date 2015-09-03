@@ -15,9 +15,9 @@ import unittest
 
 class SortTests(mango.UserDocsTextTests):
 
-    @classmethod
-    def setUpClass(klass):
-        raise unittest.SkipTest('text index service is not available')
+    # @classmethod
+    # def setUpClass(klass):
+    #     raise unittest.SkipTest('text index service is not available')
 
     def test_number_sort(self):
         q = {"age": {"$gt": 0}}

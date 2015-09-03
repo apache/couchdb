@@ -18,9 +18,9 @@ class NoDefaultFieldTest(mango.UserDocsTextTests):
 
     DEFAULT_FIELD = False
 
-    @classmethod
-    def setUpClass(klass):
-        raise unittest.SkipTest('text index service not available')
+    # @classmethod
+    # def setUpClass(klass):
+    #     raise unittest.SkipTest('text index service not available')
 
     def test_basic(self):
         docs = self.db.find({"$text": "Ramona"})
@@ -40,9 +40,9 @@ class NoDefaultFieldWithAnalyzer(mango.UserDocsTextTests):
         "analyzer": "keyword"
     }
 
-    @classmethod
-    def setUpClass(klass):
-        raise unittest.SkipTest('text not supported')
+    # @classmethod
+    # def setUpClass(klass):
+    #     raise unittest.SkipTest('text not supported')
 
     def test_basic(self):
         docs = self.db.find({"$text": "Ramona"})
@@ -61,9 +61,9 @@ class DefaultFieldWithCustomAnalyzer(mango.UserDocsTextTests):
         "analyzer": "keyword"
     }
 
-    @classmethod
-    def setUpClass(klass):
-        raise unittest.SkipTest('text not supported')
+    # @classmethod
+    # def setUpClass(klass):
+    #     raise unittest.SkipTest('text not supported')
 
     def test_basic(self):
         docs = self.db.find({"$text": "Ramona"})

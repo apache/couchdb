@@ -19,7 +19,7 @@ class IndexSelectionTests(mango.UserDocsTests):
     @classmethod
     def setUpClass(klass):
         super(IndexSelectionTests, klass).setUpClass()
-        # user_docs.add_text_indexes(klass.db, {})
+        user_docs.add_text_indexes(klass.db, {})
 
     def test_basic(self):
         resp = self.db.find({"name.last": "A last name"}, explain=True)
@@ -77,7 +77,7 @@ class IndexSelectionTests(mango.UserDocsTests):
 class MultiTextIndexSelectionTests(mango.UserDocsTests):
     @classmethod
     def setUpClass(klass):
-        raise unittest.SkipTest('text index service is not available')
+        # raise unittest.SkipTest('text index service is not available')
         super(MultiTextIndexSelectionTests, klass).setUpClass()
         klass.db.create_text_index(ddoc="foo", analyzer="keyword")
         klass.db.create_text_index(ddoc="bar", analyzer="email")

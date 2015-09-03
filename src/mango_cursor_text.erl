@@ -284,7 +284,7 @@ get_limit(CAcc) ->
 
 
 get_dreyfus_limit() ->
-    list_to_integer(config:get("dreyfus", "max_limit", "200")).
+    config:get_integer("dreyfus", "max_limit", 200).
 
 
 get_json_docs(DbName, Hits) ->

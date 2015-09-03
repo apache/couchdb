@@ -17,24 +17,24 @@ import user_docs
 import num_string_docs
 
 
-class TextIndexCheckTests(mango.DbPerClass):
+# class TextIndexCheckTests(mango.DbPerClass):
 
-    def test_create_text_index(self):
-        body = json.dumps({
-            'index': {
-                'fields': 'test'
-            },
-            'type': 'text'
-        })
-        resp = self.db.sess.post(self.db.path("_index"), data=body)
-        assert resp.status_code == 503, resp
+#     def test_create_text_index(self):
+#         body = json.dumps({
+#             'index': {
+#                 'fields': 'test'
+#             },
+#             'type': 'text'
+#         })
+#         resp = self.db.sess.post(self.db.path("_index"), data=body)
+#         assert resp.status_code == 503, resp
 
 
 class BasicTextTests(mango.UserDocsTextTests):
 
-    @classmethod
-    def setUpClass(klass):
-        raise unittest.SkipTest('text index service not available')
+    # @classmethod
+    # def setUpClass(klass):
+    #     raise unittest.SkipTest('text index service not available')
 
     def test_simple(self):
         docs = self.db.find({"$text": "Stephanie"})
@@ -431,9 +431,9 @@ class BasicTextTests(mango.UserDocsTextTests):
 
 class ElemMatchTests(mango.FriendDocsTextTests):
 
-    @classmethod
-    def setUpClass(klass):
-        raise unittest.SkipTest('text index service not available')
+    # @classmethod
+    # def setUpClass(klass):
+    #     raise unittest.SkipTest('text index service not available')
 
     def test_elem_match_non_object(self):
         q = {"bestfriends":{
@@ -566,9 +566,9 @@ class ElemMatchTests(mango.FriendDocsTextTests):
 # Test numeric strings for $text
 class NumStringTests(mango.NumStringDocsTextTests):
 
-    @classmethod
-    def setUpClass(klass):
-        raise unittest.SkipTest('text index service not available')
+    # @classmethod
+    # def setUpClass(klass):
+    #     raise unittest.SkipTest('text index service not available')
 
     def test_floating_point_val(self):
         float_point_string = num_string_docs.DOCS[2]["number_string"]
