@@ -310,6 +310,7 @@ get_view_qs(Req) ->
 get_doc_ids({json_req, {Props}}) ->
     check_docids(couch_util:get_value(<<"doc_ids">>, Props));
 get_doc_ids(#httpd{method='POST'}=Req) ->
+    couch_httpd:validate_ctype(Req, "application/json"),
     {Props} = couch_httpd:json_body_obj(Req),
     check_docids(couch_util:get_value(<<"doc_ids">>, Props));
 get_doc_ids(#httpd{method='GET'}=Req) ->
