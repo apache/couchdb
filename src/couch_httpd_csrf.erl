@@ -41,16 +41,19 @@ validate(#httpd{method = 'OPTIONS'}) ->
 validate(#httpd{} = Req) ->
     Cookie = csrf_from_req(Req),
     Header = couch_httpd:header_value(Req, "X-CouchDB-CSRF"),
-    case {Cookie, Header} of
-        {undefined, undefined} ->
+    Validate = lists:member(get_content_type(Req), csrf_mime_types()),
+    case {Validate, Cookie, Header} of
+        {false, _, _} ->
+            ok; % mime type is not in the list
+        {true, undefined, undefined} ->
             throw_if_mandatory(Req);
-        {undefined, "true"} ->
+        {true, undefined, "true"} ->
             throw_if_mandatory(Req);
-        {"deleted", "true"} ->
+        {true, "deleted", "true"} ->
             throw_if_mandatory(Req);
-        {undefined, _} ->
+        {true, undefined, _} ->
             throw({forbidden, <<"CSRF header sent without Cookie">>});
-        {Csrf, Csrf} ->
+        {true, Csrf, Csrf} ->
             ok = validate(Csrf);
         _ ->
             throw({forbidden, <<"CSRF Cookie/Header mismatch">>})
@@ -196,3 +199,25 @@ timestamp() ->
 
 csrf_mandatory() ->
     config:get_boolean("csrf", "mandatory", false).
+
+get_content_type(#httpd{} = Req) ->
+    case couch_httpd:header_value(Req, "Content-Type") of
+        undefined ->
+            undefined;
+        ReqCtype ->
+            case string:tokens(ReqCtype, ";") of
+                [Ctype] -> Ctype;
+                [Ctype | _Rest] -> Ctype
+            end
+    end.
+
+csrf_mime_types() ->
+    Default =
+        "application/x-www-form-urlencoded,"
+        "multipart/form-data,"
+        "text/plain",
+    MimeTypes = config:get("csrf", "mime_types", Default),
+    split(MimeTypes).
+
+split(CSV) ->
+    re:split(CSV, "\\s*,\\s*", [trim, {return, list}]).
