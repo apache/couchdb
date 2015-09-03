@@ -19,21 +19,26 @@ couchTests.csrf = function(debug) {
 
   // Handy function to cause CouchDB to delete the CSRF cookie
   var deleteCsrf = function() {
-    var xhr = CouchDB.request("POST", "/test_suite_db/_all_docs", {
-                              body: '{"keys": []}',
-                              headers: {'X-CouchDB-CSRF': 'foo', 'Cookie': 'CouchDB-CSRF=foo'}});
+    var xhr = CouchDB.request("POST", "/_session", {
+                              body: 'name=foo&password=bar',
+                              headers: {'X-CouchDB-CSRF': 'foo',
+                                        'Content-Type': 'application/x-www-form-urlencoded',
+                                        'Cookie': 'CouchDB-CSRF=foo'}});
     TEquals(403, xhr.status);
   };
 
+  var testFun = function () {
   // Shouldn't receive header if we didn't ask for it
   var xhr = CouchDB.request("GET", "/");
   TEquals(null, xhr.getResponseHeader("X-CouchDB-CSRF-Valid"), "Didn't ask for CSRF");
   TEquals(200, xhr.status);
 
   // Matching but invalid cookie/header should 403
-  xhr = CouchDB.request("POST", "/test_suite_db/_all_docs", {
-                        body: '{"keys": []}',
-                        headers: {'X-CouchDB-CSRF': 'foo', 'Cookie': 'CouchDB-CSRF=foo'}});
+  xhr = CouchDB.request("POST", "/_session", {
+                        body: 'name=foo&password=bar',
+                        headers: {'X-CouchDB-CSRF': 'foo',
+                                  'Content-Type': 'application/x-www-form-urlencoded',
+                                  'Cookie': 'CouchDB-CSRF=foo'}});
   TEquals(403, xhr.status);
   TEquals(null, xhr.getResponseHeader("X-CouchDB-CSRF-Valid"), "We sent invalid cookie and header");
 
@@ -43,21 +48,37 @@ couchTests.csrf = function(debug) {
   T(cookie, "Should receive cookie");
 
   // If I have a cookie, do I get a 403 if I don't send the header?
-  xhr = CouchDB.request("POST", "/test_suite_db/_all_docs", {body: '{"keys": []}'});
+  xhr = CouchDB.request("POST", "/_session", {body: 'name=foo&password=bar',
+                                              headers: {'Content-Type':
+                                                        'application/x-www-form-urlencoded'}});
   TEquals(403, xhr.status);
   TEquals(null, xhr.getResponseHeader("X-CouchDB-CSRF-Valid"), "We didn't send the header");
 
   // If I have a cookie, do I get a 200 if I send a matching header?
-  xhr = CouchDB.request("POST", "/test_suite_db/_all_docs", {body: '{"keys": []}',
-                                                             headers: {"X-CouchDB-CSRF": cookie[1]}});
+  xhr = CouchDB.request("POST", "/_session", {body: 'name=foo&password=bar',
+                                              headers: {"X-CouchDB-CSRF": cookie[1],
+                                                        'Content-Type': 'application/x-www-form-urlencoded'}});
   TEquals(200, xhr.status);
   TEquals("true", xhr.getResponseHeader("X-CouchDB-CSRF-Valid"), "Server should have sent this");
 
   // How about the wrong header?
-  xhr = CouchDB.request("POST", "/test_suite_db/_all_docs", {body: '{"keys": []}',
-                                                             headers: {'X-CouchDB-CSRF': 'foo'}});
+  xhr = CouchDB.request("POST", "/_session", {body: 'name=foo&password=bar',
+                                              headers: {'X-CouchDB-CSRF': 'foo',
+                                                        'Content-Type': 'application/x-www-form-urlencoded'}});
   TEquals(403, xhr.status);
   TEquals(null, xhr.getResponseHeader("X-CouchDB-CSRF-Valid"), "We sent a mismatched header");
 
   deleteCsrf();
+  };
+
+  run_on_modified_server(
+    [
+     {section: "couch_httpd_auth",
+      key: "iterations", value: "1"},
+     {section: "admins",
+       key: "foo", value: "bar"}
+    ],
+    testFun
+  );
+
 };
