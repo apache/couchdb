@@ -123,7 +123,7 @@ group_indexes_by_type(Indexes) ->
     % used to service this query. This is so that we
     % don't suddenly switch indexes for existing client
     % queries.
-    CursorModules = case mango_util:module_exists(dreyfus_index) of
+    CursorModules = case module_loaded(dreyfus_index) of
         true ->
             [mango_cursor_view, mango_cursor_text];
         false ->

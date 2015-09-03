@@ -42,9 +42,7 @@
 
     parse_field/1,
 
-    cached_re/2,
-
-    module_exists/1
+    cached_re/2
 ]).
 
 
@@ -397,19 +395,6 @@ check_non_empty(Field, Parts) ->
             Parts
     end.
 
-module_exists(Module) ->
-    case is_atom(Module) of
-        true ->
-            try Module:module_info() of
-                _InfoList ->
-                    true
-            catch
-                _:_ ->
-                    false
-            end;
-        false ->
-            false
-    end.
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
