@@ -166,8 +166,12 @@ from_ddoc(Db, {Props}) ->
         _ ->
             ?MANGO_ERROR(invalid_query_ddoc_language)
     end,
-
-    IdxMods = [mango_idx_view, mango_idx_text],
+    IdxMods = case mango_util:module_exists(dreyfus_index) of
+        true ->
+            [mango_idx_view, mango_idx_text];
+        false ->
+            [mango_idx_view]
+    end,
     Idxs = lists:flatmap(fun(Mod) -> Mod:from_ddoc({Props}) end, IdxMods),
     lists:map(fun(Idx) ->
         Idx#idx{
@@ -243,7 +247,12 @@ cursor_mod(#idx{type = <<"json">>}) ->
 cursor_mod(#idx{def = all_docs, type= <<"special">>}) ->
     mango_cursor_view;
 cursor_mod(#idx{type = <<"text">>}) ->
-    mango_cursor_text.
+    case mango_util:module_exists(dreyfus_index) of
+        true ->
+            mango_cursor_text;
+        false ->
+            ?MANGO_ERROR({index_service_unavailable, <<"text">>})
+    end.
 
 
 idx_mod(#idx{type = <<"json">>}) ->
@@ -251,7 +260,12 @@ idx_mod(#idx{type = <<"json">>}) ->
 idx_mod(#idx{type = <<"special">>}) ->
     mango_idx_special;
 idx_mod(#idx{type = <<"text">>}) ->
-    mango_idx_text.
+    case mango_util:module_exists(dreyfus_index) of
+        true ->
+            mango_idx_text;
+        false ->
+            ?MANGO_ERROR({index_service_unavailable, <<"text">>})
+    end.
 
 
 db_to_name(#db{name=Name}) ->
@@ -274,8 +288,12 @@ get_idx_def(Opts) ->
 get_idx_type(Opts) ->
     case proplists:get_value(type, Opts) of
         <<"json">> -> <<"json">>;
-        <<"text">> ->
-            ?MANGO_ERROR({index_not_implemented, <<"text">>});
+        <<"text">> -> case mango_util:module_exists(dreyfus_index) of
+            true ->
+                <<"text">>;
+            false ->
+                ?MANGO_ERROR({index_service_unavailable, <<"text">>})
+            end;
         %<<"geo">> -> <<"geo">>;
         undefined -> <<"json">>;
         BadType ->

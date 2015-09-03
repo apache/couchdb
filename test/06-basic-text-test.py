@@ -27,14 +27,14 @@ class TextIndexCheckTests(mango.DbPerClass):
             'type': 'text'
         })
         resp = self.db.sess.post(self.db.path("_index"), data=body)
-        assert resp.status_code == 501, resp
+        assert resp.status_code == 503, resp
 
 
 class BasicTextTests(mango.UserDocsTextTests):
 
     @classmethod
     def setUpClass(klass):
-        raise unittest.SkipTest('text index is not supported yet')
+        raise unittest.SkipTest('text index service not available')
 
     def test_simple(self):
         docs = self.db.find({"$text": "Stephanie"})
@@ -433,7 +433,7 @@ class ElemMatchTests(mango.FriendDocsTextTests):
 
     @classmethod
     def setUpClass(klass):
-        raise unittest.SkipTest('text index is not supported yet')
+        raise unittest.SkipTest('text index service not available')
 
     def test_elem_match_non_object(self):
         q = {"bestfriends":{
@@ -568,7 +568,7 @@ class NumStringTests(mango.NumStringDocsTextTests):
 
     @classmethod
     def setUpClass(klass):
-        raise unittest.SkipTest('text index is not supported yet')
+        raise unittest.SkipTest('text index service not available')
 
     def test_floating_point_val(self):
         float_point_string = num_string_docs.DOCS[2]["number_string"]

@@ -18,7 +18,7 @@ class CustomFieldsTest(mango.UserDocsTextTests):
 
     @classmethod
     def setUpClass(klass):
-        raise unittest.SkipTest('text index is not supported yet')
+        raise unittest.SkipTest('text index service not available')
 
     FIELDS = [
         {"name": "favorites.[]", "type": "string"},

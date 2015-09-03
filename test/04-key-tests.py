@@ -56,7 +56,7 @@ TEST_DOCS = [
 class KeyTests(mango.DbPerClass):
     @classmethod
     def setUpClass(klass):
-        raise unittest.SkipTest('text index is not supported yet')
+        raise unittest.SkipTest('text index service not available')
         super(KeyTests, klass).setUpClass()
         klass.db.save_docs(TEST_DOCS, w=3)
         klass.db.create_index(["type"], ddoc="view")

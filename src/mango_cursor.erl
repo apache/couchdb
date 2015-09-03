@@ -123,10 +123,12 @@ group_indexes_by_type(Indexes) ->
     % used to service this query. This is so that we
     % don't suddenly switch indexes for existing client
     % queries.
-    CursorModules = [
-        mango_cursor_view,
-        mango_cursor_text
-    ],
+    CursorModules = case mango_util:module_exists(dreyfus_index) of
+        true ->
+            [mango_cursor_view, mango_cursor_text];
+        false ->
+            [mango_cursor_view]
+    end,
     lists:flatmap(fun(CMod) ->
         case dict:find(CMod, IdxDict) of
             {ok, CModIndexes} ->

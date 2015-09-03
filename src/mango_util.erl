@@ -42,7 +42,9 @@
 
     parse_field/1,
 
-    cached_re/2
+    cached_re/2,
+
+    module_exists/1
 ]).
 
 
@@ -393,6 +395,20 @@ check_non_empty(Field, Parts) ->
             ?MANGO_ERROR({invalid_field_name, Field});
         false ->
             Parts
+    end.
+
+module_exists(Module) ->
+    case is_atom(Module) of
+        true ->
+            try Module:module_info() of
+                _InfoList ->
+                    true
+            catch
+                _:_ ->
+                    false
+            end;
+        false ->
+            false
     end.
 
 -ifdef(TEST).

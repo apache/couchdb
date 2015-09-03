@@ -20,7 +20,7 @@ class NoDefaultFieldTest(mango.UserDocsTextTests):
 
     @classmethod
     def setUpClass(klass):
-        raise unittest.SkipTest('text not supported')
+        raise unittest.SkipTest('text index service not available')
 
     def test_basic(self):
         docs = self.db.find({"$text": "Ramona"})

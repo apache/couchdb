@@ -134,6 +134,12 @@ info(mango_idx, {index_not_implemented, IndexName}) ->
         <<"index_not_implemented">>,
         fmt("~s", [IndexName])
     };
+info(mango_idx, {index_service_unavailable, IndexName}) ->
+    {
+        503,
+        <<"required index service unavailable">>,
+        fmt("~s", [IndexName])
+    };
 
 info(mango_idx_view, {invalid_index_json, BadIdx}) ->
     {

@@ -18,7 +18,7 @@ import unittest
 class IndexCrudTests(mango.DbPerClass):
     @classmethod
     def setUpClass(klass):
-        raise unittest.SkipTest('text index is not supported yet')
+        raise unittest.SkipTest('text index service not available')
         super(KeyTests, klass).setUpClass()
 
     def test_bad_fields(self):
