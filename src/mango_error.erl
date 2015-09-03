@@ -69,7 +69,7 @@ info(mango_cursor_text, {text_search_error, {error, Error}}) ->
     {
         400,
         <<"text_search_error">>,
-        fmt("Error performing text search: ~p", [Error])
+        fmt("~p", [Error])
     };
 
 info(mango_fields, {invalid_fields_json, BadFields}) ->
