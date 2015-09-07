@@ -54,17 +54,11 @@ validate(DbName, DDoc) ->
             []
     end,
     ValidateFun = fun
-        (ModName, ok) ->
-            try
-                ModName:validate(DbName, DDoc)
-            catch Type:Reason ->
-                {Type, Reason}
-            end;
-        (_ModName, Error) ->
-            Error
+        (ModName) ->
+            ModName:validate(DbName, DDoc)
     end,
     EnabledIndexers = lists:flatmap(LoadModFun, config:get("indexers")),
-    lists:foldl(ValidateFun, ok, EnabledIndexers).
+    lists:foreach(ValidateFun, EnabledIndexers).
 
 
 get_index(Module, #db{name = <<"shards/", _/binary>> = DbName}, DDoc) ->
