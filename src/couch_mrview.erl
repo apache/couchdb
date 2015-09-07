@@ -85,8 +85,6 @@ validate(DbName, DDoc) ->
         Proc ->
             try
                 lists:foreach(fun(V) -> ValidateView(Proc, V) end, Views)
-            catch Error ->
-                Error
             after
                 couch_query_servers:ret_os_process(Proc)
             end
