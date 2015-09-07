@@ -604,10 +604,12 @@ validate_doc_update(Db, Doc, GetDiskDocFun) ->
 
 validate_ddoc(DbName, DDoc) ->
     try
-        couch_index_server:validate(DbName, couch_doc:with_ejson_body(DDoc))
+        ok = couch_index_server:validate(DbName, couch_doc:with_ejson_body(DDoc))
     catch
         throw:{invalid_design_doc, Reason} ->
             {bad_request, invalid_design_doc, Reason};
+        throw:{compilation_error, Reason} ->
+            {bad_request, compilation_error, Reason};
         throw:Error ->
             Error
     end.
