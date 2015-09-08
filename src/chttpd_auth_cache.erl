@@ -75,11 +75,15 @@ get_from_cache(UserName) ->
             couch_log:debug("cache hit for ~s", [UserName]),
             Props;
         _ ->
-            Props = load_user_from_db(UserName),
             couch_stats:increment_counter([couchdb, auth_cache_misses]),
             couch_log:debug("cache miss for ~s", [UserName]),
-            ets_lru:insert(?CACHE, UserName, Props),
-            Props
+            case load_user_from_db(UserName) of
+                nil ->
+                    nil;
+                Props ->
+                    ets_lru:insert(?CACHE, UserName, Props),
+                    Props
+            end
     catch
         error:badarg ->
             couch_stats:increment_counter([couchdb, auth_cache_misses]),
