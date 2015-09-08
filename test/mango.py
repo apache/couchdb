@@ -33,7 +33,7 @@ class Database(object):
         self.port = port
         self.dbname = dbname
         self.sess = requests.session()
-        self.sess.auth = ('adm', 'pass')
+        self.sess.auth = ('testuser', 'testpass')
         self.sess.headers["Content-Type"] = "application/json"
 
     @property

@@ -16,9 +16,9 @@ import unittest
 
 class LimitTests(mango.LimitDocsTextTests):
 
-    # @classmethod
-    # def setUpClass(klass):
-    #     raise unittest.SkipTest('text index service not available')
+    @classmethod
+    def setUpClass(klass):
+        raise unittest.SkipTest('text index service not available')
 
     def test_limit_field(self):
         q = {"$or": [{"user_id" : {"$lt" : 10}}, {"filtered_array.[]": 1}]}
