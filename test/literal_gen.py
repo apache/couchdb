@@ -14,7 +14,7 @@ import random
 from string import digits, hexdigits
 
 def joiner(*items):
-    return ''.join(item() for item in items)  
+    return ''.join(item() for item in items)
 
 def roll(item, n1, n2=None):
     n2 = n2 or n1

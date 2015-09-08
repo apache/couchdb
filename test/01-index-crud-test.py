@@ -227,7 +227,7 @@ class IndexCrudTests(mango.DbPerClass):
             assert e.response.status_code == 404
         else:
             raise AssertionError("bad index delete")
-    
+
     @unittest.skip
     def test_create_text_idx(self):
         fields = [
@@ -246,7 +246,7 @@ class IndexCrudTests(mango.DbPerClass):
             ]
             return
         raise AssertionError("index not created")
-    
+
     @unittest.skip
     def test_create_bad_text_idx(self):
         bad_fields = [

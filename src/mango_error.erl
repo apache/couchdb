@@ -58,7 +58,7 @@ info(mango_cursor_text, multiple_text_indexes) ->
         <<"multiple_text_indexes">>,
         <<"You must specify an index with the `use_index` parameter.">>
     };
-info(mango_cursor_text, {text_search_error, {error, {bad_request, Msg}}}) 
+info(mango_cursor_text, {text_search_error, {error, {bad_request, Msg}}})
         when is_binary(Msg) ->
     {
         400,

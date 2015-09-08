@@ -301,4 +301,3 @@ get_json_docs(DbName, Hits) ->
                 {Sort, not_found}
         end
     end, Hits).
-
