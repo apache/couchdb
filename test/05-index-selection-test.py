@@ -19,7 +19,8 @@ class IndexSelectionTests(mango.UserDocsTests):
     @classmethod
     def setUpClass(klass):
         super(IndexSelectionTests, klass).setUpClass()
-        # user_docs.add_text_indexes(klass.db, {})
+        if mango.has_text_service():
+            user_docs.add_text_indexes(klass.db, {})
 
     def test_basic(self):
         resp = self.db.find({"name.last": "A last name"}, explain=True)
@@ -32,7 +33,7 @@ class IndexSelectionTests(mango.UserDocsTests):
             }, explain=True)
         assert resp["index"]["type"] == "json"
 
-    @unittest.skip
+    @unittest.skipUnless(mango.has_text_service(), "requires text service")
     def test_with_text(self):
         resp = self.db.find({
                 "$text" : "Stephanie",
@@ -41,12 +42,12 @@ class IndexSelectionTests(mango.UserDocsTests):
             }, explain=True)
         assert resp["index"]["type"] == "text"
 
-    @unittest.skip
+    @unittest.skipUnless(mango.has_text_service(), "requires text service")
     def test_no_view_index(self):
         resp = self.db.find({"name.first": "Ohai!"}, explain=True)
         assert resp["index"]["type"] == "text"
 
-    @unittest.skip
+    @unittest.skipUnless(mango.has_text_service(), "requires text service")
     def test_with_or(self):
         resp = self.db.find({
                 "$or": [
@@ -74,13 +75,14 @@ class IndexSelectionTests(mango.UserDocsTests):
         assert resp["index"]["ddoc"] == ddocid
 
 
+@unittest.skipUnless(mango.has_text_service(), "requires text service")
 class MultiTextIndexSelectionTests(mango.UserDocsTests):
     @classmethod
     def setUpClass(klass):
-        raise unittest.SkipTest('text index service is not available')
         super(MultiTextIndexSelectionTests, klass).setUpClass()
-        klass.db.create_text_index(ddoc="foo", analyzer="keyword")
-        klass.db.create_text_index(ddoc="bar", analyzer="email")
+        if mango.has_text_service():
+            klass.db.create_text_index(ddoc="foo", analyzer="keyword")
+            klass.db.create_text_index(ddoc="bar", analyzer="email")
 
     def test_view_ok_with_multi_text(self):
         resp = self.db.find({"name.last": "A last name"}, explain=True)

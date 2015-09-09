@@ -14,13 +14,10 @@ import mango
 import unittest
 
 
+@unittest.skipUnless(mango.has_text_service(), "requires text service")
 class NoDefaultFieldTest(mango.UserDocsTextTests):
 
     DEFAULT_FIELD = False
-
-    @classmethod
-    def setUpClass(klass):
-        raise unittest.SkipTest('text index service not available')
 
     def test_basic(self):
         docs = self.db.find({"$text": "Ramona"})
@@ -33,16 +30,13 @@ class NoDefaultFieldTest(mango.UserDocsTextTests):
         assert docs[0]["user_id"] == 9
 
 
+@unittest.skipUnless(mango.has_text_service(), "requires text service")
 class NoDefaultFieldWithAnalyzer(mango.UserDocsTextTests):
 
     DEFAULT_FIELD = {
         "enabled": False,
         "analyzer": "keyword"
     }
-
-    @classmethod
-    def setUpClass(klass):
-        raise unittest.SkipTest('text not supported')
 
     def test_basic(self):
         docs = self.db.find({"$text": "Ramona"})
@@ -54,16 +48,13 @@ class NoDefaultFieldWithAnalyzer(mango.UserDocsTextTests):
         assert docs[0]["user_id"] == 9
 
 
+@unittest.skipUnless(mango.has_text_service(), "requires text service")
 class DefaultFieldWithCustomAnalyzer(mango.UserDocsTextTests):
 
     DEFAULT_FIELD = {
         "enabled": True,
         "analyzer": "keyword"
     }
-
-    @classmethod
-    def setUpClass(klass):
-        raise unittest.SkipTest('text not supported')
 
     def test_basic(self):
         docs = self.db.find({"$text": "Ramona"})

@@ -16,11 +16,6 @@ import mango
 import unittest
 
 class IndexCrudTests(mango.DbPerClass):
-    @classmethod
-    def setUpClass(klass):
-        raise unittest.SkipTest('text index service not available')
-        super(KeyTests, klass).setUpClass()
-
     def test_bad_fields(self):
         bad_fields = [
             None,
@@ -228,7 +223,7 @@ class IndexCrudTests(mango.DbPerClass):
         else:
             raise AssertionError("bad index delete")
 
-    @unittest.skip
+    @unittest.skipUnless(mango.has_text_service(), "requires text service")
     def test_create_text_idx(self):
         fields = [
             {"name":"stringidx", "type" : "string"},
@@ -247,7 +242,7 @@ class IndexCrudTests(mango.DbPerClass):
             return
         raise AssertionError("index not created")
 
-    @unittest.skip
+    @unittest.skipUnless(mango.has_text_service(), "requires text service")
     def test_create_bad_text_idx(self):
         bad_fields = [
             True,
@@ -282,12 +277,17 @@ class IndexCrudTests(mango.DbPerClass):
         ret = self.db.create_index(fields, name="idx_03")
         assert ret is True
 
+        skip_add = 0
+
+        if mango.has_text_service():
+            skip_add = 1
+
         assert len(self.db.list_indexes(limit=2)) == 2
-        assert len(self.db.list_indexes(limit=5,skip=4)) == 2
-        assert len(self.db.list_indexes(skip=5)) == 1
-        assert len(self.db.list_indexes(skip=6)) == 0
+        assert len(self.db.list_indexes(limit=5,skip=4)) == 2 + skip_add
+        assert len(self.db.list_indexes(skip=5)) == 1 + skip_add
+        assert len(self.db.list_indexes(skip=6)) == 0 + skip_add
         assert len(self.db.list_indexes(skip=100)) == 0
-        assert len(self.db.list_indexes(limit=10000000)) == 6
+        assert len(self.db.list_indexes(limit=10000000)) == 6 + skip_add
 
         try:
             self.db.list_indexes(skip=-1)

@@ -13,11 +13,8 @@
 import mango
 import unittest
 
+@unittest.skipUnless(mango.has_text_service(), "requires text service")
 class SortTests(mango.UserDocsTextTests):
-
-    @classmethod
-    def setUpClass(klass):
-        raise unittest.SkipTest('text index service is not available')
 
     def test_number_sort(self):
         q = {"age": {"$gt": 0}}

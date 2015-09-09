@@ -53,14 +53,15 @@ TEST_DOCS = [
 ]
 
 
+@unittest.skipUnless(mango.has_text_service(), "requires text service")
 class KeyTests(mango.DbPerClass):
     @classmethod
     def setUpClass(klass):
-        raise unittest.SkipTest('text index service not available')
         super(KeyTests, klass).setUpClass()
         klass.db.save_docs(TEST_DOCS, w=3)
         klass.db.create_index(["type"], ddoc="view")
-        klass.db.create_text_index(ddoc="text")
+        if mango.has_text_service():
+            klass.db.create_text_index(ddoc="text")
 
     def run_check(self, query, check, fields=None, indexes=None):
         if indexes is None:
@@ -125,7 +126,6 @@ class KeyTests(mango.DbPerClass):
         for query in queries:
             self.run_check(query, check, indexes=["text"])
 
-    @unittest.skip
     def test_escape_period(self):
         query = {"name\\.first" : "Kvothe"}
         def check(docs):
@@ -138,7 +138,6 @@ class KeyTests(mango.DbPerClass):
             assert len(docs) == 0
         self.run_check(query, check_empty, indexes=["text"])
 
-    @unittest.skip
     def test_object_period(self):
         query = {"name.first" : "Master Elodin"}
         def check(docs):

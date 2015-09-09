@@ -16,25 +16,20 @@ import unittest
 import user_docs
 import num_string_docs
 
-
+@unittest.skipIf(mango.has_text_service(), "text service exists")
 class TextIndexCheckTests(mango.DbPerClass):
 
     def test_create_text_index(self):
         body = json.dumps({
             'index': {
-                'fields': 'test'
             },
             'type': 'text'
         })
         resp = self.db.sess.post(self.db.path("_index"), data=body)
         assert resp.status_code == 503, resp
 
-
+@unittest.skipUnless(mango.has_text_service(), "requires text service")
 class BasicTextTests(mango.UserDocsTextTests):
-
-    @classmethod
-    def setUpClass(klass):
-        raise unittest.SkipTest('text index service not available')
 
     def test_simple(self):
         docs = self.db.find({"$text": "Stephanie"})
@@ -428,12 +423,8 @@ class BasicTextTests(mango.UserDocsTextTests):
 
     # test lucene syntax in $text
 
-
+@unittest.skipUnless(mango.has_text_service(), "requires text service")
 class ElemMatchTests(mango.FriendDocsTextTests):
-
-    @classmethod
-    def setUpClass(klass):
-        raise unittest.SkipTest('text index service not available')
 
     def test_elem_match_non_object(self):
         q = {"bestfriends":{
@@ -564,11 +555,8 @@ class ElemMatchTests(mango.FriendDocsTextTests):
 
 
 # Test numeric strings for $text
+@unittest.skipUnless(mango.has_text_service(), "requires text service")
 class NumStringTests(mango.NumStringDocsTextTests):
-
-    @classmethod
-    def setUpClass(klass):
-        raise unittest.SkipTest('text index service not available')
 
     def test_floating_point_val(self):
         float_point_string = num_string_docs.DOCS[2]["number_string"]

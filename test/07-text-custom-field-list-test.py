@@ -14,11 +14,8 @@ import mango
 import unittest
 
 
+@unittest.skipUnless(mango.has_text_service(), "requires text service")
 class CustomFieldsTest(mango.UserDocsTextTests):
-
-    @classmethod
-    def setUpClass(klass):
-        raise unittest.SkipTest('text index service not available')
 
     FIELDS = [
         {"name": "favorites.[]", "type": "string"},

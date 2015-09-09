@@ -14,11 +14,8 @@ import mango
 import limit_docs
 import unittest
 
+@unittest.skipUnless(mango.has_text_service(), "requires text service")
 class LimitTests(mango.LimitDocsTextTests):
-
-    @classmethod
-    def setUpClass(klass):
-        raise unittest.SkipTest('text index service not available')
 
     def test_limit_field(self):
         q = {"$or": [{"user_id" : {"$lt" : 10}}, {"filtered_array.[]": 1}]}

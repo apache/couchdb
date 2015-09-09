@@ -14,6 +14,7 @@ import json
 import time
 import unittest
 import uuid
+import os
 
 import requests
 
@@ -25,6 +26,9 @@ import num_string_docs
 
 def random_db_name():
     return "mango_test_" + uuid.uuid4().hex
+
+def has_text_service():
+    return os.path.isfile(os.getcwd() + "/../src/mango_cursor.erl")
 
 
 class Database(object):
@@ -214,11 +218,12 @@ class UserDocsTextTests(DbPerClass):
     @classmethod
     def setUpClass(klass):
         super(UserDocsTextTests, klass).setUpClass()
-        user_docs.setup(
-                klass.db,
-                index_type="text",
-                default_field=klass.DEFAULT_FIELD,
-                fields=klass.FIELDS
+        if has_text_service():
+            user_docs.setup(
+                    klass.db,
+                    index_type="text",
+                    default_field=klass.DEFAULT_FIELD,
+                    fields=klass.FIELDS
             )
 
 
@@ -227,18 +232,21 @@ class FriendDocsTextTests(DbPerClass):
     @classmethod
     def setUpClass(klass):
         super(FriendDocsTextTests, klass).setUpClass()
-        friend_docs.setup(klass.db, index_type="text")
+        if has_text_service():
+            friend_docs.setup(klass.db, index_type="text")
 
 class LimitDocsTextTests(DbPerClass):
 
     @classmethod
     def setUpClass(klass):
         super(LimitDocsTextTests, klass).setUpClass()
-        limit_docs.setup(klass.db, index_type="text")
+        if has_text_service():
+            limit_docs.setup(klass.db, index_type="text")
 
 class NumStringDocsTextTests(DbPerClass):
 
     @classmethod
     def setUpClass(klass):
         super(NumStringDocsTextTests, klass).setUpClass()
-        num_string_docs.setup(klass.db, index_type="text")
+        if has_text_service():
+            num_string_docs.setup(klass.db, index_type="text")
