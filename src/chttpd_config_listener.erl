@@ -55,5 +55,5 @@ maybe_replace(Key, Value, Settings) ->
         {ok, Settings};
     _ ->
         chttpd:stop(),
-        {ok, lists:keyreplace(Key, 1, {Key, Value}, Settings)}
+        {ok, lists:keyreplace(Key, 1, Settings, {Key, Value})}
     end.
