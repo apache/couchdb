@@ -83,7 +83,9 @@ http_uri(JSContext* cx, JSObject* req, couch_args* args, jsval* uri_val)
 
 #else
 #include <curl/curl.h>
+#ifndef XP_WIN
 #include <unistd.h>
+#endif
 
 
 void

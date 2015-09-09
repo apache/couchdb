@@ -62,9 +62,19 @@ ok = CopyIfDifferent(CouchJSConfig, ConfigBin),
 %% TODO support curl on Windows
 {JS_CFLAGS, JS_LDFLAGS} = case lists:keyfind(with_curl, 1, CouchConfig) of
     {with_curl, true} ->
-        {"-DHAVE_CURL ", "-DHAVE_CURL -lmozjs185 -lcurl"};
+        case os:type() of
+            {win32, _} ->
+                {"/DHAVE_CURL /IC:\\relax\\curl\\include", "/LIBPATH:C:\\relax\\js-1.8.5\\js\\src /LIBPATH:C:\\Relax\\curl\\lib\\release-ssl mozjs185-1.0.lib libcurl_imp.lib"};
+            _ ->
+                {"-DHAVE_CURL", "-DHAVE_CURL -lmozjs185 -lcurl"}
+        end;
     _ ->
-        {"", "-lmozjs185"}
+        case os:type() of
+            {win32, _} ->
+                {"", "/LIBPATH:C:\\relax\\js-1.8.5\\js\\src mozjs185-1.0.lib"};
+            _ ->
+                {"", "-lmozjs185"}
+        end
 end,
 
 CouchJSSrc = ["priv/couch_js/*.c"],
@@ -85,20 +95,20 @@ CompareSrc = ["priv/couch_ejson_compare/*.c"],
 
 BaseSpecs = [
         %% couchjs
-        {"darwin", CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", JS_CFLAGS ++ "-DXP_UNIX -I/usr/local/include/js"}, {"LDFLAGS", JS_LDFLAGS ++ " -L/usr/local/lib"}]}]},
-        {"linux",  CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", JS_CFLAGS ++ "-DXP_UNIX -I/usr/include/js"}, {"LDFLAGS", JS_LDFLAGS ++ " -lm"}]}]},
-        {"bsd",   CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", JS_CFLAGS ++ "-DXP_UNIX -I/usr/local/include/js"}, {"LDFLAGS", JS_LDFLAGS ++ " -L/usr/local/lib -lm"}]}]},
-        {"win32",  CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", "/DXP_WIN /IC:\\relax\\js-1.8.5\\js\\src"}, {"LDFLAGS", "/LIBPATH:C:\\relax\\js-1.8.5\\js\\src mozjs185-1.0.lib"}]}]},
+        {"darwin", CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", JS_CFLAGS ++ " -DXP_UNIX -I/usr/local/include/js"}, {"LDFLAGS", JS_LDFLAGS ++ " -L/usr/local/lib"}]}]},
+        {"linux",  CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", JS_CFLAGS ++ " -DXP_UNIX -I/usr/include/js"}, {"LDFLAGS", JS_LDFLAGS ++ " -lm"}]}]},
+        {"bsd",   CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", JS_CFLAGS ++ " -DXP_UNIX -I/usr/local/include/js"}, {"LDFLAGS", JS_LDFLAGS ++ " -L/usr/local/lib -lm"}]}]},
+        {"win32",  CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", JS_CFLAGS ++ " /DXP_WIN /IC:\\relax\\js-1.8.5\\js\\src"}, {"LDFLAGS", JS_LDFLAGS}]}]},
         % ICU
         {"darwin", IcuPath, IcuSrc, [{env, IcuEnv ++ IcuDarwinEnv}]},
         {"linux",  IcuPath, IcuSrc, [{env, IcuEnv}]},
         {"bsd",   IcuPath, IcuSrc, [{env, IcuEnv ++ IcuBsdEnv}]},
-        {"win32",  IcuPath, IcuSrc, [{env, IcuEnv ++ IcuWinEnv}]},
+        {"win32",  IcuPath, IcuSrc, [{env, IcuWinEnv}]},
         % ejson_compare
         {"darwin", ComparePath, CompareSrc, [{env, IcuEnv ++ IcuDarwinEnv}]},
         {"linux",  ComparePath, CompareSrc, [{env, IcuEnv}]},
         {"bsd",   ComparePath, CompareSrc, [{env, IcuEnv ++ IcuBsdEnv}]},
-        {"win32",  ComparePath, CompareSrc, [{env, IcuEnv ++ IcuWinEnv}]}
+        {"win32",  ComparePath, CompareSrc, [{env, IcuWinEnv}]}
 ],
 
 SpawnSpec = [
