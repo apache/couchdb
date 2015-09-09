@@ -45,7 +45,7 @@ DepDescs = [
     {khash,             "khash",            {branch, "master"}},
     {mango,             "mango",            {branch, "master"}},
     {mem3,              "mem3",             {branch, "master"}},
-    {mochiweb,          "mochiweb",         {branch, "master"}},
+    {mochiweb,          "mochiweb",         {branch, "upstream"}},
     {oauth,             "oauth",            {branch, "master"}},
     {rexi,              "rexi",             {branch, "master"}},
     {snappy,            "snappy",           {branch, "master"}},
