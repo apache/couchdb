@@ -22,7 +22,7 @@
 -define(DEFAULT_ORIGIN_HTTPS, "https://example.com").
 -define(EXPOSED_HEADERS,
     "content-type, accept-ranges, etag, server, x-couch-request-id, " ++
-    "x-couch-update-newrev, x-couchdb-body-time, x-couchdb-csrf-valid").
+    "x-couch-update-newrev, x-couchdb-body-time").
 
 
 %% Test helpers
