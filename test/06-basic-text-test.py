@@ -14,9 +14,8 @@ import json
 import mango
 import unittest
 import user_docs
-import copy
-import num_string_docs
-from hypothesis import given, assume
+import math
+from hypothesis import given, assume, example
 import hypothesis.strategies as st
 
 @unittest.skipIf(mango.has_text_service(), "text service exists")
@@ -565,45 +564,24 @@ class NumStringTests(mango.DbPerClass):
     def setUpClass(klass):
         super(NumStringTests, klass).setUpClass()
         klass.db.recreate()
-        klass.db.create_text_index()
+        if mango.has_text_service():
+            klass.db.create_text_index()
 
-    def test_nan_val(self):
-        doc = {"number_NaN": "NaN"}
-        self.db.save_doc(doc)
-        q = {"$text": "NaN"}
-        docs = self.db.find(q)
-        print docs
-        assert docs[0]["number_NaN"] == "NaN"
+    # not available for python 2.7.x
+    def isFinite(num):
+        not (math.isinf(num) or math.isnan(num))
 
-    def test_infinity_val(self):
-        doc = {"number_Infinity": "Infinity"}
-        self.db.save_doc(doc)
-        q = {"$text": "Infinity"}
-        docs = self.db.find(q)
-        assert docs[0]["number_Infinity"] == "Infinity"
-
-    @given(float_point_string=st.floats().map(str))
-    def test_floating_point_val(self,float_point_string):
-        assume(float_point_string!="nan")
-        doc = {"number_string": float_point_string}
-        self.db.save_doc(doc)
-        q = {"$text": float_point_string}
-        docs = self.db.find(q)
-        if len(docs) == 1:
-            assert docs[0]["number_string"] == float_point_string
-        if len(docs) == 2:
-            if docs[0]["number_string"] != float_point_string:
-                assert docs[1]["number_string"] == float_point_string
-
-    @given(f=st.floats())
+    @given(f=st.floats().filter(isFinite).map(str)
+        | st.floats().map(lambda f: f.hex()))
+    @example('NaN')
+    @example('Infinity')
     def test_floating_point_val(self,f):
-        hex_float_point_string = f.hex()
-        doc = {"number_string": hex_float_point_string}
+        doc = {"number_string": f}
         self.db.save_doc(doc)
-        q = {"$text": hex_float_point_string}
+        q = {"$text": f}
         docs = self.db.find(q)
         if len(docs) == 1:
-            assert docs[0]["number_string"] == hex_float_point_string
+            assert docs[0]["number_string"] == f
         if len(docs) == 2:
-            if docs[0]["number_string"] != hex_float_point_string:
-                assert docs[1]["number_string"] == hex_float_point_string
+            if docs[0]["number_string"] != f:
+                assert docs[1]["number_string"] == f

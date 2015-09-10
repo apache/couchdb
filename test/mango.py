@@ -21,7 +21,6 @@ import requests
 import friend_docs
 import user_docs
 import limit_docs
-import num_string_docs
 
 
 def random_db_name():
@@ -242,11 +241,3 @@ class LimitDocsTextTests(DbPerClass):
         super(LimitDocsTextTests, klass).setUpClass()
         if has_text_service():
             limit_docs.setup(klass.db, index_type="text")
-
-class NumStringDocsTextTests(DbPerClass):
-
-    @classmethod
-    def setUpClass(klass):
-        super(NumStringDocsTextTests, klass).setUpClass()
-        if has_text_service():
-            num_string_docs.setup(klass.db, index_type="text")

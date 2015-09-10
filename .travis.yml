@@ -9,7 +9,7 @@ before_install:
   - cp -R ../src ./src/mango
   - make
   - cd ..
-  - couchdb/dev/run -n 1 --with-admin-party-please &
+  - couchdb/dev/run -n 1 --admin=testuser:testpass &
   - sleep 10
 
 before_script:
