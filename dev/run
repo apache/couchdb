@@ -30,7 +30,6 @@ import uuid
 from pbkdf2 import pbkdf2_hex
 
 COMMON_SALT = uuid.uuid4().hex
-COMMON_CSRF_SECRET = uuid.uuid4().hex
 
 try:
     from urllib import urlopen
@@ -259,11 +258,9 @@ def hack_local_ini(ctx, contents):
     previous_line = "; require_valid_user = false\n"
     contents = contents.replace(previous_line, previous_line + secret_line)
 
-    csrf_secret = '\n\n[csrf]\nsecret = %s\n' % COMMON_CSRF_SECRET
-
     if ctx['with_admin_party']:
         ctx['admin'] = ('Admin Party!', 'You do not need any password.')
-        return contents + csrf_secret
+        return contents
 
     # handle admin credentials passed from cli or generate own one
     if ctx['admin'] is None:
@@ -271,7 +268,7 @@ def hack_local_ini(ctx, contents):
     else:
         user, pswd = ctx['admin']
 
-    return contents + "\n%s = %s" % (user, hashify(pswd)) + csrf_secret
+    return contents + "\n%s = %s" % (user, hashify(pswd))
 
 
 def gen_password():
