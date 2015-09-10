@@ -49,8 +49,7 @@ convert(Path, {[{<<"$default">>, Arg}]}) ->
 % The $text operator specifies a Lucene syntax query
 % so we just pull it in directly.
 convert(Path, {[{<<"$text">>, Query}]}) when is_binary(Query) ->
-    Value = maybe_append_quotes(value_str(Query)),
-    {op_field, {make_field(Path, Query), Value}};
+    {op_field, {make_field(Path, Query), value_str(Query)}};
 
 % The MongoDB docs for $all are super confusing and read more
 % like they screwed up the implementation of this operator
@@ -326,7 +325,12 @@ type_str(null) ->
 
 
 value_str(Value) when is_binary(Value) ->
-    mango_util:lucene_escape_query_value(Value);
+    case mango_util:is_number_string(Value) of
+        true ->
+            <<"\"", Value/binary, "\"">>;
+        false ->
+            mango_util:lucene_escape_query_value(Value)
+    end;
 value_str(Value) when is_integer(Value) ->
     list_to_binary(integer_to_list(Value));
 value_str(Value) when is_float(Value) ->
@@ -351,15 +355,6 @@ append_sort_type(RawSortField, Selector) ->
         _ ->
             Type = get_sort_type(RawSortField, Selector),
             <<EncodeField/binary, Type/binary>>
-    end.
-
-
-maybe_append_quotes(TextValue) ->
-    case mango_util:is_number_string(TextValue) of
-        true ->
-            <<"\"", TextValue/binary, "\"">>;
-        false ->
-            TextValue
     end.
 
 

@@ -585,3 +585,10 @@ class NumStringTests(mango.DbPerClass):
         if len(docs) == 2:
             if docs[0]["number_string"] != f:
                 assert docs[1]["number_string"] == f
+        q = {"number_string": f}
+        docs = self.db.find(q)
+        if len(docs) == 1:
+            assert docs[0]["number_string"] == f
+        if len(docs) == 2:
+            if docs[0]["number_string"] != f:
+                assert docs[1]["number_string"] == f
