@@ -50,7 +50,8 @@ init([]) ->
 handle_call({get_index, DbName, #index{sig=Sig}=Index}, From, State) ->
     case ets:lookup(?BY_SIG, {DbName, Sig}) of
     [] ->
-        spawn_link(fun() -> new_index(DbName, Index) end),
+        Pid = spawn_link(fun() -> new_index(DbName, Index) end),
+        ets:insert(?BY_PID, {Pid, opening, {DbName, Sig}}),
         ets:insert(?BY_SIG, {{DbName,Sig}, [From]}),
         {noreply, State};
     [{_, WaitList}] when is_list(WaitList) ->
@@ -60,16 +61,18 @@ handle_call({get_index, DbName, #index{sig=Sig}=Index}, From, State) ->
         {reply, {ok, ExistingPid}, State}
     end;
 
-handle_call({open_ok, DbName, Sig, NewPid}, _From, State) ->
+handle_call({open_ok, DbName, Sig, NewPid}, {OpenerPid, _}, State) ->
     link(NewPid),
     [{_, WaitList}] = ets:lookup(?BY_SIG, {DbName, Sig}),
     [gen_server:reply(From, {ok, NewPid}) || From <- WaitList],
+    ets:delete(?BY_PID, OpenerPid),
     add_to_ets(NewPid, DbName, Sig),
     {reply, ok, State};
 
-handle_call({open_error, DbName, Sig, Error}, _From, State) ->
+handle_call({open_error, DbName, Sig, Error}, {OpenerPid, _}, State) ->
     [{_, WaitList}] = ets:lookup(?BY_SIG, {DbName, Sig}),
     [gen_server:reply(From, Error) || From <- WaitList],
+    ets:delete(?BY_PID, OpenerPid),
     ets:delete(?BY_SIG, {DbName, Sig}),
     {reply, ok, State}.
 
@@ -85,6 +88,12 @@ handle_info({'EXIT', FromPid, Reason}, State) ->
             exit(Reason);
         true -> ok
         end;
+    % Using Reason /= normal to force a match error
+    % if we didn't delete the Pid in a handle_call
+    % message for some reason.
+    [{_, opening, {DbName, Sig}}] when Reason /= normal ->
+        Msg = {open_error, DbName, Sig, Reason},
+        {reply, ok, _} = handle_call(Msg, {FromPid, nil}, State);
     [{_, {DbName, Sig}}] ->
         delete_from_ets(FromPid, DbName, Sig)
     end,
