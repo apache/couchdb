@@ -21,8 +21,7 @@
 -export([get_all_security/2, open_shard/2]).
 
 -export([get_db_info/2, get_doc_count/2, get_update_seq/2,
-         changes/4, map_view/5, reduce_view/5, group_info/3,
-         compact_db/1]).
+         changes/4, map_view/5, reduce_view/5, group_info/3]).
 
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("couch/include/couch_db.hrl").
@@ -132,14 +131,6 @@ delete_db(DbName) ->
 
 delete_shard_db_doc(_, DocId) ->
     rexi:reply(mem3_util:delete_db_doc(DocId)).
-
-compact_db(DbName) ->
-    {ok, Db} = couch_db:open(DbName, [?ADMIN_CTX]),
-    try
-        {ok, _} = couch_db:start_compact(Db)
-    after
-        couch_db:close(Db)
-    end.
 
 %% @equiv get_db_info(DbName, [])
 get_db_info(DbName) ->
