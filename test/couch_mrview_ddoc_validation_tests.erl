@@ -51,7 +51,9 @@ should_reject_invalid_js_map(Db) ->
             ]}}
         ]}}
     ]}),
-    ?_assertThrow({compilation_error, _}, couch_db:update_doc(Db, Doc, [])).
+    ?_assertThrow(
+        {bad_request, compilation_error, _},
+        couch_db:update_doc(Db, Doc, [])).
 
 should_reject_invalid_js_reduce(Db) ->
     Doc = couch_doc:from_json_obj({[
@@ -63,7 +65,9 @@ should_reject_invalid_js_reduce(Db) ->
             ]}}
         ]}}
     ]}),
-    ?_assertThrow({compilation_error, _}, couch_db:update_doc(Db, Doc, [])).
+    ?_assertThrow(
+        {bad_request, compilation_error, _},
+        couch_db:update_doc(Db, Doc, [])).
 
 should_reject_invalid_builtin_reduce(Db) ->
     Doc = couch_doc:from_json_obj({[
@@ -75,4 +79,6 @@ should_reject_invalid_builtin_reduce(Db) ->
             ]}}
         ]}}
     ]}),
-    ?_assertThrow({invalid_design_doc, _}, couch_db:update_doc(Db, Doc, [])).
+    ?_assertThrow(
+        {bad_request, invalid_design_doc, _},
+        couch_db:update_doc(Db, Doc, [])).
