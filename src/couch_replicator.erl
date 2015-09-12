@@ -295,6 +295,7 @@ do_init(#rep{options = Options, id = {BaseId, Ext}, user_ctx=UserCtx} = Rep) ->
         {type, replication},
         {user, UserCtx#user_ctx.name},
         {replication_id, ?l2b(BaseId ++ Ext)},
+        {database, Rep#rep.db_name},
         {doc_id, Rep#rep.doc_id},
         {source, ?l2b(SourceName)},
         {target, ?l2b(TargetName)},

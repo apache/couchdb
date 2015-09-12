@@ -53,7 +53,6 @@
 -define(replace(L, K, V), lists:keystore(K, 1, L, {K, V})).
 
 -record(rep_state, {
-    dbname,
     rep,
     starting,
     retries_left,
@@ -81,7 +80,7 @@ replication_started(#rep{id = {BaseId, _} = RepId}) ->
     case rep_state(RepId) of
     nil ->
         ok;
-    #rep_state{dbname = DbName, rep = #rep{doc_id = DocId}} ->
+    #rep_state{rep = #rep{db_name = DbName, doc_id = DocId}} ->
         update_rep_doc(DbName, DocId, [
             {<<"_replication_state">>, <<"triggered">>},
             {<<"_replication_state_reason">>, undefined},
@@ -97,7 +96,7 @@ replication_completed(#rep{id = RepId}, Stats) ->
     case rep_state(RepId) of
     nil ->
         ok;
-    #rep_state{dbname = DbName, rep = #rep{doc_id = DocId}} ->
+    #rep_state{rep = #rep{db_name = DbName, doc_id = DocId}} ->
         update_rep_doc(DbName, DocId, [
             {<<"_replication_state">>, <<"completed">>},
             {<<"_replication_state_reason">>, undefined},
@@ -123,7 +122,7 @@ replication_error(#rep{id = {BaseId, _} = RepId}, Error) ->
     case rep_state(RepId) of
     nil ->
         ok;
-    #rep_state{dbname = DbName, rep = #rep{doc_id = DocId}} ->
+    #rep_state{rep = #rep{db_name = DbName, doc_id = DocId}} ->
         update_rep_doc(DbName, DocId, [
             {<<"_replication_state">>, <<"error">>},
             {<<"_replication_state_reason">>, to_binary(error_reason(Error))},
@@ -181,7 +180,7 @@ handle_call({owner, RepId}, _From, State) ->
     case rep_state(RepId) of
     nil ->
         {reply, nonode, State};
-    #rep_state{dbname = DbName, rep = #rep{doc_id = DocId}} ->
+    #rep_state{rep = #rep{db_name = DbName, doc_id = DocId}} ->
         {reply, owner(DbName, DocId, State#state.live), State}
     end;
 
@@ -475,11 +474,11 @@ rep_user_ctx({RepDoc}) ->
 
 
 maybe_start_replication(State, DbName, DocId, RepDoc) ->
-    #rep{id = {BaseId, _} = RepId} = Rep = parse_rep_doc(RepDoc),
+    #rep{id = {BaseId, _} = RepId} = Rep0 = parse_rep_doc(RepDoc),
+    Rep = Rep0#rep{db_name = DbName},
     case rep_state(RepId) of
     nil ->
         RepState = #rep_state{
-            dbname = DbName,
             rep = Rep,
             starting = true,
             retries_left = State#state.max_retries,
@@ -500,12 +499,12 @@ maybe_start_replication(State, DbName, DocId, RepDoc) ->
         State#state{rep_start_pids = [Pid | State#state.rep_start_pids]};
     #rep_state{rep = #rep{doc_id = DocId}} ->
         State;
-    #rep_state{starting = false, dbname = DbName, rep = #rep{doc_id = OtherDocId}} ->
+    #rep_state{starting = false, rep = #rep{db_name = DbName, doc_id = OtherDocId}} ->
         couch_log:notice("The replication specified by the document `~s` was already"
             " triggered by the document `~s`", [DocId, OtherDocId]),
         maybe_tag_rep_doc(DbName, DocId, RepDoc, ?l2b(BaseId)),
         State;
-    #rep_state{starting = true, dbname = DbName, rep = #rep{doc_id = OtherDocId}} ->
+    #rep_state{starting = true, rep = #rep{db_name = DbName, doc_id = OtherDocId}} ->
         couch_log:notice("The replication specified by the document `~s` is already"
             " being triggered by the document `~s`", [DocId, OtherDocId]),
         maybe_tag_rep_doc(DbName, DocId, RepDoc, ?l2b(BaseId)),
@@ -592,8 +591,7 @@ replication_error(State, RepId, Error) ->
 
 maybe_retry_replication(#rep_state{retries_left = 0} = RepState, Error, State) ->
     #rep_state{
-        dbname = DbName,
-        rep = #rep{id = RepId, doc_id = DocId},
+        rep = #rep{id = RepId, doc_id = DocId, db_name = DbName},
         max_retries = MaxRetries
     } = RepState,
     couch_replicator:cancel_replication(RepId),

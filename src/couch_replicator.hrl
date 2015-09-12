@@ -20,5 +20,6 @@
     user_ctx,
     type = db,
     view = nil,
-    doc_id
+    doc_id,
+    db_name = null
 }).
