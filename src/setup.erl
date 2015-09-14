@@ -36,7 +36,7 @@ require_bind_address(_, _) ->
 
 is_cluster_enabled() ->
     % bind_address != 127.0.0.1 AND admins != empty
-    BindAddress = config:get("httpd", "bind_address"),
+    BindAddress = config:get("chttpd", "bind_address"),
     Admins = config:get("admins"),
     case {BindAddress, Admins} of
         {"127.0.0.1", _} -> no;
@@ -115,7 +115,7 @@ enable_cluster_int(Options, no) ->
     },
 
     % if bind_address == 127.0.0.1 and no bind_address in req -> error
-    CurrentBindAddress = config:get("httpd","bind_address"),
+    CurrentBindAddress = config:get("chttpd","bind_address"),
     NewBindAddress = proplists:get_value(bind_address, Options),
     ok = require_admins(CurrentAdmins, NewCredentials),
     ok = require_bind_address(CurrentBindAddress, NewBindAddress),
@@ -129,9 +129,9 @@ enable_cluster_int(Options, no) ->
 
     case NewBindAddress of
         undefined ->
-            config:set("httpd", "bind_address", "0.0.0.0");
+            config:set("chttpd", "bind_address", "0.0.0.0");
         NewBindAddress ->
-            config:set("httpd", "bind_address", binary_to_list(NewBindAddress))
+            config:set("chttpd", "bind_address", binary_to_list(NewBindAddress))
     end,
 
     Port = proplists:get_value(port, Options),
@@ -139,7 +139,7 @@ enable_cluster_int(Options, no) ->
         undefined ->
             ok;
         Port ->
-            config:set("httpd", "port", integer_to_list(Port))
+            config:set("chttpd", "port", integer_to_list(Port))
     end,
     couch_log:notice("Enable Cluster: ~p~n", [Options]).
     %cluster_state:set(enabled).
