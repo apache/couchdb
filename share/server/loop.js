@@ -28,6 +28,7 @@ function init_sandbox() {
     sandbox.send = Render.send;
     sandbox.getRow = Render.getRow;
     sandbox.isArray = isArray;
+    sandbox.index = Dreyfus.index;
   } catch (e) {
     //log(e.toSource());
   }
@@ -127,7 +128,8 @@ var Loop = function() {
     "add_lib"  : State.addLib,
     "map_doc"  : Views.mapDoc,
     "reduce"   : Views.reduce,
-    "rereduce" : Views.rereduce
+    "rereduce" : Views.rereduce,
+    "index_doc": Dreyfus.indexDoc
   };
   function handleError(e) {
     var type = e[0];

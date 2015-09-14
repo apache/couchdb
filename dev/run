@@ -199,7 +199,7 @@ def write_config(ctx, node, env):
         if base == "default.ini":
             content = hack_default_ini(ctx, node, content)
         elif base == "local.ini":
-            content = hack_local_ini(ctx, content)
+            content = hack_local_ini(ctx, node, content)
 
         with open(tgt, "w") as handle:
             handle.write(content)
@@ -252,7 +252,12 @@ def hack_default_ini(ctx, node, content):
     return contents
 
 
-def hack_local_ini(ctx, contents):
+def hack_local_ini(ctx, node, contents):
+    # add dreyfus config
+    clouseau_name = node.replace("node", "clouseau")
+    dreyfus_conf = '\n\n[dreyfus]\nname = %s@127.0.0.1\n' % clouseau_name
+    contents = contents + dreyfus_conf
+
     # make sure all three nodes have the same secret
     secret_line = "secret = %s\n" % COMMON_SALT
     previous_line = "; require_valid_user = false\n"

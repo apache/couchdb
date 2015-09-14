@@ -50,7 +50,8 @@ DepDescs = [
     {rexi,              "rexi",             {branch, "master"}},
     {snappy,            "snappy",           {branch, "master"}},
     {setup,             "setup",            {branch, "master"}},
-    {meck,              "meck",             {tag, "0.8.2"}}
+    {meck,              "meck",             {tag, "0.8.2"}},
+    {dreyfus,           {url, "https://github.com/cloudant-labs/dreyfus"}, {branch, "master"}}
 ],
 
 BaseUrl = "https://git-wip-us.apache.org/repos/asf/",
