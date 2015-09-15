@@ -267,13 +267,26 @@ make_field(Path, Arg) ->
 
 
 range(lt, Arg) ->
-    [<<"[-Infinity TO ">>, value_str(Arg), <<"}">>];
+    Min = get_range(min, Arg),
+    [<<"[", Min/binary, " TO ">>, value_str(Arg), <<"}">>];
 range(lte, Arg) ->
-    [<<"[-Infinity TO ">>, value_str(Arg), <<"]">>];
+    Min = get_range(min, Arg),
+    [<<"[", Min/binary, " TO ">>, value_str(Arg), <<"]">>];
 range(gte, Arg) ->
-    [<<"[">>, value_str(Arg), <<" TO Infinity]">>];
+    Max = get_range(max, Arg),
+    [<<"[">>, value_str(Arg), <<" TO ", Max/binary, "]">>];
 range(gt, Arg) ->
-    [<<"{">>, value_str(Arg), <<" TO Infinity]">>].
+    Max = get_range(max, Arg),
+    [<<"{">>, value_str(Arg), <<" TO ", Max/binary, "]">>].
+
+get_range(min, Arg) when is_number(Arg) ->
+    <<"-Infinity">>;
+get_range(min, _Arg) ->
+    <<"\"\"">>;
+get_range(max, Arg) when is_number(Arg) ->
+    <<"Infinity">>;
+get_range(max, _Arg) ->
+    <<"\u0x10FFFF">>.
 
 
 field_exists_query(Path) ->

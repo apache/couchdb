@@ -96,6 +96,10 @@ class BasicTextTests(mango.UserDocsTextTests):
         for d in docs:
             assert d["user_id"] in (1, 7, 9)
 
+        docs = self.db.find({"company": {"$lt": "Dreamia"}})
+        assert len(docs) == 1
+        assert docs[0]["company"] == "Affluex"
+
     def test_lte(self):
         docs = self.db.find({"age": {"$lte": 21}})
         assert len(docs) == 0
@@ -108,6 +112,11 @@ class BasicTextTests(mango.UserDocsTextTests):
         assert len(docs) == 3
         for d in docs:
             assert d["user_id"] in (1, 7, 9)
+
+        docs = self.db.find({"company": {"$lte": "Dreamia"}})
+        assert len(docs) == 2
+        for d in docs:
+            assert d["user_id"] in (0, 11)
 
     def test_eq(self):
         docs = self.db.find({"age": 21})
@@ -149,6 +158,9 @@ class BasicTextTests(mango.UserDocsTextTests):
         docs = self.db.find({"age": {"$gt": 79}})
         assert len(docs) == 0
 
+        docs = self.db.find({"company": {"$gt": "Zialactic"}})
+        assert len(docs) == 0
+
     def test_gte(self):
         docs = self.db.find({"age": {"$gte": 77}})
         assert len(docs) == 2
@@ -166,6 +178,10 @@ class BasicTextTests(mango.UserDocsTextTests):
 
         docs = self.db.find({"age": {"$gte": 80}})
         assert len(docs) == 0
+
+        docs = self.db.find({"company": {"$gte": "Zialactic"}})
+        assert len(docs) == 1
+        assert docs[0]["company"] == "Zialactic"
 
     def test_and(self):
         docs = self.db.find({"age": 22, "manager": True})
