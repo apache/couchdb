@@ -69,14 +69,22 @@ enable_cluster(Options) ->
             enable_cluster_http(Options)
     end.
 
+get_remote_request_options(Options) ->
+    case couch_util:get_value(remote_current_user, Options, undefined) of
+        undefined ->
+            [];
+        _ ->
+            [
+                {basic_auth, {
+                    binary_to_list(couch_util:get_value(remote_current_user, Options)),
+                    binary_to_list(couch_util:get_value(remote_current_password, Options))
+                }}
+            ]
+    end.
+
 enable_cluster_http(Options) ->
     % POST to nodeB/_setup
-    RequestOptions = [
-        {basic_auth, {
-            binary_to_list(couch_util:get_value(remote_current_user, Options)),
-            binary_to_list(couch_util:get_value(remote_current_password, Options))
-        }}
-    ],
+    RequestOptions = get_remote_request_options(Options),
 
     Body = ?JSON_ENCODE({[
         {<<"action">>, <<"enable_cluster">>},
@@ -138,8 +146,10 @@ enable_cluster_int(Options, no) ->
     case Port of
         undefined ->
             ok;
-        Port ->
-            config:set("chttpd", "port", integer_to_list(Port))
+        Port when is_binary(Port) ->
+            config:set("chttpd", "port", binary_to_list(Port));
+        Port when is_integer(Port) ->
+            config:set_integer("chttpd", "port", Port)
     end,
     couch_log:notice("Enable Cluster: ~p~n", [Options]).
     %cluster_state:set(enabled).
@@ -168,7 +178,7 @@ add_node(Options) ->
 add_node_int(_Options, no) ->
     {error, cluster_not_enabled};
 add_node_int(Options, ok) ->
-    couch_log:notice("add node: ~p~n", [Options]),
+    couch_log:notice("add node_int: ~p~n", [Options]),
     ErlangCookie = erlang:get_cookie(),
 
     % POST to nodeB/_setup
