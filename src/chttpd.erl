@@ -818,6 +818,8 @@ error_info({error, {illegal_database_name, Name}}) ->
         "digits (0-9), and any of the characters _, $, (, ), +, -, and / ",
         "are allowed. Must begin with a letter.">>,
     {400, <<"illegal_database_name">>, Message};
+error_info({_DocID,{illegal_docid,DocID}}) ->
+    {400, <<"illegal_docid">>,DocID};
 error_info({missing_stub, Reason}) ->
     {412, <<"missing_stub">>, Reason};
 error_info(request_entity_too_large) ->
