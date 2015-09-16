@@ -14,7 +14,8 @@
 
 
 -export([
-    validate/1,
+    validate_new/1,
+    validate_index_def/1,
     add/2,
     remove/2,
     from_ddoc/1,
@@ -35,9 +36,13 @@
 -include("mango_idx.hrl").
 
 
-validate(#idx{}=Idx) ->
+validate_new(#idx{}=Idx) ->
     {ok, Def} = do_validate(Idx#idx.def),
     {ok, Idx#idx{def=Def}}.
+
+
+validate_index_def(Def) ->
+    def_to_json(Def).
 
 
 add(#doc{body={Props0}}=DDoc, Idx) ->
@@ -75,17 +80,18 @@ from_ddoc({Props}) ->
     case lists:keyfind(<<"views">>, 1, Props) of
         {<<"views">>, {Views}} when is_list(Views) ->
             lists:flatmap(fun({Name, {VProps}}) ->
-                Def = proplists:get_value(<<"map">>, VProps),
-                {Opts0} = proplists:get_value(<<"options">>, VProps),
-                Opts = lists:keydelete(<<"sort">>, 1, Opts0),
-                I = #idx{
-                    type = <<"json">>,
-                    name = Name,
-                    def = Def,
-                    opts = Opts
-                },
-                % TODO: Validate the index definition
-                [I]
+                case validate_ddoc(VProps) of
+                    invalid_view ->
+                        [];
+                    {Def, Opts} ->
+                        I = #idx{
+                        type = <<"json">>,
+                        name = Name,
+                        def = Def,
+                        opts = Opts
+                        },
+                        [I]
+                end
             end, Views);
         _ ->
             []
@@ -202,6 +208,20 @@ make_view(Idx) ->
         {<<"options">>, {Idx#idx.opts}}
     ]},
     {Idx#idx.name, View}.
+
+
+validate_ddoc(VProps) ->
+    try
+        Def = proplists:get_value(<<"map">>, VProps),
+        validate_index_def(Def),
+        {Opts0} = proplists:get_value(<<"options">>, VProps),
+        Opts = lists:keydelete(<<"sort">>, 1, Opts0),
+        {Def, Opts}
+    catch Error:Reason ->
+        couch_log:error("Invalid Index Def ~p. Error: ~p, Reason: ~p",
+            [VProps, Error, Reason]),
+        invalid_view
+    end.
 
 
 % This function returns a list of indexes that

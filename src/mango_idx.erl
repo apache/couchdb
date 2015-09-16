@@ -23,7 +23,7 @@
     for_sort/2,
 
     new/2,
-    validate/1,
+    validate_new/1,
     add/2,
     remove/2,
     from_ddoc/2,
@@ -114,9 +114,9 @@ new(Db, Opts) ->
     }}.
 
 
-validate(Idx) ->
+validate_new(Idx) ->
     Mod = idx_mod(Idx),
-    Mod:validate(Idx).
+    Mod:validate_new(Idx).
 
 
 add(DDoc, Idx) ->

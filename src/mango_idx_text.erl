@@ -14,8 +14,9 @@
 
 
 -export([
-    validate/1,
+    validate_new/1,
     validate_fields/1,
+    validate_index_def/1,
     add/2,
     remove/2,
     from_ddoc/1,
@@ -31,9 +32,13 @@
 -include("mango_idx.hrl").
 
 
-validate(#idx{}=Idx) ->
+validate_new(#idx{}=Idx) ->
     {ok, Def} = do_validate(Idx#idx.def),
     {ok, Idx#idx{def=Def}}.
+
+
+validate_index_def(IndexInfo) ->
+    do_validate(IndexInfo).
 
 
 add(#doc{body={Props0}}=DDoc, Idx) ->
@@ -72,14 +77,17 @@ from_ddoc({Props}) ->
     case lists:keyfind(<<"indexes">>, 1, Props) of
         {<<"indexes">>, {Texts}} when is_list(Texts) ->
             lists:flatmap(fun({Name, {VProps}}) ->
-                Def = proplists:get_value(<<"index">>, VProps),
-                I = #idx{
-                    type = <<"text">>,
-                    name = Name,
-                    def = Def
-                },
-                % TODO: Validate the index definition
-                [I]
+                case validate_ddoc(VProps) of
+                    invalid_ddoc ->
+                        [];
+                    Def ->
+                        I = #idx{
+                        type = <<"text">>,
+                        name = Name,
+                        def = Def
+                        },
+                        [I]
+                end
             end, Texts);
         _ ->
             []
@@ -165,12 +173,26 @@ validate_field_type(<<"boolean">>) ->
     <<"boolean">>.
 
 
+validate_fields(<<"all_fields">>) ->
+    {ok, all_fields};
 validate_fields(Fields) ->
     try fields_to_json(Fields) of
         _ ->
             mango_fields:new(Fields)
     catch error:function_clause ->
         ?MANGO_ERROR({invalid_index_fields_definition, Fields})
+    end.
+
+
+validate_ddoc(VProps) ->
+    try
+        Def = proplists:get_value(<<"index">>, VProps),
+        validate_index_def(Def),
+        Def
+    catch Error:Reason ->
+        couch_log:error("Invalid Index Def ~p: Error. ~p, Reason: ~p",
+            [VProps, Error, Reason]),
+        invalid_ddoc
     end.
 
 

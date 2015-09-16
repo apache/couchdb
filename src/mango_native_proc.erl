@@ -14,6 +14,9 @@
 -behavior(gen_server).
 
 
+-include("mango_idx.hrl").
+
+
 -export([
     start_link/0,
     set_timeout/2,
@@ -72,7 +75,13 @@ handle_call({prompt, [<<"reset">>, _QueryConfig]}, _From, St) ->
     {reply, true, St#st{indexes=[]}};
 
 handle_call({prompt, [<<"add_fun">>, IndexInfo]}, _From, St) ->
-    Indexes = St#st.indexes ++ [IndexInfo],
+    Indexes = case validate_index_info(IndexInfo) of
+        true ->
+            St#st.indexes ++ [IndexInfo];
+        false ->
+            couch_log:error("No Valid Indexes For: ~p", [IndexInfo]),
+            St#st.indexes
+    end,
     NewSt = St#st{indexes = Indexes},
     {reply, true, NewSt};
 
@@ -86,7 +95,14 @@ handle_call({prompt, [<<"rereduce">>, _, _]}, _From, St) ->
     {reply, null, St};
 
 handle_call({prompt, [<<"index_doc">>, Doc]}, _From, St) ->
-    {reply, index_doc(St, mango_json:to_binary(Doc)), St};
+    Vals = case index_doc(St, mango_json:to_binary(Doc)) of
+        [] ->
+            [[]];
+        Else ->
+            Else
+    end,
+    {reply, Vals, St};
+
 
 handle_call(Msg, _From, St) ->
     {stop, {invalid_call, Msg}, {invalid_call, Msg}, St}.
@@ -296,3 +312,21 @@ make_text_field_name([P | Rest], Type) ->
     Parts = lists:reverse(Rest, [iolist_to_binary([P, ":", Type])]),
     Escaped = [mango_util:lucene_escape_field(N) || N <- Parts],
     iolist_to_binary(mango_util:join(".", Escaped)).
+
+
+validate_index_info(IndexInfo) ->
+    IdxTypes = case module_loaded(dreyfus_index) of
+        true ->
+            [mango_idx_view, mango_idx_text];
+        false ->
+            [mango_idx_view]
+    end,
+    Results = lists:foldl(fun(IdxType, Results0) ->
+        try
+            IdxType:validate_index_def(IndexInfo),
+            [valid_index | Results0]
+        catch _:_ ->
+            [invalid_index | Results0]
+        end
+    end, [], IdxTypes),
+    lists:member(valid_index, Results).
