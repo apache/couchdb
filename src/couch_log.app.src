@@ -15,5 +15,6 @@
     {vsn, git},
     {modules, [couch_log]},
     {registered, []},
-    {applications, [kernel, stdlib, lager]}
+    {applications, [kernel, stdlib]},
+    {env, [{backend, couch_log_stderr}]}
 ]}.
