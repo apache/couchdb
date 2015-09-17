@@ -770,16 +770,10 @@ end_json_response(Resp) ->
 
 maybe_add_default_headers(ForRequest, ToHeaders) ->
     DefaultHeaders = [
-        {"Content-Type", negotiate_content_type(ForRequest)},
-        {"Cache-Control", "must-revalidate"}
+        {"Cache-Control", "must-revalidate"},
+        {"Content-Type", negotiate_content_type(ForRequest)}
     ],
-    lists:foldl(fun maybe_add_header/2, ToHeaders, DefaultHeaders).
-
-maybe_add_header({HeaderName, HeaderValue}, ToHeaders) ->
-    case lists:keyfind(HeaderName, 1, ToHeaders) of
-        false -> ToHeaders ++ [{HeaderName, HeaderValue}];
-        _Found -> ToHeaders
-    end.
+    lists:ukeymerge(1, lists:keysort(1, ToHeaders), DefaultHeaders).
 
 initialize_jsonp(Req) ->
     case get(jsonp) of
@@ -1134,40 +1128,6 @@ validate_bind_address(Address) ->
 -ifdef(TEST).
 -include_lib("couch/include/couch_eunit.hrl").
 
-maybe_add_header_test_() ->
-    Cases = [
-        {[],                    % initial headers
-         {"K1", "V1"},          % header to add
-          [{"K1", "V1"}],       % expected result
-           "Adding to empty headers"},
-
-        {[{"K1", "V1"}],
-         {"K2", "V2"},
-          [{"K1", "V1"}, {"K2", "V2"}],
-           "Adding header to 1 element headers list"},
-
-        {[{"K1", "V1"}],
-         {"K1", "V2"},
-          [{"K1", "V1"}],
-           "Trying to add same header to 1 element headers list"},
-
-        {[{"K1", "V1"}, {"K2", "V2"}],
-         {"K1", "V2"},
-          [{"K1", "V1"}, {"K2", "V2"}],
-           "Trying to add same header to 2 element headers list"},
-
-        {[{"K1", "V1"}, {"K2", "V2"}],
-         {"K3", "V3"},
-          [{"K1", "V1"}, {"K2", "V2"}, {"K3", "V3"}],
-           "Adding header to 2 elements headers list"}
-    ],
-    Tests = lists:map(fun({InitialHeaders, HeaderToAdd, ProperResult, Desc}) ->
-        {Desc,
-        ?_assertEqual(ProperResult,
-            maybe_add_header(HeaderToAdd, InitialHeaders))}
-    end, Cases),
-    {"Tests adding a header to a list of headers", Tests}.
-
 maybe_add_default_headers_test_() ->
     DummyRequest = [],
     NoCache = {"Cache-Control", "no-cache"},
@@ -1180,7 +1140,7 @@ maybe_add_default_headers_test_() ->
     ApplicationJavascript = {"Content-Type", "application/javascript"},
     Cases = [
         {[],
-         [ApplicationJavascript, MustRevalidate],
+         [MustRevalidate, ApplicationJavascript],
           "Should add Content-Type and Cache-Control to empty heaeders"},
 
         {[NoCache],
@@ -1188,7 +1148,7 @@ maybe_add_default_headers_test_() ->
           "Should add Content-Type only if Cache-Control is present"},
 
         {[ApplicationJson],
-         [ApplicationJson, MustRevalidate],
+         [MustRevalidate, ApplicationJson],
           "Should add Cache-Control if Content-Type is present"},
 
         {[NoCache, ApplicationJson],
