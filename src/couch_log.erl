@@ -15,38 +15,63 @@
 -export([debug/2, info/2, notice/2, warning/2, error/2, critical/2, alert/2, emergency/2]).
 -export([set_level/1]).
 
+-export([behaviour_info/1]).
+
+behaviour_info(callbacks) ->
+    [{debug, 2}, {info, 2}, {notice, 2}, {warning, 2},
+    {error, 2}, {critical, 2}, {alert, 2}, {set_level, 1}];
+behaviour_info(_) ->
+    undefined.
+
 debug(Fmt, Args) ->
+    {ok, Backend} = get_backend(),
     catch couch_stats:increment_counter([couch_log, level, debug]),
-    lager:debug(Fmt, Args).
+    Backend:debug(Fmt, Args).
 
 info(Fmt, Args) ->
+    {ok, Backend} = get_backend(),
     catch couch_stats:increment_counter([couch_log, level, info]),
-    lager:info(Fmt, Args).
+    Backend:info(Fmt, Args).
 
 notice(Fmt, Args) ->
+    {ok, Backend} = get_backend(),
     catch couch_stats:increment_counter([couch_log, level, notice]),
-    lager:notice(Fmt, Args).
+    Backend:notice(Fmt, Args).
 
 warning(Fmt, Args) ->
+    {ok, Backend} = get_backend(),
     catch couch_stats:increment_counter([couch_log, level, warning]),
-    lager:warning(Fmt, Args).
+    Backend:warning(Fmt, Args).
 
 error(Fmt, Args) ->
+    {ok, Backend} = get_backend(),
     catch couch_stats:increment_counter([couch_log, level, 'error']),
-    lager:error(Fmt, Args).
+    Backend:error(Fmt, Args).
 
 critical(Fmt, Args) ->
+    {ok, Backend} = get_backend(),
     catch couch_stats:increment_counter([couch_log, level, critical]),
-    lager:critical(Fmt, Args).
+    Backend:critical(Fmt, Args).
 
 alert(Fmt, Args) ->
+    {ok, Backend} = get_backend(),
     catch couch_stats:increment_counter([couch_log, level, alert]),
-    lager:alert(Fmt, Args).
+    Backend:alert(Fmt, Args).
 
 emergency(Fmt, Args) ->
+    {ok, Backend} = get_backend(),
     catch couch_stats:increment_counter([couch_log, level, emergency]),
-    lager:emergency(Fmt, Args).
+    Backend:emergency(Fmt, Args).
 
 set_level(Level) ->
-    {ok, Handlers} = application:get_env(lager, handlers),
-    [lager:set_loglevel(Handler, Level) || {Handler, _} <- Handlers].
+    {ok, Backend} = application:get_env(?MODULE, backend),
+    Backend:set_level(Level).
+
+get_backend() ->
+    case application:get_env(?MODULE, backend) of
+        undefined ->
+            ok = application:load(?MODULE),
+            get_backend();
+        {ok, Backend} ->
+            {ok, Backend}
+    end.
