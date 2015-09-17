@@ -818,6 +818,8 @@ error_info({error, {illegal_database_name, Name}}) ->
         "digits (0-9), and any of the characters _, $, (, ), +, -, and / ",
         "are allowed. Must begin with a letter.">>,
     {400, <<"illegal_database_name">>, Message};
+error_info({illegal_docid, Reason}) ->
+    {400, <<"illegal_docid">>, Reason};
 error_info({_DocID,{illegal_docid,DocID}}) ->
     {400, <<"illegal_docid">>,DocID};
 error_info({error, {database_name_too_long, DbName}}) ->
