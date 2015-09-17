@@ -116,10 +116,10 @@ error_info_test() ->
                " the characters _, $, (, ), +, -, and / are allowed."
                " Must begin with a letter.">>}
         },
-	{
+        {
             {Error, {illegal_docid,1}},
             {400, <<"illegal_docid">>, 1}
-	},
+        },
         {
             {missing_stub, Reason},
             {412, <<"missing_stub">>, Reason}
