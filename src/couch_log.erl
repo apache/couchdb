@@ -13,6 +13,7 @@
 -module(couch_log).
 
 -export([debug/2, info/2, notice/2, warning/2, error/2, critical/2, alert/2, emergency/2]).
+-export([set_level/1]).
 
 debug(Fmt, Args) ->
     catch couch_stats:increment_counter([couch_log, level, debug]),
@@ -45,3 +46,7 @@ alert(Fmt, Args) ->
 emergency(Fmt, Args) ->
     catch couch_stats:increment_counter([couch_log, level, emergency]),
     lager:emergency(Fmt, Args).
+
+set_level(Level) ->
+    {ok, Handlers} = application:get_env(lager, handlers),
+    [lager:set_loglevel(Handler, Level) || {Handler, _} <- Handlers].
