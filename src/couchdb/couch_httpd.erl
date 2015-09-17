@@ -752,11 +752,8 @@ start_json_response(Req, Code) ->
 
 start_json_response(Req, Code, Headers) ->
     initialize_jsonp(Req),
-    DefaultHeaders = [
-        {"Content-Type", negotiate_content_type(Req)},
-        {"Cache-Control", "must-revalidate"}
-    ],
-    {ok, Resp} = start_chunked_response(Req, Code, DefaultHeaders ++ Headers),
+    AllHeaders = maybe_add_default_headers(Req, Headers),
+    {ok, Resp} = start_chunked_response(Req, Code, AllHeaders),
     case start_jsonp() of
         [] -> ok;
         Start -> send_chunk(Resp, Start)
@@ -766,6 +763,21 @@ start_json_response(Req, Code, Headers) ->
 end_json_response(Resp) ->
     send_chunk(Resp, end_jsonp() ++ [$\n]),
     last_chunk(Resp).
+
+
+maybe_add_default_headers(ForRequest, ToHeaders) ->
+    DefaultHeaders = [
+        {"Content-Type", negotiate_content_type(ForRequest)},
+        {"Cache-Control", "must-revalidate"}
+    ],
+    lists:foldl(fun maybe_add_header/2, ToHeaders, DefaultHeaders).
+
+maybe_add_header({HeaderName, HeaderValue}, ToHeaders) ->
+    case lists:keyfind(HeaderName, 1, ToHeaders) of
+        false -> ToHeaders ++ [{HeaderName, HeaderValue}];
+        _Found -> ToHeaders
+    end.
+
 
 initialize_jsonp(Req) ->
     case get(jsonp) of
