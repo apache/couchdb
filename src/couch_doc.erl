@@ -159,10 +159,10 @@ parse_revs([Rev | Rest]) ->
 
 
 validate_docid(<<"">>) ->
-    throw({bad_request, <<"Document id must not be empty">>});
+    throw({illegal_docid, <<"Document id must not be empty">>});
 validate_docid(Id) when is_binary(Id) ->
     case couch_util:validate_utf8(Id) of
-        false -> throw({bad_request, <<"Document id must be valid UTF-8">>});
+        false -> throw({illegal_docid, <<"Document id must be valid UTF-8">>});
         true -> ok
     end,
     case Id of
@@ -174,14 +174,14 @@ validate_docid(Id) when is_binary(Id) ->
                 ok;
             false ->
                 throw(
-                  {bad_request,
-                      <<"Only reserved document ids may start with underscore.">>})
+                  {illegal_docid,
+                   <<"Only reserved document ids may start with underscore.">>})
         end;
     _Else -> ok
     end;
 validate_docid(Id) ->
     couch_log:debug("Document id is not a string: ~p", [Id]),
-    throw({bad_request, <<"Document id must be a string">>}).
+    throw({illegal_docid, <<"Document id must be a string">>}).
 
 transfer_fields([], #doc{body=Fields}=Doc) ->
     % convert fields back to json object
