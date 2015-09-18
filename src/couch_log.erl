@@ -77,19 +77,12 @@ emergency(Fmt, Args) ->
 
 -spec set_level(atom()) -> ok.
 set_level(Level) ->
-    {ok, Backend} = application:get_env(?MODULE, backend),
+    {ok, Backend} = get_backend(),
     Backend:set_level(Level).
 
 -spec get_backend() -> {ok, atom()}.
 get_backend() ->
-    case application:get_env(?MODULE, backend) of
-        undefined ->
-            ok = application:load(?MODULE),
-            get_backend();
-        {ok, Backend} ->
-            {ok, Backend}
-    end.
-
+    application:get_env(?MODULE, backend).
 
 -ifdef(TEST).
 

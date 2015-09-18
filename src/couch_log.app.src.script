@@ -10,11 +10,33 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
+CouchConfig = case filelib:is_file(os:getenv("COUCHDB_CONFIG")) of
+    true ->
+        {ok, Result} = file:consult(os:getenv("COUCHDB_CONFIG")),
+        Result;
+    false ->
+        []
+end.
+
+Backend = case lists:keyfind(couch_log_backend, 1, CouchConfig) of
+    {couch_log_backend, Backend0} ->
+        Backend0;
+    false ->
+        couch_log_stderr
+end.
+
+BackendApps = case lists:keyfind(couch_log_backend_apps, 1, CouchConfig) of
+    {couch_log_backend_apps, Apps} ->
+        Apps;
+    false ->
+        []
+end.
+
 {application, couch_log, [
     {description, "CouchDB Log API"},
     {vsn, git},
     {modules, [couch_log]},
     {registered, []},
-    {applications, [kernel, stdlib]},
-    {env, [{backend, couch_log_stderr}]}
+    {applications, [kernel, stdlib] ++ BackendApps},
+    {env, [{backend, Backend}]}
 ]}.
