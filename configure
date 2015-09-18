@@ -627,6 +627,8 @@ EOF
 
 cat > $rootdir/config.erl << EOF
 {with_curl, $WITH_CURL}.
+{couch_log_backend, couch_log_lager}.
+{couch_log_backend_apps, [couch_log_lager]}.
 EOF
 
 

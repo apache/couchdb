@@ -20,6 +20,7 @@ DepDescs = [
     {b64url,            "b64url",           {branch, "master"}},
     {cassim,            "cassim",           {branch, "master"}},
     {couch_log,         "couch-log",        {branch, "master"}},
+    {couch_log_lager,   "couch-log-lager",  {branch, "master"}},
     {config,            "config",           {branch, "master"}},
     {chttpd,            "chttpd",           {branch, "master"}},
     {couch,             "couch",            {branch, "master"}},
