@@ -112,7 +112,15 @@ code_change(_OldVsn, State, _Extra) ->
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
 
-reload_if_updated(#state{hash = OldHash, modules = Modules} = State) ->
+reload_if_updated(#state{handle = Module} = State) ->
+    case couch_epi_util:module_exists(Module) of
+        true ->
+            do_reload_if_updated(State);
+        false ->
+            {ok, State}
+    end.
+
+do_reload_if_updated(#state{hash = OldHash, modules = Modules} = State) ->
     case couch_epi_functions_gen:hash(Modules) of
         OldHash ->
             {ok, State};

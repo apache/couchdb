@@ -144,7 +144,15 @@ ensure_exists(FilePath) ->
             {error, {notfound, FilePath}}
     end.
 
-reload_if_updated(#state{hash = OldHash, locator = Locator} = State) ->
+reload_if_updated(#state{handle = Module} = State) ->
+    case couch_epi_util:module_exists(Module) of
+        true ->
+            do_reload_if_updated(State);
+        false ->
+            {ok, State}
+    end.
+
+do_reload_if_updated(#state{hash = OldHash, locator = Locator} = State) ->
     case read(Locator) of
         {ok, OldHash, _Data} ->
             {ok, State};
