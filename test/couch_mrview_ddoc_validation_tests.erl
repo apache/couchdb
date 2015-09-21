@@ -36,7 +36,34 @@ ddoc_validation_test_() ->
                 [
                     fun should_reject_invalid_js_map/1,
                     fun should_reject_invalid_js_reduce/1,
-                    fun should_reject_invalid_builtin_reduce/1
+                    fun should_reject_invalid_builtin_reduce/1,
+                    fun should_reject_non_object_options/1,
+                    fun should_reject_non_object_filters/1,
+                    fun should_reject_non_object_lists/1,
+                    fun should_reject_non_object_shows/1,
+                    fun should_reject_non_object_updates/1,
+                    fun should_reject_non_object_views/1,
+                    fun should_reject_non_string_language/1,
+                    fun should_reject_non_string_validate_doc_update/1,
+                    fun should_reject_non_array_rewrites/1,
+                    fun should_accept_option/1,
+                    fun should_accept_any_option/1,
+                    fun should_accept_filter/1,
+                    fun should_reject_non_string_filter_function/1,
+                    fun should_accept_list/1,
+                    fun should_reject_non_string_list_function/1,
+                    fun should_accept_show/1,
+                    fun should_reject_non_string_show_function/1,
+                    fun should_accept_update/1,
+                    fun should_reject_non_string_update_function/1,
+                    fun should_accept_view/1,
+                    fun should_accept_view_with_reduce/1,
+                    fun should_accept_view_with_lib/1,
+                    fun should_reject_view_that_is_not_an_object/1,
+                    fun should_reject_view_without_map_function/1,
+                    fun should_reject_view_with_non_string_map_function/1,
+                    fun should_reject_view_with_non_string_reduce_function/1,
+                    fun should_accept_any_in_lib/1
                 ]
             }
         }
@@ -82,3 +109,257 @@ should_reject_invalid_builtin_reduce(Db) ->
     ?_assertThrow(
         {bad_request, invalid_design_doc, _},
         couch_db:update_doc(Db, Doc, [])).
+
+should_reject_non_object_options(Db) ->
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/should_reject_non_object_options">>},
+        {<<"options">>, <<"invalid">>}
+    ]}),
+    ?_assertThrow({bad_request,invalid_design_doc,
+                   <<"`options` is not an object">>},
+                  couch_db:update_doc(Db, Doc, [])).
+
+should_reject_non_object_filters(Db) ->
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/should_reject_non_object_filters">>},
+        {<<"filters">>, <<"invalid">>}
+    ]}),
+    ?_assertThrow({bad_request,invalid_design_doc,
+                   <<"`filters` is not an object">>},
+                  couch_db:update_doc(Db, Doc, [])).
+
+should_reject_non_object_lists(Db) ->
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/should_reject_non_object_lists">>},
+        {<<"lists">>, <<"invalid">>}
+    ]}),
+    ?_assertThrow({bad_request,invalid_design_doc,
+                   <<"`lists` is not an object">>},
+                  couch_db:update_doc(Db, Doc, [])).
+
+should_reject_non_object_shows(Db) ->
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/should_reject_non_object_shows">>},
+        {<<"shows">>, <<"invalid">>}
+    ]}),
+    ?_assertThrow({bad_request,invalid_design_doc,
+                   <<"`shows` is not an object">>},
+                  couch_db:update_doc(Db, Doc, [])).
+
+should_reject_non_object_updates(Db) ->
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/should_reject_non_object_updates">>},
+        {<<"updates">>, <<"invalid">>}
+    ]}),
+    ?_assertThrow({bad_request,invalid_design_doc,
+                   <<"`updates` is not an object">>},
+                  couch_db:update_doc(Db, Doc, [])).
+
+should_reject_non_object_views(Db) ->
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/should_reject_non_object_views">>},
+        {<<"views">>, <<"invalid">>}
+    ]}),
+    ?_assertThrow({bad_request,invalid_design_doc,
+                   <<"`views` is not an object">>},
+                  couch_db:update_doc(Db, Doc, [])).
+
+should_reject_non_string_language(Db) ->
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/should_reject_non_string_language">>},
+        {<<"language">>, 1}
+    ]}),
+    ?_assertThrow({bad_request,invalid_design_doc,
+                   <<"`language` in design doc is not a string">>},
+                  couch_db:update_doc(Db, Doc, [])).
+
+should_reject_non_string_validate_doc_update(Db) ->
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/should_reject_non_string_vdu">>},
+        {<<"validate_doc_update">>, 1}
+    ]}),
+    ?_assertThrow({bad_request,invalid_design_doc,
+                   <<"`validate_doc_update` in design doc is not a string">>},
+                  couch_db:update_doc(Db, Doc, [])).
+
+should_reject_non_array_rewrites(Db) ->
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/should_reject_non_array_rewrites">>},
+        {<<"rewrites">>, <<"invalid">>}
+    ]}),
+    ?_assertThrow({bad_request,invalid_design_doc,
+                   <<"`rewrites` is not an array">>},
+                  couch_db:update_doc(Db, Doc, [])).
+
+should_accept_option(Db) ->
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/should_accept_options">>},
+        {<<"options">>, {[ {<<"option1">>, <<"function(doc,req){}">>} ]}}
+    ]}),
+    ?_assertMatch({ok,_}, couch_db:update_doc(Db, Doc, [])).
+
+should_accept_any_option(Db) ->
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/should_accept_any_option">>},
+        {<<"options">>, {[ {<<"option1">>, true} ]}}
+    ]}),
+    ?_assertMatch({ok,_}, couch_db:update_doc(Db, Doc, [])).
+
+should_accept_filter(Db) ->
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/should_accept_filters">>},
+        {<<"filters">>, {[ {<<"filter1">>, <<"function(doc,req){}">>} ]}}
+    ]}),
+    ?_assertMatch({ok,_}, couch_db:update_doc(Db, Doc, [])).
+
+should_reject_non_string_filter_function(Db) ->
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/should_reject_non_string_filter_function">>},
+        {<<"filters">>, {[ {<<"filter1">>, 1} ]}}
+    ]}),
+    ?_assertThrow({bad_request,invalid_design_doc,
+                  <<"`filter1` in filters is not a string">> },
+                  couch_db:update_doc(Db, Doc, [])).
+
+should_accept_list(Db) ->
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/should_accept_lists">>},
+        {<<"lists">>, {[ {<<"list1">>, <<"function(doc,req){}">>} ]}}
+    ]}),
+    ?_assertMatch({ok,_}, couch_db:update_doc(Db, Doc, [])).
+
+should_reject_non_string_list_function(Db) ->
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/should_reject_non_string_list_function">>},
+        {<<"lists">>, {[ {<<"list1">>, 1} ]}}
+    ]}),
+    ?_assertThrow({bad_request,invalid_design_doc,
+                  <<"`list1` in lists is not a string">> },
+                  couch_db:update_doc(Db, Doc, [])).
+
+should_accept_show(Db) ->
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/should_accept_shows">>},
+        {<<"shows">>, {[ {<<"show1">>, <<"function(doc,req){}">>} ]}}
+    ]}),
+    ?_assertMatch({ok,_}, couch_db:update_doc(Db, Doc, [])).
+
+should_reject_non_string_show_function(Db) ->
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/should_reject_non_string_show_function">>},
+        {<<"shows">>, {[ {<<"show1">>, 1} ]}}
+    ]}),
+    ?_assertThrow({bad_request,invalid_design_doc,
+                  <<"`show1` in shows is not a string">> },
+                  couch_db:update_doc(Db, Doc, [])).
+
+should_accept_update(Db) ->
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/should_accept_updates">>},
+        {<<"updates">>, {[ {<<"update1">>, <<"function(doc,req){}">>} ]}}
+    ]}),
+    ?_assertMatch({ok,_}, couch_db:update_doc(Db, Doc, [])).
+
+should_reject_non_string_update_function(Db) ->
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/should_reject_non_string_update_function">>},
+        {<<"updates">>, {[ {<<"update1">>, 1} ]}}
+    ]}),
+    ?_assertThrow({bad_request,invalid_design_doc,
+                  <<"`update1` in updates is not a string">> },
+                  couch_db:update_doc(Db, Doc, [])).
+
+should_accept_view(Db) ->
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/should_accept_view">>},
+        {<<"views">>, {[
+                         {<<"view1">>, {[{<<"map">>, <<"function(d){}">>}]}}
+                       ]}}
+    ]}),
+    ?_assertMatch({ok,_}, couch_db:update_doc(Db, Doc, [])).
+
+should_accept_view_with_reduce(Db) ->
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/should_accept_view_with_reduce">>},
+        {<<"views">>, {[
+                         {<<"view1">>, {[
+                                         {<<"map">>, <<"function(d){}">>},
+                                         {<<"reduce">>,<<"function(d){}">>}
+                                        ]}}
+                       ]}}
+    ]}),
+    ?_assertMatch({ok,_}, couch_db:update_doc(Db, Doc, [])).
+
+should_accept_view_with_lib(Db) ->
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/should_accept_view_with_lib">>},
+        {<<"views">>, {[
+                         {<<"view1">>, {[
+                                         {<<"map">>, <<"function(d){}">>}
+                                        ]}},
+                         {<<"lib">>, {[
+                                         {<<"lib1">>, <<"x=42">>}
+                                      ]}}
+                       ]}}
+    ]}),
+    ?_assertMatch({ok,_}, couch_db:update_doc(Db, Doc, [])).
+
+should_reject_view_that_is_not_an_object(Db) ->
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/should_reject_non_object_view">>},
+        {<<"views">>, {[{<<"view1">>, <<"thisisbad">>}]}}
+    ]}),
+    ?_assertThrow({bad_request,invalid_design_doc,
+                  <<"View view1 must be an object">>},
+                  couch_db:update_doc(Db, Doc, [])).
+
+should_reject_view_without_map_function(Db) ->
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/should_accept_view_without_map">>},
+        {<<"views">>, {[
+                         {<<"view1">>, {[]}}
+                       ]}}
+    ]}),
+    ?_assertThrow({bad_request,invalid_design_doc,
+                  <<"View view1 must have a map function">>},
+                  couch_db:update_doc(Db, Doc, [])).
+
+
+should_reject_view_with_non_string_map_function(Db) ->
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/should_reject_view_with_nonstr_map">>},
+        {<<"views">>, {[
+                         {<<"view1">>, {[
+                                         {<<"map">>,{[]}}
+                                        ]}}
+                       ]}}
+    ]}),
+    ?_assertThrow({bad_request,invalid_design_doc,
+                  <<"`map` in view1 must be a string">>},
+                  couch_db:update_doc(Db, Doc, [])).
+
+should_reject_view_with_non_string_reduce_function(Db) ->
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/should_reject_view_with_nonstr_reduce">>},
+        {<<"views">>, {[
+                         {<<"view1">>, {[
+                                         {<<"map">>,<<"function(d){}">>},
+                                         {<<"reduce">>,1}
+                                        ]}}
+                       ]}}
+    ]}),
+    ?_assertThrow({bad_request,invalid_design_doc,
+                  <<"`reduce` in view1 must be a string">>},
+                  couch_db:update_doc(Db, Doc, [])).
+
+should_accept_any_in_lib(Db) ->
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/should_accept_any_in_lib">>},
+        {<<"views">>, {[
+                         {<<"view1">>, {[
+                                         {<<"map">>, <<"function(d){}">>}
+                                        ]}},
+                         {<<"lib">>, {[{<<"lib1">>, {[]}}]}}
+                       ]}}
+    ]}),
+    ?_assertMatch({ok,_}, couch_db:update_doc(Db, Doc, [])).

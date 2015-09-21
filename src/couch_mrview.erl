@@ -46,16 +46,104 @@
 }).
 
 
-validate(DbName, DDoc) ->
+
+%% Validate "views" name : value mapping.
+%%
+%% In the most common case name is the view name and
+%% value is an object that must have a "map" function,
+%% and an optional "reduce" function. "map" and "reduce"
+%% values should be strings (function contents).
+%%
+%% "lib" is a special case. The value
+%% of "lib" is an object that will contain libary code
+%% so it not validated.
+%%
+validate_view(<<"lib">>, {Libs})->
+    ok;
+validate_view(VName, {Views}) ->
+    case couch_util:get_value(<<"map">>, Views) of
+        MapVal when is_binary(MapVal) ->
+            ok;
+        undefined ->
+            Err0 = <<"View ",VName/binary, " must have a map function">>,
+            throw ({invalid_design_doc, Err0});
+        _ ->
+            Err1 = <<"`map` in ", VName/binary, " must be a string">>,
+            throw({invalid_design_doc, Err1})
+    end,
+    case couch_util:get_value(<<"reduce">>, Views) of
+        RedVal when is_binary(RedVal) ->
+            ok;
+        undefined ->
+            ok; % note: unlike map,  reduce function is optional
+        _ ->
+            Err2 = <<"`reduce` in ", VName/binary, " must be a string">>,
+            throw({invalid_design_doc, Err2})
+    end,
+    ok;
+validate_view(VName, _) ->
+    throw({invalid_design_doc, <<"View ", VName/binary, " must be an object">>}).
+
+
+%% Validate top level design document objects.
+%%
+%% Most cases (shows,lists,filters,...) will be
+%% function_name : function_contents(string) mappings.
+%% For example, lists can look like:
+%% {
+%%    "lst1" : "function(head, req){...}",
+%%    "lst2" : "function(head, req){...}"
+%% }
+%%
+%% With 2 excpetions:
+%%  - views :  Validated by a special function.
+%%  - options : Allowed to contain non-string values.
+%%
+validate_opt_object(<<"views">>, {Views})->
+    [validate_view(VName, ViewObj) || {VName, ViewObj} <- Views],
+    ok;
+validate_opt_object(<<"options">>, {_})->
+    ok;
+validate_opt_object(Section, {Fields}) ->
+    [validate_opt_string(FName, FVal, Section) || {FName, FVal} <- Fields],
+    ok;
+validate_opt_object(_, undefined) ->
+    ok;
+validate_opt_object(FieldName, _) ->
+    throw({invalid_design_doc, <<"`", FieldName/binary, "` is not an object">>}).
+
+
+%% If this field value is present, it must be a string
+validate_opt_string(FName, FVal)->
+    validate_opt_string(FName, FVal, <<"design doc">>).
+
+validate_opt_string(_, FVal, _) when is_binary(FVal) ->
+    ok;
+validate_opt_string(_, undefined, _) ->
+    ok;
+validate_opt_string(FName, _, Section) ->
+    ErrMsg = <<"`", FName/binary, "` in ", Section/binary, " is not a string">>,
+    throw({invalid_design_doc, ErrMsg}).
+
+
+%% If this field is present it, must be an array
+validate_opt_array(_, ArrVal) when is_list(ArrVal) ->
+    ok;
+validate_opt_array(_, undefined) ->
+    ok;
+validate_opt_array(FieldName, _) ->
+    throw({invalid_design_doc, <<"`", FieldName/binary, "` is not an array">>}).
+
+
+validate(DbName,  DDoc) ->
     {Fields} = DDoc#doc.body,
-    case couch_util:get_value(<<"options">>, Fields, {[]}) of
-        {_} -> ok;
-        _ -> throw({invalid_design_doc, <<"`options` parameter must be an object.">>})
-    end,
-    case couch_util:get_value(<<"views">>, Fields, {[]}) of
-        {_} -> ok;
-        _ -> throw({invalid_design_doc, <<"`views` parameter must be an object.">>})
-    end,
+    ObjFields =  [<<"options">>, <<"filters">>, <<"lists">>,
+                  <<"shows">>, <<"updates">>, <<"views">>],
+    StringFields = [<<"language">>, <<"validate_doc_update">>],
+    ArrayFields = [<<"rewrites">>],
+    [validate_opt_object(F, couch_util:get_value(F, Fields)) || F <- ObjFields],
+    [validate_opt_string(F, couch_util:get_value(F, Fields)) || F <- StringFields],
+    [validate_opt_array(F, couch_util:get_value(F, Fields))  || F <- ArrayFields],
     GetName = fun
         (#mrview{map_names = [Name | _]}) -> Name;
         (#mrview{reduce_funs = [{Name, _} | _]}) -> Name;
