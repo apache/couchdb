@@ -23,14 +23,19 @@
 go(DbName, Options) ->
     case validate_dbname(DbName, Options) of
     ok ->
-        {Shards, Doc} = generate_shard_map(DbName, Options),
-        case {create_shard_files(Shards), create_shard_db_doc(Doc)} of
-        {ok, {ok, Status}} ->
-            Status;
-        {file_exists, {ok, _}} ->
+        case db_exists(DbName) of
+        true ->
             {error, file_exists};
-        {_, Error} ->
-            Error
+        false ->
+            {Shards, Doc} = generate_shard_map(DbName, Options),
+            case {create_shard_files(Shards), create_shard_db_doc(Doc)} of
+            {ok, {ok, Status}} ->
+                Status;
+            {file_exists, {ok, _}} ->
+                {error, file_exists};
+            {_, Error} ->
+                Error
+            end
         end;
     Error ->
         Error
@@ -155,3 +160,35 @@ make_document([#shard{dbname=DbName}|_] = Shards, Suffix) ->
         {<<"by_range">>, {[{K,lists:sort(V)} || {K,V} <- ByRangeOut]}}
     ]}}.
 
+db_exists(DbName) -> is_list(catch mem3:shards(DbName)).
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+db_exists_for_existing_db_test() ->
+    start_meck_(),
+    Mock = fun(DbName) when is_binary(DbName) ->
+        [#shard{dbname = DbName, range = [0,100]}]
+    end,
+    ok = meck:expect(mem3, shards, Mock),
+    ?assertEqual(db_exists(<<"foobar">>), true),
+    ?assertEqual(meck:validate(mem3), true),
+    stop_meck_().
+
+db_exists_for_missing_db_test() ->
+    start_meck_(),
+    Mock = fun(DbName) ->
+        erlang:error(database_does_not_exist, DbName)
+    end,
+    ok = meck:expect(mem3, shards, Mock),
+    ?assertEqual(db_exists(<<"foobar">>), false),
+    ?assertEqual(meck:validate(mem3), false),
+    stop_meck_().
+
+start_meck_() ->
+    ok = meck:new(mem3).
+
+stop_meck_() ->
+    ok = meck:unload(mem3).
+
+-endif.
