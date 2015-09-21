@@ -26,6 +26,8 @@ Backend = case lists:keyfind(couch_log_backend, 1, CouchConfig) of
 end.
 
 BackendApps = case lists:keyfind(couch_log_backend_apps, 1, CouchConfig) of
+    {couch_log_backend_apps, {list, Apps}} ->
+        Apps;
     {couch_log_backend_apps, Apps} ->
         Apps;
     false ->
