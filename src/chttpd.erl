@@ -820,6 +820,9 @@ error_info({error, {illegal_database_name, Name}}) ->
     {400, <<"illegal_database_name">>, Message};
 error_info({_DocID,{illegal_docid,DocID}}) ->
     {400, <<"illegal_docid">>,DocID};
+error_info({error, {database_name_too_long, DbName}}) ->
+    {400, <<"database_name_too_long">>,
+        <<"At least one path segment of `", DbName/binary, "` is too long.">>};
 error_info({missing_stub, Reason}) ->
     {412, <<"missing_stub">>, Reason};
 error_info(request_entity_too_large) ->
