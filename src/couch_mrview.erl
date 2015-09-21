@@ -58,7 +58,7 @@
 %% of "lib" is an object that will contain libary code
 %% so it not validated.
 %%
-validate_view(<<"lib">>, {Libs})->
+validate_view(<<"lib">>, {_Libs})->
     ok;
 validate_view(VName, {Views}) ->
     case couch_util:get_value(<<"map">>, Views) of
