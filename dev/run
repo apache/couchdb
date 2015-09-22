@@ -115,6 +115,8 @@ def setup_argparse():
                       help='HAProxy executable path')
     parser.add_option('--haproxy-port', dest='haproxy_port', default='5984',
                       help='HAProxy port')
+    parser.add_option('--node-number', dest="node_number", type=int, default=1,
+                      help='The node number to seed them when creating the node(s)')
     return parser.parse_args()
 
 
@@ -124,7 +126,8 @@ def setup_context(opts, args):
             'no_join': opts.no_join,
             'with_admin_party': opts.with_admin_party,
             'admin': opts.admin.split(':', 1) if opts.admin else None,
-            'nodes': ['node%d' % (i + 1) for i in range(opts.nodes)],
+            'nodes': ['node%d' % (i + opts.node_number) for i in range(opts.nodes)],
+            'node_number': opts.node_number,
             'devdir': os.path.dirname(fpath),
             'rootdir': os.path.dirname(os.path.dirname(fpath)),
             'cmd': ' '.join(args),
@@ -157,7 +160,7 @@ def check_beams(ctx):
 @log('Prepare configuration files')
 def setup_configs(ctx):
     for idx, node in enumerate(ctx['nodes']):
-        cluster_port, backend_port = get_ports(idx + 1)
+        cluster_port, backend_port = get_ports(idx + ctx['node_number'])
         env = {
             "prefix": ctx['rootdir'],
             "package_author_name": "The Apache Software Foundation",
@@ -321,7 +324,7 @@ def ensure_all_nodes_alive(ctx):
         for num in range(ctx['N']):
             if status[num]:
                 continue
-            local_port, _ = get_ports(num + 1)
+            local_port, _ = get_ports(num + ctx['node_number'])
             url = "http://127.0.0.1:{0}/".format(local_port)
             try:
                 check_node_alive(url)
