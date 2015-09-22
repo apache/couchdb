@@ -28,13 +28,19 @@ go(DbName, Options) ->
             {error, file_exists};
         false ->
             {Shards, Doc} = generate_shard_map(DbName, Options),
-            case {create_shard_files(Shards), create_shard_db_doc(Doc)} of
-            {ok, {ok, Status}} ->
-                Status;
-            {file_exists, {ok, _}} ->
-                {error, file_exists};
-            {_, Error} ->
-                Error
+            CreateShardResult = create_shard_files(Shards),
+            case CreateShardResult of
+            enametoolong ->
+                {error, {database_name_too_long, DbName}};
+            _ ->
+                case {CreateShardResult, create_shard_db_doc(Doc)} of
+                {ok, {ok, Status}} ->
+                    Status;
+                {file_exists, {ok, _}} ->
+                    {error, file_exists};
+                {_, Error} ->
+                    Error
+                end
             end
         end;
     Error ->
@@ -68,6 +74,8 @@ create_shard_files(Shards) ->
     try fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Workers) of
     {error, file_exists} ->
         file_exists;
+    {error, enametoolong} ->
+        enametoolong;
     {timeout, DefunctWorkers} ->
         fabric_util:log_timeout(DefunctWorkers, "create_db"),
         {error, timeout};
@@ -76,6 +84,9 @@ create_shard_files(Shards) ->
     after
         rexi_monitor:stop(RexiMon)
     end.
+
+handle_message({error, enametoolong}, _, _) ->
+    {error, enametoolong};
 
 handle_message(file_exists, _, _) ->
     {error, file_exists};
