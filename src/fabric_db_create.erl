@@ -182,8 +182,8 @@ db_exists_for_existing_db_test() ->
         [#shard{dbname = DbName, range = [0,100]}]
     end,
     ok = meck:expect(mem3, shards, Mock),
-    ?assertEqual(db_exists(<<"foobar">>), true),
-    ?assertEqual(meck:validate(mem3), true),
+    ?assertEqual(true, db_exists(<<"foobar">>)),
+    ?assertEqual(true, meck:validate(mem3)),
     stop_meck_().
 
 db_exists_for_missing_db_test() ->
@@ -192,8 +192,8 @@ db_exists_for_missing_db_test() ->
         erlang:error(database_does_not_exist, DbName)
     end,
     ok = meck:expect(mem3, shards, Mock),
-    ?assertEqual(db_exists(<<"foobar">>), false),
-    ?assertEqual(meck:validate(mem3), false),
+    ?assertEqual(false, db_exists(<<"foobar">>)),
+    ?assertEqual(false, meck:validate(mem3)),
     stop_meck_().
 
 start_meck_() ->
