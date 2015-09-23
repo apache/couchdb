@@ -122,7 +122,7 @@ append_binary(Fd, Bin) ->
     
 append_binary_md5(Fd, Bin) ->
     ioq:call(Fd,
-        {append_bin, assemble_file_chunk(Bin, couch_util:md5(Bin))},
+        {append_bin, assemble_file_chunk(Bin, couch_crypto:hash(md5, Bin))},
         erlang:get(io_priority)).
 
 append_raw_chunk(Fd, Chunk) ->
@@ -165,7 +165,7 @@ pread_iolist(Fd, Pos) ->
     {ok, IoList, <<>>} ->
         {ok, IoList};
     {ok, IoList, Md5} ->
-        case couch_util:md5(IoList) of
+        case couch_crypto:hash(md5, IoList) of
         Md5 ->
             {ok, IoList};
         _ ->
@@ -279,7 +279,7 @@ read_header(Fd) ->
 
 write_header(Fd, Data) ->
     Bin = term_to_binary(Data),
-    Md5 = couch_util:md5(Bin),
+    Md5 = couch_crypto:hash(md5, Bin),
     % now we assemble the final header binary and write to disk
     FinalBin = <<Md5/binary, Bin/binary>>,
     ioq:call(Fd, {write_header, FinalBin}, erlang:get(io_priority)).
@@ -488,7 +488,7 @@ load_header(Fd, Block) ->
     end,
     <<Md5Sig:16/binary, HeaderBin/binary>> =
         iolist_to_binary(remove_block_prefixes(5, RawBin)),
-    Md5Sig = couch_util:md5(HeaderBin),
+    Md5Sig = couch_crypto:hash(md5, HeaderBin),
     {ok, HeaderBin}.
 
 maybe_read_more_iolist(Buffer, DataSize, _, _)

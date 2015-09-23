@@ -16,7 +16,7 @@
 
 generate(Alg, Key, Counter, OutputLen)
   when is_atom(Alg), is_binary(Key), is_integer(Counter), is_integer(OutputLen) ->
-    Hmac = hmac(Alg, Key, <<Counter:64>>),
+    Hmac = couch_crypto:hmac(Alg, Key, <<Counter:64>>),
     Offset = binary:last(Hmac) band 16#f,
     Code =
         ((binary:at(Hmac, Offset) band 16#7f) bsl 24) +
@@ -27,14 +27,4 @@ generate(Alg, Key, Counter, OutputLen)
         6 -> Code rem 1000000;
         7 -> Code rem 10000000;
         8 -> Code rem 100000000
-    end.
-
-hmac(Alg, Key, Data) ->
-    case {Alg, erlang:function_exported(crypto, hmac, 3)} of
-        {_, true} ->
-            crypto:hmac(Alg, Key, Data);
-        {sha, false} ->
-            crypto:sha_mac(Key, Data);
-        {Alg, false} ->
-            throw({unsupported, Alg})
     end.
