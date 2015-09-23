@@ -91,7 +91,7 @@ callbacks_test_() ->
         fun setup/0,
         fun cleanup/1,
         [
-            ?_assertEqual({ok, couch_log_stderr}, get_backend()),
+            ?_assertMatch({ok, _}, get_backend()),
             ?_assertEqual(ok, couch_log:debug("message", [])),
             ?_assertEqual(ok, couch_log:info("message", [])),
             ?_assertEqual(ok, couch_log:notice("message", [])),
@@ -107,9 +107,22 @@ callbacks_test_() ->
 setup() ->
     meck:new([couch_stats]),
     meck:expect(couch_stats, increment_counter, fun(_) -> ok end),
-    application:load(?MODULE).
+    start().
 
-cleanup(_) ->
+start() ->
+    start([], couch_log).
+
+start(Acc, App) ->
+    case application:start(App) of
+        ok ->
+            [App | Acc];
+        {error, {not_started, Dep}} ->
+            Acc1 = start(Acc, Dep),
+            start(Acc1, App)
+    end.
+
+cleanup(Deps) ->
+    [application:stop(Dep) || Dep <- Deps],
     meck:unload([couch_stats]).
 
 -endif.
