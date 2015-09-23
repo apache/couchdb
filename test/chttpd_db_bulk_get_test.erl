@@ -126,7 +126,7 @@ should_validate_doc_with_bad_id(Pid) ->
 
     ?_assertMatch({[{<<"id">>, DocId},
                     {<<"rev">>, null},
-                    {<<"error">>, <<"bad_request">>},
+                    {<<"error">>, <<"illegal_docid">>},
                     {<<"reason">>, _}]},
                   Doc).
 
