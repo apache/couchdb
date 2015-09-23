@@ -325,7 +325,7 @@ get_idx_name(Idx, Opts) ->
 gen_name(Idx, Opts0) ->
     Opts = lists:usort(Opts0),
     TermBin = term_to_binary({Idx, Opts}),
-    Sha = crypto:sha(TermBin),
+    Sha = couch_crypto:hash(sha, TermBin),
     mango_util:enc_hex(Sha).
 
 
