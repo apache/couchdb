@@ -75,16 +75,16 @@ find_att([Att | Rest], Name) ->
 att_md5(Att) ->
     Md50 = couch_att:foldl(
         Att,
-        fun(Chunk, Acc) -> couch_util:md5_update(Acc, Chunk) end,
-        couch_util:md5_init()),
-    couch_util:md5_final(Md50).
+        fun(Chunk, Acc) -> couch_crypto:hash_update(md5, Acc, Chunk) end,
+        couch_crypto:hash_init(md5)),
+    couch_crypto:hash_final(md5, Md50).
 
 att_decoded_md5(Att) ->
     Md50 = couch_att:foldl_decode(
         Att,
-        fun(Chunk, Acc) -> couch_util:md5_update(Acc, Chunk) end,
-        couch_util:md5_init()),
-    couch_util:md5_final(Md50).
+        fun(Chunk, Acc) -> couch_crypto:hash_update(md5, Acc, Chunk) end,
+        couch_crypto:hash_init(md5)),
+    couch_crypto:hash_final(md5, Md50).
 
 db_url(DbName) ->
     iolist_to_binary([

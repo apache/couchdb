@@ -130,7 +130,7 @@ maybe_append_filters(Base,
             [filter_code(Filter, Source, UserCtx),
                 get_value(query_params, Options, {[]})]
         end,
-    couch_util:to_hex(couch_util:md5(term_to_binary(Base2))).
+    couch_util:to_hex(couch_crypto:hash(md5, term_to_binary(Base2))).
 
 
 filter_code(Filter, Source, UserCtx) ->
