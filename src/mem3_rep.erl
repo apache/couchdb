@@ -106,8 +106,8 @@ make_local_id(#shard{node=SourceNode}, #shard{node=TargetNode}, Filter) ->
 
 
 make_local_id(SourceThing, TargetThing, Filter) ->
-    S = couch_util:encodeBase64Url(couch_util:md5(term_to_binary(SourceThing))),
-    T = couch_util:encodeBase64Url(couch_util:md5(term_to_binary(TargetThing))),
+    S = couch_util:encodeBase64Url(couch_crypto:hash(md5, term_to_binary(SourceThing))),
+    T = couch_util:encodeBase64Url(couch_crypto:hash(md5, term_to_binary(TargetThing))),
     F = case is_function(Filter) of
         true ->
             {new_uniq, Hash} = erlang:fun_info(Filter, new_uniq),
@@ -307,7 +307,7 @@ update_locals(Acc) ->
 
 find_repl_doc(SrcDb, TgtUUIDPrefix) ->
     SrcUUID = couch_db:get_uuid(SrcDb),
-    S = couch_util:encodeBase64Url(couch_util:md5(term_to_binary(SrcUUID))),
+    S = couch_util:encodeBase64Url(couch_crypto:hash(md5, term_to_binary(SrcUUID))),
     DocIdPrefix = <<"_local/shard-sync-", S/binary, "-">>,
     FoldFun = fun({DocId, {Rev0, {BodyProps}}}, _, _) ->
         TgtUUID = couch_util:get_value(<<"target_uuid">>, BodyProps, <<>>),
