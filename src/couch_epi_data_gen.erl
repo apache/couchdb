@@ -18,21 +18,13 @@
 %% To get an idea about he code of the generated module see preamble()
 
 -export([get_handle/1]).
--export([set/3, get/1, get/2, get/3]).
+-export([get/1, get/2, get/3]).
+-export([generate/2]).
 -export([by_key/1, by_key/2]).
 -export([by_source/1, by_source/2]).
 -export([keys/1, subscribers/1]).
 
--export([save/3]).
--export([current_data/2]).
-
-set(Handle, Source, Data) ->
-    case is_updated(Handle, Source, Data) of
-        false ->
-            ok;
-        true ->
-            couch_epi_module_keeper:save(Handle, Source, Data)
-    end.
+-export([get_current_definitions/1]).
 
 get(Handle) ->
     Handle:all().
@@ -173,36 +165,8 @@ version(Source, Data) ->
 module_name({Service, Key}) when is_list(Service) andalso is_list(Key) ->
     list_to_atom(string:join([atom_to_list(?MODULE), Service, Key], "_")).
 
-is_updated(Handle, Source, Data) ->
-    Sig = couch_epi_util:hash(Data),
-    if_exists(Handle, version, 1, true, fun() ->
-        try Handle:version(Source) of
-            {error, {unknown, Source}} -> true;
-            {error, Reason} -> throw(Reason);
-            Sig -> false;
-            _ -> true
-        catch
-            Class:Reason ->
-                throw({Class, {Source, Reason}})
-        end
-    end).
 
-save(Handle, undefined, []) ->
-    case current_data(Handle) of
-        [] -> generate(Handle, []);
-        _Else -> ok
-    end;
-save(Handle, Source, Data) ->
-    CurrentData = current_data(Handle),
-    NewDefs = lists:keystore(Source, 1, CurrentData, {Source, Data}),
-    generate(Handle, NewDefs).
-
-current_data(Handle, Subscriber) ->
-    if_exists(Handle, by_source, 1, [], fun() ->
-        Handle:by_source(Subscriber)
-    end).
-
-current_data(Handle) ->
+get_current_definitions(Handle) ->
     if_exists(Handle, by_source, 0, [], fun() ->
         Handle:by_source()
     end).
@@ -237,76 +201,66 @@ fold_defs(Defs, Acc, Fun) ->
 -include_lib("eunit/include/eunit.hrl").
 
 basic_test() ->
-    try
-        Module = foo_bar_baz_bugz,
+    Module = foo_bar_baz_bugz,
 
-        meck:new(couch_epi_module_keeper, [passthrough]),
-        meck:expect(couch_epi_module_keeper, save, fun
-            (Handle, Source, Modules) -> save(Handle, Source, Modules)
-        end),
+    Data1 = [some_nice_data],
+    Data2 = "other data",
+    Data3 = {"even more data"},
+    Defs1 = [{foo, Data1}],
+    Defs2 = lists:usort([{foo, Data2}, {bar, Data3}]),
 
-        Data1 = [some_nice_data],
-        Data2 = "other data",
-        Data3 = {"even more data"},
-        Defs1 = [{foo, Data1}],
-        Defs2 = lists:usort([{foo, Data2}, {bar, Data3}]),
+    Defs = [{app1, Defs1}, {app2, Defs2}],
+    generate(Module, Defs),
 
-        set(Module, app1, Defs1),
-        set(Module, app2, Defs2),
+    ?assertEqual([bar, foo], lists:usort(Module:keys())),
+    ?assertEqual([app1, app2], lists:usort(Module:subscribers())),
 
-        ?assertEqual([bar, foo], lists:usort(Module:keys())),
-        ?assertEqual([app1, app2], lists:usort(Module:subscribers())),
+    ?assertEqual(Data1, Module:get(app1, foo)),
+    ?assertEqual(Data2, Module:get(app2, foo)),
+    ?assertEqual(Data3, Module:get(app2, bar)),
 
-        ?assertEqual(Data1, Module:get(app1, foo)),
-        ?assertEqual(Data2, Module:get(app2, foo)),
-        ?assertEqual(Data3, Module:get(app2, bar)),
+    ?assertEqual(undefined, Module:get(bad, key)),
+    ?assertEqual(undefined, Module:get(source, bad)),
 
-        ?assertEqual(undefined, Module:get(bad, key)),
-        ?assertEqual(undefined, Module:get(source, bad)),
+    ?assertEqual("3KZ4EG4WBF4J683W8GSDDPYR3", Module:version(app1)),
+    ?assertEqual("4EFUU47W9XDNMV9RMZSSJQU3Y", Module:version(app2)),
 
-        ?assertEqual("3KZ4EG4WBF4J683W8GSDDPYR3", Module:version(app1)),
-        ?assertEqual("4EFUU47W9XDNMV9RMZSSJQU3Y", Module:version(app2)),
+    ?assertEqual({error,{unknown,bad}}, Module:version(bad)),
 
-        ?assertEqual({error,{unknown,bad}}, Module:version(bad)),
+    ?assertEqual(
+        [{app1,"3KZ4EG4WBF4J683W8GSDDPYR3"},
+         {app2,"4EFUU47W9XDNMV9RMZSSJQU3Y"}], lists:usort(Module:version())),
 
-        ?assertEqual(
-            [{app1,"3KZ4EG4WBF4J683W8GSDDPYR3"},
-             {app2,"4EFUU47W9XDNMV9RMZSSJQU3Y"}], lists:usort(Module:version())),
+    ?assertEqual(
+        [{app1,[some_nice_data]},{app2,"other data"}],
+        lists:usort(Module:by_key(foo))),
 
-        ?assertEqual(
-           [{app1,[some_nice_data]},{app2,"other data"}],
-           lists:usort(Module:by_key(foo))),
+    ?assertEqual([], lists:usort(Module:by_key(bad))),
 
-        ?assertEqual([], lists:usort(Module:by_key(bad))),
-
-        ?assertEqual(
-            [
-                {bar, [{app2, {"even more data"}}]},
-                {foo, [{app2, "other data"}, {app1, [some_nice_data]}]}
-            ],
-            lists:usort(Module:by_key())),
+    ?assertEqual(
+        [
+            {bar, [{app2, {"even more data"}}]},
+            {foo, [{app2, "other data"}, {app1, [some_nice_data]}]}
+        ],
+        lists:usort(Module:by_key())),
 
 
-        ?assertEqual(Defs1, lists:usort(Module:by_source(app1))),
-        ?assertEqual(Defs2, lists:usort(Module:by_source(app2))),
+    ?assertEqual(Defs1, lists:usort(Module:by_source(app1))),
+    ?assertEqual(Defs2, lists:usort(Module:by_source(app2))),
 
-        ?assertEqual([], lists:usort(Module:by_source(bad))),
+    ?assertEqual([], lists:usort(Module:by_source(bad))),
 
-        ?assertEqual(
-            [
-                {app1, [{foo, [some_nice_data]}]},
-                {app2, [{foo, "other data"}, {bar, {"even more data"}}]}
-            ],
-            lists:usort(Module:by_source())),
+    ?assertEqual(
+        [
+            {app1, [{foo, [some_nice_data]}]},
+            {app2, [{foo, "other data"}, {bar, {"even more data"}}]}
+        ],
+        lists:usort(Module:by_source())),
 
-        ?assertEqual(
-            lists:usort([Data1, Data2, Data3]), lists:usort(Module:all())),
-        ?assertEqual(lists:usort([Data1, Data2]), lists:usort(Module:all(foo))),
-        ?assertEqual([], lists:usort(Module:all(bad))),
-        ok
-    after
-        meck:unload(couch_epi_module_keeper)
-    end,
+    ?assertEqual(
+       lists:usort([Data1, Data2, Data3]), lists:usort(Module:all())),
+    ?assertEqual(lists:usort([Data1, Data2]), lists:usort(Module:all(foo))),
+    ?assertEqual([], lists:usort(Module:all(bad))),
     ok.
 
 -endif.

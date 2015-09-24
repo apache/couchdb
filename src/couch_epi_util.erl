@@ -12,7 +12,7 @@
 
 -module(couch_epi_util).
 
--export([module_version/1, hash/1, md5/1]).
+-export([module_version/1, hash/1, md5/1, module_exists/1]).
 
 -compile([nowarn_deprecated_function]).
 
@@ -23,7 +23,7 @@ module_version(Module) ->
 
 hash(Term) ->
     <<SigInt:128/integer>> = md5(term_to_binary(Term)),
-    io_lib:format("\"~.36B\"",[SigInt]).
+    lists:flatten(io_lib:format("\"~.36B\"",[SigInt])).
 
 md5(Data) ->
     case erlang:function_exported(crypto, hash, 2) of
@@ -32,3 +32,6 @@ md5(Data) ->
 	false ->
 	    crypto:md5(Data)
     end.
+
+module_exists(Module) ->
+    erlang:function_exported(Module, module_info, 0).

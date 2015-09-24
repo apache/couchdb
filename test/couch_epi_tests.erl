@@ -17,11 +17,17 @@
 -define(DATA_FILE1, ?ABS_PATH("test/fixtures/app_data1.cfg")).
 -define(DATA_FILE2, ?ABS_PATH("test/fixtures/app_data2.cfg")).
 
--export([notify_cb/5, save/3]).
+-export([notify_cb/4, save/3]).
 
--record(ctx, {file, handle, pid, kv, key}).
+-record(ctx, {file, handle, pid, kv, key, modules = []}).
 
 -define(TIMEOUT, 5000).
+
+-define(temp_atom,
+    fun() ->
+        {A, B, C} = erlang:now(),
+        list_to_atom(lists:flatten(io_lib:format("~p~p~p", [A, B, C])))
+    end).
 
 -define(MODULE1(Name), "
     -export([inc/2, fail/2]).
@@ -76,72 +82,142 @@
         ].
 ").
 
-notify_cb(App, Key, OldData, Data, KV) ->
-    save(KV, is_called, {App, Key, OldData, Data}).
+%% ------------------------------------------------------------------
+%% couch_epi_plugin behaviour
+%% ------------------------------------------------------------------
+
+plugin_module([KV, Spec]) ->
+    SpecStr = io_lib:format("~w", [Spec]),
+    KVStr = "'" ++ atom_to_list(KV) ++ "'",
+    "
+        -compile([export_all]).
+
+        app() -> test_app.
+        providers() ->
+            [].
+
+        services() ->
+            [].
+
+        data_providers() ->
+            [
+                {{test_app, descriptions}, " ++ SpecStr ++ ", [{interval, 100}]}
+            ].
+
+        data_subscriptions() ->
+            [
+                {test_app, descriptions}
+            ].
+
+        processes() -> [].
+
+        notify(Key, OldData, Data) ->
+            couch_epi_tests:notify_cb(Key, OldData, Data, " ++ KVStr ++ ").
+    ";
+plugin_module([KV]) ->
+    KVStr = "'" ++ atom_to_list(KV) ++ "'",
+    "
+        -compile([export_all]).
+
+        app() -> test_app.
+        providers() ->
+            [
+                {my_service, provider1},
+                {my_service, provider2}
+            ].
+
+        services() ->
+            [
+                {my_service, provider1}
+            ].
+
+        data_providers() ->
+            [].
+
+        data_subscriptions() ->
+            [].
+
+        processes() -> [].
+
+        notify(Key, OldData, Data) ->
+            couch_epi_tests:notify_cb(Key, OldData, Data, " ++ KVStr ++ ").
+    ".
 
 
-setup(couch_epi_data_source) ->
+notify_cb(Key, OldData, Data, KV) ->
+    save(KV, is_called, {Key, OldData, Data}).
+
+start_epi(Plugins) ->
+    application:load(couch_epi),
+    PluginsModules = lists:map(fun({Module, Body}) ->
+        ok = generate_module(Module, Body),
+        Module
+    end, Plugins),
+    application:set_env(couch_epi, plugins, PluginsModules),
+    application:start(couch_epi).
+
+setup(data_file) ->
     error_logger:tty(false),
 
     Key = {test_app, descriptions},
     File = ?tempfile(),
     {ok, _} = file:copy(?DATA_FILE1, File),
-    application:start(couch_epi),
-    {ok, Pid} = couch_epi_data_source:start_link(
-        test_app, {epi_key, Key}, {file, File}, [{interval, 100}]),
-    ok = couch_epi_data_source:wait(Pid),
-    KV = state_storage(),
-    ok = couch_epi:register_service(Key),
+    KV = start_state_storage(),
+
+    ok = start_epi([{provider_epi, plugin_module([KV, {file, File}])}]),
+
+    Pid = whereis(couch_epi:get_handle(Key)),
+
+
     #ctx{
         file = File,
         key = Key,
         handle = couch_epi:get_handle(Key),
         kv = KV,
         pid = Pid};
-setup(couch_epi_data) ->
+setup(data_module) ->
     error_logger:tty(false),
 
     Key = {test_app, descriptions},
-    application:start(couch_epi),
-    ok = generate_module(provider, ?DATA_MODULE1(provider)),
 
-    {ok, Pid} = couch_epi_data:start_link(
-        test_app, {epi_key, Key}, provider, []),
-    ok = couch_epi_data:wait(Pid),
-    KV = state_storage(),
-    ok = couch_epi:register_service(Key),
+    ok = generate_module(provider, ?DATA_MODULE1(provider)),
+    KV = start_state_storage(),
+
+    ok = start_epi([{provider_epi, plugin_module([KV, {module, provider}])}]),
+
+    Pid = whereis(couch_epi:get_handle(Key)),
+    Handle = couch_epi:get_handle(Key),
+
     #ctx{
         key = Key,
-        handle = couch_epi:get_handle(Key),
+        handle = Handle,
+        modules = [Handle, provider],
         kv = KV,
         pid = Pid};
-setup(couch_epi_functions) ->
+setup(functions) ->
     Key = my_service,
     error_logger:tty(false),
 
-    application:start(couch_epi),
     ok = generate_module(provider1, ?MODULE1(provider1)),
     ok = generate_module(provider2, ?MODULE2(provider2)),
 
-    {ok, Pid} = couch_epi_functions:start_link(
-        test_app, {epi_key, Key}, {modules, [provider1, provider2]},
-        [{interval, 100}]),
-    ok = couch_epi_functions:wait(Pid),
-    KV = state_storage(),
-    ok = couch_epi:register_service(Key),
+    KV = start_state_storage(),
+
+    ok = start_epi([{provider_epi, plugin_module([KV])}]),
+
+    Pid = whereis(couch_epi:get_handle(Key)),
+    Handle = couch_epi:get_handle(Key),
+
     #ctx{
         key = Key,
-        handle = couch_epi:get_handle(Key),
+        handle = Handle,
+        modules = [Handle, provider1, provider2],
         kv = KV,
         pid = Pid};
-setup(_Opts) ->
-    setup(couch_epi_functions).
+setup({options, _Opts}) ->
+    setup(functions).
 
-teardown(Module, #ctx{pid = Pid} = Ctx) when is_atom(Module) ->
-    Module:stop(Pid),
-    teardown(Ctx);
-teardown(_Opts, #ctx{pid = Pid} = Ctx) ->
-    couch_epi_functions:stop(Pid),
+teardown(_Case, #ctx{} = Ctx) ->
     teardown(Ctx).
 
 teardown(#ctx{file = File} = Ctx) when File /= undefined ->
@@ -152,26 +228,25 @@ teardown(#ctx{kv = KV}) ->
     application:stop(couch_epi),
     ok.
 
-upgrade_release(Pid, Module) ->
+upgrade_release(Pid, Modules) ->
     sys:suspend(Pid),
-    'ok' = sys:change_code(Pid, Module, 'undefined', []),
+    [ok = sys:change_code(Pid, M, undefined, []) || M <- Modules],
     sys:resume(Pid),
     ok.
 
 epi_config_update_test_() ->
     Funs = [
         fun ensure_notified_when_changed/2,
-        fun ensure_not_notified_when_no_change/2,
-        fun ensure_not_notified_when_unsubscribed/2
+        fun ensure_not_notified_when_no_change/2
     ],
-    Modules= [
-        couch_epi_data,
-        couch_epi_data_source,
-        couch_epi_functions
+    Cases = [
+        data_file,
+        data_module,
+        functions
     ],
     {
         "config update tests",
-        [make_case("Check notifications for: ", Modules, Funs)]
+        [make_case("Check notifications for: ", Cases, Funs)]
     }.
 
 epi_data_source_test_() ->
@@ -184,13 +259,13 @@ epi_data_source_test_() ->
         fun check_keys/2,
         fun check_subscribers/2
     ],
-    Modules= [
-        couch_epi_data,
-        couch_epi_data_source
+    Cases = [
+        data_file,
+        data_module
     ],
     {
         "epi data API tests",
-        [make_case("Check query API for: ", Modules, Funs)]
+        [make_case("Check query API for: ", Cases, Funs)]
     }.
 
 
@@ -199,7 +274,7 @@ epi_apply_test_() ->
         "epi dispatch tests",
         {
             foreach,
-            fun() -> setup(couch_epi_functions) end,
+            fun() -> setup(functions) end,
             fun teardown/1,
             [
                 fun check_pipe/1,
@@ -210,27 +285,11 @@ epi_apply_test_() ->
         }
     }.
 
-
-epi_subscription_test_() ->
-    Funs = [
-        fun ensure_unsubscribe_when_caller_die/2
-    ],
-    Modules= [
-        couch_epi_data,
-        couch_epi_data_source,
-        couch_epi_functions
-    ],
-    {
-        "epi subscription tests",
-        [make_case("Check subscription API for: ", Modules, Funs)]
-    }.
-
-
 epi_reload_test_() ->
-    Modules= [
-        couch_epi_data,
-        couch_epi_data_source,
-        couch_epi_functions
+    Cases = [
+        data_file,
+        data_module,
+        functions
     ],
     Funs = [
         fun ensure_reload_if_manually_triggered/2,
@@ -239,29 +298,38 @@ epi_reload_test_() ->
     ],
     {
         "epi reload tests",
-        {
-            foreachx,
-            fun setup/1,
-            fun teardown/2,
-            [{M, Fun} || M <- Modules, Fun <- Funs]
-        }
+        [make_case("Check reload for: ", Cases, Funs)]
     }.
-
 
 apply_options_test_() ->
     Funs = [fun ensure_apply_is_called/2],
-    make_case("Apply with options: ", valid_options_permutations(), Funs).
+    Setups = {options, valid_options_permutations()},
+    {
+        "apply options tests",
+        [make_case("Apply with options: ", Setups, Funs)]
+    }.
 
 
+make_case(Msg, {Tag, P}, Funs) ->
+    Cases = [{Tag, Case} || Case <- P],
+    make_case(Msg, Cases, Funs);
 make_case(Msg, P, Funs) ->
     [{format_case_name(Msg, Case), [
         {
             foreachx, fun setup/1, fun teardown/2,
             [
-                 {Case, Fun} || Fun <- Funs
+                 {Case, make_fun(Fun, 2)} || Fun <- Funs
             ]
         }
     ]} || Case <- P].
+
+make_fun(Fun, Arity) ->
+    {arity, A} = lists:keyfind(arity, 1, erlang:fun_info(Fun)),
+    make_fun(Fun, Arity, A).
+
+make_fun(Fun, A, A) -> Fun;
+make_fun(Fun, 2, 1) -> fun(_, A) -> Fun(A) end;
+make_fun(Fun, 1, 2) -> fun(A) -> Fun(undefined, A) end.
 
 format_case_name(Msg, Case) ->
     lists:flatten(Msg ++ io_lib:format("~p", [Case])).
@@ -276,61 +344,54 @@ valid_options_permutations() ->
         [concurrent, ignore_errors]
     ].
 
-ensure_notified_when_changed(couch_epi_functions, #ctx{key = Key} = Ctx) ->
+ensure_notified_when_changed(functions, #ctx{key = Key} = Ctx) ->
     ?_test(begin
         subscribe(Ctx, test_app, Key),
-        update(couch_epi_functions, Ctx),
+        update(functions, Ctx),
         timer:sleep(200),
         Result = get(Ctx, is_called),
-        Expected = {test_app, Key,
-            {modules, [provider1, provider2]},
-            {modules, [provider1, provider2]}},
-        ?assertMatch({ok, Expected}, Result),
+        ExpectedDefs = [
+            {provider1,[{inc,2},{fail,2}]},
+            {provider2,[{inc,2},{fail,2}]}
+        ],
+        ?assertEqual({ok, {Key, ExpectedDefs, ExpectedDefs}}, Result),
         ok
     end);
-ensure_notified_when_changed(Module, #ctx{key = Key} = Ctx) ->
+ensure_notified_when_changed(Case, #ctx{key = Key} = Ctx) ->
     ?_test(begin
         subscribe(Ctx, test_app, Key),
-        update(Module, Ctx),
+        update(Case, Ctx),
         timer:sleep(200),
         ExpectedData = lists:usort([
             {[complex, key, 1], [{type, counter}, {desc, updated_foo}]},
             {[complex, key, 2], [{type, counter}, {desc, bar}]}
         ]),
         Result = get(Ctx, is_called),
-        ?assertMatch({ok, {test_app, Key, {data, _}, {data, _}}}, Result),
-        {ok, {test_app, Key, {data, OldData}, {data, Data}}} = Result,
+        ?assertMatch({ok, {Key, _OldData, _Data}}, Result),
+        {ok, {Key, OldData, Data}} = Result,
         ?assertMatch(ExpectedData, lists:usort(Data)),
         ?assertMatch(
             [{[complex, key, 1], [{type, counter}, {desc, foo}]}],
             lists:usort(OldData))
     end).
 
-ensure_not_notified_when_no_change(_Module, #ctx{key = Key} = Ctx) ->
+ensure_not_notified_when_no_change(_Case, #ctx{key = Key} = Ctx) ->
     ?_test(begin
         subscribe(Ctx, test_app, Key),
         timer:sleep(200),
         ?assertMatch(error, get(Ctx, is_called))
     end).
 
-ensure_not_notified_when_unsubscribed(Module, #ctx{key = Key} = Ctx) ->
-    ?_test(begin
-        SubscriptionId = subscribe(Ctx, test_app, Key),
-        couch_epi:unsubscribe(SubscriptionId),
-        timer:sleep(100),
-        update(Module, Ctx),
-        timer:sleep(200),
-        ?assertMatch(error, get(Ctx, is_called))
-    end).
-
-ensure_apply_is_called(Opts, #ctx{handle = Handle, kv = KV, key = Key} = Ctx) ->
+ensure_apply_is_called({options, Opts}, #ctx{handle = Handle, kv = KV, key = Key} = Ctx) ->
     ?_test(begin
         couch_epi:apply(Handle, Key, inc, [KV, 2], Opts),
         maybe_wait(Opts),
         ?assertMatch({ok, _}, get(Ctx, inc1)),
         ?assertMatch({ok, _}, get(Ctx, inc2)),
         ok
-    end).
+    end);
+ensure_apply_is_called(undefined, #ctx{} = Ctx) ->
+    ensure_apply_is_called({options, []}, Ctx).
 
 check_pipe(#ctx{handle = Handle, kv = KV, key = Key}) ->
     ?_test(begin
@@ -361,42 +422,32 @@ ensure_fail(#ctx{handle = Handle, kv = KV, key = Key}) ->
         ok
     end).
 
-ensure_unsubscribe_when_caller_die(_Module, #ctx{key = Key} = Ctx) ->
-    ?_test(begin
-        spawn(fun() ->
-            subscribe(Ctx, test_app, Key)
-        end),
-        timer:sleep(200),
-        ?assertMatch(error, get(Ctx, is_called))
-    end).
-
-
 pipe_state(Ctx) ->
     Trace = [get(Ctx, inc1), get(Ctx, inc2)],
     lists:usort([State || {ok, State} <- Trace]).
 
-check_dump(_Module, #ctx{handle = Handle}) ->
+check_dump(_Case, #ctx{handle = Handle}) ->
     ?_test(begin
         ?assertMatch(
             [[{type, counter}, {desc, foo}]],
             couch_epi:dump(Handle))
     end).
 
-check_get(_Module, #ctx{handle = Handle}) ->
+check_get(_Case, #ctx{handle = Handle}) ->
     ?_test(begin
         ?assertMatch(
             [[{type, counter}, {desc, foo}]],
             couch_epi:get(Handle, [complex,key, 1]))
     end).
 
-check_get_value(_Module, #ctx{handle = Handle}) ->
+check_get_value(_Case, #ctx{handle = Handle}) ->
     ?_test(begin
         ?assertMatch(
             [{type, counter}, {desc, foo}],
             couch_epi:get_value(Handle, test_app, [complex,key, 1]))
     end).
 
-check_by_key(_Module, #ctx{handle = Handle}) ->
+check_by_key(_Case, #ctx{handle = Handle}) ->
     ?_test(begin
         ?assertMatch(
             [{[complex, key, 1],
@@ -407,7 +458,7 @@ check_by_key(_Module, #ctx{handle = Handle}) ->
             couch_epi:by_key(Handle, [complex, key, 1]))
     end).
 
-check_by_source(_Module, #ctx{handle = Handle}) ->
+check_by_source(_Case, #ctx{handle = Handle}) ->
     ?_test(begin
         ?assertMatch(
             [{test_app,
@@ -418,65 +469,60 @@ check_by_source(_Module, #ctx{handle = Handle}) ->
             couch_epi:by_source(Handle, test_app))
     end).
 
-check_keys(_Module, #ctx{handle = Handle}) ->
+check_keys(_Case, #ctx{handle = Handle}) ->
     ?_assertMatch([[complex,key,1]], couch_epi:keys(Handle)).
 
-check_subscribers(_Module, #ctx{handle = Handle}) ->
+check_subscribers(_Case, #ctx{handle = Handle}) ->
     ?_assertMatch([test_app], couch_epi:subscribers(Handle)).
 
 
-ensure_reload_if_manually_triggered(Module, #ctx{pid = Pid, key = Key} = Ctx) ->
+ensure_reload_if_manually_triggered(Case, #ctx{pid = Pid, key = Key} = Ctx) ->
     ?_test(begin
         subscribe(Ctx, test_app, Key),
-        update_definitions(Module, Ctx),
-        Module:reload(Pid),
+        update_definitions(Case, Ctx),
+        couch_epi_module_keeper:reload(Pid),
         timer:sleep(50),
-        Result = get(Ctx, is_called),
-        ?assertNotMatch(error, Result)
+        ?assertNotEqual(error, get(Ctx, is_called))
     end).
 
-ensure_reload_if_changed(couch_epi_data_source =  Module,
+ensure_reload_if_changed(data_file =  Case,
         #ctx{key = Key, handle = Handle} = Ctx) ->
     ?_test(begin
         Version = Handle:version(),
         subscribe(Ctx, test_app, Key),
-        update_definitions(Module, Ctx),
+        update_definitions(Case, Ctx),
         timer:sleep(250),
         ?assertNotEqual(Version, Handle:version()),
-        Result = get(Ctx, is_called),
-        ?assertNotMatch(error, Result)
+        ?assertNotEqual(error, get(Ctx, is_called))
     end);
-ensure_reload_if_changed(Module,
+ensure_reload_if_changed(Case,
         #ctx{key = Key, handle = Handle} = Ctx) ->
     ?_test(begin
         Version = Handle:version(),
         subscribe(Ctx, test_app, Key),
-        update(Module, Ctx),
+        update(Case, Ctx),
         ?assertNotEqual(Version, Handle:version()),
         timer:sleep(100), %% Allow some time for notify to be called
-        Result = get(Ctx, is_called),
-        ?assertNotMatch(error, Result)
+        ?assertNotEqual(error, get(Ctx, is_called))
     end).
 
-ensure_no_reload_when_no_change(couch_epi_functions = Module,
-        #ctx{pid = Pid, key = Key, handle = Handle} = Ctx) ->
+ensure_no_reload_when_no_change(functions,
+        #ctx{pid = Pid, key = Key, handle = Handle, modules = Modules} = Ctx) ->
     ?_test(begin
         Version = Handle:version(),
         subscribe(Ctx, test_app, Key),
-        upgrade_release(Pid, Module),
+        upgrade_release(Pid, Modules),
         ?assertEqual(Version, Handle:version()),
-        Result = get(Ctx, is_called),
-        ?assertMatch(error, Result)
+        ?assertEqual(error, get(Ctx, is_called))
     end);
-ensure_no_reload_when_no_change(Module,
+ensure_no_reload_when_no_change(_Case,
         #ctx{key = Key, handle = Handle} = Ctx) ->
     ?_test(begin
         Version = Handle:version(),
         subscribe(Ctx, test_app, Key),
         timer:sleep(450),
         ?assertEqual(Version, Handle:version()),
-        Result = get(Ctx, is_called),
-        ?assertMatch(error, Result)
+        ?assertEqual(error, get(Ctx, is_called))
     end).
 
 
@@ -488,24 +534,21 @@ generate_module(Name, Body) ->
     Tokens = couch_epi_codegen:scan(Body),
     couch_epi_codegen:generate(Name, Tokens).
 
-update(Module, #ctx{pid = Pid} = Ctx) ->
-    update_definitions(Module, Ctx),
-    upgrade_release(Pid, Module).
+update(Case, #ctx{pid = Pid, modules = Modules} = Ctx) ->
+    update_definitions(Case, Ctx),
+    upgrade_release(Pid, Modules).
 
-update_definitions(couch_epi_data_source, #ctx{file = File}) ->
+update_definitions(data_file, #ctx{file = File}) ->
     {ok, _} = file:copy(?DATA_FILE2, File),
     ok;
-update_definitions(couch_epi_data, #ctx{}) ->
+update_definitions(data_module, #ctx{}) ->
     ok = generate_module(provider, ?DATA_MODULE2(provider));
-update_definitions(couch_epi_functions, #ctx{}) ->
+update_definitions(functions, #ctx{}) ->
     ok = generate_module(provider1, ?MODULE2(provider1)).
 
-
-
-subscribe(#ctx{kv = Kv}, App, Key) ->
-    {ok, Pid} = couch_epi:subscribe(App, Key, ?MODULE, notify_cb, Kv),
+subscribe(#ctx{kv = Kv}, _App, _Key) ->
     call(Kv, empty),
-    Pid.
+    ok.
 
 maybe_wait(Opts) ->
     case lists:member(concurrent, Opts) of
@@ -536,6 +579,12 @@ call(Server, Msg) ->
 
 reply({Ref, From}, Msg) ->
     From ! {reply, Ref, Msg}.
+
+start_state_storage() ->
+    Pid = state_storage(),
+    Name = ?temp_atom(),
+    register(Name, Pid),
+    Name.
 
 state_storage() ->
     spawn_link(fun() -> state_storage(dict:new()) end).

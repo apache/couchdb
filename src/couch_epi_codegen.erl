@@ -50,7 +50,6 @@ parse_form(Tokens) ->
     case erl_parse:parse_form(Forms) of
         {ok, AST} -> {ok, AST};
         {error,{_,_, Reason}} ->
-            %%Expr = [E || {E, _Form} <- Tokens],
             {error, Expr, Reason}
     end.
 

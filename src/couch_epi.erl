@@ -13,7 +13,7 @@
 -module(couch_epi).
 
 %% subscribtion management
--export([subscribe/5, unsubscribe/1, get_handle/1]).
+-export([get_handle/1]).
 -export([register_service/1]).
 
 %% queries and introspection
@@ -28,7 +28,18 @@
 
 -export([is_configured/3]).
 
--export_type([service_id/0, app/0, key/0, handle/0, notify_cb/0]).
+%% ------------------------------------------------------------------
+%% Types Definitions
+%% ------------------------------------------------------------------
+
+-export_type([
+    service_id/0,
+    app/0,
+    key/0,
+    handle/0,
+    plugin_id/0,
+    data_spec/0
+]).
 
 -type app() :: atom().
 -type key() :: term().
@@ -36,11 +47,7 @@
 
 -type properties() :: [{key(), term()}].
 
--type notification() :: {data, term()} | {modules, [module()]}.
--type notify_cb() :: fun(
-    (App :: app(), Key :: key(), Data :: notification(), Extra :: term()) -> ok).
-
--type subscription() :: term().
+-type plugin_id() :: module().
 
 -opaque handle() :: module().
 
@@ -50,6 +57,12 @@
         | pipe.
 
 -type apply_opts() :: [apply_opt()].
+
+-type data_spec()
+    :: {module, module()}
+        | {priv_file, FileName :: string()}
+        | {file, FileName :: string()}.
+
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
@@ -115,22 +128,6 @@ keys(Handle) ->
 subscribers(Handle) ->
     couch_epi_data_gen:subscribers(Handle).
 
-
-%% Passed MFA should implement notify_cb() type
--spec subscribe(App :: app(), Key :: key(),
-    Module :: module(), Function :: atom(), Args :: [term()]) ->
-        {ok, SubscriptionId :: subscription()}.
-
-subscribe(App, Key, M, F, A) ->
-    couch_epi_server:subscribe(App, Key, {M, F, A}).
-
-
--spec unsubscribe(SubscriptionId :: subscription()) -> ok.
-
-unsubscribe(SubscriptionId) ->
-    couch_epi_server:unsubscribe(SubscriptionId).
-
-%% The success typing is (atom() | tuple(),_,_,[any()],_) -> [any()]
 -spec apply(Handle :: handle(), ServiceId :: atom(), Function :: atom(),
     Args :: [term()], Opts :: apply_opts()) -> ok.
 
@@ -166,14 +163,8 @@ is_configured(Handle, Function, Arity) ->
     [] /= couch_epi_functions_gen:modules(Handle, Function, Arity).
 
 
--spec register_service({ServiceId :: service_id(), Key :: key()}) -> ok;
-                (ServiceId :: service_id()) -> ok.
+-spec register_service(PluginId :: plugin_id()) ->
+    [supervisor:child_spec()].
 
-register_service({_ServiceId, _Key} = EPIKey) ->
-    register_service(couch_epi_data_gen, EPIKey);
-register_service(ServiceId) when is_atom(ServiceId) ->
-    register_service(couch_epi_functions_gen, ServiceId).
-
-register_service(Codegen, Key) ->
-    Handle = Codegen:get_handle(Key),
-    couch_epi_module_keeper:register_service(Codegen, Handle).
+register_service(Plugin) ->
+    couch_epi_sup:plugin_childspecs(Plugin).

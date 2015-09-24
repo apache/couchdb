@@ -12,152 +12,37 @@
 
 -module(couch_epi_functions).
 
--behaviour(gen_server).
+-include("couch_epi.hrl").
 
 %% ------------------------------------------------------------------
 %% API Function Exports
 %% ------------------------------------------------------------------
 
--export([childspec/4]).
--export([start_link/4, reload/1]).
--export([wait/1, stop/1]).
-
-%% ------------------------------------------------------------------
-%% gen_server Function Exports
-%% ------------------------------------------------------------------
-
--export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-         terminate/2, code_change/3]).
-
--record(state, {
-    provider, service_id, modules, hash, handle,
-    initialized = false, pending = []}).
+-export([interval/1, data/1]).
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
-childspec(Id, App, Key, Module) ->
-    {
-        Id,
-        {?MODULE, start_link, [
-            App,
-            {epi_key, Key},
-            {modules, [Module]},
-            []
-        ]},
-        permanent,
-        5000,
-        worker,
-        [Module]
-    }.
+interval(_) ->
+    undefined.
 
-start_link(ProviderApp, {epi_key, ServiceId}, {modules, Modules}, Options) ->
-    maybe_start_keeper(ServiceId),
-    gen_server:start_link(
-        ?MODULE, [ProviderApp, ServiceId, Modules, Options], []).
-
-reload(Server) ->
-    gen_server:call(Server, reload).
-
-wait(Server) ->
-    gen_server:call(Server, wait).
-
-stop(Server) ->
-    catch gen_server:call(Server, stop).
-
-%% ------------------------------------------------------------------
-%% gen_server Function Definitions
-%% ------------------------------------------------------------------
-
-init([Provider, ServiceId, Modules, _Options]) ->
-    gen_server:cast(self(), init),
-    {ok, #state{
-        provider = Provider,
-        modules = Modules,
-        service_id = ServiceId,
-        handle = couch_epi_functions_gen:get_handle(ServiceId)}}.
-
-handle_call(wait, _From, #state{initialized = true} = State) ->
-    {reply, ok, State};
-handle_call(wait, From, #state{pending = Pending} = State) ->
-    {noreply, State#state{pending = [From | Pending]}};
-handle_call(reload, _From, State) ->
-    {Res, NewState} = reload_if_updated(State),
-    {reply, Res, NewState};
-handle_call(stop, _From, State) ->
-    {stop, normal, State};
-handle_call(_Request, _From, State) ->
-    {reply, ok, State}.
-
-handle_cast(init, #state{pending = Pending} = State) ->
-    {_, NewState} = reload_if_updated(State),
-    [gen_server:reply(Client, ok) || Client <- Pending],
-    {noreply, NewState#state{initialized = true, pending = []}};
-handle_cast(_Msg, State) ->
-    {noreply, State}.
-
-handle_info(_Info, State) ->
-    {noreply, State}.
-
-terminate(_Reason, State) ->
-    safe_remove(State),
-    ok.
-
-code_change(_OldVsn, State, _Extra) ->
-    {_, NewState} = reload_if_updated(State),
-    {ok, NewState}.
+data(Specs) ->
+    Defs = [{A, definitions(M)} || {A, #couch_epi_spec{value = M}} <- Specs],
+    Modules = lists:flatten([M || {_App, #couch_epi_spec{value = M}} <- Specs]),
+    {ok, couch_epi_functions_gen:hash(Modules), group(Defs)}.
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
 
-reload_if_updated(#state{handle = Module} = State) ->
-    case couch_epi_util:module_exists(Module) of
-        true ->
-            do_reload_if_updated(State);
-        false ->
-            {ok, State}
-    end.
+definitions(Module) when is_atom(Module) ->
+    definitions([Module]);
+definitions(Modules) ->
+    Blacklist = [{module_info, 0}, {module_info, 1}],
+    [{M, M:module_info(exports) -- Blacklist} || M <- Modules].
 
-do_reload_if_updated(#state{hash = OldHash, modules = Modules} = State) ->
-    case couch_epi_functions_gen:hash(Modules) of
-        OldHash ->
-            {ok, State};
-        Hash ->
-            safe_add(Hash, State)
-    end.
-
-safe_add(Hash, #state{modules = OldModules} = State) ->
-    #state{
-        handle = Handle,
-        provider = Provider,
-        modules = Modules,
-        service_id = ServiceId} = State,
-    try
-        ok = couch_epi_functions_gen:add(Handle, Provider, Modules),
-        couch_epi_server:notify(
-            Provider, ServiceId, {modules, OldModules}, {modules, Modules}),
-        {ok, State#state{hash = Hash}}
-    catch Class:Reason ->
-        {{Class, Reason}, State}
-    end.
-
-safe_remove(#state{} = State) ->
-    #state{
-        handle = Handle,
-        provider = Provider,
-        modules = Modules,
-        service_id = ServiceId} = State,
-    try
-        ok = couch_epi_functions_gen:remove(Handle, Provider, Modules),
-        couch_epi_server:notify(
-            Provider, ServiceId, {modules, Modules}, {modules, []}),
-        {ok, State#state{modules = []}}
-    catch Class:Reason ->
-        {{Class, Reason}, State}
-    end.
-
-maybe_start_keeper(ServiceId) ->
-    Handle = couch_epi_functions_gen:get_handle(ServiceId),
-    couch_epi_module_keeper:maybe_start_keeper(couch_epi_functions_gen, Handle).
+group(KV) ->
+    dict:to_list(lists:foldr(fun({K,V}, D) ->
+        dict:append_list(K, V, D)
+    end, dict:new(), KV)).

@@ -12,9 +12,18 @@
 
 -module(couch_epi_functions_gen).
 
--export([add/3, remove/3, get_handle/1, hash/1, apply/4, apply/5, modules/3]).
+-export([
+    generate/2,
+    get_current_definitions/1,
+    get_handle/1,
+    hash/1
+]).
 
--export([save/3]).
+-export([
+    apply/4,
+    apply/5,
+    modules/3
+]).
 
 -ifdef(TEST).
 
@@ -24,28 +33,9 @@
 
 -record(opts, {
     ignore_errors = false,
-    ignore_providers = false,
     pipe = false,
     concurrent = false
 }).
-
-add(Handle, Source, Modules) ->
-    case is_updated(Handle, Source, Modules) of
-        false ->
-            ok;
-        true ->
-            couch_epi_module_keeper:save(Handle, Source, Modules)
-    end.
-
-remove(Handle, Source, Modules) ->
-    CurrentDefs = get_current_definitions(Handle),
-    {SourceDefs, Defs} = remove_from_definitions(CurrentDefs, Source),
-
-    NewSourceDefs = lists:filter(fun({M, _}) ->
-        not lists:member(M, Modules)
-    end, SourceDefs),
-
-    generate(Handle, Defs ++ NewSourceDefs).
 
 get_handle(ServiceId) ->
     module_name(atom_to_list(ServiceId)).
@@ -60,7 +50,6 @@ apply(Handle, _ServiceId, Function, Args, Opts) ->
     DispatchOpts = parse_opts(Opts),
     Modules = providers(Handle, Function, length(Args), DispatchOpts),
     dispatch(Handle, Modules, Function, Args, DispatchOpts).
-
 
 %% ------------------------------------------------------------------
 %% Codegeneration routines
@@ -188,36 +177,6 @@ version(Source, SrcDefs) ->
 module_name(ServiceId) when is_list(ServiceId) ->
     list_to_atom(string:join([atom_to_list(?MODULE), ServiceId], "_")).
 
-is_updated(Handle, Source, Modules) ->
-    Sig = hash(Modules),
-    if_exists(Handle, version, 1, true, fun() ->
-        try Handle:version(Source) of
-            {error, {unknown, Source}} -> true;
-            {error, Reason} -> throw(Reason);
-            Sig -> false;
-            _ -> true
-        catch
-            Class:Reason ->
-                throw({Class, {Source, Reason}})
-        end
-    end).
-
-save(Handle, undefined, []) ->
-    case get_current_definitions(Handle) of
-        [] -> generate(Handle, []);
-        _Else -> ok
-    end;
-save(Handle, Source, Modules) ->
-    CurrentDefs = get_current_definitions(Handle),
-    Definitions = definitions(Source, Modules),
-    NewDefs = lists:keystore(Source, 1, CurrentDefs, Definitions),
-    generate(Handle, NewDefs).
-
-definitions(Source, Modules) ->
-    Blacklist = [{module_info, 0}, {module_info, 1}],
-    SrcDefs = [{M, M:module_info(exports) -- Blacklist} || M <- Modules],
-    {Source, SrcDefs}.
-
 get_current_definitions(Handle) ->
     if_exists(Handle, definitions, 0, [], fun() ->
         Handle:definitions()
@@ -249,10 +208,18 @@ providers_by_function(Defs) ->
         end
     ),
     Dict = lists:foldl(fun({K, V}, Acc) ->
-        dict:append(K, V, Acc)
+        dict:update(K, fun(Modules) ->
+            append_if_missing(Modules, V)
+        end, [V], Acc)
+
     end, dict:new(), Providers),
     dict:to_list(Dict).
 
+append_if_missing(List, Value) ->
+    case lists:member(Value, List) of
+        true -> List;
+        false -> [Value | List]
+    end.
 
 hash(Modules) ->
     VSNs = [couch_epi_util:module_version(M) || M <- lists:usort(Modules)],
@@ -307,18 +274,10 @@ parse_opts([], Acc) ->
 providers(Handle, Function, Arity, #opts{}) ->
     Handle:providers(Function, Arity).
 
-remove_from_definitions(Defs, Source) ->
-    case lists:keytake(Source, 1, Defs) of
-        {value, {Source, Value}, Rest} ->
-            {Value, Rest};
-        false ->
-            {[], Defs}
-    end.
-
 -spec modules(Handle :: atom(), Function :: atom(), Arity :: pos_integer()) ->
     list().
 modules(Handle, Function, Arity) ->
-    providers(Handle, Function, Arity, #opts{ignore_providers = true}).
+    providers(Handle, Function, Arity, #opts{}).
 
 %% ------------------------------------------------------------------
 %% Tests
@@ -334,36 +293,36 @@ bar() ->
     [].
 
 basic_test() ->
-    try
-        Module = foo_bar_dispatcher,
-        meck:new(couch_epi_module_keeper, [passthrough]),
-        meck:expect(couch_epi_module_keeper, save, fun
-            (Handle, Source, Modules) -> save(Handle, Source, Modules)
-        end),
+    Module = foo_bar_dispatcher,
+    Defs = [{?MODULE, [{foo, 2}, {bar, 0}]}],
 
-        add(Module, app1, [?MODULE]),
+    generate(Module, [{app1, Defs}, {app2, Defs}]),
 
-        ?assertMatch([?MODULE], modules(Module, foo, 2)),
+    Exports = lists:sort([
+          {callbacks,2},
+          {version,1},
+          {providers,2},
+          {definitions,1},
+          {module_info,0},
+          {version,0},
+          {dispatch,3},
+          {providers,0},
+          {module_info,1},
+          {definitions,0}]),
 
-        ?assert(is_list(Module:version(app1))),
+    ?assertEqual(Exports, lists:sort(Module:module_info(exports))),
+    ?assertEqual([app1, app2], lists:sort(Module:providers())),
 
-        Defs1 = lists:usort(Module:definitions()),
-        ?assertMatch([{app1, [{?MODULE, _}]}], Defs1),
-        [{app1, [{?MODULE, Exports}]}] = Defs1,
-        ?assert(lists:member({bar, 0}, Exports)),
+    ?assertEqual([?MODULE], lists:sort(Module:providers(foo, 2))),
+    ?assertEqual([?MODULE], lists:sort(Module:providers(bar, 0))),
 
-        add(Module, app2, [?MODULE]),
-        Defs2 = lists:usort(Module:definitions()),
-        ?assertMatch([{app1, [{?MODULE, _}]}, {app2, [{?MODULE, _}]}], Defs2),
+    Defs2 = lists:usort(Module:definitions()),
+    ?assertMatch([{app1, [{?MODULE, _}]}, {app2, [{?MODULE, _}]}], Defs2),
 
-        ?assertMatch([{app1, Hash}, {app2, Hash}], Module:version()),
+    ?assertMatch([{app1, Hash}, {app2, Hash}], Module:version()),
 
-        ?assertMatch([], Module:dispatch(?MODULE, bar, [])),
-        ?assertMatch({1, 2}, Module:dispatch(?MODULE, foo, [1, 2])),
-        ok
-    after
-        meck:unload(couch_epi_module_keeper)
-    end,
+    ?assertMatch([], Module:dispatch(?MODULE, bar, [])),
+    ?assertMatch({1, 2}, Module:dispatch(?MODULE, foo, [1, 2])),
 
     ok.
 
