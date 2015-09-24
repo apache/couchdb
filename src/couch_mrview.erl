@@ -52,24 +52,31 @@
 %% In the most common case name is the view name and
 %% value is an object that must have a "map" function,
 %% and an optional "reduce" function. "map" and "reduce"
-%% values should be strings (function contents).
+%% values should be strings (function contents), except
+%% in case when langauge is <<query>> then maps must
+%% be objects.
 %%
 %% "lib" is a special case. The value
 %% of "lib" is an object that will contain libary code
 %% so it not validated.
 %%
-validate_view(<<"lib">>, {_Libs})->
+validate_view(<<"lib">>, {_Libs}, _Language)->
     ok;
-validate_view(VName, {Views}) ->
-    case couch_util:get_value(<<"map">>, Views) of
-        MapVal when is_binary(MapVal) ->
+validate_view(VName, {Views}, Language) ->
+    case {couch_util:get_value(<<"map">>, Views), Language}  of
+        {{[_ | _]}, <<"query">>} ->
             ok;
-        undefined ->
+        {_, <<"query">>} ->
+            Err1 = <<"`map` in ", VName/binary, " for queries must be an object">>,
+            throw({invalid_design_doc,Err1});
+        {Mapval, _} when is_binary(Mapval)  ->
+            ok;
+        {undefined, _} ->
             Err0 = <<"View ",VName/binary, " must have a map function">>,
             throw ({invalid_design_doc, Err0});
-        _ ->
-            Err1 = <<"`map` in ", VName/binary, " must be a string">>,
-            throw({invalid_design_doc, Err1})
+        {_, _} ->
+            Err2 = <<"`map` in ", VName/binary, " must be a string">>,
+            throw({invalid_design_doc, Err2})
     end,
     case couch_util:get_value(<<"reduce">>, Views) of
         RedVal when is_binary(RedVal) ->
@@ -77,11 +84,11 @@ validate_view(VName, {Views}) ->
         undefined ->
             ok; % note: unlike map,  reduce function is optional
         _ ->
-            Err2 = <<"`reduce` in ", VName/binary, " must be a string">>,
-            throw({invalid_design_doc, Err2})
+            Err3 = <<"`reduce` in ", VName/binary, " must be a string">>,
+            throw({invalid_design_doc, Err3})
     end,
     ok;
-validate_view(VName, _) ->
+validate_view(VName, _, _Language) ->
     throw({invalid_design_doc, <<"View ", VName/binary, " must be an object">>}).
 
 
@@ -99,17 +106,17 @@ validate_view(VName, _) ->
 %%  - views :  Validated by a special function.
 %%  - options : Allowed to contain non-string values.
 %%
-validate_opt_object(<<"views">>, {Views})->
-    [validate_view(VName, ViewObj) || {VName, ViewObj} <- Views],
+validate_opt_object(<<"views">>, {Views}, Language)->
+    [validate_view(VName, ViewObj, Language) || {VName, ViewObj} <- Views],
     ok;
-validate_opt_object(<<"options">>, {_})->
+validate_opt_object(<<"options">>, {_}, _Language)->
     ok;
-validate_opt_object(Section, {Fields}) ->
+validate_opt_object(Section, {Fields}, _Language) ->
     [validate_opt_string(FName, FVal, Section) || {FName, FVal} <- Fields],
     ok;
-validate_opt_object(_, undefined) ->
+validate_opt_object(_, undefined, _Language) ->
     ok;
-validate_opt_object(FieldName, _) ->
+validate_opt_object(FieldName, _, _Language) ->
     throw({invalid_design_doc, <<"`", FieldName/binary, "` is not an object">>}).
 
 
@@ -141,9 +148,10 @@ validate(DbName,  DDoc) ->
                   <<"shows">>, <<"updates">>, <<"views">>],
     StringFields = [<<"language">>, <<"validate_doc_update">>],
     ArrayFields = [<<"rewrites">>],
-    [validate_opt_object(F, couch_util:get_value(F, Fields)) || F <- ObjFields],
     [validate_opt_string(F, couch_util:get_value(F, Fields)) || F <- StringFields],
     [validate_opt_array(F, couch_util:get_value(F, Fields))  || F <- ArrayFields],
+    Language = couch_util:get_value(<<"language">>, Fields),
+    [validate_opt_object(F, couch_util:get_value(F, Fields), Language) || F <- ObjFields],
     GetName = fun
         (#mrview{map_names = [Name | _]}) -> Name;
         (#mrview{reduce_funs = [{Name, _} | _]}) -> Name;

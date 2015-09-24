@@ -63,7 +63,9 @@ ddoc_validation_test_() ->
                     fun should_reject_view_without_map_function/1,
                     fun should_reject_view_with_non_string_map_function/1,
                     fun should_reject_view_with_non_string_reduce_function/1,
-                    fun should_accept_any_in_lib/1
+                    fun should_accept_any_in_lib/1,
+                    fun should_accept_map_object_for_queries/1,
+                    fun should_reject_map_non_objects_for_queries/1
                 ]
             }
         }
@@ -363,3 +365,33 @@ should_accept_any_in_lib(Db) ->
                        ]}}
     ]}),
     ?_assertMatch({ok,_}, couch_db:update_doc(Db, Doc, [])).
+
+
+should_accept_map_object_for_queries(Db) ->
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/should_accept_map_objects_for_queries">>},
+        {<<"language">>, <<"query">>},
+        {<<"views">>, {[
+            {<<"view1">>, {[
+                {<<"map">>, {[
+                    {<<"x">>, <<"y">>}
+                ]}}
+           ]}}
+        ]}}
+    ]}),
+    ?_assertMatch({ok,_}, couch_db:update_doc(Db, Doc, [])).
+
+
+should_reject_map_non_objects_for_queries(Db) ->
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/should_reject_map_non_objects__with_nonstr_reduce">>},
+        {<<"language">>, <<"query">>},
+        {<<"views">>, {[
+            {<<"view1">>, {[
+                {<<"map">>, <<"function(d){}">>}
+            ]}}
+        ]}}
+    ]}),
+    ?_assertThrow({bad_request,invalid_design_doc,
+                   <<"`map` in view1 for queries must be an object">>},
+                  couch_db:update_doc(Db, Doc, [])).
