@@ -22,7 +22,6 @@ start_couch() ->
 
 start_couch(IniFiles) ->
     ok = application:set_env(config, ini_files, IniFiles),
-    ok = lager:start(),
     test_util:start_applications([inets, ibrowse, ssl, config, couch, chttpd]).
 
 stop_couch(Ctx) ->
