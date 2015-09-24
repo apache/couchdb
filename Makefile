@@ -185,3 +185,8 @@ ifeq ($(with_fauxton), 1)
 	@echo "Building Fauxton"
 	@cd src/fauxton && npm install && ./node_modules/grunt-cli/bin/grunt couchdb
 endif
+
+.PHONY: introspect
+introspect:
+	rebar -r update-deps
+	./introspect
