@@ -14,6 +14,8 @@
 
 -export([module_version/1, hash/1, md5/1]).
 
+-compile([nowarn_deprecated_function]).
+
 module_version(Module) ->
     Attributes = Module:module_info(attributes),
     {vsn, VSNs} = lists:keyfind(vsn, 1, Attributes),
