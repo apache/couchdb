@@ -91,38 +91,37 @@ callbacks_test_() ->
         fun setup/0,
         fun cleanup/1,
         [
-            ?_assertMatch({ok, _}, get_backend()),
-            ?_assertEqual(ok, couch_log:debug("message", [])),
-            ?_assertEqual(ok, couch_log:info("message", [])),
-            ?_assertEqual(ok, couch_log:notice("message", [])),
-            ?_assertEqual(ok, couch_log:warning("message", [])),
-            ?_assertEqual(ok, couch_log:error("message", [])),
-            ?_assertEqual(ok, couch_log:critical("message", [])),
-            ?_assertEqual(ok, couch_log:alert("message", [])),
-            ?_assertEqual(ok, couch_log:emergency("message", [])),
-            ?_assertEqual(ok, couch_log:set_level(info))
+            ?_assertEqual({ok, couch_log_eunit}, get_backend()),
+            ?_assertEqual(ok, couch_log:debug("debug", [])),
+            ?_assertEqual("debug", couch_log_eunit:debug()),
+            ?_assertEqual(ok, couch_log:info("info", [])),
+            ?_assertEqual("info", couch_log_eunit:info()),
+            ?_assertEqual(ok, couch_log:notice("notice", [])),
+            ?_assertEqual("notice", couch_log_eunit:notice()),
+            ?_assertEqual(ok, couch_log:warning("warning", [])),
+            ?_assertEqual("warning", couch_log_eunit:warning()),
+            ?_assertEqual(ok, couch_log:error("error", [])),
+            ?_assertEqual("error", couch_log_eunit:error()),
+            ?_assertEqual(ok, couch_log:critical("critical", [])),
+            ?_assertEqual("critical", couch_log_eunit:critical()),
+            ?_assertEqual(ok, couch_log:alert("alert", [])),
+            ?_assertEqual("alert", couch_log_eunit:alert()),
+            ?_assertEqual(ok, couch_log:emergency("emergency", [])),
+            ?_assertEqual("emergency", couch_log_eunit:emergency()),
+            ?_assertEqual(ok, couch_log:set_level(info)),
+            ?_assertEqual(info, couch_log_eunit:get_level())
         ]
     }.
 
 setup() ->
     meck:new([couch_stats]),
     meck:expect(couch_stats, increment_counter, fun(_) -> ok end),
-    start().
+    couch_log_eunit:setup(),
+    application:load(?MODULE),
+    application:set_env(?MODULE, backend, couch_log_eunit).
 
-start() ->
-    start([], couch_log).
-
-start(Acc, App) ->
-    case application:start(App) of
-        ok ->
-            [App | Acc];
-        {error, {not_started, Dep}} ->
-            Acc1 = start(Acc, Dep),
-            start(Acc1, App)
-    end.
-
-cleanup(Deps) ->
-    [application:stop(Dep) || Dep <- Deps],
-    meck:unload([couch_stats]).
+cleanup(_) ->
+    meck:unload([couch_stats]),
+    couch_log_eunit:cleanup().
 
 -endif.
