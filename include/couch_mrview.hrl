@@ -76,6 +76,7 @@
     limit = 16#10000000,
     skip = 0,
     group_level = 0,
+    group = undefined,
     stale = false,
     multi_get = false,
     inclusive_end = true,

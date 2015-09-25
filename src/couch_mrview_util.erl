@@ -439,6 +439,7 @@ fold_reduce({NthRed, Lang, View}, Fun,  Acc, Options) ->
 
 
 validate_args(Args) ->
+    GroupLevel = determine_group_level(Args),
     Reduce = Args#mrargs.reduce,
     case Reduce == undefined orelse is_boolean(Reduce) of
         true -> ok;
@@ -450,7 +451,7 @@ validate_args(Args) ->
         _ -> ok
     end,
 
-    case {Args#mrargs.view_type, Args#mrargs.group_level, Args#mrargs.keys} of
+    case {Args#mrargs.view_type, GroupLevel, Args#mrargs.keys} of
         {red, exact, _} -> ok;
         {red, _, KeyList} when is_list(KeyList) ->
             Msg = <<"Multi-key fetchs for reduce views must use `group=true`">>,
@@ -502,7 +503,7 @@ validate_args(Args) ->
         _ -> ok
     end,
 
-    case {Args#mrargs.view_type, Args#mrargs.group_level} of
+    case {Args#mrargs.view_type, GroupLevel} of
         {red, exact} -> ok;
         {_, 0} -> ok;
         {red, Int} when is_integer(Int), Int >= 0 -> ok;
@@ -550,8 +551,21 @@ validate_args(Args) ->
 
     Args#mrargs{
         start_key_docid=SKDocId,
-        end_key_docid=EKDocId
+        end_key_docid=EKDocId,
+        group_level=GroupLevel
     }.
+
+
+determine_group_level(#mrargs{group=undefined, group_level=undefined}) ->
+    0;
+determine_group_level(#mrargs{group=false, group_level=undefined}) ->
+    0;
+determine_group_level(#mrargs{group=false, group_level=Level}) when Level > 0 ->
+    mrverror(<<"Can't specify group=false and group_level>0 at the same time">>);
+determine_group_level(#mrargs{group=true, group_level=undefined}) ->
+    exact;
+determine_group_level(#mrargs{group_level=GroupLevel}) ->
+    GroupLevel.
 
 
 check_range(#mrargs{start_key=undefined}, _Cmp) ->

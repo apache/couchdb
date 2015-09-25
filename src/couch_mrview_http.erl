@@ -432,10 +432,11 @@ parse_params(Props, Keys) ->
 
 
 parse_params(Props, Keys, #mrargs{}=Args0) ->
-    Args = Args0#mrargs{keys=Keys},
+    % group_level set to undefined to detect if explicitly set by user
+    Args1 = Args0#mrargs{keys=Keys, group=undefined, group_level=undefined},
     lists:foldl(fun({K, V}, Acc) ->
         parse_param(K, V, Acc)
-    end, Args, Props).
+    end, Args1, Props).
 
 
 parse_param(Key, Val, Args) when is_binary(Key) ->
@@ -483,10 +484,7 @@ parse_param(Key, Val, Args) ->
         "skip" ->
             Args#mrargs{skip=parse_pos_int(Val)};
         "group" ->
-            case parse_boolean(Val) of
-                true -> Args#mrargs{group_level=exact};
-                _ -> Args#mrargs{group_level=0}
-            end;
+            Args#mrargs{group=parse_boolean(Val)};
         "group_level" ->
             Args#mrargs{group_level=parse_pos_int(Val)};
         "inclusive_end" ->
