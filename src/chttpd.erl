@@ -595,7 +595,7 @@ doc_etag(#doc{revs={Start, [DiskRev|_]}}) ->
     "\"" ++ ?b2l(couch_doc:rev_to_str({Start, DiskRev})) ++ "\"".
 
 make_etag(Term) ->
-    <<SigInt:128/integer>> = erlang:md5(term_to_binary(Term)),
+    <<SigInt:128/integer>> = couch_crypto:hash(md5, term_to_binary(Term)),
     list_to_binary(io_lib:format("\"~.36B\"",[SigInt])).
 
 etag_match(Req, CurrentEtag) when is_binary(CurrentEtag) ->
