@@ -15,6 +15,18 @@
 ConfigureEnv = filename:join(filename:dirname(SCRIPT), "config.erl"),
 os:putenv("COUCHDB_CONFIG", ConfigureEnv).
 
+OTP_VSN = erlang:system_info(compat_rel),
+
+Features = [
+    {'HAS_CALLBACKS', OTP_VSN > 14}
+],
+
+Properties = Features ++ [
+    {'OTP_VSN', OTP_VSN},
+    {'OTP_RELEASE', erlang:system_info(otp_release)}
+],
+
+Defines = [{d, Key, Value}|| {Key, Value} <- Properties],
 
 DepDescs = [
     {b64url,            "b64url",           {branch, "master"}},
@@ -73,7 +85,7 @@ AddConfig = [
     {deps, lists:map(MakeDep, DepDescs)},
     {sub_dirs, ["rel"]},
     {lib_dirs, ["src/"]},
-    {erl_opts, [debug_info]},
+    {erl_opts, [debug_info | Defines]},
     {eunit_opts, [verbose]},
     {plugins, [eunit_plugin]},
     {post_hooks, [{compile, "escript support/build_js.escript"}]}
