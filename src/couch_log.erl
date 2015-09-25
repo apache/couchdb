@@ -93,35 +93,46 @@ callbacks_test_() ->
         [
             ?_assertEqual({ok, couch_log_eunit}, get_backend()),
             ?_assertEqual(ok, couch_log:debug("debug", [])),
-            ?_assertEqual("debug", couch_log_eunit:debug()),
+            ?_assertEqual({debug, ["debug", []]}, last_meck_call()),
             ?_assertEqual(ok, couch_log:info("info", [])),
-            ?_assertEqual("info", couch_log_eunit:info()),
+            ?_assertEqual({info, ["info", []]}, last_meck_call()),
             ?_assertEqual(ok, couch_log:notice("notice", [])),
-            ?_assertEqual("notice", couch_log_eunit:notice()),
+            ?_assertEqual({notice, ["notice", []]}, last_meck_call()),
             ?_assertEqual(ok, couch_log:warning("warning", [])),
-            ?_assertEqual("warning", couch_log_eunit:warning()),
+            ?_assertEqual({warning, ["warning", []]}, last_meck_call()),
             ?_assertEqual(ok, couch_log:error("error", [])),
-            ?_assertEqual("error", couch_log_eunit:error()),
+            ?_assertEqual({error, ["error", []]}, last_meck_call()),
             ?_assertEqual(ok, couch_log:critical("critical", [])),
-            ?_assertEqual("critical", couch_log_eunit:critical()),
+            ?_assertEqual({critical, ["critical", []]}, last_meck_call()),
             ?_assertEqual(ok, couch_log:alert("alert", [])),
-            ?_assertEqual("alert", couch_log_eunit:alert()),
+            ?_assertEqual({alert, ["alert", []]}, last_meck_call()),
             ?_assertEqual(ok, couch_log:emergency("emergency", [])),
-            ?_assertEqual("emergency", couch_log_eunit:emergency()),
+            ?_assertEqual({emergency, ["emergency", []]}, last_meck_call()),
             ?_assertEqual(ok, couch_log:set_level(info)),
-            ?_assertEqual(info, couch_log_eunit:get_level())
+            ?_assertEqual({set_level, [info]}, last_meck_call())
         ]
     }.
 
 setup() ->
-    meck:new([couch_stats]),
+    meck:new([couch_stats, couch_log_eunit], [non_strict]),
     meck:expect(couch_stats, increment_counter, fun(_) -> ok end),
-    couch_log_eunit:setup(),
+    setup_couch_log_eunit(),
     application:load(?MODULE),
     application:set_env(?MODULE, backend, couch_log_eunit).
 
 cleanup(_) ->
-    meck:unload([couch_stats]),
-    couch_log_eunit:cleanup().
+    meck:unload([couch_stats, couch_log_eunit]).
+
+setup_couch_log_eunit() ->
+    meck:expect(couch_log_eunit, set_level, 1, ok),
+    Levels = [debug, info, notice, warning, error, critical, alert, emergency],
+    lists:foreach(fun(Fun) ->
+        meck:expect(couch_log_eunit, Fun, 2, ok)
+    end, Levels).
+
+last_meck_call() ->
+    History = meck:history(couch_log_eunit, self()),
+    {_, {couch_log_eunit, M, A}, _} = hd(lists:reverse(History)),
+    {M, A}.
 
 -endif.
