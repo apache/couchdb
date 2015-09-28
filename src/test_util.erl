@@ -70,7 +70,7 @@ start_couch(IniFiles, ExtraApps) ->
     ok = application:set_env(config, ini_files, IniFiles),
 
     Apps = start_applications(
-        [goldrush, lager, inets, ibrowse, ssl, config, couch_event, couch]
+        [goldrush, lager, inets, ibrowse, ssl, config, couch_epi, couch_event, couch]
         ++ ExtraApps),
 
     #test_context{started = Apps}.
@@ -222,7 +222,7 @@ start(Module, ExtraApps) ->
     start(Module, ExtraApps, []).
 
 start(Module, ExtraApps, Options) ->
-    Apps = start_applications([config, ioq|ExtraApps]),
+    Apps = start_applications([config, ioq, couch_epi | ExtraApps]),
     ToMock = [config, couch_stats] -- proplists:get_value(dont_mock, Options, []),
     mock(ToMock),
     #test_context{module = Module, mocked = ToMock, started = Apps}.
