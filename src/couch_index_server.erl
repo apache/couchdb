@@ -38,7 +38,6 @@
 -record(st, {root_dir}).
 
 start_link() ->
-    couch_epi:register_service(couch_index),
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 
