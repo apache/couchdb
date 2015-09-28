@@ -13,7 +13,7 @@
 
 -module(mem3_epi).
 
--behaviour(couch_epi_plugins).
+-behaviour(couch_epi_plugin).
 
 -export([
     app/0,
