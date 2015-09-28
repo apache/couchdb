@@ -24,10 +24,9 @@ start_link() ->
 
 
 init([]) ->
-    couch_epi:register_service(global_changes),
     global_changes_config_listener:subscribe(),
     {ok, {
-        {one_for_one, 5, 10}, [
+        {one_for_one, 5, 10}, couch_epi:register_service(global_changes_epi) ++ [
             {
                 global_changes_server,
                 {global_changes_server, start_link, []},
@@ -35,7 +34,5 @@ init([]) ->
                 5000,
                 worker,
                 [global_changes_server]
-            },
-            chttpd_handlers:provider(
-                global_changes, global_changes_httpd_handlers)
+            }
     ]}}.
