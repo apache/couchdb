@@ -23,5 +23,6 @@ mrview_http_test_() ->
                                             undefined, #mrargs{})),
 
          ?_assertEqual(#mrargs{group_level=1, group=undefined},
-                       couch_mrview_http:parse_params([{"group_level", "1"}]))
+                       couch_mrview_http:parse_params([{"group_level", "1"}],
+                                            undefined, #mrargs{}))
     ].
