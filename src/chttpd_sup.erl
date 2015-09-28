@@ -18,20 +18,17 @@
 
 %% Helper macro for declaring children of supervisor
 -define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 100, Type, [I]}).
+-define(NAMED_CHILD(I, M, Type), {I, {M, start_link, []}, permanent, 100, Type, [M]}).
 
 start_link(Args) ->
     supervisor:start_link({local,?MODULE}, ?MODULE, Args).
 
 init([]) ->
-    couch_epi:register_service(chttpd_auth),
-    couch_epi:register_service(chttpd_handlers),
-    couch_epi:register_service(chttpd),
-
     chttpd_config_listener:subscribe(),
-    {ok, {{one_for_one, 3, 10}, [
+    ServiceProcesses = couch_epi:register_service(chttpd_epi),
+
+    {ok, {{one_for_one, 3, 10}, add_auth_cache_if_missing(ServiceProcesses) ++ [
         ?CHILD(chttpd, worker),
-        ?CHILD(auth_cache_handler(), worker),
-        chttpd_handlers:provider(chttpd, chttpd_httpd_handlers),
         {chttpd_auth_cache_lru,
 	 {ets_lru, start_link, [chttpd_auth_cache_lru, lru_opts()]},
 	 permanent, 5000, worker, [ets_lru]}
@@ -57,10 +54,8 @@ lru_opts() ->
             []
     end.
 
-auth_cache_handler() ->
-    case application:get_env(chttpd, auth_cache) of
-        {ok, Module} ->
-            Module;
-        _ ->
-            chttpd_auth_cache
-    end.
+add_auth_cache_if_missing(Children) ->
+    case lists:keymember(auth_cache, 1, Children) of
+        true -> Children;
+        false -> [?NAMED_CHILD(auth_cache, chttpd_auth_cache, worker)]
+     end.
