@@ -12,10 +12,10 @@
 
 -module(couch_epi_sup).
 
-%% ----------------------------------
+%% --------------------
 %% Important assumption
 %% ====================
-%% Keeper and codechange_monitor childspecs relie on underdocumented feature.
+%% Keeper and codechange_monitor childspecs rely on undocumented behaviour.
 %% According to supervisor docs:
 %%    ...if the child process is a supervisor, gen_server, or gen_fsm, this
 %%    should be a list with one element [Module].

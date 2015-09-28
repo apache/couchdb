@@ -12,7 +12,6 @@
 
 -module(couch_epi).
 
-%% subscribtion management
 -export([get_handle/1]).
 -export([register_service/1]).
 
