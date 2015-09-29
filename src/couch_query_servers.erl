@@ -285,12 +285,24 @@ validate_doc_update(DDoc, EditDoc, DiskDoc, Ctx, SecObj) ->
             throw({unknown_error, Message})
     end.
 
-json_doc(nil) -> null;
+json_doc_options() ->
+    json_doc_options([]).
+
+json_doc_options(Options) ->
+    Limit = config:get_integer("query_server_config", "revs_limit", 20),
+    [{revs, Limit} | Options].
+
 json_doc(Doc) ->
-    couch_doc:to_json_obj(Doc, [revs]).
+    json_doc(Doc, json_doc_options()).
+
+json_doc(nil, _) ->
+    null;
+json_doc(Doc, Options) ->
+    couch_doc:to_json_obj(Doc, Options).
 
 filter_view(DDoc, VName, Docs) ->
-    JsonDocs = [couch_doc:to_json_obj(Doc, [revs]) || Doc <- Docs],
+    Options = json_doc_options(),
+    JsonDocs = [json_doc(Doc, Options) || Doc <- Docs],
     [true, Passes] = ddoc_prompt(DDoc, [<<"views">>, VName, <<"map">>], [JsonDocs]),
     {ok, Passes}.
 
@@ -301,7 +313,8 @@ filter_docs(Req, Db, DDoc, FName, Docs) ->
     #httpd{} = HttpReq ->
         couch_httpd_external:json_req_obj(HttpReq, Db)
     end,
-    JsonDocs = [couch_doc:to_json_obj(Doc, [revs]) || Doc <- Docs],
+    Options = json_doc_options(),
+    JsonDocs = [json_doc(Doc, Options) || Doc <- Docs],
     [true, Passes] = ddoc_prompt(DDoc, [<<"filters">>, FName],
         [JsonDocs, JsonReq]),
     {ok, Passes}.

@@ -48,13 +48,20 @@ to_json_body(true, {Body}) ->
 to_json_body(false, {Body}) ->
     Body.
 
-to_json_revisions(Options, Start, RevIds) ->
-    case lists:member(revs, Options) of
-    false -> [];
-    true ->
+to_json_revisions(Options, Start, RevIds0) ->
+    RevIds = case proplists:get_value(revs, Options) of
+        true ->
+            RevIds0;
+        Num when is_integer(Num), Num > 0 ->
+            lists:sublist(RevIds0, Num);
+        _ ->
+           []
+    end,
+    if RevIds == [] -> []; true ->
         [{<<"_revisions">>, {[{<<"start">>, Start},
-                {<<"ids">>, [revid_to_str(R) ||R <- RevIds]}]}}]
+            {<<"ids">>, [revid_to_str(R) ||R <- RevIds]}]}}]
     end.
+
 
 revid_to_str(RevId) when size(RevId) =:= 16 ->
     ?l2b(couch_util:to_hex(RevId));
