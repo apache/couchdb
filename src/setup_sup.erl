@@ -35,4 +35,4 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-    {ok, {{one_for_one, 5, 10}, couch_epi:register_service(setup_epi)}}.
+    {ok, {{one_for_one, 5, 10}, couch_epi:register_service(setup_epi, [])}}.
