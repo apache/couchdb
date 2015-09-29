@@ -26,8 +26,7 @@ init([]) ->
             worker,
             dynamic}
     ],
-    ServiceProcesses = couch_epi:register_service(couch_db_epi),
-    Children = SecondarySupervisors ++ ServiceProcesses ++ [
+    Children = SecondarySupervisors ++ [
         begin
             {ok, {Module, Fun, Args}} = couch_util:parse_term(SpecStr),
 
@@ -40,4 +39,5 @@ init([]) ->
         end
         || {Name, SpecStr}
         <- config:get("daemons"), SpecStr /= ""],
-    {ok, {{one_for_one, 50, 3600}, Children}}.
+    {ok, {{one_for_one, 50, 3600},
+        couch_epi:register_service(couch_db_epi, Children)}}.
