@@ -15,8 +15,10 @@
 ConfigureEnv = filename:join(filename:dirname(SCRIPT), "config.erl"),
 os:putenv("COUCHDB_CONFIG", ConfigureEnv).
 
-
 DepDescs = [
+%% must be compiled first as it has a custom behavior
+{couch_epi,        "couch-epi",        "33e8bae844e0994f024ee067196161d61872fcfb"},
+%% keep these sorted
 {b64url,           "b64url",           "319fc604235ab1fde37047b38a432450161db750"},
 {cassim,           "cassim",           "1ae21f7c415acf3d1aba8b4924ca3093014b86b1"},
 {couch_log,        "couch-log",        "7e615ac1b27c61e63b2b8015800ed51ece0f7ad3"},
@@ -24,7 +26,6 @@ DepDescs = [
 {config,           "config",           "b2ecd0d47a776256956ce045123423494ff85e8e"},
 {chttpd,           "chttpd",           "64a5728152ea0a17dd71f133241ef47575fdf98a"},
 {couch,            "couch",            "2594c7f123ebeecd3887d8dd01170e91d6ed26cb"},
-{couch_epi,        "couch-epi",        "aa72f6ffcc9c7095ed59b4d56f5f8139a5205a1f"},
 {couch_index,      "couch-index",      "6565cb961a8da21b21d213e4981133e119bb5ff1"},
 {couch_mrview,     "couch-mrview",     "d7f0093b1c83a721dd8e9a9b3c625d0575e26c9f"},
 {couch_replicator, "couch-replicator", "73139f0ebaee1b7bb49f926aebb0c3106c21ce74"},
