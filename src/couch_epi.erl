@@ -70,67 +70,67 @@
 -spec dump(Handle :: handle()) ->
     [Config :: properties()].
 
-dump(Handle) ->
+dump(Handle) when Handle /= undefined ->
     couch_epi_data_gen:get(Handle).
 
 -spec get(Handle :: handle(), Key :: key()) ->
     [Config :: properties()].
 
-get(Handle, Key) ->
+get(Handle, Key) when Handle /= undefined ->
     couch_epi_data_gen:get(Handle, Key).
 
 -spec get_value(Handle :: handle(), Subscriber :: app(), Key :: key()) ->
     properties().
 
-get_value(Handle, Subscriber, Key) ->
+get_value(Handle, Subscriber, Key) when Handle /= undefined ->
     couch_epi_data_gen:get(Handle, Subscriber, Key).
 
 
 -spec by_key(Handle :: handle()) ->
     [{Key :: key(), [{Source :: app(), properties()}]}].
 
-by_key(Handle) ->
+by_key(Handle) when Handle /= undefined ->
     couch_epi_data_gen:by_key(Handle).
 
 
 -spec by_key(Handle :: handle(), Key :: key()) ->
     [{Source :: app(), properties()}].
 
-by_key(Handle, Key) ->
+by_key(Handle, Key) when Handle /= undefined ->
     couch_epi_data_gen:by_key(Handle, Key).
 
 
 -spec by_source(Handle :: handle()) ->
     [{Source :: app(), [{Key :: key(), properties()}]}].
 
-by_source(Handle) ->
+by_source(Handle) when Handle /= undefined ->
     couch_epi_data_gen:by_source(Handle).
 
 
 -spec by_source(Handle :: handle(), Subscriber :: app()) ->
     [{Key :: key(), properties()}].
 
-by_source(Handle, Subscriber) ->
+by_source(Handle, Subscriber) when Handle /= undefined ->
     couch_epi_data_gen:by_source(Handle, Subscriber).
 
 
 -spec keys(Handle :: handle()) ->
     [Key :: key()].
 
-keys(Handle) ->
+keys(Handle) when Handle /= undefined ->
     couch_epi_data_gen:keys(Handle).
 
 
 -spec subscribers(Handle :: handle()) ->
     [Subscriber :: app()].
 
-subscribers(Handle) ->
+subscribers(Handle) when Handle /= undefined ->
     couch_epi_data_gen:subscribers(Handle).
 
 -spec apply(Handle :: handle(), ServiceId :: atom(), Function :: atom(),
     Args :: [term()], Opts :: apply_opts()) -> ok.
 
-apply(Handle, ServiceId, Function, Args, Opts) ->
+apply(Handle, ServiceId, Function, Args, Opts) when Handle /= undefined ->
     couch_epi_functions_gen:apply(Handle, ServiceId, Function, Args, Opts).
 
 -spec get_handle({ServiceId :: service_id(), Key :: key()}) -> handle();
@@ -144,21 +144,21 @@ get_handle(ServiceId) when is_atom(ServiceId) ->
 -spec any(Handle :: handle(), ServiceId :: atom(), Function :: atom(),
     Args :: [term()], Opts :: apply_opts()) -> boolean().
 
-any(Handle, ServiceId, Function, Args, Opts) ->
+any(Handle, ServiceId, Function, Args, Opts) when Handle /= undefined ->
     Replies = apply(Handle, ServiceId, Function, Args, Opts),
     [] /= [Reply || Reply <- Replies, Reply == true].
 
 -spec all(Handle :: handle(), ServiceId :: atom(), Function :: atom(),
     Args :: [term()], Opts :: apply_opts()) -> boolean().
 
-all(Handle, ServiceId, Function, Args, Opts) ->
+all(Handle, ServiceId, Function, Args, Opts) when Handle /= undefined ->
     Replies = apply(Handle, ServiceId, Function, Args, Opts),
     [] == [Reply || Reply <- Replies, Reply == false].
 
 -spec is_configured(
     Handle :: handle(), Function :: atom(), Arity :: pos_integer()) -> boolean().
 
-is_configured(Handle, Function, Arity) ->
+is_configured(Handle, Function, Arity) when Handle /= undefined ->
     [] /= couch_epi_functions_gen:modules(Handle, Function, Arity).
 
 
