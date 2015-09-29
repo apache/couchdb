@@ -18,5 +18,6 @@
         couch_index_server
     ]},
     {registered, [couch_index_server]},
-    {applications, [kernel, stdlib]}
+    {applications, [kernel, stdlib, couch_epi]},
+    {mod, {couch_index_app, []}}
 ]}.
