@@ -21,4 +21,4 @@ start_link(Args) ->
     supervisor:start_link({local,?MODULE}, ?MODULE, Args).
 
 init([]) ->
-    {ok, {{one_for_one, 3, 10}, couch_epi:register_service(mango_epi)}}.
+    {ok, {{one_for_one, 3, 10}, couch_epi:register_service(mango_epi, [])}}.
