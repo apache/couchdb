@@ -35,8 +35,7 @@ providers() ->
 
 
 services() ->
-    [
-    ].
+    [].
 
 data_subscriptions() ->
     [].
