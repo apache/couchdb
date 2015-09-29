@@ -32,7 +32,7 @@
 
 %% API
 -export([start_link/0]).
--export([plugin_childspecs/1]).
+-export([plugin_childspecs/2]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -47,9 +47,9 @@
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
-plugin_childspecs(Plugin) ->
+plugin_childspecs(Plugin, Children) ->
     Plugins = application:get_env(couch_epi, plugins, []),
-    plugin_childspecs(Plugin, Plugins).
+    plugin_childspecs(Plugin, Plugins, Children).
 
 %% ===================================================================
 %% Supervisor callbacks
@@ -68,10 +68,10 @@ keepers() ->
     Children = keeper_childspecs(Definitions),
     remove_duplicates(Children).
 
-plugin_childspecs(Plugin, Plugins) ->
+plugin_childspecs(Plugin, Plugins, Children) ->
     Definitions = couch_epi_plugin:grouped_definitions([Plugin]),
     ExtraChildren = couch_epi_plugin:plugin_processes(Plugin, Plugins),
-    ExtraChildren ++ childspecs(Definitions).
+    merge(ExtraChildren, Children) ++ childspecs(Definitions).
 
 childspecs(Definitions) ->
     lists:map(fun({{Kind, Key}, Defs}) ->
@@ -127,6 +127,11 @@ modules(#couch_epi_spec{kind = data_providers, value = Value}) ->
 modules(#couch_epi_spec{kind = data_subscriptions, behaviour = Module}) ->
     [Module].
 
+merge([], Children) ->
+    Children;
+merge([{Id, _, _, _, _, _} = Spec | Rest], Children) ->
+    merge(Rest, lists:keystore(Id, 1, Children, Spec)).
+
 
 %% ------------------------------------------------------------------
 %% Tests
@@ -164,7 +169,9 @@ data_subscriptions() ->
 
 processes() ->
     [
-        {?MODULE, [?CHILD(extra_process, worker)]}
+        {?MODULE, [?CHILD(extra_process, worker)]},
+        {?MODULE, [{to_replace, {new, start_link, [bar]},
+            permanent, 5000, worker, [bar]}]}
     ].
 
 notify(_Key, _OldData, _NewData) ->
@@ -188,6 +195,7 @@ parse_child_id(Id) ->
 basic_test() ->
     Expected = lists:sort([
         {extra_process, [], [extra_process]},
+        {to_replace, [bar], [bar]},
         {{my_service, providers},
             [couch_epi_functions_gen_my_service],
             [couch_epi_codechange_monitor, couch_epi_functions_gen_my_service,
@@ -205,7 +213,9 @@ basic_test() ->
             [couch_epi_codechange_monitor, couch_epi_data_gen_test_app_descriptions,
                 couch_epi_sup]}
     ]),
-    Children = lists:sort(plugin_childspecs(?MODULE, [?MODULE])),
+
+    ToReplace = {to_replace, {old, start_link, [foo]}, permanent, 5000, worker, [foo]},
+    Children = lists:sort(plugin_childspecs(?MODULE, [?MODULE], [ToReplace])),
     Results = [
         {parse_child_id(Id), Args, lists:sort(Modules)}
             || {Id, {_M, _F, Args}, _, _, _, Modules} <- Children
@@ -213,6 +223,12 @@ basic_test() ->
 
     Tests = lists:zip(Expected, Results),
     [?assertEqual(Expect, Result) || {Expect, Result} <- Tests],
+
+    ExpectedChild = {to_replace, {new, start_link, [bar]},
+        permanent, 5000, worker, [bar]},
+    ?assertEqual(
+        ExpectedChild,
+        lists:keyfind(to_replace, 1, Children)),
 
     ok.
 

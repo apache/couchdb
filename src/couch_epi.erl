@@ -13,7 +13,7 @@
 -module(couch_epi).
 
 -export([get_handle/1]).
--export([register_service/1]).
+-export([register_service/2]).
 
 %% queries and introspection
 -export([
@@ -162,8 +162,9 @@ is_configured(Handle, Function, Arity) when Handle /= undefined ->
     [] /= couch_epi_functions_gen:modules(Handle, Function, Arity).
 
 
--spec register_service(PluginId :: plugin_id()) ->
-    [supervisor:child_spec()].
+-spec register_service(
+    PluginId :: plugin_id(), Children :: [supervisor:child_spec()]) ->
+        [supervisor:child_spec()].
 
-register_service(Plugin) ->
-    couch_epi_sup:plugin_childspecs(Plugin).
+register_service(Plugin, Children) ->
+    couch_epi_sup:plugin_childspecs(Plugin, Children).
