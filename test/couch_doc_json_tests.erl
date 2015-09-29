@@ -16,25 +16,39 @@
 -include_lib("couch/include/couch_db.hrl").
 
 
+setup() ->
+    mock(couch_log),
+    mock(couch_db_plugin),
+    ok.
+
+teardown(_) ->
+    meck:unload(couch_log),
+    meck:unload(couch_db_plugin),
+    ok.
+
+mock(couch_db_plugin) ->
+    ok = meck:new(couch_db_plugin, [passthrough]),
+    ok = meck:expect(couch_db_plugin, validate_docid, fun(_) -> false end),
+    ok;
+mock(couch_log) ->
+    ok = meck:new(couch_log, [passthrough]),
+    ok = meck:expect(couch_log, debug, fun(_, _) -> ok end),
+    ok.
+
+
 json_doc_test_() ->
     {
         setup,
-        fun() -> test_util:start(?MODULE) end, fun test_util:stop/1,
-        [
-            {
-                "Document from JSON",
-                [
-                    from_json_success_cases(),
-                    from_json_error_cases()
-                ]
-            },
-            {
-                "Document to JSON",
-                [
-                    to_json_success_cases()
-                ]
-            }
-        ]
+        fun setup/0, fun teardown/1,
+        fun(_) ->
+            [{"Document from JSON", [
+                from_json_success_cases(),
+                from_json_error_cases()
+             ]},
+             {"Document to JSON", [
+                 to_json_success_cases()
+             ]}]
+        end
     }.
 
 from_json_success_cases() ->
