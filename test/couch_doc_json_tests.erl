@@ -181,12 +181,12 @@ from_json_error_cases() ->
         },
         {
             {[{<<"_id">>, {[{<<"foo">>, 5}]}}]},
-            {bad_request, <<"Document id must be a string">>},
+            {illegal_docid, <<"Document id must be a string">>},
             "Document id must be a string."
         },
         {
             {[{<<"_id">>, <<"_random">>}]},
-            {bad_request,
+            {illegal_docid,
              <<"Only reserved document ids may start with underscore.">>},
             "Disallow arbitrary underscore prefixed docids."
         },
