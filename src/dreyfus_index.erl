@@ -241,7 +241,7 @@ design_doc_to_index(#doc{id=Id,body={Fields}}, IndexName) ->
         {IndexName, {Index}} ->
             Analyzer = couch_util:get_value(<<"analyzer">>, Index, <<"standard">>),
             Def = couch_util:get_value(<<"index">>, Index),
-            Sig = ?l2b(couch_util:to_hex(couch_util:md5(term_to_binary({Analyzer, Def})))),
+            Sig = ?l2b(couch_util:to_hex(couch_crypto:hash(md5, term_to_binary({Analyzer, Def})))),
             {ok, #index{
                analyzer=Analyzer,
                ddoc_id=Id,
