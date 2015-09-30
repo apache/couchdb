@@ -45,10 +45,10 @@ setup(DName) ->
     {Ctx, OsDPid}.
 
 teardown(_, {Ctx, OsDPid}) ->
-    test_util:stop(Ctx),
     test_util:stop_sync_throw(OsDPid, fun() ->
         exit(OsDPid, shutdown)
-    end, {timeout, os_daemon_stop}, ?TIMEOUT).
+    end, {timeout, os_daemon_stop}, ?TIMEOUT),
+    test_util:stop(Ctx).
 
 
 os_daemons_test_() ->
