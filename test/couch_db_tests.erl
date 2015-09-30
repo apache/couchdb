@@ -96,7 +96,7 @@ should_create_delete_database_continuously() ->
     couch_db:close(Db),
     [{timeout, ?TIMEOUT, {integer_to_list(N) ++ " times",
                            ?_assert(loop(DbName, N))}}
-     || N <- [10, 100, 1000]].
+     || N <- [10, 100]].
 
 loop(_, 0) ->
     true;
