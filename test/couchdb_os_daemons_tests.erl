@@ -41,6 +41,9 @@ setup(DName) ->
     {ok, OsDPid} = couch_os_daemons:start_link(),
     config:set("os_daemons", DName,
                      filename:join([?FIXTURESDIR, DName]), false),
+    % Set configuration option to be used by configuration_reader_test_
+    % This will be used in os_daemon_configer.escript:test_get_cfg2
+    config:set("uuids", "algorithm","sequential", false),
     timer:sleep(?DELAY),  % sleep a bit to let daemon set kill flag
     {Ctx, OsDPid}.
 
