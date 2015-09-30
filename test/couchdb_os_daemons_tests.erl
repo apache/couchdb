@@ -37,7 +37,7 @@
 
 
 setup(DName) ->
-    Ctx = test_util:start(?MODULE, [], [{dont_mock, [config]}]),
+    Ctx = test_util:start(?MODULE, [couch_log], [{dont_mock, [config]}]),
     {ok, OsDPid} = couch_os_daemons:start_link(),
     config:set("os_daemons", DName,
                      filename:join([?FIXTURESDIR, DName]), false),
