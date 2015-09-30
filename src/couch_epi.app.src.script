@@ -10,6 +10,9 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
+ConfigFile = filename:join([os:getenv("COUCHDB_APPS_CONFIG_DIR"), "couch_epi.config"]).
+{ok, AppConfig} = file:consult(ConfigFile).
+
 {application, couch_epi,
  [
   {description, "extensible plugin interface"},
@@ -20,5 +23,5 @@
                   stdlib
                  ]},
   {mod, { couch_epi_app, []}},
-  {env, []}
+  {env, AppConfig}
  ]}.
