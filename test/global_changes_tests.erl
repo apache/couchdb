@@ -122,7 +122,7 @@ delete_admin(User) ->
 
 get_host() ->
     Addr = config:get("httpd", "bind_address", "127.0.0.1"),
-    Port = config:get("chttpd", "port", "5984"),
+    Port = integer_to_list(mochiweb_socket_server:get(chttpd, port)),
     Host = "http://" ++ Addr ++ ":" ++ Port,
     Host.
 
