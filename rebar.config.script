@@ -12,8 +12,14 @@
 
 % Set the path to the configuration environment generated
 % by `./configure`.
-ConfigureEnv = filename:join(filename:dirname(SCRIPT), "config.erl"),
+
+COUCHDB_ROOT = filename:dirname(SCRIPT).
+os:putenv("COUCHDB_ROOT", COUCHDB_ROOT).
+
+ConfigureEnv = filename:join(COUCHDB_ROOT, "config.erl").
 os:putenv("COUCHDB_CONFIG", ConfigureEnv).
+
+os:putenv("COUCHDB_APPS_CONFIG_DIR", filename:join([COUCHDB_ROOT, "rel/apps"])).
 
 DepDescs = [
 %% must be compiled first as it has a custom behavior
