@@ -20,7 +20,7 @@
 -define(t2l(V), lists:flatten(io_lib:format("~p", [V]))).
 
 start() ->
-    Ctx = test_util:start_couch([chttpd]),
+    Ctx = test_util:start_couch([chttpd, global_changes]),
     DbName = ?tempdb(),
     ok = fabric:create_db(DbName, [?ADMIN_CTX]),
     application:set_env(global_changes, dbname, DbName),
@@ -47,9 +47,9 @@ teardown(_) ->
     config:delete("global_changes", "allowed_owner", false),
     ok.
 
-allowed_owner(Req, "throw") ->
+allowed_owner(_Req, "throw") ->
     throw({unauthorized, <<"Exception thrown.">>});
-allowed_owner(Req, "pass") ->
+allowed_owner(_Req, "pass") ->
     "super".
 
 allowed_owner_hook_test_() ->
@@ -151,6 +151,6 @@ delete_admin(User) ->
 
 get_host() ->
     Addr = config:get("httpd", "bind_address", "127.0.0.1"),
-    Port = config:get("chttpd", "port", "5984"),
+    Port = integer_to_list(mochiweb_socket_server:get(chttpd, port)),
     Host = "http://" ++ Addr ++ ":" ++ Port,
     Host.
