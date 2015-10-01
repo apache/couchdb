@@ -23,19 +23,18 @@ start_link(Args) ->
     supervisor:start_link({local,?MODULE}, ?MODULE, Args).
 
 init([]) ->
-    couch_epi:register_service(chttpd_auth),
-    couch_epi:register_service(chttpd_handlers),
-    couch_epi:register_service(chttpd),
-
     chttpd_config_listener:subscribe(),
-    {ok, {{one_for_one, 3, 10}, [
+
+    Children = [
         ?CHILD(chttpd, worker),
-        ?CHILD(auth_cache_handler(), worker),
-        chttpd_handlers:provider(chttpd, chttpd_httpd_handlers),
+        ?CHILD(chttpd_auth_cache, worker),
         {chttpd_auth_cache_lru,
 	 {ets_lru, start_link, [chttpd_auth_cache_lru, lru_opts()]},
 	 permanent, 5000, worker, [ets_lru]}
-    ]}}.
+    ],
+
+    {ok, {{one_for_one, 3, 10},
+        couch_epi:register_service(chttpd_epi, Children)}}.
 
 lru_opts() ->
     case config:get("chttpd_auth_cache", "max_objects") of
@@ -55,12 +54,4 @@ lru_opts() ->
             [{max_lifetime, MxLT}];
         _ ->
             []
-    end.
-
-auth_cache_handler() ->
-    case application:get_env(chttpd, auth_cache) of
-        {ok, Module} ->
-            Module;
-        _ ->
-            chttpd_auth_cache
     end.
