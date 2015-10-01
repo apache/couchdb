@@ -51,7 +51,7 @@ open(Fd) ->
     open(Fd, []).
 
 open(Fd, Options) ->
-    gen_server:start_link(couch_stream, {Fd, self(), Options}, []).
+    gen_server:start_link(couch_stream, {Fd, self(), erlang:get(io_priority), Options}, []).
 
 close(Pid) ->
     gen_server:call(Pid, close, infinity).
@@ -198,7 +198,8 @@ write(Pid, Bin) ->
     gen_server:call(Pid, {write, Bin}, infinity).
 
 
-init({Fd, OpenerPid, Options}) ->
+init({Fd, OpenerPid, OpenerPriority, Options}) ->
+    erlang:put(io_priority, OpenerPriority),
     {EncodingFun, EndEncodingFun} =
     case couch_util:get_value(encoding, Options, identity) of
     identity ->
