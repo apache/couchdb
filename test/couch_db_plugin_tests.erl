@@ -21,23 +21,51 @@
     on_delete/2
 ]).
 
+-export([ %% couch_epi_plugin behaviour
+    app/0,
+    providers/0,
+    services/0,
+    data_providers/0,
+    data_subscriptions/0,
+    processes/0,
+    notify/3
+]).
+
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
 -record(ctx, {pid, handle}).
 
+%% couch_epi_plugin behaviour
+
+app() -> test_app.
+providers() -> [{couch_db, ?MODULE}].
+services() -> [].
+data_providers() -> [].
+data_subscriptions() -> [].
+processes() -> [].
+notify(_, _, _) -> ok.
+
+start_epi() ->
+    application:load(couch_epi),
+    Plugins = application:get_env(couch_epi, plugins, []),
+    ok = application:set_env(couch_epi, plugins, append_if_missing(Plugins, ?MODULE)),
+    ok = application:start(couch_epi).
+
+append_if_missing(List, Value) ->
+    case lists:member(Value, List) of
+        true -> List;
+        false -> [Value | List]
+    end.
+
 setup() ->
     error_logger:tty(false),
-    application:start(couch_epi),
-    {ok, FunctionsPid} = couch_epi_functions:start_link(
-        test_app, {epi_key, couch_db}, {modules, [?MODULE]},
-        [{interval, 100}]),
-    ok = couch_epi_functions:wait(FunctionsPid),
-    #ctx{pid = FunctionsPid, handle = couch_epi:get_handle(couch_db)}.
+    start_epi(),
+    #ctx{handle = couch_epi:get_handle(couch_db)}.
 
-teardown(#ctx{pid = FunctionsPid}) ->
-    erlang:unlink(FunctionsPid),
-    couch_epi_functions:stop(FunctionsPid),
+teardown(#ctx{}) ->
+    Plugins = application:get_env(couch_epi, plugins, []),
+    application:set_env(couch_epi, plugins, Plugins -- [?MODULE]),
     application:stop(couch_epi),
     ok.
 

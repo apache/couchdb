@@ -18,7 +18,6 @@ start_link() ->
     supervisor:start_link({local,couch_secondary_services}, ?MODULE, []).
 
 init([]) ->
-    couch_epi:register_service(couch_db),
     SecondarySupervisors = [
         {couch_plugin_event,
             {gen_event, start_link, [{local, couch_plugin}]},
@@ -27,10 +26,7 @@ init([]) ->
             worker,
             dynamic}
     ],
-    ServiceProviders = [
-        chttpd_handlers:provider(couch, couch_httpd_handlers)
-    ],
-    Children = SecondarySupervisors ++ ServiceProviders ++ [
+    Children = SecondarySupervisors ++ [
         begin
             {ok, {Module, Fun, Args}} = couch_util:parse_term(SpecStr),
 
@@ -43,4 +39,5 @@ init([]) ->
         end
         || {Name, SpecStr}
         <- config:get("daemons"), SpecStr /= ""],
-    {ok, {{one_for_one, 50, 3600}, Children}}.
+    {ok, {{one_for_one, 50, 3600},
+        couch_epi:register_service(couch_db_epi, Children)}}.
