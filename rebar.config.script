@@ -45,7 +45,7 @@ DepDescs = [
 {fabric,           "fabric",           "17f0377807804b7b55db6c6b378d9e266ea52236"},
 {fauxton,          "fauxton",          "ebd9ced89d27de297526acf74ebad88f1c6a6711", [raw]},
 {folsom,           "folsom",           "fbb7bc83806520ffef84107c85f53c1f7113c20d"},
-{global_changes,   "global-changes",   "07097ce3e10e970e4f00d487baf75c782943c8f8"},
+{global_changes,   "global-changes",   "e55de37ece29b6cbc0af540370d2425159338bf9"},
 {goldrush,         "goldrush",         {tag, "0.1.6"}},
 {ibrowse,          "ibrowse",          "4af2d408607874d124414ac45df1edbe3961d1cd"},
 {ioq,              "ioq",              "c7c75ebeaf41599e3a3e211097d864f0e7785829"},
