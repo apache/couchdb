@@ -334,7 +334,8 @@ db_req(#httpd{method='POST', path_parts=[DbName], user_ctx=Ctx}=Req, Db) ->
         ]});
     _Normal ->
         % normal
-        DocUrl = absolute_uri(Req, [$/, DbName, $/, DocId]),
+        DocUrl = absolute_uri(Req, [$/, couch_util:url_encode(DbName),
+            $/, couch_util:url_encode(DocId)]),
         case fabric:update_doc(Db, Doc2, Options) of
         {ok, NewRev} ->
             HttpCode = 201;
@@ -753,7 +754,8 @@ db_doc_req(#httpd{method='PUT', user_ctx=Ctx}=Req, Db, DocId) ->
     W = chttpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
     Options = [{user_ctx,Ctx}, {w,W}],
 
-    Loc = absolute_uri(Req, [$/, Db#db.name, $/, couch_util:url_encode(DocId)]),
+    Loc = absolute_uri(Req, [$/, couch_util:url_encode(Db#db.name),
+        $/, couch_util:url_encode(DocId)]),
     RespHeaders = [{"Location", Loc}],
     case couch_util:to_list(couch_httpd:header_value(Req, "Content-Type")) of
     ("multipart/related;" ++ _) = ContentType ->
@@ -815,8 +817,10 @@ db_doc_req(#httpd{method='COPY', user_ctx=Ctx}=Req, Db, SourceDocId) ->
     end,
     % respond
     {PartRes} = update_doc_result_to_json(TargetDocId, {ok, NewTargetRev}),
+    Loc = absolute_uri(Req, "/" ++ couch_util:url_encode(Db#db.name) ++ "/" ++ couch_util:url_encode(TargetDocId)),
     send_json(Req, HttpCode,
-        [{"Etag", "\"" ++ ?b2l(couch_doc:rev_to_str(NewTargetRev)) ++ "\""}],
+        [{"Location", Loc},
+        {"Etag", "\"" ++ ?b2l(couch_doc:rev_to_str(NewTargetRev)) ++ "\""}],
         {[{ok, true}] ++ PartRes});
 
 db_doc_req(Req, _Db, _DocId) ->
