@@ -13,7 +13,6 @@
 -module(chttpd_handlers).
 
 -export([
-    provider/2,
     url_handler/2,
     db_handler/2,
     design_handler/2
@@ -26,10 +25,6 @@
 %% ------------------------------------------------------------------
 %% API Function Definitions
 %% ------------------------------------------------------------------
-
-provider(App, Module) ->
-    couch_epi_functions:childspec(chttpd_handlers_subscription,
-       App, ?SERVICE_ID, Module).
 
 url_handler(HandlerKey, DefaultFun) ->
     select(collect(url_handler, [HandlerKey]), DefaultFun).
