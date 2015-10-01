@@ -22,10 +22,10 @@ start_link() ->
 
 init(_Args) ->
     Children = [
-        child(dreyfus_index_manager),
-        chttpd_handlers:provider(dreyfus, dreyfus_httpd_handlers)
+        child(dreyfus_index_manager)
     ],
-    {ok, {{one_for_one,10,1}, Children}}.
+    {ok, {{one_for_one,10,1},
+        couch_epi:register_service(dreyfus_epi, Children)}}.
 
 child(Child) ->
     {Child, {Child, start_link, []}, permanent, 1000, worker, [Child]}.
