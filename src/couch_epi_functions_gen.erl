@@ -44,7 +44,7 @@ apply(ServiceId, Function, Args, Opts) when is_atom(ServiceId) ->
     apply(get_handle(ServiceId), ServiceId, Function, Args, Opts).
 
 -spec apply(Handle :: atom(), ServiceId :: atom(), Function :: atom(),
-    Args :: [term()], Opts :: couch_epi:apply_opts()) -> ok.
+    Args :: [term()], Opts :: couch_epi:apply_opts()) -> [any()].
 
 apply(Handle, _ServiceId, Function, Args, Opts) ->
     DispatchOpts = parse_opts(Opts),

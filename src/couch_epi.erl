@@ -37,7 +37,8 @@
     key/0,
     handle/0,
     plugin_id/0,
-    data_spec/0
+    data_spec/0,
+    apply_opts/0
 ]).
 
 -type app() :: atom().
@@ -128,7 +129,7 @@ subscribers(Handle) when Handle /= undefined ->
     couch_epi_data_gen:subscribers(Handle).
 
 -spec apply(Handle :: handle(), ServiceId :: atom(), Function :: atom(),
-    Args :: [term()], Opts :: apply_opts()) -> ok.
+    Args :: [term()], Opts :: apply_opts()) -> [any()].
 
 apply(Handle, ServiceId, Function, Args, Opts) when Handle /= undefined ->
     couch_epi_functions_gen:apply(Handle, ServiceId, Function, Args, Opts).
