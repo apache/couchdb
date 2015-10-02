@@ -216,6 +216,8 @@ validate_atomic_update(_DbName, AllDocs, true) ->
 doc_update1_test() ->
     meck:new(couch_stats),
     meck:expect(couch_stats, increment_counter, fun(_) -> ok end),
+    meck:new(couch_log),
+    meck:expect(couch_log, warning, fun(_,_) -> ok end),
 
     Doc1 = #doc{revs = {1,[<<"foo">>]}},
     Doc2 = #doc{revs = {1,[<<"bar">>]}},
@@ -286,12 +288,15 @@ doc_update1_test() ->
         {error, [{Doc1,{accepted,"A"}},{Doc2,{error,internal_server_error}}]},
         ReplyW5
     ),
+    meck:unload(couch_log),
     meck:unload(couch_stats).
 
 
 doc_update2_test() ->
     meck:new(couch_stats),
     meck:expect(couch_stats, increment_counter, fun(_) -> ok end),
+    meck:new(couch_log),
+    meck:expect(couch_log, warning, fun(_,_) -> ok end),
 
     Doc1 = #doc{revs = {1,[<<"foo">>]}},
     Doc2 = #doc{revs = {1,[<<"bar">>]}},
@@ -315,6 +320,7 @@ doc_update2_test() ->
 
     ?assertEqual({accepted, [{Doc1,{accepted,Doc2}}, {Doc2,{accepted,Doc1}}]},
         Reply),
+    meck:unload(couch_log),
     meck:unload(couch_stats).
 
 doc_update3_test() ->

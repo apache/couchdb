@@ -199,6 +199,8 @@ all_revs_test() ->
     meck:new([fabric, couch_stats]),
     meck:expect(fabric, update_docs, fun(_, _, _) -> {ok, nil} end),
     meck:expect(couch_stats, increment_counter, fun(_) -> ok end),
+    meck:new(couch_log),
+    meck:expect(couch_log, notice, fun(_,_) -> ok end),
 
     State0 = #state{worker_count = 3, workers=[nil,nil,nil], r = 2, revs = all},
     Foo1 = {ok, #doc{revs = {1, [<<"foo">>]}}},
@@ -243,7 +245,7 @@ all_revs_test() ->
         {stop, [Bar1, Foo1]},
         handle_message({ok, [Bar1]}, nil, State2)
       ),
-    meck:unload([fabric, couch_stats]),
+    meck:unload([fabric, couch_log, couch_stats]),
     config:stop().
 
 specific_revs_test() ->
@@ -251,6 +253,8 @@ specific_revs_test() ->
     meck:new([fabric, couch_stats]),
     meck:expect(fabric, update_docs, fun(_, _, _) -> {ok, nil} end),
     meck:expect(couch_stats, increment_counter, fun(_) -> ok end),
+    meck:new(couch_log),
+    meck:expect(couch_log, notice, fun(_,_) -> ok end),
 
     Revs = [{1,<<"foo">>}, {1,<<"bar">>}, {1,<<"baz">>}],
     State0 = #state{
@@ -313,5 +317,5 @@ specific_revs_test() ->
         {stop, [Foo2, Bar1, Baz2]},
         handle_message({ok, [Foo2, Bar1, Baz2]}, nil, State2L)
       ),
-    meck:unload([fabric, couch_stats]),
+    meck:unload([fabric, couch_log, couch_stats]),
     config:stop().
