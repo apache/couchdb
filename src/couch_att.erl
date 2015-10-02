@@ -148,7 +148,7 @@
 ].
 
 
--opaque att() :: #att{} | attachment().
+-type att() :: #att{} | attachment().
 
 
 new() ->
