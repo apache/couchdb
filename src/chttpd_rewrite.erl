@@ -23,102 +23,7 @@
 -define(MATCH_ALL, {bind, <<"*">>}).
 
 
-%% doc The http rewrite handler. All rewriting is done from
-%% /dbname/_design/ddocname/_rewrite by default.
-%%
-%% each rules should be in rewrites member of the design doc.
-%% Ex of a complete rule :
-%%
-%%  {
-%%      ....
-%%      "rewrites": [
-%%      {
-%%          "from": "",
-%%          "to": "index.html",
-%%          "method": "GET",
-%%          "query": {}
-%%      }
-%%      ]
-%%  }
-%%
-%%  from: is the path rule used to bind current uri to the rule. It
-%% use pattern matching for that.
-%%
-%%  to: rule to rewrite an url. It can contain variables depending on binding
-%% variables discovered during pattern matching and query args (url args and from
-%% the query member.)
-%%
-%%  method: method to bind the request method to the rule. by default "*"
-%%  query: query args you want to define they can contain dynamic variable
-%% by binding the key to the bindings
-%%
-%%
-%% to and from are path with  patterns. pattern can be string starting with ":" or
-%% "*". ex:
-%% /somepath/:var/*
-%%
-%% This path is converted in erlang list by splitting "/". Each var are
-%% converted in atom. "*" is converted to '*' atom. The pattern matching is done
-%% by splitting "/" in request url in a list of token. A string pattern will
-%% match equal token. The star atom ('*' in single quotes) will match any number
-%% of tokens, but may only be present as the last pathtern in a pathspec. If all
-%% tokens are matched and all pathterms are used, then the pathspec matches. It works
-%% like webmachine. Each identified token will be reused in to rule and in query
-%%
-%% The pattern matching is done by first matching the request method to a rule. by
-%% default all methods match a rule. (method is equal to "*" by default). Then
-%% It will try to match the path to one rule. If no rule match, then a 404 error
-%% is displayed.
-%%
-%% Once a rule is found we rewrite the request url using the "to" and
-%% "query" members. The identified token are matched to the rule and
-%% will replace var. if '*' is found in the rule it will contain the remaining
-%% part if it exists.
-%%
-%% Examples:
-%%
-%% Dispatch rule            URL             TO                  Tokens
-%%
-%% {"from": "/a/b",         /a/b?k=v        /some/b?k=v         var =:= b
-%% "to": "/some/"}                                              k = v
-%%
-%% {"from": "/a/b",         /a/b            /some/b?var=b       var =:= b
-%% "to": "/some/:var"}
-%%
-%% {"from": "/a",           /a              /some
-%% "to": "/some/*"}
-%%
-%% {"from": "/a/*",         /a/b/c          /some/b/c
-%% "to": "/some/*"}
-%%
-%% {"from": "/a",           /a              /some
-%% "to": "/some/*"}
-%%
-%% {"from": "/a/:foo/*",    /a/b/c          /some/b/c?foo=b     foo =:= b
-%% "to": "/some/:foo/*"}
-%%
-%% {"from": "/a/:foo",     /a/b             /some/?k=b&foo=b    foo =:= b
-%% "to": "/some",
-%%  "query": {
-%%      "k": ":foo"
-%%  }}
-%%
-%% {"from": "/a",           /a?foo=b        /some/b             foo =:= b
-%% "to": "/some/:foo",
-%%  }}
-
-
-
-handle_rewrite_req(#httpd{
-        path_parts=[DbName, <<"_design">>, DesignName, _Rewrite|PathParts],
-        method=Method,
-        mochi_req=MochiReq}=Req, _Db, DDoc) ->
-
-    % we are in a design handler
-    DesignId = <<"_design/", DesignName/binary>>,
-    Prefix = <<"/", DbName/binary, "/", DesignId/binary>>,
-    QueryList = lists:map(fun decode_query_value/1, chttpd:qs(Req)),
-
+handle_rewrite_req(#httpd{}=Req, Db, DDoc) ->
     RewritesSoFar = erlang:get(?REWRITE_COUNT),
     MaxRewrites = config:get_integer("httpd", "rewrite_limit", 100),
     case RewritesSoFar >= MaxRewrites of
@@ -127,67 +32,170 @@ handle_rewrite_req(#httpd{
         false ->
             erlang:put(?REWRITE_COUNT, RewritesSoFar + 1)
     end,
-
-    #doc{body={Props}} = DDoc,
-
-    % get rules from ddoc
-    case couch_util:get_value(<<"rewrites">>, Props) of
+    case get_rules(DDoc) of
+        Rules when is_list(Rules) ->
+            do_rewrite(Req, Rules);
+        Rules when is_binary(Rules) ->
+            case couch_query_servers:rewrite(Req, Db, DDoc) of
+                undefined ->
+                    chttpd:send_error(Req, 404, <<"rewrite_error">>,
+                        <<"Invalid path.">>);
+                Rewrite ->
+                    do_rewrite(Req, Rewrite)
+            end;
         undefined ->
-            couch_httpd:send_error(Req, 404, <<"rewrite_error">>,
-                <<"Invalid path.">>);
-        Bin when is_binary(Bin) ->
-            couch_httpd:send_error(Req, 400, <<"rewrite_error">>,
-                <<"Rewrite rules are a String. They must be a JSON Array.">>);
-        Rules ->
-            % create dispatch list from rules
-            DispatchList =  [make_rule(Rule) || {Rule} <- Rules],
-            Method1 = couch_util:to_binary(Method),
+            chttpd:send_error(Req, 404, <<"rewrite_error">>,
+                <<"Invalid path.">>)
+    end.
 
-            %% get raw path by matching url to a rule.
-            RawPath = case try_bind_path(DispatchList, Method1,
-                    PathParts, QueryList) of
-                no_dispatch_path ->
-                    throw(not_found);
-                {NewPathParts, Bindings} ->
-                    Parts = [quote_plus(X) || X <- NewPathParts],
 
-                    % build new path, reencode query args, eventually convert
-                    % them to json
-                    Bindings1 = maybe_encode_bindings(Bindings),
-                    Path = binary_to_list(
-                        iolist_to_binary([
-                                string:join(Parts, [?SEPARATOR]),
-                                [["?", mochiweb_util:urlencode(Bindings1)]
-                                    || Bindings1 =/= [] ]
-                            ])),
+get_rules(#doc{body={Props}}) ->
+    couch_util:get_value(<<"rewrites">>, Props).
 
-                    % if path is relative detect it and rewrite path
-                    case mochiweb_util:safe_relative_path(Path) of
-                        undefined ->
-                            ?b2l(Prefix) ++ "/" ++ Path;
-                        P1 ->
-                            ?b2l(Prefix) ++ "/" ++ P1
-                    end
 
+do_rewrite(#httpd{mochi_req=MochiReq}=Req, {Props}=Rewrite) when is_list(Props) ->
+    case couch_util:get_value(<<"code">>, Props) of
+        undefined ->
+            Method = rewrite_method(Req, Rewrite),
+            Headers = rewrite_headers(Req, Rewrite),
+            Path = ?b2l(rewrite_path(Req, Rewrite)),
+            NewMochiReq = mochiweb_request:new(MochiReq:get(socket),
+                                               Method,
+                                               Path,
+                                               MochiReq:get(version),
+                                               Headers),
+            NewMochiReq:cleanup(),
+            couch_log:debug("rewrite to ~p", [Path]),
+            chttpd:handle_request_int(NewMochiReq);
+        Code ->
+            chttpd:send_response(
+                Req,
+                Code,
+                case couch_util:get_value(<<"headers">>, Props) of
+                    undefined -> [];
+                    {H1} -> H1
                 end,
+                rewrite_body(Rewrite))
+    end;
+do_rewrite(#httpd{method=Method,
+                  path_parts=[_DbName, <<"_design">>, _DesignName, _Rewrite|PathParts],
+                  mochi_req=MochiReq}=Req,
+           Rules) when is_list(Rules) ->
+    % create dispatch list from rules
+    Prefix = path_prefix(Req),
+    QueryList = lists:map(fun decode_query_value/1, chttpd:qs(Req)),
 
-            % normalize final path (fix levels "." and "..")
-            RawPath1 = ?b2l(iolist_to_binary(normalize_path(RawPath))),
+    DispatchList =  [make_rule(Rule) || {Rule} <- Rules],
+    Method1 = couch_util:to_binary(Method),
 
-            couch_log:debug("rewrite to ~p ~n", [RawPath1]),
+    %% get raw path by matching url to a rule.
+    RawPath = case try_bind_path(DispatchList, Method1,
+            PathParts, QueryList) of
+        no_dispatch_path ->
+            throw(not_found);
+        {NewPathParts, Bindings} ->
+            Parts = [quote_plus(X) || X <- NewPathParts],
 
-            % build a new mochiweb request
-            MochiReq1 = mochiweb_request:new(MochiReq:get(socket),
-                                             MochiReq:get(method),
-                                             RawPath1,
-                                             MochiReq:get(version),
-                                             MochiReq:get(headers)),
+            % build new path, reencode query args, eventually convert
+            % them to json
+            Bindings1 = maybe_encode_bindings(Bindings),
+            Path = iolist_to_binary([
+                string:join(Parts, [?SEPARATOR]),
+                [["?", mochiweb_util:urlencode(Bindings1)] || Bindings1 =/= []]
+            ]),
 
-            % cleanup, It force mochiweb to reparse raw uri.
-            MochiReq1:cleanup(),
+            % if path is relative detect it and rewrite path
+            safe_relative_path(Prefix, Path)
+        end,
 
-            chttpd:handle_request_int(MochiReq1)
-        end.
+    % normalize final path (fix levels "." and "..")
+    RawPath1 = ?b2l(normalize_path(RawPath)),
+
+    couch_log:debug("rewrite to ~p ~n", [RawPath1]),
+
+    % build a new mochiweb request
+    MochiReq1 = mochiweb_request:new(MochiReq:get(socket),
+                                     MochiReq:get(method),
+                                     RawPath1,
+                                     MochiReq:get(version),
+                                     MochiReq:get(headers)),
+
+    % cleanup, It force mochiweb to reparse raw uri.
+    MochiReq1:cleanup(),
+
+    chttpd:handle_request_int(MochiReq1).
+
+
+rewrite_method(#httpd{method=Method}, {Props}) ->
+    DefaultMethod = couch_util:to_binary(Method),
+    couch_util:get_value(<<"method">>, Props, DefaultMethod).
+
+rewrite_path(#httpd{}=Req, {Props}=Rewrite) ->
+    Prefix = path_prefix(Req),
+    RewritePath = case couch_util:get_value(<<"path">>, Props) of
+        undefined ->
+            throw({<<"rewrite_error">>,
+                   <<"Rewrite result must produce a new path.">>});
+        P -> P
+    end,
+    SafeRelativePath = safe_relative_path(Prefix, RewritePath),
+    NormalizedPath = normalize_path(SafeRelativePath),
+    QueryParams = rewrite_query_params(Req, Rewrite),
+    case QueryParams of
+        <<"">> ->
+            NormalizedPath;
+        QueryParams ->
+            <<NormalizedPath/binary, "?", QueryParams/binary>>
+    end.
+
+rewrite_query_params(#httpd{}=Req, {Props}) ->
+    RequestQS = chttpd:qs(Req),
+    RewriteQS = case couch_util:get_value(<<"query">>, Props) of
+        undefined -> RequestQS;
+        {V} -> V
+    end,
+    RewriteQSEsc = [{chttpd:quote(K), chttpd:quote(V)} || {K, V} <- RewriteQS],
+    iolist_to_binary([[K, "=", V] || {K, V} <- RewriteQSEsc]).
+
+rewrite_headers(#httpd{mochi_req=MochiReq}, {Props}) ->
+    case couch_util:get_value(<<"headers">>, Props) of
+        undefined ->
+            MochiReq:get(headers);
+        {H} ->
+            mochiweb_headers:enter_from_list(
+                lists:map(fun({Key, Val}) -> {?b2l(Key), ?b2l(Val)} end, H),
+                MochiReq:get(headers))
+    end.
+
+rewrite_body({Props}) ->
+    Body = case couch_util:get_value(<<"body">>, Props) of
+        undefined -> erlang:get(mochiweb_request_body);
+        B -> B
+    end,
+    case Body of
+        undefined ->
+            [];
+        _ ->
+            erlang:put(mochiweb_request_body, Body),
+            Body
+    end.
+
+
+path_prefix(#httpd{path_parts=[DbName, <<"_design">>, DesignName | _]}) ->
+    EscapedDesignName = ?l2b(couch_util:url_encode(DesignName)),
+    EscapedDbName = ?l2b(couch_util:url_encode(DbName)),
+    DesignId = <<"_design/", EscapedDesignName/binary>>,
+    <<"/", EscapedDbName/binary, "/", DesignId/binary>>.
+
+safe_relative_path(Prefix, Path) ->
+    case mochiweb_util:safe_relative_path(?b2l(Path)) of
+        undefined ->
+            <<Prefix/binary, "/", Path/binary>>;
+        V0 ->
+            V1 = ?l2b(V0),
+            <<Prefix/binary, "/", V1/binary>>
+    end.
+
 
 quote_plus({bind, X}) ->
     mochiweb_util:quote_plus(X);
@@ -359,9 +367,12 @@ bind_path(_, _, _) ->
 
 
 %% normalize path.
-normalize_path(Path)  ->
-    "/" ++ string:join(normalize_path1(string:tokens(Path,
-                "/"), []), [?SEPARATOR]).
+normalize_path(Path) when is_binary(Path)->
+    normalize_path(?b2l(Path));
+normalize_path(Path) when is_list(Path)->
+    Segments = normalize_path1(string:tokens(Path, "/"), []),
+    NormalizedPath = string:join(Segments, [?SEPARATOR]),
+    iolist_to_binary(["/", NormalizedPath]).
 
 
 normalize_path1([], Acc) ->

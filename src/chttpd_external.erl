@@ -13,7 +13,8 @@
 -module(chttpd_external).
 
 -export([handle_external_req/2, handle_external_req/3]).
--export([send_external_response/2, json_req_obj/2, json_req_obj/3]).
+-export([send_external_response/2]).
+-export([json_req_obj_fields/0, json_req_obj/2, json_req_obj/3, json_req_obj/4]).
 -export([default_or_content_type/2, parse_external_response/1]).
 
 -import(chttpd,[send_error/4]).
@@ -54,46 +55,66 @@ process_external_req(HttpReq, Db, Name) ->
         send_external_response(HttpReq, Response)
     end.
 
-json_req_obj(Req, Db) -> json_req_obj(Req, Db, null).
-json_req_obj(#httpd{mochi_req=Req,
-               method=Method,
-               requested_path_parts=RequestedPath,
-               path_parts=Path,
-               req_body=ReqBody
-            }, Db, DocId) ->
-    Body = case ReqBody of
-        undefined ->
-            MaxSize = list_to_integer(
-                config:get("couchdb", "max_document_size", "4294967296")),
-            Req:recv_body(MaxSize);
-        Else -> Else
-    end,
+
+json_req_obj(Req, Db) ->
+    json_req_obj(Req, Db, null).
+json_req_obj(Req, Db, DocId) ->
+    json_req_obj(Req, Db, DocId, all).
+json_req_obj(Req, Db, DocId, all) ->
+    Fields = json_req_obj_fields(),
+    json_req_obj(Req, Db, DocId, Fields);
+json_req_obj(Req, Db, DocId, Fields) when is_list(Fields) ->
+    {[{Field, json_req_obj_field(Field, Req, Db, DocId)} || Field <- Fields]}.
+
+json_req_obj_fields() ->
+    [<<"info">>, <<"uuid">>, <<"id">>, <<"method">>, <<"requested_path">>,
+     <<"path">>, <<"raw_path">>, <<"query">>, <<"headers">>, <<"body">>,
+     <<"peer">>, <<"form">>, <<"cookie">>, <<"userCtx">>, <<"secObj">>].
+
+json_req_obj_field(<<"info">>, #httpd{}, Db, _DocId) ->
+    {ok, Info} = get_db_info(Db),
+    {Info};
+json_req_obj_field(<<"uuid">>, #httpd{}, _Db, _DocId) ->
+    couch_uuids:new();
+json_req_obj_field(<<"id">>, #httpd{}, _Db, DocId) ->
+    DocId;
+json_req_obj_field(<<"method">>, #httpd{method=Method}, _Db, _DocId) ->
+    Method;
+json_req_obj_field(<<"requested_path">>, #httpd{requested_path_parts=Path}, _Db, _DocId) ->
+    Path;
+json_req_obj_field(<<"path">>, #httpd{path_parts=Path}, _Db, _DocId) ->
+    Path;
+json_req_obj_field(<<"raw_path">>, #httpd{mochi_req=Req}, _Db, _DocId) ->
+    ?l2b(Req:get(raw_path));
+json_req_obj_field(<<"query">>, #httpd{mochi_req=Req}, _Db, _DocId) ->
+    json_query_keys(to_json_terms(Req:parse_qs()));
+json_req_obj_field(<<"headers">>, #httpd{mochi_req=Req}, _Db, _DocId) ->
+    Headers = Req:get(headers),
+    Hlist = mochiweb_headers:to_list(Headers),
+    to_json_terms(Hlist);
+json_req_obj_field(<<"body">>, #httpd{req_body=undefined, mochi_req=Req}, _Db, _DocId) ->
+    MaxSize = config:get_integer("couchdb", "max_document_size", 4294967296),
+    Req:recv_body(MaxSize);
+json_req_obj_field(<<"body">>, #httpd{req_body=Body}, _Db, _DocId) ->
+    Body;
+json_req_obj_field(<<"peer">>, #httpd{mochi_req=Req}, _Db, _DocId) ->
+    ?l2b(Req:get(peer));
+json_req_obj_field(<<"form">>, #httpd{mochi_req=Req, method=Method}=HttpReq, Db, DocId) ->
+    Body = json_req_obj_field(<<"body">>, HttpReq, Db, DocId),
     ParsedForm = case Req:get_primary_header_value("content-type") of
         "application/x-www-form-urlencoded" ++ _ when Method =:= 'POST' orelse Method =:= 'PUT' ->
             mochiweb_util:parse_qs(Body);
         _ ->
             []
     end,
-    Headers = Req:get(headers),
-    Hlist = mochiweb_headers:to_list(Headers),
-    {ok, Info} = get_db_info(Db),
+    to_json_terms(ParsedForm);
+json_req_obj_field(<<"cookie">>, #httpd{mochi_req=Req}, _Db, _DocId) ->
+    to_json_terms(Req:parse_cookie());
+json_req_obj_field(<<"userCtx">>, #httpd{}, Db, _DocId) ->
+    couch_util:json_user_ctx(Db);
+json_req_obj_field(<<"secObj">>, #httpd{}, Db, _DocId) ->
+    couch_db:get_security(Db).
 
-    % add headers...
-    {[{<<"info">>, {Info}},
-        {<<"uuid">>, couch_uuids:new()},
-        {<<"id">>, DocId},
-        {<<"method">>, Method},
-        {<<"requested_path">>, RequestedPath},
-        {<<"path">>, Path},
-        {<<"raw_path">>, ?l2b(Req:get(raw_path))},
-        {<<"query">>, json_query_keys(to_json_terms(Req:parse_qs()))},
-        {<<"headers">>, to_json_terms(Hlist)},
-        {<<"body">>, Body},
-        {<<"peer">>, ?l2b(Req:get(peer))},
-        {<<"form">>, to_json_terms(ParsedForm)},
-        {<<"cookie">>, to_json_terms(Req:parse_cookie())},
-        {<<"userCtx">>, couch_util:json_user_ctx(Db)},
-        {<<"secObj">>, couch_db:get_security(Db)}]}.
 
 get_db_info(#db{main_pid = nil} = Db) ->
     fabric:get_db_info(Db);
