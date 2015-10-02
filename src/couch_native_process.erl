@@ -190,6 +190,8 @@ ddoc(State, {DDoc}, [FunPath, Args]) ->
 
 ddoc(State, {_, Fun}, [<<"validate_doc_update">>], Args) ->
     {State, (catch apply(Fun, Args))};
+ddoc(State, {_, Fun}, [<<"rewrites">>], Args) ->
+    {State, (catch apply(Fun, Args))};
 ddoc(State, {_, Fun}, [<<"filters">>|_], [Docs, Req]) ->
     FilterFunWrapper = fun(Doc) ->
         case catch Fun(Doc, Req) of
