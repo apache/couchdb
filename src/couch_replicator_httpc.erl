@@ -106,6 +106,14 @@ send_ibrowse_req(#httpdb{headers = BaseHeaders} = HttpDb, Params) ->
 process_response({error, sel_conn_closed}, _Worker, HttpDb, Params, _Cb) ->
     throw({retry, HttpDb, Params});
 
+%% This clause handles un-expected connection closing during pipelined requests.
+%% For example, if server responds to a request, sets Connection: close header
+%% and closes the socket, ibrowse will detect that error when it sends
+%% next request.
+process_response({error, connection_closing}, Worker, HttpDb, Params, _Cb)->
+    ibrowse_http_client:stop(Worker),
+    throw({retry, HttpDb, Params});
+
 process_response({error, {'EXIT',{normal,_}}}, _Worker, HttpDb, Params, _Cb) ->
     % ibrowse worker terminated because remote peer closed the socket
     % -> not an error
