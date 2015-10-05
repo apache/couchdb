@@ -188,5 +188,5 @@ endif
 
 .PHONY: introspect
 introspect:
-	rebar -r update-deps
+	${REBAR} -r update-deps
 	./introspect
