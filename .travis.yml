@@ -19,11 +19,11 @@ before_script:
 
 matrix:
    include:
+      - otp_release: 18.1
+        python: 2.7
       - otp_release: 17.5
         python: 2.7
       - otp_release: R16B03-1
-        python: 2.7
-      - otp_release: R14B04
         python: 2.7
 
 cache: apt
