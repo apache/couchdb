@@ -68,7 +68,7 @@ definitions(Kind, Key) ->
     Filtered = filter_by_key(Definitions, Kind, Key),
     case group_specs(Filtered) of
         [] -> [];
-        [{_, Defs}] -> Defs
+        [{_, Defs}] -> lists:reverse(Defs)
     end.
 
 notify(Key, OldData, NewData, Specs) ->
