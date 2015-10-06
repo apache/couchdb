@@ -120,27 +120,45 @@ build_shards_test() ->
 
 %% n_val tests
 
-nval_test() ->
-    ?assertEqual(2, mem3_util:n_val(2,4)),
-    ?assertEqual(1, mem3_util:n_val(-1,4)),
-    ?assertEqual(4, mem3_util:n_val(6,4)),
-    ok.
+nval_test_() ->
+    {"n_val tests explicit",
+     [
+      {setup,
+       fun () ->
+               meck:new([couch_log]),
+               meck:expect(couch_log, error, fun(_, _) -> ok end),
+               ok
+       end,
+       fun (_) -> meck:unload([couch_log]) end,
+       [
+        ?_assertEqual(2, mem3_util:n_val(2,4)),
+        ?_assertEqual(1, mem3_util:n_val(-1,4)),
+        ?_assertEqual(4, mem3_util:n_val(6,4))
+        ]
+       }
+     ]
+    }.
+
 
 config_01_setup() ->
+    {ok, Started} = application:ensure_all_started(couch_log),
     Ini = filename:join([code:lib_dir(mem3, test), "01-config-default.ini"]),
     {ok, Pid} = config:start_link([Ini]),
-    Pid.
+    {Pid, Started}.
 
-config_teardown(_Pid) ->
-    config:stop().
+config_teardown({_Pid, Started}) ->
+    config:stop(),
+    [ok = application:stop(A) || A <- lists:reverse(Started)],
+    ok.
+
 
 n_val_test_() ->
-    {"n_val tests",
+    {"n_val tests with config",
      [
       {setup,
        fun config_01_setup/0,
        fun config_teardown/1,
-       fun(Pid) ->
+       fun({Pid, _Started}) ->
            {with, Pid, [
                fun n_val_1/1
             ]}
