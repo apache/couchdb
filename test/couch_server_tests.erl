@@ -62,27 +62,25 @@ make_test_case(Mod, Funs) ->
     }.
 
 should_rename_on_delete(_, #db{filepath = Origin, name = DbName}) ->
-    Renamed = renamed_filename(Origin),
     ?_test(begin
         ?assert(filelib:is_regular(Origin)),
         ?assertMatch(ok, couch_server:delete(DbName, [])),
-        ?assert(filelib:is_regular(Renamed)),
-        ?assertNot(filelib:is_regular(Origin))
+        ?assertNot(filelib:is_regular(Origin)),
+        DeletedFiles = deleted_files(Origin),
+        ?assertMatch([_], DeletedFiles),
+        [Renamed] = DeletedFiles,
+        ?assertEqual(
+            filename:extension(Origin), filename:extension(Renamed)),
+        ?assert(filelib:is_regular(Renamed))
     end).
 
 should_delete(_, #db{filepath = Origin, name = DbName}) ->
-    PossiblyRenamed = renamed_filename(Origin),
     ?_test(begin
         ?assert(filelib:is_regular(Origin)),
         ?assertMatch(ok, couch_server:delete(DbName, [])),
-        ?assertNot(filelib:is_regular(PossiblyRenamed)),
-        ?assertNot(filelib:is_regular(Origin))
+        ?assertNot(filelib:is_regular(Origin)),
+        ?assertMatch([], deleted_files(Origin))
     end).
 
-
-renamed_filename(Original) ->
-    {{Y,Mon,D}, {H,Min,S}} = calendar:universal_time(),
-    Suffix = lists:flatten(
-        io_lib:format(".~w~2.10.0B~2.10.0B." ++
-            "~2.10.0B~2.10.0B~2.10.0B.deleted.couch", [Y,Mon,D,H,Min,S])),
-    filename:rootname(Original) ++ Suffix.
+deleted_files(ViewFile) ->
+    filelib:wildcard(filename:rootname(ViewFile) ++ "*.deleted.*").
