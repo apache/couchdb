@@ -52,7 +52,7 @@ DepDescs = [
 {jiffy,            "jiffy",            "ea19c417f9fd52fa3f7ef2d378735e5532c59b29"},
 {khash,            "khash",            "fc1a80fe38cb7f1c19ba0b4d275f14fbf3b5251e"},
 {mango,            "mango",            "46b58a3c53bc07db8b841fd55dc9fb32c1b6bb89"},
-{mem3,             "mem3",             "62ac9b2655cc50a9260f37d25829ab7f3c86f251"},
+{mem3,             "mem3",             "de5f32815d3a3136e43924e4723d7e3e0eb02c6e"},
 {mochiweb,         "mochiweb",         "bd6ae7cbb371666a1f68115056f7b30d13765782"},
 {oauth,            "oauth",            "099057a98e41f3aff91e77e3cf496d6c6fd901df"},
 {rexi,             "rexi",             "a327b7dbeb2b0050f7ca9072047bf8ef2d282833"},
