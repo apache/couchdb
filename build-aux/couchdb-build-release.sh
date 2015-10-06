@@ -24,7 +24,7 @@ cd src/
 for repo in *; do
   cd $repo
   mkdir ../../$RELDIR/src/$repo
-  git_ish=`git symbolic-ref -q --short HEAD || git describe --tags --exact-match`
+  git_ish=`git rev-parse --short HEAD`
   git archive $git_ish | tar -xC ../../$RELDIR/src/$repo/
   cd ..
 done
