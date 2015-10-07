@@ -157,7 +157,7 @@ docker-stop:
 eunit: export BUILDDIR = $(shell pwd)
 eunit: couch
 	@${REBAR} setup_eunit
-	@${REBAR} -r eunit skip_deps=meck,mochiweb,lager,snappy,folsom
+	@ERL_FLAGS="-args_file tmp/etc/vm.args" ${REBAR} -r eunit skip_deps=meck,mochiweb,lager,snappy,folsom
 
 javascript: all
 	# TODO: Fix tests to look for these files in their new path
