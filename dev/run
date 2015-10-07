@@ -481,8 +481,10 @@ def try_request(host, port, meth, path, success_codes, retries=10, retry_dt=1):
         conn = httpclient.HTTPConnection(host, port)
         conn.request(meth, path)
         resp = conn.getresponse()
-        if resp.status in success_codes or retries == 0:
+        if resp.status in success_codes:
             return resp.status, resp.read()
+        elif retries <= 0:
+            assert resp.status in success_codes, resp.read()
         retries -= 1
         time.sleep(retry_dt)
 
