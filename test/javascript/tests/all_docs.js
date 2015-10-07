@@ -11,8 +11,8 @@
 // the License.
 
 couchTests.all_docs = function(debug) {
-  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
-  db.deleteDb();
+  var db_name = get_random_db_name();
+  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"}, {w: 3});
   db.createDb();
   if (debug) debugger;
 
@@ -70,7 +70,7 @@ couchTests.all_docs = function(debug) {
 
   // check that deletions also show up right
   var doc1 = db.open("1");
-  var deleted = db.deleteDoc(doc1, "&w=3");
+  var deleted = db.deleteDoc(doc1);
   T(deleted.ok);
   changes = db.changes();
   T(changes.results.length == 4);
