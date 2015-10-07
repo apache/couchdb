@@ -471,6 +471,8 @@ match({[{<<"$in">>, Args}]}, Value, Cmp) ->
     Pred = fun(Arg) -> Cmp(Value, Arg) == 0 end,
     lists:any(Pred, Args);
 
+match({[{<<"$nin">>, Args}]}, Values, Cmp) when is_list(Values)->
+    not match({[{<<"$in">>, Args}]}, Values, Cmp);
 match({[{<<"$nin">>, Args}]}, Value, Cmp) ->
     Pred = fun(Arg) -> Cmp(Value, Arg) /= 0 end,
     lists:all(Pred, Args);

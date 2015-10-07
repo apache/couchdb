@@ -72,6 +72,17 @@ class OperatorTests(mango.UserDocsTests):
         assert docs[0]["user_id"] == 2
         assert docs[1]["user_id"] == 12
 
+    def test_nin_operator_array(self):
+        docs = self.db.find({
+                "manager": True,
+                "favorites": {"$nin": ["Erlang", "Python"]}
+            })
+        assert len(docs) == 4
+        for doc in docs:
+            if isinstance(doc["favorites"], list):
+                assert "Erlang" not in doc["favorites"]
+                assert "Python" not in doc["favorites"]
+
     def test_regex(self):
         docs = self.db.find({
                 "age": {"$gt": 40},
