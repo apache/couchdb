@@ -11,15 +11,15 @@
 // the License.
 
 couchTests.copy_doc = function(debug) {
-  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
-  db.deleteDb();
+  var db_name = get_random_db_name();
+  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
   if (debug) debugger;
 
   // copy a doc
   var ok = db.save({_id:"doc_to_be_copied",v:1}).ok;
   TEquals(true, ok, "Should return ok:true");
-  var xhr = CouchDB.request("COPY", "/test_suite_db/doc_to_be_copied", {
+  var xhr = CouchDB.request("COPY", "/" + db_name + "/doc_to_be_copied", {
     headers: {"Destination":"doc_that_was_copied"}
   });
 
@@ -35,26 +35,26 @@ couchTests.copy_doc = function(debug) {
   TEquals(true, doc.ok, "Should return ok:true");
 
   // error condition
-  var xhr = CouchDB.request("COPY", "/test_suite_db/doc_to_be_copied2", {
+  var xhr = CouchDB.request("COPY", "/" + db_name + "/doc_to_be_copied2", {
       headers: {"Destination":"doc_to_be_overwritten"}
   });
   TEquals(409, xhr.status, "Should return 409 status"); // conflict
 
-  var xhr = CouchDB.request("COPY", "/test_suite_db/doc_to_be_copied2");
+  var xhr = CouchDB.request("COPY", "/" + db_name + "/doc_to_be_copied2");
   TEquals(400, xhr.status, "Should return 400 status");
   TEquals("Destination header is mandatory for COPY.", JSON.parse(xhr.responseText).reason,
     "Should report missing destination header");
 
-  var xhr = CouchDB.request("COPY", "/test_suite_db/doc_to_be_copied2", {
+  var xhr = CouchDB.request("COPY", "/" + db_name + "/doc_to_be_copied2", {
     headers: {
-      "Destination": "http://localhost:5984/test_suite_db/doc_to_be_written"
+      "Destination": "http://localhost:5984/" + db_name + "/doc_to_be_written"
   }});
   TEquals(400, xhr.status, "Should return 400 status");
   TEquals("Destination URL must be relative.", JSON.parse(xhr.responseText).reason,
     "Should report invalid destination header");
 
   var rev = db.open("doc_to_be_overwritten")._rev;
-  var xhr = CouchDB.request("COPY", "/test_suite_db/doc_to_be_copied2", {
+  var xhr = CouchDB.request("COPY", "/" + db_name + "/doc_to_be_copied2", {
     headers: {"Destination":"doc_to_be_overwritten?rev=" + rev}
   });
   TEquals(201, xhr.status, "Should return 201 status");

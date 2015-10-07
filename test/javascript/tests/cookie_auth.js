@@ -13,9 +13,12 @@
 couchTests.cookie_auth = function(debug) {
   // This tests cookie-based authentication.
 
-  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
-  db.deleteDb();
+  var db_name = get_random_db_name();
+  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
+
+  // used later, needs to be global here
+  var users_db_name = get_random_db_name();
   if (debug) debugger;
 
   var password = "3.141592653589";
@@ -257,7 +260,7 @@ couchTests.cookie_auth = function(debug) {
           T(s.userCtx.roles.indexOf("_admin") != -1);
           // test session info
           T(s.info.authenticated == "cookie");
-          T(s.info.authentication_db == "test_suite_users");
+          T(s.info.authentication_db == users_db_name);
           // test that jchris still has the foo role
           T(CouchDB.session().userCtx.roles.indexOf("foo") != -1);
         });
@@ -270,13 +273,13 @@ couchTests.cookie_auth = function(debug) {
     TEquals(true, CouchDB.login("jan", "apple").ok);
   };
 
-  var usersDb = new CouchDB("test_suite_users", {"X-Couch-Full-Commit":"false"});
-  usersDb.deleteDb();
+  var usersDb = new CouchDB(users_db_name, {"X-Couch-Full-Commit":"false"});
+  usersDb.createDb();
 
   run_on_modified_server(
     [
      {section: "couch_httpd_auth",
-      key: "authentication_db", value: "test_suite_users"},
+      key: "authentication_db", value: users_db_name},
      {section: "couch_httpd_auth",
       key: "iterations", value: "1"},
      {section: "admins",

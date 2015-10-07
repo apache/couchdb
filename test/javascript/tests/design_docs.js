@@ -11,14 +11,14 @@
 // the License.
 
 couchTests.design_docs = function(debug) {
-  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
-  var db2 = new CouchDB("test_suite_db_a", {"X-Couch-Full-Commit":"false"});
+  var db_name = get_random_db_name();
+  var db_name_a = get_random_db_name();
+  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
+  var db2 = new CouchDB(db_name_a, {"X-Couch-Full-Commit":"false"});
 
   if (debug) debugger;
 
-  db.deleteDb();
   db.createDb();
-  db2.deleteDb();
   db2.createDb();
 
   var server_config = [
@@ -199,14 +199,14 @@ couchTests.design_docs = function(debug) {
     }; // designDoc
 
     var xhr = CouchDB.request(
-      "PUT", "/test_suite_db_a/_design/test", {body: JSON.stringify(designDoc)}
+      "PUT", "/" + db_name_a + "/_design/test", {body: JSON.stringify(designDoc)}
     );
     var resp = JSON.parse(xhr.responseText);
 
     TEquals(resp.rev, db.save(designDoc).rev);
 
     // test that editing a show fun on the ddoc results in a change in output
-    xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_show/simple");
+    xhr = CouchDB.request("GET", "/" + db_name + "/_design/test/_show/simple");
     T(xhr.status == 200);
     TEquals(xhr.responseText, "ok");
 
@@ -215,29 +215,29 @@ couchTests.design_docs = function(debug) {
     }).toString();
     T(db.save(designDoc).ok);
 
-    xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_show/simple");
+    xhr = CouchDB.request("GET", "/" + db_name + "/_design/test/_show/simple");
     T(xhr.status == 200);
     TEquals(xhr.responseText, "ko");
 
     xhr = CouchDB.request(
-      "GET", "/test_suite_db_a/_design/test/_show/simple?cache=buster"
+      "GET", "/" + db_name_a + "/_design/test/_show/simple?cache=buster"
     );
     T(xhr.status == 200);
     TEquals("ok", xhr.responseText, 'query server used wrong ddoc');
 
     // test commonjs require
-    xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_show/requirey");
+    xhr = CouchDB.request("GET", "/" + db_name + "/_design/test/_show/requirey");
     T(xhr.status == 200);
     TEquals("PLANKTONwhatever/commonjs/upperplankton", xhr.responseText);
 
-    xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_show/circular");
+    xhr = CouchDB.request("GET", "/" + db_name + "/_design/test/_show/circular");
     T(xhr.status == 200);
     TEquals("javascript", JSON.parse(xhr.responseText).language);
 
     // test circular commonjs dependencies
     xhr = CouchDB.request(
       "GET",
-      "/test_suite_db/_design/test/_show/circular_require"
+      "/" + db_name + "/_design/test/_show/circular_require"
     );
     TEquals(200, xhr.status);
     TEquals("One", xhr.responseText);
@@ -252,30 +252,30 @@ couchTests.design_docs = function(debug) {
     // changed
     xhr = CouchDB.request(
       "GET",
-      "/test_suite_db/_design/test/_show/circular_require"
+      "/" + db_name + "/_design/test/_show/circular_require"
     );
     TEquals(200, xhr.status);
     TEquals("Updated", xhr.responseText);
 
 
     // test module id values are as expected:
-    xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_show/idtest1");
+    xhr = CouchDB.request("GET", "/" + db_name + "/_design/test/_show/idtest1");
     TEquals(200, xhr.status);
     TEquals("whatever/idtest1/a/c/e", xhr.responseText);
 
-    xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_show/idtest2");
+    xhr = CouchDB.request("GET", "/" + db_name + "/_design/test/_show/idtest2");
     TEquals(200, xhr.status);
     TEquals("whatever/idtest2/a/c/e", xhr.responseText);
 
-    xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_show/idtest3");
+    xhr = CouchDB.request("GET", "/" + db_name + "/_design/test/_show/idtest3");
     TEquals(200, xhr.status);
     TEquals("whatever/idtest3/a/c/e", xhr.responseText);
 
-    xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_show/idtest4");
+    xhr = CouchDB.request("GET", "/" + db_name + "/_design/test/_show/idtest4");
     TEquals(200, xhr.status);
     TEquals("whatever/idtest4/a/c/e", xhr.responseText);
 
-    xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_show/idtest5");
+    xhr = CouchDB.request("GET", "/" + db_name + "/_design/test/_show/idtest5");
     TEquals(200, xhr.status);
     TEquals("whatever/idtest5/b", xhr.responseText);
 
@@ -305,7 +305,7 @@ couchTests.design_docs = function(debug) {
       TEquals(0, db.view("test/single_doc", {stale: "ok"}).total_rows, 'view info');
       TEquals(0, db.view("test/summate", {stale: "ok"}).rows.length, 'view info');
       T(db.ensureFullCommit().ok);
-      restartServer();
+      // restartServer();
     };
 
     db.bulkSave(makeDocs(numDocs + 1, numDocs * 2 + 1));
@@ -332,7 +332,7 @@ couchTests.design_docs = function(debug) {
       TEquals(len2, db.view("test/single_doc", {stale: "ok"}).total_rows, 'view cleanup');
       TEquals(len3, db.view("test/summate", {stale: "ok"}).rows.length, 'view cleanup');
       T(db.ensureFullCommit().ok);
-      restartServer();
+      // restartServer();
       // we'll test whether the view group stays closed
       // and the views stay uninitialized (they should!)
       len1 = len2 = len3 = 0;
@@ -355,7 +355,7 @@ couchTests.design_docs = function(debug) {
       T(db.view("test/no_docs").total_rows == 0);
       T(db.view("test/single_doc").total_rows == 1);
       T(db.ensureFullCommit().ok);
-      restartServer();
+      // restartServer();
     };
 
     // test when language not specified, Javascript is implied
@@ -411,7 +411,7 @@ couchTests.design_docs = function(debug) {
     T(db.view("test/no_docs") == null);
 
     T(db.ensureFullCommit().ok);
-    restartServer();
+    // restartServer();
     T(db.open(designDoc._id) == null);
     T(db.view("test/no_docs") == null);
 
