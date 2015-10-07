@@ -28,8 +28,9 @@ teardown(Url) ->
     delete_db(Url).
 
 create_db(Url) ->
-    {ok, _, _, _} = test_request:put(Url,
-                [{"Content-Type", "application/json"}], "{}").
+    {ok, Status, _, _} = test_request:put(Url,
+                [{"Content-Type", "application/json"}], "{}"),
+    ?assert(Status =:= 201 orelse Status =:= 202).
 
 
 create_doc(Url, Id) ->
@@ -37,7 +38,7 @@ create_doc(Url, Id) ->
         [{"Content-Type", "application/json"}], "{\"mr\": \"rockoartischocko\"}").
 
 delete_db(Url) ->
-    {ok, _, _, _} = test_request:delete(Url).
+    {ok, 200, _, _} = test_request:delete(Url).
 
 all_test_() ->
     {
