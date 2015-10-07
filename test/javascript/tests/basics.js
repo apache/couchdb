@@ -15,22 +15,22 @@ couchTests.basics = function(debug) {
   var result = JSON.parse(CouchDB.request("GET", "/").responseText);
   T(result.couchdb == "Welcome");
 
-  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
-  db.deleteDb();
+  var db_name = get_random_db_name()
+  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
 
-  // bug COUCHDB-100: DELETE on non-existent DB returns 500 instead of 404
-  db.deleteDb();
+  //TODO bug COUCHDB-100: DELETE on non-existent DB returns 500 instead of 404
+  //TODO db.deleteDb();
 
   db.createDb();
 
   // PUT on existing DB should return 412 instead of 500
-  xhr = CouchDB.request("PUT", "/test_suite_db/");
+  xhr = CouchDB.request("PUT", "/" + db_name + "/");
   T(xhr.status == 412);
   if (debug) debugger;
 
   // creating a new DB should return Location header
   // and it should work for dbs with slashes (COUCHDB-411)
-  var dbnames = ["test_suite_db", "test_suite_db%2Fwith_slashes"];
+  var dbnames = [db_name, db_name + "%2Fwith_slashes"];
   dbnames.forEach(function(dbname) {
     xhr = CouchDB.request("DELETE", "/" + dbname);
     xhr = CouchDB.request("PUT", "/" + dbname);
@@ -43,8 +43,8 @@ couchTests.basics = function(debug) {
   });
 
   // Get the database info, check the db_name
-  T(db.info().db_name == "test_suite_db");
-  T(CouchDB.allDbs().indexOf("test_suite_db") != -1);
+  T(db.info().db_name == "" + db_name + "");
+  T(CouchDB.allDbs().indexOf("" + db_name + "") != -1);
 
   // Get the database info, check the doc_count
   T(db.info().doc_count == 0);
@@ -172,7 +172,7 @@ couchTests.basics = function(debug) {
   T(db.open(existingDoc._id, {rev: existingDoc._rev}) != null);
 
   // test that the POST response has a Location header
-  var xhr = CouchDB.request("POST", "/test_suite_db", {
+  var xhr = CouchDB.request("POST", "/" + db_name + "", {
     body: JSON.stringify({"foo":"bar"}),
     headers: {"Content-Type": "application/json"}
   });
@@ -182,10 +182,10 @@ couchTests.basics = function(debug) {
   T(loc, "should have a Location header");
   var locs = loc.split('/');
   T(locs[locs.length-1] == resp.id);
-  T(locs[locs.length-2] == "test_suite_db");
+  T(locs[locs.length-2] == "" + db_name + "");
 
   // test that that POST's with an _id aren't overriden with a UUID.
-  var xhr = CouchDB.request("POST", "/test_suite_db", {
+  var xhr = CouchDB.request("POST", "/" + db_name + "", {
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({"_id": "oppossum", "yar": "matey"})
   });
@@ -196,10 +196,10 @@ couchTests.basics = function(debug) {
   T(doc.yar == "matey");
 
   // document put's should return a Location header
-  var xhr = CouchDB.request("PUT", "/test_suite_db/newdoc", {
+  var xhr = CouchDB.request("PUT", "/" + db_name + "/newdoc", {
     body: JSON.stringify({"a":1})
   });
-  TEquals("/test_suite_db/newdoc",
+  TEquals("/" + db_name + "/newdoc",
     xhr.getResponseHeader("Location").substr(-21),
     "should return Location header to newly created document");
   TEquals(CouchDB.protocol,
@@ -207,7 +207,7 @@ couchTests.basics = function(debug) {
     "should return absolute Location header to newly created document");
 
   // deleting a non-existent doc should be 404
-  xhr = CouchDB.request("DELETE", "/test_suite_db/doc-does-not-exist");
+  xhr = CouchDB.request("DELETE", "/" + db_name + "/doc-does-not-exist");
   T(xhr.status == 404);
 
   // Check for invalid document members
@@ -219,12 +219,12 @@ couchTests.basics = function(debug) {
   ];
   var test_doc = function(info) {
   var data = JSON.stringify(info[1]);
-    xhr = CouchDB.request("PUT", "/test_suite_db/" + info[0], {body: data});
+    xhr = CouchDB.request("PUT", "/" + db_name + "/" + info[0], {body: data});
     T(xhr.status == 500);
     result = JSON.parse(xhr.responseText);
     T(result.error == "doc_validation");
 
-    xhr = CouchDB.request("POST", "/test_suite_db/", {
+    xhr = CouchDB.request("POST", "/" + db_name + "/", {
       headers: {"Content-Type": "application/json"},
       body: data
     });
@@ -236,34 +236,34 @@ couchTests.basics = function(debug) {
 
   // Check some common error responses.
   // PUT body not an object
-  xhr = CouchDB.request("PUT", "/test_suite_db/bar", {body: "[]"});
+  xhr = CouchDB.request("PUT", "/" + db_name + "/bar", {body: "[]"});
   T(xhr.status == 400);
   result = JSON.parse(xhr.responseText);
   T(result.error == "bad_request");
   T(result.reason == "Document must be a JSON object");
 
   // Body of a _bulk_docs is not an object
-  xhr = CouchDB.request("POST", "/test_suite_db/_bulk_docs", {body: "[]"});
+  xhr = CouchDB.request("POST", "/" + db_name + "/_bulk_docs", {body: "[]"});
   T(xhr.status == 400);
   result = JSON.parse(xhr.responseText);
   T(result.error == "bad_request");
   T(result.reason == "Request body must be a JSON object");
 
   // Body of an _all_docs  multi-get is not a {"key": [...]} structure.
-  xhr = CouchDB.request("POST", "/test_suite_db/_all_docs", {body: "[]"});
+  xhr = CouchDB.request("POST", "/" + db_name + "/_all_docs", {body: "[]"});
   T(xhr.status == 400);
   result = JSON.parse(xhr.responseText);
   T(result.error == "bad_request");
   T(result.reason == "Request body must be a JSON object");
   var data = "{\"keys\": 1}";
-  xhr = CouchDB.request("POST", "/test_suite_db/_all_docs", {body:data});
+  xhr = CouchDB.request("POST", "/" + db_name + "/_all_docs", {body:data});
   T(xhr.status == 400);
   result = JSON.parse(xhr.responseText);
   T(result.error == "bad_request");
   T(result.reason == "`keys` member must be a array.");
 
   // oops, the doc id got lost in code nirwana
-  xhr = CouchDB.request("DELETE", "/test_suite_db/?rev=foobarbaz");
+  xhr = CouchDB.request("DELETE", "/" + db_name + "/?rev=foobarbaz");
   TEquals(400, xhr.status, "should return a bad request");
   result = JSON.parse(xhr.responseText);
   TEquals("bad_request", result.error);
