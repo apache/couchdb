@@ -155,6 +155,7 @@ docker-stop:
 	@docker stop `cat .docker-id`
 
 eunit: export BUILDDIR = $(shell pwd)
+eunit: export ERL_AFLAGS = -boot start_sasl -kernel error_logger silent -sasl sasl_error_logger false
 eunit: couch
 	@${REBAR} setup_eunit
 	@${REBAR} -r eunit skip_deps=meck,mochiweb,lager,snappy,folsom
