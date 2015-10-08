@@ -1359,7 +1359,7 @@ parse_doc_query({Key, Value}, Args) ->
             Args#doc_query_args{open_revs=all};
         {"open_revs", RevsJsonStr} ->
             JsonArray = ?JSON_DECODE(RevsJsonStr),
-            Args#doc_query_args{open_revs=[couch_doc:parse_rev(Rev) || Rev <- JsonArray]};
+            Args#doc_query_args{open_revs=couch_doc:parse_revs(JsonArray)};
         {"latest", "true"} ->
             Options = [latest | Args#doc_query_args.options],
             Args#doc_query_args{options=Options};
