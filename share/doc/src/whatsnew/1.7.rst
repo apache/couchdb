@@ -30,6 +30,7 @@ API Changes
 
 - :issue:`1356`: Return username on :http:post:`/_session`.
 - :issue:`1876`: Fix duplicated Content-Type for show/update functions.
+- :issue:`2845`: :statuscode:`400` returned when `revs` is not a list.
 
 Build
 -----
