@@ -80,7 +80,8 @@ create_doc(Host, DbName, Id) ->
     Body = jiffy:encode({[
         {key, "value"}
     ]}),
-    {ok, 201, _Headers, _Body} = test_request:put(Url, Headers, Body),
+    {ok, Status, _Headers, _Body} = test_request:put(Url, Headers, Body),
+    ?assert(Status =:= 201 orelse Status =:= 202),
     timer:sleep(1000),
     ok.
 
@@ -93,7 +94,8 @@ update_doc(Host, DbName, Id, Value) ->
         {key, Value},
         {'_rev', Rev}
     ]}),
-    {ok, 201, _Headers1, _Body} = test_request:put(Url, Headers, Body),
+    {ok, Status, _Headers1, _Body} = test_request:put(Url, Headers, Body),
+    ?assert(Status =:= 201 orelse Status =:= 202),
     timer:sleep(1000),
     ok.
 
