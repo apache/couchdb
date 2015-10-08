@@ -38,10 +38,15 @@ try_compile(Proc, FunctionType, FunctionName, FunctionSource) ->
     try
         proc_prompt(Proc, [<<"add_fun">>, FunctionSource]),
         ok
-    catch {compilation_error, E} ->
-        Fmt = "Compilation of the ~s function in the '~s' view failed: ~s",
-        Msg = io_lib:format(Fmt, [FunctionType, FunctionName, E]),
-        throw({compilation_error, Msg})
+    catch
+        {compilation_error, E} ->
+            Fmt = "Compilation of the ~s function in the '~s' view failed: ~s",
+            Msg = io_lib:format(Fmt, [FunctionType, FunctionName, E]),
+            throw({compilation_error, Msg});
+        {os_process_error, {exit_status, ExitStatus}} ->
+            Fmt = "Compilation of the ~s function in the '~s' view failed with exit status: ~p",
+            Msg = io_lib:format(Fmt, [FunctionType, FunctionName, ExitStatus]),
+            throw({compilation_error, Msg})
     end.
 
 start_doc_map(Lang, Functions, Lib) ->
