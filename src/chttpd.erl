@@ -797,8 +797,6 @@ error_info({unauthorized, Msg}) ->
 error_info(file_exists) ->
     {412, <<"file_exists">>, <<"The database could not be "
         "created, the file already exists.">>};
-error_info({r_quorum_not_met, Reason}) ->
-    {412, <<"read_quorum_not_met">>, Reason};
 error_info({error, {nodedown, Reason}}) ->
     {412, <<"nodedown">>, Reason};
 error_info({maintenance_mode, Node}) ->

@@ -78,10 +78,6 @@ error_info_test() ->
              <<"The database could not be created, the file already exists.">>}
         },
         {
-            {r_quorum_not_met, Reason},
-            {412, <<"read_quorum_not_met">>, Reason}
-        },
-        {
             {error, {nodedown, Reason}}, {412, <<"nodedown">>, Reason}
         },
         {
