@@ -68,7 +68,7 @@ definitions(Kind, Key) ->
     Filtered = filter_by_key(Definitions, Kind, Key),
     case group_specs(Filtered) of
         [] -> [];
-        [{_, Defs}] -> lists:reverse(Defs)
+        [{_, Defs}] -> Defs
     end.
 
 notify(Key, OldData, NewData, Specs) ->
@@ -109,9 +109,10 @@ extract_definitions(Plugin) ->
         [{{kind(), key()}, [{couch_epi:app(), #couch_epi_spec{}}]}].
 
 group_specs(Specs) ->
-    group(
+    Grouped = group(
         [{{Kind, Key}, group([{App, Spec}])}
-            || #couch_epi_spec{kind = Kind, key = Key, app = App} = Spec <- Specs]).
+            || #couch_epi_spec{kind = Kind, key = Key, app = App} = Spec <- Specs]),
+    [{K, lists:reverse(V)} || {K, V} <- Grouped].
 
 
 group(KV) ->
@@ -168,7 +169,8 @@ plugin_module(foo_epi) ->
         providers() ->
             [
                 {chttpd_handlers, foo_provider},
-                {bar_handlers, bar_provider}
+                {bar_handlers, bar_provider1},
+                {bar_handlers, bar_provider2}
             ].
 
         services() ->
@@ -228,6 +230,35 @@ generate_module(Name, Body) ->
 generate_modules(Kind, Providers) ->
     [generate_module(P, Kind(P)) || P <- Providers].
 
+provider_modules_order_test() ->
+    [ok,ok] = generate_modules(fun plugin_module/1, [foo_epi, bar_epi]),
+    ok = application:set_env(couch_epi, plugins, [foo_epi, bar_epi]),
+    Expected = [
+        {foo, bar_provider1},
+        {foo, bar_provider2},
+        {bar, bar_provider}
+    ],
+
+    Defs = definitions(providers, bar_handlers),
+    Result = [{App, V} || {App, #couch_epi_spec{value = V}} <- Defs],
+    Tests = lists:zip(Expected, Result),
+    [?assertEqual(Expect, Result) || {Expect, Result} <- Tests],
+    ok.
+
+providers_order_test() ->
+    [ok,ok] = generate_modules(fun plugin_module/1, [foo_epi, bar_epi]),
+    Expected = [
+        {foo, bar_provider1},
+        {foo, bar_provider2},
+        {bar, bar_provider}
+    ],
+    AllDefs = grouped_definitions([foo_epi, bar_epi]),
+    {_, Defs} = lists:keyfind({providers, bar_handlers}, 1, AllDefs),
+    Result = [{App, V} || {App, #couch_epi_spec{value = V}} <- Defs],
+    Tests = lists:zip(Expected, Result),
+    [?assertEqual(Expect, Result) || {Expect, Result} <- Tests],
+    ok.
+
 definitions_test() ->
     Expected = lists:sort([
         #couch_epi_spec{
@@ -275,7 +306,17 @@ definitions_test() ->
             kind = providers,
             options = [],
             key = bar_handlers,
-            value = bar_provider,
+            value = bar_provider1,
+            codegen = couch_epi_functions_gen,
+            type = couch_epi_functions
+        },
+        #couch_epi_spec{
+            behaviour = foo_epi,
+            app = foo,
+            kind = providers,
+            options = [],
+            key = bar_handlers,
+            value = bar_provider2,
             codegen = couch_epi_functions_gen,
             type = couch_epi_functions
         },

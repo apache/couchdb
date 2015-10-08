@@ -99,7 +99,7 @@ Notes:
   - if there are multiple plugins providing same service they will be called in the order
     they listed in application:get_env(couch_epi, plugins)
   - if the same plugin provides multiple implementations of the same service
-    the order is undefined (fixable)
+    the order is as defined in providers callback
 
 # couch_epi_plugin behaviour
 
