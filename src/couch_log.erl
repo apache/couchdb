@@ -19,13 +19,15 @@
 -export([debug/2, info/2, notice/2, warning/2, error/2, critical/2, alert/2, emergency/2]).
 -export([set_level/1]).
 
--export([behaviour_info/1]).
+-callback debug(Fmt::string(), Args::list()) -> ok.
+-callback info(Fmt::string(), Args::list()) -> ok.
+-callback notice(Fmt::string(), Args::list()) -> ok.
+-callback warning(Fmt::string(), Args::list()) -> ok.
+-callback error(Fmt::string(), Args::list()) -> ok.
+-callback critical(Fmt::string(), Args::list()) -> ok.
+-callback alert(Fmt::string(), Args::list()) -> ok.
+-callback set_level(Level::atom()) -> ok.
 
-behaviour_info(callbacks) ->
-    [{debug, 2}, {info, 2}, {notice, 2}, {warning, 2},
-    {error, 2}, {critical, 2}, {alert, 2}, {set_level, 1}];
-behaviour_info(_) ->
-    undefined.
 
 -spec debug(string(), list()) -> ok.
 debug(Fmt, Args) ->
