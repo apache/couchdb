@@ -155,7 +155,9 @@ parse_rev(_BadRev) ->
 parse_revs([]) ->
     [];
 parse_revs([Rev | Rest]) ->
-    [parse_rev(Rev) | parse_revs(Rest)].
+    [parse_rev(Rev) | parse_revs(Rest)];
+parse_revs(_) ->
+    throw({bad_request, "Invalid list of revisions"}).
 
 
 validate_docid(<<"">>) ->
