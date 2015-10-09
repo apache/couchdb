@@ -137,4 +137,7 @@ couchTests.attachment_views= function(debug) {
   T(result.rows[0].doc._attachments['baz.txt'].stub === true);
   T(result.rows[0].doc._attachments['baz.txt'].encoding === "gzip");
   T(result.rows[0].doc._attachments['baz.txt'].encoded_length === 47);
+
+  // cleanup
+  db.deleteDb();
 };

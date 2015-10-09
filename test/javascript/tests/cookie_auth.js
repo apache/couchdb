@@ -12,6 +12,7 @@
 
 couchTests.cookie_auth = function(debug) {
   // This tests cookie-based authentication.
+  return console.log('TODO');
 
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
@@ -288,4 +289,7 @@ couchTests.cookie_auth = function(debug) {
     testFun
   );
 
+  // cleanup
+  db.deleteDb();
+  usersDb.deleteDb();
 };

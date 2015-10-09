@@ -11,8 +11,8 @@
 // the License.
 
 couchTests.view_multi_key_all_docs = function(debug) {
-  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
-  db.deleteDb();
+  var db_name = get_random_db_name();
+  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
   if (debug) debugger;
 
@@ -72,7 +72,7 @@ couchTests.view_multi_key_all_docs = function(debug) {
   T(rows[0].id == keys[1]);
 
   // Check we get invalid rows when the key doesn't exist
-  rows = db.allDocs({}, [1, "i_dont_exist", "0"]).rows;
+  rows = db.allDocs({}, ["1111", "i_dont_exist", "0"]).rows;
   T(rows.length == 3);
   T(rows[0].error == "not_found");
   T(!rows[0].id);
@@ -81,7 +81,7 @@ couchTests.view_multi_key_all_docs = function(debug) {
   T(rows[2].id == rows[2].key && rows[2].key == "0");
 
   // keys in GET parameters
-  rows = db.allDocs({keys: [1, "i_dont_exist", "0"]}, null).rows;
+  rows = db.allDocs({keys: ["1211", "i_dont_exist", "0"]}, null).rows;
   T(rows.length == 3);
   T(rows[0].error == "not_found");
   T(!rows[0].id);
@@ -92,4 +92,7 @@ couchTests.view_multi_key_all_docs = function(debug) {
   // empty keys
   rows = db.allDocs({keys: []}, null).rows;
   T(rows.length == 0);
+
+  // cleanup
+  db.deleteDb();
 };

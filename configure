@@ -668,5 +668,5 @@ fi
 # only update dependencies, when we are not in a release tarball
 if [ -d .git  -a $SKIP_DEPS -ne 1 ]; then
   echo "==> updating dependencies"
-  ${REBAR} get-deps update-deps
+  ${REBAR} get-deps # update-deps
 fi

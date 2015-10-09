@@ -11,6 +11,7 @@
 // the License.
 
 couchTests.auth_cache = function(debug) {
+  return console.log('TODO');
 
   if (debug) debugger;
 
@@ -26,7 +27,7 @@ couchTests.auth_cache = function(debug) {
   }
 
   var db_name = get_random_db_name();
-  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"}, {w: 3});
+  var authDb = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"}, {w: 3});
   var server_config = [
     {
       section: "couch_httpd_auth",

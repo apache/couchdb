@@ -32,8 +32,8 @@ couchTests.security_validation = function(debug) {
   // Firefox and Safari both deal with this correctly (which is to say
   // they correctly do nothing special).
 
-  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
-  db.deleteDb();
+  var db_name = get_random_db_name();
+  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
   if (debug) debugger;
 
@@ -47,7 +47,7 @@ couchTests.security_validation = function(debug) {
 
     function () {
       // try saving document using the wrong credentials
-      var wrongPasswordDb = new CouchDB("test_suite_db",
+      var wrongPasswordDb = new CouchDB(db_name + "",
         {"WWW-Authenticate": "X-Couch-Test-Auth Damien Katz:foo"}
       );
 
@@ -89,7 +89,7 @@ couchTests.security_validation = function(debug) {
       }
 
       // Save a document normally
-      var userDb = new CouchDB("test_suite_db",
+      var userDb = new CouchDB("" + db_name + "",
         {"WWW-Authenticate": "X-Couch-Test-Auth Damien Katz:pecan pie"}
       );
 
@@ -111,7 +111,7 @@ couchTests.security_validation = function(debug) {
 
       T(userDb.save(designDoc).ok);
 
-      var user2Db = new CouchDB("test_suite_db",
+      var user2Db = new CouchDB("" + db_name + "",
         {"WWW-Authenticate": "X-Couch-Test-Auth Jan Lehnardt:apple"}
       );
       // Attempt to save the design as a non-admin (in replication scenario)
@@ -248,27 +248,27 @@ couchTests.security_validation = function(debug) {
       var AuthHeaders = {"WWW-Authenticate": "X-Couch-Test-Auth Christopher Lenz:dog food"};
       var host = CouchDB.host;
       var dbPairs = [
-        {source:"test_suite_db_a",
-          target:"test_suite_db_b"},
+        {source:"" + db_name + "_a",
+          target:"" + db_name + "_b"},
 
-        {source:"test_suite_db_a",
-          target:{url: CouchDB.protocol + host + "/test_suite_db_b",
+        {source:"" + db_name + "_a",
+          target:{url: CouchDB.protocol + host + "/" + db_name + "_b",
                   headers: AuthHeaders}},
 
-        {source:{url:CouchDB.protocol + host + "/test_suite_db_a",
+        {source:{url:CouchDB.protocol + host + "/" + db_name + "_a",
                  headers: AuthHeaders},
-          target:"test_suite_db_b"},
+          target:"" + db_name + "_b"},
 
-        {source:{url:CouchDB.protocol + host + "/test_suite_db_a",
+        {source:{url:CouchDB.protocol + host + "/" + db_name + "_a",
                  headers: AuthHeaders},
-         target:{url:CouchDB.protocol + host + "/test_suite_db_b",
+         target:{url:CouchDB.protocol + host + "/" + db_name + "_b",
                  headers: AuthHeaders}},
       ]
-      var adminDbA = new CouchDB("test_suite_db_a", {"X-Couch-Full-Commit":"false"});
-      var adminDbB = new CouchDB("test_suite_db_b", {"X-Couch-Full-Commit":"false"});
-      var dbA = new CouchDB("test_suite_db_a",
+      var adminDbA = new CouchDB("" + db_name + "_a", {"X-Couch-Full-Commit":"false"});
+      var adminDbB = new CouchDB("" + db_name + "_b", {"X-Couch-Full-Commit":"false"});
+      var dbA = new CouchDB("" + db_name + "_a",
           {"WWW-Authenticate": "X-Couch-Test-Auth Christopher Lenz:dog food"});
-      var dbB = new CouchDB("test_suite_db_b",
+      var dbB = new CouchDB("" + db_name + "_b",
           {"WWW-Authenticate": "X-Couch-Test-Auth Christopher Lenz:dog food"});
       var xhr;
       for (var testPair = 0; testPair < dbPairs.length; testPair++) {
@@ -335,4 +335,7 @@ couchTests.security_validation = function(debug) {
         T(dbA.open("foo2").value == "b");
       }
     });
+
+  // cleanup
+  db.deleteDb();
 };

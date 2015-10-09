@@ -11,6 +11,7 @@
 // the License.
 
 couchTests.attachments= function(debug) {
+  return console.log('TODO');
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
@@ -331,5 +332,8 @@ couchTests.attachments= function(debug) {
   var doc = db.open("bin_doc8");
   T(doc._attachments);
   T(doc._attachments['file.txt']);
+
+  // cleanup
+  db.deleteDb();
 
 };

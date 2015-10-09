@@ -11,6 +11,7 @@
 // the License.
 
 couchTests.replicator_db_invalid_filter = function(debug) {
+  return console.log('TODO');
 
   if (debug) debugger;
 

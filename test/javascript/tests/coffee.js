@@ -64,4 +64,7 @@ couchTests.coffee = function(debug) {
 
   var changes = db.changes({filter: "coffee/filter"});
   TEquals(5, changes.results.length, "should have changes");
+
+  // cleanup
+  db.deleteDb();
 };

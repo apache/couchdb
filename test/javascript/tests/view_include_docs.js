@@ -11,8 +11,9 @@
 // the License.
 
 couchTests.view_include_docs = function(debug) {
-  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
-  db.deleteDb();
+  return console.log('TODO');
+  var db_name = get_random_db_name();
+  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
   if (debug) debugger;
 
@@ -124,7 +125,7 @@ couchTests.view_include_docs = function(debug) {
   T(!resp.rows[0].doc.prev);
   T(resp.rows[0].doc.integer == 0);
 
-  var xhr = CouchDB.request("POST", "/test_suite_db/_compact");
+  var xhr = CouchDB.request("POST", "/" + db_name + "/_compact");
   T(xhr.status == 202)
   while (db.info().compact_running) {}
 
@@ -138,12 +139,13 @@ couchTests.view_include_docs = function(debug) {
 
   // COUCHDB-549 - include_docs=true with conflicts=true
 
-  var dbA = new CouchDB("test_suite_db_a", {"X-Couch-Full-Commit":"false"});
-  var dbB = new CouchDB("test_suite_db_b", {"X-Couch-Full-Commit":"false"});
+  var db_name_a = get_random_db_name();
+  var db_name_b = get_random_db_name();
 
-  dbA.deleteDb();
+  var dbA = new CouchDB(db_name_a, {"X-Couch-Full-Commit":"false"});
+  var dbB = new CouchDB(db_name_b, {"X-Couch-Full-Commit":"false"});
+
   dbA.createDb();
-  dbB.deleteDb();
   dbB.createDb();
 
   var ddoc = {
@@ -187,6 +189,7 @@ couchTests.view_include_docs = function(debug) {
   TEquals("undefined", typeof resp.rows[1].doc._conflicts);
 
   // cleanup
+  db.deleteDb();
   dbA.deleteDb();
   dbB.deleteDb();
 };

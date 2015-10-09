@@ -11,6 +11,7 @@
 // the License.
 
 couchTests.replicator_db_simple = function(debug) {
+  return console.log('TODO');
 
   if (debug) debugger;
 

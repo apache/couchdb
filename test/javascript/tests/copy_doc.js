@@ -62,4 +62,7 @@ couchTests.copy_doc = function(debug) {
   var over = db.open("doc_to_be_overwritten");
   T(rev != over._rev);
   TEquals(1, over.v, "Should be value 1");
+
+  // cleanup
+  db.deleteDb();
 };

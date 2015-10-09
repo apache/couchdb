@@ -11,15 +11,15 @@
 // the License.
 
 couchTests.etags_head = function(debug) {
-  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
-  db.deleteDb();
+  var db_name = get_random_db_name();
+  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
   if (debug) debugger;
 
   var xhr;
 
   // create a new doc
-  xhr = CouchDB.request("PUT", "/test_suite_db/1", {
+  xhr = CouchDB.request("PUT", "/" + db_name + "/1", {
     body: "{}"
   });
   T(xhr.status == 201);
@@ -28,17 +28,17 @@ couchTests.etags_head = function(debug) {
   var etag = xhr.getResponseHeader("etag");
 
   // get the doc and verify the headers match
-  xhr = CouchDB.request("GET", "/test_suite_db/1");
+  xhr = CouchDB.request("GET", "/" + db_name + "/1");
   T(etag == xhr.getResponseHeader("etag"));
 
   // 'head' the doc and verify the headers match
-  xhr = CouchDB.request("HEAD", "/test_suite_db/1", {
+  xhr = CouchDB.request("HEAD", "/" + db_name + "/1", {
     headers: {"if-none-match": "s"}
   });
   T(etag == xhr.getResponseHeader("etag"));
 
   // replace a doc
-  xhr = CouchDB.request("PUT", "/test_suite_db/1", {
+  xhr = CouchDB.request("PUT", "/" + db_name + "/1", {
     body: "{}",
     headers: {"if-match": etag}
   });
@@ -49,30 +49,33 @@ couchTests.etags_head = function(debug) {
   etag = xhr.getResponseHeader("etag");
 
   // fail to replace a doc
-  xhr = CouchDB.request("PUT", "/test_suite_db/1", {
+  xhr = CouchDB.request("PUT", "/" + db_name + "/1", {
     body: "{}"
   });
   T(xhr.status == 409);
 
   // verify get w/Etag
-  xhr = CouchDB.request("GET", "/test_suite_db/1", {
+  xhr = CouchDB.request("GET", "/" + db_name + "/1", {
     headers: {"if-none-match": etagOld}
   });
   T(xhr.status == 200);
-  xhr = CouchDB.request("GET", "/test_suite_db/1", {
+  xhr = CouchDB.request("GET", "/" + db_name + "/1", {
     headers: {"if-none-match": etag}
   });
   T(xhr.status == 304);
 
   // fail to delete a doc
-  xhr = CouchDB.request("DELETE", "/test_suite_db/1", {
+  xhr = CouchDB.request("DELETE", "/" + db_name + "/1", {
     headers: {"if-match": etagOld}
   });
   T(xhr.status == 409);
 
   //now do it for real
-  xhr = CouchDB.request("DELETE", "/test_suite_db/1", {
+  xhr = CouchDB.request("DELETE", "/" + db_name + "/1", {
     headers: {"if-match": etag}
   });
   T(xhr.status == 200);
+
+  // cleanup
+  db.deleteDb();
 };

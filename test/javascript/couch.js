@@ -158,11 +158,19 @@ function CouchDB(name, httpHeaders, globalRequestOptions) {
         body.options = options.options;
         delete options.options;
     }
-    this.last_req = this.request("POST", this.uri + "_temp_view"
-      + encodeOptions(options), {
+    var ddoc = {
+      views: {
+        view: body
+      }
+    };
+    var ddoc_name = "_design/temp_" + get_random_string();
+    this.last_req = this.request("PUT", this.uri + ddoc_name, {
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify(body)
+      body: JSON.stringify(ddoc)
     });
+    CouchDB.maybeThrowError(this.last_req);
+    this.last_req = this.request("GET", this.uri + ddoc_name + "/_view/view"
+      + encodeOptions(options));
     CouchDB.maybeThrowError(this.last_req);
     return JSON.parse(this.last_req.responseText);
   };

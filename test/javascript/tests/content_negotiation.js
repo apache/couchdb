@@ -36,4 +36,7 @@ couchTests.content_negotiation = function(debug) {
     headers: {"Accept": "application/json"}
   });
   TEquals("application/json", xhr.getResponseHeader("Content-Type"));
+
+  // cleanup
+  db.deleteDb();
 };
