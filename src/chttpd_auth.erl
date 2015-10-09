@@ -70,11 +70,11 @@ handle_session_req(Req) ->
 
 maybe_handle(Func, Args, Default) ->
     Handle = couch_epi:get_handle(?SERVICE_ID),
-    case couch_epi:apply(Handle, ?SERVICE_ID, Func, Args, []) of
-        [] when is_function(Default) ->
+    case couch_epi:decide(Handle, ?SERVICE_ID, Func, Args, []) of
+        no_decision when is_function(Default) ->
             apply(Default, Args);
-        [] ->
+        no_decision ->
             Default;
-        [Result] ->
+        {decided, Result} ->
             Result
     end.
