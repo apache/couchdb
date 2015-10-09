@@ -2,6 +2,7 @@ before_install:
    - sudo apt-get -y update
    - sudo apt-get -y install libicu-dev libmozjs185-dev pkg-config help2man libcurl4-openssl-dev
    - sudo apt-get -y install libtool automake autoconf autoconf-archive
+   - sudo apt-get -y install shunit2
 before_script: ./configure -c --disable-docs --disable-fauxton
 script:
    - ./run-tests.sh
