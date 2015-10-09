@@ -97,6 +97,22 @@ Notes:
 
   - `concurrent` is incompatible with `pipe`
 
+## decide functionality
+
+There are cases when we want to call configured providers until any of them
+would make a decission. We also would want to be able to find out if any
+decision has been made so we could call default handler. In order to be able
+to do so there is couch_epi:decide/5. Every service which uses this feature
+would get either:
+
+  - no_decision
+  - {decided, Decision :: term()}
+
+The provider module should return one of the above results. The current logic is
+to call all configured providers in order of their definition until we get
+`{decided, term()}`. If none of the providers would return this term we would
+return `no_decision`.
+
 # couch_epi_plugin behaviour
 
 The module implementing behaviour need to export following functions:

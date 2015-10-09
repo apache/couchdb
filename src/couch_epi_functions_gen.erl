@@ -22,7 +22,8 @@
 -export([
     apply/4,
     apply/5,
-    modules/3
+    modules/3,
+    decide/5
 ]).
 
 -ifdef(TEST).
@@ -34,7 +35,8 @@
 -record(opts, {
     ignore_errors = false,
     pipe = false,
-    concurrent = false
+    concurrent = false,
+    interruptible = false
 }).
 
 get_handle(ServiceId) ->
@@ -48,6 +50,15 @@ apply(ServiceId, Function, Args, Opts) when is_atom(ServiceId) ->
 
 apply(Handle, _ServiceId, Function, Args, Opts) ->
     DispatchOpts = parse_opts(Opts),
+    Modules = providers(Handle, Function, length(Args), DispatchOpts),
+    dispatch(Handle, Modules, Function, Args, DispatchOpts).
+
+-spec decide(Handle :: atom(), ServiceId :: atom(), Function :: atom(),
+    Args :: [term()], Opts :: couch_epi:apply_opts()) ->
+        no_decision | {decided, term()}.
+
+decide(Handle, _ServiceId, Function, Args, Opts) ->
+    DispatchOpts = parse_opts([interruptible|Opts]),
     Modules = providers(Handle, Function, length(Args), DispatchOpts),
     dispatch(Handle, Modules, Function, Args, DispatchOpts).
 
@@ -241,6 +252,9 @@ dispatch(Handle, Modules, Function, Args,
     lists:foldl(fun(Module, Acc) ->
         Handle:dispatch(Module, Function, Acc)
     end, Args, Modules);
+dispatch(Handle, Modules, Function, Args,
+        #opts{interruptible = true}) ->
+    apply_while(Modules, Handle, Function, Args);
 dispatch(Handle, Modules, Function, Args, #opts{} = Opts) ->
     [do_dispatch(Handle, Module, Function, Args, Opts) || Module <- Modules].
 
@@ -258,6 +272,15 @@ do_dispatch(Handle, Module, Function, Args,
 do_dispatch(Handle, Module, Function, Args, #opts{}) ->
     Handle:dispatch(Module, Function, Args).
 
+apply_while([], _Handle, _Function, _Args) ->
+    no_decision;
+apply_while([Module | Modules], Handle, Function, Args) ->
+    case Handle:dispatch(Module, Function, Args) of
+        no_decision ->
+            apply_while(Modules, Handle, Function, Args);
+        {decided, _Decission} = Result ->
+            Result
+    end.
 
 parse_opts(Opts) ->
     parse_opts(Opts, #opts{}).
@@ -268,6 +291,8 @@ parse_opts([pipe|Rest], #opts{} = Acc) ->
     parse_opts(Rest, Acc#opts{pipe = true});
 parse_opts([concurrent|Rest], #opts{} = Acc) ->
     parse_opts(Rest, Acc#opts{concurrent = true});
+parse_opts([interruptible|Rest], #opts{} = Acc) ->
+    parse_opts(Rest, Acc#opts{interruptible = true});
 parse_opts([], Acc) ->
     Acc.
 
@@ -323,6 +348,54 @@ basic_test() ->
 
     ?assertMatch([], Module:dispatch(?MODULE, bar, [])),
     ?assertMatch({1, 2}, Module:dispatch(?MODULE, foo, [1, 2])),
+
+    ok.
+
+generate_module(Name, Body) ->
+    Tokens = couch_epi_codegen:scan(Body),
+    couch_epi_codegen:generate(Name, Tokens).
+
+decide_module(decide) ->
+    "
+    -export([inc/1]).
+
+    inc(A) ->
+        {decided, A + 1}.
+    ";
+decide_module(no_decision) ->
+    "
+    -export([inc/1]).
+
+    inc(_A) ->
+        no_decision.
+    ".
+
+decide_test() ->
+    ok = generate_module(decide, decide_module(decide)),
+    ok = generate_module(no_decision, decide_module(no_decision)),
+
+    DecideDef = {foo_app, [{decide, [{inc, 1}]}]},
+    NoDecissionDef = {bar_app, [{no_decision, [{inc, 1}]}]},
+
+    DecideFirstHandle = decide_first_handle,
+    ok = generate(DecideFirstHandle, [DecideDef, NoDecissionDef]),
+    ?assertMatch([decide, no_decision], DecideFirstHandle:providers(inc, 1)),
+    ?assertMatch({decided,4}, decide(DecideFirstHandle, anything, inc, [3], [])),
+
+    DecideSecondHandle = decide_second_handle,
+    ok = generate(DecideSecondHandle, [NoDecissionDef, DecideDef]),
+    ?assertMatch([no_decision, decide], DecideSecondHandle:providers(inc, 1)),
+    ?assertMatch({decided,4}, decide(DecideSecondHandle, anything, inc, [3], [])),
+
+    NoDecissionHandle = no_decision_handle,
+    ok = generate(NoDecissionHandle, [NoDecissionDef]),
+    ?assertMatch([no_decision], NoDecissionHandle:providers(inc, 1)),
+    ?assertMatch(no_decision, decide(NoDecissionHandle, anything, inc, [3], [])),
+
+    NoHandle = no_handle,
+    ok = generate(NoHandle, []),
+    ?assertMatch([], NoHandle:providers(inc, 1)),
+    ?assertMatch(no_decision, decide(NoHandle, anything, inc, [3], [])),
 
     ok.
 

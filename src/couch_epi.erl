@@ -22,7 +22,7 @@
     keys/1, subscribers/1]).
 
 %% apply
--export([apply/5]).
+-export([apply/5, decide/5]).
 -export([any/5, all/5]).
 
 -export([is_configured/3]).
@@ -168,3 +168,10 @@ is_configured(Handle, Function, Arity) when Handle /= undefined ->
 
 register_service(Plugin, Children) ->
     couch_epi_sup:plugin_childspecs(Plugin, Children).
+
+-spec decide(Handle :: handle(), ServiceId :: atom(), Function :: atom(),
+    Args :: [term()], Opts :: apply_opts()) ->
+        no_decision | {decided, term()}.
+
+decide(Handle, ServiceId, Function, Args, Opts) when Handle /= undefined ->
+    couch_epi_functions_gen:decide(Handle, ServiceId, Function, Args, Opts).
