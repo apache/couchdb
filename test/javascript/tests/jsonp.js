@@ -28,8 +28,8 @@ function jsonp_chunk(doc) {
 
 // Do some jsonp tests.
 couchTests.jsonp = function(debug) {
-  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
-  db.deleteDb();
+  var db_name = get_random_db_name();
+  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
   if (debug) debugger;
   
@@ -37,7 +37,7 @@ couchTests.jsonp = function(debug) {
   T(db.save(doc).ok);
   
   // callback param is ignored unless jsonp is configured
-  var xhr = CouchDB.request("GET", "/test_suite_db/0?callback=jsonp_not_configured");
+  var xhr = CouchDB.request("GET", "/" + db_name + "/0?callback=jsonp_not_configured");
   JSON.parse(xhr.responseText);
 
   run_on_modified_server(
@@ -47,13 +47,13 @@ couchTests.jsonp = function(debug) {
   function() {
 
     // Test unchunked callbacks.
-    var xhr = CouchDB.request("GET", "/test_suite_db/0?callback=jsonp_no_chunk");
+    var xhr = CouchDB.request("GET", "/" + db_name + "/0?callback=jsonp_no_chunk");
     TEquals("application/javascript", xhr.getResponseHeader("Content-Type"));
     T(xhr.status == 200);
     jsonp_flag = 0;
     eval(xhr.responseText);
     T(jsonp_flag == 1);
-    xhr = CouchDB.request("GET", "/test_suite_db/0?callback=foo\"");
+    xhr = CouchDB.request("GET", "/" + db_name + "/0?callback=foo\"");
     T(xhr.status == 400);
 
     // Test chunked responses
@@ -69,7 +69,7 @@ couchTests.jsonp = function(debug) {
     };
     T(db.save(designDoc).ok);
 
-    var url = "/test_suite_db/_design/test/_view/all_docs?callback=jsonp_chunk";
+    var url = "/" + db_name + "/_design/test/_view/all_docs?callback=jsonp_chunk";
     xhr = CouchDB.request("GET", url);
     TEquals("application/javascript", xhr.getResponseHeader("Content-Type"));
     T(xhr.status == 200);
@@ -80,5 +80,6 @@ couchTests.jsonp = function(debug) {
     T(xhr.status == 400);
   });
 
-
+  // cleanup
+  db.deleteDb();
 };

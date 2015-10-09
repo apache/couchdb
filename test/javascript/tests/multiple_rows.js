@@ -11,8 +11,8 @@
 // the License.
 
 couchTests.multiple_rows = function(debug) {
-  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
-  db.deleteDb();
+  var db_name = get_random_db_name();
+  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
   if (debug) debugger;
 
@@ -77,4 +77,7 @@ couchTests.multiple_rows = function(debug) {
   T(rows[4].key == "Springfield, FL");
   T(rows[5].key == "Tampa, FL");
   T(rows[6].key == "Wilmington, NC");
+
+  // cleanup
+  db.deleteDb();
 };

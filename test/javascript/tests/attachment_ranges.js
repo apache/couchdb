@@ -156,5 +156,7 @@ couchTests.attachment_ranges = function(debug) {
         }
     });
     TEquals(200, xhr.status, "too many ranges");
+    // cleanup
+    db.deleteDb();
 
 };

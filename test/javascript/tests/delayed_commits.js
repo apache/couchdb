@@ -13,7 +13,7 @@
 couchTests.delayed_commits = function(debug) {
   // NOTE: in 2.0 deayed_commits is deprecated, so we don’t port 1.x test over
   //       to 2.0 here. jan@apache.org 2015-10-07
-  return;
+  return console.log('TODO');
 
   var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
   db.deleteDb();

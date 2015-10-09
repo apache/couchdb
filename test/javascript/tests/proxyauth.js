@@ -14,14 +14,16 @@
  
 couchTests.proxyauth = function(debug) {
   // this test proxy authentification handler
-  
-  var usersDb = new CouchDB("test_suite_users", {"X-Couch-Full-Commit":"false"});
-  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
+
+  var users_db_name = get_random_db_name();
+  var usersDb = new CouchDB(users_db_name, {"X-Couch-Full-Commit":"false"});
+
+  var db_name = get_random_db_name();
+  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
+  db.createDb();
   
   if (debug) debugger;
  
-  usersDb.deleteDb();
-
   // Simple secret key generator
   function generateSecret(length) {
     var tab = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -35,8 +37,6 @@ couchTests.proxyauth = function(debug) {
   var secret = generateSecret(64);
   
   function TestFun() {
-    db.deleteDb();
-    db.createDb();
     
     var benoitcUserDoc = CouchDB.prepareUserDoc({
       name: "benoitc@apache.org"
@@ -78,11 +78,11 @@ couchTests.proxyauth = function(debug) {
 
     db.save(designDoc);
     
-    var req = CouchDB.request("GET", "/test_suite_db/_design/test/_show/welcome",
+    var req = CouchDB.request("GET", "/" + db_name + "/_design/test/_show/welcome",
                         {headers: headers});
     T(req.responseText == "Welcome benoitc@apache.org");
     
-    req = CouchDB.request("GET", "/test_suite_db/_design/test/_show/role",
+    req = CouchDB.request("GET", "/" + db_name + "/_design/test/_show/role",
                         {headers: headers});
     T(req.responseText == "test");
     
@@ -92,11 +92,11 @@ couchTests.proxyauth = function(debug) {
     });
     T(xhr.status == 200);
     
-    req = CouchDB.request("GET", "/test_suite_db/_design/test/_show/welcome",
+    req = CouchDB.request("GET", "/" + db_name + "/_design/test/_show/welcome",
                         {headers: headers});
     T(req.responseText == "Welcome benoitc@apache.org");
     
-    req = CouchDB.request("GET", "/test_suite_db/_design/test/_show/role",
+    req = CouchDB.request("GET", "/" + db_name + "/_design/test/_show/role",
                         {headers: headers});
     T(req.responseText == "test");
     
@@ -108,7 +108,7 @@ couchTests.proxyauth = function(debug) {
       value:"{couch_httpd_auth, proxy_authentification_handler}, {couch_httpd_auth, default_authentication_handler}"},
       {section: "couch_httpd_auth",
         key: "authentication_db", 
-        value: "test_suite_users"},
+        value: users_db_name},
       {section: "couch_httpd_auth",
         key: "secret", 
         value: secret},
@@ -126,5 +126,7 @@ couchTests.proxyauth = function(debug) {
         value: "false"}],
     TestFun
   );
-  
+
+  // cleanup
+  db.deleteDb();
 };

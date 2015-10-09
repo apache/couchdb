@@ -11,8 +11,8 @@
 // the License.
 
 couchTests.view_errors = function(debug) {
-  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"true"});
-  db.deleteDb();
+  var db_name = get_random_db_name();
+  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
   if (debug) debugger;
 
@@ -48,7 +48,7 @@ couchTests.view_errors = function(debug) {
       T(results.rows[0].key[1] == null);
       
       // querying a view with invalid params should give a resonable error message
-      var xhr = CouchDB.request("POST", "/test_suite_db/_temp_view?startkey=foo", {
+      var xhr = CouchDB.request("POST", "/" + db_name + "/_temp_view?startkey=foo", {
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({language: "javascript",
           map : "function(doc){emit(doc.integer)}"
@@ -57,7 +57,7 @@ couchTests.view_errors = function(debug) {
       T(JSON.parse(xhr.responseText).error == "bad_request");
 
       // content type must be json
-      var xhr = CouchDB.request("POST", "/test_suite_db/_temp_view", {
+      var xhr = CouchDB.request("POST", "/" + db_name + "/_temp_view", {
         headers: {"Content-Type": "application/x-www-form-urlencoded"},
         body: JSON.stringify({language: "javascript",
           map : "function(doc){}"
@@ -158,7 +158,7 @@ couchTests.view_errors = function(debug) {
       }
 
       // Check error responses for invalid multi-get bodies.
-      var path = "/test_suite_db/_design/test/_view/no_reduce";
+      var path = "/" + db_name + "/_design/test/_view/no_reduce";
       var xhr = CouchDB.request("POST", path, {body: "[]"});
       T(xhr.status == 400);
       result = JSON.parse(xhr.responseText);
@@ -172,7 +172,7 @@ couchTests.view_errors = function(debug) {
       T(result.reason == "`keys` member must be a array.");
 
       // if the reduce grows to fast, throw an overflow error
-      var path = "/test_suite_db/_design/testbig/_view/reduce_too_big";
+      var path = "/" + db_name + "/_design/testbig/_view/reduce_too_big";
       xhr = CouchDB.request("GET", path);
       T(xhr.status == 500);
       result = JSON.parse(xhr.responseText);
@@ -186,4 +186,7 @@ couchTests.view_errors = function(debug) {
           T(e.reason.match(/no rows can match/i));
       }
     });
+
+  // cleanup
+  db.deleteDb();
 };

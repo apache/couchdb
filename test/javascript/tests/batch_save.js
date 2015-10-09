@@ -45,4 +45,6 @@ couchTests.batch_save = function(debug) {
   
   while(db.allDocs().total_rows != 201){};
 
+  // cleanup
+  db.deleteDb();
 };

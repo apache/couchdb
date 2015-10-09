@@ -11,6 +11,7 @@
 // the License.
 
 couchTests.design_docs = function(debug) {
+  return console.log('TODO');
   var db_name = get_random_db_name();
   var db_name_a = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});

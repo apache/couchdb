@@ -502,4 +502,7 @@ couchTests.rewrite = function(debug) {
         }
       });
   }
+
+  // cleanup
+  db.deleteDb();
 }

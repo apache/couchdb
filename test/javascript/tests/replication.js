@@ -11,7 +11,7 @@
 // the License.
 
 couchTests.replication = function(debug) {
-
+  return console.log('TODO');
   if (debug) debugger;
 
   var host = CouchDB.host;

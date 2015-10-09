@@ -11,8 +11,9 @@
 // the License.
 
 couchTests.etags_views = function(debug) {
-  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"true"});
-  db.deleteDb();
+  return console.log('TODO');
+  var db_name = get_random_db_name();
+  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"true"});
   db.createDb();
   if (debug) debugger;
 
@@ -56,10 +57,10 @@ couchTests.etags_views = function(debug) {
   var xhr;
 
   // verify get w/Etag on map view
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/etags/_view/basicView");
+  xhr = CouchDB.request("GET", "/" + db_name + "/_design/etags/_view/basicView");
   T(xhr.status == 200);
   var etag = xhr.getResponseHeader("etag");
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/etags/_view/basicView", {
+  xhr = CouchDB.request("GET", "/" + db_name + "/_design/etags/_view/basicView", {
     headers: {"if-none-match": etag}
   });
   T(xhr.status == 304);
@@ -67,58 +68,58 @@ couchTests.etags_views = function(debug) {
   // verify ETag doesn't change when an update
   // doesn't change the view group's index
   T(db.save({"_id":"doc1", "foo":"bar"}).ok);
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/etags/_view/basicView");
+  xhr = CouchDB.request("GET", "/" + db_name + "/_design/etags/_view/basicView");
   var etag1 = xhr.getResponseHeader("etag");
   T(etag1 == etag);
 
   // verify ETag always changes for include_docs=true on update
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/etags/_view/basicView?include_docs=true");
+  xhr = CouchDB.request("GET", "/" + db_name + "/_design/etags/_view/basicView?include_docs=true");
   var etag1 = xhr.getResponseHeader("etag");
   T(db.save({"_id":"doc2", "foo":"bar"}).ok);
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/etags/_view/basicView?include_docs=true");
+  xhr = CouchDB.request("GET", "/" + db_name + "/_design/etags/_view/basicView?include_docs=true");
   var etag2 = xhr.getResponseHeader("etag");
   T(etag1 != etag2);
  
   // Verify that purges affect etags
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/etags/_view/fooView");
+  xhr = CouchDB.request("GET", "/" + db_name + "/_design/etags/_view/fooView");
   var foo_etag = xhr.getResponseHeader("etag");
   var doc1 = db.open("doc1");
-  xhr = CouchDB.request("POST", "/test_suite_db/_purge", {
+  xhr = CouchDB.request("POST", "/" + db_name + "/_purge", {
     body: JSON.stringify({"doc1":[doc1._rev]})
   });
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/etags/_view/fooView");
+  xhr = CouchDB.request("GET", "/" + db_name + "/_design/etags/_view/fooView");
   var etag1 = xhr.getResponseHeader("etag");
   T(etag1 != foo_etag);
 
   // Test that _purge didn't affect the other view etags.
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/etags/_view/basicView");
+  xhr = CouchDB.request("GET", "/" + db_name + "/_design/etags/_view/basicView");
   var etag1 = xhr.getResponseHeader("etag");
   T(etag1 == etag);
 
   // verify different views in the same view group may have different ETags
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/etags/_view/fooView");
+  xhr = CouchDB.request("GET", "/" + db_name + "/_design/etags/_view/fooView");
   var etag1 = xhr.getResponseHeader("etag");
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/etags/_view/basicView");
+  xhr = CouchDB.request("GET", "/" + db_name + "/_design/etags/_view/basicView");
   var etag2 = xhr.getResponseHeader("etag");
   T(etag1 != etag2);
 
   // verify ETag changes when an update changes the view group's index.
   db.bulkSave(makeDocs(10, 20));
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/etags/_view/basicView");
+  xhr = CouchDB.request("GET", "/" + db_name + "/_design/etags/_view/basicView");
   var etag1 = xhr.getResponseHeader("etag");
   T(etag1 != etag);
 
   // verify ETag is the same after a restart
   restartServer();
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/etags/_view/basicView");
+  xhr = CouchDB.request("GET", "/" + db_name + "/_design/etags/_view/basicView");
   var etag2 = xhr.getResponseHeader("etag");
   T(etag1 == etag2);
 
   // reduce view
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/etags/_view/withReduce");
+  xhr = CouchDB.request("GET", "/" + db_name + "/_design/etags/_view/withReduce");
   T(xhr.status == 200);
   var etag = xhr.getResponseHeader("etag");
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/etags/_view/withReduce",{
+  xhr = CouchDB.request("GET", "/" + db_name + "/_design/etags/_view/withReduce",{
     headers: {"if-none-match": etag}
   });
   T(xhr.status == 304);
@@ -126,74 +127,74 @@ couchTests.etags_views = function(debug) {
   // verify ETag doesn't change when an update
   // doesn't change the view group's index
   T(db.save({"_id":"doc3", "foo":"bar"}).ok);
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/etags/_view/withReduce");
+  xhr = CouchDB.request("GET", "/" + db_name + "/_design/etags/_view/withReduce");
   var etag1 = xhr.getResponseHeader("etag");
   T(etag1 == etag);
   // purge
   var doc3 = db.open("doc3");
-  xhr = CouchDB.request("POST", "/test_suite_db/_purge", {
+  xhr = CouchDB.request("POST", "/" + db_name + "/_purge", {
     body: JSON.stringify({"doc3":[doc3._rev]})
   });
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/etags/_view/withReduce");
+  xhr = CouchDB.request("GET", "/" + db_name + "/_design/etags/_view/withReduce");
   var etag1 = xhr.getResponseHeader("etag");
   T(etag1 == etag);
 
   // verify different views in the same view group may have different ETags
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/etags/_view/fooView");
+  xhr = CouchDB.request("GET", "/" + db_name + "/_design/etags/_view/fooView");
   var etag1 = xhr.getResponseHeader("etag");
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/etags/_view/withReduce");
+  xhr = CouchDB.request("GET", "/" + db_name + "/_design/etags/_view/withReduce");
   var etag2 = xhr.getResponseHeader("etag");
   T(etag1 != etag2);
 
   // verify ETag changes when an update changes the view group's index
   db.bulkSave(makeDocs(20, 30));
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/etags/_view/withReduce");
+  xhr = CouchDB.request("GET", "/" + db_name + "/_design/etags/_view/withReduce");
   var etag1 = xhr.getResponseHeader("etag");
   T(etag1 != etag);
 
   // verify ETag is the same after a restart
   restartServer();
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/etags/_view/withReduce");
+  xhr = CouchDB.request("GET", "/" + db_name + "/_design/etags/_view/withReduce");
   var etag2 = xhr.getResponseHeader("etag");
   T(etag1 == etag2);
 
   // confirm ETag changes with different POST bodies
-  xhr = CouchDB.request("POST", "/test_suite_db/_design/etags/_view/basicView",
+  xhr = CouchDB.request("POST", "/" + db_name + "/_design/etags/_view/basicView",
     {body: JSON.stringify({keys:[1]})}
   );
   var etag1 = xhr.getResponseHeader("etag");
-  xhr = CouchDB.request("POST", "/test_suite_db/_design/etags/_view/basicView",
+  xhr = CouchDB.request("POST", "/" + db_name + "/_design/etags/_view/basicView",
     {body: JSON.stringify({keys:[2]})}
   );
   var etag2 = xhr.getResponseHeader("etag");
   T(etag1 != etag2, "POST to map view generates key-depdendent ETags");
 
   xhr = CouchDB.request("POST",
-    "/test_suite_db/_design/etags/_view/withReduce?group=true",
+    "/" + db_name + "/_design/etags/_view/withReduce?group=true",
     {body: JSON.stringify({keys:[1]})}
   );
   etag1 = xhr.getResponseHeader("etag");
   xhr = CouchDB.request("POST",
-    "/test_suite_db/_design/etags/_view/withReduce?group=true",
+    "/" + db_name + "/_design/etags/_view/withReduce?group=true",
     {body: JSON.stringify({keys:[2]})}
   );
   etag2 = xhr.getResponseHeader("etag");
   T(etag1 != etag2, "POST to reduce view generates key-depdendent ETags");
   
   // all docs
-  xhr = CouchDB.request("GET", "/test_suite_db/_all_docs");
+  xhr = CouchDB.request("GET", "/" + db_name + "/_all_docs");
   T(xhr.status == 200);
   var etag = xhr.getResponseHeader("etag");
-  xhr = CouchDB.request("GET", "/test_suite_db/_all_docs", {
+  xhr = CouchDB.request("GET", "/" + db_name + "/_all_docs", {
     headers: {"if-none-match": etag}
   });
   T(xhr.status == 304);
 
   // _changes
-  xhr = CouchDB.request("GET", "/test_suite_db/_changes");
+  xhr = CouchDB.request("GET", "/" + db_name + "/_changes");
   T(xhr.status == 200);
   var etag = xhr.getResponseHeader("etag");
-  xhr = CouchDB.request("GET", "/test_suite_db/_changes", {
+  xhr = CouchDB.request("GET", "/" + db_name + "/_changes", {
     headers: {"if-none-match": etag}
   });
   T(xhr.status == 304);
@@ -205,16 +206,18 @@ couchTests.etags_views = function(debug) {
   db.deleteDb(); 
   db.createDb(); 
   db.save({a: 1}); 
-  xhr = CouchDB.request("GET", "/test_suite_db/_all_docs"); 
+  xhr = CouchDB.request("GET", "/" + db_name + "/_all_docs"); 
   var etag = xhr.getResponseHeader("etag"); 
   db.deleteDb(); 
   db.createDb(); 
   db.save({a: 2}); 
-  xhr = CouchDB.request("GET", "/test_suite_db/_all_docs"); 
+  xhr = CouchDB.request("GET", "/" + db_name + "/_all_docs"); 
   var new_etag = xhr.getResponseHeader("etag");
   T(etag != new_etag);
   // but still be cacheable
-  xhr = CouchDB.request("GET", "/test_suite_db/_all_docs"); 
+  xhr = CouchDB.request("GET", "/" + db_name + "/_all_docs"); 
   T(new_etag == xhr.getResponseHeader("etag"));
-  
+
+  // cleanup
+  db.deleteDb();
 };

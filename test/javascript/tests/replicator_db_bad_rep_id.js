@@ -11,7 +11,7 @@
 // the License.
 
 couchTests.replicator_db_bad_rep_id = function(debug) {
-
+  return console.log('TODO');
   if (debug) debugger;
 
   var populate_db = replicator_db.populate_db;

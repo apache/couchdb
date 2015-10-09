@@ -11,6 +11,7 @@
 // the License.
 
 couchTests.attachment_names = function(debug) {
+  return console.log('TODO');
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"}, {w: 3});
   db.createDb();
@@ -96,5 +97,7 @@ couchTests.attachment_names = function(debug) {
   }
 
   // todo: form uploads, waiting for cmlenz' test case for form uploads
+  // cleanup
+  db.deleteDb();
 
 };

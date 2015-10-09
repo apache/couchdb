@@ -11,12 +11,10 @@
 // the License.
 
 couchTests.erlang_views = function(debug) {
-  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
-  db.deleteDb();
+  var db_name = get_random_db_name();
+  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
   if (debug) debugger;
-
-
 
   run_on_modified_server(
     [{section: "native_query_servers",
@@ -40,7 +38,6 @@ couchTests.erlang_views = function(debug) {
       T(results.total_rows == 1);
       T(results.rows[0].key == 1);
       T(results.rows[0].value == "str1");
-      
       // check simple reduction - another doc with same key.
       var doc = {_id: "2", integer: 1, string: "str2"};
       T(db.save(doc).ok);
@@ -87,20 +84,20 @@ couchTests.erlang_views = function(debug) {
       };
       T(db.save(designDoc).ok);
 
-      var url = "/test_suite_db/_design/erlview/_show/simple/1";
+      var url = "/" + db_name + "/_design/erlview/_show/simple/1";
       var xhr = CouchDB.request("GET", url);
       T(xhr.status == 200, "standard get should be 200");
       T(xhr.responseText == "0 - GET");
 
-      var url = "/test_suite_db/_design/erlview/_list/simple_list/simple_view";
+      var url = "/" + db_name + "/_design/erlview/_list/simple_list/simple_view";
       var xhr = CouchDB.request("GET", url);
       T(xhr.status == 200, "standard get should be 200");
       T(xhr.responseText == "head2tail");
 
       // Larger dataset
 
-      db.deleteDb();
-      db.createDb();
+      // db.deleteDb();
+      // db.createDb();
       var words = "foo bar abc def baz xxyz".split(/\s+/);
       
       var docs = [];
@@ -118,7 +115,6 @@ couchTests.erlang_views = function(debug) {
         });
       }
       T(db.bulkSave(docs).length, 250, "Saved big doc set.");
-      
       var mfun = 'fun({Doc}) -> ' +
         'Words = couch_util:get_value(<<"words">>, Doc), ' +
         'lists:foreach(fun({Word}) -> ' +
@@ -133,4 +129,7 @@ couchTests.erlang_views = function(debug) {
       T(results.rows[0].key === null, "Returned a reduced value.");
       T(results.rows[0].value > 0, "Reduce value exists.");
     });
+
+    // cleanup
+    db.deleteDb();
 };

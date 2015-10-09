@@ -11,8 +11,8 @@
 // the License.
 
 couchTests.view_collation = function(debug) {
-  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
-  db.deleteDb();
+  var db_name = get_random_db_name();
+  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
   if (debug) debugger;
 
@@ -113,4 +113,7 @@ couchTests.view_collation = function(debug) {
     endkey : "b", endkey_docid: "11",
     inclusive_end:false}).rows;
   T(rows[rows.length-1].key == "b");
+
+  // cleanup
+  db.deleteDb();
 };
