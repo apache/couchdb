@@ -160,13 +160,14 @@ eunit: couch
 	@${REBAR} -r eunit skip_deps=meck,mochiweb,lager,snappy,folsom
 
 javascript: all
-	@mkdir -p share/www/script/test
+	@mkdir -p share/www/test
 ifeq ($(IN_RELEASE), true)
 	@cp test/javascript/tests/lorem*.txt share/www/test/
 else
 	@mkdir -p src/fauxton/dist/release/test
 	@cp test/javascript/tests/lorem*.txt src/fauxton/dist/release/test/
 endif
+	# 2 remedy problems w/ "internal server error" remove dev/lib
 	@dev/run -q --with-admin-party-please test/javascript/run
 	@rm -rf share/www/script
 
