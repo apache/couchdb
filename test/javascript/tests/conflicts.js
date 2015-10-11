@@ -12,8 +12,8 @@
 
 // Do some edit conflict detection tests
 couchTests.conflicts = function(debug) {
-  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
-  db.deleteDb();
+  var db_name = get_random_db_name();
+  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
   if (debug) debugger;
 
@@ -58,27 +58,27 @@ couchTests.conflicts = function(debug) {
 
   // Make a few bad requests, specifying conflicting revs
   // ?rev doesn't match body
-  var xhr = CouchDB.request("PUT", "/test_suite_db/foo?rev=1-foobar", {
+  var xhr = CouchDB.request("PUT", "/" + db_name + "/foo?rev=1-foobar", {
     body : JSON.stringify(doc)
   });
   T(xhr.status == 400);
 
   // If-Match doesn't match body
-  xhr = CouchDB.request("PUT", "/test_suite_db/foo", {
+  xhr = CouchDB.request("PUT", "/" + db_name + "/foo", {
     headers: {"If-Match": "1-foobar"},
     body: JSON.stringify(doc)
   });
   T(xhr.status == 400);
 
   // ?rev= doesn't match If-Match
-  xhr = CouchDB.request("PUT", "/test_suite_db/foo?rev=1-boobaz", {
+  xhr = CouchDB.request("PUT", "/" + db_name + "/foo?rev=1-boobaz", {
     headers: {"If-Match": "1-foobar"},
     body: JSON.stringify(doc2)
   });
   T(xhr.status == 400);
 
   // Now update the document using ?rev=
-  xhr = CouchDB.request("PUT", "/test_suite_db/foo?rev=" + doc._rev, {
+  xhr = CouchDB.request("PUT", "/" + db_name + "/foo?rev=" + doc._rev, {
     body: JSON.stringify(doc)
   });
   T(xhr.status == 201);

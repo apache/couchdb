@@ -13,7 +13,8 @@
 // A simple class to represent a database. Uses XMLHttpRequest to interface with
 // the CouchDB server.
 
-function CouchDB(name, httpHeaders) {
+function CouchDB(name, httpHeaders, globalRequestOptions) {
+  this.globalRequestOptions = globalRequestOptions || {}
   this.name = name;
   this.uri = "/" + encodeURIComponent(name) + "/";
 
@@ -24,6 +25,7 @@ function CouchDB(name, httpHeaders) {
   this.request = function(method, uri, requestOptions) {
     requestOptions = requestOptions || {};
     requestOptions.headers = combine(requestOptions.headers, httpHeaders);
+    requestOptions.url = globalRequestOptions;
     return CouchDB.request(method, uri, requestOptions);
   };
 
@@ -357,6 +359,8 @@ CouchDB.getVersion = function() {
 };
 
 CouchDB.reloadConfig = function() {
+  // diabled until cluser port gets /_config
+  return {};
   CouchDB.last_req = CouchDB.request("POST", "/_config/_reload");
   CouchDB.maybeThrowError(CouchDB.last_req);
   return JSON.parse(CouchDB.last_req.responseText);
@@ -420,6 +424,22 @@ CouchDB.request = function(method, uri, options) {
   options.headers["Accept"] = options.headers["Accept"] || options.headers["accept"] || "application/json";
   var req = CouchDB.newXhr();
   uri = CouchDB.proxyUrl(uri);
+
+  if (options.url) {
+    var params = '';
+    for (var key in options.url) {
+      var value = options.url[key]
+      params += key + '=' + value + '&'
+    }
+    // if uri already has a ? append with &
+    if (uri.indexOf('?') === -1) {
+      uri += '?' + params;
+    } else {
+      uri += '&' + params;
+    }
+  }
+  // console.log(uri);
+  // console.log(JSON.stringify(options, null, 2));
   req.open(method, uri, false);
   if (options.headers) {
     var headers = options.headers;

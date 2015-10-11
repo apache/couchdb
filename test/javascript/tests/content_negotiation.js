@@ -11,15 +11,15 @@
 // the License.
 
 couchTests.content_negotiation = function(debug) {
-  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
-  db.deleteDb();
+  var db_name = get_random_db_name();
+  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
   if (debug) debugger;
   var xhr;
 
   // with no accept header
   var req = CouchDB.newXhr();
-  req.open("GET", CouchDB.proxyUrl("/test_suite_db/"), false);
+  req.open("GET", CouchDB.proxyUrl("/" + db_name + "/"), false);
   req.send("");
   TEquals("text/plain; charset=utf-8", req.getResponseHeader("Content-Type"));
 
@@ -27,12 +27,12 @@ couchTests.content_negotiation = function(debug) {
   var text = req.responseText;
   TEquals("\n", text[text.length-1]);
 
-  xhr = CouchDB.request("GET", "/test_suite_db/", {
+  xhr = CouchDB.request("GET", "/" + db_name + "/", {
     headers: {"Accept": "text/html; text/plain;*/*"}
   });
   TEquals("text/plain; charset=utf-8", xhr.getResponseHeader("Content-Type"));
 
-  xhr = CouchDB.request("GET", "/test_suite_db/", {
+  xhr = CouchDB.request("GET", "/" + db_name + "/", {
     headers: {"Accept": "application/json"}
   });
   TEquals("application/json", xhr.getResponseHeader("Content-Type"));
