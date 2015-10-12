@@ -286,7 +286,13 @@ couchdb_1309(DbName) ->
         ?assert(is_pid(NewIndexerPid)),
         ?assert(is_process_alive(NewIndexerPid)),
         ?assertNotEqual(IndexerPid, NewIndexerPid),
-        ?assertEqual(2, count_users(DbName)),
+        UserCnt = case count_users(DbName) of
+                      N when N > 2 ->
+                          time:sleep(1000),
+                          count_users(DbName);
+                      N -> N
+                  end,
+        ?assertEqual(2, UserCnt),
 
         Rows1 = query_view(DbName, "foo", "bar", ok),
         ?assertEqual(0, length(Rows1)),
@@ -353,9 +359,17 @@ couchdb_1283() ->
         ?assertEqual(ok, get_writer_status(Writer1)),
         ?assertEqual(ok, get_writer_status(Writer2)),
 
-        {ok, MonRef} = couch_mrview:compact(MDb1#db.name, <<"_design/foo">>,
-                                            [monitor]),
-
+        %% Below we do exactly the same as couch_mrview:compact holds inside
+        %% because we need have access to compaction Pid, not a Ref.
+        %% {ok, MonRef} = couch_mrview:compact(MDb1#db.name, <<"_design/foo">>,
+        %%                                     [monitor]),
+        {ok, Pid} = couch_index_server:get_index(
+            couch_mrview_index, MDb1#db.name, <<"_design/foo">>),
+        {ok, CPid} = gen_server:call(Pid, compact),
+        %% By suspending compaction process we ensure that compaction won't get
+        %% finished too early to make get_writer_status assertion fail.
+        erlang:suspend_process(CPid),
+        MonRef = erlang:monitor(process, CPid),
         Writer3 = spawn_writer(Db3#db.name),
         ?assert(is_process_alive(Writer3)),
         ?assertEqual({error, all_dbs_active}, get_writer_status(Writer3)),
@@ -363,6 +377,9 @@ couchdb_1283() ->
         ?assert(is_process_alive(Writer1)),
         ?assert(is_process_alive(Writer2)),
         ?assert(is_process_alive(Writer3)),
+
+        %% Resume compaction
+        erlang:resume_process(CPid),
 
         receive
             {'DOWN', MonRef, process, _, Reason} ->
@@ -547,7 +564,7 @@ compact_db(DbName) ->
     {ok, Db} = couch_db:open_int(DbName, []),
     {ok, _} = couch_db:start_compact(Db),
     ok = couch_db:close(Db),
-    wait_db_compact_done(DbName, 10).
+    wait_db_compact_done(DbName, 20).
 
 wait_db_compact_done(_DbName, 0) ->
     erlang:error({assertion_failed,
