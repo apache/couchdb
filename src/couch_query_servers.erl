@@ -261,18 +261,25 @@ get_number(Key, Props) ->
         throw({invalid_value, iolist_to_binary(Msg)})
     end.
 
+
 % use the function stored in ddoc.validate_doc_update to test an update.
+-spec validate_doc_update(DDoc, EditDoc, DiskDoc, Ctx, SecObj) -> ok when
+    DDoc    :: ddoc(),
+    EditDoc :: doc(),
+    DiskDoc :: doc() | nil,
+    Ctx     :: user_ctx(),
+    SecObj  :: sec_obj().
+
 validate_doc_update(DDoc, EditDoc, DiskDoc, Ctx, SecObj) ->
     JsonEditDoc = couch_doc:to_json_obj(EditDoc, [revs]),
     JsonDiskDoc = json_doc(DiskDoc),
-    Resp = ddoc_prompt(DDoc,
-                       [<<"validate_doc_update">>],
-                       [JsonEditDoc, JsonDiskDoc, Ctx, SecObj]),
-    case Resp of
-        _ when Resp /= 1 ->
-            couch_stats:increment_counter(
-                [couchdb, query_server, vdu_rejects], 1);
-        _ -> ok
+    Resp = ddoc_prompt(
+        DDoc,
+        [<<"validate_doc_update">>],
+        [JsonEditDoc, JsonDiskDoc, Ctx, SecObj]
+    ),
+    if Resp == 1 -> ok; true ->
+        couch_stats:increment_counter([couchdb, query_server, vdu_rejects], 1)
     end,
     case Resp of
         1 ->
@@ -285,23 +292,36 @@ validate_doc_update(DDoc, EditDoc, DiskDoc, Ctx, SecObj) ->
             throw({unknown_error, Message})
     end.
 
-json_doc(nil) -> null;
+json_doc_options() ->
+    json_doc_options([]).
+
+json_doc_options(Options) ->
+    Limit = config:get_integer("query_server_config", "revs_limit", 20),
+    [{revs, Limit} | Options].
+
 json_doc(Doc) ->
-    couch_doc:to_json_obj(Doc, [revs]).
+    json_doc(Doc, json_doc_options()).
+
+json_doc(nil, _) ->
+    null;
+json_doc(Doc, Options) ->
+    couch_doc:to_json_obj(Doc, Options).
 
 filter_view(DDoc, VName, Docs) ->
-    JsonDocs = [couch_doc:to_json_obj(Doc, [revs]) || Doc <- Docs],
+    Options = json_doc_options(),
+    JsonDocs = [json_doc(Doc, Options) || Doc <- Docs],
     [true, Passes] = ddoc_prompt(DDoc, [<<"views">>, VName, <<"map">>], [JsonDocs]),
     {ok, Passes}.
 
 filter_docs(Req, Db, DDoc, FName, Docs) ->
     JsonReq = case Req of
-    {json_req, JsonObj} ->
-        JsonObj;
-    #httpd{} = HttpReq ->
-        couch_httpd_external:json_req_obj(HttpReq, Db)
+        {json_req, JsonObj} ->
+            JsonObj;
+        #httpd{} = HttpReq ->
+            couch_httpd_external:json_req_obj(HttpReq, Db)
     end,
-    JsonDocs = [couch_doc:to_json_obj(Doc, [revs]) || Doc <- Docs],
+    Options = json_doc_options(),
+    JsonDocs = [json_doc(Doc, Options) || Doc <- Docs],
     [true, Passes] = ddoc_prompt(DDoc, [<<"filters">>, FName],
         [JsonDocs, JsonReq]),
     {ok, Passes}.

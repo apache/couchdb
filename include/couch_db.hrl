@@ -229,3 +229,10 @@
     atts = []
 }).
 
+
+-type doc() :: #doc{}.
+-type ddoc() :: #doc{}.
+-type user_ctx() :: #user_ctx{}.
+-type sec_props() :: [tuple()].
+-type sec_obj() :: {sec_props()}.
+
