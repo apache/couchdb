@@ -261,7 +261,15 @@ get_number(Key, Props) ->
         throw({invalid_value, iolist_to_binary(Msg)})
     end.
 
+
 % use the function stored in ddoc.validate_doc_update to test an update.
+-spec validate_doc_update(DDoc, EditDoc, DiskDoc, Ctx, SecObj) -> ok when
+    DDoc    :: ddoc(),
+    EditDoc :: doc(),
+    DiskDoc :: doc() | nil,
+    Ctx     :: user_ctx(),
+    SecObj  :: sec_obj().
+
 validate_doc_update(DDoc, EditDoc, DiskDoc, Ctx, SecObj) ->
     JsonEditDoc = couch_doc:to_json_obj(EditDoc, [revs]),
     JsonDiskDoc = json_doc(DiskDoc),
