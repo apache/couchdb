@@ -39,7 +39,10 @@ handle_setup_req(#httpd{method='GET'}=Req) ->
                 ok ->
                     chttpd:send_json(Req, 200, {[{state, cluster_finished}]})
             end
-    end.
+    end;
+handle_setup_req(#httpd{}=Req) ->
+    chttpd:send_method_not_allowed(Req, "GET,POST").
+
 
 get_options(Options, Setup) ->
     ExtractValues = fun({Tag, Option}, OptionsAcc) ->
