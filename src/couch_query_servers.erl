@@ -273,14 +273,13 @@ get_number(Key, Props) ->
 validate_doc_update(DDoc, EditDoc, DiskDoc, Ctx, SecObj) ->
     JsonEditDoc = couch_doc:to_json_obj(EditDoc, [revs]),
     JsonDiskDoc = json_doc(DiskDoc),
-    Resp = ddoc_prompt(DDoc,
-                       [<<"validate_doc_update">>],
-                       [JsonEditDoc, JsonDiskDoc, Ctx, SecObj]),
-    case Resp of
-        _ when Resp /= 1 ->
-            couch_stats:increment_counter(
-                [couchdb, query_server, vdu_rejects], 1);
-        _ -> ok
+    Resp = ddoc_prompt(
+        DDoc,
+        [<<"validate_doc_update">>],
+        [JsonEditDoc, JsonDiskDoc, Ctx, SecObj]
+    ),
+    if Resp == 1 -> ok; true ->
+        couch_stats:increment_counter([couchdb, query_server, vdu_rejects], 1)
     end,
     case Resp of
         1 ->
@@ -316,10 +315,10 @@ filter_view(DDoc, VName, Docs) ->
 
 filter_docs(Req, Db, DDoc, FName, Docs) ->
     JsonReq = case Req of
-    {json_req, JsonObj} ->
-        JsonObj;
-    #httpd{} = HttpReq ->
-        couch_httpd_external:json_req_obj(HttpReq, Db)
+        {json_req, JsonObj} ->
+            JsonObj;
+        #httpd{} = HttpReq ->
+            couch_httpd_external:json_req_obj(HttpReq, Db)
     end,
     Options = json_doc_options(),
     JsonDocs = [json_doc(Doc, Options) || Doc <- Docs],
