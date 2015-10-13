@@ -180,6 +180,16 @@ loop() ->
             From ! {ok, self(), ok}
     end.
 
+call(Pid, done) ->
+    Ref = erlang:monitor(process, Pid),
+    Pid ! {done, self()},
+    Res = wait(Pid),
+    receive
+        {'DOWN', Ref, _Type, Pid, _Info} ->
+            Res
+    after ?TIMEOUT ->
+            throw(timeout_error)
+    end;
 call(Pid, Command) ->
     Pid ! {Command, self()},
     wait(Pid).
