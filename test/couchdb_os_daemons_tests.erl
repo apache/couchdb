@@ -32,7 +32,8 @@
 -define(DAEMON_CAN_REBOOT, "os_daemon_can_reboot.sh").
 -define(DAEMON_DIE_ON_BOOT, "os_daemon_die_on_boot.sh").
 -define(DAEMON_DIE_QUICKLY, "os_daemon_die_quickly.sh").
--define(DELAY, 100).
+-define(TRIES, 20).
+-define(TRY_DELAY_MS, 100).
 -define(TIMEOUT, 1000).
 
 
@@ -44,7 +45,7 @@ setup(DName) ->
     % Set configuration option to be used by configuration_reader_test_
     % This will be used in os_daemon_configer.escript:test_get_cfg2
     config:set("uuids", "algorithm","sequential", false),
-    timer:sleep(?DELAY),  % sleep a bit to let daemon set kill flag
+    ensure_n_daemons_are_alive(1),
     {Ctx, OsDPid}.
 
 teardown(_, {Ctx, OsDPid}) ->
@@ -122,7 +123,7 @@ should_spawn_multiple_daemons(DName, _) ->
                          filename:join([?FIXTURESDIR, DName]), false),
         config:set("os_daemons", "baz",
                          filename:join([?FIXTURESDIR, DName]), false),
-        timer:sleep(?DELAY),
+        ensure_n_daemons_are_alive(3), % DName, "bar" and "baz"
         {ok, Daemons} = couch_os_daemons:info([table]),
         lists:foreach(fun(D) ->
             check_daemon(D)
@@ -137,14 +138,14 @@ should_keep_alive_one_daemon_on_killing_other(DName, _) ->
     ?_test(begin
         config:set("os_daemons", "bar",
                          filename:join([?FIXTURESDIR, DName]), false),
-        timer:sleep(?DELAY),
+        ensure_n_daemons_are_alive(2), % DName and "bar"
         {ok, Daemons} = couch_os_daemons:info([table]),
         lists:foreach(fun(D) ->
             check_daemon(D)
         end, Daemons),
 
         config:delete("os_daemons", "bar", false),
-        timer:sleep(?DELAY),
+        ensure_n_daemons_are_alive(1), % Dname only, "bar" should be dead
         {ok, [D2]} = couch_os_daemons:info([table]),
         check_daemon(D2, DName),
 
@@ -216,3 +217,28 @@ check_dead(D, Name) ->
     ?assertEqual(halted, D#daemon.status),
     ?assertEqual(nil, D#daemon.errors),
     ?assertEqual(nil, D#daemon.buf).
+
+daemons() ->
+    {ok, Daemons} = couch_os_daemons:info([table]),
+    Daemons.
+
+ensure_n_daemons_are_alive(NumDaemons) ->
+    retry(fun() -> length(daemons()) == NumDaemons end, "spawning"),
+    retry(fun() ->
+                  lists:all(fun(D) -> D#daemon.kill =/= undefined end, daemons())
+          end, "waiting for kill flag").
+
+retry(Pred, FailReason) ->
+    retry(Pred, ?TRIES, FailReason).
+
+retry(_Pred, 0, FailReason) ->
+    erlang:error({assertion_failed,[{module, ?MODULE}, {line, ?LINE},
+                                    {reason, "Timed out: " ++ FailReason}]});
+retry(Pred, N, FailReason) ->
+    case Pred() of
+        true ->
+            ok;
+        false ->
+            timer:sleep(?TRY_DELAY_MS),
+            retry(Pred, N - 1, FailReason)
+    end.
