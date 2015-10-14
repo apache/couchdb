@@ -157,7 +157,7 @@ docker-stop:
 eunit: export BUILDDIR = $(shell pwd)
 eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 eunit: couch
-	@${REBAR} setup_eunit
+	@${REBAR} setup_eunit 2> /dev/null
 	@${REBAR} -r eunit skip_deps=meck,mochiweb,lager,snappy,folsom,proper $(EUNIT_OPTS)
 
 javascript: all
