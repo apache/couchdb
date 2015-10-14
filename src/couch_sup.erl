@@ -84,17 +84,17 @@ handle_config_terminate(_, _, _) ->
     end).
 
 notify_starting() ->
-    io:format("Apache CouchDB ~s is starting.~n", [
+    couch_log:info("Apache CouchDB ~s is starting.~n", [
         couch_server:get_version()
     ]).
 
 
 notify_started() ->
-    io:format("Apache CouchDB has started. Time to relax.~n").
+    couch_log:info("Apache CouchDB has started. Time to relax.~n", []).
 
 
 notify_error(Error) ->
-    io:format("Error starting Apache CouchDB:~n~n    ~p~n~n", [Error]).
+    couch_log:error("Error starting Apache CouchDB:~n~n    ~p~n~n", [Error]).
 
 
 notify_uris() ->
@@ -160,6 +160,6 @@ write_file(FileName, Contents) ->
             ok;
         {error, Reason} ->
             Args = [FileName, file:format_error(Reason)],
-            io:format(standard_error, "Failed ot write ~s :: ~s", Args),
+            couch_log:error("Failed ot write ~s :: ~s", Args),
             throw({error, Reason})
     end.
