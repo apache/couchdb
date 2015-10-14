@@ -158,7 +158,7 @@ eunit: export BUILDDIR = $(shell pwd)
 eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 eunit: couch
 	@${REBAR} setup_eunit
-	@${REBAR} -r eunit skip_deps=meck,mochiweb,lager,snappy,folsom,proper
+	@${REBAR} -r eunit skip_deps=meck,mochiweb,lager,snappy,folsom,proper $(EUNIT_OPTS)
 
 javascript: all
 	# TODO: Fix tests to look for these files in their new path
