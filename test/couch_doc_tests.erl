@@ -29,14 +29,13 @@ doc_from_multi_part_stream_test() ->
     ContentType = "multipart/related;boundary=multipart_related_boundary~~~~~~~~~~~~~~~~~~~~",
     DataFun = fun() -> request(start) end,
 
-    {ok, #doc{id = <<"doc0">>, atts = [_]} = Doc, _Fun, _Parser} =
+    {ok, #doc{id = <<"doc0">>, atts = [_]}, _Fun, _Parser} =
         couch_doc:doc_from_multi_part_stream(ContentType, DataFun),
     ok.
 
 doc_to_multi_part_stream_test() ->
     Boundary = <<"multipart_related_boundary~~~~~~~~~~~~~~~~~~~~">>,
     JsonBytes = <<"{\n \"_id\": \"our document goes here\"\n}\n\n">>,
-    ContentType = "multipart/related;boundary=multipart_related_boundary~~~~~~~~~~~~~~~~~~~~",
     AttData = <<"Hello my important document">>,
     AttLength = size(AttData),
     Atts = [couch_att:new([
