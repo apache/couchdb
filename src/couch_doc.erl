@@ -17,11 +17,14 @@
 -export([validate_docid/1, get_validate_doc_fun/1]).
 -export([doc_from_multi_part_stream/2, doc_from_multi_part_stream/3]).
 -export([doc_to_multi_part_stream/5, len_doc_to_multi_part_stream/4]).
--export([abort_multi_part_stream/1, restart_open_doc_revs/3]).
+-export([restart_open_doc_revs/3]).
 -export([to_path/1]).
--export([mp_parse_doc/2]).
+
 -export([with_ejson_body/1]).
 -export([is_deleted/1]).
+
+%% deprecated
+-export([abort_multi_part_stream/1]).
 -export([num_mp_writers/1]).
 
 -include_lib("couch/include/couch_db.hrl").
@@ -367,129 +370,41 @@ merge_stubs(#doc{id=Id,atts=MemBins}=StubsDoc, #doc{atts=DiskBins}) ->
     end.
 
 len_doc_to_multi_part_stream(Boundary, JsonBytes, Atts, SendEncodedAtts) ->
-    AttsSize = lists:foldl(fun(Att, AccAttsSize) ->
-            [Data, Name, AttLen, DiskLen, Type, Encoding] =
-                 couch_att:fetch([data, name, att_len, disk_len, type, encoding], Att),
-            case Data of
-            stub ->
-                AccAttsSize;
-            _ ->
-                AccAttsSize +
-                4 + % "\r\n\r\n"
-                case SendEncodedAtts of
-                true ->
-                    % header
-                    length(integer_to_list(AttLen)) +
-                    AttLen;
-                _ ->
-                    % header
-                    length(integer_to_list(DiskLen)) +
-                    DiskLen
-                end +
-                4 + % "\r\n--"
-                size(Boundary) +
+    AttsToInclude = lists:filter(fun(Att) -> not couch_att:is_stub(Att) end, Atts),
+    AttsDecoded = decode_attributes(AttsToInclude, SendEncodedAtts),
+    couch_httpd_multipart:length_multipart_stream(Boundary, JsonBytes, AttsDecoded).
 
-                % attachment headers
-                % (the length of the Content-Length has already been set)
-                size(Name) +
-                size(Type) +
-                length("\r\nContent-Disposition: attachment; filename=\"\"") +
-                length("\r\nContent-Type: ") +
-                length("\r\nContent-Length: ") +
-                case Encoding of
-                identity ->
-                    0;
-                 _ ->
-                    length(atom_to_list(Encoding)) +
-                    length("\r\nContent-Encoding: ")
-                end
-            end
-        end, 0, Atts),
-    if AttsSize == 0 ->
-        {<<"application/json">>, iolist_size(JsonBytes)};
-    true ->
-        {<<"multipart/related; boundary=\"", Boundary/binary, "\"">>,
-            2 + % "--"
-            size(Boundary) +
-            36 + % "\r\ncontent-type: application/json\r\n\r\n"
-            iolist_size(JsonBytes) +
-            4 + % "\r\n--"
-            size(Boundary) +
-            + AttsSize +
-            2 % "--"
-            }
-    end.
 
 doc_to_multi_part_stream(Boundary, JsonBytes, Atts, WriteFun,
     SendEncodedAtts) ->
-    case lists:any(fun(Att)-> couch_att:fetch(data, Att) /= stub end, Atts) of
-    true ->
-        WriteFun([<<"--", Boundary/binary,
-                "\r\nContent-Type: application/json\r\n\r\n">>,
-                JsonBytes, <<"\r\n--", Boundary/binary>>]),
-        atts_to_mp(Atts, Boundary, WriteFun, SendEncodedAtts);
-    false ->
-        WriteFun(JsonBytes)
-    end.
+    AttsToInclude = lists:filter(fun(Att)-> couch_att:fetch(data, Att) /= stub end, Atts),
+    AttsDecoded = decode_attributes(AttsToInclude, SendEncodedAtts),
+    AttFun = case SendEncodedAtts of
+        false -> fun couch_att:foldl_decode/3;
+        true  -> fun couch_att:foldl/3
+    end,
+    couch_httpd_multipart:encode_multipart_stream(
+      Boundary, JsonBytes, AttsDecoded, WriteFun, AttFun).
 
-atts_to_mp([], _Boundary, WriteFun, _SendEncAtts) ->
-    WriteFun(<<"--">>);
-atts_to_mp([Att | RestAtts], Boundary, WriteFun, SendEncodedAtts)  ->
-    case couch_att:is_stub(Att) of
-        true ->
-            atts_to_mp(RestAtts, Boundary, WriteFun, SendEncodedAtts);
-        false ->
-            [Name, AttLen, DiskLen, Type, Encoding] =
-                couch_att:fetch([name, att_len, disk_len, type, encoding], Att),
-            % write headers
-            LengthBin = case SendEncodedAtts of
-                true  -> list_to_binary(integer_to_list(AttLen));
-                false -> list_to_binary(integer_to_list(DiskLen))
-            end,
-            WriteFun(<<"\r\nContent-Disposition: attachment; filename=\"", Name/binary, "\"">>),
-            WriteFun(<<"\r\nContent-Type: ", Type/binary>>),
-            WriteFun(<<"\r\nContent-Length: ", LengthBin/binary>>),
-            case Encoding of
-                identity ->
-                    ok;
-                _ ->
-                    EncodingBin = atom_to_binary(Encoding, latin1),
-                    WriteFun(<<"\r\nContent-Encoding: ", EncodingBin/binary>>)
-            end,
-
-            % write data
-            WriteFun(<<"\r\n\r\n">>),
-            AttFun = case SendEncodedAtts of
-                false -> fun couch_att:foldl_decode/3;
-                true  -> fun couch_att:foldl/3
-            end,
-            AttFun(Att, fun(Data, _) -> WriteFun(Data) end, ok),
-            WriteFun(<<"\r\n--", Boundary/binary>>),
-            atts_to_mp(RestAtts, Boundary, WriteFun, SendEncodedAtts)
-    end.
-
+decode_attributes(Atts, SendEncodedAtts) ->
+    lists:map(fun(Att) ->
+        [Name, AttLen, DiskLen, Type, Encoding] =
+           couch_att:fetch([name, att_len, disk_len, type, encoding], Att),
+        Len = case SendEncodedAtts of
+            true -> AttLen;
+            false -> DiskLen
+          end,
+        {Att, Name, Len, Type, Encoding}
+      end, Atts).
 
 doc_from_multi_part_stream(ContentType, DataFun) ->
     doc_from_multi_part_stream(ContentType, DataFun, make_ref()).
 
-
 doc_from_multi_part_stream(ContentType, DataFun, Ref) ->
-    Parent = self(),
-    NumMpWriters = num_mp_writers(),
-    {Parser, ParserRef} = spawn_monitor(fun() ->
-        ParentRef = erlang:monitor(process, Parent),
-        put(mp_parent_ref, ParentRef),
-        num_mp_writers(NumMpWriters),
-        {<<"--",_/binary>>, _, _} = couch_httpd:parse_multipart_request(
-            ContentType, DataFun,
-            fun(Next) -> mp_parse_doc(Next, []) end),
-        unlink(Parent)
-        end),
-    Parser ! {get_doc_bytes, Ref, self()},
-    receive
-    {started_open_doc_revs, NewRef} ->
+    case couch_httpd_multipart:decode_multipart_stream(ContentType, DataFun, Ref) of
+    {{started_open_doc_revs, NewRef}, Parser, _ParserRef} ->
         restart_open_doc_revs(Parser, Ref, NewRef);
-    {doc_bytes, Ref, DocBytes} ->
+    {{doc_bytes, Ref, DocBytes}, Parser, ParserRef} ->
         Doc = from_json_obj(?JSON_DECODE(DocBytes)),
         % we'll send the Parser process ID to the remote nodes so they can
         % retrieve their own copies of the attachment data
@@ -500,158 +415,8 @@ doc_from_multi_part_stream(ContentType, DataFun, Ref) ->
             erlang:put(mochiweb_request_recv, true)
         end,
         {ok, Doc#doc{atts=Atts}, WaitFun, Parser};
-    {'DOWN', ParserRef, _, _, normal} ->
-        ok;
-    {'DOWN', ParserRef, process, Parser, {{nocatch, {Error, Msg}}, _}} ->
-        couch_log:error("Multipart streamer ~p died with reason ~p",
-                        [ParserRef, Msg]),
-        throw({Error, Msg});
-    {'DOWN', ParserRef, _, _, Reason} ->
-        couch_log:error("Multipart streamer ~p died with reason ~p",
-                        [ParserRef, Reason]),
-        throw({error, Reason})
+    ok -> ok
     end.
-
-
-mp_parse_doc({headers, H}, []) ->
-    case couch_util:get_value("content-type", H) of
-    {"application/json", _} ->
-        fun (Next) ->
-            mp_parse_doc(Next, [])
-        end;
-    _ ->
-        throw({bad_ctype, <<"Content-Type must be application/json">>})
-    end;
-mp_parse_doc({body, Bytes}, AccBytes) ->
-    fun (Next) ->
-        mp_parse_doc(Next, [Bytes | AccBytes])
-    end;
-mp_parse_doc(body_end, AccBytes) ->
-    receive {get_doc_bytes, Ref, From} ->
-        From ! {doc_bytes, Ref, lists:reverse(AccBytes)}
-    end,
-    fun(Next) ->
-        mp_parse_atts(Next, {Ref, [], 0, orddict:new(), []})
-    end.
-
-mp_parse_atts({headers, _}, Acc) ->
-    fun(Next) -> mp_parse_atts(Next, Acc) end;
-mp_parse_atts(body_end, Acc) ->
-    fun(Next) -> mp_parse_atts(Next, Acc) end;
-mp_parse_atts({body, Bytes}, {Ref, Chunks, Offset, Counters, Waiting}) ->
-    case maybe_send_data({Ref, Chunks++[Bytes], Offset, Counters, Waiting}) of
-        abort_parsing ->
-            fun(Next) -> mp_abort_parse_atts(Next, nil) end;
-        NewAcc ->
-            fun(Next) -> mp_parse_atts(Next, NewAcc) end
-    end;
-mp_parse_atts(eof, {Ref, Chunks, Offset, Counters, Waiting}) ->
-    N = num_mp_writers(),
-    M = length(Counters),
-    case (M == N) andalso Chunks == [] of
-    true ->
-        ok;
-    false ->
-        ParentRef = get(mp_parent_ref),
-        receive
-        abort_parsing ->
-            ok;
-        {get_bytes, Ref, From} ->
-            C2 = orddict:update_counter(From, 1, Counters),
-            NewAcc = maybe_send_data({Ref, Chunks, Offset, C2, [From|Waiting]}),
-            mp_parse_atts(eof, NewAcc);
-        {'DOWN', ParentRef, _, _, _} ->
-            exit(mp_reader_coordinator_died)
-        after 3600000 ->
-            ok
-        end
-    end.
-
-mp_abort_parse_atts(eof, _) ->
-    ok;
-mp_abort_parse_atts(_, _) ->
-    fun(Next) -> mp_abort_parse_atts(Next, nil) end.
-
-maybe_send_data({Ref, Chunks, Offset, Counters, Waiting}) ->
-    receive {get_bytes, Ref, From} ->
-        NewCounters = orddict:update_counter(From, 1, Counters),
-        maybe_send_data({Ref, Chunks, Offset, NewCounters, [From|Waiting]})
-    after 0 ->
-        % reply to as many writers as possible
-        NewWaiting = lists:filter(fun(Writer) ->
-            WhichChunk = orddict:fetch(Writer, Counters),
-            ListIndex = WhichChunk - Offset,
-            if ListIndex =< length(Chunks) ->
-                Writer ! {bytes, Ref, lists:nth(ListIndex, Chunks)},
-                false;
-            true ->
-                true
-            end
-        end, Waiting),
-
-        % check if we can drop a chunk from the head of the list
-        case Counters of
-        [] ->
-            SmallestIndex = 0;
-        _ ->
-            SmallestIndex = lists:min(element(2, lists:unzip(Counters)))
-        end,
-        Size = length(Counters),
-        N = num_mp_writers(),
-        if Size == N andalso SmallestIndex == (Offset+1) ->
-            NewChunks = tl(Chunks),
-            NewOffset = Offset+1;
-        true ->
-            NewChunks = Chunks,
-            NewOffset = Offset
-        end,
-
-        % we should wait for a writer if no one has written the last chunk
-        LargestIndex = lists:max([0|element(2, lists:unzip(Counters))]),
-        if LargestIndex  >= (Offset + length(Chunks)) ->
-            % someone has written all possible chunks, keep moving
-            {Ref, NewChunks, NewOffset, Counters, NewWaiting};
-        true ->
-            ParentRef = get(mp_parent_ref),
-            receive
-            abort_parsing ->
-                abort_parsing;
-            {'DOWN', ParentRef, _, _, _} ->
-                exit(mp_reader_coordinator_died);
-            {get_bytes, Ref, X} ->
-                C2 = orddict:update_counter(X, 1, Counters),
-                maybe_send_data({Ref, NewChunks, NewOffset, C2, [X|NewWaiting]})
-            end
-        end
-    end.
-
-
-num_mp_writers(N) ->
-    erlang:put(mp_att_writers, N).
-
-
-num_mp_writers() ->
-    case erlang:get(mp_att_writers) of
-        undefined -> 1;
-        Count -> Count
-    end.
-
-
-abort_multi_part_stream(Parser) ->
-    MonRef = erlang:monitor(process, Parser),
-    Parser ! abort_parsing,
-    receive
-        {'DOWN', MonRef, _, _, _} -> ok
-    after 60000 ->
-        % One minute is quite on purpose for this timeout. We
-        % want to try and read data to keep the socket open
-        % when possible but we also don't want to just make
-        % this a super long timeout because people have to
-        % wait this long to see if they just had an error
-        % like a validate_doc_update failure.
-        throw(multi_part_abort_timeout)
-    end.
-
 
 restart_open_doc_revs(Parser, Ref, NewRef) ->
     unlink(Parser),
@@ -679,3 +444,12 @@ with_ejson_body(#doc{body = Body} = Doc) when is_binary(Body) ->
     Doc#doc{body = couch_compress:decompress(Body)};
 with_ejson_body(#doc{body = {_}} = Doc) ->
     Doc.
+
+%% deprecated
+abort_multi_part_stream(Parser) ->
+    couch_log:warning("couch_doc:abort_multi_part_stream/1 is deprecated use couch_httpd_multipart:abort_multipart_stream/1", []),
+    couch_httpd_multipart:abort_multipart_stream(Parser).
+
+num_mp_writers(N) ->
+    couch_log:warning("couch_doc:num_mp_writers/1 is deprecated use couch_httpd_multipart:num_mp_writers/1", []),
+    couch_httpd_multipart:num_mp_writers(N).

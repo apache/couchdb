@@ -590,7 +590,7 @@ db_doc_req(#httpd{method='PUT'}=Req, Db, DocId) ->
             Result
         catch throw:Err ->
             % Document rejected by a validate_doc_update function.
-            couch_doc:abort_multi_part_stream(Parser),
+            couch_httpd_multipart:abort_multipart_stream(Parser),
             throw(Err)
         end;
     _Else ->
