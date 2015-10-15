@@ -685,7 +685,7 @@ receive_docs(Streamer, UserFun, Ref, UserAcc) ->
                 {ok, UserAcc2} ->
                     ok;
                 {skip, UserAcc2} ->
-                    couch_httpd_multipart:abort_multi_part_stream(Parser)
+                    couch_httpd_multipart:abort_multipart_stream(Parser)
                 end,
                 WaitFun(),
                 receive_docs(Streamer, UserFun, Ref, UserAcc2)
