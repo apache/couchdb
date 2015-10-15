@@ -12,10 +12,14 @@
 
 -module(couch_httpd_multipart).
 
--export([encode_multipart_stream/5]).
--export([decode_multipart_stream/3]).
--export([length_multipart_stream/3]).
--export([abort_multipart_stream/1]).
+-export([
+    abort_multipart_stream/1,
+    decode_multipart_stream/3,
+    encode_multipart_stream/5,
+    length_multipart_stream/3,
+    num_mp_writers/0,
+    num_mp_writers/1
+]).
 
 -include_lib("couch/include/couch_db.hrl").
 
