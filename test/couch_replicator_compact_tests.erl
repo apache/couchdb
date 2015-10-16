@@ -21,7 +21,7 @@
 -define(TIMEOUT, 30000).
 -define(TIMEOUT_STOP, 1000).
 -define(TIMEOUT_WRITER, 3000).
--define(TIMEOUT_EUNIT, ?TIMEOUT div 1000 + 5).
+-define(TIMEOUT_EUNIT, ?TIMEOUT div 1000 + 70).
 
 setup() ->
     DbName = ?tempdb(),
