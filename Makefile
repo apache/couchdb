@@ -25,7 +25,18 @@ DESTDIR=
 ################################################################################
 
 
+.PHONY: all
+# target: all - Build everything
 all: couch fauxton docs
+
+
+.PHONY: help
+# target: help - Print this help
+help:
+	@egrep "^# target: " Makefile \
+		| sed -e 's/^# target: //g' \
+		| sort \
+		| awk '{printf("    %-15s", $$1); $$1=$$2=""; print "-" $$0}'
 
 
 ################################################################################
@@ -33,14 +44,20 @@ all: couch fauxton docs
 ################################################################################
 
 
+.PHONY: couch
+# target: couch - Build CouchDB core
 couch: config.erl
 	@$(REBAR) compile
 	@cp src/couch/priv/couchjs bin/
 
 
+.PHONY: docs
+# target: docs - Build documentation
 docs: src/docs/build
 
 
+.PHONY: fauxton
+# target: fauxton - Build Fauxton web UI
 fauxton: share/www
 
 
@@ -49,9 +66,13 @@ fauxton: share/www
 ################################################################################
 
 
+.PHONY: check
+# target: check - Test everything
 check: javascript eunit build-test
 
 
+.PHONY: eunit
+# target: eunit - Run EUnit tests, use $(EUNIT_OPTS) for custom rebar eunit params
 eunit: export BUILDDIR = $(shell pwd)
 eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 eunit: couch
@@ -59,6 +80,8 @@ eunit: couch
 	@$(REBAR) -r eunit skip_deps=meck,mochiweb,lager,snappy,folsom,proper $(EUNIT_OPTS)
 
 
+.PHONY: javascript
+# target: javascript - Run JavaScript tests suite
 javascript: all
 	# TODO: Fix tests to look for these files in their new path
 	@mkdir -p share/www/script/test
@@ -67,6 +90,8 @@ javascript: all
 	@rm -rf share/www/script
 
 
+.PHONY: build-test
+# target: build-test - Test build script
 build-test:
 	@test/build/test-configure.sh
 
@@ -76,18 +101,26 @@ build-test:
 ################################################################################
 
 
+.PHONY: docker-image
+# target: docker-image - Build Docker image
 docker-image:
 	@docker build --rm -t couchdb/dev-cluster .
 
 
+.PHONY: docker-start
+# target: docker-start - Start CouchDB in Docker container
 docker-start:
 	@docker run -d -P -t couchdb/dev-cluster > .docker-id
 
 
+.PHONY: docker-stop
+# target: docker-stop - Stop Docker container
 docker-stop:
 	@docker stop `cat .docker-id`
 
 
+.PHONY: introspect
+# target: introspect - Check for commits difference between rebar.config and repository
 introspect:
 	@$(REBAR) -r update-deps
 	@./introspect
@@ -98,6 +131,8 @@ introspect:
 ################################################################################
 
 
+.PHONY: dist
+# target: dist - Make release tarball
 dist: all
 	@./build-aux/couchdb-build-release.sh $(COUCHDB_VERSION)
 
@@ -116,6 +151,8 @@ dist: all
 	@echo "Done: apache-couchdb-$(COUCHDB_VERSION).tar.gz"
 
 
+.PHONY: install
+# target: install - Install CouchDB :-)
 -include install.mk
 install: all
 	@echo "Installing CouchDB into $(DESTDIR)/$(install_dir)..." | sed -e 's,///,/,'
@@ -167,6 +204,8 @@ install: all
 ################################################################################
 
 
+.PHONY: clean
+# target: clean - Remove build artifacts
 clean:
 	@$(REBAR) -r clean
 	@rm -f bin/couchjs
@@ -181,7 +220,8 @@ clean:
 	@rm -f dev/boot_node.beam dev/pbkdf2.pyc log/crash.log
 
 
-
+.PHONY: distclean
+# target: distclean - Remove build and release artifacts
 distclean: clean
 	@rm -f install.mk
 	@rm -f config.erl
@@ -195,10 +235,14 @@ ifneq ($(IN_RELEASE), true)
 endif
 
 
+.PHONY: devclean
+# target: devclean - Remove dev cluster artifacts
 devclean:
 	@rm -rf dev/lib/*/data
 
 
+.PHONY: uninstall
+# target: uninstall - Uninstall CouchDB :-(
 uninstall:
 	@rm -rf $(DESTDIR)/$(install_dir)
 	@rm -f $(DESTDIR)/$(bin_dir)/couchdb
