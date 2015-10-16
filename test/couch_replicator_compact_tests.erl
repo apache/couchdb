@@ -263,6 +263,8 @@ compact_db(Type, #db{name = Name}) ->
     receive
         {'DOWN', MonRef, process, CompactPid, normal} ->
             ok;
+        {'DOWN', MonRef, process, CompactPid, noproc} ->
+            ok;
         {'DOWN', MonRef, process, CompactPid, Reason} ->
             erlang:error(
                 {assertion_failed,
@@ -284,11 +286,13 @@ wait_for_compaction(Type, Db) ->
     case couch_db:wait_for_compaction(Db) of
         ok ->
             ok;
+        {error, noproc} ->
+            ok;
         {error, Reason} ->
             erlang:error(
                 {assertion_failed,
                  [{module, ?MODULE}, {line, ?LINE},
-                  {reason, lists:concat(["Compaction of", Type,
+                  {reason, lists:concat(["Compaction of ", Type,
                                          " database failed with: ", Reason])}]})
     end.
 
