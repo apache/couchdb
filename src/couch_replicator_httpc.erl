@@ -103,6 +103,20 @@ send_ibrowse_req(#httpdb{headers = BaseHeaders} = HttpDb, Params) ->
     {Worker, Response}.
 
 
+%% Stop worker, wait for it to die, then release it. Make sure it is dead before
+%% releasing it to the pool, so there is not race triggered recycling it again.
+%% The reason is recycling a dying worker, could end up that worker returning
+%% {error, req_timedout} error. While in reality is not really a timeout, just
+%% a race condition.
+stop_and_release_worker(Pool, Worker) ->
+    Ref = erlang:monitor(process, Worker),
+    ibrowse_http_client:stop(Worker),
+    receive
+        {'DOWN', Ref, _, _, _} ->
+            ok
+    end,
+    ok = couch_replicator_httpc_pool:release_worker_sync(Pool, Worker).
+
 process_response({error, sel_conn_closed}, _Worker, HttpDb, Params, _Cb) ->
     throw({retry, HttpDb, Params});
 
@@ -110,8 +124,8 @@ process_response({error, sel_conn_closed}, _Worker, HttpDb, Params, _Cb) ->
 %% For example, if server responds to a request, sets Connection: close header
 %% and closes the socket, ibrowse will detect that error when it sends
 %% next request.
-process_response({error, connection_closing}, Worker, HttpDb, Params, _Cb)->
-    ibrowse_http_client:stop(Worker),
+process_response({error, connection_closing}, Worker, HttpDb, Params, _Cb) ->
+    stop_and_release_worker(HttpDb#httpdb.httpc_pool, Worker),
     throw({retry, HttpDb, Params});
 
 process_response({error, {'EXIT',{normal,_}}}, _Worker, HttpDb, Params, _Cb) ->
