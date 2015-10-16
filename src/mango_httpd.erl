@@ -81,6 +81,7 @@ handle_index_req(#httpd{method='GET', path_parts=[_, _]}=Req, Db) ->
 	chttpd:send_json(Req, {[{total_rows, TotalRows}, {indexes, JsonIdxs}]});
 
 handle_index_req(#httpd{method='POST', path_parts=[_, _]}=Req, Db) ->
+    chttpd:validate_ctype(Req, "application/json"),
     {ok, Opts} = mango_opts:validate_idx_create(chttpd:json_body_obj(Req)),
     {ok, Idx0} = mango_idx:new(Db, Opts),
     {ok, Idx} = mango_idx:validate_new(Idx0),
@@ -111,6 +112,7 @@ handle_index_req(#httpd{method='POST', path_parts=[_, _]}=Req, Db) ->
 %% deleted, but an error will be thrown for the current ddoc id.
 handle_index_req(#httpd{method='POST', path_parts=[_, <<"_index">>,
         <<"_bulk_delete">>]}=Req, Db) ->
+    chttpd:validate_ctype(Req, "application/json"),
     {ok, Opts} = mango_opts:validate_bulk_delete(chttpd:json_body_obj(Req)),
     Idxs = mango_idx:list(Db),
     DDocs = get_bulk_delete_ddocs(Opts),
@@ -158,6 +160,7 @@ handle_index_req(Req, _Db) ->
 
 
 handle_explain_req(#httpd{method='POST'}=Req, Db) ->
+    chttpd:validate_ctype(Req, "application/json"),
     {ok, Opts0} = mango_opts:validate_find(chttpd:json_body_obj(Req)),
     {value, {selector, Sel}, Opts} = lists:keytake(selector, 1, Opts0),
     Resp = mango_crud:explain(Db, Sel, Opts),
@@ -168,6 +171,7 @@ handle_explain_req(Req, _Db) ->
 
 
 handle_find_req(#httpd{method='POST'}=Req, Db) ->
+    chttpd:validate_ctype(Req, "application/json"),
     {ok, Opts0} = mango_opts:validate_find(chttpd:json_body_obj(Req)),
     {value, {selector, Sel}, Opts} = lists:keytake(selector, 1, Opts0),
     {ok, Resp0} = start_find_resp(Req),
