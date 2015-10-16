@@ -19,34 +19,85 @@ COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)$(COUCHDB_VERSION_SUFFIX
 
 DESTDIR=
 
+
+################################################################################
+# Main commands
+################################################################################
+
+
 all: couch fauxton docs
 
-config.erl:
-	@echo "Apache CouchDB has not been configured."
-	@echo "Try \"./configure -h\" for help."
-	@echo
-	@false
+
+################################################################################
+# Building
+################################################################################
+
 
 couch: config.erl
-	@${REBAR} compile
+	@$(REBAR) compile
 	@cp src/couch/priv/couchjs bin/
 
-clean:
-	@${REBAR} -r clean
-	@rm -f bin/couchjs
-	@rm -rf src/*/ebin
-	@rm -rf src/*/.rebar
-	@rm -rf src/*/priv/*.so
-	@rm -rf src/couch/priv/{couchspawnkillable,couchjs}
-	@rm -rf share/server/main.js share/server/main-coffee.js
-	@rm -rf tmp dev/data dev/lib dev/logs
-	@rm -f src/couch/priv/couchspawnkillable
-	@rm -f src/couch/priv/couch_js/config.h
-	@rm -f dev/boot_node.beam dev/pbkdf2.pyc log/crash.log
+
+docs: src/docs/build
+
+
+fauxton: share/www
+
+
+################################################################################
+# Testing
+################################################################################
+
 
 check: javascript eunit build-test
 
-# creates a full erlang release
+
+eunit: export BUILDDIR = $(shell pwd)
+eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
+eunit: couch
+	@$(REBAR) setup_eunit 2> /dev/null
+	@$(REBAR) -r eunit skip_deps=meck,mochiweb,lager,snappy,folsom,proper $(EUNIT_OPTS)
+
+
+javascript: all
+	# TODO: Fix tests to look for these files in their new path
+	@mkdir -p share/www/script/test
+	@cp test/javascript/tests/lorem*.txt share/www/script/test/
+	@dev/run -q --with-admin-party-please test/javascript/run
+	@rm -rf share/www/script
+
+
+build-test:
+	@test/build/test-configure.sh
+
+
+################################################################################
+# Developing
+################################################################################
+
+
+docker-image:
+	@docker build --rm -t couchdb/dev-cluster .
+
+
+docker-start:
+	@docker run -d -P -t couchdb/dev-cluster > .docker-id
+
+
+docker-stop:
+	@docker stop `cat .docker-id`
+
+
+introspect:
+	@$(REBAR) -r update-deps
+	@./introspect
+
+
+################################################################################
+# Distributing
+################################################################################
+
+
 dist: all
 	@./build-aux/couchdb-build-release.sh $(COUCHDB_VERSION)
 
@@ -61,30 +112,15 @@ dist: all
 	@mkdir -p apache-couchdb-$(COUCHDB_VERSION)/share/docs/info
 	@cp src/docs/build/texinfo/CouchDB.info apache-couchdb-$(COUCHDB_VERSION)/share/docs/info/
 
-# Tar!
 	@tar czf apache-couchdb-$(COUCHDB_VERSION).tar.gz apache-couchdb-$(COUCHDB_VERSION)
 	@echo "Done: apache-couchdb-$(COUCHDB_VERSION).tar.gz"
 
-distclean: clean
-	@rm -f install.mk
-	@rm -f config.erl
-	@rm -f rel/couchdb.config
-ifneq ($(IN_RELEASE), true)
-# when we are in a release, don’t delete the
-# copied sources, generated docs, or fauxton
-	@rm -rf rel/couchdb
-	@rm -rf share/www
-	@rm -rf src/docs
-endif
-
-devclean:
-	@rm -rf dev/lib/*/data
 
 -include install.mk
 install: all
 	@echo "Installing CouchDB into $(DESTDIR)/$(install_dir)..." | sed -e 's,///,/,'
 	@rm -rf rel/couchdb
-	@${REBAR} generate # make full erlang release
+	@$(REBAR) generate # make full erlang release
 
 	@mkdir -p $(DESTDIR)/$(install_dir)
 	@cp -R rel/couchdb/* $(DESTDIR)/$(install_dir)
@@ -125,6 +161,44 @@ install: all
 
 	@echo "...done"
 
+
+################################################################################
+# Cleaning
+################################################################################
+
+
+clean:
+	@$(REBAR) -r clean
+	@rm -f bin/couchjs
+	@rm -rf src/*/ebin
+	@rm -rf src/*/.rebar
+	@rm -rf src/*/priv/*.so
+	@rm -rf src/couch/priv/{couchspawnkillable,couchjs}
+	@rm -rf share/server/main.js share/server/main-coffee.js
+	@rm -rf tmp dev/data dev/lib dev/logs
+	@rm -f src/couch/priv/couchspawnkillable
+	@rm -f src/couch/priv/couch_js/config.h
+	@rm -f dev/boot_node.beam dev/pbkdf2.pyc log/crash.log
+
+
+
+distclean: clean
+	@rm -f install.mk
+	@rm -f config.erl
+	@rm -f rel/couchdb.config
+ifneq ($(IN_RELEASE), true)
+# when we are in a release, don’t delete the
+# copied sources, generated docs, or fauxton
+	@rm -rf rel/couchdb
+	@rm -rf share/www
+	@rm -rf src/docs
+endif
+
+
+devclean:
+	@rm -rf dev/lib/*/data
+
+
 uninstall:
 	@rm -rf $(DESTDIR)/$(install_dir)
 	@rm -f $(DESTDIR)/$(bin_dir)/couchdb
@@ -137,57 +211,27 @@ uninstall:
 	@rm -rf $(DESTDIR)/$(man_dir)
 	@rm -rf $(DESTDIR)/$(info_dir)
 
-install.mk:
-# ignore install.mk missing if we are running
-# `make clean` without having run ./configure first
-ifneq ($(MAKECMDGOALS), clean)
-	@echo "No install.mk found. Run ./configure"
-	@exit 1
-endif
 
-docker-image:
-	@docker build --rm -t couchdb/dev-cluster .
+################################################################################
+# Misc
+################################################################################
 
-docker-start:
-	@docker run -d -P -t couchdb/dev-cluster > .docker-id
 
-docker-stop:
-	@docker stop `cat .docker-id`
+config.erl:
+	@echo "Apache CouchDB has not been configured."
+	@echo "Try \"./configure -h\" for help."
+	@echo
+	@false
 
-eunit: export BUILDDIR = $(shell pwd)
-eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
-eunit: couch
-	@${REBAR} setup_eunit 2> /dev/null
-	@${REBAR} -r eunit skip_deps=meck,mochiweb,lager,snappy,folsom,proper $(EUNIT_OPTS)
-
-javascript: all
-	# TODO: Fix tests to look for these files in their new path
-	@mkdir -p share/www/script/test
-	@cp test/javascript/tests/lorem*.txt share/www/script/test/
-	@dev/run -q --with-admin-party-please test/javascript/run
-	@rm -rf share/www/script
-
-build-test:
-	@test/build/test-configure.sh
-
-# build docs
-docs: src/docs/build
 
 src/docs/build:
 ifeq ($(with_docs), 1)
 	@cd src/docs; $(MAKE)
 endif
 
-# build fauxton
-fauxton: share/www
 
 share/www:
 ifeq ($(with_fauxton), 1)
 	@echo "Building Fauxton"
 	@cd src/fauxton && npm install && ./node_modules/grunt-cli/bin/grunt couchdb
 endif
-
-.PHONY: introspect
-introspect:
-	${REBAR} -r update-deps
-	./introspect
