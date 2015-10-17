@@ -11,12 +11,10 @@
 // the License.
 
 couchTests.http = function(debug) {
-  return console.log('TODO');
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
 
   // bug COUCHDB-100: DELETE on non-existent DB returns 500 instead of 404
-  // TODO: db.deleteDb();
 
   db.createDb();
 
@@ -39,6 +37,8 @@ couchTests.http = function(debug) {
     xhr.getResponseHeader("Location"),
     "should include X-Forwarded-Host");
 
+// TODO: allow modifications or leave out
+/*
   run_on_modified_server([{
     section:"httpd",
     key:"x_forwarded_host",
@@ -52,6 +52,7 @@ couchTests.http = function(debug) {
         xhr.getResponseHeader("Location"),
         "should include X-Host");
     });
+*/
 
   // COUCHDB-708: newlines document names
   xhr = CouchDB.request("PUT", "/" + db_name + "/docid%0A/attachment.txt", {
