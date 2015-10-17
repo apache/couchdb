@@ -53,7 +53,7 @@ help:
 	@egrep "^# target: " Makefile \
 		| sed -e 's/^# target: //g' \
 		| sort \
-		| awk '{printf("    %-15s", $$1); $$1=$$2=""; print "-" $$0}'
+		| awk '{printf("    %-20s", $$1); $$1=$$2=""; print "-" $$0}'
 
 
 ################################################################################
@@ -104,6 +104,30 @@ eunit: couch
 # target: javascript - Run JavaScript test suites or specific ones defined by suites option
 javascript: all share/www/script/test
 	@dev/run -q --with-admin-party-please test/javascript/run $(suites)
+
+
+.PHONY: list-eunit-apps
+# target: list-eunit-apps - List EUnit target apps
+list-eunit-apps:
+	@find ./src/ -type f -name *_test.erl -o -name *_tests.erl \
+		| cut -d '/' -f 3 \
+		| sort -u
+
+
+.PHONY: list-eunit-suites
+# target: list-eunit-suites - List EUnit target test suites
+list-eunit-suites:
+	@find ./src/ -type f -name *_test.erl -o -name *_tests.erl -printf "%f\n" \
+		| cut -d '.' -f -1 \
+		| sort
+
+
+.PHONY: list-js-suites
+# target: list-js-suites - List JavaScript test suites
+list-js-suites:
+	@find ./test/javascript/tests/ -type f -name *.js -printf "%f\n" \
+		| cut -d '.' -f -1 \
+		| sort
 
 
 .PHONY: build-test
