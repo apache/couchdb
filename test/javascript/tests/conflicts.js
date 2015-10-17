@@ -12,7 +12,6 @@
 
 // Do some edit conflict detection tests
 couchTests.conflicts = function(debug) {
-  return console.log('TODO');
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
@@ -104,8 +103,9 @@ couchTests.conflicts = function(debug) {
   T(db.save(r2).ok);
   T(db.save(r3).ok);
 
-  T(db.compact().ok);
-  while (db.info().compact_running) {};
+  // we can't compact clustered DBs, but the tests will be meaningful still w/out
+  //T(db.compact().ok);
+  //while (db.info().compact_running) {};
 
   TEquals({"_id":"doc",
         "_rev":"3-cc2f3210d779aef595cd4738be0ef8ff",
