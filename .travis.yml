@@ -5,7 +5,7 @@ before_install:
    - sudo apt-get -y install shunit2
 before_script: ./configure -c --disable-docs --disable-fauxton
 script:
-   - ./run-tests.sh
+   - make check
 language: erlang
 otp_release:
    - 18.1

@@ -68,7 +68,10 @@ fauxton: share/www
 
 .PHONY: check
 # target: check - Test everything
-check: javascript eunit build-test
+check:
+	@$(MAKE) eunit
+	@$(MAKE) javascript
+	@$(MAKE) build-test
 
 
 .PHONY: eunit
