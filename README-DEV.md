@@ -119,16 +119,69 @@ If you want to build it into different destination than `/usr/local`.
 
     ./configure --prefix=/<your directory path>
 
+If you don't want to build Fauxton or documentation specify `--disable-fauxton`
+and/or `--disable-docs` arguments for `configure` to ignore their build and
+avoid any issues with their dependencies.
+
+See `./configure --help` for more information.
+
 Testing
 -------
 
-Check the test suite by running:
+To run all the tests use run:
 
     make check
 
-Generate a coverage report by running:
+You can also run each test suite individually via `eunit` and `javascript`
+targets:
 
-    make cover
+    make eunit
+    make javascript
+
+If you need to run specific Erlang tests, you can pass special "options"
+to make targets:
+
+    # Run tests only for couch and chttpd apps
+    make eunit apps=couch,chttpd
+
+    # Run only tests from couch_btree_tests suite
+    make eunit suites=couch_btree_tests
+
+    # Run only only specific tests
+    make eunit tests=btree_open_test,reductions_test
+
+    # Ignore tests for specified apps
+    make eunit skip_deps=couch_log,couch_epi
+
+The `apps`, `suites`, `tests` and `skip_deps` could be combined in any way.
+These are mimics to `rebar eunit` arguments. If you're not satisfied by these,
+you can use EUNIT_OPT environment variable to specify exact `rebar eunit`
+options:
+
+    make eunit EUNIT_OPTS="apps=couch,chttpd"
+
+JavaScript tests accepts only `suites` option, but in the same way
+
+    # Run all JavaScript tests
+    make javascript
+
+    # Run only basic and design_options tests
+    make javascript suites="basic design_options"
+
+Note that tests are delimited here by whitespace, not by comma. You can get list
+of all possible test targets with the following command:
+
+    make list-js-suites
+
+Code analyzer could be run by:
+
+    make dialyze
+
+If you need to analyze only specific apps, you can specify them in familiar way:
+
+    make dialyze apps=couch,couch_epi
+
+See `make help` for more info and useful commands.
 
 Please report any problems to the developer's mailing list.
 
