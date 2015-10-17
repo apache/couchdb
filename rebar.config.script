@@ -85,6 +85,13 @@ AddConfig = [
     {erl_opts, [debug_info]},
     {eunit_opts, [verbose]},
     {plugins, [eunit_plugin]},
+    {dialyzer, [
+        {plt_location, local},
+        {plt_location, COUCHDB_ROOT},
+        {plt_extra_apps, [
+            asn1, compiler, crypto, inets, kernel, os_mon, runtime_tools,
+            sasl, ssl, stdlib, syntax_tools, xmerl]},
+        {warnings, [unmatched_returns, error_handling, race_conditions]}]},
     {post_hooks, [{compile, "escript support/build_js.escript"}]}
 ],
 

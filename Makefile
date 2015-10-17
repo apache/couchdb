@@ -31,6 +31,10 @@ EUNIT_OPTS=$(shell echo "\
 	suites=$(suites) \
 	tests=$(tests) \
 	" | sed -e 's/[a-z]\+= / /g')
+DIALYZE_OPTS=$(shell echo "\
+	apps=$(apps) \
+	skip_deps=$(skip_deps) \
+	" | sed -e 's/[a-z]\+= / /g')
 
 
 ################################################################################
@@ -111,6 +115,24 @@ build-test:
 ################################################################################
 # Developing
 ################################################################################
+
+
+.PHONY: build-plt
+# target: build-plt - Build project-specific PLT
+build-plt:
+	@$(REBAR) -r build-plt $(DIALYZE_OPTS)
+
+
+.PHONY: check-plt
+# target: check-plt - Check the PLT for consistency and rebuild it if it is not up-to-date
+check-plt:
+	@$(REBAR) -r check-plt $(DIALYZE_OPTS)
+
+
+.PHONY: dialyze
+# target: dialyze - Analyze the code for discrepancies
+dialyze: .rebar
+	@$(REBAR) -r dialyze $(DIALYZE_OPTS)
 
 
 .PHONY: docker-image
@@ -220,6 +242,7 @@ install: all
 # target: clean - Remove build artifacts
 clean:
 	@$(REBAR) -r clean
+	@rm -rf .rebar/
 	@rm -f bin/couchjs
 	@rm -rf src/*/ebin
 	@rm -rf src/*/.rebar
@@ -271,6 +294,9 @@ uninstall:
 ################################################################################
 # Misc
 ################################################################################
+
+
+.rebar: build-plt
 
 
 config.erl:
