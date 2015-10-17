@@ -11,7 +11,6 @@
 // the License.
 
 couchTests.bulk_docs = function(debug) {
-  return console.log('TODO');
   var db_name = get_random_db_name()
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
@@ -73,13 +72,14 @@ couchTests.bulk_docs = function(debug) {
   // Now save the bulk docs, When we use all_or_nothing, we don't get conflict
   // checking, all docs are saved regardless of conflict status, or none are
   // saved.
-  results = db.bulkSave(docs,{all_or_nothing:true});
-  T(results.error === undefined);
-
-  var doc = db.open("0", {conflicts:true});
-  var docConflict = db.open("0", {rev:doc._conflicts[0]});
-
-  T(doc.shooby == "dooby" || docConflict.shooby == "dooby");
+// TODO: all_or_nothing is not yet supported on clusters
+//  results = db.bulkSave(docs,{all_or_nothing:true});
+//  T(results.error === undefined);
+//
+//  var doc = db.open("0", {conflicts:true});
+//  var docConflict = db.open("0", {rev:doc._conflicts[0]});
+//
+//  T(doc.shooby == "dooby" || docConflict.shooby == "dooby");
 
   // verify creating a document with no id returns a new id
   var req = CouchDB.request("POST", "/" + db_name + "/_bulk_docs", {
@@ -108,7 +108,7 @@ couchTests.bulk_docs = function(debug) {
   T(req.status == 400 );
   result = JSON.parse(req.responseText);
   T(result.error == "bad_request");
-  T(result.reason == "Missing JSON list of 'docs'");
+  T(result.reason == "POST body must include `docs` parameter.");
 
   // jira-911
   db.deleteDb();
