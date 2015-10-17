@@ -102,7 +102,7 @@ javascript: all
 	# TODO: Fix tests to look for these files in their new path
 	@mkdir -p share/www/script/test
 	@cp test/javascript/tests/lorem*.txt share/www/script/test/
-	@dev/run -q --with-admin-party-please test/javascript/run
+	@dev/run -q --with-admin-party-please test/javascript/run $(tests)
 	@rm -rf share/www/script
 
 
