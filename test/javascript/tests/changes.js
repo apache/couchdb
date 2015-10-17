@@ -17,7 +17,6 @@ function jsonp(obj) {
 }
 
 couchTests.changes = function(debug) {
-  return console.log('TODO');
   var db;
   if (debug) debugger;
 
@@ -54,23 +53,24 @@ couchTests.changes = function(debug) {
     T(resp.results[0].changes[0].rev == docFoo._rev);
 
     // test with callback
-
-    run_on_modified_server(
-      [{section: "httpd",
-        key: "allow_jsonp",
-        value: "true"}],
-    function() {
-      var xhr = CouchDB.request("GET", "/" + db_name + "/_changes?callback=jsonp");
-      T(xhr.status == 200);
-      jsonp_flag = 0;
-      eval(xhr.responseText);
-      T(jsonp_flag == 1);
-    });
+// TODO: either allow jsonp in the default global config or implement a config chg mechanism analogouts 2 sebastianrothbucher:clustertest - or leave out
+//    run_on_modified_server(
+//      [{section: "httpd",
+//        key: "allow_jsonp",
+//        value: "true"}],
+//    function() {
+//      var xhr = CouchDB.request("GET", "/" + db_name + "/_changes?callback=jsonp");
+//      T(xhr.status == 200);
+//      jsonp_flag = 0;
+//      eval(xhr.responseText);
+//      T(jsonp_flag == 1);
+//    });
 
     req = CouchDB.request("GET", "/" + db_name + "/_changes?feed=" + feed + "&timeout=10");
     var lines = req.responseText.split("\n");
     T(JSON.parse(lines[0]).changes[0].rev == docFoo._rev);
-    T(JSON.parse(lines[1]).last_seq == 1);
+    // the sequence is not fully ordered and a complex structure now
+    T(JSON.parse(lines[1]).last_seq[0] == 1);
 
     var xhr;
 
@@ -282,6 +282,11 @@ couchTests.changes = function(debug) {
 
   }
 
+  // test on a new DB
+  var db_name = get_random_db_name();
+  db = new CouchDB(db_name, {"X-Couch-Full-Commit":"true"});
+  db.createDb();
+
   // test the filtered changes
   var ddoc = {
     _id : "_design/changes_filter",
@@ -436,6 +441,8 @@ couchTests.changes = function(debug) {
 
 
   // test for userCtx
+// TODO: either make part of global config, or allow 4 config changes - or leave out
+/*
   run_on_modified_server(
     [{section: "httpd",
       key: "authentication_handlers",
@@ -464,20 +471,24 @@ couchTests.changes = function(debug) {
       T(resp.results[0].id == docResp.id);
     }
   );
+*/
 
   req = CouchDB.request("GET", "/" + db_name + "/_changes?limit=1");
   resp = JSON.parse(req.responseText);
   TEquals(1, resp.results.length);
 
   //filter includes _conflicts
-  var id = db.save({'food' : 'pizza'}).id;
-  db.bulkSave([{_id: id, 'food' : 'pasta'}], {all_or_nothing:true});
-
-  req = CouchDB.request("GET", "/" + db_name + "/_changes?filter=changes_filter/conflicted");
-  resp = JSON.parse(req.responseText);
-  T(resp.results.length == 1, "filter=changes_filter/conflicted");
+// TODO: all_or_nothing not yet in place
+//  var id = db.save({'food' : 'pizza'}).id;
+//  db.bulkSave([{_id: id, 'food' : 'pasta'}], {all_or_nothing:true});
+//
+//  req = CouchDB.request("GET", "/" + db_name + "/_changes?filter=changes_filter/conflicted");
+//  resp = JSON.parse(req.responseText);
+//  T(resp.results.length == 1, "filter=changes_filter/conflicted");
 
   // test with erlang filter function
+// TODO: either make part of global config, or allow 4 config changes - or leave out
+/*
   run_on_modified_server([{
     section: "native_query_servers",
     key: "erlang",
@@ -577,9 +588,12 @@ couchTests.changes = function(debug) {
         T(line.id == "andmore");
     }
   });
+*/
 
   // COUCHDB-1037 - empty result for ?limit=1&filter=foo/bar in some cases
-  T(db.deleteDb());
+  // test w/ new temp DB
+  db_name = get_random_db_name();
+  db = new CouchDB(db_name, {"X-Couch-Full-Commit":"true"});
   T(db.createDb());
 
   ddoc = {
@@ -600,32 +614,42 @@ couchTests.changes = function(debug) {
 
   db.bulkSave(makeDocs(0, 5));
 
+// TODO: as before tests: for n>1 you can't be sure all docs are there immediately - so either stick w/ -n 1 or implement check-wait-check
+
   req = CouchDB.request("GET", "/" + db.name + "/_changes");
   resp = JSON.parse(req.responseText);
-  TEquals(7, resp.last_seq);
+  // you can't know wether 7 is the last seq as you don't know how many collapse into one number
+  //TEquals(7, resp.last_seq);
   TEquals(7, resp.results.length);
 
   req = CouchDB.request(
     "GET", "/"+ db.name + "/_changes?limit=1&filter=testdocs/testdocsonly");
   resp = JSON.parse(req.responseText);
-  TEquals(3, resp.last_seq);
+  // (seq as before)
+  //TEquals(3, resp.last_seq);
   TEquals(1, resp.results.length);
-  TEquals("0", resp.results[0].id);
+  // also, we can't guarantee ordering
+  T(resp.results[0].id.match("[0-5]"));
 
   req = CouchDB.request(
     "GET", "/" + db.name + "/_changes?limit=2&filter=testdocs/testdocsonly");
   resp = JSON.parse(req.responseText);
-  TEquals(4, resp.last_seq);
+  // (seq as before)
+  //TEquals(4, resp.last_seq);
   TEquals(2, resp.results.length);
-  TEquals("0", resp.results[0].id);
-  TEquals("1", resp.results[1].id);
+  // also, we can't guarantee ordering
+  T(resp.results[0].id.match("[0-5]"));
+  T(resp.results[1].id.match("[0-5]"));
 
-  TEquals(0, CouchDB.requestStats(['couchdb', 'httpd', 'clients_requesting_changes'], true).value);
-  CouchDB.request("GET", "/" + db.name + "/_changes");
-  TEquals(0, CouchDB.requestStats(['couchdb', 'httpd', 'clients_requesting_changes'], true).value);
+// TODO: either use local port for stats (and aggregate when n>1) or leave out
+//  TEquals(0, CouchDB.requestStats(['couchdb', 'httpd', 'clients_requesting_changes'], true).value);
+//  CouchDB.request("GET", "/" + db.name + "/_changes");
+//  TEquals(0, CouchDB.requestStats(['couchdb', 'httpd', 'clients_requesting_changes'], true).value);
 
   // COUCHDB-1256
-  T(db.deleteDb());
+  // test w/ new temp DB
+  db_name = get_random_db_name();
+  db = new CouchDB(db_name, {"X-Couch-Full-Commit":"true"});
   T(db.createDb());
 
   T(db.save({"_id":"foo", "a" : 123}).ok);
@@ -640,29 +664,36 @@ couchTests.changes = function(debug) {
   req = CouchDB.request("GET", "/" + db.name + "/_changes?style=all_docs");
   resp = JSON.parse(req.responseText);
 
-  TEquals(3, resp.last_seq);
+  // (seq as before)
+  //TEquals(3, resp.last_seq);
   TEquals(2, resp.results.length);
 
-  req = CouchDB.request("GET", "/" + db.name + "/_changes?style=all_docs&since=2");
+  // we can no longer pass a number into 'since' - but we have the 2nd last above - so we can use it (puh!)
+  req = CouchDB.request("GET", "/" + db.name + "/_changes?style=all_docs&since=" + encodeURIComponent(JSON.stringify(resp.results[0].seq)));
   resp = JSON.parse(req.responseText);
 
-  TEquals(3, resp.last_seq);
+  // (seq as before)
+  //TEquals(3, resp.last_seq);
   TEquals(1, resp.results.length);
   TEquals(2, resp.results[0].changes.length);
 
   // COUCHDB-1852
-  T(db.deleteDb());
+  // test w/ new temp DB
+  db_name = get_random_db_name();
+  db = new CouchDB(db_name, {"X-Couch-Full-Commit":"true"});
   T(db.createDb());
 
-  // create 4 documents... this assumes the update sequnce will start from 0 and get to 4
+  // create 4 documents... this assumes the update sequnce will start from 0 and then do sth in the cluster 
   db.save({"bop" : "foom"});
   db.save({"bop" : "foom"});
   db.save({"bop" : "foom"});
   db.save({"bop" : "foom"});
+  // because of clustering, we need the 2nd entry as since value
+  req = CouchDB.request("GET", "/" + db_name + "/_changes");
 
   // simulate an EventSource request with a Last-Event-ID header
   req = CouchDB.request("GET", "/" + db_name + "/_changes?feed=eventsource&timeout=0&since=0",
-        {"headers": {"Accept": "text/event-stream", "Last-Event-ID": "2"}});
+        {"headers": {"Accept": "text/event-stream", "Last-Event-ID": JSON.stringify(JSON.parse(req.responseText).results[1].seq)}});
 
   // "parse" the eventsource response and collect only the "id: ..." lines
   var changes = req.responseText.split('\n')
@@ -672,12 +703,15 @@ couchTests.changes = function(debug) {
      .filter(function (el) { return (el[0] === "id"); })
 
   // make sure we only got 2 changes, and they are update_seq=3 and update_seq=4
-  T(changes.length === 2);
-  T(changes[0][1] === "3");
-  T(changes[1][1] === "4");
+// TODO: can't pass in new-style Sequence with Last-Event-ID header
+//  T(changes.length === 2);
+//  T(changes[0][1] === "3");
+//  T(changes[1][1] === "4");
 
   // COUCHDB-1923
-  T(db.deleteDb());
+  // test w/ new temp DB
+  db_name = get_random_db_name();
+  db = new CouchDB(db_name, {"X-Couch-Full-Commit":"true"});
   T(db.createDb());
 
   var attachmentData = "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ=";
@@ -744,6 +778,4 @@ couchTests.changes = function(debug) {
   T(resp.results[0].doc._attachments['bar.txt'].encoding === "gzip");
   T(resp.results[0].doc._attachments['bar.txt'].encoded_length === 47);
 
-  // cleanup
-  db.deleteDb();
 };
