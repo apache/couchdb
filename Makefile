@@ -97,13 +97,9 @@ eunit: couch
 
 
 .PHONY: javascript
-# target: javascript - Run JavaScript tests suite
-javascript: all
-	# TODO: Fix tests to look for these files in their new path
-	@mkdir -p share/www/script/test
-	@cp test/javascript/tests/lorem*.txt share/www/script/test/
-	@dev/run -q --with-admin-party-please test/javascript/run $(tests)
-	@rm -rf share/www/script
+# target: javascript - Run JavaScript test suites or specific ones defined by suites option
+javascript: all share/www/script/test
+	@dev/run -q --with-admin-party-please test/javascript/run $(suites)
 
 
 .PHONY: build-test
@@ -295,3 +291,9 @@ ifeq ($(with_fauxton), 1)
 	@echo "Building Fauxton"
 	@cd src/fauxton && npm install && ./node_modules/grunt-cli/bin/grunt couchdb
 endif
+
+
+share/www/script/test:
+	@# TODO: Fix tests to look for these files in their new path
+	@mkdir -p $@
+	@cp test/javascript/tests/lorem*.txt share/www/script/test/
