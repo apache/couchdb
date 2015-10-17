@@ -51,13 +51,13 @@ DepDescs = [
 {ioq,              "ioq",              "c7c75ebeaf41599e3a3e211097d864f0e7785829"},
 {jiffy,            "jiffy",            "ea19c417f9fd52fa3f7ef2d378735e5532c59b29"},
 {khash,            "khash",            "7c6a9cd9776b5c6f063ccafedfa984b00877b019"},
-{mango,            "mango",            "0cc0fb8d2c2e04a4df5a1e7deb198abc78266a97"},
-{mem3,             "mem3",             "de5f32815d3a3136e43924e4723d7e3e0eb02c6e"},
+{mango,            "mango",            "a297e2e9e2c006381f982e73a08fff29c4f8db8f"},
+{mem3,             "mem3",             "80fd81b3350dc96918b460b3bfb646fddade80f2"},
 {mochiweb,         "mochiweb",         "bd6ae7cbb371666a1f68115056f7b30d13765782"},
 {oauth,            "oauth",            "099057a98e41f3aff91e77e3cf496d6c6fd901df"},
 {rexi,             "rexi",             "a327b7dbeb2b0050f7ca9072047bf8ef2d282833"},
 {snappy,           "snappy",           "0ab2796f82789895a2a86d403e63f3823d3c5a1d"},
-{setup,            "setup",            "d0a9b722485639fc43ccbfc4267f3a2dd9aa9d5a"},
+{setup,            "setup",            "b9e1f3b5d5a78a706abb358e17130fb7344567d2"},
 {meck,             "meck",             {tag, "0.8.2"}}
 ],
 
