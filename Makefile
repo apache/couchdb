@@ -19,6 +19,19 @@ COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)$(COUCHDB_VERSION_SUFFIX
 
 DESTDIR=
 
+# Rebar options
+apps=
+skip_deps=folsom,lager,meck,mochiweb,proper,snappy
+suites=
+tests=
+
+EUNIT_OPTS=$(shell echo "\
+	apps=$(apps) \
+	skip_deps=$(skip_deps) \
+	suites=$(suites) \
+	tests=$(tests) \
+	" | sed -e 's/[a-z]\+= / /g')
+
 
 ################################################################################
 # Main commands
@@ -75,12 +88,12 @@ check:
 
 
 .PHONY: eunit
-# target: eunit - Run EUnit tests, use $(EUNIT_OPTS) for custom rebar eunit params
+# target: eunit - Run EUnit tests, use EUNIT_OPTS to provide custom options
 eunit: export BUILDDIR = $(shell pwd)
 eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 eunit: couch
 	@$(REBAR) setup_eunit 2> /dev/null
-	@$(REBAR) -r eunit skip_deps=meck,mochiweb,lager,snappy,folsom,proper $(EUNIT_OPTS)
+	@$(REBAR) -r eunit $(EUNIT_OPTS)
 
 
 .PHONY: javascript
