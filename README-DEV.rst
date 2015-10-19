@@ -223,25 +223,25 @@ The release procedure is documented here::
 Unix-like Systems
 ~~~~~~~~~~~~~~~~~
 
-Prepare the release artefacts by running::
+Prepare the release artifacts by running::
 
     make distcheck
 
-You can prepare signed release artefacts by running::
+You can prepare signed release artifacts by running::
 
     make distsign
 
-The release artefacts can be found in the root source directory.
+The release artifacts can be found in the root source directory.
 
 Microsoft Windows
 ~~~~~~~~~~~~~~~~~
 
-Prepare the release artefacts by running::
+Prepare the release artifacts by running::
 
     make dist
 
-The release artefacts can be found in the `etc/windows` directory.
+The release artifacts can be found in the `etc/windows` directory.
 
 Until the build system has been improved, you must make sure that you run this
 command from a clean source checkout. If you do not, your test database and log
-files will be bundled up in the release artefact.
+files will be bundled up in the release artifacts.
