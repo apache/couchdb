@@ -206,7 +206,7 @@ should_block_producer_on_full_queue_count({Q, Producer, _}) ->
     ?assertEqual(2, couch_work_queue:item_count(Q)),
     ok = ping(Producer),
 
-    produce(Q, Producer, 20, false),
+    produce(Q, Producer, 20, true),
     ?assertEqual(3, couch_work_queue:item_count(Q)),
     Pong = ping(Producer),
 
