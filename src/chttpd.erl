@@ -402,8 +402,9 @@ is_http(_) ->
     false.
 
 make_uri(Req, Raw) ->
+    Port = integer_to_list(mochiweb_socket_server:get(chttpd, port)),
     Url = list_to_binary(["http://", config:get("httpd", "bind_address"),
-                         ":", config:get("chttpd", "port"), "/", Raw]),
+                          ":", Port, "/", Raw]),
     Headers = [
         {<<"authorization">>, ?l2b(header_value(Req,"authorization",""))},
         {<<"cookie">>, ?l2b(extract_cookie(Req))}
