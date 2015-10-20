@@ -11,7 +11,6 @@
 // the License.
 
 couchTests.attachment_names = function(debug) {
-  return console.log('TODO');
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"}, {w: 3});
   db.createDb();
@@ -65,14 +64,9 @@ couchTests.attachment_names = function(debug) {
 
   // bulk docs
   var docs = { docs: [binAttDoc] };
-  console.log(JSON.stringify(docs, null, 2));
   var xhr = CouchDB.request("POST", "/" + db_name + "/_bulk_docs", {
     body: JSON.stringify(docs)
   });
-  console.log(JSON.stringify(xhr.status, null, 2));
-  console.log(JSON.stringify(xhr.responseText, null, 2));
-  console.log(JSON.stringify(xhr.headers, null, 2));
-  
 
   TEquals(201, xhr.status, "attachment_name: bulk docs");
 
@@ -93,7 +87,7 @@ couchTests.attachment_names = function(debug) {
     TEquals(1, 2, "Attachment name with leading underscore saved. Should never show!");
   } catch (e) {
     TEquals("bad_request", e.error, "attachment_name: leading underscore");
-    TEquals("Attachment name can't start with '_'", e.reason, "attachment_name: leading underscore");
+    TEquals("Attachment name '_foo.txt' starts with prohibited character '_'", e.reason, "attachment_name: leading underscore");
   }
 
   // todo: form uploads, waiting for cmlenz' test case for form uploads

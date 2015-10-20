@@ -11,7 +11,6 @@
 // the License.
 
 couchTests.design_docs = function(debug) {
-  return console.log('TODO');
   var db_name = get_random_db_name();
   var db_name_a = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
@@ -22,6 +21,7 @@ couchTests.design_docs = function(debug) {
   db.createDb();
   db2.createDb();
 
+/*
   var server_config = [
     {
       section: "query_server_config",
@@ -29,8 +29,9 @@ couchTests.design_docs = function(debug) {
       value: "false"
     }
   ];
+*/
 
-  var testFun = function() {
+  // var testFun = function() {
     var numDocs = 500;
 
     function makebigstring(power) {
@@ -418,9 +419,10 @@ couchTests.design_docs = function(debug) {
 
     // trigger ddoc cleanup
     T(db.viewCleanup().ok);
-  }; // enf of testFun
+  //}; // enf of testFun
 
-  run_on_modified_server(server_config, testFun);
+  // not used now as we don't have modifications so far (would have to put them in)
+  //run_on_modified_server(server_config, testFun);
 
   // COUCHDB-1227 - if a design document is deleted, by adding a "_deleted"
   // field with the boolean value true, its validate_doc_update functions

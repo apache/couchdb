@@ -11,7 +11,6 @@
 // the License.
 
 couchTests.design_options = function(debug) {
-  return console.log('TODO');
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
@@ -37,12 +36,13 @@ couchTests.design_options = function(debug) {
   T(db.save(designDoc).ok);
 
   // should work for temp views
-  var rows = db.query(map, null, {options:{include_design: true}}).rows;
-  T(rows.length == 1);
-  T(rows[0].value == "_design/fu");
-
-  rows = db.query(map).rows;
-  T(rows.length == 0);
+  // no more there on cluster - pointless test 
+  //var rows = db.query(map, null, {options:{include_design: true}}).rows;
+  //T(rows.length == 1);
+  //T(rows[0].value == "_design/fu");
+  //
+  //rows = db.query(map).rows;
+  //T(rows.length == 0);
 
   // when true, should include design docs in views
   rows = db.view("fu/data").rows;
@@ -68,8 +68,9 @@ couchTests.design_options = function(debug) {
   // should also have local_seq in the view
   var resp = db.save({});
   rows = db.view("fu/with_seq").rows;
-  T(rows[0].key == 1)
-  T(rows[1].key == 2)
+  // format is more complex on cluster now
+  T(!!rows[0].key)
+  T(!!rows[1].key)
   var doc = db.open(resp.id);
   db.deleteDoc(doc);
 };
