@@ -21,8 +21,7 @@ start_couch() ->
     start_couch(?CONFIG_CHAIN).
 
 start_couch(IniFiles) ->
-    ok = application:set_env(config, ini_files, IniFiles),
-    test_util:start_applications([inets, ibrowse, ssl, config, couch, chttpd]).
+    test_util:start_couch(IniFiles, [chttpd]).
 
 stop_couch(Ctx) ->
     test_util:stop_couch(Ctx).
