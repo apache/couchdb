@@ -322,21 +322,10 @@ apply_etag({ExternalResponse}, CurrentEtag) ->
     % headers on the JsonResponse object. We need to control the Etag and
     % Vary headers. If the external function controls the Etag, we'd have to
     % run it to check for a match, which sort of defeats the purpose.
-    case couch_util:get_value(<<"headers">>, ExternalResponse, nil) of
-    nil ->
-        % no JSON headers
-        % add our Etag and Vary headers to the response
-        {[{<<"headers">>, {[{<<"Etag">>, CurrentEtag}, {<<"Vary">>, <<"Accept">>}]}} | ExternalResponse]};
-    JsonHeaders ->
-        {[case Field of
-        {<<"headers">>, JsonHeaders} -> % add our headers
-            JsonHeadersEtagged = json_apply_field({<<"Etag">>, CurrentEtag}, JsonHeaders),
-            JsonHeadersVaried = json_apply_field({<<"Vary">>, <<"Accept">>}, JsonHeadersEtagged),
-            {<<"headers">>, JsonHeadersVaried};
-        _ -> % skip non-header fields
-            Field
-        end || Field <- ExternalResponse]}
-    end.
+    apply_headers(ExternalResponse, [
+        {<<"Etag">>, CurrentEtag},
+        {<<"Vary">>, <<"Accept">>}
+    ]).
 
 apply_headers(JsonResp, []) ->
     JsonResp;
