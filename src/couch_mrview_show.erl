@@ -136,13 +136,11 @@ send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId) ->
             couch_doc:validate_docid(NewDoc#doc.id),
             {ok, NewRev} = couch_db:update_doc(Db, NewDoc, Options),
             NewRevStr = couch_doc:rev_to_str(NewRev),
-            {[
-                {<<"code">>, 201},
-                {<<"headers">>, {[
-                    {<<"X-Couch-Update-NewRev">>, NewRevStr},
-                    {<<"X-Couch-Id">>, NewDoc#doc.id}
-                ]}}
-                | JsonResp0]};
+            {JsonResp1} = apply_headers(JsonResp0, [
+                {<<"X-Couch-Update-NewRev">>, NewRevStr},
+                {<<"X-Couch-Id">>, NewDoc#doc.id}
+            ]),
+            {[{<<"code">>, 201} | JsonResp1]};
         [<<"up">>, _Other, {JsonResp0}] ->
             {[{<<"code">>, 200} | JsonResp0]}
     end,
@@ -340,6 +338,23 @@ apply_etag({ExternalResponse}, CurrentEtag) ->
         end || Field <- ExternalResponse]}
     end.
 
+apply_headers(JsonResp, []) ->
+    JsonResp;
+apply_headers(JsonResp, NewHeaders) ->
+    case couch_util:get_value(<<"headers">>, JsonResp) of
+        undefined ->
+            {[{<<"headers">>, {NewHeaders}}| JsonResp]};
+        JsonHeaders ->
+            Headers = apply_headers1(JsonHeaders, NewHeaders),
+            NewKV = {<<"headers">>, Headers},
+            {lists:keyreplace(<<"headers">>, 1, JsonResp, NewKV)}
+    end.
+apply_headers1(JsonHeaders, [{Key, Value} | Rest]) ->
+    NewJsonHeaders = json_apply_field({Key, Value}, JsonHeaders),
+    apply_headers1(NewJsonHeaders, Rest);
+apply_headers1(JsonHeaders, []) ->
+    JsonHeaders.
+
 
 % Maybe this is in the proplists API
 % todo move to couch_util
@@ -370,3 +385,52 @@ json_req_obj(Req, Db) ->
 
 last_chunk(Resp) ->
     chttpd:send_chunk(Resp, []).
+
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+apply_headers_test_() ->
+    [
+        should_apply_headers(),
+        should_apply_headers_with_merge(),
+        should_apply_headers_with_merge_overwrite()
+    ].
+
+should_apply_headers() ->
+    ?_test(begin
+        JsonResp = [{<<"code">>, 201}],
+        Headers  = [{<<"foo">>, <<"bar">>}],
+        {Props} = apply_headers(JsonResp, Headers),
+        JsonHeaders = couch_util:get_value(<<"headers">>, Props),
+        ?assertEqual({Headers}, JsonHeaders)
+    end).
+
+should_apply_headers_with_merge() ->
+    ?_test(begin
+        BaseHeaders = [{<<"bar">>, <<"baz">>}],
+        NewHeaders  = [{<<"foo">>, <<"bar">>}],
+        JsonResp = [
+            {<<"code">>, 201},
+            {<<"headers">>, {BaseHeaders}}
+        ],
+        {Props} = apply_headers(JsonResp, NewHeaders),
+        JsonHeaders = couch_util:get_value(<<"headers">>, Props),
+        ExpectedHeaders = {NewHeaders ++ BaseHeaders},
+        ?assertEqual(ExpectedHeaders, JsonHeaders)
+    end).
+
+should_apply_headers_with_merge_overwrite() ->
+    ?_test(begin
+        BaseHeaders = [{<<"foo">>, <<"bar">>}],
+        NewHeaders  = [{<<"foo">>, <<"baz">>}],
+        JsonResp = [
+            {<<"code">>, 201},
+            {<<"headers">>, {BaseHeaders}}
+        ],
+        {Props} = apply_headers(JsonResp, NewHeaders),
+        JsonHeaders = couch_util:get_value(<<"headers">>, Props),
+        ?assertEqual({NewHeaders}, JsonHeaders)
+    end).
+
+-endif.
