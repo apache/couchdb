@@ -878,31 +878,29 @@ error_headers(#httpd{mochi_req=MochiReq}=Req, 401=Code, ErrorStr, ReasonStr) ->
                         % send the browser popup header no matter what if we are require_valid_user
                         {Code, [{"WWW-Authenticate", "Basic realm=\"server\""}]};
                     _False ->
-                        % if the accept header matches html, then do the redirect. else proceed as usual.
-                        Accepts = case MochiReq:get_header_value("Accept") of
-                        undefined ->
-                           % According to the HTTP 1.1 spec, if the Accept
-                           % header is missing, it means the client accepts
-                           % all media types.
-                           "html";
-                        Else ->
-                            Else
-                        end,
-                        case re:run(Accepts, "\\bhtml\\b",
-                                [{capture, none}, caseless]) of
-                        nomatch ->
+                        case MochiReq:accepts_content_type("application/json") of
+                        true ->
                             {Code, []};
-                        match ->
-                            AuthRedirectBin = ?l2b(AuthRedirect),
-                            % Redirect to the path the user requested, not
-                            % the one that is used internally.
-                            UrlReturnRaw = case MochiReq:get_header_value("x-couchdb-vhost-path") of
-                                undefined -> MochiReq:get(path);
-                                VHostPath -> VHostPath
-                            end,
-                            UrlReturn = ?l2b(couch_util:url_encode(UrlReturnRaw)),
-                            UrlReason = ?l2b(couch_util:url_encode(ReasonStr)),
-                            {302, [{"Location", couch_httpd:absolute_uri(Req, <<AuthRedirectBin/binary,"?return=",UrlReturn/binary,"&reason=",UrlReason/binary>>)}]}
+                        false ->
+                            case MochiReq:accepts_content_type("text/html") of
+                            true ->
+                                % Redirect to the path the user requested, not
+                                % the one that is used internally.
+                                UrlReturnRaw = case MochiReq:get_header_value("x-couchdb-vhost-path") of
+                                undefined ->
+                                    MochiReq:get(path);
+                                VHostPath ->
+                                    VHostPath
+                                end,
+                                RedirectLocation = lists:flatten([
+                                    AuthRedirect,
+                                    "?return=", couch_util:url_encode(UrlReturnRaw),
+                                    "&reason=", couch_util:url_encode(ReasonStr)
+                                ]),
+                                {302, [{"Location", absolute_uri(Req, RedirectLocation)}]};
+                            false ->
+                                {Code, []}
+                            end
                         end
                     end
                 end;
