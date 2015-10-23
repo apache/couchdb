@@ -219,6 +219,12 @@ opts() ->
             {optional, true},
             {default, []},
             {validator, fun ?MODULE:validate_fields/1}
+        ]},
+        {<<"index_array_lengths">>, [
+            {tag, index_array_lengths},
+            {optional, true},
+            {default, true},
+            {validator, fun mango_opts:is_boolean/1}
         ]}
     ].
 
