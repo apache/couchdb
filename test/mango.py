@@ -104,7 +104,7 @@ class Database(object):
         return r.json()["result"] == "created"
 
     def create_text_index(self, analyzer=None, selector=None, idx_type="text",
-        default_field=None, fields=None, name=None, ddoc=None):
+        default_field=None, fields=None, name=None, ddoc=None,index_array_lengths=None):
         body = {
             "index": {
             },
@@ -117,6 +117,8 @@ class Database(object):
             body["index"]["default_analyzer"] = analyzer
         if default_field is not None:
             body["index"]["default_field"] = default_field
+        if index_array_lengths is not None:
+            body["index"]["index_array_lengths"] = index_array_lengths
         if selector is not None:
             body["selector"] = selector
         if fields is not None:
