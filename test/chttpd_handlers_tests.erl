@@ -47,17 +47,17 @@ replicate_test_() ->
 should_escape_dbname_on_replicate(Url) ->
     ?_test(
         begin
+            UrlBin = ?l2b(Url),
             Request = couch_util:json_encode({[
-                {<<"source">>, <<"foo/bar">>},
+                {<<"source">>, <<UrlBin/binary, "/foo%2Fbar">>},
                 {<<"target">>, <<"bar/baz">>},
                 {<<"create_target">>, true}
             ]}),
             {ok, 200, _, Body} = request_replicate(Url ++ "/_replicate", Request),
             JSON = couch_util:json_decode(Body),
 
-            Source = json_value(JSON, [<<"source">>, <<"url">>]),
+            Source = json_value(JSON, [<<"source">>]),
             Target = json_value(JSON, [<<"target">>, <<"url">>]),
-            UrlBin = ?l2b(Url),
             ?assertEqual(<<UrlBin/binary, "/foo%2Fbar">>, Source),
             ?assertEqual(<<UrlBin/binary, "/bar%2Fbaz">>, Target)
         end).

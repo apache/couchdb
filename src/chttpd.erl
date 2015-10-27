@@ -381,7 +381,7 @@ fix_uri(Req, Props, Type) ->
         true ->
             Props;
         false ->
-            Uri = make_uri(Req, Uri0),
+            Uri = make_uri(Req, quote(Uri0)),
             [{Type,Uri}|proplists:delete(Type,Props)]
         end
     end.
@@ -391,7 +391,7 @@ replication_uri(Type, PostProps) ->
     {Props} ->
         couch_util:get_value(<<"url">>, Props);
     Else ->
-        quote(Else)
+        Else
     end.
 
 is_http(<<"http://", _/binary>>) ->
