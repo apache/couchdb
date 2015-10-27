@@ -23,14 +23,14 @@ os:putenv("COUCHDB_APPS_CONFIG_DIR", filename:join([COUCHDB_ROOT, "rel/apps"])).
 
 DepDescs = [
 %% must be compiled first as it has a custom behavior
-{couch_epi,        "couch-epi",        "77dfaf413be31b98de59ef3fe995cc3da5d338d2"},
+{couch_epi,        "couch-epi",        "807aa3f58e39f1273e732020c80d630d9177790c"},
 %% keep these sorted
 {b64url,           "b64url",           "319fc604235ab1fde37047b38a432450161db750"},
 {cassim,           "cassim",           "1ae21f7c415acf3d1aba8b4924ca3093014b86b1"},
 {couch_log,        "couch-log",        "fb4157370403c4c97f19d958a51c889950a66a94"},
 {couch_log_lager,  "couch-log-lager",  "b2a0471a87765de50c5eb05c65c121f68a9ae9fa"},
 {config,           "config",           "b2ecd0d47a776256956ce045123423494ff85e8e"},
-{chttpd,           "chttpd",           "038a933a09ad90c814e39b0327463aca1b194982"},
+{chttpd,           "chttpd",           "06880c35d7812bcfae0861e3f9e08366d550e1cb"},
 {couch,            "couch",            "acfd7cb0c709345f396cbcb696b6305091dfac12"},
 {couch_index,      "couch-index",      "14f579dcd142ee90300244c854b301bbd5c863ee"},
 {couch_mrview,     "couch-mrview",     "2ec52eb3d8e187f5e9dfcaf8ab0dff55e40cd647"},
