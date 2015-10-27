@@ -59,7 +59,8 @@ handle_message({rexi_EXIT, Reason}, Shard, {Counters, Acc, Ushards}) ->
 
 handle_message({ok, Info}, Shard, {Counters0, Acc, Ushards}) ->
     NewAcc = append_result(Info, Shard, Acc, Ushards),
-    Counters = fabric_dict:store(Shard, ok, Counters0),
+    Counters1 = fabric_dict:store(Shard, ok, Counters0),
+    Counters = fabric_view:remove_overlapping_shards(Shard, Counters1),
     case is_complete(Counters) of
     false ->
         {ok, {Counters, NewAcc, Ushards}};
