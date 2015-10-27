@@ -96,6 +96,10 @@ There are multiple ways of doing the apply which is controlled by Opts
 Notes:
 
   - `concurrent` is incompatible with `pipe`
+  - if there are multiple plugins providing same service they will be called in the order
+    they listed in application:get_env(couch_epi, plugins)
+  - if the same plugin provides multiple implementations of the same service
+    the order is as defined in providers callback
 
 # couch_epi_plugin behaviour
 

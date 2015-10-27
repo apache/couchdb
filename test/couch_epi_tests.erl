@@ -86,7 +86,7 @@
 %% couch_epi_plugin behaviour
 %% ------------------------------------------------------------------
 
-plugin_module([KV, Spec]) ->
+plugin_module([KV, Spec]) when is_tuple(Spec) ->
     SpecStr = io_lib:format("~w", [Spec]),
     KVStr = "'" ++ atom_to_list(KV) ++ "'",
     "
@@ -114,7 +114,7 @@ plugin_module([KV, Spec]) ->
         notify(Key, OldData, Data) ->
             couch_epi_tests:notify_cb(Key, OldData, Data, " ++ KVStr ++ ").
     ";
-plugin_module([KV]) ->
+plugin_module([KV, Provider]) when is_atom(Provider) ->
     KVStr = "'" ++ atom_to_list(KV) ++ "'",
     "
         -compile([export_all]).
@@ -122,13 +122,12 @@ plugin_module([KV]) ->
         app() -> test_app.
         providers() ->
             [
-                {my_service, provider1},
-                {my_service, provider2}
+                {my_service, " ++ atom_to_list(Provider) ++ "}
             ].
 
         services() ->
             [
-                {my_service, provider1}
+                {my_service, " ++ atom_to_list(Provider) ++ "}
             ].
 
         data_providers() ->
@@ -203,7 +202,10 @@ setup(functions) ->
 
     KV = start_state_storage(),
 
-    ok = start_epi([{provider_epi, plugin_module([KV])}]),
+    ok = start_epi([
+        {provider_epi1, plugin_module([KV, provider1])},
+        {provider_epi2, plugin_module([KV, provider2])}
+    ]),
 
     Pid = whereis(couch_epi:get_handle(Key)),
     Handle = couch_epi:get_handle(Key),
@@ -284,6 +286,20 @@ epi_apply_test_() ->
             ]
         }
     }.
+
+epi_providers_order_test_() ->
+    {
+        "epi providers' order test",
+        {
+            foreach,
+            fun() -> setup(functions) end,
+            fun teardown/1,
+            [
+                fun check_providers_order/1
+            ]
+        }
+    }.
+
 
 epi_reload_test_() ->
     Cases = [
@@ -525,6 +541,14 @@ ensure_no_reload_when_no_change(_Case,
         ?assertEqual(error, get(Ctx, is_called))
     end).
 
+check_providers_order(#ctx{handle = Handle, kv = KV, key = Key} = Ctx) ->
+    ?_test(begin
+        Result = couch_epi:apply(Handle, Key, inc, [KV, 2], [pipe]),
+        ?assertMatch([KV, 4], Result),
+        Order = [element(2, get(Ctx, K)) || K <- [inc1, inc2]],
+        ?assertEqual(Order, [3, 4]),
+        ok
+    end).
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
