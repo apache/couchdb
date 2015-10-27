@@ -143,31 +143,21 @@ handle_replicate_req(#httpd{method='POST', user_ctx=Ctx} = Req) ->
     chttpd:validate_ctype(Req, "application/json"),
     %% see HACK in chttpd.erl about replication
     PostBody = get(post_body),
-    try replicate(PostBody, Ctx) of
-    {ok, {continuous, RepId}} ->
-        send_json(Req, 202, {[{ok, true}, {<<"_local_id">>, RepId}]});
-    {ok, {cancelled, RepId}} ->
-        send_json(Req, 200, {[{ok, true}, {<<"_local_id">>, RepId}]});
-    {ok, {JsonResults}} ->
-        send_json(Req, {[{ok, true} | JsonResults]});
-    {ok, stopped} ->
-        send_json(Req, 200, {[{ok, stopped}]});
-    {error, {Type, Details}} ->
-        send_json(Req, 500, {[{error, Type}, {reason, Details}]});
-    {error, not_found} ->
-        send_json(Req, 404, {[{error, not_found}]});
-    {error, Reason} ->
-        try
-            send_json(Req, 500, {[{error, Reason}]})
-        catch
-        exit:{json_encode, _} ->
-            send_json(Req, 500, {[{error, couch_util:to_binary(Reason)}]})
-        end
-    catch
-    throw:{db_not_found, Msg} ->
-        send_json(Req, 404, {[{error, db_not_found}, {reason, Msg}]});
-    throw:{unauthorized, Msg} ->
-        send_json(Req, 404, {[{error, unauthorized}, {reason, Msg}]})
+    case replicate(PostBody, Ctx) of
+        {ok, {continuous, RepId}} ->
+            send_json(Req, 202, {[{ok, true}, {<<"_local_id">>, RepId}]});
+        {ok, {cancelled, RepId}} ->
+            send_json(Req, 200, {[{ok, true}, {<<"_local_id">>, RepId}]});
+        {ok, {JsonResults}} ->
+            send_json(Req, {[{ok, true} | JsonResults]});
+        {ok, stopped} ->
+            send_json(Req, 200, {[{ok, stopped}]});
+        {error, not_found=Error} ->
+            chttpd:send_error(Req, Error);
+        {error, {_, _}=Error} ->
+            chttpd:send_error(Req, Error);
+        {_, _}=Error ->
+            chttpd:send_error(Req, Error)
     end;
 handle_replicate_req(Req) ->
     send_method_not_allowed(Req, "POST").
