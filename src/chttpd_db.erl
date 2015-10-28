@@ -576,12 +576,12 @@ db_req(#httpd{method='GET',path_parts=[_,<<"_revs_limit">>]}=Req, Db) ->
 db_req(#httpd{path_parts=[_,<<"_revs_limit">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "PUT,GET");
 
-% vanilla CouchDB sends a 301 here, but we just handle the request
-db_req(#httpd{path_parts=[DbName,<<"_design/",Name/binary>>|Rest]}=Req, Db) ->
-    db_req(Req#httpd{path_parts=[DbName, <<"_design">>, Name | Rest]}, Db);
-
 % Special case to enable using an unencoded slash in the URL of design docs,
 % as slashes in document IDs must otherwise be URL encoded.
+db_req(#httpd{method='GET', mochi_req=MochiReq, path_parts=[DbName, <<"_design/", _/binary>> | _]}=Req, _Db) ->
+    [Head | Tail] = re:split(MochiReq:get(raw_path), "_design%2F", [{return, list}, caseless]),
+    chttpd:send_redirect(Req, Head ++ "_design/" ++ Tail);
+
 db_req(#httpd{path_parts=[_DbName,<<"_design">>,Name]}=Req, Db) ->
     db_doc_req(Req, Db, <<"_design/",Name/binary>>);
 
