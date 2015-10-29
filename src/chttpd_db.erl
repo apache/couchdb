@@ -1435,7 +1435,7 @@ parse_changes_query(Req) ->
                 undefined ->
                     ChangesArgs;
                 Value ->
-                    ChangesArgs#changes_args{since=list_to_integer(Value)}
+                    ChangesArgs#changes_args{since=Value}
             end;
         _ ->
             ChangesArgs
