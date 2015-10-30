@@ -44,6 +44,48 @@ class CustomFieldsTest(mango.UserDocsTextTests):
         docs = self.db.find({"age": 22, "manager": False})
         assert len(docs) == 0
 
+    def test_element_acess(self):
+        docs = self.db.find({"favorites.0": "Ruby"})
+        assert len(docs) == 3
+        for d in docs:
+            assert "Ruby" in d["favorites"]
+
+    # This should throw an exception because we only index the array
+    # favorites.[], and not the string field favorites
+    def test_index_selection(self):
+        try:
+            self.db.find({"selector": {"$or": [{"favorites": "Ruby"},
+                {"favorites.0":"Ruby"}]}})
+        except Exception, e:
+                assert e.response.status_code == 400
+
+    def test_in_with_array(self):
+        vals = ["Lisp", "Python"]
+        docs = self.db.find({"favorites": {"$in": vals}})
+        assert len(docs) == 10
+
+    # This should also throw an error because we only indexed
+    # favorites.[] of type string. For the following query to work, the
+    # user has to index favorites.[] of type number, and also
+    # favorites.[].Versions.Alpha of type string.
+    def test_in_different_types(self):
+        vals = ["Random Garbage", 52, {"Versions": {"Alpha": "Beta"}}]
+        try:
+            self.db.find({"favorites": {"$in": vals}})
+        except Exception, e:
+                assert e.response.status_code == 400
+
+    # This test differs from the situation where we index everything.
+    # When we index everything the actual number of docs that gets
+    # returned is 5. That's because of the special situation where we
+    # have an array of an array, i.e: [["Lisp"]], because we're indexing
+    # specifically favorites.[] of type string. So it does not count
+    # the example and we only get 4 back.
+    def test_nin_with_array(self):
+        vals = ["Lisp", "Python"]
+        docs = self.db.find({"favorites": {"$nin": vals}})
+        assert len(docs) == 4
+
     def test_missing(self):
         self.db.find({"location.state": "Nevada"})
 
