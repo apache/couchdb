@@ -615,18 +615,10 @@ all_docs_view(Req, Db, Keys, OP) ->
     Args1 = Args0#mrargs{view_type=map},
     Args2 = couch_mrview_util:validate_args(Args1),
     Args3 = set_namespace(OP, Args2),
-    %% TODO: proper calculation of etag
-    Etag = [$", couch_uuids:new(), $"],
     Options = [{user_ctx, Req#httpd.user_ctx}],
-    {ok, Resp} = couch_httpd:etag_maybe(Req, fun() ->
-        Max = chttpd:chunked_response_buffer_size(),
-        VAcc0 = #vacc{db=Db, req=Req, threshold=Max, etag=Etag},
-        fabric:all_docs(Db, Options, fun couch_mrview_http:view_cb/2, VAcc0, Args3)
-    end),
-    case is_record(Resp, vacc) of
-        true -> {ok, Resp#vacc.resp};
-        _ -> {ok, Resp}
-    end.
+    Max = chttpd:chunked_response_buffer_size(),
+    VAcc = #vacc{db=Db, req=Req, threshold=Max},
+    fabric:all_docs(Db, Options, fun couch_mrview_http:view_cb/2, VAcc, Args3).
 
 db_doc_req(#httpd{method='DELETE'}=Req, Db, DocId) ->
     % check for the existence of the doc to handle the 404 case.
