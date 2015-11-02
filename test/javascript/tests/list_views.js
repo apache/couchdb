@@ -11,7 +11,6 @@
 // the License.
 
 couchTests.list_views = function(debug) {
-  return console.log('TODO: HTTP OPTIONS req not allowed for list reqs');
 
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
@@ -212,28 +211,29 @@ couchTests.list_views = function(debug) {
   T(xhr.status == 200, "standard get should be 200");
   T(/head0123456789tail/.test(xhr.responseText));
 
-  // standard options
+  // standard options - works though it does not make lots of sense
   var xhr = CouchDB.request("OPTIONS", "/" + db_name + "/_design/lists/_list/basicBasic/basicView");
   T(xhr.status == 200, "standard get should be 200");
   T(/head0123456789tail/.test(xhr.responseText));
 
-  // test that etags are available
-  var etag = xhr.getResponseHeader("etag");
-  xhr = CouchDB.request("GET", "/" + db_name + "/_design/lists/_list/basicBasic/basicView", {
-    headers: {"if-none-match": etag}
-  });
-  T(xhr.status == 304);
+  // test that etags are available - actually they're not (yet): https://issues.apache.org/jira/browse/COUCHDB-2859
+  //var etag = xhr.getResponseHeader("etag");
+  //xhr = CouchDB.request("GET", "/" + db_name + "/_design/lists/_list/basicBasic/basicView", {
+  //  headers: {"if-none-match": etag}
+  //});
+  //T(xhr.status == 304);
   
   // confirm ETag changes with different POST bodies
-  xhr = CouchDB.request("POST", "/" + db_name + "/_design/lists/_list/basicBasic/basicView",
-    {body: JSON.stringify({keys:[1]})}
-  );
-  var etag1 = xhr.getResponseHeader("etag");
-  xhr = CouchDB.request("POST", "/" + db_name + "/_design/lists/_list/basicBasic/basicView",
-    {body: JSON.stringify({keys:[2]})}
-  );
-  var etag2 = xhr.getResponseHeader("etag");
-  T(etag1 != etag2, "POST to map _list generates key-depdendent ETags");
+  // (not yet - see above)
+  //xhr = CouchDB.request("POST", "/" + db_name + "/_design/lists/_list/basicBasic/basicView",
+  //  {body: JSON.stringify({keys:[1]})}
+  //);
+  //var etag1 = xhr.getResponseHeader("etag");
+  //xhr = CouchDB.request("POST", "/" + db_name + "/_design/lists/_list/basicBasic/basicView",
+  //  {body: JSON.stringify({keys:[2]})}
+  //);
+  //var etag2 = xhr.getResponseHeader("etag");
+  //T(etag1 != etag2, "POST to map _list generates key-depdendent ETags");
 
   // test the richness of the arguments
   xhr = CouchDB.request("GET", "/" + db_name + "/_design/lists/_list/basicJSON/basicView?update_seq=true");
@@ -241,7 +241,8 @@ couchTests.list_views = function(debug) {
   var resp = JSON.parse(xhr.responseText);
   TEquals(10, resp.head.total_rows);
   TEquals(0, resp.head.offset);
-  TEquals(11, resp.head.update_seq);
+  // we don't have a (meaningful) update seq in a clustered env
+  //TEquals(11, resp.head.update_seq);
   
   T(resp.rows.length == 10);
   TEquals(resp.rows[0], {"id": "0","key": 0,"value": "0"});
@@ -298,30 +299,33 @@ couchTests.list_views = function(debug) {
   T(/Key: 1/.test(xhr.responseText));
 
   // there should be etags on reduce as well
-  var etag = xhr.getResponseHeader("etag");
-  T(etag, "Etags should be served with reduce lists");
-  xhr = CouchDB.request("GET", "/" + db_name + "/_design/lists/_list/simpleForm/withReduce?group=true", {
-    headers: {"if-none-match": etag}
-  });
-  T(xhr.status == 304);
+  // (see above 4 etags)
+  //var etag = xhr.getResponseHeader("etag");
+  //T(etag, "Etags should be served with reduce lists");
+  //xhr = CouchDB.request("GET", "/" + db_name + "/_design/lists/_list/simpleForm/withReduce?group=true", {
+  //  headers: {"if-none-match": etag}
+  //});
+  //T(xhr.status == 304);
 
   // confirm ETag changes with different POST bodies
-  xhr = CouchDB.request("POST", "/" + db_name + "/_design/lists/_list/simpleForm/withReduce?group=true",
-    {body: JSON.stringify({keys:[1]})}
-  );
-  var etag1 = xhr.getResponseHeader("etag");
-  xhr = CouchDB.request("POST", "/" + db_name + "/_design/lists/_list/simpleForm/withReduce?group=true",
-    {body: JSON.stringify({keys:[2]})}
-  );
-  var etag2 = xhr.getResponseHeader("etag");
-  T(etag1 != etag2, "POST to reduce _list generates key-depdendent ETags");
+  // (see above)
+  //xhr = CouchDB.request("POST", "/" + db_name + "/_design/lists/_list/simpleForm/withReduce?group=true",
+  //  {body: JSON.stringify({keys:[1]})}
+  //);
+  //var etag1 = xhr.getResponseHeader("etag");
+  //xhr = CouchDB.request("POST", "/" + db_name + "/_design/lists/_list/simpleForm/withReduce?group=true",
+  //  {body: JSON.stringify({keys:[2]})}
+  //);
+  //var etag2 = xhr.getResponseHeader("etag");
+  //T(etag1 != etag2, "POST to reduce _list generates key-depdendent ETags");
 
   // verify the etags expire correctly
   var docs = makeDocs(11, 12);
   db.bulkSave(docs);
 
   xhr = CouchDB.request("GET", "/" + db_name + "/_design/lists/_list/simpleForm/withReduce?group=true", {
-    headers: {"if-none-match": etag}
+    // will always be 200 as etags don't make sense (see above)
+    //headers: {"if-none-match": etag}
   });
   T(xhr.status == 200, "reduce etag");
 
@@ -443,11 +447,12 @@ couchTests.list_views = function(debug) {
     }
   };
 
-  run_on_modified_server([{
-    section: "native_query_servers",
-    key: "erlang",
-    value: "{couch_native_process, start_link, []}"
-  }], erlViewTest);
+  // make _config available 4 tests or leave commented out
+  //run_on_modified_server([{
+  //  section: "native_query_servers",
+  //  key: "erlang",
+  //  value: "{couch_native_process, start_link, []}"
+  //}], erlViewTest);
 
   // COUCHDB-1113
   var ddoc = {
