@@ -669,7 +669,7 @@ couchTests.changes = function(debug) {
   TEquals(2, resp.results.length);
 
   // we can no longer pass a number into 'since' - but we have the 2nd last above - so we can use it (puh!)
-  req = CouchDB.request("GET", "/" + db.name + "/_changes?style=all_docs&since=" + encodeURIComponent(JSON.stringify(resp.results[0].seq)));
+  req = CouchDB.request("GET", "/" + db.name + "/_changes?style=all_docs&since=" + encodeURIComponent(resp.results[0].seq));
   resp = JSON.parse(req.responseText);
 
   // (seq as before)
@@ -693,7 +693,7 @@ couchTests.changes = function(debug) {
 
   // simulate an EventSource request with a Last-Event-ID header
   req = CouchDB.request("GET", "/" + db_name + "/_changes?feed=eventsource&timeout=0&since=0",
-        {"headers": {"Accept": "text/event-stream", "Last-Event-ID": JSON.stringify(JSON.parse(req.responseText).results[1].seq)}});
+        {"headers": {"Accept": "text/event-stream", "Last-Event-ID": JSON.parse(req.responseText).results[1].seq}});
 
   // "parse" the eventsource response and collect only the "id: ..." lines
   var changes = req.responseText.split('\n')
@@ -703,10 +703,10 @@ couchTests.changes = function(debug) {
      .filter(function (el) { return (el[0] === "id"); })
 
   // make sure we only got 2 changes, and they are update_seq=3 and update_seq=4
-// TODO: can't pass in new-style Sequence with Last-Event-ID header
-//  T(changes.length === 2);
-//  T(changes[0][1] === "3");
-//  T(changes[1][1] === "4");
+  T(changes.length === 2);
+  // seq is different now
+  //T(changes[0][1] === "3");
+  //T(changes[1][1] === "4");
 
   // COUCHDB-1923
   // test w/ new temp DB
