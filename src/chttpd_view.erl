@@ -33,14 +33,16 @@ multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
         Acc1
     end, VAcc1, ArgQueries),
     {ok, Resp1} = chttpd:send_delayed_chunk(VAcc2#vacc.resp, "\r\n]}"),
-    chttpd:end_delayed_json_response(Resp1).
+    {ok, Resp2} = chttpd:end_delayed_json_response(Resp1),
+    {ok, Resp2#vacc.resp}.
 
 
 design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
     Args = couch_mrview_http:parse_params(Req, Keys),
     Max = chttpd:chunked_response_buffer_size(),
     VAcc = #vacc{db=Db, req=Req, threshold=Max},
-    fabric:query_view(Db, DDoc, ViewName, fun couch_mrview_http:view_cb/2, VAcc, Args).
+    {ok, Resp} = fabric:query_view(Db, DDoc, ViewName, fun couch_mrview_http:view_cb/2, VAcc, Args),
+    {ok, Resp#vacc.resp}.
 
 handle_view_req(#httpd{method='GET',
         path_parts=[_, _, _, _, ViewName]}=Req, Db, DDoc) ->

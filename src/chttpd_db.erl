@@ -618,7 +618,8 @@ all_docs_view(Req, Db, Keys, OP) ->
     Options = [{user_ctx, Req#httpd.user_ctx}],
     Max = chttpd:chunked_response_buffer_size(),
     VAcc = #vacc{db=Db, req=Req, threshold=Max},
-    fabric:all_docs(Db, Options, fun couch_mrview_http:view_cb/2, VAcc, Args3).
+    {ok, Resp} = fabric:all_docs(Db, Options, fun couch_mrview_http:view_cb/2, VAcc, Args3),
+    {ok, Resp#vacc.resp}.
 
 db_doc_req(#httpd{method='DELETE'}=Req, Db, DocId) ->
     % check for the existence of the doc to handle the 404 case.
