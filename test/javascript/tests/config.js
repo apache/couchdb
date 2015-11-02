@@ -11,7 +11,7 @@
 // the License.
 
 couchTests.config = function(debug) {
-  return console.log('TODO');
+  return console.log('TODO: config port not available on cluster');
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
