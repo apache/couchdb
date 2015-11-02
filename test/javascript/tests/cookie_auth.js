@@ -12,7 +12,9 @@
 
 couchTests.cookie_auth = function(debug) {
   // This tests cookie-based authentication.
-  return console.log('TODO');
+  //return console.log('TODO');
+  // TODO: re-write so we get along withOUT changed config
+  // poss.: re-write so we just use _users and add some docs (and we delete those b4 running). Admin party should not hurt when logging in more
 
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
