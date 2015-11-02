@@ -15,8 +15,13 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
+-define(USER, "chttpd_db_test_admin").
+-define(PASS, "pass").
+-define(AUTH, {basic_auth, {?USER, ?PASS}}).
+-define(CONTENT_JSON, {"Content-Type", "application/json"}).
 
 setup() ->
+    ok = config:set("admins", ?USER, ?PASS, _Persist=false),
     TmpDb = ?tempdb(),
     Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
     Port = mochiweb_socket_server:get(chttpd, port),
@@ -25,20 +30,20 @@ setup() ->
     Url.
 
 teardown(Url) ->
-    delete_db(Url).
+    delete_db(Url),
+    ok = config:delete("admins", ?USER, _Persist=false).
 
 create_db(Url) ->
-    {ok, Status, _, _} = test_request:put(Url,
-                [{"Content-Type", "application/json"}], "{}"),
+    {ok, Status, _, _} = test_request:put(Url, [?CONTENT_JSON, ?AUTH], "{}"),
     ?assert(Status =:= 201 orelse Status =:= 202).
 
 
 create_doc(Url, Id) ->
     test_request:put(Url ++ "/" ++ Id,
-        [{"Content-Type", "application/json"}], "{\"mr\": \"rockoartischocko\"}").
+        [?CONTENT_JSON, ?AUTH], "{\"mr\": \"rockoartischocko\"}").
 
 delete_db(Url) ->
-    {ok, 200, _, _} = test_request:delete(Url).
+    {ok, 200, _, _} = test_request:delete(Url, [?AUTH]).
 
 all_test_() ->
     {
@@ -66,7 +71,7 @@ should_return_ok_true_on_bulk_update(Url) ->
             Ref = couch_util:get_value(<<"rev">>, Json, undefined),
             NewDoc = "{\"docs\": [{\"_rev\": \"" ++ ?b2l(Ref) ++ "\", \"_id\": \"testdoc\"}]}",
             {ok, _, _, ResultBody} = test_request:post(Url ++ "/_bulk_docs/",
-                [{"Content-Type", "application/json"}], NewDoc),
+                [?CONTENT_JSON, ?AUTH], NewDoc),
             ResultJson = ?JSON_DECODE(ResultBody),
             {InnerJson} = lists:nth(1, ResultJson),
             couch_util:get_value(<<"ok">>, InnerJson, undefined)
@@ -75,14 +80,16 @@ should_return_ok_true_on_bulk_update(Url) ->
 
 should_accept_live_as_an_alias_for_continuous(Url) ->
     ?_test(begin
-        {ok, _, _, ResultBody} = test_request:get(Url ++ "/_changes?feed=live&timeout=1"),
+        {ok, _, _, ResultBody} =
+            test_request:get(Url ++ "/_changes?feed=live&timeout=1", [?AUTH]),
         {ResultJson} = ?JSON_DECODE(ResultBody),
         <<LastSeqNum0:1/binary, "-", _/binary>> = couch_util:get_value(
             <<"last_seq">>, ResultJson, undefined),
         LastSeqNum = list_to_integer(binary_to_list(LastSeqNum0)),
 
         {ok, _, _, _} = create_doc(Url, "testdoc2"),
-        {ok, _, _, ResultBody2} = test_request:get(Url ++ "/_changes?feed=live&timeout=1"),
+        {ok, _, _, ResultBody2} = 
+            test_request:get(Url ++ "/_changes?feed=live&timeout=1", [?AUTH]),
         [_, CleanedResult] = binary:split(ResultBody2, <<"\n">>),
         {[{_, Seq}, _]} = ?JSON_DECODE(CleanedResult),
         <<SeqNum0:1/binary, "-", _/binary>> = Seq,
