@@ -336,7 +336,7 @@ filtered_view_cb(Obj, Acc) ->
 
 view_cb({meta, Meta}, #vacc{resp=undefined}=Acc) ->
     % Map function starting
-    Headers = [{"ETag", Acc#vacc.etag}],
+    Headers = [],
     {ok, Resp} = chttpd:start_delayed_json_response(Acc#vacc.req, 200, Headers),
     view_cb({meta, Meta}, Acc#vacc{resp=Resp, should_close=true});
 view_cb({meta, Meta}, #vacc{}=Acc) ->
