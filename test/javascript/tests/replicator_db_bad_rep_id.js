@@ -11,14 +11,16 @@
 // the License.
 
 couchTests.replicator_db_bad_rep_id = function(debug) {
-  return console.log('TODO');
+  //return console.log('TODO');
   if (debug) debugger;
 
   var populate_db = replicator_db.populate_db;
   var docs1 = replicator_db.docs1;
+  // TODO: dice DBs (at least target)
   var dbA = replicator_db.dbA;
   var dbB = replicator_db.dbB;
-  var repDb = replicator_db.repDb;
+  //var repDb = replicator_db.repDb;
+  var replDb = new CouchDB("_replicator");
   var wait = replicator_db.wait;
   var waitForRep = replicator_db.waitForRep;
   var waitForSeq = replicator_db.waitForSeq;
@@ -33,9 +35,9 @@ couchTests.replicator_db_bad_rep_id = function(debug) {
       target: dbB.name,
       replication_id: "1234abc"
     };
-    T(repDb.save(repDoc).ok);
+    T(replDb.save(repDoc).ok);
 
-    waitForRep(repDb, repDoc, "completed");
+    T(waitForRep(replDb, repDoc, "completed", "error") == "completed");
     for (var i = 0; i < docs1.length; i++) {
       var doc = docs1[i];
       var copy = dbB.open(doc._id);
@@ -43,7 +45,7 @@ couchTests.replicator_db_bad_rep_id = function(debug) {
       T(copy.value === doc.value);
     }
 
-    var repDoc1 = repDb.open(repDoc._id);
+    var repDoc1 = replDb.open(repDoc._id);
     T(repDoc1 !== null);
     T(repDoc1.source === repDoc.source);
     T(repDoc1.target === repDoc.target);
@@ -54,7 +56,7 @@ couchTests.replicator_db_bad_rep_id = function(debug) {
     T(repDoc1._replication_id !== "1234abc");
   }
 
-  var server_config = [
+  /*var server_config = [
     {
       section: "couch_httpd_auth",
       key: "iterations",
@@ -63,15 +65,39 @@ couchTests.replicator_db_bad_rep_id = function(debug) {
     {
       section: "replicator",
       key: "db",
-      value: repDb.name
+      value: null //repDb.name
     }
-  ];
+  ];*/
 
-  repDb.deleteDb();
-  run_on_modified_server(server_config, rep_doc_with_bad_rep_id);
+  //repDb.deleteDb();
+  // don't run on modified server as it would be strange on cluster
+  // but use "normal" replication DB, create a doc, reliably clear after run
+  // on delete fail, the next tests would all fail
+  function handleReplDoc(show) {
+    var replDoc = replDb.open("foo_rep");
+    if(replDoc!=null) {
+      if(show) {
+        console.log(JSON.stringify(replDoc));
+      }
+      //replDb.deleteDoc(replDoc);
+    }
+  }
+
+  handleReplDoc();
+  try {
+    rep_doc_with_bad_rep_id();
+  } finally {
+    // cleanup or log
+    try {
+      handleReplDoc(true);
+    } catch (e2) {
+      console.log("Error during cleanup " + e2);
+    }
+  }
+  //run_on_modified_server(server_config, rep_doc_with_bad_rep_id);
 
   // cleanup
-  repDb.deleteDb();
+  //repDb.deleteDb();
   dbA.deleteDb();
   dbB.deleteDb();
 }
