@@ -34,8 +34,6 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
--record(ctx, {pid, handle}).
-
 %% couch_epi_plugin behaviour
 
 app() -> test_app.
@@ -46,28 +44,16 @@ data_subscriptions() -> [].
 processes() -> [].
 notify(_, _, _) -> ok.
 
-start_epi() ->
-    application:load(couch_epi),
-    Plugins = application:get_env(couch_epi, plugins, []),
-    ok = application:set_env(couch_epi, plugins, append_if_missing(Plugins, ?MODULE)),
+setup() ->
+    application:stop(couch_epi), % in case it's already running from other tests...
+    application:unload(couch_epi),
+    ok = application:load(couch_epi),
+    ok = application:set_env(couch_epi, plugins, [?MODULE]), % only this plugin
     ok = application:start(couch_epi).
 
-append_if_missing(List, Value) ->
-    case lists:member(Value, List) of
-        true -> List;
-        false -> [Value | List]
-    end.
-
-setup() ->
-    error_logger:tty(false),
-    start_epi(),
-    #ctx{handle = couch_epi:get_handle(couch_db)}.
-
-teardown(#ctx{}) ->
-    Plugins = application:get_env(couch_epi, plugins, []),
-    application:set_env(couch_epi, plugins, Plugins -- [?MODULE]),
-    application:stop(couch_epi),
-    ok.
+teardown(_) ->
+    ok = application:stop(couch_epi),
+    ok = application:unload(couch_epi).
 
 validate_dbname({true, _Db}, _) -> true;
 validate_dbname({false, _Db}, _) -> false;
@@ -97,7 +83,7 @@ callback_test_() ->
     {
         "callback tests",
         {
-            foreach, fun setup/0, fun teardown/1,
+            setup, fun setup/0, fun teardown/1,
             [
                 fun validate_dbname_match/0,
                 fun validate_dbname_no_match/0,
