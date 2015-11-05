@@ -220,7 +220,13 @@ handle_call({rep_error, RepId, Error}, _From, State) ->
     {reply, ok, replication_error(State, RepId, Error)};
 
 handle_call({rep_db_checkpoint, DbName, EndSeq}, _From, State) ->
-    true = ets:insert(?DB_TO_SEQ, {DbName, EndSeq}),
+    Entry = case ets:lookup(?DB_TO_SEQ, DbName) of
+        [] ->
+            {DbName, EndSeq, false};
+        [{DbName, _OldSeq, Rescan}] ->
+            {DbName, EndSeq, Rescan}
+    end,
+    true = ets:insert(?DB_TO_SEQ, Entry),
     {reply, ok, State};
 
 handle_call(rep_db_changed, _From, State) ->
@@ -232,14 +238,29 @@ handle_call(Msg, From, State) ->
     {stop, {error, {unexpected_call, Msg}}, State}.
 
 handle_cast({resume_scan, DbName}, State) ->
-    Since = case ets:lookup(?DB_TO_SEQ, DbName) of
-        [] -> 0;
-        [{DbName, EndSeq}] -> EndSeq
+    Pids = State#state.rep_start_pids,
+    NewPids = case lists:keyfind(DbName, 1, Pids) of
+        {DbName, _Pid} ->
+            Entry = case ets:lookup(?DB_TO_SEQ, DbName) of
+                [] ->
+                    {DbName, 0, true};
+                [{DbName, EndSeq, _Rescan}] ->
+                    {DbName, EndSeq, true}
+            end,
+            true = ets:insert(?DB_TO_SEQ, Entry),
+            Pids;
+        false ->
+            Since = case ets:lookup(?DB_TO_SEQ, DbName) of
+                [] -> 0;
+                [{DbName, EndSeq, _Rescan}] -> EndSeq
+            end,
+            true = ets:insert(?DB_TO_SEQ, {DbName, Since, false}),
+            ensure_rep_ddoc_exists(DbName),
+            Pid = start_changes_reader(DbName, Since),
+            couch_log:debug("Scanning ~s from update_seq ~p", [DbName, Since]),
+            [{DbName, Pid} | Pids]
     end,
-    ensure_rep_ddoc_exists(DbName),
-    Pid = start_changes_reader(DbName, Since),
-    couch_log:debug("Scanning ~s from update_seq ~p", [DbName, Since]),
-    {noreply, State#state{rep_start_pids = [Pid | State#state.rep_start_pids]}};
+    {noreply, State#state{rep_start_pids = NewPids}};
 
 handle_cast({set_max_retries, MaxRetries}, State) ->
     {noreply, State#state{max_retries = MaxRetries}};
@@ -270,16 +291,22 @@ handle_info({'EXIT', From, Reason}, #state{event_listener = From} = State) ->
     couch_log:error("Database update notifier died. Reason: ~p", [Reason]),
     {stop, {db_update_notifier_died, Reason}, State};
 
-handle_info({'EXIT', From, normal}, #state{rep_start_pids = Pids} = State) ->
-    % one of the replication start processes terminated successfully
-    {noreply, State#state{rep_start_pids = Pids -- [From]}};
-
 handle_info({'EXIT', From, Reason}, #state{rep_start_pids = Pids} = State) ->
-    case lists:member(From, Pids) of
-        true ->
-            Fmt = "~s : Known replication pid ~w died :: ~w",
-            couch_log:error(Fmt, [?MODULE, From, Reason]),
-            {noreply, State#state{rep_start_pids = Pids -- [From]}};
+    case lists:keytake(From, 2, Pids) of
+        {value, {DbName, From}, NewPids} ->
+            if Reason == normal -> ok; true ->
+                Fmt = "~s : Known replication pid ~w died :: ~w",
+                couch_log:error(Fmt, [?MODULE, From, Reason])
+            end,
+            NewState = State#state{rep_start_pids = NewPids},
+            case ets:lookup(?DB_TO_SEQ, DbName) of
+                [{DbName, _EndSeq, true}] ->
+                    handle_cast({resume_scan, DbName}, NewState);
+                _ ->
+                    {noreply, NewState}
+            end;
+        false when Reason == normal ->
+            {noreply, State};
         false ->
             Fmt = "~s : Unknown pid ~w died :: ~w",
             couch_log:error(Fmt, [?MODULE, From, Reason]),
@@ -306,11 +333,11 @@ terminate(_Reason, State) ->
     } = State,
     stop_all_replications(),
     lists:foreach(
-        fun(Pid) ->
+        fun({_Tag, Pid}) ->
             catch unlink(Pid),
             catch exit(Pid, stop)
         end,
-        [ScanPid | StartPids]),
+        [{scanner, ScanPid} | StartPids]),
     true = ets:delete(?REP_TO_STATE),
     true = ets:delete(?DOC_TO_REP),
     true = ets:delete(?DB_TO_SEQ),
@@ -496,7 +523,9 @@ maybe_start_replication(State, DbName, DocId, RepDoc) ->
         couch_log:notice("Delaying replication `~s` start by ~p seconds.",
             [pp_rep_id(RepId), DelaySecs]),
         Pid = spawn_link(?MODULE, start_replication, [Rep, DelaySecs]),
-        State#state{rep_start_pids = [Pid | State#state.rep_start_pids]};
+        State#state{
+            rep_start_pids = [{rep_start, Pid} | State#state.rep_start_pids]
+        };
     #rep_state{rep = #rep{doc_id = DocId}} ->
         State;
     #rep_state{starting = false, rep = #rep{db_name = DbName, doc_id = OtherDocId}} ->
@@ -612,7 +641,9 @@ maybe_retry_replication(RepState, Error, State) ->
         "~nRestarting replication in ~p seconds.",
         [pp_rep_id(RepId), DocId, to_binary(error_reason(Error)), Wait]),
     Pid = spawn_link(?MODULE, start_replication, [Rep, Wait]),
-    State#state{rep_start_pids = [Pid | State#state.rep_start_pids]}.
+    State#state{
+        rep_start_pids = [{rep_start, Pid} | State#state.rep_start_pids]
+    }.
 
 
 stop_all_replications() ->
