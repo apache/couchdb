@@ -34,6 +34,9 @@
 
 -record(test_context, {mocked = [], started = [], module}).
 
+-define(DEFAULT_APPS,
+        [inets, ibrowse, ssl, config, couch_epi, couch_event, couch]).
+
 srcdir() ->
     code:priv_dir(couch) ++ "/../../".
 
@@ -68,16 +71,11 @@ start_couch(ExtraApps) ->
 start_couch(IniFiles, ExtraApps) ->
     load_applications_with_stats(),
     ok = application:set_env(config, ini_files, IniFiles),
-
-    Apps = start_applications(
-        [goldrush, lager, inets, ibrowse, ssl, config, couch_epi, couch_event, couch]
-        ++ ExtraApps),
-
+    Apps = start_applications(?DEFAULT_APPS ++ ExtraApps),
     #test_context{started = Apps}.
 
 stop_couch() ->
-    ok = stop_applications([inets, ibrowse, ssl, config, goldrush, lager, couch]),
-    ok.
+    ok = stop_applications(?DEFAULT_APPS).
 
 stop_couch(#test_context{started = Apps}) ->
     stop_applications(Apps);
