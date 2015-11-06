@@ -1,6 +1,6 @@
 {variables, [
     {package_author_name, "The Apache Software Foundation"},
-    {cluster_port, 5984},
+    {cluster_port, 0},
     {backend_port, 5986},
     {node_name, "-name couchdbtest@127.0.0.1"},
 
