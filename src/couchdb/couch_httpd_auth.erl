@@ -18,7 +18,7 @@
 -export([null_authentication_handler/1]).
 -export([proxy_authentication_handler/1, proxy_authentification_handler/1]).
 -export([cookie_auth_header/2]).
--export([handle_session_req/1]).
+-export([handle_session_req/1,handle_delegated_session_req/1]).
 
 -import(couch_httpd, [header_value/2, send_json/2,send_json/4, send_method_not_allowed/2]).
 
@@ -232,11 +232,14 @@ cookie_auth_header(#httpd{user_ctx=#user_ctx{name=User}, auth={Secret, true}}=Re
 cookie_auth_header(_Req, _Headers) -> [].
 
 cookie_auth_cookie(Req, User, Secret, TimeStamp) ->
-    SessionData = User ++ ":" ++ erlang:integer_to_list(TimeStamp, 16),
-    Hash = crypto:sha_mac(Secret, SessionData),
     mochiweb_cookies:cookie("AuthSession",
-        couch_util:encodeBase64Url(SessionData ++ ":" ++ ?b2l(Hash)),
+        make_cookie_hash(User, Secret, TimeStamp),
         [{path, "/"}] ++ cookie_scheme(Req) ++ max_age()).
+
+make_cookie_hash(UserName, Secret, TimeStamp) ->
+    SessionData = UserName ++ ":" ++ erlang:integer_to_list(TimeStamp, 16),
+    Hash = crypto:sha_mac(Secret, SessionData),
+    couch_util:encodeBase64Url(SessionData ++ ":" ++ ?b2l(Hash)).
 
 ensure_cookie_auth_secret() ->
     case couch_config:get("couch_httpd_auth", "secret", nil) of
@@ -246,6 +249,37 @@ ensure_cookie_auth_secret() ->
             NewSecret;
         Secret -> Secret
     end.
+
+% TODO:handle admin party
+
+prepare_cookie_values(UserName, Password, UserProps) ->
+    UserProps2 = maybe_upgrade_password_hash(UserName, Password, UserProps),
+    % setup the session cookie
+    Secret = ?l2b(ensure_cookie_auth_secret()),
+    UserSalt = couch_util:get_value(<<"salt">>, UserProps2),
+    CurrentTime = make_cookie_time(),
+    {Secret, UserSalt, CurrentTime}.
+
+
+% This endpoint exists to allow users with a server admin account to get an
+% authentication token for any other user. This is useful when a middleware
+% layer has access to CouchDB as an admin user and needs to give browsers an
+% access token that authenticates them against CouchDB.
+handle_delegated_session_req(#httpd{method='POST', path_parts=[_LoginAs, UserName]}=Req) ->
+    ok = couch_httpd:verify_is_server_admin(Req),
+    case couch_auth_cache:get_user_creds(UserName) of
+        nil -> couch_httpd:send_error(Req, not_found); % maybe send better error message
+        UserProps ->
+            Password = ?l2b(couch_util:get_value("password", UserProps, "")),
+            {Secret, UserSalt, CurrentTime} = prepare_cookie_values(UserName, Password, UserProps),
+            Cookie = make_cookie_hash(?b2l(UserName), <<Secret/binary, UserSalt/binary>>, CurrentTime),
+            % Cookie = make_cookie_token(Req, UserName, UserProps),
+            send_json(Req, {[{<<"login_secret">>, Cookie}]}) % handle Cookie value string foo
+    end;
+handle_delegated_session_req(#httpd{method='POST', path_parts=[_LoginAs]}=Req) ->
+    send_json(Req, 404, [], {[{<<"error">>, <<"missing username: /_login_as/username">>}]});
+handle_delegated_session_req(Req) ->
+    send_method_not_allowed(Req, "POST").
 
 % session handlers
 % Login handler with user db
@@ -272,11 +306,7 @@ handle_session_req(#httpd{method='POST', mochi_req=MochiReq}=Req) ->
     end,
     case authenticate(Password, UserProps) of
         true ->
-            UserProps2 = maybe_upgrade_password_hash(UserName, Password, UserProps),
-            % setup the session cookie
-            Secret = ?l2b(ensure_cookie_auth_secret()),
-            UserSalt = couch_util:get_value(<<"salt">>, UserProps2),
-            CurrentTime = make_cookie_time(),
+            {Secret, UserSalt, CurrentTime} = prepare_cookie_values(UserName, Password, UserProps),
             Cookie = cookie_auth_cookie(Req, ?b2l(UserName), <<Secret/binary, UserSalt/binary>>, CurrentTime),
             % TODO document the "next" feature in Futon
             {Code, Headers} = case couch_httpd:qs_value(Req, "next", nil) of
@@ -288,8 +318,8 @@ handle_session_req(#httpd{method='POST', mochi_req=MochiReq}=Req) ->
             send_json(Req#httpd{req_body=ReqBody}, Code, Headers,
                 {[
                     {ok, true},
-                    {name, couch_util:get_value(<<"name">>, UserProps2, null)},
-                    {roles, couch_util:get_value(<<"roles">>, UserProps2, [])}
+                    {name, couch_util:get_value(<<"name">>, UserProps, null)},
+                    {roles, couch_util:get_value(<<"roles">>, UserProps, [])}
                 ]});
         _Else ->
             % clear the session
