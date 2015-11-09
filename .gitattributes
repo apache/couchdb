@@ -1,0 +1,29 @@
+# Use only Unix line feeds (LF)
+
+# Use automatic conversion by default
+* text=auto
+
+# Text files that must end with LF
+*.args     text eol=lf
+*.cfg      text eol=lf
+*.config   text eol=lf
+*.css      text eol=lf
+*.erl      text eol=lf
+*.es       text eol=lf
+*.escript  text eol=lf
+*.html     text eol=lf
+*.in       text eol=lf
+*.ini      text eol=lf
+*.js       text eol=lf
+*.json     text eol=lf
+*.md       text eol=lf
+*.mk       text eol=lf
+*.ps1      text eol=lf
+*.py       text eol=lf
+*.rb       text eol=lf
+*.rst      text eol=lf
+*.script   text eol=lf
+*.sh       text eol=lf
+*.skip     text eol=lf
+*.template text eol=lf
+*.yml      text eol=lf
