@@ -89,7 +89,7 @@ start_link(Name, Options) ->
     % just stop if one of the config settings change. couch_server_sup
     % will restart us and then we will pick up the new settings.
 
-    BindAddress = case config:get("httpd", "bind_address", "any") of
+    BindAddress = case couch_config:get("httpd", "bind_address", "any") of
                       "any" -> any;
                       Else -> Else
                   end,
