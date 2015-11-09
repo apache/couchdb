@@ -26,7 +26,7 @@ DepDescs = [
 {couch_epi,        "couch-epi",        "807aa3f58e39f1273e732020c80d630d9177790c"},
 %% keep these sorted
 {b64url,           "b64url",           "319fc604235ab1fde37047b38a432450161db750"},
-{cassim,           "cassim",           "350e4e60171bf1ccf90ebc5126304bc9870a1b03"},
+{cassim,           "cassim",           "9bbfe82125284fa7cb3317079e8bc1dc876a07bf"},
 {couch_log,        "couch-log",        "fb4157370403c4c97f19d958a51c889950a66a94"},
 {couch_log_lager,  "couch-log-lager",  "b2a0471a87765de50c5eb05c65c121f68a9ae9fa"},
 {config,           "config",           "b2ecd0d47a776256956ce045123423494ff85e8e"},
