@@ -578,7 +578,7 @@ db_req(#httpd{path_parts=[_,<<"_revs_limit">>]}=Req, _Db) ->
 
 % Special case to enable using an unencoded slash in the URL of design docs,
 % as slashes in document IDs must otherwise be URL encoded.
-db_req(#httpd{method='GET', mochi_req=MochiReq, path_parts=[DbName, <<"_design/", _/binary>> | _]}=Req, _Db) ->
+db_req(#httpd{method='GET', mochi_req=MochiReq, path_parts=[_DbName, <<"_design/", _/binary>> | _]}=Req, _Db) ->
     [Head | Tail] = re:split(MochiReq:get(raw_path), "_design%2F", [{return, list}, caseless]),
     chttpd:send_redirect(Req, Head ++ "_design/" ++ Tail);
 
