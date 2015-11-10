@@ -31,8 +31,9 @@ couchTests.replicator_db_bad_rep_id = function(debug) {
 
     var repDoc = {
       _id: "foo_rep",
-      source: dbA.name,
-      target: dbB.name,
+// TODO: fix DB name issue and remove absolute URL again
+      source: 'http://localhost:15984/'+dbA.name,
+      target: 'http://localhost:15984/'+dbB.name,
       replication_id: "1234abc"
     };
     T(replDb.save(repDoc).ok);
@@ -77,9 +78,9 @@ couchTests.replicator_db_bad_rep_id = function(debug) {
     var replDoc = replDb.open("foo_rep");
     if(replDoc!=null) {
       if(show) {
-        console.log(JSON.stringify(replDoc));
+        //console.log(JSON.stringify(replDoc));
       }
-      //replDb.deleteDoc(replDoc);
+      replDb.deleteDoc(replDoc);
     }
   }
 
