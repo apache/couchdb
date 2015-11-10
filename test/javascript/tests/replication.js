@@ -11,7 +11,7 @@
 // the License.
 
 couchTests.replication = function(debug) {
-  return console.log('TODO');
+//  return console.log('TODO');
   if (debug) debugger;
 
   var host = CouchDB.host;
@@ -210,15 +210,17 @@ couchTests.replication = function(debug) {
     TEquals(sourceInfo.doc_count, targetInfo.doc_count);
 
     TEquals('string', typeof repResult.session_id);
-    TEquals(repResult.source_last_seq, sourceInfo.update_seq);
+    // we can't rely on sequences in a cluster
+    //TEquals(repResult.source_last_seq, sourceInfo.update_seq);
     TEquals(true, repResult.history instanceof Array);
     TEquals(1, repResult.history.length);
     TEquals(repResult.history[0].session_id, repResult.session_id);
     TEquals('string', typeof repResult.history[0].start_time);
     TEquals('string', typeof repResult.history[0].end_time);
     TEquals(0, repResult.history[0].start_last_seq);
-    TEquals(sourceInfo.update_seq, repResult.history[0].end_last_seq);
-    TEquals(sourceInfo.update_seq, repResult.history[0].recorded_seq);
+    // we can't rely on sequences in a cluster
+    //TEquals(sourceInfo.update_seq, repResult.history[0].end_last_seq);
+    //TEquals(sourceInfo.update_seq, repResult.history[0].recorded_seq);
     TEquals(sourceInfo.doc_count, repResult.history[0].missing_checked);
     TEquals(sourceInfo.doc_count, repResult.history[0].missing_found);
     TEquals(sourceInfo.doc_count, repResult.history[0].docs_read);
@@ -271,15 +273,17 @@ couchTests.replication = function(debug) {
     TEquals(targetInfo.doc_count, sourceInfo.doc_count);
 
     TEquals('string', typeof repResult.session_id);
-    TEquals(sourceInfo.update_seq, repResult.source_last_seq);
+    // we can't rely on sequences in a cluster
+    //TEquals(sourceInfo.update_seq, repResult.source_last_seq);
     TEquals(true, repResult.history instanceof Array);
     TEquals(2, repResult.history.length);
     TEquals(repResult.history[0].session_id, repResult.session_id);
     TEquals('string', typeof repResult.history[0].start_time);
     TEquals('string', typeof repResult.history[0].end_time);
-    TEquals((sourceInfo.update_seq - 6), repResult.history[0].start_last_seq);
-    TEquals(sourceInfo.update_seq, repResult.history[0].end_last_seq);
-    TEquals(sourceInfo.update_seq, repResult.history[0].recorded_seq);
+    // we can't rely on sequences in a cluster
+    //TEquals((sourceInfo.update_seq - 6), repResult.history[0].start_last_seq);
+    //TEquals(sourceInfo.update_seq, repResult.history[0].end_last_seq);
+    //TEquals(sourceInfo.update_seq, repResult.history[0].recorded_seq);
     TEquals(6, repResult.history[0].missing_checked);
     TEquals(6, repResult.history[0].missing_found);
     TEquals(6, repResult.history[0].docs_read);
@@ -339,9 +343,10 @@ couchTests.replication = function(debug) {
 
     TEquals(true, repResult.history instanceof Array);
     TEquals(3, repResult.history.length);
-    TEquals((sourceInfo.update_seq - 1), repResult.history[0].start_last_seq);
-    TEquals(sourceInfo.update_seq, repResult.history[0].end_last_seq);
-    TEquals(sourceInfo.update_seq, repResult.history[0].recorded_seq);
+    // we can't rely on sequences in a cluster
+    //TEquals((sourceInfo.update_seq - 1), repResult.history[0].start_last_seq);
+    //TEquals(sourceInfo.update_seq, repResult.history[0].end_last_seq);
+    //TEquals(sourceInfo.update_seq, repResult.history[0].recorded_seq);
     TEquals(1, repResult.history[0].missing_checked);
     TEquals(1, repResult.history[0].missing_found);
     TEquals(1, repResult.history[0].docs_read);
@@ -352,9 +357,13 @@ couchTests.replication = function(debug) {
     TEquals(null, copy);
 
     var changes = targetDb.changes({since: 0});
-    var idx = changes.results.length - 1;
-    TEquals(docs[1]._id, changes.results[idx].id);
-    TEquals(true, changes.results[idx].deleted);
+    // there is no guarantee of ordering also
+    // however: the doc has to appear somewhere
+    //var idx = changes.results.length - 1;
+    var changesResDoc1 = changes.results.filter(function(c){return c.id == docs[1]._id;});
+    TEquals(1, changesResDoc1.length);
+    TEquals(docs[1]._id, changesResDoc1[0].id);
+    TEquals(true, changesResDoc1[0].deleted);
 
     // test conflict
     doc = sourceDb.open(docs[0]._id);
@@ -375,9 +384,10 @@ couchTests.replication = function(debug) {
 
     TEquals(true, repResult.history instanceof Array);
     TEquals(4, repResult.history.length);
-    TEquals((sourceInfo.update_seq - 1), repResult.history[0].start_last_seq);
-    TEquals(sourceInfo.update_seq, repResult.history[0].end_last_seq);
-    TEquals(sourceInfo.update_seq, repResult.history[0].recorded_seq);
+    // we can't rely on sequences in a cluster
+    //TEquals((sourceInfo.update_seq - 1), repResult.history[0].start_last_seq);
+    //TEquals(sourceInfo.update_seq, repResult.history[0].end_last_seq);
+    //TEquals(sourceInfo.update_seq, repResult.history[0].recorded_seq);
     TEquals(1, repResult.history[0].missing_checked);
     TEquals(1, repResult.history[0].missing_found);
     TEquals(1, repResult.history[0].docs_read);
@@ -405,9 +415,10 @@ couchTests.replication = function(debug) {
 
     TEquals(true, repResult.history instanceof Array);
     TEquals(5, repResult.history.length);
-    TEquals((sourceInfo.update_seq - 1), repResult.history[0].start_last_seq);
-    TEquals(sourceInfo.update_seq, repResult.history[0].end_last_seq);
-    TEquals(sourceInfo.update_seq, repResult.history[0].recorded_seq);
+    // we can't rely on sequences in a cluster
+    //TEquals((sourceInfo.update_seq - 1), repResult.history[0].start_last_seq);
+    //TEquals(sourceInfo.update_seq, repResult.history[0].end_last_seq);
+    //TEquals(sourceInfo.update_seq, repResult.history[0].recorded_seq);
     TEquals(1, repResult.history[0].missing_checked);
     TEquals(1, repResult.history[0].missing_found);
     TEquals(1, repResult.history[0].docs_read);
@@ -438,9 +449,10 @@ couchTests.replication = function(debug) {
 
     TEquals(true, repResult.history instanceof Array);
     TEquals(6, repResult.history.length);
-    TEquals((sourceInfo.update_seq - 1), repResult.history[0].start_last_seq);
-    TEquals(sourceInfo.update_seq, repResult.history[0].end_last_seq);
-    TEquals(sourceInfo.update_seq, repResult.history[0].recorded_seq);
+    // we can't rely on sequences in a cluster
+    //TEquals((sourceInfo.update_seq - 1), repResult.history[0].start_last_seq);
+    //TEquals(sourceInfo.update_seq, repResult.history[0].end_last_seq);
+    //TEquals(sourceInfo.update_seq, repResult.history[0].recorded_seq);
     TEquals(1, repResult.history[0].missing_checked);
     TEquals(1, repResult.history[0].missing_found);
     TEquals(1, repResult.history[0].docs_read);
@@ -463,10 +475,11 @@ couchTests.replication = function(debug) {
     TEquals(true, repResult.ok);
 
     sourceInfo = sourceDb.info();
-    TEquals(sourceInfo.update_seq, repResult.source_last_seq);
-    TEquals(sourceInfo.update_seq - 3, repResult.history[0].start_last_seq);
-    TEquals(sourceInfo.update_seq, repResult.history[0].end_last_seq);
-    TEquals(sourceInfo.update_seq, repResult.history[0].recorded_seq);
+    // we can't rely on sequences in a cluster
+    //TEquals(sourceInfo.update_seq, repResult.source_last_seq);
+    //TEquals(sourceInfo.update_seq - 3, repResult.history[0].start_last_seq);
+    //TEquals(sourceInfo.update_seq, repResult.history[0].end_last_seq);
+    //TEquals(sourceInfo.update_seq, repResult.history[0].recorded_seq);
     TEquals(3, repResult.history[0].missing_checked);
     TEquals(1, repResult.history[0].missing_found);
     TEquals(1, repResult.history[0].docs_read);
@@ -482,10 +495,11 @@ couchTests.replication = function(debug) {
     TEquals(true, repResult.ok);
 
     sourceInfo = sourceDb.info();
-    TEquals(sourceInfo.update_seq, repResult.source_last_seq);
-    TEquals(sourceInfo.update_seq - 2, repResult.history[0].start_last_seq);
-    TEquals(sourceInfo.update_seq, repResult.history[0].end_last_seq);
-    TEquals(sourceInfo.update_seq, repResult.history[0].recorded_seq);
+    // we can't rely on sequences in a cluster
+    //TEquals(sourceInfo.update_seq, repResult.source_last_seq);
+    //TEquals(sourceInfo.update_seq - 2, repResult.history[0].start_last_seq);
+    //TEquals(sourceInfo.update_seq, repResult.history[0].end_last_seq);
+    //TEquals(sourceInfo.update_seq, repResult.history[0].recorded_seq);
     TEquals(2, repResult.history[0].missing_checked);
     TEquals(0, repResult.history[0].missing_found);
     TEquals(0, repResult.history[0].docs_read);
@@ -496,7 +510,8 @@ couchTests.replication = function(debug) {
     TEquals(true, repResult.ok);
     TEquals(true, repResult.no_changes);
     sourceInfo = sourceDb.info();
-    TEquals(sourceInfo.update_seq, repResult.source_last_seq);
+    // we can't rely on sequences in a cluster
+    //TEquals(sourceInfo.update_seq, repResult.source_last_seq);
   }
 
 
