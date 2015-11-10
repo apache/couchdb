@@ -543,12 +543,13 @@ couchTests.replication = function(debug) {
   docs = makeDocs(1, 6);
 
   for (i = 0; i < dbPairs.length; i++) {
-    var since_seq = 3;
     populateDb(sourceDb, docs);
     populateDb(targetDb, []);
+    // sequences are no longer simple numbers - so pull #3 from a feed
+    var since_seq = sourceDb.changes().results[2].seq;
 
     var expected_ids = [];
-    var changes = sourceDb.changes({since: since_seq});
+    var changes = sourceDb.changes({since: JSON.stringify(since_seq)});
     for (j = 0; j < changes.results.length; j++) {
       expected_ids.push(changes.results[j].id);
     }
@@ -566,7 +567,7 @@ couchTests.replication = function(debug) {
       );
     } catch (x) {
       // OTP R14B03 onwards
-      TEquals("not found", x.error);
+      TEquals("not_found", x.error);
     }
     repResult = CouchDB.replicate(
       dbPairs[i].source,
@@ -584,7 +585,7 @@ couchTests.replication = function(debug) {
       );
     } catch (x) {
       // OTP R14B03 onwards
-      TEquals("not found", x.error);
+      TEquals("not_found", x.error);
     }
     TEquals(true, repResult.ok);
     TEquals(2, repResult.history[0].missing_checked);
