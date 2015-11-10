@@ -45,7 +45,8 @@ ddoc_validation_test_() ->
                     fun should_reject_non_object_views/1,
                     fun should_reject_non_string_language/1,
                     fun should_reject_non_string_validate_doc_update/1,
-                    fun should_reject_non_array_rewrites/1,
+                    fun should_accept_string_rewrites/1,
+                    fun should_reject_bad_rewrites/1,
                     fun should_accept_option/1,
                     fun should_accept_any_option/1,
                     fun should_accept_filter/1,
@@ -176,10 +177,17 @@ should_reject_non_string_validate_doc_update(Db) ->
     ?_assertThrow({bad_request, invalid_design_doc, _},
                   couch_db:update_doc(Db, Doc, [])).
 
-should_reject_non_array_rewrites(Db) ->
+should_accept_string_rewrites(Db) ->
     Doc = couch_doc:from_json_obj({[
         {<<"_id">>, <<"_design/should_reject_non_array_rewrites">>},
-        {<<"rewrites">>, <<"invalid">>}
+        {<<"rewrites">>, <<"function(req){}">>}
+    ]}),
+    ?_assertMatch({ok,_}, couch_db:update_doc(Db, Doc, [])).
+
+should_reject_bad_rewrites(Db) ->
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/should_reject_non_array_rewrites">>},
+        {<<"rewrites">>, 42}
     ]}),
     ?_assertThrow({bad_request, invalid_design_doc, _},
                   couch_db:update_doc(Db, Doc, [])).

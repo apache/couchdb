@@ -56,7 +56,7 @@ validate_ddoc_fields(DDoc) ->
         [{<<"language">>, string}],
         [{<<"lists">>, object}, {any, string}],
         [{<<"options">>, object}],
-        [{<<"rewrites">>, array}],
+        [{<<"rewrites">>, [string, array]}],
         [{<<"shows">>, object}, {any, string}],
         [{<<"updates">>, object}, {any, string}],
         [{<<"validate_doc_update">>, string}],
@@ -88,7 +88,7 @@ validate_ddoc_fields(DDoc, Path) ->
         ok -> ok;
         {error, {FailedPath0, Type0}} ->
             FailedPath = iolist_to_binary(join(FailedPath0, <<".">>)),
-            Type = ?l2b(atom_to_list(Type0)),
+            Type = format_type(Type0),
             throw({invalid_design_doc,
                   <<"`", FailedPath/binary, "` field must have ",
                      Type/binary, " type">>})
@@ -121,6 +121,11 @@ validate_ddoc_field(undefined, Type) when is_atom(Type) ->
     ok;
 validate_ddoc_field(_, any) ->
     ok;
+validate_ddoc_field(Value, Types) when is_list(Types) ->
+    lists:foldl(fun
+        (_, ok) -> ok;
+        (Type, _) -> validate_ddoc_field(Value, Type)
+    end, error, Types);
 validate_ddoc_field(Value, string) when is_binary(Value) ->
     ok;
 validate_ddoc_field(Value, array) when is_list(Value) ->
@@ -149,6 +154,11 @@ map_function_type({Props}) ->
         <<"query">> -> object;
         _ -> string
     end.
+
+format_type(Type) when is_atom(Type) ->
+    ?l2b(atom_to_list(Type));
+format_type(Types) when is_list(Types) ->
+    iolist_to_binary(join(lists:map(fun atom_to_list/1, Types), <<" or ">>)).
 
 join(L, Sep) ->
     join(L, Sep, []).
