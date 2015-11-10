@@ -117,8 +117,7 @@ should_reject_non_object_options(Db) ->
         {<<"_id">>, <<"_design/should_reject_non_object_options">>},
         {<<"options">>, <<"invalid">>}
     ]}),
-    ?_assertThrow({bad_request,invalid_design_doc,
-                   <<"`options` is not an object">>},
+    ?_assertThrow({bad_request, invalid_design_doc, _},
                   couch_db:update_doc(Db, Doc, [])).
 
 should_reject_non_object_filters(Db) ->
@@ -126,8 +125,7 @@ should_reject_non_object_filters(Db) ->
         {<<"_id">>, <<"_design/should_reject_non_object_filters">>},
         {<<"filters">>, <<"invalid">>}
     ]}),
-    ?_assertThrow({bad_request,invalid_design_doc,
-                   <<"`filters` is not an object">>},
+    ?_assertThrow({bad_request, invalid_design_doc, _},
                   couch_db:update_doc(Db, Doc, [])).
 
 should_reject_non_object_lists(Db) ->
@@ -135,8 +133,7 @@ should_reject_non_object_lists(Db) ->
         {<<"_id">>, <<"_design/should_reject_non_object_lists">>},
         {<<"lists">>, <<"invalid">>}
     ]}),
-    ?_assertThrow({bad_request,invalid_design_doc,
-                   <<"`lists` is not an object">>},
+    ?_assertThrow({bad_request, invalid_design_doc, _},
                   couch_db:update_doc(Db, Doc, [])).
 
 should_reject_non_object_shows(Db) ->
@@ -144,8 +141,7 @@ should_reject_non_object_shows(Db) ->
         {<<"_id">>, <<"_design/should_reject_non_object_shows">>},
         {<<"shows">>, <<"invalid">>}
     ]}),
-    ?_assertThrow({bad_request,invalid_design_doc,
-                   <<"`shows` is not an object">>},
+    ?_assertThrow({bad_request, invalid_design_doc, _},
                   couch_db:update_doc(Db, Doc, [])).
 
 should_reject_non_object_updates(Db) ->
@@ -153,8 +149,7 @@ should_reject_non_object_updates(Db) ->
         {<<"_id">>, <<"_design/should_reject_non_object_updates">>},
         {<<"updates">>, <<"invalid">>}
     ]}),
-    ?_assertThrow({bad_request,invalid_design_doc,
-                   <<"`updates` is not an object">>},
+    ?_assertThrow({bad_request, invalid_design_doc, _},
                   couch_db:update_doc(Db, Doc, [])).
 
 should_reject_non_object_views(Db) ->
@@ -162,8 +157,7 @@ should_reject_non_object_views(Db) ->
         {<<"_id">>, <<"_design/should_reject_non_object_views">>},
         {<<"views">>, <<"invalid">>}
     ]}),
-    ?_assertThrow({bad_request,invalid_design_doc,
-                   <<"`views` is not an object">>},
+    ?_assertThrow({bad_request, invalid_design_doc, _},
                   couch_db:update_doc(Db, Doc, [])).
 
 should_reject_non_string_language(Db) ->
@@ -171,8 +165,7 @@ should_reject_non_string_language(Db) ->
         {<<"_id">>, <<"_design/should_reject_non_string_language">>},
         {<<"language">>, 1}
     ]}),
-    ?_assertThrow({bad_request,invalid_design_doc,
-                   <<"`language` in design doc is not a string">>},
+    ?_assertThrow({bad_request, invalid_design_doc, _},
                   couch_db:update_doc(Db, Doc, [])).
 
 should_reject_non_string_validate_doc_update(Db) ->
@@ -180,8 +173,7 @@ should_reject_non_string_validate_doc_update(Db) ->
         {<<"_id">>, <<"_design/should_reject_non_string_vdu">>},
         {<<"validate_doc_update">>, 1}
     ]}),
-    ?_assertThrow({bad_request,invalid_design_doc,
-                   <<"`validate_doc_update` in design doc is not a string">>},
+    ?_assertThrow({bad_request, invalid_design_doc, _},
                   couch_db:update_doc(Db, Doc, [])).
 
 should_reject_non_array_rewrites(Db) ->
@@ -189,8 +181,7 @@ should_reject_non_array_rewrites(Db) ->
         {<<"_id">>, <<"_design/should_reject_non_array_rewrites">>},
         {<<"rewrites">>, <<"invalid">>}
     ]}),
-    ?_assertThrow({bad_request,invalid_design_doc,
-                   <<"`rewrites` is not an array">>},
+    ?_assertThrow({bad_request, invalid_design_doc, _},
                   couch_db:update_doc(Db, Doc, [])).
 
 should_accept_option(Db) ->
@@ -219,8 +210,7 @@ should_reject_non_string_filter_function(Db) ->
         {<<"_id">>, <<"_design/should_reject_non_string_filter_function">>},
         {<<"filters">>, {[ {<<"filter1">>, 1} ]}}
     ]}),
-    ?_assertThrow({bad_request,invalid_design_doc,
-                  <<"`filter1` in filters is not a string">> },
+    ?_assertThrow({bad_request, invalid_design_doc, _},
                   couch_db:update_doc(Db, Doc, [])).
 
 should_accept_list(Db) ->
@@ -235,8 +225,7 @@ should_reject_non_string_list_function(Db) ->
         {<<"_id">>, <<"_design/should_reject_non_string_list_function">>},
         {<<"lists">>, {[ {<<"list1">>, 1} ]}}
     ]}),
-    ?_assertThrow({bad_request,invalid_design_doc,
-                  <<"`list1` in lists is not a string">> },
+    ?_assertThrow({bad_request, invalid_design_doc, _},
                   couch_db:update_doc(Db, Doc, [])).
 
 should_accept_show(Db) ->
@@ -251,8 +240,7 @@ should_reject_non_string_show_function(Db) ->
         {<<"_id">>, <<"_design/should_reject_non_string_show_function">>},
         {<<"shows">>, {[ {<<"show1">>, 1} ]}}
     ]}),
-    ?_assertThrow({bad_request,invalid_design_doc,
-                  <<"`show1` in shows is not a string">> },
+    ?_assertThrow({bad_request, invalid_design_doc, _},
                   couch_db:update_doc(Db, Doc, [])).
 
 should_accept_update(Db) ->
@@ -267,8 +255,7 @@ should_reject_non_string_update_function(Db) ->
         {<<"_id">>, <<"_design/should_reject_non_string_update_function">>},
         {<<"updates">>, {[ {<<"update1">>, 1} ]}}
     ]}),
-    ?_assertThrow({bad_request,invalid_design_doc,
-                  <<"`update1` in updates is not a string">> },
+    ?_assertThrow({bad_request, invalid_design_doc, _},
                   couch_db:update_doc(Db, Doc, [])).
 
 should_accept_view(Db) ->
@@ -311,8 +298,7 @@ should_reject_view_that_is_not_an_object(Db) ->
         {<<"_id">>, <<"_design/should_reject_non_object_view">>},
         {<<"views">>, {[{<<"view1">>, <<"thisisbad">>}]}}
     ]}),
-    ?_assertThrow({bad_request,invalid_design_doc,
-                  <<"View view1 must be an object">>},
+    ?_assertThrow({bad_request, invalid_design_doc, _},
                   couch_db:update_doc(Db, Doc, [])).
 
 should_reject_view_without_map_function(Db) ->
@@ -322,8 +308,7 @@ should_reject_view_without_map_function(Db) ->
                          {<<"view1">>, {[]}}
                        ]}}
     ]}),
-    ?_assertThrow({bad_request,invalid_design_doc,
-                  <<"View view1 must have a map function">>},
+    ?_assertThrow({bad_request, invalid_design_doc, _},
                   couch_db:update_doc(Db, Doc, [])).
 
 
@@ -336,8 +321,7 @@ should_reject_view_with_non_string_map_function(Db) ->
                                         ]}}
                        ]}}
     ]}),
-    ?_assertThrow({bad_request,invalid_design_doc,
-                  <<"`map` in view1 must be a string">>},
+    ?_assertThrow({bad_request, invalid_design_doc, _},
                   couch_db:update_doc(Db, Doc, [])).
 
 should_reject_view_with_non_string_reduce_function(Db) ->
@@ -350,8 +334,7 @@ should_reject_view_with_non_string_reduce_function(Db) ->
                                         ]}}
                        ]}}
     ]}),
-    ?_assertThrow({bad_request,invalid_design_doc,
-                  <<"`reduce` in view1 must be a string">>},
+    ?_assertThrow({bad_request, invalid_design_doc, _},
                   couch_db:update_doc(Db, Doc, [])).
 
 should_accept_any_in_lib(Db) ->
@@ -392,6 +375,5 @@ should_reject_map_non_objects_for_queries(Db) ->
             ]}}
         ]}}
     ]}),
-    ?_assertThrow({bad_request,invalid_design_doc,
-                   <<"`map` in view1 for queries must be an object">>},
+    ?_assertThrow({bad_request, invalid_design_doc, _},
                   couch_db:update_doc(Db, Doc, [])).
