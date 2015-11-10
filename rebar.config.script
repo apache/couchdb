@@ -56,7 +56,7 @@ DepDescs = [
 {mochiweb,         "mochiweb",         "bd6ae7cbb371666a1f68115056f7b30d13765782"},
 {oauth,            "oauth",            "099057a98e41f3aff91e77e3cf496d6c6fd901df"},
 {rexi,             "rexi",             "a327b7dbeb2b0050f7ca9072047bf8ef2d282833"},
-{snappy,           "snappy",           "0ab2796f82789895a2a86d403e63f3823d3c5a1d"},
+{snappy,           "snappy",           "ce24944752ff3a60ad2710f61d4cf709a1b31863"},
 {setup,            "setup",            "b9e1f3b5d5a78a706abb358e17130fb7344567d2"},
 {meck,             "meck",             {tag, "0.8.2"}}
 ],
