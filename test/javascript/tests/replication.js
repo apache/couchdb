@@ -58,39 +58,69 @@ couchTests.replication = function(debug) {
     return data;
   }
 
-
-  function enableAttCompression(level, types) {
-    var xhr = CouchDB.request(
-      "PUT",
-      "/_config/attachments/compression_level",
-      {
-        body: JSON.stringify(level),
-        headers: {"X-Couch-Persist": "false"}
-      }
-    );
+  
+  function runAllNodes(callback) {
+    // new and fancy: clustered version: pull cluster_members and walk over all of them
+    var xhr = CouchDB.request("GET", "/_membership"); 
     T(xhr.status === 200);
-    xhr = CouchDB.request(
-      "PUT",
-      "/_config/attachments/compressible_types",
-      {
-        body: JSON.stringify(types),
-        headers: {"X-Couch-Persist": "false"}
-      }
-    );
-    T(xhr.status === 200);
+    JSON.parse(xhr.responseText).cluster_nodes.forEach(callback);
   }
 
+  function runFirstNode(callback) {
+    // new and fancy: clustered version: pull cluster_members and walk over all of them
+    var xhr = CouchDB.request("GET", "/_membership"); 
+    T(xhr.status === 200);
+    var node = JSON.parse(xhr.responseText).cluster_nodes[0];
+    return callback(node);
+  }
+
+  function getCompressionInfo() {
+    return runFirstNode(function(node) {
+      var xhr = CouchDB.request(
+        "GET",
+        "_node/" + node + "/_config/attachments"
+      );
+      T(xhr.status === 200);
+      var res = JSON.parse(xhr.responseText);
+      return {"level": res.compression_level, "types": res.compressible_types};
+    });
+  }
+
+  function enableAttCompression(level, types) {
+    runAllNodes(function(node) {
+      var xhr = CouchDB.request(
+        "PUT",
+        "_node/" + node + "/_config/attachments/compression_level",
+        {
+          body: JSON.stringify(level),
+          headers: {"X-Couch-Persist": "false"}
+        }
+      );
+      T(xhr.status === 200);
+      xhr = CouchDB.request(
+        "PUT",
+        "_node/" + node + "/_config/attachments/compressible_types",
+        {
+          body: JSON.stringify(types),
+          headers: {"X-Couch-Persist": "false"}
+        }
+      );
+      T(xhr.status === 200);
+    });
+  }
 
   function disableAttCompression() {
-    var xhr = CouchDB.request(
-      "PUT",
-      "/_config/attachments/compression_level",
-      {
-        body: JSON.stringify("0"),
-        headers: {"X-Couch-Persist": "false"}
-      }
-    );
-    T(xhr.status === 200);
+    runAllNodes(function(node) {
+      var xhr = CouchDB.request(
+        "PUT",
+        "_node/" + node + "/_config/attachments/compression_level",
+        {
+          body: JSON.stringify("0"),
+          headers: {"X-Couch-Persist": "false"}
+        }
+      );
+      T(xhr.status === 200);
+    });
   }
 
 
