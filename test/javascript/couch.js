@@ -141,7 +141,7 @@ function CouchDB(name, httpHeaders, globalRequestOptions) {
   this.query = function(mapFun, reduceFun, options, keys, language) {
     var body = {language: language || "javascript"};
     if(keys) {
-      body.keys = keys ;
+      options.keys = keys ;
     }
     if (typeof(mapFun) != "string") {
       mapFun = mapFun.toSource ? mapFun.toSource() : "(" + mapFun.toString() + ")";

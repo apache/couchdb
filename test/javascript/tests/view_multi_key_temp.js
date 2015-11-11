@@ -11,7 +11,6 @@
 // the License.
 
 couchTests.view_multi_key_temp = function(debug) {
-  return console.log('TODO');
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
