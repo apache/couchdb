@@ -740,10 +740,14 @@ couchTests.replication = function(debug) {
     // this in the clustered case because if you have very few documents
     // that pass the filter then (given single node's behavior) you end
     // up having to rescan a large portion of the database.
-    TEquals(29, repResult.source_last_seq);
-    TEquals(0, repResult.history[0].start_last_seq);
-    TEquals(29, repResult.history[0].end_last_seq);
-    TEquals(29, repResult.history[0].recorded_seq);
+    // we can't rely on sequences in a cluster
+    // not only can one figure appear twice (at least for n>1), there's also hashes involved now - so comparing seq==29 is lottery (= cutting off hashes is nonsense)
+    // above, there was brute-force comparing all attrs of all docs - now we did check if excluded docs did NOT make it
+    // in any way, we can't rely on sequences in a cluster (so leave out)
+    //TEquals(29, repResult.source_last_seq);
+    //TEquals(0, repResult.history[0].start_last_seq);
+    //TEquals(29, repResult.history[0].end_last_seq);
+    //TEquals(29, repResult.history[0].recorded_seq);
     // 16 => 15 docs with even integer field  + 1 doc with string field "7"
     TEquals(16, repResult.history[0].missing_checked);
     TEquals(16, repResult.history[0].missing_found);
@@ -786,12 +790,13 @@ couchTests.replication = function(debug) {
     }
 
     // last doc has even integer field, so last replicated seq is 36
-    TEquals(36, repResult.source_last_seq);
+    // cluster - so no seq (ditto above)
+    //TEquals(36, repResult.source_last_seq);
     TEquals(true, repResult.history instanceof Array);
     TEquals(2, repResult.history.length);
-    TEquals(29, repResult.history[0].start_last_seq);
-    TEquals(36, repResult.history[0].end_last_seq);
-    TEquals(36, repResult.history[0].recorded_seq);
+    //TEquals(29, repResult.history[0].start_last_seq);
+    //TEquals(36, repResult.history[0].end_last_seq);
+    //TEquals(36, repResult.history[0].recorded_seq);
     TEquals(3, repResult.history[0].missing_checked);
     TEquals(3, repResult.history[0].missing_found);
     TEquals(3, repResult.history[0].docs_read);
@@ -1339,12 +1344,13 @@ couchTests.replication = function(debug) {
     TEquals(null, copy);
 
     var changes = targetDb.changes({since: targetInfo.update_seq});
+    // quite unfortunately, there is no way on relying on ordering in a cluster
+    // but we can assume a length of 2
     var line1 = changes.results[changes.results.length - 2];
     var line2 = changes.results[changes.results.length - 1];
-    TEquals(newDocs[0]._id, line1.id);
-    TEquals(true, line1.deleted);
-    TEquals(newDocs[6]._id, line2.id);
-    TEquals(true, line2.deleted);
+    T(newDocs[0]._id == line1.id || newDocs[0]._id == line2.id);
+    T(newDocs[6]._id == line1.id || newDocs[6]._id == line2.id);
+    T(line1.deleted && line2.deleted);
 
     // cancel the replication
     repResult = CouchDB.replicate(
@@ -1373,6 +1379,8 @@ couchTests.replication = function(debug) {
 
   // COUCHDB-1093 - filtered and continuous _changes feed dies when the
   // database is compacted
+  // no more relevant when clustering, you can't compact (per se at least)
+  /*
   docs = makeDocs(1, 10);
   docs.push({
     _id: "_design/foo",
@@ -1422,7 +1430,7 @@ couchTests.replication = function(debug) {
   );
   TEquals(true, repResult.ok);
   TEquals('string', typeof repResult._local_id);
-
+  */
 
   //
   // test replication of compressed attachments
