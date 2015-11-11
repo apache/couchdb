@@ -650,12 +650,14 @@ EOF
 
 
 install_local_rebar() {
-  if [ ! -x "${rootdir}/bin/rebar" ]; then
-      git clone --depth 1 --branch 2.6.0 https://git-wip-us.apache.org/repos/asf/couchdb-rebar.git ${rootdir}/src/rebar
-      make -C ${rootdir}/src/rebar
-      mv ${rootdir}/src/rebar/rebar ${rootdir}/bin/rebar
-      make -C ${rootdir}/src/rebar clean
-  fi
+    if [ ! -x "${rootdir}/bin/rebar" ]; then
+        if [ ! -d "${rootdir}/src/rebar" ]; then
+            git clone --depth 1 --branch 2.6.0 https://git-wip-us.apache.org/repos/asf/couchdb-rebar.git ${rootdir}/src/rebar
+        fi
+        make -C ${rootdir}/src/rebar
+        mv ${rootdir}/src/rebar/rebar ${rootdir}/bin/rebar
+        make -C ${rootdir}/src/rebar clean
+    fi
 }
 
 
@@ -667,6 +669,6 @@ fi
 
 # only update dependencies, when we are not in a release tarball
 if [ -d .git  -a $SKIP_DEPS -ne 1 ]; then
-  echo "==> updating dependencies"
-  ${REBAR} get-deps # update-deps
+    echo "==> updating dependencies"
+    ${REBAR} get-deps update-deps
 fi

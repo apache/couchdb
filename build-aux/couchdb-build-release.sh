@@ -24,16 +24,15 @@ cd src/
 for repo in *; do
   cd $repo
   mkdir ../../$RELDIR/src/$repo
-  git_ish=`git symbolic-ref -q --short HEAD || git describe --tags --exact-match`
+  git_ish=`git rev-parse --short HEAD`
   git archive $git_ish | tar -xC ../../$RELDIR/src/$repo/
+  set +e
+  grep -rl '{vsn, git}' ../../$RELDIR/src/$repo/ | xargs sed -i "s/{vsn, git}/{vsn, \"`git describe --always --tags`\"}/" 2> /dev/null
+  set -e
   cd ..
 done
 
 cd ..
-
-# update version
-# actual version detection TBD
-perl -pi -e "s/\{vsn, git\}/\{vsn, \"$VERSION\"\}/" $RELDIR/src/*/src/*.app.src
 
 # create CONTRIBUTORS file
 if test -e .git; then

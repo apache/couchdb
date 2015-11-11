@@ -171,7 +171,8 @@ def setup_configs(ctx):
             "node_name": "-name %s@127.0.0.1" % node,
             "cluster_port": cluster_port,
             "backend_port": backend_port,
-            "fauxton_root": "src/fauxton/dist/release"
+            "fauxton_root": "src/fauxton/dist/release",
+            "uuid": "fake_uuid_for_dev"
         }
         if os.name == 'nt':
             # Erlang always wants UNIX-style paths
@@ -476,16 +477,26 @@ def cluster_setup_with_admin_party(ctx):
     create_system_databases(host, 15984)
 
 
+def try_request(host, port, meth, path, success_codes, retries=10, retry_dt=1):
+    while True:
+        conn = httpclient.HTTPConnection(host, port)
+        conn.request(meth, path)
+        resp = conn.getresponse()
+        if resp.status in success_codes:
+            return resp.status, resp.read()
+        elif retries <= 0:
+            assert resp.status in success_codes, resp.read()
+        retries -= 1
+        time.sleep(retry_dt)
+
+
 def create_system_databases(host, port):
     for dbname in ['_users', '_replicator', '_metadata', '_global_changes']:
         conn = httpclient.HTTPConnection(host, port)
         conn.request('HEAD', '/' + dbname)
         resp = conn.getresponse()
         if resp.status == 404:
-            conn = httpclient.HTTPConnection(host, port)
-            conn.request('PUT', '/' + dbname)
-            resp = conn.getresponse()
-            assert resp.status in (201, 202), resp.read()
+            try_request(host, port, 'PUT', '/' + dbname, (201, 202, 412))
 
 
 @log('Developers cluster is set up at http://127.0.0.1:{lead_port}.\n'

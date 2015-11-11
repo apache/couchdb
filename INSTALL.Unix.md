@@ -39,7 +39,7 @@ Dependencies
 
 You should have the following installed:
 
- * Erlang OTP (>=R14B01, =<R17) (http://erlang.org/)
+ * Erlang OTP (>=R16B03-1, =<18.1) (http://erlang.org/)
  * ICU                          (http://icu-project.org/)
  * OpenSSL                      (http://www.openssl.org/)
  * Mozilla SpiderMonkey (1.8.5) (http://www.mozilla.org/js/spidermonkey/)
@@ -50,7 +50,7 @@ You should have the following installed:
  * Python (>=2.7) for docs      (http://python.org/)
  * Python Sphinx (>=1.1.3)      (http://pypi.python.org/pypi/Sphinx)
 
-It is recommended that you install Erlang OTP R13B-4 or above where
+It is recommended that you install Erlang OTP R16B03-1 or above where
 possible.  You will only need libcurl if you plan to run the
 JavaScript test suite. And help2man is only need if you plan on
 installing the CouchDB man pages.  Python and Sphinx are only required
