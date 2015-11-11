@@ -11,7 +11,6 @@
 // the License.
 
 couchTests.view_offsets = function(debug) {
-  return console.log('TODO');
   if (debug) debugger;
 
   var db_name = get_random_db_name();
