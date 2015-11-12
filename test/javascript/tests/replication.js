@@ -1470,10 +1470,9 @@ couchTests.replication = function(debug) {
   };
   var bigTextAtt = makeAttData(128 * 1024);
   var attName = "readme.txt";
-  var xhr = CouchDB.request("GET", "/_config/attachments/compression_level");
-  var compressionLevel = JSON.parse(xhr.responseText);
-  xhr = CouchDB.request("GET", "/_config/attachments/compressible_types");
-  var compressibleTypes = JSON.parse(xhr.responseText);
+  var oldSettings = getCompressionInfo();
+  var compressionLevel = oldSettings.level;
+  var compressibleTypes = oldSettings.types;
 
   for (i = 0; i < dbPairs.length; i++) {
     populateDb(sourceDb, [doc]);
