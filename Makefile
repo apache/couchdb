@@ -241,9 +241,12 @@ install: all
 	@mkdir -p $(DESTDIR)/$(sysconf_dir)/local.d
 	@cp rel/couchdb/etc/default.ini rel/couchdb/etc/local.ini $(DESTDIR)/$(sysconf_dir)
 
+ifeq ($(with_fauxton), 1)
 	@mkdir -p $(DESTDIR)/$(data_dir)
 	@cp -R share/server share/www $(DESTDIR)/$(data_dir)
+endif
 
+ifeq ($(with_docs), 1)
 	@mkdir -p $(DESTDIR)/$(doc_dir)
 	@mkdir -p $(DESTDIR)/$(html_dir)
 	@mkdir -p $(DESTDIR)/$(pdf_dir)
@@ -253,6 +256,7 @@ install: all
 	@cp share/docs/pdf/CouchDB.pdf $(DESTDIR)/$(pdf_dir)/CouchDB.pdf
 	@cp share/docs/info/CouchDB.info $(DESTDIR)/$(info_dir)/CouchDB.info
 	@cp share/docs/man/apachecouchdb.1 $(DESTDIR)/$(man_dir)/couchdb.1
+endif
 
 	@echo "...done"
 
