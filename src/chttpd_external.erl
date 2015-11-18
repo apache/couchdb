@@ -112,14 +112,21 @@ json_req_obj_field(<<"cookie">>, #httpd{mochi_req=Req}, _Db, _DocId) ->
     to_json_terms(Req:parse_cookie());
 json_req_obj_field(<<"userCtx">>, #httpd{}, Db, _DocId) ->
     couch_util:json_user_ctx(Db);
-json_req_obj_field(<<"secObj">>, #httpd{}, Db, _DocId) ->
-    couch_db:get_security(Db).
+json_req_obj_field(<<"secObj">>, #httpd{user_ctx=UserCtx}, Db, _DocId) ->
+    get_db_security(Db, UserCtx).
 
 
 get_db_info(#db{main_pid = nil} = Db) ->
     fabric:get_db_info(Db);
 get_db_info(#db{} = Db) ->
     couch_db:get_db_info(Db).
+
+
+get_db_security(#db{main_pid = nil}=Db, #user_ctx{}=UserCtx) ->
+    cassim:get_security(Db, [{user_ctx, UserCtx}]);
+get_db_security(#db{}=Db, #user_ctx{}) ->
+    couch_db:get_security(Db).
+
 
 to_json_terms(Data) ->
     to_json_terms(Data, []).
