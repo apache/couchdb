@@ -157,11 +157,6 @@ handle_request_int(MochiReq) ->
     {"/" ++ Path, _, _} = mochiweb_util:urlsplit_path(RawUri),
 
     Peer = MochiReq:get(peer),
-    LogForClosedSocket = io_lib:format("mochiweb_recv_error for ~s - ~p ~s", [
-        Peer,
-        MochiReq:get(method),
-        RawUri
-    ]),
 
     Method1 =
     case MochiReq:get(method) of
@@ -209,21 +204,58 @@ handle_request_int(MochiReq) ->
                 || Part <- string:tokens(Path, "/")]
     },
 
-    {ok, HttpReq} = chttpd_plugin:before_request(HttpReq0),
-
-    HandlerKey =
-        case HttpReq#httpd.path_parts of
-            [] -> <<>>;
-            [Key|_] -> ?l2b(quote(Key))
-        end,
-
     % put small token on heap to keep requests synced to backend calls
     erlang:put(nonce, Nonce),
 
     % suppress duplicate log
     erlang:put(dont_log_request, true),
 
-    Result0 =
+    Result0 = case before_request(HttpReq0) of
+        {ok, HttpReq1} ->
+            process_request(HttpReq1);
+        {error, Response} ->
+            {HttpReq0, Response}
+    end,
+
+    {HttpReq3, HttpResp0} = result(Result0, HttpReq0),
+
+    case after_request(HttpReq3, HttpResp0) of
+        #httpd_resp{status = ok, response = Resp} ->
+            {ok, Resp};
+        #httpd_resp{status = aborted, reason = Reason} ->
+            couch_log:error("Response abnormally terminated: ~p", [Reason]),
+            exit(normal)
+    end.
+
+before_request(HttpReq) ->
+    try
+        chttpd_plugin:before_request(HttpReq)
+    catch Tag:Error ->
+        {error, catch_error(HttpReq, Tag, Error)}
+    end.
+
+after_request(HttpReq, HttpResp0) ->
+    {ok, HttpResp1} =
+        try
+            chttpd_plugin:after_request(HttpReq, HttpResp0)
+        catch _Tag:Error ->
+            Stack = erlang:get_stacktrace(),
+            send_error(HttpReq, {Error, nil, Stack}),
+            {ok, HttpResp0#httpd_resp{status = aborted}}
+        end,
+    HttpResp2 = update_stats(HttpReq, HttpResp1),
+    maybe_log(HttpReq, HttpResp2),
+    HttpResp2.
+
+process_request(#httpd{mochi_req = MochiReq} = HttpReq) ->
+    HandlerKey =
+        case HttpReq#httpd.path_parts of
+            [] -> <<>>;
+            [Key|_] -> ?l2b(quote(Key))
+        end,
+
+    RawUri = MochiReq:get(raw_path),
+
     try
         couch_httpd:validate_host(HttpReq),
         check_request_uri_length(RawUri),
@@ -242,49 +274,47 @@ handle_request_int(MochiReq) ->
         Response ->
             Response
         end
-    catch
-        throw:{http_head_abort, Resp0} ->
-            {ok, Resp0};
-        throw:{http_abort, Resp0, Reason0} ->
-            {aborted, Resp0, Reason0};
-        throw:{invalid_json, _} ->
-            send_error(HttpReq, {bad_request, "invalid UTF-8 JSON"});
-        exit:{mochiweb_recv_error, E} ->
-            couch_log:notice(LogForClosedSocket ++ " - ~p", [E]),
-            exit(normal);
-        exit:{uri_too_long, _} ->
-            send_error(HttpReq, request_uri_too_long);
-        exit:{body_too_large, _} ->
-            send_error(HttpReq, request_entity_too_large);
-        throw:Error ->
-            send_error(HttpReq, Error);
-        error:database_does_not_exist ->
-            send_error(HttpReq, database_does_not_exist);
-        Tag:Error ->
-            Stack = erlang:get_stacktrace(),
-            % TODO improve logging and metrics collection for client disconnects
-            case {Tag, Error, Stack} of
-                {exit, normal, [{mochiweb_request, send, _, _} | _]} ->
-                    exit(normal); % Client disconnect (R15+)
-                {exit, normal, [{mochiweb_request, send, _} | _]} ->
-                    exit(normal); % Client disconnect (R14)
-                _Else ->
-                    send_error(HttpReq, {Error, nil, Stack})
-            end
-    end,
+    catch Tag:Error ->
+        catch_error(HttpReq, Tag, Error)
+    end.
 
-    {HttpReq1, HttpResp0} = result(Result0, HttpReq),
-    {ok, HttpResp1} = chttpd_plugin:after_request(HttpReq1, HttpResp0),
-
-    HttpResp2 = update_stats(HttpReq1, HttpResp1),
-    maybe_log(HttpReq1, HttpResp2),
-
-    case HttpResp2 of
-        #httpd_resp{status = ok, response = Resp} ->
-            {ok, Resp};
-        #httpd_resp{status = aborted, reason = Reason} ->
-            couch_log:error("Response abnormally terminated: ~p", [Reason]),
-            exit(normal)
+catch_error(_HttpReq, throw, {http_head_abort, Resp}) ->
+    {ok, Resp};
+catch_error(_HttpReq, throw, {http_abort, Resp, Reason}) ->
+    {aborted, Resp, Reason};
+catch_error(HttpReq, throw, {invalid_json, _}) ->
+    send_error(HttpReq, {bad_request, "invalid UTF-8 JSON"});
+catch_error(HttpReq, exit, {mochiweb_recv_error, E}) ->
+    #httpd{
+        mochi_req = MochiReq,
+        peer = Peer,
+        original_method = Method
+    } = HttpReq,
+    LogForClosedSocket = io_lib:format("mochiweb_recv_error for ~s - ~p ~s", [
+        Peer,
+        Method,
+        MochiReq:get(raw_path)
+    ]),
+    couch_log:notice(LogForClosedSocket ++ " - ~p", [E]),
+    exit(normal);
+catch_error(HttpReq, exit, {uri_too_long, _}) ->
+    send_error(HttpReq, request_uri_too_long);
+catch_error(HttpReq, exit, {body_too_large, _}) ->
+    send_error(HttpReq, request_entity_too_large);
+catch_error(HttpReq, throw, Error) ->
+    send_error(HttpReq, Error);
+catch_error(HttpReq, error, database_does_not_exist) ->
+    send_error(HttpReq, database_does_not_exist);
+catch_error(HttpReq, Tag, Error) ->
+    Stack = erlang:get_stacktrace(),
+    % TODO improve logging and metrics collection for client disconnects
+    case {Tag, Error, Stack} of
+        {exit, normal, [{mochiweb_request, send, _, _} | _]} ->
+            exit(normal); % Client disconnect (R15+)
+        {exit, normal, [{mochiweb_request, send, _} | _]} ->
+            exit(normal); % Client disconnect (R14)
+        _Else ->
+            send_error(HttpReq, {Error, nil, Stack})
     end.
 
 result({#httpd{} = Req, Result}, _) ->
