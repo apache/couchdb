@@ -62,7 +62,8 @@ var DDoc = (function() {
     "filters"   : Filter.filter,
     "views"     : Filter.filter_view, 
     "updates"  : Render.update,
-    "validate_doc_update" : Validate.validate
+    "validate_doc_update" : Validate.validate,
+    "rewrites"  : Render.rewrite
   };
   var ddocs = {};
   return {
