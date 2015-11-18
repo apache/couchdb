@@ -115,6 +115,12 @@ endif
 	@dev/run -n 1 -q --with-admin-party-please test/javascript/run $(suites)
 
 
+.PHONY: check-qs
+# target: check-qs - Run query server tests (ruby and rspec required!)
+check-qs:
+	@QS_LANG=js rspec test/view_server/query_server_spec.rb
+
+
 .PHONY: list-eunit-apps
 # target: list-eunit-apps - List EUnit target apps
 list-eunit-apps:
