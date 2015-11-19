@@ -210,16 +210,24 @@ handle_request_int(MochiReq) ->
     % suppress duplicate log
     erlang:put(dont_log_request, true),
 
-    Result0 = case before_request(HttpReq0) of
+    {HttpReq2, Response} = case before_request(HttpReq0) of
         {ok, HttpReq1} ->
             process_request(HttpReq1);
-        {error, Response} ->
-            {HttpReq0, Response}
+        {error, Response0} ->
+            {HttpReq0, Response0}
     end,
 
-    {HttpReq3, HttpResp0} = result(Result0, HttpReq0),
+    {Status, Code, Reason, Resp} = split_response(Response),
 
-    case after_request(HttpReq3, HttpResp0) of
+    HttpResp = #httpd_resp{
+        code = Code,
+        status = Status,
+        response = Resp,
+        nonce = HttpReq2#httpd.nonce,
+        reason = Reason
+    },
+
+    case after_request(HttpReq2, HttpResp) of
         #httpd_resp{status = ok, response = Resp} ->
             {ok, Resp};
         #httpd_resp{status = aborted, reason = Reason} ->
@@ -269,13 +277,13 @@ process_request(#httpd{mochi_req = MochiReq} = HttpReq) ->
                     fun chttpd_auth_request:authorize_request/1),
                 {AuthorizedReq, HandlerFun(AuthorizedReq)};
             Response ->
-                Response
+                {HttpReq, Response}
             end;
         Response ->
-            Response
+            {HttpReq, Response}
         end
     catch Tag:Error ->
-        catch_error(HttpReq, Tag, Error)
+        {HttpReq, catch_error(HttpReq, Tag, Error)}
     end.
 
 catch_error(_HttpReq, throw, {http_head_abort, Resp}) ->
@@ -314,27 +322,12 @@ catch_error(HttpReq, Tag, Error) ->
             send_error(HttpReq, {Error, nil, Stack})
     end.
 
-result({#httpd{} = Req, Result}, _) ->
-    result(Result, Req);
-result(Result, #httpd{nonce = Nonce} = Req) ->
-    {Status, Code, Reason} = case Result of
-        {ok, #delayed_resp{resp=Resp}} ->
-            {ok, Resp:get(code), undefined};
-        {ok, Resp} ->
-            {ok, Resp:get(code), undefined};
-        {aborted, Resp, AbortReason} ->
-            {aborted, Resp:get(code), AbortReason}
-        end,
-
-    HttpResp = #httpd_resp{
-        code = Code,
-        status = Status,
-        response = Resp,
-        nonce = Nonce,
-        reason = Reason
-    },
-    {Req, HttpResp}.
-
+split_response({ok, #delayed_resp{resp=Resp}}) ->
+    {ok, Resp:get(code), undefined, Resp};
+split_response({ok, Resp}) ->
+    {ok, Resp:get(code), undefined, Resp};
+split_response({aborted, Resp, AbortReason}) ->
+    {aborted, Resp:get(code), AbortReason, Resp}.
 
 update_stats(HttpReq, #httpd_resp{end_ts = undefined} = Res) ->
     update_stats(HttpReq, Res#httpd_resp{end_ts = os:timestamp()});
