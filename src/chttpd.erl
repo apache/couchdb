@@ -290,12 +290,11 @@ catch_error(HttpReq, exit, {mochiweb_recv_error, E}) ->
         peer = Peer,
         original_method = Method
     } = HttpReq,
-    LogForClosedSocket = io_lib:format("mochiweb_recv_error for ~s - ~p ~s", [
+    couch_log:notice("mochiweb_recv_error for ~s - ~p ~s - ~p", [
         Peer,
         Method,
-        MochiReq:get(raw_path)
-    ]),
-    couch_log:notice(LogForClosedSocket ++ " - ~p", [E]),
+        MochiReq:get(raw_path),
+        E]),
     exit(normal);
 catch_error(HttpReq, exit, {uri_too_long, _}) ->
     send_error(HttpReq, request_uri_too_long);
