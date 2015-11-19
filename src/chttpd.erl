@@ -311,8 +311,6 @@ catch_error(HttpReq, Tag, Error) ->
     case {Tag, Error, Stack} of
         {exit, normal, [{mochiweb_request, send, _, _} | _]} ->
             exit(normal); % Client disconnect (R15+)
-        {exit, normal, [{mochiweb_request, send, _} | _]} ->
-            exit(normal); % Client disconnect (R14)
         _Else ->
             send_error(HttpReq, {Error, nil, Stack})
     end.
