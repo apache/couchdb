@@ -24,8 +24,14 @@
     ]}}
 ]}).
 
+-define(USER, "mrview_cors_test_admin").
+-define(PASS, "pass").
+-define(AUTH, {basic_auth, {?USER, ?PASS}}).
+
+
 start() ->
     Ctx = test_util:start_couch([chttpd]),
+    ok = config:set("admins", ?USER, ?PASS, _Persist=false),
     ok = config:set("httpd", "enable_cors", "true", false),
     ok = config:set("vhosts", "example.com", "/", false),
     Ctx.
@@ -37,10 +43,13 @@ setup(PortType) ->
     config:set("cors", "credentials", "false", false),
     config:set("cors", "origins", "http://example.com", false),
 
-    Addr = config:get("httpd", "bind_address", "127.0.0.1"),
-    Host = "http://" ++ Addr ++ ":" ++ port(PortType),
+    Host = host_url(PortType),
     upload_ddoc(Host, ?b2l(DbName)),
     {Host, ?b2l(DbName)}.
+
+teardown(Ctx) ->
+    ok = config:delete("admins", ?USER, _Persist=false),
+    test_util:stop_couch(Ctx).
 
 teardown(PortType, {_Host, DbName}) ->
     delete_db(PortType, ?l2b(DbName)),
@@ -51,7 +60,7 @@ cors_test_() ->
         "CORS for mrview",
         {
             setup,
-            fun start/0, fun test_util:stop_couch/1,
+            fun start/0, fun teardown/1,
             [show_tests()]
         }
     }.
@@ -75,7 +84,7 @@ should_make_shows_request(_, {Host, DbName}) ->
     ?_test(begin
          ReqUrl = Host ++ "/" ++ DbName ++ "/_design/foo/_show/bar",
          Headers = [{"Origin", "http://example.com"},
-                    {"Access-Control-Request-Method", "GET"}],
+                    {"Access-Control-Request-Method", "GET"}, ?AUTH],
          {ok, _, Resp, Body} = test_request:get(ReqUrl, Headers),
          Origin = proplists:get_value("Access-Control-Allow-Origin", Resp),
          ?assertEqual("http://example.com", Origin),
@@ -86,14 +95,36 @@ create_db(backdoor, DbName) ->
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     couch_db:close(Db);
 create_db(clustered, DbName) ->
-    ok = fabric:create_db(DbName, [?ADMIN_CTX]).
+    {ok, Status, _, _} = test_request:put(db_url(DbName), [?AUTH], ""),
+    assert_success(create_db, Status),
+    ok.
 
 delete_db(backdoor, DbName) ->
     couch_server:delete(DbName, [?ADMIN_CTX]);
 delete_db(clustered, DbName) ->
-    ok = fabric:delete_db(DbName, [?ADMIN_CTX]).
+    {ok, Status, _, _} = test_request:delete(db_url(DbName), [?AUTH]),
+    assert_success(delete_db, Status),
+    ok.
 
+assert_success(create_db, Status) ->
+    true = lists:member(Status, [201, 202]);
+assert_success(delete_db, Status) ->
+    true = lists:member(Status, [200, 202]).
+    
 
+host_url(PortType) ->
+    "http://" ++ bind_address(PortType) ++ ":" ++ port(PortType).
+
+bind_address(PortType) ->
+    config:get(section(PortType), "bind_address", "127.0.0.1").
+
+section(backdoor) -> "http";
+section(clustered) -> "chttpd".
+
+db_url(DbName) when is_binary(DbName) ->
+    db_url(binary_to_list(DbName));
+db_url(DbName) when is_list(DbName) ->
+    host_url(clustered) ++ "/" ++ DbName.
 
 port(clustered) ->
     integer_to_list(mochiweb_socket_server:get(chttpd, port));
@@ -104,5 +135,5 @@ port(backdoor) ->
 upload_ddoc(Host, DbName) ->
     Url = Host ++ "/" ++ DbName ++ "/_design/foo",
     Body = couch_util:json_encode(?DDOC),
-    {ok, 201, _Resp, _Body} = test_request:put(Url, Body),
+    {ok, 201, _Resp, _Body} = test_request:put(Url, [?AUTH], Body),
     ok.
