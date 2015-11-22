@@ -15,19 +15,38 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
+-define(USER, "admin").
+-define(PASS, "pass").
+-define(AUTH, {basic_auth, {?USER, ?PASS}}).
+
 setup() ->
     Host = get_host(),
-    add_admin("admin", <<"pass">>),
+    ok = add_admin(?USER, ?PASS),
     DbName = "foo/" ++ ?b2l(?tempdb()),
     [fabric:create_db(Name, [?ADMIN_CTX])
         || Name <- ["_global_changes", DbName]],
+    ok = http_create_db(DbName),
     {Host, DbName}.
 
 teardown({_, DbName}) ->
-    delete_admin("admin"),
     [fabric:delete_db(Name, [?ADMIN_CTX])
         || Name <- ["_global_changes", DbName]],
+    ok = http_delete_db(DbName),
+    delete_admin(?USER),
     ok.
+
+http_create_db(Name) ->
+    Resp = {ok, Status, _, _} = test_request:put(db_url(Name), [?AUTH], ""),
+    true = lists:member(Status, [201, 202]),
+    ok.
+    
+http_delete_db(Name) ->
+    {ok, Status, _, _} = test_request:delete(db_url(Name), [?AUTH]),
+    true = lists:member(Status, [200, 202]),
+    ok.
+
+db_url(Name) ->
+    get_host() ++ "/" ++ escape(Name).
 
 global_changes_test_() ->
     {
