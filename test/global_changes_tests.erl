@@ -23,14 +23,10 @@ setup() ->
     Host = get_host(),
     ok = add_admin(?USER, ?PASS),
     DbName = "foo/" ++ ?b2l(?tempdb()),
-    [fabric:create_db(Name, [?ADMIN_CTX])
-        || Name <- ["_global_changes", DbName]],
     ok = http_create_db(DbName),
     {Host, DbName}.
 
 teardown({_, DbName}) ->
-    [fabric:delete_db(Name, [?ADMIN_CTX])
-        || Name <- ["_global_changes", DbName]],
     ok = http_delete_db(DbName),
     delete_admin(?USER),
     ok.
@@ -48,12 +44,25 @@ http_delete_db(Name) ->
 db_url(Name) ->
     get_host() ++ "/" ++ escape(Name).
 
+start_couch() ->
+    Ctx = test_util:start_couch([chttpd, global_changes]),
+    ok = ensure_db_exists("_global_changes"),
+    Ctx.
+
+ensure_db_exists(Name) ->
+    case fabric:create_db(Name) of
+        ok ->
+            ok;
+        {error, file_exists} ->
+            ok
+    end.
+
 global_changes_test_() ->
     {
         "Checking global_changes endpoint",
         {
             setup,
-            fun() -> test_util:start_couch([chttpd, global_changes]) end,
+            fun start_couch/0,
             fun test_util:stop/1,
             [
                 check_response()
