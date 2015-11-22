@@ -85,7 +85,7 @@ check_response() ->
 
 should_return_correct_response_on_create({Host, DbName}) ->
     ?_test(begin
-        Headers = [{basic_auth, {"admin", "pass"}}],
+        Headers = [?AUTH],
         create_doc(Host, DbName, "bar/baz"),
         {Status, Events} = request_updates(Host, DbName, Headers),
         ?assertEqual(200, Status),
@@ -94,7 +94,7 @@ should_return_correct_response_on_create({Host, DbName}) ->
 
 should_return_correct_response_on_update({Host, DbName}) ->
     ?_test(begin
-        Headers = [{basic_auth, {"admin", "pass"}}],
+        Headers = [?AUTH],
         create_doc(Host, DbName, "bar/baz"),
         update_doc(Host, DbName, "bar/baz", "new_value"),
         {Status, Events} = request_updates(Host, DbName, Headers),
@@ -103,7 +103,7 @@ should_return_correct_response_on_update({Host, DbName}) ->
     end).
 
 create_doc(Host, DbName, Id) ->
-    Headers = [{basic_auth, {"admin", "pass"}}],
+    Headers = [?AUTH],
     Url = Host ++ "/" ++ escape(DbName) ++ "/" ++ escape(Id),
     Body = jiffy:encode({[
         {key, "value"}
@@ -114,7 +114,7 @@ create_doc(Host, DbName, Id) ->
     ok.
 
 update_doc(Host, DbName, Id, Value) ->
-    Headers = [{basic_auth, {"admin", "pass"}}],
+    Headers = [?AUTH],
     Url = Host ++ "/" ++ escape(DbName) ++ "/" ++ escape(Id),
     {ok, 200, _Headers0, BinBody} = test_request:get(Url, Headers),
     [Rev] = decode_response(BinBody, [<<"_rev">>]),
@@ -144,8 +144,7 @@ decode_response(BinBody, ToDecode) ->
     [couch_util:get_value(Key, Body) || Key <- ToDecode].
 
 add_admin(User, Pass) ->
-    Hashed = couch_passwords:hash_admin_password(Pass),
-    config:set("admins", User, ?b2l(Hashed), false).
+    config:set("admins", User, Pass, false).
 
 delete_admin(User) ->
     config:delete("admins", User, false).
@@ -153,8 +152,7 @@ delete_admin(User) ->
 get_host() ->
     Addr = config:get("httpd", "bind_address", "127.0.0.1"),
     Port = integer_to_list(mochiweb_socket_server:get(chttpd, port)),
-    Host = "http://" ++ Addr ++ ":" ++ Port,
-    Host.
+    "http://" ++ Addr ++ ":" ++ Port.
 
 escape(Path) ->
     re:replace(Path, "/", "%2f", [global, {return, list}]).
