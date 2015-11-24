@@ -642,7 +642,8 @@ python 2> /dev/null << EOF
 import sys
 import pygments
 
-if float(pygments.__version__) >= 1.5:
+pygments_version = pygments.__version__.split('.')
+if int(pygments_version[0]) >= 1 and int(pygments_version[1]) > 5:
     sys.exit(0)
 else:
     sys.exit(1)
