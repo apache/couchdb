@@ -26,6 +26,7 @@
 -callback error(Fmt::string(), Args::list()) -> ok.
 -callback critical(Fmt::string(), Args::list()) -> ok.
 -callback alert(Fmt::string(), Args::list()) -> ok.
+-callback emergency(Fmt::string(), Args::list()) -> ok.
 -callback set_level(Level::atom()) -> ok.
 
 
