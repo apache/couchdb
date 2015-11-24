@@ -16,7 +16,8 @@
 -include_lib("eunit/include/eunit.hrl").
 -endif.
 
--export([debug/2, info/2, notice/2, warning/2, error/2, critical/2, alert/2, emergency/2]).
+-export([debug/2, info/2, notice/2, warning/2, error/2, critical/2, alert/2,
+         emergency/2]).
 -export([set_level/1]).
 
 -callback debug(Fmt::string(), Args::list()) -> ok.
