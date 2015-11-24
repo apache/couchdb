@@ -15,26 +15,54 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
+-define(USER, "admin").
+-define(PASS, "pass").
+-define(AUTH, {basic_auth, {?USER, ?PASS}}).
+
 setup() ->
     Host = get_host(),
-    add_admin("admin", <<"pass">>),
+    ok = add_admin(?USER, ?PASS),
     DbName = "foo/" ++ ?b2l(?tempdb()),
-    [fabric:create_db(Name, [?ADMIN_CTX])
-        || Name <- ["_global_changes", DbName]],
+    ok = http_create_db(DbName),
     {Host, DbName}.
 
 teardown({_, DbName}) ->
-    delete_admin("admin"),
-    [fabric:delete_db(Name, [?ADMIN_CTX])
-        || Name <- ["_global_changes", DbName]],
+    ok = http_delete_db(DbName),
+    delete_admin(?USER),
     ok.
+
+http_create_db(Name) ->
+    Resp = {ok, Status, _, _} = test_request:put(db_url(Name), [?AUTH], ""),
+    true = lists:member(Status, [201, 202]),
+    ok.
+    
+http_delete_db(Name) ->
+    {ok, Status, _, _} = test_request:delete(db_url(Name), [?AUTH]),
+    true = lists:member(Status, [200, 202]),
+    ok.
+
+db_url(Name) ->
+    get_host() ++ "/" ++ escape(Name).
+
+start_couch() ->
+    Ctx = test_util:start_couch([chttpd, global_changes]),
+    ok = ensure_db_exists("_global_changes"),
+    Ctx.
+
+ensure_db_exists(Name) ->
+    case fabric:create_db(Name) of
+        ok ->
+            ok;
+        {error, file_exists} ->
+            ok
+    end.
 
 global_changes_test_() ->
     {
         "Checking global_changes endpoint",
         {
             setup,
-            fun() -> test_util:start_couch([chttpd, global_changes]) end,
+            fun start_couch/0,
             fun test_util:stop/1,
             [
                 check_response()
@@ -57,7 +85,7 @@ check_response() ->
 
 should_return_correct_response_on_create({Host, DbName}) ->
     ?_test(begin
-        Headers = [{basic_auth, {"admin", "pass"}}],
+        Headers = [?AUTH],
         create_doc(Host, DbName, "bar/baz"),
         {Status, Events} = request_updates(Host, DbName, Headers),
         ?assertEqual(200, Status),
@@ -66,7 +94,7 @@ should_return_correct_response_on_create({Host, DbName}) ->
 
 should_return_correct_response_on_update({Host, DbName}) ->
     ?_test(begin
-        Headers = [{basic_auth, {"admin", "pass"}}],
+        Headers = [?AUTH],
         create_doc(Host, DbName, "bar/baz"),
         update_doc(Host, DbName, "bar/baz", "new_value"),
         {Status, Events} = request_updates(Host, DbName, Headers),
@@ -75,7 +103,7 @@ should_return_correct_response_on_update({Host, DbName}) ->
     end).
 
 create_doc(Host, DbName, Id) ->
-    Headers = [{basic_auth, {"admin", "pass"}}],
+    Headers = [?AUTH],
     Url = Host ++ "/" ++ escape(DbName) ++ "/" ++ escape(Id),
     Body = jiffy:encode({[
         {key, "value"}
@@ -86,7 +114,7 @@ create_doc(Host, DbName, Id) ->
     ok.
 
 update_doc(Host, DbName, Id, Value) ->
-    Headers = [{basic_auth, {"admin", "pass"}}],
+    Headers = [?AUTH],
     Url = Host ++ "/" ++ escape(DbName) ++ "/" ++ escape(Id),
     {ok, 200, _Headers0, BinBody} = test_request:get(Url, Headers),
     [Rev] = decode_response(BinBody, [<<"_rev">>]),
@@ -116,8 +144,7 @@ decode_response(BinBody, ToDecode) ->
     [couch_util:get_value(Key, Body) || Key <- ToDecode].
 
 add_admin(User, Pass) ->
-    Hashed = couch_passwords:hash_admin_password(Pass),
-    config:set("admins", User, ?b2l(Hashed), false).
+    config:set("admins", User, Pass, false).
 
 delete_admin(User) ->
     config:delete("admins", User, false).
@@ -125,8 +152,7 @@ delete_admin(User) ->
 get_host() ->
     Addr = config:get("httpd", "bind_address", "127.0.0.1"),
     Port = integer_to_list(mochiweb_socket_server:get(chttpd, port)),
-    Host = "http://" ++ Addr ++ ":" ++ Port,
-    Host.
+    "http://" ++ Addr ++ ":" ++ Port.
 
 escape(Path) ->
     re:replace(Path, "/", "%2f", [global, {return, list}]).
