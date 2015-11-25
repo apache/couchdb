@@ -250,8 +250,6 @@ ensure_cookie_auth_secret() ->
         Secret -> Secret
     end.
 
-% TODO:handle admin party
-
 prepare_cookie_values(UserName, Password, UserProps) ->
     UserProps2 = maybe_upgrade_password_hash(UserName, Password, UserProps),
     % setup the session cookie
