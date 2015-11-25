@@ -267,6 +267,7 @@ prepare_cookie_values(UserName, Password, UserProps) ->
 % access token that authenticates them against CouchDB.
 handle_delegated_session_req(#httpd{method='POST', path_parts=[_LoginAs, UserName]}=Req) ->
     ok = couch_httpd:verify_is_server_admin(Req),
+    couch_httpd:validate_ctype(Req, "application/json"),
     case couch_auth_cache:get_user_creds(UserName) of
         nil -> couch_httpd:send_error(Req, not_found); % maybe send better error message
         UserProps ->
