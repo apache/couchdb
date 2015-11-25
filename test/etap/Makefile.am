@@ -100,6 +100,7 @@ tap_files = \
     220-compaction-daemon.t \
     230-pbkfd2.t \
     231-cors.t \
+    240-login-as.t \
     250-upgrade-legacy-view-files.t
 
 EXTRA_DIST = \
