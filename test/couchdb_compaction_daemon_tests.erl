@@ -15,7 +15,7 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
--define(TIMEOUT, 30000).
+-define(TIMEOUT, 60000).
 -define(TIMEOUT_S, ?TIMEOUT div 1000).
 
 
