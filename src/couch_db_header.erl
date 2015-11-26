@@ -310,8 +310,6 @@ mk_header(Vsn) ->
     }.
 
 
--ifdef(run_broken_tests).
-
 upgrade_v3_test() ->
     Vsn3Header = mk_header(3),
     NewHeader = upgrade_tuple(Vsn3Header),
@@ -330,17 +328,9 @@ upgrade_v3_test() ->
     ?assertEqual(undefined, uuid(NewHeader)),
     ?assertEqual(undefined, epochs(NewHeader)),
 
-    % Security ptr isn't changed until upgrade_disk_version/1
-    NewNewHeader = upgrade_disk_version(NewHeader),
-    ?assert(is_record(NewNewHeader, db_header)),
-    ?assertEqual(nil, security_ptr(NewNewHeader)),
+    ?assertThrow({database_disk_version_error, _},
+                 upgrade_disk_version(NewHeader)).
 
-    % Assert upgrade works on really old headers
-    NewestHeader = upgrade(Vsn3Header),
-    ?assertMatch(<<_:32/binary>>, uuid(NewestHeader)),
-    ?assertEqual([{node(), 0}], epochs(NewestHeader)).
-
--endif.
 
 upgrade_v5_test() ->
     Vsn5Header = mk_header(5),
