@@ -970,25 +970,11 @@ send_chunked_error(Resp, Error) ->
 send_redirect(Req, Path) ->
      send_response(Req, 301, [{"Location", absolute_uri(Req, Path)}], <<>>).
 
-negotiate_content_type(Req) ->
+negotiate_content_type(_Req) ->
     case get(jsonp) of
-        no_jsonp -> negotiate_content_type1(Req);
-        [] -> negotiate_content_type1(Req);
+        no_jsonp -> "application/json";
+        [] -> "application/json";
         _Callback -> "application/javascript"
-    end.
-
-negotiate_content_type1(#httpd{mochi_req=MochiReq}) ->
-    %% Determine the appropriate Content-Type header for a JSON response
-    %% depending on the Accept header in the request. A request that explicitly
-    %% lists the correct JSON MIME type will get that type, otherwise the
-    %% response will have the generic MIME type "text/plain"
-    AcceptedTypes = case MochiReq:get_header_value("Accept") of
-        undefined       -> [];
-        AcceptHeader    -> string:tokens(AcceptHeader, ", ")
-    end,
-    case lists:member("application/json", AcceptedTypes) of
-        true  -> "application/json";
-        false -> "text/plain; charset=utf-8"
     end.
 
 server_header() ->
