@@ -141,15 +141,12 @@ nval_test_() ->
 
 
 config_01_setup() ->
-    {ok, Started} = application:ensure_all_started(couch_log),
     Ini = filename:join([code:lib_dir(mem3, test), "01-config-default.ini"]),
     {ok, Pid} = config:start_link([Ini]),
-    {Pid, Started}.
+    Pid.
 
-config_teardown({_Pid, Started}) ->
-    config:stop(),
-    [ok = application:stop(A) || A <- lists:reverse(Started)],
-    ok.
+config_teardown(_Pid) ->
+    config:stop().
 
 
 n_val_test_() ->
@@ -158,7 +155,7 @@ n_val_test_() ->
       {setup,
        fun config_01_setup/0,
        fun config_teardown/1,
-       fun({Pid, _Started}) ->
+       fun(Pid) ->
            {with, Pid, [
                fun n_val_1/1
             ]}
