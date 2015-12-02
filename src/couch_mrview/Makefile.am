@@ -33,13 +33,13 @@ source_files = \
     src/couch_mrview_util.erl
 
 test_files = \
-    test/01-load.t \
-    test/02-map-views.t \
-    test/03-red-views.t \
-    test/04-index-info.t \
-    test/05-collation.t \
-    test/06-all-docs.t \
-	test/07-compact-swap.t
+    test/couch_mrview_all_docs_tests.erl \
+    test/couch_mrview_collation_tests.erl \
+    test/couch_mrview_compact_tests.erl \
+    test/couch_mrview_index_info_tests.erl \
+    test/couch_mrview_map_views_tests.erl \
+    test/couch_mrview_modules_load_tests.erl \
+    test/couch_mrview_red_views_tests.erl
 
 compiled_files = \
     ebin/couch_mrview.app \
@@ -58,7 +58,7 @@ CLEANFILES = $(compiled_files)
 
 check:
 if TESTS
-	$(abs_top_builddir)/test/etap/run $(abs_top_srcdir)/src/couch_mrview/test
+	$(abs_top_builddir)/test/couchdb/run -v $(abs_top_srcdir)/src/couch_mrview/test
 endif
 
 ebin/%.app: src/%.app.src

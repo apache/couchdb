@@ -36,13 +36,13 @@ source_files = \
 	src/couch_replicator.erl
 
 test_files = \
-	test/01-load.t \
-	test/02-httpc-pool.t \
-	test/03-replication-compact.t \
-	test/04-replication-large-atts.t \
-	test/05-replication-many-leaves.t \
-	test/06-doc-missing-stubs.t \
-	test/07-use-checkpoints.t
+	test/couch_replicator_compact_tests.erl \
+	test/couch_replicator_httpc_pool_tests.erl \
+	test/couch_replicator_large_atts_tests.erl \
+	test/couch_replicator_many_leaves_tests.erl \
+	test/couch_replicator_missing_stubs_tests.erl \
+	test/couch_replicator_modules_load_tests.erl \
+	test/couch_replicator_use_checkpoints_tests.erl
 
 compiled_files = \
 	ebin/couch_replicator_api_wrap.beam \
@@ -62,7 +62,7 @@ CLEANFILES = $(compiled_files)
 
 check:
 if TESTS
-	$(abs_top_builddir)/test/etap/run $(abs_top_srcdir)/src/couch_replicator/test
+	$(abs_top_builddir)/test/couchdb/run -v $(abs_top_srcdir)/src/couch_replicator/test
 endif
 
 ebin/%.app: src/%.app.src

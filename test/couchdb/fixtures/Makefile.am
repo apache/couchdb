@@ -10,6 +10,6 @@
 ## License for the specific language governing permissions and limitations under
 ## the License.
 
-SUBDIRS = couchdb javascript view_server
-EXTRA_DIST = random_port.ini
-
+noinst_PROGRAMS = test_cfg_register
+test_cfg_register_SOURCES = test_cfg_register.c
+test_cfg_register_CFLAGS = -D_BSD_SOURCE
