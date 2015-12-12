@@ -11,6 +11,8 @@
 // the License.
 
 couchTests.users_db = function(debug) {
+  return console.log('TODO: config not available on cluster');
+
   // This tests the users db, especially validations
   // this should also test that you can log into the couch
   

@@ -11,7 +11,7 @@
 // the License.
 
 couchTests.auth_cache = function(debug) {
-  return console.log('TODO');
+  return console.log('TODO: config not available on cluster');
 
   if (debug) debugger;
 

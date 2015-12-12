@@ -11,6 +11,7 @@
 // the License.
 
 couchTests.cookie_auth = function(debug) {
+  return console.log('TODO: config not available on cluster');
   // This tests cookie-based authentication.
   //return console.log('TODO');
   // TODO: re-write so we get along withOUT changed config

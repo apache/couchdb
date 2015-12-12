@@ -11,7 +11,7 @@
 // the License.
 
 couchTests.etags_views = function(debug) {
-  return console.log('TODO - see https://issues.apache.org/jira/browse/COUCHDB-2859');
+  return console.log('TODO: see https://issues.apache.org/jira/browse/COUCHDB-2859');
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"true"});
   db.createDb();
