@@ -112,7 +112,7 @@ else
 endif
 	@ulimit -n 10240
 	@rm -rf dev/lib
-	@dev/run -q --with-admin-party-please test/javascript/run $(suites)
+	@dev/run -n 1 -q --with-admin-party-please test/javascript/run $(suites)
 
 
 .PHONY: list-eunit-apps
