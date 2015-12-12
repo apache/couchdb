@@ -79,6 +79,8 @@ HTTP Server
 Query Server
 ------------
 
+- :issue:`1447`: Custom response headers from design functions get merged with
+  default ones.
 - :commit:`7779c11`: Upgrade Coffeescript to version 1.10.
 
 jquery.couch.js
