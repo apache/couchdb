@@ -30,6 +30,7 @@ API Changes
 
 - :issue:`1356`: Return username on :http:post:`/_session`.
 - :issue:`1876`: Fix duplicated Content-Type for show/update functions.
+- :issue:`2310`: Implement :http:post:`/{db}/_bulk_get`.
 - :issue:`2375`: :statuscode:`400` returned when invalid revision specified.
 - :issue:`2845`: :statuscode:`400` returned when `revs` is not a list.
 
