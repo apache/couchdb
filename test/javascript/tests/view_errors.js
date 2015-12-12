@@ -16,11 +16,11 @@ couchTests.view_errors = function(debug) {
   db.createDb();
   if (debug) debugger;
 
-  run_on_modified_server(
-    [{section: "couchdb",
-      key: "os_process_timeout",
-      value: "500"}],
-    function() {
+  // run_on_modified_server(
+  //   [{section: "couchdb",
+  //     key: "os_process_timeout",
+  //     value: "500"}],
+  //   function() {
       var doc = {integer: 1, string: "1", array: [1, 2, 3]};
       T(db.save(doc).ok);
 
@@ -48,7 +48,7 @@ couchTests.view_errors = function(debug) {
       T(results.rows[0].key[1] == null);
       
       // querying a view with invalid params should give a resonable error message
-      var xhr = CouchDB.request("POST", "/" + db_name + "/_temp_view?startkey=foo", {
+      var xhr = CouchDB.request("POST", "/" + db_name + "/_all_docs?startkey=foo", {
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({language: "javascript",
           map : "function(doc){emit(doc.integer)}"
@@ -57,7 +57,7 @@ couchTests.view_errors = function(debug) {
       T(JSON.parse(xhr.responseText).error == "bad_request");
 
       // content type must be json
-      var xhr = CouchDB.request("POST", "/" + db_name + "/_temp_view", {
+      var xhr = CouchDB.request("POST", "/" + db_name + "/_all_docs", {
         headers: {"Content-Type": "application/x-www-form-urlencoded"},
         body: JSON.stringify({language: "javascript",
           map : "function(doc){}"
@@ -185,7 +185,7 @@ couchTests.view_errors = function(debug) {
           T(e.error == "query_parse_error");
           T(e.reason.match(/no rows can match/i));
       }
-    });
+    // });
 
   // cleanup
   db.deleteDb();
