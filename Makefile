@@ -110,8 +110,8 @@ else
 	@mkdir -p src/fauxton/dist/release/test
 	@cp test/javascript/tests/lorem*.txt src/fauxton/dist/release/test/
 endif
-	@dev/run -q --with-admin-party-please test/javascript/run
-	@rm -rf share/www/script
+	@ulimit -n 10240
+	@rm -rf dev/lib
 	@dev/run -q --with-admin-party-please test/javascript/run $(suites)
 
 
