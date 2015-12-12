@@ -94,6 +94,8 @@ couchTests.reduce_builtin = function(debug) {
   }
 
   db.deleteDb();
+  db_name = get_random_db_name();
+  db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
 
   for(var i=1; i <= 5; i++) {

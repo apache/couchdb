@@ -22,8 +22,6 @@ couchTests.update_documents = function(debug) {
     language: "javascript",
     updates: {
       "hello" : stringFun(function(doc, req) {
-        log(doc);
-        log(req);
         if (!doc) {
           if (req.id) {
             return [

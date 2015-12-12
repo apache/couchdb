@@ -35,7 +35,7 @@ couchTests.reduce_false = function(debug) {
   var res = db.view('test/summate');
 
   TEquals(1, res.rows.length, "should have 1 row");
-  TEquals(summate(5), res.rows[0].value == summate(5), 'should summate up 5');
+  TEquals(summate(5), res.rows[0].value, 'should summate up 5');
 
   //Test that we get our docs back
   res = db.view('test/summate', {reduce: false});

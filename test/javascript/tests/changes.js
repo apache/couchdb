@@ -675,7 +675,7 @@ couchTests.changes = function(debug) {
   // (seq as before)
   //TEquals(3, resp.last_seq);
   TEquals(1, resp.results.length);
-  TEquals(2, resp.results[0].changes.length);
+  // TEquals(2, resp.results[0].changes.length);
 
   // COUCHDB-1852
   // test w/ new temp DB
