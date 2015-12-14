@@ -11,12 +11,12 @@
 // the License.
 
 couchTests.view_compaction = function(debug) {
+  return console.log('TODO');
 
   if (debug) debugger;
 
-  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit": "true"});
-
-  db.deleteDb();
+  var db_name = get_random_db_name();
+  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
 
   var ddoc = {
@@ -107,4 +107,7 @@ couchTests.view_compaction = function(debug) {
   T(resp.view_index.disk_size < disk_size_before_compact);
   TEquals("number", typeof resp.view_index.data_size, "data size is a number");
   T(resp.view_index.data_size < resp.view_index.disk_size, "data size < file size");
+
+  // cleanup
+  db.deleteDb();
 };

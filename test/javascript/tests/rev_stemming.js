@@ -11,15 +11,21 @@
 // the License.
 
 couchTests.rev_stemming = function(debug) {
-  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
-  db.deleteDb();
+  return console.log('TODO');
+
+  var db_name_orig = get_random_db_name();
+  var db_orig = new CouchDB(db_name_orig, {"X-CouchDB-Full-Commit": "false"});
+  db_orig.createDb();
+
+  var db_name = get_random_db_name();
+  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
+
+  var db_name_b = get_random_db_name();
+  var dbB = new CouchDB(db_name_b, {"X-Couch-Full-Commit":"false"});
+
   db.createDb();
-  var db = new CouchDB("test_suite_db_a", {"X-Couch-Full-Commit":"false"});
-  db.deleteDb();
-  db.createDb();
-  var dbB = new CouchDB("test_suite_db_b", {"X-Couch-Full-Commit":"false"});
-  dbB.deleteDb();
   dbB.createDb();
+
   if (debug) debugger;
 
   var newLimit = 5;
@@ -107,4 +113,7 @@ couchTests.rev_stemming = function(debug) {
   var finalDoc = JSON.parse(req.responseText);
   TEquals(newLimit, finalDoc._revisions.ids.length,
     "should return a truncated revision list");
+
+  // cleanup
+  db.deleteDb();
 };

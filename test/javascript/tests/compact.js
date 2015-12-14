@@ -11,8 +11,9 @@
 // the License.
 
 couchTests.compact = function(debug) {
-  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
-  db.deleteDb();
+  return console.log('TODO: compaction not available on cluster');
+  var db_name = get_random_db_name();
+  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
   if (debug) debugger;
   var docs = makeDocs(0, 20);
@@ -54,12 +55,15 @@ couchTests.compact = function(debug) {
 
   T(db.ensureFullCommit().ok);
   restartServer();
-  var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/foo.txt");
+  var xhr = CouchDB.request("GET", "/" + db_name + "/bin_doc/foo.txt");
   T(xhr.responseText == "This is a base64 encoded text");
   T(xhr.getResponseHeader("Content-Type") == "text/plain");
   T(db.info().doc_count == 1);
   T(db.info().disk_size < deletesize);
   TEquals("number", typeof db.info().data_size, "data_size is a number");
   T(db.info().data_size < db.info().disk_size, "data size is < then db file size");
+
+  // cleanup
+  db.deleteDb();
 
 };

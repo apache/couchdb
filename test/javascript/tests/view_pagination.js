@@ -11,8 +11,8 @@
 // the License.
 
 couchTests.view_pagination = function(debug) {
-    var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
-    db.deleteDb();
+    var db_name = get_random_db_name();
+    var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
     db.createDb();
     if (debug) debugger;
 
@@ -30,7 +30,7 @@ couchTests.view_pagination = function(debug) {
         limit: 10
       });
       T(queryResults.rows.length == 10);
-      T(queryResults.total_rows == docs.length);
+      TEquals(docs.length, queryResults.total_rows, "doc.length should match query.length");
       T(queryResults.offset == i);
       var j;
       for (j = 0; j < 10;j++) {
@@ -144,4 +144,6 @@ couchTests.view_pagination = function(debug) {
     });
     testEndkeyDocId(queryResults);
 
+    // cleanup
+    db.deleteDb();
   };
