@@ -12,14 +12,17 @@
 
 // Do some basic tests.
 couchTests.form_submit = function(debug) {
-    var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
-    db.deleteDb();
+    var db_name = get_random_db_name();
+    var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
     db.createDb();
 
     var json = "{}";
-    var xhr = CouchDB.request("POST", "/test_suite_db/baz", {body: json});
+    var xhr = CouchDB.request("POST", "/" + db_name + "/baz", {body: json});
     T(xhr.status == 415);
     result = JSON.parse(xhr.responseText);
     T(result.error, "bad_content_type");
     T(result.reason, "Invalid Content-Type header for form upload");
+
+    // cleanup
+    db.deleteDb();
 };
