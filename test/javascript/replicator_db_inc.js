@@ -32,7 +32,7 @@ replicator_db.docs1 = [
   }
 ];
 
-replicator_db.waitForRep = function waitForSeq(repDb, repDoc, state) {
+replicator_db.waitForRep = function waitForSeq(repDb, repDoc, state, errorState) {
   var newRep,
       t0 = new Date(),
       t1,
@@ -41,7 +41,8 @@ replicator_db.waitForRep = function waitForSeq(repDb, repDoc, state) {
   do {
     newRep = repDb.open(repDoc._id);
     t1 = new Date();
-  } while (((t1 - t0) <= ms) && newRep._replication_state !== state);
+  } while (((t1 - t0) <= ms) && newRep._replication_state !== state && (!errorState || newRep._replication_state !== errorState));
+  return newRep ? newRep._replication_state : null;
 }
 
 replicator_db.waitForSeq = function waitForSeq(sourceDb, targetDb) {

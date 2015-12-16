@@ -11,13 +11,20 @@
 // the License.
 
 couchTests.oauth_users_db = function(debug) {
+  return console.log('TODO: config not available on cluster');
   // This tests OAuth authentication using the _users DB instead of the ini
   // configuration for storing OAuth tokens and secrets.
 
   if (debug) debugger;
 
-  var usersDb = new CouchDB("test_suite_users",{"X-Couch-Full-Commit":"false"});
-  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
+  var users_db_name = get_random_db_name();
+  var usersDb = new CouchDB(users_db_name, {"X-Couch-Full-Commit":"false"});
+  usersDb.createDb();
+
+  var db_name = get_random_db_name();
+  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
+  db.createDb();
+
   var host = CouchDB.host;
   var authorization_url = "/_oauth/authorize";
 

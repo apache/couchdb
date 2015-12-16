@@ -102,8 +102,17 @@ eunit: couch
 
 .PHONY: javascript
 # target: javascript - Run JavaScript test suites or specific ones defined by suites option
-javascript: all share/www/script/test
-	@dev/run -q --with-admin-party-please test/javascript/run $(suites)
+javascript: all
+	@mkdir -p share/www/script/test
+ifeq ($(IN_RELEASE), true)
+	@cp test/javascript/tests/lorem*.txt share/www/test/
+else
+	@mkdir -p src/fauxton/dist/release/test
+	@cp test/javascript/tests/lorem*.txt src/fauxton/dist/release/test/
+endif
+	# This might help with emfile errors during `make javascript`: ulimit -n 10240
+	@rm -rf dev/lib
+	@dev/run -n 1 -q --with-admin-party-please test/javascript/run $(suites)
 
 
 .PHONY: list-eunit-apps
@@ -326,7 +335,6 @@ uninstall:
 
 .rebar: build-plt
 
-
 config.erl:
 	@echo "Apache CouchDB has not been configured."
 	@echo "Try \"./configure -h\" for help."
@@ -345,9 +353,3 @@ ifeq ($(with_fauxton), 1)
 	@echo "Building Fauxton"
 	@cd src/fauxton && npm install && ./node_modules/grunt-cli/bin/grunt couchdb
 endif
-
-
-share/www/script/test:
-	@# TODO: Fix tests to look for these files in their new path
-	@mkdir -p $@
-	@cp test/javascript/tests/lorem*.txt share/www/script/test/

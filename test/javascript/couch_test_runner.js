@@ -363,6 +363,7 @@ function makeDocs(start, end, templateDoc) {
 }
 
 function run_on_modified_server(settings, fun) {
+  throw new Error("_config not available on cluster")
   try {
     // set the settings
     for(var i=0; i < settings.length; i++) {
@@ -463,3 +464,14 @@ CouchDB.prepareUserDoc = function(user_doc, new_password) {
   }
   return user_doc;
 };
+
+function get_random_string() {
+  return Math.random()
+    .toString(36)
+    .replace(/[^a-z]+/g, '')
+    .substr(0, 8);
+}
+
+function get_random_db_name() {
+  return "test_suite_db_" + get_random_string()
+}

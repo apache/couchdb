@@ -11,7 +11,9 @@
 // the License.
 
 couchTests.users_db_security = function(debug) {
-  var usersDb = new CouchDB("test_suite_users", {"X-Couch-Full-Commit":"false"});
+  return console.log('TODO');
+  var db_name = get_random_db_name();
+  var usersDb = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   if (debug) debugger;
 
   function wait(ms) {
@@ -410,7 +412,6 @@ couchTests.users_db_security = function(debug) {
     });
   };
 
-  usersDb.deleteDb();
   run_on_modified_server(
     [{section: "couch_httpd_auth",
       key: "iterations", value: "1"},

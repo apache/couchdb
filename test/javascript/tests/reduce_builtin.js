@@ -11,8 +11,8 @@
 // the License.
 
 couchTests.reduce_builtin = function(debug) {
-  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
-  db.deleteDb();
+  var db_name = get_random_db_name();
+  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
   if (debug) debugger;
 
@@ -94,6 +94,8 @@ couchTests.reduce_builtin = function(debug) {
   }
 
   db.deleteDb();
+  db_name = get_random_db_name();
+  db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
 
   for(var i=1; i <= 5; i++) {
@@ -113,7 +115,8 @@ couchTests.reduce_builtin = function(debug) {
       docs.push({keys:["d", "b"]});
       docs.push({keys:["d", "c"]});
       db.bulkSave(docs);
-      T(db.info().doc_count == ((i - 1) * 10 * 11) + ((j + 1) * 11));
+      var total_docs = ((i - 1) * 10 * 11) + ((j + 1) * 11);
+      TEquals(total_docs, db.info().doc_count, 'doc count should match');
     }
 
     map = function (doc) { emit(doc.keys, 1); };
@@ -176,4 +179,7 @@ couchTests.reduce_builtin = function(debug) {
     T(equals(results.rows[5], {key:["d","b"],value:[10*i,10*i]}));
     T(equals(results.rows[6], {key:["d","c"],value:[10*i,10*i]}));
   }
+
+  // cleanup
+  db.deleteDb();
 }

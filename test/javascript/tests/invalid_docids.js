@@ -11,8 +11,8 @@
 // the License.
 
 couchTests.invalid_docids = function(debug) {
-  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
-  db.deleteDb();
+  var db_name = get_random_db_name();
+  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
   if (debug) debugger;
 
@@ -21,10 +21,10 @@ couchTests.invalid_docids = function(debug) {
   T(db.open("_local/foo")._id == "_local/foo");
 
   var urls = [
-      "/test_suite_db/_local",
-      "/test_suite_db/_local/",
-      "/test_suite_db/_local%2F",
-      "/test_suite_db/_local/foo/bar",
+      "/" + db_name + "/_local",
+      "/" + db_name + "/_local/",
+      "/" + db_name + "/_local%2F",
+      "/" + db_name + "/_local/foo/bar",
   ];
 
   urls.forEach(function(u) {
@@ -39,18 +39,18 @@ couchTests.invalid_docids = function(debug) {
     T(1 == 0, "doc id must be string");
   } catch(e) {
       T(db.last_req.status == 400);
-      T(e.error == "bad_request");
+      T(e.error == "illegal_docid");
   }
 
   // Via PUT with _id not in body.
-  var res = res = db.request("PUT", "/test_suite_db/_other", {"body": "{}"});
+  var res = res = db.request("PUT", "/" + db_name + "/_other", {"body": "{}"});
   T(res.status == 400);
-  T(JSON.parse(res.responseText).error == "bad_request");
+  T(JSON.parse(res.responseText).error == "illegal_docid");
 
   // Accidental POST to form handling code.
-  res = db.request("POST", "/test_suite_db/_tmp_view", {"body": "{}"});
+  res = db.request("POST", "/" + db_name + "/_tmp_view", {"body": "{}"});
   T(res.status == 400);
-  T(JSON.parse(res.responseText).error == "bad_request");
+  T(JSON.parse(res.responseText).error == "illegal_docid");
 
   // Test invalid _prefix
   try {
@@ -58,7 +58,7 @@ couchTests.invalid_docids = function(debug) {
     T(1 == 0, "doc id may not start with underscore");
   } catch(e) {
       T(db.last_req.status == 400);
-      T(e.error == "bad_request");
+      T(e.error == "illegal_docid");
   }
 
   // Test _bulk_docs explicitly.
@@ -72,6 +72,9 @@ couchTests.invalid_docids = function(debug) {
     T(1 == 0, "doc id may not start with underscore, even in bulk docs");
   } catch(e) {
       T(db.last_req.status == 400);
-      T(e.error == "bad_request");
+      T(e.error == "illegal_docid");
   }
+
+  // cleanup
+  db.deleteDb();
 };
