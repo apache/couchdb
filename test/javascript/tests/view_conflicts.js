@@ -11,11 +11,14 @@
 // the License.
 
 couchTests.view_conflicts = function(debug) {
-  var dbA = new CouchDB("test_suite_db_a", {"X-Couch-Full-Commit":"false"});
-  dbA.deleteDb();
+
+  var db_name_a = get_random_db_name();
+  var dbA = new CouchDB(db_name_a, {"X-Couch-Full-Commit":"false"});
+
+  var db_name_b = get_random_db_name();
+  var dbB = new CouchDB(db_name_b, {"X-Couch-Full-Commit":"false"});
+
   dbA.createDb();
-  var dbB = new CouchDB("test_suite_db_b", {"X-Couch-Full-Commit":"false"});
-  dbB.deleteDb();
   dbB.createDb();
   if (debug) debugger;
 
@@ -46,4 +49,8 @@ couchTests.view_conflicts = function(debug) {
     }
   });
   T(results.rows[0].value[0] == conflictRev);
+
+  // cleanup
+  dbA.deleteDb();
+  dbB.deleteDb();
 };
