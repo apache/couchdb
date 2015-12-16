@@ -11,8 +11,8 @@
 // the License.
 
 couchTests.utf8 = function(debug) {
-  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
-  db.deleteDb();
+  var db_name = get_random_db_name();
+  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
   if (debug) debugger;
 
@@ -39,4 +39,7 @@ couchTests.utf8 = function(debug) {
   for (var i=0; i<texts.length; i++) {
     T(rows[i].value == texts[i]);
   }
+
+  // cleanup
+  db.deleteDb();
 };
