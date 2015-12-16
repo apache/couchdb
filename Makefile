@@ -110,7 +110,7 @@ else
 	@mkdir -p src/fauxton/dist/release/test
 	@cp test/javascript/tests/lorem*.txt src/fauxton/dist/release/test/
 endif
-	@ulimit -n 10240
+	# This might help with emfile errors during `make javascript`: ulimit -n 10240
 	@rm -rf dev/lib
 	@dev/run -n 1 -q --with-admin-party-please test/javascript/run $(suites)
 
