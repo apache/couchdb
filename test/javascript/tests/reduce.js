@@ -11,8 +11,8 @@
 // the License.
 
 couchTests.reduce = function(debug) {
-  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
-  db.deleteDb();
+  var db_name = get_random_db_name();
+  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
   if (debug) debugger;
   var numDocs = 500;
@@ -48,6 +48,8 @@ couchTests.reduce = function(debug) {
   }
 
   db.deleteDb();
+  db_name = get_random_db_name();
+  db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
 
   for(var i=1; i <= 5; i++) {
@@ -67,7 +69,8 @@ couchTests.reduce = function(debug) {
       docs.push({keys:["d", "b"]});
       docs.push({keys:["d", "c"]});
       db.bulkSave(docs);
-      T(db.info().doc_count == ((i - 1) * 10 * 11) + ((j + 1) * 11));
+      var total_docs = ((i - 1) * 10 * 11) + ((j + 1) * 11);
+      TEquals(total_docs, db.info().doc_count, "doc count should match");
     }
 
     map = function (doc) { emit(doc.keys, 1); };
@@ -118,10 +121,10 @@ couchTests.reduce = function(debug) {
   }
 
   // now test out more complex reductions that need to use the combine option.
-
   db.deleteDb();
+  db_name = get_random_db_name();
+  db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
-
 
   var map = function (doc) { emit(doc.val, doc.val); };
   var reduceCombine = function (keys, values, rereduce) {
@@ -204,6 +207,8 @@ couchTests.reduce = function(debug) {
     }
 
     db.deleteDb();
+    db_name = get_random_db_name();
+    db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
     db.createDb();
 
     for (var i = 0; i < 1123; i++) {
@@ -411,4 +416,6 @@ couchTests.reduce = function(debug) {
 
   testReducePagination();
 
+  // cleanup
+  db.deleteDb();
 };
