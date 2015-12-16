@@ -15,26 +15,29 @@ couchTests.method_override = function(debug) {
   var result = JSON.parse(CouchDB.request("GET", "/").responseText);
   T(result.couchdb == "Welcome");
 
-  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
-  db.deleteDb();
+  var db_name = get_random_db_name();
+  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
 
   db.createDb();
 
   var doc = {bob : "connie"};
-  xhr = CouchDB.request("POST", "/test_suite_db/fnord", {body: JSON.stringify(doc), headers:{"X-HTTP-Method-Override" : "PUT"}});
+  xhr = CouchDB.request("POST", "/" + db_name + "/fnord", {body: JSON.stringify(doc), headers:{"X-HTTP-Method-Override" : "PUT"}});
   T(xhr.status == 201);
 
   doc = db.open("fnord");
   T(doc.bob == "connie");
 
-  xhr = CouchDB.request("POST", "/test_suite_db/fnord?rev=" + doc._rev, {headers:{"X-HTTP-Method-Override" : "DELETE"}});
+  xhr = CouchDB.request("POST", "/" + db_name + "/fnord?rev=" + doc._rev, {headers:{"X-HTTP-Method-Override" : "DELETE"}});
   T(xhr.status == 200);
 
-  xhr = CouchDB.request("GET", "/test_suite_db/fnord2", {body: JSON.stringify(doc), headers:{"X-HTTP-Method-Override" : "PUT"}});
+  xhr = CouchDB.request("GET", "/" + db_name + "/fnord2", {body: JSON.stringify(doc), headers:{"X-HTTP-Method-Override" : "PUT"}});
   // Method Override is ignored when original Method isn't POST
   T(xhr.status == 404);
 
   doc = db.open("fnord");
   T(doc == null);  
+
+  // cleanup
+  db.deleteDb();
 
 };
