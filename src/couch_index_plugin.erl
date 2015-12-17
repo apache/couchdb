@@ -14,6 +14,8 @@
 
 -export([index_update/4]).
 
+-export([before_open/2]).
+
 -include_lib("couch/include/couch_db.hrl").
 
 -define(SERVICE_ID, couch_index).
@@ -30,6 +32,10 @@ index_update(State, View, Updated, Removed) ->
         false ->
             ok
     end.
+
+before_open(Mod, State) ->
+    Handle = couch_epi:get_handle(?SERVICE_ID),
+    couch_epi:apply(Handle, ?SERVICE_ID, before_open, [Mod, State], [pipe]).
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions

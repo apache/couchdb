@@ -48,7 +48,8 @@
 }).
 
 
-start_link({Module, IdxState}) ->
+start_link({Module0, IdxState0}) ->
+    [Module, IdxState] = couch_index_plugin:before_open(Module0, IdxState0),
     proc_lib:start_link(?MODULE, init, [{Module, IdxState}]).
 
 
