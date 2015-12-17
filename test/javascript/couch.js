@@ -169,10 +169,14 @@ function CouchDB(name, httpHeaders, globalRequestOptions) {
       body: JSON.stringify(ddoc)
     });
     CouchDB.maybeThrowError(this.last_req);
+    var ddoc_result = JSON.parse(this.last_req.responseText)
     this.last_req = this.request("GET", this.uri + ddoc_name + "/_view/view"
       + encodeOptions(options));
     CouchDB.maybeThrowError(this.last_req);
-    return JSON.parse(this.last_req.responseText);
+    var query_result = JSON.parse(this.last_req.responseText);
+    var res = this.request("DELETE", this.uri + ddoc_name + '?rev=' + ddoc_result.rev);
+
+    return query_result;
   };
 
   this.view = function(viewname, options, keys) {
