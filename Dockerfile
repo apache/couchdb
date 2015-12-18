@@ -46,7 +46,7 @@ RUN sed -i'' 's/bind_address = 127.0.0.1/bind_address = 0.0.0.0/' rel/overlay/et
 
 # Build
 RUN ./configure
-RUN make
+RUN make couch
 
 EXPOSE 15984 25984 35984 15986 25986 35986
 ENTRYPOINT ["/home/couchdb/dev/run"]
