@@ -1,62 +1,52 @@
+# Licensed under the Apache License, Version 2.0 (the "License"); you may not
+# use this file except in compliance with the License. You may obtain a copy of
+# the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations under
+# the License.
+
 FROM debian:jessie
-MAINTAINER Robert Newson <rnewson@apache.org>
-ENV DEBIAN_FRONTEND noninteractive
 
-# Install prereqs
-RUN apt-get update -y && apt-get install -y --no-install-recommends \
-  apt-transport-https \
-  build-essential \
-  ca-certificates \
-  curl \
-  default-jdk \
-  git \
-  haproxy \
-  libcurl4-openssl-dev \
-  libicu-dev \
-  libmozjs185-dev \
-  libnspr4 \
-  libnspr4-0d \
-  libnspr4-dev \
-  libwxgtk3.0 \
-  openssl \
-  pkg-config \
-  procps \
-  python \
-  python-sphinx \
-  texinfo \
-  texlive-base \
-  texlive-fonts-extra \
-  texlive-fonts-recommended \
-  texlive-latex-extra \
-  wget \
-  && curl -s https://deb.nodesource.com/gpgkey/nodesource.gpg.key | apt-key add - \
-  && echo 'deb https://deb.nodesource.com/node jessie main' > /etc/apt/sources.list.d/nodesource.list \
-  && echo 'deb-src https://deb.nodesource.com/node jessie main' >> /etc/apt/sources.list.d/nodesource.list \
-  && apt-get update -y && apt-get install -y nodejs \
-  && npm install -g npm && npm install -g grunt-cli
+MAINTAINER Clemens Stolle klaemo@apache.org
 
-RUN wget http://packages.erlang-solutions.com/erlang/esl-erlang/FLAVOUR_1_general/esl-erlang_18.0-1~debian~jessie_amd64.deb && \
-  dpkg -i esl-erlang_18.0-1~debian~jessie_amd64.deb
-
-# Build rebar
-RUN git clone https://github.com/rebar/rebar /usr/src/rebar \
- && (cd /usr/src/rebar ; make && mv rebar /usr/local/bin/)
+ENV COUCHDB_VERSION master
 
 RUN groupadd -r couchdb && useradd -d /usr/src/couchdb -g couchdb couchdb
 
-# Build couchdb
+# download dependencies
+RUN apt-get update -y -qq && apt-get install -y --no-install-recommends \
+    apt-transport-https \
+    build-essential \
+    ca-certificates \
+    curl \
+    erlang-dev \
+    erlang-nox \
+    git \
+    haproxy \
+    libicu-dev \
+    libmozjs185-dev \
+    openssl \
+    python \
+ && curl -s https://deb.nodesource.com/gpgkey/nodesource.gpg.key | apt-key add - \
+ && echo 'deb https://deb.nodesource.com/node_4.x jessie main' > /etc/apt/sources.list.d/nodesource.list \
+ && echo 'deb-src https://deb.nodesource.com/node_4.x jessie main' >> /etc/apt/sources.list.d/nodesource.list \
+ && apt-get update -y -qq && apt-get install -y nodejs \
+ && npm install -g grunt-cli
+
 COPY . /usr/src/couchdb
-RUN cd /usr/src/couchdb && \
-  sed -i'' '/require_otp_vsn/d' rebar.config.script && \
-  ./configure && make && \
-  chmod +x dev/run && chown -R couchdb:couchdb /usr/src/couchdb
+
+WORKDIR /usr/src/couchdb
+RUN ./configure --disable-docs && make couch
+
+# permissions
+RUN chmod +x /usr/src/couchdb/dev/run && chown -R couchdb:couchdb /usr/src/couchdb
 
 USER couchdb
-
-# Expose nodes on external network interface
-RUN sed -i'' 's/bind_address = 127.0.0.1/bind_address = 0.0.0.0/' /usr/src/couchdb/rel/overlay/etc/default.ini
-
 EXPOSE 5984 15984 25984 35984 15986 25986 35986
-WORKDIR /usr/src/couchdb
 
 ENTRYPOINT ["/usr/src/couchdb/dev/run"]
