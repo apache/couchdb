@@ -419,5 +419,5 @@ couchTests.attachments_multipart= function(debug) {
 //  run_on_modified_server(server_config, testMultipartAttCompression);
 
 //  // cleanup
-//  db.deleteDb();
+  db.deleteDb();
 };

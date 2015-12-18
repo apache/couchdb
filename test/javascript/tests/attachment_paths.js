@@ -12,11 +12,11 @@
 
 couchTests.attachment_paths = function(debug) {
   if (debug) debugger;
-  var dbNames = ["test_suite_db", "test_suite_db/with_slashes"];
+  var r_db_name = get_random_db_name()
+  var dbNames = [r_db_name, r_db_name + "/with_slashes"];
   for (var i=0; i < dbNames.length; i++) {
     var db = new CouchDB(dbNames[i]);
     var dbName = encodeURIComponent(dbNames[i]);
-    db.deleteDb();
     db.createDb();
 
     // first just save a regular doc with an attachment that has a slash in the url.
@@ -149,5 +149,6 @@ couchTests.attachment_paths = function(debug) {
       "correct content-type"
     );
     T(binAttDoc._attachments["foo/bar2.txt"].length == 30);
+    db.deleteDb();
   }
 };

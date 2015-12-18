@@ -117,4 +117,5 @@ couchTests.conflicts = function(debug) {
     db.open("doc", {"revs": true}));
   TEquals([], db.bulkSave([r4, r3, r2], {"new_edits":false}), "no failures");
 
+  db.deleteDb();
 };

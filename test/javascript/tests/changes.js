@@ -150,6 +150,7 @@ couchTests.changes = function(debug) {
       // otherwise we'll continue to receive heartbeats forever
       xhr.abort();
     }
+    db.deleteDb();
   }
 
   if (!is_safari && xhr) {
@@ -278,10 +279,9 @@ couchTests.changes = function(debug) {
     T(change.id == "barzzzz");
     T(change.changes[0].rev == docBarz._rev);
     T(lines[3]=='"last_seq":5}');
-
-
   }
 
+  db.deleteDb();
   // test on a new DB
   var db_name = get_random_db_name();
   db = new CouchDB(db_name, {"X-Couch-Full-Commit":"true"});
@@ -590,6 +590,7 @@ couchTests.changes = function(debug) {
   });
 */
 
+  db.deleteDb();
   // COUCHDB-1037 - empty result for ?limit=1&filter=foo/bar in some cases
   // test w/ new temp DB
   db_name = get_random_db_name();
@@ -646,6 +647,7 @@ couchTests.changes = function(debug) {
 //  CouchDB.request("GET", "/" + db.name + "/_changes");
 //  TEquals(0, CouchDB.requestStats(['couchdb', 'httpd', 'clients_requesting_changes'], true).value);
 
+  db.deleteDb();
   // COUCHDB-1256
   // test w/ new temp DB
   db_name = get_random_db_name();
@@ -677,6 +679,7 @@ couchTests.changes = function(debug) {
   TEquals(1, resp.results.length);
   // TEquals(2, resp.results[0].changes.length);
 
+  db.deleteDb();
   // COUCHDB-1852
   // test w/ new temp DB
   db_name = get_random_db_name();
@@ -708,6 +711,7 @@ couchTests.changes = function(debug) {
   //T(changes[0][1] === "3");
   //T(changes[1][1] === "4");
 
+  db.deleteDb();
   // COUCHDB-1923
   // test w/ new temp DB
   db_name = get_random_db_name();
@@ -778,4 +782,5 @@ couchTests.changes = function(debug) {
   T(resp.results[0].doc._attachments['bar.txt'].encoding === "gzip");
   T(resp.results[0].doc._attachments['bar.txt'].encoded_length === 47);
 
+  db.deleteDb();
 };

@@ -1871,4 +1871,5 @@ couchTests.replication = function(debug) {
   //usersDb.deleteDb();
   sourceDb.deleteDb();
   targetDb.deleteDb();
+  (new CouchDB("test_suite_db")).deleteDb();
 };
