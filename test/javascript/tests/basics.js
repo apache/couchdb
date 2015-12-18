@@ -13,6 +13,8 @@
 // Do some basic tests.
 couchTests.basics = function(debug) {
 
+  if (debug) debugger;
+
   var result = JSON.parse(CouchDB.request("GET", "/").responseText);
   T(result.couchdb == "Welcome");
 
@@ -27,11 +29,11 @@ couchTests.basics = function(debug) {
   // PUT on existing DB should return 412 instead of 500
   xhr = CouchDB.request("PUT", "/" + db_name + "/");
   T(xhr.status == 412);
-  if (debug) debugger;
 
   // creating a new DB should return Location header
   // and it should work for dbs with slashes (COUCHDB-411)
-  var dbnames = [db_name, db_name + "%2Fwith_slashes"];
+  var db_name2 = get_random_db_name();
+  var dbnames = [db_name2, db_name2 + "%2Fwith_slashes"];
   dbnames.forEach(function(dbname) {
     xhr = CouchDB.request("DELETE", "/" + dbname);
     xhr = CouchDB.request("PUT", "/" + dbname);
@@ -41,10 +43,11 @@ couchTests.basics = function(debug) {
     TEquals(CouchDB.protocol,
       xhr.getResponseHeader("Location").substr(0, CouchDB.protocol.length),
       "should return absolute Location header to newly created document");
+    CouchDB.request("DELETE", "/" + dbname);
   });
 
   // Get the database info, check the db_name
-  T(db.info().db_name == "" + db_name + "");
+  TEquals(db.info().db_name, db_name, "get correct database name");
   T(CouchDB.allDbs().indexOf("" + db_name + "") != -1);
 
   // Get the database info, check the doc_count
@@ -144,8 +147,7 @@ couchTests.basics = function(debug) {
 
   // 1 more document should now be in the result.
   T(results.total_rows == 3);
-  // 3 query() b4 = 3 more design doc to implement them
-  T(db.info().doc_count == (6+3));
+  TEquals(6, db.info().doc_count, 'number of docs in db');
 
   var reduceFunction = function(keys, values){
     return sum(values);
@@ -165,8 +167,7 @@ couchTests.basics = function(debug) {
 
   // 1 less document should now be in the results.
   T(results.total_rows == 2);
-  // 5 query() b4 = 5 more design doc to implement them
-  T(db.info().doc_count == (5+5));
+  T(db.info().doc_count == (5));
 
   // make sure we can still open the old rev of the deleted doc
   T(db.open(existingDoc._id, {rev: existingDoc._rev}) != null);
@@ -278,24 +279,23 @@ couchTests.basics = function(debug) {
 
   // On restart, a request for creating a database that already exists can
   // not override the existing database file
-  db = new CouchDB("test_suite_foobar");
-  db.deleteDb();
-  xhr = CouchDB.request("PUT", "/" + db.name);
-  TEquals(201, xhr.status);
-
-  TEquals(true, db.save({"_id": "doc1"}).ok);
-  TEquals(true, db.ensureFullCommit().ok);
-
-  TEquals(1, db.info().doc_count);
-
-  restartServer();
-
-  xhr = CouchDB.request("PUT", "/" + db.name);
-  TEquals(412, xhr.status);
-
-  TEquals(1, db.info().doc_count);
+  // TODO
+  // db = new CouchDB(db_name);
+  // xhr = CouchDB.request("PUT", "/" + db.name);
+  // TEquals(201, xhr.status);
+  //
+  // TEquals(true, db.save({"_id": "doc1"}).ok);
+  // TEquals(true, db.ensureFullCommit().ok);
+  //
+  // TEquals(1, db.info().doc_count);
+  //
+  // restartServer();
+  //
+  // xhr = CouchDB.request("PUT", "/" + db.name);
+  // TEquals(412, xhr.status);
+  //
+  // TEquals(1, db.info().doc_count);
 
   // cleanup
   db.deleteDb();
-
 };
