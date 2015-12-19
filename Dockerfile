@@ -38,15 +38,12 @@ RUN apt-get update -y -qq && apt-get install -y --no-install-recommends \
  && apt-get update -y -qq && apt-get install -y nodejs \
  && npm install -g grunt-cli
 
-COPY . /usr/src/couchdb
+COPY dev/docker-entrypoint.sh /docker-entrypoint.sh
 
 WORKDIR /usr/src/couchdb
-RUN ./configure --disable-docs && make couch
 
-# permissions
-RUN chmod +x /usr/src/couchdb/dev/run && chown -R couchdb:couchdb /usr/src/couchdb
-
-USER couchdb
+# USER couchdb
 EXPOSE 5984 15984 25984 35984 15986 25986 35986
 
-ENTRYPOINT ["/usr/src/couchdb/dev/run"]
+ENTRYPOINT ["/docker-entrypoint.sh"]
+CMD ["dev/run"]
