@@ -65,6 +65,8 @@ ok = CopyIfDifferent(CouchJSConfig, ConfigBin),
         case os:type() of
             {win32, _} ->
                 {"/DHAVE_CURL /IC:\\relax\\curl\\include", "/LIBPATH:C:\\relax\\js-1.8.5\\js\\src /LIBPATH:C:\\Relax\\curl\\lib\\release-ssl mozjs185-1.0.lib libcurl_imp.lib"};
+            {unix, freebsd} ->
+                {"-DHAVE_CURL -I/usr/local/include", "-DHAVE_CURL -lmozjs185 -lcurl"}
             _ ->
                 {"-DHAVE_CURL", "-DHAVE_CURL -lmozjs185 -lcurl"}
         end;
