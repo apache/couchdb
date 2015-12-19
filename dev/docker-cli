@@ -24,11 +24,18 @@ if [ "$1" = 'build' ]; then
 fi
 
 if [ "$1" = 'run' ]; then
-  exec docker run -it \
+  printf "Starting CouchDB inside of docker container. Please be patient...\n\n"
+
+  # create container with appropriate port mappings
+  COUCH_CONTAINER_ID="$(docker create -it \
                   -p 5984:5984 -p 15984:15984 -p 25984:25984 -p 35984:35984 \
                   -p 15986:15986 -p 25986:25986 -p 35986:35986 \
-                  -v $(pwd):/usr/src/couchdb \
-                  couchdb-master dev/run "${@:2}"
+                  couchdb-master dev/run ${@:2})"
+
+  # copy source into container
+  docker cp . $COUCH_CONTAINER_ID:/usr/src/couchdb
+
+  exec docker start -i -a $COUCH_CONTAINER_ID
 fi
 
 if [ "$1" = 'clean' ]; then
