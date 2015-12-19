@@ -30,3 +30,8 @@ if [ "$1" = 'run' ]; then
                   -v $(pwd):/usr/src/couchdb \
                   couchdb-master dev/run "${@:2}"
 fi
+
+if [ "$1" = 'clean' ]; then
+  printf "Removing untagged docker images...\n\n"
+  exec docker images --filter "dangling=true" -q | xargs docker rmi -f
+fi
