@@ -61,7 +61,7 @@ Debian-based Systems
 
 You can install the dependencies by running:
 
-    sudo apt-get install build-essential erlang-base-hipe \
+    sudo apt-get install build-essential \
         erlang-dev erlang-manpages erlang-eunit erlang-nox \
         libicu-dev libmozjs185-dev libcurl4-openssl-dev \
         pkg-config
