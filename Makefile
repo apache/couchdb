@@ -171,19 +171,19 @@ dialyze: .rebar
 .PHONY: docker-image
 # target: docker-image - Build Docker image
 docker-image:
-	@docker build --rm -t couchdb/dev-cluster .
+	@dev/docker-cli build
 
 
 .PHONY: docker-start
 # target: docker-start - Start CouchDB in Docker container
 docker-start:
-	@docker run -d -P -t couchdb/dev-cluster > .docker-id
+	@dev/docker-cli run
 
 
-.PHONY: docker-stop
-# target: docker-stop - Stop Docker container
-docker-stop:
-	@docker stop `cat .docker-id`
+.PHONY: docker-clean
+# target: docker-clean - Remove untagged images
+docker-clean:
+	@dev/docker-cli clean
 
 
 .PHONY: introspect
