@@ -17,7 +17,7 @@
 
 % public API
 -export([get_user_creds/1, get_user_creds/2, update_user_creds/3]).
--export([get_admin/1, add_roles/2]).
+-export([get_admin/1, add_roles/2, auth_design_doc/1]).
 
 % gen_server API
 -export([start_link/0, init/1, handle_call/3, handle_info/2, handle_cast/2]).
@@ -27,7 +27,7 @@
 -export([handle_db_event/3]).
 
 -include_lib("couch/include/couch_db.hrl").
--include("couch_js_functions.hrl").
+-include_lib("couch/include/couch_js_functions.hrl").
 
 -define(STATE, auth_state_ets).
 -define(BY_USER, auth_by_user_ets).

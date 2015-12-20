@@ -13,7 +13,7 @@
 -module(couch_httpd_oauth).
 
 -include_lib("couch/include/couch_db.hrl").
--include("couch_js_functions.hrl").
+-include_lib("couch/include/couch_js_functions.hrl").
 
 -export([oauth_authentication_handler/1, handle_oauth_req/1]).
 
