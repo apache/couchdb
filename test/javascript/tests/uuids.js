@@ -11,7 +11,6 @@
 // the License.
 
 couchTests.uuids = function(debug) {
-  return console.log("TODO");// TODO 
   var etags = [];
   var testHashBustingHeaders = function(xhr) {
     T(xhr.getResponseHeader("Cache-Control").match(/no-cache/));
@@ -33,9 +32,6 @@ couchTests.uuids = function(debug) {
     //T(currentTime - dateHeader < 3000);
   };
 
-  var db_name = get_random_db_name();
-  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
-  db.createDb();
   if (debug) debugger;
 
   // a single UUID without an explicit count
