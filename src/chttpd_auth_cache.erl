@@ -19,6 +19,7 @@
 -export([listen_for_changes/1, changes_callback/2]).
 
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("couch/include/couch_js_functions.hrl").
 
 -define(CACHE, chttpd_auth_cache_lru).
 
@@ -113,6 +114,7 @@ handle_info({'DOWN', _, _, Pid, Reason}, #state{changes_pid=Pid} = State) ->
     erlang:send_after(5000, self(), {start_listener, Seq}),
     {noreply, State#state{last_seq=Seq}};
 handle_info({start_listener, Seq}, State) ->
+    ensure_auth_ddoc_exists(dbname(), <<"_design/_auth">>),
     {noreply, State#state{changes_pid = spawn_changes(Seq)}};
 handle_info(_Msg, State) ->
     {noreply, State}.
@@ -146,9 +148,14 @@ changes_callback(start, Since) ->
 changes_callback({stop, EndSeq, _Pending}, _) ->
     exit({seq, EndSeq});
 changes_callback({change, {Change}}, _) ->
-    UserName = username(couch_util:get_value(id, Change)),
-    couch_log:debug("Invalidating cached credentials for ~s", [UserName]),
-    ets_lru:remove(?CACHE, UserName),
+    case couch_util:get_value(id, Change) of
+        <<"_design/", _/binary>> ->
+            ok;
+        DocId ->
+            UserName = username(DocId),
+            couch_log:debug("Invalidating cached credentials for ~s", [UserName]),
+            ets_lru:remove(?CACHE, UserName)
+    end,
     {ok, couch_util:get_value(seq, Change)};
 changes_callback(timeout, EndSeq) ->
     exit({seq, EndSeq});
@@ -175,3 +182,30 @@ docid(UserName) ->
 
 username(<<"org.couchdb.user:", UserName/binary>>) ->
     UserName.
+
+ensure_auth_ddoc_exists(DbName, DDocId) ->
+    case fabric:open_doc(DbName, DDocId, [?ADMIN_CTX, ejson_body]) of
+    {not_found, _Reason} ->
+        {ok, AuthDesign} = couch_auth_cache:auth_design_doc(DDocId),
+        update_doc_ignoring_conflict(DbName, AuthDesign, [?ADMIN_CTX]);
+    {ok, Doc} ->
+        {Props} = couch_doc:to_json_obj(Doc, []),
+        case couch_util:get_value(<<"validate_doc_update">>, Props, []) of
+            ?AUTH_DB_DOC_VALIDATE_FUNCTION ->
+                ok;
+            _ ->
+                Props1 = lists:keyreplace(<<"validate_doc_update">>, 1, Props,
+                    {<<"validate_doc_update">>,
+                    ?AUTH_DB_DOC_VALIDATE_FUNCTION}),
+                update_doc_ignoring_conflict(DbName, couch_doc:from_json_obj({Props1}), [?ADMIN_CTX])
+        end
+    end,
+    ok.
+
+update_doc_ignoring_conflict(DbName, Doc, Options) ->
+    try
+        fabric:update_doc(DbName, Doc, Options)
+    catch
+        error:conflict ->
+            ok
+    end.
