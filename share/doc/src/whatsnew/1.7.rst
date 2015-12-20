@@ -47,6 +47,7 @@ Build
 Database Core
 -------------
 
+- :issue:`2534`: Improve checks for db admin/member.
 - :issue:`2735`: Duplicate document _ids created under high edit load.
 
 Documentation
