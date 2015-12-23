@@ -30,6 +30,7 @@ if [ "$1" = 'run' ]; then
   COUCH_CONTAINER_ID="$(docker create -it \
                   -p 5984:5984 -p 15984:15984 -p 25984:25984 -p 35984:35984 \
                   -p 15986:15986 -p 25986:25986 -p 35986:35986 \
+                  -p 4369:4369 -p 9100-9110:9100-9110 \
                   couchdb-master dev/run ${@:2})"
 
   # copy source into container
