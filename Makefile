@@ -70,8 +70,11 @@ couch: config.erl
 
 .PHONY: docs
 # target: docs - Build documentation
+ifeq ($(IN_RELEASE), true)
+docs: share/docs/html
+else
 docs: src/docs/build
-
+endif
 
 .PHONY: fauxton
 # target: fauxton - Build Fauxton web UI
