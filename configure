@@ -652,7 +652,7 @@ EOF
 install_local_rebar() {
     if [ ! -x "${rootdir}/bin/rebar" ]; then
         if [ ! -d "${rootdir}/src/rebar" ]; then
-            git clone --depth 1 --branch 2.6.0 https://git-wip-us.apache.org/repos/asf/couchdb-rebar.git ${rootdir}/src/rebar
+            git clone --depth 1 --branch hack/2.0 https://git-wip-us.apache.org/repos/asf/couchdb-rebar.git ${rootdir}/src/rebar
         fi
         make -C ${rootdir}/src/rebar
         mv ${rootdir}/src/rebar/rebar ${rootdir}/bin/rebar
