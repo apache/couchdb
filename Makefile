@@ -211,7 +211,7 @@ dist: all
 
 	@cp -r share/www apache-couchdb-$(COUCHDB_VERSION)/share/
 	@mkdir -p apache-couchdb-$(COUCHDB_VERSION)/share/docs/html
-	@cp -r src/docs/build/html apache-couchdb-$(COUCHDB_VERSION)/share/docs/html
+	@cp -r src/docs/build/html apache-couchdb-$(COUCHDB_VERSION)/share/docs/
 	@mkdir -p apache-couchdb-$(COUCHDB_VERSION)/share/docs/pdf
 	@cp src/docs/build/latex/CouchDB.pdf apache-couchdb-$(COUCHDB_VERSION)/share/docs/pdf/
 
