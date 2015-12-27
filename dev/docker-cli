@@ -13,6 +13,27 @@
 
 set -e
 
+if [ "$1" = 'help' ] || [ "$1" = '--help' ] || [ "$1" = '-h' ]; then
+  echo "
+Usage: docker-cli command
+
+Builds and runs a dockerized CouchDB 2.0 dev cluster
+
+Commands:
+  build           Build the 'couchdb-master' Docker image with a freshly
+                  compiled CouchDB. You can pass options to './configure'.
+                  e.g.: docker-cli build --disable-fauxton
+                  Will always run with '--disable-docs'
+  run             Create a container from 'couchdb-master' image and start
+                  it in the forground. You can pass the same options as
+                  you would to 'dev/run'. e.g.: docker-cli run --with-haproxy
+  clean           Remove untagged docker images
+  help            Show this help message and exit
+
+Options:
+  -h, --help      Show this help message and exit"
+fi
+
 if [ "$1" = 'build' ]; then
   printf "Building \"couchdb-master\" docker image...\n\n"
   # build docker image
