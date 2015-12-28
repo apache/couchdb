@@ -88,7 +88,7 @@ fauxton: share/www
 
 .PHONY: check
 # target: check - Test everything
-check:
+check: all
 	@$(MAKE) eunit
 	@$(MAKE) javascript
 	@$(MAKE) build-test
@@ -105,7 +105,7 @@ eunit: couch
 
 .PHONY: javascript
 # target: javascript - Run JavaScript test suites or specific ones defined by suites option
-javascript: all
+javascript:
 	@mkdir -p share/www/script/test
 ifeq ($(IN_RELEASE), true)
 	@cp test/javascript/tests/lorem*.txt share/www/test/
