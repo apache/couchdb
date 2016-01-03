@@ -372,7 +372,7 @@ maybe_log(#httpd{} = HttpReq, #httpd_resp{should_log = true} = HttpResp) ->
     RawUri = MochiReq:get(raw_path),
     RequestTime = timer:now_diff(EndTime, BeginTime) / 1000,
     couch_log:notice("~s ~s ~s ~s ~s ~B ~p ~B", [Nonce, Peer, Host,
-        atom_to_list(Method), RawUri, Code, Status, round(RequestTime)]);
+        Method, RawUri, Code, Status, round(RequestTime)]);
 maybe_log(_HttpReq, #httpd_resp{should_log = false}) ->
     ok.
 
