@@ -19,7 +19,9 @@
 ]).
 
 -export([
-    handle_message/2
+    handle_message/2,
+    composite_indexes/2,
+    choose_best_index/2
 ]).
 
 

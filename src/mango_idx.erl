@@ -42,7 +42,8 @@
     cursor_mod/1,
     idx_mod/1,
     to_json/1,
-    delete/4
+    delete/4,
+    get_usable_indexes/3
 ]).
 
 
@@ -54,6 +55,27 @@
 list(Db) ->
     {ok, Indexes} = ddoc_cache:open(db_to_name(Db), ?MODULE),
     Indexes.
+
+get_usable_indexes(Db, Selector0, Opts) ->
+    Selector = mango_selector:normalize(Selector0),
+
+    ExistingIndexes = mango_idx:list(Db),
+    if ExistingIndexes /= [] -> ok; true ->
+        ?MANGO_ERROR({no_usable_index, no_indexes_defined})
+    end,
+
+    FilteredIndexes = mango_cursor:maybe_filter_indexes(ExistingIndexes, Opts),
+    if FilteredIndexes /= [] -> ok; true ->
+        ?MANGO_ERROR({no_usable_index, no_index_matching_name})
+    end,
+
+    SortIndexes = mango_idx:for_sort(FilteredIndexes, Opts),
+    if SortIndexes /= [] -> ok; true ->
+        ?MANGO_ERROR({no_usable_index, missing_sort_index})
+    end,
+
+    UsableFilter = fun(I) -> mango_idx:is_usable(I, Selector) end,
+    lists:filter(UsableFilter, SortIndexes).
 
 recover(Db) ->
     {ok, DDocs0} = mango_util:open_ddocs(Db),
@@ -245,7 +267,7 @@ end_key(#idx{}=Idx, Ranges) ->
 cursor_mod(#idx{type = <<"json">>}) ->
     mango_cursor_view;
 cursor_mod(#idx{def = all_docs, type= <<"special">>}) ->
-    mango_cursor_view;
+    mango_cursor_special;
 cursor_mod(#idx{type = <<"text">>}) ->
     case module_loaded(dreyfus_index) of
         true ->

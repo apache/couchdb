@@ -16,7 +16,8 @@
 -export([
     create/3,
     explain/1,
-    execute/3
+    execute/3,
+    maybe_filter_indexes/2
 ]).
 
 
@@ -30,29 +31,18 @@
 
 create(Db, Selector0, Opts) ->
     Selector = mango_selector:normalize(Selector0),
+    UsableIndexes = mango_idx:get_usable_indexes(Db, Selector0, Opts),
 
-    ExistingIndexes = mango_idx:list(Db),
-    if ExistingIndexes /= [] -> ok; true ->
-        ?MANGO_ERROR({no_usable_index, no_indexes_defined})
-    end,
-
-    FilteredIndexes = maybe_filter_indexes(ExistingIndexes, Opts),
-    if FilteredIndexes /= [] -> ok; true ->
-        ?MANGO_ERROR({no_usable_index, no_index_matching_name})
-    end,
-
-    SortIndexes = mango_idx:for_sort(FilteredIndexes, Opts),
-    if SortIndexes /= [] -> ok; true ->
-        ?MANGO_ERROR({no_usable_index, missing_sort_index})
-    end,
-
-    UsableFilter = fun(I) -> mango_idx:is_usable(I, Selector) end,
-    UsableIndexes = lists:filter(UsableFilter, SortIndexes),
-    if UsableIndexes /= [] -> ok; true ->
-        ?MANGO_ERROR({no_usable_index, selector_unsupported})
-    end,
-
-    create_cursor(Db, UsableIndexes, Selector, Opts).
+    {use_index, IndexSpecified} = proplists:lookup(use_index, Opts),
+    case {length(UsableIndexes), length(IndexSpecified)} of
+        {0, 1} ->
+            ?MANGO_ERROR({no_usable_index, selector_unsupported});
+        {0, 0} ->
+            AllDocs = mango_idx:special(Db),
+            create_cursor(Db, AllDocs, Selector, Opts);
+        _ ->
+            create_cursor(Db, UsableIndexes, Selector, Opts)
+    end.
 
 
 explain(#cursor{}=Cursor) ->
@@ -125,9 +115,9 @@ group_indexes_by_type(Indexes) ->
     % queries.
     CursorModules = case module_loaded(dreyfus_index) of
         true ->
-            [mango_cursor_view, mango_cursor_text];
+            [mango_cursor_view, mango_cursor_text, mango_cursor_special];
         false ->
-            [mango_cursor_view]
+            [mango_cursor_view, mango_cursor_special]
     end,
     lists:flatmap(fun(CMod) ->
         case dict:find(CMod, IdxDict) of

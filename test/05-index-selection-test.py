@@ -74,6 +74,16 @@ class IndexSelectionTests(mango.UserDocsTests):
             }, use_index=ddocid, explain=True)
         assert resp["index"]["ddoc"] == ddocid
 
+    def test_use_most_columns(self):
+        # ddoc id for the age index
+        ddocid = "_design/ad3d537c03cd7c6a43cf8dff66ef70ea54c2b40f"
+        try:
+            self.db.find({}, use_index=ddocid)
+        except Exception, e:
+            assert e.response.status_code == 400
+        else:
+            raise AssertionError("bad find")
+
     # This doc will not be saved given the new ddoc validation code
     # in couch_mrview
     def test_manual_bad_view_idx01(self):

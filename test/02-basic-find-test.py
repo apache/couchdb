@@ -236,12 +236,9 @@ class BasicFindTests(mango.UserDocsTests):
             assert len(docs) == 15
 
     def test_empty(self):
-        try:
-            self.db.find({})
-        except Exception, e:
-            assert e.response.status_code == 400
-        else:
-            raise AssertionError("bad find")
+        docs = self.db.find({})
+        # 15 users and 9 design docs
+        assert len(docs) == 24
 
     def test_empty_subsel(self):
         docs = self.db.find({
