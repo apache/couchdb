@@ -134,15 +134,15 @@ open(Db, State) ->
                 {ok, {OldSig, Header}} ->
                     % Matching view signatures.
                     NewSt = couch_mrview_util:init_state(Db, Fd, State, Header),
-                    {ok, NewSt#mrst{fd_monitor=erlang:monitor(process, Fd)}};
+                    {ok, NewSt};
                 % end of upgrade code for <= 1.2.x
                 {ok, {Sig, Header}} ->
                     % Matching view signatures.
                     NewSt = couch_mrview_util:init_state(Db, Fd, State, Header),
-                    {ok, NewSt#mrst{fd_monitor=erlang:monitor(process, Fd)}};
+                    {ok, NewSt};
                 _ ->
                     NewSt = couch_mrview_util:reset_index(Db, Fd, State),
-                    {ok, NewSt#mrst{fd_monitor=erlang:monitor(process, Fd)}}
+                    {ok, NewSt}
             end;
         {error, Reason} = Error ->
             couch_log:error("Failed to open view file '~s': ~s",
