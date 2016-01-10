@@ -542,10 +542,10 @@ parse_opts() {
         LIBDIR="$EXEC_PREFIX/lib";
     fi
     if test -z "$DATABASEDIR"; then
-        DATABASEDIR="$LOCALSTATEDIR/lib";
+        DATABASEDIR="$LOCALSTATEDIR/lib/couchdb";
     fi
     if test -z "$VIEWDIR"; then
-        VIEWDIR="$LOCALSTATEDIR/lib";
+        VIEWDIR="$LOCALSTATEDIR/lib/couchdb";
     fi
     if test -z "$LOGDIR"; then
         LOGDIR="$LOCALSTATEDIR/log";
