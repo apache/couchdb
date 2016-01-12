@@ -240,8 +240,8 @@ provider_modules_order_test() ->
     ],
 
     Defs = definitions(providers, bar_handlers),
-    Result = [{App, V} || {App, #couch_epi_spec{value = V}} <- Defs],
-    Tests = lists:zip(Expected, Result),
+    Results = [{App, V} || {App, #couch_epi_spec{value = V}} <- Defs],
+    Tests = lists:zip(Expected, Results),
     [?assertEqual(Expect, Result) || {Expect, Result} <- Tests],
     ok.
 
@@ -254,8 +254,8 @@ providers_order_test() ->
     ],
     AllDefs = grouped_definitions([foo_epi, bar_epi]),
     {_, Defs} = lists:keyfind({providers, bar_handlers}, 1, AllDefs),
-    Result = [{App, V} || {App, #couch_epi_spec{value = V}} <- Defs],
-    Tests = lists:zip(Expected, Result),
+    Results = [{App, V} || {App, #couch_epi_spec{value = V}} <- Defs],
+    Tests = lists:zip(Expected, Results),
     [?assertEqual(Expect, Result) || {Expect, Result} <- Tests],
     ok.
 
