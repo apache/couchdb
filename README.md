@@ -32,6 +32,14 @@ From here on, there are two paths, one is via Fauxton (a) the other is
 using a HTTP endpoint (b). Fauxton just uses the HTTP endpoint in (b).
 (b) can be used to set up a cluster programmatically.
 
+When using (b) you POST HTTP requests with a JSON request body (the request content type has to be set to application/json).
+
+If you have already setup a server admin account, you might need to pass the credentials to the HTTP calls using HTTP basic authentication.
+Alternativaly, if you use the cURL command you can can add username and password inline, like so:
+
+```
+curl -X PUT "http://admin:password@127.0.0.1:5984/mydb"
+```
 
 2.a. Go to Fauxton. There is a “Cluster Setup” tab in the sidebar. Go
 to the tab and get presented with a form that asks you to enter an admin
@@ -43,23 +51,21 @@ is no need to ask for admin credentials here. If the bind_address is !=
 127.0.0.1, we can skip this entirely and Fauxton can show the add_node
 UI right away.
 
-- POST to /_setup with
+- POST a JSON entity to /_cluster_setup, the entity looks like:  
 ```
-  {
-    "action": "enable_cluster",
-    "admin": {
-      "user": "username",
-      "pass": "password"
-    },
-    ["bind_address": "xxxx",]
-    ["port": yyyy]
-  }
+{
+  "action":"enable_cluster",
+  "username":"username",
+  "password":"password",
+  "bind_address":"0.0.0.0",
+  "port": 5984
+}
 ```
 
 This sets up the admin user on the current node and binds to 0.0.0.0:5984
 or the specified ip:port. Logs admin user into Fauxton automatically.
 
-2.b. POST to /_setup as shown above.
+2.b. POST to /_cluster_setup as shown above.
 
 Repeat on all nodes.
 - keep the same username/password everywhere.
@@ -75,23 +81,20 @@ Repeat on all nodes.
 
 a. Go to Fauxton / Cluster Setup, once we have enabled the cluster, the
 UI shows an “Add Node” interface with the fields admin, and node:
-- POST to /_setup with
+- POST a JSON entity to /_cluster_setup, the entity looks like:
 ```
-  {
-    "action": "add_node",
-    "admin": { // should be auto-filled from Fauxton, store plaintext PW in
-               // localStorage until we finish_cluster or timeout.
-      "user": "username",
-      "pass": "password"
-    },
-    "node": {
-      "host": "hostname",
-      ["port": 5984]
-    }
-  }
+{
+  "action":"add_node",
+  "username":"username",
+  "password":"password",
+  "host":"192.168.1.100",
+  "port": 5984
+}
 ```
 
-b. as in a, but without the Fauxton bits, just POST to /_setup
+In the example above, this adds the node with IP address 192.168.1.100 to the cluster.
+
+b. as in a, but without the Fauxton bits, just POST to /_cluster_setup
 - this request will do this:
  - on the “setup coordination node”:
   - check if we have an Erlang Cookie Secret. If not, generate
@@ -99,7 +102,7 @@ b. as in a, but without the Fauxton bits, just POST to /_setup
     - store the cookie in config.ini, re-set_cookie() on startup.
   - make a POST request to the node specified in the body above
     using the admin credentials in the body above:
-    POST to http://username:password@node_b:5984/_setup with:
+    POST to http://username:password@node_b:5984/_cluster_setup with:
 ```
     {
       "action": "receive_cookie",
@@ -119,10 +122,10 @@ b. as in a, but without the Fauxton bits, just POST to /_setup
 
 4.a. When all nodes are added, click the [Finish Cluster Setup] button
 in Fauxton.
-- this does POST /_setup
+- this does POST /_cluster_setup
 ```
   {
-    "action": "finish_setup"
+    "action": "finish_cluster"
   }
 ```
 
@@ -144,41 +147,41 @@ This is right after starting a node for the first time, and any time
 before the cluster is enabled as outlined above.
 
 ```
-GET /_setup
+GET /_cluster_setup
 {"state": "cluster_disabled"}
 
-POST /_setup {"action":"enable_cluster"...} -> Transition to State 2
-POST /_setup {"action":"enable_cluster"...} with empty admin user/pass or invalid host/post or host/port not available -> Error
-POST /_setup {"action":"anything_but_enable_cluster"...} -> Error
+POST /_cluster_setup {"action":"enable_cluster"...} -> Transition to State 2
+POST /_cluster_setup {"action":"enable_cluster"...} with empty admin user/pass or invalid host/post or host/port not available -> Error
+POST /_cluster_setup {"action":"anything_but_enable_cluster"...} -> Error
 ```
 
 ### State 2: Cluster enabled, admin user set, waiting for nodes to be added.
 
 ```
-GET /_setup
+GET /_cluster_setup
 {"state":"cluster_enabled","nodes":[]}
 
-POST /_setup {"action":"enable_cluster"...} -> Error
-POST /_setup {"action":"add_node"...} -> Stay in State 2, but return "nodes":["node B"}] on GET
-POST /_setup {"action":"add_node"...} -> if target node not available, Error
-POST /_setup {"action":"finish_cluster"} with no nodes set up -> Error
-POST /_setup {"action":"finish_cluster"} -> Transition to State 3
-POST /_setup {"action":"delete_node"...} -> Stay in State 2, but delete node from /nodes, reflect the change in GET /_setup
-POST /_setup {"action":"delete_node","node":"unknown"} -> Error Unknown Node
+POST /_cluster_setup {"action":"enable_cluster"...} -> Error
+POST /_cluster_setup {"action":"add_node"...} -> Stay in State 2, but return "nodes":["node B"}] on GET
+POST /_cluster_setup {"action":"add_node"...} -> if target node not available, Error
+POST /_cluster_setup {"action":"finish_cluster"} with no nodes set up -> Error
+POST /_cluster_setup {"action":"finish_cluster"} -> Transition to State 3
+POST /_cluster_setup {"action":"delete_node"...} -> Stay in State 2, but delete node from /nodes, reflect the change in GET /_cluster_setup
+POST /_cluster_setup {"action":"delete_node","node":"unknown"} -> Error Unknown Node
 ```
 
 ### State 3: Cluster set up, all nodes operational
 
 ```
-GET /_setup
+GET /_cluster_setup
 {"state":"cluster_finished","nodes":["node a", "node b", ...]}
 
-POST /_setup {"action":"enable_cluster"...} -> Error
-POST /_setup {"action":"finish_cluster"...} -> Stay in State 3, do nothing
-POST /_setup {"action":"add_node"...} -> Error
-POST /_setup?i_know_what_i_am_doing=true {"action":"add_node"...} -> Add node, stay in State 3.
-POST /_setup {"action":"delete_node"...} -> Stay in State 3, but delete node from /nodes, reflect the change in GET /_setup
-POST /_setup {"action":"delete_node","node":"unknown"} -> Error Unknown Node
+POST /_cluster_setup {"action":"enable_cluster"...} -> Error
+POST /_cluster_setup {"action":"finish_cluster"...} -> Stay in State 3, do nothing
+POST /_cluster_setup {"action":"add_node"...} -> Error
+POST /_cluster_setup?i_know_what_i_am_doing=true {"action":"add_node"...} -> Add node, stay in State 3.
+POST /_cluster_setup {"action":"delete_node"...} -> Stay in State 3, but delete node from /nodes, reflect the change in GET /_cluster_setup
+POST /_cluster_setup {"action":"delete_node","node":"unknown"} -> Error Unknown Node
 ```
 
 // TBD: we need to persist the setup state somewhere.
