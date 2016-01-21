@@ -47,7 +47,18 @@ changes(DbName, #changes_args{} = Args, StartSeq, DbOptions) ->
     changes(DbName, [Args], StartSeq, DbOptions);
 changes(DbName, Options, StartVector, DbOptions) ->
     set_io_priority(DbName, DbOptions),
-    #changes_args{dir=Dir} = Args = lists:keyfind(changes_args, 1, Options),
+    Args0 = lists:keyfind(changes_args, 1, Options),
+    #changes_args{dir=Dir, filter_fun=Filter} = Args0,
+    Args = case Filter of
+        {fetch, Style, Req, {DDocId, Rev}, FName} ->
+            {ok, DDoc} = ddoc_cache:open_doc(mem3:dbname(DbName), DDocId, Rev),
+            Args0#changes_args{
+                filter_fun={custom, Style, Req, DDoc, FName}
+            };
+        _ ->
+            Args0
+    end,
+
     DbOpenOptions = Args#changes_args.db_open_options ++ DbOptions,
     case get_or_create_db(DbName, DbOpenOptions) of
     {ok, Db} ->
