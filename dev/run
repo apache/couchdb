@@ -178,6 +178,7 @@ def setup_configs(ctx):
             # Erlang always wants UNIX-style paths
             env["data_dir"] = env["data_dir"].replace("\\", "/")
             env["view_index_dir"] = env["view_index_dir"].replace("\\", "/")
+            env["prefix"] = env["prefix"].replace("\\", "/")
         write_config(ctx, node, env)
 
 
