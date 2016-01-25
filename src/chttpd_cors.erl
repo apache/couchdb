@@ -110,6 +110,10 @@ handle_preflight_request(Req, Config, Origin) ->
         SupportedMethods = get_origin_config(Config, Origin,
                 <<"allow_methods">>, ?SUPPORTED_METHODS),
 
+        SupportedHeaders = get_origin_config(Config, Origin,
+                <<"allow_headers">>, ?SUPPORTED_HEADERS),
+
+
         %% get max age
         MaxAge = couch_util:get_value("max_age", Config, ?CORS_DEFAULT_MAX_AGE),
 
@@ -135,7 +139,7 @@ handle_preflight_request(Req, Config, Origin) ->
                         {Headers, RH}
                 end,
                 %% check if headers are supported
-                case ReqHeaders -- ?SUPPORTED_HEADERS of
+                case ReqHeaders -- SupportedHeaders of
                 [] ->
                     PreflightHeaders = PreflightHeaders0 ++
                                        [{"Access-Control-Allow-Headers",
