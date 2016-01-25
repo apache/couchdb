@@ -180,15 +180,17 @@ headers(Req, RequestHeaders, Origin, Config) ->
         true ->
             AcceptedOrigins = get_accepted_origins(Req, Config),
             CorsHeaders = handle_headers(Config, Origin, AcceptedOrigins),
-            maybe_apply_headers(CorsHeaders, RequestHeaders);
+            ExposedCouchHeaders = couch_util:get_value(
+                <<"exposed_headers">>, Config, ?COUCH_HEADERS),
+            maybe_apply_headers(CorsHeaders, RequestHeaders, ExposedCouchHeaders);
         false ->
             RequestHeaders
     end.
 
 
-maybe_apply_headers([], RequestHeaders) ->
+maybe_apply_headers([], RequestHeaders, _ExposedCouchHeaders) ->
     RequestHeaders;
-maybe_apply_headers(CorsHeaders, RequestHeaders) ->
+maybe_apply_headers(CorsHeaders, RequestHeaders, ExposedCouchHeaders) ->
     %% Find all non ?SIMPLE_HEADERS and and non ?SIMPLE_CONTENT_TYPE_VALUES,
     %% expose those through Access-Control-Expose-Headers, allowing
     %% the client to access them in the browser. Also append in
@@ -214,9 +216,10 @@ maybe_apply_headers(CorsHeaders, RequestHeaders) ->
         true ->
             ExposedHeaders0
         end,
-    %% ?COUCH_HEADERS may get added later, so expose them by default
+
+    %% ExposedCouchHeaders may get added later, so expose them by default
     ACEH = [{"Access-Control-Expose-Headers",
-        string:join(ExposedHeaders ++ ?COUCH_HEADERS, ", ")}],
+        string:join(ExposedHeaders ++ ExposedCouchHeaders, ", ")}],
     CorsHeaders ++ RequestHeaders ++ ACEH.
 
 
@@ -284,6 +287,12 @@ get_cors_config(#httpd{cors_config = undefined}) ->
         AllowMethods0 ->
             split_list(AllowMethods0)
     end,
+    ExposedHeaders = case config:get("cors", "exposed_headers", undefined) of
+        undefined ->
+            ?COUCH_HEADERS;
+        ExposedHeaders0 ->
+            split_list(ExposedHeaders0)
+    end,
     Origins0 = binary_split_list(config:get("cors", "origins", [])),
     Origins = [{O, {[]}} || O <- Origins0],
     [
@@ -291,6 +300,7 @@ get_cors_config(#httpd{cors_config = undefined}) ->
         {<<"allow_credentials">>, AllowCredentials},
         {<<"allow_methods">>, AllowMethods},
         {<<"allow_headers">>, AllowHeaders},
+        {<<"exposed_headers">>, ExposedHeaders},
         {<<"origins">>, {Origins}}
     ];
 get_cors_config(#httpd{cors_config = Config}) ->
