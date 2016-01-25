@@ -24,6 +24,10 @@
     "content-type, accept-ranges, etag, server, x-couch-request-id, " ++
     "x-couch-update-newrev, x-couchdb-body-time").
 
+-define(CUSTOM_SUPPORTED_METHODS, ?SUPPORTED_METHODS -- ["CONNECT"]).
+-define(CUSTOM_SUPPORTED_HEADERS, ["extra" | ?SUPPORTED_HEADERS -- ["pragma"]]).
+-define(CUSTOM_EXPOSED_HEADERS, ["expose" | ?COUCH_HEADERS]).
+
 
 %% Test helpers
 
@@ -56,6 +60,16 @@ wildcard_cors_config() ->
         ]}}
     ].
 
+custom_cors_config() ->
+    [
+        {<<"enable_cors">>, true},
+        {<<"allow_methods">>, ?CUSTOM_SUPPORTED_METHODS},
+        {<<"allow_headers">>, ?CUSTOM_SUPPORTED_HEADERS},
+        {<<"exposed_headers">>, ?CUSTOM_EXPOSED_HEADERS},
+        {<<"origins">>, {[
+            {<<"*">>, {[]}}
+        ]}}
+    ].
 
 access_control_cors_config(AllowCredentials) ->
     [
@@ -164,6 +178,15 @@ cors_enabled_simple_config_test_() ->
                 fun test_preflight_with_scheme_no_origin_/1,
                 fun test_preflight_with_scheme_port_no_origin_/1,
                 fun test_case_sensitive_mismatch_of_allowed_origins_/1
+            ]}}.
+
+cors_enabled_custom_config_test_() ->
+    {"Simple CORS config with custom allow_methods/allow_headers/exposed_headers",
+        {foreach,
+            fun custom_cors_config/0,
+            [
+                fun test_good_headers_preflight_request_with_custom_config_/1,
+                fun test_db_request_with_custom_config_/1
             ]}}.
 
 
@@ -307,7 +330,31 @@ test_good_headers_preflight_request_(OwnerConfig) ->
         ?_assertEqual(?DEFAULT_ORIGIN,
             header(Headers1, "Access-Control-Allow-Origin")),
         ?_assertEqual(string_headers(?SUPPORTED_METHODS),
-            header(Headers1, "Access-Control-Allow-Methods"))
+            header(Headers1, "Access-Control-Allow-Methods")),
+        ?_assertEqual(string_headers(["accept-language"]),
+            header(Headers1, "Access-Control-Allow-Headers"))
+    ].
+
+test_good_headers_preflight_request_with_custom_config_(OwnerConfig) ->
+    Headers = [
+        {"Origin", ?DEFAULT_ORIGIN},
+        {"Access-Control-Request-Method", "GET"},
+        {"Access-Control-Request-Headers", "accept-language, extra"}
+    ],
+    Req = mock_request('OPTIONS', "/", Headers),
+    ?assert(chttpd_cors:is_cors_enabled(OwnerConfig)),
+    AllowMethods = couch_util:get_value(
+        <<"allow_methods">>, OwnerConfig, ?SUPPORTED_METHODS),
+    AllowHeaders = couch_util:get_value(
+        <<"allow_headers">>, OwnerConfig, ?SUPPORTED_HEADERS),
+    {ok, Headers1} = chttpd_cors:maybe_handle_preflight_request(Req, OwnerConfig),
+    [
+        ?_assertEqual(?DEFAULT_ORIGIN,
+            header(Headers1, "Access-Control-Allow-Origin")),
+        ?_assertEqual(string_headers(AllowMethods),
+            header(Headers1, "Access-Control-Allow-Methods")),
+        ?_assertEqual(string_headers(["accept-language", "extra"]),
+            header(Headers1, "Access-Control-Allow-Headers"))
     ].
 
 
@@ -362,6 +409,21 @@ test_db_request_(OwnerConfig) ->
             header(Headers1, "Access-Control-Allow-Origin")),
         ?_assertEqual(?EXPOSED_HEADERS,
             header(Headers1, "Access-Control-Expose-Headers"))
+    ].
+
+test_db_request_with_custom_config_(OwnerConfig) ->
+    Origin = ?DEFAULT_ORIGIN,
+    Headers = [{"Origin", Origin}, {"extra", "EXTRA"}],
+    Req = mock_request('GET', "/my_db", Headers),
+    Headers1 = chttpd_cors:headers(Req, Headers, Origin, OwnerConfig),
+    ExposedHeaders = couch_util:get_value(
+        <<"exposed_headers">>, OwnerConfig, ?COUCH_HEADERS),
+    [
+        ?_assertEqual(?DEFAULT_ORIGIN,
+            header(Headers1, "Access-Control-Allow-Origin")),
+        ?_assertEqual(lists:sort(["content-type" | ExposedHeaders]),
+            lists:sort(
+                split_list(header(Headers1, "Access-Control-Expose-Headers"))))
     ].
 
 
@@ -473,3 +535,6 @@ test_db_request_credentials_header_on_(OwnerConfig) ->
         ?_assertEqual("true",
             header(Headers1, "Access-Control-Allow-Credentials"))
     ].
+
+split_list(S) ->
+    re:split(S, "\\s*,\\s*", [trim, {return, list}]).
