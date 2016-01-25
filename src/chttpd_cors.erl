@@ -268,7 +268,7 @@ allow_credentials(Config, Origin) ->
 get_cors_config(#httpd{cors_config = undefined}) ->
     EnableCors = config:get("httpd", "enable_cors", "false") =:= "true",
     AllowCredentials = config:get("cors", "credentials", "false") =:= "true",
-    AllowHeaders = case config:get("cors", "methods", undefined) of
+    AllowHeaders = case config:get("cors", "headers", undefined) of
         undefined ->
             ?SUPPORTED_HEADERS;
         AllowHeaders0 ->
