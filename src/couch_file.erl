@@ -42,6 +42,8 @@
 -export([init/1, terminate/2, code_change/3]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
 
+%% helper functions
+-export([process_info/1]).
 
 %%----------------------------------------------------------------------
 %% Args:   Valid Options are [create] and [create,overwrite].
@@ -299,6 +301,8 @@ init({Filepath, Options, ReturnPid, Ref}) ->
         filelib:ensure_dir(Filepath),
         case file:open(Filepath, OpenOptions) of
         {ok, Fd} ->
+            %% Save Fd in process dictionary for debugging purposes
+            put(couch_file_fd, {Fd, Filepath}),
             {ok, Length} = file:position(Fd, eof),
             case Length > 0 of
             true ->
@@ -330,6 +334,8 @@ init({Filepath, Options, ReturnPid, Ref}) ->
         case file:open(Filepath, [read, raw]) of
         {ok, Fd_Read} ->
             {ok, Fd} = file:open(Filepath, OpenOptions),
+            %% Save Fd in process dictionary for debugging purposes
+            put(couch_file_fd, {Fd, Filepath}),
             ok = file:close(Fd_Read),
             maybe_track_open_os_files(Options),
             {ok, Eof} = file:position(Fd, eof),
@@ -591,4 +597,16 @@ is_idle(#file{is_sys=false}) ->
         {monitored_by, [Tracker]} -> true;
         {monitored_by, [_]} -> exit(tracker_monitoring_failed);
         _ -> false
+    end.
+
+-spec process_info(CouchFilePid :: pid()) ->
+    {Fd :: pid() | tuple(), FilePath :: string()}.
+
+process_info(Pid) ->
+    {dictionary, Dict} = erlang:process_info(Pid, dictionary),
+    case lists:keyfind(couch_file_fd, 1, Dict) of
+        false ->
+            undefined;
+        {couch_file_fd, {Fd, InitialName}} ->
+            {Fd, InitialName}
     end.
