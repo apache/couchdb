@@ -279,7 +279,7 @@ get_cors_config(#httpd{cors_config = undefined}) ->
         undefined ->
             ?SUPPORTED_HEADERS;
         AllowHeaders0 ->
-            split_list(AllowHeaders0)
+            [to_lower(H) || H <- split_list(AllowHeaders0)]
     end,
     AllowMethods = case config:get("cors", "methods", undefined) of
         undefined ->
@@ -291,7 +291,7 @@ get_cors_config(#httpd{cors_config = undefined}) ->
         undefined ->
             ?COUCH_HEADERS;
         ExposedHeaders0 ->
-            split_list(ExposedHeaders0)
+            [to_lower(H) || H <- split_list(ExposedHeaders0)]
     end,
     Origins0 = binary_split_list(config:get("cors", "origins", [])),
     Origins = [{O, {[]}} || O <- Origins0],
