@@ -110,6 +110,10 @@ handle_preflight_request(Req, Config, Origin) ->
         SupportedMethods = get_origin_config(Config, Origin,
                 <<"allow_methods">>, ?SUPPORTED_METHODS),
 
+        SupportedHeaders = get_origin_config(Config, Origin,
+                <<"allow_headers">>, ?SUPPORTED_HEADERS),
+
+
         %% get max age
         MaxAge = couch_util:get_value("max_age", Config, ?CORS_DEFAULT_MAX_AGE),
 
@@ -135,7 +139,7 @@ handle_preflight_request(Req, Config, Origin) ->
                         {Headers, RH}
                 end,
                 %% check if headers are supported
-                case ReqHeaders -- ?SUPPORTED_HEADERS of
+                case ReqHeaders -- SupportedHeaders of
                 [] ->
                     PreflightHeaders = PreflightHeaders0 ++
                                        [{"Access-Control-Allow-Headers",
@@ -176,15 +180,17 @@ headers(Req, RequestHeaders, Origin, Config) ->
         true ->
             AcceptedOrigins = get_accepted_origins(Req, Config),
             CorsHeaders = handle_headers(Config, Origin, AcceptedOrigins),
-            maybe_apply_headers(CorsHeaders, RequestHeaders);
+            ExposedCouchHeaders = couch_util:get_value(
+                <<"exposed_headers">>, Config, ?COUCH_HEADERS),
+            maybe_apply_headers(CorsHeaders, RequestHeaders, ExposedCouchHeaders);
         false ->
             RequestHeaders
     end.
 
 
-maybe_apply_headers([], RequestHeaders) ->
+maybe_apply_headers([], RequestHeaders, _ExposedCouchHeaders) ->
     RequestHeaders;
-maybe_apply_headers(CorsHeaders, RequestHeaders) ->
+maybe_apply_headers(CorsHeaders, RequestHeaders, ExposedCouchHeaders) ->
     %% Find all non ?SIMPLE_HEADERS and and non ?SIMPLE_CONTENT_TYPE_VALUES,
     %% expose those through Access-Control-Expose-Headers, allowing
     %% the client to access them in the browser. Also append in
@@ -210,9 +216,10 @@ maybe_apply_headers(CorsHeaders, RequestHeaders) ->
         true ->
             ExposedHeaders0
         end,
-    %% ?COUCH_HEADERS may get added later, so expose them by default
+
+    %% ExposedCouchHeaders may get added later, so expose them by default
     ACEH = [{"Access-Control-Expose-Headers",
-        string:join(ExposedHeaders ++ ?COUCH_HEADERS, ", ")}],
+        string:join(ExposedHeaders ++ ExposedCouchHeaders, ", ")}],
     CorsHeaders ++ RequestHeaders ++ ACEH.
 
 
@@ -268,17 +275,23 @@ allow_credentials(Config, Origin) ->
 get_cors_config(#httpd{cors_config = undefined}) ->
     EnableCors = config:get("httpd", "enable_cors", "false") =:= "true",
     AllowCredentials = config:get("cors", "credentials", "false") =:= "true",
-    AllowHeaders = case config:get("cors", "methods", undefined) of
+    AllowHeaders = case config:get("cors", "headers", undefined) of
         undefined ->
             ?SUPPORTED_HEADERS;
         AllowHeaders0 ->
-            split_list(AllowHeaders0)
+            [to_lower(H) || H <- split_list(AllowHeaders0)]
     end,
     AllowMethods = case config:get("cors", "methods", undefined) of
         undefined ->
             ?SUPPORTED_METHODS;
         AllowMethods0 ->
             split_list(AllowMethods0)
+    end,
+    ExposedHeaders = case config:get("cors", "exposed_headers", undefined) of
+        undefined ->
+            ?COUCH_HEADERS;
+        ExposedHeaders0 ->
+            [to_lower(H) || H <- split_list(ExposedHeaders0)]
     end,
     Origins0 = binary_split_list(config:get("cors", "origins", [])),
     Origins = [{O, {[]}} || O <- Origins0],
@@ -287,6 +300,7 @@ get_cors_config(#httpd{cors_config = undefined}) ->
         {<<"allow_credentials">>, AllowCredentials},
         {<<"allow_methods">>, AllowMethods},
         {<<"allow_headers">>, AllowHeaders},
+        {<<"exposed_headers">>, ExposedHeaders},
         {<<"origins">>, {Origins}}
     ];
 get_cors_config(#httpd{cors_config = Config}) ->
