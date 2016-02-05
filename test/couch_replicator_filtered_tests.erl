@@ -21,6 +21,16 @@
     {<<"filters">>, {[
         {<<"testfilter">>, <<"
             function(doc, req){if (doc.class == 'mammal') return true;}
+        ">>},
+        {<<"queryfilter">>, <<"
+            function(doc, req) {
+                if (doc.class && req.query.starts) {
+                    return doc.class.indexOf(req.query.starts) === 0;
+                }
+                else {
+                    return false;
+                }
+            }
         ">>}
     ]}}
 ]}).
@@ -50,6 +60,18 @@ filtered_replication_test_() ->
         }
     }.
 
+query_filtered_replication_test_() ->
+    Pairs = [{local, local}, {local, remote},
+             {remote, local}, {remote, remote}],
+    {
+        "Filtered with query replication tests",
+        {
+            foreachx,
+            fun setup/1, fun teardown/2,
+            [{Pair, fun should_succeed_with_query/2} || Pair <- Pairs]
+        }
+    }.
+
 should_succeed({From, To}, {_Ctx, {Source, Target}}) ->
     RepObject = {[
         {<<"source">>, db_url(From, Source)},
@@ -66,6 +88,32 @@ should_succeed({From, To}, {_Ctx, {Source, Target}}) ->
     {lists:flatten(io_lib:format("~p -> ~p", [From, To])), [
         {"Target DB has proper number of docs",
         ?_assertEqual(1, proplists:get_value(doc_count, TargetDbInfo))},
+        {"Target DB doesn't have deleted docs",
+        ?_assertEqual(0, proplists:get_value(doc_del_count, TargetDbInfo))},
+        {"All the docs filtered as expected",
+        ?_assert(lists:all(fun(Valid) -> Valid end, AllReplies))}
+    ]}.
+
+should_succeed_with_query({From, To}, {_Ctx, {Source, Target}}) ->
+    RepObject = {[
+        {<<"source">>, db_url(From, Source)},
+        {<<"target">>, db_url(To, Target)},
+        {<<"filter">>, <<"filter_ddoc/queryfilter">>},
+        {<<"query_params">>, {[
+            {<<"starts">>, <<"a">>}
+        ]}}
+    ]},
+    {ok, _} = couch_replicator:replicate(RepObject, ?ADMIN_USER),
+    FilterFun = fun(_DocId, {Props}) ->
+        case couch_util:get_value(<<"class">>, Props) of
+            <<"a", _/binary>> -> true;
+            _ -> false
+        end
+    end,
+    {ok, TargetDbInfo, AllReplies} = compare_dbs(Source, Target, FilterFun),
+    {lists:flatten(io_lib:format("~p -> ~p", [From, To])), [
+        {"Target DB has proper number of docs",
+        ?_assertEqual(2, proplists:get_value(doc_count, TargetDbInfo))},
         {"Target DB doesn't have deleted docs",
         ?_assertEqual(0, proplists:get_value(doc_del_count, TargetDbInfo))},
         {"All the docs filtered as expected",
@@ -120,6 +168,7 @@ create_docs(DbName) ->
     ]}),
     Doc2 = couch_doc:from_json_obj({[
         {<<"_id">>, <<"doc2">>},
+        {<<"class">>, <<"amphibians">>},
         {<<"value">>, 2}
 
     ]}),
@@ -129,7 +178,13 @@ create_docs(DbName) ->
         {<<"value">>, 3}
 
     ]}),
-    {ok, _} = couch_db:update_docs(Db, [DDoc, Doc1, Doc2, Doc3]),
+    Doc4 = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"doc4">>},
+        {<<"class">>, <<"arthropods">>},
+        {<<"value">>, 2}
+
+    ]}),
+    {ok, _} = couch_db:update_docs(Db, [DDoc, Doc1, Doc2, Doc3, Doc4]),
     couch_db:ensure_full_commit(Db),
     couch_db:close(Db).
 
