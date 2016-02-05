@@ -44,7 +44,7 @@
 -export([append_term/2, append_term/3, append_term_md5/2, append_term_md5/3]).
 -export([write_header/2, read_header/1]).
 -export([delete/2, delete/3, nuke_dir/2, init_delete_dir/1]).
--export([msec_since_last_read/1]).
+-export([last_read/1]).
 
 % gen_server callbacks
 -export([init/1, terminate/2, code_change/3]).
@@ -340,15 +340,9 @@ init_status_error(ReturnPid, Ref, Error) ->
     ignore.
 
 
-% Return time since last read. The return value is conservative in the
-% sense that if no read timestamp has been found, it would return 0. This
-% result is used to decide if reader is idle so returning 0 will avoid marking
-% it idle by accident when process is starting up.
-msec_since_last_read(Fd) when is_pid(Fd) ->
+last_read(Fd) when is_pid(Fd) ->
     Now = os:timestamp(),
-    LastRead = couch_util:process_dict_get(Fd, read_timestamp, Now),
-    DtMSec = timer:now_diff(Now, LastRead) div 1000,
-    max(0, DtMSec).
+    couch_util:process_dict_get(Fd, read_timestamp, Now).
 
 
 % server functions

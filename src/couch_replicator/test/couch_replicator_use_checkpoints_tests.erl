@@ -149,7 +149,7 @@ populate_db(DbName, DocCount) ->
 compare_dbs(Source, Target) ->
     {ok, SourceDb} = couch_db:open_int(Source, []),
     {ok, TargetDb} = couch_db:open_int(Target, []),
-    Fun = fun(FullDocInfo, _, Acc) ->
+    Fun = fun(FullDocInfo, Acc) ->
         {ok, Doc} = couch_db:open_doc(SourceDb, FullDocInfo),
         {Props} = DocJson = couch_doc:to_json_obj(Doc, [attachments]),
         DocId = couch_util:get_value(<<"_id">>, Props),
@@ -168,7 +168,7 @@ compare_dbs(Source, Target) ->
         ?assertEqual(DocJson, DocTargetJson),
         {ok, Acc}
     end,
-    {ok, _, _} = couch_db:enum_docs(SourceDb, Fun, [], []),
+    {ok, _} = couch_db:fold_docs(SourceDb, Fun, [], []),
     ok = couch_db:close(SourceDb),
     ok = couch_db:close(TargetDb).
 

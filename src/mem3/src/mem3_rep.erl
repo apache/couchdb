@@ -21,7 +21,7 @@
 ]).
 
 -export([
-    changes_enumerator/3
+    changes_enumerator/2
 ]).
 
 
@@ -177,8 +177,8 @@ repl(Db, Acc0) ->
         true ->
             {ok, 0};
         false ->
-            Fun = fun ?MODULE:changes_enumerator/3,
-            {ok, _, Acc2} = couch_db:enum_docs_since(Db, Seq, Fun, Acc1, []),
+            Fun = fun ?MODULE:changes_enumerator/2,
+            {ok, Acc2} = couch_db:fold_changes(Db, Seq, Fun, Acc1),
             {ok, #acc{seq = LastSeq}} = replicate_batch(Acc2),
             {ok, couch_db:count_changes_since(Db, LastSeq)}
     end.
@@ -230,11 +230,10 @@ compare_epochs(Acc) ->
     Seq = mem3_rpc:find_common_seq(Node, Name, UUID, Epochs),
     Acc#acc{seq = Seq, history = {[]}}.
 
-changes_enumerator(#doc_info{id=DocId}, Reds, #acc{db=Db}=Acc) ->
+changes_enumerator(#doc_info{id=DocId}, #acc{db=Db}=Acc) ->
     {ok, FDI} = couch_db:get_full_doc_info(Db, DocId),
-    changes_enumerator(FDI, Reds, Acc);
-changes_enumerator(#full_doc_info{}=FDI, _,
-  #acc{revcount=C, infos=Infos}=Acc0) ->
+    changes_enumerator(FDI, Acc);
+changes_enumerator(#full_doc_info{}=FDI, #acc{revcount=C, infos=Infos}=Acc0) ->
     #doc_info{
         high_seq=Seq,
         revs=Revs

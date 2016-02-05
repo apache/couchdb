@@ -70,7 +70,8 @@ all_test_() ->
                     fun should_return_409_for_put_att_nonexistent_rev/1,
                     fun should_return_update_seq_when_set_on_all_docs/1,
                     fun should_not_return_update_seq_when_unset_on_all_docs/1,
-                    fun should_return_correct_id_on_doc_copy/1
+                    fun should_return_correct_id_on_doc_copy/1,
+                    fun should_return_400_for_bad_engine/1
                 ]
             }
         }
@@ -252,3 +253,15 @@ attachment_doc() ->
             ]}
         }]}}
     ]}.
+
+
+should_return_400_for_bad_engine(_) ->
+    ?_test(begin
+        TmpDb = ?tempdb(),
+        Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
+        Port = mochiweb_socket_server:get(chttpd, port),
+        BaseUrl = lists:concat(["http://", Addr, ":", Port, "/", ?b2l(TmpDb)]),
+        Url = BaseUrl ++ "?engine=cowabunga",
+        {ok, Status, _, _} = test_request:put(Url, [?CONTENT_JSON, ?AUTH], "{}"),
+        ?assertEqual(400, Status)
+    end).
