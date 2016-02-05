@@ -43,7 +43,7 @@ data_providers() -> [].
 data_subscriptions() -> [].
 processes() -> [].
 notify(_, _, _) -> ok.
-fake_db() -> element(2, couch_db:clustered_db(fake, totes_fake)).
+fake_db() -> test_util:fake_db([]).
 
 setup() ->
     couch_tests:setup([

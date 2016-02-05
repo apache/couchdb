@@ -242,7 +242,7 @@ spawn_compaction_monitor(DbName) ->
                 1,
                 couch_db_updater,
                 handle_cast,
-                [{compact_done, '_'}, '_'],
+                [{compact_done, '_', '_'}, '_'],
                 DbPid,
                 ?TIMEOUT
             ),

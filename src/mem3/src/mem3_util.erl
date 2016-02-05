@@ -153,6 +153,10 @@ build_ordered_shards(DbName, DocProps) ->
 build_shards_by_node(DbName, DocProps) ->
     {ByNode} = couch_util:get_value(<<"by_node">>, DocProps, {[]}),
     Suffix = couch_util:get_value(<<"shard_suffix">>, DocProps, ""),
+    EngineOpt = case couch_util:get_value(<<"engine">>, DocProps) of
+        Engine when is_binary(Engine) -> [{engine, Engine}];
+        _ -> []
+    end,
     lists:flatmap(fun({Node, Ranges}) ->
         lists:map(fun(Range) ->
             [B,E] = string:tokens(?b2l(Range), "-"),
@@ -161,7 +165,8 @@ build_shards_by_node(DbName, DocProps) ->
             name_shard(#shard{
                 dbname = DbName,
                 node = to_atom(Node),
-                range = [Beg, End]
+                range = [Beg, End],
+                opts = EngineOpt
             }, Suffix)
         end, Ranges)
     end, ByNode).
@@ -169,6 +174,10 @@ build_shards_by_node(DbName, DocProps) ->
 build_shards_by_range(DbName, DocProps) ->
     {ByRange} = couch_util:get_value(<<"by_range">>, DocProps, {[]}),
     Suffix = couch_util:get_value(<<"shard_suffix">>, DocProps, ""),
+    EngineOpt = case couch_util:get_value(<<"engine">>, DocProps) of
+        Engine when is_binary(Engine) -> [{engine, Engine}];
+        _ -> []
+    end,
     lists:flatmap(fun({Range, Nodes}) ->
         lists:map(fun({Node, Order}) ->
             [B,E] = string:tokens(?b2l(Range), "-"),
@@ -178,7 +187,8 @@ build_shards_by_range(DbName, DocProps) ->
                 dbname = DbName,
                 node = to_atom(Node),
                 range = [Beg, End],
-                order = Order
+                order = Order,
+                opts = EngineOpt
             }, Suffix)
         end, lists:zip(Nodes, lists:seq(1, length(Nodes))))
     end, ByRange).
@@ -248,7 +258,8 @@ downcast(#ordered_shard{}=S) ->
        node = S#ordered_shard.node,
        dbname = S#ordered_shard.dbname,
        range = S#ordered_shard.range,
-       ref = S#ordered_shard.ref
+       ref = S#ordered_shard.ref,
+       opts = S#ordered_shard.opts
       };
 downcast(Shards) when is_list(Shards) ->
     [downcast(Shard) || Shard <- Shards].

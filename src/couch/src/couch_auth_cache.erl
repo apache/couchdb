@@ -326,13 +326,8 @@ refresh_entries(AuthDb) ->
         AuthDb2Seq = couch_db:get_update_seq(AuthDb2),
         case AuthDb2Seq > AuthDbSeq of
         true ->
-            {ok, _, _} = couch_db:enum_docs_since(
-                AuthDb2,
-                AuthDbSeq,
-                fun(DocInfo, _, _) -> refresh_entry(AuthDb2, DocInfo) end,
-                AuthDbSeq,
-                []
-            ),
+            Fun = fun(DocInfo, _) -> refresh_entry(AuthDb2, DocInfo) end,
+            {ok, _} = couch_db:fold_changes(AuthDb2, AuthDbSeq, Fun, nil),
             true = ets:insert(?STATE, {auth_db, AuthDb2});
         false ->
             ok

@@ -82,7 +82,7 @@ changes(DbName, Options, StartVector, DbOptions) ->
         },
         try
             {ok, #cacc{seq=LastSeq, pending=Pending, epochs=Epochs}} =
-                couch_db:changes_since(Db, StartSeq, Enum, Opts, Acc0),
+                couch_db:fold_changes(Db, StartSeq, Enum, Acc0, Opts),
             rexi:stream_last({complete, [
                 {seq, {LastSeq, uuid(Db), couch_db:owner_of(Epochs, LastSeq)}},
                 {pending, Pending}
@@ -224,7 +224,7 @@ get_missing_revs(DbName, IdRevsList, Options) ->
         Ids = [Id1 || {Id1, _Revs} <- IdRevsList],
         {ok, lists:zipwith(fun({Id, Revs}, FullDocInfoResult) ->
             case FullDocInfoResult of
-            {ok, #full_doc_info{rev_tree=RevisionTree} = FullInfo} ->
+            #full_doc_info{rev_tree=RevisionTree} = FullInfo ->
                 MissingRevs = couch_key_tree:find_missing(RevisionTree, Revs),
                 {Id, MissingRevs, possible_ancestors(FullInfo, MissingRevs)};
             not_found ->
@@ -255,8 +255,7 @@ group_info(DbName, DDocId, DbOptions) ->
 reset_validation_funs(DbName) ->
     case get_or_create_db(DbName, []) of
     {ok, Db} ->
-        DbPid = couch_db:get_pid(Db),
-        gen_server:cast(DbPid, {load_validation_funs, undefined});
+        couch_db:reload_validation_funs(Db);
     _ ->
         ok
     end.
@@ -340,6 +339,8 @@ reduce_cb(complete, Acc) ->
     {ok, Acc}.
 
 
+changes_enumerator(#full_doc_info{} = FDI, Acc) ->
+    changes_enumerator(couch_doc:to_doc_info(FDI), Acc);
 changes_enumerator(#doc_info{id= <<"_local/", _/binary>>, high_seq=Seq}, Acc) ->
     {ok, Acc#cacc{seq = Seq, pending = Acc#cacc.pending-1}};
 changes_enumerator(DocInfo, Acc) ->

@@ -545,23 +545,27 @@ has_doc(DocId1, Rows) ->
     lists:any(fun({R}) -> lists:member({<<"id">>, DocId}, R) end, Rows).
 
 backup_db_file(DbName) ->
-    DbDir = config:get("couchdb", "database_dir"),
-    DbFile = filename:join([DbDir, ?b2l(DbName) ++ ".couch"]),
-    {ok, _} = file:copy(DbFile, DbFile ++ ".backup"),
-    ok.
+    {ok, Db} = couch_db:open_int(DbName, []),
+    try
+        SrcPath = couch_db:get_filepath(Db),
+        Src = if
+            is_list(SrcPath) -> SrcPath;
+            true -> binary_to_list(SrcPath)
+        end,
+        ok = copy_tree(Src, Src ++ ".backup")
+    after
+        couch_db:close(Db)
+    end.
 
 restore_backup_db_file(DbName) ->
-    DbDir = config:get("couchdb", "database_dir"),
-
     {ok, Db} = couch_db:open_int(DbName, []),
+    Src = couch_db:get_filepath(Db),
     ok = couch_db:close(Db),
     DbPid = couch_db:get_pid(Db),
     exit(DbPid, shutdown),
 
-    DbFile = filename:join([DbDir, ?b2l(DbName) ++ ".couch"]),
-    ok = file:delete(DbFile),
-    ok = file:rename(DbFile ++ ".backup", DbFile),
-    ok.
+    exit(couch_db:get_pid(Db), shutdown),
+    ok = copy_tree(Src ++ ".backup", Src).
 
 compact_db(DbName) ->
     {ok, Db} = couch_db:open_int(DbName, []),
@@ -709,3 +713,22 @@ wait_indexer(IndexerPid) ->
                 ok
         end
     end).
+
+copy_tree(Src, Dst) ->
+    case filelib:is_dir(Src) of
+        true ->
+            {ok, Files} = file:list_dir(Src),
+            copy_tree(Files, Src, Dst);
+        false ->
+            ok = filelib:ensure_dir(Dst),
+            {ok, _} = file:copy(Src, Dst),
+            ok
+    end.
+
+copy_tree([], _Src, _Dst) ->
+    ok;
+copy_tree([File | Rest], Src, Dst) ->
+    FullSrc = filename:join(Src, File),
+    FullDst = filename:join(Dst, File),
+    ok = copy_tree(FullSrc, FullDst),
+    copy_tree(Rest, Src, Dst).

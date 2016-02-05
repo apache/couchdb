@@ -165,7 +165,7 @@ extract_view(Lang, #mrargs{view_type=red}=Args, Name, [View | Rest]) ->
 view_sig(Db, State, View, #mrargs{include_docs=true}=Args) ->
     BaseSig = view_sig(Db, State, View, Args#mrargs{include_docs=false}),
     UpdateSeq = couch_db:get_update_seq(Db),
-    PurgeSeq = couch_db:get_purge_seq(Db),
+    {ok, PurgeSeq} = couch_db:get_purge_seq(Db),
     #mrst{
         seq_indexed=SeqIndexed,
         keyseq_indexed=KeySeqIndexed
@@ -199,9 +199,10 @@ view_sig_term(BaseSig, UpdateSeq, PurgeSeq, KeySeqIndexed, SeqIndexed, Args) ->
 
 
 init_state(Db, Fd, #mrst{views=Views}=State, nil) ->
+    {ok, PurgeSeq} = couch_db:get_purge_seq(Db),
     Header = #mrheader{
         seq=0,
-        purge_seq=couch_db:get_purge_seq(Db),
+        purge_seq=PurgeSeq,
         id_btree_state=nil,
         log_btree_state=nil,
         view_states=[make_view_state(#mrview{}) || _ <- Views]
@@ -236,7 +237,9 @@ init_state(Db, Fd, State, Header) ->
         view_states=ViewStates
     } = Header,
 
-    IdBtOpts = [{compression, couch_db:compression(Db)}],
+    IdBtOpts = [
+        {compression, couch_compress:get_compression_method()}
+    ],
     {ok, IdBtree} = couch_btree:open(IdBtreeState, Fd, IdBtOpts),
     {ok, LogBtree} = case SeqIndexed orelse KeySeqIndexed of
         true -> couch_btree:open(LogBtreeState, Fd, IdBtOpts);
@@ -256,10 +259,10 @@ init_state(Db, Fd, State, Header) ->
         views=Views2
     }.
 
-open_view(Db, Fd, Lang, ViewState, View) ->
+open_view(_Db, Fd, Lang, ViewState, View) ->
     ReduceFun = make_reduce_fun(Lang, View#mrview.reduce_funs),
     LessFun = maybe_define_less_fun(View),
-    Compression = couch_db:compression(Db),
+    Compression = couch_compress:get_compression_method(),
     BTState = get_key_btree_state(ViewState),
     ViewBtOpts = [
         {less, LessFun},
@@ -268,7 +271,7 @@ open_view(Db, Fd, Lang, ViewState, View) ->
     ],
     {ok, Btree} = couch_btree:open(BTState, Fd, ViewBtOpts),
 
-    BySeqReduceFun = fun couch_db_updater:btree_by_seq_reduce/2,
+    BySeqReduceFun = fun couch_bt_engine:seq_tree_reduce/2,
     {ok, SeqBtree} = if View#mrview.seq_indexed ->
         SeqBTState = get_seq_btree_state(ViewState),
         ViewSeqBtOpts = [{reduce, BySeqReduceFun},
@@ -321,7 +324,7 @@ get_row_count(#mrview{btree=Bt}) ->
 
 all_docs_reduce_to_count(Reductions0) ->
     Reductions = maybe_convert_reductions(Reductions0),
-    Reduce = fun couch_db_updater:btree_by_id_reduce/2,
+    Reduce = fun couch_bt_engine:id_tree_reduce/2,
     {Count, _, _} = couch_btree:final_reduce(Reduce, Reductions),
     Count.
 
@@ -839,6 +842,8 @@ maybe_convert_reductions({KVs0, UserReductions}) ->
     {KVs, UserReductions}.
 
 maybe_convert_kv({<<"_local/", _/binary>> = DocId, _}) ->
+    #full_doc_info{id = DocId};
+maybe_convert_kv(#doc{id=DocId}) ->
     #full_doc_info{id = DocId};
 maybe_convert_kv(DocInfo) ->
     DocInfo.

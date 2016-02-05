@@ -536,7 +536,8 @@ send_changes(Acc, Dir, FirstRound) ->
                 {#mrview{}, {fast_view, _, _, _}} ->
                     couch_mrview:view_changes_since(View, StartSeq, DbEnumFun, [{dir, Dir}], Acc);
                 {undefined, _} ->
-                    couch_db:changes_since(Db, StartSeq, DbEnumFun, [{dir, Dir}], Acc);
+                    Opts = [{dir, Dir}],
+                    couch_db:fold_changes(Db, StartSeq, DbEnumFun, Acc, Opts);
                 {#mrview{}, _} ->
                     ViewEnumFun = fun view_changes_enumerator/2,
                     {Go, Acc0} = couch_mrview:view_changes_since(View, StartSeq, ViewEnumFun, [{dir, Dir}], Acc),
@@ -571,18 +572,22 @@ can_optimize(_, _) ->
 
 
 send_changes_doc_ids(Db, StartSeq, Dir, Fun, Acc0, {doc_ids, _Style, DocIds}) ->
-    Lookups = couch_db:get_full_doc_infos(Db, DocIds),
+    Results = couch_db:get_full_doc_infos(Db, DocIds),
     FullInfos = lists:foldl(fun
-        ({ok, FDI}, Acc) -> [FDI | Acc];
+        (#full_doc_info{}=FDI, Acc) -> [FDI | Acc];
         (not_found, Acc) -> Acc
-    end, [], Lookups),
+    end, [], Results),
     send_lookup_changes(FullInfos, StartSeq, Dir, Db, Fun, Acc0).
 
 
 send_changes_design_docs(Db, StartSeq, Dir, Fun, Acc0, {design_docs, _Style}) ->
     FoldFun = fun(FDI, Acc) -> {ok, [FDI | Acc]} end,
-    KeyOpts = [{start_key, <<"_design/">>}, {end_key_gt, <<"_design0">>}],
-    {ok, FullInfos} = couch_db:fold_docs(Db, FoldFun, [], KeyOpts),
+    Opts = [
+        include_deleted,
+        {start_key, <<"_design/">>},
+        {end_key_gt, <<"_design0">>}
+    ],
+    {ok, FullInfos} = couch_db:fold_docs(Db, FoldFun, [], Opts),
     send_lookup_changes(FullInfos, StartSeq, Dir, Db, Fun, Acc0).
 
 
@@ -757,6 +762,8 @@ changes_enumerator(Value0, Acc) ->
     end,
     Results = [Result || Result <- Results0, Result /= null],
     Seq = case Value of
+        #full_doc_info{} ->
+            Value#full_doc_info.update_seq;
         #doc_info{} ->
             Value#doc_info.high_seq;
         {{Seq0, _}, _} ->
@@ -816,6 +823,8 @@ view_changes_row(Results, KVs, Acc) ->
     ] ++ maybe_get_changes_doc({Id, Rev}, Acc)}.
 
 
+changes_row(Results, #full_doc_info{} = FDI, Acc) ->
+    changes_row(Results, couch_doc:to_doc_info(FDI), Acc);
 changes_row(Results, DocInfo, Acc) ->
     #doc_info{
         id = Id, high_seq = Seq, revs = [#rev_info{deleted = Del} | _]

@@ -23,7 +23,7 @@
 -export([get_placement/1]).
 
 %% For mem3 use only.
--export([name/1, node/1, range/1]).
+-export([name/1, node/1, range/1, engine/1]).
 
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
@@ -99,7 +99,8 @@ shards_int(DbName, Options) ->
             name = ShardDbName,
             dbname = ShardDbName,
             range = [0, (2 bsl 31)-1],
-            order = undefined}];
+            order = undefined,
+            opts = []}];
     ShardDbName ->
         %% shard_db is treated as a single sharded db to support calls to db_info
         %% and view_all_docs
@@ -107,7 +108,8 @@ shards_int(DbName, Options) ->
             node = node(),
             name = ShardDbName,
             dbname = ShardDbName,
-            range = [0, (2 bsl 31)-1]}];
+            range = [0, (2 bsl 31)-1],
+            opts = []}];
     _ ->
         mem3_shards:for_db(DbName, Options)
     end.
@@ -307,3 +309,15 @@ name(#shard{name=Name}) ->
     Name;
 name(#ordered_shard{name=Name}) ->
     Name.
+
+engine(#shard{opts=Opts}) ->
+    engine(Opts);
+engine(#ordered_shard{opts=Opts}) ->
+    engine(Opts);
+engine(Opts) when is_list(Opts) ->
+    case couch_util:get_value(engine, Opts) of
+        Engine when is_binary(Engine) ->
+            [{engine, Engine}];
+        _ ->
+            []
+    end.

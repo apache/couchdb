@@ -112,7 +112,10 @@
     % the json body object.
     body = {[]},
 
-    atts = [] :: [couch_att:att()], % attachments
+    % Atts can be a binary when a storage engine
+    % returns attachment info blob in compressed
+    % form.
+    atts = [] :: [couch_att:att()] | binary(), % attachments
 
     deleted = false,
 

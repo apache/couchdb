@@ -12,7 +12,7 @@
 
 -module(couch_util).
 
--export([priv_dir/0, normpath/1]).
+-export([priv_dir/0, normpath/1, fold_files/5]).
 -export([should_flush/0, should_flush/1, to_existing_atom/1]).
 -export([rand32/0, implode/2, collate/2, collate/3]).
 -export([abs_pathname/1,abs_pathname/2, trim/1, drop_dot_couch_ext/1]).
@@ -33,6 +33,7 @@
 -export([find_in_binary/2]).
 -export([callback_exists/3, validate_callback_exists/3]).
 -export([with_proc/4]).
+-export([check_md5/2]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -61,6 +62,44 @@ normparts(["." | RestParts], Acc) ->
     normparts(RestParts, Acc);
 normparts([Part | RestParts], Acc) ->
     normparts(RestParts, [Part | Acc]).
+
+
+% This is implementation is similar the builtin filelib:fold_files/5
+% except that this version will run the user supplied function
+% on directories that match the regular expression as well.
+%
+% This is motivated by the case when couch_server is searching
+% for pluggable storage engines. This change allows a
+% database to be either a file or a directory.
+fold_files(Dir, RegExp, Recursive, Fun, Acc) ->
+    {ok, Re} = re:compile(RegExp, [unicode]),
+    fold_files1(Dir, Re, Recursive, Fun, Acc).
+
+fold_files1(Dir, RegExp, Recursive, Fun, Acc) ->
+    case file:list_dir(Dir) of
+        {ok, Files} ->
+            fold_files2(Files, Dir, RegExp, Recursive, Fun, Acc);
+        {error, _} ->
+            Acc
+    end.
+
+fold_files2([], _Dir, _RegExp, _Recursive, _Fun, Acc) ->
+    Acc;
+fold_files2([File | Rest], Dir, RegExp, Recursive, Fun, Acc0) ->
+    FullName = filename:join(Dir, File),
+    case (catch re:run(File, RegExp, [{capture, none}])) of
+        match ->
+            Acc1 = Fun(FullName, Acc0),
+            fold_files2(Rest, Dir, RegExp, Recursive, Fun, Acc1);
+        _ ->
+            case Recursive andalso filelib:is_dir(FullName) of
+                true ->
+                    Acc1 = fold_files1(FullName, RegExp, Recursive, Fun, Acc0),
+                    fold_files2(Rest, Dir, RegExp, Recursive, Fun, Acc1);
+                false ->
+                    fold_files2(Rest, Dir, RegExp, Recursive, Fun, Acc0)
+            end
+    end.
 
 % works like list_to_existing_atom, except can be list or binary and it
 % gives you the original value instead of an error if no existing atom.
@@ -577,6 +616,12 @@ validate_callback_exists(Module, Function, Arity) ->
         throw({error,
             {undefined_callback, CallbackStr, {Module, Function, Arity}}})
     end.
+
+
+check_md5(_NewSig, <<>>) -> ok;
+check_md5(Sig, Sig) -> ok;
+check_md5(_, _) -> throw(md5_mismatch).
+
 
 ensure_loaded(Module) when is_atom(Module) ->
     case code:ensure_loaded(Module) of

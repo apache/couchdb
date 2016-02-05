@@ -284,8 +284,15 @@ create_db_req(#httpd{}=Req, DbName) ->
     N = chttpd:qs_value(Req, "n", config:get("cluster", "n", "3")),
     Q = chttpd:qs_value(Req, "q", config:get("cluster", "q", "8")),
     P = chttpd:qs_value(Req, "placement", config:get("cluster", "placement")),
+    E = iolist_to_binary(chttpd:qs_value(Req, "engine", "couch")),
+    Options = [
+        {n, N},
+        {q, Q},
+        {placement, P},
+        {engine, E}
+    ],
     DocUrl = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName)),
-    case fabric:create_db(DbName, [{n,N}, {q,Q}, {placement,P}]) of
+    case fabric:create_db(DbName, Options) of
     ok ->
         send_json(Req, 201, [{"Location", DocUrl}], {[{ok, true}]});
     accepted ->

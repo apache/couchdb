@@ -28,7 +28,7 @@ go(DbName, Options) ->
             {error, file_exists};
         false ->
             {Shards, Doc} = generate_shard_map(DbName, Options),
-            CreateShardResult = create_shard_files(Shards),
+            CreateShardResult = create_shard_files(Shards, Options),
             case CreateShardResult of
             enametoolong ->
                 {error, {database_name_too_long, DbName}};
@@ -64,12 +64,12 @@ generate_shard_map(DbName, Options) ->
         % the DB already exists, and may have a different Suffix
         ok;
     {not_found, _} ->
-        Doc = make_document(Shards, Suffix)
+        Doc = make_document(Shards, Suffix, Options)
     end,
     {Shards, Doc}.
 
-create_shard_files(Shards) ->
-    Workers = fabric_util:submit_jobs(Shards, create_db, []),
+create_shard_files(Shards, Options) ->
+    Workers = fabric_util:submit_jobs(Shards, create_db, [Options]),
     RexiMon = fabric_util:create_monitors(Shards),
     try fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Workers) of
     {error, file_exists} ->
@@ -155,7 +155,7 @@ maybe_stop(W, Counters) ->
         end
     end.
 
-make_document([#shard{dbname=DbName}|_] = Shards, Suffix) ->
+make_document([#shard{dbname=DbName}|_] = Shards, Suffix, Options) ->
     {RawOut, ByNodeOut, ByRangeOut} =
     lists:foldl(fun(#shard{node=N, range=[B,E]}, {Raw, ByNode, ByRange}) ->
         Range = ?l2b([couch_util:to_hex(<<B:32/integer>>), "-",
@@ -164,12 +164,19 @@ make_document([#shard{dbname=DbName}|_] = Shards, Suffix) ->
         {[[<<"add">>, Range, Node] | Raw], orddict:append(Node, Range, ByNode),
             orddict:append(Range, Node, ByRange)}
     end, {[], [], []}, Shards),
-    #doc{id=DbName, body = {[
-        {<<"shard_suffix">>, Suffix},
-        {<<"changelog">>, lists:sort(RawOut)},
-        {<<"by_node">>, {[{K,lists:sort(V)} || {K,V} <- ByNodeOut]}},
-        {<<"by_range">>, {[{K,lists:sort(V)} || {K,V} <- ByRangeOut]}}
-    ]}}.
+    EngineProp = case couch_util:get_value(engine, Options) of
+        E when is_binary(E) -> [{<<"engine">>, E}];
+        _ -> []
+    end,
+    #doc{
+        id = DbName,
+        body = {[
+            {<<"shard_suffix">>, Suffix},
+            {<<"changelog">>, lists:sort(RawOut)},
+            {<<"by_node">>, {[{K,lists:sort(V)} || {K,V} <- ByNodeOut]}},
+            {<<"by_range">>, {[{K,lists:sort(V)} || {K,V} <- ByRangeOut]}}
+        ] ++ EngineProp}
+    }.
 
 db_exists(DbName) -> is_list(catch mem3:shards(DbName)).
 

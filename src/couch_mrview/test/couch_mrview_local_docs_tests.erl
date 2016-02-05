@@ -115,7 +115,11 @@ should_query_with_include_docs(Db) ->
         {include_docs, true}
     ]),
     {row, Doc0} = mk_row(8),
-    Doc = Doc0 ++ [{doc, {[{<<"val">>, 8}]}}],
+    Doc = Doc0 ++ [{doc, {[
+        {<<"_id">>, <<"_local/8">>},
+        {<<"_rev">>, <<"0-1">>},
+        {<<"val">>, 8}
+    ]}}],
     Expect = {ok, [
         {meta, [{total, 10}, {offset, 8}]},
         {row, Doc}

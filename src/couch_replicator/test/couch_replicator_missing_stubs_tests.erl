@@ -131,9 +131,9 @@ populate_db(DbName) ->
 
 update_db_docs(DbName, Times) ->
     {ok, Db} = couch_db:open_int(DbName, []),
-    {ok, _, _} = couch_db:enum_docs(
+    {ok, _} = couch_db:fold_docs(
         Db,
-        fun(FDI, _, Acc) -> db_fold_fun(FDI, Acc) end,
+        fun(FDI, Acc) -> db_fold_fun(FDI, Acc) end,
         {DbName, Times},
         []),
     ok = couch_db:close(Db).
