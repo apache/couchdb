@@ -168,7 +168,7 @@
 % value would be hard to report its ok to just return the
 % result of os:timestamp/0 as this will just disable idle
 % databases from automatically closing.
--callback last_activity(DbHandle::db_handle()) -> elrang:timestamp().
+-callback last_activity(DbHandle::db_handle()) -> erlang:timestamp().
 
 
 % All of the get_* functions may be called from many
