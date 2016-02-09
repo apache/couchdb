@@ -15,11 +15,15 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
+-include_lib("chttpd/include/chttpd_cors.hrl").
 
--define(SUPPORTED_METHODS,
-        "GET, HEAD, POST, PUT, DELETE, TRACE, CONNECT, COPY, OPTIONS").
 -define(TIMEOUT, 1000).
 
+-define(_assertEqualLists(A, B),
+    ?_assertEqual(lists:usort(A), lists:usort(B))).
+
+-define(assertEqualLists(A, B),
+    ?assertEqual(lists:usort(A), lists:usort(B))).
 
 start() ->
     Ctx = test_util:start_couch([ioq]),
@@ -182,18 +186,18 @@ should_make_simple_request(_, {_, _, Url, DefaultHeaders}) ->
         ?assertEqual(
             "http://example.com",
             proplists:get_value("Access-Control-Allow-Origin", Resp)),
-        ?assertEqual(
-            "Cache-Control, Content-Type, Server",
-            proplists:get_value("Access-Control-Expose-Headers", Resp))
+        ?assertEqualLists(
+            ?COUCH_HEADERS ++ list_simple_headers(Resp),
+            split_list(proplists:get_value("Access-Control-Expose-Headers", Resp)))
     end).
 
 should_make_preflight_request(_, {_, _, Url, DefaultHeaders}) ->
-    ?_assertEqual(?SUPPORTED_METHODS,
+    ?_assertEqualLists(?SUPPORTED_METHODS,
         begin
             Headers = DefaultHeaders
                       ++ [{"Access-Control-Request-Method", "GET"}],
             {ok, _, Resp, _} = test_request:options(Url, Headers),
-            proplists:get_value("Access-Control-Allow-Methods", Resp)
+            split_list(proplists:get_value("Access-Control-Allow-Methods", Resp))
         end).
 
 should_make_prefligh_request_with_port({_, VHost}, {_, _, Url, _}) ->
@@ -251,7 +255,7 @@ should_make_origin_request_with_auth(_, {_, _, Url, DefaultHeaders}) ->
         end).
 
 should_make_preflight_request_with_auth(_, {_, _, Url, DefaultHeaders}) ->
-    ?_assertEqual(?SUPPORTED_METHODS,
+    ?_assertEqualLists(?SUPPORTED_METHODS,
         begin
             Hashed = couch_passwords:hash_admin_password(<<"test">>),
             config:set("admins", "test", ?b2l(Hashed), false),
@@ -260,7 +264,7 @@ should_make_preflight_request_with_auth(_, {_, _, Url, DefaultHeaders}) ->
             {ok, _, Resp, _} = test_request:options(
                 Url, Headers, [{basic_auth, {"test", "test"}}]),
             config:delete("admins", "test", false),
-            proplists:get_value("Access-Control-Allow-Methods", Resp)
+            split_list(proplists:get_value("Access-Control-Allow-Methods", Resp))
         end).
 
 should_not_return_cors_headers_for_invalid_origin({Host, _}) ->
@@ -331,3 +335,10 @@ maybe_append_vhost(true) ->
     [{"Host", "http://example.com"}];
 maybe_append_vhost(false) ->
     [].
+
+split_list(S) ->
+    re:split(S, "\\s*,\\s*", [trim, {return, list}]).
+
+list_simple_headers(Headers) ->
+    LCHeaders = [string:to_lower(K) || {K, _V} <- Headers],
+    lists:filter(fun(H) -> lists:member(H, ?SIMPLE_HEADERS) end, LCHeaders).
