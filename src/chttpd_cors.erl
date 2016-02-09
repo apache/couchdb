@@ -385,7 +385,7 @@ get_origin(Req) ->
         undefined ->
             undefined;
         Origin ->
-            ?l2b(to_lower(Origin))
+            ?l2b(Origin)
     end.
 
 
