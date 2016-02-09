@@ -157,16 +157,15 @@ send_external_response(Req, Response) ->
         code = Code,
         data = Data,
         ctype = CType,
-        headers = Headers,
+        headers = Headers0,
         json = Json
     } = parse_external_response(Response),
-    Headers1 = default_or_content_type(CType, Headers),
-    Headers2 = chttpd_cors:headers(Req, Headers1),
+    Headers1 = default_or_content_type(CType, Headers0),
     case Json of
     nil ->
-        chttpd:send_response(Req, Code, Headers2, Data);
+        chttpd:send_response(Req, Code, Headers1, Data);
     Json ->
-        chttpd:send_json(Req, Code, Headers2, Json)
+        chttpd:send_json(Req, Code, Headers1, Json)
     end.
 
 parse_external_response({Response}) ->
