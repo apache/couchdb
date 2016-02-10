@@ -189,3 +189,11 @@ This product also includes the following third-party components:
 * CSS.escape (https://github.com/mathiasbynens/CSS.escape/)
 
   Copyright Mathias Bynens
+
+* Papaparse.js
+
+  Copyright (c) 2015 Matthew Holt
+
+* react-bootstrap.js
+
+  Copyright (c) 2014 Stephen J. Collings, Matthew Honnibal, Pieter Vanderwerff

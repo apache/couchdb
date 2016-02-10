@@ -13,7 +13,8 @@
 // A simple class to represent a database. Uses XMLHttpRequest to interface with
 // the CouchDB server.
 
-function CouchDB(name, httpHeaders) {
+function CouchDB(name, httpHeaders, globalRequestOptions) {
+  this.globalRequestOptions = globalRequestOptions || {}
   this.name = name;
   this.uri = "/" + encodeURIComponent(name) + "/";
 
@@ -24,6 +25,7 @@ function CouchDB(name, httpHeaders) {
   this.request = function(method, uri, requestOptions) {
     requestOptions = requestOptions || {};
     requestOptions.headers = combine(requestOptions.headers, httpHeaders);
+    requestOptions.url = globalRequestOptions;
     return CouchDB.request(method, uri, requestOptions);
   };
 
@@ -139,7 +141,7 @@ function CouchDB(name, httpHeaders) {
   this.query = function(mapFun, reduceFun, options, keys, language) {
     var body = {language: language || "javascript"};
     if(keys) {
-      body.keys = keys ;
+      options.keys = keys ;
     }
     if (typeof(mapFun) != "string") {
       mapFun = mapFun.toSource ? mapFun.toSource() : "(" + mapFun.toString() + ")";
@@ -156,13 +158,25 @@ function CouchDB(name, httpHeaders) {
         body.options = options.options;
         delete options.options;
     }
-    this.last_req = this.request("POST", this.uri + "_temp_view"
-      + encodeOptions(options), {
+    var ddoc = {
+      views: {
+        view: body
+      }
+    };
+    var ddoc_name = "_design/temp_" + get_random_string();
+    this.last_req = this.request("PUT", this.uri + ddoc_name, {
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify(body)
+      body: JSON.stringify(ddoc)
     });
     CouchDB.maybeThrowError(this.last_req);
-    return JSON.parse(this.last_req.responseText);
+    var ddoc_result = JSON.parse(this.last_req.responseText)
+    this.last_req = this.request("GET", this.uri + ddoc_name + "/_view/view"
+      + encodeOptions(options));
+    CouchDB.maybeThrowError(this.last_req);
+    var query_result = JSON.parse(this.last_req.responseText);
+    var res = this.request("DELETE", this.uri + ddoc_name + '?rev=' + ddoc_result.rev);
+
+    return query_result;
   };
 
   this.view = function(viewname, options, keys) {
@@ -357,6 +371,8 @@ CouchDB.getVersion = function() {
 };
 
 CouchDB.reloadConfig = function() {
+  // diabled until cluser port gets /_config
+  return {};
   CouchDB.last_req = CouchDB.request("POST", "/_config/_reload");
   CouchDB.maybeThrowError(CouchDB.last_req);
   return JSON.parse(CouchDB.last_req.responseText);
@@ -420,6 +436,22 @@ CouchDB.request = function(method, uri, options) {
   options.headers["Accept"] = options.headers["Accept"] || options.headers["accept"] || "application/json";
   var req = CouchDB.newXhr();
   uri = CouchDB.proxyUrl(uri);
+
+  if (options.url) {
+    var params = '';
+    for (var key in options.url) {
+      var value = options.url[key]
+      params += key + '=' + value + '&'
+    }
+    // if uri already has a ? append with &
+    if (uri.indexOf('?') === -1) {
+      uri += '?' + params;
+    } else {
+      uri += '&' + params;
+    }
+  }
+  // console.log(uri);
+  // console.log(JSON.stringify(options, null, 2));
   req.open(method, uri, false);
   if (options.headers) {
     var headers = options.headers;

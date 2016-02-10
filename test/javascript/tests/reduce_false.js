@@ -11,8 +11,8 @@
 // the License.
 
 couchTests.reduce_false = function(debug) {
-  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
-  db.deleteDb();
+  var db_name = get_random_db_name();
+  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
   if (debug) debugger;
 
@@ -33,7 +33,9 @@ couchTests.reduce_false = function(debug) {
 
   // Test that the reduce works
   var res = db.view('test/summate');
-  T(res.rows.length == 1 && res.rows[0].value == summate(5));
+
+  TEquals(1, res.rows.length, "should have 1 row");
+  TEquals(summate(5), res.rows[0].value, 'should summate up 5');
 
   //Test that we get our docs back
   res = db.view('test/summate', {reduce: false});
@@ -41,4 +43,7 @@ couchTests.reduce_false = function(debug) {
   for(var i=0; i<5; i++) {
     T(res.rows[i].value == i+1);
   }
+
+  // cleanup
+  db.deleteDb();
 };

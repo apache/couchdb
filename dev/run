@@ -30,8 +30,6 @@ import uuid
 from pbkdf2 import pbkdf2_hex
 
 COMMON_SALT = uuid.uuid4().hex
-COMMON_CSRF_SECRET = uuid.uuid4().hex
-HAPROXY_PORT = os.environ.get("HAPROXY_PORT", "5984")
 
 try:
     from urllib import urlopen
@@ -111,6 +109,14 @@ def setup_argparse():
                       dest='no_join', default=False,
                       action='store_true',
                       help='Do not join nodes on boot')
+    parser.add_option('--with-haproxy', dest='with_haproxy', default=False,
+                      action='store_true', help='Use HAProxy')
+    parser.add_option('--haproxy', dest='haproxy', default='haproxy',
+                      help='HAProxy executable path')
+    parser.add_option('--haproxy-port', dest='haproxy_port', default='5984',
+                      help='HAProxy port')
+    parser.add_option('--node-number', dest="node_number", type=int, default=1,
+                      help='The node number to seed them when creating the node(s)')
     return parser.parse_args()
 
 
@@ -120,11 +126,15 @@ def setup_context(opts, args):
             'no_join': opts.no_join,
             'with_admin_party': opts.with_admin_party,
             'admin': opts.admin.split(':', 1) if opts.admin else None,
-            'nodes': ['node%d' % (i + 1) for i in range(opts.nodes)],
+            'nodes': ['node%d' % (i + opts.node_number) for i in range(opts.nodes)],
+            'node_number': opts.node_number,
             'devdir': os.path.dirname(fpath),
             'rootdir': os.path.dirname(os.path.dirname(fpath)),
             'cmd': ' '.join(args),
             'verbose': opts.verbose,
+            'with_haproxy': opts.with_haproxy,
+            'haproxy': opts.haproxy,
+            'haproxy_port': opts.haproxy_port,
             'procs': []}
 
 
@@ -150,7 +160,7 @@ def check_beams(ctx):
 @log('Prepare configuration files')
 def setup_configs(ctx):
     for idx, node in enumerate(ctx['nodes']):
-        cluster_port, backend_port = get_ports(idx + 1)
+        cluster_port, backend_port = get_ports(idx + ctx['node_number'])
         env = {
             "prefix": ctx['rootdir'],
             "package_author_name": "The Apache Software Foundation",
@@ -161,8 +171,14 @@ def setup_configs(ctx):
             "node_name": "-name %s@127.0.0.1" % node,
             "cluster_port": cluster_port,
             "backend_port": backend_port,
-            "fauxton_root": "src/fauxton/dist/release"
+            "fauxton_root": "src/fauxton/dist/release",
+            "uuid": "fake_uuid_for_dev"
         }
+        if os.name == 'nt':
+            # Erlang always wants UNIX-style paths
+            env["data_dir"] = env["data_dir"].replace("\\", "/")
+            env["view_index_dir"] = env["view_index_dir"].replace("\\", "/")
+            env["prefix"] = env["prefix"].replace("\\", "/")
         write_config(ctx, node, env)
 
 
@@ -194,23 +210,12 @@ def write_config(ctx, node, env):
             handle.write(content)
 
 
-def find_haproxy():
-    p = sp.Popen(
-        ["which", "haproxy"],
-        stdin=sp.PIPE,
-        stdout=sp.PIPE,
-        stderr=sp.STDOUT
-    )
-    (res, _) = p.communicate()
-    if res.strip():
-        return res.strip().decode()
-    return "/usr/sbin/haproxy"
-
-
 def boot_haproxy(ctx):
+    if not ctx['with_haproxy']:
+        return
     config = os.path.join(ctx['rootdir'], "rel", "haproxy.cfg")
     cmd = [
-        find_haproxy(),
+        ctx['haproxy'],
         "-f",
         config
     ]
@@ -218,7 +223,7 @@ def boot_haproxy(ctx):
     log = open(logfname, "w")
     env = os.environ.copy()
     if "HAPROXY_PORT" not in env:
-        env["HAPROXY_PORT"] = HAPROXY_PORT
+        env["HAPROXY_PORT"] = ctx['haproxy_port']
     return sp.Popen(
             " ".join(cmd),
             shell=True,
@@ -232,6 +237,9 @@ def boot_haproxy(ctx):
 def hack_default_ini(ctx, node, content):
     # Replace log file
     logfile = os.path.join(ctx['devdir'], "logs", "%s.log" % node)
+    if os.name == 'nt':
+        # Erlang always wants UNIX-style paths
+        logfile = logfile.replace("\\", "/")
     repl = "file = %s" % logfile
     contents = re.sub("(?m)^file.*$", repl, content)
 
@@ -255,11 +263,9 @@ def hack_local_ini(ctx, contents):
     previous_line = "; require_valid_user = false\n"
     contents = contents.replace(previous_line, previous_line + secret_line)
 
-    csrf_secret = '\n\n[csrf]\nsecret = %s\n' % COMMON_CSRF_SECRET
-
     if ctx['with_admin_party']:
         ctx['admin'] = ('Admin Party!', 'You do not need any password.')
-        return contents + csrf_secret
+        return contents
 
     # handle admin credentials passed from cli or generate own one
     if ctx['admin'] is None:
@@ -267,7 +273,7 @@ def hack_local_ini(ctx, contents):
     else:
         user, pswd = ctx['admin']
 
-    return contents + "\n%s = %s" % (user, hashify(pswd)) + csrf_secret
+    return contents + "\n%s = %s" % (user, hashify(pswd))
 
 
 def gen_password():
@@ -304,7 +310,7 @@ def startup(ctx):
 
 def kill_processes(ctx):
     for proc in ctx['procs']:
-        if proc.returncode is None:
+        if proc and proc.returncode is None:
             proc.kill()
 
 
@@ -320,7 +326,7 @@ def ensure_all_nodes_alive(ctx):
         for num in range(ctx['N']):
             if status[num]:
                 continue
-            local_port, _ = get_ports(num + 1)
+            local_port, _ = get_ports(num + ctx['node_number'])
             url = "http://127.0.0.1:{0}/".format(local_port)
             try:
                 check_node_alive(url)
@@ -376,6 +382,9 @@ def boot_node(ctx, node):
     ]
     logfname = os.path.join(ctx['devdir'], "logs", "%s.log" % node)
     log = open(logfname, "wb")
+    if os.name == 'nt':
+        # Erlang always wants UNIX-style paths
+        cmd = [x.replace("\\", "/") for x in cmd]
     return sp.Popen(cmd, stdin=sp.PIPE, stdout=log, stderr=sp.STDOUT, env=env)
 
 
@@ -469,16 +478,26 @@ def cluster_setup_with_admin_party(ctx):
     create_system_databases(host, 15984)
 
 
+def try_request(host, port, meth, path, success_codes, retries=10, retry_dt=1):
+    while True:
+        conn = httpclient.HTTPConnection(host, port)
+        conn.request(meth, path)
+        resp = conn.getresponse()
+        if resp.status in success_codes:
+            return resp.status, resp.read()
+        elif retries <= 0:
+            assert resp.status in success_codes, resp.read()
+        retries -= 1
+        time.sleep(retry_dt)
+
+
 def create_system_databases(host, port):
     for dbname in ['_users', '_replicator', '_metadata', '_global_changes']:
         conn = httpclient.HTTPConnection(host, port)
         conn.request('HEAD', '/' + dbname)
         resp = conn.getresponse()
         if resp.status == 404:
-            conn = httpclient.HTTPConnection(host, port)
-            conn.request('PUT', '/' + dbname)
-            resp = conn.getresponse()
-            assert resp.status in (201, 202), resp.read()
+            try_request(host, port, 'PUT', '/' + dbname, (201, 202, 412))
 
 
 @log('Developers cluster is set up at http://127.0.0.1:{lead_port}.\n'
@@ -488,7 +507,7 @@ def create_system_databases(host, port):
 def join(ctx, lead_port, user, password):
     while True:
         for proc in ctx['procs']:
-            if proc.returncode is not None:
+            if proc is not None and proc.returncode is not None:
                 exit(1)
         time.sleep(2)
 

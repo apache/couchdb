@@ -12,44 +12,53 @@
 
 % Set the path to the configuration environment generated
 % by `./configure`.
-ConfigureEnv = filename:join(filename:dirname(SCRIPT), "config.erl"),
+
+COUCHDB_ROOT = filename:dirname(SCRIPT).
+os:putenv("COUCHDB_ROOT", COUCHDB_ROOT).
+
+ConfigureEnv = filename:join(COUCHDB_ROOT, "config.erl").
 os:putenv("COUCHDB_CONFIG", ConfigureEnv).
 
+os:putenv("COUCHDB_APPS_CONFIG_DIR", filename:join([COUCHDB_ROOT, "rel/apps"])).
 
 DepDescs = [
-    {b64url,            "b64url",           {branch, "master"}},
-    {cassim,            "cassim",           {branch, "master"}},
-    {couch_log,         "couch-log",        {branch, "master"}},
-    {config,            "config",           {branch, "master"}},
-    {chttpd,            "chttpd",           {branch, "master"}},
-    {couch,             "couch",            {branch, "master"}},
-    {couch_epi,         "couch-epi",        {branch, "master"}},
-    {couch_index,       "couch-index",      {branch, "master"}},
-    {couch_mrview,      "couch-mrview",     {branch, "master"}},
-    {couch_replicator,  "couch-replicator", {branch, "master"}},
-    {couch_plugins,     "couch-plugins",    {branch, "master"}},
-    {couch_event,       "couch-event",      {branch, "master"}},
-    {couch_stats,       "couch-stats",      {branch, "master"}},
-    {docs,              "documentation",    {branch, "master"}, [raw]},
-    {ddoc_cache,        "ddoc-cache",       {branch, "master"}},
-    {ets_lru,           "ets-lru",          {branch, "master"}},
-    {fabric,            "fabric",           {branch, "master"}},
-    {fauxton,           "fauxton",          {branch, "master"}, [raw]},
-    {folsom,            "folsom",           {branch, "master"}},
-    {global_changes,    "global-changes",   {branch, "master"}},
-    {goldrush,          "goldrush",         {tag, "0.1.6"}},
-    {ibrowse,           "ibrowse",          {branch, "master"}},
-    {ioq,               "ioq",              {branch, "master"}},
-    {jiffy,             "jiffy",            {branch, "master"}},
-    {khash,             "khash",            {branch, "master"}},
-    {mango,             "mango",            {branch, "master"}},
-    {mem3,              "mem3",             {branch, "master"}},
-    {mochiweb,          "mochiweb",         {branch, "master"}},
-    {oauth,             "oauth",            {branch, "master"}},
-    {rexi,              "rexi",             {branch, "master"}},
-    {snappy,            "snappy",           {branch, "master"}},
-    {setup,             "setup",            {branch, "master"}},
-    {meck,              "meck",             {tag, "0.8.2"}}
+%% must be compiled first as it has a custom behavior
+{couch_epi,        "couch-epi",        "807aa3f58e39f1273e732020c80d630d9177790c"},
+{config,           "config",           "a2d5ad2eedc960248b806f61df0a1009462bdb46"},
+%% keep these sorted
+{b64url,           "b64url",           "319fc604235ab1fde37047b38a432450161db750"},
+{cassim,           "cassim",           "ab1ef1cee5f7b7ec1733e44845c1df99fc7a66a3"},
+{couch_log,        "couch-log",        "939b3a7bda7dcb03f841b899762b188ca31bc230"},
+{couch_log_lager,  "couch-log-lager",  "b2a0471a87765de50c5eb05c65c121f68a9ae9fa"},
+{chttpd,           "chttpd",           "417679a9cf2277693253d3f9c2ac0e52fa1ba75c"},
+{couch,            "couch",            "010704ad9ddfd8bbd28c91e6c87484ef25afa296"},
+{couch_index,      "couch-index",      "14f579dcd142ee90300244c854b301bbd5c863ee"},
+{couch_mrview,     "couch-mrview",     "6c9833d667e319b82a7a1fffb8ba92116534e63f"},
+{couch_replicator, "couch-replicator", "3f268abba89bd5b93f43185465e66ef42b3876ad"},
+{couch_plugins,    "couch-plugins",    "3e73b723cb126cfc471b560d17c24a8b5c540085"},
+{couch_event,      "couch-event",      "835a41885d1e276d207758954f8238aa7bba0ae8"},
+{couch_stats,      "couch-stats",      "7895d4d3f509ed24f09b6d1a0bd0e06af34551dc"},
+{couch_peruser,    "peruser",          "ff7d190970a46722137fbc7a1a75466e8a544ae1"},
+{docs,             "documentation",    "bbc4b7191763b0aced2aab51dec98a8a42e36729", [raw]},
+{ddoc_cache,       "ddoc-cache",       "c762e90a33ce3cda19ef142dd1120f1087ecd876"},
+{ets_lru,          "ets-lru",          "c05488c8b1d7ec1c3554a828e0c9bf2888932ed6"},
+{fabric,           "fabric",           "4c94f3095595a50a71860a75cc8866adb9a28ce3"},
+{fauxton,          "fauxton",          {tag, "v1.0.9"}, [raw]},
+{folsom,           "folsom",           "a5c95dec18227c977029fbd3b638966d98f17003"},
+{global_changes,   "global-changes",   "e55de37ece29b6cbc0af540370d2425159338bf9"},
+{goldrush,         "goldrush",         {tag, "0.1.6"}},
+{ibrowse,          "ibrowse",          "4af2d408607874d124414ac45df1edbe3961d1cd"},
+{ioq,              "ioq",              "c7c75ebeaf41599e3a3e211097d864f0e7785829"},
+{jiffy,            "jiffy",            "ea19c417f9fd52fa3f7ef2d378735e5532c59b29"},
+{khash,            "khash",            "7c6a9cd9776b5c6f063ccafedfa984b00877b019"},
+{mango,            "mango",            "db3116c48780ad09064281ebc4e374b497781767"},
+{mem3,             "mem3",             "f20843714eee54c687739c94c6ac870e7a1e6a00"},
+{mochiweb,         "mochiweb",         "bd6ae7cbb371666a1f68115056f7b30d13765782"},
+{oauth,            "oauth",            "099057a98e41f3aff91e77e3cf496d6c6fd901df"},
+{rexi,             "rexi",             "a327b7dbeb2b0050f7ca9072047bf8ef2d282833"},
+{snappy,           "snappy",           "ce24944752ff3a60ad2710f61d4cf709a1b31863"},
+{setup,            "setup",            "b9e1f3b5d5a78a706abb358e17130fb7344567d2"},
+{meck,             "meck",             {tag, "0.8.2"}}
 ],
 
 BaseUrl = "https://git-wip-us.apache.org/repos/asf/",
@@ -68,7 +77,7 @@ MakeDep = fun
 end,
 
 AddConfig = [
-    {require_otp_vsn, "R14B01|R14B03|R14B04|R16B02|R16B03-1|17|18"},
+    {require_otp_vsn, "R16B03|R16B03-1|17|18"},
     {deps_dir, "src"},
     {deps, lists:map(MakeDep, DepDescs)},
     {sub_dirs, ["rel"]},
@@ -76,6 +85,13 @@ AddConfig = [
     {erl_opts, [debug_info]},
     {eunit_opts, [verbose]},
     {plugins, [eunit_plugin]},
+    {dialyzer, [
+        {plt_location, local},
+        {plt_location, COUCHDB_ROOT},
+        {plt_extra_apps, [
+            asn1, compiler, crypto, inets, kernel, os_mon, runtime_tools,
+            sasl, ssl, stdlib, syntax_tools, xmerl]},
+        {warnings, [unmatched_returns, error_handling, race_conditions]}]},
     {post_hooks, [{compile, "escript support/build_js.escript"}]}
 ],
 

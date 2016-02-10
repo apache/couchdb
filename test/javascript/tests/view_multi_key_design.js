@@ -11,8 +11,9 @@
 // the License.
 
 couchTests.view_multi_key_design = function(debug) {
-  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
-  db.deleteDb();
+  return console.log('TODO');
+  var db_name = get_random_db_name();
+  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
   if (debug) debugger;
 
@@ -217,4 +218,7 @@ couchTests.view_multi_key_design = function(debug) {
   T(curr.length == 2);
   T(curr[0].value == 27);
   T(curr[1].value == 26);
+
+  // cleanup
+  db.deleteDb();
 };

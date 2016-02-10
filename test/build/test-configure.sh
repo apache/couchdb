@@ -52,13 +52,13 @@ fi
 CMD="./configure --test "
 
 test_defaults() {
-    EXPECT="/usr/local /usr/local /usr/local/bin /usr/local/libexec /usr/local/etc /usr/local/share /usr/local/share /usr/local/var /usr/local/var/run /usr/local/share/doc/apache-couchdb /usr/local/lib /usr/local/var/lib /usr/local/var/lib /usr/local/var/log /usr/local/share/man /usr/local/share/info /usr/local/share/doc/apache-couchdb/html /usr/local/share/doc/apache-couchdb/pdf"
+    EXPECT="/usr/local /usr/local /usr/local/bin /usr/local/libexec /usr/local/etc /usr/local/share /usr/local/share /usr/local/var /usr/local/var/run /usr/local/share/doc/apache-couchdb /usr/local/lib /usr/local/var/lib/couchdb /usr/local/var/lib/couchdb /usr/local/var/log /usr/local/share/man /usr/local/share/info /usr/local/share/doc/apache-couchdb/html /usr/local/share/doc/apache-couchdb/pdf"
     RESULT=`$CMD`
     assertEquals "test defaults" "$EXPECT" "$RESULT"
 }
 
 test_prefix() {
-    EXPECT="/opt/local /opt/local /opt/local/bin /opt/local/libexec /opt/local/etc /opt/local/share /opt/local/share /opt/local/var /opt/local/var/run /opt/local/share/doc/apache-couchdb /opt/local/lib /opt/local/var/lib /opt/local/var/lib /opt/local/var/log /opt/local/share/man /opt/local/share/info /opt/local/share/doc/apache-couchdb/html /opt/local/share/doc/apache-couchdb/pdf"
+    EXPECT="/opt/local /opt/local /opt/local/bin /opt/local/libexec /opt/local/etc /opt/local/share /opt/local/share /opt/local/var /opt/local/var/run /opt/local/share/doc/apache-couchdb /opt/local/lib /opt/local/var/lib/couchdb /opt/local/var/lib/couchdb /opt/local/var/log /opt/local/share/man /opt/local/share/info /opt/local/share/doc/apache-couchdb/html /opt/local/share/doc/apache-couchdb/pdf"
 
     RESULT=`$CMD --prefix=/opt/local`
     assertEquals "test prefix" "$EXPECT" "$RESULT"
@@ -79,7 +79,7 @@ test_prefix_error() {
 
 
 test_exec_prefix() {
-    EXPECT="/usr/local /opt/local /opt/local/bin /opt/local/libexec /usr/local/etc /usr/local/share /usr/local/share /usr/local/var /usr/local/var/run /usr/local/share/doc/apache-couchdb /opt/local/lib /usr/local/var/lib /usr/local/var/lib /usr/local/var/log /usr/local/share/man /usr/local/share/info /usr/local/share/doc/apache-couchdb/html /usr/local/share/doc/apache-couchdb/pdf"
+    EXPECT="/usr/local /opt/local /opt/local/bin /opt/local/libexec /usr/local/etc /usr/local/share /usr/local/share /usr/local/var /usr/local/var/run /usr/local/share/doc/apache-couchdb /opt/local/lib /usr/local/var/lib/couchdb /usr/local/var/lib/couchdb /usr/local/var/log /usr/local/share/man /usr/local/share/info /usr/local/share/doc/apache-couchdb/html /usr/local/share/doc/apache-couchdb/pdf"
 
     RESULT=`$CMD --exec-prefix=/opt/local`
     assertEquals "test exec_prefix" "$EXPECT" "$RESULT"
@@ -89,7 +89,7 @@ test_exec_prefix() {
 }
 
 test_exec_prefix_eval() {
-    EXPECT="/horse/local /horse/local /horse/local/bin /horse/local/libexec /horse/local/etc /horse/local/share /horse/local/share /horse/local/var /horse/local/var/run /horse/local/share/doc/apache-couchdb /horse/local/lib /horse/local/var/lib /horse/local/var/lib /horse/local/var/log /horse/local/share/man /horse/local/share/info /horse/local/share/doc/apache-couchdb/html /horse/local/share/doc/apache-couchdb/pdf"
+    EXPECT="/horse/local /horse/local /horse/local/bin /horse/local/libexec /horse/local/etc /horse/local/share /horse/local/share /horse/local/var /horse/local/var/run /horse/local/share/doc/apache-couchdb /horse/local/lib /horse/local/var/lib/couchdb /horse/local/var/lib/couchdb /horse/local/var/log /horse/local/share/man /horse/local/share/info /horse/local/share/doc/apache-couchdb/html /horse/local/share/doc/apache-couchdb/pdf"
 
     RESULT=`$CMD --prefix=/horse/local --exec-prefix=\\${prefix}`
     assertEquals "test exec_prefix" "$EXPECT" "$RESULT"
@@ -109,7 +109,7 @@ test_exec_prefix_error() {
 }
 
 test_bindir() {
-    EXPECT="/usr/local /usr/local /my/funky/bindir /usr/local/libexec /usr/local/etc /usr/local/share /usr/local/share /usr/local/var /usr/local/var/run /usr/local/share/doc/apache-couchdb /usr/local/lib /usr/local/var/lib /usr/local/var/lib /usr/local/var/log /usr/local/share/man /usr/local/share/info /usr/local/share/doc/apache-couchdb/html /usr/local/share/doc/apache-couchdb/pdf"
+    EXPECT="/usr/local /usr/local /my/funky/bindir /usr/local/libexec /usr/local/etc /usr/local/share /usr/local/share /usr/local/var /usr/local/var/run /usr/local/share/doc/apache-couchdb /usr/local/lib /usr/local/var/lib/couchdb /usr/local/var/lib/couchdb /usr/local/var/log /usr/local/share/man /usr/local/share/info /usr/local/share/doc/apache-couchdb/html /usr/local/share/doc/apache-couchdb/pdf"
 
     RESULT=`$CMD --bindir=/my/funky/bindir`
     assertEquals "test bindir" "$EXPECT" "$RESULT"
@@ -129,7 +129,7 @@ test_bindir_error() {
 }
 
 test_libexecdir() {
-    EXPECT="/usr/local /usr/local /usr/local/bin /opt/local/libexec /usr/local/etc /usr/local/share /usr/local/share /usr/local/var /usr/local/var/run /usr/local/share/doc/apache-couchdb /usr/local/lib /usr/local/var/lib /usr/local/var/lib /usr/local/var/log /usr/local/share/man /usr/local/share/info /usr/local/share/doc/apache-couchdb/html /usr/local/share/doc/apache-couchdb/pdf"
+    EXPECT="/usr/local /usr/local /usr/local/bin /opt/local/libexec /usr/local/etc /usr/local/share /usr/local/share /usr/local/var /usr/local/var/run /usr/local/share/doc/apache-couchdb /usr/local/lib /usr/local/var/lib/couchdb /usr/local/var/lib/couchdb /usr/local/var/log /usr/local/share/man /usr/local/share/info /usr/local/share/doc/apache-couchdb/html /usr/local/share/doc/apache-couchdb/pdf"
 
     RESULT=`$CMD --libexecdir=/opt/local/libexec`
     assertEquals "test libexecdir" "$EXPECT" "$RESULT"
@@ -149,7 +149,7 @@ test_libexecdir_error() {
 }
 
 test_sysconfdir() {
-    EXPECT="/usr/local /usr/local /usr/local/bin /usr/local/libexec /opt/local/etc /usr/local/share /usr/local/share /usr/local/var /usr/local/var/run /usr/local/share/doc/apache-couchdb /usr/local/lib /usr/local/var/lib /usr/local/var/lib /usr/local/var/log /usr/local/share/man /usr/local/share/info /usr/local/share/doc/apache-couchdb/html /usr/local/share/doc/apache-couchdb/pdf"
+    EXPECT="/usr/local /usr/local /usr/local/bin /usr/local/libexec /opt/local/etc /usr/local/share /usr/local/share /usr/local/var /usr/local/var/run /usr/local/share/doc/apache-couchdb /usr/local/lib /usr/local/var/lib/couchdb /usr/local/var/lib/couchdb /usr/local/var/log /usr/local/share/man /usr/local/share/info /usr/local/share/doc/apache-couchdb/html /usr/local/share/doc/apache-couchdb/pdf"
 
     RESULT=`$CMD --sysconfdir=/opt/local/etc`
     assertEquals "test sysconfdir" "$EXPECT" "$RESULT"
@@ -169,7 +169,7 @@ test_sysconfdir_error() {
 }
 
 test_datarootdir() {
-    EXPECT="/usr/local /usr/local /usr/local/bin /usr/local/libexec /usr/local/etc /opt/local/share /opt/local/share /usr/local/var /usr/local/var/run /opt/local/share/doc/apache-couchdb /usr/local/lib /usr/local/var/lib /usr/local/var/lib /usr/local/var/log /opt/local/share/man /opt/local/share/info /opt/local/share/doc/apache-couchdb/html /opt/local/share/doc/apache-couchdb/pdf"
+    EXPECT="/usr/local /usr/local /usr/local/bin /usr/local/libexec /usr/local/etc /opt/local/share /opt/local/share /usr/local/var /usr/local/var/run /opt/local/share/doc/apache-couchdb /usr/local/lib /usr/local/var/lib/couchdb /usr/local/var/lib/couchdb /usr/local/var/log /opt/local/share/man /opt/local/share/info /opt/local/share/doc/apache-couchdb/html /opt/local/share/doc/apache-couchdb/pdf"
 
     RESULT=`$CMD --datarootdir=/opt/local/share`
     assertEquals "test datarootdir" "$EXPECT" "$RESULT"
@@ -189,7 +189,7 @@ test_datarootdir_error() {
 }
 
 test_localstatedir() {
-    EXPECT="/usr/local /usr/local /usr/local/bin /usr/local/libexec /usr/local/etc /usr/local/share /usr/local/share /horse/local/var /horse/local/var/run /usr/local/share/doc/apache-couchdb /usr/local/lib /horse/local/var/lib /horse/local/var/lib /horse/local/var/log /usr/local/share/man /usr/local/share/info /usr/local/share/doc/apache-couchdb/html /usr/local/share/doc/apache-couchdb/pdf"
+    EXPECT="/usr/local /usr/local /usr/local/bin /usr/local/libexec /usr/local/etc /usr/local/share /usr/local/share /horse/local/var /horse/local/var/run /usr/local/share/doc/apache-couchdb /usr/local/lib /horse/local/var/lib/couchdb /horse/local/var/lib/couchdb /horse/local/var/log /usr/local/share/man /usr/local/share/info /usr/local/share/doc/apache-couchdb/html /usr/local/share/doc/apache-couchdb/pdf"
 
     RESULT=`$CMD --localstatedir=/horse/local/var`
     assertEquals "test localstatedir" "$EXPECT" "$RESULT"
@@ -209,7 +209,7 @@ test_localstatedir_error() {
 }
 
 test_runstatedir() {
-    EXPECT="/usr/local /usr/local /usr/local/bin /usr/local/libexec /usr/local/etc /usr/local/share /usr/local/share /usr/local/var /horse/local/var/run /usr/local/share/doc/apache-couchdb /usr/local/lib /usr/local/var/lib /usr/local/var/lib /usr/local/var/log /usr/local/share/man /usr/local/share/info /usr/local/share/doc/apache-couchdb/html /usr/local/share/doc/apache-couchdb/pdf"
+    EXPECT="/usr/local /usr/local /usr/local/bin /usr/local/libexec /usr/local/etc /usr/local/share /usr/local/share /usr/local/var /horse/local/var/run /usr/local/share/doc/apache-couchdb /usr/local/lib /usr/local/var/lib/couchdb /usr/local/var/lib/couchdb /usr/local/var/log /usr/local/share/man /usr/local/share/info /usr/local/share/doc/apache-couchdb/html /usr/local/share/doc/apache-couchdb/pdf"
 
     RESULT=`$CMD --runstatedir=/horse/local/var/run`
     assertEquals "test runstatedir" "$EXPECT" "$RESULT"
@@ -229,7 +229,7 @@ test_runstatedir_error() {
 }
 
 test_docdir() {
-    EXPECT="/usr/local /usr/local /usr/local/bin /usr/local/libexec /usr/local/etc /usr/local/share /usr/local/share /usr/local/var /usr/local/var/run /horse/local/share/doc /usr/local/lib /usr/local/var/lib /usr/local/var/lib /usr/local/var/log /usr/local/share/man /usr/local/share/info /horse/local/share/doc/html /horse/local/share/doc/pdf"
+    EXPECT="/usr/local /usr/local /usr/local/bin /usr/local/libexec /usr/local/etc /usr/local/share /usr/local/share /usr/local/var /usr/local/var/run /horse/local/share/doc /usr/local/lib /usr/local/var/lib/couchdb /usr/local/var/lib/couchdb /usr/local/var/log /usr/local/share/man /usr/local/share/info /horse/local/share/doc/html /horse/local/share/doc/pdf"
 
     RESULT=`$CMD --docdir=/horse/local/share/doc`
     assertEquals "test docdir" "$EXPECT" "$RESULT"
@@ -249,7 +249,7 @@ test_docdir_error() {
 }
 
 test_libdir() {
-    EXPECT="/usr/local /usr/local /usr/local/bin /usr/local/libexec /usr/local/etc /usr/local/share /usr/local/share /usr/local/var /usr/local/var/run /usr/local/share/doc/apache-couchdb /horse/local/lib /usr/local/var/lib /usr/local/var/lib /usr/local/var/log /usr/local/share/man /usr/local/share/info /usr/local/share/doc/apache-couchdb/html /usr/local/share/doc/apache-couchdb/pdf"
+    EXPECT="/usr/local /usr/local /usr/local/bin /usr/local/libexec /usr/local/etc /usr/local/share /usr/local/share /usr/local/var /usr/local/var/run /usr/local/share/doc/apache-couchdb /horse/local/lib /usr/local/var/lib/couchdb /usr/local/var/lib/couchdb /usr/local/var/log /usr/local/share/man /usr/local/share/info /usr/local/share/doc/apache-couchdb/html /usr/local/share/doc/apache-couchdb/pdf"
 
     RESULT=`$CMD --libdir=/horse/local/lib`
     assertEquals "test libdir" "$EXPECT" "$RESULT"
@@ -269,7 +269,7 @@ test_libdir_error() {
 }
 
 test_database_dir() {
-    EXPECT="/usr/local /usr/local /usr/local/bin /usr/local/libexec /usr/local/etc /usr/local/share /usr/local/share /usr/local/var /usr/local/var/run /usr/local/share/doc/apache-couchdb /usr/local/lib /horse/local/var/lib /usr/local/var/lib /usr/local/var/log /usr/local/share/man /usr/local/share/info /usr/local/share/doc/apache-couchdb/html /usr/local/share/doc/apache-couchdb/pdf"
+    EXPECT="/usr/local /usr/local /usr/local/bin /usr/local/libexec /usr/local/etc /usr/local/share /usr/local/share /usr/local/var /usr/local/var/run /usr/local/share/doc/apache-couchdb /usr/local/lib /horse/local/var/lib /usr/local/var/lib/couchdb /usr/local/var/log /usr/local/share/man /usr/local/share/info /usr/local/share/doc/apache-couchdb/html /usr/local/share/doc/apache-couchdb/pdf"
 
     RESULT=`$CMD --databasedir=/horse/local/var/lib`
     assertEquals "test databasedir" "$EXPECT" "$RESULT"
@@ -289,7 +289,7 @@ test_database_dir_error() {
 }
 
 test_view_dir() {
-    EXPECT="/usr/local /usr/local /usr/local/bin /usr/local/libexec /usr/local/etc /usr/local/share /usr/local/share /usr/local/var /usr/local/var/run /usr/local/share/doc/apache-couchdb /usr/local/lib /usr/local/var/lib /horse/local/var/lib /usr/local/var/log /usr/local/share/man /usr/local/share/info /usr/local/share/doc/apache-couchdb/html /usr/local/share/doc/apache-couchdb/pdf"
+    EXPECT="/usr/local /usr/local /usr/local/bin /usr/local/libexec /usr/local/etc /usr/local/share /usr/local/share /usr/local/var /usr/local/var/run /usr/local/share/doc/apache-couchdb /usr/local/lib /usr/local/var/lib/couchdb /horse/local/var/lib /usr/local/var/log /usr/local/share/man /usr/local/share/info /usr/local/share/doc/apache-couchdb/html /usr/local/share/doc/apache-couchdb/pdf"
 
     RESULT=`$CMD --viewindexdir=/horse/local/var/lib`
     assertEquals "test viewindexdir" "$EXPECT" "$RESULT"
@@ -309,7 +309,7 @@ test_view_dir_error() {
 }
 
 test_logdir() {
-    EXPECT="/usr/local /usr/local /usr/local/bin /usr/local/libexec /usr/local/etc /usr/local/share /usr/local/share /usr/local/var /usr/local/var/run /usr/local/share/doc/apache-couchdb /usr/local/lib /usr/local/var/lib /usr/local/var/lib /horse/log /usr/local/share/man /usr/local/share/info /usr/local/share/doc/apache-couchdb/html /usr/local/share/doc/apache-couchdb/pdf"
+    EXPECT="/usr/local /usr/local /usr/local/bin /usr/local/libexec /usr/local/etc /usr/local/share /usr/local/share /usr/local/var /usr/local/var/run /usr/local/share/doc/apache-couchdb /usr/local/lib /usr/local/var/lib/couchdb /usr/local/var/lib/couchdb /horse/log /usr/local/share/man /usr/local/share/info /usr/local/share/doc/apache-couchdb/html /usr/local/share/doc/apache-couchdb/pdf"
 
     RESULT=`$CMD --logdir=/horse/log`
     assertEquals "test logdir" "$EXPECT" "$RESULT"
@@ -329,7 +329,7 @@ test_logdir_error() {
 }
 
 test_mandir() {
-    EXPECT="/usr/local /usr/local /usr/local/bin /usr/local/libexec /usr/local/etc /usr/local/share /usr/local/share /usr/local/var /usr/local/var/run /usr/local/share/doc/apache-couchdb /usr/local/lib /usr/local/var/lib /usr/local/var/lib /usr/local/var/log /horse/local/share/man /usr/local/share/info /usr/local/share/doc/apache-couchdb/html /usr/local/share/doc/apache-couchdb/pdf"
+    EXPECT="/usr/local /usr/local /usr/local/bin /usr/local/libexec /usr/local/etc /usr/local/share /usr/local/share /usr/local/var /usr/local/var/run /usr/local/share/doc/apache-couchdb /usr/local/lib /usr/local/var/lib/couchdb /usr/local/var/lib/couchdb /usr/local/var/log /horse/local/share/man /usr/local/share/info /usr/local/share/doc/apache-couchdb/html /usr/local/share/doc/apache-couchdb/pdf"
 
     RESULT=`$CMD --mandir=/horse/local/share/man`
     assertEquals "test mandir" "$EXPECT" "$RESULT"
@@ -349,7 +349,7 @@ test_mandir_error() {
 }
 
 test_infodir() {
-    EXPECT="/usr/local /usr/local /usr/local/bin /usr/local/libexec /usr/local/etc /usr/local/share /usr/local/share /usr/local/var /usr/local/var/run /usr/local/share/doc/apache-couchdb /usr/local/lib /usr/local/var/lib /usr/local/var/lib /usr/local/var/log /usr/local/share/man /horse/local/share/info /usr/local/share/doc/apache-couchdb/html /usr/local/share/doc/apache-couchdb/pdf"
+    EXPECT="/usr/local /usr/local /usr/local/bin /usr/local/libexec /usr/local/etc /usr/local/share /usr/local/share /usr/local/var /usr/local/var/run /usr/local/share/doc/apache-couchdb /usr/local/lib /usr/local/var/lib/couchdb /usr/local/var/lib/couchdb /usr/local/var/log /usr/local/share/man /horse/local/share/info /usr/local/share/doc/apache-couchdb/html /usr/local/share/doc/apache-couchdb/pdf"
 
     RESULT=`$CMD --infodir=/horse/local/share/info`
     assertEquals "test infodir" "$EXPECT" "$RESULT"
@@ -369,7 +369,7 @@ test_infodir_error() {
 }
 
 test_htmldir() {
-    EXPECT="/usr/local /usr/local /usr/local/bin /usr/local/libexec /usr/local/etc /usr/local/share /usr/local/share /usr/local/var /usr/local/var/run /usr/local/share/doc/apache-couchdb /usr/local/lib /usr/local/var/lib /usr/local/var/lib /usr/local/var/log /usr/local/share/man /usr/local/share/info /horse/local/share/doc/html /usr/local/share/doc/apache-couchdb/pdf"
+    EXPECT="/usr/local /usr/local /usr/local/bin /usr/local/libexec /usr/local/etc /usr/local/share /usr/local/share /usr/local/var /usr/local/var/run /usr/local/share/doc/apache-couchdb /usr/local/lib /usr/local/var/lib/couchdb /usr/local/var/lib/couchdb /usr/local/var/log /usr/local/share/man /usr/local/share/info /horse/local/share/doc/html /usr/local/share/doc/apache-couchdb/pdf"
 
     RESULT=`$CMD --htmldir=/horse/local/share/doc/html`
     assertEquals "test htmldir" "$EXPECT" "$RESULT"
@@ -389,7 +389,7 @@ test_htmldir_error() {
 }
 
 test_pdfdir() {
-    EXPECT="/usr/local /usr/local /usr/local/bin /usr/local/libexec /usr/local/etc /usr/local/share /usr/local/share /usr/local/var /usr/local/var/run /usr/local/share/doc/apache-couchdb /usr/local/lib /usr/local/var/lib /usr/local/var/lib /usr/local/var/log /usr/local/share/man /usr/local/share/info /usr/local/share/doc/apache-couchdb/html /horse/local/share/doc/pdf"
+    EXPECT="/usr/local /usr/local /usr/local/bin /usr/local/libexec /usr/local/etc /usr/local/share /usr/local/share /usr/local/var /usr/local/var/run /usr/local/share/doc/apache-couchdb /usr/local/lib /usr/local/var/lib/couchdb /usr/local/var/lib/couchdb /usr/local/var/log /usr/local/share/man /usr/local/share/info /usr/local/share/doc/apache-couchdb/html /horse/local/share/doc/pdf"
 
     RESULT=`$CMD --pdfdir=/horse/local/share/doc/pdf`
     assertEquals "test pdfdir" "$EXPECT" "$RESULT"

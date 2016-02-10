@@ -114,6 +114,7 @@ $InstallDir="$LibDir\couchdb"
 $LogFile="$LogDir\couch.log"
 $BuildFauxton = [int](-not $DisableFauxton)
 $BuildDocs = [int](-not $DisableDocs)
+$Hostname = [System.Net.Dns]::GetHostEntry([string]"localhost").HostName
 
 Write-Verbose "==> configuring couchdb in rel\couchdb.config"
 $CouchDBConfig = @"
@@ -138,7 +139,7 @@ $CouchDBConfig = @"
 {log_file, "$LogFile"}.
 {fauxton_root, "$DataRootDir/couchdb/www"}.
 {user, "$CouchDBUser"}.
-{node_name, "-name couchdb"}.
+{node_name, "-name $Hostname"}.
 {cluster_port, 5984}.
 {backend_port, 5986}.
 "@

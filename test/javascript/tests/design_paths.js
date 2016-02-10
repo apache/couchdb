@@ -12,11 +12,11 @@
 
 couchTests.design_paths = function(debug) {
   if (debug) debugger;
-  var dbNames = ["test_suite_db", "test_suite_db/with_slashes"];
+  var db_name = get_random_db_name()
+  var dbNames = [db_name, db_name + "/with_slashes"];
   for (var i=0; i < dbNames.length; i++) {
     var db = new CouchDB(dbNames[i]);
     var dbName = encodeURIComponent(dbNames[i]);
-    db.deleteDb();
     db.createDb();
 
     // create a ddoc w bulk_docs
@@ -68,5 +68,6 @@ couchTests.design_paths = function(debug) {
     // ensure that views are addressable
     resp = db.view("test2/testing");
     T(resp.total_rows == 0);
+    db.deleteDb();
   };
 };

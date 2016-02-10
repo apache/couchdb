@@ -363,32 +363,41 @@ function makeDocs(start, end, templateDoc) {
 }
 
 function run_on_modified_server(settings, fun) {
+  var xhr = CouchDB.request("GET", "/_membership");
+  var nodes = JSON.parse(xhr.responseText).all_nodes;
   try {
     // set the settings
     for(var i=0; i < settings.length; i++) {
       var s = settings[i];
-      var xhr = CouchDB.request("PUT", "/_config/" + s.section + "/" + s.key, {
-        body: JSON.stringify(s.value),
-        headers: {"X-Couch-Persist": "false"}
-      });
-      CouchDB.maybeThrowError(xhr);
-      s.oldValue = xhr.responseText;
+      for (var n in nodes) {
+        xhr = CouchDB.request("PUT", "/_node/" + nodes[n] + "/_config/" + s.section + "/" + s.key, {
+          body: JSON.stringify(s.value),
+          headers: {"X-Couch-Persist": "false"}
+        });
+        CouchDB.maybeThrowError(xhr);
+        if (typeof s[nodes[n]] === 'undefined') {
+          s[nodes[n]] = {};
+        }
+        s[nodes[n]] = xhr.responseText;
+      }
     }
     // run the thing
     fun();
   } finally {
     // unset the settings
     for(var j=0; j < i; j++) {
-      var s = settings[j];
-      if(s.oldValue == "\"\"\n") { // unset value
-        CouchDB.request("DELETE", "/_config/" + s.section + "/" + s.key, {
-          headers: {"X-Couch-Persist": "false"}
-        });
-      } else {
-        CouchDB.request("PUT", "/_config/" + s.section + "/" + s.key, {
-          body: s.oldValue,
-          headers: {"X-Couch-Persist": "false"}
-        });
+      for (var n in nodes) {
+        var s = settings[j];
+        if(s[nodes[n]] == "\"\"\n") { // unset value
+          CouchDB.request("DELETE", "/_node/" + nodes[n] + "/_config/" + s.section + "/" + s.key, {
+            headers: {"X-Couch-Persist": "false"}
+          });
+        } else {
+          CouchDB.request("PUT", "/_node/" + nodes[n] + "/_config/" + s.section + "/" + s.key, {
+            body: s[nodes[n]],
+            headers: {"X-Couch-Persist": "false"}
+          });
+        }
       }
     }
   }
@@ -463,3 +472,14 @@ CouchDB.prepareUserDoc = function(user_doc, new_password) {
   }
   return user_doc;
 };
+
+function get_random_string() {
+  return Math.random()
+    .toString(36)
+    .replace(/[^a-z]+/g, '')
+    .substr(0, 8);
+}
+
+function get_random_db_name() {
+  return "test_suite_db_" + get_random_string()
+}

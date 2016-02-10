@@ -17,25 +17,24 @@ mkdir $RELDIR
 CURRENT_BRANCH=`git rev-parse --abbrev-ref HEAD`
 
 # copy sources over
-git archive $CURRENT_BRANCH | tar -xC $RELDIR/
+git archive $CURRENT_BRANCH | tar -xC $RELDIR/ -f -
 mkdir $RELDIR/src
 cd src/
 
 for repo in *; do
   cd $repo
   mkdir ../../$RELDIR/src/$repo
-  git_ish=`git symbolic-ref -q --short HEAD || git describe --tags --exact-match`
-  git archive $git_ish | tar -xC ../../$RELDIR/src/$repo/
+  git_ish=`git rev-parse --short HEAD`
+  git archive $git_ish | tar -xC ../../$RELDIR/src/$repo/ -f -
+  set +e
+  grep -rl '{vsn, git}' ../../$RELDIR/src/$repo/ | xargs sed -ie "s/{vsn, git}/{vsn, \"`git describe --always --tags`\"}/" 2> /dev/null
+  set -e
   cd ..
 done
 
 cd ..
 
-# update version
-# actual version detection TBD
-perl -pi -e "s/\{vsn, git\}/\{vsn, \"$VERSION\"\}/" $RELDIR/src/*/src/*.app.src
-
-# create THANKS file
+# create CONTRIBUTORS file
 if test -e .git; then
     OS=`uname -s`
     case "$OS" in
@@ -47,11 +46,11 @@ if test -e .git; then
     ;;
     esac
 
-    sed -e "/^#.*/d" THANKS.in > $RELDIR/THANKS
+    sed -e "/^#.*/d" CONTRIBUTORS.in > $RELDIR/CONTRIBUTORS
     CONTRIB_EMAIL_SED_COMMAND="s/^[[:blank:]]{5}[[:digit:]]+[[:blank:]]/ * /"
     git shortlog -se 6c976bd..HEAD \
         | grep -v @apache.org \
-        | sed $SED_ERE_FLAG -e "$CONTRIB_EMAIL_SED_COMMAND" >> $RELDIR/THANKS
-    echo "" >> $RELDIR/THANKS # simplest portable newline
-    echo "For a list of authors see the \`AUTHORS\` file." >> $RELDIR/THANKS
+        | sed $SED_ERE_FLAG -e "$CONTRIB_EMAIL_SED_COMMAND" >> $RELDIR/CONTRIBUTORS
+    echo "" >> $RELDIR/CONTRIBUTORS # simplest portable newline
+    echo "For a list of authors see the \`AUTHORS\` file." >> $RELDIR/CONTRIBUTORS
 fi

@@ -11,14 +11,17 @@
 // the License.
 
 couchTests.replicator_db_by_doc_id = function(debug) {
+  //return console.log('TODO');
 
   if (debug) debugger;
 
   var populate_db = replicator_db.populate_db;
   var docs1 = replicator_db.docs1;
+  // TODO: dice DBs (at least target)
   var dbA = replicator_db.dbA;
   var dbB = replicator_db.dbB;
-  var repDb = replicator_db.repDb;
+  //var repDb = replicator_db.repDb;
+  var replDb = new CouchDB("_replicator");
   var wait = replicator_db.wait;
   var waitForRep = replicator_db.waitForRep;
   var waitForSeq = replicator_db.waitForSeq;
@@ -38,12 +41,13 @@ couchTests.replicator_db_by_doc_id = function(debug) {
     var repDoc = {
       _id: "foo_cont_rep_doc",
       source: "http://" + CouchDB.host + "/" + dbA.name,
-      target: dbB.name,
+      // TODO: fix DB name issue and remove absolute URL again
+      target: 'http://localhost:15984/' + dbB.name,
       doc_ids: ["foo666", "foo3", "_design/mydesign", "foo999", "foo1"]
     };
-    T(repDb.save(repDoc).ok);
+    T(replDb.save(repDoc).ok);
 
-    waitForRep(repDb, repDoc, "completed");
+    waitForRep(replDb, repDoc, "completed");
     var copy = dbB.open("foo1");
     T(copy !== null);
     T(copy.value === 11);
@@ -62,21 +66,22 @@ couchTests.replicator_db_by_doc_id = function(debug) {
     T(copy === null);
 
     copy = dbB.open("_design/mydesign");
-    T(copy === null);
+    // TODO: recheck - but I believe this should be in the target! (see also #written below)
+    T(copy !== null);
 
-    repDoc = repDb.open(repDoc._id);
+    repDoc = replDb.open(repDoc._id);
     T(typeof repDoc._replication_stats === "object", "doc has stats");
     var stats = repDoc._replication_stats;
     TEquals(3, stats.revisions_checked, "right # of revisions_checked");
     TEquals(3, stats.missing_revisions_found, "right # of missing_revisions_found");
     TEquals(3, stats.docs_read, "right # of docs_read");
-    TEquals(2, stats.docs_written, "right # of docs_written");
-    TEquals(1, stats.doc_write_failures, "right # of doc_write_failures");
-    TEquals(dbA.info().update_seq, stats.checkpointed_source_seq,
-      "right checkpointed_source_seq");
+    TEquals(3, stats.docs_written, "right # of docs_written");
+    TEquals(0, stats.doc_write_failures, "right # of doc_write_failures");
+    // sequences are no more meaningful in a cluster
+    //TEquals(dbA.info().update_seq, stats.checkpointed_source_seq, "right checkpointed_source_seq");
   }
 
-  var server_config = [
+  /*var server_config = [
     {
       section: "couch_httpd_auth",
       key: "iterations",
@@ -87,13 +92,37 @@ couchTests.replicator_db_by_doc_id = function(debug) {
       key: "db",
       value: repDb.name
     }
-  ];
+  ];*/
 
-  repDb.deleteDb();
-  run_on_modified_server(server_config, by_doc_ids_replication);
+  //repDb.deleteDb();
+  // don't run on modified server as it would be strange on cluster
+  // but use "normal" replication DB, create a doc, reliably clear after run
+  // on delete fail, the next tests would all fail
+  function handleReplDoc(show) {
+    var replDoc = replDb.open("foo_cont_rep_doc");
+    if(replDoc!=null) {
+      if(show) {
+        //console.log(JSON.stringify(replDoc));
+      }
+      replDb.deleteDoc(replDoc);
+    }
+  }
+
+  handleReplDoc();
+  try {
+    by_doc_ids_replication();
+  } finally {
+    // cleanup or log
+    try {
+      handleReplDoc(true);
+    } catch (e2) {
+      console.log("Error during cleanup " + e2);
+    }
+  }
+  //run_on_modified_server(server_config, by_doc_ids_replication);
 
   // cleanup
-  repDb.deleteDb();
+  //repDb.deleteDb();
   dbA.deleteDb();
   dbB.deleteDb();
 }

@@ -447,6 +447,30 @@ functions = {
         end.
     ERLANG
   },
+  "rewrite-basic" => {
+    "js" => <<-JS,
+    function(req) {
+      return "new/location";
+    }
+    JS
+    "erlang" => <<-ERLANG,
+        fun(Req) ->
+            {[{"path", "new/location"}]}
+        end.
+    ERLANG
+  },
+  "rewrite-no-rule" => {
+    "js" => <<-JS,
+    function(req) {
+      return;
+    }
+    JS
+    "erlang" => <<-ERLANG,
+        fun(Req) ->
+            undefined
+        end.
+    ERLANG
+  },
   "error" => {
     "js" => <<-JS,
     function() {
@@ -747,7 +771,44 @@ describe "query server normal case" do
           should == true
       end
     end
+
+  describe "ddoc rewrites" do
+    describe "simple rewrite" do
+      before(:all) do
+        @ddoc = {
+          "_id" => "foo",
+          "rewrites" => functions["rewrite-basic"][LANGUAGE]
+        }
+        @qs.teach_ddoc(@ddoc)
+      end
+      it "should run normal" do
+        ok, resp = @qs.ddoc_run(@ddoc,
+          ["rewrites"],
+          [{"path" => "foo/bar"}, {"method" => "POST"}]
+        )
+        ok.should == "ok"
+        resp["path"].should == "new/location"
+      end
+    end
+
+    describe "no rule" do
+      before(:all) do
+        @ddoc = {
+          "_id" => "foo",
+          "rewrites" => functions["rewrite-no-rule"][LANGUAGE]
+        }
+        @qs.teach_ddoc(@ddoc)
+      end
+      it "should run normal" do
+        resp = @qs.ddoc_run(@ddoc,
+          ["rewrites"],
+          [{"path" => "foo/bar"}, {"method" => "POST"}]
+        )
+        resp.should == ['no_dispatch_rule']
+      end
+    end
   end
+end
 
 
 

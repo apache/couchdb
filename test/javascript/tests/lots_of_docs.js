@@ -12,8 +12,8 @@
 
 // test saving a semi-large quanitity of documents and do some view queries.
 couchTests.lots_of_docs = function(debug) {
-  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
-  db.deleteDb();
+  var db_name = get_random_db_name();
+  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
   if (debug) debugger;
 
@@ -52,4 +52,7 @@ couchTests.lots_of_docs = function(debug) {
   // Check _all_docs with descending=true again (now that there are many docs)
   var desc = db.allDocs({descending:true});
   T(desc.total_rows == desc.rows.length);
+
+  // cleanup
+  db.deleteDb();
 };

@@ -11,13 +11,19 @@
 // the License.
 
 couchTests.reader_acl = function(debug) {
+  return console.log('TODO: config not available on cluster');
   // this tests read access control
 
-  var usersDb = new CouchDB("test_suite_users", {"X-Couch-Full-Commit":"false"});
-  var secretDb = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
+  var users_db_name = get_random_db_name();
+  var usersDb = new CouchDB(users_db_name, {"X-Couch-Full-Commit":"false"});
+
+  var db_name = get_random_db_name();
+  var secretDb = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
+
+
   function testFun() {
     try {
-      usersDb.deleteDb();
+      // usersDb.deleteDb();
       try {
         usersDb.createDb();
       } catch(e) {
@@ -25,7 +31,7 @@ couchTests.reader_acl = function(debug) {
          throw e;
         }
       }
-      secretDb.deleteDb();
+      // secretDb.deleteDb();
       secretDb.createDb();
 
       // create a user with top-secret-clearance
@@ -201,7 +207,7 @@ couchTests.reader_acl = function(debug) {
       key: "authentication_handlers",
       value: "{couch_httpd_auth, cookie_authentication_handler}, {couch_httpd_auth, default_authentication_handler}"},
      {section: "couch_httpd_auth",
-      key: "authentication_db", value: "test_suite_users"}],
+      key: "authentication_db", value: users_db_name}],
     testFun
   );
         
@@ -213,7 +219,10 @@ couchTests.reader_acl = function(debug) {
       key: "authentication_handlers",
       value: "{couch_httpd_auth, cookie_authentication_handler}, {couch_httpd_auth, default_authentication_handler}"},
      {section: "couch_httpd_auth",
-      key: "authentication_db", value: "test_suite_users"}],
+      key: "authentication_db", value: users_db_name}],
     testFun2
   );
+
+  // cleanup
+  db.deleteDb();
 }
