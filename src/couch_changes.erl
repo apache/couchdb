@@ -229,9 +229,12 @@ configure_filter(FilterName, Style, Req, Db) ->
     FilterNameParts = string:tokens(FilterName, "/"),
     case [?l2b(couch_httpd:unquote(Part)) || Part <- FilterNameParts] of
         [DName, FName] ->
-            {ok, DDoc} = open_ddoc(Db, <<"_design/", DName/binary>>),
+            DesignId = <<"_design/", DName/binary>>,
+            {ok, DDoc} = ddoc_cache:open_doc(fabric:dbname(Db), DesignId),
             check_member_exists(DDoc, [<<"filters">>, FName]),
-            {custom, Style, Req, DDoc, FName};
+            DIR = fabric_util:doc_id_and_rev(DDoc),
+            {fetch, Style, Req, DIR, FName};
+
         [] ->
             {default, Style};
         _Else ->
