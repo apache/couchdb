@@ -24,6 +24,7 @@
 % gen_server callbacks
 -export([init/1, terminate/2, code_change/3]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
+-export([format_status/2]).
 
 -export([details/1]).
 
@@ -502,6 +503,42 @@ code_change(_OldVsn, #rep_state{}=State, _Extra) ->
     {ok, State}.
 
 
+headers_strip_creds([], Acc) ->
+    lists:reverse(Acc);
+headers_strip_creds([{Key, Value0} | Rest], Acc) ->
+    Value = case string:to_lower(Key) of
+    "authorization" ->
+        "****";
+    _ ->
+        Value0
+    end,
+    headers_strip_creds(Rest, [{Key, Value} | Acc]).
+
+
+httpdb_strip_creds(#httpdb{url = Url, headers = Headers} = HttpDb) ->
+    HttpDb#httpdb{
+        url = couch_util:url_strip_password(Url),
+        headers = headers_strip_creds(Headers, [])
+    }.
+
+
+rep_strip_creds(#rep{source = Source, target = Target} = Rep) ->
+    Rep#rep{
+        source = httpdb_strip_creds(Source),
+        target = httpdb_strip_creds(Target)
+    }.
+
+
+state_strip_creds(#rep_state{rep_details = Rep, source = Source, target = Target} = State) ->
+    % #rep_state contains the source and target at the top level and also
+    % in the nested #rep_details record
+    State#rep_state{
+        rep_details = rep_strip_creds(Rep),
+        source = httpdb_strip_creds(Source),
+        target = httpdb_strip_creds(Target)
+    }.
+
+
 terminate(normal, #rep_state{rep_details = #rep{id = RepId} = Rep,
     checkpoint_history = CheckpointHistory} = State) ->
     terminate_cleanup(State),
@@ -516,8 +553,9 @@ terminate(shutdown, #rep_state{rep_details = #rep{id = RepId}} = State) ->
 terminate(shutdown, {error, Class, Error, Stack, InitArgs}) ->
     #rep{id=RepId} = InitArgs,
     couch_stats:increment_counter([couch_replicator, failed_starts]),
+    CleanInitArgs = rep_strip_creds(InitArgs),
     couch_log:error("~p:~p: Replication failed to start for args ~p: ~p",
-             [Class, Error, InitArgs, Stack]),
+             [Class, Error, CleanInitArgs, Stack]),
     case Error of
     {unauthorized, DbUri} ->
         NotifyError = {unauthorized, <<"unauthorized to access or create database ", DbUri/binary>>};
@@ -546,6 +584,10 @@ terminate_cleanup(State) ->
     stop_db_compaction_notifier(State#rep_state.target_db_compaction_notifier),
     couch_replicator_api_wrap:db_close(State#rep_state.source),
     couch_replicator_api_wrap:db_close(State#rep_state.target).
+
+
+format_status(_Opt, [_PDict, State]) ->
+    [{data, [{"State", state_strip_creds(State)}]}].
 
 
 do_last_checkpoint(#rep_state{seqs_in_progress = [],
