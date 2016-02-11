@@ -62,8 +62,8 @@ changes_test_() ->
             [
                 filter_by_doc_id(),
                 filter_by_design(),
-                continuous_feed(),
-                filter_by_custom_function()
+                continuous_feed()
+                %%filter_by_custom_function()
             ]
         }
     }.
