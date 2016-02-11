@@ -170,7 +170,9 @@ handle_changes(Args1, Req, Db0, Type) ->
 handle_db_event(_DbName, updated, Parent) ->
     Parent ! updated,
     {ok, Parent};
-
+handle_db_event(_DbName, deleted, Parent) ->
+    Parent ! deleted,
+    {ok, Parent};
 handle_db_event(_DbName, _Event, Parent) ->
     {ok, Parent}.
 
