@@ -318,28 +318,16 @@ cors_config(Host, Key, Default) ->
         config:get("cors", Key, Default)).
 
 
-cors_section(Host0) ->
-    {Host, _Port} = split_host_port(Host0),
+cors_section(HostValue) ->
+    HostPort = maybe_strip_scheme(HostValue),
+    Host = hd(string:tokens(HostPort, ":")),
     "cors:" ++ Host.
 
-split_host_port(HostAsString) ->
-    % split at semicolon ":"
-    Split = string:rchr(HostAsString, $:),
-    split_host_port(HostAsString, Split).
 
-split_host_port(HostAsString, 0) ->
-    % no semicolon
-    {HostAsString, '*'};
-split_host_port(HostAsString, N) ->
-    HostPart = string:substr(HostAsString, 1, N-1),
-    % parse out port
-    % is there a nicer way?
-    case (catch erlang:list_to_integer(string:substr(HostAsString,
-                    N+1, length(HostAsString)))) of
-    {'EXIT', _} ->
-        {HostAsString, '*'};
-    Port ->
-        {HostPart, Port}
+maybe_strip_scheme(Host) ->
+    case string:str(Host, "://") of
+        0 -> Host;
+        N -> string:substr(Host, N + 3)
     end.
 
 
