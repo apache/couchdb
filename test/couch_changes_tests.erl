@@ -18,8 +18,6 @@
 -define(TIMEOUT, 3000).
 -define(TEST_TIMEOUT, 10000).
 
--ifdef(run_broken_tests).
-
 -record(row, {
     id,
     seq,
@@ -64,8 +62,8 @@ changes_test_() ->
             [
                 filter_by_doc_id(),
                 filter_by_design(),
-                continuous_feed(),
-                filter_by_custom_function()
+                continuous_feed()
+                %%filter_by_custom_function()
             ]
         }
     }.
@@ -117,7 +115,8 @@ continuous_feed() ->
             foreach,
             fun setup/0, fun teardown/1,
             [
-                fun should_filter_continuous_feed_by_specific_doc_ids/1
+                fun should_filter_continuous_feed_by_specific_doc_ids/1,
+                fun should_end_changes_when_db_deleted/1
             ]
         }
     }.
@@ -314,6 +313,25 @@ should_filter_continuous_feed_by_specific_doc_ids({DbName, Revs}) ->
 
             ?assertMatch([#row{seq = 18, id = <<"doc3">>}], FinalRows)
         end).
+
+
+should_end_changes_when_db_deleted({DbName, _Revs}) ->
+    ?_test(begin
+        {ok, Db} = couch_db:open_int(DbName, []),
+        ChangesArgs = #changes_args{
+            filter = "_doc_ids",
+            feed = "continuous"
+        },
+        DocIds = [<<"doc3">>, <<"doc4">>, <<"doc9999">>],
+        Req = {json_req, {[{<<"doc_ids">>, DocIds}]}},
+        Consumer = spawn_consumer(DbName, ChangesArgs, Req),
+        ok = pause(Consumer),
+        ok = couch_server:delete(DbName, [?ADMIN_CTX]),
+        ok = unpause(Consumer),
+        {_Rows, _LastSeq} = wait_finished(Consumer),
+        stop_consumer(Consumer),
+        ok
+    end).
 
 should_emit_only_design_documents({DbName, Revs}) ->
     ?_test(
@@ -601,6 +619,4 @@ create_db(DbName) ->
     couch_db:create(DbName, [?ADMIN_CTX, overwrite]).
 
 delete_db(DbName) ->
-    ok = couch_server:delete(DbName, [?ADMIN_CTX]).
-
--endif.
+    couch_server:delete(DbName, [?ADMIN_CTX]).
