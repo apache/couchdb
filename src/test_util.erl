@@ -164,19 +164,19 @@ stop_sync_throw(Pid, Fun, Error, Timeout) ->
 
 with_process_restart(Name) ->
     {Pid, true} = with_process_restart(
-        fun() -> exit(whereis(Name), shutdown) end, Name),
+        Name, fun() -> exit(whereis(Name), shutdown) end),
     Pid.
 
 with_process_restart(Name, Fun) ->
     with_process_restart(Name, Fun, 5000).
 
 with_process_restart(Name, Fun, Timeout) ->
-    ok = stop_sync(Name, Fun),
+    Res = stop_sync(Name, Fun),
     case wait_process(Name, Timeout) of
     timeout ->
         timeout;
     Pid ->
-        Pid
+        {Pid, Res}
     end.
 
 
