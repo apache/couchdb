@@ -61,52 +61,46 @@ var Couch = {
   compileFunction : function(source, ddoc, name) {
     if (!source) throw(["error","not_found","missing function"]);
 
-    var evaluate_function_source = function(source, evalFunction, sandbox) {
-      sandbox = sandbox || {};
-      if(typeof CoffeeScript === "undefined") {
-        return evalFunction(source, sandbox, name);
-      } else {
-        var coffee = CoffeeScript.compile(source, {bare: true});
-        return evalFunction(coffee, sandbox, name);
+    var functionObject = null;
+    var sandbox = create_sandbox();
+
+    var require = function(name, module) {
+      module = module || {};
+      var newModule = resolveModule(name.split('/'), module.parent, ddoc);
+      if (!ddoc._module_cache.hasOwnProperty(newModule.id)) {
+        // create empty exports object before executing the module,
+        // stops circular requires from filling the stack
+        ddoc._module_cache[newModule.id] = {};
+        var s = "function (module, exports, require) { " + newModule.current + "\n }";
+        try {
+          var func = sandbox ? evalcx(s, sandbox, newModule.id) : eval(s);
+          func.apply(sandbox, [newModule, newModule.exports, function(name) {
+            return require(name, newModule);
+          }]);
+        } catch(e) {
+          throw [
+            "error",
+            "compilation_error",
+            "Module require('" +name+ "') raised error " +
+            (e.toSource ? e.toSource() : e.stack)
+          ];
+        }
+        ddoc._module_cache[newModule.id] = newModule.exports;
       }
+      return ddoc._module_cache[newModule.id];
+    };
+
+    if (ddoc) {
+      sandbox.require = require;
+      if (!ddoc._module_cache) ddoc._module_cache = {};
     }
 
     try {
-      if (sandbox) {
-        if (ddoc) {
-          if (!ddoc._module_cache) {
-            ddoc._module_cache = {};
-          }
-          var require = function(name, module) {
-            module = module || {};
-            var newModule = resolveModule(name.split('/'), module.parent, ddoc);
-            if (!ddoc._module_cache.hasOwnProperty(newModule.id)) {
-              // create empty exports object before executing the module,
-              // stops circular requires from filling the stack
-              ddoc._module_cache[newModule.id] = {};
-              var s = "function (module, exports, require) { " + newModule.current + "\n }";
-              try {
-                var func = sandbox ? evalcx(s, sandbox, newModule.id) : eval(s);
-                func.apply(sandbox, [newModule, newModule.exports, function(name) {
-                  return require(name, newModule);
-                }]);
-              } catch(e) { 
-                throw [
-                  "error",
-                  "compilation_error",
-                  "Module require('" +name+ "') raised error " +
-                  (e.toSource ? e.toSource() : e.stack)
-                ];
-              }
-              ddoc._module_cache[newModule.id] = newModule.exports;
-            }
-            return ddoc._module_cache[newModule.id];
-          };
-          sandbox.require = require;
-        }
-        var functionObject = evaluate_function_source(source, evalcx, sandbox);
+      if(typeof CoffeeScript === "undefined") {
+        functionObject = evalcx(source, sandbox, name);
       } else {
-        var functionObject = evaluate_function_source(source, eval);
+        var transpiled = CoffeeScript.compile(source, {bare: true});
+        functionObject = evalcx(transpiled, sandbox, name);
       }
     } catch (err) {
       throw([

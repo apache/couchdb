@@ -10,13 +10,10 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-var sandbox = null;
-var filter_sandbox = null;
-
-function init_sandbox() {
+function create_sandbox() {
   try {
     // if possible, use evalcx (not always available)
-    sandbox = evalcx('');
+    var sandbox = evalcx('');
     sandbox.emit = Views.emit;
     sandbox.sum = Views.sum;
     sandbox.log = log;
@@ -29,26 +26,16 @@ function init_sandbox() {
     sandbox.getRow = Render.getRow;
     sandbox.isArray = isArray;
   } catch (e) {
-    //log(e.toSource());
+    var sandbox = {};
   }
-};
-init_sandbox();
-
-function init_filter_sandbox() {
-  try {
-    filter_sandbox = evalcx('');
-    for (var p in sandbox) {
-      if (sandbox.hasOwnProperty(p)) {
-        filter_sandbox[p] = sandbox[p];
-      }
-    }
-    filter_sandbox.emit = Filter.emit;
-  } catch(e) {
-    log(e.toSource ? e.toSource() : e.stack);
-  }
+  return sandbox;
 };
 
-init_filter_sandbox();
+function create_filter_sandbox() {
+  var sandbox = create_sandbox();
+  sandbox.emit = Filter.emit;
+  return sandbox;
+};
 
 // Commands are in the form of json arrays:
 // ["commandname",..optional args...]\n
