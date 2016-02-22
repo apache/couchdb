@@ -54,3 +54,6 @@ if test -e .git; then
     echo "" >> $RELDIR/CONTRIBUTORS # simplest portable newline
     echo "For a list of authors see the \`AUTHORS\` file." >> $RELDIR/CONTRIBUTORS
 fi
+
+# copy our rebar
+cp bin/rebar $RELDIR/bin/rebar
