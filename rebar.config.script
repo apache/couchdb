@@ -32,7 +32,12 @@ CouchJSName = case os:type() of
         "couchjs"
 end,
 CouchJSPath = filename:join(["priv", CouchJSName]),
-Version = string:strip(os:cmd("git describe --always"), right, $\n),
+Version = case os:getenv("COUCHDB_VERSION") of
+    false ->
+        string:strip(os:cmd("git describe --always"), right, $\n);
+    Version0 ->
+        Version0
+end,
 
 CouchConfig = case filelib:is_file(os:getenv("COUCHDB_CONFIG")) of
     true ->
