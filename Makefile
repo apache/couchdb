@@ -64,7 +64,7 @@ help:
 .PHONY: couch
 # target: couch - Build CouchDB core
 couch: config.erl
-	@$(REBAR) compile
+	@COUCHDB_VERSION=$(COUCHDB_VERSION) $(REBAR) compile
 	@cp src/couch/priv/couchjs bin/
 
 
