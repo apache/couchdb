@@ -178,13 +178,15 @@ get_pending_count(#db{name=DbName}=Db, Seq) when is_number(Seq) ->
     {ok, Pending}.
 
 get_view_info(#httpdb{} = Db, DDocId, ViewName) ->
-    Path = iolist_to_binary([DDocId, "/_view/", ViewName, "/_info"]),
+    Path = io_lib:format("~s/_view/~s/_info", [DDocId, ViewName]),
     send_req(Db, [{path, Path}],
         fun(200, _, {Props}) ->
-            {ok, Props}
+            {VInfo} = couch_util:get_value(<<"view_index">>, Props, {[]}),
+            {ok, VInfo}
         end);
 get_view_info(#db{name = DbName}, DDocId, ViewName) ->
-    couch_mrview:get_view_info(DbName, DDocId, ViewName).
+    {ok, VInfo} = couch_mrview:get_view_info(DbName, DDocId, ViewName),
+    {ok, [{couch_util:to_binary(K), V} || {K, V} <- VInfo]}.
 
 
 ensure_full_commit(#httpdb{} = Db) ->

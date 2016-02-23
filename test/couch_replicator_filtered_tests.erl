@@ -32,6 +32,17 @@
                 }
             }
         ">>}
+    ]}},
+    {<<"views">>, {[
+        {<<"mammals">>, {[
+            {<<"map">>, <<"
+                function(doc) {
+                    if (doc.class == 'mammal') {
+                        emit(doc._id, null);
+                    }
+                }
+            ">>}
+        ]}}
     ]}}
 ]}).
 
@@ -69,6 +80,17 @@ query_filtered_replication_test_() ->
             foreachx,
             fun setup/1, fun teardown/2,
             [{Pair, fun should_succeed_with_query/2} || Pair <- Pairs]
+        }
+    }.
+
+view_filtered_replication_test_() ->
+    Pairs = [{local, local}],
+    {
+        "Filtered with a view replication tests",
+        {
+            foreachx,
+            fun setup/1, fun teardown/2,
+            [{Pair, fun should_succeed_with_view/2} || Pair <- Pairs]
         }
     }.
 
@@ -114,6 +136,29 @@ should_succeed_with_query({From, To}, {_Ctx, {Source, Target}}) ->
     {lists:flatten(io_lib:format("~p -> ~p", [From, To])), [
         {"Target DB has proper number of docs",
         ?_assertEqual(2, proplists:get_value(doc_count, TargetDbInfo))},
+        {"Target DB doesn't have deleted docs",
+        ?_assertEqual(0, proplists:get_value(doc_del_count, TargetDbInfo))},
+        {"All the docs filtered as expected",
+        ?_assert(lists:all(fun(Valid) -> Valid end, AllReplies))}
+    ]}.
+
+should_succeed_with_view({From, To}, {_Ctx, {Source, Target}}) ->
+    RepObject = {[
+        {<<"source">>, db_url(From, Source)},
+        {<<"target">>, db_url(To, Target)},
+        {<<"filter">>, <<"_view">>},
+        {<<"query_params">>, {[
+            {<<"view">>, <<"filter_ddoc/mammals">>}
+        ]}}
+    ]},
+    {ok, _} = couch_replicator:replicate(RepObject, ?ADMIN_USER),
+    FilterFun = fun(_DocId, {Props}) ->
+        couch_util:get_value(<<"class">>, Props) == <<"mammal">>
+    end,
+    {ok, TargetDbInfo, AllReplies} = compare_dbs(Source, Target, FilterFun),
+    {lists:flatten(io_lib:format("~p -> ~p", [From, To])), [
+        {"Target DB has proper number of docs",
+        ?_assertEqual(1, proplists:get_value(doc_count, TargetDbInfo))},
         {"Target DB doesn't have deleted docs",
         ?_assertEqual(0, proplists:get_value(doc_del_count, TargetDbInfo))},
         {"All the docs filtered as expected",
