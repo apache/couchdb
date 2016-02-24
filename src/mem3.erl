@@ -13,7 +13,7 @@
 -module(mem3).
 
 -export([start/0, stop/0, restart/0, nodes/0, node_info/2, shards/1, shards/2,
-    choose_shards/2, n/1, n/2, dbname/1, ushards/1]).
+    choose_shards/2, n/1, n/2, dbname/1, ushards/1, get_maintenance_mode/0]).
 -export([get_shard/3, local_shards/1, shard_suffix/1, fold_shards/2]).
 -export([sync_security/0, sync_security/1]).
 -export([compare_nodelists/0, compare_shards/1]).
@@ -80,6 +80,11 @@ nodes() ->
 node_info(Node, Key) ->
     mem3_nodes:get_node_info(Node, Key).
 
+-spec get_maintenance_mode() -> {node(), Mode::list()}.
+get_maintenance_mode() ->
+    Mode = config:get("couchdb", "maintenance_mode", "false"),
+    {node(), Mode}.
+
 -spec shards(DbName::iodata()) -> [#shard{}].
 shards(DbName) ->
     shards_int(DbName, []).
@@ -126,7 +131,7 @@ shards_int(DbName, DocId, Options) ->
 
 -spec ushards(DbName::iodata()) -> [#shard{}].
 ushards(DbName) ->
-    Nodes = [node()|erlang:nodes()],
+    Nodes = non_maintenance_nodes(),
     ZoneMap = zone_map(Nodes),
     Shards = ushards(DbName, live_shards(DbName, Nodes, [ordered]), ZoneMap),
     mem3_util:downcast(Shards).
@@ -253,6 +258,10 @@ allowed_nodes() ->
 
 nodes_in_zone(Nodes, Zone) ->
     [Node || Node <- Nodes, Zone == mem3:node_info(Node, <<"zone">>)].
+
+non_maintenance_nodes() ->
+    {Modes, _} = rpc:multicall(mem3, get_maintenance_mode, []),
+    [N || {N, Mode} <- Modes, Mode =:= "false"].
 
 live_shards(DbName, Nodes) ->
     live_shards(DbName, Nodes, []).
