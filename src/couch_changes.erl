@@ -231,11 +231,15 @@ configure_filter(FilterName, Style, Req, Db) ->
     FilterNameParts = string:tokens(FilterName, "/"),
     case [?l2b(couch_httpd:unquote(Part)) || Part <- FilterNameParts] of
         [DName, FName] ->
-            DesignId = <<"_design/", DName/binary>>,
-            {ok, DDoc} = ddoc_cache:open_doc(fabric:dbname(Db), DesignId),
+            {ok, DDoc} = open_ddoc(Db, <<"_design/", DName/binary>>),
             check_member_exists(DDoc, [<<"filters">>, FName]),
-            DIR = fabric_util:doc_id_and_rev(DDoc),
-            {fetch, Style, Req, DIR, FName};
+            case Db#db.id_tree of
+                undefined ->
+                    DIR = fabric_util:doc_id_and_rev(DDoc),
+                    {fetch, Style, Req, DIR, FName};
+                _ ->
+                    {custom, Style, Req, DDoc, FName}
+            end;
 
         [] ->
             {default, Style};
@@ -339,15 +343,7 @@ check_docids(_) ->
 
 
 open_ddoc(#db{name=DbName, id_tree=undefined}, DDocId) ->
-    {_, Ref} = spawn_monitor(fun() ->
-        exit(fabric:open_doc(mem3:dbname(DbName), DDocId, [ejson_body]))
-    end),
-    receive
-        {'DOWN', Ref, _, _, {ok, _}=Response} ->
-            Response;
-        {'DOWN', Ref, _, _, Response} ->
-            throw(Response)
-    end;
+    {ok, _DDoc} = ddoc_cache:open_doc(mem3:dbname(DbName), DDocId);
 open_ddoc(Db, DDocId) ->
     case couch_db:open_doc(Db, DDocId, [ejson_body]) of
         {ok, _} = Resp -> Resp;
