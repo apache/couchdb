@@ -287,8 +287,7 @@ remove_ancestors_test() ->
     ).
 
 is_replicator_db(DbName) ->
-    ConfigName = list_to_binary(config:get("replicator", "db", "_replicator")),
-    DbName == ConfigName orelse path_ends_with(DbName, <<"_replicator">>).
+    path_ends_with(DbName, <<"_replicator">>).
 
 is_users_db(DbName) ->
     ConfigName = list_to_binary(config:get(
