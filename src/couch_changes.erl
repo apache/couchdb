@@ -343,7 +343,10 @@ check_docids(_) ->
 
 
 open_ddoc(#db{name=DbName, id_tree=undefined}, DDocId) ->
-    {ok, _DDoc} = ddoc_cache:open_doc(mem3:dbname(DbName), DDocId);
+    case ddoc_cache:open_doc(mem3:dbname(DbName), DDocId) of
+        {ok, _} = Resp -> Resp;
+        Else -> throw(Else)
+    end;
 open_ddoc(Db, DDocId) ->
     case couch_db:open_doc(Db, DDocId, [ejson_body]) of
         {ok, _} = Resp -> Resp;
