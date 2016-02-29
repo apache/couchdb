@@ -208,14 +208,21 @@ configure_filter("_view", Style, Req, Db) ->
         [DName, VName] ->
             {ok, DDoc} = open_ddoc(Db, <<"_design/", DName/binary>>),
             check_member_exists(DDoc, [<<"views">>, VName]),
-            try
+            FilterType = try
                 true = couch_util:get_nested_json_value(
                         DDoc#doc.body,
                         [<<"options">>, <<"seq_indexed">>]
                 ),
-                {fast_view, Style, DDoc, VName}
+                fast_view
             catch _:_ ->
-                {view, Style, DDoc, VName}
+                view
+            end,
+            case Db#db.id_tree of
+                undefined ->
+                    DIR = fabric_util:doc_id_and_rev(DDoc),
+                    {fetch, FilterType, Style, DIR, VName};
+                _ ->
+                    {FilterType, Style, DDoc, VName}
             end;
         [] ->
             Msg = "`view` must be of the form `designname/viewname`",
@@ -236,7 +243,7 @@ configure_filter(FilterName, Style, Req, Db) ->
             case Db#db.id_tree of
                 undefined ->
                     DIR = fabric_util:doc_id_and_rev(DDoc),
-                    {fetch, Style, Req, DIR, FName};
+                    {fetch, custom, Style, Req, DIR, FName};
                 _ ->
                     {custom, Style, Req, DDoc, FName}
             end;
