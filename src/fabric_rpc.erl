@@ -50,11 +50,15 @@ changes(DbName, Options, StartVector, DbOptions) ->
     Args0 = lists:keyfind(changes_args, 1, Options),
     #changes_args{dir=Dir, filter_fun=Filter} = Args0,
     Args = case Filter of
-        {fetch, Style, Req, {DDocId, Rev}, FName} ->
+        {fetch, custom, Style, Req, {DDocId, Rev}, FName} ->
             {ok, DDoc} = ddoc_cache:open_doc(mem3:dbname(DbName), DDocId, Rev),
             Args0#changes_args{
                 filter_fun={custom, Style, Req, DDoc, FName}
             };
+        {fetch, FilterType, Style, {DDocId, Rev}, VName}
+                when FilterType == view orelse FilterType == fast_view ->
+            {ok, DDoc} = ddoc_cache:open_doc(mem3:dbname(DbName), DDocId, Rev),
+            Args0#changes_args{filter_fun={FilterType, Style, DDoc, VName}};
         _ ->
             Args0
     end,
