@@ -519,7 +519,9 @@ httpdb_strip_creds(#httpdb{url = Url, headers = Headers} = HttpDb) ->
     HttpDb#httpdb{
         url = couch_util:url_strip_password(Url),
         headers = headers_strip_creds(Headers, [])
-    }.
+    };
+httpdb_strip_creds(LocalDb) ->
+    LocalDb.
 
 
 rep_strip_creds(#rep{source = Source, target = Target} = Rep) ->
