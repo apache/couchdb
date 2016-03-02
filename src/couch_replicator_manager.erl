@@ -137,9 +137,6 @@ continue(#rep{id = RepId}) ->
     {node() == Owner, Owner}.
 
 
-handle_config_change("replicator", "db", _, _, S) ->
-    ok = gen_server:call(S, rep_db_changed),
-    remove_handler;
 handle_config_change("replicator", "max_replication_retry_count", V, _, S) ->
     ok = gen_server:cast(S, {set_max_retries, retries_value(V)}),
     {ok, S};
@@ -164,9 +161,8 @@ init(_) ->
     ok = config:listen_for_changes(?MODULE, Server),
     ScanPid = spawn_link(fun() -> scan_all_dbs(Server) end),
     % Automatically start node local changes feed loop
-    LocalRepDb = ?l2b(config:get("replicator", "db", "_replicator")),
-    ensure_rep_db_exists(LocalRepDb),
-    Pid = start_changes_reader(LocalRepDb, 0),
+    ensure_rep_db_exists(<<"_replicator">>),
+    Pid = start_changes_reader(<<"_replicator">>, 0),
     {ok, #state{
         event_listener = start_event_listener(),
         scan_pid = ScanPid,
@@ -228,9 +224,6 @@ handle_call({rep_db_checkpoint, DbName, EndSeq}, _From, State) ->
     end,
     true = ets:insert(?DB_TO_SEQ, Entry),
     {reply, ok, State};
-
-handle_call(rep_db_changed, _From, State) ->
-    {stop, shutdown, ok, State};
 
 handle_call(Msg, From, State) ->
     couch_log:error("Replication manager received unexpected call ~p from ~p",
