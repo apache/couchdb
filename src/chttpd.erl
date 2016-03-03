@@ -25,6 +25,7 @@
     server_header/0, start_chunked_response/3,send_chunk/2,
     start_response_length/4, send/2, start_json_response/2,
     start_json_response/3, end_json_response/1, send_response/4,
+    send_response_no_cors/4,
     send_method_not_allowed/2, send_error/2, send_error/4, send_redirect/2,
     send_chunked_error/2, send_json/2,send_json/3,send_json/4,
     validate_ctype/2]).
@@ -221,6 +222,7 @@ handle_request_int(MochiReq) ->
 
     % suppress duplicate log
     erlang:put(dont_log_request, true),
+    erlang:put(dont_log_response, true),
 
     {HttpReq2, Response} = case before_request(HttpReq0) of
         {ok, HttpReq1} ->
@@ -643,9 +645,8 @@ etag_respond(Req, CurrentEtag, RespFun) ->
     case etag_match(Req, CurrentEtag) of
     true ->
         % the client has this in their cache.
-        Headers0 = [{"Etag", CurrentEtag}],
-        Headers1 = chttpd_cors:headers(Req, Headers0),
-        chttpd:send_response(Req, 304, Headers1, <<>>);
+        Headers = [{"Etag", CurrentEtag}],
+        chttpd:send_response(Req, 304, Headers, <<>>);
     false ->
         % Run the function.
         RespFun()
@@ -689,12 +690,13 @@ send_chunk(Resp, Data) ->
     Resp:write_chunk(Data),
     {ok, Resp}.
 
-send_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers0, Body) ->
-    couch_stats:increment_counter([couchdb, httpd_status_codes, Code]),
-    Headers = Headers0 ++ server_header() ++
-	[timing(), reqid() | couch_httpd_auth:cookie_auth_header(Req, Headers0)],
-    {ok, MochiReq:respond({Code, Headers, Body})}.
+send_response(Req, Code, Headers0, Body) ->
+    Headers1 = [timing(), reqid() | Headers0],
+    couch_httpd:send_response(Req, Code, Headers1, Body).
 
+send_response_no_cors(Req, Code, Headers0, Body) ->
+    Headers1 = [timing(), reqid() | Headers0],
+    couch_httpd:send_response_no_cors(Req, Code, Headers1, Body).
 
 send_method_not_allowed(Req, Methods) ->
     send_error(Req, 405, [{"Allow", Methods}], <<"method_not_allowed">>,
@@ -708,16 +710,14 @@ send_json(Req, Code, Value) ->
 
 send_json(Req, Code, Headers0, Value) ->
     Headers1 = [timing(), reqid() | Headers0],
-    Headers2 = chttpd_cors:headers(Req, Headers1),
-    couch_httpd:send_json(Req, Code, Headers2, Value).
+    couch_httpd:send_json(Req, Code, Headers1, Value).
 
 start_json_response(Req, Code) ->
     start_json_response(Req, Code, []).
 
 start_json_response(Req, Code, Headers0) ->
     Headers1 = [timing(), reqid() | Headers0],
-    Headers2 = chttpd_cors:headers(Req, Headers1),
-    couch_httpd:start_json_response(Req, Code, Headers2).
+    couch_httpd:start_json_response(Req, Code, Headers1).
 
 end_json_response(Resp) ->
     couch_httpd:end_json_response(Resp).
@@ -989,9 +989,8 @@ send_chunked_error(Resp, Error) ->
     send_chunk(Resp, []).
 
 send_redirect(Req, Path) ->
-    Headers0 = [{"Location", chttpd:absolute_uri(Req, Path)}],
-    Headers1 = chttpd_cors:headers(Req, Headers0),
-    send_response(Req, 301, Headers1, <<>>).
+    Headers = [{"Location", chttpd:absolute_uri(Req, Path)}],
+    send_response(Req, 301, Headers, <<>>).
 
 server_header() ->
     couch_httpd:server_header().

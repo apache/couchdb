@@ -38,7 +38,7 @@ maybe_handle_preflight_request(Req) ->
         not_preflight ->
             not_preflight;
         {ok, PreflightHeaders} ->
-            chttpd:send_response(Req, 204, PreflightHeaders, <<>>)
+            chttpd:send_response_no_cors(Req, 204, PreflightHeaders, <<>>)
     end.
 
 
@@ -227,10 +227,12 @@ simple_headers(Headers) ->
     LCHeaders = [to_lower(H) || H <- Headers],
     lists:filter(fun(H) -> lists:member(H, ?SIMPLE_HEADERS) end, LCHeaders).
 
+
 to_lower(String) when is_binary(String) ->
     to_lower(?b2l(String));
 to_lower(String) ->
     string:to_lower(String).
+
 
 handle_headers(_Config, _Origin, []) ->
     [];
@@ -272,28 +274,32 @@ allow_credentials(Config, Origin) ->
     get_origin_config(Config, Origin, <<"allow_credentials">>,
         ?CORS_DEFAULT_ALLOW_CREDENTIALS).
 
-get_cors_config(#httpd{cors_config = undefined}) ->
+
+get_cors_config(#httpd{cors_config = undefined, mochi_req = MochiReq}) ->
+    Host = couch_httpd_vhost:host(MochiReq),
+
     EnableCors = config:get("httpd", "enable_cors", "false") =:= "true",
-    AllowCredentials = config:get("cors", "credentials", "false") =:= "true",
-    AllowHeaders = case config:get("cors", "headers", undefined) of
+    AllowCredentials = cors_config(Host, "credentials", "false") =:= "true",
+
+    AllowHeaders = case cors_config(Host, "headers", undefined) of
         undefined ->
             ?SUPPORTED_HEADERS;
         AllowHeaders0 ->
             [to_lower(H) || H <- split_list(AllowHeaders0)]
     end,
-    AllowMethods = case config:get("cors", "methods", undefined) of
+    AllowMethods = case cors_config(Host, "methods", undefined) of
         undefined ->
             ?SUPPORTED_METHODS;
         AllowMethods0 ->
             split_list(AllowMethods0)
     end,
-    ExposedHeaders = case config:get("cors", "exposed_headers", undefined) of
+    ExposedHeaders = case cors_config(Host, "exposed_headers", undefined) of
         undefined ->
             ?COUCH_HEADERS;
         ExposedHeaders0 ->
             [to_lower(H) || H <- split_list(ExposedHeaders0)]
     end,
-    Origins0 = binary_split_list(config:get("cors", "origins", [])),
+    Origins0 = binary_split_list(cors_config(Host, "origins", [])),
     Origins = [{O, {[]}} || O <- Origins0],
     [
         {<<"enable_cors">>, EnableCors},
@@ -305,6 +311,25 @@ get_cors_config(#httpd{cors_config = undefined}) ->
     ];
 get_cors_config(#httpd{cors_config = Config}) ->
     Config.
+
+
+cors_config(Host, Key, Default) ->
+    config:get(cors_section(Host), Key,
+        config:get("cors", Key, Default)).
+
+
+cors_section(HostValue) ->
+    HostPort = maybe_strip_scheme(HostValue),
+    Host = hd(string:tokens(HostPort, ":")),
+    "cors:" ++ Host.
+
+
+maybe_strip_scheme(Host) ->
+    case string:str(Host, "://") of
+        0 -> Host;
+        N -> string:substr(Host, N + 3)
+    end.
+
 
 is_cors_enabled(Config) ->
     case get(disable_couch_httpd_cors) of
@@ -360,7 +385,7 @@ get_origin(Req) ->
         undefined ->
             undefined;
         Origin ->
-            ?l2b(to_lower(Origin))
+            ?l2b(Origin)
     end.
 
 
