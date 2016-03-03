@@ -26,7 +26,8 @@
 -export([start_chunked_response/3,send_chunk/2,log_request/2]).
 -export([start_response_length/4, start_response/3, send/2]).
 -export([start_json_response/2, start_json_response/3, end_json_response/1]).
--export([send_response/4,send_method_not_allowed/2,send_error/2,send_error/4, send_redirect/2,send_chunked_error/2]).
+-export([send_response/4,send_response_no_cors/4,send_method_not_allowed/2,
+    send_error/2,send_error/4, send_redirect/2,send_chunked_error/2]).
 -export([send_json/2,send_json/3,send_json/4,last_chunk/1,parse_multipart_request/3]).
 -export([accepted_encodings/1,handle_request_int/5,validate_referer/1,validate_ctype/2]).
 -export([http_1_0_keep_alive/2]).
@@ -720,7 +721,11 @@ last_chunk(Resp) ->
     Resp:write_chunk([]),
     {ok, Resp}.
 
-send_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers, Body) ->
+send_response(Req, Code, Headers0, Body) ->
+    Headers1 = chttpd_cors:headers(Req, Headers0),
+    send_response_no_cors(Req, Code, Headers1, Body).
+
+send_response_no_cors(#httpd{mochi_req=MochiReq}=Req, Code, Headers, Body) ->
     log_request(Req, Code),
     couch_stats:increment_counter([couchdb, httpd_status_codes, Code]),
     Headers1 = http_1_0_keep_alive(MochiReq, Headers),
@@ -732,9 +737,8 @@ send_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers, Body) ->
     end,
     Headers2 = Headers1 ++ server_header() ++
                couch_httpd_auth:cookie_auth_header(Req, Headers1),
-    Headers3 = chttpd_cors:headers(Req, Headers2),
 
-    {ok, MochiReq:respond({Code, Headers3, Body})}.
+    {ok, MochiReq:respond({Code, Headers2, Body})}.
 
 send_method_not_allowed(Req, Methods) ->
     send_error(Req, 405, [{"Allow", Methods}], <<"method_not_allowed">>, ?l2b("Only " ++ Methods ++ " allowed")).
