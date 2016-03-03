@@ -649,6 +649,18 @@ log_request(#httpd{mochi_req=MochiReq,peer=Peer}=Req, Code) ->
             gen_event:notify(couch_plugin, {log_request, Req, Code})
     end.
 
+log_response(Code, Body) ->
+    case erlang:get(dont_log_response) of
+        true ->
+            ok;
+        _ when Code >= 500 ->
+            couch_log:error("httpd ~p error response:~n ~s", [Code, Body]);
+        _ when Code >= 400 ->
+            couch_log:error("httpd ~p error response:~n ~s", [Code, Body]);
+        _ ->
+            ok
+    end.
+
 start_response_length(#httpd{mochi_req=MochiReq}=Req, Code, Headers, Length) ->
     log_request(Req, Code),
     couch_stats:increment_counter([couchdb, httpd_status_codes, Code]),
@@ -729,15 +741,9 @@ send_response_no_cors(#httpd{mochi_req=MochiReq}=Req, Code, Headers, Body) ->
     log_request(Req, Code),
     couch_stats:increment_counter([couchdb, httpd_status_codes, Code]),
     Headers1 = http_1_0_keep_alive(MochiReq, Headers),
-    if Code >= 500 ->
-        couch_log:error("httpd ~p error response:~n ~s", [Code, Body]);
-    Code >= 400 ->
-        couch_log:debug("httpd ~p error response:~n ~s", [Code, Body]);
-    true -> ok
-    end,
     Headers2 = Headers1 ++ server_header() ++
                couch_httpd_auth:cookie_auth_header(Req, Headers1),
-
+    log_response(Code, Body),
     {ok, MochiReq:respond({Code, Headers2, Body})}.
 
 send_method_not_allowed(Req, Methods) ->
