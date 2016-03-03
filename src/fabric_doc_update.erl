@@ -126,7 +126,6 @@ force_reply(Doc, [FirstReply|_] = Replies, {Health, W, Acc}) ->
     {true, Reply} ->
         {Health, W, [{Doc,Reply} | Acc]};
     false ->
-        couch_log:warning("write quorum (~p) failed for ~s", [W, Doc#doc.id]),
         case [Reply || {ok, Reply} <- Replies] of
         [] ->
             % check if all errors are identical, if so inherit health
