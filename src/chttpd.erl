@@ -222,6 +222,7 @@ handle_request_int(MochiReq) ->
 
     % suppress duplicate log
     erlang:put(dont_log_request, true),
+    erlang:put(dont_log_response, true),
 
     {HttpReq2, Response} = case before_request(HttpReq0) of
         {ok, HttpReq1} ->
