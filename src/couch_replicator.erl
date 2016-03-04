@@ -353,6 +353,13 @@ do_init(#rep{options = Options, id = {BaseId, Ext}, user_ctx=UserCtx} = Rep) ->
         }
     }.
 
+adjust_maxconn(Src = #httpdb{http_connections = 1}, RepId) ->
+    Msg = "Adjusting minimum number of HTTP source connections to 2 for ~p",
+    couch_log:notice(Msg, [RepId]),
+    Src#httpdb{http_connections = 2};
+
+adjust_maxconn(Src, _RepId) ->
+    Src.
 
 handle_info(shutdown, St) ->
     {stop, shutdown, St};
@@ -627,10 +634,13 @@ cancel_timer(#rep_state{timer = Timer} = State) ->
 
 init_state(Rep) ->
     #rep{
-        source = Src, target = Tgt,
+        id = {BaseId, _Ext},
+        source = Src0, target = Tgt,
         options = Options, user_ctx = UserCtx,
         type = Type, view = View
     } = Rep,
+    % Adjust minimum number of http source connections to 2 to avoid deadlock
+    Src = adjust_maxconn(Src0, BaseId),
     {ok, Source} = couch_replicator_api_wrap:db_open(Src, [{user_ctx, UserCtx}]),
     {ok, Target} = couch_replicator_api_wrap:db_open(Tgt, [{user_ctx, UserCtx}],
         get_value(create_target, Options, false)),
