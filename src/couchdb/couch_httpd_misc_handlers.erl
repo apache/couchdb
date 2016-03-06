@@ -45,12 +45,14 @@ handle_welcome_req(Req, _) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
 handle_favicon_req(#httpd{method='GET'}=Req, DocumentRoot) ->
-    {{Year,Month,Day},Time} = erlang:universaltime(),
-    OneYearFromNow = {{Year+1,Month,Day},Time},
+    {DateNow, TimeNow} = calendar:universal_time(),
+    DaysNow = calendar:date_to_gregorian_days(DateNow),
+    DaysWhenExpires = DaysNow + 365,
+    DateWhenExpires = calendar:gregorian_days_to_date(DaysWhenExpires),
     CachingHeaders = [
         %favicon should expire a year from now
         {"Cache-Control", "public, max-age=31536000"},
-        {"Expires", couch_util:rfc1123_date(OneYearFromNow)}
+        {"Expires", couch_util:rfc1123_date({DateWhenExpires, TimeNow})}
     ],
     couch_httpd:serve_file(Req, "favicon.ico", DocumentRoot, CachingHeaders);
 
