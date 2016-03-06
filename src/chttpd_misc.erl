@@ -59,7 +59,16 @@ handle_favicon_req(Req) ->
     handle_favicon_req(Req, config:get("chttpd", "docroot")).
 
 handle_favicon_req(#httpd{method='GET'}=Req, DocumentRoot) ->
-    chttpd:serve_file(Req, "favicon.ico", DocumentRoot);
+    {DateNow, TimeNow} = calendar:universal_time(),
+    DaysNow = calendar:date_to_gregorian_days(DateNow),
+    DaysWhenExpires = DaysNow + 365,
+    DateWhenExpires = calendar:gregorian_days_to_date(DaysWhenExpires),
+    CachingHeaders = [
+        %favicon should expire a year from now
+        {"Cache-Control", "public, max-age=31536000"},
+        {"Expires", couch_util:rfc1123_date({DateWhenExpires, TimeNow})}
+    ],
+    chttpd:serve_file(Req, "favicon.ico", DocumentRoot, CachingHeaders);
 handle_favicon_req(Req, _) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
