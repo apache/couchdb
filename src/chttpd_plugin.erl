@@ -15,7 +15,8 @@
 -export([
     before_request/1,
     after_request/2,
-    handle_error/1
+    handle_error/1,
+    before_response/4
 ]).
 
 -define(SERVICE_ID, chttpd).
@@ -37,6 +38,11 @@ after_request(HttpReq, Result) ->
 handle_error(Error) ->
     [Error1] = with_pipe(handle_error, [Error]),
     Error1.
+
+before_response(HttpReq0, Code0, Headers0, Value0) ->
+    [HttpReq, Code, Headers, Value] =
+        with_pipe(before_response, [HttpReq0, Code0, Headers0, Value0]),
+    {ok, {HttpReq, Code, Headers, Value}}.
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions

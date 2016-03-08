@@ -1066,9 +1066,11 @@ basic_headers(Req, Headers0) ->
         ++ couch_httpd_auth:cookie_auth_header(Req, Headers0),
     chttpd_cors:headers(Req, Headers).
 
-handle_response(Req, Code, Headers, Args, Type) ->
-    couch_stats:increment_counter([couchdb, httpd_status_codes, Code]),
-    respond_(Req, Code, Headers, Args, Type).
+handle_response(Req0, Code0, Headers0, Args0, Type) ->
+    {ok, {Req1, Code1, Headers1, Args1}} =
+        chttpd_plugin:before_response(Req0, Code0, Headers0, Args0),
+    couch_stats:increment_counter([couchdb, httpd_status_codes, Code1]),
+    respond_(Req1, Code1, Headers1, Args1, Type).
 
 respond_(#httpd{mochi_req = MochiReq}, Code, Headers, _Args, start_response) ->
     MochiReq:start_response({Code, Headers});
