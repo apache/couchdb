@@ -656,9 +656,8 @@ verify_is_server_admin(#httpd{user_ctx=#user_ctx{roles=Roles}}) ->
     end.
 
 start_response_length(#httpd{mochi_req=MochiReq}=Req, Code, Headers0, Length) ->
-    couch_stats:increment_counter([couchdb, httpd_status_codes, Code]),
     Headers1 = basic_headers(Req, Headers0),
-    Resp = MochiReq:start_response_length({Code, Headers1, Length}),
+    Resp = handle_response(Req, Code, Headers1, Length, start_response_length),
     case MochiReq:get(method) of
     'HEAD' -> throw({http_head_abort, Resp});
     _ -> ok
@@ -670,9 +669,8 @@ send(Resp, Data) ->
     {ok, Resp}.
 
 start_chunked_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers0) ->
-    couch_stats:increment_counter([couchdb, httpd_status_codes, Code]),
     Headers1 = basic_headers(Req, Headers0),
-    Resp = MochiReq:respond({Code, Headers1, chunked}),
+    Resp = handle_response(Req, Code, Headers1, chunked, respond),
     case MochiReq:get(method) of
     'HEAD' -> throw({http_head_abort, Resp});
     _ -> ok
@@ -1067,3 +1065,12 @@ basic_headers(Req, Headers0) ->
         ++ server_header()
         ++ couch_httpd_auth:cookie_auth_header(Req, Headers0),
     chttpd_cors:headers(Req, Headers).
+
+handle_response(Req, Code, Headers, Args, Type) ->
+    couch_stats:increment_counter([couchdb, httpd_status_codes, Code]),
+    respond_(Req, Code, Headers, Args, Type).
+
+respond_(#httpd{mochi_req = MochiReq}, Code, Headers, _Args, start_response) ->
+    MochiReq:start_response({Code, Headers});
+respond_(#httpd{mochi_req = MochiReq}, Code, Headers, Args, Type) ->
+    MochiReq:Type({Code, Headers, Args}).
