@@ -504,10 +504,8 @@ primary_header_value(#httpd{mochi_req=MochiReq}, Key) ->
 serve_file(Req, RelativePath, DocumentRoot) ->
     serve_file(Req, RelativePath, DocumentRoot, []).
 
-serve_file(#httpd{mochi_req=MochiReq}=Req, RelativePath, DocumentRoot,
-           ExtraHeaders) ->
-    Headers = basic_headers(Req, ExtraHeaders),
-    {ok, MochiReq:serve_file(RelativePath, DocumentRoot, Headers)}.
+serve_file(Req0, RelativePath0, DocumentRoot0, ExtraHeaders) ->
+    couch_httpd:serve_file(Req0, RelativePath0, DocumentRoot0, ExtraHeaders).
 
 qs_value(Req, Key) ->
     qs_value(Req, Key, undefined).
