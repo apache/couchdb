@@ -35,7 +35,7 @@ after_request(HttpReq, Result) ->
     {ok, Result1}.
 
 handle_error(Error) ->
-    [Error1] = with_pipe(after_request, [Error]),
+    [Error1] = with_pipe(handle_error, [Error]),
     Error1.
 
 %% ------------------------------------------------------------------
