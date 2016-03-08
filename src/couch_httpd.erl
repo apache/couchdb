@@ -476,11 +476,14 @@ accepted_encodings(#httpd{mochi_req=MochiReq}) ->
 serve_file(Req, RelativePath, DocumentRoot) ->
     serve_file(Req, RelativePath, DocumentRoot, []).
 
-serve_file(#httpd{mochi_req=MochiReq}=Req, RelativePath, DocumentRoot,
-           ExtraHeaders) ->
-    log_request(Req, 200),
-    Headers = basic_headers(Req, ExtraHeaders),
-    {ok, MochiReq:serve_file(RelativePath, DocumentRoot, Headers)}.
+serve_file(Req0, RelativePath0, DocumentRoot0, ExtraHeaders) ->
+    Headers0 = basic_headers(Req0, ExtraHeaders),
+    {ok, {Req1, Code1, Headers1, RelativePath1, DocumentRoot1}} =
+        chttpd_plugin:before_serve_file(
+            Req0, 200, Headers0, RelativePath0, DocumentRoot0),
+    log_request(Req1, Code1),
+    #httpd{mochi_req = MochiReq} = Req1,
+    {ok, MochiReq:serve_file(RelativePath1, DocumentRoot1, Headers1)}.
 
 qs_value(Req, Key) ->
     qs_value(Req, Key, undefined).
