@@ -539,7 +539,7 @@ spawn_consumer(DbName, ChangesArgs0, Req) ->
         ChangesArgs = case (ChangesArgs0#changes_args.timeout =:= undefined)
             andalso (ChangesArgs0#changes_args.heartbeat =:= undefined) of
             true ->
-                ChangesArgs0#changes_args{timeout = 10, heartbeat = 10};
+                ChangesArgs0#changes_args{heartbeat = 10};
             false ->
                 ChangesArgs0
         end,
