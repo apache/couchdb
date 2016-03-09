@@ -22,7 +22,6 @@
     {<<"doc3">>, 210}
 ]).
 -define(NUM_ATTS, 2).
--define(TIMEOUT_STOP, 1000).
 -define(TIMEOUT_EUNIT, 60).
 -define(i2l(I), integer_to_list(I)).
 -define(io2b(Io), iolist_to_binary(Io)).

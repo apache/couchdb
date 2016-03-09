@@ -25,7 +25,6 @@
 -define(ATT_SIZE_2, round(6.6 * 1024 * 1024)).
 -define(DOCS_COUNT, 11).
 -define(TIMEOUT_EUNIT, 30).
--define(TIMEOUT_STOP, 1000).
 
 
 setup() ->

@@ -19,8 +19,7 @@
 -define(ATTFILE, filename:join([?FIXTURESDIR, "logo.png"])).
 -define(DELAY, 100).
 -define(TIMEOUT, 30000).
--define(TIMEOUT_STOP, 1000).
--define(TIMEOUT_WRITER, 3000).
+-define(TIMEOUT_WRITER, 9000).
 -define(TIMEOUT_EUNIT, ?TIMEOUT div 1000 + 70).
 
 setup() ->
