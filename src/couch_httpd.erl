@@ -745,8 +745,7 @@ send_json(Req, Code, Value) ->
 send_json(Req, Code, Headers, Value) ->
     initialize_jsonp(Req),
     AllHeaders = maybe_add_default_headers(Req, Headers),
-    Body = [start_jsonp(), ?JSON_ENCODE(Value), end_jsonp(), $\n],
-    send_response(Req, Code, AllHeaders, Body).
+    send_response(Req, Code, AllHeaders, {json, Value}).
 
 start_json_response(Req, Code) ->
     start_json_response(Req, Code, []).
@@ -1121,11 +1120,18 @@ basic_headers_no_cors(Req, Headers) ->
         ++ couch_httpd_auth:cookie_auth_header(Req, Headers).
 
 handle_response(Req0, Code0, Headers0, Args0, Type) ->
-    {ok, {Req1, Code1, Headers1, Args1}} =
-        chttpd_plugin:before_response(Req0, Code0, Headers0, Args0),
+    {ok, {Req1, Code1, Headers1, Args1}} = before_response(Req0, Code0, Headers0, Args0),
     couch_stats:increment_counter([couchdb, httpd_status_codes, Code1]),
     log_request(Req0, Code1),
     respond_(Req1, Code1, Headers1, Args1, Type).
+
+before_response(Req0, Code0, Headers0, {json, JsonObj}) ->
+    {ok, {Req1, Code1, Headers1, Body1}} =
+        chttpd_plugin:before_response(Req0, Code0, Headers0, JsonObj),
+    Body2 = [start_jsonp(), ?JSON_ENCODE(Body1), end_jsonp(), $\n],
+    {ok, {Req1, Code1, Headers1, Body2}};
+before_response(Req0, Code0, Headers0, Args0) ->
+    chttpd_plugin:before_response(Req0, Code0, Headers0, Args0).
 
 respond_(#httpd{mochi_req = MochiReq}, Code, Headers, _Args, start_response) ->
     MochiReq:start_response({Code, Headers});
