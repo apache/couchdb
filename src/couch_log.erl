@@ -112,11 +112,7 @@ set_level(Level) ->
 -spec get_backend() -> {ok, atom()}.
 get_backend() ->
     BackendName = "couch_log_" ++ config:get("log", "backend", "stderr"),
-    Backend = list_to_existing_atom(BackendName),  %% yes, we need crash here
-    case erlang:module_loaded(Backend) of
-        true -> {ok, Backend};
-        false -> {ok, couch_log_stderr}
-    end.
+    {ok, list_to_existing_atom(BackendName)}.
 
 -ifdef(TEST).
 
