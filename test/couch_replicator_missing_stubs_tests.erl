@@ -22,7 +22,6 @@
 ]).
 
 -define(REVS_LIMIT, 3).
--define(TIMEOUT_STOP, 1000).
 -define(TIMEOUT_EUNIT, 30).
 
 setup() ->

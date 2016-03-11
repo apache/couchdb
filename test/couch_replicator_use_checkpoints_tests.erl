@@ -16,7 +16,6 @@
 -include_lib("couch/include/couch_db.hrl").
 
 -define(DOCS_COUNT, 100).
--define(TIMEOUT_STOP, 1000).
 -define(TIMEOUT_EUNIT, 30).
 -define(i2l(I), integer_to_list(I)).
 -define(io2b(Io), iolist_to_binary(Io)).
