@@ -26,7 +26,7 @@ teardown(_, _) ->
 
 auth_test_() ->
     Tests = [
-        fun should_not_return_username_on_post_to_session/2,
+        fun should_return_username_on_post_to_session/2,
         fun should_return_authenticated_field/2,
         fun should_return_list_of_handlers/2
     ],
@@ -48,7 +48,7 @@ make_test_cases(Mod, Funs) ->
         {foreachx, fun setup/1, fun teardown/2, [{Mod, Fun} || Fun <- Funs]}
     }.
 
-should_not_return_username_on_post_to_session(_PortType, Url) ->
+should_return_username_on_post_to_session(_PortType, Url) ->
     ?_assertEqual(<<"rocko">>,
         begin
             ok = config:set("admins", "rocko", "artischocko", false),
