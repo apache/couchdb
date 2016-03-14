@@ -10,15 +10,14 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(couchdb_compaction_daemon).
+-module(couchdb_compaction_daemon_tests).
 
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
--define(TIMEOUT, 30000).
+-define(TIMEOUT, 60000).
 -define(TIMEOUT_S, ?TIMEOUT div 1000).
 
--ifdef(run_broken_tests).
 
 start() ->
     Ctx = test_util:start_couch(),
@@ -248,7 +247,7 @@ is_idle(DbName) ->
     ok = couch_db:close(Db),
     not lists:any(fun(M) -> M /= self() end, Monitors).
 
-with_config_change(DbName, Fun) ->
+with_config_change(_DbName, Fun) ->
     Current = ets:info(couch_compaction_daemon_config, size),
     Fun(),
     test_util:wait(fun() ->
@@ -257,5 +256,3 @@ with_config_change(DbName, Fun) ->
             true -> wait
         end
     end).
-
--endif.
