@@ -34,7 +34,7 @@ DepDescs = [
 {couch,            "couch",            "40adf248cfed83cc13c0f8fd4ba64a53ca9328ee"},
 {couch_index,      "couch-index",      "e8c8ca8b0bb66193f1ba7e4b1d7e4a3817d661ab"},
 {couch_mrview,     "couch-mrview",     "6ec35971ebd96133cc6a34fa29f1d364049a7ecd"},
-{couch_replicator, "couch-replicator", "493a0d11d43b512ae81195f84aab0336ca61e94f"},
+{couch_replicator, "couch-replicator", "7ff43edd44127fb517be94e104e1621b9478b9f2"},
 {couch_plugins,    "couch-plugins",    "3e73b723cb126cfc471b560d17c24a8b5c540085"},
 {couch_event,      "couch-event",      "835a41885d1e276d207758954f8238aa7bba0ae8"},
 {couch_stats,      "couch-stats",      "7895d4d3f509ed24f09b6d1a0bd0e06af34551dc"},
