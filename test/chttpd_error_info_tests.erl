@@ -164,5 +164,5 @@ error_info_test() ->
     ],
 
     lists:foreach(fun({Arg, Result}) ->
-        ?assertEqual(Result, apply(chttpd, error_info, [Arg]))
+        ?assertEqual(Result, chttpd:error_info(Arg))
     end, ArgResult).
