@@ -114,77 +114,65 @@ callback_test_() ->
 
 
 validate_dbname_match() ->
-    ?_assertMatch(
-        {true, [validate_dbname, db]},
-        couch_db_plugin:validate_dbname({true, [db]}, db)).
+    ?assert(couch_db_plugin:validate_dbname({true, [db]}, db)).
 
 validate_dbname_no_match() ->
-    ?_assertMatch(
-        {false, [db]},
-        couch_db_plugin:validate_dbname({false, [db]}, db)).
+    ?assertNot(couch_db_plugin:validate_dbname({false, [db]}, db)).
 
 validate_dbname_throw() ->
-    ?_assertThrow(
+    ?assertThrow(
         validate_dbname,
         couch_db_plugin:validate_dbname({fail, [db]}, db)).
 
 before_doc_update_match() ->
-    ?_assertMatch(
+    ?assertMatch(
         {true, [before_doc_update, doc]},
         couch_db_plugin:before_doc_update(#db{}, {true, [doc]})).
 
 before_doc_update_no_match() ->
-    ?_assertMatch(
+    ?assertMatch(
         {false, [doc]},
         couch_db_plugin:before_doc_update(#db{}, {false, [doc]})).
 
 before_doc_update_throw() ->
-    ?_assertThrow(
+    ?assertThrow(
         before_doc_update,
         couch_db_plugin:before_doc_update(#db{}, {fail, [doc]})).
 
 
 after_doc_read_match() ->
-    ?_assertMatch(
+    ?assertMatch(
         {true, [after_doc_read, doc]},
         couch_db_plugin:after_doc_read(#db{}, {true, [doc]})).
 
 after_doc_read_no_match() ->
-    ?_assertMatch(
+    ?assertMatch(
         {false, [doc]},
         couch_db_plugin:after_doc_read(#db{}, {false, [doc]})).
 
 after_doc_read_throw() ->
-    ?_assertThrow(
+    ?assertThrow(
         after_doc_read,
         couch_db_plugin:after_doc_read(#db{}, {fail, [doc]})).
 
 
 validate_docid_match() ->
-    ?_assertMatch(
-        {true, [validate_docid, doc]},
-        couch_db_plugin:validate_docid({true, [doc]})).
+    ?assert(couch_db_plugin:validate_docid({true, [doc]})).
 
 validate_docid_no_match() ->
-    ?_assertMatch(
-        {false, [doc]},
-        couch_db_plugin:validate_docid({false, [doc]})).
+    ?assertNot(couch_db_plugin:validate_docid({false, [doc]})).
 
 validate_docid_throw() ->
-    ?_assertThrow(
+    ?assertThrow(
         validate_docid,
         couch_db_plugin:validate_docid({fail, [doc]})).
 
 
 check_is_admin_match() ->
-    ?_assertMatch(
-        true,
-        couch_db_plugin:check_is_admin({true, [db]})).
+    ?assert(couch_db_plugin:check_is_admin({true, [db]})).
 
 check_is_admin_no_match() ->
-    ?assertMatch(
-        false,
-        couch_db_plugin:check_is_admin({false, [db]})).
+    ?assertNot(couch_db_plugin:check_is_admin({false, [db]})).
 
 check_is_admin_throw() ->
     ?assertThrow(
@@ -192,14 +180,14 @@ check_is_admin_throw() ->
         couch_db_plugin:check_is_admin({fail, [db]})).
 
 on_delete_match() ->
-    ?_assertMatch(
-        true,
-        couch_db_plugin:on_delete(true, [])).
+    ?assertMatch(
+       [true],
+       couch_db_plugin:on_delete(true, [])).
 
 on_delete_no_match() ->
-    ?_assertMatch(
-        false,
-        couch_db_plugin:on_delete(false, [])).
+    ?assertMatch(
+       [false],
+       couch_db_plugin:on_delete(false, [])).
 
 on_delete_throw() ->
     ?assertThrow(
