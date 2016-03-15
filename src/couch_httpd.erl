@@ -476,14 +476,14 @@ accepted_encodings(#httpd{mochi_req=MochiReq}) ->
 serve_file(Req, RelativePath, DocumentRoot) ->
     serve_file(Req, RelativePath, DocumentRoot, []).
 
-serve_file(#httpd{mochi_req=MochiReq}=Req, RelativePath, DocumentRoot,
-           ExtraHeaders) ->
-    log_request(Req, 200),
-    ResponseHeaders = server_header()
-        ++ couch_httpd_auth:cookie_auth_header(Req, [])
-        ++ ExtraHeaders,
-    ResponseHeaders1 = chttpd_cors:headers(Req, ResponseHeaders),
-    {ok, MochiReq:serve_file(RelativePath, DocumentRoot, ResponseHeaders1)}.
+serve_file(Req0, RelativePath0, DocumentRoot0, ExtraHeaders) ->
+    Headers0 = basic_headers(Req0, ExtraHeaders),
+    {ok, {Req1, Code1, Headers1, RelativePath1, DocumentRoot1}} =
+        chttpd_plugin:before_serve_file(
+            Req0, 200, Headers0, RelativePath0, DocumentRoot0),
+    log_request(Req1, Code1),
+    #httpd{mochi_req = MochiReq} = Req1,
+    {ok, MochiReq:serve_file(RelativePath1, DocumentRoot1, Headers1)}.
 
 qs_value(Req, Key) ->
     qs_value(Req, Key, undefined).
@@ -661,26 +661,18 @@ log_response(Code, Body) ->
             ok
     end.
 
-start_response_length(#httpd{mochi_req=MochiReq}=Req, Code, Headers, Length) ->
-    log_request(Req, Code),
-    couch_stats:increment_counter([couchdb, httpd_status_codes, Code]),
-    Headers1 = Headers ++ server_header() ++
-               couch_httpd_auth:cookie_auth_header(Req, Headers),
-    Headers2 = chttpd_cors:headers(Req, Headers1),
-    Resp = MochiReq:start_response_length({Code, Headers2, Length}),
+start_response_length(#httpd{mochi_req=MochiReq}=Req, Code, Headers0, Length) ->
+    Headers1 = basic_headers(Req, Headers0),
+    Resp = handle_response(Req, Code, Headers1, Length, start_response_length),
     case MochiReq:get(method) of
     'HEAD' -> throw({http_head_abort, Resp});
     _ -> ok
     end,
     {ok, Resp}.
 
-start_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers) ->
-    log_request(Req, Code),
-    couch_stats:increment_counter([couchdb, httpd_status_codes, Code]),
-    CookieHeader = couch_httpd_auth:cookie_auth_header(Req, Headers),
-    Headers1 = Headers ++ server_header() ++ CookieHeader,
-    Headers2 = chttpd_cors:headers(Req, Headers1),
-    Resp = MochiReq:start_response({Code, Headers2}),
+start_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers0) ->
+    Headers1 = basic_headers(Req, Headers0),
+    Resp = handle_response(Req, Code, Headers1, undefined, start_response),
     case MochiReq:get(method) of
         'HEAD' -> throw({http_head_abort, Resp});
         _ -> ok
@@ -699,6 +691,8 @@ no_resp_conn_header([{Hdr, _}|Rest]) ->
         _ -> no_resp_conn_header(Rest)
     end.
 
+http_1_0_keep_alive(#httpd{mochi_req = MochiReq}, Headers) ->
+    http_1_0_keep_alive(MochiReq, Headers);
 http_1_0_keep_alive(Req, Headers) ->
     KeepOpen = Req:should_close() == false,
     IsHttp10 = Req:get(version) == {1, 0},
@@ -708,14 +702,9 @@ http_1_0_keep_alive(Req, Headers) ->
         false -> Headers
     end.
 
-start_chunked_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers) ->
-    log_request(Req, Code),
-    couch_stats:increment_counter([couchdb, httpd_status_codes, Code]),
-    Headers1 = http_1_0_keep_alive(MochiReq, Headers),
-    Headers2 = Headers1 ++ server_header() ++
-               couch_httpd_auth:cookie_auth_header(Req, Headers1),
-    Headers3 = chttpd_cors:headers(Req, Headers2),
-    Resp = MochiReq:respond({Code, Headers3, chunked}),
+start_chunked_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers0) ->
+    Headers1 = add_headers(Req, Headers0),
+    Resp = handle_response(Req, Code, Headers1, chunked, respond),
     case MochiReq:get(method) of
     'HEAD' -> throw({http_head_abort, Resp});
     _ -> ok
@@ -738,13 +727,11 @@ send_response(Req, Code, Headers0, Body) ->
     send_response_no_cors(Req, Code, Headers1, Body).
 
 send_response_no_cors(#httpd{mochi_req=MochiReq}=Req, Code, Headers, Body) ->
-    log_request(Req, Code),
-    couch_stats:increment_counter([couchdb, httpd_status_codes, Code]),
     Headers1 = http_1_0_keep_alive(MochiReq, Headers),
-    Headers2 = Headers1 ++ server_header() ++
-               couch_httpd_auth:cookie_auth_header(Req, Headers1),
+    Headers2 = basic_headers_no_cors(Req, Headers1),
+    Resp = handle_response(Req, Code, Headers2, Body, respond),
     log_response(Code, Body),
-    {ok, MochiReq:respond({Code, Headers2, Body})}.
+    {ok, Resp}.
 
 send_method_not_allowed(Req, Methods) ->
     send_error(Req, 405, [{"Allow", Methods}], <<"method_not_allowed">>, ?l2b("Only " ++ Methods ++ " allowed")).
@@ -758,8 +745,7 @@ send_json(Req, Code, Value) ->
 send_json(Req, Code, Headers, Value) ->
     initialize_jsonp(Req),
     AllHeaders = maybe_add_default_headers(Req, Headers),
-    Body = [start_jsonp(), ?JSON_ENCODE(Value), end_jsonp(), $\n],
-    send_response(Req, Code, AllHeaders, Body).
+    send_response(Req, Code, AllHeaders, {json, Value}).
 
 start_json_response(Req, Code) ->
     start_json_response(Req, Code, []).
@@ -1120,6 +1106,37 @@ validate_bind_address(Address) ->
         _ -> throw({error, invalid_bind_address})
     end.
 
+add_headers(Req, Headers0) ->
+    Headers = basic_headers(Req, Headers0),
+    http_1_0_keep_alive(Req, Headers).
+
+basic_headers(Req, Headers0) ->
+    Headers = basic_headers_no_cors(Req, Headers0),
+    chttpd_cors:headers(Req, Headers).
+
+basic_headers_no_cors(Req, Headers) ->
+    Headers
+        ++ server_header()
+        ++ couch_httpd_auth:cookie_auth_header(Req, Headers).
+
+handle_response(Req0, Code0, Headers0, Args0, Type) ->
+    {ok, {Req1, Code1, Headers1, Args1}} = before_response(Req0, Code0, Headers0, Args0),
+    couch_stats:increment_counter([couchdb, httpd_status_codes, Code1]),
+    log_request(Req0, Code1),
+    respond_(Req1, Code1, Headers1, Args1, Type).
+
+before_response(Req0, Code0, Headers0, {json, JsonObj}) ->
+    {ok, {Req1, Code1, Headers1, Body1}} =
+        chttpd_plugin:before_response(Req0, Code0, Headers0, JsonObj),
+    Body2 = [start_jsonp(), ?JSON_ENCODE(Body1), end_jsonp(), $\n],
+    {ok, {Req1, Code1, Headers1, Body2}};
+before_response(Req0, Code0, Headers0, Args0) ->
+    chttpd_plugin:before_response(Req0, Code0, Headers0, Args0).
+
+respond_(#httpd{mochi_req = MochiReq}, Code, Headers, _Args, start_response) ->
+    MochiReq:start_response({Code, Headers});
+respond_(#httpd{mochi_req = MochiReq}, Code, Headers, Args, Type) ->
+    MochiReq:Type({Code, Headers, Args}).
 
 %%%%%%%% module tests below %%%%%%%%
 
