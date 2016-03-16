@@ -204,13 +204,14 @@ get_next_row(#collector{rows = []}) ->
     throw(complete);
 get_next_row(#collector{reducer = RedSrc} = St) when RedSrc =/= undefined ->
     #collector{
-        query_args = #mrargs{direction=Dir},
+        query_args = #mrargs{direction = Dir},
         keys = Keys,
         rows = RowDict,
         lang = Lang,
-        counters = Counters0
+        counters = Counters0,
+        collation = Collation
     } = St,
-    {Key, RestKeys} = find_next_key(Keys, Dir, RowDict),
+    {Key, RestKeys} = find_next_key(Keys, Dir, Collation, RowDict),
     case dict:find(Key, RowDict) of
     {ok, Records} ->
         NewRowDict = dict:erase(Key, RowDict),
@@ -238,18 +239,19 @@ get_next_row(State) ->
     {Row, State#collector{rows = Rest, counters=Counters1}}.
 
 %% TODO: rectify nil <-> undefined discrepancies
-find_next_key(nil, Dir, RowDict) ->
-    find_next_key(undefined, Dir, RowDict);
-find_next_key(undefined, Dir, RowDict) ->
-    case lists:sort(sort_fun(Dir), dict:fetch_keys(RowDict)) of
+find_next_key(nil, Dir, Collation, RowDict) ->
+    find_next_key(undefined, Dir, Collation, RowDict);
+find_next_key(undefined, Dir, Collation, RowDict) ->
+    CmpFun = fun(A, B) -> compare(Dir, Collation, A, B) end,
+    case lists:sort(CmpFun, dict:fetch_keys(RowDict)) of
     [] ->
         throw(complete);
     [Key|_] ->
         {Key, nil}
     end;
-find_next_key([], _, _) ->
+find_next_key([], _, _, _) ->
     throw(complete);
-find_next_key([Key|Rest], _, _) ->
+find_next_key([Key|Rest], _, _, _) ->
     {Key, Rest}.
 
 transform_row(#view_row{key=Key, id=reduced, value=Value}) ->
@@ -263,11 +265,11 @@ transform_row(#view_row{key=Key, id=_Id, value=_Value, doc={error,Reason}}) ->
 transform_row(#view_row{key=Key, id=Id, value=Value, doc=Doc}) ->
     {row, [{id,Id}, {key,Key}, {value,Value}, {doc,Doc}]}.
 
-
-sort_fun(fwd) ->
-    fun(A,A) -> true; (A,B) -> couch_ejson_compare:less_json(A,B) end;
-sort_fun(rev) ->
-    fun(A,A) -> true; (A,B) -> couch_ejson_compare:less_json(B,A) end.
+compare(_, _, A, A) -> true;
+compare(fwd, <<"raw">>, A, B) -> A < B;
+compare(rev, <<"raw">>, A, B) -> B < A;
+compare(fwd, _, A, B) -> couch_ejson_compare:less_json(A, B);
+compare(rev, _, A, B) -> couch_ejson_compare:less_json(B, A).
 
 extract_view(Pid, ViewName, [], _ViewType) ->
     couch_log:error("missing_named_view ~p", [ViewName]),

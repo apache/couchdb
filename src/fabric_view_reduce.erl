@@ -23,8 +23,7 @@ go(DbName, GroupId, View, Args, Callback, Acc0, VInfo) when is_binary(GroupId) -
     {ok, DDoc} = fabric:open_doc(DbName, <<"_design/", GroupId/binary>>, []),
     go(DbName, DDoc, View, Args, Callback, Acc0, VInfo);
 
-go(DbName, DDoc, VName, Args, Callback, Acc, {red, {_, Lang, _}, _}=VInfo) ->
-    RedSrc = couch_mrview_util:extract_view_reduce(VInfo),
+go(DbName, DDoc, VName, Args, Callback, Acc, VInfo) ->
     RPCArgs = [fabric_util:doc_id_and_rev(DDoc), VName, Args],
     Shards = fabric_view:get_shards(DbName, Args),
     Repls = fabric_view:get_shard_replacements(DbName, Shards),
@@ -37,7 +36,7 @@ go(DbName, DDoc, VName, Args, Callback, Acc, {red, {_, Lang, _}, _}=VInfo) ->
         case fabric_util:stream_start(Workers0, #shard.ref, StartFun, Repls) of
             {ok, Workers} ->
                 try
-                    go2(DbName, Workers, Lang, RedSrc, Args, Callback, Acc)
+                    go2(DbName, Workers, VInfo, Args, Callback, Acc)
                 after
                     fabric_util:cleanup(Workers)
                 end;
@@ -58,8 +57,9 @@ go(DbName, DDoc, VName, Args, Callback, Acc, {red, {_, Lang, _}, _}=VInfo) ->
         rexi_monitor:stop(RexiMon)
     end.
 
-go2(DbName, Workers, Lang, RedSrc, Args, Callback, Acc0) ->
-    #mrargs{limit = Limit, skip = Skip, keys = Keys} = Args,
+go2(DbName, Workers, {red, {_, Lang, View}, _}=VInfo, Args, Callback, Acc0) ->
+    #mrargs{limit = Limit, skip = Skip, keys = Keys, direction=Dir} = Args,
+    RedSrc = couch_mrview_util:extract_view_reduce(VInfo),
     OsProc = case os_proc_needed(RedSrc) of
         true -> couch_query_servers:get_os_process(Lang);
         _ -> nil
@@ -75,6 +75,7 @@ go2(DbName, Workers, Lang, RedSrc, Args, Callback, Acc0) ->
         lang = Lang,
         os_proc = OsProc,
         reducer = RedSrc,
+        collation = couch_util:get_value(<<"collation">>, View#mrview.options),
         rows = dict:new(),
         user_acc = Acc0
     },
