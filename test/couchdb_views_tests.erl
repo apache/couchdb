@@ -288,7 +288,7 @@ couchdb_1309(DbName) ->
         ?assertNotEqual(IndexerPid, NewIndexerPid),
         UserCnt = case count_users(DbName) of
                       N when N > 2 ->
-                          time:sleep(1000),
+                          timer:sleep(1000),
                           count_users(DbName);
                       N -> N
                   end,
