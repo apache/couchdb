@@ -649,16 +649,17 @@ log_request(#httpd{mochi_req=MochiReq,peer=Peer}=Req, Code) ->
             gen_event:notify(couch_plugin, {log_request, Req, Code})
     end.
 
+log_response(Code, _) when Code < 400 ->
+    ok;
 log_response(Code, Body) ->
-    case erlang:get(dont_log_response) of
-        true ->
+    case {erlang:get(dont_log_response), Body} of
+        {true, _} ->
             ok;
-        _ when Code >= 500 ->
-            couch_log:error("httpd ~p error response:~n ~s", [Code, Body]);
-        _ when Code >= 400 ->
-            couch_log:error("httpd ~p error response:~n ~s", [Code, Body]);
+        {_, {json, JsonObj}} ->
+            ErrorMsg = couch_util:json_encode(JsonObj),
+            couch_log:error("httpd ~p error response:~n ~s", [Code, ErrorMsg]);
         _ ->
-            ok
+            couch_log:error("httpd ~p error response:~n ~s", [Code, Body])
     end.
 
 start_response_length(#httpd{mochi_req=MochiReq}=Req, Code, Headers0, Length) ->
@@ -1176,5 +1177,42 @@ maybe_add_default_headers_test_() ->
          maybe_add_default_headers(DummyRequest, InitialHeaders))}
     end, Cases),
     {"Tests adding default headers", Tests}.
+
+log_request_test_() ->
+    {foreachx,
+        fun(_) ->
+            ok = meck:new([couch_log]),
+            ok = meck:expect(couch_log, error, fun(Fmt, Args) ->
+                case catch io_lib_format:fwrite(Fmt, Args) of
+                    {'EXIT', Error} -> Error;
+                    _ -> ok
+                end
+            end)
+        end,
+        fun(_, _) ->
+            meck:unload([couch_log])
+        end,
+        [{Flag, fun should_accept_code_and_message/2} || Flag <- [true, false]]
+    }.
+
+should_accept_code_and_message(DontLogFlag, _) ->
+    erlang:put(dont_log_response, DontLogFlag),
+    {"with dont_log_response = " ++ atom_to_list(DontLogFlag),
+        [
+            {"Should accept code 200 and string message",
+            ?_assertEqual(ok, log_response(200, "OK"))},
+            {"Should accept code 200 and JSON message",
+            ?_assertEqual(ok, log_response(200, {json, {[{ok, true}]}}))},
+            {"Should accept code >= 400 and string error",
+            ?_assertEqual(ok, log_response(405, method_not_allowed))},
+            {"Should accept code >= 400 and JSON error",
+            ?_assertEqual(ok,
+                log_response(405, {json, {[{error, method_not_allowed}]}}))},
+            {"Should accept code >= 500 and string error",
+            ?_assertEqual(ok, log_response(500, undef))},
+            {"Should accept code >= 500 and JSON error",
+            ?_assertEqual(ok, log_response(500, {json, {[{error, undef}]}}))}
+        ]
+    }.
 
 -endif.
