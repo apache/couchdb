@@ -43,16 +43,14 @@ data_subscriptions() -> [].
 processes() -> [].
 notify(_, _, _) -> ok.
 
-setup() ->
-    application:stop(couch_epi), % in case it's already running from other tests...
-    application:unload(couch_epi),
-    ok = application:load(couch_epi),
-    ok = application:set_env(couch_epi, plugins, [?MODULE]), % only this plugin
-    ok = application:start(couch_epi).
 
-teardown(_) ->
-    ok = application:stop(couch_epi),
-    ok = application:unload(couch_epi).
+setup() ->
+    couch_tests:setup([
+        couch_epi_dispatch:dispatch(chttpd, ?MODULE)
+    ], [], []).
+
+teardown(Ctx) ->
+    couch_tests:teardown(Ctx).
 
 before_request({true, Id}) -> [{true, [{before_request, Id}]}];
 before_request({false, Id}) -> [{false, Id}];
