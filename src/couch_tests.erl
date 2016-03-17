@@ -14,6 +14,7 @@
 
 -export([
     new/4,
+    setup/1,
     setup/3,
     teardown/1
 ]).
@@ -52,6 +53,9 @@ new(Module, FixtureId, Setup, Teardown) ->
         setup = Setup,
         teardown = Teardown
     }.
+
+setup(Chain) ->
+    setup(Chain, [], []).
 
 setup(Chain, Args, Opts) ->
     Ctx = #couch_tests_ctx{chain = Chain, args = Args, opts = Opts},
