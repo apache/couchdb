@@ -47,7 +47,7 @@ notify(_, _, _) -> ok.
 setup() ->
     couch_tests:setup([
         couch_epi_dispatch:dispatch(chttpd, ?MODULE)
-    ], [], []).
+    ]).
 
 teardown(Ctx) ->
     couch_tests:teardown(Ctx).
