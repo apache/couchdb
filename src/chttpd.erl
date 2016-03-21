@@ -371,10 +371,11 @@ maybe_log(#httpd{} = HttpReq, #httpd_resp{should_log = true} = HttpResp) ->
         code = Code,
         status = Status
     } = HttpResp,
+    User = get_user(HttpReq),
     Host = MochiReq:get_header_value("Host"),
     RawUri = MochiReq:get(raw_path),
     RequestTime = timer:now_diff(EndTime, BeginTime) / 1000,
-    couch_log:notice("~s ~s ~s ~s ~s ~B ~p ~B", [Nonce, Peer, Host,
+    couch_log:notice("~s ~s ~s ~s ~s ~s ~B ~p ~B", [Nonce, Peer, Host, User,
         Method, RawUri, Code, Status, round(RequestTime)]);
 maybe_log(_HttpReq, #httpd_resp{should_log = false}) ->
     ok.
@@ -1085,6 +1086,10 @@ respond_(#httpd{mochi_req = MochiReq}, Code, Headers, _Args, start_response) ->
 respond_(#httpd{mochi_req = MochiReq}, Code, Headers, Args, Type) ->
     MochiReq:Type({Code, Headers, Args}).
 
+get_user(#httpd{user_ctx = #user_ctx{name = User}}) ->
+    couch_util:url_encode(User);
+get_user(#httpd{user_ctx = undefined}) ->
+    "undefined".
 
 -ifdef(TEST).
 
