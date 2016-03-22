@@ -349,8 +349,6 @@ test_good_headers_preflight_request_with_custom_config_(OwnerConfig) ->
     ?assert(chttpd_cors:is_cors_enabled(OwnerConfig)),
     AllowMethods = couch_util:get_value(
         <<"allow_methods">>, OwnerConfig, ?SUPPORTED_METHODS),
-    AllowHeaders = couch_util:get_value(
-        <<"allow_headers">>, OwnerConfig, ?SUPPORTED_HEADERS),
     MaxAge = couch_util:get_value(
         <<"max_age">>, OwnerConfig, ?CORS_DEFAULT_MAX_AGE),
     {ok, Headers1} = chttpd_cors:maybe_handle_preflight_request(Req, OwnerConfig),
