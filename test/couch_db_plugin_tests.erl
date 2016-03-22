@@ -45,15 +45,12 @@ processes() -> [].
 notify(_, _, _) -> ok.
 
 setup() ->
-    application:stop(couch_epi), % in case it's already running from other tests...
-    application:unload(couch_epi),
-    ok = application:load(couch_epi),
-    ok = application:set_env(couch_epi, plugins, [?MODULE]), % only this plugin
-    ok = application:start(couch_epi).
+    couch_tests:setup([
+        couch_epi_dispatch:dispatch(chttpd, ?MODULE)
+    ]).
 
-teardown(_) ->
-    ok = application:stop(couch_epi),
-    ok = application:unload(couch_epi).
+teardown(Ctx) ->
+    couch_tests:teardown(Ctx).
 
 validate_dbname({true, _Db}, _) -> true;
 validate_dbname({false, _Db}, _) -> false;
