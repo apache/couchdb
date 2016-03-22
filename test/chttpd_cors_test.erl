@@ -28,6 +28,7 @@
 -define(CUSTOM_SUPPORTED_HEADERS, ["extra" | ?SUPPORTED_HEADERS -- ["pragma"]]).
 -define(CUSTOM_EXPOSED_HEADERS, ["expose" | ?COUCH_HEADERS]).
 
+-define(CUSTOM_MAX_AGE, round(?CORS_DEFAULT_MAX_AGE / 2)).
 
 %% Test helpers
 
@@ -66,6 +67,7 @@ custom_cors_config() ->
         {<<"allow_methods">>, ?CUSTOM_SUPPORTED_METHODS},
         {<<"allow_headers">>, ?CUSTOM_SUPPORTED_HEADERS},
         {<<"exposed_headers">>, ?CUSTOM_EXPOSED_HEADERS},
+        {<<"max_age">>, ?CUSTOM_MAX_AGE},
         {<<"origins">>, {[
             {<<"*">>, {[]}}
         ]}}
@@ -340,7 +342,8 @@ test_good_headers_preflight_request_with_custom_config_(OwnerConfig) ->
     Headers = [
         {"Origin", ?DEFAULT_ORIGIN},
         {"Access-Control-Request-Method", "GET"},
-        {"Access-Control-Request-Headers", "accept-language, extra"}
+        {"Access-Control-Request-Headers", "accept-language, extra"},
+        {"Access-Control-Max-Age", ?CORS_DEFAULT_MAX_AGE}
     ],
     Req = mock_request('OPTIONS', "/", Headers),
     ?assert(chttpd_cors:is_cors_enabled(OwnerConfig)),
@@ -348,6 +351,8 @@ test_good_headers_preflight_request_with_custom_config_(OwnerConfig) ->
         <<"allow_methods">>, OwnerConfig, ?SUPPORTED_METHODS),
     AllowHeaders = couch_util:get_value(
         <<"allow_headers">>, OwnerConfig, ?SUPPORTED_HEADERS),
+    MaxAge = couch_util:get_value(
+        <<"max_age">>, OwnerConfig, ?CORS_DEFAULT_MAX_AGE),
     {ok, Headers1} = chttpd_cors:maybe_handle_preflight_request(Req, OwnerConfig),
     [
         ?_assertEqual(?DEFAULT_ORIGIN,
@@ -355,7 +360,9 @@ test_good_headers_preflight_request_with_custom_config_(OwnerConfig) ->
         ?_assertEqual(string_headers(AllowMethods),
             header(Headers1, "Access-Control-Allow-Methods")),
         ?_assertEqual(string_headers(["accept-language", "extra"]),
-            header(Headers1, "Access-Control-Allow-Headers"))
+            header(Headers1, "Access-Control-Allow-Headers")),
+        ?_assertEqual(MaxAge,
+            header(Headers1, "Access-Control-Max-Age"))
     ].
 
 

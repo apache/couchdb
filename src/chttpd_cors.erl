@@ -115,7 +115,8 @@ handle_preflight_request(Req, Config, Origin) ->
 
 
         %% get max age
-        MaxAge = couch_util:get_value("max_age", Config, ?CORS_DEFAULT_MAX_AGE),
+        MaxAge = couch_util:get_value(<<"max_age">>, Config,
+            ?CORS_DEFAULT_MAX_AGE),
 
         PreflightHeaders0 = maybe_add_credentials(Config, Origin, [
             {"Access-Control-Allow-Origin", binary_to_list(Origin)},
@@ -300,6 +301,7 @@ get_cors_config(#httpd{cors_config = undefined, mochi_req = MochiReq}) ->
         ExposedHeaders0 ->
             [to_lower(H) || H <- split_list(ExposedHeaders0)]
     end,
+    MaxAge = cors_config(Host, "max_age", ?CORS_DEFAULT_MAX_AGE),
     Origins0 = binary_split_list(cors_config(Host, "origins", [])),
     Origins = [{O, {[]}} || O <- Origins0],
     [
@@ -308,6 +310,7 @@ get_cors_config(#httpd{cors_config = undefined, mochi_req = MochiReq}) ->
         {<<"allow_methods">>, AllowMethods},
         {<<"allow_headers">>, AllowHeaders},
         {<<"exposed_headers">>, ExposedHeaders},
+        {<<"max_age">>, MaxAge},
         {<<"origins">>, {Origins}}
     ];
 get_cors_config(#httpd{cors_config = Config}) ->
