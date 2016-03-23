@@ -364,7 +364,6 @@ ensure_notified_when_changed(functions, #ctx{key = Key} = Ctx) ->
     ?_test(begin
         subscribe(Ctx, test_app, Key),
         update(functions, Ctx),
-        timer:sleep(200),
         Result = get(Ctx, is_called),
         ExpectedDefs = [
             {provider1,[{inc,2},{fail,2}]},
@@ -377,7 +376,6 @@ ensure_notified_when_changed(Case, #ctx{key = Key} = Ctx) ->
     ?_test(begin
         subscribe(Ctx, test_app, Key),
         update(Case, Ctx),
-        timer:sleep(200),
         ExpectedData = lists:usort([
             {[complex, key, 1], [{type, counter}, {desc, updated_foo}]},
             {[complex, key, 2], [{type, counter}, {desc, bar}]}
@@ -560,7 +558,8 @@ generate_module(Name, Body) ->
 
 update(Case, #ctx{pid = Pid, modules = Modules} = Ctx) ->
     update_definitions(Case, Ctx),
-    upgrade_release(Pid, Modules).
+    upgrade_release(Pid, Modules),
+    wait_update(Ctx).
 
 update_definitions(data_file, #ctx{file = File}) ->
     {ok, _} = file:copy(?DATA_FILE2, File),
@@ -580,6 +579,14 @@ maybe_wait(Opts) ->
             timer:sleep(100);
         false ->
             ok
+    end.
+
+wait_update(Ctx) ->
+    case get(Ctx, is_called) of
+        error ->
+            timer:sleep(100),
+            wait_update(Ctx);
+        _ -> ok
     end.
 
 %% ------------
