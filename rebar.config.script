@@ -61,6 +61,8 @@ DepDescs = [
                    {tag, "v1.1.15"}, [raw]},
 %% Third party deps
 {folsom,           "folsom",           {tag, "CouchDB-0.8.2"}},
+{hyper,            {url, "https://github.com/GameAnalytics/hyper.git"},
+                   "8cdce4bf97280b5a9501c16bce37071aab0387bd"},
 {ibrowse,          "ibrowse",          {tag, "CouchDB-4.0.1"}},
 {jiffy,            "jiffy",            {tag, "CouchDB-0.14.11-2"}},
 {mochiweb,         "mochiweb",         {tag, "v2.17.0"}},
