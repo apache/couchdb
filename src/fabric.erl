@@ -346,7 +346,15 @@ query_view(DbName, DDoc, ViewName, Callback, Acc0, QueryArgs0) ->
                 VInfo
             );
         false ->
-            fabric_view_map:go(Db, DDoc, View, QueryArgs2, Callback, Acc0)
+            fabric_view_map:go(
+                Db,
+                DDoc,
+                View,
+                QueryArgs2,
+                Callback,
+                Acc0,
+                VInfo
+            )
     end.
 
 %% @doc retrieve info about a view group, disk size, language, whether compaction

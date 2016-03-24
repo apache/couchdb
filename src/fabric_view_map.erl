@@ -12,18 +12,18 @@
 
 -module(fabric_view_map).
 
--export([go/6]).
+-export([go/7]).
 
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
-go(DbName, GroupId, View, Args, Callback, Acc0) when is_binary(GroupId) ->
+go(DbName, GroupId, View, Args, Callback, Acc, VInfo) when is_binary(GroupId) ->
     {ok, DDoc} = fabric:open_doc(DbName, <<"_design/", GroupId/binary>>, []),
-    go(DbName, DDoc, View, Args, Callback, Acc0);
+    go(DbName, DDoc, View, Args, Callback, Acc, VInfo);
 
-go(DbName, DDoc, View, Args, Callback, Acc) ->
+go(DbName, DDoc, View, Args, Callback, Acc, VInfo) ->
     Shards = fabric_view:get_shards(DbName, Args),
     Repls = fabric_view:get_shard_replacements(DbName, Shards),
     RPCArgs = [fabric_util:doc_id_and_rev(DDoc), View, Args],
@@ -36,7 +36,7 @@ go(DbName, DDoc, View, Args, Callback, Acc) ->
         case fabric_util:stream_start(Workers0, #shard.ref, StartFun, Repls) of
             {ok, Workers} ->
                 try
-                    go(DbName, Workers, Args, Callback, Acc)
+                    go(DbName, Workers, VInfo, Args, Callback, Acc)
                 after
                     fabric_util:cleanup(Workers)
                 end;
@@ -57,8 +57,9 @@ go(DbName, DDoc, View, Args, Callback, Acc) ->
         rexi_monitor:stop(RexiMon)
     end.
 
-go(DbName, Workers, Args, Callback, Acc0) ->
+go(DbName, Workers, {map, View, _}, Args, Callback, Acc0) ->
     #mrargs{limit = Limit, skip = Skip, keys = Keys} = Args,
+    Collation = couch_util:get_value(<<"collation">>, View#mrview.options),
     State = #collector{
         db_name=DbName,
         query_args = Args,
@@ -68,6 +69,7 @@ go(DbName, Workers, Args, Callback, Acc0) ->
         limit = Limit,
         keys = fabric_view:keydict(Keys),
         sorted = Args#mrargs.sorted,
+        collation = Collation,
         user_acc = Acc0
     },
     case rexi_utils:recv(Workers, #shard.ref, fun handle_message/3,
@@ -135,12 +137,19 @@ handle_message(#view_row{} = Row, {_,From}, #collector{sorted=false} = St) ->
 
 handle_message(#view_row{} = Row, {Worker, From}, State) ->
     #collector{
-        query_args = #mrargs{direction=Dir},
+        query_args = #mrargs{direction = Dir},
         counters = Counters0,
         rows = Rows0,
-        keys = KeyDict
+        keys = KeyDict,
+        collation = Collation
     } = State,
-    Rows = merge_row(Dir, KeyDict, Row#view_row{worker={Worker, From}}, Rows0),
+    Rows = merge_row(
+        Dir,
+        Collation,
+        KeyDict,
+        Row#view_row{worker={Worker, From}},
+        Rows0
+    ),
     Counters1 = fabric_dict:update_counter(Worker, 1, Counters0),
     State1 = State#collector{rows=Rows, counters=Counters1},
     fabric_view:maybe_send_row(State1);
@@ -149,17 +158,19 @@ handle_message(complete, Worker, State) ->
     Counters = fabric_dict:update_counter(Worker, 1, State#collector.counters),
     fabric_view:maybe_send_row(State#collector{counters = Counters}).
 
-merge_row(fwd, undefined, Row, Rows) ->
+merge_row(Dir, Collation, undefined, Row, Rows) ->
     lists:merge(fun(#view_row{key=KeyA, id=IdA}, #view_row{key=KeyB, id=IdB}) ->
-        couch_ejson_compare:less_json_ids({KeyA, IdA}, {KeyB, IdB})
+        compare(Dir, Collation, {KeyA, IdA}, {KeyB, IdB})
     end, [Row], Rows);
-merge_row(rev, undefined, Row, Rows) ->
-    lists:merge(fun(#view_row{key=KeyA, id=IdA}, #view_row{key=KeyB, id=IdB}) ->
-        couch_ejson_compare:less_json_ids({KeyB, IdB}, {KeyA, IdA})
-    end, [Row], Rows);
-merge_row(_, KeyDict, Row, Rows) ->
+merge_row(_, _, KeyDict, Row, Rows) ->
     lists:merge(fun(#view_row{key=A, id=IdA}, #view_row{key=B, id=IdB}) ->
         if A =:= B -> IdA < IdB; true ->
             dict:fetch(A, KeyDict) < dict:fetch(B, KeyDict)
         end
     end, [Row], Rows).
+
+compare(_, _, A, A) -> true;
+compare(fwd, <<"raw">>, A, B) -> A < B;
+compare(rev, <<"raw">>, A, B) -> B < A;
+compare(fwd, _, A, B) -> couch_ejson_compare:less_json_ids(A, B);
+compare(rev, _, A, B) -> couch_ejson_compare:less_json_ids(B, A).
