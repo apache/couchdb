@@ -873,7 +873,7 @@ new_revid(#doc{body=Body, revs={OldStart,OldRevs}, atts=Atts, deleted=Deleted}) 
             ?l2b(integer_to_list(couch_util:rand32()));
         Atts2 ->
             OldRev = case OldRevs of [] -> 0; [OldRev0|_] -> OldRev0 end,
-            couch_crypto:hash(md5, term_to_binary([Deleted, OldStart, OldRev, Body, Atts2]))
+            couch_crypto:hash(md5, term_to_binary([Deleted, OldStart, OldRev, Body, Atts2], [{minor_version, 1}]))
     end.
 
 new_revs([], OutBuckets, IdRevsAcc) ->
