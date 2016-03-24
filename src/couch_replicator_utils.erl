@@ -367,19 +367,11 @@ ssl_params(Url) ->
         []
     end.
 
-ssl_verify_options(Value) ->
-    ssl_verify_options(Value, erlang:system_info(otp_release)).
-
-ssl_verify_options(true, OTPVersion) when OTPVersion >= "R14" ->
+ssl_verify_options(true) ->
     CAFile = config:get("replicator", "ssl_trusted_certificates_file"),
     [{verify, verify_peer}, {cacertfile, CAFile}];
-ssl_verify_options(false, OTPVersion) when OTPVersion >= "R14" ->
-    [{verify, verify_none}];
-ssl_verify_options(true, _OTPVersion) ->
-    CAFile = config:get("replicator", "ssl_trusted_certificates_file"),
-    [{verify, 2}, {cacertfile, CAFile}];
-ssl_verify_options(false, _OTPVersion) ->
-    [{verify, 0}].
+ssl_verify_options(false) ->
+    [{verify, verify_none}].
 
 
 %% New db record has Options field removed here to enable smoother dbcore migration
