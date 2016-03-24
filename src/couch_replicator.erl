@@ -123,7 +123,7 @@ async_replicate(#rep{id = {BaseId, Ext}, source = Src, target = Tgt} = Rep) ->
     ChildSpec = {
         RepChildId,
         {gen_server, start_link, [?MODULE, Rep, [{timeout, Timeout}]]},
-        temporary,
+        transient,
         250,
         worker,
         [?MODULE]
@@ -305,16 +305,6 @@ do_init(#rep{options = Options, id = {BaseId, Ext}, user_ctx=UserCtx} = Rep) ->
         {checkpoint_interval, CheckpointInterval}
     ]),
     couch_task_status:set_update_frequency(1000),
-
-    % Until OTP R14B03:
-    %
-    % Restarting a temporary supervised child implies that the original arguments
-    % (#rep{} record) specified in the MFA component of the supervisor
-    % child spec will always be used whenever the child is restarted.
-    % This implies the same replication performance tunning parameters will
-    % always be used. The solution is to delete the child spec (see
-    % cancel_replication/1) and then start the replication again, but this is
-    % unfortunately not immune to race conditions.
 
     couch_log:notice("Replication `~p` is using:~n"
         "~c~p worker processes~n"
