@@ -578,7 +578,31 @@ start_replication(Rep, Wait) ->
     end.
 
 replication_complete(DbName, DocId) ->
-    true = ets:delete(?DOC_TO_REP, {DbName, DocId}).
+    case ets:lookup(?DOC_TO_REP, {DbName, DocId}) of
+    [{{DbName, DocId}, {BaseId, Ext} = RepId}] ->
+        case rep_state(RepId) of
+        nil ->
+            % Prior to OTP R14B02, temporary child specs remain in
+            % in the supervisor after a worker finishes - remove them.
+            % We want to be able to start the same replication but with
+            % eventually different values for parameters that don't
+            % contribute to its ID calculation.
+            case erlang:system_info(otp_release) < "R14B02" of
+            true ->
+                spawn(fun() ->
+                    _ = supervisor:delete_child(couch_replicator_job_sup, BaseId ++ Ext)
+                end);
+            false ->
+                ok
+            end;
+        #rep_state{} ->
+            ok
+        end,
+        true = ets:delete(?DOC_TO_REP, {DbName, DocId});
+    _ ->
+        ok
+    end.
+
 
 rep_doc_deleted(DbName, DocId) ->
     case ets:lookup(?DOC_TO_REP, {DbName, DocId}) of
