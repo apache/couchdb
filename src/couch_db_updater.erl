@@ -294,6 +294,10 @@ handle_info({update_docs, Client, GroupedDocs, NonRepDocs, MergeConflicts,
             couch_event:notify(Db2#db.name, updated);
         true -> ok
         end,
+        if NonRepDocs2 /= [] ->
+            couch_event:notify(Db2#db.name, local_updated);
+        true -> ok
+        end,
         [catch(ClientPid ! {done, self()}) || ClientPid <- Clients],
         Db3 = case length(UpdatedDDocIds) > 0 of
             true ->
