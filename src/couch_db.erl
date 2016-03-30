@@ -1513,10 +1513,8 @@ select_gt(V1, _V2) -> V1.
 select_lt(V1, V2) when V1 > V2 -> V2;
 select_lt(V1, _V2) -> V1.
 
-normalize_dbname(<<"shards/", _/binary>> = Path) ->
-    lists:last(binary:split(mem3:dbname(Path), <<"/">>, [global]));
 normalize_dbname(DbName) ->
-    DbName.
+    mem3:dbname(DbName).
 
 validate_dbname(DbName) when is_list(DbName) ->
     validate_dbname(?l2b(DbName));
@@ -1546,3 +1544,79 @@ is_systemdb(<<"shards/", _/binary>> = Path) when is_binary(Path) ->
     is_systemdb(normalize_dbname(Path));
 is_systemdb(DbName) when is_binary(DbName) ->
     lists:member(DbName, ?SYSTEM_DATABASES).
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+setup() ->
+    ok = meck:new(couch_db_plugin, [passthrough]),
+    ok = meck:expect(couch_db_plugin, validate_dbname, fun(_, _) -> false end),
+    ok.
+
+teardown(_) ->
+    (catch meck:unload(couch_db_plugin)).
+
+validate_dbname_success_test_() ->
+    Cases =
+        generate_cases_with_shards("long/co$mplex-/path+/_something")
+        ++ generate_cases_with_shards("something")
+        ++ lists:append(
+            [generate_cases_with_shards(?b2l(SystemDb))
+                || SystemDb <- ?SYSTEM_DATABASES]),
+    {
+        foreach, fun setup/0, fun teardown/1,
+        [{test_name(A), fun() -> should_pass_validate_dbname(A) end} || {_, A} <- Cases]
+    }.
+
+validate_dbname_fail_test_() ->
+    Cases = generate_cases("_long/co$mplex-/path+/_something")
+       ++ generate_cases("_something")
+       ++ generate_cases_with_shards("long/co$mplex-/path+/_something#")
+       ++ generate_cases_with_shards("long/co$mplex-/path+/some.thing"),
+    {
+        foreach, fun setup/0, fun teardown/1,
+        [{test_name(A), fun() -> should_fail_validate_dbname(A) end} || {_, A} <- Cases]
+    }.
+
+validate_normalize_dbname_test_() ->
+    Cases = generate_cases_with_shards("long/co$mplex-/path+/_something")
+       ++ generate_cases_with_shards("something"),
+    [{test_name(B), fun() -> should_normalize_dbname(A, B) end} || {A, B} <- Cases].
+
+
+should_pass_validate_dbname(DbName) ->
+    {test_name(DbName), ?_assertEqual(ok, validate_dbname(DbName))}.
+
+should_fail_validate_dbname(DbName) ->
+    {test_name(DbName), ?_test(begin
+        Result = validate_dbname(DbName),
+        ?assertMatch({error, {illegal_database_name, _}}, Result),
+        {error, {illegal_database_name, FailedDbName}} = Result,
+        ?assertEqual(to_binary(DbName), FailedDbName),
+        ok
+    end)}.
+
+should_normalize_dbname(Arg, DbName) ->
+    Result = ?l2b(filename:rootname(Arg)),
+    {test_name(DbName), ?_assertEqual(Result, normalize_dbname(DbName))}.
+
+to_binary(DbName) when is_list(DbName) ->
+    ?l2b(DbName);
+to_binary(DbName) when is_binary(DbName) ->
+    DbName.
+
+test_name(DbName) ->
+    lists:flatten(io_lib:format("~p", [DbName])).
+
+generate_cases_with_shards(DbName) ->
+    DbNameWithShard = add_shard(DbName),
+    Cases = [DbName, ?l2b(DbName), DbNameWithShard, ?l2b(DbNameWithShard)],
+    [{DbName, Case} || Case <- Cases].
+
+add_shard(DbName) ->
+    "shards/00000000-3fffffff/" ++ DbName ++ ".1415960794".
+
+generate_cases(DbName) ->
+    [{DbName, DbName}, {DbName, ?l2b(DbName)}].
+
+-endif.
