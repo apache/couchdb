@@ -34,6 +34,8 @@
 
 -define(LOWEST_SEQ, 0).
 
+-define(DEFAULT_CHECKPOINT_INTERVAL, 30000).
+
 -import(couch_util, [
     get_value/2,
     get_value/3,
@@ -76,7 +78,7 @@
     target_monitor = nil,
     source_seq = nil,
     use_checkpoints = true,
-    checkpoint_interval = 5000,
+    checkpoint_interval = ?DEFAULT_CHECKPOINT_INTERVAL,
     type = db,
     view = nil
 }).
@@ -683,7 +685,7 @@ init_state(Rep) ->
         source_seq = SourceSeq,
         use_checkpoints = get_value(use_checkpoints, Options, true),
         checkpoint_interval = get_value(checkpoint_interval, Options,
-                                        5000),
+                                        ?DEFAULT_CHECKPOINT_INTERVAL),
         type = Type,
         view = View
     },

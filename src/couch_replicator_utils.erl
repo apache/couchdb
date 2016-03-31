@@ -255,7 +255,7 @@ make_options(Props) ->
     DefTimeout = config:get("replicator", "connection_timeout", "30000"),
     DefRetries = config:get("replicator", "retries_per_request", "10"),
     UseCheckpoints = config:get("replicator", "use_checkpoints", "true"),
-    DefCheckpointInterval = config:get("replicator", "checkpoint_interval", "5000"),
+    DefCheckpointInterval = config:get("replicator", "checkpoint_interval", "30000"),
     {ok, DefSocketOptions} = couch_util:parse_term(
         config:get("replicator", "socket_options",
             "[{keepalive, true}, {nodelay, false}]")),
