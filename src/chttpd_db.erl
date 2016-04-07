@@ -950,7 +950,7 @@ http_code_from_status(Status) ->
             200
     end.
 
-update_doc(Db, DocId, #doc{deleted=Deleted}=Doc, Options) ->
+update_doc(Db, DocId, #doc{deleted=Deleted, body=DocBody}=Doc, Options) ->
     {_, Ref} = spawn_monitor(fun() ->
         try fabric:update_doc(Db, Doc, Options) of
             Resp ->
@@ -981,8 +981,7 @@ update_doc(Db, DocId, #doc{deleted=Deleted}=Doc, Options) ->
     {accepted, NewRev} ->
         Accepted = true
     end,
-    NewRevStr = couch_doc:rev_to_str(NewRev),
-    Etag = <<"\"", NewRevStr/binary, "\"">>,
+    Etag = couch_httpd:doc_etag(DocId, DocBody, NewRev),
     Status = case {Accepted, Deleted} of
         {true, _} ->
             accepted;
@@ -991,6 +990,7 @@ update_doc(Db, DocId, #doc{deleted=Deleted}=Doc, Options) ->
         {false, false} ->
             created
     end,
+    NewRevStr = couch_doc:rev_to_str(NewRev),
     Body = {[{ok, true}, {id, DocId}, {rev, NewRevStr}]},
     {Status, {etag, Etag}, Body}.
 
