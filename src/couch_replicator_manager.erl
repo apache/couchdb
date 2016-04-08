@@ -922,12 +922,7 @@ scan_all_dbs(Server) when is_pid(Server) ->
 	end, ok).
 
 is_replicator_db(DbName) ->
-    case lists:last(binary:split(mem3:dbname(DbName), <<"/">>, [global])) of
-        <<"_replicator">> ->
-            true;
-        _ ->
-            false
-    end.
+    <<"_replicator">> =:= couch_db:dbname_suffix(DbName).
 
 get_json_value(Key, Props) ->
     get_json_value(Key, Props, undefined).
