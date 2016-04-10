@@ -181,7 +181,13 @@ handle_config_terminate(_, _, _) ->
     end).
 
 init([]) ->
-    ets:new(?SHARDS, [bag, protected, named_table, {keypos,#shard.dbname}]),
+    ets:new(?SHARDS, [
+        bag,
+        protected,
+        named_table,
+        {keypos,#shard.dbname},
+        {read_concurrency, true}
+    ]),
     ets:new(?DBS, [set, protected, named_table]),
     ets:new(?ATIMES, [ordered_set, protected, named_table]),
     ok = config:listen_for_changes(?MODULE, nil),
