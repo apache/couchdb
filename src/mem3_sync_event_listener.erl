@@ -207,13 +207,18 @@ maybe_push_shards(St) ->
     end.
 
 push_shard(ShardName) ->
-    try mem3:shards(mem3:dbname(ShardName)) of
+    try mem3_shards:for_shard_name(ShardName) of
     Shards ->
-        Targets = [S || #shard{node=N, name=Name} = S <- Shards,
-            N =/= node(), Name =:= ShardName],
         Live = nodes(),
-        [mem3_sync:push(ShardName,N) || #shard{node=N} <- Targets,
-            lists:member(N, Live)]
+        lists:foreach(
+            fun(#shard{node=N}) ->
+                case lists:member(N, Live) of
+                    true -> mem3_sync:push(ShardName, N);
+                    false -> ok
+                end
+            end,
+            Shards
+        )
     catch error:database_does_not_exist ->
         ok
     end.

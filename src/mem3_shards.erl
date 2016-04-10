@@ -21,6 +21,7 @@
 
 -export([start_link/0]).
 -export([for_db/1, for_db/2, for_docid/2, for_docid/3, get/3, local/1, fold/2]).
+-export([for_shard_name/1]).
 -export([set_max_size/1]).
 
 -record(st, {
@@ -88,6 +89,42 @@ for_docid(DbName, DocId, Options) ->
             Else
     catch error:badarg ->
         load_shards_from_disk(DbName, DocId)
+    end,
+    case lists:member(ordered, Options) of
+        true  -> Shards;
+        false -> mem3_util:downcast(Shards)
+    end.
+
+for_shard_name(ShardName) ->
+    for_shard_name(ShardName, []).
+
+for_shard_name(ShardName, Options) ->
+    DbName = mem3:dbname(ShardName),
+    ShardHead = #shard{
+        name = ShardName,
+        node = '_',
+        dbname = DbName,
+        range = '_',
+        ref = '_'
+    },
+    OrderedShardHead = #ordered_shard{
+        name = ShardName,
+        node = '_',
+        dbname = DbName,
+        range = '_',
+        ref = '_',
+        order = '_'
+    },
+    ShardSpec = {ShardHead, [], ['$_']},
+    OrderedShardSpec = {OrderedShardHead, [], ['$_']},
+    Shards = try ets:select(?SHARDS, [ShardSpec, OrderedShardSpec]) of
+        [] ->
+            filter_shards_by_name(ShardName, load_shards_from_disk(DbName));
+        Else ->
+            gen_server:cast(?MODULE, {cache_hit, DbName}),
+            Else
+    catch error:badarg ->
+        filter_shards_by_name(ShardName, load_shards_from_disk(DbName))
     end,
     case lists:member(ordered, Options) of
         true  -> Shards;
@@ -360,3 +397,15 @@ cache_clear(St) ->
     true = ets:delete_all_objects(?SHARDS),
     true = ets:delete_all_objects(?ATIMES),
     St#st{cur_size=0}.
+
+filter_shards_by_name(Name, Shards) ->
+    filter_shards_by_name(Name, [], Shards).
+
+filter_shards_by_name(_, Matches, []) ->
+    Matches;
+filter_shards_by_name(Name, Matches, [#ordered_shard{name=Name}=S|Ss]) ->
+    filter_shards_by_name(Name, [S|Matches], Ss);
+filter_shards_by_name(Name, Matches, [#shard{name=Name}=S|Ss]) ->
+    filter_shards_by_name(Name, [S|Matches], Ss);
+filter_shards_by_name(Name, Matches, [_|Ss]) ->
+    filter_shards_by_name(Name, Matches, Ss).
