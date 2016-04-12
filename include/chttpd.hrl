@@ -20,3 +20,9 @@
     should_log = true,
     reason
 }).
+
+-define(is_hex(C), (
+    (C >= $0 andalso C =< $9) orelse
+    (C >= $a andalso C =< $f) orelse
+    (C >= $A andalso C =< $F)
+)).

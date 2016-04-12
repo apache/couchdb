@@ -281,6 +281,7 @@ process_request(#httpd{mochi_req = MochiReq} = HttpReq) ->
     try
         couch_httpd:validate_host(HttpReq),
         check_request_uri_length(RawUri),
+        check_url_encoding(RawUri),
         case chttpd_cors:maybe_handle_preflight_request(HttpReq) of
         not_preflight ->
             case chttpd_auth:authenticate(HttpReq, fun authenticate_request/1) of
@@ -405,6 +406,15 @@ check_request_uri_length(Uri, MaxUriLen) when is_list(MaxUriLen) ->
         false ->
             ok
     end.
+
+check_url_encoding([]) ->
+    ok;
+check_url_encoding([$%, A, B | Rest]) when ?is_hex(A), ?is_hex(B) ->
+    check_url_encoding(Rest);
+check_url_encoding([$% | _]) ->
+    throw({bad_request, invalid_url_encoding});
+check_url_encoding([_ | Rest]) ->
+    check_url_encoding(Rest).
 
 fix_uri(Req, Props, Type) ->
     case replication_uri(Type, Props) of
@@ -1074,3 +1084,60 @@ respond_(#httpd{mochi_req = MochiReq}, Code, Headers, _Args, start_response) ->
     MochiReq:start_response({Code, Headers});
 respond_(#httpd{mochi_req = MochiReq}, Code, Headers, Args, Type) ->
     MochiReq:Type({Code, Headers, Args}).
+
+
+-ifdef(TEST).
+
+-include_lib("eunit/include/eunit.hrl").
+
+check_url_encoding_pass_test_() ->
+    [
+        ?_assertEqual(ok, check_url_encoding("/dbname")),
+        ?_assertEqual(ok, check_url_encoding("/dbname/doc_id")),
+        ?_assertEqual(ok, check_url_encoding("/dbname/doc_id?rev=1-abcdefgh")),
+        ?_assertEqual(ok, check_url_encoding("/dbname%25")),
+        ?_assertEqual(ok, check_url_encoding("/dbname/doc_id%25")),
+        ?_assertEqual(ok, check_url_encoding("/dbname%25%3a")),
+        ?_assertEqual(ok, check_url_encoding("/dbname/doc_id%25%3a")),
+        ?_assertEqual(ok, check_url_encoding("/user%2Fdbname")),
+        ?_assertEqual(ok, check_url_encoding("/user%2Fdbname/doc_id")),
+        ?_assertEqual(ok, check_url_encoding("/dbname/escaped%25doc_id")),
+        ?_assertEqual(ok, check_url_encoding("/dbname/doc%2eid")),
+        ?_assertEqual(ok, check_url_encoding("/dbname/doc%2Eid")),
+        ?_assertEqual(ok, check_url_encoding("/dbname-with-dash")),
+        ?_assertEqual(ok, check_url_encoding("/dbname/doc_id-with-dash"))
+    ].
+
+check_url_encoding_fail_test_() ->
+    [
+        ?_assertThrow({bad_request, invalid_url_encoding},
+            check_url_encoding("/dbname%")),
+        ?_assertThrow({bad_request, invalid_url_encoding},
+            check_url_encoding("/dbname/doc_id%")),
+        ?_assertThrow({bad_request, invalid_url_encoding},
+            check_url_encoding("/dbname/doc_id%?rev=1-abcdefgh")),
+        ?_assertThrow({bad_request, invalid_url_encoding},
+            check_url_encoding("/dbname%2")),
+        ?_assertThrow({bad_request, invalid_url_encoding},
+            check_url_encoding("/dbname/doc_id%2")),
+        ?_assertThrow({bad_request, invalid_url_encoding},
+            check_url_encoding("/user%2Fdbname%")),
+        ?_assertThrow({bad_request, invalid_url_encoding},
+            check_url_encoding("/user%2Fdbname/doc_id%")),
+        ?_assertThrow({bad_request, invalid_url_encoding},
+            check_url_encoding("%")),
+        ?_assertThrow({bad_request, invalid_url_encoding},
+            check_url_encoding("/%")),
+        ?_assertThrow({bad_request, invalid_url_encoding},
+            check_url_encoding("/%2")),
+        ?_assertThrow({bad_request, invalid_url_encoding},
+            check_url_encoding("/dbname%2%3A")),
+        ?_assertThrow({bad_request, invalid_url_encoding},
+            check_url_encoding("/dbname%%3Ae")),
+        ?_assertThrow({bad_request, invalid_url_encoding},
+            check_url_encoding("/dbname%2g")),
+        ?_assertThrow({bad_request, invalid_url_encoding},
+            check_url_encoding("/dbname%g2"))
+    ].
+
+-endif.
