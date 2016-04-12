@@ -198,7 +198,10 @@ ensure_auth_ddoc_exists(DbName, DDocId) ->
                     {<<"validate_doc_update">>,
                     ?AUTH_DB_DOC_VALIDATE_FUNCTION}),
                 update_doc_ignoring_conflict(DbName, couch_doc:from_json_obj({Props1}), [?ADMIN_CTX])
-        end
+        end;
+    {error, Reason} ->
+        couch_log:notice("Failed to ensure auth ddoc ~s/~s exists for reason: ~p", [DbName, DDocId, Reason]),
+        ok
     end,
     ok.
 
