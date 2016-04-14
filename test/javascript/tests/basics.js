@@ -82,7 +82,7 @@ couchTests.basics = function(debug) {
   T(db.save({_id:"2",a:3,b:9}).ok);
   T(db.save({_id:"3",a:4,b:16}).ok);
 
-  // TODO: unreliable in clusters w/ n>1, either -n 1 or some wait and recheck
+  // with n=3 and w=r=2, it SHOULD be reliable in clusters - execute often 2 see...
 
   // Check the database doc count
   T(db.info().doc_count == 4);

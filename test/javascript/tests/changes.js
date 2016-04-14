@@ -79,6 +79,7 @@ couchTests.changes = function(debug) {
     } catch (err) {
     }
 
+    // these will NEVER run as we're always in navigator == undefined
     if (!is_safari && xhr) {
       // Only test the continuous stuff if we have a real XHR object
       // with real async support.
@@ -153,6 +154,7 @@ couchTests.changes = function(debug) {
     db.deleteDb();
   }
 
+  // these will NEVER run as we're always in navigator == undefined
   if (!is_safari && xhr) {
     // test Server Sent Event (eventsource)
     if (!!window.EventSource) {
@@ -324,12 +326,27 @@ couchTests.changes = function(debug) {
   var resp = JSON.parse(req.responseText);
   T(resp.results.length == 0);
 
-  db.save({"bop" : "foom"});
-  db.save({"bop" : false});
+  var docres1 = db.save({"bop" : "foom"});
+  T(docres1.ok);
+  var docres2 = db.save({"bop" : false});
+  T(docres2.ok);
 
   var req = CouchDB.request("GET", "/" + db_name + "/_changes?filter=changes_filter/bop");
   var resp = JSON.parse(req.responseText);
+  var seqold = resp.results[0].seq;
   T(resp.results.length == 1, "filtered/bop");
+  T(resp.results[0].changes[0].rev == docres1.rev, "filtered/bop rev");
+  // save and reload (substitute for all those parts that never run)
+  var chgdoc1 = db.open(docres1.id);
+  chgdoc1.newattr = "s/th new";
+  docres1 = db.save(chgdoc1);
+  T(docres1.ok);
+  req = CouchDB.request("GET", "/" + db_name + "/_changes?filter=changes_filter/bop");
+  resp = JSON.parse(req.responseText);
+  var seqchg = resp.results[0].seq;
+  T(resp.results.length == 1, "filtered/bop new");
+  T(resp.results[0].changes[0].rev == docres1.rev, "filtered/bop rev new");
+  T(seqold != seqchg, "filtered/bop new seq number");
 
   req = CouchDB.request("GET", "/" + db_name + "/_changes?filter=changes_filter/dynamic&field=woox");
   resp = JSON.parse(req.responseText);
@@ -338,7 +355,9 @@ couchTests.changes = function(debug) {
   req = CouchDB.request("GET", "/" + db_name + "/_changes?filter=changes_filter/dynamic&field=bop");
   resp = JSON.parse(req.responseText);
   T(resp.results.length == 1, "changes_filter/dynamic&field=bop");
-
+  T(resp.results[0].changes[0].rev == docres1.rev, "filtered/dynamic&field=bop rev");
+ 
+  // these will NEVER run as we're always in navigator == undefined
   if (!is_safari && xhr) { // full test requires parallel connections
     // filter with longpoll
     // longpoll filters full history when run without a since seq
