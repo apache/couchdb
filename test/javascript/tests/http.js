@@ -37,8 +37,6 @@ couchTests.http = function(debug) {
     xhr.getResponseHeader("Location"),
     "should include X-Forwarded-Host");
 
-// TODO: allow modifications or leave out
-/*
   run_on_modified_server([{
     section:"httpd",
     key:"x_forwarded_host",
@@ -52,7 +50,6 @@ couchTests.http = function(debug) {
         xhr.getResponseHeader("Location"),
         "should include X-Host");
     });
-*/
 
   // COUCHDB-708: newlines document names
   xhr = CouchDB.request("PUT", "/" + db_name + "/docid%0A/attachment.txt", {

@@ -216,7 +216,7 @@ couchTests.list_views = function(debug) {
   T(xhr.status == 200, "standard get should be 200");
   T(/head0123456789tail/.test(xhr.responseText));
 
-  // test that etags are available - actually they're not (yet): https://issues.apache.org/jira/browse/COUCHDB-2859
+  // TODO: test that etags are available - actually they're not (yet): https://issues.apache.org/jira/browse/COUCHDB-2859
   //var etag = xhr.getResponseHeader("etag");
   //xhr = CouchDB.request("GET", "/" + db_name + "/_design/lists/_list/basicBasic/basicView", {
   //  headers: {"if-none-match": etag}
