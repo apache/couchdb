@@ -11,9 +11,8 @@
 // the License.
 
 couchTests.recreate_doc = function(debug) {
-  return console.log('TODO: compaction not available on cluster');
   var db_name = get_random_db_name();
-  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
+  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"}, {"w": 3});
   db.createDb();
   if (debug) debugger;
 
@@ -96,8 +95,10 @@ couchTests.recreate_doc = function(debug) {
       };
       T(db.save(ret[ret.length-1]).ok);
     }
+/* TODO: if we need and can, re-enable compaction which per se is not available in the cluster - that way, we at least have all else
     db.compact();
     while(db.info().compact_running) {}
+*/
     return ret;
   }
 
@@ -113,7 +114,8 @@ couchTests.recreate_doc = function(debug) {
     var prev_seq = -1;
     for(var i = 0; i < resp.results.length; i++) {
       row = resp.results[i];
-      T(row.seq > prev_seq, "Unordered _changes feed.");
+      // that won't hold true in clusters
+      //T(row.seq > prev_seq, "Unordered _changes feed.");
       T(docids[row.id] === undefined, "Duplicates in _changes feed.");
       prev_seq = row.seq;
       docids[row.id] = true;
@@ -136,12 +138,14 @@ couchTests.recreate_doc = function(debug) {
   // as it didn't consider the possibility that a compaction
   // might run after the original tree screw up.
 
+/* TODO: if we need and can, re-enable compaction which per se is not available in the cluster - that way, we at least have all else
   revs = createDoc("b");
   T(db.save(revs[1], {new_edits: false}).ok);
   db.compact();
   while(db.info().compact_running) {}
   T(db.save(revs[revs.length-1]).ok);
   checkChanges();
+*/
 
   // cleanup
   db.deleteDb();
