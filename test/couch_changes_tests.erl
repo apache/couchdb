@@ -60,6 +60,7 @@ changes_test_() ->
             setup,
             fun test_util:start_couch/0, fun test_util:stop_couch/1,
             [
+                filter_by_selector(),
                 filter_by_doc_id(),
                 filter_by_design(),
                 continuous_feed()
@@ -83,6 +84,24 @@ filter_by_doc_id() ->
             ]
         }
     }.
+
+filter_by_selector() ->
+    {
+        "Filter _selector",
+        {
+            foreach,
+            fun setup/0, fun teardown/1,
+            [
+                fun should_select_basic/1,
+                fun should_select_with_since/1,
+                fun should_select_when_no_result/1,
+                fun should_select_with_deleted_docs/1,
+                fun should_select_with_continuous/1,
+                fun should_stop_selector_when_db_deleted/1
+            ]
+        }
+    }.
+
 
 filter_by_design() ->
     {
@@ -317,7 +336,7 @@ should_filter_continuous_feed_by_specific_doc_ids({DbName, Revs}) ->
 
 should_end_changes_when_db_deleted({DbName, _Revs}) ->
     ?_test(begin
-        {ok, Db} = couch_db:open_int(DbName, []),
+        {ok, _Db} = couch_db:open_int(DbName, []),
         ChangesArgs = #changes_args{
             filter = "_doc_ids",
             feed = "continuous"
@@ -332,6 +351,140 @@ should_end_changes_when_db_deleted({DbName, _Revs}) ->
         stop_consumer(Consumer),
         ok
     end).
+
+
+should_select_basic({DbName, _}) ->
+    ?_test(
+        begin
+            ChArgs = #changes_args{filter = "_selector"},
+            Selector = {[{<<"_id">>, <<"doc3">>}]},
+            Req = {json_req, {[{<<"selector">>, Selector}]}},
+            Consumer = spawn_consumer(DbName, ChArgs, Req),
+            {Rows, LastSeq} = wait_finished(Consumer),
+            {ok, Db} = couch_db:open_int(DbName, []),
+            UpSeq = couch_db:get_update_seq(Db),
+            couch_db:close(Db),
+            stop_consumer(Consumer),
+            ?assertEqual(1, length(Rows)),
+            [#row{seq = Seq, id = Id}] = Rows,
+            ?assertEqual(<<"doc3">>, Id),
+            ?assertEqual(6, Seq),
+            ?assertEqual(UpSeq, LastSeq)
+        end).
+
+should_select_with_since({DbName, _}) ->
+    ?_test(
+        begin
+            ChArgs = #changes_args{filter = "_selector", since = 9},
+            GteDoc2 = {[{<<"$gte">>, <<"doc1">>}]},
+            Selector = {[{<<"_id">>, GteDoc2}]},
+            Req = {json_req, {[{<<"selector">>, Selector}]}},
+            Consumer = spawn_consumer(DbName, ChArgs, Req),
+            {Rows, LastSeq} = wait_finished(Consumer),
+            {ok, Db} = couch_db:open_int(DbName, []),
+            UpSeq = couch_db:get_update_seq(Db),
+            couch_db:close(Db),
+            stop_consumer(Consumer),
+            ?assertEqual(1, length(Rows)),
+            [#row{seq = Seq, id = Id}] = Rows,
+            ?assertEqual(<<"doc8">>, Id),
+            ?assertEqual(10, Seq),
+            ?assertEqual(UpSeq, LastSeq)
+        end).
+
+should_select_when_no_result({DbName, _}) ->
+    ?_test(
+        begin
+            ChArgs = #changes_args{filter = "_selector"},
+            Selector = {[{<<"_id">>, <<"nopers">>}]},
+            Req = {json_req, {[{<<"selector">>, Selector}]}},
+            Consumer = spawn_consumer(DbName, ChArgs, Req),
+            {Rows, LastSeq} = wait_finished(Consumer),
+            {ok, Db} = couch_db:open_int(DbName, []),
+            UpSeq = couch_db:get_update_seq(Db),
+            couch_db:close(Db),
+            stop_consumer(Consumer),
+            ?assertEqual(0, length(Rows)),
+            ?assertEqual(UpSeq, LastSeq)
+        end).
+
+should_select_with_deleted_docs({DbName, Revs}) ->
+    ?_test(
+        begin
+            Rev3_2 = element(6, Revs),
+            {ok, Db} = couch_db:open_int(DbName, []),
+            {ok, _} = save_doc(
+                Db,
+                {[{<<"_id">>, <<"doc3">>},
+                  {<<"_deleted">>, true},
+                  {<<"_rev">>, Rev3_2}]}),
+            ChArgs = #changes_args{filter = "_selector"},
+            Selector = {[{<<"_id">>, <<"doc3">>}]},
+            Req = {json_req, {[{<<"selector">>, Selector}]}},
+            Consumer = spawn_consumer(DbName, ChArgs, Req),
+            {Rows, LastSeq} = wait_finished(Consumer),
+            couch_db:close(Db),
+            stop_consumer(Consumer),
+            ?assertMatch(
+                [#row{seq = LastSeq, id = <<"doc3">>, deleted = true}],
+                Rows
+            ),
+            ?assertEqual(11, LastSeq)
+        end).
+
+should_select_with_continuous({DbName, Revs}) ->
+    ?_test(
+        begin
+            {ok, Db} = couch_db:open_int(DbName, []),
+            ChArgs = #changes_args{filter = "_selector", feed = "continuous"},
+            GteDoc8 = {[{<<"$gte">>, <<"doc8">>}]},
+            Selector = {[{<<"_id">>, GteDoc8}]},
+            Req = {json_req, {[{<<"selector">>, Selector}]}},
+            Consumer = spawn_consumer(DbName, ChArgs, Req),
+            ok = pause(Consumer),
+            Rows = get_rows(Consumer),
+            ?assertMatch(
+               [#row{seq = 10, id = <<"doc8">>, deleted = false}],
+               Rows
+            ),
+            clear_rows(Consumer),
+            {ok, _} = save_doc(Db, {[{<<"_id">>, <<"doc01">>}]}),
+            ok = unpause(Consumer),
+            timer:sleep(100),
+            ok = pause(Consumer),
+            ?assertEqual([], get_rows(Consumer)),
+            Rev4 = element(4, Revs),
+            Rev8 = element(10, Revs),
+            {ok, _} = save_doc(Db, {[{<<"_id">>, <<"doc8">>},
+                                     {<<"_rev">>, Rev8}]}),
+            {ok, _} = save_doc(Db, {[{<<"_id">>, <<"doc4">>},
+                                     {<<"_rev">>, Rev4}]}),
+            ok = unpause(Consumer),
+            timer:sleep(100),
+            ok = pause(Consumer),
+            NewRows = get_rows(Consumer),
+            ?assertMatch(
+               [#row{seq = _, id = <<"doc8">>, deleted = false}],
+               NewRows
+            )
+        end).
+
+should_stop_selector_when_db_deleted({DbName, _Revs}) ->
+    ?_test(
+       begin
+           {ok, _Db} = couch_db:open_int(DbName, []),
+           ChArgs = #changes_args{filter = "_selector", feed = "continuous"},
+           Selector = {[{<<"_id">>, <<"doc3">>}]},
+           Req = {json_req, {[{<<"selector">>, Selector}]}},
+           Consumer = spawn_consumer(DbName, ChArgs, Req),
+           ok = pause(Consumer),
+           ok = couch_server:delete(DbName, [?ADMIN_CTX]),
+           ok = unpause(Consumer),
+           {_Rows, _LastSeq} = wait_finished(Consumer),
+           stop_consumer(Consumer),
+           ok
+       end).
+
 
 should_emit_only_design_documents({DbName, Revs}) ->
     ?_test(

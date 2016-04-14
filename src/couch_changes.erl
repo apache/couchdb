@@ -196,6 +196,8 @@ get_callback_acc(Callback) when is_function(Callback, 2) ->
 
 configure_filter("_doc_ids", Style, Req, _Db) ->
     {doc_ids, Style, get_doc_ids(Req)};
+configure_filter("_selector", Style, Req, _Db) ->
+    {selector, Style,  get_selector(Req)};
 configure_filter("_design", Style, _Req, _Db) ->
     {design_docs, Style};
 configure_filter("_view", Style, Req, Db) ->
@@ -267,6 +269,11 @@ filter(_Db, DocInfo, {doc_ids, Style, DocIds}) ->
         false ->
             []
     end;
+filter(Db, DocInfo, {selector, Style, Selector}) ->
+    Docs = open_revs(Db, DocInfo, Style),
+    Passes = [mango_selector:match(Selector, couch_doc:to_json_obj(Doc, []))
+        || Doc <- Docs],
+    filter_revs(Passes, Docs);
 filter(_Db, DocInfo, {design_docs, Style}) ->
     case DocInfo#doc_info.id of
         <<"_design", _/binary>> ->
@@ -336,6 +343,15 @@ get_doc_ids(_) ->
     throw({bad_request, no_doc_ids_provided}).
 
 
+get_selector({json_req, {Props}}) ->
+    check_selector(couch_util:get_value(<<"selector">>, Props));
+get_selector(#httpd{method='POST'}=Req) ->
+    couch_httpd:validate_ctype(Req, "application/json"),
+    get_selector({json_req,  couch_httpd:json_body_obj(Req)});
+get_selector(_) ->
+    throw({bad_request, "Selector must be specified in POST payload"}).
+
+
 check_docids(DocIds) when is_list(DocIds) ->
     lists:foreach(fun
         (DocId) when not is_binary(DocId) ->
@@ -347,6 +363,18 @@ check_docids(DocIds) when is_list(DocIds) ->
 check_docids(_) ->
     Msg = "`doc_ids` filter parameter is not a list of doc ids.",
     throw({bad_request, Msg}).
+
+
+check_selector(Selector={_}) ->
+    try
+        mango_selector:normalize(Selector)
+    catch
+        {mango_error, Mod, Reason0} ->
+            {_StatusCode, _Error, Reason} = mango_error:info(Mod, Reason0),
+            throw({bad_request, Reason})
+    end;
+check_selector(_Selector) ->
+    throw({bad_request, "Selector error: expected a JSON object"}).
 
 
 open_ddoc(#db{name=DbName, id_tree=undefined}, DDocId) ->
