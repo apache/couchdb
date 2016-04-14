@@ -637,7 +637,7 @@ couchTests.changes = function(debug) {
 
   db.bulkSave(makeDocs(0, 5));
 
-// TODO: as before tests: for n>1 you can't be sure all docs are there immediately - so either stick w/ -n 1 or implement check-wait-check
+// for n>1 you can't be sure all docs are there immediately - so either stick w/ -n 1 or implement check-wait-check or use the quorum (for now, the latter seems 2 suffice)
 
   req = CouchDB.request("GET", "/" + db.name + "/_changes");
   resp = JSON.parse(req.responseText);
