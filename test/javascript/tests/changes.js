@@ -32,7 +32,8 @@ couchTests.changes = function(debug) {
   testChanges("continuous");
   function testChanges(feed) {
     var db_name = get_random_db_name();
-    db = new CouchDB(db_name, {"X-Couch-Full-Commit":"true"});
+    // (write-quorums help keep a consistent feed)
+    db = new CouchDB(db_name, {"X-Couch-Full-Commit":"true"}, {"w": 3});
     db.createDb();
 
     var req = CouchDB.request("GET", "/" + db_name + "/_changes");
@@ -45,12 +46,13 @@ couchTests.changes = function(debug) {
     T(db.ensureFullCommit().ok);
     T(db.open(docFoo._id)._id == docFoo._id);
 
-    req = CouchDB.request("GET", "/" + db_name + "/_changes");
-    var resp = JSON.parse(req.responseText);
-
-    TEquals("1", resp.last_seq.substr(0, 1), "seq must start with 1");
-    T(resp.results.length == 1, "one doc db");
-    T(resp.results[0].changes[0].rev == docFoo._rev);
+    retry_part(function(){ // avoid Heisenbugs
+      req = CouchDB.request("GET", "/" + db_name + "/_changes");
+      var resp = JSON.parse(req.responseText);
+      TEquals("1", resp.last_seq.substr(0, 1), "seq must start with 1");
+      T(resp.results.length == 1, "one doc db");
+      T(resp.results[0].changes[0].rev == docFoo._rev);
+    });
 
     // test with callback
 // TODO: either allow jsonp in the default global config or implement a config chg mechanism analogouts 2 sebastianrothbucher:clustertest - or leave out
@@ -66,7 +68,8 @@ couchTests.changes = function(debug) {
 //      T(jsonp_flag == 1);
 //    });
 
-    req = CouchDB.request("GET", "/" + db_name + "/_changes?feed=" + feed + "&timeout=10");
+    // increase timeout to 100 to have enough time 2 assemble (seems like too little timeouts kill
+    req = CouchDB.request("GET", "/" + db_name + "/_changes?feed=" + feed + "&timeout=100");
     var lines = req.responseText.split("\n");
     T(JSON.parse(lines[0]).changes[0].rev == docFoo._rev);
     // the sequence is not fully ordered and a complex structure now
@@ -286,7 +289,7 @@ couchTests.changes = function(debug) {
   db.deleteDb();
   // test on a new DB
   var db_name = get_random_db_name();
-  db = new CouchDB(db_name, {"X-Couch-Full-Commit":"true"});
+  db = new CouchDB(db_name, {"X-Couch-Full-Commit":"true"}, {"w": 3});
   db.createDb();
 
   // test the filtered changes
@@ -613,7 +616,7 @@ couchTests.changes = function(debug) {
   // COUCHDB-1037 - empty result for ?limit=1&filter=foo/bar in some cases
   // test w/ new temp DB
   db_name = get_random_db_name();
-  db = new CouchDB(db_name, {"X-Couch-Full-Commit":"true"});
+  db = new CouchDB(db_name, {"X-Couch-Full-Commit":"true"}, {"w": 3});
   T(db.createDb());
 
   ddoc = {
@@ -670,7 +673,7 @@ couchTests.changes = function(debug) {
   // COUCHDB-1256
   // test w/ new temp DB
   db_name = get_random_db_name();
-  db = new CouchDB(db_name, {"X-Couch-Full-Commit":"true"});
+  db = new CouchDB(db_name, {"X-Couch-Full-Commit":"true"}, {"w": 3});
   T(db.createDb());
 
   T(db.save({"_id":"foo", "a" : 123}).ok);
@@ -702,7 +705,7 @@ couchTests.changes = function(debug) {
   // COUCHDB-1852
   // test w/ new temp DB
   db_name = get_random_db_name();
-  db = new CouchDB(db_name, {"X-Couch-Full-Commit":"true"});
+  db = new CouchDB(db_name, {"X-Couch-Full-Commit":"true"}, {"w": 3});
   T(db.createDb());
 
   // create 4 documents... this assumes the update sequnce will start from 0 and then do sth in the cluster 
@@ -714,7 +717,8 @@ couchTests.changes = function(debug) {
   req = CouchDB.request("GET", "/" + db_name + "/_changes");
 
   // simulate an EventSource request with a Last-Event-ID header
-  req = CouchDB.request("GET", "/" + db_name + "/_changes?feed=eventsource&timeout=0&since=0",
+  // increase timeout to 100 to have enough time 2 assemble (seems like too little timeouts kill  
+  req = CouchDB.request("GET", "/" + db_name + "/_changes?feed=eventsource&timeout=100&since=0",
         {"headers": {"Accept": "text/event-stream", "Last-Event-ID": JSON.parse(req.responseText).results[1].seq}});
 
   // "parse" the eventsource response and collect only the "id: ..." lines
@@ -734,7 +738,7 @@ couchTests.changes = function(debug) {
   // COUCHDB-1923
   // test w/ new temp DB
   db_name = get_random_db_name();
-  db = new CouchDB(db_name, {"X-Couch-Full-Commit":"true"});
+  db = new CouchDB(db_name, {"X-Couch-Full-Commit":"true"}, {"w": 3});
   T(db.createDb());
 
   var attachmentData = "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ=";

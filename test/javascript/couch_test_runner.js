@@ -483,3 +483,21 @@ function get_random_string() {
 function get_random_db_name() {
   return "test_suite_db_" + get_random_string()
 }
+
+// for Heisenbug-prone spots: retry n times (e.g. quora not met immediately)
+// if the problem still persists afterwards, we need sth else (similar to e.g. webdriver)
+function retry_part(fct, n) {
+  n = n || 3;
+  for(var i=1; i<=n; i++){
+    try {
+      fct();
+    }catch(e){
+      if(i<n){
+        continue;
+      }else{
+        throw e;
+      }
+    }
+  }
+}
+
