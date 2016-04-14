@@ -18,20 +18,22 @@ couchTests.view_sandboxing = function(debug) {
 
   var doc = {integer: 1, string: "1", array: [1, 2, 3]};
   T(db.save(doc).ok);
-/*
+
   // make sure that attempting to change the document throws an error
   var results = db.query(function(doc) {
     doc.integer = 2;
     emit(null, doc);
-  });
-  T(results.total_rows == 0);
+  }, null, {"include_docs": true});
+  // either we have an error or our doc is unchanged
+  T(results.total_rows == 0 || results.rows[0].doc.integer == 1);
 
   var results = db.query(function(doc) {
     doc.array[0] = 0;
     emit(null, doc);
-  });
-  T(results.total_rows == 0);
-*/
+  }, null, {"include_docs": true});
+  // either we have an error or our doc is unchanged
+  T(results.total_rows == 0 || results.rows[0].doc.array[0] == 1);
+
   // make sure that a view cannot invoke interpreter internals such as the
   // garbage collector
   var results = db.query(function(doc) {
@@ -123,17 +125,22 @@ couchTests.view_sandboxing = function(debug) {
     TEquals(3, view2Results.rows[0].value[2]);
   }
 
-  TEquals(1, view2Results.rows[1].value["a"]);
-  TEquals(2, view2Results.rows[1].value["b"]);
-  TEquals('undefined', typeof view2Results.rows[1].value["c"],
-    "doc2.tokens object was not sealed");
+  // we can't be 100% sure about the order for the same key
+  T(view2Results.rows[1].value["a"] == 1 || view2Results.rows[1].value[0] == "foo");
+  T(view2Results.rows[1].value["b"] == 2 || view2Results.rows[1].value[1] == "bar");
+  T(view2Results.rows[2].value["a"] == 1 || view2Results.rows[2].value[0] == "foo");
+  T(view2Results.rows[2].value["b"] == 2 || view2Results.rows[2].value[1] == "bar");
+  TEquals('undefined', typeof view2Results.rows[1].value["c"], "doc2.tokens object was not sealed");
+  TEquals('undefined', typeof view2Results.rows[2].value["c"], "doc2.tokens object was not sealed");
 
+/* (see above)
   TEquals(2, view2Results.rows[2].value.length,
     "Warning: installed SpiderMonkey version doesn't allow sealing of arrays");
   if (view2Results.rows[2].value.length === 2) {
     TEquals("foo", view2Results.rows[2].value[0]);
     TEquals("bar", view2Results.rows[2].value[1]);
   }
+*/
 
   // cleanup
   db.deleteDb();
