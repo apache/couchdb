@@ -490,7 +490,7 @@ function retry_part(fct, n) {
   n = n || 3;
   for(var i=1; i<=n; i++){
     try {
-      fct();
+      return fct();
     }catch(e){
       if(i<n){
         continue;
