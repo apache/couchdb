@@ -231,53 +231,37 @@ dist: all
 # target: install - Install CouchDB :-)
 -include install.mk
 install: all
-	@echo "Installing CouchDB into $(DESTDIR)/$(install_dir)..." | sed -e 's,///,/,'
+	@echo "Installing CouchDB into rel/couchdb/ ..."
 	@rm -rf rel/couchdb
-	@$(REBAR) generate # make full erlang release
-
-	@mkdir -p $(DESTDIR)/$(install_dir)
-	@cp -R rel/couchdb/* $(DESTDIR)/$(install_dir)
-
-	@mkdir -p $(DESTDIR)/$(database_dir)
-	@chown $(user) $(DESTDIR)/$(database_dir)
-
-	@mkdir -p $(DESTDIR)/$(view_index_dir)
-	@chown $(user) $(DESTDIR)/$(view_index_dir)
-
-	@mkdir -p $(DESTDIR)/`dirname $(log_file)`
-	@touch $(DESTDIR)/$(log_file)
-	@chown $(user) $(DESTDIR)/$(log_file)
-
-	@mkdir -p $(DESTDIR)/$(bin_dir)
-	@cp rel/couchdb/bin/couchdb $(DESTDIR)/$(bin_dir)
-
-	@mkdir -p $(DESTDIR)/$(libexec_dir)
-	@cp rel/couchdb/bin/couchjs $(DESTDIR)/$(libexec_dir)
-
-	@mkdir -p $(DESTDIR)/$(sysconf_dir)
-	@mkdir -p $(DESTDIR)/$(sysconf_dir)/default.d
-	@mkdir -p $(DESTDIR)/$(sysconf_dir)/local.d
-	@cp rel/couchdb/etc/default.ini rel/couchdb/etc/local.ini $(DESTDIR)/$(sysconf_dir)
+	@$(REBAR) generate > /dev/null 2>&1 # make full erlang release
 
 ifeq ($(with_fauxton), 1)
-	@mkdir -p $(DESTDIR)/$(data_dir)
-	@cp -R share/server share/www $(DESTDIR)/$(data_dir)
+	@mkdir -p rel/couchdb/share/
+	@cp -R share/www rel/couchdb/share/
 endif
 
 ifeq ($(with_docs), 1)
-	@mkdir -p $(DESTDIR)/$(doc_dir)
-	@mkdir -p $(DESTDIR)/$(html_dir)
-	@mkdir -p $(DESTDIR)/$(pdf_dir)
-	@mkdir -p $(DESTDIR)/$(man_dir)
-	@mkdir -p $(DESTDIR)/$(info_dir)
-	@cp -R share/docs/html $(DESTDIR)/$(html_dir)/html
-	@cp share/docs/pdf/CouchDB.pdf $(DESTDIR)/$(pdf_dir)/CouchDB.pdf
-	@cp share/docs/info/CouchDB.info $(DESTDIR)/$(info_dir)/CouchDB.info
-	@cp share/docs/man/apachecouchdb.1 $(DESTDIR)/$(man_dir)/couchdb.1
+ifeq ($(IN_RELEASE), true)
+	@mkdir -p rel/couchdb/share/www/docs/
+	@mkdir -p rel/couchdb/share/docs/
+	@cp -R share/docs/html/* rel/couchdb/share/www/docs/
+	@cp share/docs/pdf/CouchDB.pdf rel/couchdb/share/docs/CouchDB.pdf
+	@cp share/docs/man/apachecouchdb.1 rel/couchdb/share/docs/couchdb.1
+	@cp share/docs/info/CouchDB.info rel/couchdb/share/docs/CouchDB.info
+else
+	@mkdir -p rel/couchdb/share/docs/
+	@cp -R src/docs/build/html/ rel/couchdb/share/www/docs
+	@cp src/docs/build/latex/CouchDB.pdf rel/couchdb/share/docs/CouchDB.pdf
+	@cp src/docs/build/man/apachecouchdb.1 rel/couchdb/share/docs/couchdb.1
+	@cp src/docs/build/texinfo/CouchDB.info rel/couchdb/share/docs/CouchDB.info
+endif
 endif
 
-	@echo "...done"
-
+	@echo "... done"
+	@echo
+	@echo "    You can now copy the rel/couchdb/ directory anywhere on your system."
+	@echo "    Start CouchDB with ./bin/couchdb from within that directory."
+	@echo
 
 ################################################################################
 # Cleaning

@@ -13,7 +13,8 @@
 # the License.
 
 COUCHDB_BIN_DIR=$(cd ${0%/*} && pwd)
-ERTS_BIN_DIR=$COUCHDB_BIN_DIR/../lib/couchdb/
+ERTS_BIN_DIR=$COUCHDB_BIN_DIR/../
+cd $COUCHDB_BIN_DIR/../
 
 export ROOTDIR=${ERTS_BIN_DIR%/*}
 
