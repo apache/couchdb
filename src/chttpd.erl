@@ -371,10 +371,11 @@ maybe_log(#httpd{} = HttpReq, #httpd_resp{should_log = true} = HttpResp) ->
         code = Code,
         status = Status
     } = HttpResp,
+    User = get_user(HttpReq),
     Host = MochiReq:get_header_value("Host"),
     RawUri = MochiReq:get(raw_path),
     RequestTime = timer:now_diff(EndTime, BeginTime) / 1000,
-    couch_log:notice("~s ~s ~s ~s ~s ~B ~p ~B", [Nonce, Peer, Host,
+    couch_log:notice("~s ~s ~s ~s ~s ~s ~B ~p ~B", [Nonce, Peer, Host, User,
         Method, RawUri, Code, Status, round(RequestTime)]);
 maybe_log(_HttpReq, #httpd_resp{should_log = false}) ->
     ok.
@@ -1085,6 +1086,10 @@ respond_(#httpd{mochi_req = MochiReq}, Code, Headers, _Args, start_response) ->
 respond_(#httpd{mochi_req = MochiReq}, Code, Headers, Args, Type) ->
     MochiReq:Type({Code, Headers, Args}).
 
+get_user(#httpd{user_ctx = #user_ctx{name = User}}) ->
+    couch_util:url_encode(User);
+get_user(#httpd{user_ctx = undefined}) ->
+    "undefined".
 
 -ifdef(TEST).
 
@@ -1139,5 +1144,47 @@ check_url_encoding_fail_test_() ->
         ?_assertThrow({bad_request, invalid_url_encoding},
             check_url_encoding("/dbname%g2"))
     ].
+
+log_format_test() ->
+    ?assertEqual(
+        "nonce 127.0.0.1 127.0.0.1:15984 undefined "
+        "GET /_cluster_setup 201 ok 10000",
+        test_log_request("/_cluster_setup", undefined)),
+    ?assertEqual(
+        "nonce 127.0.0.1 127.0.0.1:15984 user_foo "
+        "GET /_all_dbs 201 ok 10000",
+        test_log_request("/_all_dbs", #user_ctx{name = <<"user_foo">>})),
+
+    %% Utf8Name = unicode:characters_to_binary(Something),
+    Utf8User = <<227,130,136,227,129,134,227,129,147,227,129,157>>,
+    ?assertEqual(
+        "nonce 127.0.0.1 127.0.0.1:15984 %E3%82%88%E3%81%86%E3%81%93%E3%81%9D "
+        "GET /_all_dbs 201 ok 10000",
+        test_log_request("/_all_dbs", #user_ctx{name = Utf8User})),
+    ok.
+
+test_log_request(RawPath, UserCtx) ->
+    Headers = mochiweb_headers:make([{"HOST", "127.0.0.1:15984"}]),
+    MochiReq = mochiweb_request:new(socket, [], 'POST', RawPath, version, Headers),
+    Req = #httpd{
+        mochi_req = MochiReq,
+        begin_ts = {1458,588713,124003},
+        original_method = 'GET',
+        peer = "127.0.0.1",
+        nonce = "nonce",
+        user_ctx = UserCtx
+    },
+    Resp = #httpd_resp{
+        end_ts = {1458,588723,124303},
+        code = 201,
+        status = ok
+    },
+    ok = meck:new(couch_log, [passthrough]),
+    ok = meck:expect(couch_log, notice, fun(Format, Args) ->
+        lists:flatten(io_lib:format(Format, Args))
+    end),
+    Message = maybe_log(Req, Resp),
+    ok = meck:unload(couch_log),
+    Message.
 
 -endif.
