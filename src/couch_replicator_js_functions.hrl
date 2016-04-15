@@ -81,10 +81,29 @@
                 reportError('The `doc_ids\\' field must be an array of strings.');
             }
 
+            if ((typeof newDoc.selector !== 'undefined') &&
+                (typeof newDoc.selector !== 'object')) {
+
+                reportError('The `selector\\' field must be an object.');
+            }
+
             if ((typeof newDoc.filter !== 'undefined') &&
                 ((typeof newDoc.filter !== 'string') || !newDoc.filter)) {
 
                 reportError('The `filter\\' field must be a non-empty string.');
+            }
+
+            if ((typeof newDoc.doc_ids !== 'undefined') &&
+                (typeof newDoc.selector !== 'undefined')) {
+
+                reportError('`doc_ids\\' field is incompatible with `selector\\'.');
+            }
+
+            if ( ((typeof newDoc.doc_ids !== 'undefined') ||
+                  (typeof newDoc.selector !== 'undefined')) &&
+                 (typeof newDoc.filter !== 'undefined') ) {
+
+                reportError('`filter\\' field is incompatible with `selector\\' and `doc_ids\\'.');
             }
 
             if ((typeof newDoc.query_params !== 'undefined') &&

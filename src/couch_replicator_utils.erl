@@ -115,20 +115,24 @@ replication_id(#rep{user_ctx = UserCtx} = Rep, 1) ->
 
 maybe_append_filters(Base,
         #rep{source = Source, user_ctx = UserCtx, options = Options}) ->
+    Filter = get_value(filter, Options),
+    DocIds = get_value(doc_ids, Options),
+    Selector = get_value(selector, Options),
     Base2 = Base ++
-        case get_value(filter, Options) of
-        undefined ->
-            case get_value(doc_ids, Options) of
-            undefined ->
-                [];
-            DocIds ->
-                [DocIds]
-            end;
-        <<"_", _/binary>> = Filter ->
-                [Filter, get_value(query_params, Options, {[]})];
-        Filter ->
+        case {Filter, DocIds, Selector} of
+        {undefined, undefined, undefined} ->
+            [];
+        {<<"_", _/binary>>, undefined, undefined} ->
+            [Filter, get_value(query_params, Options, {[]})];
+        {_, undefined, undefined} ->
             [filter_code(Filter, Source, UserCtx),
-                get_value(query_params, Options, {[]})]
+                get_value(query_params, Options, {[]})];
+        {undefined, _, undefined} ->
+            [DocIds];
+        {undefined, undefined, _} ->
+            [ejsort(mango_selector:normalize(Selector))];
+        _ ->
+            throw({error, <<"`selector`, `filter` and `doc_ids` fields are mutually exclusive">>})
         end,
     couch_util:to_hex(couch_crypto:hash(md5, term_to_binary(Base2))).
 
@@ -248,7 +252,8 @@ maybe_add_trailing_slash(Url) ->
 
 
 make_options(Props) ->
-    Options = lists:ukeysort(1, convert_options(Props)),
+    Options0 = lists:ukeysort(1, convert_options(Props)),
+    Options = check_options(Options0),
     DefWorkers = config:get("replicator", "worker_processes", "4"),
     DefBatchSize = config:get("replicator", "worker_batch_size", "500"),
     DefConns = config:get("replicator", "http_connections", "20"),
@@ -296,6 +301,10 @@ convert_options([{<<"doc_ids">>, V} | R]) ->
     % encoded doc IDs.
     DocIds = [?l2b(couch_httpd:unquote(Id)) || Id <- V],
     [{doc_ids, DocIds} | convert_options(R)];
+convert_options([{<<"selector">>, V} | _R]) when not is_tuple(V) ->
+    throw({bad_request, <<"parameter `selector` must be a JSON object">>});
+convert_options([{<<"selector">>, V} | R]) ->
+    [{selector, V} | convert_options(R)];
 convert_options([{<<"worker_processes">>, V} | R]) ->
     [{worker_processes, couch_util:to_integer(V)} | convert_options(R)];
 convert_options([{<<"worker_batch_size">>, V} | R]) ->
@@ -317,6 +326,19 @@ convert_options([{<<"checkpoint_interval">>, V} | R]) ->
     [{checkpoint_interval, couch_util:to_integer(V)} | convert_options(R)];
 convert_options([_ | R]) -> % skip unknown option
     convert_options(R).
+
+check_options(Options) ->
+    DocIds = lists:keyfind(doc_ids, 1, Options),
+    Filter = lists:keyfind(filter, 1, Options),
+    Selector = lists:keyfind(selector, 1, Options),
+    case {DocIds, Filter, Selector} of
+        {false, false, false} -> Options;
+        {false, false, _} -> Options;
+        {false, _, false} -> Options;
+        {_, false, false} -> Options;
+        _ ->
+            throw({bad_request, "`doc_ids`, `filter`, `selector` are mutually exclusive options"})
+    end.
 
 
 parse_proxy_params(ProxyUrl) when is_binary(ProxyUrl) ->
@@ -458,3 +480,65 @@ is_deleted(Change) ->
     Else ->
         Else
     end.
+
+
+% Sort an EJSON object's properties to attempt
+% to generate a unique representation. This is used
+% to reduce the chance of getting different
+% replication checkpoints for the same Mango selector
+ejsort({V})->
+    ejsort_props(V, []);
+ejsort(V) when is_list(V) ->
+    ejsort_array(V, []);
+ejsort(V) ->
+    V.
+
+ejsort_props([], Acc)->
+    {lists:keysort(1, Acc)};
+ejsort_props([{K, V}| R], Acc) ->
+    ejsort_props(R, [{K, ejsort(V)} | Acc]).
+
+ejsort_array([], Acc)->
+    lists:reverse(Acc);
+ejsort_array([V | R], Acc) ->
+    ejsort_array(R, [ejsort(V) | Acc]).
+
+
+-ifdef(TEST).
+
+-include_lib("eunit/include/eunit.hrl").
+
+ejsort_basic_values_test() ->
+    ?assertEqual(ejsort(0), 0),
+    ?assertEqual(ejsort(<<"a">>), <<"a">>),
+    ?assertEqual(ejsort(true), true),
+    ?assertEqual(ejsort([]), []),
+    ?assertEqual(ejsort({[]}), {[]}).
+
+ejsort_compound_values_test() ->
+    ?assertEqual(ejsort([2, 1, 3 ,<<"a">>]), [2, 1, 3, <<"a">>]),
+    Ej1 = {[{<<"a">>, 0}, {<<"c">>, 0},  {<<"b">>, 0}]},
+    Ej1s =  {[{<<"a">>, 0}, {<<"b">>, 0}, {<<"c">>, 0}]},
+    ?assertEqual(ejsort(Ej1), Ej1s),
+    Ej2 = {[{<<"x">>, Ej1}, {<<"z">>, Ej1}, {<<"y">>, [Ej1, Ej1]}]},
+    ?assertEqual(ejsort(Ej2),
+        {[{<<"x">>, Ej1s}, {<<"y">>, [Ej1s, Ej1s]}, {<<"z">>, Ej1s}]}).
+
+check_options_pass_values_test() ->
+    ?assertEqual(check_options([]), []),
+    ?assertEqual(check_options([baz, {other,fiz}]), [baz, {other, fiz}]),
+    ?assertEqual(check_options([{doc_ids, x}]), [{doc_ids, x}]),
+    ?assertEqual(check_options([{filter, x}]), [{filter, x}]),
+    ?assertEqual(check_options([{selector, x}]), [{selector, x}]).
+
+check_options_fail_values_test() ->
+    ?assertThrow({bad_request, _},
+        check_options([{doc_ids, x}, {filter, y}])),
+    ?assertThrow({bad_request, _},
+        check_options([{doc_ids, x}, {selector, y}])),
+    ?assertThrow({bad_request, _},
+        check_options([{filter, x}, {selector, y}])),
+    ?assertThrow({bad_request, _},
+        check_options([{doc_ids, x}, {selector, y}, {filter, z}])).
+
+-endif.

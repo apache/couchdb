@@ -469,11 +469,16 @@ changes_since(#httpdb{headers = Headers1, timeout = InactiveTimeout} = HttpDb,
         {"timeout", integer_to_list(Timeout)}
            ],
     DocIds = get_value(doc_ids, Options),
-    {QArgs, Method, Body, Headers} = case DocIds of
-    undefined ->
+    Selector = get_value(selector, Options),
+    {QArgs, Method, Body, Headers} = case {DocIds, Selector} of
+    {undefined, undefined} ->
         QArgs1 = maybe_add_changes_filter_q_args(BaseQArgs, Options),
         {QArgs1, get, [], Headers1};
-    _ when is_list(DocIds) ->
+    {undefined, _} when is_tuple(Selector) ->
+        Headers2 = [{"Content-Type", "application/json"} | Headers1],
+        JsonSelector = ?JSON_ENCODE({[{<<"selector">>, Selector}]}),
+        {[{"filter", "_selector"} | BaseQArgs], post, JsonSelector, Headers2};
+    {_, undefined} when is_list(DocIds) ->
         Headers2 = [{"Content-Type", "application/json"} | Headers1],
         JsonDocIds = ?JSON_ENCODE({[{<<"doc_ids">>, DocIds}]}),
         {[{"filter", "_doc_ids"} | BaseQArgs], post, JsonDocIds, Headers2}
@@ -506,11 +511,15 @@ changes_since(#httpdb{headers = Headers1, timeout = InactiveTimeout} = HttpDb,
                     end)
         end);
 changes_since(Db, Style, StartSeq, UserFun, Options) ->
-    Filter = case get_value(doc_ids, Options) of
-    undefined ->
+    DocIds = get_value(doc_ids, Options),
+    Selector = get_value(selector, Options),
+    Filter = case {DocIds, Selector} of
+    {undefined, undefined} ->
         ?b2l(get_value(filter, Options, <<>>));
-    _DocIds ->
-        "_doc_ids"
+    {_, undefined} ->
+        "_doc_ids";
+    {undefined, _} ->
+        "_selector"
     end,
     Args = #changes_args{
         style = Style,
@@ -580,6 +589,8 @@ changes_json_req(_Db, "", _QueryParams, _Options) ->
     {[]};
 changes_json_req(_Db, "_doc_ids", _QueryParams, Options) ->
     {[{<<"doc_ids">>, get_value(doc_ids, Options)}]};
+changes_json_req(_Db, "_selector", _QueryParams, Options) ->
+    {[{<<"selector">>, get_value(selector, Options)}]};
 changes_json_req(Db, FilterName, {QueryParams}, _Options) ->
     {ok, Info} = couch_db:get_db_info(Db),
     % simulate a request to db_name/_changes
