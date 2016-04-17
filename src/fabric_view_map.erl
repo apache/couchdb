@@ -58,7 +58,7 @@ go(DbName, DDoc, View, Args, Callback, Acc, VInfo) ->
     end.
 
 go(DbName, Workers, {map, View, _}, Args, Callback, Acc0) ->
-    #mrargs{limit = Limit, skip = Skip, keys = Keys} = Args,
+    #mrargs{limit = Limit, skip = Skip, keys = Keys, update_seq=UpdateSeq} = Args,
     Collation = couch_util:get_value(<<"collation">>, View#mrview.options),
     State = #collector{
         db_name=DbName,
@@ -70,7 +70,8 @@ go(DbName, Workers, {map, View, _}, Args, Callback, Acc0) ->
         keys = fabric_view:keydict(Keys),
         sorted = Args#mrargs.sorted,
         collation = Collation,
-        user_acc = Acc0
+        user_acc = Acc0,
+        update_seq = case UpdateSeq of true -> []; false -> nil end
     },
     case rexi_utils:recv(Workers, #shard.ref, fun handle_message/3,
         State, infinity, 1000 * 60 * 60) of
@@ -91,12 +92,14 @@ handle_message({rexi_EXIT, Reason}, Worker, State) ->
 handle_message({meta, Meta0}, {Worker, From}, State) ->
     Tot = couch_util:get_value(total, Meta0, 0),
     Off = couch_util:get_value(offset, Meta0, 0),
+    Seq = couch_util:get_value(update_seq, Meta0, 0),
     #collector{
         callback = Callback,
         counters = Counters0,
         total_rows = Total0,
         offset = Offset0,
-        user_acc = AccIn
+        user_acc = AccIn,
+        update_seq = UpdateSeq0
     } = State,
     % Assert that we don't have other messages from this
     % worker when the total_and_offset message arrives.
@@ -105,16 +108,27 @@ handle_message({meta, Meta0}, {Worker, From}, State) ->
     Counters1 = fabric_dict:update_counter(Worker, 1, Counters0),
     Total = Total0 + Tot,
     Offset = Offset0 + Off,
+    UpdateSeq = case UpdateSeq0 of
+        nil -> nil;
+        _   -> [{Worker, Seq} | UpdateSeq0]
+    end,
     case fabric_dict:any(0, Counters1) of
     true ->
         {ok, State#collector{
             counters = Counters1,
             total_rows = Total,
+            update_seq = UpdateSeq,
             offset = Offset
         }};
     false ->
         FinalOffset = erlang:min(Total, Offset+State#collector.skip),
-        Meta = [{total, Total}, {offset, FinalOffset}],
+        Meta = [{total, Total}, {offset, FinalOffset}] ++
+            case UpdateSeq of
+                nil ->
+                    [];
+                _ ->
+                    [{update_seq, fabric_view_changes:pack_seqs(UpdateSeq)}]
+            end,
         {Go, Acc} = Callback({meta, Meta}, AccIn),
         {Go, State#collector{
             counters = fabric_dict:decrement_all(Counters1),
