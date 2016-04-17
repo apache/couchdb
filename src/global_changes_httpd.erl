@@ -57,10 +57,10 @@ handle_global_changes_req(#httpd{method='GET'}=Req) ->
             chttpd:etag_respond(Req, Etag, fun() ->
                 fabric:changes(Db, fun changes_callback/2, Acc#acc{etag=Etag}, Options1)
             end);
-        Feed when Feed =:= "continuous"; Feed =:= "longpoll" ->
+        Feed when Feed =:= "continuous"; Feed =:= "longpoll"; Feed =:= "eventsource" ->
             fabric:changes(Db, fun changes_callback/2, Acc, Options1);
         _ ->
-            Msg = <<"Supported `feed` types: normal, continuous, longpoll">>,
+            Msg = <<"Supported `feed` types: normal, continuous, longpoll, eventsource">>,
             throw({bad_request, Msg})
     end;
 handle_global_changes_req(Req) ->
