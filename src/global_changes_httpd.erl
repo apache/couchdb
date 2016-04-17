@@ -127,6 +127,34 @@ changes_callback({stop, EndSeq, _Pending}, #acc{feed="continuous"}=Acc) ->
         [?JSON_ENCODE({[{<<"last_seq">>, EndSeq}]}) | "\n"]),
     chttpd:end_delayed_json_response(Resp1);
 
+% callbacks for eventsource feed (newline-delimited eventsource Objects)
+changes_callback(start, #acc{feed = "eventsource"} = Acc) ->
+    #acc{resp = Req} = Acc,
+    Headers = [
+        {"Content-Type", "text/event-stream"},
+        {"Cache-Control", "no-cache"}
+    ],
+    {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, Headers),
+    {ok, Acc#acc{resp = Resp, last_data_sent_time=os:timestamp()}};
+changes_callback({change, {ChangeProp}=Change}, #acc{resp = Resp, feed = "eventsource"} = Acc) ->
+    Seq = proplists:get_value(seq, ChangeProp),
+    Chunk = [
+        "data: ", ?JSON_ENCODE(Change),
+        "\n", "id: ", ?JSON_ENCODE(Seq),
+        "\n\n"
+    ],
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, Chunk),
+    maybe_finish(Acc#acc{resp = Resp1});
+changes_callback(timeout, #acc{feed = "eventsource"} = Acc) ->
+    #acc{resp = Resp} = Acc,
+    Chunk = "event: heartbeat\ndata: \n\n",
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, Chunk),
+    {ok, {"eventsource", Resp1}};
+changes_callback({stop, _EndSeq}, #acc{feed = "eventsource"} = Acc) ->
+    #acc{resp = Resp} = Acc,
+    % {ok, Resp1} = chttpd:send_delayed_chunk(Resp, Buf),
+    chttpd:end_delayed_json_response(Resp);
+
 % callbacks for longpoll and normal (single JSON Object)
 changes_callback(start, #acc{feed="normal", etag=Etag}=Acc)
         when Etag =/= undefined ->
