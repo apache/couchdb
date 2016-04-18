@@ -695,7 +695,9 @@ send(Resp, Data) ->
 
 no_resp_conn_header([]) ->
     true;
-no_resp_conn_header([{Hdr, _}|Rest]) ->
+no_resp_conn_header([{Hdr, V}|Rest]) when is_binary(Hdr)->
+    no_resp_conn_header([{?b2l(Hdr), V}|Rest]);
+no_resp_conn_header([{Hdr, _}|Rest]) when is_list(Hdr)->
     case string:to_lower(Hdr) of
         "connection" -> false;
         _ -> no_resp_conn_header(Rest)
