@@ -64,7 +64,7 @@ You can install the dependencies by running:
     sudo apt-get install build-essential erlang-base \
         erlang-dev erlang-manpages erlang-eunit erlang-nox \
         libicu-dev libmozjs185-dev libcurl4-openssl-dev \
-        pkg-config
+        pkg-config sphinx-common
 
 There are lots of Erlang packages. If there is a problem with your
 install, try a different mix. There is more information on the
