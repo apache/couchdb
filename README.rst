@@ -47,6 +47,21 @@ The mailing lists provide a wealth of support and knowledge for you to tap into.
 Feel free to drop by with your questions or discussion. See the official CouchDB
 website for more information about our community resources.
 
+Suggested additional docs
+-------------------------
+
+These resources makes it easier to understand CouchDB and the concepts behind it:
+
+`Distributed systems for fun and profit
+<http://book.mixu.net/distsys/>`_
+
+`Dynamo: Amazon’s Highly Available Key-value Store
+<http://www.allthingsdistributed.com/files/amazon-dynamo-sosp2007.pdf>`_
+
+`The Ubiquitous B-Tree
+<http://wwwold.cs.umd.edu/class/fall2002/cmsc818s/Readings/b-tree.pdf>`_
+
+
 Running the Testsuite
 ---------------------
 
