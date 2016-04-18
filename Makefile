@@ -91,7 +91,7 @@ fauxton: share/www
 check: all
 	@$(MAKE) eunit
 	@$(MAKE) javascript
-	@$(MAKE) build-test
+#	@$(MAKE) build-test
 
 
 .PHONY: eunit
