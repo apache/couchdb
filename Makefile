@@ -227,10 +227,10 @@ dist: all
 	@echo "Done: apache-couchdb-$(COUCHDB_VERSION).tar.gz"
 
 
-.PHONY: install
-# target: install - Install CouchDB :-)
+.PHONY: build
+# target: build - Build CouchDB!
 -include install.mk
-install: all
+build: all
 	@echo "Installing CouchDB into rel/couchdb/ ..."
 	@rm -rf rel/couchdb
 	@$(REBAR) generate > /dev/null 2>&1 # make full erlang release
@@ -259,8 +259,19 @@ endif
 
 	@echo "... done"
 	@echo
-	@echo "    You can now copy the rel/couchdb/ directory anywhere on your system."
+	@echo "    You can now copy the rel/couchdb directory anywhere on your system."
 	@echo "    Start CouchDB with ./bin/couchdb from within that directory."
+	@echo
+
+.PHONY: install
+# target: install- install CouchDB :)
+install:
+	@echo
+	@echo "Notice: There is no 'make install' command for CouchDB 2.0 yet."
+	@echo
+	@echo "    To install CouchDB into your system, copy the rel/couchdb"
+	@echo "    to your desired installation location. For example:"
+	@echo "    cp -r rel/couchdb /usr/local/lib"
 	@echo
 
 ################################################################################
