@@ -35,6 +35,7 @@
 -export([monitored_by/1]).
 -export([normalize_dbname/1]).
 -export([validate_dbname/1]).
+-export([dbname_suffix/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -1513,10 +1514,23 @@ select_gt(V1, _V2) -> V1.
 select_lt(V1, V2) when V1 > V2 -> V2;
 select_lt(V1, _V2) -> V1.
 
-normalize_dbname(<<"shards/", _/binary>> = Path) ->
-    lists:last(binary:split(mem3:dbname(Path), <<"/">>, [global]));
-normalize_dbname(DbName) ->
-    DbName.
+-spec normalize_dbname(list() | binary()) -> binary().
+
+normalize_dbname(DbName) when is_list(DbName) ->
+    normalize_dbname(list_to_binary(DbName));
+normalize_dbname(DbName) when is_binary(DbName) ->
+    case filename:extension(DbName) of
+        <<".couch">> ->
+            mem3:dbname(filename:rootname(DbName));
+        _ ->
+            mem3:dbname(DbName)
+    end.
+
+-spec dbname_suffix(list() | binary()) -> binary().
+
+dbname_suffix(DbName) ->
+    filename:basename(normalize_dbname(DbName)).
+
 
 validate_dbname(DbName) when is_list(DbName) ->
     validate_dbname(?l2b(DbName));
@@ -1542,7 +1556,103 @@ validate_dbname_int(DbName, Normalized) when is_binary(DbName) ->
 
 is_systemdb(DbName) when is_list(DbName) ->
     is_systemdb(?l2b(DbName));
-is_systemdb(<<"shards/", _/binary>> = Path) when is_binary(Path) ->
-    is_systemdb(normalize_dbname(Path));
 is_systemdb(DbName) when is_binary(DbName) ->
-    lists:member(DbName, ?SYSTEM_DATABASES).
+    lists:member(dbname_suffix(DbName), ?SYSTEM_DATABASES).
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+setup() ->
+    ok = meck:new(couch_db_plugin, [passthrough]),
+    ok = meck:expect(couch_db_plugin, validate_dbname, fun(_, _) -> false end),
+    ok.
+
+teardown(_) ->
+    (catch meck:unload(couch_db_plugin)).
+
+validate_dbname_success_test_() ->
+    Cases =
+        generate_cases_with_shards("long/co$mplex-/path+/_something")
+        ++ generate_cases_with_shards("something")
+        ++ lists:append(
+            [generate_cases_with_shards(?b2l(SystemDb))
+                || SystemDb <- ?SYSTEM_DATABASES]),
+    {
+        foreach, fun setup/0, fun teardown/1,
+        [{test_name(A), fun() -> should_pass_validate_dbname(A) end} || {_, A} <- Cases]
+    }.
+
+validate_dbname_fail_test_() ->
+    Cases = generate_cases("_long/co$mplex-/path+/_something")
+       ++ generate_cases("_something")
+       ++ generate_cases_with_shards("long/co$mplex-/path+/_something#")
+       ++ generate_cases_with_shards("long/co$mplex-/path+/some.thing"),
+    {
+        foreach, fun setup/0, fun teardown/1,
+        [{test_name(A), fun() -> should_fail_validate_dbname(A) end} || {_, A} <- Cases]
+    }.
+
+normalize_dbname_test_() ->
+    Cases = generate_cases_with_shards("long/co$mplex-/path+/_something")
+       ++ generate_cases_with_shards("_something"),
+    WithExpected = [{?l2b(filename:rootname(A)), B} || {A, B} <- Cases],
+    [{test_name({Expected, Db}), ?_assertEqual(Expected, normalize_dbname(Db))}
+        || {Expected, Db} <- WithExpected].
+
+dbname_suffix_test_() ->
+    Cases = generate_cases_with_shards("long/co$mplex-/path+/_something")
+       ++ generate_cases_with_shards("_something"),
+    WithExpected = [{?l2b(filename:basename(Arg)), Db} || {Arg, Db} <- Cases],
+    [{test_name({Expected, Db}), ?_assertEqual(Expected, dbname_suffix(Db))}
+        || {Expected, Db} <- WithExpected].
+
+is_systemdb_test_() ->
+    Cases = lists:append([
+        generate_cases_with_shards("long/co$mplex-/path+/" ++ ?b2l(Db))
+            || Db <- ?SYSTEM_DATABASES]
+        ++ [generate_cases_with_shards(?b2l(Db)) || Db <- ?SYSTEM_DATABASES
+    ]),
+    WithExpected = [{?l2b(filename:basename(filename:rootname(Arg))), Db}
+        || {Arg, Db} <- Cases],
+    [{test_name({Expected, Db}) ++ " in ?SYSTEM_DATABASES",
+        ?_assert(is_systemdb(Db))} || {Expected, Db} <- WithExpected].
+
+should_pass_validate_dbname(DbName) ->
+    {test_name(DbName), ?_assertEqual(ok, validate_dbname(DbName))}.
+
+should_fail_validate_dbname(DbName) ->
+    {test_name(DbName), ?_test(begin
+        Result = validate_dbname(DbName),
+        ?assertMatch({error, {illegal_database_name, _}}, Result),
+        {error, {illegal_database_name, FailedDbName}} = Result,
+        ?assertEqual(to_binary(DbName), FailedDbName),
+        ok
+    end)}.
+
+to_binary(DbName) when is_list(DbName) ->
+    ?l2b(DbName);
+to_binary(DbName) when is_binary(DbName) ->
+    DbName.
+
+test_name({Expected, DbName}) ->
+    lists:flatten(io_lib:format("~p -> ~p", [DbName, Expected]));
+test_name(DbName) ->
+    lists:flatten(io_lib:format("~p", [DbName])).
+
+generate_cases_with_shards(DbName) ->
+    DbNameWithShard = add_shard(DbName),
+    DbNameWithShardAndExtension = add_shard(DbName) ++ ".couch",
+    Cases = [
+        DbName, ?l2b(DbName),
+        DbNameWithShard, ?l2b(DbNameWithShard),
+        DbNameWithShardAndExtension, ?l2b(DbNameWithShardAndExtension)
+    ],
+    [{DbName, Case} || Case <- Cases].
+
+add_shard(DbName) ->
+    "shards/00000000-3fffffff/" ++ DbName ++ ".1415960794".
+
+generate_cases(DbName) ->
+    [{DbName, DbName}, {DbName, ?l2b(DbName)}].
+
+-endif.
