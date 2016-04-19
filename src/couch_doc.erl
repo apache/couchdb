@@ -403,13 +403,13 @@ doc_from_multi_part_stream(ContentType, DataFun, Ref) ->
         restart_open_doc_revs(Parser, Ref, NewRef);
     {{doc_bytes, Ref, DocBytes}, Parser, ParserRef} ->
         Doc = from_json_obj(?JSON_DECODE(DocBytes)),
+        erlang:put(mochiweb_request_recv, true),
         % we'll send the Parser process ID to the remote nodes so they can
         % retrieve their own copies of the attachment data
         WithParser = fun(follows) -> {follows, Parser, Ref}; (D) -> D end,
         Atts = [couch_att:transform(data, WithParser, A) || A <- Doc#doc.atts],
         WaitFun = fun() ->
-            receive {'DOWN', ParserRef, _, _, _} -> ok end,
-            erlang:put(mochiweb_request_recv, true)
+            receive {'DOWN', ParserRef, _, _, _} -> ok end
         end,
         {ok, Doc#doc{atts=Atts}, WaitFun, Parser};
     ok -> ok
