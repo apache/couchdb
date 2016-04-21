@@ -395,9 +395,13 @@ couchTests.show_documents = function(debug) {
   // (we don't need no modified server!)
   T(db.setDbProperty("_security", {foo: true}).ok);
   T(db.save({_id:"testdoc",foo:1}).ok);
-  xhr = CouchDB.request("GET", "/" + db_name + "/_design/template/_show/secObj");
-  var resp = JSON.parse(xhr.responseText);
-  T(resp.foo == true);
+  // nasty source of Heisenbugs - it replicates after a short time, so give it some tries
+  // (needs PR #400 and #401 to be merged)
+  retry_part(function(){
+    xhr = CouchDB.request("GET", "/" + db_name + "/_design/template/_show/secObj");
+    var resp = JSON.parse(xhr.responseText);
+    T(resp.foo == true);
+  }, 10);
 
   // cleanup
   db.deleteDb();

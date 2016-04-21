@@ -99,6 +99,9 @@ couchTests.view_sandboxing = function(debug) {
   };
 
   db.deleteDb();
+  // avoid Heisenbugs when files are not cleared entirely
+  db_name = get_random_db_name();
+  db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
   T(db.save(ddoc).ok);
   T(db.save(doc1).ok);

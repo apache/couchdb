@@ -11,7 +11,7 @@
 // the License.
 
 couchTests.bulk_docs = function(debug) {
-  var db_name = get_random_db_name()
+  var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
   if (debug) debugger;
@@ -112,6 +112,9 @@ couchTests.bulk_docs = function(debug) {
 
   // jira-911
   db.deleteDb();
+  // avoid Heisenbugs w/ files remaining - create a new name
+  db_name = get_random_db_name();
+  db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
   docs = [];
   docs.push({"_id":"0", "a" : 0});
