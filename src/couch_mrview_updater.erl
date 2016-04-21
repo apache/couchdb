@@ -168,7 +168,8 @@ finish_update(#mrst{doc_acc=Acc}=State) ->
     end.
 
 
-map_docs(Parent, State0) ->
+map_docs(Parent, #mrst{db_name = DbName, idx_name = IdxName} = State0) ->
+    erlang:put(io_priority, {view_update, DbName, IdxName}),
     case couch_work_queue:dequeue(State0#mrst.doc_queue) of
         closed ->
             couch_query_servers:stop_doc_map(State0#mrst.qserver),
@@ -201,11 +202,12 @@ map_docs(Parent, State0) ->
     end.
 
 
-write_results(Parent, State) ->
+write_results(Parent, #mrst{db_name = DbName, idx_name = IdxName} = State) ->
     case accumulate_writes(State, State#mrst.write_queue, nil) of
         stop ->
             Parent ! {new_state, State};
         {Go, {Seq, ViewKVs, DocIdKeys, Seqs, Log}} ->
+            erlang:put(io_priority, {view_update, DbName, IdxName}),
             NewState = write_kvs(State, Seq, ViewKVs, DocIdKeys, Seqs, Log),
             if Go == stop ->
                 Parent ! {new_state, NewState};
