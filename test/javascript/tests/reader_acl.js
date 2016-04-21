@@ -87,7 +87,10 @@ couchTests.reader_acl = function(debug) {
       T(CouchDB.login("jchris@apache.org", "funnybone").ok);
 
       // db admin can read
-      T(secretDb.open("baz").foo == "bar");
+      // retry as propagation could take time
+      retry_part(function(){
+        T(secretDb.open("baz").foo == "bar");
+      });
 
       // and run temp views - they don't exist any more, so leave out 
       /*TEquals(secretDb.query(function(doc) {
@@ -160,7 +163,10 @@ couchTests.reader_acl = function(debug) {
 
       T(CouchDB.login("jchris@apache.org", "funnybone").ok);
       T(CouchDB.session().userCtx.roles.indexOf("_admin") == -1);
-      T(secretDb.open("baz").foo == "bar");
+      // retry as propagation could take time
+      retry_part(function(){
+        T(secretDb.open("baz").foo == "bar");
+      });
 
       // can't set non string reader names or roles
       try {
