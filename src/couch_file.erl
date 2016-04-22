@@ -246,7 +246,11 @@ delete_file(RootDir, Filepath, Async) ->
 
 rename_file(Original) ->
     DeletedFileName = deleted_filename(Original),
-    file:rename(Original, DeletedFileName).
+    Now = calendar:local_time(),
+    case file:rename(Original, DeletedFileName) of
+        ok -> file:change_time(DeletedFileName, Now);
+        Else -> Else
+    end.
 
 deleted_filename(Original) ->
     {{Y, Mon, D}, {H, Min, S}} = calendar:universal_time(),
