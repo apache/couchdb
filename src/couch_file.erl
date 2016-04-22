@@ -222,8 +222,9 @@ delete(RootDir, Filepath) ->
     delete(RootDir, Filepath, true).
 
 delete(RootDir, FullFilePath, Async) ->
-    RenameOnDelete = config:get_boolean("couchdb", "rename_on_delete", false),
-    case RenameOnDelete of
+    EnableRecovery = config:get_boolean("couchdb",
+        "enable_database_recovery", false),
+    case EnableRecovery of
         true ->
             rename_file(FullFilePath);
         false ->

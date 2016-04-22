@@ -26,7 +26,7 @@ setup() ->
     Db.
 
 setup(rename) ->
-    config:set("couchdb", "rename_on_delete", "true", false),
+    config:set("couchdb", "enable_database_recovery", "true", false),
     setup();
 setup(_) ->
     setup().
@@ -36,7 +36,7 @@ teardown(Db) ->
     (catch file:delete(Db#db.filepath)).
 
 teardown(rename, Db) ->
-    config:set("couchdb", "rename_on_delete", "false", false),
+    config:set("couchdb", "enable_database_recovery", "false", false),
     teardown(Db);
 teardown(_, Db) ->
     teardown(Db).

@@ -295,11 +295,11 @@ delete_test_() ->
             end,
             [
                 fun(Cfg) ->
-                    {"rename_on_delete = false",
+                    {"enable_database_recovery = false",
                     make_delete_test_case(Cfg, false)}
                 end,
                 fun(Cfg) ->
-                    {"rename_on_delete = true",
+                    {"enable_database_recovery = true",
                     make_delete_test_case(Cfg, true)}
                 end
             ]
@@ -307,15 +307,15 @@ delete_test_() ->
     }.
 
 
-make_delete_test_case({RootDir, File}, RenameOnDelete) ->
+make_delete_test_case({RootDir, File}, EnableRecovery) ->
     meck:expect(config, get_boolean, fun
-        ("couchdb", "rename_on_delete", _) -> RenameOnDelete
+        ("couchdb", "enable_database_recovery", _) -> EnableRecovery
     end),
     FileExistsBefore = filelib:is_regular(File),
     couch_file:delete(RootDir, File, false),
     FileExistsAfter = filelib:is_regular(File),
     RenamedFiles = filelib:wildcard(filename:rootname(File) ++ "*.deleted.*"),
-    ExpectRenamedCount = if RenameOnDelete -> 1; true -> 0 end,
+    ExpectRenamedCount = if EnableRecovery -> 1; true -> 0 end,
     [
         ?_assert(FileExistsBefore),
         ?_assertNot(FileExistsAfter),
