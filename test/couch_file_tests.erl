@@ -274,3 +274,50 @@ write_random_data(Fd, N) ->
     Term = lists:nth(random:uniform(4) + 1, Choices),
     {ok, _, _} = couch_file:append_term(Fd, Term),
     write_random_data(Fd, N - 1).
+
+
+delete_test_() ->
+    {
+        "File delete tests",
+        {
+            foreach,
+            fun() ->
+                meck:new(config, [passthrough]),
+                File = ?tempfile() ++ ".couch",
+                RootDir = filename:dirname(File),
+                ok = couch_file:init_delete_dir(RootDir),
+                ok = file:write_file(File, <<>>),
+                {RootDir, File}
+            end,
+            fun({_, File}) ->
+                meck:unload(config),
+                file:delete(File)
+            end,
+            [
+                fun(Cfg) ->
+                    {"rename_on_delete = false",
+                    make_delete_test_case(Cfg, false)}
+                end,
+                fun(Cfg) ->
+                    {"rename_on_delete = true",
+                    make_delete_test_case(Cfg, true)}
+                end
+            ]
+        }
+    }.
+
+
+make_delete_test_case({RootDir, File}, RenameOnDelete) ->
+    meck:expect(config, get_boolean, fun
+        ("couchdb", "rename_on_delete", _) -> RenameOnDelete
+    end),
+    FileExistsBefore = filelib:is_regular(File),
+    couch_file:delete(RootDir, File, false),
+    FileExistsAfter = filelib:is_regular(File),
+    RenamedFiles = filelib:wildcard(filename:rootname(File) ++ "*.deleted.*"),
+    ExpectRenamedCount = if RenameOnDelete -> 1; true -> 0 end,
+    [
+        ?_assert(FileExistsBefore),
+        ?_assertNot(FileExistsAfter),
+        ?_assertEqual(ExpectRenamedCount, length(RenamedFiles))
+    ].

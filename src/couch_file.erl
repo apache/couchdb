@@ -221,8 +221,16 @@ close(Fd) ->
 delete(RootDir, Filepath) ->
     delete(RootDir, Filepath, true).
 
+delete(RootDir, FullFilePath, Async) ->
+    RenameOnDelete = config:get_boolean("couchdb", "rename_on_delete", false),
+    case RenameOnDelete of
+        true ->
+            rename_file(FullFilePath);
+        false ->
+            delete_file(RootDir, FullFilePath, Async)
+    end.
 
-delete(RootDir, Filepath, Async) ->
+delete_file(RootDir, Filepath, Async) ->
     DelFile = filename:join([RootDir,".delete", ?b2l(couch_uuids:random())]),
     case file:rename(Filepath, DelFile) of
     ok ->
@@ -236,6 +244,17 @@ delete(RootDir, Filepath, Async) ->
         Error
     end.
 
+rename_file(Original) ->
+    DeletedFileName = deleted_filename(Original),
+    file:rename(Original, DeletedFileName).
+
+deleted_filename(Original) ->
+    {{Y, Mon, D}, {H, Min, S}} = calendar:universal_time(),
+    Suffix = lists:flatten(
+        io_lib:format(".~w~2.10.0B~2.10.0B."
+            ++ "~2.10.0B~2.10.0B~2.10.0B.deleted"
+            ++ filename:extension(Original), [Y, Mon, D, H, Min, S])),
+    filename:rootname(Original) ++ Suffix.
 
 nuke_dir(RootDelDir, Dir) ->
     FoldFun = fun(File) ->
@@ -610,3 +629,43 @@ process_info(Pid) ->
         {couch_file_fd, {Fd, InitialName}} ->
             {Fd, InitialName}
     end.
+
+
+-ifdef(TEST).
+-include_lib("couch/include/couch_eunit.hrl").
+
+deleted_filename_test_() ->
+    DbNames = ["dbname", "db.name", "user/dbname"],
+    Fixtures = make_filename_fixtures(DbNames),
+    lists:map(fun(Fixture) ->
+        should_create_proper_deleted_filename(Fixture)
+    end, Fixtures).
+
+should_create_proper_deleted_filename(Before) ->
+    {Before,
+    ?_test(begin
+        BeforeExtension = filename:extension(Before),
+        BeforeBasename = filename:basename(Before, BeforeExtension),
+        Re = "^" ++ BeforeBasename ++ "\.[0-9]{8}\.[0-9]{6}\.deleted\..*$",
+        After = deleted_filename(Before),
+        ?assertEqual(match,
+            re:run(filename:basename(After), Re, [{capture, none}])),
+        ?assertEqual(BeforeExtension, filename:extension(After))
+    end)}.
+
+make_filename_fixtures(DbNames) ->
+    Formats = [
+        "~s.couch",
+        ".~s_design/mrview/3133e28517e89a3e11435dd5ac4ad85a.view",
+        "shards/00000000-1fffffff/~s.1458336317.couch",
+        ".shards/00000000-1fffffff/~s.1458336317_design",
+        ".shards/00000000-1fffffff/~s.1458336317_design"
+            "/mrview/3133e28517e89a3e11435dd5ac4ad85a.view"
+    ],
+    lists:flatmap(fun(DbName) ->
+        lists:map(fun(Format) ->
+            filename:join("/srv/data", io_lib:format(Format, [DbName]))
+        end, Formats)
+    end, DbNames).
+
+-endif.
