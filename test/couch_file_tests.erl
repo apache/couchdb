@@ -296,26 +296,51 @@ delete_test_() ->
             [
                 fun(Cfg) ->
                     {"enable_database_recovery = false",
-                    make_delete_test_case(Cfg, false)}
+                    make_enable_recovery_test_case(Cfg, false)}
                 end,
                 fun(Cfg) ->
                     {"enable_database_recovery = true",
-                    make_delete_test_case(Cfg, true)}
+                    make_enable_recovery_test_case(Cfg, true)}
+                end,
+                fun(Cfg) ->
+                    {"delete_after_rename = true",
+                    make_delete_after_rename_test_case(Cfg, true)}
+                end,
+                fun(Cfg) ->
+                    {"delete_after_rename = false",
+                    make_delete_after_rename_test_case(Cfg, false)}
                 end
             ]
         }
     }.
 
 
-make_delete_test_case({RootDir, File}, EnableRecovery) ->
+make_enable_recovery_test_case({RootDir, File}, EnableRecovery) ->
     meck:expect(config, get_boolean, fun
-        ("couchdb", "enable_database_recovery", _) -> EnableRecovery
+        ("couchdb", "enable_database_recovery", _) -> EnableRecovery;
+        ("couchdb", "delete_after_rename", _) -> true
     end),
     FileExistsBefore = filelib:is_regular(File),
     couch_file:delete(RootDir, File, false),
     FileExistsAfter = filelib:is_regular(File),
     RenamedFiles = filelib:wildcard(filename:rootname(File) ++ "*.deleted.*"),
     ExpectRenamedCount = if EnableRecovery -> 1; true -> 0 end,
+    [
+        ?_assert(FileExistsBefore),
+        ?_assertNot(FileExistsAfter),
+        ?_assertEqual(ExpectRenamedCount, length(RenamedFiles))
+    ].
+
+make_delete_after_rename_test_case({RootDir, File}, DeleteAfterRename) ->
+    meck:expect(config, get_boolean, fun
+        ("couchdb", "enable_database_recovery", _) -> false;
+        ("couchdb", "delete_after_rename", _) -> DeleteAfterRename
+    end),
+    FileExistsBefore = filelib:is_regular(File),
+    couch_file:delete(RootDir, File, false),
+    FileExistsAfter = filelib:is_regular(File),
+    RenamedFiles = filelib:wildcard(filename:join([RootDir, ".delete", "*"])),
+    ExpectRenamedCount = if DeleteAfterRename -> 0; true -> 1 end,
     [
         ?_assert(FileExistsBefore),
         ?_assertNot(FileExistsAfter),

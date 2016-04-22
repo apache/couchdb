@@ -228,21 +228,23 @@ delete(RootDir, FullFilePath, Async) ->
         true ->
             rename_file(FullFilePath);
         false ->
-            delete_file(RootDir, FullFilePath, Async)
+            DeleteAfterRename = config:get_boolean("couchdb",
+                "delete_after_rename", true),
+            delete_file(RootDir, FullFilePath, Async, DeleteAfterRename)
     end.
 
-delete_file(RootDir, Filepath, Async) ->
+delete_file(RootDir, Filepath, Async, DeleteAfterRename) ->
     DelFile = filename:join([RootDir,".delete", ?b2l(couch_uuids:random())]),
     case file:rename(Filepath, DelFile) of
-    ok ->
+    ok when DeleteAfterRename ->
         if (Async) ->
             spawn(file, delete, [DelFile]),
             ok;
         true ->
             file:delete(DelFile)
         end;
-    Error ->
-        Error
+    Else ->
+        Else
     end.
 
 rename_file(Original) ->
