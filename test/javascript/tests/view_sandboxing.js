@@ -145,6 +145,47 @@ couchTests.view_sandboxing = function(debug) {
   }
 */
 
+  // test that runtime code evaluation can be prevented
+  console.log('TODO: config port not available on cluster');
+  /*var couchjs_command_xhr = CouchDB.request(
+    "GET", "/_config/query_servers/javascript");
+
+  var couchjs_command = JSON.parse(couchjs_command_xhr.responseText);
+  var couchjs_command_args = couchjs_command.match(/\S+|"(?:\\"|[^"])+"/g);
+
+  couchjs_command_args.splice(1, 0, "--no-eval");
+  var new_couchjs_command = couchjs_command_args.join(" ");
+
+  run_on_modified_server(
+    [{section: "query_servers",
+      key: "javascript",
+      value: new_couchjs_command}],
+    function () {
+      var ddoc = {
+        _id: "_design/foobar",
+        language: "javascript",
+        views: {
+          view: {
+            map:
+            (function(doc) {
+              var glob = emit.constructor('return this')();
+              emit(doc._id, null);
+            }).toString()
+          }
+        }
+      };
+
+      db.deleteDb();
+      db.createDb();
+      T(db.save(ddoc).ok);
+
+      T(db.save(doc).ok);
+      var results = db.view(
+        "foobar/view", {bypass_cache: Math.round(Math.random() * 1000)});
+
+      TEquals(0, results.rows.length);
+    });*/
+
   // cleanup
   db.deleteDb();
 };
