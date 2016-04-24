@@ -61,38 +61,48 @@ couchTests.users_db = function(debug) {
     });
     T(s.name == null);
     T(s.info.authenticated == "default");
+
+    // make sure we'll not hit the cache with this
+    var kchrisUserDoc = CouchDB.prepareUserDoc({
+      name: "kchris@apache.org"
+    }, "sadbone");
+    T(usersDb.save(kchrisUserDoc).ok);
     
     // save with new_edits=false to force conflict save does no more work => actually replicate and change simultanously
     CouchDB.replicate(usersDb.name, usersDbAlt.name);
-    // ok, now create a conflicting edit on the jchris doc, and make sure there's no login.
-    var jchrisUser2 = JSON.parse(JSON.stringify(jchrisUserDoc));
-    jchrisUser2.foo = "bar";
-    T(usersDb.save(jchrisUser2).ok);
+    // ok, now create a conflicting edit on the kchris doc, and make sure there's no login.
+    var kchrisUser2 = JSON.parse(JSON.stringify(kchrisUserDoc));
+    kchrisUser2.foo = "bar";
+    T(usersDb.save(kchrisUser2).ok);
     // now the other
-    var jchrisUser3 = JSON.parse(JSON.stringify(jchrisUserDoc));
-    jchrisUser3.foo = "barrrr";
-    T(usersDbAlt.save(jchrisUser3).ok);
+    var kchrisUser3 = JSON.parse(JSON.stringify(kchrisUserDoc));
+    kchrisUser3.foo = "barrrr";
+    T(usersDbAlt.save(kchrisUser3).ok);
     // and replicate back
     CouchDB.replicate(usersDbAlt.name, usersDb.name);
 
-    var jchrisWithConflict = usersDb.open(jchrisUserDoc._id, {conflicts : true, revs_info: true});
-    T(jchrisWithConflict._conflicts.length == 1);
+    var kchrisWithConflict = usersDb.open(kchrisUserDoc._id, {conflicts : true, revs_info: true});
+    T(kchrisWithConflict._conflicts.length == 1);
     
     // no login with conflicted user doc
     CouchDB.logout();
-    var s = CouchDB.session({
-      headers : {
-        "Authorization" : "Basic amNocmlzQGFwYWNoZS5vcmc6ZnVubnlib25l"
-      }
-    });
-// TODO: conflicting Docs perfectly qualify 4 login
-//    T(s.userCtx.name == null);
+    var s = null;
+    try {
+      s = CouchDB.session({
+        headers : {
+          "Authorization" : "Basic a2NocmlzQGFwYWNoZS5vcmc6ZnVubnlib25l"
+        }
+      });
+    }catch(e){
+      // old test had name==null, now we might have an error. Anyway: test below
+    }
+    T(s == null || s.userCtx.name == null);
 
     // you can delete a user doc
     s = CouchDB.session().userCtx;
     T(s.name == null);
     T(s.roles.indexOf("_admin") !== -1);
-    T(usersDb.deleteDoc(jchrisWithConflict).ok);
+    T(usersDb.deleteDoc(kchrisWithConflict).ok);
 
     // you can't change doc from type "user"
 // TODO: needs design doc (see above)
