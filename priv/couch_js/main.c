@@ -349,6 +349,26 @@ static JSFunctionSpec global_functions[] = {
 };
 
 
+static JSBool
+csp_allows(JSContext* cx)
+{
+    couch_args *args = (couch_args*)JS_GetContextPrivate(cx);
+    if(args->no_eval) {
+        return JS_FALSE;
+    } else {
+        return JS_TRUE;
+    }
+}
+
+
+static JSSecurityCallbacks security_callbacks = {
+    NULL,
+    NULL,
+    NULL,
+    csp_allows
+};
+
+
 int
 main(int argc, const char* argv[])
 {
@@ -382,7 +402,8 @@ main(int argc, const char* argv[])
     JS_SetOptions(cx, JSOPTION_TYPE_INFERENCE);
 #endif
     JS_SetContextPrivate(cx, args);
-    
+    JS_SetRuntimeSecurityCallbacks(rt, &security_callbacks);
+
     SETUP_REQUEST(cx);
 
     global = JS_NewCompartmentAndGlobalObject(cx, &global_class, NULL);

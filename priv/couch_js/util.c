@@ -98,6 +98,8 @@ couch_parse_args(int argc, const char* argv[])
             }
         } else if(strcmp("-u", argv[i]) == 0) {
             args->uri_file = argv[++i];
+        } else if(strcmp("--no-eval", argv[i]) == 0) {
+            args->no_eval = 1;
         } else if(strcmp("--", argv[i]) == 0) {
             i++;
             break;

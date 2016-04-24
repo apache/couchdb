@@ -16,6 +16,7 @@
 #include <jsapi.h>
 
 typedef struct {
+    int          no_eval;
     int          use_http;
     int          use_test_funs;
     int          stack_size;

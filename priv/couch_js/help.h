@@ -54,6 +54,7 @@ static const char USAGE_TEMPLATE[] =
     "              most SIZE bytes of memory to be allocated\n"
     "  -u FILE     path to a .uri file containing the address\n"
     "              (or addresses) of one or more servers\n"
+    "  --no-eval   Disable runtime code evaluation\n"
     "\n"
     "Report bugs at <%s>.\n";
 
