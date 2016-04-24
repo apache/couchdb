@@ -57,26 +57,29 @@ var Mime = (function() {
   registerType("url_encoded_form", "application/x-www-form-urlencoded");
   // http://www.ietf.org/rfc/rfc4627.txt
   registerType("json", "application/json", "text/x-json");
-  
-  
+
+
+  var providesUsed = false;
   var mimeFuns = [];
+  var responseContentType = null;
+
   function provides(type, fun) {
-    Mime.providesUsed = true;
+    providesUsed = true;
     mimeFuns.push([type, fun]);
   };
 
   function resetProvides() {
     // set globals
-    Mime.providesUsed = false;
+    providesUsed = false;
     mimeFuns = [];
-    Mime.responseContentType = null;  
+    responseContentType = null;
   };
 
   function runProvides(req, ddoc) {
     var supportedMimes = [], bestFun, bestKey = null, accept = req.headers["Accept"];
     if (req.query && req.query.format) {
       bestKey = req.query.format;
-      Mime.responseContentType = mimesByKey[bestKey][0];
+      responseContentType = mimesByKey[bestKey][0];
     } else if (accept) {
       // log("using accept header: "+accept);
       mimeFuns.reverse().forEach(function(mimeFun) {
@@ -85,12 +88,12 @@ var Mime = (function() {
           supportedMimes = supportedMimes.concat(mimesByKey[mimeKey]);
         }
       });
-      Mime.responseContentType = Mimeparse.bestMatch(supportedMimes, accept);
-      bestKey = keysByMime[Mime.responseContentType];
+      responseContentType = Mimeparse.bestMatch(supportedMimes, accept);
+      bestKey = keysByMime[responseContentType];
     } else {
       // just do the first one
       bestKey = mimeFuns[0][0];
-      Mime.responseContentType = mimesByKey[bestKey][0];
+      responseContentType = mimesByKey[bestKey][0];
     }
 
     if (bestKey) {
@@ -113,12 +116,18 @@ var Mime = (function() {
     }
   };
 
-  
+
   return {
     registerType : registerType,
     provides : provides,
     resetProvides : resetProvides,
-    runProvides : runProvides
+    runProvides : runProvides,
+    providesUsed : function () {
+      return providesUsed;
+    },
+    responseContentType : function () {
+      return responseContentType;
+    }
   };
 })();
 
@@ -145,7 +154,7 @@ var Render = (function() {
   };
 
   function sendStart() {
-    startResp = applyContentType((startResp || {}), Mime.responseContentType);
+    startResp = applyContentType((startResp || {}), Mime.responseContentType());
     respond(["start", chunks, startResp]);
     chunks = [];
     startResp = {};
@@ -155,7 +164,7 @@ var Render = (function() {
   function applyContentType(resp, responseContentType) {
     resp["headers"] = resp["headers"] || {};
     if (responseContentType) {
-      resp["headers"]["Content-Type"] = resp["headers"]["Content-Type"] || responseContentType;    
+      resp["headers"]["Content-Type"] = resp["headers"]["Content-Type"] || responseContentType;
     }
     return resp;
   }
@@ -242,12 +251,12 @@ var Render = (function() {
         resetList();
       }
 
-      if (Mime.providesUsed) {
+      if (Mime.providesUsed()) {
         var provided_resp = Mime.runProvides(args[1], ddoc) || {};
         provided_resp = maybeWrapResponse(provided_resp);
         resp.body = (resp.body || "") + chunks.join("");
         resp.body += provided_resp.body || "";
-        resp = applyContentType(resp, Mime.responseContentType);
+        resp = applyContentType(resp, Mime.responseContentType());
         resetList();
       }
 
@@ -301,9 +310,9 @@ var Render = (function() {
       var req = args[1];
       var tail = listFun.apply(ddoc, args);
 
-      if (Mime.providesUsed) {
+      if (Mime.providesUsed()) {
         tail = Mime.runProvides(req, ddoc);
-      }    
+      }
       if (!gotRow) getRow();
       if (typeof tail != "undefined") {
         chunks.push(tail);
