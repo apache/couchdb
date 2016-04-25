@@ -1086,6 +1086,9 @@ respond_(#httpd{mochi_req = MochiReq}, Code, Headers, _Args, start_response) ->
 respond_(#httpd{mochi_req = MochiReq}, Code, Headers, Args, Type) ->
     MochiReq:Type({Code, Headers, Args}).
 
+get_user(#httpd{user_ctx = #user_ctx{name = null}}) ->
+    % admin party
+    "undefined";
 get_user(#httpd{user_ctx = #user_ctx{name = User}}) ->
     couch_util:url_encode(User);
 get_user(#httpd{user_ctx = undefined}) ->
