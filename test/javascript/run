@@ -35,6 +35,7 @@ SCRIPTS = """
     test/javascript/couch_test_runner.js
     test/javascript/couch_http.js
     test/javascript/test_setup.js
+    share/server/util.js
 """.split()
 
 RUNNER = "test/javascript/cli_runner.js"

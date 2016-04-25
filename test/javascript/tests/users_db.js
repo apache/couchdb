@@ -15,11 +15,8 @@ couchTests.users_db = function(debug) {
   // This tests the users db, especially validations
   // this should also test that you can log into the couch
   
-  var users_db_name = get_random_db_name();
+  var users_db_name = '_users'; //get_random_db_name();
   var usersDb = new CouchDB(users_db_name, {"X-Couch-Full-Commit":"false"});
-  usersDb.createDb();
-  var usersDbAlt = new CouchDB(users_db_name + "_alt", {"X-Couch-Full-Commit":"false"});
-  usersDbAlt.createDb();
 
   // test that you can treat "_user" as a db-name
   // this can complicate people who try to secure the users db with 
@@ -29,10 +26,14 @@ couchTests.users_db = function(debug) {
   // to determine the actual users db name.
 
   function testFun() {
+
     // test that the validation function is installed
+    // this will fail When the test is run in isolation,
+    // since it doesn’t wait for the ddoc to be created.
+    // in a full test suite run, this is fine.
+    // dev trick: run `test/javascript/run basics users_db`
     var ddoc = usersDb.open("_design/_auth");
-// TODO: validation ddoc does not get installed on cluster
-//  T(ddoc.validate_doc_update);
+    T(ddoc.validate_doc_update);
     
     // test that you can login as a user using basic auth
     var jchrisUserDoc = CouchDB.prepareUserDoc({
@@ -52,8 +53,7 @@ couchTests.users_db = function(debug) {
     T(s.userCtx.name == "jchris@apache.org");
     T(s.info.authenticated == "default");
     T(s.info.authentication_db == "" + users_db_name + "");
-    T(s.info.authentication_handlers.indexOf("cookie")>=0);
-    T(s.info.authentication_handlers.indexOf("default")>=0);
+    TEquals(["cookie", "default", "local"], s.info.authentication_handlers);
     var s = CouchDB.session({
       headers : {
         "Authorization" : "Basic Xzpf" // name and pass of _:_
@@ -61,52 +61,46 @@ couchTests.users_db = function(debug) {
     });
     T(s.name == null);
     T(s.info.authenticated == "default");
-
-    // make sure we'll not hit the cache with this
-    var kchrisUserDoc = CouchDB.prepareUserDoc({
-      name: "kchris@apache.org"
-    }, "sadbone");
-    T(usersDb.save(kchrisUserDoc).ok);
     
-    // save with new_edits=false to force conflict save does no more work => actually replicate and change simultanously
-    CouchDB.replicate(usersDb.name, usersDbAlt.name);
-    // ok, now create a conflicting edit on the kchris doc, and make sure there's no login.
-    var kchrisUser2 = JSON.parse(JSON.stringify(kchrisUserDoc));
-    kchrisUser2.foo = "bar";
-    T(usersDb.save(kchrisUser2).ok);
-    // now the other
-    var kchrisUser3 = JSON.parse(JSON.stringify(kchrisUserDoc));
-    kchrisUser3.foo = "barrrr";
-    T(usersDbAlt.save(kchrisUser3).ok);
-    // and replicate back
-    CouchDB.replicate(usersDbAlt.name, usersDb.name);
-
-    var kchrisWithConflict = usersDb.open(kchrisUserDoc._id, {conflicts : true, revs_info: true});
-    T(kchrisWithConflict._conflicts.length == 1);
     
-    // no login with conflicted user doc
-    CouchDB.logout();
-    var s = null;
+    // ok, now create a conflicting edit on the jchris doc, and make sure there's no login.
+    var jchrisUser2 = JSON.parse(JSON.stringify(jchrisUserDoc));
+    jchrisUser2.foo = "bar";
+    var r = usersDb.save(jchrisUser2)
+    T(r.ok);
     try {
-      s = CouchDB.session({
+      usersDb.save(jchrisUserDoc);
+      T(false && "should be an update conflict");
+    } catch(e) {
+      T(true);
+    }
+    // save as bulk with new_edits=false to force conflict save
+    jchrisUserDoc._rev = "1-asd" // set new rev, changed in 2.x!
+    var resp = usersDb.bulkSave([jchrisUserDoc],{new_edits: false});
+
+    var jchrisWithConflict = usersDb.open(jchrisUserDoc._id, {conflicts : true});
+    T(jchrisWithConflict._conflicts.length == 1);
+
+    // no login with conflicted user doc
+    try {
+      var s = CouchDB.session({
         headers : {
-          "Authorization" : "Basic a2NocmlzQGFwYWNoZS5vcmc6ZnVubnlib25l"
+          "Authorization" : "Basic amNocmlzQGFwYWNoZS5vcmc6ZnVubnlib25l"
         }
       });
-    }catch(e){
-      // old test had name==null, now we might have an error. Anyway: test below
+      T(false && "this will throw");
+    } catch(e) {
+      T(e.error == "unauthorized");
+      T(/conflict/.test(e.reason));
     }
-    T(s == null || s.userCtx.name == null);
 
     // you can delete a user doc
     s = CouchDB.session().userCtx;
     T(s.name == null);
     T(s.roles.indexOf("_admin") !== -1);
-    T(usersDb.deleteDoc(kchrisWithConflict).ok);
+    T(usersDb.deleteDoc(jchrisWithConflict).ok);
 
     // you can't change doc from type "user"
-// TODO: needs design doc (see above)
-/*
     jchrisUserDoc = usersDb.open(jchrisUserDoc._id);
     jchrisUserDoc.type = "not user";
     try {
@@ -157,7 +151,7 @@ couchTests.users_db = function(debug) {
     } catch(e) {
       TEquals("Character `:` is not allowed in usernames.", e.reason);
     }
-*/
+
     // test that you can login as a user with a password starting with :
     var doc = CouchDB.prepareUserDoc({
       name: "foo@example.org"
@@ -177,15 +171,7 @@ couchTests.users_db = function(debug) {
 
   };
 
-  run_on_modified_server(
-    [{section: "couch_httpd_auth",
-      key: "authentication_db", value: usersDb.name},
-     {section: "chttpd_auth",
-      key: "authentication_db", value: usersDb.name}],
-    testFun
-  );
-
+  testFun()
   usersDb.deleteDb(); // cleanup
-  usersDbAlt.deleteDb(); // cleanup
   
 }
