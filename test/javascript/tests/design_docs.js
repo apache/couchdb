@@ -428,6 +428,9 @@ couchTests.design_docs = function(debug) {
   // field with the boolean value true, its validate_doc_update functions
   // should no longer have effect.
   db.deleteDb();
+  // avoid Heisenbugs w/ files remaining - create a new name
+  db_name = get_random_db_name();
+  db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
   var ddoc = {
     _id: "_design/test",

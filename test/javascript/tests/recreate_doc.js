@@ -79,6 +79,9 @@ couchTests.recreate_doc = function(debug) {
   }
 
   db.deleteDb();
+  // avoid Heisenbugs - have a new name
+  db_name = get_random_db_name();
+  db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"}, {"w": 3});
   db.createDb();
 
   // Helper function to create a doc with multiple revisions

@@ -60,8 +60,10 @@ couchTests.view_offsets = function(debug) {
   ].forEach(function(row){ check(row[0], row[1]);});
 
   var runTest = function () {
-    var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
-    db.deleteDb();
+    var db_name = get_random_db_name();
+    var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
+    // (the DB will never exist per se)
+    //db.deleteDb();
     db.createDb();
 
     var designDoc = {
@@ -98,6 +100,9 @@ couchTests.view_offsets = function(debug) {
         startkey: ["b", 6],
         endkey: ["b", 7]
     });
+
+    // delete (temp) DB now
+    db.deleteDb();
 
     return res1.offset == 4 && res2.offset == docs.length && res3.offset == 8;
 

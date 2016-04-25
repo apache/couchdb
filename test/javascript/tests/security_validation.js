@@ -257,9 +257,10 @@ couchTests.security_validation = function(debug) {
       var A = CouchDB.protocol + CouchDB.host + "/" + db_name + "_a";
       var B = CouchDB.protocol + CouchDB.host + "/" + db_name + "_b";
 
-      adminDbA.deleteDb();
+      // (the databases never exist b4 - and we made sure they're deleted below)
+      //adminDbA.deleteDb();
       adminDbA.createDb();
-      adminDbB.deleteDb();
+      //adminDbB.deleteDb();
       adminDbB.createDb();
 
       // save and replicate a documents that will and will not pass our design

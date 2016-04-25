@@ -87,7 +87,10 @@ couchTests.reader_acl = function(debug) {
       T(CouchDB.login("jchris@apache.org", "funnybone").ok);
 
       // db admin can read
-      T(secretDb.open("baz").foo == "bar");
+      // retry as propagation could take time
+      retry_part(function(){
+        T(secretDb.open("baz").foo == "bar");
+      });
 
       // and run temp views - they don't exist any more, so leave out 
       /*TEquals(secretDb.query(function(doc) {
@@ -113,10 +116,10 @@ couchTests.reader_acl = function(debug) {
       // server _admin can always read
       T(secretDb.open("baz").foo == "bar");
 
-      // and run temp views
-      TEquals(secretDb.query(function(doc) {
+      // and run temp views - they don't exist any more, so leave out
+      /*TEquals(secretDb.query(function(doc) {
         emit(null, null)
-      }).total_rows, 1);
+      }).total_rows, 1);*/
 
       T(secretDb.save({
         "_id" : "_design/foo",
@@ -134,15 +137,15 @@ couchTests.reader_acl = function(debug) {
       // members can query stored views
       T(secretDb.view("foo/bar").total_rows == 1);
       
-      // members can't do temp views
-      try {
+      // members can't do temp views - they don't exist any more, so leave out
+      /*try {
         var results = secretDb.query(function(doc) {
           emit(null, null);
         });
         T(false && "temp view should be admin only");
       } catch (e) {
         T(true && "temp view is admin only");
-      }
+      }*/
       
       CouchDB.logout();
 
@@ -160,7 +163,10 @@ couchTests.reader_acl = function(debug) {
 
       T(CouchDB.login("jchris@apache.org", "funnybone").ok);
       T(CouchDB.session().userCtx.roles.indexOf("_admin") == -1);
-      T(secretDb.open("baz").foo == "bar");
+      // retry as propagation could take time
+      retry_part(function(){
+        T(secretDb.open("baz").foo == "bar");
+      });
 
       // can't set non string reader names or roles
       try {

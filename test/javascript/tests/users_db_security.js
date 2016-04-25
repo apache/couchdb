@@ -11,7 +11,7 @@
 // the License.
 
 couchTests.users_db_security = function(debug) {
-  return console.log('TODO');
+  return console.log('TODO after at least COUCHDB-2991 is adressed');
   var db_name = get_random_db_name();
   var usersDb = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   if (debug) debugger;

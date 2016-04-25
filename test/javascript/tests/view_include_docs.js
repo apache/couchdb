@@ -11,7 +11,6 @@
 // the License.
 
 couchTests.view_include_docs = function(debug) {
-  return console.log('TODO');
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
@@ -125,7 +124,8 @@ couchTests.view_include_docs = function(debug) {
   T(!resp.rows[0].doc.prev);
   T(resp.rows[0].doc.integer == 0);
 
-  var xhr = CouchDB.request("POST", "/" + db_name + "/_compact");
+  // there's no compaction on cluster (and the test ist questionable to say the least: mvcc is no version control after all) - but keep rest of test
+  /*var xhr = CouchDB.request("POST", "/" + db_name + "/_compact");
   T(xhr.status == 202)
   while (db.info().compact_running) {}
 
@@ -135,7 +135,7 @@ couchTests.view_include_docs = function(debug) {
   T(resp.rows[0].id == "0");
   T(!resp.rows[0].doc);
   T(resp.rows[0].doc == null);
-  T(resp.rows[1].doc.integer == 23);
+  T(resp.rows[1].doc.integer == 23);*/
 
   // COUCHDB-549 - include_docs=true with conflicts=true
 

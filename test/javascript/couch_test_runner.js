@@ -486,13 +486,19 @@ function get_random_db_name() {
 
 // for Heisenbug-prone spots: retry n times (e.g. quora not met immediately)
 // if the problem still persists afterwards, we need sth else (similar to e.g. webdriver)
-function retry_part(fct, n) {
+function retry_part(fct, n, duration) {
   n = n || 3;
+  duration = (duration == undefined ? 100 : duration);
   for(var i=1; i<=n; i++){
     try {
       return fct();
     }catch(e){
       if(i<n){
+        // wait
+        var b4 = (new Date()).getTime();
+        // if this is too bad, we could GET /
+        // or in fact get _changes w/ longpoll on _users or so
+        while(((new Date()).getTime() - b4) < duration) {}
         continue;
       }else{
         throw e;
