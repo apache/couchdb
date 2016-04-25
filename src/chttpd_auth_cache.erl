@@ -48,10 +48,7 @@ get_user_creds(_Req, UserName) when is_binary(UserName) ->
 	        couch_util:get_value(<<"roles">>, UserProps))
         end
     end,
-    case Resp of
-        nil -> nil;
-        _ -> {ok, Resp, nil}
-    end.
+    maybe_validate_user_creds(Resp).
 
 update_user_creds(_Req, UserDoc, _Ctx) ->
     {_, Ref} = spawn_monitor(fun() ->
@@ -163,7 +160,7 @@ changes_callback({error, _}, EndSeq) ->
     exit({seq, EndSeq}).
 
 load_user_from_db(UserName) ->
-    try fabric:open_doc(dbname(), docid(UserName), [?ADMIN_CTX, ejson_body]) of
+    try fabric:open_doc(dbname(), docid(UserName), [?ADMIN_CTX, ejson_body, conflicts]) of
 	{ok, Doc} ->
 	    {Props} = couch_doc:to_json_obj(Doc, []),
 	    Props;
@@ -212,3 +209,28 @@ update_doc_ignoring_conflict(DbName, Doc, Options) ->
         throw:conflict ->
             ok
     end.
+
+maybe_validate_user_creds(nil) ->
+    nil;
+maybe_validate_user_creds(UserCreds) ->
+    AllowConflictedUserDocs = config:get_boolean("chttpd_auth", "allow_conflicted_user_docs", false),
+    maybe_validate_user_creds(UserCreds, AllowConflictedUserDocs).
+
+maybe_validate_user_creds(UserCreds, false) ->
+    {ok, UserCreds, nil};
+maybe_validate_user_creds(UserCreds, true) ->
+    validate_user_creds(UserCreds).
+
+% throws if UserCreds includes a _conflicts member
+% returns UserCreds otherwise
+validate_user_creds(UserCreds) ->
+    case couch_util:get_value(<<"_conflicts">>, UserCreds) of
+        undefined ->
+            ok;
+        _ConflictList ->
+            throw({unauthorized,
+                <<"User document conflicts must be resolved before the document",
+                  " is used for authentication purposes.">>
+            })
+    end,
+    {ok, UserCreds, nil}.
