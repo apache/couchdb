@@ -264,6 +264,18 @@ deleted_filename(Original) ->
     filename:rootname(Original) ++ Suffix.
 
 nuke_dir(RootDelDir, Dir) ->
+    EnableRecovery = config:get_boolean("couchdb",
+        "enable_database_recovery", false),
+    case EnableRecovery of
+        true ->
+            rename_file(Dir);
+        false ->
+            delete_dir(RootDelDir, Dir)
+    end.
+
+delete_dir(RootDelDir, Dir) ->
+    DeleteAfterRename = config:get_boolean("couchdb",
+        "delete_after_rename", true),
     FoldFun = fun(File) ->
         Path = Dir ++ "/" ++ File,
         case filelib:is_dir(Path) of
@@ -271,7 +283,7 @@ nuke_dir(RootDelDir, Dir) ->
                 ok = nuke_dir(RootDelDir, Path),
                 file:del_dir(Path);
             false ->
-                delete(RootDelDir, Path, false)
+                delete_file(RootDelDir, Path, false, DeleteAfterRename)
         end
     end,
     case file:list_dir(Dir) of
