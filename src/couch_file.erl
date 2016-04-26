@@ -219,12 +219,14 @@ close(Fd) ->
 
 
 delete(RootDir, Filepath) ->
-    delete(RootDir, Filepath, true).
+    delete(RootDir, Filepath, []).
 
-delete(RootDir, FullFilePath, Async) ->
+delete(RootDir, FullFilePath, Options) ->
     EnableRecovery = config:get_boolean("couchdb",
         "enable_database_recovery", false),
-    case EnableRecovery of
+    Async = not lists:member(sync, Options),
+    Context = couch_util:get_value(context, Options, compaction),
+    case Context =:= delete andalso EnableRecovery of
         true ->
             rename_file(FullFilePath);
         false ->

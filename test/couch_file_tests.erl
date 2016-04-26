@@ -295,12 +295,20 @@ delete_test_() ->
             end,
             [
                 fun(Cfg) ->
-                    {"enable_database_recovery = false",
-                    make_enable_recovery_test_case(Cfg, false)}
+                    {"enable_database_recovery = false, context = delete",
+                    make_enable_recovery_test_case(Cfg, false, delete)}
                 end,
                 fun(Cfg) ->
-                    {"enable_database_recovery = true",
-                    make_enable_recovery_test_case(Cfg, true)}
+                    {"enable_database_recovery = true, context = delete",
+                    make_enable_recovery_test_case(Cfg, true, delete)}
+                end,
+                fun(Cfg) ->
+                    {"enable_database_recovery = false, context = compaction",
+                    make_enable_recovery_test_case(Cfg, false, compaction)}
+                end,
+                fun(Cfg) ->
+                    {"enable_database_recovery = true, context = compaction",
+                    make_enable_recovery_test_case(Cfg, true, compaction)}
                 end,
                 fun(Cfg) ->
                     {"delete_after_rename = true",
@@ -315,20 +323,25 @@ delete_test_() ->
     }.
 
 
-make_enable_recovery_test_case({RootDir, File}, EnableRecovery) ->
+make_enable_recovery_test_case({RootDir, File}, EnableRecovery, Context) ->
     meck:expect(config, get_boolean, fun
         ("couchdb", "enable_database_recovery", _) -> EnableRecovery;
-        ("couchdb", "delete_after_rename", _) -> true
+        ("couchdb", "delete_after_rename", _) -> false
     end),
     FileExistsBefore = filelib:is_regular(File),
-    couch_file:delete(RootDir, File, false),
+    couch_file:delete(RootDir, File, [{context, Context}]),
     FileExistsAfter = filelib:is_regular(File),
     RenamedFiles = filelib:wildcard(filename:rootname(File) ++ "*.deleted.*"),
-    ExpectRenamedCount = if EnableRecovery -> 1; true -> 0 end,
+    DeletedFiles = filelib:wildcard(RootDir ++ "/.delete/*"),
+    {ExpectRenamedCount, ExpectDeletedCount} = if
+        EnableRecovery andalso Context =:= delete -> {1, 0};
+        true -> {0, 1}
+    end,
     [
         ?_assert(FileExistsBefore),
         ?_assertNot(FileExistsAfter),
-        ?_assertEqual(ExpectRenamedCount, length(RenamedFiles))
+        ?_assertEqual(ExpectRenamedCount, length(RenamedFiles)),
+        ?_assertEqual(ExpectDeletedCount, length(DeletedFiles))
     ].
 
 make_delete_after_rename_test_case({RootDir, File}, DeleteAfterRename) ->
@@ -337,7 +350,7 @@ make_delete_after_rename_test_case({RootDir, File}, DeleteAfterRename) ->
         ("couchdb", "delete_after_rename", _) -> DeleteAfterRename
     end),
     FileExistsBefore = filelib:is_regular(File),
-    couch_file:delete(RootDir, File, false),
+    couch_file:delete(RootDir, File),
     FileExistsAfter = filelib:is_regular(File),
     RenamedFiles = filelib:wildcard(filename:join([RootDir, ".delete", "*"])),
     ExpectRenamedCount = if DeleteAfterRename -> 0; true -> 1 end,

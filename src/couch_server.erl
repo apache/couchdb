@@ -459,8 +459,8 @@ handle_call({delete, DbName, Options}, _From, Server) ->
 
         couch_db_plugin:on_delete(DbName, Options),
 
-        Async = not lists:member(sync, Options),
-        case couch_file:delete(Server#server.root_dir, FullFilepath, Async) of
+        DelOpt = [{context, delete} | Options],
+        case couch_file:delete(Server#server.root_dir, FullFilepath, DelOpt) of
         ok ->
             couch_event:notify(DbName, deleted),
             {reply, ok, Server2};
