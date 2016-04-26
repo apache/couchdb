@@ -21,7 +21,9 @@
 
 
 start_update(Partial, State, NumChanges) ->
-    QueueOpts = [{max_size, 100000}, {max_items, 500}],
+    MaxSize = config:get_integer("view_updater", "queue_memory_cap", 100000),
+    MaxItems = config:get_integer("view_updater", "queue_item_cap", 500),
+    QueueOpts = [{max_size, MaxSize}, {max_items, MaxItems}],
     {ok, DocQueue} = couch_work_queue:new(QueueOpts),
     {ok, WriteQueue} = couch_work_queue:new(QueueOpts),
 
