@@ -45,6 +45,8 @@
 -define(REP_TO_STATE, couch_rep_id_to_rep_state).
 -define(INITIAL_WAIT, 2.5). % seconds
 -define(MAX_WAIT, 600).     % seconds
+-define(AVG_ERROR_DELAY_MSEC, 100).
+-define(MAX_ERROR_DELAY_MSEC, 60000).
 -define(OWNER, <<"owner">>).
 
 -define(DB_TO_SEQ, db_to_seq).
@@ -124,12 +126,22 @@ replication_error(#rep{id = {BaseId, _} = RepId}, Error) ->
     nil ->
         ok;
     #rep_state{rep = #rep{db_name = DbName, doc_id = DocId}} ->
+        ok = add_error_jitter(),
         update_rep_doc(DbName, DocId, [
             {<<"_replication_state">>, <<"error">>},
             {<<"_replication_state_reason">>, to_binary(error_reason(Error))},
             {<<"_replication_id">>, ?l2b(BaseId)}]),
         ok = gen_server:call(?MODULE, {rep_error, RepId, Error}, infinity)
     end.
+
+% Add random delay proportional to the number of replications
+% on current node, in order to prevent a stampede when a source
+% with multiple replication targets fails
+add_error_jitter() ->
+    RepCount = ets:info(?REP_TO_STATE, size),
+    Range = min(2 * RepCount * ?AVG_ERROR_DELAY_MSEC, ?MAX_ERROR_DELAY_MSEC),
+    timer:sleep(random:uniform(Range)).
+
 
 continue(#rep{doc_id = null}) ->
     {true, no_owner};

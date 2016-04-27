@@ -256,6 +256,8 @@ init(InitArgs) ->
 do_init(#rep{options = Options, id = {BaseId, Ext}, user_ctx=UserCtx} = Rep) ->
     process_flag(trap_exit, true),
 
+    random:seed(os:timestamp()),
+
     #rep_state{
         source = Source,
         target = Target,
