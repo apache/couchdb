@@ -274,3 +274,180 @@ write_random_data(Fd, N) ->
     Term = lists:nth(random:uniform(4) + 1, Choices),
     {ok, _, _} = couch_file:append_term(Fd, Term),
     write_random_data(Fd, N - 1).
+
+
+delete_test_() ->
+    {
+        "File delete tests",
+        {
+            foreach,
+            fun() ->
+                meck:new(config, [passthrough]),
+                File = ?tempfile() ++ ".couch",
+                RootDir = filename:dirname(File),
+                ok = couch_file:init_delete_dir(RootDir),
+                ok = file:write_file(File, <<>>),
+                {RootDir, File}
+            end,
+            fun({_, File}) ->
+                meck:unload(config),
+                file:delete(File)
+            end,
+            [
+                fun(Cfg) ->
+                    {"enable_database_recovery = false, context = delete",
+                    make_enable_recovery_test_case(Cfg, false, delete)}
+                end,
+                fun(Cfg) ->
+                    {"enable_database_recovery = true, context = delete",
+                    make_enable_recovery_test_case(Cfg, true, delete)}
+                end,
+                fun(Cfg) ->
+                    {"enable_database_recovery = false, context = compaction",
+                    make_enable_recovery_test_case(Cfg, false, compaction)}
+                end,
+                fun(Cfg) ->
+                    {"enable_database_recovery = true, context = compaction",
+                    make_enable_recovery_test_case(Cfg, true, compaction)}
+                end,
+                fun(Cfg) ->
+                    {"delete_after_rename = true",
+                    make_delete_after_rename_test_case(Cfg, true)}
+                end,
+                fun(Cfg) ->
+                    {"delete_after_rename = false",
+                    make_delete_after_rename_test_case(Cfg, false)}
+                end
+            ]
+        }
+    }.
+
+
+make_enable_recovery_test_case({RootDir, File}, EnableRecovery, Context) ->
+    meck:expect(config, get_boolean, fun
+        ("couchdb", "enable_database_recovery", _) -> EnableRecovery;
+        ("couchdb", "delete_after_rename", _) -> false
+    end),
+    FileExistsBefore = filelib:is_regular(File),
+    couch_file:delete(RootDir, File, [{context, Context}]),
+    FileExistsAfter = filelib:is_regular(File),
+    RenamedFiles = filelib:wildcard(filename:rootname(File) ++ "*.deleted.*"),
+    DeletedFiles = filelib:wildcard(RootDir ++ "/.delete/*"),
+    {ExpectRenamedCount, ExpectDeletedCount} = if
+        EnableRecovery andalso Context =:= delete -> {1, 0};
+        true -> {0, 1}
+    end,
+    [
+        ?_assert(FileExistsBefore),
+        ?_assertNot(FileExistsAfter),
+        ?_assertEqual(ExpectRenamedCount, length(RenamedFiles)),
+        ?_assertEqual(ExpectDeletedCount, length(DeletedFiles))
+    ].
+
+make_delete_after_rename_test_case({RootDir, File}, DeleteAfterRename) ->
+    meck:expect(config, get_boolean, fun
+        ("couchdb", "enable_database_recovery", _) -> false;
+        ("couchdb", "delete_after_rename", _) -> DeleteAfterRename
+    end),
+    FileExistsBefore = filelib:is_regular(File),
+    couch_file:delete(RootDir, File),
+    FileExistsAfter = filelib:is_regular(File),
+    RenamedFiles = filelib:wildcard(filename:join([RootDir, ".delete", "*"])),
+    ExpectRenamedCount = if DeleteAfterRename -> 0; true -> 1 end,
+    [
+        ?_assert(FileExistsBefore),
+        ?_assertNot(FileExistsAfter),
+        ?_assertEqual(ExpectRenamedCount, length(RenamedFiles))
+    ].
+
+
+nuke_dir_test_() ->
+    {
+        "Nuke directory tests",
+        {
+            foreach,
+            fun() ->
+                meck:new(config, [passthrough]),
+                File0 = ?tempfile() ++ ".couch",
+                RootDir = filename:dirname(File0),
+                BaseName = filename:basename(File0),
+                Seed = crypto:rand_uniform(1000000000, 9999999999),
+                DDocDir = io_lib:format("db.~b_design", [Seed]),
+                ViewDir = filename:join([RootDir, DDocDir]),
+                file:make_dir(ViewDir),
+                File = filename:join([ViewDir, BaseName]),
+                file:rename(File0, File),
+                ok = couch_file:init_delete_dir(RootDir),
+                ok = file:write_file(File, <<>>),
+                {RootDir, ViewDir}
+            end,
+            fun({RootDir, ViewDir}) ->
+                meck:unload(config),
+                remove_dir(ViewDir),
+                Ext = filename:extension(ViewDir),
+                case filelib:wildcard(RootDir ++ "/*.deleted" ++ Ext) of
+                    [DelDir] -> remove_dir(DelDir);
+                    _ -> ok
+                end
+            end,
+            [
+                fun(Cfg) ->
+                    {"enable_database_recovery = false",
+                    make_rename_dir_test_case(Cfg, false)}
+                end,
+                fun(Cfg) ->
+                    {"enable_database_recovery = true",
+                    make_rename_dir_test_case(Cfg, true)}
+                end,
+                fun(Cfg) ->
+                    {"delete_after_rename = true",
+                    make_delete_dir_test_case(Cfg, true)}
+                end,
+                fun(Cfg) ->
+                    {"delete_after_rename = false",
+                    make_delete_dir_test_case(Cfg, false)}
+                end
+            ]
+        }
+    }.
+
+
+make_rename_dir_test_case({RootDir, ViewDir}, EnableRecovery) ->
+    meck:expect(config, get_boolean, fun
+        ("couchdb", "enable_database_recovery", _) -> EnableRecovery;
+        ("couchdb", "delete_after_rename", _) -> true
+    end),
+    DirExistsBefore = filelib:is_dir(ViewDir),
+    couch_file:nuke_dir(RootDir, ViewDir),
+    DirExistsAfter = filelib:is_dir(ViewDir),
+    Ext = filename:extension(ViewDir),
+    RenamedDirs = filelib:wildcard(RootDir ++ "/*.deleted" ++ Ext),
+    ExpectRenamedCount = if EnableRecovery -> 1; true -> 0 end,
+    [
+        ?_assert(DirExistsBefore),
+        ?_assertNot(DirExistsAfter),
+        ?_assertEqual(ExpectRenamedCount, length(RenamedDirs))
+    ].
+
+make_delete_dir_test_case({RootDir, ViewDir}, DeleteAfterRename) ->
+    meck:expect(config, get_boolean, fun
+        ("couchdb", "enable_database_recovery", _) -> false;
+        ("couchdb", "delete_after_rename", _) -> DeleteAfterRename
+    end),
+    DirExistsBefore = filelib:is_dir(ViewDir),
+    couch_file:nuke_dir(RootDir, ViewDir),
+    DirExistsAfter = filelib:is_dir(ViewDir),
+    Ext = filename:extension(ViewDir),
+    RenamedDirs = filelib:wildcard(RootDir ++ "/*.deleted" ++ Ext),
+    RenamedFiles = filelib:wildcard(RootDir ++ "/.delete/*"),
+    ExpectRenamedCount = if DeleteAfterRename -> 0; true -> 1 end,
+    [
+        ?_assert(DirExistsBefore),
+        ?_assertNot(DirExistsAfter),
+        ?_assertEqual(0, length(RenamedDirs)),
+        ?_assertEqual(ExpectRenamedCount, length(RenamedFiles))
+    ].
+
+remove_dir(Dir) ->
+    [file:delete(File) || File <- filelib:wildcard(filename:join([Dir, "*"]))],
+    file:del_dir(Dir).

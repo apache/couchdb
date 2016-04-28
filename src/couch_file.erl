@@ -219,25 +219,65 @@ close(Fd) ->
 
 
 delete(RootDir, Filepath) ->
-    delete(RootDir, Filepath, true).
+    delete(RootDir, Filepath, []).
 
+delete(RootDir, FullFilePath, Options) ->
+    EnableRecovery = config:get_boolean("couchdb",
+        "enable_database_recovery", false),
+    Async = not lists:member(sync, Options),
+    Context = couch_util:get_value(context, Options, compaction),
+    case Context =:= delete andalso EnableRecovery of
+        true ->
+            rename_file(FullFilePath);
+        false ->
+            DeleteAfterRename = config:get_boolean("couchdb",
+                "delete_after_rename", true),
+            delete_file(RootDir, FullFilePath, Async, DeleteAfterRename)
+    end.
 
-delete(RootDir, Filepath, Async) ->
+delete_file(RootDir, Filepath, Async, DeleteAfterRename) ->
     DelFile = filename:join([RootDir,".delete", ?b2l(couch_uuids:random())]),
     case file:rename(Filepath, DelFile) of
-    ok ->
+    ok when DeleteAfterRename ->
         if (Async) ->
             spawn(file, delete, [DelFile]),
             ok;
         true ->
             file:delete(DelFile)
         end;
-    Error ->
-        Error
+    Else ->
+        Else
     end.
 
+rename_file(Original) ->
+    DeletedFileName = deleted_filename(Original),
+    Now = calendar:local_time(),
+    case file:rename(Original, DeletedFileName) of
+        ok -> file:change_time(DeletedFileName, Now);
+        Else -> Else
+    end.
+
+deleted_filename(Original) ->
+    {{Y, Mon, D}, {H, Min, S}} = calendar:universal_time(),
+    Suffix = lists:flatten(
+        io_lib:format(".~w~2.10.0B~2.10.0B."
+            ++ "~2.10.0B~2.10.0B~2.10.0B.deleted"
+            ++ filename:extension(Original), [Y, Mon, D, H, Min, S])),
+    filename:rootname(Original) ++ Suffix.
 
 nuke_dir(RootDelDir, Dir) ->
+    EnableRecovery = config:get_boolean("couchdb",
+        "enable_database_recovery", false),
+    case EnableRecovery of
+        true ->
+            rename_file(Dir);
+        false ->
+            delete_dir(RootDelDir, Dir)
+    end.
+
+delete_dir(RootDelDir, Dir) ->
+    DeleteAfterRename = config:get_boolean("couchdb",
+        "delete_after_rename", true),
     FoldFun = fun(File) ->
         Path = Dir ++ "/" ++ File,
         case filelib:is_dir(Path) of
@@ -245,7 +285,7 @@ nuke_dir(RootDelDir, Dir) ->
                 ok = nuke_dir(RootDelDir, Path),
                 file:del_dir(Path);
             false ->
-                delete(RootDelDir, Path, false)
+                delete_file(RootDelDir, Path, false, DeleteAfterRename)
         end
     end,
     case file:list_dir(Dir) of
@@ -610,3 +650,43 @@ process_info(Pid) ->
         {couch_file_fd, {Fd, InitialName}} ->
             {Fd, InitialName}
     end.
+
+
+-ifdef(TEST).
+-include_lib("couch/include/couch_eunit.hrl").
+
+deleted_filename_test_() ->
+    DbNames = ["dbname", "db.name", "user/dbname"],
+    Fixtures = make_filename_fixtures(DbNames),
+    lists:map(fun(Fixture) ->
+        should_create_proper_deleted_filename(Fixture)
+    end, Fixtures).
+
+should_create_proper_deleted_filename(Before) ->
+    {Before,
+    ?_test(begin
+        BeforeExtension = filename:extension(Before),
+        BeforeBasename = filename:basename(Before, BeforeExtension),
+        Re = "^" ++ BeforeBasename ++ "\.[0-9]{8}\.[0-9]{6}\.deleted\..*$",
+        After = deleted_filename(Before),
+        ?assertEqual(match,
+            re:run(filename:basename(After), Re, [{capture, none}])),
+        ?assertEqual(BeforeExtension, filename:extension(After))
+    end)}.
+
+make_filename_fixtures(DbNames) ->
+    Formats = [
+        "~s.couch",
+        ".~s_design/mrview/3133e28517e89a3e11435dd5ac4ad85a.view",
+        "shards/00000000-1fffffff/~s.1458336317.couch",
+        ".shards/00000000-1fffffff/~s.1458336317_design",
+        ".shards/00000000-1fffffff/~s.1458336317_design"
+            "/mrview/3133e28517e89a3e11435dd5ac4ad85a.view"
+    ],
+    lists:flatmap(fun(DbName) ->
+        lists:map(fun(Format) ->
+            filename:join("/srv/data", io_lib:format(Format, [DbName]))
+        end, Formats)
+    end, DbNames).
+
+-endif.
