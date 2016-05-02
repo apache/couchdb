@@ -1,52 +1,49 @@
-FROM debian:wheezy
-MAINTAINER Robert Newson <rnewson@apache.org>
-ENV DEBIAN_FRONTEND noninteractive
+# Licensed under the Apache License, Version 2.0 (the "License"); you may not
+# use this file except in compliance with the License. You may obtain a copy of
+# the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations under
+# the License.
 
-# Configure backports
-RUN echo "deb http://http.debian.net/debian wheezy-backports main" >> /etc/apt/sources.list
-RUN apt-get -qq update
+FROM debian:jessie
 
-# Install prereqs
-RUN apt-get --no-install-recommends -y install \
+MAINTAINER Clemens Stolle klaemo@apache.org
+
+ENV COUCHDB_VERSION master
+
+RUN groupadd -r couchdb && useradd -d /usr/src/couchdb -g couchdb couchdb
+
+# download dependencies
+RUN apt-get update -y -qq && apt-get install -y --no-install-recommends \
+    apt-transport-https \
     build-essential \
     ca-certificates \
     curl \
     erlang-dev \
     erlang-nox \
     git \
+    haproxy \
     libicu-dev \
     libmozjs185-dev \
-    python
+    openssl \
+    python \
+ && curl -s https://deb.nodesource.com/gpgkey/nodesource.gpg.key | apt-key add - \
+ && echo 'deb https://deb.nodesource.com/node_4.x jessie main' > /etc/apt/sources.list.d/nodesource.list \
+ && echo 'deb-src https://deb.nodesource.com/node_4.x jessie main' >> /etc/apt/sources.list.d/nodesource.list \
+ && apt-get update -y -qq && apt-get install -y nodejs \
+ && npm install -g grunt-cli
 
-# Build rebar
-RUN useradd -m rebar
-USER rebar
-WORKDIR /home/rebar
-RUN curl -L https://github.com/rebar/rebar/archive/2.5.0.tar.gz | tar zxf -
-WORKDIR /home/rebar/rebar-2.5.0
-RUN ./bootstrap
-USER root
-RUN cp rebar /usr/local/bin/
-RUN chmod 755 /usr/local/bin/rebar
+COPY dev/docker-entrypoint.sh /docker-entrypoint.sh
 
-# Build couchdb
-RUN useradd -m couchdb
-RUN mkdir -p /home/couchdb
-ADD . /home/couchdb
-USER root
-RUN chown -R couchdb:couchdb /home/couchdb
-USER couchdb
-WORKDIR /home/couchdb
+WORKDIR /usr/src/couchdb
 
-# We don't to be so strict for simple testing.
-RUN sed -i'' '/require_otp_vsn/d' rebar.config.script
+# USER couchdb
+EXPOSE 5984 15984 25984 35984 15986 25986 35986
 
-# Expose nodes on external network interface
-RUN sed -i'' 's/bind_address = 127.0.0.1/bind_address = 0.0.0.0/' rel/overlay/etc/default.ini
-
-# Build
-RUN ./configure
-RUN make couch
-
-EXPOSE 15984 25984 35984 15986 25986 35986
-ENTRYPOINT ["/home/couchdb/dev/run"]
+ENTRYPOINT ["/docker-entrypoint.sh"]
+CMD ["dev/run"]

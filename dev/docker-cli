@@ -1,0 +1,66 @@
+#!/bin/bash
+# Licensed under the Apache License, Version 2.0 (the "License"); you may not
+# use this file except in compliance with the License. You may obtain a copy of
+# the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations under
+# the License.
+
+set -e
+
+if [ "$1" = 'help' ] || [ "$1" = '--help' ] || [ "$1" = '-h' ]; then
+  echo "
+Usage: docker-cli command
+
+Builds and runs a dockerized CouchDB 2.0 dev cluster
+
+Commands:
+  build           Build the 'couchdb-master' Docker image with a freshly
+                  compiled CouchDB. You can pass options to './configure'.
+                  e.g.: docker-cli build --disable-fauxton
+                  Will always run with '--disable-docs'
+  run             Create a container from 'couchdb-master' image and start
+                  it in the forground. You can pass the same options as
+                  you would to 'dev/run'. e.g.: docker-cli run --with-haproxy
+  clean           Remove untagged docker images
+  help            Show this help message and exit
+
+Options:
+  -h, --help      Show this help message and exit"
+fi
+
+if [ "$1" = 'build' ]; then
+  printf "Building \"couchdb-master\" docker image...\n\n"
+  # build docker image
+  docker build -t couchdb-master .
+
+  printf "\nBuilding CouchDB inside of docker container...\n\n"
+  # run build process inside of a container
+  exec docker run -it --rm -v $(pwd):/usr/src/couchdb couchdb-master build "${@:2}"
+fi
+
+if [ "$1" = 'run' ]; then
+  printf "Starting CouchDB inside of docker container. Please be patient...\n\n"
+
+  # create container with appropriate port mappings
+  COUCH_CONTAINER_ID="$(docker create -it \
+                  -p 5984:5984 -p 15984:15984 -p 25984:25984 -p 35984:35984 \
+                  -p 15986:15986 -p 25986:25986 -p 35986:35986 \
+                  -p 4369:4369 -p 9100-9110:9100-9110 \
+                  couchdb-master dev/run ${@:2})"
+
+  # copy source into container
+  docker cp . $COUCH_CONTAINER_ID:/usr/src/couchdb
+
+  exec docker start -i -a $COUCH_CONTAINER_ID
+fi
+
+if [ "$1" = 'clean' ]; then
+  printf "Removing untagged docker images...\n\n"
+  exec docker images --filter "dangling=true" -q | xargs docker rmi -f
+fi
