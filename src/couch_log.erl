@@ -97,7 +97,7 @@ log(Level, Fmt, Args) ->
             apply(Backend, Level, [Fmt, Args])
     end.
 
--spec is_active_level(atom()) -> boolean.
+-spec is_active_level(atom()) -> boolean().
 is_active_level(Level) ->
     CurrentLevel = level_to_atom(config:get("log", "level", "notice")),
     level_integer(Level) >= level_integer(CurrentLevel).
