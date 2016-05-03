@@ -25,6 +25,7 @@
 -define(SNAPPY, <<1,49,64,131,104,1,108,0,0,0,5,104,2,100,0,
     1,97,97,1,104,1,8,8,98,97,2,5,8,8,99,97,3,5,8,44,100,97,
     4,104,2,100,0,1,101,97,5,106>>).
+-define(CORRUPT, <<2,12,85,06>>).
 
 
 compress_test_() ->
@@ -38,7 +39,8 @@ decompress_test_() ->
     [
         ?_assertEqual(?TERM, couch_compress:decompress(?NONE)),
         ?_assertEqual(?TERM, couch_compress:decompress(?DEFLATE)),
-        ?_assertEqual(?TERM, couch_compress:decompress(?SNAPPY))
+        ?_assertEqual(?TERM, couch_compress:decompress(?SNAPPY)),
+        ?_assertError(invalid_compression, couch_compress:decompress(?CORRUPT))
     ].
 
 recompress_test_() ->
@@ -62,5 +64,11 @@ is_compressed_test_() ->
         ?_assertNot(couch_compress:is_compressed(?DEFLATE, none)),
         ?_assertNot(couch_compress:is_compressed(?DEFLATE, snappy)),
         ?_assertNot(couch_compress:is_compressed(?SNAPPY, none)),
-        ?_assertNot(couch_compress:is_compressed(?SNAPPY, {deflate, 9}))
+        ?_assertNot(couch_compress:is_compressed(?SNAPPY, {deflate, 9})),
+        ?_assertError(invalid_compression,
+            couch_compress:is_compressed(?CORRUPT, none)),
+        ?_assertError(invalid_compression,
+            couch_compress:is_compressed(?CORRUPT, {deflate, 9})),
+        ?_assertError(invalid_compression,
+            couch_compress:is_compressed(?CORRUPT, snappy))
     ].
