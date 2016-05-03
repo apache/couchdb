@@ -37,7 +37,7 @@
 
 go(Parent, ParentRef, DbName, Timeout) ->
     Notifiers = start_update_notifiers(DbName),
-    MonRefs = lists:usort([rexi_utils:server_pid(N) || {N, _Ref} <- Notifiers]),
+    MonRefs = lists:usort([rexi_utils:server_pid(N) || #worker{node = N} <- Notifiers]),
     RexiMon = rexi_monitor:start(MonRefs),
     MonPid = start_cleanup_monitor(self(), Notifiers),
     %% This is not a common pattern for rexi but to enable the calling
