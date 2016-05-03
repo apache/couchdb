@@ -84,7 +84,10 @@ get_db_info(DbName) ->
     fabric_db_info:go(dbname(DbName)).
 
 %% @doc the number of docs in a database
--spec get_doc_count(dbname()) -> {ok, non_neg_integer()}.
+-spec get_doc_count(dbname()) ->
+    {ok, non_neg_integer()} |
+    {error, atom()} |
+    {error, atom(), any()}.
 get_doc_count(DbName) ->
     fabric_db_doc_count:go(dbname(DbName)).
 
