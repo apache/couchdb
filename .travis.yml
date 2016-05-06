@@ -1,14 +1,17 @@
 before_install:
    - sudo apt-get -y update
-   - sudo apt-get -y install libicu-dev libmozjs-dev pkg-config help2man
+   - sudo apt-get -y install libicu-dev libmozjs185-dev pkg-config help2man libcurl4-openssl-dev
    - sudo apt-get -y install libtool automake autoconf autoconf-archive
-   - sudo apt-get -y install texlive-latex-base texlive-latex-recommended
-   - sudo apt-get -y install texlive-latex-extra texlive-fonts-recommended texinfo
-   - sudo apt-get -y install python-pygments python-docutils python-sphinx 
-before_script: ./bootstrap && ./configure
-script: make distcheck
+   - sudo apt-get -y install shunit2
+before_script: ./configure -c --disable-docs --disable-fauxton
+script:
+   - make check
 language: erlang
 otp_release:
-   - R16B
-   - R15B03
-   - R14B04
+   - 18.1
+   - 18.0
+   - 17.5
+   - R16B03-1
+git:
+  depth: 10
+cache: apt

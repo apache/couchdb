@@ -314,7 +314,26 @@ var Render = (function() {
     }
   };
 
-  function renderError(e, funSrc) {
+  function runRewrite(fun, ddoc, args) {
+      var result;
+      try {
+        result = fun.apply(ddoc, args);
+      } catch(error) {
+        renderError(error, fun.toString(), "rewrite_error");
+      }
+
+      if (!result) {
+        respond(["no_dispatch_rule"]);
+        return;
+      }
+
+      if (typeof result === "string") {
+        result = {path: result, method: args[0].method};
+      }
+      respond(["ok", result]);
+  }
+
+  function renderError(e, funSrc, errType) {
     if (e.error && e.reason || e[0] == "error" || e[0] == "fatal") {
       throw(e);
     } else {
@@ -322,7 +341,7 @@ var Render = (function() {
                        (e.toSource ? e.toSource() : e.toString()) + " \n" +
                        "stacktrace: " + e.stack;
       log(logMessage);
-      throw(["error", "render_error", logMessage]);
+      throw(["error", errType || "render_error", logMessage]);
     }
   };
 
@@ -347,6 +366,9 @@ var Render = (function() {
     },
     list : function(fun, ddoc, args) {
       runList(fun, ddoc, args);
+    },
+    rewrite : function(fun, ddoc, args) {
+      runRewrite(fun, ddoc, args);
     }
   };
 })();

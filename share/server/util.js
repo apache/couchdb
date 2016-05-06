@@ -58,9 +58,6 @@ var resolveModule = function(names, mod, root) {
 
 var Couch = {
   // moving this away from global so we can move to json2.js later
-  toJSON : function (val) {
-    return JSON.stringify(val);
-  },
   compileFunction : function(source, ddoc, name) {
     if (!source) throw(["error","not_found","missing function"]);
 
@@ -141,10 +138,10 @@ var Couch = {
   }
 };
 
-// prints the object as JSON, and rescues and logs any toJSON() related errors
+// prints the object as JSON, and rescues and logs any JSON.stringify() related errors
 function respond(obj) {
   try {
-    print(Couch.toJSON(obj));
+    print(JSON.stringify(obj));
   } catch(e) {
     log("Error converting object to JSON: " + e.toString());
     log("error on obj: "+ (obj.toSource ? obj.toSource() : obj.toString()));
@@ -156,7 +153,7 @@ function log(message) {
   if (typeof message == "xml") {
     message = message.toXMLString();
   } else if (typeof message != "string") {
-    message = Couch.toJSON(message);
+    message = JSON.stringify(message);
   }
   respond(["log", String(message)]);
 };

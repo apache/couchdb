@@ -1,5 +1,5 @@
 Apache CouchDB
-Copyright 2009-2013 The Apache Software Foundation
+Copyright 2009-2014 The Apache Software Foundation
 
 This product includes software developed at
 The Apache Software Foundation (http://www.apache.org/).
@@ -86,10 +86,6 @@ This product also includes the following third-party components:
 
    Copyright 2012, Jeremy Ashkenas
 
- * almond.js (http://github.com/jrburke/almond)
-
-  Copyright 2011, The Dojo Foundation
-
  * backbone.js (http://backbonejs.org/)
 
   Copyright 2012, Jeremy Ashkenas, DocumentCloud Inc.
@@ -101,10 +97,6 @@ This product also includes the following third-party components:
  * d3.js (http://d3js.org)
 
   Copyright 2012, Michael Bostock
-
- * JSHint (http://jshint.com/)
-
-  Copyright 2002, Douglas Crockford, modifications by JSHint Community
 
  * Lodash (http://lodash.com/)
 
@@ -130,14 +122,6 @@ This product also includes the following third-party components:
 
    Copyright (c) 2010-2011, The Dojo Foundation
 
- * jquery.form.js (https://github.com/malsup/form/)
-
-   Copyright 2006-2013 (c) M. Alsup
-
- * couch_dbupdates
-   
-   Copyright 2012, Benoît Chesneau <benoitc@refuge.io>
- 
  * mocha.js (https://github.com/visionmedia/mocha)
   
    Copyright (c) 2011-2013 TJ Holowaychuk <tj@vision-media.ca>
@@ -158,30 +142,6 @@ This product also includes the following third-party components:
 
    Copyright (c) 2013 Dave Gandy
 
- * httpdomain.py (https://bitbucket.org/birkenfeld/sphinx-contrib/src/6a3a8ca714cfce957530890d0431d9a7b88c930f/httpdomain/sphinxcontrib/httpdomain.py?at=httpdomain-1.1.9)
-
-   Copyright (c) 2010, Hong Minhee <minhee@dahlia.kr>
-
- * externals.rst (http://davispj.com/2010/09/26/new-couchdb-externals-api.html)
-
-   Copyright 2008-2010, Paul Joseph Davis <paul.joseph.davis@gmail.com>
-
- * protocol.rst (http://www.dataprotocols.org/en/latest/couchdb_replication.html)
-
-   Copyright 2011-2013, Benoît Chesneau <benoitc@refuge.io>
-
- * views/intro.rst views/nosql.rst views/pagination.rst
-
-   Copyright 2013, Creative Commons Attribution license
-
- * share/doc/src/couchapp/views/joins.rst (Using View Collation)
-
-   Copyright 2007, Christopher Lenz <cmlenz@gmail.com>
-
- * share/doc/src/templates/couchdb/domainindex.html
-
-   Copyright 2007-2011 by the Sphinx team
-
  * sandbox.js https://github.com/KlausTrainer/sandbox.js
 
    (c) 2013 Klaus Trainer
@@ -189,3 +149,55 @@ This product also includes the following third-party components:
  * ace editor https://github.com/ajaxorg/ace
 
    Copyright (c) 2010, Ajax.org B.V.
+
+ * src/fauxton/asserts/js/plugins/cloudant.pagingcollection.js
+
+   Copyright (c) 2014, Cloudant http://cloudant.com
+
+ * velocity.js (https://github.com/julianshapiro/velocity)
+
+   Copyright (c) 2014 Julian Shapiro
+
+* is_base_dir function in eunit_plugin.erl (https://github.com/ChicagoBoss/ChicagoBoss/blob/master/skel/priv/rebar/boss_plugin.erl)
+
+   Copyright (c) 2009-2011 Evan Miller
+
+* ?assertNotMatch in couch_eunit.hrl (https://github.com/richcarl/eunit/blob/master/include/eunit.hrl#L200-L219)
+
+   Copyright (C) 2004-2006 Mickaël Rémond, Richard Carlsson
+
+* src/fauxton/test/nightwatch_tests/custom-commands/waitForAttribute.js
+
+   Copyright (c) 2014 Dave Koo
+
+* moment.js
+
+   Copyright (c) 2011-2014 Tim Wood, Iskren Chernev, moment.js contributors
+
+* React.js
+
+  Copyright (c) 2013-2015, Facebook, Inc.
+
+* Flux.js
+
+  Copyright (c) 2014, Facebook, Inc. All rights reserved.
+
+* es5-shim.js
+
+  Copyright (C) 2009-2014 Kristopher Michael Kowal and contributors
+
+* CSS.escape (https://github.com/mathiasbynens/CSS.escape/)
+
+  Copyright Mathias Bynens
+
+* Papaparse.js
+
+  Copyright (c) 2015 Matthew Holt
+
+* react-bootstrap.js
+
+  Copyright (c) 2014 Stephen J. Collings, Matthew Honnibal, Pieter Vanderwerff
+
+* velocity-react
+
+  Copyright (c) 2015 Twitter, Inc.

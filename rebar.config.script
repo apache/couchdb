@@ -1,0 +1,101 @@
+% Licensed under the Apache License, Version 2.0 (the "License"); you may not
+% use this file except in compliance with the License. You may obtain a copy of
+% the License at
+%
+%   http://www.apache.org/licenses/LICENSE-2.0
+%
+% Unless required by applicable law or agreed to in writing, software
+% distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+% WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+% License for the specific language governing permissions and limitations under
+% the License.
+
+% Set the path to the configuration environment generated
+% by `./configure`.
+
+COUCHDB_ROOT = filename:dirname(SCRIPT).
+os:putenv("COUCHDB_ROOT", COUCHDB_ROOT).
+
+ConfigureEnv = filename:join(COUCHDB_ROOT, "config.erl").
+os:putenv("COUCHDB_CONFIG", ConfigureEnv).
+
+os:putenv("COUCHDB_APPS_CONFIG_DIR", filename:join([COUCHDB_ROOT, "rel/apps"])).
+
+DepDescs = [
+%% must be compiled first as it has a custom behavior
+{couch_epi,        "couch-epi",        "5a7f2868c720bc428e6c888dc61d988b9a5f63f1"},
+{config,           "config",           "a2d5ad2eedc960248b806f61df0a1009462bdb46"},
+%% keep these sorted
+{b64url,           "b64url",           "319fc604235ab1fde37047b38a432450161db750"},
+{cassim,           "cassim",           "ab1ef1cee5f7b7ec1733e44845c1df99fc7a66a3"},
+{couch_log,        "couch-log",        "e4abbd3874356dc7a201b09676e27ff7dc8bed7c"},
+{couch_log_lager,  "couch-log-lager",  "b2a0471a87765de50c5eb05c65c121f68a9ae9fa"},
+{chttpd,           "chttpd",           "7cffe7edc5abe1a41103eae7f076e843222f429b"},
+{couch,            "couch",            "b49d069160ed6a35a044994cf516ad79b099601d"},
+{couch_index,      "couch-index",      "e8c8ca8b0bb66193f1ba7e4b1d7e4a3817d661ab"},
+{couch_mrview,     "couch-mrview",     "6ec35971ebd96133cc6a34fa29f1d364049a7ecd"},
+{couch_replicator, "couch-replicator", "ab0afce2d6fdfeeade636a9252327ac09a1e423f"},
+{couch_plugins,    "couch-plugins",    "3e73b723cb126cfc471b560d17c24a8b5c540085"},
+{couch_event,      "couch-event",      "835a41885d1e276d207758954f8238aa7bba0ae8"},
+{couch_stats,      "couch-stats",      "7895d4d3f509ed24f09b6d1a0bd0e06af34551dc"},
+{couch_peruser,    "peruser",          "ff7d190970a46722137fbc7a1a75466e8a544ae1"},
+{couch_tests,       "erlang-tests",    "cba29c894aace569f13e6bf83bc6ef06fd448712"},
+{docs,             "documentation",    "089f404d26374d8c6942a725d05627d6901a9330", [raw]},
+{ddoc_cache,       "ddoc-cache",       "c762e90a33ce3cda19ef142dd1120f1087ecd876"},
+{ets_lru,          "ets-lru",          "c05488c8b1d7ec1c3554a828e0c9bf2888932ed6"},
+{fabric,           "fabric",           "ecaacfecf0e356d84ca2978346ba409107df064e"},
+{fauxton,          "fauxton",          {tag, "v1.1.2"}, [raw]},
+{folsom,           "folsom",           "a5c95dec18227c977029fbd3b638966d98f17003"},
+{global_changes,   "global-changes",   "e55de37ece29b6cbc0af540370d2425159338bf9"},
+{goldrush,         "goldrush",         {tag, "0.1.6"}},
+{ibrowse,          "ibrowse",          "4af2d408607874d124414ac45df1edbe3961d1cd"},
+{ioq,              "ioq",              "c7c75ebeaf41599e3a3e211097d864f0e7785829"},
+{jiffy,            "jiffy",            "ea19c417f9fd52fa3f7ef2d378735e5532c59b29"},
+{khash,            "khash",            "7c6a9cd9776b5c6f063ccafedfa984b00877b019"},
+{mango,            "mango",            "01252f971bef0c8da1d78bf5a7b506b71926ce1b"},
+{mem3,             "mem3",             "699308f510d335d05bfd0416ad5e893b68a7ec1d"},
+{mochiweb,         "mochiweb",         "bd6ae7cbb371666a1f68115056f7b30d13765782"},
+{oauth,            "oauth",            "099057a98e41f3aff91e77e3cf496d6c6fd901df"},
+{rexi,             "rexi",             "a327b7dbeb2b0050f7ca9072047bf8ef2d282833"},
+{snappy,           "snappy",           "fac852f59a3457ec10dd8365642d6b30928260c1"},
+{setup,            "setup",            "b9e1f3b5d5a78a706abb358e17130fb7344567d2"},
+{meck,             "meck",             {tag, "0.8.2"}}
+],
+
+BaseUrl = "https://git-wip-us.apache.org/repos/asf/",
+
+MakeDep = fun
+    ({AppName, {url, Url}, Version}) ->
+        {AppName, ".*", {git, Url, Version}};
+    ({AppName, {url, Url}, Version, Options}) ->
+        {AppName, ".*", {git, Url, Version}, Options};
+    ({AppName, RepoName, Version}) ->
+        Url = BaseUrl ++ "couchdb-" ++ RepoName ++ ".git",
+        {AppName, ".*", {git, Url, Version}};
+    ({AppName, RepoName, Version, Options}) ->
+        Url = BaseUrl ++ "couchdb-" ++ RepoName ++ ".git",
+        {AppName, ".*", {git, Url, Version}, Options}
+end,
+
+AddConfig = [
+    {require_otp_vsn, "R16B03|R16B03-1|17|18"},
+    {deps_dir, "src"},
+    {deps, lists:map(MakeDep, DepDescs)},
+    {sub_dirs, ["rel"]},
+    {lib_dirs, ["src/"]},
+    {erl_opts, [debug_info]},
+    {eunit_opts, [verbose]},
+    {plugins, [eunit_plugin]},
+    {dialyzer, [
+        {plt_location, local},
+        {plt_location, COUCHDB_ROOT},
+        {plt_extra_apps, [
+            asn1, compiler, crypto, inets, kernel, os_mon, runtime_tools,
+            sasl, ssl, stdlib, syntax_tools, xmerl]},
+        {warnings, [unmatched_returns, error_handling, race_conditions]}]},
+    {post_hooks, [{compile, "escript support/build_js.escript"}]}
+],
+
+C = lists:foldl(fun({K, V}, CfgAcc) ->
+    lists:keystore(K, 1, CfgAcc, {K, V})
+end, CONFIG, AddConfig).

@@ -1,0 +1,73 @@
+#!/usr/bin/env escript
+%% -*- mode: erlang -*-
+
+main(_) ->
+    introspect("rebar.config.script").
+
+introspect(File) ->
+    Bindings = [{'SCRIPT', File}, {'CONFIG', []}],
+    {ok, Config} = file:script(File, Bindings),
+    {deps, Deps} = lists:keyfind(deps, 1, Config),
+    introspect_deps(Deps).
+
+introspect_deps([]) ->
+    ok;
+introspect_deps([Dep | Rest]) ->
+    introspect_dep(Dep),
+    introspect_deps(Rest).
+
+introspect_dep({App, VsnRegex, {git, Url, From}, _Raw}) ->
+    introspect_dep({App, VsnRegex, {git, Url, From}});
+introspect_dep({App, _VsnRegex, {git, _Url, From}}) ->
+    io:format(bold("~s~n"), [App]),
+    introspect_diff(App, From),
+    io:format("~n", []),
+    ok.
+
+revision({branch, Branch}) ->
+    Branch;
+revision({tag, Tag}) ->
+    Tag;
+revision(Rev) ->
+    Rev.
+
+introspect_diff(App, From) ->
+    introspect_diff(App, revision(From), "origin/master").
+
+introspect_diff(App, From, ToBranch) ->
+    {ok, Log} = sh(App, io_lib:format("git log --pretty=oneline ~s..~s", [From, ToBranch])),
+    case Log of
+        [] ->
+            io:format("  up to date on ~s~n", [bold(ToBranch)]);
+        _ ->
+            io:format("  ~B commits behind ~s~n", [length(Log), bold(ToBranch)]),
+            io:format("~s~n~n", [string:join(["    " ++ L || L <- Log], "\n")])
+    end.
+
+sh(App, Cmd) ->
+    Dir = lists:flatten(["src/", atom_to_list(App)]),
+    Port = open_port({spawn, lists:flatten(Cmd)},
+                     [{cd, Dir},
+                      {line, 16384},
+                      exit_status,
+                      stderr_to_stdout,
+                      use_stdio]),
+    read_port(Port).
+
+read_port(Port) ->
+    read_port(Port, []).
+
+read_port(Port, Acc) ->
+    receive
+        {Port, {data, {eol, Line}}} ->
+            read_port(Port, [Line | Acc]);
+        {Port, {data, {noeol, Line}}} ->
+            read_port(Port, [Line | Acc]);
+        {Port, {exit_status, 0}} ->
+            {ok, lists:reverse(Acc)};
+        {Port, {exit_status, Code}} ->
+            {error, Code, Acc}
+    end.
+
+bold(Text) ->
+    "\e[1m" ++ Text ++ "\e[0m".
