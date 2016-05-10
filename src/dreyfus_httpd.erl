@@ -28,6 +28,7 @@ handle_search_req(Req, Db, DDoc) ->
 handle_search_req(#httpd{method=Method, path_parts=[_, _, _, _, IndexName]}=Req
                   ,#db{name=DbName}=Db, DDoc, RetryCount, RetryPause)
   when Method == 'GET'; Method == 'POST' ->
+    Start = os:timestamp(),
     QueryArgs = #index_query_args{
         q = Query,
         include_docs = IncludeDocs,
@@ -96,7 +97,9 @@ handle_search_req(#httpd{method=Method, path_parts=[_, _, _, _, IndexName]}=Req
                 {error, Reason} ->
                     handle_error(Req, Db, DDoc, RetryCount, RetryPause, Reason)
             end
-    end;
+    end,
+    RequestTime = timer:now_diff(os:timestamp(), Start) div 1000,
+    couch_stats:update_histogram([dreyfus, httpd, search], RequestTime);
 handle_search_req(#httpd{path_parts=[_, _, _, _, _]}=Req, _Db, _DDoc, _RetryCount, _RetryPause) ->
     send_method_not_allowed(Req, "GET,POST");
 handle_search_req(Req, _Db, _DDoc, _RetryCount, _RetryPause) ->
