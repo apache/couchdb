@@ -78,7 +78,7 @@ attach_nodes([S | Rest], Acc, [Node | Nodes], UsedNodes) ->
 
 open_db_doc(DocId) ->
     DbName = ?l2b(config:get("mem3", "shards_db", "_dbs")),
-    {ok, Db} = couch_db:open(DbName, []),
+    {ok, Db} = couch_db:open(DbName, [?ADMIN_CTX]),
     try couch_db:open_doc(Db, DocId, [ejson_body]) after couch_db:close(Db) end.
 
 write_db_doc(Doc) ->
@@ -86,7 +86,7 @@ write_db_doc(Doc) ->
     write_db_doc(DbName, Doc, true).
 
 write_db_doc(DbName, #doc{id=Id, body=Body} = Doc, ShouldMutate) ->
-    {ok, Db} = couch_db:open(DbName, []),
+    {ok, Db} = couch_db:open(DbName, [?ADMIN_CTX]),
     try couch_db:open_doc(Db, Id, [ejson_body]) of
     {ok, #doc{body = Body}} ->
         % the doc is already in the desired state, we're done here
@@ -112,7 +112,7 @@ delete_db_doc(DocId) ->
     delete_db_doc(DbName, DocId, true).
 
 delete_db_doc(DbName, DocId, ShouldMutate) ->
-    {ok, Db} = couch_db:open(DbName, []),
+    {ok, Db} = couch_db:open(DbName, [?ADMIN_CTX]),
     {ok, Revs} = couch_db:open_doc_revs(Db, DocId, all, []),
     try [Doc#doc{deleted=true} || {ok, #doc{deleted=false}=Doc} <- Revs] of
     [] ->
