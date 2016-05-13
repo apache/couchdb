@@ -492,7 +492,7 @@ def try_request(host, port, meth, path, success_codes, retries=10, retry_dt=1):
 
 
 def create_system_databases(host, port):
-    for dbname in ['_users', '_replicator', '_metadata', '_global_changes']:
+    for dbname in ['_users', '_replicator', '_global_changes']:
         conn = httpclient.HTTPConnection(host, port)
         conn.request('HEAD', '/' + dbname)
         resp = conn.getresponse()
