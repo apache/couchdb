@@ -291,7 +291,7 @@ delete_db_req(#httpd{}=Req, DbName) ->
     end.
 
 do_db_req(#httpd{path_parts=[DbName|_], user_ctx=Ctx}=Req, Fun) ->
-    cassim:get_security(DbName, [{user_ctx,Ctx}]), % calls check_is_reader
+    fabric:get_security(DbName, [{user_ctx,Ctx}]), % calls check_is_reader
     Fun(Req, #db{name=DbName, user_ctx=Ctx}).
 
 db_req(#httpd{method='GET',path_parts=[DbName]}=Req, _Db) ->
@@ -545,23 +545,20 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_revs_diff">>]}=Req, Db) ->
 db_req(#httpd{path_parts=[_,<<"_revs_diff">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "POST");
 
-%% DEPRECATED: this endpoint functionality will be replaced by _security_mvcc
-db_req(#httpd{method='PUT',path_parts=[_,<<"_security">>]}=Req, Db) ->
-    put_security(Req, Db, true);
+db_req(#httpd{method='PUT',path_parts=[_,<<"_security">>],user_ctx=Ctx}=Req,
+        Db) ->
+    SecObj = chttpd:json_body(Req),
+    case fabric:set_security(Db, SecObj, [{user_ctx, Ctx}]) of
+        ok ->
+            send_json(Req, {[{<<"ok">>, true}]});
+        Else ->
+            throw(Else)
+    end;
 
 db_req(#httpd{method='GET',path_parts=[_,<<"_security">>],user_ctx=Ctx}=Req, Db) ->
-    send_json(Req, cassim:get_security(Db, [{user_ctx,Ctx}]));
+    send_json(Req, fabric:get_security(Db));
 
 db_req(#httpd{path_parts=[_,<<"_security">>]}=Req, _Db) ->
-    send_method_not_allowed(Req, "PUT,GET");
-
-db_req(#httpd{method='PUT',path_parts=[_,<<"_security_mvcc">>]}=Req, Db) ->
-    put_security(Req, Db, false);
-
-db_req(#httpd{method='GET',path_parts=[_,<<"_security_mvcc">>],user_ctx=Ctx}=Req, Db) ->
-    send_json(Req, cassim:get_security(Db, [{user_ctx,Ctx}]));
-
-db_req(#httpd{path_parts=[_,<<"_security_mvcc">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "PUT,GET");
 
 db_req(#httpd{method='PUT',path_parts=[_,<<"_revs_limit">>],user_ctx=Ctx}=Req,
@@ -1486,55 +1483,6 @@ monitor_attachments(Att) ->
 
 demonitor_refs(Refs) when is_list(Refs) ->
     [demonitor(Ref) || Ref <- Refs].
-
-%% This function should exist in cassim, but its depedence on the #httpd{}
-%% record makes it difficult to separate. This function should be refactored and
-%% moved into cassim once couch_doc_from_req and update_doc are reworked.
-put_security(#httpd{user_ctx=Ctx}=Req, Db, FetchRev) ->
-    case {cassim:is_enabled(), cassim:metadata_db_exists()} of
-        {true, true} ->
-            DbName = Db#db.name,
-            DocId = cassim_metadata_cache:security_meta_id(DbName),
-            {SecObj0} = chttpd:json_body(Req),
-            {OldSecDoc} = cassim:get_security(DbName),
-            OldRev = couch_util:get_value(<<"_rev">>, OldSecDoc, undefined),
-            %% Maybe update the security doc with the rev when hiding mvcc logic
-            SecObj = case {FetchRev, OldRev} of
-                %% User supplied rev, just use the req body
-                {false, _} ->
-                    SecObj0;
-                %% User did not supply rev, but new security doc
-                {true, undefined} ->
-                    SecObj0;
-                %% User did not supply rev, use the old rev
-                {true, OldRev} ->
-                    [{<<"_rev">>, OldRev}|proplists:delete(<<"_rev">>, SecObj0)]
-            end,
-            SecDoc = couch_doc_from_req(Req, DocId, {SecObj}),
-            Options = [
-                delay_commit,
-                interactive_edit,
-                {user_ctx, Ctx},
-                {w, integer_to_list(mem3:quorum(Db))}
-            ],
-            {Status, {etag, Etag}, Body} =
-                cassim:set_security(Db, SecDoc, Options),
-            HttpCode = http_code_from_status(Status),
-            ResponseHeaders = [{"Etag", Etag}],
-            send_json(Req, HttpCode, ResponseHeaders, Body);
-        {false, true} ->
-            throw({error, security_migration_updates_disabled});
-        %% handle completely disabled case and also cassim setting enabled but
-        %% metadata db does not exist.
-        _ ->
-            SecObj = chttpd:json_body(Req),
-            case fabric:set_security(Db, SecObj, [{user_ctx, Ctx}]) of
-                ok ->
-                    send_json(Req, {[{<<"ok">>, true}]});
-                Else ->
-                    throw(Else)
-            end
-    end.
 
 set_namespace(<<"_all_docs">>, Args) ->
     set_namespace(undefined, Args);

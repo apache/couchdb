@@ -123,7 +123,7 @@ get_db_info(#db{} = Db) ->
 
 
 get_db_security(#db{main_pid = nil}=Db, #user_ctx{}=UserCtx) ->
-    cassim:get_security(Db, [{user_ctx, UserCtx}]);
+    couch_db:get_security(Db);
 get_db_security(#db{}=Db, #user_ctx{}) ->
     couch_db:get_security(Db).
 
