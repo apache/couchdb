@@ -191,9 +191,7 @@ handle_call(get_compactor_pid, _From, State) ->
 handle_call({compacted, NewIdxState}, _From, State) ->
     #st{
         mod=Mod,
-        idx_state=OldIdxState,
-        updater=Updater,
-        commit_delay=Delay
+        idx_state=OldIdxState
     } = State,
     assert_signature_match(Mod, OldIdxState, NewIdxState),
     NewSeq = Mod:get(update_seq, NewIdxState),
@@ -202,25 +200,9 @@ handle_call({compacted, NewIdxState}, _From, State) ->
     % up to date with the current index. Otherwise indexes could roll back
     % (perhaps considerably) to previous points in history.
     case NewSeq >= OldSeq of
-        true ->
-            {ok, NewIdxState1} = Mod:swap_compacted(OldIdxState, NewIdxState),
-            % Restart the indexer if it's running.
-            case couch_index_updater:is_running(Updater) of
-                true -> ok = couch_index_updater:restart(Updater, NewIdxState1);
-                false -> ok
-            end,
-            case State#st.committed of
-                true -> erlang:send_after(Delay, self(), commit);
-                false -> ok
-            end,
-            {reply, ok, State#st{
-                idx_state=NewIdxState1,
-                committed=false
-            }};
-        _ ->
-            {reply, recompact, State}
+        true -> {reply, ok, commit_compacted(NewIdxState, State)};
+        false -> {reply, recompact, State}
     end.
-
 
 handle_cast({config_change, NewDelay}, State) ->
     MsDelay = 1000 * list_to_integer(NewDelay),
@@ -407,3 +389,25 @@ assert_signature_match(Mod, OldIdxState, NewIdxState) ->
         {Sig, Sig} -> ok;
         _ -> erlang:error(signature_mismatch)
     end.
+
+commit_compacted(NewIdxState, State) ->
+    #st{
+        mod=Mod,
+        idx_state=OldIdxState,
+        updater=Updater,
+        commit_delay=Delay
+    } = State,
+    {ok, NewIdxState1} = Mod:swap_compacted(OldIdxState, NewIdxState),
+    % Restart the indexer if it's running.
+    case couch_index_updater:is_running(Updater) of
+        true -> ok = couch_index_updater:restart(Updater, NewIdxState1);
+        false -> ok
+    end,
+    case State#st.committed of
+        true -> erlang:send_after(Delay, self(), commit);
+        false -> ok
+    end,
+    State#st{
+        idx_state=NewIdxState1,
+        committed=false
+     }.
