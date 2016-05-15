@@ -570,7 +570,7 @@ init_db(DbName, Filepath, Fd, Header0, Options) ->
         [{compression, Compression}]),
     case couch_db_header:security_ptr(Header) of
     nil ->
-        Security = default_security_object(),
+        Security = default_security_object(DbName),
         SecurityPtr = nil;
     SecurityPtr ->
         {ok, Security} = couch_file:pread_term(Fd, SecurityPtr)
@@ -1438,9 +1438,17 @@ make_doc_summary(#db{compression = Comp}, {Body0, Atts0}) ->
     SummaryBin = ?term_to_bin({Body, Atts}),
     couch_file:assemble_file_chunk(SummaryBin, couch_crypto:hash(md5, SummaryBin)).
 
-default_security_object() ->
-    case config:get("couchdb", "default_security", "open") of
+default_security_object(<<"shards/", _/binary>>) ->
+    case config:get("couchdb", "default_security", "everyone") of
         "admin_only" ->
+            [{<<"members">>,{[{<<"roles">>,[<<"_admin">>]}]}},
+             {<<"admins">>,{[{<<"roles">>,[<<"_admin">>]}]}}];
+        Everyone when Everyone == "everyone"; Everyone == "admin_local" ->
+            []
+    end;
+default_security_object(_DbName) ->
+    case config:get("couchdb", "default_security", "everyone") of
+        Admin when Admin == "admin_only"; Admin == "admin_local" ->
             [{<<"members">>,{[{<<"roles">>,[<<"_admin">>]}]}},
              {<<"admins">>,{[{<<"roles">>,[<<"_admin">>]}]}}];
         "everyone" ->
