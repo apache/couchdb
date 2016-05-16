@@ -20,6 +20,7 @@
 -define(INITIAL_WAIT, 60000).
 -define(MONITOR_CHECK, 10000).
 -define(SIZE_BLOCK, 16#1000). % 4 KiB
+-define(READ_AHEAD, 2 * ?SIZE_BLOCK).
 
 
 -record(file, {
@@ -413,8 +414,10 @@ handle_call(close, _From, #file{fd=Fd}=File) ->
 handle_call({pread_iolist, Pos}, _From, File) ->
     {RawData, NextPos} = try
         % up to 8Kbs of read ahead
-        read_raw_iolist_int(File, Pos, 2 * ?SIZE_BLOCK - (Pos rem ?SIZE_BLOCK))
+        read_raw_iolist_int(File, Pos, ?READ_AHEAD - (Pos rem ?SIZE_BLOCK))
     catch
+    throw:read_beyond_eof ->
+        throw(read_beyond_eof);
     _:_ ->
         read_raw_iolist_int(File, Pos, 4)
     end,
@@ -550,11 +553,16 @@ maybe_read_more_iolist(Buffer, DataSize, NextPos, File) ->
     {Data::iolist(), CurPos::non_neg_integer()}.
 read_raw_iolist_int(Fd, {Pos, _Size}, Len) -> % 0110 UPGRADE CODE
     read_raw_iolist_int(Fd, Pos, Len);
-read_raw_iolist_int(#file{fd = Fd}, Pos, Len) ->
+read_raw_iolist_int(#file{fd = Fd} = F, Pos, Len) ->
     BlockOffset = Pos rem ?SIZE_BLOCK,
     TotalBytes = calculate_total_read_len(BlockOffset, Len),
-    {ok, <<RawBin:TotalBytes/binary>>} = file:pread(Fd, Pos, TotalBytes),
-    {remove_block_prefixes(BlockOffset, RawBin), Pos + TotalBytes}.
+    case Pos + TotalBytes of
+    Size when Size > F#file.eof + ?READ_AHEAD ->
+        throw(read_beyond_eof);
+    Size ->
+        {ok, <<RawBin:TotalBytes/binary>>} = file:pread(Fd, Pos, TotalBytes),
+        {remove_block_prefixes(BlockOffset, RawBin), Size}
+    end.
 
 -spec extract_md5(iolist()) -> {binary(), iolist()}.
 extract_md5(FullIoList) ->

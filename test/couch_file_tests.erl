@@ -24,7 +24,10 @@ setup() ->
     Fd.
 
 teardown(Fd) ->
-    ok = couch_file:close(Fd).
+    case is_process_alive(Fd) of
+        true -> ok = couch_file:close(Fd);
+        false -> ok
+    end.
 
 open_close_test_() ->
     {
@@ -126,8 +129,18 @@ should_read_iolist(Fd) ->
 should_fsync(Fd) ->
     {"How does on test fsync?", ?_assertMatch(ok, couch_file:sync(Fd))}.
 
-should_not_read_beyond_eof(_) ->
-    {"No idea how to test reading beyond EOF", ?_assert(true)}.
+should_not_read_beyond_eof(Fd) ->
+    BigBin = list_to_binary(lists:duplicate(100000, 0)),
+    DoubleBin = round(byte_size(BigBin) * 2),
+    {ok, Pos, _Size} = couch_file:append_binary(Fd, BigBin),
+    {_, Filepath} = couch_file:process_info(Fd),
+    %% corrupt db file
+    {ok, Io} = file:open(Filepath, [read, write, binary]),
+    ok = file:pwrite(Io, Pos, <<0:1/integer, DoubleBin:31/integer>>),
+    file:close(Io),
+    unlink(Fd),
+    ExpectedError = {badmatch, {'EXIT', {bad_return_value, read_beyond_eof}}},
+    ?_assertError(ExpectedError, couch_file:pread_binary(Fd, Pos)).
 
 should_truncate(Fd) ->
     {ok, 0, _} = couch_file:append_term(Fd, foo),
