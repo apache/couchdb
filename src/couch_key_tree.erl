@@ -60,6 +60,7 @@ map/2,
 map_leafs/2,
 mapfold/3,
 merge/3,
+merge/2,
 remove_leafs/2,
 stem/2
 ]).
