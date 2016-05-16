@@ -88,6 +88,8 @@ key_tree_get_leaves_test_()->
                 should_gather_non_existant_leaf(),
                 should_gather_leaf(),
                 shoul_gather_multiple_leaves(),
+                should_gather_single_leaf_for_multiple_revs(),
+                should_gather_multiple_for_multiple_revs(),
                 should_retrieve_full_key_path(),
                 should_retrieve_full_key_path_for_node(),
                 should_retrieve_leaves_with_parent_node(),
@@ -346,6 +348,18 @@ shoul_gather_multiple_leaves()->
     TwoChildSibs = [{0, {"1","foo", [{"1a", "bar", []}, {"1b", "bar", []}]}}],
     ?_assertEqual({[{"bar", {1, ["1a","1"]}},{"bar",{1, ["1b","1"]}}],[]},
                   couch_key_tree:get_key_leafs(TwoChildSibs, [{0, "1"}])).
+
+should_gather_single_leaf_for_multiple_revs() ->
+    OneChild = [{0, {"1","foo",[{"1a", "bar", []}]}}],
+    ToFind = [{0, "1"}, {1, "1a"}],
+    ?_assertEqual({[{"bar", {1, ["1a", "1"]}}],[]},
+                  couch_key_tree:get_key_leafs(OneChild, ToFind)).
+
+should_gather_multiple_for_multiple_revs() ->
+    TwoChildSibs = [{0, {"1","foo", [{"1a", "bar", []}, {"1b", "bar", []}]}}],
+    ToFind = [{0, "1"}, {1, "1a"}],
+    ?_assertEqual({[{"bar", {1, ["1a","1"]}},{"bar",{1, ["1b","1"]}}],[]},
+                  couch_key_tree:get_key_leafs(TwoChildSibs, ToFind)).
 
 should_retrieve_full_key_path()->
     TwoChildSibs = [{0, {"1","foo", [{"1a", "bar", []}, {"1b", "bar", []}]}}],

@@ -281,24 +281,48 @@ get_key_leafs([{Pos, Tree}|Rest], Keys, Acc) ->
     {Gotten, RemainingKeys} = get_key_leafs_simple(Pos, [Tree], Keys, []),
     get_key_leafs(Rest, RemainingKeys, Gotten ++ Acc).
 
-get_key_leafs_simple(_Pos, _Tree, [], _KeyPathAcc) ->
+get_key_leafs_simple(_Pos, _Tree, [], _PathAcc) ->
     {[], []};
-get_key_leafs_simple(_Pos, [], KeysToGet, _KeyPathAcc) ->
-    {[], KeysToGet};
-get_key_leafs_simple(Pos, [{Key, _Value, SubTree}=Tree | RestTree], KeysToGet, KeyPathAcc) ->
-    case lists:delete({Pos, Key}, KeysToGet) of
-    KeysToGet -> % same list, key not found
-        {LeafsFound, KeysToGet2} = get_key_leafs_simple(Pos + 1, SubTree, KeysToGet, [Key | KeyPathAcc]),
-        {RestLeafsFound, KeysRemaining} = get_key_leafs_simple(Pos, RestTree, KeysToGet2, KeyPathAcc),
-        {LeafsFound ++ RestLeafsFound, KeysRemaining};
-    KeysToGet2 ->
-        LeafsFound = get_all_leafs_simple(Pos, [Tree], KeyPathAcc),
-        LeafKeysFound = [{LeafPos, LeafRev} || {_, {LeafPos, [LeafRev|_]}}
-            <- LeafsFound],
-        KeysToGet3 = KeysToGet2 -- LeafKeysFound,
-        {RestLeafsFound, KeysRemaining} = get_key_leafs_simple(Pos, RestTree, KeysToGet3, KeyPathAcc),
-        {LeafsFound ++ RestLeafsFound, KeysRemaining}
+get_key_leafs_simple(_Pos, [], Keys, _PathAcc) ->
+    {[], Keys};
+get_key_leafs_simple(Pos, [{Key, _, SubTree}=Tree | RestTree], Keys, PathAcc) ->
+    case lists:delete({Pos, Key}, Keys) of
+        Keys ->
+            % Same list, key not found
+            NewPathAcc = [Key | PathAcc],
+            {ChildLeafs, Keys2} = get_key_leafs_simple(Pos + 1, SubTree, Keys, NewPathAcc),
+            {SiblingLeafs, Keys3} = get_key_leafs_simple(Pos, RestTree, Keys2, PathAcc),
+            {ChildLeafs ++ SiblingLeafs, Keys3};
+        Keys2 ->
+            % This is a key we were looking for, get all descendant
+            % leafs while removing any requested key we find. Notice
+            % that this key will be returned by get_key_leafs_simple2
+            % if it's a leaf so there's no need to return it here.
+            {ChildLeafs, Keys3} = get_key_leafs_simple2(Pos, [Tree], Keys2, PathAcc),
+            {SiblingLeafs, Keys4} = get_key_leafs_simple(Pos, RestTree, Keys3, PathAcc),
+            {ChildLeafs ++ SiblingLeafs, Keys4}
     end.
+
+
+get_key_leafs_simple2(_Pos, [], Keys, _PathAcc) ->
+    % No more tree to deal with so no more keys to return.
+    {[], Keys};
+get_key_leafs_simple2(Pos, [{Key, Value, []} | RestTree], Keys, PathAcc) ->
+    % This is a leaf as defined by having an empty list of
+    % child nodes. The assertion is a bit subtle but the function
+    % clause match means its a leaf.
+    Keys2 = lists:delete({Pos, Key}, Keys),
+    {SiblingLeafs, Keys3} = get_key_leafs_simple2(Pos, RestTree, Keys2, PathAcc),
+    {[{Value, {Pos, [Key | PathAcc]}} | SiblingLeafs], Keys3};
+get_key_leafs_simple2(Pos, [{Key, _Value, SubTree} | RestTree], Keys, PathAcc) ->
+    % This isn't a leaf. Recurse into the subtree and then
+    % process any sibling branches.
+    Keys2 = lists:delete({Pos, Key}, Keys),
+    NewPathAcc = [Key | PathAcc],
+    {ChildLeafs, Keys3} = get_key_leafs_simple2(Pos + 1, SubTree, Keys2, NewPathAcc),
+    {SiblingLeafs, Keys4} = get_key_leafs_simple2(Pos, RestTree, Keys3, PathAcc),
+    {ChildLeafs ++ SiblingLeafs, Keys4}.
+
 
 get(Tree, KeysToGet) ->
     {KeyPaths, KeysNotFound} = get_full_key_paths(Tree, KeysToGet),
