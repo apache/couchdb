@@ -199,9 +199,14 @@ handle_call({compacted, NewIdxState}, _From, State) ->
     % For indices that require swapping files, we have to make sure we're
     % up to date with the current index. Otherwise indexes could roll back
     % (perhaps considerably) to previous points in history.
-    case NewSeq >= OldSeq of
-        true -> {reply, ok, commit_compacted(NewIdxState, State)};
-        false -> {reply, recompact, State}
+    case is_recompaction_enabled(NewIdxState, State) of
+        true ->
+            case NewSeq >= OldSeq of
+                true -> {reply, ok, commit_compacted(NewIdxState, State)};
+                false -> {reply, recompact, State}
+            end;
+        false ->
+            {reply, ok, commit_compacted(NewIdxState, State)}
     end.
 
 handle_cast({config_change, NewDelay}, State) ->
@@ -411,3 +416,31 @@ commit_compacted(NewIdxState, State) ->
         idx_state=NewIdxState1,
         committed=false
      }.
+
+is_recompaction_enabled(IdxState, #st{mod = Mod}) ->
+    DbName = binary_to_list(Mod:get(db_name, IdxState)),
+    IdxName = binary_to_list(Mod:get(idx_name, IdxState)),
+    IdxKey = DbName ++ ":" ++ IdxName,
+
+    IdxSignature = couch_index_util:hexsig((Mod:get(signature, IdxState))),
+
+    Global = get_value("view_compaction", "enabled_recompaction"),
+    PerSignature = get_value("view_compaction.recompaction", IdxSignature),
+    PerIdx = get_value("view_compaction.recompaction", IdxKey),
+    PerDb = get_value("view_compaction.recompaction", DbName),
+
+    find_most_specific([Global, PerDb, PerIdx, PerSignature], true).
+
+find_most_specific(Settings, Default) ->
+    Reversed = lists:reverse([Default | Settings]),
+    [Value | _] = lists:dropwhile(fun(A) -> A =:= undefined end, Reversed),
+    Value.
+
+get_value(Section, Key) ->
+    case config:get(Section, Key) of
+        "enabled" -> true;
+        "disabled" -> false;
+        "true" -> true;
+        "false" -> false;
+        undefined -> undefined
+    end.
