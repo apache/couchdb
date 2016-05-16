@@ -570,8 +570,10 @@ read_raw_iolist_int(#file{fd = Fd, pread_limit = Limit} = F, Pos, Len) ->
     TotalBytes = calculate_total_read_len(BlockOffset, Len),
     case Pos + TotalBytes of
     Size when Size > F#file.eof + ?READ_AHEAD ->
+        couch_stats:increment_counter([pread, exceed_eof]),
         throw(read_beyond_eof);
     Size when Size > Limit ->
+        couch_stats:increment_counter([pread, exceed_limit]),
         throw({exceed_pread_limit, Limit});
     Size ->
         {ok, <<RawBin:TotalBytes/binary>>} = file:pread(Fd, Pos, TotalBytes),
