@@ -11,18 +11,11 @@
 // the License.
 
 couchTests.users_db_security = function(debug) {
-  return console.log('TODO after at least COUCHDB-2991 is adressed');
-  var db_name = get_random_db_name();
+  var db_name = '_users';
   var usersDb = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
-  if (debug) debugger;
+  try { usersDb.createDb(); } catch (e) { /* ignore if exists*/ }
 
-  function wait(ms) {
-    var t0 = new Date(), t1;
-    do {
-      CouchDB.request("GET", "/");
-      t1 = new Date();
-    } while ((t1 - t0) <= ms);
-  }
+  if (debug) debugger;
 
   var loginUser = function(username) {
     var pws = {
@@ -32,6 +25,9 @@ couchTests.users_db_security = function(debug) {
       fdmanana: "foobar",
       benoitc: "test"
     };
+    // we are changing jchris’s password further down
+    // the next two lines keep the code cleaner in
+    // the actual tests
     var username1 = username.replace(/[0-9]$/, "");
     var password = pws[username];
     T(CouchDB.login(username1, pws[username]).ok);
@@ -98,7 +94,7 @@ couchTests.users_db_security = function(debug) {
 
     // jan's gonna be admin as he's the first user
     TEquals(true, usersDb.save(userDoc).ok, "should save document");
-    userDoc = usersDb.open("org.couchdb.user:jchris");
+    userDoc = open_as(usersDb, "org.couchdb.user:jchris", "jchris");
     TEquals(undefined, userDoc.password, "password field should be null 1");
     TEquals(40, userDoc.derived_key.length, "derived_key should exist");
     TEquals(32, userDoc.salt.length, "salt should exist");
@@ -141,7 +137,7 @@ couchTests.users_db_security = function(debug) {
       jchrisDoc.password = "couch";
 
       TEquals(true, save_as(usersDb, jchrisDoc, "jchris").ok);
-      wait(100);
+      wait(5000);
       var jchrisDoc = open_as(usersDb, "org.couchdb.user:jchris", "jchris1");
 
       TEquals(undefined, jchrisDoc.password, "password field should be null 2");
@@ -184,8 +180,11 @@ couchTests.users_db_security = function(debug) {
       T(!rnewsonDoc.derived_key);
       T(!rnewsonDoc.iterations);
 
-      TEquals(true, CouchDB.login("rnewson", "plaintext_password").ok);
-      rnewsonDoc = usersDb.open(rnewsonDoc._id);
+      wait(5000); // wait for auth cache invalidation
+      var r = CouchDB.login("rnewson", "plaintext_password")
+      log(r)
+      TEquals(true, r.ok);
+      rnewsonDoc = open_as(usersDb, rnewsonDoc._id, "rnewson");
       TEquals("pbkdf2", rnewsonDoc.password_scheme);
       T(rnewsonDoc.salt != salt);
       T(!rnewsonDoc.password_sha);
@@ -415,8 +414,8 @@ couchTests.users_db_security = function(debug) {
   run_on_modified_server(
     [{section: "couch_httpd_auth",
       key: "iterations", value: "1"},
-     {section: "couch_httpd_auth",
-      key: "authentication_db", value: usersDb.name}],
+   {section: "admins",
+    key: "jan", value: "apple"}],
     testFun
   );
   usersDb.deleteDb(); // cleanup

@@ -470,7 +470,7 @@ CouchDB.requestStats = function(path, test) {
     query_arg = "?flush=true";
   }
 
-  var url = "/_stats/" + path.join("/") + query_arg;
+  var url = "/_node/node1@127.0.0.1/_stats/" + path.join("/") + query_arg;
   var stat = CouchDB.request("GET", url).responseText;
   return JSON.parse(stat);
 };

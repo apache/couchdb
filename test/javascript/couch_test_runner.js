@@ -507,3 +507,10 @@ function retry_part(fct, n, duration) {
   }
 }
 
+function wait(ms) {
+  var t0 = new Date(), t1;
+  do {
+    CouchDB.request("GET", "/");
+    t1 = new Date();
+  } while ((t1 - t0) <= ms);
+}

@@ -15,8 +15,9 @@ couchTests.users_db = function(debug) {
   // This tests the users db, especially validations
   // this should also test that you can log into the couch
   
-  var users_db_name = '_users'; //get_random_db_name();
+  var users_db_name = '_users';
   var usersDb = new CouchDB(users_db_name, {"X-Couch-Full-Commit":"false"});
+  try { usersDb.createDb(); } catch (e) { /* ignore if exists*/ }
 
   // test that you can treat "_user" as a db-name
   // this can complicate people who try to secure the users db with 
@@ -32,8 +33,8 @@ couchTests.users_db = function(debug) {
     // since it doesn’t wait for the ddoc to be created.
     // in a full test suite run, this is fine.
     // dev trick: run `test/javascript/run basics users_db`
-    var ddoc = usersDb.open("_design/_auth");
-    T(ddoc.validate_doc_update);
+    // var ddoc = usersDb.open("_design/_auth");
+    // T(ddoc.validate_doc_update);
     
     // test that you can login as a user using basic auth
     var jchrisUserDoc = CouchDB.prepareUserDoc({
@@ -60,14 +61,14 @@ couchTests.users_db = function(debug) {
       }
     });
     T(s.name == null);
-    T(s.info.authenticated == "default");
+    T(s.info.authenticated == "local");
     
     
     // ok, now create a conflicting edit on the jchris doc, and make sure there's no login.
     var jchrisUser2 = JSON.parse(JSON.stringify(jchrisUserDoc));
     jchrisUser2.foo = "bar";
-    var r = usersDb.save(jchrisUser2)
-    T(r.ok);
+
+    T(usersDb.save(jchrisUser2).ok);
     try {
       usersDb.save(jchrisUserDoc);
       T(false && "should be an update conflict");
@@ -80,6 +81,7 @@ couchTests.users_db = function(debug) {
 
     var jchrisWithConflict = usersDb.open(jchrisUserDoc._id, {conflicts : true});
     T(jchrisWithConflict._conflicts.length == 1);
+    wait(5000) // wait for auth_cache invalidation
 
     // no login with conflicted user doc
     try {
@@ -171,7 +173,13 @@ couchTests.users_db = function(debug) {
 
   };
 
-  testFun()
+  run_on_modified_server(
+    [{section: "couch_httpd_auth",
+      key: "iterations", value: "1"},
+     {section: "admins",
+      key: "jan", value: "apple"}],
+    testFun
+  );
   usersDb.deleteDb(); // cleanup
   
 }
