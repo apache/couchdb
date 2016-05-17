@@ -444,3 +444,122 @@ get_value(Section, Key) ->
         "false" -> false;
         undefined -> undefined
     end.
+
+-ifdef(TEST).
+-include_lib("couch/include/couch_eunit.hrl").
+
+get(db_name, _, _) ->
+    <<"db_name">>;
+get(idx_name, _, _) ->
+    <<"idx_name">>;
+get(signature, _, _) ->
+    <<61,237,157,230,136,93,96,201,204,17,137,186,50,249,44,135>>.
+
+setup(Settings) ->
+    ok = meck:new([config], [passthrough]),
+    ok = meck:new([test_index], [non_strict]),
+    ok = meck:expect(config, get, fun(Section, Key) ->
+        configure(Section, Key, Settings)
+    end),
+    ok = meck:expect(test_index, get, fun get/3),
+    {undefined, #st{mod = {test_index}}}.
+
+teardown(_, _) ->
+    (catch meck:unload(config)),
+    (catch meck:unload(test_index)),
+    ok.
+
+configure("view_compaction", "enabled_recompaction", [Global, _Db, _Index]) ->
+    Global;
+configure("view_compaction.recompaction", "db_name", [_Global, Db, _Index]) ->
+    Db;
+configure("view_compaction.recompaction", "db_name:" ++ _, [_, _, Index]) ->
+    Index;
+configure(Section, Key, _) ->
+    meck:passthrough([Section, Key]).
+
+recompaction_configuration_test_() ->
+    {
+        "Compaction tests",
+        {
+            setup,
+            fun test_util:start_couch/0, fun test_util:stop_couch/1,
+            {
+                foreachx,
+                fun setup/1, fun teardown/2,
+                recompaction_configuration_tests()
+            }
+        }
+    }.
+
+recompaction_configuration_tests() ->
+    AllCases = couch_tests_combinatorics:product([
+        [undefined, "true", "false"],
+        [undefined, "enabled", "disabled"],
+        [undefined, "enabled", "disabled"]
+    ]),
+
+    EnabledCases = [
+        [undefined, undefined, undefined],
+
+        [undefined, undefined,"enabled"],
+        [undefined, "enabled", undefined],
+        [undefined, "disabled", "enabled"],
+        [undefined, "enabled", "enabled"],
+
+        ["true", undefined, undefined],
+        ["true", undefined, "enabled"],
+        ["true", "disabled", "enabled"],
+        ["true", "enabled", undefined],
+        ["true", "enabled", "enabled"],
+
+        ["false", undefined, "enabled"],
+        ["false", "enabled", undefined],
+        ["false", "disabled", "enabled"],
+        ["false", "enabled", "enabled"]
+    ],
+
+    DisabledCases = [
+        [undefined, undefined, "disabled"],
+        [undefined, "disabled", undefined],
+        [undefined, "disabled", "disabled"],
+        [undefined, "enabled", "disabled"],
+
+        ["true", undefined, "disabled"],
+        ["true", "disabled", undefined],
+        ["true", "disabled", "disabled"],
+        ["true", "enabled", "disabled"],
+
+        ["false", undefined, undefined],
+        ["false", undefined, "disabled"],
+        ["false", "disabled", undefined],
+        ["false", "disabled", "disabled"],
+        ["false", "enabled", "disabled"]
+    ],
+
+    ?assertEqual([], AllCases -- (EnabledCases ++ DisabledCases)),
+
+    [{Settings, fun should_not_call_recompact/2} || Settings <- DisabledCases]
+    ++
+    [{Settings, fun should_call_recompact/2} || Settings <- EnabledCases].
+
+should_call_recompact(Settings, {IdxState, State}) ->
+    {test_id(Settings), ?_test(begin
+        ?assert(is_recompaction_enabled(IdxState, State)),
+        ok
+    end)}.
+
+should_not_call_recompact(Settings, {IdxState, State}) ->
+    {test_id(Settings), ?_test(begin
+        ?assertNot(is_recompaction_enabled(IdxState, State)),
+        ok
+    end)}.
+
+to_string(undefined) -> "undefined";
+to_string(Value) -> Value.
+
+test_id(Settings0) ->
+    Settings1 = [to_string(Value) || Value <- Settings0],
+    "[ " ++ lists:flatten(string:join(Settings1, " , ")) ++ " ]".
+
+-endif.
