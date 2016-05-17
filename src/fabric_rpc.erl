@@ -268,13 +268,7 @@ with_db(DbName, Options, {M,F,A}) ->
     end.
 
 get_or_create_db(DbName, Options) ->
-    case couch_db:open_int(DbName, Options) of
-    {not_found, no_db_file} ->
-        couch_log:warning("~p creating ~s", [?MODULE, DbName]),
-        couch_server:create(DbName, Options);
-    Else ->
-        Else
-    end.
+    couch_db:open_int(DbName, [{create_if_missing, true} | Options]).
 
 
 view_cb({meta, Meta}, Acc) ->
