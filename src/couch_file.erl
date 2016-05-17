@@ -12,7 +12,7 @@
 
 -module(couch_file).
 -behaviour(gen_server).
--vsn(1).
+-vsn(2).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -20,13 +20,16 @@
 -define(INITIAL_WAIT, 60000).
 -define(MONITOR_CHECK, 10000).
 -define(SIZE_BLOCK, 16#1000). % 4 KiB
+-define(READ_AHEAD, 2 * ?SIZE_BLOCK).
+-define(IS_OLD_STATE(S), tuple_size(S) /= tuple_size(#file{})).
 
 
 -record(file, {
     fd,
     is_sys,
     eof = 0,
-    db_pid
+    db_pid,
+    pread_limit = 0
 }).
 
 % public API
@@ -336,6 +339,8 @@ init_status_error(ReturnPid, Ref, Error) ->
 init({Filepath, Options, ReturnPid, Ref}) ->
     process_flag(trap_exit, true),
     OpenOptions = file_open_options(Options),
+    Limit = get_pread_limit(),
+    IsSys = lists:member(sys_db, Options),
     case lists:member(create, Options) of
     true ->
         filelib:ensure_dir(Filepath),
@@ -356,7 +361,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                     ok = file:sync(Fd),
                     maybe_track_open_os_files(Options),
                     erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-                    {ok, #file{fd=Fd, is_sys=lists:member(sys_db, Options)}};
+                    {ok, #file{fd=Fd, is_sys=IsSys, pread_limit=Limit}};
                 false ->
                     ok = file:close(Fd),
                     init_status_error(ReturnPid, Ref, {error, eexist})
@@ -364,7 +369,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
             false ->
                 maybe_track_open_os_files(Options),
                 erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-                {ok, #file{fd=Fd, is_sys=lists:member(sys_db, Options)}}
+                {ok, #file{fd=Fd, is_sys=IsSys, pread_limit=Limit}}
             end;
         Error ->
             init_status_error(ReturnPid, Ref, Error)
@@ -380,7 +385,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
             maybe_track_open_os_files(Options),
             {ok, Eof} = file:position(Fd, eof),
             erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-            {ok, #file{fd=Fd, eof=Eof, is_sys=lists:member(sys_db, Options)}};
+            {ok, #file{fd=Fd, eof=Eof, is_sys=IsSys, pread_limit=Limit}};
         Error ->
             init_status_error(ReturnPid, Ref, Error)
         end
@@ -407,14 +412,21 @@ terminate(_Reason, #file{fd = nil}) ->
 terminate(_Reason, #file{fd = Fd}) ->
     ok = file:close(Fd).
 
+handle_call(Msg, From, File) when ?IS_OLD_STATE(File) ->
+    handle_call(Msg, From, upgrade_state(File));
+
 handle_call(close, _From, #file{fd=Fd}=File) ->
     {stop, normal, file:close(Fd), File#file{fd = nil}};
 
 handle_call({pread_iolist, Pos}, _From, File) ->
     {RawData, NextPos} = try
         % up to 8Kbs of read ahead
-        read_raw_iolist_int(File, Pos, 2 * ?SIZE_BLOCK - (Pos rem ?SIZE_BLOCK))
+        read_raw_iolist_int(File, Pos, ?READ_AHEAD - (Pos rem ?SIZE_BLOCK))
     catch
+    throw:read_beyond_eof ->
+        throw(read_beyond_eof);
+    throw:{exceed_pread_limit, Limit} ->
+        throw({exceed_pread_limit, Limit});
     _:_ ->
         read_raw_iolist_int(File, Pos, 4)
     end,
@@ -488,6 +500,9 @@ handle_cast(close, Fd) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
+handle_info(Msg, File) when ?IS_OLD_STATE(File) ->
+    handle_info(Msg, upgrade_state(File));
+
 handle_info(maybe_close, File) ->
     case is_idle(File) of
         true ->
@@ -550,11 +565,20 @@ maybe_read_more_iolist(Buffer, DataSize, NextPos, File) ->
     {Data::iolist(), CurPos::non_neg_integer()}.
 read_raw_iolist_int(Fd, {Pos, _Size}, Len) -> % 0110 UPGRADE CODE
     read_raw_iolist_int(Fd, Pos, Len);
-read_raw_iolist_int(#file{fd = Fd}, Pos, Len) ->
+read_raw_iolist_int(#file{fd = Fd, pread_limit = Limit} = F, Pos, Len) ->
     BlockOffset = Pos rem ?SIZE_BLOCK,
     TotalBytes = calculate_total_read_len(BlockOffset, Len),
-    {ok, <<RawBin:TotalBytes/binary>>} = file:pread(Fd, Pos, TotalBytes),
-    {remove_block_prefixes(BlockOffset, RawBin), Pos + TotalBytes}.
+    case Pos + TotalBytes of
+    Size when Size > F#file.eof + ?READ_AHEAD ->
+        couch_stats:increment_counter([pread, exceed_eof]),
+        throw(read_beyond_eof);
+    Size when Size > Limit ->
+        couch_stats:increment_counter([pread, exceed_limit]),
+        throw({exceed_pread_limit, Limit});
+    Size ->
+        {ok, <<RawBin:TotalBytes/binary>>} = file:pread(Fd, Pos, TotalBytes),
+        {remove_block_prefixes(BlockOffset, RawBin), Size}
+    end.
 
 -spec extract_md5(iolist()) -> {binary(), iolist()}.
 extract_md5(FullIoList) ->
@@ -651,6 +675,17 @@ process_info(Pid) ->
             {Fd, InitialName}
     end.
 
+upgrade_state({file, Fd, IsSys, Eof, DbPid}) ->
+    Limit = get_pread_limit(),
+    #file{fd=Fd, is_sys=IsSys, eof=Eof, db_pid=DbPid, pread_limit=Limit};
+upgrade_state(State) ->
+    State.
+
+get_pread_limit() ->
+    case config:get_integer("couchdb", "max_pread_size", 0) of
+        N when N > 0 -> N;
+        _ -> infinity
+    end.
 
 -ifdef(TEST).
 -include_lib("couch/include/couch_eunit.hrl").

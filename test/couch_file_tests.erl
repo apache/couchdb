@@ -24,7 +24,10 @@ setup() ->
     Fd.
 
 teardown(Fd) ->
-    ok = couch_file:close(Fd).
+    case is_process_alive(Fd) of
+        true -> ok = couch_file:close(Fd);
+        false -> ok
+    end.
 
 open_close_test_() ->
     {
@@ -126,8 +129,18 @@ should_read_iolist(Fd) ->
 should_fsync(Fd) ->
     {"How does on test fsync?", ?_assertMatch(ok, couch_file:sync(Fd))}.
 
-should_not_read_beyond_eof(_) ->
-    {"No idea how to test reading beyond EOF", ?_assert(true)}.
+should_not_read_beyond_eof(Fd) ->
+    BigBin = list_to_binary(lists:duplicate(100000, 0)),
+    DoubleBin = round(byte_size(BigBin) * 2),
+    {ok, Pos, _Size} = couch_file:append_binary(Fd, BigBin),
+    {_, Filepath} = couch_file:process_info(Fd),
+    %% corrupt db file
+    {ok, Io} = file:open(Filepath, [read, write, binary]),
+    ok = file:pwrite(Io, Pos, <<0:1/integer, DoubleBin:31/integer>>),
+    file:close(Io),
+    unlink(Fd),
+    ExpectedError = {badmatch, {'EXIT', {bad_return_value, read_beyond_eof}}},
+    ?_assertError(ExpectedError, couch_file:pread_binary(Fd, Pos)).
 
 should_truncate(Fd) ->
     {ok, 0, _} = couch_file:append_term(Fd, foo),
@@ -136,6 +149,38 @@ should_truncate(Fd) ->
     {ok, _, _} = couch_file:append_binary(Fd, BigBin),
     ok = couch_file:truncate(Fd, Size),
     ?_assertMatch({ok, foo}, couch_file:pread_term(Fd, 0)).
+
+pread_limit_test_() ->
+    {
+        "Read limit tests",
+        {
+            setup,
+            fun() ->
+                Ctx = test_util:start(?MODULE),
+                config:set("couchdb", "max_pread_size", "50000"),
+                Ctx
+            end,
+            fun(Ctx) ->
+                config:delete("couchdb", "max_pread_size"),
+                test_util:stop(Ctx)
+            end,
+            ?foreach([
+                fun should_increase_file_size_on_write/1,
+                fun should_return_current_file_size_on_write/1,
+                fun should_write_and_read_term/1,
+                fun should_write_and_read_binary/1,
+                fun should_not_read_more_than_pread_limit/1
+            ])
+        }
+    }.
+
+should_not_read_more_than_pread_limit(Fd) ->
+    BigBin = list_to_binary(lists:duplicate(100000, 0)),
+    {ok, Pos, _Size} = couch_file:append_binary(Fd, BigBin),
+    unlink(Fd),
+    ExpectedError = {badmatch, {'EXIT', {bad_return_value,
+        {exceed_pread_limit, 50000}}}},
+    ?_assertError(ExpectedError, couch_file:pread_binary(Fd, Pos)).
 
 
 header_test_() ->
