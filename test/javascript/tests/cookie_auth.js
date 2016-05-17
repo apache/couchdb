@@ -75,7 +75,7 @@ couchTests.cookie_auth = function(debug) {
 
       // test that the users db is born with the auth ddoc
       var ddoc = open_as(usersDb, "_design/_auth", "jan");
-      T(ddoc.validate_doc_update);
+      T(ddoc && ddoc.validate_doc_update);
 
       // TODO test that changing the config so an existing db becomes the users db installs the ddoc also
 
@@ -277,9 +277,16 @@ couchTests.cookie_auth = function(debug) {
     TEquals(true, CouchDB.login("jan", "apple").ok);
   };
 
+  // per se, _users is born with a ddoc
+  // problem is: the birth seems async and it takes some time till it is there. We do know, however, that it WILL. So: use _changes 2 our advantage
+  var users_db_chg = CouchDB.request("GET", users_db_name + "/_changes?feed=longpoll&timeout=5000&filter=_design");
+  T(users_db_chg.responseText);
+  // now we should be safe
   run_on_modified_server(
     [
      {section: "couch_httpd_auth",
+      key: "authentication_db", value: users_db_name},
+     {section: "chttpd_auth",
       key: "authentication_db", value: users_db_name},
      {section: "couch_httpd_auth",
       key: "iterations", value: "1"},
