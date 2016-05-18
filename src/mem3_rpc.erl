@@ -60,7 +60,7 @@ find_common_seq(Node, DbName, SourceUUID, SourceEpochs) ->
 
 load_checkpoint_rpc(DbName, SourceNode, SourceUUID) ->
     erlang:put(io_priority, {internal_repl, DbName}),
-    case couch_db:open_int(DbName, [?ADMIN_CTX]) of
+    case get_or_create_db(DbName, [?ADMIN_CTX]) of
     {ok, Db} ->
         TargetUUID = couch_db:get_uuid(Db),
         NewId = mem3_rep:make_local_id(SourceUUID, TargetUUID),
@@ -83,7 +83,7 @@ load_checkpoint_rpc(DbName, SourceNode, SourceUUID) ->
 
 save_checkpoint_rpc(DbName, Id, SourceSeq, NewEntry0, History0) ->
     erlang:put(io_priority, {internal_repl, DbName}),
-    case couch_db:open_int(DbName, [?ADMIN_CTX]) of
+    case get_or_create_db(DbName, [?ADMIN_CTX]) of
         {ok, #db{update_seq = TargetSeq} = Db} ->
             NewEntry = {[
                 {<<"target_node">>, atom_to_binary(node(), utf8)},
@@ -113,7 +113,7 @@ save_checkpoint_rpc(DbName, Id, SourceSeq, NewEntry0, History0) ->
 
 find_common_seq_rpc(DbName, SourceUUID, SourceEpochs) ->
     erlang:put(io_priority, {internal_repl, DbName}),
-    case couch_db:open_int(DbName, [?ADMIN_CTX]) of
+    case get_or_create_db(DbName, [?ADMIN_CTX]) of
     {ok, Db} ->
         case couch_db:get_uuid(Db) of
         SourceUUID ->
@@ -273,6 +273,10 @@ rexi_call(Node, MFA) ->
     after
         rexi_monitor:stop(Mon)
     end.
+
+
+get_or_create_db(DbName, Options) ->
+    couch_db:open_int(DbName, [{create_if_missing, true} | Options]).
 
 
 -ifdef(TEST).
