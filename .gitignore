@@ -130,8 +130,9 @@ test/.deps/
 test/couchdb/run
 test/couchdb/fixtures/.deps/
 test/couchdb/fixtures/os_daemon_configer.escript
+test/couchdb/fixtures/test_cfg_register
 test/couchdb/include/couch_eunit.hrl
-test/couchdb/fixtures/.deps/
+test/couchdb/temp/
 test/javascript/run
 test/javascript/run_js_tests.sh
 test/local.ini
