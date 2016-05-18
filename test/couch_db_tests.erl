@@ -39,6 +39,18 @@ create_delete_db_test_()->
         }
     }.
 
+open_db_test_()->
+    {
+        "Database open tests",
+        {
+            setup,
+            fun setup/0, fun test_util:stop_couch/1,
+            fun(_) ->
+                [should_create_db_if_missing()]
+            end
+        }
+    }.
+
 
 should_create_db() ->
     DbName = ?tempdb(),
@@ -97,6 +109,13 @@ should_create_delete_database_continuously() ->
     [{timeout, ?TIMEOUT, {integer_to_list(N) ++ " times",
                            ?_assert(loop(DbName, N))}}
      || N <- [10, 100]].
+
+should_create_db_if_missing() ->
+    DbName = ?tempdb(),
+    {ok, Db} = couch_db:open(DbName, [{create_if_missing, true}]),
+    ok = couch_db:close(Db),
+    {ok, AllDbs} = couch_server:all_databases(),
+    ?_assert(lists:member(DbName, AllDbs)).
 
 loop(_, 0) ->
     true;

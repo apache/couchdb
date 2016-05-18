@@ -81,10 +81,14 @@ open(DbName, Options0) ->
         {ok, Db#db{user_ctx=Ctx, fd_monitor=erlang:monitor(process,Fd)}};
     _ ->
         Timeout = couch_util:get_value(timeout, Options, infinity),
+        Create = couch_util:get_value(create_if_missing, Options, false),
         case gen_server:call(couch_server, {open, DbName, Options}, Timeout) of
         {ok, #db{fd=Fd} = Db} ->
             update_lru(DbName, Options),
             {ok, Db#db{user_ctx=Ctx, fd_monitor=erlang:monitor(process,Fd)}};
+        {not_found, no_db_file} when Create ->
+            couch_log:warning("creating missing database: ~s", [DbName]),
+            couch_server:create(DbName, Options);
         Error ->
             Error
         end
