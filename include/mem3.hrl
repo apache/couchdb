@@ -15,7 +15,7 @@
     name :: binary() | '_',
     node :: node() | '_',
     dbname :: binary(),
-    range :: [non_neg_integer() | '$1' | '$2'],
+    range :: [non_neg_integer() | '$1' | '$2'] | '_',
     ref :: reference() | 'undefined' | '_'
 }).
 
@@ -24,7 +24,7 @@
     name :: binary() | '_',
     node :: node() | '_',
     dbname :: binary(),
-    range :: [non_neg_integer() | '$1' | '$2'],
+    range :: [non_neg_integer() | '$1' | '$2'] | '_',
     ref :: reference() | 'undefined' | '_',
     order :: non_neg_integer() | 'undefined' | '_'
 }).
