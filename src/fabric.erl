@@ -147,7 +147,7 @@ get_security(DbName, Options) ->
 
 %% @doc retrieve the security object for all shards of a database
 -spec get_all_security(dbname()) ->
-    {ok, json_obj()} |
+    {ok, [{#shard{}, json_obj()}]} |
     {error, no_majority | timeout} |
     {error, atom(), any()}.
 get_all_security(DbName) ->
@@ -155,7 +155,7 @@ get_all_security(DbName) ->
 
 %% @doc retrieve the security object for all shards of a database
 -spec get_all_security(dbname(), [option()]) ->
-    {ok, json_obj()} |
+    {ok, [{#shard{}, json_obj()}]} |
     {error, no_majority | timeout} |
     {error, atom(), any()}.
 get_all_security(DbName, Options) ->
