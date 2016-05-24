@@ -330,7 +330,9 @@ check_finish_quorum_newer() ->
         S0 = state0(all, false),
         {ok, S1} = handle_message({ok, [foo1(), bar1()]}, w1, S0),
         Expect = {stop, [bar1(), foo2()]},
+        ok = meck:reset(fabric),
         ?assertEqual(Expect, handle_message({ok, [foo2(), bar1()]}, w2, S1)),
+        ok = meck:wait(fabric, update_docs, '_', 5000),
         ?assertMatch(
             [{_, {fabric, update_docs, [_, _, _]}, _}],
             meck:history(fabric)
