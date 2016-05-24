@@ -191,9 +191,7 @@ handle_call(get_compactor_pid, _From, State) ->
 handle_call({compacted, NewIdxState}, _From, State) ->
     #st{
         mod=Mod,
-        idx_state=OldIdxState,
-        updater=Updater,
-        commit_delay=Delay
+        idx_state=OldIdxState
     } = State,
     assert_signature_match(Mod, OldIdxState, NewIdxState),
     NewSeq = Mod:get(update_seq, NewIdxState),
@@ -201,26 +199,15 @@ handle_call({compacted, NewIdxState}, _From, State) ->
     % For indices that require swapping files, we have to make sure we're
     % up to date with the current index. Otherwise indexes could roll back
     % (perhaps considerably) to previous points in history.
-    case NewSeq >= OldSeq of
+    case is_recompaction_enabled(NewIdxState, State) of
         true ->
-            {ok, NewIdxState1} = Mod:swap_compacted(OldIdxState, NewIdxState),
-            % Restart the indexer if it's running.
-            case couch_index_updater:is_running(Updater) of
-                true -> ok = couch_index_updater:restart(Updater, NewIdxState1);
-                false -> ok
-            end,
-            case State#st.committed of
-                true -> erlang:send_after(Delay, self(), commit);
-                false -> ok
-            end,
-            {reply, ok, State#st{
-                idx_state=NewIdxState1,
-                committed=false
-            }};
-        _ ->
-            {reply, recompact, State}
+            case NewSeq >= OldSeq of
+                true -> {reply, ok, commit_compacted(NewIdxState, State)};
+                false -> {reply, recompact, State}
+            end;
+        false ->
+            {reply, ok, commit_compacted(NewIdxState, State)}
     end.
-
 
 handle_cast({config_change, NewDelay}, State) ->
     MsDelay = 1000 * list_to_integer(NewDelay),
@@ -407,3 +394,172 @@ assert_signature_match(Mod, OldIdxState, NewIdxState) ->
         {Sig, Sig} -> ok;
         _ -> erlang:error(signature_mismatch)
     end.
+
+commit_compacted(NewIdxState, State) ->
+    #st{
+        mod=Mod,
+        idx_state=OldIdxState,
+        updater=Updater,
+        commit_delay=Delay
+    } = State,
+    {ok, NewIdxState1} = Mod:swap_compacted(OldIdxState, NewIdxState),
+    % Restart the indexer if it's running.
+    case couch_index_updater:is_running(Updater) of
+        true -> ok = couch_index_updater:restart(Updater, NewIdxState1);
+        false -> ok
+    end,
+    case State#st.committed of
+        true -> erlang:send_after(Delay, self(), commit);
+        false -> ok
+    end,
+    State#st{
+        idx_state=NewIdxState1,
+        committed=false
+     }.
+
+is_recompaction_enabled(IdxState, #st{mod = Mod}) ->
+    DbName = binary_to_list(Mod:get(db_name, IdxState)),
+    IdxName = binary_to_list(Mod:get(idx_name, IdxState)),
+    IdxKey = DbName ++ ":" ++ IdxName,
+
+    IdxSignature = couch_index_util:hexsig((Mod:get(signature, IdxState))),
+
+    Global = get_value("view_compaction", "enabled_recompaction"),
+    PerSignature = get_value("view_compaction.recompaction", IdxSignature),
+    PerIdx = get_value("view_compaction.recompaction", IdxKey),
+    PerDb = get_value("view_compaction.recompaction", DbName),
+
+    find_most_specific([Global, PerDb, PerIdx, PerSignature], true).
+
+find_most_specific(Settings, Default) ->
+    Reversed = lists:reverse([Default | Settings]),
+    [Value | _] = lists:dropwhile(fun(A) -> A =:= undefined end, Reversed),
+    Value.
+
+get_value(Section, Key) ->
+    case config:get(Section, Key) of
+        "enabled" -> true;
+        "disabled" -> false;
+        "true" -> true;
+        "false" -> false;
+        undefined -> undefined
+    end.
+
+-ifdef(TEST).
+-include_lib("couch/include/couch_eunit.hrl").
+
+get(db_name, _, _) ->
+    <<"db_name">>;
+get(idx_name, _, _) ->
+    <<"idx_name">>;
+get(signature, _, _) ->
+    <<61,237,157,230,136,93,96,201,204,17,137,186,50,249,44,135>>.
+
+setup(Settings) ->
+    ok = meck:new([config], [passthrough]),
+    ok = meck:new([test_index], [non_strict]),
+    ok = meck:expect(config, get, fun(Section, Key) ->
+        configure(Section, Key, Settings)
+    end),
+    ok = meck:expect(test_index, get, fun get/3),
+    {undefined, #st{mod = {test_index}}}.
+
+teardown(_, _) ->
+    (catch meck:unload(config)),
+    (catch meck:unload(test_index)),
+    ok.
+
+configure("view_compaction", "enabled_recompaction", [Global, _Db, _Index]) ->
+    Global;
+configure("view_compaction.recompaction", "db_name", [_Global, Db, _Index]) ->
+    Db;
+configure("view_compaction.recompaction", "db_name:" ++ _, [_, _, Index]) ->
+    Index;
+configure(Section, Key, _) ->
+    meck:passthrough([Section, Key]).
+
+recompaction_configuration_test_() ->
+    {
+        "Compaction tests",
+        {
+            setup,
+            fun test_util:start_couch/0, fun test_util:stop_couch/1,
+            {
+                foreachx,
+                fun setup/1, fun teardown/2,
+                recompaction_configuration_tests()
+            }
+        }
+    }.
+
+recompaction_configuration_tests() ->
+    AllCases = couch_tests_combinatorics:product([
+        [undefined, "true", "false"],
+        [undefined, "enabled", "disabled"],
+        [undefined, "enabled", "disabled"]
+    ]),
+
+    EnabledCases = [
+        [undefined, undefined, undefined],
+
+        [undefined, undefined,"enabled"],
+        [undefined, "enabled", undefined],
+        [undefined, "disabled", "enabled"],
+        [undefined, "enabled", "enabled"],
+
+        ["true", undefined, undefined],
+        ["true", undefined, "enabled"],
+        ["true", "disabled", "enabled"],
+        ["true", "enabled", undefined],
+        ["true", "enabled", "enabled"],
+
+        ["false", undefined, "enabled"],
+        ["false", "enabled", undefined],
+        ["false", "disabled", "enabled"],
+        ["false", "enabled", "enabled"]
+    ],
+
+    DisabledCases = [
+        [undefined, undefined, "disabled"],
+        [undefined, "disabled", undefined],
+        [undefined, "disabled", "disabled"],
+        [undefined, "enabled", "disabled"],
+
+        ["true", undefined, "disabled"],
+        ["true", "disabled", undefined],
+        ["true", "disabled", "disabled"],
+        ["true", "enabled", "disabled"],
+
+        ["false", undefined, undefined],
+        ["false", undefined, "disabled"],
+        ["false", "disabled", undefined],
+        ["false", "disabled", "disabled"],
+        ["false", "enabled", "disabled"]
+    ],
+
+    ?assertEqual([], AllCases -- (EnabledCases ++ DisabledCases)),
+
+    [{Settings, fun should_not_call_recompact/2} || Settings <- DisabledCases]
+    ++
+    [{Settings, fun should_call_recompact/2} || Settings <- EnabledCases].
+
+should_call_recompact(Settings, {IdxState, State}) ->
+    {test_id(Settings), ?_test(begin
+        ?assert(is_recompaction_enabled(IdxState, State)),
+        ok
+    end)}.
+
+should_not_call_recompact(Settings, {IdxState, State}) ->
+    {test_id(Settings), ?_test(begin
+        ?assertNot(is_recompaction_enabled(IdxState, State)),
+        ok
+    end)}.
+
+to_string(undefined) -> "undefined";
+to_string(Value) -> Value.
+
+test_id(Settings0) ->
+    Settings1 = [to_string(Value) || Value <- Settings0],
+    "[ " ++ lists:flatten(string:join(Settings1, " , ")) ++ " ]".
+
+-endif.
