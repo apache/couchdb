@@ -68,6 +68,7 @@ setup_oauth() ->
     config:set("oauth_token_users", "otoksec1", "joe", false),
     config:set("oauth_consumer_secrets", "consec1", "foo", false),
     config:set("oauth_token_secrets", "otoksec1", "foobar", false),
+    config:set("couchdb", "default_security", "everyone", false),
     config:set("couch_httpd_auth", "require_valid_user", "true", false),
 
     ok = config:set(
