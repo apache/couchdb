@@ -49,7 +49,7 @@
 get_user_creds(UserName) ->
     get_user_creds(nil, UserName).
 
--spec get_user_creds(Req::#httpd{}, UserName::string() | binary()) ->
+-spec get_user_creds(Req::#httpd{} | nil, UserName::string() | binary()) ->
     {ok, Credentials::list(), term()} | nil.
 
 get_user_creds(Req, UserName) when is_list(UserName) ->
