@@ -49,7 +49,7 @@ handle_event(Event, {Fun, Acc}) when is_function(Fun, 2) ->
     {ok, {Fun, Acc2}}.
 
 handle_call(_Msg, State) ->
-    {reply, ok, State}.
+    {ok, ok, State}.
 
 handle_info(_Msg, State) ->
     {ok, State}.
