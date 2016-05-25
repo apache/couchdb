@@ -62,7 +62,7 @@ terminate(_Reason, _State) ->
     ok.
 
 handle_call(_Whatever, _From, State) ->
-    {ok, State}.
+    {reply, ok, State}.
 
 handle_cast(stop, State) ->
     {stop, normal, State}.
