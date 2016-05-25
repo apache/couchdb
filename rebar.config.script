@@ -30,7 +30,7 @@ DepDescs = [
 {couch_log,        "couch-log",        "cc5540419e0a4bb7872d18bc5a94f39446d83a88"},
 {couch_log_lager,  "couch-log-lager",  "b2a0471a87765de50c5eb05c65c121f68a9ae9fa"},
 {chttpd,           "chttpd",           "f3d5d1b0cd8eda814805b5a7290892ee0b3a73ab"},
-{couch,            "couch",            "49774f269a6a42af05ead4f17b52edda5f065c78"},
+{couch,            "couch",            "23f188096fb8f8c867f3cda0fa55c30ecce34b10"},
 {couch_index,      "couch-index",      "aa8e6f9573a2dd04bf5a1a98576b1809e1a68035"},
 {couch_mrview,     "couch-mrview",     "e36509b2dfb7bba5f09fcb62f0e23a538451afb5"},
 {couch_replicator, "couch-replicator", "ab0afce2d6fdfeeade636a9252327ac09a1e423f"},
