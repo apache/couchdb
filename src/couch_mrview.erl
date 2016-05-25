@@ -297,8 +297,8 @@ count_view_changes_since(Db, DDoc, VName, SinceSeq) ->
 
 count_view_changes_since(Db, DDoc, VName, SinceSeq, Options) ->
     Args0 = make_view_changes_args(Options),
-    {ok, {_, View}, _, Args} = couch_mrview_util:get_view(Db, DDoc, VName,
-                                                          Args0),
+    {ok, {_Type, View, _Ref}, _, Args} = couch_mrview_util:get_view(
+        Db, DDoc, VName, Args0),
     case View#mrview.seq_indexed of
         true ->
             OptList = make_view_changes_opts(SinceSeq, Options, Args),
