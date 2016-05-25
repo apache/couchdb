@@ -273,7 +273,8 @@ find_next_node() ->
 
 %% @doc Finds the next {DbName,Node} pair in the list of waiting replications
 %% which does not correspond to an already running replication
--spec next_replication([#job{}], [#job{}], [#job{}]) -> {#job{}, [#job{}]} | nil.
+-spec next_replication([#job{}], queue:queue(_), queue:queue(_)) ->
+    {#job{}, queue:queue(_)} | nil.
 next_replication(Active, Waiting, WaitingAndRunning) ->
     case is_empty(Waiting) of
     true ->
