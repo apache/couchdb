@@ -664,7 +664,7 @@ is_idle(#file{is_sys=false}) ->
     end.
 
 -spec process_info(CouchFilePid :: pid()) ->
-    {Fd :: pid() | tuple(), FilePath :: string()}.
+    {Fd :: pid() | tuple(), FilePath :: string()} | undefined.
 
 process_info(Pid) ->
     {dictionary, Dict} = erlang:process_info(Pid, dictionary),
