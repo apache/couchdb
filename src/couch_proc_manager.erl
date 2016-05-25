@@ -443,7 +443,7 @@ return_proc(#state{} = State, #proc_int{} = ProcInt) ->
     NewState = case is_process_alive(Pid) of true ->
         case ProcInt#proc_int.t0 < State#state.threshold_ts of
             true ->
-                remove_proc(State, Pid);
+                remove_proc(State, ProcInt);
             false ->
                 gen_server:cast(Pid, garbage_collect),
                 true = ets:update_element(?PROCS, Pid, [
