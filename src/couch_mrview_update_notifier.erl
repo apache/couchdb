@@ -39,7 +39,7 @@ handle_event(Event, Fun) ->
     {ok, Fun}.
 
 handle_call(_Request, State) ->
-    {reply, ok, State}.
+    {ok, ok, State}.
 
 handle_info({'EXIT', Pid, Reason}, Pid) ->
     couch_log:error("View update notification process ~p died: ~p", [Pid, Reason]),
