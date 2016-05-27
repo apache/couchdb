@@ -26,7 +26,8 @@
     handle_utils_dir_req/2,
     handle_uuids_req/1,
     handle_welcome_req/1,
-    handle_welcome_req/2
+    handle_welcome_req/2,
+    get_stats/0
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
@@ -294,8 +295,9 @@ handle_node_req(#httpd{path_parts=[_, _Node, <<"_stats">>]}=Req) ->
     send_method_not_allowed(Req, "GET");
 % GET /_node/$node/_system
 handle_node_req(#httpd{method='GET', path_parts=[_, Node, <<"_system">>]}=Req) ->
-    Stats = call_node(Node, chttpd_misc, handle_system_req, [Req]),
-    chttpd:send_json(Req, Stats);
+    Stats = call_node(Node, chttpd_misc, get_stats, []),
+    EJSON = couch_stats_httpd:to_ejson(Stats),
+    send_json(Req, EJSON);
 handle_node_req(#httpd{path_parts=[_, _Node, <<"_system">>]}=Req) ->
     send_method_not_allowed(Req, "GET");
 handle_node_req(#httpd{path_parts=[_]}=Req) ->
@@ -334,6 +336,11 @@ flush(Node, Req) ->
 % Note: this resource is exposed on the backdoor interface, but it's in chttpd
 % because it's not couch trunk
 handle_system_req(Req) ->
+    Stats = get_stats(),
+    EJSON = couch_stats_httpd:to_ejson(Stats),
+    send_json(Req, EJSON).
+
+get_stats() ->
     Other = erlang:memory(system) - lists:sum([X || {_,X} <-
         erlang:memory([atom, code, binary, ets])]),
     Memory = [{other, Other} | erlang:memory([atom, atom_used, processes,
@@ -343,7 +350,7 @@ handle_system_req(Req) ->
     {CF, CDU} = db_pid_stats(),
     MessageQueues0 = [{couch_file, {CF}}, {couch_db_updater, {CDU}}],
     MessageQueues = MessageQueues0 ++ message_queues(registered()),
-    send_json(Req, {[
+    [
         {uptime, element(1,statistics(wall_clock)) div 1000},
         {memory, {Memory}},
         {run_queue, statistics(run_queue)},
@@ -361,7 +368,7 @@ handle_system_req(Req) ->
         {message_queues, {MessageQueues}},
         {internal_replication_jobs, mem3_sync:get_backlog()},
         {distribution, {get_distribution_stats()}}
-    ]}).
+    ].
 
 db_pid_stats() ->
     {monitors, M} = process_info(whereis(couch_stats_process_tracker), monitors),
