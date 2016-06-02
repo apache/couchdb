@@ -94,7 +94,14 @@ code_change(_OldVsn, State, _Extra) ->
 
 
 compact(Parent, Mod, IdxState) ->
-    compact(Parent, Mod, IdxState, []).
+    DbName = Mod:get(db_name, IdxState),
+    %% We use with_db here to make sure we hold db open
+    %% during both phases of compaction
+    %%  * compact
+    %%  * recompact
+    couch_util:with_db(DbName, fun(_) ->
+        compact(Parent, Mod, IdxState, [])
+    end).
 
 compact(Idx, Mod, IdxState, Opts) ->
     DbName = Mod:get(db_name, IdxState),
