@@ -352,19 +352,26 @@ changes_enumerator(DocInfo, Acc) ->
             {id, Id},
             {changes, Results},
             {deleted, Del} |
-            if IncludeDocs -> [doc_member(Db, DocInfo, Opts)]; true -> [] end
+            if IncludeDocs -> [doc_member(Db, DocInfo, Opts, Filter)]; true -> [] end
         ]}
     end,
     ok = rexi:stream2(ChangesRow),
     {ok, Acc#cacc{seq = Seq, pending = Pending-1}}.
 
-doc_member(Shard, DocInfo, Opts) ->
+doc_member(Shard, DocInfo, Opts, Filter) ->
     case couch_db:open_doc(Shard, DocInfo, [deleted | Opts]) of
     {ok, Doc} ->
-        {doc, couch_doc:to_json_obj(Doc, Opts)};
+        {doc, maybe_filtered_json_doc(Doc, Opts, Filter)};
     Error ->
         Error
     end.
+
+maybe_filtered_json_doc(Doc, Opts, {selector, _Style, {_Selector, Fields}})
+    when Fields =/= nil ->
+    mango_fields:extract(couch_doc:to_json_obj(Doc, Opts), Fields);
+maybe_filtered_json_doc(Doc, Opts, _Filter) ->
+    couch_doc:to_json_obj(Doc, Opts).
+
 
 possible_ancestors(_FullInfo, []) ->
     [];
@@ -545,5 +552,20 @@ is_owner_test() ->
     ?assert(is_owner(bar, 150, [{baz, 200}, {bar, 100}, {foo, 1}])),
     ?assertError(duplicate_epoch, is_owner(foo, 1, [{foo, 1}, {bar, 1}])),
     ?assertError(epoch_order, is_owner(foo, 1, [{foo, 100}, {bar, 200}])).
+
+maybe_filtered_json_doc_no_filter_test() ->
+    Body = {[{<<"a">>, 1}]},
+    Doc = #doc{id = <<"1">>, revs = {1, [<<"r1">>]}, body = Body},
+    {JDocProps} = maybe_filtered_json_doc(Doc, [], x),
+    ExpectedProps = [{<<"_id">>, <<"1">>}, {<<"_rev">>, <<"1-r1">>}, {<<"a">>, 1}],
+    ?assertEqual(lists:keysort(1, JDocProps), ExpectedProps).
+
+maybe_filtered_json_doc_with_filter_test() ->
+    Body = {[{<<"a">>, 1}]},
+    Doc = #doc{id = <<"1">>, revs = {1, [<<"r1">>]}, body = Body},
+    Fields = [<<"a">>, <<"nonexistent">>],
+    Filter = {selector, main_only, {some_selector, Fields}},
+    {JDocProps} = maybe_filtered_json_doc(Doc, [], Filter),
+    ?assertEqual(JDocProps, [{<<"a">>, 1}]).
 
 -endif.
