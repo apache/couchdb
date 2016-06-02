@@ -47,7 +47,7 @@ go(DbName, Id, Revs, Options) ->
     RexiMon = fabric_util:create_monitors(Workers),
     try fabric_util:recv(Workers, #shard.ref, fun handle_message/3, State) of
     {ok, {ok, Reply}} ->
-        {ok, Reply};
+        {ok, filter_reply(Reply)};
     {timeout, #state{workers=DefunctWorkers}} ->
         fabric_util:log_timeout(DefunctWorkers, "open_revs"),
         {error, timeout};
@@ -230,7 +230,11 @@ tree_format_replies(RevTree) ->
 dict_format_replies(Dict) ->
     lists:sort([Reply || {_, {Reply, _}} <- Dict]).
 
-
+filter_reply(Replies) ->
+    case [{ok, Doc} || {ok, Doc} <- Replies] of
+        [] -> Replies;
+        Filtered -> Filtered
+    end.
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -264,7 +268,9 @@ revs() -> [{1,<<"foo">>}, {1,<<"bar">>}, {1,<<"baz">>}].
 
 foo1() -> {ok, #doc{revs = {1, [<<"foo">>]}}}.
 foo2() -> {ok, #doc{revs = {2, [<<"foo2">>, <<"foo">>]}}}.
+fooNF() -> {{not_found, missing}, {1,<<"foo">>}}.
 bar1() -> {ok, #doc{revs = {1, [<<"bar">>]}}}.
+barNF() -> {{not_found, missing}, {1,<<"bar">>}}.
 bazNF() -> {{not_found, missing}, {1,<<"baz">>}}.
 baz1() -> {ok, #doc{revs = {1, [<<"baz">>]}}}.
 
@@ -287,7 +293,9 @@ open_doc_revs_test_() ->
             check_latest_true(),
             check_ancestor_counted_in_quorum(),
             check_not_found_counts_for_descendant(),
-            check_worker_error_skipped()
+            check_worker_error_skipped(),
+            check_not_found_replies_are_removed_when_doc_found(),
+            check_not_found_returned_when_doc_not_found()
         ]
     }.
 
@@ -445,6 +453,20 @@ check_worker_error_skipped() ->
         {ok, S1} = handle_message(Msg1, w1, S0),
         {ok, S2} = handle_message(Msg2, w2, S1),
         ?assertEqual(Expect, handle_message(Msg3, w2, S2))
+    end).
+
+check_not_found_replies_are_removed_when_doc_found() ->
+    ?_test(begin
+        Replies = [foo1(), bar1(), bazNF()],
+        Expect = [foo1(), bar1()],
+        ?assertEqual(Expect, filter_reply(Replies))
+    end).
+
+check_not_found_returned_when_doc_not_found() ->
+    ?_test(begin
+        Replies = [fooNF(), barNF(), bazNF()],
+        Expect = [fooNF(), barNF(), bazNF()],
+        ?assertEqual(Expect, filter_reply(Replies))
     end).
 
 
