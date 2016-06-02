@@ -122,7 +122,7 @@ get_db_info(#db{} = Db) ->
     couch_db:get_db_info(Db).
 
 
-get_db_security(#db{main_pid = nil}=Db, #user_ctx{}=UserCtx) ->
+get_db_security(#db{main_pid = nil}=Db, #user_ctx{}) ->
     fabric:get_security(Db);
 get_db_security(#db{}=Db, #user_ctx{}) ->
     couch_db:get_security(Db).

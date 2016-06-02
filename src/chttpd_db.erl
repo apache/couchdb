@@ -555,7 +555,7 @@ db_req(#httpd{method='PUT',path_parts=[_,<<"_security">>],user_ctx=Ctx}=Req,
             throw(Else)
     end;
 
-db_req(#httpd{method='GET',path_parts=[_,<<"_security">>],user_ctx=Ctx}=Req, Db) ->
+db_req(#httpd{method='GET',path_parts=[_,<<"_security">>]}=Req, Db) ->
     send_json(Req, fabric:get_security(Db));
 
 db_req(#httpd{path_parts=[_,<<"_security">>]}=Req, _Db) ->
