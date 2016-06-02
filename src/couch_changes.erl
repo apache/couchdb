@@ -197,7 +197,7 @@ get_callback_acc(Callback) when is_function(Callback, 2) ->
 configure_filter("_doc_ids", Style, Req, _Db) ->
     {doc_ids, Style, get_doc_ids(Req)};
 configure_filter("_selector", Style, Req, _Db) ->
-    {selector, Style,  get_selector(Req)};
+    {selector, Style,  get_selector_and_fields(Req)};
 configure_filter("_design", Style, _Req, _Db) ->
     {design_docs, Style};
 configure_filter("_view", Style, Req, Db) ->
@@ -269,7 +269,7 @@ filter(_Db, DocInfo, {doc_ids, Style, DocIds}) ->
         false ->
             []
     end;
-filter(Db, DocInfo, {selector, Style, Selector}) ->
+filter(Db, DocInfo, {selector, Style, {Selector, _Fields}}) ->
     Docs = open_revs(Db, DocInfo, Style),
     Passes = [mango_selector:match(Selector, couch_doc:to_json_obj(Doc, []))
         || Doc <- Docs],
@@ -344,12 +344,14 @@ get_doc_ids(_) ->
     throw({bad_request, no_doc_ids_provided}).
 
 
-get_selector({json_req, {Props}}) ->
-    check_selector(couch_util:get_value(<<"selector">>, Props));
-get_selector(#httpd{method='POST'}=Req) ->
+get_selector_and_fields({json_req, {Props}}) ->
+    Selector = check_selector(couch_util:get_value(<<"selector">>, Props)),
+    Fields = check_fields(couch_util:get_value(<<"fields">>, Props, nil)),
+    {Selector, Fields};
+get_selector_and_fields(#httpd{method='POST'}=Req) ->
     couch_httpd:validate_ctype(Req, "application/json"),
-    get_selector({json_req,  couch_httpd:json_body_obj(Req)});
-get_selector(_) ->
+    get_selector_and_fields({json_req,  couch_httpd:json_body_obj(Req)});
+get_selector_and_fields(_) ->
     throw({bad_request, "Selector must be specified in POST payload"}).
 
 
@@ -376,6 +378,21 @@ check_selector(Selector={_}) ->
     end;
 check_selector(_Selector) ->
     throw({bad_request, "Selector error: expected a JSON object"}).
+
+
+check_fields(nil) ->
+    nil;
+check_fields(Fields) when is_list(Fields) ->
+    try
+        {ok, Fields1} = mango_fields:new(Fields),
+        Fields1
+    catch
+        {mango_error, Mod, Reason0} ->
+            {_StatusCode, _Error, Reason} = mango_error:info(Mod, Reason0),
+            throw({bad_request, Reason})
+    end;
+check_fields(_Fields) ->
+    throw({bad_request, "Selector error: fields must be JSON array"}).
 
 
 open_ddoc(#db{name=DbName, id_tree=undefined}, DDocId) ->
@@ -806,21 +823,33 @@ maybe_get_changes_doc(Value, #changes_acc{include_docs=true}=Acc) ->
     #changes_acc{
         db = Db,
         doc_options = DocOpts,
-        conflicts = Conflicts
+        conflicts = Conflicts,
+        filter = Filter
     } = Acc,
     Opts = case Conflicts of
-        true -> [deleted, conflicts];
-        false -> [deleted]
-    end,
-    Doc = couch_index_util:load_doc(Db, Value, Opts),
-    case Doc of
-        null ->
-            [{doc, null}];
-        _ ->
-            [{doc, couch_doc:to_json_obj(Doc, DocOpts)}]
-    end;
+               true -> [deleted, conflicts];
+               false -> [deleted]
+           end,
+    load_doc(Db, Value, Opts, DocOpts, Filter);
+
 maybe_get_changes_doc(_Value, _Acc) ->
     [].
+
+
+load_doc(Db, Value, Opts, DocOpts, Filter) ->
+    case couch_index_util:load_doc(Db, Value, Opts) of
+        null ->
+            [{doc, null}];
+        Doc ->
+            [{doc, doc_to_json(Doc, DocOpts, Filter)}]
+    end.
+
+
+doc_to_json(Doc, DocOpts, {selector, _Style, {_Selector, Fields}})
+    when Fields =/= nil ->
+    mango_fields:extract(couch_doc:to_json_obj(Doc, DocOpts), Fields);
+doc_to_json(Doc, DocOpts, _Filter) ->
+    couch_doc:to_json_obj(Doc, DocOpts).
 
 
 deleted_item(true) -> [{<<"deleted">>, true}];

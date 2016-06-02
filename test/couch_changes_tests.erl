@@ -21,7 +21,8 @@
 -record(row, {
     id,
     seq,
-    deleted = false
+    deleted = false,
+    doc = nil
 }).
 
 setup() ->
@@ -98,7 +99,9 @@ filter_by_selector() ->
                 fun should_select_when_no_result/1,
                 fun should_select_with_deleted_docs/1,
                 fun should_select_with_continuous/1,
-                fun should_stop_selector_when_db_deleted/1
+                fun should_stop_selector_when_db_deleted/1,
+                fun should_select_with_empty_fields/1,
+                fun should_select_with_fields/1
             ]
         }
     }.
@@ -500,6 +503,49 @@ should_stop_selector_when_db_deleted({DbName, _Revs}) ->
        end).
 
 
+should_select_with_empty_fields({DbName, _}) ->
+    ?_test(
+        begin
+            ChArgs = #changes_args{filter = "_selector", include_docs=true},
+            Selector = {[{<<"_id">>, <<"doc3">>}]},
+            Req = {json_req, {[{<<"selector">>, Selector},
+                               {<<"fields">>, []}]}},
+            Consumer = spawn_consumer(DbName, ChArgs, Req),
+            {Rows, LastSeq} = wait_finished(Consumer),
+            {ok, Db} = couch_db:open_int(DbName, []),
+            UpSeq = couch_db:get_update_seq(Db),
+            couch_db:close(Db),
+            stop_consumer(Consumer),
+            ?assertEqual(1, length(Rows)),
+            [#row{seq = Seq, id = Id, doc = Doc}] = Rows,
+            ?assertEqual(<<"doc3">>, Id),
+            ?assertEqual(6, Seq),
+            ?assertEqual(UpSeq, LastSeq),
+            ?assertMatch({[{_K1, _V1}, {_K2, _V2}]}, Doc)
+        end).
+
+should_select_with_fields({DbName, _}) ->
+    ?_test(
+        begin
+            ChArgs = #changes_args{filter = "_selector", include_docs=true},
+            Selector = {[{<<"_id">>, <<"doc3">>}]},
+            Req = {json_req, {[{<<"selector">>, Selector},
+                               {<<"fields">>, [<<"_id">>, <<"nope">>]}]}},
+            Consumer = spawn_consumer(DbName, ChArgs, Req),
+            {Rows, LastSeq} = wait_finished(Consumer),
+            {ok, Db} = couch_db:open_int(DbName, []),
+            UpSeq = couch_db:get_update_seq(Db),
+            couch_db:close(Db),
+            stop_consumer(Consumer),
+            ?assertEqual(1, length(Rows)),
+            [#row{seq = Seq, id = Id, doc = Doc}] = Rows,
+            ?assertEqual(<<"doc3">>, Id),
+            ?assertEqual(6, Seq),
+            ?assertEqual(UpSeq, LastSeq),
+            ?assertMatch(Doc, {[{<<"_id">>, <<"doc3">>}]})
+        end).
+
+
 should_emit_only_design_documents({DbName, Revs}) ->
     ?_test(
         begin
@@ -793,7 +839,8 @@ spawn_consumer(DbName, ChangesArgs0, Req) ->
                 Id = couch_util:get_value(<<"id">>, Change),
                 Seq = couch_util:get_value(<<"seq">>, Change),
                 Del = couch_util:get_value(<<"deleted">>, Change, false),
-                [#row{id = Id, seq = Seq, deleted = Del} | Acc];
+                Doc = couch_util:get_value(doc, Change, nil),
+                [#row{id = Id, seq = Seq, deleted = Del, doc = Doc} | Acc];
             ({stop, LastSeq}, _, Acc) ->
                 Parent ! {consumer_finished, lists:reverse(Acc), LastSeq},
                 stop_loop(Parent, Acc);
