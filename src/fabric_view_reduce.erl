@@ -58,7 +58,7 @@ go(DbName, DDoc, VName, Args, Callback, Acc, VInfo) ->
     end.
 
 go2(DbName, Workers, {red, {_, Lang, View}, _}=VInfo, Args, Callback, Acc0) ->
-    #mrargs{limit = Limit, skip = Skip, keys = Keys, direction=Dir} = Args,
+    #mrargs{limit = Limit, skip = Skip, keys = Keys} = Args,
     RedSrc = couch_mrview_util:extract_view_reduce(VInfo),
     OsProc = case os_proc_needed(RedSrc) of
         true -> couch_query_servers:get_os_process(Lang);
