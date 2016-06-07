@@ -33,8 +33,7 @@ multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
         Acc1
     end, VAcc1, ArgQueries),
     {ok, Resp1} = chttpd:send_delayed_chunk(VAcc2#vacc.resp, "\r\n]}"),
-    {ok, Resp2} = chttpd:end_delayed_json_response(Resp1),
-    {ok, Resp2#vacc.resp}.
+    chttpd:end_delayed_json_response(Resp1).
 
 
 design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
