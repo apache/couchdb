@@ -41,7 +41,7 @@ handle_search_req(#httpd{method=Method, path_parts=[_, _, _, _, IndexName]}=Req
         _ ->
             ok
     end,
-    case Grouping#grouping.by of
+    Response = case Grouping#grouping.by of
         nil ->
             case dreyfus_fabric_search:go(DbName, DDoc, IndexName, QueryArgs) of
                 {ok, Bookmark0, TotalHits, Hits0} -> % legacy clause
@@ -99,7 +99,8 @@ handle_search_req(#httpd{method=Method, path_parts=[_, _, _, _, IndexName]}=Req
             end
     end,
     RequestTime = timer:now_diff(os:timestamp(), Start) div 1000,
-    couch_stats:update_histogram([dreyfus, httpd, search], RequestTime);
+    couch_stats:update_histogram([dreyfus, httpd, search], RequestTime),
+    Response;
 handle_search_req(#httpd{path_parts=[_, _, _, _, _]}=Req, _Db, _DDoc, _RetryCount, _RetryPause) ->
     send_method_not_allowed(Req, "GET,POST");
 handle_search_req(Req, _Db, _DDoc, _RetryCount, _RetryPause) ->
