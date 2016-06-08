@@ -41,7 +41,7 @@ handle_search_req(#httpd{method=Method, path_parts=[_, _, _, _, IndexName]}=Req
         _ ->
             ok
     end,
-    case Grouping#grouping.by of
+    Response = case Grouping#grouping.by of
         nil ->
             case dreyfus_fabric_search:go(DbName, DDoc, IndexName, QueryArgs) of
                 {ok, Bookmark0, TotalHits, Hits0} -> % legacy clause
@@ -78,7 +78,7 @@ handle_search_req(#httpd{method=Method, path_parts=[_, _, _, _, IndexName]}=Req
             end;
         _ ->
             % ensure limit in group query >0
-            LimitValue = parse_positive_int_param("limit", QueryArgs#index_query_args.limit, 
+            LimitValue = parse_positive_int_param("limit", QueryArgs#index_query_args.limit,
                                                   "max_limit", "200"),
             UseNewApi = Grouping#grouping.new_api,
             case dreyfus_fabric_group1:go(DbName, DDoc, IndexName, QueryArgs) of
@@ -99,7 +99,8 @@ handle_search_req(#httpd{method=Method, path_parts=[_, _, _, _, IndexName]}=Req
             end
     end,
     RequestTime = timer:now_diff(os:timestamp(), Start) div 1000,
-    couch_stats:update_histogram([dreyfus, httpd, search], RequestTime);
+    couch_stats:update_histogram([dreyfus, httpd, search], RequestTime),
+    Response;
 handle_search_req(#httpd{path_parts=[_, _, _, _, _]}=Req, _Db, _DDoc, _RetryCount, _RetryPause) ->
     send_method_not_allowed(Req, "GET,POST");
 handle_search_req(Req, _Db, _DDoc, _RetryCount, _RetryPause) ->
@@ -404,11 +405,11 @@ hits_to_json(DbName, IncludeDocs, Hits) ->
     if IncludeDocs ->
         {ok, JsonDocs} = dreyfus_fabric:get_json_docs(DbName, Ids),
         lists:zipwith(fun(Hit, {Id, Doc}) ->
-                case Hit of 
-                    {Id, Order, Fields} ->     
+                case Hit of
+                    {Id, Order, Fields} ->
                         {[{id, Id}, {order, Order}, {fields, {Fields}}, Doc]};
                     {Id, Order, Fields, Highlights} ->
-                        {[{id, Id}, {order, Order}, {fields, {Fields}}, 
+                        {[{id, Id}, {order, Order}, {fields, {Fields}},
                           {highlights, {Highlights}}, Doc]}
                 end
             end, HitData, JsonDocs);
@@ -416,7 +417,7 @@ hits_to_json(DbName, IncludeDocs, Hits) ->
     true ->
         lists:map(fun(Hit) ->
                 case Hit of
-                    {Id, Order, Fields} -> 
+                    {Id, Order, Fields} ->
                       {[{id, Id}, {order, Order}, {fields, {Fields}}]};
                     {Id, Order, Fields, Highlights} ->
                       {[{id, Id}, {order, Order}, {fields, {Fields}}, {highlights, {Highlights}}]}
@@ -454,7 +455,7 @@ facet_to_json({K0, _V0, C0}) ->
     {hd(K0), facets_to_json(C2)}.
 
 send_grouped_response(Req, {TotalHits, TotalGroupedHits, Groups}, UseNewApi) ->
-    GroupResponsePairs = case UseNewApi of 
+    GroupResponsePairs = case UseNewApi of
         true -> [{total_rows, TotalHits}, {groups, Groups}];
         false -> [{total_hits, TotalHits}, {total_grouped_hits, TotalGroupedHits}, {groups, Groups}]
     end,
