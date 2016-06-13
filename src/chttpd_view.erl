@@ -21,7 +21,8 @@ multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
     {ok, #mrst{views=Views}} = couch_mrview_util:ddoc_to_mrst(Db, DDoc),
     Args1 = couch_mrview_util:set_view_type(Args0, ViewName, Views),
     ArgQueries = lists:map(fun({Query}) ->
-        QueryArg = couch_mrview_http:parse_params(Query, undefined, Args1),
+        QueryArg = couch_mrview_http:parse_params(Query, undefined,
+            Args1, [decoded]),
         couch_mrview_util:validate_args(QueryArg)
     end, Queries),
     VAcc0 = #vacc{db=Db, req=Req, prepend="\r\n"},
