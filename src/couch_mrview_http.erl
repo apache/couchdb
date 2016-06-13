@@ -32,6 +32,7 @@
     prepend_val/1,
     parse_params/2,
     parse_params/3,
+    parse_params/4,
     view_cb/2,
     row_to_json/1,
     row_to_json/2,
@@ -439,39 +440,55 @@ parse_params(Props, Keys) ->
     parse_params(Props, Keys, Args).
 
 
-parse_params(Props, Keys, #mrargs{}=Args0) ->
+parse_params(Props, Keys, Args) ->
+    parse_params(Props, Keys, Args, []).
+
+parse_params(Props, Keys, #mrargs{}=Args0, Options) ->
+    IsDecoded = lists:member(decoded, Options),
     % group_level set to undefined to detect if explicitly set by user
     Args1 = Args0#mrargs{keys=Keys, group=undefined, group_level=undefined},
     lists:foldl(fun({K, V}, Acc) ->
-        parse_param(K, V, Acc)
+        parse_param(K, V, Acc, IsDecoded)
     end, Args1, Props).
 
 
-parse_param(Key, Val, Args) when is_binary(Key) ->
-    parse_param(binary_to_list(Key), Val, Args);
-parse_param(Key, Val, Args) ->
+parse_param(Key, Val, Args, IsDecoded) when is_binary(Key) ->
+    parse_param(binary_to_list(Key), Val, Args, IsDecoded);
+parse_param(Key, Val, Args, IsDecoded) ->
     case Key of
         "" ->
             Args;
         "reduce" ->
             Args#mrargs{reduce=parse_boolean(Val)};
+        "key" when IsDecoded ->
+            Args#mrargs{start_key=Val, end_key=Val};
         "key" ->
-            JsonKey = parse_json(Val),
+            JsonKey = ?JSON_DECODE(Val),
             Args#mrargs{start_key=JsonKey, end_key=JsonKey};
+        "keys" when IsDecoded ->
+            Args#mrargs{keys=Val};
         "keys" ->
-            Args#mrargs{keys=parse_json(Val)};
+            Args#mrargs{keys=?JSON_DECODE(Val)};
+        "startkey" when IsDecoded ->
+            Args#mrargs{start_key=Val};
+        "start_key" when IsDecoded ->
+            Args#mrargs{start_key=Val};
         "startkey" ->
-            Args#mrargs{start_key=parse_json(Val)};
+            Args#mrargs{start_key=?JSON_DECODE(Val)};
         "start_key" ->
-            Args#mrargs{start_key=parse_json(Val)};
+            Args#mrargs{start_key=?JSON_DECODE(Val)};
         "startkey_docid" ->
             Args#mrargs{start_key_docid=couch_util:to_binary(Val)};
         "start_key_doc_id" ->
             Args#mrargs{start_key_docid=couch_util:to_binary(Val)};
+        "endkey" when IsDecoded ->
+            Args#mrargs{end_key=Val};
+        "end_key" when IsDecoded ->
+            Args#mrargs{end_key=Val};
         "endkey" ->
-            Args#mrargs{end_key=parse_json(Val)};
+            Args#mrargs{end_key=?JSON_DECODE(Val)};
         "end_key" ->
-            Args#mrargs{end_key=parse_json(Val)};
+            Args#mrargs{end_key=?JSON_DECODE(Val)};
         "endkey_docid" ->
             Args#mrargs{end_key_docid=couch_util:to_binary(Val)};
         "end_key_doc_id" ->
@@ -573,9 +590,3 @@ check_view_etag(Sig, Acc0, Req) ->
         true -> throw({etag_match, ETag});
         false -> {ok, Acc0#vacc{etag=ETag}}
     end.
-
-
-parse_json(V) when is_list(V) ->
-    ?JSON_DECODE(V);
-parse_json(V) ->
-    V.
