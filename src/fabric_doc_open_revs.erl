@@ -160,8 +160,10 @@ sort_key({{not_found, _}, {Pos, Rev}}) ->
 
 
 dict_replies(Dict, []) ->
-    Counts = [Count || {_Key, {_Reply, Count}} <- Dict],
-    {Dict, lists:min(Counts)};
+    case [Count || {_Key, {_Reply, Count}} <- Dict] of
+        [] -> {Dict, 0};
+        Counts -> {Dict, lists:min(Counts)}
+    end;
 
 dict_replies(Dict, [Reply | Rest]) ->
     NewDict = fabric_util:update_counter(Reply, 1, Dict),
