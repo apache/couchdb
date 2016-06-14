@@ -46,8 +46,8 @@ go(DbName, Id, Revs, Options) ->
     },
     RexiMon = fabric_util:create_monitors(Workers),
     try fabric_util:recv(Workers, #shard.ref, fun handle_message/3, State) of
-    {ok, {ok, Reply}} ->
-        {ok, filter_reply(Reply)};
+    {ok, Replies} ->
+        {ok, filter_reply(Replies)};
     {timeout, #state{workers=DefunctWorkers}} ->
         fabric_util:log_timeout(DefunctWorkers, "open_revs"),
         {error, timeout};
