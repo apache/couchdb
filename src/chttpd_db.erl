@@ -1026,7 +1026,8 @@ couch_doc_from_req(Req, DocId, Json) ->
 % couch_doc_open(Db, DocId) ->
 %   couch_doc_open(Db, DocId, nil, []).
 
-couch_doc_open(Db, DocId, Rev, Options) ->
+couch_doc_open(#db{} = Db, DocId, Rev, Options0) ->
+    Options = [{user_ctx, Db#db.user_ctx} | Options0],
     case Rev of
     nil -> % open most recent rev
         case fabric:open_doc(Db, DocId, Options) of
