@@ -249,9 +249,15 @@ def hack_default_ini(ctx, node, content):
     coffeejs = os.path.join(ctx['rootdir'], "share", "server", "main-coffee.js")
 
     repl = "javascript = %s %s" % (couchjs, mainjs)
+    if os.name == 'nt':
+        # Erlang always wants UNIX-style paths
+        repl = repl.replace("\\", "/")
     contents = re.sub("(?m)^javascript.*$", repl, contents)
 
     repl = "coffeescript = %s %s" % (couchjs, coffeejs)
+    if os.name == 'nt':
+        # Erlang always wants UNIX-style paths
+        repl = repl.replace("\\", "/")
     contents = re.sub("(?m)^coffeescript.*$", repl, contents)
 
     return contents
