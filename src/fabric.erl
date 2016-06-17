@@ -466,10 +466,8 @@ name(Thing) ->
 
 docid(DocId) when is_list(DocId) ->
     list_to_binary(DocId);
-docid(DocId) when is_binary(DocId) ->
-    DocId;
 docid(DocId) ->
-    erlang:error({illegal_docid, DocId}).
+    DocId.
 
 docs(Docs) when is_list(Docs) ->
     [doc(D) || D <- Docs];
