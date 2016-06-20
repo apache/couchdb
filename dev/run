@@ -174,7 +174,7 @@ def setup_configs(ctx):
             "fauxton_root": "src/fauxton/dist/release",
             "uuid": "fake_uuid_for_dev"
         }
-        if os.name == 'nt':
+        if os.sep == '\\':
             # Erlang always wants UNIX-style paths
             env["data_dir"] = env["data_dir"].replace("\\", "/")
             env["view_index_dir"] = env["view_index_dir"].replace("\\", "/")
@@ -237,7 +237,7 @@ def boot_haproxy(ctx):
 def hack_default_ini(ctx, node, content):
     # Replace log file
     logfile = os.path.join(ctx['devdir'], "logs", "%s.log" % node)
-    if os.name == 'nt':
+    if os.sep == '\\':
         # Erlang always wants UNIX-style paths
         logfile = logfile.replace("\\", "/")
     repl = "file = %s" % logfile
@@ -249,13 +249,13 @@ def hack_default_ini(ctx, node, content):
     coffeejs = os.path.join(ctx['rootdir'], "share", "server", "main-coffee.js")
 
     repl = "javascript = %s %s" % (couchjs, mainjs)
-    if os.name == 'nt':
+    if os.sep == '\\':
         # Erlang always wants UNIX-style paths
         repl = repl.replace("\\", "/")
     contents = re.sub("(?m)^javascript.*$", repl, contents)
 
     repl = "coffeescript = %s %s" % (couchjs, coffeejs)
-    if os.name == 'nt':
+    if os.sep == '\\':
         # Erlang always wants UNIX-style paths
         repl = repl.replace("\\", "/")
     contents = re.sub("(?m)^coffeescript.*$", repl, contents)
@@ -388,7 +388,7 @@ def boot_node(ctx, node):
     ]
     logfname = os.path.join(ctx['devdir'], "logs", "%s.log" % node)
     log = open(logfname, "wb")
-    if os.name == 'nt':
+    if os.sep == '\\':
         # Erlang always wants UNIX-style paths
         cmd = [x.replace("\\", "/") for x in cmd]
     return sp.Popen(cmd, stdin=sp.PIPE, stdout=log, stderr=sp.STDOUT, env=env)
