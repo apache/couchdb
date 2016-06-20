@@ -227,7 +227,7 @@ list_cb({row, Row}, #lacc{code=undefined} = Acc) ->
 list_cb({row, Row}, Acc) ->
     send_list_row(Row, Acc);
 list_cb(complete, Acc) ->
-    #lacc{qserver = {Proc, _}, resp = Resp0} = Acc,
+    #lacc{qserver = {Proc, _}, req = Req, resp = Resp0} = Acc,
     if Resp0 =:= nil ->
         {ok, #lacc{resp = Resp}} = start_list_resp({[]}, Acc);
     true ->
@@ -240,7 +240,7 @@ list_cb(complete, Acc) ->
         [<<"end">>, Data] ->
             #lacc{resp = Resp2} = send_non_empty_chunk(Acc#lacc{resp=Resp}, Data)
     end,
-    last_chunk(Resp2),
+    last_chunk(Req, Resp2),
     {ok, Resp2}.
 
 start_list_resp(Head, Acc) ->
@@ -262,7 +262,7 @@ fixup_headers(Headers, #lacc{etag=ETag} = Acc) ->
     Headers3 = chttpd_external:default_or_content_type(CType, ExtHeaders),
     Acc#lacc{code=Code, headers=Headers3}.
 
-send_list_row(Row, #lacc{qserver = {Proc, _}, resp = Resp} = Acc) ->
+send_list_row(Row, #lacc{qserver = {Proc, _}, req = Req, resp = Resp} = Acc) ->
     RowObj = case couch_util:get_value(id, Row) of
         undefined -> [];
         Id -> [{id, Id}]
@@ -286,12 +286,12 @@ send_list_row(Row, #lacc{qserver = {Proc, _}, resp = Resp} = Acc) ->
     [<<"end">>, Chunk, Headers] ->
         Acc2 = send_non_empty_chunk(fixup_headers(Headers, Acc), Chunk),
         #lacc{resp = Resp2} = Acc2,
-        last_chunk(Resp2),
+        last_chunk(Req, Resp2),
         {stop, Acc2};
     [<<"end">>, Chunk] ->
         Acc2 = send_non_empty_chunk(Acc, Chunk),
         #lacc{resp = Resp2} = Acc2,
-        last_chunk(Resp2),
+        last_chunk(Req, Resp2),
         {stop, Acc2}
     catch Error ->
         case Resp of
@@ -372,7 +372,9 @@ json_req_obj(Req, Db) ->
     spawn_monitor(fun() -> exit(chttpd_external:json_req_obj(Req, Db)) end),
     receive {'DOWN', _, _, _, JsonReq} -> JsonReq end.
 
-last_chunk(Resp) ->
+last_chunk(Req, undefined) ->
+    chttpd:send_response(Req, 200, [], <<"">>);
+last_chunk(_Req, Resp) ->
     chttpd:send_chunk(Resp, []).
 
 
