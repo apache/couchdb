@@ -18,7 +18,7 @@
 -export([request_timeout/0, attachments_timeout/0, all_docs_timeout/0]).
 -export([stream_start/2, stream_start/4]).
 -export([log_timeout/2, remove_done_workers/2]).
--export([is_users_db/1, is_replicator_db/1, fake_db/1]).
+-export([is_users_db/1, is_replicator_db/1, fake_db/2]).
 
 -compile({inline, [{doc_id_and_rev,1}]}).
 
@@ -297,9 +297,10 @@ is_users_db(DbName) ->
 path_ends_with(Path, Suffix) ->
     Suffix =:= couch_db:dbname_suffix(Path).
 
-fake_db(Opts) ->
+fake_db(DbName, Opts) ->
+    {SecProps} = fabric:get_security(DbName), % as admin
     UserCtx = couch_util:get_value(user_ctx, Opts, #user_ctx{}),
-    #db{user_ctx = UserCtx}.
+    #db{name = DbName, security = SecProps, user_ctx = UserCtx}.
 
 %% test function
 kv(Item, Count) ->

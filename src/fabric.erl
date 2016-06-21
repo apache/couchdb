@@ -327,7 +327,7 @@ query_view(DbName, DDoc, ViewName, Callback, Acc0, QueryArgs0) ->
     case fabric_util:is_users_db(Db) of
     true ->
         Req = Acc0#vacc.req,
-        FakeDb = fabric_util:fake_db([{user_ctx, Req#httpd.user_ctx}]),
+        FakeDb = fabric_util:fake_db(Db, [{user_ctx, Req#httpd.user_ctx}]),
         couch_users_db:after_doc_read(DDoc, FakeDb);
     false ->
         ok
