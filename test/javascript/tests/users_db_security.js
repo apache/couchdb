@@ -148,38 +148,6 @@ couchTests.users_db_security = function(debug) {
       TEquals(true, userDoc.derived_key != jchrisDoc.derived_key,
         "should have new derived_key");
 
-      // SHA-1 password hashes are upgraded to PBKDF2 on successful
-      // authentication
-      var rnewsonDoc = {
-        _id: "org.couchdb.user:rnewson",
-        type: "user",
-        name: "rnewson",
-        // password: "plaintext_password",
-        password_sha: "e29dc3aeed5abf43185c33e479f8998558c59474",
-        salt: "24f1e0a87c2e374212bda1073107e8ae",
-        roles: []
-      };
-
-      var password_sha = rnewsonDoc.password_sha,
-        salt = rnewsonDoc.salt,
-        derived_key,
-        iterations;
-
-      usersDb.save(rnewsonDoc);
-      rnewsonDoc = open_as(usersDb, rnewsonDoc._id, "jan");
-      T(!rnewsonDoc.password_scheme);
-      T(!rnewsonDoc.derived_key);
-      T(!rnewsonDoc.iterations);
-
-      // check that we don't upgrade when the password is wrong
-      TEquals("unauthorized", CouchDB.login("rnewson", "wrong_password").error);
-      rnewsonDoc = open_as(usersDb, rnewsonDoc._id, "jan");
-      TEquals(salt, rnewsonDoc.salt);
-      TEquals(password_sha, rnewsonDoc.password_sha);
-      T(!rnewsonDoc.password_scheme);
-      T(!rnewsonDoc.derived_key);
-      T(!rnewsonDoc.iterations);
-
       wait(5000); // wait for auth cache invalidation
       var r = CouchDB.login("rnewson", "plaintext_password")
       log(r)
