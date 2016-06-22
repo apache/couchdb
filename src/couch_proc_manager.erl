@@ -371,13 +371,8 @@ new_proc(Client) ->
     Resp = try
         case new_proc_int(From, Lang) of
         {ok, NewProc} ->
-            case teach_ddoc(DDoc, DDocKey, NewProc) of
-            {ok, Proc} ->
-                {spawn_ok, Proc, From};
-            {error, Reason} ->
-                gen_server:reply(From, {error, Reason}),
-                spawn_error
-            end;
+            {ok, Proc} = teach_ddoc(DDoc, DDocKey, NewProc),
+            {spawn_ok, Proc, From};
         Error ->
             gen_server:reply(From, {error, Error}),
             spawn_error
