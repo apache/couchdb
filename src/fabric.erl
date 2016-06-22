@@ -222,7 +222,7 @@ get_missing_revs(DbName, IdsRevs, Options) when is_list(IdsRevs) ->
 
 %% @doc update a single doc
 %% @equiv update_docs(DbName,[Doc],Options)
--spec update_doc(dbname(), #doc{}, [option()]) ->
+-spec update_doc(dbname(), #doc{} | json_obj(), [option()]) ->
     {ok, any()} | any().
 update_doc(DbName, Doc, Options) ->
     case update_docs(DbName, [Doc], opts(Options)) of
@@ -241,7 +241,7 @@ update_doc(DbName, Doc, Options) ->
     end.
 
 %% @doc update a list of docs
--spec update_docs(dbname(), [#doc{}], [option()]) ->
+-spec update_docs(dbname(), [#doc{} | json_obj()], [option()]) ->
     {ok, any()} | any().
 update_docs(DbName, Docs, Options) ->
     try
