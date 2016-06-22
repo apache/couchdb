@@ -52,12 +52,15 @@
     soft_limit
 }).
 
+-type docid() :: iodata().
+-type revision() :: {integer(), binary()}.
+
 -record(client, {
-    timestamp,
-    from,
-    lang,
-    ddoc,
-    ddoc_key
+    timestamp :: os:timestamp() | '_',
+    from :: undefined | {pid(), reference()}  | '_',
+    lang :: binary() | '_',
+    ddoc :: #doc{} | '_',
+    ddoc_key :: undefined | {DDocId :: docid(), Rev :: revision()} | '_'
 }).
 
 -record(proc_int, {
@@ -519,7 +522,7 @@ flush_waiters(State, Lang) ->
 add_waiting_client(Client) ->
     ets:insert(?WAITERS, Client#client{timestamp=os:timestamp()}).
 
-
+-spec get_waiting_client(Lang :: binary()) -> undefined | #client{}.
 get_waiting_client(Lang) ->
     case ets:match_object(?WAITERS, #client{lang=Lang, _='_'}, 1) of
         '$end_of_table' ->
