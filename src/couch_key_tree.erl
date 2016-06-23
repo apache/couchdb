@@ -174,8 +174,8 @@ merge_at([Tree | Sibs], 0, INodes) ->
         fail -> fail
     end.
 
--spec merge_extend(tree(), tree()) ->
-                {tree(), new_leaf | new_branch | internal_node}.
+-spec merge_extend(revtree(), revtree()) ->
+                {revtree(), new_leaf | new_branch | internal_node}.
 merge_extend([], B) when B =/= [] ->
     % Most likely the insert branch simply extends this one, so the new
     % branch is exactly B. Its also possible that B is a branch because

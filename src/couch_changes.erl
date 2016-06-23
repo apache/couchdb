@@ -804,25 +804,19 @@ changes_row(Results, DocInfo, Acc) ->
 maybe_get_changes_doc(Value, #changes_acc{include_docs=true}=Acc) ->
     #changes_acc{
         db = Db,
-        include_docs = IncDoc,
         doc_options = DocOpts,
         conflicts = Conflicts
     } = Acc,
-    case IncDoc of
-        true ->
-            Opts = case Conflicts of
-                true -> [deleted, conflicts];
-                false -> [deleted]
-            end,
-            Doc = couch_index_util:load_doc(Db, Value, Opts),
-            case Doc of
-                null ->
-                    [{doc, null}];
-                _ ->
-                    [{doc, couch_doc:to_json_obj(Doc, DocOpts)}]
-            end;
-        false ->
-            []
+    Opts = case Conflicts of
+        true -> [deleted, conflicts];
+        false -> [deleted]
+    end,
+    Doc = couch_index_util:load_doc(Db, Value, Opts),
+    case Doc of
+        null ->
+            [{doc, null}];
+        _ ->
+            [{doc, couch_doc:to_json_obj(Doc, DocOpts)}]
     end;
 maybe_get_changes_doc(_Value, _Acc) ->
     [].
