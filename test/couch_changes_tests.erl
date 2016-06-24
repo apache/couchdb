@@ -55,7 +55,7 @@ teardown({DbName, _}) ->
 
 changes_test_() ->
     {
-        "Changes feeed",
+        "Changes feed",
         {
             setup,
             fun test_util:start_couch/0, fun test_util:stop_couch/1,
