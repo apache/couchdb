@@ -63,8 +63,9 @@ changes_test_() ->
                 filter_by_selector(),
                 filter_by_doc_id(),
                 filter_by_design(),
-                continuous_feed()
+                continuous_feed(),
                 %%filter_by_custom_function()
+                filter_by_view()
             ]
         }
     }.
@@ -123,6 +124,19 @@ filter_by_custom_function() ->
             fun setup/0, fun teardown/1,
             [
                 fun should_receive_heartbeats/1
+            ]
+        }
+    }.
+
+filter_by_view() ->
+    {
+        "Filter _view",
+        {
+            foreach,
+            fun setup/0, fun teardown/1,
+            [
+                fun should_filter_by_view/1,
+                fun should_filter_by_fast_view/1
             ]
         }
     }.
@@ -591,6 +605,87 @@ should_receive_heartbeats(_) ->
              ?assert(Heartbeats3 > Heartbeats2)
         end)}.
 
+should_filter_by_view({DbName, _}) ->
+    ?_test(
+        begin
+            {ok, Db0} = couch_db:open_int(DbName, [?ADMIN_CTX]),
+            DDocId = <<"_design/app">>,
+            DDoc = couch_doc:from_json_obj({[
+                {<<"_id">>, DDocId},
+                {<<"language">>, <<"javascript">>},
+                {<<"views">>, {[
+                    {<<"valid">>, {[
+                        {<<"map">>, <<"function(doc) {"
+                        " if (doc._id == 'doc3') {"
+                            " emit(doc); "
+                        "} }">>}
+                    ]}}
+                ]}}
+            ]}),
+            {ok, _} = couch_db:update_doc(Db0, DDoc, []),
+            couch_db:close(Db0),
+            %%
+            ChangesArgs = #changes_args{filter = "_view"},
+            Opts = {json_req, {[{
+                <<"query">>, {[
+                    {<<"view">>, <<"app/valid">>}
+                ]}
+            }]}},
+            Consumer = spawn_consumer(DbName, ChangesArgs, Opts),
+            {Rows, LastSeq} = wait_finished(Consumer),
+            {ok, Db} = couch_db:open_int(DbName, []),
+            UpSeq = couch_db:get_update_seq(Db),
+            couch_db:close(Db),
+            stop_consumer(Consumer),
+            ?assertEqual(1, length(Rows)),
+            [#row{seq = Seq, id = Id}] = Rows,
+            ?assertEqual(<<"doc3">>, Id),
+            ?assertEqual(6, Seq),
+            ?assertEqual(UpSeq, LastSeq)
+        end).
+
+should_filter_by_fast_view({DbName, _}) ->
+    ?_test(
+        begin
+            {ok, Db0} = couch_db:open_int(DbName, [?ADMIN_CTX]),
+            DDocId = <<"_design/app">>,
+            DDoc = couch_doc:from_json_obj({[
+                {<<"_id">>, DDocId},
+                {<<"language">>, <<"javascript">>},
+                {<<"options">>, {[{<<"seq_indexed">>, true}]}},
+                {<<"views">>, {[
+                    {<<"valid">>, {[
+                        {<<"map">>, <<"function(doc) {"
+                        " if (doc._id == 'doc3') {"
+                            " emit(doc); "
+                        "} }">>}
+                    ]}}
+                ]}}
+            ]}),
+            {ok, _} = couch_db:update_doc(Db0, DDoc, []),
+            couch_db:close(Db0),
+            %%
+            ChangesArgs = #changes_args{filter = "_view"},
+            Opts = {json_req, {[{
+                <<"query">>, {[
+                    {<<"view">>, <<"app/valid">>}
+                ]}
+            }]}},
+            Consumer = spawn_consumer(DbName, ChangesArgs, Opts),
+            {Rows, LastSeq} = wait_finished(Consumer),
+            {ok, Db} = couch_db:open_int(DbName, []),
+            DbUpSeq = couch_db:get_update_seq(Db),
+            {ok, ViewInfo} = couch_mrview:get_view_info(Db, DDoc, <<"valid">>),
+            {update_seq, ViewUpSeq} = lists:keyfind(update_seq, 1, ViewInfo),
+            couch_db:close(Db),
+            stop_consumer(Consumer),
+            ?assertEqual(1, length(Rows)),
+            [#row{seq = Seq, id = Id}] = Rows,
+            ?assertEqual(<<"doc3">>, Id),
+            ?assertEqual(6, Seq),
+            ?assertEqual(LastSeq, Seq),
+            ?assertEqual(DbUpSeq, ViewUpSeq)
+        end).
 
 save_doc(Db, Json) ->
     Doc = couch_doc:from_json_obj(Json),
