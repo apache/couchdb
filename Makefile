@@ -114,8 +114,9 @@ else
 	@cp test/javascript/tests/lorem*.txt src/fauxton/dist/release/test/
 endif
 	# This might help with emfile errors during `make javascript`: ulimit -n 10240
-	@rm -rf dev/lib
-	@dev/run -n 1 -q --with-admin-party-please test/javascript/run $(suites)
+#	@rm -rf dev/lib
+#	@dev/run -n 1 -q --with-admin-party-please test/javascript/run $(suites)
+	@bash javascript.sh
 
 
 .PHONY: check-qs
