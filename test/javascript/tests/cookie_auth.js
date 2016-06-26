@@ -74,8 +74,15 @@ couchTests.cookie_auth = function(debug) {
     try {
 
       // test that the users db is born with the auth ddoc
-      var ddoc = open_as(usersDb, "_design/_auth", "jan");
-      T(ddoc && ddoc.validate_doc_update);
+      // it might need an auth attempt to actually have it
+      CouchDB.login("someone", "somepass"); // might fail, but who cares?
+      CouchDB.logout();
+      wait(5000);
+      // now we should definitely have it - but poss. after LOOOONG time
+      retry_part(function(){
+        var ddoc = open_as(usersDb, "_design/_auth", "jan");
+        T(ddoc && ddoc.validate_doc_update);
+      }, 120, 500);
 
       // TODO test that changing the config so an existing db becomes the users db installs the ddoc also
 
@@ -283,12 +290,7 @@ couchTests.cookie_auth = function(debug) {
   T(users_db_chg.responseText);
   // now we should be safe
   run_on_modified_server(
-    [
-     {section: "couch_httpd_auth",
-      key: "authentication_db", value: users_db_name},
-     {section: "chttpd_auth",
-      key: "authentication_db", value: users_db_name},
-     {section: "couch_httpd_auth",
+    [{section: "couch_httpd_auth",
       key: "iterations", value: "1"},
      {section: "admins",
        key: "jan", value: "apple"}

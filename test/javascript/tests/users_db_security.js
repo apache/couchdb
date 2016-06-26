@@ -94,24 +94,15 @@ couchTests.users_db_security = function(debug) {
 
     // jan's gonna be admin as he's the first user
     TEquals(true, usersDb.save(userDoc).ok, "should save document");
-    userDoc = open_as(usersDb, "org.couchdb.user:jchris", "jchris");
+    wait(5000);
+    retry_part(function(){
+      // open once as jan to be sure
+      userDoc = open_as(usersDb, "org.couchdb.user:jchris", "jan");
+      userDoc = open_as(usersDb, "org.couchdb.user:jchris", "jchris");
+    }, 12, 500);
     TEquals(undefined, userDoc.password, "password field should be null 1");
     TEquals(40, userDoc.derived_key.length, "derived_key should exist");
     TEquals(32, userDoc.salt.length, "salt should exist");
-
-    // create server admin
-    run_on_modified_server([
-        {
-          section: "couch_httpd_auth",
-          key: "iterations",
-          value: "1"
-        },
-        {
-          section: "admins",
-          key: "jan",
-          value: "apple"
-        }
-      ], function() {
 
       // anonymous should not be able to read an existing user's user document
       var res = usersDb.open("org.couchdb.user:jchris");
@@ -257,7 +248,6 @@ couchTests.users_db_security = function(debug) {
 
       // log in one last time so run_on_modified_server can clean up the admin account
       TEquals(true, CouchDB.login("jan", "apple").ok);
-    });
 
     run_on_modified_server([
         {
@@ -365,6 +355,6 @@ couchTests.users_db_security = function(debug) {
     key: "jan", value: "apple"}],
     testFun
   );
-  usersDb.deleteDb(); // cleanup
 
+  usersDb.deleteDb();
 };

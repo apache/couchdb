@@ -1552,6 +1552,7 @@ couchTests.replication = function(debug) {
   }, "erly");
   var defaultUsersDb = new CouchDB("_users", {"X-Couch-Full-Commit":"false"});
   //var usersDb = new CouchDB("test_suite_auth", {"X-Couch-Full-Commit":"false"});
+  try { defaultUsersDb.createDb(); } catch (e) { /* ignore if exists*/ }
   /*var server_config = [
     {
       section: "couch_httpd_auth",
@@ -1890,6 +1891,7 @@ couchTests.replication = function(debug) {
   //usersDb.deleteDb();
   sourceDb.deleteDb();
   targetDb.deleteDb();
+  defaultUsersDb.deleteDb();
   // (not sure what this is - cleanup after 'file not found tests' poss. - not harmful anyway) 
   (new CouchDB("test_suite_db")).deleteDb();
 };
