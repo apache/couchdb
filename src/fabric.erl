@@ -222,7 +222,7 @@ get_missing_revs(DbName, IdsRevs, Options) when is_list(IdsRevs) ->
 
 %% @doc update a single doc
 %% @equiv update_docs(DbName,[Doc],Options)
--spec update_doc(dbname(), #doc{}, [option()]) ->
+-spec update_doc(dbname(), #doc{} | json_obj(), [option()]) ->
     {ok, any()} | any().
 update_doc(DbName, Doc, Options) ->
     case update_docs(DbName, [Doc], opts(Options)) of
@@ -241,7 +241,7 @@ update_doc(DbName, Doc, Options) ->
     end.
 
 %% @doc update a list of docs
--spec update_docs(dbname(), [#doc{}], [option()]) ->
+-spec update_docs(dbname(), [#doc{} | json_obj()], [option()]) ->
     {ok, any()} | any().
 update_docs(DbName, Docs, Options) ->
     try
@@ -277,8 +277,11 @@ all_docs(DbName, Callback, Acc, QueryArgs) ->
 %%      also be passed to further constrain the query. See <a href=
 %%      "http://wiki.apache.org/couchdb/HTTP_Document_API#All_Documents">
 %%      all_docs</a> for details
--spec all_docs(dbname(), [{atom(), any()}], callback(), [] | tuple(), #mrargs{}) ->
-    {ok, [any()]}.
+-spec all_docs(
+        dbname(), [{atom(), any()}], callback(), [] | tuple(),
+        #mrargs{} | [option()]) ->
+    {ok, any()}.
+
 all_docs(DbName, Options, Callback, Acc0, #mrargs{} = QueryArgs) when
         is_function(Callback, 2) ->
     fabric_view_all_docs:go(dbname(DbName), opts(Options), QueryArgs, Callback, Acc0);
