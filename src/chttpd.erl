@@ -546,7 +546,7 @@ absolute_uri(#httpd{mochi_req=MochiReq, absolute_uri = undefined}, Path) ->
         undefined ->
             case MochiReq:get_header_value("Host") of
                 undefined ->
-                    {ok, {Address, Port}} = inet:sockname(MochiReq:get(socket)),
+                    {ok, {Address, Port}} = sockname(MochiReq:get(socket)),
                     inet_parse:ntoa(Address) ++ ":" ++ integer_to_list(Port);
                 Value1 ->
                     Value1
@@ -574,6 +574,11 @@ absolute_uri(#httpd{mochi_req=MochiReq, absolute_uri = undefined}, Path) ->
     Scheme ++ "://" ++ Host ++ Path;
 absolute_uri(#httpd{absolute_uri = URI}, Path) ->
     URI ++ Path.
+
+sockname(Socket) when is_pid(Socket) ->
+    inet:sockname(Socket);
+sockname(Socket) when is_tuple(Socket) -> % is_tuple since ssl_api.hrl is not exposed
+    ssl:sockname(Socket).
 
 unquote(UrlEncodedString) ->
     mochiweb_util:unquote(UrlEncodedString).
