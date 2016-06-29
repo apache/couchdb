@@ -107,8 +107,6 @@ couchTests.security_validation = function(debug) {
         admins : {names : ["jerry"]}
       }).ok);
 
-      // TODO: when _security is correctly honored (COUCHDB-2990), switch back
-      //T(userDb.save(designDoc).ok);
       T(db.save(designDoc).ok);
 
       var user2Db = new CouchDB("" + db_name + "",
@@ -205,8 +203,7 @@ couchTests.security_validation = function(debug) {
 
       // now turn on admin override
       T(db.setDbProperty("_security", {admin_override : true}).ok);
-      // TODO: re-include after COUCHDB-2990
-      //T(db.save(doc).ok);
+      T(db.save(doc).ok);
 
       // try to do something lame
       try {
