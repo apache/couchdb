@@ -200,6 +200,15 @@ couchTests.users_db = function(debug) {
     testFun
   );
 
+  CouchDB.logout();
   usersDbAlt.deleteDb(); // cleanup
-  usersDb.deleteDb();
+  // usersDb.deleteDb();
+  // make tests more stable by deleting only docs
+  usersDb.allDocs({include_docs: true}).rows.filter(function(d){return d.id!='_design/_auth';}).forEach(function(d){
+    usersDb.deleteDoc(d.doc);
+  });
+  //console.log(JSON.stringify(usersDb.allDocs()));
+  TEquals(1, usersDb.allDocs().rows.length);
+  wait(1000); // make sure the docs are gone 4 good - killing too quickly makes them stay
+
 }

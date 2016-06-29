@@ -1,4 +1,5 @@
 #!/bin/bash
+# alternative runner for tests - a clean environment every time = way more stability
 for t in test/javascript/tests/*.js
 do
 #  echo $t

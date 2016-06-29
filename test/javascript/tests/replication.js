@@ -1887,11 +1887,20 @@ couchTests.replication = function(debug) {
     TEquals(200, xhr.status, "Authorized to cancel replication");
   //});
 
+  CouchDB.logout();
   // cleanup
   //usersDb.deleteDb();
   sourceDb.deleteDb();
   targetDb.deleteDb();
-  defaultUsersDb.deleteDb();
+  // defaultUsersDb.deleteDb();
+  // make tests more stable by deleting only docs
+  defaultUsersDb.allDocs({include_docs: true}).rows.filter(function(d){return d.id!='_design/_auth';}).forEach(function(d){
+    defaultUsersDb.deleteDoc(d.doc);
+  });
+  //console.log(JSON.stringify(defaultUsersDb.allDocs()));
+  TEquals(1, defaultUsersDb.allDocs().rows.length);
+  wait(1000); // make sure the docs are gone 4 good - killing too quickly makes them stay
+
   // (not sure what this is - cleanup after 'file not found tests' poss. - not harmful anyway) 
   (new CouchDB("test_suite_db")).deleteDb();
 };
