@@ -115,8 +115,7 @@ couchTests.users_db = function(debug) {
     //T(s.name == null);
     //console.log(JSON.stringify(usersDb.allDocs()));
     T(s.roles.indexOf("_admin") !== -1);
-// TODO: fix deletion of user docs
-//    T(usersDb.deleteDoc(jchrisWithConflict).ok);
+    T(usersDb.deleteDoc(jchrisWithConflict).ok);
 
     // you can't change doc from type "user"
     jchrisUserDoc = usersDb.open(jchrisUserDoc._id);
