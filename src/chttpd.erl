@@ -884,7 +884,7 @@ error_info({Error, nil, _Stack}) ->
 error_info({Error, Reason, _Stack}) ->
     {500, couch_util:to_binary(Error), couch_util:to_binary(Reason)};
 error_info(Error) ->
-    maybe_handle_error({<<"unknown_error">>, Error}).
+    maybe_handle_error(Error).
 
 maybe_handle_error(Error) ->
     case chttpd_plugin:handle_error(Error) of
@@ -893,7 +893,7 @@ maybe_handle_error(Error) ->
         {Err, Reason} ->
             {500, couch_util:to_binary(Err), couch_util:to_binary(Reason)};
         Error ->
-            {500, couch_util:to_binary(Error), null}
+            {500, <<"unknown_error">>, couch_util:to_binary(Error)}
     end.
 
 
