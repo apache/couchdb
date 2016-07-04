@@ -218,7 +218,7 @@ couchTests.attachments= function(debug) {
 
   // test large attachments - COUCHDB-366
   var lorem = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. '
-  for (var i=0; i<64; i++) {
+  for (var i=0; i<10; i++) {
     lorem = lorem + lorem;
   }
   var xhr = CouchDB.request("PUT", "/" + db_name + "/bin_doc5/lorem.txt", {
@@ -234,7 +234,7 @@ couchTests.attachments= function(debug) {
 
   // test large inline attachment too
   var lorem_b64 = 'TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdC4g'
-  for (var i=0; i<64; i++) {
+  for (var i=0; i<10; i++) {
     lorem_b64 = lorem_b64 + lorem_b64;
   }
   var doc = db.open("bin_doc5", {attachments:true});
