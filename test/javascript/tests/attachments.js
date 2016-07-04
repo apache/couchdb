@@ -217,7 +217,10 @@ couchTests.attachments= function(debug) {
 */
 
   // test large attachments - COUCHDB-366
-  var lorem = CouchDB.request("GET", "http://localhost:15984/_utils/test/lorem.txt").responseText;
+  var lorem = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. '
+  for (var i=0; i<64; i++) {
+    lorem = lorem + lorem;
+  }
   var xhr = CouchDB.request("PUT", "/" + db_name + "/bin_doc5/lorem.txt", {
     headers:{"Content-Type":"text/plain;charset=utf-8"},
     body:lorem
@@ -230,8 +233,10 @@ couchTests.attachments= function(debug) {
   TEqualsIgnoreCase("text/plain;charset=utf-8", xhr.getResponseHeader("Content-Type"));
 
   // test large inline attachment too
-  var lorem_b64 = CouchDB.request("GET", "http://localhost:15984/_utils/test/lorem_b64.txt");
-  lorem_b64 = lorem_b64.responseText;
+  var lorem_b64 = 'TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdC4g'
+  for (var i=0; i<64; i++) {
+    lorem_b64 = lorem_b64 + lorem_b64;
+  }
   var doc = db.open("bin_doc5", {attachments:true});
   TEquals(lorem_b64, doc._attachments["lorem.txt"].data, 'binary attachment data should match');
 
