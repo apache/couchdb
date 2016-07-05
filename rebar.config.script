@@ -43,7 +43,7 @@ DepDescs = [
 {ddoc_cache,       "ddoc-cache",       "c762e90a33ce3cda19ef142dd1120f1087ecd876"},
 {ets_lru,          "ets-lru",          "c05488c8b1d7ec1c3554a828e0c9bf2888932ed6"},
 {fabric,           "fabric",           "aa17ddf3c149a7ac5316e5c821d0d704ac857960"},
-{fauxton,          "fauxton",          {tag, "v1.1.2"}, [raw]},
+{fauxton,          "fauxton",          {tag, "v1.1.5"}, [raw]},
 {folsom,           "folsom",           "a5c95dec18227c977029fbd3b638966d98f17003"},
 {global_changes,   "global-changes",   "203fb088ed81149108e64d18ffd9c3f5df154f97"},
 {goldrush,         "goldrush",         {tag, "0.1.6"}},
