@@ -281,7 +281,8 @@ filter(_Db, DocInfo, {design_docs, Style}) ->
         _ ->
             []
     end;
-filter(Db, DocInfo, {view, Style, DDoc, VName}) ->
+filter(Db, DocInfo, {FilterType, Style, DDoc, VName})
+        when FilterType == view; FilterType == fast_view ->
     Docs = open_revs(Db, DocInfo, Style),
     {ok, Passes} = couch_query_servers:filter_view(DDoc, VName, Docs),
     filter_revs(Passes, Docs);
