@@ -23,7 +23,7 @@
 -export([cookie_auth_header/2]).
 -export([handle_session_req/1, handle_session_req/2]).
 
--export([authenticate/2, verify_totp/2, maybe_upgrade_password_hash/6]).
+-export([authenticate/2, verify_totp/2]).
 -export([ensure_cookie_auth_secret/0, make_cookie_time/0]).
 -export([cookie_auth_cookie/4, cookie_scheme/1]).
 -export([maybe_value/3]).
@@ -97,12 +97,9 @@ default_authentication_handler(Req, AuthModule) ->
                 Password = ?l2b(Pass),
                 case authenticate(Password, UserProps) of
                     true ->
-                        UserProps2 = maybe_upgrade_password_hash(
-                            Req, UserName, Password, UserProps,
-                            AuthModule, AuthCtx),
                         Req#httpd{user_ctx=#user_ctx{
                             name=UserName,
-                            roles=couch_util:get_value(<<"roles">>, UserProps2, [])
+                            roles=couch_util:get_value(<<"roles">>, UserProps, [])
                         }};
                     false ->
                         authentication_warning(Req, UserName),
@@ -308,11 +305,9 @@ handle_session_req(#httpd{method='POST', mochi_req=MochiReq}=Req, AuthModule) ->
     case authenticate(Password, UserProps) of
         true ->
             verify_totp(UserProps, Form),
-            UserProps2 = maybe_upgrade_password_hash(
-                Req, UserName, Password, UserProps, AuthModule, AuthCtx),
             % setup the session cookie
             Secret = ?l2b(ensure_cookie_auth_secret()),
-            UserSalt = couch_util:get_value(<<"salt">>, UserProps2),
+            UserSalt = couch_util:get_value(<<"salt">>, UserProps),
             CurrentTime = make_cookie_time(),
             Cookie = cookie_auth_cookie(Req, ?b2l(UserName), <<Secret/binary, UserSalt/binary>>, CurrentTime),
             % TODO document the "next" feature in Futon
@@ -326,7 +321,7 @@ handle_session_req(#httpd{method='POST', mochi_req=MochiReq}=Req, AuthModule) ->
                 {[
                     {ok, true},
                     {name, UserName},
-                    {roles, couch_util:get_value(<<"roles">>, UserProps2, [])}
+                    {roles, couch_util:get_value(<<"roles">>, UserProps, [])}
                 ]});
         false ->
             authentication_warning(Req, UserName),
@@ -394,21 +389,6 @@ extract_username(Form) ->
 maybe_value(_Key, undefined, _Fun) -> [];
 maybe_value(Key, Else, Fun) ->
     [{Key, Fun(Else)}].
-
-maybe_upgrade_password_hash(Req, UserName, Password, UserProps,
-        AuthModule, AuthCtx) ->
-    IsAdmin = lists:member(<<"_admin">>, couch_util:get_value(<<"roles">>, UserProps, [])),
-    case {IsAdmin, couch_util:get_value(<<"password_scheme">>, UserProps, <<"simple">>)} of
-    {false, <<"simple">>} ->
-        UserProps2 = proplists:delete(<<"password_sha">>, UserProps),
-        UserProps3 = [{<<"password">>, Password} | UserProps2],
-        NewUserDoc = couch_doc:from_json_obj({UserProps3}),
-        ok = AuthModule:update_user_creds(Req, NewUserDoc, AuthCtx),
-        {ok, NewUserProps, _} = AuthModule:get_user_creds(Req, UserName),
-        NewUserProps;
-    _ ->
-        UserProps
-    end.
 
 authenticate(Pass, UserProps) ->
     UserSalt = couch_util:get_value(<<"salt">>, UserProps, <<>>),
