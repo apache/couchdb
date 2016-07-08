@@ -58,17 +58,23 @@ handle_message({rexi_EXIT, Reason}, Shard, {Counters, Acc, Ushards}) ->
     end;
 
 handle_message({ok, Info}, Shard, {Counters0, Acc, Ushards}) ->
-    NewAcc = append_result(Info, Shard, Acc, Ushards),
-    Counters1 = fabric_dict:store(Shard, ok, Counters0),
-    Counters = fabric_view:remove_overlapping_shards(Shard, Counters1),
-    case is_complete(Counters) of
-    false ->
-        {ok, {Counters, NewAcc, Ushards}};
-    true ->
-        Pending = aggregate_pending(NewAcc),
-        Infos = get_infos(NewAcc),
-        Results = [{updates_pending, {Pending}} | merge_results(Infos)],
-        {stop, Results}
+    case fabric_dict:lookup_element(Shard, Counters0) of
+    undefined ->
+        % already heard from other node in this range
+        {ok, {Counters0, Acc, Ushards}};
+    nil ->
+        NewAcc = append_result(Info, Shard, Acc, Ushards),
+        Counters1 = fabric_dict:store(Shard, ok, Counters0),
+        Counters = fabric_view:remove_overlapping_shards(Shard, Counters1),
+        case is_complete(Counters) of
+        false ->
+            {ok, {Counters, NewAcc, Ushards}};
+        true ->
+            Pending = aggregate_pending(NewAcc),
+            Infos = get_infos(NewAcc),
+            Results = [{updates_pending, {Pending}} | merge_results(Infos)],
+            {stop, Results}
+        end
     end;
 handle_message(_, _, Acc) ->
     {ok, Acc}.
