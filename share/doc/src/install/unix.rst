@@ -52,7 +52,7 @@ Dependencies
 
 You should have the following installed:
 
-* `Erlang OTP (>=R14B01, =<R18) <http://erlang.org/>`_
+* `Erlang OTP (>=R14B01, =<R19) <http://erlang.org/>`_
 * `ICU                          <http://icu-project.org/>`_
 * `OpenSSL                      <http://www.openssl.org/>`_
 * `Mozilla SpiderMonkey (1.8.5) <http://www.mozilla.org/js/spidermonkey/>`_

@@ -7,12 +7,15 @@ before_install:
    - sudo apt-get -y install python-pygments python-docutils python-sphinx
 before_script: ./bootstrap && ./configure
 script:
+   - rm -f erlang-*.tar.bz2
    - make distcheck
    - cd src/fauxton
    - npm install
    - grunt test
 language: erlang
 otp_release:
+   - 19.0
+   - 18.3
    - 17.0
    - R16B03-1
    - R15B03
