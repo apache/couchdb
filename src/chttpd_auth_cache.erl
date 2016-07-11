@@ -92,7 +92,8 @@ get_from_cache(UserName) ->
 %% gen_server callbacks
 
 init([]) ->
-    {ok, #state{changes_pid = spawn_changes(0)}}.
+    self() ! {start_listener, 0},
+    {ok, #state{}}.
 
 handle_call(_Call, _From, State) ->
     {noreply, State}.
@@ -116,8 +117,10 @@ handle_info({start_listener, Seq}, State) ->
 handle_info(_Msg, State) ->
     {noreply, State}.
 
-terminate(_Reason, #state{changes_pid = Pid}) ->
-    exit(Pid, kill).
+terminate(_Reason, #state{changes_pid = Pid}) when is_pid(Pid) ->
+    exit(Pid, kill);
+terminate(_Reason, _State) ->
+    ok.
 
 code_change(_OldVsn, #state{}=State, _Extra) ->
     {ok, State}.
