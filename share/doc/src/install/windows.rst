@@ -90,7 +90,7 @@ Dependencies
 
 You should have the following installed:
 
-* `Erlang OTP (>=14B01, <R19)    <http://erlang.org/>`_
+* `Erlang OTP (>=14B01, <R18)    <http://erlang.org/>`_
 * `ICU        (>=4.*)            <http://icu-project.org/>`_
 * `OpenSSL    (>0.9.8r)          <http://www.openssl.org/>`_
 * `Mozilla SpiderMonkey (=1.8.5) <http://www.mozilla.org/js/spidermonkey/>`_
