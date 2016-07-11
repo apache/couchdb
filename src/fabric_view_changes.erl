@@ -432,8 +432,29 @@ do_unpack_seqs(Opaque, DbName) ->
             Ranges = lists:usort(lists:map(Extract, Unpacked)),
             Filter = fun(S) -> not lists:member(S#shard.range, Ranges) end,
             Replacements = lists:filter(Filter, mem3:shards(DbName)),
-            Unpacked ++ [{R, 0} || R <- Replacements]
+            Unpacked ++ [{R, get_old_seq(R, Deduped)} || R <- Replacements]
     end.
+
+
+get_old_seq(#shard{range=R}, SinceSeqs) ->
+    case lists:keyfind(R, 2, SinceSeqs) of
+        {_Node, R, Seq} when is_number(Seq) ->
+            % Unfortunately we don't have access to the db
+            % uuid so we can't set a replacememnt here.
+            0;
+        {Node, R, {Seq, Uuid}} ->
+            % This update seq is using the old format that
+            % didn't include the node. This information is
+            % important for replacement.
+            {Seq, Uuid, Node};
+        {_Node, R, {Seq, Uuid, EpochNode}} ->
+            % This is the newest sequence format that we
+            % can use for replacement.
+            {Seq, Uuid, EpochNode};
+        _ ->
+            0
+    end.
+
 
 changes_row(Props0) ->
     Props1 = case couch_util:get_value(deleted, Props0) of
