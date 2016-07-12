@@ -104,6 +104,7 @@ couchTests.users_db = function(debug) {
       });
       T(false && "this will throw");
     } catch(e) {
+      log(e.error)
       T(e.error == "unauthorized");
       T(/conflict/.test(e.reason));
     }
@@ -205,6 +206,7 @@ couchTests.users_db = function(debug) {
       } finally {
         CouchDB.login("jan", "apple");
         usersDb.deleteDb(); // cleanup
+        usersDb.createDb();
         usersDbAlt.deleteDb(); // cleanup
         CouchDB.logout();
       }
