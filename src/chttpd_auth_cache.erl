@@ -112,7 +112,6 @@ handle_info({'DOWN', _, _, Pid, Reason}, #state{changes_pid=Pid} = State) ->
     erlang:send_after(5000, self(), {start_listener, Seq}),
     {noreply, State#state{last_seq=Seq}};
 handle_info({start_listener, Seq}, State) ->
-    ensure_auth_ddoc_exists(dbname(), <<"_design/_auth">>),
     {noreply, State#state{changes_pid = spawn_changes(Seq)}};
 handle_info(_Msg, State) ->
     {noreply, State}.
@@ -132,6 +131,7 @@ spawn_changes(Since) ->
     Pid.
 
 listen_for_changes(Since) ->
+    ensure_auth_ddoc_exists(dbname(), <<"_design/_auth">>),
     CBFun = fun ?MODULE:changes_callback/2,
     Args = #changes_args{
         feed = "continuous",
