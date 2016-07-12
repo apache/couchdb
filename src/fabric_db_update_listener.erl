@@ -85,7 +85,7 @@ handle_db_event(_DbName, updated, #cb_state{notify = true} = St) ->
     {ok, St};
 handle_db_event(_DbName, deleted, St) ->
     {stop, St};
-handle_db_event(DbName, Event, St) ->
+handle_db_event(_DbName, _Event, St) ->
     {ok, St}.
 
 start_cleanup_monitor(Parent, Notifiers) ->
