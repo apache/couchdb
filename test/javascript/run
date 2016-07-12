@@ -72,7 +72,8 @@ def mkformatter(tests):
 
 def run_couchjs(test, fmt):
     fmt(test)
-    cmd = [COUCHJS, "-H"] + ["-u", "test/javascript/couchdb.uri"] + SCRIPTS + [test, RUNNER]
+    cmd = [COUCHJS, "-H", "-T"] + \
+            ["-u", "test/javascript/couchdb.uri"] + SCRIPTS + [test, RUNNER]
     p = sp.Popen(
         cmd,
         stdin=sp.PIPE,
