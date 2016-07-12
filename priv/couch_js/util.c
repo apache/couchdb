@@ -88,6 +88,8 @@ couch_parse_args(int argc, const char* argv[])
             exit(0);
         } else if(strcmp("-H", argv[i]) == 0) {
             args->use_http = 1;
+        } else if(strcmp("-T", argv[i]) == 0) {
+            args->use_test_funs = 1;
         } else if(strcmp("-S", argv[i]) == 0) {
             args->stack_size = atoi(argv[++i]);
             if(args->stack_size <= 0) {
