@@ -495,11 +495,7 @@ function retry_part(fct, n, duration) {
     }catch(e){
       if(i<n){
         // wait
-        var b4 = (new Date()).getTime();
-        // if this is too bad, we could GET /
-        // or in fact get _changes w/ longpoll on _users or so
-        while(((new Date()).getTime() - b4) < duration) {}
-        continue;
+        sleep(duration);
       }else{
         throw e;
       }
@@ -508,9 +504,5 @@ function retry_part(fct, n, duration) {
 }
 
 function wait(ms) {
-  var t0 = new Date(), t1;
-  do {
-    CouchDB.request("GET", "/");
-    t1 = new Date();
-  } while ((t1 - t0) <= ms);
+  sleep(ms);
 }
