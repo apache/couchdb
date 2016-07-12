@@ -48,6 +48,8 @@ static const char USAGE_TEMPLATE[] =
     "  -V          display version information and exit\n"
     "  -H          enable %s cURL bindings (only avaiable\n"
     "              if package was built with cURL available)\n"
+    "  -T          enable test suite specific functions (these\n"
+    "              should not be enabled for production systems)\n"
     "  -S SIZE     specify that the runtime should allow at\n"
     "              most SIZE bytes of memory to be allocated\n"
     "  -u FILE     path to a .uri file containing the address\n"

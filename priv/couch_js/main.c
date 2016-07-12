@@ -14,6 +14,13 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifdef XP_WIN
+#include <windows.h>
+#include <mapiwin.h>
+#else
+#include <unistd.h>
+#endif
+
 #include <jsapi.h>
 #include "config.h"
 #include "http.h"
@@ -275,6 +282,25 @@ seal(JSContext* cx, uintN argc, jsval* vp)
 }
 
 
+static JSBool
+js_sleep(JSContext* cx, uintN argc, jsval* vp)
+{
+    jsval* argv = JS_ARGV(cx, vp);
+    int duration = 0;
+    if(!JS_ConvertArguments(cx, argc, argv, "/i", &duration)) {
+        return JS_FALSE;
+    }
+
+#ifdef XP_WIN
+    Sleep(duration);
+#else
+    usleep(duration * 1000);
+#endif
+
+    return JS_TRUE;
+}
+
+
 JSClass CouchHTTPClass = {
     "CouchHTTP",
     JSCLASS_HAS_PRIVATE
@@ -303,6 +329,12 @@ JSFunctionSpec CouchHTTPFunctions[] = {
     JS_FS("_open", req_open, 3, 0),
     JS_FS("_setRequestHeader", req_set_hdr, 2, 0),
     JS_FS("_send", req_send, 1, 0),
+    JS_FS_END
+};
+
+
+JSFunctionSpec TestSuiteFunctions[] = {
+    JS_FS("sleep", js_sleep, 1, 0),
     JS_FS_END
 };
 
@@ -386,6 +418,11 @@ main(int argc, const char* argv[])
             exit(2);
         }
     } 
+
+    if(args->use_test_funs) {
+        if(couch_load_funcs(cx, global, TestSuiteFunctions) != JS_TRUE)
+            return 1;
+    }
 
     for(i = 0 ; args->scripts[i] ; i++) {
         // Convert script source to jschars.

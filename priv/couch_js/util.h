@@ -17,6 +17,7 @@
 
 typedef struct {
     int          use_http;
+    int          use_test_funs;
     int          stack_size;
     const char** scripts;
     const char*  uri_file;
