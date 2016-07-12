@@ -83,7 +83,9 @@ start_update_notifier(DbNames) ->
 handle_db_event(_DbName, updated, #cb_state{notify = true} = St) ->
     erlang:send(St#cb_state.client_pid, {St#cb_state.client_ref, db_updated}),
     {ok, St};
-handle_db_event(_DbName, _Event, St) ->
+handle_db_event(_DbName, deleted, St) ->
+    {stop, St};
+handle_db_event(DbName, Event, St) ->
     {ok, St}.
 
 start_cleanup_monitor(Parent, Notifiers) ->
