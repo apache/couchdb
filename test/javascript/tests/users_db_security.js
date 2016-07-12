@@ -94,7 +94,7 @@ couchTests.users_db_security = function(debug) {
 
     // jan's gonna be admin as he's the first user
     TEquals(true, usersDb.save(userDoc).ok, "should save document");
-    // wait(5000)
+    wait(5000)
     userDoc = open_as(usersDb, "org.couchdb.user:jchris", "jchris");
     TEquals(undefined, userDoc.password, "password field should be null 1");
     TEquals(40, userDoc.derived_key.length, "derived_key should exist");
@@ -147,7 +147,7 @@ couchTests.users_db_security = function(debug) {
     };
 
     usersDb.save(fdmananaDoc);
-    var fdmananaDocAsReadByjchris = open_as(usersDb, "org.couchdb.user:fdmanana", "jchris");
+    var fdmananaDocAsReadByjchris = open_as(usersDb, "org.couchdb.user:fdmanana", "jchris1");
     TEquals(null, fdmananaDocAsReadByjchris,
       "should not_found opening another user's user doc");
 
@@ -202,7 +202,7 @@ couchTests.users_db_security = function(debug) {
 
     // non-admins can't read design docs
     try {
-      open_as(usersDb, "_design/user_db_auth", "jchris");
+      open_as(usersDb, "_design/user_db_auth", "jchris1");
       T(false, "non-admin read design doc, should not happen");
     } catch(e) {
       TEquals("forbidden", e.error, "non-admins can't read design docs");
@@ -306,7 +306,7 @@ couchTests.users_db_security = function(debug) {
         value: "false"
       }
     ], function() {
-      TEquals(true, CouchDB.login("jchris", "mp3").ok);
+      TEquals(true, CouchDB.login("jchris", "couch").ok);
 
       try {
         var all = usersDb.allDocs({ include_docs: true });
@@ -339,8 +339,8 @@ couchTests.users_db_security = function(debug) {
         CouchDB.login("jan", "apple");
         usersDb.deleteDb(); // cleanup
         usersDb.createDb();
-        CouchDB.logout();
       }
     }
   );
+  CouchDB.logout();
 };
