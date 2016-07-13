@@ -7,6 +7,8 @@ priv/couchjs
 priv/couchspawnkillable
 priv/*.exp
 priv/*.lib
+priv/*.dll
+priv/*.exe
 vc120.pdb
 
 .rebar/
