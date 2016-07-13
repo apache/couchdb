@@ -1552,6 +1552,7 @@ couchTests.replication = function(debug) {
     roles: ["erlanger"]
   }, "erly");
   var defaultUsersDb = new CouchDB("_users", {"X-Couch-Full-Commit":"false"});
+  try { defaultUsersDb.createDb(); } catch (e) { /* ignore if exists*/ }
   //var usersDb = new CouchDB("test_suite_auth", {"X-Couch-Full-Commit":"false"});
   /*var server_config = [
     {
