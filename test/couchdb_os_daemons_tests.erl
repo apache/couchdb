@@ -12,6 +12,12 @@
 
 -module(couchdb_os_daemons_tests).
 
+%% tests are UNIX-specific, will not function under Windows
+-ifdef(WINDOWS).
+-undef(TEST).
+-define(NOTEST, 1).
+-endif.
+
 -include_lib("couch/include/couch_eunit.hrl").
 
 %% keep in sync with couchdb/couch_os_daemons.erl
