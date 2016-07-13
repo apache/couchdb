@@ -211,6 +211,7 @@ couchTests.replication = function(debug) {
           return tasks[i];
         }
       }
+      sleep(500);
       t1 = new Date();
     } while((t1 - t0) <= delay);
 
