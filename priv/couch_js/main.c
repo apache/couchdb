@@ -16,7 +16,6 @@
 
 #ifdef XP_WIN
 #include <windows.h>
-#include <mapiwin.h>
 #else
 #include <unistd.h>
 #endif
