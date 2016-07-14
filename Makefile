@@ -227,10 +227,10 @@ dist: all
 	@echo "Done: apache-couchdb-$(COUCHDB_VERSION).tar.gz"
 
 
-.PHONY: build
-# target: build - Build CouchDB!
+.PHONY: release
+# target: release - Create an Erlang release including CouchDB!
 -include install.mk
-build: all
+release: all
 	@echo "Installing CouchDB into rel/couchdb/ ..."
 	@rm -rf rel/couchdb
 	@$(REBAR) generate > /dev/null 2>&1 # make full erlang release
