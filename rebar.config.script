@@ -23,7 +23,7 @@ os:putenv("COUCHDB_APPS_CONFIG_DIR", filename:join([COUCHDB_ROOT, "rel/apps"])).
 
 DepDescs = [
 %% must be compiled first as it has a custom behavior
-{couch_epi,        "couch-epi",        "5a7f2868c720bc428e6c888dc61d988b9a5f63f1"},
+{couch_epi,        "couch-epi",        "f6ad55d804ac741b59fe37dd092787113847661c"},
 {config,           "config",           "60977f81dc06af4a3d1e89891b3061ed4cd01e95"},
 %% keep these sorted
 {b64url,           "b64url",           "6895652d80f95cdf04efb14625abed868998f174"},
@@ -56,7 +56,7 @@ DepDescs = [
 {mochiweb,         "mochiweb",         "bd6ae7cbb371666a1f68115056f7b30d13765782"},
 {oauth,            "oauth",            "099057a98e41f3aff91e77e3cf496d6c6fd901df"},
 {rexi,             "rexi",             "a327b7dbeb2b0050f7ca9072047bf8ef2d282833"},
-{snappy,           "snappy",           "fac852f59a3457ec10dd8365642d6b30928260c1"},
+{snappy,           "snappy",           "a728b960611d0795025de7e9668d06b9926c479d"},
 {setup,            "setup",            "b9e1f3b5d5a78a706abb358e17130fb7344567d2"},
 {meck,             "meck",             {tag, "0.8.2"}}
 ],
@@ -77,7 +77,7 @@ MakeDep = fun
 end,
 
 AddConfig = [
-    {require_otp_vsn, "R16B03|R16B03-1|17|18"},
+    {require_otp_vsn, "R16B03|R16B03-1|17|18|19"},
     {deps_dir, "src"},
     {deps, lists:map(MakeDep, DepDescs)},
     {sub_dirs, ["rel"]},
