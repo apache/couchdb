@@ -49,7 +49,7 @@ DepDescs = [
 {goldrush,         "goldrush",         {tag, "0.1.6"}},
 {ibrowse,          "ibrowse",          "4af2d408607874d124414ac45df1edbe3961d1cd"},
 {ioq,              "ioq",              "c7c75ebeaf41599e3a3e211097d864f0e7785829"},
-{jiffy,            "jiffy",            "ea19c417f9fd52fa3f7ef2d378735e5532c59b29"},
+{jiffy,            "jiffy",            "d3c00e19d8fa20c21758402231247602190988d3"},
 {khash,            "khash",            "7c6a9cd9776b5c6f063ccafedfa984b00877b019"},
 {mango,            "mango",            "01252f971bef0c8da1d78bf5a7b506b71926ce1b"},
 {mem3,             "mem3",             "15615b295ec970ca9b12b7b54107a80b95149511"},
