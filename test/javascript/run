@@ -111,7 +111,7 @@ def main():
         args = ["test/javascript/tests"]
     for name in args:
         if os.path.isdir(name):
-            tests.extend(glob.glob(os.path.join(name, "*.js")))
+            tests.extend(sorted(glob.glob(os.path.join(name, "*.js"))))
         elif os.path.isfile(name):
             tests.append(name)
         else:
