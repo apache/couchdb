@@ -66,6 +66,15 @@ fixup_terminator(Tokens) ->
         {dot, _} -> Tokens;
         {';', _} -> Tokens;
         Token ->
-            {line, Line} = erl_scan:token_info(Token, line),
+            Line = line(Token),
             Tokens ++ [{dot, Line}]
+    end.
+
+line(Token) ->
+    case erlang:function_exported(erl_scan, line, 1) of
+        true ->
+            erl_scan:line(Token);
+        false ->
+            {line, Line} = erl_scan:token_info(Token, line),
+            Line
     end.
