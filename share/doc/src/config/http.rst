@@ -553,7 +553,84 @@ with the vhost name prefixed by ``cors:``. Example case for the vhost
   ; List of accepted methods
   methods = HEAD, GET
 
+Cross-site Request Forgery protection
+=====================================
 
+.. config:section:: csrf :: Cross-site Request Forgery
+
+    .. versionadded:: 1.7 added CSRF protection, see JIRA :issue:`2762`
+
+    `CSRF`, or "Cross-site Request Forgery" is a web-based exploit
+    where an attacker can cause a user agent to make an authenticated
+    form post or XHR request against a foreign site without their
+    consent. The attack works because a user agent will send any
+    cookies it has along with the request. The attacker does not see
+    the response, nor can they see the user agent's cookies. The
+    attacker hopes to gain indirectly, e.g, by posting to a password
+    reset form or cause damage by issuing a database delete request.
+
+    To prevent this, CouchDB can require a matching request header
+    before processing any request. The correct value of this header is
+    unknown to the attacker and so their attack fails.
+
+    To enable CSRF protection, add the custom request header
+    `X-CouchDB-CSRF` wih value `true` to any request. The response will
+    return a cookie named `CouchDB-CSRF`.
+
+    If CouchDB sees the `CouchDB-CSRF` cookie in a request it expects
+    the same value to be sent in the `X-CouchDB-CSRF` header. If the
+    header is missing or does not match the cookie, a `403 Forbidden`
+    response is generated. Additionally, CouchDB logs a warning, to
+    allow administrators to detect potential CSRF attacks in progress.
+
+    Careful clients can verify whether their requests were protected
+    from CSRF by examining the `X-CouchDB-CSRF-Valid` response
+    header. It should be present and its value should be `true`.
+
+    CSRF cookies expire after a configurable period of time but will
+    automatically be refreshed by CouchDB on subsequent requests. An
+    expired CSRF cookie is equivalent to not sending the cookie (and
+    thus the request will not be protected from CSRF).
+
+    The following pseudo-code shows how to use the CSRF protection in
+    an opportunistic fashion, gracefully degrading when the mechanism
+    is not available.
+
+    .. code-block:: javascript
+
+        if (hasCookie("CouchDB-CSRF")) {
+          setRequestHeader("X-CouchDB-CSRF", cookieValue("CouchDB-CSRF"));
+        } else {
+          setRequestHeader("X-CouchDB-CSRF", "true");
+        }
+
+    .. config:option:: mandatory
+
+        CouchDB can insist on CSRF Cookie/Header for all requests
+        (except those to the welcome handler, /, so you can acquire a
+        cookie) with this setting. The default is false::
+
+            [csrf]
+            mandatory = true
+
+    .. config:option:: secret
+
+        All CSRF cookies are signed by the server using this value. A
+        random value will be chosen if you don't specify it, but we
+        recommend setting it yourself, especially if you are running a
+        cluster of more than one node. The secret must match on all
+        nodes in a cluster to avoid sadness::
+
+            [csrf]
+            secret = b6fdf2e8213a36dbcca34e61e4000967
+
+    .. config:option:: timeout
+
+        All CSRF cookies expire after `timeout` seconds. The default
+        is an hour::
+
+            [csrf]
+            timeout = 3600
 
 .. _config/vhosts:
 
