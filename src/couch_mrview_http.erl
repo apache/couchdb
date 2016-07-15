@@ -340,6 +340,9 @@ view_cb({meta, Meta}, #vacc{resp=undefined}=Acc) ->
     Headers = [],
     {ok, Resp} = chttpd:start_delayed_json_response(Acc#vacc.req, 200, Headers),
     view_cb({meta, Meta}, Acc#vacc{resp=Resp, should_close=true});
+view_cb({meta, _Meta}, #vacc{row_sent=true}=Acc) ->
+    % sorted=false and meta arrived late, ignore it.
+    {ok, Acc};
 view_cb({meta, Meta}, #vacc{}=Acc) ->
     % Sending metadata
     Parts = case couch_util:get_value(total, Meta) of
@@ -358,10 +361,15 @@ view_cb({meta, Meta}, #vacc{}=Acc) ->
     Chunk = [prepend_val(Acc), "{", string:join(Parts, ","), "\r\n"],
     {ok, AccOut} = maybe_flush_response(Acc, Chunk, iolist_size(Chunk)),
     {ok, AccOut#vacc{prepend=""}};
+view_cb({row, Row}, #vacc{resp=undefined}=Acc) ->
+    % sorted=false and a row arrived before meta, start response.
+    Pre = "{\"rows\":[\r\n",
+    {ok, Resp} = chttpd:start_delayed_json_response(Acc#vacc.req, 200, []),
+    view_cb({row, Row}, Acc#vacc{row_sent=true,resp=Resp, prepend=Pre, should_close=true});
 view_cb({row, Row}, Acc) ->
     % Adding another row
     Chunk = [prepend_val(Acc), row_to_json(Row)],
-    maybe_flush_response(Acc, Chunk, iolist_size(Chunk));
+    maybe_flush_response(Acc#vacc{row_sent=true}, Chunk, iolist_size(Chunk));
 view_cb(complete, #vacc{resp=undefined}=Acc) ->
     % Nothing in view
     {ok, Resp} = chttpd:send_json(Acc#vacc.req, 200, {[{rows, []}]}),
@@ -538,6 +546,8 @@ parse_param(Key, Val, Args, IsDecoded) ->
             Args#mrargs{conflicts=parse_boolean(Val)};
         "callback" ->
             Args#mrargs{callback=couch_util:to_binary(Val)};
+        "sorted" ->
+            Args#mrargs{sorted=parse_boolean(Val)};
         _ ->
             BKey = couch_util:to_binary(Key),
             BVal = couch_util:to_binary(Val),

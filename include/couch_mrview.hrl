@@ -98,7 +98,8 @@
     should_close = false,
     buffer = [],
     bufsize = 0,
-    threshold = 1490
+    threshold = 1490,
+    row_sent = false
 }).
 
 -record(lacc, {

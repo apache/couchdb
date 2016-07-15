@@ -510,6 +510,11 @@ validate_args(Args) ->
         {_, EKDocId1} -> EKDocId1
     end,
 
+    case is_boolean(Args#mrargs.sorted) of
+        true -> ok;
+        _ -> mrverror(<<"Invalid value for `sorted`.">>)
+    end,
+
     Args#mrargs{
         start_key_docid=SKDocId,
         end_key_docid=EKDocId,
