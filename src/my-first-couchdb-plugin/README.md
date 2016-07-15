@@ -2,7 +2,7 @@
 
 A practical guide to developing CouchDB plugins.
 
-*NOTE: this feature is considered beta, possibly subject to change and expects that you understand some Erlang.
+*NOTE: this feature is considered beta, possibly subject to change and expects that you understand some Erlang.*
 
 ## Preparation
 
@@ -48,9 +48,14 @@ The output should be something like this:
 
 The compiled results are stored in a directory called `ebin/`. Poke around in there if you are interested on how this all looks.
 
-To run CouchDB with your new plugin make sure CouchDB isn’t already running elsewhere and then do this:
+To run CouchDB with your new plugin make sure CouchDB isn’t already running elsewhere.
+Change to the project root directory and run the command
 
     make dev
+
+Then start your CouchDB instance like this:
+
+    utils/run -i
 
 The output should look something like this:
 
@@ -117,7 +122,7 @@ Before we get going, let’s create another file that handles all our HTTP handl
 
     -export([handle_req/1]).
 
-    -include_lib("couch/include/couch_db.hrl").
+    -include_lib("../couchdb/couch_db.hrl").
 
     handle_req(#httpd{method='GET'}=Req) ->
         couch_httpd:send_json(Req, {[{<<"hello">>, <<"world">>}]});
@@ -154,17 +159,15 @@ This means that `/_all_dbs`, the API endpoint that allows you to list all databa
 
 Say we want to make our `handle_req` function answer under the endpoint `/_my_plugin` (you want to start with an underscore here, as CouchDB will consider all other characters as real database names), we would add something like this:
 
-    _my_plugin = {my_first_couchdb_plugin, handle_req}
+    _my_plugin = {my_first_couchdb_plugin_httpd, handle_req}
 
-But don’t add that to `etc/couchdb/default.ini.tpl.in`! Instead, craete a new `.ini` file in your plugin at `priv/default.d/my_first_couchdb_plugin.ini` with these contents:
+But don’t add that to `etc/couchdb/default.ini.tpl.in`! Instead, open `etc/couchdb/local_dev.ini`, find the section `[httpd_global_handlers]` and add the line like this:
 
     [httpd_global_handlers]
+    ;other handlers may go here
     _my_plugin = {my_first_couchdb_plugin_httpd, handle_req}
-    
 
-Don’t miss the new line at the end.
-
-Now run `make dev` again, and then open a second terminal:
+Now switch to the main directory, run `make dev` again, then type `utils/run -i` and open a second terminal:
 
     curl http://127.0.0.1:5984/_my_plugin
     {"hello":"world"}
@@ -174,14 +177,16 @@ It worked, yay!
 When we do a `POST` request, that should fail:
 
     curl -X POST http://127.0.0.1:5984/_my_plugin
-
+    {"error":"method_not_allowed","reason":"Only GET allowed"}
 
 
 TODO:
-- show that POST fails as expected
+
 - exploring #httpd{} and how to react to different kinds of HTTP requests
 - hook up `handle_req` with `my_func`
-...
+- address differences in plugin config on globally installed vs. locally run dev systems
+- ...
+
 * * *
 
 
