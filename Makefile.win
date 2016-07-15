@@ -76,8 +76,8 @@ fauxton: share\www
 .PHONY: check
 # target: check - Test everything
 check: all
-	@$(MAKE) eunit
-	@$(MAKE) javascript
+	@$(MAKE) -f Makefile.win eunit
+	@$(MAKE) -f Makefile.win javascript
 
 
 .PHONY: eunit
@@ -200,13 +200,13 @@ ifeq ($(IN_RELEASE), true)
 	-@mkdir rel\couchdb\share\www\docs
 	-@mkdir rel\couchdb\share\docs
 	@robocopy /E share\docs\html\* rel\couchdb\share\www\docs
-	@copy share\docs\pdf\CouchDB.pdf rel\couchdb\share\docs\CouchDB.pdf
+#	@copy share\docs\pdf\CouchDB.pdf rel\couchdb\share\docs\CouchDB.pdf
 	@copy share\docs\man\apachecouchdb.1 rel\couchdb\share\docs\couchdb.1
 	@copy share\docs\info\CouchDB.info rel\couchdb\share\docs\CouchDB.info
 else
 	-@mkdir rel\couchdb\share\docs
-	@robocopy /E src\docs\build\html\ rel\couchdb\share\www\docs
-	@copy src\docs\build\latex\CouchDB.pdf rel\couchdb\share\docs\CouchDB.pdf
+	@robocopy /E src\docs\build\html\* rel\couchdb\share\www\docs
+#	@copy src\docs\build\latex\CouchDB.pdf rel\couchdb\share\docs\CouchDB.pdf
 	@copy src\docs\build\man\apachecouchdb.1 rel\couchdb\share\docs\couchdb.1
 	@copy src\docs\build\texinfo\CouchDB.info rel\couchdb\share\docs\CouchDB.info
 endif
