@@ -211,7 +211,7 @@ wait_compaction_started(DbName) ->
             true ->  ok
         end
     end,
-    case test_util:wait(WaitFun, 10000) of
+    case test_util:wait(WaitFun, ?TIMEOUT) of
         timeout ->
             erlang:error({assertion_failed,
                           [{module, ?MODULE},
@@ -228,7 +228,7 @@ wait_compaction_finished(DbName) ->
             false -> ok
         end
     end,
-    case test_util:wait(WaitFun, 10000) of
+    case test_util:wait(WaitFun, ?TIMEOUT) of
         timeout ->
             erlang:error({assertion_failed,
                           [{module, ?MODULE},
