@@ -48,15 +48,15 @@ get_view(Db, DDoc, ViewName, Args0) ->
     DbUpdateSeq = couch_util:with_db(Db, fun(WDb) ->
         couch_db:get_update_seq(WDb)
     end),
-    MinSeq = case Args2#mrargs.stale of
-        ok -> 0; update_after -> 0; _ -> DbUpdateSeq
+    MinSeq = case Args2#mrargs.update of
+        false -> 0; lazy -> 0; _ -> DbUpdateSeq
     end,
     {ok, State} = case couch_index:get_state(Pid, MinSeq) of
         {ok, _} = Resp -> Resp;
         Error -> throw(Error)
     end,
     Ref = erlang:monitor(process, State#mrst.fd),
-    if Args2#mrargs.stale == update_after ->
+    if Args2#mrargs.update == lazy ->
         spawn(fun() -> catch couch_index:get_state(Pid, DbUpdateSeq) end);
         true -> ok
     end,
@@ -472,11 +472,17 @@ validate_args(Args) ->
         {map, _} -> mrverror(<<"Invalid use of grouping on a map view.">>)
     end,
 
-    case Args#mrargs.stale of
-        ok -> ok;
-        update_after -> ok;
+    case Args#mrargs.stable of
+        true -> ok;
         false -> ok;
-        _ -> mrverror(<<"Invalid value for `stale`.">>)
+        _ -> mrverror(<<"Invalid value for `stable`.">>)
+    end,
+
+    case Args#mrargs.update of
+        true -> ok;
+        false -> ok;
+        lazy -> ok;
+        _ -> mrverror(<<"Invalid value for `update`.">>)
     end,
 
     case is_boolean(Args#mrargs.inclusive_end) of
