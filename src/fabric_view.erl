@@ -302,10 +302,9 @@ index_of(X, [X|_Rest], I) ->
 index_of(X, [_|Rest], I) ->
     index_of(X, Rest, I+1).
 
-get_shards(DbName, #mrargs{stale=Stale})
-  when Stale == ok orelse Stale == update_after ->
+get_shards(DbName, #mrargs{stable=true}) ->
     mem3:ushards(DbName);
-get_shards(DbName, #mrargs{stale=false}) ->
+get_shards(DbName, #mrargs{stable=false}) ->
     mem3:shards(DbName).
 
 get_shard_replacements(DbName, UsedShards0) ->
