@@ -189,6 +189,7 @@ release: all
 	@echo Installing CouchDB into rel\couchdb\ ...
 	-@rmdir /s/q rel\couchdb
 	@$(REBAR) generate
+	@copy src\couch\priv\couchjs.exe rel\couchdb\bin
 
 ifeq ($(with_fauxton), 1)
 	-@mkdir rel\couchdb\share
