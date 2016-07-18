@@ -1536,12 +1536,8 @@ validate_dbname(DbName) when is_list(DbName) ->
     validate_dbname(?l2b(DbName));
 validate_dbname(DbName) when is_binary(DbName) ->
     Normalized = normalize_dbname(DbName),
-    case couch_db_plugin:validate_dbname(DbName, Normalized) of
-        true ->
-            ok;
-        false ->
-            validate_dbname_int(DbName, Normalized)
-    end.
+    couch_db_plugin:validate_dbname(
+        DbName, Normalized, fun validate_dbname_int/2).
 
 validate_dbname_int(DbName, Normalized) when is_binary(DbName) ->
     case re:run(DbName, ?DBNAME_REGEX, [{capture,none}, dollar_endonly]) of

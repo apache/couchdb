@@ -13,7 +13,7 @@
 -module(couch_db_plugin).
 
 -export([
-    validate_dbname/2,
+    validate_dbname/3,
     before_doc_update/2,
     after_doc_read/2,
     validate_docid/1,
@@ -29,10 +29,8 @@
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
-validate_dbname(DbName, Normalized) ->
-    Handle = couch_epi:get_handle(?SERVICE_ID),
-    %% callbacks return true only if it specifically allow the given Id
-    couch_epi:any(Handle, ?SERVICE_ID, validate_dbname, [DbName, Normalized], []).
+validate_dbname(DbName, Normalized, Default) ->
+    maybe_handle(validate_dbname, [DbName, Normalized], Default).
 
 before_doc_update(#db{before_doc_update = Fun} = Db, Doc0) ->
     case with_pipe(before_doc_update, [Doc0, Db]) of
@@ -70,3 +68,14 @@ with_pipe(Func, Args) ->
 do_apply(Func, Args, Opts) ->
     Handle = couch_epi:get_handle(?SERVICE_ID),
     couch_epi:apply(Handle, ?SERVICE_ID, Func, Args, Opts).
+
+maybe_handle(Func, Args, Default) ->
+    Handle = couch_epi:get_handle(?SERVICE_ID),
+    case couch_epi:decide(Handle, ?SERVICE_ID, Func, Args, []) of
+       no_decision when is_function(Default) ->
+           apply(Default, Args);
+       no_decision ->
+           Default;
+       {decided, Result} ->
+           Result
+    end.
