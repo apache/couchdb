@@ -52,9 +52,10 @@ setup() ->
 teardown(Ctx) ->
     couch_tests:teardown(Ctx).
 
-validate_dbname({true, _Db}, _) -> true;
-validate_dbname({false, _Db}, _) -> false;
-validate_dbname({fail, _Db}, _) -> throw(validate_dbname).
+validate_dbname({true, _Db}, _) -> {decided, true};
+validate_dbname({false, _Db}, _) -> {decided, false};
+validate_dbname({fail, _Db}, _) -> throw(validate_dbname);
+validate_dbname({pass, _Db}, _) -> no_decision.
 
 before_doc_update({fail, _Doc}, _Db) -> throw(before_doc_update);
 before_doc_update({true, Doc}, Db) -> [{true, [before_doc_update|Doc]}, Db];
@@ -85,6 +86,7 @@ callback_test_() ->
                 fun validate_dbname_match/0,
                 fun validate_dbname_no_match/0,
                 fun validate_dbname_throw/0,
+                fun validate_dbname_pass/0,
 
                 fun before_doc_update_match/0,
                 fun before_doc_update_no_match/0,
@@ -111,15 +113,22 @@ callback_test_() ->
 
 
 validate_dbname_match() ->
-    ?assert(couch_db_plugin:validate_dbname({true, [db]}, db)).
+    ?assert(couch_db_plugin:validate_dbname(
+        {true, [db]}, db, fun(_, _) -> pass end)).
 
 validate_dbname_no_match() ->
-    ?assertNot(couch_db_plugin:validate_dbname({false, [db]}, db)).
+    ?assertNot(couch_db_plugin:validate_dbname(
+        {false, [db]}, db, fun(_, _) -> pass end)).
 
 validate_dbname_throw() ->
     ?assertThrow(
         validate_dbname,
-        couch_db_plugin:validate_dbname({fail, [db]}, db)).
+        couch_db_plugin:validate_dbname(
+            {fail, [db]}, db, fun(_, _) -> pass end)).
+
+validate_dbname_pass() ->
+    ?assertEqual(pass, couch_db_plugin:validate_dbname(
+        {pass, [db]}, db, fun(_, _) -> pass end)).
 
 before_doc_update_match() ->
     ?assertMatch(
