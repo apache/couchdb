@@ -359,6 +359,7 @@ def check_node_alive(url):
             error = exc
             time.sleep(1)
         else:
+            error = None
             break
     if error is not None:
         raise error
