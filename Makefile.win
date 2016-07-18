@@ -186,48 +186,45 @@ dist: all
 # target: release - Create an Erlang release including CouchDB!
 -include install.mk
 release: all
-	@echo "Installing CouchDB into rel\couchdb\ ..."
+	@echo Installing CouchDB into rel\couchdb\ ...
 	-@rmdir /s/q rel\couchdb
-	@$(REBAR) generate > \dev\null 2>&1 # make full erlang release
+	@$(REBAR) generate
 
 ifeq ($(with_fauxton), 1)
 	-@mkdir rel\couchdb\share
-	@robocopy /E share\www rel\couchdb\share
+	-@xcopy share\www rel\couchdb\share\www /E/I
 endif
 
 ifeq ($(with_docs), 1)
-ifeq ($(IN_RELEASE), true)
 	-@mkdir rel\couchdb\share\www\docs
 	-@mkdir rel\couchdb\share\docs
-	@robocopy /E share\docs\html\* rel\couchdb\share\www\docs
-#	@copy share\docs\pdf\CouchDB.pdf rel\couchdb\share\docs\CouchDB.pdf
+ifeq ($(IN_RELEASE), true)
+	@xcopy share\docs\html rel\couchdb\share\www\docs /E /I
 	@copy share\docs\man\apachecouchdb.1 rel\couchdb\share\docs\couchdb.1
-	@copy share\docs\info\CouchDB.info rel\couchdb\share\docs\CouchDB.info
+	-@copy share\docs\info\CouchDB.info rel\couchdb\share\docs\CouchDB.info
 else
-	-@mkdir rel\couchdb\share\docs
-	@robocopy /E src\docs\build\html\* rel\couchdb\share\www\docs
-#	@copy src\docs\build\latex\CouchDB.pdf rel\couchdb\share\docs\CouchDB.pdf
+	@xcopy src\docs\build\html rel\couchdb\share\www\docs /E /I
 	@copy src\docs\build\man\apachecouchdb.1 rel\couchdb\share\docs\couchdb.1
-	@copy src\docs\build\texinfo\CouchDB.info rel\couchdb\share\docs\CouchDB.info
+	-@copy src\docs\build\texinfo\CouchDB.info rel\couchdb\share\docs\CouchDB.info
 endif
 endif
 
-	@echo "... done"
-	@echo
-	@echo "    You can now copy the rel\couchdb directory anywhere on your system."
-	@echo "    Start CouchDB with .\bin\couchdb from within that directory."
-	@echo
+	@echo ... done
+	@echo .
+	@echo     You can now copy the rel\couchdb directory anywhere on your system.
+	@echo     Start CouchDB with .\bin\couchdb.cmd from within that directory.
+	@echo .
 
 .PHONY: install
 # target: install- install CouchDB :)
 install:
-	@echo
-	@echo "Notice: There is no 'make install' command for CouchDB 2.0 yet."
-	@echo
-	@echo "    To install CouchDB into your system, copy the rel\couchdb"
-	@echo "    to your desired installation location. For example:"
-	@echo "    robocopy /E rel\couchdb \usr\local\lib"
-	@echo
+	@echo .
+	@echo Notice: There is no 'make install' command for CouchDB 2.0 yet.
+	@echo .
+	@echo     To install CouchDB into your system, copy the rel\couchdb
+	@echo     to your desired installation location. For example:
+	@echo     xcopy /E rel\couchdb \usr\local\lib
+	@echo .
 
 ################################################################################
 # Cleaning
@@ -316,5 +313,5 @@ endif
 share\www:
 ifeq ($(with_fauxton), 1)
 	@echo "Building Fauxton"
-	@cd src\fauxton && npm install --production && .\node_modules\grunt-cli\bin\grunt couchdb
+	@cd src\fauxton && npm install --production && .\node_modules\.bin\grunt couchdb
 endif
