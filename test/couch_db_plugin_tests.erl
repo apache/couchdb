@@ -83,30 +83,30 @@ callback_test_() ->
         {
             setup, fun setup/0, fun teardown/1,
             [
-                fun validate_dbname_match/0,
-                fun validate_dbname_no_match/0,
-                fun validate_dbname_throw/0,
-                fun validate_dbname_pass/0,
+                {"validate_dbname_match", fun validate_dbname_match/0},
+                {"validate_dbname_no_match", fun validate_dbname_no_match/0},
+                {"validate_dbname_throw", fun validate_dbname_throw/0},
+                {"validate_dbname_pass", fun validate_dbname_pass/0},
 
-                fun before_doc_update_match/0,
-                fun before_doc_update_no_match/0,
-                fun before_doc_update_throw/0,
+                {"before_doc_update_match", fun before_doc_update_match/0},
+                {"before_doc_update_no_match", fun before_doc_update_no_match/0},
+                {"before_doc_update_throw", fun before_doc_update_throw/0},
 
-                fun after_doc_read_match/0,
-                fun after_doc_read_no_match/0,
-                fun after_doc_read_throw/0,
+                {"after_doc_read_match", fun after_doc_read_match/0},
+                {"after_doc_read_no_match", fun after_doc_read_no_match/0},
+                {"after_doc_read_throw", fun after_doc_read_throw/0},
 
-                fun validate_docid_match/0,
-                fun validate_docid_no_match/0,
-                fun validate_docid_throw/0,
+                {"validate_docid_match", fun validate_docid_match/0},
+                {"validate_docid_no_match", fun validate_docid_no_match/0},
+                {"validate_docid_throw", fun validate_docid_throw/0},
 
-                fun check_is_admin_match/0,
-                fun check_is_admin_no_match/0,
-                fun check_is_admin_throw/0,
+                {"check_is_admin_match", fun check_is_admin_match/0},
+                {"check_is_admin_no_match", fun check_is_admin_no_match/0},
+                {"check_is_admin_throw", fun check_is_admin_throw/0},
 
-                fun on_delete_match/0,
-                fun on_delete_no_match/0,
-                fun on_delete_throw/0
+                {"on_delete_match", fun on_delete_match/0},
+                {"on_delete_no_match", fun on_delete_no_match/0},
+                {"on_delete_throw", fun on_delete_throw/0}
             ]
         }
     }.
