@@ -14,7 +14,7 @@
 
 SET COUCHDB_BIN_DIR=%~dp0
 SET ROOTDIR=%COUCHDB_BIN_DIR%\..\
-CD %ROOTDIR%
+CD "%ROOTDIR%"
 
 SET /P START_ERL= < releases\start_erl.data
 FOR /F "tokens=1" %%G IN ("%START_ERL%") DO SET ERTS_VSN=%%G
@@ -23,9 +23,10 @@ FOR /F "tokens=2" %%G IN ("%START_ERL%") DO SET APP_VSN=%%G
 set BINDIR=%ROOTDIR%/erts-%ERTS_VSN%/bin
 set EMU=beam
 set PROGNAME=%~n0
+set PATH=%PATH%;%COUCHDB_BIN_DIR%
 
-%BINDIR%\erl -boot %ROOTDIR%\releases\%APP_VSN%\couchdb ^
--args_file %ROOTDIR%\etc\vm.args ^
--config %ROOTDIR%\releases\%APP_VSN%\sys.config
+"%BINDIR%\erl" -boot "%ROOTDIR%\releases\%APP_VSN%\couchdb" ^
+-args_file "%ROOTDIR%\etc\vm.args" ^
+-config "%ROOTDIR%\releases\%APP_VSN%\sys.config"
 
 :: EXIT /B
