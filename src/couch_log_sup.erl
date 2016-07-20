@@ -23,5 +23,27 @@ start_link() ->
 
 
 init([]) ->
-    ok = couch_log_config_listener:subscribe(),
-    {ok, {{one_for_one, 1, 1}, []}}.
+    ok = couch_log_config:init(),
+    ok = couch_log_config_listener:start(),
+    {ok, {{one_for_one, 1, 1}, children()}}.
+
+
+children() ->
+    [
+        {
+            couch_log_server,
+            {couch_log_server, start_link, []},
+            permanent,
+            5000,
+            worker,
+            [couch_log_server]
+        },
+        {
+            couch_log_monitor,
+            {couch_log_monitor, start_link, []},
+            permanent,
+            5000,
+            worker,
+            [couch_log_monitor]
+        }
+    ].

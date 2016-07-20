@@ -11,36 +11,64 @@
 % the License.
 
 -module(couch_log_config_listener).
--vsn(2).
 -behaviour(config_listener).
 
-% public interface
--export([subscribe/0]).
 
-% config_listener callback
--export([handle_config_change/5, handle_config_terminate/3]).
+-export([
+    start/0
+]).
 
-subscribe() ->
-    Settings = [
-        {backend, config:get("log", "backend", "stderr")},
-        {level, config:get("log", "level", "notice")}
-    ],
-    ok = config:listen_for_changes(?MODULE, Settings),
-    ok.
+-export([
+    handle_config_change/5,
+    handle_config_terminate/3
+]).
 
-handle_config_change("log", "backend", Value, _, Settings) ->
-    {level, Level} = lists:keyfind(level, 1, Settings),
-    couch_log:set_level(Level),
-    {ok, lists:keyreplace(backend, 1, Settings, {backend, Value})};
-handle_config_change("log", "level", Value, _, Settings) ->
-    couch_log:set_level(Value),
-    {ok, lists:keyreplace(level, 1, Settings, {level, Value})};
+
+-ifdef(TEST).
+-define(RELISTEN_DELAY, 500).
+-else.
+-define(RELISTEN_DELAY, 5000).
+-endif.
+
+
+start() ->
+    ok = config:listen_for_changes(?MODULE, nil).
+
+
+handle_config_change("log", Key, _, _, _) ->
+    case Key of
+        "level" ->
+            couch_log_config:reconfigure();
+        "max_message_size" ->
+            couch_log_config:reconfigure();
+        _ ->
+            % Someone may have changed the config for
+            % the writer so we need to re-initialize.
+            couch_log_server:reconfigure()
+    end,
+    notify_listeners(),
+    {ok, nil};
+
 handle_config_change(_, _, _, _, Settings) ->
     {ok, Settings}.
 
-handle_config_terminate(_, stop, _) -> ok;
-handle_config_terminate(_Server, _Reason, State) ->
+
+handle_config_terminate(_, stop, _) ->
+    ok;
+handle_config_terminate(_, _, _) ->
     spawn(fun() ->
-        timer:sleep(5000),
-        config:listen_for_changes(?MODULE, State)
+        timer:sleep(?RELISTEN_DELAY),
+        ok = config:listen_for_changes(?MODULE, nil)
     end).
+
+
+-ifdef(TEST).
+notify_listeners() ->
+    Listeners = application:get_env(couch_log, config_listeners, []),
+    lists:foreach(fun(L) ->
+        L ! couch_log_config_change_finished
+    end, Listeners).
+-else.
+notify_listeners() ->
+    ok.
+-endif.

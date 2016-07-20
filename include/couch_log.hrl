@@ -10,6 +10,10 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-{deps, [
-    {meck, ".*", {git, "https://git-wip-us.apache.org/repos/asf/couchdb-meck.git", {tag, "0.8.2"}}}
-]}.
+-record(log_entry, {
+    level,
+    pid,
+    msg,
+    msg_id,
+    time_stamp
+}).
