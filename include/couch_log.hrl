@@ -17,3 +17,6 @@
     msg_id,
     time_stamp
 }).
+
+
+-define(COUCH_LOG_TEST_TABLE, couch_log_test_table).
