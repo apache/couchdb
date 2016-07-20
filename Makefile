@@ -331,6 +331,17 @@ uninstall:
 	@rm -rf $(DESTDIR)/$(man_dir)
 	@rm -rf $(DESTDIR)/$(info_dir)
 
+.PHONY: rc
+rc:
+ifeq ($(strip $(COUCH_RC)),)
+	@echo "COUCH_RC environment variable not set. Run as 'COUCH_RC=X make rc'"
+else
+	@rm -rf apache-couchdb-*
+	@$(MAKE) dist
+	@rm apache-couchdb-*.tar.gz
+	@mv apache-couchdb-* apache-couchdb-2.0.0-RC$(COUCH_RC)
+	@tar czf apache-couchdb-2.0.0-RC$(COUCH_RC).tar.gz apache-couchdb-2.0.0-RC$(COUCH_RC)
+endif
 
 ################################################################################
 # Misc
