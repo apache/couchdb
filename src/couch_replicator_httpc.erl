@@ -180,6 +180,9 @@ process_stream_response(ReqId, Worker, HttpDb, Params, Callback) ->
                 Ret = Callback(Ok, Headers, StreamDataFun),
                 Ret
             catch
+                throw:{maybe_retry_req, connection_closed} ->
+                    maybe_retry({connection_closed, mid_stream},
+                        Worker, HttpDb, Params);
                 throw:{maybe_retry_req, Err} ->
                     maybe_retry(Err, Worker, HttpDb, Params)
             end;
