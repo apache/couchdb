@@ -23,7 +23,8 @@ multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
     ArgQueries = lists:map(fun({Query}) ->
         QueryArg = couch_mrview_http:parse_params(Query, undefined,
             Args1, [decoded]),
-        couch_mrview_util:validate_args(QueryArg)
+        QueryArg1 = couch_mrview_util:set_view_type(QueryArg, ViewName, Views),
+        couch_mrview_util:validate_args(QueryArg1)
     end, Queries),
     VAcc0 = #vacc{db=Db, req=Req, prepend="\r\n"},
     FirstChunk = "{\"results\":[",
@@ -78,3 +79,55 @@ handle_view_req(Req, _Db, _DDoc) ->
 handle_temp_view_req(Req, _Db) ->
     Msg = <<"Temporary views are not supported in CouchDB">>,
     chttpd:send_error(Req, 403, forbidden, Msg).
+
+
+
+-ifdef(TEST).
+
+-include_lib("eunit/include/eunit.hrl").
+
+
+check_multi_query_reduce_view_overrides_test_() ->
+    {
+        foreach,
+        fun setup/0,
+        fun teardown/1,
+        [
+            t_check_include_docs_throw_validation_error(),
+            t_check_user_can_override_individual_query_type()
+        ]
+    }.
+
+
+t_check_include_docs_throw_validation_error() ->
+    ?_test(begin
+        Req = #httpd{qs = []},
+        Query = {[{<<"include_docs">>, true}]},
+        Throw = {query_parse_error, <<"`include_docs` is invalid for reduce">>},
+        ?assertThrow(Throw, multi_query_view(Req, db, ddoc, <<"v">>, [Query]))
+    end).
+
+
+t_check_user_can_override_individual_query_type() ->
+    ?_test(begin
+        Req = #httpd{qs = []},
+        Query = {[{<<"include_docs">>, true}, {<<"reduce">>, false}]},
+        multi_query_view(Req, db, ddoc, <<"v">>, [Query]),
+        ?assertEqual(1, meck:num_calls(chttpd, start_delayed_json_response, '_'))
+    end).
+
+
+setup() ->
+    Views = [#mrview{reduce_funs = [{<<"v">>, <<"_count">>}]}],
+    meck:expect(couch_mrview_util, ddoc_to_mrst, 2, {ok, #mrst{views = Views}}),
+    meck:expect(chttpd, start_delayed_json_response, 4, {ok, resp}),
+    meck:expect(fabric, query_view, 6, {ok, #vacc{}}),
+    meck:expect(chttpd, send_delayed_chunk, 2, {ok, resp}),
+    meck:expect(chttpd, end_delayed_json_response, 1, ok).
+
+
+teardown(_) ->
+    meck:unload().
+
+
+-endif.
