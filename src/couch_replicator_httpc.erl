@@ -277,12 +277,12 @@ backoff(Worker, #httpdb{backoff = Backoff} = HttpDb, Params) ->
     NewBackoff = erlang:min(Backoff2, ?MAX_BACKOFF_WAIT),
     NewHttpDb = HttpDb#httpdb{backoff = NewBackoff},
     case Backoff2 of
-        W0 when W0 >= ?MAX_BACKOFF_LOG_THRESHOLD -> % Past 8 min, we log retries
+        W0 when W0 > ?MAX_BACKOFF_WAIT ->
+            report_error(Worker, HttpDb, Params, {error,
+                "Long 429-induced Retry Time Out"});
+        W1 when W1 >= ?MAX_BACKOFF_LOG_THRESHOLD -> % Past 8 min, we log retries
             log_retry_error(Params, HttpDb, Backoff2, "429 Retry"),
             throw({retry, NewHttpDb, Params});
-        W1 when W1 > ?MAX_BACKOFF_WAIT ->
-            report_error(Worker, HttpDb, Params, {error,
-                "429 Retry Timeout"});
         _ ->
             throw({retry, NewHttpDb, Params})
     end.
