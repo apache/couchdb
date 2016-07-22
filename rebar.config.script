@@ -27,8 +27,7 @@ DepDescs = [
 {config,           "config",           "60977f81dc06af4a3d1e89891b3061ed4cd01e95"},
 %% keep these sorted
 {b64url,           "b64url",           "6895652d80f95cdf04efb14625abed868998f174"},
-{couch_log,        "couch-log",        "cc5540419e0a4bb7872d18bc5a94f39446d83a88"},
-{couch_log_lager,  "couch-log-lager",  "a7a8b7efb8855a8b0cf9612eeca7c190c414bbfb"},
+{couch_log,        "couch-log",        "da0e48964f8175f8a8956ff1a25e047c3b2e0e2d"},
 {chttpd,           "chttpd",           "5e3bf1f5e2e96841ce0d2b26606c7f590c067bdc"},
 {couch,            "couch",            "ac3dae37da1e44dfba6fbed8ec11fa1c6779ee33"},
 {couch_index,      "couch-index",      "e7d269800302224eacf9585f74eb30822495755b"},
@@ -46,7 +45,6 @@ DepDescs = [
 {fauxton,          "fauxton",          {tag, "v1.1.5"}, [raw]},
 {folsom,           "folsom",           "a5c95dec18227c977029fbd3b638966d98f17003"},
 {global_changes,   "global-changes",   "203fb088ed81149108e64d18ffd9c3f5df154f97"},
-{goldrush,         "goldrush",         {tag, "0.1.6"}},
 {ibrowse,          "ibrowse",          "4af2d408607874d124414ac45df1edbe3961d1cd"},
 {ioq,              "ioq",              "c7c75ebeaf41599e3a3e211097d864f0e7785829"},
 {jiffy,            "jiffy",            "d3c00e19d8fa20c21758402231247602190988d3"},
