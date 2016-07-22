@@ -375,7 +375,7 @@ maybe_log(#httpd{} = HttpReq, #httpd_resp{should_log = true} = HttpResp) ->
     Host = MochiReq:get_header_value("Host"),
     RawUri = MochiReq:get(raw_path),
     RequestTime = timer:now_diff(EndTime, BeginTime) / 1000,
-    couch_log:notice("~s ~s ~s ~s ~s ~s ~B ~p ~B", [Nonce, Peer, Host, User,
+    couch_log:notice("~s ~s ~s ~s ~s ~B ~p ~B", [Host, Peer, User,
         Method, RawUri, Code, Status, round(RequestTime)]);
 maybe_log(_HttpReq, #httpd_resp{should_log = false}) ->
     ok.
@@ -1153,18 +1153,18 @@ check_url_encoding_fail_test_() ->
 
 log_format_test() ->
     ?assertEqual(
-        "nonce 127.0.0.1 127.0.0.1:15984 undefined "
+        "127.0.0.1:15984 127.0.0.1 undefined "
         "GET /_cluster_setup 201 ok 10000",
         test_log_request("/_cluster_setup", undefined)),
     ?assertEqual(
-        "nonce 127.0.0.1 127.0.0.1:15984 user_foo "
+        "127.0.0.1:15984 127.0.0.1 user_foo "
         "GET /_all_dbs 201 ok 10000",
         test_log_request("/_all_dbs", #user_ctx{name = <<"user_foo">>})),
 
     %% Utf8Name = unicode:characters_to_binary(Something),
     Utf8User = <<227,130,136,227,129,134,227,129,147,227,129,157>>,
     ?assertEqual(
-        "nonce 127.0.0.1 127.0.0.1:15984 %E3%82%88%E3%81%86%E3%81%93%E3%81%9D "
+        "127.0.0.1:15984 127.0.0.1 %E3%82%88%E3%81%86%E3%81%93%E3%81%9D "
         "GET /_all_dbs 201 ok 10000",
         test_log_request("/_all_dbs", #user_ctx{name = Utf8User})),
     ok.
