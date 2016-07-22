@@ -220,7 +220,7 @@ start(Module, ExtraApps) ->
     start(Module, ExtraApps, []).
 
 start(Module, ExtraApps, Options) ->
-    Apps = start_applications([config, ioq, couch_epi | ExtraApps]),
+    Apps = start_applications([config, couch_log, ioq, couch_epi | ExtraApps]),
     ToMock = [config, couch_stats] -- proplists:get_value(dont_mock, Options, []),
     mock(ToMock),
     #test_context{module = Module, mocked = ToMock, started = Apps}.
