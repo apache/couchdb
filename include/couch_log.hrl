@@ -10,10 +10,13 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-{application, couch_log, [
-    {description, "CouchDB Log API"},
-    {vsn, git},
-    {registered, [couch_log_sup]},
-    {applications, [kernel, stdlib, config]},
-    {mod, {couch_log_app, []}}
-]}.
+-record(log_entry, {
+    level,
+    pid,
+    msg,
+    msg_id,
+    time_stamp
+}).
+
+
+-define(COUCH_LOG_TEST_TABLE, couch_log_test_table).
