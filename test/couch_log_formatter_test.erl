@@ -29,6 +29,14 @@ truncate_test() ->
     ?assert(length(Entry#log_entry.msg) =< 16000).
 
 
+format_reason_test() ->
+    MsgFmt = "This is a reason: ~r",
+    Reason = {foo, [{x, k, 3}, {c, d, 2}]},
+    Entry = couch_log_formatter:format(info, self(), MsgFmt, [Reason]),
+    Formatted = "This is a reason: foo at x:k/3 <= c:d/2",
+    ?assertEqual(Formatted, lists:flatten(Entry#log_entry.msg)).
+
+
 gen_server_error_test() ->
     Pid = self(),
     Event = {
@@ -111,6 +119,26 @@ gen_event_error_test() ->
         "last msg: {ohai,there}",
         "state: curr_state"
     ]).
+
+
+emulator_error_test() ->
+    Event = {
+        error,
+        erlang:group_leader(),
+        {
+            emulator,
+            "~s~n",
+            ["A process died and stuff\n"]
+        }
+    },
+    ?assertMatch(
+        #log_entry{
+            level = error,
+            pid = emulator,
+            msg = "A process died and stuff"
+        },
+        do_format(Event)
+    ).
 
 
 normal_error_test() ->
