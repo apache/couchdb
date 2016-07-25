@@ -80,6 +80,13 @@ format({error, _GL, {Pid, "** gen_event handler" ++ _, Args}}) ->
     MsgArgs = [ID, Name, format_reason(Reason), LastMsg, State],
     format(error, Pid, MsgFmt, MsgArgs);
 
+format({error, _GL, {emulator, "~s~n", [Msg]}}) when is_list(Msg) ->
+    % These messages are for whenever any process exits due
+    % to a throw or error. We intercept here to remove the
+    % extra newlines.
+    NewMsg = lists:sublist(Msg, length(Msg) - 1),
+    format(error, emulator, NewMsg);
+
 format({error, _GL, {Pid, Fmt, Args}}) ->
     format(error, Pid, Fmt, Args);
 
