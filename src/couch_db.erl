@@ -1544,7 +1544,8 @@ validate_dbname(DbName) when is_binary(DbName) ->
         DbName, Normalized, fun validate_dbname_int/2).
 
 validate_dbname_int(DbName, Normalized) when is_binary(DbName) ->
-    case re:run(DbName, ?DBNAME_REGEX, [{capture,none}, dollar_endonly]) of
+    DbNoExt = maybe_remove_extension(DbName),
+    case re:run(DbNoExt, ?DBNAME_REGEX, [{capture,none}, dollar_endonly]) of
         match ->
             ok;
         nomatch ->
@@ -1563,23 +1564,23 @@ is_systemdb(DbName) when is_binary(DbName) ->
 -include_lib("eunit/include/eunit.hrl").
 
 setup() ->
-    ok = meck:new(couch_db_plugin, [passthrough]),
-    ok = meck:expect(couch_db_plugin, validate_dbname, fun(_, _) -> false end),
+    ok = meck:new(couch_epi, [passthrough]),
+    ok = meck:expect(couch_epi, decide, fun(_, _, _, _, _) -> no_decision end),
     ok.
 
 teardown(_) ->
-    (catch meck:unload(couch_db_plugin)).
+    (catch meck:unload(couch_epi)).
 
 validate_dbname_success_test_() ->
     Cases =
-        generate_cases_with_shards("long/co$mplex-/path+/_something")
+        generate_cases_with_shards("long/co$mplex-/path+/something")
         ++ generate_cases_with_shards("something")
         ++ lists:append(
             [generate_cases_with_shards(?b2l(SystemDb))
                 || SystemDb <- ?SYSTEM_DATABASES]),
     {
         foreach, fun setup/0, fun teardown/1,
-        [{test_name(A), fun() -> should_pass_validate_dbname(A) end} || {_, A} <- Cases]
+        [should_pass_validate_dbname(A) || {_, A} <- Cases]
     }.
 
 validate_dbname_fail_test_() ->
@@ -1589,7 +1590,7 @@ validate_dbname_fail_test_() ->
        ++ generate_cases_with_shards("long/co$mplex-/path+/some.thing"),
     {
         foreach, fun setup/0, fun teardown/1,
-        [{test_name(A), fun() -> should_fail_validate_dbname(A) end} || {_, A} <- Cases]
+        [should_fail_validate_dbname(A) || {_, A} <- Cases]
     }.
 
 normalize_dbname_test_() ->
