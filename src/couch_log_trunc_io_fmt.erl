@@ -121,6 +121,7 @@ collect_cc([$p|Fmt], [A|Args]) -> {$p,[A],Fmt,Args};
 collect_cc([$W|Fmt], [A,Depth|Args]) -> {$W,[A,Depth],Fmt,Args};
 collect_cc([$P|Fmt], [A,Depth|Args]) -> {$P,[A,Depth],Fmt,Args};
 collect_cc([$s|Fmt], [A|Args]) -> {$s,[A],Fmt,Args};
+collect_cc([$r|Fmt], [A|Args]) -> {$r,[A],Fmt,Args};
 collect_cc([$e|Fmt], [A|Args]) -> {$e,[A],Fmt,Args};
 collect_cc([$f|Fmt], [A|Args]) -> {$f,[A],Fmt,Args};
 collect_cc([$g|Fmt], [A|Args]) -> {$g,[A],Fmt,Args};
@@ -254,6 +255,10 @@ control2($s, [L0], F, Adj, P, Pad, latin1, L) ->
 control2($s, [L0], F, Adj, P, Pad, unicode, L) ->
     List = couch_log_trunc_io:fprint(cdata_to_chars(L0), L, [{force_strings, true}]),
     Res = uniconv(string(List, F, Adj, P, Pad)),
+    {Res, lists:flatlength(Res)};
+control2($r, [R], F, Adj, P, Pad, _Enc, _L) ->
+    List = couch_log_formatter:format_reason(R),
+    Res = string(List, F, Adj, P, Pad),
     {Res, lists:flatlength(Res)}.
 
 iolist_to_chars([C|Cs]) when is_integer(C), C >= $\000, C =< $\377 ->
