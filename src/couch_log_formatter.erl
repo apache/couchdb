@@ -283,8 +283,16 @@ format_reason({Reason, [{M, F, A} | _] = Trace})
         when is_atom(M), is_atom(F), is_integer(A) ->
     [format_reason(Reason), " at ", format_trace(Trace)];
 
+format_reason({Reason, [{M, F, A} | _] = Trace})
+        when is_atom(M), is_atom(F), is_list(A) ->
+    [format_reason(Reason), " at ", format_trace(Trace)];
+
 format_reason({Reason, [{M, F, A, Props} | _] = Trace})
         when is_atom(M), is_atom(F), is_integer(A), is_list(Props) ->
+    [format_reason(Reason), " at ", format_trace(Trace)];
+
+format_reason({Reason, [{M, F, A, Props} | _] = Trace})
+        when is_atom(M), is_atom(F), is_list(A), is_list(Props) ->
     [format_reason(Reason), " at ", format_trace(Trace)];
 
 format_reason(Reason) ->
