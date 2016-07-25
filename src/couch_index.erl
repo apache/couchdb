@@ -139,7 +139,7 @@ terminate(Reason, State) ->
         couch_index_util:hexsig(Mod:get(signature, IdxState)),
         Reason
     ],
-    couch_log:info("Closing index for db: ~s idx: ~s sig: ~p~nreason: ~p", Args),
+    couch_log:info("Closing index for db: ~s idx: ~s sig: ~p because ~r", Args),
     ok.
 
 
