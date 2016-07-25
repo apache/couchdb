@@ -106,7 +106,7 @@ handle_info({'DOWN', _, _, Pid, Reason}, #state{changes_pid=Pid} = State) ->
         {seq, EndSeq} ->
             EndSeq;
         _ ->
-            couch_log:notice("~p changes listener died ~p", [?MODULE, Reason]),
+            couch_log:notice("~p changes listener died ~r", [?MODULE, Reason]),
             0
     end,
     erlang:send_after(5000, self(), {start_listener, Seq}),
