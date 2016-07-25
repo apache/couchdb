@@ -1519,12 +1519,16 @@ select_lt(V1, _V2) -> V1.
 normalize_dbname(DbName) when is_list(DbName) ->
     normalize_dbname(list_to_binary(DbName));
 normalize_dbname(DbName) when is_binary(DbName) ->
+    mem3:dbname(maybe_remove_extension(DbName)).
+
+maybe_remove_extension(DbName) ->
     case filename:extension(DbName) of
         <<".couch">> ->
-            mem3:dbname(filename:rootname(DbName));
+            filename:rootname(DbName);
         _ ->
-            mem3:dbname(DbName)
+            DbName
     end.
+
 
 -spec dbname_suffix(list() | binary()) -> binary().
 
