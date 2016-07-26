@@ -183,7 +183,7 @@ init(_) ->
         scan_pid = ScanPid,
         max_retries = retries_value(
             config:get("replicator", "max_replication_retry_count", "10")),
-        rep_start_pids = [Pid],
+        rep_start_pids = [{?REPLICATOR_DB, Pid}],
         live = Live,
         epoch = Epoch
     }}.
