@@ -48,6 +48,7 @@
 -define(AVG_ERROR_DELAY_MSEC, 100).
 -define(MAX_ERROR_DELAY_MSEC, 60000).
 -define(OWNER, <<"owner">>).
+-define(REPLICATOR_DB, <<"_replicator">>).
 
 -define(DB_TO_SEQ, db_to_seq).
 -define(CTX, {user_ctx, #user_ctx{roles=[<<"_admin">>, <<"_replicator">>]}}).
@@ -175,8 +176,8 @@ init(_) ->
     Epoch = make_ref(),
     ScanPid = spawn_link(fun() -> scan_all_dbs(Server) end),
     % Automatically start node local changes feed loop
-    ensure_rep_db_exists(<<"_replicator">>),
-    Pid = start_changes_reader(<<"_replicator">>, 0, Epoch),
+    ensure_rep_db_exists(?REPLICATOR_DB),
+    Pid = start_changes_reader(?REPLICATOR_DB, 0, Epoch),
     {ok, #state{
         event_listener = start_event_listener(),
         scan_pid = ScanPid,
@@ -951,7 +952,7 @@ scan_all_dbs(Server) when is_pid(Server) ->
 	end, ok).
 
 is_replicator_db(DbName) ->
-    <<"_replicator">> =:= couch_db:dbname_suffix(DbName).
+    ?REPLICATOR_DB =:= couch_db:dbname_suffix(DbName).
 
 get_json_value(Key, Props) ->
     get_json_value(Key, Props, undefined).
