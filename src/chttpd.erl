@@ -469,7 +469,7 @@ authenticate_request(Req) ->
     AuthenticationFuns = [
         {<<"cookie">>, fun chttpd_auth:cookie_authentication_handler/1},
         {<<"default">>, fun chttpd_auth:default_authentication_handler/1},
-        {<<"local">>, fun chttpd_auth:party_mode_handler/1} %% should be last
+        fun chttpd_auth:party_mode_handler/1 %% must be last
     ],
     authenticate_request(Req, chttpd_auth_cache, AuthenticationFuns).
 
@@ -484,6 +484,8 @@ authenticate_request(#httpd{user_ctx=#user_ctx{}} = Req, _AuthFuns) ->
     Req;
 authenticate_request(#httpd{} = Req, [{Name, AuthFun}|Rest]) ->
     authenticate_request(maybe_set_handler(AuthFun(Req), Name), Rest);
+authenticate_request(#httpd{} = Req, [AuthFun|Rest]) ->
+    authenticate_request(AuthFun(Req), Rest);
 authenticate_request(Response, _AuthFuns) ->
     Response.
 
