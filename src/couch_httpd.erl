@@ -170,7 +170,7 @@ set_auth_handlers() ->
     AuthHandlers = lists:map(
         fun(A) -> {auth_handler_name(A), make_arity_1_fun(A)} end, AuthenticationSrcs),
     AuthenticationFuns = AuthHandlers ++ [
-        {<<"local">>, fun couch_httpd_auth:party_mode_handler/1} %% should be last
+        fun couch_httpd_auth:party_mode_handler/1 %% must be last
     ],
     ok = application:set_env(couch, auth_handlers, AuthenticationFuns).
 
