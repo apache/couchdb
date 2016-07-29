@@ -294,7 +294,7 @@ indexable_fields(Fields, {op_or, [{op_field, Field0},
         true ->
             indexable_fields(Fields, Field1);
         false ->
-            Fields1 = indexable_fields(Fields, Field0),
+            Fields1 = indexable_fields(Fields, {op_field, Field0}),
             indexable_fields(Fields1, Field1)
     end;
 indexable_fields(Fields, {op_or, Args}) when is_list(Args) ->

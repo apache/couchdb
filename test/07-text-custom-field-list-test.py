@@ -139,3 +139,9 @@ class CustomFieldsTest(mango.UserDocsTextTests):
         docs = self.db.find({"age": 22}, fields = ["all_fields"])
         assert len(docs) == 1
         assert docs == [{}]
+
+    def test_two_or(self):
+        docs = self.db.find({"$or": [{"location.state": "New Hampshire"},
+            {"location.state": "Don't Exist"}]})
+        assert len(docs) == 1
+        assert docs[0]["user_id"] == 10
