@@ -57,14 +57,14 @@ couchTests.users_db = function(debug) {
     T(s.userCtx.name == "jchris@apache.org");
     T(s.info.authenticated == "default");
     T(s.info.authentication_db == "" + users_db_name + "");
-    TEquals(["cookie", "default", "local"], s.info.authentication_handlers);
+    TEquals(["cookie", "default"], s.info.authentication_handlers);
     var s = CouchDB.session({
       headers : {
         "Authorization" : "Basic Xzpf" // name and pass of _:_
       }
     });
     T(s.name == null);
-    T(s.info.authenticated == "local");
+    T(typeof(s.info.authenticated) === 'undefined');
     CouchDB.logout();
     
     // ok, now create a conflicting edit on the jchris doc, and make sure there's no login.

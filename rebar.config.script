@@ -28,8 +28,8 @@ DepDescs = [
 %% keep these sorted
 {b64url,           "b64url",           "6895652d80f95cdf04efb14625abed868998f174"},
 {couch_log,        "couch-log",        "741d48c94a10469d2e0283acbee7592e82a992ab"},
-{chttpd,           "chttpd",           "5b6d1b1dc2809af464fc11385d558631593f0614"},
-{couch,            "couch",            "a128c2cc6a3731e4c1824553252442cd18173e36"},
+{chttpd,           "chttpd",           "3509b91537266e29709789a5f8ccc4f101f4ce54"},
+{couch,            "couch",            "4e7b6265b3be88bed97572b50a412b470bf680d1"},
 {couch_index,      "couch-index",      "e7d269800302224eacf9585f74eb30822495755b"},
 {couch_mrview,     "couch-mrview",     "157132c6e603b1870a08c04e8459a177387932ed"},
 {couch_replicator, "couch-replicator", "05247a26019ce5416e13ef80a12c307bdc790ee4"},
