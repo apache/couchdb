@@ -45,8 +45,8 @@
 -define(REP_TO_STATE, couch_rep_id_to_rep_state).
 -define(INITIAL_WAIT, 2.5). % seconds
 -define(MAX_WAIT, 600).     % seconds
--define(AVG_ERROR_DELAY_MSEC, 100).
--define(MAX_ERROR_DELAY_MSEC, 60000).
+-define(AVG_DELAY_MSEC, 100).
+-define(MAX_DELAY_MSEC, 60000).
 -define(OWNER, <<"owner">>).
 -define(REPLICATOR_DB, <<"_replicator">>).
 
@@ -127,22 +127,13 @@ replication_error(#rep{id = {BaseId, _} = RepId}, Error) ->
     nil ->
         ok;
     #rep_state{rep = #rep{db_name = DbName, doc_id = DocId}} ->
-        ok = add_error_jitter(),
+        ok = timer:sleep(jitter(ets:info(?REP_TO_STATE, size))),
         update_rep_doc(DbName, DocId, [
             {<<"_replication_state">>, <<"error">>},
             {<<"_replication_state_reason">>, to_binary(error_reason(Error))},
             {<<"_replication_id">>, ?l2b(BaseId)}]),
         ok = gen_server:call(?MODULE, {rep_error, RepId, Error}, infinity)
     end.
-
-% Add random delay proportional to the number of replications
-% on current node, in order to prevent a stampede when a source
-% with multiple replication targets fails
-add_error_jitter() ->
-    RepCount = ets:info(?REP_TO_STATE, size),
-    Range = min(2 * RepCount * ?AVG_ERROR_DELAY_MSEC, ?MAX_ERROR_DELAY_MSEC),
-    timer:sleep(random:uniform(Range)).
-
 
 continue(#rep{doc_id = null}) ->
     {true, no_owner};
@@ -939,7 +930,7 @@ scan_all_dbs(Server) when is_pid(Server) ->
     Root = config:get("couchdb", "database_dir", "."),
     NormRoot = couch_util:normpath(Root),
     filelib:fold_files(Root, "_replicator(\\.[0-9]{10,})?.couch$", true,
-        fun(Filename, _) ->
+        fun(Filename, Acc) ->
 	    % shamelessly stolen from couch_server.erl
             NormFilename = couch_util:normpath(Filename),
             case NormFilename -- NormRoot of
@@ -947,9 +938,21 @@ scan_all_dbs(Server) when is_pid(Server) ->
                 RelativeFilename -> ok
             end,
             DbName = ?l2b(filename:rootname(RelativeFilename, ".couch")),
-	    gen_server:cast(Server, {resume_scan, DbName}),
-	    ok
-	end, ok).
+            Jitter = jitter(Acc),
+            spawn_link(fun() ->
+                timer:sleep(Jitter),
+                gen_server:cast(Server, {resume_scan, DbName})
+            end),
+	    Acc + 1
+	end, 1).
+
+% calculate random delay proportional to the number of replications
+% on current node, in order to prevent a stampede:
+%   - when a source with multiple replication targets fails
+%   - when we restart couch_replication_manager
+jitter(N) ->
+    Range = min(2 * N * ?AVG_DELAY_MSEC, ?MAX_DELAY_MSEC),
+    random:uniform(Range).
 
 is_replicator_db(DbName) ->
     ?REPLICATOR_DB =:= couch_db:dbname_suffix(DbName).
