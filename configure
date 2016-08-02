@@ -22,6 +22,7 @@ basename=`basename $0`
 PACKAGE_AUTHOR_NAME="The Apache Software Foundation"
 
 # TEST=0
+LOG_FILE="./var/log/couchdb.log"
 WITH_CURL="false"
 WITH_FAUXTON=1
 WITH_DOCS=1
@@ -43,7 +44,7 @@ Options:
   # --prefix=DIRECTORY          set the installation prefix (defaults to $DEFAULT_PREFIX)
   # --databasedir DIRECTORY     specify the data directory (defaults to /var/lib/couchdb)
   # --viewindexdir DIRECTORY    specify the view directory (defaults to /var/lib/couchdb)
-  # --logdir DIRECTORY          specify the log file (defaults to /var/log/couchdb.log)
+  --logfile FILENAME          specify the log file (defaults to ./var/log/couchdb.log)
   -c | --with-curl            request that couchjs is linked to cURL (default false)
   --disable-fauxton           do not build Fauxton
   --disable-docs              do not build any documentation or manpages
@@ -138,12 +139,29 @@ parse_opts() {
                 printf 'ERROR: "--user" requires a non-empty argument.\n' >&2
                 exit 1
                 ;;
+            --logfile)
+                if [ -n "$2" ]; then
+                    eval LOG_FILE=$2
+                    shift 2
+                    continue
+                else
+                    printf 'ERROR: "--logfile" requires a non-empty argument.\n' >&2
+                    exit 1
+                fi
+                ;;
+            --logfile=?*)
+                eval LOG_FILE=${1#*=}
+                ;;
+            --logfile=)
+                printf 'ERROR: "--logfile" requires a non-empty argument.\n' >&2
+                exit 1
+                ;;
             --) # End of options
                 shift
                 break
                 ;;
             -?*)
-                echo "WARNING: Unkonwn option '$1', ignoring" >&2
+                echo "WARNING: Unknown option '$1', ignoring" >&2
                 shift
                 ;;
             *) # Done
