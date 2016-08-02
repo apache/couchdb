@@ -243,11 +243,6 @@ def boot_haproxy(ctx):
 
 
 def hack_default_ini(ctx, node, content):
-    # Replace log file
-    logfile = toposixpath(os.path.join(ctx['devdir'], "logs", "%s.log" % node))
-    repl = "file = %s" % logfile
-    contents = re.sub("(?m)^file.*$", repl, content)
-
     # Replace couchjs command
     couchjs = os.path.join(ctx['rootdir'], "src", "couch", "priv", "couchjs")
     mainjs = os.path.join(ctx['rootdir'], "share", "server", "main.js")
