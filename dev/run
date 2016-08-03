@@ -242,7 +242,7 @@ def boot_haproxy(ctx):
         )
 
 
-def hack_default_ini(ctx, node, content):
+def hack_default_ini(ctx, node, contents):
     # Replace couchjs command
     couchjs = os.path.join(ctx['rootdir'], "src", "couch", "priv", "couchjs")
     mainjs = os.path.join(ctx['rootdir'], "share", "server", "main.js")
