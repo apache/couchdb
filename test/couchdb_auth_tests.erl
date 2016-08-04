@@ -27,7 +27,7 @@ teardown(_, _) ->
 auth_test_() ->
     Tests = [
         fun should_return_username_on_post_to_session/2,
-        fun should_return_authenticated_field/2,
+        fun should_not_return_authenticated_field/2,
         fun should_return_list_of_handlers/2
     ],
     {
@@ -58,21 +58,21 @@ should_return_username_on_post_to_session(_PortType, Url) ->
             proplists:get_value(<<"name">>, Json)
         end).
 
-should_return_authenticated_field(_PortType, Url) ->
-    ?_assertEqual(<<"local">>,
+should_not_return_authenticated_field(_PortType, Url) ->
+    ?_assertThrow({not_found, _},
         begin
             couch_util:get_nested_json_value(session(Url), [
                 <<"info">>, <<"authenticated">>])
         end).
 
 should_return_list_of_handlers(backdoor, Url) ->
-    ?_assertEqual([<<"oauth">>,<<"cookie">>,<<"default">>, <<"local">>],
+    ?_assertEqual([<<"oauth">>,<<"cookie">>,<<"default">>],
         begin
             couch_util:get_nested_json_value(session(Url), [
                 <<"info">>, <<"authentication_handlers">>])
         end);
 should_return_list_of_handlers(clustered, Url) ->
-    ?_assertEqual([<<"cookie">>,<<"default">>,<<"local">>],
+    ?_assertEqual([<<"cookie">>,<<"default">>],
         begin
             couch_util:get_nested_json_value(session(Url), [
                 <<"info">>, <<"authentication_handlers">>])
