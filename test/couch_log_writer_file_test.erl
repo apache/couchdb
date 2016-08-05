@@ -141,16 +141,24 @@ check_reopen() ->
     {ok, St2} = clear_clock(couch_log_writer_file:maybe_reopen(St1)),
     ?assertEqual(St1, St2),
 
-    % Delete file
-    file:delete("./couch.log"),
-    {ok, St3} = clear_clock(couch_log_writer_file:maybe_reopen(St2)),
-    ?assert(element(3, St3) /= element(3, St2)),
+    case os:type() of
+        {win32, _} ->
+            % Windows file handling doesn't work the same
+            % as Unix where you can move or delete an open
+            % file so these tests make no sense there.
+            yay_we_pass;
+        _ ->
+            % Delete file
+            file:delete("./couch.log"),
+            {ok, St3} = clear_clock(couch_log_writer_file:maybe_reopen(St2)),
+            ?assert(element(3, St3) /= element(3, St2)),
 
-    % Recreate file
-    file:delete("./couch.log"),
-    file:write_file("./couch.log", ""),
-    {ok, St4} = clear_clock(couch_log_writer_file:maybe_reopen(St3)),
-    ?assert(element(3, St4) /= element(3, St2)).
+            % Recreate file
+            file:delete("./couch.log"),
+            file:write_file("./couch.log", ""),
+            {ok, St4} = clear_clock(couch_log_writer_file:maybe_reopen(St3)),
+            ?assert(element(3, St4) /= element(3, St2))
+    end.
 
 
 clear_clock({ok, St}) ->
