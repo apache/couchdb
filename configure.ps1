@@ -136,7 +136,7 @@ $CouchDBConfig = @"
 {prefix, "."}.
 {data_dir, "./data"}.
 {view_index_dir, "./data"}.
-{log_file, ""}.
+{log_file, "./var/log/couchdb.log"}.
 {fauxton_root, "./share/www"}.
 {user, "$CouchDBUser"}.
 {node_name, "-name couchdb@localhost"}.
