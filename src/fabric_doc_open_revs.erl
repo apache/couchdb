@@ -47,7 +47,7 @@ go(DbName, Id, Revs, Options) ->
     RexiMon = fabric_util:create_monitors(Workers),
     try fabric_util:recv(Workers, #shard.ref, fun handle_message/3, State) of
     {ok, Replies} ->
-        {ok, filter_reply(Replies)};
+        {ok, Replies};
     {timeout, #state{workers=DefunctWorkers}} ->
         fabric_util:log_timeout(DefunctWorkers, "open_revs"),
         {error, timeout};
@@ -214,7 +214,8 @@ format_reply(true, Replies) ->
     tree_format_replies(Replies);
 
 format_reply(false, Replies) ->
-    dict_format_replies(Replies).
+    Filtered = filter_reply(Replies),
+    dict_format_replies(Filtered).
 
 
 tree_format_replies(RevTree) ->
@@ -233,10 +234,19 @@ dict_format_replies(Dict) ->
     lists:sort([Reply || {_, {Reply, _}} <- Dict]).
 
 filter_reply(Replies) ->
-    case [{ok, Doc} || {ok, Doc} <- Replies] of
-        [] -> Replies;
-        Filtered -> Filtered
-    end.
+    AllFoundRevs = lists:foldl(fun
+        ({{{not_found, missing}, _}, _}, Acc) ->
+            Acc;
+        ({{_, {Pos, [Rev | _]}}, _}, Acc) ->
+            [{Pos, Rev} | Acc]
+    end, [], Replies),
+    %% keep not_found replies only for the revs that don't also have doc reply
+    lists:filter(fun
+        ({{{not_found, missing}, Rev}, _}) ->
+            not lists:member(Rev, AllFoundRevs);
+        (_) ->
+            true
+    end, Replies).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -297,6 +307,7 @@ open_doc_revs_test_() ->
             check_not_found_counts_for_descendant(),
             check_worker_error_skipped(),
             check_not_found_replies_are_removed_when_doc_found(),
+            check_not_found_returned_when_one_of_docs_not_found(),
             check_not_found_returned_when_doc_not_found()
         ]
     }.
@@ -457,19 +468,35 @@ check_worker_error_skipped() ->
         ?assertEqual(Expect, handle_message(Msg3, w2, S2))
     end).
 
+
 check_not_found_replies_are_removed_when_doc_found() ->
     ?_test(begin
-        Replies = [foo1(), bar1(), bazNF()],
-        Expect = [foo1(), bar1()],
+        Replies = replies_to_dict([foo1(), bar1(), fooNF()]),
+        Expect = replies_to_dict([foo1(), bar1()]),
+        ?assertEqual(Expect, filter_reply(Replies))
+    end).
+
+check_not_found_returned_when_one_of_docs_not_found() ->
+    ?_test(begin
+        Replies = replies_to_dict([foo1(), foo2(), barNF()]),
+        Expect = replies_to_dict([foo1(), foo2(), barNF()]),
         ?assertEqual(Expect, filter_reply(Replies))
     end).
 
 check_not_found_returned_when_doc_not_found() ->
     ?_test(begin
-        Replies = [fooNF(), barNF(), bazNF()],
-        Expect = [fooNF(), barNF(), bazNF()],
+        Replies = replies_to_dict([fooNF(), barNF(), bazNF()]),
+        Expect = replies_to_dict([fooNF(), barNF(), bazNF()]),
         ?assertEqual(Expect, filter_reply(Replies))
     end).
 
+replies_to_dict(Replies) ->
+    [reply_to_element(R) || R <- Replies].
+
+reply_to_element({ok, #doc{revs = Revs}} = Reply) ->
+    {_, [Rev | _]} = Revs,
+    {{Rev, Revs}, {Reply, 1}};
+reply_to_element(Reply) ->
+    {Reply, {Reply, 1}}.
 
 -endif.
