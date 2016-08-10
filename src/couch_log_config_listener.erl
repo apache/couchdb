@@ -11,11 +11,21 @@
 % the License.
 
 -module(couch_log_config_listener).
+-behaviour(gen_server).
 -behaviour(config_listener).
 
 
 -export([
-    start/0
+    start_link/0
+]).
+
+-export([
+    init/1,
+    terminate/2,
+    handle_call/3,
+    handle_cast/2,
+    handle_info/2,
+    code_change/3
 ]).
 
 -export([
@@ -31,8 +41,37 @@
 -endif.
 
 
-start() ->
-    ok = config:listen_for_changes(?MODULE, nil).
+start_link() ->
+    gen_server:start_link({local, ?MODULE}, ?MODULE, nil, []).
+
+
+init(_) ->
+    ok = config:listen_for_changes(?MODULE, nil),
+    {ok, nil}.
+
+
+terminate(_, _) ->
+    ok.
+
+
+handle_call(_, _, _) ->
+    {reply, ignored, nil}.
+
+
+handle_cast(_, _) ->
+    {noreply, nil}.
+
+
+handle_info(restart_listener, _) ->
+    ok = config:listen_for_changes(?MODULE, nil),
+    {noreply, nil};
+
+handle_info(_, _) ->
+    {noreply, nil}.
+
+
+code_change(_, _, _) ->
+    {ok, nil}.
 
 
 handle_config_change("log", Key, _, _, _) ->
@@ -56,10 +95,7 @@ handle_config_change(_, _, _, _, Settings) ->
 handle_config_terminate(_, stop, _) ->
     ok;
 handle_config_terminate(_, _, _) ->
-    spawn(fun() ->
-        timer:sleep(?RELISTEN_DELAY),
-        ok = config:listen_for_changes(?MODULE, nil)
-    end).
+    erlang:send_after(?RELISTEN_DELAY, whereis(?MODULE), restart_listener).
 
 
 -ifdef(TEST).
