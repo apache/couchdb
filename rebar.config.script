@@ -24,7 +24,7 @@ os:putenv("COUCHDB_APPS_CONFIG_DIR", filename:join([COUCHDB_ROOT, "rel/apps"])).
 DepDescs = [
 %% must be compiled first as it has a custom behavior
 {couch_epi,        "couch-epi",        "f6ad55d804ac741b59fe37dd092787113847661c"},
-{config,           "config",           "693abb635bd6e75b7a122cc6313b6e561c96e01a"},
+{config,           "config",           "12dcbf571516970f7cfa586bda9a1f1cad82d5bb"},
 %% keep these sorted
 {b64url,           "b64url",           "6895652d80f95cdf04efb14625abed868998f174"},
 {couch_log,        "couch-log",        "afe8375e08808f01984d03286dace759b37efc05"},
