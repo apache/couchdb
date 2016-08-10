@@ -17,9 +17,6 @@
 -include_lib("eunit/include/eunit.hrl").
 
 
--define(HANDLER, {config_listener, couch_log_config_listener}).
-
-
 couch_log_config_test_() ->
     {setup,
         fun couch_log_test_util:start/0,
@@ -32,18 +29,11 @@ couch_log_config_test_() ->
 
 
 check_restart_listener() ->
-    Handlers1 = gen_event:which_handlers(config_event),
-    ?assert(lists:member(?HANDLER, Handlers1)),
-
-    gen_event:delete_handler(config_event, ?HANDLER, testing),
-
-    Handlers2 = gen_event:which_handlers(config_event),
-    ?assert(not lists:member(?HANDLER, Handlers2)),
-
+    ?assertNotEqual(not_found, get_handler()),
+    gen_event:delete_handler(config_event, get_handler(), testing),
+    ?assertEqual(not_found, get_handler()),
     timer:sleep(1000),
-
-    Handlers3 = gen_event:which_handlers(config_event),
-    ?assert(lists:member(?HANDLER, Handlers3)).
+    ?assertNotEqual(not_found, get_handler()).
 
 
 check_ignore_non_log() ->
@@ -54,3 +44,13 @@ check_ignore_non_log() ->
         end)
     end,
     ?assertError(config_change_timeout, Run()).
+
+
+get_handler() ->
+    FoldFun = fun
+        ({config_listener, {couch_log_config_listener, _}} = H, not_found) ->
+            H;
+        (_, Acc) ->
+            Acc
+    end,
+    lists:foldl(FoldFun, not_found, gen_event:which_handlers(config_event)).
