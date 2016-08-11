@@ -28,7 +28,7 @@ DepDescs = [
 %% keep these sorted
 {b64url,           "b64url",           "6895652d80f95cdf04efb14625abed868998f174"},
 {couch_log,        "couch-log",        "afe8375e08808f01984d03286dace759b37efc05"},
-{chttpd,           "chttpd",           "3509b91537266e29709789a5f8ccc4f101f4ce54"},
+{chttpd,           "chttpd",           "68f8fa50d021ba6573b9cf394aef26c1ec705aff"},
 {couch,            "couch",            "1df597fc2e9a8208e7716f8542a7f6a8e9b606e8"},
 {couch_index,      "couch-index",      "e7d269800302224eacf9585f74eb30822495755b"},
 {couch_mrview,     "couch-mrview",     "157132c6e603b1870a08c04e8459a177387932ed"},
@@ -41,7 +41,7 @@ DepDescs = [
 {docs,             "documentation",    "eab768d17ca0b9d20f4fc884a48376c9533356c1", [raw]},
 {ddoc_cache,       "ddoc-cache",       "c762e90a33ce3cda19ef142dd1120f1087ecd876"},
 {ets_lru,          "ets-lru",          "c05488c8b1d7ec1c3554a828e0c9bf2888932ed6"},
-{fabric,           "fabric",           "ebea1b8f5d49fe60f326b33dbdc06176ecfea5d1"},
+{fabric,           "fabric",           "cb85279e00f2e96b65e9605a82653558accc8e03"},
 {fauxton,          "fauxton",          {tag, "v1.1.7"}, [raw]},
 {folsom,           "folsom",           "a5c95dec18227c977029fbd3b638966d98f17003"},
 {global_changes,   "global-changes",   "203fb088ed81149108e64d18ffd9c3f5df154f97"},
