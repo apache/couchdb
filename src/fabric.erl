@@ -34,7 +34,7 @@
 
 % miscellany
 -export([design_docs/1, reset_validation_funs/1, cleanup_index_files/0,
-    cleanup_index_files/1, dbname/1]).
+    cleanup_index_files/1, cleanup_index_files_all_nodes/1, dbname/1]).
 
 -include_lib("fabric/include/fabric.hrl").
 
@@ -464,8 +464,14 @@ cleanup_index_files(DbName) ->
     [file:delete(File) || File <- DeleteFiles],
     ok.
 
-%% some simple type validation and transcoding
+%% @doc clean up index files for a specific db on all nodes
+-spec cleanup_index_files_all_nodes(dbname()) -> [reference()].
+cleanup_index_files_all_nodes(DbName) ->
+    lists:foreach(fun(Node) ->
+        rexi:cast(Node, {?MODULE, cleanup_index_files, [DbName]})
+    end, mem3:nodes()).
 
+%% some simple type validation and transcoding
 dbname(DbName) when is_list(DbName) ->
     list_to_binary(DbName);
 dbname(DbName) when is_binary(DbName) ->
