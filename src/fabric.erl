@@ -20,7 +20,8 @@
 -export([all_dbs/0, all_dbs/1, create_db/1, create_db/2, delete_db/1,
     delete_db/2, get_db_info/1, get_doc_count/1, set_revs_limit/3,
     set_security/2, set_security/3, get_revs_limit/1, get_security/1,
-    get_security/2, get_all_security/1, get_all_security/2]).
+    get_security/2, get_all_security/1, get_all_security/2,
+    compact/1, compact/2]).
 
 % Documents
 -export([open_doc/3, open_revs/4, get_doc_info/3, get_full_doc_info/3,
@@ -160,6 +161,16 @@ get_all_security(DbName) ->
     {error, atom(), any()}.
 get_all_security(DbName, Options) ->
     fabric_db_meta:get_all_security(dbname(DbName), opts(Options)).
+
+compact(DbName) ->
+    [rexi:cast(Node, {fabric_rpc, compact, [Name]}) ||
+        #shard{node=Node, name=Name} <- mem3:shards(dbname(DbName))],
+    ok.
+
+compact(DbName, DesignName) ->
+    [rexi:cast(Node, {fabric_rpc, compact, [Name, DesignName]}) ||
+        #shard{node=Node, name=Name} <- mem3:shards(dbname(DbName))],
+    ok.
 
 % doc operations
 

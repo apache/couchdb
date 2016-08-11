@@ -19,6 +19,7 @@
 -export([create_db/1, delete_db/1, reset_validation_funs/1, set_security/3,
     set_revs_limit/3, create_shard_db_doc/2, delete_shard_db_doc/2]).
 -export([get_all_security/2, open_shard/2]).
+-export([compact/1, compact/2]).
 
 -export([get_db_info/2, get_doc_count/2, get_update_seq/2,
          changes/4, map_view/5, reduce_view/5, group_info/3]).
@@ -245,6 +246,15 @@ reset_validation_funs(DbName) ->
 open_shard(Name, Opts) ->
     set_io_priority(Name, Opts),
     rexi:reply(couch_db:open(Name, Opts)).
+
+compact(DbName) ->
+    with_db(DbName, [], {couch_db, start_compact, []}).
+
+compact(ShardName, DesignName) ->
+    {ok, Pid} = couch_index_server:get_index(
+        couch_mrview_index, ShardName, <<"_design/", DesignName/binary>>),
+    Ref = erlang:make_ref(),
+    Pid ! {'$gen_call', {self(), Ref}, compact}.
 
 %%
 %% internal
