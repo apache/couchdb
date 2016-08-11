@@ -225,9 +225,24 @@ maybe_flush_changes_feed(Acc0, Data, Len) ->
     },
     {ok, Acc}.
 
-handle_compact_req(Req, _) ->
-    Msg = <<"Compaction must be triggered on a per-shard basis in CouchDB">>,
-    couch_httpd:send_error(Req, 403, forbidden, Msg).
+handle_compact_req(#httpd{method='POST'}=Req, Db) ->
+    chttpd:validate_ctype(Req, "application/json"),
+    case Req#httpd.path_parts of
+        [_DbName, <<"_compact">>] ->
+            ok = fabric:compact(Db),
+            send_json(Req, 202, {[{ok, true}]});
+        [DbName, <<"_compact">>, DesignName | _] ->
+            case ddoc_cache:open(DbName, <<"_design/", DesignName/binary>>) of
+                {ok, _DDoc} ->
+                    ok = fabric:compact(Db, DesignName),
+                    send_json(Req, 202, {[{ok, true}]});
+                Error ->
+                    throw(Error)
+            end
+    end;
+
+handle_compact_req(Req, _Db) ->
+    send_method_not_allowed(Req, "POST").
 
 handle_view_cleanup_req(Req, Db) ->
     ok = fabric:cleanup_index_files(Db),
