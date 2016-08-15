@@ -388,7 +388,7 @@ changes_reader_cb({change, Change, _}, _, {Server, DbName, Epoch}) ->
             ok
     end,
     {Server, DbName, Epoch};
-changes_reader_cb({stop, EndSeq, _Pending}, _, {Server, DbName, Epoch}) ->
+changes_reader_cb({stop, EndSeq}, _, {Server, DbName, Epoch}) ->
     Msg = {rep_db_checkpoint, DbName, EndSeq},
     ok = gen_server:call(Server, Msg, infinity),
     {Server, DbName, Epoch};
