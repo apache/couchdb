@@ -15,26 +15,33 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
--define(TIMEOUT, 3000).
+-define(TIMEOUT, 1000).
 
 
-start() ->
-    Ctx = test_util:start_couch(),
-    config:set("query_server_config", "os_process_limit", "3", false),
-    timer:sleep(100), %% we need to wait to let gen_server:cast finish
-    Ctx.
+setup() ->
+    ok = couch_proc_manager:reload(),
+    ok = setup_config().
 
+teardown(_) ->
+    ok.
 
 os_proc_pool_test_() ->
     {
         "OS processes pool tests",
         {
             setup,
-            fun start/0, fun test_util:stop_couch/1,
-            [
-                should_block_new_proc_on_full_pool(),
-                should_free_slot_on_proc_unexpected_exit()
-            ]
+            fun test_util:start_couch/0, fun test_util:stop_couch/1,
+            {
+                foreach,
+                fun setup/0, fun teardown/1,
+                [
+                    should_block_new_proc_on_full_pool(),
+                    should_free_slot_on_proc_unexpected_exit(),
+                    should_reuse_known_proc(),
+                    should_process_waiting_queue_as_fifo(),
+                    should_reduce_pool_on_idle_os_procs()
+                ]
+            }
         }
     }.
 
@@ -115,11 +122,128 @@ should_free_slot_on_proc_unexpected_exit() ->
     end).
 
 
+should_reuse_known_proc() ->
+    ?_test(begin
+        Client1 = spawn_client(<<"ddoc1">>),
+        Client2 = spawn_client(<<"ddoc2">>),
+
+        ?assertEqual(ok, ping_client(Client1)),
+        ?assertEqual(ok, ping_client(Client2)),
+
+        Proc1 = get_client_proc(Client1, "1"),
+        Proc2 = get_client_proc(Client2, "2"),
+        ?assertNotEqual(Proc1#proc.pid, Proc2#proc.pid),
+
+        ?assertEqual(ok, stop_client(Client1)),
+        ?assertEqual(ok, stop_client(Client2)),
+        ?assert(is_process_alive(Proc1#proc.pid)),
+        ?assert(is_process_alive(Proc2#proc.pid)),
+
+        Client1Again = spawn_client(<<"ddoc1">>),
+        ?assertEqual(ok, ping_client(Client1Again)),
+        Proc1Again = get_client_proc(Client1Again, "1-again"),
+        ?assertEqual(Proc1#proc.pid, Proc1Again#proc.pid),
+        ?assertNotEqual(Proc1#proc.client, Proc1Again#proc.client),
+        ?assertEqual(ok, stop_client(Client1Again))
+    end).
+
+
+should_process_waiting_queue_as_fifo() ->
+    ?_test(begin
+        Client1 = spawn_client(<<"ddoc1">>),
+        Client2 = spawn_client(<<"ddoc2">>),
+        Client3 = spawn_client(<<"ddoc3">>),
+        Client4 = spawn_client(<<"ddoc4">>),
+        Client5 = spawn_client(<<"ddoc5">>),
+
+        ?assertEqual(ok, ping_client(Client1)),
+        ?assertEqual(ok, ping_client(Client2)),
+        ?assertEqual(ok, ping_client(Client3)),
+        ?assertEqual(timeout, ping_client(Client4)),
+        ?assertEqual(timeout, ping_client(Client5)),
+
+        Proc1 = get_client_proc(Client1, "1"),
+        ?assertEqual(ok, stop_client(Client1)),
+        ?assertEqual(ok, ping_client(Client4)),
+        Proc4 = get_client_proc(Client4, "4"),
+
+        ?assertNotEqual(Proc4#proc.client, Proc1#proc.client),
+        ?assertEqual(Proc1#proc.pid, Proc4#proc.pid),
+        ?assertEqual(timeout, ping_client(Client5)),
+
+        ?assertEqual(ok, stop_client(Client2)),
+        ?assertEqual(ok, stop_client(Client3)),
+        ?assertEqual(ok, stop_client(Client4)),
+        ?assertEqual(ok, stop_client(Client5))
+    end).
+
+
+should_reduce_pool_on_idle_os_procs() ->
+    ?_test(begin
+        %% os_process_idle_limit is in sec
+        config:set("query_server_config",
+            "os_process_idle_limit", "1", false),
+        ok = confirm_config("os_process_idle_limit", "1"),
+
+        Client1 = spawn_client(<<"ddoc1">>),
+        Client2 = spawn_client(<<"ddoc2">>),
+        Client3 = spawn_client(<<"ddoc3">>),
+
+        ?assertEqual(ok, ping_client(Client1)),
+        ?assertEqual(ok, ping_client(Client2)),
+        ?assertEqual(ok, ping_client(Client3)),
+
+        ?assertEqual(3, couch_proc_manager:get_proc_count()),
+
+        ?assertEqual(ok, stop_client(Client1)),
+        ?assertEqual(ok, stop_client(Client2)),
+        ?assertEqual(ok, stop_client(Client3)),
+
+        timer:sleep(1200),
+        ?assertEqual(1, couch_proc_manager:get_proc_count())
+    end).
+
+
+setup_config() ->
+    config:set("query_server_config", "os_process_limit", "3", false),
+    config:set("query_server_config", "os_process_soft_limit", "2", false),
+    ok = confirm_config("os_process_soft_limit", "2").
+
+confirm_config(Key, Value) ->
+    confirm_config(Key, Value, 0).
+
+confirm_config(Key, Value, Count) ->
+    case config:get("query_server_config", Key) of
+        Value ->
+            ok;
+        _ when Count > 10 ->
+            erlang:error({config_setup, [
+                {module, ?MODULE},
+                {line, ?LINE},
+                {value, timeout}
+            ]});
+        _ ->
+            %% we need to wait to let gen_server:cast finish
+            timer:sleep(10),
+            confirm_config(Key, Value, Count + 1)
+    end.
+
 spawn_client() ->
     Parent = self(),
     Ref = make_ref(),
     Pid = spawn(fun() ->
         Proc = couch_query_servers:get_os_process(<<"javascript">>),
+        loop(Parent, Ref, Proc)
+    end),
+    {Pid, Ref}.
+
+spawn_client(DDocId) ->
+    Parent = self(),
+    Ref = make_ref(),
+    Pid = spawn(fun() ->
+        DDocKey = {DDocId, <<"1-abcdefgh">>},
+        DDoc = #doc{body={[]}},
+        Proc = couch_query_servers:get_ddoc_process(DDoc, DDocKey),
         loop(Parent, Ref, Proc)
     end),
     {Pid, Ref}.

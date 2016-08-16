@@ -22,7 +22,7 @@
 -export([with_ddoc_proc/2, proc_prompt/2, ddoc_prompt/3, ddoc_proc_prompt/3, json_doc/1]).
 
 % For 210-os-proc-pool.t
--export([get_os_process/1, ret_os_process/1]).
+-export([get_os_process/1, get_ddoc_process/2, ret_os_process/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 
