@@ -12,7 +12,7 @@
 
 -module(mem3_shards).
 -behaviour(gen_server).
--vsn(2).
+-vsn(3).
 -behaviour(config_listener).
 
 -export([init/1, terminate/2, code_change/3]).
@@ -36,6 +36,7 @@
 -define(DBS, mem3_dbs).
 -define(SHARDS, mem3_shards).
 -define(ATIMES, mem3_atimes).
+-define(RELISTEN_DELAY, 5000).
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -173,12 +174,10 @@ handle_config_change("mem3", "shards_db", _DbName, _, _) ->
 handle_config_change(_, _, _, _, _) ->
     {ok, nil}.
 
-handle_config_terminate(_, stop, _) -> ok;
-handle_config_terminate(_, _, _) ->
-    spawn(fun() ->
-        timer:sleep(5000),
-        config:listen_for_changes(?MODULE, nil)
-    end).
+handle_config_terminate(_, stop, _) ->
+    ok;
+handle_config_terminate(_Server, _Reason, _State) ->
+    erlang:send_after(?RELISTEN_DELAY, whereis(?MODULE), restart_config_listener).
 
 init([]) ->
     ets:new(?SHARDS, [
@@ -235,6 +234,9 @@ handle_info({'DOWN', _, _, Pid, Reason}, #st{changes_pid=Pid}=St) ->
 handle_info({start_listener, Seq}, St) ->
     {NewPid, _} = spawn_monitor(fun() -> listen_for_changes(Seq) end),
     {noreply, St#st{changes_pid=NewPid}};
+handle_info(restart_config_listener, State) ->
+    ok = config:listen_for_changes(?MODULE, nil),
+    {noreply, State};
 handle_info(_Msg, St) ->
     {noreply, St}.
 
