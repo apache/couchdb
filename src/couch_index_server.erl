@@ -14,7 +14,7 @@
 -behaviour(gen_server).
 -behaviour(config_listener).
 
--vsn(1).
+-vsn(2).
 
 -export([start_link/0, validate/2, get_index/4, get_index/3, get_index/2]).
 
@@ -33,7 +33,7 @@
 -define(BY_SIG, couchdb_indexes_by_sig).
 -define(BY_PID, couchdb_indexes_by_pid).
 -define(BY_DB, couchdb_indexes_by_db).
-
+-define(RELISTEN_DELAY, 5000).
 
 -record(st, {root_dir}).
 
@@ -115,7 +115,7 @@ get_index(Module, IdxState) ->
 
 init([]) ->
     process_flag(trap_exit, true),
-    ok = config:listen_for_changes(?MODULE, nil),
+    ok = config:listen_for_changes(?MODULE, couch_index_util:root_dir()),
     ets:new(?BY_SIG, [protected, set, named_table]),
     ets:new(?BY_PID, [private, set, named_table]),
     ets:new(?BY_DB, [protected, bag, named_table]),
@@ -175,6 +175,9 @@ handle_info({'EXIT', Pid, Reason}, Server) ->
             ok
     end,
     {noreply, Server};
+handle_info(restart_config_listener, State) ->
+    ok = config:listen_for_changes(?MODULE, couch_index_util:root_dir()),
+    {noreply, State};
 handle_info(Msg, State) ->
     couch_log:warning("~p did not expect ~p", [?MODULE, Msg]),
     {noreply, State}.
@@ -197,13 +200,11 @@ handle_config_change("couchdb", "view_index_dir", _, _, _) ->
 handle_config_change(_, _, _, _, RootDir) ->
     {ok, RootDir}.
 
-handle_config_terminate(_Server, stop, _State) -> ok;
+handle_config_terminate(_, stop, _) ->
+    ok;
 handle_config_terminate(_Server, _Reason, _State) ->
-    State = couch_index_util:root_dir(),
-    spawn(fun() ->
-        timer:sleep(5000),
-        config:listen_for_changes(?MODULE, State)
-    end).
+    erlang:send_after(?RELISTEN_DELAY, whereis(?MODULE), restart_config_listener),
+    {ok, couch_index_util:root_dir()}.
 
 new_index({Mod, IdxState, DbName, Sig}) ->
     DDocId = Mod:get(idx_name, IdxState),
