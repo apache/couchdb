@@ -12,6 +12,7 @@
 
 -module(couch_sup).
 -behaviour(supervisor).
+-vsn(1).
 -behaviour(config_listener).
 
 
@@ -35,7 +36,6 @@ start_link() ->
             notify_started(),
             notify_uris(),
             write_uris(),
-            ok = config:listen_for_changes(?MODULE, nil),
             Resp;
         Else ->
             notify_error(Else),
@@ -46,6 +46,14 @@ start_link() ->
 init(_Args) ->
     couch_log:info("Starting ~s", [?MODULE]),
     {ok, {{one_for_one,10, 60}, [
+        {
+            config_listener_mon,
+            {config_listener_mon, start_link, [?MODULE, nil]},
+            permanent,
+            5000,
+            worker,
+            [config_listener_mon]
+        },
         {
             couch_primary_services,
             {couch_primary_sup, start_link, []},
@@ -76,12 +84,8 @@ handle_config_change("couchdb", "util_driver_dir", _, _, _) ->
 handle_config_change(_, _, _, _, _) ->
     {ok, nil}.
 
-handle_config_terminate(_, stop, _) -> ok;
-handle_config_terminate(_, _, _) ->
-    spawn(fun() ->
-        timer:sleep(5000),
-        config:listen_for_changes(?MODULE, undefined)
-    end).
+handle_config_terminate(_Server, _Reason, _State) ->
+    ok.
 
 notify_starting() ->
     couch_log:info("Apache CouchDB ~s is starting.~n", [

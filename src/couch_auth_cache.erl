@@ -12,7 +12,7 @@
 
 -module(couch_auth_cache).
 -behaviour(gen_server).
--vsn(2).
+-vsn(3).
 -behaviour(config_listener).
 
 % public API
@@ -32,6 +32,8 @@
 -define(STATE, auth_state_ets).
 -define(BY_USER, auth_by_user_ets).
 -define(BY_ATIME, auth_by_atime_ets).
+
+-define(RELISTEN_DELAY, 5000).
 
 -record(state, {
     max_cache_size = 0,
@@ -242,7 +244,11 @@ handle_info({'DOWN', Ref, _, _, Reason}, #state{closed = Closed} = State) ->
             {stop, Reason, State};
         NewClosed ->
             {noreply, reinit_cache(State#state{closed = NewClosed})}
-    end.
+    end;
+handle_info(restart_config_listener, State) ->
+    ok = config:listen_for_changes(?MODULE, nil),
+    {noreply, State}.
+
 
 
 terminate(_Reason, #state{event_listener = Listener}) ->
@@ -265,12 +271,10 @@ handle_config_change("couch_httpd_auth", "authentication_db", _DbName, _, _) ->
 handle_config_change(_, _, _, _, _) ->
     {ok, nil}.
 
-handle_config_terminate(_, stop, _) -> ok;
-handle_config_terminate(_, _, _) ->
-    spawn(fun() ->
-        timer:sleep(5000),
-        config:listen_for_changes(?MODULE, nil)
-    end).
+handle_config_terminate(_, stop, _) ->
+    ok;
+handle_config_terminate(_Server, _Reason, _State) ->
+    erlang:send_after(?RELISTEN_DELAY, whereis(?MODULE), restart_config_listener).
 
 clear_cache(State) ->
     exec_if_auth_db(fun(AuthDb) -> catch couch_db:close(AuthDb) end),
