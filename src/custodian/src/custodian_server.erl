@@ -2,7 +2,7 @@
 
 -module(custodian_server).
 -behaviour(gen_server).
--vsn(2).
+-vsn(3).
 -behaviour(config_listener).
 
 % public api.
@@ -30,29 +30,30 @@
 
 -define(VSN_0_2_7, 184129240591641721395874905059581858099).
 
+-define(RELISTEN_DELAY, 5000).
+
+
 % public functions.
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 handle_config_change("couchdb", "maintenance_mode", _, _, S) ->
-    ok = gen_server:cast(S, refresh),
+    ok = gen_server:cast(?MODULE, refresh),
     {ok, S};
 handle_config_change(_, _, _, _, S) ->
     {ok, S}.
 
-handle_config_terminate(_, stop, _) -> ok;
-handle_config_terminate(Self, _, _) ->
-    spawn(fun() ->
-        timer:sleep(5000),
-        config:listen_for_changes(?MODULE, Self)
-    end).
+handle_config_terminate(_, stop, _) ->
+    ok;
+handle_config_terminate(_Server, _Reason, _State) ->
+    erlang:send_after(?RELISTEN_DELAY, whereis(?MODULE), restart_config_listener).
 
 % gen_server functions.
 init(_) ->
     process_flag(trap_exit, true),
     net_kernel:monitor_nodes(true),
-    ok = config:listen_for_changes(?MODULE, self()),
+    ok = config:listen_for_changes(?MODULE, nil),
     {ok, LisPid} = start_event_listener(),
     {ok, start_shard_checker(#state{
         event_listener=LisPid
@@ -87,7 +88,11 @@ handle_info({'EXIT', Pid, Reason}, #state{shard_checker=Pid}=State) ->
 handle_info({'EXIT', Pid, Reason}, #state{event_listener=Pid}=State) ->
     couch_log:notice("custodian update notifier died ~p", [Reason]),
     {ok, Pid1} = start_event_listener(),
-    {noreply, State#state{event_listener=Pid1}}.
+    {noreply, State#state{event_listener=Pid1}};
+
+handle_info(restart_config_listener, State) ->
+    ok = config:listen_for_changes(?MODULE, nil),
+    {noreply, State}.
 
 terminate(_Reason, State) ->
     couch_event:stop_listener(State#state.event_listener),
@@ -95,7 +100,7 @@ terminate(_Reason, State) ->
     ok.
 
 code_change(?VSN_0_2_7, State, _Extra) ->
-    ok = config:listen_for_changes(?MODULE, self()),
+    ok = config:listen_for_changes(?MODULE, nil),
     {ok, State};
 code_change(_OldVsn, #state{}=State, _Extra) ->
     {ok, State}.
