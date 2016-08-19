@@ -12,7 +12,7 @@
 
 -module(couch_replicator_manager).
 -behaviour(gen_server).
--vsn(2).
+-vsn(3).
 -behaviour(config_listener).
 
 % public API
@@ -54,6 +54,8 @@
 -define(CTX, {user_ctx, #user_ctx{roles=[<<"_admin">>, <<"_replicator">>]}}).
 
 -define(replace(L, K, V), lists:keystore(K, 1, L, {K, V})).
+
+-define(RELISTEN_DELAY, 5000).
 
 -record(rep_state, {
     rep,
@@ -143,17 +145,15 @@ continue(#rep{id = RepId}) ->
 
 
 handle_config_change("replicator", "max_replication_retry_count", V, _, S) ->
-    ok = gen_server:cast(S, {set_max_retries, retries_value(V)}),
+    ok = gen_server:cast(?MODULE, {set_max_retries, retries_value(V)}),
     {ok, S};
 handle_config_change(_, _, _, _, S) ->
     {ok, S}.
 
-handle_config_terminate(_, stop, _) -> ok;
-handle_config_terminate(Self, _, _) ->
-    spawn(fun() ->
-        timer:sleep(5000),
-        config:listen_for_changes(?MODULE, Self)
-    end).
+handle_config_terminate(_, stop, _) ->
+    ok;
+handle_config_terminate(_Server, _Reason, _State) ->
+    erlang:send_after(?RELISTEN_DELAY, whereis(?MODULE), restart_config_listener).
 
 init(_) ->
     process_flag(trap_exit, true),
@@ -163,7 +163,7 @@ init(_) ->
     ?REP_TO_STATE = ets:new(?REP_TO_STATE, [named_table, set, public]),
     ?DB_TO_SEQ = ets:new(?DB_TO_SEQ, [named_table, set, public]),
     Server = self(),
-    ok = config:listen_for_changes(?MODULE, Server),
+    ok = config:listen_for_changes(?MODULE, nil),
     Epoch = make_ref(),
     ScanPid = spawn_link(fun() -> scan_all_dbs(Server) end),
     % Automatically start node local changes feed loop
@@ -329,6 +329,10 @@ handle_info({'DOWN', _Ref, _, _, _}, State) ->
 
 handle_info(shutdown, State) ->
     {stop, shutdown, State};
+
+handle_info(restart_config_listener, State) ->
+    ok = config:listen_for_changes(?MODULE, nil),
+    {noreply, State};
 
 handle_info(Msg, State) ->
     couch_log:error("Replication manager received unexpected message ~p", [Msg]),
