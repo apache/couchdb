@@ -39,7 +39,7 @@ Dependencies
 
 You should have the following installed:
 
- * Erlang OTP (>=R16B03-1, =<18.1) (http://erlang.org/)
+ * Erlang OTP (>=R16B03-1, =<19.x) (http://erlang.org/)
  * ICU                          (http://icu-project.org/)
  * OpenSSL                      (http://www.openssl.org/)
  * Mozilla SpiderMonkey (1.8.5) (http://www.mozilla.org/js/spidermonkey/)
