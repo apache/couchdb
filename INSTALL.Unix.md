@@ -1,5 +1,4 @@
-Apache CouchDB INSTALL.Unix
-==========================
+# Apache CouchDB INSTALL.Unix
 
 A high-level guide to Unix-like systems, inc. Mac OS X and Ubuntu.
 
@@ -17,8 +16,7 @@ update their archives. If you're running into trouble, be sure to
 check out the wiki. If you have any tips to share, please also update
 the wiki so that others can benefit from your experience.
 
-Troubleshooting
----------------
+## Troubleshooting
 
 There is a troubleshooting guide:
 
@@ -34,8 +32,7 @@ There are collection of friendly mailing lists:
 
 Please work through these in order if you experience any problems.
 
-Dependencies
-------------
+## Dependencies
 
 You should have the following installed:
 
@@ -56,8 +53,7 @@ JavaScript test suite. And help2man is only need if you plan on
 installing the CouchDB man pages.  Python and Sphinx are only required
 for building the online documentation.
 
-Debian-based Systems
-~~~~~~~~~~~~~~~~~~~~
+### Debian-based Systems
 
 You can install the dependencies by running:
 
@@ -83,8 +79,7 @@ For up to date instructions, please see:
 Unfortunately, it seems that installing dependencies on Ubuntu is
 troublesome.
 
-RedHat-based (Fedora, Centos, RHEL) Systems
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### RedHat-based (Fedora, Centos, RHEL) Systems
 
 You can install the dependencies by running:
 
@@ -97,8 +92,7 @@ While CouchDB builds against the default js-devel-1.7.0 included in
 some distributions, it's recommended to use a more recent
 js-devel-1.8.5.
 
-Mac OS X
-~~~~~~~~
+### Mac OS X
 
 To build CouchDB from source on Mac OS X, you will need to install
 the Command Line Tools:
@@ -122,8 +116,7 @@ a segmentation fault or a bus error, you will need to install your own
 version of OpenSSL. See the troubleshooting guide, mentioned above,
 for more information.
 
-FreeBSD
--------
+### FreeBSD
 
 FreeBSD requires the use of GNU Make. Where `make` is specified in this
 documentation, substitute `gmake`.
@@ -132,8 +125,7 @@ You can install this by running:
 
     pkg install gmake
 
-Installing
-----------
+## Installing
 
 Once you have satisfied the dependencies you should run:
 
@@ -165,8 +157,7 @@ If everything was successful you should see the following message:
 
 Relax.
 
-User Registration
------------------
+## User Registration
 
 You should create a special `couchdb` user for CouchDB.
 
@@ -185,15 +176,13 @@ On Mac OS X you can use the Workgroup Manager to create users:
 
 You must make sure that:
 
-    * The user has a working POSIX shell
-
-    * The user's home directory is `/usr/local/var/lib/couchdb`
+ * The user has a working POSIX shell
+ * The user's home directory is `/usr/local/var/lib/couchdb`
 
 You can test this by:
 
-    * Trying to log in as the `couchdb` user
-
-    * Running `pwd` and checking the present working directory
+ * Trying to log in as the `couchdb` user
+ * Running `pwd` and checking the present working directory
 
 Change the ownership of the CouchDB directories by running:
 
@@ -213,8 +202,7 @@ Update the permissions for your `default.ini` file:
 
     chmod 0644 /usr/local/etc/couchdb/default.ini
 
-First Run
----------
+## First Run
 
 You can start the CouchDB server by running:
 
@@ -236,11 +224,9 @@ To check that everything has worked, point your web browser to:
 
 From here you should run the test suite in Firefox.
 
-Running as a Daemon
--------------------
+## Running as a Daemon
 
-SysV/BSD-style Systems
-~~~~~~~~~~~~~~~~~~~~~~
+### SysV/BSD-style Systems
 
 You can use the `couchdb` init script to control the CouchDB daemon.
 
@@ -288,8 +274,7 @@ Consult your `logrotate` documentation for more information.
 It is critical that the CouchDB logs are rotated so as not to fill
 your disk.
 
-Mac OS X
-~~~~~~~~
+### Mac OS X
 
 You can use the `launchctl` command to control the CouchDB daemon.
 
