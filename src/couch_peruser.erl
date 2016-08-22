@@ -12,7 +12,6 @@
 
 -module(couch_peruser).
 -behaviour(gen_server).
--behaviour(config_listener).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -22,12 +21,11 @@
 -export([start_link/0, init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
-% config_listener callbacks
--export([handle_config_change/5, handle_config_terminate/3]).
-
 -export([init_changes_handler/1, changes_handler/3]).
 
 -record(state, {parent, db_name, delete_dbs, changes_pid, changes_ref}).
+
+-define(RELISTEN_DELAY, 5000).
 
 
 start_link() ->
@@ -168,7 +166,7 @@ user_db_name(User) ->
 %% gen_server callbacks
 
 init([]) ->
-    ok = config:listen_for_changes(?MODULE, self()),
+    ok = subscribe_for_changes(),
     {ok, init()}.
 
 handle_call(_Msg, _From, State) ->
@@ -188,8 +186,28 @@ handle_cast(_Msg, State) ->
 
 handle_info({'DOWN', Ref, _, _, _Reason}, #state{changes_ref=Ref} = State) ->
     {stop, normal, State};
+handle_info({config_change, "couch_peruser", _, _}, State) ->
+    handle_cast(update_config, State);
+handle_info({config_change, "couch_httpd_auth", "authentication_db", _}, State) ->
+    handle_cast(update_config, State);
+handle_info({gen_event_EXIT, _Handler, _Reason}, State) ->
+    erlang:send_after(?RELISTEN_DELAY, self(), restart_config_listener),
+    {noreply, State};
+handle_info({'EXIT', _Pid, _Reason}, State) ->
+    erlang:send_after(?RELISTEN_DELAY, self(), restart_config_listener),
+    {noreply, State};
+handle_info(restart_config_listener, State) ->
+    ok = subscribe_for_changes(),
+    {noreply, State};
 handle_info(_Msg, State) ->
     {noreply, State}.
+
+subscribe_for_changes() ->
+    config:subscribe_for_changes([
+        {"couch_httpd_auth", "authentication_db"},
+        "couch_peruser"
+    ]).
+
 
 terminate(_Reason, _State) ->
     %% Everything should be linked or monitored, let nature
@@ -198,18 +216,3 @@ terminate(_Reason, _State) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
-
-
-%% config_listener callbacks
-
-handle_config_change("couch_httpd_auth", "authentication_db", _Value, _Persist, Server) ->
-    ok = gen_server:cast(Server, update_config),
-    {ok, Server};
-handle_config_change("couch_peruser", _Key, _Value, _Persist, Server) ->
-    ok = gen_server:cast(Server, update_config),
-    {ok, Server};
-handle_config_change(_Section, _Key, _Value, _Persist, Server) ->
-    {ok, Server}.
-
-handle_config_terminate(_Self, Reason, _Server) ->
-    {stop, Reason}.
