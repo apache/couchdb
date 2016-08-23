@@ -29,12 +29,19 @@ couch_log_config_test_() ->
 
 
 check_restart_listener() ->
-    ?assertNotEqual(not_found, get_handler()),
-    gen_event:delete_handler(config_event, get_handler(), testing),
-    ?assertEqual(not_found, get_handler()),
-    timer:sleep(1000),
-    ?assertNotEqual(not_found, get_handler()).
+    Listener1 = get_listener(),
+    ?assert(is_process_alive(Listener1)),
 
+    Handler1 = get_handler(),
+    ?assertNotEqual(not_found, Handler1),
+    ok = gen_event:delete_handler(config_event, get_handler(), testing),
+    ?assertEqual(not_found, get_handler()),
+
+    timer:sleep(100),
+    ?assertNot(is_process_alive(Listener1)),
+
+    ?assert(is_process_alive(get_listener())),
+    ok.
 
 check_ignore_non_log() ->
     Run = fun() ->
@@ -48,9 +55,13 @@ check_ignore_non_log() ->
 
 get_handler() ->
     FoldFun = fun
-        ({config_listener, {couch_log_config_listener, _}} = H, not_found) ->
+        ({config_listener, {couch_log_sup, _}} = H, not_found) ->
             H;
         (_, Acc) ->
             Acc
     end,
     lists:foldl(FoldFun, not_found, gen_event:which_handlers(config_event)).
+
+get_listener() ->
+    Children = supervisor:which_children(couch_log_sup),
+    hd([Pid || {config_listener_mon, Pid, _, _} <- Children]).
