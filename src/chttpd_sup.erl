@@ -12,9 +12,15 @@
 
 -module(chttpd_sup).
 -behaviour(supervisor).
+-vsn(1).
+
+-behaviour(config_listener).
+
 -export([init/1]).
 
 -export([start_link/1]).
+
+-export([handle_config_change/5, handle_config_terminate/3]).
 
 %% Helper macro for declaring children of supervisor
 -define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 100, Type, [I]}).
@@ -23,9 +29,15 @@ start_link(Args) ->
     supervisor:start_link({local,?MODULE}, ?MODULE, Args).
 
 init([]) ->
-    chttpd_config_listener:subscribe(),
-
     Children = [
+        {
+            config_listener_mon,
+            {config_listener_mon, start_link, [?MODULE, settings()]},
+            permanent,
+            5000,
+            worker,
+            [config_listener_mon]
+        },
         ?CHILD(chttpd, worker),
         ?CHILD(chttpd_auth_cache, worker),
         {chttpd_auth_cache_lru,
@@ -35,6 +47,37 @@ init([]) ->
 
     {ok, {{one_for_one, 3, 10},
         couch_epi:register_service(chttpd_epi, Children)}}.
+
+handle_config_change("chttpd", "bind_address", Value, _, Settings) ->
+    maybe_replace(bind_address, Value, Settings);
+handle_config_change("chttpd", "port", Value, _, Settings) ->
+    maybe_replace(port, Value, Settings);
+handle_config_change("chttpd", "backlog", Value, _, Settings) ->
+    maybe_replace(backlog, Value, Settings);
+handle_config_change("chttpd", "server_options", Value, _, Settings) ->
+    maybe_replace(server_options, Value, Settings);
+handle_config_change(_, _, _, _, Settings) ->
+    {ok, Settings}.
+
+handle_config_terminate(_Server, _Reason, _State) ->
+    ok.
+
+settings() ->
+    [
+        {bind_address, config:get("chttpd", "bind_address")},
+        {port, config:get("chttpd", "port")},
+        {backlog, config:get("chttpd", "backlog")},
+        {server_options, config:get("chttpd", "server_options")}
+    ].
+
+maybe_replace(Key, Value, Settings) ->
+    case couch_util:get_value(Key, Settings) of
+    Value ->
+        {ok, Settings};
+    _ ->
+        chttpd:stop(),
+        {ok, lists:keyreplace(Key, 1, Settings, {Key, Value})}
+    end.
 
 lru_opts() ->
     case config:get("chttpd_auth_cache", "max_objects") of
