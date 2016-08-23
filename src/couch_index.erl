@@ -31,6 +31,7 @@
 
 -define(CHECK_INTERVAL, 600000). % 10 minutes
 -define(RELISTEN_DELAY, 5000).
+-define(CONFIG_SUBSCRIPTION, [{"query_server_config", "commit_freq"}]).
 
 -record(st, {
     mod,
@@ -85,7 +86,7 @@ config_change("query_server_config", "commit_freq", NewValue) ->
 
 
 init({Mod, IdxState}) ->
-    ok = config:subscribe_for_changes([{"query_server_config", "commit_freq"}]),
+    ok = config:subscribe_for_changes(?CONFIG_SUBSCRIPTION),
     DbName = Mod:get(db_name, IdxState),
     erlang:send_after(?CHECK_INTERVAL, self(), maybe_close),
     Resp = couch_util:with_db(DbName, fun(Db) ->
@@ -347,7 +348,7 @@ handle_info({gen_event_EXIT, _Handler, _Reason}, State) ->
     erlang:send_after(?RELISTEN_DELAY, self(), restart_config_listener),
     {noreply, State};
 handle_info(restart_config_listener, State) ->
-    ok = config:subscribe_for_changes([{"query_server_config", "commit_freq"}]),
+    ok = config:subscribe_for_changes(?CONFIG_SUBSCRIPTION),
     {noreply, State}.
 
 code_change(_OldVsn, State, _Extra) ->
