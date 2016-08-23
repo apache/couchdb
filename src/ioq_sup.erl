@@ -31,7 +31,7 @@ init([]) ->
             worker,
             [config_listener_mon]
         },
-        ?CHILD(ioq_server, worker)
+        ?CHILD(ioq, worker)
     ]} }.
 
 handle_config_change("ioq", _Key, _Val, _Persist, St) ->
