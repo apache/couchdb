@@ -20,6 +20,8 @@
 % config_listener api
 -export([handle_config_change/5, handle_config_terminate/3]).
 
+-define(RELISTEN_DELAY, 5000).
+
 -record(state, {
     concurrency,
     ratio,
@@ -83,6 +85,9 @@ handle_info({'DOWN', Ref, _, _, Reason}, State) ->
         false ->
             {noreply, State, 0}
     end;
+handle_info(restart_config_listener, State) ->
+    ok = config:listen_for_changes(?MODULE, nil),
+    {noreply, State};
 handle_info(timeout, State) ->
     {noreply, maybe_submit_request(State)}.
 
@@ -91,13 +96,10 @@ handle_config_change("ioq", _, _, _, _) ->
 handle_config_change(_, _, _, _, _) ->
     {ok, nil}.
 
-handle_config_terminate(_, stop, _) -> ok;
-handle_config_terminate(_, _, _) ->
-    spawn(fun() ->
-        timer:sleep(5000),
-        config:listen_for_changes(?MODULE, nil)
-    end),
-    ok.
+handle_config_terminate(_Server, stop, _State) ->
+    ok;
+handle_config_terminate(_Server, _Reason, _State) ->
+    erlang:send_after(?RELISTEN_DELAY, whereis(?MODULE), restart_config_listener).
 
 code_change(_Vsn, State, _Extra) ->
     {ok, State}.

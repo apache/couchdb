@@ -13,6 +13,7 @@
 -module(ioq_sup).
 -behaviour(supervisor).
 -export([start_link/0, init/1]).
+-export([handle_config_change/5, handle_config_terminate/3]).
 
 %% Helper macro for declaring children of supervisor
 -define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 5000, Type, [I]}).
@@ -21,4 +22,24 @@ start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 init([]) ->
-    {ok, { {one_for_one, 5, 10}, [?CHILD(ioq, worker)]}}.
+    {ok, { {one_for_one, 5, 10}, [
+        {
+            config_listener_mon,
+            {config_listener_mon, start_link, [?MODULE, nil]},
+            permanent,
+            5000,
+            worker,
+            [config_listener_mon]
+        },
+        ?CHILD(ioq, worker)
+    ]} }.
+
+handle_config_change("ioq", _Key, _Val, _Persist, St) ->
+    gen_server:cast(ioq_server, update_config),
+    {ok, St};
+handle_config_change(_Sec, _Key, _Val, _Persist, St) ->
+    {ok, St}.
+
+handle_config_terminate(_Server, _Reason, _State) ->
+    gen_server:cast(ioq_server, update_config),
+    ok.
