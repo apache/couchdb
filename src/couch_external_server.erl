@@ -20,6 +20,7 @@
 -include_lib("couch/include/couch_db.hrl").
 
 -define(RELISTEN_DELAY, 5000).
+-define(CONFIG_SUBSCRIPTION, [{"couchdb", "os_process_timeout"}]).
 
 % External API
 
@@ -38,7 +39,7 @@ execute(Pid, JsonReq) ->
 init([Name, Command]) ->
     couch_log:info("EXTERNAL: Starting process for: ~s", [Name]),
     couch_log:info("COMMAND: ~s", [Command]),
-    ok = config:subscribe_for_changes([{"couchdb", "os_process_timeout"}]),
+    ok = config:subscribe_for_changes(?CONFIG_SUBSCRIPTION),
     process_flag(trap_exit, true),
     Timeout = list_to_integer(config:get("couchdb", "os_process_timeout",
         "5000")),
@@ -74,7 +75,7 @@ handle_info(restart_config_listener, {Name, Command, Pid, _} = State) ->
             erlang:send_after(?RELISTEN_DELAY, self(), restart_config_listener),
             {noreply, State};
         EventMgr ->
-            ok = config:subscribe_for_changes([{"couchdb", "os_process_timeout"}]),
+            ok = config:subscribe_for_changes(?CONFIG_SUBSCRIPTION),
             {noreply, {Name, Command, Pid, EventMgr}}
     end.
 
