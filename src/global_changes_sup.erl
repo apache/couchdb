@@ -18,15 +18,27 @@
 
 -export([init/1]).
 
+-export([handle_config_change/5]).
+-export([handle_config_terminate/3]).
+
+-define(LISTENER, global_changes_listener).
+-define(SERVER, global_changes_server).
 
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 
 init([]) ->
-    global_changes_config_listener:subscribe(),
     {ok, {
         {one_for_one, 5, 10}, couch_epi:register_service(global_changes_epi, [
+            {
+                config_listener_mon,
+                {config_listener_mon, start_link, [?MODULE, nil]},
+                permanent,
+                5000,
+                worker,
+                [config_listener_mon]
+            },
             {
                 global_changes_server,
                 {global_changes_server, start_link, []},
@@ -36,3 +48,37 @@ init([]) ->
                 [global_changes_server]
             }
     ])}}.
+
+handle_config_change("global_changes", "max_event_delay", MaxDelayStr, _, _) ->
+    try list_to_integer(MaxDelayStr) of
+        MaxDelay ->
+            gen_server:cast(?LISTENER, {set_max_event_delay, MaxDelay})
+    catch error:badarg ->
+        ok
+    end,
+    ok;
+
+handle_config_change("global_changes", "max_write_delay", MaxDelayStr, _, _) ->
+    try list_to_integer(MaxDelayStr) of
+        MaxDelay ->
+            gen_server:cast(?SERVER, {set_max_write_delay, MaxDelay})
+    catch error:badarg ->
+        ok
+    end,
+    ok;
+
+handle_config_change("global_changes", "update_db", "false", _, _) ->
+    gen_server:cast(?LISTENER, {set_update_db, false}),
+    gen_server:cast(?SERVER, {set_update_db, false}),
+    ok;
+
+handle_config_change("global_changes", "update_db", _, _, _) ->
+    gen_server:cast(?LISTENER, {set_update_db, true}),
+    gen_server:cast(?SERVER, {set_update_db, true}),
+    ok;
+
+handle_config_change(_, _, _, _, _) ->
+    ok.
+
+handle_config_terminate(_Server, _Reason, _State) ->
+    ok.
