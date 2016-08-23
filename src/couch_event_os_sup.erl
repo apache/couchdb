@@ -22,7 +22,7 @@
 -behaviour(supervisor).
 -behaviour(config_listener).
 
--vsn(1).
+-vsn(2).
 
 -export([
     start_link/0,
@@ -40,10 +40,17 @@ start_link() ->
 
 
 init([]) ->
-    ok = config:listen_for_changes(?MODULE, nil),
-
     UpdateNotifierExes = config:get("update_notification"),
-    Children = [child(Id, Exe) || {Id, Exe} <- UpdateNotifierExes],
+    Children = [
+        {
+            config_listener_mon,
+            {config_listener_mon, start_link, [?MODULE, nil]},
+            permanent,
+            5000,
+            worker,
+            [config_listener_mon]
+        }
+    | [child(Id, Exe) || {Id, Exe} <- UpdateNotifierExes]],
 
     {ok, {
         {one_for_one, 10, 3600},
@@ -61,12 +68,7 @@ handle_config_change("update_notification", Id, Exe, _, _) when is_list(Exe) ->
 handle_config_change(_, _, _, _, _) ->
     {ok, nil}.
 
-handle_config_terminate(_, stop, _) -> ok;
-handle_config_terminate(_, _, _) ->
-    spawn(fun() ->
-        timer:sleep(5000),
-        config:listen_for_changes(?MODULE, nil)
-    end),
+handle_config_terminate(_Server, _Reason, _State) ->
     ok.
 
 child(Id, Arg) ->
