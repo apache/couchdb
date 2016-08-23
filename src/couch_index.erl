@@ -12,9 +12,8 @@
 
 -module(couch_index).
 -behaviour(gen_server).
--behaviour(config_listener).
 
--vsn(1).
+-vsn(2).
 
 %% API
 -export([start_link/1, stop/1, get_state/2, get_info/1]).
@@ -26,15 +25,13 @@
 -export([init/1, terminate/2, code_change/3]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
 
-% config_listener api
--export([handle_config_change/5, handle_config_terminate/3]).
-
 
 -include_lib("couch/include/couch_db.hrl").
 
 
 -define(CHECK_INTERVAL, 600000). % 10 minutes
-
+-define(RELISTEN_DELAY, 5000).
+-define(CONFIG_SUBSCRIPTION, [{"query_server_config", "commit_freq"}]).
 
 -record(st, {
     mod,
@@ -89,7 +86,7 @@ config_change("query_server_config", "commit_freq", NewValue) ->
 
 
 init({Mod, IdxState}) ->
-    ok = config:listen_for_changes(?MODULE, nil),
+    ok = config:subscribe_for_changes(?CONFIG_SUBSCRIPTION),
     DbName = Mod:get(db_name, IdxState),
     erlang:send_after(?CHECK_INTERVAL, self(), maybe_close),
     Resp = couch_util:with_db(DbName, fun(Db) ->
@@ -344,24 +341,18 @@ handle_info({'DOWN', _, _, _Pid, _}, #st{mod=Mod, idx_state=IdxState}=State) ->
     Args = [Mod:get(db_name, IdxState), Mod:get(idx_name, IdxState)],
     couch_log:info("Index shutdown by monitor notice for db: ~s idx: ~s", Args),
     catch send_all(State#st.waiters, shutdown),
-    {stop, normal, State#st{waiters=[]}}.
-
+    {stop, normal, State#st{waiters=[]}};
+handle_info({config_change, "query_server_config", "commit_freq", NewDelay, _}, State) ->
+    handle_cast({config_change, NewDelay}, State);
+handle_info({gen_event_EXIT, _Handler, _Reason}, State) ->
+    erlang:send_after(?RELISTEN_DELAY, self(), restart_config_listener),
+    {noreply, State};
+handle_info(restart_config_listener, State) ->
+    ok = config:subscribe_for_changes(?CONFIG_SUBSCRIPTION),
+    {noreply, State}.
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
-
-
-handle_config_change("query_server_config", "commit_freq", Val, _, _) ->
-    {ok, gen_server:cast(?MODULE, {config_update, Val})};
-handle_config_change(_, _, _, _, _) ->
-    {ok, nil}.
-
-handle_config_terminate(_Server, stop, _State) -> ok;
-handle_config_terminate(_Server, _Reason, _State) ->
-    spawn(fun() ->
-        timer:sleep(5000),
-        config:listen_for_changes(?MODULE, nil)
-    end).
 
 maybe_restart_updater(#st{waiters=[]}) ->
     ok;
