@@ -233,7 +233,7 @@ dist: all
 release: all
 	@echo "Installing CouchDB into rel/couchdb/ ..."
 	@rm -rf rel/couchdb
-	@$(REBAR) generate > /dev/null 2>&1 # make full erlang release
+	@$(REBAR) generate # make full erlang release
 
 ifeq ($(with_fauxton), 1)
 	@mkdir -p rel/couchdb/share/
