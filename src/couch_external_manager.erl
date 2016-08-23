@@ -12,7 +12,7 @@
 
 -module(couch_external_manager).
 -behaviour(gen_server).
--vsn(2).
+-vsn(3).
 -behaviour(config_listener).
 
 -export([start_link/0, execute/2]).
@@ -22,6 +22,8 @@
 -export([handle_config_change/5, handle_config_terminate/3]).
 
 -include_lib("couch/include/couch_db.hrl").
+
+-define(RELISTEN_DELAY, 5000).
 
 start_link() ->
     gen_server:start_link({local, couch_external_manager},
@@ -41,12 +43,11 @@ handle_config_change("external", UrlName, _, _, _) ->
 handle_config_change(_, _, _, _, _) ->
     {ok, nil}.
 
-handle_config_terminate(_, stop, _) -> ok;
-handle_config_terminate(_, _, _) ->
-    spawn(fun() ->
-        timer:sleep(5000),
-        config:listen_for_changes(?MODULE, nil)
-    end).
+handle_config_terminate(_, stop, _) ->
+    ok;
+handle_config_terminate(_Server, _Reason, _State) ->
+    erlang:send_after(?RELISTEN_DELAY, whereis(?MODULE), restart_config_listener).
+
 
 % gen_server API
 
@@ -108,7 +109,12 @@ handle_info({'EXIT', Pid, Reason}, Handlers) ->
     % Remove Pid from the handlers table so we don't try closing
     % it a second time in terminate/2.
     ets:match_delete(Handlers, {'_', Pid}),
-    {stop, normal, Handlers}.
+    {stop, normal, Handlers};
+
+handle_info(restart_config_listener, State) ->
+    ok = config:listen_for_changes(?MODULE, nil),
+    {noreply, State}.
+
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.

@@ -12,6 +12,7 @@
 
 -module(couch_compaction_daemon).
 -behaviour(gen_server).
+-vsn(1).
 -behaviour(config_listener).
 
 % public API
@@ -28,6 +29,8 @@
 -include_lib("kernel/include/file.hrl").
 
 -define(CONFIG_ETS, couch_compaction_daemon_config).
+
+-define(RELISTEN_DELAY, 5000).
 
 -record(state, {
     loop_pid,
@@ -98,7 +101,10 @@ handle_call(Msg, _From, State) ->
 
 
 handle_info({'EXIT', Pid, Reason}, #state{loop_pid = Pid} = State) ->
-    {stop, {compaction_loop_died, Reason}, State}.
+    {stop, {compaction_loop_died, Reason}, State};
+handle_info(restart_config_listener, State) ->
+    ok = config:listen_for_changes(?MODULE, nil),
+    {noreply, State}.
 
 
 terminate(_Reason, _State) ->
@@ -114,12 +120,10 @@ handle_config_change("compactions", DbName, Value, _, _) ->
 handle_config_change(_, _, _, _, _) ->
     {ok, nil}.
 
-handle_config_terminate(_, stop, _) -> ok;
-handle_config_terminate(_, _, _) ->
-    spawn(fun() ->
-        timer:sleep(5000),
-        config:listen_for_changes(?MODULE, nil)
-    end).
+handle_config_terminate(_, stop, _) ->
+    ok;
+handle_config_terminate(_Server, _Reason, _State) ->
+    erlang:send_after(?RELISTEN_DELAY, whereis(?MODULE), restart_config_listener).
 
 compact_loop(Parent) ->
     {ok, _} = couch_server:all_databases(

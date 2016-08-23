@@ -13,7 +13,7 @@
 -module(couch_server).
 -behaviour(gen_server).
 -behaviour(config_listener).
--vsn(2).
+-vsn(3).
 
 -export([open/2,create/2,delete/2,get_version/0,get_version/1,get_uuid/0]).
 -export([all_databases/0, all_databases/2]).
@@ -28,6 +28,7 @@
 -include_lib("couch/include/couch_db.hrl").
 
 -define(MAX_DBS_OPEN, 100).
+-define(RELISTEN_DELAY, 5000).
 
 -record(server,{
     root_dir = [],
@@ -233,13 +234,10 @@ handle_config_change("httpd_db_handlers", _, _, _, _) ->
 handle_config_change(_, _, _, _, _) ->
     {ok, nil}.
 
-handle_config_terminate(_, stop, _) -> ok;
-handle_config_terminate(_, _, _) ->
-    spawn(fun() ->
-        timer:sleep(5000),
-        config:listen_for_changes(?MODULE, nil)
-    end).
-
+handle_config_terminate(_, stop, _) ->
+    ok;
+handle_config_terminate(_Server, _Reason, _State) ->
+    erlang:send_after(?RELISTEN_DELAY, whereis(?MODULE), restart_config_listener).
 
 
 all_databases() ->
@@ -527,6 +525,9 @@ handle_info({'EXIT', Pid, Reason}, Server) ->
     [] ->
         {noreply, Server}
     end;
+handle_info(restart_config_listener, State) ->
+    ok = config:listen_for_changes(?MODULE, nil),
+    {noreply, State};
 handle_info(Info, Server) ->
     {stop, {unknown_message, Info}, Server}.
 

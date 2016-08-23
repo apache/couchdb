@@ -13,7 +13,7 @@
 -module(couch_proc_manager).
 -behaviour(gen_server).
 -behaviour(config_listener).
--vsn(2).
+-vsn(3).
 
 -export([
     start_link/0,
@@ -43,6 +43,7 @@
 -define(PROCS, couch_proc_manager_procs).
 -define(WAITERS, couch_proc_manager_waiters).
 -define(OPENING, couch_proc_manager_opening).
+-define(RELISTEN_DELAY, 5000).
 
 -record(state, {
     config,
@@ -248,6 +249,11 @@ handle_info({'DOWN', Ref, _, _, _Reason}, State0) ->
             {noreply, State0}
     end;
 
+
+handle_info(restart_config_listener, State) ->
+    ok = config:listen_for_changes(?MODULE, nil),
+    {noreply, State};
+
 handle_info(_Msg, State) ->
     {noreply, State}.
 
@@ -255,15 +261,11 @@ handle_info(_Msg, State) ->
 code_change(_OldVsn, #state{}=State, _Extra) ->
     {ok, State}.
 
-handle_config_terminate(_, stop, _) -> ok;
-handle_config_terminate(_, _, _) ->
-    spawn(fun() ->
-        timer:sleep(5000),
-        config:listen_for_changes(?MODULE, undefined),
-        % Reload our config in case it changed in the last
-        % five seconds.
-        gen_server:cast(?MODULE, reload_config)
-    end).
+handle_config_terminate(_, stop, _) ->
+    ok;
+handle_config_terminate(_Server, _Reason, _State) ->
+    gen_server:cast(?MODULE, reload_config),
+    erlang:send_after(?RELISTEN_DELAY, whereis(?MODULE), restart_config_listener).
 
 handle_config_change("query_server_config", _, _, _, _) ->
     gen_server:cast(?MODULE, reload_config),

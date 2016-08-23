@@ -11,6 +11,7 @@
 % the License.
 -module(couch_os_daemons).
 -behaviour(gen_server).
+-vsn(1).
 -behaviour(config_listener).
 
 -export([start_link/0, info/0, info/1]).
@@ -36,6 +37,7 @@
 
 -define(PORT_OPTIONS, [stream, {line, 1024}, binary, exit_status, hide]).
 -define(TIMEOUT, 5000).
+-define(RELISTEN_DELAY, 5000).
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -183,6 +185,9 @@ handle_info({Port, Error}, Table) ->
     [D] = ets:lookup(Table, Port),
     true = ets:insert(Table, D#daemon{status=restarting, buf=nil}),
     {noreply, Table};
+handle_info(restart_config_listener, State) ->
+    ok = config:listen_for_changes(?MODULE, nil),
+    {noreply, State};
 handle_info(Msg, Table) ->
     couch_log:error("Unexpected info message to ~p: ~p", [?MODULE, Msg]),
     {stop, error, Table}.
@@ -195,12 +200,11 @@ handle_config_change(Section, Key, _, _, _) ->
     gen_server:cast(?MODULE, {config_change, Section, Key}),
     {ok, nil}.
 
-handle_config_terminate(_, stop, _) -> ok;
-handle_config_terminate(_, _, _) ->
-    spawn(fun() ->
-        timer:sleep(5000),
-        config:listen_for_changes(?MODULE, nil)
-    end).
+handle_config_terminate(_, stop, _) ->
+    ok;
+handle_config_terminate(_Server, _Reason, _State) ->
+    erlang:send_after(?RELISTEN_DELAY, whereis(?MODULE), restart_config_listener).
+
 
 % Internal API
 

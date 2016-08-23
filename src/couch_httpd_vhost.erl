@@ -12,6 +12,7 @@
 
 -module(couch_httpd_vhost).
 -behaviour(gen_server).
+-vsn(1).
 -behaviour(config_listener).
 
 -export([start_link/0, reload/0, get_state/0, dispatch_host/1]).
@@ -27,6 +28,7 @@
 
 -define(SEPARATOR, $\/).
 -define(MATCH_ALL, {bind, '*'}).
+-define(RELISTEN_DELAY, 5000).
 
 -record(vhosts_state, {
         vhosts,
@@ -355,6 +357,9 @@ handle_call(_Msg, _From, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
+handle_info(restart_config_listener, State) ->
+    ok = config:listen_for_changes(?MODULE, nil),
+    {noreply, State};
 handle_info(_Info, State) ->
     {noreply, State}.
 
@@ -374,12 +379,10 @@ handle_config_change("vhosts", _, _, _, _) ->
 handle_config_change(_, _, _, _, _) ->
     {ok, nil}.
 
-handle_config_terminate(_, stop, _) -> ok;
-handle_config_terminate(_, _, _) ->
-    spawn(fun() ->
-        timer:sleep(5000),
-        config:listen_for_changes(?MODULE, nil)
-    end).
+handle_config_terminate(_, stop, _) ->
+    ok;
+handle_config_terminate(_Server, _Reason, _State) ->
+    erlang:send_after(?RELISTEN_DELAY, whereis(?MODULE), restart_config_listener).
 
 load_conf() ->
     %% get vhost globals
