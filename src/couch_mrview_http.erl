@@ -309,7 +309,7 @@ multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
         VAcc1 = VAcc0#vacc{resp=Resp0},
         VAcc2 = lists:foldl(fun(Args, Acc0) ->
             {ok, Acc1} = couch_mrview:query_view(Db, DDoc, ViewName, Args, fun view_cb/2, Acc0),
-            Acc1
+            reset_vacc(Acc1)
         end, VAcc1, ArgQueries),
         {ok, Resp1} = chttpd:send_delayed_chunk(VAcc2#vacc.resp, "\r\n]}"),
         {ok, Resp2} = chttpd:end_delayed_json_response(Resp1),
@@ -319,6 +319,10 @@ multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
         true -> {ok, Resp2#vacc.resp};
         _ -> {ok, Resp2}
     end.
+
+%% reset between queries in multi-query
+reset_vacc(Vacc) ->
+    Vacc#vacc{row_sent=false}.
 
 
 filtered_view_cb({row, Row0}, Acc) ->
