@@ -382,7 +382,8 @@ view_cb(complete, #vacc{resp=Resp, buffer=Buf, threshold=Max}=Acc) ->
             {ok, Resp2} = chttpd:end_delayed_json_response(Resp1),
             {ok, Acc#vacc{resp=Resp2}};
         _ ->
-            {ok, Acc#vacc{resp=Resp1, prepend=",\r\n", buffer=[], bufsize=0}}
+            {ok, Acc#vacc{resp=Resp1,
+                prepend=",\r\n", buffer=[], bufsize=0}}
     end;
 view_cb({error, Reason}, #vacc{resp=undefined}=Acc) ->
     {ok, Resp} = chttpd:send_error(Acc#vacc.req, Reason),
