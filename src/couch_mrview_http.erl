@@ -309,7 +309,7 @@ multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
         VAcc1 = VAcc0#vacc{resp=Resp0},
         VAcc2 = lists:foldl(fun(Args, Acc0) ->
             {ok, Acc1} = couch_mrview:query_view(Db, DDoc, ViewName, Args, fun view_cb/2, Acc0),
-            reset_vacc(Acc1)
+            Acc1
         end, VAcc1, ArgQueries),
         {ok, Resp1} = chttpd:send_delayed_chunk(VAcc2#vacc.resp, "\r\n]}"),
         {ok, Resp2} = chttpd:end_delayed_json_response(Resp1),
@@ -319,11 +319,6 @@ multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
         true -> {ok, Resp2#vacc.resp};
         _ -> {ok, Resp2}
     end.
-
-%% reset between queries in multi-query
-reset_vacc(Vacc) ->
-    Vacc#vacc{row_sent=false}.
-
 
 filtered_view_cb({row, Row0}, Acc) ->
   Row1 = lists:map(fun({doc, null}) ->
@@ -339,16 +334,44 @@ filtered_view_cb(Obj, Acc) ->
     view_cb(Obj, Acc).
 
 
-view_cb({meta, Meta}, #vacc{resp=undefined}=Acc) ->
-    % Map function starting
+%% these clauses start (and possibly end) the response
+view_cb({error, Reason}, #vacc{resp=undefined}=Acc) ->
+    {ok, Resp} = chttpd:send_error(Acc#vacc.req, Reason),
+    {ok, Acc#vacc{resp=Resp}};
+
+view_cb(complete, #vacc{resp=undefined}=Acc) ->
+    % Nothing in view
+    {ok, Resp} = chttpd:send_json(Acc#vacc.req, 200, {[{rows, []}]}),
+    {ok, Acc#vacc{resp=Resp}};
+
+view_cb(Msg, #vacc{resp=undefined}=Acc) ->
+    %% Start response
     Headers = [],
     {ok, Resp} = chttpd:start_delayed_json_response(Acc#vacc.req, 200, Headers),
-    view_cb({meta, Meta}, Acc#vacc{resp=Resp, should_close=true});
-view_cb({meta, _Meta}, #vacc{row_sent=true}=Acc) ->
-    % sorted=false and meta arrived late, ignore it.
-    {ok, Acc};
-view_cb({meta, Meta}, #vacc{}=Acc) ->
-    % Sending metadata
+    view_cb(Msg, Acc#vacc{resp=Resp, should_close=true});
+
+%% ---------------------------------------------------
+
+%% From here on down, the response has been started.
+
+view_cb({error, Reason}, #vacc{resp=Resp}=Acc) ->
+    {ok, Resp1} = chttpd:send_delayed_error(Resp, Reason),
+    {ok, Acc#vacc{resp=Resp1}};
+
+view_cb(complete, #vacc{resp=Resp, buffer=Buf, threshold=Max}=Acc) ->
+    % Finish view output and possibly end the response
+    {ok, Resp1} = chttpd:close_delayed_json_object(Resp, Buf, "\r\n]}", Max),
+    case Acc#vacc.should_close of
+        true ->
+            {ok, Resp2} = chttpd:end_delayed_json_response(Resp1),
+            {ok, Acc#vacc{resp=Resp2}};
+        _ ->
+            {ok, Acc#vacc{resp=Resp1, meta_sent=false, row_sent=false,
+                prepend=",\r\n", buffer=[], bufsize=0}}
+    end;
+
+view_cb({meta, Meta}, #vacc{meta_sent=false, row_sent=false}=Acc) ->
+    % Sending metadata as we've not sent it or any row yet
     Parts = case couch_util:get_value(total, Meta) of
         undefined -> [];
         Total -> [io_lib:format("\"total_rows\":~p", [Total])]
@@ -364,36 +387,23 @@ view_cb({meta, Meta}, #vacc{}=Acc) ->
     end ++ ["\"rows\":["],
     Chunk = [prepend_val(Acc), "{", string:join(Parts, ","), "\r\n"],
     {ok, AccOut} = maybe_flush_response(Acc, Chunk, iolist_size(Chunk)),
-    {ok, AccOut#vacc{prepend=""}};
-view_cb({row, Row}, #vacc{resp=undefined}=Acc) ->
-    % sorted=false and a row arrived before meta, start response.
-    Pre = "{\"rows\":[\r\n",
-    {ok, Resp} = chttpd:start_delayed_json_response(Acc#vacc.req, 200, []),
-    view_cb({row, Row}, Acc#vacc{row_sent=true,resp=Resp, prepend=Pre, should_close=true});
-view_cb({row, Row}, Acc) ->
+    {ok, AccOut#vacc{prepend="", meta_sent=true}};
+
+view_cb({meta, _Meta}, #vacc{}=Acc) ->
+    %% ignore metadata
+    {ok, Acc};
+
+view_cb({row, Row}, #vacc{meta_sent=false}=Acc) ->
+    %% sorted=false and row arrived before meta
+    % Adding another row
+    Chunk = [prepend_val(Acc), "{\"rows\":[\r\n", row_to_json(Row)],
+    maybe_flush_response(Acc#vacc{meta_sent=true, row_sent=true}, Chunk, iolist_size(Chunk));
+
+view_cb({row, Row}, #vacc{meta_sent=true}=Acc) ->
     % Adding another row
     Chunk = [prepend_val(Acc), row_to_json(Row)],
-    maybe_flush_response(Acc#vacc{row_sent=true}, Chunk, iolist_size(Chunk));
-view_cb(complete, #vacc{resp=undefined}=Acc) ->
-    % Nothing in view
-    {ok, Resp} = chttpd:send_json(Acc#vacc.req, 200, {[{rows, []}]}),
-    {ok, Acc#vacc{resp=Resp}};
-view_cb(complete, #vacc{resp=Resp, buffer=Buf, threshold=Max}=Acc) ->
-    % Finish view output and possibly end the response
-    {ok, Resp1} = chttpd:close_delayed_json_object(Resp, Buf, "\r\n]}", Max),
-    case Acc#vacc.should_close of
-        true ->
-            {ok, Resp2} = chttpd:end_delayed_json_response(Resp1),
-            {ok, Acc#vacc{resp=Resp2}};
-        _ ->
-            {ok, Acc#vacc{resp=Resp1, prepend=",\r\n", buffer=[], bufsize=0}}
-    end;
-view_cb({error, Reason}, #vacc{resp=undefined}=Acc) ->
-    {ok, Resp} = chttpd:send_error(Acc#vacc.req, Reason),
-    {ok, Acc#vacc{resp=Resp}};
-view_cb({error, Reason}, #vacc{resp=Resp}=Acc) ->
-    {ok, Resp1} = chttpd:send_delayed_error(Resp, Reason),
-    {ok, Acc#vacc{resp=Resp1}}.
+    maybe_flush_response(Acc#vacc{row_sent=true}, Chunk, iolist_size(Chunk)).
+
 
 maybe_flush_response(#vacc{bufsize=Size, threshold=Max} = Acc, Data, Len)
         when Size > 0 andalso (Size + Len) > Max ->

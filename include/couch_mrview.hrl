@@ -99,7 +99,8 @@
     buffer = [],
     bufsize = 0,
     threshold = 1490,
-    row_sent = false
+    row_sent = false,
+    meta_sent = false
 }).
 
 -record(lacc, {
