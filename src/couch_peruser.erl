@@ -186,9 +186,9 @@ handle_cast(_Msg, State) ->
 
 handle_info({'DOWN', Ref, _, _, _Reason}, #state{changes_ref=Ref} = State) ->
     {stop, normal, State};
-handle_info({config_change, "couch_peruser", _, _}, State) ->
+handle_info({config_change, "couch_peruser", _, _, _}, State) ->
     handle_cast(update_config, State);
-handle_info({config_change, "couch_httpd_auth", "authentication_db", _}, State) ->
+handle_info({config_change, "couch_httpd_auth", "authentication_db", _, _}, State) ->
     handle_cast(update_config, State);
 handle_info({gen_event_EXIT, _Handler, _Reason}, State) ->
     erlang:send_after(?RELISTEN_DELAY, self(), restart_config_listener),
