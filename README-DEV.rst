@@ -218,30 +218,30 @@ Releasing
 
 The release procedure is documented here::
 
-    https://wiki.apache.org/couchdb/Release_Procedure
+    https://cwiki.apache.org/confluence/display/COUCHDB/Release+Procedure
 
 Unix-like Systems
 ~~~~~~~~~~~~~~~~~
 
-Prepare the release artifacts by running::
+A release tarball can be built by running::
 
-    make distcheck
+    make dist
 
-You can prepare signed release artifacts by running::
+An Erlang CouchDB release includes the full Erlang Run Time System and
+all dependent applications necessary to run CouchDB, standalone. The
+release created is completely relocatable on the file system, and is
+the recommended way to distribute binaries of CouchDB. A release can be
+built by running::
 
-    make distsign
+    make release
 
-The release artifacts can be found in the root source directory.
+The release can then be found in the rel/couchdb directory.
 
 Microsoft Windows
 ~~~~~~~~~~~~~~~~~
 
-Prepare the release artifacts by running::
+The release tarball and Erlang CouchDB release commands work on
+Microsoft Windows the same as they do on Unix-like systems. To create
+a full installer, the separate couchdb-glazier repository is required.
+Full instructions are available in that repository's README file.
 
-    make dist
-
-The release artifacts can be found in the `etc/windows` directory.
-
-Until the build system has been improved, you must make sure that you run this
-command from a clean source checkout. If you do not, your test database and log
-files will be bundled up in the release artifacts.
