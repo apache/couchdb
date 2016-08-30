@@ -13,7 +13,7 @@
   * service - an abstract functionality defined by unique name and API
   * provider - a self-contained implementation of `Service`'s API
   * subscriber - an application or a process which uses functionality provided by `Provider`
-  * epi_key - is a routing key it has to be in on of the following forms
+  * epi_key - is a routing key it has to be in one of the following forms
     - `{service_id :: atom(), key :: term()}` - for `couch_epi_data_source`
     - `service_id :: atom()` - for `couch_epi_functions`
   * handle - is opaque data structure returned from `couch_epi:get_handle(EpiKey)`
@@ -48,7 +48,7 @@ it would then just do something like:
 
      couch_epi:get(Handle, Service, Key)
 
-The service provider also have to mention the data keys it is using in its
+The service provider also has to mention the data keys it is using in its
 implementation of couch_epi_plugin behaviour
 
     data_subscriptions() ->
@@ -69,7 +69,7 @@ There are also additional functions to get the same data in various formats
 # Function dispatch example
 
 Any application that wants to register implementation functions for a service
-could add following into it's implementation of couch_epi_plugin behaviour:
+could add the following into it's implementation of couch_epi_plugin behaviour:
 
     providers() ->
         [{my_service, module_which_implements_the_functions}].
@@ -104,7 +104,7 @@ Notes:
 ## decide functionality
 
 There are cases when we want to call configured providers until any of them
-would make a decission. We also would want to be able to find out if any
+would make a decision. We also would want to be able to find out if any
 decision has been made so we could call default handler. In order to be able
 to do so there is couch_epi:decide/5. Every service which uses this feature
 would get either:
@@ -119,7 +119,7 @@ return `no_decision`.
 
 # couch_epi_plugin behaviour
 
-The module implementing behaviour need to export following functions:
+The module implementing this behaviour needs to export the following functions:
 
   - Module:app/0 - Returns atom representing the application name
   - Module:providers/0 - Returns list of {service_id(), module()} tuples
