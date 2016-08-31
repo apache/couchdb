@@ -146,7 +146,7 @@ pick_command1(_) ->
 % gen_server API
 init([Command, Options, PortOptions]) ->
     PrivDir = couch_util:priv_dir(),
-    Spawnkiller = filename:join(PrivDir, "couchspawnkillable"),
+    Spawnkiller = "\"" ++ filename:join(PrivDir, "couchspawnkillable") ++ "\"",
     V = config:get("query_server_config", "os_process_idle_limit", "300"),
     IdleLimit = list_to_integer(V) * 1000,
     BaseProc = #os_proc{
