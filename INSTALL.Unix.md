@@ -56,8 +56,7 @@ JavaScript test suite. And help2man is only need if you plan on
 installing the CouchDB man pages.  Python and Sphinx are only required
 for building the online documentation.
 
-Debian-based Systems
-~~~~~~~~~~~~~~~~~~~~
+#### Debian-based Systems
 
 You can install the dependencies by running:
 
@@ -77,8 +76,7 @@ For up to date instructions, please see:
 Unfortunately, it seems that installing dependencies on Ubuntu is
 troublesome.
 
-RedHat-based (Fedora, Centos, RHEL) Systems
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#### RedHat-based (Fedora, Centos, RHEL) Systems
 
 You can install the dependencies by running:
 
@@ -91,8 +89,7 @@ While CouchDB builds against the default js-devel-1.7.0 included in
 some distributions, it's recommended to use a more recent
 js-devel-1.8.5.
 
-Mac OS X
-~~~~~~~~
+#### Mac OS X
 
 To build CouchDB from source on Mac OS X, you will need to install
 the Command Line Tools:
@@ -116,8 +113,7 @@ a segmentation fault or a bus error, you will need to install your own
 version of OpenSSL. See the troubleshooting guide, mentioned above,
 for more information.
 
-FreeBSD
--------
+#### FreeBSD
 
 FreeBSD requires the use of GNU Make. Where `make` is specified in this
 documentation, substitute `gmake`.
@@ -233,8 +229,7 @@ From here you should run the test suite in Firefox.
 Running as a Daemon
 -------------------
 
-SysV/BSD-style Systems
-~~~~~~~~~~~~~~~~~~~~~~
+#### SysV/BSD-style Systems
 
 You can use the `couchdb` init script to control the CouchDB daemon.
 
@@ -282,8 +277,7 @@ Consult your `logrotate` documentation for more information.
 It is critical that the CouchDB logs are rotated so as not to fill
 your disk.
 
-Mac OS X
-~~~~~~~~
+#### Mac OS X
 
 You can use the `launchctl` command to control the CouchDB daemon.
 
