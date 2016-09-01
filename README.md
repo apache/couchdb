@@ -86,7 +86,8 @@ UI shows an “Add Node” interface with the fields admin, and node:
     },
     "node": {
       "host": "hostname",
-      ["port": 5984]
+      ["port": 5984],
+      "name": "node1"  // as in “node1@hostname”, same as in vm.args
     }
   }
 ```
