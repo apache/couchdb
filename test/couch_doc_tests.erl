@@ -72,6 +72,34 @@ len_doc_to_multi_part_stream_test() ->
         couch_doc:len_doc_to_multi_part_stream(Boundary, JsonBytes, Atts, true),
     ok.
 
+validate_docid_test_() ->
+    {setup,
+        fun() ->
+            ok = meck:new(couch_db_plugin, [passthrough]),
+            meck:expect(couch_db_plugin, validate_docid, fun(_) -> false end)
+        end,
+        fun(_) ->
+            meck:unload(couch_db_plugin)
+        end,
+        [
+            ?_assertEqual(ok, couch_doc:validate_docid(<<"idx">>)),
+            ?_assertEqual(ok, couch_doc:validate_docid(<<"_design/idx">>)),
+            ?_assertEqual(ok, couch_doc:validate_docid(<<"_local/idx">>)),
+            ?_assertThrow({illegal_docid, _},
+                couch_doc:validate_docid(<<>>)),
+            ?_assertThrow({illegal_docid, _},
+                couch_doc:validate_docid(<<16#80>>)),
+            ?_assertThrow({illegal_docid, _},
+                couch_doc:validate_docid(<<"_idx">>)),
+            ?_assertThrow({illegal_docid, _},
+                couch_doc:validate_docid(<<"_">>)),
+            ?_assertThrow({illegal_docid, _},
+                couch_doc:validate_docid(<<"_design/">>)),
+            ?_assertThrow({illegal_docid, _},
+                couch_doc:validate_docid(<<"_local/">>))
+        ]
+    }.
+
 request(start) ->
     {ok, Doc} = file:read_file(?REQUEST_FIXTURE),
     {Doc, fun() -> request(stop) end};
