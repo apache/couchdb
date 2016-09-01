@@ -169,6 +169,10 @@ parse_revs(_) ->
 
 validate_docid(<<"">>) ->
     throw({illegal_docid, <<"Document id must not be empty">>});
+validate_docid(<<"_design/">>) ->
+    throw({illegal_docid, <<"Illegal document id `_design/`">>});
+validate_docid(<<"_local/">>) ->
+    throw({illegal_docid, <<"Illegal document id `_local/`">>});
 validate_docid(Id) when is_binary(Id) ->
     case couch_util:validate_utf8(Id) of
         false -> throw({illegal_docid, <<"Document id must be valid UTF-8">>});
