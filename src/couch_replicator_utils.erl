@@ -278,14 +278,20 @@ make_options(Props) ->
 
 convert_options([])->
     [];
+convert_options([{<<"cancel">>, V} | _R]) when not is_boolean(V)->
+    throw({bad_request, <<"parameter `cancel` must be a boolean">>});
 convert_options([{<<"cancel">>, V} | R]) ->
     [{cancel, V} | convert_options(R)];
 convert_options([{IdOpt, V} | R]) when IdOpt =:= <<"_local_id">>;
         IdOpt =:= <<"replication_id">>; IdOpt =:= <<"id">> ->
     Id = lists:splitwith(fun(X) -> X =/= $+ end, ?b2l(V)),
     [{id, Id} | convert_options(R)];
+convert_options([{<<"create_target">>, V} | _R]) when not is_boolean(V)->
+    throw({bad_request, <<"parameter `create_target` must be a boolean">>});
 convert_options([{<<"create_target">>, V} | R]) ->
     [{create_target, V} | convert_options(R)];
+convert_options([{<<"continuous">>, V} | _R]) when not is_boolean(V)->
+    throw({bad_request, <<"parameter `continuous` must be a boolean">>});
 convert_options([{<<"continuous">>, V} | R]) ->
     [{continuous, V} | convert_options(R)];
 convert_options([{<<"filter">>, V} | R]) ->
@@ -540,5 +546,31 @@ check_options_fail_values_test() ->
         check_options([{filter, x}, {selector, y}])),
     ?assertThrow({bad_request, _},
         check_options([{doc_ids, x}, {selector, y}, {filter, z}])).
+
+check_convert_options_pass_test() ->
+    ?assertEqual([], convert_options([])),
+    ?assertEqual([], convert_options([{<<"random">>, 42}])),
+    ?assertEqual([{cancel, true}],
+        convert_options([{<<"cancel">>, true}])),
+    ?assertEqual([{create_target, true}],
+        convert_options([{<<"create_target">>, true}])),
+    ?assertEqual([{continuous, true}],
+        convert_options([{<<"continuous">>, true}])),
+    ?assertEqual([{doc_ids, [<<"id">>]}],
+        convert_options([{<<"doc_ids">>, [<<"id">>]}])),
+    ?assertEqual([{selector, {key, value}}],
+        convert_options([{<<"selector">>, {key, value}}])).
+
+check_convert_options_fail_test() ->
+    ?assertThrow({bad_request, _},
+        convert_options([{<<"cancel">>, <<"true">>}])),
+    ?assertThrow({bad_request, _},
+        convert_options([{<<"create_target">>, <<"true">>}])),
+    ?assertThrow({bad_request, _},
+        convert_options([{<<"continuous">>, <<"true">>}])),
+    ?assertThrow({bad_request, _},
+        convert_options([{<<"doc_ids">>, not_a_list}])),
+    ?assertThrow({bad_request, _},
+        convert_options([{<<"selector">>, [{key, value}]}])).
 
 -endif.
