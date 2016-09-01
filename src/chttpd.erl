@@ -363,8 +363,7 @@ maybe_log(#httpd{} = HttpReq, #httpd_resp{should_log = true} = HttpResp) ->
         mochi_req = MochiReq,
         begin_ts = BeginTime,
         original_method = Method,
-        peer = Peer,
-        nonce = Nonce
+        peer = Peer
     } = HttpReq,
     #httpd_resp{
         end_ts = EndTime,
