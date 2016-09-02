@@ -90,7 +90,8 @@ handle_changes_req1(#httpd{}=Req, Db) ->
     "normal" ->
         T0 = os:timestamp(),
         {ok, Info} = fabric:get_db_info(Db),
-        Etag = chttpd:make_etag(Info),
+        Suffix = mem3:shard_suffix(Db),
+        Etag = chttpd:make_etag({Info, Suffix}),
         DeltaT = timer:now_diff(os:timestamp(), T0) / 1000,
         couch_stats:update_histogram([couchdb, dbinfo], DeltaT),
         chttpd:etag_respond(Req, Etag, fun() ->
