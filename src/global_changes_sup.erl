@@ -56,7 +56,7 @@ handle_config_change("global_changes", "max_event_delay", MaxDelayStr, _, _) ->
     catch error:badarg ->
         ok
     end,
-    ok;
+    {ok, nil};
 
 handle_config_change("global_changes", "max_write_delay", MaxDelayStr, _, _) ->
     try list_to_integer(MaxDelayStr) of
@@ -65,20 +65,20 @@ handle_config_change("global_changes", "max_write_delay", MaxDelayStr, _, _) ->
     catch error:badarg ->
         ok
     end,
-    ok;
+    {ok, nil};
 
 handle_config_change("global_changes", "update_db", "false", _, _) ->
     gen_server:cast(?LISTENER, {set_update_db, false}),
     gen_server:cast(?SERVER, {set_update_db, false}),
-    ok;
+    {ok, nil};
 
 handle_config_change("global_changes", "update_db", _, _, _) ->
     gen_server:cast(?LISTENER, {set_update_db, true}),
     gen_server:cast(?SERVER, {set_update_db, true}),
-    ok;
+    {ok, nil};
 
 handle_config_change(_, _, _, _, _) ->
-    ok.
+    {ok, nil}.
 
 handle_config_terminate(_Server, _Reason, _State) ->
     ok.
