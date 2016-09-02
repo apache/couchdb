@@ -168,7 +168,7 @@ load_user_from_db(UserName) ->
 	    {Props} = couch_doc:to_json_obj(Doc, []),
 	    Props;
 	_Else ->
-	    couch_log:warning("no record of user ~s", [UserName]),
+	    couch_log:debug("no record of user ~s", [UserName]),
 	    nil
     catch error:database_does_not_exist ->
 	    nil
