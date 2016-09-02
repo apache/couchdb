@@ -53,7 +53,8 @@ handle_global_changes_req(#httpd{method='GET'}=Req) ->
     case Feed of
         "normal" ->
             {ok, Info} = fabric:get_db_info(Db),
-            Etag = chttpd:make_etag(Info),
+            Suffix = mem3:shard_suffix(Db),
+            Etag = chttpd:make_etag({Info, Suffix}),
             chttpd:etag_respond(Req, Etag, fun() ->
                 fabric:changes(Db, fun changes_callback/2, Acc#acc{etag=Etag}, Options1)
             end);
