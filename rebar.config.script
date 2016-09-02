@@ -28,7 +28,7 @@ DepDescs = [
 %% keep these sorted
 {b64url,           "b64url",           "6895652d80f95cdf04efb14625abed868998f174"},
 {couch_log,        "couch-log",        "ad803f66dbd1900b67543259142875a6d03503ce"},
-{chttpd,           "chttpd",           "35cb9388f48fea0244d9952b9e1845e015ac95de"},
+{chttpd,           "chttpd",           "de784a5807cd80e8510cb2193d2fcae1cfadf76f"},
 {couch,            "couch",            "f122f94291bfbc87496efca3c04540bb190b985a"},
 {couch_index,      "couch-index",      "ee21d0181f0879bf9ab2dc6d67cc5c26c7c76628"},
 {couch_mrview,     "couch-mrview",     "9133f6d1612374e73f18f13244a32ce8678aab67"},
@@ -44,7 +44,7 @@ DepDescs = [
 {fabric,           "fabric",           "78eb096dae277facc5cf4f6f166e5591da6c165f"},
 {fauxton,          "fauxton",          {tag, "v1.1.8"}, [raw]},
 {folsom,           "folsom",           "a5c95dec18227c977029fbd3b638966d98f17003"},
-{global_changes,   "global-changes",   "f7e43f56ba239f08a3368ff4aea88e50132b7952"},
+{global_changes,   "global-changes",   "68c6a0eb43e52ba2c867a6f0c8318fa98c3f053f"},
 {ibrowse,          "ibrowse",          "4af2d408607874d124414ac45df1edbe3961d1cd"},
 {ioq,              "ioq",              "ba99ec70d31cf82fe4868ab4bb92b0978f4fe67f"},
 {jiffy,            "jiffy",            "d3c00e19d8fa20c21758402231247602190988d3"},
