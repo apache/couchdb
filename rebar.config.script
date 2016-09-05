@@ -44,7 +44,7 @@ DepDescs = [
 {fabric,           "fabric",           "78eb096dae277facc5cf4f6f166e5591da6c165f"},
 {fauxton,          "fauxton",          {tag, "v1.1.8"}, [raw]},
 {folsom,           "folsom",           "a5c95dec18227c977029fbd3b638966d98f17003"},
-{global_changes,   "global-changes",   "68c6a0eb43e52ba2c867a6f0c8318fa98c3f053f"},
+{global_changes,   "global-changes",   "f6e4c5629a7d996d284e4489f1897c057823f846"},
 {ibrowse,          "ibrowse",          "4af2d408607874d124414ac45df1edbe3961d1cd"},
 {ioq,              "ioq",              "ba99ec70d31cf82fe4868ab4bb92b0978f4fe67f"},
 {jiffy,            "jiffy",            "d3c00e19d8fa20c21758402231247602190988d3"},
