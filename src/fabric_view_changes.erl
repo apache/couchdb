@@ -103,6 +103,8 @@ keep_sending_changes(DbName, Args, Callback, Seqs, AccIn, Timeout, UpListen, T0)
             list_to_integer(MaxStr)
         end,
         case {Heartbeat, AccumulatedTime > Max, WaitForUpdate} of
+        {_, _, changes_feed_died} ->
+            Callback({stop, LastSeq, pending_count(Offset)}, AccOut);
         {undefined, _, timeout} ->
             Callback({stop, LastSeq, pending_count(Offset)}, AccOut);
         {_, true, timeout} ->

@@ -122,8 +122,8 @@ wait_db_updated({Pid, Ref}) ->
         {state, Pid, State} ->
             erlang:demonitor(MonRef, [flush]),
             State;
-        {'DOWN', MonRef, process, Pid, Reason} ->
-            throw({changes_feed_died, Reason})
+        {'DOWN', MonRef, process, Pid, _Reason} ->
+            changes_feed_died
     after 300000 ->
         ?MODULE:wait_db_updated({Pid, Ref})
     end.
