@@ -234,3 +234,5 @@ if [ -d .git  -a $SKIP_DEPS -ne 1 ]; then
     echo "==> updating dependencies"
     ${REBAR} get-deps update-deps
 fi
+
+echo "You have configured Apache CouchDB, time to relax. Relax."
