@@ -207,7 +207,7 @@ validate_atomic_update(_DbName, AllDocs, true) ->
     % TODO actually perform the validation.  This requires some hackery, we need
     % to basically extract the prep_and_validate_updates function from couch_db
     % and only run that, without actually writing in case of a success.
-    Error = {not_implemented, <<"all_or_nothing is not supported yet">>},
+    Error = {not_implemented, <<"all_or_nothing is not supported">>},
     PreCommitFailures = lists:map(fun(#doc{id=Id, revs = {Pos,Revs}}) ->
         case Revs of [] -> RevId = <<>>; [RevId|_] -> ok end,
         {{Id, {Pos, RevId}}, Error}
