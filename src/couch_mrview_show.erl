@@ -323,7 +323,7 @@ apply_etag({ExternalResponse}, CurrentEtag) ->
     % Vary headers. If the external function controls the Etag, we'd have to
     % run it to check for a match, which sort of defeats the purpose.
     apply_headers(ExternalResponse, [
-        {<<"Etag">>, CurrentEtag},
+        {<<"ETag">>, CurrentEtag},
         {<<"Vary">>, <<"Accept">>}
     ]).
 
