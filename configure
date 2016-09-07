@@ -40,36 +40,11 @@ Options:
 
   -h | --help                 display a short help message and exit
   -u | --user USER            set the username to run as (defaults to $COUCHDB_USER)
-  # --prefix=DIRECTORY          set the installation prefix (defaults to $DEFAULT_PREFIX)
-  # --databasedir DIRECTORY     specify the data directory (defaults to /var/lib/couchdb)
-  # --viewindexdir DIRECTORY    specify the view directory (defaults to /var/lib/couchdb)
-  # --logdir DIRECTORY          specify the log file (defaults to /var/log/couchdb.log)
   -c | --with-curl            request that couchjs is linked to cURL (default false)
   --disable-fauxton           do not build Fauxton
   --disable-docs              do not build any documentation or manpages
   --skip-deps                 do not update erlang dependencies
   --rebar=PATH                use rebar by specified path (version >=2.6.0 && <3.0 required)
-  #
-  #
-  # Installation directories:
-  #   --prefix=PREFIX         install architecture-independent files in PREFIX
-  #                           [/usr/local]
-  #   --exec-prefix=EPREFIX   install architecture-dependent files in EPREFIX
-  #                           [PREFIX]
-  #
-  # Fine tuning of the installation directories:
-  #   --bindir=DIR            user executables [EPREFIX/bin]
-  #   --libexecdir=DIR        program executables [EPREFIX/libexec]
-  #   --sysconfdir=DIR        read-only single-machine data [PREFIX/etc]
-  #   --localstatedir=DIR     modifiable single-machine data [PREFIX/var]
-  #   --libdir=DIR            object code libraries [EPREFIX/lib]
-  #   --datarootdir=DIR       read-only arch.-independent data root [PREFIX/share]
-  #   --datadir=DIR           read-only architecture-independent data [DATAROOTDIR]
-  #   --infodir=DIR           info documentation [DATAROOTDIR/info]
-  #   --mandir=DIR            man documentation [DATAROOTDIR/man]
-  #   --docdir=DIR            documentation root [DATAROOTDIR/doc/apache-couchdb]
-  #   --htmldir=DIR           html documentation [DOCDIR]
-  #   --pdfdir=DIR            pdf documentation [DOCDIR]
 EOF
 }
 
