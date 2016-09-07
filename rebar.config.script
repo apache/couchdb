@@ -41,7 +41,7 @@ DepDescs = [
 {docs,             "documentation",    "968b874ea76d5ee71647f7e7ebba8b1bdbef2ac8", [raw]},
 {ddoc_cache,       "ddoc-cache",       "c762e90a33ce3cda19ef142dd1120f1087ecd876"},
 {ets_lru,          "ets-lru",          "c05488c8b1d7ec1c3554a828e0c9bf2888932ed6"},
-{fabric,           "fabric",           "78eb096dae277facc5cf4f6f166e5591da6c165f"},
+{fabric,           "fabric",           "c7214fd2fef2fdbbf47964f6017c71ec8e8196ca"},
 {fauxton,          "fauxton",          {tag, "v1.1.8"}, [raw]},
 {folsom,           "folsom",           "a5c95dec18227c977029fbd3b638966d98f17003"},
 {global_changes,   "global-changes",   "f6e4c5629a7d996d284e4489f1897c057823f846"},
