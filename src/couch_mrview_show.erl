@@ -317,6 +317,8 @@ send_non_empty_chunk(#lacc{resp=Resp} = Acc, Chunk) ->
     Acc.
 
 
+apply_etag(JsonResp, undefined) ->
+    JsonResp;
 apply_etag({ExternalResponse}, CurrentEtag) ->
     % Here we embark on the delicate task of replacing or creating the
     % headers on the JsonResponse object. We need to control the Etag and
