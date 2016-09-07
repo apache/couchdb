@@ -200,3 +200,4 @@ if ( (Test-Path .git -PathType Container) -and (-not $SkipDeps) ) {
 
 Pop-Location
 [Environment]::CurrentDirectory = $PWD
+Write-Verbose "You have configured Apache CouchDB, time to relax. Relax."
