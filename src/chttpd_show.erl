@@ -200,7 +200,7 @@ handle_view_list(Req, Db, DDoc, LName, {ViewDesignName, ViewName}, Keys) ->
     couch_util:get_nested_json_value(DDoc#doc.body, [<<"lists">>, LName]),
     {ok, VDoc} = ddoc_cache:open(Db#db.name, <<"_design/", ViewDesignName/binary>>),
     CB = fun couch_mrview_show:list_cb/2,
-    Etag = couch_uuids:new(),
+    Etag = [$", couch_uuids:new(), $"],
     QueryArgs = couch_mrview_http:parse_params(Req, Keys),
     Options = [{user_ctx, Req#httpd.user_ctx}],
     chttpd:etag_respond(Req, Etag, fun() ->
