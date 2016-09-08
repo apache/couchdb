@@ -1,0 +1,14 @@
+* Replicator
+
+The replicator (whether invoked via _replicate or a document stored in
+the _replicator database) understands two kinds of source and target;
+
+1. A url (e.g, "https://foo:bar@foo.com/db1"), called a "remote" source/target.
+2. a database name (e.g, "db1"), called a "local" source/target.
+
+Whenever the latter type is used, this refers to a local unclustered
+database, not a clustered one.
+
+In a future release we hope to support "local" source/target to
+clustered databases but for now you recommend always using the url
+format for source and target.
