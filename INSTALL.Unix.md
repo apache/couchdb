@@ -116,9 +116,6 @@ Once you have satisfied the dependencies you should run:
 
     ./configure
 
-This script will configure CouchDB to be installed into `/usr/local`
-by default.
-
 If you wish to customize the installation, pass `--help` to this
 script.
 
