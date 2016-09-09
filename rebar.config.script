@@ -38,7 +38,7 @@ DepDescs = [
 {couch_stats,      "couch-stats",      "7895d4d3f509ed24f09b6d1a0bd0e06af34551dc"},
 {couch_peruser,    "peruser",          "4eea9571171a5b41d832da32204a1122a01f4b0e"},
 {couch_tests,       "erlang-tests",    "37b3bfeb4b1a48a592456e67991362e155ed81e0"},
-{docs,             "documentation",    "f36a82a675ea49be919a5e66b82fa88fa4e6d663", [raw]},
+{docs,             "documentation",    "68a87981c5a87ead50668a100a136b2925099f01", [raw]},
 {ddoc_cache,       "ddoc-cache",       "c762e90a33ce3cda19ef142dd1120f1087ecd876"},
 {ets_lru,          "ets-lru",          "c05488c8b1d7ec1c3554a828e0c9bf2888932ed6"},
 {fabric,           "fabric",           "f84750e3d31accf7bcadb0ba05249c23ce920521"},
