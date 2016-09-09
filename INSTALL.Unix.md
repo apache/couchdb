@@ -1,5 +1,4 @@
-Apache CouchDB INSTALL.Unix
-==========================
+# Apache CouchDB INSTALL.Unix
 
 A high-level guide to Unix-like systems, inc. Mac OS X and Ubuntu.
 
@@ -17,8 +16,7 @@ update their archives. If you're running into trouble, be sure to
 check out the wiki. If you have any tips to share, please also update
 the wiki so that others can benefit from your experience.
 
-Troubleshooting
----------------
+## Troubleshooting
 
 There is a troubleshooting guide:
 
@@ -34,8 +32,7 @@ There are collection of friendly mailing lists:
 
 Please work through these in order if you experience any problems.
 
-Dependencies
-------------
+## Dependencies
 
 You should have the following installed:
 
@@ -54,10 +51,14 @@ It is recommended that you install Erlang OTP R16B03-1 or above where
 possible.  You will only need libcurl if you plan to run the
 JavaScript test suite. And help2man is only need if you plan on
 installing the CouchDB man pages.  Python and Sphinx are only required
-for building the online documentation.
+for building the online documentation. Documentation build can be disabled
+by adding the `--disable-docs` flag to the `configure` script.
 
-Debian-based Systems
-~~~~~~~~~~~~~~~~~~~~
+For up to date instructions, please see:
+
+  https://cwiki.apache.org/confluence/display/COUCHDB/Installing+CouchDB
+
+### Debian-based Systems
 
 You can install the dependencies by running:
 
@@ -68,31 +69,16 @@ You can install the dependencies by running:
 Be sure to update the version numbers to match your system's available
 packages.
 
-For up to date instructions, please see:
-
-  http://wiki.apache.org/couchdb/Installing_on_Debian
-
-  http://wiki.apache.org/couchdb/Installing_on_Ubuntu
-
-Unfortunately, it seems that installing dependencies on Ubuntu is
-troublesome.
-
-RedHat-based (Fedora, Centos, RHEL) Systems
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### RedHat-based (Fedora, Centos, RHEL) Systems
 
 You can install the dependencies by running:
 
     sudo yum install autoconf autoconf-archive automake \
         curl-devel erlang-asn1 erlang-erts erlang-eunit \
         erlang-os_mon erlang-xmerl help2man \
-        js-devel libicu-devel libtool perl-Test-Harness
+        js-devel-1.8.5 libicu-devel libtool perl-Test-Harness
 
-While CouchDB builds against the default js-devel-1.7.0 included in
-some distributions, it's recommended to use a more recent
-js-devel-1.8.5.
-
-Mac OS X
-~~~~~~~~
+### Mac OS X
 
 To build CouchDB from source on Mac OS X, you will need to install
 the Command Line Tools:
@@ -113,11 +99,9 @@ Learn more about Homebrew at:
 Some versions of Mac OS X ship a problematic OpenSSL library. If
 you're experiencing troubles with CouchDB crashing intermittently with
 a segmentation fault or a bus error, you will need to install your own
-version of OpenSSL. See the troubleshooting guide, mentioned above,
-for more information.
+version of OpenSSL. See the wiki, mentioned above, for more information.
 
-FreeBSD
--------
+### FreeBSD
 
 FreeBSD requires the use of GNU Make. Where `make` is specified in this
 documentation, substitute `gmake`.
@@ -126,8 +110,7 @@ You can install this by running:
 
     pkg install gmake
 
-Installing
-----------
+## Installing
 
 Once you have satisfied the dependencies you should run:
 
@@ -145,43 +128,43 @@ If everything was successful you should see the following message:
 
 Relax.
 
-To install CouchDB you should run:
+To build CouchDB you should run:
 
-    make && sudo make install
-
-You only need to use `sudo` if you're installing into a system directory.
+    make release
 
 Try `gmake` if `make` is giving you any problems.
 
 If everything was successful you should see the following message:
 
-    You have installed Apache CouchDB, time to relax.
+    ... done
+    You can now copy the rel/couchdb directory anywhere on your system.
+    Start CouchDB with ./bin/couchdb from within that directory.
 
 Relax.
 
-User Registration
------------------
+## User Registration
 
 You should create a special `couchdb` user for CouchDB.
 
 On many Unix-like systems you can run:
 
     adduser --system \
-            --home /usr/local/var/lib/couchdb \
             --no-create-home \
             --shell /bin/bash \
             --group --gecos \
             "CouchDB Administrator" couchdb
 
-On Mac OS X you can use the Workgroup Manager to create users:
-
-  http://www.apple.com/support/downloads/serveradmintools1047.html
+On Mac OS X you can use the Workgroup Manager to create users. Links to
+download the Workgroup Manager vary by OS version; search Apple's support
+site to find the download appropriate for your system.
 
 You must make sure that:
 
     * The user has a working POSIX shell
 
-    * The user's home directory is `/usr/local/var/lib/couchdb`
+    * The user's home directory is wherever you have copied the release.
+      As a recommendation, copy the `rel\couchdb` directory into
+      `/home/couchdb`.
 
 You can test this by:
 
@@ -189,30 +172,27 @@ You can test this by:
 
     * Running `pwd` and checking the present working directory
 
+Copy the built couchdb release to the new user's home directory:
+
+    cp -R /path/to/couchdb/rel/couchdb /home/couchdb
+
 Change the ownership of the CouchDB directories by running:
 
-    chown -R couchdb:couchdb /usr/local/etc/couchdb
-    chown -R couchdb:couchdb /usr/local/var/lib/couchdb
-    chown -R couchdb:couchdb /usr/local/var/log/couchdb
-    chown -R couchdb:couchdb /usr/local/var/run/couchdb
+    chown -R couchdb:couchdb /home/couchdb/couchdb
 
 Change the permission of the CouchDB directories by running:
 
-    chmod 0770 /usr/local/etc/couchdb
-    chmod 0770 /usr/local/var/lib/couchdb
-    chmod 0770 /usr/local/var/log/couchdb
-    chmod 0770 /usr/local/var/run/couchdb
+    find /home/couchdb/couchdb -type d -exec chmod 0770 {} \;
 
-Update the permissions for your `default.ini` file:
+Update the permissions for your ini files:
 
-    chmod 0644 /usr/local/etc/couchdb/default.ini
+    chmod 0644 /home/couchdb/couchdb/etc/*
 
-First Run
----------
+## First Run
 
 You can start the CouchDB server by running:
 
-    sudo -i -u couchdb couchdb
+    sudo -i -u couchdb couchdb/bin/couchdb
 
 This uses the `sudo` command to run the `couchdb` command as the
 `couchdb` user.
@@ -226,91 +206,21 @@ Relax.
 
 To check that everything has worked, point your web browser to:
 
-    http://127.0.0.1:5984/_utils/index.html
+    http://127.0.0.1:5984/_utils/
 
-From here you should run the test suite in Firefox.
+From here you should click "Verify" then "Verify Installation" to
+validate CouchDB is working as expected.
 
-Running as a Daemon
--------------------
+## Running as a Daemon
 
-SysV/BSD-style Systems
-~~~~~~~~~~~~~~~~~~~~~~
+CouchDB no longer ships with any daemonization scripts.
 
-You can use the `couchdb` init script to control the CouchDB daemon.
+The couchdb team recommends [runit](http://smarden.org/runit/) to
+run CouchDB persistently and reliably. Configuration of runit is
+straightforward; if you have questions, reach out to the CouchDB
+user mailing list.
 
-On SysV-style systems, the init script will be installed into:
-
-    /usr/local/etc/init.d
-
-On BSD-style systems, the init script will be installed into:
-
-    /usr/local/etc/rc.d
-
-We use the `[init.d|rc.d]` notation to refer to both of these
-directories.
-
-You can control the CouchDB daemon by running:
-
-    /usr/local/etc/[init.d|rc.d]/couchdb [start|stop|restart|status]
-
-If you wish to configure how the init script works, you can edit:
-
-    /usr/local/etc/default/couchdb
-
-Comment out the `COUCHDB_USER` setting if you're running as a
-non-superuser.
-
-To start the daemon on boot, copy the init script to:
-
-    /etc/[init.d|rc.d]
-
-You should then configure your system to run the init script
-automatically.
-
-You may be able to run:
-
-    sudo update-rc.d couchdb defaults
-
-If this fails, consult your system documentation for more information.
-
-A `logrotate` configuration is installed into:
-
-    /usr/local/etc/logrotate.d/couchdb
-
-Consult your `logrotate` documentation for more information.
-
-It is critical that the CouchDB logs are rotated so as not to fill
-your disk.
-
-Mac OS X
-~~~~~~~~
-
-You can use the `launchctl` command to control the CouchDB daemon.
-
-You can load the configuration by running:
-
-    sudo launchctl load \
-         /usr/local/Library/LaunchDaemons/org.apache.couchdb.plist
-
-You can stop the CouchDB daemon by running:
-
-    sudo launchctl unload \
-         /usr/local/Library/LaunchDaemons/org.apache.couchdb.plist
-
-You can start CouchDB by running:
-
-    sudo launchctl start org.apache.couchdb
-
-You can restart CouchDB by running:
-
-    sudo launchctl stop org.apache.couchdb
-
-You can edit the launchd configuration by running:
-
-    open /usr/local/Library/LaunchDaemons/org.apache.couchdb.plist
-
-To start the daemon on boot, copy the configuration file to:
-
-    /Library/LaunchDaemons
+Naturally, you can configure systemd, launchd or SysV-init daemons to
+launch CouchDB and keep it running using standard configuration files.
 
 Consult your system documentation for more information.
