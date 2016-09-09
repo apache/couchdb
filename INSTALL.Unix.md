@@ -209,8 +209,9 @@ To check that everything has worked, point your web browser to:
 
     http://127.0.0.1:5984/_utils/
 
-From here you should click "Verify" then "Verify Installation" to
-validate CouchDB is working as expected.
+From here you should verify your installation by pointing your web browser to:
+
+    http://localhost:5984/_utils/verify_install.html
 
 ## Running as a Daemon
 
