@@ -141,6 +141,8 @@ Relax.
 
 ## User Registration
 
+For OS X, in the steps below, substitute `/Users/couchdb` for `/home/couchdb`.
+
 You should create a special `couchdb` user for CouchDB.
 
 On many Unix-like systems you can run:
@@ -151,9 +153,11 @@ On many Unix-like systems you can run:
             --group --gecos \
             "CouchDB Administrator" couchdb
 
-On Mac OS X you can use the Workgroup Manager to create users. Links to
-download the Workgroup Manager vary by OS version; search Apple's support
-site to find the download appropriate for your system.
+On Mac OS X you can use the Workgroup Manager to create users up to version
+10.9, and dscl or sysadminctl after version 10.9. Search Apple's support
+site to find the documentation appropriate for your system. As of recent
+versions of OS X, this functionality is also included in Server.app,
+available through the App Store only as part of OS X Server.
 
 You must make sure that:
 
@@ -161,7 +165,7 @@ You must make sure that:
 
     * The user's home directory is wherever you have copied the release.
       As a recommendation, copy the `rel\couchdb` directory into
-      `/home/couchdb`.
+      `/home/couchdb` or `/Users/couchdb`.
 
 You can test this by:
 
@@ -175,7 +179,7 @@ Copy the built couchdb release to the new user's home directory:
 
 Change the ownership of the CouchDB directories by running:
 
-    chown -R couchdb:couchdb /home/couchdb/couchdb
+    chown -R couchdb:couchdb /home/couchdb/couchdb 
 
 Change the permission of the CouchDB directories by running:
 
