@@ -25,7 +25,7 @@ for repo in *; do
   cd $repo
   mkdir ../../$RELDIR/src/$repo
   git_ish=`git rev-parse --short HEAD`
-  git archive $git_ish | tar -xC ../../$RELDIR/src/$repo/ -f -
+  git archive $git_ish | tar --exclude '*do_not_compile.erl' -xC ../../$RELDIR/src/$repo/ -f -
   set +e
   grep -rl '{vsn, git}' ../../$RELDIR/src/$repo/ | xargs sed -ie "s/{vsn, git}/{vsn, \"`git describe --always --tags`\"}/" 2> /dev/null
   set -e
