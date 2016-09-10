@@ -110,7 +110,7 @@ handle_all_dbs_req(#httpd{method='GET'}=Req) ->
     Etag = couch_httpd:make_etag({Info}),
     Options = [{user_ctx, Req#httpd.user_ctx}],
     {ok, Resp} = chttpd:etag_respond(Req, Etag, fun() ->
-        {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, [{"Etag",Etag}]),
+        {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, [{"ETag",Etag}]),
         VAcc = #vacc{req=Req,resp=Resp},
         fabric:all_docs(ShardDbName, Options, fun all_dbs_callback/2, VAcc, Args)
     end),

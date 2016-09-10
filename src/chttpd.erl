@@ -655,7 +655,7 @@ etag_respond(Req, CurrentEtag, RespFun) ->
     case etag_match(Req, CurrentEtag) of
     true ->
         % the client has this in their cache.
-        Headers = [{"Etag", CurrentEtag}],
+        Headers = [{"ETag", CurrentEtag}],
         chttpd:send_response(Req, 304, Headers, <<>>);
     false ->
         % Run the function.

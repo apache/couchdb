@@ -240,11 +240,11 @@ apply_etag({ExternalResponse}, CurrentEtag) ->
     nil ->
         % no JSON headers
         % add our Etag and Vary headers to the response
-        {[{<<"headers">>, {[{<<"Etag">>, CurrentEtag}, {<<"Vary">>, <<"Accept">>}]}} | ExternalResponse]};
+        {[{<<"headers">>, {[{<<"ETag">>, CurrentEtag}, {<<"Vary">>, <<"Accept">>}]}} | ExternalResponse]};
     JsonHeaders ->
         {[case Field of
         {<<"headers">>, JsonHeaders} -> % add our headers
-            JsonHeadersEtagged = json_apply_field({<<"Etag">>, CurrentEtag}, JsonHeaders),
+            JsonHeadersEtagged = json_apply_field({<<"ETag">>, CurrentEtag}, JsonHeaders),
             JsonHeadersVaried = json_apply_field({<<"Vary">>, <<"Accept">>}, JsonHeadersEtagged),
             {<<"headers">>, JsonHeadersVaried};
         _ -> % skip non-header fields

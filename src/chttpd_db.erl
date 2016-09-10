@@ -171,7 +171,7 @@ changes_callback(start, #cacc{feed = normal} = Acc) ->
     #cacc{etag = Etag, mochi = Req} = Acc,
     FirstChunk = "{\"results\":[\n",
     {ok, Resp} = chttpd:start_delayed_json_response(Req, 200,
-        [{"Etag",Etag}], FirstChunk),
+        [{"ETag",Etag}], FirstChunk),
     {ok, Acc#cacc{mochi = Resp, responding = true}};
 changes_callback(start, Acc) ->
     #cacc{mochi = Req} = Acc,
@@ -741,7 +741,7 @@ db_doc_req(#httpd{method='POST', user_ctx=Ctx}=Req, Db, DocId) ->
     {accepted, NewRev} ->
         HttpCode = 202
     end,
-    send_json(Req, HttpCode, [{"Etag", "\"" ++ ?b2l(couch_doc:rev_to_str(NewRev)) ++ "\""}], {[
+    send_json(Req, HttpCode, [{"ETag", "\"" ++ ?b2l(couch_doc:rev_to_str(NewRev)) ++ "\""}], {[
         {ok, true},
         {id, DocId},
         {rev, couch_doc:rev_to_str(NewRev)}
@@ -822,7 +822,7 @@ db_doc_req(#httpd{method='COPY', user_ctx=Ctx}=Req, Db, SourceDocId) ->
     Loc = absolute_uri(Req, "/" ++ couch_util:url_encode(Db#db.name) ++ "/" ++ couch_util:url_encode(TargetDocId)),
     send_json(Req, HttpCode,
         [{"Location", Loc},
-        {"Etag", "\"" ++ ?b2l(couch_doc:rev_to_str(NewTargetRev)) ++ "\""}],
+        {"ETag", "\"" ++ ?b2l(couch_doc:rev_to_str(NewTargetRev)) ++ "\""}],
         {[{ok, true}] ++ PartRes});
 
 db_doc_req(Req, _Db, _DocId) ->
@@ -834,7 +834,7 @@ send_doc(Req, Doc, Options) ->
         DiskEtag = couch_httpd:doc_etag(Doc),
         % output etag only when we have no meta
         chttpd:etag_respond(Req, DiskEtag, fun() ->
-            send_doc_efficiently(Req, Doc, [{"Etag", DiskEtag}], Options)
+            send_doc_efficiently(Req, Doc, [{"ETag", DiskEtag}], Options)
         end);
     _ ->
         send_doc_efficiently(Req, Doc, [], Options)
@@ -950,7 +950,7 @@ send_updated_doc(#httpd{user_ctx=Ctx} = Req, Db, DocId, #doc{deleted=Deleted}=Do
     {Status, {etag, Etag}, Body} = update_doc(Db, DocId,
         #doc{deleted=Deleted}=Doc, Options),
     HttpCode = http_code_from_status(Status),
-    ResponseHeaders = [{"Etag", Etag} | Headers],
+    ResponseHeaders = [{"ETag", Etag} | Headers],
     send_json(Req, HttpCode, ResponseHeaders, Body).
 
 http_code_from_status(Status) ->
