@@ -91,7 +91,7 @@ default_authentication_handler(Req, AuthModule) ->
         case AuthModule:get_user_creds(Req, User) of
             nil ->
                 throw({unauthorized, <<"Name or password is incorrect.">>});
-            {ok, UserProps, AuthCtx} ->
+            {ok, UserProps, _AuthCtx} ->
                 reject_if_totp(UserProps),
                 UserName = ?l2b(User),
                 Password = ?l2b(Pass),
@@ -298,7 +298,7 @@ handle_session_req(#httpd{method='POST', mochi_req=MochiReq}=Req, AuthModule) ->
     UserName = ?l2b(extract_username(Form)),
     Password = ?l2b(couch_util:get_value("password", Form, "")),
     couch_log:debug("Attempt Login: ~s",[UserName]),
-    {ok, UserProps, AuthCtx} = case AuthModule:get_user_creds(Req, UserName) of
+    {ok, UserProps, _AuthCtx} = case AuthModule:get_user_creds(Req, UserName) of
         nil -> {ok, [], nil};
         Result -> Result
     end,
