@@ -12,7 +12,7 @@
 
 {application, couch, [
     {description, "Apache CouchDB"},
-    {vsn, git},
+    {vsn, {cmd, "echo $COUCHDB_VERSION"}},
     {registered, [
         couch_db_update,
         couch_db_update_notifier_sup,
