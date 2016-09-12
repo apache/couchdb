@@ -19,7 +19,7 @@ COUCHDB_VERSION_SUFFIX = -$(shell git rev-parse --short --verify HEAD)
 else
 COUCHDB_VERSION_SUFFIX = 
 endif
-COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)$(COUCHDB_VERSION_SUFFIX)
+COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)
 
 DESTDIR=
 
