@@ -93,7 +93,7 @@ validate_find({Props}) ->
         {<<"limit">>, [
             {tag, limit},
             {optional, true},
-            {default, 10000000000},
+            {default, 25},
             {validator, fun is_non_neg_integer/1}
         ]},
         {<<"skip">>, [
