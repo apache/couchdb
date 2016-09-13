@@ -119,9 +119,11 @@ maybe_add_sys_db_callbacks(DbName, Options) when is_binary(DbName) ->
 maybe_add_sys_db_callbacks(DbName, Options) ->
     DbsDbName = config:get("mem3", "shards_db", "_dbs"),
     NodesDbName = config:get("mem3", "nodes_db", "_nodes"),
-    IsReplicatorDb = path_ends_with(DbName, <<"_replicator">>),
-    IsUsersDb = DbName ==config:get("couch_httpd_auth", "authentication_db", "_users") orelse
-	path_ends_with(DbName, <<"_users">>),
+
+    IsReplicatorDb = path_ends_with(DbName, "_replicator"),
+    UsersDbSuffix = config:get("couchdb", "users_db_suffix", "_users"),
+    IsUsersDb = path_ends_with(DbName, "_users")
+        orelse path_ends_with(DbName, UsersDbSuffix),
     if
 	DbName == DbsDbName ->
 	    [sys_db | Options];
@@ -139,8 +141,10 @@ maybe_add_sys_db_callbacks(DbName, Options) ->
 	    Options
     end.
 
-path_ends_with(Path, Suffix) ->
-    Suffix == couch_db:normalize_dbname(Path).
+path_ends_with(Path, Suffix) when is_binary(Suffix) ->
+    Suffix =:= couch_db:dbname_suffix(Path);
+path_ends_with(Path, Suffix) when is_list(Suffix) ->
+    path_ends_with(Path, ?l2b(Suffix)).
 
 check_dbname(#server{}, DbName) ->
     couch_db:validate_dbname(DbName).
@@ -539,3 +543,89 @@ db_closed(Server, Options) ->
         false -> Server#server{dbs_open=Server#server.dbs_open - 1};
         true -> Server
     end.
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+setup() ->
+    ok = meck:new(config, [passthrough]),
+    ok = meck:expect(config, get, fun config_get/3),
+    ok.
+
+teardown(_) ->
+    (catch meck:unload(config)).
+
+config_get("couchdb", "users_db_suffix", _) -> "users_db";
+config_get(_, _, _) -> undefined.
+
+maybe_add_sys_db_callbacks_pass_test_() ->
+    SysDbCases = [
+        "shards/00000000-3fffffff/foo/users_db.1415960794.couch",
+        "shards/00000000-3fffffff/foo/users_db.1415960794",
+        "shards/00000000-3fffffff/foo/users_db",
+        "shards/00000000-3fffffff/users_db.1415960794.couch",
+        "shards/00000000-3fffffff/users_db.1415960794",
+        "shards/00000000-3fffffff/users_db",
+
+        "shards/00000000-3fffffff/_users.1415960794.couch",
+        "shards/00000000-3fffffff/_users.1415960794",
+        "shards/00000000-3fffffff/_users",
+
+        "foo/users_db.couch",
+        "foo/users_db",
+        "users_db.couch",
+        "users_db",
+        "foo/_users.couch",
+        "foo/_users",
+        "_users.couch",
+        "_users",
+
+        "shards/00000000-3fffffff/foo/_replicator.1415960794.couch",
+        "shards/00000000-3fffffff/foo/_replicator.1415960794",
+        "shards/00000000-3fffffff/_replicator",
+        "foo/_replicator.couch",
+        "foo/_replicator",
+        "_replicator.couch",
+        "_replicator"
+    ],
+
+    NonSysDbCases = [
+        "shards/00000000-3fffffff/foo/mydb.1415960794.couch",
+        "shards/00000000-3fffffff/foo/mydb.1415960794",
+        "shards/00000000-3fffffff/mydb",
+        "foo/mydb.couch",
+        "foo/mydb",
+        "mydb.couch",
+        "mydb"
+    ],
+    {
+        foreach, fun setup/0, fun teardown/1,
+        [
+            [should_add_sys_db_callbacks(C) || C <- SysDbCases]
+            ++
+            [should_add_sys_db_callbacks(?l2b(C)) || C <- SysDbCases]
+            ++
+            [should_not_add_sys_db_callbacks(C) || C <- NonSysDbCases]
+            ++
+            [should_not_add_sys_db_callbacks(?l2b(C)) || C <- NonSysDbCases]
+        ]
+    }.
+
+should_add_sys_db_callbacks(DbName) ->
+    {test_name(DbName), ?_test(begin
+        Options = maybe_add_sys_db_callbacks(DbName, [other_options]),
+        ?assert(lists:member(sys_db, Options)),
+        ok
+    end)}.
+should_not_add_sys_db_callbacks(DbName) ->
+    {test_name(DbName), ?_test(begin
+        Options = maybe_add_sys_db_callbacks(DbName, [other_options]),
+        ?assertNot(lists:member(sys_db, Options)),
+        ok
+    end)}.
+
+test_name(DbName) ->
+    lists:flatten(io_lib:format("~p", [DbName])).
+
+
+-endif.
