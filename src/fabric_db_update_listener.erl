@@ -84,7 +84,8 @@ handle_db_event(_DbName, updated, #cb_state{notify = true} = St) ->
     erlang:send(St#cb_state.client_pid, {St#cb_state.client_ref, db_updated}),
     {ok, St};
 handle_db_event(_DbName, deleted, St) ->
-    {stop, St};
+    erlang:send(St#cb_state.client_pid, {St#cb_state.client_ref, db_deleted}),
+    stop;
 handle_db_event(_DbName, _Event, St) ->
     {ok, St}.
 
@@ -155,6 +156,8 @@ handle_message(db_updated, _Worker, #acc{state=waiting}=Acc) ->
     {ok, Acc#acc{state=unset}};
 handle_message(db_updated, _Worker, Acc) ->
     {ok, Acc#acc{state=updated}};
+handle_message(db_deleted, _Worker, Acc) ->
+    {stop, ok};
 handle_message(get_state, _Worker, #acc{state=unset}=Acc) ->
     {ok, Acc#acc{state=waiting}};
 handle_message(get_state, _Worker, Acc) ->
