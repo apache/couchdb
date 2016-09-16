@@ -45,10 +45,7 @@ dev_start() ->
     couch:start().
 
 get_version() ->
-    case application:get_key(couch, vsn) of
-        {ok, Version} -> Version;
-        undefined -> "0.0.0"
-    end.
+    ?COUCHDB_VERSION. %% Defined in rebar.config.script
 get_version(short) ->
   %% strip git hash from version string
   [Version|_Rest] = string:tokens(get_version(), "+"),

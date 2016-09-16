@@ -135,7 +135,8 @@ end,
 AddConfig = [
     {port_specs, PortSpecs},
     {erl_opts, [
-        {platform_define, "win32", 'WINDOWS'}
+        {platform_define, "win32", 'WINDOWS'},
+        {d, 'COUCHDB_VERSION', Version}
     ]},
     {eunit_compile_opts, [{platform_define, "win32", 'WINDOWS'}]}
 ].
