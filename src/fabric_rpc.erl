@@ -22,7 +22,7 @@
 -export([compact/1, compact/2]).
 
 -export([get_db_info/2, get_doc_count/2, get_update_seq/2,
-         changes/4, map_view/5, reduce_view/5, group_info/3]).
+         changes/4, map_view/5, reduce_view/5, group_info/3, update_mrview/4]).
 
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("couch/include/couch_db.hrl").
@@ -98,6 +98,14 @@ all_docs(DbName, Options, #mrargs{keys=undefined} = Args0) ->
     {ok, Db} = get_or_create_db(DbName, Options),
     VAcc0 = #vacc{db=Db},
     couch_mrview:query_all_docs(Db, Args, fun view_cb/2, VAcc0).
+
+update_mrview(DbName, {DDocId, Rev}, ViewName, Args0) ->
+    {ok, DDoc} = ddoc_cache:open_doc(mem3:dbname(DbName), DDocId, Rev),
+    couch_util:with_db(DbName, fun(Db) ->
+        UpdateSeq = couch_db:get_update_seq(Db),
+        {ok, Pid, _} = couch_mrview:get_view_index_pid(Db, DDoc, ViewName,                                                Args0),
+        couch_index:get_state(Pid, UpdateSeq)
+    end).
 
 %% @equiv map_view(DbName, DDoc, ViewName, Args0, [])
 map_view(DbName, DDocInfo, ViewName, Args0) ->

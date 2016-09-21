@@ -24,8 +24,10 @@ go(DbName, GroupId, View, Args, Callback, Acc0, VInfo) when is_binary(GroupId) -
     go(DbName, DDoc, View, Args, Callback, Acc0, VInfo);
 
 go(DbName, DDoc, VName, Args, Callback, Acc, VInfo) ->
-    RPCArgs = [fabric_util:doc_id_and_rev(DDoc), VName, Args],
+    DocIdAndRev = fabric_util:doc_id_and_rev(DDoc),
+    RPCArgs = [DocIdAndRev, VName, Args],
     Shards = fabric_view:get_shards(DbName, Args),
+    fabric_view:maybe_update_others(DbName, DocIdAndRev, Shards, VName, Args),
     Repls = fabric_view:get_shard_replacements(DbName, Shards),
     StartFun = fun(Shard) ->
         hd(fabric_util:submit_jobs([Shard], fabric_rpc, reduce_view, RPCArgs))
