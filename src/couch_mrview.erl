@@ -14,7 +14,7 @@
 
 -export([validate/2]).
 -export([query_all_docs/2, query_all_docs/4]).
--export([query_view/3, query_view/4, query_view/6]).
+-export([query_view/3, query_view/4, query_view/6, get_view_index_pid/4]).
 -export([view_changes_since/5]).
 -export([view_changes_since/6, view_changes_since/7]).
 -export([count_view_changes_since/4, count_view_changes_since/5]).
@@ -247,6 +247,10 @@ query_view(Db, DDoc, VName, Args0, Callback, Acc0) ->
         _ -> {ok, Acc0}
     end,
     query_view(Db, VInfo, Args, Callback, Acc1).
+
+
+get_view_index_pid(Db, DDoc, ViewName, Args0) ->
+    couch_mrview_util:get_view_index_pid(Db, DDoc, ViewName, Args0).
 
 
 query_view(Db, {Type, View, Ref}, Args, Callback, Acc) ->
