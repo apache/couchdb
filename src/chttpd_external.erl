@@ -94,7 +94,11 @@ json_req_obj_field(<<"headers">>, #httpd{mochi_req=Req}, _Db, _DocId) ->
     to_json_terms(Hlist);
 json_req_obj_field(<<"body">>, #httpd{req_body=undefined, mochi_req=Req}, _Db, _DocId) ->
     MaxSize = config:get_integer("couchdb", "max_document_size", 4294967296),
-    Req:recv_body(MaxSize);
+    try
+        Req:recv_body(MaxSize)
+    catch exit:normal ->
+        exit({bad_request, <<"Invalid request body">>})
+    end;
 json_req_obj_field(<<"body">>, #httpd{req_body=Body}, _Db, _DocId) ->
     Body;
 json_req_obj_field(<<"peer">>, #httpd{mochi_req=Req}, _Db, _DocId) ->
