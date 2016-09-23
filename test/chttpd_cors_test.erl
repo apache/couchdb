@@ -255,6 +255,7 @@ cors_enabled_wildcard_test_() ->
                 fun test_no_access_control_method_preflight_request_/1,
                 fun test_preflight_request_/1,
                 fun test_preflight_request_no_allow_credentials_/1,
+                fun test_preflight_request_empty_request_headers_/1,
                 fun test_db_request_/1,
                 fun test_db_preflight_request_/1,
                 fun test_db_host_origin_request_/1,
@@ -396,6 +397,24 @@ test_preflight_request_no_allow_credentials_(OwnerConfig) ->
             header(Headers1, "Access-Control-Allow-Methods")),
         ?_assertEqual(undefined,
             header(Headers1, "Access-Control-Allow-Credentials"))
+    ].
+
+
+test_preflight_request_empty_request_headers_(OwnerConfig) ->
+    Headers = [
+        {"Origin", ?DEFAULT_ORIGIN},
+        {"Access-Control-Request-Method", "POST"},
+        {"Access-Control-Request-Headers", ""}
+    ],
+    Req = mock_request('OPTIONS', "/", Headers),
+    {ok, Headers1} = chttpd_cors:maybe_handle_preflight_request(Req, OwnerConfig),
+    [
+        ?_assertEqual(?DEFAULT_ORIGIN,
+            header(Headers1, "Access-Control-Allow-Origin")),
+        ?_assertEqual(string_headers(?SUPPORTED_METHODS),
+            header(Headers1, "Access-Control-Allow-Methods")),
+        ?_assertEqual("",
+            header(Headers1, "Access-Control-Allow-Headers"))
     ].
 
 

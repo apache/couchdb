@@ -130,6 +130,7 @@ handle_preflight_request(Req, Config, Origin) ->
                     "Access-Control-Request-Headers"),
                 {FinalReqHeaders, ReqHeaders} = case AccessHeaders of
                     undefined -> {"", []};
+                    "" -> {"", []};
                     Headers ->
                         %% transform header list in something we
                         %% could check. make sure everything is a
