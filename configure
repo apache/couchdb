@@ -82,9 +82,9 @@ parse_opts() {
 
             --rebar)
                 if [ -x "$2" ]; then
-                    version=`$2 --version 2> /dev/null | grep -o "2\.[6-9]\.[0-9]"`
+                    version=`$2 --version 2> /dev/null | grep -o "3\.[6-9]\.[0-9]"`
                     if [ $? -ne 0 ]; then
-                        printf 'Rebar >=2.6.0 and <3.0.0 required' >&2
+                        printf 'Rebar >3.0.0 required' >&2
                         exit 1
                     fi
                     eval REBAR=$2
@@ -187,23 +187,25 @@ EOF
 
 
 install_local_rebar() {
-    if [ ! -x "${rootdir}/bin/rebar" ]; then
+    if [ ! -x "${rootdir}/bin/rebar3" ]; then
         if [ ! -d "${rootdir}/src/rebar" ]; then
-            git clone --depth 1 --branch 2.6.0 https://git-wip-us.apache.org/repos/asf/couchdb-rebar.git ${rootdir}/src/rebar
+            git clone --depth 1 --branch 3.3.1 https://github.com/erlang/rebar3.git ${rootdir}/src/rebar
         fi
-        make -C ${rootdir}/src/rebar
-        mv ${rootdir}/src/rebar/rebar ${rootdir}/bin/rebar
-        make -C ${rootdir}/src/rebar clean
+        cd ${rootdir}/src/rebar && ./bootstrap
+        ${rootdir}/src/rebar/rebar3 clean
+        mv ${rootdir}/src/rebar/rebar3 ${rootdir}/bin/rebar3
+
     fi
 }
 
 
 if [ -z "${REBAR}" ]; then
     install_local_rebar
-    REBAR=${rootdir}/bin/rebar
+    REBAR=${rootdir}/bin/rebar3
 fi
 
 
+### mehhh
 # only update dependencies, when we are not in a release tarball
 if [ -d .git  -a $SKIP_DEPS -ne 1 ]; then
     echo "==> updating dependencies"
