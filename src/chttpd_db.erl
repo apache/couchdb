@@ -160,7 +160,7 @@ changes_callback(timeout, #cacc{feed = eventsource} = Acc) ->
     #cacc{mochi = Resp} = Acc,
     Chunk = "event: heartbeat\ndata: \n\n",
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp, Chunk),
-    {ok, {"eventsource", Resp1}};
+    {ok, Acc#cacc{mochi = Resp1}};
 changes_callback({stop, _EndSeq}, #cacc{feed = eventsource} = Acc) ->
     #cacc{mochi = Resp, buffer = Buf} = Acc,
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp, Buf),
