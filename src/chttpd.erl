@@ -61,9 +61,9 @@ start_link(http) ->
 
 start_link(https) ->
     Port = config:get("ssl", "port", "6984"),
-    {ok, Ciphers} = couch_util:parse_term(config:get("ssl", "ciphers", undefined)),
-    {ok, Versions} = couch_util:parse_term(config:get("ssl", "tls_versions", undefined)),
-    {ok, SecureRenegotiate} = couch_util:parse_term(config:get("ssl", "secure_renegotiate", undefined)),
+    {ok, Ciphers} = couch_util:parse_term(config:get("ssl", "ciphers", "undefined")),
+    {ok, Versions} = couch_util:parse_term(config:get("ssl", "tls_versions", "undefined")),
+    {ok, SecureRenegotiate} = couch_util:parse_term(config:get("ssl", "secure_renegotiate", "undefined")),
     ServerOpts0 =
         [{cacertfile, config:get("ssl", "cacert_file", undefined)},
          {keyfile, config:get("ssl", "key_file", undefined)},
