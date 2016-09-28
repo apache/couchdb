@@ -12,7 +12,7 @@
 
 -module(couch_mrview_util).
 
--export([get_view/4]).
+-export([get_view/4, get_view_index_pid/4]).
 -export([ddoc_to_mrst/2, init_state/4, reset_index/3]).
 -export([make_header/1]).
 -export([index_file/2, compaction_file/2, open_file/1]).
@@ -40,11 +40,7 @@
 
 
 get_view(Db, DDoc, ViewName, Args0) ->
-    ArgCheck = fun(InitState) ->
-        Args1 = set_view_type(Args0, ViewName, InitState#mrst.views),
-        {ok, validate_args(Args1)}
-    end,
-    {ok, Pid, Args2} = couch_index_server:get_index(?MOD, Db, DDoc, ArgCheck),
+    {ok, Pid, Args2} = get_view_index_pid(Db, DDoc, ViewName, Args0),
     DbUpdateSeq = couch_util:with_db(Db, fun(WDb) ->
         couch_db:get_update_seq(WDb)
     end),
@@ -65,6 +61,14 @@ get_view(Db, DDoc, ViewName, Args0) ->
     check_range(Args3, view_cmp(View)),
     Sig = view_sig(Db, State, View, Args3),
     {ok, {Type, View, Ref}, Sig, Args3}.
+
+
+get_view_index_pid(Db, DDoc, ViewName, Args0) ->
+    ArgCheck = fun(InitState) ->
+        Args1 = set_view_type(Args0, ViewName, InitState#mrst.views),
+        {ok, validate_args(Args1)}
+    end,
+    couch_index_server:get_index(?MOD, Db, DDoc, ArgCheck).
 
 
 ddoc_to_mrst(DbName, #doc{id=Id, body={Fields}}) ->
