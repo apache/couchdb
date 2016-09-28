@@ -15,7 +15,7 @@
 -export([is_progress_possible/1, remove_overlapping_shards/2, maybe_send_row/1,
     transform_row/1, keydict/1, extract_view/4, get_shards/2,
     check_down_shards/2, handle_worker_exit/3,
-    get_shard_replacements/2]).
+    get_shard_replacements/2, maybe_update_others/5]).
 
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
@@ -307,6 +307,13 @@ get_shards(DbName, #mrargs{stale=Stale})
     mem3:ushards(DbName);
 get_shards(DbName, #mrargs{stale=false}) ->
     mem3:shards(DbName).
+
+maybe_update_others(DbName, DDoc, ShardsInvolved, ViewName,
+    #mrargs{stale=update_after} = Args) ->
+    ShardsNeedUpdated = mem3:shards(DbName) -- ShardsInvolved,
+    lists:foreach(fun(#shard{node=Node, name=ShardName}) ->
+        rpc:cast(Node, fabric_rpc, update_mrview, [ShardName, DDoc, ViewName, Args])
+    end, ShardsNeedUpdated).
 
 get_shard_replacements(DbName, UsedShards0) ->
     % We only want to generate a replacements list from shards
