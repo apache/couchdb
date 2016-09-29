@@ -156,7 +156,7 @@ handle_message(db_updated, _Worker, #acc{state=waiting}=Acc) ->
     {ok, Acc#acc{state=unset}};
 handle_message(db_updated, _Worker, Acc) ->
     {ok, Acc#acc{state=updated}};
-handle_message(db_deleted, _Worker, Acc) ->
+handle_message(db_deleted, _Worker, _Acc) ->
     {stop, ok};
 handle_message(get_state, _Worker, #acc{state=unset}=Acc) ->
     {ok, Acc#acc{state=waiting}};
