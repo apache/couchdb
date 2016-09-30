@@ -16,7 +16,7 @@
     ranges,
     selector,
     opts,
-    limit = 25,
+    limit,
     skip = 0,
     fields = undefined,
     user_fun,

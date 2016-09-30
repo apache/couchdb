@@ -51,7 +51,7 @@ create(Db, Indexes, Selector, Opts0) ->
     Opts = unpack_bookmark(Db#db.name, Opts0),
 
     DreyfusLimit = get_dreyfus_limit(),
-    Limit = erlang:min(DreyfusLimit, couch_util:get_value(limit, Opts, 50)),
+    Limit = erlang:min(DreyfusLimit, couch_util:get_value(limit, Opts, mango_opts:default_limit())),
     Skip = couch_util:get_value(skip, Opts, 0),
     Fields = couch_util:get_value(fields, Opts, all_fields),
 

@@ -32,7 +32,9 @@
     validate_bookmark/1,
     validate_sort/1,
     validate_fields/1,
-    validate_bulk_delete/1
+    validate_bulk_delete/1,
+
+    default_limit/0
 ]).
 
 
@@ -93,7 +95,7 @@ validate_find({Props}) ->
         {<<"limit">>, [
             {tag, limit},
             {optional, true},
-            {default, 25},
+            {default, default_limit()},
             {validator, fun is_non_neg_integer/1}
         ]},
         {<<"skip">>, [
@@ -308,3 +310,5 @@ validate_opt(Name, [{validator, Fun} | Rest], Value) ->
     end.
 
 
+default_limit() ->
+    config:get_integer("mango", "default_limit", 25).

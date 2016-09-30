@@ -35,7 +35,7 @@ create(Db, Indexes, Selector, Opts) ->
     Composited = mango_cursor_view:composite_indexes(Indexes, FieldRanges),
     {Index, IndexRanges} = mango_cursor_view:choose_best_index(Db, Composited),
 
-    Limit = couch_util:get_value(limit, Opts, 10000000000),
+    Limit = couch_util:get_value(limit, Opts, mango_opts:default_limit()),
     Skip = couch_util:get_value(skip, Opts, 0),
     Fields = couch_util:get_value(fields, Opts, all_fields),
 
