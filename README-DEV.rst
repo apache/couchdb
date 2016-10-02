@@ -36,7 +36,7 @@ However, you do not need them if:
 * You don't care about building the documentation
 
 If you intend to build Fauxton, you will also need to install its
-dependencies. After running ./configure to download all of the
+dependencies. After running ``./configure`` to download all of the
 dependent repositories, you can read about required dependencies in
 `src/fauxton/readme.md`. Typically, installing npm and node.js are
 sufficient to enable a Fauxton build.
@@ -118,13 +118,13 @@ If you intend to run the test suites::
 
     ./configure -c
 
-If you want to build it into different destination than `/usr/local`.:
+If you want to build it into different destination than `/usr/local`.::
 
     ./configure --prefix=/<your directory path>
 
-If you don't want to build Fauxton or documentation specify ``--disable-fauxton``
-and/or ``--disable-docs`` arguments for `configure` to ignore their build and
-avoid any issues with their dependencies.
+If you don't want to build Fauxton or documentation specify
+``--disable-fauxton`` and/or ``--disable-docs`` arguments for ``configure`` to
+ignore their build and avoid any issues with their dependencies.
 
 See ``./configure --help`` for more information.
 

@@ -56,17 +56,17 @@ Getting started with developing
 For more detail, read the README-DEV.rst file in this directory.
 
 Basically you just have to install the needed dependencies which are
-documented in the install docs and then run `./configure && make`.
+documented in the install docs and then run ``./configure && make``.
 
-You don't need to run `make install` after compiling, just use
-`./dev/run` to spin up three nodes. You can add haproxy as a caching
-layer in front of this cluster by running `./dev/run --with-haproxy
---haproxy=/path/to/haproxy` . You will now have a local cluster
-listening on port `5984`.
+You don't need to run ``make install`` after compiling, just use
+``./dev/run`` to spin up three nodes. You can add haproxy as a caching
+layer in front of this cluster by running ``./dev/run --with-haproxy
+--haproxy=/path/to/haproxy`` . You will now have a local cluster
+listening on port 5984.
 
 For Fauxton developers fixing the admin-party does not work via the button in
-Fauxton. To fix the admin party you have to run `./dev/run` with the `admin`
-flag, e.g. `./dev/run --admin=username:password`. If you want to have an
+Fauxton. To fix the admin party you have to run ``./dev/run`` with the ``admin``
+flag, e.g. ``./dev/run --admin=username:password``. If you want to have an
 admin-party, just omit the flag.
 
 Cryptographic Software Notice
