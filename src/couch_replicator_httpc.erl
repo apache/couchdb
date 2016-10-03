@@ -27,9 +27,6 @@
 
 -define(replace(L, K, V), lists:keystore(K, 1, L, {K, V})).
 -define(MAX_WAIT, 5 * 60 * 1000).
--define(MAX_BACKOFF_WAIT, 250 * 32768).
--define(MAX_BACKOFF_LOG_THRESHOLD, 512000).
--define(BACKOFF_EXP, 1.5).
 -define(STREAM_STATUS, ibrowse_stream_status).
 
 
@@ -168,7 +165,7 @@ process_stream_response(ReqId, Worker, HttpDb, Params, Callback) ->
     {ibrowse_async_headers, ReqId, Code, Headers} ->
         case list_to_integer(Code) of
         429 ->
-            backoff(Worker, HttpDb#httpdb{timeout = ?MAX_BACKOFF_WAIT},
+            backoff(Worker, HttpDb#httpdb{timeout = get_max_back_off()},
                 Params);
         Ok when (Ok >= 200 andalso Ok < 300) ; (Ok >= 400 andalso Ok < 500) ->
             StreamDataFun = fun() ->
@@ -272,15 +269,17 @@ discard_message(ReqId, Worker, Count) ->
 %% For 429 errors, we perform an exponential backoff up to 2.17 hours.
 %% We use Backoff time as a timeout/failure end.
 backoff(Worker, #httpdb{backoff = Backoff} = HttpDb, Params) ->
+    MaxBackOff = get_max_back_off(),
+    MaxBackOffLog = get_back_off_log_threshold(),
     ok = timer:sleep(random:uniform(Backoff)),
-    Backoff2 = round(Backoff*?BACKOFF_EXP),
-    NewBackoff = erlang:min(Backoff2, ?MAX_BACKOFF_WAIT),
+    Backoff2 = round(Backoff*get_back_off_exp()),
+    NewBackoff = erlang:min(Backoff2, MaxBackOff),
     NewHttpDb = HttpDb#httpdb{backoff = NewBackoff},
     case Backoff2 of
-        W0 when W0 > ?MAX_BACKOFF_WAIT ->
+        W0 when W0 > MaxBackOff ->
             report_error(Worker, HttpDb, Params, {error,
                 "Long 429-induced Retry Time Out"});
-        W1 when W1 >= ?MAX_BACKOFF_LOG_THRESHOLD -> % Past 8 min, we log retries
+        W1 when W1 >=  MaxBackOffLog -> % Past 8 min, we log retries
             log_retry_error(Params, HttpDb, Backoff2, "429 Retry"),
             throw({retry, NewHttpDb, Params});
         _ ->
@@ -440,3 +439,12 @@ after_redirect(RedirectUrl, _Code, HttpDb, Params) ->
 after_redirect(RedirectUrl, HttpDb, Params) ->
     Params2 = lists:keydelete(path, 1, lists:keydelete(qs, 1, Params)),
     {HttpDb#httpdb{url = RedirectUrl}, Params2}.
+
+get_max_back_off() ->
+    config:get_integer("replicator", "max_backoff_wait", 250 * 32768).
+
+get_back_off_log_threshold() ->
+    config:get_integer("replicator", "max_backoff_log_threshold", 512000).
+
+get_back_off_exp() ->
+    config:get_float("replicator", "backoff_exp", 1.5).
