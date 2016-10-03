@@ -447,22 +447,38 @@ batch_doc(#doc{atts = Atts}) ->
 
 flush_docs(_Target, []) ->
     couch_replicator_stats:new();
-
 flush_docs(Target, DocList) ->
-    {ok, Errors} = couch_replicator_api_wrap:update_docs(
-        Target, DocList, [delay_commit], replicated_changes),
+    FlushResult = couch_replicator_api_wrap:update_docs(Target, DocList,
+        [delay_commit], replicated_changes),
+    handle_flush_docs_result(FlushResult, Target, DocList).
+
+
+handle_flush_docs_result({error, request_body_too_large}, _Target, [Doc]) ->
+    couch_log:error("Replicator: failed to write doc ~p. Too large", [Doc]),
+    couch_replicator_stats:new([{doc_write_failures, 1}]);
+handle_flush_docs_result({error, request_body_too_large}, Target, DocList) ->
+    Len = length(DocList),
+    {DocList1, DocList2} = lists:split(Len div 2, DocList),
+    couch_log:notice("Replicator: couldn't write batch of size ~p to ~p because"
+        " request body is too large. Splitting batch into 2 separate batches of"
+        " sizes ~p and ~p", [Len, couch_replicator_api_wrap:db_uri(Target),
+        length(DocList1), length(DocList2)]),
+    flush_docs(Target, DocList1),
+    flush_docs(Target, DocList2);
+handle_flush_docs_result({ok, Errors}, Target, DocList) ->
     DbUri = couch_replicator_api_wrap:db_uri(Target),
     lists:foreach(
         fun({Props}) ->
-            couch_log:error("Replicator: couldn't write document `~s`, revision `~s`,"
-                " to target database `~s`. Error: `~s`, reason: `~s`.",
-                [get_value(id, Props, ""), get_value(rev, Props, ""), DbUri,
-                    get_value(error, Props, ""), get_value(reason, Props, "")])
+            couch_log:error("Replicator: couldn't write document `~s`, revision"
+                " `~s`, to target database `~s`. Error: `~s`, reason: `~s`.", [
+                get_value(id, Props, ""), get_value(rev, Props, ""), DbUri,
+                get_value(error, Props, ""), get_value(reason, Props, "")])
         end, Errors),
     couch_replicator_stats:new([
         {docs_written, length(DocList) - length(Errors)},
         {doc_write_failures, length(Errors)}
     ]).
+
 
 flush_doc(Target, #doc{id = Id, revs = {Pos, [RevId | _]}} = Doc) ->
     try couch_replicator_api_wrap:update_doc(Target, Doc, [], replicated_changes) of

@@ -448,6 +448,8 @@ update_docs(#httpdb{} = HttpDb, DocList, Options, UpdateType) ->
             {body, {BodyFun, [prefix | Docs]}}, {headers, Headers}],
         fun(201, _, Results) when is_list(Results) ->
                 {ok, bulk_results_to_errors(DocList, Results, remote)};
+           (413, _, _) ->
+                {error, request_body_too_large};
            (417, _, Results) when is_list(Results) ->
                 {ok, bulk_results_to_errors(DocList, Results, remote)}
         end);
