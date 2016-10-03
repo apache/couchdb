@@ -54,7 +54,11 @@ handle_error_message({error, Reason}, Worker,
     handle_error(Reason, Worker, Counters);
 handle_error_message({'EXIT', Reason}, Worker,
                      Counters, _Replacements, _StartFun, _StartArgs) ->
-    handle_error({exit, Reason}, Worker, Counters).
+    handle_error({exit, Reason}, Worker, Counters);
+handle_error_message(Reason, Worker, Counters,
+                     _Replacements, _StartFun, _StartArgs) ->
+    couch_log:error("Unexpected error during request: ~p", [Reason]),
+    handle_error(Reason, Worker, Counters).
 
 handle_error(Reason, Worker, Counters0) ->
     Counters = fabric_dict:erase(Worker, Counters0),
