@@ -343,7 +343,7 @@ changes_enumerator(DocInfo, Acc) ->
     #doc_info{id=Id, high_seq=Seq, revs=[#rev_info{deleted=Del}|_]} = DocInfo,
     case [X || X <- couch_changes:filter(Db, DocInfo, Filter), X /= null] of
     [] ->
-        {ok, Acc#cacc{seq = Seq, pending = Pending-1}};
+        ChangesRow = {no_pass, Seq};
     Results ->
         Opts = if Conflicts -> [conflicts | DocOptions]; true -> DocOptions end,
         ChangesRow = {change, [
@@ -353,10 +353,10 @@ changes_enumerator(DocInfo, Acc) ->
             {changes, Results},
             {deleted, Del} |
             if IncludeDocs -> [doc_member(Db, DocInfo, Opts)]; true -> [] end
-        ]},
-        ok = rexi:stream2(ChangesRow),
-        {ok, Acc#cacc{seq = Seq, pending = Pending-1}}
-    end.
+        ]}
+    end,
+    ok = rexi:stream2(ChangesRow),
+    {ok, Acc#cacc{seq = Seq, pending = Pending-1}}.
 
 doc_member(Shard, DocInfo, Opts) ->
     case couch_db:open_doc(Shard, DocInfo, [deleted | Opts]) of
