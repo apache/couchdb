@@ -392,6 +392,8 @@ update_doc(#httpdb{} = HttpDb, #doc{id = DocId} = Doc, Options, Type) ->
                     throw({forbidden, get_value(<<"reason">>, Props)});
                 {412, <<"missing_stub">>} ->
                     throw({missing_stub, get_value(<<"reason">>, Props)});
+                {413, _} ->
+                    {error, request_body_too_large};
                 {_, Error} ->
                     {error, Error}
                 end
