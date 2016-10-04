@@ -22,7 +22,12 @@
 -define(SIZE_BLOCK, 16#1000). % 4 KiB
 -define(READ_AHEAD, 2 * ?SIZE_BLOCK).
 -define(IS_OLD_STATE(S), tuple_size(S) /= tuple_size(#file{})).
+-define(PREFIX_SIZE, 5).
+-define(DEFAULT_READ_COUNT, 1024).
 
+-type block_id() :: non_neg_integer().
+-type location() :: non_neg_integer().
+-type header_size() :: non_neg_integer().
 
 -record(file, {
     fd,
@@ -524,33 +529,82 @@ handle_info({'EXIT', _, Reason}, Fd) ->
     {stop, Reason, Fd}.
 
 
-find_header(_Fd, -1) ->
-    no_valid_header;
 find_header(Fd, Block) ->
     case (catch load_header(Fd, Block)) of
     {ok, Bin} ->
         {ok, Bin};
     _Error ->
-        find_header(Fd, Block -1)
+        ReadCount = config:get_integer(
+            "couchdb", "find_header_read_count", ?DEFAULT_READ_COUNT),
+        find_header(Fd, Block -1, ReadCount)
     end.
 
 load_header(Fd, Block) ->
     {ok, <<1, HeaderLen:32/integer, RestBlock/binary>>} =
         file:pread(Fd, Block * ?SIZE_BLOCK, ?SIZE_BLOCK),
-    TotalBytes = calculate_total_read_len(5, HeaderLen),
-    case TotalBytes > byte_size(RestBlock) of
-    false ->
-        <<RawBin:TotalBytes/binary, _/binary>> = RestBlock;
-    true ->
-        {ok, Missing} = file:pread(
-            Fd, (Block * ?SIZE_BLOCK) + 5 + byte_size(RestBlock),
-            TotalBytes - byte_size(RestBlock)),
-        RawBin = <<RestBlock/binary, Missing/binary>>
+    load_header(Fd, Block * ?SIZE_BLOCK, HeaderLen, RestBlock).
+
+load_header(Fd, Pos, HeaderLen) ->
+    load_header(Fd, Pos, HeaderLen, <<>>).
+
+load_header(Fd, Pos, HeaderLen, RestBlock) ->
+    TotalBytes = calculate_total_read_len(?PREFIX_SIZE, HeaderLen),
+    RawBin = case TotalBytes =< byte_size(RestBlock) of
+        true ->
+            <<RawBin0:TotalBytes/binary, _/binary>> = RestBlock,
+            RawBin0;
+        false ->
+            ReadStart = Pos + ?PREFIX_SIZE + byte_size(RestBlock),
+            ReadLen = TotalBytes - byte_size(RestBlock),
+            {ok, Missing} = file:pread(Fd, ReadStart, ReadLen),
+            <<RestBlock/binary, Missing/binary>>
     end,
     <<Md5Sig:16/binary, HeaderBin/binary>> =
-        iolist_to_binary(remove_block_prefixes(5, RawBin)),
+        iolist_to_binary(remove_block_prefixes(?PREFIX_SIZE, RawBin)),
     Md5Sig = couch_crypto:hash(md5, HeaderBin),
     {ok, HeaderBin}.
+
+
+%% Read multiple block locations using a single file:pread/2.
+-spec find_header(file:fd(), block_id(), non_neg_integer()) ->
+    {ok, binary()} | no_valid_header.
+find_header(_Fd, Block, _ReadCount) when Block < 0 ->
+    no_valid_header;
+find_header(Fd, Block, ReadCount) ->
+    FirstBlock = max(0, Block - ReadCount + 1),
+    BlockLocations = [?SIZE_BLOCK*B || B <- lists:seq(FirstBlock, Block)],
+    {ok, DataL} = file:pread(Fd, [{L, ?PREFIX_SIZE} || L <- BlockLocations]),
+    %% Since BlockLocations are ordered from oldest to newest, we rely
+    %% on lists:foldl/3 to reverse the order, making HeaderLocations
+    %% correctly ordered from newest to oldest.
+    HeaderLocations = lists:foldl(fun
+        ({Loc, <<1, HeaderSize:32/integer>>}, Acc) ->
+            [{Loc, HeaderSize} | Acc];
+        (_, Acc) ->
+            Acc
+    end, [], lists:zip(BlockLocations, DataL)),
+    case find_newest_header(Fd, HeaderLocations) of
+        {ok, _Location, HeaderBin} ->
+            {ok, HeaderBin};
+        _ ->
+            ok = file:advise(
+                Fd, hd(BlockLocations), ReadCount * ?SIZE_BLOCK, dont_need),
+            NextBlock = hd(BlockLocations) div ?SIZE_BLOCK - 1,
+            find_header(Fd, NextBlock, ReadCount)
+    end.
+
+-spec find_newest_header(file:fd(), [{location(), header_size()}]) ->
+    {ok, binary()} | not_found.
+find_newest_header(_Fd, []) ->
+    not_found;
+find_newest_header(Fd, [{Location, Size} | LocationSizes]) ->
+    case (catch load_header(Fd, Location, Size)) of
+        {ok, HeaderBin} ->
+            {ok, Location, HeaderBin};
+        _Error ->
+            find_newest_header(Fd, LocationSizes)
+    end.
+
 
 maybe_read_more_iolist(Buffer, DataSize, _, _)
     when DataSize =< byte_size(Buffer) ->
