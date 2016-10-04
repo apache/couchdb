@@ -83,10 +83,10 @@ enc_charbuf(const jschar* src, size_t srclen, char* dst, size_t* dstlenp)
             {
                 // Invalid second half of surrogate pair
                 v = (uint32) 0xFFFD;
+                // Undo our character advancement
+                src--;
+                srclen++;
             }
-            // Undo our character advancement
-            src--;
-            srclen++;
         }
         else
         {
