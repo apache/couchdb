@@ -594,7 +594,7 @@ find_header(Fd, Block, ReadCount) ->
     end.
 
 -spec find_newest_header(file:fd(), [{location(), header_size()}]) ->
-    {ok, binary()} | not_found.
+    {ok, location(), binary()} | not_found.
 find_newest_header(_Fd, []) ->
     not_found;
 find_newest_header(Fd, [{Location, Size} | LocationSizes]) ->
