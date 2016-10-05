@@ -313,7 +313,9 @@ maybe_update_others(DbName, DDoc, ShardsInvolved, ViewName,
     ShardsNeedUpdated = mem3:shards(DbName) -- ShardsInvolved,
     lists:foreach(fun(#shard{node=Node, name=ShardName}) ->
         rpc:cast(Node, fabric_rpc, update_mrview, [ShardName, DDoc, ViewName, Args])
-    end, ShardsNeedUpdated).
+    end, ShardsNeedUpdated);
+maybe_update_others(_DbName, _DDoc, _ShardsInvolved, _ViewName, _Args) ->
+    ok.
 
 get_shard_replacements(DbName, UsedShards0) ->
     % We only want to generate a replacements list from shards
