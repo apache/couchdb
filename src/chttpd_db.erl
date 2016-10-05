@@ -1222,7 +1222,7 @@ db_attachment_req(#httpd{method=Method, user_ctx=Ctx}=Req, Db, DocId, FileNamePa
             couch_doc:validate_docid(DocId),
             #doc{id=DocId};
         Rev ->
-            case fabric:open_revs(Db, DocId, [Rev], []) of
+            case fabric:open_revs(Db, DocId, [Rev], [{user_ctx,Ctx}]) of
             {ok, [{ok, Doc0}]}  -> Doc0;
             {ok, [Error]}       -> throw(Error)
             end
