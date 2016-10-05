@@ -52,7 +52,10 @@ read_changes(Parent, StartSeq, Db, ChangesQueue, Options, Ts) ->
         throw:recurse ->
             LS = get(last_seq),
             read_changes(Parent, LS, Db, ChangesQueue, Options, Ts+1);
-        exit:{http_request_failed, _, _, _} = Error ->
+        throw:retry_no_limit ->
+            LS = get(last_seq),
+            read_changes(Parent, LS, Db, ChangesQueue, Options, Ts);
+        throw:{retry_limit, Error} ->
         couch_stats:increment_counter(
             [couch_replicator, changes_read_failures]
         ),

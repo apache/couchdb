@@ -138,6 +138,8 @@ process_response({ibrowse_req_id, ReqId}, Worker, HttpDb, Params, Callback) ->
 
 process_response({ok, Code, Headers, Body}, Worker, HttpDb, Params, Callback) ->
     case list_to_integer(Code) of
+    429 ->
+        backoff(Worker, HttpDb, Params);
     Ok when (Ok >= 200 andalso Ok < 300) ; (Ok >= 400 andalso Ok < 500) ->
         couch_stats:increment_counter([couch_replicator, responses, success]),
         EJson = case Body of
@@ -162,6 +164,9 @@ process_stream_response(ReqId, Worker, HttpDb, Params, Callback) ->
     receive
     {ibrowse_async_headers, ReqId, Code, Headers} ->
         case list_to_integer(Code) of
+        429 ->
+            backoff(Worker, HttpDb#httpdb{timeout = get_max_back_off()},
+                Params);
         Ok when (Ok >= 200 andalso Ok < 300) ; (Ok >= 400 andalso Ok < 500) ->
             StreamDataFun = fun() ->
                 stream_data_self(HttpDb, Params, Worker, ReqId, Callback)
@@ -172,6 +177,9 @@ process_stream_response(ReqId, Worker, HttpDb, Params, Callback) ->
                 Ret = Callback(Ok, Headers, StreamDataFun),
                 Ret
             catch
+                throw:{maybe_retry_req, connection_closed} ->
+                    maybe_retry({connection_closed, mid_stream},
+                        Worker, HttpDb, Params);
                 throw:{maybe_retry_req, Err} ->
                     maybe_retry(Err, Worker, HttpDb, Params)
             end;
@@ -258,19 +266,44 @@ discard_message(ReqId, Worker, Count) ->
     end.
 
 
+%% For 429 errors, we perform an exponential backoff up to 2.17 hours.
+%% We use Backoff time as a timeout/failure end.
+backoff(Worker, #httpdb{backoff = Backoff} = HttpDb, Params) ->
+    MaxBackOff = get_max_back_off(),
+    MaxBackOffLog = get_back_off_log_threshold(),
+    ok = timer:sleep(random:uniform(Backoff)),
+    Backoff2 = round(Backoff*get_back_off_exp()),
+    NewBackoff = erlang:min(Backoff2, MaxBackOff),
+    NewHttpDb = HttpDb#httpdb{backoff = NewBackoff},
+    case Backoff2 of
+        W0 when W0 > MaxBackOff ->
+            report_error(Worker, HttpDb, Params, {error,
+                "Long 429-induced Retry Time Out"});
+        W1 when W1 >=  MaxBackOffLog -> % Past 8 min, we log retries
+            log_retry_error(Params, HttpDb, Backoff2, "429 Retry"),
+            throw({retry, NewHttpDb, Params});
+        _ ->
+            throw({retry, NewHttpDb, Params})
+    end.
+
+
 maybe_retry(Error, Worker, #httpdb{retries = 0} = HttpDb, Params) ->
     report_error(Worker, HttpDb, Params, {error, Error});
 
 maybe_retry(Error, _Worker, #httpdb{retries = Retries, wait = Wait} = HttpDb,
     Params) ->
-    Method = string:to_upper(atom_to_list(get_value(method, Params, get))),
-    Url = couch_util:url_strip_password(full_url(HttpDb, Params)),
-    couch_log:notice("Retrying ~s request to ~s in ~p seconds due to error ~s",
-        [Method, Url, Wait / 1000, error_cause(Error)]),
     ok = timer:sleep(Wait),
+    log_retry_error(Params, HttpDb, Wait, Error),
     Wait2 = erlang:min(Wait * 2, ?MAX_WAIT),
     NewHttpDb = HttpDb#httpdb{retries = Retries - 1, wait = Wait2},
     throw({retry, NewHttpDb, Params}).
+
+
+log_retry_error(Params, HttpDb, Wait, Error) ->
+    Method = string:to_upper(atom_to_list(get_value(method, Params, get))),
+    Url = couch_util:url_strip_password(full_url(HttpDb, Params)),
+    couch_log:notice("Retrying ~s request to ~s in ~p seconds due to error ~s",
+        [Method, Url, Wait / 1000, error_cause(Error)]).
 
 
 report_error(_Worker, HttpDb, Params, Error) ->
@@ -406,3 +439,12 @@ after_redirect(RedirectUrl, _Code, HttpDb, Params) ->
 after_redirect(RedirectUrl, HttpDb, Params) ->
     Params2 = lists:keydelete(path, 1, lists:keydelete(qs, 1, Params)),
     {HttpDb#httpdb{url = RedirectUrl}, Params2}.
+
+get_max_back_off() ->
+    config:get_integer("replicator", "max_backoff_wait", 250 * 32768).
+
+get_back_off_log_threshold() ->
+    config:get_integer("replicator", "max_backoff_log_threshold", 512000).
+
+get_back_off_exp() ->
+    config:get_float("replicator", "backoff_exp", 1.5).
