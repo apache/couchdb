@@ -161,7 +161,7 @@ populate_db(Db, NumDocs) ->
 refresh_index(DbName) ->
     {ok, Db} = couch_db:open_int(DbName, []),
     {ok, DDoc} = couch_db:open_doc(Db, ?DDOC_ID, [ejson_body]),
-    couch_mrview:query_view(Db, DDoc, <<"by_id">>, [{stale, false}]),
+    couch_mrview:query_view(Db, DDoc, <<"by_id">>, [{update, true}]),
     ok = couch_db:close(Db).
 
 compact_db(DbName) ->
