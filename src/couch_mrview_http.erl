@@ -518,11 +518,25 @@ parse_param(Key, Val, Args, IsDecoded) ->
         "limit" ->
             Args#mrargs{limit=parse_pos_int(Val)};
         "stale" when Val == "ok" orelse Val == <<"ok">> ->
-            Args#mrargs{stale=ok};
+            Args#mrargs{stable=true, update=false};
         "stale" when Val == "update_after" orelse Val == <<"update_after">> ->
-            Args#mrargs{stale=update_after};
+            Args#mrargs{stable=true, update=lazy};
         "stale" ->
             throw({query_parse_error, <<"Invalid value for `stale`.">>});
+        "stable" when Val == "true" orelse Val == <<"true">> ->
+            Args#mrargs{stable=true};
+        "stable" when Val == "false" orelse Val == <<"false">> ->
+            Args#mrargs{stable=false};
+        "stable" ->
+            throw({query_parse_error, <<"Invalid value for `stable`.">>});
+        "update" when Val == "true" orelse Val == <<"true">> ->
+            Args#mrargs{update=true};
+        "update" when Val == "false" orelse Val == <<"false">> ->
+            Args#mrargs{update=false};
+        "update" when Val == "lazy" orelse Val == <<"lazy">> ->
+            Args#mrargs{update=lazy};
+        "update" ->
+            throw({query_parse_error, <<"Invalid value for `update`.">>});
         "descending" ->
             case parse_boolean(Val) of
                 true -> Args#mrargs{direction=rev};
