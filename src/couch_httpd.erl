@@ -33,6 +33,8 @@
 -export([http_1_0_keep_alive/2]).
 -export([validate_host/1]).
 -export([validate_bind_address/1]).
+-export([check_max_request_length/1]).
+
 
 -define(HANDLER_NAME_IN_MODULE_POS, 6).
 
@@ -445,6 +447,18 @@ validate_ctype(Req, Ctype) ->
             throw({bad_ctype, "Content-Type must be "++Ctype})
         end
     end.
+
+
+check_max_request_length(Req) ->
+    Len = list_to_integer(header_value(Req, "Content-Length", "0")),
+    MaxLen = config:get_integer("couchdb", "max_document_size", 4294967296),
+    case Len > MaxLen of
+        true ->
+            exit({body_too_large, Len});
+        false ->
+            ok
+    end.
+
 
 % Utilities
 

@@ -583,6 +583,7 @@ db_doc_req(#httpd{method='PUT'}=Req, Db, DocId) ->
 
     case couch_util:to_list(couch_httpd:header_value(Req, "Content-Type")) of
     ("multipart/related;" ++ _) = ContentType ->
+        couch_chttpd:check_max_request_length(Req),
         {ok, Doc0, WaitFun, Parser} = couch_doc:doc_from_multi_part_stream(
             ContentType, fun() -> receive_request_data(Req) end),
         Doc = couch_doc_from_req(Req, DocId, Doc0),
