@@ -25,6 +25,7 @@ PACKAGE_AUTHOR_NAME="The Apache Software Foundation"
 WITH_CURL="false"
 WITH_FAUXTON=1
 WITH_DOCS=1
+WITH_SNAP=1
 SKIP_DEPS=0
 
 COUCHDB_USER=`whoami`
@@ -43,6 +44,7 @@ Options:
   -c | --with-curl            request that couchjs is linked to cURL (default false)
   --disable-fauxton           do not build Fauxton
   --disable-docs              do not build any documentation or manpages
+  --disable-snap              do not build snap package config
   --skip-deps                 do not update erlang dependencies
   --rebar=PATH                use rebar by specified path (version >=2.6.0 && <3.0 required)
 EOF
@@ -70,6 +72,12 @@ parse_opts() {
 
             --disable-docs)
                 WITH_DOCS=0
+                shift
+                continue
+                ;;
+
+            --disable-snap)
+                WITH_SNAP=0
                 shift
                 continue
                 ;;
@@ -184,7 +192,85 @@ EOF
 cat > $rootdir/config.erl << EOF
 {with_curl, $WITH_CURL}.
 EOF
+ 
+if [ "${WITH_SNAP}" -eq "1" ]; then
+echo "==> configuring snapcraft config"
+cat > rel/snapcraft.yaml << EOF
+name: couchdb
+version: 2.0
+summary: Document based database
+description: CouchDB is a database that completely embraces the web. Store your data with JSON documents. Access your documents and query your indexes with your web browser, via HTTP. Index, combine, and transform your documents with JavaScript. 
+confinement: strict
+grade: stable
 
+apps:
+    couchdb:
+        daemon: simple
+        command: snap_run
+        plugs: [network-bind]
+    run:
+        command: snap_run
+        plugs: [network-bind]
+parts:
+    couchdb: 
+        plugin: dump
+        source: .
+        organize:
+            snap.ini: couchdb/etc/snap.ini
+            snap_run: bin/snap_run
+        stage:
+            - couchdb
+            - bin
+        snap:
+            - couchdb
+            - bin
+    erlang:
+        plugin: nil
+        stage-packages:
+            - erlang-base-hipe
+            - erlang-crypto
+            - erlang-eunit
+            - erlang-inets
+            - erlang-os-mon
+            - erlang-public-key
+            - erlang-ssl
+            - erlang-syntax-tools
+            - erlang-tools
+            - erlang-xmerl
+            - libc6
+            - libcurl3
+            - libgcc1
+            - libicu55
+            - libmozjs185-1.0
+            - libstdc++6
+EOF
+
+cat > rel/snap.ini << EOF
+; Snap-specific Configuration Settings
+
+[couchdb]
+database_dir = /var/snap/couchdb/common/data
+view_index_dir = /var/snap/couchdb/common/data
+
+[log]
+writer = file
+file = /var/snap/couchdb/current/couchdb.log
+;level = info
+EOF
+
+cat > rel/snap_run << EOF
+#!/bin/sh
+
+export HOME=$SNAP_DATA
+export ERL_FLAGS="-couch_ini \${SNAP}/couchdb/etc/default.ini \${SNAP}/couchdb/etc/snap.ini \${SNAP_DATA}/local.ini"
+if [ ! -e \${SNAP_DATA}/local.ini ]; then
+    touch \${SNAP_DATA}/local.ini
+fi
+
+exec \${SNAP}/couchdb/bin/couchdb
+EOF
+chmod +x rel/snap_run
+fi
 
 install_local_rebar() {
     if [ ! -x "${rootdir}/bin/rebar" ]; then
