@@ -26,6 +26,7 @@
    total_changes
 }).
 
+-define(DEFAULT_RECOMPACT_RETRY_COUNT, 3).
 
 compact(_Db, State, Opts) ->
     case lists:member(recompact, Opts) of
@@ -148,14 +149,30 @@ compact(State) ->
 
 
 recompact(State) ->
+    RetryCount = config:get_integer("view_compaction", "recompact_retry_count",
+        ?DEFAULT_RECOMPACT_RETRY_COUNT),
+    recompact(State, RetryCount).
+
+recompact(State, 0) ->
+    couch_log:error("couch_mrview_compactor:recompact max retries exceeded ~p",
+        [State]),
+    {ok, State};
+recompact(State, Attempt) ->
     link(State#mrst.fd),
     {Pid, Ref} = erlang:spawn_monitor(fun() ->
         couch_index_updater:update(couch_mrview_index, State)
     end),
     receive
-        {'DOWN', Ref, _, _, {updated, Pid, State2}} ->
+        {'DOWN', Ref, _, _, Result} ->
             unlink(State#mrst.fd),
-            {ok, State2}
+            case Result of
+                {updated, Pid, State2} ->
+                    {ok, State2};
+                Error ->
+                    couch_log:info("couch_mrview_compactor:recompact error ~p",
+                        [Error]),
+                    recompact(State, Attempt - 1)
+            end
     end.
 
 compact_log(LogBtree, BufferSize, Acc0) ->
