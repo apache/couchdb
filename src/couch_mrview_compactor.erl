@@ -149,31 +149,40 @@ compact(State) ->
 
 
 recompact(State) ->
-    RetryCount = config:get_integer("view_compaction", "recompact_retry_count",
-        ?DEFAULT_RECOMPACT_RETRY_COUNT),
-    recompact(State, RetryCount).
+    recompact(State, recompact_retry_count()).
 
-recompact(State, 0) ->
-    couch_log:error("couch_mrview_compactor:recompact max retries exceeded ~p",
-        [State]),
-    {ok, State};
-recompact(State, Attempt) ->
+recompact(_State, 0) ->
+    erlang:error(exceeded_recompact_retry_count);
+
+recompact(State, RetryCount) ->
+    Self = self(),
     link(State#mrst.fd),
     {Pid, Ref} = erlang:spawn_monitor(fun() ->
-        couch_index_updater:update(couch_mrview_index, State)
+        couch_index_updater:update(Self, couch_mrview_index, State)
     end),
+    recompact_loop(Pid, Ref, State, RetryCount).
+
+recompact_loop(Pid, Ref, State, RetryCount) ->
     receive
-        {'DOWN', Ref, _, _, Result} ->
+        {'$gen_cast', {new_state, State2}} ->
+            % We've made progress so reset RetryCount
+            recompact_loop(Pid, Ref, State2, recompact_retry_count());
+        {'DOWN', Ref, _, _, {updated, Pid, State2}} ->
             unlink(State#mrst.fd),
-            case Result of
-                {updated, Pid, State2} ->
-                    {ok, State2};
-                Error ->
-                    couch_log:info("couch_mrview_compactor:recompact error ~p",
-                        [Error]),
-                    recompact(State, Attempt - 1)
-            end
+            {ok, State2};
+        {'DOWN', Ref, _, _, Reason} ->
+            unlink(State#mrst.fd),
+            couch_log:warning("Error during recompaction: ~r", [Reason]),
+            recompact(State, RetryCount - 1)
     end.
+
+recompact_retry_count() ->
+    config:get_integer(
+        "view_compaction",
+        "recompact_retry_count",
+        ?DEFAULT_RECOMPACT_RETRY_COUNT
+    ).
+
 
 compact_log(LogBtree, BufferSize, Acc0) ->
     FoldFun = fun(KV, Acc) ->
