@@ -272,6 +272,7 @@ EOF
 chmod +x rel/snap_run
 fi
 
+
 install_local_rebar() {
     if [ ! -x "${rootdir}/bin/rebar" ]; then
         if [ ! -d "${rootdir}/src/rebar" ]; then
