@@ -1,3 +1,4 @@
+.rebar/
 ebin/
 test/*.pyc
 venv/
