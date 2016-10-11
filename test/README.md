@@ -1,9 +1,9 @@
 Mango Tests
 ===========
 
-CouchDB should be started with ./dev/run -a testuser:testpass.
+CouchDB should be started with `./dev/run -a testuser:testpass`.
 
-To run these, do this in the top level directory:
+To run these, do this in the Mango top level directory:
 
     $ virtualenv venv
     $ source venv/bin/activate
