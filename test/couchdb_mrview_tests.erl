@@ -27,6 +27,11 @@
             "var data = JSON.parse(req.body); "
             "return ['test', data];"
         "}">>}
+    ]}},
+    {<<"views">>, {[
+        {<<"view1">>, {[
+            {<<"map">>, <<"function(doc){emit(doc._id, doc._rev)}">>}
+        ]}}
     ]}}
 ]}).
 
@@ -60,7 +65,7 @@ teardown(PortType, {_Host, DbName}) ->
     delete_db(PortType, ?l2b(DbName)),
     ok.
 
-mrview_update_test_() ->
+mrview_show_test_() ->
     {
         "Check show functionality",
         {
@@ -69,6 +74,19 @@ mrview_update_test_() ->
             [
                 make_test_case(clustered, [fun should_return_invalid_request_body/2]),
                 make_test_case(backdoor, [fun should_return_invalid_request_body/2])
+            ]
+        }
+    }.
+
+mrview_query_test_() ->
+    {
+        "Check view query functionality",
+        {
+            setup,
+            fun start/0, fun teardown/1,
+            [
+                make_test_case(clustered, [fun should_return_400_for_wrong_order_of_keys/2]),
+                make_test_case(backdoor, [fun should_return_400_for_wrong_order_of_keys/2])
             ]
         }
     }.
@@ -90,6 +108,22 @@ should_return_invalid_request_body(PortType, {Host, DbName}) ->
             <<"bad_request">>, couch_util:get_value(<<"error">>, Props)),
          ?assertEqual(
             <<"Invalid request body">>, couch_util:get_value(<<"reason">>, Props)),
+         ?assertEqual(400, Status),
+         ok
+    end).
+
+should_return_400_for_wrong_order_of_keys(_PortType, {Host, DbName}) ->
+    Args = [{start_key, "\"bbb\""}, {end_key, "\"aaa\""}],
+    ?_test(begin
+         ReqUrl = Host ++ "/" ++ DbName
+              ++ "/_design/foo/_view/view1?" ++ mochiweb_util:urlencode(Args),
+         {ok, Status, _Headers, Body} = test_request:get(ReqUrl, [?AUTH]),
+         {Props} = jiffy:decode(Body),
+         ?assertEqual(
+            <<"query_parse_error">>, couch_util:get_value(<<"error">>, Props)),
+         ?assertEqual(
+            <<"No rows can match your key range, reverse your start_key and end_key or set descending=true">>,
+            couch_util:get_value(<<"reason">>, Props)),
          ?assertEqual(400, Status),
          ok
     end).
