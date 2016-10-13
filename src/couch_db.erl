@@ -1412,7 +1412,7 @@ make_doc(_Db, Id, Deleted, nil = _Bp, RevisionPath) ->
         atts = [],
         deleted = Deleted
     };
-make_doc(#db{fd=Fd}=Db, Id, Deleted, Bp, RevisionPath) ->
+make_doc(#db{fd=Fd, revs_limit=RevsLimit}=Db, Id, Deleted, Bp, {Pos, Revs}) ->
     {BodyData, Atts0} = case Bp of
         nil ->
             {[], []};
@@ -1428,7 +1428,7 @@ make_doc(#db{fd=Fd}=Db, Id, Deleted, Bp, RevisionPath) ->
     Atts = [couch_att:from_disk_term(Fd, T) || T <- Atts0],
     Doc = #doc{
         id = Id,
-        revs = RevisionPath,
+        revs = {Pos, lists:sublist(Revs, 1, RevsLimit)},
         body = BodyData,
         atts = Atts,
         deleted = Deleted
