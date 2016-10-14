@@ -53,6 +53,14 @@
         var isReplicator = (userCtx.roles.indexOf('_replicator') >= 0);
         var isAdmin = (userCtx.roles.indexOf('_admin') >= 0);
 
+        if (newDoc._replication_state === 'error') {
+            // Skip validation in case when we update the document with the
+            // failed state. In this case it might be malformed. However,
+            // replicator will not pay attention to failed documents so this
+            // is safe.
+            return;
+        }
+
         if (oldDoc && !newDoc._deleted && !isReplicator &&
             (oldDoc._replication_state === 'triggered')) {
             reportError('Only the replicator can edit replication documents ' +
