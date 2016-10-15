@@ -117,6 +117,8 @@ start_link(Name, Options) ->
          end,
     ok = couch_httpd:validate_bind_address(IP),
 
+    set_auth_handlers(),
+
     Options1 = Options ++ [
         {loop, fun ?MODULE:handle_request/1},
         {name, Name},
@@ -464,12 +466,35 @@ extract_cookie(#httpd{mochi_req = MochiReq}) ->
     end.
 %%% end hack
 
-authenticate_request(Req) ->
-    AuthenticationFuns = [
-        {<<"cookie">>, fun chttpd_auth:cookie_authentication_handler/1},
-        {<<"default">>, fun chttpd_auth:default_authentication_handler/1},
+set_auth_handlers() ->
+    AuthenticationDefault =  "{chttpd_auth, cookie_authentication_handler},
+      {chttpd_auth, default_authentication_handler}",
+    AuthenticationSrcs = couch_httpd:make_fun_spec_strs(
+        config:get("chttpd", "authentication_handlers", AuthenticationDefault)),
+    AuthHandlers = lists:map(
+        fun(A) -> {auth_handler_name(A), couch_httpd:make_arity_1_fun(A)} end, AuthenticationSrcs),
+    AuthenticationFuns = AuthHandlers ++ [
         fun chttpd_auth:party_mode_handler/1 %% must be last
     ],
+    ok = application:set_env(chttpd, auth_handlers, AuthenticationFuns).
+
+% SpecStr is a string like "{my_module, my_fun}"
+% Takes the first token of the function name in front '_' as auth handler name
+% e.g.
+% chttpd_auth:default_authentication_handler: default
+% chttpd_auth_cookie_authentication_handler: cookie
+% couch_http_auth:proxy_authentication_handler: proxy
+%
+% couch_http:auth_handler_name can't be used here, since it assumes the name
+% of the auth handler to be the 6th token split by [\\W_]
+% - this only works for modules with exactly two underscores in their name
+% - is not very robust (a space after the ',' is assumed)
+auth_handler_name(SpecStr) ->
+    {ok, {_, Fun}} = couch_util:parse_term(SpecStr),
+    hd(string:tokens(atom_to_list(Fun), "_")).
+
+authenticate_request(Req) ->
+    {ok, AuthenticationFuns} = application:get_env(chttpd, auth_handlers),
     authenticate_request(Req, chttpd_auth_cache, AuthenticationFuns).
 
 authenticate_request(#httpd{} = Req0, AuthModule, AuthFuns) ->
