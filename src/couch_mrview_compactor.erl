@@ -291,3 +291,39 @@ swap_compacted(OldState, NewState) ->
     erlang:demonitor(OldState#mrst.fd_monitor, [flush]),
     
     {ok, NewState#mrst{fd_monitor=Ref}}.
+
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+recompact_test_() ->
+    [
+        recompact_success_after_progress(),
+        recompact_exceeded_retry_count()
+    ].
+
+recompact_success_after_progress() ->
+    ?_test(begin
+        ok = meck:expect(couch_index_updater, update, fun
+            (Pid, _, #mrst{update_seq=0} = State) ->
+                Pid ! {'$gen_cast', {new_state, State#mrst{update_seq=1}}};
+            (_, _, State) ->
+                exit({updated, self(), State})
+        end),
+        State = #mrst{fd=self(), update_seq=0},
+        ?assertEqual({ok, State#mrst{update_seq=1}}, recompact(State)),
+        meck:unload(couch_index_updater)
+    end).
+
+recompact_exceeded_retry_count() ->
+    ?_test(begin
+        ok = meck:expect(couch_index_updater, update,
+            fun(_, _, _) ->
+                exit(error)
+        end),
+        State = #mrst{fd=self()},
+        ?assertError(exceeded_recompact_retry_count, recompact(State)),
+        meck:unload(couch_index_updater)
+    end).
+
+-endif.
