@@ -26,7 +26,8 @@ class IndexCrudTests(mango.DbPerClass):
             {"foo": "bar"},
             [{"foo": 2}],
             [{"foo": "asc", "bar": "desc"}],
-            [{"foo": "asc"}, {"bar": "desc"}]
+            [{"foo": "asc"}, {"bar": "desc"}],
+            [""]
         ]
         for fields in bad_fields:
             try:
@@ -254,7 +255,8 @@ class IndexCrudTests(mango.DbPerClass):
             [{"name": "foo3", "type": "garbage"}],
             [{"type": "number"}],
             [{"name": "age", "type": "number"} , {"name": "bad"}],
-            [{"name": "age", "type": "number"} , "bla"]
+            [{"name": "age", "type": "number"} , "bla"],
+            [{"name": "", "type": "number"} , "bla"]
         ]
         for fields in bad_fields:
             try:

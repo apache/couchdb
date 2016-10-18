@@ -159,11 +159,23 @@ def_to_json([{Key, Value} | Rest]) ->
 fields_to_json([]) ->
     [];
 fields_to_json([{[{<<"name">>, Name}, {<<"type">>, Type0}]} | Rest]) ->
+    ok = validate_field_name(Name),
     Type = validate_field_type(Type0),
     [{[{Name, Type}]} | fields_to_json(Rest)];
 fields_to_json([{[{<<"type">>, Type0}, {<<"name">>, Name}]} | Rest]) ->
+    ok = validate_field_name(Name),
     Type = validate_field_type(Type0),
     [{[{Name, Type}]} | fields_to_json(Rest)].
+
+
+%% In the future, we can possibly add more restrictive validation.
+%% For now, let's make sure the field name is not blank.
+validate_field_name(<<"">>) ->
+    throw(invalid_field_name);
+validate_field_name(Else) when is_binary(Else)->
+    ok;
+validate_field_name(_) ->
+    throw(invalid_field_name).
 
 
 validate_field_type(<<"string">>) ->
@@ -181,6 +193,8 @@ validate_fields(Fields) ->
         _ ->
             mango_fields:new(Fields)
     catch error:function_clause ->
+        ?MANGO_ERROR({invalid_index_fields_definition, Fields});
+    throw:invalid_field_name ->
         ?MANGO_ERROR({invalid_index_fields_definition, Fields})
     end.
 

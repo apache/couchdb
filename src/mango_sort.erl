@@ -47,6 +47,8 @@ directions({Props}) ->
     [Dir || {_Name, Dir} <- Props].
 
 
+sort_field(<<"">>) ->
+    ?MANGO_ERROR({invalid_sort_field, <<"">>});
 sort_field(Field) when is_binary(Field) ->
     {Field, <<"asc">>};
 sort_field({[{Name, <<"asc">>}]}) when is_binary(Name) ->
