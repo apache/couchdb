@@ -140,7 +140,6 @@ Keys:
 
 * action - "create\_index"
 * index - JSON array following sort syntax, described below
-* missing\_is\_null (optional) (default: false) - When indexing documents that do not contain a field required by the index they are usually ignored for the purpose of that index, using `missing\_is\_null` adds an entry to the index for the document with a value of `null`
 * type (optional) (default: "json") - string, specifying the index type to create. Currently only "json" indexes are supported but in the future we will provide full-text indexes as well as Geo spatial indexes
 * name (optional) - string, optionally specify a name for the index. If a name is not provided one will be automatically generated
 * ddoc (optional) - Indexes can be grouped into design documents underneath the hood for efficiency. This is an advanced feature. Don't specify a design document here unless you know the consequences of index invalidation. By default each index is placed in its own separate design document for isolation.
