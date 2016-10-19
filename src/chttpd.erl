@@ -491,7 +491,7 @@ set_auth_handlers() ->
 % - is not very robust (a space after the ',' is assumed)
 auth_handler_name(SpecStr) ->
     {ok, {_, Fun}} = couch_util:parse_term(SpecStr),
-    hd(string:tokens(atom_to_list(Fun), "_")).
+    hd(binary:split(atom_to_binary(Fun, latin1), <<"_">>)).
 
 authenticate_request(Req) ->
     {ok, AuthenticationFuns} = application:get_env(chttpd, auth_handlers),
