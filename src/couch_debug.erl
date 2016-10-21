@@ -14,7 +14,8 @@
 
 -export([
     opened_files/0,
-    opened_files_by_regexp/1
+    opened_files_by_regexp/1,
+    opened_files_contains/1
 ]).
 
 -spec opened_files() ->
@@ -41,4 +42,11 @@ opened_files_by_regexp(FileRegExp) ->
     {ok, RegExp} = re:compile(FileRegExp),
     lists:filter(fun({_Port, _Pid, _Fd, Path}) ->
         re:run(Path, RegExp) =/= nomatch
+    end, couch_debug:opened_files()).
+
+-spec opened_files_contains(FileNameFragment :: iodata()) ->
+    [{port(), CouchFilePid :: pid(), Fd :: pid() | tuple(), FilePath :: string()}].
+opened_files_contains(FileNameFragment) ->
+    lists:filter(fun({_Port, _Pid, _Fd, Path}) ->
+        string:str(Path, FileNameFragment) > 0
     end, couch_debug:opened_files()).
