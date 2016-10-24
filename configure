@@ -30,6 +30,9 @@ SKIP_DEPS=0
 
 COUCHDB_USER=`whoami`
 
+. ${rootdir}/version.mk
+COUCHDB_VERSION=${vsn_major}.${vsn_minor}.${vsn_patch}
+
 display_help () {
     cat << EOF
 Usage: $basename [OPTION]
@@ -197,7 +200,7 @@ if [ "${WITH_SNAP}" -eq "1" ]; then
 echo "==> configuring snapcraft config"
 cat > rel/snapcraft.yaml << EOF
 name: couchdb
-version: 2.0
+version: $COUCHDB_VERSION
 summary: Document based database
 description: CouchDB is a database that completely embraces the web. Store your data with JSON documents. Access your documents and query your indexes with your web browser, via HTTP. Index, combine, and transform your documents with JavaScript. 
 confinement: strict
