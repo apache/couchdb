@@ -201,6 +201,10 @@ introspect:
 	@$(REBAR) -r update-deps
 	@./introspect
 
+.PHONY: snap
+# target: snap - Build Snap package
+snap: release
+	@cd rel/; snapcraft snap --output ../couchdb_$(COUCHDB_VERSION)_amd64.snap
 
 ################################################################################
 # Distributing
