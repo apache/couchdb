@@ -151,8 +151,9 @@ compact(State) ->
 recompact(State) ->
     recompact(State, recompact_retry_count()).
 
-recompact(_State, 0) ->
-    erlang:error(exceeded_recompact_retry_count);
+recompact(#mrst{db_name=DbName, idx_name=IdxName}, 0) ->
+    erlang:error({exceeded_recompact_retry_count,
+        [{db_name, DbName}, {idx_name, IdxName}]});
 
 recompact(State, RetryCount) ->
     Self = self(),
@@ -321,8 +322,10 @@ recompact_exceeded_retry_count() ->
             fun(_, _, _) ->
                 exit(error)
         end),
-        State = #mrst{fd=self()},
-        ?assertError(exceeded_recompact_retry_count, recompact(State)),
+        State = #mrst{fd=self(), db_name=foo, idx_name=bar},
+        ExpectedError = {exceeded_recompact_retry_count,
+            [{db_name, foo}, {idx_name, bar}]},
+        ?assertError(ExpectedError, recompact(State)),
         meck:unload(couch_index_updater)
     end).
 
