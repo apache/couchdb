@@ -532,11 +532,16 @@ db_req(#httpd{path_parts=[_,OP]}=Req, _Db) when ?IS_ALL_DOCS(OP) ->
 db_req(#httpd{method='POST',path_parts=[_,<<"_missing_revs">>]}=Req, Db) ->
     chttpd:validate_ctype(Req, "application/json"),
     {JsonDocIdRevs} = chttpd:json_body_obj(Req),
-    {ok, Results} = fabric:get_missing_revs(Db, JsonDocIdRevs),
-    Results2 = [{Id, couch_doc:revs_to_strs(Revs)} || {Id, Revs, _} <- Results],
-    send_json(Req, {[
-        {missing_revs, {Results2}}
-    ]});
+    case fabric:get_missing_revs(Db, JsonDocIdRevs) of
+        {error, Reason} ->
+            chttpd:send_error(Req, Reason);
+        {ok, Results} ->
+            Results2 = [{Id, couch_doc:revs_to_strs(Revs)} ||
+                    {Id, Revs, _} <- Results],
+            send_json(Req, {[
+                {missing_revs, {Results2}}
+            ]})
+    end;
 
 db_req(#httpd{path_parts=[_,<<"_missing_revs">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "POST");
@@ -544,19 +549,23 @@ db_req(#httpd{path_parts=[_,<<"_missing_revs">>]}=Req, _Db) ->
 db_req(#httpd{method='POST',path_parts=[_,<<"_revs_diff">>]}=Req, Db) ->
     chttpd:validate_ctype(Req, "application/json"),
     {JsonDocIdRevs} = chttpd:json_body_obj(Req),
-    {ok, Results} = fabric:get_missing_revs(Db, JsonDocIdRevs),
-    Results2 =
-    lists:map(fun({Id, MissingRevs, PossibleAncestors}) ->
-        {Id,
-            {[{missing, couch_doc:revs_to_strs(MissingRevs)}] ++
-                if PossibleAncestors == [] ->
-                    [];
-                true ->
-                    [{possible_ancestors,
-                        couch_doc:revs_to_strs(PossibleAncestors)}]
-                end}}
-    end, Results),
-    send_json(Req, {Results2});
+    case fabric:get_missing_revs(Db, JsonDocIdRevs) of
+        {error, Reason} ->
+            chttpd:send_error(Req, Reason);
+        {ok, Results} ->
+            Results2 =
+            lists:map(fun({Id, MissingRevs, PossibleAncestors}) ->
+                {Id,
+                    {[{missing, couch_doc:revs_to_strs(MissingRevs)}] ++
+                        if PossibleAncestors == [] ->
+                            [];
+                        true ->
+                            [{possible_ancestors,
+                                couch_doc:revs_to_strs(PossibleAncestors)}]
+                        end}}
+            end, Results),
+            send_json(Req, {Results2})
+    end;
 
 db_req(#httpd{path_parts=[_,<<"_revs_diff">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "POST");
