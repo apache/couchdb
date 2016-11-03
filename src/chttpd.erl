@@ -885,6 +885,8 @@ error_info({_DocID,{illegal_docid,DocID}}) ->
 error_info({error, {database_name_too_long, DbName}}) ->
     {400, <<"database_name_too_long">>,
         <<"At least one path segment of `", DbName/binary, "` is too long.">>};
+error_info({doc_validation, Reason}) ->
+    {400, <<"doc_validation">>, Reason};
 error_info({missing_stub, Reason}) ->
     {412, <<"missing_stub">>, Reason};
 error_info(request_entity_too_large) ->
