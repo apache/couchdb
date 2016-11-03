@@ -139,7 +139,8 @@ should_not_read_beyond_eof(Fd) ->
     ok = file:pwrite(Io, Pos, <<0:1/integer, DoubleBin:31/integer>>),
     file:close(Io),
     unlink(Fd),
-    ExpectedError = {badmatch, {'EXIT', {bad_return_value, read_beyond_eof}}},
+    ExpectedError = {badmatch, {'EXIT', {bad_return_value,
+        {read_beyond_eof, Filepath}}}},
     ?_assertError(ExpectedError, couch_file:pread_binary(Fd, Pos)).
 
 should_truncate(Fd) ->
@@ -175,11 +176,12 @@ pread_limit_test_() ->
     }.
 
 should_not_read_more_than_pread_limit(Fd) ->
+    {_, Filepath} = couch_file:process_info(Fd),
     BigBin = list_to_binary(lists:duplicate(100000, 0)),
     {ok, Pos, _Size} = couch_file:append_binary(Fd, BigBin),
     unlink(Fd),
     ExpectedError = {badmatch, {'EXIT', {bad_return_value,
-        {exceed_pread_limit, 50000}}}},
+        {exceed_pread_limit, Filepath, 50000}}}},
     ?_assertError(ExpectedError, couch_file:pread_binary(Fd, Pos)).
 
 
