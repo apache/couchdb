@@ -428,10 +428,10 @@ handle_call({pread_iolist, Pos}, _From, File) ->
         % up to 8Kbs of read ahead
         read_raw_iolist_int(File, Pos, ?READ_AHEAD - (Pos rem ?SIZE_BLOCK))
     catch
-    throw:read_beyond_eof ->
-        throw(read_beyond_eof);
-    throw:{exceed_pread_limit, Limit} ->
-        throw({exceed_pread_limit, Limit});
+    throw:{read_beyond_eof, _} = Reason ->
+        throw(Reason);
+    throw:{exceed_pread_limit, _, _} = Reason ->
+        throw(Reason);
     _:_ ->
         read_raw_iolist_int(File, Pos, 4)
     end,
@@ -625,10 +625,12 @@ read_raw_iolist_int(#file{fd = Fd, pread_limit = Limit} = F, Pos, Len) ->
     case Pos + TotalBytes of
     Size when Size > F#file.eof + ?READ_AHEAD ->
         couch_stats:increment_counter([pread, exceed_eof]),
-        throw(read_beyond_eof);
+        {_Fd, Filepath} = get(couch_file_fd),
+        throw({read_beyond_eof, Filepath});
     Size when Size > Limit ->
         couch_stats:increment_counter([pread, exceed_limit]),
-        throw({exceed_pread_limit, Limit});
+        {_Fd, Filepath} = get(couch_file_fd),
+        throw({exceed_pread_limit, Filepath, Limit});
     Size ->
         {ok, <<RawBin:TotalBytes/binary>>} = file:pread(Fd, Pos, TotalBytes),
         {remove_block_prefixes(BlockOffset, RawBin), Size}
