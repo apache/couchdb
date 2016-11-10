@@ -58,6 +58,81 @@ couch_auth_cache_test_() ->
         }
     }.
 
+auth_vdu_test_() ->
+    Cases = [
+        %% Old            , New           , Result
+        %% [Roles, Type]  , [Roles, Type] ,
+
+        %% Updating valid user doc with valid one
+        {[custom, user], [custom, user], "ok"},
+
+        %% Updating invalid doc (missing type or roles field) with valid one
+        {[missing, missing], [custom, user], "ok"},
+        {[missing, user], [custom, user], "ok"},
+        {[custom, missing], [custom, user], "ok"},
+
+        %% Updating invalid doc (wrong type) with valid one
+        {[missing, other], [custom, user], "ok"},
+        {[custom, other], [custom, user], "ok"},
+
+        %% Updating valid document with invalid one
+        {[custom, user], [missing, missing], "doc.type must be user"},
+        {[custom, user], [missing, user], "doc.roles must exist"},
+        {[custom, user], [custom, missing], "doc.type must be user"},
+        {[custom, user], [missing, other], "doc.type must be user"},
+        {[custom, user], [custom, other], "doc.type must be user"},
+
+        %% Updating invalid doc with invalid one
+        {[missing, missing], [missing, missing], "doc.type must be user"},
+        {[missing, missing], [missing, user], "doc.roles must exist"},
+        {[missing, missing], [custom, missing], "doc.type must be user"},
+        {[missing, missing], [missing, other], "doc.type must be user"},
+        {[missing, missing], [custom, other], "doc.type must be user"},
+
+        {[missing, user], [missing, missing], "doc.type must be user"},
+        {[missing, user], [missing, user], "doc.roles must exist"},
+        {[missing, user], [custom, missing], "doc.type must be user"},
+        {[missing, user], [missing, other], "doc.type must be user"},
+        {[missing, user], [custom, other], "doc.type must be user"},
+
+        {[missing, other], [missing, missing], "doc.type must be user"},
+        {[missing, other], [missing, user], "doc.roles must exist"},
+        {[missing, other], [custom, missing], "doc.type must be user"},
+        {[missing, other], [missing, other], "doc.type must be user"},
+        {[missing, other], [custom, other], "doc.type must be user"},
+
+        {[custom, missing], [missing, missing], "doc.type must be user"},
+        {[custom, missing], [missing, user], "doc.roles must exist"},
+        {[custom, missing], [custom, missing], "doc.type must be user"},
+        {[custom, missing], [missing, other], "doc.type must be user"},
+        {[custom, missing], [custom, other], "doc.type must be user"},
+
+        {[custom, other], [missing, missing], "doc.type must be user"},
+        {[custom, other], [missing, user], "doc.roles must exist"},
+        {[custom, other], [custom, missing], "doc.type must be user"},
+        {[custom, other], [missing, other], "doc.type must be user"},
+        {[custom, other], [custom, other], "doc.type must be user"}
+    ],
+
+    %% Make sure we covered all combinations
+    AllPossibleDocs = couch_tests_combinatorics:product([
+        [missing, custom],
+        [missing, user, other]
+    ]),
+    AllPossibleCases = couch_tests_combinatorics:product(
+        [AllPossibleDocs, AllPossibleDocs]),
+    ?assertEqual([], AllPossibleCases -- [[A, B] || {A, B, _} <- Cases]),
+
+    {
+        "Check User doc validation",
+        {
+            setup,
+            fun test_util:start_couch/0, fun test_util:stop_couch/1,
+            [
+                make_validate_test(Case) || Case <- Cases
+            ]
+       }
+    }.
 
 should_get_nil_on_missed_cache(_) ->
     ?_assertEqual(nil, couch_auth_cache:get_user_creds("joe")).
@@ -238,3 +313,44 @@ is_opened(DbName) ->
     Monitors = couch_db:monitored_by(AuthDb) -- [self()],
     ok = couch_db:close(AuthDb),
     Monitors /= [].
+
+make_validate_test({Old, New, "ok"} = Case) ->
+    {test_id(Case), ?_assertEqual(ok, validate(doc(Old), doc(New)))};
+make_validate_test({Old, New, Reason} = Case) ->
+    Failure = ?l2b(Reason),
+    {test_id(Case), ?_assertThrow({forbidden, Failure}, validate(doc(Old), doc(New)))}.
+
+test_id({[OldRoles, OldType], [NewRoles, NewType], Result}) ->
+    lists:flatten(io_lib:format(
+        "(roles: ~w, type: ~w) -> (roles: ~w, type: ~w) ==> \"~s\"",
+        [OldRoles, OldType, NewRoles, NewType, Result])).
+
+doc([Roles, Type]) ->
+    couch_doc:from_json_obj({[
+        {<<"_id">>,<<"org.couchdb.user:foo">>},
+        {<<"_rev">>,<<"1-281c81adb1bf10927a6160f246dc0468">>},
+        {<<"name">>,<<"foo">>},
+        {<<"password_scheme">>,<<"simple">>},
+        {<<"salt">>,<<"00000000000000000000000000000000">>},
+        {<<"password_sha">>, <<"111111111111111111111111111111111111">>}]
+        ++ type(Type) ++ roles(Roles)}).
+
+roles(custom) -> [{<<"roles">>, [<<"custom">>]}];
+roles(missing) -> [].
+
+type(user) -> [{<<"type">>, <<"user">>}];
+type(other) -> [{<<"type">>, <<"other">>}];
+type(missing) -> [].
+
+validate(DiskDoc, NewDoc) ->
+    JSONCtx = {[
+        {<<"db">>, <<"foo/bar">>},
+        {<<"name">>, <<"foo">>},
+        {<<"roles">>, [<<"_admin">>]}
+    ]},
+    validate(DiskDoc, NewDoc, JSONCtx).
+
+validate(DiskDoc, NewDoc, JSONCtx) ->
+    {ok, DDoc0} = couch_auth_cache:auth_design_doc(<<"_design/anything">>),
+    DDoc = DDoc0#doc{revs = {1, [<<>>]}},
+    couch_query_servers:validate_doc_update(DDoc, NewDoc, DiskDoc, JSONCtx, []).

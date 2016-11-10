@@ -23,7 +23,7 @@
             }
         }
 
-        if ((oldDoc && oldDoc.type !== 'user') || newDoc.type !== 'user') {
+        if (newDoc.type !== 'user') {
             throw({forbidden : 'doc.type must be user'});
         } // we only allow user docs for now
 
@@ -108,7 +108,7 @@
                     });
                 }
                 // validate role updates
-                var oldRoles = oldDoc.roles.sort();
+                var oldRoles = (oldDoc.roles || []).sort();
                 var newRoles = newDoc.roles.sort();
 
                 if (oldRoles.length !== newRoles.length) {
