@@ -253,7 +253,11 @@ reset_validation_funs(DbName) ->
 
 open_shard(Name, Opts) ->
     set_io_priority(Name, Opts),
-    rexi:reply(couch_db:open(Name, Opts)).
+    try
+        rexi:reply(couch_db:open(Name, Opts))
+    catch exit:{timeout, _} ->
+        couch_stats:increment_counter([fabric, open_shard, timeouts])
+    end.
 
 compact(DbName) ->
     with_db(DbName, [], {couch_db, start_compact, []}).
