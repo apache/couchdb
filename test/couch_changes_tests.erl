@@ -161,18 +161,12 @@ continuous_feed() ->
 should_filter_by_specific_doc_ids({DbName, _}) ->
     ?_test(
         begin
-            ChangesArgs = #changes_args{
+            ChArgs = #changes_args{
                 filter = "_doc_ids"
             },
             DocIds = [<<"doc3">>, <<"doc4">>, <<"doc9999">>],
             Req = {json_req, {[{<<"doc_ids">>, DocIds}]}},
-            Consumer = spawn_consumer(DbName, ChangesArgs, Req),
-
-            {Rows, LastSeq} = wait_finished(Consumer),
-            {ok, Db} = couch_db:open_int(DbName, []),
-            UpSeq = couch_db:get_update_seq(Db),
-            couch_db:close(Db),
-            stop_consumer(Consumer),
+            {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
 
             ?assertEqual(2, length(Rows)),
             [#row{seq = Seq1, id = Id1}, #row{seq = Seq2, id = Id2}] = Rows,
@@ -186,18 +180,13 @@ should_filter_by_specific_doc_ids({DbName, _}) ->
 should_filter_by_specific_doc_ids_descending({DbName, _}) ->
     ?_test(
         begin
-            ChangesArgs = #changes_args{
+            ChArgs = #changes_args{
                 filter = "_doc_ids",
                 dir = rev
             },
             DocIds = [<<"doc3">>, <<"doc4">>, <<"doc9999">>],
             Req = {json_req, {[{<<"doc_ids">>, DocIds}]}},
-            Consumer = spawn_consumer(DbName, ChangesArgs, Req),
-
-            {Rows, LastSeq} = wait_finished(Consumer),
-            {ok, Db} = couch_db:open_int(DbName, []),
-            couch_db:close(Db),
-            stop_consumer(Consumer),
+            {Rows, LastSeq, _} = run_changes_query(DbName, ChArgs, Req),
 
             ?assertEqual(2, length(Rows)),
             [#row{seq = Seq1, id = Id1}, #row{seq = Seq2, id = Id2}] = Rows,
@@ -211,19 +200,13 @@ should_filter_by_specific_doc_ids_descending({DbName, _}) ->
 should_filter_by_specific_doc_ids_with_since({DbName, _}) ->
     ?_test(
         begin
-            ChangesArgs = #changes_args{
+            ChArgs = #changes_args{
                 filter = "_doc_ids",
                 since = 5
             },
             DocIds = [<<"doc3">>, <<"doc4">>, <<"doc9999">>],
             Req = {json_req, {[{<<"doc_ids">>, DocIds}]}},
-            Consumer = spawn_consumer(DbName, ChangesArgs, Req),
-
-            {Rows, LastSeq} = wait_finished(Consumer),
-            {ok, Db} = couch_db:open_int(DbName, []),
-            UpSeq = couch_db:get_update_seq(Db),
-            couch_db:close(Db),
-            stop_consumer(Consumer),
+            {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
 
             ?assertEqual(1, length(Rows)),
             [#row{seq = Seq1, id = Id1}] = Rows,
@@ -235,19 +218,13 @@ should_filter_by_specific_doc_ids_with_since({DbName, _}) ->
 should_filter_by_specific_doc_ids_no_result({DbName, _}) ->
     ?_test(
         begin
-            ChangesArgs = #changes_args{
+            ChArgs = #changes_args{
                 filter = "_doc_ids",
                 since = 6
             },
             DocIds = [<<"doc3">>, <<"doc4">>, <<"doc9999">>],
             Req = {json_req, {[{<<"doc_ids">>, DocIds}]}},
-            Consumer = spawn_consumer(DbName, ChangesArgs, Req),
-
-            {Rows, LastSeq} = wait_finished(Consumer),
-            {ok, Db} = couch_db:open_int(DbName, []),
-            UpSeq = couch_db:get_update_seq(Db),
-            couch_db:close(Db),
-            stop_consumer(Consumer),
+            {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
 
             ?assertEqual(0, length(Rows)),
             ?assertEqual(UpSeq, LastSeq)
@@ -264,17 +241,13 @@ should_handle_deleted_docs({DbName, Revs}) ->
                   {<<"_deleted">>, true},
                   {<<"_rev">>, Rev3_2}]}),
 
-            ChangesArgs = #changes_args{
+            ChArgs = #changes_args{
                 filter = "_doc_ids",
                 since = 9
             },
             DocIds = [<<"doc3">>, <<"doc4">>, <<"doc9999">>],
             Req = {json_req, {[{<<"doc_ids">>, DocIds}]}},
-            Consumer = spawn_consumer(DbName, ChangesArgs, Req),
-
-            {Rows, LastSeq} = wait_finished(Consumer),
-            couch_db:close(Db),
-            stop_consumer(Consumer),
+            {Rows, LastSeq, _} = run_changes_query(DbName, ChArgs, Req),
 
             ?assertEqual(1, length(Rows)),
             ?assertMatch(
@@ -376,12 +349,7 @@ should_select_basic({DbName, _}) ->
             ChArgs = #changes_args{filter = "_selector"},
             Selector = {[{<<"_id">>, <<"doc3">>}]},
             Req = {json_req, {[{<<"selector">>, Selector}]}},
-            Consumer = spawn_consumer(DbName, ChArgs, Req),
-            {Rows, LastSeq} = wait_finished(Consumer),
-            {ok, Db} = couch_db:open_int(DbName, []),
-            UpSeq = couch_db:get_update_seq(Db),
-            couch_db:close(Db),
-            stop_consumer(Consumer),
+            {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
             ?assertEqual(1, length(Rows)),
             [#row{seq = Seq, id = Id}] = Rows,
             ?assertEqual(<<"doc3">>, Id),
@@ -396,12 +364,7 @@ should_select_with_since({DbName, _}) ->
             GteDoc2 = {[{<<"$gte">>, <<"doc1">>}]},
             Selector = {[{<<"_id">>, GteDoc2}]},
             Req = {json_req, {[{<<"selector">>, Selector}]}},
-            Consumer = spawn_consumer(DbName, ChArgs, Req),
-            {Rows, LastSeq} = wait_finished(Consumer),
-            {ok, Db} = couch_db:open_int(DbName, []),
-            UpSeq = couch_db:get_update_seq(Db),
-            couch_db:close(Db),
-            stop_consumer(Consumer),
+            {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
             ?assertEqual(1, length(Rows)),
             [#row{seq = Seq, id = Id}] = Rows,
             ?assertEqual(<<"doc8">>, Id),
@@ -415,12 +378,7 @@ should_select_when_no_result({DbName, _}) ->
             ChArgs = #changes_args{filter = "_selector"},
             Selector = {[{<<"_id">>, <<"nopers">>}]},
             Req = {json_req, {[{<<"selector">>, Selector}]}},
-            Consumer = spawn_consumer(DbName, ChArgs, Req),
-            {Rows, LastSeq} = wait_finished(Consumer),
-            {ok, Db} = couch_db:open_int(DbName, []),
-            UpSeq = couch_db:get_update_seq(Db),
-            couch_db:close(Db),
-            stop_consumer(Consumer),
+            {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
             ?assertEqual(0, length(Rows)),
             ?assertEqual(UpSeq, LastSeq)
         end).
@@ -438,10 +396,7 @@ should_select_with_deleted_docs({DbName, Revs}) ->
             ChArgs = #changes_args{filter = "_selector"},
             Selector = {[{<<"_id">>, <<"doc3">>}]},
             Req = {json_req, {[{<<"selector">>, Selector}]}},
-            Consumer = spawn_consumer(DbName, ChArgs, Req),
-            {Rows, LastSeq} = wait_finished(Consumer),
-            couch_db:close(Db),
-            stop_consumer(Consumer),
+            {Rows, LastSeq, _} = run_changes_query(DbName, ChArgs, Req),
             ?assertMatch(
                 [#row{seq = LastSeq, id = <<"doc3">>, deleted = true}],
                 Rows
@@ -510,12 +465,7 @@ should_select_with_empty_fields({DbName, _}) ->
             Selector = {[{<<"_id">>, <<"doc3">>}]},
             Req = {json_req, {[{<<"selector">>, Selector},
                                {<<"fields">>, []}]}},
-            Consumer = spawn_consumer(DbName, ChArgs, Req),
-            {Rows, LastSeq} = wait_finished(Consumer),
-            {ok, Db} = couch_db:open_int(DbName, []),
-            UpSeq = couch_db:get_update_seq(Db),
-            couch_db:close(Db),
-            stop_consumer(Consumer),
+            {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
             ?assertEqual(1, length(Rows)),
             [#row{seq = Seq, id = Id, doc = Doc}] = Rows,
             ?assertEqual(<<"doc3">>, Id),
@@ -531,12 +481,7 @@ should_select_with_fields({DbName, _}) ->
             Selector = {[{<<"_id">>, <<"doc3">>}]},
             Req = {json_req, {[{<<"selector">>, Selector},
                                {<<"fields">>, [<<"_id">>, <<"nope">>]}]}},
-            Consumer = spawn_consumer(DbName, ChArgs, Req),
-            {Rows, LastSeq} = wait_finished(Consumer),
-            {ok, Db} = couch_db:open_int(DbName, []),
-            UpSeq = couch_db:get_update_seq(Db),
-            couch_db:close(Db),
-            stop_consumer(Consumer),
+            {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
             ?assertEqual(1, length(Rows)),
             [#row{seq = Seq, id = Id, doc = Doc}] = Rows,
             ?assertEqual(<<"doc3">>, Id),
@@ -549,32 +494,26 @@ should_select_with_fields({DbName, _}) ->
 should_emit_only_design_documents({DbName, Revs}) ->
     ?_test(
         begin
-            ChangesArgs = #changes_args{
+            ChArgs = #changes_args{
                 filter = "_design"
             },
-            Consumer = spawn_consumer(DbName, ChangesArgs, {json_req, null}),
-
-            {Rows, LastSeq} = wait_finished(Consumer),
-            {ok, Db} = couch_db:open_int(DbName, []),
-            UpSeq = couch_db:get_update_seq(Db),
-            couch_db:close(Db),
+            Req = {json_req, null},
+            {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
 
             ?assertEqual(1, length(Rows)),
             ?assertEqual(UpSeq, LastSeq),
             ?assertEqual([#row{seq = 8, id = <<"_design/foo">>}], Rows),
 
-            stop_consumer(Consumer),
 
-            {ok, Db2} = couch_db:open_int(DbName, [?ADMIN_CTX]),
-            {ok, _} = save_doc(Db2, {[{<<"_id">>, <<"_design/foo">>},
+            {ok, Db} = couch_db:open_int(DbName, [?ADMIN_CTX]),
+            {ok, _} = save_doc(Db, {[{<<"_id">>, <<"_design/foo">>},
                                       {<<"_rev">>, element(8, Revs)},
                                       {<<"_deleted">>, true}]}),
 
-            Consumer2 = spawn_consumer(DbName, ChangesArgs, {json_req, null}),
+            couch_db:close(Db),
+            {Rows2, LastSeq2, _} = run_changes_query(DbName, ChArgs, Req),
 
-            {Rows2, LastSeq2} = wait_finished(Consumer2),
             UpSeq2 = UpSeq + 1,
-            couch_db:close(Db2),
 
             ?assertEqual(1, length(Rows2)),
             ?assertEqual(UpSeq2, LastSeq2),
@@ -654,7 +593,6 @@ should_receive_heartbeats(_) ->
 should_filter_by_view({DbName, _}) ->
     ?_test(
         begin
-            {ok, Db0} = couch_db:open_int(DbName, [?ADMIN_CTX]),
             DDocId = <<"_design/app">>,
             DDoc = couch_doc:from_json_obj({[
                 {<<"_id">>, DDocId},
@@ -668,21 +606,14 @@ should_filter_by_view({DbName, _}) ->
                     ]}}
                 ]}}
             ]}),
-            {ok, _} = couch_db:update_doc(Db0, DDoc, []),
-            couch_db:close(Db0),
-            %%
-            ChangesArgs = #changes_args{filter = "_view"},
-            Opts = {json_req, {[{
+            ChArgs = #changes_args{filter = "_view"},
+            Req = {json_req, {[{
                 <<"query">>, {[
                     {<<"view">>, <<"app/valid">>}
                 ]}
             }]}},
-            Consumer = spawn_consumer(DbName, ChangesArgs, Opts),
-            {Rows, LastSeq} = wait_finished(Consumer),
-            {ok, Db} = couch_db:open_int(DbName, []),
-            UpSeq = couch_db:get_update_seq(Db),
-            couch_db:close(Db),
-            stop_consumer(Consumer),
+            ok = update_ddoc(DbName, DDoc),
+            {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
             ?assertEqual(1, length(Rows)),
             [#row{seq = Seq, id = Id}] = Rows,
             ?assertEqual(<<"doc3">>, Id),
@@ -693,7 +624,6 @@ should_filter_by_view({DbName, _}) ->
 should_filter_by_fast_view({DbName, _}) ->
     ?_test(
         begin
-            {ok, Db0} = couch_db:open_int(DbName, [?ADMIN_CTX]),
             DDocId = <<"_design/app">>,
             DDoc = couch_doc:from_json_obj({[
                 {<<"_id">>, DDocId},
@@ -708,30 +638,39 @@ should_filter_by_fast_view({DbName, _}) ->
                     ]}}
                 ]}}
             ]}),
-            {ok, _} = couch_db:update_doc(Db0, DDoc, []),
-            couch_db:close(Db0),
-            %%
-            ChangesArgs = #changes_args{filter = "_view"},
-            Opts = {json_req, {[{
+            ChArgs = #changes_args{filter = "_view"},
+            Req = {json_req, {[{
                 <<"query">>, {[
                     {<<"view">>, <<"app/valid">>}
                 ]}
             }]}},
-            Consumer = spawn_consumer(DbName, ChangesArgs, Opts),
-            {Rows, LastSeq} = wait_finished(Consumer),
+            ok = update_ddoc(DbName, DDoc),
+            {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
             {ok, Db} = couch_db:open_int(DbName, []),
-            DbUpSeq = couch_db:get_update_seq(Db),
             {ok, ViewInfo} = couch_mrview:get_view_info(Db, DDoc, <<"valid">>),
             {update_seq, ViewUpSeq} = lists:keyfind(update_seq, 1, ViewInfo),
             couch_db:close(Db),
-            stop_consumer(Consumer),
             ?assertEqual(1, length(Rows)),
             [#row{seq = Seq, id = Id}] = Rows,
             ?assertEqual(<<"doc3">>, Id),
             ?assertEqual(6, Seq),
             ?assertEqual(LastSeq, Seq),
-            ?assertEqual(DbUpSeq, ViewUpSeq)
+            ?assertEqual(UpSeq, ViewUpSeq)
         end).
+
+update_ddoc(DbName, DDoc) ->
+    {ok, Db} = couch_db:open_int(DbName, [?ADMIN_CTX]),
+    {ok, _} = couch_db:update_doc(Db, DDoc, []),
+    couch_db:close(Db).
+
+run_changes_query(DbName, ChangesArgs, Opts) ->
+    Consumer = spawn_consumer(DbName, ChangesArgs, Opts),
+    {Rows, LastSeq} = wait_finished(Consumer),
+    {ok, Db} = couch_db:open_int(DbName, []),
+    UpSeq = couch_db:get_update_seq(Db),
+    couch_db:close(Db),
+    stop_consumer(Consumer),
+    {Rows, LastSeq, UpSeq}.
 
 save_doc(Db, Json) ->
     Doc = couch_doc:from_json_obj(Json),
