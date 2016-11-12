@@ -908,7 +908,7 @@ error_info({_Error, _Reason} = Error) ->
 error_info({Error, nil, _Stack}) ->
     error_info(Error);
 error_info({Error, Reason, _Stack}) ->
-    {500, couch_util:to_binary(Error), couch_util:to_binary(Reason)};
+    error_info({Error, Reason});
 error_info(Error) ->
     maybe_handle_error(Error).
 
