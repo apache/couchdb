@@ -66,6 +66,7 @@ changes_test_() ->
                 filter_by_design(),
                 continuous_feed(),
                 %%filter_by_custom_function()
+                filter_by_filter_function(),
                 filter_by_view()
             ]
         }
@@ -127,6 +128,19 @@ filter_by_custom_function() ->
             fun setup/0, fun teardown/1,
             [
                 fun should_receive_heartbeats/1
+            ]
+        }
+    }.
+
+filter_by_filter_function() ->
+    {
+        "Filter by filters",
+        {
+            foreach,
+            fun setup/0, fun teardown/1,
+            [
+                fun should_filter_by_doc_attribute/1,
+                fun should_filter_by_user_ctx/1
             ]
         }
     }.
@@ -589,6 +603,60 @@ should_receive_heartbeats(_) ->
              Heartbeats3 = get_heartbeats(Consumer),
              ?assert(Heartbeats3 > Heartbeats2)
         end)}.
+
+should_filter_by_doc_attribute({DbName, _}) ->
+    ?_test(
+        begin
+            DDocId = <<"_design/app">>,
+            DDoc = couch_doc:from_json_obj({[
+                {<<"_id">>, DDocId},
+                {<<"language">>, <<"javascript">>},
+                {<<"filters">>, {[
+                    {<<"valid">>, <<"function(doc, req) {"
+                    " if (doc._id == 'doc3') {"
+                        " return true; "
+                    "} }">>}
+                ]}}
+            ]}),
+            ChArgs = #changes_args{filter = "app/valid"},
+            Req = {json_req, null},
+            ok = update_ddoc(DbName, DDoc),
+            {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
+            ?assertEqual(1, length(Rows)),
+            [#row{seq = Seq, id = Id}] = Rows,
+            ?assertEqual(<<"doc3">>, Id),
+            ?assertEqual(6, Seq),
+            ?assertEqual(UpSeq, LastSeq)
+        end).
+
+should_filter_by_user_ctx({DbName, _}) ->
+    ?_test(
+        begin
+            DDocId = <<"_design/app">>,
+            DDoc = couch_doc:from_json_obj({[
+                {<<"_id">>, DDocId},
+                {<<"language">>, <<"javascript">>},
+                {<<"filters">>, {[
+                    {<<"valid">>, <<"function(doc, req) {"
+                    " if (req.userCtx.name == doc._id) {"
+                        " return true; "
+                    "} }">>}
+                ]}}
+            ]}),
+            ChArgs = #changes_args{filter = "app/valid"},
+            UserCtx = #user_ctx{name = <<"doc3">>, roles = []},
+            DbRec = #db{name = DbName, user_ctx = UserCtx},
+            Req = {json_req, {[{
+                <<"userCtx">>, couch_util:json_user_ctx(DbRec)
+            }]}},
+            ok = update_ddoc(DbName, DDoc),
+            {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
+            ?assertEqual(1, length(Rows)),
+            [#row{seq = Seq, id = Id}] = Rows,
+            ?assertEqual(<<"doc3">>, Id),
+            ?assertEqual(6, Seq),
+            ?assertEqual(UpSeq, LastSeq)
+        end).
 
 should_filter_by_view({DbName, _}) ->
     ?_test(
