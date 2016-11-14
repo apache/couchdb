@@ -329,8 +329,7 @@ upgrade_mrargs({mrargs,
         Skip,
         GroupLevel,
         Group,
-        Stable,
-        Update,
+        Stale,
         MultiGet,
         InclusiveEnd,
         IncludeDocs,
@@ -340,10 +339,10 @@ upgrade_mrargs({mrargs,
         Callback,
         Sorted,
         Extra}) ->
-    Stale = case {Stable, Update} of
-            {true, false} -> ok;
-            {true, lazy} -> update_after;
-            {_, _} -> false
+    {Stable, Update} = case Stale of
+        ok -> {true, false};
+        update_after -> {true, lazy};
+        _ -> {false, true}
     end,
     #mrargs{
         view_type = ViewType,
@@ -359,7 +358,8 @@ upgrade_mrargs({mrargs,
         skip = Skip,
         group_level = GroupLevel,
         group = Group,
-        stale = Stale,
+        stable = Stable,
+        update = Update,
         multi_get = MultiGet,
         inclusive_end = InclusiveEnd,
         include_docs = IncludeDocs,
