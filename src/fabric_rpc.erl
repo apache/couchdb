@@ -92,18 +92,22 @@ changes(DbName, Options, StartVector, DbOptions) ->
         rexi:stream_last(Error)
     end.
 
-all_docs(DbName, Options, #mrargs{keys=undefined} = Args0) ->
-    set_io_priority(DbName, Options),
-    Args = fix_skip_and_limit(Args0),
-    {ok, Db} = get_or_create_db(DbName, Options),
-    VAcc0 = #vacc{db=Db},
-    couch_mrview:query_all_docs(Db, Args, fun view_cb/2, VAcc0).
+all_docs(DbName, Options, Args0) ->
+    case fabric_util:upgrade_mrargs(Args0) of
+        #mrargs{keys=undefined} ->
+            set_io_priority(DbName, Options),
+            Args = fix_skip_and_limit(Args0),
+            {ok, Db} = get_or_create_db(DbName, Options),
+            VAcc0 = #vacc{db=Db},
+            couch_mrview:query_all_docs(Db, Args, fun view_cb/2, VAcc0)
+    end.
 
 update_mrview(DbName, {DDocId, Rev}, ViewName, Args0) ->
     {ok, DDoc} = ddoc_cache:open_doc(mem3:dbname(DbName), DDocId, Rev),
     couch_util:with_db(DbName, fun(Db) ->
         UpdateSeq = couch_db:get_update_seq(Db),
-        {ok, Pid, _} = couch_mrview:get_view_index_pid(Db, DDoc, ViewName,                                                Args0),
+        {ok, Pid, _} = couch_mrview:get_view_index_pid(
+            Db, DDoc, ViewName, fabric_util:upgrade_mrargs(Args0)),
         couch_index:get_state(Pid, UpdateSeq)
     end).
 
@@ -116,7 +120,7 @@ map_view(DbName, {DDocId, Rev}, ViewName, Args0, DbOptions) ->
     map_view(DbName, DDoc, ViewName, Args0, DbOptions);
 map_view(DbName, DDoc, ViewName, Args0, DbOptions) ->
     set_io_priority(DbName, DbOptions),
-    Args = fix_skip_and_limit(Args0),
+    Args = fix_skip_and_limit(fabric_util:upgrade_mrargs(Args0)),
     {ok, Db} = get_or_create_db(DbName, DbOptions),
     VAcc0 = #vacc{db=Db},
     couch_mrview:query_view(Db, DDoc, ViewName, Args, fun view_cb/2, VAcc0).
@@ -130,7 +134,7 @@ reduce_view(DbName, {DDocId, Rev}, ViewName, Args0, DbOptions) ->
     reduce_view(DbName, DDoc, ViewName, Args0, DbOptions);
 reduce_view(DbName, DDoc, ViewName, Args0, DbOptions) ->
     set_io_priority(DbName, DbOptions),
-    Args = fix_skip_and_limit(Args0),
+    Args = fix_skip_and_limit(fabric_util:upgrade_mrargs(Args0)),
     {ok, Db} = get_or_create_db(DbName, DbOptions),
     VAcc0 = #vacc{db=Db},
     couch_mrview:query_view(Db, DDoc, ViewName, Args, fun reduce_cb/2, VAcc0).
