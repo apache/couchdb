@@ -302,14 +302,13 @@ index_of(X, [X|_Rest], I) ->
 index_of(X, [_|Rest], I) ->
     index_of(X, Rest, I+1).
 
-get_shards(DbName, #mrargs{stale=Stale})
-  when Stale == ok orelse Stale == update_after ->
+get_shards(DbName, #mrargs{stable=true}) ->
     mem3:ushards(DbName);
-get_shards(DbName, #mrargs{stale=false}) ->
+get_shards(DbName, #mrargs{stable=false}) ->
     mem3:shards(DbName).
 
 maybe_update_others(DbName, DDoc, ShardsInvolved, ViewName,
-    #mrargs{stale=update_after} = Args) ->
+    #mrargs{update=lazy} = Args) ->
     ShardsNeedUpdated = mem3:shards(DbName) -- ShardsInvolved,
     lists:foreach(fun(#shard{node=Node, name=ShardName}) ->
         rpc:cast(Node, fabric_rpc, update_mrview, [ShardName, DDoc, ViewName, Args])
