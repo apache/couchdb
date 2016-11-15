@@ -19,12 +19,14 @@
 -export([stream_start/2, stream_start/4]).
 -export([log_timeout/2, remove_done_workers/2]).
 -export([is_users_db/1, is_replicator_db/1, fake_db/2]).
+-export([upgrade_mrargs/1]).
 
 -compile({inline, [{doc_id_and_rev,1}]}).
 
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("couch_mrview/include/couch_mrview.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 remove_down_workers(Workers, BadNode) ->
@@ -308,3 +310,63 @@ kv(Item, Count) ->
 
 doc_id_and_rev(#doc{id=DocId, revs={RevNum, [RevHash|_]}}) ->
     {DocId, {RevNum, RevHash}}.
+
+
+upgrade_mrargs(#mrargs{} = Args) ->
+    Args;
+
+upgrade_mrargs({mrargs,
+        ViewType,
+        Reduce,
+        PreflightFun,
+        StartKey,
+        StartKeyDocId,
+        EndKey,
+        EndKeyDocId,
+        Keys,
+        Direction,
+        Limit,
+        Skip,
+        GroupLevel,
+        Group,
+        Stable,
+        Update,
+        MultiGet,
+        InclusiveEnd,
+        IncludeDocs,
+        DocOptions,
+        UpdateSeq,
+        Conflicts,
+        Callback,
+        Sorted,
+        Extra}) ->
+    Stale = case {Stable, Update} of
+            {true, false} -> ok;
+            {true, lazy} -> update_after;
+            {_, _} -> false
+    end,
+    #mrargs{
+        view_type = ViewType,
+        reduce = Reduce,
+        preflight_fun = PreflightFun,
+        start_key = StartKey,
+        start_key_docid = StartKeyDocId,
+        end_key = EndKey,
+        end_key_docid = EndKeyDocId,
+        keys = Keys,
+        direction = Direction,
+        limit = Limit,
+        skip = Skip,
+        group_level = GroupLevel,
+        group = Group,
+        stale = Stale,
+        multi_get = MultiGet,
+        inclusive_end = InclusiveEnd,
+        include_docs = IncludeDocs,
+        doc_options = DocOptions,
+        update_seq = UpdateSeq,
+        conflicts = Conflicts,
+        callback = Callback,
+        sorted = Sorted,
+        extra = Extra
+    }.
