@@ -291,7 +291,7 @@ all_docs(DbName, Callback, Acc, QueryArgs) ->
 -spec all_docs(
         dbname(), [{atom(), any()}], callback(), [] | tuple(),
         #mrargs{} | [option()]) ->
-    {ok, any()}.
+    {ok, any()} | {error, Reason :: term()}.
 
 all_docs(DbName, Options, Callback, Acc0, #mrargs{} = QueryArgs) when
         is_function(Callback, 2) ->
@@ -406,7 +406,7 @@ end_changes() ->
     fabric_view_changes:increment_changes_epoch().
 
 %% @doc retrieve all the design docs from a database
--spec design_docs(dbname()) -> {ok, [json_obj()]}.
+-spec design_docs(dbname()) -> {ok, [json_obj()]} | {error, Reason :: term()}.
 design_docs(DbName) ->
     Extra = case get(io_priority) of
         undefined -> [];
