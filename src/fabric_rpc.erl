@@ -94,9 +94,9 @@ changes(DbName, Options, StartVector, DbOptions) ->
 
 all_docs(DbName, Options, Args0) ->
     case fabric_util:upgrade_mrargs(Args0) of
-        #mrargs{keys=undefined} ->
+        #mrargs{keys=undefined} = Args1 ->
             set_io_priority(DbName, Options),
-            Args = fix_skip_and_limit(Args0),
+            Args = fix_skip_and_limit(Args1),
             {ok, Db} = get_or_create_db(DbName, Options),
             VAcc0 = #vacc{db=Db},
             couch_mrview:query_all_docs(Db, Args, fun view_cb/2, VAcc0)
