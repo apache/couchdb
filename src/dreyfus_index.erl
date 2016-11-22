@@ -106,10 +106,14 @@ init({DbName, Index}) ->
               index=Index#index{current_seq=Seq, dbname=DbName},
               index_pid=Pid
              },
-            {ok, Db} = couch_db:open_int(DbName, []),
-            try couch_db:monitor(Db) after couch_db:close(Db) end,
-            proc_lib:init_ack({ok, self()}),
-            gen_server:enter_loop(?MODULE, [], State);
+            case couch_db:open_int(DbName, []) of
+                {ok, Db} ->
+                    try couch_db:monitor(Db) after couch_db:close(Db) end,
+                    proc_lib:init_ack({ok, self()}),
+                    gen_server:enter_loop(?MODULE, [], State);
+                Error ->
+                    proc_lib:init_ack(Error)
+            end;
         Error ->
             proc_lib:init_ack(Error)
     end.
