@@ -244,18 +244,18 @@ accumulate_writes(State, W, Acc0) ->
             {stop, {Seq, ViewKVs, DocIdKVs, Seqs, Log}};
         {ok, Info} ->
             {_, _, NewIds, _, _} = Acc = merge_results(Info, Seq, ViewKVs, DocIdKVs, Seqs, Log),
-            case accumulate_more(length(NewIds)) of
+            case accumulate_more(length(NewIds), Acc) of
                 true -> accumulate_writes(State, W, Acc);
                 false -> {ok, Acc}
             end
     end.
 
 
-accumulate_more(NumDocIds) ->
+accumulate_more(NumDocIds, Acc) ->
     % check if we have enough items now
     MinItems = config:get("view_updater", "min_writer_items", "100"),
     MinSize = config:get("view_updater", "min_writer_size", "16777216"),
-    {memory, CurrMem} = process_info(self(), memory),
+    CurrMem = ?term_size(Acc),
     NumDocIds < list_to_integer(MinItems)
         andalso CurrMem < list_to_integer(MinSize).
 
