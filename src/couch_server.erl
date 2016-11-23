@@ -334,46 +334,57 @@ handle_call({set_max_dbs_open, Max}, _From, Server) ->
 handle_call(get_server, _From, Server) ->
     {reply, {ok, Server}, Server};
 handle_call({open_result, T0, DbName, {ok, Db}}, {FromPid, _Tag}, Server) ->
-    link(Db#db.main_pid),
     true = ets:delete(couch_dbs_pid_to_name, FromPid),
     OpenTime = timer:now_diff(os:timestamp(), T0) / 1000,
     couch_stats:update_histogram([couchdb, db_open_time], OpenTime),
     % icky hack of field values - compactor_pid used to store clients
     % and fd used to possibly store a creation request
-    [#db{fd=ReqType, compactor_pid=Froms}] = ets:lookup(couch_dbs, DbName),
-    [gen_server:reply(From, {ok, Db}) || From <- Froms],
-    % Cancel the creation request if it exists.
-    case ReqType of
-        {create, DbName, _Filepath, _Options, CrFrom} ->
-            gen_server:reply(CrFrom, file_exists);
-        _ ->
-            ok
-    end,
-    true = ets:insert(couch_dbs, Db),
-    true = ets:insert(couch_dbs_pid_to_name, {Db#db.main_pid, DbName}),
-    Lru = case couch_db:is_system_db(Db) of
-        false ->
-            couch_lru:insert(DbName, Server#server.lru);
-        true ->
-            Server#server.lru
-    end,
-    {reply, ok, Server#server{lru = Lru}};
+    case ets:lookup(couch_dbs, DbName) of
+        [] ->
+            % db was deleted during async open
+            exit(Db#db.main_pid, kill),
+            {reply, ok, Server};
+        [#db{fd=ReqType, compactor_pid=Froms}] ->
+            link(Db#db.main_pid),
+            [gen_server:reply(From, {ok, Db}) || From <- Froms],
+            % Cancel the creation request if it exists.
+            case ReqType of
+                {create, DbName, _Filepath, _Options, CrFrom} ->
+                    gen_server:reply(CrFrom, file_exists);
+                _ ->
+                    ok
+            end,
+            true = ets:insert(couch_dbs, Db),
+            true = ets:insert(couch_dbs_pid_to_name, {Db#db.main_pid, DbName}),
+            Lru = case couch_db:is_system_db(Db) of
+                false ->
+                    couch_lru:insert(DbName, Server#server.lru);
+                true ->
+                    Server#server.lru
+            end,
+            {reply, ok, Server#server{lru = Lru}}
+    end;
 handle_call({open_result, T0, DbName, {error, eexist}}, From, Server) ->
     handle_call({open_result, T0, DbName, file_exists}, From, Server);
 handle_call({open_result, _T0, DbName, Error}, {FromPid, _Tag}, Server) ->
     % icky hack of field values - compactor_pid used to store clients
-    [#db{fd=ReqType, compactor_pid=Froms}=Db] = ets:lookup(couch_dbs, DbName),
-    [gen_server:reply(From, Error) || From <- Froms],
-    couch_log:info("open_result error ~p for ~s", [Error, DbName]),
-    true = ets:delete(couch_dbs, DbName),
-    true = ets:delete(couch_dbs_pid_to_name, FromPid),
-    NewServer = case ReqType of
-        {create, DbName, Filepath, Options, CrFrom} ->
-            open_async(Server, CrFrom, DbName, Filepath, Options);
-        _ ->
-            Server
-    end,
-    {reply, ok, db_closed(NewServer, Db#db.options)};
+    case ets:lookup(couch_dbs, DbName) of
+        [] ->
+            % db was deleted during async open
+            {reply, ok, Server};
+        [#db{fd=ReqType, compactor_pid=Froms}=Db] ->
+            [gen_server:reply(From, Error) || From <- Froms],
+            couch_log:info("open_result error ~p for ~s", [Error, DbName]),
+            true = ets:delete(couch_dbs, DbName),
+            true = ets:delete(couch_dbs_pid_to_name, FromPid),
+            NewServer = case ReqType of
+                {create, DbName, Filepath, Options, CrFrom} ->
+                    open_async(Server, CrFrom, DbName, Filepath, Options);
+                _ ->
+                    Server
+            end,
+            {reply, ok, db_closed(NewServer, Db#db.options)}
+    end;
 handle_call({open, DbName, Options}, From, Server) ->
     case ets:lookup(couch_dbs, DbName) of
     [] ->
