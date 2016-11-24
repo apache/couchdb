@@ -55,7 +55,7 @@ get_state(Pid, RequestSeq) ->
 
 
 get_info(Pid) ->
-    gen_server:call(Pid, get_info).
+    gen_server:call(Pid, get_info, group_info_timeout_msec()).
 
 
 trigger_update(Pid, UpdateSeq) ->
@@ -415,6 +415,16 @@ commit_delay() ->
     config:get_integer("query_server_config", "commit_freq", 5) * 1000.
 
 
+group_info_timeout_msec() ->
+    Timeout = config:get("query_server_config", "group_info_timeout", "5000"),
+    case Timeout of
+        "infinity" ->
+            infinity;
+        Milliseconds ->
+            list_to_integer(Milliseconds)
+    end.
+
+
 -ifdef(TEST).
 -include_lib("couch/include/couch_eunit.hrl").
 
@@ -531,5 +541,38 @@ to_string(Value) -> Value.
 test_id(Settings0) ->
     Settings1 = [to_string(Value) || Value <- Settings0],
     "[ " ++ lists:flatten(string:join(Settings1, " , ")) ++ " ]".
+
+
+get_group_timeout_info_test_() ->
+    {
+        foreach,
+        fun() -> ok end,
+        fun(_) -> meck:unload() end,
+        [
+            t_group_timeout_info_integer(),
+            t_group_timeout_info_infinity()
+        ]
+    }.
+
+
+t_group_timeout_info_integer() ->
+     ?_test(begin
+        meck:expect(config, get,
+            fun("query_server_config", "group_info_timeout", _) ->
+               "5001"
+            end),
+        ?assertEqual(5001, group_info_timeout_msec())
+    end).
+
+
+t_group_timeout_info_infinity() ->
+     ?_test(begin
+        meck:expect(config, get,
+            fun("query_server_config", "group_info_timeout", _) ->
+                "infinity"
+            end),
+        ?assertEqual(infinity, group_info_timeout_msec())
+    end).
+
 
 -endif.
