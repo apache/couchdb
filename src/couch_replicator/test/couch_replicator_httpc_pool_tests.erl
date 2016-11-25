@@ -30,7 +30,7 @@ httpc_pool_test_() ->
         "httpc pool tests",
         {
             setup,
-            fun test_util:start_couch/0, fun test_util:stop_couch/1,
+            fun() -> test_util:start_couch([couch_replicator]) end, fun test_util:stop_couch/1,
             {
                 foreach,
                 fun setup/0, fun teardown/1,

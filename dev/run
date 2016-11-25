@@ -125,6 +125,8 @@ def setup_argparse():
                       help='HAProxy port')
     parser.add_option('--node-number', dest="node_number", type=int, default=1,
                       help='The node number to seed them when creating the node(s)')
+    parser.add_option('-c', '--config-overrides', action="append", default=[],
+                      help='Optional key=val config overrides. Can be repeated')
     return parser.parse_args()
 
 
@@ -143,6 +145,7 @@ def setup_context(opts, args):
             'with_haproxy': opts.with_haproxy,
             'haproxy': opts.haproxy,
             'haproxy_port': opts.haproxy_port,
+            'config_overrides': opts.config_overrides,
             'procs': []}
 
 
@@ -190,6 +193,16 @@ def setup_configs(ctx):
         write_config(ctx, node, env)
 
 
+def apply_config_overrides(ctx, content):
+    for kv_str in  ctx['config_overrides']:
+        key, val = kv_str.split('=')
+        key, val = key.strip(), val.strip()
+        match = "[;=]{0,2}%s.*" % key
+        repl = "%s = %s" % (key, val)
+        content = re.sub(match, repl, content)
+    return content
+
+
 def get_ports(idnode):
     assert idnode
     return ((10000 * idnode) + 5984, (10000 * idnode) + 5986)
@@ -214,6 +227,7 @@ def write_config(ctx, node, env):
 
         if base == "default.ini":
             content = hack_default_ini(ctx, node, content)
+            content = apply_config_overrides(ctx, content)
         elif base == "local.ini":
             content = hack_local_ini(ctx, content)
 

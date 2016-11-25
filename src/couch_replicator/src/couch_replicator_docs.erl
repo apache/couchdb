@@ -154,7 +154,7 @@ ensure_rep_ddoc_exists(RepDb, DDocId) ->
         {not_found, _Reason} ->
             DocProps = replication_design_doc_props(DDocId),
             DDoc = couch_doc:from_json_obj({DocProps}),
-            couch_log:notice("creating replicator ddoc", []),
+            couch_log:notice("creating replicator ddoc ~p", [RepDb]),
             {ok, _Rev} = save_rep_doc(RepDb, DDoc);
         {ok, Doc} ->
             Latest = replication_design_doc_props(DDocId),
@@ -166,7 +166,7 @@ ensure_rep_ddoc_exists(RepDb, DDocId) ->
                 false ->
                     LatestWithRev = [{<<"_rev">>, Rev} | Latest],
                     DDoc = couch_doc:from_json_obj({LatestWithRev}),
-                    couch_log:notice("updating replicator ddoc", []),
+                    couch_log:notice("updating replicator ddoc ~p", [RepDb]),
                     try
                         {ok, _} = save_rep_doc(RepDb, DDoc)
                     catch
