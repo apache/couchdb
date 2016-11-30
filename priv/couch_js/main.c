@@ -387,11 +387,11 @@ main(int argc, const char* argv[])
 
     couch_args* args = couch_parse_args(argc, argv);
 
-    rt = JS_NewRuntime(64L * 1024L * 1024L);
+    rt = JS_NewRuntime(args->stack_size);
     if(rt == NULL)
         return 1;
 
-    cx = JS_NewContext(rt, args->stack_size);
+    cx = JS_NewContext(rt, 8L * 1024L);
     if(cx == NULL)
         return 1;
 
