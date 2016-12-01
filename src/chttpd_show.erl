@@ -139,13 +139,11 @@ send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId) ->
             {accepted, _} ->
                 Code = 202
             end,
-            {[
-                {<<"code">>, Code},
-                {<<"headers">>, {[
-                    {<<"X-Couch-Update-NewRev">>, NewRevStr},
-                    {<<"X-Couch-Id">>, NewDoc#doc.id}
-                ]}}
-                | JsonResp0]};
+            {JsonResp1} = apply_headers(JsonResp0, [
+                {<<"X-Couch-Update-NewRev">>, NewRevStr},
+                {<<"X-Couch-Id">>, NewDoc#doc.id}
+            ]),
+            {[{<<"code">>, Code} | JsonResp1]};
         [<<"up">>, _Other, {JsonResp0}] ->
             {[{<<"code">>, 200} | JsonResp0]}
     end,
@@ -231,24 +229,31 @@ json_apply_field({Key, NewValue}, [], Acc) ->
     % end of list, add ours
     {[{Key, NewValue}|Acc]}.
 
+apply_etag(JsonResp, undefined) ->
+    JsonResp;
 apply_etag({ExternalResponse}, CurrentEtag) ->
     % Here we embark on the delicate task of replacing or creating the
     % headers on the JsonResponse object. We need to control the Etag and
     % Vary headers. If the external function controls the Etag, we'd have to
     % run it to check for a match, which sort of defeats the purpose.
-    case couch_util:get_value(<<"headers">>, ExternalResponse, nil) of
-    nil ->
-        % no JSON headers
-        % add our Etag and Vary headers to the response
-        {[{<<"headers">>, {[{<<"ETag">>, CurrentEtag}, {<<"Vary">>, <<"Accept">>}]}} | ExternalResponse]};
-    JsonHeaders ->
-        {[case Field of
-        {<<"headers">>, JsonHeaders} -> % add our headers
-            JsonHeadersEtagged = json_apply_field({<<"ETag">>, CurrentEtag}, JsonHeaders),
-            JsonHeadersVaried = json_apply_field({<<"Vary">>, <<"Accept">>}, JsonHeadersEtagged),
-            {<<"headers">>, JsonHeadersVaried};
-        _ -> % skip non-header fields
-            Field
-        end || Field <- ExternalResponse]}
-    end.
+    apply_headers(ExternalResponse, [
+        {<<"ETag">>, CurrentEtag},
+        {<<"Vary">>, <<"Accept">>}
+    ]).
 
+apply_headers(JsonResp, []) ->
+    JsonResp;
+apply_headers(JsonResp, NewHeaders) ->
+    case couch_util:get_value(<<"headers">>, JsonResp) of
+        undefined ->
+            {[{<<"headers">>, {NewHeaders}}| JsonResp]};
+        JsonHeaders ->
+            Headers = apply_headers1(JsonHeaders, NewHeaders),
+            NewKV = {<<"headers">>, Headers},
+            {lists:keyreplace(<<"headers">>, 1, JsonResp, NewKV)}
+    end.
+apply_headers1(JsonHeaders, [{Key, Value} | Rest]) ->
+    NewJsonHeaders = json_apply_field({Key, Value}, JsonHeaders),
+    apply_headers1(NewJsonHeaders, Rest);
+apply_headers1(JsonHeaders, []) ->
+    JsonHeaders.
