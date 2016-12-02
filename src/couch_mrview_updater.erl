@@ -38,7 +38,7 @@ start_update(Partial, State, NumChanges) ->
     Self = self(),
     MapFun = fun() ->
         couch_task_status:add_task([
-            {indexer_pid, Partial},
+            {indexer_pid, ?l2b(pid_to_list(Partial))},
             {type, indexer},
             {database, State#mrst.db_name},
             {design_document, State#mrst.idx_name},
