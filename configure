@@ -210,10 +210,10 @@ apps:
     couchdb:
         daemon: simple
         command: snap_run
-        plugs: [network-bind]
+        plugs: [network-bind, browser-support]
     run:
         command: snap_run
-        plugs: [network-bind]
+        plugs: [network-bind, browser-support]
 parts:
     couchdb: 
         plugin: dump
