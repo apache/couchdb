@@ -174,6 +174,12 @@ info(mango_idx_text, {index_not_found, BadIdx}) ->
         <<"index_not_found">>,
         fmt("Text index ~s not found in this design doc.", [BadIdx])
     };
+info(mango_idx_text, index_all_disabled) ->
+    {
+        403,
+        <<"index_all_disabled">>,
+        <<"New text indexes are forbidden to index all fields.">>
+    };
 
 info(mango_opts, {invalid_bulk_docs, Val}) ->
     {

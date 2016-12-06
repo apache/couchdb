@@ -14,7 +14,7 @@
 
 
 -export([
-    validate_new/1,
+    validate_new/2,
     validate_index_def/1,
     add/2,
     remove/2,
@@ -36,7 +36,7 @@
 -include("mango_idx.hrl").
 
 
-validate_new(#idx{}=Idx) ->
+validate_new(#idx{}=Idx, _Db) ->
     {ok, Def} = do_validate(Idx#idx.def),
     {ok, Idx#idx{def=Def}}.
 

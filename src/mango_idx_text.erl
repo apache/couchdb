@@ -14,7 +14,7 @@
 
 
 -export([
-    validate_new/1,
+    validate_new/2,
     validate_fields/1,
     validate_index_def/1,
     add/2,
@@ -32,8 +32,9 @@
 -include("mango_idx.hrl").
 
 
-validate_new(#idx{}=Idx) ->
+validate_new(#idx{}=Idx, Db) ->
     {ok, Def} = do_validate(Idx#idx.def),
+    maybe_reject_index_all_req(Def, Db),
     {ok, Idx#idx{def=Def}}.
 
 
@@ -327,3 +328,81 @@ indexable_fields(Fields, {op_null, {_, _}}) ->
 
 indexable_fields(Fields, {op_default, _}) ->
     [<<"$default">> | Fields].
+
+
+maybe_reject_index_all_req({Def}, #db{name=DbName, user_ctx=Ctx}) ->
+    User = Ctx#user_ctx.name,
+    Fields = couch_util:get_value(fields, Def),
+    case {Fields, forbid_index_all()} of
+        {all_fields, "true"} ->
+            ?MANGO_ERROR(index_all_disabled);
+        {all_fields, "warn"} ->
+            couch_log:warning("User ~p is indexing all fields in db ~p",
+                [User, DbName]);
+        _ ->
+            ok
+    end.
+
+
+forbid_index_all() ->
+    config:get("mango", "index_all_disabled", "false").
+
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+
+setup() ->
+    test_util:start_couch(),
+    meck:expect(couch_log, warning, 2,
+        fun(_,_) ->
+            throw({test_error, logged_warning})
+        end),
+    %default index all def that generates {fields, all_fields}
+    Index = #idx{def={[]}},
+    Db = #db{name = <<"testdb">>, user_ctx=#user_ctx{name = <<"u1">>}},
+    {Index, Db}.
+
+
+teardown(_) ->
+    ok = config:delete("mango", "index_all_disabled"),
+    test_util:stop_couch().
+
+
+index_all_test_() ->
+    {
+        foreach,
+        fun setup/0,
+        fun teardown/1,
+        [
+            fun forbid_index_all/1,
+            fun default_and_false_index_all/1,
+            fun warn_index_all/1
+        ]
+
+    }.
+
+
+forbid_index_all({Idx, Db}) ->
+    ok = config:set("mango", "index_all_disabled", "true"),
+    ?_assertThrow({mango_error, ?MODULE, index_all_disabled},
+        validate_new(Idx, Db)
+    ).
+
+
+default_and_false_index_all({Idx, Db}) ->
+    {ok, #idx{def={Def}}} = validate_new(Idx, Db),
+    Fields = couch_util:get_value(fields, Def),
+    ?_assertEqual(all_fields, Fields),
+    ok = config:set("mango", "index_all_disabled", "false"),
+    {ok, #idx{def={Def2}}} = validate_new(Idx, Db),
+    Fields2 = couch_util:get_value(fields, Def2),
+    ?_assertEqual(all_fields, Fields2).
+
+
+warn_index_all({Idx, Db}) ->
+    ok = config:set("mango", "index_all_disabled", "warn"),
+    ?_assertThrow({test_error, logged_warning}, validate_new(Idx, Db)).
+
+
+-endif.
