@@ -261,7 +261,7 @@ all_databases(Fun, Acc0) ->
                 [$/ | RelativeFilename] -> ok;
                 RelativeFilename -> ok
                 end,
-                case Fun(?l2b(filename:rootname(RelativeFilename, ".couch")), AccIn) of
+                case Fun(couch_util:drop_dot_couch_ext(?l2b(RelativeFilename)), AccIn) of
                 {ok, NewAcc} -> NewAcc;
                 {stop, NewAcc} -> throw({stop, Fun, NewAcc})
                 end
