@@ -1519,15 +1519,7 @@ select_lt(V1, _V2) -> V1.
 normalize_dbname(DbName) when is_list(DbName) ->
     normalize_dbname(list_to_binary(DbName));
 normalize_dbname(DbName) when is_binary(DbName) ->
-    mem3:dbname(maybe_remove_extension(DbName)).
-
-maybe_remove_extension(DbName) ->
-    case filename:extension(DbName) of
-        <<".couch">> ->
-            filename:rootname(DbName);
-        _ ->
-            DbName
-    end.
+    mem3:dbname(couch_util:drop_dot_couch_ext(DbName)).
 
 
 -spec dbname_suffix(list() | binary()) -> binary().
@@ -1544,7 +1536,7 @@ validate_dbname(DbName) when is_binary(DbName) ->
         DbName, Normalized, fun validate_dbname_int/2).
 
 validate_dbname_int(DbName, Normalized) when is_binary(DbName) ->
-    DbNoExt = maybe_remove_extension(DbName),
+    DbNoExt = couch_util:drop_dot_couch_ext(DbName),
     case re:run(DbNoExt, ?DBNAME_REGEX, [{capture,none}, dollar_endonly]) of
         match ->
             ok;

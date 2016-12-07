@@ -15,7 +15,7 @@
 -export([priv_dir/0, normpath/1]).
 -export([should_flush/0, should_flush/1, to_existing_atom/1]).
 -export([rand32/0, implode/2, collate/2, collate/3]).
--export([abs_pathname/1,abs_pathname/2, trim/1]).
+-export([abs_pathname/1,abs_pathname/2, trim/1, drop_dot_couch_ext/1]).
 -export([encodeBase64Url/1, decodeBase64Url/1]).
 -export([validate_utf8/1, to_hex/1, parse_term/1, dict_find/3]).
 -export([get_nested_json_value/2, json_user_ctx/1]).
@@ -256,6 +256,20 @@ is_whitespace(_Else) -> false.
 trim(String) ->
     String2 = lists:dropwhile(fun is_whitespace/1, String),
     lists:reverse(lists:dropwhile(fun is_whitespace/1, lists:reverse(String2))).
+
+
+drop_dot_couch_ext(DbName) when is_binary(DbName) ->
+    PrefixLen = size(DbName) - 6,
+    case DbName of
+        <<Prefix:PrefixLen/binary, ".couch">> ->
+            Prefix;
+        Else ->
+            Else
+    end;
+
+drop_dot_couch_ext(DbName) when is_list(DbName) ->
+    binary_to_list(drop_dot_couch_ext(iolist_to_binary(DbName))).
+
 
 % takes a heirarchical list of dirs and removes the dots ".", double dots
 % ".." and the corresponding parent dirs.
