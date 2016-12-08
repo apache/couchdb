@@ -155,7 +155,7 @@ rewrite_query_params(#httpd{}=Req, {Props}) ->
         {V} -> V
     end,
     RewriteQSEsc = [{chttpd:quote(K), chttpd:quote(V)} || {K, V} <- RewriteQS],
-    iolist_to_binary([[K, "=", V] || {K, V} <- RewriteQSEsc]).
+    iolist_to_binary(string:join([[K, "=", V] || {K, V} <- RewriteQSEsc], "&")).
 
 rewrite_headers(#httpd{mochi_req=MochiReq}, {Props}) ->
     case couch_util:get_value(<<"headers">>, Props) of
