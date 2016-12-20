@@ -21,7 +21,7 @@
 -define(MONITOR_CHECK, 10000).
 -define(SIZE_BLOCK, 16#1000). % 4 KiB
 -define(READ_AHEAD, 2 * ?SIZE_BLOCK).
--define(IS_OLD_STATE(S), tuple_size(S) /= tuple_size(#file{})).
+-define(IS_OLD_STATE(S), is_pid(S#file.db_monitor)).
 -define(PREFIX_SIZE, 5).
 -define(DEFAULT_READ_COUNT, 1024).
 
@@ -33,7 +33,7 @@
     fd,
     is_sys,
     eof = 0,
-    db_pid,
+    db_monitor,
     pread_limit = 0
 }).
 
@@ -342,7 +342,6 @@ init_status_error(ReturnPid, Ref, Error) ->
 % server functions
 
 init({Filepath, Options, ReturnPid, Ref}) ->
-    process_flag(trap_exit, true),
     OpenOptions = file_open_options(Options),
     Limit = get_pread_limit(),
     IsSys = lists:member(sys_db, Options),
@@ -450,13 +449,13 @@ handle_call({pread_iolist, Pos}, _From, File) ->
 handle_call(bytes, _From, #file{fd = Fd} = File) ->
     {reply, file:position(Fd, eof), File};
 
-handle_call({set_db_pid, Pid}, _From, #file{db_pid=OldPid}=File) ->
-    case is_pid(OldPid) of
-        true -> unlink(OldPid);
+handle_call({set_db_pid, Pid}, _From, #file{db_monitor=OldRef}=File) ->
+    case is_reference(OldRef) of
+        true -> demonitor(OldRef, [flush]);
         false -> ok
     end,
-    link(Pid),
-    {reply, ok, File#file{db_pid=Pid}};
+    Ref = monitor(process, Pid),
+    {reply, ok, File#file{db_monitor=Ref}};
 
 handle_call(sync, _From, #file{fd=Fd}=File) ->
     {reply, file:sync(Fd), File};
@@ -517,16 +516,11 @@ handle_info(maybe_close, File) ->
             {noreply, File}
     end;
 
-handle_info({'EXIT', Pid, _}, #file{db_pid=Pid}=File) ->
+handle_info({'DOWN', Ref, process, _Pid, _Info}, #file{db_monitor=Ref}=File) ->
     case is_idle(File) of
         true -> {stop, normal, File};
         false -> {noreply, File}
-    end;
-
-handle_info({'EXIT', _, normal}, Fd) ->
-    {noreply, Fd};
-handle_info({'EXIT', _, Reason}, Fd) ->
-    {stop, Reason, Fd}.
+    end.
 
 
 find_header(Fd, Block) ->
@@ -731,9 +725,10 @@ process_info(Pid) ->
             {Fd, InitialName}
     end.
 
-upgrade_state({file, Fd, IsSys, Eof, DbPid}) ->
-    Limit = get_pread_limit(),
-    #file{fd=Fd, is_sys=IsSys, eof=Eof, db_pid=DbPid, pread_limit=Limit};
+upgrade_state(#file{db_monitor=DbPid}=File) when is_pid(DbPid) ->
+    unlink(DbPid),
+    Ref = monitor(process, DbPid),
+    File#file{db_monitor=Ref};
 upgrade_state(State) ->
     State.
 
