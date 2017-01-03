@@ -54,14 +54,19 @@ go(DbName, Options, QueryArgs, Callback, Acc0) ->
     #mrargs{
         direction = Dir,
         include_docs = IncludeDocs,
-        doc_options = Doc_Options,
+        doc_options = DocOptions0,
         limit = Limit,
+        conflicts = Conflicts,
         skip = Skip,
         keys = Keys0
     } = QueryArgs,
     {_, Ref0} = spawn_monitor(fun() -> exit(fabric:get_doc_count(DbName)) end),
+    DocOptions1 = case Conflicts of
+        true -> [conflicts|DocOptions0];
+        _ -> DocOptions0
+    end,
     SpawnFun = fun(Key) ->
-        spawn_monitor(?MODULE, open_doc, [DbName, Options ++ Doc_Options, Key, IncludeDocs])
+        spawn_monitor(?MODULE, open_doc, [DbName, Options ++ DocOptions1, Key, IncludeDocs])
     end,
     MaxJobs = all_docs_concurrency(),
     Keys1 = case Dir of
