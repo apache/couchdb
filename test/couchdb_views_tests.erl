@@ -529,8 +529,9 @@ view_cleanup(DbName) ->
 count_users(DbName) ->
     {ok, Db} = couch_db:open_int(DbName, [?ADMIN_CTX]),
     {monitored_by, Monitors} = erlang:process_info(Db#db.main_pid, monitored_by),
+    CouchFiles = [P || P <- Monitors, couch_file:process_info(P) =/= undefined],
     ok = couch_db:close(Db),
-    length(lists:usort(Monitors) -- [self()]).
+    length(lists:usort(Monitors) -- [self() | CouchFiles]).
 
 count_index_files(DbName) ->
     % call server to fetch the index files
