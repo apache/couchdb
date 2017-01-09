@@ -351,7 +351,9 @@ changes_enumerator(DocInfo, Acc) ->
     #doc_info{id=Id, high_seq=Seq, revs=[#rev_info{deleted=Del}|_]} = DocInfo,
     case [X || X <- couch_changes:filter(Db, DocInfo, Filter), X /= null] of
     [] ->
-        ChangesRow = {no_pass, Seq};
+        ChangesRow = {no_pass, [
+            {pending, Pending-1},
+            {seq, Seq}]};
     Results ->
         Opts = if Conflicts -> [conflicts | DocOptions]; true -> DocOptions end,
         ChangesRow = {change, [

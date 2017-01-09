@@ -256,6 +256,19 @@ handle_message({complete, Props}, Worker, #collector{limit=0} = State) ->
     end,
     maybe_stop(State#collector{offset = O1});
 
+handle_message({no_pass, Props}, {Worker, From}, #collector{limit=0} = State)
+  when is_list(Props) ->
+    #collector{counters = S0, offset = O0} = State,
+    O1 = case fabric_dict:lookup_element(Worker, O0) of
+        null ->
+            fabric_dict:store(Worker, couch_util:get_value(pending, Props), O0);
+        _ ->
+            O0
+    end,
+    S1 = fabric_dict:store(Worker, couch_util:get_value(seq, Props), S0),
+    rexi:stream_ack(From),
+    maybe_stop(State#collector{counters = S1, offset = O1});
+
 handle_message(#change{} = Row, {Worker, From}, St) ->
     Change = {change, [
         {seq, Row#change.key},
@@ -288,7 +301,12 @@ handle_message({change, Props}, {Worker, From}, St) ->
     rexi:stream_ack(From),
     {Go, St#collector{counters=S1, offset=O1, limit=Limit-1, user_acc=Acc}};
 
-handle_message({no_pass, Seq}, {Worker, From}, St) ->
+%% upgrade clause
+handle_message({no_pass, Seq}, From, St) when is_integer(Seq) ->
+    handle_message({no_pass, [{seq, Seq}]}, From, St);
+
+handle_message({no_pass, Props}, {Worker, From}, St) ->
+    Seq = couch_util:get_value(seq, Props),
     #collector{counters = S0} = St,
     true = fabric_dict:is_key(Worker, S0),
     S1 = fabric_dict:store(Worker, Seq, S0),
