@@ -24,6 +24,7 @@
     worker_count,
     workers,
     reply_count = 0,
+    reply_error_count = 0,
     r,
     revs,
     latest,
@@ -60,13 +61,15 @@ go(DbName, Id, Revs, Options) ->
 
 handle_message({rexi_DOWN, _, {_,NodeRef},_}, _Worker, #state{workers=Workers}=State) ->
     NewState = State#state{
-        workers = lists:keydelete(NodeRef, #shard.node, Workers)
+        workers = lists:keydelete(NodeRef, #shard.node, Workers),
+        reply_error_count = State#state.reply_error_count + 1
     },
     handle_message({ok, []}, nil, NewState);
 
 handle_message({rexi_EXIT, _}, Worker, #state{workers=Workers}=State) ->
     NewState = State#state{
-        workers = lists:delete(Worker, Workers)
+        workers = lists:delete(Worker, Workers),
+        reply_error_count = State#state.reply_error_count + 1
     },
     handle_message({ok, []}, nil, NewState);
 
@@ -80,10 +83,14 @@ handle_message({ok, RawReplies}, Worker, State) ->
         r = R,
         revs = Revs,
         latest = Latest,
-        repair = InRepair
+        repair = InRepair,
+        reply_error_count = ReplyErrorCount
     } = State,
 
     IsTree = Revs == all orelse Latest,
+
+    % Do not count error replies when checking quorum
+    QuorumReplies = ReplyCount + 1 - ReplyErrorCount >= R,
 
     {NewReplies, QuorumMet, Repair} = case IsTree of
         true ->
@@ -91,7 +98,7 @@ handle_message({ok, RawReplies}, Worker, State) ->
                     tree_replies(PrevReplies, tree_sort(RawReplies)),
             NumLeafs = couch_key_tree:count_leafs(PrevReplies),
             SameNumRevs = length(RawReplies) == NumLeafs,
-            QMet = AllInternal andalso SameNumRevs andalso ReplyCount + 1 >= R,
+            QMet = AllInternal andalso SameNumRevs andalso QuorumReplies,
             {NewReplies0, QMet, Repair0};
         false ->
             {NewReplies0, MinCount} = dict_replies(PrevReplies, RawReplies),
@@ -306,6 +313,7 @@ open_doc_revs_test_() ->
             check_ancestor_counted_in_quorum(),
             check_not_found_counts_for_descendant(),
             check_worker_error_skipped(),
+            check_quorum_only_counts_valid_responses(),
             check_not_found_replies_are_removed_when_doc_found(),
             check_not_found_returned_when_one_of_docs_not_found(),
             check_not_found_returned_when_doc_not_found()
@@ -459,6 +467,20 @@ check_worker_error_skipped() ->
     ?_test(begin
         S0 = state0(revs(), true),
         Msg1 = {ok, [foo1(), bar1(), baz1()]},
+        Msg2 = {rexi_EXIT, reason},
+        Msg3 = {ok, [foo1(), bar1(), baz1()]},
+        Expect = {stop, [bar1(), baz1(), foo1()]},
+
+        {ok, S1} = handle_message(Msg1, w1, S0),
+        {ok, S2} = handle_message(Msg2, w2, S1),
+        ?assertEqual(Expect, handle_message(Msg3, w3, S2))
+    end).
+
+
+check_quorum_only_counts_valid_responses() ->
+    ?_test(begin
+        S0 = state0(revs(), true),
+        Msg1 = {rexi_EXIT, reason},
         Msg2 = {rexi_EXIT, reason},
         Msg3 = {ok, [foo1(), bar1(), baz1()]},
         Expect = {stop, [bar1(), baz1(), foo1()]},
