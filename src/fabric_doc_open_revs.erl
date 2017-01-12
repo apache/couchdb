@@ -465,7 +465,7 @@ check_worker_error_skipped() ->
 
         {ok, S1} = handle_message(Msg1, w1, S0),
         {ok, S2} = handle_message(Msg2, w2, S1),
-        ?assertEqual(Expect, handle_message(Msg3, w2, S2))
+        ?assertEqual(Expect, handle_message(Msg3, w3, S2))
     end).
 
 
