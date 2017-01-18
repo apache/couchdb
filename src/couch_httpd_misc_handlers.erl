@@ -130,10 +130,12 @@ handle_uuids_req(#httpd{method='GET'}=Req) ->
     Count = try list_to_integer(couch_httpd:qs_value(Req, "count", "1")) of
         N when N > Max ->
             throw({forbidden, <<"count parameter too large">>});
+        N when N < 0 ->
+            throw({bad_request, <<"count must be a positive integer">>});
         N -> N
     catch
         error:badarg ->
-            throw({bad_request, <<"count parameter is not an integer">>})
+            throw({bad_request, <<"count must be a positive integer">>})
     end,
     UUIDs = [couch_uuids:new() || _ <- lists:seq(1, Count)],
     Etag = couch_httpd:make_etag(UUIDs),
