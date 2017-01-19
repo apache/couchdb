@@ -476,7 +476,7 @@ handle_call({append_bin, Bin}, _From, #file{fd = Fd, eof = Pos} = File) ->
     ok ->
         {reply, {ok, Pos, Size}, File#file{eof = Pos + Size}};
     Error ->
-        {reply, Error, File}
+        {reply, Error, reset_eof(File)}
     end;
 
 handle_call({write_header, Bin}, _From, #file{fd = Fd, eof = Pos} = File) ->
@@ -492,7 +492,7 @@ handle_call({write_header, Bin}, _From, #file{fd = Fd, eof = Pos} = File) ->
     ok ->
         {reply, ok, File#file{eof = Pos + iolist_size(FinalBin)}};
     Error ->
-        {reply, Error, File}
+        {reply, Error, reset_eof(File)}
     end;
 
 handle_call(find_header, _From, #file{fd = Fd, eof = Pos} = File) ->
@@ -737,6 +737,11 @@ get_pread_limit() ->
         N when N > 0 -> N;
         _ -> infinity
     end.
+
+%% in event of a partially successful write.
+reset_eof(#file{} = File) ->
+    {ok, Eof} = file:position(File#file.fd, eof),
+    File#file{eof = Eof}.
 
 -ifdef(TEST).
 -include_lib("couch/include/couch_eunit.hrl").
