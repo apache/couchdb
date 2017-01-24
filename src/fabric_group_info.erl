@@ -19,7 +19,7 @@
 -include_lib("couch/include/couch_db.hrl").
 
 go(DbName, GroupId) when is_binary(GroupId) ->
-    {ok, DDoc} = fabric:open_doc(DbName, GroupId, []),
+    {ok, DDoc} = fabric:open_doc(DbName, GroupId, [?ADMIN_CTX]),
     go(DbName, DDoc);
 
 go(DbName, #doc{id=DDocId}) ->
