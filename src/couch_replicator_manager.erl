@@ -931,24 +931,34 @@ strip_credentials({Props}) ->
     {lists:keydelete(<<"oauth">>, 1, Props)}.
 
 scan_all_dbs(Server) when is_pid(Server) ->
-    Root = config:get("couchdb", "database_dir", "."),
-    NormRoot = couch_util:normpath(Root),
-    filelib:fold_files(Root, "_replicator(\\.[0-9]{10,})?.couch$", true,
-        fun(Filename, Acc) ->
-	    % shamelessly stolen from couch_server.erl
-            NormFilename = couch_util:normpath(Filename),
-            case NormFilename -- NormRoot of
-                [$/ | RelativeFilename] -> ok;
-                RelativeFilename -> ok
-            end,
-            DbName = ?l2b(filename:rootname(RelativeFilename, ".couch")),
-            Jitter = jitter(Acc),
-            spawn_link(fun() ->
-                timer:sleep(Jitter),
-                gen_server:cast(Server, {resume_scan, DbName})
-            end),
-	    Acc + 1
-	end, 1).
+    {ok, Db} = mem3_util:ensure_exists(
+        config:get("mem3", "shard_db", "dbs")),
+    ChangesFun = couch_changes:handle_changes(#changes_args{}, nil, Db, nil),
+    ChangesFun(fun({change, {Change}, _}, _) ->
+        DbName = couch_util:get_value(<<"id">>, Change),
+        case DbName of <<"_design/", _/binary>> -> ok; _Else ->
+            case couch_replicator_utils:is_deleted(Change) of
+            true ->
+                ok;
+            false ->
+                [gen_server:cast(Server, {resume_scan, ShardName})
+                    || ShardName <- replicator_shards(DbName)],
+                ok
+            end
+        end;
+        (_, _) -> ok
+    end),
+    couch_db:close(Db).
+
+
+replicator_shards(DbName) ->
+    case is_replicator_db(DbName) of
+    false ->
+        [];
+    true ->
+        [ShardName || #shard{name = ShardName} <- mem3:local_shards(DbName)]
+    end.
+
 
 % calculate random delay proportional to the number of replications
 % on current node, in order to prevent a stampede:
@@ -980,3 +990,41 @@ get_json_value(Key, Props, Default) when is_binary(Key) ->
         Else ->
             Else
     end.
+
+
+-ifdef(TEST).
+
+-include_lib("couch/include/couch_eunit.hrl").
+
+replicator_shards_test_() ->
+{
+      foreach,
+      fun() -> test_util:start_couch([mem3, fabric]) end,
+      fun(Ctx) -> test_util:stop_couch(Ctx) end,
+      [
+          t_pass_replicator_shard(),
+          t_fail_non_replicator_shard()
+     ]
+}.
+
+
+t_pass_replicator_shard() ->
+    ?_test(begin
+        DbName0 = ?tempdb(),
+        DbName = <<DbName0/binary, "/_replicator">>,
+        ok = fabric:create_db(DbName, [?CTX]),
+        ?assertEqual(8, length(replicator_shards(DbName))),
+        fabric:delete_db(DbName, [?CTX])
+    end).
+
+
+t_fail_non_replicator_shard() ->
+    ?_test(begin
+        DbName = ?tempdb(),
+        ok = fabric:create_db(DbName, [?CTX]),
+        ?assertEqual([], replicator_shards(DbName)),
+        fabric:delete_db(DbName, [?CTX])
+    end).
+
+
+-endif.
