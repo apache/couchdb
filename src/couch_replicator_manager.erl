@@ -932,7 +932,7 @@ strip_credentials({Props}) ->
 
 scan_all_dbs(Server) when is_pid(Server) ->
     {ok, Db} = mem3_util:ensure_exists(
-        config:get("mem3", "shard_db", "dbs")),
+        config:get("mem3", "shards_db", "_dbs")),
     ChangesFun = couch_changes:handle_changes(#changes_args{}, nil, Db, nil),
     ChangesFun(fun({change, {Change}, _}, _) ->
         DbName = couch_util:get_value(<<"id">>, Change),
