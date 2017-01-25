@@ -47,6 +47,8 @@ go(DbName, Id, Revs, Options) ->
     },
     RexiMon = fabric_util:create_monitors(Workers),
     try fabric_util:recv(Workers, #shard.ref, fun handle_message/3, State) of
+    {ok, []} ->
+        {error, all_workers_died};
     {ok, Replies} ->
         {ok, Replies};
     {timeout, #state{workers=DefunctWorkers}} ->
@@ -314,6 +316,7 @@ open_doc_revs_test_() ->
             check_not_found_counts_for_descendant(),
             check_worker_error_skipped(),
             check_quorum_only_counts_valid_responses(),
+            check_empty_list_when_no_workers_reply(),
             check_not_found_replies_are_removed_when_doc_found(),
             check_not_found_returned_when_one_of_docs_not_found(),
             check_not_found_returned_when_doc_not_found()
@@ -484,6 +487,20 @@ check_quorum_only_counts_valid_responses() ->
         Msg2 = {rexi_EXIT, reason},
         Msg3 = {ok, [foo1(), bar1(), baz1()]},
         Expect = {stop, [bar1(), baz1(), foo1()]},
+
+        {ok, S1} = handle_message(Msg1, w1, S0),
+        {ok, S2} = handle_message(Msg2, w2, S1),
+        ?assertEqual(Expect, handle_message(Msg3, w3, S2))
+    end).
+
+
+check_empty_list_when_no_workers_reply() ->
+    ?_test(begin
+        S0 = state0(revs(), true),
+        Msg1 = {rexi_EXIT, reason},
+        Msg2 = {rexi_EXIT, reason},
+        Msg3 = {rexi_DOWN, nodedown, {nil, node()}, nil},
+        Expect = {stop, []},
 
         {ok, S1} = handle_message(Msg1, w1, S0),
         {ok, S2} = handle_message(Msg2, w2, S1),
