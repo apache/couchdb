@@ -183,6 +183,7 @@ def setup_configs(ctx):
                                                 "lib", node, "data")),
             "node_name": "-name %s@127.0.0.1" % node,
             "cluster_port": cluster_port,
+            "cluster_tls_port": cluster_port + 1,
             "backend_port": backend_port,
             "fauxton_root": fauxton_root,
             "uuid": "fake_uuid_for_dev"

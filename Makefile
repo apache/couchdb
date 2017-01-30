@@ -63,7 +63,7 @@ help:
 
 .PHONY: couch
 # target: couch - Build CouchDB core
-couch: config.erl
+couch: certs config.erl
 	@COUCHDB_VERSION=$(COUCHDB_VERSION) $(REBAR) compile
 	@cp src/couch/priv/couchjs bin/
 
@@ -298,6 +298,7 @@ clean:
 	@rm -f src/couch/priv/couchspawnkillable
 	@rm -f src/couch/priv/couch_js/config.h
 	@rm -f dev/boot_node.beam dev/pbkdf2.pyc log/crash.log
+	@rm -r *.pem
 
 
 .PHONY: distclean
@@ -376,3 +377,14 @@ ifeq ($(with_fauxton), 1)
 	@echo "Building Fauxton"
 	@cd src/fauxton && npm install --production && ./node_modules/grunt-cli/bin/grunt couchdb
 endif
+
+certs: ecc_cert.pem
+
+%_cert.pem: %_key.pem %_csr.pem
+	@openssl req -x509 -days 99999 -key $*_key.pem -in $*_csr.pem -out $@
+
+%_csr.pem: %_key.pem
+	@openssl req -new -key $< -out $@ -subj "/O=Apache Software Foundation/OU=Apache CouchDB"
+
+ecc_key.pem:
+	@openssl ecparam -genkey -name prime256v1 -out ecc_key.pem

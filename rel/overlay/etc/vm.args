@@ -31,5 +31,11 @@
 # Start a pool of asynchronous IO threads
 +A 16
 
+# Encrypt the RPC traffic
+-proto_dist inet_tls
+-ssl_dist_opt server_certfile "ecc_cert.pem"
+-ssl_dist_opt server_keyfile  "ecc_key.pem"
+-ssl_dist_opt server_secure_renegotiate true client_secure_renegotiate true
+
 # Comment this line out to enable the interactive Erlang shell on startup
 +Bd -noinput

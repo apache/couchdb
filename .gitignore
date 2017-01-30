@@ -32,3 +32,5 @@ src/couch/priv/couchspawnkillable
 .rebar
 bin/
 apache-couchdb-*/
+
+*.pem
