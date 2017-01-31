@@ -20,7 +20,6 @@
 -define(INITIAL_WAIT, 60000).
 -define(MONITOR_CHECK, 10000).
 -define(SIZE_BLOCK, 16#1000). % 4 KiB
--define(READ_AHEAD, 2 * ?SIZE_BLOCK).
 -define(IS_OLD_STATE(S), is_pid(S#file.db_monitor)).
 -define(PREFIX_SIZE, 5).
 -define(DEFAULT_READ_COUNT, 1024).
@@ -423,27 +422,15 @@ handle_call(close, _From, #file{fd=Fd}=File) ->
     {stop, normal, file:close(Fd), File#file{fd = nil}};
 
 handle_call({pread_iolist, Pos}, _From, File) ->
-    {RawData, NextPos} = try
-        % up to 8Kbs of read ahead
-        read_raw_iolist_int(File, Pos, ?READ_AHEAD - (Pos rem ?SIZE_BLOCK))
-    catch
-    throw:{read_beyond_eof, _} = Reason ->
-        throw(Reason);
-    throw:{exceed_pread_limit, _, _} = Reason ->
-        throw(Reason);
-    _:_ ->
-        read_raw_iolist_int(File, Pos, 4)
-    end,
-    <<Prefix:1/integer, Len:31/integer, RestRawData/binary>> =
-        iolist_to_binary(RawData),
-    case Prefix of
-    1 ->
-        {Md5, IoList} = extract_md5(
-            maybe_read_more_iolist(RestRawData, 16 + Len, NextPos, File)),
+    {LenIolist, NextPos} = read_raw_iolist_int(File, Pos, 4),
+    case iolist_to_binary(LenIolist) of
+    <<1:1/integer,Len:31/integer>> -> % an MD5-prefixed term
+        {Md5AndIoList, _} = read_raw_iolist_int(File, NextPos, Len+16),
+        {Md5, IoList} = extract_md5(Md5AndIoList),
         {reply, {ok, IoList, Md5}, File};
-    0 ->
-        IoList = maybe_read_more_iolist(RestRawData, Len, NextPos, File),
-        {reply, {ok, IoList, <<>>}, File}
+    <<0:1/integer,Len:31/integer>> ->
+        {Iolist, _} = read_raw_iolist_int(File, NextPos, Len),
+        {reply, {ok, Iolist, <<>>}, File}
     end;
 
 handle_call(bytes, _From, #file{fd = Fd} = File) ->
@@ -617,7 +604,7 @@ read_raw_iolist_int(#file{fd = Fd, pread_limit = Limit} = F, Pos, Len) ->
     BlockOffset = Pos rem ?SIZE_BLOCK,
     TotalBytes = calculate_total_read_len(BlockOffset, Len),
     case Pos + TotalBytes of
-    Size when Size > F#file.eof + ?READ_AHEAD ->
+    Size when Size > F#file.eof ->
         couch_stats:increment_counter([pread, exceed_eof]),
         {_Fd, Filepath} = get(couch_file_fd),
         throw({read_beyond_eof, Filepath});
