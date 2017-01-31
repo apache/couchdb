@@ -289,6 +289,8 @@ validate_doc_update(DDoc, EditDoc, DiskDoc, Ctx, SecObj) ->
             throw({forbidden, Message});
         {[{<<"unauthorized">>, Message}]} ->
             throw({unauthorized, Message});
+        {[{_, Message}]} ->
+            throw({unknown_error, Message});
         Message when is_binary(Message) ->
             throw({unknown_error, Message})
     end.
