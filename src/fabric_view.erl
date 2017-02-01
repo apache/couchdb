@@ -172,7 +172,9 @@ possibly_embed_doc(#collector{db_name=DbName, query_args=Args},
                     {ok, NewDoc} ->
                         Row#view_row{doc=couch_doc:to_json_obj(NewDoc,[])};
                     {not_found, _} ->
-                        Row#view_row{doc=null}
+                        Row#view_row{doc=null};
+                    Else ->
+                        Row#view_row{doc={error, Else}}
                     end;
                 Rev0 ->
                     Rev = couch_doc:parse_rev(Rev0),
@@ -180,7 +182,9 @@ possibly_embed_doc(#collector{db_name=DbName, query_args=Args},
                     {ok, [{ok, NewDoc}]} ->
                         Row#view_row{doc=couch_doc:to_json_obj(NewDoc,[])};
                     {ok, [{{not_found, _}, Rev}]} ->
-                        Row#view_row{doc=null}
+                        Row#view_row{doc=null};
+                    Else ->
+                        Row#view_row{doc={error, Else}}
                     end
                 end) end),
             receive {'DOWN',Ref,process,Pid, Resp} ->
