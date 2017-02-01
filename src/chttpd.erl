@@ -894,6 +894,9 @@ error_info(request_entity_too_large) ->
 error_info({error, security_migration_updates_disabled}) ->
     {503, <<"security_migration">>, <<"Updates to security docs are disabled during "
         "security migration.">>};
+error_info(all_workers_died) ->
+    {503, <<"service unvailable">>, <<"Nodes are unable to service this "
+        "request due to overloading or maintenance mode.">>};
 error_info(not_implemented) ->
     {501, <<"not_implemented">>, <<"this feature is not yet implemented">>};
 error_info(timeout) ->
