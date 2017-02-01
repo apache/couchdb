@@ -364,13 +364,17 @@ json_apply_field({Key, NewValue}, [], Acc) ->
 
 % This loads the db info if we have a fully loaded db record, but we might not
 % have the db locally on this node, so then load the info through fabric.
-json_req_obj(Req, #db{main_pid=Pid}=Db) when is_pid(Pid) ->
-    chttpd_external:json_req_obj(Req, Db);
 json_req_obj(Req, Db) ->
-    % use a separate process because we're already in a receive loop, and
-    % json_req_obj calls fabric:get_db_info()
-    spawn_monitor(fun() -> exit(chttpd_external:json_req_obj(Req, Db)) end),
-    receive {'DOWN', _, _, _, JsonReq} -> JsonReq end.
+    case couch_db:is_clustered(Db) of
+        true ->
+            % use a separate process because we're already in a receive loop,
+            % and json_req_obj calls fabric:get_db_info()
+            JRO = fun() -> exit(chttpd_external:json_req_obj(Req, Db)) end,
+            spawn_monitor(JRO),
+            receive {'DOWN', _, _, _, JsonReq} -> JsonReq end;
+        false ->
+            chttpd_external:json_req_obj(Req, Db)
+    end.
 
 last_chunk(Req, undefined) ->
     chttpd:send_response(Req, 200, [], <<"">>);

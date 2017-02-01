@@ -92,7 +92,7 @@ code_change(_OldVsn, #state{}=State, _Extra) ->
 initialize_nodelist() ->
     DbName = config:get("mem3", "nodes_db", "_nodes"),
     {ok, Db} = mem3_util:ensure_exists(DbName),
-    {ok, _, Db} = couch_btree:fold(Db#db.id_tree, fun first_fold/3, Db, []),
+    {ok, _} = couch_db:fold_docs(Db, fun first_fold/2, Db, []),
     % add self if not already present
     case ets:lookup(?MODULE, node()) of
     [_] ->
@@ -103,13 +103,13 @@ initialize_nodelist() ->
         {ok, _} = couch_db:update_doc(Db, Doc, [])
     end,
     couch_db:close(Db),
-    Db#db.update_seq.
+    couch_db:get_update_seq(Db).
 
-first_fold(#full_doc_info{id = <<"_design/", _/binary>>}, _, Acc) ->
+first_fold(#full_doc_info{id = <<"_design/", _/binary>>}, Acc) ->
     {ok, Acc};
-first_fold(#full_doc_info{deleted=true}, _, Acc) ->
+first_fold(#full_doc_info{deleted=true}, Acc) ->
     {ok, Acc};
-first_fold(#full_doc_info{id=Id}=DocInfo, _, Db) ->
+first_fold(#full_doc_info{id=Id}=DocInfo, Db) ->
     {ok, #doc{body={Props}}} = couch_db:open_doc(Db, DocInfo, [ejson_body]),
     ets:insert(?MODULE, {mem3_util:to_atom(Id), Props}),
     {ok, Db}.

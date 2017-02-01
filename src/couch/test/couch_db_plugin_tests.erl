@@ -43,6 +43,7 @@ data_providers() -> [].
 data_subscriptions() -> [].
 processes() -> [].
 notify(_, _, _) -> ok.
+fake_db() -> element(2, couch_db:clustered_db(fake, totes_fake)).
 
 setup() ->
     couch_tests:setup([
@@ -133,33 +134,33 @@ validate_dbname_pass() ->
 before_doc_update_match() ->
     ?assertMatch(
         {true, [before_doc_update, doc]},
-        couch_db_plugin:before_doc_update(#db{}, {true, [doc]})).
+        couch_db_plugin:before_doc_update(fake_db(), {true, [doc]})).
 
 before_doc_update_no_match() ->
     ?assertMatch(
         {false, [doc]},
-        couch_db_plugin:before_doc_update(#db{}, {false, [doc]})).
+        couch_db_plugin:before_doc_update(fake_db(), {false, [doc]})).
 
 before_doc_update_throw() ->
     ?assertThrow(
         before_doc_update,
-        couch_db_plugin:before_doc_update(#db{}, {fail, [doc]})).
+        couch_db_plugin:before_doc_update(fake_db(), {fail, [doc]})).
 
 
 after_doc_read_match() ->
     ?assertMatch(
         {true, [after_doc_read, doc]},
-        couch_db_plugin:after_doc_read(#db{}, {true, [doc]})).
+        couch_db_plugin:after_doc_read(fake_db(), {true, [doc]})).
 
 after_doc_read_no_match() ->
     ?assertMatch(
         {false, [doc]},
-        couch_db_plugin:after_doc_read(#db{}, {false, [doc]})).
+        couch_db_plugin:after_doc_read(fake_db(), {false, [doc]})).
 
 after_doc_read_throw() ->
     ?assertThrow(
         after_doc_read,
-        couch_db_plugin:after_doc_read(#db{}, {fail, [doc]})).
+        couch_db_plugin:after_doc_read(fake_db(), {fail, [doc]})).
 
 
 validate_docid_match() ->

@@ -38,7 +38,8 @@
 }).
 
 %% rpc endpoints
-%%  call to with_db will supply your M:F with a #db{} and then remaining args
+%%  call to with_db will supply your M:F with a Db instance
+%%  and then remaining args
 
 %% @equiv changes(DbName, Args, StartSeq, [])
 changes(DbName, Args, StartSeq) ->
@@ -225,7 +226,7 @@ get_missing_revs(DbName, IdRevsList, Options) ->
             not_found ->
                 {Id, Revs, []}
             end
-        end, IdRevsList, couch_btree:lookup(Db#db.id_tree, Ids))};
+        end, IdRevsList, couch_db:get_full_doc_infos(Db, Ids))};
     Error ->
         Error
     end).
@@ -249,8 +250,9 @@ group_info(DbName, DDocId, DbOptions) ->
 
 reset_validation_funs(DbName) ->
     case get_or_create_db(DbName, []) of
-    {ok, #db{main_pid = Pid}} ->
-        gen_server:cast(Pid, {load_validation_funs, undefined});
+    {ok, Db} ->
+        DbPid = couch_db:get_pid(Db),
+        gen_server:cast(DbPid, {load_validation_funs, undefined});
     _ ->
         ok
     end.

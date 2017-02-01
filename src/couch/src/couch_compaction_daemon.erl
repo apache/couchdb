@@ -319,7 +319,7 @@ can_db_compact(#config{db_frag = Threshold} = Config, Db) ->
         {Frag, SpaceRequired} = frag(DbInfo),
         couch_log:debug("Fragmentation for database `~s` is ~p%, estimated"
                         " space for compaction is ~p bytes.",
-                        [Db#db.name, Frag, SpaceRequired]),
+                        [couch_db:name(Db), Frag, SpaceRequired]),
         case check_frag(Threshold, Frag) of
         false ->
             false;
@@ -332,7 +332,7 @@ can_db_compact(#config{db_frag = Threshold} = Config, Db) ->
                 couch_log:warning("Compaction daemon - skipping database `~s` "
                     "compaction: the estimated necessary disk space is about ~p"
                     " bytes but the currently available disk space is ~p bytes.",
-                    [Db#db.name, SpaceRequired, Free]),
+                    [couch_db:name(Db), SpaceRequired, Free]),
                 false
             end
         end
