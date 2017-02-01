@@ -348,11 +348,11 @@ couchdb_1283() ->
         ]}),
         {ok, _} = couch_db:update_doc(MDb1, DDoc, []),
         ok = populate_db(MDb1, 100, 100),
-        query_view(MDb1#db.name, "foo", "foo"),
+        query_view(couch_db:name(MDb1), "foo", "foo"),
         ok = couch_db:close(MDb1),
 
         {ok, Pid} = couch_index_server:get_index(
-            couch_mrview_index, MDb1#db.name, <<"_design/foo">>),
+            couch_mrview_index, couch_db:name(MDb1), <<"_design/foo">>),
 
         % Start and pause compacton
         WaitRef = erlang:make_ref(),
@@ -522,7 +522,8 @@ view_cleanup(DbName) ->
 
 count_users(DbName) ->
     {ok, Db} = couch_db:open_int(DbName, [?ADMIN_CTX]),
-    {monitored_by, Monitors} = erlang:process_info(Db#db.main_pid, monitored_by),
+    DbPid = couch_db:get_pid(Db),
+    {monitored_by, Monitors} = process_info(DbPid, monitored_by),
     CouchFiles = [P || P <- Monitors, couch_file:process_info(P) =/= undefined],
     ok = couch_db:close(Db),
     length(lists:usort(Monitors) -- [self() | CouchFiles]).
@@ -546,9 +547,10 @@ backup_db_file(DbName) ->
 restore_backup_db_file(DbName) ->
     DbDir = config:get("couchdb", "database_dir"),
 
-    {ok, #db{main_pid = UpdaterPid} = Db} = couch_db:open_int(DbName, []),
+    {ok, Db} = couch_db:open_int(DbName, []),
     ok = couch_db:close(Db),
-    exit(UpdaterPid, shutdown),
+    DbPid = couch_db:get_pid(Db),
+    exit(DbPid, shutdown),
 
     DbFile = filename:join([DbDir, ?b2l(DbName) ++ ".couch"]),
     ok = file:delete(DbFile),
@@ -556,9 +558,13 @@ restore_backup_db_file(DbName) ->
 
     test_util:wait(fun() ->
         case couch_server:open(DbName, [{timeout, ?TIMEOUT}]) of
-            {ok, #db{main_pid = UpdaterPid}} -> wait;
-            {ok, _} -> ok;
-            Else -> Else
+            {ok, WaitDb} ->
+                case couch_db:get_pid(WaitDb) == DbPid of
+                    true -> wait;
+                    false -> ok
+                end;
+            Else ->
+                Else
         end
     end, ?TIMEOUT, ?DELAY).
 
@@ -576,7 +582,8 @@ wait_db_compact_done(_DbName, 0) ->
 wait_db_compact_done(DbName, N) ->
     {ok, Db} = couch_db:open_int(DbName, []),
     ok = couch_db:close(Db),
-    case is_pid(Db#db.compactor_pid) of
+    CompactorPid = couch_db:get_compactor_pid(Db),
+    case is_pid(CompactorPid) of
     false ->
         ok;
     true ->

@@ -323,7 +323,7 @@ get_update_seq() ->
     DbName = config:get("mem3", "shards_db", "_dbs"),
     {ok, Db} = mem3_util:ensure_exists(DbName),
     couch_db:close(Db),
-    Db#db.update_seq.
+    couch_db:get_update_seq(Db).
 
 listen_for_changes(Since) ->
     DbName = config:get("mem3", "shards_db", "_dbs"),
@@ -380,7 +380,7 @@ load_shards_from_disk(DbName) when is_binary(DbName) ->
         couch_db:close(Db)
     end.
 
-load_shards_from_db(#db{} = ShardDb, DbName) ->
+load_shards_from_db(ShardDb, DbName) ->
     case couch_db:open_doc(ShardDb, DbName, [ejson_body]) of
     {ok, #doc{body = {Props}}} ->
         Seq = couch_db:get_update_seq(ShardDb),
@@ -659,7 +659,7 @@ t_spawn_writer_in_load_shards_from_db() ->
         meck:expect(couch_db, get_update_seq, 1, 1),
         meck:expect(mem3_util, build_ordered_shards, 2, mock_shards()),
         erlang:register(?MODULE, self()), % register to get cache_insert cast
-        load_shards_from_db(#db{name = <<"testdb">>}, ?DB),
+        load_shards_from_db(test_util:fake_db([{name, <<"testdb">>}]), ?DB),
         meck:validate(couch_db),
         meck:validate(mem3_util),
         Cast = receive
@@ -746,8 +746,8 @@ mem3_shards_changes_test_() -> {
 
 
 setup_changes() ->
-    ok = meck:expect(mem3_util, ensure_exists, ['_'],
-        {ok, #db{name = <<"dbs">>, update_seq = 0}}),
+    RespDb = test_util:fake_db([{name, <<"dbs">>}, {update_seq, 0}]),
+    ok = meck:expect(mem3_util, ensure_exists, ['_'], {ok, RespDb}),
     ok = meck:expect(couch_db, close, ['_'], ok),
     ok = application:start(config),
     {ok, Pid} = ?MODULE:start_link(),

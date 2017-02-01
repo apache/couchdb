@@ -67,16 +67,16 @@
 
 
 
-start_link(Cp, #db{} = Source, Target, ChangesManager, _MaxConns) ->
+start_link(Cp, #httpdb{} = Source, Target, ChangesManager, MaxConns) ->
+    gen_server:start_link(
+        ?MODULE, {Cp, Source, Target, ChangesManager, MaxConns}, []);
+
+start_link(Cp, Source, Target, ChangesManager, _MaxConns) ->
     Pid = spawn_link(fun() ->
         erlang:put(last_stats_report, now()),
         queue_fetch_loop(Source, Target, Cp, Cp, ChangesManager)
     end),
-    {ok, Pid};
-
-start_link(Cp, Source, Target, ChangesManager, MaxConns) ->
-    gen_server:start_link(
-        ?MODULE, {Cp, Source, Target, ChangesManager, MaxConns}, []).
+    {ok, Pid}.
 
 
 init({Cp, Source, Target, ChangesManager, MaxConns}) ->
@@ -139,15 +139,23 @@ handle_call(flush, {Pid, _} = From,
     {noreply, State2#state{flush_waiter = From}}.
 
 
-handle_cast({db_compacted, DbName},
-    #state{source = #db{name = DbName} = Source} = State) ->
-    {ok, NewSource} = couch_db:reopen(Source),
-    {noreply, State#state{source = NewSource}};
-
-handle_cast({db_compacted, DbName},
-    #state{target = #db{name = DbName} = Target} = State) ->
-    {ok, NewTarget} = couch_db:reopen(Target),
-    {noreply, State#state{target = NewTarget}};
+handle_cast({db_compacted, DbName} = Msg, #state{} = State) ->
+    #state{
+        source = Source,
+        target = Target
+    } = State,
+    SourceName = couch_replicator_utils:local_db_name(Source),
+    TargetName = couch_replicator_utils:local_db_name(Target),
+    case DbName of
+        SourceName ->
+            {ok, NewSource} = couch_db:reopen(Source),
+            {noreply, State#state{source = NewSource}};
+        TargetName ->
+            {ok, NewTarget} = couch_db:reopen(Target),
+            {noreply, State#state{target = NewTarget}};
+        _Else ->
+            {stop, {unexpected_async_call, Msg}, State}
+    end;
 
 handle_cast(Msg, State) ->
     {stop, {unexpected_async_call, Msg}, State}.
@@ -227,15 +235,15 @@ queue_fetch_loop(Source, Target, Parent, Cp, ChangesManager) ->
         Target2 = open_db(Target),
         {IdRevs, Stats0} = find_missing(Changes, Target2),
         case Source of
-        #db{} ->
-            Source2 = open_db(Source),
-            Stats = local_process_batch(
-                IdRevs, Cp, Source2, Target2, #batch{}, Stats0),
-            close_db(Source2);
         #httpdb{} ->
             ok = gen_server:call(Parent, {add_stats, Stats0}, infinity),
             remote_process_batch(IdRevs, Parent),
-            {ok, Stats} = gen_server:call(Parent, flush, infinity)
+            {ok, Stats} = gen_server:call(Parent, flush, infinity);
+        _Db ->
+            Source2 = open_db(Source),
+            Stats = local_process_batch(
+                IdRevs, Cp, Source2, Target2, #batch{}, Stats0),
+            close_db(Source2)
         end,
         close_db(Target2),
         ok = gen_server:call(Cp, {report_seq_done, ReportSeq, Stats}, infinity),
@@ -252,7 +260,7 @@ local_process_batch([], Cp, Source, Target, #batch{docs = Docs, size = Size}, St
     case Target of
     #httpdb{} ->
         couch_log:debug("Worker flushing doc batch of size ~p bytes", [Size]);
-    #db{} ->
+    _Db ->
         couch_log:debug("Worker flushing doc batch of ~p docs", [Size])
     end,
     Stats2 = flush_docs(Target, Docs),
@@ -367,7 +375,7 @@ spawn_writer(Target, #batch{docs = DocList, size = Size}) ->
     case {Target, Size > 0} of
     {#httpdb{}, true} ->
         couch_log:debug("Worker flushing doc batch of size ~p bytes", [Size]);
-    {#db{}, true} ->
+    {_Db, true} ->
         couch_log:debug("Worker flushing doc batch of ~p docs", [Size]);
     _ ->
         ok
@@ -429,7 +437,7 @@ maybe_flush_docs(#httpdb{} = Target, Batch, Doc) ->
         end
     end;
 
-maybe_flush_docs(#db{} = Target, #batch{docs = DocAcc, size = SizeAcc}, Doc) ->
+maybe_flush_docs(Target, #batch{docs = DocAcc, size = SizeAcc}, Doc) ->
     case SizeAcc + 1 of
     SizeAcc2 when SizeAcc2 >= ?DOC_BUFFER_LEN ->
         couch_log:debug("Worker flushing doc batch of ~p docs", [SizeAcc2]),

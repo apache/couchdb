@@ -60,11 +60,11 @@
 db_uri(#httpdb{url = Url}) ->
     couch_util:url_strip_password(Url);
 
-db_uri(#db{name = Name}) ->
-    db_uri(Name);
+db_uri(DbName) when is_binary(DbName) ->
+    ?b2l(DbName);
 
-db_uri(DbName) ->
-    ?b2l(DbName).
+db_uri(Db) ->
+    db_uri(couch_db:name(Db)).
 
 
 db_open(Db, Options) ->
@@ -153,10 +153,12 @@ get_db_info(#httpdb{} = Db) ->
         fun(200, _, {Props}) ->
             {ok, Props}
         end);
-get_db_info(#db{name = DbName, user_ctx = UserCtx}) ->
-    {ok, Db} = couch_db:open(DbName, [{user_ctx, UserCtx}]),
-    {ok, Info} = couch_db:get_db_info(Db),
-    couch_db:close(Db),
+get_db_info(Db) ->
+    DbName = couch_db:name(Db),
+    UserCtx = couch_db:get_user_ctx(Db),
+    {ok, InfoDb} = couch_db:open(DbName, [{user_ctx, UserCtx}]),
+    {ok, Info} = couch_db:get_db_info(InfoDb),
+    couch_db:close(InfoDb),
     {ok, [{couch_util:to_binary(K), V} || {K, V} <- Info]}.
 
 
@@ -176,8 +178,10 @@ get_pending_count(#httpdb{} = Db, Seq) ->
     send_req(Db, Options, fun(200, _, {Props}) ->
         {ok, couch_util:get_value(<<"pending">>, Props, null)}
     end);
-get_pending_count(#db{name=DbName}=Db, Seq) when is_number(Seq) ->
-    {ok, CountDb} = couch_db:open(DbName, [{user_ctx, Db#db.user_ctx}]),
+get_pending_count(Db, Seq) when is_number(Seq) ->
+    DbName = couch_db:name(Db),
+    UserCtx = couch_db:get_user_ctx(Db),
+    {ok, CountDb} = couch_db:open(DbName, [{user_ctx, UserCtx}]),
     Pending = couch_db:count_changes_since(CountDb, Seq),
     couch_db:close(CountDb),
     {ok, Pending}.
@@ -189,7 +193,8 @@ get_view_info(#httpdb{} = Db, DDocId, ViewName) ->
             {VInfo} = couch_util:get_value(<<"view_index">>, Props, {[]}),
             {ok, VInfo}
         end);
-get_view_info(#db{name = DbName}, DDocId, ViewName) ->
+get_view_info(Db, DDocId, ViewName) ->
+    DbName = couch_db:name(Db),
     {ok, VInfo} = couch_mrview:get_view_info(DbName, DDocId, ViewName),
     {ok, [{couch_util:to_binary(K), V} || {K, V} <- VInfo]}.
 
