@@ -39,8 +39,8 @@
 %   -> 404 // Not Found
 % Else
 %   -> save_doc
-before_doc_update(Doc, #db{user_ctx = UserCtx} = Db) ->
-    #user_ctx{name=Name} = UserCtx,
+before_doc_update(Doc, Db) ->
+    #user_ctx{name=Name} = couch_db:get_user_ctx(Db),
     DocName = get_doc_name(Doc),
     case (catch couch_db:check_is_admin(Db)) of
     ok ->
@@ -108,8 +108,8 @@ after_doc_read(#doc{id = <<?DESIGN_DOC_PREFIX, _/binary>>} = Doc, Db) ->
         throw({forbidden,
         <<"Only administrators can view design docs in the users database.">>})
     end;
-after_doc_read(Doc, #db{user_ctx = UserCtx} = Db) ->
-    #user_ctx{name=Name} = UserCtx,
+after_doc_read(Doc, Db) ->
+    #user_ctx{name=Name} = couch_db:get_user_ctx(Db),
     DocName = get_doc_name(Doc),
     case (catch couch_db:check_is_admin(Db)) of
     ok ->

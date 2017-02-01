@@ -182,7 +182,7 @@ update(DbName) ->
     lists:foreach(fun(_) ->
         Doc = couch_doc:from_json_obj({[{<<"_id">>, couch_uuids:new()}]}),
         {ok, _} = couch_db:update_docs(Db, [Doc]),
-        query_view(Db#db.name)
+        query_view(couch_db:name(Db))
     end, lists:seq(1, 200)),
     couch_db:close(Db).
 
@@ -220,7 +220,7 @@ spawn_compaction_monitor(DbName) ->
     {Pid, Ref} = spawn_monitor(fun() ->
         DaemonPid = whereis(couch_compaction_daemon),
         DbPid = couch_util:with_db(DbName, fun(Db) ->
-            Db#db.main_pid
+            couch_db:get_pid(Db)
         end),
         {ok, ViewPid} = couch_index_server:get_index(couch_mrview_index,
                 DbName, <<"_design/foo">>),

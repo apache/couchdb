@@ -265,7 +265,7 @@ hash_password(Password) ->
 shutdown_db(DbName) ->
     {ok, AuthDb} = couch_db:open_int(DbName, [?ADMIN_CTX]),
     ok = couch_db:close(AuthDb),
-    couch_util:shutdown_sync(AuthDb#db.main_pid),
+    couch_util:shutdown_sync(couch_db:get_pid(AuthDb)),
     ok = timer:sleep(1000).
 
 get_doc_rev(DbName, UserName) ->

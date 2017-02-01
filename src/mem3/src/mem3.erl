@@ -145,13 +145,13 @@ get_shard(DbName, Node, Range) ->
 local_shards(DbName) ->
     mem3_shards:local(DbName).
 
-shard_suffix(#db{name=DbName}) ->
-    shard_suffix(DbName);
-shard_suffix(DbName0) ->
+shard_suffix(DbName0) when is_binary(DbName0) ->
     Shard = hd(shards(DbName0)),
     <<"shards/", _:8/binary, "-", _:8/binary, "/", DbName/binary>> =
         Shard#shard.name,
-    filename:extension(binary_to_list(DbName)).
+    filename:extension(binary_to_list(DbName));
+shard_suffix(Db) ->
+    shard_suffix(couch_db:name(Db)).
 
 fold_shards(Fun, Acc) ->
     mem3_shards:fold(Fun, Acc).
@@ -292,10 +292,11 @@ group_by_range(Shards) ->
 
 % quorum functions
 
-quorum(#db{name=DbName}) ->
-    quorum(DbName);
-quorum(DbName) ->
-    n(DbName) div 2 + 1.
+quorum(DbName) when is_binary(DbName) ->
+    n(DbName) div 2 + 1;
+quorum(Db) ->
+    quorum(couch_db:name(Db)).
+
 
 node(#shard{node=Node}) ->
     Node;

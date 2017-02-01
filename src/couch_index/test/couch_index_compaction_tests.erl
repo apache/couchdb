@@ -23,7 +23,8 @@ setup() ->
     ?assertNot(is_opened(Db)),
     {Db, IndexerPid}.
 
-fake_index(#db{name = DbName} = Db) ->
+fake_index(Db) ->
+    DbName = couch_db:name(Db),
     ok = meck:new([test_index], [non_strict]),
     ok = meck:expect(test_index, init, ['_', '_'], {ok, 10}),
     ok = meck:expect(test_index, open, fun(_Db, State) ->

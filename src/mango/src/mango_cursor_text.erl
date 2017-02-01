@@ -50,7 +50,7 @@ create(Db, Indexes, Selector, Opts0) ->
             ?MANGO_ERROR(multiple_text_indexes)
     end,
 
-    Opts = unpack_bookmark(Db#db.name, Opts0),
+    Opts = unpack_bookmark(couch_db:name(Db), Opts0),
 
     DreyfusLimit = get_dreyfus_limit(),
     Limit = erlang:min(DreyfusLimit, couch_util:get_value(limit, Opts, mango_opts:default_limit())),
@@ -96,7 +96,7 @@ execute(Cursor, UserFun, UserAcc) ->
     },
     CAcc = #cacc{
         selector = Selector,
-        dbname = Db#db.name,
+        dbname = couch_db:name(Db),
         ddocid = ddocid(Idx),
         idx_name = mango_idx:name(Idx),
         bookmark = get_bookmark(Opts),

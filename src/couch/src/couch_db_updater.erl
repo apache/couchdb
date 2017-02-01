@@ -20,6 +20,7 @@
 -export([init/1,terminate/2,handle_call/3,handle_cast/2,code_change/3,handle_info/2]).
 
 -include_lib("couch/include/couch_db.hrl").
+-include("couch_db_int.hrl").
 
 -record(comp_header, {
     db_header,

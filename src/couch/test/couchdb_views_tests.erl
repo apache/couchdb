@@ -340,7 +340,7 @@ couchdb_1283() ->
         ]}),
         {ok, _} = couch_db:update_doc(MDb1, DDoc, []),
         ok = populate_db(MDb1, 100, 100),
-        query_view(MDb1#db.name, "foo", "foo"),
+        query_view(couch_db:name(MDb1), "foo", "foo"),
         ok = couch_db:close(MDb1),
 
         {ok, Db1} = couch_db:create(?tempdb(), [?ADMIN_CTX]),
@@ -350,8 +350,8 @@ couchdb_1283() ->
         {ok, Db3} = couch_db:create(?tempdb(), [?ADMIN_CTX]),
         ok = couch_db:close(Db3),
 
-        Writer1 = spawn_writer(Db1#db.name),
-        Writer2 = spawn_writer(Db2#db.name),
+        Writer1 = spawn_writer(couch_db:name(Db1)),
+        Writer2 = spawn_writer(couch_db:name(Db2)),
 
         ?assert(is_process_alive(Writer1)),
         ?assert(is_process_alive(Writer2)),
@@ -361,16 +361,16 @@ couchdb_1283() ->
 
         %% Below we do exactly the same as couch_mrview:compact holds inside
         %% because we need have access to compaction Pid, not a Ref.
-        %% {ok, MonRef} = couch_mrview:compact(MDb1#db.name, <<"_design/foo">>,
+        %% {ok, MonRef} = couch_mrview:compact(MDb1, <<"_design/foo">>,
         %%                                     [monitor]),
         {ok, Pid} = couch_index_server:get_index(
-            couch_mrview_index, MDb1#db.name, <<"_design/foo">>),
+            couch_mrview_index, couch_db:name(MDb1), <<"_design/foo">>),
         {ok, CPid} = gen_server:call(Pid, compact),
         %% By suspending compaction process we ensure that compaction won't get
         %% finished too early to make get_writer_status assertion fail.
         erlang:suspend_process(CPid),
         MonRef = erlang:monitor(process, CPid),
-        Writer3 = spawn_writer(Db3#db.name),
+        Writer3 = spawn_writer(couch_db:name(Db3)),
         ?assert(is_process_alive(Writer3)),
         ?assertEqual({error, all_dbs_active}, get_writer_status(Writer3)),
 
@@ -528,7 +528,8 @@ view_cleanup(DbName) ->
 
 count_users(DbName) ->
     {ok, Db} = couch_db:open_int(DbName, [?ADMIN_CTX]),
-    {monitored_by, Monitors} = erlang:process_info(Db#db.main_pid, monitored_by),
+    DbPid = couch_db:get_pid(Db),
+    {monitored_by, Monitors} = erlang:process_info(DbPid, monitored_by),
     CouchFiles = [P || P <- Monitors, couch_file:process_info(P) =/= undefined],
     ok = couch_db:close(Db),
     length(lists:usort(Monitors) -- [self() | CouchFiles]).
@@ -554,7 +555,8 @@ restore_backup_db_file(DbName) ->
 
     {ok, Db} = couch_db:open_int(DbName, []),
     ok = couch_db:close(Db),
-    exit(Db#db.main_pid, shutdown),
+    DbPid = couch_db:get_pid(Db),
+    exit(DbPid, shutdown),
 
     DbFile = filename:join([DbDir, ?b2l(DbName) ++ ".couch"]),
     ok = file:delete(DbFile),
@@ -575,7 +577,8 @@ wait_db_compact_done(_DbName, 0) ->
 wait_db_compact_done(DbName, N) ->
     {ok, Db} = couch_db:open_int(DbName, []),
     ok = couch_db:close(Db),
-    case is_pid(Db#db.compactor_pid) of
+    CompactorPid = couch_db:get_compactor_pid(Db),
+    case is_pid(CompactorPid) of
     false ->
         ok;
     true ->

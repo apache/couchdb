@@ -290,12 +290,12 @@ idx_mod(#idx{type = <<"text">>}) ->
     end.
 
 
-db_to_name(#db{name=Name}) ->
-    Name;
 db_to_name(Name) when is_binary(Name) ->
     Name;
 db_to_name(Name) when is_list(Name) ->
-    iolist_to_binary(Name).
+    iolist_to_binary(Name);
+db_to_name(Db) ->
+    couch_db:name(Db).
 
 
 get_idx_def(Opts) ->

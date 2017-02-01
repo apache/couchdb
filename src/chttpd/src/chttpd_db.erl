@@ -84,7 +84,7 @@ handle_changes_req1(#httpd{}=Req, Db) ->
     #changes_args{filter=Raw, style=Style} = Args0 = parse_changes_query(Req),
     ChangesArgs = Args0#changes_args{
         filter_fun = couch_changes:configure_filter(Raw, Style, Req, Db),
-        db_open_options = [{user_ctx, Db#db.user_ctx}]
+        db_open_options = [{user_ctx, couch_db:get_user_ctx(Db)}]
     },
     Max = chttpd:chunked_response_buffer_size(),
     case ChangesArgs#changes_args.feed of
@@ -253,7 +253,7 @@ handle_view_cleanup_req(Req, Db) ->
 handle_design_req(#httpd{
         path_parts=[_DbName, _Design, Name, <<"_",_/binary>> = Action | _Rest]
     }=Req, Db) ->
-    DbName = mem3:dbname(Db#db.name),
+    DbName = mem3:dbname(couch_db:name(Db)),
     case ddoc_cache:open(DbName, <<"_design/", Name/binary>>) of
     {ok, DDoc} ->
         Handler = chttpd_handlers:design_handler(Action, fun bad_action_req/3),
@@ -309,7 +309,8 @@ delete_db_req(#httpd{}=Req, DbName) ->
 
 do_db_req(#httpd{path_parts=[DbName|_], user_ctx=Ctx}=Req, Fun) ->
     fabric:get_security(DbName, [{user_ctx,Ctx}]), % calls check_is_reader
-    Fun(Req, #db{name=DbName, user_ctx=Ctx}).
+    {ok, Db} = couch_db:clustered_db(DbName, Ctx),
+    Fun(Req, Db).
 
 db_req(#httpd{method='GET',path_parts=[DbName]}=Req, _Db) ->
     % measure the time required to generate the etag, see if it's worth it
@@ -767,16 +768,17 @@ db_doc_req(#httpd{method='PUT', user_ctx=Ctx}=Req, Db, DocId) ->
     } = parse_doc_query(Req),
     couch_doc:validate_docid(DocId),
 
+    DbName = couch_db:name(Db),
     W = chttpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
     Options = [{user_ctx,Ctx}, {w,W}],
 
-    Loc = absolute_uri(Req, [$/, couch_util:url_encode(Db#db.name),
+    Loc = absolute_uri(Req, [$/, couch_util:url_encode(DbName),
         $/, couch_util:url_encode(DocId)]),
     RespHeaders = [{"Location", Loc}],
     case couch_util:to_list(couch_httpd:header_value(Req, "Content-Type")) of
     ("multipart/related;" ++ _) = ContentType ->
         couch_httpd:check_max_request_length(Req),
-        couch_httpd_multipart:num_mp_writers(mem3:n(mem3:dbname(Db#db.name), DocId)),
+        couch_httpd_multipart:num_mp_writers(mem3:n(mem3:dbname(DbName), DocId)),
         {ok, Doc0, WaitFun, Parser} = couch_doc:doc_from_multi_part_stream(ContentType,
                 fun() -> receive_request_data(Req) end),
         Doc = couch_doc_from_req(Req, DocId, Doc0),
@@ -833,8 +835,9 @@ db_doc_req(#httpd{method='COPY', user_ctx=Ctx}=Req, Db, SourceDocId) ->
         HttpCode = 202
     end,
     % respond
+    DbName = couch_db:name(Db),
     {PartRes} = update_doc_result_to_json(TargetDocId, {ok, NewTargetRev}),
-    Loc = absolute_uri(Req, "/" ++ couch_util:url_encode(Db#db.name) ++ "/" ++ couch_util:url_encode(TargetDocId)),
+    Loc = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName) ++ "/" ++ couch_util:url_encode(TargetDocId)),
     send_json(Req, HttpCode,
         [{"Location", Loc},
         {"ETag", "\"" ++ ?b2l(couch_doc:rev_to_str(NewTargetRev)) ++ "\""}],
@@ -1057,8 +1060,8 @@ couch_doc_from_req(Req, DocId, Json) ->
 % couch_doc_open(Db, DocId) ->
 %   couch_doc_open(Db, DocId, nil, []).
 
-couch_doc_open(#db{} = Db, DocId, Rev, Options0) ->
-    Options = [{user_ctx, Db#db.user_ctx} | Options0],
+couch_doc_open(Db, DocId, Rev, Options0) ->
+    Options = [{user_ctx, couch_db:get_user_ctx(Db)} | Options0],
     case Rev of
     nil -> % open most recent rev
         case fabric:open_doc(Db, DocId, Options) of
@@ -1262,7 +1265,7 @@ db_attachment_req(#httpd{method=Method, user_ctx=Ctx}=Req, Db, DocId, FileNamePa
         HttpCode = 202
     end,
     erlang:put(mochiweb_request_recv, true),
-    #db{name=DbName} = Db,
+    DbName = couch_db:name(Db),
 
     {Status, Headers} = case Method of
         'DELETE' ->

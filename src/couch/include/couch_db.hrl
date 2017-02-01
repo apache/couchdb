@@ -128,33 +128,6 @@
     handler
 }).
 
--record(db, {
-    main_pid = nil,
-    compactor_pid = nil,
-    instance_start_time, % number of microsecs since jan 1 1970 as a binary string
-    fd,
-    fd_monitor,
-    header = couch_db_header:new(),
-    committed_update_seq,
-    id_tree,
-    seq_tree,
-    local_tree,
-    update_seq,
-    name,
-    filepath,
-    validate_doc_funs = undefined,
-    security = [],
-    security_ptr = nil,
-    user_ctx = #user_ctx{},
-    waiting_delayed_commit = nil,
-    revs_limit = 1000,
-    fsync_options = [],
-    options = [],
-    compression,
-    before_doc_update = nil, % nil | fun(Doc, Db) -> NewDoc
-    after_doc_read = nil    % nil | fun(Doc, Db) -> NewDoc
-}).
-
 -record(view_fold_helper_funs, {
     reduce_count,
     passed_end,

@@ -196,7 +196,8 @@ handle_view_list_req(Req, _Db, _DDoc) ->
 handle_view_list(Req, Db, DDoc, LName, {ViewDesignName, ViewName}, Keys) ->
     %% Will throw an exception if the _list handler is missing
     couch_util:get_nested_json_value(DDoc#doc.body, [<<"lists">>, LName]),
-    {ok, VDoc} = ddoc_cache:open(Db#db.name, <<"_design/", ViewDesignName/binary>>),
+    DbName = couch_db:name(Db),
+    {ok, VDoc} = ddoc_cache:open(DbName, <<"_design/", ViewDesignName/binary>>),
     CB = fun couch_mrview_show:list_cb/2,
     QueryArgs = couch_mrview_http:parse_params(Req, Keys),
     Options = [{user_ctx, Req#httpd.user_ctx}],

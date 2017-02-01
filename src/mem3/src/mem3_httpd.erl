@@ -32,7 +32,7 @@ handle_membership_req(#httpd{path_parts=[<<"_membership">>]}=Req) ->
 
 handle_shards_req(#httpd{method='GET',
         path_parts=[_DbName, <<"_shards">>]} = Req, Db) ->
-    DbName = mem3:dbname(Db#db.name),
+    DbName = mem3:dbname(couch_db:name(Db)),
     Shards = mem3:shards(DbName),
     JsonShards = json_shards(Shards, dict:new()),
     couch_httpd:send_json(Req, {[
@@ -40,7 +40,7 @@ handle_shards_req(#httpd{method='GET',
     ]});
 handle_shards_req(#httpd{method='GET',
         path_parts=[_DbName, <<"_shards">>, DocId]} = Req, Db) ->
-    DbName = mem3:dbname(Db#db.name),
+    DbName = mem3:dbname(couch_db:name(Db)),
     Shards = mem3:shards(DbName, DocId),
     {[{Shard, Dbs}]} = json_shards(Shards, dict:new()),
     couch_httpd:send_json(Req, {[

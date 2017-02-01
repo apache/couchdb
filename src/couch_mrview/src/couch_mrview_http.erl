@@ -103,11 +103,11 @@ handle_view_changes_req(#httpd{path_parts=[_,<<"_design">>,DDocName,<<"_view_cha
 handle_view_req(#httpd{method='GET',
                       path_parts=[_, _, DDocName, _, VName, <<"_info">>]}=Req,
                 Db, _DDoc) ->
-
+    DbName = couch_db:name(Db),
     DDocId = <<"_design/", DDocName/binary >>,
-    {ok, Info} = couch_mrview:get_view_info(Db#db.name, DDocId, VName),
+    {ok, Info} = couch_mrview:get_view_info(DbName, DDocId, VName),
 
-    FinalInfo = [{db_name, Db#db.name},
+    FinalInfo = [{db_name, DbName},
                  {ddoc, DDocId},
                  {view, VName}] ++ Info,
     chttpd:send_json(Req, 200, {FinalInfo});
@@ -212,7 +212,7 @@ is_restricted(Db, _) ->
     couch_db:is_system_db(Db).
 
 is_public_fields_configured(Db) ->
-    DbName = ?b2l(Db#db.name),
+    DbName = ?b2l(couch_db:name(Db)),
     case config:get("couch_httpd_auth", "authentication_db", "_users") of
     DbName ->
         UsersDbPublic = config:get("couch_httpd_auth", "users_db_public", "false"),
@@ -237,7 +237,7 @@ do_all_docs_req(Req, Db, Keys, NS) ->
     {ok, Resp} = couch_httpd:etag_maybe(Req, fun() ->
         Max = chttpd:chunked_response_buffer_size(),
         VAcc0 = #vacc{db=Db, req=Req, threshold=Max},
-        DbName = ?b2l(Db#db.name),
+        DbName = ?b2l(couch_db:name(Db)),
         UsersDbName = config:get("couch_httpd_auth",
                                  "authentication_db",
                                  "_users"),

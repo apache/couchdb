@@ -645,7 +645,7 @@ should_filter_by_user_ctx({DbName, _}) ->
             ]}),
             ChArgs = #changes_args{filter = "app/valid"},
             UserCtx = #user_ctx{name = <<"doc3">>, roles = []},
-            DbRec = #db{name = DbName, user_ctx = UserCtx},
+            {ok, DbRec} = couch_db:clustered_db(DbName, UserCtx),
             Req = {json_req, {[{
                 <<"userCtx">>, couch_util:json_user_ctx(DbRec)
             }]}},

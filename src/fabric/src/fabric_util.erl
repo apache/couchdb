@@ -302,7 +302,8 @@ path_ends_with(Path, Suffix) ->
 fake_db(DbName, Opts) ->
     {SecProps} = fabric:get_security(DbName), % as admin
     UserCtx = couch_util:get_value(user_ctx, Opts, #user_ctx{}),
-    #db{name = DbName, security = SecProps, user_ctx = UserCtx}.
+    {ok, Db} = couch_db:clustered_db(DbName, UserCtx, SecProps),
+    Db.
 
 %% test function
 kv(Item, Count) ->

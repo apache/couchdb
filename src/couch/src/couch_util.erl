@@ -198,7 +198,9 @@ json_apply_field({Key, NewValue}, [{OtherKey, OtherVal} | Headers], Acc) ->
 json_apply_field({Key, NewValue}, [], Acc) ->
     {[{Key, NewValue}|Acc]}.
 
-json_user_ctx(#db{name=ShardName, user_ctx=Ctx}) ->
+json_user_ctx(Db) ->
+    ShardName = couch_db:name(Db),
+    Ctx = couch_db:get_user_ctx(Db),
     {[{<<"db">>, mem3:dbname(ShardName)},
             {<<"name">>,Ctx#user_ctx.name},
             {<<"roles">>,Ctx#user_ctx.roles}]}.
@@ -455,9 +457,7 @@ encode_doc_id(Id) ->
     url_encode(Id).
 
 
-with_db(Db, Fun) when is_record(Db, db) ->
-    Fun(Db);
-with_db(DbName, Fun) ->
+with_db(DbName, Fun)  when is_binary(DbName) ->
     case couch_db:open_int(DbName, [?ADMIN_CTX]) of
         {ok, Db} ->
             try
@@ -467,6 +467,13 @@ with_db(DbName, Fun) ->
             end;
         Else ->
             throw(Else)
+    end;
+with_db(Db, Fun) ->
+    case couch_db:is_db(Db) of
+        true ->
+            Fun(Db);
+        false ->
+            erlang:error({invalid_db, Db})
     end.
 
 rfc1123_date() ->

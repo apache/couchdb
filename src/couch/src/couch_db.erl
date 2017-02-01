@@ -20,6 +20,9 @@
     reopen/1,
     close/1,
 
+    clustered_db/2,
+    clustered_db/3,
+
     monitor/1,
     monitored_by/1,
     is_idle/1,
@@ -30,21 +33,28 @@
 
     name/1,
     compression/1,
+    get_after_doc_read_fun/1,
+    get_before_doc_update_fun/1,
     get_committed_update_seq/1,
     get_compacted_seq/1,
+    get_compactor_pid/1,
     get_db_info/1,
     get_doc_count/1,
     get_epochs/1,
+    get_filepath/1,
     get_instance_start_time/1,
     get_last_purged/1,
     get_pid/1,
     get_revs_limit/1,
     get_security/1,
     get_update_seq/1,
+    get_user_ctx/1,
     get_uuid/1,
     get_purge_seq/1,
 
+    is_db/1,
     is_system_db/1,
+    is_clustered/1,
 
     increment_update_seq/1,
     set_revs_limit/2,
@@ -78,6 +88,8 @@
 
     with_stream/3,
 
+    fold_docs/4,
+    fold_local_docs/4,
     enum_docs/4,
     enum_docs_reduce_to_count/1,
 
@@ -111,6 +123,7 @@
 
 
 -include_lib("couch/include/couch_db.hrl").
+-include("couch_db_int.hrl").
 
 -define(DBNAME_REGEX,
     "^[a-z][a-z0-9\\_\\$()\\+\\-\\/]*" % use the stock CouchDB regex
@@ -189,8 +202,24 @@ incref(#db{fd = Fd} = Db) ->
     Ref = erlang:monitor(process, Fd),
     {ok, Db#db{fd_monitor = Ref}}.
 
+clustered_db(DbName, UserCtx) ->
+    clustered_db(DbName, UserCtx, []).
+
+clustered_db(DbName, UserCtx, SecProps) ->
+    {ok, #db{name = DbName, user_ctx = UserCtx, security = SecProps}}.
+
+is_db(#db{}) ->
+    true;
+is_db(_) ->
+    false.
+
 is_system_db(#db{options = Options}) ->
     lists:member(sys_db, Options).
+
+is_clustered(#db{main_pid = nil}) ->
+    true;
+is_clustered(#db{}) ->
+    false.
 
 ensure_full_commit(#db{main_pid=Pid, instance_start_time=StartTime}) ->
     ok = gen_server:call(Pid, full_commit, infinity),
@@ -372,11 +401,20 @@ increment_update_seq(#db{main_pid=Pid}) ->
 purge_docs(#db{main_pid=Pid}, IdsRevs) ->
     gen_server:call(Pid, {purge_docs, IdsRevs}).
 
+get_after_doc_read_fun(#db{after_doc_read = Fun}) ->
+    Fun.
+
+get_before_doc_update_fun(#db{before_doc_update = Fun}) ->
+    Fun.
+
 get_committed_update_seq(#db{committed_update_seq=Seq}) ->
     Seq.
 
 get_update_seq(#db{update_seq=Seq})->
     Seq.
+
+get_user_ctx(#db{user_ctx = UserCtx}) ->
+    UserCtx.
 
 get_purge_seq(#db{}=Db) ->
     couch_db_header:purge_seq(Db#db.header).
@@ -404,11 +442,17 @@ get_epochs(#db{}=Db) ->
     validate_epochs(Epochs),
     Epochs.
 
+get_filepath(#db{filepath = FilePath}) ->
+    FilePath.
+
 get_instance_start_time(#db{instance_start_time = IST}) ->
     IST.
 
 get_compacted_seq(#db{}=Db) ->
     couch_db_header:compacted_seq(Db#db.header).
+
+get_compactor_pid(#db{compactor_pid = Pid}) ->
+    Pid.
 
 get_db_info(Db) ->
     #db{fd=Fd,
@@ -1358,6 +1402,17 @@ enum_docs_since(Db, SinceSeq, InFun, Acc, Options) ->
         Db#db.seq_tree, InFun, Acc,
             [{start_key, SinceSeq + 1} | Options]),
     {ok, enum_docs_since_reduce_to_count(LastReduction), AccOut}.
+
+
+fold_docs(Db, InFun, InAcc, Opts) ->
+    Wrapper = fun(FDI, _, Acc) -> InFun(FDI, Acc) end,
+    {ok, _, AccOut} = couch_btree:fold(Db#db.id_tree, Wrapper, InAcc, Opts),
+    {ok, AccOut}.
+
+fold_local_docs(Db, InFun, InAcc, Opts) ->
+    Wrapper = fun(FDI, _, Acc) -> InFun(FDI, Acc) end,
+    {ok, _, AccOut} = couch_btree:fold(Db#db.local_tree, Wrapper, InAcc, Opts),
+    {ok, AccOut}.
 
 enum_docs(Db, InFun, InAcc, Options0) ->
     {NS, Options} = extract_namespace(Options0),
