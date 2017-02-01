@@ -673,11 +673,10 @@ db_doc_req(#httpd{method='GET', mochi_req=MochiReq}=Req, Db, DocId) ->
         Doc = couch_doc_open(Db, DocId, Rev, Options2),
         send_doc(Req, Doc, Options2);
     _ ->
-        {ok, Results} = fabric:open_revs(Db, DocId, Revs, Options),
-        case Results of
-            [] when Revs == all ->
+        case fabric:open_revs(Db, DocId, Revs, Options) of
+            {ok, []} when Revs == all ->
                 chttpd:send_error(Req, {not_found, missing});
-            _Else ->
+            {ok, Results} ->
                 case MochiReq:accepts_content_type("multipart/mixed") of
                 false ->
                     {ok, Resp} = start_json_response(Req, 200),
@@ -703,7 +702,9 @@ db_doc_req(#httpd{method='GET', mochi_req=MochiReq}=Req, Db, DocId) ->
                     end_json_response(Resp);
                 true ->
                     send_docs_multipart(Req, Results, Options)
-                end
+                end;
+            {error, Error} ->
+                chttpd:send_error(Req, Error)
         end
     end;
 
@@ -722,7 +723,10 @@ db_doc_req(#httpd{method='POST', user_ctx=Ctx}=Req, Db, DocId) ->
         Doc = couch_doc_from_req(Req, DocId, Json);
     false ->
         Rev = couch_doc:parse_rev(list_to_binary(couch_util:get_value("_rev", Form))),
-        {ok, [{ok, Doc}]} = fabric:open_revs(Db, DocId, [Rev], [])
+        Doc = case fabric:open_revs(Db, DocId, [Rev], []) of
+            {ok, [{ok, Doc0}]} -> Doc0;
+            {error, Error} -> throw(Error)
+        end
     end,
     UpdatedAtts = [
         couch_att:new([
@@ -1063,14 +1067,16 @@ couch_doc_open(#db{} = Db, DocId, Rev, Options0) ->
          Error ->
              throw(Error)
          end;
-  _ -> % open a specific rev (deletions come back as stubs)
-      case fabric:open_revs(Db, DocId, [Rev], Options) of
-          {ok, [{ok, Doc}]} ->
-              Doc;
-          {ok, [{{not_found, missing}, Rev}]} ->
-              throw(not_found);
-          {ok, [Else]} ->
-              throw(Else)
+    _ -> % open a specific rev (deletions come back as stubs)
+        case fabric:open_revs(Db, DocId, [Rev], Options) of
+        {ok, [{ok, Doc}]} ->
+            Doc;
+        {ok, [{{not_found, missing}, Rev}]} ->
+            throw(not_found);
+        {ok, [Else]} ->
+            throw(Else);
+        {error, Error} ->
+            throw(Error)
       end
   end.
 
@@ -1235,7 +1241,8 @@ db_attachment_req(#httpd{method=Method, user_ctx=Ctx}=Req, Db, DocId, FileNamePa
         Rev ->
             case fabric:open_revs(Db, DocId, [Rev], [{user_ctx,Ctx}]) of
             {ok, [{ok, Doc0}]}  -> Doc0;
-            {ok, [Error]}       -> throw(Error)
+            {ok, [Error]}       -> throw(Error);
+            {error, Error}      -> throw(Error)
             end
     end,
 
