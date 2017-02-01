@@ -13,6 +13,8 @@
 -module(test_util).
 
 -include_lib("couch/include/couch_eunit.hrl").
+-include("couch_db.hrl").
+-include("couch_db_int.hrl").
 
 -export([init_code_path/0]).
 -export([source_file/1, build_file/1]).
@@ -31,6 +33,8 @@
 -export([wait/1, wait/2, wait/3]).
 
 -export([start/1, start/2, start/3, stop/1]).
+
+-export([fake_db/1]).
 
 -record(test_context, {mocked = [], started = [], module}).
 
@@ -229,6 +233,16 @@ start(Module, ExtraApps, Options) ->
 stop(#test_context{mocked = Mocked, started = Apps}) ->
     meck:unload(Mocked),
     stop_applications(Apps).
+
+fake_db(Fields) ->
+    Indexes = lists:zip(
+            record_info(fields, db),
+            lists:seq(2, record_info(size, db))
+        ),
+    lists:foldl(fun({FieldName, Value}, Acc) ->
+        Idx = couch_util:get_value(FieldName, Indexes),
+        setelement(Idx, Acc, Value)
+    end, #db{}, Fields).
 
 now_us() ->
     {MegaSecs, Secs, MicroSecs} = now(),
