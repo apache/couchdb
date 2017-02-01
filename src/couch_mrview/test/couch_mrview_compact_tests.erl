@@ -26,7 +26,7 @@ setup() ->
 teardown(Db) ->
     meck:unload(),
     couch_db:close(Db),
-    couch_server:delete(Db#db.name, [?ADMIN_CTX]),
+    couch_server:delete(couch_db:name(Db), [?ADMIN_CTX]),
     ok.
 
 

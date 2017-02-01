@@ -120,16 +120,22 @@ json_req_obj_field(<<"secObj">>, #httpd{user_ctx=UserCtx}, Db, _DocId) ->
     get_db_security(Db, UserCtx).
 
 
-get_db_info(#db{main_pid = nil} = Db) ->
-    fabric:get_db_info(Db);
-get_db_info(#db{} = Db) ->
-    couch_db:get_db_info(Db).
+get_db_info(Db) ->
+    case couch_db:is_clustered(Db) of
+        true ->
+            fabric:get_db_info(Db);
+        false ->
+            couch_db:get_db_info(Db)
+    end.
 
 
-get_db_security(#db{main_pid = nil}=Db, #user_ctx{}) ->
-    fabric:get_security(Db);
-get_db_security(#db{}=Db, #user_ctx{}) ->
-    couch_db:get_security(Db).
+get_db_security(Db, #user_ctx{}) ->
+    case couch_db:is_clustered(Db) of
+        true ->
+            fabric:get_security(Db);
+        false ->
+            couch_db:get_security(Db)
+    end.
 
 
 to_json_terms(Data) ->
