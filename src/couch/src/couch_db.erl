@@ -12,30 +12,96 @@
 
 -module(couch_db).
 
--export([open/2,open_int/2,close/1,create/2,get_db_info/1,get_design_docs/1]).
--export([start_compact/1, cancel_compact/1]).
--export([wait_for_compaction/1, wait_for_compaction/2]).
--export([is_idle/1,monitor/1,count_changes_since/2]).
--export([update_doc/3,update_doc/4,update_docs/4,update_docs/2,update_docs/3,delete_doc/3]).
--export([get_doc_info/2,get_full_doc_info/2,get_full_doc_infos/2]).
--export([open_doc/2,open_doc/3,open_doc_revs/4]).
--export([set_revs_limit/2,get_revs_limit/1]).
--export([get_missing_revs/2,name/1,get_update_seq/1,get_committed_update_seq/1]).
--export([get_uuid/1, get_epochs/1, get_compacted_seq/1]).
--export([enum_docs/4,enum_docs_since/5]).
--export([enum_docs_since_reduce_to_count/1,enum_docs_reduce_to_count/1]).
--export([increment_update_seq/1,get_purge_seq/1,purge_docs/2,get_last_purged/1]).
--export([start_link/3,open_doc_int/3,ensure_full_commit/1,ensure_full_commit/2]).
--export([set_security/2,get_security/1]).
--export([changes_since/4,changes_since/5,read_doc/2,new_revid/1]).
--export([check_is_admin/1, is_admin/1, check_is_member/1, get_doc_count/1]).
--export([reopen/1, is_system_db/1, compression/1, make_doc/5]).
--export([load_validation_funs/1]).
--export([check_md5/2, with_stream/3]).
--export([monitored_by/1]).
--export([normalize_dbname/1]).
--export([validate_dbname/1]).
--export([dbname_suffix/1]).
+-export([
+    create/2,
+    open/2,
+    open_int/2,
+    reopen/1,
+    close/1,
+
+    monitor/1,
+    monitored_by/1,
+    is_idle/1,
+
+    is_admin/1,
+    check_is_admin/1,
+    check_is_member/1,
+
+    name/1,
+    compression/1,
+    get_committed_update_seq/1,
+    get_compacted_seq/1,
+    get_db_info/1,
+    get_doc_count/1,
+    get_epochs/1,
+    get_last_purged/1,
+    get_revs_limit/1,
+    get_security/1,
+    get_update_seq/1,
+    get_uuid/1,
+    get_purge_seq/1,
+
+    is_system_db/1,
+
+    increment_update_seq/1,
+    set_revs_limit/2,
+    set_security/2,
+
+    ensure_full_commit/1,
+    ensure_full_commit/2,
+
+    load_validation_funs/1,
+
+    open_doc/2,
+    open_doc/3,
+    open_doc_revs/4,
+    open_doc_int/3,
+    read_doc/2,
+    get_doc_info/2,
+    get_full_doc_info/2,
+    get_full_doc_infos/2,
+    get_missing_revs/2,
+    get_design_docs/1,
+
+    update_doc/3,
+    update_doc/4,
+    update_docs/4,
+    update_docs/2,
+    update_docs/3,
+    delete_doc/3,
+
+    purge_docs/2,
+
+    with_stream/3,
+
+    enum_docs/4,
+    enum_docs_reduce_to_count/1,
+
+    enum_docs_since/5,
+    enum_docs_since_reduce_to_count/1,
+    changes_since/4,
+    changes_since/5,
+    count_changes_since/2,
+
+    start_compact/1,
+    cancel_compact/1,
+    wait_for_compaction/1,
+    wait_for_compaction/2,
+
+    dbname_suffix/1,
+    normalize_dbname/1,
+    validate_dbname/1,
+
+    check_md5/2,
+    make_doc/5,
+    new_revid/1
+]).
+
+
+-export([
+    start_link/3
+]).
+
 
 -include_lib("couch/include/couch_db.hrl").
 
