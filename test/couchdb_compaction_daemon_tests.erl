@@ -26,6 +26,10 @@ start() ->
     Ctx.
 
 setup() ->
+    ok = meck:new(couch_db_updater, [passthrough]),
+    ok = meck:new(couch_mrview_compactor, [passthrough]),
+    ok = meck:new(couch_compaction_daemon, [passthrough]),
+
     DbName = ?tempdb(),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     create_design_doc(Db),
@@ -40,6 +44,11 @@ teardown(DbName) ->
         end,
         Configs),
     couch_server:delete(DbName, [?ADMIN_CTX]),
+
+    (catch meck:unload(couch_compaction_daemon)),
+    (catch meck:unload(couch_mrview_compactor)),
+    (catch meck:unload(couch_db_updater)),
+
     ok.
 
 
@@ -66,6 +75,8 @@ should_compact_by_default_rule(DbName) ->
         {ok, Db} = couch_db:open_int(DbName, []),
         populate(DbName, 70, 70, 200 * 1024),
 
+        CompactionMonitor = spawn_compaction_monitor(DbName),
+
         {_, DbFileSize} = get_db_frag(DbName),
         {_, ViewFileSize} = get_view_frag(DbName),
 
@@ -75,8 +86,7 @@ should_compact_by_default_rule(DbName) ->
                 false)
         end),
 
-        wait_compaction_started(DbName),
-        wait_compaction_finished(DbName),
+        wait_for_compaction(CompactionMonitor),
 
         with_config_change(DbName, fun() ->
             ok = config:delete("compactions", "_default", false)
@@ -100,6 +110,8 @@ should_compact_by_dbname_rule(DbName) ->
         {ok, Db} = couch_db:open_int(DbName, []),
         populate(DbName, 70, 70, 200 * 1024),
 
+        CompactionMonitor = spawn_compaction_monitor(DbName),
+
         {_, DbFileSize} = get_db_frag(DbName),
         {_, ViewFileSize} = get_view_frag(DbName),
 
@@ -109,8 +121,7 @@ should_compact_by_dbname_rule(DbName) ->
                 false)
         end),
 
-        wait_compaction_started(DbName),
-        wait_compaction_finished(DbName),
+        wait_for_compaction(CompactionMonitor),
 
         with_config_change(DbName, fun() ->
             ok = config:delete("compactions", ?b2l(DbName), false)
@@ -190,7 +201,7 @@ get_db_frag(DbName) ->
     {ok, Info} = couch_db:get_db_info(Db),
     couch_db:close(Db),
     FileSize = get_size(file, Info),
-    DataSize = get_size(external, Info),
+    DataSize = get_size(active, Info),
     {round((FileSize - DataSize) / FileSize * 100), FileSize}.
 
 get_view_frag(DbName) ->
@@ -198,48 +209,76 @@ get_view_frag(DbName) ->
     {ok, Info} = couch_mrview:get_info(Db, <<"_design/foo">>),
     couch_db:close(Db),
     FileSize = get_size(file, Info),
-    DataSize = get_size(external, Info),
+    DataSize = get_size(active, Info),
     {round((FileSize - DataSize) / FileSize * 100), FileSize}.
 
 get_size(Kind, Info) ->
     couch_util:get_nested_json_value({Info}, [sizes, Kind]).
 
-wait_compaction_started(DbName) ->
-    WaitFun = fun() ->
-        case is_compaction_running(DbName) of
-            false -> wait;
-            true ->  ok
-        end
+spawn_compaction_monitor(DbName) ->
+    TestPid = self(),
+    {Pid, Ref} = spawn_monitor(fun() ->
+        DaemonPid = whereis(couch_compaction_daemon),
+        DbPid = couch_util:with_db(DbName, fun(Db) ->
+            couch_db:get_pid(Db)
+        end),
+        {ok, ViewPid} = couch_index_server:get_index(couch_mrview_index,
+                DbName, <<"_design/foo">>),
+        TestPid ! {self(), started},
+        receive
+            {TestPid, go} -> ok
+        after ?TIMEOUT ->
+            erlang:error(timeout)
+        end,
+        meck:wait(
+                1,
+                couch_compaction_daemon,
+                handle_cast,
+                [{config_update, '_', '_'}, '_'],
+                DaemonPid,
+                ?TIMEOUT
+            ),
+        meck:wait(
+                1,
+                couch_db_updater,
+                handle_cast,
+                [{compact_done, '_'}, '_'],
+                DbPid,
+                ?TIMEOUT
+            ),
+        meck:wait(
+                1,
+                couch_mrview_compactor,
+                swap_compacted,
+                ['_', '_'],
+                ViewPid,
+                ?TIMEOUT
+            )
+    end),
+    receive
+        {Pid, started} -> ok;
+        {'DOWN', Ref, _, _, _} -> erlang:error(monitor_failure)
+    after ?TIMEOUT ->
+        erlang:error({assertion_failed, [
+                {module, ?MODULE},
+                {line, ?LINE},
+                {reason, "Compaction starting timeout"}
+            ]})
     end,
-    case test_util:wait(WaitFun, ?TIMEOUT) of
-        timeout ->
-            erlang:error({assertion_failed,
-                          [{module, ?MODULE},
-                           {line, ?LINE},
-                           {reason, "Compaction starting timeout"}]});
-        _ ->
-            ok
-    end.
+    {Pid, Ref}.
 
-wait_compaction_finished(DbName) ->
-    WaitFun = fun() ->
-        case is_compaction_running(DbName) of
-            true -> wait;
-            false -> ok
-        end
-    end,
-    case test_util:wait(WaitFun, ?TIMEOUT) of
-        timeout ->
-            erlang:error({assertion_failed,
-                          [{module, ?MODULE},
-                           {line, ?LINE},
-                           {reason, "Compaction timeout"}]});
-        _ ->
-            ok
+wait_for_compaction({Pid, Ref}) ->
+    Pid ! {self(), go},
+    receive
+        {'DOWN', Ref, _, _, normal} -> ok;
+        {'DOWN', Ref, _, _, Other} -> erlang:error(Other)
+    after ?TIMEOUT ->
+        erlang:error({assertion_failed, [
+                {module, ?MODULE},
+                {line, ?LINE},
+                {reason, "Compaction finishing timeout"}
+            ]})
     end.
-
-is_compaction_running(_DbName) ->
-    couch_compaction_daemon:in_progress() /= [].
 
 is_idle(DbName) ->
     {ok, Db} = couch_db:open_int(DbName, [?ADMIN_CTX]),
