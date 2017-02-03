@@ -219,7 +219,9 @@ is_system_db(#db{options = Options}) ->
 is_clustered(#db{main_pid = nil}) ->
     true;
 is_clustered(#db{}) ->
-    false.
+    false;
+is_clustered(?NEW_PSE_DB = Db) ->
+    ?PSE_DB_MAIN_PID(Db) == undefined.
 
 ensure_full_commit(#db{main_pid=Pid, instance_start_time=StartTime}) ->
     ok = gen_server:call(Pid, full_commit, infinity),
@@ -232,6 +234,8 @@ ensure_full_commit(Db, RequiredSeq) ->
 
 close(#db{fd_monitor=Ref}) ->
     erlang:demonitor(Ref, [flush]),
+    ok;
+close(?NEW_PSE_DB) ->
     ok.
 
 is_idle(#db{compactor_pid=nil, waiting_delayed_commit=nil} = Db) ->
@@ -414,7 +418,9 @@ get_update_seq(#db{update_seq=Seq})->
     Seq.
 
 get_user_ctx(#db{user_ctx = UserCtx}) ->
-    UserCtx.
+    UserCtx;
+get_user_ctx(?NEW_PSE_DB = Db) ->
+    ?PSE_DB_USER_CTX(Db).
 
 get_purge_seq(#db{}=Db) ->
     couch_db_header:purge_seq(Db#db.header).
@@ -632,7 +638,9 @@ get_members(#db{security=SecProps}) ->
         couch_util:get_value(<<"readers">>, SecProps, {[]})).
 
 get_security(#db{security=SecProps}) ->
-    {SecProps}.
+    {SecProps};
+get_security(?NEW_PSE_DB = Db) ->
+    {?PSE_DB_SECURITY(Db)}.
 
 set_security(#db{main_pid=Pid}=Db, {NewSecProps}) when is_list(NewSecProps) ->
     check_is_admin(Db),
@@ -681,7 +689,9 @@ set_revs_limit(_Db, _Limit) ->
     throw(invalid_revs_limit).
 
 name(#db{name=Name}) ->
-    Name.
+    Name;
+name(?NEW_PSE_DB = Db) ->
+    ?PSE_DB_NAME(Db).
 
 compression(#db{compression=Compression}) ->
     Compression.
