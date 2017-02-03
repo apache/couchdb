@@ -26,6 +26,7 @@
 -export([handle_config_change/5, handle_config_terminate/3]).
 
 -include_lib("couch/include/couch_db.hrl").
+-include("couch_server_int.hrl").
 
 -define(MAX_DBS_OPEN, 100).
 -define(RELISTEN_DELAY, 5000).
@@ -73,16 +74,18 @@ sup_start_link() ->
 open(DbName, Options0) ->
     Ctx = couch_util:get_value(user_ctx, Options0, #user_ctx{}),
     case ets:lookup(couch_dbs, DbName) of
-    [#db{fd=Fd, fd_monitor=Lock, options=Options} = Db] when Lock =/= locked ->
-        update_lru(DbName, Options),
-        {ok, Db#db{user_ctx=Ctx, fd_monitor=erlang:monitor(process,Fd)}};
+    [#entry{db = Db0, lock = Lock} = Entry] when Lock =/= locked ->
+        update_lru(DbName, Entry#entry.db_options),
+        {ok, Db1} = couch_db:incref(Db0),
+        couch_db:set_user_ctx(Db1, Ctx);
     _ ->
         Options = maybe_add_sys_db_callbacks(DbName, Options0),
         Timeout = couch_util:get_value(timeout, Options, infinity),
         Create = couch_util:get_value(create_if_missing, Options, false),
         case gen_server:call(couch_server, {open, DbName, Options}, Timeout) of
-        {ok, #db{fd=Fd} = Db} ->
-            {ok, Db#db{user_ctx=Ctx, fd_monitor=erlang:monitor(process,Fd)}};
+        {ok, Db0} ->
+            {ok, Db1} = couch_db:incref(Db0),
+            couch_db:set_user_ctx(Db1, Ctx);
         {not_found, no_db_file} when Create ->
             couch_log:warning("creating missing database: ~s", [DbName]),
             couch_server:create(DbName, Options);
@@ -103,9 +106,10 @@ close_lru() ->
 create(DbName, Options0) ->
     Options = maybe_add_sys_db_callbacks(DbName, Options0),
     case gen_server:call(couch_server, {create, DbName, Options}, infinity) of
-    {ok, #db{fd=Fd} = Db} ->
+    {ok, Db0} ->
         Ctx = couch_util:get_value(user_ctx, Options, #user_ctx{}),
-        {ok, Db#db{user_ctx=Ctx, fd_monitor=erlang:monitor(process,Fd)}};
+        {ok, Db1} = couch_db:incref(Db0),
+        couch_db:set_user_ctx(Db1, Ctx);
     Error ->
         Error
     end.
@@ -187,7 +191,7 @@ init([]) ->
     ok = config:listen_for_changes(?MODULE, nil),
     ok = couch_file:init_delete_dir(RootDir),
     hash_admin_passwords(),
-    ets:new(couch_dbs, [set, protected, named_table, {keypos, #db.name}]),
+    ets:new(couch_dbs, [set, protected, named_table, {keypos, #entry.name}]),
     ets:new(couch_dbs_pid_to_name, [set, protected, named_table]),
     process_flag(trap_exit, true),
     {ok, #server{root_dir=RootDir,
@@ -199,8 +203,9 @@ terminate(Reason, Srv) ->
     couch_log:error("couch_server terminating with ~p, state ~2048p",
                     [Reason,
                      Srv#server{lru = redacted}]),
-    ets:foldl(fun(#db{main_pid=Pid}, _) -> couch_util:shutdown_sync(Pid) end,
-        nil, couch_dbs),
+    ets:foldl(fun(#entry{db = Db}, _) ->
+        couch_util:shutdown_sync(couch_db:get_pid(Db))
+    end, nil, couch_dbs),
     ok.
 
 handle_config_change("couchdb", "database_dir", _, _, _) ->
@@ -306,15 +311,13 @@ open_async(Server, From, DbName, Filepath, Options) ->
         true -> create;
         false -> open
     end,
-    % icky hack of field values - compactor_pid used to store clients
-    % and fd used for opening request info
-    true = ets:insert(couch_dbs, #db{
+    true = ets:insert(couch_dbs, #entry{
         name = DbName,
-        fd = ReqType,
-        main_pid = Opener,
-        compactor_pid = [From],
-        fd_monitor = locked,
-        options = Options
+        pid = Opener,
+        lock = locked,
+        waiters = [From],
+        req_type = ReqType,
+        db_options = Options
     }),
     true = ets:insert(couch_dbs_pid_to_name, {Opener, DbName}),
     db_opened(Server, Options).
@@ -338,16 +341,15 @@ handle_call({open_result, T0, DbName, {ok, Db}}, {FromPid, _Tag}, Server) ->
     true = ets:delete(couch_dbs_pid_to_name, FromPid),
     OpenTime = timer:now_diff(os:timestamp(), T0) / 1000,
     couch_stats:update_histogram([couchdb, db_open_time], OpenTime),
-    % icky hack of field values - compactor_pid used to store clients
-    % and fd used to possibly store a creation request
+    DbPid = couch_db:get_pid(Db),
     case ets:lookup(couch_dbs, DbName) of
         [] ->
             % db was deleted during async open
-            exit(Db#db.main_pid, kill),
+            exit(DbPid, kill),
             {reply, ok, Server};
-        [#db{fd=ReqType, compactor_pid=Froms}] ->
-            link(Db#db.main_pid),
-            [gen_server:reply(From, {ok, Db}) || From <- Froms],
+        [#entry{req_type = ReqType, waiters = Waiters} = Entry] ->
+            link(DbPid),
+            [gen_server:reply(Waiter, {ok, Db}) || Waiter <- Waiters],
             % Cancel the creation request if it exists.
             case ReqType of
                 {create, DbName, _Filepath, _Options, CrFrom} ->
@@ -355,8 +357,15 @@ handle_call({open_result, T0, DbName, {ok, Db}}, {FromPid, _Tag}, Server) ->
                 _ ->
                     ok
             end,
-            true = ets:insert(couch_dbs, Db),
-            true = ets:insert(couch_dbs_pid_to_name, {Db#db.main_pid, DbName}),
+            true = ets:insert(couch_dbs, #entry{
+                name = DbName,
+                db = Db,
+                pid = DbPid,
+                lock = unlocked,
+                db_options = Entry#entry.db_options,
+                start_time = couch_db:get_instance_start_time(Db)
+            }),
+            true = ets:insert(couch_dbs_pid_to_name, {DbPid, DbName}),
             Lru = case couch_db:is_system_db(Db) of
                 false ->
                     couch_lru:insert(DbName, Server#server.lru);
@@ -368,13 +377,12 @@ handle_call({open_result, T0, DbName, {ok, Db}}, {FromPid, _Tag}, Server) ->
 handle_call({open_result, T0, DbName, {error, eexist}}, From, Server) ->
     handle_call({open_result, T0, DbName, file_exists}, From, Server);
 handle_call({open_result, _T0, DbName, Error}, {FromPid, _Tag}, Server) ->
-    % icky hack of field values - compactor_pid used to store clients
     case ets:lookup(couch_dbs, DbName) of
         [] ->
             % db was deleted during async open
             {reply, ok, Server};
-        [#db{fd=ReqType, compactor_pid=Froms}=Db] ->
-            [gen_server:reply(From, Error) || From <- Froms],
+        [#entry{req_type = ReqType, waiters = Waiters} = Entry] ->
+            [gen_server:reply(Waiter, Error) || Waiter <- Waiters],
             couch_log:info("open_result error ~p for ~s", [Error, DbName]),
             true = ets:delete(couch_dbs, DbName),
             true = ets:delete(couch_dbs_pid_to_name, FromPid),
@@ -384,7 +392,7 @@ handle_call({open_result, _T0, DbName, Error}, {FromPid, _Tag}, Server) ->
                 _ ->
                     Server
             end,
-            {reply, ok, db_closed(NewServer, Db#db.options)}
+            {reply, ok, db_closed(NewServer, Entry#entry.db_options)}
     end;
 handle_call({open, DbName, Options}, From, Server) ->
     case ets:lookup(couch_dbs, DbName) of
@@ -402,15 +410,14 @@ handle_call({open, DbName, Options}, From, Server) ->
         Error ->
             {reply, Error, Server}
         end;
-    [#db{compactor_pid = Froms} = Db] when is_list(Froms) ->
-        % icky hack of field values - compactor_pid used to store clients
-        true = ets:insert(couch_dbs, Db#db{compactor_pid = [From|Froms]}),
-        if length(Froms) =< 10 -> ok; true ->
+    [#entry{waiters = Waiters} = Entry] when is_list(Waiters) ->
+        true = ets:insert(couch_dbs, Entry#entry{waiters = [From | Waiters]}),
+        if length(Waiters) =< 10 -> ok; true ->
             Fmt = "~b clients waiting to open db ~s",
-            couch_log:info(Fmt, [length(Froms), DbName])
+            couch_log:info(Fmt, [length(Waiters), DbName])
         end,
         {noreply, Server};
-    [#db{} = Db] ->
+    [#entry{db = Db}] ->
         {reply, {ok, Db}, Server}
     end;
 handle_call({create, DbName, Options}, From, Server) ->
@@ -427,14 +434,13 @@ handle_call({create, DbName, Options}, From, Server) ->
             CloseError ->
                 {reply, CloseError, Server}
             end;
-        [#db{fd=open}=Db] ->
+        [#entry{req_type = open} = Entry] ->
             % We're trying to create a database while someone is in
             % the middle of trying to open it. We allow one creator
             % to wait while we figure out if it'll succeed.
-            % icky hack of field values - fd used to store create request
             CrOptions = [create | Options],
-            NewDb = Db#db{fd={create, DbName, Filepath, CrOptions, From}},
-            true = ets:insert(couch_dbs, NewDb),
+            Req = {create, DbName, Filepath, CrOptions, From},
+            true = ets:insert(couch_dbs, Entry#entry{req_type = Req}),
             {noreply, Server};
         [_AlreadyRunningDb] ->
             {reply, file_exists, Server}
@@ -450,18 +456,17 @@ handle_call({delete, DbName, Options}, _From, Server) ->
         Server2 =
         case ets:lookup(couch_dbs, DbName) of
         [] -> Server;
-        [#db{main_pid=Pid, compactor_pid=Froms} = Db] when is_list(Froms) ->
-            % icky hack of field values - compactor_pid used to store clients
+        [#entry{pid = Pid, waiters = Waiters} = Entry] when is_list(Waiters) ->
             true = ets:delete(couch_dbs, DbName),
             true = ets:delete(couch_dbs_pid_to_name, Pid),
             exit(Pid, kill),
-            [gen_server:reply(F, not_found) || F <- Froms],
-            db_closed(Server, Db#db.options);
-        [#db{main_pid=Pid} = Db] ->
+            [gen_server:reply(Waiter, not_found) || Waiter <- Waiters],
+            db_closed(Server, Entry#entry.db_options);
+        [#entry{pid = Pid} = Entry] ->
             true = ets:delete(couch_dbs, DbName),
             true = ets:delete(couch_dbs_pid_to_name, Pid),
             exit(Pid, kill),
-            db_closed(Server, Db#db.options)
+            db_closed(Server, Entry#entry.db_options)
         end,
 
         %% Delete any leftover compaction files. If we don't do this a
@@ -487,11 +492,12 @@ handle_call({delete, DbName, Options}, _From, Server) ->
     Error ->
         {reply, Error, Server}
     end;
-handle_call({db_updated, #db{}=Db}, _From, Server0) ->
-    #db{name = DbName, instance_start_time = StartTime} = Db,
-    Server = try ets:lookup_element(couch_dbs, DbName, #db.instance_start_time) of
+handle_call({db_updated, Db}, _From, Server0) ->
+    DbName = couch_db:name(Db),
+    StartTime = couch_db:get_instance_start_time(Db),
+    Server = try ets:lookup_element(couch_dbs, DbName, #entry.start_time) of
         StartTime ->
-            true = ets:insert(couch_dbs, Db),
+            true = ets:update_element(couch_dbs, DbName, {#entry.db, Db}),
             Lru = case couch_db:is_system_db(Db) of
                 false -> couch_lru:update(DbName, Server0#server.lru);
                 true -> Server0#server.lru
@@ -519,22 +525,19 @@ handle_info({'EXIT', _Pid, config_change}, Server) ->
 handle_info({'EXIT', Pid, Reason}, Server) ->
     case ets:lookup(couch_dbs_pid_to_name, Pid) of
     [{Pid, DbName}] ->
-        [#db{compactor_pid=Froms}=Db] = ets:lookup(couch_dbs, DbName),
+        [#entry{waiters = Waiters} = Entry] = ets:lookup(couch_dbs, DbName),
         if Reason /= snappy_nif_not_loaded -> ok; true ->
             Msg = io_lib:format("To open the database `~s`, Apache CouchDB "
                 "must be built with Erlang OTP R13B04 or higher.", [DbName]),
             couch_log:error(Msg, [])
         end,
         couch_log:info("db ~s died with reason ~p", [DbName, Reason]),
-        % icky hack of field values - compactor_pid used to store clients
-        if is_list(Froms) ->
-            [gen_server:reply(From, Reason) || From <- Froms];
-        true ->
-            ok
+        if not is_list(Waiters) -> ok; true ->
+            [gen_server:reply(Waiter, Reason) || Waiter <- Waiters]
         end,
         true = ets:delete(couch_dbs, DbName),
         true = ets:delete(couch_dbs_pid_to_name, Pid),
-        {noreply, db_closed(Server, Db#db.options)};
+        {noreply, db_closed(Server, Entry#entry.db_options)};
     [] ->
         {noreply, Server}
     end;

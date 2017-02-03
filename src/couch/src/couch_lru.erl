@@ -13,7 +13,7 @@
 -module(couch_lru).
 -export([new/0, insert/2, update/2, close/1]).
 
--include_lib("couch/include/couch_db.hrl").
+-include("couch_server_int.hrl").
 
 new() ->
     Updates = ets:new(couch_lru_updates, [ordered_set]),
@@ -49,18 +49,19 @@ close({Count, Updates, Dbs}) ->
 close_int('$end_of_table', _Updates, _Dbs) ->
     false;
 close_int({_Count, DbName} = Key, Updates, Dbs) ->
-    case ets:update_element(couch_dbs, DbName, {#db.fd_monitor, locked}) of
+    case ets:update_element(couch_dbs, DbName, {#entry.lock, locked}) of
     true ->
-        [#db{main_pid = Pid} = Db] = ets:lookup(couch_dbs, DbName),
+        [#entry{db = Db, pid = DbPid}] = ets:lookup(couch_dbs, DbName),
         case couch_db:is_idle(Db) of true ->
             true = ets:delete(couch_dbs, DbName),
-            true = ets:delete(couch_dbs_pid_to_name, Pid),
-            exit(Pid, kill),
+            true = ets:delete(couch_dbs_pid_to_name, DbPid),
+            exit(DbPid, kill),
             true = ets:delete(Updates, Key),
             true = ets:delete(Dbs, DbName),
             true;
         false ->
-            true = ets:update_element(couch_dbs, DbName, {#db.fd_monitor, nil}),
+            ElemSpec = {#entry.lock, unlocked},
+            true = ets:update_element(couch_dbs, DbName, ElemSpec),
             couch_stats:increment_counter([couchdb, couch_server, lru_skip]),
             close_int(ets:next(Updates, Key), Updates, Dbs)
         end;

@@ -14,11 +14,12 @@
 
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("couch/src/couch_server_int.hrl").
 
 
 setup() ->
     ok = meck:new(couch_db, [passthrough]),
-    ets:new(couch_dbs, [set, public, named_table, {keypos, #db.name}]),
+    ets:new(couch_dbs, [set, public, named_table, {keypos, #entry.name}]),
     ets:new(couch_dbs_pid_to_name, [set, public, named_table]),
     couch_lru:new().
 
@@ -101,7 +102,7 @@ close_test_() ->
     }.
 
 add_record(Lru, Key, Pid) ->
-    true = ets:insert(couch_dbs, #db{name = Key, main_pid = Pid}),
+    true = ets:insert(couch_dbs, #entry{name = Key, pid = Pid}),
     true = ets:insert(couch_dbs_pid_to_name, {Pid, Key}),
     {ok, couch_lru:insert(Key, Lru)}.
 
