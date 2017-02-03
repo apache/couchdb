@@ -36,3 +36,58 @@
     before_doc_update = nil, % nil | fun(Doc, Db) -> NewDoc
     after_doc_read = nil    % nil | fun(Doc, Db) -> NewDoc
 }).
+
+
+-record(new_pse_db, {
+    vsn,
+    name,
+    filepath,
+
+    engine = {couch_bt_engine, undefined},
+
+    main_pid = nil,
+    compactor_pid = nil,
+
+    committed_update_seq,
+
+    instance_start_time, % number of microsecs since jan 1 1970 as a binary string
+
+    user_ctx = #user_ctx{},
+    security = [],
+    validate_doc_funs = undefined,
+
+    before_doc_update = nil, % nil | fun(Doc, Db) -> NewDoc
+    after_doc_read = nil,    % nil | fun(Doc, Db) -> NewDoc
+
+    waiting_delayed_commit = nil,
+
+    options = [],
+    compression
+}).
+
+
+-define(NEW_PSE_DB, {
+    db,
+    _, % Version
+    _, % Name
+    _, % FilePath
+    _, % Engine
+    _, % MainPid
+    _, % CompactorPid
+    _, % CommittedUpdateSeq
+    _, % InstanceStartTime
+    _, % UserCtx
+    _, % Security
+    _, % ValidateDocFuns
+    _, % BeforeDocUpdate
+    _, % AfterDocRead
+    _, % WaitingDelayedCommit
+    _, % Options
+    _  % Compression
+}).
+
+
+-define(PSE_DB_NAME(Db), element(3, Db)).
+-define(PSE_DB_MAIN_PID(Db), element(6, Db)).
+-define(PSE_DB_USER_CTX(Db), element(10, Db)).
+-define(PSE_DB_SECURITY(Db), element(11, Db)).
