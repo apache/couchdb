@@ -23,84 +23,80 @@
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
 
-get(Property, State) ->
-    case Property of
-        db_name ->
-            State#mrst.db_name;
-        idx_name ->
-            State#mrst.idx_name;
-        signature ->
-            State#mrst.sig;
-        update_seq ->
-            State#mrst.update_seq;
-        purge_seq ->
-            State#mrst.purge_seq;
-        update_options ->
-            Opts = State#mrst.design_opts,
-            IncDesign = couch_util:get_value(<<"include_design">>, Opts, false),
-            LocalSeq = couch_util:get_value(<<"local_seq">>, Opts, false),
-            SeqIndexed = couch_util:get_value(<<"seq_indexed">>, Opts, false),
-            KeySeqIndexed = couch_util:get_value(<<"keyseq_indexed">>, Opts, false),
-            if IncDesign -> [include_design]; true -> [] end
-                ++ if LocalSeq -> [local_seq]; true -> [] end
-                ++ if KeySeqIndexed -> [keyseq_indexed]; true -> [] end
-                ++ if SeqIndexed -> [seq_indexed]; true -> [] end;
-        fd ->
-            State#mrst.fd;
-        language ->
-            State#mrst.language;
-        views ->
-            State#mrst.views;
-        info ->
-            #mrst{
-                fd = Fd,
-                sig = Sig,
-                id_btree = IdBtree,
-                log_btree = LogBtree,
-                language = Lang,
-                update_seq = UpdateSeq,
-                purge_seq = PurgeSeq,
-                views = Views,
-                design_opts = Opts
-            } = State,
-            {ok, FileSize} = couch_file:bytes(Fd),
-            {ok, ExternalSize} = couch_mrview_util:calculate_external_size(Views),
-            LogBtSize = case LogBtree of
-                nil ->
-                    0;
-                _ ->
-                    couch_btree:size(LogBtree)
-            end,
-            ActiveSize = couch_btree:size(IdBtree) + LogBtSize + ExternalSize,
+get(db_name, #mrst{db_name = DbName}) ->
+    DbName;
+get(idx_name, #mrst{idx_name = IdxName}) ->
+    IdxName;
+get(signature, #mrst{sig = Signature}) ->
+    Signature;
+get(update_seq, #mrst{update_seq = UpdateSeq}) ->
+    UpdateSeq;
+get(purge_seq, #mrst{purge_seq = PurgeSeq}) ->
+    PurgeSeq;
+get(update_options, #mrst{design_opts = Opts}) ->
+    IncDesign = couch_util:get_value(<<"include_design">>, Opts, false),
+    LocalSeq = couch_util:get_value(<<"local_seq">>, Opts, false),
+    SeqIndexed = couch_util:get_value(<<"seq_indexed">>, Opts, false),
+    KeySeqIndexed = couch_util:get_value(<<"keyseq_indexed">>, Opts, false),
+    if IncDesign -> [include_design]; true -> [] end
+        ++ if LocalSeq -> [local_seq]; true -> [] end
+        ++ if KeySeqIndexed -> [keyseq_indexed]; true -> [] end
+        ++ if SeqIndexed -> [seq_indexed]; true -> [] end;
+get(fd, #mrst{fd = Fd}) ->
+    Fd;
+get(language, #mrst{language = Language}) ->
+    Language;
+get(views, #mrst{views = Views}) ->
+    Views;
+get(info, State) ->
+    #mrst{
+        fd = Fd,
+        sig = Sig,
+        id_btree = IdBtree,
+        log_btree = LogBtree,
+        language = Lang,
+        update_seq = UpdateSeq,
+        purge_seq = PurgeSeq,
+        views = Views,
+        design_opts = Opts
+    } = State,
+    {ok, FileSize} = couch_file:bytes(Fd),
+    {ok, ExternalSize} = couch_mrview_util:calculate_external_size(Views),
+    LogBtSize = case LogBtree of
+        nil ->
+            0;
+        _ ->
+            couch_btree:size(LogBtree)
+    end,
+    ActiveSize = couch_btree:size(IdBtree) + LogBtSize + ExternalSize,
 
-            IncDesign = couch_util:get_value(<<"include_design">>, Opts, false),
-            LocalSeq = couch_util:get_value(<<"local_seq">>, Opts, false),
-            SeqIndexed = couch_util:get_value(<<"seq_indexed">>, Opts, false),
-            KeySeqIndexed = couch_util:get_value(<<"keyseq_indexed">>, Opts, false),
-            UpdateOptions =
-                if IncDesign -> [<<"include_design">>]; true -> [] end
-                ++ if LocalSeq -> [<<"local_seq">>]; true -> [] end
-                ++ if KeySeqIndexed -> [<<"keyseq_indexed">>]; true -> [] end
-                ++ if SeqIndexed -> [<<"seq_indexed">>]; true -> [] end,
+    IncDesign = couch_util:get_value(<<"include_design">>, Opts, false),
+    LocalSeq = couch_util:get_value(<<"local_seq">>, Opts, false),
+    SeqIndexed = couch_util:get_value(<<"seq_indexed">>, Opts, false),
+    KeySeqIndexed = couch_util:get_value(<<"keyseq_indexed">>, Opts, false),
+    UpdateOptions =
+        if IncDesign -> [<<"include_design">>]; true -> [] end
+        ++ if LocalSeq -> [<<"local_seq">>]; true -> [] end
+        ++ if KeySeqIndexed -> [<<"keyseq_indexed">>]; true -> [] end
+        ++ if SeqIndexed -> [<<"seq_indexed">>]; true -> [] end,
 
 
-            {ok, [
-                {signature, list_to_binary(couch_index_util:hexsig(Sig))},
-                {language, Lang},
-                {disk_size, FileSize}, % legacy
-                {data_size, ExternalSize}, % legacy
-                {sizes, {[
-                    {file, FileSize},
-                    {active, ActiveSize},
-                    {external, ExternalSize}
-                ]}},
-                {update_seq, UpdateSeq},
-                {purge_seq, PurgeSeq},
-                {update_options, UpdateOptions}
-            ]};
-        Other ->
-            throw({unknown_index_property, Other})
-    end.
+    {ok, [
+        {signature, list_to_binary(couch_index_util:hexsig(Sig))},
+        {language, Lang},
+        {disk_size, FileSize}, % legacy
+        {data_size, ExternalSize}, % legacy
+        {sizes, {[
+            {file, FileSize},
+            {active, ActiveSize},
+            {external, ExternalSize}
+        ]}},
+        {update_seq, UpdateSeq},
+        {purge_seq, PurgeSeq},
+        {update_options, UpdateOptions}
+    ]};
+get(Other, _) ->
+    throw({unknown_index_property, Other}).
 
 
 init(Db, DDoc) ->
