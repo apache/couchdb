@@ -566,5 +566,39 @@ DOCS =  [
                 "type": "work"
             }
         ]
+    },
+    {
+        "_id": "589f32af493145f890e1b051",
+        "user_id": 15,
+        "name": {
+            "first": "Tanisha",
+            "last": "Bowers"
+        },
+        "friends": [
+            {
+                "id": 0,
+                "name": {
+                    "first": "Ochoa",
+                    "last": "Pratt"
+                },
+                "type": "personal"
+            },
+            {
+                "id": 1,
+                "name": {
+                    "first": "Ochoa",
+                    "last": "Romero"
+                },
+                "type": "personal"
+            },
+            {
+                "id": 2,
+                "name": {
+                    "first": "Ochoa",
+                    "last": "Bowman"
+                },
+                "type": "work"
+            }
+        ]
     }
 ]

@@ -145,3 +145,14 @@ class CustomFieldsTest(mango.UserDocsTextTests):
             {"location.state": "Don't Exist"}]})
         assert len(docs) == 1
         assert docs[0]["user_id"] == 10
+
+    def test_all_match(self):
+        docs = self.db.find({
+            "favorites": {
+                "$allMatch": {
+                    "$eq": "Erlang"
+                }
+            }
+        })
+        assert len(docs) == 1
+        assert docs[0]["user_id"] == 10

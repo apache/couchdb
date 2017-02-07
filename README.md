@@ -272,6 +272,7 @@ The list of combining characters:
 * "$nor" - array argument
 * "$all" - array argument (special operator for array values)
 * "$elemMatch" - single argument (special operator for array values)
+* "$allMatch" - single argument (special operator for array values)
 
 ### Condition Operators
 

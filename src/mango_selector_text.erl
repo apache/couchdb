@@ -86,6 +86,9 @@ convert(Path, {[{<<"$all">>, Args}]}) ->
 convert(Path, {[{<<"$elemMatch">>, Arg}]}) ->
     convert([<<"[]">> | Path], Arg);
 
+convert(Path, {[{<<"$allMatch">>, Arg}]}) ->
+    convert([<<"[]">> | Path], Arg);
+
 % Our comparison operators are fairly straight forward
 convert(Path, {[{<<"$lt">>, Arg}]}) when is_list(Arg); is_tuple(Arg);
         Arg =:= null ->

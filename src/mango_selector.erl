@@ -127,6 +127,11 @@ norm_ops({[{<<"$elemMatch">>, {_}=Arg}]}) ->
 norm_ops({[{<<"$elemMatch">>, Arg}]}) ->
     ?MANGO_ERROR({bad_arg, '$elemMatch', Arg});
 
+norm_ops({[{<<"$allMatch">>, {_}=Arg}]}) ->
+    {[{<<"$allMatch">>, norm_ops(Arg)}]};
+norm_ops({[{<<"$allMatch">>, Arg}]}) ->
+    ?MANGO_ERROR({bad_arg, '$allMatch', Arg});
+
 norm_ops({[{<<"$size">>, Arg}]}) when is_integer(Arg), Arg >= 0 ->
     {[{<<"$size">>, Arg}]};
 norm_ops({[{<<"$size">>, Arg}]}) ->
@@ -209,8 +214,9 @@ norm_ops(Value) ->
 % Its important to note that we can only normalize
 % field names like this through boolean operators where
 % we can gaurantee commutativity. We can't necessarily
-% do the same through the '$elemMatch' operators but we
-% can apply the same algorithm to its arguments.
+% do the same through the '$elemMatch' or '$allMatch'
+% operators but we can apply the same algorithm to its
+% arguments.
 norm_fields({[]}) ->
     {[]};
 norm_fields(Selector) ->
@@ -235,6 +241,10 @@ norm_fields({[{<<"$nor">>, Args}]}, Path) ->
 % operator arguments independently.
 norm_fields({[{<<"$elemMatch">>, Arg}]}, Path) ->
     Cond = {[{<<"$elemMatch">>, norm_fields(Arg)}]},
+    {[{Path, Cond}]};
+
+norm_fields({[{<<"$allMatch">>, Arg}]}, Path) ->
+    Cond = {[{<<"$allMatch">>, norm_fields(Arg)}]},
     {[{Path, Cond}]};
 
 
@@ -314,6 +324,9 @@ norm_negations({[{<<"$or">>, Args}]}) ->
 
 norm_negations({[{<<"$elemMatch">>, Arg}]}) ->
     {[{<<"$elemMatch">>, norm_negations(Arg)}]};
+
+norm_negations({[{<<"$allMatch">>, Arg}]}) ->
+    {[{<<"$allMatch">>, norm_negations(Arg)}]};
 
 % All other conditions can't introduce negations anywhere
 % further down the operator tree.
@@ -411,7 +424,7 @@ match({[{<<"$all">>, Args}]}, Values, _Cmp) when is_list(Values) ->
 match({[{<<"$all">>, _Args}]}, _Values, _Cmp) ->
     false;
 
-%% This is for $elemMatch and possibly $in because of our normalizer.
+%% This is for $elemMatch, $allMatch, and possibly $in because of our normalizer.
 %% A selector such as {"field_name": {"$elemMatch": {"$gte": 80, "$lt": 85}}}
 %% gets normalized to:
 %% {[{<<"field_name">>,
@@ -444,6 +457,24 @@ match({[{<<"$elemMatch">>, Arg}]}, Values, Cmp) when is_list(Values) ->
             false
     end;
 match({[{<<"$elemMatch">>, _Arg}]}, _Value, _Cmp) ->
+    false;
+
+% Matches when all elements in values match the
+% sub-selector Arg.
+match({[{<<"$allMatch">>, Arg}]}, Values, Cmp) when is_list(Values) ->
+    try
+        lists:foreach(fun(V) ->
+            case match(Arg, V, Cmp) of
+              false -> throw(unmatched);
+              _ -> ok
+            end
+        end, Values),
+        true
+    catch
+        _:_ ->
+            false
+    end;
+match({[{<<"$allMatch">>, _Arg}]}, _Value, _Cmp) ->
     false;
 
 % Our comparison operators are fairly straight forward

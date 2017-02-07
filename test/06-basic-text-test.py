@@ -571,6 +571,49 @@ class ElemMatchTests(mango.FriendDocsTextTests):
         for d in docs:
             assert d["user_id"] in (10, 11,12)
 
+@unittest.skipUnless(mango.has_text_service(), "requires text service")
+class AllMatchTests(mango.FriendDocsTextTests):
+
+    def test_all_match(self):
+        q = {"friends": {
+                "$allMatch":
+                    {"type": "personal"}
+            }
+        }
+        docs = self.db.find(q)
+        assert len(docs) == 2
+        for d in docs:
+            assert d["user_id"] in (8, 5)
+
+        # Check that we can do logic in allMatch
+        q = {
+            "friends": {
+                "$allMatch": {
+                    "name.first": "Ochoa",
+                    "$or": [
+                        {"type": "work"},
+                        {"type": "personal"}
+                    ]
+                }
+            }
+        }
+        docs = self.db.find(q)
+        assert len(docs) == 1
+        assert docs[0]["user_id"] == 15
+
+        # Same as last, but using $in
+        q = {
+            "friends": {
+                "$allMatch": {
+                    "name.first": "Ochoa",
+                    "type": {"$in": ["work", "personal"]}
+                }
+            }
+        }
+        docs = self.db.find(q)
+        assert len(docs) == 1
+        assert docs[0]["user_id"] == 15
+
 
 # Test numeric strings for $text
 @unittest.skipUnless(mango.has_text_service(), "requires text service")

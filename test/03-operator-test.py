@@ -63,6 +63,46 @@ class OperatorTests(mango.UserDocsTests):
         assert len(docs) == 1
         assert docs[0]["user_id"] == "b"
 
+    def test_all_match(self):
+        amdocs = [
+            {
+                "user_id": "a",
+                "bang": [
+                    {
+                        "foo": 1,
+                        "bar": 2
+                    },
+                    {
+                        "foo": 3,
+                        "bar": 4
+                    }
+                ]
+            },
+            {
+                "user_id": "b",
+                "bang": [
+                    {
+                        "foo": 1,
+                        "bar": 2
+                    },
+                    {
+                        "foo": 4,
+                        "bar": 4
+                    }
+                ]
+            }
+        ]
+        self.db.save_docs(amdocs, w=3)
+        docs = self.db.find({
+            "_id": {"$gt": None},
+            "bang": {"$allMatch": {
+                "foo": {"$mod": [2,1]},
+                "bar": {"$mod": [2,0]}
+            }}
+        })
+        assert len(docs) == 1
+        assert docs[0]["user_id"] == "a"
+
     def test_in_operator_array(self):
         docs = self.db.find({
                 "manager": True,
