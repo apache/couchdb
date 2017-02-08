@@ -122,5 +122,10 @@ process_change({last_seq, _}, _) ->
     ok.
 
 is_doc_id_too_long(IdLength) ->
-    ConfigMax = config:get_integer("replicator", "max_document_id_length", 0),
-    ConfigMax > 0 andalso IdLength > ConfigMax.
+    case config:get("replicator", "max_document_id_length", "infinity") of
+        "infinity" ->
+            false;
+        ConfigMaxStr ->
+            ConfigMax = list_to_integer(ConfigMaxStr),
+            ConfigMax > 0 andalso IdLength > ConfigMax
+    end.

@@ -28,7 +28,7 @@ setup(_) ->
 teardown(_, {Ctx, {Source, Target}}) ->
     delete_db(Source),
     delete_db(Target),
-    config:set("replicator", "max_document_id_length", "0"),
+    config:set("replicator", "max_document_id_length", "infinity"),
     ok = test_util:stop_couch(Ctx).
 
 
