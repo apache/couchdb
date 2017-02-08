@@ -92,10 +92,9 @@ process_change(#doc_info{id = <<>>} = DocInfo, {_, Db, _, _, _}) ->
 process_change(#doc_info{id = Id} = DocInfo, {Parent, Db, ChangesQueue, _, _}) ->
     case is_doc_id_too_long(byte_size(Id)) of
         true ->
-            ShortId = lists:sublist(binary_to_list(Id), 64),
             SourceDb = couch_replicator_api_wrap:db_uri(Db),
             couch_log:error("Replicator: document id `~s...` from source db "
-                " `~s` is too long, ignoring.", [ShortId, SourceDb]),
+                " `~64s` is too long, ignoring.", [Id, SourceDb]),
             Stats = couch_replicator_stats:new([{doc_write_failures, 1}]),
             ok = gen_server:call(Parent, {add_stats, Stats}, infinity);
         false ->
