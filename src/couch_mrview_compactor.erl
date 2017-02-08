@@ -307,13 +307,16 @@ recompact_success_after_progress() ->
     ?_test(begin
         ok = meck:expect(couch_index_updater, update, fun
             (Pid, _, #mrst{update_seq=0} = State) ->
-                Pid ! {'$gen_cast', {new_state, State#mrst{update_seq=1}}};
-            (_, _, State) ->
-                exit({updated, self(), State})
+                Pid ! {'$gen_cast', {new_state, State#mrst{update_seq = 1}}},
+                timer:sleep(100),
+                exit({updated, self(), State#mrst{update_seq = 2}})
         end),
-        State = #mrst{fd=self(), update_seq=0},
-        ?assertEqual({ok, State#mrst{update_seq=1}}, recompact(State)),
-        meck:unload(couch_index_updater)
+        try
+            State = #mrst{fd=self(), update_seq=0},
+            ?assertEqual({ok, State#mrst{update_seq = 2}}, recompact(State))
+        after
+            meck:unload(couch_index_updater)
+        end
     end).
 
 recompact_exceeded_retry_count() ->
@@ -322,11 +325,16 @@ recompact_exceeded_retry_count() ->
             fun(_, _, _) ->
                 exit(error)
         end),
-        State = #mrst{fd=self(), db_name=foo, idx_name=bar},
-        ExpectedError = {exceeded_recompact_retry_count,
-            [{db_name, foo}, {idx_name, bar}]},
-        ?assertError(ExpectedError, recompact(State)),
-        meck:unload(couch_index_updater)
+        ok = meck:expect(couch_log, warning, fun(_, _) -> ok end),
+        try
+            State = #mrst{fd=self(), db_name=foo, idx_name=bar},
+            ExpectedError = {exceeded_recompact_retry_count,
+                [{db_name, foo}, {idx_name, bar}]},
+                ?assertError(ExpectedError, recompact(State))
+        after
+            meck:unload(couch_log),
+            meck:unload(couch_index_updater)
+        end
     end).
 
 -endif.
