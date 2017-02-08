@@ -74,12 +74,9 @@ get(info, State) ->
     LocalSeq = couch_util:get_value(<<"local_seq">>, Opts, false),
     SeqIndexed = couch_util:get_value(<<"seq_indexed">>, Opts, false),
     KeySeqIndexed = couch_util:get_value(<<"keyseq_indexed">>, Opts, false),
-    UpdateOptions =
-        if IncDesign -> [<<"include_design">>]; true -> [] end
-        ++ if LocalSeq -> [<<"local_seq">>]; true -> [] end
-        ++ if KeySeqIndexed -> [<<"keyseq_indexed">>]; true -> [] end
-        ++ if SeqIndexed -> [<<"seq_indexed">>]; true -> [] end,
 
+    UpdateOptions0 = get(update_options, State),
+    UpdateOptions = [atom_to_binary(O, latin1) || O <- UpdateOptions0],
 
     {ok, [
         {signature, list_to_binary(couch_index_util:hexsig(Sig))},
