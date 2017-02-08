@@ -20,45 +20,46 @@
 -export([request/3, request/4]).
 
 get(Url) ->
-    request(get, Url, []).
+    get(Url, []).
 
 get(Url, Headers) ->
-    request(get, Url, Headers).
+    get(Url, Headers, []).
+
 get(Url, Headers, Opts) ->
     request(get, Url, Headers, [], Opts).
 
 post(Url, Body) ->
-    request(post, Url, [], Body).
+    post(Url, [], Body).
 
 post(Url, Headers, Body) ->
-    request(post, Url, Headers, Body).
+    post(Url, Headers, Body, []).
 
 post(Url, Headers, Body, Opts) ->
     request(post, Url, Headers, Body, Opts).
 
 put(Url, Body) ->
-    request(put, Url, [], Body).
+    put(Url, [], Body).
 
 put(Url, Headers, Body) ->
-    request(put, Url, Headers, Body).
+    put(Url, Headers, Body, []).
 
 put(Url, Headers, Body, Opts) ->
     request(put, Url, Headers, Body, Opts).
 
 delete(Url) ->
-    request(delete, Url, []).
+    delete(Url, []).
 
 delete(Url, Opts) ->
-    request(delete, Url, [], [], Opts).
+    delete(Url, [], Opts).
 
 delete(Url, Headers, Opts) ->
     request(delete, Url, Headers, [], Opts).
 
 options(Url) ->
-    request(options, Url, []).
+    options(Url, []).
 
 options(Url, Headers) ->
-    request(options, Url, Headers).
+    options(Url, Headers, []).
 
 options(Url, Headers, Opts) ->
     request(options, Url, Headers, [], Opts).
