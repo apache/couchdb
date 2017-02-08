@@ -325,7 +325,15 @@ serialize_doc(#st{} = St, #doc{} = Doc) ->
     SummaryBin = ?term_to_bin({Body, Atts}),
     Md5 = couch_crypto:hash(md5, SummaryBin),
     Data = couch_file:assemble_file_chunk(SummaryBin, Md5),
-    Doc#doc{body = Data}.
+    % TODO: This is a terrible hack to get around the issues
+    %       in COUCHDB-3255. We'll need to come back and figure
+    %       out a better approach to handling the case when we
+    %       need to generate a new revision id after the doc
+    %       has been serialized.
+    Doc#doc{
+        body = Data,
+        meta = [{comp_body, Body} | Doc#doc.meta]
+    }.
 
 
 write_doc_body(St, #doc{} = Doc) ->

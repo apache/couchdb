@@ -942,7 +942,7 @@ prep_and_validate_replicated_updates(Db, [Bucket|RestBuckets], [OldInfo|RestOldI
 
 
 
-new_revid(#doc{body=Body0, revs={OldStart,OldRevs}, atts=Atts, deleted=Deleted}) ->
+new_revid(#doc{body=Body, revs={OldStart,OldRevs}, atts=Atts, deleted=Deleted}) ->
     DigestedAtts = lists:foldl(fun(Att, Acc) ->
         [N, T, M] = couch_att:fetch([name, type, md5], Att),
         case M == <<>> of
@@ -950,16 +950,6 @@ new_revid(#doc{body=Body0, revs={OldStart,OldRevs}, atts=Atts, deleted=Deleted})
             false -> [{N, T, M} | Acc]
         end
     end, [], Atts),
-    Body = case Body0 of
-        {summary, [_Len, _Md5, BodyAtts], _SizeInfo, _AttsFd} ->
-            {CompBody, _CompAtts} = binary_to_term(BodyAtts),
-            couch_compress:decompress(CompBody);
-        {summary, [_Len, BodyAtts], _SizeInfo, _AttsFd} ->
-            {CompBody, _CompAtts} = binary_to_term(BodyAtts),
-            couch_compress:decompress(CompBody);
-        Else ->
-            Else
-    end,
     case DigestedAtts of
         Atts2 when length(Atts) =/= length(Atts2) ->
             % We must have old style non-md5 attachments

@@ -525,7 +525,17 @@ merge_rev_tree(OldInfo, NewDoc, Client, Limit, false)
             % Update the new doc based on revisions in OldInfo
             #doc_info{revs=[WinningRev | _]} = couch_doc:to_doc_info(OldInfo),
             #rev_info{rev={OldPos, OldRev}} = WinningRev,
-            NewRevId = couch_db:new_revid(NewDoc#doc{revs={OldPos, [OldRev]}}),
+            Body = case couch_util:get_value(comp_body, NewDoc#doc.meta) of
+                CompBody when is_binary(CompBody) ->
+                    couch_compress:decompress(CompBody);
+                _ ->
+                    NewDoc#doc.body
+            end,
+            RevIdDoc = NewDoc#doc{
+                revs = {OldPos, [OldRev]},
+                body = Body
+            },
+            NewRevId = couch_db:new_revid(RevIdDoc),
             NewDoc2 = NewDoc#doc{revs={OldPos + 1, [NewRevId, OldRev]}},
 
             % Merge our modified new doc into the tree
