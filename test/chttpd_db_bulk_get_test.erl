@@ -19,6 +19,7 @@
 
 
 setup() ->
+    mock(config),
     mock(chttpd),
     mock(couch_epi),
     mock(couch_httpd),
@@ -31,6 +32,7 @@ setup() ->
 
 teardown(Pid) ->
     ok = stop_accumulator(Pid),
+    meck:unload(config),
     meck:unload(chttpd),
     meck:unload(couch_epi),
     meck:unload(couch_httpd),
@@ -270,6 +272,10 @@ mock(couch_stats) ->
     ok;
 mock(fabric) ->
     ok = meck:new(fabric, [passthrough]),
+    ok;
+mock(config) ->
+    ok = meck:new(config, [passthrough]),
+    ok = meck:expect(config, get, fun(_, _, Default) -> Default end),
     ok.
 
 
