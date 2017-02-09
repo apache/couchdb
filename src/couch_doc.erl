@@ -174,6 +174,14 @@ validate_docid(<<"_design/">>) ->
 validate_docid(<<"_local/">>) ->
     throw({illegal_docid, <<"Illegal document id `_local/`">>});
 validate_docid(Id) when is_binary(Id) ->
+    MaxLen = case config:get("couchdb", "max_document_id_length", "infinity") of
+        "infinity" -> infinity;
+        IntegerVal -> list_to_integer(IntegerVal)
+    end,
+    case MaxLen > 0 andalso byte_size(Id) > MaxLen of
+        true -> throw({illegal_docid, <<"Document id is too long">>});
+        false -> ok
+    end,
     case couch_util:validate_utf8(Id) of
         false -> throw({illegal_docid, <<"Document id must be valid UTF-8">>});
         true -> ok

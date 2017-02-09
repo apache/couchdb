@@ -18,11 +18,13 @@
 
 setup() ->
     mock(couch_log),
+    mock(config),
     mock(couch_db_plugin),
     ok.
 
 teardown(_) ->
     meck:unload(couch_log),
+    meck:unload(config),
     meck:unload(couch_db_plugin),
     ok.
 
@@ -33,6 +35,11 @@ mock(couch_db_plugin) ->
 mock(couch_log) ->
     ok = meck:new(couch_log, [passthrough]),
     ok = meck:expect(couch_log, debug, fun(_, _) -> ok end),
+    ok;
+mock(config) ->
+    meck:new(config, [passthrough]),
+    meck:expect(config, get, fun(_, _) -> undefined end),
+    meck:expect(config, get, fun(_, _, Default) -> Default end),
     ok.
 
 
