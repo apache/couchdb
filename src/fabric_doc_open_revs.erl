@@ -47,7 +47,7 @@ go(DbName, Id, Revs, Options) ->
     },
     RexiMon = fabric_util:create_monitors(Workers),
     try fabric_util:recv(Workers, #shard.ref, fun handle_message/3, State) of
-    {ok, []} ->
+    {ok, all_workers_died} ->
         {error, all_workers_died};
     {ok, Replies} ->
         {ok, Replies};
@@ -92,8 +92,9 @@ handle_message({ok, RawReplies}, Worker, State) ->
     IsTree = Revs == all orelse Latest,
 
     % Do not count error replies when checking quorum
-    QuorumReplies = ReplyCount + 1 - ReplyErrorCount >= R,
 
+    RealReplyCount = ReplyCount + 1 - ReplyErrorCount,
+    QuorumReplies = RealReplyCount >= R,
     {NewReplies, QuorumMet, Repair} = case IsTree of
         true ->
             {NewReplies0, AllInternal, Repair0} =
@@ -119,7 +120,7 @@ handle_message({ok, RawReplies}, Worker, State) ->
                     ReplyCount + 1,
                     InRepair orelse Repair
                 ),
-            {stop, format_reply(IsTree, NewReplies)};
+            {stop, format_reply(IsTree, NewReplies, RealReplyCount)};
         false ->
             {ok, State#state{
                 replies = NewReplies,
@@ -219,10 +220,13 @@ read_repair(Db, Docs) ->
     end.
 
 
-format_reply(true, Replies) ->
+format_reply(_, _, RealReplyCount) when RealReplyCount =< 0 ->
+    all_workers_died;
+
+format_reply(true, Replies, _) ->
     tree_format_replies(Replies);
 
-format_reply(false, Replies) ->
+format_reply(false, Replies, _) ->
     Filtered = filter_reply(Replies),
     dict_format_replies(Filtered).
 
@@ -500,7 +504,7 @@ check_empty_list_when_no_workers_reply() ->
         Msg1 = {rexi_EXIT, reason},
         Msg2 = {rexi_EXIT, reason},
         Msg3 = {rexi_DOWN, nodedown, {nil, node()}, nil},
-        Expect = {stop, []},
+        Expect = {stop, all_workers_died},
 
         {ok, S1} = handle_message(Msg1, w1, S0),
         {ok, S2} = handle_message(Msg2, w2, S1),
