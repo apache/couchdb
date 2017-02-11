@@ -352,6 +352,9 @@ chunkify(InList) ->
 
 chunkify([], _ChunkThreshold, [], 0, OutputChunks) ->
     lists:reverse(OutputChunks);
+chunkify([], _ChunkThreshold, [Item], _OutListSize, [PrevChunk | RestChunks]) ->
+    NewPrevChunk = PrevChunk ++ [Item],
+    lists:reverse(RestChunks, [NewPrevChunk]);
 chunkify([], _ChunkThreshold, OutList, _OutListSize, OutputChunks) ->
     lists:reverse([lists:reverse(OutList) | OutputChunks]);
 chunkify([InElement | RestInList], ChunkThreshold, OutList, OutListSize, OutputChunks) ->
