@@ -80,6 +80,8 @@ AddConfig = [
     {deps, lists:map(MakeDep, DepDescs)},
     {sub_dirs, ["rel"]},
     {lib_dirs, ["src/"]},
+    {src_dirs, ["src", "test/helpers"]},
+    {i, ["test/include"]},
     {erl_opts, [debug_info]},
     {eunit_opts, [verbose]},
     {plugins, [eunit_plugin]},
