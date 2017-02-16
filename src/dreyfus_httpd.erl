@@ -26,8 +26,9 @@ handle_search_req(Req, Db, DDoc) ->
     handle_search_req(Req, Db, DDoc, 0, 500).
 
 handle_search_req(#httpd{method=Method, path_parts=[_, _, _, _, IndexName]}=Req
-                  ,#db{name=DbName}=Db, DDoc, RetryCount, RetryPause)
+                  ,Db, DDoc, RetryCount, RetryPause)
   when Method == 'GET'; Method == 'POST' ->
+    DbName = couch_db:name(Db),
     Start = os:timestamp(),
     QueryArgs = #index_query_args{
         q = Query,
@@ -107,7 +108,8 @@ handle_search_req(Req, _Db, _DDoc, _RetryCount, _RetryPause) ->
     send_error(Req, {bad_request, "path not recognized"}).
 
 handle_info_req(#httpd{method='GET', path_parts=[_, _, _, _, IndexName]}=Req
-                  ,#db{name=DbName}, #doc{id=Id}=DDoc) ->
+                  ,Db, #doc{id=Id}=DDoc) ->
+    DbName = couch_db:name(Db),
     case dreyfus_fabric_info:go(DbName, DDoc, IndexName, info) of
         {ok, IndexInfoList} ->
             send_json(Req, 200, {[
@@ -122,7 +124,8 @@ handle_info_req(#httpd{path_parts=[_, _, _, _, _]}=Req, _Db, _DDoc) ->
 handle_info_req(Req, _Db, _DDoc) ->
     send_error(Req, {bad_request, "path not recognized"}).
 
-handle_disk_size_req(#httpd{method='GET', path_parts=[_, _, _, _, IndexName]}=Req, #db{name=DbName}, #doc{id=Id}=DDoc) ->
+handle_disk_size_req(#httpd{method='GET', path_parts=[_, _, _, _, IndexName]}=Req, Db, #doc{id=Id}=DDoc) ->
+    DbName = couch_db:name(Db),
     case dreyfus_fabric_info:go(DbName, DDoc, IndexName, disk_size) of
         {ok, IndexInfoList} ->
             send_json(Req, 200, {[
@@ -137,8 +140,8 @@ handle_disk_size_req(#httpd{path_parts=[_, _, _, _, _]}=Req, _Db, _DDoc) ->
 handle_disk_size_req(Req, _Db, _DDoc) ->
     send_error(Req, {bad_request, "path not recognized"}).
 
-handle_cleanup_req(#httpd{method='POST'}=Req, #db{name=DbName}) ->
-    ok = dreyfus_fabric_cleanup:go(DbName),
+handle_cleanup_req(#httpd{method='POST'}=Req, Db) ->
+    ok = dreyfus_fabric_cleanup:go(couch_db:name(Db)),
     send_json(Req, 202, {[{ok, true}]});
 handle_cleanup_req(Req, _Db) ->
     send_method_not_allowed(Req, "POST").
