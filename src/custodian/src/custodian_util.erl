@@ -47,17 +47,17 @@ fold_dbs(Acc, Fun) ->
     {ok, Db} = ensure_dbs_exists(),
     try
         State0 = #state{live=Live, safe=Safe, n=N, callback=Fun, db=Db, acc=Acc},
-        {ok, _, State1} = couch_db:enum_docs(Db, fun fold_dbs/3, State0, []),
+        {ok, State1} = couch_db:fold_docs(Db, fun fold_dbs1/2, State0, []),
         State1#state.acc
     after
         couch_db:close(Db)
     end.
 
-fold_dbs(#full_doc_info{id = <<"_design/", _/binary>>}, _, Acc) ->
+fold_dbs1(#full_doc_info{id = <<"_design/", _/binary>>}, Acc) ->
     {ok, Acc};
-fold_dbs(#full_doc_info{deleted=true}, _, Acc) ->
+fold_dbs1(#full_doc_info{deleted=true}, Acc) ->
     {ok, Acc};
-fold_dbs(#full_doc_info{id = Id} = FDI, _, State) ->
+fold_dbs1(#full_doc_info{id = Id} = FDI, State) ->
     InternalAcc = case count_conflicts(FDI) of
         0 ->
             State#state.acc;
@@ -67,7 +67,8 @@ fold_dbs(#full_doc_info{id = Id} = FDI, _, State) ->
     Shards = load_shards(State#state.db, FDI),
     Rs = [R || #shard{range=R} <- lists:ukeysort(#shard.range, Shards)],
     ActualN = [{R1, [N || #shard{node=N,range=R2} <- Shards, R1 == R2]} ||  R1 <- Rs],
-    fold_dbs(Id, ActualN, State#state{acc=InternalAcc});
+    fold_dbs(Id, ActualN, State#state{acc=InternalAcc}).
+
 fold_dbs(_Id, [], Acc) ->
     {ok, Acc};
 fold_dbs(Id, [{Range, Nodes}|Rest], State) ->
