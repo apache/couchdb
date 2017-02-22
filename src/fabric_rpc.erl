@@ -422,6 +422,7 @@ make_att_reader({follows, Parser, Ref}) ->
         Parser ! {get_bytes, Ref, self()},
         receive
             {bytes, Ref, Bytes} ->
+                rexi:reply(attachment_chunk_received),
                 Bytes;
             {'DOWN', ParserRef, _, _, Reason} ->
                 throw({mp_parser_died, Reason})
