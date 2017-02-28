@@ -934,21 +934,29 @@ scan_all_dbs(Server) when is_pid(Server) ->
     {ok, Db} = mem3_util:ensure_exists(
         config:get("mem3", "shards_db", "_dbs")),
     ChangesFun = couch_changes:handle_changes(#changes_args{}, nil, Db, nil),
-    ChangesFun(fun({change, {Change}, _}, _) ->
-        DbName = couch_util:get_value(<<"id">>, Change),
-        case DbName of <<"_design/", _/binary>> -> ok; _Else ->
-            case couch_replicator_utils:is_deleted(Change) of
-            true ->
-                ok;
-            false ->
-                [gen_server:cast(Server, {resume_scan, ShardName})
-                    || ShardName <- replicator_shards(DbName)],
-                ok
-            end
-        end;
-        (_, _) -> ok
-    end),
+    ChangesFun({fun scan_changes_cb/3, {Server, 1}}),
     couch_db:close(Db).
+
+scan_changes_cb({change, {Change}, _}, _, {Server, AccCount}) ->
+    DbName = couch_util:get_value(<<"id">>, Change),
+    case DbName of <<"_design/", _/binary>> -> {Server, AccCount}; _Else ->
+        case couch_replicator_utils:is_deleted(Change) of
+        true ->
+            {Server, AccCount};
+        false ->
+            UpdatedCount = lists:foldl(fun(ShardName, Count) ->
+                spawn_link(fun() ->
+                    timer:sleep(jitter(Count)),
+                    gen_server:cast(Server, {resume_scan, ShardName})
+                end),
+                Count + 1
+           end, AccCount, replicator_shards(DbName)),
+           {Server, UpdatedCount}
+        end
+    end;
+
+scan_changes_cb(_, _, {Server, AccCount}) ->
+    {Server, AccCount}.
 
 
 replicator_shards(DbName) ->
@@ -1023,6 +1031,44 @@ t_fail_non_replicator_shard() ->
         DbName = ?tempdb(),
         ok = fabric:create_db(DbName, [?CTX]),
         ?assertEqual([], replicator_shards(DbName)),
+        fabric:delete_db(DbName, [?CTX])
+    end).
+
+
+scan_dbs_test_() ->
+{
+      foreach,
+      fun() -> test_util:start_couch([mem3, fabric]) end,
+      fun(Ctx) -> test_util:stop_couch(Ctx) end,
+      [
+          t_resume_db_shard(),
+          t_sleep_based_on_count()
+     ]
+}.
+
+
+t_resume_db_shard() ->
+    ?_test(begin
+        DbName0 = ?tempdb(),
+        DbName = <<DbName0/binary, "/_replicator">>,
+        ok = fabric:create_db(DbName, [?CTX]),
+        Change = {[{<<"id">>, DbName}]},
+        scan_changes_cb({change, Change, req}, type, {self(), 1}),
+        ResumeMsg = receive Msg -> Msg after 1000 -> timeout end,
+        ?assertMatch({'$gen_cast', {resume_scan, <<"shards/", _/binary>>}}, ResumeMsg),
+        fabric:delete_db(DbName, [?CTX])
+    end).
+
+
+t_sleep_based_on_count() ->
+    ?_test(begin
+        DbName0 = ?tempdb(),
+        DbName = <<DbName0/binary, "/_replicator">>,
+        ok = fabric:create_db(DbName, [?CTX]),
+        Change = {[{<<"id">>, DbName}]},
+        scan_changes_cb({change, Change, req}, type, {self(), 1000}),
+        Timeout = receive Msg -> Msg after 100 -> timeout end,
+        ?assertEqual(timeout, Timeout),
         fabric:delete_db(DbName, [?CTX])
     end).
 
