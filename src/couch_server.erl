@@ -71,18 +71,17 @@ sup_start_link() ->
 
 
 open(DbName, Options0) ->
-    Options = maybe_add_sys_db_callbacks(DbName, Options0),
-    Ctx = couch_util:get_value(user_ctx, Options, #user_ctx{}),
+    Ctx = couch_util:get_value(user_ctx, Options0, #user_ctx{}),
     case ets:lookup(couch_dbs, DbName) of
-    [#db{fd=Fd, fd_monitor=Lock} = Db] when Lock =/= locked ->
+    [#db{fd=Fd, fd_monitor=Lock, options=Options} = Db] when Lock =/= locked ->
         update_lru(DbName, Options),
         {ok, Db#db{user_ctx=Ctx, fd_monitor=erlang:monitor(process,Fd)}};
     _ ->
+        Options = maybe_add_sys_db_callbacks(DbName, Options0),
         Timeout = couch_util:get_value(timeout, Options, infinity),
         Create = couch_util:get_value(create_if_missing, Options, false),
         case gen_server:call(couch_server, {open, DbName, Options}, Timeout) of
         {ok, #db{fd=Fd} = Db} ->
-            update_lru(DbName, Options),
             {ok, Db#db{user_ctx=Ctx, fd_monitor=erlang:monitor(process,Fd)}};
         {not_found, no_db_file} when Create ->
             couch_log:warning("creating missing database: ~s", [DbName]),
