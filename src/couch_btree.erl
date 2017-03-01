@@ -342,11 +342,9 @@ complete_root(Bt, KPs) ->
 % it's probably really inefficient.
 
 chunkify(InList) ->
-    BaseChunkSize = get_chunk_size(),
+    ChunkThreshold = get_chunk_size(),
     case ?term_size(InList) of
-    Size when Size > BaseChunkSize ->
-        NumberOfChunksLikely = ((Size div BaseChunkSize) + 1),
-        ChunkThreshold = Size div NumberOfChunksLikely,
+    Size when Size > ChunkThreshold ->
         chunkify(InList, ChunkThreshold, [], 0, []);
     _Else ->
         [InList]
@@ -354,6 +352,9 @@ chunkify(InList) ->
 
 chunkify([], _ChunkThreshold, [], 0, OutputChunks) ->
     lists:reverse(OutputChunks);
+chunkify([], _ChunkThreshold, [Item], _OutListSize, [PrevChunk | RestChunks]) ->
+    NewPrevChunk = PrevChunk ++ [Item],
+    lists:reverse(RestChunks, [NewPrevChunk]);
 chunkify([], _ChunkThreshold, OutList, _OutListSize, OutputChunks) ->
     lists:reverse([lists:reverse(OutList) | OutputChunks]);
 chunkify([InElement | RestInList], ChunkThreshold, OutList, OutListSize, OutputChunks) ->
