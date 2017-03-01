@@ -731,11 +731,15 @@ update_rep_doc(RepDbName, #doc{body = {RepDocBody}} = RepDoc, KVs, _Try) ->
     end.
 
 open_rep_doc(DbName, DocId) ->
-    {ok, Db} = couch_db:open_int(DbName, [?CTX, sys_db]),
-    try
-        couch_db:open_doc(Db, DocId, [ejson_body])
-    after
-        couch_db:close(Db)
+    case couch_db:open_int(DbName, [?CTX, sys_db]) of
+        {ok, Db} ->
+            try
+                couch_db:open_doc(Db, DocId, [ejson_body])
+            after
+                couch_db:close(Db)
+            end;
+        Else ->
+            Else
     end.
 
 save_rep_doc(DbName, Doc) ->
@@ -791,6 +795,9 @@ ensure_rep_ddoc_exists(RepDb) ->
 
 ensure_rep_ddoc_exists(RepDb, DDocId) ->
     case open_rep_doc(RepDb, DDocId) of
+        {not_found, no_db_file} ->
+            %% database was deleted.
+            ok;
         {not_found, _Reason} ->
             {ok, DDoc} = replication_design_doc(DDocId),
             couch_log:notice("creating replicator ddoc", []),
@@ -941,9 +948,12 @@ scan_all_dbs(Server) when is_pid(Server) ->
             true ->
                 ok;
             false ->
-                [gen_server:cast(Server, {resume_scan, ShardName})
-                    || ShardName <- replicator_shards(DbName)],
-                ok
+                try
+                    [gen_server:cast(Server, {resume_scan, ShardName})
+                        || ShardName <- replicator_shards(DbName)]
+                catch error:database_does_not_exist ->
+                    ok
+                end
             end
         end;
         (_, _) -> ok
