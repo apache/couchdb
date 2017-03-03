@@ -391,7 +391,7 @@ active_size(#db{}=Db, #size_info{}=SI) ->
         case couch_btree:size(T) of
             _ when Acc == null ->
                 null;
-            undefined ->
+            nil ->
                 null;
             Size ->
                 Acc + Size
