@@ -93,8 +93,8 @@ replication_started(#rep{id = {BaseId, _} = RepId}) ->
             {<<"_replication_id">>, ?l2b(BaseId)},
             {<<"_replication_stats">>, undefined}]),
         ok = gen_server:call(?MODULE, {rep_started, RepId}, infinity),
-        couch_log:notice("Document `~s` triggered replication `~s`",
-            [DocId, pp_rep_id(RepId)])
+        couch_log:notice("Document `~s` from `~s` triggered replication `~s`",
+            [DocId, DbName, pp_rep_id(RepId)])
     end.
 
 
@@ -108,8 +108,8 @@ replication_completed(#rep{id = RepId}, Stats) ->
             {<<"_replication_state_reason">>, undefined},
             {<<"_replication_stats">>, {Stats}}]),
         ok = gen_server:call(?MODULE, {rep_complete, RepId}, infinity),
-        couch_log:notice("Replication `~s` finished (triggered by document `~s`)",
-            [pp_rep_id(RepId), DocId])
+        couch_log:notice("Replication `~s` finished (triggered by document `~s`"
+            " from `~s`)", [pp_rep_id(RepId), DocId, DbName])
     end.
 
 
@@ -117,10 +117,10 @@ replication_usurped(#rep{id = RepId}, By) ->
     case rep_state(RepId) of
     nil ->
         ok;
-    #rep_state{rep = #rep{doc_id = DocId}} ->
+    #rep_state{rep = #rep{db_name = DbName, doc_id = DocId}} ->
         ok = gen_server:call(?MODULE, {rep_complete, RepId}, infinity),
-        couch_log:notice("Replication `~s` usurped by ~s (triggered by document `~s`)",
-            [pp_rep_id(RepId), By, DocId])
+        couch_log:notice("Replication `~s` usurped by ~s (triggered by document"
+            " `~s` from `~s`)", [pp_rep_id(RepId), By, DocId, DbName])
     end.
 
 
@@ -461,10 +461,11 @@ process_update(State, DbName, {Change}) ->
         rep_doc_deleted(DbName, DocId),
         State;
     {Owner, false} when Owner /= node() ->
-        couch_log:notice("Not starting '~s' as owner is ~s.", [DocId, Owner]),
+        couch_log:notice("Not starting '~s' from '~s' as owner is ~s.",
+            [DocId, DbName, Owner]),
         State;
     {_Owner, false} ->
-        couch_log:notice("Maybe starting '~s' as I'm the owner", [DocId]),
+        couch_log:notice("Maybe starting '~s' from '~s' as I'm the owner", [DocId, DbName]),
         case get_json_value(<<"_replication_state">>, RepProps) of
         undefined ->
             maybe_start_replication(State, DbName, DocId, JsonRepDoc);
@@ -497,8 +498,8 @@ rep_db_update_error(Error, DbName, DocId) ->
     _ ->
         Reason = to_binary(Error)
     end,
-    couch_log:error("Replication manager, error processing document `~s`: ~s",
-        [DocId, Reason]),
+    couch_log:error("Replication manager, error processing document `~s`"
+        " from `~s`: ~s", [DocId, DbName, Reason]),
     update_rep_doc(DbName, DocId, [{<<"_replication_state">>, <<"error">>},
                            {<<"_replication_state_reason">>, Reason}]).
 
@@ -528,8 +529,8 @@ maybe_start_replication(State, DbName, DocId, RepDoc) ->
         },
         true = ets:insert(?REP_TO_STATE, {RepId, RepState}),
         true = ets:insert(?DOC_TO_REP, {{DbName, DocId}, RepId}),
-        couch_log:notice("Attempting to start replication `~s` (document `~s`).",
-            [pp_rep_id(RepId), DocId]),
+        couch_log:notice("Attempting to start replication `~s` (document `~s`"
+            " from `~s`).", [pp_rep_id(RepId), DocId, DbName]),
         StartDelaySecs = erlang:max(0,
             config:get_integer("replicator", "start_delay", 10)),
         StartSplaySecs = erlang:max(1,
@@ -544,13 +545,15 @@ maybe_start_replication(State, DbName, DocId, RepDoc) ->
     #rep_state{rep = #rep{doc_id = DocId}} ->
         State;
     #rep_state{starting = false, rep = #rep{db_name = DbName, doc_id = OtherDocId}} ->
-        couch_log:notice("The replication specified by the document `~s` was already"
-            " triggered by the document `~s`", [DocId, OtherDocId]),
+        couch_log:notice("The replication specified by the document `~s` from"
+            " `~s` was already triggered by the document `~s`",
+            [DocId, DbName, OtherDocId]),
         maybe_tag_rep_doc(DbName, DocId, RepDoc, ?l2b(BaseId)),
         State;
     #rep_state{starting = true, rep = #rep{db_name = DbName, doc_id = OtherDocId}} ->
-        couch_log:notice("The replication specified by the document `~s` is already"
-            " being triggered by the document `~s`", [DocId, OtherDocId]),
+        couch_log:notice("The replication specified by the document `~s` from"
+            " `~s` is already being triggered by the document `~s`",
+            [DocId, DbName, OtherDocId]),
         maybe_tag_rep_doc(DbName, DocId, RepDoc, ?l2b(BaseId)),
         State
     end.
@@ -618,8 +621,8 @@ rep_doc_deleted(DbName, DocId) ->
         couch_replicator:cancel_replication(RepId),
         true = ets:delete(?REP_TO_STATE, RepId),
         true = ets:delete(?DOC_TO_REP, {DbName, DocId}),
-        couch_log:notice("Stopped replication `~s` because replication document `~s`"
-            " was deleted", [pp_rep_id(RepId), DocId]);
+        couch_log:notice("Stopped replication `~s` because replication document"
+            " `~s` from `~s` was deleted", [pp_rep_id(RepId), DocId, DbName]);
     [] ->
         ok
     end.
@@ -641,20 +644,20 @@ maybe_retry_replication(#rep_state{retries_left = 0} = RepState, Error, State) -
     couch_replicator:cancel_replication(RepId),
     true = ets:delete(?REP_TO_STATE, RepId),
     true = ets:delete(?DOC_TO_REP, {DbName, DocId}),
-    couch_log:error("Error in replication `~s` (triggered by document `~s`): ~s"
-        "~nReached maximum retry attempts (~p).",
-        [pp_rep_id(RepId), DocId, to_binary(error_reason(Error)), MaxRetries]),
+    couch_log:error("Error in replication `~s` (triggered by document `~s` from"
+        " `~s` ): ~s~nReached maximum retry attempts (~p).", [pp_rep_id(RepId),
+        DocId, DbName, to_binary(error_reason(Error)), MaxRetries]),
     State;
 
 maybe_retry_replication(RepState, Error, State) ->
     #rep_state{
-        rep = #rep{id = RepId, doc_id = DocId} = Rep
+        rep = #rep{id = RepId, doc_id = DocId, db_name = DbName} = Rep
     } = RepState,
     #rep_state{wait = Wait} = NewRepState = state_after_error(RepState),
     true = ets:insert(?REP_TO_STATE, {RepId, NewRepState}),
-    couch_log:error("Error in replication `~s` (triggered by document `~s`): ~s"
-        "~nRestarting replication in ~p seconds.",
-        [pp_rep_id(RepId), DocId, to_binary(error_reason(Error)), Wait]),
+    couch_log:error("Error in replication `~s` (triggered by document `~s` from"
+        " `~s` ): ~s~nRestarting replication in ~p seconds.", [pp_rep_id(RepId),
+        DocId, DbName, to_binary(error_reason(Error)), Wait]),
     Pid = spawn_link(?MODULE, start_replication, [Rep, Wait]),
     State#state{
         rep_start_pids = [{rep_start, Pid} | State#state.rep_start_pids]
