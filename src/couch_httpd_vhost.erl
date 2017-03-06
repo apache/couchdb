@@ -96,6 +96,14 @@ get_state() ->
 %% @doc Try to find a rule matching current Host heade. some rule is
 %% found it rewrite the Mochiweb Request else it return current Request.
 dispatch_host(MochiReq) ->
+    case vhost_enabled() of
+        true ->
+            dispatch_host_int(MochiReq);
+        false ->
+            MochiReq
+    end.
+
+dispatch_host_int(MochiReq) ->
     #vhosts_state{
         vhost_globals = VHostGlobals,
         vhosts = VHosts,
@@ -398,3 +406,14 @@ load_conf() ->
             "redirect_vhost_handler", DefaultVHostFun)),
 
     {VHostGlobals, VHosts, Fun}.
+
+%% cheaply determine if there are any virtual hosts
+%% configured at all.
+vhost_enabled() ->
+    case {config:get("httpd", "vhost_global_handlers"),
+          config:get("vhosts")} of
+        {undefined, []} ->
+            false;
+        _ ->
+            true
+    end.
