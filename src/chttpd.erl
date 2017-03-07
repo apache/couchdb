@@ -629,8 +629,8 @@ body(#httpd{mochi_req=MochiReq, req_body=ReqBody}) ->
     case ReqBody of
         undefined ->
             % Maximum size of document PUT request body (4GB)
-            MaxSize = list_to_integer(
-                config:get("couchdb", "max_document_size", "4294967296")),
+            MaxSize =  config:get_integer("httpd", "max_http_request_size",
+                4294967296),
             Begin = os:timestamp(),
             try
                 MochiReq:recv_body(MaxSize)
