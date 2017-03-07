@@ -17,7 +17,6 @@
 -export([start_db_compaction_notifier/2, stop_db_compaction_notifier/1]).
 -export([replication_id/2]).
 -export([sum_stats/2, is_deleted/1]).
--export([mp_parse_doc/2]).
 
 -export([handle_db_event/3]).
 
@@ -448,35 +447,6 @@ handle_db_event(_DbName, _Event, Server) ->
 % Obsolete - remove in next release
 sum_stats(S1, S2) ->
     couch_replicator_stats:sum_stats(S1, S2).
-
-mp_parse_doc({headers, H}, []) ->
-    case couch_util:get_value("content-type", H) of
-    {"application/json", _} ->
-        fun (Next) ->
-            mp_parse_doc(Next, [])
-        end
-    end;
-mp_parse_doc({body, Bytes}, AccBytes) ->
-    fun (Next) ->
-        mp_parse_doc(Next, [Bytes | AccBytes])
-    end;
-mp_parse_doc(body_end, AccBytes) ->
-    receive {get_doc_bytes, Ref, From} ->
-        From ! {doc_bytes, Ref, lists:reverse(AccBytes)}
-    end,
-    fun mp_parse_atts/1.
-
-mp_parse_atts(eof) ->
-    ok;
-mp_parse_atts({headers, _H}) ->
-    fun mp_parse_atts/1;
-mp_parse_atts({body, Bytes}) ->
-    receive {get_bytes, Ref, From} ->
-        From ! {bytes, Ref, Bytes}
-    end,
-    fun mp_parse_atts/1;
-mp_parse_atts(body_end) ->
-    fun mp_parse_atts/1.
 
 is_deleted(Change) ->
     case couch_util:get_value(<<"deleted">>, Change) of
