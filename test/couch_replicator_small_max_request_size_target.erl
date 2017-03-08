@@ -27,7 +27,7 @@ setup(remote) ->
 
 setup({A, B}) ->
     Ctx = test_util:start_couch([couch_replicator]),
-    config:set("couchdb", "max_document_size", "10000", false),
+    config:set("httpd", "max_http_request_size", "10000", false),
     Source = setup(A),
     Target = setup(B),
     {Ctx, {Source, Target}}.
@@ -49,7 +49,7 @@ teardown(_, {Ctx, {Source, Target}}) ->
 reduce_max_request_size_test_() ->
     Pairs = [{local, remote}, {remote, remote}],
     {
-        "Replicate docs when target has a small max_document_size",
+        "Replicate docs when target has a small max_http_request_size",
         {
             foreachx,
             fun setup/1, fun teardown/2,
@@ -66,8 +66,8 @@ reduce_max_request_size_test_() ->
     }.
 
 
-% Test documents which are below max_document_size but when batched, batch size
-% will be greater than max_document_size. Replicator could automatically split
+% Test documents which are below max_http_request_size but when batched, batch size
+% will be greater than max_http_request_size. Replicator could automatically split
 % the batch into smaller batches and POST those separately.
 should_replicate_all_docs({From, To}, {_Ctx, {Source, Target}}) ->
     {lists:flatten(io_lib:format("~p -> ~p", [From, To])),
