@@ -21,9 +21,12 @@ You may need:
 * `GnuPG                  <http://www.gnupg.org/>`_
 * `md5sum                 <http://www.microbrew.org/tools/md5sha1sum/>`_
 * `sha1sum                <http://www.microbrew.org/tools/md5sha1sum/>`_
+* `nodejs                 <http://nodejs.org/>`_
+* `npm                    <https://www.npmjs.com/>`_               
 
-The first of these optional dependencies are required for building the
-documentation. The last three are needed to build releases.
+The first four of these optional dependencies are required for building the
+documentation. The next three are needed to build releases. The last two are for
+needed to build fauxton.
 
 You will need these optional dependencies installed if:
 
@@ -51,7 +54,8 @@ Debian-based (inc. Ubuntu) Systems
 
     sudo apt-get install help2man python-sphinx \
         texlive-latex-base texlive-latex-recommended \
-        texlive-latex-extra texlive-fonts-recommended texinfo gnupg
+        texlive-latex-extra texlive-fonts-recommended texinfo gnupg \
+        nodejs npm
 
 Gentoo-based Systems
 ~~~~~~~~~~~~~~~~~~~~
@@ -67,7 +71,8 @@ RedHat-based (Fedora, Centos, RHEL) Systems
 ::
 
     sudo yum install help2man python-sphinx python-docutils \
-        python-pygments texlive-latex texlive-latex-fonts texinfo gnupg
+        python-pygments texlive-latex texlive-latex-fonts texinfo gnupg \
+        nodejs npm
 
 Mac OS X
 ~~~~~~~~
@@ -79,7 +84,7 @@ Unless you want to install the optional dependencies, skip to the next section.
 
 Install what else we can with Homebrew::
 
-    brew install help2man gnupg md5sha1sum
+    brew install help2man gnupg md5sha1sum node
 
 If you don't already have pip installed, install it::
 
@@ -99,7 +104,7 @@ FreeBSD
 
 ::
 
-    pkg install help2man texinfo gnupg py27-sphinx texlive-full tex-formats
+    pkg install help2man texinfo gnupg py27-sphinx texlive-full tex-formats node
 
 Windows
 ~~~~~~~
