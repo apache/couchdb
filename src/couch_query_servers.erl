@@ -27,7 +27,7 @@
 -include_lib("couch/include/couch_db.hrl").
 
 -define(SUMERROR, <<"The _sum function requires that map values be numbers, "
-    "arrays of numbers, or objects, not '~p'. Objects cannot be mixed with other "
+    "arrays of numbers, or objects. Objects cannot be mixed with other "
     "data structures. Objects can be arbitrarily nested, provided that the values "
     "for all fields are themselves numbers, arrays of numbers, or objects.">>).
 
@@ -142,25 +142,34 @@ os_rereduce(Lang, OsRedSrcs, KVs) ->
 builtin_reduce(_Re, [], _KVs, Acc) ->
     {ok, lists:reverse(Acc)};
 builtin_reduce(Re, [<<"_sum",_/binary>>|BuiltinReds], KVs, Acc) ->
-    Sum = builtin_sum_rows(KVs),
+    Sum = builtin_sum_rows(KVs, []),
     builtin_reduce(Re, BuiltinReds, KVs, [Sum|Acc]);
 builtin_reduce(reduce, [<<"_count",_/binary>>|BuiltinReds], KVs, Acc) ->
     Count = length(KVs),
     builtin_reduce(reduce, BuiltinReds, KVs, [Count|Acc]);
 builtin_reduce(rereduce, [<<"_count",_/binary>>|BuiltinReds], KVs, Acc) ->
-    Count = builtin_sum_rows(KVs),
+    Count = builtin_sum_rows(KVs, []),
     builtin_reduce(rereduce, BuiltinReds, KVs, [Count|Acc]);
 builtin_reduce(Re, [<<"_stats",_/binary>>|BuiltinReds], KVs, Acc) ->
     Stats = builtin_stats(Re, KVs),
     builtin_reduce(Re, BuiltinReds, KVs, [Stats|Acc]).
 
-builtin_sum_rows(KVs) ->
-    lists:foldl(fun([_Key, Value], Acc) -> sum_values(Value, Acc) end, 0, KVs).
 
-sum_values({Props}, 0) ->
-    {Props};
-sum_values({Props}, {AccProps}) ->
-    {sum_objects(lists:sort(Props), lists:sort(AccProps))};
+builtin_sum_rows([], Acc) ->
+    Acc;
+builtin_sum_rows([[_Key, Value] | RestKVs], Acc) ->
+    try sum_values(Value, Acc) of
+        NewAcc ->
+            builtin_sum_rows(RestKVs, NewAcc)
+    catch
+        throw:{builtin_reduce_error, Obj} ->
+            Obj;
+        throw:{invalid_value, Reason, Cause} ->
+            {[{<<"error">>, <<"builtin_reduce_error">>},
+                {<<"reason">>, Reason}, {<<"caused_by">>, Cause}]}
+    end.
+
+
 sum_values(Value, Acc) when is_number(Value), is_number(Acc) ->
     Acc + Value;
 sum_values(Value, Acc) when is_list(Value), is_list(Acc) ->
@@ -169,6 +178,19 @@ sum_values(Value, Acc) when is_number(Value), is_list(Acc) ->
     sum_arrays(Acc, [Value]);
 sum_values(Value, Acc) when is_list(Value), is_number(Acc) ->
     sum_arrays([Acc], Value);
+sum_values({Props}, Acc) ->
+    case lists:keyfind(<<"error">>, 1, Props) of
+        {<<"error">>, <<"builtin_reduce_error">>} ->
+            throw({builtin_reduce_error, {Props}});
+        false ->
+            ok
+    end,
+    case Acc of
+        0 ->
+            {Props};
+        {AccProps} ->
+            {sum_objects(lists:sort(Props), lists:sort(AccProps))}
+    end;
 sum_values(Else, _Acc) ->
     throw_sum_error(Else).
 
@@ -490,7 +512,7 @@ ret_os_process(Proc) ->
     ok.
 
 throw_sum_error(Else) ->
-    throw({invalid_value, iolist_to_binary(io_lib:format(?SUMERROR, [Else]))}).
+    throw({invalid_value, ?SUMERROR, Else}).
 
 throw_stat_error(Else) ->
     throw({invalid_value, iolist_to_binary(io_lib:format(?STATERROR, [Else]))}).
@@ -498,6 +520,17 @@ throw_stat_error(Else) ->
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
+
+builtin_sum_rows_negative_test() ->
+    A = [{[{<<"a">>, 1}]}, {[{<<"a">>, 2}]}, {[{<<"a">>, 3}]}],
+    E = {[{<<"error">>, <<"builtin_reduce_error">>}]},
+    ?assertEqual(E, builtin_sum_rows([["K", E]], [])),
+    % The below case is where the value is invalid, but no error because
+    % it's only one document.
+    ?assertEqual(A, builtin_sum_rows([["K", A]], [])),
+    {Result} = builtin_sum_rows([["K", A]], [1, 2, 3]),
+    ?assertEqual({<<"error">>, <<"builtin_reduce_error">>},
+        lists:keyfind(<<"error">>, 1, Result)).
 
 sum_values_test() ->
     ?assertEqual(3, sum_values(1, 2)),
@@ -511,6 +544,19 @@ sum_values_test() ->
             {<<"f">>,1}, {<<"g">>,2}]},
     ?assertEqual(Z, sum_values(X, Y)),
     ?assertEqual(Z, sum_values(Y, X)).
+
+sum_values_negative_test() ->
+    % invalid value
+    A = [{[{<<"a">>, 1}]}, {[{<<"a">>, 2}]}, {[{<<"a">>, 3}]}],
+    B = ["error 1", "error 2"],
+    C = [<<"error 3">>, <<"error 4">>],
+    KV = {[{<<"error">>, <<"builtin_reduce_error">>},
+        {<<"reason">>, ?SUMERROR}, {<<"caused_by">>, <<"some cause">>}]},
+    ?assertThrow({invalid_value, _, _}, sum_values(A, [1, 2, 3])),
+    ?assertThrow({invalid_value, _, _}, sum_values(A, 0)),
+    ?assertThrow({invalid_value, _, _}, sum_values(B, [1, 2])),
+    ?assertThrow({invalid_value, _, _}, sum_values(C, [0])),
+    ?assertThrow({builtin_reduce_error, KV}, sum_values(KV, [0])).
 
 stat_values_test() ->
     ?assertEqual({1, 2, 0, 1, 1}, stat_values(1, 0)),
