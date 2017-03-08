@@ -451,7 +451,7 @@ validate_ctype(Req, Ctype) ->
 
 check_max_request_length(Req) ->
     Len = list_to_integer(header_value(Req, "Content-Length", "0")),
-    MaxLen = config:get_integer("couchdb", "max_document_size", 4294967296),
+    MaxLen = config:get_integer("httpd", "max_http_request_size", 4294967296),
     case Len > MaxLen of
         true ->
             exit({body_too_large, Len});
@@ -576,8 +576,7 @@ body_length(#httpd{mochi_req=MochiReq}) ->
     MochiReq:get(body_length).
 
 body(#httpd{mochi_req=MochiReq, req_body=undefined}) ->
-    MaxSize = list_to_integer(
-        config:get("couchdb", "max_document_size", "4294967296")),
+    MaxSize = config:get_integer("httpd", "max_http_request_size", 4294967296),
     MochiReq:recv_body(MaxSize);
 body(#httpd{req_body=ReqBody}) ->
     ReqBody.
