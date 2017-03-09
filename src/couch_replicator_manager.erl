@@ -266,9 +266,17 @@ handle_cast({resume_scan, DbName}, State) ->
             end,
             true = ets:insert(?DB_TO_SEQ, {DbName, Since, false}),
             ensure_rep_ddoc_exists(DbName),
-            Pid = start_changes_reader(DbName, Since, State#state.epoch),
-            couch_log:debug("Scanning ~s from update_seq ~p", [DbName, Since]),
-            [{DbName, Pid} | Pids]
+            case has_replication_docs(DbName) of
+                false ->
+                    %% the database is empty save for the rep_ddoc,
+                    %% don't bother scanning it.
+                    couch_log:debug("ignoring empty ~s", [DbName]),
+                    Pids;
+                true ->
+                    Pid = start_changes_reader(DbName, Since, State#state.epoch),
+                    couch_log:debug("Scanning ~s from update_seq ~p", [DbName, Since]),
+                    [{DbName, Pid} | Pids]
+            end
     end,
     {noreply, State#state{rep_start_pids = NewPids}};
 
@@ -1003,6 +1011,38 @@ get_json_value(Key, Props, Default) when is_binary(Key) ->
         Else ->
             Else
     end.
+
+
+has_replication_docs(DbName) ->
+    {ok, Db} = couch_db:open(DbName, []),
+    try
+        case couch_db:get_doc_count(Db) of
+            {ok, 0} ->
+                false;
+            {ok, 1} ->
+                case first_doc_id(Db) of
+                    <<"_design/_replicator">> ->
+                        false;
+                    _Else ->
+                        true
+                end;
+            _Else ->
+                true
+        end
+    after
+        couch_db:close(Db)
+    end.
+
+
+first_doc_id(#db{} = Db) ->
+    Fun = fun
+        (#full_doc_info{deleted = true}, _Reds, Acc) ->
+            {ok, Acc};
+        (FDI, _Reds, _Acc) ->
+            {stop, FDI#full_doc_info.id}
+    end,
+    {ok, _, Id} = couch_btree:fold(Db#db.id_tree, Fun, nil, []),
+    Id.
 
 
 -ifdef(TEST).
