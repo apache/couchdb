@@ -375,7 +375,7 @@ changes_reader({Server, Epoch}, DbName, Since) ->
         #changes_args{
             include_docs = true,
             since = Since,
-            feed = "longpoll",
+            feed = "normal",
             timeout = infinity
         },
         {json_req, null},
