@@ -284,26 +284,24 @@ send_list_row(Row, #lacc{qserver = {Proc, _}, req = Req, resp = Resp} = Acc) ->
         Acc2 = send_non_empty_chunk(Acc, Chunk),
         {ok, Acc2};
     [<<"end">>, Chunk, Headers] ->
-        Acc2 = send_non_empty_chunk(fixup_headers(Headers, Acc), Chunk),
-        #lacc{resp = Resp2} = Acc2,
-        last_chunk(Req, Resp2),
-        {stop, Acc2};
+        #lacc{resp = Resp2} = send_non_empty_chunk(fixup_headers(Headers, Acc), Chunk),
+        {ok, Resp3} = last_chunk(Req, Resp2),
+        {stop, Resp3};
     [<<"end">>, Chunk] ->
-        Acc2 = send_non_empty_chunk(Acc, Chunk),
-        #lacc{resp = Resp2} = Acc2,
-        last_chunk(Req, Resp2),
-        {stop, Acc2}
+        #lacc{resp = Resp2} = send_non_empty_chunk(Acc, Chunk),
+        {ok, Resp3} = last_chunk(Req, Resp2),
+        {stop, Resp3}
     catch Error ->
-        case Resp of
+        {ok, Resp2} = case Resp of
             undefined ->
                 {Code, _, _} = chttpd:error_info(Error),
                 #lacc{req=Req, headers=Headers} = Acc,
-                {ok, Resp2} = chttpd:start_chunked_response(Req, Code, Headers),
-                Acc2 = Acc#lacc{resp=Resp2, code=Code};
-            _ -> Resp2 = Resp, Acc2 = Acc
+                chttpd:start_chunked_response(Req, Code, Headers);
+            _ ->
+                {ok, Resp}
         end,
-        chttpd:send_chunked_error(Resp2, Error),
-        {stop, Acc2}
+        {ok, Resp3} = chttpd:send_chunked_error(Resp2, Error),
+        {stop, Resp3}
     end.
 
 send_non_empty_chunk(Acc, []) ->
