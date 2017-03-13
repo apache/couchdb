@@ -891,6 +891,8 @@ error_info({missing_stub, Reason}) ->
     {412, <<"missing_stub">>, Reason};
 error_info(request_entity_too_large) ->
     {413, <<"too_large">>, <<"the request entity is too large">>};
+error_info({request_entity_too_large, DocID}) ->
+    {413, <<"document_too_large">>, DocID};
 error_info({error, security_migration_updates_disabled}) ->
     {503, <<"security_migration">>, <<"Updates to security docs are disabled during "
         "security migration.">>};
