@@ -256,7 +256,7 @@ db_req(#httpd{method='GET',path_parts=[_DbName]}=Req, Db) ->
 
 db_req(#httpd{method='POST',path_parts=[_DbName]}=Req, Db) ->
     couch_httpd:validate_ctype(Req, "application/json"),
-    Doc = couch_doc:from_json_obj(couch_httpd:json_body(Req)),
+    Doc = couch_doc:from_json_obj_validate(couch_httpd:json_body(Req)),
     validate_attachment_names(Doc),
     Doc2 = case Doc#doc.id of
         <<"">> ->
@@ -319,7 +319,7 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>]}=Req, Db) ->
         true ->
             Docs = lists:map(
                 fun({ObjProps} = JsonObj) ->
-                    Doc = couch_doc:from_json_obj(JsonObj),
+                    Doc = couch_doc:from_json_obj_validate(JsonObj),
                     validate_attachment_names(Doc),
                     Id = case Doc#doc.id of
                         <<>> -> couch_uuids:new();
@@ -353,7 +353,7 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>]}=Req, Db) ->
             end;
         false ->
             Docs = lists:map(fun(JsonObj) ->
-                    Doc = couch_doc:from_json_obj(JsonObj),
+                    Doc = couch_doc:from_json_obj_validate(JsonObj),
                     validate_attachment_names(Doc),
                     Doc
                 end, DocsArray),
@@ -809,7 +809,7 @@ couch_doc_from_req(Req, DocId, #doc{revs=Revs}=Doc) ->
     end,
     Doc#doc{id=DocId, revs=Revs2};
 couch_doc_from_req(Req, DocId, Json) ->
-    couch_doc_from_req(Req, DocId, couch_doc:from_json_obj(Json)).
+    couch_doc_from_req(Req, DocId, couch_doc:from_json_obj_validate(Json)).
 
 % Useful for debugging
 % couch_doc_open(Db, DocId) ->
