@@ -34,13 +34,14 @@ update(DbName, {Tree0, Dict0}) ->
         {Tree0, Dict0}
     end.
 
+%% Attempt to close the oldest idle database.
 close({Tree, _} = Cache) ->
     close_int(gb_trees:next(gb_trees:iterator(Tree)), Cache).
 
 %% internals
 
 close_int(none, _) ->
-    erlang:error(all_dbs_active);
+    false;
 close_int({Lru, DbName, Iter}, {Tree, Dict} = Cache) ->
     case ets:update_element(couch_dbs, DbName, {#db.fd_monitor, locked}) of
     true ->
@@ -49,7 +50,7 @@ close_int({Lru, DbName, Iter}, {Tree, Dict} = Cache) ->
             true = ets:delete(couch_dbs, DbName),
             true = ets:delete(couch_dbs_pid_to_name, Pid),
             exit(Pid, kill),
-            {gb_trees:delete(Lru, Tree), dict:erase(DbName, Dict)};
+            {true, {gb_trees:delete(Lru, Tree), dict:erase(DbName, Dict)}};
         false ->
             true = ets:update_element(couch_dbs, DbName, {#db.fd_monitor, nil}),
             couch_stats:increment_counter([couchdb, couch_server, lru_skip]),
