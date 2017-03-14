@@ -497,7 +497,7 @@ docs(Docs) ->
 doc(#doc{} = Doc) ->
     Doc;
 doc({_} = Doc) ->
-    couch_doc:from_json_obj(Doc);
+    couch_doc:from_json_obj_validate(Doc);
 doc(Doc) ->
     erlang:error({illegal_doc_format, Doc}).
 
