@@ -16,33 +16,39 @@
 -include_lib("couch/include/couch_db.hrl").
 
 new() ->
-    {gb_trees:empty(), dict:new()}.
+    Updates = ets:new(couch_lru_updates, [ordered_set]),
+    Dbs = ets:new(couch_lru_dbs, [set]),
+    {0, Updates, Dbs}.
 
-insert(DbName, {Tree0, Dict0}) ->
-    Lru = erlang:now(),
-    {gb_trees:insert(Lru, DbName, Tree0), dict:store(DbName, Lru, Dict0)}.
+insert(DbName, {Count, Updates, Dbs}) ->
+    update(DbName, {Count, Updates, Dbs}).
 
-update(DbName, {Tree0, Dict0}) ->
-    case dict:find(DbName, Dict0) of
-    {ok, Old} ->
-        New = erlang:now(),
-        Tree = gb_trees:insert(New, DbName, gb_trees:delete(Old, Tree0)),
-        Dict = dict:store(DbName, New, Dict0),
-        {Tree, Dict};
-    error ->
-        % We closed this database before processing the update.  Ignore
-        {Tree0, Dict0}
+update(DbName, {Count, Updates, Dbs}) ->
+    case ets:lookup(Dbs, DbName) of
+        [] ->
+            true = ets:insert(Dbs, {DbName, Count});
+        [{DbName, OldCount}] ->
+            true = ets:update_element(Dbs, DbName, {2, Count}),
+            true = ets:delete(Updates, {OldCount, DbName})
+    end,
+    true = ets:insert(Updates, {{Count, DbName}}),
+    {Count + 1, Updates, Dbs}.
+
+
+close({Count, Updates, Dbs}) ->
+    case close_int(ets:next(Updates, {-1, <<>>}), Updates, Dbs) of
+        true ->
+            {true, {Count, Updates, Dbs}};
+        false ->
+            false
     end.
 
-%% Attempt to close the oldest idle database.
-close({Tree, _} = Cache) ->
-    close_int(gb_trees:next(gb_trees:iterator(Tree)), Cache).
 
 %% internals
 
-close_int(none, _) ->
+close_int('$end_of_table', _Updates, _Dbs) ->
     false;
-close_int({Lru, DbName, Iter}, {Tree, Dict} = Cache) ->
+close_int({_Count, DbName} = Key, Updates, Dbs) ->
     case ets:update_element(couch_dbs, DbName, {#db.fd_monitor, locked}) of
     true ->
         [#db{main_pid = Pid} = Db] = ets:lookup(couch_dbs, DbName),
@@ -50,14 +56,16 @@ close_int({Lru, DbName, Iter}, {Tree, Dict} = Cache) ->
             true = ets:delete(couch_dbs, DbName),
             true = ets:delete(couch_dbs_pid_to_name, Pid),
             exit(Pid, kill),
-            {true, {gb_trees:delete(Lru, Tree), dict:erase(DbName, Dict)}};
+            true = ets:delete(Updates, Key),
+            true = ets:delete(Dbs, DbName),
+            true;
         false ->
             true = ets:update_element(couch_dbs, DbName, {#db.fd_monitor, nil}),
             couch_stats:increment_counter([couchdb, couch_server, lru_skip]),
-            close_int(gb_trees:next(Iter), update(DbName, Cache))
+            close_int(ets:next(Updates, Key), Updates, Dbs)
         end;
     false ->
-        NewTree = gb_trees:delete(Lru, Tree),
-        NewIter = gb_trees:iterator(NewTree),
-        close_int(gb_trees:next(NewIter), {NewTree, dict:erase(DbName, Dict)})
+        true = ets:delete(Updates, Key),
+        true = ets:delete(Dbs, DbName),
+        close_int(ets:next(Updates, Key), Updates, Dbs)
     end.
