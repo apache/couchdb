@@ -359,7 +359,7 @@ handle_call({open_result, _T0, DbName, Error}, {FromPid, _Tag}, Server) ->
         [] ->
             % db was deleted during async open
             {reply, ok, Server};
-        [#db{fd=ReqType, compactor_pid=Froms}=Db] ->
+        [#db{fd=ReqType, compactor_pid=Froms}] ->
             [gen_server:reply(From, Error) || From <- Froms],
             couch_log:info("open_result error ~p for ~s", [Error, DbName]),
             true = ets:delete(couch_dbs, DbName),
@@ -378,13 +378,9 @@ handle_call({open, DbName, Options}, From, Server) ->
         DbNameList = binary_to_list(DbName),
         case check_dbname(Server, DbNameList) of
         ok ->
-            case maybe_close_lru_db(Server) of
-            {ok, Server2} ->
-                Filepath = get_full_filename(Server, DbNameList),
-                {noreply, open_async(Server2, From, DbName, Filepath, Options)};
-            CloseError ->
-                {reply, CloseError, Server}
-            end;
+            {ok, Server2} = maybe_close_lru_db(Server),
+            Filepath = get_full_filename(Server, DbNameList),
+            {noreply, open_async(Server2, From, DbName, Filepath, Options)};
         Error ->
             {reply, Error, Server}
         end;
@@ -406,13 +402,9 @@ handle_call({create, DbName, Options}, From, Server) ->
     ok ->
         case ets:lookup(couch_dbs, DbName) of
         [] ->
-            case maybe_close_lru_db(Server) of
-            {ok, Server2} ->
-                {noreply, open_async(Server2, From, DbName, Filepath,
-                        [create | Options])};
-            CloseError ->
-                {reply, CloseError, Server}
-            end;
+            {ok, Server2} = maybe_close_lru_db(Server),
+            {noreply, open_async(Server2, From, DbName, Filepath,
+                [create | Options])};
         [#db{fd=open}=Db] ->
             % We're trying to create a database while someone is in
             % the middle of trying to open it. We allow one creator
@@ -436,14 +428,14 @@ handle_call({delete, DbName, Options}, _From, Server) ->
         Server2 =
         case ets:lookup(couch_dbs, DbName) of
         [] -> Server;
-        [#db{main_pid=Pid, compactor_pid=Froms} = Db] when is_list(Froms) ->
+        [#db{main_pid=Pid, compactor_pid=Froms}] when is_list(Froms) ->
             % icky hack of field values - compactor_pid used to store clients
             true = ets:delete(couch_dbs, DbName),
             true = ets:delete(couch_dbs_pid_to_name, Pid),
             exit(Pid, kill),
             [gen_server:reply(F, not_found) || F <- Froms],
             db_closed(Server);
-        [#db{main_pid=Pid} = Db] ->
+        [#db{main_pid=Pid}] ->
             true = ets:delete(couch_dbs, DbName),
             true = ets:delete(couch_dbs_pid_to_name, Pid),
             exit(Pid, kill),
@@ -502,7 +494,7 @@ handle_info({'EXIT', _Pid, config_change}, Server) ->
 handle_info({'EXIT', Pid, Reason}, Server) ->
     case ets:lookup(couch_dbs_pid_to_name, Pid) of
     [{Pid, DbName}] ->
-        [#db{compactor_pid=Froms}=Db] = ets:lookup(couch_dbs, DbName),
+        [#db{compactor_pid=Froms}] = ets:lookup(couch_dbs, DbName),
         if Reason /= snappy_nif_not_loaded -> ok; true ->
             Msg = io_lib:format("To open the database `~s`, Apache CouchDB "
                 "must be built with Erlang OTP R13B04 or higher.", [DbName]),
