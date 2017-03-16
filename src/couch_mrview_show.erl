@@ -284,26 +284,24 @@ send_list_row(Row, #lacc{qserver = {Proc, _}, req = Req, resp = Resp} = Acc) ->
         Acc2 = send_non_empty_chunk(Acc, Chunk),
         {ok, Acc2};
     [<<"end">>, Chunk, Headers] ->
-        Acc2 = send_non_empty_chunk(fixup_headers(Headers, Acc), Chunk),
-        #lacc{resp = Resp2} = Acc2,
-        last_chunk(Req, Resp2),
-        {stop, Acc2};
+        #lacc{resp = Resp2} = send_non_empty_chunk(fixup_headers(Headers, Acc), Chunk),
+        {ok, Resp3} = last_chunk(Req, Resp2),
+        {stop, Resp3};
     [<<"end">>, Chunk] ->
-        Acc2 = send_non_empty_chunk(Acc, Chunk),
-        #lacc{resp = Resp2} = Acc2,
-        last_chunk(Req, Resp2),
-        {stop, Acc2}
+        #lacc{resp = Resp2} = send_non_empty_chunk(Acc, Chunk),
+        {ok, Resp3} = last_chunk(Req, Resp2),
+        {stop, Resp3}
     catch Error ->
-        case Resp of
+        {ok, Resp2} = case Resp of
             undefined ->
                 {Code, _, _} = chttpd:error_info(Error),
                 #lacc{req=Req, headers=Headers} = Acc,
-                {ok, Resp2} = chttpd:start_chunked_response(Req, Code, Headers),
-                Acc2 = Acc#lacc{resp=Resp2, code=Code};
-            _ -> Resp2 = Resp, Acc2 = Acc
+                chttpd:start_chunked_response(Req, Code, Headers);
+            _ ->
+                {ok, Resp}
         end,
-        chttpd:send_chunked_error(Resp2, Error),
-        {stop, Acc2}
+        {ok, Resp3} = chttpd:send_chunked_error(Resp2, Error),
+        {stop, Resp3}
     end.
 
 send_non_empty_chunk(Acc, []) ->
@@ -424,6 +422,44 @@ should_apply_headers_with_merge_overwrite() ->
         {Props} = apply_headers(JsonResp, NewHeaders),
         JsonHeaders = couch_util:get_value(<<"headers">>, Props),
         ?assertEqual({NewHeaders}, JsonHeaders)
+    end).
+
+
+send_list_row_test_() ->
+    Cases = couch_tests_combinatorics:product([
+        [
+            {"[<<\"end\">>, [], []]", fun(_, _) -> [<<"end">>, [], []] end},
+            {"[<<\"end\">>, []]", fun(_, _) -> [<<"end">>, []] end},
+            {"throw(timeout)", fun(_, _) -> throw(timeout) end}
+        ],
+        [
+            req,
+            undefined
+        ]]),
+    {"Ensure send_list_row returns a valid response on end or error",
+        {setup, fun setup/0, fun(_) -> meck:unload() end, [
+            {
+                lists:flatten(io_lib:format("~s -- ~p", [N, R])),
+                should_return_valid_response(F, R)
+            } || [{N, F}, R] <- Cases
+        ]}
+    }.
+
+setup() ->
+    ok = meck:expect(chttpd, send_chunk,
+        fun(Resp, _) -> {ok, Resp} end),
+    ok = meck:expect(chttpd, send_chunked_error,
+        fun(Resp, _) -> {ok, Resp} end),
+    ok = meck:expect(chttpd, start_chunked_response,
+        fun(_, _, _) -> {ok, resp} end),
+    ok = meck:expect(chttpd_external, parse_external_response, 1,
+        #extern_resp_args{headers = []}).
+
+should_return_valid_response(Spec, Req) ->
+    ?_test(begin
+        ok = meck:expect(couch_query_servers, proc_prompt, Spec),
+        Acc = #lacc{qserver = {proc, undefined}, req = Req, resp = resp},
+        ?assertEqual({stop, resp}, send_list_row([], Acc))
     end).
 
 -endif.
