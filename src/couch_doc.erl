@@ -13,7 +13,7 @@
 -module(couch_doc).
 
 -export([to_doc_info/1,to_doc_info_path/1,parse_rev/1,parse_revs/1,rev_to_str/1,revs_to_strs/1]).
--export([from_json_obj/1,to_json_obj/2,has_stubs/1, merge_stubs/2]).
+-export([from_json_obj/1, from_json_obj_validate/1, to_json_obj/2,has_stubs/1, merge_stubs/2]).
 -export([validate_docid/1, get_validate_doc_fun/1]).
 -export([doc_from_multi_part_stream/2, doc_from_multi_part_stream/3]).
 -export([doc_to_multi_part_stream/5, len_doc_to_multi_part_stream/4]).
@@ -123,6 +123,16 @@ doc_to_json_obj(#doc{id=Id,deleted=Del,body=Body,revs={Start, RevIds},
         ++ to_json_meta(Meta)
         ++ to_json_attachments(Doc#doc.atts, Options)
     }.
+
+from_json_obj_validate(EJson) ->
+    MaxSize = config:get_integer("couchdb", "max_document_size", 4294967296),
+    Doc = from_json_obj(EJson),
+    case erlang:external_size(Doc#doc.body) =< MaxSize of
+        true ->
+             Doc;
+        false ->
+            throw({request_entity_too_large, Doc#doc.id})
+    end.
 
 from_json_obj({Props}) ->
     transfer_fields(Props, #doc{body=[]});
@@ -414,7 +424,7 @@ doc_from_multi_part_stream(ContentType, DataFun, Ref) ->
     {{started_open_doc_revs, NewRef}, Parser, _ParserRef} ->
         restart_open_doc_revs(Parser, Ref, NewRef);
     {{doc_bytes, Ref, DocBytes}, Parser, ParserRef} ->
-        Doc = from_json_obj(?JSON_DECODE(DocBytes)),
+        Doc = from_json_obj_validate(?JSON_DECODE(DocBytes)),
         erlang:put(mochiweb_request_recv, true),
         % we'll send the Parser process ID to the remote nodes so they can
         % retrieve their own copies of the attachment data
