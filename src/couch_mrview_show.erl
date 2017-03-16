@@ -424,4 +424,42 @@ should_apply_headers_with_merge_overwrite() ->
         ?assertEqual({NewHeaders}, JsonHeaders)
     end).
 
+
+send_list_row_test_() ->
+    Cases = couch_tests_combinatorics:product([
+        [
+            {"[<<\"end\">>, [], []]", fun(_, _) -> [<<"end">>, [], []] end},
+            {"[<<\"end\">>, []]", fun(_, _) -> [<<"end">>, []] end},
+            {"throw(timeout)", fun(_, _) -> throw(timeout) end}
+        ],
+        [
+            req,
+            undefined
+        ]]),
+    {"Ensure send_list_row returns a valid response on end or error",
+        {setup, fun setup/0, fun(_) -> meck:unload() end, [
+            {
+                lists:flatten(io_lib:format("~s -- ~p", [N, R])),
+                should_return_valid_response(F, R)
+            } || [{N, F}, R] <- Cases
+        ]}
+    }.
+
+setup() ->
+    ok = meck:expect(chttpd, send_chunk,
+        fun(Resp, _) -> {ok, Resp} end),
+    ok = meck:expect(chttpd, send_chunked_error,
+        fun(Resp, _) -> {ok, Resp} end),
+    ok = meck:expect(chttpd, start_chunked_response,
+        fun(_, _, _) -> {ok, resp} end),
+    ok = meck:expect(chttpd_external, parse_external_response, 1,
+        #extern_resp_args{headers = []}).
+
+should_return_valid_response(Spec, Req) ->
+    ?_test(begin
+        ok = meck:expect(couch_query_servers, proc_prompt, Spec),
+        Acc = #lacc{qserver = {proc, undefined}, req = Req, resp = resp},
+        ?assertEqual({stop, resp}, send_list_row([], Acc))
+    end).
+
 -endif.
