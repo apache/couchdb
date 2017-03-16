@@ -325,7 +325,7 @@ db_req(#httpd{method='POST', path_parts=[DbName], user_ctx=Ctx}=Req, Db) ->
     W = chttpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
     Options = [{user_ctx,Ctx}, {w,W}],
 
-    Doc = couch_doc:from_json_obj(chttpd:json_body(Req)),
+    Doc = couch_doc:from_json_obj_validate(chttpd:json_body(Req)),
     Doc2 = case Doc#doc.id of
         <<"">> ->
             Doc#doc{id=couch_uuids:new(), revs={0, []}};
@@ -410,7 +410,7 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, 
     true ->
         Docs = lists:map(
             fun(JsonObj) ->
-                Doc = couch_doc:from_json_obj(JsonObj),
+                Doc = couch_doc:from_json_obj_validate(JsonObj),
                 validate_attachment_names(Doc),
                 Id = case Doc#doc.id of
                     <<>> -> couch_uuids:new();
@@ -441,7 +441,7 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, 
             send_json(Req, 417, ErrorsJson)
         end;
     false ->
-        Docs = [couch_doc:from_json_obj(JsonObj) || JsonObj <- DocsArray],
+        Docs = [couch_doc:from_json_obj_validate(JsonObj) || JsonObj <- DocsArray],
         [validate_attachment_names(D) || D <- Docs],
         case fabric:update_docs(Db, Docs, [replicated_changes|Options]) of
         {ok, Errors} ->
@@ -1050,7 +1050,7 @@ couch_doc_from_req(Req, DocId, #doc{revs=Revs} = Doc) ->
     end,
     Doc#doc{id=DocId, revs=Revs2};
 couch_doc_from_req(Req, DocId, Json) ->
-    couch_doc_from_req(Req, DocId, couch_doc:from_json_obj(Json)).
+    couch_doc_from_req(Req, DocId, couch_doc:from_json_obj_validate(Json)).
 
 
 % Useful for debugging
