@@ -92,6 +92,7 @@ def run_couchjs(test, fmt):
             sys.stderr.write(line)
     p.wait()
     fmt(p.returncode == 0)
+    return p.returncode == 0
 
 
 def options():
@@ -132,9 +133,14 @@ def main():
         tests = tmp
 
     fmt = mkformatter(tests)
+    all_tests_passed = True
     for test in tests:
-        run_couchjs(test, fmt)
+        all_tests_passed = run_couchjs(test, fmt) and all_tests_passed
 
+    if all_tests_passed:
+        exit(0)
+    else:
+        exit(1)
 
 if __name__ == "__main__":
     try:
