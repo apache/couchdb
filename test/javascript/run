@@ -92,6 +92,7 @@ def run_couchjs(test, fmt):
             sys.stderr.write(line)
     p.wait()
     fmt(p.returncode == 0)
+    return p.returncode
 
 
 def options():
@@ -132,8 +133,21 @@ def main():
         tests = tmp
 
     fmt = mkformatter(tests)
+    passed = 0
+    failed = 0
     for test in tests:
-        run_couchjs(test, fmt)
+        result = run_couchjs(test, fmt)
+        if result == 0:
+            passed += 1
+        else:
+            failed += 1
+
+    sys.stderr.write("======================================================="
+        + os.linesep)
+    sys.stderr.write("JavaScript tests complete." + os.linesep)
+    sys.stderr.write("  Failed: {}.  Skipped or passed: {}.".format(
+        failed, passed) + os.linesep)
+    exit(failed > 0)
 
 
 if __name__ == "__main__":
