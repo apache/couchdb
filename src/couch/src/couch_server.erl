@@ -20,7 +20,7 @@
 -export([init/1, handle_call/3,sup_start_link/0]).
 -export([handle_cast/2,code_change/3,handle_info/2,terminate/2]).
 -export([dev_start/0,is_admin/2,has_admins/0,get_stats/0]).
--export([close_lru/0]).
+-export([close_lru/0, maybe_close_db/1]).
 
 % config_listener api
 -export([handle_config_change/5, handle_config_terminate/3]).
@@ -36,7 +36,7 @@
     dbs_open=0,
     start_time="",
     update_lru_on_read=true,
-    lru = couch_lru:new()
+    lru = couch_lru:new(fun maybe_close_db/1)
     }).
 
 dev_start() ->
@@ -96,6 +96,26 @@ update_lru(DbName) ->
 
 close_lru() ->
     gen_server:call(couch_server, close_lru).
+
+maybe_close_db(DbName) ->
+    % First element of return indicates if we should stop closing DBs from the
+    % LRU and the second element indicates if we closed a DB.
+    case ets:update_element(couch_dbs, DbName, {#db.fd_monitor, locked}) of
+    true ->
+        [#db{main_pid = Pid} = Db] = ets:lookup(couch_dbs, DbName),
+        case couch_db:is_idle(Db) of true ->
+            true = ets:delete(couch_dbs, DbName),
+            true = ets:delete(couch_dbs_pid_to_name, Pid),
+            exit(Pid, kill),
+            {true, true};
+        false ->
+            true = ets:update_element(couch_dbs, DbName, {#db.fd_monitor, nil}),
+            couch_stats:increment_counter([couchdb, couch_server, lru_skip]),
+            {false, false}
+        end;
+    false ->
+        {false, true}
+    end.
 
 create(DbName, Options0) ->
     Options = maybe_add_sys_db_callbacks(DbName, Options0),

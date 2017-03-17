@@ -231,6 +231,12 @@
     atts = []
 }).
 
+-record(couch_lru, {
+    count=0,
+    updates,
+    counts,
+    close_fun
+}).
 
 -type doc() :: #doc{}.
 -type ddoc() :: #doc{}.
