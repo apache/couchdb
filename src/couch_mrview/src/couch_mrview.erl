@@ -533,15 +533,17 @@ map_fold({{Key, Id}, Val}, _Offset, Acc) ->
         user_acc=UAcc1,
         last_go=Go
     }};
-map_fold({<<"_local/",_/binary>> = DocId, {Rev0, _Body}}, _Offset, #mracc{} = Acc) ->
+map_fold({<<"_local/",_/binary>> = DocId, {Rev0, Body}}, _Offset, #mracc{} = Acc) ->
     #mracc{
         limit=Limit,
         callback=Callback,
-        user_acc=UAcc0
+        user_acc=UAcc0,
+        args=Args
     } = Acc,
     Rev = {0, list_to_binary(integer_to_list(Rev0))},
     Value = {[{rev, couch_doc:rev_to_str(Rev)}]},
-    Row = [{id, DocId}, {key, DocId}, {value, Value}],
+    Doc = if Args#mrargs.include_docs -> [{doc, Body}]; true -> [] end,
+    Row = [{id, DocId}, {key, DocId}, {value, Value}] ++ Doc,
     {Go, UAcc1} = Callback({row, Row}, UAcc0),
     {Go, Acc#mracc{
         limit=Limit-1,
