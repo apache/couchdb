@@ -20,7 +20,7 @@ setup() ->
     ok = meck:new(couch_db, [passthrough]),
     ets:new(couch_dbs, [set, public, named_table, {keypos, #db.name}]),
     ets:new(couch_dbs_pid_to_name, [set, public, named_table]),
-    couch_lru:new().
+    couch_lru:new(fun couch_server:maybe_close_db/1).
 
 teardown(_) ->
     ets:delete(couch_dbs),
@@ -29,18 +29,18 @@ teardown(_) ->
 
 new_test_() ->
     {setup,
-        fun() -> couch_lru:new() end,
+        fun() -> couch_lru:new(fun couch_server:maybe_close_db/1) end,
         fun(Lru) ->
-            ?_assertMatch({0, _, _}, Lru)
+            ?_assertEqual(0, Lru#couch_lru.count)
         end
     }.
 
 insert_test_() ->
     {setup,
-        fun() -> couch_lru:new() end,
+        fun() -> couch_lru:new(fun couch_server:maybe_close_db/1) end,
         fun(Lru) ->
             Key = <<"test">>,
-            {1, Updates, Dbs} = couch_lru:insert(Key, Lru),
+            #couch_lru{count=1, updates=Updates, counts=Dbs} = couch_lru:insert(Key, Lru),
             [
                 ?_assertEqual(1, ets_size(Dbs)),
                 ?_assert(ets:member(Dbs, Key)),
@@ -52,11 +52,11 @@ insert_test_() ->
 
 insert_same_test_() ->
     {setup,
-        fun() -> couch_lru:new() end,
+        fun() -> couch_lru:new(fun couch_server:maybe_close_db/1) end,
         fun(Lru) ->
             Key = <<"test">>,
-            Lru1 = {1, Updates, Dbs} = couch_lru:insert(Key, Lru),
-            {2, Updates, Dbs} = couch_lru:insert(Key, Lru1),
+            Lru1 = #couch_lru{count=1} = couch_lru:insert(Key, Lru),
+            #couch_lru{count=2, updates=Updates, counts=Dbs} = couch_lru:insert(Key, Lru1),
             [
                 ?_assertEqual(1, ets_size(Dbs)),
                 ?_assert(ets:member(Dbs, Key)),
@@ -68,11 +68,11 @@ insert_same_test_() ->
 
 update_test_() ->
     {setup,
-        fun() -> couch_lru:new() end,
+        fun() -> couch_lru:new(fun couch_server:maybe_close_db/1) end,
         fun(Lru) ->
             Key = <<"test">>,
-            Lru1 = {1, Updates, Dbs} = couch_lru:update(Key, Lru),
-            {2, Updates, Dbs} = couch_lru:update(Key, Lru1),
+            Lru1 = #couch_lru{count=1} = couch_lru:update(Key, Lru),
+            #couch_lru{count=2, updates=Updates, counts=Dbs} = couch_lru:update(Key, Lru1),
             [
                 ?_assertEqual(1, ets_size(Dbs)),
                 ?_assert(ets:member(Dbs, Key)),
@@ -90,7 +90,7 @@ close_test_() ->
             ok = meck:expect(couch_db, is_idle, 1, true),
             {ok, Lru1} = add_record(Lru, <<"test1">>, c:pid(0, 1001, 0)),
             {ok, Lru2} = add_record(Lru1, <<"test2">>, c:pid(0, 2001, 0)),
-            {true, {2, Updates, Dbs}} = couch_lru:close(Lru2),
+            {true, #couch_lru{count=2, updates=Updates, counts=Dbs}} = couch_lru:close(Lru2),
             [
                 ?_assertEqual(1, ets_size(Dbs)),
                 ?_assert(ets:member(Dbs, <<"test2">>)),

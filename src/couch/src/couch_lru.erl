@@ -11,34 +11,36 @@
 % the License.
 
 -module(couch_lru).
--export([new/0, insert/2, update/2, close/1]).
+-export([new/1, insert/2, update/2, close/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 
-new() ->
+new(CloseFun) ->
     Updates = ets:new(couch_lru_updates, [ordered_set]),
-    Dbs = ets:new(couch_lru_dbs, [set]),
-    {0, Updates, Dbs}.
+    Counts = ets:new(couch_lru_counts, [set]),
+    #couch_lru{updates=Updates, counts=Counts, close_fun=CloseFun}.
 
-insert(DbName, {Count, Updates, Dbs}) ->
-    update(DbName, {Count, Updates, Dbs}).
+insert(Name, Lru) ->
+    update(Name, Lru).
 
-update(DbName, {Count, Updates, Dbs}) ->
-    case ets:lookup(Dbs, DbName) of
+update(Name, Lru) ->
+    #couch_lru{counts=Counts, updates=Updates, count=Count} = Lru,
+    case ets:lookup(Counts, Name) of
         [] ->
-            true = ets:insert(Dbs, {DbName, Count});
-        [{DbName, OldCount}] ->
-            true = ets:update_element(Dbs, DbName, {2, Count}),
-            true = ets:delete(Updates, {OldCount, DbName})
+            true = ets:insert(Counts, {Name, Count});
+        [{Name, OldCount}] ->
+            true = ets:update_element(Counts, Name, {2, Count}),
+            true = ets:delete(Updates, {OldCount, Name})
     end,
-    true = ets:insert(Updates, {{Count, DbName}}),
-    {Count + 1, Updates, Dbs}.
+    true = ets:insert(Updates, {{Count, Name}}),
+    Lru#couch_lru{count=Count+1}.
 
 
-close({Count, Updates, Dbs}) ->
-    case close_int(ets:next(Updates, {-1, <<>>}), Updates, Dbs) of
+close(Lru) ->
+    #couch_lru{updates=Updates} = Lru,
+    case close_int(ets:next(Updates, {-1, <<>>}), Lru) of
         true ->
-            {true, {Count, Updates, Dbs}};
+            {true, Lru};
         false ->
             false
     end.
@@ -46,26 +48,19 @@ close({Count, Updates, Dbs}) ->
 
 %% internals
 
-close_int('$end_of_table', _Updates, _Dbs) ->
+close_int('$end_of_table', _Lru) ->
     false;
-close_int({_Count, DbName} = Key, Updates, Dbs) ->
-    case ets:update_element(couch_dbs, DbName, {#db.fd_monitor, locked}) of
-    true ->
-        [#db{main_pid = Pid} = Db] = ets:lookup(couch_dbs, DbName),
-        case couch_db:is_idle(Db) of true ->
-            true = ets:delete(couch_dbs, DbName),
-            true = ets:delete(couch_dbs_pid_to_name, Pid),
-            exit(Pid, kill),
+close_int({_Count, Name} = Key, Lru) ->
+    #couch_lru{updates=Updates, counts=Counts, close_fun=CloseFun} = Lru,
+    {Stop, Remove} = CloseFun(Name),
+    case Remove of
+        true ->
             true = ets:delete(Updates, Key),
-            true = ets:delete(Dbs, DbName),
-            true;
+            true = ets:delete(Counts, Name);
         false ->
-            true = ets:update_element(couch_dbs, DbName, {#db.fd_monitor, nil}),
-            couch_stats:increment_counter([couchdb, couch_server, lru_skip]),
-            close_int(ets:next(Updates, Key), Updates, Dbs)
-        end;
-    false ->
-        true = ets:delete(Updates, Key),
-        true = ets:delete(Dbs, DbName),
-        close_int(ets:next(Updates, Key), Updates, Dbs)
+            ok
+    end,
+    case Stop of
+        false -> close_int(ets:next(Updates, Key), Lru);
+        true -> true
     end.
