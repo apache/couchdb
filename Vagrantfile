@@ -15,10 +15,10 @@ Vagrant::Config.run do |config|
   if Dir.glob("#{File.dirname(__FILE__)}/.vagrant/machines/default/*/id").empty?
     # install build-essential
     pkg_cmd = "apt-get update -qq; apt-get install -q -y build-essential git " \
-        "autoconf autoconf-archive gnu-standards help2man texinfo; "
+        "autoconf autoconf-archive gnu-standards help2man; "
 
     # Install erlang
-    pkg_cmd << "apt-get install -q -y erlang-base-hipe erlang-dev " \
+    pkg_cmd << "apt-get install -q -y erlang-base erlang-dev " \
         "erlang-manpages erlang-eunit erlang-nox erlang-xmerl erlang-inets; "
 
     # couchdb developper dependencies
@@ -26,7 +26,7 @@ Vagrant::Config.run do |config|
         "curl libcurl4-gnutls-dev libtool; "
 
     # doc dependencies
-    pkg_cmd << "apt-get install -q -y help2man texinfo python-sphinx python-pip; " \
+    pkg_cmd << "apt-get install -q -y help2man python-sphinx python-pip; " \
         "pip install -U pygments; "
 
     config.vm.provision :shell, :inline => pkg_cmd

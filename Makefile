@@ -219,13 +219,9 @@ dist: all
 	@cp -r share/www apache-couchdb-$(COUCHDB_VERSION)/share/
 	@mkdir -p apache-couchdb-$(COUCHDB_VERSION)/share/docs/html
 	@cp -r src/docs/build/html apache-couchdb-$(COUCHDB_VERSION)/share/docs/
-	@mkdir -p apache-couchdb-$(COUCHDB_VERSION)/share/docs/pdf
-	@cp src/docs/build/latex/CouchDB.pdf apache-couchdb-$(COUCHDB_VERSION)/share/docs/pdf/
 
 	@mkdir -p apache-couchdb-$(COUCHDB_VERSION)/share/docs/man
 	@cp src/docs/build/man/apachecouchdb.1 apache-couchdb-$(COUCHDB_VERSION)/share/docs/man/
-	@mkdir -p apache-couchdb-$(COUCHDB_VERSION)/share/docs/info
-	@cp src/docs/build/texinfo/CouchDB.info apache-couchdb-$(COUCHDB_VERSION)/share/docs/info/
 
 	@tar czf apache-couchdb-$(COUCHDB_VERSION).tar.gz apache-couchdb-$(COUCHDB_VERSION)
 	@echo "Done: apache-couchdb-$(COUCHDB_VERSION).tar.gz"
@@ -249,15 +245,11 @@ ifeq ($(IN_RELEASE), true)
 	@mkdir -p rel/couchdb/share/www/docs/
 	@mkdir -p rel/couchdb/share/docs/
 	@cp -R share/docs/html/* rel/couchdb/share/www/docs/
-	@cp share/docs/pdf/CouchDB.pdf rel/couchdb/share/docs/CouchDB.pdf
 	@cp share/docs/man/apachecouchdb.1 rel/couchdb/share/docs/couchdb.1
-	@cp share/docs/info/CouchDB.info rel/couchdb/share/docs/CouchDB.info
 else
 	@mkdir -p rel/couchdb/share/docs/
 	@cp -R src/docs/build/html/ rel/couchdb/share/www/docs
-	@cp src/docs/build/latex/CouchDB.pdf rel/couchdb/share/docs/CouchDB.pdf
 	@cp src/docs/build/man/apachecouchdb.1 rel/couchdb/share/docs/couchdb.1
-	@cp src/docs/build/texinfo/CouchDB.info rel/couchdb/share/docs/CouchDB.info
 endif
 endif
 
@@ -331,9 +323,7 @@ uninstall:
 	@rm -rf $(DESTDIR)/$(data_dir)
 	@rm -rf $(DESTDIR)/$(doc_dir)
 	@rm -rf $(DESTDIR)/$(html_dir)
-	@rm -rf $(DESTDIR)/$(pdf_dir)
 	@rm -rf $(DESTDIR)/$(man_dir)
-	@rm -rf $(DESTDIR)/$(info_dir)
 
 .PHONY: rc
 rc:

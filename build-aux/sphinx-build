@@ -25,39 +25,6 @@ WARNING: 'sphinx-build' is needed, and is missing on your system.
 EOF
 fi
 
-if test "$2" = "texinfo"; then
-    if test -z "`which makeinfo`"; then
-        missing=yes
-        cat << EOF
-WARNING: 'makeinfo' is needed, and is missing on your system.
-         You might have modified some files without having the
-         proper tools for further handling them.
-EOF
-    fi
-    if test "$missing" != "yes"; then
-        sphinx-build $*
-    else
-        mkdir -p texinfo
-        echo "info:" > texinfo/Makefile
-    fi
-fi
-
-if test "$2" = "latex"; then
-    if test -z "`which pdflatex`"; then
-        missing=yes
-        cat << EOF
-WARNING: 'pdflatex' is needed, and is missing on your system.
-         You might have modified some files without having the
-         proper tools for further handling them.
-EOF
-    fi
-    if test "$missing" != "yes"; then
-        sphinx-build $*
-    else
-        mkdir -p latex
-        echo "all-pdf:" > latex/Makefile
-    fi
-fi
 if test "$2" = "html"; then
     if test "$missing" != "yes"; then
         sphinx-build $*

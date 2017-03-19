@@ -15,8 +15,6 @@ Dependencies
 You may need:
 
 * `Sphinx                 <http://sphinx.pocoo.org/>`_
-* `LaTex                  <http://www.latex-project.org/>`_
-* `GNU Texinfo            <http://www.gnu.org/software/texinfo/>`_
 * `GNU help2man           <http://www.gnu.org/software/help2man/>`_
 * `GnuPG                  <http://www.gnupg.org/>`_
 * `md5sum                 <http://www.microbrew.org/tools/md5sha1sum/>`_
@@ -52,18 +50,14 @@ Debian-based (inc. Ubuntu) Systems
 
 ::
 
-    sudo apt-get install help2man python-sphinx \
-        texlive-latex-base texlive-latex-recommended \
-        texlive-latex-extra texlive-fonts-recommended texinfo gnupg \
-        nodejs npm
+    sudo apt-get install help2man python-sphinx gnupg nodejs npm
 
 Gentoo-based Systems
 ~~~~~~~~~~~~~~~~~~~~
 
 ::
 
-    sudo emerge texinfo gnupg coreutils pkgconfig help2man
-    sudo USE=latex emerge sphinx
+    sudo emerge gnupg coreutils pkgconfig help2man sphinx
 
 RedHat-based (Fedora, Centos, RHEL) Systems
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -71,8 +65,7 @@ RedHat-based (Fedora, Centos, RHEL) Systems
 ::
 
     sudo yum install help2man python-sphinx python-docutils \
-        python-pygments texlive-latex texlive-latex-fonts texinfo gnupg \
-        nodejs npm
+        python-pygments gnupg nodejs npm
 
 Mac OS X
 ~~~~~~~~
@@ -96,15 +89,12 @@ Now, install the required Python packages::
     sudo pip install docutils
     sudo pip install pygments
 
-Download `MacTeX <http://www.tug.org/mactex/>`_ and follow the instructions 
-to get a working LaTeX install on your system.
-
 FreeBSD
 ~~~~~~~
 
 ::
 
-    pkg install help2man texinfo gnupg py27-sphinx texlive-full tex-formats node
+    pkg install help2man gnupg py27-sphinx node
 
 Windows
 ~~~~~~~

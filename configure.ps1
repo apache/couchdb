@@ -29,11 +29,9 @@
   -ViewindexDir DIR         specify the view directory [LOCALSTATEDIR\lib]
   -LogDir DIR               specify the log directory [LOCALSTATEDIR\log]
   -DataDir DIR              read-only architecture-independent data [DATAROOTDIR]
-  -InfoDir DIR              info documentation [DATAROOTDIR\info]
   -ManDir DIR               man documentation [DATAROOTDIR\man]
   -DocDir DIR               documentation root [DATAROOTDIR\doc\apache-couchdb]
   -HTMLDir DIR              html documentation [DOCDIR\html]
-  -PDFDir DIR               pdf documentation [DOCDIR\pdf]
 .LINK
     http://couchdb.apache.org/
 #>
@@ -81,16 +79,12 @@ Param(
     [ValidateNotNullOrEmpty()]
     [string]$DataDir = "$DataRootDir", # read-only arch.-independent data (default $DataRootDir)
     [ValidateNotNullOrEmpty()]
-    [string]$InfoDir = "$DataRootDir\info", # info documentation (default $DataRootDir\info)
-    [ValidateNotNullOrEmpty()]
     [string]$ManDir = "$DataRootDir\man", # man documentation (default $DataRootDir\man)
     [ValidateNotNullOrEmpty()]
 
     [string]$DocDir = "$DataRootDir\doc\apache-couchdb", # man documentation (default $DataRootDir\doc\apache-couchdb)
     [ValidateNotNullOrEmpty()]
     [string]$HTMLDir = "$DocDir\html", # html documentation (default $DocDir\html)
-    [ValidateNotNullOrEmpty()]
-    [string]$PDFDir = "$DocDir\pdf" # pdf documentation (default $DocDir\pdf)
 )
 
 
@@ -103,7 +97,7 @@ Push-Location $rootdir
 # The test script lives in test/build/test-configure.sh
 If ($Test) {
     Write-Output @"
-"$Prefix" "$ExecPrefix" "$BinDir" "$LibExecDir" "$SysConfDir" "$DataRootDir" "$DataDir" "$LocalStateDir" "$RunStateDir" "$DocDir" "$LibDir" "$DatabaseDir" "$ViewIndexDir" "$LogDir" "$ManDir" "$InfoDir" "$HTMLDir" "$PDFDir"
+"$Prefix" "$ExecPrefix" "$BinDir" "$LibExecDir" "$SysConfDir" "$DataRootDir" "$DataDir" "$LocalStateDir" "$RunStateDir" "$DocDir" "$LibDir" "$DatabaseDir" "$ViewIndexDir" "$LogDir" "$ManDir" "$HTMLDir"
 "@
     exit 0
 }
@@ -175,9 +169,7 @@ view_index_dir = $ViewIndexDir
 log_file = $LogFile
 
 html_dir = $HTMLDir
-pdf_dir = $PDFDir
 man_dir = $ManDir
-info_dir = $InfoDir
 
 with_fauxton = $BuildFauxton
 with_docs = $BuildDocs
