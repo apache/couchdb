@@ -29,8 +29,9 @@ var Filter = (function() {
       },
       filter_view : function(fun, ddoc, args) {
         // recompile
-        var source = fun.toSource();
-        fun = evalcx(source, filter_sandbox);
+        var sandbox = create_filter_sandbox();
+        var source = fun.toSource ? fun.toSource() : '(' + fun.toString() + ')';
+        fun = evalcx(source, sandbox);
 
         var results = [];
         var docs = args[0];

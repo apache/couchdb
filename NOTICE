@@ -1,5 +1,5 @@
 Apache CouchDB
-Copyright 2009-2012 The Apache Software Foundation
+Copyright 2009-2016 The Apache Software Foundation
 
 This product includes software developed at
 The Apache Software Foundation (http://www.apache.org/).
@@ -18,9 +18,9 @@ This product also includes the following third-party components:
 
    Copyright 2004, Scott James Remnant <scott@netsplit.com>
 
- * jQuery (http://jquery.com/)
+ * jQuery (http://jquery.org/)
 
-   Copyright 2011, John Resig
+   Copyright 2012 jQuery Foundation and other contributors
  
  * jQuery UI (http://jqueryui.com)
 
@@ -28,7 +28,7 @@ This product also includes the following third-party components:
 
  * json2.js (http://www.json.org/)
 
-   In the public domain
+   Public domain
 
  * MochiWeb (http://code.google.com/p/mochiweb/)
 
@@ -36,11 +36,11 @@ This product also includes the following third-party components:
 
  * ibrowse (http://github.com/cmullaparthi/ibrowse/tree/master)
 
-   Copyright 2009, Chandrashekhar Mullaparthi
+   Copyright 2005-2012, Chandrashekhar Mullaparthi
 
- * Erlang OAuth (http://github.com/tim/erlang-oauth/tree/master)
+ * Erlang OAuth (http://github.com/tim/erlang-oauth)
 
-   Copyright 2009, Tim Fletcher <http://tfletcher.com/>
+   Copyright 2012, the authors and contributors
 
  * ETap (http://github.com/ngerakines/etap/)
 
@@ -64,7 +64,7 @@ This product also includes the following third-party components:
 
  * snappy (http://code.google.com/p/snappy/)
 
-  Copyright 2005 and onwards Google Inc.
+  Copyright 2005, Google Inc.
 
  * snappy-erlang-nif (https://github.com/fdmanana/snappy-erlang-nif)
 
@@ -74,9 +74,17 @@ This product also includes the following third-party components:
 
   Copyright 2011, Jeremy Ashkenas
 
- * almond.js (http://github.com/jrburke/almond)
+ * Sphinx (http://sphinx-doc.org/)
+ 
+   Copyright 2011, the Sphinx team
 
-  Copyright 2011, The Dojo Foundation
+ * Sizzle (http://sizzlejs.com/)
+ 
+   Copyright 2010, The Dojo Foundation
+ 
+ * Underscore.js 1.4.2 (http://underscorejs.org)
+
+   Copyright 2012, Jeremy Ashkenas
 
  * backbone.js (http://backbonejs.org/)
 
@@ -89,10 +97,6 @@ This product also includes the following third-party components:
  * d3.js (http://d3js.org)
 
   Copyright 2012, Michael Bostock
-
- * JSHint (http://jshint.com/)
-
-  Copyright 2002, Douglas Crockford, modifications by JSHint Community
 
  * Lodash (http://lodash.com/)
 
@@ -116,12 +120,84 @@ This product also includes the following third-party components:
 
  * require.js (https://github.com/jrburke/requirejs)
 
-	Copyright (c) 2010-2011, The Dojo Foundation
+   Copyright (c) 2010-2011, The Dojo Foundation
 
- * codemirror.js (https://github.com/marijnh/CodeMirror)
+ * mocha.js (https://github.com/visionmedia/mocha)
+  
+   Copyright (c) 2011-2013 TJ Holowaychuk <tj@vision-media.ca>
 
-	Copyright (C) 2013 by Marijn Haverbeke <marijnh@gmail.com>
+ * chaijs https://github.com/chaijs
+   
+   Copyright (c) 2011-2013 Jake Luer jake@alogicalparadox.com
 
- * codemirror-javascript.js (https://github.com/marijnh/CodeMirror)
+ * sinon-chai
 
-	Copyright (C) 2013 by Marijn Haverbeke <marijnh@gmail.com>
+   Copyright © 2012–2013 Domenic Denicola <domenic@domenicdenicola.com>
+ 
+ * spin.js
+
+   Copyright (c) 2011 Felix Gnass [fgnass at neteye dot de]
+ 
+ * font-awesome http://fortawesome.github.io/Font-Awesome/
+
+   Copyright (c) 2013 Dave Gandy
+
+ * sandbox.js https://github.com/KlausTrainer/sandbox.js
+
+   (c) 2013 Klaus Trainer
+
+ * ace editor https://github.com/ajaxorg/ace
+
+   Copyright (c) 2010, Ajax.org B.V.
+
+ * src/fauxton/asserts/js/plugins/cloudant.pagingcollection.js
+
+   Copyright (c) 2014, Cloudant http://cloudant.com
+
+ * velocity.js (https://github.com/julianshapiro/velocity)
+
+   Copyright (c) 2014 Julian Shapiro
+
+* is_base_dir function in eunit_plugin.erl (https://github.com/ChicagoBoss/ChicagoBoss/blob/master/skel/priv/rebar/boss_plugin.erl)
+
+   Copyright (c) 2009-2011 Evan Miller
+
+* ?assertNotMatch in couch_eunit.hrl (https://github.com/richcarl/eunit/blob/master/include/eunit.hrl#L200-L219)
+
+   Copyright (C) 2004-2006 Mickaël Rémond, Richard Carlsson
+
+* src/fauxton/test/nightwatch_tests/custom-commands/waitForAttribute.js
+
+   Copyright (c) 2014 Dave Koo
+
+* moment.js
+
+   Copyright (c) 2011-2014 Tim Wood, Iskren Chernev, moment.js contributors
+
+* React.js
+
+  Copyright (c) 2013-2015, Facebook, Inc.
+
+* Flux.js
+
+  Copyright (c) 2014, Facebook, Inc. All rights reserved.
+
+* es5-shim.js
+
+  Copyright (C) 2009-2014 Kristopher Michael Kowal and contributors
+
+* CSS.escape (https://github.com/mathiasbynens/CSS.escape/)
+
+  Copyright Mathias Bynens
+
+* Papaparse.js
+
+  Copyright (c) 2015 Matthew Holt
+
+* react-bootstrap.js
+
+  Copyright (c) 2014 Stephen J. Collings, Matthew Honnibal, Pieter Vanderwerff
+
+* velocity-react
+
+  Copyright (c) 2015 Twitter, Inc.

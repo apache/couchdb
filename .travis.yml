@@ -1,12 +1,17 @@
 before_install:
-   - sudo apt-get update
-   - sudo apt-get install libicu-dev libmozjs-dev
-before_script: ./bootstrap && ./configure
-script: make distcheck
+   - sudo apt-get -y update
+   - sudo apt-get -y install libicu-dev libmozjs185-dev pkg-config help2man libcurl4-openssl-dev
+   - sudo apt-get -y install libtool automake autoconf autoconf-archive
+   - sudo apt-get -y install shunit2
+before_script: ./configure -c --disable-docs --disable-fauxton
+script:
+   - make check
 language: erlang
 otp_release:
-   - R15B02
-   - R15B01
-   - R15B
-   - R14B04
-   - R14B03
+   - 18.1
+   - 18.0
+   - 17.5
+   - R16B03-1
+git:
+  depth: 10
+cache: apt

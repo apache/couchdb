@@ -30,7 +30,7 @@ var Views = (function() {
         reductions[i] = null;
       }
     };
-    var reduce_line = Couch.toJSON(reductions);
+    var reduce_line = JSON.stringify(reductions);
     var reduce_length = reduce_line.length;
     // TODO make reduce_limit config into a number
     if (State.query_config && State.query_config.reduce_limit &&
@@ -63,7 +63,8 @@ var Views = (function() {
       // will kill the OS process. This is not normally what you want.
       throw(err);
     }
-    var message = "function raised exception " + err.toSource();
+    var message = "function raised exception " +
+                  (err.toSource ? err.toSource() : err.stack);
     if (doc) message += " with doc._id " + doc._id;
     log(message);
   };
@@ -108,19 +109,19 @@ var Views = (function() {
       Couch.recursivelySeal(doc);
 
       var buf = [];
-      for (var i = 0; i < State.funs.length; i++) {
+      for each (fun in State.funs) {
         map_results = [];
         try {
-          State.funs[i](doc);
-          buf.push(Couch.toJSON(map_results));
+          fun(doc);
+          buf.push(map_results);
         } catch (err) {
           handleViewError(err, doc);
           // If the error is not fatal, we treat the doc as if it
           // did not emit anything, by buffering an empty array.
-          buf.push("[]");
+          buf.push([]);
         }
       }
-      print("[" + buf.join(", ") + "]");
+      print(JSON.stringify(buf));
     }
   };
 })();

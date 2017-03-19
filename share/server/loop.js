@@ -10,17 +10,14 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-var sandbox = null;
-var filter_sandbox = null;
-
-function init_sandbox() {
+function create_sandbox() {
   try {
     // if possible, use evalcx (not always available)
-    sandbox = evalcx('');
+    var sandbox = evalcx('');
     sandbox.emit = Views.emit;
     sandbox.sum = Views.sum;
     sandbox.log = log;
-    sandbox.toJSON = Couch.toJSON;
+    sandbox.toJSON = JSON.stringify;
     sandbox.JSON = JSON;
     sandbox.provides = Mime.provides;
     sandbox.registerType = Mime.registerType;
@@ -29,26 +26,16 @@ function init_sandbox() {
     sandbox.getRow = Render.getRow;
     sandbox.isArray = isArray;
   } catch (e) {
-    //log(e.toSource());
+    var sandbox = {};
   }
-};
-init_sandbox();
-
-function init_filter_sandbox() {
-  try {
-    filter_sandbox = evalcx('');
-    for (var p in sandbox) {
-      if (sandbox.hasOwnProperty(p)) {
-        filter_sandbox[p] = sandbox[p];
-      }
-    }
-    filter_sandbox.emit = Filter.emit;
-  } catch(e) {
-    log(e.toSource());
-  }
+  return sandbox;
 };
 
-init_filter_sandbox();
+function create_filter_sandbox() {
+  var sandbox = create_sandbox();
+  sandbox.emit = Filter.emit;
+  return sandbox;
+};
 
 // Commands are in the form of json arrays:
 // ["commandname",..optional args...]\n
@@ -62,7 +49,8 @@ var DDoc = (function() {
     "filters"   : Filter.filter,
     "views"     : Filter.filter_view, 
     "updates"  : Render.update,
-    "validate_doc_update" : Validate.validate
+    "validate_doc_update" : Validate.validate,
+    "rewrites"  : Render.rewrite
   };
   var ddocs = {};
   return {
@@ -143,7 +131,7 @@ var Loop = function() {
     } else if (e.name) {
       respond(["error", e.name, e]);
     } else {
-      respond(["error","unnamed_error",e.toSource()]);
+      respond(["error","unnamed_error",e.toSource ? e.toSource() : e.stack]);
     }
   };
   while (line = readline()) {
@@ -163,5 +151,15 @@ var Loop = function() {
     }
   };
 };
+
+// Seal all the globals to prevent modification.
+seal(Couch, true);
+seal(JSON, true);
+seal(Mime, true);
+seal(Render, true);
+seal(Filter, true);
+seal(Views, true);
+seal(isArray, true);
+seal(log, true);
 
 Loop();

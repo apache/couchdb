@@ -1,0 +1,157 @@
+#!/usr/bin/env python
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may not
+# use this file except in compliance with the License. You may obtain a copy of
+# the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations under
+# the License.
+
+import glob
+import optparse as op
+import os
+import subprocess as sp
+import sys
+
+
+USAGE = "%prog [options] [command to run...]"
+TEST_PATH = os.path.dirname(os.path.abspath(__file__))
+ROOT_PATH = os.path.dirname(os.path.dirname(TEST_PATH))
+N = 3
+
+COUCHJS = "src/couch/priv/couchjs"
+
+SCRIPTS = """
+    test/javascript/json2.js
+    test/javascript/sha1.js
+    test/javascript/oauth.js
+    test/javascript/couch.js
+    test/javascript/replicator_db_inc.js
+    test/javascript/couch_test_runner.js
+    test/javascript/couch_http.js
+    test/javascript/test_setup.js
+    share/server/util.js
+""".split()
+
+RUNNER = "test/javascript/cli_runner.js"
+
+
+def mkformatter(tests):
+    longest = max(map(len, tests))
+    green = "\033[32m"
+    red = "\033[31m"
+    clear = "\033[0m"
+    if not sys.stderr.isatty():
+        green, read, clear = "", "", ""
+
+    def _colorized(passed):
+        if passed:
+            return green + "pass" + clear
+        else:
+            return red + "fail" + clear
+
+    def _fmt(test):
+        if isinstance(test, str):
+            padding = (longest - len(test)) * " "
+            sys.stderr.write(test + "   " + padding)
+            sys.stderr.flush()
+        elif isinstance(test, bool):
+            if test:
+                sys.stderr.write(_colorized(test) + os.linesep)
+            else:
+                sys.stderr.write(_colorized(test) + os.linesep)
+            sys.stderr.flush()
+
+    return _fmt
+
+
+def run_couchjs(test, fmt):
+    fmt(test)
+    cmd = [COUCHJS, "-H", "-T"] + \
+            ["-u", "test/javascript/couchdb.uri"] + SCRIPTS + [test, RUNNER]
+    p = sp.Popen(
+        cmd,
+        stdin=sp.PIPE,
+        stdout=sp.PIPE,
+        stderr=sys.stderr
+    )
+    while True:
+        line = p.stdout.readline()
+        if not line:
+            break
+        line = line.decode()
+        if line.strip() == "restart":
+            sys.stdout.write("reboot_nodes(ctx)" + os.linesep)
+            sys.stdout.flush()
+        else:
+            sys.stderr.write(line)
+    p.wait()
+    fmt(p.returncode == 0)
+    return p.returncode
+
+
+def options():
+    return [
+        op.make_option("-s", "--start", metavar="FILENAME", default=None,
+                       help="Start from the given filename if multiple files "
+                            "are passed")
+    ]
+
+
+def main():
+    parser = op.OptionParser(usage=USAGE, option_list=options())
+    opts, args = parser.parse_args()
+
+    tests = []
+    if not len(args):
+        args = ["test/javascript/tests"]
+    for name in args:
+        if os.path.isdir(name):
+            tests.extend(sorted(glob.glob(os.path.join(name, "*.js"))))
+        elif os.path.isfile(name):
+            tests.append(name)
+        else:
+            pname = os.path.join("test/javascript/tests", name)
+            if os.path.isfile(pname):
+                tests.append(pname)
+            elif os.path.isfile(pname + ".js"):
+                tests.append(pname + ".js")
+            else:
+                sys.stderr.write("Unknown test: " + name + os.linesep)
+                exit(1)
+
+    if opts.start is not None:
+        tmp = []
+        for name in tests:
+            if name >= opts.start:
+                tmp.append(name)
+        tests = tmp
+
+    fmt = mkformatter(tests)
+    passed = 0
+    failed = 0
+    for test in tests:
+        result = run_couchjs(test, fmt)
+        if result == 0:
+            passed += 1
+        else:
+            failed += 1
+
+    sys.stderr.write("======================================================="
+        + os.linesep)
+    sys.stderr.write("JavaScript tests complete." + os.linesep)
+    sys.stderr.write("  Failed: {}.  Skipped or passed: {}.".format(
+        failed, passed) + os.linesep)
+    exit(failed > 0)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass

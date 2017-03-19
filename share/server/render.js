@@ -57,26 +57,29 @@ var Mime = (function() {
   registerType("url_encoded_form", "application/x-www-form-urlencoded");
   // http://www.ietf.org/rfc/rfc4627.txt
   registerType("json", "application/json", "text/x-json");
-  
-  
+
+
+  var providesUsed = false;
   var mimeFuns = [];
+  var responseContentType = null;
+
   function provides(type, fun) {
-    Mime.providesUsed = true;
+    providesUsed = true;
     mimeFuns.push([type, fun]);
   };
 
   function resetProvides() {
     // set globals
-    Mime.providesUsed = false;
+    providesUsed = false;
     mimeFuns = [];
-    Mime.responseContentType = null;  
+    responseContentType = null;
   };
 
   function runProvides(req, ddoc) {
     var supportedMimes = [], bestFun, bestKey = null, accept = req.headers["Accept"];
     if (req.query && req.query.format) {
       bestKey = req.query.format;
-      Mime.responseContentType = mimesByKey[bestKey][0];
+      responseContentType = mimesByKey[bestKey][0];
     } else if (accept) {
       // log("using accept header: "+accept);
       mimeFuns.reverse().forEach(function(mimeFun) {
@@ -85,12 +88,12 @@ var Mime = (function() {
           supportedMimes = supportedMimes.concat(mimesByKey[mimeKey]);
         }
       });
-      Mime.responseContentType = Mimeparse.bestMatch(supportedMimes, accept);
-      bestKey = keysByMime[Mime.responseContentType];
+      responseContentType = Mimeparse.bestMatch(supportedMimes, accept);
+      bestKey = keysByMime[responseContentType];
     } else {
       // just do the first one
       bestKey = mimeFuns[0][0];
-      Mime.responseContentType = mimesByKey[bestKey][0];
+      responseContentType = mimesByKey[bestKey][0];
     }
 
     if (bestKey) {
@@ -113,12 +116,18 @@ var Mime = (function() {
     }
   };
 
-  
+
   return {
     registerType : registerType,
     provides : provides,
     resetProvides : resetProvides,
-    runProvides : runProvides
+    runProvides : runProvides,
+    providesUsed : function () {
+      return providesUsed;
+    },
+    responseContentType : function () {
+      return responseContentType;
+    }
   };
 })();
 
@@ -133,6 +142,7 @@ var Mime = (function() {
 ////
 
 var Render = (function() {
+  var new_header = false;
   var chunks = [];
   
   
@@ -140,19 +150,21 @@ var Render = (function() {
   var startResp = {};
   function start(resp) {
     startResp = resp || {};
+    new_header = true;
   };
 
   function sendStart() {
-    startResp = applyContentType((startResp || {}), Mime.responseContentType);
+    startResp = applyContentType((startResp || {}), Mime.responseContentType());
     respond(["start", chunks, startResp]);
     chunks = [];
     startResp = {};
+    new_header = false;
   }
 
   function applyContentType(resp, responseContentType) {
     resp["headers"] = resp["headers"] || {};
     if (responseContentType) {
-      resp["headers"]["Content-Type"] = resp["headers"]["Content-Type"] || responseContentType;    
+      resp["headers"]["Content-Type"] = resp["headers"]["Content-Type"] || responseContentType;
     }
     return resp;
   }
@@ -162,7 +174,13 @@ var Render = (function() {
   };
 
   function blowChunks(label) {
-    respond([label||"chunks", chunks]);
+    if (new_header) {
+      respond([label||"chunks", chunks, startResp]);
+      new_header = false;
+    }
+    else {
+      respond([label||"chunks", chunks]);
+    }
     chunks = [];
   };
 
@@ -233,12 +251,12 @@ var Render = (function() {
         resetList();
       }
 
-      if (Mime.providesUsed) {
+      if (Mime.providesUsed()) {
         var provided_resp = Mime.runProvides(args[1], ddoc) || {};
         provided_resp = maybeWrapResponse(provided_resp);
         resp.body = (resp.body || "") + chunks.join("");
         resp.body += provided_resp.body || "";
-        resp = applyContentType(resp, Mime.responseContentType);
+        resp = applyContentType(resp, Mime.responseContentType());
         resetList();
       }
 
@@ -252,7 +270,7 @@ var Render = (function() {
       if (args[0] === null && isDocRequestPath(args[1])) {
         throw(["error", "not_found", "document not found"]);
       } else {
-        renderError(e, fun.toSource());
+        renderError(e, fun.toString());
       }
     }
   };
@@ -272,7 +290,7 @@ var Render = (function() {
         throw(["error", "render_error", "undefined response from update function"]);      
       }
     } catch(e) {
-      renderError(e, fun.toSource());
+      renderError(e, fun.toString());
     }
   };
 
@@ -281,6 +299,7 @@ var Render = (function() {
     lastRow = false;
     chunks = [];
     startResp = {};
+    new_header = false;
   };
 
   function runList(listFun, ddoc, args) {
@@ -291,26 +310,47 @@ var Render = (function() {
       var req = args[1];
       var tail = listFun.apply(ddoc, args);
 
-      if (Mime.providesUsed) {
+      if (Mime.providesUsed()) {
         tail = Mime.runProvides(req, ddoc);
-      }    
+      }
       if (!gotRow) getRow();
       if (typeof tail != "undefined") {
         chunks.push(tail);
       }
       blowChunks("end");
     } catch(e) {
-      renderError(e, listFun.toSource());
+      renderError(e, listFun.toString());
     }
   };
 
-  function renderError(e, funSrc) {
+  function runRewrite(fun, ddoc, args) {
+      var result;
+      try {
+        result = fun.apply(ddoc, args);
+      } catch(error) {
+        renderError(error, fun.toString(), "rewrite_error");
+      }
+
+      if (!result) {
+        respond(["no_dispatch_rule"]);
+        return;
+      }
+
+      if (typeof result === "string") {
+        result = {path: result, method: args[0].method};
+      }
+      respond(["ok", result]);
+  }
+
+  function renderError(e, funSrc, errType) {
     if (e.error && e.reason || e[0] == "error" || e[0] == "fatal") {
       throw(e);
     } else {
-      var logMessage = "function raised error: "+e.toSource()+" \nstacktrace: "+e.stack;
+      var logMessage = "function raised error: " +
+                       (e.toSource ? e.toSource() : e.toString()) + " \n" +
+                       "stacktrace: " + e.stack;
       log(logMessage);
-      throw(["error", "render_error", logMessage]);
+      throw(["error", errType || "render_error", logMessage]);
     }
   };
 
@@ -335,6 +375,9 @@ var Render = (function() {
     },
     list : function(fun, ddoc, args) {
       runList(fun, ddoc, args);
+    },
+    rewrite : function(fun, ddoc, args) {
+      runRewrite(fun, ddoc, args);
     }
   };
 })();
