@@ -1606,8 +1606,10 @@ couchTests.replication = function(debug) {
       if (prevJoeUserDoc) {
         joeUserDoc._rev = prevJoeUserDoc._rev;
       }
-      TEquals(true, defaultUsersDb.save(joeUserDoc).ok);
-
+      if(i == 0) {
+        TEquals(true, defaultUsersDb.save(joeUserDoc).ok);
+        wait(5000);
+      }
       TEquals(true, CouchDB.login("joe", "erly").ok);
       TEquals('joe', CouchDB.session().userCtx.name);
 
@@ -1683,7 +1685,10 @@ couchTests.replication = function(debug) {
       if (prevJoeUserDoc) {
         joeUserDoc._rev = prevJoeUserDoc._rev;
       }
-      TEquals(true, defaultUsersDb.save(joeUserDoc).ok);
+      if(i == 0) {
+        TEquals(true, defaultUsersDb.save(joeUserDoc).ok);
+        wait(5000);
+      }
 
       TEquals(true, CouchDB.login("joe", "erly").ok);
       TEquals('joe', CouchDB.session().userCtx.name);
