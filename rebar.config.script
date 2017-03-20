@@ -39,7 +39,7 @@ DepDescs = [
 {couch_peruser,    "peruser",          "4eea9571171a5b41d832da32204a1122a01f4b0e"},
 {couch_tests,       "erlang-tests",    "37b3bfeb4b1a48a592456e67991362e155ed81e0"},
 {docs,             {url, "https://github.com/apache/couchdb-documentation"},
-                   "17b722ea3b6b295abf44281c0db1c5ba9ab459f0", [raw]},
+                   "2a2f88a54c97c47fda4ccb94f3e786185bbed199", [raw]},
 {ddoc_cache,       "ddoc-cache",       "c762e90a33ce3cda19ef142dd1120f1087ecd876"},
 {ets_lru,          "ets-lru",          "c05488c8b1d7ec1c3554a828e0c9bf2888932ed6"},
 {fabric,           "fabric",           "ce62148d0a4469751d8078cc223684da29b5d4a7"},
