@@ -15,7 +15,7 @@ couchTests.replication = function(debug) {
   if (debug) debugger;
 
   var host = CouchDB.host;
-  // as we change names during execution, do NOT use test_suite_db or a 
+  // as we change names during execution, do NOT use test_suite_db or a
   // pre-computed value like ''+sourceDb.name (compute only on use)
   var sourceDb;
   var targetDb;
@@ -60,17 +60,17 @@ couchTests.replication = function(debug) {
     return data;
   }
 
-  
+
   function runAllNodes(callback) {
     // new and fancy: clustered version: pull cluster_members and walk over all of them
-    var xhr = CouchDB.request("GET", "/_membership"); 
+    var xhr = CouchDB.request("GET", "/_membership");
     T(xhr.status === 200);
     JSON.parse(xhr.responseText).cluster_nodes.forEach(callback);
   }
 
   function runFirstNode(callback) {
     // new and fancy: clustered version: pull cluster_members and walk over all of them
-    var xhr = CouchDB.request("GET", "/_membership"); 
+    var xhr = CouchDB.request("GET", "/_membership");
     T(xhr.status === 200);
     var node = JSON.parse(xhr.responseText).cluster_nodes[0];
     return callback(node);
@@ -132,7 +132,7 @@ couchTests.replication = function(debug) {
         sourceDb.deleteDb();
       }
       sourceDb = new CouchDB(get_random_db_name() + "_src",{"X-Couch-Full-Commit":"false"});
-      sourceDb.createDb(); 
+      sourceDb.createDb();
     }
     for (var i = 0; i < docs.length; i++) {
       var doc = docs[i];
@@ -1892,6 +1892,6 @@ couchTests.replication = function(debug) {
   //usersDb.deleteDb();
   sourceDb.deleteDb();
   targetDb.deleteDb();
-  // (not sure what this is - cleanup after 'file not found tests' poss. - not harmful anyway) 
+  // (not sure what this is - cleanup after 'file not found tests' poss. - not harmful anyway)
   (new CouchDB("test_suite_db")).deleteDb();
 };
