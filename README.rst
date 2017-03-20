@@ -1,5 +1,7 @@
 HI HUMBEDOOH!
 
+ASFBot: dance
+
 Apache CouchDB README
 =====================
 
