@@ -1,3 +1,5 @@
+HI HUMBEDOOH!
+
 Apache CouchDB README
 =====================
 
