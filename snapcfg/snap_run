@@ -1,0 +1,9 @@
+#!/bin/sh
+
+export HOME=$SNAP_DATA
+export ERL_FLAGS="-couch_ini ${SNAP}/rel/couchdb/etc/default.ini ${SNAP}/rel/couchdb/etc/snap.ini ${SNAP_DATA}/local.ini"
+if [ ! -e ${SNAP_DATA}/local.ini ]; then
+    touch ${SNAP_DATA}/local.ini
+fi
+
+exec ${SNAP}/rel/couchdb/bin/couchdb

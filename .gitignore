@@ -4,7 +4,6 @@ config.erl
 install.mk
 rel/*.config
 rel/dev*
-rel/snap*
 rel/tmpdata
 src/
 /log
