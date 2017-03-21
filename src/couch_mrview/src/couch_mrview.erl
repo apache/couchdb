@@ -403,8 +403,7 @@ cleanup(Db) ->
 
 
 all_docs_fold(Db, #mrargs{keys=undefined}=Args, Callback, UAcc) ->
-    {ok, Info} = couch_db:get_db_info(Db),
-    Total = couch_util:get_value(doc_count, Info),
+    Total = get_total_rows(Db, Args),
     UpdateSeq = couch_db:get_update_seq(Db),
     Acc = #mracc{
         db=Db,
@@ -421,8 +420,7 @@ all_docs_fold(Db, #mrargs{keys=undefined}=Args, Callback, UAcc) ->
     {ok, Offset, FinalAcc} = couch_db:enum_docs(Db, fun map_fold/3, Acc, Opts),
     finish_fold(FinalAcc, [{total, Total}, {offset, Offset}]);
 all_docs_fold(Db, #mrargs{direction=Dir, keys=Keys0}=Args, Callback, UAcc) ->
-    {ok, Info} = couch_db:get_db_info(Db),
-    Total = couch_util:get_value(doc_count, Info),
+    Total = get_total_rows(Db, Args),
     UpdateSeq = couch_db:get_update_seq(Db),
     Acc = #mracc{
         db=Db,
@@ -652,6 +650,18 @@ make_meta(Args, UpdateSeq, Base) ->
     case Args#mrargs.update_seq of
         true -> {meta, Base ++ [{update_seq, UpdateSeq}]};
         _ -> {meta, Base}
+    end.
+
+
+get_total_rows(#db{local_tree = LocalTree} = Db, #mrargs{extra = Extra}) ->
+    case couch_util:get_value(namespace, Extra) of
+        <<"_local">> ->
+            FoldFun = fun(_, _, Acc) -> {ok, Acc + 1} end,
+            {ok, _, Total} = couch_btree:foldl(LocalTree, FoldFun, 0),
+            Total;
+        _ ->
+            {ok, Info} = couch_db:get_db_info(Db),
+            couch_util:get_value(doc_count, Info)
     end.
 
 
