@@ -24,10 +24,13 @@ init_db(Name, Type) ->
 
 init_db(Name, Type, Count) ->
     {ok, Db} = new_db(Name, Type),
-    Docs = make_docs(Count),
+    Docs = make_docs(Type, Count),
     save_docs(Db, Docs).
 
 
+new_db(Name, local) ->
+    couch_server:delete(Name, [?ADMIN_CTX]),
+    couch_db:create(Name, [?ADMIN_CTX]);
 new_db(Name, Type) ->
     couch_server:delete(Name, [?ADMIN_CTX]),
     {ok, Db} = couch_db:create(Name, [?ADMIN_CTX]),
@@ -41,7 +44,9 @@ save_docs(Db, Docs) ->
     couch_db:reopen(Db).
 
 
-make_docs(Count) ->
+make_docs(local, Count) ->
+    [local_doc(I) || I <- lists:seq(1, Count)];
+make_docs(_, Count) ->
     [doc(I) || I <- lists:seq(1, Count)].
 
 ddoc(changes) ->
@@ -115,5 +120,12 @@ ddoc(red) ->
 doc(Id) ->
     couch_doc:from_json_obj({[
         {<<"_id">>, list_to_binary(integer_to_list(Id))},
+        {<<"val">>, Id}
+    ]}).
+
+
+local_doc(Id) ->
+    couch_doc:from_json_obj({[
+        {<<"_id">>, list_to_binary(io_lib:format("_local/~b", [Id]))},
         {<<"val">>, Id}
     ]}).
