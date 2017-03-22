@@ -12,16 +12,16 @@
 
 DreyfusAppFile  = filename:join(filename:dirname(SCRIPT),
     "../dreyfus/src/dreyfus.app.src"),
-CursorFile = filename:join(filename:dirname(SCRIPT),
+RenameFile = filename:join(filename:dirname(SCRIPT),
     "src/mango_cursor_text.erl"),
-RenameFile  = filename:join(filename:dirname(SCRIPT),
-    "src/mango_cursor_text.nocompile"),
+CursorFile = filename:join(filename:dirname(SCRIPT),
+    "src/mango_cursor_text.erl.nocompile"),
 
 case filelib:is_regular(DreyfusAppFile) of
     true ->
-        ok;
+        file:rename(CursorFile, RenameFile);
     false ->
-        file:rename(CursorFile, RenameFile)
+        ok
 end,
 
 CONFIG.

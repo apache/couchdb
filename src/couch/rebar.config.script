@@ -136,7 +136,8 @@ AddConfig = [
     {port_specs, PortSpecs},
     {erl_opts, [
         {platform_define, "win32", 'WINDOWS'},
-        {d, 'COUCHDB_VERSION', Version}
+        {d, 'COUCHDB_VERSION', Version},
+        {i, "../"}
     ]},
     {eunit_compile_opts, [{platform_define, "win32", 'WINDOWS'}]}
 ].
@@ -144,4 +145,3 @@ AddConfig = [
 lists:foldl(fun({K, V}, CfgAcc) ->
     lists:keystore(K, 1, CfgAcc, {K, V})
 end, CONFIG, AddConfig).
-

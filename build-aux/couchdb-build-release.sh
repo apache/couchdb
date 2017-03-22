@@ -18,14 +18,15 @@ CURRENT_BRANCH=`git rev-parse --abbrev-ref HEAD`
 
 # copy sources over
 git archive $CURRENT_BRANCH | tar -xC $RELDIR/ -f -
-mkdir $RELDIR/src
 cd src/
 
 for repo in *; do
   cd $repo
-  mkdir ../../$RELDIR/src/$repo
-  git_ish=`git rev-parse --short HEAD`
-  git archive $git_ish | tar --exclude '*do_not_compile.erl' -xC ../../$RELDIR/src/$repo/ -f -
+  if [ -d ".git" ]; then
+    mkdir -p ../../$RELDIR/src/$repo
+    git_ish=`git rev-parse --short HEAD`
+    git archive $git_ish | tar --exclude '*do_not_compile.erl' -xC ../../$RELDIR/src/$repo/ -f -
+  fi
   set +e
   grep -rl '{vsn, git}' ../../$RELDIR/src/$repo/ | xargs sed -ie "s/{vsn, git}/{vsn, \"`git describe --always --tags`\"}/" 2> /dev/null
   set -e
