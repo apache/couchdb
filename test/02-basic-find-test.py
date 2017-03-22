@@ -237,8 +237,8 @@ class BasicFindTests(mango.UserDocsTests):
 
     def test_empty(self):
         docs = self.db.find({})
-        # 15 users and 9 design docs
-        assert len(docs) == 24
+        # 15 users 
+        assert len(docs) == 15
 
     def test_empty_subsel(self):
         docs = self.db.find({

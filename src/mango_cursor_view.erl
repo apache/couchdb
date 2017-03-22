@@ -20,6 +20,7 @@
 
 -export([
     handle_message/2,
+    handle_all_docs_message/2,
     composite_indexes/2,
     choose_best_index/2
 ]).
@@ -85,11 +86,12 @@ execute(#cursor{db = Db, index = Idx} = Cursor0, UserFun, UserAcc) ->
                 include_docs = true
             },
             Args = apply_opts(Cursor#cursor.opts, BaseArgs),
-            CB = fun ?MODULE:handle_message/2,
             {ok, LastCursor} = case mango_idx:def(Idx) of
                 all_docs ->
+                    CB = fun ?MODULE:handle_all_docs_message/2,
                     fabric:all_docs(Db, CB, Cursor, Args);
                 _ ->
+                    CB = fun ?MODULE:handle_message/2,
                     % Normal view
                     DDoc = ddocid(Idx),
                     Name = mango_idx:name(Idx),
@@ -168,6 +170,15 @@ handle_message(complete, Cursor) ->
     {ok, Cursor};
 handle_message({error, Reason}, _Cursor) ->
     {error, Reason}.
+
+
+handle_all_docs_message({row, Props}, Cursor) ->
+    case is_design_doc(Props) of
+        true -> {ok, Cursor};
+        false -> handle_message({row, Props}, Cursor)
+    end;
+handle_all_docs_message(Message, Cursor) ->
+    handle_message(Message, Cursor).
 
 
 handle_doc(#cursor{skip = S} = C, _) when S > 0 ->
@@ -253,4 +264,10 @@ doc_member(Db, RowProps, Opts) ->
                 Else ->
                     Else
             end
+    end.
+
+is_design_doc(RowProps) ->
+    case couch_util:get_value(id, RowProps) of
+        <<"_design/", _/binary>> -> true;
+        _ -> false
     end.
