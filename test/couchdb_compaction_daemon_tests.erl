@@ -220,7 +220,7 @@ spawn_compaction_monitor(DbName) ->
     {Pid, Ref} = spawn_monitor(fun() ->
         DaemonPid = whereis(couch_compaction_daemon),
         DbPid = couch_util:with_db(DbName, fun(Db) ->
-            couch_db:get_pid(Db)
+            Db#db.main_pid
         end),
         {ok, ViewPid} = couch_index_server:get_index(couch_mrview_index,
                 DbName, <<"_design/foo">>),
@@ -257,7 +257,7 @@ spawn_compaction_monitor(DbName) ->
     end),
     receive
         {Pid, started} -> ok;
-        {'DOWN', Ref, _, _, _} -> erlang:error(monitor_failure)
+        {'DOWN', Ref, _, _, Reason} -> erlang:error({monitor_failure, Reason})
     after ?TIMEOUT ->
         erlang:error({assertion_failed, [
                 {module, ?MODULE},
