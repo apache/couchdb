@@ -29,7 +29,7 @@ DepDescs = [
 {b64url,           "b64url",           "6895652d80f95cdf04efb14625abed868998f174"},
 {couch_log,        "couch-log",        "ad803f66dbd1900b67543259142875a6d03503ce"},
 {chttpd,           "chttpd",           "74002101513c03df74a4c25f3c892f5d003fa5da"},
-{couch,            "couch",            "c50a8cda6b0b669dbc987ebd76362620077822fe"},
+{couch,            "couch",            "f09e3210158feb3e193809e8fff24c0df0171c2e"},
 {couch_index,      "couch-index",      "f0a6854e578469612937a766632fdcdc52ee9c65"},
 {couch_mrview,     "couch-mrview",     "49533ef9d7a536003faabf9640861e0ecf45eb37"},
 {couch_replicator, "couch-replicator", "d00b981445c03622497088eb872059ab4f48b298"},
