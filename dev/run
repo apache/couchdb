@@ -58,7 +58,7 @@ def log(msg):
                 if log.verbose:
                     sys.stdout.write(chars)
                     sys.stdout.flush()
-            callargs = dict(zip(inspect.getargspec(func).args, args))
+            callargs = dict(list(zip(inspect.getargspec(func).args, args)))
             callargs.update(kwargs)
             print_('[ * ] ' + msg.format(**callargs) + ' ... ')
             try:
@@ -472,7 +472,7 @@ def cluster_setup_with_admin_party(ctx):
         conn.request('PUT', "/_nodes/%s@127.0.0.1" % node, body)
         resp = conn.getresponse()
         if resp.status not in (200, 201, 202, 409):
-            print('Failed to join %s into cluster: %s' % (node, resp.read()))
+            print(('Failed to join %s into cluster: %s' % (node, resp.read())))
             sys.exit(1)
     create_system_databases(host, 15984)
 

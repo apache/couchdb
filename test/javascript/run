@@ -42,7 +42,7 @@ RUNNER = "test/javascript/cli_runner.js"
 
 
 def mkformatter(tests):
-    longest = max(map(len, tests))
+    longest = max([len(x) for x in tests])
     green = "\033[32m"
     red = "\033[31m"
     clear = "\033[0m"
