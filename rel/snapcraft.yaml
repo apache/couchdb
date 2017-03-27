@@ -1,0 +1,47 @@
+name: couchdb
+version: 2.0.0
+summary: Document based database
+description: CouchDB is a database that completely embraces the web. Store your data with JSON documents. Access your documents and query your indexes with your web browser, via HTTP. Index, combine, and transform your documents with JavaScript. 
+confinement: strict
+grade: stable
+
+apps:
+    couchdb:
+        daemon: simple
+        command: snap_run
+        plugs: [network-bind, browser-support, mount-observe]
+    run:
+        command: snap_run
+        plugs: [network-bind, browser-support, mount-observe]
+parts:
+    couchdb: 
+        plugin: dump
+        source: .
+        organize:
+            snap.ini: couchdb/etc/snap.ini
+            snap_run: bin/snap_run
+        stage:
+            - couchdb
+            - bin
+        snap:
+            - couchdb
+            - bin
+    erlang:
+        plugin: nil
+        stage-packages:
+            - erlang-base-hipe
+            - erlang-crypto
+            - erlang-eunit
+            - erlang-inets
+            - erlang-os-mon
+            - erlang-public-key
+            - erlang-ssl
+            - erlang-syntax-tools
+            - erlang-tools
+            - erlang-xmerl
+            - libc6
+            - libcurl3
+            - libgcc1
+            - libicu55
+            - libmozjs185-1.0
+            - libstdc++6

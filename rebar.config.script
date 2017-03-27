@@ -44,7 +44,7 @@ DepDescs = [
 {ets_lru,          "ets-lru",          "c05488c8b1d7ec1c3554a828e0c9bf2888932ed6"},
 {fabric,           "fabric",           "ce62148d0a4469751d8078cc223684da29b5d4a7"},
 {fauxton,          {url, "https://github.com/apache/couchdb-fauxton"},
-                   {tag, "v1.1.10"}, [raw]},
+                   {tag, "v1.1.11"}, [raw]},
 {folsom,           "folsom",           "a5c95dec18227c977029fbd3b638966d98f17003"},
 {global_changes,   "global-changes",   "f6e4c5629a7d996d284e4489f1897c057823f846"},
 {ibrowse,          "ibrowse",          "4af2d408607874d124414ac45df1edbe3961d1cd"},
