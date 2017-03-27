@@ -46,13 +46,17 @@
 init() ->
     {ok, Socket} = gen_udp:open(0),
 
-    SysLogHost = config:get("log", "syslog_host"),
-    Host = case inet:getaddr(SysLogHost, inet) of
-        {ok, Address} when SysLogHost /= undefined ->
-            Address;
-        _ ->
-            undefined
-    end,
+    Host = case config:get("log", "syslog_host") of
+        undefined ->
+            undefined;
+        SysLogHost ->
+            case inet:getaddr(SysLogHost, inet) of
+                {ok, Address} ->
+                    Address;
+                _ ->
+                    undefined
+            end
+        end,
 
     {ok, #st{
         socket = Socket,
