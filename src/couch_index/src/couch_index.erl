@@ -240,8 +240,11 @@ handle_cast({new_state, NewIdxState}, State) ->
     couch_log:debug("Updated index for db: ~s idx: ~s seq: ~B", Args),
     Rest = send_replies(State#st.waiters, CurrSeq, NewIdxState),
     case State#st.committed of
-        true -> erlang:send_after(commit_delay(), self(), commit);
-        false -> ok
+        true ->
+            ok = couch_index_server:set_committing(self(), true),
+            erlang:send_after(commit_delay(), self(), commit);
+        false ->
+            ok
     end,
     {noreply, State#st{
         idx_state=NewIdxState,
@@ -297,6 +300,7 @@ handle_info(commit, State) ->
             % Commit the updates
             ok = Mod:commit(IdxState),
             couch_event:notify(DbName, {index_commit, IdxName}),
+            ok = couch_index_server:set_committing(self(), false),
             {noreply, State#st{committed=true}};
         _ ->
             % We can't commit the header because the database seq that's
@@ -305,6 +309,7 @@ handle_info(commit, State) ->
             % forever out of sync with the database. But a crash before we
             % commit these changes, no big deal, we only lose incremental
             % changes since last committal.
+            ok = couch_index_server:set_committing(self(), true),
             erlang:send_after(commit_delay(), self(), commit),
             {noreply, State}
     end;
@@ -385,8 +390,11 @@ commit_compacted(NewIdxState, State) ->
         false -> ok
     end,
     case State#st.committed of
-        true -> erlang:send_after(commit_delay(), self(), commit);
-        false -> ok
+        true ->
+            ok = couch_index_server:set_committing(self(), true),
+            erlang:send_after(commit_delay(), self(), commit);
+        false ->
+            ok
     end,
     State#st{
         idx_state=NewIdxState1,
