@@ -62,12 +62,14 @@ handle_call({compact, _}, _From, #st{pid=Pid}=State) when is_pid(Pid) ->
     {reply, {ok, Pid}, State};
 handle_call({compact, IdxState}, _From, #st{idx=Idx}=State) ->
     Pid = spawn_link(fun() -> compact(Idx, State#st.mod, IdxState) end),
+    ok = couch_index_server:set_compacting(Idx, true),
     {reply, {ok, Pid}, State#st{pid=Pid}};
 handle_call(cancel, _From, #st{pid=undefined}=State) ->
     {reply, ok, State};
 handle_call(cancel, _From, #st{pid=Pid}=State) ->
     unlink(Pid),
     exit(Pid, kill),
+    ok = couch_index_server:set_compacting(State#st.idx, false),
     {reply, ok, State#st{pid=undefined}};
 handle_call(is_running, _From, #st{pid=Pid}=State) when is_pid(Pid) ->
     {reply, true, State};
@@ -80,6 +82,7 @@ handle_cast(_Mesg, State) ->
 
 
 handle_info({'EXIT', Pid, normal}, #st{pid=Pid}=State) ->
+    ok = couch_index_server:set_compacting(State#st.idx, false),
     {noreply, State#st{pid=undefined}};
 handle_info({'EXIT', _Pid, normal}, State) ->
     {noreply, State};
