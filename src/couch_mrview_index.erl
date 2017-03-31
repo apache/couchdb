@@ -57,8 +57,7 @@ get(info, State) ->
         language = Lang,
         update_seq = UpdateSeq,
         purge_seq = PurgeSeq,
-        views = Views,
-        design_opts = Opts
+        views = Views
     } = State,
     {ok, FileSize} = couch_file:bytes(Fd),
     {ok, ExternalSize} = couch_mrview_util:calculate_external_size(Views),
@@ -69,11 +68,6 @@ get(info, State) ->
             couch_btree:size(LogBtree)
     end,
     ActiveSize = couch_btree:size(IdBtree) + LogBtSize + ExternalSize,
-
-    IncDesign = couch_util:get_value(<<"include_design">>, Opts, false),
-    LocalSeq = couch_util:get_value(<<"local_seq">>, Opts, false),
-    SeqIndexed = couch_util:get_value(<<"seq_indexed">>, Opts, false),
-    KeySeqIndexed = couch_util:get_value(<<"keyseq_indexed">>, Opts, false),
 
     UpdateOptions0 = get(update_options, State),
     UpdateOptions = [atom_to_binary(O, latin1) || O <- UpdateOptions0],
