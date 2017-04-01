@@ -1,0 +1,53 @@
+% Licensed under the Apache License, Version 2.0 (the "License"); you may not
+% use this file except in compliance with the License. You may obtain a copy of
+% the License at
+%
+%   http://www.apache.org/licenses/LICENSE-2.0
+%
+% Unless required by applicable law or agreed to in writing, software
+% distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+% WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+% License for the specific language governing permissions and limitations under
+% the License.
+
+{application, mem3, [
+    {description, "CouchDB Cluster Membership"},
+    {vsn, git},
+    {modules, [
+        mem3,
+        mem3_app,
+        mem3_httpd,
+        mem3_nodes,
+        mem3_rep,
+        mem3_shards,
+        mem3_sup,
+        mem3_sync,
+        mem3_sync_event,
+        mem3_sync_nodes,
+        mem3_sync_security,
+        mem3_util
+    ]},
+    {mod, {mem3_app, []}},
+    {registered, [
+        mem3_events,
+        mem3_nodes,
+        mem3_shards,
+        mem3_sync,
+        mem3_sync_nodes,
+        mem3_sup
+    ]},
+    {applications, [
+        kernel,
+        stdlib,
+        config,
+        sasl,
+        crypto,
+        mochiweb,
+        couch_epi,
+        couch,
+        rexi,
+        couch_log,
+        couch_event,
+        couch_stats
+    ]}
+]}.
