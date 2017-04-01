@@ -1,0 +1,147 @@
+%% Licensed under the Apache License, Version 2.0 (the "License"); you may not
+%% use this file except in compliance with the License. You may obtain a copy of
+%% the License at
+%%
+%%   http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing, software
+%% distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+%% WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+%% License for the specific language governing permissions and limitations under
+%% the License.
+
+CopyIfDifferent = fun(Path, Contents) ->
+    case filelib:is_file(Path) of
+        true ->
+            case file:read_file(Path) of
+                {ok, Contents} ->
+                    ok;
+                _ ->
+                    file:write_file(Path, Contents)
+            end;
+        false ->
+            file:write_file(Path, Contents)
+    end
+end,
+
+
+CouchJSName = case os:type() of
+    {win32, _} ->
+        "couchjs.exe";
+    _ ->
+        "couchjs"
+end,
+CouchJSPath = filename:join(["priv", CouchJSName]),
+Version = case os:getenv("COUCHDB_VERSION") of
+    false ->
+        string:strip(os:cmd("git describe --always"), right, $\n);
+    Version0 ->
+        string:strip(Version0, right)
+end,
+
+CouchConfig = case filelib:is_file(os:getenv("COUCHDB_CONFIG")) of
+    true ->
+        {ok, Result} = file:consult(os:getenv("COUCHDB_CONFIG")),
+        Result;
+    false ->
+        []
+end.
+
+ConfigH = [
+    {"SM185", ""},
+    {"HAVE_JS_GET_STRING_CHARS_AND_LENGTH", "1"},
+    {"JSSCRIPT_TYPE", "JSObject*"},
+    {"COUCHJS_NAME", "\"" ++ CouchJSName++ "\""},
+    {"PACKAGE", "\"apache-couchdb\""},
+    {"PACKAGE_BUGREPORT", "\"https://issues.apache.org/jira/browse/COUCHDB\""},
+    {"PACKAGE_NAME", "\"Apache CouchDB\""},
+    {"PACKAGE_STRING", "\"Apache CouchDB " ++ Version ++ "\""},
+    {"PACKAGE_VERSION", "\"" ++ Version ++ "\""}
+],
+
+CouchJSConfig = "priv/couch_js/config.h",
+ConfigSrc = [["#define ", K, " ", V, $\n] || {K, V} <- ConfigH],
+ConfigBin = iolist_to_binary(ConfigSrc),
+ok = CopyIfDifferent(CouchJSConfig, ConfigBin),
+
+%% TODO support curl on Windows
+{JS_CFLAGS, JS_LDFLAGS} = case lists:keyfind(with_curl, 1, CouchConfig) of
+    {with_curl, true} ->
+        case os:type() of
+            {win32, _} ->
+                {"/DHAVE_CURL /IC:\\relax\\curl\\include", "/LIBPATH:C:\\relax\\js-1.8.5\\js\\src /LIBPATH:C:\\Relax\\curl\\lib\\release-ssl mozjs185-1.0.lib libcurl_imp.lib"};
+            {unix, freebsd} ->
+                {"-DHAVE_CURL -I/usr/local/include", "-DHAVE_CURL -lmozjs185 -lcurl"};
+            _ ->
+                {"-DHAVE_CURL", "-DHAVE_CURL -lmozjs185 -lcurl"}
+        end;
+    _ ->
+        case os:type() of
+            {win32, _} ->
+                {"", "/LIBPATH:C:\\relax\\js-1.8.5\\js\\src mozjs185-1.0.lib"};
+            _ ->
+                {"", "-lmozjs185"}
+        end
+end,
+
+CouchJSSrc = ["priv/couch_js/*.c"],
+
+IcuPath = "priv/couch_icu_driver.so",
+IcuSrc = ["priv/icu_driver/*.c"],
+IcuEnv = [{"DRV_CFLAGS",  "$DRV_CFLAGS -DPIC -O2 -fno-common"},
+          {"DRV_LDFLAGS", "$DRV_LDFLAGS -lm -licuuc -licudata -licui18n -lpthread"}],
+IcuDarwinEnv = [{"CFLAGS", "-DXP_UNIX -I/usr/local/opt/icu4c/include"},
+                {"LDFLAGS", "-L/usr/local/opt/icu4c/lib"}],
+IcuBsdEnv = [{"CFLAGS", "-DXP_UNIX -I/usr/local/include"},
+             {"LDFLAGS", "-L/usr/local/lib"}],
+IcuWinEnv = [{"CFLAGS", "/DXP_WIN /IC:\\relax\\icu\\include"},
+             {"LDFLAGS", "/LIBPATH:C:\\relax\\icu\\lib64 icuin.lib icudt.lib icuuc.lib"}],
+
+ComparePath = "priv/couch_ejson_compare.so",
+CompareSrc = ["priv/couch_ejson_compare/*.c"],
+
+BaseSpecs = [
+        %% couchjs
+        {"darwin", CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", JS_CFLAGS ++ " -DXP_UNIX -I/usr/local/include/js"}, {"LDFLAGS", JS_LDFLAGS ++ " -L/usr/local/lib"}]}]},
+        {"linux",  CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", JS_CFLAGS ++ " -DXP_UNIX -I/usr/include/js"}, {"LDFLAGS", JS_LDFLAGS ++ " -lm"}]}]},
+        {"bsd",   CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", JS_CFLAGS ++ " -DXP_UNIX -I/usr/local/include/js"}, {"LDFLAGS", JS_LDFLAGS ++ " -L/usr/local/lib -lm"}]}]},
+        {"win32",  CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", JS_CFLAGS ++ " /DXP_WIN /IC:\\relax\\js-1.8.5\\js\\src"}, {"LDFLAGS", JS_LDFLAGS}]}]},
+        % ICU
+        {"darwin", IcuPath, IcuSrc, [{env, IcuEnv ++ IcuDarwinEnv}]},
+        {"linux",  IcuPath, IcuSrc, [{env, IcuEnv}]},
+        {"bsd",   IcuPath, IcuSrc, [{env, IcuEnv ++ IcuBsdEnv}]},
+        {"win32",  IcuPath, IcuSrc, [{env, IcuWinEnv}]},
+        % ejson_compare
+        {"darwin", ComparePath, CompareSrc, [{env, IcuEnv ++ IcuDarwinEnv}]},
+        {"linux",  ComparePath, CompareSrc, [{env, IcuEnv}]},
+        {"bsd",   ComparePath, CompareSrc, [{env, IcuEnv ++ IcuBsdEnv}]},
+        {"win32",  ComparePath, CompareSrc, [{env, IcuWinEnv}]}
+],
+
+SpawnSpec = [
+    {"priv/couchspawnkillable", ["priv/spawnkillable/*.c"]}
+],
+
+PortSpecs = case os:type() of
+    {win32, _} ->
+        BaseSpecs ++ SpawnSpec;
+    _ ->
+        {ok, CSK} = file:read_file("priv/spawnkillable/couchspawnkillable.sh"),
+        ok = CopyIfDifferent("priv/couchspawnkillable", CSK),
+        os:cmd("chmod +x priv/couchspawnkillable"),
+        BaseSpecs
+end,
+
+AddConfig = [
+    {port_specs, PortSpecs},
+    {erl_opts, [
+        {platform_define, "win32", 'WINDOWS'},
+        {d, 'COUCHDB_VERSION', Version}
+    ]},
+    {eunit_compile_opts, [{platform_define, "win32", 'WINDOWS'}]}
+].
+
+lists:foldl(fun({K, V}, CfgAcc) ->
+    lists:keystore(K, 1, CfgAcc, {K, V})
+end, CONFIG, AddConfig).
+

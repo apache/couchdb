@@ -1,0 +1,52 @@
+% Licensed under the Apache License, Version 2.0 (the "License"); you may not
+% use this file except in compliance with the License. You may obtain a copy of
+% the License at
+%
+%   http://www.apache.org/licenses/LICENSE-2.0
+%
+% Unless required by applicable law or agreed to in writing, software
+% distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+% WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+% License for the specific language governing permissions and limitations under
+% the License.
+
+{application, couch, [
+    {description, "Apache CouchDB"},
+    {vsn, git},
+    {registered, [
+        couch_db_update,
+        couch_db_update_notifier_sup,
+        couch_external_manager,
+        couch_httpd,
+        couch_primary_services,
+        couch_proc_manager,
+        couch_secondary_services,
+        couch_server,
+        couch_sup,
+        couch_task_status
+    ]},
+    {mod, {couch_app, []}},
+    {applications, [
+        % stdlib
+        kernel,
+        stdlib,
+        crypto,
+        sasl,
+        inets,
+        ssl,
+        os_mon,
+
+        % Upstream deps
+        ibrowse,
+        mochiweb,
+        oauth,
+
+        % ASF deps
+        couch_epi,
+        b64url,
+        couch_log,
+        couch_event,
+        ioq,
+        couch_stats
+    ]}
+]}.

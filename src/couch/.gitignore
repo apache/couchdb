@@ -1,0 +1,15 @@
+*.o
+*.so
+ebin/
+
+priv/couch_js/config.h
+priv/couchjs
+priv/couchspawnkillable
+priv/*.exp
+priv/*.lib
+priv/*.dll
+priv/*.exe
+vc120.pdb
+
+.rebar/
+.eunit
