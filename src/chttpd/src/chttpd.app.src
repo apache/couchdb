@@ -1,0 +1,46 @@
+% Licensed under the Apache License, Version 2.0 (the "License"); you may not
+% use this file except in compliance with the License. You may obtain a copy of
+% the License at
+%
+%   http://www.apache.org/licenses/LICENSE-2.0
+%
+% Unless required by applicable law or agreed to in writing, software
+% distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+% WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+% License for the specific language governing permissions and limitations under
+% the License.
+
+ {application, chttpd, [
+    {description, "HTTP interface for CouchDB cluster"},
+    {vsn, git},
+    {modules, [
+        chttpd,
+        chttpd_app,
+        chttpd_auth_cache,
+        chttpd_config_listener,
+        chttpd_db,
+        chttpd_external,
+        chttpd_misc,
+        chttpd_rewrite,
+        chttpd_show,
+        chttpd_sup,
+        chttpd_view
+    ]},
+    {registered, [
+        chttpd_sup,
+        chttpd,
+        chttpd_auth_cache,
+        chttpd_auth_cache_lru
+    ]},
+    {applications, [
+        kernel,
+        stdlib,
+        couch_log,
+        couch_stats,
+        config,
+        couch,
+        ets_lru,
+        fabric
+    ]},
+    {mod, {chttpd_app,[]}}
+]}.
