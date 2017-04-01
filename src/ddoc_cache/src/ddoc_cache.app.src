@@ -1,0 +1,44 @@
+% Licensed under the Apache License, Version 2.0 (the "License"); you may not
+% use this file except in compliance with the License. You may obtain a copy of
+% the License at
+%
+%   http://www.apache.org/licenses/LICENSE-2.0
+%
+% Unless required by applicable law or agreed to in writing, software
+% distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+% WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+% License for the specific language governing permissions and limitations under
+% the License.
+
+{application, ddoc_cache, [
+    {description, "Design Document Cache"},
+    {vsn, git},
+    {modules, [
+        ddoc_cache,
+        ddoc_cache_app,
+        ddoc_cache_opener,
+        ddoc_cache_sup,
+        ddoc_cache_util
+    ]},
+    {registered, [
+        ddoc_cache_lru,
+        ddoc_cache_opener
+    ]},
+    {applications, [
+        kernel,
+        stdlib,
+        crypto,
+        couch_event,
+        ets_lru,
+        mem3,
+        fabric,
+        couch_log,
+        couch_stats
+    ]},
+    {mod, {ddoc_cache_app, []}},
+    {env, [
+        {max_objects, unlimited},
+        {max_size, 104857600}, % 100M
+        {max_lifetime, 60000} % 1m
+    ]}
+]}.
