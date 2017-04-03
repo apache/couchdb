@@ -15,7 +15,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
--export([compact/3, swap_compacted/2]).
+-export([compact/3, swap_compacted/2, remove_compacted/1]).
 
 -record(acc, {
    btree = nil,
@@ -292,6 +292,13 @@ swap_compacted(OldState, NewState) ->
     erlang:demonitor(OldState#mrst.fd_monitor, [flush]),
     
     {ok, NewState#mrst{fd_monitor=Ref}}.
+
+
+remove_compacted(#mrst{sig = Sig, db_name = DbName} = State) ->
+    RootDir = couch_index_util:root_dir(),
+    CompactFName = couch_mrview_util:compaction_file(DbName, Sig),
+    ok = couch_file:delete(RootDir, CompactFName),
+    {ok, State}.
 
 
 -ifdef(TEST).

@@ -38,7 +38,8 @@ compaction_test_() ->
                 foreach,
                 fun setup/0, fun teardown/1,
                 [
-                    fun should_swap/1
+                    fun should_swap/1,
+                    fun should_remove/1
                 ]
             }
         }
@@ -67,6 +68,35 @@ should_swap(Db) ->
                 {assertion_failed,
                  [{module, ?MODULE}, {line, ?LINE},
                   {reason, "query failed"}]})
+        end
+    end).
+
+
+should_remove(Db) ->
+    ?_test(begin
+        DDoc = <<"_design/bar">>,
+        couch_mrview:query_view(Db, DDoc, <<"baz">>),
+        {ok, Pid} = couch_index_server:get_index(couch_mrview_index, Db, DDoc),
+        ok = couch_index:compact(Pid, []),
+        {ok, CPid} = couch_index:get_compactor_pid(Pid),
+        Info = recon:info(CPid),
+        Ancs = couch_util:get_value('$ancestors',
+            couch_util:get_value(dictionary,
+                couch_util:get_value(meta, Info))),
+        Links = couch_util:get_value(links,
+            couch_util:get_value(signals, Info)),
+        [CompactionPid] = Links -- Ancs,
+        MonRef = erlang:monitor(process, CompactionPid),
+        exit(CompactionPid, crash),
+        receive
+            {'DOWN', MonRef, process, _, crash} ->
+                ?assert(is_process_alive(Pid)),
+                ?assert(is_process_alive(CPid))
+        after ?TIMEOUT ->
+            erlang:error(
+                {assertion_failed,
+                 [{module, ?MODULE}, {line, ?LINE},
+                  {reason, "compaction didn't failed :/"}]})
         end
     end).
 
