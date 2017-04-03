@@ -81,6 +81,14 @@ handle_cast(_Mesg, State) ->
 
 handle_info({'EXIT', Pid, normal}, #st{pid=Pid}=State) ->
     {noreply, State#st{pid=undefined}};
+handle_info({'EXIT', Pid, Reason}, #st{pid = Pid} = State) ->
+    #st{idx = Idx, mod = Mod} = State,
+    {ok, IdxState} = gen_server:call(Idx, {compaction_failed, Reason}),
+    DbName = Mod:get(db_name, IdxState),
+    IdxName = Mod:get(idx_name, IdxState),
+    Args = [DbName, IdxName, Reason],
+    couch_log:error("Compaction failed for db: ~s idx: ~s reason: ~p", Args),
+    {noreply, State#st{pid = undefined}};
 handle_info({'EXIT', _Pid, normal}, State) ->
     {noreply, State};
 handle_info({'EXIT', Pid, _Reason}, #st{idx=Pid}=State) ->

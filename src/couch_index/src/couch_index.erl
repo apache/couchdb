@@ -192,7 +192,17 @@ handle_call({compacted, NewIdxState}, _From, State) ->
             end;
         false ->
             {reply, ok, commit_compacted(NewIdxState, State)}
-    end.
+    end;
+handle_call({compaction_failed, Reason}, _From, State) ->
+    #st{
+        mod = Mod,
+        idx_state = OldIdxState,
+        waiters = Waiters
+    } = State,
+    send_all(Waiters, Reason),
+    {ok, NewIdxState} = Mod:remove_compacted(OldIdxState),
+    NewState = State#st{idx_state = NewIdxState, waiters = []},
+    {reply, {ok, NewIdxState}, NewState}.
 
 handle_cast({trigger_update, UpdateSeq}, State) ->
     #st{
