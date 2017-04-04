@@ -1,6 +1,16 @@
 Apache CouchDB README
 =====================
 
+Travis CI master build status: |travisci|
+
+.. |travisci| image:: https://travis-ci.org/apache/couchdb.svg?branch=master
+    :target: https://travis-ci.org/apache/couchdb
+
+Jenkins CI master build status: |jenkins|
+
+.. |jenkins| image:: https://builds.apache.org/buildStatus/icon?job=CouchDB
+    :target: https://builds.apache.org/job/CouchDB/
+
 Installation
 ------------
 
