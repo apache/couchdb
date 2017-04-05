@@ -54,7 +54,7 @@ parts:
 
     snap-config:
         plugin: dump
-        source: ./snapcfg/
+        source: ./snap/
         organize:
             snap.ini: rel/couchdb/etc/snap.ini
             snap_run: rel/couchdb/bin/snap_run
