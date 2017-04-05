@@ -15,7 +15,7 @@
 
 
 %% API
--export([start_link/2, run/2, cancel/1, is_running/1]).
+-export([start_link/2, run/2, cancel/1, is_running/1, get_compacting_pid/1]).
 
 %% gen_server callbacks
 -export([init/1, terminate/2, code_change/3]).
@@ -47,6 +47,8 @@ cancel(Pid) ->
 is_running(Pid) ->
     gen_server:call(Pid, is_running).
 
+get_compacting_pid(Pid) ->
+    gen_server:call(Pid, get_compacting_pid).
 
 init({Index, Module}) ->
     process_flag(trap_exit, true),
@@ -69,6 +71,8 @@ handle_call(cancel, _From, #st{pid=Pid}=State) ->
     unlink(Pid),
     exit(Pid, kill),
     {reply, ok, State#st{pid=undefined}};
+handle_call(get_compacting_pid, _From, #st{pid=Pid}=State) ->
+    {reply, {ok, Pid}, State};
 handle_call(is_running, _From, #st{pid=Pid}=State) when is_pid(Pid) ->
     {reply, true, State};
 handle_call(is_running, _From, State) ->
