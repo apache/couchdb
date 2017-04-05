@@ -34,7 +34,7 @@
 create(Db, Indexes, Selector, Opts) ->
     FieldRanges = mango_idx_view:field_ranges(Selector),
     Composited = composite_indexes(Indexes, FieldRanges),
-    {Index, IndexRanges} = choose_best_index(Db, Composited),
+    {Index, IndexRanges, _ColPrefixLength} = choose_best_index(Db, Composited),
 
     Limit = couch_util:get_value(limit, Opts, mango_opts:default_limit()),
     Skip = couch_util:get_value(skip, Opts, 0),
@@ -107,10 +107,14 @@ execute(#cursor{db = Db, index = Idx} = Cursor0, UserFun, UserAcc) ->
 % check FieldRanges for a, b, c, and d and return
 % the longest prefix of columns found.
 composite_indexes(Indexes, FieldRanges) ->
-    lists:foldl(fun(Idx, Acc) ->
+    FieldKeys = [Key || {Key, _} <- FieldRanges],
+    SortedIndexes = lists:foldl(fun(Idx, Acc) ->
         Cols = mango_idx:columns(Idx),
         Prefix = composite_prefix(Cols, FieldRanges),
-        [{Idx, Prefix} | Acc]
+        % create a ColPrefixLength based on how close the number of fields
+        % the index has to the number of Prefixes the index can use
+        ColPrefixLength = abs(length(Cols) - length(FieldKeys)),
+        [{Idx, Prefix, ColPrefixLength} | Acc]
     end, [], Indexes).
 
 
@@ -135,14 +139,13 @@ composite_prefix([Col | Rest], Ranges) ->
 % reduce view read on each index with the ranges to find
 % the one that has the fewest number of rows or something.
 choose_best_index(_DbName, IndexRanges) ->
-    Cmp = fun({A1, A2}, {B1, B2}) ->
-        case length(A2) - length(B2) of
+    Cmp = fun({IdxA, PrefixA, ColPrefixLengthA}, {IdxB, PrefixB, ColPrefixLengthB}) ->
+        case ColPrefixLengthA - ColPrefixLengthB of
             N when N < 0 -> true;
             N when N == 0 ->
-                % This is a really bad sort and will end
-                % up preferring indices based on the
-                % (dbname, ddocid, view_name) triple
-                A1 =< B1;
+                % We have no other way to choose, so at this point 
+                % select index based on (dbname, ddocid, view_name) triple
+                IdxA =< IdxB;
             _ ->
                 false
         end
