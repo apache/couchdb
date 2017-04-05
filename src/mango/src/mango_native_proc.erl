@@ -175,7 +175,7 @@ get_text_entries0(IdxProps, Doc) ->
     Fields = if not DefaultEnabled -> Fields0; true ->
         add_default_text_field(Fields0)
     end,
-    FieldNames = get_field_names(Fields, []),
+    FieldNames = get_field_names(Fields),
     Converted = convert_text_fields(Fields),
     FieldNames ++ Converted.
 
@@ -257,15 +257,11 @@ add_default_text_field([_ | Rest], Acc) ->
 
 
 %% index of all field names
-get_field_names([], FAcc) ->
-    FAcc;
-get_field_names([{Name, _Type, _Value} | Rest], FAcc) ->
-    case lists:member([<<"$fieldnames">>, Name, []], FAcc) of
-        true ->
-            get_field_names(Rest, FAcc);
-        false ->
-            get_field_names(Rest, [[<<"$fieldnames">>, Name, []] | FAcc])
-    end.
+get_field_names(Fields) ->
+    FieldNameSet = lists:foldl(fun({Name, _, _}, Set) ->
+        gb_sets:add([<<"$fieldnames">>, Name, []], Set)
+    end, gb_sets:new(), Fields),
+    gb_sets:to_list(FieldNameSet).
 
 
 convert_text_fields([]) ->
