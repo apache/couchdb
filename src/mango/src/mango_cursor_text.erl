@@ -12,6 +12,8 @@
 
 -module(mango_cursor_text).
 
+-ifdef(HAVE_DREYFUS).
+
 -export([
     create/4,
     explain/1,
@@ -304,3 +306,5 @@ get_json_docs(DbName, Hits) ->
                 {Sort, not_found}
         end
     end, Hits).
+
+-endif.

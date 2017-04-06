@@ -10,18 +10,15 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-DreyfusAppFile  = filename:join(filename:dirname(SCRIPT),
-    "../dreyfus/src/dreyfus.app.src"),
-RenameFile = filename:join(filename:dirname(SCRIPT),
-    "src/mango_cursor_text.erl"),
-CursorFile = filename:join(filename:dirname(SCRIPT),
-    "src/mango_cursor_text.erl.nocompile"),
 
-case filelib:is_regular(DreyfusAppFile) of
-    true ->
-        file:rename(CursorFile, RenameFile);
-    false ->
-        ok
-end,
+HaveDreyfus = code:lib_dir(dreyfus) /= {error, bad_name}.
 
-CONFIG.
+if not HaveDreyfus -> CONFIG; true ->
+    CurrOpts = case lists:keyfind(erl_opts, 1, CONFIG) of
+        {erl_opts, Opts} -> Opts;
+        false -> []
+    end,
+    NewOpts = [{d, 'HAVE_DREYFUS'} | CurrOpts],
+    lists:keystore(erl_opts, 1, CONFIG, {erl_opts, NewOpts})
+end.
+
