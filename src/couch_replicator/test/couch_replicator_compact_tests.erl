@@ -281,7 +281,7 @@ reopen_db(DbName) ->
     {ok, Db}.
 
 compact_db(Type, #db{name = Name}) ->
-    {ok, Db} = couch_db:open_int(Name, []),
+    {ok, Db} = couch_db:open_int(Name, [?ADMIN_CTX]),
     {ok, CompactPid} = couch_db:start_compact(Db),
     MonRef = erlang:monitor(process, CompactPid),
     receive

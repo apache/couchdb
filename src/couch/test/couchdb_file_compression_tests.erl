@@ -174,7 +174,7 @@ refresh_index(DbName) ->
 
 compact_db(DbName) ->
     DiskSizeBefore = db_disk_size(DbName),
-    {ok, Db} = couch_db:open_int(DbName, []),
+    {ok, Db} = couch_db:open_int(DbName, [?ADMIN_CTX]),
     {ok, _CompactPid} = couch_db:start_compact(Db),
     wait_compaction(DbName, "database", ?LINE),
     ok = couch_db:close(Db),

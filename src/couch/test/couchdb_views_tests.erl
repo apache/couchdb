@@ -582,7 +582,7 @@ restore_backup_db_file(DbName) ->
     end, ?TIMEOUT, ?DELAY).
 
 compact_db(DbName) ->
-    {ok, Db} = couch_db:open_int(DbName, []),
+    {ok, Db} = couch_db:open_int(DbName, [?ADMIN_CTX]),
     {ok, _} = couch_db:start_compact(Db),
     ok = couch_db:close(Db),
     wait_db_compact_done(DbName, 20).
