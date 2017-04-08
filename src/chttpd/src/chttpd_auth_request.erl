@@ -61,6 +61,10 @@ authorize_request_int(#httpd{path_parts=[_DbName], method='PUT'}=Req) ->
     require_admin(Req);
 authorize_request_int(#httpd{path_parts=[_DbName], method='DELETE'}=Req) ->
     require_admin(Req);
+authorize_request_int(#httpd{path_parts=[_DbName, <<"_compact">>]}=Req) ->
+    require_admin(Req);
+authorize_request_int(#httpd{path_parts=[_DbName, <<"_view_cleanup">>]}=Req) ->
+    require_admin(Req);
 authorize_request_int(#httpd{path_parts=[_DbName|_]}=Req) ->
     db_authorization_check(Req).
 
