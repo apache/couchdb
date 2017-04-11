@@ -51,7 +51,7 @@ go(DbName, DDoc, IndexName, #index_query_args{}=QueryArgs) ->
     LiveNodes = [node() | nodes()],
     LiveShards = [S || #shard{node=Node} = S <- Shards, lists:member(Node, LiveNodes)],
     Bookmark1 = dreyfus_bookmark:add_missing_shards(Bookmark0, LiveShards),
-    Counters = lists:flatmap(fun({#shard{name=Name, node=N} = Shard, After}) ->
+    Counters0 = lists:flatmap(fun({#shard{name=Name, node=N} = Shard, After}) ->
         QueryArgs1 = dreyfus_util:export(QueryArgs#index_query_args{
             bookmark = After
         }),
@@ -59,15 +59,16 @@ go(DbName, DDoc, IndexName, #index_query_args{}=QueryArgs) ->
         true ->
             Ref = rexi:cast(N, {dreyfus_rpc, search,
                                 [Name, DDoc, IndexName, QueryArgs1]}),
-            [{Shard#shard{ref = Ref}, nil}];
+            [Shard#shard{ref = Ref}];
         false ->
             lists:map(fun(#shard{name=Name2, node=N2} = NewShard) ->
                 Ref = rexi:cast(N2, {dreyfus_rpc, search,
                                      [Name2, DDoc, IndexName, QueryArgs1]}),
-                {NewShard#shard{ref = Ref}, nil}
+                NewShard#shard{ref = Ref}
             end, find_replacement_shards(Shard, LiveShards))
         end
     end, Bookmark1),
+    Counters = fabric_dict:init(Counters0, nil),
     QueryArgs2 = QueryArgs#index_query_args{
         bookmark = Bookmark1
     },
