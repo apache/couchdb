@@ -40,7 +40,7 @@
 
 
 get_view(Db, DDoc, ViewName, Args0) ->
-    {ok, Pid, Args2} = get_view_index_pid(Db, DDoc, ViewName, Args0),
+    {ok, Pid, Mon, Args2} = get_view_index_pid(Db, DDoc, ViewName, Args0),
     DbUpdateSeq = couch_util:with_db(Db, fun(WDb) ->
         couch_db:get_update_seq(WDb)
     end),
@@ -51,9 +51,14 @@ get_view(Db, DDoc, ViewName, Args0) ->
         {ok, _} = Resp -> Resp;
         Error -> throw(Error)
     end,
+    ok = couch_index_server:close(Mon),
     Ref = erlang:monitor(process, State#mrst.fd),
     if Args2#mrargs.update == lazy ->
-        spawn(fun() -> catch couch_index:get_state(Pid, DbUpdateSeq) end);
+        spawn(fun() ->
+            {ok, Pid2, Mon2} = couch_index_server:get_index(?MOD, Db, DDoc),
+            catch couch_index:get_state(Pid2, DbUpdateSeq),
+            ok = couch_index_server:close(Mon2)
+        end);
         true -> ok
     end,
     #mrst{language=Lang, views=Views} = State,
