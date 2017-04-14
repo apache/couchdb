@@ -285,10 +285,10 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 
-handle_config_change("couchdb", "index_dir", RootDir, _, State) ->
-    {ok, State#st{root_dir=RootDir}};
-handle_config_change("couchdb", "view_index_dir", RootDir, _, State) ->
-    {ok, State#st{root_dir=RootDir}};
+handle_config_change("couchdb", "index_dir", RootDir, _, #st{root_dir=RootDir}=State) ->
+    {ok, State};
+handle_config_change("couchdb", "view_index_dir", RootDir, _, #st{root_dir=RootDir}=State) ->
+    {ok, State};
 handle_config_change("couchdb", "index_dir", _, _, _) ->
     exit(whereis(couch_index_server), config_change),
     remove_handler;
