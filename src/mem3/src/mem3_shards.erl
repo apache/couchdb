@@ -37,7 +37,10 @@
 -define(DBS, mem3_dbs).
 -define(SHARDS, mem3_shards).
 -define(ATIMES, mem3_atimes).
+-define(OPENERS, mem3_openers).
 -define(RELISTEN_DELAY, 5000).
+-define(WRITE_TIMEOUT, 1000).
+-define(WRITE_IDLE_TIMEOUT, 30000).
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -183,13 +186,14 @@ handle_config_terminate(_Server, _Reason, _State) ->
 init([]) ->
     ets:new(?SHARDS, [
         bag,
-        protected,
+        public,
         named_table,
         {keypos,#shard.dbname},
         {read_concurrency, true}
     ]),
     ets:new(?DBS, [set, protected, named_table]),
     ets:new(?ATIMES, [ordered_set, protected, named_table]),
+    ets:new(?OPENERS, [bag, public, named_table]),
     ok = config:listen_for_changes(?MODULE, nil),
     SizeList = config:get("mem3", "shard_cache_size", "25000"),
     UpdateSeq = get_update_seq(),
@@ -212,18 +216,20 @@ handle_cast({cache_hit, DbName}, St) ->
     couch_stats:increment_counter([mem3, shard_cache, hit]),
     cache_hit(DbName),
     {noreply, St};
-handle_cast({cache_insert, DbName, Shards, UpdateSeq}, St) ->
-    couch_stats:increment_counter([mem3, shard_cache, miss]),
+handle_cast({cache_insert, DbName, Writer, UpdateSeq}, St) ->
     NewSt = case UpdateSeq < St#st.update_seq of
-        true -> St;
-        false -> cache_free(cache_insert(St, DbName, Shards))
+        true ->
+            Writer ! cancel,
+            St;
+        false ->
+            cache_free(cache_insert(St, DbName, Writer))
     end,
     {noreply, NewSt};
 handle_cast({cache_remove, DbName}, St) ->
     couch_stats:increment_counter([mem3, shard_cache, eviction]),
     {noreply, cache_remove(St, DbName)};
-handle_cast({cache_insert_change, DbName, Shards, UpdateSeq}, St) ->
-    Msg = {cache_insert, DbName, Shards, UpdateSeq},
+handle_cast({cache_insert_change, DbName, Writer, UpdateSeq}, St) ->
+    Msg = {cache_insert, DbName, Writer, UpdateSeq},
     {noreply, NewSt} = handle_cast(Msg, St),
     {noreply, NewSt#st{update_seq = UpdateSeq}};
 handle_cast({cache_remove_change, DbName, UpdateSeq}, St) ->
@@ -328,7 +334,9 @@ changes_callback({change, {Change}, _}, _) ->
                     [DbName, Reason]);
             {Doc} ->
                 Shards = mem3_util:build_ordered_shards(DbName, Doc),
-                Msg = {cache_insert_change, DbName, Shards, Seq},
+                Writer = spawn_shard_writer(DbName, Shards),
+                ets:insert(?OPENERS, {DbName, Writer}),
+                Msg = {cache_insert_change, DbName, Writer, Seq},
                 gen_server:cast(?MODULE, Msg),
                 [create_if_missing(mem3:name(S)) || S
                     <- Shards, mem3:node(S) =:= node()]
@@ -340,6 +348,7 @@ changes_callback(timeout, _) ->
     ok.
 
 load_shards_from_disk(DbName) when is_binary(DbName) ->
+    couch_stats:increment_counter([mem3, shard_cache, miss]),
     X = ?l2b(config:get("mem3", "shards_db", "_dbs")),
     {ok, Db} = mem3_util:ensure_exists(X),
     try
@@ -353,7 +362,18 @@ load_shards_from_db(#db{} = ShardDb, DbName) ->
     {ok, #doc{body = {Props}}} ->
         Seq = couch_db:get_update_seq(ShardDb),
         Shards = mem3_util:build_ordered_shards(DbName, Props),
-        gen_server:cast(?MODULE, {cache_insert, DbName, Shards, Seq}),
+        case maybe_spawn_shard_writer(DbName, Shards) of
+            Writer when is_pid(Writer) ->
+                case ets:insert_new(?OPENERS, {DbName, Writer}) of
+                    true ->
+                        Msg = {cache_insert, DbName, Writer, Seq},
+                        gen_server:cast(?MODULE, Msg);
+                    false ->
+                        Writer ! cancel
+                end;
+            ignore ->
+                ok
+        end,
         Shards;
     {not_found, _} ->
         erlang:error(database_does_not_exist, ?b2l(DbName))
@@ -384,10 +404,10 @@ create_if_missing(Name) ->
         end
     end.
 
-cache_insert(#st{cur_size=Cur}=St, DbName, Shards) ->
+cache_insert(#st{cur_size=Cur}=St, DbName, Writer) ->
     NewATime = now(),
     true = ets:delete(?SHARDS, DbName),
-    true = ets:insert(?SHARDS, Shards),
+    flush_write(DbName, Writer),
     case ets:lookup(?DBS, DbName) of
         [{DbName, ATime}] ->
             true = ets:delete(?ATIMES, ATime),
@@ -437,6 +457,43 @@ cache_clear(St) ->
     true = ets:delete_all_objects(?SHARDS),
     true = ets:delete_all_objects(?ATIMES),
     St#st{cur_size=0}.
+
+maybe_spawn_shard_writer(DbName, Shards) ->
+    case ets:member(?OPENERS, DbName) of
+        true ->
+            ignore;
+        false ->
+            spawn_shard_writer(DbName, Shards)
+    end.
+
+spawn_shard_writer(DbName, Shards) ->
+    erlang:spawn(fun() -> shard_writer(DbName, Shards) end).
+
+shard_writer(DbName, Shards) ->
+    try
+        receive
+            write ->
+                true = ets:insert(?SHARDS, Shards);
+            cancel ->
+                ok
+        after ?WRITE_IDLE_TIMEOUT ->
+            ok
+        end
+    after
+        true = ets:delete(?OPENERS, {DbName, self()})
+    end.
+
+flush_write(DbName, Writer) ->
+    Ref = erlang:monitor(process, Writer),
+    Writer ! write,
+    receive
+        {'DOWN', Ref, _, _, normal} ->
+            ok;
+        {'DOWN', Ref, _, _, Error} ->
+            erlang:exit({mem3_shards_bad_write, Error})
+    after ?WRITE_TIMEOUT ->
+        erlang:exit({mem3_shards_write_timeout, DbName})
+    end.
 
 filter_shards_by_name(Name, Shards) ->
     filter_shards_by_name(Name, [], Shards).
