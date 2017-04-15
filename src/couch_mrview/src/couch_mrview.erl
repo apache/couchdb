@@ -389,7 +389,7 @@ compact(Db, DDoc, Opts) ->
 
 cancel_compaction(Db, DDoc) ->
     {ok, IPid} = couch_index_server:get_index(couch_mrview_index, Db, DDoc),
-    {ok, CPid} = couch_index:get_compactor_pid(IPid),
+    {ok, CPid} = gen_server:call(IPid, get_compactor_pid),
     ok = couch_index_compactor:cancel(CPid),
 
     % Cleanup the compaction file if it exists
