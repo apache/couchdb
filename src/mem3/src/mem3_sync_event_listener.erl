@@ -223,7 +223,7 @@ setup() ->
 
     ok = meck:new(config_notifier, [passthrough]),
     ok = meck:expect(config_notifier, handle_event, [
-        {[{'_', '_', "error", '_'}, '_'], meck:raise(throw, raised_error)},
+        {[{'_', '_', '_', "error", '_'}, '_'], meck:raise(throw, raised_error)},
         {['_', '_'], meck:passthrough()}
     ]),
 
