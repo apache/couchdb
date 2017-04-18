@@ -480,7 +480,7 @@ shard_writer(DbName, Shards, IdleTimeout) ->
             ok
         end
     after
-        true = ets:delete(?OPENERS, {DbName, self()})
+        true = ets:delete_object(?OPENERS, {DbName, self()})
     end.
 
 flush_write(DbName, Writer, WriteTimeout) ->
