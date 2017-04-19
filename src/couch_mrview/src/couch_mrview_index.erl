@@ -16,7 +16,7 @@
 -export([get/2]).
 -export([init/2, open/2, close/1, reset/1, delete/1]).
 -export([start_update/3, purge/4, process_doc/3, finish_update/1, commit/1]).
--export([compact/3, swap_compacted/2]).
+-export([compact/3, swap_compacted/2, remove_compacted/1]).
 -export([index_file_exists/1]).
 
 -include_lib("couch/include/couch_db.hrl").
@@ -182,6 +182,10 @@ compact(Db, State, Opts) ->
 
 swap_compacted(OldState, NewState) ->
     couch_mrview_compactor:swap_compacted(OldState, NewState).
+
+
+remove_compacted(State) ->
+    couch_mrview_compactor:remove_compacted(State).
 
 
 index_file_exists(State) ->

@@ -15,7 +15,7 @@
 
 
 %% API
--export([start_link/2, run/2, cancel/1, is_running/1]).
+-export([start_link/2, run/2, cancel/1, is_running/1, get_compacting_pid/1]).
 
 %% gen_server callbacks
 -export([init/1, terminate/2, code_change/3]).
@@ -47,6 +47,8 @@ cancel(Pid) ->
 is_running(Pid) ->
     gen_server:call(Pid, is_running).
 
+get_compacting_pid(Pid) ->
+    gen_server:call(Pid, get_compacting_pid).
 
 init({Index, Module}) ->
     process_flag(trap_exit, true),
@@ -69,6 +71,8 @@ handle_call(cancel, _From, #st{pid=Pid}=State) ->
     unlink(Pid),
     exit(Pid, kill),
     {reply, ok, State#st{pid=undefined}};
+handle_call(get_compacting_pid, _From, #st{pid=Pid}=State) ->
+    {reply, {ok, Pid}, State};
 handle_call(is_running, _From, #st{pid=Pid}=State) when is_pid(Pid) ->
     {reply, true, State};
 handle_call(is_running, _From, State) ->
@@ -81,6 +85,14 @@ handle_cast(_Mesg, State) ->
 
 handle_info({'EXIT', Pid, normal}, #st{pid=Pid}=State) ->
     {noreply, State#st{pid=undefined}};
+handle_info({'EXIT', Pid, Reason}, #st{pid = Pid} = State) ->
+    #st{idx = Idx, mod = Mod} = State,
+    {ok, IdxState} = gen_server:call(Idx, {compaction_failed, Reason}),
+    DbName = Mod:get(db_name, IdxState),
+    IdxName = Mod:get(idx_name, IdxState),
+    Args = [DbName, IdxName, Reason],
+    couch_log:error("Compaction failed for db: ~s idx: ~s reason: ~p", Args),
+    {noreply, State#st{pid = undefined}};
 handle_info({'EXIT', _Pid, normal}, State) ->
     {noreply, State};
 handle_info({'EXIT', Pid, _Reason}, #st{idx=Pid}=State) ->
