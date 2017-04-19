@@ -95,6 +95,7 @@ handle_info({'EXIT', Pid, Reason}, #st{pid = Pid} = State) ->
     IdxName = Mod:get(idx_name, IdxState),
     Args = [DbName, IdxName, Reason],
     couch_log:error("Compaction failed for db: ~s idx: ~s reason: ~p", Args),
+    ok = couch_index_server:set_compacting(State#st.idx, false),
     {noreply, State#st{pid = undefined}};
 handle_info({'EXIT', _Pid, normal}, State) ->
     {noreply, State};
