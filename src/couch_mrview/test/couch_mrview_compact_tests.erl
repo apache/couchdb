@@ -20,9 +20,11 @@
 
 setup() ->
     {ok, Db} = couch_mrview_test_util:init_db(?tempdb(), map, 1000),
+    ok = meck:new(couch_mrview_compactor, [passthrough]),
     Db.
 
 teardown(Db) ->
+    meck:unload(),
     couch_db:close(Db),
     couch_server:delete(Db#db.name, [?ADMIN_CTX]),
     ok.
@@ -75,28 +77,25 @@ should_swap(Db) ->
 should_remove(Db) ->
     ?_test(begin
         DDoc = <<"_design/bar">>,
-        couch_mrview:query_view(Db, DDoc, <<"baz">>),
-        {ok, Pid} = couch_index_server:get_index(couch_mrview_index, Db, DDoc),
-        ok = couch_index:compact(Pid, []),
-        {ok, CPid} = couch_index:get_compactor_pid(Pid),
-        Info = recon:info(CPid),
-        Ancs = couch_util:get_value('$ancestors',
-            couch_util:get_value(dictionary,
-                couch_util:get_value(meta, Info))),
-        Links = couch_util:get_value(links,
-            couch_util:get_value(signals, Info)),
-        [CompactionPid] = Links -- Ancs,
-        MonRef = erlang:monitor(process, CompactionPid),
-        exit(CompactionPid, crash),
+        {ok, _Results} = couch_mrview:query_view(Db, DDoc, <<"baz">>),
+        {ok, IndexPid} = couch_index_server:get_index(couch_mrview_index, Db, DDoc),
+        ok = couch_index:compact(IndexPid, []),
+        {ok, CompactorPid} = couch_index:get_compactor_pid(IndexPid),
+        {ok, CompactingPid} = couch_index_compactor:get_compacting_pid(CompactorPid),
+        MonRef = erlang:monitor(process, CompactingPid),
+        exit(CompactingPid, crash),
         receive
             {'DOWN', MonRef, process, _, crash} ->
-                ?assert(is_process_alive(Pid)),
-                ?assert(is_process_alive(CPid))
+                meck:wait(couch_mrview_compactor, remove_compacted, '_', 100),
+                ?assertEqual(1, meck:num_calls(
+                    couch_mrview_compactor, remove_compacted, '_', IndexPid)),
+                ?assert(is_process_alive(IndexPid)),
+                ?assert(is_process_alive(CompactorPid))
         after ?TIMEOUT ->
             erlang:error(
-                {assertion_failed,
-                 [{module, ?MODULE}, {line, ?LINE},
-                  {reason, "compaction didn't failed :/"}]})
+                {assertion_failed, [
+                    {module, ?MODULE}, {line, ?LINE},
+                    {reason, "compaction didn't exit :/"}]})
         end
     end).
 
