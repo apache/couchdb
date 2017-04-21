@@ -199,7 +199,7 @@ def write_config(ctx, node, env):
     etc_src = os.path.join(ctx['rootdir'], "rel", "overlay", "etc")
     etc_tgt = ensure_dir_exists(ctx['devdir'], "lib", node, "etc")
 
-    for fname in glob.glob(os.path.join(etc_src, "*")):
+    for fname in glob.glob(os.path.join(etc_src, "*.ini")):
         base = os.path.basename(fname)
         tgt = os.path.join(etc_tgt, base)
 
