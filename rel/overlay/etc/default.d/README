@@ -1,0 +1,11 @@
+CouchDB default configuration files
+
+Files found under the etc/default.d directory that end with .ini are
+parsed within couchdb(1) at startup.
+
+This directory is intended for distribution-specific overrides of
+CouchDB defaults. Package maintainers should be placing overrides in
+this directory.
+
+System administrator should place overrides in the etc/local.d directory
+instead.
