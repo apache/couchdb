@@ -19,6 +19,7 @@
 -define(PASS, "pass").
 -define(AUTH, {basic_auth, {?USER, ?PASS}}).
 -define(CONTENT_JSON, {"Content-Type", "application/json"}).
+-define(FIXTURE_TXT, ?ABS_PATH(?FILE)).
 
 setup() ->
     ok = config:set("admins", ?USER, ?PASS, _Persist=false),
@@ -56,7 +57,10 @@ all_test_() ->
                 fun setup/0, fun teardown/1,
                 [
                     fun should_return_ok_true_on_bulk_update/1,
-                    fun should_accept_live_as_an_alias_for_continuous/1
+                    fun should_accept_live_as_an_alias_for_continuous/1,
+                    fun should_return_404_for_delete_att_on_notadoc/1,
+                    fun should_return_409_for_del_att_without_rev/1,
+                    fun should_return_200_for_del_att_with_rev/1
                 ]
             }
         }
@@ -96,4 +100,82 @@ should_accept_live_as_an_alias_for_continuous(Url) ->
         SeqNum = list_to_integer(binary_to_list(SeqNum0)),
 
         ?assertEqual(LastSeqNum + 1, SeqNum)
+    end).
+
+
+should_return_404_for_delete_att_on_notadoc(Url) ->
+    ?_test(begin
+        {ok, RC, _, RespBody} = test_request:delete(
+            Url ++ "/notadoc/att.pdf",
+            [?CONTENT_JSON, ?AUTH],
+            []
+        ),
+        ?assertEqual(404, RC),
+        ?assertEqual(
+          {[{<<"error">>,<<"not_found">>},
+            {<<"reason">>,<<"missing">>}]},
+          jiffy:decode(RespBody)
+        ),
+        {ok, RC1, _, _} = test_request:get(
+            Url ++ "/notadoc",
+            [?CONTENT_JSON, ?AUTH],
+            []
+        ),
+        ?assertEqual(404, RC1)
+    end).
+
+
+should_return_409_for_del_att_without_rev(Url) ->
+    ?_test(begin
+        {ok, Data} = file:read_file(?FIXTURE_TXT),
+        Doc = {[
+            {<<"_attachments">>, {[
+                {<<"file.erl">>, {[
+                    {<<"content_type">>, <<"text/plain">>},
+                    {<<"data">>, base64:encode(Data)}
+                ]}
+            }]}}
+        ]},
+        {ok, RC, _, _} = test_request:put(
+            Url ++ "/testdoc3",
+            [?CONTENT_JSON, ?AUTH],
+            jiffy:encode(Doc)
+        ),
+        ?assertEqual(201, RC),
+
+        {ok, RC1, _, _} = test_request:delete(
+            Url ++ "/testdoc3/file.erl",
+            [?CONTENT_JSON, ?AUTH],
+            []
+        ),
+        ?assertEqual(409, RC1)
+    end).
+
+should_return_200_for_del_att_with_rev(Url) ->
+  ?_test(begin
+      {ok, Data} = file:read_file(?FIXTURE_TXT),
+      Doc = {[
+          {<<"_attachments">>, {[
+              {<<"file.erl">>, {[
+                  {<<"content_type">>, <<"text/plain">>},
+                  {<<"data">>, base64:encode(Data)}
+              ]}
+          }]}}
+      ]},
+      {ok, RC, _Headers, RespBody} = test_request:put(
+          Url ++ "/testdoc4",
+          [?CONTENT_JSON, ?AUTH],
+          jiffy:encode(Doc)
+      ),
+      ?assertEqual(201, RC),
+
+      {ResultJson} = ?JSON_DECODE(RespBody),
+      Rev = couch_util:get_value(<<"rev">>, ResultJson, undefined),
+
+      {ok, RC1, _, _} = test_request:delete(
+          Url ++ "/testdoc4/file.erl?rev=" ++ Rev,
+          [?CONTENT_JSON, ?AUTH],
+          []
+      ),
+      ?assertEqual(200, RC1)
     end).
