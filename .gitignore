@@ -15,6 +15,7 @@ ebin/
 erl_crash.dump
 install.mk
 rel/*.config
+rel/couchdb
 rel/dev*
 rel/tmpdata
 share/server/main-coffee.js
