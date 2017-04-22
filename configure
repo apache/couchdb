@@ -121,7 +121,7 @@ parse_opts() {
                 break
                 ;;
             -?*)
-                echo "WARNING: Unkonwn option '$1', ignoring" >&2
+                echo "WARNING: Unknown option '$1', ignoring" >&2
                 shift
                 ;;
             *) # Done
