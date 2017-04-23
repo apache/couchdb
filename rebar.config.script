@@ -21,59 +21,53 @@ os:putenv("COUCHDB_CONFIG", ConfigureEnv).
 
 os:putenv("COUCHDB_APPS_CONFIG_DIR", filename:join([COUCHDB_ROOT, "rel/apps"])).
 
-SubDirs = [
-    %% must be compiled first as it has a custom behavior
-    "src/couch_epi",
-    "src/couch_log",
-    "src/chttpd",
-    "src/couch",
-    "src/couch_index",
-    "src/couch_mrview",
-    "src/couch_replicator",
-    "src/couch_plugins",
-    "src/couch_event",
-    "src/couch_stats",
-    "src/couch_peruser",
-    "src/couch_tests",
-    "src/ddoc_cache",
-    "src/fabric",
-    "src/global_changes",
-    "src/mango",
-    "src/mem3",
-    "src/rexi",
-    "rel"
-],
-
 DepDescs = [
-%% Independent Apps
-{config,           "config",           "f62d553b337ce975edb0fb68772d22bdd3bf6490"},
+%% must be compiled first as it has a custom behavior
+{couch_epi,        "couch-epi",        "f6ad55d804ac741b59fe37dd092787113847661c"},
+{config,           "config",           "a83b75ef4d3dc80071ae8ae412fb0c724726d12c"},
+%% keep these sorted
 {b64url,           "b64url",           "6895652d80f95cdf04efb14625abed868998f174"},
-{ets_lru,          "ets-lru",          "c05488c8b1d7ec1c3554a828e0c9bf2888932ed6"},
-{khash,            "khash",            "7c6a9cd9776b5c6f063ccafedfa984b00877b019"},
-{snappy,           "snappy",           "a728b960611d0795025de7e9668d06b9926c479d"},
-{setup,            "setup",            "e8d1e32ba3b4f5f3be0e06e5269b12d811f24d52"},
-{ioq,              "ioq",              "1d2b149ee12dfeaf8d89a67b2f937207f4c5bdf2"},
-
-%% Non-Erlang deps
+{couch_log,        "couch-log",        "ad803f66dbd1900b67543259142875a6d03503ce"},
+{chttpd,           "chttpd",           "297493f29978d6effd9ae865b5822f54261c6955"},
+{couch,            "couch",            "a468b0db6f1a9795b32e26c34b340df4d51f31b0"},
+{couch_index,      "couch-index",      "53555fd909d5dd3d4a610c3fd6795950a8f7d022"},
+{couch_mrview,     "couch-mrview",     "a0b0392afe66ece9ef3bb4fdd5a4f159c97c47eb"},
+{couch_replicator, "couch-replicator", "b9232c8d410d529d65030896e075c4b4327631b0"},
+{couch_plugins,    "couch-plugins",    "3e73b723cb126cfc471b560d17c24a8b5c540085"},
+{couch_event,      "couch-event",      "7e382132219d708239306aa3591740694943d367"},
+{couch_stats,      "couch-stats",      "7895d4d3f509ed24f09b6d1a0bd0e06af34551dc"},
+{couch_peruser,    "peruser",          "4eea9571171a5b41d832da32204a1122a01f4b0e"},
+{couch_tests,       "erlang-tests",    "37b3bfeb4b1a48a592456e67991362e155ed81e0"},
 {docs,             {url, "https://github.com/apache/couchdb-documentation"},
-                   "3b15a7cb5e1958bc71ac865b56d3081ab43f5942", [raw]},
+                   "59a887a97f9b6befc6de0c5bdaf17d79fb7f915d", [raw]},
+{ddoc_cache,       "ddoc-cache",       "c762e90a33ce3cda19ef142dd1120f1087ecd876"},
+{ets_lru,          "ets-lru",          "c05488c8b1d7ec1c3554a828e0c9bf2888932ed6"},
+{fabric,           "fabric",           "f84750e3d31accf7bcadb0ba05249c23ce920521"},
 {fauxton,          {url, "https://github.com/apache/couchdb-fauxton"},
-                  {tag, "v1.1.11"}, [raw]},
-%% Third party deps
-{folsom,           "folsom",           "46f7c2b785b26448d4bdc18c1700f2319badd7d6"},
+                   {tag, "v1.1.11"}, [raw]},
+{folsom,           "folsom",           "a5c95dec18227c977029fbd3b638966d98f17003"},
+{global_changes,   "global-changes",   "f6e4c5629a7d996d284e4489f1897c057823f846"},
 {ibrowse,          "ibrowse",          "4af2d408607874d124414ac45df1edbe3961d1cd"},
+{ioq,              "ioq",              "ba99ec70d31cf82fe4868ab4bb92b0978f4fe67f"},
 {jiffy,            "jiffy",            "d3c00e19d8fa20c21758402231247602190988d3"},
+{khash,            "khash",            "7c6a9cd9776b5c6f063ccafedfa984b00877b019"},
+{mango,            "mango",            "610ccb60d09bb2a730fa1af318c6ce558538d2ba"},
+{mem3,             "mem3",             "252467cb4a27637090b5f9006483f5b7ab551699"},
 {mochiweb,         "mochiweb",         "bd6ae7cbb371666a1f68115056f7b30d13765782"},
+{oauth,            "oauth",            "099057a98e41f3aff91e77e3cf496d6c6fd901df"},
+{rexi,             "rexi",             "a327b7dbeb2b0050f7ca9072047bf8ef2d282833"},
+{snappy,           "snappy",           "a728b960611d0795025de7e9668d06b9926c479d"},
+{setup,            "setup",            "b9e1f3b5d5a78a706abb358e17130fb7344567d2"},
 {meck,             "meck",             {tag, "0.8.2"}},
-
-%% Deprecated
-{oauth,            "oauth",            "099057a98e41f3aff91e77e3cf496d6c6fd901df"}
+{dreyfus,          "dreyfus",          "master"}
 ],
 
-
-BaseUrl = "https://github.com/apache/",
+BaseUrl = "https://git-wip-us.apache.org/repos/asf/",
 
 MakeDep = fun
+    ({AppName, RepoName, Version}) when AppName == dreyfus ->
+        Url = "https://github.com/cloudant-labs/" ++ RepoName ++ ".git",
+        {AppName, ".*", {git, Url, Version}};
     ({AppName, {url, Url}, Version}) ->
         {AppName, ".*", {git, Url, Version}};
     ({AppName, {url, Url}, Version, Options}) ->
@@ -90,9 +84,9 @@ AddConfig = [
     {require_otp_vsn, "R16B03|R16B03-1|17|18|19"},
     {deps_dir, "src"},
     {deps, lists:map(MakeDep, DepDescs)},
-    {sub_dirs, SubDirs},
-    {lib_dirs, ["src"]},
-    {erl_opts, [debug_info, {i, "../"}]},
+    {sub_dirs, ["rel"]},
+    {lib_dirs, ["src/"]},
+    {erl_opts, [debug_info]},
     {eunit_opts, [verbose]},
     {plugins, [eunit_plugin]},
     {dialyzer, [
