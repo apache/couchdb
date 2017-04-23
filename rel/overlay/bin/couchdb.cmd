@@ -27,6 +27,6 @@ set PATH=%PATH%;%COUCHDB_BIN_DIR%
 
 "%BINDIR%\erl" -boot "%ROOTDIR%\releases\%APP_VSN%\couchdb" ^
 -args_file "%ROOTDIR%\etc\vm.args" ^
--config "%ROOTDIR%\releases\%APP_VSN%\sys.config"
+-config "%ROOTDIR%\releases\%APP_VSN%\sys.config" %*
 
 :: EXIT /B
