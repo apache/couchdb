@@ -257,6 +257,29 @@ handle_cast(delete, State) ->
     #st{mod=Mod, idx_state=IdxState} = State,
     ok = Mod:delete(IdxState),
     {stop, normal, State};
+handle_cast({ddoc_updated, DDocResult}, State) ->
+    #st{mod = Mod, idx_state = IdxState, waiters = Waiters} = State,
+    Shutdown = case DDocResult of
+        {not_found, deleted} ->
+            true;
+        {ok, DDoc} ->
+            DbName = Mod:get(db_name, IdxState),
+            couch_util:with_db(DbName, fun(Db) ->
+                {ok, NewIdxState} = Mod:init(Db, DDoc),
+                Mod:get(signature, NewIdxState) =/= Mod:get(signature, IdxState)
+            end)
+    end,
+    case Shutdown of
+        true ->
+            case Waiters of
+                [] ->
+                    {stop, normal, State};
+                _ ->
+                    {noreply, State#st{shutdown = true}}
+            end;
+        false ->
+            {noreply, State#st{shutdown = false}}
+    end;
 handle_cast(ddoc_updated, State) ->
     #st{mod = Mod, idx_state = IdxState, waiters = Waiters} = State,
     DbName = Mod:get(db_name, IdxState),
