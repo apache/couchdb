@@ -64,7 +64,7 @@ You can install the dependencies by running:
 
     sudo apt-get --no-install-recommends -y install \
         build-essential pkg-config erlang erlang-reltool \
-        libicu-dev libmozjs185-dev libcurl4-openssl-dev
+        libicu-dev libmozjs185-dev libcurl4-openssl-dev npm
 
 Be sure to update the version numbers to match your system's available
 packages.
