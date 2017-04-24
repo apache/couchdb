@@ -1236,6 +1236,10 @@ db_attachment_req(#httpd{method=Method, user_ctx=Ctx}=Req, Db, DocId, FileNamePa
 
     Doc = case extract_header_rev(Req, chttpd:qs_value(Req, "rev")) of
         missing_rev -> % make the new doc
+            if Method =/= 'DELETE' -> ok; true ->
+                % check for the existence of the doc to handle the 404 case.
+                couch_doc_open(Db, DocId, nil, [])
+            end,
             couch_doc:validate_docid(DocId),
             #doc{id=DocId};
         Rev ->
