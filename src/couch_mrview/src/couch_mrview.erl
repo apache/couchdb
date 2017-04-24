@@ -403,8 +403,7 @@ cleanup(Db) ->
 
 
 all_docs_fold(Db, #mrargs{keys=undefined}=Args, Callback, UAcc) ->
-    {ok, Info} = couch_db:get_db_info(Db),
-    Total = couch_util:get_value(doc_count, Info),
+    Total = get_total_rows(Db, Args),
     UpdateSeq = couch_db:get_update_seq(Db),
     Acc = #mracc{
         db=Db,
@@ -421,8 +420,7 @@ all_docs_fold(Db, #mrargs{keys=undefined}=Args, Callback, UAcc) ->
     {ok, Offset, FinalAcc} = couch_db:enum_docs(Db, fun map_fold/3, Acc, Opts),
     finish_fold(FinalAcc, [{total, Total}, {offset, Offset}]);
 all_docs_fold(Db, #mrargs{direction=Dir, keys=Keys0}=Args, Callback, UAcc) ->
-    {ok, Info} = couch_db:get_db_info(Db),
-    Total = couch_util:get_value(doc_count, Info),
+    Total = get_total_rows(Db, Args),
     UpdateSeq = couch_db:get_update_seq(Db),
     Acc = #mracc{
         db=Db,
@@ -533,15 +531,17 @@ map_fold({{Key, Id}, Val}, _Offset, Acc) ->
         user_acc=UAcc1,
         last_go=Go
     }};
-map_fold({<<"_local/",_/binary>> = DocId, {Rev0, _Body}}, _Offset, #mracc{} = Acc) ->
+map_fold({<<"_local/",_/binary>> = DocId, {Rev0, Body}}, _Offset, #mracc{} = Acc) ->
     #mracc{
         limit=Limit,
         callback=Callback,
-        user_acc=UAcc0
+        user_acc=UAcc0,
+        args=Args
     } = Acc,
     Rev = {0, list_to_binary(integer_to_list(Rev0))},
     Value = {[{rev, couch_doc:rev_to_str(Rev)}]},
-    Row = [{id, DocId}, {key, DocId}, {value, Value}],
+    Doc = if Args#mrargs.include_docs -> [{doc, Body}]; true -> [] end,
+    Row = [{id, DocId}, {key, DocId}, {value, Value}] ++ Doc,
     {Go, UAcc1} = Callback({row, Row}, UAcc0),
     {Go, Acc#mracc{
         limit=Limit-1,
@@ -650,6 +650,18 @@ make_meta(Args, UpdateSeq, Base) ->
     case Args#mrargs.update_seq of
         true -> {meta, Base ++ [{update_seq, UpdateSeq}]};
         _ -> {meta, Base}
+    end.
+
+
+get_total_rows(#db{local_tree = LocalTree} = Db, #mrargs{extra = Extra}) ->
+    case couch_util:get_value(namespace, Extra) of
+        <<"_local">> ->
+            FoldFun = fun(_, _, Acc) -> {ok, Acc + 1} end,
+            {ok, _, Total} = couch_btree:foldl(LocalTree, FoldFun, 0),
+            Total;
+        _ ->
+            {ok, Info} = couch_db:get_db_info(Db),
+            couch_util:get_value(doc_count, Info)
     end.
 
 
