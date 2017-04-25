@@ -16,8 +16,9 @@
 -export([open_doc/3, open_revs/4, get_doc_info/3, get_full_doc_info/3,
     get_missing_revs/2, get_missing_revs/3, update_docs/3]).
 -export([all_docs/3, changes/3, map_view/4, reduce_view/4, group_info/2]).
--export([create_db/1, delete_db/1, reset_validation_funs/1, set_security/3,
-    set_revs_limit/3, create_shard_db_doc/2, delete_shard_db_doc/2]).
+-export([create_db/1, create_db/2, delete_db/1, reset_validation_funs/1,
+    set_security/3, set_revs_limit/3, create_shard_db_doc/2,
+    delete_shard_db_doc/2]).
 -export([get_all_security/2, open_shard/2]).
 -export([compact/1, compact/2]).
 
@@ -145,7 +146,10 @@ fix_skip_and_limit(Args) ->
     Args#mrargs{skip=0, limit=Skip+Limit}.
 
 create_db(DbName) ->
-    rexi:reply(case couch_server:create(DbName, []) of
+    create_db(DbName, []).
+
+create_db(DbName, Options) ->
+    rexi:reply(case couch_server:create(DbName, Options) of
     {ok, _} ->
         ok;
     Error ->
