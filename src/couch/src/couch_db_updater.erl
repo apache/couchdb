@@ -61,7 +61,12 @@ init({DbName, Filepath, Fd, Options}) ->
         end
     end,
     Db = init_db(DbName, Filepath, Fd, Header, Options),
-    couch_stats_process_tracker:track([couchdb, open_databases]),
+    case lists:member(sys_db, Options) of
+        false ->
+            couch_stats_process_tracker:track([couchdb, open_databases]);
+        true ->
+            ok
+    end,
     % we don't load validation funs here because the fabric query is liable to
     % race conditions.  Instead see couch_db:validate_doc_update, which loads
     % them lazily

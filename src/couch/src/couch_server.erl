@@ -73,8 +73,8 @@ sup_start_link() ->
 open(DbName, Options0) ->
     Ctx = couch_util:get_value(user_ctx, Options0, #user_ctx{}),
     case ets:lookup(couch_dbs, DbName) of
-    [#db{fd=Fd, fd_monitor=Lock} = Db] when Lock =/= locked ->
-        update_lru(DbName),
+    [#db{fd=Fd, fd_monitor=Lock, options=Options} = Db] when Lock =/= locked ->
+        update_lru(DbName, Options),
         {ok, Db#db{user_ctx=Ctx, fd_monitor=erlang:monitor(process,Fd)}};
     _ ->
         Options = maybe_add_sys_db_callbacks(DbName, Options0),
@@ -91,8 +91,11 @@ open(DbName, Options0) ->
         end
     end.
 
-update_lru(DbName) ->
-    gen_server:cast(couch_server, {update_lru, DbName}).
+update_lru(DbName, Options) ->
+    case lists:member(sys_db, Options) of
+        false -> gen_server:cast(couch_server, {update_lru, DbName});
+        true -> ok
+    end.
 
 close_lru() ->
     gen_server:call(couch_server, close_lru).
@@ -268,15 +271,20 @@ all_databases(Fun, Acc0) ->
     {ok, FinalAcc}.
 
 
+make_room(Server, Options) ->
+    case lists:member(sys_db, Options) of
+        false -> maybe_close_lru_db(Server);
+        true -> {ok, Server}
+    end.
+
 maybe_close_lru_db(#server{dbs_open=NumOpen, max_dbs_open=MaxOpen}=Server)
         when NumOpen < MaxOpen ->
     {ok, Server};
 maybe_close_lru_db(#server{lru=Lru}=Server) ->
-    case couch_lru:close(Lru) of
-        false ->
-            {ok, Server};
-        {true, NewLru} ->
-            maybe_close_lru_db(db_closed(Server#server{lru = NewLru}))
+    try
+        {ok, db_closed(Server#server{lru = couch_lru:close(Lru)}, [])}
+    catch error:all_dbs_active ->
+        {error, all_dbs_active}
     end.
 
 open_async(Server, From, DbName, Filepath, Options) ->
@@ -308,14 +316,13 @@ open_async(Server, From, DbName, Filepath, Options) ->
         options = Options
     }),
     true = ets:insert(couch_dbs_pid_to_name, {Opener, DbName}),
-    db_opened(Server).
+    db_opened(Server, Options).
 
 handle_call(close_lru, _From, #server{lru=Lru} = Server) ->
-    case couch_lru:close(Lru) of
-        false ->
-            {reply, ok, Server};
-        {true, NewLru} ->
-            {reply, ok, db_closed(Server#server{lru = NewLru})}
+    try
+        {reply, ok, db_closed(Server#server{lru = couch_lru:close(Lru)}, [])}
+    catch error:all_dbs_active ->
+        {reply, {error, all_dbs_active}, Server}
     end;
 handle_call(open_dbs_count, _From, Server) ->
     {reply, Server#server.dbs_open, Server};
@@ -348,7 +355,12 @@ handle_call({open_result, T0, DbName, {ok, Db}}, {FromPid, _Tag}, Server) ->
             end,
             true = ets:insert(couch_dbs, Db),
             true = ets:insert(couch_dbs_pid_to_name, {Db#db.main_pid, DbName}),
-            Lru = couch_lru:insert(DbName, Server#server.lru),
+            Lru = case couch_db:is_system_db(Db) of
+                false ->
+                    couch_lru:insert(DbName, Server#server.lru);
+                true ->
+                    Server#server.lru
+            end,
             {reply, ok, Server#server{lru = Lru}}
     end;
 handle_call({open_result, T0, DbName, {error, eexist}}, From, Server) ->
@@ -370,7 +382,7 @@ handle_call({open_result, _T0, DbName, Error}, {FromPid, _Tag}, Server) ->
                 _ ->
                     Server
             end,
-            {reply, ok, db_closed(NewServer)}
+            {reply, ok, db_closed(NewServer, Db#db.options)}
     end;
 handle_call({open, DbName, Options}, From, Server) ->
     case ets:lookup(couch_dbs, DbName) of
@@ -378,7 +390,7 @@ handle_call({open, DbName, Options}, From, Server) ->
         DbNameList = binary_to_list(DbName),
         case check_dbname(Server, DbNameList) of
         ok ->
-            case maybe_close_lru_db(Server) of
+            case make_room(Server, Options) of
             {ok, Server2} ->
                 Filepath = get_full_filename(Server, DbNameList),
                 {noreply, open_async(Server2, From, DbName, Filepath, Options)};
@@ -406,7 +418,7 @@ handle_call({create, DbName, Options}, From, Server) ->
     ok ->
         case ets:lookup(couch_dbs, DbName) of
         [] ->
-            case maybe_close_lru_db(Server) of
+            case make_room(Server, Options) of
             {ok, Server2} ->
                 {noreply, open_async(Server2, From, DbName, Filepath,
                         [create | Options])};
@@ -442,12 +454,12 @@ handle_call({delete, DbName, Options}, _From, Server) ->
             true = ets:delete(couch_dbs_pid_to_name, Pid),
             exit(Pid, kill),
             [gen_server:reply(F, not_found) || F <- Froms],
-            db_closed(Server);
+            db_closed(Server, Db#db.options);
         [#db{main_pid=Pid} = Db] ->
             true = ets:delete(couch_dbs, DbName),
             true = ets:delete(couch_dbs_pid_to_name, Pid),
             exit(Pid, kill),
-            db_closed(Server)
+            db_closed(Server, Db#db.options)
         end,
 
         %% Delete any leftover compaction files. If we don't do this a
@@ -478,7 +490,10 @@ handle_call({db_updated, #db{}=Db}, _From, Server0) ->
     Server = try ets:lookup_element(couch_dbs, DbName, #db.instance_start_time) of
         StartTime ->
             true = ets:insert(couch_dbs, Db),
-            Lru = couch_lru:update(DbName, Server0#server.lru),
+            Lru = case couch_db:is_system_db(Db) of
+                false -> couch_lru:update(DbName, Server0#server.lru);
+                true -> Server0#server.lru
+            end,
             Server0#server{lru = Lru};
         _ ->
             Server0
@@ -517,7 +532,7 @@ handle_info({'EXIT', Pid, Reason}, Server) ->
         end,
         true = ets:delete(couch_dbs, DbName),
         true = ets:delete(couch_dbs_pid_to_name, Pid),
-        {noreply, db_closed(Server)};
+        {noreply, db_closed(Server, Db#db.options)};
     [] ->
         {noreply, Server}
     end;
@@ -527,11 +542,17 @@ handle_info(restart_config_listener, State) ->
 handle_info(Info, Server) ->
     {stop, {unknown_message, Info}, Server}.
 
-db_opened(Server) ->
-    Server#server{dbs_open=Server#server.dbs_open + 1}.
+db_opened(Server, Options) ->
+    case lists:member(sys_db, Options) of
+        false -> Server#server{dbs_open=Server#server.dbs_open + 1};
+        true -> Server
+    end.
 
-db_closed(Server) ->
-    Server#server{dbs_open=Server#server.dbs_open - 1}.
+db_closed(Server, Options) ->
+    case lists:member(sys_db, Options) of
+        false -> Server#server{dbs_open=Server#server.dbs_open - 1};
+        true -> Server
+    end.
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").

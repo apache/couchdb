@@ -362,7 +362,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                     {ok, 0} = file:position(Fd, 0),
                     ok = file:truncate(Fd),
                     ok = file:sync(Fd),
-                    couch_stats_process_tracker:track([couchdb, open_os_files]),
+                    maybe_track_open_os_files(Options),
                     erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
                     {ok, #file{fd=Fd, is_sys=IsSys, pread_limit=Limit}};
                 false ->
@@ -370,7 +370,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                     init_status_error(ReturnPid, Ref, {error, eexist})
                 end;
             false ->
-                couch_stats_process_tracker:track([couchdb, open_os_files]),
+                maybe_track_open_os_files(Options),
                 erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
                 {ok, #file{fd=Fd, is_sys=IsSys, pread_limit=Limit}}
             end;
@@ -385,7 +385,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
             %% Save Fd in process dictionary for debugging purposes
             put(couch_file_fd, {Fd, Filepath}),
             ok = file:close(Fd_Read),
-            couch_stats_process_tracker:track([couchdb, open_os_files]),
+            maybe_track_open_os_files(Options),
             {ok, Eof} = file:position(Fd, eof),
             erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
             {ok, #file{fd=Fd, eof=Eof, is_sys=IsSys, pread_limit=Limit}};
@@ -400,6 +400,14 @@ file_open_options(Options) ->
         [];
     false ->
         [append]
+    end.
+
+maybe_track_open_os_files(Options) ->
+    case not lists:member(sys_db, Options) of
+        true ->
+            couch_stats_process_tracker:track([couchdb, open_os_files]);
+        false ->
+            ok
     end.
 
 terminate(_Reason, #file{fd = nil}) ->
@@ -668,7 +676,13 @@ split_iolist([Byte | Rest], SplitAt, BeginAcc) when is_integer(Byte) ->
     split_iolist(Rest, SplitAt - 1, [Byte | BeginAcc]).
 
 
-is_idle(#file{}) ->
+% System dbs aren't monitored by couch_stats_process_tracker
+is_idle(#file{is_sys=true}) ->
+    case process_info(self(), monitored_by) of
+        {monitored_by, []} -> true;
+        _ -> false
+    end;
+is_idle(#file{is_sys=false}) ->
     Tracker = whereis(couch_stats_process_tracker),
     case process_info(self(), monitored_by) of
         {monitored_by, []} -> true;
