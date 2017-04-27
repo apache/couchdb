@@ -281,10 +281,11 @@ maybe_close_lru_db(#server{dbs_open=NumOpen, max_dbs_open=MaxOpen}=Server)
         when NumOpen < MaxOpen ->
     {ok, Server};
 maybe_close_lru_db(#server{lru=Lru}=Server) ->
-    try
-        {ok, db_closed(Server#server{lru = couch_lru:close(Lru)}, [])}
-    catch error:all_dbs_active ->
-        {error, all_dbs_active}
+    case couch_lru:close(Lru) of
+        {true, NewLru} ->
+            {ok, db_closed(Server#server{lru = NewLru}, [])};
+        false ->
+            {error, all_dbs_active}
     end.
 
 open_async(Server, From, DbName, Filepath, Options) ->
@@ -319,10 +320,11 @@ open_async(Server, From, DbName, Filepath, Options) ->
     db_opened(Server, Options).
 
 handle_call(close_lru, _From, #server{lru=Lru} = Server) ->
-    try
-        {reply, ok, db_closed(Server#server{lru = couch_lru:close(Lru)}, [])}
-    catch error:all_dbs_active ->
-        {reply, {error, all_dbs_active}, Server}
+    case couch_lru:close(Lru) of
+        {true, NewLru} ->
+            {reply, ok, db_closed(Server#server{lru = NewLru}, [])};
+        false ->
+            {reply, {error, all_dbs_active}, Server}
     end;
 handle_call(open_dbs_count, _From, Server) ->
     {reply, Server#server.dbs_open, Server};
