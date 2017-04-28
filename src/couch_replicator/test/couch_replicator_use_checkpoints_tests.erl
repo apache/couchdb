@@ -15,6 +15,11 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
+-import(couch_replicator_test_helper, [
+    db_url/1,
+    replicate/1
+]).
+
 -define(DOCS_COUNT, 100).
 -define(TIMEOUT_EUNIT, 30).
 -define(i2l(I), integer_to_list(I)).
@@ -167,23 +172,10 @@ compare_dbs(Source, Target) ->
     ok = couch_db:close(SourceDb),
     ok = couch_db:close(TargetDb).
 
-db_url(DbName) ->
-    iolist_to_binary([
-        "http://", config:get("httpd", "bind_address", "127.0.0.1"),
-        ":", integer_to_list(mochiweb_socket_server:get(couch_httpd, port)),
-        "/", DbName
-    ]).
-
 replicate(Source, Target, UseCheckpoints) ->
-    RepObject = {[
+    replicate({[
         {<<"source">>, Source},
         {<<"target">>, Target},
         {<<"use_checkpoints">>, UseCheckpoints}
-    ]},
-    {ok, Rep} = couch_replicator_utils:parse_rep_doc(RepObject, ?ADMIN_USER),
-    {ok, Pid} = couch_replicator:async_replicate(Rep),
-    MonRef = erlang:monitor(process, Pid),
-    receive
-        {'DOWN', MonRef, process, Pid, _} ->
-            ok
-    end.
+    ]}).
+

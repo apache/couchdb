@@ -11,28 +11,5 @@
 % the License.
 
 
-
--record(httpdb, {
-    url,
-    oauth = nil,
-    headers = [
-        {"Accept", "application/json"},
-        {"User-Agent", "CouchDB-Replicator/" ++ couch_server:get_version()}
-    ],
-    timeout,            % milliseconds
-    ibrowse_options = [],
-    retries = 10,
-    wait = 250,         % milliseconds
-    httpc_pool = nil,
-    http_connections,
-    first_error_timestamp = nil,
-    proxy_url
-}).
-
--record(oauth, {
-    consumer_key,
-    token,
-    token_secret,
-    consumer_secret,
-    signature_method
-}).
+-type job_id() :: term().
+-type job_args() :: term().

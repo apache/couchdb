@@ -14,24 +14,15 @@
     {description, "CouchDB replicator"},
     {vsn, git},
     {mod, {couch_replicator_app, []}},
-    {modules, [
-        couch_replicator,
-        couch_replicator_api_wrap,
-        couch_replicator_app,
-        couch_replicator_httpc,
-        couch_replicator_httpd,
-        couch_replicator_job_sup,
-        couch_replicator_notifier,
-        couch_replicator_manager,
-        couch_replicator_httpc_pool,
-        couch_replicator_sup,
-        couch_replicator_utils,
-        couch_replicator_worker
-    ]},
     {registered, [
-        couch_replicator,
-        couch_replicator_manager,
-        couch_replicator_job_sup
+        couch_replicator_sup,
+        couch_replicator_rate_limiter,
+        couch_replicator_connection,
+        couch_replication,  % couch_replication_event gen_event
+        couch_replicator_clustering,
+        couch_replicator_scheduler,
+        couch_replicator_scheduler_sup,
+        couch_replicator_doc_processor
     ]},
     {applications, [
         kernel,
@@ -43,4 +34,3 @@
         couch_stats
     ]}
 ]}.
-

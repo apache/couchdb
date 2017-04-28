@@ -40,8 +40,18 @@
 -define(MAX_DISCARDED_MESSAGES, 16).
 
 
-setup(#httpdb{httpc_pool = nil, url = Url, http_connections = MaxConns} = Db) ->
-    {ok, Pid} = couch_replicator_httpc_pool:start_link(Url, [{max_connections, MaxConns}]),
+setup(Db) ->
+    #httpdb{
+        httpc_pool = nil,
+        url = Url,
+        http_connections = MaxConns,
+        proxy_url = ProxyURL
+    } = Db,
+    HttpcURL = case ProxyURL of
+        undefined -> Url;
+        _ when is_list(ProxyURL) -> ProxyURL
+    end,
+    {ok, Pid} = couch_replicator_httpc_pool:start_link(HttpcURL, [{max_connections, MaxConns}]),
     {ok, Db#httpdb{httpc_pool = Pid}}.
 
 
@@ -98,6 +108,7 @@ send_ibrowse_req(#httpdb{headers = BaseHeaders} = HttpDb, Params) ->
         lists:ukeymerge(1, get_value(ibrowse_options, Params, []),
             HttpDb#httpdb.ibrowse_options)
     ],
+    backoff_before_request(Worker, HttpDb, Params),
     Response = ibrowse:send_req_direct(
         Worker, Url, Headers2, Method, Body, IbrowseOptions, Timeout),
     {Worker, Response}.
@@ -139,8 +150,9 @@ process_response({ibrowse_req_id, ReqId}, Worker, HttpDb, Params, Callback) ->
 process_response({ok, Code, Headers, Body}, Worker, HttpDb, Params, Callback) ->
     case list_to_integer(Code) of
     429 ->
-        backoff(Worker, HttpDb, Params);
+        backoff(HttpDb, Params);
     Ok when (Ok >= 200 andalso Ok < 300) ; (Ok >= 400 andalso Ok < 500) ->
+        backoff_success(HttpDb, Params),
         couch_stats:increment_counter([couch_replicator, responses, success]),
         EJson = case Body of
         <<>> ->
@@ -150,6 +162,7 @@ process_response({ok, Code, Headers, Body}, Worker, HttpDb, Params, Callback) ->
         end,
         Callback(Ok, Headers, EJson);
     R when R =:= 301 ; R =:= 302 ; R =:= 303 ->
+        backoff_success(HttpDb, Params),
         do_redirect(Worker, R, Headers, HttpDb, Params, Callback);
     Error ->
         couch_stats:increment_counter([couch_replicator, responses, failure]),
@@ -165,9 +178,10 @@ process_stream_response(ReqId, Worker, HttpDb, Params, Callback) ->
     {ibrowse_async_headers, ReqId, Code, Headers} ->
         case list_to_integer(Code) of
         429 ->
-            backoff(Worker, HttpDb#httpdb{timeout = get_max_back_off()},
-                Params);
+            Timeout = couch_replicator_rate_limiter:max_interval(),
+            backoff(HttpDb#httpdb{timeout = Timeout}, Params);
         Ok when (Ok >= 200 andalso Ok < 300) ; (Ok >= 400 andalso Ok < 500) ->
+            backoff_success(HttpDb, Params),
             StreamDataFun = fun() ->
                 stream_data_self(HttpDb, Params, Worker, ReqId, Callback)
             end,
@@ -184,6 +198,7 @@ process_stream_response(ReqId, Worker, HttpDb, Params, Callback) ->
                     maybe_retry(Err, Worker, HttpDb, Params)
             end;
         R when R =:= 301 ; R =:= 302 ; R =:= 303 ->
+            backoff_success(HttpDb, Params),
             do_redirect(Worker, R, Headers, HttpDb, Params, Callback);
         Error ->
             couch_stats:increment_counter(
@@ -266,37 +281,48 @@ discard_message(ReqId, Worker, Count) ->
     end.
 
 
-%% For 429 errors, we perform an exponential backoff up to 2.17 hours.
-%% We use Backoff time as a timeout/failure end.
-backoff(Worker, #httpdb{backoff = Backoff} = HttpDb, Params) ->
-    MaxBackOff = get_max_back_off(),
-    MaxBackOffLog = get_back_off_log_threshold(),
-    ok = timer:sleep(random:uniform(Backoff)),
-    Backoff2 = round(Backoff*get_back_off_exp()),
-    NewBackoff = erlang:min(Backoff2, MaxBackOff),
-    NewHttpDb = HttpDb#httpdb{backoff = NewBackoff},
-    case Backoff2 of
-        W0 when W0 > MaxBackOff ->
-            report_error(Worker, HttpDb, Params, {error,
-                "Long 429-induced Retry Time Out"});
-        W1 when W1 >=  MaxBackOffLog -> % Past 8 min, we log retries
-            log_retry_error(Params, HttpDb, Backoff2, "429 Retry"),
-            throw({retry, NewHttpDb, Params});
-        _ ->
-            throw({retry, NewHttpDb, Params})
-    end.
-
-
 maybe_retry(Error, Worker, #httpdb{retries = 0} = HttpDb, Params) ->
     report_error(Worker, HttpDb, Params, {error, Error});
 
-maybe_retry(Error, _Worker, #httpdb{retries = Retries, wait = Wait} = HttpDb,
+maybe_retry(Error, Worker, #httpdb{retries = Retries, wait = Wait} = HttpDb,
     Params) ->
-    ok = timer:sleep(Wait),
-    log_retry_error(Params, HttpDb, Wait, Error),
-    Wait2 = erlang:min(Wait * 2, ?MAX_WAIT),
-    NewHttpDb = HttpDb#httpdb{retries = Retries - 1, wait = Wait2},
-    throw({retry, NewHttpDb, Params}).
+    case total_error_time_exceeded(HttpDb) of
+        true ->
+            report_error(Worker, HttpDb, Params, {error, Error});
+        false ->
+            ok = timer:sleep(Wait),
+            log_retry_error(Params, HttpDb, Wait, Error),
+            Wait2 = erlang:min(Wait * 2, ?MAX_WAIT),
+            HttpDb1 = HttpDb#httpdb{retries = Retries - 1, wait = Wait2},
+            HttpDb2 = update_first_error_timestamp(HttpDb1),
+            throw({retry, HttpDb2, Params})
+    end.
+
+
+% When retrying, check to make total time spent retrying a request is below
+% the current scheduler health threshold. The goal is to not exceed the
+% threshold, otherwise the job which keep retrying too long will still be
+% considered healthy.
+total_error_time_exceeded(#httpdb{first_error_timestamp = nil}) ->
+    false;
+
+total_error_time_exceeded(#httpdb{first_error_timestamp = ErrorTimestamp}) ->
+    HealthThresholdSec = couch_replicator_scheduler:health_threshold(),
+    % Theshold value is halved because in the calling code the next step
+    % is a doubling. Not halving here could mean sleeping too long and
+    % exceeding the health threshold.
+    ThresholdUSec = (HealthThresholdSec / 2) * 1000000,
+    timer:now_diff(os:timestamp(), ErrorTimestamp) > ThresholdUSec.
+
+
+% Remember the first time an error occurs. This value is used later to check
+% the total time spend retrying a request. Because retrying is cursive, on
+% successful result #httpdb{} record is reset back to the original value.
+update_first_error_timestamp(#httpdb{first_error_timestamp = nil} = HttpDb) ->
+    HttpDb#httpdb{first_error_timestamp = os:timestamp()};
+
+update_first_error_timestamp(HttpDb) ->
+    HttpDb.
 
 
 log_retry_error(Params, HttpDb, Wait, Error) ->
@@ -440,11 +466,32 @@ after_redirect(RedirectUrl, HttpDb, Params) ->
     Params2 = lists:keydelete(path, 1, lists:keydelete(qs, 1, Params)),
     {HttpDb#httpdb{url = RedirectUrl}, Params2}.
 
-get_max_back_off() ->
-    config:get_integer("replicator", "max_backoff_wait", 250 * 32768).
 
-get_back_off_log_threshold() ->
-    config:get_integer("replicator", "max_backoff_log_threshold", 512000).
+backoff_key(HttpDb, Params) ->
+    Method = get_value(method, Params, get),
+    Url = HttpDb#httpdb.url,
+    {Url, Method}.
 
-get_back_off_exp() ->
-    config:get_float("replicator", "backoff_exp", 1.5).
+
+backoff(HttpDb, Params) ->
+    Key = backoff_key(HttpDb, Params),
+    couch_replicator_rate_limiter:failure(Key),
+    throw({retry, HttpDb, Params}).
+
+
+backoff_success(HttpDb, Params) ->
+    Key = backoff_key(HttpDb, Params),
+    couch_replicator_rate_limiter:success(Key).
+
+
+backoff_before_request(Worker, HttpDb, Params) ->
+    Key = backoff_key(HttpDb, Params),
+    Limit = couch_replicator_rate_limiter:max_interval(),
+    case couch_replicator_rate_limiter:interval(Key) of
+        Sleep when Sleep >= Limit ->
+            report_error(Worker, HttpDb, Params, max_backoff);
+        Sleep when Sleep >= 1 ->
+            timer:sleep(Sleep);
+        Sleep when Sleep == 0 ->
+            ok
+    end.

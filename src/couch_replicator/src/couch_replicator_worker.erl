@@ -196,6 +196,9 @@ handle_info({'EXIT', Pid, normal}, #state{writer = nil} = State) ->
         {noreply, State2}
     end;
 
+handle_info({'EXIT', _Pid, max_backoff}, State) ->
+    {stop, {shutdown, max_backoff}, State};
+
 handle_info({'EXIT', Pid, Reason}, State) ->
    {stop, {process_died, Pid, Reason}, State}.
 
