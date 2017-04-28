@@ -372,6 +372,7 @@ couchdb_1283() ->
         MonRef = erlang:monitor(process, CPid),
         Writer3 = spawn_writer(Db3#db.name),
         ?assert(is_process_alive(Writer3)),
+        ?assertEqual({error, all_dbs_active}, get_writer_status(Writer3)),
 
         ?assert(is_process_alive(Writer1)),
         ?assert(is_process_alive(Writer2)),
@@ -390,6 +391,7 @@ couchdb_1283() ->
                   {reason, "Failure compacting view group"}]})
         end,
 
+        ?assertEqual(ok, writer_try_again(Writer3)),
         ?assertEqual(ok, get_writer_status(Writer3)),
 
         ?assert(is_process_alive(Writer1)),
