@@ -100,7 +100,7 @@ else
 	@copy test\javascript\tests\lorem*.txt src\fauxton\dist\release\test
 endif
 	-@rmdir /s/q dev\lib
-	@python dev\run -n 1 -q --with-admin-party-please python test\javascript\run $(suites)
+	@python dev\run -n 1 -q --with-admin-party-please -c startup_jitter=0 python test\javascript\run $(suites)
 
 
 .PHONY: check-qs
