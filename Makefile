@@ -203,11 +203,6 @@ introspect:
 	@$(REBAR) -r update-deps
 	@./introspect
 
-.PHONY: snap
-# target: snap - Build Snap package
-snap: 
-	@snapcraft snap
-
 ################################################################################
 # Distributing
 ################################################################################
