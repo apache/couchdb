@@ -315,12 +315,7 @@ fold_fun(#doc_info{}=DI, _, {Db, UFun, UAcc}) ->
 
 get_update_seq() ->
     DbName = config:get("mem3", "shards_db", "_dbs"),
-    case mem3_util:ensure_exists(DbName) of
-    {ok, Db} ->
-        {ok, Db};
-    file_exists ->
-        {ok, Db} = mem3_util:ensure_exists(DbName)
-    end,
+    {ok, Db} = mem3_util:ensure_exists(DbName),
     couch_db:close(Db),
     Db#db.update_seq.
 
