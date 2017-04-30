@@ -260,7 +260,7 @@ endif
 # target: install- install CouchDB :)
 install:
 	@echo
-	@echo "Notice: There is no 'make install' command for CouchDB 2.0 yet."
+	@echo "Notice: There is no 'make install' command for CouchDB 2.x."
 	@echo
 	@echo "    To install CouchDB into your system, copy the rel/couchdb"
 	@echo "    to your desired installation location. For example:"
@@ -330,11 +330,11 @@ else
 	@rm -rf apache-couchdb-*
 	@$(MAKE) dist 2>&1 > /dev/null
 	@rm apache-couchdb-*.tar.gz
-	@mv apache-couchdb-* apache-couchdb-2.0.0-RC$(COUCH_RC)
-	@tar czf apache-couchdb-2.0.0-RC$(COUCH_RC).tar.gz apache-couchdb-2.0.0-RC$(COUCH_RC)
-	@echo "Done apache-couchdb-2.0.0-RC$(COUCH_RC).tar.gz"
+	@mv apache-couchdb-* apache-couchdb-2.1.0-RC$(COUCH_RC)
+	@tar czf apache-couchdb-2.1.0-RC$(COUCH_RC).tar.gz apache-couchdb-2.1.0-RC$(COUCH_RC)
+	@echo "Done apache-couchdb-2.1.0-RC$(COUCH_RC).tar.gz"
 	@echo "Here is the list of commits since the last RC"
-	@git log --left-right --graph --cherry-pick --oneline 2.0.0-RC$(shell echo $(COUCH_RC)-1 | bc)...master
+	@git log --left-right --graph --cherry-pick --oneline 2.1.0-RC$(shell echo $(COUCH_RC)-1 | bc)...master
 	@echo "Done!"
 endif
 
