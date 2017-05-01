@@ -19,15 +19,21 @@
     find_common_seq/4,
     get_missing_revs/4,
     update_docs/4,
+    get_purge_seq/2,
+    purge_docs/4,
     load_checkpoint/4,
-    save_checkpoint/6
+    save_checkpoint/7,
+    load_purges/3,
+    save_purge_checkpoint/5
 ]).
 
 % Private RPC callbacks
 -export([
     find_common_seq_rpc/3,
     load_checkpoint_rpc/3,
-    save_checkpoint_rpc/5
+    save_checkpoint_rpc/6,
+    load_purges_rpc/2,
+    save_purge_checkpoint_rpc/4
 ]).
 
 
@@ -43,14 +49,32 @@ update_docs(Node, DbName, Docs, Options) ->
     rexi_call(Node, {fabric_rpc, update_docs, [DbName, Docs, Options]}).
 
 
+get_purge_seq(Node, DbName) ->
+    rexi_call(Node, {fabric_rpc, get_purge_seq, [DbName]}).
+
+
+purge_docs(Node, DbName, PUUIdsIdsRevs, Options) ->
+    rexi_call(Node, {fabric_rpc, purge_docs, [DbName, PUUIdsIdsRevs, Options]}).
+
+
 load_checkpoint(Node, DbName, SourceNode, SourceUUID) ->
     Args = [DbName, SourceNode, SourceUUID],
     rexi_call(Node, {mem3_rpc, load_checkpoint_rpc, Args}).
 
 
-save_checkpoint(Node, DbName, DocId, Seq, Entry, History) ->
-    Args = [DbName, DocId, Seq, Entry, History],
+save_checkpoint(Node, DbName, DocId, Seq, PurgeSeq, Entry, History) ->
+    Args = [DbName, DocId, Seq, PurgeSeq, Entry, History],
     rexi_call(Node, {mem3_rpc, save_checkpoint_rpc, Args}).
+
+
+load_purges(Node, DbName, SourceUUID) ->
+    Args = [DbName, SourceUUID],
+    rexi_call(Node, {mem3_rpc, load_purges_rpc, Args}).
+
+
+save_purge_checkpoint(Node, DbName, DocId, PurgeSeq, SourceNode) ->
+    Args = [DbName, DocId, PurgeSeq, SourceNode],
+    rexi_call(Node, {mem3_rpc, save_purge_checkpoint_rpc, Args}).
 
 
 find_common_seq(Node, DbName, SourceUUID, SourceEpochs) ->
@@ -81,7 +105,8 @@ load_checkpoint_rpc(DbName, SourceNode, SourceUUID) ->
     end.
 
 
-save_checkpoint_rpc(DbName, Id, SourceSeq, NewEntry0, History0) ->
+save_checkpoint_rpc(DbName, Id, SourceSeq, SourcePurgeSeq,
+        NewEntry0, History0) ->
     erlang:put(io_priority, {internal_repl, DbName}),
     case get_or_create_db(DbName, [?ADMIN_CTX]) of
         {ok, Db} ->
@@ -92,6 +117,7 @@ save_checkpoint_rpc(DbName, Id, SourceSeq, NewEntry0, History0) ->
             ] ++ NewEntry0},
             Body = {[
                 {<<"seq">>, SourceSeq},
+                {<<"purge_seq">>, SourcePurgeSeq},
                 {<<"target_uuid">>, couch_db:get_uuid(Db)},
                 {<<"history">>, add_checkpoint(NewEntry, History0)}
             ]},
@@ -111,6 +137,7 @@ save_checkpoint_rpc(DbName, Id, SourceSeq, NewEntry0, History0) ->
             rexi:reply(Error)
     end.
 
+
 find_common_seq_rpc(DbName, SourceUUID, SourceEpochs) ->
     erlang:put(io_priority, {internal_repl, DbName}),
     case get_or_create_db(DbName, [?ADMIN_CTX]) of
@@ -125,6 +152,64 @@ find_common_seq_rpc(DbName, SourceUUID, SourceEpochs) ->
         end;
     Error ->
         rexi:reply(Error)
+    end.
+
+
+load_purges_rpc(DbName, SourceUUID) ->
+    erlang:put(io_priority, {internal_repl, DbName}),
+    case get_or_create_db(DbName, [?ADMIN_CTX]) of
+    {ok, Db} ->
+        TargetUUID = couch_db:get_uuid(Db),
+        DocId = mem3_rep:make_local_purge_id(SourceUUID, TargetUUID),
+        LastPSeq = case couch_db:open_doc(Db, DocId, []) of
+            {ok, #doc{body={Props}} } ->
+                couch_util:get_value(<<"purge_seq">>, Props);
+            {not_found, _} ->
+                0
+        end,
+        {ok, CurPSeq} = couch_db:get_purge_seq(Db),
+        UUIDsIdsRevs = if (LastPSeq == CurPSeq) -> []; true ->
+            FoldFun = fun({_PSeq, UUID, Id, Revs}, Acc) ->
+                [{UUID, Id, Revs} | Acc]
+            end,
+            {ok, UUIDsIdsRevs0} = couch_db:fold_purged_docs(
+                Db, LastPSeq, FoldFun, [], []
+            ),
+            UUIDsIdsRevs0
+        end,
+        rexi:reply({ok, {UUIDsIdsRevs, DocId, CurPSeq}});
+    Error ->
+        rexi:reply(Error)
+    end.
+
+
+save_purge_checkpoint_rpc(DbName, Id, PurgeSeq, Node) ->
+    erlang:put(io_priority, {internal_repl, DbName}),
+    case get_or_create_db(DbName, [?ADMIN_CTX]) of
+        {ok, Db} ->
+            Timestamp = couch_util:utc_string(),
+            Body = {[
+                {<<"purge_seq">>, PurgeSeq},
+                {<<"timestamp_utc">>, Timestamp},
+                {<<"verify_module">>, <<"mem3_rep">>},
+                {<<"verify_function">>, <<"mem3_sync_purge">>},
+                {<<"verify_options">>, {[{<<"node">>, Node}]}},
+                {<<"type">>, <<"internal_replication">>}
+            ]},
+            Doc = #doc{id = Id, body = Body},
+            rexi:reply(try couch_db:update_doc(Db, Doc, []) of
+                {ok, _} ->
+                    {ok, Body};
+                Else ->
+                    {error, Else}
+            catch
+                Exception ->
+                    Exception;
+                error:Reason ->
+                    {error, Reason}
+            end);
+        Error ->
+            rexi:reply(Error)
     end.
 
 
