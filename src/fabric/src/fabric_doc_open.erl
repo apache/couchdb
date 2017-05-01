@@ -25,7 +25,8 @@
     r,
     state,
     replies,
-    q_reply
+    q_reply,
+    replies_by_node=[] %[{Node, Reply}] used for checking if a doc is purged
 }).
 
 
@@ -83,7 +84,8 @@ handle_message({rexi_EXIT, _Reason}, Worker, Acc) ->
     end;
 handle_message(Reply, Worker, Acc) ->
     NewReplies = fabric_util:update_counter(Reply, 1, Acc#acc.replies),
-    NewAcc = Acc#acc{replies = NewReplies},
+    NewNReplies = [{Worker#shard.node, Reply}|Acc#acc.replies_by_node],
+    NewAcc = Acc#acc{replies = NewReplies, replies_by_node = NewNReplies},
     case is_r_met(Acc#acc.workers, NewReplies, Acc#acc.r) of
     {true, QuorumReply} ->
         fabric_util:cleanup(lists:delete(Worker, Acc#acc.workers)),
@@ -122,14 +124,15 @@ is_r_met(Workers, Replies, R) ->
         no_more_workers
     end.
 
-read_repair(#acc{dbname=DbName, replies=Replies}) ->
+read_repair(#acc{dbname=DbName, replies=Replies, replies_by_node=NReplies0}) ->
     Docs = [Doc || {_, {{ok, #doc{}=Doc}, _}} <- Replies],
+    NReplies = [{Node, Doc} || {Node, {ok, #doc{}=Doc}} <- NReplies0],
     case Docs of
     % omit local docs from read repair
     [#doc{id = <<?LOCAL_DOC_PREFIX, _/binary>>} | _] ->
         choose_reply(Docs);
     [#doc{id=Id} | _] ->
-        Opts = [replicated_changes, ?ADMIN_CTX],
+        Opts = [replicated_changes, ?ADMIN_CTX, {read_repair, NReplies}],
         Res = fabric:update_docs(DbName, Docs, Opts),
         case Res of
             {ok, []} ->
@@ -319,7 +322,8 @@ handle_message_reply_test() ->
     ?assertEqual(
         {ok, Acc0#acc{
             workers=[Worker0, Worker1],
-            replies=[fabric_util:kv(foo,1)]
+            replies=[fabric_util:kv(foo,1)],
+            replies_by_node=[{undefined, foo}]
         }},
         handle_message(foo, Worker2, Acc0)
     ),
@@ -327,7 +331,8 @@ handle_message_reply_test() ->
     ?assertEqual(
         {ok, Acc0#acc{
             workers=[Worker0, Worker1],
-            replies=[fabric_util:kv(bar,1), fabric_util:kv(foo,1)]
+            replies=[fabric_util:kv(bar,1), fabric_util:kv(foo,1)],
+            replies_by_node=[{undefined, bar}]
         }},
         handle_message(bar, Worker2, Acc0#acc{
             replies=[fabric_util:kv(foo,1)]
@@ -339,18 +344,21 @@ handle_message_reply_test() ->
     % is returned. Bit subtle on the assertions here.
 
     ?assertEqual(
-        {stop, Acc0#acc{workers=[],replies=[fabric_util:kv(foo,1)]}},
+        {stop, Acc0#acc{workers=[],replies=[fabric_util:kv(foo,1)],
+            replies_by_node=[{undefined, foo}]}},
         handle_message(foo, Worker0, Acc0#acc{workers=[Worker0]})
     ),
 
     ?assertEqual(
         {stop, Acc0#acc{
             workers=[],
-            replies=[fabric_util:kv(bar,1), fabric_util:kv(foo,1)]
+            replies=[fabric_util:kv(bar,1), fabric_util:kv(foo,1)],
+            replies_by_node =[{undefined, bar}, {undefined, foo}]
         }},
         handle_message(bar, Worker0, Acc0#acc{
             workers=[Worker0],
-            replies=[fabric_util:kv(foo,1)]
+            replies=[fabric_util:kv(foo,1)],
+            replies_by_node=[{undefined, foo}]
         })
     ),
 
@@ -362,11 +370,13 @@ handle_message_reply_test() ->
             workers=[],
             replies=[fabric_util:kv(foo,2)],
             state=r_met,
-            q_reply=foo
+            q_reply=foo,
+            replies_by_node =[{undefined, foo}, {undefined, foo}]
         }},
         handle_message(foo, Worker1, Acc0#acc{
             workers=[Worker0, Worker1],
-            replies=[fabric_util:kv(foo,1)]
+            replies=[fabric_util:kv(foo,1)],
+            replies_by_node =[{undefined, foo}]
         })
     ),
 
@@ -376,7 +386,8 @@ handle_message_reply_test() ->
             r=1,
             replies=[fabric_util:kv(foo,1)],
             state=r_met,
-            q_reply=foo
+            q_reply=foo,
+            replies_by_node =[{undefined, foo}]
         }},
         handle_message(foo, Worker0, Acc0#acc{r=1})
     ),
@@ -386,11 +397,14 @@ handle_message_reply_test() ->
             workers=[],
             replies=[fabric_util:kv(bar,1), fabric_util:kv(foo,2)],
             state=r_met,
-            q_reply=foo
+            q_reply=foo,
+            replies_by_node =[{undefined, foo}, {undefined, foo},
+                {undefined, bar}]
         }},
         handle_message(foo, Worker0, Acc0#acc{
             workers=[Worker0],
-            replies=[fabric_util:kv(bar,1), fabric_util:kv(foo,1)]
+            replies=[fabric_util:kv(bar,1), fabric_util:kv(foo,1)],
+            replies_by_node =[{undefined, foo}, {undefined, bar}]
         })
     ),
 

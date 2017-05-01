@@ -21,6 +21,7 @@
     delete_shard_db_doc/2]).
 -export([get_all_security/2, open_shard/2]).
 -export([compact/1, compact/2]).
+-export([get_purge_seq/2, purge_docs/3, set_purged_docs_limit/3]).
 
 -export([get_db_info/2, get_doc_count/2, get_update_seq/2,
          changes/4, map_view/5, reduce_view/5, group_info/3, update_mrview/4]).
@@ -201,6 +202,9 @@ get_all_security(DbName, Options) ->
 set_revs_limit(DbName, Limit, Options) ->
     with_db(DbName, Options, {couch_db, set_revs_limit, [Limit]}).
 
+set_purged_docs_limit(DbName, Limit, Options) ->
+    with_db(DbName, Options, {couch_db, set_purged_docs_limit, [Limit]}).
+
 open_doc(DbName, DocId, Options) ->
     with_db(DbName, Options, {couch_db, open_doc, [DocId, Options]}).
 
@@ -236,14 +240,31 @@ get_missing_revs(DbName, IdRevsList, Options) ->
     end).
 
 update_docs(DbName, Docs0, Options) ->
-    case proplists:get_value(replicated_changes, Options) of
-    true ->
-        X = replicated_changes;
-    _ ->
-        X = interactive_edit
+    X = case proplists:get_value(replicated_changes, Options) of
+        true -> replicated_changes;
+        _ -> interactive_edit
     end,
-    Docs = make_att_readers(Docs0),
-    with_db(DbName, Options, {couch_db, update_docs, [Docs, Options, X]}).
+    DocsByNode = couch_util:get_value(read_repair, Options),
+    case {X, DocsByNode} of
+        {_, undefined} ->
+            Docs = make_att_readers(Docs0),
+            with_db(DbName, Options,
+                {couch_db, update_docs, [Docs, Options, X]});
+        {replicated_changes, _} ->
+            update_docs_read_repair(DbName, DocsByNode, Options)
+    end.
+
+get_purge_seq(DbName, DbOptions) ->
+    with_db(DbName, DbOptions, {couch_db, get_purge_seq, []}).
+
+purge_docs(DbName, UUIdsIdsRevs, Options) ->
+    case proplists:get_value(replicated_changes, Options) of
+        true ->
+            X = replicated_changes;
+        _ ->
+            X = interactive_edit
+    end,
+    with_db(DbName, Options, {couch_db, purge_docs, [UUIdsIdsRevs, X]}).
 
 %% @equiv group_info(DbName, DDocId, [])
 group_info(DbName, DDocId) ->
@@ -297,6 +318,75 @@ with_db(DbName, Options, {M,F,A}) ->
     Error ->
         rexi:reply(Error)
     end.
+
+
+update_docs_read_repair(DbName, DocsByNode, Options) ->
+    set_io_priority(DbName, Options),
+    case get_or_create_db(DbName, Options) of
+    {ok, Db} ->
+        % omit Revisions that have been purged
+        Docs = filter_purged_revs(Db, DocsByNode),
+        Docs2 = make_att_readers(Docs),
+        {M,F,A} = {couch_db, update_docs, [Docs2, Options, replicated_changes]},
+        rexi:reply(try
+            apply(M, F, [Db | A])
+        catch Exception ->
+            Exception;
+        error:Reason ->
+            couch_log:error("rpc ~p:~p/~p ~p ~p", [M, F, length(A)+1, Reason,
+                clean_stack()]),
+            {error, Reason}
+        end);
+    Error ->
+        rexi:reply(Error)
+    end.
+
+
+% given [{Node, Doc}] diff revs of the same DocID from diff nodes
+% returns [Doc] filtering out purged docs.
+% This is done for read-repair from fabric_doc_open,
+% so that not to recreate Docs that have been purged before
+% on this node() from Nodes that are out of sync.
+filter_purged_revs(Db, DocsByNode) ->
+    AllowedPSeqLag = config:get_integer("purge", "allowed_purge_seq_lag", 100),
+    {ok, DbPSeq} = couch_db:get_purge_seq(Db),
+    PurgeFoldFun = fun({_P,_U, Id, Revs}, Acc) ->  [{Id, Revs}|Acc]  end,
+    V = "v" ++ config:get("purge", "version", "1") ++ "-",
+    StartKey = ?l2b(?LOCAL_DOC_PREFIX ++ "purge-" ++  V ++ "mem3-"),
+    EndKey = ?l2b(?LOCAL_DOC_PREFIX ++ "purge-" ++ V ++ "mem31"),
+    Opts = [{start_key, StartKey}, {end_key_gt, EndKey}],
+    % go through _local/purge-mem3-.. docs
+    % find Node that this LDoc corresponds to
+    % check if update from Node has not been recently purged on current node
+    LDocsFoldFun = fun(#doc{body={Props}}, Acc) ->
+        {VOps} = couch_util:get_value(<<"verify_options">>, Props),
+        Node = couch_util:get_value(<<"node">>, VOps),
+        Result = lists:keyfind(Node, 1, DocsByNode),
+        NewAcc = if not Result -> Acc; true ->
+            {Node, Doc} = Result,
+            NodePSeq = couch_util:get_value(<<"purge_seq">>, Props),
+            if  NodePSeq == DbPSeq ->
+                    [Doc|Acc];
+                (NodePSeq+AllowedPSeqLag) < DbPSeq ->
+                    % Node is very out of sync, ignore updates from it
+                    Acc;
+                true -> %(NodePSeq+ClientAllowedPSeqLag) >= DbPSeq
+                    % if Doc has been purged recently, than ignore it
+                    {ok, PurgedIdsRevs} = couch_db:fold_purged_docs(Db,
+                            NodePSeq, PurgeFoldFun, [], []),
+                    {Start, [FirstRevId|_]} = Doc#doc.revs,
+                    DocIdRevs = {Doc#doc.id, [{Start, FirstRevId}]},
+                    case lists:member(DocIdRevs, PurgedIdsRevs) of
+                        true -> Acc;
+                        false -> [Doc|Acc]
+                    end
+            end
+        end,
+        {ok, NewAcc}
+    end,
+    {ok, Docs} = couch_db_engine:fold_local_docs(Db, LDocsFoldFun, [], Opts),
+    Docs.
+
 
 get_or_create_db(DbName, Options) ->
     couch_db:open_int(DbName, [{create_if_missing, true} | Options]).
