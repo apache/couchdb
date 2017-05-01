@@ -54,13 +54,13 @@ start(#st{} = St, DbName, Options, Parent) ->
     % and hope everything works out for the best.
     unlink(DFd),
 
-    NewSt1 = copy_purge_info(St, NewSt),
-    NewSt2 = copy_compact(DbName, St, NewSt1, Retry),
+    NewSt2 = copy_compact(DbName, St, NewSt, Retry),
     NewSt3 = sort_meta_data(NewSt2),
     NewSt4 = commit_compaction_data(NewSt3),
     NewSt5 = copy_meta_data(NewSt4),
-    {ok, NewSt6} = couch_bt_engine:commit_data(NewSt5),
-    ok = couch_bt_engine:decref(NewSt6),
+    NewSt6 = copy_purge_info(St, NewSt5, Parent),
+    {ok, NewSt7} = couch_bt_engine:commit_data(NewSt6),
+    ok = couch_bt_engine:decref(NewSt7),
     ok = couch_file:close(MFd),
 
     % Done
@@ -88,31 +88,14 @@ open_compaction_files(SrcHdr, DbFilePath, Options) ->
             St1 = bind_emsort(St0, MetaFd, nil),
             {ok, St1, DataFile, DataFd, MetaFd, St0#st.id_tree};
         _ ->
-            Header = couch_bt_engine_header:from(SrcHdr),
+            Header0 = couch_bt_engine_header:from(SrcHdr),
+            % set purge_seq of NewSt to -1 on the 1st round of compaction
+            Header = couch_bt_engine_header:set(Header0, [{purge_seq, -1}]),
             ok = reset_compaction_file(DataFd, Header),
             ok = reset_compaction_file(MetaFd, Header),
             St0 = couch_bt_engine:init_state(DataFile, DataFd, Header, Options),
             St1 = bind_emsort(St0, MetaFd, nil),
             {ok, St1, DataFile, DataFd, MetaFd, nil}
-    end.
-
-
-copy_purge_info(OldSt, NewSt) ->
-    OldHdr = OldSt#st.header,
-    NewHdr = NewSt#st.header,
-    OldPurgeSeq = couch_bt_engine_header:purge_seq(OldHdr),
-    case OldPurgeSeq > 0 of
-        true ->
-            Purged = couch_bt_engine:get_last_purged(OldSt),
-            Opts = [{compression, NewSt#st.compression}],
-            {ok, Ptr, _} = couch_file:append_term(NewSt#st.fd, Purged, Opts),
-            NewNewHdr = couch_bt_engine_header:set(NewHdr, [
-                {purge_seq, OldPurgeSeq},
-                {purged_docs, Ptr}
-            ]),
-            NewSt#st{header = NewNewHdr};
-        false ->
-            NewSt
     end.
 
 
@@ -321,6 +304,99 @@ copy_doc_attachments(#st{} = SrcSt, SrcSp, DstSt) ->
             {Name, Type, NewBinSp, AttLen, DiskLen, RevPos, ExpectedMd5, Enc}
         end, BinInfos),
     {BodyData, NewBinInfos}.
+
+
+copy_purge_info(OldSt, NewSt, Parent) ->
+    OldPSeq = couch_bt_engine:get_purge_seq(OldSt),
+    NewPSeq = couch_bt_engine:get_purge_seq(NewSt),
+    % During 1st round of compaction, we copy all purges from OldSt to NewSt
+    %   respecting purged_docs_limit. During recompaction rounds, we copy
+    %   purges occurred during compact and remove from db's ID and Seq trees
+    %   completely purged Docs
+    % As we do diff copy_purge operations on the 1st and subsequent rounds of
+    % compaction, we need NewPSeq==-1 indicate the 1st round of compaction.
+    % We can't use NewPSeq==0 to indicate 1st round, as it will be wrong
+    % for the case when compaction started with OldPSeq=0 and NewPSeq=0
+    % and during compaction there were purge requests, and OldPSeq>0
+    % On recompaction, we need operations for copy_new_purge_info
+    % but since NewPseq is still 0 after 1s round, checking for 0 will lead us
+    % wrongly to copy_purge_info_from_start.
+    case NewPSeq of
+        OldPSeq  -> NewSt; % nothing to copy
+        -1 when OldPSeq > 0 -> copy_purge_info_from_start(OldSt, NewSt, Parent);
+        -1 when OldPSeq == 0  -> % just update the header
+            NewHeader =
+                couch_bt_engine_header:set(NewSt#st.header, [{purge_seq, 0}]),
+            NewSt#st{header=NewHeader};
+        _ -> copy_new_purge_info(OldSt, NewSt)
+    end.
+
+
+copy_purge_info_from_start(OldSt, NewSt, Parent) ->
+    % purge requests happened up to & including DisposPSeq can be disregarded
+    {ok, DisposPSeq} = gen_server:call(Parent, get_disposable_purge_seq),
+    FoldFun = fun({P, U, Id, Rs}, {AccP, AccU}) ->
+        {[{P, U}|AccP], [{U, {Id, Rs}}|AccU]}
+    end,
+    % copy purge requests from OldSt to NewSt starting AFTER DisposPSeq
+    {ok, {AddP, AddU}} = couch_bt_engine:fold_purged_docs(
+        OldSt, DisposPSeq, FoldFun, {[], []}, []),
+    {ok, NewPTree} = couch_btree:add(NewSt#st.purge_tree, lists:reverse(AddP)),
+    {ok, NewUTree} = couch_btree:add(NewSt#st.upurge_tree, lists:reverse(AddU)),
+    NewHeader = couch_bt_engine_header:set(NewSt#st.header,
+        [{purge_seq, couch_bt_engine:get_purge_seq(OldSt)}]
+    ),
+    NewSt#st{purge_tree = NewPTree, upurge_tree = NewUTree, header = NewHeader}.
+
+
+copy_new_purge_info(OldSt, NewSt) ->
+    % collect purges since NewPSeq
+    FoldFun = fun({P, U, Id, Rs}, {AccP, AccU, AccI, AccR}) ->
+        {[{P,U}|AccP], [{U,{Id, Rs}}|AccU], [Id|AccI], [{Id, Rs}|AccR]}
+    end,
+    NewPSeq = couch_bt_engine:get_purge_seq(NewSt),
+    InitAcc = {[], [], [], []},
+    {ok, {AddP, AddU, DocIds, PIdsRevs}} =
+        couch_bt_engine:fold_purged_docs(OldSt, NewPSeq, FoldFun, InitAcc, []),
+    {ok, NewPTree} = couch_btree:add(NewSt#st.purge_tree, lists:reverse(AddP)),
+    {ok, NewUTree} = couch_btree:add(NewSt#st.upurge_tree, lists:reverse(AddU)),
+
+    % Since purging a document will change the update_seq,
+    % finish_compaction will restart compaction in order to process
+    % the new updates, which takes care of handling partially
+    % purged documents.
+    % collect only Ids and Seqs of docs that were completely purged
+    OldDocInfos = couch_bt_engine:open_docs(NewSt, DocIds),
+    FoldFun2 = fun({OldFDI, {Id,Revs}}, {Acc1, Acc2}) ->
+        #full_doc_info{rev_tree=Tree, update_seq=UpSeq} = OldFDI,
+        case couch_key_tree:remove_leafs(Tree, Revs) of
+            {[], _} ->
+                {[Id| Acc1], [UpSeq| Acc2]};
+            _ ->
+                {Acc1, Acc2}
+        end
+    end,
+    {RemIds, RemSeqs} =
+        lists:foldl(FoldFun2, {[], []}, lists:zip(OldDocInfos, PIdsRevs)),
+    % remove from NewSt docs that were completely purged
+    {NewIdTree, NewSeqTree} = case {RemIds, RemSeqs} of
+        {[], []} ->
+            {NewSt#st.id_tree, NewSt#st.seq_tree};
+        _ ->
+            {ok, NewIT} = couch_btree:add_remove(NewSt#st.id_tree, [], RemIds),
+            {ok, NewST} = couch_btree:add_remove(NewSt#st.seq_tree, [], RemSeqs),
+            {NewIT, NewST}
+    end,
+    NewHeader = couch_bt_engine_header:set(NewSt#st.header,
+        [{purge_seq, couch_bt_engine:get_purge_seq(OldSt)}]
+    ),
+    NewSt#st{
+        header = NewHeader,
+        id_tree = NewIdTree,
+        seq_tree = NewSeqTree,
+        purge_tree = NewPTree,
+        upurge_tree = NewUTree
+    }.
 
 
 sort_meta_data(St0) ->
