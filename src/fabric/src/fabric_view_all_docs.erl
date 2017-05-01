@@ -58,9 +58,9 @@ go(DbName, Options, QueryArgs, Callback, Acc0) ->
         limit = Limit,
         conflicts = Conflicts,
         skip = Skip,
-        keys = Keys0
+        keys = Keys0,
+        extra = Extra
     } = QueryArgs,
-    {_, Ref0} = spawn_monitor(fun() -> exit(fabric:get_doc_count(DbName)) end),
     DocOptions1 = case Conflicts of
         true -> [conflicts|DocOptions0];
         _ -> DocOptions0
@@ -81,20 +81,31 @@ go(DbName, Options, QueryArgs, Callback, Acc0) ->
         true -> lists:sublist(Keys2, Limit);
         false -> Keys2
     end,
-    Timeout = fabric_util:all_docs_timeout(),
-    receive {'DOWN', Ref0, _, _, Result} ->
-        case Result of
-            {ok, TotalRows} ->
-                {ok, Acc1} = Callback({meta, [{total, TotalRows}]}, Acc0),
-                {ok, Acc2} = doc_receive_loop(
-                    Keys3, queue:new(), SpawnFun, MaxJobs, Callback, Acc1
-                ),
-                Callback(complete, Acc2);
-            Error ->
-                Callback({error, Error}, Acc0)
-        end
-    after Timeout ->
-        Callback(timeout, Acc0)
+    Resp = case couch_util:get_value(namespace, Extra, <<"_all_docs">>) of
+        <<"_local">> ->
+            {ok, null};
+        _ ->
+            Timeout = fabric_util:all_docs_timeout(),
+            {_, Ref0} = spawn_monitor(fun() ->
+                exit(fabric:get_doc_count(DbName))
+            end),
+            receive {'DOWN', Ref0, _, _, Result} ->
+                Result
+            after Timeout ->
+                timeout
+            end
+    end,
+    case Resp of
+        {ok, TotalRows} ->
+            {ok, Acc1} = Callback({meta, [{total, TotalRows}]}, Acc0),
+            {ok, Acc2} = doc_receive_loop(
+                Keys3, queue:new(), SpawnFun, MaxJobs, Callback, Acc1
+            ),
+            Callback(complete, Acc2);
+        timeout ->
+            Callback(timeout, Acc0);
+        Error ->
+            Callback({error, Error}, Acc0)
     end.
 
 go(DbName, _Options, Workers, QueryArgs, Callback, Acc0) ->
@@ -142,10 +153,11 @@ handle_message({meta, Meta0}, {Worker, From}, State) ->
     0 = fabric_dict:lookup_element(Worker, Counters0),
     rexi:stream_ack(From),
     Counters1 = fabric_dict:update_counter(Worker, 1, Counters0),
-    Total = Total0 + Tot,
-    Offset = Offset0 + Off,
-    UpdateSeq = case UpdateSeq0 of
-        nil -> nil;
+    Total = if Tot == null -> null; true -> Total0 + Tot end,
+    Offset = if Off == null -> null; true -> Offset0 + Off end,
+    UpdateSeq = case {UpdateSeq0, Seq} of
+        {nil, _} -> nil;
+        {_, null} -> null;
         _   -> [{Worker, Seq} | UpdateSeq0]
     end,
     case fabric_dict:any(0, Counters1) of
@@ -157,11 +169,16 @@ handle_message({meta, Meta0}, {Worker, From}, State) ->
             offset = Offset
         }};
     false ->
-        FinalOffset = erlang:min(Total, Offset+State#collector.skip),
+        FinalOffset = case Offset of
+            null -> null;
+            _ -> erlang:min(Total, Offset+State#collector.skip)
+        end,
         Meta = [{total, Total}, {offset, FinalOffset}] ++
             case UpdateSeq of
                 nil ->
                     [];
+                null ->
+                    [{update_seq, null}];
                 _ ->
                     [{update_seq, fabric_view_changes:pack_seqs(UpdateSeq)}]
             end,

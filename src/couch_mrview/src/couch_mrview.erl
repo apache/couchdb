@@ -403,8 +403,9 @@ cleanup(Db) ->
 
 
 all_docs_fold(Db, #mrargs{keys=undefined}=Args, Callback, UAcc) ->
+    ReduceFun = get_reduce_fun(Args),
     Total = get_total_rows(Db, Args),
-    UpdateSeq = couch_db:get_update_seq(Db),
+    UpdateSeq = get_update_seq(Db, Args),
     Acc = #mracc{
         db=Db,
         total_rows=Total,
@@ -412,7 +413,7 @@ all_docs_fold(Db, #mrargs{keys=undefined}=Args, Callback, UAcc) ->
         skip=Args#mrargs.skip,
         callback=Callback,
         user_acc=UAcc,
-        reduce_fun=fun couch_mrview_util:all_docs_reduce_to_count/1,
+        reduce_fun=ReduceFun,
         update_seq=UpdateSeq,
         args=Args
     },
@@ -420,8 +421,9 @@ all_docs_fold(Db, #mrargs{keys=undefined}=Args, Callback, UAcc) ->
     {ok, Offset, FinalAcc} = couch_db:enum_docs(Db, fun map_fold/3, Acc, Opts),
     finish_fold(FinalAcc, [{total, Total}, {offset, Offset}]);
 all_docs_fold(Db, #mrargs{direction=Dir, keys=Keys0}=Args, Callback, UAcc) ->
+    ReduceFun = get_reduce_fun(Args),
     Total = get_total_rows(Db, Args),
-    UpdateSeq = couch_db:get_update_seq(Db),
+    UpdateSeq = get_update_seq(Db, Args),
     Acc = #mracc{
         db=Db,
         total_rows=Total,
@@ -429,7 +431,7 @@ all_docs_fold(Db, #mrargs{direction=Dir, keys=Keys0}=Args, Callback, UAcc) ->
         skip=Args#mrargs.skip,
         callback=Callback,
         user_acc=UAcc,
-        reduce_fun=fun couch_mrview_util:all_docs_reduce_to_count/1,
+        reduce_fun=ReduceFun,
         update_seq=UpdateSeq,
         args=Args
     },
@@ -653,15 +655,31 @@ make_meta(Args, UpdateSeq, Base) ->
     end.
 
 
-get_total_rows(#db{local_tree = LocalTree} = Db, #mrargs{extra = Extra}) ->
+get_reduce_fun(#mrargs{extra = Extra}) ->
     case couch_util:get_value(namespace, Extra) of
         <<"_local">> ->
-            FoldFun = fun(_, _, Acc) -> {ok, Acc + 1} end,
-            {ok, _, Total} = couch_btree:foldl(LocalTree, FoldFun, 0),
-            Total;
+            fun(_) -> null end;
+        _ ->
+            fun couch_mrview_util:all_docs_reduce_to_count/1
+    end.
+
+
+get_total_rows(#db{} = Db, #mrargs{extra = Extra}) ->
+    case couch_util:get_value(namespace, Extra) of
+        <<"_local">> ->
+            null;
         _ ->
             {ok, Info} = couch_db:get_db_info(Db),
             couch_util:get_value(doc_count, Info)
+    end.
+
+
+get_update_seq(#db{} = Db, #mrargs{extra = Extra}) ->
+    case couch_util:get_value(namespace, Extra) of
+        <<"_local">> ->
+            null;
+        _ ->
+            couch_db:get_update_seq(Db)
     end.
 
 

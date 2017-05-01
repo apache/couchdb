@@ -43,7 +43,8 @@ all_docs_test_() ->
                     fun should_query_with_range/1,
                     fun should_query_with_range_rev/1,
                     fun should_query_with_limit_and_skip/1,
-                    fun should_query_with_include_docs/1
+                    fun should_query_with_include_docs/1,
+                    fun should_query_with_update_seq/1
                 ]
             }
         }
@@ -53,7 +54,7 @@ all_docs_test_() ->
 should_query(Db) ->
     Result = run_query(Db, []),
     Expect = {ok, [
-        {meta, [{total, 10}, {offset, 0}]},
+        {meta, [{total, null}, {offset, null}]},
         mk_row(1),
         mk_row(10),
         mk_row(2),
@@ -73,7 +74,7 @@ should_query_with_range(Db) ->
         {end_key, <<"_local/5">>}
     ]),
     Expect = {ok, [
-        {meta, [{total, 10}, {offset, 3}]},
+        {meta, [{total, null}, {offset, null}]},
         mk_row(3),
         mk_row(4),
         mk_row(5)
@@ -87,7 +88,7 @@ should_query_with_range_rev(Db) ->
         {inclusive_end, true}
     ]),
     Expect = {ok, [
-        {meta, [{total, 10}, {offset, 4}]},
+        {meta, [{total, null}, {offset, null}]},
         mk_row(5),
         mk_row(4),
         mk_row(3)
@@ -101,7 +102,7 @@ should_query_with_limit_and_skip(Db) ->
         {skip, 3}
     ]),
     Expect = {ok, [
-        {meta, [{total, 10}, {offset, 5}]},
+        {meta, [{total, null}, {offset, null}]},
         mk_row(5),
         mk_row(6),
         mk_row(7)
@@ -117,11 +118,22 @@ should_query_with_include_docs(Db) ->
     {row, Doc0} = mk_row(8),
     Doc = Doc0 ++ [{doc, {[{<<"val">>, 8}]}}],
     Expect = {ok, [
-        {meta, [{total, 10}, {offset, 8}]},
+        {meta, [{total, null}, {offset, null}]},
         {row, Doc}
     ]},
     ?_assertEqual(Expect, Result).
 
+should_query_with_update_seq(Db) ->
+    Result = run_query(Db, [
+        {start_key, <<"_local/2">>},
+        {limit, 1},
+        {update_seq, true}
+    ]),
+    Expect = {ok, [
+        {meta, [{total, null}, {offset, null}, {update_seq, null}]},
+        mk_row(2)
+    ]},
+    ?_assertEqual(Expect, Result).
 
 mk_row(IntId) ->
     Id = list_to_binary(io_lib:format("_local/~b", [IntId])),

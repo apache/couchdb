@@ -380,6 +380,8 @@ view_cb({meta, Meta}, #vacc{meta_sent=false, row_sent=false}=Acc) ->
         Offset -> [io_lib:format("\"offset\":~p", [Offset])]
     end ++ case couch_util:get_value(update_seq, Meta) of
         undefined -> [];
+        null ->
+            ["\"update_seq\":null"];
         UpdateSeq when is_integer(UpdateSeq) ->
             [io_lib:format("\"update_seq\":~B", [UpdateSeq])];
         UpdateSeq when is_binary(UpdateSeq) ->

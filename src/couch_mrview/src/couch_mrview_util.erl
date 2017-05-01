@@ -345,8 +345,7 @@ get_row_count(#mrview{btree=Bt}) ->
     {ok, Count}.
 
 
-all_docs_reduce_to_count(Reductions0) ->
-    Reductions = maybe_convert_reductions(Reductions0),
+all_docs_reduce_to_count(Reductions) ->
     Reduce = fun couch_db_updater:btree_by_id_reduce/2,
     {Count, _, _} = couch_btree:final_reduce(Reduce, Reductions),
     Count.
@@ -864,16 +863,6 @@ maybe_load_doc(Db, Id, Val, #mrargs{conflicts=true, doc_options=Opts}) ->
     doc_row(couch_index_util:load_doc(Db, docid_rev(Id, Val), [conflicts]), Opts);
 maybe_load_doc(Db, Id, Val, #mrargs{doc_options=Opts}) ->
     doc_row(couch_index_util:load_doc(Db, docid_rev(Id, Val), []), Opts).
-
-
-maybe_convert_reductions({KVs0, UserReductions}) ->
-    KVs = lists:map(fun maybe_convert_kv/1, KVs0),
-    {KVs, UserReductions}.
-
-maybe_convert_kv({<<"_local/", _/binary>> = DocId, _}) ->
-    #full_doc_info{id = DocId};
-maybe_convert_kv(DocInfo) ->
-    DocInfo.
 
 
 doc_row(null, _Opts) ->
