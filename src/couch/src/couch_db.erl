@@ -1288,7 +1288,7 @@ enum_docs(Db, <<"_local">>, InFun, InAcc, Options) ->
     FoldFun = pipe([fun skip_deleted/4], InFun),
     {ok, _LastReduce, OutAcc} = couch_btree:fold(
         Db#db.local_tree, FoldFun, InAcc, Options),
-    {ok, 0, OutAcc};
+    {ok, null, OutAcc};
 enum_docs(Db, NS, InFun, InAcc, Options0) ->
     FoldFun = pipe([
         fun skip_deleted/4,
