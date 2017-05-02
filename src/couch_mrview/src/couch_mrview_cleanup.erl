@@ -41,7 +41,23 @@ run(Db) ->
 
     lists:foreach(fun(FN) ->
         couch_log:debug("Deleting stale view file: ~s", [FN]),
-        couch_file:delete(RootDir, FN, [sync])
+        couch_file:delete(RootDir, FN, [sync]),
+        Sig = couch_mrview_util:get_signature_from_filename(FN),
+        if length(Sig) < 16 -> ok; true ->
+            case re:run(Sig,"^[a-fA-F0-9]+$",[{capture, none}]) of
+                match ->
+                    DocId = couch_mrview_util:get_local_purge_doc_id(Sig),
+                    case couch_db:open_doc(Db, DocId, []) of
+                        {ok, LocalPurgeDoc} ->
+                            couch_db:update_doc(Db,
+                                LocalPurgeDoc#doc{deleted=true}, [?ADMIN_CTX]);
+                        {not_found, _} ->
+                            ok
+                    end;
+                _ ->
+                    ok
+            end
+        end
     end, ToDelete),
 
     ok.
