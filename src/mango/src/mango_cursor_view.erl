@@ -34,7 +34,7 @@
 create(Db, Indexes, Selector, Opts) ->
     FieldRanges = mango_idx_view:field_ranges(Selector),
     Composited = composite_indexes(Indexes, FieldRanges),
-    {Index, IndexRanges, _KeysPrefixLength} = choose_best_index(Db, Composited),
+    {Index, IndexRanges} = choose_best_index(Db, Composited),
 
     Limit = couch_util:get_value(limit, Opts, mango_opts:default_limit()),
     Skip = couch_util:get_value(skip, Opts, 0),
@@ -107,14 +107,14 @@ execute(#cursor{db = Db, index = Idx} = Cursor0, UserFun, UserAcc) ->
 % check FieldRanges for a, b, c, and d and return
 % the longest prefix of columns found.
 composite_indexes(Indexes, FieldRanges) ->
-    FieldKeys = [Key || {Key, _} <- FieldRanges],
     lists:foldl(fun(Idx, Acc) ->
         Cols = mango_idx:columns(Idx),
         Prefix = composite_prefix(Cols, FieldRanges),
-        % create a KeysPrefixLength based on how close the prefix of
-        % the index is to the number of keys in the selector
-        KeysPrefixLength = length(FieldKeys) - length(Prefix),
-        [{Idx, Prefix, KeysPrefixLength} | Acc]
+        % Calcuate the difference between the FieldRanges/Selector
+        % and the Prefix. We want to select the index with a prefix
+        % that is as close to the FieldRanges as possible
+        PrefixDifference = length(FieldRanges) - length(Prefix),
+        [{Idx, Prefix, PrefixDifference} | Acc]
     end, [], Indexes).
 
 
@@ -128,36 +128,41 @@ composite_prefix([Col | Rest], Ranges) ->
             []
     end.
 
-% Low and behold our query planner
-% First pass: sort the IndexRanges by KeysPrefixLength,
-% if that is equal, choose the index with the least number of 
+
+% The query planner
+% First choose the index with the lowest difference between its 
+% Prefix and the FieldRanges. If that is equal, then
+% choose the index with the least number of 
 % fields in the index. If we still cannot break the tie, 
 % then choose alphabetically based on ddocId.
-% Return the first element.
+% Return the first element's Index and IndexRanges.
 %
 % In the future we can look into doing a cached parallel
 % reduce view read on each index with the ranges to find
 % the one that has the fewest number of rows or something.
 choose_best_index(_DbName, IndexRanges) ->
-    Cmp = fun({IdxA, PrefixA, KeysPrefixLengthA}, {IdxB, PrefixB, KeysPrefixLengthB}) ->
-        case KeysPrefixLengthA - KeysPrefixLengthB of
+    Cmp = fun({IdxA, _PrefixA, PrefixDifferenceA}, {IdxB, _PrefixB, PrefixDifferenceB}) ->
+        case PrefixDifferenceA - PrefixDifferenceB of
             N when N < 0 -> true;
             N when N == 0 ->
                 ColsLenA = length(mango_idx:columns(IdxA)),
                 ColsLenB = length(mango_idx:columns(IdxB)),
                 case ColsLenA - ColsLenB of
-                    M when M < 0 -> true;
+                    M when M < 0 -> 
+                        true;
                     M when M == 0 ->
                         % We have no other way to choose, so at this point 
-                        % select index based on (dbname, ddocid, view_name) triple
+                        % select the index based on (dbname, ddocid, view_name) triple
                         IdxA =< IdxB;
-                    _ -> false
+                    _ -> 
+                        false
                 end;
             _ ->
                 false
         end
     end,
-    hd(lists:sort(Cmp, IndexRanges)).
+    {SelectedIndex, SelectedIndexRanges, _} = hd(lists:sort(Cmp, IndexRanges)),
+    {SelectedIndex, SelectedIndexRanges}.
 
 
 handle_message({meta, _}, Cursor) ->
@@ -281,5 +286,3 @@ is_design_doc(RowProps) ->
         <<"_design/", _/binary>> -> true;
         _ -> false
     end.
-
- 
