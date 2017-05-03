@@ -19,6 +19,8 @@
 
 -include_lib("couch/include/couch_db.hrl").
 
+-define(FILL_RATIO, 0.5).
+
 extract(#btree{extract_kv=undefined}, Value) ->
     Value;
 extract(#btree{extract_kv=Extract}, Value) ->
@@ -398,7 +400,14 @@ modify_node(Bt, RootPointerInfo, Actions, QueryOutput) ->
         {LastKey, _LastValue} = element(tuple_size(NodeTuple), NodeTuple),
         {ok, [{LastKey, RootPointerInfo}], QueryOutput2};
     _Else2 ->
-        {ok, ResultList} = write_node(Bt, NodeType, NewNodeList),
+        {ok, ResultList} = case RootPointerInfo of
+        nil ->
+            write_node(Bt, NodeType, NewNodeList);
+        _ ->
+            {LastKey, _LastValue} = element(tuple_size(NodeTuple), NodeTuple),
+            OldNode = {LastKey, RootPointerInfo},
+            write_node(Bt, OldNode, NodeType, NodeList, NewNodeList)
+        end,
         {ok, ResultList, QueryOutput2}
     end.
 
@@ -441,6 +450,59 @@ write_node(#btree{fd = Fd, compression = Comp} = Bt, NodeType, NodeList) ->
         ANodeList <- NodeListList
     ],
     {ok, ResultList}.
+
+
+write_node(Bt, _OldNode, NodeType, [], NewList) ->
+    write_node(Bt, NodeType, NewList);
+write_node(Bt, _OldNode, NodeType, [_], NewList) ->
+    write_node(Bt, NodeType, NewList);
+write_node(Bt, OldNode, NodeType, OldList, NewList) ->
+    case can_reuse_old_node(OldList, NewList) of
+        {true, Prefix, Suffix} ->
+            {ok, PrefixKVs} = case Prefix of
+                [] -> {ok, []};
+                _ -> write_node(Bt, NodeType, Prefix)
+            end,
+            {ok, SuffixKVs} = case Suffix of
+                [] -> {ok, []};
+                _ -> write_node(Bt, NodeType, Suffix)
+            end,
+            Result = PrefixKVs ++ [OldNode] ++ SuffixKVs,
+            {ok, Result};
+        false ->
+            write_node(Bt, NodeType, NewList)
+    end.
+
+can_reuse_old_node(OldList, NewList) ->
+    {Prefix, RestNewList} = remove_prefix_kvs(hd(OldList), NewList),
+    case old_list_is_prefix(OldList, RestNewList, 0) of
+        {true, Size, Suffix} ->
+            ReuseThreshold = get_chunk_size() * ?FILL_RATIO,
+            if Size < ReuseThreshold -> false; true ->
+                {true, Prefix, Suffix}
+            end;
+        false ->
+            false
+    end.
+
+remove_prefix_kvs(KV1, [KV2 | Rest]) when KV2 < KV1 ->
+    {Prefix, RestNewList} = remove_prefix_kvs(KV1, Rest),
+    {[KV2 | Prefix], RestNewList};
+remove_prefix_kvs(_, RestNewList) ->
+    {[], RestNewList}.
+
+% No more KV's in the old node so its a prefix
+old_list_is_prefix([], Suffix, Size) ->
+    {true, Size, Suffix};
+% Some KV's have been removed from the old node
+old_list_is_prefix(_OldList, [], _Size) ->
+    false;
+% KV is equal in both old and new node so continue
+old_list_is_prefix([KV | Rest1], [KV | Rest2], Acc) ->
+    old_list_is_prefix(Rest1, Rest2, ?term_size(KV) + Acc);
+% KV mismatch between old and new node so not a prefix
+old_list_is_prefix(_OldList, _NewList, _Acc) ->
+    false.
 
 modify_kpnode(Bt, {}, _LowerBound, Actions, [], QueryOutput) ->
     modify_node(Bt, nil, Actions, QueryOutput);
