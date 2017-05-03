@@ -396,7 +396,8 @@ modify_node(Bt, RootPointerInfo, Actions, QueryOutput) ->
         {LastKey, _LastValue} = element(tuple_size(NodeTuple), NodeTuple),
         {ok, [{LastKey, RootPointerInfo}], QueryOutput2};
     _Else2 ->
-        {ok, ResultList} = write_node(Bt, NodeType, NewNodeList),
+        {ok, ResultList} = write_node(
+                Bt, RootPointerInfo, NodeType, NodeList, NewNodeList),
         {ok, ResultList, QueryOutput2}
     end.
 
@@ -439,6 +440,71 @@ write_node(#btree{fd = Fd, compression = Comp} = Bt, NodeType, NodeList) ->
         ANodeList <- NodeListList
     ],
     {ok, ResultList}.
+
+% Don't make our append-only write optimization for
+% kp nodes.
+write_node(Bt, _OldNode, kp_node, _OldList, NewList) ->
+    write_node(Bt, kp_node, NewList);
+
+% If we're creating a new kv node then there's no
+% possibility for the optimization
+write_node(Bt, _OldNode, NodeType, [], NewList) ->
+    write_node(Bt, NodeType, NewList);
+
+% Disable the optimization for nodes that only
+% have a single element so we don't end up increasing
+% the number of reads when folding a btree
+write_node(Bt, _OldNode, NodeType, [_], NewList) ->
+    write_node(Bt, NodeType, NewList);
+
+% If a KV node has had a new key appended to the
+% end of its list we can instead take the appended
+% KVs and create a new node while reusing the old
+% node already on disk. This saves us both the effort
+% of writing data that's already on disk as well as
+% saves us the disk space that would have been
+% orphaned by not reusing the old node.
+write_node(Bt, OldNode, NodeType, OldList, NewList) ->
+    case is_append_only(OldList, NewList) of
+        false ->
+            write_node(Bt, NodeType, NewList);
+        {true, Suffix} ->
+            case old_node_full(OldList) of
+                true ->
+                    {ok, Results} = write_node(Bt, NodeType, Suffix),
+                    {OldLastKey, _} = lists:last(OldList),
+                    {ok, [{OldLastKey,OldNode} | Results]};
+                false ->
+                    write_node(Bt, NodeType, NewList)
+            end
+    end.
+
+% This function will blow up if OldList == NewList
+% on purpose as an assertion that modify_node
+% doesn't provide this input.
+%
+% First clause finds our suff
+is_append_only([], [_ | _] = Suffix) ->
+    {true, Suffix};
+
+% We've removed keys from the node
+is_append_only([_ | _], []) ->
+    false;
+
+% We've found a mismatch of keys in the node
+is_append_only([KV1 | _], [KV2 | _]) when KV1 /= KV2 ->
+    false;
+
+% Current key is equal, keep going
+is_append_only([KV | Rest1], [KV | Rest2]) ->
+    is_append_only(Rest1, Rest2).
+
+old_node_full(OldList) ->
+    ChunkThreshold = get_chunk_size(),
+    NodeSize = lists:foldl(fun(KV, Acc) ->
+        Acc + ?term_size(KV)
+    end, 0, OldList),
+    NodeSize >= ChunkThreshold.
 
 modify_kpnode(Bt, {}, _LowerBound, Actions, [], QueryOutput) ->
     modify_node(Bt, nil, Actions, QueryOutput);
