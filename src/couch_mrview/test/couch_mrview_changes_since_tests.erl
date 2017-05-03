@@ -17,19 +17,12 @@
 
 -define(TIMEOUT, 1000).
 
-
-
-setup() ->
-    {ok, Db} = couch_mrview_test_util:init_db(?tempdb(), changes),
-    Db.
-
 teardown(Db) ->
     couch_db:close(Db),
     couch_server:delete(Db#db.name, [?ADMIN_CTX]),
     ok.
 
-
-changes_since_test() ->
+changes_since_basic_test_() ->
     {
         "changes_since tests",
         {
@@ -37,17 +30,62 @@ changes_since_test() ->
             fun test_util:start_couch/0, fun test_util:stop_couch/1,
             {
                 foreach,
-                fun setup/0, fun teardown/1,
+                fun() ->
+                    Type = {changes, seq_indexed},
+                    {ok, Db} = couch_mrview_test_util:init_db(?tempdb(), Type),
+                    Db
+                end,
+                fun teardown/1,
                 [
                     fun test_basic/1,
-                    fun test_range/1,
                     fun test_basic_since/1,
-                    fun test_range_since/1,
                     fun test_basic_count/1,
-                    fun test_range_count/1,
                     fun test_basic_count_since/1,
+                    fun test_compact/1
+                ]
+            }
+        }
+    }.
+
+changes_since_range_test_() ->
+    {
+        "changes_since_range tests",
+        {
+            setup,
+            fun test_util:start_couch/0, fun test_util:stop_couch/1,
+            {
+                foreach,
+                fun() ->
+                    Type = {changes, keyseq_indexed},
+                    {ok, Db} = couch_mrview_test_util:init_db(?tempdb(), Type),
+                    Db
+                end,
+                fun teardown/1,
+                [
+                    fun test_range/1,
+                    fun test_range_since/1
+                ]
+            }
+        }
+    }.
+
+changes_since_range_count_test_() ->
+    {
+        "changes_since_range_count tests",
+        {
+            setup,
+            fun test_util:start_couch/0, fun test_util:stop_couch/1,
+            {
+                foreach,
+                fun() ->
+                    Type = {changes, seq_indexed_keyseq_indexed},
+                    {ok, Db} = couch_mrview_test_util:init_db(?tempdb(), Type),
+                    Db
+                end,
+                fun teardown/1,
+                [
+                    fun test_range_count/1,
                     fun test_range_count_since/1,
-                    fun test_compact/1,
                     fun test_remove_key/1
                 ]
             }
@@ -57,46 +95,48 @@ changes_since_test() ->
 test_basic(Db) ->
     Result = run_query(Db, 0, []),
     Expect = {ok, [
-                {{2, 1, <<"1">>}, 1},
-                {{3, 10, <<"10">>}, 10},
-                {{4, 2, <<"2">>}, 2},
-                {{5, 3, <<"3">>}, 3},
-                {{6, 4, <<"4">>}, 4},
-                {{7, 5, <<"5">>}, 5},
-                {{8, 6, <<"6">>}, 6},
-                {{9, 7, <<"7">>}, 7},
-                {{10, 8, <<"8">>}, 8},
-                {{11, 9, <<"9">>}, 9}
+                {{2, <<"1">>, <<"1">>}, 1},
+                {{3, <<"10">>, <<"10">>}, 10},
+                {{4, <<"2">>, <<"2">>}, 2},
+                {{5, <<"3">>, <<"3">>}, 3},
+                {{6, <<"4">>, <<"4">>}, 4},
+                {{7, <<"5">>, <<"5">>}, 5},
+                {{8, <<"6">>, <<"6">>}, 6},
+                {{9, <<"7">>, <<"7">>}, 7},
+                {{10, <<"8">>, <<"8">>}, 8},
+                {{11, <<"9">>, <<"9">>}, 9}
     ]},
     ?_assertEqual(Result, Expect).
 
 
 test_range(Db) ->
-    Result = run_query(Db, 0, [{start_key, 3}, {end_key, 5}]),
+    Range = [{start_key, <<"3">>}, {end_key, <<"5">>}],
+    Result = run_query(Db, 0, Range),
     Expect = {ok, [
-                {{5, 3, <<"3">>}, 3},
-                {{6, 4, <<"4">>}, 4},
-                {{7, 5, <<"5">>}, 5}
+                {{5, <<"3">>, <<"3">>}, 3},
+                {{6, <<"4">>, <<"4">>}, 4},
+                {{7, <<"5">>, <<"5">>}, 5}
     ]},
     ?_assertEqual(Result, Expect).
 
 test_basic_since(Db) ->
     Result = run_query(Db, 5, []),
     Expect = {ok, [
-                {{6, 4, <<"4">>}, 4},
-                {{7, 5, <<"5">>}, 5},
-                {{8, 6, <<"6">>}, 6},
-                {{9, 7, <<"7">>}, 7},
-                {{10, 8, <<"8">>}, 8},
-                {{11, 9, <<"9">>}, 9}
+                {{6, <<"4">>, <<"4">>}, 4},
+                {{7, <<"5">>, <<"5">>}, 5},
+                {{8, <<"6">>, <<"6">>}, 6},
+                {{9, <<"7">>, <<"7">>}, 7},
+                {{10, <<"8">>, <<"8">>}, 8},
+                {{11, <<"9">>, <<"9">>}, 9}
     ]},
     ?_assertEqual(Result, Expect).
 
 test_range_since(Db) ->
-    Result = run_query(Db, 5, [{start_key, 3}, {end_key, 5}]),
+    Range = [{start_key, <<"3">>}, {end_key, <<"5">>}],
+    Result = run_query(Db, 5, Range),
     Expect = {ok, [
-                {{6, 4, <<"4">>}, 4},
-                {{7, 5, <<"5">>}, 5}
+                {{6, <<"4">>, <<"4">>}, 4},
+                {{7, <<"5">>, <<"5">>}, 5}
     ]},
     ?_assertEqual(Result, Expect).
 
@@ -105,7 +145,8 @@ test_basic_count(Db) ->
     ?_assertEqual(Result, 10).
 
 test_range_count(Db) ->
-    Result = run_count_query(Db, 0, [{start_key, 3}, {end_key, 5}]),
+    Range = [{start_key, <<"3">>}, {end_key, <<"5">>}],
+    Result = run_count_query(Db, 0, Range),
     ?_assertEqual(Result, 3).
 
 test_basic_count_since(Db) ->
@@ -113,14 +154,14 @@ test_basic_count_since(Db) ->
     ?_assertEqual(Result, 6).
 
 test_range_count_since(Db) ->
-    Result = run_count_query(Db, 5, [{start_key, 3}, {end_key, 5}]),
+    Range = [{start_key, <<"3">>}, {end_key, <<"5">>}],
+    Result = run_count_query(Db, 5, Range),
     ?_assertEqual(Result, 2).
 
 test_compact(Db) ->
     Result = couch_mrview:compact(Db, <<"_design/bar">>),
-    ?_assertEqual(Result, ok),
     Count = run_count_query(Db, 0, []),
-    ?_assertEqual(Count, 10).
+    [?_assertEqual(Result, ok), ?_assertEqual(Count, 10)].
 
 test_remove_key(Db) ->
     %% add new doc
@@ -130,13 +171,12 @@ test_remove_key(Db) ->
     {ok, _} =  couch_db:ensure_full_commit(Db),
     {ok, Db1} = couch_db:reopen(Db),
     Result = run_count_query(Db1, 0, []),
-    ?_assertEqual(Result, 11),
     %% check new view key
-    Result1 = run_query(Db1, 0, [{start_key, 11}, {end_key, 11}]),
+    Range = [{start_key, <<"11">>}, {end_key, <<"11">>}],
+    Result1 = run_query(Db1, 0, Range),
     Expect = {ok, [
-                {{12, 11, <<"11">>}, 11}
+                {{12, <<"11">>, <<"11">>}, 11}
     ]},
-    ?_assertEqual(Result1, Expect),
 
     %% delete doc
     Doc2 = couch_doc:from_json_obj({[
@@ -147,13 +187,17 @@ test_remove_key(Db) ->
     {ok, _} = couch_db:update_doc(Db1, Doc2, []),
     {ok, Db2} = couch_db:reopen(Db1),
     Result2 = run_count_query(Db2, 0, []),
-    ?_assertEqual(Result2, 11),
     %% check new view key
-    Result3 = run_query(Db2, 0, [{start_key, 11}, {end_key, 11}]),
+    Result3 = run_query(Db2, 0, Range),
     Expect2 = {ok, [
-                {{13, 11, <<"11">>}, {[{<<"_removed">>, true}]}}
+                {{13, <<"11">>, <<"11">>}, removed}
     ]},
-    ?_assertEqual(Result3, Expect2).
+    [
+        ?_assertEqual(Result, 11),
+        ?_assertEqual(Result1, Expect),
+        ?_assertEqual(Result2, 11),
+        ?_assertEqual(Result3, Expect2)
+    ].
 
 run_query(Db, Since, Opts) ->
     Fun = fun(KV, Acc) -> {ok, [KV | Acc]} end,

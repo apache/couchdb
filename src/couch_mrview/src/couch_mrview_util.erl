@@ -343,7 +343,7 @@ get_view_changes_count(View) ->
             {ok, 0};
         {#btree{}, nil} ->
             couch_btree:fold_reduce(SBtree, CountFun, 0, []);
-        {nil, #btree{}} ->
+        {_, #btree{}} ->
             couch_btree:fold_reduce(KSBtree, CountFun, 0, [])
     end,
     case {SBtree, KSBtree} of
@@ -813,9 +813,9 @@ changes_expand_dups([{{[Key, Seq], DocId}, {dups, Vals}} | Rest], Acc) ->
 changes_expand_dups([{{Seq, Key}, {DocId, {dups, Vals}}} | Rest], Acc) ->
     Expanded = [{{Seq, Key, DocId}, Val} || Val <- Vals],
     changes_expand_dups(Rest, Expanded ++ Acc);
-changes_expand_dups([{{[Key, Seq], DocId}, Val} | Rest], Acc) ->
+changes_expand_dups([{{[Key, Seq], DocId}, {Val, _}} | Rest], Acc) ->
     changes_expand_dups(Rest, [{{Seq, Key, DocId}, Val} | Acc]);
-changes_expand_dups([{{Seq, Key}, {DocId, Val}} | Rest], Acc) ->
+changes_expand_dups([{{Seq, Key}, {DocId, Val, _}} | Rest], Acc) ->
     changes_expand_dups(Rest, [{{Seq, Key, DocId}, Val} | Acc]).
 
 maybe_load_doc(_Db, _DI, #mrargs{include_docs=false}) ->

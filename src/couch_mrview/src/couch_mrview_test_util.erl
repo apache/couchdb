@@ -49,26 +49,27 @@ make_docs(local, Count) ->
 make_docs(_, Count) ->
     [doc(I) || I <- lists:seq(1, Count)].
 
-ddoc(changes) ->
+ddoc({changes, Opts}) ->
+    ViewOpts = case Opts of
+        seq_indexed ->
+            [{<<"seq_indexed">>, true}];
+        keyseq_indexed ->
+            [{<<"keyseq_indexed">>, true}];
+        seq_indexed_keyseq_indexed ->
+            [
+                {<<"seq_indexed">>, true},
+                {<<"keyseq_indexed">>, true}
+            ]
+    end,
     couch_doc:from_json_obj({[
         {<<"_id">>, <<"_design/bar">>},
-        {<<"options">>, {[
-            {<<"seq_indexed">>, true}
-        ]}},
+        {<<"options">>, {ViewOpts}},
         {<<"views">>, {[
             {<<"baz">>, {[
-                {<<"map">>, <<"function(doc) {emit(doc.val, doc.val);}">>}
-            ]}},
-            {<<"bing">>, {[
-                {<<"map">>, <<"function(doc) {}">>}
-            ]}},
-            {<<"zing">>, {[
-                {<<"map">>, <<
-                    "function(doc) {\n"
-                    "  if(doc.foo !== undefined)\n"
-                    "    emit(doc.foo, 0);\n"
-                    "}"
-                >>}
+                {
+                    <<"map">>,
+                    <<"function(doc) {emit(doc.val.toString(), doc.val);}">>
+                }
             ]}}
         ]}}
     ]});
