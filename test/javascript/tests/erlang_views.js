@@ -11,7 +11,6 @@
 // the License.
 
 couchTests.erlang_views = function(debug) {
-  return console.log('TODO: config not available on cluster');
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
@@ -97,8 +96,11 @@ couchTests.erlang_views = function(debug) {
 
       // Larger dataset
 
-      // db.deleteDb();
-      // db.createDb();
+      db.deleteDb();
+      // avoid Heisenbugs when files are not cleared entirely
+      db_name = get_random_db_name();
+      db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
+      db.createDb();
       var words = "foo bar abc def baz xxyz".split(/\s+/);
       
       var docs = [];

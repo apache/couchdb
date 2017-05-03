@@ -13,11 +13,11 @@
  
  
 couchTests.proxyauth = function(debug) {
-  return console.log('TODO: config not available on cluster');
   // this test proxy authentification handler
 
   var users_db_name = get_random_db_name();
   var usersDb = new CouchDB(users_db_name, {"X-Couch-Full-Commit":"false"});
+  usersDb.createDb();
 
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
@@ -56,7 +56,8 @@ couchTests.proxyauth = function(debug) {
     T(s.info.authenticated == "default");
     
     CouchDB.logout();
-    
+
+/*  XXX: None of the rest of this is supported yet in 2.0    
     var headers = {
       "X-Auth-CouchDB-UserName": "benoitc@apache.org",
       "X-Auth-CouchDB-Roles": "test",
@@ -81,13 +82,13 @@ couchTests.proxyauth = function(debug) {
     
     var req = CouchDB.request("GET", "/" + db_name + "/_design/test/_show/welcome",
                         {headers: headers});
-    T(req.responseText == "Welcome benoitc@apache.org");
+    T(req.responseText == "Welcome benoitc@apache.org", req.responseText);
     
     req = CouchDB.request("GET", "/" + db_name + "/_design/test/_show/role",
                         {headers: headers});
     T(req.responseText == "test");
     
-    var xhr = CouchDB.request("PUT", "/_config/couch_httpd_auth/proxy_use_secret",{
+    var xhr = CouchDB.request("PUT", "/_node/node1@127.0.0.1/_config/couch_httpd_auth/proxy_use_secret",{
       body : JSON.stringify("true"),
       headers: {"X-Couch-Persist": "false"}
     });
@@ -100,29 +101,30 @@ couchTests.proxyauth = function(debug) {
     req = CouchDB.request("GET", "/" + db_name + "/_design/test/_show/role",
                         {headers: headers});
     T(req.responseText == "test");
-    
+*/
+
   }
   
   run_on_modified_server(
     [{section: "httpd",
       key: "authentication_handlers",
-      value:"{couch_httpd_auth, proxy_authentification_handler}, {couch_httpd_auth, default_authentication_handler}"},
-      {section: "couch_httpd_auth",
+      value:"{chttpd_auth, proxy_authentification_handler}, {chttpd_auth, default_authentication_handler}"},
+      {section: "chttpd_auth",
         key: "authentication_db", 
         value: users_db_name},
-      {section: "couch_httpd_auth",
+      {section: "chttpd_auth",
         key: "secret", 
         value: secret},
-      {section: "couch_httpd_auth",
+      {section: "chttpd_auth",
         key: "x_auth_username", 
         value: "X-Auth-CouchDB-UserName"},
-      {section: "couch_httpd_auth",
+      {section: "chttpd_auth",
         key: "x_auth_roles", 
         value: "X-Auth-CouchDB-Roles"},
-      {section: "couch_httpd_auth",
+      {section: "chttpd_auth",
         key: "x_auth_token", 
         value: "X-Auth-CouchDB-Token"},
-      {section: "couch_httpd_auth",
+      {section: "chttpd_auth",
         key: "proxy_use_secret", 
         value: "false"}],
     TestFun

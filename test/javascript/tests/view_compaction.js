@@ -11,8 +11,6 @@
 // the License.
 
 couchTests.view_compaction = function(debug) {
-  return console.log('TODO');
-
   if (debug) debugger;
 
   var db_name = get_random_db_name();
@@ -87,7 +85,7 @@ couchTests.view_compaction = function(debug) {
   T(data_size_before_compact < disk_size_before_compact, "data size < file size");
 
   // compact view group
-  var xhr = CouchDB.request("POST", "/" + db.name + "/_design/foo/_compact");
+  var xhr = CouchDB.request("POST", "/" + db.name + "/_compact/foo");
   T(JSON.parse(xhr.responseText).ok === true);
 
   resp = db.designInfo("_design/foo");

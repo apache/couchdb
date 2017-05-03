@@ -11,7 +11,7 @@
 // the License.
 
 couchTests.oauth_users_db = function(debug) {
-  return console.log('TODO: config not available on cluster');
+  return console.log('TODO: oauth not available on clustered interface');
   // This tests OAuth authentication using the _users DB instead of the ini
   // configuration for storing OAuth tokens and secrets.
 

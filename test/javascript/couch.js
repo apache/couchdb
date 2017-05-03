@@ -139,7 +139,8 @@ function CouchDB(name, httpHeaders, globalRequestOptions) {
 
   // Applies the map function to the contents of database and returns the results.
   this.query = function(mapFun, reduceFun, options, keys, language) {
-    var body = {language: language || "javascript"};
+    //var body = {language: language || "javascript"};
+    var body = {}
     if(keys) {
       options.keys = keys ;
     }
@@ -159,6 +160,7 @@ function CouchDB(name, httpHeaders, globalRequestOptions) {
         delete options.options;
     }
     var ddoc = {
+      language: language || "javascript",
       views: {
         view: body
       }
