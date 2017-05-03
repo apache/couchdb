@@ -189,7 +189,7 @@ active_doc(DbName, DocId) ->
             {ok, DocInfo} ->
                 {ok, DocInfo};
             {error, not_found} ->
-                active_doc_rpc(DbName, DocId, Nodes -- Owner)
+                active_doc_rpc(DbName, DocId, Nodes -- [Owner])
         end
     catch
         % Might be a local database
