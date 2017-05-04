@@ -1,17 +1,54 @@
-before_install:
-   - sudo apt-get -y update
-   - sudo apt-get -y install libicu-dev libmozjs185-dev pkg-config help2man libcurl4-openssl-dev
-   - sudo apt-get -y install libtool automake autoconf autoconf-archive
-   - sudo apt-get -y install shunit2
-before_script: ./configure -c --disable-docs --disable-fauxton
-script:
-   - make check
 language: erlang
+sudo: false
+
+os: linux
 otp_release:
-   - 18.1
-   - 18.0
+   - 19.3
+   - 18.3
    - 17.5
    - R16B03-1
+
+addons:
+  apt:
+    packages:
+    - build-essential
+    - curl
+    - libcurl4-openssl-dev
+    - libicu-dev
+    - libmozjs185-dev
+    - pkg-config
+    - help2man
+    - shunit2
+
 git:
   depth: 10
-cache: apt
+
+# Enable this block if you want to build docs & fauxton too
+#cache:
+#  - pip
+#node_js:
+#  - 6
+#install:
+#  - pip install sphinx
+#before_script:
+#  - ./configure -c
+
+# Then comment this section out
+before_script:
+  - ./configure -c --disable-docs --disable-fauxton
+
+script:
+   - make check
+
+# Re-enable once test suite is reliable
+#notifications:
+#  email: false
+#  irc:
+#    channels:
+#      "irc.freenode.org#couchdb-dev"
+#  on_success: change
+#  on_failure: always
+#  use_notice: true
+#  skip_join: true
+#  template:
+#    - %{repository_slug}/%{branch}: %{message} %{build_url}"
