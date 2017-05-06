@@ -156,7 +156,7 @@ hs256_verify(Message, HMAC, SecretKey) ->
     case crypto:hmac(sha256, SecretKey, Message) of
         HMAC ->
             ok;
-        E ->
+        _ ->
             throw({error, bad_hmac})
     end.
 
