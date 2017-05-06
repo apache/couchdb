@@ -56,6 +56,7 @@ validate_header(Props) ->
 validate_payload(Props) ->
     validate_iss(Props),
     validate_iat(Props),
+    validate_nbf(Props),
     validate_exp(Props).
 
 
@@ -75,6 +76,15 @@ validate_iat(Props) ->
     case proplists:get_value(<<"iat">>, Props) of
         undefined ->
             throw({error, missing_iat});
+        IAT ->
+            assert_past(iat, IAT)
+    end.
+
+
+validate_nbf(Props) ->
+    case proplists:get_value(<<"nbf">>, Props) of
+        undefined ->
+            throw({error, missing_nbf});
         IAT ->
             assert_past(iat, IAT)
     end.
