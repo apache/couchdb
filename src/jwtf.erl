@@ -12,14 +12,12 @@
 
 -module(jwtf).
 
--export([decode/1]).
+-export([decode/3]).
 
--spec decode(EncodedToken :: binary()) ->
-    {ok, DecodedToken :: term()} | {error, Reason :: term()}.
-decode(EncodedToken) ->
+decode(EncodedToken, Checks, KS) ->
     try
         [Header, Payload, Signature] = split(EncodedToken),
-        validate(Header, Payload, Signature),
+        validate(Header, Payload, Signature, Checks, KS),
         {ok, decode_json(Payload)}
     catch
         throw:Error ->
@@ -27,104 +25,139 @@ decode(EncodedToken) ->
     end.
 
 
-validate(Header0, Payload0, Signature) ->
+validate(Header0, Payload0, Signature, Checks, KS) ->
     Header1 = props(decode_json(Header0)),
     validate_header(Header1),
 
     Payload1 = props(decode_json(Payload0)),
-    validate_payload(Payload1),
+    validate_payload(Payload1, Checks),
 
-    PublicKey = public_key(Payload1),
-    rs256_verify(Header0, Payload0, Signature, PublicKey).
+    Alg = prop(<<"alg">>, Header1),
+    Key = key(Payload1, Checks, KS),
+    verify(Alg, Header0, Payload0, Signature, Key).
 
 
 validate_header(Props) ->
-    case proplists:get_value(<<"typ">>, Props) of
+    case prop(<<"typ">>, Props) of
         <<"JWT">> ->
             ok;
         _ ->
             throw({error, invalid_type})
     end,
-    case proplists:get_value(<<"alg">>, Props) of
+    case prop(<<"alg">>, Props) of
         <<"RS256">> ->
+            ok;
+        <<"HS256">> ->
             ok;
         _ ->
             throw({error, invalid_alg})
     end.
 
 
-validate_payload(Props) ->
-    validate_iss(Props),
-    validate_iat(Props),
-    validate_nbf(Props),
-    validate_exp(Props).
+%% Not all these fields have to be present, but if they _are_ present
+%% they must be valid.
+validate_payload(Props, Checks) ->
+    validate_iss(Props, Checks),
+    validate_iat(Props, Checks),
+    validate_nbf(Props, Checks),
+    validate_exp(Props, Checks).
 
 
-validate_iss(Props) ->
-    ExpectedISS = list_to_binary(config:get("iam", "iss")),
-    case proplists:get_value(<<"iss">>, Props) of
-        undefined ->
+validate_iss(Props, Checks) ->
+    ExpectedISS = prop(iss, Checks),
+    ActualISS = prop(<<"iss">>, Props),
+
+    case {ExpectedISS, ActualISS} of
+        {ISS, undefined} when ISS /= undefined ->
             throw({error, missing_iss});
-        ExpectedISS ->
+        {ISS, ISS} ->
             ok;
-        _ ->
+        {_, _} ->
             throw({error, invalid_iss})
     end.
 
 
-validate_iat(Props) ->
-    case proplists:get_value(<<"iat">>, Props) of
-        undefined ->
+validate_iat(Props, Checks) ->
+    Required = prop(iat, Checks),
+    IAT = prop(<<"iat">>, Props),
+
+    case {Required, IAT} of
+        {undefined, undefined} ->
+            ok;
+        {true, undefined} ->
             throw({error, missing_iat});
-        IAT ->
+        {true, IAT} ->
             assert_past(iat, IAT)
     end.
 
 
-validate_nbf(Props) ->
-    case proplists:get_value(<<"nbf">>, Props) of
-        undefined ->
+validate_nbf(Props, Checks) ->
+    Required = prop(nbf, Checks),
+    NBF = prop(<<"nbf">>, Props),
+
+    case {Required, NBF} of
+        {undefined, undefined} ->
+            ok;
+        {true, undefined} ->
             throw({error, missing_nbf});
-        IAT ->
+        {true, IAT} ->
             assert_past(iat, IAT)
     end.
 
 
-validate_exp(Props) ->
-    case proplists:get_value(<<"exp">>, Props) of
-        undefined ->
+validate_exp(Props, Checks) ->
+    Required = prop(exp, Checks),
+    EXP = prop(<<"exp">>, Props),
+
+    case {Required, EXP} of
+        {undefined, undefined} ->
+            ok;
+        {true, undefined} ->
             throw({error, missing_exp});
-        EXP ->
+        {true, EXP} ->
             assert_future(exp, EXP)
     end.
 
 
-public_key(Props) ->
-    KID = case proplists:get_value(<<"kid">>, Props) of
-        undefined ->
+key(Props, Checks, KS) ->
+    Required = prop(kid, Checks),
+    KID = prop(<<"kid">>, Props),
+    case {Required, KID} of
+        {undefined, undefined} ->
+            KS(undefined);
+        {true, undefined} ->
             throw({error, missing_kid});
-        List ->
-             binary_to_list(List)
-    end,
-    case config:get("iam_rsa_public_keys", KID) of
-        undefined ->
-            throw({error, public_key_not_found});
-        ExpMod ->
-            [Exp, Mod] = re:split(ExpMod, ",", [{return, binary}]),
-            [
-                crypto:bytes_to_integer(base64:decode(Exp)),
-                crypto:bytes_to_integer(base64:decode(Mod))
-            ]
+        {true, KID} ->
+            KS(KID)
     end.
 
 
-rs256_verify(Header, Payload, Signature, PublicKey) ->
+verify(Alg, Header, Payload, Signature0, Key) ->
     Message = <<Header/binary, $., Payload/binary>>,
+    Signature1 = b64url:decode(Signature0),
+    case Alg of
+        <<"RS256">> ->
+            rs256_verify(Message, Signature1, Key);
+        <<"HS256">> ->
+            hs256_verify(Message, Signature1, Key)
+    end.
+
+
+rs256_verify(Message, Signature, PublicKey) ->
     case crypto:verify(rsa, sha256, Message, Signature, PublicKey) of
         true ->
             ok;
         false ->
             throw({error, bad_signature})
+    end.
+
+
+hs256_verify(Message, HMAC, SecretKey) ->
+    case crypto:hmac(sha256, SecretKey, Message) of
+        HMAC ->
+            ok;
+        E ->
+            throw({error, bad_hmac})
     end.
 
 
@@ -171,19 +204,41 @@ now_seconds() ->
     {MegaSecs, Secs, _MicroSecs} = os:timestamp(),
     MegaSecs * 1000000 + Secs.
 
+
+prop(Prop, Props) ->
+    proplists:get_value(Prop, Props).
+
+
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
-decode_test() ->
-    ok = application:start(config),
+hs256_test() ->
+    EncodedToken = <<"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwc"
+                     "zovL2Zvby5jb20iLCJpYXQiOjAsImV4cCI6MTAwMDAwMDAwMDAwMDA"
+                     "sImtpZCI6ImJhciJ9.lpOvEnYLdcujwo9RbhzXme6J-eQ1yfl782qq"
+                     "crR6QYE">>,
+    KS = fun(_) -> <<"secret">> end,
+    Checks = [{iss, <<"https://foo.com">>}, iat, exp, kid],
+    ?assertMatch({ok, _}, decode(EncodedToken, Checks, KS)).
 
-    EncodedToken = <<"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2Zvby5jb20iLCJpYXQiOjAsImV4cCI6MTAwMDAwMDAwMDAwMDAsImtpZCI6ImJhciJ9.bi87-lkEeOblTb_5ZEh6FkmOSg3mC_kqu2xcYJpJb3So29agyJkkidu3NF8R20x-Xi1wD6E8ACgfODsbdu5dbNRc-HUaFUnvyBr-M94PXhSOvLduoXT2mg1tgD1s_n0QgmH0pP-aAINgotDiUBuQ-pMD5hDIX2EYqAjwRcnVrno">>,
+rs256_test() ->
+    EncodedToken = <<"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwc"
+                     "zovL2Zvby5jb20iLCJpYXQiOjAsImV4cCI6MTAwMDAwMDAwMDAwMDA"
+                     "sImtpZCI6ImJhciJ9.bi87-lkEeOblTb_5ZEh6FkmOSg3mC_kqu2xc"
+                     "YJpJb3So29agyJkkidu3NF8R20x-Xi1wD6E8ACgfODsbdu5dbNRc-H"
+                     "UaFUnvyBr-M94PXhSOvLduoXT2mg1tgD1s_n0QgmH0pP-aAINgotDi"
+                     "UBuQ-pMD5hDIX2EYqAjwRcnVrno">>,
 
-    PublicKey = "AQAB,3ZWrUY0Y6IKN1qI4BhxR2C7oHVFgGPYkd38uGq1jQNSqEvJFcN93CYm16/G78FAFKWqwsJb3Wx+nbxDn6LtP4AhULB1H0K0g7/jLklDAHvI8yhOKlvoyvsUFPWtNxlJyh5JJXvkNKV/4Oo12e69f8QCuQ6NpEPl+cSvXIqUYBCs=",
+    PublicKey = <<"AQAB,3ZWrUY0Y6IKN1qI4BhxR2C7oHVFgGPYkd38uGq1jQNSqEvJFcN93CY"
+                  "m16/G78FAFKWqwsJb3Wx+nbxDn6LtP4AhULB1H0K0g7/jLklDAHvI8yhOKl"
+                  "voyvsUFPWtNxlJyh5JJXvkNKV/4Oo12e69f8QCuQ6NpEPl+cSvXIqUYBCs=">>,
 
-    config:set("iam", "iss", "https://foo.com"),
-    config:set("iam_rsa_public_keys", "bar", PublicKey),
+    Checks = [{iss, <<"https://foo.com">>}, iat, exp, kid],
+    KS = fun(<<"bar">>) -> PublicKey end,
 
-    ?assertEqual(nope, decode(EncodedToken)).
+    ?assertMatch({ok, _}, decode(EncodedToken, Checks, KS)).
 
 -endif.
+
+
+

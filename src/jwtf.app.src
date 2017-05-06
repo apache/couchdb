@@ -18,7 +18,6 @@
         kernel,
         stdlib,
         b64url,
-        config,
         crypto,
         jiffy
     ]},
