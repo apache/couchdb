@@ -19,7 +19,8 @@
         stdlib,
         b64url,
         crypto,
-        jiffy
+        jiffy,
+        public_key
     ]},
     {env,[]},
     {modules, []},

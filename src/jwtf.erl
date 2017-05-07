@@ -42,7 +42,7 @@ validate_header(Props) ->
         <<"JWT">> ->
             ok;
         _ ->
-            throw({error, invalid_type})
+            throw({error, invalid_typ})
     end,
     case prop(<<"alg">>, Props) of
         <<"RS256">> ->
@@ -101,7 +101,7 @@ validate_nbf(Props, Checks) ->
         {true, undefined} ->
             throw({error, missing_nbf});
         {true, IAT} ->
-            assert_past(iat, IAT)
+            assert_past(nbf, IAT)
     end.
 
 
@@ -144,7 +144,7 @@ verify(Alg, Header, Payload, Signature0, Key) ->
 
 
 rs256_verify(Message, Signature, PublicKey) ->
-    case crypto:verify(rsa, sha256, Message, Signature, PublicKey) of
+    case public_key:verify(Message, sha256, Signature, PublicKey) of
         true ->
             ok;
         false ->
@@ -212,31 +212,125 @@ prop(Prop, Props) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
+encode(Header0, Payload0) ->
+    Header1 = b64url:encode(jiffy:encode(Header0)),
+    Payload1 = b64url:encode(jiffy:encode(Payload0)),
+    Sig = b64url:encode(<<"bad">>),
+    <<Header1/binary, $., Payload1/binary, $., Sig/binary>>.
+
+valid_header() ->
+    {[{<<"typ">>, <<"JWT">>}, {<<"alg">>, <<"RS256">>}]}.
+
+jwt_io_pubkey() ->
+    PublicKeyPEM = <<"-----BEGIN PUBLIC KEY-----\n"
+                  "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDdlatRjRjogo3WojgGH"
+                  "FHYLugdUWAY9iR3fy4arWNA1KoS8kVw33cJibXr8bvwUAUparCwlvdbH6"
+                  "dvEOfou0/gCFQsHUfQrSDv+MuSUMAe8jzKE4qW+jK+xQU9a03GUnKHkkl"
+                  "e+Q0pX/g6jXZ7r1/xAK5Do2kQ+X5xK9cipRgEKwIDAQAB\n"
+                  "-----END PUBLIC KEY-----\n">>,
+    [PEMEntry] = public_key:pem_decode(PublicKeyPEM),
+    public_key:pem_entry_decode(PEMEntry).
+
+
+invalid_typ_test() ->
+    Encoded = encode({[{<<"typ">>, <<"NOPE">>}]}, []),
+    ?assertEqual({error, invalid_typ}, decode(Encoded, [typ], nil)).
+
+
+invalid_alg_test() ->
+    Encoded = encode({[{<<"typ">>, <<"JWT">>}, {<<"alg">>, <<"NOPE">>}]}, []),
+    ?assertEqual({error, invalid_alg}, decode(Encoded, [alg], nil)).
+
+
+missing_iss_test() ->
+    Encoded = encode(valid_header(), {[]}),
+    ?assertEqual({error, missing_iss}, decode(Encoded, [{iss, right}], nil)).
+
+
+invalid_iss_test() ->
+    Encoded = encode(valid_header(), {[{<<"iss">>, <<"wrong">>}]}),
+    ?assertEqual({error, invalid_iss}, decode(Encoded, [{iss, right}], nil)).
+
+
+missing_iat_test() ->
+    Encoded = encode(valid_header(), {[]}),
+    ?assertEqual({error, missing_iat}, decode(Encoded, [iat], nil)).
+
+
+invalid_iat_test() ->
+    Encoded = encode(valid_header(), {[{<<"iat">>, 32503680000}]}),
+    ?assertEqual({error, {iat,not_in_past}}, decode(Encoded, [iat], nil)).
+
+
+missing_nbf_test() ->
+    Encoded = encode(valid_header(), {[]}),
+    ?assertEqual({error, missing_nbf}, decode(Encoded, [nbf], nil)).
+
+
+invalid_nbf_test() ->
+    Encoded = encode(valid_header(), {[{<<"nbf">>, 32503680000}]}),
+    ?assertEqual({error, {nbf,not_in_past}}, decode(Encoded, [nbf], nil)).
+
+
+missing_exp_test() ->
+    Encoded = encode(valid_header(), {[]}),
+    ?assertEqual({error, missing_exp}, decode(Encoded, [exp], nil)).
+
+
+invalid_exp_test() ->
+    Encoded = encode(valid_header(), {[{<<"exp">>, 0}]}),
+    ?assertEqual({error, {exp,not_in_future}}, decode(Encoded, [exp], nil)).
+
+
+bad_rs256_sig_test() ->
+    Encoded = encode(
+        {[{<<"typ">>, <<"JWT">>}, {<<"alg">>, <<"RS256">>}]},
+        {[]}),
+    KS = fun(undefined) -> jwt_io_pubkey() end,
+    ?assertEqual({error, bad_signature}, decode(Encoded, [], KS)).
+
+
+bad_hs256_sig_test() ->
+    Encoded = encode(
+        {[{<<"typ">>, <<"JWT">>}, {<<"alg">>, <<"HS256">>}]},
+        {[]}),
+    KS = fun(undefined) -> <<"bad">> end,
+    ?assertEqual({error, bad_hmac}, decode(Encoded, [], KS)).
+
+
+malformed_token_test() ->
+    ?assertEqual({error, malformed_token}, decode(<<"a.b.c.d">>, [], nil)).
+
+
 hs256_test() ->
     EncodedToken = <<"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwc"
                      "zovL2Zvby5jb20iLCJpYXQiOjAsImV4cCI6MTAwMDAwMDAwMDAwMDA"
                      "sImtpZCI6ImJhciJ9.lpOvEnYLdcujwo9RbhzXme6J-eQ1yfl782qq"
                      "crR6QYE">>,
     KS = fun(_) -> <<"secret">> end,
-    Checks = [{iss, <<"https://foo.com">>}, iat, exp, kid],
+    Checks = [{iss, <<"https://foo.com">>}, iat, exp, kid, sig],
     ?assertMatch({ok, _}, decode(EncodedToken, Checks, KS)).
 
+
+%% jwt.io example
 rs256_test() ->
-    EncodedToken = <<"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwc"
-                     "zovL2Zvby5jb20iLCJpYXQiOjAsImV4cCI6MTAwMDAwMDAwMDAwMDA"
-                     "sImtpZCI6ImJhciJ9.bi87-lkEeOblTb_5ZEh6FkmOSg3mC_kqu2xc"
-                     "YJpJb3So29agyJkkidu3NF8R20x-Xi1wD6E8ACgfODsbdu5dbNRc-H"
-                     "UaFUnvyBr-M94PXhSOvLduoXT2mg1tgD1s_n0QgmH0pP-aAINgotDi"
-                     "UBuQ-pMD5hDIX2EYqAjwRcnVrno">>,
+    EncodedToken = <<"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0N"
+                     "TY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWV9.Ek"
+                     "N-DOsnsuRjRO6BxXemmJDm3HbxrbRzXglbN2S4sOkopdU4IsDxTI8j"
+                     "O19W_A4K8ZPJijNLis4EZsHeY559a4DFOd50_OqgHGuERTqYZyuhtF"
+                     "39yxJPAjUESwxk2J5k_4zM3O-vtd1Ghyo4IbqKKSy6J9mTniYJPenn"
+                     "5-HIirE">>,
 
-    PublicKey = <<"AQAB,3ZWrUY0Y6IKN1qI4BhxR2C7oHVFgGPYkd38uGq1jQNSqEvJFcN93CY"
-                  "m16/G78FAFKWqwsJb3Wx+nbxDn6LtP4AhULB1H0K0g7/jLklDAHvI8yhOKl"
-                  "voyvsUFPWtNxlJyh5JJXvkNKV/4Oo12e69f8QCuQ6NpEPl+cSvXIqUYBCs=">>,
+    Checks = [sig],
+    KS = fun(undefined) -> jwt_io_pubkey() end,
 
-    Checks = [{iss, <<"https://foo.com">>}, iat, exp, kid],
-    KS = fun(<<"bar">>) -> PublicKey end,
+    ExpectedPayload = {[
+        {<<"sub">>, <<"1234567890">>},
+        {<<"name">>, <<"John Doe">>},
+        {<<"admin">>, true}
+    ]},
 
-    ?assertMatch({ok, _}, decode(EncodedToken, Checks, KS)).
+    ?assertMatch({ok, ExpectedPayload}, decode(EncodedToken, Checks, KS)).
 
 -endif.
 
