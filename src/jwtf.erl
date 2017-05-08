@@ -250,9 +250,19 @@ jwt_io_pubkey() ->
     public_key:pem_entry_decode(PEMEntry).
 
 
+missing_typ_test() ->
+    Encoded = encode({[]}, []),
+    ?assertEqual({error, missing_typ}, decode(Encoded, [typ], nil)).
+
+
 invalid_typ_test() ->
     Encoded = encode({[{<<"typ">>, <<"NOPE">>}]}, []),
     ?assertEqual({error, invalid_typ}, decode(Encoded, [typ], nil)).
+
+
+missing_alg_test() ->
+    Encoded = encode({[{<<"typ">>, <<"NOPE">>}]}, []),
+    ?assertEqual({error, missing_alg}, decode(Encoded, [alg], nil)).
 
 
 invalid_alg_test() ->
@@ -300,6 +310,11 @@ invalid_exp_test() ->
     ?assertEqual({error, {exp,not_in_future}}, decode(Encoded, [exp], nil)).
 
 
+missing_kid_test() ->
+    Encoded = encode(valid_header(), {[]}),
+    ?assertEqual({error, missing_kid}, decode(Encoded, [kid], nil)).
+
+
 bad_rs256_sig_test() ->
     Encoded = encode(
         {[{<<"typ">>, <<"JWT">>}, {<<"alg">>, <<"RS256">>}]},
@@ -339,7 +354,7 @@ rs256_test() ->
                      "39yxJPAjUESwxk2J5k_4zM3O-vtd1Ghyo4IbqKKSy6J9mTniYJPenn"
                      "5-HIirE">>,
 
-    Checks = [sig],
+    Checks = [sig, alg],
     KS = fun(undefined) -> jwt_io_pubkey() end,
 
     ExpectedPayload = {[
