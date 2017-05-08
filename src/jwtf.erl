@@ -333,6 +333,3 @@ rs256_test() ->
     ?assertMatch({ok, ExpectedPayload}, decode(EncodedToken, Checks, KS)).
 
 -endif.
-
-
-
