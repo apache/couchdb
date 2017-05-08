@@ -23,6 +23,7 @@
 -export([for_db/1, for_db/2, for_docid/2, for_docid/3, get/3, local/1, fold/2]).
 -export([for_shard_name/1]).
 -export([set_max_size/1]).
+-export([get_changes_pid/0]).
 
 -record(st, {
     max_size = 25000,
@@ -169,6 +170,9 @@ fold(Fun, Acc) ->
 set_max_size(Size) when is_integer(Size), Size > 0 ->
     gen_server:call(?MODULE, {set_max_size, Size}).
 
+get_changes_pid() ->
+    gen_server:call(?MODULE, get_changes_pid).
+
 handle_config_change("mem3", "shard_cache_size", SizeList, _, _) ->
     Size = list_to_integer(SizeList),
     {ok, gen_server:call(?MODULE, {set_max_size, Size}, infinity)};
@@ -219,6 +223,8 @@ handle_call(shard_db_changed, _From, St) ->
     {reply, ok, St};
 handle_call({set_write_timeout, Timeout}, _From, St) ->
     {reply, ok, St#st{write_timeout = Timeout}};
+handle_call(get_changes_pid, _From, St) ->
+    {reply, {ok, St#st.changes_pid}, St};
 handle_call(_Call, _From, St) ->
     {noreply, St}.
 
