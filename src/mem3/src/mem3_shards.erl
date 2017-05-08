@@ -732,4 +732,45 @@ wait_writer_result(WRef) ->
 spawn_link_mock_writer(Db, Shards, Timeout) ->
     erlang:spawn_link(fun() -> shard_writer(Db, Shards, Timeout) end).
 
+
+
+mem3_shards_changes_test_() -> {
+    "Test mem3_shards changes listener", {
+        foreach,
+        fun setup_changes/0, fun teardown_changes/1,
+        [
+            fun should_kill_changes_listener_on_shutdown/1
+        ]
+    }
+}.
+
+
+setup_changes() ->
+    ok = meck:expect(mem3_util, ensure_exists, ['_'],
+        {ok, #db{name = <<"dbs">>, update_seq = 0}}),
+    ok = meck:expect(couch_db, close, ['_'], ok),
+    ok = application:start(config),
+    {ok, Pid} = ?MODULE:start_link(),
+    true = erlang:unlink(Pid),
+    Pid.
+
+
+teardown_changes(Pid) ->
+    true = exit(Pid, shutdown),
+    ok = application:stop(config),
+    meck:unload().
+
+
+should_kill_changes_listener_on_shutdown(Pid) ->
+    ?_test(begin
+        ?assert(is_process_alive(Pid)),
+        {ok, ChangesPid} = get_changes_pid(),
+        ?assert(is_process_alive(ChangesPid)),
+        true = test_util:stop_sync_throw(
+            ChangesPid, fun() -> exit(Pid, shutdown) end, wait_timeout),
+        ?assertNot(is_process_alive(ChangesPid)),
+        ok
+    end).
+
+
 -endif.
