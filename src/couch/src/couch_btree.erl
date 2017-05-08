@@ -465,10 +465,17 @@ write_node(Bt, _OldNode, NodeType, [_], NewList) ->
 % saves us the disk space that would have been
 % orphaned by not reusing the old node.
 write_node(Bt, OldNode, NodeType, OldList, NewList) ->
-    case is_append_only(OldList, NewList) of
-        false ->
-            write_node(Bt, NodeType, NewList);
-        {true, Suffix} ->
+    case is_extension(OldList, NewList) of
+        {prefix, Prefix} ->
+            case old_node_full(OldList) of
+                true ->
+                    {ok, Results} = write_node(Bt, NodeType, Prefix),
+                    {OldLastKey, _} = lists:last(OldList),
+                    {ok, Results ++ [{OldLastKey, OldNode}]};
+                false ->
+                    write_node(Bt, NodeType, NewList)
+            end;
+        {suffix, Suffix} ->
             case old_node_full(OldList) of
                 true ->
                     {ok, Results} = write_node(Bt, NodeType, Suffix),
@@ -476,28 +483,26 @@ write_node(Bt, OldNode, NodeType, OldList, NewList) ->
                     {ok, [{OldLastKey,OldNode} | Results]};
                 false ->
                     write_node(Bt, NodeType, NewList)
-            end
+            end;
+        false ->
+            write_node(Bt, NodeType, NewList)
     end.
 
-% This function will blow up if OldList == NewList
-% on purpose as an assertion that modify_node
-% doesn't provide this input.
-%
-% First clause finds our suff
-is_append_only([], [_ | _] = Suffix) ->
-    {true, Suffix};
-
-% We've removed keys from the node
-is_append_only([_ | _], []) ->
-    false;
-
-% We've found a mismatch of keys in the node
-is_append_only([KV1 | _], [KV2 | _]) when KV1 /= KV2 ->
-    false;
-
-% Current key is equal, keep going
-is_append_only([KV | Rest1], [KV | Rest2]) ->
-    is_append_only(Rest1, Rest2).
+is_extension(OldList, NewList) ->
+    case lists:suffix(OldList, NewList) of
+        true ->
+            PrefixLength = length(NewList) - length(OldList),
+            {Prefix, _} = lists:split(PrefixLength, NewList),
+            {prefix, Prefix};
+        false ->
+            case lists:prefix(OldList, NewList) of
+                true ->
+                    Suffix = lists:nthtail(length(OldList), NewList),
+                    {suffix, Suffix};
+                false ->
+                    false
+            end
+    end.
 
 old_node_full(OldList) ->
     ChunkThreshold = get_chunk_size(),
