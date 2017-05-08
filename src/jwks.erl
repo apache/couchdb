@@ -135,7 +135,7 @@ decode_number(Base64) ->
 
 jwks_test() ->
     application:start(ibrowse),
-    jwks:start_link("https://iam.stage1.eu-gb.bluemix.net/oidc/keys"),
-    ?assertMatch({ok, _}, jwks:get_key(?MODULE, <<"20170401-00:00:00">>)).
+    jwks:start_link("https://iam.eu-gb.bluemix.net/oidc/keys"),
+    ?assertMatch({ok, _}, jwks:get_key(?MODULE, <<"20170402-00:00:00">>)).
 
 -endif.
