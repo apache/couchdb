@@ -27,7 +27,7 @@ decode(EncodedToken, Checks, KS) ->
 
 validate(Header0, Payload0, Signature, Checks, KS) ->
     Header1 = props(decode_json(Header0)),
-    validate_header(Header1),
+    validate_header(Header1, Checks),
 
     Payload1 = props(decode_json(Payload0)),
     validate_payload(Payload1, Checks),
@@ -37,17 +37,37 @@ validate(Header0, Payload0, Signature, Checks, KS) ->
     verify(Alg, Header0, Payload0, Signature, Key).
 
 
-validate_header(Props) ->
-    case prop(<<"typ">>, Props) of
-        <<"JWT">> ->
+validate_header(Props, Checks) ->
+    validate_typ(Props, Checks),
+    validate_alg(Props, Checks).
+
+
+validate_typ(Props, Checks) ->
+    Required = prop(typ, Checks),
+    TYP = prop(<<"typ">>, Props),
+    case {Required, TYP} of
+        {undefined, _} ->
             ok;
-        _ ->
+        {true, undefined} ->
+            throw({error, missing_typ});
+        {true, <<"JWT">>} ->
+            ok;
+        {true, _} ->
             throw({error, invalid_typ})
-    end,
-    case prop(<<"alg">>, Props) of
-        <<"RS256">> ->
+    end.
+
+
+validate_alg(Props, Checks) ->
+    Required = prop(alg, Checks),
+    Alg = prop(<<"alg">>, Props),
+    case {Required, Alg} of
+        {undefined, _} ->
             ok;
-        <<"HS256">> ->
+        {true, undefined} ->
+            throw({error, missing_alg});
+        {true, <<"RS256">>} ->
+            ok;
+        {true, <<"HS256">>} ->
             ok;
         _ ->
             throw({error, invalid_alg})
@@ -82,7 +102,7 @@ validate_iat(Props, Checks) ->
     IAT = prop(<<"iat">>, Props),
 
     case {Required, IAT} of
-        {undefined, undefined} ->
+        {undefined, _} ->
             ok;
         {true, undefined} ->
             throw({error, missing_iat});
@@ -96,7 +116,7 @@ validate_nbf(Props, Checks) ->
     NBF = prop(<<"nbf">>, Props),
 
     case {Required, NBF} of
-        {undefined, undefined} ->
+        {undefined, _} ->
             ok;
         {true, undefined} ->
             throw({error, missing_nbf});
@@ -110,7 +130,7 @@ validate_exp(Props, Checks) ->
     EXP = prop(<<"exp">>, Props),
 
     case {Required, EXP} of
-        {undefined, undefined} ->
+        {undefined, _} ->
             ok;
         {true, undefined} ->
             throw({error, missing_exp});
@@ -123,11 +143,9 @@ key(Props, Checks, KS) ->
     Required = prop(kid, Checks),
     KID = prop(<<"kid">>, Props),
     case {Required, KID} of
-        {undefined, undefined} ->
-            KS(undefined);
         {true, undefined} ->
             throw({error, missing_kid});
-        {true, KID} ->
+        {_, KID} ->
             KS(KID)
     end.
 
@@ -308,7 +326,7 @@ hs256_test() ->
                      "sImtpZCI6ImJhciJ9.lpOvEnYLdcujwo9RbhzXme6J-eQ1yfl782qq"
                      "crR6QYE">>,
     KS = fun(_) -> <<"secret">> end,
-    Checks = [{iss, <<"https://foo.com">>}, iat, exp, kid, sig],
+    Checks = [{iss, <<"https://foo.com">>}, iat, exp, kid, sig, typ, alg],
     ?assertMatch({ok, _}, decode(EncodedToken, Checks, KS)).
 
 
