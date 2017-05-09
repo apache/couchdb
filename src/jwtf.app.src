@@ -18,6 +18,7 @@
         kernel,
         stdlib,
         b64url,
+        couch_stats,
         crypto,
         jiffy,
         public_key

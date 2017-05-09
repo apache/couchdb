@@ -32,21 +32,25 @@
     terminate/2
 ]).
 
-start_link(Url) ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, Url, []).
+start_link(JWKSUrl) ->
+    gen_server:start_link({local, ?MODULE}, ?MODULE, JWKSUrl, []).
 
 
 get_key(Pid, Kid) ->
     case lookup(Kid) of
         {ok, Key} ->
-            %% couch_stats:increment_counter([jkws, hit]),
+            couch_stats:increment_counter([jkws, hit]),
             {ok, Key};
         {error, not_found} ->
-            %% couch_stats:increment_counter([jkws, miss]),
+            couch_stats:increment_counter([jkws, miss]),
             Url = gen_server:call(Pid, get_url),
-            KeySet = get_keyset(Url),
-            ok = gen_server:call(Pid, {replace_keyset, KeySet}),
-            lookup(Kid)
+            case get_keyset(Url) of
+                {ok, KeySet} ->
+                    ok = gen_server:call(Pid, {replace_keyset, KeySet}),
+                    lookup(Kid);
+                {error, Reason} ->
+                    {error, Reason}
+            end
     end.
 
 
@@ -99,15 +103,14 @@ terminate(_Reason, _State) ->
 
 get_keyset(Url) ->
     ReqHeaders = [],
-    %% T0 = os:timestamp(),
+    T0 = os:timestamp(),
     case ibrowse:send_req(Url, ReqHeaders, get) of
         {ok, "200", _RespHeaders, RespBody} ->
-            %% Latency = timer:now_diff(os:timestamp(), T0) / 1000,
-            %% couch_stats:update_histogram([jkws, latency], Latency),
-            parse_keyset(RespBody);
-        Else ->
-            io:format("~p", [Else]),
-            []
+            Latency = timer:now_diff(os:timestamp(), T0) / 1000,
+            couch_stats:update_histogram([jkws, latency], Latency),
+            {ok, parse_keyset(RespBody)};
+        _Else ->
+            {error, get_keyset_failed}
     end.
 
 
