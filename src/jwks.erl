@@ -11,112 +11,22 @@
 % the License.
 
 % @doc
-% This module parses JSON Web Key Sets (JWKS) and caches them for
-% performance reasons. To use the module, include it in your
-% supervision tree.
+% This module fetches and parses JSON Web Key Sets (JWKS).
 
 -module(jwks).
--behaviour(gen_server).
 
 -export([
-    start_link/1,
-    get_key/2
+    get_keyset/1
 ]).
-
--export([
-    init/1,
-    handle_call/3,
-    handle_cast/2,
-    handle_info/2,
-    code_change/3,
-    terminate/2
-]).
-
-start_link(JWKSUrl) ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, JWKSUrl, []).
-
-
-get_key(Pid, Kid) ->
-    case lookup(Kid) of
-        {ok, Key} ->
-            couch_stats:increment_counter([jkws, hit]),
-            {ok, Key};
-        {error, not_found} ->
-            couch_stats:increment_counter([jkws, miss]),
-            Url = gen_server:call(Pid, get_url),
-            case get_keyset(Url) of
-                {ok, KeySet} ->
-                    ok = gen_server:call(Pid, {replace_keyset, KeySet}),
-                    lookup(Kid);
-                {error, Reason} ->
-                    {error, Reason}
-            end
-    end.
-
-
-lookup(Kid) ->
-    case ets:lookup(?MODULE, Kid) of
-        [{Kid, Key}] ->
-            {ok, Key};
-        [] ->
-            {error, not_found}
-    end.
-
-
-
-%% gen_server functions
-
-init(Url) ->
-    ?MODULE = ets:new(?MODULE, [protected, named_table, {read_concurrency, true}]),
-    KeySet = get_keyset(Url),
-    set_keyset(KeySet),
-    {ok, Url}.
-
-
-handle_call({replace_keyset, KeySet}, _From, State) ->
-    set_keyset(KeySet),
-    {reply, ok, State};
-
-handle_call(get_url, _From, State) ->
-    {reply, State, State};
-
-handle_call(_Msg, _From, State) ->
-    {noreply, State}.
-
-
-handle_cast(_Msg, State) ->
-    {noreply, State}.
-
-
-handle_info(_Msg, State) ->
-    {noreply, State}.
-
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
-
-
-terminate(_Reason, _State) ->
-    ok.
-
-%% private functions
 
 get_keyset(Url) ->
     ReqHeaders = [],
-    T0 = os:timestamp(),
     case ibrowse:send_req(Url, ReqHeaders, get) of
         {ok, "200", _RespHeaders, RespBody} ->
-            Latency = timer:now_diff(os:timestamp(), T0) / 1000,
-            couch_stats:update_histogram([jkws, latency], Latency),
             {ok, parse_keyset(RespBody)};
         _Else ->
             {error, get_keyset_failed}
     end.
-
-
-set_keyset(KeySet) ->
-    true = ets:delete_all_objects(?MODULE),
-    true = ets:insert(?MODULE, KeySet).
 
 
 parse_keyset(Body) ->
@@ -142,8 +52,7 @@ decode_number(Base64) ->
 -include_lib("eunit/include/eunit.hrl").
 
 jwks_test() ->
-    application:start(ibrowse),
-    jwks:start_link("https://iam.eu-gb.bluemix.net/oidc/keys"),
-    ?assertMatch({ok, _}, jwks:get_key(?MODULE, <<"20170402-00:00:00">>)).
+    application:ensure_all_started(ibrowse),
+    ?assertMatch({ok, _}, get_keyset("https://iam.eu-gb.bluemix.net/oidc/keys")).
 
 -endif.
