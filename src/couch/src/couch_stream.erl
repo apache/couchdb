@@ -259,7 +259,7 @@ handle_call({write, Bin}, _From, Stream) ->
                         buffer_len=0,
                         md5=Md5_2,
                         identity_md5=IdenMd5_2,
-                        identity_len=IdenLen + BinSize}};
+                        identity_len=IdenLen + BinSize}, hibernate};
     true ->
         {reply, ok, Stream#stream{
                         buffer_list=[Bin|Buffer],
