@@ -33,7 +33,7 @@ validate(Header0, Payload0, Signature, Checks, KS) ->
     validate_payload(Payload1, Checks),
 
     Alg = prop(<<"alg">>, Header1),
-    Key = key(Payload1, Checks, KS),
+    Key = key(Header1, Checks, KS),
     verify(Alg, Header0, Payload0, Signature, Key).
 
 
@@ -311,7 +311,7 @@ invalid_exp_test() ->
 
 
 missing_kid_test() ->
-    Encoded = encode(valid_header(), {[]}),
+    Encoded = encode({[]}, {[]}),
     ?assertEqual({error, missing_kid}, decode(Encoded, [kid], nil)).
 
 
@@ -336,13 +336,13 @@ malformed_token_test() ->
 
 
 hs256_test() ->
-    EncodedToken = <<"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwc"
-                     "zovL2Zvby5jb20iLCJpYXQiOjAsImV4cCI6MTAwMDAwMDAwMDAwMDA"
-                     "sImtpZCI6ImJhciJ9.lpOvEnYLdcujwo9RbhzXme6J-eQ1yfl782qq"
-                     "crR6QYE">>,
-    KS = fun(_) -> <<"secret">> end,
-    Checks = [{iss, <<"https://foo.com">>}, iat, exp, kid, sig, typ, alg],
-    ?assertMatch({ok, _}, decode(EncodedToken, Checks, KS)).
+    EncodedToken = <<"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjEyMzQ1Ni"
+                     "J9.eyJpc3MiOiJodHRwczovL2Zvby5jb20iLCJpYXQiOjAsImV4cCI"
+                     "6MTAwMDAwMDAwMDAwMDAsImtpZCI6ImJhciJ9.iS8AH11QHHlczkBn"
+                     "Hl9X119BYLOZyZPllOVhSBZ4RZs">>,
+    KS = fun(<<"123456">>) -> <<"secret">> end,
+    Checks = [{iss, <<"https://foo.com">>}, iat, exp, sig, typ, alg, kid],
+    ?assertMatch({ok, _}, catch decode(EncodedToken, Checks, KS)).
 
 
 %% jwt.io example
