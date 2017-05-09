@@ -15,7 +15,12 @@ RUN apt-get --no-install-recommends -y install \
     git \
     libicu-dev \
     libmozjs185-dev \
-    python
+    python \
+    nodejs-legacy
+
+RUN curl -L --insecure -O https://www.npmjs.org/install.sh \
+    && npm_install=2.8.4 /bin/bash install.sh
+
 
 # Build couchdb
 RUN useradd -m couchdb
