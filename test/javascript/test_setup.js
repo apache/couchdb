@@ -59,7 +59,7 @@ function waitForSuccess(fun, tag) {
   
   while (!complete) {
     var now = new Date().getTime();
-    if (now > start + 5000) {
+    if (now > start + 10000) {
       complete = true;
       print('\nFAIL ' + tag);
       quit(1);
