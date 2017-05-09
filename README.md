@@ -6,5 +6,7 @@ This library provides JWT parsing and validation functions
 
 Supports;
 
-# Verify
-# RS256
+* Verify
+* RS256
+* HS256
+
