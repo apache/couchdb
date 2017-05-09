@@ -98,7 +98,9 @@ validate_iss(Props, Checks) ->
     ActualISS = prop(<<"iss">>, Props),
 
     case {ExpectedISS, ActualISS} of
-        {ISS, undefined} when ISS /= undefined ->
+        {undefined, _} ->
+            ok;
+        {_ISS, undefined} ->
             throw({error, missing_iss});
         {ISS, ISS} ->
             ok;
