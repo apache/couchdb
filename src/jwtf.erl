@@ -10,10 +10,20 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
+% @doc
+% This module decodes and validates JWT tokens. Almost all property
+% checks are optional. If not checked, the presence or validity of the
+% field is not verified. Signature check is mandatory, though.
+
 -module(jwtf).
 
 -export([decode/3]).
 
+% @doc decode
+% Decodes the supplied encoded token, checking
+% for the attributes defined in Checks and calling
+% the key store function to retrieve the key needed
+% to verify the signature
 decode(EncodedToken, Checks, KS) ->
     try
         [Header, Payload, Signature] = split(EncodedToken),

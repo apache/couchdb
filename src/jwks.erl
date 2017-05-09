@@ -10,6 +10,11 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
+% @doc
+% This module parses JSON Web Key Sets (JWKS) and caches them for
+% performance reasons. To use the module, include it in your
+% supervision tree.
+
 -module(jwks).
 -behaviour(gen_server).
 
