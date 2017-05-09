@@ -110,7 +110,11 @@ composite_indexes(Indexes, FieldRanges) ->
     lists:foldl(fun(Idx, Acc) ->
         Cols = mango_idx:columns(Idx),
         Prefix = composite_prefix(Cols, FieldRanges),
-        [{Idx, Prefix} | Acc]
+        % Calcuate the difference between the FieldRanges/Selector
+        % and the Prefix. We want to select the index with a prefix
+        % that is as close to the FieldRanges as possible
+        PrefixDifference = length(FieldRanges) - length(Prefix),
+        [{Idx, Prefix, PrefixDifference} | Acc]
     end, [], Indexes).
 
 
@@ -125,29 +129,40 @@ composite_prefix([Col | Rest], Ranges) ->
     end.
 
 
-% Low and behold our query planner. Or something.
-% So stupid, but we can fix this up later. First
-% pass: Sort the IndexRanges by (num_columns, idx_name)
-% and return the first element. Yes. Its going to
-% be that dumb for now.
+% The query planner
+% First choose the index with the lowest difference between its 
+% Prefix and the FieldRanges. If that is equal, then
+% choose the index with the least number of 
+% fields in the index. If we still cannot break the tie, 
+% then choose alphabetically based on ddocId.
+% Return the first element's Index and IndexRanges.
 %
 % In the future we can look into doing a cached parallel
 % reduce view read on each index with the ranges to find
 % the one that has the fewest number of rows or something.
 choose_best_index(_DbName, IndexRanges) ->
-    Cmp = fun({A1, A2}, {B1, B2}) ->
-        case length(A2) - length(B2) of
+    Cmp = fun({IdxA, _PrefixA, PrefixDifferenceA}, {IdxB, _PrefixB, PrefixDifferenceB}) ->
+        case PrefixDifferenceA - PrefixDifferenceB of
             N when N < 0 -> true;
             N when N == 0 ->
-                % This is a really bad sort and will end
-                % up preferring indices based on the
-                % (dbname, ddocid, view_name) triple
-                A1 =< B1;
+                ColsLenA = length(mango_idx:columns(IdxA)),
+                ColsLenB = length(mango_idx:columns(IdxB)),
+                case ColsLenA - ColsLenB of
+                    M when M < 0 -> 
+                        true;
+                    M when M == 0 ->
+                        % We have no other way to choose, so at this point 
+                        % select the index based on (dbname, ddocid, view_name) triple
+                        IdxA =< IdxB;
+                    _ -> 
+                        false
+                end;
             _ ->
                 false
         end
     end,
-    hd(lists:sort(Cmp, IndexRanges)).
+    {SelectedIndex, SelectedIndexRanges, _} = hd(lists:sort(Cmp, IndexRanges)),
+    {SelectedIndex, SelectedIndexRanges}.
 
 
 handle_message({meta, _}, Cursor) ->
