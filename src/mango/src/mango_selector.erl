@@ -461,7 +461,7 @@ match({[{<<"$elemMatch">>, _Arg}]}, _Value, _Cmp) ->
 
 % Matches when all elements in values match the
 % sub-selector Arg.
-match({[{<<"$allMatch">>, Arg}]}, Values, Cmp) when is_list(Values) ->
+match({[{<<"$allMatch">>, Arg}]}, Values, Cmp) when is_list(Values), length(Values) > 0 ->
     try
         lists:foreach(fun(V) ->
             case match(Arg, V, Cmp) of
