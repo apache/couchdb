@@ -20,7 +20,6 @@ class OperatorTests(mango.UserDocsTests):
                 "manager": True,
                 "favorites": {"$all": ["Lisp", "Python"]}
             })
-        print docs
         assert len(docs) == 4
         assert docs[0]["user_id"] == 2
         assert docs[1]["user_id"] == 12
@@ -59,7 +58,6 @@ class OperatorTests(mango.UserDocsTests):
                 "bam": True
             }}
         })
-        print docs
         assert len(docs) == 1
         assert docs[0]["user_id"] == "b"
 
@@ -94,7 +92,6 @@ class OperatorTests(mango.UserDocsTests):
         ]
         self.db.save_docs(amdocs, w=3)
         docs = self.db.find({
-            "_id": {"$gt": None},
             "bang": {"$allMatch": {
                 "foo": {"$mod": [2,1]},
                 "bar": {"$mod": [2,0]}
@@ -102,6 +99,21 @@ class OperatorTests(mango.UserDocsTests):
         })
         assert len(docs) == 1
         assert docs[0]["user_id"] == "a"
+    
+    def test_empty_all_match(self):
+        amdocs = [
+            {
+                "bad_doc": "a",
+                "emptybang": []
+            }
+        ]
+        self.db.save_docs(amdocs, w=3)
+        docs = self.db.find({
+            "emptybang": {"$allMatch": {
+                "foo": {"$eq": 2}
+            }}
+        })
+        assert len(docs) == 0
 
     def test_in_operator_array(self):
         docs = self.db.find({
