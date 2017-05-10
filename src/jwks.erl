@@ -48,6 +48,18 @@ parse_key({Props}) ->
             [{{Kty, Kid}, #'RSAPublicKey'{
                 modulus = decode_number(N),
                 publicExponent =  decode_number(E)}}];
+        {<<"ES256">>, <<"EC">>} ->
+            Crv = proplists:get_value(<<"crv">>, Props),
+            case Crv of
+                <<"P-256">> ->
+                    X = proplists:get_value(<<"x">>, Props),
+                    Y = proplists:get_value(<<"y">>, Props),
+                    Point = <<4:8, X/binary, Y/binary>>,
+                    [{{Kty, Kid}, #'ECPoint'{
+                        point = Point}}];
+                _ ->
+                    []
+            end;
         _ ->
             []
     end.
@@ -91,6 +103,6 @@ ec_test() ->
         {<<"kid">>, <<"1">>}
     ]},
     %% TODO figure out how to convert x,y to an ECPoint.
-    ?assertMatch([], parse_key(Ejson)).
+    ?assertMatch([{{<<"EC">>, <<"1">>}, {'ECPoint', _}}], parse_key(Ejson)).
 
 -endif.
