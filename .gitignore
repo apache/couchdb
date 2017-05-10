@@ -9,6 +9,8 @@ log
 apache-couchdb-*/
 bin/
 config.erl
+*.tar.gz
+*.tar.bz2
 dev/boot_node.beam
 dev/lib/
 dev/logs/
