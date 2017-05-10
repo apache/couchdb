@@ -17,19 +17,29 @@ addons:
     - libicu-dev
     - libmozjs185-dev
     - pkg-config
+    - python-requests
+    - python-sphinx
     - help2man
     - shunit2
+
+python:
+  - "2.7"
 
 git:
   depth: 10
 
+# logfile uploader uses requests
+cache:
+  - pip
+
+# logfile uploader credentials
+env:
+  global:
+    - secure: "UdA/gKIlyuXaW+hUgRx40t1TYjLCGxMqHvM5Uw7UbUH2dqEkgJiLfhZGchS1JVzl8M01VKZUUzS7v2nvRLiHZN1kvaw5kfq31VRoafUah8jfmvqNWZVdLovHl3aw5UX/HRt0RkbWbhdbdknTfh6+YinSZ+Nb54jCErMg9nabXtM="
+
 # Enable this block if you want to build docs & fauxton too
-#cache:
-#  - pip
 #node_js:
 #  - 6
-#install:
-#  - pip install sphinx
 #before_script:
 #  - ./configure -c
 
@@ -39,6 +49,9 @@ before_script:
 
 script:
    - make check
+
+after_failure:
+  - build-aux/logfile-uploader.py
 
 # Re-enable once test suite is reliable
 #notifications:

@@ -99,7 +99,9 @@ def options():
     return [
         op.make_option("-s", "--start", metavar="FILENAME", default=None,
                        help="Start from the given filename if multiple files "
-                            "are passed")
+                            "are passed"),
+        op.make_option("-a", "--all", action="store_true", dest="all",
+                       help="Run all tests, even if one or more fail")
     ]
 
 
@@ -141,6 +143,8 @@ def main():
             passed += 1
         else:
             failed += 1
+            if not opts.all:
+                break
 
     sys.stderr.write("======================================================="
         + os.linesep)
