@@ -114,7 +114,7 @@ ec_test() ->
         {<<"kid">>, <<"1">>}
     ]},
     ?assertMatch([{_Key, _Value}], parse_key(Ejson)),
-    {_, ECPublicKey} = parse_key(Ejson),
+    [{_, ECPublicKey}] = parse_key(Ejson),
     Msg = <<"foo">>,
     Sig = public_key:sign(Msg, sha256, PrivateKey),
     ?assert(public_key:verify(Msg, sha256, Sig, ECPublicKey)).
