@@ -54,10 +54,12 @@ parse_key({Props}) ->
                 <<"P-256">> ->
                     X = proplists:get_value(<<"x">>, Props),
                     Y = proplists:get_value(<<"y">>, Props),
-                    Point = <<4:8, X/binary, Y/binary>>,
+                    Point = <<4:8,
+                        (b64url:decode(X))/binary,
+                        (b64url:decode(Y))/binary>>,
                     [{{Kty, Kid}, {
                         #'ECPoint'{point = Point},
-                        {namedCurve, secp256r1}
+                        {namedCurve,{1,2,840,10045,3,1,7}}
                     }}];
                 _ ->
                     []
@@ -96,6 +98,13 @@ rs_test() ->
 
 
 ec_test() ->
+    PrivateKey = #'ECPrivateKey'{
+        version = 1,
+        parameters = {namedCurve,{1,2,840,10045,3,1,7}},
+        privateKey = b64url:decode("870MB6gfuTJ4HtUnUvYMyJpr5eUZNP4Bk43bVdj3eAE"),
+        publicKey = <<4:8,
+            (b64url:decode("MKBCTNIcKUSDii11ySs3526iDZ8AiTo7Tu6KPAqv7D4"))/binary,
+            (b64url:decode("4Etl6SRW2YiLUrN5vfvVHuhp7x8PxltmWWlbbM4IFyM"))/binary>>},
     Ejson = {[
         {<<"kty">>, <<"EC">>},
         {<<"crv">>, <<"P-256">>},
@@ -104,8 +113,10 @@ ec_test() ->
         {<<"alg">>, <<"ES256">>},
         {<<"kid">>, <<"1">>}
     ]},
-    %% TODO figure out how to convert x,y to an ECPoint.
-    ?assertMatch([{{<<"EC">>, <<"1">>}, {{'ECPoint', _},
-        {namedCurve, secp256r1}}}], parse_key(Ejson)).
+    ?assertMatch([{_Key, _Value}], parse_key(Ejson)),
+    {_, ECPublicKey} = parse_key(Ejson),
+    Msg = <<"foo">>,
+    Sig = public_key:sign(Msg, sha256, PrivateKey),
+    ?assert(public_key:verify(Msg, sha256, Sig, ECPublicKey)).
 
 -endif.
