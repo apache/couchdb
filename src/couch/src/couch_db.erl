@@ -393,8 +393,8 @@ get_pid(#db{main_pid = Pid}) ->
     Pid.
 
 get_doc_count(Db) ->
-    {ok, {Count, _, _}} = couch_btree:full_reduce(Db#db.id_tree),
-    {ok, Count}.
+    {ok, Reds} = couch_btree:full_reduce(Db#db.id_tree),
+    {ok, element(1, Reds)}.
 
 get_uuid(#db{}=Db) ->
     couch_db_header:uuid(Db#db.header).
