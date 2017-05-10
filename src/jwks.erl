@@ -55,8 +55,10 @@ parse_key({Props}) ->
                     X = proplists:get_value(<<"x">>, Props),
                     Y = proplists:get_value(<<"y">>, Props),
                     Point = <<4:8, X/binary, Y/binary>>,
-                    [{{Kty, Kid}, #'ECPoint'{
-                        point = Point}}];
+                    [{{Kty, Kid}, {
+                        #'ECPoint'{point = Point},
+                        {namedCurve, secp256r1}
+                    }}];
                 _ ->
                     []
             end;
@@ -103,6 +105,7 @@ ec_test() ->
         {<<"kid">>, <<"1">>}
     ]},
     %% TODO figure out how to convert x,y to an ECPoint.
-    ?assertMatch([{{<<"EC">>, <<"1">>}, {'ECPoint', _}}], parse_key(Ejson)).
+    ?assertMatch([{{<<"EC">>, <<"1">>}, {{'ECPoint', _},
+        {namedCurve, secp256r1}}}], parse_key(Ejson)).
 
 -endif.
