@@ -70,17 +70,31 @@ validate_typ(Props, Checks) ->
 validate_alg(Props, Checks) ->
     Required = prop(alg, Checks),
     Alg = prop(<<"alg">>, Props),
+    Valid = [
+        <<"RS256">>,
+        <<"RS384">>,
+        <<"RS512">>,
+
+        <<"HS256">>,
+        <<"HS384">>,
+        <<"HS512">>,
+
+        <<"ES384">>,
+        <<"ES512">>,
+        <<"ES512">>
+    ],
     case {Required, Alg} of
         {undefined, _} ->
             ok;
         {true, undefined} ->
             throw({error, missing_alg});
-        {true, <<"RS256">>} ->
-            ok;
-        {true, <<"HS256">>} ->
-            ok;
-        _ ->
-            throw({error, invalid_alg})
+        {true, Alg} ->
+            case lists:member(Alg, Valid) of
+                true ->
+                    ok;
+                false ->
+                    throw({error, invalid_alg})
+            end
     end.
 
 
@@ -167,14 +181,30 @@ verify(Alg, Header, Payload, Signature0, Key) ->
     Signature1 = b64url:decode(Signature0),
     case Alg of
         <<"RS256">> ->
-            rs256_verify(Message, Signature1, Key);
+            public_key_verify(sha256, Message, Signature1, Key);
+        <<"RS384">> ->
+            public_key_verify(sha384, Message, Signature1, Key);
+        <<"RS512">> ->
+            public_key_verify(sha512, Message, Signature1, Key);
+
+        <<"ES256">> ->
+            public_key_verify(sha256, Message, Signature1, Key);
+        <<"ES384">> ->
+            public_key_verify(sha384, Message, Signature1, Key);
+        <<"ES512">> ->
+            public_key_verify(sha512, Message, Signature1, Key);
+
         <<"HS256">> ->
-            hs256_verify(Message, Signature1, Key)
+            hmac_verify(sha256, Message, Signature1, Key);
+        <<"HS384">> ->
+            hmac_verify(sha384, Message, Signature1, Key);
+        <<"HS512">> ->
+            hmac_verify(sha512, Message, Signature1, Key)
     end.
 
 
-rs256_verify(Message, Signature, PublicKey) ->
-    case public_key:verify(Message, sha256, Signature, PublicKey) of
+public_key_verify(Alg, Message, Signature, PublicKey) ->
+    case public_key:verify(Message, Alg, Signature, PublicKey) of
         true ->
             ok;
         false ->
@@ -182,8 +212,8 @@ rs256_verify(Message, Signature, PublicKey) ->
     end.
 
 
-hs256_verify(Message, HMAC, SecretKey) ->
-    case crypto:hmac(sha256, SecretKey, Message) of
+hmac_verify(Alg, Message, HMAC, SecretKey) ->
+    case crypto:hmac(Alg, SecretKey, Message) of
         HMAC ->
             ok;
         _ ->
