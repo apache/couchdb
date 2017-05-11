@@ -377,17 +377,40 @@ malformed_token_test() ->
     ?assertEqual({error, malformed_token}, decode(<<"a.b.c.d">>, [], nil)).
 
 
+%% jwt.io generated
 hs256_test() ->
     EncodedToken = <<"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjEyMzQ1Ni"
                      "J9.eyJpc3MiOiJodHRwczovL2Zvby5jb20iLCJpYXQiOjAsImV4cCI"
                      "6MTAwMDAwMDAwMDAwMDAsImtpZCI6ImJhciJ9.iS8AH11QHHlczkBn"
                      "Hl9X119BYLOZyZPllOVhSBZ4RZs">>,
     KS = fun(<<"123456">>) -> <<"secret">> end,
-    Checks = [{iss, <<"https://foo.com">>}, iat, exp, sig, typ, alg, kid],
+    Checks = [{iss, <<"https://foo.com">>}, iat, exp, typ, alg, kid],
     ?assertMatch({ok, _}, catch decode(EncodedToken, Checks, KS)).
 
 
-%% jwt.io example
+%% pip install PyJWT
+%% > import jwt
+%% > jwt.encode({'foo':'bar'}, 'secret', algorithm='HS384')
+hs384_test() ->
+    EncodedToken = <<"eyJhbGciOiJIUzM4NCIsInR5cCI6IkpXVCJ9.eyJmb28iOiJiYXIif"
+                     "Q.2quwghs6I56GM3j7ZQbn-ASZ53xdBqzPzTDHm_CtVec32LUy-Ezy"
+                     "L3JjIe7WjL93">>,
+    KS = fun(_) -> <<"secret">> end,
+    ?assertMatch({ok, {[{<<"foo">>,<<"bar">>}]}}, catch decode(EncodedToken, [], KS)).
+
+
+%% pip install PyJWT
+%% > import jwt
+%% > jwt.encode({'foo':'bar'}, 'secret', algorithm='HS512')
+hs512_test() ->
+    EncodedToken = <<"eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJmb28iOiJiYX"
+                     "IifQ.WePl7achkd0oGNB8XRF_LJwxlyiPZqpdNgdKpDboAjSTsW"
+                     "q-aOGNynTp8TOv8KjonFym8vwFwppXOLoLXbkIaQ">>,
+    KS = fun(_) -> <<"secret">> end,
+    ?assertMatch({ok, {[{<<"foo">>,<<"bar">>}]}}, catch decode(EncodedToken, [], KS)).
+
+
+%% jwt.io generated
 rs256_test() ->
     EncodedToken = <<"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0N"
                      "TY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWV9.Ek"
@@ -406,5 +429,6 @@ rs256_test() ->
     ]},
 
     ?assertMatch({ok, ExpectedPayload}, decode(EncodedToken, Checks, KS)).
+
 
 -endif.
