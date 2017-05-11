@@ -218,7 +218,7 @@ handle_cast(start_compact, Db) ->
         % compact currently running, this is a no-op
         {noreply, Db}
     end;
-handle_cast({compact_done, CompactFilepath}, #db{filepath=Filepath}=Db) ->
+handle_cast({compact_done, CompactFilepath}, #db{filepath=Filepath,fd=Fd}=Db) ->
     {ok, NewFd} = couch_file:open(CompactFilepath),
     {ok, NewHeader0} = couch_file:read_header(NewFd),
     NewHeader = couch_db_header:set(NewHeader0, [
@@ -242,8 +242,11 @@ handle_cast({compact_done, CompactFilepath}, #db{filepath=Filepath}=Db) ->
             revs_limit = Db#db.revs_limit
         }),
 
-        couch_log:debug("CouchDB swapping files ~s and ~s.",
-                        [Filepath, CompactFilepath]),
+        {ok, Pre} = couch_file:bytes(Fd),
+        {ok, Post} = couch_file:bytes(NewFd),
+
+        couch_log:notice("Compaction swap for db: ~s ~p ~p", [Filepath,
+                Pre, Post]),
         ok = file:rename(CompactFilepath, Filepath ++ ".compact"),
         RootDir = config:get("couchdb", "database_dir", "."),
         couch_file:delete(RootDir, Filepath),

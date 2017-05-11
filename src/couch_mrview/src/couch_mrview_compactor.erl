@@ -275,8 +275,12 @@ update_task(VID, #acc{changes=Changes, total_changes=Total}=Acc, ChangesInc) ->
 
 swap_compacted(OldState, NewState) ->
     #mrst{
+        fd = Fd
+    } = OldState,
+    #mrst{
         sig=Sig,
-        db_name=DbName
+        db_name=DbName,
+        fd=NewFd
     } = NewState,
 
     link(NewState#mrst.fd),
@@ -285,6 +289,11 @@ swap_compacted(OldState, NewState) ->
     RootDir = couch_index_util:root_dir(),
     IndexFName = couch_mrview_util:index_file(DbName, Sig),
     CompactFName = couch_mrview_util:compaction_file(DbName, Sig),
+
+    {ok, Pre} = couch_file:bytes(Fd),
+    {ok, Post} = couch_file:bytes(NewFd),
+    couch_log:notice("Compaction swap for view ~s ~p ~p", [IndexFName,
+        Pre, Post]),
     ok = couch_file:delete(RootDir, IndexFName),
     ok = file:rename(CompactFName, IndexFName),
 
