@@ -16,10 +16,41 @@
 -module(jwks).
 
 -export([
+    get_key/3,
     get_keyset/1
 ]).
 
 -include_lib("public_key/include/public_key.hrl").
+
+get_key(Url, Kty, Kid) ->
+    case lookup(Url, Kty, Kid) of
+        {ok, Key} ->
+            {ok, Key};
+        {error, not_found} ->
+            update_cache(Url),
+            lookup(Url, Kty, Kid)
+    end.
+
+
+lookup(Url, Kty, Kid) ->
+    case ets_lru:lookup_d(jwks_cache_lru, {Url, Kty, Kid}) of
+        {ok, Key} ->
+            {ok, Key};
+        not_found ->
+            {error, not_found}
+    end.
+
+
+update_cache(Url) ->
+    case get_keyset(Url) of
+        {ok, KeySet} ->
+            [ets_lru:insert(jwks_cache_lru, {Url, Kty, Kid}, Key)
+                || {{Kty, Kid}, Key} <- KeySet],
+            ok;
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
 
 get_keyset(Url) ->
     ReqHeaders = [],

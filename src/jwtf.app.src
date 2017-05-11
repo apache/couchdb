@@ -14,11 +14,13 @@
     {description, "JSON Web Token Functions"},
     {vsn, git},
     {registered, []},
+    {mod, { jwtf_app, []}},
     {applications, [
         kernel,
         stdlib,
         b64url,
         crypto,
+        ets_lru,
         jiffy,
         public_key
     ]},
