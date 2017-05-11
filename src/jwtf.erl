@@ -132,8 +132,10 @@ validate_iat(Props, Checks) ->
             ok;
         {true, undefined} ->
             throw({error, missing_iat});
-        {true, IAT} ->
-            assert_past(iat, IAT)
+        {true, IAT} when is_integer(IAT) ->
+            ok;
+        {true, _} ->
+            throw({error, invalid_iat})
     end.
 
 
@@ -328,8 +330,8 @@ missing_iat_test() ->
 
 
 invalid_iat_test() ->
-    Encoded = encode(valid_header(), {[{<<"iat">>, 32503680000}]}),
-    ?assertEqual({error, {iat,not_in_past}}, decode(Encoded, [iat], nil)).
+    Encoded = encode(valid_header(), {[{<<"iat">>, <<"hello">>}]}),
+    ?assertEqual({error, invalid_iat}, decode(Encoded, [iat], nil)).
 
 
 missing_nbf_test() ->
