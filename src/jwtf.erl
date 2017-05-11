@@ -373,7 +373,7 @@ missing_nbf_test() ->
 
 
 invalid_nbf_test() ->
-    Encoded = encode(valid_header(), {[{<<"nbf">>, 32503680000}]}),
+    Encoded = encode(valid_header(), {[{<<"nbf">>, 2 * now_seconds()}]}),
     ?assertEqual({error, {unauthorized, <<"nbf not in past">>}}, decode(Encoded, [nbf], nil)).
 
 
