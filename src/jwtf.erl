@@ -168,13 +168,14 @@ validate_exp(Props, Checks) ->
 
 
 key(Props, Checks, KS) ->
+    Alg = prop(<<"alg">>, Props),
     Required = prop(kid, Checks),
     KID = prop(<<"kid">>, Props),
     case {Required, KID} of
         {true, undefined} ->
             throw({error, missing_kid});
         {_, KID} ->
-            KS(KID)
+            KS(Alg, KID)
     end.
 
 
@@ -363,7 +364,7 @@ bad_rs256_sig_test() ->
     Encoded = encode(
         {[{<<"typ">>, <<"JWT">>}, {<<"alg">>, <<"RS256">>}]},
         {[]}),
-    KS = fun(undefined) -> jwt_io_pubkey() end,
+    KS = fun(<<"RS256">>, undefined) -> jwt_io_pubkey() end,
     ?assertEqual({error, bad_signature}, decode(Encoded, [], KS)).
 
 
@@ -371,7 +372,7 @@ bad_hs256_sig_test() ->
     Encoded = encode(
         {[{<<"typ">>, <<"JWT">>}, {<<"alg">>, <<"HS256">>}]},
         {[]}),
-    KS = fun(undefined) -> <<"bad">> end,
+    KS = fun(<<"HS256">>, undefined) -> <<"bad">> end,
     ?assertEqual({error, bad_hmac}, decode(Encoded, [], KS)).
 
 
@@ -385,7 +386,7 @@ hs256_test() ->
                      "J9.eyJpc3MiOiJodHRwczovL2Zvby5jb20iLCJpYXQiOjAsImV4cCI"
                      "6MTAwMDAwMDAwMDAwMDAsImtpZCI6ImJhciJ9.iS8AH11QHHlczkBn"
                      "Hl9X119BYLOZyZPllOVhSBZ4RZs">>,
-    KS = fun(<<"123456">>) -> <<"secret">> end,
+    KS = fun(<<"HS256">>, <<"123456">>) -> <<"secret">> end,
     Checks = [{iss, <<"https://foo.com">>}, iat, exp, typ, alg, kid],
     ?assertMatch({ok, _}, catch decode(EncodedToken, Checks, KS)).
 
@@ -397,7 +398,7 @@ hs384_test() ->
     EncodedToken = <<"eyJhbGciOiJIUzM4NCIsInR5cCI6IkpXVCJ9.eyJmb28iOiJiYXIif"
                      "Q.2quwghs6I56GM3j7ZQbn-ASZ53xdBqzPzTDHm_CtVec32LUy-Ezy"
                      "L3JjIe7WjL93">>,
-    KS = fun(_) -> <<"secret">> end,
+    KS = fun(<<"HS384">>, _) -> <<"secret">> end,
     ?assertMatch({ok, {[{<<"foo">>,<<"bar">>}]}}, catch decode(EncodedToken, [], KS)).
 
 
@@ -408,7 +409,7 @@ hs512_test() ->
     EncodedToken = <<"eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJmb28iOiJiYX"
                      "IifQ.WePl7achkd0oGNB8XRF_LJwxlyiPZqpdNgdKpDboAjSTsW"
                      "q-aOGNynTp8TOv8KjonFym8vwFwppXOLoLXbkIaQ">>,
-    KS = fun(_) -> <<"secret">> end,
+    KS = fun(<<"HS512">>, _) -> <<"secret">> end,
     ?assertMatch({ok, {[{<<"foo">>,<<"bar">>}]}}, catch decode(EncodedToken, [], KS)).
 
 
@@ -422,7 +423,7 @@ rs256_test() ->
                      "5-HIirE">>,
 
     Checks = [sig, alg],
-    KS = fun(undefined) -> jwt_io_pubkey() end,
+    KS = fun(<<"RS256">>, undefined) -> jwt_io_pubkey() end,
 
     ExpectedPayload = {[
         {<<"sub">>, <<"1234567890">>},
