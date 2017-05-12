@@ -21,6 +21,7 @@
         b64url,
         crypto,
         ets_lru,
+        ibrowse,
         jiffy,
         public_key
     ]},
