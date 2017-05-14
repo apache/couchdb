@@ -86,7 +86,17 @@ should_accept_live_as_an_alias_for_continuous(Url) ->
     ?_test(begin
         {ok, _, _, ResultBody} =
             test_request:get(Url ++ "/_changes?feed=live&timeout=1", [?AUTH]),
-        {ResultJson} = ?JSON_DECODE(ResultBody),
+        % https://issues.apache.org/jira/browse/COUCHDB-3415?filter=12340503
+        % if the decode fails, print out ResultBody, so we can debug what
+        % extra data is coming in.
+        {ResultJson} = try ?JSON_DECODE(ResultBody) of
+            Json -> Json
+        catch
+            throw:Error ->
+                io:format(user, "~nJSON_DECODE error: ~p~n", [Error]),
+                io:format(user, "~nOffending String: ~p~n", [ResultBody]),
+                ?assert(false) % should not happen, abort
+        end,
         <<LastSeqNum0:1/binary, "-", _/binary>> = couch_util:get_value(
             <<"last_seq">>, ResultJson, undefined),
         LastSeqNum = list_to_integer(binary_to_list(LastSeqNum0)),
