@@ -321,6 +321,11 @@ function TEquals(expected, actual, testName) {
     "', got '" + repr(actual) + "'", testName);
 }
 
+function TNotEquals(expected, actual, testName) {
+  T(notEquals(expected, actual), "expected '" + repr(expected) +
+    "', got '" + repr(actual) + "'", testName);
+}
+
 function TEqualsIgnoreCase(expected, actual, testName) {
   T(equals(expected.toUpperCase(), actual.toUpperCase()), "expected '" + repr(expected) +
     "', got '" + repr(actual) + "'", testName);
@@ -333,6 +338,10 @@ function equals(a,b) {
   } catch (e) {
     return false;
   }
+}
+
+function notEquals(a,b) {
+  if (a != b) return true;
 }
 
 function repr(val) {

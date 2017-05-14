@@ -202,7 +202,7 @@ couchTests.show_documents = function(debug) {
   T(xhr.status == 404);
   var resp = JSON.parse(xhr.responseText);
   T(resp.error == "not_found");
-  
+
   // show with doc
   xhr = CouchDB.request("GET", "/" + db_name + "/_design/template/_show/just-name/"+docid);
   T(xhr.responseText == "Just Rusty");
@@ -293,7 +293,7 @@ couchTests.show_documents = function(debug) {
     headers: {"if-none-match": etag}
   });
   // should not be 304 if we change the doc
-  T(xhr.status != 304, "changed ddoc");
+  TNotEquals(304, xhr.status, "changed ddoc");
 
   // update design doc function
   designDoc.shows["just-name"] = stringFun(function(doc, req) {
