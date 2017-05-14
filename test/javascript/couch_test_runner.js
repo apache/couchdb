@@ -342,6 +342,7 @@ function equals(a,b) {
 
 function notEquals(a,b) {
   if (a != b) return true;
+  return false;
 }
 
 function repr(val) {
