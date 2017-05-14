@@ -42,6 +42,11 @@ teardown(Url) ->
 
 create_db(Url) ->
     {ok, Status, _, _} = test_request:put(Url, [?CONTENT_JSON, ?AUTH], "{}"),
+    case Status of
+        201 -> ok;
+        202 -> ok;
+        Else -> io:format(user, "~n HTTP Status Code: ~p~n", [Status])
+    end,
     ?assert(Status =:= 201 orelse Status =:= 202).
 
 delete_db(Url) ->
@@ -170,4 +175,3 @@ post_multi_part_form(Url) ->
         [?CONTENT_MULTI_FORM, ?AUTH, Referer], Doc2),
     {Msg1} = ?JSON_DECODE(ResultBody1),
     ?_assertEqual({<<"error">>, <<"document_too_large">>}, lists:nth(1, Msg1)).
-
