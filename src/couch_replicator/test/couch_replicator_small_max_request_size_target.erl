@@ -9,7 +9,7 @@
     compare_dbs/3
 ]).
 
--define(TIMEOUT_EUNIT, 30).
+-define(TIMEOUT_EUNIT, 60).
 
 
 setup() ->
