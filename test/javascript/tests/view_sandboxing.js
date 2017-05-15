@@ -145,10 +145,12 @@ couchTests.view_sandboxing = function(debug) {
   }
 */
 
+  // cleanup
+  db.deleteDb();
+
   // test that runtime code evaluation can be prevented
-  console.log('TODO: config port not available on cluster');
-  /*var couchjs_command_xhr = CouchDB.request(
-    "GET", "/_config/query_servers/javascript");
+  var couchjs_command_xhr = CouchDB.request(
+    "GET", "_node/node1@127.0.0.1/_config/query_servers/javascript");
 
   var couchjs_command = JSON.parse(couchjs_command_xhr.responseText);
   var couchjs_command_args = couchjs_command.match(/\S+|"(?:\\"|[^"])+"/g);
@@ -161,31 +163,24 @@ couchTests.view_sandboxing = function(debug) {
       key: "javascript",
       value: new_couchjs_command}],
     function () {
-      var ddoc = {
-        _id: "_design/foobar",
-        language: "javascript",
-        views: {
-          view: {
-            map:
-            (function(doc) {
-              var glob = emit.constructor('return this')();
-              emit(doc._id, null);
-            }).toString()
-          }
-        }
-      };
+      CouchDB.request("POST", "_reload_query_servers");
 
-      db.deleteDb();
+      db_name = get_random_db_name();
+      db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
       db.createDb();
-      T(db.save(ddoc).ok);
 
+      var doc = {integer: 1, string: "1", array: [1, 2, 3]};
       T(db.save(doc).ok);
-      var results = db.view(
-        "foobar/view", {bypass_cache: Math.round(Math.random() * 1000)});
+
+      var results = db.query(function(doc) {
+          var glob = emit.constructor('return this')();
+          emit(doc._id, null);
+      });
 
       TEquals(0, results.rows.length);
-    });*/
+    });
 
   // cleanup
+  CouchDB.request("POST", "_reload_query_servers");
   db.deleteDb();
 };
