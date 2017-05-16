@@ -83,18 +83,19 @@ stop_couch(_) ->
     stop_couch().
 
 start_applications(Apps) ->
-    start_applications(Apps, []).
+    StartOrder = calculate_start_order(Apps),
+    start_applications(StartOrder, []).
 
 start_applications([], Acc) ->
     lists:reverse(Acc);
+start_applications([App|Apps], Acc) when App == kernel; App == stdlib ->
+    start_applications(Apps, Acc);
 start_applications([App|Apps], Acc) ->
     case application:start(App) of
-    {error, {already_started, _}} ->
-        start_applications(Apps, Acc);
-    {error, {not_started, Dep}} ->
-        start_applications([Dep, App | Apps], Acc);
-    {error, {not_running, Dep}} ->
-        start_applications([Dep, App | Apps], Acc);
+    {error, {already_started, App}} ->
+        io:format(standard_error, "Application ~s was left running!~n", [App]),
+        application:stop(App),
+        start_applications([App|Apps], Acc);
     ok ->
         start_applications(Apps, [App|Acc])
     end.
@@ -258,3 +259,48 @@ load_applications_with_stats() ->
 stats_file_to_app(File) ->
     [_Desc, _Priv, App|_] = lists:reverse(filename:split(File)),
     erlang:list_to_atom(App).
+
+calculate_start_order(Apps) ->
+    AllApps = calculate_start_order(sort_apps(Apps), []),
+    % AllApps may not be the same list as Apps if we
+    % loaded any dependencies. We recurse here when
+    % that changes so that our sort_apps function has
+    % a global view of all applications to start.
+    case lists:usort(AllApps) == lists:usort(Apps) of
+        true -> AllApps;
+        false -> calculate_start_order(AllApps)
+    end.
+
+calculate_start_order([], StartOrder) ->
+    lists:reverse(StartOrder);
+calculate_start_order([App | RestApps], StartOrder) ->
+    NewStartOrder = load_app_deps(App, StartOrder),
+    calculate_start_order(RestApps, NewStartOrder).
+
+load_app_deps(App, StartOrder) ->
+    case lists:member(App, StartOrder) of
+        true ->
+            StartOrder;
+        false ->
+            case application:load(App) of
+                ok -> ok;
+                {error, {already_loaded, App}} -> ok
+            end,
+            {ok, Apps} = application:get_key(App, applications),
+            Deps = case App of
+                kernel -> Apps;
+                stdlib -> Apps;
+                _ -> lists:usort([kernel, stdlib | Apps])
+            end,
+            NewStartOrder = lists:foldl(fun(Dep, Acc) ->
+                load_app_deps(Dep, Acc)
+            end, StartOrder, Deps),
+            [App | NewStartOrder]
+    end.
+
+sort_apps(Apps) ->
+    Weighted = [weight_app(App) || App <- Apps],
+    element(2, lists:unzip(lists:sort(Weighted))).
+
+weight_app(couch_log) -> {0.0, couch_log};
+weight_app(Else) -> {1.0, Else}.
