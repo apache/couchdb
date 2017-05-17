@@ -1,14 +1,15 @@
 <!-- Thank you for your contribution!
 
-     Please file this form by replacing markdown commentary
-     tags with the text. If section needs in no action - remove it.
+     Please file this form by replacing the Markdown comments
+     with your text. If a section needs no action - remove it.
 
      Also remember, that CouchDB uses the Review-Then-Commit (RTC) model
-     of code collaboration. Positive feedback provides by +1 from committers
-     while negative by -1. The -1 also means veto and need to be addressed
-     to find the consensus. Once there are no objections, PR could be merged.
+     of code collaboration. Positive feedback is represented +1 from committers
+     and negative is a -1. The -1 also means veto, and needs to be addressed
+     to proceed. Once there are no objections, the PR can be merged by a
+     CouchDB committer.
 
-     See: http://couchdb.apache.org/bylaws.html#decisions for more info -->
+     See: http://couchdb.apache.org/bylaws.html#decisions for more info. -->
 
 ## Overview
 
@@ -21,16 +22,17 @@
      Does it provides any behaviour that the end users
      could notice? -->
 
-## JIRA issue number
+## GitHub issue number
 
-<!-- If this is a significant change, please file a JIRA issue at:
-     https://issues.apache.org/jira/browse/COUCHDB
-     and include the number here and in commit message(s)  -->
+<!-- If this is a significant change, please file a separate issue at:
+     https://github.com/apache/couchdb/issues
+     and include the number here and in commit message(s) using
+     syntax like "Fixes #472" or "Fixes apache/couchdb#472".  -->
 
 ## Related Pull Requests
 
-<!-- If your changes affects on multiple components in different
-     repositories please list here links to those pull requests.  -->
+<!-- If your changes affects multiple components in different
+     repositories please put links to those pull requests here.  -->
 
 ## Checklist
 
