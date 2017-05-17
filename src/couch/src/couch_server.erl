@@ -199,6 +199,9 @@ hash_admin_passwords(Persist) ->
         end, couch_passwords:get_unhashed_admins()).
 
 init([]) ->
+    % Mark pluggable storage engines as a supported feature
+    config:enable_feature('pluggable-storage-engines'),
+
     % read config and register for configuration changes
 
     % just stop if one of the config settings change. couch_server_sup
