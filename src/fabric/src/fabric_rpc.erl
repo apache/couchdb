@@ -254,8 +254,8 @@ update_docs(DbName, Docs0, Options) ->
             update_docs_read_repair(DbName, DocsByNode, Options)
     end.
 
-get_purge_seq(DbName, DbOptions) ->
-    with_db(DbName, DbOptions, {couch_db, get_purge_seq, []}).
+get_purge_seq(DbName, Options) ->
+    with_db(DbName, Options, {couch_db, get_purge_seq, []}).
 
 purge_docs(DbName, UUIdsIdsRevs, Options) ->
     case proplists:get_value(replicated_changes, Options) of

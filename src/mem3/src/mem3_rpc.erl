@@ -19,7 +19,7 @@
     find_common_seq/4,
     get_missing_revs/4,
     update_docs/4,
-    get_purge_seq/2,
+    get_purge_seq/3,
     purge_docs/4,
     load_checkpoint/4,
     save_checkpoint/7,
@@ -49,8 +49,8 @@ update_docs(Node, DbName, Docs, Options) ->
     rexi_call(Node, {fabric_rpc, update_docs, [DbName, Docs, Options]}).
 
 
-get_purge_seq(Node, DbName) ->
-    rexi_call(Node, {fabric_rpc, get_purge_seq, [DbName]}).
+get_purge_seq(Node, DbName, Options) ->
+    rexi_call(Node, {fabric_rpc, get_purge_seq, [DbName, Options]}).
 
 
 purge_docs(Node, DbName, PUUIdsIdsRevs, Options) ->
