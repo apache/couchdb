@@ -39,7 +39,7 @@ You should have the following installed:
  * Erlang OTP (>=R16B03-1, =<19.x) (http://erlang.org/)
  * ICU                          (http://icu-project.org/)
  * OpenSSL                      (http://www.openssl.org/)
- * Mozilla SpiderMonkey (1.8.5) (http://www.mozilla.org/js/spidermonkey/)
+ * Mozilla SpiderMonkey (1.8.5) (https://developer.mozilla.org/en/docs/Mozilla/Projects/SpiderMonkey/Releases/1.8.5)
  * GNU Make                     (http://www.gnu.org/software/make/)
  * GNU Compiler Collection      (http://gcc.gnu.org/)
  * libcurl                      (http://curl.haxx.se/libcurl/)
