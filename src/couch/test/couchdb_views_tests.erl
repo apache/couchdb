@@ -226,7 +226,7 @@ should_cleanup_all_index_files({DbName, {FooRev, BooRev}})->
 
 couchdb_1138(DbName) ->
     ?_test(begin
-        {ok, IndexerPid} = couch_index_server:get_index(
+        {ok, IndexerPid, Mon} = couch_index_server:get_index(
             couch_mrview_index, DbName, <<"_design/foo">>),
         ?assert(is_pid(IndexerPid)),
         ?assert(is_process_alive(IndexerPid)),
@@ -259,12 +259,14 @@ couchdb_1138(DbName) ->
         ?assertEqual(5, length(Rows2)),
         ?assertEqual(2, count_users(DbName)),
 
-        ?assert(is_process_alive(IndexerPid))
+        ?assert(is_process_alive(IndexerPid)),
+
+        couch_index_server:close(Mon)
     end).
 
 couchdb_1309(DbName) ->
     ?_test(begin
-        {ok, IndexerPid} = couch_index_server:get_index(
+        {ok, IndexerPid, Mon} = couch_index_server:get_index(
             couch_mrview_index, DbName, <<"_design/foo">>),
         ?assert(is_pid(IndexerPid)),
         ?assert(is_process_alive(IndexerPid)),
@@ -281,7 +283,7 @@ couchdb_1309(DbName) ->
         ?assert(is_process_alive(IndexerPid)),
 
         update_design_doc(DbName,  <<"_design/foo">>, <<"bar">>),
-        {ok, NewIndexerPid} = couch_index_server:get_index(
+        {ok, NewIndexerPid, NewMon} = couch_index_server:get_index(
             couch_mrview_index, DbName, <<"_design/foo">>),
         ?assert(is_pid(NewIndexerPid)),
         ?assert(is_process_alive(NewIndexerPid)),
@@ -301,12 +303,15 @@ couchdb_1309(DbName) ->
         ?assertEqual(4, length(Rows2)),
 
         ok = stop_indexer( %% FIXME we need to grab monitor earlier
-               fun() -> ok end,
+               fun() -> couch_index_server:close(Mon) end,
                IndexerPid, ?LINE,
                "old view group is not dead after ddoc update"),
 
         ok = stop_indexer(
-               fun() -> couch_server:delete(DbName, [?ADMIN_USER]) end,
+               fun() ->
+                   couch_index_server:close(NewMon),
+                   couch_server:delete(DbName, [?ADMIN_USER])
+               end,
                NewIndexerPid, ?LINE,
                "new view group did not die after DB deletion")
     end).
@@ -363,9 +368,10 @@ couchdb_1283() ->
         %% because we need have access to compaction Pid, not a Ref.
         %% {ok, MonRef} = couch_mrview:compact(MDb1#db.name, <<"_design/foo">>,
         %%                                     [monitor]),
-        {ok, Pid} = couch_index_server:get_index(
+        {ok, Pid, Mon} = couch_index_server:get_index(
             couch_mrview_index, MDb1#db.name, <<"_design/foo">>),
         {ok, CPid} = gen_server:call(Pid, compact),
+        couch_index_server:close(Mon),
         %% By suspending compaction process we ensure that compaction won't get
         %% finished too early to make get_writer_status assertion fail.
         erlang:suspend_process(CPid),

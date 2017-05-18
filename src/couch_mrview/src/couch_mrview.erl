@@ -325,16 +325,19 @@ count_view_changes_since(Db, DDoc, VName, SinceSeq, Options) ->
 
 
 get_info(Db, DDoc) ->
-    {ok, Pid} = couch_index_server:get_index(couch_mrview_index, Db, DDoc),
-    couch_index:get_info(Pid).
+    {ok, Pid, Mon} = couch_index_server:get_index(couch_mrview_index, Db, DDoc),
+    Info = couch_index:get_info(Pid),
+    ok = couch_index_server:close(Mon),
+    Info.
 
 
 trigger_update(Db, DDoc) ->
     trigger_update(Db, DDoc, couch_db:get_update_seq(Db)).
 
 trigger_update(Db, DDoc, UpdateSeq) ->
-    {ok, Pid} = couch_index_server:get_index(couch_mrview_index, Db, DDoc),
-    couch_index:trigger_update(Pid, UpdateSeq).
+    {ok, Pid, Mon} = couch_index_server:get_index(couch_mrview_index, Db, DDoc),
+    couch_index:trigger_update(Pid, UpdateSeq),
+    couch_index_server:close(Mon).
 
 %% get informations on a view
 get_view_info(Db, DDoc, VName) ->
@@ -369,10 +372,14 @@ refresh(Db, DDoc) ->
             end),
 
     case couch_index_server:get_index(couch_mrview_index, Db, DDoc) of
-        {ok, Pid} ->
-            case catch couch_index:get_state(Pid, UpdateSeq) of
-                {ok, _} -> ok;
-                Error -> {error, Error}
+        {ok, Pid, Mon} ->
+            try
+                case catch couch_index:get_state(Pid, UpdateSeq) of
+                    {ok, _} -> ok;
+                    Error -> {error, Error}
+                end
+            after
+                couch_index_server:close(Mon)
             end;
         Error ->
             {error, Error}
@@ -383,17 +390,20 @@ compact(Db, DDoc) ->
 
 
 compact(Db, DDoc, Opts) ->
-    {ok, Pid} = couch_index_server:get_index(couch_mrview_index, Db, DDoc),
-    couch_index:compact(Pid, Opts).
+    {ok, Pid, Mon} = couch_index_server:get_index(couch_mrview_index, Db, DDoc),
+    Ret = couch_index:compact(Pid, Opts),
+    couch_index_server:close(Mon),
+    Ret.
 
 
 cancel_compaction(Db, DDoc) ->
-    {ok, IPid} = couch_index_server:get_index(couch_mrview_index, Db, DDoc),
+    {ok, IPid, Mon} = couch_index_server:get_index(couch_mrview_index, Db, DDoc),
     {ok, CPid} = couch_index:get_compactor_pid(IPid),
     ok = couch_index_compactor:cancel(CPid),
 
     % Cleanup the compaction file if it exists
     {ok, #mrst{sig=Sig, db_name=DbName}} = couch_index:get_state(IPid, 0),
+    couch_index_server:close(Mon),
     couch_mrview_util:delete_compaction_file(DbName, Sig),
     ok.
 

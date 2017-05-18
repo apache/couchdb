@@ -19,9 +19,9 @@ setup() ->
     DbName = ?tempdb(),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     couch_db:close(Db),
-    {ok, IndexerPid} = fake_index(Db),
+    {ok, IndexerPid, Mon} = fake_index(Db),
     ?assertNot(is_opened(Db)),
-    {Db, IndexerPid}.
+    {Db, IndexerPid, Mon}.
 
 fake_index(#db{name = DbName} = Db) ->
     ok = meck:new([test_index], [non_strict]),
@@ -67,7 +67,7 @@ compaction_test_() ->
     }.
 
 
-hold_db_for_recompaction({Db, Idx}) ->
+hold_db_for_recompaction({Db, Idx, Mon}) ->
     ?_test(begin
         ?assertNot(is_opened(Db)),
         ok = meck:reset(test_index),
@@ -87,6 +87,7 @@ hold_db_for_recompaction({Db, Idx}) ->
         end,
 
         ?assertNot(is_opened(Db)),
+        couch_index_server:close(Mon),
         ok
     end).
 

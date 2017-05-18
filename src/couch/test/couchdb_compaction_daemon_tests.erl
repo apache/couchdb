@@ -222,8 +222,9 @@ spawn_compaction_monitor(DbName) ->
         DbPid = couch_util:with_db(DbName, fun(Db) ->
             Db#db.main_pid
         end),
-        {ok, ViewPid} = couch_index_server:get_index(couch_mrview_index,
+        {ok, ViewPid, Mon} = couch_index_server:get_index(couch_mrview_index,
                 DbName, <<"_design/foo">>),
+        couch_index_server:close(Mon),
         TestPid ! {self(), started},
         receive
             {TestPid, go} -> ok
