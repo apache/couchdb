@@ -165,7 +165,8 @@ load_purges_rpc(DbName, SourceUUID) ->
             {ok, #doc{body={Props}} } ->
                 couch_util:get_value(<<"purge_seq">>, Props);
             {not_found, _} ->
-                0
+                {ok, OldestPSeq} = couch_db:get_oldest_purge_seq(Db),
+                OldestPSeq
         end,
         {ok, CurPSeq} = couch_db:get_purge_seq(Db),
         UUIDsIdsRevs = if (LastPSeq == CurPSeq) -> []; true ->
