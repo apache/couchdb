@@ -15,6 +15,8 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
+-define(WAIT_TIMEOUT, 1000).
+
 setup() ->
     DbName = ?tempdb(),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
@@ -86,9 +88,17 @@ hold_db_for_recompaction({Db, Idx}) ->
             throw(timeout)
         end,
 
-        ?assertNot(is_opened(Db)),
+        ?assertEqual(ok, wait_db_close(Db)),
         ok
     end).
+
+wait_db_close(Db) ->
+    test_util:wait(fun() ->
+        case is_opened(Db) of
+            false -> ok;
+            true -> wait
+        end
+    end, ?WAIT_TIMEOUT).
 
 is_opened(Db) ->
     Monitors = [M || M <- couch_db:monitored_by(Db), M =/= self()],
