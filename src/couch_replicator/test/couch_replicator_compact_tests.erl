@@ -113,7 +113,9 @@ check_active_tasks(RepPid, {BaseId, Ext} = RepId, Src, Tgt) ->
     FullRepId = ?l2b(BaseId ++ Ext),
     Pid = ?l2b(pid_to_list(RepPid)),
     ok = wait_for_replicator(RepId),
-    [RepTask] = replication_tasks(),
+    RepTasks = wait_for_task_status(),
+    ?assertNotEqual(timeout, RepTasks),
+    [RepTask] = RepTasks,
     ?assertEqual(Pid, couch_util:get_value(pid, RepTask)),
     ?assertEqual(FullRepId, couch_util:get_value(replication_id, RepTask)),
     ?assertEqual(true, couch_util:get_value(continuous, RepTask)),
@@ -143,6 +145,16 @@ wait_for_replicator(RepId) ->
     %% we query replicator:details to ensure that do_init happen
     ?assertMatch({ok, _}, rep_details(RepId)),
     ok.
+
+wait_for_task_status() ->
+    test_util:wait(fun() ->
+        case couch_task_status:all() of
+            [] ->
+                wait;
+            Tasks ->
+                Tasks
+        end
+    end).
 
 should_cancel_replication(RepId, RepPid) ->
     ?_assertNot(begin
