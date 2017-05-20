@@ -156,11 +156,6 @@ wait_for_task_status() ->
         end
     end).
 
-replication_tasks() ->
-    lists:filter(fun(P) ->
-        couch_util:get_value(type, P) =:= replication
-    end, couch_task_status:all()).
-
 should_cancel_replication(RepId, RepPid) ->
     ?_assertNot(begin
         ok = couch_replicator_scheduler:remove_job(RepId),
