@@ -57,6 +57,7 @@ handle_action("enable_cluster", Setup) ->
     Options = get_options([
         {username, <<"username">>},
         {password, <<"password">>},
+        {password_hash, <<"password_hash">>},
         {bind_address, <<"bind_address">>},
         {port, <<"port">>},
         {remote_node, <<"remote_node">>},
