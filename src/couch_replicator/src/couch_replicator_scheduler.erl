@@ -209,6 +209,7 @@ restart_job(JobId) ->
 %% gen_server functions
 
 init(_) ->
+    config:enable_feature('scheduler'),
     EtsOpts = [named_table, {keypos, #job.id}, {read_concurrency, true},
         {write_concurrency, true}],
     ?MODULE = ets:new(?MODULE, EtsOpts),
