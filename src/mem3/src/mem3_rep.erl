@@ -173,10 +173,16 @@ find_source_seq_int(#doc{body={Props}}, SrcNode0, TgtNode0, TgtUUID, TgtSeq) ->
 repl(#db{name=DbName, seq_tree=Bt}=Db, Acc0) ->
     erlang:put(io_priority, {internal_repl, DbName}),
     #acc{seq=Seq} = Acc1 = calculate_start_seq(Acc0#acc{source = Db}),
-    Fun = fun ?MODULE:changes_enumerator/3,
-    {ok, _, Acc2} = couch_btree:fold(Bt, Fun, Acc1, [{start_key, Seq + 1}]),
-    {ok, #acc{seq = LastSeq}} = replicate_batch(Acc2),
-    {ok, couch_db:count_changes_since(Db, LastSeq)}.
+    case Seq >= couch_db:get_update_seq(Db) of
+        true ->
+            {ok, 0};
+        false ->
+            Fun = fun ?MODULE:changes_enumerator/3,
+            FoldOpts =  [{start_key, Seq + 1}],
+            {ok, _, Acc2} = couch_btree:fold(Bt, Fun, Acc1, FoldOpts),
+            {ok, #acc{seq = LastSeq}} = replicate_batch(Acc2),
+            {ok, couch_db:count_changes_since(Db, LastSeq)}
+    end.
 
 
 calculate_start_seq(Acc) ->
