@@ -46,7 +46,7 @@ SubDirs = [
 
 DepDescs = [
 %% Independent Apps
-{config,           "config",           "f62d553b337ce975edb0fb68772d22bdd3bf6490"},
+{config,           "config",           "c5a42b52f28853e511afaa5b35d48770da1159d4"},
 {b64url,           "b64url",           "6895652d80f95cdf04efb14625abed868998f174"},
 {ets_lru,          "ets-lru",          "c05488c8b1d7ec1c3554a828e0c9bf2888932ed6"},
 {khash,            "khash",            "7c6a9cd9776b5c6f063ccafedfa984b00877b019"},
