@@ -29,7 +29,8 @@ go(DbName, AllIdsRevs, Opts) ->
     {Counters, Workers} = dict:fold(fun(Shard, UUIDsIdsRevs, {Cs,Ws}) ->
         UUIDs = [UUID || {UUID, _Id, _Revs} <-UUIDsIdsRevs],
         #shard{name=Name, node=Node} = Shard,
-        Ref = rexi:cast(Node, {fabric_rpc, purge_docs, [Name, UUIDsIdsRevs, Options]}),
+        Ref = rexi:cast(Node,
+            {fabric_rpc, purge_docs, [Name, UUIDsIdsRevs, Options]}),
         Worker = Shard#shard{ref=Ref},
         { [{Worker, UUIDs}|Cs], [Worker|Ws]}
     end, {[], []}, group_idrevs_by_shard(DbName, AllUUIDsIdsRevs)),
@@ -38,18 +39,28 @@ go(DbName, AllIdsRevs, Opts) ->
     W = couch_util:get_value(w, Options, integer_to_list(mem3:quorum(DbName))),
     Acc = {length(Workers), DocCount, list_to_integer(W), Counters, dict:new()},
     Timeout = fabric_util:request_timeout(),
-    try rexi_utils:recv(Workers, #shard.ref, fun handle_message/3, Acc, infinity, Timeout) of
+    try rexi_utils:recv(Workers, #shard.ref,
+        fun handle_message/3, Acc, infinity, Timeout) of
     {ok, {Health, Results}} when Health =:= ok; Health =:= accepted ->
         % Results-> [{UUID, {ok, Revs}}]
         {Health, [R || R <-
-            couch_util:reorder_results(AllUUIDs, Results), R =/= noreply]};
+            couch_util:reorder_results(AllUUIDs, Results)]};
     {timeout, Acc1} ->
-        {_, _, W1, Counters1, DocsDict1} = Acc1,
+        {_, _, W1, Counters1, DocReplDict0} = Acc1,
         {DefunctWorkers, _} = lists:unzip(Counters1),
         fabric_util:log_timeout(DefunctWorkers, "purge_docs"),
-        {Health, _, Resp} = dict:fold(fun force_reply/3, {ok, W1, []}, DocsDict1),
-        {Health, [R || R <-
-            couch_util:reorder_results(AllUUIDs, Resp), R =/= noreply]};
+        DocReplDict = lists:foldl(fun({_W, Docs}, Dict) ->
+            Replies = [{error, timeout} || _D <- Docs],
+            append_purge_replies(Docs, Replies, Dict)
+        end, DocReplDict0, Counters1),
+        {Health, _, Resp} = dict:fold(
+            fun force_reply/3, {ok, W1, []}, DocReplDict),
+        case Health of
+            error -> timeout;
+            _ -> {Health, [R || R <-
+                couch_util:reorder_results(AllUUIDs, Resp)]}
+
+        end;
     Else ->
         Else
     after
@@ -64,7 +75,7 @@ handle_message({rexi_DOWN, _, {_,NodeRef},_}, _Worker, Acc0) ->
     % fill DocsDict with error messages for relevant Docs
     DocsDict = lists:foldl(fun({_W, Docs}, CDocsDict) ->
         Replies = [{error, internal_server_error} || _D <- Docs],
-        append_update_replies(Docs, Replies, CDocsDict)
+        append_purge_replies(Docs, Replies, CDocsDict)
     end, DocsDict0, FailCounters),
     skip_message({length(NewCounters), DocCount, W, NewCounters, DocsDict});
 handle_message({rexi_EXIT, _}, Worker, Acc0) ->
@@ -72,12 +83,12 @@ handle_message({rexi_EXIT, _}, Worker, Acc0) ->
     % fill DocsDict with error messages for relevant Docs
     {value, {_W, Docs}, NewCounters} = lists:keytake(Worker, 1, Counters),
     Replies = [{error, internal_server_error} || _D <- Docs],
-    DocsDict = append_update_replies(Docs, Replies, DocsDict0),
+    DocsDict = append_purge_replies(Docs, Replies, DocsDict0),
     skip_message({WC-1, DocCount, W, NewCounters, DocsDict});
 handle_message({ok, Replies0}, Worker, Acc0) ->
     {WCount, DocCount, W, Counters, DocsDict0} = Acc0,
     {value, {_W, Docs}, NewCounters} = lists:keytake(Worker, 1, Counters),
-    DocsDict = append_update_replies(Docs, Replies0, DocsDict0),
+    DocsDict = append_purge_replies(Docs, Replies0, DocsDict0),
     case {WCount, dict:size(DocsDict)} of
     {1, _} ->
         % last message has arrived, we need to conclude things
@@ -100,7 +111,7 @@ handle_message({error, purged_docs_limit_exceeded}=Error, Worker, Acc0) ->
     % fill DocsDict with error messages for relevant Docs
     {value, {_W, Docs}, NewCounters} = lists:keytake(Worker, 1, Counters),
     Replies = [Error || _D <- Docs],
-    DocsDict = append_update_replies(Docs, Replies, DocsDict0),
+    DocsDict = append_purge_replies(Docs, Replies, DocsDict0),
     skip_message({WC-1, DocCount, W, NewCounters, DocsDict});
 handle_message({bad_request, Msg}, _, _) ->
     throw({bad_request, Msg}).
@@ -126,13 +137,14 @@ force_reply(Doc, Replies, {Health, W, Acc}) ->
             case UReplies of
                 [{error, internal_server_error}] ->
                     {error, W, [{Doc, {error, internal_server_error}} | Acc]};
+                [{error, timeout}] ->
+                    {error, W, [{Doc, {error, timeout}} | Acc]};
                 [FirstReply|[]] ->
                     % check if all errors are identical, if so inherit health
                     {Health, W, [{Doc, FirstReply} | Acc]};
                 _ ->
                     {error, W, [{Doc, UReplies} | Acc]}
              end;
-
         AcceptedReplies0 ->
             NewHealth = case Health of ok -> accepted; _ -> Health end,
             AcceptedReplies = lists:usort(lists:flatten(AcceptedReplies0)),
@@ -174,10 +186,10 @@ group_idrevs_by_shard(DbName, UUIDsIdsRevs) ->
     end, dict:new(), UUIDsIdsRevs).
 
 
-append_update_replies([], [], DocReplyDict) ->
+append_purge_replies([], [], DocReplyDict) ->
     DocReplyDict;
-append_update_replies([Doc|Rest1], [Reply|Rest2], Dict0) ->
-    append_update_replies(Rest1, Rest2, dict:append(Doc, Reply, Dict0)).
+append_purge_replies([Doc|Rest1], [Reply|Rest2], Dict0) ->
+    append_purge_replies(Rest1, Rest2, dict:append(Doc, Reply, Dict0)).
 
 
 skip_message({0, _, W, _, DocsDict}) ->

@@ -289,7 +289,14 @@ update_docs(DbName, Docs, Options) ->
     PurgeSeq   :: any().
 purge_docs(DbName, IdsRevs, Options) when is_list(IdsRevs) ->
     IdsRevs2 = [idrevs(IdRs) || IdRs <- IdsRevs],
-    fabric_doc_purge:go(dbname(DbName), IdsRevs2, opts(Options)).
+    case fabric_doc_purge:go(dbname(DbName), IdsRevs2, opts(Options)) of
+        {ok, Results} ->
+            {ok, Results};
+        {accepted, Results} ->
+            {accepted, Results};
+        Error ->
+            throw(Error)
+    end.
 
 
 %% @doc spawns a process to upload attachment data and
