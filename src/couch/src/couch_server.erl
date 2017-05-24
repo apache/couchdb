@@ -21,6 +21,7 @@
 -export([handle_cast/2,code_change/3,handle_info/2,terminate/2]).
 -export([dev_start/0,is_admin/2,has_admins/0,get_stats/0]).
 -export([close_lru/0]).
+-export([close_db_if_idle/1]).
 
 % config_listener api
 -export([handle_config_change/5, handle_config_terminate/3]).
@@ -172,6 +173,15 @@ hash_admin_passwords(Persist) ->
             HashedPassword = couch_passwords:hash_admin_password(ClearPassword),
             config:set("admins", User, ?b2l(HashedPassword), Persist)
         end, couch_passwords:get_unhashed_admins()).
+
+close_db_if_idle(DbName) ->
+    case ets:lookup(couch_dbs, DbName) of
+        [#db{}] ->
+            gen_server:cast(couch_server, {close_db_if_idle, DbName});
+         _ ->
+            ok
+    end.
+
 
 init([]) ->
     % read config and register for configuration changes
@@ -508,6 +518,24 @@ handle_cast({update_lru, DbName}, #server{lru = Lru, update_lru_on_read=true} = 
     {noreply, Server#server{lru = couch_lru:update(DbName, Lru)}};
 handle_cast({update_lru, _DbName}, Server) ->
     {noreply, Server};
+handle_cast({close_db_if_idle, DbName}, Server) ->
+    case ets:update_element(couch_dbs, DbName, {#db.fd_monitor, locked}) of
+    true ->
+        [#db{main_pid = Pid} = Db] = ets:lookup(couch_dbs, DbName),
+        case couch_db:is_idle(Db) of
+        true ->
+            true = ets:delete(couch_dbs, DbName),
+            true = ets:delete(couch_dbs_pid_to_name, Pid),
+            exit(Pid, kill),
+            {noreply, db_closed(Server, Db#db.options)};
+        false ->
+            true = ets:update_element(couch_dbs, DbName, {#db.fd_monitor, nil}),
+            {noreply, Server}
+        end;
+    false ->
+        {noreply, Server}
+    end;
+
 handle_cast(Msg, Server) ->
     {stop, {unknown_cast_message, Msg}, Server}.
 

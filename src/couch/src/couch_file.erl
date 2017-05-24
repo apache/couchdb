@@ -44,6 +44,7 @@
 -export([append_term/2, append_term/3, append_term_md5/2, append_term_md5/3]).
 -export([write_header/2, read_header/1]).
 -export([delete/2, delete/3, nuke_dir/2, init_delete_dir/1]).
+-export([msec_since_last_read/1]).
 
 % gen_server callbacks
 -export([init/1, terminate/2, code_change/3]).
@@ -338,12 +339,25 @@ init_status_error(ReturnPid, Ref, Error) ->
     ReturnPid ! {Ref, self(), Error},
     ignore.
 
+
+% Return time since last read. The return value is conservative in the
+% sense that if no read timestamp has been found, it would return 0. This
+% result is used to decide if reader is idle so returning 0 will avoid marking
+% it idle by accident when process is starting up.
+msec_since_last_read(Fd) when is_pid(Fd) ->
+    Now = os:timestamp(),
+    LastRead = couch_util:process_dict_get(Fd, read_timestamp, Now),
+    DtMSec = timer:now_diff(Now, LastRead) div 1000,
+    max(0, DtMSec).
+
+
 % server functions
 
 init({Filepath, Options, ReturnPid, Ref}) ->
     OpenOptions = file_open_options(Options),
     Limit = get_pread_limit(),
     IsSys = lists:member(sys_db, Options),
+    update_read_timestamp(),
     case lists:member(create, Options) of
     true ->
         filelib:ensure_dir(Filepath),
@@ -422,6 +436,7 @@ handle_call(close, _From, #file{fd=Fd}=File) ->
     {stop, normal, file:close(Fd), File#file{fd = nil}};
 
 handle_call({pread_iolist, Pos}, _From, File) ->
+    update_read_timestamp(),
     {LenIolist, NextPos} = read_raw_iolist_int(File, Pos, 4),
     case iolist_to_binary(LenIolist) of
     <<1:1/integer,Len:31/integer>> -> % an MD5-prefixed term
@@ -695,13 +710,10 @@ is_idle(#file{is_sys=false}) ->
     {Fd :: pid() | tuple(), FilePath :: string()} | undefined.
 
 process_info(Pid) ->
-    {dictionary, Dict} = erlang:process_info(Pid, dictionary),
-    case lists:keyfind(couch_file_fd, 1, Dict) of
-        false ->
-            undefined;
-        {couch_file_fd, {Fd, InitialName}} ->
-            {Fd, InitialName}
-    end.
+    couch_util:process_dict_get(Pid, couch_file_fd).
+
+update_read_timestamp() ->
+    put(read_timestamp, os:timestamp()).
 
 upgrade_state(#file{db_monitor=DbPid}=File) when is_pid(DbPid) ->
     unlink(DbPid),
