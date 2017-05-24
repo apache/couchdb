@@ -360,6 +360,15 @@ missing_kid_test() ->
     ?assertEqual({error, missing_kid}, decode(Encoded, [kid], nil)).
 
 
+public_key_not_found_test() ->
+    Encoded = encode(
+        {[{<<"alg">>, <<"RS256">>}, {<<"kid">>, <<"1">>}]},
+        {[]}),
+    KS = fun(_, _) -> throw({error, not_found}) end,
+    Expected = {error, not_found},
+    ?assertEqual(Expected, decode(Encoded, [], KS)).
+
+
 bad_rs256_sig_test() ->
     Encoded = encode(
         {[{<<"typ">>, <<"JWT">>}, {<<"alg">>, <<"RS256">>}]},
