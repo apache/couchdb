@@ -33,6 +33,7 @@
 -export([find_in_binary/2]).
 -export([callback_exists/3, validate_callback_exists/3]).
 -export([with_proc/4]).
+-export([process_dict_get/2, process_dict_get/3]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -597,4 +598,22 @@ with_proc(M, F, A, Timeout) ->
     after Timeout ->
         erlang:demonitor(Ref, [flush]),
         {error, timeout}
+    end.
+
+
+process_dict_get(Pid, Key) ->
+    process_dict_get(Pid, Key, undefined).
+
+
+process_dict_get(Pid, Key, DefaultValue) ->
+    case process_info(Pid, dictionary) of
+        {dictionary, Dict} ->
+            case lists:keyfind(Key, 1, Dict) of
+                false ->
+                    DefaultValue;
+                {Key, Value} ->
+                    Value
+            end;
+        undefined ->
+            DefaultValue
     end.
