@@ -27,7 +27,7 @@ WITH_FAUXTON=1
 WITH_DOCS=1
 SKIP_DEPS=0
 
-COUCHDB_USER=`whoami`
+COUCHDB_USER="$(whoami 2>/dev/null || echo couchdb)"
 
 . ${rootdir}/version.mk
 COUCHDB_VERSION=${vsn_major}.${vsn_minor}.${vsn_patch}
