@@ -29,10 +29,6 @@
 
 -export([changes_enumerator/2]).
 
-% For the builtin filter _docs_ids, this is the maximum number
-% of documents for which we trigger the optimized code path.
--define(MAX_DOC_IDS, 100).
-
 -record(changes_acc, {
     db,
     view_name,
@@ -556,9 +552,14 @@ send_changes(Acc, Dir, FirstRound) ->
     end.
 
 
-can_optimize(true, {doc_ids, _Style, DocIds})
-        when length(DocIds) =< ?MAX_DOC_IDS ->
-    {true, fun send_changes_doc_ids/6};
+can_optimize(true, {doc_ids, _Style, DocIds}) ->
+    MaxDocIds = config:get_integer("couchdb",
+        "changes_doc_ids_optimization_threshold", 100),
+    if length(DocIds) =< MaxDocIds ->
+        {true, fun send_changes_doc_ids/6};
+    true ->
+        false
+    end;
 can_optimize(true, {design_docs, _Style}) ->
     {true, fun send_changes_design_docs/6};
 can_optimize(_, _) ->
