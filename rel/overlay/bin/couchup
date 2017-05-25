@@ -388,7 +388,7 @@ def main(argv):
               database during this process, or those deletions may not
               successfully replicate to the 2.x database.
          '''))
-    parser_replicate.add_argument('-a', '--all_dbs', action='store_true',
+    parser_replicate.add_argument('-a', '--all-dbs', action='store_true',
         help='act on all databases available')
     parser_replicate.add_argument('-i', '--include-system-dbs',
         action='store_true',
