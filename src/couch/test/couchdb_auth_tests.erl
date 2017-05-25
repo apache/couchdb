@@ -16,7 +16,8 @@
 
 
 setup(PortType) ->
-    ok = config:set("admins", "rocko", "artischocko", false),
+    Hashed = couch_passwords:hash_admin_password("artischocko"),
+    ok = config:set("admins", "rocko", binary_to_list(Hashed), _Persist=false),
     Addr = config:get("httpd", "bind_address", "127.0.0.1"),
     lists:concat(["http://", Addr, ":", port(PortType), "/_session"]).
 
@@ -51,7 +52,8 @@ make_test_cases(Mod, Funs) ->
 should_return_username_on_post_to_session(_PortType, Url) ->
     ?_assertEqual(<<"rocko">>,
         begin
-            ok = config:set("admins", "rocko", "artischocko", false),
+            Hashed = couch_passwords:hash_admin_password(<<"artischocko">>),
+            ok = config:set("admins", "rocko", binary_to_list(Hashed), false),
             {ok, _, _, Body} = test_request:post(Url, [{"Content-Type", "application/json"}],
                 "{\"name\":\"rocko\", \"password\":\"artischocko\"}"),
             {Json} = jiffy:decode(Body),
