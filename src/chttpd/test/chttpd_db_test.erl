@@ -22,7 +22,8 @@
 -define(FIXTURE_TXT, ?ABS_PATH(?FILE)).
 
 setup() ->
-    ok = config:set("admins", ?USER, ?PASS, _Persist=false),
+    Hashed = couch_passwords:hash_admin_password(?PASS),
+    ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist=false),
     TmpDb = ?tempdb(),
     Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
     Port = mochiweb_socket_server:get(chttpd, port),

@@ -144,7 +144,8 @@ decode_response(BinBody, ToDecode) ->
     [couch_util:get_value(Key, Body) || Key <- ToDecode].
 
 add_admin(User, Pass) ->
-    config:set("admins", User, Pass, false).
+    Hashed = couch_passwords:hash_admin_password(Pass),
+    config:set("admins", User, ?b2l(Hashed), _Persist=false).
 
 delete_admin(User) ->
     config:delete("admins", User, false).

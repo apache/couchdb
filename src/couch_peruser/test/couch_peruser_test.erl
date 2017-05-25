@@ -20,7 +20,8 @@
 
 setup_all() ->
     TestCtx = test_util:start_couch([chttpd]),
-    config:set("admins", ?ADMIN_USERNAME, ?ADMIN_PASSWORD),
+    Hashed = couch_passwords:hash_admin_password(?ADMIN_PASSWORD),
+    ok = config:set("admins", ?ADMIN_USERNAME, ?b2l(Hashed), _Persist=false),
     TestCtx.
 
 teardown_all(TestCtx) ->

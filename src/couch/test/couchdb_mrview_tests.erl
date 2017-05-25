@@ -42,7 +42,8 @@
 
 start() ->
     Ctx = test_util:start_couch([chttpd]),
-    ok = config:set("admins", ?USER, ?PASS, _Persist=false),
+    Hashed = couch_passwords:hash_admin_password(?PASS),
+    ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist=false),
     Ctx.
 
 setup(PortType) ->
