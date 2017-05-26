@@ -113,10 +113,6 @@ If you intend to run the test suites::
 
     ./configure -c
 
-If you want to build it into different destination than `/usr/local`.::
-
-    ./configure --prefix=/<your directory path>
-
 If you don't want to build Fauxton or documentation specify
 ``--disable-fauxton`` and/or ``--disable-docs`` arguments for ``configure`` to
 ignore their build and avoid any issues with their dependencies.
