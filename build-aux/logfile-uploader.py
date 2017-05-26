@@ -59,9 +59,8 @@ def build_ci_doc():
         doc['builder'] = 'jenkins'
         doc['build_id'] = os.environ['BUILD_NUMBER']
         doc['url'] = os.environ['BUILD_URL']
-        doc['branch'] = os.environ['GIT_BRANCH']
-        doc['commit'] = os.environ['GIT_COMMIT']
-        doc['repo'] = os.environ['GIT_URL']
+        doc['branch'] = os.environ['BRANCH_NAME']
+        doc['repo'] = 'https://github.com/apache/couchdb'
     else:
         doc['builder'] = 'manual'
         # TODO: shell out to get correct repo, commit, branch info?
