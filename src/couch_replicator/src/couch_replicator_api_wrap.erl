@@ -80,6 +80,8 @@ db_open(#httpdb{} = Db1, _Options, Create) ->
             send_req(Db, [{method, put}],
                 fun(401, _, _) ->
                     throw({unauthorized, ?l2b(db_uri(Db))});
+                (403, _, _) ->
+                    throw({forbidden, ?l2b(db_uri(Db))});
                 (_, _, _) ->
                     ok
                 end)
@@ -100,6 +102,8 @@ db_open(#httpdb{} = Db1, _Options, Create) ->
                  throw({db_not_found, ?l2b(db_uri(Db))});
             (401, _, _) ->
                 throw({unauthorized, ?l2b(db_uri(Db))});
+            (403, _, _) ->
+                throw({forbidden, ?l2b(db_uri(Db))});
             (_, _, _) ->
                 throw({db_not_found, ?l2b(db_uri(Db))})
             end)
