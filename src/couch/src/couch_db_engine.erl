@@ -46,7 +46,7 @@
 -type write_stream_options() :: [
         {buffer_size, Size::pos_integer()} |
         {encoding, atom()} |
-        {compression_level, pos_integer()}
+        {compression_level, non_neg_integer()}
     ].
 
 -type doc_fold_options() :: [
