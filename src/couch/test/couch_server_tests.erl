@@ -89,3 +89,19 @@ should_delete(_, Db) ->
 
 deleted_files(ViewFile) ->
     filelib:wildcard(filename:rootname(ViewFile) ++ "*.deleted.*").
+
+
+bad_engine_option_test_() ->
+    {
+        setup,
+        fun start/0,
+        fun test_util:stop/1,
+        [
+            fun t_bad_engine_option/0
+        ]
+    }.
+
+
+t_bad_engine_option() ->
+    Resp = couch_server:create(?tempdb(), [{engine, <<"cowabunga!">>}]),
+    ?assertEqual(Resp, {error, {invalid_engine_extension, <<"cowabunga!">>}}).

@@ -437,7 +437,7 @@ handle_call({open, DbName, Options}, From, Server) ->
         ok ->
             case make_room(Server, Options) of
             {ok, Server2} ->
-                Engine = get_engine(Server2, DbNameList),
+                {ok, Engine} = get_engine(Server2, DbNameList),
                 {noreply, open_async(Server2, From, DbName, Engine, Options)};
             CloseError ->
                 {reply, CloseError, Server}
@@ -457,28 +457,32 @@ handle_call({open, DbName, Options}, From, Server) ->
     end;
 handle_call({create, DbName, Options}, From, Server) ->
     DbNameList = binary_to_list(DbName),
-    Engine = get_engine(Server, DbNameList, Options),
-    case check_dbname(Server, DbNameList) of
-    ok ->
-        case ets:lookup(couch_dbs, DbName) of
-        [] ->
-            case make_room(Server, Options) of
-            {ok, Server2} ->
-                {noreply, open_async(Server2, From, DbName, Engine,
-                        [create | Options])};
-            CloseError ->
-                {reply, CloseError, Server}
+    case get_engine(Server, DbNameList, Options) of
+    {ok, Engine} ->
+        case check_dbname(Server, DbNameList) of
+        ok ->
+            case ets:lookup(couch_dbs, DbName) of
+            [] ->
+                case make_room(Server, Options) of
+                {ok, Server2} ->
+                    {noreply, open_async(Server2, From, DbName, Engine,
+                            [create | Options])};
+                CloseError ->
+                    {reply, CloseError, Server}
+                end;
+            [#entry{req_type = open} = Entry] ->
+                % We're trying to create a database while someone is in
+                % the middle of trying to open it. We allow one creator
+                % to wait while we figure out if it'll succeed.
+                CrOptions = [create | Options],
+                Req = {create, DbName, Engine, CrOptions, From},
+                true = ets:insert(couch_dbs, Entry#entry{req_type = Req}),
+                {noreply, Server};
+            [_AlreadyRunningDb] ->
+                {reply, file_exists, Server}
             end;
-        [#entry{req_type = open} = Entry] ->
-            % We're trying to create a database while someone is in
-            % the middle of trying to open it. We allow one creator
-            % to wait while we figure out if it'll succeed.
-            CrOptions = [create | Options],
-            Req = {create, DbName, Engine, CrOptions, From},
-            true = ets:insert(couch_dbs, Entry#entry{req_type = Req}),
-            {noreply, Server};
-        [_AlreadyRunningDb] ->
-            {reply, file_exists, Server}
+        Error ->
+            {reply, Error, Server}
         end;
     Error ->
         {reply, Error, Server}
@@ -510,7 +514,7 @@ handle_call({delete, DbName, Options}, _From, Server) ->
         % Make sure and remove all compaction data
         delete_compaction_files(DbNameList, DelOpt),
 
-        {Engine, FilePath} = get_engine(Server, DbNameList),
+        {ok, {Engine, FilePath}} = get_engine(Server, DbNameList),
         RootDir = Server#server.root_dir,
         case couch_db_engine:delete(Engine, RootDir, FilePath, DelOpt) of
         ok ->
@@ -617,12 +621,12 @@ get_engine(Server, DbName, Options) ->
     case couch_util:get_value(engine, Options) of
         Ext when is_binary(Ext) ->
             ExtStr = binary_to_list(Ext),
-            case couch_util:get_value(ExtStr, Engines) of
-                Engine when is_atom(Engine) ->
+            case lists:keyfind(ExtStr, 1, Engines) of
+                {ExtStr, Engine} ->
                     Path = make_filepath(RootDir, DbName, ExtStr),
-                    {Engine, Path};
-                _ ->
-                    get_engine(Server, DbName)
+                    {ok, {Engine, Path}};
+                false ->
+                    {error, {invalid_engine_extension, Ext}}
             end;
         _ ->
             get_engine(Server, DbName)
@@ -639,7 +643,7 @@ get_engine(Server, DbName) ->
         [] ->
             get_default_engine(Server, DbName);
         [Engine] ->
-            Engine;
+            {ok, Engine};
         _ ->
             erlang:error(engine_conflict)
     end.
@@ -667,17 +671,17 @@ get_default_engine(Server, DbName) ->
         Extension when is_list(Extension) ->
             case lists:keyfind(Extension, 1, Engines) of
                 {Extension, Module} ->
-                    {Module, make_filepath(RootDir, DbName, Extension)};
+                    {ok, {Module, make_filepath(RootDir, DbName, Extension)}};
                 false ->
                     Fmt = "Invalid storage engine extension ~s,"
                             " configured engine extensions are: ~s",
                     Exts = [E || {E, _} <- Engines],
                     Args = [Extension, string:join(Exts, ", ")],
                     couch_log:error(Fmt, Args),
-                    Default
+                    {ok, Default}
             end;
         _ ->
-            Default
+            {ok, Default}
     end.
 
 
