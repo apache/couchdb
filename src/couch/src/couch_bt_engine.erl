@@ -300,7 +300,7 @@ open_docs(#st{} = St, DocIds) ->
 open_local_docs(#st{} = St, DocIds) ->
     Results = couch_btree:lookup(St#st.local_tree, DocIds),
     lists:map(fun
-        ({ok, #doc{} = Doc}) -> Doc;
+        ({ok, Doc}) -> Doc;
         (not_found) -> not_found
     end, Results).
 
