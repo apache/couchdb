@@ -166,7 +166,7 @@ handle_call({purge_docs, IdRevs}, _From, Db) ->
     {reply, {ok, PurgeSeq, PurgedIdRevs}, Db2};
 
 handle_call(Msg, From, Db) ->
-    couch_db_engine:handle_call(Msg, From, Db).
+    couch_db_engine:handle_db_updater_call(Msg, From, Db).
 
 
 handle_cast({load_validation_funs, ValidationFuns}, Db) ->
@@ -267,7 +267,7 @@ handle_info({'EXIT', _Pid, normal}, Db) ->
 handle_info({'EXIT', _Pid, Reason}, Db) ->
     {stop, Reason, Db};
 handle_info(Msg, Db) ->
-    couch_db_engine:handle_info(Msg, Db).
+    couch_db_engine:handle_db_updater_info(Msg, Db).
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.

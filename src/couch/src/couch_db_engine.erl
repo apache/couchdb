@@ -140,14 +140,14 @@
 % This is called in the context of couch_db_updater:handle_call/3
 % for any message that is unknown. It can be used to handle messages
 % from asynchronous processes like the engine's compactor if it has one.
--callback handle_call(Msg::any(), DbHandle::db_handle()) ->
+-callback handle_db_updater_call(Msg::any(), DbHandle::db_handle()) ->
         {reply, Resp::any(), NewDbHandle::db_handle()} |
         {stop, Reason::any(), Resp::any(), NewDbHandle::db_handle()}.
 
 
 % This is called in the context of couch_db_updater:handle_info/2
 % and has the same properties as handle_call/3.
--callback handle_info(Msg::any(), DbHandle::db_handle()) ->
+-callback handle_db_updater_info(Msg::any(), DbHandle::db_handle()) ->
     {noreply, NewDbHandle::db_handle()} |
     {noreply, NewDbHandle::db_handle(), Timeout::timeout()} |
     {stop, Reason::any(), NewDbHandle::db_handle()}.
@@ -573,8 +573,8 @@
 
     init/3,
     terminate/2,
-    handle_call/3,
-    handle_info/2,
+    handle_db_updater_call/3,
+    handle_db_updater_info/2,
 
     incref/1,
     decref/1,
@@ -647,11 +647,11 @@ terminate(Reason, #db{} = Db) ->
     Engine:terminate(Reason, EngineState).
 
 
-handle_call(Msg, _From, #db{} = Db) ->
+handle_db_updater_call(Msg, _From, #db{} = Db) ->
     #db{
         engine = {Engine, EngineState}
     } = Db,
-    case Engine:handle_call(Msg, EngineState) of
+    case Engine:handle_db_updater_call(Msg, EngineState) of
         {reply, Resp, NewState} ->
             {reply, Resp, Db#db{engine = {Engine, NewState}}};
         {stop, Reason, Resp, NewState} ->
@@ -659,12 +659,12 @@ handle_call(Msg, _From, #db{} = Db) ->
     end.
 
 
-handle_info(Msg, #db{} = Db) ->
+handle_db_updater_info(Msg, #db{} = Db) ->
     #db{
         name = Name,
         engine = {Engine, EngineState}
     } = Db,
-    case Engine:handle_info(Msg, EngineState) of
+    case Engine:handle_db_updater_info(Msg, EngineState) of
         {noreply, NewState} ->
             {noreply, Db#db{engine = {Engine, NewState}}};
         {noreply, NewState, Timeout} ->
