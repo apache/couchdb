@@ -827,8 +827,6 @@ reduce_sizes(S1, S2) ->
     reduce_sizes(US1, US2).
 
 
-active_size(#st{} = St, Size) when is_integer(Size) ->
-    active_size(St, #size_info{active=Size});
 active_size(#st{} = St, #size_info{} = SI) ->
     Trees = [
         St#st.id_tree,
