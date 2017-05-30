@@ -1206,7 +1206,10 @@ set_new_att_revpos(#doc{revs={RevPos,_Revs},atts=Atts0}=Doc) ->
     Atts = lists:map(
         fun(Att) ->
             case couch_att:fetch(data, Att) of
-                {_Fd, _Sp} -> Att; % already commited to disk, don't set new rev
+                % already commited to disk, don't set new rev
+                {stream, _} -> Att;
+                {Fd, _} when is_pid(Fd) -> Att;
+                % write required so update RevPos
                 _ -> couch_att:store(revpos, RevPos+1, Att)
             end
         end, Atts0),
