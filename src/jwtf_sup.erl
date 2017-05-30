@@ -33,7 +33,7 @@ init([]) ->
             {ets_lru, start_link, [jwks_cache_lru, lru_opts()]},
             permanent, 5000, worker, [ets_lru]}
     ],
-    {ok, { {one_for_all, 0, 1}, Children} }.
+    {ok, { {one_for_all, 5, 10}, Children} }.
 
 %%====================================================================
 %% Internal functions
