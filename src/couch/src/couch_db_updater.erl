@@ -190,13 +190,8 @@ handle_cast(start_compact, Db) ->
             % compact currently running, this is a no-op
             {noreply, Db}
     end;
-handle_cast({compact_done, CompactEngine, CompactInfo}, #db{} = OldDb) ->
-    {ok, NewDb} = case couch_db_engine:get_engine(OldDb) of
-        CompactEngine ->
-            couch_db_engine:finish_compaction(OldDb, CompactInfo);
-        _ ->
-            finish_engine_swap(OldDb, CompactEngine, CompactInfo)
-    end,
+handle_cast({compact_done, _Engine, CompactInfo}, #db{} = OldDb) ->
+    {ok, NewDb} = couch_db_engine:finish_compaction(OldDb, CompactInfo),
     {noreply, NewDb};
 
 handle_cast(Msg, #db{name = Name} = Db) ->
@@ -685,10 +680,6 @@ commit_data(Db, _) ->
         waiting_delayed_commit = nil,
         committed_update_seq = couch_db_engine:get_update_seq(Db)
     }.
-
-
-finish_engine_swap(_OldDb, _NewEngine, _CompactFilePath) ->
-    erlang:error(explode).
 
 
 pair_write_info(Old, New) ->
