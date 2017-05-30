@@ -153,10 +153,6 @@ build_ordered_shards(DbName, DocProps) ->
 build_shards_by_node(DbName, DocProps) ->
     {ByNode} = couch_util:get_value(<<"by_node">>, DocProps, {[]}),
     Suffix = couch_util:get_value(<<"shard_suffix">>, DocProps, ""),
-    EngineOpt = case couch_util:get_value(<<"engine">>, DocProps) of
-        Engine when is_binary(Engine) -> [{engine, Engine}];
-        _ -> []
-    end,
     lists:flatmap(fun({Node, Ranges}) ->
         lists:map(fun(Range) ->
             [B,E] = string:tokens(?b2l(Range), "-"),
@@ -166,7 +162,7 @@ build_shards_by_node(DbName, DocProps) ->
                 dbname = DbName,
                 node = to_atom(Node),
                 range = [Beg, End],
-                opts = EngineOpt
+                opts = get_engine_opt(DocProps)
             }, Suffix)
         end, Ranges)
     end, ByNode).
@@ -174,10 +170,6 @@ build_shards_by_node(DbName, DocProps) ->
 build_shards_by_range(DbName, DocProps) ->
     {ByRange} = couch_util:get_value(<<"by_range">>, DocProps, {[]}),
     Suffix = couch_util:get_value(<<"shard_suffix">>, DocProps, ""),
-    EngineOpt = case couch_util:get_value(<<"engine">>, DocProps) of
-        Engine when is_binary(Engine) -> [{engine, Engine}];
-        _ -> []
-    end,
     lists:flatmap(fun({Range, Nodes}) ->
         lists:map(fun({Node, Order}) ->
             [B,E] = string:tokens(?b2l(Range), "-"),
@@ -188,7 +180,7 @@ build_shards_by_range(DbName, DocProps) ->
                 node = to_atom(Node),
                 range = [Beg, End],
                 order = Order,
-                opts = EngineOpt
+                opts = get_engine_opt(DocProps)
             }, Suffix)
         end, lists:zip(Nodes, lists:seq(1, length(Nodes))))
     end, ByRange).
@@ -204,6 +196,14 @@ to_integer(N) when is_binary(N) ->
     list_to_integer(binary_to_list(N));
 to_integer(N) when is_list(N) ->
     list_to_integer(N).
+
+get_engine_opt(DocProps) ->
+    case couch_util:get_value(<<"engine">>, DocProps) of
+        Engine when is_binary(Engine) ->
+            [{engine, Engine}];
+        _ ->
+            []
+    end.
 
 n_val(undefined, NodeCount) ->
     n_val(config:get("cluster", "n", "3"), NodeCount);
