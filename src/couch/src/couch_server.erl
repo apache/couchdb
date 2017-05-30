@@ -669,6 +669,11 @@ get_default_engine(Server, DbName) ->
                 {Extension, Module} ->
                     {Module, make_filepath(RootDir, DbName, Extension)};
                 false ->
+                    Fmt = "Invalid storage engine extension ~s,"
+                            " configured engine extensions are: ~s",
+                    Exts = [E || {E, _} <- Engines],
+                    Args = [Extension, string:join(Exts, ", ")],
+                    couch_log:error(Fmt, Args),
                     Default
             end;
         _ ->
