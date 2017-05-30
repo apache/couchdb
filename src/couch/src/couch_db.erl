@@ -370,7 +370,6 @@ get_doc_info(Db, Id) ->
         Else
     end.
 
-%   returns {ok, DocInfo} or not_found
 get_full_doc_info(Db, Id) ->
     [Result] = get_full_doc_infos(Db, [Id]),
     Result.
