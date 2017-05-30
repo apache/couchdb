@@ -60,7 +60,8 @@ all_test_() ->
                     fun should_accept_live_as_an_alias_for_continuous/1,
                     fun should_return_404_for_delete_att_on_notadoc/1,
                     fun should_return_409_for_del_att_without_rev/1,
-                    fun should_return_200_for_del_att_with_rev/1
+                    fun should_return_200_for_del_att_with_rev/1,
+                    fun should_return_400_for_bad_engine/1
                 ]
             }
         }
@@ -92,7 +93,7 @@ should_accept_live_as_an_alias_for_continuous(Url) ->
         LastSeqNum = list_to_integer(binary_to_list(LastSeqNum0)),
 
         {ok, _, _, _} = create_doc(Url, "testdoc2"),
-        {ok, _, _, ResultBody2} = 
+        {ok, _, _, ResultBody2} =
             test_request:get(Url ++ "/_changes?feed=live&timeout=1", [?AUTH]),
         [_, CleanedResult] = binary:split(ResultBody2, <<"\n">>),
         {[{_, Seq}, _]} = ?JSON_DECODE(CleanedResult),
@@ -178,4 +179,15 @@ should_return_200_for_del_att_with_rev(Url) ->
           []
       ),
       ?assertEqual(200, RC1)
+    end).
+
+should_return_400_for_bad_engine(_) ->
+    ?_test(begin
+        TmpDb = ?tempdb(),
+        Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
+        Port = mochiweb_socket_server:get(chttpd, port),
+        BaseUrl = lists:concat(["http://", Addr, ":", Port, "/", ?b2l(TmpDb)]),
+        Url = BaseUrl ++ "?engine=cowabunga",
+        {ok, Status, _, _} = test_request:put(Url, [?CONTENT_JSON, ?AUTH], "{}"),
+        ?assertEqual(400, Status)
     end).

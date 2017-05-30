@@ -284,13 +284,12 @@ create_db_req(#httpd{}=Req, DbName) ->
     N = chttpd:qs_value(Req, "n", config:get("cluster", "n", "3")),
     Q = chttpd:qs_value(Req, "q", config:get("cluster", "q", "8")),
     P = chttpd:qs_value(Req, "placement", config:get("cluster", "placement")),
-    E = iolist_to_binary(chttpd:qs_value(Req, "engine", "couch")),
+    EngineOpt = parse_engine_opt(Req),
     Options = [
         {n, N},
         {q, Q},
-        {placement, P},
-        {engine, E}
-    ],
+        {placement, P}
+    ] ++ EngineOpt,
     DocUrl = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName)),
     case fabric:create_db(DbName, Options) of
     ok ->
@@ -1358,6 +1357,20 @@ get_md5_header(Req) ->
 
 parse_doc_query(Req) ->
     lists:foldl(fun parse_doc_query/2, #doc_query_args{}, chttpd:qs(Req)).
+
+parse_engine_opt(Req) ->
+    case chttpd:qs_value(Req, "engine") of
+        undefined ->
+            [];
+        Extension ->
+            Available = couch_server:get_engine_extensions(),
+            case lists:member(Extension, Available) of
+                true ->
+                    [{engine, iolist_to_binary(Extension)}];
+                false ->
+                    throw({bad_request, invalid_engine_extension})
+            end
+    end.
 
 parse_doc_query({Key, Value}, Args) ->
     case {Key, Value} of

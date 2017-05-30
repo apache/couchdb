@@ -23,6 +23,7 @@
 -export([close_lru/0]).
 -export([delete_compaction_files/1]).
 -export([exists/1]).
+-export([get_engine_extensions/0]).
 
 % config_listener api
 -export([handle_config_change/5, handle_config_terminate/3]).
