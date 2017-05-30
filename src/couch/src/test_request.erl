@@ -17,7 +17,7 @@
 -export([put/2, put/3, put/4]).
 -export([delete/1, delete/2, delete/3]).
 -export([options/1, options/2, options/3]).
--export([request/3, request/4]).
+-export([request/3, request/4, request/5]).
 
 get(Url) ->
     get(Url, []).
