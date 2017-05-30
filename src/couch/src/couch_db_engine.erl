@@ -510,7 +510,7 @@
 % This function may be called by many processes concurrently.
 %
 % This function is called to count the number of documents changed
-% since they given UpdateSeq (ie, not including the possible change
+% since the given UpdateSeq (ie, not including the possible change
 % at exactly UpdateSeq). It is currently only used internally to
 % provide a status update in a replication's _active_tasks entry
 % to indicate how many documents are left to be processed.
