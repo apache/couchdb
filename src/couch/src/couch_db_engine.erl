@@ -96,7 +96,7 @@
             RootDir::filepath(),
             DbPath::filepath(),
             DelOpts::delete_options()) ->
-        ok | {error, Reason::atom()} | any().
+        ok | {error, Reason::atom()}.
 
 
 % This function can be called from multiple contexts. It
