@@ -338,6 +338,7 @@ couchTests.users_db_security = function(debug) {
       } finally {
         CouchDB.login("jan", "apple");
         usersDb.deleteDb(); // cleanup
+        sleep(5000);
         usersDb.createDb();
       }
     }
