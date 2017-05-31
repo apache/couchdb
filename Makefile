@@ -64,7 +64,7 @@ help:
 .PHONY: couch
 # target: couch - Build CouchDB core
 couch: config.erl
-	@COUCHDB_VERSION=$(COUCHDB_VERSION) $(REBAR) compile
+	@COUCHDB_VERSION=$(COUCHDB_VERSION) "$(REBAR)" compile
 	@cp src/couch/priv/couchjs bin/
 
 
@@ -99,8 +99,8 @@ check: all
 eunit: export BUILDDIR = $(shell pwd)
 eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 eunit: couch
-	@$(REBAR) setup_eunit 2> /dev/null
-	@$(REBAR) -r eunit $(EUNIT_OPTS)
+	@"$(REBAR)" setup_eunit 2> /dev/null
+	@"$(REBAR)" -r eunit $(EUNIT_OPTS)
 
 
 .PHONY: javascript
@@ -164,19 +164,19 @@ build-test:
 .PHONY: build-plt
 # target: build-plt - Build project-specific PLT
 build-plt:
-	@$(REBAR) -r build-plt $(DIALYZE_OPTS)
+	@"$(REBAR)" -r build-plt $(DIALYZE_OPTS)
 
 
 .PHONY: check-plt
 # target: check-plt - Check the PLT for consistency and rebuild it if it is not up-to-date
 check-plt:
-	@$(REBAR) -r check-plt $(DIALYZE_OPTS)
+	@"$(REBAR)" -r check-plt $(DIALYZE_OPTS)
 
 
 .PHONY: dialyze
 # target: dialyze - Analyze the code for discrepancies
 dialyze: .rebar
-	@$(REBAR) -r dialyze $(DIALYZE_OPTS)
+	@"$(REBAR)" -r dialyze $(DIALYZE_OPTS)
 
 
 .PHONY: docker-image
@@ -200,7 +200,7 @@ docker-stop:
 .PHONY: introspect
 # target: introspect - Check for commits difference between rebar.config and repository
 introspect:
-	@$(REBAR) -r update-deps
+	@"$(REBAR)" -r update-deps
 	@./introspect
 
 ################################################################################
@@ -230,7 +230,7 @@ dist: all
 release: all
 	@echo "Installing CouchDB into rel/couchdb/ ..."
 	@rm -rf rel/couchdb
-	@$(REBAR) generate # make full erlang release
+	@"$(REBAR)" generate # make full erlang release
 
 ifeq ($(with_fauxton), 1)
 	@mkdir -p rel/couchdb/share/
@@ -275,7 +275,7 @@ install:
 .PHONY: clean
 # target: clean - Remove build artifacts
 clean:
-	@$(REBAR) -r clean
+	@"$(REBAR)" -r clean
 	@rm -rf .rebar/
 	@rm -f bin/couchjs
 	@rm -rf src/*/ebin
