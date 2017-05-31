@@ -122,7 +122,7 @@ fold_start_key(FoldFun, DocIdFun) ->
             {dir, rev},
             {start_key, <<255>>}
         ]),
-    ?assertEqual(length(AllDocIds), length(AllDocIdAccFwd)),
+    ?assertEqual(length(AllDocIds), length(AllDocIdAccRev)),
     ?assertEqual(AllDocIds, AllDocIdAccRev),
 
     {ok, DocIdAccFwd} = Engine:FoldFun(St, fun fold_fun/2, [], [
