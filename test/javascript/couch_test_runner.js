@@ -436,37 +436,6 @@ function waitForSuccess(fun, tag) {
   }
 }
 
-function getCurrentToken() {
-  var xhr = CouchDB.request("GET", "/_restart/token");
-  return JSON.parse(xhr.responseText).token;
-};
-
-
-function restartServer() {
-  var token = getCurrentToken();
-  var token_changed = false;
-  var tDelta = 5000;
-  var t0 = new Date();
-  var t1;
-
-  CouchDB.request("POST", "/_restart");
-
-  do {
-    try {
-      if(token != getCurrentToken()) {
-        token_changed = true;
-      }
-    } catch (e) {
-      // Ignore errors while the server restarts
-    }
-    t1 = new Date();
-  } while(((t1 - t0) <= tDelta) && !token_changed);
-
-  if(!token_changed) {
-    throw("Server restart failed");
-  }
-}
-
 // legacy functions for CouchDB < 1.2.0
 // we keep them to make sure we keep BC
 CouchDB.user_prefix = "org.couchdb.user:";
