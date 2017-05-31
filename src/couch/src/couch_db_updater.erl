@@ -645,17 +645,17 @@ update_local_doc_revs(Docs) ->
         } = NewDoc,
         case PrevRevs of
             [RevStr | _] ->
-                PrevRev = list_to_integer(?b2l(RevStr));
+                PrevRev = binary_to_integer(RevStr);
             [] ->
                 PrevRev = 0
         end,
         NewRev = case Delete of
             false ->
-                ?l2b(integer_to_list(PrevRev + 1));
+                PrevRev + 1;
             true  ->
-                <<"0">>
+                0
         end,
-        send_result(Client, NewDoc, {ok, {0, NewRev}}),
+        send_result(Client, NewDoc, {ok, {0, integer_to_binary(NewRev)}}),
         NewDoc#doc{
             revs = {0, [NewRev]}
         }

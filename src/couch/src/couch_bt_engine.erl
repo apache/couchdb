@@ -594,26 +594,25 @@ seq_tree_reduce(rereduce, Reds) ->
     lists:sum(Reds).
 
 
-local_tree_split(#doc{} = Doc) ->
+local_tree_split(#doc{revs = {0, [Rev]}} = Doc) when is_binary(Rev) ->
     #doc{
         id = Id,
-        revs = {0, [Rev]},
+        body = BodyData
+    } = Doc,
+    {Id, {binary_to_integer(Rev), BodyData}};
+
+local_tree_split(#doc{revs = {0, [Rev]}} = Doc) when is_integer(Rev) ->
+    #doc{
+        id = Id,
         body = BodyData
     } = Doc,
     {Id, {Rev, BodyData}}.
 
 
-local_tree_join(Id, {Rev, BodyData}) when is_binary(Rev) ->
-    #doc{
-        id = Id,
-        revs = {0, [Rev]},
-        body = BodyData
-    };
-
 local_tree_join(Id, {Rev, BodyData}) when is_integer(Rev) ->
     #doc{
         id = Id,
-        revs = {0, [list_to_binary(integer_to_list(Rev))]},
+        revs = {0, [integer_to_binary(Rev)]},
         body = BodyData
     }.
 

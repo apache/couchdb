@@ -161,13 +161,13 @@ gen_local_write(Engine, St, {Action, {DocId, Body}}) ->
         [#doc{revs = {0, []}}] ->
             0;
         [#doc{revs = {0, [RevStr | _]}}] ->
-            list_to_integer(binary_to_list(RevStr))
+            binary_to_integer(RevStr)
     end,
     {RevId, Deleted} = case Action of
         Action when Action == create; Action == update ->
-            {list_to_binary(integer_to_list(PrevRev + 1)), false};
+            {PrevRev + 1, false};
         delete ->
-            {<<"0">>, true}
+            {0, true}
     end,
     #doc{
         id = DocId,
