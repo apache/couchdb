@@ -61,8 +61,7 @@ function waitForSuccess(fun, tag) {
     var now = new Date().getTime();
     if (now > start + 10000) {
       complete = true;
-      print('\nFAIL ' + tag);
-      quit(1);
+      throw(Error('\nFAIL ' + tag));
     }
     try {
       while (new Date().getTime() < now + 500);
@@ -71,11 +70,36 @@ function waitForSuccess(fun, tag) {
   }
 }
 
+function getUptime() {
+  var url = "/_node/node1@127.0.0.1/_system"
+  var stats = JSON.parse(CouchDB.request("GET", url).responseText);
+  return stats['uptime'];
+}
+
 function restartServer() {
+  var olduptime = getUptime();
+  if (olduptime < 5) {
+    // handle quick-restarts, though this slows things down
+    sleep(5000);
+    olduptime = getUptime();
+  }
   print('restart');
+
+  /* Need to pass olduptime to check fn so can't reuse waitForSuccess here */
   var start = new Date().getTime();
-  while (new Date().getTime() < start + 1000);
-  waitForSuccess(CouchDB.isRunning, 'restart');
+  var complete = false;
+  while (!complete) {
+    var now = new Date().getTime();
+    if (now > start + 10000) {
+      complete = true;
+      uptime = getUptime();
+      throw(Error('FAILED to restart: ' + uptime + ' not < ' + olduptime));
+    }
+    try {
+      sleep(500);
+      complete = getUptime() < olduptime;
+    } catch (e) {}
+  }
 }
 
 /*
