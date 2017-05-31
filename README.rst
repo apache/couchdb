@@ -1,3 +1,9 @@
+HI HUMBEDOOH!
+
+ASFBot: dance
+
+My hovercraft is full of eels
+
 Apache CouchDB README
 =====================
 
