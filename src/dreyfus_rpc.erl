@@ -19,7 +19,7 @@
 -import(couch_query_servers, [get_os_process/1, ret_os_process/1, proc_prompt/2]).
 
 % public api.
--export([search/4, group1/4, group2/4, info/3]).
+-export([search/4, group1/4, group2/4, info/3, disk_size/3]).
 
 % private callback
 -export([call/5, info_int/3]).
@@ -86,6 +86,17 @@ info_int(DbName, DDoc, IndexName) ->
                 Error ->
                     rexi:reply(Error)
             end;
+        Error ->
+            rexi:reply(Error)
+    end.
+
+disk_size(DbName, DDoc, IndexName) ->
+    erlang:put(io_priority, {interactive, DbName}),
+    check_interactive_mode(),
+    case dreyfus_index:design_doc_to_index(DDoc, IndexName) of
+        {ok, Index} ->
+            Result = dreyfus_index_manager:get_disk_size(DbName, Index),
+            rexi:reply(Result);
         Error ->
             rexi:reply(Error)
     end.
