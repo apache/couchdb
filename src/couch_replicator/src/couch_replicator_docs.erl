@@ -305,19 +305,25 @@ update_rep_doc(RepDbName, RepDocId, KVs) ->
 
 
 update_rep_doc(RepDbName, RepDocId, KVs, Wait) when is_binary(RepDocId) ->
-    try
-        case open_rep_doc(RepDbName, RepDocId) of
-            {ok, LastRepDoc} ->
-                update_rep_doc(RepDbName, LastRepDoc, KVs, Wait * 2);
-            _ ->
-                ok
-        end
-    catch
-        throw:conflict ->
+    Result = case open_rep_doc(RepDbName, RepDocId) of
+        {ok, LastRepDoc} ->
+            try
+                update_rep_doc(RepDbName, LastRepDoc, KVs, Wait * 2)
+            catch
+                throw:conflict ->
+                    {error, conflict}
+            end;
+        _ ->
+            ok
+    end,
+    case Result of
+        {error, conflict} ->  % Handle it here to enable tail call optimization
             Msg = "Conflict when updating replication doc `~s`. Retrying.",
             couch_log:error(Msg, [RepDocId]),
             ok = timer:sleep(random:uniform(erlang:min(128, Wait)) * 100),
-            update_rep_doc(RepDbName, RepDocId, KVs, Wait * 2)
+            update_rep_doc(RepDbName, RepDocId, KVs, Wait * 2);
+        Result ->
+            Result
     end;
 
 update_rep_doc(RepDbName, #doc{body = {RepDocBody}} = RepDoc, KVs, _Try) ->
