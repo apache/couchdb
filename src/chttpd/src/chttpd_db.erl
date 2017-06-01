@@ -1269,7 +1269,7 @@ db_attachment_req(#httpd{method=Method, user_ctx=Ctx}=Req, Db, DocId, FileNamePa
             {200, []};
         _ ->
             {HttpCode, [{"Location", absolute_uri(Req, [$/, DbName, $/, couch_util:url_encode(DocId), $/,
-                FileName])}]}
+                couch_util:url_encode(FileName)])}]}
         end,
     send_json(Req,Status, Headers, {[
         {ok, true},
