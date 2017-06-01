@@ -396,7 +396,8 @@ modify_node(Bt, RootPointerInfo, Actions, QueryOutput) ->
         {LastKey, _LastValue} = element(tuple_size(NodeTuple), NodeTuple),
         {ok, [{LastKey, RootPointerInfo}], QueryOutput2};
     _Else2 ->
-        {ok, ResultList} = write_node(Bt, NodeType, NewNodeList),
+        {ok, ResultList} = write_node(
+                Bt, RootPointerInfo, NodeType, NodeList, NewNodeList),
         {ok, ResultList, QueryOutput2}
     end.
 
@@ -439,6 +440,76 @@ write_node(#btree{fd = Fd, compression = Comp} = Bt, NodeType, NodeList) ->
         ANodeList <- NodeListList
     ],
     {ok, ResultList}.
+
+% Don't make our append-only write optimization for
+% kp nodes.
+write_node(Bt, _OldNode, kp_node, _OldList, NewList) ->
+    write_node(Bt, kp_node, NewList);
+
+% If we're creating a new kv node then there's no
+% possibility for the optimization
+write_node(Bt, _OldNode, NodeType, [], NewList) ->
+    write_node(Bt, NodeType, NewList);
+
+% Disable the optimization for nodes that only
+% have a single element so we don't end up increasing
+% the number of reads when folding a btree
+write_node(Bt, _OldNode, NodeType, [_], NewList) ->
+    write_node(Bt, NodeType, NewList);
+
+% If a KV node has had a new key appended to the
+% end of its list we can instead take the appended
+% KVs and create a new node while reusing the old
+% node already on disk. This saves us both the effort
+% of writing data that's already on disk as well as
+% saves us the disk space that would have been
+% orphaned by not reusing the old node.
+write_node(Bt, OldNode, NodeType, OldList, NewList) ->
+    case is_extension(OldList, NewList) of
+        {prefix, Prefix} ->
+            case old_node_full(OldList) of
+                true ->
+                    {ok, Results} = write_node(Bt, NodeType, Prefix),
+                    {OldLastKey, _} = lists:last(OldList),
+                    {ok, Results ++ [{OldLastKey, OldNode}]};
+                false ->
+                    write_node(Bt, NodeType, NewList)
+            end;
+        {suffix, Suffix} ->
+            case old_node_full(OldList) of
+                true ->
+                    {ok, Results} = write_node(Bt, NodeType, Suffix),
+                    {OldLastKey, _} = lists:last(OldList),
+                    {ok, [{OldLastKey,OldNode} | Results]};
+                false ->
+                    write_node(Bt, NodeType, NewList)
+            end;
+        false ->
+            write_node(Bt, NodeType, NewList)
+    end.
+
+is_extension(OldList, NewList) ->
+    case lists:suffix(OldList, NewList) of
+        true ->
+            PrefixLength = length(NewList) - length(OldList),
+            {Prefix, _} = lists:split(PrefixLength, NewList),
+            {prefix, Prefix};
+        false ->
+            case lists:prefix(OldList, NewList) of
+                true ->
+                    Suffix = lists:nthtail(length(OldList), NewList),
+                    {suffix, Suffix};
+                false ->
+                    false
+            end
+    end.
+
+old_node_full(OldList) ->
+    ChunkThreshold = get_chunk_size(),
+    NodeSize = lists:foldl(fun(KV, Acc) ->
+        Acc + ?term_size(KV)
+    end, 0, OldList),
+    NodeSize >= ChunkThreshold.
 
 modify_kpnode(Bt, {}, _LowerBound, Actions, [], QueryOutput) ->
     modify_node(Bt, nil, Actions, QueryOutput);
