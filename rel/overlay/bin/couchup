@@ -288,7 +288,7 @@ def _rebuild(args):
                         args['clustered_port'], db, ddoc, view),
                     params={'limit': 1},
                     auth=args['creds'],
-                    timeout=args['timeout'])
+                    timeout=float(args['timeout']))
             except requests.exceptions.Timeout:
                 if not args['quiet']:
                     print("Timeout, view is processing. Moving on.")
