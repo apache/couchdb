@@ -78,9 +78,9 @@ function getUptime() {
 
 function restartServer() {
   var olduptime = getUptime();
-  if (olduptime < 5) {
+  if (olduptime < 15) {
     // handle quick-restarts, though this slows things down
-    sleep(5000);
+    sleep(15000);
     olduptime = getUptime();
   }
   print('restart');
