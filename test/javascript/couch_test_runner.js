@@ -322,7 +322,7 @@ function TEquals(expected, actual, testName) {
 }
 
 function TNotEquals(expected, actual, testName) {
-  T(notEquals(expected, actual), "expected '" + repr(expected) +
+  T(notEquals(expected, actual), "expected != '" + repr(expected) +
     "', got '" + repr(actual) + "'", testName);
 }
 

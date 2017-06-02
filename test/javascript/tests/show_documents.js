@@ -277,39 +277,6 @@ couchTests.show_documents = function(debug) {
   // status is 200
   T(xhr.status == 200);
 
-  // get new etag and request again
-  etag = xhr.getResponseHeader("etag");
-  xhr = CouchDB.request("GET", "/" + db_name + "/_design/template/_show/just-name/"+docid, {
-    headers: {"if-none-match": etag}
-  });
-  // should be 304
-  T(xhr.status == 304);
-
-  // update design doc (but not function)
-  designDoc.isChanged = true;
-  T(db.save(designDoc).ok);
-
-  xhr = CouchDB.request("GET", "/" + db_name + "/_design/template/_show/just-name/"+docid, {
-    headers: {"if-none-match": etag}
-  });
-  // should not be 304 if we change the doc
-  TNotEquals(304, xhr.status, "changed ddoc");
-
-  // update design doc function
-  designDoc.shows["just-name"] = stringFun(function(doc, req) {
-   return {
-     body : "Just old " + doc.name
-   };
-  });
-  T(db.save(designDoc).ok);
-
-  xhr = CouchDB.request("GET", "/" + db_name + "/_design/template/_show/just-name/"+docid, {
-    headers: {"if-none-match": etag}
-  });
-  // status is 200
-  T(xhr.status == 200);
-
-
   // JS can't set etag
   xhr = CouchDB.request("GET", "/" + db_name + "/_design/template/_show/no-set-etag/"+docid);
   // extract the ETag header values
