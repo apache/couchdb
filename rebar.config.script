@@ -48,7 +48,7 @@ DepDescs = [
 %% Independent Apps
 {config,           "config",           "c5a42b52f28853e511afaa5b35d48770da1159d4"},
 {b64url,           "b64url",           "6895652d80f95cdf04efb14625abed868998f174"},
-{ets_lru,          "ets-lru",          "c05488c8b1d7ec1c3554a828e0c9bf2888932ed6"},
+{ets_lru,          "ets-lru",          "1376e50b82571d98bb2cbd96f27d370b20b9fc24"},
 {khash,            "khash",            "7c6a9cd9776b5c6f063ccafedfa984b00877b019"},
 {snappy,           "snappy",           "a728b960611d0795025de7e9668d06b9926c479d"},
 {setup,            "setup",            "e8d1e32ba3b4f5f3be0e06e5269b12d811f24d52"},
