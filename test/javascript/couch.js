@@ -436,6 +436,7 @@ CouchDB.request = function(method, uri, options) {
   options.headers = typeof(options.headers) == 'object' ? options.headers : {};
   options.headers["Content-Type"] = options.headers["Content-Type"] || options.headers["content-type"] || "application/json";
   options.headers["Accept"] = options.headers["Accept"] || options.headers["accept"] || "application/json";
+  options.headers["Connection"] = options.headers["Connection"] || options.headers["connection"] || "close";
   var req = CouchDB.newXhr();
   uri = CouchDB.proxyUrl(uri);
 
