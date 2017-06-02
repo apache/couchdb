@@ -48,19 +48,19 @@ init([]) ->
 
 lru_opts() ->
     case application:get_env(ddoc_cache, max_objects) of
-        {ok, MxObjs} when is_integer(MxObjs), MxObjs > 0 ->
+        {ok, MxObjs} when is_integer(MxObjs), MxObjs >= 0 ->
             [{max_objects, MxObjs}];
         _ ->
             []
     end ++
     case application:get_env(ddoc_cache, max_size) of
-        {ok, MxSize} when is_integer(MxSize), MxSize > 0 ->
+        {ok, MxSize} when is_integer(MxSize), MxSize >= 0 ->
             [{max_size, MxSize}];
         _ ->
             []
     end ++
     case application:get_env(ddoc_cache, max_lifetime) of
-        {ok, MxLT} when is_integer(MxLT), MxLT > 0 ->
+        {ok, MxLT} when is_integer(MxLT), MxLT >= 0 ->
             [{max_lifetime, MxLT}];
         _ ->
             []
