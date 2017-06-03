@@ -342,6 +342,11 @@ couchdb_1283() ->
         ok = populate_db(MDb1, 100, 100),
         query_view(MDb1#db.name, "foo", "foo"),
         ok = couch_db:close(MDb1),
+        % monitor db and index pids
+        {ok, DDPid} = couch_index_server:get_index(
+            couch_mrview_index, MDb1#db.name, <<"_design/foo">>),
+        DesignDocMonRef = erlang:monitor(process, DDPid),
+        DatabaseMonRef = erlang:monitor(process, MDb1#db.main_pid),
 
         {ok, Db1} = couch_db:create(?tempdb(), [?ADMIN_CTX]),
         ok = couch_db:close(Db1),
@@ -349,6 +354,11 @@ couchdb_1283() ->
         ok = couch_db:close(Db2),
         {ok, Db3} = couch_db:create(?tempdb(), [?ADMIN_CTX]),
         ok = couch_db:close(Db3),
+
+        wait_for_process_shutdown(DatabaseMonRef, killed,
+          {reason, "Failure waiting for db shutdown"}),
+        wait_for_process_shutdown(DesignDocMonRef, normal,
+          {reason, "Failure waiting for view index shutdown"}),
 
         Writer1 = spawn_writer(Db1#db.name),
         Writer2 = spawn_writer(Db2#db.name),
@@ -380,16 +390,8 @@ couchdb_1283() ->
 
         %% Resume compaction
         erlang:resume_process(CPid),
-
-        receive
-            {'DOWN', MonRef, process, _, Reason} ->
-                ?assertEqual(normal, Reason)
-        after ?TIMEOUT ->
-            erlang:error(
-                {assertion_failed,
-                 [{module, ?MODULE}, {line, ?LINE},
-                  {reason, "Failure compacting view group"}]})
-        end,
+        wait_for_process_shutdown(MonRef, normal,
+          {reason, "Failure compacting view group"}),
 
         ?assertEqual(ok, writer_try_again(Writer3)),
         ?assertEqual(ok, get_writer_status(Writer3)),
@@ -402,6 +404,17 @@ couchdb_1283() ->
         ?assertEqual(ok, stop_writer(Writer2)),
         ?assertEqual(ok, stop_writer(Writer3))
     end).
+
+wait_for_process_shutdown(Pid, ExpectedReason, Error) ->
+  receive
+      {'DOWN', Pid, process, _, Reason} ->
+          ?assertEqual(ExpectedReason, Reason)
+  after ?TIMEOUT ->
+      erlang:error(
+          {assertion_failed,
+           [{module, ?MODULE}, {line, ?LINE}, Error]})
+  end.
+
 
 create_doc(DbName, DocId) when is_list(DocId) ->
     create_doc(DbName, ?l2b(DocId));
