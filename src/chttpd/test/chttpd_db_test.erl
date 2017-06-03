@@ -105,7 +105,9 @@ should_accept_live_as_an_alias_for_continuous(Url) ->
         {ok, _, _, _} = create_doc(Url, "testdoc2"),
         {ok, _, _, ResultBody2} = 
             test_request:get(Url ++ "/_changes?feed=live&timeout=1", [?AUTH]),
+        io:format(user, "~nDEBUG COUCHDB-3415: ResultBody2: ~p~n", [ResultBody2]),
         [_, CleanedResult] = binary:split(ResultBody2, <<"\n">>),
+        io:format(user, "~nDEBUG COUCHDB-3415: CleanedResult: ~p~n", [CleanedResult]),
         {[{_, Seq}, _]} = ?JSON_DECODE(CleanedResult),
         <<SeqNum0:1/binary, "-", _/binary>> = Seq,
         SeqNum = list_to_integer(binary_to_list(SeqNum0)),
