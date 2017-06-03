@@ -14,6 +14,7 @@
 -behaviour(gen_server).
 
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("mem3/include/mem3.hrl").
 
 -define(USERDB_PREFIX, "userdb-").
 
@@ -24,6 +25,7 @@
 -export([init_changes_handler/1, changes_handler/3]).
 
 -record(state, {parent, db_name, delete_dbs, changes_pid, changes_ref}).
+-record(clusterState, {parent, db_name, delete_dbs, states}).
 
 -define(RELISTEN_DELAY, 5000).
 
@@ -34,17 +36,32 @@ start_link() ->
 init() ->
     case config:get_boolean("couch_peruser", "enable", false) of
     false ->
-        #state{};
+        #clusterState{};
     true ->
         DbName = ?l2b(config:get(
                          "couch_httpd_auth", "authentication_db", "_users")),
         DeleteDbs = config:get_boolean("couch_peruser", "delete_dbs", false),
-        State = #state{parent = self(),
-                       db_name = DbName,
-                       delete_dbs = DeleteDbs},
-        {Pid, Ref} = spawn_opt(
-            ?MODULE, init_changes_handler, [State], [link, monitor]),
-        State#state{changes_pid=Pid, changes_ref=Ref}
+
+        ClusterState = #clusterState{
+            parent = self(),
+            db_name = DbName,
+            delete_dbs = DeleteDbs
+        },
+        try
+            States = lists:map(fun (A) ->
+                S = #state{parent = ClusterState#clusterState.parent,
+                           db_name = A#shard.name,
+                           delete_dbs = DeleteDbs},
+                {Pid, Ref} = spawn_opt(
+                    ?MODULE, init_changes_handler, [S], [link, monitor]),
+                S#state{changes_pid=Pid, changes_ref=Ref}
+            end, mem3:local_shards(DbName)),
+
+            ClusterState#clusterState{states = States}
+        catch error:database_does_not_exist ->
+            couch_log:warning("couch_peruser can't proceed as underlying database (~s) is missing, disables itself.", [DbName]),
+            config:set("couch_peruser", "enable", "false", lists:concat([binary_to_list(DbName), " is missing"]))
+        end
     end.
 
 init_changes_handler(#state{db_name=DbName} = State) ->
@@ -172,12 +189,15 @@ init([]) ->
 handle_call(_Msg, _From, State) ->
     {reply, error, State}.
 
-handle_cast(update_config, State) when State#state.changes_pid =/= undefined ->
-    % we don't want to have multiple changes handler at the same time
-    demonitor(State#state.changes_ref, [flush]),
-    exit(State#state.changes_pid, kill),
+
+handle_cast(update_config, ClusterState) when ClusterState#clusterState.states =/= undefined ->
+    lists:foreach(fun (State) ->
+        demonitor(State#state.changes_ref, [flush]),
+        exit(State#state.changes_pid, kill)
+    end, ClusterState#clusterState.states),
+
     {noreply, init()};
-handle_cast(update_config, _State) ->
+handle_cast(update_config, _) ->
     {noreply, init()};
 handle_cast(stop, State) ->
     {stop, normal, State};
