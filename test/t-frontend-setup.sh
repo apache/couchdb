@@ -16,10 +16,10 @@ HEADERS="-HContent-Type:application/json"
 curl a:b@127.0.0.1:15986/_nodes/_all_docs
 
 # Enable Cluster on node A
-curl a:b@127.0.0.1:15984/_cluster_setup -d '{"action":"enable_cluster","username":"foo","password":"baz","bind_address":"0.0.0.0"}' $HEADERS
+curl a:b@127.0.0.1:15984/_cluster_setup -d '{"action":"enable_cluster","username":"foo","password":"baz","bind_address":"0.0.0.0","node_count":2}' $HEADERS
 
 # Enable Cluster on node B
-curl a:b@127.0.0.1:15984/_cluster_setup -d '{"action":"enable_cluster","remote_node":"127.0.0.1","port":"25984","remote_current_user":"a","remote_current_password":"b","username":"foo","password":"baz","bind_address":"0.0.0.0"}' $HEADERS
+curl a:b@127.0.0.1:15984/_cluster_setup -d '{"action":"enable_cluster","remote_node":"127.0.0.1","port":"25984","remote_current_user":"a","remote_current_password":"b","username":"foo","password":"baz","bind_address":"0.0.0.0","node_count":2}' $HEADERS
 
 # Add node B on node A
 curl a:b@127.0.0.1:15984/_cluster_setup -d '{"action":"add_node","username":"foo","password":"baz","host":"127.0.0.1","port":25984}' $HEADERS
@@ -56,5 +56,8 @@ curl a:b@127.0.0.1:25984/_users
 curl a:b@127.0.0.1:25984/_replicator
 curl a:b@127.0.0.1:25984/_metadata
 curl a:b@127.0.0.1:25984/_global_changes
+
+# Number of nodes is set to 2
+curl a:b@127.0.0.1:25984/_node/node2@127.0.0.1/_config/cluster/n
 
 echo "YAY ALL GOOD"

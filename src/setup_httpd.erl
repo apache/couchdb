@@ -61,7 +61,8 @@ handle_action("enable_cluster", Setup) ->
         {port, <<"port">>},
         {remote_node, <<"remote_node">>},
         {remote_current_user, <<"remote_current_user">>},
-        {remote_current_password, <<"remote_current_password">>}
+        {remote_current_password, <<"remote_current_password">>},
+        {node_count, <<"node_count">>}
     ], Setup),
     case setup:enable_cluster(Options) of
         {error, cluster_enabled} ->
