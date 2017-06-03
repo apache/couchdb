@@ -41,6 +41,7 @@
 -define(TRIES, 20).
 -define(TRY_DELAY_MS, 100).
 -define(TIMEOUT, 10000).
+-define(CONFIG_TIMEOUT, 1000).
 
 
 setup(DName) ->
@@ -164,7 +165,7 @@ should_read_write_config_settings_by_daemon(DName, _) ->
     ?_test(begin
         % have to wait till daemon run all his tests
         % see daemon's script for more info
-        timer:sleep(?TIMEOUT),
+        timer:sleep(?CONFIG_TIMEOUT),
         {ok, [D]} = couch_os_daemons:info([table]),
         check_daemon(D, DName)
     end).
