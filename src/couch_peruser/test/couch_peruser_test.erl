@@ -31,14 +31,16 @@ teardown_all(TestCtx) ->
 setup() ->
     TestAuthDb = ?tempdb(),
     do_request(put, get_base_url() ++ "/" ++ ?b2l(TestAuthDb)),
+    do_request(put, get_cluster_base_url() ++ "/" ++ ?b2l(TestAuthDb)),
     set_config("couch_httpd_auth", "authentication_db", ?b2l(TestAuthDb)),
     set_config("couch_peruser", "enable", "true"),
     TestAuthDb.
 
 teardown(TestAuthDb) ->
-    set_config("couch_httpd_auth", "authentication_db", "_users"),
     set_config("couch_peruser", "enable", "false"),
     set_config("couch_peruser", "delete_dbs", "false"),
+    set_config("couch_httpd_auth", "authentication_db", "_users"),
+    do_request(delete, get_cluster_base_url() ++ "/" ++ ?b2l(TestAuthDb)),
     do_request(delete, get_base_url() ++ "/" ++ ?b2l(TestAuthDb)),
     lists:foreach(fun (DbName) ->
         case DbName of
@@ -62,6 +64,11 @@ do_request(Method, Url, Body) ->
         {"Content-Type", "application/json"}],
     {ok, _, _, _} = test_request:request(Method, Url, Headers, Body).
 
+do_anon_request(Method, Url, Body) ->
+    Headers = [
+        {"Content-Type", "application/json"}],
+    {ok, _, _, _} = test_request:request(Method, Url, Headers, Body).
+
 create_db(DbName) ->
     {ok, _, _, _} = do_request(put, get_cluster_base_url() ++ "/" ++ ?b2l(DbName)).
 
@@ -72,13 +79,22 @@ create_user(AuthDb, Name) ->
     Body = "{\"name\":\"" ++ Name ++
         "\",\"type\":\"user\",\"roles\":[],\"password\":\"secret\"}",
     Url = lists:concat([
-        get_base_url(), "/", ?b2l(AuthDb), "/org.couchdb.user:", Name]),
+        get_cluster_base_url(), "/", ?b2l(AuthDb), "/org.couchdb.user:", Name]),
     {ok, 201, _, _} = do_request(put, Url, Body),
     % let's proceed after giving couch_peruser some time to create the user db
     timer:sleep(2000).
 
+create_anon_user(AuthDb, Name) ->
+    Body = "{\"name\":\"" ++ Name ++
+        "\",\"type\":\"user\",\"roles\":[],\"password\":\"secret\"}",
+    Url = lists:concat([
+        get_cluster_base_url(), "/", ?b2l(AuthDb), "/org.couchdb.user:", Name]),
+    {ok, 201, _, _} = do_anon_request(put, Url, Body),
+    % let's proceed after giving couch_peruser some time to create the user db
+    timer:sleep(2000).
+
 delete_user(AuthDb, Name) ->
-    Url = lists:concat([get_base_url(), "/", ?b2l(AuthDb),
+    Url = lists:concat([get_cluster_base_url(), "/", ?b2l(AuthDb),
         "/org.couchdb.user:", Name]),
     {ok, 200, _, Body} = do_request(get, Url),
     {DocProps} = jiffy:decode(Body),
@@ -117,6 +133,11 @@ get_cluster_base_url() ->
 should_create_user_db(TestAuthDb) ->
     create_user(TestAuthDb, "foo"),
     ?_assert(lists:member(<<"userdb-666f6f">>, all_dbs())).
+
+should_create_anon_user_db(TestAuthDb) ->
+    create_anon_user(TestAuthDb, "fooo"),
+    io:fwrite("HELLO: " ++ ?b2l(TestAuthDb) ++ "~n", []),
+    ?_assert(lists:member(<<"userdb-666f6f6f">>, all_dbs())).
 
 should_not_delete_user_db(TestAuthDb) ->
     User = "foo",
@@ -264,6 +285,7 @@ couch_peruser_test_() ->
                 foreach,
                 fun setup/0, fun teardown/1,
                 [
+                    fun should_create_anon_user_db/1,
                     fun should_create_user_db/1,
                     fun should_not_delete_user_db/1,
                     fun should_delete_user_db/1,
