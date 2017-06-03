@@ -40,7 +40,7 @@
 -define(DAEMON_DIE_QUICKLY, "os_daemon_die_quickly.sh").
 -define(TRIES, 20).
 -define(TRY_DELAY_MS, 100).
--define(TIMEOUT, 1000).
+-define(TIMEOUT, 10000).
 
 
 setup(DName) ->
