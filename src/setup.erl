@@ -90,11 +90,13 @@ get_remote_request_options(Options) ->
 enable_cluster_http(Options) ->
     % POST to nodeB/_setup
     RequestOptions = get_remote_request_options(Options),
+    AdminUsername = couch_util:get_value(username, Options),
+    AdminPasswordHash = config:get("admins", binary_to_list(AdminUsername)),
 
     Body = ?JSON_ENCODE({[
         {<<"action">>, <<"enable_cluster">>},
-        {<<"username">>, couch_util:get_value(username, Options)},
-        {<<"password">>, couch_util:get_value(password, Options)},
+        {<<"username">>, AdminUsername},
+        {<<"password_hash">>, ?l2b(AdminPasswordHash)},
         {<<"bind_address">>, couch_util:get_value(bind_address, Options)},
         {<<"port">>, couch_util:get_value(port, Options)},
         {<<"node_count">>, couch_util:get_value(node_count, Options)}
@@ -125,7 +127,10 @@ enable_cluster_int(Options, no) ->
     CurrentAdmins = config:get("admins"),
     NewCredentials = {
         proplists:get_value(username, Options),
-        proplists:get_value(password, Options)
+        case proplists:get_value(password_hash, Options) of
+          undefined -> proplists:get_value(password, Options);
+          Pw -> Pw
+        end
     },
 
     % if bind_address == 127.0.0.1 and no bind_address in req -> error
@@ -138,7 +143,7 @@ enable_cluster_int(Options, no) ->
         {undefined, undefined} ->
             ok;
         {Username, Password} ->
-            maybe_set_admin(Username, Password)
+            set_admin(Username, Password)
     end,
 
     case NewBindAddress of
@@ -163,14 +168,8 @@ enable_cluster_int(Options, no) ->
     end,
     couch_log:notice("Enable Cluster: ~p~n", [Options]).
 
-maybe_set_admin(Username, Password) ->
-    case couch_auth_cache:get_admin(Username) of
-        nil ->
-            HashedPassword = couch_passwords:hash_admin_password(Password),
-            config:set("admins", binary_to_list(Username), binary_to_list(HashedPassword));
-        _Else ->
-            ok
-    end.
+set_admin(Username, Password) ->
+  config:set("admins", binary_to_list(Username), binary_to_list(Password)).
 
 
 finish_cluster() ->
