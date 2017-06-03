@@ -88,7 +88,8 @@ handle_action("add_node", Setup) ->
         {username, <<"username">>},
         {password, <<"password">>},
         {host, <<"host">>},
-        {port, <<"port">>}
+        {port, <<"port">>},
+        {name, <<"name">>}
     ], Setup),
     case setup:add_node(Options) of
         {error, cluster_not_enabled} ->

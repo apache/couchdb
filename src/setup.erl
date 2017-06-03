@@ -209,13 +209,14 @@ add_node_int(Options, ok) ->
 
     Host = proplists:get_value(host, Options),
     Port = get_port(proplists:get_value(port, Options, 5984)),
+    Name = proplists:get_value(name, Options, get_default_name(Port)),
 
     Url = binary_to_list(<<"http://", Host/binary, ":", Port/binary, "/_cluster_setup">>),
 
     case ibrowse:send_req(Url, Headers, post, Body, RequestOptions) of
         {ok, "201", _, _} ->
             % when done, PUT :5986/nodes/nodeB
-            create_node_doc(Host, Port);
+            create_node_doc(Host, Name);
         Else ->
             couch_log:notice("send_req: ~p~n", [Else]),
             Else
@@ -228,16 +229,15 @@ get_port(Port) when is_list(Port) ->
 get_port(Port) when is_binary(Port) ->
     Port.
 
-create_node_doc(Host, Port) ->
+create_node_doc(Host, Name) ->
     {ok, Db} = couch_db:open_int(<<"_nodes">>, []),
-    Name = get_name(Port),
     Doc = {[{<<"_id">>, <<Name/binary, "@", Host/binary>>}]},
     Options = [],
     CouchDoc = couch_doc:from_json_obj(Doc),
 
     couch_db:update_doc(Db, CouchDoc, Options).
 
-get_name(Port) ->
+get_default_name(Port) ->
     case Port of
         % shortcut for easier development
         <<"15984">> ->
