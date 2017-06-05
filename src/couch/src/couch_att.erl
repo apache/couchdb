@@ -490,6 +490,19 @@ flush(Db, Att) ->
     flush_data(Db, fetch(data, Att), Att).
 
 
+flush_data(Db, {Fd, StreamPointer}, Att) when is_pid(Fd) ->
+    % Temporary clause to handle previous non-PSE versions in a mixed cluster.
+    % Only applicable to for (default) couch_bt_engine. Remove in next release.
+    case couch_db_engine:get_engine(Db) of
+        couch_bt_engine ->
+            StreamEngine = {couch_bt_engine_stream, {Fd, StreamPointer}},
+            flush_data(Db, {stream, StreamEngine}, Att);
+        OtherEngine ->
+            Msg = "Mixed (PSE vs non-PSE) cluster attachment handling only"
+                "supported for default couch_bt_engine not ~p",
+            couch_log:error(Msg, OtherEngine),
+            erlang:error({unsupported_mixed_cluster_configuration, OtherEngine})
+    end;
 flush_data(Db, Data, Att) when is_binary(Data) ->
     couch_db:with_stream(Db, Att, fun(OutputStream) ->
         couch_stream:write(OutputStream, Data)
