@@ -34,28 +34,16 @@
 -export([to_key_seq/1]).
 
 -define(MOD, couch_mrview_index).
+-define(GET_VIEW_RETRY_COUNT, 1).
+-define(GET_VIEW_RETRY_DELAY, 50).
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
 
 get_view(Db, DDoc, ViewName, Args0) ->
-    {ok, Pid, Args2} = get_view_index_pid(Db, DDoc, ViewName, Args0),
-    DbUpdateSeq = couch_util:with_db(Db, fun(WDb) ->
-        couch_db:get_update_seq(WDb)
-    end),
-    MinSeq = case Args2#mrargs.update of
-        false -> 0; lazy -> 0; _ -> DbUpdateSeq
-    end,
-    {ok, State} = case couch_index:get_state(Pid, MinSeq) of
-        {ok, _} = Resp -> Resp;
-        Error -> throw(Error)
-    end,
+    {ok, State, Args2} = get_view_index_state(Db, DDoc, ViewName, Args0),
     Ref = erlang:monitor(process, State#mrst.fd),
-    if Args2#mrargs.update == lazy ->
-        spawn(fun() -> catch couch_index:get_state(Pid, DbUpdateSeq) end);
-        true -> ok
-    end,
     #mrst{language=Lang, views=Views} = State,
     {Type, View, Args3} = extract_view(Lang, Args2, ViewName, Views),
     check_range(Args3, view_cmp(View)),
@@ -69,6 +57,39 @@ get_view_index_pid(Db, DDoc, ViewName, Args0) ->
         {ok, validate_args(Args1)}
     end,
     couch_index_server:get_index(?MOD, Db, DDoc, ArgCheck).
+
+
+get_view_index_state(Db, DDoc, ViewName, Args0) ->
+    get_view_index_state(Db, DDoc, ViewName, Args0, ?GET_VIEW_RETRY_COUNT).
+
+get_view_index_state(_, DDoc, _, _, RetryCount) when RetryCount < 0 ->
+    couch_log:warning("DDoc '~s' recreated too frequently", [DDoc#doc.id]),
+    throw({get_view_state, exceeded_retry_count});
+get_view_index_state(Db, DDoc, ViewName, Args0, RetryCount) ->
+    try
+        {ok, Pid, Args} = get_view_index_pid(Db, DDoc, ViewName, Args0),
+        UpdateSeq = couch_util:with_db(Db, fun(WDb) ->
+            couch_db:get_update_seq(WDb)
+        end),
+        {ok, State} = case Args#mrargs.update of
+            lazy ->
+                spawn(fun() ->
+                    catch couch_index:get_state(Pid, UpdateSeq)
+                end),
+                couch_index:get_state(Pid, 0);
+            false ->
+                couch_index:get_state(Pid, 0);
+            _ ->
+                couch_index:get_state(Pid, UpdateSeq)
+        end,
+        {ok, State, Args}
+    catch
+        exit:{Reason, _} when Reason == noproc; Reason == normal ->
+            timer:sleep(?GET_VIEW_RETRY_DELAY),
+            get_view_index_state(Db, DDoc, ViewName, Args0, RetryCount - 1);
+        Error ->
+            throw(Error)
+    end.
 
 
 ddoc_to_mrst(DbName, #doc{id=Id, body={Fields}}) ->
