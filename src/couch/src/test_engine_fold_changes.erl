@@ -120,6 +120,20 @@ cet_update_second_of_two() ->
     ?assertEqual([{<<"a">>, 1}, {<<"b">>, 3}], lists:reverse(Changes)).
 
 
+cet_delete_first() ->
+    {ok, Engine, St1} = test_engine_util:init_engine(),
+    Actions = [
+        {create, {<<"a">>, []}},
+        {create, {<<"b">>, []}},
+        {delete, {<<"a">>, []}}
+    ],
+    {ok, St2} = test_engine_util:apply_actions(Engine, St1, Actions),
+
+    ?assertEqual(2, Engine:count_changes_since(St2, 0)),
+    {ok, Changes} = Engine:fold_changes(St2, 0, fun fold_fun/2, [], []),
+    ?assertEqual([{<<"b">>, 2}, {<<"a">>, 3}], lists:reverse(Changes)).
+
+
 cet_check_mutation_ordering() ->
     Actions = shuffle(lists:map(fun(Seq) ->
         {create, {docid(Seq), []}}

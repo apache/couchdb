@@ -29,6 +29,18 @@ cet_fold_all_local() ->
     fold_all(fold_local_docs, fun local_docid/1).
 
 
+cet_fold_exclude_deleted_docs() ->
+    fold_exclude_deleted_docs(fold_docs, fun docid/1).
+
+
+cet_fold_exclude_deleted_docs_local() ->
+    fold_exclude_deleted_docs(fold_local_docs, fun local_docid/1).
+
+
+cet_fold_include_deleted_docs() ->
+    fold_include_deleted_docs(fold_docs, fun docid/1).
+
+
 cet_fold_start_key() ->
     fold_start_key(fold_docs, fun docid/1).
 
@@ -92,6 +104,30 @@ fold_all(FoldFun, DocIdFun) ->
     ?assertEqual(?NUM_DOCS, length(DocIdAccRev)),
     ?assertEqual(DocIds, DocIdAccRev).
 
+
+fold_exclude_deleted_docs(FoldFun, DocIdFun) ->
+    DocIds = [DocIdFun(I) || I <- lists:seq(1, ?NUM_DOCS), I rem 2 =:= 0],
+    DeletedDocIds = [DocIdFun(I) || I <- lists:seq(1, ?NUM_DOCS), I rem 2 > 0],
+
+    {ok, Engine, St0} = init_st(DocIdFun),
+    {ok, Engine, St} = delete_docs(DeletedDocIds, Engine, St0),
+
+    {ok, DocIdAccFwd} = Engine:FoldFun(St, fun fold_fun/2, [], []),
+    ?assertEqual(length(DocIds), length(DocIdAccFwd)),
+    ?assertEqual(DocIds, lists:reverse(DocIdAccFwd)).
+
+
+fold_include_deleted_docs(FoldFun, DocIdFun) ->
+    DocIds = [DocIdFun(I) || I <- lists:seq(1, ?NUM_DOCS)],
+    DeletedDocIds = [DocIdFun(I) || I <- lists:seq(1, ?NUM_DOCS), I rem 2 > 0],
+
+    {ok, Engine, St0} = init_st(DocIdFun),
+    {ok, Engine, St} = delete_docs(DeletedDocIds, Engine, St0),
+
+    {ok, DocIdAccFwd} = Engine:FoldFun(St, fun fold_fun/2, [], [include_deleted]),
+    ?assertEqual(length(DocIds), length(DocIdAccFwd)),
+    ?assertEqual(DocIds, lists:reverse(DocIdAccFwd)).
+    
 
 fold_start_key(FoldFun, DocIdFun) ->
     {ok, Engine, St} = init_st(DocIdFun),
@@ -355,6 +391,14 @@ init_st(DocIdFun) ->
     Actions = lists:map(fun(Id) ->
         {create, {DocIdFun(Id), [{<<"int">>, Id}]}}
     end, lists:seq(1, ?NUM_DOCS)),
+    {ok, St2} = test_engine_util:apply_actions(Engine, St1, Actions),
+    {ok, Engine, St2}.
+
+
+delete_docs(DocIds, Engine, St1) ->
+    Actions = lists:map(fun(Id) ->
+        {delete, {Id, []}}
+    end, DocIds),
     {ok, St2} = test_engine_util:apply_actions(Engine, St1, Actions),
     {ok, Engine, St2}.
 
