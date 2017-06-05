@@ -87,6 +87,8 @@ get_view_index_state(Db, DDoc, ViewName, Args0, RetryCount) ->
         exit:{Reason, _} when Reason == noproc; Reason == normal ->
             timer:sleep(?GET_VIEW_RETRY_DELAY),
             get_view_index_state(Db, DDoc, ViewName, Args0, RetryCount - 1);
+        error:{badmatch, Error} ->
+            throw(Error);
         Error ->
             throw(Error)
     end.
