@@ -78,7 +78,13 @@ def build_ci_doc():
     return doc
 
 def upload_logs():
-    lp = os.environ['COUCHAUTH'].split(':')
+    try:
+        lp = os.environ['COUCHAUTH'].split(':')
+    except KeyError as e:
+        print ("ERROR: COUCHAUTH credentials unavailable! "
+            "Unable to upload logfiles.")
+        exit(1)
+
     creds = (lp[0], lp[1])
     doc = build_ci_doc()
     req = requests.post(COUCH_URL,
