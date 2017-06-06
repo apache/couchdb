@@ -25,4 +25,5 @@ db_handler(_) -> no_match.
 
 design_handler(<<"_search">>)      -> fun dreyfus_httpd:handle_search_req/3;
 design_handler(<<"_search_info">>) -> fun dreyfus_httpd:handle_info_req/3;
+design_handler(<<"_search_disk_size">>) -> fun dreyfus_httpd:handle_disk_size_req/3;
 design_handler(_) -> no_match.

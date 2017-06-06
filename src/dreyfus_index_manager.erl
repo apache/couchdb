@@ -23,7 +23,7 @@
 -define(BY_PID, dreyfus_by_pid).
 
 % public api.
--export([start_link/0, get_index/2]).
+-export([start_link/0, get_index/2, get_disk_size/2]).
 
 % gen_server api.
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
@@ -37,6 +37,9 @@ start_link() ->
 
 get_index(DbName, Index) ->
     gen_server:call(?MODULE, {get_index, DbName, Index}, infinity).
+
+get_disk_size(DbName, Index) ->
+    gen_server:call(?MODULE, {get_disk_size, DbName, Index}, infinity).
 
 % gen_server functions.
 
@@ -60,6 +63,11 @@ handle_call({get_index, DbName, #index{sig=Sig}=Index}, From, State) ->
     [{_, ExistingPid}] ->
         {reply, {ok, ExistingPid}, State}
     end;
+
+handle_call({get_disk_size, DbName, #index{sig=Sig}=Index}, From, State) ->
+    Path = <<DbName/binary,"/",Sig/binary>>,
+    Reply = clouseau_rpc:disk_size(Path),
+    {reply, Reply, State};
 
 handle_call({open_ok, DbName, Sig, NewPid}, {OpenerPid, _}, State) ->
     link(NewPid),

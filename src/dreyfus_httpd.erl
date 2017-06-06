@@ -15,7 +15,7 @@
 
 -module(dreyfus_httpd).
 
--export([handle_search_req/3, handle_info_req/3,
+-export([handle_search_req/3, handle_info_req/3, handle_disk_size_req/3,
          handle_cleanup_req/2, handle_analyze_req/1]).
 -include("dreyfus.hrl").
 -include_lib("couch/include/couch_db.hrl").
@@ -108,7 +108,7 @@ handle_search_req(Req, _Db, _DDoc, _RetryCount, _RetryPause) ->
 
 handle_info_req(#httpd{method='GET', path_parts=[_, _, _, _, IndexName]}=Req
                   ,#db{name=DbName}, #doc{id=Id}=DDoc) ->
-    case dreyfus_fabric_info:go(DbName, DDoc, IndexName) of
+    case dreyfus_fabric_info:go(DbName, DDoc, IndexName, info) of
         {ok, IndexInfoList} ->
             send_json(Req, 200, {[
                 {name,  <<Id/binary,"/",IndexName/binary>>},
@@ -120,6 +120,21 @@ handle_info_req(#httpd{method='GET', path_parts=[_, _, _, _, IndexName]}=Req
 handle_info_req(#httpd{path_parts=[_, _, _, _, _]}=Req, _Db, _DDoc) ->
     send_method_not_allowed(Req, "GET");
 handle_info_req(Req, _Db, _DDoc) ->
+    send_error(Req, {bad_request, "path not recognized"}).
+
+handle_disk_size_req(#httpd{method='GET', path_parts=[_, _, _, _, IndexName]}=Req, #db{name=DbName}, #doc{id=Id}=DDoc) ->
+    case dreyfus_fabric_info:go(DbName, DDoc, IndexName, disk_size) of
+        {ok, IndexInfoList} ->
+            send_json(Req, 200, {[
+                {name,  <<Id/binary,"/",IndexName/binary>>},
+                {search_index, {IndexInfoList}}
+            ]});
+        {error, Reason} ->
+            send_error(Req, Reason)
+    end;
+handle_disk_size_req(#httpd{path_parts=[_, _, _, _, _]}=Req, _Db, _DDoc) ->
+    send_method_not_allowed(Req, "GET");
+handle_disk_size_req(Req, _Db, _DDoc) ->
     send_error(Req, {bad_request, "path not recognized"}).
 
 handle_cleanup_req(#httpd{method='POST'}=Req, #db{name=DbName}) ->

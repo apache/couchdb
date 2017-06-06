@@ -19,15 +19,15 @@
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
--export([go/3]).
+-export([go/4]).
 
-go(DbName, DDocId, IndexName) when is_binary(DDocId) ->
+go(DbName, DDocId, IndexName, InfoLevel) when is_binary(DDocId) ->
     {ok, DDoc} = fabric:open_doc(DbName, <<"_design/", DDocId/binary>>, []),
-    go(DbName, DDoc, IndexName);
+    go(DbName, DDoc, IndexName, InfoLevel);
 
-go(DbName, DDoc, IndexName) ->
+go(DbName, DDoc, IndexName, InfoLevel) ->
     Shards = mem3:shards(DbName),
-    Workers = fabric_util:submit_jobs(Shards, dreyfus_rpc, info, [DDoc, IndexName]),
+    Workers = fabric_util:submit_jobs(Shards, dreyfus_rpc, InfoLevel, [DDoc, IndexName]),
     RexiMon = fabric_util:create_monitors(Shards),
     Acc0 = {fabric_dict:init(Workers, nil), []},
     try
