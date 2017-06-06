@@ -138,7 +138,7 @@ send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId) ->
             NewRevStr = couch_doc:rev_to_str(NewRev),
             {JsonResp1} = apply_headers(JsonResp0, [
                 {<<"X-Couch-Update-NewRev">>, NewRevStr},
-                {<<"X-Couch-Id">>, NewDoc#doc.id}
+                {<<"X-Couch-Id">>, couch_util:url_encode(NewDoc#doc.id)}
             ]),
             {[{<<"code">>, 201} | JsonResp1]};
         [<<"up">>, _Other, {JsonResp0}] ->
