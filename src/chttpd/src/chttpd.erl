@@ -910,6 +910,8 @@ error_info(not_implemented) ->
 error_info(timeout) ->
     {500, <<"timeout">>, <<"The request could not be processed in a reasonable"
         " amount of time.">>};
+error_info({service_unavailable, Reason}) ->
+    {503, <<"service unavailable">>, Reason};
 error_info({timeout, _Reason}) ->
     error_info(timeout);
 error_info({Error, null}) ->
