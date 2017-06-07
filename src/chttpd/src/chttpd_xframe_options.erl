@@ -26,7 +26,7 @@
 % <frame>, <iframe> or <object>.
 
 header(Req, Headers) ->
-    header(Req, Headers, get_xframe_config()).
+    header(Req, Headers, get_xframe_config(Req)).
 
 
 
@@ -71,7 +71,7 @@ check_host(#httpd{mochi_req = MochiReq}, Config) ->
 
 
 
-get_xframe_config() ->
+get_xframe_config(#httpd{xframe_config = undefined}) ->
     EnableXFrame = config:get("chttpd", "enable_xframe_options", "false") =:= "true",
     SameOrigin = config:get("x_frame_options", "same_origin", "false") =:= "true",
     AcceptedHosts = case config:get("x_frame_options", "hosts", undefined) of
@@ -82,7 +82,9 @@ get_xframe_config() ->
         {enabled, EnableXFrame},
         {same_origin, SameOrigin},
         {hosts, AcceptedHosts}
-    ].
+    ];
+get_xframe_config(#httpd{xframe_config = Config}) ->
+    Config.
 
 
 
