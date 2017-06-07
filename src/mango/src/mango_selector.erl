@@ -186,7 +186,7 @@ norm_ops({[{Field, Cond}]}) ->
     {[{Field, norm_ops(Cond)}]};
 
 % An implicit $and
-norm_ops({Props}) when length(Props) > 1 ->
+norm_ops({[_, _ | _] = Props}) ->
     {[{<<"$and">>, [norm_ops({[P]}) || P <- Props]}]};
 
 % A bare value condition means equality
@@ -461,7 +461,7 @@ match({[{<<"$elemMatch">>, _Arg}]}, _Value, _Cmp) ->
 
 % Matches when all elements in values match the
 % sub-selector Arg.
-match({[{<<"$allMatch">>, Arg}]}, Values, Cmp) when is_list(Values), length(Values) > 0 ->
+match({[{<<"$allMatch">>, Arg}]}, [_ | _] = Values, Cmp) ->
     try
         lists:foreach(fun(V) ->
             case match(Arg, V, Cmp) of
@@ -564,5 +564,5 @@ match({[{Field, Cond}]}, Value, Cmp) ->
             match(Cond, SubValue, Cmp)
     end;
 
-match({Props} = Sel, _Value, _Cmp) when length(Props) > 1 ->
+match({[_, _ | _] = _Props} = Sel, _Value, _Cmp) ->
     erlang:error({unnormalized_selector, Sel}).
