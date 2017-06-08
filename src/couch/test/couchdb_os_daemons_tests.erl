@@ -56,9 +56,16 @@ setup(DName) ->
     {Ctx, OsDPid}.
 
 teardown(_, {Ctx, OsDPid}) ->
-    test_util:stop_sync_throw(OsDPid, fun() ->
-        exit(OsDPid, shutdown)
-    end, {timeout, os_daemon_stop}, ?TIMEOUT),
+    try
+        test_util:stop_sync_throw(OsDPid, fun() ->
+            exit(OsDPid, shutdown)
+        end, {timeout, os_daemon_stop}, ?TIMEOUT)
+    catch
+        {timeout, os_daemon_stop} ->
+            Msg = "~nWARNING: OS daemons test stop ~p msec timeout exceeded~n",
+            io:format(standard_error, Msg, [?TIMEOUT]),
+            exit(OsDPid, kill)
+    end,
     test_util:stop(Ctx).
 
 
