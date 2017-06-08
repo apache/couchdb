@@ -17,7 +17,53 @@
 
 -module(jwtf).
 
--export([decode/3]).
+-export([
+    encode/3,
+    decode/3
+]).
+
+-define(ALGS, [
+    {<<"RS256">>, {public_key, sha256}}, % RSA PKCS#1 signature with SHA-256
+    {<<"RS384">>, {public_key, sha384}},
+    {<<"RS512">>, {public_key, sha512}},
+    {<<"ES256">>, {public_key, sha256}},
+    {<<"ES384">>, {public_key, sha384}},
+    {<<"ES512">>, {public_key, sha512}},
+    {<<"HS256">>, {hmac, sha256}},
+    {<<"HS384">>, {hmac, sha384}},
+    {<<"HS512">>, {hmac, sha512}}]).
+
+-define(VALID_ALGS, proplists:get_keys(?ALGS)).
+
+
+% @doc encode
+% Encode the JSON Header and Claims using Key and Alg obtained from Header
+-spec encode(term(), term(), term()) ->
+    {ok, binary()} | no_return().
+encode(Header = {HeaderProps}, Claims, Key) ->
+    try
+        Alg = case prop(<<"alg">>, HeaderProps) of
+            undefined ->
+                throw(missing_alg);
+            Val ->
+                Val
+        end,
+        EncodedHeader = b64url:encode(jiffy:encode(Header)),
+        EncodedClaims = b64url:encode(jiffy:encode(Claims)),
+        Message = <<EncodedHeader/binary, $., EncodedClaims/binary>>,
+        SignatureOrMac = case verification_algorithm(Alg) of
+            {public_key, Algorithm} ->
+                public_key:sign(Message, Algorithm, Key);
+            {hmac, Algorithm} ->
+                crypto:hmac(Algorithm, Key, Message)
+        end,
+        EncodedSignatureOrMac = b64url:encode(SignatureOrMac),
+        {ok, <<Message/binary, $., EncodedSignatureOrMac/binary>>}
+    catch
+        throw:Error ->
+            {error, Error}
+    end.
+
 
 % @doc decode
 % Decodes the supplied encoded token, checking
@@ -32,6 +78,19 @@ decode(EncodedToken, Checks, KS) ->
     catch
         throw:Error ->
             Error
+    end.
+
+
+% @doc verification_algorithm
+% Return {VerificationMethod, Algorithm} tuple for the specified Alg
+-spec verification_algorithm(binary()) ->
+    {atom(), atom()} | no_return().
+verification_algorithm(Alg) ->
+    case lists:keyfind(Alg, 1, ?ALGS) of
+        {Alg, Val} ->
+            Val;
+        false ->
+            throw(invalid_alg)
     end.
 
 
@@ -70,26 +129,13 @@ validate_typ(Props, Checks) ->
 validate_alg(Props, Checks) ->
     Required = prop(alg, Checks),
     Alg = prop(<<"alg">>, Props),
-    Valid = [
-        <<"RS256">>,
-        <<"RS384">>,
-        <<"RS512">>,
-
-        <<"HS256">>,
-        <<"HS384">>,
-        <<"HS512">>,
-
-        <<"ES384">>,
-        <<"ES512">>,
-        <<"ES512">>
-    ],
     case {Required, Alg} of
         {undefined, _} ->
             ok;
         {true, undefined} ->
             throw({error, missing_alg});
         {true, Alg} ->
-            case lists:member(Alg, Valid) of
+            case lists:member(Alg, ?VALID_ALGS) of
                 true ->
                     ok;
                 false ->
@@ -179,35 +225,20 @@ key(Props, Checks, KS) ->
     end.
 
 
-verify(Alg, Header, Payload, Signature0, Key) ->
+verify(Alg, Header, Payload, SignatureOrMac0, Key) ->
     Message = <<Header/binary, $., Payload/binary>>,
-    Signature1 = b64url:decode(Signature0),
-    case Alg of
-        <<"RS256">> ->
-            public_key_verify(sha256, Message, Signature1, Key);
-        <<"RS384">> ->
-            public_key_verify(sha384, Message, Signature1, Key);
-        <<"RS512">> ->
-            public_key_verify(sha512, Message, Signature1, Key);
-
-        <<"ES256">> ->
-            public_key_verify(sha256, Message, Signature1, Key);
-        <<"ES384">> ->
-            public_key_verify(sha384, Message, Signature1, Key);
-        <<"ES512">> ->
-            public_key_verify(sha512, Message, Signature1, Key);
-
-        <<"HS256">> ->
-            hmac_verify(sha256, Message, Signature1, Key);
-        <<"HS384">> ->
-            hmac_verify(sha384, Message, Signature1, Key);
-        <<"HS512">> ->
-            hmac_verify(sha512, Message, Signature1, Key)
+    SignatureOrMac1 = b64url:decode(SignatureOrMac0),
+    {VerificationMethod, Algorithm} = verification_algorithm(Alg),
+    case VerificationMethod of
+        public_key ->
+            public_key_verify(Algorithm, Message, SignatureOrMac1, Key);
+        hmac ->
+            hmac_verify(Algorithm, Message, SignatureOrMac1, Key)
     end.
 
 
-public_key_verify(Alg, Message, Signature, PublicKey) ->
-    case public_key:verify(Message, Alg, Signature, PublicKey) of
+public_key_verify(Algorithm, Message, Signature, PublicKey) ->
+    case public_key:verify(Message, Algorithm, Signature, PublicKey) of
         true ->
             ok;
         false ->
@@ -215,8 +246,8 @@ public_key_verify(Alg, Message, Signature, PublicKey) ->
     end.
 
 
-hmac_verify(Alg, Message, HMAC, SecretKey) ->
-    case crypto:hmac(Alg, SecretKey, Message) of
+hmac_verify(Algorithm, Message, HMAC, SecretKey) ->
+    case crypto:hmac(Algorithm, SecretKey, Message) of
         HMAC ->
             ok;
         _ ->
@@ -442,5 +473,49 @@ rs256_test() ->
 
     ?assertMatch({ok, ExpectedPayload}, decode(EncodedToken, Checks, KS)).
 
+
+encode_missing_alg_test() ->
+    ?assertEqual({error, missing_alg},
+        encode({[]}, {[]}, <<"foo">>)).
+
+
+encode_invalid_alg_test() ->
+    ?assertEqual({error, invalid_alg},
+        encode({[{<<"alg">>, <<"BOGUS">>}]}, {[]}, <<"foo">>)).
+
+
+encode_decode_test_() ->
+    [{Alg, encode_decode(Alg)} || Alg <- ?VALID_ALGS].
+
+
+encode_decode(Alg) ->
+    {EncodeKey, DecodeKey} = case verification_algorithm(Alg) of
+        {public_key, Algorithm} ->
+            jwtf_test_util:create_keypair();
+        {hmac, Algorithm} ->
+            Key = <<"a-super-secret-key">>,
+            {Key, Key}
+    end,
+    Claims = claims(),
+    {ok, Encoded} = encode(header(Alg), Claims, EncodeKey),
+    KS = fun(_, _) -> DecodeKey end,
+    {ok, Decoded} = decode(Encoded, [], KS),
+    ?_assertMatch(Claims, Decoded).
+
+
+header(Alg) ->
+    {[
+        {<<"typ">>, <<"JWT">>},
+        {<<"alg">>, Alg},
+        {<<"kid">>, <<"20170520-00:00:00">>}
+    ]}.
+
+
+claims() ->
+    EpochSeconds = 1496205841,
+    {[
+        {<<"iat">>, EpochSeconds},
+        {<<"exp">>, EpochSeconds + 3600}
+    ]}.
 
 -endif.
