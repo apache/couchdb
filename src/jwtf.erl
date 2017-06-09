@@ -195,7 +195,7 @@ validate_nbf(Props, Checks) ->
         {true, undefined} ->
             throw({error, missing_nbf});
         {true, IAT} ->
-            assert_past(nbf, IAT)
+            assert_past(<<"nbf">>, IAT)
     end.
 
 
@@ -209,7 +209,7 @@ validate_exp(Props, Checks) ->
         {true, undefined} ->
             throw({error, missing_exp});
         {true, EXP} ->
-            assert_future(exp, EXP)
+            assert_future(<<"exp">>, EXP)
     end.
 
 
@@ -282,7 +282,7 @@ assert_past(Name, Time) ->
         true ->
             ok;
         false ->
-            throw({error, {Name, not_in_past}})
+            throw({error, <<Name/binary, " not in past">>})
     end.
 
 assert_future(Name, Time) ->
@@ -290,7 +290,7 @@ assert_future(Name, Time) ->
         true ->
             ok;
         false ->
-            throw({error, {Name, not_in_future}})
+            throw({error, <<Name/binary, " not in future">>})
     end.
 
 
@@ -373,7 +373,7 @@ missing_nbf_test() ->
 
 invalid_nbf_test() ->
     Encoded = encode(valid_header(), {[{<<"nbf">>, 32503680000}]}),
-    ?assertEqual({error, {nbf,not_in_past}}, decode(Encoded, [nbf], nil)).
+    ?assertEqual({error, <<"nbf not in past">>}, decode(Encoded, [nbf], nil)).
 
 
 missing_exp_test() ->
@@ -383,7 +383,7 @@ missing_exp_test() ->
 
 invalid_exp_test() ->
     Encoded = encode(valid_header(), {[{<<"exp">>, 0}]}),
-    ?assertEqual({error, {exp,not_in_future}}, decode(Encoded, [exp], nil)).
+    ?assertEqual({error, <<"exp not in future">>}, decode(Encoded, [exp], nil)).
 
 
 missing_kid_test() ->
