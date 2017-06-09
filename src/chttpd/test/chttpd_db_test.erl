@@ -84,35 +84,29 @@ should_return_ok_true_on_bulk_update(Url) ->
 
 
 should_accept_live_as_an_alias_for_continuous(Url) ->
-    ?_test(begin
-        {ok, _, _, ResultBody} =
-            test_request:get(Url ++ "/_changes?feed=live&timeout=1", [?AUTH]),
-        % https://issues.apache.org/jira/browse/COUCHDB-3415?filter=12340503
-        % if the decode fails, print out ResultBody, so we can debug what
-        % extra data is coming in.
-        {ResultJson} = try ?JSON_DECODE(ResultBody) of
-            Json -> Json
+    GetLastSeq = fun(Bin) ->
+        Parts = binary:split(Bin, <<"\n">>, [global]),
+        Filtered = [P || P <- Parts, size(P) > 0],
+        LastSeqBin = lists:last(Filtered),
+        {Result} = try ?JSON_DECODE(LastSeqBin) of
+            Data -> Data
         catch
-            throw:Error ->
-                io:format(user, "~nJSON_DECODE error: ~p~n", [Error]),
-                io:format(user, "~nOffending String: ~p~n", [ResultBody]),
+            _:_ ->
                 ?assert(false) % should not happen, abort
         end,
-        <<LastSeqNum0:1/binary, "-", _/binary>> = couch_util:get_value(
-            <<"last_seq">>, ResultJson, undefined),
-        LastSeqNum = list_to_integer(binary_to_list(LastSeqNum0)),
+        couch_util:get_value(<<"last_seq">>, Result, undefined)
+    end,
+    ?_test(begin
+        {ok, _, _, ResultBody1} =
+            test_request:get(Url ++ "/_changes?feed=live&timeout=1", [?AUTH]),
+        LastSeq1 = GetLastSeq(ResultBody1),
 
         {ok, _, _, _} = create_doc(Url, "testdoc2"),
-        {ok, _, _, ResultBody2} = 
+        {ok, _, _, ResultBody2} =
             test_request:get(Url ++ "/_changes?feed=live&timeout=1", [?AUTH]),
-        io:format(user, "~nDEBUG COUCHDB-3415: ResultBody2: ~p~n", [ResultBody2]),
-        [_, CleanedResult] = binary:split(ResultBody2, <<"\n">>),
-        io:format(user, "~nDEBUG COUCHDB-3415: CleanedResult: ~p~n", [CleanedResult]),
-        {[{_, Seq}, _]} = ?JSON_DECODE(CleanedResult),
-        <<SeqNum0:1/binary, "-", _/binary>> = Seq,
-        SeqNum = list_to_integer(binary_to_list(SeqNum0)),
+        LastSeq2 = GetLastSeq(ResultBody2),
 
-        ?assertEqual(LastSeqNum + 1, SeqNum)
+        ?assertNotEqual(LastSeq1, LastSeq2)
     end).
 
 
