@@ -1113,7 +1113,7 @@ basic_headers(Req, Headers0) ->
     Headers = Headers0
         ++ server_header()
         ++ couch_httpd_auth:cookie_auth_header(Req, Headers0),
-    Headers1 = chttpd_xframe_options:headers(Req, Headers),
+    Headers1 = chttpd_xframe_options:header(Req, Headers),
     chttpd_cors:headers(Req, Headers1).
 
 handle_response(Req0, Code0, Headers0, Args0, Type) ->
