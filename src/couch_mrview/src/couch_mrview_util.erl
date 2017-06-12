@@ -338,7 +338,10 @@ temp_view_to_ddoc({Props}) ->
 
 
 get_row_count(#mrview{btree=Bt}) ->
-    {ok, {Count, _Reds}} = couch_btree:full_reduce(Bt),
+    Count = case couch_btree:full_reduce(Bt) of
+        {ok, {Count0, _Reds, _}} -> Count0;
+        {ok, {Count0, _Reds}} -> Count0
+    end,
     {ok, Count}.
 
 
@@ -786,27 +789,33 @@ changes_ekey_opts(_StartSeq, #mrargs{end_key=EKey,
     end.
 
 
+reduced_external_size(Tree) ->
+    case couch_btree:full_reduce(Tree) of
+        {ok, {_, _, Size}} -> Size;
+        % return 0 for versions of the reduce function without Size
+        {ok, {_, _}} -> 0
+    end.
 
 
 calculate_external_size(Views) ->
     SumFun = fun(#mrview{btree=Bt, seq_btree=SBt, key_byseq_btree=KSBt}, Acc) ->
-        Size0 = sum_btree_sizes(Acc, couch_btree:size(Bt)),
+        Size0 = sum_btree_sizes(Acc, reduced_external_size(Bt)),
         Size1 = case SBt of
             nil -> Size0;
-            _ -> sum_btree_sizes(Size0, couch_btree:size(SBt))
+            _ -> sum_btree_sizes(Size0, reduced_external_size(SBt))
         end,
         case KSBt of
             nil -> Size1;
-            _ -> sum_btree_sizes(Size1, couch_btree:size(KSBt))
+            _ -> sum_btree_sizes(Size1, reduced_external_size(KSBt))
         end
     end,
     {ok, lists:foldl(SumFun, 0, Views)}.
 
 
 sum_btree_sizes(nil, _) ->
-    null;
+    0;
 sum_btree_sizes(_, nil) ->
-    null;
+    0;
 sum_btree_sizes(Size1, Size2) ->
     Size1 + Size2.
 
@@ -1038,22 +1047,32 @@ get_user_reds(Reduction) ->
     element(2, Reduction).
 
 
+get_external_size_reds(Reduction) when tuple_size(Reduction) == 2 ->
+    0;
+
+get_external_size_reds(Reduction) when tuple_size(Reduction) == 3 ->
+    element(3, Reduction).
+
+
 make_reduce_fun(Lang, ReduceFuns) ->
     FunSrcs = [FunSrc || {_, FunSrc} <- ReduceFuns],
     fun
         (reduce, KVs0) ->
             KVs = detuple_kvs(expand_dups(KVs0, []), []),
             {ok, Result} = couch_query_servers:reduce(Lang, FunSrcs, KVs),
-            {length(KVs), Result};
+            ExternalSize = kv_external_size(KVs, Result),
+            {length(KVs), Result, ExternalSize};
         (rereduce, Reds) ->
-            ExtractFun = fun(Red, {CountsAcc0, URedsAcc0}) ->
+            ExtractFun = fun(Red, {CountsAcc0, URedsAcc0, ExtAcc0}) ->
                 CountsAcc = CountsAcc0 + get_count(Red),
                 URedsAcc = lists:append(URedsAcc0, [get_user_reds(Red)]),
-                {CountsAcc, URedsAcc}
+                ExtAcc = ExtAcc0 + get_external_size_reds(Red),
+                {CountsAcc, URedsAcc, ExtAcc}
             end,
-            {Counts, UReds} = lists:foldl(ExtractFun, {0, []}, Reds),
+            {Counts, UReds, ExternalSize} = lists:foldl(ExtractFun,
+                {0, [], 0}, Reds),
             {ok, Result} = couch_query_servers:rereduce(Lang, FunSrcs, UReds),
-            {Counts, Result}
+            {Counts, Result, ExternalSize}
     end.
 
 
@@ -1130,3 +1149,9 @@ get_view_queries({Props}) ->
         _ ->
             throw({bad_request, "`queries` member must be a array."})
     end.
+
+
+kv_external_size(KVList, Reduction) ->
+    lists:foldl(fun([[Key, _], Value], Acc) ->
+        ?term_size(Key) + ?term_size(Value) + Acc
+    end, ?term_size(Reduction), KVList).
