@@ -112,9 +112,16 @@ init({Mod, IdxState}) ->
     end.
 
 
-terminate(Reason, State) ->
+terminate(Reason0, State) ->
     #st{mod=Mod, idx_state=IdxState}=State,
-    Mod:close(IdxState),
+    case Reason0 of
+        {shutdown, ddoc_updated} ->
+            Mod:shutdown(IdxState),
+            Reason = ddoc_updated;
+        _ ->
+            Mod:close(IdxState),
+            Reason = Reason0
+    end,
     send_all(State#st.waiters, Reason),
     couch_util:shutdown_sync(State#st.updater),
     couch_util:shutdown_sync(State#st.compactor),
@@ -271,7 +278,7 @@ handle_cast(delete, State) ->
     ok = Mod:delete(IdxState),
     {stop, normal, State};
 handle_cast({ddoc_updated, DDocResult}, State) ->
-    #st{mod = Mod, idx_state = IdxState, waiters = Waiters} = State,
+    #st{mod = Mod, idx_state = IdxState} = State,
     Shutdown = case DDocResult of
         {not_found, deleted} ->
             true;
@@ -284,17 +291,12 @@ handle_cast({ddoc_updated, DDocResult}, State) ->
     end,
     case Shutdown of
         true ->
-            case Waiters of
-                [] ->
-                    {stop, normal, State};
-                _ ->
-                    {noreply, State#st{shutdown = true}}
-            end;
+            {stop, {shutdown, ddoc_updated}, State#st{shutdown = true}};
         false ->
             {noreply, State#st{shutdown = false}}
     end;
 handle_cast(ddoc_updated, State) ->
-    #st{mod = Mod, idx_state = IdxState, waiters = Waiters} = State,
+    #st{mod = Mod, idx_state = IdxState} = State,
     DbName = Mod:get(db_name, IdxState),
     DDocId = Mod:get(idx_name, IdxState),
     Shutdown = couch_util:with_db(DbName, fun(Db) ->
@@ -308,12 +310,7 @@ handle_cast(ddoc_updated, State) ->
     end),
     case Shutdown of
         true ->
-            case Waiters of
-                [] ->
-                    {stop, normal, State};
-                _ ->
-                    {noreply, State#st{shutdown = true}}
-            end;
+            {stop, {shutdown, ddoc_updated}, State#st{shutdown = true}};
         false ->
             {noreply, State#st{shutdown = false}}
     end;

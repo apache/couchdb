@@ -42,13 +42,17 @@
 
 
 get_view(Db, DDoc, ViewName, Args0) ->
-    {ok, State, Args2} = get_view_index_state(Db, DDoc, ViewName, Args0),
-    Ref = erlang:monitor(process, State#mrst.fd),
-    #mrst{language=Lang, views=Views} = State,
-    {Type, View, Args3} = extract_view(Lang, Args2, ViewName, Views),
-    check_range(Args3, view_cmp(View)),
-    Sig = view_sig(Db, State, View, Args3),
-    {ok, {Type, View, Ref}, Sig, Args3}.
+    case get_view_index_state(Db, DDoc, ViewName, Args0) of
+        {ok, State, Args2} ->
+            Ref = erlang:monitor(process, State#mrst.fd),
+            #mrst{language=Lang, views=Views} = State,
+            {Type, View, Args3} = extract_view(Lang, Args2, ViewName, Views),
+            check_range(Args3, view_cmp(View)),
+            Sig = view_sig(Db, State, View, Args3),
+            {ok, {Type, View, Ref}, Sig, Args3};
+        ddoc_updated ->
+            ddoc_updated
+    end.
 
 
 get_view_index_pid(Db, DDoc, ViewName, Args0) ->
@@ -71,7 +75,7 @@ get_view_index_state(Db, DDoc, ViewName, Args0, RetryCount) ->
         UpdateSeq = couch_util:with_db(Db, fun(WDb) ->
             couch_db:get_update_seq(WDb)
         end),
-        {ok, State} = case Args#mrargs.update of
+        State = case Args#mrargs.update of
             lazy ->
                 spawn(fun() ->
                     catch couch_index:get_state(Pid, UpdateSeq)
@@ -82,7 +86,11 @@ get_view_index_state(Db, DDoc, ViewName, Args0, RetryCount) ->
             _ ->
                 couch_index:get_state(Pid, UpdateSeq)
         end,
-        {ok, State, Args}
+        case State of
+            {ok, State0} -> {ok, State0, Args};
+            ddoc_updated -> ddoc_updated;
+            Else -> throw(Else)
+        end
     catch
         exit:{Reason, _} when Reason == noproc; Reason == normal ->
             timer:sleep(?GET_VIEW_RETRY_DELAY),
