@@ -132,6 +132,9 @@ handle_stream_start(rexi_STREAM_INIT, {Worker, From}, St) ->
                 {stop, St#stream_acc{workers=Workers1}}
         end
     end;
+handle_stream_start({ok, ddoc_updated}, _, St) ->
+    cleanup(St#stream_acc.workers),
+    {stop, ddoc_updated};
 handle_stream_start(Else, _, _) ->
     exit({invalid_stream_start, Else}).
 

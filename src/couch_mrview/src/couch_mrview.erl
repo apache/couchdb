@@ -241,12 +241,16 @@ query_view(Db, DDoc, VName, Args) ->
 query_view(Db, DDoc, VName, Args, Callback, Acc) when is_list(Args) ->
     query_view(Db, DDoc, VName, to_mrargs(Args), Callback, Acc);
 query_view(Db, DDoc, VName, Args0, Callback, Acc0) ->
-    {ok, VInfo, Sig, Args} = couch_mrview_util:get_view(Db, DDoc, VName, Args0),
-    {ok, Acc1} = case Args#mrargs.preflight_fun of
-        PFFun when is_function(PFFun, 2) -> PFFun(Sig, Acc0);
-        _ -> {ok, Acc0}
-    end,
-    query_view(Db, VInfo, Args, Callback, Acc1).
+    case couch_mrview_util:get_view(Db, DDoc, VName, Args0) of
+        {ok, VInfo, Sig, Args} ->
+            {ok, Acc1} = case Args#mrargs.preflight_fun of
+                PFFun when is_function(PFFun, 2) -> PFFun(Sig, Acc0);
+                 _ -> {ok, Acc0}
+            end,
+            query_view(Db, VInfo, Args, Callback, Acc1);
+        ddoc_updated ->
+            Callback(ok, ddoc_updated)
+    end.
 
 
 get_view_index_pid(Db, DDoc, ViewName, Args0) ->
@@ -689,6 +693,8 @@ default_cb({final, Info}, []) ->
     {ok, [Info]};
 default_cb({final, _}, Acc) ->
     {ok, Acc};
+default_cb(ok, ddoc_updated) ->
+    {ok, ddoc_updated};
 default_cb(Row, Acc) ->
     {ok, [Row | Acc]}.
 

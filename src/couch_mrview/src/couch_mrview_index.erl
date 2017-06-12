@@ -14,7 +14,7 @@
 
 
 -export([get/2]).
--export([init/2, open/2, close/1, reset/1, delete/1]).
+-export([init/2, open/2, close/1, reset/1, delete/1, shutdown/1]).
 -export([start_update/3, purge/4, process_doc/3, finish_update/1, commit/1]).
 -export([compact/3, swap_compacted/2, remove_compacted/1]).
 -export([index_file_exists/1]).
@@ -141,6 +141,18 @@ open(Db, State) ->
 close(State) ->
     erlang:demonitor(State#mrst.fd_monitor, [flush]),
     couch_file:close(State#mrst.fd).
+
+
+% This called after ddoc_updated event occurrs, and
+% before we shutdown couch_index process.
+% We unlink couch_index from corresponding couch_file and demonitor it.
+% This allows all outstanding queries that are currently streaming
+% data from couch_file finish successfully.
+% couch_file will be closed automatically after all
+% outstanding queries are done.
+shutdown(State) ->
+    erlang:demonitor(State#mrst.fd_monitor, [flush]),
+    unlink(State#mrst.fd).
 
 
 delete(#mrst{db_name=DbName, sig=Sig}=State) ->

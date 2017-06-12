@@ -36,6 +36,8 @@ go(DbName, DDoc, VName, Args, Callback, Acc, VInfo) ->
     RexiMon = fabric_util:create_monitors(Workers0),
     try
         case fabric_util:stream_start(Workers0, #shard.ref, StartFun, Repls) of
+            {ok, ddoc_updated} ->
+                Callback({error, ddoc_updated}, Acc);
             {ok, Workers} ->
                 try
                     go2(DbName, Workers, VInfo, Args, Callback, Acc)
@@ -150,7 +152,10 @@ handle_message(#view_row{key=Key} = Row, {Worker, From}, State) ->
 handle_message(complete, Worker, #collector{counters = Counters0} = State) ->
     true = fabric_dict:is_key(Worker, Counters0),
     C1 = fabric_dict:update_counter(Worker, 1, Counters0),
-    fabric_view:maybe_send_row(State#collector{counters = C1}).
+    fabric_view:maybe_send_row(State#collector{counters = C1});
+
+handle_message(ddoc_updated, _Worker, State) ->
+    {stop, State}.
 
 os_proc_needed(<<"_", _/binary>>) -> false;
 os_proc_needed(_) -> true.

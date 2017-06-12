@@ -846,6 +846,8 @@ error_info({not_found, Reason}) ->
     {404, <<"not_found">>, Reason};
 error_info({filter_fetch_error, Reason}) ->
     {404, <<"not_found">>, Reason};
+error_info(ddoc_updated) ->
+    {404, <<"not_found">>, <<"Design document was updated or deleted.">>};
 error_info({not_acceptable, Reason}) ->
     {406, <<"not_acceptable">>, Reason};
 error_info(conflict) ->

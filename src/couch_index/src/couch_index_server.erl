@@ -106,6 +106,13 @@ get_index(Module, IdxState) ->
     Sig = Module:get(signature, IdxState),
     case ets:lookup(?BY_SIG, {DbName, Sig}) of
         [{_, Pid}] when is_pid(Pid) ->
+            DDocId = Module:get(idx_name, IdxState),
+            case ets:match_object(?BY_DB, {DbName, {DDocId, Sig}}) of
+                [] ->
+                    Args = [Pid, DbName, DDocId, Sig],
+                    gen_server:cast(?MODULE, {add_to_ets, Args});
+                _ -> ok
+            end,
             {ok, Pid};
         _ ->
             Args = {Module, IdxState, DbName, Sig},
@@ -161,14 +168,25 @@ handle_call({reset_indexes, DbName}, _From, State) ->
 
 handle_cast({reset_indexes, DbName}, State) ->
     reset_indexes(DbName, State#st.root_dir),
+    {noreply, State};
+handle_cast({add_to_ets, [Pid, DbName, DDocId, Sig]}, State) ->
+    % check if Pid still exists
+    case ets:lookup(?BY_PID, Pid) of
+        [{Pid, {DbName, Sig}}] when is_pid(Pid) ->
+            ets:insert(?BY_DB, {DbName, {DDocId, Sig}});
+        _ -> ok
+    end,
+    {noreply, State};
+handle_cast({rem_from_ets, [DbName, DDocId, Sig]}, State) ->
+    ets:delete_object(?BY_DB, {DbName, {DDocId, Sig}}),
     {noreply, State}.
 
 handle_info({'EXIT', Pid, Reason}, Server) ->
     case ets:lookup(?BY_PID, Pid) of
         [{Pid, {DbName, Sig}}] ->
-            [{DbName, {DDocId, Sig}}] =
-                ets:match_object(?BY_DB, {DbName, {'$1', Sig}}),
-            rem_from_ets(DbName, Sig, DDocId, Pid);
+            DDocIds = [DDocId || {_, {DDocId, _}}
+                <- ets:match_object(?BY_DB, {DbName, {'$1', Sig}})],
+            rem_from_ets(DbName, Sig, DDocIds, Pid);
         [] when Reason /= normal ->
             exit(Reason);
         _Else ->
@@ -221,14 +239,17 @@ new_index({Mod, IdxState, DbName, Sig}) ->
 
 reset_indexes(DbName, Root) ->
     % shutdown all the updaters and clear the files, the db got changed
-    Fun = fun({_, {DDocId, Sig}}) ->
+    SigDDocIds = lists:foldl(fun({_, {DDocId, Sig}}, DDict) ->
+        dict:append(Sig, DDocId, DDict)
+    end, dict:new(), ets:lookup(?BY_DB, DbName)),
+    Fun = fun({Sig, DDocIds}) ->
         [{_, Pid}] = ets:lookup(?BY_SIG, {DbName, Sig}),
         MRef = erlang:monitor(process, Pid),
         gen_server:cast(Pid, delete),
         receive {'DOWN', MRef, _, _, _} -> ok end,
-        rem_from_ets(DbName, Sig, DDocId, Pid)
+        rem_from_ets(DbName, Sig, DDocIds, Pid)
     end,
-    lists:foreach(Fun, ets:lookup(?BY_DB, DbName)),
+    lists:foreach(Fun, dict:to_list(SigDDocIds)),
     Path = couch_index_util:index_dir("", DbName),
     couch_file:nuke_dir(Root, Path).
 
@@ -239,10 +260,12 @@ add_to_ets(DbName, Sig, DDocId, Pid) ->
     ets:insert(?BY_DB, {DbName, {DDocId, Sig}}).
 
 
-rem_from_ets(DbName, Sig, DDocId, Pid) ->
+rem_from_ets(DbName, Sig, DDocIds, Pid) ->
     ets:delete(?BY_SIG, {DbName, Sig}),
     ets:delete(?BY_PID, Pid),
-    ets:delete_object(?BY_DB, {DbName, {DDocId, Sig}}).
+    lists:foreach(fun(DDocId) ->
+        ets:delete_object(?BY_DB, {DbName, {DDocId, Sig}})
+    end, DDocIds).
 
 
 handle_db_event(DbName, created, St) ->
@@ -259,10 +282,19 @@ handle_db_event(<<"shards/", _/binary>> = DbName, {ddoc_updated,
     DbShards = [mem3:name(Sh) || Sh <- mem3:local_shards(mem3:dbname(DbName))],
     lists:foreach(fun(DbShard) ->
         lists:foreach(fun({_DbShard, {_DDocId, Sig}}) ->
-            case ets:lookup(?BY_SIG, {DbShard, Sig}) of
-                [{_, IndexPid}] -> (catch
-                    gen_server:cast(IndexPid, {ddoc_updated, DDocResult}));
-                [] -> []
+            % check if there are other ddocs with the same Sig for the same db
+            SigDDocs = ets:match_object(?BY_DB, {DbShard, {'$1', Sig}}),
+            if length(SigDDocs) > 1 ->
+                % remove records from ?BY_DB for this DDoc
+                Args = [DbShard, DDocId, Sig],
+                gen_server:cast(?MODULE, {rem_from_ets, Args});
+            true ->
+                % single DDoc with this Sig - close couch_index processes
+                case ets:lookup(?BY_SIG, {DbShard, Sig}) of
+                    [{_, IndexPid}] -> (catch
+                        gen_server:cast(IndexPid, {ddoc_updated, DDocResult}));
+                    [] -> []
+                end
             end
         end, ets:match_object(?BY_DB, {DbShard, {DDocId, '$1'}}))
     end, DbShards),
