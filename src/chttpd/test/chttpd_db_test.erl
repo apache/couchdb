@@ -134,19 +134,10 @@ should_return_404_for_delete_att_on_notadoc(Url) ->
 
 should_return_409_for_del_att_without_rev(Url) ->
     ?_test(begin
-        {ok, Data} = file:read_file(?FIXTURE_TXT),
-        Doc = {[
-            {<<"_attachments">>, {[
-                {<<"file.erl">>, {[
-                    {<<"content_type">>, <<"text/plain">>},
-                    {<<"data">>, base64:encode(Data)}
-                ]}
-            }]}}
-        ]},
         {ok, RC, _, _} = test_request:put(
             Url ++ "/testdoc3",
             [?CONTENT_JSON, ?AUTH],
-            jiffy:encode(Doc)
+            jiffy:encode(attachment_doc())
         ),
         ?assertEqual(201, RC),
 
@@ -158,21 +149,13 @@ should_return_409_for_del_att_without_rev(Url) ->
         ?assertEqual(409, RC1)
     end).
 
+
 should_return_200_for_del_att_with_rev(Url) ->
   ?_test(begin
-      {ok, Data} = file:read_file(?FIXTURE_TXT),
-      Doc = {[
-          {<<"_attachments">>, {[
-              {<<"file.erl">>, {[
-                  {<<"content_type">>, <<"text/plain">>},
-                  {<<"data">>, base64:encode(Data)}
-              ]}
-          }]}}
-      ]},
       {ok, RC, _Headers, RespBody} = test_request:put(
           Url ++ "/testdoc4",
           [?CONTENT_JSON, ?AUTH],
-          jiffy:encode(Doc)
+          jiffy:encode(attachment_doc())
       ),
       ?assertEqual(201, RC),
 
@@ -186,3 +169,15 @@ should_return_200_for_del_att_with_rev(Url) ->
       ),
       ?assertEqual(200, RC1)
     end).
+
+
+attachment_doc() ->
+    {ok, Data} = file:read_file(?FIXTURE_TXT),
+    {[
+        {<<"_attachments">>, {[
+            {<<"file.erl">>, {[
+                {<<"content_type">>, <<"text/plain">>},
+                {<<"data">>, base64:encode(Data)}
+            ]}
+        }]}}
+    ]}.
