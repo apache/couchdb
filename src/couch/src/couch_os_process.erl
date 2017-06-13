@@ -62,10 +62,14 @@ prompt(Pid, Data) ->
 % Utility functions for reading and writing
 % in custom functions
 writeline(OsProc, Data) when is_record(OsProc, os_proc) ->
-    port_command(OsProc#os_proc.port, [Data, $\n]).
+    Res = port_command(OsProc#os_proc.port, [Data, $\n]),
+    couch_io_logger:log_output(Data),
+    Res.
 
 readline(#os_proc{} = OsProc) ->
-    readline(OsProc, []).
+    Res = readline(OsProc, []),
+    couch_io_logger:log_input(Res),
+    Res.
 readline(#os_proc{port = Port} = OsProc, Acc) ->
     receive
     {Port, {data, {noeol, Data}}} when is_binary(Acc) ->
@@ -145,6 +149,7 @@ pick_command1(_) ->
 
 % gen_server API
 init([Command, Options, PortOptions]) ->
+    couch_io_logger:start(os:getenv("COUCHDB_IO_LOG_DIR")),
     PrivDir = couch_util:priv_dir(),
     Spawnkiller = "\"" ++ filename:join(PrivDir, "couchspawnkillable") ++ "\"",
     V = config:get("query_server_config", "os_process_idle_limit", "300"),
@@ -178,8 +183,14 @@ init([Command, Options, PortOptions]) ->
     end, BaseProc, Options),
     {ok, OsProc, IdleLimit}.
 
-terminate(_Reason, #os_proc{port=Port}) ->
+terminate(Reason, #os_proc{port=Port}) ->
     catch port_close(Port),
+    case Reason of
+        normal ->
+            couch_io_logger:stop_noerror();
+        Error ->
+            couch_io_logger:stop_error(Error)
+    end,
     ok.
 
 handle_call({set_timeout, TimeOut}, _From, #os_proc{idle=Idle}=OsProc) ->
