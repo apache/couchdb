@@ -31,6 +31,7 @@
 -export([
     find_common_seq_rpc/3,
     load_checkpoint_rpc/3,
+    save_checkpoint_rpc/5,
     save_checkpoint_rpc/6,
     load_purges_rpc/2,
     save_purge_checkpoint_rpc/4
@@ -102,6 +103,38 @@ load_checkpoint_rpc(DbName, SourceNode, SourceUUID) ->
         end;
     Error ->
         rexi:reply(Error)
+    end.
+
+
+% Remove after all nodes in the cluster are upgrades to clustered purge
+save_checkpoint_rpc(DbName, Id, SourceSeq, NewEntry0, History0) ->
+    erlang:put(io_priority, {internal_repl, DbName}),
+    case get_or_create_db(DbName, [?ADMIN_CTX]) of
+        {ok, Db} ->
+            NewEntry = {[
+                {<<"target_node">>, atom_to_binary(node(), utf8)},
+                {<<"target_uuid">>, couch_db:get_uuid(Db)},
+                {<<"target_seq">>, couch_db:get_update_seq(Db)}
+            ] ++ NewEntry0},
+            Body = {[
+                {<<"seq">>, SourceSeq},
+                {<<"target_uuid">>, couch_db:get_uuid(Db)},
+                {<<"history">>, add_checkpoint(NewEntry, History0)}
+            ]},
+            Doc = #doc{id = Id, body = Body},
+            rexi:reply(try couch_db:update_doc(Db, Doc, []) of
+                {ok, _} ->
+                    {ok, Body};
+                Else ->
+                    {error, Else}
+            catch
+                Exception ->
+                    Exception;
+                error:Reason ->
+                    {error, Reason}
+            end);
+        Error ->
+            rexi:reply(Error)
     end.
 
 
