@@ -51,14 +51,13 @@ generate_xframe_header(Req, Headers, Config) ->
 
 
 
-check_host(#httpd{mochi_req = MochiReq}, Config) ->
+check_host(#httpd{mochi_req = MochiReq} = Req, Config) ->
     Host = couch_httpd_vhost:host(MochiReq),
     case Host of
         [] -> 
             ?DENY;
         Host ->
-            Scheme = atom_to_list(MochiReq:get(scheme)), 
-            FullHost = Scheme ++ "://" ++ Host,
+            FullHost = chttpd:absolute_uri(Req, ""),
             AcceptedHosts = get_accepted_hosts(Config),
             AcceptAll = ["*"] =:= AcceptedHosts,
             case AcceptAll orelse lists:member(FullHost, AcceptedHosts) of
