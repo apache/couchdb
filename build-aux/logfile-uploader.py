@@ -41,6 +41,9 @@ def collect_logfiles():
     # JS harness
     for log in glob.glob('dev/logs/node1.log'):
         tb.add(log)
+    # couchjs OS process IO logs
+    for log in glob.glob('/tmp/couchjslogs/*'):
+        tb.add(log)
     tb.close()
 
 def build_ci_doc():
