@@ -129,6 +129,7 @@ init([]) ->
     couch_event:link_listener(?MODULE, handle_db_event, nil, [all_dbs]),
     RootDir = couch_index_util:root_dir(),
     couch_file:init_delete_dir(RootDir),
+    couch_file:init_recovery_dir(RootDir),
     {ok, #st{root_dir=RootDir}}.
 
 
@@ -161,14 +162,9 @@ handle_call({async_error, {DbName, _DDocId, Sig}, Error}, _From, State) ->
     [gen_server:reply(From, Error) || From <- Waiters],
     ets:delete(?BY_SIG, {DbName, Sig}),
     {reply, ok, State};
-handle_call({reset_indexes, DbName}, _From, State) ->
-    reset_indexes(DbName, State#st.root_dir),
+handle_call({reset_indexes, DbName, Options}, _From, State) ->
+    reset_indexes(DbName, State#st.root_dir, Options),
     {reply, ok, State}.
-
-
-handle_cast({reset_indexes, DbName}, State) ->
-    reset_indexes(DbName, State#st.root_dir),
-    {noreply, State};
 handle_cast({add_to_ets, [Pid, DbName, DDocId, Sig]}, State) ->
     % check if Pid still exists
     case ets:lookup(?BY_PID, Pid) of
@@ -179,6 +175,11 @@ handle_cast({add_to_ets, [Pid, DbName, DDocId, Sig]}, State) ->
     {noreply, State};
 handle_cast({rem_from_ets, [DbName, DDocId, Sig]}, State) ->
     ets:delete_object(?BY_DB, {DbName, {DDocId, Sig}}),
+    {noreply, State};
+
+
+handle_cast({reset_indexes, DbName, Options}, State) ->
+    reset_indexes(DbName, State#st.root_dir, Options),
     {noreply, State}.
 
 handle_info({'EXIT', Pid, Reason}, Server) ->
@@ -237,7 +238,7 @@ new_index({Mod, IdxState, DbName, Sig}) ->
     end.
 
 
-reset_indexes(DbName, Root) ->
+reset_indexes(DbName, Root, Options) ->
     % shutdown all the updaters and clear the files, the db got changed
     SigDDocIds = lists:foldl(fun({_, {DDocId, Sig}}, DDict) ->
         dict:append(Sig, DDocId, DDict)
@@ -251,7 +252,8 @@ reset_indexes(DbName, Root) ->
     end,
     lists:foreach(Fun, dict:to_list(SigDDocIds)),
     Path = couch_index_util:index_dir("", DbName),
-    couch_file:nuke_dir(Root, Path).
+    Options1 = [{db_name, DbName} | Options],
+    couch_file:nuke_dir(Root, Path, Options1).
 
 
 add_to_ets(DbName, Sig, DDocId, Pid) ->
@@ -269,10 +271,10 @@ rem_from_ets(DbName, Sig, DDocIds, Pid) ->
 
 
 handle_db_event(DbName, created, St) ->
-    gen_server:cast(?MODULE, {reset_indexes, DbName}),
+    gen_server:cast(?MODULE, {reset_indexes, DbName, []}),
     {ok, St};
 handle_db_event(DbName, deleted, St) ->
-    gen_server:cast(?MODULE, {reset_indexes, DbName}),
+    gen_server:cast(?MODULE, {reset_indexes, DbName, [{context, delete}]}),
     {ok, St};
 handle_db_event(<<"shards/", _/binary>> = DbName, {ddoc_updated,
         DDocId}, St) ->

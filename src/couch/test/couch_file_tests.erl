@@ -419,32 +419,44 @@ nuke_dir_test_() ->
                 RootDir = filename:dirname(File0),
                 BaseName = filename:basename(File0),
                 Seed = crypto:rand_uniform(1000000000, 9999999999),
-                DDocDir = io_lib:format("db.~b_design", [Seed]),
+                DBName0 = io_lib:format("db.~b", [Seed]),
+                DBName = iolist_to_binary(DBName0),
+                DDocDir = io_lib:format("~s_design", [DBName0]),
                 ViewDir = filename:join([RootDir, DDocDir]),
                 file:make_dir(ViewDir),
                 File = filename:join([ViewDir, BaseName]),
                 file:rename(File0, File),
                 ok = couch_file:init_delete_dir(RootDir),
                 ok = file:write_file(File, <<>>),
-                {RootDir, ViewDir}
+                {RootDir, ViewDir, DBName}
             end,
-            fun({RootDir, ViewDir}) ->
+            fun({RootDir, ViewDir, _DBName}) ->
                 meck:unload(config),
                 remove_dir(ViewDir),
                 Ext = filename:extension(ViewDir),
                 case filelib:wildcard(RootDir ++ "/*.deleted" ++ Ext) of
                     [DelDir] -> remove_dir(DelDir);
                     _ -> ok
-                end
+                end,
+                RecDirPaths = RootDir ++ "/.recovery" ++ "/*_design",
+                [remove_dir(Dir) || Dir <- filelib:wildcard(RecDirPaths)]
             end,
             [
                 fun(Cfg) ->
-                    {"enable_database_recovery = false",
-                    make_rename_dir_test_case(Cfg, false)}
+                    {"enable_database_recovery = false, context = delete",
+                    make_rename_dir_test_case(Cfg, false, delete)}
                 end,
                 fun(Cfg) ->
-                    {"enable_database_recovery = true",
-                    make_rename_dir_test_case(Cfg, true)}
+                    {"enable_database_recovery = false, context = compaction",
+                    make_rename_dir_test_case(Cfg, false, compaction)}
+                end,
+                fun(Cfg) ->
+                    {"enable_database_recovery = true, context = delete",
+                    make_rename_dir_test_case(Cfg, true, delete)}
+                end,
+                fun(Cfg) ->
+                    {"enable_database_recovery = true, context = compaction",
+                    make_rename_dir_test_case(Cfg, true, compaction)}
                 end,
                 fun(Cfg) ->
                     {"delete_after_rename = true",
@@ -459,16 +471,26 @@ nuke_dir_test_() ->
     }.
 
 
-make_rename_dir_test_case({RootDir, ViewDir}, EnableRecovery) ->
+make_rename_dir_test_case({RootDir, ViewDir, DBName}, EnableRecovery, Context) ->
     meck:expect(config, get_boolean, fun
         ("couchdb", "enable_database_recovery", _) -> EnableRecovery;
         ("couchdb", "delete_after_rename", _) -> true
     end),
     DirExistsBefore = filelib:is_dir(ViewDir),
-    couch_file:nuke_dir(RootDir, ViewDir),
+
+    couch_file:nuke_dir(
+        RootDir,
+        ViewDir,
+        [{db_name, DBName}, {context, Context}]
+    ),
     DirExistsAfter = filelib:is_dir(ViewDir),
-    Ext = filename:extension(ViewDir),
-    RenamedDirs = filelib:wildcard(RootDir ++ "/*.deleted" ++ Ext),
+    RenamedDirs = if Context =:= delete ->
+        filelib:wildcard(RootDir ++ "/.recovery" ++ "/*_design");
+    true ->
+        Ext = filename:extension(ViewDir),
+        filelib:wildcard(RootDir ++ "/*.deleted" ++ Ext)
+    end,
+
     ExpectRenamedCount = if EnableRecovery -> 1; true -> 0 end,
     [
         ?_assert(DirExistsBefore),
@@ -476,7 +498,7 @@ make_rename_dir_test_case({RootDir, ViewDir}, EnableRecovery) ->
         ?_assertEqual(ExpectRenamedCount, length(RenamedDirs))
     ].
 
-make_delete_dir_test_case({RootDir, ViewDir}, DeleteAfterRename) ->
+make_delete_dir_test_case({RootDir, ViewDir, _DBName}, DeleteAfterRename) ->
     meck:expect(config, get_boolean, fun
         ("couchdb", "enable_database_recovery", _) -> false;
         ("couchdb", "delete_after_rename", _) -> DeleteAfterRename
