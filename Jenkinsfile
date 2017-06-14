@@ -19,6 +19,7 @@ pipeline {
   environment {
     COUCHAUTH = credentials('couchdb_vm2_couchdb')
     recipient = 'notifications@couchdb.apache.org'
+    COUCHDB_IO_LOG_DIR = '/tmp/couchjslogs'
   }
 
   stages {
@@ -65,6 +66,8 @@ pipeline {
               withDockerContainer(image: 'couchdbdev/centos-6-erlang-18.3', args: '-e LD_LIBRARY_PATH=/usr/local/bin --user 0:0') {
                 sh '''
                   cwd=$(pwd)
+                  rm -rf /tmp/couchjslogs
+                  mkdir -p /tmp/couchjslogs
                   builddir=$(mktemp -d)
                   cd $builddir
                   tar -xf $cwd/apache-couchdb-*.tar.gz
@@ -86,6 +89,8 @@ pipeline {
               withDockerContainer(image: 'couchdbdev/centos-7-erlang-default', args: '-e LD_LIBRARY_PATH=/usr/local/bin --user 0:0') {
                 sh '''
                   cwd=$(pwd)
+                  rm -rf /tmp/couchjslogs
+                  mkdir -p /tmp/couchjslogs
                   builddir=$(mktemp -d)
                   cd $builddir
                   tar -xf $cwd/apache-couchdb-*.tar.gz
@@ -107,6 +112,8 @@ pipeline {
               withDockerContainer(image: 'couchdbdev/centos-7-erlang-18.3', args: '-e LD_LIBRARY_PATH=/usr/local/bin --user 0:0') {
                 sh '''
                   cwd=$(pwd)
+                  rm -rf /tmp/couchjslogs
+                  mkdir -p /tmp/couchjslogs
                   builddir=$(mktemp -d)
                   cd $builddir
                   tar -xf $cwd/apache-couchdb-*.tar.gz
@@ -128,6 +135,8 @@ pipeline {
               withDockerContainer(image: 'couchdbdev/ubuntu-12.04-erlang-18.3', args: '--user 0:0') {
                 sh '''
                   cwd=$(pwd)
+                  rm -rf /tmp/couchjslogs
+                  mkdir -p /tmp/couchjslogs
                   builddir=$(mktemp -d)
                   cd $builddir
                   tar -xf $cwd/apache-couchdb-*.tar.gz
@@ -149,6 +158,8 @@ pipeline {
               withDockerContainer(image: 'couchdbdev/ubuntu-14.04-erlang-default', args: '--user 0:0') {
                 sh '''
                   cwd=$(pwd)
+                  rm -rf /tmp/couchjslogs
+                  mkdir -p /tmp/couchjslogs
                   builddir=$(mktemp -d)
                   cd $builddir
                   tar -xf $cwd/apache-couchdb-*.tar.gz
@@ -170,6 +181,8 @@ pipeline {
               withDockerContainer(image: 'couchdbdev/ubuntu-14.04-erlang-18.3', args: '--user 0:0') {
                 sh '''
                   cwd=$(pwd)
+                  rm -rf /tmp/couchjslogs
+                  mkdir -p /tmp/couchjslogs
                   builddir=$(mktemp -d)
                   cd $builddir
                   tar -xf $cwd/apache-couchdb-*.tar.gz
@@ -191,6 +204,8 @@ pipeline {
               withDockerContainer(image: 'couchdbdev/ubuntu-16.04-erlang-default', args: '--user 0:0') {
                 sh '''
                   cwd=$(pwd)
+                  rm -rf /tmp/couchjslogs
+                  mkdir -p /tmp/couchjslogs
                   builddir=$(mktemp -d)
                   cd $builddir
                   tar -xf $cwd/apache-couchdb-*.tar.gz
@@ -212,6 +227,8 @@ pipeline {
               withDockerContainer(image: 'couchdbdev/ubuntu-16.04-erlang-18.3', args: '--user 0:0') {
                 sh '''
                   cwd=$(pwd)
+                  rm -rf /tmp/couchjslogs
+                  mkdir -p /tmp/couchjslogs
                   builddir=$(mktemp -d)
                   cd $builddir
                   tar -xf $cwd/apache-couchdb-*.tar.gz
@@ -233,6 +250,8 @@ pipeline {
               withDockerContainer(image: 'couchdbdev/debian-8-erlang-default', args: '--user 0:0') {
                 sh '''
                   cwd=$(pwd)
+                  rm -rf /tmp/couchjslogs
+                  mkdir -p /tmp/couchjslogs
                   builddir=$(mktemp -d)
                   cd $builddir
                   tar -xf $cwd/apache-couchdb-*.tar.gz
@@ -254,6 +273,8 @@ pipeline {
               withDockerContainer(image: 'couchdbdev/debian-8-erlang-18.3', args: '--user 0:0') {
                 sh '''
                   cwd=$(pwd)
+                  rm -rf /tmp/couchjslogs
+                  mkdir -p /tmp/couchjslogs
                   builddir=$(mktemp -d)
                   cd $builddir
                   tar -xf $cwd/apache-couchdb-*.tar.gz

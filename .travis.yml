@@ -36,6 +36,7 @@ cache:
 env:
   global:
     - secure: "UdA/gKIlyuXaW+hUgRx40t1TYjLCGxMqHvM5Uw7UbUH2dqEkgJiLfhZGchS1JVzl8M01VKZUUzS7v2nvRLiHZN1kvaw5kfq31VRoafUah8jfmvqNWZVdLovHl3aw5UX/HRt0RkbWbhdbdknTfh6+YinSZ+Nb54jCErMg9nabXtM="
+    - COUCHDB_IO_LOG_DIR=/tmp/couchjslogs
 
 # Enable this block if you want to build docs & fauxton too
 #node_js:
@@ -45,6 +46,8 @@ env:
 
 # Then comment this section out
 before_script:
+  - rm -rf /tmp/couchjslogs
+  - mkdir -p /tmp/couchjslogs
   - ./configure -c --disable-docs --disable-fauxton
 
 script:
