@@ -86,7 +86,7 @@ execute(#cursor{db = Db, index = Idx} = Cursor0, UserFun, UserAcc) ->
                 include_docs = true
             },
             Args = apply_opts(Cursor#cursor.opts, BaseArgs),
-            {ok, LastCursor} = case mango_idx:def(Idx) of
+            Result = case mango_idx:def(Idx) of
                 all_docs ->
                     CB = fun ?MODULE:handle_all_docs_message/2,
                     fabric:all_docs(Db, CB, Cursor, Args);
@@ -97,7 +97,12 @@ execute(#cursor{db = Db, index = Idx} = Cursor0, UserFun, UserAcc) ->
                     Name = mango_idx:name(Idx),
                     fabric:query_view(Db, DDoc, Name, CB, Cursor, Args)
             end,
-            {ok, LastCursor#cursor.user_acc}
+            case Result of
+                {ok, LastCursor} ->
+                    {ok, LastCursor#cursor.user_acc};
+                {error, Reason} ->
+                    {error, Reason}
+            end
     end.
 
 
