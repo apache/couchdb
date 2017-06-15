@@ -305,6 +305,7 @@ prop(Prop, Props) ->
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
+-include_lib("public_key/include/public_key.hrl").
 
 encode(Header0, Payload0) ->
     Header1 = b64url:encode(jiffy:encode(Header0)),
@@ -491,7 +492,7 @@ encode_decode_test_() ->
 encode_decode(Alg) ->
     {EncodeKey, DecodeKey} = case verification_algorithm(Alg) of
         {public_key, Algorithm} ->
-            jwtf_test_util:create_keypair();
+            create_keypair();
         {hmac, Algorithm} ->
             Key = <<"a-super-secret-key">>,
             {Key, Key}
@@ -517,5 +518,35 @@ claims() ->
         {<<"iat">>, EpochSeconds},
         {<<"exp">>, EpochSeconds + 3600}
     ]}.
+
+create_keypair() ->
+    %% https://tools.ietf.org/html/rfc7517#appendix-C
+    N = decode(<<"t6Q8PWSi1dkJj9hTP8hNYFlvadM7DflW9mWepOJhJ66w7nyoK1gPNqFMSQRy"
+        "O125Gp-TEkodhWr0iujjHVx7BcV0llS4w5ACGgPrcAd6ZcSR0-Iqom-QFcNP"
+        "8Sjg086MwoqQU_LYywlAGZ21WSdS_PERyGFiNnj3QQlO8Yns5jCtLCRwLHL0"
+        "Pb1fEv45AuRIuUfVcPySBWYnDyGxvjYGDSM-AqWS9zIQ2ZilgT-GqUmipg0X"
+        "OC0Cc20rgLe2ymLHjpHciCKVAbY5-L32-lSeZO-Os6U15_aXrk9Gw8cPUaX1"
+        "_I8sLGuSiVdt3C_Fn2PZ3Z8i744FPFGGcG1qs2Wz-Q">>),
+    E = decode(<<"AQAB">>),
+    D = decode(<<"GRtbIQmhOZtyszfgKdg4u_N-R_mZGU_9k7JQ_jn1DnfTuMdSNprTeaSTyWfS"
+        "NkuaAwnOEbIQVy1IQbWVV25NY3ybc_IhUJtfri7bAXYEReWaCl3hdlPKXy9U"
+        "vqPYGR0kIXTQRqns-dVJ7jahlI7LyckrpTmrM8dWBo4_PMaenNnPiQgO0xnu"
+        "ToxutRZJfJvG4Ox4ka3GORQd9CsCZ2vsUDmsXOfUENOyMqADC6p1M3h33tsu"
+        "rY15k9qMSpG9OX_IJAXmxzAh_tWiZOwk2K4yxH9tS3Lq1yX8C1EWmeRDkK2a"
+        "hecG85-oLKQt5VEpWHKmjOi_gJSdSgqcN96X52esAQ">>),
+    RSAPrivateKey = #'RSAPrivateKey'{
+        modulus = N,
+        publicExponent = E,
+        privateExponent = D
+    },
+    RSAPublicKey = #'RSAPublicKey'{
+        modulus = N,
+        publicExponent = E
+    },
+    {RSAPrivateKey, RSAPublicKey}.
+
+
+decode(Goop) ->
+    crypto:bytes_to_integer(b64url:decode(Goop)).
 
 -endif.
