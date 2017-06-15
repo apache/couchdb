@@ -77,7 +77,7 @@ decode(EncodedToken, Checks, KS) ->
         {ok, decode_json(Payload)}
     catch
         throw:Error ->
-            Error
+            {error, Error}
     end.
 
 
@@ -118,11 +118,11 @@ validate_typ(Props, Checks) ->
         {undefined, _} ->
             ok;
         {true, undefined} ->
-            throw({error, missing_typ});
+            throw(missing_typ);
         {true, <<"JWT">>} ->
             ok;
         {true, _} ->
-            throw({error, invalid_typ})
+            throw(invalid_typ)
     end.
 
 
@@ -133,13 +133,13 @@ validate_alg(Props, Checks) ->
         {undefined, _} ->
             ok;
         {true, undefined} ->
-            throw({error, missing_alg});
+            throw(missing_alg);
         {true, Alg} ->
             case lists:member(Alg, ?VALID_ALGS) of
                 true ->
                     ok;
                 false ->
-                    throw({error, invalid_alg})
+                    throw(invalid_alg)
             end
     end.
 
@@ -161,11 +161,11 @@ validate_iss(Props, Checks) ->
         {undefined, _} ->
             ok;
         {_ISS, undefined} ->
-            throw({error, missing_iss});
+            throw(missing_iss);
         {ISS, ISS} ->
             ok;
         {_, _} ->
-            throw({error, invalid_iss})
+            throw(invalid_iss)
     end.
 
 
@@ -177,11 +177,11 @@ validate_iat(Props, Checks) ->
         {undefined, _} ->
             ok;
         {true, undefined} ->
-            throw({error, missing_iat});
+            throw(missing_iat);
         {true, IAT} when is_integer(IAT) ->
             ok;
         {true, _} ->
-            throw({error, invalid_iat})
+            throw(invalid_iat)
     end.
 
 
@@ -193,7 +193,7 @@ validate_nbf(Props, Checks) ->
         {undefined, _} ->
             ok;
         {true, undefined} ->
-            throw({error, missing_nbf});
+            throw(missing_nbf);
         {true, IAT} ->
             assert_past(<<"nbf">>, IAT)
     end.
@@ -207,7 +207,7 @@ validate_exp(Props, Checks) ->
         {undefined, _} ->
             ok;
         {true, undefined} ->
-            throw({error, missing_exp});
+            throw(missing_exp);
         {true, EXP} ->
             assert_future(<<"exp">>, EXP)
     end.
@@ -219,7 +219,7 @@ key(Props, Checks, KS) ->
     KID = prop(<<"kid">>, Props),
     case {Required, KID} of
         {true, undefined} ->
-            throw({error, missing_kid});
+            throw(missing_kid);
         {_, KID} ->
             KS(Alg, KID)
     end.
@@ -242,7 +242,7 @@ public_key_verify(Algorithm, Message, Signature, PublicKey) ->
         true ->
             ok;
         false ->
-            throw({error, bad_signature})
+            throw(bad_signature)
     end.
 
 
@@ -251,21 +251,21 @@ hmac_verify(Algorithm, Message, HMAC, SecretKey) ->
         HMAC ->
             ok;
         _ ->
-            throw({error, bad_hmac})
+            throw(bad_hmac)
     end.
 
 
 split(EncodedToken) ->
     case binary:split(EncodedToken, <<$.>>, [global]) of
         [_, _, _] = Split -> Split;
-        _ -> throw({error, malformed_token})
+        _ -> throw(malformed_token)
     end.
 
 
 decode_json(Encoded) ->
     case b64url:decode(Encoded) of
         {error, Reason} ->
-            throw({error, Reason});
+            throw(Reason);
         Decoded ->
             jiffy:decode(Decoded)
     end.
@@ -274,7 +274,7 @@ props({Props}) ->
     Props;
 
 props(_) ->
-    throw({error, not_object}).
+    throw(not_object).
 
 
 assert_past(Name, Time) ->
@@ -282,7 +282,7 @@ assert_past(Name, Time) ->
         true ->
             ok;
         false ->
-            throw({error, <<Name/binary, " not in past">>})
+            throw(<<Name/binary, " not in past">>)
     end.
 
 assert_future(Name, Time) ->
@@ -290,7 +290,7 @@ assert_future(Name, Time) ->
         true ->
             ok;
         false ->
-            throw({error, <<Name/binary, " not in future">>})
+            throw(<<Name/binary, " not in future">>)
     end.
 
 
@@ -395,7 +395,7 @@ public_key_not_found_test() ->
     Encoded = encode(
         {[{<<"alg">>, <<"RS256">>}, {<<"kid">>, <<"1">>}]},
         {[]}),
-    KS = fun(_, _) -> throw({error, not_found}) end,
+    KS = fun(_, _) -> throw(not_found) end,
     Expected = {error, not_found},
     ?assertEqual(Expected, decode(Encoded, [], KS)).
 
