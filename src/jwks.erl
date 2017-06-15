@@ -27,8 +27,12 @@ get_key(Url, Kty, Kid) ->
         {ok, Key} ->
             {ok, Key};
         {error, not_found} ->
-            update_cache(Url),
-            lookup(Url, Kty, Kid)
+            case update_cache(Url) of
+                ok ->
+                    lookup(Url, Kty, Kid);
+                {error, Reason} ->
+                    {error, Reason}
+            end
     end.
 
 
