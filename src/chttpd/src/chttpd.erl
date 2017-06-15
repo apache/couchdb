@@ -721,13 +721,11 @@ send_chunk(Resp, Data) ->
 
 send_response(Req, Code, Headers0, Body) ->
     Headers1 = [timing(), reqid() | Headers0],
-    Headers2 = chttpd_xframe_options:header(Req, Headers1),
-    couch_httpd:send_response(Req, Code, Headers2, Body).
+    couch_httpd:send_response(Req, Code, Headers1, Body).
 
 send_response_no_cors(Req, Code, Headers0, Body) ->
     Headers1 = [timing(), reqid() | Headers0],
-    Headers2 = chttpd_xframe_options:header(Req, Headers1),
-    couch_httpd:send_response_no_cors(Req, Code, Headers2, Body).
+    couch_httpd:send_response_no_cors(Req, Code, Headers1, Body).
 
 send_method_not_allowed(Req, Methods) ->
     send_error(Req, 405, [{"Allow", Methods}], <<"method_not_allowed">>,
@@ -741,16 +739,14 @@ send_json(Req, Code, Value) ->
 
 send_json(Req, Code, Headers0, Value) ->
     Headers1 = [timing(), reqid() | Headers0],
-    Headers2 = chttpd_xframe_options:header(Req, Headers1),
-    couch_httpd:send_json(Req, Code, Headers2, Value).
+    couch_httpd:send_json(Req, Code, Headers1, Value).
 
 start_json_response(Req, Code) ->
     start_json_response(Req, Code, []).
 
 start_json_response(Req, Code, Headers0) ->
     Headers1 = [timing(), reqid() | Headers0],
-    Headers2 = chttpd_xframe_options:header(Req, Headers1),
-    couch_httpd:start_json_response(Req, Code, Headers2).
+    couch_httpd:start_json_response(Req, Code, Headers1).
 
 end_json_response(Resp) ->
     couch_httpd:end_json_response(Resp).
