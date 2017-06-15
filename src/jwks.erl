@@ -61,8 +61,12 @@ get_keyset(Url) ->
     case ibrowse:send_req(Url, ReqHeaders, get) of
         {ok, "200", _RespHeaders, RespBody} ->
             {ok, parse_keyset(RespBody)};
-        _Else ->
-            {error, get_keyset_failed}
+        {ok, Code, _RespHeaders, _RespBody} ->
+            couch_log:warning("get_keyset failed with code ~p", [Code]),
+            {error, {service_unavailable, <<"JWKS service unavailable">>}};
+        {error, Reason} ->
+            couch_log:warning("get_keyset failed with reason ~p", [Reason]),
+            {error, {service_unavailable, <<"JWKS service unavailable">>}}
     end.
 
 

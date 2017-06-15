@@ -44,7 +44,7 @@ encode(Header = {HeaderProps}, Claims, Key) ->
     try
         Alg = case prop(<<"alg">>, HeaderProps) of
             undefined ->
-                throw(missing_alg);
+                throw({bad_request, <<"Missing alg header parameter">>});
             Val ->
                 Val
         end,
@@ -90,7 +90,7 @@ verification_algorithm(Alg) ->
         {Alg, Val} ->
             Val;
         false ->
-            throw(invalid_alg)
+            throw({bad_request, <<"Invalid alg header parameter">>})
     end.
 
 
@@ -118,11 +118,11 @@ validate_typ(Props, Checks) ->
         {undefined, _} ->
             ok;
         {true, undefined} ->
-            throw(missing_typ);
+            throw({bad_request, <<"Missing typ header parameter">>});
         {true, <<"JWT">>} ->
             ok;
         {true, _} ->
-            throw(invalid_typ)
+            throw({bad_request, <<"Invalid typ header parameter">>})
     end.
 
 
@@ -133,13 +133,13 @@ validate_alg(Props, Checks) ->
         {undefined, _} ->
             ok;
         {true, undefined} ->
-            throw(missing_alg);
+            throw({bad_request, <<"Missing alg header parameter">>});
         {true, Alg} ->
             case lists:member(Alg, ?VALID_ALGS) of
                 true ->
                     ok;
                 false ->
-                    throw(invalid_alg)
+                    throw({bad_request, <<"Invalid alg header parameter">>})
             end
     end.
 
@@ -161,11 +161,11 @@ validate_iss(Props, Checks) ->
         {undefined, _} ->
             ok;
         {_ISS, undefined} ->
-            throw(missing_iss);
+            throw({bad_request, <<"Missing iss claim">>});
         {ISS, ISS} ->
             ok;
         {_, _} ->
-            throw(invalid_iss)
+            throw({bad_request, <<"Invalid iss claim">>})
     end.
 
 
@@ -177,11 +177,11 @@ validate_iat(Props, Checks) ->
         {undefined, _} ->
             ok;
         {true, undefined} ->
-            throw(missing_iat);
+            throw({bad_request, <<"Missing iat claim">>});
         {true, IAT} when is_integer(IAT) ->
             ok;
         {true, _} ->
-            throw(invalid_iat)
+            throw({bad_request, <<"Invalid iat claim">>})
     end.
 
 
@@ -193,7 +193,7 @@ validate_nbf(Props, Checks) ->
         {undefined, _} ->
             ok;
         {true, undefined} ->
-            throw(missing_nbf);
+            throw({bad_request, <<"Missing nbf claim">>});
         {true, IAT} ->
             assert_past(<<"nbf">>, IAT)
     end.
@@ -207,7 +207,7 @@ validate_exp(Props, Checks) ->
         {undefined, _} ->
             ok;
         {true, undefined} ->
-            throw(missing_exp);
+            throw({bad_request, <<"Missing exp claim">>});
         {true, EXP} ->
             assert_future(<<"exp">>, EXP)
     end.
@@ -219,7 +219,7 @@ key(Props, Checks, KS) ->
     KID = prop(<<"kid">>, Props),
     case {Required, KID} of
         {true, undefined} ->
-            throw(missing_kid);
+            throw({bad_request, <<"Missing kid claim">>});
         {_, KID} ->
             KS(Alg, KID)
     end.
@@ -242,7 +242,7 @@ public_key_verify(Algorithm, Message, Signature, PublicKey) ->
         true ->
             ok;
         false ->
-            throw(bad_signature)
+            throw({bad_request, <<"Bad signature">>})
     end.
 
 
@@ -251,21 +251,21 @@ hmac_verify(Algorithm, Message, HMAC, SecretKey) ->
         HMAC ->
             ok;
         _ ->
-            throw(bad_hmac)
+            throw({bad_request, <<"Bad HMAC">>})
     end.
 
 
 split(EncodedToken) ->
     case binary:split(EncodedToken, <<$.>>, [global]) of
         [_, _, _] = Split -> Split;
-        _ -> throw(malformed_token)
+        _ -> throw({bad_request, <<"Malformed token">>})
     end.
 
 
 decode_json(Encoded) ->
     case b64url:decode(Encoded) of
         {error, Reason} ->
-            throw(Reason);
+            throw({bad_request, Reason});
         Decoded ->
             jiffy:decode(Decoded)
     end.
@@ -274,7 +274,7 @@ props({Props}) ->
     Props;
 
 props(_) ->
-    throw(not_object).
+    throw({bad_request, <<"Not an object">>}).
 
 
 assert_past(Name, Time) ->
@@ -282,7 +282,7 @@ assert_past(Name, Time) ->
         true ->
             ok;
         false ->
-            throw(<<Name/binary, " not in past">>)
+            throw({unauthorized, <<Name/binary, " not in past">>})
     end.
 
 assert_future(Name, Time) ->
@@ -290,7 +290,7 @@ assert_future(Name, Time) ->
         true ->
             ok;
         false ->
-            throw(<<Name/binary, " not in future">>)
+            throw({unauthorized, <<Name/binary, " not in future">>})
     end.
 
 
@@ -328,67 +328,67 @@ jwt_io_pubkey() ->
 
 missing_typ_test() ->
     Encoded = encode({[]}, []),
-    ?assertEqual({error, missing_typ}, decode(Encoded, [typ], nil)).
+    ?assertEqual({error, {bad_request,<<"Missing typ header parameter">>}}, decode(Encoded, [typ], nil)).
 
 
 invalid_typ_test() ->
     Encoded = encode({[{<<"typ">>, <<"NOPE">>}]}, []),
-    ?assertEqual({error, invalid_typ}, decode(Encoded, [typ], nil)).
+    ?assertEqual({error, {bad_request,<<"Invalid typ header parameter">>}}, decode(Encoded, [typ], nil)).
 
 
 missing_alg_test() ->
     Encoded = encode({[{<<"typ">>, <<"NOPE">>}]}, []),
-    ?assertEqual({error, missing_alg}, decode(Encoded, [alg], nil)).
+    ?assertEqual({error, {bad_request,<<"Missing alg header parameter">>}}, decode(Encoded, [alg], nil)).
 
 
 invalid_alg_test() ->
     Encoded = encode({[{<<"typ">>, <<"JWT">>}, {<<"alg">>, <<"NOPE">>}]}, []),
-    ?assertEqual({error, invalid_alg}, decode(Encoded, [alg], nil)).
+    ?assertEqual({error, {bad_request,<<"Invalid alg header parameter">>}}, decode(Encoded, [alg], nil)).
 
 
 missing_iss_test() ->
     Encoded = encode(valid_header(), {[]}),
-    ?assertEqual({error, missing_iss}, decode(Encoded, [{iss, right}], nil)).
+    ?assertEqual({error, {bad_request,<<"Missing iss claim">>}}, decode(Encoded, [{iss, right}], nil)).
 
 
 invalid_iss_test() ->
     Encoded = encode(valid_header(), {[{<<"iss">>, <<"wrong">>}]}),
-    ?assertEqual({error, invalid_iss}, decode(Encoded, [{iss, right}], nil)).
+    ?assertEqual({error, {bad_request,<<"Invalid iss claim">>}}, decode(Encoded, [{iss, right}], nil)).
 
 
 missing_iat_test() ->
     Encoded = encode(valid_header(), {[]}),
-    ?assertEqual({error, missing_iat}, decode(Encoded, [iat], nil)).
+    ?assertEqual({error, {bad_request,<<"Missing iat claim">>}}, decode(Encoded, [iat], nil)).
 
 
 invalid_iat_test() ->
     Encoded = encode(valid_header(), {[{<<"iat">>, <<"hello">>}]}),
-    ?assertEqual({error, invalid_iat}, decode(Encoded, [iat], nil)).
+    ?assertEqual({error, {bad_request,<<"Invalid iat claim">>}}, decode(Encoded, [iat], nil)).
 
 
 missing_nbf_test() ->
     Encoded = encode(valid_header(), {[]}),
-    ?assertEqual({error, missing_nbf}, decode(Encoded, [nbf], nil)).
+    ?assertEqual({error, {bad_request,<<"Missing nbf claim">>}}, decode(Encoded, [nbf], nil)).
 
 
 invalid_nbf_test() ->
     Encoded = encode(valid_header(), {[{<<"nbf">>, 32503680000}]}),
-    ?assertEqual({error, <<"nbf not in past">>}, decode(Encoded, [nbf], nil)).
+    ?assertEqual({error, {unauthorized, <<"nbf not in past">>}}, decode(Encoded, [nbf], nil)).
 
 
 missing_exp_test() ->
     Encoded = encode(valid_header(), {[]}),
-    ?assertEqual({error, missing_exp}, decode(Encoded, [exp], nil)).
+    ?assertEqual({error, {bad_request, <<"Missing exp claim">>}}, decode(Encoded, [exp], nil)).
 
 
 invalid_exp_test() ->
     Encoded = encode(valid_header(), {[{<<"exp">>, 0}]}),
-    ?assertEqual({error, <<"exp not in future">>}, decode(Encoded, [exp], nil)).
+    ?assertEqual({error, {unauthorized, <<"exp not in future">>}}, decode(Encoded, [exp], nil)).
 
 
 missing_kid_test() ->
     Encoded = encode({[]}, {[]}),
-    ?assertEqual({error, missing_kid}, decode(Encoded, [kid], nil)).
+    ?assertEqual({error, {bad_request, <<"Missing kid claim">>}}, decode(Encoded, [kid], nil)).
 
 
 public_key_not_found_test() ->
@@ -405,7 +405,7 @@ bad_rs256_sig_test() ->
         {[{<<"typ">>, <<"JWT">>}, {<<"alg">>, <<"RS256">>}]},
         {[]}),
     KS = fun(<<"RS256">>, undefined) -> jwt_io_pubkey() end,
-    ?assertEqual({error, bad_signature}, decode(Encoded, [], KS)).
+    ?assertEqual({error, {bad_request, <<"Bad signature">>}}, decode(Encoded, [], KS)).
 
 
 bad_hs256_sig_test() ->
@@ -413,11 +413,11 @@ bad_hs256_sig_test() ->
         {[{<<"typ">>, <<"JWT">>}, {<<"alg">>, <<"HS256">>}]},
         {[]}),
     KS = fun(<<"HS256">>, undefined) -> <<"bad">> end,
-    ?assertEqual({error, bad_hmac}, decode(Encoded, [], KS)).
+    ?assertEqual({error, {bad_request, <<"Bad HMAC">>}}, decode(Encoded, [], KS)).
 
 
 malformed_token_test() ->
-    ?assertEqual({error, malformed_token}, decode(<<"a.b.c.d">>, [], nil)).
+    ?assertEqual({error, {bad_request, <<"Malformed token">>}}, decode(<<"a.b.c.d">>, [], nil)).
 
 
 %% jwt.io generated
@@ -475,12 +475,12 @@ rs256_test() ->
 
 
 encode_missing_alg_test() ->
-    ?assertEqual({error, missing_alg},
+    ?assertEqual({error, {bad_request, <<"Missing alg header parameter">>}},
         encode({[]}, {[]}, <<"foo">>)).
 
 
 encode_invalid_alg_test() ->
-    ?assertEqual({error, invalid_alg},
+    ?assertEqual({error, {bad_request, <<"Invalid alg header parameter">>}},
         encode({[{<<"alg">>, <<"BOGUS">>}]}, {[]}, <<"foo">>)).
 
 
