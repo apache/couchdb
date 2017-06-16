@@ -116,8 +116,7 @@ couchTests.attachments= function(debug) {
     headers:{"Content-Type":"text/plain;charset=utf-8"},
     body:bin_data
   });
-// TODO: revisit whether 500 makes sense for non-existing revs
-  T(xhr.status == 409 || xhr.status == 500);
+  T(xhr.status == 409);
 
   // with current rev
   var xhr = CouchDB.request("PUT", "/" + db_name + "/bin_doc3/attachment.txt?rev=" + rev, {
