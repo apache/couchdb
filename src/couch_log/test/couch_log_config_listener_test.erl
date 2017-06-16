@@ -16,6 +16,7 @@
 -include_lib("couch_log/include/couch_log.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
+-define(TIMEOUT, 1000).
 
 couch_log_config_test_() ->
     {setup,
@@ -34,13 +35,27 @@ check_restart_listener() ->
 
     Handler1 = get_handler(),
     ?assertNotEqual(not_found, Handler1),
+    Ref = erlang:monitor(process, Listener1),
     ok = gen_event:delete_handler(config_event, get_handler(), testing),
-    ?assertEqual(not_found, get_handler()),
 
-    timer:sleep(100),
-    ?assertNot(is_process_alive(Listener1)),
+    receive
+        {'DOWN', Ref, process, _, _} ->
+            ?assertNot(is_process_alive(Listener1))
+        after ?TIMEOUT ->
+            erlang:error({timeout, config_listener_mon_death})
+    end,
 
-    ?assert(is_process_alive(get_listener())),
+    NewHandler = test_util:wait(fun() ->
+        case get_handler() of
+            not_found -> wait;
+            Reply -> Reply
+        end
+    end, ?TIMEOUT, 20),
+    ?assertEqual(Handler1, NewHandler),
+
+    Listener2 = get_listener(),
+    ?assert(is_process_alive(Listener2)),
+    ?assertNotEqual(Listener1, Listener2),
     ok.
 
 check_ignore_non_log() ->
