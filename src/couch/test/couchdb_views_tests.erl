@@ -168,7 +168,7 @@ should_not_remember_docs_in_index_after_backup_restore(DbName) ->
         ?assert(has_doc("doc3", Rows0)),
         ?assert(has_doc("doc666", Rows0)),
 
-        restore_backup_db_file(DbName),
+        ?assertEqual(ok, restore_backup_db_file(DbName)),
 
         Rows1 = query_view(DbName, "foo", "bar"),
         ?assert(has_doc("doc1", Rows1)),
@@ -565,14 +565,21 @@ backup_db_file(DbName) ->
 restore_backup_db_file(DbName) ->
     DbDir = config:get("couchdb", "database_dir"),
 
-    {ok, Db} = couch_db:open_int(DbName, []),
+    {ok, #db{main_pid = UpdaterPid} = Db} = couch_db:open_int(DbName, []),
     ok = couch_db:close(Db),
-    exit(Db#db.main_pid, shutdown),
+    exit(UpdaterPid, shutdown),
 
     DbFile = filename:join([DbDir, ?b2l(DbName) ++ ".couch"]),
     ok = file:delete(DbFile),
     ok = file:rename(DbFile ++ ".backup", DbFile),
-    ok.
+
+    test_util:wait(fun() ->
+        case couch_server:open(DbName, [{timeout, ?TIMEOUT}]) of
+            {ok, #db{main_pid = UpdaterPid}} -> wait;
+            {ok, _} -> ok;
+            Else -> Else
+        end
+    end, ?TIMEOUT, ?DELAY).
 
 compact_db(DbName) ->
     {ok, Db} = couch_db:open_int(DbName, []),
