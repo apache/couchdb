@@ -10,23 +10,18 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-{application, ddoc_cache, [
-    {description, "Design Document Cache"},
-    {vsn, git},
-    {registered, [
-        ddoc_cache_lru,
-        ddoc_cache_opener
-    ]},
-    {applications, [
-        kernel,
-        stdlib,
-        crypto,
-        config,
-        couch_event,
-        couch_log,
-        couch_stats,
-        mem3,
-        fabric
-    ]},
-    {mod, {ddoc_cache_app, []}}
-]}.
+-module(ddoc_cache_value).
+
+
+-export([
+    wrap/1,
+    unwrap/1
+]).
+
+
+wrap(Value) ->
+    {?MODULE, term_to_binary(Value)}.
+
+
+unwrap({?MODULE, Bin}) when is_binary(Bin) ->
+    binary_to_term(Bin).
