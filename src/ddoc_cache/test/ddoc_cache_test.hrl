@@ -10,23 +10,17 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-{application, ddoc_cache, [
-    {description, "Design Document Cache"},
-    {vsn, git},
-    {registered, [
-        ddoc_cache_lru,
-        ddoc_cache_opener
-    ]},
-    {applications, [
-        kernel,
-        stdlib,
-        crypto,
-        config,
-        couch_event,
-        couch_log,
-        couch_stats,
-        mem3,
-        fabric
-    ]},
-    {mod, {ddoc_cache_app, []}}
-]}.
+
+-define(CACHE, ddoc_cache_entries).
+-define(LRU, ddoc_cache_lru).
+-define(OPENERS, ddoc_cache_openers).
+
+-define(FOOBAR, <<"_design/foobar">>).
+-define(VDU, <<"_design/vdu">>).
+-define(CUSTOM, <<"_design/custom">>).
+
+-record(entry, {
+    key,
+    val,
+    pid
+}).

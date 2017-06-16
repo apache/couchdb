@@ -12,86 +12,43 @@
 
 -module(ddoc_cache).
 
--export([
-    start/0,
-    stop/0
-]).
 
 -export([
     open_doc/2,
     open_doc/3,
     open_validation_funs/1,
-    evict/2,
+    open_custom/2,
+    refresh/2,
 
     %% deprecated
     open/2
 ]).
 
-start() ->
-    application:start(ddoc_cache).
-
-stop() ->
-    application:stop(ddoc_cache).
 
 open_doc(DbName, DocId) ->
-    Key = {DbName, DocId, '_'},
-    case ddoc_cache_opener:match_newest(Key) of
-        {ok, _} = Resp ->
-            couch_stats:increment_counter([ddoc_cache, hit]),
-            Resp;
-        missing ->
-            couch_stats:increment_counter([ddoc_cache, miss]),
-            ddoc_cache_opener:open_doc(DbName, DocId);
-        recover ->
-            couch_stats:increment_counter([ddoc_cache, recovery]),
-            ddoc_cache_opener:recover_doc(DbName, DocId)
-    end.
+    Key = {ddoc_cache_entry_ddocid, {DbName, DocId}},
+    ddoc_cache_lru:open(Key).
+
 
 open_doc(DbName, DocId, RevId) ->
-    Key = {DbName, DocId, RevId},
-    case ddoc_cache_opener:lookup(Key) of
-        {ok, _} = Resp ->
-            couch_stats:increment_counter([ddoc_cache, hit]),
-            Resp;
-        missing ->
-            couch_stats:increment_counter([ddoc_cache, miss]),
-            ddoc_cache_opener:open_doc(DbName, DocId, RevId);
-        recover ->
-            couch_stats:increment_counter([ddoc_cache, recovery]),
-            ddoc_cache_opener:recover_doc(DbName, DocId, RevId)
-    end.
+    Key = {ddoc_cache_entry_ddocid_rev, {DbName, DocId, RevId}},
+    ddoc_cache_lru:open(Key).
+
 
 open_validation_funs(DbName) ->
-    Key = {DbName, validation_funs},
-    case ddoc_cache_opener:lookup(Key) of
-        {ok, _} = Resp ->
-            couch_stats:increment_counter([ddoc_cache, hit]),
-            Resp;
-        missing ->
-            couch_stats:increment_counter([ddoc_cache, miss]),
-            ddoc_cache_opener:open_validation_funs(DbName);
-        recover ->
-            couch_stats:increment_counter([ddoc_cache, recovery]),
-            ddoc_cache_opener:recover_validation_funs(DbName)
-    end.
+    Key = {ddoc_cache_entry_validation_funs, DbName},
+    ddoc_cache_lru:open(Key).
+
 
 open_custom(DbName, Mod) ->
-    Key = {DbName, Mod},
-    case ddoc_cache_opener:lookup(Key) of
-        {ok, _} = Resp ->
-            couch_stats:increment_counter([ddoc_cache, hit]),
-            Resp;
-        missing ->
-            couch_stats:increment_counter([ddoc_cache, miss]),
-            ddoc_cache_opener:open_doc(DbName, Mod);
-        recover ->
-            couch_stats:increment_counter([ddoc_cache, recovery]),
-            Mod:recover(DbName)
-    end.
+    Key = {ddoc_cache_entry_custom, {DbName, Mod}},
+    ddoc_cache_lru:open(Key).
 
-evict(ShardDbName, DDocIds) ->
+
+refresh(ShardDbName, DDocIds) when is_list(DDocIds) ->
     DbName = mem3:dbname(ShardDbName),
-    ddoc_cache_opener:evict_docs(DbName, DDocIds).
+    ddoc_cache_lru:refresh(DbName, DDocIds).
+
 
 open(DbName, validation_funs) ->
     open_validation_funs(DbName);
