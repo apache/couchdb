@@ -117,6 +117,7 @@ decode_number(Base64) ->
 
 jwks_test() ->
     application:ensure_all_started(ibrowse),
+    application:ensure_all_started(ssl),
     ?assertMatch({ok, _}, get_keyset("https://iam.eu-gb.bluemix.net/oidc/keys")).
 
 rs_test() ->
