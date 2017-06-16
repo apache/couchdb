@@ -319,7 +319,7 @@ handle_info({update_docs, Client, GroupedDocs, NonRepDocs, MergeConflicts,
                     couch_event:notify(Db2#db.name, {ddoc_updated, DDocId})
                 end, UpdatedDDocIds),
                 couch_event:notify(Db2#db.name, ddoc_updated),
-                ddoc_cache:evict(Db2#db.name, UpdatedDDocIds),
+                ddoc_cache:refresh(Db2#db.name, UpdatedDDocIds),
                 refresh_validate_doc_funs(Db2);
             false ->
                 Db2

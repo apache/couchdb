@@ -10,23 +10,28 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-{application, ddoc_cache, [
-    {description, "Design Document Cache"},
-    {vsn, git},
-    {registered, [
-        ddoc_cache_lru,
-        ddoc_cache_opener
-    ]},
-    {applications, [
-        kernel,
-        stdlib,
-        crypto,
-        config,
-        couch_event,
-        couch_log,
-        couch_stats,
-        mem3,
-        fabric
-    ]},
-    {mod, {ddoc_cache_app, []}}
-]}.
+-module(ddoc_cache_entry_custom).
+
+
+-export([
+    dbname/1,
+    ddocid/1,
+    recover/1,
+    insert/2
+]).
+
+
+dbname({DbName, _}) ->
+    DbName.
+
+
+ddocid(_) ->
+    no_ddocid.
+
+
+recover({DbName, Mod}) ->
+    Mod:recover(DbName).
+
+
+insert(_, _) ->
+    ok.

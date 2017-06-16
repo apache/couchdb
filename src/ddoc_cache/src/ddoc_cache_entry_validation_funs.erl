@@ -10,25 +10,35 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(ddoc_cache_util).
+-module(ddoc_cache_entry_validation_funs).
 
 
 -export([
-    new_uuid/0
+    dbname/1,
+    ddocid/1,
+    recover/1,
+    insert/2
 ]).
 
 
-new_uuid() ->
-    to_hex(crypto:strong_rand_bytes(16), []).
+dbname(DbName) ->
+    DbName.
 
 
-to_hex(<<>>, Acc) ->
-    list_to_binary(lists:reverse(Acc));
-to_hex(<<C1:4, C2:4, Rest/binary>>, Acc) ->
-    to_hex(Rest, [hexdig(C1), hexdig(C2) | Acc]).
+ddocid(_) ->
+    no_ddocid.
 
 
-hexdig(C) when C >= 0, C =< 9 ->
-    C + $0;
-hexdig(C) when C >= 10, C =< 15 ->
-    C + $A - 10.
+recover(DbName) ->
+    {ok, DDocs} = fabric:design_docs(mem3:dbname(DbName)),
+    Funs = lists:flatmap(fun(DDoc) ->
+        case couch_doc:get_validate_doc_fun(DDoc) of
+            nil -> [];
+            Fun -> [Fun]
+        end
+    end, DDocs),
+    {ok, Funs}.
+
+
+insert(_, _) ->
+    ok.
