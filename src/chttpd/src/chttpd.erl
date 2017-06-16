@@ -850,6 +850,8 @@ error_info(conflict) ->
     {409, <<"conflict">>, <<"Document update conflict.">>};
 error_info({conflict, _}) ->
     {409, <<"conflict">>, <<"Document update conflict.">>};
+error_info({{not_found, missing}, {_, _}}) ->
+    {409, <<"not_found">>, <<"missing_rev">>};
 error_info({forbidden, Error, Msg}) ->
     {403, Error, Msg};
 error_info({forbidden, Msg}) ->
