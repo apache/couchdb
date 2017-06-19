@@ -17,23 +17,27 @@
 
 -define(TIMEOUT, 120000).
 -define(TIMEOUT_S, ?TIMEOUT div 1000).
+-define(MODS_TO_MOCK,
+        [couch_db_updater, couch_mrview_compactor, couch_compaction_daemon]).
 
 
 start() ->
     Ctx = test_util:start_couch(),
     config:set("compaction_daemon", "check_interval", "3", false),
     config:set("compaction_daemon", "min_file_size", "100000", false),
+    ok = meck:new(?MODS_TO_MOCK, [passthrough]),
     Ctx.
 
-setup() ->
-    ok = meck:new(couch_db_updater, [passthrough]),
-    ok = meck:new(couch_mrview_compactor, [passthrough]),
-    ok = meck:new(couch_compaction_daemon, [passthrough]),
+stop(Ctx) ->
+    test_util:stop_couch(Ctx),
+    meck:unload(?MODS_TO_MOCK).
 
+setup() ->
     DbName = ?tempdb(),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     create_design_doc(Db),
     ok = couch_db:close(Db),
+    meck:reset(?MODS_TO_MOCK),
     DbName.
 
 teardown(DbName) ->
@@ -43,13 +47,7 @@ teardown(DbName) ->
             ok = config:delete("compactions", Key, false)
         end,
         Configs),
-    couch_server:delete(DbName, [?ADMIN_CTX]),
-
-    (catch meck:unload(couch_compaction_daemon)),
-    (catch meck:unload(couch_mrview_compactor)),
-    (catch meck:unload(couch_db_updater)),
-
-    ok.
+    couch_server:delete(DbName, [?ADMIN_CTX]).
 
 
 compaction_daemon_test_() ->
@@ -57,7 +55,7 @@ compaction_daemon_test_() ->
         "Compaction daemon tests",
         {
             setup,
-            fun start/0, fun test_util:stop_couch/1,
+            fun start/0, fun stop/1,
             {
                 foreach,
                 fun setup/0, fun teardown/1,
