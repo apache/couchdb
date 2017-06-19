@@ -338,12 +338,12 @@ invalid_typ_test() ->
 
 
 missing_alg_test() ->
-    Encoded = encode({[{<<"typ">>, <<"NOPE">>}]}, []),
+    Encoded = encode({[]}, []),
     ?assertEqual({error, {bad_request,<<"Missing alg header parameter">>}}, decode(Encoded, [alg], nil)).
 
 
 invalid_alg_test() ->
-    Encoded = encode({[{<<"typ">>, <<"JWT">>}, {<<"alg">>, <<"NOPE">>}]}, []),
+    Encoded = encode({[{<<"alg">>, <<"NOPE">>}]}, []),
     ?assertEqual({error, {bad_request,<<"Invalid alg header parameter">>}}, decode(Encoded, [alg], nil)).
 
 
@@ -373,7 +373,7 @@ missing_nbf_test() ->
 
 
 invalid_nbf_test() ->
-    Encoded = encode(valid_header(), {[{<<"nbf">>, 32503680000}]}),
+    Encoded = encode(valid_header(), {[{<<"nbf">>, 2 * now_seconds()}]}),
     ?assertEqual({error, {unauthorized, <<"nbf not in past">>}}, decode(Encoded, [nbf], nil)).
 
 
