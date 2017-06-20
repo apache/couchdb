@@ -923,16 +923,7 @@ update_docs_int(Db, DocsList, NonRepDocs, MergeConflicts, FullCommit) ->
         (_) -> []
     end, Ids),
 
-    Db4 = case length(UpdatedDDocIds) > 0 of
-        true ->
-            couch_event:notify(Db3#db.name, ddoc_updated),
-            ddoc_cache:evict(Db3#db.name, UpdatedDDocIds),
-            refresh_validate_doc_funs(Db3);
-        false ->
-            Db3
-    end,
-
-    {ok, commit_data(Db4, not FullCommit), UpdatedDDocIds}.
+    {ok, commit_data(Db3, not FullCommit), UpdatedDDocIds}.
 
 update_local_docs(Db, []) ->
     {ok, Db};
