@@ -491,9 +491,9 @@ encode_decode_test_() ->
 
 encode_decode(Alg) ->
     {EncodeKey, DecodeKey} = case verification_algorithm(Alg) of
-        {public_key, Algorithm} ->
+        {public_key, _Algorithm} ->
             create_keypair();
-        {hmac, Algorithm} ->
+        {hmac, _Algorithm} ->
             Key = <<"a-super-secret-key">>,
             {Key, Key}
     end,
