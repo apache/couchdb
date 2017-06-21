@@ -11,28 +11,21 @@
 % the License.
 
 -module(chttpd_exclude_headers).
--include_lib("couch/include/couch_db.hrl").
+
+
 
 -export([maybe_exclude_headers/2]).
 
 
 
-% List of essential headers for an http request. If we leave out server then Mochiweb adds in its default one
--define(ESSENTIAL_HEADERS, ["Cache-Control", "ETag", "Content-Type", "Content-Length", "Vary", "Server"]).
-
-
-
-%Default headers so that Mochiweb doesn't sent its own
--define(DEFAULT_HEADERS, ["Server"]).
-
-
+-include_lib("couch/include/couch_db.hrl").
 
 maybe_exclude_headers(#httpd{mochi_req = MochiReq}, Headers) ->
     case MochiReq:get_header_value("X-Couch-Exclude-Headers") of
         "All" -> 
-            filter_headers(Headers, ?DEFAULT_HEADERS);
-        "Non-Essential"  ->
-            filter_headers(Headers, ?ESSENTIAL_HEADERS);
+            filter_headers(Headers, get_header_list("all"));
+        "Minimal"  ->
+            filter_headers(Headers, get_header_list("minimal"));
         _ -> 
             Headers
     end.
@@ -43,3 +36,14 @@ filter_headers(Headers, IncludeList) ->
     lists:filter(fun({HeaderName, _}) -> 
         lists:member(HeaderName, IncludeList)
     end, Headers).
+
+
+
+get_header_list(Section) ->
+    SectionStr = config:get("exclude_headers", Section, []),
+    split_list(SectionStr).
+
+
+
+split_list(S) ->
+    re:split(S, "\\s*,\\s*", [trim, {return, list}]). 

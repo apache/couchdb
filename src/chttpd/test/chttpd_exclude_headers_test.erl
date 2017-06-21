@@ -38,7 +38,7 @@ default_headers() ->
 
 
 
-only_cache_headers() ->
+minimal_options_headers() ->
     [
         {"Cache-Control","must-revalidate"},
         {"Content-Type","application/json"},
@@ -48,6 +48,12 @@ only_cache_headers() ->
         {"Server","CouchDB/2.1.0-f1a1d7f1c (Erlang OTP/19)"}
     ].
 
+
+
+all_options_headers() ->
+    [
+        {"Server","CouchDB/2.1.0-f1a1d7f1c (Erlang OTP/19)"}
+    ].
 
 
 default_no_exclude_header_test() ->
@@ -62,8 +68,45 @@ unsupported_exclude_header_test() ->
     ?assertEqual(default_headers(), Headers).
 
 
+setup() ->
+ok.
 
-all_none_cache_headers_test() ->
-    Req = mock_request([{"X-Couch-Exclude-Headers", "Non-Essential"}]),
+
+teardown(_) ->
+    meck:unload(config).
+
+
+
+exclude_headers_test_() ->
+     {
+         "Test X-Couch-Exclude-Headers",
+         {
+             foreach, fun setup/0, fun teardown/1,
+             [
+                 fun minimal_options/1,
+                 fun all_options/1
+             ]
+         }
+     }.
+
+
+
+minimal_options(_) ->
+    ok = meck:new(config),
+    ok = meck:expect(config, get, fun("exclude_headers", "minimal",  _) -> 
+        "Cache-Control, Content-Length, Content-Type, ETag, Server, Vary"
+    end),
+    Req = mock_request([{"X-Couch-Exclude-Headers", "Minimal"}]),
     Headers = chttpd_exclude_headers:maybe_exclude_headers(Req, default_headers()),
-    ?assertEqual(only_cache_headers(), Headers).
+    ?_assertEqual(minimal_options_headers(), Headers).
+
+
+
+all_options(_) ->
+    ok = meck:new(config),
+    ok = meck:expect(config, get, fun("exclude_headers", "all",  _) -> 
+        "Server"
+    end),
+    Req = mock_request([{"X-Couch-Exclude-Headers", "All"}]),
+    Headers = chttpd_exclude_headers:maybe_exclude_headers(Req, default_headers()),
+    ?_assertEqual(all_options_headers(), Headers).
