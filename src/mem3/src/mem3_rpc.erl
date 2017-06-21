@@ -198,8 +198,9 @@ load_purges_rpc(DbName, SourceUUID) ->
             {ok, #doc{body={Props}} } ->
                 couch_util:get_value(<<"purge_seq">>, Props);
             {not_found, _} ->
+                % synchronize only last purge
                 {ok, OldestPSeq} = couch_db:get_oldest_purge_seq(Db),
-                OldestPSeq
+                erlang:max(OldestPSeq-1, 0)
         end,
         {ok, CurPSeq} = couch_db:get_purge_seq(Db),
         UUIDsIdsRevs = if (LastPSeq == CurPSeq) -> []; true ->
