@@ -18,6 +18,8 @@
 ]).
 
 -define(DENY, "DENY").
+-define(SAMEORIGIN, "SAMEORIGIN").
+-define(ALLOWFROM, "ALLOW-FROM ").
 
 
 -include_lib("couch/include/couch_db.hrl").
@@ -43,7 +45,7 @@ header(Req, Headers, Config) ->
 generate_xframe_header(Req, Headers, Config) ->
     XframeOption = case lists:keyfind(same_origin, 1, Config) of 
         {same_origin, true} -> 
-            "SAMEORIGIN";
+            ?SAMEORIGIN;
         _ ->
             check_host(Req, Config)
     end,
@@ -61,11 +63,9 @@ check_host(#httpd{mochi_req = MochiReq} = Req, Config) ->
             AcceptedHosts = get_accepted_hosts(Config),
             AcceptAll = ["*"] =:= AcceptedHosts,
             case AcceptAll orelse lists:member(FullHost, AcceptedHosts) of
-                true -> "ALLOW-FROM " ++ FullHost;
+                true -> ?ALLOWFROM ++ FullHost;
                 false -> ?DENY
             end
-
-
      end.
 
 
@@ -73,7 +73,7 @@ check_host(#httpd{mochi_req = MochiReq} = Req, Config) ->
 get_xframe_config(#httpd{xframe_config = undefined}) ->
     EnableXFrame = config:get("httpd", "enable_xframe_options", "false") =:= "true",
     SameOrigin = config:get("x_frame_options", "same_origin", "false") =:= "true",
-    AcceptedHosts = case config:get("x_frame_options", "hosts", undefined) of
+    AcceptedHosts = case config:get("x_frame_options", "hosts") of
         undefined -> [];
         Hosts -> split_list(Hosts)
     end,
