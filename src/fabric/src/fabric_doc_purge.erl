@@ -32,7 +32,7 @@ go(DbName, AllIdsRevs, Opts) ->
         Ref = rexi:cast(Node,
             {fabric_rpc, purge_docs, [Name, UUIDsIdsRevs, Options]}),
         Worker = Shard#shard{ref=Ref},
-        { [{Worker, UUIDs}|Cs], [Worker|Ws]}
+        {[{Worker, UUIDs}|Cs], [Worker|Ws]}
     end, {[], []}, group_idrevs_by_shard(DbName, AllUUIDsIdsRevs)),
 
     RexiMon = fabric_util:create_monitors(Workers),
@@ -118,12 +118,12 @@ handle_message({bad_request, Msg}, _, _) ->
 
 
 tag_docs(AllIdsRevs) ->
-    lists:foldr(fun({Id, Revs}, {UUIDsAcc, UUIDsIdsRevsAcc, L}) ->
+    {UUIDs, UUIDsIdsRevs, DocCount} = lists:foldl(fun(
+        {Id, Revs}, {UAcc, UIRAcc, C}) ->
         UUID = couch_uuids:new(),
-        NewUUIDsAcc = [UUID | UUIDsAcc],
-        NewUUIDsIdsRevsAcc = [{UUID, Id, Revs} | UUIDsIdsRevsAcc],
-        {NewUUIDsAcc, NewUUIDsIdsRevsAcc, L+1}
-    end, {[], [], 0}, AllIdsRevs).
+        {[UUID|UAcc], [{UUID, Id, Revs}|UIRAcc], C+1}
+    end, {[], [], 0}, AllIdsRevs),
+    {lists:reverse(UUIDs), lists:reverse(UUIDsIdsRevs), DocCount}.
 
 
 force_reply(Doc, Replies, {Health, W, Acc}) ->
