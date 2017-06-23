@@ -216,6 +216,7 @@ spawn_compaction_monitor(DbName) ->
         end),
         {ok, ViewPid} = couch_index_server:get_index(couch_mrview_index,
                 DbName, <<"_design/foo">>),
+        {ok, CompactorPid} = couch_index:get_compactor_pid(ViewPid),
         TestPid ! {self(), started},
         receive
             {TestPid, go} -> ok
@@ -238,6 +239,16 @@ spawn_compaction_monitor(DbName) ->
                 DbPid,
                 ?TIMEOUT
             ),
+        meck:reset(couch_mrview_compactor),
+        meck:wait(
+                1,
+                couch_mrview_compactor,
+                compact,
+                ['_', '_', '_'],
+                ?TIMEOUT
+            ),
+        {ok, CPid} = couch_index_compactor:get_compacting_pid(CompactorPid),
+        CRef = erlang:monitor(process, CPid),
         meck:wait(
                 1,
                 couch_mrview_compactor,
@@ -245,7 +256,12 @@ spawn_compaction_monitor(DbName) ->
                 ['_', '_'],
                 ViewPid,
                 ?TIMEOUT
-            )
+            ),
+        receive
+            {'DOWN', CRef, process, _, _} -> ok
+        after ?TIMEOUT ->
+            erlang:error(timeout)
+        end
     end),
     receive
         {Pid, started} -> ok;
