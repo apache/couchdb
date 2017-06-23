@@ -36,6 +36,7 @@ setup() ->
     DbName = ?tempdb(),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     create_design_doc(Db),
+    populate(DbName, 70, 70, 200 * 1024),
     ok = couch_db:close(Db),
     meck:reset(?MODS_TO_MOCK),
     DbName.
@@ -47,7 +48,8 @@ teardown(DbName) ->
             ok = config:delete("compactions", Key, false)
         end,
         Configs),
-    couch_server:delete(DbName, [?ADMIN_CTX]).
+    couch_server:delete(DbName, [?ADMIN_CTX]),
+    exit(whereis(couch_index_server), shutdown).
 
 
 compaction_daemon_test_() ->
@@ -70,9 +72,6 @@ compaction_daemon_test_() ->
 
 should_compact_by_default_rule(DbName) ->
     {timeout, ?TIMEOUT_S, ?_test(begin
-        {ok, Db} = couch_db:open_int(DbName, []),
-        populate(DbName, 70, 70, 200 * 1024),
-
         CompactionMonitor = spawn_compaction_monitor(DbName),
 
         {_, DbFileSize} = get_db_frag(DbName),
@@ -99,15 +98,11 @@ should_compact_by_default_rule(DbName) ->
         ?assert(DbFileSize > DbFileSize2),
         ?assert(ViewFileSize > ViewFileSize2),
 
-        ?assert(is_idle(DbName)),
-        ok = couch_db:close(Db)
+        ?assert(is_idle(DbName))
     end)}.
 
 should_compact_by_dbname_rule(DbName) ->
     {timeout, ?TIMEOUT_S, ?_test(begin
-        {ok, Db} = couch_db:open_int(DbName, []),
-        populate(DbName, 70, 70, 200 * 1024),
-
         CompactionMonitor = spawn_compaction_monitor(DbName),
 
         {_, DbFileSize} = get_db_frag(DbName),
@@ -134,8 +129,7 @@ should_compact_by_dbname_rule(DbName) ->
         ?assert(DbFileSize > DbFileSize2),
         ?assert(ViewFileSize > ViewFileSize2),
 
-        ?assert(is_idle(DbName)),
-        ok = couch_db:close(Db)
+        ?assert(is_idle(DbName))
     end)}.
 
 
