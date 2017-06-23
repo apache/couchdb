@@ -18,6 +18,15 @@
     opened_files_contains/1
 ]).
 
+-export([
+    tired_by_kind/2,
+    tired_by_kind/3,
+    process_by_kind/1,
+    process_by_kind/2
+]).
+
+
+
 -spec opened_files() ->
     [{port(), CouchFilePid :: pid(), Fd :: pid() | tuple(), FilePath :: string()}].
 
@@ -50,3 +59,28 @@ opened_files_contains(FileNameFragment) ->
     lists:filter(fun({_Port, _Pid, _Fd, Path}) ->
         string:str(Path, FileNameFragment) > 0
     end, couch_debug:opened_files()).
+
+tired_by_kind(Kind, Threshold) ->
+    tired_by_kind(Kind, erlang:processes(), Threshold).
+
+tired_by_kind(Kind, Pids, Threshold) ->
+    lists:filter(fun(Pid) ->
+        is_kind(Pid, Kind) andalso is_tired(Pid, Threshold)
+    end, Pids).
+
+process_by_kind(Kind) ->
+    process_by_kind(Kind, erlang:processes()).
+
+process_by_kind(Kind, Pids) ->
+    lists:filter(fun(Pid) ->
+        is_kind(Pid, Kind)
+    end, Pids).
+
+is_tired(Pid, Threshold) ->
+    case erlang:process_info(Pid, message_queue_len) of
+        {message_queue_len, Len} -> Len >= Threshold;
+        _ -> false
+    end.
+
+is_kind(Pid, Kind) ->
+    couch_util:process_dict_get(Pid, kind) =:= Kind.

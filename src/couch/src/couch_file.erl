@@ -354,6 +354,7 @@ msec_since_last_read(Fd) when is_pid(Fd) ->
 % server functions
 
 init({Filepath, Options, ReturnPid, Ref}) ->
+    erlang:put(kind, ?MODULE),
     OpenOptions = file_open_options(Options),
     Limit = get_pread_limit(),
     IsSys = lists:member(sys_db, Options),

@@ -37,6 +37,7 @@
 }).
 
 init({DbName, Filepath, Fd, Options}) ->
+    erlang:put(kind, ?MODULE),
     erlang:put(io_priority, {db_update, DbName}),
     update_idle_limit_from_config(),
     case lists:member(create, Options) of

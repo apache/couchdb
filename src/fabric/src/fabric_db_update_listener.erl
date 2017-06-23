@@ -68,6 +68,7 @@ start_update_notifiers(Shards) ->
         dict:append(Node, Name, Acc)
     end, dict:new(), Shards),
     lists:map(fun({Node, DbNames}) ->
+        erlang:put(kind, ?MODULE), %% changes_feed
         Ref = rexi:cast(Node, {?MODULE, start_update_notifier, [DbNames]}),
         #worker{ref=Ref, node=Node}
     end, dict:to_list(EndPointDict)).
