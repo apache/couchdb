@@ -17,23 +17,28 @@
 
 -define(TIMEOUT, 120000).
 -define(TIMEOUT_S, ?TIMEOUT div 1000).
+-define(MODS_TO_MOCK,
+        [couch_db_updater, couch_mrview_compactor, couch_compaction_daemon]).
 
 
 start() ->
     Ctx = test_util:start_couch(),
     config:set("compaction_daemon", "check_interval", "3", false),
     config:set("compaction_daemon", "min_file_size", "100000", false),
+    ok = meck:new(?MODS_TO_MOCK, [passthrough]),
     Ctx.
 
-setup() ->
-    ok = meck:new(couch_db_updater, [passthrough]),
-    ok = meck:new(couch_mrview_compactor, [passthrough]),
-    ok = meck:new(couch_compaction_daemon, [passthrough]),
+stop(Ctx) ->
+    test_util:stop_couch(Ctx),
+    meck:unload(?MODS_TO_MOCK).
 
+setup() ->
     DbName = ?tempdb(),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     create_design_doc(Db),
+    populate(DbName, 70, 70, 200 * 1024),
     ok = couch_db:close(Db),
+    meck:reset(?MODS_TO_MOCK),
     DbName.
 
 teardown(DbName) ->
@@ -44,12 +49,7 @@ teardown(DbName) ->
         end,
         Configs),
     couch_server:delete(DbName, [?ADMIN_CTX]),
-
-    (catch meck:unload(couch_compaction_daemon)),
-    (catch meck:unload(couch_mrview_compactor)),
-    (catch meck:unload(couch_db_updater)),
-
-    ok.
+    exit(whereis(couch_index_server), shutdown).
 
 
 compaction_daemon_test_() ->
@@ -57,7 +57,7 @@ compaction_daemon_test_() ->
         "Compaction daemon tests",
         {
             setup,
-            fun start/0, fun test_util:stop_couch/1,
+            fun start/0, fun stop/1,
             {
                 foreach,
                 fun setup/0, fun teardown/1,
@@ -72,9 +72,6 @@ compaction_daemon_test_() ->
 
 should_compact_by_default_rule(DbName) ->
     {timeout, ?TIMEOUT_S, ?_test(begin
-        {ok, Db} = couch_db:open_int(DbName, []),
-        populate(DbName, 70, 70, 200 * 1024),
-
         CompactionMonitor = spawn_compaction_monitor(DbName),
 
         {_, DbFileSize} = get_db_frag(DbName),
@@ -101,15 +98,11 @@ should_compact_by_default_rule(DbName) ->
         ?assert(DbFileSize > DbFileSize2),
         ?assert(ViewFileSize > ViewFileSize2),
 
-        ?assert(is_idle(DbName)),
-        ok = couch_db:close(Db)
+        ?assert(is_idle(DbName))
     end)}.
 
 should_compact_by_dbname_rule(DbName) ->
     {timeout, ?TIMEOUT_S, ?_test(begin
-        {ok, Db} = couch_db:open_int(DbName, []),
-        populate(DbName, 70, 70, 200 * 1024),
-
         CompactionMonitor = spawn_compaction_monitor(DbName),
 
         {_, DbFileSize} = get_db_frag(DbName),
@@ -136,8 +129,7 @@ should_compact_by_dbname_rule(DbName) ->
         ?assert(DbFileSize > DbFileSize2),
         ?assert(ViewFileSize > ViewFileSize2),
 
-        ?assert(is_idle(DbName)),
-        ok = couch_db:close(Db)
+        ?assert(is_idle(DbName))
     end)}.
 
 
@@ -224,6 +216,7 @@ spawn_compaction_monitor(DbName) ->
         end),
         {ok, ViewPid} = couch_index_server:get_index(couch_mrview_index,
                 DbName, <<"_design/foo">>),
+        {ok, CompactorPid} = couch_index:get_compactor_pid(ViewPid),
         TestPid ! {self(), started},
         receive
             {TestPid, go} -> ok
@@ -246,6 +239,16 @@ spawn_compaction_monitor(DbName) ->
                 DbPid,
                 ?TIMEOUT
             ),
+        meck:reset(couch_mrview_compactor),
+        meck:wait(
+                1,
+                couch_mrview_compactor,
+                compact,
+                ['_', '_', '_'],
+                ?TIMEOUT
+            ),
+        {ok, CPid} = couch_index_compactor:get_compacting_pid(CompactorPid),
+        CRef = erlang:monitor(process, CPid),
         meck:wait(
                 1,
                 couch_mrview_compactor,
@@ -253,7 +256,12 @@ spawn_compaction_monitor(DbName) ->
                 ['_', '_'],
                 ViewPid,
                 ?TIMEOUT
-            )
+            ),
+        receive
+            {'DOWN', CRef, process, _, _} -> ok
+        after ?TIMEOUT ->
+            erlang:error(timeout)
+        end
     end),
     receive
         {Pid, started} -> ok;
