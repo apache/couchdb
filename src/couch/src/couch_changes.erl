@@ -30,7 +30,10 @@
 -export([changes_enumerator/2]).
 
 %% export so we can use fully qualified call to facilitate hot-code upgrade
--export([keep_sending_changes/3]).
+-export([
+    keep_sending_changes/3,
+    wait_updated/3
+]).
 
 -record(changes_acc, {
     db,
@@ -870,7 +873,7 @@ wait_updated(Timeout, TimeoutFun, UserAcc) ->
         {Go, UserAcc2} = TimeoutFun(UserAcc),
         case Go of
         ok ->
-            wait_updated(Timeout, TimeoutFun, UserAcc2);
+            ?MODULE:wait_updated(Timeout, TimeoutFun, UserAcc2);
         stop ->
             {stop, UserAcc2}
         end
