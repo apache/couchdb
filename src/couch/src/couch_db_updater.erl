@@ -1087,8 +1087,7 @@ copy_docs(Db, #db{fd = DestFd} = NewDb, MixedInfos, Retry) ->
         {NewRevTree, FinalAcc} = couch_key_tree:mapfold(fun
             (_Rev, #leaf{ptr=Sp}=Leaf, leaf, SizesAcc) ->
                 {Body, AttInfos} = copy_doc_attachments(Db, Sp, DestFd),
-                IsComp = couch_compress:is_compressed(Body, Compress),
-                EJsonBody = case IsComp of
+                EJsonBody = case is_binary(Body) of
                     true ->
                         couch_compress:decompress(Body);
                     false ->
