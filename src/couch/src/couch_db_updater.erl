@@ -677,7 +677,7 @@ flush_trees(#db{fd = Fd} = Db,
             case Value of
             #doc{deleted = IsDeleted, body = {summary, _, _, _} = DocSummary} ->
                 {summary, Summary, AttSizeInfo, AttsFd} = DocSummary,
-                EJsonBody = get_body_from_meta(Value#doc.meta, Summary),
+                ExternalSize = get_meta_body_size(Value#doc.meta, Summary),
                 % this node value is actually an unwritten document summary,
                 % write to disk.
                 % make sure the Fd in the written bins is the same Fd we are
@@ -696,7 +696,6 @@ flush_trees(#db{fd = Fd} = Db,
                                     " changed. Possibly retrying.", []),
                     throw(retry)
                 end,
-                ExternalSize = ?term_size(EJsonBody),
                 {ok, NewSummaryPointer, SummarySize} =
                     couch_file:append_raw_chunk(Fd, Summary),
                 Leaf = #leaf{
@@ -1477,10 +1476,10 @@ make_doc_summary(#db{compression = Comp}, {Body0, Atts0}) ->
     couch_file:assemble_file_chunk(SummaryBin, couch_crypto:hash(md5, SummaryBin)).
 
 
-get_body_from_meta(Meta, Summary) ->
-    case lists:keyfind(ejson_body, 1, Meta) of
-        {ejson_body, Body} ->
-            Body;
+get_meta_body_size(Meta, Summary) ->
+    case lists:keyfind(ejson_size, 1, Meta) of
+        {ejson_size, ExternalSize} ->
+            ExternalSize;
         false ->
             couch_compress:decompress(Summary)
     end.

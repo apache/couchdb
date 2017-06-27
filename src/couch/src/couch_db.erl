@@ -1112,8 +1112,9 @@ prepare_doc_summaries(Db, BucketList) ->
             end,
             SummaryChunk = couch_db_updater:make_doc_summary(Db, {Body, DiskAtts}),
             Meta = Doc#doc.meta,
+            ExternalSize = ?term_size(Body),
             Doc#doc{body = {summary, SummaryChunk, SizeInfo, AttsFd},
-                meta = [{ejson_body, Body} | Meta]}
+                meta = [{ejson_size, ExternalSize} | Meta]}
         end,
         Bucket) || Bucket <- BucketList].
 
