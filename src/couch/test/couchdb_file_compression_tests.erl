@@ -150,6 +150,7 @@ compare_compression_methods(DbName) ->
     ?assert(ExternalSizeNone =:= ExternalSizeSnappy),
     ?assert(ExternalSizeNone =:= ExternalSizeDeflate9).
 
+
 populate_db(_Db, NumDocs) when NumDocs =< 0 ->
     ok;
 populate_db(Db, NumDocs) ->
