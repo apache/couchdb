@@ -111,6 +111,7 @@ should_compare_compression_methods(DbName) ->
 
 compare_compression_methods(DbName) ->
     config:set("couchdb", "file_compression", "none", false),
+    ExternalSizePreCompact = db_external_size(DbName),
     compact_db(DbName),
     compact_view(DbName),
     DbSizeNone = db_disk_size(DbName),
@@ -145,9 +146,9 @@ compare_compression_methods(DbName) ->
 
     ?assert(DbSizeDeflate1 > DbSizeDeflate9),
     ?assert(ViewSizeDeflate1 > ViewSizeDeflate9),
+    ?assert(ExternalSizePreCompact =:= ExternalSizeNone),
     ?assert(ExternalSizeNone =:= ExternalSizeSnappy),
     ?assert(ExternalSizeNone =:= ExternalSizeDeflate9).
-
 
 populate_db(_Db, NumDocs) when NumDocs =< 0 ->
     ok;
