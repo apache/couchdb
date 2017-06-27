@@ -384,10 +384,12 @@ purge_docs(#db{main_pid=Pid}=Db, UUIdsIdsRevs) ->
     Rev      :: {non_neg_integer(), binary()},
     Reply    :: {ok, []}
               | {ok, [Rev]}.
-purge_docs(#db{main_pid=Pid}, UUIdsIdsRevs, interactive_edit) ->
+purge_docs(#db{main_pid=Pid} = Db, UUIdsIdsRevs, interactive_edit) ->
+    increment_stat(Db, [couchdb, database_purges]),
     gen_server:call(Pid, {purge_docs, UUIdsIdsRevs});
 
 purge_docs(#db{main_pid=Pid}=Db, UUIdsIdsRevs0, replicated_changes) ->
+    increment_stat(Db, [couchdb, database_purges]),
     % filter out purge requests that have been already applied:
     % their UUIDs exist in upurge_tree
     UUIDs = [UUID || {UUID, _Id, _Revs} <- UUIdsIdsRevs0],

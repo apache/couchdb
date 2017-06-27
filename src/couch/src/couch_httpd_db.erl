@@ -376,6 +376,7 @@ db_req(#httpd{path_parts=[_,<<"_bulk_docs">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "POST");
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_purge">>]}=Req, Db) ->
+    couch_stats:increment_counter([couchdb, httpd, purge_requests]),
     couch_httpd:validate_ctype(Req, "application/json"),
     {IdsRevs} = couch_httpd:json_body_obj(Req),
     IdsRevs2 = [{couch_uuids:new(), Id, couch_doc:parse_revs(Revs)} ||

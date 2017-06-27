@@ -496,6 +496,7 @@ db_req(#httpd{path_parts=[_, <<"_bulk_get">>]}=Req, _Db) ->
 
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_purge">>]}=Req, Db) ->
+    couch_stats:increment_counter([couchdb, httpd, purge_requests]),
     chttpd:validate_ctype(Req, "application/json"),
     W = chttpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
     Options = [{user_ctx, Req#httpd.user_ctx}, {w, W}],
