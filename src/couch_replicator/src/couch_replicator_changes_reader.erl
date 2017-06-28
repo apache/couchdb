@@ -16,7 +16,7 @@
 -export([start_link/4]).
 
 % Exported for code reloading
--export([read_changes/6]).
+-export([read_changes/5]).
 
 -include_lib("couch/include/couch_db.hrl").
 -include("couch_replicator_api_wrap.hrl").
@@ -32,29 +32,29 @@ start_link(StartSeq, #httpdb{} = Db, ChangesQueue, Options) ->
         put(last_seq, StartSeq),
         put(retries_left, Db#httpdb.retries),
         ?MODULE:read_changes(Parent, StartSeq, Db#httpdb{retries = 0},
-            ChangesQueue, Options, 1)
+            ChangesQueue, Options)
     end)};
 start_link(StartSeq, Db, ChangesQueue, Options) ->
     Parent = self(),
     {ok, spawn_link(fun() ->
-        ?MODULE:read_changes(Parent, StartSeq, Db, ChangesQueue, Options, 1)
+        ?MODULE:read_changes(Parent, StartSeq, Db, ChangesQueue, Options)
     end)}.
 
-read_changes(Parent, StartSeq, Db, ChangesQueue, Options, Ts) ->
+read_changes(Parent, StartSeq, Db, ChangesQueue, Options) ->
     Continuous = couch_util:get_value(continuous, Options),
     try
         couch_replicator_api_wrap:changes_since(Db, all_docs, StartSeq,
             fun(Item) ->
-                process_change(Item, {Parent, Db, ChangesQueue, Continuous, Ts})
+                process_change(Item, {Parent, Db, ChangesQueue, Continuous})
             end, Options),
         couch_work_queue:close(ChangesQueue)
     catch
         throw:recurse ->
             LS = get(last_seq),
-            read_changes(Parent, LS, Db, ChangesQueue, Options, Ts+1);
+            read_changes(Parent, LS, Db, ChangesQueue, Options);
         throw:retry_no_limit ->
             LS = get(last_seq),
-            read_changes(Parent, LS, Db, ChangesQueue, Options, Ts);
+            read_changes(Parent, LS, Db, ChangesQueue, Options);
         throw:{retry_limit, Error} ->
         couch_stats:increment_counter(
             [couch_replicator, changes_read_failures]
@@ -75,7 +75,7 @@ read_changes(Parent, StartSeq, Db, ChangesQueue, Options, Ts) ->
                     " with since=~p", [couch_replicator_api_wrap:db_uri(Db), LastSeq]),
                 Db
             end,
-            read_changes(Parent, LastSeq, Db2, ChangesQueue, Options, Ts);
+            read_changes(Parent, LastSeq, Db2, ChangesQueue, Options);
         _ ->
             exit(Error)
         end
@@ -89,7 +89,7 @@ process_change(#doc_info{id = <<>>} = DocInfo, {_, Db, _, _, _}) ->
         "source database `~s` (_changes sequence ~p)",
         [couch_replicator_api_wrap:db_uri(Db), DocInfo#doc_info.high_seq]);
 
-process_change(#doc_info{id = Id} = DocInfo, {Parent, Db, ChangesQueue, _, _}) ->
+process_change(#doc_info{id = Id} = DocInfo, {Parent, Db, ChangesQueue, _}) ->
     case is_doc_id_too_long(byte_size(Id)) of
         true ->
             SourceDb = couch_replicator_api_wrap:db_uri(Db),
@@ -102,14 +102,13 @@ process_change(#doc_info{id = Id} = DocInfo, {Parent, Db, ChangesQueue, _, _}) -
             put(last_seq, DocInfo#doc_info.high_seq)
     end;
 
-process_change({last_seq, LS}, {Parent, _, _, true = _Continuous, Ts}) ->
+process_change({last_seq, LS}, {_Parent, _, ChangesQueue, true = _Continuous}) ->
     % LS should never be undefined, but it doesn't hurt to be defensive inside
     % the replicator.
     Seq = case LS of undefined -> get(last_seq); _ -> LS end,
     OldSeq = get(last_seq),
     if Seq == OldSeq -> ok; true ->
-        Msg = {report_seq_done, {Ts, Seq}, couch_replicator_stats:new()},
-        ok = gen_server:call(Parent, Msg, infinity)
+        ok = couch_work_queue:queue(ChangesQueue, {last_seq, Seq})
     end,
     put(last_seq, Seq),
     throw(recurse);

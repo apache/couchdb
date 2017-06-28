@@ -219,6 +219,10 @@ queue_fetch_loop(Source, Target, Parent, Cp, ChangesManager) ->
     receive
     {closed, ChangesManager} ->
         ok;
+    {changes, ChangesManager, [], ReportSeq} ->
+        Stats = couch_replicator_stats:new(),
+        ok = gen_server:call(Cp, {report_seq_done, ReportSeq, Stats}, infinity),
+        queue_fetch_loop(Source, Target, Parent, Cp, ChangesManager);
     {changes, ChangesManager, Changes, ReportSeq} ->
         Target2 = open_db(Target),
         {IdRevs, Stats0} = find_missing(Changes, Target2),
