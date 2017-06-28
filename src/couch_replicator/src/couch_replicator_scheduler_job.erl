@@ -652,9 +652,19 @@ changes_manager_loop_open(Parent, ChangesQueue, BatchSize, Ts) ->
         case couch_work_queue:dequeue(ChangesQueue, BatchSize) of
         closed ->
             From ! {closed, self()};
-        {ok, Changes} ->
-            #doc_info{high_seq = Seq} = lists:last(Changes),
-            ReportSeq = {Ts, Seq},
+        {ok, ChangesOrLastSeqs} ->
+            ReportSeq = case lists:last(ChangesOrLastSeqs) of
+                {last_seq, Seq} ->
+                    {Ts, Seq};
+                #doc_info{high_seq = Seq} ->
+                    {Ts, Seq}
+            end,
+            Changes = lists:filter(
+                fun(#doc_info{}) ->
+                    true;
+                ({last_seq, _Seq}) ->
+                    false
+            end, ChangesOrLastSeqs),
             ok = gen_server:cast(Parent, {report_seq, ReportSeq}),
             From ! {changes, self(), Changes, ReportSeq}
         end,
