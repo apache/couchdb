@@ -10,22 +10,22 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(chttpd_exclude_headers).
+-module(chttpd_prefer_header).
 
 
 
--export([maybe_exclude_headers/2]).
+-export([maybe_return_minimal/2]).
 
 
 
 -include_lib("couch/include/couch_db.hrl").
 
-maybe_exclude_headers(#httpd{mochi_req = MochiReq}, Headers) ->
-    case MochiReq:get_header_value("X-Couch-Exclude-Headers") of
-        "All" -> 
-            filter_headers(Headers, get_header_list("all"));
-        "Minimal"  ->
-            filter_headers(Headers, get_header_list("minimal"));
+
+
+maybe_return_minimal(#httpd{mochi_req = MochiReq}, Headers) ->
+    case MochiReq:get_header_value("Prefer") of
+        "return=minimal" -> 
+            filter_headers(Headers, get_header_list());
         _ -> 
             Headers
     end.
@@ -39,8 +39,8 @@ filter_headers(Headers, IncludeList) ->
 
 
 
-get_header_list(Section) ->
-    SectionStr = config:get("exclude_headers", Section, []),
+get_header_list() ->
+    SectionStr = config:get("prefer_header", "minimal", []),
     split_list(SectionStr).
 
 

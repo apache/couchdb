@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(chttpd_exclude_headers_test).
+-module(chttpd_prefer_header_test).
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
@@ -50,26 +50,22 @@ minimal_options_headers() ->
 
 
 
-all_options_headers() ->
-    [
-        {"Server","CouchDB/2.1.0-f1a1d7f1c (Erlang OTP/19)"}
-    ].
-
-
 default_no_exclude_header_test() ->
-    Headers = chttpd_exclude_headers:maybe_exclude_headers(mock_request([]), default_headers()),
+    Headers = chttpd_prefer_header:maybe_return_minimal(mock_request([]), default_headers()),
     ?assertEqual(default_headers(), Headers).
 
 
 
 unsupported_exclude_header_test() ->
-    Req = mock_request([{"X-Couch-Exclude-Headers", "Wrong"}]),
-    Headers = chttpd_exclude_headers:maybe_exclude_headers(Req, default_headers()),
+    Req = mock_request([{"prefer", "Wrong"}]),
+    Headers = chttpd_prefer_header:maybe_return_minimal(Req, default_headers()),
     ?assertEqual(default_headers(), Headers).
+
 
 
 setup() ->
 ok.
+
 
 
 teardown(_) ->
@@ -83,8 +79,7 @@ exclude_headers_test_() ->
          {
              foreach, fun setup/0, fun teardown/1,
              [
-                 fun minimal_options/1,
-                 fun all_options/1
+                 fun minimal_options/1
              ]
          }
      }.
@@ -93,20 +88,9 @@ exclude_headers_test_() ->
 
 minimal_options(_) ->
     ok = meck:new(config),
-    ok = meck:expect(config, get, fun("exclude_headers", "minimal",  _) -> 
+    ok = meck:expect(config, get, fun("prefer_header", "minimal",  _) -> 
         "Cache-Control, Content-Length, Content-Type, ETag, Server, Vary"
     end),
-    Req = mock_request([{"X-Couch-Exclude-Headers", "Minimal"}]),
-    Headers = chttpd_exclude_headers:maybe_exclude_headers(Req, default_headers()),
+    Req = mock_request([{"Prefer", "return=minimal"}]),
+    Headers = chttpd_prefer_header:maybe_return_minimal(Req, default_headers()),
     ?_assertEqual(minimal_options_headers(), Headers).
-
-
-
-all_options(_) ->
-    ok = meck:new(config),
-    ok = meck:expect(config, get, fun("exclude_headers", "all",  _) -> 
-        "Server"
-    end),
-    Req = mock_request([{"X-Couch-Exclude-Headers", "All"}]),
-    Headers = chttpd_exclude_headers:maybe_exclude_headers(Req, default_headers()),
-    ?_assertEqual(all_options_headers(), Headers).
