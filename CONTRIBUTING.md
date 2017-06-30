@@ -152,15 +152,15 @@ on how to send one :)
    You will need to wait about 30 minutes after completing this process
    for it to complete. Follow the instructions in the organisational
    invite email you receive. Alternately, you can use the Apache mirror
-   of the repository at `https://gitbox.apache.org/asf/repos/<name>.git`
+   of the repository at `https://gitbox.apache.org/repos/asf/couchdb.git`
    if you do not agree to the GitHub Terms of Service.
 
 2. Clone the repo and create a branch.
 
    ```bash
-   git clone https://github.com/couchdb/<repo-name>
-   # or git clone https://gitbox.apache.org/asf/repos/<name>.git
-   cd <repo-name>
+   git clone https://github.com/couchdb/couchdb
+   # or git clone https://gitbox.apache.org/repos/asf/couchdb.git
+   cd couchdb
    git checkout -b <topic-branch-name>
    ```
 
