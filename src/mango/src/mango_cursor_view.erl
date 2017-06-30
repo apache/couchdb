@@ -85,11 +85,14 @@ execute(#cursor{db = Db, index = Idx} = Cursor0, UserFun, UserAcc) ->
                 end_key = mango_idx:end_key(Idx, Cursor#cursor.ranges),
                 include_docs = true
             },
-            Args = apply_opts(Cursor#cursor.opts, BaseArgs),
+            #cursor{opts = Opts} = Cursor,
+            Args = apply_opts(Opts, BaseArgs),
+            UserCtx = couch_util:get_value(user_ctx, Opts, #user_ctx{}),
+            DbOpts = [{user_ctx, UserCtx}],
             Result = case mango_idx:def(Idx) of
                 all_docs ->
                     CB = fun ?MODULE:handle_all_docs_message/2,
-                    fabric:all_docs(Db, CB, Cursor, Args);
+                    fabric:all_docs(Db, DbOpts, CB, Cursor, Args);
                 _ ->
                     CB = fun ?MODULE:handle_message/2,
                     % Normal view
