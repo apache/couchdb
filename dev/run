@@ -188,7 +188,8 @@ def setup_configs(ctx):
             "cluster_port": cluster_port,
             "backend_port": backend_port,
             "fauxton_root": fauxton_root,
-            "uuid": "fake_uuid_for_dev"
+            "uuid": "fake_uuid_for_dev",
+            "_default": ""
         }
         write_config(ctx, node, env)
 
