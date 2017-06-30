@@ -138,10 +138,10 @@ composite_prefix([Col | Rest], Ranges) ->
 
 
 % The query planner
-% First choose the index with the lowest difference between its 
+% First choose the index with the lowest difference between its
 % Prefix and the FieldRanges. If that is equal, then
-% choose the index with the least number of 
-% fields in the index. If we still cannot break the tie, 
+% choose the index with the least number of
+% fields in the index. If we still cannot break the tie,
 % then choose alphabetically based on ddocId.
 % Return the first element's Index and IndexRanges.
 %
@@ -156,13 +156,13 @@ choose_best_index(_DbName, IndexRanges) ->
                 ColsLenA = length(mango_idx:columns(IdxA)),
                 ColsLenB = length(mango_idx:columns(IdxB)),
                 case ColsLenA - ColsLenB of
-                    M when M < 0 -> 
+                    M when M < 0 ->
                         true;
                     M when M == 0 ->
-                        % We have no other way to choose, so at this point 
+                        % We have no other way to choose, so at this point
                         % select the index based on (dbname, ddocid, view_name) triple
                         IdxA =< IdxB;
-                    _ -> 
+                    _ ->
                         false
                 end;
             _ ->
@@ -270,6 +270,22 @@ apply_opts([{sort, Sort} | Rest], Args) ->
             },
             apply_opts(Rest, NewArgs)
     end;
+apply_opts([{stale, ok} | Rest], Args) ->
+    NewArgs = Args#mrargs{
+        stable = true,
+        update = false
+    },
+    apply_opts(Rest, NewArgs);
+apply_opts([{stable, true} | Rest], Args) ->
+    NewArgs = Args#mrargs{
+        stable = true
+    },
+    apply_opts(Rest, NewArgs);
+apply_opts([{update, false} | Rest], Args) ->
+    NewArgs = Args#mrargs{
+        update = false
+    },
+    apply_opts(Rest, NewArgs);
 apply_opts([{_, _} | Rest], Args) ->
     % Ignore unknown options
     apply_opts(Rest, Args).

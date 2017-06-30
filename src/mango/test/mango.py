@@ -155,7 +155,7 @@ class Database(object):
 
     def find(self, selector, limit=25, skip=0, sort=None, fields=None,
                 r=1, conflicts=False, use_index=None, explain=False,
-                bookmark=None, return_raw=False):
+                bookmark=None, return_raw=False, update=True):
         body = {
             "selector": selector,
             "use_index": use_index,
@@ -170,6 +170,8 @@ class Database(object):
             body["fields"] = fields
         if bookmark is not None:
             body["bookmark"] = bookmark
+        if update == False:
+            body["update"] = False
         body = json.dumps(body)
         if explain:
             path = self.path("_explain")
