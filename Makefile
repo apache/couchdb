@@ -102,6 +102,12 @@ eunit: couch
 	@$(REBAR) setup_eunit 2> /dev/null
 	@$(REBAR) -r eunit $(EUNIT_OPTS)
 
+.PHONY: soak-eunit
+soak-eunit: export BUILDDIR = $(shell pwd)
+soak-eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
+soak-eunit: couch
+	@$(REBAR) setup_eunit 2> /dev/null
+	while [ $$? -eq 0 ] ; do $(REBAR) -r eunit $(EUNIT_OPTS) ; done
 
 .PHONY: javascript
 # target: javascript - Run JavaScript test suites or specific ones defined by suites option
