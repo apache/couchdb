@@ -141,9 +141,10 @@ update(Idx, Mod, IdxState) ->
         DbUpdateSeq = couch_db:get_update_seq(Db),
         DbCommittedSeq = couch_db:get_committed_update_seq(Db),
 
+        NumUpdateChanges = couch_db:count_changes_since(Db, CurrSeq),
+        NumPurgeChanges = count_pending_purged_docs_since(Db, Mod, IdxState),
+        TotalChanges = NumUpdateChanges + NumPurgeChanges,
         {ok, PurgedIdxState} = purge_index(Db, Mod, IdxState),
-
-        NumChanges = couch_db:count_changes_since(Db, CurrSeq),
 
         GetSeq = fun
             (#full_doc_info{update_seq=Seq}) -> Seq;
@@ -182,8 +183,13 @@ update(Idx, Mod, IdxState) ->
                     {ok, {NewSt, true}}
             end
         end,
+        {ok, InitIdxState} = Mod:start_update(
+            Idx,
+            PurgedIdxState,
+            TotalChanges,
+            NumPurgeChanges
+        ),
 
-        {ok, InitIdxState} = Mod:start_update(Idx, PurgedIdxState, NumChanges),
         Acc0 = {InitIdxState, true},
         {ok, Acc} = couch_db:fold_changes(Db, CurrSeq, Proc, Acc0, []),
         {ProcIdxSt, SendLast} = Acc,
@@ -223,3 +229,8 @@ purge_index(Db, Mod, IdxState) ->
             Mod:update_local_purge_doc(Db, NewStateAcc),
             {ok, NewStateAcc}
     end.
+
+count_pending_purged_docs_since(Db, Mod, IdxState) ->
+    {ok, DbPurgeSeq} = couch_db:get_purge_seq(Db),
+    IdxPurgeSeq = Mod:get(purge_seq, IdxState),
+    DbPurgeSeq - IdxPurgeSeq.

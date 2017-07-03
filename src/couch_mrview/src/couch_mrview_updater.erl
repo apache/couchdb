@@ -12,15 +12,14 @@
 
 -module(couch_mrview_updater).
 
--export([start_update/3, purge/4, process_doc/3, finish_update/1]).
+-export([start_update/4, purge/4, process_doc/3, finish_update/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
 -define(REM_VAL, removed).
 
-
-start_update(Partial, State, NumChanges) ->
+start_update(Partial, State, NumChanges, NumChangesDone) ->
     MaxSize = config:get_integer("view_updater", "queue_memory_cap", 100000),
     MaxItems = config:get_integer("view_updater", "queue_item_cap", 500),
     QueueOpts = [{max_size, MaxSize}, {max_items, MaxItems}],
@@ -36,14 +35,19 @@ start_update(Partial, State, NumChanges) ->
     },
 
     Self = self(),
+
     MapFun = fun() ->
+        Progress = case NumChanges of
+            0 -> 0;
+            _ -> (NumChangesDone * 100) div NumChanges
+        end,
         couch_task_status:add_task([
             {indexer_pid, ?l2b(pid_to_list(Partial))},
             {type, indexer},
             {database, State#mrst.db_name},
             {design_document, State#mrst.idx_name},
-            {progress, 0},
-            {changes_done, 0},
+            {progress, Progress},
+            {changes_done, NumChangesDone},
             {total_changes, NumChanges}
         ]),
         couch_task_status:set_update_frequency(500),
