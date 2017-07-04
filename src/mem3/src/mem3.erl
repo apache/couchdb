@@ -249,7 +249,10 @@ range(<<"shards/", Start:8/binary, "-", End:8/binary, "/", _/binary>>) ->
      httpd_util:hexlist_to_integer(binary_to_list(End))].
 
 allowed_nodes() ->
-    [Node || Node <- mem3:nodes(), mem3:node_info(Node, <<"decom">>) =/= true].
+    lists:filter(fun(Node) ->
+        Decom = mem3:node_info(Node, <<"decom">>),
+        (Decom =/= true) andalso (Decom =/= <<"true">>)
+    end, mem3:nodes()).
 
 nodes_in_zone(Nodes, Zone) ->
     [Node || Node <- Nodes, Zone == mem3:node_info(Node, <<"zone">>)].
@@ -306,3 +309,33 @@ name(#shard{name=Name}) ->
     Name;
 name(#ordered_shard{name=Name}) ->
     Name.
+
+
+-ifdef(TEST).
+
+-include_lib("eunit/include/eunit.hrl").
+
+-define(ALLOWED_NODE, 'node1@127.0.0.1').
+
+allowed_nodes_test_() ->
+    {"allowed_nodes test", [{
+        setup,
+        fun () ->
+            Props = [
+                {?ALLOWED_NODE, []},
+                {'node2@127.0.0.1', [{<<"decom">>,<<"true">>}]},
+                {'node3@127.0.0.1', [{<<"decom">>,true}]}],
+            ok = meck:expect(mem3_nodes, get_nodelist,
+                fun() -> proplists:get_keys(Props) end),
+            ok = meck:expect(mem3_nodes, get_node_info,
+                fun(Node, Key) ->
+                    couch_util:get_value(Key, proplists:get_value(Node, Props))
+                end)
+        end,
+        fun (_) -> meck:unload() end,
+        [
+            ?_assertMatch([?ALLOWED_NODE], allowed_nodes())
+        ]
+    }]}.
+
+-endif.
