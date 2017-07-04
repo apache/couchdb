@@ -224,22 +224,6 @@ couchTests.design_docs = function(debug) {
     TEquals(200, xhr.status);
     TEquals("One", xhr.responseText);
 
-    // Test that changes to the design doc properly invalidate cached modules:
-
-    // update the designDoc and replace
-    designDoc.whatever.commonjs.circular_one = "exports.name = 'Updated';"
-    T(db.save(designDoc).ok);
-
-    // request circular_require show function again and check the response has
-    // changed
-    xhr = CouchDB.request(
-      "GET",
-      "/" + db_name + "/_design/test/_show/circular_require"
-    );
-    TEquals(200, xhr.status);
-    TEquals("Updated", xhr.responseText);
-
-
     // test module id values are as expected:
     xhr = CouchDB.request("GET", "/" + db_name + "/_design/test/_show/idtest1");
     TEquals(200, xhr.status);
