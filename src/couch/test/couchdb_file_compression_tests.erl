@@ -44,7 +44,7 @@ teardown(DbName) ->
     ok.
 
 
-couch_auth_cache_test_() ->
+couch_file_compression_test_() ->
     {
         "CouchDB file compression tests",
         {
@@ -70,8 +70,10 @@ should_use_none(DbName) ->
     {
         "Use no compression",
         [
-            {"compact database", ?_test(compact_db(DbName))},
-            {"compact view", ?_test(compact_view(DbName))}
+            {"compact database",
+             {timeout, 5 + ?TIMEOUT div 1000, ?_test(compact_db(DbName))}},
+            {"compact view",
+             {timeout, 5 + ?TIMEOUT div 1000, ?_test(compact_view(DbName))}}
         ]
     }.
 
@@ -80,8 +82,10 @@ should_use_deflate_1(DbName) ->
     {
         "Use deflate compression at level 1",
         [
-            {"compact database", ?_test(compact_db(DbName))},
-            {"compact view", ?_test(compact_view(DbName))}
+            {"compact database",
+             {timeout, 5 + ?TIMEOUT div 1000, ?_test(compact_db(DbName))}},
+            {"compact view",
+             {timeout, 5 + ?TIMEOUT div 1000, ?_test(compact_view(DbName))}}
         ]
     }.
 
@@ -90,8 +94,10 @@ should_use_deflate_9(DbName) ->
     {
         "Use deflate compression at level 9",
         [
-            {"compact database", ?_test(compact_db(DbName))},
-            {"compact view", ?_test(compact_view(DbName))}
+            {"compact database",
+             {timeout, 5 + ?TIMEOUT div 1000, ?_test(compact_db(DbName))}},
+            {"compact view",
+             {timeout, 5 + ?TIMEOUT div 1000, ?_test(compact_view(DbName))}}
         ]
     }.
 
@@ -100,8 +106,10 @@ should_use_snappy(DbName) ->
     {
         "Use snappy compression",
         [
-            {"compact database", ?_test(compact_db(DbName))},
-            {"compact view", ?_test(compact_view(DbName))}
+            {"compact database",
+             {timeout, 5 + ?TIMEOUT div 1000, ?_test(compact_db(DbName))}},
+            {"compact view",
+             {timeout, 5 + ?TIMEOUT div 1000, ?_test(compact_view(DbName))}}
         ]
     }.
 
