@@ -28,7 +28,7 @@
 
 -include_lib("couch/include/couch_db.hrl").
 
--define(MAX_DBS_OPEN, 100).
+-define(MAX_DBS_OPEN, 500).
 -define(RELISTEN_DELAY, 5000).
 
 -record(server,{
