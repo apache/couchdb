@@ -82,7 +82,7 @@ read_changes(Parent, StartSeq, Db, ChangesQueue, Options) ->
     end.
 
 
-process_change(#doc_info{id = <<>>} = DocInfo, {_, Db, _, _, _}) ->
+process_change(#doc_info{id = <<>>} = DocInfo, {_, Db, _, _}) ->
     % Previous CouchDB releases had a bug which allowed a doc with an empty ID
     % to be inserted into databases. Such doc is impossible to GET.
     couch_log:error("Replicator: ignoring document with empty ID in "
