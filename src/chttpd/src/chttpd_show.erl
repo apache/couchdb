@@ -211,7 +211,8 @@ handle_view_list(Req, Db, DDoc, LName, {ViewDesignName, ViewName}, Keys) ->
             <<"_all_docs">> ->
                 fabric:all_docs(Db, Options, CB, Acc, QueryArgs);
             _ ->
-                fabric:query_view(Db, VDoc, ViewName, CB, Acc, QueryArgs)
+                fabric:query_view(Db, Options, VDoc, ViewName,
+                    CB, Acc, QueryArgs)
         end
     end).
 

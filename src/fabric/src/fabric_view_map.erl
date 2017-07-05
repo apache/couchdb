@@ -12,23 +12,24 @@
 
 -module(fabric_view_map).
 
--export([go/7]).
+-export([go/8]).
 
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
-go(DbName, GroupId, View, Args, Callback, Acc, VInfo) when is_binary(GroupId) ->
+go(DbName, Options, GroupId, View, Args, Callback, Acc, VInfo)
+        when is_binary(GroupId) ->
     {ok, DDoc} = fabric:open_doc(DbName, <<"_design/", GroupId/binary>>, []),
-    go(DbName, DDoc, View, Args, Callback, Acc, VInfo);
+    go(DbName, Options, DDoc, View, Args, Callback, Acc, VInfo);
 
-go(DbName, DDoc, View, Args, Callback, Acc, VInfo) ->
+go(DbName, Options, DDoc, View, Args, Callback, Acc, VInfo) ->
     Shards = fabric_view:get_shards(DbName, Args),
     DocIdAndRev = fabric_util:doc_id_and_rev(DDoc),
     fabric_view:maybe_update_others(DbName, DocIdAndRev, Shards, View, Args),
     Repls = fabric_view:get_shard_replacements(DbName, Shards),
-    RPCArgs = [DocIdAndRev, View, Args],
+    RPCArgs = [DocIdAndRev, View, Args, Options],
     StartFun = fun(Shard) ->
         hd(fabric_util:submit_jobs([Shard], fabric_rpc, map_view, RPCArgs))
     end,
