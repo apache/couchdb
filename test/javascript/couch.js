@@ -147,6 +147,9 @@ function CouchDB(name, httpHeaders, globalRequestOptions) {
     if (typeof(mapFun) != "string") {
       mapFun = mapFun.toSource ? mapFun.toSource() : "(" + mapFun.toString() + ")";
     }
+    if ((!language) || language.toLowerCase() == "javascript") {
+      mapFun = mapFun + "/" + "* avoid race cond " + (new Date().getTime()) + " *" + "/";
+    }
     body.map = mapFun;
     if (reduceFun != null) {
       if (typeof(reduceFun) != "string") {
