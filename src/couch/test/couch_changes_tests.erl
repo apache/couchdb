@@ -281,7 +281,9 @@ should_filter_continuous_feed_by_specific_doc_ids({DbName, Revs}) ->
             },
             DocIds = [<<"doc3">>, <<"doc4">>, <<"doc9999">>],
             Req = {json_req, {[{<<"doc_ids">>, DocIds}]}},
+            reset_row_notifications(),
             Consumer = spawn_consumer(DbName, ChangesArgs, Req),
+            ?assertEqual(ok, wait_row_notifications(2)),
             ok = pause(Consumer),
 
             Rows = get_rows(Consumer),
@@ -310,8 +312,9 @@ should_filter_continuous_feed_by_specific_doc_ids({DbName, Revs}) ->
             {ok, _} = save_doc(Db, {[{<<"_id">>, <<"doc12">>}]}),
             {ok, Rev3_3} = save_doc(Db, {[{<<"_id">>, <<"doc3">>},
                                           {<<"_rev">>, Rev3_2}]}),
+            reset_row_notifications(),
             ok = unpause(Consumer),
-            timer:sleep(100),
+            ?assertEqual(ok, wait_row_notifications(2)),
             ok = pause(Consumer),
 
             NewRows = get_rows(Consumer),
@@ -325,8 +328,9 @@ should_filter_continuous_feed_by_specific_doc_ids({DbName, Revs}) ->
             clear_rows(Consumer),
             {ok, _Rev3_4} = save_doc(Db, {[{<<"_id">>, <<"doc3">>},
                                            {<<"_rev">>, Rev3_3}]}),
+            reset_row_notifications(),
             ok = unpause(Consumer),
-            timer:sleep(100),
+            ?assertEqual(ok, wait_row_notifications(1)),
             ok = pause(Consumer),
 
             FinalRows = get_rows(Consumer),
@@ -426,7 +430,9 @@ should_select_with_continuous({DbName, Revs}) ->
             GteDoc8 = {[{<<"$gte">>, <<"doc8">>}]},
             Selector = {[{<<"_id">>, GteDoc8}]},
             Req = {json_req, {[{<<"selector">>, Selector}]}},
+            reset_row_notifications(),
             Consumer = spawn_consumer(DbName, ChArgs, Req),
+            ?assertEqual(ok, wait_row_notifications(1)),
             ok = pause(Consumer),
             Rows = get_rows(Consumer),
             ?assertMatch(
@@ -445,8 +451,9 @@ should_select_with_continuous({DbName, Revs}) ->
                                      {<<"_rev">>, Rev8}]}),
             {ok, _} = save_doc(Db, {[{<<"_id">>, <<"doc4">>},
                                      {<<"_rev">>, Rev4}]}),
+            reset_row_notifications(),
             ok = unpause(Consumer),
-            timer:sleep(100),
+            ?assertEqual(ok, wait_row_notifications(1)),
             ok = pause(Consumer),
             NewRows = get_rows(Consumer),
             ?assertMatch(
@@ -837,6 +844,27 @@ wait_finished({_, ConsumerRef}) ->
         ]})
     end.
 
+
+reset_row_notifications() ->
+    receive
+        row ->
+            reset_row_notifications()
+    after 0 ->
+        ok
+    end.
+
+
+wait_row_notifications(N) ->
+    receive
+        row when N == 1 ->
+            ok;
+        row when N > 1 ->
+            wait_row_notifications(N - 1)
+    after ?TIMEOUT ->
+        timeout
+    end.
+
+
 spawn_consumer(DbName, ChangesArgs0, Req) ->
     Parent = self(),
     spawn_monitor(fun() ->
@@ -847,6 +875,7 @@ spawn_consumer(DbName, ChangesArgs0, Req) ->
                 Seq = couch_util:get_value(<<"seq">>, Change),
                 Del = couch_util:get_value(<<"deleted">>, Change, false),
                 Doc = couch_util:get_value(doc, Change, nil),
+                Parent ! row,
                 [#row{id = Id, seq = Seq, deleted = Del, doc = Doc} | Acc];
             ({stop, LastSeq}, _, Acc) ->
                 Parent ! {consumer_finished, lists:reverse(Acc), LastSeq},
@@ -861,7 +890,7 @@ spawn_consumer(DbName, ChangesArgs0, Req) ->
         ChangesArgs = case (ChangesArgs0#changes_args.timeout =:= undefined)
             andalso (ChangesArgs0#changes_args.heartbeat =:= undefined) of
             true ->
-                ChangesArgs0#changes_args{timeout = 10, heartbeat = 10};
+                ChangesArgs0#changes_args{timeout = 1000, heartbeat = 100};
             false ->
                 ChangesArgs0
         end,
