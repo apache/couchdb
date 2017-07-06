@@ -62,7 +62,7 @@ DepDescs = [
 %% Third party deps
 {folsom,           "folsom",           "46f7c2b785b26448d4bdc18c1700f2319badd7d6"},
 {ibrowse,          "ibrowse",          "4af2d408607874d124414ac45df1edbe3961d1cd"},
-{jiffy,            "jiffy",            "99a3d4378bd6832210c58b22cc259486d4fc067a"},
+{jiffy,            "jiffy",            "1acdd1ac389dff3d763589f64331227ae594f3b7"},
 {mochiweb,         "mochiweb",         "bd6ae7cbb371666a1f68115056f7b30d13765782"},
 {meck,             "meck",             {tag, "0.8.2"}},
 
