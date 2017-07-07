@@ -26,12 +26,14 @@ multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
         QueryArg1 = couch_mrview_util:set_view_type(QueryArg, ViewName, Views),
         couch_mrview_util:validate_args(QueryArg1)
     end, Queries),
+    Options = [{user_ctx, Req#httpd.user_ctx}],
     VAcc0 = #vacc{db=Db, req=Req, prepend="\r\n"},
     FirstChunk = "{\"results\":[",
     {ok, Resp0} = chttpd:start_delayed_json_response(VAcc0#vacc.req, 200, [], FirstChunk),
     VAcc1 = VAcc0#vacc{resp=Resp0},
     VAcc2 = lists:foldl(fun(Args, Acc0) ->
-        {ok, Acc1} = fabric:query_view(Db, DDoc, ViewName, fun couch_mrview_http:view_cb/2, Acc0, Args),
+        {ok, Acc1} = fabric:query_view(Db, Options, DDoc, ViewName,
+            fun couch_mrview_http:view_cb/2, Acc0, Args),
         Acc1
     end, VAcc1, ArgQueries),
     {ok, Resp1} = chttpd:send_delayed_chunk(VAcc2#vacc.resp, "\r\n]}"),
@@ -42,7 +44,9 @@ design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
     Args = couch_mrview_http:parse_params(Req, Keys),
     Max = chttpd:chunked_response_buffer_size(),
     VAcc = #vacc{db=Db, req=Req, threshold=Max},
-    {ok, Resp} = fabric:query_view(Db, DDoc, ViewName, fun couch_mrview_http:view_cb/2, VAcc, Args),
+    Options = [{user_ctx, Req#httpd.user_ctx}],
+    {ok, Resp} = fabric:query_view(Db, Options, DDoc, ViewName,
+        fun couch_mrview_http:view_cb/2, VAcc, Args),
     {ok, Resp#vacc.resp}.
 
 handle_view_req(#httpd{method='GET',
@@ -121,7 +125,7 @@ setup() ->
     Views = [#mrview{reduce_funs = [{<<"v">>, <<"_count">>}]}],
     meck:expect(couch_mrview_util, ddoc_to_mrst, 2, {ok, #mrst{views = Views}}),
     meck:expect(chttpd, start_delayed_json_response, 4, {ok, resp}),
-    meck:expect(fabric, query_view, 6, {ok, #vacc{}}),
+    meck:expect(fabric, query_view, 7, {ok, #vacc{}}),
     meck:expect(chttpd, send_delayed_chunk, 2, {ok, resp}),
     meck:expect(chttpd, end_delayed_json_response, 1, ok).
 

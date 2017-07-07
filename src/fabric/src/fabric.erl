@@ -30,7 +30,7 @@
 
 % Views
 -export([all_docs/4, all_docs/5, changes/4, query_view/3, query_view/4,
-    query_view/6, get_view_group_info/2, end_changes/0]).
+    query_view/6, query_view/7, get_view_group_info/2, end_changes/0]).
 
 % miscellany
 -export([design_docs/1, reset_validation_funs/1, cleanup_index_files/0,
@@ -324,24 +324,30 @@ query_view(DbName, DesignName, ViewName, QueryArgs) ->
     Callback = fun default_callback/2,
     query_view(DbName, DesignName, ViewName, Callback, [], QueryArgs).
 
+
+%% @equiv query_view(DbName, DesignName, [],
+%%                     ViewName, fun default_callback/2, [], QueryArgs)
+query_view(DbName, DDoc, ViewName, Callback, Acc, QueryArgs) ->
+    query_view(DbName, [], DDoc, ViewName, Callback, Acc, QueryArgs).
+
+
 %% @doc execute a given view.
 %%      There are many additional query args that can be passed to a view,
 %%      see <a href="http://wiki.apache.org/couchdb/HTTP_view_API#Querying_Options">
 %%      query args</a> for details.
--spec query_view(dbname(), #doc{} | binary(), iodata(), callback(), any(),
-        #mrargs{}) ->
+-spec query_view(dbname(), [{atom(), any()}] | [],
+        #doc{} | binary(), iodata(), callback(), any(), #mrargs{}) ->
     any().
-query_view(Db, GroupId, ViewName, Callback, Acc0, QueryArgs)
+query_view(Db, Options, GroupId, ViewName, Callback, Acc0, QueryArgs)
         when is_binary(GroupId) ->
     DbName = dbname(Db),
     {ok, DDoc} = ddoc_cache:open(DbName, <<"_design/", GroupId/binary>>),
-    query_view(DbName, DDoc, ViewName, Callback, Acc0, QueryArgs);
-query_view(DbName, DDoc, ViewName, Callback, Acc0, QueryArgs0) ->
+    query_view(DbName, Options, DDoc, ViewName, Callback, Acc0, QueryArgs);
+query_view(DbName, Options, DDoc, ViewName, Callback, Acc0, QueryArgs0) ->
     Db = dbname(DbName), View = name(ViewName),
     case fabric_util:is_users_db(Db) of
     true ->
-        Req = Acc0#vacc.req,
-        FakeDb = fabric_util:fake_db(Db, [{user_ctx, Req#httpd.user_ctx}]),
+        FakeDb = fabric_util:fake_db(Db, Options),
         couch_users_db:after_doc_read(DDoc, FakeDb);
     false ->
         ok
@@ -365,6 +371,7 @@ query_view(DbName, DDoc, ViewName, Callback, Acc0, QueryArgs0) ->
         false ->
             fabric_view_map:go(
                 Db,
+                Options,
                 DDoc,
                 View,
                 QueryArgs2,
