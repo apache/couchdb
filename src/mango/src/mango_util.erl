@@ -17,6 +17,7 @@
     open_doc/2,
     open_ddocs/1,
     load_ddoc/2,
+    load_ddoc/3,
 
     defer/3,
     do_defer/3,
@@ -104,7 +105,10 @@ open_ddocs(Db) ->
 
 
 load_ddoc(Db, DDocId) ->
-    case open_doc(Db, DDocId, [deleted, ejson_body]) of
+    load_ddoc(Db, DDocId, [deleted, ejson_body]).
+
+load_ddoc(Db, DDocId, DbOpts) ->
+    case open_doc(Db, DDocId, DbOpts) of
         {ok, Doc} ->
             {ok, check_lang(Doc)};
         not_found ->
