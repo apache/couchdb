@@ -54,6 +54,11 @@ With this pattern:
 import copy
 
 
+def setup_users(db, **kwargs):
+    db.recreate()
+    db.save_docs(copy.deepcopy(USERS_DOCS))
+
+
 def setup(db, index_type="view", **kwargs):
     db.recreate()
     db.save_docs(copy.deepcopy(DOCS))
@@ -486,5 +491,36 @@ DOCS = [
             "Python",
             "Lisp"
         ]
+    }
+]
+
+
+USERS_DOCS = [
+    {
+        "_id": "org.couchdb.user:demo01",
+        "name": "demo01",
+        "username": "demo01",
+        "password": "apple01",
+        "roles": ["design"],
+        "order": 1,
+        "type": "user"
+    },
+    {
+        "_id": "org.couchdb.user:demo02",
+        "name": "demo02",
+        "username": "demo02",
+        "password": "apple02",
+        "roles": ["reader"],
+        "order": 2,
+        "type": "user"
+    },
+    {
+        "_id": "org.couchdb.user:demo03",
+        "name": "demo03",
+        "username": "demo03",
+        "password": "apple03",
+        "roles": ["reader", "writer"],
+        "order": 3,
+        "type": "user"
     }
 ]

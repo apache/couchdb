@@ -192,6 +192,17 @@ class Database(object):
             return None
 
 
+class UsersDbTests(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(klass):
+        klass.db = Database("127.0.0.1", "15984", "_users")
+        user_docs.setup_users(klass.db)
+
+    def setUp(self):
+        self.db = self.__class__.db
+
+
 class DbPerClass(unittest.TestCase):
 
     @classmethod
