@@ -98,7 +98,7 @@ execute(#cursor{db = Db, index = Idx} = Cursor0, UserFun, UserAcc) ->
                     % Normal view
                     DDoc = ddocid(Idx),
                     Name = mango_idx:name(Idx),
-                    fabric:query_view(Db, DDoc, Name, CB, Cursor, Args)
+                    fabric:query_view(Db, DbOpts, DDoc, Name, CB, Cursor, Args)
             end,
             case Result of
                 {ok, LastCursor} ->
