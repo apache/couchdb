@@ -11,9 +11,6 @@
 // the License.
 
 couchTests.config = function(debug) {
-  var db_name = get_random_db_name();
-  var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
-  db.createDb();
   if (debug) debugger;
 
   // test that /_config returns all the settings

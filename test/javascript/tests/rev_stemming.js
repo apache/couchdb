@@ -117,5 +117,7 @@ couchTests.rev_stemming = function(debug) {
     "should return a truncated revision list");
 
   // cleanup
+  db_orig.deleteDb();
   db.deleteDb();
+  dbB.deleteDb();
 };

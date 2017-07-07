@@ -505,8 +505,7 @@ couchTests.rewrite = function(debug) {
             TEquals(200, xhr.status);
         }
       });
+    // cleanup
+    db.deleteDb();
   }
-
-  // cleanup
-  db.deleteDb();
 }
