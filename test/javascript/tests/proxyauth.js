@@ -132,4 +132,6 @@ couchTests.proxyauth = function(debug) {
 
   // cleanup
   db.deleteDb();
+  usersDb.deleteDb();
+
 };

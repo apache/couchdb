@@ -32,6 +32,9 @@ couchTests.delayed_commits = function(debug) {
       // other updates. If it crashes or is restarted you may lose the most
       // recent commits.
 
+      // restartServer() requires a server to be up 15s before it restarts
+      sleep(15000);
+
       T(db.save({_id:"1",a:2,b:4}).ok);
       T(db.open("1") != null);
 
@@ -41,4 +44,7 @@ couchTests.delayed_commits = function(debug) {
       // note if we waited > 1 sec before the restart, the doc would likely
       // commit.
     });
+
+  // cleanup
+  db.deleteDb();
 };

@@ -1715,9 +1715,6 @@ couchTests.replication = function(debug) {
 
   // COUCHDB-885 - push replication of a doc with attachment causes a
   //               conflict in the target.
-  sourceDb = new CouchDB("test_suite_db_a");
-  targetDb = new CouchDB("test_suite_db_b");
-
   populateSourceDb([]);
   populateTargetDb([]);
 

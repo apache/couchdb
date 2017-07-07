@@ -336,5 +336,8 @@ couchTests.rewrite = function(debug) {
     var url = "/"+dbName+"/_design/loop/_rewrite/loop";
     var xhr = CouchDB.request("GET", url);
     TEquals(400, xhr.status);
+
+    // cleanup
+    db.deleteDb();
   }
 }
