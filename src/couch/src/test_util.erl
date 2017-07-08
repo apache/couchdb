@@ -72,6 +72,7 @@ start_couch(IniFiles, ExtraApps) ->
     load_applications_with_stats(),
     ok = application:set_env(config, ini_files, IniFiles),
     Apps = start_applications(?DEFAULT_APPS ++ ExtraApps),
+    ok = config:delete("compactions", "_default", false),
     #test_context{started = Apps}.
 
 stop_couch() ->
