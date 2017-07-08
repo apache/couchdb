@@ -40,7 +40,7 @@ function get_contributors {
 
 function print_comitter_list {
   # list of external repos that we exclude
-  local EXCLUDE=("bear" "folsom" "goldrush" "ibrowse" "jiffy" "lager" "meck" "mochiweb" "oauth" "snappy")
+  local EXCLUDE=("bear" "folsom" "goldrush" "ibrowse" "jiffy" "lager" "meck" "mochiweb" "snappy")
   local EXCLUDE=$(printf "\|%s" "${EXCLUDE[@]}")
   local EXCLUDE=${EXCLUDE:2}
   local SUBREPOS=$(ls src/ | grep -v "$EXCLUDE")

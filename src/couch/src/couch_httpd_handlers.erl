@@ -14,7 +14,6 @@
 
 -export([url_handler/1, db_handler/1, design_handler/1]).
 
-url_handler(<<"_oauth">>)          -> fun couch_httpd_oauth:handle_oauth_req/1;
 url_handler(_) -> no_match.
 
 db_handler(_) -> no_match.

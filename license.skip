@@ -133,7 +133,6 @@
 ^src/couchjs-node/README.md
 ^src/couchjs-node/Makefile
 ^src/couchjs-node/Makefile.in
-^src/erlang-oauth/.*
 ^src/couch_dbupdates
 ^src/ejson/.*
 ^src/etap/.*
@@ -188,7 +187,6 @@
 ^src/twig/ebin/twig.app
 ^src/twig/README.md
 ^src/twig/src/trunc_io.erl
-^src/oauth/.*
 ^stamp-h1
 ^test/Makefile
 ^test/Makefile.in

@@ -38,10 +38,6 @@ This product also includes the following third-party components:
 
    Copyright 2005-2012, Chandrashekhar Mullaparthi
 
- * Erlang OAuth (http://github.com/tim/erlang-oauth)
-
-   Copyright 2012, the authors and contributors
-
  * ETap (http://github.com/ngerakines/etap/)
 
    Copyright 2009, Nick Gerakines <nick@gerakines.net>

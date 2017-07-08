@@ -68,7 +68,7 @@ should_not_return_authenticated_field(_PortType, Url) ->
         end).
 
 should_return_list_of_handlers(backdoor, Url) ->
-    ?_assertEqual([<<"oauth">>,<<"cookie">>,<<"default">>],
+    ?_assertEqual([<<"cookie">>,<<"default">>],
         begin
             couch_util:get_nested_json_value(session(Url), [
                 <<"info">>, <<"authentication_handlers">>])

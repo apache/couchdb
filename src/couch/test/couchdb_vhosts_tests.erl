@@ -59,42 +59,6 @@ setup() ->
     Url = "http://" ++ Addr ++ ":" ++ Port,
     {Url, ?b2l(DbName)}.
 
-setup_oauth() ->
-    DbName = ?tempdb(),
-    {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
-
-    config:set("couch_httpd_auth", "authentication_db",
-                     ?b2l(?tempdb()), false),
-    config:set("oauth_token_users", "otoksec1", "joe", false),
-    config:set("oauth_consumer_secrets", "consec1", "foo", false),
-    config:set("oauth_token_secrets", "otoksec1", "foobar", false),
-    config:set("couchdb", "default_security", "everyone", false),
-    config:set("couch_httpd_auth", "require_valid_user", "true", false),
-
-    ok = config:set(
-        "vhosts", "oauth-example.com",
-        "/" ++ ?b2l(DbName) ++ "/_design/test/_rewrite/foobar", false),
-
-    DDoc = couch_doc:from_json_obj({[
-        {<<"_id">>, <<"_design/test">>},
-        {<<"language">>, <<"javascript">>},
-        {<<"rewrites">>, [
-            {[
-                {<<"from">>, <<"foobar">>},
-                {<<"to">>, <<"_info">>}
-            ]}
-        ]}
-    ]}),
-    {ok, _} = couch_db:update_doc(Db, DDoc, []),
-
-    couch_db:ensure_full_commit(Db),
-    couch_db:close(Db),
-
-    Addr = config:get("httpd", "bind_address", "127.0.0.1"),
-    Port = integer_to_list(mochiweb_socket_server:get(couch_httpd, port)),
-    Url = "http://" ++ Addr ++ ":" ++ Port,
-    {Url, ?b2l(DbName)}.
-
 teardown({_, DbName}) ->
     ok = couch_server:delete(?l2b(DbName), []),
     ok.
@@ -126,25 +90,6 @@ vhosts_test_() ->
             }
         }
     }.
-
-oauth_test_() ->
-    {
-        "Virtual Hosts OAuth tests",
-        {
-            setup,
-            fun test_util:start_couch/0, fun test_util:stop_couch/1,
-            {
-                foreach,
-                fun setup_oauth/0, fun teardown/1,
-                [
-                    fun should_require_auth/1,
-                    fun should_succeed_oauth/1,
-                    fun should_fail_oauth_with_wrong_credentials/1
-                ]
-            }
-        }
-    }.
-
 
 should_return_database_info({Url, DbName}) ->
     ?_test(begin
@@ -343,90 +288,6 @@ should_return_path_for_vhost_with_wildcard_host({Url, DbName}) ->
                 {Json} = jiffy:decode(Body),
                 Path = ?l2b("/" ++ DbName ++ "/_design/doc1/_show/test"),
                 ?assertEqual(Path, proplists:get_value(<<"path">>, Json));
-            Else ->
-                erlang:error({assertion_failed,
-                             [{module, ?MODULE},
-                              {line, ?LINE},
-                              {reason, ?iofmt("Request failed: ~p", [Else])}]})
-        end
-    end).
-
-should_require_auth({Url, _}) ->
-    ?_test(begin
-        case test_request:get(Url, [], [{host_header, "oauth-example.com"}]) of
-            {ok, Code, _, Body} ->
-                ?assertEqual(401, Code),
-                {JsonBody} = jiffy:decode(Body),
-                ?assertEqual(<<"unauthorized">>,
-                             couch_util:get_value(<<"error">>, JsonBody));
-            Else ->
-                erlang:error({assertion_failed,
-                             [{module, ?MODULE},
-                              {line, ?LINE},
-                              {reason, ?iofmt("Request failed: ~p", [Else])}]})
-        end
-    end).
-
-should_succeed_oauth({Url, _}) ->
-    ?_test(begin
-        AuthDbName = config:get("couch_httpd_auth", "authentication_db"),
-        JoeDoc = couch_doc:from_json_obj({[
-            {<<"_id">>, <<"org.couchdb.user:joe">>},
-            {<<"type">>, <<"user">>},
-            {<<"name">>, <<"joe">>},
-            {<<"roles">>, []},
-            {<<"password_sha">>, <<"fe95df1ca59a9b567bdca5cbaf8412abd6e06121">>},
-            {<<"salt">>, <<"4e170ffeb6f34daecfd814dfb4001a73">>}
-        ]}),
-        {ok, AuthDb} = couch_db:open_int(?l2b(AuthDbName), [?ADMIN_CTX]),
-        {ok, _} = couch_db:update_doc(AuthDb, JoeDoc, [?ADMIN_CTX]),
-
-        Host = "oauth-example.com",
-        Consumer = {"consec1", "foo", hmac_sha1},
-        SignedParams = oauth:sign(
-            "GET", "http://" ++ Host ++ "/", [], Consumer, "otoksec1", "foobar"),
-        OAuthUrl = oauth:uri(Url, SignedParams),
-
-        case test_request:get(OAuthUrl, [], [{host_header, Host}]) of
-            {ok, Code, _, Body} ->
-                ?assertEqual(200, Code),
-                {JsonBody} = jiffy:decode(Body),
-                ?assertEqual(<<"test">>,
-                             couch_util:get_value(<<"name">>, JsonBody));
-            Else ->
-                erlang:error({assertion_failed,
-                             [{module, ?MODULE},
-                              {line, ?LINE},
-                              {reason, ?iofmt("Request failed: ~p", [Else])}]})
-        end
-    end).
-
-should_fail_oauth_with_wrong_credentials({Url, _}) ->
-    ?_test(begin
-        AuthDbName = config:get("couch_httpd_auth", "authentication_db"),
-        JoeDoc = couch_doc:from_json_obj({[
-            {<<"_id">>, <<"org.couchdb.user:joe">>},
-            {<<"type">>, <<"user">>},
-            {<<"name">>, <<"joe">>},
-            {<<"roles">>, []},
-            {<<"password_sha">>, <<"fe95df1ca59a9b567bdca5cbaf8412abd6e06121">>},
-            {<<"salt">>, <<"4e170ffeb6f34daecfd814dfb4001a73">>}
-        ]}),
-        {ok, AuthDb} = couch_db:open_int(?l2b(AuthDbName), [?ADMIN_CTX]),
-        {ok, _} = couch_db:update_doc(AuthDb, JoeDoc, [?ADMIN_CTX]),
-
-        Host = "oauth-example.com",
-        Consumer = {"consec1", "bad_secret", hmac_sha1},
-        SignedParams = oauth:sign(
-            "GET", "http://" ++ Host ++ "/", [], Consumer, "otoksec1", "foobar"),
-        OAuthUrl = oauth:uri(Url, SignedParams),
-
-        case test_request:get(OAuthUrl, [], [{host_header, Host}]) of
-            {ok, Code, _, Body} ->
-                ?assertEqual(401, Code),
-                {JsonBody} = jiffy:decode(Body),
-                ?assertEqual(<<"unauthorized">>,
-                             couch_util:get_value(<<"error">>, JsonBody));
             Else ->
                 erlang:error({assertion_failed,
                              [{module, ?MODULE},

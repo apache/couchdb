@@ -23,7 +23,6 @@ deps() ->
         crypto,
         public_key,
         ssl,
-        oauth,
         ibrowse,
         mochiweb,
         config,
