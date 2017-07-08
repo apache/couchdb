@@ -84,7 +84,7 @@ Param(
 
     [string]$DocDir = "$DataRootDir\doc\apache-couchdb", # man documentation (default $DataRootDir\doc\apache-couchdb)
     [ValidateNotNullOrEmpty()]
-    [string]$HTMLDir = "$DocDir\html", # html documentation (default $DocDir\html)
+    [string]$HTMLDir = "$DocDir\html" # html documentation (default $DocDir\html)
 )
 
 

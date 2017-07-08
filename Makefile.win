@@ -12,6 +12,7 @@
 
 include version.mk
 
+SHELL=cmd.exe
 REBAR?=$(shell where rebar.cmd)
 IN_RELEASE = $(shell if not exist .git echo true)
 ifeq ($(IN_RELEASE), true)
