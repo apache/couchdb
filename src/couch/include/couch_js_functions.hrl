@@ -150,21 +150,3 @@
         }
     }
 ">>).
-
-
--define(OAUTH_MAP_FUN, <<"
-    function(doc) {
-        if (doc.type === 'user' && doc.oauth && doc.oauth.consumer_keys) {
-            for (var consumer_key in doc.oauth.consumer_keys) {
-                for (var token in doc.oauth.tokens) {
-                    var obj = {
-                        'consumer_secret': doc.oauth.consumer_keys[consumer_key],
-                        'token_secret': doc.oauth.tokens[token],
-                        'username': doc.name
-                    };
-                    emit([consumer_key, token], obj);
-                }
-            }
-        }
-    }
-">>).

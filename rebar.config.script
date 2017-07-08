@@ -64,10 +64,8 @@ DepDescs = [
 {ibrowse,          "ibrowse",          "4af2d408607874d124414ac45df1edbe3961d1cd"},
 {jiffy,            "jiffy",            "1acdd1ac389dff3d763589f64331227ae594f3b7"},
 {mochiweb,         "mochiweb",         "bd6ae7cbb371666a1f68115056f7b30d13765782"},
-{meck,             "meck",             {tag, "0.8.2"}},
+{meck,             "meck",             {tag, "0.8.2"}}
 
-%% Deprecated
-{oauth,            "oauth",            "099057a98e41f3aff91e77e3cf496d6c6fd901df"}
 ],
 
 

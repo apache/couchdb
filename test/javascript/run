@@ -29,7 +29,6 @@ COUCHJS = "src/couch/priv/couchjs"
 SCRIPTS = """
     test/javascript/json2.js
     test/javascript/sha1.js
-    test/javascript/oauth.js
     test/javascript/couch.js
     test/javascript/replicator_db_inc.js
     test/javascript/couch_test_runner.js

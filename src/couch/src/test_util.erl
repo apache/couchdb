@@ -47,7 +47,6 @@ init_code_path() ->
     Paths = [
         "couchdb",
         "jiffy",
-        "oauth",
         "ibrowse",
         "mochiweb",
         "snappy"
