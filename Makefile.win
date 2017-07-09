@@ -16,11 +16,12 @@ SHELL=cmd.exe
 REBAR?=$(shell where rebar.cmd)
 IN_RELEASE = $(shell if not exist .git echo true)
 ifeq ($(IN_RELEASE), true)
-COUCHDB_VERSION_SUFFIX = -$(shell git rev-parse --short --verify HEAD)
+COUCHDB_VERSION_SUFFIX=
+COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)
 else
-COUCHDB_VERSION_SUFFIX = 
-endif
+COUCHDB_VERSION_SUFFIX = -$(shell git rev-parse --short --verify HEAD)
 COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)$(COUCHDB_VERSION_SUFFIX)
+endif
 
 DESTDIR=
 
