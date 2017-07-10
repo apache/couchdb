@@ -29,11 +29,12 @@ handle_setup_req(#httpd{method='POST'}=Req) ->
     end;
 handle_setup_req(#httpd{method='GET'}=Req) ->
     ok = chttpd:verify_is_server_admin(Req),
+    Dbs = chttpd:qs_json_value(Req, "ensure_dbs_exist", setup:cluster_system_dbs()),
     case setup:is_cluster_enabled() of
         no ->
             chttpd:send_json(Req, 200, {[{state, cluster_disabled}]});
         ok ->
-            case setup:has_cluster_system_dbs() of
+            case setup:has_cluster_system_dbs(Dbs) of
                 no ->
                     chttpd:send_json(Req, 200, {[{state, cluster_enabled}]});
                 ok ->
@@ -74,7 +75,11 @@ handle_action("enable_cluster", Setup) ->
 
 handle_action("finish_cluster", Setup) ->
     couch_log:notice("finish_cluster: ~p~n", [Setup]),
-    case setup:finish_cluster() of
+
+    Options = get_options([
+        {ensure_dbs_exist, <<"ensure_dbs_exist">>}
+    ], Setup),
+    case setup:finish_cluster(Options) of
         {error, cluster_finished} ->
             {error, <<"Cluster is already finished">>};
         Else ->

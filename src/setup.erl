@@ -12,8 +12,8 @@
 
 -module(setup).
 
--export([enable_cluster/1, finish_cluster/0, add_node/1, receive_cookie/1]).
--export([is_cluster_enabled/0, has_cluster_system_dbs/0]).
+-export([enable_cluster/1, finish_cluster/1, add_node/1, receive_cookie/1]).
+-export([is_cluster_enabled/0, has_cluster_system_dbs/1, cluster_system_dbs/0]).
 
 -include_lib("../couch/include/couch_db.hrl").
 
@@ -53,9 +53,6 @@ is_cluster_enabled() ->
 cluster_system_dbs() ->
     ["_users", "_replicator", "_global_changes"].
 
-
-has_cluster_system_dbs() ->
-    has_cluster_system_dbs(cluster_system_dbs()).
 
 has_cluster_system_dbs([]) ->
     ok;
@@ -172,12 +169,19 @@ set_admin(Username, Password) ->
   config:set("admins", binary_to_list(Username), binary_to_list(Password)).
 
 
-finish_cluster() ->
-    finish_cluster_int(has_cluster_system_dbs()).
-finish_cluster_int(ok) ->
+finish_cluster(Options) ->
+    Dbs = proplists:get_value(ensure_dbs_exist, Options),
+    case Dbs of
+        undefined ->
+            finish_cluster_int(cluster_system_dbs(), has_cluster_system_dbs(cluster_system_dbs()));
+        Dbs ->
+            finish_cluster_int(Dbs, has_cluster_system_dbs(Dbs))
+    end.
+
+finish_cluster_int(_Dbs, ok) ->
     {error, cluster_finished};
-finish_cluster_int(no) ->
-    lists:foreach(fun fabric:create_db/1, cluster_system_dbs()).
+finish_cluster_int(Dbs, no) ->
+    lists:foreach(fun fabric:create_db/1, Dbs).
 
 
 add_node(Options) ->
