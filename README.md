@@ -2,21 +2,26 @@ This module implements /_cluster_setup and manages the setting up, duh, of a Cou
 
 ### Testing
 
-```
+```bash
 git clone https://git-wip-us.apache.org/repos/asf/couchdb.git
 cd couchdb
 git checkout setup
 ./configure
 make
-
-# in dev/run comment out the line `connect_nodes("127.0.0.1", 15984)`
-
-dev/run --admin a:b
-
-# in a new terminal
-src/setup/test/t.sh
-
+dev/run --no-join -n 2 --admin a:b
 ```
+
+Then, in a new terminal:
+
+    $ src/setup/test/t.sh
+
+Before running each test, kill the `dev/run` script, then reset the
+CouchDB instances with:
+
+    $ rm -rf dev/lib/ dev/logs/
+    $ dev/run --no-join -n 2 --admin a:b
+
+before running the next shell script.
 
 The Plan:
 

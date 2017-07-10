@@ -14,6 +14,7 @@
 
 -export([enable_cluster/1, finish_cluster/1, add_node/1, receive_cookie/1]).
 -export([is_cluster_enabled/0, has_cluster_system_dbs/1, cluster_system_dbs/0]).
+-export([enable_single_node/1, is_single_node_enabled/1]).
 
 -include_lib("../couch/include/couch_db.hrl").
 
@@ -49,6 +50,15 @@ is_cluster_enabled() ->
         {_,_} -> ok
     end.
 
+is_single_node_enabled(Dbs) ->
+    % admins != empty AND dbs exist
+    Admins = config:get("admins"),
+    HasDbs = has_cluster_system_dbs(Dbs),
+    case {Admins, HasDbs} of
+        {[], _} -> no;
+        {_, no} -> no;
+        {_,_} -> ok
+    end.
 
 cluster_system_dbs() ->
     ["_users", "_replicator", "_global_changes"].
@@ -129,18 +139,27 @@ enable_cluster_int(Options, no) ->
           Pw -> Pw
         end
     },
+    ok = require_admins(CurrentAdmins, NewCredentials),
 
     % if bind_address == 127.0.0.1 and no bind_address in req -> error
     CurrentBindAddress = config:get("chttpd","bind_address"),
     NewBindAddress = proplists:get_value(bind_address, Options),
-    ok = require_admins(CurrentAdmins, NewCredentials),
     ok = require_bind_address(CurrentBindAddress, NewBindAddress),
 
+    NodeCount = couch_util:get_value(node_count, Options),
+    ok = require_node_count(NodeCount),
+
+    Port = proplists:get_value(port, Options),
+
+    setup_node(NewCredentials, NewBindAddress, NodeCount, Port),
+    couch_log:notice("Enable Cluster: ~p~n", [Options]).
+
+setup_node(NewCredentials, NewBindAddress, NodeCount, Port) ->
     case NewCredentials of
         {undefined, undefined} ->
             ok;
         {Username, Password} ->
-            set_admin(Username, Password)
+            config:set("admins", binary_to_list(Username), binary_to_list(Password))
     end,
 
     case NewBindAddress of
@@ -150,11 +169,8 @@ enable_cluster_int(Options, no) ->
             config:set("chttpd", "bind_address", binary_to_list(NewBindAddress))
     end,
 
-    NodeCount = couch_util:get_value(node_count, Options),
-    ok = require_node_count(NodeCount),
     config:set_integer("cluster", "n", NodeCount),
 
-    Port = proplists:get_value(port, Options),
     case Port of
         undefined ->
             ok;
@@ -162,11 +178,7 @@ enable_cluster_int(Options, no) ->
             config:set("chttpd", "port", binary_to_list(Port));
         Port when is_integer(Port) ->
             config:set_integer("chttpd", "port", Port)
-    end,
-    couch_log:notice("Enable Cluster: ~p~n", [Options]).
-
-set_admin(Username, Password) ->
-  config:set("admins", binary_to_list(Username), binary_to_list(Password)).
+    end.
 
 
 finish_cluster(Options) ->
@@ -182,6 +194,34 @@ finish_cluster_int(_Dbs, ok) ->
     {error, cluster_finished};
 finish_cluster_int(Dbs, no) ->
     lists:foreach(fun fabric:create_db/1, Dbs).
+
+
+enable_single_node(Options) ->
+    % if no admin in config and no admin in req -> error
+    CurrentAdmins = config:get("admins"),
+    NewCredentials = {
+        proplists:get_value(username, Options),
+        case proplists:get_value(password_hash, Options) of
+          undefined -> proplists:get_value(password, Options);
+          Pw -> Pw
+        end
+    },
+    ok = require_admins(CurrentAdmins, NewCredentials),
+
+    % skip bind_address validation, anything is fine
+    NewBindAddress = proplists:get_value(bind_address, Options),
+
+    Port = proplists:get_value(port, Options),
+
+    setup_node(NewCredentials, NewBindAddress, 1, Port),
+    Dbs = proplists:get_value(ensure_dbs_exist, Options),
+    case Dbs of
+        undefined ->
+            finish_cluster_int(cluster_system_dbs(), has_cluster_system_dbs(cluster_system_dbs()));
+        Dbs ->
+            finish_cluster_int(Dbs, has_cluster_system_dbs(Dbs))
+    end,
+    couch_log:notice("Enable Single Node: ~p~n", [Options]).
 
 
 add_node(Options) ->
