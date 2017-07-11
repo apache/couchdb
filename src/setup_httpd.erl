@@ -32,25 +32,25 @@ handle_setup_req(#httpd{method='GET'}=Req) ->
     Dbs = chttpd:qs_json_value(Req, "ensure_dbs_exist", setup:cluster_system_dbs()),
     couch_log:notice("Dbs: ~p~n", [Dbs]),
     case erlang:list_to_integer(config:get("cluster", "n", undefined)) of
-    1 ->
-        case setup:is_single_node_enabled(Dbs) of
-        no ->
-            chttpd:send_json(Req, 200, {[{state, single_node_disabled}]});
-        ok ->
-            chttpd:send_json(Req, 200, {[{state, single_node_enabled}]})
-        end;
-    _ -> 
-        case setup:is_cluster_enabled() of
-        no ->
-            chttpd:send_json(Req, 200, {[{state, cluster_disabled}]});
-        ok ->
-            case setup:has_cluster_system_dbs(Dbs) of
-            no ->
-                chttpd:send_json(Req, 200, {[{state, cluster_enabled}]});
-            ok ->
-                chttpd:send_json(Req, 200, {[{state, cluster_finished}]})
+        1 ->
+            case setup:is_single_node_enabled(Dbs) of
+                false ->
+                    chttpd:send_json(Req, 200, {[{state, single_node_disabled}]});
+                true ->
+                    chttpd:send_json(Req, 200, {[{state, single_node_enabled}]})
+            end;
+        _ -> 
+            case setup:is_cluster_enabled() of
+                false ->
+                    chttpd:send_json(Req, 200, {[{state, cluster_disabled}]});
+                true ->
+                    case setup:has_cluster_system_dbs(Dbs) of
+                        false ->
+                            chttpd:send_json(Req, 200, {[{state, cluster_enabled}]});
+                        true ->
+                            chttpd:send_json(Req, 200, {[{state, cluster_finished}]})
+                    end
             end
-        end
     end;
 handle_setup_req(#httpd{}=Req) ->
     chttpd:send_method_not_allowed(Req, "GET,POST").
