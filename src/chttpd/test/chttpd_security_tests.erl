@@ -34,7 +34,7 @@
 
 setup() ->
     ok = config:set("admins", ?USER, ?PASS, _Persist=false),
-    UserDb = ?tempdb(),
+    UserDb = <<"_users">>,
     TmpDb = ?tempdb(),
     ok = config:set("couch_httpd_auth", "authentication_db", ?b2l(UserDb)),
     Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
@@ -45,8 +45,8 @@ setup() ->
     create_db(UsersUrl),
     create_db(Url),
     create_design_doc(Url),
-    create_user(UsersUrl,?TEST_MEMBER,[<<?TEST_MEMBER_PASS>>]),
-    create_user(UsersUrl,?TEST_ADMIN,[<<?TEST_MEMBER_PASS>>]),
+    create_user(UsersUrl,?TEST_MEMBER,?TEST_MEMBER_PASS,[<<?TEST_MEMBER>>]),
+    create_user(UsersUrl,?TEST_ADMIN,?TEST_ADMIN_PASS,[<<?TEST_ADMIN>>]),
     set_security(Url),
     [Url, UsersUrl].
 
@@ -58,7 +58,7 @@ teardown([Url,UsersUrl]) ->
     ok = config:delete("admins", ?USER, _Persist=false).
 
 create_db(Url) ->
-    {ok, Status, _, _} = test_request:put(Url, [?CONTENT_JSON, ?AUTH], "{}"),
+    {ok, Status, _, Body} = test_request:put(Url, [?CONTENT_JSON, ?AUTH], "{}"),
     ?assert(Status =:= 201 orelse Status =:= 202).
 
 create_design_doc(Url) ->
@@ -67,29 +67,27 @@ create_design_doc(Url) ->
     ?assert(Status =:= 201 orelse Status =:= 202).
 
 set_security(Url) ->
-
     SecurityUrl = lists:concat([Url, "/_security"]),
     SecurityProperties = [
-        {<<"admins">>,{[{<<"roles">>,[<<"test_admin">>]}]}},
-        {<<"members">>,{[{<<"roles">>,[<<"test_member">>]}]}}
+        {<<"admins">>,{[{<<"roles">>,[<<?TEST_ADMIN>>]}]}},
+        {<<"members">>,{[{<<"roles">>,[<<?TEST_MEMBER>>]}]}}
     ],
 
     Body = jiffy:encode({SecurityProperties}),
-    {ok, Status, _, _} = test_request:post(Url, [?CONTENT_JSON, ?AUTH], Body),
-    ?assert(Status =:= 201 orelse Status =:= 202).
+    {ok, Status, _, _} = test_request:put(SecurityUrl, [?CONTENT_JSON, ?AUTH], Body),
+    ?assert(Status =:= 200).
 
 delete_db(Url) ->
     {ok, 200, _, _} = test_request:delete(Url, [?AUTH]).
 
-create_user(UsersUrl,Name, Roles) ->
+create_user(UsersUrl, Name, Password, Roles) ->
    
     Body = "{\"name\":\"" ++ Name ++
-        "\",\"type\":\"user\",\"roles\":" ++ erlang:binary_to_list(jiffy:encode(Roles)) ++ ",\"password\":\"secret\"}",
+        "\",\"type\":\"user\",\"roles\":" ++ erlang:binary_to_list(jiffy:encode(Roles)) ++ ",\"password\":\"" ++ Password ++"\"}",
+    
     Url = lists:concat([
         UsersUrl, "/org.couchdb.user:", Name]),
-    {ok, 201, _, _} = test_request:put(Url, [?CONTENT_JSON, ?AUTH], Body),
-    % let's proceed after giving couch_peruser some time to create the user db
-    timer:sleep(2000).
+    {ok, 201, _, _} = test_request:put(Url, [?CONTENT_JSON, ?AUTH], Body).
 
 
 all_test_() ->
