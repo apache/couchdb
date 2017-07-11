@@ -124,6 +124,21 @@ endif
             -c 'startup_jitter=0' \
             test/javascript/run $(suites)
 
+.PHONY: soak-javascript
+soak-javascript:
+	@mkdir -p share/www/script/test
+ifeq ($(IN_RELEASE), true)
+	@cp test/javascript/tests/lorem*.txt share/www/script.test/
+else
+	@mkdir -p src/fauxton/dist/release/test
+	@cp test/javascript/tests/lorem*.txt src/fauxton/dist/release/test/
+endif
+	@rm -rf dev/lib
+	while [ $$? -eq 0 ]; do \
+		dev/run -n 1 -q --with-admin-party-please \
+				-c 'startup_jitter=0' \
+				test/javascript/run $(suites); \
+	done
 
 .PHONY: check-qs
 # target: check-qs - Run query server tests (ruby and rspec required!)
