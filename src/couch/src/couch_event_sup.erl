@@ -48,7 +48,7 @@ start_link(ServerName, EventMgr, EventHandler, Args) ->
     gen_server:start_link(ServerName, couch_event_sup, {EventMgr, EventHandler, Args}, []).
 
 stop(Pid) ->
-    gen_server:cast(Pid, stop).
+    gen_server:call(Pid, stop).
 
 init({EventMgr, EventHandler, Args}) ->
     case gen_event:add_sup_handler(EventMgr, EventHandler, Args) of
@@ -61,11 +61,11 @@ init({EventMgr, EventHandler, Args}) ->
 terminate(_Reason, _State) ->
     ok.
 
-handle_call(_Whatever, _From, State) ->
-    {reply, ok, State}.
+handle_call(stop, _From, State) ->
+    {stop, normal, ok, State}.
 
-handle_cast(stop, State) ->
-    {stop, normal, State}.
+handle_cast(_Msg, State) ->
+    {noreply, State}.
 
 handle_info({gen_event_EXIT, _Handler, Reason}, State) ->
     {stop, Reason, State}.
