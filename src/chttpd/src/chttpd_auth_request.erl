@@ -62,9 +62,9 @@ authorize_request_int(#httpd{path_parts=[_DbName], method='PUT'}=Req) ->
 authorize_request_int(#httpd{path_parts=[_DbName], method='DELETE'}=Req) ->
     require_admin(Req);
 authorize_request_int(#httpd{path_parts=[_DbName, <<"_compact">>|_]}=Req) ->
-    require_admin(Req);
+    require_db_admin(Req);
 authorize_request_int(#httpd{path_parts=[_DbName, <<"_view_cleanup">>]}=Req) ->
-    require_admin(Req);
+    require_db_admin(Req);
 authorize_request_int(#httpd{path_parts=[_DbName|_]}=Req) ->
     db_authorization_check(Req).
 
@@ -94,3 +94,33 @@ db_authorization_check(#httpd{path_parts=[DbName|_],user_ctx=Ctx}=Req) ->
 require_admin(Req) ->
     ok = couch_httpd:verify_is_server_admin(Req),
     Req.
+
+require_db_admin(#httpd{path_parts=[DbName|_],user_ctx=Ctx}=Req) ->
+    Sec = fabric:get_security(DbName, [{user_ctx, Ctx}]),
+    
+    case is_db_admin(Ctx,Sec) of
+        true -> Req;
+        false ->  throw({unauthorized, <<"You are not a server or db admin.">>})
+    end.
+
+is_db_admin(#user_ctx{name=UserName,roles=UserRoles}, {Security}) ->
+    {Admins} = couch_util:get_value(<<"admins">>, Security, {[]}),    
+    Names = couch_util:get_value(<<"names">>, Admins, []),
+    Roles = couch_util:get_value(<<"roles">>, Admins, []),
+    case check_security(roles, UserRoles, [<<"_admin">> | Roles]) of
+        true -> true;
+        false -> check_security(names, UserName, Names)
+    end.
+
+check_security(roles, [], _) ->
+    false;
+check_security(roles, UserRoles, Roles) ->
+    UserRolesSet = ordsets:from_list(UserRoles),
+    RolesSet = ordsets:from_list(Roles),
+    not ordsets:is_disjoint(UserRolesSet, RolesSet);
+check_security(names, _, []) ->
+    false;
+check_security(names, null, _) ->
+    false;
+check_security(names, UserName, Names) ->
+    lists:member(UserName, Names).
