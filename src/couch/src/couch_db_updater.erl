@@ -1076,7 +1076,6 @@ check_md5(_, _) -> throw(md5_mismatch).
 
 copy_docs(Db, #db{fd = DestFd} = NewDb, MixedInfos, Retry) ->
     DocInfoIds = [Id || #doc_info{id=Id} <- MixedInfos],
-    Compress = NewDb#db.compression,
     LookupResults = couch_btree:lookup(Db#db.id_tree, DocInfoIds),
     % COUCHDB-968, make sure we prune duplicates during compaction
     NewInfos0 = lists:usort(fun(#full_doc_info{id=A}, #full_doc_info{id=B}) ->
