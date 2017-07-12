@@ -345,6 +345,13 @@ couchdb_1283() ->
         % monitor db and index pids
         {ok, DDPid} = couch_index_server:get_index(
             couch_mrview_index, MDb1#db.name, <<"_design/foo">>),
+
+        % Our query could have run after a partial update
+        % so we need to make sure that the updater has
+        % exited and released its monitor on the database
+        % fd.
+        wait_for_updater_exit(DDPid),
+
         DesignDocMonRef = erlang:monitor(process, DDPid),
         DatabaseMonRef = erlang:monitor(process, MDb1#db.main_pid),
 
@@ -627,6 +634,26 @@ wait_view_compact_done(DbName, DDocId, N) ->
         true ->
             ok = timer:sleep(?DELAY),
             wait_view_compact_done(DbName, DDocId, N - 1)
+    end.
+
+% This is a bit of a dirty hack fishing through various
+% state records but at least its better than putting
+% a sleep on it and calling it fixed.
+wait_for_updater_exit(DDPid) ->
+    % #st record from couch_index.erl
+    IdxState = sys:get_state(DDPid),
+    UpdaterPid = element(4, IdxState),
+
+    % #st record from couch_index_updater.erl
+    UpdaterState = sys:get_state(UpdaterPid),
+    RunnerPid = element(4, UpdaterState),
+
+    % RunnerPid can be nil, undefined, or a pid so
+    % just check if its a pid and wait on it to
+    % exit
+    if not is_pid(RunnerPid) -> ok; true ->
+        Ref = erlang:monitor(process, RunnerPid),
+        receive {'DOWN', Ref, _, _, _} -> ok end
     end.
 
 spawn_writer(DbName) ->
