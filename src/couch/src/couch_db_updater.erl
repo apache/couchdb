@@ -1086,6 +1086,8 @@ copy_docs(Db, #db{fd = DestFd} = NewDb, MixedInfos, Retry) ->
         {NewRevTree, FinalAcc} = couch_key_tree:mapfold(fun
             (_Rev, #leaf{ptr=Sp}=Leaf, leaf, SizesAcc) ->
                 {Body, AttInfos} = copy_doc_attachments(Db, Sp, DestFd),
+                % In the future, we should figure out how to do this for
+                % upgrade purposes.
                 EJsonBody = case is_binary(Body) of
                     true ->
                         couch_compress:decompress(Body);
