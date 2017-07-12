@@ -73,12 +73,20 @@ handle_call({update, IdxState}, _From, #st{idx=Idx, mod=Mod}=State) ->
 handle_call({restart, IdxState}, _From, #st{idx=Idx, mod=Mod}=State) ->
     Args = [Mod:get(db_name, IdxState), Mod:get(idx_name, IdxState)],
     couch_log:info("Restarting index update for db: ~s idx: ~s", Args),
-    case is_pid(State#st.pid) of
+    Pid = State#st.pid,
+    case is_pid(Pid) of
         true -> couch_util:shutdown_sync(State#st.pid);
         _ -> ok
     end,
-    Pid = spawn_link(?MODULE, update, [Idx, State#st.mod, IdxState]),
-    {reply, ok, State#st{pid=Pid}};
+    % Make sure and flush a possible 'EXIT' message
+    % that's already in our mailbox
+    receive
+        {'EXIT', Pid, _} -> ok
+    after 0 ->
+        ok
+    end,
+    NewPid = spawn_link(?MODULE, update, [Idx, State#st.mod, IdxState]),
+    {reply, ok, State#st{pid=NewPid}};
 handle_call(is_running, _From, #st{pid=Pid}=State) when is_pid(Pid) ->
     {reply, true, State};
 handle_call(is_running, _From, State) ->
