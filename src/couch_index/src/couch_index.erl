@@ -230,24 +230,37 @@ handle_cast({new_state, NewIdxState}, State) ->
         mod=Mod,
         idx_state=OldIdxState
     } = State,
-    assert_signature_match(Mod, OldIdxState, NewIdxState),
-    CurrSeq = Mod:get(update_seq, NewIdxState),
-    Args = [
-        Mod:get(db_name, NewIdxState),
-        Mod:get(idx_name, NewIdxState),
-        CurrSeq
-    ],
-    couch_log:debug("Updated index for db: ~s idx: ~s seq: ~B", Args),
-    Rest = send_replies(State#st.waiters, CurrSeq, NewIdxState),
-    case State#st.committed of
-        true -> erlang:send_after(commit_delay(), self(), commit);
-        false -> ok
-    end,
-    {noreply, State#st{
-        idx_state=NewIdxState,
-        waiters=Rest,
-        committed=false
-    }};
+    OldFd = Mod:get(fd, OldIdxState),
+    NewFd = Mod:get(fd, NewIdxState),
+    case NewFd == OldFd of
+        true ->
+            assert_signature_match(Mod, OldIdxState, NewIdxState),
+            CurrSeq = Mod:get(update_seq, NewIdxState),
+            Args = [
+                Mod:get(db_name, NewIdxState),
+                Mod:get(idx_name, NewIdxState),
+                CurrSeq
+            ],
+            couch_log:debug("Updated index for db: ~s idx: ~s seq: ~B", Args),
+            Rest = send_replies(State#st.waiters, CurrSeq, NewIdxState),
+            case State#st.committed of
+                true -> erlang:send_after(commit_delay(), self(), commit);
+                false -> ok
+            end,
+            {noreply, State#st{
+                idx_state=NewIdxState,
+                waiters=Rest,
+                committed=false
+            }};
+        false ->
+            Fmt = "Ignoring update from old indexer for db: ~s idx: ~s",
+            Args = [
+                Mod:get(db_name, NewIdxState),
+                Mod:get(idx_name, NewIdxState)
+            ],
+            couch_log:warning(Fmt, Args),
+            {noreply, State}
+    end;
 handle_cast({update_error, Error}, State) ->
     send_all(State#st.waiters, Error),
     {noreply, State#st{waiters=[]}};
