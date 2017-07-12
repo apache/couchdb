@@ -46,7 +46,14 @@
 -export([set_timeout/2, prompt/2]).
 
 -define(STATE, native_proc_state).
--record(evstate, {ddocs, funs=[], query_config=[], list_pid=nil, timeout=5000}).
+-record(evstate, {
+    ddocs,
+    funs = [],
+    query_config = [],
+    list_pid = nil,
+    timeout = 5000,
+    idle = 5000
+}).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -65,10 +72,12 @@ prompt(Pid, Data) when is_list(Data) ->
 
 % gen_server callbacks
 init([]) ->
-    {ok, #evstate{ddocs=dict:new()}}.
+    V = config:get("query_server_config", "os_process_idle_limit", "300"),
+    Idle = list_to_integer(V) * 1000,
+    {ok, #evstate{ddocs=dict:new(), idle=Idle}, Idle}.
 
 handle_call({set_timeout, TimeOut}, _From, State) ->
-    {reply, ok, State#evstate{timeout=TimeOut}};
+    {reply, ok, State#evstate{timeout=TimeOut}, State#evstate.idle};
 
 handle_call({prompt, Data}, _From, State) ->
     couch_log:debug("Prompt native qs: ~s",[?JSON_ENCODE(Data)]),
@@ -79,28 +88,38 @@ handle_call({prompt, Data}, _From, State) ->
                 {State, [<<"error">>, Why, Why]}
         end,
 
+    Idle = State#evstate.idle,
     case Resp of
         {error, Reason} ->
             Msg = io_lib:format("couch native server error: ~p", [Reason]),
-            {reply, [<<"error">>, <<"native_query_server">>, list_to_binary(Msg)], NewState};
+            Error = [<<"error">>, <<"native_query_server">>, list_to_binary(Msg)],
+            {reply, Error, NewState, Idle};
         [<<"error">> | Rest] ->
             % Msg = io_lib:format("couch native server error: ~p", [Rest]),
             % TODO: markh? (jan)
-            {reply, [<<"error">> | Rest], NewState};
+            {reply, [<<"error">> | Rest], NewState, Idle};
         [<<"fatal">> | Rest] ->
             % Msg = io_lib:format("couch native server error: ~p", [Rest]),
             % TODO: markh? (jan)
             {stop, fatal, [<<"error">> | Rest], NewState};
         Resp ->
-            {reply, Resp, NewState}
+            {reply, Resp, NewState, Idle}
     end.
 
 handle_cast(garbage_collect, State) ->
     erlang:garbage_collect(),
-    {noreply, State};
-handle_cast(_, State) -> {noreply, State}.
+    {noreply, State, State#evstate.idle};
+handle_cast(stop, State) ->
+    {stop, normal, State};
+handle_cast(_Msg, State) ->
+    {noreply, State, State#evstate.idle}.
 
-handle_info({'EXIT',_,normal}, State) -> {noreply, State};
+handle_info(timeout, State) ->
+    gen_server:cast(couch_proc_manager, {os_proc_idle, self()}),
+    erlang:garbage_collect(),
+    {noreply, State, State#evstate.idle};
+handle_info({'EXIT',_,normal}, State) ->
+    {noreply, State, State#evstate.idle};
 handle_info({'EXIT',_,Reason}, State) ->
     {stop, Reason, State}.
 terminate(_Reason, _State) -> ok.
@@ -142,8 +161,13 @@ run(#evstate{list_pid=Pid}=State, _Command) when is_pid(Pid) ->
     {State, [<<"error">>, list_error, list_error]};
 run(#evstate{ddocs=DDocs}, [<<"reset">>]) ->
     {#evstate{ddocs=DDocs}, true};
-run(#evstate{ddocs=DDocs}, [<<"reset">>, QueryConfig]) ->
-    {#evstate{ddocs=DDocs, query_config=QueryConfig}, true};
+run(#evstate{ddocs=DDocs, idle=Idle}, [<<"reset">>, QueryConfig]) ->
+    NewState = #evstate{
+        ddocs = DDocs,
+        query_config = QueryConfig,
+        idle = Idle
+    },
+    {NewState, true};
 run(#evstate{funs=Funs}=State, [<<"add_fun">> , BinFunc]) ->
     FunInfo = makefun(State, BinFunc),
     {State#evstate{funs=Funs ++ [FunInfo]}, true};
