@@ -97,14 +97,14 @@ require_admin(Req) ->
 
 require_db_admin(#httpd{path_parts=[DbName|_],user_ctx=Ctx}=Req) ->
     Sec = fabric:get_security(DbName, [{user_ctx, Ctx}]),
-    
+
     case is_db_admin(Ctx,Sec) of
         true -> Req;
         false ->  throw({unauthorized, <<"You are not a server or db admin.">>})
     end.
 
 is_db_admin(#user_ctx{name=UserName,roles=UserRoles}, {Security}) ->
-    {Admins} = couch_util:get_value(<<"admins">>, Security, {[]}),    
+    {Admins} = couch_util:get_value(<<"admins">>, Security, {[]}),
     Names = couch_util:get_value(<<"names">>, Admins, []),
     Roles = couch_util:get_value(<<"roles">>, Admins, []),
     case check_security(roles, UserRoles, [<<"_admin">> | Roles]) of
