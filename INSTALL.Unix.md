@@ -148,6 +148,7 @@ You should create a special `couchdb` user for CouchDB.
 On many Unix-like systems you can run:
 
     adduser --system \
+            --home /opt/couchdb \
             --no-create-home \
             --shell /bin/bash \
             --group --gecos \
@@ -159,13 +160,7 @@ site to find the documentation appropriate for your system. As of recent
 versions of OS X, this functionality is also included in Server.app,
 available through the App Store only as part of OS X Server.
 
-You must make sure that:
-
-    * The user has a working POSIX shell
-
-    * The user's home directory is wherever you have copied the release.
-      As a recommendation, copy the `rel\couchdb` directory into
-      `/home/couchdb` or `/Users/couchdb`.
+You must make sure that the user has a working POSIX shell.
 
 You can test this by:
 
@@ -175,19 +170,19 @@ You can test this by:
 
 Copy the built couchdb release to the new user's home directory:
 
-    cp -R /path/to/couchdb/rel/couchdb /home/couchdb
+    cp -R /path/to/couchdb/rel/couchdb /opt/couchdb
 
 Change the ownership of the CouchDB directories by running:
 
-    chown -R couchdb:couchdb /home/couchdb/couchdb 
+    chown -R couchdb:couchdb /opt/couchdb
 
 Change the permission of the CouchDB directories by running:
 
-    find /home/couchdb/couchdb -type d -exec chmod 0770 {} \;
+    find /opt/couchdb -type d -exec chmod 0770 {} \;
 
 Update the permissions for your ini files:
 
-    chmod 0644 /home/couchdb/couchdb/etc/*
+    chmod 0644 /opt/couchdb/etc/*
 
 ## First Run
 
@@ -215,8 +210,6 @@ From here you should verify your installation by pointing your web browser to:
 
 ## Running as a Daemon
 
-CouchDB no longer ships with any daemonization scripts.
-
 The couchdb team recommends [runit](http://smarden.org/runit/) to
 run CouchDB persistently and reliably. Configuration of runit is
 straightforward; if you have questions, reach out to the CouchDB
@@ -224,5 +217,11 @@ user mailing list.
 
 Naturally, you can configure systemd, launchd or SysV-init daemons to
 launch CouchDB and keep it running using standard configuration files.
+Sample scripts are in the couchdb-pkg repository:
+
+* SysV-init (Debian-style): https://github.com/apache/couchdb-pkg/blob/master/debian/couchdb.init
+* SysV-init (RHEL-style): https://github.com/apache/couchdb-pkg/blob/master/rpm/SOURCES/couchdb.init
+* upstart: Use the Debian-style sysvinit script instead.
+* systemd: https://github.com/apache/couchdb-pkg/blob/master/debian/couchdb.service
 
 Consult your system documentation for more information.
