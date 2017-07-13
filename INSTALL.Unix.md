@@ -44,8 +44,14 @@ You should have the following installed:
  * GNU Compiler Collection      (http://gcc.gnu.org/)
  * libcurl                      (http://curl.haxx.se/libcurl/)
  * help2man                     (http://www.gnu.org/s/help2man/)
- * Python (>=2.7) for docs      (http://python.org/)
- * Python Sphinx (>=1.1.3)      (http://pypi.python.org/pypi/Sphinx)
+ * Python (>=2.7)               (http://python.org/)
+
+To build Fauxton, you should have the following installed:
+ * Node.JS (>=6.x)              (https://nodejs.org/)
+   -- obtainable from NodeSource (https://github.com/nodesource/distributions)
+
+To build the documentation, you should have the following installed:
+ * Python Sphinx (>=1.5)        (http://pypi.python.org/pypi/Sphinx)
 
 It is recommended that you install Erlang OTP R16B03-1 or above where
 possible.  You will only need libcurl if you plan to run the
@@ -54,10 +60,6 @@ installing the CouchDB man pages.  Python and Sphinx are only required
 for building the online documentation. Documentation build can be disabled
 by adding the `--disable-docs` flag to the `configure` script.
 
-For up to date instructions, please see:
-
-  https://cwiki.apache.org/confluence/display/COUCHDB/Installing+CouchDB
-
 ### Debian-based Systems
 
 You can install the dependencies by running:
@@ -65,6 +67,13 @@ You can install the dependencies by running:
     sudo apt-get --no-install-recommends -y install \
         build-essential pkg-config erlang erlang-reltool \
         libicu-dev libmozjs185-dev libcurl4-openssl-dev
+
+You can install the Node.JS dependencies via [NodeSource](https://github.com/nodesource/distributions#installation-instructions).
+
+You can install the documentation dependencies by running:
+
+    sudo apt-get --no-install-recommends -y install \
+        python-sphinx
 
 Be sure to update the version numbers to match your system's available
 packages.
@@ -78,6 +87,14 @@ You can install the dependencies by running:
         erlang-os_mon erlang-xmerl help2man \
         js-devel-1.8.5 libicu-devel libtool perl-Test-Harness
 
+You can install the Node.JS dependencies via [NodeSource](https://github.com/nodesource/distributions#rpminstall).
+
+The built-in packages for Sphinx in RHEL repositories are too old
+to run the documentation build process. Instead, use pip:
+
+    sudo yum install python-pip
+    sudo pip install sphinx
+
 ### Mac OS X
 
 To build CouchDB from source on Mac OS X, you will need to install
@@ -89,6 +106,14 @@ You can then install the other dependencies by running:
 
     brew install autoconf autoconf-archive automake libtool \
         erlang icu4c spidermonkey curl pkg-config
+
+You can install the Node.JS dependencies via the
+[official Macintosh installer](https://nodejs.org/en/download/).
+
+You can install the documentation dependencies by running:
+
+    sudo easy_install pip
+    sudo pip install sphinx
 
 You will need Homebrew installed to use the `brew` command.
 
