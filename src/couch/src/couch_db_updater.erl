@@ -1481,7 +1481,7 @@ get_meta_body_size(Meta, Summary) ->
         {ejson_size, ExternalSize} ->
             ExternalSize;
         false ->
-            couch_compress:decompress(Summary)
+            ?term_size(couch_compress:decompress(Summary))
     end.
 
 
