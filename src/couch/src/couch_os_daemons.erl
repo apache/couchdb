@@ -36,7 +36,6 @@
 }).
 
 -define(PORT_OPTIONS, [stream, {line, 1024}, binary, exit_status, hide]).
--define(TIMEOUT, 5000).
 -define(RELISTEN_DELAY, 5000).
 
 start_link() ->
