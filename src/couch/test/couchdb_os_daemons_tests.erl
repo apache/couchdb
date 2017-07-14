@@ -52,6 +52,7 @@ setup(DName) ->
     % Set configuration option to be used by configuration_reader_test_
     % This will be used in os_daemon_configer.escript:test_get_cfg2
     config:set("uuids", "algorithm","sequential", false),
+    config:set("os_daemon_settings", "max_retries", "2"),
     ensure_n_daemons_are_alive(1),
     {Ctx, OsDPid}.
 
@@ -181,7 +182,7 @@ should_fail_due_to_lack_of_permissions(DName, _) ->
     ?_test(should_halts(DName, 1000)).
 
 should_die_on_boot(DName, _) ->
-    ?_test(should_halts(DName, 1000)).
+    ?_test(should_halts(DName, 2000)).
 
 should_die_quickly(DName, _) ->
     ?_test(should_halts(DName, 4000)).
