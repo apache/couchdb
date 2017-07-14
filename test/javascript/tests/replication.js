@@ -218,12 +218,15 @@ couchTests.replication = function(debug) {
     return null;
   }
 
+  function getSourceLastSeq(sourceDb) {
+      return sourceDb.changes({"since":"now"}).last_seq;
+  }
 
   function waitForSeq(sourceDb, targetDb, rep_id) {
-    var sourceSeq = sourceDb.info().update_seq,
+    var sourceSeq = getSourceLastSeq(sourceDb),
         t0 = new Date(),
         t1,
-        ms = 3000;
+        ms = 30000;
 
     do {
       var task = getTask(rep_id, 0);
@@ -231,7 +234,24 @@ couchTests.replication = function(debug) {
         return;
       }
       t1 = new Date();
+      sleep(500);
     } while (((t1 - t0) <= ms));
+    throw(Error('Timeout waiting for replication through_seq = source update seq'));
+  }
+
+  function waitReplicationTaskStop(rep_id) {
+      var t0 = new Date(),
+          t1,
+          ms = 30000;
+      do {
+        var task = getTask(rep_id, 0);
+        if(task == null) {
+            return;
+        }
+        t1 = new Date();
+        sleep(500);
+      } while (((t1 - t0) <= ms));
+      throw(Error('Timeout waiting for replication task stop' + rep_id));
   }
 
   // test simple replications (not continuous, not filtered), including
@@ -1423,7 +1443,8 @@ couchTests.replication = function(debug) {
     };
     TEquals(true, sourceDb.save(doc).ok);
 
-    waitForSeq(sourceDb, targetDb, rep_id);
+    waitReplicationTaskStop(rep_id);
+
     copy = targetDb.open(doc._id);
     TEquals(null, copy);
   }
