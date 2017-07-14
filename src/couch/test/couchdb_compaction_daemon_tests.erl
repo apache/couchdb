@@ -293,6 +293,13 @@ is_idle(DbName) ->
     {ok, Db} = couch_db:open_int(DbName, [?ADMIN_CTX]),
     Monitors = couch_db:monitored_by(Db),
     ok = couch_db:close(Db),
+    Others = [M || M <- Monitors, M /= self()],
+    if Others == [] -> ok; true ->
+        lists:foreach(fun(Other) ->
+            Args = [Other, process_info(Other)],
+            couch_log:error("XKCD: MONITORED BY ~p :: ~p", Args)
+        end, Others)
+    end,
     not lists:any(fun(M) -> M /= self() end, Monitors).
 
 with_config_change(_DbName, Fun) ->
