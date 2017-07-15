@@ -677,6 +677,7 @@ flush_trees(#db{fd = Fd} = Db,
             case Value of
             #doc{deleted = IsDeleted, body = {summary, _, _, _} = DocSummary} ->
                 {summary, Summary, AttSizeInfo, AttsFd} = DocSummary,
+                ExternalSize = get_meta_body_size(Value#doc.meta, Summary),
                 % this node value is actually an unwritten document summary,
                 % write to disk.
                 % make sure the Fd in the written bins is the same Fd we are
@@ -695,7 +696,6 @@ flush_trees(#db{fd = Fd} = Db,
                                     " changed. Possibly retrying.", []),
                     throw(retry)
                 end,
-                ExternalSize = ?term_size(Summary),
                 {ok, NewSummaryPointer, SummarySize} =
                     couch_file:append_raw_chunk(Fd, Summary),
                 Leaf = #leaf{
@@ -1086,8 +1086,16 @@ copy_docs(Db, #db{fd = DestFd} = NewDb, MixedInfos, Retry) ->
         {NewRevTree, FinalAcc} = couch_key_tree:mapfold(fun
             (_Rev, #leaf{ptr=Sp}=Leaf, leaf, SizesAcc) ->
                 {Body, AttInfos} = copy_doc_attachments(Db, Sp, DestFd),
+                % In the future, we should figure out how to do this for
+                % upgrade purposes.
+                EJsonBody = case is_binary(Body) of
+                    true ->
+                        couch_compress:decompress(Body);
+                    false ->
+                        Body
+                end,
                 SummaryChunk = make_doc_summary(NewDb, {Body, AttInfos}),
-                ExternalSize = ?term_size(SummaryChunk),
+                ExternalSize = ?term_size(EJsonBody),
                 {ok, Pos, SummarySize} = couch_file:append_raw_chunk(
                     DestFd, SummaryChunk),
                 AttSizes = [{element(3,A), element(4,A)} || A <- AttInfos],
@@ -1466,6 +1474,16 @@ make_doc_summary(#db{compression = Comp}, {Body0, Atts0}) ->
     end,
     SummaryBin = ?term_to_bin({Body, Atts}),
     couch_file:assemble_file_chunk(SummaryBin, couch_crypto:hash(md5, SummaryBin)).
+
+
+get_meta_body_size(Meta, Summary) ->
+    case lists:keyfind(ejson_size, 1, Meta) of
+        {ejson_size, ExternalSize} ->
+            ExternalSize;
+        false ->
+            ?term_size(couch_compress:decompress(Summary))
+    end.
+
 
 default_security_object(<<"shards/", _/binary>>) ->
     case config:get("couchdb", "default_security", "everyone") of
