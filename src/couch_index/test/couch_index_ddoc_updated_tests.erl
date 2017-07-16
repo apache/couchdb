@@ -118,7 +118,7 @@ fake_index() ->
         (idx_name, {_DbName, DDoc}) ->
             DDoc#doc.id;
         (signature, {_DbName, DDoc}) ->
-            couch_crypto:hash(md5, term_to_binary(DDoc));
+            crypto:hash(md5, term_to_binary(DDoc));
         (update_seq, Seq) ->
             Seq
     end).

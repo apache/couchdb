@@ -1473,7 +1473,7 @@ make_doc_summary(#db{compression = Comp}, {Body0, Atts0}) ->
         couch_compress:compress(Atts0, Comp)
     end,
     SummaryBin = ?term_to_bin({Body, Atts}),
-    couch_file:assemble_file_chunk(SummaryBin, couch_crypto:hash(md5, SummaryBin)).
+    couch_file:assemble_file_chunk(SummaryBin, crypto:hash(md5, SummaryBin)).
 
 
 get_meta_body_size(Meta, Summary) ->
