@@ -39,7 +39,7 @@ handle_setup_req(#httpd{method='GET'}=Req) ->
                 true ->
                     chttpd:send_json(Req, 200, {[{state, single_node_enabled}]})
             end;
-        _ -> 
+        _ ->
             case setup:is_cluster_enabled() of
                 false ->
                     chttpd:send_json(Req, 200, {[{state, cluster_disabled}]});
