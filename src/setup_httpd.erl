@@ -94,7 +94,7 @@ handle_action("finish_cluster", Setup) ->
         {error, cluster_finished} ->
             {error, <<"Cluster is already finished">>};
         Else ->
-            couch_log:notice("Else: ~p~n", [Else]),
+            couch_log:notice("finish_cluster: ~p~n", [Else]),
             ok
     end;
 
