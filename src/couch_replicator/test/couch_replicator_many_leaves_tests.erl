@@ -186,7 +186,7 @@ add_attachments(SourceDb, NumAtts,  [{DocId, NumConflicts} | Rest]) ->
     NewDocs = lists:foldl(
         fun(#doc{atts = Atts, revs = {Pos, [Rev | _]}} = Doc, Acc) ->
             NewAtts = lists:foldl(fun(I, AttAcc) ->
-                AttData = crypto:rand_bytes(100),
+                AttData = crypto:strong_rand_bytes(100),
                 NewAtt = couch_att:new([
                     {name, ?io2b(["att_", ?i2l(I), "_",
                         couch_doc:rev_to_str({Pos, Rev})])},

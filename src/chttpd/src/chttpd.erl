@@ -204,7 +204,7 @@ handle_request_int(MochiReq) ->
         Other -> Other
     end,
 
-    Nonce = couch_util:to_hex(crypto:rand_bytes(5)),
+    Nonce = couch_util:to_hex(crypto:strong_rand_bytes(5)),
 
     HttpReq0 = #httpd{
         mochi_req = MochiReq,

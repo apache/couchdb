@@ -37,10 +37,10 @@ new() ->
     gen_server:call(?MODULE, create).
 
 random() ->
-    list_to_binary(couch_util:to_hex(crypto:rand_bytes(16))).
+    list_to_binary(couch_util:to_hex(crypto:strong_rand_bytes(16))).
 
 utc_random() ->
-    utc_suffix(couch_util:to_hex(crypto:rand_bytes(9))).
+    utc_suffix(couch_util:to_hex(crypto:strong_rand_bytes(9))).
 
 utc_suffix(Suffix) ->
     Now = {_, _, Micro} = erlang:now(), % uniqueness is used.
@@ -100,7 +100,7 @@ handle_config_terminate(_Server, _Reason, _State) ->
     erlang:send_after(?RELISTEN_DELAY, whereis(?MODULE), restart_config_listener).
 
 new_prefix() ->
-    couch_util:to_hex((crypto:rand_bytes(13))).
+    couch_util:to_hex((crypto:strong_rand_bytes(13))).
 
 inc() ->
     crypto:rand_uniform(1, 16#ffe).

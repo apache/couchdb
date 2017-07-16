@@ -19,7 +19,7 @@
 
 
 new_uuid() ->
-    to_hex(crypto:rand_bytes(16), []).
+    to_hex(crypto:strong_rand_bytes(16), []).
 
 
 to_hex(<<>>, Acc) ->

@@ -114,7 +114,7 @@ should_update_source_docs(Source, Times) ->
 
 populate_db(DbName) ->
     {ok, Db} = couch_db:open_int(DbName, []),
-    AttData = crypto:rand_bytes(6000),
+    AttData = crypto:strong_rand_bytes(6000),
     Doc = #doc{
         id = <<"doc1">>,
         atts = [
@@ -146,7 +146,7 @@ db_fold_fun(FullDocInfo, {DbName, Times}) ->
             {ok, Db2} = couch_db:reopen(Db),
             NewDocVersion = Doc#doc{
                 revs = {Pos, [RevId]},
-                body = {[{<<"value">>, base64:encode(crypto:rand_bytes(100))}]}
+                body = {[{<<"value">>, base64:encode(crypto:strong_rand_bytes(100))}]}
             },
             {ok, NewRev} = couch_db:update_doc(Db2, NewDocVersion, []),
             NewRev
