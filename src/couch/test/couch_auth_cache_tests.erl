@@ -260,7 +260,7 @@ update_user_doc(DbName, UserName, Password, Rev) ->
     {ok, couch_doc:rev_to_str(NewRev)}.
 
 hash_password(Password) ->
-    ?l2b(couch_util:to_hex(couch_crypto:hash(sha, iolist_to_binary([Password, ?SALT])))).
+    ?l2b(couch_util:to_hex(crypto:hash(sha, iolist_to_binary([Password, ?SALT])))).
 
 shutdown_db(DbName) ->
     {ok, AuthDb} = couch_db:open_int(DbName, [?ADMIN_CTX]),

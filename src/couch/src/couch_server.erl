@@ -153,7 +153,7 @@ is_admin(User, ClearPwd) ->
     case config:get("admins", User) of
     "-hashed-" ++ HashedPwdAndSalt ->
         [HashedPwd, Salt] = string:tokens(HashedPwdAndSalt, ","),
-        couch_util:to_hex(couch_crypto:hash(sha, ClearPwd ++ Salt)) == HashedPwd;
+        couch_util:to_hex(crypto:hash(sha, ClearPwd ++ Salt)) == HashedPwd;
     _Else ->
         false
     end.

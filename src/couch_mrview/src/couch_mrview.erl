@@ -217,7 +217,7 @@ query_all_docs(Db, Args, Callback, Acc) when is_list(Args) ->
 query_all_docs(Db, Args0, Callback, Acc) ->
     Sig = couch_util:with_db(Db, fun(WDb) ->
         {ok, Info} = couch_db:get_db_info(WDb),
-        couch_index_util:hexsig(couch_crypto:hash(md5, term_to_binary(Info)))
+        couch_index_util:hexsig(crypto:hash(md5, term_to_binary(Info)))
     end),
     Args1 = Args0#mrargs{view_type=map},
     Args2 = couch_mrview_util:validate_args(Args1),

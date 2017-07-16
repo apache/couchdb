@@ -16,7 +16,7 @@
 
 generate(Alg, Key, Counter, OutputLen)
   when is_atom(Alg), is_binary(Key), is_integer(Counter), is_integer(OutputLen) ->
-    Hmac = couch_crypto:hmac(Alg, Key, <<Counter:64>>),
+    Hmac = crypto:hmac(Alg, Key, <<Counter:64>>),
     Offset = binary:last(Hmac) band 16#f,
     Code =
         ((binary:at(Hmac, Offset) band 16#7f) bsl 24) +

@@ -141,7 +141,7 @@ add_doc_siblings(Db, _DocId, 0, AccDocs, AccRevs) ->
 
 add_doc_siblings(Db, DocId, NumLeaves, AccDocs, AccRevs) ->
     Value = ?l2b(?i2l(NumLeaves)),
-    Rev = couch_crypto:hash(md5, Value),
+    Rev = crypto:hash(md5, Value),
     Doc = #doc{
         id = DocId,
         revs = {1, [Rev]},

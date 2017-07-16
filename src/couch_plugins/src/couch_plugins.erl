@@ -231,7 +231,7 @@ do_verify_checksum(Filename, Checksum) ->
   couch_log:debug("Checking Filename: ~s", [Filename]),
   case file:read_file(Filename) of
   {ok, Data} ->
-    ComputedChecksum = binary_to_list(base64:encode(couch_crypto:hash(sha, Data))),
+    ComputedChecksum = binary_to_list(base64:encode(crypto:hash(sha, Data))),
     case ComputedChecksum of
     Checksum -> ok;
     _Else ->
