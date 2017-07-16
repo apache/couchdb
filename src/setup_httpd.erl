@@ -29,15 +29,27 @@ handle_setup_req(#httpd{method='POST'}=Req) ->
     end;
 handle_setup_req(#httpd{method='GET'}=Req) ->
     ok = chttpd:verify_is_server_admin(Req),
-    case setup:is_cluster_enabled() of
-        no ->
-            chttpd:send_json(Req, 200, {[{state, cluster_disabled}]});
-        ok ->
-            case setup:has_cluster_system_dbs() of
-                no ->
-                    chttpd:send_json(Req, 200, {[{state, cluster_enabled}]});
-                ok ->
-                    chttpd:send_json(Req, 200, {[{state, cluster_finished}]})
+    Dbs = chttpd:qs_json_value(Req, "ensure_dbs_exist", setup:cluster_system_dbs()),
+    couch_log:notice("Dbs: ~p~n", [Dbs]),
+    case erlang:list_to_integer(config:get("cluster", "n", undefined)) of
+        1 ->
+            case setup:is_single_node_enabled(Dbs) of
+                false ->
+                    chttpd:send_json(Req, 200, {[{state, single_node_disabled}]});
+                true ->
+                    chttpd:send_json(Req, 200, {[{state, single_node_enabled}]})
+            end;
+        _ ->
+            case setup:is_cluster_enabled() of
+                false ->
+                    chttpd:send_json(Req, 200, {[{state, cluster_disabled}]});
+                true ->
+                    case setup:has_cluster_system_dbs(Dbs) of
+                        false ->
+                            chttpd:send_json(Req, 200, {[{state, cluster_enabled}]});
+                        true ->
+                            chttpd:send_json(Req, 200, {[{state, cluster_finished}]})
+                    end
             end
     end;
 handle_setup_req(#httpd{}=Req) ->
@@ -74,13 +86,37 @@ handle_action("enable_cluster", Setup) ->
 
 handle_action("finish_cluster", Setup) ->
     couch_log:notice("finish_cluster: ~p~n", [Setup]),
-    case setup:finish_cluster() of
+
+    Options = get_options([
+        {ensure_dbs_exist, <<"ensure_dbs_exist">>}
+    ], Setup),
+    case setup:finish_cluster(Options) of
+        {error, cluster_finished} ->
+            {error, <<"Cluster is already finished">>};
+        Else ->
+            couch_log:notice("finish_cluster: ~p~n", [Else]),
+            ok
+    end;
+
+handle_action("enable_single_node", Setup) ->
+    couch_log:notice("enable_single_node: ~p~n", [Setup]),
+
+    Options = get_options([
+        {ensure_dbs_exist, <<"ensure_dbs_exist">>},
+        {username, <<"username">>},
+        {password, <<"password">>},
+        {password_hash, <<"password_hash">>},
+        {bind_address, <<"bind_address">>},
+        {port, <<"port">>}
+    ], Setup),
+    case setup:enable_single_node(Options) of
         {error, cluster_finished} ->
             {error, <<"Cluster is already finished">>};
         Else ->
             couch_log:notice("Else: ~p~n", [Else]),
             ok
     end;
+
 
 handle_action("add_node", Setup) ->
     couch_log:notice("add_node: ~p~n", [Setup]),
