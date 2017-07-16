@@ -208,7 +208,7 @@ enable_single_node(Options) ->
 
     setup_node(NewCredentials, NewBindAddress, 1, Port),
     Dbs = proplists:get_value(ensure_dbs_exist, Options, cluster_system_dbs()),
-    finish_cluster_int(Dbs, has_cluster_system_dbs(Dbs))
+    finish_cluster_int(Dbs, has_cluster_system_dbs(Dbs)),
     couch_log:notice("Enable Single Node: ~p~n", [Options]).
 
 
