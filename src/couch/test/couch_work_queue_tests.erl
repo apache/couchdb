@@ -335,7 +335,7 @@ producer_loop(Parent, Q) ->
             Parent ! {pong, Ref},
             producer_loop(Parent, Q);
         {produce, Ref, Size} ->
-            Item = crypto:rand_bytes(Size),
+            Item = crypto:strong_rand_bytes(Size),
             Parent ! {item, Ref, Item},
             ok = couch_work_queue:queue(Q, Item),
             producer_loop(Parent, Q)

@@ -461,7 +461,7 @@ populate_db(Db, BatchSize, N) when N > 0 ->
         fun(_) ->
             couch_doc:from_json_obj({[
                 {<<"_id">>, couch_uuids:new()},
-                {<<"value">>, base64:encode(crypto:rand_bytes(1000))}
+                {<<"value">>, base64:encode(crypto:strong_rand_bytes(1000))}
             ]})
         end,
         lists:seq(1, BatchSize)),
