@@ -117,7 +117,14 @@ view_group_shutdown_test_() ->
         "View group shutdown",
         {
             setup,
-            fun test_util:start_couch/0, fun test_util:stop_couch/1,
+            fun() ->
+                meck:new(couch_mrview_index, [passthrough]),
+                test_util:start_couch()
+            end,
+            fun(Ctx) ->
+                test_util:stop_couch(Ctx),
+                meck:unload()
+            end,
             [couchdb_1283()]
         }
     }.
@@ -342,74 +349,29 @@ couchdb_1283() ->
         ok = populate_db(MDb1, 100, 100),
         query_view(MDb1#db.name, "foo", "foo"),
         ok = couch_db:close(MDb1),
-        % monitor db and index pids
-        {ok, DDPid} = couch_index_server:get_index(
-            couch_mrview_index, MDb1#db.name, <<"_design/foo">>),
 
-        % Our query could have run after a partial update
-        % so we need to make sure that the updater has
-        % exited and released its monitor on the database
-        % fd.
-        wait_for_updater_exit(DDPid),
-
-        DesignDocMonRef = erlang:monitor(process, DDPid),
-        DatabaseMonRef = erlang:monitor(process, MDb1#db.main_pid),
-
-        {ok, Db1} = couch_db:create(?tempdb(), [?ADMIN_CTX]),
-        ok = couch_db:close(Db1),
-        {ok, Db2} = couch_db:create(?tempdb(), [?ADMIN_CTX]),
-        ok = couch_db:close(Db2),
-        {ok, Db3} = couch_db:create(?tempdb(), [?ADMIN_CTX]),
-        ok = couch_db:close(Db3),
-
-        wait_for_process_shutdown(DatabaseMonRef, killed,
-          {reason, "Failure waiting for db shutdown"}),
-        wait_for_process_shutdown(DesignDocMonRef, normal,
-          {reason, "Failure waiting for view index shutdown"}),
-
-        Writer1 = spawn_writer(Db1#db.name),
-        Writer2 = spawn_writer(Db2#db.name),
-
-        ?assert(is_process_alive(Writer1)),
-        ?assert(is_process_alive(Writer2)),
-
-        ?assertEqual(ok, get_writer_status(Writer1)),
-        ?assertEqual(ok, get_writer_status(Writer2)),
-
-        %% Below we do exactly the same as couch_mrview:compact holds inside
-        %% because we need have access to compaction Pid, not a Ref.
-        %% {ok, MonRef} = couch_mrview:compact(MDb1#db.name, <<"_design/foo">>,
-        %%                                     [monitor]),
         {ok, Pid} = couch_index_server:get_index(
             couch_mrview_index, MDb1#db.name, <<"_design/foo">>),
+
+        % Start and pause compacton
         {ok, CPid} = gen_server:call(Pid, compact),
-        %% By suspending compaction process we ensure that compaction won't get
-        %% finished too early to make get_writer_status assertion fail.
+        meck:wait(couch_mrview_index, compact, ['_', '_', '_'], 1000),
         erlang:suspend_process(CPid),
-        MonRef = erlang:monitor(process, CPid),
-        Writer3 = spawn_writer(Db3#db.name),
-        ?assert(is_process_alive(Writer3)),
-        ?assertEqual({error, all_dbs_active}, get_writer_status(Writer3)),
+        CRef = erlang:monitor(process, CPid),
+        ?assert(is_process_alive(CPid)),
 
-        ?assert(is_process_alive(Writer1)),
-        ?assert(is_process_alive(Writer2)),
-        ?assert(is_process_alive(Writer3)),
+        % Make sure that a compaction process takes a monitor
+        % on the database's main_pid
+        ?assertEqual(true, lists:member(CPid, couch_db:monitored_by(MDb1))),
 
-        %% Resume compaction
+        % Finish compaction to and make sure the monitor
+        % disappears
         erlang:resume_process(CPid),
-        wait_for_process_shutdown(MonRef, normal,
+        wait_for_process_shutdown(CRef, normal,
           {reason, "Failure compacting view group"}),
 
-        ?assertEqual(ok, writer_try_again(Writer3)),
-        ?assertEqual(ok, get_writer_status(Writer3)),
-
-        ?assert(is_process_alive(Writer1)),
-        ?assert(is_process_alive(Writer2)),
-        ?assert(is_process_alive(Writer3)),
-
-        ?assertEqual(ok, stop_writer(Writer1)),
-        ?assertEqual(ok, stop_writer(Writer2)),
-        ?assertEqual(ok, stop_writer(Writer3))
+        % Make sure that the monitor was removed
+        ?assertEqual(false, lists:member(CPid, couch_db:monitored_by(MDb1)))
     end).
 
 wait_for_process_shutdown(Pid, ExpectedReason, Error) ->
@@ -634,96 +596,6 @@ wait_view_compact_done(DbName, DDocId, N) ->
         true ->
             ok = timer:sleep(?DELAY),
             wait_view_compact_done(DbName, DDocId, N - 1)
-    end.
-
-% This is a bit of a dirty hack fishing through various
-% state records but at least its better than putting
-% a sleep on it and calling it fixed.
-wait_for_updater_exit(DDPid) ->
-    % #st record from couch_index.erl
-    IdxState = sys:get_state(DDPid),
-    UpdaterPid = element(4, IdxState),
-
-    % #st record from couch_index_updater.erl
-    UpdaterState = sys:get_state(UpdaterPid),
-    RunnerPid = element(4, UpdaterState),
-
-    % RunnerPid can be nil, undefined, or a pid so
-    % just check if its a pid and wait on it to
-    % exit
-    if not is_pid(RunnerPid) -> ok; true ->
-        Ref = erlang:monitor(process, RunnerPid),
-        receive {'DOWN', Ref, _, _, _} -> ok end
-    end.
-
-spawn_writer(DbName) ->
-    Parent = self(),
-    spawn(fun() ->
-        process_flag(priority, high),
-        writer_loop(DbName, Parent)
-    end).
-
-get_writer_status(Writer) ->
-    Ref = make_ref(),
-    Writer ! {get_status, Ref},
-    receive
-        {db_open, Ref} ->
-            ok;
-        {db_open_error, Error, Ref} ->
-            Error
-    after ?TIMEOUT ->
-        timeout
-    end.
-
-writer_try_again(Writer) ->
-    Ref = make_ref(),
-    Writer ! {try_again, Ref},
-    receive
-        {ok, Ref} ->
-            ok
-    after ?TIMEOUT ->
-        timeout
-    end.
-
-stop_writer(Writer) ->
-    Ref = make_ref(),
-    Writer ! {stop, Ref},
-    receive
-        {ok, Ref} ->
-            ok
-    after ?TIMEOUT ->
-        erlang:error({assertion_failed,
-                      [{module, ?MODULE},
-                       {line, ?LINE},
-                       {reason, "Timeout on stopping process"}]})
-    end.
-
-writer_loop(DbName, Parent) ->
-    case couch_db:open_int(DbName, []) of
-        {ok, Db} ->
-            writer_loop_1(Db, Parent);
-        Error ->
-            writer_loop_2(DbName, Parent, Error)
-    end.
-
-writer_loop_1(Db, Parent) ->
-    receive
-        {get_status, Ref} ->
-            Parent ! {db_open, Ref},
-            writer_loop_1(Db, Parent);
-        {stop, Ref} ->
-            ok = couch_db:close(Db),
-            Parent ! {ok, Ref}
-    end.
-
-writer_loop_2(DbName, Parent, Error) ->
-    receive
-        {get_status, Ref} ->
-            Parent ! {db_open_error, Error, Ref},
-            writer_loop_2(DbName, Parent, Error);
-        {try_again, Ref} ->
-            Parent ! {ok, Ref},
-            writer_loop(DbName, Parent)
     end.
 
 read_header(File) ->
