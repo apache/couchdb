@@ -25,6 +25,7 @@
     is_pos_integer/1,
     is_non_neg_integer/1,
     is_object/1,
+    is_ok_or_false/1,
 
     validate_idx_name/1,
     validate_selector/1,
@@ -127,6 +128,24 @@ validate_find({Props}) ->
             {optional, true},
             {default, false},
             {validator, fun mango_opts:is_boolean/1}
+        ]},
+        {<<"stale">>, [
+            {tag, stale},
+            {optional, true},
+            {default, false},
+            {validator, fun mango_opts:is_ok_or_false/1}
+        ]},
+        {<<"update">>, [
+            {tag, update},
+            {optional, true},
+            {default, true},
+            {validator, fun mango_opts:is_boolean/1}
+        ]},
+        {<<"stable">>, [
+            {tag, stable},
+            {optional, true},
+            {default, false},
+            {validator, fun mango_opts:is_boolean/1}
         ]}
     ],
     validate(Props, Opts).
@@ -197,6 +216,14 @@ is_object({Props}) ->
 is_object(Else) ->
     ?MANGO_ERROR({invalid_object, Else}).
 
+is_ok_or_false(<<"ok">>) ->
+  {ok, ok};
+is_ok_or_false(<<"false">>) -> % convenience
+  {ok, false};
+is_ok_or_false(false) ->
+  {ok, false};
+is_ok_or_false(Else) ->
+  ?MANGO_ERROR({invalid_ok_or_false_value, Else}).
 
 validate_idx_name(auto_name) ->
     {ok, auto_name};
