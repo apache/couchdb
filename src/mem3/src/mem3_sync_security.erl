@@ -44,10 +44,20 @@ maybe_sync_int(#shard{name=Name}=Src, Dst) ->
 
 go() ->
     {ok, Dbs} = fabric:all_dbs(),
-    lists:foreach(fun handle_db/1, Dbs).
+    lists:foreach(fun handle_existing_db/1, Dbs).
 
 go(DbName) when is_binary(DbName) ->
-    handle_db(DbName).
+    handle_existing_db(DbName).
+
+handle_existing_db(DbName) ->
+    try handle_db(DbName) of
+        _ -> ok
+    catch
+        error:database_does_not_exist->
+            couch_log:error("Db was deleted while getting security"
+                " object. DbName: ~p", [DbName]),
+            ok
+    end.
 
 handle_db(DbName) ->
     ShardCount = length(mem3:shards(DbName)),
