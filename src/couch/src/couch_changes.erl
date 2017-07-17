@@ -29,6 +29,12 @@
 
 -export([changes_enumerator/2]).
 
+%% export so we can use fully qualified call to facilitate hot-code upgrade
+-export([
+    keep_sending_changes/3,
+    wait_updated/3
+]).
+
 -record(changes_acc, {
     db,
     view_name,
@@ -644,7 +650,7 @@ keep_sending_changes(Args, Acc0, FirstRound) ->
             DbOptions1 = [{user_ctx, Db#db.user_ctx} | DbOptions],
             case couch_db:open(Db#db.name, DbOptions1) of
             {ok, Db2} ->
-                keep_sending_changes(
+                ?MODULE:keep_sending_changes(
                   Args#changes_args{limit=NewLimit},
                   ChangesAcc#changes_acc{
                     db = Db2,
@@ -867,7 +873,7 @@ wait_updated(Timeout, TimeoutFun, UserAcc) ->
         {Go, UserAcc2} = TimeoutFun(UserAcc),
         case Go of
         ok ->
-            wait_updated(Timeout, TimeoutFun, UserAcc2);
+            ?MODULE:wait_updated(Timeout, TimeoutFun, UserAcc2);
         stop ->
             {stop, UserAcc2}
         end
