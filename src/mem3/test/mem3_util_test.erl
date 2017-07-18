@@ -145,8 +145,8 @@ config_01_setup() ->
     {ok, Pid} = config:start_link([Ini]),
     Pid.
 
-config_teardown(_Pid) ->
-    config:stop().
+config_teardown(Pid) ->
+    test_util:stop_config(Pid).
 
 
 n_val_test_() ->
