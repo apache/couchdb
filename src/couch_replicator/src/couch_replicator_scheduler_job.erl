@@ -215,9 +215,6 @@ do_init(#rep{options = Options, id = {BaseId, Ext}, user_ctx=UserCtx} = Rep) ->
     }.
 
 
-handle_call(get_details, _From, #rep_state{rep_details = Rep} = State) ->
-    {reply, {ok, Rep}, State};
-
 handle_call({add_stats, Stats}, From, State) ->
     gen_server:reply(From, ok),
     NewStats = couch_replicator_utils:sum_stats(State#rep_state.stats, Stats),
