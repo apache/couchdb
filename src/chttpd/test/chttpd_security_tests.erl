@@ -81,10 +81,10 @@ delete_db(Url) ->
     {ok, 200, _, _} = test_request:delete(Url, [?AUTH]).
 
 create_user(UsersUrl, Name, Password, Roles) ->
-   
+
     Body = "{\"name\":\"" ++ Name ++
         "\",\"type\":\"user\",\"roles\":" ++ erlang:binary_to_list(jiffy:encode(Roles)) ++ ",\"password\":\"" ++ Password ++"\"}",
-    
+
     Url = lists:concat([
         UsersUrl, "/org.couchdb.user:", Name]),
     {ok, 201, _, _} = test_request:put(Url, [?CONTENT_JSON, ?AUTH], Body).
