@@ -367,7 +367,7 @@ forbid_index_all() ->
 
 
 setup() ->
-    test_util:start_couch(),
+    Ctx = test_util:start_couch(),
     meck:expect(couch_log, warning, 2,
         fun(_,_) ->
             throw({test_error, logged_warning})
@@ -375,12 +375,12 @@ setup() ->
     %default index all def that generates {fields, all_fields}
     Index = #idx{def={[]}},
     Db = #db{name = <<"testdb">>, user_ctx=#user_ctx{name = <<"u1">>}},
-    {Index, Db}.
+    {Index, Db, Ctx}.
 
 
-teardown(_) ->
-    ok = config:delete("mango", "index_all_disabled"),
-    test_util:stop_couch().
+teardown({_, _, Ctx}) ->
+    meck:unload(),
+    test_util:stop_couch(Ctx).
 
 
 index_all_test_() ->
@@ -397,26 +397,32 @@ index_all_test_() ->
     }.
 
 
-forbid_index_all({Idx, Db}) ->
-    ok = config:set("mango", "index_all_disabled", "true"),
-    ?_assertThrow({mango_error, ?MODULE, index_all_disabled},
-        validate_new(Idx, Db)
-    ).
+forbid_index_all({Idx, Db, _}) ->
+    ?_test(begin
+        ok = config:set("mango", "index_all_disabled", "true", false),
+        ?assertThrow({mango_error, ?MODULE, index_all_disabled},
+            validate_new(Idx, Db)
+        )
+    end).
 
 
-default_and_false_index_all({Idx, Db}) ->
-    {ok, #idx{def={Def}}} = validate_new(Idx, Db),
-    Fields = couch_util:get_value(fields, Def),
-    ?_assertEqual(all_fields, Fields),
-    ok = config:set("mango", "index_all_disabled", "false"),
-    {ok, #idx{def={Def2}}} = validate_new(Idx, Db),
-    Fields2 = couch_util:get_value(fields, Def2),
-    ?_assertEqual(all_fields, Fields2).
+default_and_false_index_all({Idx, Db, _}) ->
+    ?_test(begin
+        {ok, #idx{def={Def}}} = validate_new(Idx, Db),
+        Fields = couch_util:get_value(fields, Def),
+        ?assertEqual(all_fields, Fields),
+        ok = config:set("mango", "index_all_disabled", "false", false),
+        {ok, #idx{def={Def2}}} = validate_new(Idx, Db),
+        Fields2 = couch_util:get_value(fields, Def2),
+        ?assertEqual(all_fields, Fields2)
+    end).
 
 
-warn_index_all({Idx, Db}) ->
-    ok = config:set("mango", "index_all_disabled", "warn"),
-    ?_assertThrow({test_error, logged_warning}, validate_new(Idx, Db)).
+warn_index_all({Idx, Db, _}) ->
+    ?_test(begin
+        ok = config:set("mango", "index_all_disabled", "warn", false),
+        ?assertThrow({test_error, logged_warning}, validate_new(Idx, Db))
+    end).
 
 
 -endif.
