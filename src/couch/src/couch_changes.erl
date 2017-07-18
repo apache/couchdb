@@ -31,8 +31,7 @@
 
 %% export so we can use fully qualified call to facilitate hot-code upgrade
 -export([
-    keep_sending_changes/3,
-    wait_updated/3
+    keep_sending_changes/3
 ]).
 
 -record(changes_acc, {
