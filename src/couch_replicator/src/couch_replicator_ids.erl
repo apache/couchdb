@@ -18,6 +18,8 @@
     convert/1
 ]).
 
+-include_lib("ibrowse/include/ibrowse.hrl").
+
 -include_lib("couch/include/couch_db.hrl").
 -include("couch_replicator_api_wrap.hrl").
 -include("couch_replicator.hrl").
@@ -36,6 +38,12 @@ replication_id(#rep{options = Options} = Rep) ->
 % Versioned clauses for generating replication IDs.
 % If a change is made to how replications are identified,
 % please add a new clause and increase ?REP_ID_VERSION.
+
+replication_id(#rep{user_ctx = UserCtx} = Rep, 4) ->
+    UUID = couch_server:get_uuid(),
+    SrcInfo = get_v4_endpoint(UserCtx, Rep#rep.source),
+    TgtInfo = get_v4_endpoint(UserCtx, Rep#rep.target),
+    maybe_append_filters([UUID, SrcInfo, TgtInfo], Rep);
 
 replication_id(#rep{user_ctx = UserCtx} = Rep, 3) ->
     UUID = couch_server:get_uuid(),
@@ -125,3 +133,170 @@ get_rep_endpoint(_UserCtx, #httpdb{url=Url, headers=Headers, oauth=OAuth}) ->
     end;
 get_rep_endpoint(UserCtx, <<DbName/binary>>) ->
     {local, DbName, UserCtx}.
+
+
+get_v4_endpoint(UserCtx, #httpdb{} = HttpDb) ->
+    {Url, Headers, OAuth} = case get_rep_endpoint(UserCtx, HttpDb) of
+        {remote, U, Hds} ->
+            {U, Hds, undefined};
+        {remote, U, Hds, OA} ->
+            {U, Hds, OA}
+    end,
+    {UserFromHeaders, HeadersWithoutBasicAuth} = remove_basic_auth(Headers),
+    {UserFromUrl, Host, NonDefaultPort, Path} = get_v4_url_info(Url),
+    User = pick_defined_value([UserFromUrl, UserFromHeaders]),
+    {remote, User, Host, NonDefaultPort, Path, HeadersWithoutBasicAuth, OAuth};
+get_v4_endpoint(UserCtx, <<DbName/binary>>) ->
+    {local, DbName, UserCtx}.
+
+
+remove_basic_auth(Headers) ->
+    case lists:partition(fun is_basic_auth/1, Headers) of
+        {[], HeadersWithoutBasicAuth} ->
+            {undefined, HeadersWithoutBasicAuth};
+        {[{_, "Basic " ++ Base64} | _], HeadersWithoutBasicAuth} ->
+            User = get_basic_auth_user(Base64),
+            {User, HeadersWithoutBasicAuth}
+    end.
+
+
+is_basic_auth({"Authorization", "Basic " ++ _Base64}) ->
+    true;
+is_basic_auth(_) ->
+    false.
+
+
+get_basic_auth_user(Base64) ->
+    try re:split(base64:decode(Base64), ":", [{return, list}, {parts, 2}]) of
+        [User, _Pass] ->
+            User;
+        _ ->
+            undefined
+    catch
+        % Tolerate invalid B64 values here to avoid crashing replicator
+        error:function_clause ->
+            undefined
+    end.
+
+
+pick_defined_value(Values) ->
+    case [V || V <- Values, V /= undefined] of
+        [] ->
+            undefined;
+        DefinedValues ->
+            hd(DefinedValues)
+    end.
+
+
+get_v4_url_info(Url) when is_binary(Url) ->
+    get_v4_url_info(binary_to_list(Url));
+get_v4_url_info(Url) ->
+    case ibrowse_lib:parse_url(Url) of
+        {error, invalid_uri} ->
+            % Tolerate errors here to avoid a bad user document
+            % crashing the replicator
+            {undefined, Url, undefined, undefined};
+        #url{
+            protocol = Schema,
+            username = User,
+            host = Host,
+            port = Port,
+            path = Path
+        } ->
+            NonDefaultPort = get_non_default_port(Schema, Port),
+            {User, Host, NonDefaultPort, Path}
+    end.
+
+
+get_non_default_port(https, 443) ->
+    default;
+get_non_default_port(http, 80) ->
+    default;
+get_non_default_port(http, 5984) ->
+    default;
+get_non_default_port(_Schema, Port) ->
+    Port.
+
+
+-ifdef(TEST).
+
+-include_lib("eunit/include/eunit.hrl").
+
+http_v4_endpoint_test_() ->
+    [?_assertMatch({remote, User, Host, Port, Path, HeadersNoAuth, undefined},
+        get_v4_endpoint(nil, #httpdb{url = Url, headers = Headers})) ||
+            {{User, Host, Port, Path, HeadersNoAuth}, {Url, Headers}} <- [
+                {
+                    {undefined, "host", default, "/", []},
+                    {"http://host", []}
+                },
+                {
+                    {undefined, "host", default, "/", []},
+                    {"https://host", []}
+                },
+                {
+                    {undefined, "host", default, "/", []},
+                    {"http://host:5984", []}
+                },
+                {
+                    {undefined, "host", 1, "/", []},
+                    {"http://host:1", []}
+                },
+                {
+                    {undefined, "host", 2, "/", []},
+                    {"https://host:2", []}
+                },
+                {
+                    {undefined, "host", default, "/", [{"h","v"}]},
+                    {"http://host", [{"h","v"}]}
+                },
+                {
+                    {undefined, "host", default, "/a/b", []},
+                    {"http://host/a/b", []}
+                },
+                {
+                    {"user", "host", default, "/", []},
+                    {"http://user:pass@host", []}
+                },
+                {
+                    {"user", "host", 3, "/", []},
+                    {"http://user:pass@host:3", []}
+                },
+                {
+                    {"user", "host", default, "/", []},
+                    {"http://user:newpass@host", []}
+                },
+                {
+                    {"user", "host", default, "/", []},
+                    {"http://host", [basic_auth("user","pass")]}
+                },
+                {
+                    {"user", "host", default, "/", []},
+                    {"http://host", [basic_auth("user","newpass")]}
+                },
+                {
+                    {"user1", "host", default, "/", []},
+                    {"http://user1:pass1@host", [basic_auth("user2","pass2")]}
+                },
+                {
+                    {"user", "host", default, "/", [{"h", "v"}]},
+                    {"http://host", [{"h", "v"}, basic_auth("user","pass")]}
+                },
+                {
+                    {undefined, "random_junk", undefined, undefined},
+                    {"random_junk", []}
+                },
+                {
+                    {undefined, "host", default, "/", []},
+                    {"http://host", [{"Authorization", "Basic bad"}]}
+                }
+        ]
+    ].
+
+
+basic_auth(User, Pass) ->
+    B64Auth = base64:encode_to_string(User ++ ":" ++ Pass),
+    {"Authorization", "Basic " ++ B64Auth}.
+
+
+-endif.
