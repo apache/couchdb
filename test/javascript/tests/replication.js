@@ -1841,7 +1841,7 @@ couchTests.replication = function(debug) {
       headers: {"Content-Type": "application/json"}
   });
   TEquals(200, xhr.status, "Replication cancel request success");
-
+  waitReplicationTaskStop(repId);
   task = getTask(repId);
   TEquals(null, task, "Replication was canceled");
 
