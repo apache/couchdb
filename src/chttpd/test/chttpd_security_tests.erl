@@ -33,10 +33,12 @@
 -define(FIXTURE_TXT, ?ABS_PATH(?FILE)).
 
 setup() ->
-    ok = config:set("admins", ?USER, ?PASS, _Persist=false),
-    UserDb = <<"_users">>,
+    Hashed = couch_passwords:hash_admin_password(?PASS),
+    ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist=false),
+    UserDb = ?tempdb(),
     TmpDb = ?tempdb(),
-    ok = config:set("couch_httpd_auth", "authentication_db", ?b2l(UserDb)),
+    ok = config:set("chttpd_auth", "authentication_db", ?b2l(UserDb)),
+
     Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
     Port = mochiweb_socket_server:get(chttpd, port),
     BaseUrl = lists:concat(["http://", Addr, ":", Port, "/"]),
@@ -51,18 +53,16 @@ setup() ->
     [Url, UsersUrl].
 
 teardown([Url,UsersUrl]) ->
-    Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
-    Port = mochiweb_socket_server:get(chttpd, port),
     delete_db(Url),
     delete_db(UsersUrl),
     ok = config:delete("admins", ?USER, _Persist=false).
 
 create_db(Url) ->
-    {ok, Status, _, Body} = test_request:put(Url, [?CONTENT_JSON, ?AUTH], "{}"),
+    {ok, Status, _, _} = test_request:put(Url, [?CONTENT_JSON, ?AUTH], "{}"),
     ?assert(Status =:= 201 orelse Status =:= 202).
 
 create_design_doc(Url) ->
-    {ok, Status, _, _} = test_request:put(lists:concat([Url, '/_design/test']), [?CONTENT_JSON, ?AUTH], 
+    {ok, Status, _, _} = test_request:put(lists:concat([Url, '/_design/test']), [?CONTENT_JSON, ?AUTH],
             "{\"id\":\"_design/test\"}"),
     ?assert(Status =:= 201 orelse Status =:= 202).
 
@@ -81,10 +81,10 @@ delete_db(Url) ->
     {ok, 200, _, _} = test_request:delete(Url, [?AUTH]).
 
 create_user(UsersUrl, Name, Password, Roles) ->
-   
+
     Body = "{\"name\":\"" ++ Name ++
         "\",\"type\":\"user\",\"roles\":" ++ erlang:binary_to_list(jiffy:encode(Roles)) ++ ",\"password\":\"" ++ Password ++"\"}",
-    
+
     Url = lists:concat([
         UsersUrl, "/org.couchdb.user:", Name]),
     {ok, 201, _, _} = test_request:put(Url, [?CONTENT_JSON, ?AUTH], Body).
@@ -113,7 +113,7 @@ all_test_() ->
         }
     }.
 
-should_allow_admin_db_compaction([Url,UsersUrl]) ->
+should_allow_admin_db_compaction([Url,_UsersUrl]) ->
     ?_assertEqual(true,
         begin
             {ok, _, _, ResultBody} = test_request:post(Url ++ "/_compact",
@@ -123,7 +123,7 @@ should_allow_admin_db_compaction([Url,UsersUrl]) ->
             couch_util:get_value(<<"ok">>, InnerJson, undefined)
         end).
 
-should_disallow_anonymous_db_compaction([Url,UsersUrl]) ->
+should_disallow_anonymous_db_compaction([Url,_UsersUrl]) ->
     {ok, _, _, ResultBody} = test_request:post(Url ++ "/_compact",
         [?CONTENT_JSON], ""),
     ResultJson = ?JSON_DECODE(ResultBody),
@@ -131,7 +131,7 @@ should_disallow_anonymous_db_compaction([Url,UsersUrl]) ->
     ErrType = couch_util:get_value(<<"error">>, InnerJson),
     ?_assertEqual(<<"unauthorized">>,ErrType).
 
-should_disallow_db_member_db_compaction([Url,UsersUrl]) ->
+should_disallow_db_member_db_compaction([Url,_UsersUrl]) ->
     {ok, _, _, ResultBody} = test_request:post(Url ++ "/_compact",
         [?CONTENT_JSON, ?TEST_MEMBER_AUTH], ""),
     ResultJson = ?JSON_DECODE(ResultBody),
@@ -139,7 +139,7 @@ should_disallow_db_member_db_compaction([Url,UsersUrl]) ->
     ErrType = couch_util:get_value(<<"error">>, InnerJson),
     ?_assertEqual(<<"unauthorized">>,ErrType).
 
-should_allow_db_admin_db_compaction([Url,UsersUrl]) ->
+should_allow_db_admin_db_compaction([Url,_UsersUrl]) ->
     ?_assertEqual(true,
         begin
             {ok, _, _, ResultBody} = test_request:post(Url ++ "/_compact",
@@ -149,7 +149,7 @@ should_allow_db_admin_db_compaction([Url,UsersUrl]) ->
             couch_util:get_value(<<"ok">>, InnerJson, undefined)
         end).
 
-should_allow_admin_view_compaction([Url,UsersUrl]) ->
+should_allow_admin_view_compaction([Url,_UsersUrl]) ->
     ?_assertEqual(true,
         begin
             {ok, _, _, ResultBody} = test_request:post(Url ++ "/_compact/test",
@@ -159,7 +159,7 @@ should_allow_admin_view_compaction([Url,UsersUrl]) ->
             couch_util:get_value(<<"ok">>, InnerJson, undefined)
         end).
 
-should_disallow_anonymous_view_compaction([Url,UsersUrl]) ->
+should_disallow_anonymous_view_compaction([Url,_UsersUrl]) ->
     {ok, _, _, ResultBody} = test_request:post(Url ++ "/_compact/test",
         [?CONTENT_JSON], ""),
     ResultJson = ?JSON_DECODE(ResultBody),
@@ -167,7 +167,7 @@ should_disallow_anonymous_view_compaction([Url,UsersUrl]) ->
     ErrType = couch_util:get_value(<<"error">>, InnerJson),
     ?_assertEqual(<<"unauthorized">>,ErrType).
 
-should_allow_admin_db_view_cleanup([Url,UsersUrl]) ->
+should_allow_admin_db_view_cleanup([Url,_UsersUrl]) ->
     ?_assertEqual(true,
         begin
             {ok, _, _, ResultBody} = test_request:post(Url ++ "/_view_cleanup",
@@ -177,7 +177,7 @@ should_allow_admin_db_view_cleanup([Url,UsersUrl]) ->
             couch_util:get_value(<<"ok">>, InnerJson, undefined)
         end).
 
-should_disallow_anonymous_db_view_cleanup([Url,UsersUrl]) ->
+should_disallow_anonymous_db_view_cleanup([Url,_UsersUrl]) ->
     {ok, _, _, ResultBody} = test_request:post(Url ++ "/_view_cleanup",
         [?CONTENT_JSON], ""),
     ResultJson = ?JSON_DECODE(ResultBody),
