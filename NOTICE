@@ -173,6 +173,8 @@ This product also includes the following third-party components:
 * React.js
 
   Copyright (c) 2013-2015, Facebook, Inc.
+  NOTE: This is a Facebook "BSD+patents" licensed artifact. For more
+  information, see https://issues.apache.org/jira/browse/LEGAL-303
 
 * Flux.js
 
