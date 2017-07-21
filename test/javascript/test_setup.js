@@ -85,20 +85,26 @@ function restartServer() {
   }
   print('restart');
 
-  /* Need to pass olduptime to check fn so can't reuse waitForSuccess here */
+  /* Wait up to 15s for server to restart */
   var start = new Date().getTime();
   var complete = false;
-  while (!complete) {
-    var now = new Date().getTime();
-    if (now > start + 10000) {
-      complete = true;
-      uptime = getUptime();
-      throw(Error('FAILED to restart: ' + uptime + ' not < ' + olduptime));
-    }
+  while (1) {
+    sleep(500);
     try {
-      sleep(500);
-      complete = getUptime() < olduptime;
+      if (getUptime() < olduptime) {
+        return;
+      }
     } catch (e) {}
+
+    var now = new Date().getTime();
+    if (now > start + 15000) {
+      try {
+        uptime = getUptime();
+        throw(Error('FAILED to restart: ' + uptime + ' not < ' + olduptime));
+      } catch (e) {
+        throw(Error('FAILED to restart: server is unresponsive, waited 15s'));
+      }
+    }
   }
 }
 
