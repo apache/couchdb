@@ -52,7 +52,7 @@ setup(DName) ->
     % Set configuration option to be used by configuration_reader_test_
     % This will be used in os_daemon_configer.escript:test_get_cfg2
     config:set("uuids", "algorithm","sequential", false),
-    config:set("os_daemon_settings", "max_retries", "2"),
+    config:set("os_daemon_settings", "max_retries", "2", false),
     ensure_n_daemons_are_alive(1),
     {Ctx, OsDPid}.
 
