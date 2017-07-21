@@ -140,8 +140,8 @@ should_create_anon_user_db(TestAuthDb) ->
     ?_assert(lists:member(<<"userdb-666f6f6f">>, all_dbs())).
 
 should_not_delete_user_db(TestAuthDb) ->
-    User = "foo",
-    UserDbName = <<"userdb-666f6f">>,
+    User = "foooo",
+    UserDbName = <<"userdb-666f6f6f6f">>,
     create_user(TestAuthDb, User),
     ?assert(lists:member(UserDbName, all_dbs())),
     delete_user(TestAuthDb, User),
@@ -164,18 +164,22 @@ should_reflect_config_changes(TestAuthDb) ->
     ?assert(lists:member(UserDbName, all_dbs())),
     delete_user(TestAuthDb, User),
     ?assert(not lists:member(UserDbName, all_dbs())),
-    create_user(TestAuthDb, User),
-    ?assert(lists:member(UserDbName, all_dbs())),
+    User2 = "bazz",
+    UserDbName2 = <<"userdb-62617a7a">>,
+    create_user(TestAuthDb, User2),
+    ?assert(lists:member(UserDbName2, all_dbs())),
     set_config("couch_peruser", "delete_dbs", "false"),
-    delete_user(TestAuthDb, User),
-    ?assert(lists:member(UserDbName, all_dbs())),
-    create_user(TestAuthDb, User),
+    delete_user(TestAuthDb, User2),
+    ?assert(lists:member(UserDbName2, all_dbs())),
+    create_user(TestAuthDb, User2),
     set_config("couch_peruser", "delete_dbs", "true"),
-    delete_user(TestAuthDb, User),
-    ?assert(not lists:member(UserDbName, all_dbs())),
+    delete_user(TestAuthDb, User2),
+    ?assert(not lists:member(UserDbName2, all_dbs())),
     set_config("couch_peruser", "enable", "false"),
-    create_user(TestAuthDb, User),
-    ?_assert(not lists:member(UserDbName, all_dbs())).
+    User3 = "bazzz",
+    UserDbName3 = <<"userdb-62617a7a7a">>,
+    create_user(TestAuthDb, User3),
+    ?_assert(not lists:member(UserDbName3, all_dbs())).
 
 should_add_user_to_db_admins(TestAuthDb) ->
     User = "qux",
@@ -186,16 +190,16 @@ should_add_user_to_db_admins(TestAuthDb) ->
         proplists:get_value(<<"admins">>, get_security(UserDbName))).
 
 should_add_user_to_db_members(TestAuthDb) ->
-    User = "qux",
-    UserDbName = <<"userdb-717578">>,
+    User = "quxx",
+    UserDbName = <<"userdb-71757878">>,
     create_user(TestAuthDb, User),
     ?_assertEqual(
-        {[{<<"names">>,[<<"qux">>]}]},
+        {[{<<"names">>,[<<"quxx">>]}]},
         proplists:get_value(<<"members">>, get_security(UserDbName))).
 
 should_not_remove_existing_db_admins(TestAuthDb) ->
-    User = "qux",
-    UserDbName = <<"userdb-717578">>,
+    User = "quxxx",
+    UserDbName = <<"userdb-7175787878">>,
     SecurityProperties = [
         {<<"admins">>,{[{<<"names">>,[<<"foo">>,<<"bar">>]}]}},
         {<<"members">>,{[{<<"names">>,[<<"baz">>,<<"pow">>]}]}}
@@ -208,11 +212,11 @@ should_not_remove_existing_db_admins(TestAuthDb) ->
     AdminNames = proplists:get_value(<<"names">>, AdminProperties),
     ?_assert(lists:member(<<"foo">>, AdminNames)),
     ?_assert(lists:member(<<"bar">>, AdminNames)),
-    ?_assert(lists:member(<<"qux">>, AdminNames)).
+    ?_assert(lists:member(<<"quxxx">>, AdminNames)).
 
 should_not_remove_existing_db_members(TestAuthDb) ->
-    User = "qux",
-    UserDbName = <<"userdb-717578">>,
+    User = "quy",
+    UserDbName = <<"userdb-717579">>,
     SecurityProperties = [
         {<<"admins">>,{[{<<"names">>,[<<"pow">>,<<"wow">>]}]}},
         {<<"members">>,{[{<<"names">>,[<<"pow">>,<<"wow">>]}]}}
@@ -225,11 +229,11 @@ should_not_remove_existing_db_members(TestAuthDb) ->
     MemberNames = proplists:get_value(<<"names">>, MemberProperties),
     ?_assert(lists:member(<<"pow">>, MemberNames)),
     ?_assert(lists:member(<<"wow">>, MemberNames)),
-    ?_assert(lists:member(<<"qux">>, MemberNames)).
+    ?_assert(lists:member(<<"quy">>, MemberNames)).
 
 should_remove_user_from_db_admins(TestAuthDb) ->
-    User = "qux",
-    UserDbName = <<"userdb-717578">>,
+    User = "quz",
+    UserDbName = <<"userdb-71757a">>,
     SecurityProperties = [
         {<<"admins">>,{[{<<"names">>,[<<"foo">>,<<"bar">>]}]}},
         {<<"members">>,{[{<<"names">>,[<<"baz">>,<<"pow">>]}]}}
@@ -242,18 +246,18 @@ should_remove_user_from_db_admins(TestAuthDb) ->
     AdminNames = proplists:get_value(<<"names">>, AdminProperties),
     ?assert(lists:member(<<"foo">>, AdminNames)),
     ?assert(lists:member(<<"bar">>, AdminNames)),
-    ?assert(lists:member(<<"qux">>, AdminNames)),
+    ?assert(lists:member(<<"quz">>, AdminNames)),
     delete_user(TestAuthDb, User),
     {NewAdminProperties} = proplists:get_value(<<"admins">>,
         get_security(UserDbName)),
     NewAdminNames = proplists:get_value(<<"names">>, NewAdminProperties),
     ?_assert(lists:member(<<"foo">>, NewAdminNames)),
     ?_assert(lists:member(<<"bar">>, NewAdminNames)),
-    ?_assert(not lists:member(<<"qux">>, NewAdminNames)).
+    ?_assert(not lists:member(<<"quz">>, NewAdminNames)).
 
 should_remove_user_from_db_members(TestAuthDb) ->
-    User = "qux",
-    UserDbName = <<"userdb-717578">>,
+    User = "rux",
+    UserDbName = <<"userdb-727578">>,
     SecurityProperties = [
         {<<"admins">>,{[{<<"names">>,[<<"pow">>,<<"wow">>]}]}},
         {<<"members">>,{[{<<"names">>,[<<"pow">>,<<"wow">>]}]}}
@@ -266,14 +270,14 @@ should_remove_user_from_db_members(TestAuthDb) ->
     MemberNames = proplists:get_value(<<"names">>, MemberProperties),
     ?assert(lists:member(<<"pow">>, MemberNames)),
     ?assert(lists:member(<<"wow">>, MemberNames)),
-    ?assert(lists:member(<<"qux">>, MemberNames)),
+    ?assert(lists:member(<<"rux">>, MemberNames)),
     delete_user(TestAuthDb, User),
     {NewMemberProperties} = proplists:get_value(<<"members">>,
         get_security(UserDbName)),
     NewMemberNames = proplists:get_value(<<"names">>, NewMemberProperties),
     ?_assert(lists:member(<<"foo">>, NewMemberNames)),
     ?_assert(lists:member(<<"bar">>, NewMemberNames)),
-    ?_assert(not lists:member(<<"qux">>, NewMemberNames)).
+    ?_assert(not lists:member(<<"rux">>, NewMemberNames)).
 
 couch_peruser_test_() ->
     {
