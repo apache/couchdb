@@ -46,13 +46,13 @@ SubDirs = [
 
 DepDescs = [
 %% Independent Apps
-{config,           "config",           "c5a42b52f28853e511afaa5b35d48770da1159d4"},
-{b64url,           "b64url",           "6895652d80f95cdf04efb14625abed868998f174"},
-{ets_lru,          "ets-lru",          "c952e2cf819613d0e406e430758405fac4d54431"},
-{khash,            "khash",            "7c6a9cd9776b5c6f063ccafedfa984b00877b019"},
-{snappy,           "snappy",           "a728b960611d0795025de7e9668d06b9926c479d"},
-{setup,            "setup",            "4d9bd589fe68d6108021ef8417f3e5d91e4d113e"},
-{ioq,              "ioq",              "1d2b149ee12dfeaf8d89a67b2f937207f4c5bdf2"},
+{config,           "config",           {tag, "1.0.0"}},
+{b64url,           "b64url",           {tag, "1.0.0"}},
+{ets_lru,          "ets-lru",          {tag, "1.0.0"}},
+{khash,            "khash",            {tag, "1.0.0"}},
+{snappy,           "snappy",           {tag, "CouchDB-1.0.0"}},
+{setup,            "setup",            {tag, "1.0.0"}},
+{ioq,              "ioq",              {tag, "1.0.0"}},
 
 %% Non-Erlang deps
 {docs,             {url, "https://github.com/apache/couchdb-documentation"},
@@ -60,10 +60,10 @@ DepDescs = [
 {fauxton,          {url, "https://github.com/apache/couchdb-fauxton"},
                   {tag, "v1.1.12"}, [raw]},
 %% Third party deps
-{folsom,           "folsom",           "46f7c2b785b26448d4bdc18c1700f2319badd7d6"},
-{ibrowse,          "ibrowse",          "4af2d408607874d124414ac45df1edbe3961d1cd"},
-{jiffy,            "jiffy",            "1acdd1ac389dff3d763589f64331227ae594f3b7"},
-{mochiweb,         "mochiweb",         "bd6ae7cbb371666a1f68115056f7b30d13765782"},
+{folsom,           "folsom",           {tag, "CouchDB-0.8.1"}},
+{ibrowse,          "ibrowse",          {tag, "CouchDB-4.0.1"}},
+{jiffy,            "jiffy",            {tag, "CouchDB-0.14.11-1"}},
+{mochiweb,         "mochiweb",         {tag, "CouchDB-2.12.0-1"}},
 {meck,             "meck",             {tag, "0.8.2"}}
 
 ],
