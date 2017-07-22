@@ -136,7 +136,6 @@ should_create_user_db(TestAuthDb) ->
 
 should_create_anon_user_db(TestAuthDb) ->
     create_anon_user(TestAuthDb, "fooo"),
-    io:fwrite("HELLO: " ++ ?b2l(TestAuthDb) ++ "~n", []),
     ?_assert(lists:member(<<"userdb-666f6f6f">>, all_dbs())).
 
 should_not_delete_user_db(TestAuthDb) ->
