@@ -277,8 +277,8 @@ should_remove_user_from_db_members(TestAuthDb) ->
         get_security(UserDbName)),
     NewMemberNames = proplists:get_value(<<"names">>, NewMemberProperties),
     [
-      ?_assert(lists:member(<<"foo">>, NewMemberNames)),
-      ?_assert(lists:member(<<"bar">>, NewMemberNames)),
+      ?_assert(lists:member(<<"pow">>, NewMemberNames)),
+      ?_assert(lists:member(<<"wow">>, NewMemberNames)),
       ?_assert(not lists:member(<<"qux">>, NewMemberNames))
     ].
 
