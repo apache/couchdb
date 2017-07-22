@@ -16,6 +16,7 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
+-define(TIMEOUT, 30).
 
 -define(USER, "couch_db_admin").
 -define(PASS, "pass").
@@ -69,34 +70,36 @@ couch_db_mpr_test_() ->
                 foreach,
                 fun setup/0,
                 fun teardown/1,
-                [{with, [
+                [
                     fun recreate_with_mpr/1
-                ]}]
+                ]
             }
         }
     }.
 
 
 recreate_with_mpr(Url) ->
-    DocId1 = "foo",
-    DocId2 = "bar",
+    {timeout, ?TIMEOUT, ?_test(begin
+        DocId1 = "foo",
+        DocId2 = "bar",
 
-    create_db(Url),
-    create_and_delete_doc(Url, DocId1),
-    Rev1 = create_with_mpr(Url, DocId1),
-    delete_db(Url),
+        create_db(Url),
+        create_and_delete_doc(Url, DocId1),
+        Rev1 = create_with_mpr(Url, DocId1),
+        delete_db(Url),
 
-    create_db(Url),
-    create_and_delete_doc(Url, DocId1),
-    % We create a second unrelated doc to change the
-    % position on disk where the attachment is written
-    % so that we can assert that the position on disk
-    % is not included when calculating a revision.
-    create_and_delete_doc(Url, DocId2),
-    Rev2 = create_with_mpr(Url, DocId1),
-    delete_db(Url),
+        create_db(Url),
+        create_and_delete_doc(Url, DocId1),
+        % We create a second unrelated doc to change the
+        % position on disk where the attachment is written
+        % so that we can assert that the position on disk
+        % is not included when calculating a revision.
+        create_and_delete_doc(Url, DocId2),
+        Rev2 = create_with_mpr(Url, DocId1),
+        delete_db(Url),
 
-    ?assertEqual(Rev1, Rev2).
+        ?assertEqual(Rev1, Rev2)
+    end)}.
 
 
 create_and_delete_doc(Url, DocId) ->
