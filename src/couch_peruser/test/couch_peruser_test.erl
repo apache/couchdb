@@ -205,9 +205,11 @@ should_not_remove_existing_db_admins(TestAuthDb) ->
     {AdminProperties} = proplists:get_value(<<"admins">>,
         get_security(UserDbName)),
     AdminNames = proplists:get_value(<<"names">>, AdminProperties),
-    ?_assert(lists:member(<<"foo">>, AdminNames)),
-    ?_assert(lists:member(<<"bar">>, AdminNames)),
-    ?_assert(lists:member(<<"qux">>, AdminNames)).
+    [
+      ?_assert(lists:member(<<"foo">>, AdminNames)),
+      ?_assert(lists:member(<<"bar">>, AdminNames)),
+      ?_assert(lists:member(<<"qux">>, AdminNames))
+    ].
 
 should_not_remove_existing_db_members(TestAuthDb) ->
     User = "qux",
@@ -222,9 +224,11 @@ should_not_remove_existing_db_members(TestAuthDb) ->
     {MemberProperties} = proplists:get_value(<<"members">>,
         get_security(UserDbName)),
     MemberNames = proplists:get_value(<<"names">>, MemberProperties),
-    ?_assert(lists:member(<<"pow">>, MemberNames)),
-    ?_assert(lists:member(<<"wow">>, MemberNames)),
-    ?_assert(lists:member(<<"qux">>, MemberNames)).
+    [
+      ?_assert(lists:member(<<"pow">>, MemberNames)),
+      ?_assert(lists:member(<<"wow">>, MemberNames)),
+      ?_assert(lists:member(<<"qux">>, MemberNames))
+    ].
 
 should_remove_user_from_db_admins(TestAuthDb) ->
     User = "qux",
@@ -246,9 +250,11 @@ should_remove_user_from_db_admins(TestAuthDb) ->
     {NewAdminProperties} = proplists:get_value(<<"admins">>,
         get_security(UserDbName)),
     NewAdminNames = proplists:get_value(<<"names">>, NewAdminProperties),
-    ?_assert(lists:member(<<"foo">>, NewAdminNames)),
-    ?_assert(lists:member(<<"bar">>, NewAdminNames)),
-    ?_assert(not lists:member(<<"qux">>, NewAdminNames)).
+    [
+      ?_assert(lists:member(<<"foo">>, NewAdminNames)),
+      ?_assert(lists:member(<<"bar">>, NewAdminNames)),
+      ?_assert(not lists:member(<<"qux">>, NewAdminNames))
+    ].
 
 should_remove_user_from_db_members(TestAuthDb) ->
     User = "qux",
@@ -270,9 +276,11 @@ should_remove_user_from_db_members(TestAuthDb) ->
     {NewMemberProperties} = proplists:get_value(<<"members">>,
         get_security(UserDbName)),
     NewMemberNames = proplists:get_value(<<"names">>, NewMemberProperties),
-    ?_assert(lists:member(<<"foo">>, NewMemberNames)),
-    ?_assert(lists:member(<<"bar">>, NewMemberNames)),
-    ?_assert(not lists:member(<<"qux">>, NewMemberNames)).
+    [
+      ?_assert(lists:member(<<"foo">>, NewMemberNames)),
+      ?_assert(lists:member(<<"bar">>, NewMemberNames)),
+      ?_assert(not lists:member(<<"qux">>, NewMemberNames))
+    ].
 
 couch_peruser_test_() ->
     {
