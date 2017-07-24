@@ -113,7 +113,7 @@ def main():
     print ("Uploading logfiles...")
     collect_logfiles()
     req = upload_logs()
-    print (req.url)
+    print (req.url.split('?')[0])
     print (req.content)
     print ("Upload complete!")
 
