@@ -35,9 +35,9 @@ We have documentation:
 
     http://docs.couchdb.org/
 
-They include a changelog:
+It includes a changelog:
 
-    http://docs.couchdb.org/en/latest/changelog.html
+    http://docs.couchdb.org/en/latest/whatsnew/
 
 For troubleshooting or cryptic error messages, see:
 
