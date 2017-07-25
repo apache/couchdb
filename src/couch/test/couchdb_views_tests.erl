@@ -354,11 +354,22 @@ couchdb_1283() ->
             couch_mrview_index, MDb1#db.name, <<"_design/foo">>),
 
         % Start and pause compacton
+        WaitRef = erlang:make_ref(),
+        meck:expect(couch_mrview_index, compact, fun(Db, State, Opts) ->
+            receive {WaitRef, From, init} -> ok end,
+            From ! {WaitRef, inited},
+            receive {WaitRef, go} -> ok end,
+            meck:passthrough([Db, State, Opts])
+        end),
+
         {ok, CPid} = gen_server:call(Pid, compact),
-        meck:wait(couch_mrview_index, compact, ['_', '_', '_'], 1000),
-        erlang:suspend_process(CPid),
         CRef = erlang:monitor(process, CPid),
         ?assert(is_process_alive(CPid)),
+
+        % Make sure that our compactor is waiting for us
+        % before we continue our assertions
+        CPid ! {WaitRef, self(), init},
+        receive {WaitRef, inited} -> ok end,
 
         % Make sure that a compaction process takes a monitor
         % on the database's main_pid
@@ -366,7 +377,7 @@ couchdb_1283() ->
 
         % Finish compaction to and make sure the monitor
         % disappears
-        erlang:resume_process(CPid),
+        CPid ! {WaitRef, go},
         wait_for_process_shutdown(CRef, normal,
           {reason, "Failure compacting view group"}),
 
