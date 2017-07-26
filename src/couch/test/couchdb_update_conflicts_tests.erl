@@ -18,7 +18,7 @@
 -define(i2l(I), integer_to_list(I)).
 -define(DOC_ID, <<"foobar">>).
 -define(NUM_CLIENTS, [100, 500, 1000, 2000, 5000, 10000]).
--define(TIMEOUT, 10000).
+-define(TIMEOUT, 20000).
 
 start() ->
     Ctx = test_util:start_couch(),
