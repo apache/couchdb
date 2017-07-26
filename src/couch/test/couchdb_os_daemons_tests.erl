@@ -38,7 +38,7 @@
 -define(DAEMON_CAN_REBOOT, "os_daemon_can_reboot.sh").
 -define(DAEMON_DIE_ON_BOOT, "os_daemon_die_on_boot.sh").
 -define(DAEMON_DIE_QUICKLY, "os_daemon_die_quickly.sh").
--define(TRIES, 20).
+-define(TRIES, 40).
 -define(TRY_DELAY_MS, 100).
 -define(TIMEOUT, 10000).
 -define(CONFIG_TIMEOUT, 1000).

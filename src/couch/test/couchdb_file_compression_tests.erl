@@ -17,7 +17,7 @@
 
 -define(DDOC_ID, <<"_design/test">>).
 -define(DOCS_COUNT, 5000).
--define(TIMEOUT, 30000).
+-define(TIMEOUT, 60000).
 
 setup() ->
     config:set("couchdb", "file_compression", "none", false),
