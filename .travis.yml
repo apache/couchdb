@@ -19,6 +19,7 @@ addons:
     - pkg-config
     - python-requests
     - python-sphinx
+#    - sphinx-rtd-theme
     - help2man
     - shunit2
 
