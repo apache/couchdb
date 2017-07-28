@@ -57,8 +57,12 @@ reduce_max_request_size_test_() ->
              || Pair <- Pairs]
             ++ [{Pair, fun should_replicate_one/2}
              || Pair <- Pairs]
-            ++ [{Pair, fun should_replicate_one_with_attachment/2}
-             || Pair <- Pairs]
+            % Disabled. See issue 574. Sometimes PUTs with a doc and
+            % attachment which exceed maximum request size are simply
+            % closed instead of returning a 413 request. That makes these
+            % tests flaky.
+            % ++ [{Pair, fun should_replicate_one_with_attachment/2}
+            %  || Pair <- Pairs]
         }
     }.
 
@@ -85,12 +89,13 @@ should_replicate_one({From, To}, {_Ctx, {Source, Target}}) ->
 % If a document has an attachment > 64 * 1024 bytes, replicator will switch to
 % POST-ing individual documents directly and skip bulk_docs. Test that case
 % separately
-should_replicate_one_with_attachment({From, To}, {_Ctx, {Source, Target}}) ->
-    {lists:flatten(io_lib:format("~p -> ~p", [From, To])),
-     {inorder, [should_populate_source_one_large_attachment(Source),
-                should_populate_source(Source),
-                should_replicate(Source, Target),
-                should_compare_databases(Source, Target, [<<"doc0">>])]}}.
+% See note in main test function why this was disabled.
+% should_replicate_one_with_attachment({From, To}, {_Ctx, {Source, Target}}) ->
+%    {lists:flatten(io_lib:format("~p -> ~p", [From, To])),
+%     {inorder, [should_populate_source_one_large_attachment(Source),
+%                should_populate_source(Source),
+%                should_replicate(Source, Target),
+%                should_compare_databases(Source, Target, [<<"doc0">>])]}}.
 
 
 should_populate_source({remote, Source}) ->
@@ -107,11 +112,11 @@ should_populate_source_one_large_one_small(Source) ->
     {timeout, ?TIMEOUT_EUNIT, ?_test(one_large_one_small(Source, 12000, 3000))}.
 
 
-should_populate_source_one_large_attachment({remote, Source}) ->
-    should_populate_source_one_large_attachment(Source);
+% should_populate_source_one_large_attachment({remote, Source}) ->
+%    should_populate_source_one_large_attachment(Source);
 
-should_populate_source_one_large_attachment(Source) ->
-    {timeout, ?TIMEOUT_EUNIT, ?_test(one_large_attachment(Source, 70000, 70000))}.
+% should_populate_source_one_large_attachment(Source) ->
+%   {timeout, ?TIMEOUT_EUNIT, ?_test(one_large_attachment(Source, 70000, 70000))}.
 
 
 should_replicate({remote, Source}, Target) ->
@@ -151,8 +156,8 @@ one_large_one_small(DbName, Large, Small) ->
     add_doc(DbName, <<"doc1">>, Small, 0).
 
 
-one_large_attachment(DbName, Size, AttSize) ->
-    add_doc(DbName, <<"doc0">>, Size, AttSize).
+% one_large_attachment(DbName, Size, AttSize) ->
+%    add_doc(DbName, <<"doc0">>, Size, AttSize).
 
 
 add_doc(DbName, DocId, Size, AttSize) when is_binary(DocId) ->
