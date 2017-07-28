@@ -128,8 +128,10 @@ stop_and_release_worker(Pool, Worker) ->
     end,
     ok = couch_replicator_httpc_pool:release_worker_sync(Pool, Worker).
 
-process_response({error, sel_conn_closed}, _Worker, HttpDb, Params, _Cb) ->
-    throw({retry, HttpDb, Params});
+process_response({error, sel_conn_closed}, Worker, HttpDb, Params, _Cb) ->
+    stop_and_release_worker(HttpDb#httpdb.httpc_pool, Worker),
+    maybe_retry(sel_conn_closed, Worker, HttpDb, Params);
+
 
 %% This clause handles un-expected connection closing during pipelined requests.
 %% For example, if server responds to a request, sets Connection: close header
