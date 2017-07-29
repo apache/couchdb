@@ -568,7 +568,7 @@ init_state(Rep) ->
     {ok, SourceInfo} = couch_replicator_api_wrap:get_db_info(Source),
     {ok, TargetInfo} = couch_replicator_api_wrap:get_db_info(Target),
 
-    [SourceLog, TargetLog] = find_replication_logs([Source, Target], Rep),
+    [SourceLog, TargetLog] = find_and_migrate_logs([Source, Target], Rep),
 
     {StartSeq0, History} = compare_replication_logs(SourceLog, TargetLog),
     StartSeq1 = get_value(since_seq, Options, StartSeq0),
@@ -610,7 +610,7 @@ init_state(Rep) ->
     State#rep_state{timer = start_timer(State)}.
 
 
-find_replication_logs(DbList, #rep{id = {BaseId, _}} = Rep) ->
+find_and_migrate_logs(DbList, #rep{id = {BaseId, _}} = Rep) ->
     LogId = ?l2b(?LOCAL_DOC_PREFIX ++ BaseId),
     fold_replication_logs(DbList, ?REP_ID_VERSION, LogId, LogId, Rep, []).
 
@@ -632,8 +632,20 @@ fold_replication_logs([Db | Rest] = Dbs, Vsn, LogId, NewId, Rep, Acc) ->
             Rest, ?REP_ID_VERSION, NewId, NewId, Rep, [Doc | Acc]);
     {ok, Doc} ->
         MigratedLog = #doc{id = NewId, body = Doc#doc.body},
+        maybe_save_migrated_log(Rep, Db, MigratedLog, Doc#doc.id),
         fold_replication_logs(
             Rest, ?REP_ID_VERSION, NewId, NewId, Rep, [MigratedLog | Acc])
+    end.
+
+
+maybe_save_migrated_log(Rep, Db, #doc{} = Doc, OldId) ->
+    case get_value(use_checkpoints, Rep#rep.options, true) of
+        true ->
+            update_checkpoint(Db, Doc),
+            Msg = "Migrated replication checkpoint. Db:~p ~p -> ~p",
+            couch_log:notice(Msg, [httpdb_strip_creds(Db), OldId, Doc#doc.id]);
+        false ->
+            ok
     end.
 
 
