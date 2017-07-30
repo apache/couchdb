@@ -29,27 +29,30 @@ pipeline {
   stages {
     stage('Build') {
       agent {
-        docker {
+        // Cannot use docker agent type because image will not be pulled fresh
+        // each time. Instead, manually insert docker pull then run with the
+        // the docker image.
+        node {
           label 'couchdbtest'
-          // This image has the oldest Erlang we support, 16B03
-          image 'couchdbdev/ubuntu-14.04-erlang-default'
+        }
+      }
+      steps {
+        // This image has the oldest Erlang we support, 16B03
+        sh 'docker pull couchdbdev/ubuntu-14.04-erlang-default:latest'
+        timeout(time: 15, unit: "MINUTES") {
           // https://github.com/jenkins-infra/jenkins.io/blob/master/Jenkinsfile#64
           // We need the jenkins user mapped inside of the image
           // npm config cache below is required because /home/jenkins doesn't
           // ACTUALLY exist in the image
-          // We need root here to clean up after previous runs where we used to do everything as root
-          args '-e npm_config_cache=npm-cache -e HOME=. -v=/etc/passwd:/etc/passwd -v /etc/group:/etc/group'
-        }
-      }
-      steps {
-        timeout(time: 15, unit: "MINUTES") {
-          sh '''
-            set
-            rm -rf apache-couchdb-*
-            ./configure --with-curl
-            make dist
-            chmod -R a+w * .
-          '''
+          withDockerContainer(image: 'couchdbdev/ubuntu-14.04-erlang-default', args: '-e npm_config_cache=npm-cache -e HOME=. -v=/etc/passwd:/etc/passwd -v /etc/group:/etc/group') {
+            sh '''
+              set
+              rm -rf apache-couchdb-*
+              ./configure --with-curl
+              make dist
+              chmod -R a+w * .
+            '''
+          }
         }
       }
       post {
