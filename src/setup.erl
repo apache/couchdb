@@ -169,7 +169,9 @@ setup_node(NewCredentials, NewBindAddress, NodeCount, Port) ->
             config:set("chttpd", "bind_address", binary_to_list(NewBindAddress))
     end,
 
-    config:set_integer("cluster", "n", NodeCount),
+    % for single node setups, set n=1, for larger setups, don’t
+    % exceed n=3 as a default
+    config:set_integer("cluster", "n", min(NodeCount, 3)),
 
     case Port of
         undefined ->
