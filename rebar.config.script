@@ -51,14 +51,14 @@ DepDescs = [
 {ets_lru,          "ets-lru",          {tag, "1.0.0"}},
 {khash,            "khash",            {tag, "1.0.0"}},
 {snappy,           "snappy",           {tag, "CouchDB-1.0.0"}},
-{setup,            "setup",            {tag, "1.0.0"}},
+{setup,            "setup",            {tag, "1.0.1"}},
 {ioq,              "ioq",              {tag, "1.0.0"}},
 
 %% Non-Erlang deps
 {docs,             {url, "https://github.com/apache/couchdb-documentation"},
-                   "5513b2454e583595fd92ab3b3f2b637437cd5230", [raw]},
+                   {tag, "2.1.0"}, [raw]},
 {fauxton,          {url, "https://github.com/apache/couchdb-fauxton"},
-                  {tag, "v1.1.13"}, [raw]},
+                   {tag, "v1.1.13"}, [raw]},
 %% Third party deps
 {folsom,           "folsom",           {tag, "CouchDB-0.8.1"}},
 {ibrowse,          "ibrowse",          {tag, "CouchDB-4.0.1"}},
