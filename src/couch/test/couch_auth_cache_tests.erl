@@ -16,7 +16,7 @@
 -include_lib("couch/include/couch_db.hrl").
 
 -define(SALT, <<"SALT">>).
--define(TIMEOUT, 1000).
+-define(DB_TIMEOUT, 15000).
 
 start() ->
     test_util:start_couch([ioq]).
@@ -230,12 +230,12 @@ should_recover_cache_after_shutdown(DbName) ->
     end).
 
 should_close_old_db_on_auth_db_change(DbName) ->
-    ?_test(begin
-        ?assert(is_opened(DbName)),
+    {timeout, ?DB_TIMEOUT, ?_test(begin
+        ?assertEqual(ok, wait_db(DbName, fun is_opened/1)),
         config:set("couch_httpd_auth", "authentication_db",
                          ?b2l(?tempdb()), false),
-        ?assertNot(is_opened(DbName))
-    end).
+        ?assertEqual(ok, wait_db(DbName, fun is_closed/1))
+    end)}.
 
 update_user_doc(DbName, UserName, Password) ->
     update_user_doc(DbName, UserName, Password, nil).
@@ -258,6 +258,17 @@ update_user_doc(DbName, UserName, Password, Rev) ->
     {ok, NewRev} = couch_db:update_doc(AuthDb, Doc, []),
     ok = couch_db:close(AuthDb),
     {ok, couch_doc:rev_to_str(NewRev)}.
+
+wait_db(Db, DbFun) ->
+    test_util:wait(fun() ->
+        case DbFun(Db) of
+            true ->
+                ok;
+            false ->
+                wait
+        end
+   end, ?DB_TIMEOUT, 500).
+
 
 hash_password(Password) ->
     ?l2b(couch_util:to_hex(crypto:hash(sha, iolist_to_binary([Password, ?SALT])))).
@@ -313,6 +324,9 @@ is_opened(DbName) ->
     Monitors = couch_db:monitored_by(AuthDb) -- [self()],
     ok = couch_db:close(AuthDb),
     Monitors /= [].
+
+is_closed(DbName) ->
+    not is_opened(DbName).
 
 make_validate_test({Old, New, "ok"} = Case) ->
     {test_id(Case), ?_assertEqual(ok, validate(doc(Old), doc(New)))};
