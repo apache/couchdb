@@ -15,13 +15,11 @@
 -include_lib("eunit/include/eunit.hrl").
 
 
-
 mock_request(ExcludeHeader) ->
     Headers = mochiweb_headers:make(ExcludeHeader),
     MochiReq = mochiweb_request:new(nil, 'GET', "/", {1, 1}, Headers),
     MochiReq:cleanup(),
     #httpd{mochi_req = MochiReq}.
-
 
 
 default_headers() ->
@@ -37,7 +35,6 @@ default_headers() ->
     ].
 
 
-
 minimal_options_headers() ->
     [
         {"Cache-Control","must-revalidate"},
@@ -49,11 +46,12 @@ minimal_options_headers() ->
     ].
 
 
-
 default_no_exclude_header_test() ->
-    Headers = chttpd_prefer_header:maybe_return_minimal(mock_request([]), default_headers()),
+    Headers = chttpd_prefer_header:maybe_return_minimal(
+        mock_request([]), 
+        default_headers()
+        ),
     ?assertEqual(default_headers(), Headers).
-
 
 
 unsupported_exclude_header_test() ->
@@ -62,35 +60,50 @@ unsupported_exclude_header_test() ->
     ?assertEqual(default_headers(), Headers).
 
 
+empty_header_test() ->
+    Req = mock_request([{"prefer", ""}]),
+    Headers = chttpd_prefer_header:maybe_return_minimal(Req, default_headers()),
+    ?assertEqual(default_headers(), Headers).
 
 setup() ->
-ok.
-
+    ok = meck:new(config),
+    ok = meck:expect(config, get, fun("chttpd", "prefer_minimal",  _) -> 
+        "Cache-Control, Content-Length, Content-Type, ETag, Server, Vary"
+    end),
+    ok.
 
 
 teardown(_) ->
     meck:unload(config).
 
 
-
 exclude_headers_test_() ->
      {
-         "Test X-Couch-Exclude-Headers",
+         "Test Prefer headers",
          {
              foreach, fun setup/0, fun teardown/1,
              [
-                 fun minimal_options/1
+                 fun minimal_options/1,
+                 fun minimal_options_check_header_case/1,
+                 fun minimal_options_check_header_value_case/1
              ]
          }
      }.
 
 
-
 minimal_options(_) ->
-    ok = meck:new(config),
-    ok = meck:expect(config, get, fun("prefer_header", "minimal",  _) -> 
-        "Cache-Control, Content-Length, Content-Type, ETag, Server, Vary"
-    end),
     Req = mock_request([{"Prefer", "return=minimal"}]),
+    Headers = chttpd_prefer_header:maybe_return_minimal(Req, default_headers()),
+    ?_assertEqual(minimal_options_headers(), Headers).
+
+
+minimal_options_check_header_case(_) ->
+    Req = mock_request([{"prefer", "return=minimal"}]),
+    Headers = chttpd_prefer_header:maybe_return_minimal(Req, default_headers()),
+    ?_assertEqual(minimal_options_headers(), Headers).
+
+
+minimal_options_check_header_value_case(_) ->
+    Req = mock_request([{"prefer", "RETURN=MINIMAL"}]),
     Headers = chttpd_prefer_header:maybe_return_minimal(Req, default_headers()),
     ?_assertEqual(minimal_options_headers(), Headers).
