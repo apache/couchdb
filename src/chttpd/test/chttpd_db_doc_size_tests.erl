@@ -93,7 +93,7 @@ put_single_doc(Url) ->
 
 bulk_doc(Url) ->
     NewDoc = "{\"docs\": [{\"doc1\": 1}, {\"errordoc\":
-        \"this_should_be_the_error_document\"}]}",
+        \"this_should_be_the_too_large_error_document\"}]}",
     {ok, _, _, ResultBody} = test_request:post(Url ++ "/_bulk_docs/",
         [?CONTENT_JSON, ?AUTH], NewDoc),
     ResultJson = ?JSON_DECODE(ResultBody),

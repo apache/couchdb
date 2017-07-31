@@ -128,7 +128,7 @@ doc_to_json_obj(#doc{id=Id,deleted=Del,body=Body,revs={Start, RevIds},
 from_json_obj_validate(EJson) ->
     MaxSize = config:get_integer("couchdb", "max_document_size", 4294967296),
     Doc = from_json_obj(EJson),
-    case erlang:external_size(Doc#doc.body) =< MaxSize of
+    case couch_ejson_size:encoded_size(Doc#doc.body) =< MaxSize of
         true ->
              validate_attachment_sizes(Doc#doc.atts),
              Doc;
