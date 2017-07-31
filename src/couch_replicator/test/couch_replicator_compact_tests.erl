@@ -22,9 +22,9 @@
 ]).
 
 -define(ATTFILE, filename:join([?FIXTURESDIR, "logo.png"])).
--define(DELAY, 100).
--define(TIMEOUT, 30000).
--define(TIMEOUT_WRITER, 18000).
+-define(DELAY, 500).
+-define(TIMEOUT, 360000).
+-define(TIMEOUT_WRITER, 100000).
 -define(TIMEOUT_EUNIT, ?TIMEOUT div 1000 + 70).
 
 setup() ->
@@ -75,7 +75,7 @@ should_populate_replicate_compact({From, To}, {_Ctx, {Source, Target}}) ->
      {inorder, [
          should_run_replication(RepPid, RepId, Source, Target),
          should_all_processes_be_alive(RepPid, Source, Target),
-         should_populate_and_compact(RepPid, Source, Target, 50, 5),
+         should_populate_and_compact(RepPid, Source, Target, 50, 3),
          should_wait_target_in_sync(Source, Target),
          should_ensure_replication_still_running(RepPid, RepId, Source, Target),
          should_cancel_replication(RepId, RepPid),
