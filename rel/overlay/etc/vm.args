@@ -10,10 +10,22 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-# Each node in the system must have a unique name.  A name can be short
-# (specified using -sname) or it can by fully qualified (-name).  There can be
-# no communication between nodes running with the -sname flag and those running 
-# with the -name flag.
+# Each node in the system must have a unique name. These are specified through
+# the Erlang -name flag, which takes the form nodename@hostname. CouchDB
+# recommends the following values for this flag:
+#
+# 1. If this is a single node, not in a cluster, use:
+#    -name couchdb@127.0.0.1
+# 2. If DNS is configured for this host, use the FQDN, such as:
+#    -name couchdb@my.host.domain.com
+# 3. If DNS isn't configured for this host, use IP addresses only, such as:
+#    -name couchdb@192.168.0.1
+#
+# Do not rely on tricks with /etc/hosts or libresolv to handle anything
+# other than the above 3 approaches correctly.
+#
+# Multiple CouchDBs running on the same machine can use couchdb1@, couchdb2@,
+# etc.
 {{node_name}}
 
 # All nodes must share the same magic cookie for distributed Erlang to work.
