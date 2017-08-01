@@ -250,7 +250,7 @@ design_doc_to_index(#doc{id=Id,body={Fields}}, IndexName) ->
                 undefined ->
                     {error, InvalidDDocError};
                 Def ->
-                    Sig = ?l2b(couch_util:to_hex(couch_crypto:hash(md5,
+                    Sig = ?l2b(couch_util:to_hex(crypto:hash(md5,
                         term_to_binary({Analyzer, Def})))),
                     {ok, #index{
                         analyzer=Analyzer,
