@@ -15,7 +15,7 @@
 
 -export([
     maybe_return_minimal/2
-    ]).
+]).
 
 
 -include_lib("couch/include/couch_db.hrl").
