@@ -22,6 +22,7 @@
 -record(ctx, {file, handle, pid, kv, key, modules = []}).
 
 -define(TIMEOUT, 5000).
+-define(RELOAD_WAIT, 1000).
 
 -define(temp_atom,
     fun() ->
@@ -392,7 +393,7 @@ ensure_notified_when_changed(Case, #ctx{key = Key} = Ctx) ->
 ensure_not_notified_when_no_change(_Case, #ctx{key = Key} = Ctx) ->
     ?_test(begin
         subscribe(Ctx, test_app, Key),
-        timer:sleep(200),
+        timer:sleep(?RELOAD_WAIT),
         ?assertMatch(error, get(Ctx, is_called))
     end).
 
@@ -495,7 +496,7 @@ ensure_reload_if_manually_triggered(Case, #ctx{pid = Pid, key = Key} = Ctx) ->
         subscribe(Ctx, test_app, Key),
         update_definitions(Case, Ctx),
         couch_epi_module_keeper:reload(Pid),
-        timer:sleep(50),
+        timer:sleep(?RELOAD_WAIT),
         ?assertNotEqual(error, get(Ctx, is_called))
     end).
 
@@ -505,7 +506,7 @@ ensure_reload_if_changed(data_file =  Case,
         Version = Handle:version(),
         subscribe(Ctx, test_app, Key),
         update_definitions(Case, Ctx),
-        timer:sleep(250),
+        timer:sleep(?RELOAD_WAIT),
         ?assertNotEqual(Version, Handle:version()),
         ?assertNotEqual(error, get(Ctx, is_called))
     end);
@@ -516,7 +517,7 @@ ensure_reload_if_changed(Case,
         subscribe(Ctx, test_app, Key),
         update(Case, Ctx),
         ?assertNotEqual(Version, Handle:version()),
-        timer:sleep(100), %% Allow some time for notify to be called
+        timer:sleep(?RELOAD_WAIT), %% Allow some time for notify to be called
         ?assertNotEqual(error, get(Ctx, is_called))
     end).
 
@@ -534,7 +535,7 @@ ensure_no_reload_when_no_change(_Case,
     ?_test(begin
         Version = Handle:version(),
         subscribe(Ctx, test_app, Key),
-        timer:sleep(450),
+        timer:sleep(?RELOAD_WAIT),
         ?assertEqual(Version, Handle:version()),
         ?assertEqual(error, get(Ctx, is_called))
     end).
@@ -576,7 +577,7 @@ subscribe(#ctx{kv = Kv}, _App, _Key) ->
 maybe_wait(Opts) ->
     case lists:member(concurrent, Opts) of
         true ->
-            timer:sleep(100);
+            timer:sleep(?RELOAD_WAIT);
         false ->
             ok
     end.
@@ -584,7 +585,7 @@ maybe_wait(Opts) ->
 wait_update(Ctx) ->
     case get(Ctx, is_called) of
         error ->
-            timer:sleep(100),
+            timer:sleep(?RELOAD_WAIT),
             wait_update(Ctx);
         _ -> ok
     end.
