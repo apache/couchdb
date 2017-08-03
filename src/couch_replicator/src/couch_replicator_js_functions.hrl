@@ -53,6 +53,11 @@
         var isReplicator = (userCtx.roles.indexOf('_replicator') >= 0);
         var isAdmin = (userCtx.roles.indexOf('_admin') >= 0);
 
+        if (isReplicator) {
+            // Always let replicator update the replication document
+            return;
+        }
+
         if (newDoc._replication_state === 'failed') {
             // Skip validation in case when we update the document with the
             // failed state. In this case it might be malformed. However,
