@@ -38,6 +38,7 @@ create(Db, Indexes, Selector, Opts) ->
     Limit = couch_util:get_value(limit, Opts, mango_opts:default_limit()),
     Skip = couch_util:get_value(skip, Opts, 0),
     Fields = couch_util:get_value(fields, Opts, all_fields),
+    Bookmark = couch_util:get_value(bookmark, Opts), 
 
     {ok, #cursor{
         db = Db,
@@ -47,7 +48,8 @@ create(Db, Indexes, Selector, Opts) ->
         opts = Opts,
         limit = Limit,
         skip = Skip,
-        fields = Fields
+        fields = Fields,
+        bookmark = Bookmark
     }}.
 
 
