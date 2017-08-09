@@ -755,7 +755,8 @@ send_response_no_cors(#httpd{mochi_req=MochiReq}=Req, Code, Headers, Body) ->
     Headers1 = http_1_0_keep_alive(MochiReq, Headers),
     Headers2 = basic_headers_no_cors(Req, Headers1),
     Headers3 = chttpd_xframe_options:header(Req, Headers2),
-    Resp = handle_response(Req, Code, Headers3, Body, respond),
+	Headers4 = chttpd_prefer_header:maybe_return_minimal(Req, Headers3),
+    Resp = handle_response(Req, Code, Headers4, Body, respond),
     log_response(Code, Body),
     {ok, Resp}.
 
@@ -1134,7 +1135,8 @@ validate_bind_address(Address) ->
 
 add_headers(Req, Headers0) ->
     Headers = basic_headers(Req, Headers0),
-    http_1_0_keep_alive(Req, Headers).
+    Headers1 = http_1_0_keep_alive(Req, Headers),
+    chttpd_prefer_header:maybe_return_minimal(Req, Headers1).
 
 basic_headers(Req, Headers0) ->
     Headers1 = basic_headers_no_cors(Req, Headers0),
