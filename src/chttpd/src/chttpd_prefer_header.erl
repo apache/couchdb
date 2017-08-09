@@ -46,7 +46,7 @@ filter_headers(Headers, IncludeList) ->
 
 
 get_header_list() ->
-    SectionStr = config:get("chttpd", "prefer_minimal", []),
+    SectionStr = config:get("chttpd", "prefer_minimal", ""),
     split_list(SectionStr).
 
 
