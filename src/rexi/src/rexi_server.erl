@@ -138,7 +138,11 @@ init_p(From, {M,F,A}, Nonce) ->
     put(nonce, Nonce),
     try apply(M, F, A) catch exit:normal -> ok; Class:Reason ->
         Stack = clean_stack(),
-        couch_log:error("rexi_server ~p:~p ~100p", [Class, Reason, Stack]),
+        {ClientPid, _ClientRef} = From,
+        couch_log:error(
+            "rexi_server: from: ~s(~p) mfa: ~s:~s/~p ~p:~p ~100p", [
+            node(ClientPid), ClientPid, M, F, length(A),
+            Class, Reason, Stack]),
         exit(#error{
             timestamp = now(),
             reason = {Class, Reason},
