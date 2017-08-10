@@ -18,49 +18,57 @@ DOCS = [
         "_id": "100",
         "name": "Jimi",
         "location": "AUS",
-        "user_id": 1
+        "user_id": 1,
+        "same": "value"
     },
     {
         "_id": "200",
         "name": "Eddie",
         "location": "BRA",
-        "user_id": 2
+        "user_id": 2,
+        "same": "value"
     },
     {
         "_id": "300",
         "name": "Harry",
         "location": "CAN",
-        "user_id":3
+        "user_id":3,
+        "same": "value"
     },
     {
         "_id": "400",
         "name": "Eddie",
         "location": "DEN",
-        "user_id":4
+        "user_id":4,
+        "same": "value"
     },
     {
         "_id": "500",
         "name": "Jones",
         "location": "ETH",
-        "user_id":5
+        "user_id":5,
+        "same": "value"
     },
     {
         "_id": "600",
         "name": "Winnifried",
         "location": "FRA",
-        "user_id":6
+        "user_id":6,
+        "same": "value"
     },
     {
         "_id": "700",
         "name": "Marilyn",
         "location": "GHA",
-        "user_id":7
+        "user_id":7,
+        "same": "value"
     },
     {
         "_id": "800",
         "name": "Sandra",
         "location": "ZAR",
-        "user_id":8
+        "user_id":8,
+        "same": "value"
     },
 ]
 
@@ -214,5 +222,24 @@ class PaginateJsonDocs(mango.DbPerClass):
         assert docs[0]['_id'] == '300'
 
         resp = self.db.find(selector, fields=["_id"], limit=5, sort=sort, return_raw=True, bookmark=bookmark2)
+        docs = resp['docs']
+        assert len(docs) == 0
+
+    def test_index_pagination_same_emitted_key(self):
+        self.db.create_index(["same"])
+        selector = {"same": {"$gt": ""}} 
+        resp = self.db.find(selector, fields=["_id"], limit=5, return_raw=True)
+        docs = resp['docs']
+        bookmark1 = resp["bookmark"]
+        assert len(docs) == 5
+        assert docs[0]['_id'] == '100'
+
+        resp = self.db.find(selector, fields=["_id"], limit=5, return_raw=True, bookmark=bookmark1)
+        docs = resp['docs']
+        bookmark2 = resp["bookmark"]
+        assert len(docs) == 3
+        assert docs[0]['_id'] == '600'
+
+        resp = self.db.find(selector, fields=["_id"], limit=5, return_raw=True, bookmark=bookmark2)
         docs = resp['docs']
         assert len(docs) == 0

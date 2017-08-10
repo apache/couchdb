@@ -23,18 +23,27 @@
 -include("mango_cursor.hrl").
 -include("mango.hrl").
 
-update_args(EncodedBookmark, Args) when EncodedBookmark =:= nil ->
-    Args;
-update_args(EncodedBookmark, #mrargs{skip = Skip} = Args) ->
+update_args(EncodedBookmark, Args) ->
     Bookmark = unpack(EncodedBookmark),
-    {startkey, Startkey} = lists:keyfind(startkey, 1, Bookmark),
-    {startkey_docid, StartkeyDocId} = lists:keyfind(startkey_docid, 1, Bookmark),
-    Args2 = Args#mrargs{
-        start_key = Startkey,
-        start_key_docid = StartkeyDocId,
-        skip = 1 + Skip
-    },
-    Args2.
+    update_args2(Bookmark, Args).
+
+
+update_args2(Bookmark, #mrargs{skip = Skip} = Args) when is_list(Bookmark) ->
+    case lists:keymember(startkey, 1, Bookmark) andalso lists:keymember(startkey_docid, 1, Bookmark) of
+        true -> 
+            {startkey, Startkey} = lists:keyfind(startkey, 1, Bookmark),
+            {startkey_docid, StartkeyDocId} = lists:keyfind(startkey_docid, 1, Bookmark),
+            Args2 = Args#mrargs{
+                start_key = Startkey,
+                start_key_docid = StartkeyDocId,
+                skip = 1 + Skip
+            },
+            Args2;
+        false ->
+            Args
+    end;
+update_args2(_Bookmark, Args) ->
+    Args.
     
 
 create(#cursor{bookmark_docid = BookmarkDocId, bookmark_key = BookmarkKey}) when BookmarkKey =/= undefined ->
@@ -48,6 +57,8 @@ create(#cursor{bookmark = Bookmark}) ->
     Bookmark.
 
 
+unpack(nil) ->
+    nil;
 unpack(Packed) ->
     try
         binary_to_term(couch_util:decodeBase64Url(Packed))
