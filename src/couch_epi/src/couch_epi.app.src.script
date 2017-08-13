@@ -20,7 +20,8 @@ ConfigFile = filename:join([os:getenv("COUCHDB_APPS_CONFIG_DIR"), "couch_epi.con
   {registered, [couch_epi_sup, couch_epi_server]},
   {applications, [
                   kernel,
-                  stdlib
+                  stdlib,
+                  crypto
                  ]},
   {mod, { couch_epi_app, []}},
   {env, AppConfig}
