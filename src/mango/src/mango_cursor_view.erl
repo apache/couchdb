@@ -315,7 +315,6 @@ doc_member(Db, RowProps, Opts) ->
             end
     end.
 
-
 is_design_doc(RowProps) ->
     case couch_util:get_value(id, RowProps) of
         <<"_design/", _/binary>> -> true;

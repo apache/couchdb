@@ -167,6 +167,17 @@ class PaginateJsonDocs(mango.DbPerClass):
         else:
             raise AssertionError("Should have thrown error for bad bookmark")
     
+    def test_throws_error_on_text_bookmark(self):
+        bookmark = 'g2wAAAABaANkABFub2RlMUBjb3VjaGRiLm5ldGwAAAACYQBiP____2poAkY_8AAAAAAAAGEHag'
+        try:
+            self.db.find({"_id": {"$gt": 0}}, bookmark=bookmark)
+        except Exception, e:
+            resp = e.response.json()
+            assert resp["error"] == "invalid_bookmark"
+            assert e.response.status_code == 400
+        else:
+            raise AssertionError("Should have thrown error for bad bookmark")
+    
     def test_index_pagination(self):
         self.db.create_index(["location"])
         selector = {"location": {"$gt": "A"}} 

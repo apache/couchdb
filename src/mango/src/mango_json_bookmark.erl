@@ -23,27 +23,20 @@
 -include("mango_cursor.hrl").
 -include("mango.hrl").
 
-update_args(EncodedBookmark, Args) ->
+update_args(EncodedBookmark,  #mrargs{skip = Skip} = Args) ->
     Bookmark = unpack(EncodedBookmark),
-    update_args2(Bookmark, Args).
-
-
-update_args2(Bookmark, #mrargs{skip = Skip} = Args) when is_list(Bookmark) ->
-    case lists:keymember(startkey, 1, Bookmark) andalso lists:keymember(startkey_docid, 1, Bookmark) of
+    case is_list(Bookmark) of
         true -> 
             {startkey, Startkey} = lists:keyfind(startkey, 1, Bookmark),
             {startkey_docid, StartkeyDocId} = lists:keyfind(startkey_docid, 1, Bookmark),
-            Args2 = Args#mrargs{
+            Args#mrargs{
                 start_key = Startkey,
                 start_key_docid = StartkeyDocId,
                 skip = 1 + Skip
-            },
-            Args2;
+            };
         false ->
             Args
-    end;
-update_args2(_Bookmark, Args) ->
-    Args.
+    end.
     
 
 create(#cursor{bookmark_docid = BookmarkDocId, bookmark_key = BookmarkKey}) when BookmarkKey =/= undefined ->
@@ -61,8 +54,18 @@ unpack(nil) ->
     nil;
 unpack(Packed) ->
     try
-        binary_to_term(couch_util:decodeBase64Url(Packed))
+        Bookmark = binary_to_term(couch_util:decodeBase64Url(Packed)),
+        verify(Bookmark)
     catch _:_ ->
         ?MANGO_ERROR({invalid_bookmark, Packed})
     end.
+
+verify(Bookmark) when is_list(Bookmark) ->
+    case lists:keymember(startkey, 1, Bookmark) andalso lists:keymember(startkey_docid, 1, Bookmark) of
+        true -> Bookmark;
+        _ -> throw(invalid_bookmark)
+    end;
+verify(_Bookmark) ->
+    throw(invalid_bookmark).
+
    
