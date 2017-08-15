@@ -55,7 +55,7 @@ before_script:
   - make venv
   - source venv/bin/activate
   - make pip-install
-  - cd ..
+  - cd ../..
 
 script:
    - make mango-test
