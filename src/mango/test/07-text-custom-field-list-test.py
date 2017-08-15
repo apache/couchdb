@@ -64,6 +64,16 @@ class CustomFieldsTest(mango.UserDocsTextTests):
         docs = self.db.find({"favorites": {"$in": vals}})
         assert len(docs) == 10
 
+    def test_in_with_array_not_explicit(self):
+        agelist = [22, 51]
+        statelist = ["New Hampshire"]
+        docs = self.db.find({"age": {"$in": agelist}})
+        docs2 = self.db.find({"location.state": {"$in": statelist}})
+        docs3 = self.db.find({"age": {"$in": statelist}})
+        assert len(docs) == 2
+        assert len(docs2) == 1
+        assert len(docs3) == 0
+
     # This should also throw an error because we only indexed
     # favorites.[] of type string. For the following query to work, the
     # user has to index favorites.[] of type number, and also
@@ -75,16 +85,10 @@ class CustomFieldsTest(mango.UserDocsTextTests):
         except Exception, e:
                 assert e.response.status_code == 400
 
-    # This test differs from the situation where we index everything.
-    # When we index everything the actual number of docs that gets
-    # returned is 5. That's because of the special situation where we
-    # have an array of an array, i.e: [["Lisp"]], because we're indexing
-    # specifically favorites.[] of type string. So it does not count
-    # the example and we only get 4 back.
     def test_nin_with_array(self):
         vals = ["Lisp", "Python"]
         docs = self.db.find({"favorites": {"$nin": vals}})
-        assert len(docs) == 4
+        assert len(docs) == 5
 
     def test_missing(self):
         self.db.find({"location.state": "Nevada"})
