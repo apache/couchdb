@@ -36,7 +36,7 @@ cache:
 
 # logfile uploader credentials
 env:
-  matric:
+  matrix:
     - COMMAND=check
     - COMMAND=mango-on-travis
   global:
