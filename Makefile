@@ -182,7 +182,6 @@ mango-on-travis:
 	(./dev/run -n 1 --admin=testuser:testpass &)
 	sleep 10;
 	cd src/mango && make venv
-	cd src/mango && source venv/bin/activate
 	cd src/mango && make pip-install
 	cd src/mango && nosetests
 
