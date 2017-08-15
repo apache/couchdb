@@ -51,6 +51,11 @@ before_script:
   - rm -rf /tmp/couchjslogs
   - mkdir -p /tmp/couchjslogs
   - ./configure -c --disable-docs --disable-fauxton
+  - cd src/mango
+  - make venv
+  - source venv/bin/activate
+  - make pip-install
+  - cd ..
 
 script:
    - make mango-test

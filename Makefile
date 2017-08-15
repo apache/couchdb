@@ -181,11 +181,7 @@ build-test:
 mango-test:
 	./dev/run -n 1 --admin=testuser:testpass &\
 	sleep 30; \
-	cd src/mango; \
-	make venv; \
-	. ./venv/bin/activate; \
-	make pip-install; \
-	nosetests; \
+	cd src/mango && nosetests; \
 	kill %1;
 
 
