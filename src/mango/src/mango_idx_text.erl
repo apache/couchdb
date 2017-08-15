@@ -307,7 +307,7 @@ indexable_fields(Fields, {op_or, [{op_field, Field0},
         {op_field, {[Name | _], _}} = Field1]}) ->
     case lists:member(<<"[]">>, Name) of
         true ->
-            indexable_fields(Fields, Field1);
+            indexable_fields(Fields, {op_field, Field0});
         false ->
             Fields1 = indexable_fields(Fields, {op_field, Field0}),
             indexable_fields(Fields1, Field1)
