@@ -53,7 +53,7 @@ before_script:
   - ./configure -c --disable-docs --disable-fauxton
 
 script:
-   - make check mango-test
+   - make mango-test
 
 after_failure:
   - build-aux/logfile-uploader.py
