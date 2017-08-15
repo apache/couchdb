@@ -179,8 +179,8 @@ build-test:
 .PHONY: mango-on-travis
 # target: mango-on-travis - Run Mango tests on travis 
 mango-on-travis:
-	(./dev/run -n 1 --admin=testuser:testpass &)
-	sleep 10;
+	./dev/run -n 1 --admin=testuser:testpass &
+	sleep 30
 	cd src/mango; \
 	make venv; \
 	. ./venv/bin/activate; \
