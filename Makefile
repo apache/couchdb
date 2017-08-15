@@ -179,10 +179,7 @@ build-test:
 .PHONY: mango-test
 # target: mango-test - Run Mango tests
 mango-test: all
-	./dev/run -n 1 --admin=testuser:testpass &\
-	sleep 30; \
-	cd src/mango && nosetests; \
-	kill %1;
+	./test/build/test-run-couch-for-mango.sh \
 
 
 ################################################################################
