@@ -178,7 +178,7 @@ build-test:
 
 .PHONY: mango-test
 # target: mango-test - Run Mango tests
-mango-test:
+mango-test: all
 	./dev/run -n 1 --admin=testuser:testpass &\
 	sleep 30; \
 	cd src/mango && nosetests; \
