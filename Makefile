@@ -176,16 +176,17 @@ build-test:
 	@test/build/test-configure.sh
 
 
-.PHONY: mango-on-travis
-# target: mango-on-travis - Run Mango tests on travis 
-mango-on-travis:
-	./dev/run -n 1 --admin=testuser:testpass &
-	sleep 30
+.PHONY: mango-test
+# target: mango-test - Run Mango tests
+mango-test:
+	./dev/run -n 1 --admin=testuser:testpass &\
+	sleep 30; \
 	cd src/mango; \
 	make venv; \
 	. ./venv/bin/activate; \
 	make pip-install; \
-	nosetests;
+	nosetests; \
+	kill %1;
 
 
 ################################################################################

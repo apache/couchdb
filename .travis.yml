@@ -36,9 +36,6 @@ cache:
 
 # logfile uploader credentials
 env:
-  matrix:
-    - COMMAND=check
-    - COMMAND=mango-on-travis
   global:
     - secure: "UdA/gKIlyuXaW+hUgRx40t1TYjLCGxMqHvM5Uw7UbUH2dqEkgJiLfhZGchS1JVzl8M01VKZUUzS7v2nvRLiHZN1kvaw5kfq31VRoafUah8jfmvqNWZVdLovHl3aw5UX/HRt0RkbWbhdbdknTfh6+YinSZ+Nb54jCErMg9nabXtM="
     - COUCHDB_IO_LOG_DIR=/tmp/couchjslogs
@@ -56,7 +53,7 @@ before_script:
   - ./configure -c --disable-docs --disable-fauxton
 
 script:
-   - make $COMMAND
+   - make check mango-test
 
 after_failure:
   - build-aux/logfile-uploader.py
