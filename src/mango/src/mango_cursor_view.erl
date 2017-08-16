@@ -39,6 +39,7 @@ create(Db, Indexes, Selector, Opts) ->
     Limit = couch_util:get_value(limit, Opts, mango_opts:default_limit()),
     Skip = couch_util:get_value(skip, Opts, 0),
     Fields = couch_util:get_value(fields, Opts, all_fields),
+    Bookmark = couch_util:get_value(bookmark, Opts), 
 
     {ok, #cursor{
         db = Db,
@@ -48,7 +49,8 @@ create(Db, Indexes, Selector, Opts) ->
         opts = Opts,
         limit = Limit,
         skip = Skip,
-        fields = Fields
+        fields = Fields,
+        bookmark = Bookmark
     }}.
 
 
@@ -85,8 +87,9 @@ execute(#cursor{db = Db, index = Idx} = Cursor0, UserFun, UserAcc) ->
                 end_key = mango_idx:end_key(Idx, Cursor#cursor.ranges),
                 include_docs = true
             },
-            #cursor{opts = Opts} = Cursor,
-            Args = apply_opts(Opts, BaseArgs),
+            #cursor{opts = Opts, bookmark = Bookmark} = Cursor,
+            Args0 = apply_opts(Opts, BaseArgs),
+            Args = mango_json_bookmark:update_args(Bookmark, Args0),
             UserCtx = couch_util:get_value(user_ctx, Opts, #user_ctx{}),
             DbOpts = [{user_ctx, UserCtx}],
             Result = case mango_idx:def(Idx) of
@@ -102,7 +105,10 @@ execute(#cursor{db = Db, index = Idx} = Cursor0, UserFun, UserAcc) ->
             end,
             case Result of
                 {ok, LastCursor} ->
-                    {ok, LastCursor#cursor.user_acc};
+                    NewBookmark = mango_json_bookmark:create(LastCursor),
+                    Arg = {add_key, bookmark, NewBookmark},
+                    {_Go, FinalUserAcc} = UserFun(Arg, LastCursor#cursor.user_acc),
+                    {ok, FinalUserAcc};
                 {error, Reason} ->
                     {error, Reason}
             end
@@ -180,8 +186,9 @@ handle_message({row, Props}, Cursor) ->
         {ok, Doc} ->
             case mango_selector:match(Cursor#cursor.selector, Doc) of
                 true ->
-                    FinalDoc = mango_fields:extract(Doc, Cursor#cursor.fields),
-                    handle_doc(Cursor, FinalDoc);
+                    Cursor1 = update_bookmark_keys(Cursor, Props),
+                    FinalDoc = mango_fields:extract(Doc, Cursor1#cursor.fields),
+                    handle_doc(Cursor1, FinalDoc);
                 false ->
                     {ok, Cursor}
             end;
@@ -286,6 +293,9 @@ apply_opts([{update, false} | Rest], Args) ->
         update = false
     },
     apply_opts(Rest, NewArgs);
+% apply_opts([{bookmark, Bookmark} | Rest], Args) when Bookmark =/= nil ->
+%     NewArgs = mango_json_bookmark:update_args(Bookmark, Args),
+%     apply_opts(Rest, NewArgs);
 apply_opts([{_, _} | Rest], Args) ->
     % Ignore unknown options
     apply_opts(Rest, Args).
@@ -310,3 +320,14 @@ is_design_doc(RowProps) ->
         <<"_design/", _/binary>> -> true;
         _ -> false
     end.
+
+
+update_bookmark_keys(#cursor{limit = Limit} = Cursor, Props) when Limit > 0 ->
+    Id = couch_util:get_value(id, Props), 
+    Key = couch_util:get_value(key, Props), 
+    Cursor#cursor {
+        bookmark_docid = Id,
+        bookmark_key = Key
+    };
+update_bookmark_keys(Cursor, _Props) ->
+    Cursor.

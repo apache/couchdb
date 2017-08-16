@@ -46,11 +46,18 @@ info(mango_cursor, {no_usable_index, selector_unsupported}) ->
         <<"There is no index available for this selector.">>
     };
 
+info(mango_json_bookmark, {invalid_bookmark, BadBookmark}) ->
+    {
+        400,
+        <<"invalid_bookmark">>,
+        fmt("Invalid bookmark value: ~s", [?JSON_ENCODE(BadBookmark)])
+    };
+
 info(mango_cursor_text, {invalid_bookmark, BadBookmark}) ->
     {
         400,
         <<"invalid_bookmark">>,
-        fmt("Invalid boomkark value: ~s", [?JSON_ENCODE(BadBookmark)])
+        fmt("Invalid bookmark value: ~s", [?JSON_ENCODE(BadBookmark)])
     };
 info(mango_cursor_text, multiple_text_indexes) ->
     {
