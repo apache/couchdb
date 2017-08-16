@@ -16,6 +16,9 @@ import mango
 import unittest
 
 class IndexCrudTests(mango.DbPerClass):
+    def setUp(self):
+        self.db.recreate()
+
     def test_bad_fields(self):
         bad_fields = [
             None,
@@ -92,6 +95,8 @@ class IndexCrudTests(mango.DbPerClass):
     def test_create_idx_01_exists(self):
         fields = ["foo", "bar"]
         ret = self.db.create_index(fields, name="idx_01")
+        assert ret is True
+        ret = self.db.create_index(fields, name="idx_01")
         assert ret is False
 
     def test_create_idx_02(self):
@@ -106,6 +111,8 @@ class IndexCrudTests(mango.DbPerClass):
         raise AssertionError("index not created")
 
     def test_read_idx_doc(self):
+        self.db.create_index(["foo", "bar"], name="idx_01")
+        self.db.create_index(["hello", "bar"])
         for idx in self.db.list_indexes():
             if idx["type"] == "special":
                 continue
@@ -116,6 +123,7 @@ class IndexCrudTests(mango.DbPerClass):
             assert info["name"] == ddocid.split('_design/')[-1]
 
     def test_delete_idx_escaped(self):
+        self.db.create_index(["foo", "bar"], name="idx_01")
         pre_indexes = self.db.list_indexes()
         ret = self.db.create_index(["bing"], name="idx_del_1")
         assert ret is True
@@ -182,7 +190,6 @@ class IndexCrudTests(mango.DbPerClass):
             assert idx["type"] != "text"
 
     def test_recreate_index(self):
-        self.db.recreate()
         pre_indexes = self.db.list_indexes()
         for i in range(5):
             ret = self.db.create_index(["bing"], name="idx_recreate")
@@ -206,6 +213,7 @@ class IndexCrudTests(mango.DbPerClass):
             raise AssertionError("bad index delete")
 
         # Missing view name
+        ret = self.db.create_index(["fields"], name="idx_01")
         indexes = self.db.list_indexes()
         not_special = [idx for idx in indexes if idx["type"] != "special"]
         idx = random.choice(not_special)
@@ -278,6 +286,14 @@ class IndexCrudTests(mango.DbPerClass):
 
         fields = ["field3"]
         ret = self.db.create_index(fields, name="idx_03")
+        assert ret is True
+
+        fields = ["field4"]
+        ret = self.db.create_index(fields, name="idx_04")
+        assert ret is True
+
+        fields = ["field5"]
+        ret = self.db.create_index(fields, name="idx_05")
         assert ret is True
 
         skip_add = 0
