@@ -20,5 +20,8 @@
     skip = 0,
     fields = undefined,
     user_fun,
-    user_acc
+    user_acc,
+    bookmark,
+    bookmark_docid,
+    bookmark_key
 }).
