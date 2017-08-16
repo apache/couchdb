@@ -176,6 +176,12 @@ build-test:
 	@test/build/test-configure.sh
 
 
+.PHONY: mango-test
+# target: mango-test - Run Mango tests
+mango-test: all
+	./test/build/test-run-couch-for-mango.sh \
+
+
 ################################################################################
 # Developing
 ################################################################################
