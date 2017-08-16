@@ -22,9 +22,17 @@
 -include("couch_bt_engine.hrl").
 
 
+-record(comp_st, {
+    db_name,
+    old_st,
+    new_st,
+    meta_fd,
+    retry
+}).
+
 -record(comp_header, {
     db_header,
-    meta_state
+    meta_st
 }).
 
 -record(merge_st, {
@@ -38,68 +46,106 @@
 
 start(#st{} = St, DbName, Options, Parent) ->
     erlang:put(io_priority, {db_compact, DbName}),
-    #st{
-        filepath = FilePath,
-        header = Header
-    } = St,
     couch_log:debug("Compaction process spawned for db \"~s\"", [DbName]),
 
     couch_db_engine:trigger_on_compact(DbName),
 
-    {ok, NewSt, DName, DFd, MFd, Retry} =
-            open_compaction_files(Header, FilePath, Options),
-    erlang:monitor(process, MFd),
+    {ok, InitCompSt} = open_compaction_files(DbName, St, Options),
 
-    % This is a bit worrisome. init_db/4 will monitor the data fd
-    % but it doesn't know about the meta fd. For now I'll maintain
-    % that the data fd is the old normal fd and meta fd is special
-    % and hope everything works out for the best.
-    unlink(DFd),
+    Stages = [
+        fun copy_purge_info/1,
+        fun copy_compact/1,
+        fun commit_compaction_data/1,
+        fun sort_meta_data/1,
+        fun commit_compaction_data/1,
+        fun copy_meta_data/1,
+        fun compact_final_sync/1
+    ],
 
-    NewSt1 = copy_purge_info(DbName, St, NewSt, Retry),
-    NewSt2 = copy_compact(DbName, St, NewSt1, Retry),
-    NewSt3 = sort_meta_data(NewSt2),
-    NewSt4 = commit_compaction_data(NewSt3),
-    NewSt5 = copy_meta_data(NewSt4),
-    {ok, NewSt6} = couch_bt_engine:commit_data(NewSt5),
-    ok = couch_bt_engine:decref(NewSt6),
-    ok = couch_file:close(MFd),
+    FinalCompSt = lists:foldl(fun(Stage, CompSt) ->
+        Stage(CompSt)
+    end, InitCompSt, Stages),
 
-    % Done
-    gen_server:cast(Parent, {compact_done, couch_bt_engine, DName}).
+    #comp_st{
+        new_st = FinalNewSt,
+        meta_fd = MetaFd
+    } = FinalCompSt,
+
+    ok = couch_bt_engine:decref(FinalNewSt),
+    ok = couch_file:close(MetaFd),
+
+    Msg = {compact_done, couch_bt_engine, FinalNewSt#st.filepath},
+    gen_server:cast(Parent, Msg).
 
 
-open_compaction_files(SrcHdr, DbFilePath, Options) ->
+open_compaction_files(DbName, OldSt, Options) ->
+    #st{
+        filepath = DbFilePath,
+        header = SrcHdr
+    } = OldSt,
     DataFile = DbFilePath ++ ".compact.data",
     MetaFile = DbFilePath ++ ".compact.meta",
     {ok, DataFd, DataHdr} = open_compaction_file(DataFile),
     {ok, MetaFd, MetaHdr} = open_compaction_file(MetaFile),
     DataHdrIsDbHdr = couch_bt_engine_header:is_header(DataHdr),
-    case {DataHdr, MetaHdr} of
+    CompSt = case {DataHdr, MetaHdr} of
         {#comp_header{}=A, #comp_header{}=A} ->
+            % We're restarting a compaction that did not finish
+            % before trying to swap out with the original db
             DbHeader = A#comp_header.db_header,
             St0 = couch_bt_engine:init_state(
                     DataFile, DataFd, DbHeader, Options),
-            St1 = bind_emsort(St0, MetaFd, A#comp_header.meta_state),
-            {ok, St1, DataFile, DataFd, MetaFd, St0#st.id_tree};
+            St1 = bind_emsort(St0, MetaFd, A#comp_header.meta_st),
+            #comp_st{
+                db_name = DbName,
+                old_st = OldSt,
+                new_st = St1,
+                meta_fd = MetaFd,
+                retry = St0#st.id_tree
+            };
         _ when DataHdrIsDbHdr ->
+            % We tried to swap out the compaction but there were
+            % writes to the database during compaction. Start
+            % a compaction retry.
             Header = couch_bt_engine_header:from(SrcHdr),
             ok = reset_compaction_file(MetaFd, Header),
             St0 = couch_bt_engine:init_state(
                     DataFile, DataFd, DataHdr, Options),
             St1 = bind_emsort(St0, MetaFd, nil),
-            {ok, St1, DataFile, DataFd, MetaFd, St0#st.id_tree};
+            #comp_st{
+                db_name = DbName,
+                old_st = OldSt,
+                new_st = St1,
+                meta_fd = MetaFd,
+                retry = St0#st.id_tree
+            };
         _ ->
+            % We're starting a compaction from scratch
             Header = couch_bt_engine_header:from(SrcHdr),
             ok = reset_compaction_file(DataFd, Header),
             ok = reset_compaction_file(MetaFd, Header),
             St0 = couch_bt_engine:init_state(DataFile, DataFd, Header, Options),
             St1 = bind_emsort(St0, MetaFd, nil),
-            {ok, St1, DataFile, DataFd, MetaFd, nil}
-    end.
+            #comp_st{
+                db_name = DbName,
+                old_st = OldSt,
+                new_st = St1,
+                meta_fd = MetaFd,
+                retry = nil
+            }
+    end,
+    unlink(DataFd),
+    erlang:monitor(process, MetaFd),
+    {ok, CompSt}.
 
 
-copy_purge_info(DbName, OldSt, NewSt, Retry) ->
+copy_purge_info(#comp_st{} = CompSt) ->
+    #comp_st{
+        db_name = DbName,
+        old_st = OldSt,
+        new_st = NewSt,
+        retry = Retry
+    } = CompSt,
     MinPurgeSeq = couch_util:with_db(DbName, fun(Db) ->
         couch_db:get_minimum_purge_seq(Db)
     end),
@@ -132,7 +178,11 @@ copy_purge_info(DbName, OldSt, NewSt, Retry) ->
     Opts = [{start_key, StartSeq}],
     {ok, _, FinalAcc} = couch_btree:fold(OldPSTree, EnumFun, InitAcc, Opts),
     {NewStAcc, Infos, _, _} = FinalAcc,
-    copy_purge_infos(OldSt, NewStAcc, Infos, MinPurgeSeq, Retry).
+    FinalNewSt = copy_purge_infos(OldSt, NewStAcc, Infos, MinPurgeSeq, Retry),
+
+    CompSt#comp_st{
+        new_st = FinalNewSt
+    }.
 
 
 copy_purge_infos(OldSt, NewSt0, Infos, MinPurgeSeq, Retry) ->
@@ -206,7 +256,14 @@ copy_purge_infos(OldSt, NewSt0, Infos, MinPurgeSeq, Retry) ->
     bind_emsort(NewSt4, MetaFd, MetaState).
 
 
-copy_compact(DbName, St, NewSt0, Retry) ->
+copy_compact(#comp_st{} = CompSt) ->
+    #comp_st{
+        db_name = DbName,
+        old_st = St,
+        new_st = NewSt0,
+        retry = Retry
+    } = CompSt,
+
     Compression = couch_compress:get_compression_method(),
     NewSt = NewSt0#st{compression = Compression},
     NewUpdateSeq = couch_bt_engine:get_update_seq(NewSt0),
@@ -282,7 +339,10 @@ copy_compact(DbName, St, NewSt0, Retry) ->
 
     FinalUpdateSeq = couch_bt_engine:get_update_seq(St),
     {ok, NewSt6} = couch_bt_engine:set_update_seq(NewSt5, FinalUpdateSeq),
-    commit_compaction_data(NewSt6).
+
+    CompSt#comp_st{
+        new_st = NewSt6
+    }.
 
 
 copy_docs(St, #st{} = NewSt, MixedInfos, Retry) ->
@@ -417,12 +477,16 @@ copy_doc_attachments(#st{} = SrcSt, SrcSp, DstSt) ->
     {BodyData, NewBinInfos}.
 
 
-sort_meta_data(St0) ->
+sort_meta_data(#comp_st{new_st = St0} = CompSt) ->
     {ok, Ems} = couch_emsort:merge(St0#st.id_tree),
-    St0#st{id_tree=Ems}.
+    CompSt#comp_st{
+        new_st = St0#st{
+            id_tree = Ems
+        }
+    }.
 
 
-copy_meta_data(#st{} = St) ->
+copy_meta_data(#comp_st{new_st = St} = CompSt) ->
     #st{
         fd = Fd,
         header = Header,
@@ -446,7 +510,19 @@ copy_meta_data(#st{} = St) ->
     {ok, SeqTree} = couch_btree:add_remove(
         Acc#merge_st.seq_tree, [], Acc#merge_st.rem_seqs
     ),
-    St#st{id_tree=IdTree, seq_tree=SeqTree}.
+    CompSt#comp_st{
+        new_st = St#st{
+            id_tree = IdTree,
+            seq_tree = SeqTree
+        }
+    }.
+
+
+compact_final_sync(#comp_st{new_st = St0} = CompSt) ->
+    {ok, St1} = couch_bt_engine:commit_data(St0),
+    CompSt#comp_st{
+        new_st = St1
+    }.
 
 
 open_compaction_file(FilePath) ->
@@ -467,10 +543,15 @@ reset_compaction_file(Fd, Header) ->
     ok = couch_file:write_header(Fd, Header).
 
 
-commit_compaction_data(#st{}=St) ->
+commit_compaction_data(#comp_st{new_st = St} = CompSt) ->
     % Compaction needs to write headers to both the data file
     % and the meta file so if we need to restart we can pick
     % back up from where we left off.
+    CompSt#comp_st{
+        new_st = commit_compaction_data(St)
+    };
+
+commit_compaction_data(#st{} = St) ->
     commit_compaction_data(St, couch_emsort:get_fd(St#st.id_tree)),
     commit_compaction_data(St, St#st.fd).
 
@@ -483,7 +564,7 @@ commit_compaction_data(#st{header = OldHeader} = St0, Fd) ->
     Header = couch_bt_engine:update_header(St1, St1#st.header),
     CompHeader = #comp_header{
         db_header = Header,
-        meta_state = MetaState
+        meta_st = MetaState
     },
     ok = couch_file:sync(Fd),
     ok = couch_file:write_header(Fd, CompHeader),
