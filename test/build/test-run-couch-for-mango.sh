@@ -16,7 +16,7 @@ export SERVER_PID=$!
 sleep 10
 curl http://dev:15984
 cd src/mango/ 
-nosetests --nocapture
+nosetests
 
 EXIT_STATUS=$?
 if [[ ! -z $SERVER_PID ]]; then

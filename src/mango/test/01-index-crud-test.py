@@ -194,10 +194,6 @@ class IndexCrudTests(mango.DbPerClass):
                 self.db.delete_index(idx["ddoc"], idx["name"])
                 break
             post_indexes = self.db.list_indexes()
-            print 'Post'
-            print post_indexes
-            print "Pre"
-            print pre_indexes
             assert pre_indexes == post_indexes
 
     def test_delete_misisng(self):
