@@ -19,6 +19,7 @@ addons:
     - pkg-config
     - python-requests
     - python-sphinx
+    - python-virtualenv
 #    - sphinx-rtd-theme
     - help2man
     - shunit2
@@ -50,9 +51,14 @@ before_script:
   - rm -rf /tmp/couchjslogs
   - mkdir -p /tmp/couchjslogs
   - ./configure -c --disable-docs --disable-fauxton
+  - cd src/mango
+  - make venv
+  - source venv/bin/activate
+  - make pip-install
+  - cd ../..
 
 script:
-   - make check
+   - make check mango-test
 
 after_failure:
   - build-aux/logfile-uploader.py
