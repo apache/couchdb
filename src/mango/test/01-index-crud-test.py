@@ -182,6 +182,7 @@ class IndexCrudTests(mango.DbPerClass):
             assert idx["type"] != "text"
 
     def test_recreate_index(self):
+        self.db.recreate()
         pre_indexes = self.db.list_indexes()
         for i in range(5):
             ret = self.db.create_index(["bing"], name="idx_recreate")
@@ -193,7 +194,9 @@ class IndexCrudTests(mango.DbPerClass):
                 self.db.delete_index(idx["ddoc"], idx["name"])
                 break
             post_indexes = self.db.list_indexes()
+            print 'Post'
             print post_indexes
+            print "Pre"
             print pre_indexes
             assert pre_indexes == post_indexes
 
