@@ -20,12 +20,14 @@
 
 setup_all() ->
     TestCtx = test_util:start_couch([chttpd]),
+    ok = application:start(couch_peruser),
     Hashed = couch_passwords:hash_admin_password(?ADMIN_PASSWORD),
     ok = config:set("admins", ?ADMIN_USERNAME, ?b2l(Hashed), _Persist=false),
     TestCtx.
 
 teardown_all(TestCtx) ->
     config:delete("admins", ?ADMIN_USERNAME),
+    ok = application:stop(couch_peruser),
     test_util:stop_couch(TestCtx).
 
 setup() ->
