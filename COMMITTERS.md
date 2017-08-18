@@ -48,5 +48,3 @@ mean this in the sense of being loyal to the project and its interests.
  * Maria Andersson <mia@apache.org>
  * Michelle Phung <michellep@apache.org>
  * Clemens Stolle <klaemo@apache.org>
-
-For a list of other credits see the `THANKS` file.
