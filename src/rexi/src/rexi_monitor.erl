@@ -12,6 +12,7 @@
 
 -module(rexi_monitor).
 -export([start/1, stop/1]).
+-export([wait_monitors/1]).
 
 
 %% @doc spawn_links a process which monitors the supplied list of items and
@@ -51,7 +52,7 @@ wait_monitors(Parent) ->
     receive
     {'DOWN', _, process, Pid, Reason} ->
         notify_parent(Parent, Pid, Reason),
-        wait_monitors(Parent);
+        ?MODULE:wait_monitors(Parent);
     {Parent, shutdown} ->
         ok
     end.
