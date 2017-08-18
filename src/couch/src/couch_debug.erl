@@ -18,6 +18,18 @@
     opened_files_contains/1
 ]).
 
+-export([
+    process_name/1,
+    link_tree/1,
+    link_tree/2,
+    mapfold/3,
+    map/2,
+    fold/3,
+    linked_processes_info/2,
+    print_linked_processes/1,
+    ps/1
+]).
+
 -spec opened_files() ->
     [{port(), CouchFilePid :: pid(), Fd :: pid() | tuple(), FilePath :: string()}].
 
@@ -50,3 +62,215 @@ opened_files_contains(FileNameFragment) ->
     lists:filter(fun({_Port, _Pid, _Fd, Path}) ->
         string:str(Path, FileNameFragment) > 0
     end, couch_debug:opened_files()).
+
+process_name(Pid) ->
+    case process_info(Pid, registered_name) of
+        {registered_name, Name} ->
+            iolist_to_list(io_lib:format("~s[~p]", [Name, Pid]));
+        _ ->
+            {dictionary, Dict} = process_info(Pid, dictionary),
+            case proplists:get_value('$initial_call', Dict) of
+                undefined ->
+                    {initial_call, {M, F, A}} = process_info(Pid, initial_call),
+                    iolist_to_list(io_lib:format("~p:~p/~p[~p]", [M, F, A, Pid]));
+                {M, F, A} ->
+                    iolist_to_list(io_lib:format("~p:~p/~p[~p]", [M, F, A, Pid]))
+            end
+    end.
+
+iolist_to_list(List) ->
+    binary_to_list(iolist_to_binary(List)).
+
+link_tree(RootPid) ->
+    link_tree(RootPid, []).
+
+link_tree(RootPid, Info) ->
+    link_tree(RootPid, Info, fun(_, Props) -> Props end).
+
+link_tree(RootPid, Info, Fun) ->
+    {_, Result} = link_tree(
+        RootPid, [links | Info], gb_trees:empty(), 0, [RootPid], Fun),
+    Result.
+
+link_tree(RootPid, Info, Visited0, Pos, [Pid | Rest], Fun) ->
+    case gb_trees:lookup(Pid, Visited0) of
+        {value, Props} ->
+            {Visited0, [{Pos, {Pid, Fun(Pid, Props), []}}]};
+        none when RootPid =< Pid ->
+            Props = info(Pid, Info),
+            Visited1 = gb_trees:insert(Pid, Props, Visited0),
+            {links, Children} = lists:keyfind(links, 1, Props),
+            {Visited2, NewTree} = link_tree(
+                RootPid, Info, Visited1, Pos + 1, Children, Fun),
+            {Visited3, Result} = link_tree(
+                RootPid, Info, Visited2, Pos, Rest, Fun),
+            {Visited3, [{Pos, {Pid, Fun(Pid, Props), NewTree}}]  ++ Result};
+        none ->
+            Props = info(Pid, Info),
+            Visited1 = gb_trees:insert(Pid, Props, Visited0),
+            {Visited2, Result} = link_tree(
+                RootPid, Info, Visited1, Pos, Rest, Fun),
+            {Visited2, [{Pos, {Pid, Fun(Pid, Props), []}}] ++ Result}
+    end;
+link_tree(_RootPid, _Info, Visited, _Pos, [], _Fun) ->
+    {Visited, []}.
+
+
+info(Pid, Info) when is_pid(Pid) ->
+    ValidProps = [
+        backtrace,
+        binary,
+        catchlevel,
+        current_function,
+        current_location,
+        current_stacktrace,
+        dictionary,
+        error_handler,
+        garbage_collection,
+        garbage_collection_info,
+        group_leader,
+        heap_size,
+        initial_call,
+        links,
+        last_calls,
+        memory,
+        message_queue_len,
+        messages,
+        min_heap_size,
+        min_bin_vheap_size,
+        monitored_by,
+        monitors,
+        message_queue_data,
+        priority,
+        reductions,
+        registered_name,
+        sequential_trace_token,
+        stack_size,
+        status,
+        suspending,
+        total_heap_size,
+        trace,
+        trap_exit
+    ],
+    Validated = lists:filter(fun(P) -> lists:member(P, ValidProps) end, Info),
+    process_info(Pid, lists:usort(Validated));
+info(Port, Info) when is_port(Port) ->
+    ValidProps = [
+        registered_name,
+        id,
+        connected,
+        links,
+        name,
+        input,
+        output,
+        os_pid
+    ],
+    Validated = lists:filter(fun(P) -> lists:member(P, ValidProps) end, Info),
+    erlang:port_info(Port, lists:usort(Validated)).
+
+mapfold([], Acc, _Fun) ->
+    {[], Acc};
+mapfold([{Pos, {Key, Value0, SubTree0}} | Rest0], Acc0, Fun) ->
+    {Value1, Acc1} = Fun(Key, Value0, Pos, Acc0),
+    {SubTree1, Acc2} = mapfold(SubTree0, Acc1, Fun),
+    {Rest1, Acc3} = mapfold(Rest0, Acc2, Fun),
+    {[{Pos, {Key, Value1, SubTree1}} | Rest1], Acc3}.
+
+map(Tree, Fun) ->
+    {Result, _} = mapfold(Tree, nil, fun(Key, Value, Pos, Acc) ->
+        {Fun(Key, Value, Pos), Acc}
+    end),
+    Result.
+
+fold(Tree, Acc, Fun) ->
+    {_, Result} = mapfold(Tree, Acc, fun(Key, Value, Pos, AccIn) ->
+        {Value, Fun(Key, Value, Pos, AccIn)}
+    end),
+    Result.
+
+linked_processes_info(Pid, Info) ->
+    link_tree(Pid, Info, fun(P, Props) -> {process_name(P), Props} end).
+
+print_linked_processes(Pid) ->
+    Info = [reductions, message_queue_len, memory],
+    TableSpec = [
+        {50, left, name}, {12, centre, reductions},
+        {19, centre, message_queue_len}, {10, centre, memory}
+    ],
+    Tree = linked_processes_info(Pid, Info),
+    print_tree(Tree, TableSpec).
+
+id("couch_file:init" ++ _, Pid, _Props) ->
+    case couch_file:process_info(Pid) of
+        {{file_descriptor, prim_file, {Port, Fd}}, FilePath} ->
+            term2str([
+                term2str(Fd), ":",
+                term2str(Port), ":",
+                shorten_path(FilePath)]);
+        undefined ->
+            ""
+    end;
+id(_IdStr, _Pid, _Props) ->
+    "".
+
+ps(couch_index_server) ->
+    Info = [reductions, message_queue_len, memory],
+    TableSpec = [
+        {50, left, name}, {12, centre, reductions},
+        {19, centre, message_queue_len}, {14, centre, memory}, {id}
+    ],
+
+    Tree = link_tree(whereis(couch_index_server), Info, fun(P, Props) ->
+        IdStr = process_name(P),
+        {IdStr, [{id, id(IdStr, P, Props)} | Props]}
+    end),
+
+    print_tree(Tree, TableSpec);
+ps(Name) ->
+    throw({error, {unsuported, Name, [couch_index_server]}}).
+
+shorten_path(Path) ->
+    ViewDir = list_to_binary(config:get("couchdb", "view_index_dir")),
+    DatabaseDir = list_to_binary(config:get("couchdb", "database_dir")),
+    File = list_to_binary(Path),
+    Len = max(
+        binary:longest_common_prefix([File, DatabaseDir]),
+        binary:longest_common_prefix([File, ViewDir])
+    ),
+    <<_:Len/binary, Rest/binary>> = File,
+    binary_to_list(Rest).
+
+%% Pretty print functions
+
+%% Limmitations:
+%%   - The first column has to be specified as {Width, left, Something}
+print_tree(Tree, TableSpec) ->
+    io:format("~s~n", [format(TableSpec)]),
+    map(Tree, fun(_, {Id, Props}, Pos) ->
+        io:format("~s~n", [table_row(Id, Pos * 2, Props, TableSpec)])
+    end),
+    ok.
+
+format(Spec) ->
+    Fields = [format_value(Format) || Format <- Spec],
+    string:join(Fields, "|").
+
+format_value({Value}) -> term2str(Value);
+format_value({Width, Align, Value}) -> string:Align(term2str(Value), Width).
+
+bind_value({K}, Props) when is_list(Props) ->
+    {element(2, lists:keyfind(K, 1, Props))};
+bind_value({Width, Align, K}, Props) when is_list(Props) ->
+    {Width, Align, element(2, lists:keyfind(K, 1, Props))}.
+
+term2str(Atom) when is_atom(Atom) -> atom_to_list(Atom);
+term2str(Binary) when is_binary(Binary) -> binary_to_list(Binary);
+term2str(Integer) when is_integer(Integer) -> integer_to_list(Integer);
+term2str(Float) when is_float(Float) -> float_to_list(Float);
+term2str(String) when is_list(String) -> lists:flatten(String);
+term2str(Term) -> iolist_to_list(io_lib:format("~p", [Term])).
+
+table_row(Key, Indent, Props, [{KeyWidth, Align, _} | Spec]) ->
+    Values = [bind_value(Format, Props) || Format <- Spec],
+    KeyStr = string:Align(term2str(Key), KeyWidth - Indent),
+    [string:copies(" ", Indent), KeyStr, "|" | format(Values)].
