@@ -56,18 +56,31 @@ create(Db, Indexes, Selector, Opts) ->
 
 explain(Cursor) ->
     #cursor{
-        index = Idx,
-        ranges = Ranges
+        opts = Opts
     } = Cursor,
-    case Ranges of
-        [empty] ->
-            [{range, empty}];
-        _ ->
-            [{range, {[
-            {start_key, mango_idx:start_key(Idx, Ranges)},
-            {end_key, mango_idx:end_key(Idx, Ranges)}
-        ]}}]
-    end.
+
+    BaseArgs = base_args(Cursor),
+    Args = apply_opts(Opts, BaseArgs),
+    [{mrargs, {[
+        {include_docs, Args#mrargs.include_docs},
+        {view_type, Args#mrargs.view_type},
+        {reduce, Args#mrargs.reduce},
+        {start_key, Args#mrargs.start_key},
+        {end_key, Args#mrargs.end_key},
+        {direction, Args#mrargs.direction},
+        {stable, Args#mrargs.stable},
+        {update, Args#mrargs.update}
+    ]}}].
+
+
+base_args(#cursor{index = Idx} = Cursor) ->
+    #mrargs{
+        view_type = map,
+        reduce = false,
+        start_key = mango_idx:start_key(Idx, Cursor#cursor.ranges),
+        end_key = mango_idx:end_key(Idx, Cursor#cursor.ranges),
+        include_docs = true
+    }.
 
 
 execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFun, UserAcc) ->
@@ -81,16 +94,10 @@ execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFu
             % empty indicates unsatisfiable ranges, so don't perform search
             {ok, UserAcc};
         _ ->
-            BaseArgs = #mrargs{
-                view_type = map,
-                reduce = false,
-                start_key = mango_idx:start_key(Idx, Cursor#cursor.ranges),
-                end_key = mango_idx:end_key(Idx, Cursor#cursor.ranges),
-                include_docs = true
-            },
+            BaseArgs = base_args(Cursor),
             #cursor{opts = Opts, bookmark = Bookmark} = Cursor,
             Args0 = apply_opts(Opts, BaseArgs),
-            Args = mango_json_bookmark:update_args(Bookmark, Args0),
+            Args = mango_json_bookmark:update_args(Bookmark, Args0), 
             UserCtx = couch_util:get_value(user_ctx, Opts, #user_ctx{}),
             DbOpts = [{user_ctx, UserCtx}],
             Result = case mango_idx:def(Idx) of

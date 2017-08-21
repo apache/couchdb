@@ -14,7 +14,6 @@
 
 import mango
 
-
 class BasicFindTests(mango.UserDocsTests):
 
     def test_bad_selector(self):
@@ -264,3 +263,15 @@ class BasicFindTests(mango.UserDocsTests):
                 ]
             })
         assert len(docs) == 0
+
+    def test_explain_view_args(self):
+        explain = self.db.find({
+               "age":{"$gt": 0}
+            }, fields=["manager"],
+            explain=True)
+        assert explain["mrargs"]["stable"] == False
+        assert explain["mrargs"]["update"] == True
+        assert explain["mrargs"]["reduce"] == False
+        assert explain["mrargs"]["start_key"] == [0]
+        assert explain["mrargs"]["end_key"] == [{}]
+        assert explain["mrargs"]["include_docs"] == True
