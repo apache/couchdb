@@ -13,6 +13,11 @@
 -module(couch_debug).
 
 -export([
+    help/0,
+    help/1
+]).
+
+-export([
     opened_files/0,
     opened_files_by_regexp/1,
     opened_files_contains/1
@@ -29,6 +34,182 @@
     print_linked_processes/1,
     ps/1
 ]).
+
+
+help() ->
+    [
+        opened_files,
+        opened_files_by_regexp,
+        opened_files_contains,
+        process_name,
+        link_tree,
+        link_tree,
+        mapfold,
+        map,
+        fold,
+        linked_processes_info,
+        print_linked_processes,
+        ps
+    ].
+
+-spec help(Function :: atom()) -> ok.
+help(opened_files) ->
+    io:format("
+    opened_files()
+    --------------
+
+    Returns list of currently opened files
+    It iterates through erlang:ports and filter out all ports which are not efile.
+    It uses `process_info(Pid, dictionary)` to get info about couch_file properties.
+    ---
+    ", []);
+help(opened_files_by_regexp) ->
+    io:format("
+    opened_files_by_regexp(FileRegExp)
+    ----------------------------------
+
+    Returns list of currently opened files which name matches provided regular expression.
+    It iterates through `erlang:ports()` and filter out all ports which are not efile.
+    It uses `process_info(Pid, dictionary)` to get info about couch_file properties.
+    ---
+    ", []);
+help(opened_files_contains) ->
+    io:format("
+    opened_files_contains(SubString)
+    --------------------------------
+
+    Returns list of currently opened files which name contains provided SubString.
+    It iterates through `erlang:ports()` and filter out all ports which are not efile.
+    It uses `process_info(Pid, dictionary)` to get info about couch_file properties.
+    ---
+    ", []);
+help(process_name) ->
+    io:format("
+    process_name(Pid)
+    -----------------
+
+    Uses heuristics to figure out the best way to name process.
+    The heuristic is based on the following information about the process:
+    - process_info(Pid, registered_name)
+    - '$initial_call' key in process dictionary
+    - process_info(Pid, initial_call)
+
+    ---
+    ", []);
+help(link_tree) ->
+    io:format("
+    link_tree(Pid)
+    --------------
+
+    Returns a tree which represents a cluster of linked processes.
+    This function receives the initial Pid to start from.
+    The function doesn't recurse to pids older than initial one.
+    The Pids which are lesser than initial Pid are still shown in the output.
+    This is analogue of `link_tree(RootPid, []).`
+
+    link_tree(Pid, Info)
+    --------------------
+
+    Returns a tree which represents a cluster of linked processes.
+    This function receives the initial Pid to start from.
+    The function doesn't recurse to pids older than initial one.
+    The Pids which are lesser than initial Pid are still shown in the output.
+    The info argument is a list of process_info_item() as documented in
+    erlang:process_info/2. We don't do any attempts to prevent dangerous items.
+    Be warn that passing some of them such as `messages` for example
+    can be dangerous in a very busy system.
+    ---
+    ", []);
+help(mapfold) ->
+    io:format("
+    mapfold(Tree, Acc, Fun)
+    -----------------------
+
+    Traverses all nodes of the tree. It is a combination of a map and fold.
+    It calls a user provided callback for every node of the tree.
+    `Fun(Key, Value, Pos, Acc) -> {NewValue, NewAcc}`.
+    Where:
+      - Key of the node (usualy Pid of a process)
+      - Value of the node (usualy information collected by link_tree)
+      - Pos - depth from the root of the tree
+      - Acc - user's accumulator
+
+    ---
+    ", []);
+help(map) ->
+    io:format("
+    map(Tree, Fun)
+    -----------------------
+
+    Traverses all nodes of the tree in order to modify them.
+    It calls a user provided callback
+    `Fun(Key, Value, Pos) -> NewValue`
+    Where:
+      - Key of the node (usualy Pid of a process)
+      - Value of the node (usualy information collected by link_tree)
+      - Pos - depth from the root of the tree
+
+    ---
+    ", []);
+help(fold) ->
+    io:format("
+    fold(Tree, Fun)
+    Traverses all nodes of the tree in order to collect some aggregated information
+    about the tree. It calls a user provided callback
+    `Fun(Key, Value, Pos) -> NewValue`
+    Where:
+      - Key of the node (usualy Pid of a process)
+      - Value of the node (usualy information collected by link_tree)
+      - Pos - depth from the root of the tree
+
+    ---
+    ", []);
+help(linked_processes_info) ->
+    io:format("
+        linked_processes_info(Pid, Info)
+        --------------------------------
+
+        Convinience function which reduces the amount of typing compared to direct
+        use of link_tree.
+          - Pid: initial Pid to start from
+          - Info: a list of process_info_item() as documented
+            in erlang:process_info/2.
+
+        ---
+    ", []);
+help(print_linked_processes) ->
+    io:format("
+        print_linked_processes(Pid)
+        ---------------------------
+
+        Print cluster of linked processes. This function receives the
+        initial Pid to start from. The function doesn't recurse to pids
+        older than initial one. The output would look like similar to:
+        ```
+couch_debug:print_linked_processes(whereis(couch_index_server)).
+name                                         | reductions | message_queue_len |  memory
+couch_index_server[<0.288.0>]                |   478240   |         0         |  109696
+  couch_index:init/1[<0.3520.22>]            |    4899    |         0         |  109456
+    couch_file:init/1[<0.886.22>]            |   11973    |         0         |  67984
+      couch_index:init/1[<0.3520.22>]        |    4899    |         0         |  109456
+        ```
+
+        ---
+    ", []);
+help(ps) ->
+    io:format("
+        ps(couch_index_server)
+        ----------------------
+
+       Convinence function which would display additional information about processes.
+       For couch_file Pids the path to the file as well as file descriptor are added.
+       ---
+    ", []);
+help(Unknown) ->
+    io:format("Unknown function: `~p`. Please try one of the following:~n", [Unknown]),
+    [io:format("    - ~s~n", [Function]) || Function <- help()],
+    io:format("    ---~n", []),
+    ok.
 
 -spec opened_files() ->
     [{port(), CouchFilePid :: pid(), Fd :: pid() | tuple(), FilePath :: string()}].
