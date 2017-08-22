@@ -46,7 +46,7 @@ create_db(Url) ->
     case Status of
         201 -> ok;
         202 -> ok;
-        Else -> io:format(user, "~n HTTP Status Code: ~p~n", [Status])
+        _ -> io:format(user, "~n HTTP Status Code: ~p~n", [Status])
     end,
     ?assert(Status =:= 201 orelse Status =:= 202).
 
