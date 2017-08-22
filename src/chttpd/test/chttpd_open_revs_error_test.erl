@@ -55,7 +55,8 @@ open_revs_error_test_() ->
         "open revs error tests",
         {
             setup,
-            fun chttpd_test_util:start_couch/0, fun chttpd_test_util:stop_couch/1,
+            fun chttpd_test_util:start_couch/0,
+            fun chttpd_test_util:stop_couch/1,
             {
                 foreach,
                 fun setup/0, fun teardown/1,
@@ -74,7 +75,7 @@ should_return_503_error_for_open_revs_get(Url) ->
     mock_open_revs({error, all_workers_died}),
     {ok, Code, _, _} = test_request:get(Url ++
         "/testdoc?rev=" ++ ?b2l(Ref), [?AUTH]),
-     ?_assertEqual(503, Code).
+    ?_assertEqual(503, Code).
 
 should_return_503_error_for_open_revs_post_form(Url) ->
     Port = mochiweb_socket_server:get(chttpd, port),

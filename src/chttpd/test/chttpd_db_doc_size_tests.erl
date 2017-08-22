@@ -58,7 +58,8 @@ all_test_() ->
         "chttpd db max_document_size tests",
         {
             setup,
-            fun chttpd_test_util:start_couch/0, fun chttpd_test_util:stop_couch/1,
+            fun chttpd_test_util:start_couch/0,
+            fun chttpd_test_util:stop_couch/1,
             {
                 foreach,
                 fun setup/0, fun teardown/1,
@@ -118,7 +119,7 @@ put_post_doc_attach_inline(Url) ->
     {ok, _, _, ResultBody} = test_request:post(Url,
         [?CONTENT_JSON, ?AUTH], Doc1),
     {Msg} = ?JSON_DECODE(ResultBody),
-       {ok, _, _, ResultBody1} = test_request:post(Url,
+    {ok, _, _, ResultBody1} = test_request:post(Url,
         [?CONTENT_JSON, ?AUTH], Doc2),
     {Msg1} = ?JSON_DECODE(ResultBody1),
 
