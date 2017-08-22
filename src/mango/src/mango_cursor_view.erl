@@ -165,9 +165,14 @@ choose_best_index(_DbName, IndexRanges) ->
                     M when M < 0 ->
                         true;
                     M when M == 0 ->
-                        % We have no other way to choose, so at this point
-                        % select the index based on (dbname, ddocid, view_name) triple
-                        IdxA =< IdxB;
+                        case maybe_sort_based_on_selector(IdxA, IdxB) of 
+                            undefined ->
+                                % We have no other way to choose, so at this point
+                                % select the index based on (dbname, ddocid, view_name) triple
+                                IdxA =< IdxB;
+                            Result -> 
+                                Result
+                        end;
                     _ ->
                         false
                 end;
@@ -177,6 +182,14 @@ choose_best_index(_DbName, IndexRanges) ->
     end,
     {SelectedIndex, SelectedIndexRanges, _} = hd(lists:sort(Cmp, IndexRanges)),
     {SelectedIndex, SelectedIndexRanges}.
+
+
+maybe_sort_based_on_selector(IdxA, IdxB) ->
+    case [mango_idx:get_idx_selector(IdxA), mango_idx:get_idx_selector(IdxB)] of
+        [A, _] when A =/= undefined -> true;
+        [_, B] when B =/= undefined -> false;
+        [undefined, undefined] -> false
+    end.
 
 
 handle_message({meta, _}, Cursor) ->

@@ -43,7 +43,8 @@
     idx_mod/1,
     to_json/1,
     delete/4,
-    get_usable_indexes/3
+    get_usable_indexes/3,
+    get_idx_selector/1
 ]).
 
 
@@ -74,8 +75,10 @@ get_usable_indexes(Db, Selector0, Opts) ->
         ?MANGO_ERROR({no_usable_index, missing_sort_index})
     end,
 
+    SelectorIndexes = maybe_filter_selector(SortIndexes, Selector, Opts),
+
     UsableFilter = fun(I) -> mango_idx:is_usable(I, Selector) end,
-    lists:filter(UsableFilter, SortIndexes).
+    lists:filter(UsableFilter, SelectorIndexes).
 
 recover(Db) ->
     {ok, DDocs0} = mango_util:open_ddocs(Db),
@@ -90,6 +93,17 @@ recover(Db) ->
     {ok, Special ++ lists:flatmap(fun(Doc) ->
         from_ddoc(Db, Doc)
     end, DDocs)}.
+
+
+maybe_filter_selector(Indexes, Selector, Opts) ->
+    lists:filter(fun (Index) ->
+        case get_idx_selector(Index) of
+            undefined -> 
+                true;
+            IndexSelector ->
+                mango_selector:is_subset(IndexSelector, Selector)
+        end
+    end, Indexes).
 
 
 for_sort(Indexes, Opts) ->
@@ -343,6 +357,14 @@ get_idx_name(Idx, Opts) ->
             gen_name(Idx, Opts)
     end.
 
+get_idx_selector(#idx{def = Def}) when Def =:= all_docs; Def =:= undefined ->
+    undefined;
+get_idx_selector(#idx{def = {Def}} = Idx) ->
+    case proplists:get_value(<<"selector">>, Def) of
+        undefined -> undefined;
+        {[]} -> undefined;
+        Selector -> Selector
+    end.
 
 gen_name(Idx, Opts0) ->
     Opts = lists:usort(Opts0),
