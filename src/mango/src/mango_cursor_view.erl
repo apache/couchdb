@@ -293,9 +293,6 @@ apply_opts([{update, false} | Rest], Args) ->
         update = false
     },
     apply_opts(Rest, NewArgs);
-% apply_opts([{bookmark, Bookmark} | Rest], Args) when Bookmark =/= nil ->
-%     NewArgs = mango_json_bookmark:update_args(Bookmark, Args),
-%     apply_opts(Rest, NewArgs);
 apply_opts([{_, _} | Rest], Args) ->
     % Ignore unknown options
     apply_opts(Rest, Args).
