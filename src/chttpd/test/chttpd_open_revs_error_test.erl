@@ -97,7 +97,12 @@ should_return_503_error_for_open_revs_post_form(Url) ->
     mock_open_revs({error, all_workers_died}),
     {ok, Code, _, ResultBody1} = test_request:post(Url ++ "/" ++ "RevDoc",
         [?CONTENT_MULTI_FORM, ?AUTH, Referer], Doc2),
-    ?_assertEqual(503, Code).
+    {Json1} = ?JSON_DECODE(ResultBody1),
+    ErrorMessage = couch_util:get_value(<<"error">>, Json1),
+    [
+        ?_assertEqual(503, Code),
+        ?_assertEqual(<<"service unvailable">>, ErrorMessage)
+    ].
 
 mock_open_revs(RevsResp) ->
     ok = meck:expect(fabric, open_revs, fun(_, _, _, _) -> RevsResp end).
