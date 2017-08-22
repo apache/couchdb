@@ -15,7 +15,8 @@
 
 -export([
     normalize/1,
-    match/2
+    match/2,
+    is_subset/2
 ]).
 
 
@@ -566,3 +567,16 @@ match({[{Field, Cond}]}, Value, Cmp) ->
 
 match({[_, _ | _] = _Props} = Sel, _Value, _Cmp) ->
     erlang:error({unnormalized_selector, Sel}).
+
+
+% We could get fancier here later with checking what kind of subset it is
+% e.g. if a selector is {age: {"$gte": 5}} and a query is
+% {age: {"$gte": 10}} we could say that is is a subset
+is_subset({[{<<"$and">>, Args}]}, Selector2) ->
+    Pred = fun(Selector1) -> is_subset(Selector1, Selector2) end,
+    lists:all(Pred, Args);
+is_subset(Selector1, {[{<<"$and">>, Args}]}) ->
+    Pred = fun(Selector2) -> is_subset(Selector1, Selector2) end,
+    lists:any(Pred, Args);
+is_subset({Selector1}, {Selector2}) ->    
+    sets:is_subset(sets:from_list(Selector1), sets:from_list(Selector2)).

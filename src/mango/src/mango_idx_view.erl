@@ -197,6 +197,12 @@ opts() ->
         {<<"fields">>, [
             {tag, fields},
             {validator, fun mango_opts:validate_sort/1}
+        ]},
+        {<<"selector">>, [
+            {tag, selector},
+            {optional, true},
+            {default, {[]}},
+            {validator, fun mango_opts:validate_selector/1}
         ]}
     ].
 
