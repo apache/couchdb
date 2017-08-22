@@ -34,10 +34,11 @@
 
 setup() ->
     Hashed = couch_passwords:hash_admin_password(?PASS),
-    ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist=false),
+    Persist = false,
+    ok = config:set("admins", ?USER, ?b2l(Hashed), Persist),
     UserDb = ?tempdb(),
     TmpDb = ?tempdb(),
-    ok = config:set("chttpd_auth", "authentication_db", ?b2l(UserDb)),
+    ok = config:set("chttpd_auth", "authentication_db", ?b2l(UserDb), Persist),
 
     Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
     Port = mochiweb_socket_server:get(chttpd, port),
