@@ -118,20 +118,24 @@ put_post_doc_attach_inline(Url) ->
     {ok, _, _, ResultBody} = test_request:post(Url,
         [?CONTENT_JSON, ?AUTH], Doc1),
     {Msg} = ?JSON_DECODE(ResultBody),
-    ?_assertEqual({<<"ok">>, true}, lists:nth(1, Msg)),
        {ok, _, _, ResultBody1} = test_request:post(Url,
         [?CONTENT_JSON, ?AUTH], Doc2),
     {Msg1} = ?JSON_DECODE(ResultBody1),
-    ?_assertEqual({<<"error">>, <<"document_too_large">>}, lists:nth(1, Msg1)),
 
     {ok, _, _, ResultBody2} = test_request:put(Url ++ "/" ++ "accept",
         [?CONTENT_JSON, ?AUTH], Doc1),
     {Msg2} = ?JSON_DECODE(ResultBody2),
-    ?_assertEqual({<<"ok">>, true}, lists:nth(1, Msg2)),
     {ok, _, _, ResultBody3} = test_request:put(Url ++ "/" ++ "fail",
         [?CONTENT_JSON, ?AUTH], Doc2),
     {Msg3} = ?JSON_DECODE(ResultBody3),
-    ?_assertEqual({<<"error">>, <<"document_too_large">>}, lists:nth(1, Msg3)).
+    [
+        ?_assertEqual({<<"ok">>, true}, lists:nth(1, Msg)),
+        ?_assertEqual({<<"error">>, <<"document_too_large">>},
+            lists:nth(1, Msg1)),
+        ?_assertEqual({<<"ok">>, true}, lists:nth(1, Msg2)),
+        ?_assertEqual({<<"error">>, <<"document_too_large">>},
+            lists:nth(1, Msg3))
+    ].
 
 put_multi_part_related(Url) ->
     Body1 = "{\"body\":\"This is a body.\",",
@@ -148,11 +152,14 @@ put_multi_part_related(Url) ->
     {ok, _, _, ResultBody} = test_request:put(Url ++ "/" ++ "accept",
         [?CONTENT_MULTI_RELATED, ?AUTH], Doc1),
     {Msg} = ?JSON_DECODE(ResultBody),
-    ?_assertEqual({<<"ok">>, true}, lists:nth(1, Msg)),
        {ok, _, _, ResultBody1} = test_request:put(Url ++ "/" ++ "faildoc",
         [?CONTENT_MULTI_RELATED, ?AUTH], Doc2),
     {Msg1} = ?JSON_DECODE(ResultBody1),
-    ?_assertEqual({<<"error">>, <<"document_too_large">>}, lists:nth(1, Msg1)).
+    [
+        ?_assertEqual({<<"ok">>, true}, lists:nth(1, Msg)),
+        ?_assertEqual({<<"error">>, <<"document_too_large">>},
+            lists:nth(1, Msg1))
+    ].
 
 post_multi_part_form(Url) ->
     Port = mochiweb_socket_server:get(chttpd, port),
@@ -171,8 +178,11 @@ post_multi_part_form(Url) ->
     {ok, _, _, ResultBody} = test_request:post(Url ++ "/" ++ "accept",
         [?CONTENT_MULTI_FORM, ?AUTH, Referer], Doc1),
     {Msg} = ?JSON_DECODE(ResultBody),
-    ?_assertEqual({<<"ok">>, true}, lists:nth(1, Msg)),
     {ok, _, _, ResultBody1} = test_request:post(Url ++ "/" ++ "fail",
         [?CONTENT_MULTI_FORM, ?AUTH, Referer], Doc2),
     {Msg1} = ?JSON_DECODE(ResultBody1),
-    ?_assertEqual({<<"error">>, <<"document_too_large">>}, lists:nth(1, Msg1)).
+    [
+        ?_assertEqual({<<"ok">>, true}, lists:nth(1, Msg)),
+        ?_assertEqual({<<"error">>, <<"document_too_large">>},
+            lists:nth(1, Msg1))
+    ].
