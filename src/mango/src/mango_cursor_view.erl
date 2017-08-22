@@ -108,10 +108,21 @@ execute(#cursor{db = Db, index = Idx} = Cursor0, UserFun, UserAcc) ->
                     NewBookmark = mango_json_bookmark:create(LastCursor),
                     Arg = {add_key, bookmark, NewBookmark},
                     {_Go, FinalUserAcc} = UserFun(Arg, LastCursor#cursor.user_acc),
-                    {ok, FinalUserAcc};
+                    maybe_add_execution_stats(LastCursor, FinalUserAcc);
                 {error, Reason} ->
                     {error, Reason}
             end
+    end.
+
+
+maybe_add_execution_stats(#cursor{opts = Opts, user_fun = UserFun} = Cursor, UserAcc) ->
+    case couch_util:get_value(execution_stats, Opts) of
+        true ->
+            Arg = {add_key, execution_stats, Cursor#cursor.execution_stats},
+            {_Go, FinalUserAcc} = UserFun(Arg, UserAcc),
+            {ok, FinalUserAcc};
+        _ ->
+            {ok, UserAcc}
     end.
 
 
@@ -182,15 +193,21 @@ choose_best_index(_DbName, IndexRanges) ->
 handle_message({meta, _}, Cursor) ->
     {ok, Cursor};
 handle_message({row, Props}, Cursor) ->
-    case doc_member(Cursor#cursor.db, Props, Cursor#cursor.opts) of
-        {ok, Doc} ->
-            case mango_selector:match(Cursor#cursor.selector, Doc) of
+    case doc_member(Cursor#cursor.db, Props, Cursor#cursor.opts, Cursor#cursor.execution_stats) of
+        {ok, Doc, {execution_stats, ExecutionStats1}} ->
+            Cursor1 = Cursor#cursor {
+                execution_stats = ExecutionStats1
+            },
+            case mango_selector:match(Cursor1#cursor.selector, Doc) of
                 true ->
-                    Cursor1 = update_bookmark_keys(Cursor, Props),
-                    FinalDoc = mango_fields:extract(Doc, Cursor1#cursor.fields),
-                    handle_doc(Cursor1, FinalDoc);
+                    Cursor2 = update_bookmark_keys(Cursor1, Props),
+                    FinalDoc = mango_fields:extract(Doc, Cursor2#cursor.fields),
+                    Cursor3 = Cursor2#cursor {
+                        execution_stats = mango_execution_stats:incr_results_returned(Cursor2#cursor.execution_stats)
+                    },
+                    handle_doc(Cursor3, FinalDoc);
                 false ->
-                    {ok, Cursor}
+                    {ok, Cursor1}
             end;
         Error ->
             couch_log:error("~s :: Error loading doc: ~p", [?MODULE, Error]),
@@ -298,15 +315,17 @@ apply_opts([{_, _} | Rest], Args) ->
     apply_opts(Rest, Args).
 
 
-doc_member(Db, RowProps, Opts) ->
+doc_member(Db, RowProps, Opts, ExecutionStats) ->
     case couch_util:get_value(doc, RowProps) of
         {DocProps} ->
-            {ok, {DocProps}};
+            ExecutionStats1 = mango_execution_stats:incr_docs_examined(ExecutionStats),
+            {ok, {DocProps}, {execution_stats, ExecutionStats1}};
         undefined ->
+            ExecutionStats1 = mango_execution_stats:incr_quorum_docs_examined(ExecutionStats),
             Id = couch_util:get_value(id, RowProps),
             case mango_util:defer(fabric, open_doc, [Db, Id, Opts]) of
                 {ok, #doc{}=Doc} ->
-                    {ok, couch_doc:to_json_obj(Doc, [])};
+                    {ok, couch_doc:to_json_obj(Doc, []), {execution_stats, ExecutionStats1}};
                 Else ->
                     Else
             end

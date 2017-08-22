@@ -10,22 +10,9 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--include("mango_execution_stats.hrl").
-
-
--record(cursor, {
-    db,
-    index,
-    ranges,
-    selector,
-    opts,
-    limit,
-    skip = 0,
-    fields = undefined,
-    user_fun,
-    user_acc,
-    execution_stats = #execution_stats{},
-    bookmark,
-    bookmark_docid,
-    bookmark_key
+-record(execution_stats, {
+    totalKeysExamined = 0,
+    totalDocsExamined = 0,
+    totalQuorumDocsExamined = 0,
+    resultsReturned = 0
 }).
