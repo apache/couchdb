@@ -466,7 +466,7 @@ random_processes(Acc, Left) ->
         spawn ->
             spawn(fun process_fun/0);
         spawn_link ->
-            spawn(fun process_fun/0)
+            spawn_link(fun process_fun/0)
     end,
     random_processes([Pid | Acc], Left - 1).
 
