@@ -15,11 +15,11 @@
 export SERVER_PID=$!
 sleep 10
 curl http://dev:15984
-cd src/mango/ 
+cd src/mango/
 nosetests
 
 EXIT_STATUS=$?
-if [[ ! -z $SERVER_PID ]]; then
+if [ ! -z "$SERVER_PID" ]; then
   kill $SERVER_PID
 fi
 exit $EXIT_STATUS
