@@ -27,9 +27,9 @@
     process_name/1,
     link_tree/1,
     link_tree/2,
-    mapfold/3,
-    map/2,
-    fold/3,
+    mapfold_tree/3,
+    map_tree/2,
+    fold_tree/3,
     linked_processes_info/2,
     print_linked_processes/1,
     ps/1
@@ -120,9 +120,9 @@ help(link_tree) ->
     can be dangerous in a very busy system.
     ---
     ", []);
-help(mapfold) ->
+help(mapfold_tree) ->
     io:format("
-    mapfold(Tree, Acc, Fun)
+    mapfold_tree(Tree, Acc, Fun)
     -----------------------
 
     Traverses all nodes of the tree. It is a combination of a map and fold.
@@ -136,9 +136,9 @@ help(mapfold) ->
 
     ---
     ", []);
-help(map) ->
+help(map_tree) ->
     io:format("
-    map(Tree, Fun)
+    map_tree(Tree, Fun)
     -----------------------
 
     Traverses all nodes of the tree in order to modify them.
@@ -151,9 +151,9 @@ help(map) ->
 
     ---
     ", []);
-help(fold) ->
+help(fold_tree) ->
     io:format("
-    fold(Tree, Fun)
+    fold_tree(Tree, Fun)
     Traverses all nodes of the tree in order to collect some aggregated information
     about the tree. It calls a user provided callback
     `Fun(Key, Value, Pos) -> NewValue`
@@ -349,22 +349,22 @@ info(Port, Info) when is_port(Port) ->
     Validated = lists:filter(fun(P) -> lists:member(P, ValidProps) end, Info),
     erlang:port_info(Port, lists:usort(Validated)).
 
-mapfold([], Acc, _Fun) ->
+mapfold_tree([], Acc, _Fun) ->
     {[], Acc};
-mapfold([{Pos, {Key, Value0, SubTree0}} | Rest0], Acc0, Fun) ->
+mapfold_tree([{Pos, {Key, Value0, SubTree0}} | Rest0], Acc0, Fun) ->
     {Value1, Acc1} = Fun(Key, Value0, Pos, Acc0),
-    {SubTree1, Acc2} = mapfold(SubTree0, Acc1, Fun),
-    {Rest1, Acc3} = mapfold(Rest0, Acc2, Fun),
+    {SubTree1, Acc2} = mapfold_tree(SubTree0, Acc1, Fun),
+    {Rest1, Acc3} = mapfold_tree(Rest0, Acc2, Fun),
     {[{Pos, {Key, Value1, SubTree1}} | Rest1], Acc3}.
 
-map(Tree, Fun) ->
-    {Result, _} = mapfold(Tree, nil, fun(Key, Value, Pos, Acc) ->
+map_tree(Tree, Fun) ->
+    {Result, _} = mapfold_tree(Tree, nil, fun(Key, Value, Pos, Acc) ->
         {Fun(Key, Value, Pos), Acc}
     end),
     Result.
 
-fold(Tree, Acc, Fun) ->
-    {_, Result} = mapfold(Tree, Acc, fun(Key, Value, Pos, AccIn) ->
+fold_tree(Tree, Acc, Fun) ->
+    {_, Result} = mapfold_tree(Tree, Acc, fun(Key, Value, Pos, AccIn) ->
         {Value, Fun(Key, Value, Pos, AccIn)}
     end),
     Result.
@@ -427,7 +427,7 @@ shorten_path(Path) ->
 %%   - The first column has to be specified as {Width, left, Something}
 print_tree(Tree, TableSpec) ->
     io:format("~s~n", [format(TableSpec)]),
-    map(Tree, fun(_, {Id, Props}, Pos) ->
+    map_tree(Tree, fun(_, {Id, Props}, Pos) ->
         io:format("~s~n", [table_row(Id, Pos * 2, Props, TableSpec)])
     end),
     ok.
