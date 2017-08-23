@@ -34,6 +34,11 @@
     print_linked_processes/1
 ]).
 
+-ifdef(TEST).
+    -compile(export_all).
+
+    -include_lib("proper/include/proper.hrl").
+-endif.
 
 help() ->
     [
@@ -451,3 +456,73 @@ table_row(Key, Indent, Props, [{KeyWidth, Align, _} | Spec]) ->
     Values = [bind_value(Format, Props) || Format <- Spec],
     KeyStr = string:Align(term2str(Key), KeyWidth - Indent),
     [string:copies(" ", Indent), KeyStr, "|" | format(Values)].
+
+-ifdef(TEST).
+-include_lib("couch/include/couch_eunit.hrl").
+
+random_processes() ->
+    random_processes([]).
+
+random_processes(Pids) ->
+    frequency([
+        {1, ?LET(Started, Pids, lists:flatten(Started))},
+        {3, ?LAZY(random_processes([element(1, spawn_monitor(fun process_fun/0)) | Pids]))},
+        {5, ?LAZY(random_processes([spawn(fun process_fun/0) | Pids]))},
+        {10, ?LAZY(random_processes([spawn_link(fun process_fun/0) | Pids]))}
+]).
+
+process_fun() ->
+    receive looper -> ok end.
+
+tree() ->
+    {ok, Processes} = proper_gen:pick(random_processes()),
+    {ok, InitialPid} = proper_gen:pick(oneof(Processes)),
+    {InitialPid, Processes, link_tree(InitialPid)}.
+
+setup() ->
+    tree().
+
+teardown({_InitialPid, Processes, _Tree}) ->
+    [exit(Pid, normal) || Pid <- Processes].
+
+link_tree_test_() ->
+    {
+        "link_tree tests",
+        {
+            foreach,
+            fun setup/0, fun teardown/1,
+            [
+                fun should_have_same_shape/1,
+                fun should_include_extra_info/1
+            ]
+        }
+    }.
+
+should_have_same_shape({InitialPid, _Processes, Tree}) ->
+    ?_test(begin
+         InfoTree = linked_processes_info(InitialPid, []),
+         ?assert(is_equal(InfoTree, Tree)),
+         ok
+    end).
+
+should_include_extra_info({InitialPid, _Processes, _Tree}) ->
+    Info = [reductions, message_queue_len, memory],
+    ?_test(begin
+         InfoTree = linked_processes_info(InitialPid, Info),
+         map_tree(InfoTree, fun(_Pid, {_Id, Props}, _Pos) ->
+            ?assert(lists:keymember(reductions, 1, Props)),
+            ?assert(lists:keymember(message_queue_len, 1, Props)),
+            ?assert(lists:keymember(memory, 1, Props)),
+            Props
+         end),
+         ok
+    end).
+
+is_equal([], []) -> true;
+is_equal([{Pos, {Pid, _, A}} | RestA], [{Pos, {Pid, _, B}} | RestB]) ->
+    case is_equal(RestA, RestB) of
+        false -> false;
+        true -> is_equal(A, B)
+    end.
+
+-endif.
