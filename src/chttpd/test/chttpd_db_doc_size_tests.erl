@@ -76,26 +76,20 @@ all_test_() ->
     }.
 
 post_single_doc(Url) ->
-    ?_assertEqual({<<"error">>, <<"document_too_large">>},
-        begin
-            NewDoc = "{\"post_single_doc\": \"some_doc\",
-                \"_id\": \"testdoc\", \"should_be\" : \"too_large\"}",
-            {ok, _, _, ResultBody} = test_request:post(Url,
-                [?CONTENT_JSON, ?AUTH], NewDoc),
-            {ErrorMsg} = ?JSON_DECODE(ResultBody),
-            lists:nth(1, ErrorMsg)
-        end).
+    NewDoc = "{\"post_single_doc\": \"some_doc\",
+        \"_id\": \"testdoc\", \"should_be\" : \"too_large\"}",
+    {ok, _, _, ResultBody} = test_request:post(Url,
+        [?CONTENT_JSON, ?AUTH], NewDoc),
+    {[ErrorMsg | _]} = ?JSON_DECODE(ResultBody),
+    ?_assertEqual({<<"error">>, <<"document_too_large">>}, ErrorMsg).
 
 put_single_doc(Url) ->
-    ?_assertEqual({<<"error">>, <<"document_too_large">>},
-        begin
-            NewDoc = "{\"post_single_doc\": \"some_doc\",
-                \"_id\": \"testdoc\", \"should_be\" : \"too_large\"}",
-            {ok, _, _, ResultBody} = test_request:put(Url ++ "/" ++ "testid",
-                [?CONTENT_JSON, ?AUTH], NewDoc),
-            {ErrorMsg} = ?JSON_DECODE(ResultBody),
-            lists:nth(1, ErrorMsg)
-        end).
+    NewDoc = "{\"post_single_doc\": \"some_doc\",
+        \"_id\": \"testdoc\", \"should_be\" : \"too_large\"}",
+    {ok, _, _, ResultBody} = test_request:put(Url ++ "/" ++ "testid",
+        [?CONTENT_JSON, ?AUTH], NewDoc),
+    {[ErrorMsg | _]} = ?JSON_DECODE(ResultBody),
+    ?_assertEqual({<<"error">>, <<"document_too_large">>}, ErrorMsg).
 
 bulk_doc(Url) ->
     NewDoc = "{\"docs\": [{\"doc1\": 1}, {\"errordoc\":
@@ -118,24 +112,22 @@ put_post_doc_attach_inline(Url) ->
 
     {ok, _, _, ResultBody} = test_request:post(Url,
         [?CONTENT_JSON, ?AUTH], Doc1),
-    {Msg} = ?JSON_DECODE(ResultBody),
+    {[Msg | _]} = ?JSON_DECODE(ResultBody),
     {ok, _, _, ResultBody1} = test_request:post(Url,
         [?CONTENT_JSON, ?AUTH], Doc2),
-    {Msg1} = ?JSON_DECODE(ResultBody1),
+    {[Msg1 | _]} = ?JSON_DECODE(ResultBody1),
 
     {ok, _, _, ResultBody2} = test_request:put(Url ++ "/" ++ "accept",
         [?CONTENT_JSON, ?AUTH], Doc1),
-    {Msg2} = ?JSON_DECODE(ResultBody2),
+    {[Msg2 | _]} = ?JSON_DECODE(ResultBody2),
     {ok, _, _, ResultBody3} = test_request:put(Url ++ "/" ++ "fail",
         [?CONTENT_JSON, ?AUTH], Doc2),
-    {Msg3} = ?JSON_DECODE(ResultBody3),
+    {[Msg3 | _]} = ?JSON_DECODE(ResultBody3),
     [
-        ?_assertEqual({<<"ok">>, true}, lists:nth(1, Msg)),
-        ?_assertEqual({<<"error">>, <<"document_too_large">>},
-            lists:nth(1, Msg1)),
-        ?_assertEqual({<<"ok">>, true}, lists:nth(1, Msg2)),
-        ?_assertEqual({<<"error">>, <<"document_too_large">>},
-            lists:nth(1, Msg3))
+        ?_assertEqual({<<"ok">>, true}, Msg),
+        ?_assertEqual({<<"error">>, <<"document_too_large">>}, Msg1),
+        ?_assertEqual({<<"ok">>, true}, Msg2),
+        ?_assertEqual({<<"error">>, <<"document_too_large">>}, Msg3)
     ].
 
 put_multi_part_related(Url) ->
@@ -152,14 +144,13 @@ put_multi_part_related(Url) ->
     Doc2 = lists:concat([DocBeg, Body2, DocRest]),
     {ok, _, _, ResultBody} = test_request:put(Url ++ "/" ++ "accept",
         [?CONTENT_MULTI_RELATED, ?AUTH], Doc1),
-    {Msg} = ?JSON_DECODE(ResultBody),
+    {[Msg | _]} = ?JSON_DECODE(ResultBody),
        {ok, _, _, ResultBody1} = test_request:put(Url ++ "/" ++ "faildoc",
         [?CONTENT_MULTI_RELATED, ?AUTH], Doc2),
-    {Msg1} = ?JSON_DECODE(ResultBody1),
+    {[Msg1 | _]} = ?JSON_DECODE(ResultBody1),
     [
-        ?_assertEqual({<<"ok">>, true}, lists:nth(1, Msg)),
-        ?_assertEqual({<<"error">>, <<"document_too_large">>},
-            lists:nth(1, Msg1))
+        ?_assertEqual({<<"ok">>, true}, Msg),
+        ?_assertEqual({<<"error">>, <<"document_too_large">>}, Msg1)
     ].
 
 post_multi_part_form(Url) ->
@@ -178,12 +169,11 @@ post_multi_part_form(Url) ->
     Doc2 = lists:concat([DocBeg, Body2, DocRest]),
     {ok, _, _, ResultBody} = test_request:post(Url ++ "/" ++ "accept",
         [?CONTENT_MULTI_FORM, ?AUTH, Referer], Doc1),
-    {Msg} = ?JSON_DECODE(ResultBody),
+    {[Msg | _]} = ?JSON_DECODE(ResultBody),
     {ok, _, _, ResultBody1} = test_request:post(Url ++ "/" ++ "fail",
         [?CONTENT_MULTI_FORM, ?AUTH, Referer], Doc2),
-    {Msg1} = ?JSON_DECODE(ResultBody1),
+    {[Msg1 | _]} = ?JSON_DECODE(ResultBody1),
     [
-        ?_assertEqual({<<"ok">>, true}, lists:nth(1, Msg)),
-        ?_assertEqual({<<"error">>, <<"document_too_large">>},
-            lists:nth(1, Msg1))
+        ?_assertEqual({<<"ok">>, true}, Msg),
+        ?_assertEqual({<<"error">>, <<"document_too_large">>}, Msg1)
     ].
