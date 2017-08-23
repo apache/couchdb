@@ -28,7 +28,6 @@ setup() ->
             {<<"baz">>, {[
                 {<<"map">>, <<
                     "function(doc) {\n"
-                    "    var i = 0; while(i<1000){ i++ };\n"
                     "    emit(doc.val, doc.val);\n"
                     "}"
                 >>}
@@ -47,12 +46,19 @@ setup() ->
     {ok, _} =
         couch_mrview:query_view(Db2, <<"_design/bar">>, <<"baz">>, [], CB, 0),
 
+    meck:new(couch_index_updater, [passthrough]),
+    meck:expect(couch_index_updater, update, fun(Idx, Mod, IdxSt) ->
+        timer:sleep(5000),
+        meck:passthrough([Idx, Mod, IdxSt])
+    end),
+
     % add more docs
     {ok, _} = couch_db:update_docs(Db2, Docs999, []),
     {ok, Db3} = couch_db:reopen(Db2),
     Db3.
 
 teardown(Db) ->
+    meck:unload(couch_index_updater),
     couch_db:close(Db),
     couch_server:delete(Db#db.name, [?ADMIN_CTX]),
     ok.
