@@ -267,11 +267,6 @@ run_find(Resp, Db, Sel, Opts) ->
     mango_crud:find(Db, Sel, fun handle_doc/2, Acc0, Opts).
 
 
-handle_doc({add_key, Key, Value = #execution_stats{}}, Acc0) ->
-    #vacc{kvs=KVs} = Acc0,
-    JSONValue = mango_execution_stats:to_json(Value),
-    NewKVs = lists:keystore(Key, 1, KVs, {Key, JSONValue}),
-    {ok, Acc0#vacc{kvs = NewKVs}};
 handle_doc({add_key, Key, Value}, Acc0) ->
     #vacc{kvs=KVs} = Acc0,
     NewKVs = lists:keystore(Key, 1, KVs, {Key, Value}),

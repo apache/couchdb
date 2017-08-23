@@ -74,7 +74,7 @@ execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFu
     Cursor = Cursor0#cursor{
         user_fun = UserFun,
         user_acc = UserAcc,
-        execution_stats = mango_execution_stats:log_execution_start(Stats)
+        execution_stats = mango_execution_stats:log_start(Stats)
     },
     case Cursor#cursor.ranges of
         [empty] ->
@@ -109,22 +109,12 @@ execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFu
                     NewBookmark = mango_json_bookmark:create(LastCursor),
                     Arg = {add_key, bookmark, NewBookmark},
                     {_Go, FinalUserAcc} = UserFun(Arg, LastCursor#cursor.user_acc),
-                    maybe_add_execution_stats(LastCursor, FinalUserAcc);
+                    Stats0 = LastCursor#cursor.execution_stats,
+                    FinalUserAcc0 = mango_execution_stats:maybe_add_stats(Opts, UserFun, Stats0, FinalUserAcc),
+                    {ok, FinalUserAcc0};
                 {error, Reason} ->
                     {error, Reason}
             end
-    end.
-
-
-maybe_add_execution_stats(#cursor{opts = Opts, user_fun = UserFun, execution_stats = Stats}, UserAcc) ->
-    case couch_util:get_value(execution_stats, Opts) of
-        true ->
-            Stats0 = mango_execution_stats:log_execution_end(Stats),
-            Arg = {add_key, execution_stats, Stats0},
-            {_Go, FinalUserAcc} = UserFun(Arg, UserAcc),
-            {ok, FinalUserAcc};
-        _ ->
-            {ok, UserAcc}
     end.
 
 
