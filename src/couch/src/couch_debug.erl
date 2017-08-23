@@ -45,8 +45,7 @@ help() ->
         map,
         fold,
         linked_processes_info,
-        print_linked_processes,
-        ps
+        print_linked_processes
     ].
 
 -spec help(Function :: atom()) -> ok.
