@@ -31,8 +31,7 @@
     map_tree/2,
     fold_tree/3,
     linked_processes_info/2,
-    print_linked_processes/1,
-    ps/1
+    print_linked_processes/1
 ]).
 
 
@@ -179,7 +178,10 @@ help(linked_processes_info) ->
     ", []);
 help(print_linked_processes) ->
     io:format("
-        print_linked_processes(Pid)
+        - print_linked_processes(Pid)
+        - print_linked_processes(RegisteredName)
+        - print_linked_processes(couch_index_server)
+
         ---------------------------
 
         Print cluster of linked processes. This function receives the
@@ -195,15 +197,6 @@ couch_index_server[<0.288.0>]                |   478240   |         0         | 
         ```
 
         ---
-    ", []);
-help(ps) ->
-    io:format("
-        ps(couch_index_server)
-        ----------------------
-
-       Convinence function which would display additional information about processes.
-       For couch_file Pids the path to the file as well as file descriptor are added.
-       ---
     ", []);
 help(Unknown) ->
     io:format("Unknown function: `~p`. Please try one of the following:~n", [Unknown]),
@@ -372,7 +365,14 @@ fold_tree(Tree, Acc, Fun) ->
 linked_processes_info(Pid, Info) ->
     link_tree(Pid, Info, fun(P, Props) -> {process_name(P), Props} end).
 
-print_linked_processes(Pid) ->
+print_linked_processes(couch_index_server) ->
+    print_couch_index_server_processes();
+print_linked_processes(Name) when is_atom(Name) ->
+    case whereis(Name) of
+        undefined -> {error, {unknown, Name}};
+        Pid -> print_linked_processes(Pid)
+    end;
+print_linked_processes(Pid) when is_pid(Pid) ->
     Info = [reductions, message_queue_len, memory],
     TableSpec = [
         {50, left, name}, {12, centre, reductions},
@@ -394,7 +394,7 @@ id("couch_file:init" ++ _, Pid, _Props) ->
 id(_IdStr, _Pid, _Props) ->
     "".
 
-ps(couch_index_server) ->
+print_couch_index_server_processes() ->
     Info = [reductions, message_queue_len, memory],
     TableSpec = [
         {50, left, name}, {12, centre, reductions},
@@ -405,10 +405,7 @@ ps(couch_index_server) ->
         IdStr = process_name(P),
         {IdStr, [{id, id(IdStr, P, Props)} | Props]}
     end),
-
-    print_tree(Tree, TableSpec);
-ps(Name) ->
-    throw({error, {unsuported, Name, [couch_index_server]}}).
+    print_tree(Tree, TableSpec).
 
 shorten_path(Path) ->
     ViewDir = list_to_binary(config:get("couchdb", "view_index_dir")),
