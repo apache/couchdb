@@ -42,7 +42,6 @@ help() ->
         opened_files_contains,
         process_name,
         link_tree,
-        link_tree,
         mapfold,
         map,
         fold,
