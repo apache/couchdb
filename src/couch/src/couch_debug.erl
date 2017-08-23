@@ -55,7 +55,7 @@ help(opened_files) ->
     --------------
 
     Returns list of currently opened files
-    It iterates through erlang:ports and filter out all ports which are not efile.
+    It iterates through `erlang:ports` and filters out all ports which are not efile.
     It uses `process_info(Pid, dictionary)` to get info about couch_file properties.
     ---
     ", []);
@@ -64,7 +64,7 @@ help(opened_files_by_regexp) ->
     opened_files_by_regexp(FileRegExp)
     ----------------------------------
 
-    Returns list of currently opened files which name matches provided regular expression.
+    Returns list of currently opened files which name match the provided regular expression.
     It iterates through `erlang:ports()` and filter out all ports which are not efile.
     It uses `process_info(Pid, dictionary)` to get info about couch_file properties.
     ---
@@ -74,8 +74,8 @@ help(opened_files_contains) ->
     opened_files_contains(SubString)
     --------------------------------
 
-    Returns list of currently opened files which name contains provided SubString.
-    It iterates through `erlang:ports()` and filter out all ports which are not efile.
+    Returns list of currently opened files whose names contain the provided SubString.
+    It iterates through `erlang:ports()` and filters out all ports which are not efile.
     It uses `process_info(Pid, dictionary)` to get info about couch_file properties.
     ---
     ", []);
@@ -84,7 +84,7 @@ help(process_name) ->
     process_name(Pid)
     -----------------
 
-    Uses heuristics to figure out the best way to name process.
+    Uses heuristics to figure out the process name.
     The heuristic is based on the following information about the process:
     - process_info(Pid, registered_name)
     - '$initial_call' key in process dictionary
@@ -165,7 +165,7 @@ help(linked_processes_info) ->
         linked_processes_info(Pid, Info)
         --------------------------------
 
-        Convinience function which reduces the amount of typing compared to direct
+        Convenience function which reduces the amount of typing compared to direct
         use of link_tree.
           - Pid: initial Pid to start from
           - Info: a list of process_info_item() as documented
