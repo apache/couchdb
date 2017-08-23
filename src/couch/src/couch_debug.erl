@@ -34,12 +34,6 @@
     print_linked_processes/1
 ]).
 
--ifdef(TEST).
-    -compile(export_all).
-
-    -include_lib("proper/include/proper.hrl").
--endif.
-
 help() ->
     [
         opened_files,
@@ -461,22 +455,32 @@ table_row(Key, Indent, Props, [{KeyWidth, Align, _} | Spec]) ->
 -include_lib("couch/include/couch_eunit.hrl").
 
 random_processes() ->
-    random_processes([]).
+    random_processes([], 50).
 
-random_processes(Pids) ->
-    frequency([
-        {1, ?LET(Started, Pids, lists:flatten(Started))},
-        {3, ?LAZY(random_processes([element(1, spawn_monitor(fun process_fun/0)) | Pids]))},
-        {5, ?LAZY(random_processes([spawn(fun process_fun/0) | Pids]))},
-        {10, ?LAZY(random_processes([spawn_link(fun process_fun/0) | Pids]))}
-]).
+random_processes(Pids, 0) ->
+    Pids;
+random_processes(Acc, Left) ->
+    Pid = case oneof([spawn_monitor, spawn, spawn_link]) of
+        spawn_monitor ->
+            {P, _} = spawn_monitor(fun process_fun/0),
+            P;
+        spawn ->
+            spawn(fun process_fun/0);
+        spawn_link ->
+            spawn(fun process_fun/0)
+    end,
+    random_processes([Pid | Acc], Left - 1).
+
+
+oneof(Options) ->
+    lists:nth(random:uniform(length(Options)), Options).
 
 process_fun() ->
     receive looper -> ok end.
 
 tree() ->
-    {ok, Processes} = proper_gen:pick(random_processes()),
-    {ok, InitialPid} = proper_gen:pick(oneof(Processes)),
+    Processes = random_processes(),
+    InitialPid = oneof(Processes),
     {InitialPid, Processes, link_tree(InitialPid)}.
 
 setup() ->
