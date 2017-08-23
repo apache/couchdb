@@ -419,6 +419,13 @@ shorten_path(Path) ->
 
 %% Limmitations:
 %%   - The first column has to be specified as {Width, left, Something}
+%% The TableSpec is a list of either:
+%%   - {Value}
+%%   - {Width, Align, Value}
+%% Align is one of the following:
+%%  - left
+%%  - centre
+%%  - right
 print_tree(Tree, TableSpec) ->
     io:format("~s~n", [format(TableSpec)]),
     map_tree(Tree, fun(_, {Id, Props}, Pos) ->
