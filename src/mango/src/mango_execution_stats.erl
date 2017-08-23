@@ -18,7 +18,9 @@
     incr_keys_examined/1,
     incr_docs_examined/1,
     incr_quorum_docs_examined/1,
-    incr_results_returned/1
+    incr_results_returned/1,
+    log_execution_start/1,
+    log_execution_end/1
 ]).
 
 
@@ -30,7 +32,8 @@ to_json(Stats) ->
         {total_keys_examined, Stats#execution_stats.totalKeysExamined},
         {total_docs_examined, Stats#execution_stats.totalDocsExamined},
         {total_quorum_docs_examined, Stats#execution_stats.totalQuorumDocsExamined},
-        {results_returned, Stats#execution_stats.resultsReturned}
+        {results_returned, Stats#execution_stats.resultsReturned},
+        {execution_time_ms, Stats#execution_stats.executionTimeMs}
     ]}.
 
 
@@ -52,4 +55,16 @@ incr_quorum_docs_examined(Stats) ->
 incr_results_returned(Stats) ->
     Stats#execution_stats {
         resultsReturned = Stats#execution_stats.resultsReturned + 1
+    }.
+
+log_execution_start(Stats) ->
+    Stats#execution_stats {
+        executionStartTime = now()
+    }.
+
+log_execution_end(Stats) ->
+    End = now(),
+    Diff = timer:now_diff(End, Stats#execution_stats.executionStartTime) / 1000 % ms,
+    Stats#execution_stats {
+        executionTimeMs = Diff
     }.

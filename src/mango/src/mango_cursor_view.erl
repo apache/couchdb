@@ -70,10 +70,11 @@ explain(Cursor) ->
     end.
 
 
-execute(#cursor{db = Db, index = Idx} = Cursor0, UserFun, UserAcc) ->
+execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFun, UserAcc) ->
     Cursor = Cursor0#cursor{
         user_fun = UserFun,
-        user_acc = UserAcc
+        user_acc = UserAcc,
+        execution_stats = mango_execution_stats:log_execution_start(Stats)
     },
     case Cursor#cursor.ranges of
         [empty] ->
@@ -115,10 +116,11 @@ execute(#cursor{db = Db, index = Idx} = Cursor0, UserFun, UserAcc) ->
     end.
 
 
-maybe_add_execution_stats(#cursor{opts = Opts, user_fun = UserFun} = Cursor, UserAcc) ->
+maybe_add_execution_stats(#cursor{opts = Opts, user_fun = UserFun, execution_stats = Stats}, UserAcc) ->
     case couch_util:get_value(execution_stats, Opts) of
         true ->
-            Arg = {add_key, execution_stats, Cursor#cursor.execution_stats},
+            Stats0 = mango_execution_stats:log_execution_end(Stats),
+            Arg = {add_key, execution_stats, Stats0},
             {_Go, FinalUserAcc} = UserFun(Arg, UserAcc),
             {ok, FinalUserAcc};
         _ ->
