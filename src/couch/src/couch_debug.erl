@@ -234,7 +234,7 @@ opened_files_contains(FileNameFragment) ->
         string:str(Path, FileNameFragment) > 0
     end, couch_debug:opened_files()).
 
-process_name(Pid) ->
+process_name(Pid) when is_pid(Pid) ->
     case process_info(Pid, registered_name) of
         {registered_name, Name} ->
             iolist_to_list(io_lib:format("~s[~p]", [Name, Pid]));
@@ -247,7 +247,9 @@ process_name(Pid) ->
                 {M, F, A} ->
                     iolist_to_list(io_lib:format("~p:~p/~p[~p]", [M, F, A, Pid]))
             end
-    end.
+    end;
+process_name(Else) ->
+    iolist_to_list(io_lib:format("~p", [Else])).
 
 iolist_to_list(List) ->
     binary_to_list(iolist_to_binary(List)).
@@ -337,7 +339,15 @@ info(Port, Info) when is_port(Port) ->
         os_pid
     ],
     Validated = lists:filter(fun(P) -> lists:member(P, ValidProps) end, Info),
-    erlang:port_info(Port, lists:usort(Validated)).
+    port_info(Port, lists:usort(Validated)).
+
+port_info(Port, Items) ->
+    lists:foldl(fun(Item, Acc) ->
+        case (catch erlang:port_info(Port, Item)) of
+            {Item, _Value} = Info -> [Info | Acc];
+            _Else -> Acc
+        end
+    end, [], Items).
 
 mapfold_tree([], Acc, _Fun) ->
     {[], Acc};
@@ -460,33 +470,49 @@ table_row(Key, Indent, Props, [{KeyWidth, Align, _} | Spec]) ->
 -ifdef(TEST).
 -include_lib("couch/include/couch_eunit.hrl").
 
-random_processes() ->
-    random_processes([], 50).
+random_processes(Depth) ->
+    random_processes([], Depth).
 
 random_processes(Pids, 0) ->
-    Pids;
-random_processes(Acc, Left) ->
-    Pid = case oneof([spawn_monitor, spawn, spawn_link]) of
+    lists:usort(Pids);
+random_processes(Acc, Depth) ->
+    Caller = self(),
+    Ref = make_ref(),
+    Pid = case oneof([spawn_link, open_port]) of
         spawn_monitor ->
-            {P, _} = spawn_monitor(fun process_fun/0),
+            {P, _} = spawn_monitor(fun() ->
+                Caller ! {Ref, random_processes(Depth - 1)},
+                receive looper -> ok end
+            end),
             P;
         spawn ->
-            spawn(fun process_fun/0);
+            spawn(fun() ->
+                Caller ! {Ref, random_processes(Depth - 1)},
+                receive looper -> ok end
+            end);
         spawn_link ->
-            spawn_link(fun process_fun/0)
+            spawn_link(fun() ->
+                Caller ! {Ref, random_processes(Depth - 1)},
+                receive looper -> ok end
+            end);
+        open_port ->
+            spawn_link(fun() ->
+                Port = erlang:open_port({spawn, "sleep 10"}, []),
+                true = erlang:link(Port),
+                Caller ! {Ref, random_processes(Depth - 1)},
+                receive looper -> ok end
+            end)
     end,
-    random_processes([Pid | Acc], Left - 1).
-
+    receive
+        {Ref, Pids} -> random_processes([Pid | Pids] ++ Acc, Depth - 1)
+    end.
 
 oneof(Options) ->
     lists:nth(random:uniform(length(Options)), Options).
 
-process_fun() ->
-    receive looper -> ok end.
 
 tree() ->
-    Processes = random_processes(),
-    InitialPid = oneof(Processes),
+    [InitialPid | _] = Processes = random_processes(5),
     {InitialPid, Processes, link_tree(InitialPid)}.
 
 setup() ->
@@ -519,10 +545,15 @@ should_include_extra_info({InitialPid, _Processes, _Tree}) ->
     Info = [reductions, message_queue_len, memory],
     ?_test(begin
          InfoTree = linked_processes_info(InitialPid, Info),
-         map_tree(InfoTree, fun(_Pid, {_Id, Props}, _Pos) ->
-            ?assert(lists:keymember(reductions, 1, Props)),
-            ?assert(lists:keymember(message_queue_len, 1, Props)),
-            ?assert(lists:keymember(memory, 1, Props)),
+         map_tree(InfoTree, fun(Key, {_Id, Props}, _Pos) ->
+            case Key of
+                Pid when is_pid(Pid) ->
+                    ?assert(lists:keymember(reductions, 1, Props)),
+                    ?assert(lists:keymember(message_queue_len, 1, Props)),
+                    ?assert(lists:keymember(memory, 1, Props));
+                Port ->
+                    ok
+            end,
             Props
          end),
          ok
