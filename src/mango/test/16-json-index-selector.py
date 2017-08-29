@@ -10,8 +10,9 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-import mango
 import copy
+import mango
+import unittest
 
 DOCS = [
     {
@@ -81,43 +82,128 @@ class IndexSelectorJson(mango.DbPerClass):
         selector = {"location": {"$gte": "FRA"}}
         self.db.create_index(["location"], selector=selector)
         indexes = self.db.list_indexes()
-        assert indexes[1]["def"]["selector"] == selector
+        self.assertEqual(indexes[1]["def"]["selector"], selector)
 
-    def test_uses_selector_for_index(self):
+    def test_uses_partial_index_for_query_selector(self):
         selector = {"location": {"$gte": "FRA"}}
         self.db.create_index(["location"], selector=selector, name="Selected")
-        resp = self.db.find({"location":{"$gte": "FRA"}}, explain=True)
-        assert resp["index"]["name"] == "Selected"
+        resp = self.db.find(selector, explain=True)
+        self.assertEqual(resp["index"]["name"], "Selected")
 
-    def test_uses_selector_for_index_multiple_fields(self):
+    def test_uses_partial_index_for_query_multiple_fields(self):
         selector = {"location": {"$gte": "FRA"}}
         self.db.create_index(["location"], selector=selector, name="Selected")
         resp = self.db.find({"location":{"$gte": "FRA"}, "user_id": 7}, explain=True)
-        assert resp["index"]["name"] == "Selected"
+        self.assertEqual(resp["index"]["name"], "Selected")
 
-    def test_uses_selector_for_index_multiple_fields_on_both(self):
+    def test_uses_partial_index_for_query_selector_multiple_fields(self):
         selector = {"location": {"$gte": "FRA"}, "user_id": 7}
         self.db.create_index(["location"], selector=selector, name="Selected")
-        resp = self.db.find({"location":{"$gte": "FRA"}, "user_id": 7}, explain=True)
-        assert resp["index"]["name"] == "Selected"
+        resp = self.db.find(selector, explain=True)
+        self.assertEqual(resp["index"]["name"], "Selected")
 
-    def test_with_or_selector(self):
+    def test_uses_partial_index_for_query_selector_multiple_fields_diff_order(self):
+        selector = {"location": {"$gte": "FRA"}, "user_id": 7}
+        self.db.create_index(["location"], selector=selector, name="Selected")
+        resp = self.db.find({"user_id": 7, "location": {"$gte": "FRA"}}, explain=True)
+        self.assertEqual(resp["index"]["name"], "Selected")
+
+    def test_does_not_use_partial_index_for_or_query(self):
         selector = {"location": {"$gte": "FRA"}, "user_id": 7}
         self.db.create_index(["location"], selector=selector, name="Selected")
         self.db.create_index(["location"], name="NotSelected")
-        resp = self.db.find({"$or":[{"location":{"$gte": "FRA"}, "user_id": 7}, {"name": "Sandra"}]}, explain=True)
-        assert resp["index"]["name"] != "Selected"
+        resp = self.db.find({"$or":[selector, {"name": "Sandra"}]}, explain=True)
+        self.assertEqual(resp["index"]["name"], "_all_docs")
 
-    def test_does_not_use_selector_index(self):
+    def test_does_not_use_partial_index_for_disjoint_query_selector(self):
         selector = {"location": {"$gte": "FRA"}}
         self.db.create_index(["location"], selector=selector, name="Selected")
         resp = self.db.find({"location":{"$eq": "ZAR"}}, explain=True)
-        assert resp["index"]["name"] != "Selected"
+        self.assertEqual(resp["index"]["name"], "_all_docs")
 
-    def test_two_indexes_use_index_with_selector(self):
+    def test_prefers_partial_index_over_global_index(self):
         selector = {"location": {"$gte": "ZAR"}}
         self.db.create_index(["location"], selector=selector, name="Selected")
         self.db.create_index(["location"], name="NotSelected")
         resp = self.db.find({"location":{"$gte": "ZAR"}}, explain=True)
-        print resp
-        assert resp["index"]["name"] == "Selected"
+        self.assertEqual(resp["index"]["name"], "Selected")
+
+    @unittest.skip("aspirational - currently fails")
+    def test_prefers_most_selective_partial_index(self):
+        self.db.create_index(["location"], selector={"location": {"$gte": "ZAR"}},
+                             name="Selected location")
+        self.db.create_index(["location"], selector={"location": {"$gte": "ZAR"}, "user_id": 7},
+                             name="Selected location and user")
+        resp = self.db.find({"location": {"$gte": "ZAR"}, "user_id": 7}, explain=True)
+        self.assertEqual(resp["index"]["name"], "Selected location and user")
+
+    def test_does_not_use_partial_index_that_is_too_selective(self):
+        self.db.create_index(["location"], selector={"location": {"$gte": "ZAR"}},
+                             name="Selected location")
+        self.db.create_index(["location"], selector={"location": {"$gte": "ZAR"}, "user_id": 7},
+                             name="Selected location and user")
+        resp = self.db.find({"location": {"$gte": "ZAR"}}, explain=True)
+        self.assertEqual(resp["index"]["name"], "Selected location")
+
+    def test_does_not_use_partial_index_with_invalid_query_sort(self):
+        self.db.create_index(["location"], selector={"location": {"$gte": "ZAR"}},
+                             name="Selected")
+        resp = self.db.find({"location": {"$gte": "ZAR"}}, sort=[{"location":"desc"}], explain=True)
+        self.assertEqual(resp["index"]["name"], "_all_docs")
+
+    def test_does_not_use_partial_index_with_invalid_index_sort(self):
+        self.db.create_index([{"location":"desc"}], selector={"location": {"$gte": "ZAR"}},
+                             name="Selected")
+        resp = self.db.find({"location": {"$gte": "ZAR"}}, explain=True)
+        self.assertEqual(resp["index"]["name"], "_all_docs")
+
+    @unittest.skip("aspirational - currently fails")
+    def test_uses_overlapping_but_not_exact_partial_index(self):
+        self.db.create_index(["location"], selector={"location": {"$exists": True}},
+                             name="Selected")
+        resp = self.db.find({"location": {"$gte": "ZAR"}}, explain=True)
+        self.assertEqual(resp["index"]["name"], "Selected")
+
+    @unittest.skip("aspirational - currently fails")
+    def test_uses_partial_index_for_ne(self):
+        self.db.create_index(["location"], selector={"location": {"$ne": "ZAR"}},
+                             name="Selected")
+        resp = self.db.find({"location": {"$ne": "ZAR"}}, explain=True)
+        self.assertEqual(resp["index"]["name"], "Selected")
+
+    def test_uses_partial_index_for_ne_non_indexed_field(self):
+        self.db.create_index(["user_id"], selector={"location": {"$ne": "ZAR"}},
+                             name="Selected")
+        resp = self.db.find({"location": {"$ne": "ZAR"}, "user_id": 7}, explain=True)
+        self.assertEqual(resp["index"]["name"], "Selected")
+
+    @unittest.skip("aspirational - currently fails")
+    def test_partial_index_with_combination_selector(self):
+        selector = {"$or": [
+            {"location": "ZAR"},
+            {"location": "BRA"}]}
+        self.db.create_index(["location"], selector=selector, name="Selected")
+        resp = self.db.find(selector, explain=True)
+        self.assertEqual(resp["index"]["name"], "Selected")
+
+    @unittest.skip("aspirational - currently fails")
+    def test_uses_partial_index_for_ne_null(self):
+        selector = {"location": {"$ne": None}}
+        self.db.create_index(["location"], selector=selector, name="Selected")
+        resp = self.db.find(selector, explain=True)
+        self.assertEqual(resp["index"]["name"], "Selected")
+
+    @unittest.skip("aspirational - currently fails")
+    def test_uses_partial_index_for_exists(self):
+        selector = {"location": {"$exists": True}}
+        self.db.create_index(["location"], selector=selector, name="Selected")
+        resp = self.db.find(selector, explain=True)
+        self.assertEqual(resp["index"]["name"], "Selected")
+
+    @unittest.skip("aspirational - currently fails")
+    def test_uses_global_index_for_exists(self):
+        selector = {"location": {"$exists": True}}
+        self.db.create_index(["location"], name="Global")
+        resp = self.db.find(selector, explain=True)
+        self.assertEqual(resp["index"]["name"], "Global")
+
