@@ -145,31 +145,33 @@ class IndexSelectorJson(mango.DbPerClass):
         resp = self.db.find({"location": {"$gte": "ZAR"}}, explain=True)
         self.assertEqual(resp["index"]["name"], "Selected location")
 
-    def test_does_not_use_partial_index_with_invalid_query_sort(self):
+    def test_uses_partial_index_with_query_sort(self):
         self.db.create_index(["location"], selector={"location": {"$gte": "ZAR"}},
                              name="Selected")
         resp = self.db.find({"location": {"$gte": "ZAR"}}, sort=[{"location":"desc"}], explain=True)
-        self.assertEqual(resp["index"]["name"], "_all_docs")
+        self.assertEqual(resp["index"]["name"], "Selected")
 
-    def test_does_not_use_partial_index_with_invalid_index_sort(self):
-        self.db.create_index([{"location":"desc"}], selector={"location": {"$gte": "ZAR"}},
-                             name="Selected")
-        resp = self.db.find({"location": {"$gte": "ZAR"}}, explain=True)
-        self.assertEqual(resp["index"]["name"], "_all_docs")
-
-    @unittest.skip("aspirational - currently fails")
+    @unittest.skip("currently fails. V2 - support subset ranges and expand selector at query time")
     def test_uses_overlapping_but_not_exact_partial_index(self):
         self.db.create_index(["location"], selector={"location": {"$exists": True}},
                              name="Selected")
         resp = self.db.find({"location": {"$gte": "ZAR"}}, explain=True)
         self.assertEqual(resp["index"]["name"], "Selected")
 
-    @unittest.skip("aspirational - currently fails")
+    @unittest.skip("remove partial index selector from find selector before determining startkey/endkey params")
     def test_uses_partial_index_for_ne(self):
         self.db.create_index(["location"], selector={"location": {"$ne": "ZAR"}},
                              name="Selected")
         resp = self.db.find({"location": {"$ne": "ZAR"}}, explain=True)
         self.assertEqual(resp["index"]["name"], "Selected")
+
+    def test_uses_partial_index_for_ne_diff_field(self):
+        self.db.create_index(["user_id"], selector={"location": {"$ne": "DEN"}},
+                             name="Selected")
+        resp = self.db.find({"location": {"$ne": "DEN"}, "user_id": {"$gte": 4}}, explain=True)
+        self.assertEqual(resp["index"]["name"], "Selected")
+        resp2 = self.db.find({"user_id": {"$gte": 4}}, explain=True)
+        self.assertEqual(resp2["index"]["name"], "_all_docs")
 
     def test_uses_partial_index_for_ne_non_indexed_field(self):
         self.db.create_index(["user_id"], selector={"location": {"$ne": "ZAR"}},
