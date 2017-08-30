@@ -206,4 +206,3 @@ class IndexSelectorJson(mango.DbPerClass):
         self.db.create_index(["location"], name="Global")
         resp = self.db.find(selector, explain=True)
         self.assertEqual(resp["index"]["name"], "Global")
-
