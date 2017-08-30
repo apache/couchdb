@@ -1494,14 +1494,10 @@ copy_from_tree(#comp_st{old_db = OldDb, new_db = NewDb} = CompSt) ->
     NewIdTree = CompSt#comp_st.new_id_tree,
     NewSeqTree = NewDb#db.seq_tree,
 
-    BufferSize = list_to_integer(
-        config:get("database_compaction", "doc_buffer_size", "524288")),
-
     EnumByIdFun = fun({DocId, UpdateSeq}, _, {DstIdTree, Batch, Count}) ->
         case Count >= 1000 of
             true ->
-                DstIdTree2 = flush_docid_batch(
-                        Batch, NewSeqTree, DstIdTree, BufferSize),
+                DstIdTree2 = flush_docid_batch(Batch, NewSeqTree, DstIdTree),
                 update_compact_task(Count),
                 {ok, {DstIdTree2, [{DocId, UpdateSeq}], 1}};
             false ->
@@ -1512,8 +1508,7 @@ copy_from_tree(#comp_st{old_db = OldDb, new_db = NewDb} = CompSt) ->
     ?COMP_EVENT(id_init),
     {ok, _, {NewIdTree2, LastBatch, LastCount}} =
         couch_btree:foldl(OldIdTree, EnumByIdFun, {NewIdTree, [], 0}, []),
-    NewIdTree3 = flush_docid_batch(
-            LastBatch, NewSeqTree, NewIdTree2, BufferSize),
+    NewIdTree3 = flush_docid_batch(LastBatch, NewSeqTree, NewIdTree2),
     ?COMP_EVENT(id_done),
     update_compact_task(LastCount),
     CompSt#comp_st{
@@ -1521,26 +1516,17 @@ copy_from_tree(#comp_st{old_db = OldDb, new_db = NewDb} = CompSt) ->
     }.
 
 
-flush_docid_batch(DocIds, SeqTree, IdTree, MaxBufSize) ->
-    flush_docid_batch(DocIds, SeqTree, IdTree, MaxBufSize, [], 0).
+flush_docid_batch([], _, IdTree) ->
+    IdTree;
 
-
-flush_docid_batch([], _, IdTree, _, Batch, _) ->
-    {ok, NewIdTree} = couch_btree:add(IdTree, Batch),
-    NewIdTree;
-
-flush_docid_batch(DocIds, SeqTree, IdTree, MaxBufSize, Buf, BufSize)
-        when BufSize >= MaxBufSize ->
-    {ok, NewIdTree} = couch_btree:add(IdTree, Buf),
-    flush_docid_batch(DocIds, SeqTree, NewIdTree, MaxBufSize, [], 0);
-
-flush_docid_batch(DocIds, SeqTree, IdTree, MaxBufSize, Buf, BufSize) ->
-    [{_Id, Seq} | Rest] = DocIds,
-    [{ok, #full_doc_info{} = FDI}] = couch_btree:lookup(SeqTree, [Seq]),
-    NewBuf = [FDI | Buf],
-    NewBufSize = BufSize + ?term_size(FDI),
-    ?COMP_EVENT(id_copy),
-    flush_docid_batch(Rest, SeqTree, IdTree, MaxBufSize, NewBuf, NewBufSize).
+flush_docid_batch(DocIds, SeqTree, IdTree) ->
+    Seqs = [Seq || {_Id, Seq} <- DocIds],
+    FDIs = lists:map(fun({ok, #full_doc_info{} = FDI}) ->
+        ?COMP_EVENT(id_copy),
+        FDI
+    end, couch_btree:lookup(SeqTree, Seqs)),
+    {ok, NewIdTree} = couch_btree:add(IdTree, FDIs),
+    NewIdTree.
 
 
 compact_id_join(Id, {HighSeq, _, _}) ->
