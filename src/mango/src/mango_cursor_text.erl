@@ -38,7 +38,8 @@
     skip,
     user_fun,
     user_acc,
-    fields
+    fields,
+    execution_stats
 }).
 
 
@@ -87,7 +88,8 @@ execute(Cursor, UserFun, UserAcc) ->
         limit = Limit,
         skip = Skip,
         selector = Selector,
-        opts = Opts
+        opts = Opts,
+        execution_stats = Stats
     } = Cursor,
     QueryArgs = #index_query_args{
         q = mango_selector_text:convert(Selector),
@@ -105,7 +107,8 @@ execute(Cursor, UserFun, UserAcc) ->
         query_args = QueryArgs,
         user_fun = UserFun,
         user_acc = UserAcc,
-        fields = Cursor#cursor.fields
+        fields = Cursor#cursor.fields,
+        execution_stats = mango_execution_stats:log_start(Stats)
     },
     try
         execute(CAcc)
@@ -114,12 +117,14 @@ execute(Cursor, UserFun, UserAcc) ->
             #cacc{
                 bookmark = FinalBM,
                 user_fun = UserFun,
-                user_acc = LastUserAcc
+                user_acc = LastUserAcc,
+                execution_stats = Stats0
             } = FinalCAcc,
             JsonBM = dreyfus_bookmark:pack(FinalBM),
             Arg = {add_key, bookmark, JsonBM},
             {_Go, FinalUserAcc} = UserFun(Arg, LastUserAcc),
-            {ok, FinalUserAcc}
+            FinalUserAcc0 = mango_execution_stats:maybe_add_stats(Opts, UserFun, Stats0, FinalUserAcc),
+            {ok, FinalUserAcc0}
     end.
 
 
@@ -165,25 +170,28 @@ handle_hits(CAcc0, [{Sort, Doc} | Rest]) ->
 handle_hit(CAcc0, Sort, Doc) ->
     #cacc{
         limit = Limit,
-        skip = Skip
+        skip = Skip,
+        execution_stats = Stats
     } = CAcc0,
     CAcc1 = update_bookmark(CAcc0, Sort),
-    case mango_selector:match(CAcc1#cacc.selector, Doc) of
+    Stats1 = mango_execution_stats:incr_docs_examined(Stats),
+    CAcc2 = CAcc1#cacc{execution_stats = Stats1},
+    case mango_selector:match(CAcc2#cacc.selector, Doc) of
         true when Skip > 0 ->
-            CAcc1#cacc{skip = Skip - 1};
+            CAcc2#cacc{skip = Skip - 1};
         true when Limit == 0 ->
             % We hit this case if the user spcified with a
             % zero limit. Notice that in this case we need
             % to return the bookmark from before this match
             throw({stop, CAcc0});
         true when Limit == 1 ->
-            NewCAcc = apply_user_fun(CAcc1, Doc),
+            NewCAcc = apply_user_fun(CAcc2, Doc),
             throw({stop, NewCAcc});
         true when Limit > 1 ->
-            NewCAcc = apply_user_fun(CAcc1, Doc),
+            NewCAcc = apply_user_fun(CAcc2, Doc),
             NewCAcc#cacc{limit = Limit - 1};
         false ->
-            CAcc1
+            CAcc2
     end.
 
 
@@ -191,13 +199,15 @@ apply_user_fun(CAcc, Doc) ->
     FinalDoc = mango_fields:extract(Doc, CAcc#cacc.fields),
     #cacc{
         user_fun = UserFun,
-        user_acc = UserAcc
+        user_acc = UserAcc,
+        execution_stats = Stats
     } = CAcc,
+    Stats0 = mango_execution_stats:incr_results_returned(Stats),
     case UserFun({row, FinalDoc}, UserAcc) of
         {ok, NewUserAcc} ->
-            CAcc#cacc{user_acc = NewUserAcc};
+            CAcc#cacc{user_acc = NewUserAcc, execution_stats = Stats0};
         {stop, NewUserAcc} ->
-            throw({stop, CAcc#cacc{user_acc = NewUserAcc}})
+            throw({stop, CAcc#cacc{user_acc = NewUserAcc, execution_stats = Stats0}})
     end.
 
 
@@ -296,6 +306,7 @@ get_json_docs(DbName, Hits) ->
     Ids = lists:map(fun(#sortable{item = Item}) ->
         couch_util:get_value(<<"_id">>, Item#hit.fields)
     end, Hits),
+    % TODO: respect R query parameter (same as json indexes)
     {ok, IdDocs} = dreyfus_fabric:get_json_docs(DbName, Ids),
     lists:map(fun(#sortable{item = Item} = Sort) ->
         Id = couch_util:get_value(<<"_id">>, Item#hit.fields),

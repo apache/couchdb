@@ -146,6 +146,12 @@ validate_find({Props}) ->
             {optional, true},
             {default, false},
             {validator, fun mango_opts:is_boolean/1}
+        ]},
+        {<<"execution_stats">>, [
+            {tag, execution_stats},
+            {optional, true},
+            {default, false},
+            {validator, fun mango_opts:is_boolean/1}
         ]}
     ],
     validate(Props, Opts).
