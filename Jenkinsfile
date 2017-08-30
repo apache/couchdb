@@ -403,8 +403,13 @@ pipeline {
         expression { return env.BRANCH_NAME ==~ /master|2.0.x|2.1.x|jenkins-.*/ }
       }
       agent {
-        docker {
-          // This image has the deb AND rpm repo tools installed in it
+        // Cannot use docker agent type because image will not be pulled fresh
+        // each time. Instead, manually insert docker pull then run with the
+        // the docker image.
+        node {
+          label 'couchdbtest'
+        }
+      }
           image 'couchdbdev/debian-8-base:latest'
           // We need the jenkins user mapped inside of the image
           args '-v /etc/passwd:/etc/passwd -v /etc/group:/etc/group'
@@ -412,46 +417,49 @@ pipeline {
         }
       }
       steps {
-        withCredentials([file(credentialsId: 'jenkins-key', variable: 'KEY')]) {
-          sh 'rm -rf pkgs *.tar.gz'
-          unarchive mapping: ['pkgs/' : '.']
-          unstash 'tarball'
-          echo 'Retrieving & cleaning current couchdb-vm2 tree...'
-          sh '''
-            rsync -avz -e "ssh -o StrictHostKeyChecking=no -i $KEY" jenkins@couchdb-vm2.apache.org:/var/www/html/$BRANCH_NAME . || mkdir -p $BRANCH_NAME
-            rm -rf $BRANCH_NAME/debian/* $BRANCH_NAME/el6/* $BRANCH_NAME/el7/*
-            mkdir -p $BRANCH_NAME/debian $BRANCH_NAME/el6 $BRANCH_NAME/el7 $BRANCH_NAME/source
-          '''
-          echo 'Building Debian repo...'
-          sh '''
-            git clone https://github.com/apache/couchdb-pkg
-            reprepro -b couchdb-pkg/repo includedeb jessie pkgs/jessie/*deb
-            reprepro -b couchdb-pkg/repo includedeb trusty pkgs/trusty/*deb
-            reprepro -b couchdb-pkg/repo includedeb xenial pkgs/xenial/*deb
-          '''
-          echo 'Building CentOS repos...'
-          sh '''
-            cd pkgs/centos6 && createrepo --database .
-            cd ../centos7 && rm -f js* && createrepo --database .
-          '''
-          echo 'Building tree to upload...'
-          sh '''
-            mv couchdb-pkg/repo/pool $BRANCH_NAME/debian
-            mv couchdb-pkg/repo/dists $BRANCH_NAME/debian
-            mv pkgs/centos6/* $BRANCH_NAME/el6
-            mv pkgs/centos7/* $BRANCH_NAME/el7
-            mv apache-couchdb-*.tar.gz $BRANCH_NAME/source
-            cd $BRANCH_NAME/source
-            ls -1tr | head -n -10 | xargs -d '\n' rm -f --
-            cd ../..
-          '''
-          echo 'rsyncing tree to couchdb-vm2...'
-          sh '''
-            rsync -avz --delete -e "ssh -o StrictHostKeyChecking=no -i $KEY" $BRANCH_NAME jenkins@couchdb-vm2.apache.org:/var/www/html
-            rm -rf $BRANCH_NAME couchdb-pkg *.tar.gz
-          '''
-          deleteDir()
-        } // withCredentials
+        sh 'docker pull couchdbdev/debian-8-base:latest'
+        withDockerContainer(image: 'couchdbdev/debian-8-base:latest', args: '-e npm_config_cache=npm-cache -e HOME=. -v=/etc/passwd:/etc/passwd -v /etc/group:/etc/group') {
+          withCredentials([file(credentialsId: 'jenkins-key', variable: 'KEY')]) {
+            sh 'rm -rf pkgs *.tar.gz'
+            unarchive mapping: ['pkgs/' : '.']
+            unstash 'tarball'
+            echo 'Retrieving & cleaning current couchdb-vm2 tree...'
+            sh '''
+              rsync -avz -e "ssh -o StrictHostKeyChecking=no -i $KEY" jenkins@couchdb-vm2.apache.org:/var/www/html/$BRANCH_NAME . || mkdir -p $BRANCH_NAME
+              rm -rf $BRANCH_NAME/debian/* $BRANCH_NAME/el6/* $BRANCH_NAME/el7/*
+              mkdir -p $BRANCH_NAME/debian $BRANCH_NAME/el6 $BRANCH_NAME/el7 $BRANCH_NAME/source
+            '''
+            echo 'Building Debian repo...'
+            sh '''
+              git clone https://github.com/apache/couchdb-pkg
+              reprepro -b couchdb-pkg/repo includedeb jessie pkgs/jessie/*deb
+              reprepro -b couchdb-pkg/repo includedeb trusty pkgs/trusty/*deb
+              reprepro -b couchdb-pkg/repo includedeb xenial pkgs/xenial/*deb
+            '''
+            echo 'Building CentOS repos...'
+            sh '''
+              cd pkgs/centos6 && createrepo --database .
+              cd ../centos7 && rm -f js* && createrepo --database .
+            '''
+            echo 'Building tree to upload...'
+            sh '''
+              mv couchdb-pkg/repo/pool $BRANCH_NAME/debian
+              mv couchdb-pkg/repo/dists $BRANCH_NAME/debian
+              mv pkgs/centos6/* $BRANCH_NAME/el6
+              mv pkgs/centos7/* $BRANCH_NAME/el7
+              mv apache-couchdb-*.tar.gz $BRANCH_NAME/source
+              cd $BRANCH_NAME/source
+              ls -1tr | head -n -10 | xargs -d '\n' rm -f --
+              cd ../..
+            '''
+            echo 'rsyncing tree to couchdb-vm2...'
+            sh '''
+              rsync -avz --delete -e "ssh -o StrictHostKeyChecking=no -i $KEY" $BRANCH_NAME jenkins@couchdb-vm2.apache.org:/var/www/html
+              rm -rf $BRANCH_NAME couchdb-pkg *.tar.gz
+            '''
+            deleteDir()
+          } // withCredentials
+        } // withDockerContainer
       } // steps
     } // stage
   } // stages
