@@ -410,12 +410,6 @@ pipeline {
           label 'couchdbtest'
         }
       }
-          image 'couchdbdev/debian-8-base:latest'
-          // We need the jenkins user mapped inside of the image
-          args '-v /etc/passwd:/etc/passwd -v /etc/group:/etc/group'
-          label 'couchdbtest'
-        }
-      }
       steps {
         sh 'docker pull couchdbdev/debian-8-base:latest'
         withDockerContainer(image: 'couchdbdev/debian-8-base:latest', args: '-e npm_config_cache=npm-cache -e HOME=. -v=/etc/passwd:/etc/passwd -v /etc/group:/etc/group') {
