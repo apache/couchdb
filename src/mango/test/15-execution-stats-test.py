@@ -18,12 +18,12 @@ class ExecutionStatsTests(mango.UserDocsTests):
 
     def test_simple_json_index(self):
         resp = self.db.find({"age": {"$lt": 35}}, return_raw=True, executionStats=True)
-        assert len(resp["docs"]) == 3
-        assert resp["execution_stats"]["total_keys_examined"] == 0
-        assert resp["execution_stats"]["total_docs_examined"] == 3
-        assert resp["execution_stats"]["total_quorum_docs_examined"] == 0
-        assert resp["execution_stats"]["results_returned"] == 3
-        assert resp["execution_stats"]["execution_time_ms"] > 0
+        self.assertEqual(len(resp["docs"]), 3)
+        self.assertEqual(resp["execution_stats"]["total_keys_examined"], 0)
+        self.assertEqual(resp["execution_stats"]["total_docs_examined"], 3)
+        self.assertEqual(resp["execution_stats"]["total_quorum_docs_examined"], 0)
+        self.assertEqual(resp["execution_stats"]["results_returned"], 3)
+        self.assertGreater(resp["execution_stats"]["execution_time_ms"], 0)
 
     def test_no_execution_stats(self):
         resp = self.db.find({"age": {"$lt": 35}}, return_raw=True, executionStats=False)
@@ -31,12 +31,12 @@ class ExecutionStatsTests(mango.UserDocsTests):
 
     def test_quorum_json_index(self):
         resp = self.db.find({"age": {"$lt": 35}}, return_raw=True, r=3, executionStats=True)
-        assert len(resp["docs"]) == 3
-        assert resp["execution_stats"]["total_keys_examined"] == 0
-        assert resp["execution_stats"]["total_docs_examined"] == 0
-        assert resp["execution_stats"]["total_quorum_docs_examined"] == 3
-        assert resp["execution_stats"]["results_returned"] == 3
-        assert resp["execution_stats"]["execution_time_ms"] > 0
+        self.assertEqual(len(resp["docs"]), 3)
+        self.assertEqual(resp["execution_stats"]["total_keys_examined"], 0)
+        self.assertEqual(resp["execution_stats"]["total_docs_examined"], 0)
+        self.assertEqual(resp["execution_stats"]["total_quorum_docs_examined"], 3)
+        self.assertEqual(resp["execution_stats"]["results_returned"], 3)
+        self.assertGreater(resp["execution_stats"]["execution_time_ms"], 0)
 
 @unittest.skipUnless(mango.has_text_service(), "requires text service")
 class ExecutionStatsTests_Text(mango.UserDocsTextTests):
@@ -45,14 +45,14 @@ class ExecutionStatsTests_Text(mango.UserDocsTextTests):
         resp = self.db.find({"$text": "Stephanie"}, 
                 return_raw=True, 
                 executionStats=True)
-        assert len(resp["docs"]) == 1
-        assert resp["execution_stats"]["total_keys_examined"] == 0
-        assert resp["execution_stats"]["total_docs_examined"] == 1
-        assert resp["execution_stats"]["total_quorum_docs_examined"] == 0
-        assert resp["execution_stats"]["results_returned"] == 1
-        assert resp["execution_stats"]["execution_time_ms"] > 0
+        self.assertEqual(len(resp["docs"]), 1)
+        self.assertEqual(resp["execution_stats"]["total_keys_examined"], 0)
+        self.assertEqual(resp["execution_stats"]["total_docs_examined"], 1)
+        self.assertEqual(resp["execution_stats"]["total_quorum_docs_examined"], 0)
+        self.assertEqual(resp["execution_stats"]["results_returned"], 1)
+        self.assertGreater(resp["execution_stats"]["execution_time_ms"], 0)
 
     def test_no_execution_stats(self):
         resp = self.db.find({"$text": "Stephanie"}, 
                 return_raw=True)
-        assert "execution_stats" not in resp
+        self.assertNotIn("execution_stats", resp)
