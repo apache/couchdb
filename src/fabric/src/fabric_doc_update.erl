@@ -96,7 +96,9 @@ handle_message({not_found, no_db_file} = X, Worker, Acc0) ->
     Docs = couch_util:get_value(Worker, GroupedDocs),
     handle_message({ok, [X || _D <- Docs]}, Worker, Acc0);
 handle_message({bad_request, Msg}, _, _) ->
-    throw({bad_request, Msg}).
+    throw({bad_request, Msg});
+handle_message({request_entity_too_large, Entity}, _, _) ->
+    throw({request_entity_too_large, Entity}).
 
 before_doc_update(DbName, Docs, Opts) ->
     case {fabric_util:is_replicator_db(DbName), fabric_util:is_users_db(DbName)} of
