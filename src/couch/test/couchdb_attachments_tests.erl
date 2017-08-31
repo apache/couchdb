@@ -14,6 +14,7 @@
 
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("mem3/include/mem3.hrl").
 
 -define(COMPRESSION_LEVEL, 8).
 -define(ATT_BIN_NAME, <<"logo.png">>).
@@ -512,6 +513,137 @@ should_create_compressible_att_with_ctype_params({Host, DbName}) ->
                      couch_util:get_value(<<"encoded_length">>, AttJson)),
         ?assertEqual(byte_size(Data),
                      couch_util:get_value(<<"length">>, AttJson))
+    end)}.
+
+
+compact_after_lowering_attachment_size_limit_test_() ->
+    {
+        "Compact after lowering attachment size limit",
+        {
+            foreach,
+            fun() ->
+                Ctx = test_util:start_couch(),
+                DbName = ?tempdb(),
+                {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
+                ok = couch_db:close(Db),
+                {Ctx, DbName}
+            end,
+            fun({Ctx, DbName}) ->
+                config:delete("couchdb", "max_attachment_size"),
+                ok = couch_server:delete(DbName, [?ADMIN_CTX]),
+                test_util:stop_couch(Ctx)
+            end,
+            [
+                fun should_compact_after_lowering_attachment_size_limit/1
+            ]
+        }
+    }.
+
+
+should_compact_after_lowering_attachment_size_limit({_Ctx, DbName}) ->
+    {timeout, ?TIMEOUT_EUNIT, ?_test(begin
+        {ok, Db1} = couch_db:open(DbName, [?ADMIN_CTX]),
+        Doc1 = #doc{id = <<"doc1">>, atts = att(1000)},
+        {ok, _} = couch_db:update_doc(Db1, Doc1, []),
+        couch_db:close(Db1),
+        config:set("couchdb", "max_attachment_size", "1", _Persist = false),
+        compact_db(DbName),
+        {ok, Db2} = couch_db:open_int(DbName, []),
+        {ok, Doc2} = couch_db:open_doc(Db2, <<"doc1">>),
+        couch_db:close(Db2),
+        [Att] = Doc2#doc.atts,
+        ?assertEqual(1000, couch_att:fetch(att_len, Att))
+    end)}.
+
+
+att(Size) when is_integer(Size), Size >= 1 ->
+    [couch_att:new([
+        {name, <<"att">>},
+        {type, <<"app/binary">>},
+        {att_len, Size},
+        {data, fun(_Bytes) ->
+            << <<"x">> || _ <- lists:seq(1, Size) >>
+        end}
+    ])].
+
+
+compact_db(DbName) ->
+    {ok, Db} = couch_db:open_int(DbName, []),
+    {ok, _CompactPid} = couch_db:start_compact(Db),
+    wait_compaction(DbName, "database", ?LINE),
+    ok = couch_db:close(Db).
+
+
+wait_compaction(DbName, Kind, Line) ->
+    WaitFun = fun() ->
+       case is_compaction_running(DbName) of
+           true -> wait;
+           false -> ok
+       end
+    end,
+    case test_util:wait(WaitFun, ?TIMEOUT) of
+        timeout ->
+            erlang:error({assertion_failed,
+                          [{module, ?MODULE},
+                           {line, Line},
+                           {reason, "Timeout waiting for "
+                                    ++ Kind
+                                    ++ " database compaction"}]});
+        _ ->
+            ok
+    end.
+
+
+is_compaction_running(DbName) ->
+    {ok, Db} = couch_db:open_int(DbName, []),
+    {ok, DbInfo} = couch_db:get_db_info(Db),
+    couch_db:close(Db),
+    couch_util:get_value(compact_running, DbInfo) =:= true.
+
+
+internal_replication_after_lowering_attachment_size_limit_test_() ->
+    {
+        "Internal replication after lowering max attachment size",
+        {
+            foreach,
+            fun() ->
+                Ctx = test_util:start_couch([mem3]),
+                SrcName = ?tempdb(),
+                {ok, SrcDb} = couch_db:create(SrcName, [?ADMIN_CTX]),
+                ok = couch_db:close(SrcDb),
+                TgtName = ?tempdb(),
+                {ok, TgtDb} = couch_db:create(TgtName, [?ADMIN_CTX]),
+                ok = couch_db:close(TgtDb),
+                {Ctx, SrcName, TgtName}
+            end,
+            fun({Ctx, SrcName, TgtName}) ->
+                config:delete("couchdb", "max_attachment_size"),
+                ok = couch_server:delete(SrcName, [?ADMIN_CTX]),
+                ok = couch_server:delete(TgtName, [?ADMIN_CTX]),
+                test_util:stop_couch(Ctx)
+            end,
+            [
+                fun should_replicate_after_lowering_attachment_size/1
+            ]
+        }
+    }.
+
+should_replicate_after_lowering_attachment_size({_Ctx, SrcName, TgtName}) ->
+    {timeout, ?TIMEOUT_EUNIT, ?_test(begin
+        {ok, SrcDb} = couch_db:open(SrcName, [?ADMIN_CTX]),
+        SrcDoc = #doc{id = <<"doc">>, atts = att(1000)},
+        {ok, _} = couch_db:update_doc(SrcDb, SrcDoc, []),
+        couch_db:close(SrcDb),
+        config:set("couchdb", "max_attachment_size", "1", _Persist = false),
+        % Create a pair of "fake" shards
+        SrcShard = #shard{name = SrcName, node = node()},
+        TgtShard = #shard{name = TgtName, node = node()},
+        mem3_rep:go(SrcShard, TgtShard, []),
+        {ok, TgtDb} = couch_db:open_int(TgtName, []),
+        {ok, TgtDoc} = couch_db:open_doc(TgtDb, <<"doc">>),
+        couch_db:close(TgtDb),
+        [Att] = TgtDoc#doc.atts,
+        ?assertEqual(1000, couch_att:fetch(att_len, Att))
     end)}.
 
 

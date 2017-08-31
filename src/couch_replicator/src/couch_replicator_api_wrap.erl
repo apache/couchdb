@@ -711,10 +711,12 @@ receive_docs(Streamer, UserFun, Ref, UserAcc) ->
     {headers, Ref, Headers} ->
         case header_value("content-type", Headers) of
         {"multipart/related", _} = ContentType ->
+            % Skip document body and attachment size limits validation here
+            % since these should be validated by the replication target
             case couch_doc:doc_from_multi_part_stream(
                 ContentType,
                 fun() -> receive_doc_data(Streamer, Ref) end,
-                Ref) of
+                Ref, _ValidateDocLimits = false) of
             {ok, Doc, WaitFun, Parser} ->
                 case run_user_fun(UserFun, {ok, Doc}, UserAcc, Ref) of
                 {ok, UserAcc2} ->
