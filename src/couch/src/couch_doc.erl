@@ -16,6 +16,7 @@
 -export([from_json_obj/1, from_json_obj_validate/1, to_json_obj/2,has_stubs/1, merge_stubs/2]).
 -export([validate_docid/1, get_validate_doc_fun/1]).
 -export([doc_from_multi_part_stream/2, doc_from_multi_part_stream/3]).
+-export([doc_from_multi_part_stream/4]).
 -export([doc_to_multi_part_stream/5, len_doc_to_multi_part_stream/4]).
 -export([restart_open_doc_revs/3]).
 -export([to_path/1]).
@@ -129,10 +130,23 @@ from_json_obj_validate(EJson) ->
     Doc = from_json_obj(EJson),
     case erlang:external_size(Doc#doc.body) =< MaxSize of
         true ->
+             validate_attachment_sizes(Doc#doc.atts),
              Doc;
         false ->
             throw({request_entity_too_large, Doc#doc.id})
     end.
+
+
+validate_attachment_sizes([]) ->
+    ok;
+validate_attachment_sizes(Atts) ->
+    MaxAttSize = couch_att:max_attachment_size(),
+    lists:foreach(fun(Att) ->
+         AttName = couch_att:fetch(name, Att),
+         AttSize = couch_att:fetch(att_len, Att),
+         couch_att:validate_attachment_size(AttName, AttSize, MaxAttSize)
+    end, Atts).
+
 
 from_json_obj({Props}) ->
     transfer_fields(Props, #doc{body=[]});
@@ -420,11 +434,19 @@ doc_from_multi_part_stream(ContentType, DataFun) ->
     doc_from_multi_part_stream(ContentType, DataFun, make_ref()).
 
 doc_from_multi_part_stream(ContentType, DataFun, Ref) ->
+    doc_from_multi_part_stream(ContentType, DataFun, Ref, true).
+
+doc_from_multi_part_stream(ContentType, DataFun, Ref, ValidateDocLimits) ->
     case couch_httpd_multipart:decode_multipart_stream(ContentType, DataFun, Ref) of
     {{started_open_doc_revs, NewRef}, Parser, _ParserRef} ->
         restart_open_doc_revs(Parser, Ref, NewRef);
     {{doc_bytes, Ref, DocBytes}, Parser, ParserRef} ->
-        Doc = from_json_obj_validate(?JSON_DECODE(DocBytes)),
+        Doc = case ValidateDocLimits of
+            true ->
+                from_json_obj_validate(?JSON_DECODE(DocBytes));
+            false ->
+                from_json_obj(?JSON_DECODE(DocBytes))
+        end,
         erlang:put(mochiweb_request_recv, true),
         % we'll send the Parser process ID to the remote nodes so they can
         % retrieve their own copies of the attachment data

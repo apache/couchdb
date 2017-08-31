@@ -885,6 +885,10 @@ error_info(file_exists) ->
         "created, the file already exists.">>};
 error_info(request_entity_too_large) ->
     {413, <<"too_large">>, <<"the request entity is too large">>};
+error_info({request_entity_too_large, {attachment, AttName}}) ->
+    {413, <<"attachment_too_large">>, AttName};
+error_info({request_entity_too_large, DocID}) ->
+    {413, <<"document_too_large">>, DocID};
 error_info(request_uri_too_long) ->
     {414, <<"too_long">>, <<"the request uri is too long">>};
 error_info({bad_ctype, Reason}) ->

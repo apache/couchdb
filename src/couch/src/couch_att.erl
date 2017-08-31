@@ -50,6 +50,11 @@
     downgrade/1
 ]).
 
+-export([
+    max_attachment_size/0,
+    validate_attachment_size/3
+]).
+
 -compile(nowarn_deprecated_type).
 -export_type([att/0]).
 
@@ -500,6 +505,8 @@ flush_data(Fd, Data, Att) when is_binary(Data) ->
         couch_stream:write(OutputStream, Data)
     end);
 flush_data(Fd, Fun, Att) when is_function(Fun) ->
+    AttName = fetch(name, Att),
+    MaxAttSize = max_attachment_size(),
     case fetch(att_len, Att) of
         undefined ->
             couch_db:with_stream(Fd, Att, fun(OutputStream) ->
@@ -510,7 +517,7 @@ flush_data(Fd, Fun, Att) when is_function(Fun) ->
                     % WriterFun({0, _Footers}, State)
                     % Called with Length == 0 on the last time.
                     % WriterFun returns NewState.
-                    fun({0, Footers}, _) ->
+                    fun({0, Footers}, _Total) ->
                         F = mochiweb_headers:from_binary(Footers),
                         case mochiweb_headers:get_value("Content-MD5", F) of
                         undefined ->
@@ -518,11 +525,15 @@ flush_data(Fd, Fun, Att) when is_function(Fun) ->
                         Md5 ->
                             {md5, base64:decode(Md5)}
                         end;
-                    ({_Length, Chunk}, _) ->
-                        couch_stream:write(OutputStream, Chunk)
-                    end, ok)
+                    ({Length, Chunk}, Total0) ->
+                        Total = Total0 + Length,
+                        validate_attachment_size(AttName, Total, MaxAttSize),
+                        couch_stream:write(OutputStream, Chunk),
+                        Total
+                    end, 0)
             end);
         AttLen ->
+            validate_attachment_size(AttName, AttLen, MaxAttSize),
             couch_db:with_stream(Fd, Att, fun(OutputStream) ->
                 write_streamed_attachment(OutputStream, Fun, AttLen)
             end)
@@ -678,6 +689,22 @@ downgrade(Att) ->
 upgrade_encoding(true) -> gzip;
 upgrade_encoding(false) -> identity;
 upgrade_encoding(Encoding) -> Encoding.
+
+
+max_attachment_size() ->
+    case config:get("couchdb", "max_attachment_size", "infinity") of
+        "infinity" ->
+            infinity;
+        MaxAttSize ->
+            list_to_integer(MaxAttSize)
+    end.
+
+
+validate_attachment_size(AttName, AttSize, MaxAttSize)
+        when is_integer(AttSize),  AttSize > MaxAttSize ->
+    throw({request_entity_too_large, {attachment, AttName}});
+validate_attachment_size(_AttName, _AttSize, _MAxAttSize) ->
+    ok.
 
 
 -ifdef(TEST).
