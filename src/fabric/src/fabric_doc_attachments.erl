@@ -24,8 +24,8 @@ receiver(_Req, {unknown_transfer_encoding, Unknown}) ->
     exit({unknown_transfer_encoding, Unknown});
 receiver(Req, chunked) ->
     MiddleMan = spawn(fun() -> middleman(Req, chunked) end),
-    fun(4096, ChunkFun, ok) ->
-        write_chunks(MiddleMan, ChunkFun)
+    fun(4096, ChunkFun, State) ->
+        write_chunks(MiddleMan, ChunkFun, State)
     end;
 receiver(_Req, 0) ->
     <<"">>;
@@ -63,27 +63,29 @@ maybe_send_continue(#httpd{mochi_req = MochiReq} = Req) ->
         end
     end.
 
-write_chunks(MiddleMan, ChunkFun) ->
+write_chunks(MiddleMan, ChunkFun, State) ->
     MiddleMan ! {self(), gimme_data},
     Timeout = fabric_util:attachments_timeout(),
     receive
     {MiddleMan, ChunkRecordList} ->
         rexi:reply(attachment_chunk_received),
-        case flush_chunks(ChunkRecordList, ChunkFun) of
-        continue -> write_chunks(MiddleMan, ChunkFun);
-        done -> ok
+        case flush_chunks(ChunkRecordList, ChunkFun, State) of
+            {continue, NewState} ->
+                write_chunks(MiddleMan, ChunkFun, NewState);
+            {done, NewState} ->
+                NewState
         end
     after Timeout ->
         exit(timeout)
     end.
 
-flush_chunks([], _ChunkFun) ->
-    continue;
-flush_chunks([{0, _}], _ChunkFun) ->
-    done;
-flush_chunks([Chunk | Rest], ChunkFun) ->
-    ChunkFun(Chunk, ok),
-    flush_chunks(Rest, ChunkFun).
+flush_chunks([], _ChunkFun, State) ->
+    {continue, State};
+flush_chunks([{0, _}], _ChunkFun, State) ->
+    {done, State};
+flush_chunks([Chunk | Rest], ChunkFun, State) ->
+    NewState = ChunkFun(Chunk, State),
+    flush_chunks(Rest, ChunkFun, NewState).
 
 receive_unchunked_attachment(_Req, 0) ->
     ok;
