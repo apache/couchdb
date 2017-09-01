@@ -58,7 +58,7 @@ before_script:
   - cd ../..
 
 script:
-   - make check mango-test
+   - make check
 
 after_failure:
   - build-aux/logfile-uploader.py
