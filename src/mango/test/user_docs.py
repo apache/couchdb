@@ -354,6 +354,7 @@ DOCS = [
         "company": "Manglo",
         "email": "ramonafloyd@manglo.com",
         "manager": True,
+        "twitter": None,
         "favorites": [
             "Lisp",
             "Erlang",
