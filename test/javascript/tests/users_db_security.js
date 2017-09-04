@@ -75,6 +75,17 @@ couchTests.users_db_security = function(debug) {
     }
   };
 
+  var request_as = function(db, ddoc_path, username) {
+    loginUser(username);
+    try {
+      var uri = db.uri + ddoc_path;
+      var req = CouchDB.request("GET", uri);
+      return req;
+    } finally {
+      CouchDB.logout();
+    }
+  };
+
   var testFun = function()
   {
 
@@ -178,6 +189,14 @@ couchTests.users_db_security = function(debug) {
         test: {
           map: "function(doc) { emit(doc._id, null); }"
         }
+      },
+      lists: {
+        names: "function(head, req) { "
+          + "var row; while (row = getRow()) { send(row.key + \"\\n\"); }"
+          + "}"
+      },
+      shows: {
+        name: "function(doc, req) { return doc.name; }"
       }
     };
 
@@ -207,6 +226,33 @@ couchTests.users_db_security = function(debug) {
     } catch(e) {
       TEquals("forbidden", e.error, "non-admins can't read design docs");
     }
+
+    // admin shold be able to read _list
+    var listPath = ddoc["_id"] + "/_list/names/test";
+    var result = request_as(usersDb, listPath, "jan");
+    var lines = result.responseText.split("\n");
+    T(result.status == 200, "should allow access to db admin");
+    TEquals(4, lines.length, "should list users to db admin");
+
+    // non-admins can't read _list
+    var result = request_as(usersDb, listPath, "jchris1");
+    T(result.status == 403, "should deny access to non-admin");
+
+    // admin should be able to read _show
+    var showPath = ddoc["_id"] + "/_show/name/org.couchdb.user:jchris";
+    var result = request_as(usersDb, showPath, "jan");
+    T(result.status == 200, "should allow access to db admin");
+    TEquals("jchris", result.responseText, "should show username to db admin");
+
+    // non-admin should be able to access own _show
+    var result = request_as(usersDb, showPath, "jchris1");
+    T(result.status == 200, "should allow access to own user record");
+    TEquals("jchris", result.responseText, "should show own username");
+
+    // non-admin can't read other's _show
+    var showPath = ddoc["_id"] + "/_show/name/org.couchdb.user:jan";
+    var result = request_as(usersDb, showPath, "jchris1");
+    T(result.status == 404, "non-admin can't read others's user docs");
 
     // admin should be able to read and edit any user doc
     fdmananaDoc.password = "mobile";
