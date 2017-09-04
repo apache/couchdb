@@ -22,8 +22,8 @@
 % it looks up the doc an then passes it to the query server.
 % then it sends the response from the query server to the http client.
 
-maybe_open_doc(Db, DocId) ->
-    case fabric:open_doc(Db, DocId, [conflicts]) of
+maybe_open_doc(Db, DocId, Options) ->
+    case fabric:open_doc(Db, DocId, Options) of
     {ok, Doc} ->
         Doc;
     {not_found, _} ->
@@ -35,7 +35,8 @@ handle_doc_show_req(#httpd{
     }=Req, Db, DDoc) ->
 
     % open the doc
-    Doc = maybe_open_doc(Db, DocId),
+    Options = [conflicts, {user_ctx, Req#httpd.user_ctx}],
+    Doc = maybe_open_doc(Db, DocId, Options),
 
     % we don't handle revs here b/c they are an internal api
     % returns 404 if there is no doc with DocId
@@ -49,7 +50,8 @@ handle_doc_show_req(#httpd{
     DocId1 = ?l2b(string:join([?b2l(P)|| P <- DocParts], "/")),
 
     % open the doc
-    Doc = maybe_open_doc(Db, DocId1),
+    Options = [conflicts, {user_ctx, Req#httpd.user_ctx}],
+    Doc = maybe_open_doc(Db, DocId1, Options),
 
     % we don't handle revs here b/c they are an internal api
     % pass 404 docs to the show function
@@ -107,7 +109,8 @@ handle_doc_update_req(#httpd{
         path_parts=[_, _, _, _, UpdateName | DocIdParts]
     }=Req, Db, DDoc) ->
     DocId = ?l2b(string:join([?b2l(P) || P <- DocIdParts], "/")),
-    Doc = maybe_open_doc(Db, DocId),
+    Options = [conflicts, {user_ctx, Req#httpd.user_ctx}],
+    Doc = maybe_open_doc(Db, DocId, Options),
     send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId);
 
 handle_doc_update_req(Req, _Db, _DDoc) ->
