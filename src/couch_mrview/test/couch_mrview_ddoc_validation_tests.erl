@@ -15,6 +15,8 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
+-define(LIB, {[{<<"mylib">>, {[{<<"lib1">>, <<"x=42">>}]}}]}).
+
 setup() ->
     {ok, Db} = couch_mrview_test_util:init_db(?tempdb(), map),
     Db.
@@ -39,9 +41,13 @@ ddoc_validation_test_() ->
                     fun should_reject_invalid_builtin_reduce/1,
                     fun should_reject_non_object_options/1,
                     fun should_reject_non_object_filters/1,
+                    fun should_accept_obj_in_filters/1,
                     fun should_reject_non_object_lists/1,
+                    fun should_accept_obj_in_lists/1,
                     fun should_reject_non_object_shows/1,
+                    fun should_accept_obj_in_shows/1,
                     fun should_reject_non_object_updates/1,
+                    fun should_accept_obj_in_updates/1,
                     fun should_reject_non_object_views/1,
                     fun should_reject_non_string_language/1,
                     fun should_reject_non_string_validate_doc_update/1,
@@ -50,13 +56,13 @@ ddoc_validation_test_() ->
                     fun should_accept_option/1,
                     fun should_accept_any_option/1,
                     fun should_accept_filter/1,
-                    fun should_reject_non_string_filter_function/1,
+                    fun should_reject_non_string_or_obj_filter_function/1,
                     fun should_accept_list/1,
-                    fun should_reject_non_string_list_function/1,
+                    fun should_reject_non_string_or_obj_list_function/1,
                     fun should_accept_show/1,
-                    fun should_reject_non_string_show_function/1,
+                    fun should_reject_non_string_or_obj_show_function/1,
                     fun should_accept_update/1,
-                    fun should_reject_non_string_update_function/1,
+                    fun should_reject_non_string_or_obj_update_function/1,
                     fun should_accept_view/1,
                     fun should_accept_view_with_reduce/1,
                     fun should_accept_view_with_lib/1,
@@ -129,6 +135,13 @@ should_reject_non_object_filters(Db) ->
     ?_assertThrow({bad_request, invalid_design_doc, _},
                   couch_db:update_doc(Db, Doc, [])).
 
+should_accept_obj_in_filters(Db) ->
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/should_accept_obj_in_filters">>},
+        {<<"filters">>, ?LIB}
+    ]}),
+    ?_assertMatch({ok, _}, couch_db:update_doc(Db, Doc, [])).
+
 should_reject_non_object_lists(Db) ->
     Doc = couch_doc:from_json_obj({[
         {<<"_id">>, <<"_design/should_reject_non_object_lists">>},
@@ -145,6 +158,13 @@ should_reject_non_object_shows(Db) ->
     ?_assertThrow({bad_request, invalid_design_doc, _},
                   couch_db:update_doc(Db, Doc, [])).
 
+should_accept_obj_in_shows(Db) ->
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/should_accept_obj_in_shows">>},
+        {<<"shows">>, ?LIB}
+    ]}),
+    ?_assertMatch({ok, _}, couch_db:update_doc(Db, Doc, [])).
+
 should_reject_non_object_updates(Db) ->
     Doc = couch_doc:from_json_obj({[
         {<<"_id">>, <<"_design/should_reject_non_object_updates">>},
@@ -152,6 +172,13 @@ should_reject_non_object_updates(Db) ->
     ]}),
     ?_assertThrow({bad_request, invalid_design_doc, _},
                   couch_db:update_doc(Db, Doc, [])).
+
+should_accept_obj_in_updates(Db) ->
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/should_accept_obj_in_updates">>},
+        {<<"updates">>, ?LIB}
+    ]}),
+    ?_assertMatch({ok, _}, couch_db:update_doc(Db, Doc, [])).
 
 should_reject_non_object_views(Db) ->
     Doc = couch_doc:from_json_obj({[
@@ -213,9 +240,9 @@ should_accept_filter(Db) ->
     ]}),
     ?_assertMatch({ok,_}, couch_db:update_doc(Db, Doc, [])).
 
-should_reject_non_string_filter_function(Db) ->
+should_reject_non_string_or_obj_filter_function(Db) ->
     Doc = couch_doc:from_json_obj({[
-        {<<"_id">>, <<"_design/should_reject_non_string_filter_function">>},
+        {<<"_id">>, <<"_design/should_reject_non_string_or_obj_filter_function">>},
         {<<"filters">>, {[ {<<"filter1">>, 1} ]}}
     ]}),
     ?_assertThrow({bad_request, invalid_design_doc, _},
@@ -228,13 +255,21 @@ should_accept_list(Db) ->
     ]}),
     ?_assertMatch({ok,_}, couch_db:update_doc(Db, Doc, [])).
 
-should_reject_non_string_list_function(Db) ->
+should_reject_non_string_or_obj_list_function(Db) ->
     Doc = couch_doc:from_json_obj({[
-        {<<"_id">>, <<"_design/should_reject_non_string_list_function">>},
+        {<<"_id">>, <<"_design/should_reject_non_string_or_obj_list_function">>},
         {<<"lists">>, {[ {<<"list1">>, 1} ]}}
     ]}),
     ?_assertThrow({bad_request, invalid_design_doc, _},
                   couch_db:update_doc(Db, Doc, [])).
+
+should_accept_obj_in_lists(Db) ->
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/should_accept_obj_in_lists">>},
+        {<<"lists">>, ?LIB}
+    ]}),
+    ?_assertMatch({ok, _}, couch_db:update_doc(Db, Doc, [])).
+
 
 should_accept_show(Db) ->
     Doc = couch_doc:from_json_obj({[
@@ -243,9 +278,9 @@ should_accept_show(Db) ->
     ]}),
     ?_assertMatch({ok,_}, couch_db:update_doc(Db, Doc, [])).
 
-should_reject_non_string_show_function(Db) ->
+should_reject_non_string_or_obj_show_function(Db) ->
     Doc = couch_doc:from_json_obj({[
-        {<<"_id">>, <<"_design/should_reject_non_string_show_function">>},
+        {<<"_id">>, <<"_design/should_reject_non_string_or_obj_show_function">>},
         {<<"shows">>, {[ {<<"show1">>, 1} ]}}
     ]}),
     ?_assertThrow({bad_request, invalid_design_doc, _},
@@ -258,9 +293,9 @@ should_accept_update(Db) ->
     ]}),
     ?_assertMatch({ok,_}, couch_db:update_doc(Db, Doc, [])).
 
-should_reject_non_string_update_function(Db) ->
+should_reject_non_string_or_obj_update_function(Db) ->
     Doc = couch_doc:from_json_obj({[
-        {<<"_id">>, <<"_design/should_reject_non_string_update_function">>},
+        {<<"_id">>, <<"_design/should_reject_non_string_or_obj_update_function">>},
         {<<"updates">>, {[ {<<"update1">>, 1} ]}}
     ]}),
     ?_assertThrow({bad_request, invalid_design_doc, _},
