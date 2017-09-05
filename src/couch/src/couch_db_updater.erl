@@ -1228,7 +1228,7 @@ copy_compact(#comp_st{} = CompSt) ->
     TaskProps0 = [
         {type, database_compaction},
         {phase, copy_docs},
-        {retry, (Retry /= nil)},
+        {retry, Retry},
         {database, Db#db.name},
         {progress, 0},
         {changes_done, 0},
