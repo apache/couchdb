@@ -50,6 +50,8 @@
     get_fd/1,
     get_state/1,
 
+    add/2,
+
     insert/2,
     lookup/2
 ]).
@@ -84,6 +86,13 @@ get_state(#ehamt{fd = Fd, root = Root}) ->
     flush_nodes(Fd, Root).
 
 
+add(EHamt, KVs) ->
+    NewSt = lists:foldl(fun(KV, Acc) ->
+        insert(Acc, KV)
+    end, EHamt, KVs),
+    {ok, NewSt}.
+
+
 insert(EHamt, {K, V}) ->
     #ehamt{
         fd = Fd,
@@ -91,19 +100,26 @@ insert(EHamt, {K, V}) ->
     } = EHamt,
     HId = hash(K),
     {ok, DiskLoc, _} = couch_file:append_term(Fd, {K, V}),
-    insert(Fd, read_node(Fd, Root), HId, DiskLoc, 0).
+    NewRoot = insert(Fd, read_node(Fd, Root), HId, DiskLoc, 0),
+    EHamt#ehamt{
+        root = NewRoot
+    }.
 
+insert(Fd, NodeDiskLoc, HId, DiskLoc, Depth) when is_integer(NodeDiskLoc) ->
+    {ok, Node} = couch_file:pread_term(Fd, NodeDiskLoc),
+    insert(Fd, Node, HId, DiskLoc, Depth);
 
-insert(_Fd, {item, HId, DiskLocs}, HId, DiskLoc, _Depth) ->
-    {item, HId, [DiskLoc | DiskLocs]};
+insert(_Fd, {item, HId1, DiskLocs}, HId2, DiskLoc, Depth)
+        when HId1 == HId2 orelse Depth >= 5 ->
+    {item, HId1, [DiskLoc | DiskLocs]};
 
 insert(Fd, {item, HId1, DiskLocs}, HId2, DiskLoc, Depth) ->
     % Transform this item in a new node and then
     % continue our insertion algorithm. We do this
     % because we're not guaranteed that the hash ids
     % are different at the current depth.
-    Map = get_header_index(HId1, Depth),
-    Children = [{item, HId1, DiskLocs}],
+    Map = 1 bsl get_header_index(HId1, Depth),
+    Children = {{item, HId1, DiskLocs}},
     Node = {node, Map, Children},
     insert(Fd, Node, HId2, DiskLoc, Depth);
 
@@ -112,17 +128,17 @@ insert(Fd, {node, Map, Children}, HId, DiskLoc, Depth) ->
     case is_set(Map, Idx) of
         true ->
             Pos = get_header_position(Map, Idx),
-            Child = erlang:element(Pos + 1, Children),
+            Child = erlang:element(Pos, Children),
             NewChild0 = insert(Fd, Child, HId, DiskLoc, Depth + 1),
             NewChild1 = write_node(Fd, NewChild0, Depth + 1),
-            NewChildren = erlang:setelement(Pos + 1, Children, NewChild1),
+            NewChildren = erlang:setelement(Pos, Children, NewChild1),
             {node, Map, NewChildren};
         false ->
             Pos = get_header_position(Map, Idx),
             NewChild0 = {item, HId, [DiskLoc]},
             NewChild1 = write_node(Fd, NewChild0, Depth + 1),
-            NewMap = Map bor Idx,
-            NewChildren = erlang:insert_element(Pos + 1, Children, NewChild1),
+            NewMap = Map bor (1 bsl Idx),
+            NewChildren = erlang:insert_element(Pos, Children, NewChild1),
             {node, NewMap, NewChildren}
     end.
 
@@ -136,15 +152,17 @@ lookup(EHamt, Key) ->
     lookup(Fd, read_node(Fd, Root), HId, Key, 0).
 
 
-lookup(_Fd, {item, HId, []}, HId, _, _) ->
+lookup(_Fd, {item, HId1, []}, HId2, _, Depth)
+        when HId1 == HId2 orelse Depth >= 5 ->
     not_found;
 
-lookup(Fd, {item, HId, [DiskLoc | RestLocs]}, HId, Key, Depth) ->
+lookup(Fd, {item, HId1, [DiskLoc | RestLocs]}, HId2, Key, Depth)
+        when HId1 == HId2 orelse Depth >= 5 ->
     case couch_file:pread_term(Fd, DiskLoc) of
         {ok, {Key, Value}} ->
             {ok, Value};
         {ok, _} ->
-            lookup(Fd, {item, HId, RestLocs}, HId, Key, Depth)
+            lookup(Fd, {item, HId1, RestLocs}, HId2, Key, Depth)
     end;
 
 lookup(_Fd, {item, HId1, _}, HId2, _, _) when HId1 /= HId2 ->
@@ -214,7 +232,8 @@ get_header_index(HashId, Depth) when Depth >= 0, Depth < 5->
 
 
 is_set(Header, Idx) when Idx >= 0, Idx =< 31 ->
-    Header band (1 bsl Idx).
+    Mask = 1 bsl Idx,
+    Header band Mask == Mask.
 
 
 get_header_position(Header, Idx) ->
