@@ -115,10 +115,24 @@ columns(Idx) ->
 
 is_usable(Idx, Selector) ->
     % This index is usable if at least the first column is
-    % a member of the indexable fields of the selector.
+    % a member of the indexable fields of the selector and all
+    % the fields in the index are in the selector
     Columns = columns(Idx),
     Fields = indexable_fields(Selector),
-    lists:member(hd(Columns), Fields) andalso not is_text_search(Selector).
+    lists:member(hd(Columns), Fields) 
+    andalso all_columns_in_selector(Columns, Selector)  
+    andalso not is_text_search(Selector).
+
+
+all_columns_in_selector(Columns, Selector) ->
+    Fields = selector_fields(Selector),
+    lists:subtract(lists:usort(Columns), Fields) =:= [].
+    
+    
+selector_fields({[{<<"$", _/binary>>, Args}]}) ->
+    lists:usort(lists:flatten([selector_fields(A) || A <- Args]));
+selector_fields({[{Field, _Cond}]}) ->
+    [Field].
 
 
 is_text_search({[]}) ->
@@ -488,3 +502,43 @@ range_pos(Low, Arg, High) ->
                     max
             end
     end.
+
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+
+all_columns_in_selector_true_one_test() ->
+    Selector = {[{<<"name">>,{[{<<"$eq">>,<<"Sheila">>}]}}]},
+    ?assert(all_columns_in_selector([<<"name">>], Selector)).
+
+
+all_columns_in_selector_false_test() ->
+    Selector = {[{<<"lastname">>,{[{<<"$eq">>,<<"Sheila">>}]}}]},
+    ?assertEqual(false, all_columns_in_selector([<<"name">>], Selector)).
+
+
+all_columns_in_selector_true_with_and_test() ->
+    Selector = {[{<<"$and">>,
+                    [
+                        {[{<<"user_id">>,{[{<<"$lt">>,8}]}}]},
+                        {[{<<"location">>,{[{<<"$gte">>,<<"FRA">>}]}}]},
+                        {[{<<"location">>,{[{<<"$lte">>,<<"ZAR">>}]}}]},
+                        {[{<<"age">>,{[{<<"$lte">>,20}]}}]}
+                    ]
+                }]},
+    ?assert(all_columns_in_selector([<<"age">>, <<"location">>, <<"user_id">>], Selector)).
+
+
+all_columns_in_selector_true_with_or_test() ->
+    Selector = {[{<<"$or">>,
+                    [
+                        {[{<<"user_id">>,{[{<<"$lt">>,8}]}}]},
+                        {[{<<"location">>,{[{<<"$lte">>,<<"ZAR">>}]}}]},
+                        {[{<<"age">>,{[{<<"$lte">>,20}]}}]}
+                ]
+                }]},
+    ?assertEqual(true, all_columns_in_selector([<<"age">>, <<"location">>, <<"user_id">>], Selector)).
+
+
+-endif.
