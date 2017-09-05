@@ -52,13 +52,13 @@ validate_ddoc_fields(DDoc) ->
     lists:foreach(fun(Path) ->
         validate_ddoc_fields(DDoc, Path)
     end, [
-        [{<<"filters">>, object}, {any, string}],
+        [{<<"filters">>, object}, {any, [object, string]}],
         [{<<"language">>, string}],
-        [{<<"lists">>, object}, {any, string}],
+        [{<<"lists">>, object}, {any, [object, string]}],
         [{<<"options">>, object}],
         [{<<"rewrites">>, [string, array]}],
-        [{<<"shows">>, object}, {any, string}],
-        [{<<"updates">>, object}, {any, string}],
+        [{<<"shows">>, object}, {any, [object, string]}],
+        [{<<"updates">>, object}, {any, [object, string]}],
         [{<<"validate_doc_update">>, string}],
         [{<<"views">>, object}, {<<"lib">>, object}],
         [{<<"views">>, object}, {any, object}, {<<"map">>, MapFuncType}],
