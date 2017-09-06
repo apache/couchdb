@@ -1039,11 +1039,21 @@ check_md5(Md5, Md5) -> ok;
 check_md5(_, _) -> throw(md5_mismatch).
 
 
+-ifdef(TEST).
+-define(COMP_EVENT(Name),
+        couch_db_updater_ev:event(Name)).
+-else.
+-define(COMP_EVENT(Name), ignore).
+-endif.
+
+
 start_copy_compact(#db{}=Db) ->
     erlang:put(io_priority, {db_compact, Db#db.name}),
     couch_log:debug("Compaction process spawned for db \"~s\"", [Db#db.name]),
 
+    ?COMP_EVENT(init),
     {ok, InitCompSt} = open_compaction_files(Db),
+    ?COMP_EVENT(files_opened),
 
     Stages = [
         fun copy_purge_info/1,
@@ -1052,7 +1062,8 @@ start_copy_compact(#db{}=Db) ->
         fun sort_meta_data/1,
         fun commit_compaction_data/1,
         fun copy_meta_data/1,
-        fun compact_final_sync/1
+        fun compact_final_sync/1,
+        fun verify_compaction/1
     ],
 
     FinalCompSt = lists:foldl(fun(Stage, CompSt) ->
@@ -1067,6 +1078,7 @@ start_copy_compact(#db{}=Db) ->
     close_db(FinalNewDb),
     ok = couch_file:close(MetaFd),
 
+    ?COMP_EVENT(before_notify),
     gen_server:cast(Db#db.main_pid, {compact_done, FinalNewDb#db.filepath}).
 
 
@@ -1146,6 +1158,7 @@ reset_compaction_file(Fd, Header) ->
 
 
 copy_purge_info(#comp_st{old_db = OldDb, new_db = NewDb} = CompSt) ->
+    ?COMP_EVENT(purge_init),
     OldHdr = OldDb#db.header,
     NewHdr = NewDb#db.header,
     OldPurgeSeq = couch_db_header:purge_seq(OldHdr),
@@ -1154,6 +1167,7 @@ copy_purge_info(#comp_st{old_db = OldDb, new_db = NewDb} = CompSt) ->
         {ok, PurgedIdsRevs} = couch_db:get_last_purged(OldDb),
         Opts = [{compression, NewDb#db.compression}],
         {ok, Ptr, _} = couch_file:append_term(NewDb#db.fd, PurgedIdsRevs, Opts),
+        ?COMP_EVENT(purge_done),
         CompSt#comp_st{
             new_db = NewDb#db{
                 header = couch_db_header:set(NewHdr, [
@@ -1163,6 +1177,7 @@ copy_purge_info(#comp_st{old_db = OldDb, new_db = NewDb} = CompSt) ->
             }
         };
     true ->
+        ?COMP_EVENT(purge_done),
         CompSt
     end.
 
@@ -1229,12 +1244,15 @@ copy_compact(#comp_st{} = CompSt) ->
         couch_task_status:set_update_frequency(500)
     end,
 
+    ?COMP_EVENT(seq_init),
     {ok, _, {NewDb2, Uncopied, _, _}} =
         couch_btree:foldl(Db#db.seq_tree, EnumBySeqFun,
             {NewDb, [], 0, 0},
             [{start_key, NewDb#db.update_seq + 1}]),
 
     NewDb3 = copy_docs(Db, NewDb2, lists:reverse(Uncopied), Retry),
+
+    ?COMP_EVENT(seq_done),
 
     % copy misc header values
     if NewDb3#db.security /= Db#db.security ->
@@ -1294,6 +1312,7 @@ copy_docs(Db, #db{fd = DestFd} = NewDb, MixedInfos, Retry) ->
         TotalAttSize = lists:foldl(fun({_, S}, A) -> S + A end, 0, FinalAtts),
         NewActiveSize = FinalAS + TotalAttSize,
         NewExternalSize = FinalES + TotalAttSize,
+        ?COMP_EVENT(seq_copy),
         Info#full_doc_info{
             rev_tree = NewRevTree,
             sizes = #size_info{
@@ -1420,7 +1439,9 @@ bind_id_tree(Db, Fd, State) ->
 
 
 sort_meta_data(#comp_st{new_db = Db0} = CompSt) ->
+    ?COMP_EVENT(md_sort_init),
     {ok, Ems} = couch_emsort:merge(Db0#db.id_tree),
+    ?COMP_EVENT(md_sort_done),
     CompSt#comp_st{
         new_db = Db0#db{
             id_tree = Ems
@@ -1447,11 +1468,13 @@ copy_meta_data(#comp_st{new_db = Db} = CompSt) ->
         rem_seqs=[],
         infos=[]
     },
+    ?COMP_EVENT(md_copy_init),
     Acc = merge_docids(Iter, Acc0),
     {ok, IdTree} = couch_btree:add(Acc#merge_st.id_tree, Acc#merge_st.infos),
     {ok, SeqTree} = couch_btree:add_remove(
         Acc#merge_st.seq_tree, [], Acc#merge_st.rem_seqs
     ),
+    ?COMP_EVENT(md_copy_done),
     CompSt#comp_st{
         new_db = Db#db{
             id_tree = IdTree,
@@ -1461,11 +1484,46 @@ copy_meta_data(#comp_st{new_db = Db} = CompSt) ->
 
 
 compact_final_sync(#comp_st{new_db = NewDb0} = CompSt) ->
+    ?COMP_EVENT(before_final_sync),
     NewHdr = db_to_header(NewDb0, NewDb0#db.header),
     NewDb1 = sync_header(NewDb0, NewHdr),
+    ?COMP_EVENT(after_final_sync),
     CompSt#comp_st{
         new_db = NewDb1
     }.
+
+
+verify_compaction(#comp_st{old_db = OldDb, new_db = NewDb} = CompSt) ->
+    {ok, OldIdReds0} = couch_btree:full_reduce(OldDb#db.id_tree),
+    {ok, OldSeqReds} = couch_btree:full_reduce(OldDb#db.seq_tree),
+    {ok, NewIdReds0} = couch_btree:full_reduce(NewDb#db.id_tree),
+    {ok, NewSeqReds} = couch_btree:full_reduce(NewDb#db.seq_tree),
+    {
+        OldDocCount,
+        OldDelDocCount,
+        OldSizes
+    } = OldIdReds0,
+    #size_info{
+        external = OldExternalSize
+    } = upgrade_sizes(OldSizes),
+    OldIdReds = {OldDocCount, OldDelDocCount, OldExternalSize},
+    {
+        NewDocCount,
+        NewDelDocCount,
+        #size_info{external = NewExternalSize}
+    } = NewIdReds0,
+    NewIdReds = {NewDocCount, NewDelDocCount, NewExternalSize},
+    if NewIdReds == OldIdReds -> ok; true ->
+        Fmt1 = "Compacted id tree for ~s differs from source: ~p /= ~p",
+        couch_log:error(Fmt1, [couch_db:name(OldDb), NewIdReds, OldIdReds]),
+        exit({compaction_error, id_tree})
+    end,
+    if NewSeqReds == OldSeqReds -> ok; true ->
+        Fmt2 = "Compacted seq tree for ~s differs from source: ~p /= ~p",
+        couch_log:error(Fmt2, [couch_db:name(OldDb), NewSeqReds, OldSeqReds]),
+        exit({compaction_error, seq_tree})
+    end,
+    CompSt.
 
 
 merge_docids(Iter, #merge_st{infos=Infos}=Acc) when length(Infos) > 1000 ->
@@ -1491,6 +1549,7 @@ merge_docids(Iter, #merge_st{curr=Curr}=Acc) ->
                 rem_seqs = Seqs ++ Acc#merge_st.rem_seqs,
                 curr = NewCurr
             },
+            ?COMP_EVENT(md_copy_row),
             merge_docids(NextIter, Acc1);
         {finished, FDI, Seqs} ->
             Acc#merge_st{
