@@ -174,9 +174,9 @@ couchTests.view_errors = function(debug) {
       // if the reduce grows to fast, throw an overflow error
       var path = "/" + db_name + "/_design/testbig/_view/reduce_too_big";
       xhr = CouchDB.request("GET", path);
-      T(xhr.status == 500);
+      T(xhr.status == 200);
       result = JSON.parse(xhr.responseText);
-      T(result.error == "reduce_overflow_error");
+      T(result.rows[0].error == "reduce_overflow_error");
 
       try {
           db.query(function() {emit(null, null)}, null, {startkey: 2, endkey:1});
