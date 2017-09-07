@@ -11,9 +11,9 @@
 # the License.
 
 import mango
+import unittest
 
-
-class OperatorTests(mango.UserDocsTests):
+class OperatorTests:
 
     def assertUserIds(self, user_ids, docs):
         user_ids_returned = list(d["user_id"] for d in docs)
@@ -198,3 +198,13 @@ class OperatorTests(mango.UserDocsTests):
         self.assertGreater(len(docs), 0)
         for d in docs:
             self.assertNotIn("twitter", d)
+
+
+class OperatorJSONTests(mango.UserDocsTests, OperatorTests):
+    pass
+
+
+@unittest.skipUnless(mango.has_text_service(), "requires text service")
+class OperatorTextTests(mango.UserDocsTextTests, OperatorTests):
+    pass
+
