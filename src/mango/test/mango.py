@@ -226,6 +226,17 @@ class UserDocsTests(DbPerClass):
         user_docs.setup(klass.db)
 
 
+class UserDocsTestsNoIndexes(DbPerClass):
+
+    @classmethod
+    def setUpClass(klass):
+        super(UserDocsTestsNoIndexes, klass).setUpClass()
+        user_docs.setup(
+                    klass.db,
+                    index_type="_all_docs"
+            )
+
+
 class UserDocsTextTests(DbPerClass):
 
     DEFAULT_FIELD = None

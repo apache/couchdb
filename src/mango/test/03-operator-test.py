@@ -208,3 +208,8 @@ class OperatorJSONTests(mango.UserDocsTests, OperatorTests):
 class OperatorTextTests(mango.UserDocsTextTests, OperatorTests):
     pass
 
+
+class OperatorAllDocsTests(mango.UserDocsTestsNoIndexes, OperatorTests):
+    pass
+
+
