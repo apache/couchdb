@@ -19,7 +19,7 @@ class OperatorTests:
         user_ids_returned = list(d["user_id"] for d in docs)
         user_ids.sort()
         user_ids_returned.sort()
-        self.assertEqual(user_ids_returned, user_ids)
+        self.assertEqual(user_ids, user_ids_returned)
 
     def test_all(self):
         docs = self.db.find({
@@ -174,7 +174,7 @@ class OperatorTests:
         for d in docs:
             self.assertIn("twitter", d)
 
-    def test_range_includes_null_but_not_missing(self):
+    def test_lt_includes_null_but_not_missing(self):
         docs = self.db.find({
                 "twitter": {"$lt": 1}
             })
@@ -182,6 +182,36 @@ class OperatorTests:
         self.assertUserIds(user_ids, docs)
         for d in docs:
             self.assertEqual(d["twitter"], None)
+
+    def test_lte_includes_null_but_not_missing(self):
+        docs = self.db.find({
+                "twitter": {"$lt": 1}
+            })
+        user_ids = [9]
+        self.assertUserIds(user_ids, docs)
+        for d in docs:
+            self.assertEqual(d["twitter"], None)
+
+    def test_lte_null_includes_null_but_not_missing(self):
+        docs = self.db.find({
+                "twitter": {"$lte": None}
+            })
+        user_ids = [9]
+        self.assertUserIds(user_ids, docs)
+        for d in docs:
+            self.assertEqual(d["twitter"], None)
+
+    def test_lte_at_z_except_null_excludes_null_and_missing(self):
+        docs = self.db.find({
+            "twitter": {"$and": [
+                {"$lte": "@z"},
+                {"$ne": None}
+            ]}
+        })
+        user_ids = [0,1,4,13]
+        self.assertUserIds(user_ids, docs)
+        for d in docs:
+            self.assertNotEqual(d["twitter"], None)
 
     def test_range_gte_null_includes_null_but_not_missing(self):
         docs = self.db.find({
@@ -198,6 +228,25 @@ class OperatorTests:
         self.assertGreater(len(docs), 0)
         for d in docs:
             self.assertNotIn("twitter", d)
+    
+    @unittest.skipUnless(not mango.has_text_service(), 
+    "text indexes do not support range queries across type boundaries")
+    def test_lte_respsects_unicode_collation(self):
+        docs = self.db.find({
+                "ordered": {"$lte": "a"}
+            })
+        user_ids = [7,8,9,10,11,12]
+        self.assertUserIds(user_ids, docs)
+        
+    @unittest.skipUnless(not mango.has_text_service(), 
+    "text indexes do not support range queries across type boundaries")
+    def test_gte_respsects_unicode_collation(self):
+        docs = self.db.find({
+                "ordered": {"$gte": "a"}
+            })
+        user_ids = [12,13,14]
+        self.assertUserIds(user_ids, docs)
+        
 
 
 class OperatorJSONTests(mango.UserDocsTests, OperatorTests):
