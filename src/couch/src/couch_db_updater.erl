@@ -36,11 +36,12 @@
 }).
 
 -record(merge_st, {
+    src_fd,
     id_tree,
     seq_tree,
     curr,
     rem_seqs,
-    infos
+    locs
 }).
 
 init({DbName, Filepath, Fd, Options}) ->
@@ -1340,10 +1341,16 @@ copy_docs(Db, #db{fd = DestFd} = NewDb, MixedInfos, Retry) ->
     {ok, SeqTree} = couch_btree:add_remove(
             NewDb#db.seq_tree, NewInfos, RemoveSeqs),
 
-    FDIKVs = lists:map(fun(#full_doc_info{id=Id, update_seq=Seq}=FDI) ->
-        {{Id, Seq}, FDI}
-    end, NewInfos),
-    {ok, IdEms} = couch_emsort:add(NewDb#db.id_tree, FDIKVs),
+    EMSortFd = couch_emsort:get_fd(NewDb#db.id_tree),
+    {ok, LocSizes} = couch_file:append_terms(EMSortFd, NewInfos),
+    EMSortEntries = lists:zipwith(fun(FDI, {Loc, _}) ->
+        #full_doc_info{
+            id = Id,
+            update_seq = Seq
+        } = FDI,
+        {{Id, Seq}, Loc}
+    end, NewInfos, LocSizes),
+    {ok, IdEms} = couch_emsort:add(NewDb#db.id_tree, EMSortEntries),
     update_compact_task(length(NewInfos)),
     NewDb#db{id_tree=IdEms, seq_tree=SeqTree}.
 
@@ -1455,6 +1462,7 @@ copy_meta_data(#comp_st{new_db = Db} = CompSt) ->
         header = Header
     } = Db,
     Src = Db#db.id_tree,
+    SrcFd = couch_emsort:get_fd(Src),
     DstState = couch_db_header:id_tree_state(Header),
     {ok, IdTree0} = couch_btree:open(DstState, Fd, [
         {split, fun ?MODULE:btree_by_id_split/1},
@@ -1463,14 +1471,16 @@ copy_meta_data(#comp_st{new_db = Db} = CompSt) ->
     ]),
     {ok, Iter} = couch_emsort:iter(Src),
     Acc0 = #merge_st{
+        src_fd=SrcFd,
         id_tree=IdTree0,
         seq_tree=Db#db.seq_tree,
         rem_seqs=[],
-        infos=[]
+        locs=[]
     },
     ?COMP_EVENT(md_copy_init),
     Acc = merge_docids(Iter, Acc0),
-    {ok, IdTree} = couch_btree:add(Acc#merge_st.id_tree, Acc#merge_st.infos),
+    {ok, Infos} = couch_file:pread_terms(SrcFd, Acc#merge_st.locs),
+    {ok, IdTree} = couch_btree:add(Acc#merge_st.id_tree, Infos),
     {ok, SeqTree} = couch_btree:add_remove(
         Acc#merge_st.seq_tree, [], Acc#merge_st.rem_seqs
     ),
@@ -1526,34 +1536,36 @@ verify_compaction(#comp_st{old_db = OldDb, new_db = NewDb} = CompSt) ->
     CompSt.
 
 
-merge_docids(Iter, #merge_st{infos=Infos}=Acc) when length(Infos) > 1000 ->
+merge_docids(Iter, #merge_st{locs=Locs}=Acc) when length(Locs) > 1000 ->
     #merge_st{
+        src_fd=SrcFd,
         id_tree=IdTree0,
         seq_tree=SeqTree0,
         rem_seqs=RemSeqs
     } = Acc,
+    {ok, Infos} = couch_file:pread_terms(SrcFd, Locs),
     {ok, IdTree1} = couch_btree:add(IdTree0, Infos),
     {ok, SeqTree1} = couch_btree:add_remove(SeqTree0, [], RemSeqs),
     Acc1 = Acc#merge_st{
         id_tree=IdTree1,
         seq_tree=SeqTree1,
         rem_seqs=[],
-        infos=[]
+        locs=[]
     },
     merge_docids(Iter, Acc1);
 merge_docids(Iter, #merge_st{curr=Curr}=Acc) ->
     case next_info(Iter, Curr, []) of
-        {NextIter, NewCurr, FDI, Seqs} ->
+        {NextIter, NewCurr, Loc, Seqs} ->
             Acc1 = Acc#merge_st{
-                infos = [FDI | Acc#merge_st.infos],
+                locs = [Loc | Acc#merge_st.locs],
                 rem_seqs = Seqs ++ Acc#merge_st.rem_seqs,
                 curr = NewCurr
             },
             ?COMP_EVENT(md_copy_row),
             merge_docids(NextIter, Acc1);
-        {finished, FDI, Seqs} ->
+        {finished, Loc, Seqs} ->
             Acc#merge_st{
-                infos = [FDI | Acc#merge_st.infos],
+                locs = [Loc | Acc#merge_st.locs],
                 rem_seqs = Seqs ++ Acc#merge_st.rem_seqs,
                 curr = undefined
             };
@@ -1564,19 +1576,19 @@ merge_docids(Iter, #merge_st{curr=Curr}=Acc) ->
 
 next_info(Iter, undefined, []) ->
     case couch_emsort:next(Iter) of
-        {ok, {{Id, Seq}, FDI}, NextIter} ->
-            next_info(NextIter, {Id, Seq, FDI}, []);
+        {ok, {{Id, Seq}, Loc}, NextIter} ->
+            next_info(NextIter, {Id, Seq, Loc}, []);
         finished ->
             empty
     end;
-next_info(Iter, {Id, Seq, FDI}, Seqs) ->
+next_info(Iter, {Id, Seq, Loc}, Seqs) ->
     case couch_emsort:next(Iter) of
-        {ok, {{Id, NSeq}, NFDI}, NextIter} ->
-            next_info(NextIter, {Id, NSeq, NFDI}, [Seq | Seqs]);
-        {ok, {{NId, NSeq}, NFDI}, NextIter} ->
-            {NextIter, {NId, NSeq, NFDI}, FDI, Seqs};
+        {ok, {{Id, NSeq}, NLoc}, NextIter} ->
+            next_info(NextIter, {Id, NSeq, NLoc}, [Seq | Seqs]);
+        {ok, {{NId, NSeq}, NLoc}, NextIter} ->
+            {NextIter, {NId, NSeq, NLoc}, Loc, Seqs};
         finished ->
-            {finished, FDI, Seqs}
+            {finished, Loc, Seqs}
     end.
 
 
