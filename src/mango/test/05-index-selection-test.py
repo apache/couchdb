@@ -23,7 +23,7 @@ class IndexSelectionTests(mango.UserDocsTests):
             user_docs.add_text_indexes(klass.db, {})
 
     def test_basic(self):
-        resp = self.db.find({"name.last": "A last name"}, explain=True)
+        resp = self.db.find({"manager": "A manager"}, explain=True)
         assert resp["index"]["type"] == "json"
 
     def test_with_and(self):
