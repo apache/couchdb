@@ -74,6 +74,14 @@ class IndexSelectionTests(mango.UserDocsTests):
             }, use_index=ddocid, explain=True)
         self.assertEqual(resp["index"]["ddoc"], ddocid)
 
+    def test_no_valid_sort_index(self):
+        try:
+            self.db.find({"_id": {"$gt": None}}, sort=["name"], return_raw=True)
+        except Exception, e:
+            self.assertEqual(e.response.status_code, 400)
+        else:
+            raise AssertionError("bad find")
+
     def test_invalid_use_index(self):
         # ddoc id for the age index
         ddocid = "_design/ad3d537c03cd7c6a43cf8dff66ef70ea54c2b40f"
