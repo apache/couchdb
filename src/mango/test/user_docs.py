@@ -83,7 +83,8 @@ def add_view_indexes(db, kwargs):
         ["manager"],
         ["favorites"],
         ["favorites.3"],
-        ["twitter"]
+        ["twitter"],
+        ["ordered"]
     ]
     for idx in indexes:
         assert db.create_index(idx) is True
@@ -310,8 +311,8 @@ DOCS = [
             "Ruby",
             "Erlang"
         ],
-        "exists_field" : "should_exist1"
-
+        "exists_field" : "should_exist1",
+        "ordered": None
     },
     {
         "_id": "6c0afcf1-e57e-421d-a03d-0c0717ebf843",
@@ -333,7 +334,8 @@ DOCS = [
         "email": "jamesmcdaniel@globoil.com",
         "manager": True,
         "favorites": None,
-        "exists_field" : "should_exist2"
+        "exists_field" : "should_exist2",
+        "ordered": False
     },
     {
         "_id": "954272af-d5ed-4039-a5eb-8ed57e9def01",
@@ -361,7 +363,8 @@ DOCS = [
             "Python"
         ],
         "exists_array" : ["should", "exist", "array1"],
-        "complex_field_value" : "+-(){}[]^~&&*||\"\\/?:!"
+        "complex_field_value" : "+-(){}[]^~&&*||\"\\/?:!",
+        "ordered": True
     },
     {
         "_id": "e900001d-bc48-48a6-9b1a-ac9a1f5d1a03",
@@ -386,7 +389,8 @@ DOCS = [
             "Erlang",
             "Erlang"
         ],
-        "exists_array" : ["should", "exist", "array2"]
+        "exists_array" : ["should", "exist", "array2"],
+        "ordered": 9
     },
     {
         "_id": "b06aadcf-cd0f-4ca6-9f7e-2c993e48d4c4",
@@ -414,7 +418,8 @@ DOCS = [
             "C++",
             "C++"
         ],
-        "exists_object" : {"should": "object"}
+        "exists_object" : {"should": "object"},
+        "ordered": 10000
     },
     {
         "_id": "5b61abc1-a3d3-4092-b9d7-ced90e675536",
@@ -440,7 +445,8 @@ DOCS = [
             "Python",
             "Lisp"
         ],
-        "exists_object" : {"another": "object"}
+        "exists_object" : {"another": "object"},
+        "ordered": "a"
     },
     {
         "_id": "b1e70402-8add-4068-af8f-b4f3d0feb049",
@@ -466,7 +472,8 @@ DOCS = [
             "C",
             "Ruby",
             "Ruby"
-        ]
+        ],
+        "ordered": "A"
     },
     {
         "_id": "c78c529f-0b07-4947-90a6-d6b7ca81da62",
@@ -491,7 +498,8 @@ DOCS = [
             "Erlang",
             "Python",
             "Lisp"
-        ]
+        ],
+        "ordered": "aa"
     }
 ]
 
