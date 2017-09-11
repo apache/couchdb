@@ -24,14 +24,14 @@ class IndexSelectionTests(mango.UserDocsTests):
 
     def test_basic(self):
         resp = self.db.find({"name.last": "A last name"}, explain=True)
-        assert resp["index"]["type"] == "json"
+        self.assertEqual(resp["index"]["type"], "json")
 
     def test_with_and(self):
         resp = self.db.find({
                 "name.first": "Stephanie",
                 "name.last": "This doesn't have to match anything."
             }, explain=True)
-        assert resp["index"]["type"] == "json"
+        self.assertEqual(resp["index"]["type"], "json")
 
     @unittest.skipUnless(mango.has_text_service(), "requires text service")
     def test_with_text(self):
@@ -40,12 +40,12 @@ class IndexSelectionTests(mango.UserDocsTests):
                 "name.first": "Stephanie",
                 "name.last": "This doesn't have to match anything."
             }, explain=True)
-        assert resp["index"]["type"] == "text"
+        self.assertEqual(resp["index"]["type"], "text")
 
     @unittest.skipUnless(mango.has_text_service(), "requires text service")
     def test_no_view_index(self):
         resp = self.db.find({"name.first": "Ohai!"}, explain=True)
-        assert resp["index"]["type"] == "text"
+        self.assertEqual(resp["index"]["type"], "text")
 
     @unittest.skipUnless(mango.has_text_service(), "requires text service")
     def test_with_or(self):
@@ -55,7 +55,7 @@ class IndexSelectionTests(mango.UserDocsTests):
                     {"name.last": "This doesn't have to match anything."}
                 ]
             }, explain=True)
-        assert resp["index"]["type"] == "text"
+        self.assertEqual(resp["index"]["type"], "text")
 
     def test_use_most_columns(self):
         # ddoc id for the age index
@@ -65,22 +65,22 @@ class IndexSelectionTests(mango.UserDocsTests):
                 "name.last": "Something or other",
                 "age": {"$gt": 1}
             }, explain=True)
-        assert resp["index"]["ddoc"] != "_design/" + ddocid
+        self.assertNotEqual(resp["index"]["ddoc"], "_design/" + ddocid)
 
         resp = self.db.find({
                 "name.first": "Stephanie",
                 "name.last": "Something or other",
                 "age": {"$gt": 1}
             }, use_index=ddocid, explain=True)
-        assert resp["index"]["ddoc"] == ddocid
+        self.assertEqual(resp["index"]["ddoc"], ddocid)
 
-    def test_use_most_columns(self):
+    def test_invalid_use_index(self):
         # ddoc id for the age index
         ddocid = "_design/ad3d537c03cd7c6a43cf8dff66ef70ea54c2b40f"
         try:
             self.db.find({}, use_index=ddocid)
         except Exception, e:
-            assert e.response.status_code == 400
+            self.assertEqual(e.response.status_code, 400)
         else:
             raise AssertionError("bad find")
 
@@ -149,9 +149,9 @@ class IndexSelectionTests(mango.UserDocsTests):
         }
         self.db.save_doc(design_doc)
         docs= self.db.find({"age" : 48})
-        assert len(docs) == 1
-        assert docs[0]["name"]["first"] == "Stephanie"
-        assert docs[0]["age"] == 48
+        self.assertEqual(len(docs), 1)
+        self.assertEqual(docs[0]["name"]["first"], "Stephanie")
+        self.assertEqual(docs[0]["age"], 48)
 
 
 @unittest.skipUnless(mango.has_text_service(), "requires text service")
@@ -165,14 +165,14 @@ class MultiTextIndexSelectionTests(mango.UserDocsTests):
 
     def test_view_ok_with_multi_text(self):
         resp = self.db.find({"name.last": "A last name"}, explain=True)
-        assert resp["index"]["type"] == "json"
+        self.assertEqual(resp["index"]["type"], "json")
 
     def test_multi_text_index_is_error(self):
         try:
             self.db.find({"$text": "a query"}, explain=True)
         except Exception, e:
-            assert e.response.status_code == 400
+            self.assertEqual(e.response.status_code, 400)
 
     def test_use_index_works(self):
         resp = self.db.find({"$text": "a query"}, use_index="foo", explain=True)
-        assert resp["index"]["ddoc"] == "_design/foo"
+        self.assertEqual(resp["index"]["ddoc"], "_design/foo")
