@@ -509,34 +509,47 @@ free_space(Path) ->
             length(filename:split(PathA)) > length(filename:split(PathB))
         end,
         disksup:get_disk_data()),
-    free_space_rec(abs_path(Path), DiskData).
+    {ok, Path0} = abs_path(Path),
+    free_space_rec(Path0, DiskData).
 
 free_space_rec(_Path, []) ->
     undefined;
 free_space_rec(Path, [{MountPoint0, Total, Usage} | Rest]) ->
-    MountPoint = abs_path(MountPoint0),
-    case MountPoint =:= string:substr(Path, 1, length(MountPoint)) of
-    false ->
-        free_space_rec(Path, Rest);
-    true ->
-        trunc(Total - (Total * (Usage / 100))) * 1024
+    case abs_path(MountPoint0) of
+    {ok, MountPoint} ->
+        case MountPoint =:= string:substr(Path, 1, length(MountPoint)) of
+        false ->
+            free_space_rec(Path, Rest);
+        true ->
+            trunc(Total - (Total * (Usage / 100))) * 1024
+        end;
+    {error, Reason} ->
+        couch_log:warning("Compaction daemon - unable to calculate free space"
+                        " for `~s`: `~s`",
+                        [MountPoint0, Reason]),
+        free_space_rec(Path, Rest)
     end.
 
 abs_path(Path0) ->
-    {ok, Info} = file:read_link_info(Path0),
-    case Info#file_info.type of
-        symlink ->
-            {ok, Path} = file:read_link(Path0),
-            abs_path(Path);
-        _ ->
-            abs_path2(Path0)
+    case file:read_link_info(Path0) of
+    {ok, Info} ->
+        case Info#file_info.type of
+            symlink ->
+                {ok, Path} = file:read_link(Path0),
+                abs_path(Path);
+            _ ->
+                abs_path2(Path0)
+        end;
+    {error, Reason} ->
+        {error, Reason}
     end.
+
 
 abs_path2(Path0) ->
     Path = filename:absname(Path0),
     case lists:last(Path) of
     $/ ->
-        Path;
+        {ok, Path};
     _ ->
-        Path ++ "/"
+        {ok, Path ++ "/"}
     end.
