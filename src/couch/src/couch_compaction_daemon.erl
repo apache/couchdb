@@ -509,8 +509,8 @@ free_space(Path) ->
             length(filename:split(PathA)) > length(filename:split(PathB))
         end,
         disksup:get_disk_data()),
-    {ok, Path0} = abs_path(Path),
-    free_space_rec(Path0, DiskData).
+    {ok, AbsPath} = abs_path(Path),
+    free_space_rec(AbsPath, DiskData).
 
 free_space_rec(_Path, []) ->
     undefined;
@@ -525,8 +525,8 @@ free_space_rec(Path, [{MountPoint0, Total, Usage} | Rest]) ->
         end;
     {error, Reason} ->
         couch_log:warning("Compaction daemon - unable to calculate free space"
-                        " for `~s`: `~s`",
-                        [MountPoint0, Reason]),
+            " for `~s`: `~s`",
+            [MountPoint0, Reason]),
         free_space_rec(Path, Rest)
     end.
 
@@ -543,7 +543,6 @@ abs_path(Path0) ->
     {error, Reason} ->
         {error, Reason}
     end.
-
 
 abs_path2(Path0) ->
     Path = filename:absname(Path0),
