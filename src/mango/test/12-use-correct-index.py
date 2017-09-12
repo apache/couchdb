@@ -58,42 +58,42 @@ class ChooseCorrectIndexForDocs(mango.DbPerClass):
         self.db.create_index(["name", "age", "user_id"], ddoc="aaa")
         self.db.create_index(["name"], ddoc="zzz")
         explain = self.db.find({"name": "Eddie"}, explain=True)
-        assert explain["index"]["ddoc"] == '_design/zzz'
+        self.assertEqual(explain["index"]["ddoc"], '_design/zzz')
 
     def test_choose_index_with_two(self):
         self.db.create_index(["name", "age", "user_id"], ddoc="aaa")
         self.db.create_index(["name", "age"], ddoc="bbb")
         self.db.create_index(["name"], ddoc="zzz")
         explain = self.db.find({"name": "Eddie", "age":{"$gte": 12}}, explain=True)
-        assert explain["index"]["ddoc"] == '_design/bbb'
+        self.assertEqual(explain["index"]["ddoc"], '_design/bbb')
 
     def test_choose_index_alphabetically(self):
         self.db.create_index(["name", "age", "user_id"], ddoc="aaa")
         self.db.create_index(["name", "age", "location"], ddoc="bbb")
         self.db.create_index(["name"], ddoc="zzz")
         explain = self.db.find({"name": "Eddie", "age": {"$gte": 12}}, explain=True)
-        assert explain["index"]["ddoc"] == '_design/aaa'
+        self.assertEqual(explain["index"]["ddoc"], '_design/aaa')
 
     def test_choose_index_most_accurate(self):
         self.db.create_index(["name", "location", "user_id"], ddoc="aaa")
         self.db.create_index(["name", "age", "user_id"], ddoc="bbb")
         self.db.create_index(["name"], ddoc="zzz")
         explain = self.db.find({"name": "Eddie", "age": {"$gte": 12}}, explain=True)
-        assert explain["index"]["ddoc"] == '_design/bbb'
+        self.assertEqual(explain["index"]["ddoc"], '_design/bbb')
     
     def test_choose_index_most_accurate_in_memory_selector(self):
         self.db.create_index(["name", "location", "user_id"], ddoc="aaa")
         self.db.create_index(["name", "age", "user_id"], ddoc="bbb")
         self.db.create_index(["name"], ddoc="zzz")
         explain = self.db.find({"name": "Eddie", "number": {"$lte": 12}}, explain=True)
-        assert explain["index"]["ddoc"] == '_design/zzz'
+        self.assertEqual(explain["index"]["ddoc"], '_design/zzz')
 
     def test_warn_on_full_db_scan(self):
         selector = {"not_indexed":"foo"}
         explain_resp = self.db.find(selector, explain=True, return_raw=True)
-        assert explain_resp["index"]["type"] == "special"
+        self.assertEqual(explain_resp["index"]["type"], "special")
         resp = self.db.find(selector, return_raw=True)
-        assert resp["warning"] == "no matching index found, create an index to optimize query time"
+        self.assertEqual(resp["warning"], "no matching index found, create an index to optimize query time")
 
     def test_chooses_idxA(self):
         DOCS2 = [
@@ -104,4 +104,4 @@ class ChooseCorrectIndexForDocs(mango.DbPerClass):
         self.db.create_index(["a", "b", "c"])
         self.db.create_index(["a", "d", "e"])
         explain = self.db.find({"a": {"$gt": 0}, "b": {"$gt": 0}, "c": {"$gt": 0}}, explain=True)
-        assert explain["index"]["def"]["fields"] == [{'a': 'asc'}, {'b': 'asc'}, {'c': 'asc'}]
+        self.assertEqual(explain["index"]["def"]["fields"], [{'a': 'asc'}, {'b': 'asc'}, {'c': 'asc'}])
