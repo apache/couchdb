@@ -118,7 +118,8 @@ execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFu
                     {_Go, FinalUserAcc} = UserFun(Arg, LastCursor#cursor.user_acc),
                     Stats0 = LastCursor#cursor.execution_stats,
                     FinalUserAcc0 = mango_execution_stats:maybe_add_stats(Opts, UserFun, Stats0, FinalUserAcc),
-                    {ok, FinalUserAcc0};
+                    FinalUserAcc1 = mango_cursor:maybe_add_warning(UserFun, Idx, FinalUserAcc0),
+                    {ok, FinalUserAcc1};
                 {error, Reason} ->
                     {error, Reason}
             end
