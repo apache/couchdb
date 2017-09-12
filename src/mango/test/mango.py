@@ -84,7 +84,7 @@ class Database(object):
         r.raise_for_status()
         return r.json()
 
-    def create_index(self, fields, idx_type="json", name=None, ddoc=None):
+    def create_index(self, fields, idx_type="json", name=None, ddoc=None, selector=None):
         body = {
             "index": {
                 "fields": fields
@@ -96,8 +96,11 @@ class Database(object):
             body["name"] = name
         if ddoc is not None:
             body["ddoc"] = ddoc
+        if selector is not None:
+            body["index"]["selector"] = selector
         body = json.dumps(body)
         r = self.sess.post(self.path("_index"), data=body)
+        print r.json()
         r.raise_for_status()
         assert r.json()["id"] is not None
         assert r.json()["name"] is not None
@@ -180,6 +183,7 @@ class Database(object):
         else:
             path = self.path("_find")
         r = self.sess.post(path, data=body)
+        print r.json()
         r.raise_for_status()
         if explain or return_raw:
             return r.json()

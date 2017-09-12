@@ -90,7 +90,7 @@ execute(#cursor{index=Idx}=Cursor, UserFun, UserAcc) ->
 maybe_filter_indexes(Indexes, Opts) ->
     case lists:keyfind(use_index, 1, Opts) of
         {use_index, []} ->
-            Indexes;
+            remove_indexes_with_selector(Indexes);
         {use_index, [DesignId]} ->
             filter_indexes(Indexes, DesignId);
         {use_index, [DesignId, ViewName]} ->
@@ -112,6 +112,16 @@ filter_indexes(Indexes, DesignId0) ->
 filter_indexes(Indexes0, DesignId, ViewName) ->
     Indexes = filter_indexes(Indexes0, DesignId),
     FiltFun = fun(I) -> mango_idx:name(I) == ViewName end,
+    lists:filter(FiltFun, Indexes).
+
+
+remove_indexes_with_selector(Indexes) ->
+    FiltFun = fun(Idx) -> 
+        case mango_idx:get_idx_selector(Idx) of
+            undefined -> true;
+            _ -> false
+        end
+    end,
     lists:filter(FiltFun, Indexes).
 
 
