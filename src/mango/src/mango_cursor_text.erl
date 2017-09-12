@@ -124,7 +124,8 @@ execute(Cursor, UserFun, UserAcc) ->
             Arg = {add_key, bookmark, JsonBM},
             {_Go, FinalUserAcc} = UserFun(Arg, LastUserAcc),
             FinalUserAcc0 = mango_execution_stats:maybe_add_stats(Opts, UserFun, Stats0, FinalUserAcc),
-            {ok, FinalUserAcc0}
+            FinalUserAcc1 = mango_cursor:maybe_add_warning(UserFun, Idx, FinalUserAcc0),
+            {ok, FinalUserAcc1}
     end.
 
 

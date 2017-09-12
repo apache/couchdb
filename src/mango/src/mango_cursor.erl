@@ -17,13 +17,15 @@
     create/3,
     explain/1,
     execute/3,
-    maybe_filter_indexes/2
+    maybe_filter_indexes/2,
+    maybe_add_warning/3
 ]).
 
 
 -include_lib("couch/include/couch_db.hrl").
 -include("mango.hrl").
 -include("mango_cursor.hrl").
+-include("mango_idx.hrl").
 
 
 -ifdef(HAVE_DREYFUS).
@@ -134,3 +136,14 @@ group_indexes_by_type(Indexes) ->
                 []
         end
     end, ?CURSOR_MODULES).
+
+
+maybe_add_warning(UserFun, #idx{type = IndexType}, UserAcc) ->
+    case IndexType of
+        <<"special">> ->
+            Arg = {add_key, warning, <<"no matching index found, create an index to optimize query time">>},
+            {_Go, UserAcc0} = UserFun(Arg, UserAcc),
+            UserAcc0;
+        _ ->
+            UserAcc
+    end.
