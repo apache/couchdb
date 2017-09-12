@@ -88,6 +88,13 @@ class ChooseCorrectIndexForDocs(mango.DbPerClass):
         explain = self.db.find({"name": "Eddie", "number": {"$lte": 12}}, explain=True)
         assert explain["index"]["ddoc"] == '_design/zzz'
 
+    def test_warn_on_full_db_scan(self):
+        selector = {"not_indexed":"foo"}
+        explain_resp = self.db.find(selector, explain=True, return_raw=True)
+        assert explain_resp["index"]["type"] == "special"
+        resp = self.db.find(selector, return_raw=True)
+        assert resp["warning"] == "no matching index found, create an index to optimize query time"
+
     def test_chooses_idxA(self):
         DOCS2 = [
             {"a":1, "b":1, "c":1},
