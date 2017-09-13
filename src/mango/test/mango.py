@@ -100,7 +100,6 @@ class Database(object):
             body["index"]["selector"] = selector
         body = json.dumps(body)
         r = self.sess.post(self.path("_index"), data=body)
-        print r.json()
         r.raise_for_status()
         assert r.json()["id"] is not None
         assert r.json()["name"] is not None
@@ -123,7 +122,7 @@ class Database(object):
         if index_array_lengths is not None:
             body["index"]["index_array_lengths"] = index_array_lengths
         if selector is not None:
-            body["selector"] = selector
+            body["index"]["selector"] = selector
         if fields is not None:
             body["index"]["fields"] = fields
         if ddoc is not None:
@@ -183,7 +182,6 @@ class Database(object):
         else:
             path = self.path("_find")
         r = self.sess.post(path, data=body)
-        print r.json()
         r.raise_for_status()
         if explain or return_raw:
             return r.json()
