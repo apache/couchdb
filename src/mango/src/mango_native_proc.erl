@@ -139,27 +139,24 @@ get_index_entries({IdxProps}, Doc) ->
         [] -> {[]};
         Else -> Else
     end,
-    Values = get_index_values(Fields, Selector, Doc),
+    Values = get_index_values(Fields, Doc),
     case lists:member(not_found, Values) of
         true ->
             [];
         false ->
-            [[Values, null]]
+            case should_index(Selector, Doc) of
+                true -> [[Values, null]];
+                false -> []
+            end
     end.
 
 
-get_index_values(Fields, Selector, Doc) ->
+get_index_values(Fields, Doc) ->
     lists:map(fun({Field, _Dir}) ->
         case mango_doc:get_field(Doc, Field) of
-            not_found -> 
-                not_found;
-            bad_path -> 
-                not_found;
-            Value -> 
-                case should_index(Selector, Doc) of
-                    true -> Value;
-                    false -> not_found
-                end
+            not_found -> not_found;
+            bad_path -> not_found;
+            Value -> Value
         end
     end, Fields).
 

@@ -122,7 +122,7 @@ class IndexSelectorJson(mango.DbPerClass):
         self.assertEqual(indexes[1]["def"]["selector"], selector)
 
     @unittest.skipUnless(mango.has_text_service(), "requires text service")
-    def test_uses_partial_index_for_query_selector(self):
+    def test_text_uses_partial_index_for_query_selector(self):
         selector = {"location": {"$gte": "FRA"}}
         self.db.create_text_index(["location"], selector=selector, ddoc="Selected", name="Selected")
         resp = self.db.find(selector, explain=True, use_index='Selected')
@@ -131,7 +131,7 @@ class IndexSelectorJson(mango.DbPerClass):
         self.assertEqual(len(docs), 3)
 
     @unittest.skipUnless(mango.has_text_service(), "requires text service")
-    def test_uses_partial_index_with_different_selector(self):
+    def test_text_uses_partial_index_with_different_selector(self):
         selector = {"location": {"$gte": "FRA"}}
         selector2 = {"location": {"$gte": "A"}}
         self.db.create_text_index(["location"], selector=selector, ddoc="Selected", name="Selected")
@@ -141,14 +141,14 @@ class IndexSelectorJson(mango.DbPerClass):
         self.assertEqual(len(docs), 3)
 
     @unittest.skipUnless(mango.has_text_service(), "requires text service")
-    def test_doesnot_use_selector_when_not_specified(self):
+    def test_text_doesnot_use_selector_when_not_specified(self):
         selector = {"location": {"$gte": "FRA"}}
         self.db.create_text_index(["location"], selector=selector, ddoc="Selected", name="Selected")
         resp = self.db.find(selector, explain=True)
         self.assertEqual(resp["index"]["name"], "_all_docs")
 
     @unittest.skipUnless(mango.has_text_service(), "requires text service")
-    def test_doesnot_use_selector_when_not_specified_with_index(self):
+    def test_text_doesnot_use_selector_when_not_specified_with_index(self):
         selector = {"location": {"$gte": "FRA"}}
         self.db.create_text_index(["location"], selector=selector, ddoc="Selected", name="Selected")
         self.db.create_text_index(["location"], name="NotSelected")
