@@ -139,14 +139,14 @@ get_index_entries({IdxProps}, Doc) ->
         [] -> {[]};
         Else -> Else
     end,
-    Values = get_index_values(Fields, Doc),
-    case lists:member(not_found, Values) of
-        true ->
+    case should_index(Selector, Doc) of
+        false -> 
             [];
-        false ->
-            case should_index(Selector, Doc) of
-                true -> [[Values, null]];
-                false -> []
+        true -> 
+            Values = get_index_values(Fields, Doc),
+            case lists:member(not_found, Values) of
+                true -> [];
+                false -> [[Values, null]]
             end
     end.
 
