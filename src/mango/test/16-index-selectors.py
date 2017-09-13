@@ -117,14 +117,14 @@ class IndexSelectorJson(mango.DbPerClass):
     @unittest.skipUnless(mango.has_text_service(), "requires text service")
     def test_text_saves_selector_in_index(self):
         selector = {"location": {"$gte": "FRA"}}
-        self.db.create_text_index(["location"], selector=selector)
+        self.db.create_text_index(fields=[{"name":"location", "type":"string"}], selector=selector)
         indexes = self.db.list_indexes()
         self.assertEqual(indexes[1]["def"]["selector"], selector)
 
     @unittest.skipUnless(mango.has_text_service(), "requires text service")
     def test_text_uses_partial_index_for_query_selector(self):
         selector = {"location": {"$gte": "FRA"}}
-        self.db.create_text_index(["location"], selector=selector, ddoc="Selected", name="Selected")
+        self.db.create_text_index(fields=[{"name":"location", "type":"string"}], selector=selector, ddoc="Selected", name="Selected")
         resp = self.db.find(selector, explain=True, use_index='Selected')
         self.assertEqual(resp["index"]["name"], "Selected")
         docs = self.db.find(selector, use_index='Selected', fields=['_id', 'location'])
@@ -134,7 +134,7 @@ class IndexSelectorJson(mango.DbPerClass):
     def test_text_uses_partial_index_with_different_selector(self):
         selector = {"location": {"$gte": "FRA"}}
         selector2 = {"location": {"$gte": "A"}}
-        self.db.create_text_index(["location"], selector=selector, ddoc="Selected", name="Selected")
+        self.db.create_text_index(fields=[{"name":"location", "type":"string"}], selector=selector, ddoc="Selected", name="Selected")
         resp = self.db.find(selector2, explain=True, use_index='Selected')
         self.assertEqual(resp["index"]["name"], "Selected")
         docs = self.db.find(selector2, use_index='Selected')
@@ -143,14 +143,14 @@ class IndexSelectorJson(mango.DbPerClass):
     @unittest.skipUnless(mango.has_text_service(), "requires text service")
     def test_text_doesnot_use_selector_when_not_specified(self):
         selector = {"location": {"$gte": "FRA"}}
-        self.db.create_text_index(["location"], selector=selector, ddoc="Selected", name="Selected")
+        self.db.create_text_index(fields=[{"name":"location", "type":"string"}], selector=selector, ddoc="Selected", name="Selected")
         resp = self.db.find(selector, explain=True)
         self.assertEqual(resp["index"]["name"], "_all_docs")
 
     @unittest.skipUnless(mango.has_text_service(), "requires text service")
     def test_text_doesnot_use_selector_when_not_specified_with_index(self):
         selector = {"location": {"$gte": "FRA"}}
-        self.db.create_text_index(["location"], selector=selector, ddoc="Selected", name="Selected")
-        self.db.create_text_index(["location"], name="NotSelected")
+        self.db.create_text_index(fields=[{"name":"location", "type":"string"}], selector=selector, ddoc="Selected", name="Selected")
+        self.db.create_text_index(fields=[{"name":"location", "type":"string"}], name="NotSelected")
         resp = self.db.find(selector, explain=True)
         self.assertEqual(resp["index"]["name"], "NotSelected")
