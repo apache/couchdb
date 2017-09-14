@@ -135,7 +135,7 @@ index_doc(#st{indexes=Indexes}, Doc) ->
 
 get_index_entries({IdxProps}, Doc) ->
     {Fields} = couch_util:get_value(<<"fields">>, IdxProps),
-    Selector = get_index_selector(IdxProps),
+    Selector = get_index_partial_filter_selector(IdxProps),
     case should_index(Selector, Doc) of
         false -> 
             [];
@@ -159,7 +159,7 @@ get_index_values(Fields, Doc) ->
 
 
 get_text_entries({IdxProps}, Doc) ->
-    Selector = get_index_selector(IdxProps),
+    Selector = get_index_partial_filter_selector(IdxProps),
     case should_index(Selector, Doc) of
         true ->
             get_text_entries0(IdxProps, Doc);
@@ -168,10 +168,19 @@ get_text_entries({IdxProps}, Doc) ->
     end.
 
 
-get_index_selector(IdxProps) ->
-    case couch_util:get_value(<<"selector">>, IdxProps) of
-        [] -> {[]};
-        Else -> Else
+get_index_partial_filter_selector(IdxProps) ->
+    case couch_util:get_value(<<"partial_filter_selector">>, IdxProps) of
+        undefined ->
+            case couch_util:get_value(<<"selector">>, IdxProps, []) of
+                [] -> 
+                    {[]};
+                Else -> 
+                    Else
+            end;
+        [] -> 
+            {[]};
+        Else -> 
+            Else
     end.
 
 

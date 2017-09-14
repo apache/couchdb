@@ -199,8 +199,8 @@ opts() ->
             {tag, fields},
             {validator, fun mango_opts:validate_sort/1}
         ]},
-        {<<"selector">>, [
-            {tag, selector},
+        {<<"partial_filter_selector">>, [
+            {tag, partial_filter_selector},
             {optional, true},
             {default, {[]}},
             {validator, fun mango_opts:validate_selector/1}
