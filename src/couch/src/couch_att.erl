@@ -413,13 +413,21 @@ follow_from_json(Att, Props) ->
 
 inline_from_json(Att, Props) ->
     B64Data = couch_util:get_value(<<"data">>, Props),
-    Data = base64:decode(B64Data),
-    Length = size(Data),
-    RevPos = couch_util:get_value(<<"revpos">>, Props, 0),
-    store([
-        {data, Data}, {revpos, RevPos}, {disk_len, Length},
-        {att_len, Length}
-    ], Att).
+    try base64:decode(B64Data) of
+        Data ->
+            Length = size(Data),
+            RevPos = couch_util:get_value(<<"revpos">>, Props, 0),
+            store([
+                {data, Data}, {revpos, RevPos}, {disk_len, Length},
+                {att_len, Length}
+            ], Att)
+    catch
+        _:_ ->
+            Name = fetch(name, Att),
+            ErrMsg =  <<"Invalid attachment data for ", Name/binary>>,
+            throw({bad_request, ErrMsg})
+    end.
+
 
 
 encoded_lengths_from_json(Props) ->
@@ -787,8 +795,37 @@ attachment_disk_term_test_() ->
 
 
 attachment_json_term_test_() ->
-    %% We need to create a few variations including stubs and inline data.
-    {"JSON term tests", []}.
+    Props = [
+        {<<"content_type">>, <<"application/json">>},
+        {<<"digest">>, <<"md5-QCNtWUNXV0UzJnEjMk92YUk1JA==">>},
+        {<<"length">>, 14},
+        {<<"revpos">>, 1}
+    ],
+    PropsInline = [{<<"data">>, <<"eyJhbnN3ZXIiOiA0Mn0=">>}] ++ Props,
+    InvalidProps = [{<<"data">>, <<"!Base64Encoded$">>}] ++ Props,
+    Att = couch_att:new([
+        {name, <<"attachment.json">>},
+        {type, <<"application/json">>}
+    ]),
+    ResultStub = couch_att:new([
+        {name, <<"attachment.json">>},
+        {type, <<"application/json">>},
+        {att_len, 14},
+        {disk_len, 14},
+        {md5, <<"@#mYCWWE3&q#2OvaI5$">>},
+        {revpos, 1},
+        {data, stub},
+        {encoding, identity}
+    ]),
+    ResultFollows = ResultStub#att{data = follows},
+    ResultInline = ResultStub#att{md5 = <<>>, data = <<"{\"answer\": 42}">>},
+    {"JSON term tests", [
+        ?_assertEqual(ResultStub, stub_from_json(Att, Props)),
+        ?_assertEqual(ResultFollows, follow_from_json(Att, Props)),
+        ?_assertEqual(ResultInline, inline_from_json(Att, PropsInline)),
+        ?_assertThrow({bad_request, _}, inline_from_json(Att, Props)),
+        ?_assertThrow({bad_request, _}, inline_from_json(Att, InvalidProps))
+    ]}.
 
 
 attachment_stub_merge_test_() ->

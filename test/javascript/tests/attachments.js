@@ -33,6 +33,24 @@ couchTests.attachments= function(debug) {
   var save_response = db.save(binAttDoc);
   T(save_response.ok);
 
+  var badAttDoc = {
+    _id: "bad_doc",
+    _attachments: {
+      "foo.txt": {
+        content_type: "text/plain",
+        data: "notBase64Encoded="
+      }
+    }
+  };
+
+  try {
+    db.save(badAttDoc);
+    T(false && "Shouldn't get here!");
+  } catch (e) {
+    TEquals("bad_request", e.error);
+    TEquals("Invalid attachment data for foo.txt", e.message);
+  }
+
   var xhr = CouchDB.request("GET", "/" + db_name + "/bin_doc/foo.txt");
   T(xhr.responseText == "This is a base64 encoded text");
   T(xhr.getResponseHeader("Content-Type") == "application/octet-stream");
