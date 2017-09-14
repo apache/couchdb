@@ -135,31 +135,43 @@ index_doc(#st{indexes=Indexes}, Doc) ->
 
 get_index_entries({IdxProps}, Doc) ->
     {Fields} = couch_util:get_value(<<"fields">>, IdxProps),
-    Values = lists:map(fun({Field, _Dir}) ->
-        case mango_doc:get_field(Doc, Field) of
-            not_found -> not_found;
-            bad_path -> not_found;
-            Else -> Else
-        end
-    end, Fields),
-    case lists:member(not_found, Values) of
-        true ->
+    Selector = get_index_selector(IdxProps),
+    case should_index(Selector, Doc) of
+        false -> 
             [];
-        false ->
-            [[Values, null]]
+        true -> 
+            Values = get_index_values(Fields, Doc),
+            case lists:member(not_found, Values) of
+                true -> [];
+                false -> [[Values, null]]
+            end
     end.
 
 
+get_index_values(Fields, Doc) ->
+    lists:map(fun({Field, _Dir}) ->
+        case mango_doc:get_field(Doc, Field) of
+            not_found -> not_found;
+            bad_path -> not_found;
+            Value -> Value
+        end
+    end, Fields).
+
+
 get_text_entries({IdxProps}, Doc) ->
-    Selector = case couch_util:get_value(<<"selector">>, IdxProps) of
-        [] -> {[]};
-        Else -> Else
-    end,
+    Selector = get_index_selector(IdxProps),
     case should_index(Selector, Doc) of
         true ->
             get_text_entries0(IdxProps, Doc);
         false ->
             []
+    end.
+
+
+get_index_selector(IdxProps) ->
+    case couch_util:get_value(<<"selector">>, IdxProps) of
+        [] -> {[]};
+        Else -> Else
     end.
 
 

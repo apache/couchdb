@@ -43,7 +43,8 @@
     idx_mod/1,
     to_json/1,
     delete/4,
-    get_usable_indexes/3
+    get_usable_indexes/3,
+    get_idx_selector/1
 ]).
 
 
@@ -64,7 +65,7 @@ get_usable_indexes(Db, Selector0, Opts) ->
         ?MANGO_ERROR({no_usable_index, no_indexes_defined})
     end,
 
-    FilteredIndexes = mango_cursor:maybe_filter_indexes(ExistingIndexes, Opts),
+    FilteredIndexes = mango_cursor:maybe_filter_indexes_by_ddoc(ExistingIndexes, Opts),
     if FilteredIndexes /= [] -> ok; true ->
         ?MANGO_ERROR({no_usable_index, no_index_matching_name})
     end,
@@ -365,5 +366,15 @@ filter_opts([{w, _} | Rest]) ->
     filter_opts(Rest);
 filter_opts([Opt | Rest]) ->
     [Opt | filter_opts(Rest)].
+
+
+get_idx_selector(#idx{def = Def}) when Def =:= all_docs; Def =:= undefined ->
+    undefined;
+get_idx_selector(#idx{def = {Def}}) ->
+    case proplists:get_value(<<"selector">>, Def) of
+        undefined -> undefined;
+        {[]} -> undefined;
+        Selector -> Selector
+    end.
 
 
