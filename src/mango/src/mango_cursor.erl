@@ -17,7 +17,7 @@
     create/3,
     explain/1,
     execute/3,
-    maybe_filter_indexes/2,
+    maybe_filter_indexes_by_ddoc/2,
     maybe_add_warning/3
 ]).
 
@@ -87,9 +87,11 @@ execute(#cursor{index=Idx}=Cursor, UserFun, UserAcc) ->
     Mod:execute(Cursor, UserFun, UserAcc).
 
 
-maybe_filter_indexes(Indexes, Opts) ->
+maybe_filter_indexes_by_ddoc(Indexes, Opts) ->
     case lists:keyfind(use_index, 1, Opts) of
         {use_index, []} ->
+            %We remove any indexes that have a selector 
+            % since they are only used when specified via use_index
             remove_indexes_with_selector(Indexes);
         {use_index, [DesignId]} ->
             filter_indexes(Indexes, DesignId);
