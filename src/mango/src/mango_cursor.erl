@@ -17,7 +17,7 @@
     create/3,
     explain/1,
     execute/3,
-    maybe_filter_indexes/2,
+    maybe_filter_indexes_by_ddoc/2,
     maybe_add_warning/3
 ]).
 
@@ -87,10 +87,12 @@ execute(#cursor{index=Idx}=Cursor, UserFun, UserAcc) ->
     Mod:execute(Cursor, UserFun, UserAcc).
 
 
-maybe_filter_indexes(Indexes, Opts) ->
+maybe_filter_indexes_by_ddoc(Indexes, Opts) ->
     case lists:keyfind(use_index, 1, Opts) of
         {use_index, []} ->
-            Indexes;
+            %We remove any indexes that have a selector 
+            % since they are only used when specified via use_index
+            remove_indexes_with_selector(Indexes);
         {use_index, [DesignId]} ->
             filter_indexes(Indexes, DesignId);
         {use_index, [DesignId, ViewName]} ->
@@ -112,6 +114,16 @@ filter_indexes(Indexes, DesignId0) ->
 filter_indexes(Indexes0, DesignId, ViewName) ->
     Indexes = filter_indexes(Indexes0, DesignId),
     FiltFun = fun(I) -> mango_idx:name(I) == ViewName end,
+    lists:filter(FiltFun, Indexes).
+
+
+remove_indexes_with_selector(Indexes) ->
+    FiltFun = fun(Idx) -> 
+        case mango_idx:get_idx_selector(Idx) of
+            undefined -> true;
+            _ -> false
+        end
+    end,
     lists:filter(FiltFun, Indexes).
 
 
