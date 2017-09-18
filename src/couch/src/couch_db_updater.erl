@@ -1342,7 +1342,8 @@ copy_docs(Db, #db{fd = DestFd} = NewDb, MixedInfos, Retry) ->
             NewDb#db.seq_tree, NewInfos, RemoveSeqs),
 
     EMSortFd = couch_emsort:get_fd(NewDb#db.id_tree),
-    {ok, LocSizes} = couch_file:append_terms(EMSortFd, NewInfos),
+    EMOpts = [{compression, none}],
+    {ok, LocSizes} = couch_file:append_terms(EMSortFd, NewInfos, EMOpts),
     EMSortEntries = lists:zipwith(fun(FDI, {Loc, _}) ->
         #full_doc_info{
             id = Id,

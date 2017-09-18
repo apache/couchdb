@@ -216,7 +216,8 @@ write_kvs(Ems, KVs) ->
     lists:foldr(fun(KV, Acc) ->
         append_item(Ems, Acc, KV, Ems#ems.chain_chunk)
     end, {[], nil}, lists:sort(KVs)),
-    {ok, Final, _} = couch_file:append_term(Ems#ems.fd, {LastKVs, LastPos}),
+    {ok, Final, _} = couch_file:append_term(Ems#ems.fd, {LastKVs, LastPos},
+        [{compression, none}]),
     Final.
 
 
@@ -263,7 +264,8 @@ merge_chains(Ems, Choose, BB) ->
 
 
 merge_chains(Ems, _Choose, [], ChainAcc) ->
-    {ok, CPos, _} = couch_file:append_term(Ems#ems.fd, ChainAcc),
+    {ok, CPos, _} = couch_file:append_term(Ems#ems.fd, ChainAcc,
+        [{compression, none}]),
     CPos;
 merge_chains(#ems{chain_chunk=CC}=Ems, Choose, Chains, Acc) ->
     {KV, RestChains} = choose_kv(Choose, Ems, Chains),
@@ -311,7 +313,8 @@ ins_big_chain(Rest, Chain, Acc) ->
 
 
 append_item(Ems, {List, Prev}, Pos, Size) when length(List) >= Size ->
-    {ok, PrevList, _} = couch_file:append_term(Ems#ems.fd, {List, Prev}),
+    {ok, PrevList, _} = couch_file:append_term(Ems#ems.fd, {List, Prev},
+        [{compression, none}]),
     {[Pos], PrevList};
 append_item(_Ems, {List, Prev}, Pos, _Size) ->
     {[Pos | List], Prev}.
