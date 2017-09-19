@@ -84,7 +84,7 @@ class Database(object):
         r.raise_for_status()
         return r.json()
 
-    def create_index(self, fields, idx_type="json", name=None, ddoc=None):
+    def create_index(self, fields, idx_type="json", name=None, ddoc=None, selector=None):
         body = {
             "index": {
                 "fields": fields
@@ -96,6 +96,8 @@ class Database(object):
             body["name"] = name
         if ddoc is not None:
             body["ddoc"] = ddoc
+        if selector is not None:
+            body["index"]["selector"] = selector
         body = json.dumps(body)
         r = self.sess.post(self.path("_index"), data=body)
         r.raise_for_status()
@@ -120,7 +122,7 @@ class Database(object):
         if index_array_lengths is not None:
             body["index"]["index_array_lengths"] = index_array_lengths
         if selector is not None:
-            body["selector"] = selector
+            body["index"]["selector"] = selector
         if fields is not None:
             body["index"]["fields"] = fields
         if ddoc is not None:
@@ -224,6 +226,17 @@ class UserDocsTests(DbPerClass):
     def setUpClass(klass):
         super(UserDocsTests, klass).setUpClass()
         user_docs.setup(klass.db)
+
+
+class UserDocsTestsNoIndexes(DbPerClass):
+
+    @classmethod
+    def setUpClass(klass):
+        super(UserDocsTestsNoIndexes, klass).setUpClass()
+        user_docs.setup(
+                    klass.db,
+                    index_type="_all_docs"
+            )
 
 
 class UserDocsTextTests(DbPerClass):

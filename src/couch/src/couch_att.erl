@@ -50,6 +50,11 @@
     downgrade/1
 ]).
 
+-export([
+    max_attachment_size/0,
+    validate_attachment_size/3
+]).
+
 -compile(nowarn_deprecated_type).
 -export_type([att/0]).
 
@@ -408,13 +413,21 @@ follow_from_json(Att, Props) ->
 
 inline_from_json(Att, Props) ->
     B64Data = couch_util:get_value(<<"data">>, Props),
-    Data = base64:decode(B64Data),
-    Length = size(Data),
-    RevPos = couch_util:get_value(<<"revpos">>, Props, 0),
-    store([
-        {data, Data}, {revpos, RevPos}, {disk_len, Length},
-        {att_len, Length}
-    ], Att).
+    try base64:decode(B64Data) of
+        Data ->
+            Length = size(Data),
+            RevPos = couch_util:get_value(<<"revpos">>, Props, 0),
+            store([
+                {data, Data}, {revpos, RevPos}, {disk_len, Length},
+                {att_len, Length}
+            ], Att)
+    catch
+        _:_ ->
+            Name = fetch(name, Att),
+            ErrMsg =  <<"Invalid attachment data for ", Name/binary>>,
+            throw({bad_request, ErrMsg})
+    end.
+
 
 
 encoded_lengths_from_json(Props) ->
@@ -500,6 +513,8 @@ flush_data(Fd, Data, Att) when is_binary(Data) ->
         couch_stream:write(OutputStream, Data)
     end);
 flush_data(Fd, Fun, Att) when is_function(Fun) ->
+    AttName = fetch(name, Att),
+    MaxAttSize = max_attachment_size(),
     case fetch(att_len, Att) of
         undefined ->
             couch_db:with_stream(Fd, Att, fun(OutputStream) ->
@@ -510,7 +525,7 @@ flush_data(Fd, Fun, Att) when is_function(Fun) ->
                     % WriterFun({0, _Footers}, State)
                     % Called with Length == 0 on the last time.
                     % WriterFun returns NewState.
-                    fun({0, Footers}, _) ->
+                    fun({0, Footers}, _Total) ->
                         F = mochiweb_headers:from_binary(Footers),
                         case mochiweb_headers:get_value("Content-MD5", F) of
                         undefined ->
@@ -518,11 +533,15 @@ flush_data(Fd, Fun, Att) when is_function(Fun) ->
                         Md5 ->
                             {md5, base64:decode(Md5)}
                         end;
-                    ({_Length, Chunk}, _) ->
-                        couch_stream:write(OutputStream, Chunk)
-                    end, ok)
+                    ({Length, Chunk}, Total0) ->
+                        Total = Total0 + Length,
+                        validate_attachment_size(AttName, Total, MaxAttSize),
+                        couch_stream:write(OutputStream, Chunk),
+                        Total
+                    end, 0)
             end);
         AttLen ->
+            validate_attachment_size(AttName, AttLen, MaxAttSize),
             couch_db:with_stream(Fd, Att, fun(OutputStream) ->
                 write_streamed_attachment(OutputStream, Fun, AttLen)
             end)
@@ -680,6 +699,22 @@ upgrade_encoding(false) -> identity;
 upgrade_encoding(Encoding) -> Encoding.
 
 
+max_attachment_size() ->
+    case config:get("couchdb", "max_attachment_size", "infinity") of
+        "infinity" ->
+            infinity;
+        MaxAttSize ->
+            list_to_integer(MaxAttSize)
+    end.
+
+
+validate_attachment_size(AttName, AttSize, MaxAttSize)
+        when is_integer(AttSize),  AttSize > MaxAttSize ->
+    throw({request_entity_too_large, {attachment, AttName}});
+validate_attachment_size(_AttName, _AttSize, _MAxAttSize) ->
+    ok.
+
+
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
@@ -760,8 +795,37 @@ attachment_disk_term_test_() ->
 
 
 attachment_json_term_test_() ->
-    %% We need to create a few variations including stubs and inline data.
-    {"JSON term tests", []}.
+    Props = [
+        {<<"content_type">>, <<"application/json">>},
+        {<<"digest">>, <<"md5-QCNtWUNXV0UzJnEjMk92YUk1JA==">>},
+        {<<"length">>, 14},
+        {<<"revpos">>, 1}
+    ],
+    PropsInline = [{<<"data">>, <<"eyJhbnN3ZXIiOiA0Mn0=">>}] ++ Props,
+    InvalidProps = [{<<"data">>, <<"!Base64Encoded$">>}] ++ Props,
+    Att = couch_att:new([
+        {name, <<"attachment.json">>},
+        {type, <<"application/json">>}
+    ]),
+    ResultStub = couch_att:new([
+        {name, <<"attachment.json">>},
+        {type, <<"application/json">>},
+        {att_len, 14},
+        {disk_len, 14},
+        {md5, <<"@#mYCWWE3&q#2OvaI5$">>},
+        {revpos, 1},
+        {data, stub},
+        {encoding, identity}
+    ]),
+    ResultFollows = ResultStub#att{data = follows},
+    ResultInline = ResultStub#att{md5 = <<>>, data = <<"{\"answer\": 42}">>},
+    {"JSON term tests", [
+        ?_assertEqual(ResultStub, stub_from_json(Att, Props)),
+        ?_assertEqual(ResultFollows, follow_from_json(Att, Props)),
+        ?_assertEqual(ResultInline, inline_from_json(Att, PropsInline)),
+        ?_assertThrow({bad_request, _}, inline_from_json(Att, Props)),
+        ?_assertThrow({bad_request, _}, inline_from_json(Att, InvalidProps))
+    ]}.
 
 
 attachment_stub_merge_test_() ->

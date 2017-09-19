@@ -17,13 +17,15 @@
     create/3,
     explain/1,
     execute/3,
-    maybe_filter_indexes/2
+    maybe_filter_indexes_by_ddoc/2,
+    maybe_add_warning/3
 ]).
 
 
 -include_lib("couch/include/couch_db.hrl").
 -include("mango.hrl").
 -include("mango_cursor.hrl").
+-include("mango_idx.hrl").
 
 
 -ifdef(HAVE_DREYFUS).
@@ -85,10 +87,12 @@ execute(#cursor{index=Idx}=Cursor, UserFun, UserAcc) ->
     Mod:execute(Cursor, UserFun, UserAcc).
 
 
-maybe_filter_indexes(Indexes, Opts) ->
+maybe_filter_indexes_by_ddoc(Indexes, Opts) ->
     case lists:keyfind(use_index, 1, Opts) of
         {use_index, []} ->
-            Indexes;
+            %We remove any indexes that have a selector 
+            % since they are only used when specified via use_index
+            remove_indexes_with_selector(Indexes);
         {use_index, [DesignId]} ->
             filter_indexes(Indexes, DesignId);
         {use_index, [DesignId, ViewName]} ->
@@ -113,6 +117,16 @@ filter_indexes(Indexes0, DesignId, ViewName) ->
     lists:filter(FiltFun, Indexes).
 
 
+remove_indexes_with_selector(Indexes) ->
+    FiltFun = fun(Idx) -> 
+        case mango_idx:get_idx_selector(Idx) of
+            undefined -> true;
+            _ -> false
+        end
+    end,
+    lists:filter(FiltFun, Indexes).
+
+
 create_cursor(Db, Indexes, Selector, Opts) ->
     [{CursorMod, CursorModIndexes} | _] = group_indexes_by_type(Indexes),
     CursorMod:create(Db, CursorModIndexes, Selector, Opts).
@@ -134,3 +148,14 @@ group_indexes_by_type(Indexes) ->
                 []
         end
     end, ?CURSOR_MODULES).
+
+
+maybe_add_warning(UserFun, #idx{type = IndexType}, UserAcc) ->
+    case IndexType of
+        <<"special">> ->
+            Arg = {add_key, warning, <<"no matching index found, create an index to optimize query time">>},
+            {_Go, UserAcc0} = UserFun(Arg, UserAcc),
+            UserAcc0;
+        _ ->
+            UserAcc
+    end.

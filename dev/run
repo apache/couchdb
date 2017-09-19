@@ -146,6 +146,7 @@ def setup_context(opts, args):
             'haproxy': opts.haproxy,
             'haproxy_port': opts.haproxy_port,
             'config_overrides': opts.config_overrides,
+            'reset_logs': True,
             'procs': []}
 
 
@@ -400,8 +401,12 @@ def boot_node(ctx, node):
         "-pa", os.path.join(erl_libs, "*"),
         "-s", "boot_node"
     ]
+    if ctx['reset_logs']:
+        mode = "wb"
+    else:
+        mode = "r+b"
     logfname = os.path.join(ctx['devdir'], "logs", "%s.log" % node)
-    log = open(logfname, "wb")
+    log = open(logfname, mode)
     cmd = [toposixpath(x) for x in cmd]
     return sp.Popen(cmd, stdin=sp.PIPE, stdout=log, stderr=sp.STDOUT, env=env)
 
@@ -545,6 +550,7 @@ def run_command(ctx, cmd):
 
 @log('Restart all nodes')
 def reboot_nodes(ctx):
+    ctx['reset_logs'] = False
     kill_processes(ctx)
     boot_nodes(ctx)
     ensure_all_nodes_alive(ctx)

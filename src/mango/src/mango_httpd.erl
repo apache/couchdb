@@ -38,13 +38,13 @@ handle_req(#httpd{} = Req, Db0) ->
         handle_req_int(Req, Db)
     catch
         throw:{mango_error, Module, Reason} ->
-            %Stack = erlang:get_stacktrace(),
-            {Code, ErrorStr, ReasonStr} = mango_error:info(Module, Reason),
-            Resp = {[
-                {<<"error">>, ErrorStr},
-                {<<"reason">>, ReasonStr}
-            ]},
-            chttpd:send_json(Req, Code, Resp)
+            case mango_error:info(Module, Reason) of
+            {500, ErrorStr, ReasonStr} ->
+                Stack = erlang:get_stacktrace(),
+                chttpd:send_error(Req, 500, [], ErrorStr, ReasonStr, Stack);
+            {Code, ErrorStr, ReasonStr} ->
+                chttpd:send_error(Req, Code, ErrorStr, ReasonStr)
+            end
     end.
 
 
@@ -183,7 +183,7 @@ handle_find_req(#httpd{method='POST'}=Req, Db) ->
     chttpd:validate_ctype(Req, "application/json"),
     {ok, Opts0} = mango_opts:validate_find(chttpd:json_body_obj(Req)),
     {value, {selector, Sel}, Opts} = lists:keytake(selector, 1, Opts0),
-    {ok, Resp0} = start_find_resp(Req, Db, Sel, Opts),
+    {ok, Resp0} = start_find_resp(Req),
     {ok, AccOut} = run_find(Resp0, Db, Sel, Opts),
     end_find_resp(AccOut);
 
@@ -230,18 +230,8 @@ convert_to_design_id(DDocId) ->
     end.
 
 
-start_find_resp(Req, Db, Sel, Opts) ->
-    chttpd:start_delayed_json_response(Req, 200, [], maybe_add_warning(Db, Sel, Opts)).
-
-
-maybe_add_warning(Db, Selector, Opts) ->
-    UsableIndexes = mango_idx:get_usable_indexes(Db, Selector, Opts),
-    case length(UsableIndexes) of
-        0 ->
-            "{\"warning\":\"no matching index found, create an index to optimize query time\",\r\n\"docs\":[";
-        _ ->
-            "{\"docs\":["
-    end.
+start_find_resp(Req) ->
+    chttpd:start_delayed_json_response(Req, 200, [], "{\"docs\":[").
 
 
 end_find_resp(Acc0) ->

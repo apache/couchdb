@@ -21,19 +21,19 @@
 ]).
 
 
-info(mango_cursor, {no_usable_index, no_indexes_defined}) ->
+info(mango_idx, {no_usable_index, no_indexes_defined}) ->
     {
         400,
         <<"no_usable_index">>,
         <<"There are no indexes defined in this database.">>
     };
-info(mango_cursor, {no_usable_index, no_index_matching_name}) ->
+info(mango_idx, {no_usable_index, no_index_matching_name}) ->
     {
         400,
         <<"no_usable_index">>,
         <<"No index matches the index specified with \"use_index\"">>
     };
-info(mango_cursor, {no_usable_index, missing_sort_index}) ->
+info(mango_idx, {no_usable_index, missing_sort_index}) ->
     {
         400,
         <<"no_usable_index">>,
