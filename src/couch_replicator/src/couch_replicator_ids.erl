@@ -78,7 +78,11 @@ replication_id(#rep{user_ctx = UserCtx} = Rep, 1) ->
 -spec convert([_] | binary() | {string(), string()}) -> {string(), string()}.
 convert(Id) when is_list(Id) ->
     convert(?l2b(Id));
-convert(Id) when is_binary(Id) ->
+convert(Id0) when is_binary(Id0) ->
+    % Spaces can result from mochiweb incorrectly unquoting + characters from
+    % the URL path. So undo the incorrect parsing here to avoid forcing
+    % users to url encode + characters.
+    Id = binary:replace(Id0, <<" ">>, <<"+">>, [global]),
     lists:splitwith(fun(Char) -> Char =/= $+ end, ?b2l(Id));
 convert({BaseId, Ext} = Id) when is_list(BaseId), is_list(Ext) ->
     Id.
@@ -221,6 +225,16 @@ get_non_default_port(_Schema, Port) ->
 -ifdef(TEST).
 
 -include_lib("eunit/include/eunit.hrl").
+
+
+replication_id_convert_test_() ->
+    [?_assertEqual(Expected, convert(Id)) || {Expected, Id} <- [
+        {{"abc", ""}, "abc"},
+        {{"abc", ""}, <<"abc">>},
+        {{"abc", "+x+y"}, <<"abc+x+y">>},
+        {{"abc", "+x+y"}, {"abc", "+x+y"}},
+        {{"abc", "+x+y"}, <<"abc x y">>}
+    ]].
 
 http_v4_endpoint_test_() ->
     [?_assertMatch({remote, User, Host, Port, Path, HeadersNoAuth, undefined},
