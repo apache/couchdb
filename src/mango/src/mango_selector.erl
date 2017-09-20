@@ -15,7 +15,8 @@
 
 -export([
     normalize/1,
-    match/2
+    match/2,
+    has_required_fields/2
 ]).
 
 
@@ -566,3 +567,110 @@ match({[{Field, Cond}]}, Value, Cmp) ->
 
 match({[_, _ | _] = _Props} = Sel, _Value, _Cmp) ->
     erlang:error({unnormalized_selector, Sel}).
+
+
+% Returns true if Selector requires all  
+% fields in RequiredFields to exist in any matching documents.
+
+% For each condition in the selector, check
+% whether the field is in RequiredFields.
+% If it is, remove it from RequiredFields and continue
+% until we match then all or run out of selector to
+% match against.
+
+% Empty selector
+has_required_fields({[]}, _) ->
+    false;
+
+% No more required fields
+has_required_fields(_, []) ->
+    true;
+
+% No more selector
+has_required_fields([], _) ->
+    false;
+
+has_required_fields(Selector, RequiredFields) when not is_list(Selector) ->
+    has_required_fields([Selector], RequiredFields);
+
+% We can "see" through $and operator. We ignore other
+% combination operators because they can't be used to restrict
+% an index.
+has_required_fields([{[{<<"$and">>, Args}]}], RequiredFields) 
+        when is_list(Args) ->
+    has_required_fields(Args, RequiredFields);
+
+has_required_fields([{[{Field, Cond}]} | Rest], RequiredFields) ->
+    case Cond of
+        % $exists:false is a special case - this is the only operator
+        % that explicitly does not require a field to exist
+        {[{<<"$exists">>, false}]} ->
+            has_required_fields(Rest, RequiredFields);
+        _ ->
+            has_required_fields(Rest, lists:delete(Field, RequiredFields))
+    end.
+    
+
+%%%%%%%% module tests below %%%%%%%%
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+has_required_fields_basic_test() ->
+    RequiredFields = [<<"A">>],
+    Selector = {[{<<"A">>, <<"foo">>}]},
+    Normalized = normalize(Selector),
+    ?assertEqual(true, has_required_fields(Normalized, RequiredFields)).
+
+has_required_fields_basic_failure_test() ->
+    RequiredFields = [<<"B">>],
+    Selector = {[{<<"A">>, <<"foo">>}]},
+    Normalized = normalize(Selector),
+    ?assertEqual(false, has_required_fields(Normalized, RequiredFields)).
+
+has_required_fields_empty_selector_test() ->
+    RequiredFields = [<<"A">>],
+    Selector = {[]},
+    Normalized = normalize(Selector),
+    ?assertEqual(false, has_required_fields(Normalized, RequiredFields)).
+
+has_required_fields_exists_false_test() ->
+    RequiredFields = [<<"A">>],
+    Selector = {[{<<"A">>,{[{<<"$exists">>, false}]}}]},
+    Normalized = normalize(Selector),
+    ?assertEqual(false, has_required_fields(Normalized, RequiredFields)).
+
+has_required_fields_and_true_test() ->
+    RequiredFields = [<<"A">>],
+    Selector = {[{<<"$and">>,
+          [
+              {[{<<"A">>, <<"foo">>}]},
+              {[{<<"B">>, <<"foo">>}]}
+          ]
+    }]},
+    Normalized = normalize(Selector),
+    ?assertEqual(true, has_required_fields(Normalized, RequiredFields)).
+
+has_required_fields_and_false_test() ->
+    RequiredFields = [<<"A">>, <<"C">>],
+    Selector = {[{<<"$and">>,
+          [
+              {[{<<"A">>, <<"foo">>}]},
+              {[{<<"B">>, <<"foo">>}]}
+          ]
+    }]},
+    Normalized = normalize(Selector),
+    ?assertEqual(false, has_required_fields(Normalized, RequiredFields)).
+
+has_required_fields_or_test() ->
+    RequiredFields = [<<"A">>],
+    Selector = {[{<<"$or">>,
+          [
+              {[{<<"A">>, <<"foo">>}]},
+              {[{<<"B">>, <<"foo">>}]}
+          ]
+    }]},
+    Normalized = normalize(Selector),
+    ?assertEqual(false, has_required_fields(Normalized, RequiredFields)).
+
+-endif.
