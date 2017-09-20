@@ -26,8 +26,8 @@ class OperatorTests:
                 "manager": True,
                 "favorites": {"$all": ["Lisp", "Python"]}
             })
-        self.assertEqual(len(docs), 4)
-        user_ids = [2,12,9,14]
+        self.assertEqual(len(docs), 3)
+        user_ids = [2,12,9]
         self.assertUserIds(user_ids, docs)
 
     def test_all_non_array(self):
@@ -124,7 +124,7 @@ class OperatorTests:
                 "manager": True,
                 "favorites": {"$in": ["Ruby", "Python"]}
             })
-        self.assertUserIds([2,6,7,9,11,12,14], docs)
+        self.assertUserIds([2,6,7,9,11,12], docs)
 
     def test_nin_operator_array(self):
         docs = self.db.find({
