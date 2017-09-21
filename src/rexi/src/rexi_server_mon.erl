@@ -77,11 +77,13 @@ handle_info({nodeup, _}, ChildMod) ->
     start_servers(ChildMod),
     {noreply, ChildMod};
 
-handle_info({nodedown, _}, St) ->
-    {noreply, St};
+handle_info({nodedown, _}, ChildMod) ->
+    stop_servers(ChildMod),
+    {noreply, ChildMod};
 
 handle_info(check_nodes, ChildMod) ->
     start_servers(ChildMod),
+    stop_servers(ChildMod),
     erlang:send_after(?INTERVAL, self(), check_nodes),
     {noreply, ChildMod};
 
@@ -101,13 +103,27 @@ start_servers(ChildMod) ->
         {ok, _} = start_server(ChildMod, Id)
     end, missing_servers(ChildMod)).
 
+stop_servers(ChildMod) ->
+    lists:foreach(fun(Id) ->
+        ok = stop_server(ChildMod, Id)
+    end, extra_servers(ChildMod)).
+
+
+server_ids(ChildMod) ->
+    Nodes = [node() | nodes()],
+    [list_to_atom(lists:concat([ChildMod, "_", Node])) || Node <- Nodes].
+
+
+running_servers(ChildMod) ->
+    [Id || {Id, _, _, _} <- supervisor:which_children(sup_module(ChildMod))].
+
 
 missing_servers(ChildMod) ->
-    ServerIds = [list_to_atom(lists:concat([ChildMod, "_", Node]))
-        || Node <- [node() | nodes()]],
-    SupModule = sup_module(ChildMod),
-    ChildIds = [Id || {Id, _, _, _} <- supervisor:which_children(SupModule)],
-    ServerIds -- ChildIds.
+    server_ids(ChildMod) -- running_servers(ChildMod).
+
+
+extra_servers(ChildMod) ->
+    running_servers(ChildMod) -- server_ids(ChildMod).
 
 
 start_server(ChildMod, ChildId) ->
@@ -125,6 +141,13 @@ start_server(ChildMod, ChildId) ->
         Else ->
             erlang:error(Else)
     end.
+
+
+stop_server(ChildMod, ChildId) ->
+    SupMod = sup_module(ChildMod),
+    ok = supervisor:terminate_child(SupMod, ChildId),
+    ok = supervisor:delete_child(SupMod, ChildId).
+
 
 sup_module(ChildMod) ->
     list_to_atom(lists:concat([ChildMod, "_sup"])).
