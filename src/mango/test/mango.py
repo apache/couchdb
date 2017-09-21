@@ -84,7 +84,8 @@ class Database(object):
         r.raise_for_status()
         return r.json()
 
-    def create_index(self, fields, idx_type="json", name=None, ddoc=None, selector=None):
+    def create_index(self, fields, idx_type="json", name=None, ddoc=None, 
+        partial_filter_selector=None, selector=None):
         body = {
             "index": {
                 "fields": fields
@@ -98,6 +99,8 @@ class Database(object):
             body["ddoc"] = ddoc
         if selector is not None:
             body["index"]["selector"] = selector
+        if partial_filter_selector is not None:
+            body["index"]["partial_filter_selector"] = partial_filter_selector
         body = json.dumps(body)
         r = self.sess.post(self.path("_index"), data=body)
         r.raise_for_status()
@@ -105,8 +108,9 @@ class Database(object):
         assert r.json()["name"] is not None
         return r.json()["result"] == "created"
 
-    def create_text_index(self, analyzer=None, selector=None, idx_type="text",
-        default_field=None, fields=None, name=None, ddoc=None,index_array_lengths=None):
+    def create_text_index(self, analyzer=None, idx_type="text",
+        partial_filter_selector=None, default_field=None, fields=None, 
+        name=None, ddoc=None,index_array_lengths=None):
         body = {
             "index": {
             },
@@ -121,8 +125,8 @@ class Database(object):
             body["index"]["default_field"] = default_field
         if index_array_lengths is not None:
             body["index"]["index_array_lengths"] = index_array_lengths
-        if selector is not None:
-            body["index"]["selector"] = selector
+        if partial_filter_selector is not None:
+            body["index"]["partial_filter_selector"] = partial_filter_selector
         if fields is not None:
             body["index"]["fields"] = fields
         if ddoc is not None:
