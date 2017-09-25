@@ -28,6 +28,7 @@
 
 -behaviour(gen_server).
 -behaviour(config_listener).
+-behaviour(mem3_cluster).
 
 -export([
     start_link/0
@@ -55,6 +56,12 @@
     handle_config_terminate/3
 ]).
 
+% mem3_cluster callbacks
+-export([
+    cluster_stable/1,
+    cluster_unstable/1
+]).
+
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("mem3/include/mem3.hrl").
 
@@ -63,11 +70,8 @@
 -define(RELISTEN_DELAY, 5000).
 
 -record(state, {
-    start_time :: erlang:timestamp(),
-    last_change :: erlang:timestamp(),
-    period = ?DEFAULT_QUIET_PERIOD :: non_neg_integer(),
-    start_period = ?DEFAULT_START_PERIOD :: non_neg_integer(),
-    timer :: reference()
+    mem3_cluster_pid :: pid(),
+    cluster_stable :: boolean()
 }).
 
 
@@ -115,64 +119,55 @@ link_cluster_event_listener(Mod, Fun, Args)
     Pid.
 
 
+% Mem3 cluster callbacks
+
+cluster_unstable(Server) ->
+    couch_replicator_notifier:notify({cluster, unstable}),
+    couch_stats:update_gauge([couch_replicator, cluster_is_stable], 0),
+    couch_log:notice("~s : cluster unstable", [?MODULE]),
+    gen_server:cast(Server, cluster_unstable),
+    Server.
+
+cluster_stable(Server) ->
+    couch_replicator_notifier:notify({cluster, stable}),
+    couch_stats:update_gauge([couch_replicator, cluster_is_stable], 1),
+    couch_log:notice("~s : cluster stable", [?MODULE]),
+    gen_server:cast(Server, cluster_stable),
+    Server.
+
+
 % gen_server callbacks
 
 init([]) ->
-    net_kernel:monitor_nodes(true),
     ok = config:listen_for_changes(?MODULE, nil),
     Period = abs(config:get_integer("replicator", "cluster_quiet_period",
         ?DEFAULT_QUIET_PERIOD)),
     StartPeriod = abs(config:get_integer("replicator", "cluster_start_period",
         ?DEFAULT_START_PERIOD)),
-    couch_log:debug("Initialized clustering gen_server ~w", [self()]),
     couch_stats:update_gauge([couch_replicator, cluster_is_stable], 0),
-    {ok, #state{
-        start_time = os:timestamp(),
-        last_change = os:timestamp(),
-        period = Period,
-        start_period = StartPeriod,
-        timer = new_timer(StartPeriod)
-    }}.
+    {ok, Mem3Cluster} = mem3_cluster:start_link(?MODULE, self(), StartPeriod,
+        Period),
+    {ok, #state{mem3_cluster_pid = Mem3Cluster, cluster_stable = false}}.
 
 
 terminate(_Reason, _State) ->
     ok.
 
 
-handle_call(is_stable, _From, State) ->
-    {reply, is_stable(State), State}.
+handle_call(is_stable, _From, #state{cluster_stable = IsStable} = State) ->
+    {reply, IsStable, State}.
 
 
-handle_cast({set_period, QuietPeriod}, State) ->
-    {noreply, State#state{period = QuietPeriod}}.
+handle_cast({set_period, Period}, #state{mem3_cluster_pid = Pid} = State) ->
+    ok = mem3_cluster:set_period(Pid, Period),
+    {noreply, State};
 
+handle_cast(cluster_stable, State) ->
+    {noreply, State#state{cluster_stable = true}};
 
-handle_info({nodeup, Node}, State) ->
-    Timer = new_timer(interval(State)),
-    couch_replicator_notifier:notify({cluster, unstable}),
-    couch_stats:update_gauge([couch_replicator, cluster_is_stable], 0),
-    couch_log:notice("~s : nodeup ~s, cluster unstable", [?MODULE, Node]),
-    {noreply, State#state{last_change = os:timestamp(), timer = Timer}};
+handle_cast(cluster_unstable, State) ->
+    {noreply, State#state{cluster_stable = false}}.
 
-handle_info({nodedown, Node}, State) ->
-    Timer = new_timer(interval(State)),
-    couch_replicator_notifier:notify({cluster, unstable}),
-    couch_stats:update_gauge([couch_replicator, cluster_is_stable], 0),
-    couch_log:notice("~s : nodedown ~s, cluster unstable", [?MODULE, Node]),
-    {noreply, State#state{last_change = os:timestamp(), timer = Timer}};
-
-handle_info(stability_check, State) ->
-   erlang:cancel_timer(State#state.timer),
-   case is_stable(State) of
-       true ->
-           couch_replicator_notifier:notify({cluster, stable}),
-           couch_stats:update_gauge([couch_replicator, cluster_is_stable], 1),
-           couch_log:notice("~s : publish cluster `stable` event", [?MODULE]),
-           {noreply, State};
-       false ->
-           Timer = new_timer(interval(State)),
-           {noreply, State#state{timer = Timer}}
-   end;
 
 handle_info(restart_config_listener, State) ->
     ok = config:listen_for_changes(?MODULE, nil),
@@ -184,41 +179,6 @@ code_change(_OldVsn, State, _Extra) ->
 
 
 %% Internal functions
-
--spec new_timer(non_neg_integer()) -> reference().
-new_timer(IntervalSec) ->
-    erlang:send_after(IntervalSec * 1000, self(), stability_check).
-
-
-% For the first Period seconds after node boot we check cluster stability every
-% StartPeriod seconds. Once the initial Period seconds have passed we continue
-% to monitor once every Period seconds
--spec interval(#state{}) -> non_neg_integer().
-interval(#state{period = Period, start_period = StartPeriod,
-        start_time = T0}) ->
-    case now_diff_sec(T0) > Period of
-        true ->
-            % Normal operation
-            Period;
-        false ->
-            % During startup
-            StartPeriod
-    end.
-
-
--spec is_stable(#state{}) -> boolean().
-is_stable(#state{last_change = TS} = State) ->
-    now_diff_sec(TS) > interval(State).
-
-
--spec now_diff_sec(erlang:timestamp()) -> non_neg_integer().
-now_diff_sec(Time) ->
-    case timer:now_diff(os:timestamp(), Time) of
-        USec when USec < 0 ->
-            0;
-        USec when USec >= 0 ->
-             USec / 1000000
-    end.
 
 
 handle_config_change("replicator", "cluster_quiet_period", V, _, S) ->
