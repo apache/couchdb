@@ -30,6 +30,9 @@
     terminate/2
 ]).
 
+
+-include("couch_stats.hrl").
+
 -record(st, {
     descriptions,
     stats,
@@ -52,11 +55,9 @@ start_link() ->
 
 init([]) ->
     {ok, Descs} = reload_metrics(),
-    Interval = case application:get_env(couch_stats, collection_interval) of
-        {ok, I} -> I * 1000
-    end,
-    {ok, CT} = timer:send_interval(Interval, self(), collect),
-    {ok, RT} = timer:send_interval(600000, self(), reload),
+    Interval = config:get_integer("stats", "interval", ?DEFAULT_INTERVAL),
+    {ok, CT} = timer:send_interval(Interval * 1000, self(), collect),
+    {ok, RT} = timer:send_interval(?RELOAD_INTERVAL * 1000, self(), reload),
     {ok, #st{descriptions=Descs, stats=[], collect_timer=CT, reload_timer=RT}}.
 
 handle_call(fetch, _from, #st{stats = Stats}=State) ->
