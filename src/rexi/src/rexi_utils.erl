@@ -32,8 +32,9 @@ send(Dest, Msg) ->
     case erlang:send(Dest, Msg, [noconnect, nosuspend]) of
     ok ->
         ok;
-    _ ->
-        % treat nosuspend and noconnect the same
+    noconnect ->
+        handle_noconnect_send(Dest, Msg);
+    nosuspend ->
         rexi_buffer:send(Dest, Msg)
     end.
 
@@ -101,3 +102,12 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
     after PerMsgTO ->
         {timeout, Acc0}
     end.
+
+
+handle_noconnect_send(Dest, {'$gen_cast', {doit, From, _Nonce, MFA}}) ->
+    handle_noconnect_send(Dest, {'$gen_cast', {doit, From, MFA}});
+handle_noconnect_send(Dest, {'$gen_cast', {doit, {Caller, _Ref}, _MFA}}) ->
+    erlang:send(Caller, {rexi_DOWN, self(), Dest, noconnect}),
+    couch_stats:increment_counter([rexi, down]);
+handle_noconnect_send(_Dest, _Msg) ->
+    couch_stats:increment_counter([rexi, down]).
