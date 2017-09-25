@@ -14,6 +14,7 @@
 
 -module(rexi_server_mon).
 -behaviour(gen_server).
+-behaviour(mem3_cluster).
 -vsn(1).
 
 
@@ -32,8 +33,13 @@
     code_change/3
 ]).
 
+-export([
+   cluster_stable/1,
+   cluster_unstable/1
+]).
 
--define(INTERVAL, 60000).
+
+-define(CLUSTER_STABILITY_PERIOD_SEC, 15).
 
 
 start_link(ChildMod) ->
@@ -45,9 +51,23 @@ status() ->
     gen_server:call(?MODULE, status).
 
 
+% Mem3 cluster callbacks
+
+cluster_unstable(Server) ->
+    couch_log:notice("~s : cluster unstable", [?MODULE]),
+    gen_server:cast(Server, cluster_unstable),
+    Server.
+
+cluster_stable(Server) ->
+    gen_server:cast(Server, cluster_stable),
+    Server.
+
+
+% gen_server callbacks
+
 init(ChildMod) ->
-    net_kernel:monitor_nodes(true),
-    erlang:send(self(), check_nodes),
+    {ok, _Mem3Cluster} = mem3_cluster:start_link(?MODULE, self(),
+        ?CLUSTER_STABILITY_PERIOD_SEC, ?CLUSTER_STABILITY_PERIOD_SEC),
     {ok, ChildMod}.
 
 
@@ -67,23 +87,26 @@ handle_call(Msg, _From, St) ->
     couch_log:notice("~s ignored_call ~w", [?MODULE, Msg]),
     {reply, ignored, St}.
 
+% If cluster is unstable a node was added or just removed. Check if any nodes
+% can be started, but do not immediately stop nodes, defer that till cluster
+% stabilized.
+handle_cast(cluster_unstable, ChildMod) ->
+    couch_log:notice("~s : cluster unstable", [ChildMod]),
+    start_servers(ChildMod),
+    {noreply, ChildMod};
+
+% When cluster is stable, start any servers for new nodes and stop servers for
+% the ones that disconnected.
+handle_cast(cluster_stable, ChildMod) ->
+    couch_log:notice("~s : cluster stable", [ChildMod]),
+    start_servers(ChildMod),
+    stop_servers(ChildMod),
+    {noreply, ChildMod};
 
 handle_cast(Msg, St) ->
     couch_log:notice("~s ignored_cast ~w", [?MODULE, Msg]),
     {noreply, St}.
 
-
-handle_info({nodeup, _}, ChildMod) ->
-    start_servers(ChildMod),
-    {noreply, ChildMod};
-
-handle_info({nodedown, _}, St) ->
-    {noreply, St};
-
-handle_info(check_nodes, ChildMod) ->
-    start_servers(ChildMod),
-    erlang:send_after(?INTERVAL, self(), check_nodes),
-    {noreply, ChildMod};
 
 handle_info(Msg, St) ->
     couch_log:notice("~s ignored_info ~w", [?MODULE, Msg]),
@@ -101,13 +124,27 @@ start_servers(ChildMod) ->
         {ok, _} = start_server(ChildMod, Id)
     end, missing_servers(ChildMod)).
 
+stop_servers(ChildMod) ->
+    lists:foreach(fun(Id) ->
+        ok = stop_server(ChildMod, Id)
+    end, extra_servers(ChildMod)).
+
+
+server_ids(ChildMod) ->
+    Nodes = [node() | nodes()],
+    [list_to_atom(lists:concat([ChildMod, "_", Node])) || Node <- Nodes].
+
+
+running_servers(ChildMod) ->
+    [Id || {Id, _, _, _} <- supervisor:which_children(sup_module(ChildMod))].
+
 
 missing_servers(ChildMod) ->
-    ServerIds = [list_to_atom(lists:concat([ChildMod, "_", Node]))
-        || Node <- [node() | nodes()]],
-    SupModule = sup_module(ChildMod),
-    ChildIds = [Id || {Id, _, _, _} <- supervisor:which_children(SupModule)],
-    ServerIds -- ChildIds.
+    server_ids(ChildMod) -- running_servers(ChildMod).
+
+
+extra_servers(ChildMod) ->
+    running_servers(ChildMod) -- server_ids(ChildMod).
 
 
 start_server(ChildMod, ChildId) ->
@@ -125,6 +162,13 @@ start_server(ChildMod, ChildId) ->
         Else ->
             erlang:error(Else)
     end.
+
+
+stop_server(ChildMod, ChildId) ->
+    SupMod = sup_module(ChildMod),
+    ok = supervisor:terminate_child(SupMod, ChildId),
+    ok = supervisor:delete_child(SupMod, ChildId).
+
 
 sup_module(ChildMod) ->
     list_to_atom(lists:concat([ChildMod, "_sup"])).
