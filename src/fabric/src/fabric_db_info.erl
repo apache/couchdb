@@ -22,7 +22,8 @@ go(DbName) ->
     Workers = fabric_util:submit_jobs(Shards, get_db_info, []),
     RexiMon = fabric_util:create_monitors(Shards),
     Fun = fun handle_message/3,
-    Acc0 = {fabric_dict:init(Workers, nil), []},
+    {ok, ClusterInfo} = get_cluster_info(Shards),
+    Acc0 = {fabric_dict:init(Workers, nil), [{cluster, ClusterInfo}]},
     try
         case fabric_util:recv(Workers, #shard.ref, Fun, Acc0) of
             {ok, Acc} -> {ok, Acc};
@@ -104,6 +105,8 @@ merge_results(Info) ->
             [{other, {merge_other_results(X)}} | Acc];
         (disk_format_version, X, Acc) ->
             [{disk_format_version, lists:max(X)} | Acc];
+        (cluster, [X], Acc) ->
+            [{cluster, {X}} | Acc];
         (_, _, Acc) ->
             Acc
     end, [{instance_start_time, <<"0">>}], Dict).
@@ -127,3 +130,46 @@ merge_object(Objects) ->
         (Key, X, Acc) ->
             [{Key, lists:sum(X)} | Acc]
     end, [], Dict).
+
+get_cluster_info(Shards) ->
+    Dict = lists:foldl(fun(#shard{range = R}, Acc) ->
+        dict:update_counter(R, 1, Acc)
+    end, dict:new(), Shards),
+    Q = dict:size(Dict),
+    N = dict:fold(fun(_, X, Acc) -> max(X, Acc) end, 0, Dict),
+    %% defaults as per mem3:quorum/1
+    WR = N div 2 + 1,
+    {ok, [{q, Q}, {n, N}, {w, WR}, {r, WR}]}.
+
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+get_cluster_info_test_() ->
+    {
+        setup,
+        fun setup/0,
+        fun get_cluster_info_test_generator/1
+    }.
+
+
+setup() ->
+    Quorums = [1, 2, 3],
+    Shards = [1, 3, 5, 8, 12, 24],
+    [{N, Q} || N <- Quorums, Q <- Shards].
+
+get_cluster_info_test_generator([]) ->
+    [];
+get_cluster_info_test_generator([{N, Q} | Rest]) ->
+    {generator,
+    fun() ->
+        Nodes = lists:seq(1, 8),
+        Shards = mem3_util:create_partition_map(<<"foo">>, N, Q, Nodes),
+        {ok, Info} = get_cluster_info(Shards),
+        [
+            ?_assertEqual(N, couch_util:get_value(n, Info)),
+            ?_assertEqual(Q, couch_util:get_value(q, Info))
+        ] ++ get_cluster_info_test_generator(Rest)
+    end}.
+
+-endif.
