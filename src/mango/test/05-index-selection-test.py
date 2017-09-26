@@ -77,7 +77,7 @@ class IndexSelectionTests(mango.UserDocsTests):
     def test_no_valid_sort_index(self):
         try:
             self.db.find({"_id": {"$gt": None}}, sort=["name"], return_raw=True)
-        except Exception, e:
+        except Exception as e:
             self.assertEqual(e.response.status_code, 400)
         else:
             raise AssertionError("bad find")
@@ -87,7 +87,7 @@ class IndexSelectionTests(mango.UserDocsTests):
         ddocid = "_design/ad3d537c03cd7c6a43cf8dff66ef70ea54c2b40f"
         try:
             self.db.find({}, use_index=ddocid)
-        except Exception, e:
+        except Exception as e:
             self.assertEqual(e.response.status_code, 400)
         else:
             raise AssertionError("bad find")
@@ -145,7 +145,7 @@ class IndexSelectionTests(mango.UserDocsTests):
         }
         try:
             self.db.find(selector, use_index=ddocid)
-        except Exception, e:
+        except Exception as e:
             self.assertEqual(e.response.status_code, 400)
         else:
             raise AssertionError("did not reject bad use_index")
@@ -159,7 +159,7 @@ class IndexSelectionTests(mango.UserDocsTests):
         }
         try:
             self.db.find(selector, use_index=ddocid, sort=[{"manager":"desc"}])
-        except Exception, e:
+        except Exception as e:
             self.assertEqual(e.response.status_code, 400)
         else:
             raise AssertionError("did not reject bad use_index")
@@ -250,7 +250,7 @@ class MultiTextIndexSelectionTests(mango.UserDocsTests):
     def test_multi_text_index_is_error(self):
         try:
             self.db.find({"$text": "a query"}, explain=True)
-        except Exception, e:
+        except Exception as e:
             self.assertEqual(e.response.status_code, 400)
 
     def test_use_index_works(self):

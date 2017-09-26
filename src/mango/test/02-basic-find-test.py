@@ -30,7 +30,7 @@ class BasicFindTests(mango.UserDocsTests):
         for bs in bad_selectors:
             try:
                 self.db.find(bs)
-            except Exception, e:
+            except Exception as e:
                 assert e.response.status_code == 400
             else:
                 raise AssertionError("bad find")
@@ -49,7 +49,7 @@ class BasicFindTests(mango.UserDocsTests):
         for bl in bad_limits:
             try:
                 self.db.find({"int":{"$gt":2}}, limit=bl)
-            except Exception, e:
+            except Exception as e:
                 assert e.response.status_code == 400
             else:
                 raise AssertionError("bad find")
@@ -68,7 +68,7 @@ class BasicFindTests(mango.UserDocsTests):
         for bs in bad_skips:
             try:
                 self.db.find({"int":{"$gt":2}}, skip=bs)
-            except Exception, e:
+            except Exception as e:
                 assert e.response.status_code == 400
             else:
                 raise AssertionError("bad find")
@@ -88,7 +88,7 @@ class BasicFindTests(mango.UserDocsTests):
         for bs in bad_sorts:
             try:
                 self.db.find({"int":{"$gt":2}}, sort=bs)
-            except Exception, e:
+            except Exception as e:
                 assert e.response.status_code == 400
             else:
                 raise AssertionError("bad find")
@@ -108,7 +108,7 @@ class BasicFindTests(mango.UserDocsTests):
         for bf in bad_fields:
             try:
                 self.db.find({"int":{"$gt":2}}, fields=bf)
-            except Exception, e:
+            except Exception as e:
                 assert e.response.status_code == 400
             else:
                 raise AssertionError("bad find")
@@ -126,7 +126,7 @@ class BasicFindTests(mango.UserDocsTests):
         for br in bad_rs:
             try:
                 self.db.find({"int":{"$gt":2}}, r=br)
-            except Exception, e:
+            except Exception as e:
                 assert e.response.status_code == 400
             else:
                 raise AssertionError("bad find")
@@ -142,7 +142,7 @@ class BasicFindTests(mango.UserDocsTests):
         for bc in bad_conflicts:
             try:
                 self.db.find({"int":{"$gt":2}}, conflicts=bc)
-            except Exception, e:
+            except Exception as e:
                 assert e.response.status_code == 400
             else:
                 raise AssertionError("bad find")

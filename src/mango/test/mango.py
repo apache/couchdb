@@ -44,7 +44,7 @@ class Database(object):
         return "http://{}:{}/{}".format(self.host, self.port, self.dbname)
 
     def path(self, parts):
-        if isinstance(parts, (str, unicode)):
+        if isinstance(parts, ("".__class__, u"".__class__)):
             parts = [parts]
         return "/".join([self.url] + parts)
 

@@ -64,7 +64,6 @@ class BasicTextTests(mango.UserDocsTextTests):
 
         # Nested Level
         docs = self.db.find({"favorites.0.2": "Python"})
-        print len(docs)
         assert len(docs) == 1
         for d in docs:
             assert "Python" in d["favorites"][0][2]
@@ -451,14 +450,12 @@ class ElemMatchTests(mango.FriendDocsTextTests):
             }
         }
         docs = self.db.find(q)
-        print len(docs)
         assert len(docs) == 1
         assert docs[0]["bestfriends"] == ["Wolverine", "Cyclops"]
 
         q = {"results": {"$elemMatch": {"$gte": 80, "$lt": 85}}}
 
         docs = self.db.find(q)
-        print len(docs)
         assert len(docs) == 1
         assert docs[0]["results"] == [82, 85, 88]
 

@@ -35,7 +35,7 @@ class IndexCrudTests(mango.DbPerClass):
         for fields in bad_fields:
             try:
                 self.db.create_index(fields)
-            except Exception, e:
+            except Exception as e:
                 assert e.response.status_code == 400
             else:
                 raise AssertionError("bad create index")
@@ -54,7 +54,7 @@ class IndexCrudTests(mango.DbPerClass):
         for bt in bad_types:
             try:
                 self.db.create_index(["foo"], idx_type=bt)
-            except Exception, e:
+            except Exception as e:
                 assert e.response.status_code == 400, (bt, e.response.status_code)
             else:
                 raise AssertionError("bad create index")
@@ -70,13 +70,13 @@ class IndexCrudTests(mango.DbPerClass):
         for bn in bad_names:
             try:
                 self.db.create_index(["foo"], name=bn)
-            except Exception, e:
+            except Exception as e:
                 assert e.response.status_code == 400
             else:
                 raise AssertionError("bad create index")
             try:
                 self.db.create_index(["foo"], ddoc=bn)
-            except Exception, e:
+            except Exception as e:
                 assert e.response.status_code == 400
             else:
                 raise AssertionError("bad create index")
@@ -207,7 +207,7 @@ class IndexCrudTests(mango.DbPerClass):
         # Missing design doc
         try:
             self.db.delete_index("this_is_not_a_design_doc_id", "foo")
-        except Exception, e:
+        except Exception as e:
             assert e.response.status_code == 404
         else:
             raise AssertionError("bad index delete")
@@ -220,7 +220,7 @@ class IndexCrudTests(mango.DbPerClass):
         ddocid = idx["ddoc"].split("/")[-1]
         try:
             self.db.delete_index(ddocid, "this_is_not_an_index_name")
-        except Exception, e:
+        except Exception as e:
             assert e.response.status_code == 404
         else:
             raise AssertionError("bad index delete")
@@ -228,7 +228,7 @@ class IndexCrudTests(mango.DbPerClass):
         # Bad view type
         try:
             self.db.delete_index(ddocid, idx["name"], idx_type="not_a_real_type")
-        except Exception, e:
+        except Exception as e:
             assert e.response.status_code == 404
         else:
             raise AssertionError("bad index delete")
@@ -244,7 +244,6 @@ class IndexCrudTests(mango.DbPerClass):
         for idx in self.db.list_indexes():
             if idx["name"] != "text_idx_01":
                 continue
-            print idx["def"]
             assert idx["def"]["fields"] == [
                 {"stringidx": "string"},
                 {"booleanidx": "boolean"}
@@ -270,7 +269,7 @@ class IndexCrudTests(mango.DbPerClass):
         for fields in bad_fields:
             try:
                 self.db.create_text_index(fields=fields)
-            except Exception, e:
+            except Exception as e:
                 assert e.response.status_code == 400
             else:
                 raise AssertionError("bad create text index")
@@ -310,10 +309,10 @@ class IndexCrudTests(mango.DbPerClass):
 
         try:
             self.db.list_indexes(skip=-1)
-        except Exception, e:
+        except Exception as e:
             assert e.response.status_code == 500
 
         try:
             self.db.list_indexes(limit=0)
-        except Exception, e:
+        except Exception as e:
             assert e.response.status_code == 500
