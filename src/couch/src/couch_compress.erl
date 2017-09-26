@@ -14,6 +14,7 @@
 
 -export([compress/2, decompress/1, is_compressed/2]).
 -export([get_compression_method/0]).
+-export([uncompressed_size/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -83,3 +84,16 @@ is_compressed(Term, _Method) when not is_binary(Term) ->
 is_compressed(_, _) ->
     error(invalid_compression).
 
+
+uncompressed_size(<<?SNAPPY_PREFIX, Rest/binary>>) ->
+    {ok, Size} = snappy:uncompressed_length(Rest),
+    Size;
+uncompressed_size(<<?COMPRESSED_TERM_PREFIX, Size:32, _/binary>> = _Bin) ->
+    % See http://erlang.org/doc/apps/erts/erl_ext_dist.html
+    % The uncompressed binary would be encoded with <<131, Rest/binary>>
+    % so need to add 1 for 131
+    Size + 1;
+uncompressed_size(<<?TERM_PREFIX, _/binary>> = Bin) ->
+    byte_size(Bin);
+uncompressed_size(_) ->
+    error(invalid_compression).

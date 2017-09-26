@@ -29,6 +29,10 @@
     update_gauge/2
 ]).
 
+
+-include("couch_stats.hrl").
+
+
 -type response() :: ok | {error, unknown_metric}.
 -type stat() :: {any(), [{atom(), any()}]}.
 
@@ -56,7 +60,7 @@ new(counter, Name) ->
         {error, Name, metric_already_exists} -> {error, metric_exists}
     end;
 new(histogram, Name) ->
-    {ok, Time} = application:get_env(couch_stats, collection_interval),
+    Time = config:get_integer("stats", "interval", ?DEFAULT_INTERVAL),
     case folsom_metrics:new_histogram(Name, slide_uniform, {Time, 1024}) of
         ok -> ok;
         {error, Name, metric_already_exists} -> {error, metric_exists}

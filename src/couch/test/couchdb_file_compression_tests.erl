@@ -157,7 +157,7 @@ compare_compression_methods(DbName) ->
 
     ?assert(DbSizeDeflate1 > DbSizeDeflate9),
     ?assert(ViewSizeDeflate1 > ViewSizeDeflate9),
-    ?assert(ExternalSizePreCompact =:= ExternalSizeNone),
+    ?assert(ExternalSizePreCompact >= ExternalSizeNone),
     ?assert(ExternalSizeNone =:= ExternalSizeSnappy),
     ?assert(ExternalSizeNone =:= ExternalSizeDeflate9),
     ?assert(ViewExternalSizeNone =:= ViewExternalSizeSnappy),

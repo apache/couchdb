@@ -1079,14 +1079,13 @@ copy_docs(Db, #db{fd = DestFd} = NewDb, MixedInfos, Retry) ->
                 {Body, AttInfos} = copy_doc_attachments(Db, Sp, DestFd),
                 % In the future, we should figure out how to do this for
                 % upgrade purposes.
-                EJsonBody = case is_binary(Body) of
+                ExternalSize = case is_binary(Body) of
                     true ->
-                        couch_compress:decompress(Body);
+                        couch_compress:uncompressed_size(Body);
                     false ->
-                        Body
+                        ?term_size(Body)
                 end,
                 SummaryChunk = make_doc_summary(NewDb, {Body, AttInfos}),
-                ExternalSize = ?term_size(EJsonBody),
                 {ok, Pos, SummarySize} = couch_file:append_raw_chunk(
                     DestFd, SummaryChunk),
                 AttSizes = [{element(3,A), element(4,A)} || A <- AttInfos],
@@ -1472,7 +1471,7 @@ get_meta_body_size(Meta, Summary) ->
         {ejson_size, ExternalSize} ->
             ExternalSize;
         false ->
-            ?term_size(couch_compress:decompress(Summary))
+            couch_compress:uncompressed_size(Summary)
     end.
 
 
