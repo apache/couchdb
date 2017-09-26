@@ -154,6 +154,10 @@ handle_request_int(MochiReq) ->
         ok = mochiweb_socket:setopts(MochiReq:get(socket), SocketOpts)
     end,
 
+    % Set random seed
+    <<A:32, B:32, C:32>> = crypto:rand_bytes(12),
+    random:seed({A,B,C}),
+
     % for the path, use the raw path with the query string and fragment
     % removed, but URL quoting left intact
     RawUri = MochiReq:get(raw_path),
