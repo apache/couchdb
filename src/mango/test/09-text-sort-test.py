@@ -43,7 +43,7 @@ class SortTests(mango.UserDocsTextTests):
         q = {"email": {"$gt": None}}
         try:
             self.db.find(q, sort=["email"])
-        except Exception, e:
+        except Exception as e:
             assert e.response.status_code == 400
         else:
             raise AssertionError("Should have thrown error for sort")
@@ -79,7 +79,7 @@ class SortTests(mango.UserDocsTextTests):
             {"age": "34"}]}
         try:
             self.db.find(q, sort=["age"])
-        except Exception, e:
+        except Exception as e:
             assert e.response.status_code == 400
         else:
             raise AssertionError("Should have thrown error for sort")

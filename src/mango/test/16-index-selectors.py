@@ -143,7 +143,7 @@ class IndexSelectorJson(mango.DbPerClass):
         selector = {"location": {"$gte": "FRA"}}
         try:
             self.db.create_index(["location"], selector=selector)
-        except Exception, e:
+        except Exception as e:
             assert e.response.status_code == 400
         else:
             raise AssertionError("bad index creation")
