@@ -21,7 +21,7 @@
     ],
     timeout,            % milliseconds
     ibrowse_options = [],
-    retries = 10,
+    retries = 5,
     wait = 250,         % milliseconds
     httpc_pool = nil,
     http_connections,
