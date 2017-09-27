@@ -466,7 +466,7 @@ make_options(Props) ->
     DefBatchSize = config:get("replicator", "worker_batch_size", "500"),
     DefConns = config:get("replicator", "http_connections", "20"),
     DefTimeout = config:get("replicator", "connection_timeout", "30000"),
-    DefRetries = config:get("replicator", "retries_per_request", "10"),
+    DefRetries = config:get("replicator", "retries_per_request", "5"),
     UseCheckpoints = config:get("replicator", "use_checkpoints", "true"),
     DefCheckpointInterval = config:get("replicator", "checkpoint_interval",
         "30000"),
