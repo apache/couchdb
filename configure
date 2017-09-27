@@ -156,7 +156,7 @@ cat > rel/couchdb.config << EOF
 {log_file, "$LOG_FILE"}.
 {fauxton_root, "./share/www"}.
 {user, "$COUCHDB_USER"}.
-{node_name, "-name couchdb@localhost"}.
+{node_name, "-name couchdb@127.0.0.1"}.
 {cluster_port, 5984}.
 {backend_port, 5986}.
 EOF
