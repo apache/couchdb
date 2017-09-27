@@ -72,3 +72,14 @@ is_compressed_test_() ->
         ?_assertError(invalid_compression,
             couch_compress:is_compressed(?CORRUPT, snappy))
     ].
+
+uncompressed_size_test_() ->
+    [
+        ?_assertEqual(49, couch_compress:uncompressed_size(?NONE)),
+        ?_assertEqual(49, couch_compress:uncompressed_size(?DEFLATE)),
+        ?_assertEqual(49, couch_compress:uncompressed_size(?SNAPPY)),
+        ?_assertEqual(5, couch_compress:uncompressed_size(
+            couch_compress:compress(x, {deflate, 9}))),
+        ?_assertError(invalid_compression,
+            couch_compress:uncompressed_size(?CORRUPT))
+    ].

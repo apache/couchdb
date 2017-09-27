@@ -10,11 +10,14 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-{application, couch_stats, [
-    {description, "Simple statistics collection"},
-    {vsn, git},
-    {registered, [couch_stats_aggregator, couch_stats_process_tracker]},
-    {applications, [kernel, stdlib, folsom, couch_log]},
-    {mod, {couch_stats_app, []}},
-    {env, []}
-]}.
+
+-record(entry, {
+    name,
+    db,
+    pid,
+    lock,
+    waiters,
+    req_type,
+    db_options,
+    start_time
+}).

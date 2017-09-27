@@ -87,8 +87,8 @@ should_all_processes_be_alive(RepPid, Source, Target) ->
         {ok, SourceDb} = reopen_db(Source),
         {ok, TargetDb} = reopen_db(Target),
         ?assert(is_process_alive(RepPid)),
-        ?assert(is_process_alive(SourceDb#db.main_pid)),
-        ?assert(is_process_alive(TargetDb#db.main_pid))
+        ?assert(is_process_alive(couch_db:get_pid(SourceDb))),
+        ?assert(is_process_alive(couch_db:get_pid(TargetDb)))
     end).
 
 should_run_replication(RepPid, RepId, Source, Target) ->
@@ -164,12 +164,12 @@ should_populate_and_compact(RepPid, Source, Target, BatchSize, Rounds) ->
 
                 compact_db("source", SourceDb),
                 ?assert(is_process_alive(RepPid)),
-                ?assert(is_process_alive(SourceDb#db.main_pid)),
+                ?assert(is_process_alive(couch_db:get_pid(SourceDb))),
                 wait_for_compaction("source", SourceDb),
 
                 compact_db("target", TargetDb),
                 ?assert(is_process_alive(RepPid)),
-                ?assert(is_process_alive(TargetDb#db.main_pid)),
+                ?assert(is_process_alive(couch_db:get_pid(TargetDb))),
                 wait_for_compaction("target", TargetDb),
 
                 {ok, SourceDb2} = reopen_db(SourceDb),
@@ -180,14 +180,14 @@ should_populate_and_compact(RepPid, Source, Target, BatchSize, Rounds) ->
 
                 compact_db("source", SourceDb2),
                 ?assert(is_process_alive(RepPid)),
-                ?assert(is_process_alive(SourceDb2#db.main_pid)),
+                ?assert(is_process_alive(couch_db:get_pid(SourceDb2))),
                 pause_writer(Writer),
                 wait_for_compaction("source", SourceDb2),
                 resume_writer(Writer),
 
                 compact_db("target", TargetDb2),
                 ?assert(is_process_alive(RepPid)),
-                ?assert(is_process_alive(TargetDb2#db.main_pid)),
+                ?assert(is_process_alive(couch_db:get_pid(TargetDb2))),
                 pause_writer(Writer),
                 wait_for_compaction("target", TargetDb2),
                 resume_writer(Writer)
@@ -263,14 +263,16 @@ should_compare_databases(Source, Target) ->
 
 reopen_db({remote, Db}) ->
     reopen_db(Db);
-reopen_db(#db{name=DbName}) ->
-    reopen_db(DbName);
-reopen_db(DbName) ->
+reopen_db(DbName) when is_binary(DbName) ->
     {ok, Db} = couch_db:open_int(DbName, []),
     ok = couch_db:close(Db),
-    {ok, Db}.
+    {ok, Db};
+reopen_db(Db) ->
+    reopen_db(couch_db:name(Db)).
 
-compact_db(Type, #db{name = Name}) ->
+
+compact_db(Type, Db0) ->
+    Name = couch_db:name(Db0),
     {ok, Db} = couch_db:open_int(Name, []),
     {ok, CompactPid} = couch_db:start_compact(Db),
     MonRef = erlang:monitor(process, CompactPid),
@@ -405,7 +407,8 @@ stop_writer(Pid) ->
                        {reason, "Timeout stopping source database writer"}]})
     end.
 
-writer_loop(#db{name = DbName}, Parent, Counter) ->
+writer_loop(Db0, Parent, Counter) ->
+    DbName = couch_db:name(Db0),
     {ok, Data} = file:read_file(?ATTFILE),
     maybe_pause(Parent, Counter),
     Doc = couch_doc:from_json_obj({[

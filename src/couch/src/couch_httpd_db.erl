@@ -70,7 +70,8 @@ handle_changes_req(#httpd{method='GET'}=Req, Db, ChangesArgs, ChangesFun) ->
 handle_changes_req(#httpd{}=Req, _Db, _ChangesArgs, _ChangesFun) ->
     couch_httpd:send_method_not_allowed(Req, "GET,HEAD,POST").
 
-handle_changes_req1(Req, #db{name=DbName}=Db, ChangesArgs, ChangesFun) ->
+handle_changes_req1(Req, Db, ChangesArgs, ChangesFun) ->
+    DbName = couch_db:name(Db),
     AuthDbName = ?l2b(config:get("couch_httpd_auth", "authentication_db")),
     case AuthDbName of
     DbName ->
@@ -287,7 +288,7 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_ensure_full_commit">>]}=Req, Db) -
         RequiredSeq > CommittedSeq ->
             couch_db:ensure_full_commit(Db);
         true ->
-            {ok, Db#db.instance_start_time}
+            {ok, couch_db:get_instance_start_time(Db)}
         end
     end,
     send_json(Req, 201, {[
@@ -733,7 +734,8 @@ update_doc_result_to_json(DocId, Error) ->
 
 
 update_doc(Req, Db, DocId, #doc{deleted=false}=Doc) ->
-    Loc = absolute_uri(Req, "/" ++ couch_util:url_encode(Db#db.name) ++ "/" ++ couch_util:url_encode(DocId)),
+    DbName = couch_db:name(Db),
+    Loc = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName) ++ "/" ++ couch_util:url_encode(DocId)),
     update_doc(Req, Db, DocId, Doc, [{"Location", Loc}]);
 update_doc(Req, Db, DocId, Doc) ->
     update_doc(Req, Db, DocId, Doc, []).
@@ -1037,7 +1039,7 @@ db_attachment_req(#httpd{method=Method,mochi_req=MochiReq}=Req, Db, DocId, FileN
         [];
     _ ->
         [{"Location", absolute_uri(Req, "/" ++
-            couch_util:url_encode(Db#db.name) ++ "/" ++
+            couch_util:url_encode(couch_db:name(Db)) ++ "/" ++
             couch_util:url_encode(DocId) ++ "/" ++
             couch_util:url_encode(FileName)
         )}]
@@ -1149,7 +1151,7 @@ parse_changes_query(Req, Db) ->
         {"descending", "true"} ->
             Args#changes_args{dir=rev};
         {"since", "now"} ->
-            UpdateSeq = couch_util:with_db(Db#db.name, fun(WDb) ->
+            UpdateSeq = couch_util:with_db(couch_db:name(Db), fun(WDb) ->
                                         couch_db:get_update_seq(WDb)
                                 end),
             Args#changes_args{since=UpdateSeq};

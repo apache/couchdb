@@ -30,12 +30,7 @@
 -define(i2b(V), couch_util:integer_to_boolean(V)).
 -define(b2i(V), couch_util:boolean_to_integer(V)).
 -define(term_to_bin(T), term_to_binary(T, [{minor_version, 1}])).
--define(term_size(T),
-    try
-        erlang:external_size(T)
-    catch _:_ ->
-        byte_size(?term_to_bin(T))
-    end).
+-define(term_size(T), erlang:external_size(T, [{minor_version, 1}])).
 
 -define(DEFAULT_ATTACHMENT_CONTENT_TYPE, <<"application/octet-stream">>).
 
@@ -127,33 +122,6 @@
     name=null,
     roles=[],
     handler
-}).
-
--record(db, {
-    main_pid = nil,
-    compactor_pid = nil,
-    instance_start_time, % number of microsecs since jan 1 1970 as a binary string
-    fd,
-    fd_monitor,
-    header = couch_db_header:new(),
-    committed_update_seq,
-    id_tree,
-    seq_tree,
-    local_tree,
-    update_seq,
-    name,
-    filepath,
-    validate_doc_funs = undefined,
-    security = [],
-    security_ptr = nil,
-    user_ctx = #user_ctx{},
-    waiting_delayed_commit = nil,
-    revs_limit = 1000,
-    fsync_options = [],
-    options = [],
-    compression,
-    before_doc_update = nil, % nil | fun(Doc, Db) -> NewDoc
-    after_doc_read = nil    % nil | fun(Doc, Db) -> NewDoc
 }).
 
 -record(view_fold_helper_funs, {

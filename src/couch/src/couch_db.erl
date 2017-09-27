@@ -12,32 +12,118 @@
 
 -module(couch_db).
 
--export([open/2,open_int/2,close/1,create/2,get_db_info/1,get_design_docs/1]).
--export([start_compact/1, cancel_compact/1]).
--export([wait_for_compaction/1, wait_for_compaction/2]).
--export([is_idle/1,monitor/1,count_changes_since/2]).
--export([update_doc/3,update_doc/4,update_docs/4,update_docs/2,update_docs/3,delete_doc/3]).
--export([get_doc_info/2,get_full_doc_info/2,get_full_doc_infos/2]).
--export([open_doc/2,open_doc/3,open_doc_revs/4]).
--export([set_revs_limit/2,get_revs_limit/1]).
--export([get_missing_revs/2,name/1,get_update_seq/1,get_committed_update_seq/1]).
--export([get_uuid/1, get_epochs/1, get_compacted_seq/1]).
--export([enum_docs/4,enum_docs_since/5]).
--export([enum_docs_since_reduce_to_count/1,enum_docs_reduce_to_count/1]).
--export([increment_update_seq/1,get_purge_seq/1,purge_docs/2,get_last_purged/1]).
--export([start_link/3,open_doc_int/3,ensure_full_commit/1,ensure_full_commit/2]).
--export([set_security/2,get_security/1]).
--export([changes_since/4,changes_since/5,read_doc/2,new_revid/1]).
--export([check_is_admin/1, is_admin/1, check_is_member/1, get_doc_count/1]).
--export([reopen/1, is_system_db/1, compression/1, make_doc/5]).
--export([load_validation_funs/1]).
--export([check_md5/2, with_stream/3]).
--export([monitored_by/1]).
--export([normalize_dbname/1]).
--export([validate_dbname/1]).
--export([dbname_suffix/1]).
+-export([
+    create/2,
+    open/2,
+    open_int/2,
+    incref/1,
+    reopen/1,
+    close/1,
+
+    clustered_db/2,
+    clustered_db/3,
+
+    monitor/1,
+    monitored_by/1,
+    is_idle/1,
+
+    is_admin/1,
+    check_is_admin/1,
+    check_is_member/1,
+
+    name/1,
+    compression/1,
+    get_after_doc_read_fun/1,
+    get_before_doc_update_fun/1,
+    get_committed_update_seq/1,
+    get_compacted_seq/1,
+    get_compactor_pid/1,
+    get_db_info/1,
+    get_doc_count/1,
+    get_epochs/1,
+    get_filepath/1,
+    get_instance_start_time/1,
+    get_last_purged/1,
+    get_pid/1,
+    get_revs_limit/1,
+    get_security/1,
+    get_update_seq/1,
+    get_user_ctx/1,
+    get_uuid/1,
+    get_purge_seq/1,
+
+    is_db/1,
+    is_system_db/1,
+    is_clustered/1,
+
+    increment_update_seq/1,
+    set_revs_limit/2,
+    set_security/2,
+    set_user_ctx/2,
+
+    ensure_full_commit/1,
+    ensure_full_commit/2,
+
+    load_validation_funs/1,
+
+    open_doc/2,
+    open_doc/3,
+    open_doc_revs/4,
+    open_doc_int/3,
+    read_doc/2,
+    get_doc_info/2,
+    get_full_doc_info/2,
+    get_full_doc_infos/2,
+    get_missing_revs/2,
+    get_design_docs/1,
+
+    update_doc/3,
+    update_doc/4,
+    update_docs/4,
+    update_docs/2,
+    update_docs/3,
+    delete_doc/3,
+
+    purge_docs/2,
+
+    with_stream/3,
+
+    fold_docs/4,
+    fold_local_docs/4,
+    enum_docs/4,
+    enum_docs_reduce_to_count/1,
+
+    enum_docs_since/5,
+    enum_docs_since_reduce_to_count/1,
+    changes_since/4,
+    changes_since/5,
+    count_changes_since/2,
+
+    calculate_start_seq/3,
+    owner_of/2,
+
+    start_compact/1,
+    cancel_compact/1,
+    wait_for_compaction/1,
+    wait_for_compaction/2,
+
+    dbname_suffix/1,
+    normalize_dbname/1,
+    validate_dbname/1,
+
+    check_md5/2,
+    make_doc/5,
+    new_revid/1
+]).
+
+
+-export([
+    start_link/3
+]).
+
 
 -include_lib("couch/include/couch_db.hrl").
+-include("couch_db_int.hrl").
 
 -define(DBNAME_REGEX,
     "^[a-z][a-z0-9\\_\\$()\\+\\-\\/]*" % use the stock CouchDB regex
@@ -112,8 +198,30 @@ reopen(#db{main_pid = Pid, fd = Fd, fd_monitor = OldRef, user_ctx = UserCtx}) ->
         {ok, NewDb#db{user_ctx = UserCtx, fd_monitor = NewRef}}
     end.
 
+incref(#db{fd = Fd} = Db) ->
+    Ref = erlang:monitor(process, Fd),
+    {ok, Db#db{fd_monitor = Ref}}.
+
+clustered_db(DbName, UserCtx) ->
+    clustered_db(DbName, UserCtx, []).
+
+clustered_db(DbName, UserCtx, SecProps) ->
+    {ok, #db{name = DbName, user_ctx = UserCtx, security = SecProps}}.
+
+is_db(#db{}) ->
+    true;
+is_db(_) ->
+    false.
+
 is_system_db(#db{options = Options}) ->
     lists:member(sys_db, Options).
+
+is_clustered(#db{main_pid = nil}) ->
+    true;
+is_clustered(#db{}) ->
+    false;
+is_clustered(?NEW_PSE_DB = Db) ->
+    ?PSE_DB_MAIN_PID(Db) == undefined.
 
 ensure_full_commit(#db{main_pid=Pid, instance_start_time=StartTime}) ->
     ok = gen_server:call(Pid, full_commit, infinity),
@@ -126,6 +234,8 @@ ensure_full_commit(Db, RequiredSeq) ->
 
 close(#db{fd_monitor=Ref}) ->
     erlang:demonitor(Ref, [flush]),
+    ok;
+close(?NEW_PSE_DB) ->
     ok.
 
 is_idle(#db{compactor_pid=nil, waiting_delayed_commit=nil} = Db) ->
@@ -295,11 +405,22 @@ increment_update_seq(#db{main_pid=Pid}) ->
 purge_docs(#db{main_pid=Pid}, IdsRevs) ->
     gen_server:call(Pid, {purge_docs, IdsRevs}).
 
+get_after_doc_read_fun(#db{after_doc_read = Fun}) ->
+    Fun.
+
+get_before_doc_update_fun(#db{before_doc_update = Fun}) ->
+    Fun.
+
 get_committed_update_seq(#db{committed_update_seq=Seq}) ->
     Seq.
 
 get_update_seq(#db{update_seq=Seq})->
     Seq.
+
+get_user_ctx(#db{user_ctx = UserCtx}) ->
+    UserCtx;
+get_user_ctx(?NEW_PSE_DB = Db) ->
+    ?PSE_DB_USER_CTX(Db).
 
 get_purge_seq(#db{}=Db) ->
     couch_db_header:purge_seq(Db#db.header).
@@ -312,18 +433,32 @@ get_last_purged(#db{}=Db) ->
             couch_file:pread_term(Db#db.fd, Pointer)
     end.
 
+get_pid(#db{main_pid = Pid}) ->
+    Pid.
+
 get_doc_count(Db) ->
-    {ok, {Count, _, _}} = couch_btree:full_reduce(Db#db.id_tree),
-    {ok, Count}.
+    {ok, Reds} = couch_btree:full_reduce(Db#db.id_tree),
+    {ok, element(1, Reds)}.
 
 get_uuid(#db{}=Db) ->
     couch_db_header:uuid(Db#db.header).
 
 get_epochs(#db{}=Db) ->
-    couch_db_header:epochs(Db#db.header).
+    Epochs = couch_db_header:epochs(Db#db.header),
+    validate_epochs(Epochs),
+    Epochs.
+
+get_filepath(#db{filepath = FilePath}) ->
+    FilePath.
+
+get_instance_start_time(#db{instance_start_time = IST}) ->
+    IST.
 
 get_compacted_seq(#db{}=Db) ->
     couch_db_header:compacted_seq(Db#db.header).
+
+get_compactor_pid(#db{compactor_pid = Pid}) ->
+    Pid.
 
 get_db_info(Db) ->
     #db{fd=Fd,
@@ -503,7 +638,9 @@ get_members(#db{security=SecProps}) ->
         couch_util:get_value(<<"readers">>, SecProps, {[]})).
 
 get_security(#db{security=SecProps}) ->
-    {SecProps}.
+    {SecProps};
+get_security(?NEW_PSE_DB = Db) ->
+    {?PSE_DB_SECURITY(Db)}.
 
 set_security(#db{main_pid=Pid}=Db, {NewSecProps}) when is_list(NewSecProps) ->
     check_is_admin(Db),
@@ -513,6 +650,9 @@ set_security(#db{main_pid=Pid}=Db, {NewSecProps}) when is_list(NewSecProps) ->
     ok;
 set_security(_, _) ->
     throw(bad_request).
+
+set_user_ctx(#db{} = Db, UserCtx) ->
+    {ok, Db#db{user_ctx = UserCtx}}.
 
 validate_security_object(SecProps) ->
     Admins = couch_util:get_value(<<"admins">>, SecProps, {[]}),
@@ -549,7 +689,9 @@ set_revs_limit(_Db, _Limit) ->
     throw(invalid_revs_limit).
 
 name(#db{name=Name}) ->
-    Name.
+    Name;
+name(?NEW_PSE_DB = Db) ->
+    ?PSE_DB_NAME(Db).
 
 compression(#db{compression=Compression}) ->
     Compression.
@@ -1275,6 +1417,17 @@ enum_docs_since(Db, SinceSeq, InFun, Acc, Options) ->
             [{start_key, SinceSeq + 1} | Options]),
     {ok, enum_docs_since_reduce_to_count(LastReduction), AccOut}.
 
+
+fold_docs(Db, InFun, InAcc, Opts) ->
+    Wrapper = fun(FDI, _, Acc) -> InFun(FDI, Acc) end,
+    {ok, _, AccOut} = couch_btree:fold(Db#db.id_tree, Wrapper, InAcc, Opts),
+    {ok, AccOut}.
+
+fold_local_docs(Db, InFun, InAcc, Opts) ->
+    Wrapper = fun(FDI, _, Acc) -> InFun(FDI, Acc) end,
+    {ok, _, AccOut} = couch_btree:fold(Db#db.local_tree, Wrapper, InAcc, Opts),
+    {ok, AccOut}.
+
 enum_docs(Db, InFun, InAcc, Options0) ->
     {NS, Options} = extract_namespace(Options0),
     enum_docs(Db, NS, InFun, InAcc, Options).
@@ -1297,6 +1450,78 @@ enum_docs(Db, NS, InFun, InAcc, Options0) ->
     {ok, LastReduce, OutAcc} = couch_btree:fold(
         Db#db.id_tree, FoldFun, InAcc, Options),
     {ok, enum_docs_reduce_to_count(LastReduce), OutAcc}.
+
+
+calculate_start_seq(_Db, _Node, Seq) when is_integer(Seq) ->
+    Seq;
+calculate_start_seq(Db, Node, {Seq, Uuid}) ->
+    % Treat the current node as the epoch node
+    calculate_start_seq(Db, Node, {Seq, Uuid, Node});
+calculate_start_seq(Db, _Node, {Seq, Uuid, EpochNode}) ->
+    case is_prefix(Uuid, get_uuid(Db)) of
+        true ->
+            case is_owner(EpochNode, Seq, get_epochs(Db)) of
+                true -> Seq;
+                false -> 0
+            end;
+        false ->
+            %% The file was rebuilt, most likely in a different
+            %% order, so rewind.
+            0
+    end;
+calculate_start_seq(Db, _Node, {replace, OriginalNode, Uuid, Seq}) ->
+    case is_prefix(Uuid, couch_db:get_uuid(Db)) of
+        true ->
+            start_seq(get_epochs(Db), OriginalNode, Seq);
+        false ->
+            {replace, OriginalNode, Uuid, Seq}
+    end.
+
+
+validate_epochs(Epochs) ->
+    %% Assert uniqueness.
+    case length(Epochs) == length(lists:ukeysort(2, Epochs)) of
+        true  -> ok;
+        false -> erlang:error(duplicate_epoch)
+    end,
+    %% Assert order.
+    case Epochs == lists:sort(fun({_, A}, {_, B}) -> B =< A end, Epochs) of
+        true  -> ok;
+        false -> erlang:error(epoch_order)
+    end.
+
+
+is_prefix(Pattern, Subject) ->
+     binary:longest_common_prefix([Pattern, Subject]) == size(Pattern).
+
+
+is_owner(Node, Seq, Epochs) ->
+    Node =:= owner_of(Epochs, Seq).
+
+
+owner_of(Db, Seq) when not is_list(Db) ->
+    owner_of(get_epochs(Db), Seq);
+owner_of([], _Seq) ->
+    undefined;
+owner_of([{EpochNode, EpochSeq} | _Rest], Seq) when Seq > EpochSeq ->
+    EpochNode;
+owner_of([_ | Rest], Seq) ->
+    owner_of(Rest, Seq).
+
+
+start_seq([{OrigNode, EpochSeq} | _], OrigNode, Seq) when Seq > EpochSeq ->
+    %% OrigNode is the owner of the Seq so we can safely stream from there
+    Seq;
+start_seq([{_, NewSeq}, {OrigNode, _} | _], OrigNode, Seq) when Seq > NewSeq ->
+    %% We transferred this file before Seq was written on OrigNode, so we need
+    %% to stream from the beginning of the next epoch. Note that it is _not_
+    %% necessary for the current node to own the epoch beginning at NewSeq
+    NewSeq;
+start_seq([_ | Rest], OrigNode, Seq) ->
+    start_seq(Rest, OrigNode, Seq);
+start_seq([], OrigNode, Seq) ->
+    erlang:error({epoch_mismatch, OrigNode, Seq}).
+
 
 extract_namespace(Options0) ->
     case proplists:split(Options0, [namespace]) of
@@ -1635,6 +1860,30 @@ should_fail_validate_dbname(DbName) ->
         ?assertEqual(to_binary(DbName), FailedDbName),
         ok
     end)}.
+
+calculate_start_seq_test() ->
+    %% uuid mismatch is always a rewind.
+    Hdr1 = couch_db_header:new(),
+    Hdr2 = couch_db_header:set(Hdr1, [{epochs, [{node1, 1}]}, {uuid, <<"uuid1">>}]),
+    ?assertEqual(0, calculate_start_seq(#db{header=Hdr2}, node1, {1, <<"uuid2">>})),
+    %% uuid matches and seq is owned by node.
+    Hdr3 = couch_db_header:set(Hdr2, [{epochs, [{node1, 1}]}]),
+    ?assertEqual(2, calculate_start_seq(#db{header=Hdr3}, node1, {2, <<"uuid1">>})),
+    %% uuids match but seq is not owned by node.
+    Hdr4 = couch_db_header:set(Hdr2, [{epochs, [{node2, 2}, {node1, 1}]}]),
+    ?assertEqual(0, calculate_start_seq(#db{header=Hdr4}, node1, {3, <<"uuid1">>})),
+    %% return integer if we didn't get a vector.
+    ?assertEqual(4, calculate_start_seq(#db{}, foo, 4)).
+
+is_owner_test() ->
+    ?assertNot(is_owner(foo, 1, [])),
+    ?assertNot(is_owner(foo, 1, [{foo, 1}])),
+    ?assert(is_owner(foo, 2, [{foo, 1}])),
+    ?assert(is_owner(foo, 50, [{bar, 100}, {foo, 1}])),
+    ?assert(is_owner(foo, 50, [{baz, 200}, {bar, 100}, {foo, 1}])),
+    ?assert(is_owner(bar, 150, [{baz, 200}, {bar, 100}, {foo, 1}])),
+    ?assertError(duplicate_epoch, validate_epochs([{foo, 1}, {bar, 1}])),
+    ?assertError(epoch_order, validate_epochs([{foo, 100}, {bar, 200}])).
 
 to_binary(DbName) when is_list(DbName) ->
     ?l2b(DbName);

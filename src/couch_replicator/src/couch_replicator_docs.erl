@@ -121,7 +121,7 @@ update_error(#rep{db_name = DbName, doc_id = DocId, id = RepId}, Error) ->
     ok.
 
 
--spec ensure_rep_db_exists() -> {ok, #db{}}.
+-spec ensure_rep_db_exists() -> {ok, Db::any()}.
 ensure_rep_db_exists() ->
     Db = case couch_db:open_int(?REP_DB_NAME, [?CTX, sys_db,
             nologifmissing]) of
@@ -466,7 +466,7 @@ make_options(Props) ->
     DefBatchSize = config:get("replicator", "worker_batch_size", "500"),
     DefConns = config:get("replicator", "http_connections", "20"),
     DefTimeout = config:get("replicator", "connection_timeout", "30000"),
-    DefRetries = config:get("replicator", "retries_per_request", "10"),
+    DefRetries = config:get("replicator", "retries_per_request", "5"),
     UseCheckpoints = config:get("replicator", "use_checkpoints", "true"),
     DefCheckpointInterval = config:get("replicator", "checkpoint_interval",
         "30000"),
@@ -621,11 +621,14 @@ ssl_verify_options(false) ->
     [{verify, verify_none}].
 
 
--spec before_doc_update(#doc{}, #db{}) -> #doc{}.
+-spec before_doc_update(#doc{}, Db::any()) -> #doc{}.
 before_doc_update(#doc{id = <<?DESIGN_DOC_PREFIX, _/binary>>} = Doc, _Db) ->
     Doc;
-before_doc_update(#doc{body = {Body}} = Doc, #db{user_ctx=UserCtx} = Db) ->
-    #user_ctx{roles = Roles, name = Name} = UserCtx,
+before_doc_update(#doc{body = {Body}} = Doc, Db) ->
+    #user_ctx{
+       roles = Roles,
+       name = Name
+    } = couch_db:get_user_ctx(Db),
     case lists:member(<<"_replicator">>, Roles) of
     true ->
         Doc;
@@ -649,11 +652,11 @@ before_doc_update(#doc{body = {Body}} = Doc, #db{user_ctx=UserCtx} = Db) ->
     end.
 
 
--spec after_doc_read(#doc{}, #db{}) -> #doc{}.
+-spec after_doc_read(#doc{}, Db::any()) -> #doc{}.
 after_doc_read(#doc{id = <<?DESIGN_DOC_PREFIX, _/binary>>} = Doc, _Db) ->
     Doc;
-after_doc_read(#doc{body = {Body}} = Doc, #db{user_ctx=UserCtx} = Db) ->
-    #user_ctx{name = Name} = UserCtx,
+after_doc_read(#doc{body = {Body}} = Doc, Db) ->
+    #user_ctx{name = Name} = couch_db:get_user_ctx(Db),
     case (catch couch_db:check_is_admin(Db)) of
     ok ->
         Doc;

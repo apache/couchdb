@@ -170,16 +170,15 @@ find_source_seq_int(#doc{body={Props}}, SrcNode0, TgtNode0, TgtUUID, TgtSeq) ->
     end.
 
 
-repl(#db{name=DbName, seq_tree=Bt}=Db, Acc0) ->
-    erlang:put(io_priority, {internal_repl, DbName}),
+repl(Db, Acc0) ->
+    erlang:put(io_priority, {internal_repl, couch_db:name(Db)}),
     #acc{seq=Seq} = Acc1 = calculate_start_seq(Acc0#acc{source = Db}),
     case Seq >= couch_db:get_update_seq(Db) of
         true ->
             {ok, 0};
         false ->
             Fun = fun ?MODULE:changes_enumerator/3,
-            FoldOpts =  [{start_key, Seq + 1}],
-            {ok, _, Acc2} = couch_btree:fold(Bt, Fun, Acc1, FoldOpts),
+            {ok, _, Acc2} = couch_db:enum_docs_since(Db, Seq, Fun, Acc1, []),
             {ok, #acc{seq = LastSeq}} = replicate_batch(Acc2),
             {ok, couch_db:count_changes_since(Db, LastSeq)}
     end.
@@ -343,7 +342,7 @@ find_repl_doc(SrcDb, TgtUUIDPrefix) ->
     SrcUUID = couch_db:get_uuid(SrcDb),
     S = couch_util:encodeBase64Url(crypto:hash(md5, term_to_binary(SrcUUID))),
     DocIdPrefix = <<"_local/shard-sync-", S/binary, "-">>,
-    FoldFun = fun({DocId, {Rev0, {BodyProps}}}, _, _) ->
+    FoldFun = fun({DocId, {Rev0, {BodyProps}}}, _) ->
         TgtUUID = couch_util:get_value(<<"target_uuid">>, BodyProps, <<>>),
         case is_prefix(DocIdPrefix, DocId) of
             true ->
@@ -360,10 +359,10 @@ find_repl_doc(SrcDb, TgtUUIDPrefix) ->
         end
     end,
     Options = [{start_key, DocIdPrefix}],
-    case couch_btree:fold(SrcDb#db.local_tree, FoldFun, not_found, Options) of
-        {ok, _, {TgtUUID, Doc}} ->
+    case couch_db:fold_local_docs(SrcDb, FoldFun, not_found, Options) of
+        {ok, {TgtUUID, Doc}} ->
             {ok, TgtUUID, Doc};
-        {ok, _, not_found} ->
+        {ok, not_found} ->
             {not_found, missing};
         Else ->
             couch_log:error("Error finding replication doc: ~w", [Else]),

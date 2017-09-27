@@ -91,7 +91,7 @@ check_all_indexers_exit_on_ddoc_change({_Ctx, DbName}) ->
         % assert that all index processes exit after ddoc updated
         ok = meck:reset(test_index),
         couch_index_server:handle_db_event(
-            DbShard#db.name, {ddoc_updated, DDocID}, {st, ""}),
+            couch_db:name(DbShard), {ddoc_updated, DDocID}, {st, ""}),
 
         ok = meck:wait(N, test_index, init, ['_', '_'], 5000),
         IndexesAfter = get_indexes_by_ddoc(DDocID, 0),

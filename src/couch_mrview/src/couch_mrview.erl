@@ -364,15 +364,12 @@ get_view_info(Db, DDoc, VName) ->
 
 
 %% @doc refresh a view index
-refresh(#db{name=DbName}, DDoc) ->
-    refresh(DbName, DDoc);
-
-refresh(Db, DDoc) ->
-    UpdateSeq = couch_util:with_db(Db, fun(WDb) ->
+refresh(DbName, DDoc) when is_binary(DbName)->
+    UpdateSeq = couch_util:with_db(DbName, fun(WDb) ->
                     couch_db:get_update_seq(WDb)
             end),
 
-    case couch_index_server:get_index(couch_mrview_index, Db, DDoc) of
+    case couch_index_server:get_index(couch_mrview_index, DbName, DDoc) of
         {ok, Pid} ->
             case catch couch_index:get_state(Pid, UpdateSeq) of
                 {ok, _} -> ok;
@@ -380,7 +377,10 @@ refresh(Db, DDoc) ->
             end;
         Error ->
             {error, Error}
-    end.
+    end;
+
+refresh(Db, DDoc) ->
+    refresh(couch_db:name(Db), DDoc).
 
 compact(Db, DDoc) ->
     compact(Db, DDoc, []).
@@ -668,7 +668,7 @@ get_reduce_fun(#mrargs{extra = Extra}) ->
     end.
 
 
-get_total_rows(#db{} = Db, #mrargs{extra = Extra}) ->
+get_total_rows(Db, #mrargs{extra = Extra}) ->
     case couch_util:get_value(namespace, Extra) of
         <<"_local">> ->
             null;
@@ -678,7 +678,7 @@ get_total_rows(#db{} = Db, #mrargs{extra = Extra}) ->
     end.
 
 
-get_update_seq(#db{} = Db, #mrargs{extra = Extra}) ->
+get_update_seq(Db, #mrargs{extra = Extra}) ->
     case couch_util:get_value(namespace, Extra) of
         <<"_local">> ->
             null;
