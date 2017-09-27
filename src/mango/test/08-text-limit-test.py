@@ -47,7 +47,6 @@ class LimitTests(mango.LimitDocsTextTests):
     def test_limit_field5(self):
         q = {"age": {"$exists": True}}
         docs = self.db.find(q, limit=250)
-        print len(docs)
         assert len(docs) == 75
         for d in docs:
             assert d["age"] < 100
@@ -78,7 +77,7 @@ class LimitTests(mango.LimitDocsTextTests):
         q = {"$or": [{"user_id" : {"$lt" : 100}}, {"filtered_array.[]": 1}]}
         try:
             self.db.find(q, limit=-1)
-        except Exception, e:
+        except Exception as e:
             assert e.response.status_code == 400
         else:
             raise AssertionError("Should have thrown error for negative limit")
@@ -87,7 +86,7 @@ class LimitTests(mango.LimitDocsTextTests):
         q = {"$or": [{"user_id" : {"$lt" : 100}}, {"filtered_array.[]": 1}]}
         try:
             self.db.find(q, skip=-1)
-        except Exception, e:
+        except Exception as e:
             assert e.response.status_code == 400
         else:
             raise AssertionError("Should have thrown error for negative skip")
@@ -102,7 +101,6 @@ class LimitTests(mango.LimitDocsTextTests):
 
 
     def run_bookmark_check(self, size):
-        print size
         q = {"age": {"$gt": 0}}
         seen_docs = set()
         bm = None
