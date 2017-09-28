@@ -72,5 +72,5 @@ if [ ! -z "$VERBOSE" ]; then
 fi
 
 exec "$BINDIR/erl" -boot "$ROOTDIR/releases/$APP_VSN/start_clean" \
-    -name remsh$$@$LHOST -remsh $NAME -hidden -setcookie $COOKIE \
+    -name remsh$$@$LHOST -remsh $NODE -hidden -setcookie $COOKIE \
     "$@"
