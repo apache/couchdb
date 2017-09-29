@@ -114,11 +114,12 @@ columns(Idx) ->
 
 
 is_usable(Idx, Selector) ->
-    % This index is usable if at least the first column is
-    % a member of the indexable fields of the selector.
-    Columns = columns(Idx),
-    Fields = indexable_fields(Selector),
-    lists:member(hd(Columns), Fields) andalso not is_text_search(Selector).
+    % This index is usable if all of the columns are 
+    % restricted by the selector such that they are required to exist
+    % and the selector is not a text search (so requires a text index)
+    RequiredFields = columns(Idx),
+    mango_selector:has_required_fields(Selector, RequiredFields)
+        andalso not is_text_search(Selector).
 
 
 is_text_search({[]}) ->
@@ -198,8 +199,8 @@ opts() ->
             {tag, fields},
             {validator, fun mango_opts:validate_sort/1}
         ]},
-        {<<"selector">>, [
-            {tag, selector},
+        {<<"partial_filter_selector">>, [
+            {tag, partial_filter_selector},
             {optional, true},
             {default, {[]}},
             {validator, fun mango_opts:validate_selector/1}

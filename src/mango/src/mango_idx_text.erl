@@ -223,7 +223,13 @@ opts() ->
             {optional, true},
             {default, {[]}}
         ]},
-         {<<"selector">>, [
+        {<<"partial_filter_selector">>, [
+            {tag, partial_filter_selector},
+            {optional, true},
+            {default, {[]}},
+            {validator, fun mango_opts:validate_selector/1}
+        ]},
+        {<<"selector">>, [
             {tag, selector},
             {optional, true},
             {default, {[]}},
@@ -344,8 +350,9 @@ indexable_fields(Fields, {op_default, _}) ->
     [<<"$default">> | Fields].
 
 
-maybe_reject_index_all_req({Def}, #db{name=DbName, user_ctx=Ctx}) ->
-    User = Ctx#user_ctx.name,
+maybe_reject_index_all_req({Def}, Db) ->
+    DbName = couch_db:name(Db),
+    #user_ctx{name = User} = couch_db:get_user_ctx(Db),
     Fields = couch_util:get_value(fields, Def),
     case {Fields, forbid_index_all()} of
         {all_fields, "true"} ->
@@ -374,7 +381,9 @@ setup() ->
         end),
     %default index all def that generates {fields, all_fields}
     Index = #idx{def={[]}},
-    Db = #db{name = <<"testdb">>, user_ctx=#user_ctx{name = <<"u1">>}},
+    DbName = <<"testdb">>,
+    UserCtx = #user_ctx{name = <<"u1">>},
+    {ok, Db} = couch_db:clustered_db(DbName, UserCtx),
     {Index, Db, Ctx}.
 
 

@@ -494,6 +494,9 @@ flush(Fd, Att) ->
     flush_data(Fd, fetch(data, Att), Att).
 
 
+flush_data(Fd, {stream, {couch_bt_engine_stream, {OtherFd, StreamPointer}}},
+        Att) ->
+    flush_data(Fd, {OtherFd, StreamPointer}, Att);
 flush_data(Fd, {Fd0, _}, Att) when Fd0 == Fd ->
     % already written to our file, nothing to write
     Att;

@@ -56,7 +56,7 @@ class CustomFieldsTest(mango.UserDocsTextTests):
         try:
             self.db.find({"selector": {"$or": [{"favorites": "Ruby"},
                 {"favorites.0":"Ruby"}]}})
-        except Exception, e:
+        except Exception as e:
                 assert e.response.status_code == 400
 
     def test_in_with_array(self):
@@ -82,7 +82,7 @@ class CustomFieldsTest(mango.UserDocsTextTests):
         vals = ["Random Garbage", 52, {"Versions": {"Alpha": "Beta"}}]
         try:
             self.db.find({"favorites": {"$in": vals}})
-        except Exception, e:
+        except Exception as e:
                 assert e.response.status_code == 400
 
     def test_nin_with_array(self):

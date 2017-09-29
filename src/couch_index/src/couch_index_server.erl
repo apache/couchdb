@@ -60,11 +60,9 @@ validate(DbName, DDoc) ->
     lists:foreach(ValidateFun, EnabledIndexers).
 
 
-get_index(Module, #db{name = <<"shards/", _/binary>> = DbName}, DDoc) ->
-    case is_record(DDoc, doc) of
-        true -> get_index(Module, DbName, DDoc, nil);
-        false -> get_index(Module, DbName, DDoc)
-    end;
+get_index(Module, <<"shards/", _/binary>> = DbName, DDoc)
+        when is_record(DDoc, doc) ->
+    get_index(Module, DbName, DDoc, nil);
 get_index(Module, <<"shards/", _/binary>> = DbName, DDoc) ->
     {Pid, Ref} = spawn_monitor(fun() ->
         exit(fabric:open_doc(mem3:dbname(DbName), DDoc, [ejson_body, ?ADMIN_CTX]))
@@ -77,9 +75,10 @@ get_index(Module, <<"shards/", _/binary>> = DbName, DDoc) ->
         erlang:demonitor(Ref, [flush]),
         {error, timeout}
     end;
-
-get_index(Module, DbName, DDoc) ->
-    get_index(Module, DbName, DDoc, nil).
+get_index(Module, DbName, DDoc) when is_binary(DbName) ->
+    get_index(Module, DbName, DDoc, nil);
+get_index(Module, Db, DDoc) ->
+    get_index(Module, couch_db:name(Db), DDoc).
 
 
 get_index(Module, DbName, DDoc, Fun) when is_binary(DbName) ->

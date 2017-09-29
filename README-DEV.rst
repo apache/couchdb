@@ -12,19 +12,28 @@ If you're unsure what this means, ignore this document.
 Dependencies
 ------------
 
-You may need:
+You need the following to run tests:
+
+* `Python                 <https://www.python.org/>`_
+* `nose                   <https://nose.readthedocs.io/en/latest/>`_
+* `requests               <http://docs.python-requests.org/>`_
+* `hypothesis             <https://pypi.python.org/pypi/hypothesis>`_
+
+You need the following optionally to build documentation:
 
 * `Sphinx                 <http://sphinx.pocoo.org/>`_
 * `GNU help2man           <http://www.gnu.org/software/help2man/>`_
 * `GnuPG                  <http://www.gnupg.org/>`_
+
+You need the following optionally to build releases:
+
 * `md5sum                 <http://www.microbrew.org/tools/md5sha1sum/>`_
 * `sha1sum                <http://www.microbrew.org/tools/md5sha1sum/>`_
+
+You need the following optionally to build Fauxton:
+
 * `nodejs                 <http://nodejs.org/>`_
 * `npm                    <https://www.npmjs.com/>`_               
-
-The first four of these optional dependencies are required for building the
-documentation. The next three are needed to build releases. The last two are for
-needed to build fauxton.
 
 You will need these optional dependencies installed if:
 
@@ -50,14 +59,16 @@ Debian-based (inc. Ubuntu) Systems
 
 ::
 
-    sudo apt-get install help2man python-sphinx gnupg nodejs npm
+    sudo apt-get install help2man python-sphinx gnupg nodejs npm \
+         python-hypothesis python-requests python-nose
 
 Gentoo-based Systems
 ~~~~~~~~~~~~~~~~~~~~
 
 ::
 
-    sudo emerge gnupg coreutils pkgconfig help2man sphinx
+    sudo emerge gnupg coreutils pkgconfig help2man sphinx python
+    sudo pip install hypothesis requests nose
 
 RedHat-based (Fedora, Centos, RHEL) Systems
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -65,7 +76,8 @@ RedHat-based (Fedora, Centos, RHEL) Systems
 ::
 
     sudo yum install help2man python-sphinx python-docutils \
-        python-pygments gnupg nodejs npm
+        python-pygments gnupg nodejs npm python-nose python-requests \
+        python-hypothesis
 
 Mac OS X
 ~~~~~~~~
@@ -85,9 +97,7 @@ If you don't already have pip installed, install it::
 
 Now, install the required Python packages::
 
-    sudo pip install sphinx
-    sudo pip install docutils
-    sudo pip install pygments
+    sudo pip install sphinx docutils pygments nose requests hypothesis
 
 FreeBSD
 ~~~~~~~
@@ -95,6 +105,7 @@ FreeBSD
 ::
 
     pkg install help2man gnupg py27-sphinx node
+    pip install nose requests hypothesis
 
 Windows
 ~~~~~~~

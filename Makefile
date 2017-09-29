@@ -91,6 +91,7 @@ fauxton: share/www
 check: all
 	@$(MAKE) eunit
 	@$(MAKE) javascript
+	@$(MAKE) mango-test
 #	@$(MAKE) build-test
 
 

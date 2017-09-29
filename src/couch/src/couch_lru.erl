@@ -13,7 +13,7 @@
 -module(couch_lru).
 -export([new/0, insert/2, update/2, close/1]).
 
--include_lib("couch/include/couch_db.hrl").
+-include("couch_server_int.hrl").
 
 new() ->
     {gb_trees:empty(), dict:new()}.
@@ -43,16 +43,17 @@ close({Tree, _} = Cache) ->
 close_int(none, _) ->
     false;
 close_int({Lru, DbName, Iter}, {Tree, Dict} = Cache) ->
-    case ets:update_element(couch_dbs, DbName, {#db.fd_monitor, locked}) of
+    case ets:update_element(couch_dbs, DbName, {#entry.lock, locked}) of
     true ->
-        [#db{main_pid = Pid} = Db] = ets:lookup(couch_dbs, DbName),
+        [#entry{db = Db, pid = Pid}] = ets:lookup(couch_dbs, DbName),
         case couch_db:is_idle(Db) of true ->
             true = ets:delete(couch_dbs, DbName),
             true = ets:delete(couch_dbs_pid_to_name, Pid),
             exit(Pid, kill),
             {true, {gb_trees:delete(Lru, Tree), dict:erase(DbName, Dict)}};
         false ->
-            true = ets:update_element(couch_dbs, DbName, {#db.fd_monitor, nil}),
+            ElemSpec = {#entry.lock, unlocked},
+            true = ets:update_element(couch_dbs, DbName, ElemSpec),
             couch_stats:increment_counter([couchdb, couch_server, lru_skip]),
             close_int(gb_trees:next(Iter), update(DbName, Cache))
         end;

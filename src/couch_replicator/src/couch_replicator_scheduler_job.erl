@@ -95,8 +95,6 @@ start_link(#rep{id = {BaseId, Ext}, source = Src, target = Tgt} = Rep) ->
 
     case gen_server:start_link(ServerName, ?MODULE, Rep, []) of
         {ok, Pid} ->
-            couch_log:notice("starting new replication `~s` at ~p (`~s` -> `~s`)",
-                             [RepChildId, Pid, Source, Target]),
             {ok, Pid};
         {error, Reason} ->
             couch_log:warning("failed to start replication `~s` (`~s` -> `~s`)",
@@ -184,24 +182,7 @@ do_init(#rep{options = Options, id = {BaseId, Ext}, user_ctx=UserCtx} = Rep) ->
     % cancel_replication/1) and then start the replication again, but this is
     % unfortunately not immune to race conditions.
 
-    couch_log:notice("Replication `~p` is using:~n"
-        "~c~p worker processes~n"
-        "~ca worker batch size of ~p~n"
-        "~c~p HTTP connections~n"
-        "~ca connection timeout of ~p milliseconds~n"
-        "~c~p retries per request~n"
-        "~csocket options are: ~s~s",
-        [BaseId ++ Ext, $\t, NumWorkers, $\t, BatchSize, $\t,
-            MaxConns, $\t, get_value(connection_timeout, Options),
-            $\t, get_value(retries, Options),
-            $\t, io_lib:format("~p", [get_value(socket_options, Options)]),
-            case StartSeq of
-            ?LOWEST_SEQ ->
-                "";
-            _ ->
-                io_lib:format("~n~csource start sequence ~p", [$\t, StartSeq])
-            end]),
-
+    log_replication_start(State),
     couch_log:debug("Worker pids are: ~p", [Workers]),
 
     doc_update_triggered(Rep),
@@ -254,16 +235,21 @@ handle_call({report_seq_done, Seq, StatsInc}, From,
     update_task(NewState),
     {noreply, NewState}.
 
-
-handle_cast({db_compacted, DbName},
-    #rep_state{source = #db{name = DbName} = Source} = State) ->
-    {ok, NewSource} = couch_db:reopen(Source),
-    {noreply, State#rep_state{source = NewSource}};
-
-handle_cast({db_compacted, DbName},
-    #rep_state{target = #db{name = DbName} = Target} = State) ->
-    {ok, NewTarget} = couch_db:reopen(Target),
-    {noreply, State#rep_state{target = NewTarget}};
+handle_cast({db_compacted, DbName}, State) ->
+    #rep_state{
+        source = Source,
+        target = Target
+    } = State,
+    SourceName = couch_replicator_utils:local_db_name(Source),
+    TargetName = couch_replicator_utils:local_db_name(Target),
+    case DbName of
+        SourceName ->
+            {ok, NewSource} = couch_db:reopen(Source),
+            {noreply, State#rep_state{source = NewSource}};
+        TargetName ->
+            {ok, NewTarget} = couch_db:reopen(Target),
+            {noreply, State#rep_state{target = NewTarget}}
+    end;
 
 handle_cast(checkpoint, State) ->
     case do_checkpoint(State) of
@@ -358,10 +344,11 @@ handle_info(timeout, InitArgs) ->
             {stop, {shutdown, max_backoff}, {error, InitArgs}};
         Class:Error ->
             ShutdownReason = {error, replication_start_error(Error)},
+            StackTop2 = lists:sublist(erlang:get_stacktrace(), 2),
             % Shutdown state is a hack as it is not really the state of the
             % gen_server (it failed to initialize, so it doesn't have one).
             % Shutdown state is used to pass extra info about why start failed.
-            ShutdownState = {error, Class, erlang:get_stacktrace(), InitArgs},
+            ShutdownState = {error, Class, StackTop2, InitArgs},
             {stop, {shutdown, ShutdownReason}, ShutdownState}
     end.
 
@@ -394,11 +381,20 @@ terminate({shutdown, max_backoff}, {error, InitArgs}) ->
     couch_replicator_notifier:notify({error, RepId, max_backoff});
 
 terminate({shutdown, {error, Error}}, {error, Class, Stack, InitArgs}) ->
-    #rep{id=RepId} = InitArgs,
+    #rep{
+        id = {BaseId, Ext} = RepId,
+        source = Source0,
+        target = Target0,
+        doc_id = DocId,
+        db_name = DbName
+    } = InitArgs,
+    Source = couch_replicator_api_wrap:db_uri(Source0),
+    Target = couch_replicator_api_wrap:db_uri(Target0),
+    RepIdStr = BaseId ++ Ext,
+    Msg = "~p:~p: Replication ~s failed to start ~p -> ~p doc ~p:~p stack:~p",
+    couch_log:error(Msg, [Class, Error, RepIdStr, Source, Target, DbName,
+        DocId, Stack]),
     couch_stats:increment_counter([couch_replicator, failed_starts]),
-    CleanInitArgs = rep_strip_creds(InitArgs),
-    couch_log:error("~p:~p: Replication failed to start for args ~p: ~p",
-             [Class, Error, CleanInitArgs, Stack]),
     couch_replicator_notifier:notify({error, RepId, Error});
 
 terminate({shutdown, max_backoff}, State) ->
@@ -436,7 +432,37 @@ code_change(_OldVsn, #rep_state{}=State, _Extra) ->
 
 
 format_status(_Opt, [_PDict, State]) ->
-    [{data, [{"State", state_strip_creds(State)}]}].
+    #rep_state{
+       source = Source,
+       target = Target,
+       rep_details = RepDetails,
+       start_seq = StartSeq,
+       source_seq = SourceSeq,
+       committed_seq = CommitedSeq,
+       current_through_seq = ThroughSeq,
+       highest_seq_done = HighestSeqDone,
+       session_id = SessionId
+    } = state_strip_creds(State),
+    #rep{
+       id = RepId,
+       options = Options,
+       doc_id = DocId,
+       db_name = DbName
+    } = RepDetails,
+    [
+        {rep_id, RepId},
+        {source, couch_replicator_api_wrap:db_uri(Source)},
+        {target, couch_replicator_api_wrap:db_uri(Target)},
+        {db_name, DbName},
+        {doc_id, DocId},
+        {options, Options},
+        {session_id, SessionId},
+        {start_seq, StartSeq},
+        {source_seq, SourceSeq},
+        {committed_seq, CommitedSeq},
+        {current_through_seq, ThroughSeq},
+        {highest_seq_done, HighestSeqDone}
+    ].
 
 
 startup_jitter() ->
@@ -910,10 +936,10 @@ has_session_id(SessionId, [{Props} | Rest]) ->
     end.
 
 
-db_monitor(#db{} = Db) ->
-    couch_db:monitor(Db);
-db_monitor(_HttpDb) ->
-    nil.
+db_monitor(#httpdb{}) ->
+	nil;
+db_monitor(Db) ->
+	couch_db:monitor(Db).
 
 
 get_pending_count(St) ->
@@ -984,5 +1010,99 @@ replication_start_error({unauthorized, DbUri}) ->
     {unauthorized, <<"unauthorized to access or create database ", DbUri/binary>>};
 replication_start_error({db_not_found, DbUri}) ->
     {db_not_found, <<"could not open ", DbUri/binary>>};
+replication_start_error({http_request_failed, _Method, Url0,
+        {error, {error, {conn_failed, {error, nxdomain}}}}}) ->
+    Url = ?l2b(couch_util:url_strip_password(Url0)),
+    {nxdomain, <<"could not resolve ", Url/binary>>};
+replication_start_error({http_request_failed, Method0, Url0,
+        {error, {code, Code}}}) when is_integer(Code) ->
+    Url = ?l2b(couch_util:url_strip_password(Url0)),
+    Method = ?l2b(Method0),
+    {http_error_code, Code, <<Method/binary, " ", Url/binary>>};
 replication_start_error(Error) ->
     Error.
+
+
+log_replication_start(#rep_state{rep_details = Rep} = RepState) ->
+    #rep{
+       id = {BaseId, Ext},
+       doc_id = DocId,
+       db_name = DbName,
+       options = Options
+    } = Rep,
+    Id = BaseId ++ Ext,
+    Workers = get_value(worker_processes, Options),
+    BatchSize = get_value(worker_batch_size, Options),
+    #rep_state{
+       source_name = Source,  % credentials already stripped
+       target_name = Target,  % credentials already stripped
+       session_id = Sid
+    } = RepState,
+    From = case DbName of
+        ShardName when is_binary(ShardName) ->
+            io_lib:format("from doc ~s:~s", [mem3:dbname(ShardName), DocId]);
+        _ ->
+            "from _replicate endpoint"
+    end,
+    Msg = "Starting replication ~s (~s -> ~s) ~s worker_procesess:~p"
+        " worker_batch_size:~p session_id:~s",
+    couch_log:notice(Msg, [Id, Source, Target, From, Workers, BatchSize, Sid]).
+
+
+-ifdef(TEST).
+
+-include_lib("eunit/include/eunit.hrl").
+
+
+replication_start_error_test() ->
+    ?assertEqual({unauthorized, <<"unauthorized to access or create database"
+        " http://x/y">>}, replication_start_error({unauthorized,
+        <<"http://x/y">>})),
+    ?assertEqual({db_not_found, <<"could not open http://x/y">>},
+        replication_start_error({db_not_found, <<"http://x/y">>})),
+    ?assertEqual({nxdomain,<<"could not resolve http://x/y">>},
+        replication_start_error({http_request_failed, "GET", "http://x/y",
+        {error, {error, {conn_failed, {error, nxdomain}}}}})),
+    ?assertEqual({http_error_code,503,<<"GET http://x/y">>},
+        replication_start_error({http_request_failed, "GET", "http://x/y",
+        {error, {code, 503}}})).
+
+
+scheduler_job_format_status_test() ->
+    Source = <<"http://u:p@h1/d1">>,
+    Target = <<"http://u:p@h2/d2">>,
+    Rep = #rep{
+        id = {"base", "+ext"},
+        source = couch_replicator_docs:parse_rep_db(Source, [], []),
+        target = couch_replicator_docs:parse_rep_db(Target, [], []),
+        options = [{create_target, true}],
+        doc_id = <<"mydoc">>,
+        db_name = <<"mydb">>
+    },
+    State = #rep_state{
+        rep_details = Rep,
+        source = Rep#rep.source,
+        target = Rep#rep.target,
+        session_id = <<"a">>,
+        start_seq = <<"1">>,
+        source_seq = <<"2">>,
+        committed_seq = <<"3">>,
+        current_through_seq = <<"4">>,
+        highest_seq_done = <<"5">>
+    },
+    Format = format_status(opts_ignored, [pdict, State]),
+    ?assertEqual("http://u:*****@h1/d1/", proplists:get_value(source, Format)),
+    ?assertEqual("http://u:*****@h2/d2/", proplists:get_value(target, Format)),
+    ?assertEqual({"base", "+ext"}, proplists:get_value(rep_id, Format)),
+    ?assertEqual([{create_target, true}], proplists:get_value(options, Format)),
+    ?assertEqual(<<"mydoc">>, proplists:get_value(doc_id, Format)),
+    ?assertEqual(<<"mydb">>, proplists:get_value(db_name, Format)),
+    ?assertEqual(<<"a">>, proplists:get_value(session_id, Format)),
+    ?assertEqual(<<"1">>, proplists:get_value(start_seq, Format)),
+    ?assertEqual(<<"2">>, proplists:get_value(source_seq, Format)),
+    ?assertEqual(<<"3">>, proplists:get_value(committed_seq, Format)),
+    ?assertEqual(<<"4">>, proplists:get_value(current_through_seq, Format)),
+    ?assertEqual(<<"5">>, proplists:get_value(highest_seq_done, Format)).
+
+
+-endif.

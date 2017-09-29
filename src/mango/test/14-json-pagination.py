@@ -159,7 +159,7 @@ class PaginateJsonDocs(mango.DbPerClass):
     def test_bad_bookmark(self):
         try:
             self.db.find({"_id": {"$gt": 0}}, bookmark="bad-bookmark")
-        except Exception, e:
+        except Exception as e:
             resp = e.response.json()
             assert resp["error"] == "invalid_bookmark"
             assert resp["reason"] == "Invalid bookmark value: \"bad-bookmark\""
@@ -171,7 +171,7 @@ class PaginateJsonDocs(mango.DbPerClass):
         bookmark = 'g2wAAAABaANkABFub2RlMUBjb3VjaGRiLm5ldGwAAAACYQBiP____2poAkY_8AAAAAAAAGEHag'
         try:
             self.db.find({"_id": {"$gt": 0}}, bookmark=bookmark)
-        except Exception, e:
+        except Exception as e:
             resp = e.response.json()
             assert resp["error"] == "invalid_bookmark"
             assert e.response.status_code == 400

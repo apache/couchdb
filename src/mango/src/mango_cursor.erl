@@ -90,9 +90,9 @@ execute(#cursor{index=Idx}=Cursor, UserFun, UserAcc) ->
 maybe_filter_indexes_by_ddoc(Indexes, Opts) ->
     case lists:keyfind(use_index, 1, Opts) of
         {use_index, []} ->
-            %We remove any indexes that have a selector 
+            % We remove any indexes that have a selector 
             % since they are only used when specified via use_index
-            remove_indexes_with_selector(Indexes);
+            remove_indexes_with_partial_filter_selector(Indexes);
         {use_index, [DesignId]} ->
             filter_indexes(Indexes, DesignId);
         {use_index, [DesignId, ViewName]} ->
@@ -117,9 +117,9 @@ filter_indexes(Indexes0, DesignId, ViewName) ->
     lists:filter(FiltFun, Indexes).
 
 
-remove_indexes_with_selector(Indexes) ->
+remove_indexes_with_partial_filter_selector(Indexes) ->
     FiltFun = fun(Idx) -> 
-        case mango_idx:get_idx_selector(Idx) of
+        case mango_idx:get_partial_filter_selector(Idx) of
             undefined -> true;
             _ -> false
         end

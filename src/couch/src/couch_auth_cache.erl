@@ -322,13 +322,15 @@ refresh_entries(AuthDb) ->
     nil ->
         ok;
     AuthDb2 ->
-        case AuthDb2#db.update_seq > AuthDb#db.update_seq of
+        AuthDbSeq = couch_db:get_update_seq(AuthDb),
+        AuthDb2Seq = couch_db:get_update_seq(AuthDb2),
+        case AuthDb2Seq > AuthDbSeq of
         true ->
             {ok, _, _} = couch_db:enum_docs_since(
                 AuthDb2,
-                AuthDb#db.update_seq,
+                AuthDbSeq,
                 fun(DocInfo, _, _) -> refresh_entry(AuthDb2, DocInfo) end,
-                AuthDb#db.update_seq,
+                AuthDbSeq,
                 []
             ),
             true = ets:insert(?STATE, {auth_db, AuthDb2});
@@ -386,7 +388,9 @@ cache_needs_refresh() ->
             nil ->
                 false;
             AuthDb2 ->
-                AuthDb2#db.update_seq > AuthDb#db.update_seq
+                AuthDbSeq = couch_db:get_update_seq(AuthDb),
+                AuthDb2Seq = couch_db:get_update_seq(AuthDb2),
+                AuthDb2Seq > AuthDbSeq
             end
         end,
         false
@@ -407,7 +411,7 @@ exec_if_auth_db(Fun) ->
 
 exec_if_auth_db(Fun, DefRes) ->
     case ets:lookup(?STATE, auth_db) of
-    [{auth_db, #db{} = AuthDb}] ->
+    [{auth_db, AuthDb}] ->
         Fun(AuthDb);
     _ ->
         DefRes

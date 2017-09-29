@@ -16,6 +16,7 @@
    parse_rep_doc/2,
    open_db/1,
    close_db/1,
+   local_db_name/1,
    start_db_compaction_notifier/2,
    stop_db_compaction_notifier/1,
    replication_id/2,
@@ -35,6 +36,7 @@
 
 -include_lib("couch/include/couch_db.hrl").
 -include("couch_replicator.hrl").
+-include("couch_replicator_api_wrap.hrl").
 
 -import(couch_util, [
     get_value/2,
@@ -42,26 +44,35 @@
 ]).
 
 
-open_db(#db{name = Name, user_ctx = UserCtx}) ->
-    {ok, Db} = couch_db:open(Name, [{user_ctx, UserCtx} | []]),
-    Db;
-open_db(HttpDb) ->
-    HttpDb.
+open_db(#httpdb{} = HttpDb) ->
+    HttpDb;
+open_db(Db) ->
+    DbName = couch_db:name(Db),
+    UserCtx = couch_db:get_user_ctx(Db),
+    {ok, NewDb} = couch_db:open(DbName, [{user_ctx, UserCtx}]),
+    NewDb.
 
 
-close_db(#db{} = Db) ->
-    couch_db:close(Db);
-close_db(_HttpDb) ->
-    ok.
+close_db(#httpdb{}) ->
+    ok;
+close_db(Db) ->
+    couch_db:close(Db).
 
 
-start_db_compaction_notifier(#db{name = DbName}, Server) ->
+local_db_name(#httpdb{}) ->
+    undefined;
+local_db_name(Db) ->
+    couch_db:name(Db).
+
+
+start_db_compaction_notifier(#httpdb{}, _) ->
+    nil;
+start_db_compaction_notifier(Db, Server) ->
+    DbName = couch_db:name(Db),
     {ok, Pid} = couch_event:link_listener(
             ?MODULE, handle_db_event, Server, [{dbname, DbName}]
         ),
-    Pid;
-start_db_compaction_notifier(_, _) ->
-    nil.
+    Pid.
 
 
 stop_db_compaction_notifier(nil) ->

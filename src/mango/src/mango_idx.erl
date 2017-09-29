@@ -44,7 +44,7 @@
     to_json/1,
     delete/4,
     get_usable_indexes/3,
-    get_idx_selector/1
+    get_partial_filter_selector/1
 ]).
 
 
@@ -291,12 +291,12 @@ idx_mod(#idx{type = <<"text">>}) ->
     end.
 
 
-db_to_name(#db{name=Name}) ->
-    Name;
 db_to_name(Name) when is_binary(Name) ->
     Name;
 db_to_name(Name) when is_list(Name) ->
-    iolist_to_binary(Name).
+    iolist_to_binary(Name);
+db_to_name(Db) ->
+    couch_db:name(Db).
 
 
 get_idx_def(Opts) ->
@@ -368,13 +368,66 @@ filter_opts([Opt | Rest]) ->
     [Opt | filter_opts(Rest)].
 
 
-get_idx_selector(#idx{def = Def}) when Def =:= all_docs; Def =:= undefined ->
+get_partial_filter_selector(#idx{def = Def}) when Def =:= all_docs; Def =:= undefined ->
     undefined;
-get_idx_selector(#idx{def = {Def}}) ->
+get_partial_filter_selector(#idx{def = {Def}}) ->
+    case proplists:get_value(<<"partial_filter_selector">>, Def) of
+        undefined -> get_legacy_selector(Def);
+        {[]} -> undefined;
+        Selector -> Selector
+    end.
+
+
+% Partial filter selectors is supported in text indexes via the selector field
+% This adds backwards support for existing indexes that might have a selector in it
+get_legacy_selector(Def) ->
     case proplists:get_value(<<"selector">>, Def) of
         undefined -> undefined;
         {[]} -> undefined;
         Selector -> Selector
     end.
 
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
 
+index(SelectorName, Selector) ->
+    {
+        idx,<<"mango_test_46418cd02081470d93290dc12306ebcb">>,
+           <<"_design/57e860dee471f40a2c74ea5b72997b81dda36a24">>,
+           <<"Selected">>,<<"json">>,
+           {[{<<"fields">>,{[{<<"location">>,<<"asc">>}]}},
+             {SelectorName,{Selector}}]},
+           [{<<"def">>,{[{<<"fields">>,[<<"location">>]}]}}]
+    }.
+
+get_partial_filter_all_docs_test() ->
+    Idx = #idx{def = all_docs},
+    ?assertEqual(undefined, get_partial_filter_selector(Idx)).
+
+get_partial_filter_undefined_def_test() ->
+    Idx = #idx{def = undefined},
+    ?assertEqual(undefined, get_partial_filter_selector(Idx)).
+
+get_partial_filter_selector_default_test() ->
+    Idx = index(<<"partial_filter_selector">>, []),
+    ?assertEqual(undefined, get_partial_filter_selector(Idx)).
+
+get_partial_filter_selector_missing_test() ->
+    Idx = index(<<"partial_filter_selector">>, []),
+    ?assertEqual(undefined, get_partial_filter_selector(Idx)).
+
+get_partial_filter_selector_with_selector_test() ->
+    Selector = [{<<"location">>,{[{<<"$gt">>,<<"FRA">>}]}}],
+    Idx = index(<<"partial_filter_selector">>, Selector),
+    ?assertEqual({Selector}, get_partial_filter_selector(Idx)).
+
+get_partial_filter_selector_with_legacy_selector_test() ->
+    Selector = [{<<"location">>,{[{<<"$gt">>,<<"FRA">>}]}}],
+    Idx = index(<<"selector">>, Selector),
+    ?assertEqual({Selector}, get_partial_filter_selector(Idx)).
+
+get_partial_filter_selector_with_legacy_default_selector_test() ->
+    Idx = index(<<"selector">>, []),
+    ?assertEqual(undefined, get_partial_filter_selector(Idx)).
+
+-endif.
