@@ -133,6 +133,8 @@ PortSpecs = case os:type() of
 end,
 
 AddConfig = [
+    {cover_enabled, true},
+    {cover_print_enabled, true},
     {port_specs, PortSpecs},
     {erl_opts, [
         {platform_define, "win32", 'WINDOWS'},
