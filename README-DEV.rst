@@ -89,7 +89,7 @@ Unless you want to install the optional dependencies, skip to the next section.
 
 Install what else we can with Homebrew::
 
-    brew install help2man gnupg md5sha1sum node
+    brew install help2man gnupg md5sha1sum node spidermonkey
 
 If you don't already have pip installed, install it::
 
