@@ -97,7 +97,7 @@ If you don't already have pip installed, install it::
 
 Now, install the required Python packages::
 
-    sudo pip install sphinx docutils pygments nose requests hypothesis
+    sudo pip install sphinx docutils pygments nose requests hypothesis sphinx_rtd_theme
 
 FreeBSD
 ~~~~~~~
