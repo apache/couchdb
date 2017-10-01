@@ -2,6 +2,7 @@
 *.pyc
 *.snap
 *.so
+*.swp
 .DS_Store
 .rebar/
 .eunit/
