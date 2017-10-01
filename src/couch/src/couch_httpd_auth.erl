@@ -85,6 +85,8 @@ basic_name_pw(Req) ->
 default_authentication_handler(Req) ->
     default_authentication_handler(Req, couch_auth_cache).
 
+default_authentication_handler(#httpd{path_parts=[<<"_up">>]}=Req, _) ->
+    Req#httpd{user_ctx=?ADMIN_USER};
 default_authentication_handler(Req, AuthModule) ->
     case basic_name_pw(Req) of
     {User, Pass} ->
