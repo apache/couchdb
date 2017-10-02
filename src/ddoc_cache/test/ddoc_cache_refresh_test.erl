@@ -158,7 +158,7 @@ check_upgrade_clause({DbName, _}) ->
 
 
 rand_string() ->
-    Bin = crypto:rand_bytes(8),
+    Bin = crypto:strong_rand_bytes(8),
     to_hex(Bin, []).
 
 
