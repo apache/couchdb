@@ -508,7 +508,7 @@ random_processes(Acc, Depth) ->
     end.
 
 oneof(Options) ->
-    lists:nth(random:uniform(length(Options)), Options).
+    lists:nth(couch_rand:uniform(length(Options)), Options).
 
 
 tree() ->

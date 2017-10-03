@@ -316,7 +316,7 @@ update_rep_doc(RepDbName, RepDocId, KVs, Wait) when is_binary(RepDocId) ->
         throw:conflict ->
             Msg = "Conflict when updating replication doc `~s`. Retrying.",
             couch_log:error(Msg, [RepDocId]),
-            ok = timer:sleep(random:uniform(erlang:min(128, Wait)) * 100),
+            ok = timer:sleep(couch_rand:uniform(erlang:min(128, Wait)) * 100),
             update_rep_doc(RepDbName, RepDocId, KVs, Wait * 2)
     end;
 

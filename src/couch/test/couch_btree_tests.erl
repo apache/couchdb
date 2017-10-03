@@ -82,7 +82,7 @@ btree_open_test_() ->
 
 sorted_kvs_test_() ->
     Funs = kvs_test_funs(),
-    Sorted = [{Seq, random:uniform()} || Seq <- lists:seq(1, ?ROWS)],
+    Sorted = [{Seq, couch_rand:uniform()} || Seq <- lists:seq(1, ?ROWS)],
     {
         "BTree with sorted keys",
         {
@@ -97,7 +97,7 @@ sorted_kvs_test_() ->
     }.
 
 rsorted_kvs_test_() ->
-    Sorted = [{Seq, random:uniform()} || Seq <- lists:seq(1, ?ROWS)],
+    Sorted = [{Seq, couch_rand:uniform()} || Seq <- lists:seq(1, ?ROWS)],
     Funs = kvs_test_funs(),
     Reversed = Sorted,
     {
@@ -115,7 +115,7 @@ rsorted_kvs_test_() ->
 
 shuffled_kvs_test_() ->
     Funs = kvs_test_funs(),
-    Sorted = [{Seq, random:uniform()} || Seq <- lists:seq(1, ?ROWS)],
+    Sorted = [{Seq, couch_rand:uniform()} || Seq <- lists:seq(1, ?ROWS)],
     Shuffled = shuffle(Sorted),
     {
         "BTree with shuffled keys",
@@ -479,7 +479,7 @@ randomize(T, List) ->
         end, randomize(List), lists:seq(1, (T - 1))).
 
 randomize(List) ->
-    D = lists:map(fun(A) -> {random:uniform(), A} end, List),
+    D = lists:map(fun(A) -> {couch_rand:uniform(), A} end, List),
     {_, D1} = lists:unzip(lists:keysort(1, D)),
     D1.
 

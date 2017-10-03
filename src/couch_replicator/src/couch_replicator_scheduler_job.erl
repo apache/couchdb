@@ -110,7 +110,6 @@ init(InitArgs) ->
 do_init(#rep{options = Options, id = {BaseId, Ext}, user_ctx=UserCtx} = Rep) ->
     process_flag(trap_exit, true),
 
-    random:seed(os:timestamp()),
     timer:sleep(startup_jitter()),
 
     #rep_state{
@@ -468,7 +467,7 @@ format_status(_Opt, [_PDict, State]) ->
 startup_jitter() ->
     Jitter = config:get_integer("replicator", "startup_jitter",
         ?STARTUP_JITTER_DEFAULT),
-    random:uniform(erlang:max(1, Jitter)).
+    couch_rand:uniform(erlang:max(1, Jitter)).
 
 
 headers_strip_creds([], Acc) ->
