@@ -29,7 +29,7 @@ doc_from_multi_part_stream_test() ->
     ContentType = "multipart/related;boundary=multipart_related_boundary~~~~~~~~~~~~~~~~~~~~",
     DataFun = fun() -> request(start) end,
 
-    mock_config_max_document_id_length(),
+    mock_config(),
     {ok, #doc{id = <<"doc0">>, atts = [_]}, _Fun, _Parser} =
         couch_doc:doc_from_multi_part_stream(ContentType, DataFun),
     meck:unload(config),
@@ -77,7 +77,7 @@ len_doc_to_multi_part_stream_test() ->
 validate_docid_test_() ->
     {setup,
         fun() ->
-            mock_config_max_document_id_length(),
+            mock_config(),
             ok = meck:new(couch_db_plugin, [passthrough]),
             meck:expect(couch_db_plugin, validate_docid, fun(_) -> false end)
         end,
@@ -90,6 +90,9 @@ validate_docid_test_() ->
             ?_assertEqual(ok, couch_doc:validate_docid(<<"_design/idx">>)),
             ?_assertEqual(ok, couch_doc:validate_docid(<<"_local/idx">>)),
             ?_assertEqual(ok, couch_doc:validate_docid(large_id(1024))),
+            ?_assertEqual(ok, couch_doc:validate_docid(<<"_users">>, <<"_dbs">>)),
+            ?_assertEqual(ok, couch_doc:validate_docid(<<"_replicator">>, <<"_dbs">>)),
+            ?_assertEqual(ok, couch_doc:validate_docid(<<"_global_changes">>, <<"_dbs">>)),
             ?_assertThrow({illegal_docid, _},
                 couch_doc:validate_docid(<<>>)),
             ?_assertThrow({illegal_docid, _},
@@ -103,7 +106,11 @@ validate_docid_test_() ->
             ?_assertThrow({illegal_docid, _},
                 couch_doc:validate_docid(<<"_local/">>)),
             ?_assertThrow({illegal_docid, _},
-                couch_doc:validate_docid(large_id(1025)))
+                couch_doc:validate_docid(large_id(1025))),
+            ?_assertThrow({illegal_docid, _},
+                couch_doc:validate_docid(<<"_users">>, <<"foo">>)),
+            ?_assertThrow({illegal_docid, _},
+                couch_doc:validate_docid(<<"_weeee">>, <<"_dbs">>))
         ]
     }.
 
@@ -127,11 +134,12 @@ collected() ->
     B = binary:replace(iolist_to_binary(get(data)), <<"\r\n">>, <<0>>, [global]),
     binary:split(B, [<<0>>], [global]).
 
-mock_config_max_document_id_length() ->
+mock_config() ->
     ok = meck:new(config, [passthrough]),
     meck:expect(config, get,
         fun("couchdb", "max_document_id_length", "infinity") -> "1024";
            ("couchdb", "max_attachment_size", "infinity") -> "infinity";
+           ("mem3", "shards_db", "_dbs") -> "_dbs";
             (Key, Val, Default) -> meck:passthrough([Key, Val, Default])
         end
     ).
