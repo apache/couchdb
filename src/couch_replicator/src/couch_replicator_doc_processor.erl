@@ -423,20 +423,20 @@ error_backoff(ErrCnt) ->
     % ErrCnt is the exponent here. The reason 64 is used is to start at
     % 64 (about a minute) max range. Then first backoff would be 30 sec
     % on average. Then 1 minute and so on.
-    random:uniform(?INITIAL_BACKOFF_EXPONENT bsl Exp).
+    couch_rand:uniform(?INITIAL_BACKOFF_EXPONENT bsl Exp).
 
 
 -spec filter_backoff() -> seconds().
 filter_backoff() ->
     Total = ets:info(?MODULE, size),
-    % This value scaled by the number of replications. If the are a lot of
-    % them wait is longer, but not more than a day (?TS_DAY_SEC). If there
-    % are just few, wait is shorter, starting at about 30 seconds. `2 *` is
-    % used since the expected wait would then be 0.5 * Range so it is easier
-    % to see the average wait. `1 +` is used because random:uniform only
+    % This value scaled by the number of replications. If the are a lot of them
+    % wait is longer, but not more than a day (?TS_DAY_SEC). If there are just
+    % few, wait is shorter, starting at about 30 seconds. `2 *` is used since
+    % the expected wait would then be 0.5 * Range so it is easier to see the
+    % average wait. `1 +` is used because couch_rand:uniform only
     % accepts >= 1 values and crashes otherwise.
     Range = 1 + min(2 * (Total / 10), ?TS_DAY_SEC),
-    ?MIN_FILTER_DELAY_SEC + random:uniform(round(Range)).
+    ?MIN_FILTER_DELAY_SEC + couch_rand:uniform(round(Range)).
 
 
 % Document removed from db -- clear ets table and remove all scheduled jobs

@@ -131,15 +131,18 @@ PortSpecs = case os:type() of
         os:cmd("chmod +x priv/couchspawnkillable"),
         BaseSpecs
 end,
-
+PlatformDefines = [
+   {platform_define, "^R16", 'NORANDMODULE'},
+   {platform_define, "^17", 'NORANDMODULE'},
+   {platform_define, "win32", 'WINDOWS'}
+],
 AddConfig = [
     {port_specs, PortSpecs},
-    {erl_opts, [
-        {platform_define, "win32", 'WINDOWS'},
+    {erl_opts, PlatformDefines ++ [
         {d, 'COUCHDB_VERSION', Version},
         {i, "../"}
     ]},
-    {eunit_compile_opts, [{platform_define, "win32", 'WINDOWS'}]}
+    {eunit_compile_opts, PlatformDefines}
 ].
 
 lists:foldl(fun({K, V}, CfgAcc) ->

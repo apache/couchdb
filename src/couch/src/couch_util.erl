@@ -209,7 +209,8 @@ json_user_ctx(Db) ->
 
 % returns a random integer
 rand32() ->
-    crypto:rand_uniform(0, 16#100000000).
+    <<I:32>> = crypto:strong_rand_bytes(4),
+    I.
 
 % given a pathname "../foo/bar/" it gives back the fully qualified
 % absolute pathname.
