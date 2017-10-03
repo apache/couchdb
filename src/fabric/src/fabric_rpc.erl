@@ -344,48 +344,53 @@ update_docs_read_repair(DbName, DocsByNode, Options) ->
 
 % given [{Node, Doc}] diff revs of the same DocID from diff nodes
 % returns [Doc] filtering out purged docs.
-% This is done for read-repair from fabric_doc_open,
+% This is done for read-repair from fabric_doc_open or fabric_doc_open_revs,
 % so that not to recreate Docs that have been purged before
 % on this node() from Nodes that are out of sync.
 filter_purged_revs(Db, DocsByNode) ->
-    AllowedPSeqLag = config:get_integer("purge", "allowed_purge_seq_lag", 100),
-    {ok, DbPSeq} = couch_db:get_purge_seq(Db),
-    PurgeFoldFun = fun({_P,_U, Id, Revs}, Acc) ->  [{Id, Revs}|Acc]  end,
+    % go through _local/purge-mem3-.. docs
+    % and assemble NodePSeqs = [{Node1, NodePSeq1}, ...]
+    % NodePSeq1 - purge_seq of this node known to Node1
     V = "v" ++ config:get("purge", "version", "1") ++ "-",
     StartKey = ?l2b(?LOCAL_DOC_PREFIX ++ "purge-" ++  V ++ "mem3-"),
     EndKey = ?l2b(?LOCAL_DOC_PREFIX ++ "purge-" ++ V ++ "mem31"),
     Opts = [{start_key, StartKey}, {end_key_gt, EndKey}],
-    % go through _local/purge-mem3-.. docs
-    % find Node that this LDoc corresponds to
-    % check if update from Node has not been recently purged on current node
     LDocsFoldFun = fun(#doc{body={Props}}, Acc) ->
         {VOps} = couch_util:get_value(<<"verify_options">>, Props),
         Node = couch_util:get_value(<<"node">>, VOps),
-        Result = lists:keyfind(Node, 1, DocsByNode),
-        NewAcc = if not Result -> Acc; true ->
-            {Node, Doc} = Result,
-            NodePSeq = couch_util:get_value(<<"purge_seq">>, Props),
-            if  NodePSeq == DbPSeq ->
-                    [Doc|Acc];
-                (NodePSeq+AllowedPSeqLag) < DbPSeq ->
-                    % Node is very out of sync, ignore updates from it
-                    Acc;
-                true -> %(NodePSeq+ClientAllowedPSeqLag) >= DbPSeq
-                    % if Doc has been purged recently, than ignore it
-                    {ok, PurgedIdsRevs} = couch_db:fold_purged_docs(Db,
-                            NodePSeq, PurgeFoldFun, [], []),
-                    {Start, [FirstRevId|_]} = Doc#doc.revs,
-                    DocIdRevs = {Doc#doc.id, [{Start, FirstRevId}]},
-                    case lists:member(DocIdRevs, PurgedIdsRevs) of
-                        true -> Acc;
-                        false -> [Doc|Acc]
-                    end
-            end
-        end,
-        {ok, NewAcc}
+        NodePSeq = couch_util:get_value(<<"purge_seq">>, Props),
+        {ok, [{Node, NodePSeq} | Acc]}
     end,
-    {ok, Docs} = couch_db_engine:fold_local_docs(Db, LDocsFoldFun, [], Opts),
-    Docs.
+    {ok, NodePSeqs} =
+        couch_db_engine:fold_local_docs(Db, LDocsFoldFun, [], Opts),
+
+    % go through all doc_updates and
+    % filter out updates from nodes that are behind in purges synchronization
+    AllowedPSeqLag = config:get_integer("purge", "allowed_purge_seq_lag", 100),
+    {ok, DbPSeq} = couch_db:get_purge_seq(Db),
+    PurgeFoldFun = fun({_P,_U, Id, Revs}, Acc) ->  [{Id, Revs}|Acc]  end,
+    lists:foldl(fun({Node, Doc}, Docs) ->
+        NodePSeq = case lists:keyfind(Node, 1, NodePSeqs) of
+           {Node, NodePSeq0} -> NodePSeq0;
+           false -> 0
+        end,
+        if  NodePSeq == DbPSeq ->
+            [Doc|Docs];
+        (NodePSeq+AllowedPSeqLag) < DbPSeq ->
+            % Node is very out of sync, ignore updates from it
+            Docs;
+        true -> %(NodePSeq+ClientAllowedPSeqLag) >= DbPSeq
+            % if Doc has been purged recently -> ignore it
+            {ok, PurgedIdsRevs} = couch_db:fold_purged_docs(Db,
+                    NodePSeq, PurgeFoldFun, [], []),
+            {Start, [FirstRevId|_]} = Doc#doc.revs,
+            DocIdRevs = {Doc#doc.id, [{Start, FirstRevId}]},
+            case lists:member(DocIdRevs, PurgedIdsRevs) of
+                true -> Docs;
+                false -> [Doc|Docs]
+            end
+        end
+    end, [], DocsByNode).
 
 
 get_or_create_db(DbName, Options) ->
