@@ -302,7 +302,7 @@ notify_fold(DbName, {Server, DbSuffix, Count}) ->
 % number of shards back to back during startup.
 jitter(N) ->
     Range = min(2 * N * ?AVG_DELAY_MSEC, ?MAX_DELAY_MSEC),
-    random:uniform(Range).
+    couch_rand:uniform(Range).
 
 
 scan_local_db(Server, DbSuffix) when is_pid(Server) ->

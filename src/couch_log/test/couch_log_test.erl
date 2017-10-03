@@ -80,6 +80,5 @@ check_levels(TestLevel, [CfgLevel | RestLevels]) ->
 
 
 new_msg() ->
-    random:seed(os:timestamp()),
-    Bin = list_to_binary([random:uniform(255) || _ <- lists:seq(1, 16)]),
+    Bin = list_to_binary([couch_rand:uniform(255) || _ <- lists:seq(1, 16)]),
     couch_util:to_hex(Bin).

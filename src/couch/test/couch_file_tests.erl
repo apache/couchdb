@@ -311,14 +311,14 @@ check_header_recovery(CheckFun) ->
     ok.
 
 write_random_data(Fd) ->
-    write_random_data(Fd, 100 + random:uniform(1000)).
+    write_random_data(Fd, 100 + couch_rand:uniform(1000)).
 
 write_random_data(Fd, 0) ->
     {ok, Bytes} = couch_file:bytes(Fd),
     {ok, (1 + Bytes div ?BLOCK_SIZE) * ?BLOCK_SIZE};
 write_random_data(Fd, N) ->
     Choices = [foo, bar, <<"bizzingle">>, "bank", ["rough", stuff]],
-    Term = lists:nth(random:uniform(4) + 1, Choices),
+    Term = lists:nth(couch_rand:uniform(4) + 1, Choices),
     {ok, _, _} = couch_file:append_term(Fd, Term),
     write_random_data(Fd, N - 1).
 
