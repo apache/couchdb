@@ -44,7 +44,7 @@ class UsersDbFindTests(mango.UsersDbTests):
 
     def test_sort(self):
         self.db.create_index(["order", "name"])
-        selector = {"name": {"$gt": "demo01"}}
+        selector = {"name": {"$gt": "demo01"}, "order": {"$exists": True}}
         docs1 = self.db.find(selector, sort=[{"order": "asc"}])
         docs2 = list(sorted(docs1, key=lambda d: d["order"]))
         assert docs1 is not docs2 and docs1 == docs2

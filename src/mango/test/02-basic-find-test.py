@@ -222,6 +222,36 @@ class BasicFindTests(mango.UserDocsTests):
         docs2 = list(reversed(sorted(docs1, key=lambda d: d["age"])))
         assert docs1 is not docs2 and docs1 == docs2
 
+    def test_sort_desc_complex(self):
+        docs = self.db.find({
+            "company": {"$lt": "M"},
+            "manager": {"$exists": True},
+            "$or": [
+                {"company": "Dreamia"},
+                {"manager": True}
+            ]
+        }, sort=[{"company":"desc"}])
+        
+        companies_returned = list(d["company"] for d in docs)
+        desc_companies = sorted(companies_returned, reverse=True)
+        self.assertEqual(desc_companies, companies_returned)
+
+    def test_sort_desc_complex_error(self):
+        try:
+            self.db.find({
+            "company": {"$lt": "M"},
+            "$or": [
+                {"company": "Dreamia"},
+                {"manager": True}
+            ]
+        }, sort=[{"company":"desc"}])
+        except Exception as e:
+            self.assertEqual(e.response.status_code, 400)
+            resp = e.response.json()
+            self.assertEqual(resp["error"], "no_usable_index")
+        else:
+            raise AssertionError("expected find error")
+
     def test_fields(self):
         selector = {"age": {"$gt": 0}}
         docs = self.db.find(selector, fields=["user_id", "location.address"])

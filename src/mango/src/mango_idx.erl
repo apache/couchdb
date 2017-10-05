@@ -70,13 +70,31 @@ get_usable_indexes(Db, Selector0, Opts) ->
         ?MANGO_ERROR({no_usable_index, no_index_matching_name})
     end,
 
-    SortIndexes = mango_idx:for_sort(FilteredIndexes, Opts),
-    if SortIndexes /= [] -> ok; true ->
-        ?MANGO_ERROR({no_usable_index, missing_sort_index})
+    UsableFilter = fun(I) -> mango_idx:is_usable(I, Selector) end,
+    UsableIndexes0 = lists:filter(UsableFilter, FilteredIndexes),
+
+    UsableIndexes1 = case has_use_index(Opts) of
+        true ->
+            case mango_cursor:maybe_filter_indexes_by_ddoc(UsableIndexes0, Opts) of
+                [] -> ?MANGO_ERROR({no_usable_index, no_usable_index_matching_name});
+                UsableFilteredIndexes -> UsableFilteredIndexes
+            end;
+        false ->
+            UsableIndexes0
     end,
 
-    UsableFilter = fun(I) -> mango_idx:is_usable(I, Selector) end,
-    lists:filter(UsableFilter, SortIndexes).
+    % If a sort was specified we have to find an index that
+    % can satisfy the request.
+    case has_sort(Opts) of
+        true ->
+            case mango_idx:for_sort(UsableIndexes1, Opts) of
+                [] -> ?MANGO_ERROR({no_usable_index, missing_sort_index}); 
+                SortIndexes -> SortIndexes
+            end;
+        false ->
+            UsableIndexes1
+    end.
+
 
 recover(Db) ->
     {ok, DDocs0} = mango_util:open_ddocs(Db),
@@ -93,15 +111,29 @@ recover(Db) ->
     end, DDocs)}.
 
 
-for_sort(Indexes, Opts) ->
-    % If a sort was specified we have to find an index that
-    % can satisfy the request.
+has_use_index(Opts) ->
     case lists:keyfind(sort, 1, Opts) of
-        {sort, {SProps}} when is_list(SProps) ->
-            for_sort_int(Indexes, {SProps});
+        {use_index, _} ->
+            true;
         _ ->
-            Indexes
+            false
     end.
+
+
+has_sort(Opts) ->
+    case lists:keyfind(sort, 1, Opts) of
+        {sort, {[]}} ->
+            false;
+        {sort, {SProps}} when is_list(SProps) ->
+            true;
+        _ ->
+            false
+    end.
+
+
+for_sort(Indexes, Opts) ->
+    {sort, {SProps}} = lists:keyfind(sort, 1, Opts),
+    for_sort_int(Indexes, {SProps}).
 
 
 for_sort_int(Indexes, Sort) ->
