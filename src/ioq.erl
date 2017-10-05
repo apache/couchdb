@@ -136,7 +136,7 @@ make_next_request(#state{}=State) ->
         {false, true} ->
             choose_next_request(#state.compaction, State);
         {false, false} ->
-            case random:uniform() < State#state.ratio of
+            case couch_rand:uniform() < State#state.ratio of
                 true ->
                     choose_next_request(#state.compaction, State);
                 false ->
