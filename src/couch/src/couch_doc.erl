@@ -13,8 +13,10 @@
 -module(couch_doc).
 
 -export([to_doc_info/1,to_doc_info_path/1,parse_rev/1,parse_revs/1,rev_to_str/1,revs_to_strs/1]).
--export([from_json_obj/1, from_json_obj_validate/1, to_json_obj/2,has_stubs/1, merge_stubs/2]).
--export([validate_docid/1, get_validate_doc_fun/1]).
+-export([from_json_obj/1, from_json_obj_validate/1]).
+-export([from_json_obj/2, from_json_obj_validate/2]).
+-export([to_json_obj/2, has_stubs/1, merge_stubs/2]).
+-export([validate_docid/1, validate_docid/2, get_validate_doc_fun/1]).
 -export([doc_from_multi_part_stream/2, doc_from_multi_part_stream/3]).
 -export([doc_from_multi_part_stream/4]).
 -export([doc_to_multi_part_stream/5, len_doc_to_multi_part_stream/4]).
@@ -126,8 +128,11 @@ doc_to_json_obj(#doc{id=Id,deleted=Del,body=Body,revs={Start, RevIds},
     }.
 
 from_json_obj_validate(EJson) ->
+    from_json_obj_validate(EJson, undefined).
+
+from_json_obj_validate(EJson, DbName) ->
     MaxSize = config:get_integer("couchdb", "max_document_size", 4294967296),
-    Doc = from_json_obj(EJson),
+    Doc = from_json_obj(EJson, DbName),
     case couch_ejson_size:encoded_size(Doc#doc.body) =< MaxSize of
         true ->
              validate_attachment_sizes(Doc#doc.atts),
@@ -149,9 +154,11 @@ validate_attachment_sizes(Atts) ->
 
 
 from_json_obj({Props}) ->
-    transfer_fields(Props, #doc{body=[]});
+    from_json_obj({Props}, undefined).
 
-from_json_obj(_Other) ->
+from_json_obj({Props}, DbName) ->
+    transfer_fields(Props, #doc{body=[]}, DbName);
+from_json_obj(_Other, _) ->
     throw({bad_request, "Document must be a JSON object"}).
 
 parse_revid(RevId) when size(RevId) =:= 32 ->
@@ -191,6 +198,15 @@ parse_revs(_) ->
     throw({bad_request, "Invalid list of revisions"}).
 
 
+validate_docid(DocId, DbName) ->
+    case DbName =:= ?l2b(config:get("mem3", "shards_db", "_dbs")) andalso
+        lists:member(DocId, ?SYSTEM_DATABASES) of
+        true ->
+            ok;
+        false ->
+            validate_docid(DocId)
+    end.
+
 validate_docid(<<"">>) ->
     throw({illegal_docid, <<"Document id must not be empty">>});
 validate_docid(<<"_design/">>) ->
@@ -228,28 +244,28 @@ validate_docid(Id) ->
     couch_log:debug("Document id is not a string: ~p", [Id]),
     throw({illegal_docid, <<"Document id must be a string">>}).
 
-transfer_fields([], #doc{body=Fields}=Doc) ->
+transfer_fields([], #doc{body=Fields}=Doc, _) ->
     % convert fields back to json object
     Doc#doc{body={lists:reverse(Fields)}};
 
-transfer_fields([{<<"_id">>, Id} | Rest], Doc) ->
-    validate_docid(Id),
-    transfer_fields(Rest, Doc#doc{id=Id});
+transfer_fields([{<<"_id">>, Id} | Rest], Doc, DbName) ->
+    validate_docid(Id, DbName),
+    transfer_fields(Rest, Doc#doc{id=Id}, DbName);
 
-transfer_fields([{<<"_rev">>, Rev} | Rest], #doc{revs={0, []}}=Doc) ->
+transfer_fields([{<<"_rev">>, Rev} | Rest], #doc{revs={0, []}}=Doc, DbName) ->
     {Pos, RevId} = parse_rev(Rev),
     transfer_fields(Rest,
-            Doc#doc{revs={Pos, [RevId]}});
+            Doc#doc{revs={Pos, [RevId]}}, DbName);
 
-transfer_fields([{<<"_rev">>, _Rev} | Rest], Doc) ->
+transfer_fields([{<<"_rev">>, _Rev} | Rest], Doc, DbName) ->
     % we already got the rev from the _revisions
-    transfer_fields(Rest,Doc);
+    transfer_fields(Rest, Doc, DbName);
 
-transfer_fields([{<<"_attachments">>, {JsonBins}} | Rest], Doc) ->
+transfer_fields([{<<"_attachments">>, {JsonBins}} | Rest], Doc, DbName) ->
     Atts = [couch_att:from_json(Name, Props) || {Name, {Props}} <- JsonBins],
-    transfer_fields(Rest, Doc#doc{atts=Atts});
+    transfer_fields(Rest, Doc#doc{atts=Atts}, DbName);
 
-transfer_fields([{<<"_revisions">>, {Props}} | Rest], Doc) ->
+transfer_fields([{<<"_revisions">>, {Props}} | Rest], Doc, DbName) ->
     RevIds = couch_util:get_value(<<"ids">>, Props),
     Start = couch_util:get_value(<<"start">>, Props),
     if not is_integer(Start) ->
@@ -262,45 +278,45 @@ transfer_fields([{<<"_revisions">>, {Props}} | Rest], Doc) ->
     [throw({doc_validation, "RevId isn't a string"}) ||
             RevId <- RevIds, not is_binary(RevId)],
     RevIds2 = [parse_revid(RevId) || RevId <- RevIds],
-    transfer_fields(Rest, Doc#doc{revs={Start, RevIds2}});
+    transfer_fields(Rest, Doc#doc{revs={Start, RevIds2}}, DbName);
 
-transfer_fields([{<<"_deleted">>, B} | Rest], Doc) when is_boolean(B) ->
-    transfer_fields(Rest, Doc#doc{deleted=B});
+transfer_fields([{<<"_deleted">>, B} | Rest], Doc, DbName) when is_boolean(B) ->
+    transfer_fields(Rest, Doc#doc{deleted=B}, DbName);
 
 % ignored fields
-transfer_fields([{<<"_revs_info">>, _} | Rest], Doc) ->
-    transfer_fields(Rest, Doc);
-transfer_fields([{<<"_local_seq">>, _} | Rest], Doc) ->
-    transfer_fields(Rest, Doc);
-transfer_fields([{<<"_conflicts">>, _} | Rest], Doc) ->
-    transfer_fields(Rest, Doc);
-transfer_fields([{<<"_deleted_conflicts">>, _} | Rest], Doc) ->
-    transfer_fields(Rest, Doc);
+transfer_fields([{<<"_revs_info">>, _} | Rest], Doc, DbName) ->
+    transfer_fields(Rest, Doc, DbName);
+transfer_fields([{<<"_local_seq">>, _} | Rest], Doc, DbName) ->
+    transfer_fields(Rest, Doc, DbName);
+transfer_fields([{<<"_conflicts">>, _} | Rest], Doc, DbName) ->
+    transfer_fields(Rest, Doc, DbName);
+transfer_fields([{<<"_deleted_conflicts">>, _} | Rest], Doc, DbName) ->
+    transfer_fields(Rest, Doc, DbName);
 
 % special fields for replication documents
 transfer_fields([{<<"_replication_state">>, _} = Field | Rest],
-    #doc{body=Fields} = Doc) ->
-    transfer_fields(Rest, Doc#doc{body=[Field|Fields]});
+    #doc{body=Fields} = Doc, DbName) ->
+    transfer_fields(Rest, Doc#doc{body=[Field|Fields]}, DbName);
 transfer_fields([{<<"_replication_state_time">>, _} = Field | Rest],
-    #doc{body=Fields} = Doc) ->
-    transfer_fields(Rest, Doc#doc{body=[Field|Fields]});
+    #doc{body=Fields} = Doc, DbName) ->
+    transfer_fields(Rest, Doc#doc{body=[Field|Fields]}, DbName);
 transfer_fields([{<<"_replication_state_reason">>, _} = Field | Rest],
-    #doc{body=Fields} = Doc) ->
-    transfer_fields(Rest, Doc#doc{body=[Field|Fields]});
+    #doc{body=Fields} = Doc, DbName) ->
+    transfer_fields(Rest, Doc#doc{body=[Field|Fields]}, DbName);
 transfer_fields([{<<"_replication_id">>, _} = Field | Rest],
-    #doc{body=Fields} = Doc) ->
-    transfer_fields(Rest, Doc#doc{body=[Field|Fields]});
+    #doc{body=Fields} = Doc, DbName) ->
+    transfer_fields(Rest, Doc#doc{body=[Field|Fields]}, DbName);
 transfer_fields([{<<"_replication_stats">>, _} = Field | Rest],
-    #doc{body=Fields} = Doc) ->
-    transfer_fields(Rest, Doc#doc{body=[Field|Fields]});
+    #doc{body=Fields} = Doc, DbName) ->
+    transfer_fields(Rest, Doc#doc{body=[Field|Fields]}, DbName);
 
 % unknown special field
-transfer_fields([{<<"_",Name/binary>>, _} | _], _) ->
+transfer_fields([{<<"_",Name/binary>>, _} | _], _, _) ->
     throw({doc_validation,
             ?l2b(io_lib:format("Bad special document member: _~s", [Name]))});
 
-transfer_fields([Field | Rest], #doc{body=Fields}=Doc) ->
-    transfer_fields(Rest, Doc#doc{body=[Field|Fields]}).
+transfer_fields([Field | Rest], #doc{body=Fields}=Doc, DbName) ->
+    transfer_fields(Rest, Doc#doc{body=[Field|Fields]}, DbName).
 
 to_doc_info(FullDocInfo) ->
     {DocInfo, _Path} = to_doc_info_path(FullDocInfo),
