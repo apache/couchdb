@@ -202,10 +202,7 @@ handle_message({row, Props}, Cursor) ->
                 true ->
                     Cursor2 = update_bookmark_keys(Cursor1, Props),
                     FinalDoc = mango_fields:extract(Doc, Cursor2#cursor.fields),
-                    Cursor3 = Cursor2#cursor {
-                        execution_stats = mango_execution_stats:incr_results_returned(Cursor2#cursor.execution_stats)
-                    },
-                    handle_doc(Cursor3, FinalDoc);
+                    handle_doc(Cursor2, FinalDoc);
                 false ->
                     {ok, Cursor1}
             end;
@@ -230,13 +227,14 @@ handle_all_docs_message(Message, Cursor) ->
 
 handle_doc(#cursor{skip = S} = C, _) when S > 0 ->
     {ok, C#cursor{skip = S - 1}};
-handle_doc(#cursor{limit = L} = C, Doc) when L > 0 ->
+handle_doc(#cursor{limit = L, execution_stats = Stats} = C, Doc) when L > 0 ->
     UserFun = C#cursor.user_fun,
     UserAcc = C#cursor.user_acc,
     {Go, NewAcc} = UserFun({row, Doc}, UserAcc),
     {Go, C#cursor{
         user_acc = NewAcc,
-        limit = L - 1
+        limit = L - 1,
+        execution_stats = mango_execution_stats:incr_results_returned(Stats)
     }};
 handle_doc(C, _Doc) ->
     {stop, C}.

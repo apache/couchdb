@@ -38,6 +38,10 @@ class ExecutionStatsTests(mango.UserDocsTests):
         self.assertEqual(resp["execution_stats"]["results_returned"], 3)
         self.assertGreater(resp["execution_stats"]["execution_time_ms"], 0)
 
+    def test_results_returned_limit(self):
+        resp = self.db.find({"age": {"$lt": 35}}, limit=2, return_raw=True, executionStats=True)
+        self.assertEqual(resp["execution_stats"]["results_returned"], len(resp["docs"]))
+
 @unittest.skipUnless(mango.has_text_service(), "requires text service")
 class ExecutionStatsTests_Text(mango.UserDocsTextTests):
 
