@@ -186,7 +186,20 @@ couchTests.rewrite = function(debug) {
             {
               "from": "/db/*",
               "to": "../../*"
-            }
+            },
+            {
+               "from": "renamedRewriteKeyView",
+               "to": "_view/rewriteKeyView",
+               "query": {
+                   "startkey": [
+                       ":by"
+                   ],
+                   "endkey": [
+                       ":by",
+                       {}
+                   ]
+               }
+             }
           ],
           lists: {
             simpleForm: stringFun(function(head, req) {
@@ -269,6 +282,14 @@ couchTests.rewrite = function(debug) {
               map: stringFun(function(doc) {
                 if (doc.type == "complex") {
                   emit(doc.b, doc.string);
+                }
+              })
+            },
+            rewriteKeyView: {
+              map: stringFun(function(doc){
+                 if (doc.type == "complex") {
+                  emit([doc.string], doc);
+                  emit(['']);
                 }
               })
             }
@@ -414,6 +435,31 @@ couchTests.rewrite = function(debug) {
         var result = JSON.parse(xhr.responseText);
         T(result['_id'] == "_design/test");
         T(typeof(result['_revs_info']) === "object");
+
+        // COUCHDB-2722 - The keys from the rewrited query params of a view should be blank when not specified in the URL
+        // Rewrite start and end key with by parameter
+        base_url = "/"+dbName+"/_design/test/"
+        view_url = base_url + "_view/rewriteKeyView"
+        rewrited_view_url = base_url + "_rewrite/renamedRewriteKeyView"
+
+        // When by = 'doc 3'
+        xhr = CouchDB.request("GET", rewrited_view_url + "?by=doc%203");
+        T(xhr.status == 200, "with by query param = value");
+        var result = JSON.parse(xhr.responseText);
+        T(result.rows.length == 1);
+
+        // When by is blank
+        xhr = CouchDB.request("GET", rewrited_view_url + "?by=");
+        T(xhr.status == 200, "with by query param = null");
+        var result = JSON.parse(xhr.responseText);
+        T(result.rows.length == 5);
+
+        // When by is undefined
+        // the key startkey should be blank instead and not kept as :by instead
+        xhr = CouchDB.request("GET", rewrited_view_url);
+        T(xhr.status == 200, "on renamed view without any param");
+        var result = JSON.parse(xhr.responseText);
+        T(result.rows.length == 5);
 
         // test path relative to server
         T(db.save({
