@@ -85,7 +85,7 @@ MakeDep = fun
 end,
 
 AddConfig = [
-    {require_otp_vsn, "R16B03|R16B03-1|17|18|19"},
+    {require_otp_vsn, "R16B03|R16B03-1|17|18|19|20"},
     {deps_dir, "src"},
     {deps, lists:map(MakeDep, DepDescs)},
     {sub_dirs, SubDirs},
