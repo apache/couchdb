@@ -758,8 +758,8 @@ create_already_compressed_att(Host, DbName) ->
 gzip(Data) ->
     Z = zlib:open(),
     ok = zlib:deflateInit(Z, ?COMPRESSION_LEVEL, deflated, 16 + 15, 8, default),
-    zlib:deflate(Z, Data),
+    Chunk = zlib:deflate(Z, Data),
     Last = zlib:deflate(Z, [], finish),
     ok = zlib:deflateEnd(Z),
     ok = zlib:close(Z),
-    Last.
+    [Chunk, Last].
