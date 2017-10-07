@@ -12,11 +12,10 @@
 
 -module(couch_peruser).
 -behaviour(gen_server).
+-behaviour(mem3_cluster).
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("mem3/include/mem3.hrl").
-
--define(USERDB_PREFIX, "userdb-").
 
 % gen_server callbacks
 -export([start_link/0, init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -27,10 +26,25 @@
 
 -export([init_changes_handler/1, changes_handler/3]).
 
--record(state, {parent, db_name, delete_dbs, changes_pid, changes_ref}).
--record(clusterState, {parent, db_name, delete_dbs, states}).
+% mem3_cluster callbacks
+-export([
+    cluster_stable/1,
+    cluster_unstable/1
+]).
 
+-record(state, {parent, db_name, delete_dbs, changes_pid, changes_ref}).
+-record(clusterState, {parent,
+    db_name,
+    delete_dbs,
+    states,
+    mem3_cluster_pid,
+    cluster_stable
+}).
+
+-define(USERDB_PREFIX, "userdb-").
 -define(RELISTEN_DELAY, 5000).
+-define(DEFAULT_QUIET_PERIOD, 60). % seconds
+-define(DEFAULT_START_PERIOD, 5). % seconds
 
 
 start_link() ->
@@ -48,18 +62,24 @@ init() ->
                          "couch_httpd_auth", "authentication_db", "_users")),
         DeleteDbs = config:get_boolean("couch_peruser", "delete_dbs", false),
 
-        ClusterState = #clusterState{
-            parent = self(),
-            db_name = DbName,
-            delete_dbs = DeleteDbs
-        },
-
         % set up cluster-stable listener
-        couch_replicator_clustering:link_cluster_event_listener(?MODULE,
-            notify_cluster_event, [self()]),
+        Period = abs(config:get_integer("couch_peruser", "cluster_quiet_period",
+            ?DEFAULT_QUIET_PERIOD)),
+        StartPeriod = abs(config:get_integer("couch_peruser", "cluster_start_period",
+            ?DEFAULT_START_PERIOD)),
+
+        {ok, Mem3Cluster} = mem3_cluster:start_link(?MODULE, self(), StartPeriod,
+            Period),
 
         couch_log:debug("peruser: registered for cluster event on node ~p", [node()]),
-        ClusterState
+
+        #clusterState{
+            parent = self(),
+            db_name = DbName,
+            delete_dbs = DeleteDbs,
+            mem3_cluster_pid = Mem3Cluster,
+            cluster_stable = false
+        }
     end.
 
 % Cluster membership change notification callback
@@ -80,7 +100,7 @@ start_listening(#clusterState{db_name=DbName, delete_dbs=DeleteDbs} = ClusterSta
             S#state{changes_pid=Pid, changes_ref=Ref}
         end, mem3:local_shards(DbName)),
 
-        ClusterState#clusterState{states = States}
+        ClusterState#clusterState{states = States, cluster_stable = true}
     catch error:database_does_not_exist ->
         couch_log:warning("couch_peruser can't proceed as underlying database (~s) is missing, disables itself.", [DbName]),
         config:set("couch_peruser", "enable", "false", lists:concat([binary_to_list(DbName), " is missing"]))
@@ -166,6 +186,7 @@ ensure_user_db(User) ->
         {ok, _DbInfo} = fabric:get_db_info(UserDb)
     catch error:database_does_not_exist ->
         case fabric:create_db(UserDb, [?ADMIN_CTX]) of
+        {error, file_exists} -> ok;
         ok -> ok;
         accepted -> ok
         end
@@ -207,7 +228,7 @@ remove_user(User, Prop, {Modified, SecProps}) ->
 ensure_security(User, UserDb, TransformFun) ->
     case fabric:get_all_security(UserDb, [?ADMIN_CTX]) of
     {error, no_majority} ->
-      % single node, ignore
+       % single node, ignore
        ok;
     {ok, Shards} ->
         {_ShardInfo, {SecProps}} = hd(Shards),
@@ -237,6 +258,16 @@ exit_changes(ClusterState) ->
         exit(State#state.changes_pid, kill)
     end, ClusterState#clusterState.states).
 
+% Mem3 cluster callbacks
+
+cluster_unstable(Server) ->
+    gen_server:cast(Server, cluster_unstable),
+    Server.
+
+cluster_stable(Server) ->
+    gen_server:cast(Server, cluster_stable),
+    Server.
+
 %% gen_server callbacks
 
 init([]) ->
@@ -254,12 +285,12 @@ handle_cast(update_config, _) ->
     {noreply, init()};
 handle_cast(stop, State) ->
     {stop, normal, State};
-handle_cast({cluster, unstable}, ClusterState) when ClusterState#clusterState.states =/= undefined ->
+handle_cast(cluster_unstable, ClusterState) when ClusterState#clusterState.states =/= undefined ->
     exit_changes(ClusterState),
     {noreply, init()};
-handle_cast({cluster, unstable}, _) ->
+handle_cast(cluster_unstable, _) ->
     {noreply, init()};
-handle_cast({cluster, stable}, State) ->
+handle_cast(cluster_stable, State) ->
     {noreply, start_listening(State)};
 handle_cast(_Msg, State) ->
     {noreply, State}.
