@@ -14,7 +14,7 @@
     {description, "couch_peruser - maintains per-user databases in CouchDB"},
     {vsn, git},
     {registered, []},
-    {applications, [kernel, stdlib, config, couch, fabric]},
+    {applications, [kernel, stdlib, config, couch, fabric, couch_replicator, mem3]},
     {mod, {couch_peruser_app, []}},
     {env, []},
     {modules, [couch_peruser, couch_peruser_app, couch_peruser_sup]}
