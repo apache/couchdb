@@ -1,6 +1,6 @@
 before_install:
    - sudo apt-get -y update
-   - sudo apt-get -y install libicu-dev libmozjs-dev pkg-config help2man
+   - sudo apt-get -y install libicu-dev libmozjs185-dev pkg-config help2man
    - sudo apt-get -y install libtool automake autoconf autoconf-archive
    - sudo apt-get -y install texlive-latex-base texlive-latex-recommended
    - sudo apt-get -y install texlive-latex-extra texlive-fonts-recommended texinfo
