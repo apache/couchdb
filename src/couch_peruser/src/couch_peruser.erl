@@ -33,20 +33,20 @@
 ]).
 
 -record(state, {
-    parent,
-    db_name,
-    delete_dbs,
-    changes_pid,
-    changes_ref
+    parent :: pid(),
+    db_name :: binary(),
+    delete_dbs :: boolean(),
+    changes_pid :: pid(),
+    changes_ref :: reference()
 }).
 
 -record(clusterState, {
-    parent,
-    db_name,
-    delete_dbs,
-    states,
-    mem3_cluster_pid,
-    cluster_stable
+    parent :: pid(),
+    db_name :: binary(),
+    delete_dbs :: boolean(),
+    states :: list(),
+    mem3_cluster_pid :: pid(),
+    cluster_stable :: boolean()
 }).
 
 -define(USERDB_PREFIX, "userdb-").
@@ -57,10 +57,11 @@
 %%
 %% Please leave in the commented-out couch_log:debug calls, thanks! — Jan
 %%
-
+-spec start_link() -> {ok, pid()} | ignore | {error, term()}.
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
+-spec init() -> #clusterState{}.
 init() ->
     couch_log:debug("peruser: starting on node ~p in pid ~p", [node(), self()]),
     case config:get_boolean("couch_peruser", "enable", false) of
@@ -92,11 +93,12 @@ init() ->
     end.
 
 % Cluster membership change notification callback
--spec notify_cluster_event(pid(), {cluster, any()}) -> ok.
+-spec notify_cluster_event(Server :: pid(), Event :: {cluster, any()}) -> ok.
 notify_cluster_event(Server, {cluster, _} = Event) ->
     % couch_log:debug("peruser: received cluster event ~p on node ~p", [Event, node()]),
     gen_server:cast(Server, Event).
 
+-spec start_listening(ClusterState :: #clusterState{}) -> #clusterState{} | ok.
 start_listening(#clusterState{states=States}=ClusterState) when length(States) > 0 ->
     % couch_log:debug("peruser: start_listening() already run on node ~p in pid ~p", [node(), self()]),
     ClusterState;
@@ -119,6 +121,7 @@ start_listening(#clusterState{db_name=DbName, delete_dbs=DeleteDbs} = ClusterSta
         config:set("couch_peruser", "enable", "false", lists:concat([binary_to_list(DbName), " is missing"]))
     end.
 
+-spec init_changes_handler(State :: #state{}) -> ok.
 init_changes_handler(#state{db_name=DbName} = State) ->
     % couch_log:debug("peruser: init_changes_handler() on DbName ~p", [DbName]),
     try
@@ -132,7 +135,8 @@ init_changes_handler(#state{db_name=DbName} = State) ->
         ok
     end.
 
-
+-type db_change() :: {atom(), tuple(), binary()}.
+-spec changes_handler(Change :: db_change(), ResultType :: any(), State :: #state{}) -> #state{}.
 changes_handler({change, {Doc}, _Prepend}, _ResType, State=#state{db_name=DbName}) ->
     % couch_log:debug("peruser: changes_handler() on DbName/Doc ~p/~p", [DbName, Doc]),
 
@@ -165,7 +169,7 @@ changes_handler({change, {Doc}, _Prepend}, _ResType, State=#state{db_name=DbName
 changes_handler(_Event, _ResType, State) ->
     State.
 
-
+-spec should_handle_doc(ShardName :: binary(), DocId::binary()) -> boolean().
 should_handle_doc(ShardName, DocId) ->
     case is_stable() of
     false ->
@@ -178,6 +182,7 @@ should_handle_doc(ShardName, DocId) ->
         should_handle_doc_int(ShardName, DocId)
     end.
 
+-spec should_handle_doc_int(ShardName :: binary(), DocId :: binary()) -> boolean().
 should_handle_doc_int(ShardName, DocId) ->
     DbName = mem3:dbname(ShardName),
     Live = [erlang:node() | erlang:nodes()],
@@ -192,7 +197,7 @@ should_handle_doc_int(ShardName, DocId) ->
         false
   end.
 
-
+-spec delete_user_db(User :: binary()) -> binary().
 delete_user_db(User) ->
     UserDb = user_db_name(User),
     try
@@ -205,6 +210,7 @@ delete_user_db(User) ->
     end,
     UserDb.
 
+-spec ensure_user_db(User :: binary()) -> binary().
 ensure_user_db(User) ->
     UserDb = user_db_name(User),
     try
@@ -218,6 +224,7 @@ ensure_user_db(User) ->
     end,
     UserDb.
 
+-spec add_user(User :: binary(), Properties :: tuple(), Acc :: tuple()) -> tuple().
 add_user(User, Prop, {Modified, SecProps}) ->
     {PropValue} = couch_util:get_value(Prop, SecProps, {[]}),
     Names = couch_util:get_value(<<"names">>, PropValue, []),
@@ -234,6 +241,7 @@ add_user(User, Prop, {Modified, SecProps}) ->
                    {<<"names">>, [User | Names]})}})}
     end.
 
+-spec remove_user(User :: binary(), Properties :: tuple(), Acc :: tuple()) -> tuple().
 remove_user(User, Prop, {Modified, SecProps}) ->
     {PropValue} = couch_util:get_value(Prop, SecProps, {[]}),
     Names = couch_util:get_value(<<"names">>, PropValue, []),
@@ -250,10 +258,11 @@ remove_user(User, Prop, {Modified, SecProps}) ->
                    {<<"names">>, lists:delete(User, Names)})}})}
     end.
 
+-spec ensure_security(User :: binary(), UserDb :: binary(), TransformFun :: fun()) -> ok.
 ensure_security(User, UserDb, TransformFun) ->
     case fabric:get_all_security(UserDb, [?ADMIN_CTX]) of
     {error, no_majority} ->
-       % single node, ignore
+       % TODO: make sure this is still true: single node, ignore
        ok;
     {ok, Shards} ->
         {_ShardInfo, {SecProps}} = hd(Shards),
@@ -272,11 +281,13 @@ ensure_security(User, UserDb, TransformFun) ->
         end
     end.
 
+-spec user_db_name(User :: binary()) -> binary().
 user_db_name(User) ->
     HexUser = list_to_binary(
         [string:to_lower(integer_to_list(X, 16)) || <<X>> <= User]),
     <<?USERDB_PREFIX,HexUser/binary>>.
 
+-spec exit_changes(ClusterState :: #clusterState{}) -> ok.
 exit_changes(ClusterState) ->
     lists:foreach(fun (State) ->
         demonitor(State#state.changes_ref, [flush]),
@@ -289,16 +300,20 @@ is_stable() ->
 
 % Mem3 cluster callbacks
 
+% TODO: find out what type Server is
+-spec cluster_unstable(Server :: any()) -> any().
 cluster_unstable(Server) ->
     gen_server:cast(Server, cluster_unstable),
     Server.
 
+% TODO: find out what type Server is
+-spec cluster_stable(Server :: any()) -> any().
 cluster_stable(Server) ->
     gen_server:cast(Server, cluster_stable),
     Server.
 
 %% gen_server callbacks
-
+-spec init(Options :: list()) -> {ok, #clusterState{}}.
 init([]) ->
     ok = subscribe_for_changes(),
     {ok, init()}.
@@ -344,12 +359,12 @@ handle_info(restart_config_listener, State) ->
 handle_info(_Msg, State) ->
     {noreply, State}.
 
+-spec subscribe_for_changes() -> ok.
 subscribe_for_changes() ->
     config:subscribe_for_changes([
         {"couch_httpd_auth", "authentication_db"},
         "couch_peruser"
     ]).
-
 
 terminate(_Reason, _State) ->
     %% Everything should be linked or monitored, let nature
