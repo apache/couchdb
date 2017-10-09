@@ -21,9 +21,6 @@
 -export([start_link/0, init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
-% cluster state notification callback
--export([notify_cluster_event/2]).
-
 -export([init_changes_handler/1, changes_handler/3]).
 
 % mem3_cluster callbacks
@@ -92,11 +89,6 @@ init() ->
         }
     end.
 
-% Cluster membership change notification callback
--spec notify_cluster_event(Server :: pid(), Event :: {cluster, any()}) -> ok.
-notify_cluster_event(Server, {cluster, _} = Event) ->
-    % couch_log:debug("peruser: received cluster event ~p on node ~p", [Event, node()]),
-    gen_server:cast(Server, Event).
 
 -spec start_listening(ClusterState :: #clusterState{}) -> #clusterState{} | ok.
 start_listening(#clusterState{states=States}=ClusterState) when length(States) > 0 ->
