@@ -13,7 +13,7 @@
 {application, couch_peruser, [
     {description, "couch_peruser - maintains per-user databases in CouchDB"},
     {vsn, git},
-    {registered, []},
+    {registered, [couch_peruser, couch_peruser_sup]},
     {applications, [kernel, stdlib, config, couch, fabric, mem3]},
     {mod, {couch_peruser_app, []}},
     {env, []}
