@@ -144,7 +144,7 @@ init_p(From, {M,F,A}, Nonce) ->
             node(ClientPid), ClientPid, M, F, length(A),
             Class, Reason, Stack]),
         exit(#error{
-            timestamp = now(),
+            timestamp = os:timestamp(),
             reason = {Class, Reason},
             mfa = {M,F,A},
             nonce = Nonce,

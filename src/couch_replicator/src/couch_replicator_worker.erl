@@ -73,7 +73,7 @@ start_link(Cp, #httpdb{} = Source, Target, ChangesManager, MaxConns) ->
 
 start_link(Cp, Source, Target, ChangesManager, _MaxConns) ->
     Pid = spawn_link(fun() ->
-        erlang:put(last_stats_report, now()),
+        erlang:put(last_stats_report, os:timestamp()),
         queue_fetch_loop(Source, Target, Cp, Cp, ChangesManager)
     end),
     {ok, Pid}.
@@ -85,7 +85,7 @@ init({Cp, Source, Target, ChangesManager, MaxConns}) ->
     LoopPid = spawn_link(fun() ->
         queue_fetch_loop(Source, Target, Parent, Cp, ChangesManager)
     end),
-    erlang:put(last_stats_report, now()),
+    erlang:put(last_stats_report, os:timestamp()),
     State = #state{
         cp = Cp,
         max_parallel_conns = MaxConns,
@@ -247,7 +247,7 @@ queue_fetch_loop(Source, Target, Parent, Cp, ChangesManager) ->
         end,
         close_db(Target2),
         ok = gen_server:call(Cp, {report_seq_done, ReportSeq, Stats}, infinity),
-        erlang:put(last_stats_report, now()),
+        erlang:put(last_stats_report, os:timestamp()),
         couch_log:debug("Worker reported completion of seq ~p", [ReportSeq]),
         queue_fetch_loop(Source, Target, Parent, Cp, ChangesManager)
     end.
@@ -392,7 +392,7 @@ spawn_writer(Target, #batch{docs = DocList, size = Size}) ->
 
 after_full_flush(#state{stats = Stats, flush_waiter = Waiter} = State) ->
     gen_server:reply(Waiter, {ok, Stats}),
-    erlang:put(last_stats_report, now()),
+    erlang:put(last_stats_report, os:timestamp()),
     State#state{
         stats = couch_replicator_stats:new(),
         flush_waiter = nil,
@@ -543,7 +543,7 @@ find_missing(DocInfos, Target) ->
 
 
 maybe_report_stats(Cp, Stats) ->
-    Now = now(),
+    Now = os:timestamp(),
     case timer:now_diff(erlang:get(last_stats_report), Now) >= ?STATS_DELAY of
     true ->
         ok = gen_server:call(Cp, {add_stats, Stats}, infinity),
