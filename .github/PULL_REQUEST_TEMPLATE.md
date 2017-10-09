@@ -22,17 +22,10 @@
      Does it provides any behaviour that the end users
      could notice? -->
 
-## GitHub issue number
-
-<!-- If this is a significant change, please file a separate issue at:
-     https://github.com/apache/couchdb/issues
-     and include the number here and in commit message(s) using
-     syntax like "Fixes #472" or "Fixes apache/couchdb#472".  -->
-
-## Related Pull Requests
+## Related Issues or Pull Requests
 
 <!-- If your changes affects multiple components in different
-     repositories please put links to those pull requests here.  -->
+     repositories please put links to those issues or pull requests here.  -->
 
 ## Checklist
 
