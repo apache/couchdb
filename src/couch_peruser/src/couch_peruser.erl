@@ -29,7 +29,7 @@
     cluster_unstable/1
 ]).
 
--record(state, {
+-record(changes_state, {
     parent :: pid(),
     db_name :: binary(),
     delete_dbs :: boolean(),
@@ -37,7 +37,7 @@
     changes_ref :: reference()
 }).
 
--record(clusterState, {
+-record(state, {
     parent :: pid(),
     db_name :: binary(),
     delete_dbs :: boolean(),
@@ -58,13 +58,13 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
--spec init() -> #clusterState{}.
+-spec init() -> #state{}.
 init() ->
     couch_log:debug("peruser: starting on node ~p in pid ~p", [node(), self()]),
     case config:get_boolean("couch_peruser", "enable", false) of
     false ->
         couch_log:debug("peruser: disabled on node ~p", [node()]),
-        #clusterState{};
+        #state{};
     true ->
         couch_log:debug("peruser: enabled on node ~p", [node()]),
         DbName = ?l2b(config:get(
@@ -80,7 +80,7 @@ init() ->
         {ok, Mem3Cluster} = mem3_cluster:start_link(?MODULE, self(), StartPeriod,
             Period),
 
-        #clusterState{
+        #state{
             parent = self(),
             db_name = DbName,
             delete_dbs = DeleteDbs,
@@ -90,35 +90,35 @@ init() ->
     end.
 
 
--spec start_listening(ClusterState :: #clusterState{}) -> #clusterState{} | ok.
-start_listening(#clusterState{states=States}=ClusterState) when length(States) > 0 ->
+-spec start_listening(State :: #state{}) -> #state{} | ok.
+start_listening(#state{states=ChangesStates}=State) when length(ChangesStates) > 0 ->
     % couch_log:debug("peruser: start_listening() already run on node ~p in pid ~p", [node(), self()]),
-    ClusterState;
-start_listening(#clusterState{db_name=DbName, delete_dbs=DeleteDbs} = ClusterState) ->
+    State;
+start_listening(#state{db_name=DbName, delete_dbs=DeleteDbs} = State) ->
     % couch_log:debug("peruser: start_listening() on node ~p", [node()]),
     try
         States = lists:map(fun (A) ->
-            S = #state{parent = ClusterState#clusterState.parent,
+            S = #changes_state{parent = State#state.parent,
                        db_name = A#shard.name,
                        delete_dbs = DeleteDbs},
             {Pid, Ref} = spawn_opt(
                 ?MODULE, init_changes_handler, [S], [link, monitor]),
-            S#state{changes_pid=Pid, changes_ref=Ref}
+            S#changes_state{changes_pid=Pid, changes_ref=Ref}
         end, mem3:local_shards(DbName)),
         % couch_log:debug("peruser: start_listening() States ~p", [States]),
 
-        ClusterState#clusterState{states = States, cluster_stable = true}
+        State#state{states = States, cluster_stable = true}
     catch error:database_does_not_exist ->
         couch_log:warning("couch_peruser can't proceed as underlying database (~s) is missing, disables itself.", [DbName]),
         config:set("couch_peruser", "enable", "false", lists:concat([binary_to_list(DbName), " is missing"]))
     end.
 
--spec init_changes_handler(State :: #state{}) -> ok.
-init_changes_handler(#state{db_name=DbName} = State) ->
+-spec init_changes_handler(ChangesState :: #changes_state{}) -> ok.
+init_changes_handler(#changes_state{db_name=DbName} = ChangesState) ->
     % couch_log:debug("peruser: init_changes_handler() on DbName ~p", [DbName]),
     try
         {ok, Db} = couch_db:open_int(DbName, [?ADMIN_CTX, sys_db]),
-        FunAcc = {fun ?MODULE:changes_handler/3, State},
+        FunAcc = {fun ?MODULE:changes_handler/3, ChangesState},
         (couch_changes:handle_db_changes(
              #changes_args{feed="continuous", timeout=infinity},
              {json_req, null},
@@ -128,8 +128,8 @@ init_changes_handler(#state{db_name=DbName} = State) ->
     end.
 
 -type db_change() :: {atom(), tuple(), binary()}.
--spec changes_handler(Change :: db_change(), ResultType :: any(), State :: #state{}) -> #state{}.
-changes_handler({change, {Doc}, _Prepend}, _ResType, State=#state{db_name=DbName}) ->
+-spec changes_handler(Change :: db_change(), ResultType :: any(), ChangesState :: #changes_state{}) -> #changes_state{}.
+changes_handler({change, {Doc}, _Prepend}, _ResType, ChangesState=#changes_state{db_name=DbName}) ->
     % couch_log:debug("peruser: changes_handler() on DbName/Doc ~p/~p", [DbName, Doc]),
 
     case couch_util:get_value(<<"id">>, Doc) of
@@ -140,26 +140,26 @@ changes_handler({change, {Doc}, _Prepend}, _ResType, State=#state{db_name=DbName
             false ->
                 UserDb = ensure_user_db(User),
                 ok = ensure_security(User, UserDb, fun add_user/3),
-                State;
+                ChangesState;
             true ->
-                case State#state.delete_dbs of
+                case ChangesState#changes_state.delete_dbs of
                 true ->
                     _UserDb = delete_user_db(User),
-                    State;
+                    ChangesState;
                 false ->
                     UserDb = user_db_name(User),
                     ok = ensure_security(User, UserDb, fun remove_user/3),
-                    State
+                    ChangesState
                 end
             end;
         false ->
-            State
+            ChangesState
         end;
     _ ->
-        State
+        ChangesState
     end;
-changes_handler(_Event, _ResType, State) ->
-    State.
+changes_handler(_Event, _ResType, ChangesState) ->
+    ChangesState.
 
 -spec should_handle_doc(ShardName :: binary(), DocId::binary()) -> boolean().
 should_handle_doc(ShardName, DocId) ->
@@ -279,12 +279,12 @@ user_db_name(User) ->
         [string:to_lower(integer_to_list(X, 16)) || <<X>> <= User]),
     <<?USERDB_PREFIX,HexUser/binary>>.
 
--spec exit_changes(ClusterState :: #clusterState{}) -> ok.
-exit_changes(ClusterState) ->
-    lists:foreach(fun (State) ->
-        demonitor(State#state.changes_ref, [flush]),
-        exit(State#state.changes_pid, kill)
-    end, ClusterState#clusterState.states).
+-spec exit_changes(State :: #state{}) -> ok.
+exit_changes(State) ->
+    lists:foreach(fun (ChangesState) ->
+        demonitor(State#changes_state.changes_ref, [flush]),
+        exit(ChangesState#changes_state.changes_pid, kill)
+    end, State#state.states).
 
 -spec is_stable() -> true | false.
 is_stable() ->
@@ -305,26 +305,26 @@ cluster_stable(Server) ->
     Server.
 
 %% gen_server callbacks
--spec init(Options :: list()) -> {ok, #clusterState{}}.
+-spec init(Options :: list()) -> {ok, #state{}}.
 init([]) ->
     ok = subscribe_for_changes(),
     {ok, init()}.
 
-handle_call(is_stable, _From, #clusterState{cluster_stable = IsStable} = State) ->
+handle_call(is_stable, _From, #state{cluster_stable = IsStable} = State) ->
     {reply, IsStable, State};
 handle_call(_Msg, _From, State) ->
     {reply, error, State}.
 
 
-handle_cast(update_config, ClusterState) when ClusterState#clusterState.states =/= undefined ->
-    exit_changes(ClusterState),
+handle_cast(update_config, State) when State#state.states =/= undefined ->
+    exit_changes(State),
     {noreply, init()};
 handle_cast(update_config, _) ->
     {noreply, init()};
 handle_cast(stop, State) ->
     {stop, normal, State};
-handle_cast(cluster_unstable, ClusterState) when ClusterState#clusterState.states =/= undefined ->
-    exit_changes(ClusterState),
+handle_cast(cluster_unstable, State) when State#state.states =/= undefined ->
+    exit_changes(State),
     {noreply, init()};
 handle_cast(cluster_unstable, _) ->
     {noreply, init()};
@@ -333,7 +333,7 @@ handle_cast(cluster_stable, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info({'DOWN', Ref, _, _, _Reason}, #state{changes_ref=Ref} = State) ->
+handle_info({'DOWN', Ref, _, _, _Reason}, #changes_state{changes_ref=Ref} = State) ->
     {stop, normal, State};
 handle_info({config_change, "couch_peruser", _, _, _}, State) ->
     handle_cast(update_config, State);
