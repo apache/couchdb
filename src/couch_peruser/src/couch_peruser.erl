@@ -283,6 +283,7 @@ user_db_name(User) ->
 exit_changes(State) ->
     lists:foreach(fun (ChangesState) ->
         demonitor(State#changes_state.changes_ref, [flush]),
+        unlink(ChangesState#changes_state.changes_pid),
         exit(ChangesState#changes_state.changes_pid, kill)
     end, State#state.states).
 
