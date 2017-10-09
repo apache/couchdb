@@ -16,6 +16,5 @@
     {registered, []},
     {applications, [kernel, stdlib, config, couch, fabric, mem3]},
     {mod, {couch_peruser_app, []}},
-    {env, []},
-    {modules, [couch_peruser, couch_peruser_app, couch_peruser_sup]}
+    {env, []}
 ]}.
