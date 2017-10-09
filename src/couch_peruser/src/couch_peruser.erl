@@ -133,7 +133,7 @@ changes_handler({change, {Doc}, _Prepend}, _ResType, ChangesState=#changes_state
     % couch_log:debug("peruser: changes_handler() on DbName/Doc ~p/~p", [DbName, Doc]),
 
     case couch_util:get_value(<<"id">>, Doc) of
-    <<"org.couchdb.user:",User/binary>>=DocId ->
+    <<"org.couchdb.user:",User/binary>> = DocId ->
         case should_handle_doc(DbName, DocId) of
         true ->
             case couch_util:get_value(<<"deleted">>, Doc, false) of
