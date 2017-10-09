@@ -290,6 +290,13 @@ exit_changes(State) ->
 is_stable() ->
     gen_server:call(?MODULE, is_stable).
 
+-spec subscribe_for_changes() -> ok.
+subscribe_for_changes() ->
+    config:subscribe_for_changes([
+        {"couch_httpd_auth", "authentication_db"},
+        "couch_peruser"
+    ]).
+
 % Mem3 cluster callbacks
 
 % TODO: find out what type Server is
@@ -350,13 +357,6 @@ handle_info(restart_config_listener, State) ->
     {noreply, State};
 handle_info(_Msg, State) ->
     {noreply, State}.
-
--spec subscribe_for_changes() -> ok.
-subscribe_for_changes() ->
-    config:subscribe_for_changes([
-        {"couch_httpd_auth", "authentication_db"},
-        "couch_peruser"
-    ]).
 
 terminate(_Reason, _State) ->
     %% Everything should be linked or monitored, let nature
