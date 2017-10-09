@@ -33,12 +33,6 @@ info(mango_idx, {no_usable_index, no_index_matching_name}) ->
         <<"no_usable_index">>,
         <<"No index matches the index specified with \"use_index\"">>
     };
-info(mango_idx, {no_usable_index, no_usable_index_matching_name}) ->
-    {
-        400,
-        <<"no_usable_index">>,
-        <<"The index specified with \"use_index\" is not usable for the query.">>
-    };
 info(mango_idx, {no_usable_index, missing_sort_index}) ->
     {
         400,
@@ -49,7 +43,7 @@ info(mango_cursor, {no_usable_index, selector_unsupported}) ->
     {
         400,
         <<"no_usable_index">>,
-        <<"There is no index available for this selector.">>
+        <<"The index specified with \"use_index\" is not usable for the query.">>
     };
 
 info(mango_json_bookmark, {invalid_bookmark, BadBookmark}) ->
