@@ -132,6 +132,8 @@ PortSpecs = case os:type() of
         BaseSpecs
 end,
 PlatformDefines = [
+   {platform_define, "^R16", 'PRE18TIMEFEATURES'},
+   {platform_define, "^17", 'PRE18TIMEFEATURES'},
    {platform_define, "^R16", 'NORANDMODULE'},
    {platform_define, "^17", 'NORANDMODULE'},
    {platform_define, "win32", 'WINDOWS'}
