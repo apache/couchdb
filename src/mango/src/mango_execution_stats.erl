@@ -64,12 +64,12 @@ incr_results_returned(Stats) ->
 
 log_start(Stats) ->
     Stats#execution_stats {
-        executionStartTime = now()
+        executionStartTime = os:timestamp()
     }.
 
 
 log_end(Stats) ->
-    End = now(),
+    End = os:timestamp(),
     Diff = timer:now_diff(End, Stats#execution_stats.executionStartTime) / 1000,
     Stats#execution_stats {
         executionTimeMs = Diff

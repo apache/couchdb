@@ -34,6 +34,7 @@
 -export([callback_exists/3, validate_callback_exists/3]).
 -export([with_proc/4]).
 -export([process_dict_get/2, process_dict_get/3]).
+-export([unique_monotonic_integer/0]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -625,3 +626,17 @@ process_dict_get(Pid, Key, DefaultValue) ->
         undefined ->
             DefaultValue
     end.
+
+
+-ifdef(PRE18TIMEFEATURES).
+
+unique_monotonic_integer() ->
+    {Ms, S, Us} = erlang:now(),
+    (Ms * 1000000 + S) * 1000000 + Us.
+
+-else.
+
+unique_monotonic_integer() ->
+    erlang:unique_integer([monotonic, positive]).
+
+-endif.

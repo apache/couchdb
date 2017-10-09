@@ -429,7 +429,7 @@ create_if_missing(Name) ->
     end.
 
 cache_insert(#st{cur_size=Cur}=St, DbName, Writer, Timeout) ->
-    NewATime = now(),
+    NewATime = couch_util:unique_monotonic_integer(),
     true = ets:delete(?SHARDS, DbName),
     flush_write(DbName, Writer, Timeout),
     case ets:lookup(?DBS, DbName) of
@@ -458,7 +458,7 @@ cache_remove(#st{cur_size=Cur}=St, DbName) ->
 cache_hit(DbName) ->
     case ets:lookup(?DBS, DbName) of
         [{DbName, ATime}] ->
-            NewATime = now(),
+            NewATime = couch_util:unique_monotonic_integer(),
             true = ets:delete(?ATIMES, ATime),
             true = ets:insert(?ATIMES, {NewATime, DbName}),
             true = ets:insert(?DBS, {DbName, NewATime});

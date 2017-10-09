@@ -26,7 +26,7 @@
 
 -define(temp_atom,
     fun() ->
-        {A, B, C} = erlang:now(),
+        {A, B, C} = os:timestamp(),
         list_to_atom(lists:flatten(io_lib:format("~p~p~p", [A, B, C])))
     end).
 
