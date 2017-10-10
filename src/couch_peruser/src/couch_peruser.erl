@@ -279,10 +279,10 @@ user_db_name(User) ->
         [string:to_lower(integer_to_list(X, 16)) || <<X>> <= User]),
     <<?USERDB_PREFIX,HexUser/binary>>.
 
--spec exit_changes(State :: #state{}) -> ok.
-exit_changes(State) ->
+-spec exit_changes(ChangesState :: #changes_state{}) -> ok.
+exit_changes(ChangesState) ->
     lists:foreach(fun (ChangesState) ->
-        demonitor(State#changes_state.changes_ref, [flush]),
+        demonitor(ChangesState#changes_state.changes_ref, [flush]),
         unlink(ChangesState#changes_state.changes_pid),
         exit(ChangesState#changes_state.changes_pid, kill)
     end, State#state.states).
