@@ -343,7 +343,7 @@ handle_cast(cluster_stable, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info({'DOWN', Ref, _, _, _Reason}, #changes_state{changes_ref=Ref} = State) ->
+handle_info({'DOWN', _Ref, _, _, _Reason}, State) ->
     {stop, normal, State};
 handle_info({config_change, "couch_peruser", _, _, _}, State) ->
     handle_cast(update_config, State);
