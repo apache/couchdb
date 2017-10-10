@@ -74,8 +74,8 @@ init_state() ->
         % set up cluster-stable listener
         Period = abs(config:get_integer("couch_peruser", "cluster_quiet_period",
             ?DEFAULT_QUIET_PERIOD)),
-        StartPeriod = abs(config:get_integer("couch_peruser", "cluster_start_period",
-            ?DEFAULT_START_PERIOD)),
+        StartPeriod = abs(config:get_integer("couch_peruser",
+            "cluster_start_period", ?DEFAULT_START_PERIOD)),
 
         {ok, Mem3Cluster} = mem3_cluster:start_link(?MODULE, self(), StartPeriod,
             Period),
@@ -91,7 +91,8 @@ init_state() ->
 
 
 -spec start_listening(State :: #state{}) -> #state{} | ok.
-start_listening(#state{states=ChangesStates}=State) when length(ChangesStates) > 0 ->
+start_listening(#state{states=ChangesStates}=State)
+    when length(ChangesStates) > 0 ->
     % couch_log:debug("peruser: start_listening() already run on node ~p in pid ~p", [node(), self()]),
     State;
 start_listening(#state{db_name=DbName, delete_dbs=DeleteDbs} = State) ->
@@ -281,8 +282,8 @@ user_db_name(User) ->
         [string:to_lower(integer_to_list(X, 16)) || <<X>> <= User]),
     <<?USERDB_PREFIX,HexUser/binary>>.
 
--spec exit_changes(ChangesState :: #changes_state{}) -> ok.
-exit_changes(ChangesState) ->
+-spec exit_changes(State :: #state{}) -> ok.
+exit_changes(State) ->
     lists:foreach(fun (ChangesState) ->
         demonitor(ChangesState#changes_state.changes_ref, [flush]),
         unlink(ChangesState#changes_state.changes_pid),
