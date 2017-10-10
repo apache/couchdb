@@ -98,9 +98,11 @@ start_listening(#state{db_name=DbName, delete_dbs=DeleteDbs} = State) ->
     % couch_log:debug("peruser: start_listening() on node ~p", [node()]),
     try
         States = lists:map(fun (A) ->
-            S = #changes_state{parent = State#state.parent,
-                       db_name = A#shard.name,
-                       delete_dbs = DeleteDbs},
+            S = #changes_state{
+                parent = State#state.parent,
+                db_name = A#shard.name,
+                delete_dbs = DeleteDbs
+            },
             {Pid, Ref} = spawn_opt(
                 ?MODULE, init_changes_handler, [S], [link, monitor]),
             S#changes_state{changes_pid=Pid, changes_ref=Ref}
