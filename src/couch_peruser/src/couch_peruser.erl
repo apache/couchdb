@@ -131,8 +131,14 @@ init_changes_handler(#changes_state{db_name=DbName} = ChangesState) ->
     end.
 
 -type db_change() :: {atom(), tuple(), binary()}.
--spec changes_handler(Change :: db_change(), ResultType :: any(), ChangesState :: #changes_state{}) -> #changes_state{}.
-changes_handler({change, {Doc}, _Prepend}, _ResType, ChangesState=#changes_state{db_name=DbName}) ->
+-spec changes_handler(
+    Change :: db_change(),
+    ResultType :: any(),
+    ChangesState :: #changes_state{}) -> #changes_state{}.
+changes_handler(
+    {change, {Doc}, _Prepend},
+    _ResType,
+    ChangesState=#changes_state{db_name=DbName}) ->
     % couch_log:debug("peruser: changes_handler() on DbName/Doc ~p/~p", [DbName, Doc]),
 
     case couch_util:get_value(<<"id">>, Doc) of
@@ -171,13 +177,16 @@ should_handle_doc(ShardName, DocId) ->
         % when the cluster is unstable, we have already stopped all Listeners
         % the next stable event will restart all listeners and pick up this
         % doc change
-        couch_log:debug("peruser: skipping, cluster unstable ~s/~s", [ShardName, DocId]),
+        couch_log:debug("peruser: skipping, cluster unstable ~s/~s",
+            [ShardName, DocId]),
         false;
     true ->
         should_handle_doc_int(ShardName, DocId)
     end.
 
--spec should_handle_doc_int(ShardName :: binary(), DocId :: binary()) -> boolean().
+-spec should_handle_doc_int(
+    ShardName :: binary(),
+    DocId :: binary()) -> boolean().
 should_handle_doc_int(ShardName, DocId) ->
     DbName = mem3:dbname(ShardName),
     Live = [erlang:node() | erlang:nodes()],
@@ -219,7 +228,10 @@ ensure_user_db(User) ->
     end,
     UserDb.
 
--spec add_user(User :: binary(), Properties :: tuple(), Acc :: tuple()) -> tuple().
+-spec add_user(
+    User :: binary(),
+    Properties :: tuple(),
+    Acc :: tuple()) -> tuple().
 add_user(User, Prop, {Modified, SecProps}) ->
     {PropValue} = couch_util:get_value(Prop, SecProps, {[]}),
     Names = couch_util:get_value(<<"names">>, PropValue, []),
@@ -236,7 +248,10 @@ add_user(User, Prop, {Modified, SecProps}) ->
                    {<<"names">>, [User | Names]})}})}
     end.
 
--spec remove_user(User :: binary(), Properties :: tuple(), Acc :: tuple()) -> tuple().
+-spec remove_user(
+    User :: binary(),
+    Properties :: tuple(),
+    Acc :: tuple()) -> tuple().
 remove_user(User, Prop, {Modified, SecProps}) ->
     {PropValue} = couch_util:get_value(Prop, SecProps, {[]}),
     Names = couch_util:get_value(<<"names">>, PropValue, []),
@@ -253,7 +268,10 @@ remove_user(User, Prop, {Modified, SecProps}) ->
                    {<<"names">>, lists:delete(User, Names)})}})}
     end.
 
--spec ensure_security(User :: binary(), UserDb :: binary(), TransformFun :: fun()) -> ok.
+-spec ensure_security(
+    User :: binary(),
+    UserDb :: binary(),
+    TransformFun :: fun()) -> ok.
 ensure_security(User, UserDb, TransformFun) ->
     case fabric:get_all_security(UserDb, [?ADMIN_CTX]) of
     {error, no_majority} ->
@@ -348,7 +366,10 @@ handle_info({'DOWN', _Ref, _, _, _Reason}, State) ->
     {stop, normal, State};
 handle_info({config_change, "couch_peruser", _, _, _}, State) ->
     handle_cast(update_config, State);
-handle_info({config_change, "couch_httpd_auth", "authentication_db", _, _}, State) ->
+handle_info({
+    config_change,
+    "couch_httpd_auth",
+    "authentication_db", _, _}, State) ->
     handle_cast(update_config, State);
 handle_info({gen_event_EXIT, _Handler, _Reason}, State) ->
     erlang:send_after(?RELISTEN_DELAY, self(), restart_config_listener),
