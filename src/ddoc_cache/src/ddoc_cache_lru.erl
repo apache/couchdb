@@ -39,6 +39,9 @@
 -include("ddoc_cache.hrl").
 
 
+-define(OPENER, ddoc_cache_opener).
+
+
 -record(st, {
     pids, % pid -> key
     dbs, % dbname -> docid -> key -> pid
@@ -143,11 +146,11 @@ handle_call(Msg, _From, St) ->
 
 
 handle_cast({evict, DbName}, St) ->
-    gen_server:abcast(mem3:nodes(), ?MODULE, {do_evict, DbName}),
+    gen_server:abcast(mem3:nodes(), ?OPENER, {do_evict, DbName}),
     {noreply, St};
 
 handle_cast({refresh, DbName, DDocIds}, St) ->
-    gen_server:abcast(mem3:nodes(), ?MODULE, {do_refresh, DbName, DDocIds}),
+    gen_server:abcast(mem3:nodes(), ?OPENER, {do_evict, DbName, DDocIds}),
     {noreply, St};
 
 handle_cast({do_evict, DbName}, St) ->
