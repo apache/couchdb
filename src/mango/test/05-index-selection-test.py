@@ -15,12 +15,7 @@ import user_docs
 import unittest
 
 
-class IndexSelectionTests(mango.UserDocsTests):
-    @classmethod
-    def setUpClass(klass):
-        super(IndexSelectionTests, klass).setUpClass()
-        if mango.has_text_service():
-            user_docs.add_text_indexes(klass.db, {})
+class IndexSelectionTests:
 
     def test_basic(self):
         resp = self.db.find({"age": 123}, explain=True)
@@ -32,30 +27,6 @@ class IndexSelectionTests(mango.UserDocsTests):
                 "name.last": "This doesn't have to match anything."
             }, explain=True)
         self.assertEqual(resp["index"]["type"], "json")
-
-    @unittest.skipUnless(mango.has_text_service(), "requires text service")
-    def test_with_text(self):
-        resp = self.db.find({
-                "$text" : "Stephanie",
-                "name.first": "Stephanie",
-                "name.last": "This doesn't have to match anything."
-            }, explain=True)
-        self.assertEqual(resp["index"]["type"], "text")
-
-    @unittest.skipUnless(mango.has_text_service(), "requires text service")
-    def test_no_view_index(self):
-        resp = self.db.find({"name.first": "Ohai!"}, explain=True)
-        self.assertEqual(resp["index"]["type"], "text")
-
-    @unittest.skipUnless(mango.has_text_service(), "requires text service")
-    def test_with_or(self):
-        resp = self.db.find({
-                "$or": [
-                    {"name.first": "Stephanie"},
-                    {"name.last": "This doesn't have to match anything."}
-                ]
-            }, explain=True)
-        self.assertEqual(resp["index"]["type"], "text")
 
     def test_use_most_columns(self):
         # ddoc id for the age index
@@ -91,36 +62,6 @@ class IndexSelectionTests(mango.UserDocsTests):
             self.assertEqual(e.response.status_code, 400)
         else:
             raise AssertionError("bad find")
-
-    def test_uses_all_docs_when_fields_do_not_match_selector(self):
-        # index exists on ["company", "manager"] but not ["company"]
-        # so we should fall back to all docs (so we include docs
-        # with no "manager" field)
-        selector = {
-            "company": "Pharmex"
-        }
-        docs = self.db.find(selector)
-        self.assertEqual(len(docs), 1)
-        self.assertEqual(docs[0]["company"], "Pharmex")
-        self.assertNotIn("manager", docs[0])
-        
-        resp_explain = self.db.find(selector, explain=True)
-        self.assertEqual(resp_explain["index"]["type"], "special")
-
-    def test_uses_all_docs_when_selector_doesnt_require_fields_to_exist(self):
-        # as in test above, use a selector that doesn't overlap with the index
-        # due to an explicit exists clause
-        selector = {
-            "company": "Pharmex",
-            "manager": {"$exists": False}
-        }
-        docs = self.db.find(selector)
-        self.assertEqual(len(docs), 1)
-        self.assertEqual(docs[0]["company"], "Pharmex")
-        self.assertNotIn("manager", docs[0])
-
-        resp_explain = self.db.find(selector, explain=True)
-        self.assertEqual(resp_explain["index"]["type"], "special")
 
     def test_uses_index_when_no_range_or_equals(self):
         # index on ["manager"] should be valid because
@@ -200,7 +141,77 @@ class IndexSelectionTests(mango.UserDocsTests):
         with self.assertRaises(KeyError):
             self.db.save_doc(design_doc)
 
-    @unittest.skipUnless(mango.has_text_service(), "requires text service")
+
+class JSONIndexSelectionTests(mango.UserDocsTests, IndexSelectionTests):
+
+    @classmethod
+    def setUpClass(klass):
+        super(JSONIndexSelectionTests, klass).setUpClass()
+
+    def test_uses_all_docs_when_fields_do_not_match_selector(self):
+        # index exists on ["company", "manager"] but not ["company"]
+        # so we should fall back to all docs (so we include docs
+        # with no "manager" field)
+        selector = {
+            "company": "Pharmex"
+        }
+        docs = self.db.find(selector)
+        self.assertEqual(len(docs), 1)
+        self.assertEqual(docs[0]["company"], "Pharmex")
+        self.assertNotIn("manager", docs[0])
+        
+        resp_explain = self.db.find(selector, explain=True)
+
+        self.assertEqual(resp_explain["index"]["type"], "special")
+
+    def test_uses_all_docs_when_selector_doesnt_require_fields_to_exist(self):
+        # as in test above, use a selector that doesn't overlap with the index
+        # due to an explicit exists clause
+        selector = {
+            "company": "Pharmex",
+            "manager": {"$exists": False}
+        }
+        docs = self.db.find(selector)
+        self.assertEqual(len(docs), 1)
+        self.assertEqual(docs[0]["company"], "Pharmex")
+        self.assertNotIn("manager", docs[0])
+
+        resp_explain = self.db.find(selector, explain=True)
+        self.assertEqual(resp_explain["index"]["type"], "special")
+
+
+@unittest.skipUnless(mango.has_text_service(), "requires text service")
+class TextIndexSelectionTests(mango.UserDocsTests, IndexSelectionTests):
+
+    @classmethod
+    def setUpClass(klass):
+        super(TextIndexSelectionTests, klass).setUpClass()
+
+    def setUp(self):
+        self.db.recreate()
+        user_docs.add_text_indexes(self.db, {})
+
+    def test_with_text(self):
+        resp = self.db.find({
+                "$text" : "Stephanie",
+                "name.first": "Stephanie",
+                "name.last": "This doesn't have to match anything."
+            }, explain=True)
+        self.assertEqual(resp["index"]["type"], "text")
+
+    def test_no_view_index(self):
+        resp = self.db.find({"name.first": "Ohai!"}, explain=True)
+        self.assertEqual(resp["index"]["type"], "text")
+
+    def test_with_or(self):
+        resp = self.db.find({
+                "$or": [
+                    {"name.first": "Stephanie"},
+                    {"name.last": "This doesn't have to match anything."}
+                ]
+            }, explain=True)
+        self.assertEqual(resp["index"]["type"], "text")
+    
     def test_manual_bad_text_idx(self):
         design_doc = {
             "_id": "_design/bad_text_index",
@@ -243,8 +254,8 @@ class MultiTextIndexSelectionTests(mango.UserDocsTests):
             klass.db.create_text_index(ddoc="foo", analyzer="keyword")
             klass.db.create_text_index(ddoc="bar", analyzer="email")
 
-    def test_view_ok_with_multi_text(self):
-        resp = self.db.find({"name.last": "A last name"}, explain=True)
+    def test_fallback_to_json_with_multi_text(self):
+        resp = self.db.find({"name.first": "A first name", "name.last": "A last name"}, explain=True)
         self.assertEqual(resp["index"]["type"], "json")
 
     def test_multi_text_index_is_error(self):
