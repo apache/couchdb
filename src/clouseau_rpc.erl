@@ -20,7 +20,7 @@
 -export([open_index/3]).
 -export([await/2, commit/2, get_update_seq/1, info/1, search/6, search/2]).
 -export([group1/7, group2/8, group2/2]).
--export([delete/2, update/3, cleanup/1, cleanup/2]).
+-export([delete/2, update/3, cleanup/1, cleanup/2, rename/1]).
 -export([analyze/2, version/0, disk_size/1]).
 
 open_index(Peer, Path, Analyzer) ->
@@ -76,6 +76,9 @@ update(Ref, Id, Fields) ->
 
 cleanup(DbName) ->
     gen_server:cast({cleanup, clouseau()}, {cleanup, DbName}).
+
+rename(DbName) ->
+  gen_server:cast({cleanup, clouseau()}, {rename, DbName}).
 
 cleanup(DbName, ActiveSigs) ->
     gen_server:cast({cleanup, clouseau()}, {cleanup, DbName, ActiveSigs}).
