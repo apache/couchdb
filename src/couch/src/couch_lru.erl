@@ -19,13 +19,13 @@ new() ->
     {gb_trees:empty(), dict:new()}.
 
 insert(DbName, {Tree0, Dict0}) ->
-    Lru = erlang:now(),
+    Lru = couch_util:unique_monotonic_integer(),
     {gb_trees:insert(Lru, DbName, Tree0), dict:store(DbName, Lru, Dict0)}.
 
 update(DbName, {Tree0, Dict0}) ->
     case dict:find(DbName, Dict0) of
     {ok, Old} ->
-        New = erlang:now(),
+        New = couch_util:unique_monotonic_integer(),
         Tree = gb_trees:insert(New, DbName, gb_trees:delete(Old, Tree0)),
         Dict = dict:store(DbName, New, Dict0),
         {Tree, Dict};

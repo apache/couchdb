@@ -45,7 +45,6 @@
 
 -export([
     owner/2,
-    owner/3,
     is_stable/0,
     link_cluster_event_listener/3
 ]).
@@ -94,13 +93,6 @@ owner(<<"shards/", _/binary>> = DbName, DocId) ->
     end;
 owner(_DbName, _DocId) ->
     node().
-
-
-% Direct calculation of node membership. This is the algorithm part. It
-% doesn't read the shard map, just picks owner based on a hash.
--spec owner(binary(), binary(), [node()]) -> node().
-owner(DbName, DocId, Nodes) ->
-    hd(mem3_util:rotate_list({DbName, DocId}, lists:usort(Nodes))).
 
 
 -spec is_stable() -> true | false.
@@ -200,4 +192,4 @@ owner_int(ShardName, DocId) ->
     Live = [node() | nodes()],
     Shards = mem3:shards(DbName, DocId),
     Nodes = [N || #shard{node=N} <- Shards, lists:member(N, Live)],
-    owner(DbName, DocId, Nodes).
+    mem3:owner(DbName, DocId, Nodes).

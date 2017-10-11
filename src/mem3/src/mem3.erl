@@ -19,7 +19,7 @@
 -export([compare_nodelists/0, compare_shards/1]).
 -export([quorum/1, group_by_proximity/1]).
 -export([live_shards/2]).
--export([belongs/2]).
+-export([belongs/2, owner/3]).
 -export([get_placement/1]).
 
 %% For mem3 use only.
@@ -310,6 +310,12 @@ name(#shard{name=Name}) ->
     Name;
 name(#ordered_shard{name=Name}) ->
     Name.
+
+% Direct calculation of node membership. This is the algorithm part. It
+% doesn't read the shard map, just picks owner based on a hash.
+-spec owner(binary(), binary(), [node()]) -> node().
+owner(DbName, DocId, Nodes) ->
+    hd(mem3_util:rotate_list({DbName, DocId}, lists:usort(Nodes))).
 
 
 -ifdef(TEST).

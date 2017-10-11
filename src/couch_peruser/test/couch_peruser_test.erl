@@ -20,12 +20,14 @@
 
 setup_all() ->
     TestCtx = test_util:start_couch([chttpd]),
+    ok = application:start(couch_peruser),
     Hashed = couch_passwords:hash_admin_password(?ADMIN_PASSWORD),
     ok = config:set("admins", ?ADMIN_USERNAME, ?b2l(Hashed), _Persist=false),
     TestCtx.
 
 teardown_all(TestCtx) ->
     config:delete("admins", ?ADMIN_USERNAME),
+    ok = application:stop(couch_peruser),
     test_util:stop_couch(TestCtx).
 
 setup() ->
@@ -33,13 +35,22 @@ setup() ->
     do_request(put, get_base_url() ++ "/" ++ ?b2l(TestAuthDb)),
     do_request(put, get_cluster_base_url() ++ "/" ++ ?b2l(TestAuthDb)),
     set_config("couch_httpd_auth", "authentication_db", ?b2l(TestAuthDb)),
+    set_config("couch_peruser", "cluster_quiet_period", "1"),
+    set_config("couch_peruser", "cluster_start_period", "1"),
     set_config("couch_peruser", "enable", "true"),
+    set_config("cluster", "n", "1"),
+    set_config("log", "level", "debug"),
+    timer:sleep(6000),
     TestAuthDb.
 
 teardown(TestAuthDb) ->
     set_config("couch_peruser", "enable", "false"),
     set_config("couch_peruser", "delete_dbs", "false"),
     set_config("couch_httpd_auth", "authentication_db", "_users"),
+    set_config("couch_peruser", "cluster_quiet_period", "60"),
+    set_config("couch_peruser", "cluster_start_period", "5"),
+    set_config("cluster", "n", "3"),
+    set_config("log", "level", "info"),
     do_request(delete, get_cluster_base_url() ++ "/" ++ ?b2l(TestAuthDb)),
     do_request(delete, get_base_url() ++ "/" ++ ?b2l(TestAuthDb)),
     lists:foreach(fun (DbName) ->
@@ -151,8 +162,10 @@ should_delete_user_db(TestAuthDb) ->
     UserDbName = <<"userdb-626172">>,
     set_config("couch_peruser", "delete_dbs", "true"),
     create_user(TestAuthDb, User),
+    timer:sleep(2000),
     ?assert(lists:member(UserDbName, all_dbs())),
     delete_user(TestAuthDb, User),
+    timer:sleep(2000),
     ?_assert(not lists:member(UserDbName, all_dbs())).
 
 should_reflect_config_changes(TestAuthDb) ->
@@ -160,20 +173,26 @@ should_reflect_config_changes(TestAuthDb) ->
     UserDbName = <<"userdb-62617a">>,
     set_config("couch_peruser", "delete_dbs", "true"),
     create_user(TestAuthDb, User),
+    timer:sleep(2000),
     ?assert(lists:member(UserDbName, all_dbs())),
     delete_user(TestAuthDb, User),
+    timer:sleep(2000),
     ?assert(not lists:member(UserDbName, all_dbs())),
     create_user(TestAuthDb, User),
+    timer:sleep(2000),
     ?assert(lists:member(UserDbName, all_dbs())),
     set_config("couch_peruser", "delete_dbs", "false"),
     delete_user(TestAuthDb, User),
+    timer:sleep(2000),
     ?assert(lists:member(UserDbName, all_dbs())),
     create_user(TestAuthDb, User),
     set_config("couch_peruser", "delete_dbs", "true"),
     delete_user(TestAuthDb, User),
+    timer:sleep(2000),
     ?assert(not lists:member(UserDbName, all_dbs())),
     set_config("couch_peruser", "enable", "false"),
     create_user(TestAuthDb, User),
+    timer:sleep(2000),
     ?_assert(not lists:member(UserDbName, all_dbs())).
 
 should_add_user_to_db_admins(TestAuthDb) ->
