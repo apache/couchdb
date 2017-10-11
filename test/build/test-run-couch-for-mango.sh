@@ -13,8 +13,17 @@
 
 ./dev/run -n 1 --admin=testuser:testpass &
 export SERVER_PID=$!
-sleep 10
-curl http://dev:15984
+
+COUCH_STARTED=-1
+while ( [ $COUCH_STARTED -ne 0 ] ); do
+  curl -s http://127.0.0.1:15984
+  COUCH_STARTED=$?
+  if [ $COUCH_STARTED -ne 0 ]; then
+    # do not wait another 5 seconds if couch started now
+    sleep 5
+  fi
+done
+
 cd src/mango/
 nosetests
 

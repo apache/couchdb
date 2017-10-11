@@ -184,7 +184,7 @@ active_doc(DbName, DocId) ->
         Live = [node() | nodes()],
         Nodes = lists:usort([N || #shard{node=N} <- Shards,
             lists:member(N, Live)]),
-        Owner = couch_replicator_clustering:owner(DbName, DocId, Nodes),
+        Owner = mem3:owner(DbName, DocId, Nodes),
         case active_doc_rpc(DbName, DocId, [Owner]) of
             {ok, DocInfo} ->
                 {ok, DocInfo};
