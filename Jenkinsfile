@@ -182,29 +182,6 @@ pipeline {
             deleteDir()
           } // node
         },
-        ubuntu1204erlang183: {
-          node(label: 'couchdbtest') {
-            timeout(time: 45, unit: "MINUTES") {
-              sh 'docker pull couchdbdev/ubuntu-12.04-erlang-18.3'
-              withDockerContainer(image: 'couchdbdev/ubuntu-12.04-erlang-18.3') {
-                sh 'rm -f apache-couchdb-*.tar.gz'
-                unstash 'tarball'
-                sh '''
-                  cwd=$(pwd)
-                  mkdir -p $COUCHDB_IO_LOG_DIR
-                  builddir=$(mktemp -d)
-                  cd $builddir
-                  tar -xf $cwd/apache-couchdb-*.tar.gz
-                  cd apache-couchdb-*
-                  ./configure --with-curl
-                  make all
-                  make check || (build-aux/logfile-uploader.py && false)
-                '''
-              } // withDocker
-            } // timeout
-            deleteDir()
-          } // node
-        },
         ubuntu1404erlangdefault: {
           node(label: 'couchdbtest') {
             timeout(time: 45, unit: "MINUTES") {
@@ -393,6 +370,69 @@ pipeline {
             archiveArtifacts artifacts: 'pkgs/**', fingerprint: true
             deleteDir()
           } // node
+        },
+        debian9erlangdefault: {
+          node(label: 'couchdbtest') {
+            timeout(time: 45, unit: "MINUTES") {
+              sh 'docker pull couchdbdev/debian-9-erlang-default'
+              withDockerContainer(image: 'couchdbdev/debian-9-erlang-default') {
+                sh 'rm -f apache-couchdb-*.tar.gz'
+                unstash 'tarball'
+                sh '''
+                  cwd=$(pwd)
+                  mkdir -p $COUCHDB_IO_LOG_DIR
+                  builddir=$(mktemp -d)
+                  cd $builddir
+                  tar -xf $cwd/apache-couchdb-*.tar.gz
+                  cd apache-couchdb-*
+                  ./configure --with-curl
+                  make all
+                  make check || (build-aux/logfile-uploader.py && false)
+                '''
+              } // withDocker
+            } // timeout
+            deleteDir()
+          } // node
+        },
+        debian9erlang183: {
+          node(label: 'couchdbtest') {
+            timeout(time: 60, unit: "MINUTES") {
+              sh 'docker pull couchdbdev/debian-9-erlang-18.3'
+              withDockerContainer(image: 'couchdbdev/debian-9-erlang-18.3') {
+                sh 'rm -f apache-couchdb-*.tar.gz'
+                unstash 'tarball'
+                sh '''
+                  cwd=$(pwd)
+                  mkdir -p $COUCHDB_IO_LOG_DIR
+
+                  # Build CouchDB from tarball
+                  builddir=$(mktemp -d)
+                  cd $builddir
+                  tar -xf $cwd/apache-couchdb-*.tar.gz
+                  cd apache-couchdb-*
+                  ./configure --with-curl
+                  make all
+                  make check || (build-aux/logfile-uploader.py && false)
+
+                  # Build CouchDB packages
+                  cd $builddir
+                  git clone https://github.com/apache/couchdb-pkg
+                  mkdir couchdb
+                  cp $cwd/apache-couchdb-*.tar.gz couchdb
+                  tar -xf $cwd/apache-couchdb-*.tar.gz -C couchdb
+                  cd couchdb-pkg
+                  platform=$(lsb_release -cs)
+                  make $platform PLATFORM=$platform
+
+                  # Cleanup & save for posterity
+                  rm -rf $cwd/pkgs/$platform && mkdir -p $cwd/pkgs/$platform
+                  mv ../couchdb/*deb $cwd/pkgs/$platform || true
+                '''
+              } // withDocker
+            } // timeout
+            archiveArtifacts artifacts: 'pkgs/**', fingerprint: true
+            deleteDir()
+          } // node
         }
         ) // parallel
       } // steps
@@ -429,6 +469,7 @@ pipeline {
               reprepro -b couchdb-pkg/repo includedeb jessie pkgs/jessie/*deb
               reprepro -b couchdb-pkg/repo includedeb trusty pkgs/trusty/*deb
               reprepro -b couchdb-pkg/repo includedeb xenial pkgs/xenial/*deb
+              reprepro -b couchdb-pkg/repo includedeb stretch pkgs/stretch/*deb
             '''
             echo 'Building CentOS repos...'
             sh '''
