@@ -20,7 +20,7 @@
     remove/2,
     from_ddoc/1,
     to_json/1,
-    is_usable/2,
+    is_usable/3,
     columns/1,
     start_key/1,
     end_key/1,
@@ -113,12 +113,17 @@ columns(Idx) ->
     [Key || {Key, _} <- Fields].
 
 
-is_usable(Idx, Selector) ->
-    % This index is usable if all of the columns are 
+is_usable(Idx, Selector, SortFields) ->
+    % This index is usable if all of the columns are
     % restricted by the selector such that they are required to exist
     % and the selector is not a text search (so requires a text index)
     RequiredFields = columns(Idx),
-    mango_selector:has_required_fields(Selector, RequiredFields)
+
+    % sort fields are required to exist in the results so 
+    % we don't need to check the selector for these
+    RequiredFields1 = ordsets:subtract(lists:usort(RequiredFields), lists:usort(SortFields)),
+
+    mango_selector:has_required_fields(Selector, RequiredFields1)
         andalso not is_text_search(Selector).
 
 

@@ -46,7 +46,7 @@
 
 create(Db, Selector0, Opts) ->
     Selector = mango_selector:normalize(Selector0),
-    UsableIndexes = mango_idx:get_usable_indexes(Db, Selector0, Opts),
+    UsableIndexes = mango_idx:get_usable_indexes(Db, Selector, Opts),
 
     {use_index, IndexSpecified} = proplists:lookup(use_index, Opts),
     case {length(UsableIndexes), length(IndexSpecified)} of
