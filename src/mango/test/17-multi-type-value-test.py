@@ -17,23 +17,28 @@ import unittest
 DOCS = [
     {
         "_id": "1",
-        "name": "Jimi"
+        "name": "Jimi",
+        "age": 10
     },
     {
         "_id": "2",
-        "name": {"forename":"Eddie"}
+        "name": {"forename":"Eddie"},
+        "age": 20
     },
     {
         "_id": "3",
-        "name": None
+        "name": None,
+        "age": 30
     },
     {
         "_id": "4",
-        "name": 1
+        "name": 1,
+        "age": 40
     },
     {
         "_id": "5",
-        "forename": "Sam"
+        "forename": "Sam",
+        "age": 50
     }
 ]
 
@@ -58,6 +63,13 @@ class MultiValueFieldTests:
         for d in docs:
             self.assertIn("name", d)
 
+    def test_can_query_with_age_and_name_range(self):
+        docs = self.db.find({"age": {"$gte": 0, "$lt": 40}, "name": {"$gte": 0}})
+        # expect to include "Jimi", 1 and {"forename":"Eddie"}
+        self.assertEqual(len(docs), 2)
+        for d in docs:
+            self.assertIn("name", d)
+
 
 
 class MultiValueFieldJSONTests(mango.DbPerClass, MultiValueFieldTests):
@@ -65,6 +77,7 @@ class MultiValueFieldJSONTests(mango.DbPerClass, MultiValueFieldTests):
         self.db.recreate()
         self.db.save_docs(copy.deepcopy(DOCS))
         self.db.create_index(["name"])
+        self.db.create_index(["age", "name"])
 
 # @unittest.skipUnless(mango.has_text_service(), "requires text service")
 # class MultiValueFieldTextTests(MultiValueFieldDocsNoIndexes, OperatorTests):
