@@ -36,6 +36,8 @@ DIALYZE_OPTS=$(shell echo "\
 	skip_deps=$(skip_deps) \
 	" | sed -e 's/[a-z]\+= / /g')
 
+#ignore javascript tests
+ignore_js_suites=
 
 ################################################################################
 # Main commands
@@ -123,7 +125,8 @@ endif
 	@rm -rf dev/lib
 	@dev/run -n 1 -q --with-admin-party-please \
             -c 'startup_jitter=0' \
-            test/javascript/run $(suites)
+            'test/javascript/run --suites "$(suites)" \
+            --ignore "$(ignore_js_suites)"'
 
 .PHONY: soak-javascript
 soak-javascript:
@@ -138,7 +141,8 @@ endif
 	while [ $$? -eq 0 ]; do \
 		dev/run -n 1 -q --with-admin-party-please \
 				-c 'startup_jitter=0' \
-				test/javascript/run $(suites); \
+				'test/javascript/run --suites "$(suites)" \
+				--ignore "$(ignore_js_suites)"'  \
 	done
 
 .PHONY: check-qs
