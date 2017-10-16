@@ -29,7 +29,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 -include("mango_cursor.hrl").
-
+-include("mango_idx_view.hrl").
 
 create(Db, Indexes, Selector, Opts) ->
     FieldRanges = mango_idx_view:field_ranges(Selector),
@@ -61,17 +61,36 @@ explain(Cursor) ->
 
     BaseArgs = base_args(Cursor),
     Args = apply_opts(Opts, BaseArgs),
+
     [{mrargs, {[
         {include_docs, Args#mrargs.include_docs},
         {view_type, Args#mrargs.view_type},
         {reduce, Args#mrargs.reduce},
         {start_key, Args#mrargs.start_key},
-        {end_key, Args#mrargs.end_key},
+        {end_key, maybe_replace_max_json(Args#mrargs.end_key)},
         {direction, Args#mrargs.direction},
         {stable, Args#mrargs.stable},
         {update, Args#mrargs.update}
     ]}}].
 
+
+% replace internal values that cannot
+% be represented as a valid UTF-8 string
+% with a token for JSON serialization
+maybe_replace_max_json([]) ->
+    [];
+
+maybe_replace_max_json(?MAX_STR) ->
+    <<"<MAX>">>;
+
+maybe_replace_max_json([H | T] = EndKey) when is_list(EndKey) ->
+    H1 = if H == ?MAX_JSON_OBJ -> <<"<MAX>">>;
+            true -> H
+    end,
+    [H1 | maybe_replace_max_json(T)];
+
+maybe_replace_max_json(EndKey) ->
+    EndKey.
 
 base_args(#cursor{index = Idx} = Cursor) ->
     #mrargs{
