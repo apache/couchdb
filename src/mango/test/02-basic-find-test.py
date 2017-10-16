@@ -319,5 +319,5 @@ class BasicFindTests(mango.UserDocsTests):
         assert explain["mrargs"]["update"] == True
         assert explain["mrargs"]["reduce"] == False
         assert explain["mrargs"]["start_key"] == [0]
-        assert explain["mrargs"]["end_key"] == [{}]
+        assert explain["mrargs"]["end_key"] == ["<MAX>"]
         assert explain["mrargs"]["include_docs"] == True

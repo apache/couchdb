@@ -34,6 +34,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include("mango.hrl").
 -include("mango_idx.hrl").
+-include("mango_idx_view.hrl").
 
 
 validate_new(#idx{}=Idx, _Db) ->
@@ -163,11 +164,11 @@ start_key([{'$eq', Key, '$eq', Key} | Rest]) ->
 
 
 end_key([]) ->
-    [{[]}];
+    [?MAX_JSON_OBJ];
 end_key([{_, _, '$lt', Key} | Rest]) ->
     case mango_json:special(Key) of
         true ->
-            [{[]}];
+            [?MAX_JSON_OBJ];
         false ->
             [Key | end_key(Rest)]
     end;
