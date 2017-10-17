@@ -27,7 +27,7 @@ def random_db_name():
     return "mango_test_" + uuid.uuid4().hex
 
 def has_text_service():
-    return os.path.isfile(os.getcwd() + "/../src/mango_cursor_text.erl")
+    return os.environ.get('MANGO_TEXT_INDEXES') == '1'
 
 
 class Database(object):
