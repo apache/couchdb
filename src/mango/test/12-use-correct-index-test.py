@@ -68,15 +68,15 @@ class ChooseCorrectIndexForDocs(mango.DbPerClass):
         self.assertEqual(explain["index"]["ddoc"], '_design/bbb')
 
     def test_choose_index_alphabetically(self):
-        self.db.create_index(["name", "age", "user_id"], ddoc="aaa")
-        self.db.create_index(["name", "age", "location"], ddoc="bbb")
+        self.db.create_index(["name"], ddoc="aaa")
+        self.db.create_index(["name"], ddoc="bbb")
         self.db.create_index(["name"], ddoc="zzz")
         explain = self.db.find({"name": "Eddie", "age": {"$gte": 12}}, explain=True)
         self.assertEqual(explain["index"]["ddoc"], '_design/aaa')
 
     def test_choose_index_most_accurate(self):
-        self.db.create_index(["name", "location", "user_id"], ddoc="aaa")
-        self.db.create_index(["name", "age", "user_id"], ddoc="bbb")
+        self.db.create_index(["name", "age", "user_id"], ddoc="aaa")
+        self.db.create_index(["name", "age"], ddoc="bbb")
         self.db.create_index(["name"], ddoc="zzz")
         explain = self.db.find({"name": "Eddie", "age": {"$gte": 12}}, explain=True)
         self.assertEqual(explain["index"]["ddoc"], '_design/bbb')
@@ -105,3 +105,12 @@ class ChooseCorrectIndexForDocs(mango.DbPerClass):
         self.db.create_index(["a", "d", "e"])
         explain = self.db.find({"a": {"$gt": 0}, "b": {"$gt": 0}, "c": {"$gt": 0}}, explain=True)
         self.assertEqual(explain["index"]["def"]["fields"], [{'a': 'asc'}, {'b': 'asc'}, {'c': 'asc'}])
+
+    def test_can_query_with_range_on_secondary_column(self):
+        self.db.create_index(["age", "name"], ddoc="bbb")
+        selector = {"age": 10, "name": {"$gte": 0}}
+        docs = self.db.find(selector)
+        self.assertEqual(len(docs), 1)
+        explain = self.db.find(selector, explain=True)
+        self.assertEqual(explain["index"]["ddoc"], "_design/bbb")
+        self.assertEqual(explain["mrargs"]["end_key"], [10, '<MAX>'])

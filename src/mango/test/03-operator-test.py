@@ -174,6 +174,9 @@ class OperatorTests:
         for d in docs:
             self.assertIn("twitter", d)
 
+    # ideally this work be consistent across index types but, alas, it is not
+    @unittest.skipUnless(not mango.has_text_service(),
+    "text indexes do not support range queries across type boundaries")
     def test_lt_includes_null_but_not_missing(self):
         docs = self.db.find({
                 "twitter": {"$lt": 1}
@@ -183,6 +186,8 @@ class OperatorTests:
         for d in docs:
             self.assertEqual(d["twitter"], None)
 
+    @unittest.skipUnless(not mango.has_text_service(),
+    "text indexes do not support range queries across type boundaries")
     def test_lte_includes_null_but_not_missing(self):
         docs = self.db.find({
                 "twitter": {"$lt": 1}

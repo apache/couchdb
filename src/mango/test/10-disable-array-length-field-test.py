@@ -13,28 +13,24 @@
 import mango
 import unittest
 
-
+@unittest.skipUnless(mango.has_text_service(), "requires text service")
 class DisableIndexArrayLengthsTest(mango.UserDocsTextTests):
 
-    @classmethod
-    def setUpClass(klass):
-        super(DisableIndexArrayLengthsTest, klass).setUpClass()
-        if mango.has_text_service():
-            klass.db.create_text_index(ddoc="disable_index_array_lengths",
+    def setUp(klass):
+        self.db.recreate()
+        self.db.create_text_index(ddoc="disable_index_array_lengths",
                                        analyzer="keyword",
                                        index_array_lengths=False)
-            klass.db.create_text_index(ddoc="explicit_enable_index_array_lengths",
+        self.db.create_text_index(ddoc="explicit_enable_index_array_lengths",
                                        analyzer="keyword",
                                        index_array_lengths=True)
 
-    @unittest.skipUnless(mango.has_text_service(), "requires text service")
     def test_disable_index_array_length(self):
         docs = self.db.find({"favorites": {"$size": 4}},
                             use_index="disable_index_array_lengths")
         for d in docs:
             assert len(d["favorites"]) == 0
 
-    @unittest.skipUnless(mango.has_text_service(), "requires text service")
     def test_enable_index_array_length(self):
         docs = self.db.find({"favorites": {"$size": 4}},
                             use_index="explicit_enable_index_array_lengths")
