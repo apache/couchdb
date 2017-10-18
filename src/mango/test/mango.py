@@ -66,7 +66,7 @@ class Database(object):
             parts = [parts]
         return "/".join([self.url] + parts)
 
-    def create(self, q=1, n=3):
+    def create(self, q=1, n=1):
         r = self.sess.get(self.url)
         if r.status_code == 404:
             r = self.sess.put(self.url, params={"q":q, "n": n})
