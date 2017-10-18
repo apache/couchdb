@@ -29,19 +29,37 @@ def random_db_name():
 def has_text_service():
     return os.environ.get('MANGO_TEXT_INDEXES') == '1'
 
+def get_from_environment(key, default):
+    value = os.environ.get(key)
+    return value if value is not None else default
+
 
 class Database(object):
-    def __init__(self, host, port, dbname, auth=None):
-        self.host = host
-        self.port = port
+    def __init__(self, dbname,
+                 host="127.0.0.1", port="15984",
+                 user='testuser', password='testpass'):
+        root_url = get_from_environment('COUCH_HOST', "http://{}:{}".format(host, port))
+        auth_header = get_from_environment('COUCH_AUTH_HEADER', None)
+        user = get_from_environment('COUCH_USER', user)
+        password = get_from_environment('COUCH_PASSWORD', password)
+
+        self.root_url = root_url
         self.dbname = dbname
         self.sess = requests.session()
-        self.sess.auth = ('testuser', 'testpass')
+
+        # allow explicit auth header to be set to enable testing
+        # against deployments where basic auth isn't available
+        if auth_header is not None:
+            self.sess.headers["Authorization"] = auth_header
+        else:
+            self.sess.auth = (user, password)
+
         self.sess.headers["Content-Type"] = "application/json"
+
 
     @property
     def url(self):
-        return "http://{}:{}/{}".format(self.host, self.port, self.dbname)
+        return "{}/{}".format(self.root_url, self.dbname)
 
     def path(self, parts):
         if isinstance(parts, ("".__class__, u"".__class__)):
@@ -206,7 +224,7 @@ class UsersDbTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(klass):
-        klass.db = Database("127.0.0.1", "15984", "_users")
+        klass.db = Database("_users")
         user_docs.setup_users(klass.db)
 
     def setUp(self):
@@ -217,7 +235,7 @@ class DbPerClass(unittest.TestCase):
 
     @classmethod
     def setUpClass(klass):
-        klass.db = Database("127.0.0.1", "15984", random_db_name())
+        klass.db = Database(random_db_name())
         klass.db.create(q=1, n=3)
 
     def setUp(self):
