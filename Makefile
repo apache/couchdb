@@ -14,7 +14,7 @@ include version.mk
 
 REBAR?=$(shell echo `pwd`/bin/rebar)
 IN_RELEASE = $(shell if [ ! -d .git ]; then echo true; fi)
-COUCHDB_VERSION_SUFFIX = $(shell if [ -d .git ]; then echo '-`git rev-parse --short --verify HEAD`'; fi)
+COUCHDB_VERSION_SUFFIX = $(shell if [ ! -z "$(COUCH_RC)" ]; then echo '-RC$(COUCH_RC)'; else if [ -d .git ]; then echo '-`git rev-parse --short --verify HEAD`'; fi; fi)
 COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)$(COUCHDB_VERSION_SUFFIX)
 
 DESTDIR=
@@ -349,21 +349,6 @@ uninstall:
 	@rm -rf $(DESTDIR)/$(html_dir)
 	@rm -rf $(DESTDIR)/$(man_dir)
 
-.PHONY: rc
-rc:
-ifeq ($(strip $(COUCH_RC)),)
-	@echo "COUCH_RC environment variable not set. Run as 'COUCH_RC=X make rc'"
-else
-	@rm -rf apache-couchdb-*
-	@$(MAKE) dist 2>&1 > /dev/null
-	@rm apache-couchdb-*.tar.gz
-	@mv apache-couchdb-* apache-couchdb-2.1.0-RC$(COUCH_RC)
-	@tar czf apache-couchdb-2.1.0-RC$(COUCH_RC).tar.gz apache-couchdb-2.1.0-RC$(COUCH_RC)
-	@echo "Done apache-couchdb-2.1.0-RC$(COUCH_RC).tar.gz"
-	@echo "Here is the list of commits since the last RC"
-	@git log --left-right --graph --cherry-pick --oneline 2.1.0-RC$(shell echo $(COUCH_RC)-1 | bc)...master
-	@echo "Done!"
-endif
 
 ################################################################################
 # Misc
