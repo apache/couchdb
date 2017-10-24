@@ -536,7 +536,7 @@ host_for_request(#httpd{mochi_req=MochiReq}) ->
         Value -> Value
     end.
 
-absolute_uri(#httpd{mochi_req=MochiReq}=Req, Path) ->
+absolute_uri(#httpd{mochi_req=MochiReq}=Req, [$/ | _] = Path) ->
     Host = host_for_request(Req),
     XSsl = config:get("httpd", "x_forwarded_ssl", "X-Forwarded-Ssl"),
     Scheme = case MochiReq:get_header_value(XSsl) of
@@ -552,7 +552,9 @@ absolute_uri(#httpd{mochi_req=MochiReq}=Req, Path) ->
                               end
                      end
              end,
-    Scheme ++ "://" ++ Host ++ Path.
+    Scheme ++ "://" ++ Host ++ Path;
+absolute_uri(_Req, _Path) ->
+    throw({bad_request, "path must begin with a /."}).
 
 unquote(UrlEncodedString) ->
     mochiweb_util:unquote(UrlEncodedString).
