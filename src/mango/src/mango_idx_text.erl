@@ -22,7 +22,7 @@
     from_ddoc/1,
     to_json/1,
     columns/1,
-    is_usable/2,
+    is_usable/3,
     get_default_field_options/1
 ]).
 
@@ -125,7 +125,7 @@ columns(Idx) ->
     end.
 
 
-is_usable(Idx, Selector) ->
+is_usable(Idx, Selector, _) ->
     case columns(Idx) of
         all_fields ->
             true;

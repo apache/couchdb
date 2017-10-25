@@ -609,7 +609,7 @@ has_required_fields([{[{Field, Cond}]} | Rest], RequiredFields) ->
         _ ->
             has_required_fields(Rest, lists:delete(Field, RequiredFields))
     end.
-    
+
 
 %%%%%%%% module tests below %%%%%%%%
 
