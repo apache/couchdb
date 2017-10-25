@@ -26,7 +26,6 @@
     couchapp/index
     externals
     query-server/index
-    fauxton/index
     api/index
     json-structure
     experimental
