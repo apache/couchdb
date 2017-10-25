@@ -35,11 +35,24 @@
 -export([with_proc/4]).
 -export([process_dict_get/2, process_dict_get/3]).
 -export([unique_monotonic_integer/0]).
+-export([check_config_blacklist/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 
 % arbitrarily chosen amount of memory to use before flushing to disk
 -define(FLUSH_MAX_MEM, 10000000).
+
+-define(BLACKLIST_CONFIG_SECTIONS, [
+    <<"daemons">>,
+    <<"external">>,
+    <<"httpd_design_handlers">>,
+    <<"httpd_db_handlers">>,
+    <<"httpd_global_handlers">>,
+    <<"native_query_servers">>,
+    <<"os_daemons">>,
+    <<"query_servers">>
+]).
+
 
 priv_dir() ->
     case code:priv_dir(couch) of
@@ -640,3 +653,12 @@ unique_monotonic_integer() ->
     erlang:unique_integer([monotonic, positive]).
 
 -endif.
+
+check_config_blacklist(Section) ->
+    case lists:member(Section, ?BLACKLIST_CONFIG_SECTIONS) of
+    true ->
+        Msg = <<"Config section blacklisted for modification over HTTP API.">>,
+        throw({forbidden, Msg});
+    _ ->
+        ok
+    end.
