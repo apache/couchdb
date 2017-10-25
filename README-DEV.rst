@@ -173,8 +173,15 @@ JavaScript tests accepts only `suites` option, but in the same way::
     # Run only basic and design_options tests
     make javascript suites="basic design_options"
 
-Note that tests are delimited here by whitespace, not by comma. You can get list
-of all possible test targets with the following command::
+    # Ignore specific test suites via command line
+    make javascript ignore_js_suites="all_docs bulk_docs"
+
+    # Ignore specific test suites in makefile
+    ignore_js_suites=all_docs,bulk_docs
+
+Note that tests on the command line are delimited here by whitespace,
+not by comma.You can get list of all possible test targets with the
+following command::
 
     make list-js-suites
 
