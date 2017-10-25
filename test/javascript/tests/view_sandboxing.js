@@ -148,6 +148,7 @@ couchTests.view_sandboxing = function(debug) {
   // cleanup
   db.deleteDb();
 
+/* TODO: re-enable this test once --no-eval is the default
   // test that runtime code evaluation can be prevented
   var couchjs_command_xhr = CouchDB.request(
     "GET", "_node/node1@127.0.0.1/_config/query_servers/javascript");
@@ -179,6 +180,7 @@ couchTests.view_sandboxing = function(debug) {
 
       TEquals(0, results.rows.length);
     });
+*/
 
   // cleanup
   CouchDB.request("POST", "_reload_query_servers");

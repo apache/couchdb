@@ -212,4 +212,12 @@ couchTests.config = function(debug) {
     headers: {"X-Couch-Persist": "false"}
   });
   TEquals(200, xhr.status, "Reset config whitelist to undefined");
+
+  // Confirm that the blacklist is functional
+  ["daemons", "external", "httpd_design_handlers", "httpd_db_handlers", "native_query_servers", "os_daemons", "query_servers"].forEach(function(section) {
+    xhr = CouchDB.request("PUT", "/_node/node1@127.0.0.1/_config/" + section + "/wohali",{
+      body: "\"rules\""
+    });
+    TEquals(403, xhr.status, "Blacklisted config section " + section);
+  });
 };
