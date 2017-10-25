@@ -148,41 +148,21 @@ couchTests.view_sandboxing = function(debug) {
   // cleanup
   db.deleteDb();
 
-/* TODO: re-enable this test once --no-eval is the default
   // test that runtime code evaluation can be prevented
-  var couchjs_command_xhr = CouchDB.request(
-    "GET", "_node/node1@127.0.0.1/_config/query_servers/javascript");
+  db_name = get_random_db_name();
+  db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
+  db.createDb();
 
-  var couchjs_command = JSON.parse(couchjs_command_xhr.responseText);
-  var couchjs_command_args = couchjs_command.match(/\S+|"(?:\\"|[^"])+"/g);
+  var doc = {integer: 1, string: "1", array: [1, 2, 3]};
+  T(db.save(doc).ok);
 
-  couchjs_command_args.splice(1, 0, "--no-eval");
-  var new_couchjs_command = couchjs_command_args.join(" ");
+  var results = db.query(function(doc) {
+      var glob = emit.constructor('return this')();
+      emit(doc._id, null);
+  });
 
-  run_on_modified_server(
-    [{section: "query_servers",
-      key: "javascript",
-      value: new_couchjs_command}],
-    function () {
-      CouchDB.request("POST", "_reload_query_servers");
-
-      db_name = get_random_db_name();
-      db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
-      db.createDb();
-
-      var doc = {integer: 1, string: "1", array: [1, 2, 3]};
-      T(db.save(doc).ok);
-
-      var results = db.query(function(doc) {
-          var glob = emit.constructor('return this')();
-          emit(doc._id, null);
-      });
-
-      TEquals(0, results.rows.length);
-    });
-*/
+  TEquals(0, results.rows.length);
 
   // cleanup
-  CouchDB.request("POST", "_reload_query_servers");
   db.deleteDb();
 };
