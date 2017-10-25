@@ -124,6 +124,7 @@ else
 endif
 	@rm -rf dev/lib
 	@dev/run -n 1 -q --with-admin-party-please \
+            --enable-erlang-views \
             -c 'startup_jitter=0' \
             'test/javascript/run --suites "$(suites)" \
             --ignore "$(ignore_js_suites)"'
