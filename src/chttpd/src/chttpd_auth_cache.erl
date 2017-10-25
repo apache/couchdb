@@ -218,15 +218,47 @@ maybe_validate_user_creds(nil) ->
 % throws if UserCreds includes a _conflicts member
 % returns UserCreds otherwise
 maybe_validate_user_creds(UserCreds) ->
-    AllowConflictedUserDocs = config:get_boolean("chttpd_auth", "allow_conflicted_user_docs", false),
-    case {couch_util:get_value(<<"_conflicts">>, UserCreds), AllowConflictedUserDocs} of
-        {undefined, _} ->
-            {ok, UserCreds, nil};
+    ok = validate_conflicts(UserCreds),
+    ok = validate_dupes(UserCreds),
+    {ok, UserCreds, nil}.
+
+
+validate_conflicts(UserCreds) ->
+    AllowConflictedUserDocs = config:get_boolean("chttpd_auth",
+        "allow_conflicted_user_docs", false),
+    Conflicts = couch_util:get_value(<<"_conflicts">>, UserCreds, false),
+    Throw = {unauthorized,
+        <<"User document conflicts must be resolved before the document",
+        " is used for authentication purposes.">>},
+    case {Conflicts, AllowConflictedUserDocs} of
+        {false, _} ->
+            ok;
         {_, true} ->
-            {ok, UserCreds, nil};
-        {_ConflictList, false} ->
-            throw({unauthorized,
-                <<"User document conflicts must be resolved before the document",
-                  " is used for authentication purposes.">>
-            })
+            ok;
+        {_, false} ->
+            throw(Throw)
+    end.
+
+
+validate_dupes(UserCreds) ->
+    AllowDupedUserDocs = config:get_boolean("chttpd_auth",
+        "allow_user_docs_with_duplicate_keys", false),
+    Dupes = has_dupes(UserCreds),
+    Throw = {unauthorized,
+        <<"User document duplicate keys must be removed before the document",
+          " is used for authentication purposes.">>},
+    case {Dupes, AllowDupedUserDocs} of
+        {false, _} ->
+            ok;
+        {_, true} ->
+            ok;
+        {_, false} ->
+            throw(Throw)
+    end.
+
+
+has_dupes(UserCreds) ->
+    case couch_users_db:is_valid_doc_body(UserCreds) of
+        true -> false;
+        _ -> true
     end.
