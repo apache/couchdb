@@ -30,11 +30,32 @@
 -export([with_db/2]).
 -export([rfc1123_date/0, rfc1123_date/1]).
 -export([find_in_binary/2]).
+-export([check_config_blacklist/1]).
 
 -include("couch_db.hrl").
 
 % arbitrarily chosen amount of memory to use before flushing to disk
 -define(FLUSH_MAX_MEM, 10000000).
+
+-define(BLACKLIST_CONFIG_SECTIONS, [
+    <<"daemons">>,
+    <<"external">>,
+    <<"httpd_design_handlers">>,
+    <<"httpd_db_handlers">>,
+    <<"httpd_global_handlers">>,
+    <<"native_query_servers">>,
+    <<"os_daemons">>,
+    <<"query_servers">>
+]).
+
+check_config_blacklist(Section) ->
+    case lists:member(Section, ?BLACKLIST_CONFIG_SECTIONS) of
+    true ->
+        Msg = <<"Config section blacklisted for modification over HTTP API.">>,
+        throw({forbidden, Msg});
+    _ ->
+        ok
+    end.
 
 priv_dir() ->
     case code:priv_dir(couch) of
