@@ -120,9 +120,6 @@ html_files = \
     html/_sources/cve/2012-5649.txt \
     html/_sources/cve/2012-5650.txt \
     html/_sources/cve/index.txt \
-    html/_sources/fauxton/addons.txt \
-    html/_sources/fauxton/index.txt \
-    html/_sources/fauxton/install.txt \
     html/_sources/install/index.txt \
     html/_sources/install/freebsd.txt \
     html/_sources/install/mac.txt \
@@ -242,9 +239,6 @@ html_files = \
     html/cve/2012-5649.html \
     html/cve/2012-5650.html \
     html/cve/index.html \
-    html/fauxton/addons.html \
-    html/fauxton/index.html \
-    html/fauxton/install.html \
     html/install/index.html \
     html/install/freebsd.html \
     html/install/mac.html \
@@ -390,9 +384,6 @@ src_files = \
     ../src/cve/2012-5650.rst \
     ../src/cve/2014-2668.rst \
     ../src/cve/index.rst \
-    ../src/fauxton/addons.rst \
-    ../src/fauxton/index.rst \
-    ../src/fauxton/install.rst \
     ../src/install/index.rst \
     ../src/install/freebsd.rst \
     ../src/install/mac.rst \

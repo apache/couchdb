@@ -21,7 +21,7 @@ This product also includes the following third-party components:
  * jQuery (http://jquery.org/)
 
    Copyright 2012 jQuery Foundation and other contributors
- 
+
  * jQuery UI (http://jqueryui.com)
 
    Copyright 2011, Paul Bakaus
@@ -71,13 +71,13 @@ This product also includes the following third-party components:
   Copyright 2011, Jeremy Ashkenas
 
  * Sphinx (http://sphinx-doc.org/)
- 
+
    Copyright 2011, the Sphinx team
 
  * Sizzle (http://sizzlejs.com/)
- 
+
    Copyright 2010, The Dojo Foundation
- 
+
  * Underscore.js 1.4.2 (http://underscorejs.org)
 
    Copyright 2012, Jeremy Ashkenas
@@ -127,25 +127,25 @@ This product also includes the following third-party components:
    Copyright 2006-2013 (c) M. Alsup
 
  * couch_dbupdates
-   
+
    Copyright 2012, Benoît Chesneau <benoitc@refuge.io>
- 
+
  * mocha.js (https://github.com/visionmedia/mocha)
-  
+
    Copyright (c) 2011-2013 TJ Holowaychuk <tj@vision-media.ca>
 
  * chaijs https://github.com/chaijs
-   
+
    Copyright (c) 2011-2013 Jake Luer jake@alogicalparadox.com
 
  * sinon-chai
 
    Copyright © 2012–2013 Domenic Denicola <domenic@domenicdenicola.com>
- 
+
  * spin.js
 
    Copyright (c) 2011 Felix Gnass [fgnass at neteye dot de]
- 
+
  * font-awesome http://fortawesome.github.io/Font-Awesome/
 
    Copyright (c) 2013 Dave Gandy
@@ -181,7 +181,3 @@ This product also includes the following third-party components:
  * ace editor https://github.com/ajaxorg/ace
 
    Copyright (c) 2010, Ajax.org B.V.
-
- * src/fauxton/asserts/js/plugins/cloudant.pagingcollection.js
-
-   Copyright (c) 2014, Cloudant http://cloudant.com
