@@ -228,8 +228,9 @@ handle_uuids_req(Req) ->
 
 
 % Node-specific request handler (_config and _stats)
-
-
+% Support _local meaning this node
+handle_node_req(#httpd{path_parts=[A, <<"_local">>|Rest]}=Req) ->
+    handle_node_req(Req#httpd{path_parts=[A, node()] ++ Rest});
 % GET /_node/$node/_config
 handle_node_req(#httpd{method='GET', path_parts=[_, Node, <<"_config">>]}=Req) ->
     Grouped = lists:foldl(fun({{Section, Key}, Value}, Acc) ->
