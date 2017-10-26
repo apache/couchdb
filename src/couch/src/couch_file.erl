@@ -43,7 +43,8 @@
 -export([append_raw_chunk/2, assemble_file_chunk/1, assemble_file_chunk/2]).
 -export([append_term/2, append_term/3, append_term_md5/2, append_term_md5/3]).
 -export([write_header/2, read_header/1]).
--export([delete/2, delete/3, nuke_dir/2, init_delete_dir/1]).
+-export([delete/2, delete/3, nuke_dir/2, nuke_dir/3]).
+-export([init_delete_dir/1, init_recovery_dir/1]).
 -export([msec_since_last_read/1]).
 
 % gen_server callbacks
@@ -265,6 +266,18 @@ rename_file(Original) ->
         Else -> Else
     end.
 
+rename_dir(RootDelDir, Original, DbName) ->
+    DbDir = binary_to_list(DbName) ++ "_design",
+    RenamedIndexDir = filename:join(
+        [RootDelDir, ".recovery", DbDir]
+    ),
+    Now = calendar:local_time(),
+    filelib:ensure_dir(RenamedIndexDir),
+    case file:rename(Original, RenamedIndexDir) of
+        ok -> file:change_time(RenamedIndexDir, Now);
+        Else -> Else
+    end.
+
 deleted_filename(Original) ->
     {{Y, Mon, D}, {H, Min, S}} = calendar:universal_time(),
     Suffix = lists:flatten(
@@ -273,14 +286,18 @@ deleted_filename(Original) ->
             ++ filename:extension(Original), [Y, Mon, D, H, Min, S])),
     filename:rootname(Original) ++ Suffix.
 
-nuke_dir(RootDelDir, Dir) ->
+nuke_dir(RootDir, Dir) ->
+    nuke_dir(RootDir, Dir, []).
+nuke_dir(RootDelDir, Dir, Options) ->
     EnableRecovery = config:get_boolean("couchdb",
         "enable_database_recovery", false),
+    Context = couch_util:get_value(context, Options, compaction),
     case EnableRecovery of
-        true ->
-            rename_file(Dir);
-        false ->
-            delete_dir(RootDelDir, Dir)
+        true when Context == delete ->
+            DbName = couch_util:get_value(db_name, Options),
+            rename_dir(RootDelDir, Dir, DbName);
+        true -> rename_file(Dir);
+        false -> delete_dir(RootDelDir, Dir)
     end.
 
 delete_dir(RootDelDir, Dir) ->
@@ -318,6 +335,9 @@ init_delete_dir(RootDir) ->
     end),
     ok.
 
+init_recovery_dir(RootDir) ->
+    Dir = filename:join(RootDir, ".recovery"),
+    filelib:ensure_dir(filename:join(Dir, "foo")).
 
 read_header(Fd) ->
     case ioq:call(Fd, find_header, erlang:get(io_priority)) of
@@ -762,11 +782,25 @@ make_filename_fixtures(DbNames) ->
         "shards/00000000-1fffffff/~s.1458336317.couch",
         ".shards/00000000-1fffffff/~s.1458336317_design",
         ".shards/00000000-1fffffff/~s.1458336317_design"
-            "/mrview/3133e28517e89a3e11435dd5ac4ad85a.view"
+            "/mrview/3133e28517e89a3e11435dd5ac4ad85a.view",
+        ".recovery/1499329402/shards/00000000-1fffffff/~s.1499329402_design",
+        ".recovery/1499329402/shards/00000000-1fffffff/~s.1499329402_design"
+            "/mrview/8fabddcb28f501d6764afd7def3bd352.view"
     ],
     lists:flatmap(fun(DbName) ->
         lists:map(fun(Format) ->
-            filename:join("/srv/data", io_lib:format(Format, [DbName]))
+            % Count how many times we need to specify the database name
+            % by splitting on the ~s formatter.
+            ArgCount = erlang:length(binary:split(
+                list_to_binary(Format),
+                <<"~s">>,
+                [global])
+            ) - 1,
+            Args = case ArgCount of
+                1 -> [DbName];
+                2 -> [DbName, DbName]
+            end,
+            filename:join("/srv/data/", io_lib:format(Format, Args))
         end, Formats)
     end, DbNames).
 
