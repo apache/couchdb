@@ -17,9 +17,7 @@ couchTests.erlang_views = function(debug) {
   if (debug) debugger;
 
   run_on_modified_server(
-    [{section: "native_query_servers",
-      key: "erlang",
-      value: "{couch_native_process, start_link, []}"}],
+    [],
     function() {
       // Note we just do some basic 'smoke tests' here - the
       // test/query_server_spec.rb tests have more comprehensive tests
