@@ -15,7 +15,7 @@
 
 -export([start_link/0, get_user_creds/2, update_user_creds/3]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
-	 code_change/3]).
+    code_change/3]).
 -export([listen_for_changes/1, changes_callback/2]).
 
 -include_lib("couch/include/couch_db.hrl").
@@ -45,7 +45,7 @@ get_user_creds(_Req, UserName) when is_binary(UserName) ->
             Props;
         UserProps when is_list(UserProps) ->
             couch_auth_cache:add_roles(Props,
-	        couch_util:get_value(<<"roles">>, UserProps))
+                couch_util:get_value(<<"roles">>, UserProps))
         end
     end,
     maybe_validate_user_creds(Resp).
@@ -164,14 +164,14 @@ changes_callback({error, _}, EndSeq) ->
 
 load_user_from_db(UserName) ->
     try fabric:open_doc(dbname(), docid(UserName), [?ADMIN_CTX, ejson_body, conflicts]) of
-	{ok, Doc} ->
-	    {Props} = couch_doc:to_json_obj(Doc, []),
-	    Props;
-	_Else ->
-	    couch_log:debug("no record of user ~s", [UserName]),
-	    nil
+    {ok, Doc} ->
+        {Props} = couch_doc:to_json_obj(Doc, []),
+        Props;
+    _Else ->
+        couch_log:debug("no record of user ~s", [UserName]),
+        nil
     catch error:database_does_not_exist ->
-	    nil
+        nil
     end.
 
 dbname() ->
