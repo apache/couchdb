@@ -122,6 +122,7 @@ class Database(object):
         body = json.dumps(body)
         r = self.sess.post(self.path("_index"), data=body)
         r.raise_for_status()
+
         assert r.json()["id"] is not None
         assert r.json()["name"] is not None
         return r.json()["result"] == "created"
@@ -165,13 +166,13 @@ class Database(object):
 
     def delete_index(self, ddocid, name, idx_type="json"):
         path = ["_index", ddocid, idx_type, name]
-        r = self.sess.delete(self.path(path), params={"w":"3"})
+        r = self.sess.delete(self.path(path), params={"w": 1})
         r.raise_for_status()
 
     def bulk_delete(self, docs):
         body = {
             "docids" : docs,
-            "w": 3
+            "w": 1
         }
         body = json.dumps(body)
         r = self.sess.post(self.path("_index/_bulk_delete"), data=body)
