@@ -34,7 +34,7 @@ def get_from_environment(key, default):
     return value if value is not None else default
 
 # add delay functionality
-def delay(n=5, t=0.2):
+def delay(n=5, t=0.5):
     for i in range(0, n):
         time.sleep(t)
 
