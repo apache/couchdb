@@ -13,6 +13,7 @@
 -module(couch_users_db).
 
 -export([before_doc_update/2, after_doc_read/2, strip_non_public_fields/1]).
+-export([is_valid_doc_body/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -40,6 +41,12 @@
 % Else
 %   -> save_doc
 before_doc_update(Doc, Db) ->
+    case is_valid_doc_body(Doc#doc.body) of
+    true ->
+        ok;
+    false ->
+        throw({bad_request, "User docs must not contain duplicate fields."})
+    end,
     #user_ctx{name=Name} = couch_db:get_user_ctx(Db),
     DocName = get_doc_name(Doc),
     case (catch couch_db:check_is_admin(Db)) of
@@ -50,6 +57,21 @@ before_doc_update(Doc, Db) ->
     _ ->
         throw(not_found)
     end.
+
+% Make sure that _users db docs do not contain repeated
+% field names.
+is_valid_doc_body({Props}) ->
+    {Keys, Values} = lists:unzip(Props),
+    case length(Keys) == length(lists:usort(Keys)) of
+        true ->
+            lists:all(fun is_valid_doc_body/1, Values);
+        false ->
+            false
+    end;
+is_valid_doc_body(Values) when is_list(Values)->
+    lists:all(fun is_valid_doc_body/1, Values);
+is_valid_doc_body(_) ->
+    true.
 
 % If newDoc.password == null || newDoc.password == undefined:
 %   ->

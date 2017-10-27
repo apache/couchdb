@@ -353,10 +353,10 @@ static JSBool
 csp_allows(JSContext* cx)
 {
     couch_args *args = (couch_args*)JS_GetContextPrivate(cx);
-    if(args->no_eval) {
-        return JS_FALSE;
-    } else {
+    if(args->eval) {
         return JS_TRUE;
+    } else {
+        return JS_FALSE;
     }
 }
 
