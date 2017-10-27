@@ -33,6 +33,11 @@ def get_from_environment(key, default):
     value = os.environ.get(key)
     return value if value is not None else default
 
+# add delay functionality
+def delay(n=5, t=0.2):
+    for i in range(0, n):
+        time.sleep(t)
+
 
 class Database(object):
     def __init__(self, dbname,
@@ -77,9 +82,9 @@ class Database(object):
 
     def recreate(self):
         self.delete()
-        time.sleep(1)
+        delay()
         self.create()
-        time.sleep(1)
+        delay()
 
     def save_doc(self, doc):
         self.save_docs([doc])
@@ -166,13 +171,14 @@ class Database(object):
 
     def delete_index(self, ddocid, name, idx_type="json"):
         path = ["_index", ddocid, idx_type, name]
-        r = self.sess.delete(self.path(path), params={"w": "1"})
+        r = self.sess.delete(self.path(path), params={"w": "3"})
+        delay()
         r.raise_for_status()
 
     def bulk_delete(self, docs):
         body = {
             "docids" : docs,
-            "w": 1
+            "w": 3
         }
         body = json.dumps(body)
         r = self.sess.post(self.path("_index/_bulk_delete"), data=body)
