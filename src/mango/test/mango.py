@@ -166,7 +166,7 @@ class Database(object):
 
     def delete_index(self, ddocid, name, idx_type="json"):
         path = ["_index", ddocid, idx_type, name]
-        r = self.sess.delete(self.path(path), params={"w": 1})
+        r = self.sess.delete(self.path(path), params={"w": "1"})
         r.raise_for_status()
 
     def bulk_delete(self, docs):
