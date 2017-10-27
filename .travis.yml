@@ -9,9 +9,6 @@ before_script: ./bootstrap && ./configure
 script:
    - rm -f erlang-*.tar.bz2
    - make distcheck
-   - cd src/fauxton
-   - npm install
-   - grunt test
 language: erlang
 otp_release:
    - 19.0
