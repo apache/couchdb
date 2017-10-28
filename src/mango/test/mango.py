@@ -128,7 +128,6 @@ class Database(object):
         r = self.sess.post(self.path("_index"), data=body)
         delay()
         r.raise_for_status()
-
         assert r.json()["id"] is not None
         assert r.json()["name"] is not None
         return r.json()["result"] == "created"
