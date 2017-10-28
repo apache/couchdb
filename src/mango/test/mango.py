@@ -126,6 +126,7 @@ class Database(object):
             body["index"]["partial_filter_selector"] = partial_filter_selector
         body = json.dumps(body)
         r = self.sess.post(self.path("_index"), data=body)
+        delay()
         r.raise_for_status()
 
         assert r.json()["id"] is not None
@@ -157,6 +158,7 @@ class Database(object):
             body["ddoc"] = ddoc
         body = json.dumps(body)
         r = self.sess.post(self.path("_index"), data=body)
+        delay()
         r.raise_for_status()
         return r.json()["result"] == "created"
 
@@ -182,6 +184,7 @@ class Database(object):
         }
         body = json.dumps(body)
         r = self.sess.post(self.path("_index/_bulk_delete"), data=body)
+        delay(n=10)
         return r.json()
 
     def find(self, selector, limit=25, skip=0, sort=None, fields=None,
