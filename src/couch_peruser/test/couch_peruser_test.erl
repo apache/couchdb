@@ -42,7 +42,6 @@ setup() ->
     set_config("couch_peruser", "cluster_start_period", "1"),
     set_config("couch_peruser", "enable", "true"),
     set_config("cluster", "n", "1"),
-    set_config("log", "level", "debug"),
     timer:sleep(1000),
     TestAuthDb.
 
@@ -53,7 +52,6 @@ teardown(TestAuthDb) ->
     set_config("couch_peruser", "cluster_quiet_period", "60"),
     set_config("couch_peruser", "cluster_start_period", "5"),
     set_config("cluster", "n", "3"),
-    set_config("log", "level", "info"),
     do_request(delete, get_cluster_base_url() ++ "/" ++ ?b2l(TestAuthDb)),
     do_request(delete, get_base_url() ++ "/" ++ ?b2l(TestAuthDb)),
     lists:foreach(fun (DbName) ->
@@ -127,6 +125,10 @@ set_security(DbName, SecurityProperties) ->
 all_dbs() ->
     {ok, 200, _, Body} = do_request(get, get_cluster_base_url() ++ "/_all_dbs"),
     jiffy:decode(Body).
+
+all_dbs_with_errors() ->
+    {Result, StatusCode, _Headers, Body} = do_request(get, get_cluster_base_url() ++ "/_all_dbs"),
+    {Result, StatusCode, _Headers, jiffy:decode(Body)}.
 
 get_base_url() ->
     Addr = config:get("httpd", "bind_address", "127.0.0.1"),
@@ -316,21 +318,33 @@ should_remove_user_from_db_members(TestAuthDb) ->
 % infinite loop waiting for a db to be created, either this returns true
 % or we get a test timeout error
 wait_for_db_create(UserDbName) ->
-    case lists:member(UserDbName, all_dbs()) of
-        true -> true;
-        _Else ->
+    case all_dbs_with_errors() of
+        {error, _, _ , _} ->
             timer:sleep(?WAIT_FOR_DB_TIMEOUT),
-            wait_for_db_create(UserDbName)
+            wait_for_db_create(UserDbName);
+        {ok, _, _, AllDbs} ->
+            case lists:member(UserDbName, AllDbs) of
+                true -> true;
+                _Else ->
+                    timer:sleep(?WAIT_FOR_DB_TIMEOUT),
+                    wait_for_db_create(UserDbName)
+            end
     end.
 
 % infinite loop waiting for a db to be deleted, either this returns true
 % or we get a test timeout error
 wait_for_db_delete(UserDbName) ->
-    case not lists:member(UserDbName, all_dbs()) of
-        true -> true;
-        _Else ->
+    case all_dbs_with_errors() of
+        {ok, 500, _ , _} ->
             timer:sleep(?WAIT_FOR_DB_TIMEOUT),
-            wait_for_db_delete(UserDbName)
+            wait_for_db_delete(UserDbName);
+        {ok, _, _, AllDbs} ->
+            case not lists:member(UserDbName, AllDbs) of
+                true -> true;
+                _Else ->
+                    timer:sleep(?WAIT_FOR_DB_TIMEOUT),
+                    wait_for_db_delete(UserDbName)
+            end
     end.
 
 wait_for_security_create(Type, User, UserDbName) ->
