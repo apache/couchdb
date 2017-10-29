@@ -236,7 +236,7 @@ To check that everything has worked, point your web browser to:
 
 From here you should verify your installation by pointing your web browser to:
 
-    http://localhost:5984/_utils/verify_install.html
+    http://localhost:5984/_utils/#/verifyinstall
 
 ## Running as a Daemon
 
