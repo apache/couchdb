@@ -40,22 +40,21 @@
 
 -define(tempfile,
     fun() ->
-        {A, B, C} = erlang:now(),
+        A = integer_to_list(couch_util:unique_monotonic_integer()),
         N = node(),
-        FileName = lists:flatten(io_lib:format("~p-~p.~p.~p", [N, A, B, C])),
+        FileName = lists:flatten(io_lib:format("~p-~p", [N, A])),
         filename:join([?TEMPDIR, FileName])
     end).
 -define(tempdb,
     fun() ->
-            Nums = tuple_to_list(erlang:now()),
+            Nums = integer_to_list(couch_util:unique_monotonic_integer()),
             Prefix = "eunit-test-db",
             Suffix = lists:concat([integer_to_list(Num) || Num <- Nums]),
             list_to_binary(Prefix ++ "-" ++ Suffix)
     end).
 -define(docid,
     fun() ->
-        {A, B, C} = erlang:now(),
-        lists:flatten(io_lib:format("~p~p~p", [A, B, C]))
+        integer_to_list(couch_util:unique_monotonic_integer())
     end).
 
 %% Like assertEqual, but using == instead of =:=
