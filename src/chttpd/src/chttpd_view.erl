@@ -82,7 +82,7 @@ handle_view_req(Req, _Db, _DDoc) ->
 
 handle_temp_view_req(Req, _Db) ->
     Msg = <<"Temporary views are not supported in CouchDB">>,
-    chttpd:send_error(Req, 403, forbidden, Msg).
+    chttpd:send_error(Req, 410, gone, Msg).
 
 
 
