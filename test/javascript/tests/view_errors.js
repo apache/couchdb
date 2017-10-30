@@ -185,6 +185,18 @@ couchTests.view_errors = function(debug) {
           T(e.error == "query_parse_error");
           T(e.reason.match(/no rows can match/i));
       }
+
+      // querying a temporary view should give "gone" error message
+      var xhr = CouchDB.request("POST", "/" + db_name + "/_temp_view", {
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({language: "javascript",
+          map : "function(doc){emit(doc.integer)}"
+        })
+      });
+      T(xhr.status == 410);
+      result = JSON.parse(xhr.responseText);
+      T(result.error == "gone");
+      T(result.reason == "Temporary views are not supported in CouchDB");
     // });
 
   // cleanup
