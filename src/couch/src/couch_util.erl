@@ -426,7 +426,7 @@ json_encode(V) ->
 
 json_decode(V) ->
     try
-        jiffy:decode(V)
+        jiffy:decode(V, [dedupe_keys])
     catch
         throw:Error ->
             throw({invalid_json, Error})
