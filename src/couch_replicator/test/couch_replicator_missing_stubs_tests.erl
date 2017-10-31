@@ -121,7 +121,7 @@ should_update_source_docs(Source, Times) ->
 
 populate_db(DbName) ->
     {ok, Db} = couch_db:open_int(DbName, []),
-    AttData = crypto:rand_bytes(6000),
+    AttData = crypto:strong_rand_bytes(6000),
     Doc = #doc{
         id = <<"doc1">>,
         atts = [
