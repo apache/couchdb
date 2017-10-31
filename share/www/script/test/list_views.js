@@ -221,7 +221,7 @@ couchTests.list_views = function(debug) {
     headers: {"if-none-match": etag}
   });
   T(xhr.status == 304);
-  
+
   // confirm ETag changes with different POST bodies
   xhr = CouchDB.request("POST", "/test_suite_db/_design/lists/_list/basicBasic/basicView",
     {body: JSON.stringify({keys:[1]})}
@@ -240,7 +240,7 @@ couchTests.list_views = function(debug) {
   TEquals(10, resp.head.total_rows);
   TEquals(0, resp.head.offset);
   TEquals(11, resp.head.update_seq);
-  
+
   T(resp.rows.length == 10);
   TEquals(resp.rows[0], {"id": "0","key": 0,"value": "0"});
 
@@ -414,7 +414,7 @@ couchTests.list_views = function(debug) {
   xhr = CouchDB.request("POST", url, {
     body: '{"keys":[-2,-4,-5,-7]}'
   });
-  
+
   T(xhr.status == 200, "multi key separate docs");
   T(!(/Key: -3/.test(xhr.responseText)));
   T(/Key: -7/.test(xhr.responseText));
@@ -441,11 +441,12 @@ couchTests.list_views = function(debug) {
     }
   };
 
-  run_on_modified_server([{
-    section: "native_query_servers",
-    key: "erlang",
-    value: "{couch_native_process, start_link, []}"
-  }], erlViewTest);
+  // diabled because of https://github.com/apache/couchdb/pull/939
+  // run_on_modified_server([{
+  //   section: "native_query_servers",
+  //   key: "erlang",
+  //   value: "{couch_native_process, start_link, []}"
+  // }], erlViewTest);
 
   // COUCHDB-1113
   var ddoc = {

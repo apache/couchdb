@@ -11,6 +11,7 @@
 // the License.
 
 couchTests.erlang_views = function(debug) {
+  return; // diabled because of https://github.com/apache/couchdb/pull/939
   var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
   db.deleteDb();
   db.createDb();
@@ -40,7 +41,7 @@ couchTests.erlang_views = function(debug) {
       T(results.total_rows == 1);
       T(results.rows[0].key == 1);
       T(results.rows[0].value == "str1");
-      
+
       // check simple reduction - another doc with same key.
       var doc = {_id: "2", integer: 1, string: "str2"};
       T(db.save(doc).ok);
@@ -99,7 +100,7 @@ couchTests.erlang_views = function(debug) {
       db.deleteDb();
       db.createDb();
       var words = "foo bar abc def baz xxyz".split(/\s+/);
-      
+
       var docs = [];
       for(var i = 0; i < 250; i++) {
         var body = [];
@@ -115,16 +116,16 @@ couchTests.erlang_views = function(debug) {
         });
       }
       T(db.bulkSave(docs).length, 250, "Saved big doc set.");
-      
+
       var mfun = 'fun({Doc}) -> ' +
         'Words = couch_util:get_value(<<"words">>, Doc), ' +
         'lists:foreach(fun({Word}) -> ' +
-            'WordString = couch_util:get_value(<<"word">>, Word), ' + 
-            'Count = couch_util:get_value(<<"count">>, Word), ' + 
+            'WordString = couch_util:get_value(<<"word">>, Word), ' +
+            'Count = couch_util:get_value(<<"count">>, Word), ' +
             'Emit(WordString , Count) ' +
           'end, Words) ' +
         'end.';
-      
+
       var rfun = 'fun(Keys, Values, RR) -> length(Values) end.';
       var results = db.query(mfun, rfun, null, null, "erlang");
       T(results.rows[0].key === null, "Returned a reduced value.");
