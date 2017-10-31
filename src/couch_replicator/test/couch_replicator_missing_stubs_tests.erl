@@ -153,7 +153,7 @@ db_fold_fun(FullDocInfo, {DbName, Times}) ->
             {ok, Db2} = couch_db:reopen(Db),
             NewDocVersion = Doc#doc{
                 revs = {Pos, [RevId]},
-                body = {[{<<"value">>, base64:encode(crypto:rand_bytes(100))}]}
+                body = {[{<<"value">>, base64:encode(crypto:strong_rand_bytes(100))}]}
             },
             {ok, NewRev} = couch_db:update_doc(Db2, NewDocVersion, []),
             NewRev

@@ -209,7 +209,7 @@ json_user_ctx(#db{name=DbName, user_ctx=Ctx}) ->
 
 % returns a random integer
 rand32() ->
-    crypto:rand_uniform(0, 16#100000000).
+    crypto:strong_rand_bytes(4).
 
 % given a pathname "../foo/bar/" it gives back the fully qualified
 % absolute pathname.
@@ -415,20 +415,20 @@ verify(_X, _Y) -> false.
 
 -spec md5(Data::(iolist() | binary())) -> Digest::binary().
 md5(Data) ->
-    try crypto:md5(Data) catch error:_ -> erlang:md5(Data) end.
+    try crypto:hash(md5, Data) catch error:_ -> erlang:md5(Data) end.
 
 -spec md5_init() -> Context::binary().
 md5_init() ->
-    try crypto:md5_init() catch error:_ -> erlang:md5_init() end.
+    try crypto:hash_init(md5) catch error:_ -> erlang:md5_init() end.
 
 -spec md5_update(Context::binary(), Data::(iolist() | binary())) ->
     NewContext::binary().
 md5_update(Ctx, D) ->
-    try crypto:md5_update(Ctx,D) catch error:_ -> erlang:md5_update(Ctx,D) end.
+    try crypto:hash_update(Ctx,D) catch error:_ -> erlang:md5_update(Ctx,D) end.
 
 -spec md5_final(Context::binary()) -> Digest::binary().
 md5_final(Ctx) ->
-    try crypto:md5_final(Ctx) catch error:_ -> erlang:md5_final(Ctx) end.
+    try crypto:hash_final(Ctx) catch error:_ -> erlang:md5_final(Ctx) end.
 
 % linear search is faster for small lists, length() is 0.5 ms for 100k list
 reorder_results(Keys, SortedResults) when length(Keys) < 100 ->

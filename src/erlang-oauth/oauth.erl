@@ -77,7 +77,7 @@ signature_params(Consumer, Params, Token) ->
 
 signature_params(Consumer, Params) ->
   Timestamp = unix_timestamp(),
-  Nonce = base64:encode_to_string(crypto:rand_bytes(32)), % cf. ruby-oauth
+  Nonce = base64:encode_to_string(crypto:strong_rand_bytes(32)), % cf. ruby-oauth
   [ {"oauth_version", "1.0"}
   , {"oauth_nonce", Nonce}
   , {"oauth_timestamp", integer_to_list(Timestamp)}
@@ -128,7 +128,7 @@ hmac_sha1_signature(HttpMethod, URL, Params, Consumer, TokenSecret) ->
 
 hmac_sha1_signature(BaseString, Consumer, TokenSecret) ->
   Key = uri_join([consumer_secret(Consumer), TokenSecret]),
-  base64:encode_to_string(crypto:sha_mac(Key, BaseString)).
+  base64:encode_to_string(crypto:hmac(sha, Key, BaseString)).
 
 hmac_sha1_verify(Signature, HttpMethod, URL, Params, Consumer, TokenSecret) ->
   verify_in_constant_time(Signature, hmac_sha1_signature(HttpMethod, URL, Params, Consumer, TokenSecret)).
