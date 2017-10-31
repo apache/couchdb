@@ -31,6 +31,7 @@
 -define(MAX_BULK_ATT_SIZE, 64 * 1024).
 -define(MAX_BULK_ATTS_PER_DOC, 8).
 -define(STATS_DELAY, 10000000).              % 10 seconds (in microseconds)
+-define(MISSING_DOC_RETRY_MSEC, 2000).
 
 -import(couch_replicator_utils, [
     open_db/1,
@@ -314,11 +315,17 @@ fetch_doc(Source, {Id, Revs, PAs}, DocHandler, Acc) ->
         couch_log:error("Retrying fetch and update of document `~s` as it is "
             "unexpectedly missing. Missing revisions are: ~s",
             [Id, couch_doc:revs_to_strs(Revs)]),
+        WaitMSec = config:get_integer("replicator", "missing_doc_retry_msec",
+            ?MISSING_DOC_RETRY_MSEC),
+        timer:sleep(WaitMSec),
         couch_replicator_api_wrap:open_doc_revs(Source, Id, Revs, [latest], DocHandler, Acc);
     throw:{missing_stub, _} ->
         couch_log:error("Retrying fetch and update of document `~s` due to out of "
             "sync attachment stubs. Missing revisions are: ~s",
             [Id, couch_doc:revs_to_strs(Revs)]),
+        WaitMSec = config:get_integer("replicator", "missing_doc_retry_msec",
+            ?MISSING_DOC_RETRY_MSEC),
+        timer:sleep(WaitMSec),
         couch_replicator_api_wrap:open_doc_revs(Source, Id, Revs, [latest], DocHandler, Acc)
     end.
 
