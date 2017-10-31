@@ -36,6 +36,9 @@ init() ->
 decode(undefined) ->
     throw({invalid_json, undefined});
 decode(IoList) ->
+    dedupe_objs(decode_int(IoList)).
+
+decode_int(IoList) ->
     try
         nif_decode(IoList)
     catch exit:ejson_nif_not_loaded ->
@@ -159,6 +162,23 @@ make_ejson([{3, String} | RevEvs], [[PrevValue|RestObject] | RestStack] = _Stack
     make_ejson(RevEvs, [[{String, PrevValue}|RestObject] | RestStack]);
 make_ejson([Value | RevEvs], [Vals | RestStack] = _Stack) ->
     make_ejson(RevEvs, [[Value | Vals] | RestStack]).
+
+
+dedupe_objs({Props}) when is_list(Props) ->
+    RevProps = lists:reverse(Props),
+    {_, NewProps} = lists:foldl(fun({Key, Val}, {Seen, PropAcc}) ->
+        case sets:is_element(Key, Seen) of
+            true ->
+                {Seen, PropAcc};
+            false ->
+                {sets:add_element(Key, Seen), [{Key, Val} | PropAcc]}
+        end
+    end, {sets:new(), []}, RevProps),
+    {NewProps};
+dedupe_objs(Vals) when is_list(Vals) ->
+    lists:map(fun dedupe_objs/1, Vals);
+dedupe_objs(Val) ->
+    Val.
 
 
 reverse_tokens(_) ->
