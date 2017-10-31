@@ -6,6 +6,10 @@ The Apache Software Foundation (http://www.apache.org/).
 
 This product also includes the following third-party components:
 
+* jQuery (http://jquery.org/)		
+		
+   Copyright 2012 jQuery Foundation and other contributors
+
  * json2.js (http://www.json.org/)
 
    Public domain
