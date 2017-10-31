@@ -169,7 +169,7 @@ html_files = \
     html/_static/comment-bright.png \
     html/_static/comment-close.png \
     html/_static/comment.png \
-    html/_static/default.css \
+    html/_static/classic.css \
     html/_static/doctools.js \
     html/_static/down-pressed.png \
     html/_static/down.png \
