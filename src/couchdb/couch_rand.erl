@@ -23,7 +23,12 @@
 
 
 has_rand_module() ->
-    OtpRelease = list_to_integer(erlang:system_info(otp_release)),
+    OtpRelease = case erlang:system_info(otp_release) of
+        % < R15 is excluded by ./configure already
+        "R15" ++ _OtpVsn -> 15;
+        "R16" ++ _OtpVsn -> 16;
+        Release -> list_to_integer(Release)
+    end,
     OtpRelease >= ?MIN_OTP_VERSION_WITH_RAND_MODULE.
 
 
