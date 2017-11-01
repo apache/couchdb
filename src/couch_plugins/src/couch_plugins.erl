@@ -228,7 +228,7 @@ do_verify_checksum(Filename, Checksum) ->
   ?LOG_DEBUG("Checking Filename: ~s", [Filename]),
   case file:read_file(Filename) of
   {ok, Data} ->
-    ComputedChecksum = binary_to_list(base64:encode(crypto:sha(Data))),
+    ComputedChecksum = binary_to_list(base64:encode(crypto:hash(sha, Data))),
     case ComputedChecksum of
     Checksum -> ok;
     _Else ->

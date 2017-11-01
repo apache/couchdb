@@ -123,7 +123,7 @@ proxy_authentication_handler(Req) ->
 %% @deprecated
 proxy_authentification_handler(Req) ->
     proxy_authentication_handler(Req).
-    
+
 proxy_auth_user(Req) ->
     XHeaderUserName = couch_config:get("couch_httpd_auth", "x_auth_username",
                                 "X-Auth-CouchDB-UserName"),
@@ -145,7 +145,7 @@ proxy_auth_user(Req) ->
                         nil ->
                             Req#httpd{user_ctx=#user_ctx{name=?l2b(UserName), roles=Roles}};
                         Secret ->
-                            ExpectedToken = couch_util:to_hex(crypto:sha_mac(Secret, UserName)),
+                            ExpectedToken = couch_util:to_hex(crypto:hmac(sha, Secret, UserName)),
                             case header_value(Req, XHeaderToken) of
                                 Token when Token == ExpectedToken ->
                                     Req#httpd{user_ctx=#user_ctx{name=?l2b(UserName),
@@ -186,7 +186,7 @@ cookie_authentication_handler(#httpd{mochi_req=MochiReq}=Req) ->
             UserProps ->
                 UserSalt = couch_util:get_value(<<"salt">>, UserProps, <<"">>),
                 FullSecret = <<Secret/binary, UserSalt/binary>>,
-                ExpectedHash = crypto:sha_mac(FullSecret, User ++ ":" ++ TimeStr),
+                ExpectedHash = crypto:hmac(sha, FullSecret, User ++ ":" ++ TimeStr),
                 Hash = ?l2b(HashStr),
                 Timeout = list_to_integer(
                     couch_config:get("couch_httpd_auth", "timeout", "600")),
@@ -233,7 +233,7 @@ cookie_auth_header(_Req, _Headers) -> [].
 
 cookie_auth_cookie(Req, User, Secret, TimeStamp) ->
     SessionData = User ++ ":" ++ erlang:integer_to_list(TimeStamp, 16),
-    Hash = crypto:sha_mac(Secret, SessionData),
+    Hash = crypto:hmac(sha, Secret, SessionData),
     mochiweb_cookies:cookie("AuthSession",
         couch_util:encodeBase64Url(SessionData ++ ":" ++ ?b2l(Hash)),
         [{path, "/"}] ++ cookie_scheme(Req) ++ max_age()).

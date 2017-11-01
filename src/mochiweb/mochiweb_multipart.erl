@@ -38,7 +38,7 @@ parts_to_body([{Start, End, Body}], ContentType, Size) ->
     {HeaderList, Body};
 parts_to_body(BodyList, ContentType, Size) when is_list(BodyList) ->
     parts_to_multipart_body(BodyList, ContentType, Size,
-                            mochihex:to_hex(crypto:rand_bytes(8))).
+                            mochihex:to_hex(crypto:strong_rand_bytes(8))).
 
 %% @spec parts_to_multipart_body([bodypart()], ContentType::string(),
 %%                               Size::integer(), Boundary::string()) ->

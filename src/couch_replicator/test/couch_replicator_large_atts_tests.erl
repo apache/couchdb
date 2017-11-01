@@ -176,7 +176,7 @@ att(Name, Size, Type) ->
         name = Name,
         type = Type,
         att_len = Size,
-        data = fun(Count) -> crypto:rand_bytes(Count) end
+        data = fun(Count) -> crypto:strong_rand_bytes(Count) end
     }.
 
 find_att([], _Name) ->

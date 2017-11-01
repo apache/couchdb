@@ -65,6 +65,7 @@ source_files = \
     couch_passwords.erl \
     couch_primary_sup.erl \
     couch_query_servers.erl \
+    couch_rand.erl \
     couch_ref_counter.erl \
     couch_secondary_sup.erl \
     couch_server.erl \
@@ -122,6 +123,7 @@ compiled_files = \
     couch_passwords.beam \
     couch_primary_sup.beam \
     couch_query_servers.beam \
+    couch_rand.beam \
     couch_ref_counter.beam \
     couch_secondary_sup.beam \
     couch_server.beam \
@@ -195,4 +197,3 @@ endif
 
 %.beam: %.erl couch_db.hrl couch_js_functions.hrl
 	$(ERLC) $(ERLC_FLAGS) ${TEST} $<;
-

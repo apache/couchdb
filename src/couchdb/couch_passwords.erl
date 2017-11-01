@@ -23,7 +23,7 @@
 %% legacy scheme, not used for new passwords.
 -spec simple(binary(), binary()) -> binary().
 simple(Password, Salt) when is_binary(Password), is_binary(Salt) ->
-    ?l2b(couch_util:to_hex(crypto:sha(<<Password/binary, Salt/binary>>))).
+    ?l2b(couch_util:to_hex(crypto:hash(sha, <<Password/binary, Salt/binary>>))).
 
 %% CouchDB utility functions
 -spec hash_admin_password(binary() | list()) -> binary().
@@ -89,12 +89,12 @@ pbkdf2(_Password, _Salt, Iterations, _BlockIndex, Iteration, _Prev, Acc)
     when Iteration > Iterations ->
     Acc;
 pbkdf2(Password, Salt, Iterations, BlockIndex, 1, _Prev, _Acc) ->
-    InitialBlock = crypto:sha_mac(Password,
+    InitialBlock = crypto:hmac(sha, Password,
         <<Salt/binary,BlockIndex:32/integer>>),
     pbkdf2(Password, Salt, Iterations, BlockIndex, 2,
         InitialBlock, InitialBlock);
 pbkdf2(Password, Salt, Iterations, BlockIndex, Iteration, Prev, Acc) ->
-    Next = crypto:sha_mac(Password, Prev),
+    Next = crypto:hmac(sha, Password, Prev),
     pbkdf2(Password, Salt, Iterations, BlockIndex, Iteration + 1,
                    Next, crypto:exor(Next, Acc)).
 

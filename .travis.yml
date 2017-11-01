@@ -11,13 +11,12 @@ script:
    - make distcheck
 language: erlang
 otp_release:
-   - 19.0
+   - 20.1
+   - 19.3
    - 18.3
-   - 17.0
+   - 17.5
    - R16B03-1
    - R15B03
-   - R14B04
 matrix:
   allow_failures:
-    - otp_release: R14B04
     - otp_release: R15B03
