@@ -17,8 +17,6 @@ otp_release:
    - 17.0
    - R16B03-1
    - R15B03
-   - R14B04
 matrix:
   allow_failures:
-    - otp_release: R14B04
     - otp_release: R15B03
