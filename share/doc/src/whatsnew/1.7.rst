@@ -28,7 +28,11 @@ Version 1.7.0
 API Changes
 -----------
 
+- :issue:`1356`: Return username on :http:post:`/_session`.
 - :issue:`1876`: Fix duplicated Content-Type for show/update functions.
+- :issue:`2310`: Implement :http:post:`/{db}/_bulk_get`.
+- :issue:`2375`: :statuscode:`400` returned when invalid revision specified.
+- :issue:`2845`: :statuscode:`400` returned when `revs` is not a list.
 
 Build
 -----
@@ -43,6 +47,7 @@ Build
 Database Core
 -------------
 
+- :issue:`2534`: Improve checks for db admin/member.
 - :issue:`2735`: Duplicate document _ids created under high edit load.
 
 Documentation
@@ -78,6 +83,8 @@ HTTP Server
 Query Server
 ------------
 
+- :issue:`1447`: Custom response headers from design functions get merged with
+  default ones.
 - :commit:`7779c11`: Upgrade Coffeescript to version 1.10.
 
 jquery.couch.js
