@@ -89,7 +89,7 @@ Unless you want to install the optional dependencies, skip to the next section.
 
 Install what else we can with Homebrew::
 
-    brew install help2man gnupg md5sha1sum node
+    brew install help2man gnupg md5sha1sum node spidermonkey
 
 If you don't already have pip installed, install it::
 
@@ -97,7 +97,7 @@ If you don't already have pip installed, install it::
 
 Now, install the required Python packages::
 
-    sudo pip install sphinx docutils pygments nose requests hypothesis
+    sudo pip install sphinx docutils pygments nose requests hypothesis sphinx_rtd_theme
 
 FreeBSD
 ~~~~~~~
@@ -173,8 +173,15 @@ JavaScript tests accepts only `suites` option, but in the same way::
     # Run only basic and design_options tests
     make javascript suites="basic design_options"
 
-Note that tests are delimited here by whitespace, not by comma. You can get list
-of all possible test targets with the following command::
+    # Ignore specific test suites via command line
+    make javascript ignore_js_suites="all_docs bulk_docs"
+
+    # Ignore specific test suites in makefile
+    ignore_js_suites=all_docs,bulk_docs
+
+Note that tests on the command line are delimited here by whitespace,
+not by comma.You can get list of all possible test targets with the
+following command::
 
     make list-js-suites
 

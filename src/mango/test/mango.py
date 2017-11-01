@@ -27,28 +27,51 @@ def random_db_name():
     return "mango_test_" + uuid.uuid4().hex
 
 def has_text_service():
-    return os.path.isfile(os.getcwd() + "/../src/mango_cursor_text.erl")
+    return os.environ.get('MANGO_TEXT_INDEXES') == '1'
+
+def get_from_environment(key, default):
+    value = os.environ.get(key)
+    return value if value is not None else default
+
+# add delay functionality
+def delay(n=5, t=0.5):
+    for i in range(0, n):
+        time.sleep(t)
 
 
 class Database(object):
-    def __init__(self, host, port, dbname, auth=None):
-        self.host = host
-        self.port = port
+    def __init__(self, dbname,
+                 host="127.0.0.1", port="15984",
+                 user='testuser', password='testpass'):
+        root_url = get_from_environment('COUCH_HOST', "http://{}:{}".format(host, port))
+        auth_header = get_from_environment('COUCH_AUTH_HEADER', None)
+        user = get_from_environment('COUCH_USER', user)
+        password = get_from_environment('COUCH_PASSWORD', password)
+
+        self.root_url = root_url
         self.dbname = dbname
         self.sess = requests.session()
-        self.sess.auth = ('testuser', 'testpass')
+
+        # allow explicit auth header to be set to enable testing
+        # against deployments where basic auth isn't available
+        if auth_header is not None:
+            self.sess.headers["Authorization"] = auth_header
+        else:
+            self.sess.auth = (user, password)
+
         self.sess.headers["Content-Type"] = "application/json"
+
 
     @property
     def url(self):
-        return "http://{}:{}/{}".format(self.host, self.port, self.dbname)
+        return "{}/{}".format(self.root_url, self.dbname)
 
     def path(self, parts):
         if isinstance(parts, ("".__class__, u"".__class__)):
             parts = [parts]
         return "/".join([self.url] + parts)
 
-    def create(self, q=1, n=3):
+    def create(self, q=1, n=1):
         r = self.sess.get(self.url)
         if r.status_code == 404:
             r = self.sess.put(self.url, params={"q":q, "n": n})
@@ -59,9 +82,9 @@ class Database(object):
 
     def recreate(self):
         self.delete()
-        time.sleep(1)
+        delay()
         self.create()
-        time.sleep(1)
+        delay()
 
     def save_doc(self, doc):
         self.save_docs([doc])
@@ -103,6 +126,7 @@ class Database(object):
             body["index"]["partial_filter_selector"] = partial_filter_selector
         body = json.dumps(body)
         r = self.sess.post(self.path("_index"), data=body)
+        delay()
         r.raise_for_status()
         assert r.json()["id"] is not None
         assert r.json()["name"] is not None
@@ -133,6 +157,7 @@ class Database(object):
             body["ddoc"] = ddoc
         body = json.dumps(body)
         r = self.sess.post(self.path("_index"), data=body)
+        delay()
         r.raise_for_status()
         return r.json()["result"] == "created"
 
@@ -147,7 +172,8 @@ class Database(object):
 
     def delete_index(self, ddocid, name, idx_type="json"):
         path = ["_index", ddocid, idx_type, name]
-        r = self.sess.delete(self.path(path), params={"w":"3"})
+        r = self.sess.delete(self.path(path), params={"w": "3"})
+        delay()
         r.raise_for_status()
 
     def bulk_delete(self, docs):
@@ -157,6 +183,7 @@ class Database(object):
         }
         body = json.dumps(body)
         r = self.sess.post(self.path("_index/_bulk_delete"), data=body)
+        delay(n=10)
         return r.json()
 
     def find(self, selector, limit=25, skip=0, sort=None, fields=None,
@@ -206,7 +233,7 @@ class UsersDbTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(klass):
-        klass.db = Database("127.0.0.1", "15984", "_users")
+        klass.db = Database("_users")
         user_docs.setup_users(klass.db)
 
     def setUp(self):
@@ -217,7 +244,7 @@ class DbPerClass(unittest.TestCase):
 
     @classmethod
     def setUpClass(klass):
-        klass.db = Database("127.0.0.1", "15984", random_db_name())
+        klass.db = Database(random_db_name())
         klass.db.create(q=1, n=3)
 
     def setUp(self):

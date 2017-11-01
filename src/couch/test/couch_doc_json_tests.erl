@@ -171,6 +171,45 @@ from_json_success_cases() ->
         end,
         Cases).
 
+from_json_with_db_name_success_cases() ->
+    Cases = [
+        {
+            {[]},
+            <<"_dbs">>,
+            #doc{},
+            "DbName _dbs is acceptable with no docid"
+        },
+        {
+            {[{<<"_id">>, <<"zing!">>}]},
+            <<"_dbs">>,
+            #doc{id = <<"zing!">>},
+            "DbName _dbs is acceptable with a normal docid"
+        },
+        {
+            {[{<<"_id">>, <<"_users">>}]},
+            <<"_dbs">>,
+            #doc{id = <<"_users">>},
+            "_dbs/_users is acceptable"
+        },
+        {
+            {[{<<"_id">>, <<"_replicator">>}]},
+            <<"_dbs">>,
+            #doc{id = <<"_replicator">>},
+            "_dbs/_replicator is acceptable"
+        },
+        {
+            {[{<<"_id">>, <<"_global_changes">>}]},
+            <<"_dbs">>,
+            #doc{id = <<"_global_changes">>},
+            "_dbs/_global_changes is acceptable"
+        }
+    ],
+    lists:map(
+        fun({EJson, DbName, Expect, Msg}) ->
+            {Msg, ?_assertMatch(Expect, couch_doc:from_json_obj_validate(EJson, DbName))}
+        end,
+        Cases).
+
 from_json_error_cases() ->
     Cases = [
         {
@@ -260,6 +299,38 @@ from_json_error_cases() ->
                 _:_ -> {Msg, ?_assert(true)}
             end
     end, Cases).
+
+from_json_with_dbname_error_cases() ->
+    Cases = [
+        {
+            {[{<<"_id">>, <<"_random">>}]},
+            <<"_dbs">>,
+            {illegal_docid,
+             <<"Only reserved document ids may start with underscore.">>},
+            "Disallow non-system-DB underscore prefixed docids in _dbs database."
+        },
+        {
+            {[{<<"_id">>, <<"_random">>}]},
+            <<"foobar">>,
+            {illegal_docid,
+             <<"Only reserved document ids may start with underscore.">>},
+            "Disallow arbitrary underscore prefixed docids in regular database."
+        },
+        {
+            {[{<<"_id">>, <<"_users">>}]},
+            <<"foobar">>,
+            {illegal_docid,
+             <<"Only reserved document ids may start with underscore.">>},
+            "Disallow system-DB docid _users in regular database."
+        }
+    ],
+
+    lists:map(
+        fun({EJson, DbName, Expect, Msg}) ->
+            Error = (catch couch_doc:from_json_obj_validate(EJson, DbName)),
+            {Msg, ?_assertMatch(Expect, Error)}
+        end,
+        Cases).
 
 to_json_success_cases() ->
     Cases = [

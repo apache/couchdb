@@ -203,8 +203,6 @@ get_shard([#shard{node = Node, name = Name} | Rest], Opts, Timeout, Factor) ->
         rexi_monitor:stop(Mon)
     end.
 
-error_info({{<<"reduce_overflow_error">>, _} = Error, _Stack}) ->
-    Error;
 error_info({{timeout, _} = Error, _Stack}) ->
     Error;
 error_info({{Error, Reason}, Stack}) ->

@@ -113,6 +113,9 @@ def setup_argparse():
                       dest='with_admin_party', default=False,
                       action='store_true',
                       help='Runs a dev cluster with admin party mode on')
+    parser.add_option('--enable-erlang-views',
+                      action='store_true',
+                      help='Enables the Erlang view server')
     parser.add_option('--no-join',
                       dest='no_join', default=False,
                       action='store_true',
@@ -135,6 +138,7 @@ def setup_context(opts, args):
     return {'N': opts.nodes,
             'no_join': opts.no_join,
             'with_admin_party': opts.with_admin_party,
+            'enable_erlang_views': opts.enable_erlang_views,
             'admin': opts.admin.split(':', 1) if opts.admin else None,
             'nodes': ['node%d' % (i + opts.node_number) for i in range(opts.nodes)],
             'node_number': opts.node_number,
@@ -273,6 +277,13 @@ def hack_default_ini(ctx, node, contents):
 
     repl = toposixpath("coffeescript = %s %s" % (couchjs, coffeejs))
     contents = re.sub("(?m)^coffeescript.*$", repl, contents)
+
+    if ctx['enable_erlang_views']:
+        contents = re.sub(
+            "^\[native_query_servers\]$",
+            "[native_query_servers]\nerlang = {couch_native_process, start_link, []}",
+            contents,
+            flags=re.MULTILINE)
 
     return contents
 

@@ -20,7 +20,7 @@
     remove/2,
     from_ddoc/1,
     to_json/1,
-    is_usable/2,
+    is_usable/3,
     columns/1,
     start_key/1,
     end_key/1,
@@ -34,6 +34,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include("mango.hrl").
 -include("mango_idx.hrl").
+-include("mango_idx_view.hrl").
 
 
 validate_new(#idx{}=Idx, _Db) ->
@@ -113,12 +114,17 @@ columns(Idx) ->
     [Key || {Key, _} <- Fields].
 
 
-is_usable(Idx, Selector) ->
-    % This index is usable if all of the columns are 
+is_usable(Idx, Selector, SortFields) ->
+    % This index is usable if all of the columns are
     % restricted by the selector such that they are required to exist
     % and the selector is not a text search (so requires a text index)
     RequiredFields = columns(Idx),
-    mango_selector:has_required_fields(Selector, RequiredFields)
+
+    % sort fields are required to exist in the results so 
+    % we don't need to check the selector for these
+    RequiredFields1 = ordsets:subtract(lists:usort(RequiredFields), lists:usort(SortFields)),
+
+    mango_selector:has_required_fields(Selector, RequiredFields1)
         andalso not is_text_search(Selector).
 
 
@@ -158,11 +164,11 @@ start_key([{'$eq', Key, '$eq', Key} | Rest]) ->
 
 
 end_key([]) ->
-    [{[]}];
+    [?MAX_JSON_OBJ];
 end_key([{_, _, '$lt', Key} | Rest]) ->
     case mango_json:special(Key) of
         true ->
-            [{[]}];
+            [?MAX_JSON_OBJ];
         false ->
             [Key | end_key(Rest)]
     end;

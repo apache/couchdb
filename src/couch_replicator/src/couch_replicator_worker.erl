@@ -31,6 +31,7 @@
 -define(MAX_BULK_ATT_SIZE, 64 * 1024).
 -define(MAX_BULK_ATTS_PER_DOC, 8).
 -define(STATS_DELAY, 10000000).              % 10 seconds (in microseconds)
+-define(MISSING_DOC_RETRY_MSEC, 2000).
 
 -import(couch_replicator_utils, [
     open_db/1,
@@ -73,7 +74,7 @@ start_link(Cp, #httpdb{} = Source, Target, ChangesManager, MaxConns) ->
 
 start_link(Cp, Source, Target, ChangesManager, _MaxConns) ->
     Pid = spawn_link(fun() ->
-        erlang:put(last_stats_report, now()),
+        erlang:put(last_stats_report, os:timestamp()),
         queue_fetch_loop(Source, Target, Cp, Cp, ChangesManager)
     end),
     {ok, Pid}.
@@ -85,7 +86,7 @@ init({Cp, Source, Target, ChangesManager, MaxConns}) ->
     LoopPid = spawn_link(fun() ->
         queue_fetch_loop(Source, Target, Parent, Cp, ChangesManager)
     end),
-    erlang:put(last_stats_report, now()),
+    erlang:put(last_stats_report, os:timestamp()),
     State = #state{
         cp = Cp,
         max_parallel_conns = MaxConns,
@@ -247,7 +248,7 @@ queue_fetch_loop(Source, Target, Parent, Cp, ChangesManager) ->
         end,
         close_db(Target2),
         ok = gen_server:call(Cp, {report_seq_done, ReportSeq, Stats}, infinity),
-        erlang:put(last_stats_report, now()),
+        erlang:put(last_stats_report, os:timestamp()),
         couch_log:debug("Worker reported completion of seq ~p", [ReportSeq]),
         queue_fetch_loop(Source, Target, Parent, Cp, ChangesManager)
     end.
@@ -314,11 +315,17 @@ fetch_doc(Source, {Id, Revs, PAs}, DocHandler, Acc) ->
         couch_log:error("Retrying fetch and update of document `~s` as it is "
             "unexpectedly missing. Missing revisions are: ~s",
             [Id, couch_doc:revs_to_strs(Revs)]),
+        WaitMSec = config:get_integer("replicator", "missing_doc_retry_msec",
+            ?MISSING_DOC_RETRY_MSEC),
+        timer:sleep(WaitMSec),
         couch_replicator_api_wrap:open_doc_revs(Source, Id, Revs, [latest], DocHandler, Acc);
     throw:{missing_stub, _} ->
         couch_log:error("Retrying fetch and update of document `~s` due to out of "
             "sync attachment stubs. Missing revisions are: ~s",
             [Id, couch_doc:revs_to_strs(Revs)]),
+        WaitMSec = config:get_integer("replicator", "missing_doc_retry_msec",
+            ?MISSING_DOC_RETRY_MSEC),
+        timer:sleep(WaitMSec),
         couch_replicator_api_wrap:open_doc_revs(Source, Id, Revs, [latest], DocHandler, Acc)
     end.
 
@@ -392,7 +399,7 @@ spawn_writer(Target, #batch{docs = DocList, size = Size}) ->
 
 after_full_flush(#state{stats = Stats, flush_waiter = Waiter} = State) ->
     gen_server:reply(Waiter, {ok, Stats}),
-    erlang:put(last_stats_report, now()),
+    erlang:put(last_stats_report, os:timestamp()),
     State#state{
         stats = couch_replicator_stats:new(),
         flush_waiter = nil,
@@ -543,7 +550,7 @@ find_missing(DocInfos, Target) ->
 
 
 maybe_report_stats(Cp, Stats) ->
-    Now = now(),
+    Now = os:timestamp(),
     case timer:now_diff(erlang:get(last_stats_report), Now) >= ?STATS_DELAY of
     true ->
         ok = gen_server:call(Cp, {add_stats, Stats}, infinity),

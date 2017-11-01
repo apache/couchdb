@@ -29,7 +29,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 -include("mango_cursor.hrl").
-
+-include("mango_idx_view.hrl").
 
 create(Db, Indexes, Selector, Opts) ->
     FieldRanges = mango_idx_view:field_ranges(Selector),
@@ -61,17 +61,36 @@ explain(Cursor) ->
 
     BaseArgs = base_args(Cursor),
     Args = apply_opts(Opts, BaseArgs),
+
     [{mrargs, {[
         {include_docs, Args#mrargs.include_docs},
         {view_type, Args#mrargs.view_type},
         {reduce, Args#mrargs.reduce},
         {start_key, Args#mrargs.start_key},
-        {end_key, Args#mrargs.end_key},
+        {end_key, maybe_replace_max_json(Args#mrargs.end_key)},
         {direction, Args#mrargs.direction},
         {stable, Args#mrargs.stable},
         {update, Args#mrargs.update}
     ]}}].
 
+
+% replace internal values that cannot
+% be represented as a valid UTF-8 string
+% with a token for JSON serialization
+maybe_replace_max_json([]) ->
+    [];
+
+maybe_replace_max_json(?MAX_STR) ->
+    <<"<MAX>">>;
+
+maybe_replace_max_json([H | T] = EndKey) when is_list(EndKey) ->
+    H1 = if H == ?MAX_JSON_OBJ -> <<"<MAX>">>;
+            true -> H
+    end,
+    [H1 | maybe_replace_max_json(T)];
+
+maybe_replace_max_json(EndKey) ->
+    EndKey.
 
 base_args(#cursor{index = Idx} = Cursor) ->
     #mrargs{
@@ -202,10 +221,7 @@ handle_message({row, Props}, Cursor) ->
                 true ->
                     Cursor2 = update_bookmark_keys(Cursor1, Props),
                     FinalDoc = mango_fields:extract(Doc, Cursor2#cursor.fields),
-                    Cursor3 = Cursor2#cursor {
-                        execution_stats = mango_execution_stats:incr_results_returned(Cursor2#cursor.execution_stats)
-                    },
-                    handle_doc(Cursor3, FinalDoc);
+                    handle_doc(Cursor2, FinalDoc);
                 false ->
                     {ok, Cursor1}
             end;
@@ -230,13 +246,14 @@ handle_all_docs_message(Message, Cursor) ->
 
 handle_doc(#cursor{skip = S} = C, _) when S > 0 ->
     {ok, C#cursor{skip = S - 1}};
-handle_doc(#cursor{limit = L} = C, Doc) when L > 0 ->
+handle_doc(#cursor{limit = L, execution_stats = Stats} = C, Doc) when L > 0 ->
     UserFun = C#cursor.user_fun,
     UserAcc = C#cursor.user_acc,
     {Go, NewAcc} = UserFun({row, Doc}, UserAcc),
     {Go, C#cursor{
         user_acc = NewAcc,
-        limit = L - 1
+        limit = L - 1,
+        execution_stats = mango_execution_stats:incr_results_returned(Stats)
     }};
 handle_doc(C, _Doc) ->
     {stop, C}.

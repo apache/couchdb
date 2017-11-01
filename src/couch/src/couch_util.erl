@@ -34,11 +34,25 @@
 -export([callback_exists/3, validate_callback_exists/3]).
 -export([with_proc/4]).
 -export([process_dict_get/2, process_dict_get/3]).
+-export([unique_monotonic_integer/0]).
+-export([check_config_blacklist/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 
 % arbitrarily chosen amount of memory to use before flushing to disk
 -define(FLUSH_MAX_MEM, 10000000).
+
+-define(BLACKLIST_CONFIG_SECTIONS, [
+    <<"daemons">>,
+    <<"external">>,
+    <<"httpd_design_handlers">>,
+    <<"httpd_db_handlers">>,
+    <<"httpd_global_handlers">>,
+    <<"native_query_servers">>,
+    <<"os_daemons">>,
+    <<"query_servers">>
+]).
+
 
 priv_dir() ->
     case code:priv_dir(couch) of
@@ -209,7 +223,8 @@ json_user_ctx(Db) ->
 
 % returns a random integer
 rand32() ->
-    crypto:rand_uniform(0, 16#100000000).
+    <<I:32>> = crypto:strong_rand_bytes(4),
+    I.
 
 % given a pathname "../foo/bar/" it gives back the fully qualified
 % absolute pathname.
@@ -411,7 +426,7 @@ json_encode(V) ->
 
 json_decode(V) ->
     try
-        jiffy:decode(V)
+        jiffy:decode(V, [dedupe_keys])
     catch
         throw:Error ->
             throw({invalid_json, Error})
@@ -623,4 +638,27 @@ process_dict_get(Pid, Key, DefaultValue) ->
             end;
         undefined ->
             DefaultValue
+    end.
+
+
+-ifdef(PRE18TIMEFEATURES).
+
+unique_monotonic_integer() ->
+    {Ms, S, Us} = erlang:now(),
+    (Ms * 1000000 + S) * 1000000 + Us.
+
+-else.
+
+unique_monotonic_integer() ->
+    erlang:unique_integer([monotonic, positive]).
+
+-endif.
+
+check_config_blacklist(Section) ->
+    case lists:member(Section, ?BLACKLIST_CONFIG_SECTIONS) of
+    true ->
+        Msg = <<"Config section blacklisted for modification over HTTP API.">>,
+        throw({forbidden, Msg});
+    _ ->
+        ok
     end.

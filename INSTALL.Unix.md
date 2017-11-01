@@ -135,6 +135,11 @@ You can install this by running:
 
     pkg install gmake
 
+You can install the remaining dependencies by running:
+
+    pkg install npm4 help2man openssl icu curl git \
+        autoconf automake libtool node spidermonkey185
+
 ## Installing
 
 Once you have satisfied the dependencies you should run:
@@ -231,7 +236,7 @@ To check that everything has worked, point your web browser to:
 
 From here you should verify your installation by pointing your web browser to:
 
-    http://localhost:5984/_utils/verify_install.html
+    http://localhost:5984/_utils/#/verifyinstall
 
 ## Running as a Daemon
 

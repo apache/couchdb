@@ -125,18 +125,37 @@ os_reduce(Lang, OsRedSrcs, KVs) ->
     Proc = get_os_process(Lang),
     OsResults = try proc_prompt(Proc, [<<"reduce">>, OsRedSrcs, KVs]) of
         [true, Reductions] -> Reductions
+    catch
+        throw:{reduce_overflow_error, Msg} ->
+            [{[{reduce_overflow_error, Msg}]} || _ <- OsRedSrcs]
     after
         ok = ret_os_process(Proc)
     end,
     {ok, OsResults}.
 
 os_rereduce(Lang, OsRedSrcs, KVs) ->
-    Proc = get_os_process(Lang),
-    try proc_prompt(Proc, [<<"rereduce">>, OsRedSrcs, KVs]) of
-        [true, [Reduction]] -> Reduction
-    after
-        ok = ret_os_process(Proc)
+    case get_overflow_error(KVs) of
+        undefined ->
+            Proc = get_os_process(Lang),
+            try proc_prompt(Proc, [<<"rereduce">>, OsRedSrcs, KVs]) of
+                [true, [Reduction]] -> Reduction
+            catch
+                throw:{reduce_overflow_error, Msg} ->
+                    {[{reduce_overflow_error, Msg}]}
+            after
+                ok = ret_os_process(Proc)
+            end;
+        Error ->
+            Error
     end.
+
+
+get_overflow_error([]) ->
+    undefined;
+get_overflow_error([{[{reduce_overflow_error, _}]} = Error | _]) ->
+    Error;
+get_overflow_error([_ | Rest]) ->
+    get_overflow_error(Rest).
 
 
 builtin_reduce(_Re, [], _KVs, Acc) ->

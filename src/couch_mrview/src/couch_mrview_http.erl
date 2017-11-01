@@ -440,7 +440,11 @@ row_to_json(error, Row) ->
     % match prior behavior.
     Key = couch_util:get_value(key, Row),
     Val = couch_util:get_value(value, Row),
-    Obj = {[{key, Key}, {error, Val}]},
+    Reason = couch_util:get_value(reason, Row),
+    ReasonProp = if Reason == undefined -> []; true ->
+        [{reason, Reason}]
+    end,
+    Obj = {[{key, Key}, {error, Val}] ++ ReasonProp},
     ?JSON_ENCODE(Obj);
 row_to_json(Id0, Row) ->
     Id = case Id0 of

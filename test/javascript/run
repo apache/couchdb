@@ -17,6 +17,7 @@ import optparse as op
 import os
 import subprocess as sp
 import sys
+import re
 
 
 USAGE = "%prog [options] [command to run...]"
@@ -71,7 +72,7 @@ def mkformatter(tests):
 
 def run_couchjs(test, fmt):
     fmt(test)
-    cmd = [COUCHJS, "-H", "-T"] + \
+    cmd = [COUCHJS, "--eval", "-H", "-T"] + \
             ["-u", "test/javascript/couchdb.uri"] + SCRIPTS + [test, RUNNER]
     p = sp.Popen(
         cmd,
@@ -100,7 +101,13 @@ def options():
                        help="Start from the given filename if multiple files "
                             "are passed"),
         op.make_option("-a", "--all", action="store_true", dest="all",
-                       help="Run all tests, even if one or more fail")
+                       help="Run all tests, even if one or more fail"),
+        op.make_option("-i", "--ignore", type="string", action="callback",
+                       default=None, callback=get_delimited_list,
+                       dest="ignore", help="Ignore test suites"),
+        op.make_option("-u", "--suites", type="string", action="callback",
+                       default=None, callback=get_delimited_list,
+                       dest="suites", help="Run specific suites")
     ]
 
 
@@ -108,23 +115,15 @@ def main():
     parser = op.OptionParser(usage=USAGE, option_list=options())
     opts, args = parser.parse_args()
 
+    run_list = []
+    ignore_list = []
     tests = []
-    if not len(args):
-        args = ["test/javascript/tests"]
-    for name in args:
-        if os.path.isdir(name):
-            tests.extend(sorted(glob.glob(os.path.join(name, "*.js"))))
-        elif os.path.isfile(name):
-            tests.append(name)
-        else:
-            pname = os.path.join("test/javascript/tests", name)
-            if os.path.isfile(pname):
-                tests.append(pname)
-            elif os.path.isfile(pname + ".js"):
-                tests.append(pname + ".js")
-            else:
-                sys.stderr.write("Unknown test: " + name + os.linesep)
-                exit(1)
+
+    run_list = ["test/javascript/tests"] if not opts.suites else opts.suites
+    run_list = build_test_case_paths(run_list)
+    ignore_list = build_test_case_paths(opts.ignore)
+    # sort is needed because certain tests fail if executed out of order
+    tests = sorted(list(set(run_list)-set(ignore_list)))
 
     if opts.start is not None:
         tmp = []
@@ -152,6 +151,30 @@ def main():
         failed, passed) + os.linesep)
     exit(failed > 0)
 
+def build_test_case_paths(args=None):
+    tests = []
+    if args is None:
+        args = []
+    for name in args:
+        if os.path.isdir(name):
+            tests.extend(sorted(glob.glob(os.path.join(name, "*.js"))))
+        elif os.path.isfile(name):
+            check = tests.append(name)
+        else:
+            pname = os.path.join("test/javascript/tests", name)
+            if os.path.isfile(pname):
+                tests.append(pname)
+            elif os.path.isfile(pname + ".js"):
+                tests.append(pname + ".js")
+            else:
+                sys.stderr.write("Unknown test: " + name + os.linesep)
+                exit(1)
+    return tests
+
+
+def get_delimited_list(option, opt, value, parser):
+    delimited = [i for i in re.split(r',|\s', value.strip()) if i]
+    setattr(parser.values, option.dest, delimited)
 
 if __name__ == "__main__":
     try:

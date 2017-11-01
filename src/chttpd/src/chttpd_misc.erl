@@ -228,8 +228,9 @@ handle_uuids_req(Req) ->
 
 
 % Node-specific request handler (_config and _stats)
-
-
+% Support _local meaning this node
+handle_node_req(#httpd{path_parts=[A, <<"_local">>|Rest]}=Req) ->
+    handle_node_req(Req#httpd{path_parts=[A, node()] ++ Rest});
 % GET /_node/$node/_config
 handle_node_req(#httpd{method='GET', path_parts=[_, Node, <<"_config">>]}=Req) ->
     Grouped = lists:foldl(fun({{Section, Key}, Value}, Acc) ->
@@ -256,6 +257,7 @@ handle_node_req(#httpd{path_parts=[_, _Node, <<"_config">>, _Section]}=Req) ->
 % PUT /_node/$node/_config/Section/Key
 % "value"
 handle_node_req(#httpd{method='PUT', path_parts=[_, Node, <<"_config">>, Section, Key]}=Req) ->
+    couch_util:check_config_blacklist(Section),
     Value = chttpd:json_body(Req),
     Persist = chttpd:header_value(Req, "X-Couch-Persist") /= "false",
     OldValue = call_node(Node, config, get, [Section, Key, ""]),
@@ -271,6 +273,7 @@ handle_node_req(#httpd{method='GET', path_parts=[_, Node, <<"_config">>, Section
     end;
 % DELETE /_node/$node/_config/Section/Key
 handle_node_req(#httpd{method='DELETE',path_parts=[_, Node, <<"_config">>, Section, Key]}=Req) ->
+    couch_util:check_config_blacklist(Section),
     Persist = chttpd:header_value(Req, "X-Couch-Persist") /= "false",
     case call_node(Node, config, get, [Section, Key, undefined]) of
     undefined ->

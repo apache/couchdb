@@ -245,7 +245,7 @@ fake_db(Fields) ->
     end, #db{}, Fields).
 
 now_us() ->
-    {MegaSecs, Secs, MicroSecs} = now(),
+    {MegaSecs, Secs, MicroSecs} = os:timestamp(),
     (MegaSecs * 1000000 + Secs) * 1000000 + MicroSecs.
 
 mock(Modules) when is_list(Modules) ->

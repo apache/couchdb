@@ -265,7 +265,7 @@ cookie_auth_cookie(Req, User, Secret, TimeStamp) ->
     Hash = crypto:hmac(sha, Secret, SessionData),
     mochiweb_cookies:cookie("AuthSession",
         couch_util:encodeBase64Url(SessionData ++ ":" ++ ?b2l(Hash)),
-        [{path, "/"}] ++ cookie_scheme(Req) ++ max_age()).
+        [{path, "/"}] ++ cookie_scheme(Req) ++ max_age() ++ cookie_domain()).
 
 ensure_cookie_auth_secret() ->
     case config:get("couch_httpd_auth", "secret", undefined) of
@@ -440,6 +440,13 @@ max_age() ->
             Timeout = list_to_integer(
                 config:get("couch_httpd_auth", "timeout", "600")),
             [{max_age, Timeout}]
+    end.
+
+cookie_domain() ->
+    Domain = config:get("couch_httpd_auth", "cookie_domain", ""),
+    case Domain of
+        "" -> [];
+        _ -> [{domain, Domain}]
     end.
 
 reject_if_totp(User) ->

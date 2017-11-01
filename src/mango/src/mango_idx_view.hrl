@@ -10,11 +10,4 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-{application, couch_peruser, [
-    {description, "couch_peruser - maintains per-user databases in CouchDB"},
-    {vsn, git},
-    {registered, [couch_peruser, couch_peruser_sup]},
-    {applications, [kernel, stdlib, config, couch, fabric, mem3]},
-    {mod, {couch_peruser_app, []}},
-    {env, []}
-]}.
+-define(MAX_JSON_OBJ, {<<255, 255, 255, 255>>}).
