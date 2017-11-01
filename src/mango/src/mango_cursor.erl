@@ -18,6 +18,7 @@
     explain/1,
     execute/3,
     maybe_filter_indexes_by_ddoc/2,
+    remove_indexes_with_partial_filter_selector/1,
     maybe_add_warning/3
 ]).
 
@@ -47,16 +48,18 @@
 create(Db, Selector0, Opts) ->
     Selector = mango_selector:normalize(Selector0),
     UsableIndexes = mango_idx:get_usable_indexes(Db, Selector, Opts),
-
-    {use_index, IndexSpecified} = proplists:lookup(use_index, Opts),
-    case {length(UsableIndexes), length(IndexSpecified)} of
-        {0, 0} ->
+    case length(UsableIndexes) of
+        0 ->
             AllDocs = mango_idx:special(Db),
             create_cursor(Db, AllDocs, Selector, Opts);
-        {0, _} ->
-            ?MANGO_ERROR({no_usable_index, selector_unsupported});
         _ ->
-            create_cursor(Db, UsableIndexes, Selector, Opts)
+            case mango_cursor:maybe_filter_indexes_by_ddoc(UsableIndexes, Opts) of
+                [] ->
+                    % use_index doesn't match a valid index - fall back to a valid one
+                    create_cursor(Db, UsableIndexes, Selector, Opts);
+                UserSpecifiedIndex ->
+                    create_cursor(Db, UserSpecifiedIndex, Selector, Opts)
+            end
     end.
 
 
@@ -90,9 +93,7 @@ execute(#cursor{index=Idx}=Cursor, UserFun, UserAcc) ->
 maybe_filter_indexes_by_ddoc(Indexes, Opts) ->
     case lists:keyfind(use_index, 1, Opts) of
         {use_index, []} ->
-            % We remove any indexes that have a selector 
-            % since they are only used when specified via use_index
-            remove_indexes_with_partial_filter_selector(Indexes);
+            [];
         {use_index, [DesignId]} ->
             filter_indexes(Indexes, DesignId);
         {use_index, [DesignId, ViewName]} ->
@@ -150,12 +151,54 @@ group_indexes_by_type(Indexes) ->
     end, ?CURSOR_MODULES).
 
 
-maybe_add_warning(UserFun, #idx{type = IndexType}, UserAcc) ->
-    case IndexType of
+maybe_add_warning(UserFun, #cursor{index = Index, opts = Opts}, UserAcc) ->
+    UseIndexInvalid = case lists:keyfind(use_index, 1, Opts) of
+        {use_index, []} ->
+            [];
+        {use_index, [DesignId]} ->
+            case filter_indexes([Index], DesignId) of
+                [] ->
+                    [fmt("_design/~s was not used because it does not contain a valid index for this query.", 
+                        [ddoc_name(DesignId)])];
+                _ ->
+                    []
+            end;
+        {use_index, [DesignId, ViewName]} ->
+            case filter_indexes([Index], DesignId, ViewName) of
+                [] ->
+                    [fmt("_design/~s, ~s was not used because it is not a valid index for this query.", 
+                        [ddoc_name(DesignId), ViewName])];
+                _ ->
+                    []
+            end
+    end,
+
+    NoIndex = case Index#idx.type of
         <<"special">> ->
-            Arg = {add_key, warning, <<"no matching index found, create an index to optimize query time">>},
-            {_Go, UserAcc0} = UserFun(Arg, UserAcc),
-            UserAcc0;
+            [<<"no matching index found, create an index to optimize query time">>];
         _ ->
-            UserAcc
-    end.
+            []
+    end,
+
+    maybe_add_warning_int(UseIndexInvalid ++ NoIndex, UserFun, UserAcc).
+
+
+maybe_add_warning_int([], _, UserAcc) ->
+   UserAcc;
+
+maybe_add_warning_int(Warnings, UserFun, UserAcc) ->
+    % only include the first warning
+    Arg = {add_key, warning, hd(Warnings)},
+    {_Go, UserAcc0} = UserFun(Arg, UserAcc),
+    UserAcc0.
+
+
+fmt(Format, Args) ->
+    iolist_to_binary(io_lib:format(Format, Args)).
+
+
+ddoc_name(<<"_design/", Name/binary>>) ->
+    Name;
+
+ddoc_name(Name) ->
+    Name.

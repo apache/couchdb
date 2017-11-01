@@ -60,16 +60,15 @@ list(Db) ->
 get_usable_indexes(Db, Selector, Opts) ->
     ExistingIndexes = mango_idx:list(Db),
 
-    FilteredIndexes = mango_cursor:maybe_filter_indexes_by_ddoc(ExistingIndexes, Opts),
-    if FilteredIndexes /= [] -> ok; true ->
-        ?MANGO_ERROR({no_usable_index, no_index_matching_name})
-    end,
+    GlobalIndexes = mango_cursor:remove_indexes_with_partial_filter_selector(ExistingIndexes),
+    UserSpecifiedIndex = mango_cursor:maybe_filter_indexes_by_ddoc(ExistingIndexes, Opts),
+    UsableIndexes0 = lists:usort(GlobalIndexes ++ UserSpecifiedIndex),
 
     SortFields = get_sort_fields(Opts),
     UsableFilter = fun(I) -> is_usable(I, Selector, SortFields) end,
-    UsableIndexes0 = lists:filter(UsableFilter, FilteredIndexes),
+    UsableIndexes1 = lists:filter(UsableFilter, UsableIndexes0),
 
-    case maybe_filter_by_sort_fields(UsableIndexes0, SortFields) of
+    case maybe_filter_by_sort_fields(UsableIndexes1, SortFields) of
         {ok, SortIndexes} -> 
             SortIndexes;
         {error, no_usable_index} -> 
