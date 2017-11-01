@@ -120,7 +120,7 @@ is_usable(Idx, Selector, SortFields) ->
     % and the selector is not a text search (so requires a text index)
     RequiredFields = columns(Idx),
 
-    % sort fields are required to exist in the results so 
+    % sort fields are required to exist in the results so
     % we don't need to check the selector for these
     RequiredFields1 = ordsets:subtract(lists:usort(RequiredFields), lists:usort(SortFields)),
 
@@ -195,6 +195,10 @@ def_to_json([{fields, Fields} | Rest]) ->
     [{<<"fields">>, mango_sort:to_json(Fields)} | def_to_json(Rest)];
 def_to_json([{<<"fields">>, Fields} | Rest]) ->
     [{<<"fields">>, mango_sort:to_json(Fields)} | def_to_json(Rest)];
+% Don't include partial_filter_selector in the json conversion
+% if its the default value
+def_to_json([{<<"partial_filter_selector">>, {[]}} | Rest]) ->
+    def_to_json(Rest);
 def_to_json([{Key, Value} | Rest]) ->
     [{Key, Value} | def_to_json(Rest)].
 
