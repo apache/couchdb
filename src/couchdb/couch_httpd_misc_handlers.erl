@@ -168,6 +168,7 @@ handle_config_req(#httpd{method='GET', path_parts=[_, Section, Key]}=Req) ->
 handle_config_req(#httpd{method=Method, path_parts=[_, Section, Key]}=Req)
       when (Method == 'PUT') or (Method == 'DELETE') ->
     ok = couch_httpd:verify_is_server_admin(Req),
+    couch_util:check_config_blacklist(Section),
     Persist = couch_httpd:header_value(Req, "X-Couch-Persist") /= "false",
     case couch_config:get(<<"httpd">>, <<"config_whitelist">>, null) of
         null ->
