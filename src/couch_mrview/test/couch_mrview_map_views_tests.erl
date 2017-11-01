@@ -42,7 +42,8 @@ map_views_test_() ->
                     fun should_map_with_range/1,
                     fun should_map_with_limit_and_skip/1,
                     fun should_map_with_include_docs/1,
-                    fun should_map_empty_views/1
+                    fun should_map_empty_views/1,
+                    fun should_give_ext_size_seq_indexed_test/1
                 ]
             }
         }
@@ -117,6 +118,26 @@ should_map_empty_views(Db) ->
         {meta, [{total, 0}, {offset, 0}]}
     ]},
     ?_assertEqual(Expect, Result).
+
+should_give_ext_size_seq_indexed_test(Db) ->
+    DDoc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/seqdoc">>},
+        {<<"options">>, {[{<<"seq_indexed">>, true}]}},
+        {<<"views">>, {[
+                {<<"view1">>, {[
+                    {<<"map">>, <<"function(doc){emit(doc._id, doc._id);}">>}
+                ]}}
+            ]}
+        }
+    ]}),
+    {ok, _} = couch_db:update_doc(Db, DDoc, []),
+    {ok, Db1} = couch_db:open_int(couch_db:name(Db), []),
+    {ok, DDoc1} = couch_db:open_doc(Db1, <<"_design/seqdoc">>, [ejson_body]),
+    couch_mrview:query_view(Db1, DDoc1, <<"view1">>, [{update, true}]),
+    {ok, Info} = couch_mrview:get_info(Db1, DDoc),
+    Size = couch_util:get_nested_json_value({Info}, [sizes, external]),
+    ok = couch_db:close(Db1),
+    ?_assert(is_number(Size)).
 
 
 run_query(Db, Opts) ->

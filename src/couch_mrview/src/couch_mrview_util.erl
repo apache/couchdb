@@ -299,7 +299,7 @@ open_view(Db, Fd, Lang, ViewState, View) ->
     ],
     {ok, Btree} = couch_btree:open(BTState, Fd, ViewBtOpts),
 
-    BySeqReduceFun = fun couch_db_updater:btree_by_seq_reduce/2,
+    BySeqReduceFun = make_seq_reduce_fun(),
     {ok, SeqBtree} = if View#mrview.seq_indexed ->
         SeqBTState = get_seq_btree_state(ViewState),
         ViewSeqBtOpts = [{reduce, BySeqReduceFun},
@@ -804,16 +804,24 @@ reduced_external_size(Tree) ->
     end.
 
 
+reduced_seq_external_size(Tree) ->
+    case couch_btree:full_reduce(Tree) of
+        {ok, {_, Size}} -> Size;
+        % return 0 for older versions that only returned number of docs
+        {ok, NumDocs} when is_integer(NumDocs) -> 0
+    end.
+
+
 calculate_external_size(Views) ->
     SumFun = fun(#mrview{btree=Bt, seq_btree=SBt, key_byseq_btree=KSBt}, Acc) ->
         Size0 = sum_btree_sizes(Acc, reduced_external_size(Bt)),
         Size1 = case SBt of
             nil -> Size0;
-            _ -> sum_btree_sizes(Size0, reduced_external_size(SBt))
+            _ -> sum_btree_sizes(Size0, reduced_seq_external_size(SBt))
         end,
         case KSBt of
             nil -> Size1;
-            _ -> sum_btree_sizes(Size1, reduced_external_size(KSBt))
+            _ -> sum_btree_sizes(Size1, reduced_seq_external_size(KSBt))
         end
     end,
     {ok, lists:foldl(SumFun, 0, Views)}.
@@ -1044,6 +1052,10 @@ get_user_reds(Reduction) ->
     element(2, Reduction).
 
 
+% This is for backwards compatibility for seq btree reduces
+get_external_size_reds(Reduction) when is_integer(Reduction) ->
+    0;
+
 get_external_size_reds(Reduction) when tuple_size(Reduction) == 2 ->
     0;
 
@@ -1070,6 +1082,22 @@ make_reduce_fun(Lang, ReduceFuns) ->
                 {0, [], 0}, Reds),
             {ok, Result} = couch_query_servers:rereduce(Lang, FunSrcs, UReds),
             {Counts, Result, ExternalSize}
+    end.
+
+make_seq_reduce_fun() ->
+    fun
+        (reduce, KVs0) ->
+            KVs = detuple_kvs(expand_dups(KVs0, []), []),
+            NumDocs = length(KVs),
+            ExternalSize = kv_external_size(KVs, NumDocs),
+            {NumDocs, ExternalSize};
+        (rereduce, Reds) ->
+            ExtractFun = fun(Red, {NumDocsAcc0, ExtAcc0}) ->
+                NumDocsAcc = NumDocsAcc0 + get_count(Red),
+                ExtAcc = ExtAcc0 + get_external_size_reds(Red),
+                {NumDocsAcc, ExtAcc}
+            end,
+            lists:foldl(ExtractFun, {0, 0}, Reds)
     end.
 
 
