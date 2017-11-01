@@ -21,12 +21,6 @@
 ]).
 
 
-info(mango_idx, {no_usable_index, no_indexes_defined}) ->
-    {
-        400,
-        <<"no_usable_index">>,
-        <<"There are no indexes defined in this database.">>
-    };
 info(mango_idx, {no_usable_index, no_index_matching_name}) ->
     {
         400,

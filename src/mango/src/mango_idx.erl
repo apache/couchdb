@@ -59,9 +59,6 @@ list(Db) ->
 
 get_usable_indexes(Db, Selector, Opts) ->
     ExistingIndexes = mango_idx:list(Db),
-    if ExistingIndexes /= [] -> ok; true ->
-        ?MANGO_ERROR({no_usable_index, no_indexes_defined})
-    end,
 
     FilteredIndexes = mango_cursor:maybe_filter_indexes_by_ddoc(ExistingIndexes, Opts),
     if FilteredIndexes /= [] -> ok; true ->
