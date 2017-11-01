@@ -161,6 +161,11 @@ class IndexSelectorJson(mango.DbPerClass):
         indexes = self.db.list_indexes()
         self.assertEqual(indexes[1]["def"]["partial_filter_selector"], selector)
 
+    def test_partial_filter_only_in_return_if_not_default(self):
+        self.db.create_index(["location"])
+        index = self.db.list_indexes()[1]
+        self.assertEqual('partial_filter_selector' in index['def'], False)
+
     def test_saves_selector_in_index_throws(self):
         selector = {"location": {"$gte": "FRA"}}
         try:
@@ -265,3 +270,9 @@ class IndexSelectorJson(mango.DbPerClass):
         self.assertEqual(resp["index"]["name"], "oldschooltext")
         docs = self.db.find(selector, use_index='oldschooltext')
         self.assertEqual(len(docs), 3)
+
+    @unittest.skipUnless(mango.has_text_service(), "requires text service")
+    def test_text_partial_filter_only_in_return_if_not_default(self):
+        self.db.create_text_index(fields=[{"name":"location"}])
+        index = self.db.list_indexes()[1]
+        self.assertEqual('partial_filter_selector' in index['def'], False)

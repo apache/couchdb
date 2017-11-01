@@ -195,6 +195,10 @@ def_to_json([{fields, Fields} | Rest]) ->
     [{<<"fields">>, mango_sort:to_json(Fields)} | def_to_json(Rest)];
 def_to_json([{<<"fields">>, Fields} | Rest]) ->
     [{<<"fields">>, mango_sort:to_json(Fields)} | def_to_json(Rest)];
+% Don't include partial_filter_selector in the json conversion
+% if its the default value
+def_to_json([{<<"partial_filter_selector">>, {[]}} | Rest]) ->
+    def_to_json(Rest);
 def_to_json([{Key, Value} | Rest]) ->
     [{Key, Value} | def_to_json(Rest)].
 
