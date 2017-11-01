@@ -120,7 +120,7 @@ is_usable(Idx, Selector, SortFields) ->
     % and the selector is not a text search (so requires a text index)
     RequiredFields = columns(Idx),
 
-    % sort fields are required to exist in the results so
+    % sort fields are required to exist in the results so 
     % we don't need to check the selector for these
     RequiredFields1 = ordsets:subtract(lists:usort(RequiredFields), lists:usort(SortFields)),
 
