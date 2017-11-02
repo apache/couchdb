@@ -285,6 +285,12 @@ def hack_default_ini(ctx, node, contents):
             contents,
             flags=re.MULTILINE)
 
+    # #957: Too many iterations breaks cluster setup on slow CI runs
+    contents = re.sub(
+        "^iterations = 10000 ",
+        "iterations = 10 ",
+        contents,
+        flags=re.MULTILINE)
     return contents
 
 
