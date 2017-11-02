@@ -110,6 +110,16 @@ couchTests.bulk_docs = function(debug) {
   T(result.error == "bad_request");
   T(result.reason == "POST body must include `docs` parameter.");
 
+  // verify that sending a request with invalid `new_edits` causes error
+  var req = CouchDB.request("POST", "/" + db_name + "/_bulk_docs", {
+    body: JSON.stringify({"docs": [], "new_edits": 0})
+  });
+
+  T(req.status == 400);
+  result = JSON.parse(req.responseText);
+  T(result.error == "bad_request");
+  T(result.reason == "`new_edits` parameter must be a boolean.");
+
   // jira-911
   db.deleteDb();
   // avoid Heisenbugs w/ files remaining - create a new name
