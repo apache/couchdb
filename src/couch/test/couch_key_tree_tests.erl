@@ -191,9 +191,8 @@ should_merge_tree_of_odd_length()->
                                     {"1b", "bar", []}]}},
     TwoChildPlusSibs = {1, {"1","foo", [{"1a", "bar", [{"1aa", "bar", []}]},
                                         {"1b", "bar", []}]}},
-
-    ?_assertEqual({[TwoChildPlusSibs], new_branch},
-                  couch_key_tree:merge([TwoChild], TwoChildSibs, ?DEPTH)).
+    ?_assertEqual({[TwoChildPlusSibs], new_leaf},
+                  couch_key_tree:merge([TwoChildSibs], TwoChild, ?DEPTH)).
 
 should_merge_tree_with_stem()->
     Stemmed = {2, {"1a", "bar", []}},
