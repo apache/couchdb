@@ -167,8 +167,23 @@ should_merge_reflexive_for_child_nodes()->
 should_merge_tree_to_itself()->
     TwoChildSibs = {1, {"1","foo", [{"1a", "bar", []},
                                     {"1b", "bar", []}]}},
-    ?_assertEqual({[TwoChildSibs], new_branch},
-                  couch_key_tree:merge([TwoChildSibs], TwoChildSibs, ?DEPTH)).
+    Leafs = couch_key_tree:get_all_leafs([TwoChildSibs]),
+    Paths = lists:map(fun leaf_to_path/1, Leafs),
+    FinalTree = lists:foldl(fun(Path, TreeAcc) ->
+        {NewTree, internal_node} = couch_key_tree:merge(TreeAcc, Path),
+        NewTree
+    end, [TwoChildSibs], Paths),
+    ?_assertEqual([TwoChildSibs], FinalTree).
+
+leaf_to_path({Value, {Start, Keys}}) ->
+    [Branch] = to_branch(Value, lists:reverse(Keys)),
+    {Start - length(Keys) + 1, Branch}.
+
+to_branch(Value, [Key]) ->
+    [{Key, Value, []}];
+to_branch(Value, [Key | RestKeys]) ->
+    [{Key, [], to_branch(Value, RestKeys)}].
+
 
 should_merge_tree_of_odd_length()->
     TwoChild = {1, {"1","foo", [{"1a", "bar", [{"1aa", "bar", []}]}]}},
