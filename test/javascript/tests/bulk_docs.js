@@ -110,6 +110,16 @@ couchTests.bulk_docs = function(debug) {
   T(result.error == "bad_request");
   T(result.reason == "POST body must include `docs` parameter.");
 
+  // verify that sending a request with invalid `docs` causes error
+  var req = CouchDB.request("POST", "/" + db_name + "/_bulk_docs", {
+    body: JSON.stringify({"docs": "foo"})
+  });
+
+  T(req.status == 400);
+  result = JSON.parse(req.responseText);
+  T(result.error == "bad_request");
+  T(result.reason == "`docs` parameter must be an array.");
+
   // verify that sending a request with invalid `new_edits` causes error
   var req = CouchDB.request("POST", "/" + db_name + "/_bulk_docs", {
     body: JSON.stringify({"docs": [], "new_edits": 0})
