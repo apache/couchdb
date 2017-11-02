@@ -451,7 +451,9 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, 
         {accepted, Errors} ->
             ErrorsJson = lists:map(fun update_doc_result_to_json/1, Errors),
             send_json(Req, 202, ErrorsJson)
-        end
+        end;
+    _ ->
+        throw({bad_request, <<"`new_edits` parameter must be a boolean.">>})
     end;
 
 db_req(#httpd{path_parts=[_,<<"_bulk_docs">>]}=Req, _Db) ->
