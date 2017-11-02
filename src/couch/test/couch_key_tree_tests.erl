@@ -44,7 +44,7 @@ key_tree_merge_test_()->
                 should_merge_tree_with_large_stem(),
                 should_merge_stems(),
                 should_create_conflicts_on_merge(),
-                should_create_no_conflicts_on_merge(),
+                should_create_no_conflicts_on_full_stem(),
                 should_ignore_conflicting_branch()
             ]
         }
@@ -240,12 +240,12 @@ should_create_conflicts_on_merge()->
     ?_assertEqual({[OneChild, Stemmed], new_branch},
                   couch_key_tree:merge([OneChild], Stemmed, ?DEPTH)).
 
-should_create_no_conflicts_on_merge()->
+should_create_no_conflicts_on_full_stem()->
     OneChild = {1, {"1","foo",[{"1a", "bar", []}]}},
     Stemmed = {3, {"1aa", "bar", []}},
     TwoChild = {1, {"1","foo", [{"1a", "bar", [{"1aa", "bar", []}]}]}},
-    ?_assertEqual({[TwoChild], new_leaf},
-                  couch_key_tree:merge([OneChild, Stemmed], TwoChild, ?DEPTH)).
+    {Merged, new_leaf} = couch_key_tree:merge([OneChild, Stemmed], TwoChild),
+    ?_assertEqual([TwoChild], couch_key_tree:full_stem(Merged, ?DEPTH)).
 
 should_ignore_conflicting_branch()->
     %% this test is based on couch-902-test-case2.py
