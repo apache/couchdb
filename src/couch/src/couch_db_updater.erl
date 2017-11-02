@@ -755,9 +755,15 @@ merge_rev_trees(_Limit, _Merge, [], [], AccNewInfos, AccRemoveSeqs, AccSeq) ->
 merge_rev_trees(Limit, MergeConflicts, [NewDocs|RestDocsList],
         [OldDocInfo|RestOldInfo], AccNewInfos, AccRemoveSeqs, AccSeq) ->
     erlang:put(last_id_merged, OldDocInfo#full_doc_info.id), % for debugging
+    SortFun = fun({_, #doc{revs={D1, R1}}}, {_, #doc{revs={D2, R2}}}) ->
+        A = {(D1 - length(R1)), lists:reverse(R1)},
+        B = {(D2 - length(R2)), lists:reverse(R2)},
+        A =< B
+    end,
+    SortedDocs = lists:sort(SortFun, NewDocs),
     NewDocInfo0 = lists:foldl(fun({Client, NewDoc}, OldInfoAcc) ->
         merge_rev_tree(OldInfoAcc, NewDoc, Client, MergeConflicts)
-    end, OldDocInfo, NewDocs),
+    end, OldDocInfo, SortedDocs),
     NewDocInfo1 = stem_full_doc_info(NewDocInfo0, Limit),
     % When MergeConflicts is false, we updated #full_doc_info.deleted on every
     % iteration of merge_rev_tree. However, merge_rev_tree does not update
