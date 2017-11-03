@@ -333,7 +333,7 @@ get_idx_type(Opts) ->
 
 get_idx_ddoc(Idx, Opts) ->
     case proplists:get_value(ddoc, Opts) of
-        <<"_design/", _Rest>> = Name ->
+        <<"_design/", _Rest/binary>> = Name ->
             Name;
         Name when is_binary(Name) ->
             <<"_design/", Name/binary>>;
@@ -436,5 +436,14 @@ get_partial_filter_selector_with_legacy_selector_test() ->
 get_partial_filter_selector_with_legacy_default_selector_test() ->
     Idx = index(<<"selector">>, []),
     ?assertEqual(undefined, get_partial_filter_selector(Idx)).
+
+
+get_idx_ddoc_name_only_test() ->
+    Opts = [{ddoc, <<"foo">>}],
+    ?assertEqual(<<"_design/foo">>, get_idx_ddoc({}, Opts)).
+
+get_idx_ddoc_design_slash_name_test() ->
+    Opts = [{ddoc, <<"_design/foo">>}],
+    ?assertEqual(<<"_design/foo">>, get_idx_ddoc({}, Opts)).
 
 -endif.
