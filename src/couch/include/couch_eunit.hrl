@@ -42,7 +42,7 @@
     fun() ->
         A = integer_to_list(couch_util:unique_monotonic_integer()),
         N = node(),
-        FileName = lists:flatten(io_lib:format("~p-~p", [N, A])),
+        FileName = lists:flatten(io_lib:format("~p-~s", [N, A])),
         filename:join([?TEMPDIR, FileName])
     end).
 -define(tempdb,
