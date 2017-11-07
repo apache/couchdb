@@ -450,14 +450,14 @@ class ElemMatchTests(mango.FriendDocsTextTests):
             }
         }
         docs = self.db.find(q)
-        assert len(docs) == 1
-        assert docs[0]["bestfriends"] == ["Wolverine", "Cyclops"]
+        self.assertEqual(len(docs), 1)
+        self.assertEqual(docs[0]["bestfriends"], ["Wolverine", "Cyclops"])
 
         q = {"results": {"$elemMatch": {"$gte": 80, "$lt": 85}}}
 
         docs = self.db.find(q)
-        assert len(docs) == 1
-        assert docs[0]["results"] == [82, 85, 88]
+        self.assertEqual(len(docs), 1)
+        self.assertEqual(docs[0]["results"], [82, 85, 88])
 
     def test_elem_match(self):
         q = {"friends": {
@@ -466,9 +466,9 @@ class ElemMatchTests(mango.FriendDocsTextTests):
             }
         }
         docs = self.db.find(q)
-        assert len(docs) == 2
+        self.assertEqual(len(docs), 2)
         for d in docs:
-            assert d["user_id"] in (0, 1)
+            self.assertIn(d["user_id"], (0, 1))
 
         q = {
             "friends": {
@@ -479,8 +479,8 @@ class ElemMatchTests(mango.FriendDocsTextTests):
             }
         }
         docs = self.db.find(q)
-        assert len(docs) == 1
-        assert docs[0]["user_id"] == 4
+        self.assertEqual(len(docs), 1)
+        self.assertEqual(docs[0]["user_id"], 4)
 
 
         # Check that we can do logic in elemMatch
@@ -490,8 +490,9 @@ class ElemMatchTests(mango.FriendDocsTextTests):
             }}
         }
         docs = self.db.find(q)
-        assert len(docs) == 1
-        assert docs[0]["user_id"] == 1
+        self.assertEqual(len(docs), 2)
+        for d in docs:
+            self.assertIn(d["user_id"], (1, 15))
 
         q = {
             "friends": {
@@ -505,9 +506,9 @@ class ElemMatchTests(mango.FriendDocsTextTests):
             }
         }
         docs = self.db.find(q)
-        assert len(docs) == 2
+        self.assertEqual(len(docs), 3)
         for d in docs:
-            assert d["user_id"] in (1, 4)
+            self.assertIn(d["user_id"], (1, 4, 15))
 
         # Same as last, but using $in
         q = {
@@ -519,9 +520,9 @@ class ElemMatchTests(mango.FriendDocsTextTests):
             }
         }
         docs = self.db.find(q)
-        assert len(docs) == 2
+        self.assertEqual(len(docs), 3)
         for d in docs:
-            assert d["user_id"] in (1, 4)
+            self.assertIn(d["user_id"], (1, 4, 15))
 
         q = {
             "$and": [{
@@ -564,9 +565,9 @@ class ElemMatchTests(mango.FriendDocsTextTests):
             ]
         }
         docs = self.db.find(q)
-        assert len(docs) == 3
+        self.assertEqual(len(docs), 3)
         for d in docs:
-            assert d["user_id"] in (10, 11,12)
+            self.assertIn(d["user_id"], (10, 11,12))
 
 @unittest.skipUnless(mango.has_text_service(), "requires text service")
 class AllMatchTests(mango.FriendDocsTextTests):
