@@ -1,7 +1,9 @@
 *.o
-*.pyc
+*.sha256
+*.sha512
 *.snap
 *.so
+*.pyc
 .DS_Store
 .rebar/
 .eunit/
