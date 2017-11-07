@@ -14,8 +14,17 @@ include version.mk
 
 REBAR?=$(shell echo `pwd`/bin/rebar)
 IN_RELEASE = $(shell if [ ! -d .git ]; then echo true; fi)
-COUCHDB_VERSION_SUFFIX = $(shell if [ ! -z "$(COUCH_RC)" ]; then echo '-RC$(COUCH_RC)'; else if [ -d .git ]; then echo '-`git rev-parse --short --verify HEAD`'; fi; fi)
-COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)$(COUCHDB_VERSION_SUFFIX)
+ifeq ($(IN_RELEASE), true)
+COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)
+else
+RELTAG = $(shell git describe | grep -E '^[0-9]+\.[0-9]\.[0-9]+(-RC[0-9]+)?$$')
+ifeq ($(RELTAG),)
+COUCHDB_VERSION_SUFFIX = $(shell git rev-parse --short --verify HEAD)
+COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)-$(COUCHDB_VERSION_SUFFIX)
+else
+COUCHDB_VERSION = $(RELTAG)
+endif
+endif
 
 DESTDIR=
 
