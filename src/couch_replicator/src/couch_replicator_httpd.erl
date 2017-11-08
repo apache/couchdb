@@ -82,6 +82,8 @@ handle_scheduler_req(#httpd{method='GET', path_parts=[_,<<"docs">>|Unquoted]}
         {error, invalid} ->
             throw(bad_request)
     end;
+handle_scheduler_req(#httpd{method='GET'} = Req) ->
+    send_json(Req, 404, {[{error, <<"not found">>}]});
 handle_scheduler_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
