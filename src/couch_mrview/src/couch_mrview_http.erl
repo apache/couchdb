@@ -158,6 +158,8 @@ is_admin(Db) ->
     case catch couch_db:check_is_admin(Db) of
     {unauthorized, _} ->
         false;
+    {forbidden, _} ->
+        false;
     ok ->
         true
     end.
