@@ -149,6 +149,7 @@ texinfo_documents = [(
 
 extlinks = {
     'issue': ('%s-%%s' % _info['LOCAL_BUG_URI'], 'COUCHDB-'),
+    'ghissue': ('https://github.com/apache/couchdb/issues/%s', '#'),
     'commit': ('https://git-wip-us.apache.org/repos/asf?p=couchdb.git;a=commit;h=%s', '#')
 }
 

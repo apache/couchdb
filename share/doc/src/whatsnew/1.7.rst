@@ -20,6 +20,17 @@
    :depth: 1
    :local:
 
+.. _release/1.7.1:
+
+Version 1.7.1
+=============
+
+Bug Fix
+-------
+
+- :ghissue:`974`: Fix access to /db/_all_docs for database members.
+
+
 .. _release/1.7.0:
 
 Version 1.7.0
