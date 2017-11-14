@@ -12,6 +12,7 @@
 
 import mango
 import unittest
+import user_docs
 
 
 @unittest.skipUnless(mango.has_text_service(), "requires text service")
@@ -160,3 +161,52 @@ class CustomFieldsTest(mango.UserDocsTextTests):
         })
         assert len(docs) == 1
         assert docs[0]["user_id"] == 10
+
+@unittest.skipUnless(mango.has_text_service(), "requires text service")
+class CustomFieldsExistsTest(mango.UserDocsTextTests):
+
+    FIELDS = [
+        {"name": "exists_field", "type": "string"},
+        {"name": "exists_array.[]", "type": "string"},
+        {"name": "exists_object.should", "type": "string"},
+        {"name": "twitter", "type": "string"}
+    ]
+
+    def test_exists_field(self):
+        docs = self.db.find({"exists_field": {"$exists": True}})
+        self.assertEqual(len(docs), 2)
+        for d in docs:
+            self.assertIn(d["user_id"], (7, 8))
+
+        docs = self.db.find({"exists_field": {"$exists": False}})
+        self.assertEqual(len(docs), len(user_docs.DOCS) - 2)
+        for d in docs:
+            self.assertNotIn(d["user_id"], (7, 8))
+
+    def test_exists_array(self):
+        docs = self.db.find({"exists_array": {"$exists": True}})
+        self.assertEqual(len(docs), 2)
+        for d in docs:
+            self.assertIn(d["user_id"], (9, 10))
+
+        docs = self.db.find({"exists_array": {"$exists": False}})
+        self.assertEqual(len(docs), len(user_docs.DOCS) - 2)
+        for d in docs:
+            self.assertNotIn(d["user_id"], (9, 10))
+
+    def test_exists_object_member(self):
+        docs = self.db.find({"exists_object.should": {"$exists": True}})
+        self.assertEqual(len(docs), 1)
+        self.assertEqual(docs[0]["user_id"], 11)
+
+        docs = self.db.find({"exists_object.should": {"$exists": False}})
+        self.assertEqual(len(docs), len(user_docs.DOCS) - 1)
+        for d in docs:
+            self.assertNotEqual(d["user_id"], 11)
+
+    def test_exists_false_same_as_views(self):
+        docs = self.db.find({
+                "twitter": {"$exists": False}
+            })
+        for d in docs:
+            self.assertNotIn(d["user_id"], (0, 1, 4, 13))
