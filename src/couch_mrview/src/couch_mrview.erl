@@ -218,6 +218,29 @@ query_all_docs(Db, Args) ->
 query_all_docs(Db, Args, Callback, Acc) when is_list(Args) ->
     query_all_docs(Db, to_mrargs(Args), Callback, Acc);
 query_all_docs(Db, Args0, Callback, Acc) ->
+    case couch_db:is_admin(Db) of
+        true -> query_all_docs_admin(Db, Args0, Callback, Acc);
+        false -> query_all_docs_access(Db, Args0, Callback, Acc)
+    end.
+
+query_all_docs_access(Db, Args0, Callback, Acc) ->
+    % query our not yest existing, home-grown _access view.
+    % use query_view for this.
+    DDoc = #doc{
+        id = <<"_design/_access">>,
+        body = {[
+            {<<"language">>,<<"_access">>},
+            {<<"views">>, {[
+                {<<"_access">>, {[
+                    {<<"map">>, <<"_access/map">>}
+                ]}}
+            ]}}
+        ]}
+    },
+    VName = <<"_access">>,
+    query_view(Db, DDoc, VName, Args0, Callback, Acc).
+
+query_all_docs_admin(Db, Args0, Callback, Acc) ->
     Sig = couch_util:with_db(Db, fun(WDb) ->
         {ok, Info} = couch_db:get_db_info(WDb),
         couch_index_util:hexsig(couch_hash:md5_hash(term_to_binary(Info)))
@@ -244,6 +267,7 @@ query_view(Db, DDoc, VName, Args) ->
 query_view(Db, DDoc, VName, Args, Callback, Acc) when is_list(Args) ->
     query_view(Db, DDoc, VName, to_mrargs(Args), Callback, Acc);
 query_view(Db, DDoc, VName, Args0, Callback, Acc0) ->
+    couch_log:info("~n~n DDoc:~p, VName: ~p ~n~n", [DDoc, VName]),
     case couch_mrview_util:get_view(Db, DDoc, VName, Args0) of
         {ok, VInfo, Sig, Args} ->
             {ok, Acc1} = case Args#mrargs.preflight_fun of
