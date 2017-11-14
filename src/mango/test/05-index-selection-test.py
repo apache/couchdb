@@ -181,15 +181,13 @@ class JSONIndexSelectionTests(mango.UserDocsTests, IndexSelectionTests):
 
 
 @unittest.skipUnless(mango.has_text_service(), "requires text service")
-class TextIndexSelectionTests(mango.UserDocsTests, IndexSelectionTests):
+class TextIndexSelectionTests(mango.UserDocsTests):
 
     @classmethod
     def setUpClass(klass):
         super(TextIndexSelectionTests, klass).setUpClass()
-
-    def setUp(self):
-        self.db.recreate()
-        user_docs.add_text_indexes(self.db, {})
+        if mango.has_text_service():
+            user_docs.add_text_indexes(klass.db, {})
 
     def test_with_text(self):
         resp = self.db.find({

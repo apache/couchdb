@@ -273,6 +273,6 @@ class IndexSelectorJson(mango.DbPerClass):
 
     @unittest.skipUnless(mango.has_text_service(), "requires text service")
     def test_text_partial_filter_only_in_return_if_not_default(self):
-        self.db.create_text_index(fields=[{"name":"location"}])
+        self.db.create_text_index(fields=[{"name":"location", "type":"string"}])
         index = self.db.list_indexes()[1]
         self.assertEqual('partial_filter_selector' in index['def'], False)

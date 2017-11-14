@@ -16,7 +16,7 @@ import unittest
 @unittest.skipUnless(mango.has_text_service(), "requires text service")
 class DisableIndexArrayLengthsTest(mango.UserDocsTextTests):
 
-    def setUp(klass):
+    def setUp(self):
         self.db.recreate()
         self.db.create_text_index(ddoc="disable_index_array_lengths",
                                        analyzer="keyword",
