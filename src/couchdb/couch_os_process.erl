@@ -142,7 +142,7 @@ pick_command1(_) ->
 % gen_server API
 init([Command, Options, PortOptions]) ->
     PrivDir = couch_util:priv_dir(),
-    Spawnkiller = filename:join(PrivDir, "couchspawnkillable"),
+    Spawnkiller = "\"" ++ filename:join(PrivDir, "couchspawnkillable") ++ "\"",
     BaseProc = #os_proc{
         command=Command,
         port=open_port({spawn, Spawnkiller ++ " " ++ Command}, PortOptions),
