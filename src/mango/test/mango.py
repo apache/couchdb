@@ -82,9 +82,7 @@ class Database(object):
 
     def recreate(self):
         self.delete()
-        delay()
         self.create()
-        delay()
 
     def save_doc(self, doc):
         self.save_docs([doc])
@@ -126,7 +124,6 @@ class Database(object):
             body["index"]["partial_filter_selector"] = partial_filter_selector
         body = json.dumps(body)
         r = self.sess.post(self.path("_index"), data=body)
-        delay()
         r.raise_for_status()
         assert r.json()["id"] is not None
         assert r.json()["name"] is not None
@@ -157,7 +154,6 @@ class Database(object):
             body["ddoc"] = ddoc
         body = json.dumps(body)
         r = self.sess.post(self.path("_index"), data=body)
-        delay()
         r.raise_for_status()
         return r.json()["result"] == "created"
 
@@ -173,7 +169,6 @@ class Database(object):
     def delete_index(self, ddocid, name, idx_type="json"):
         path = ["_index", ddocid, idx_type, name]
         r = self.sess.delete(self.path(path), params={"w": "3"})
-        delay()
         r.raise_for_status()
 
     def bulk_delete(self, docs):
@@ -183,7 +178,6 @@ class Database(object):
         }
         body = json.dumps(body)
         r = self.sess.post(self.path("_index/_bulk_delete"), data=body)
-        delay(n=10)
         return r.json()
 
     def find(self, selector, limit=25, skip=0, sort=None, fields=None,
