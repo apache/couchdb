@@ -81,6 +81,12 @@ class Database(object):
         r = self.sess.delete(self.url)
 
     def recreate(self):
+        r = self.sess.get(self.url)
+        db_info = r.json()
+        docs = db_info["doc_count"] + db_info["doc_del_count"]
+        if docs == 0:
+            # db never used - create unnecessary
+            return
         self.delete()
         self.create()
 
