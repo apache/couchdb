@@ -127,7 +127,14 @@ class Database(object):
         r.raise_for_status()
         assert r.json()["id"] is not None
         assert r.json()["name"] is not None
-        return r.json()["result"] == "created"
+
+        created = r.json()["result"] == "created"
+        if created:
+            # wait until the database reports the index as available
+            while len(self.get_index(r.json()["id"], r.json()["name"])) < 1:
+                delay(t=0.1)
+
+        return created
 
     def create_text_index(self, analyzer=None, idx_type="text",
         partial_filter_selector=None, default_field=None, fields=None, 
