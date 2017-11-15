@@ -165,11 +165,27 @@ class Database(object):
         r = self.sess.get(self.path("_index?"+limit+";"+skip))
         r.raise_for_status()
         return r.json()["indexes"]
+    
+    def get_index(self, ddocid, name):
+        if ddocid is None:
+            return [i for i in self.list_indexes() if i["name"] == name]
+
+        ddocid = ddocid.replace("%2F", "/")
+        if not ddocid.startswith("_design/"):
+            ddocid = "_design/" + ddocid
+
+        if name is None:
+            return [i for i in self.list_indexes() if i["ddoc"] == ddocid]
+        else:
+            return [i for i in self.list_indexes() if i["ddoc"] == ddocid and i["name"] == name]
 
     def delete_index(self, ddocid, name, idx_type="json"):
         path = ["_index", ddocid, idx_type, name]
         r = self.sess.delete(self.path(path), params={"w": "3"})
         r.raise_for_status()
+
+        while len(self.get_index(ddocid, name)) == 1:
+            delay(t=0.1)
 
     def bulk_delete(self, docs):
         body = {
