@@ -243,16 +243,29 @@ query_all_docs_access(Db, Args0, Callback, Acc) ->
     UserName = UserCtx#user_ctx.name,
     couch_log:info("~n~n UserName:~p~n~n", [UserName]),
     % TODO: add roles
-    Args = prefix_startkey_endkey(UserName, Args0),
+    Args = prefix_startkey_endkey(UserName, Args0, Args0#mrargs.direction),
     query_view(Db, DDoc, VName, Args, Callback, Acc).
 
-prefix_startkey_endkey(UserName, #mrargs{start_key=StartKey, end_key=EndKey} = Args0) ->
-    Args0#mrargs {
+prefix_startkey_endkey(UserName, Args, fwd) ->
+    #mrargs{start_key=StartKey, end_key=EndKey} = Args,
+    Args#mrargs {
         start_key = case StartKey of
             undefined -> [UserName];
             StartKey -> [UserName, StartKey]
         end,
         end_key = case EndKey of
+            undefined -> [UserName, {}];
+            EndKey -> [UserName, EndKey, {}]
+        end
+    };
+prefix_startkey_endkey(UserName, Args, rev) ->
+    #mrargs{start_key=StartKey, end_key=EndKey} = Args,
+    Args#mrargs {
+        end_key = case StartKey of
+            undefined -> [UserName];
+            StartKey -> [UserName, StartKey]
+        end,
+        start_key = case EndKey of
             undefined -> [UserName, {}];
             EndKey -> [UserName, EndKey, {}]
         end
