@@ -63,8 +63,7 @@ multi_merge/2,
 merge/3,
 merge/2,
 remove_leafs/2,
-stem/2,
-full_stem/2
+stem/2
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
@@ -481,53 +480,64 @@ map_leafs_simple(Fun, Pos, [{Key, Value, SubTree} | RestTree]) ->
 
 
 stem(Trees, Limit) ->
-    lists:sort(lists:flatmap(fun(Tree) ->
-        stem_tree(Tree, Limit)
-    end, Trees)).
-
-
-stem_tree({Depth, Child}, Limit) ->
-    case stem_tree(Depth, Child, Limit) of
-        {_, NewChild, NewBranches} ->
-            [{Depth, NewChild} | NewBranches];
-        {_, NewBranches} ->
-            NewBranches
+    try
+        {_, Branches} = lists:foldl(fun(Tree, {Seen, TreeAcc}) ->
+            {NewSeen, NewBranches} = stem_tree(Tree, Limit, Seen),
+            {NewSeen, NewBranches ++ TreeAcc}
+        end, {sets:new(), []}, Trees),
+        lists:sort(Branches)
+    catch throw:dupe_keys ->
+        repair_tree(Trees, Limit)
     end.
 
 
-stem_tree(_Depth, {_Key, _Val, []} = Leaf, Limit) ->
-    {Limit - 1, Leaf, []};
+stem_tree({Depth, Child}, Limit, Seen) ->
+    case stem_tree(Depth, Child, Limit, Seen) of
+        {NewSeen, _, NewChild, NewBranches} ->
+            {NewSeen, [{Depth, NewChild} | NewBranches]};
+        {NewSeen, _, NewBranches} ->
+            {NewSeen, NewBranches}
+    end.
 
-stem_tree(Depth, {Key, Val, Children}, Limit) ->
-    FinalAcc = lists:foldl(fun(Child, {LimitPosAcc, ChildAcc, BranchAcc}) ->
-        case stem_tree(Depth + 1, Child, Limit) of
-            {LimitPos, NewChild, NewBranches} ->
+
+stem_tree(_Depth, {_Key, _Val, []} = Leaf, Limit, Seen) ->
+    {Seen, Limit - 1, Leaf, []};
+
+stem_tree(Depth, {Key, Val, Children}, Limit, Seen0) ->
+    Seen1 = case sets:is_element(Key, Seen0) of
+        true -> throw(dupe_keys);
+        false -> sets:add_element(Key, Seen0)
+    end,
+    FinalAcc = lists:foldl(fun(Child, Acc) ->
+        {SeenAcc, LimitPosAcc, ChildAcc, BranchAcc} = Acc,
+        case stem_tree(Depth + 1, Child, Limit, SeenAcc) of
+            {NewSeenAcc, LimitPos, NewChild, NewBranches} ->
                 NewLimitPosAcc = erlang:max(LimitPos, LimitPosAcc),
                 NewChildAcc = [NewChild | ChildAcc],
                 NewBranchAcc = NewBranches ++ BranchAcc,
-                {NewLimitPosAcc, NewChildAcc, NewBranchAcc};
-            {LimitPos, NewBranches} ->
+                {NewSeenAcc, NewLimitPosAcc, NewChildAcc, NewBranchAcc};
+            {NewSeenAcc, LimitPos, NewBranches} ->
                 NewLimitPosAcc = erlang:max(LimitPos, LimitPosAcc),
                 NewBranchAcc = NewBranches ++ BranchAcc,
-                {NewLimitPosAcc, ChildAcc, NewBranchAcc}
+                {NewSeenAcc, NewLimitPosAcc, ChildAcc, NewBranchAcc}
         end
-    end, {-1, [], []}, Children),
-    {FinalLimitPos, FinalChildren, FinalBranches} = FinalAcc,
+    end, {Seen1, -1, [], []}, Children),
+    {FinalSeen, FinalLimitPos, FinalChildren, FinalBranches} = FinalAcc,
     case FinalLimitPos of
         N when N > 0, length(FinalChildren) > 0 ->
             FinalNode = {Key, Val, lists:reverse(FinalChildren)},
-            {FinalLimitPos - 1, FinalNode, FinalBranches};
+            {FinalSeen, FinalLimitPos - 1, FinalNode, FinalBranches};
         0 when length(FinalChildren) > 0 ->
             NewBranches = lists:map(fun(Child) ->
                 {Depth + 1, Child}
             end, lists:reverse(FinalChildren)),
-            {-1, NewBranches ++ FinalBranches};
+            {FinalSeen, -1, NewBranches ++ FinalBranches};
         N when N < 0, length(FinalChildren) == 0 ->
-            {FinalLimitPos - 1, FinalBranches}
+            {FinalSeen, FinalLimitPos - 1, FinalBranches}
     end.
 
 
-full_stem(Trees, Limit) ->
+repair_tree(Trees, Limit) ->
     % flatten each branch in a tree into a tree path, sort by starting rev #
     Paths = lists:sort(lists:map(fun({Pos, Path}) ->
         StemmedPath = lists:sublist(Path, Limit),

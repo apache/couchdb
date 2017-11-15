@@ -876,11 +876,8 @@ stem_full_doc_info(#full_doc_info{rev_tree = Tree} = Info, Limit) ->
     Stemmed = couch_key_tree:stem(Tree, Limit),
     Info#full_doc_info{rev_tree = Stemmed}.
 
-full_stem_full_doc_infos(#db{revs_limit=Limit}, DocInfos) ->
-    lists:map(fun(#full_doc_info{rev_tree=Tree}=FDI) ->
-        Stemmed = couch_key_tree:full_stem(Tree, Limit),
-        FDI#full_doc_info{rev_tree=Stemmed}
-    end, DocInfos).
+stem_full_doc_infos(#db{revs_limit=Limit}, DocInfos) ->
+    lists:map(fun(FDI) -> stem_full_doc_info(FDI, Limit) end, DocInfos).
 
 update_docs_int(Db, DocsList, NonRepDocs, MergeConflicts, FullCommit) ->
     #db{
@@ -1128,7 +1125,7 @@ copy_docs(Db, #db{fd = DestFd} = NewDb, MixedInfos, Retry) ->
         }
     end, NewInfos0),
 
-    NewInfos = full_stem_full_doc_infos(Db, NewInfos1),
+    NewInfos = stem_full_doc_infos(Db, NewInfos1),
     RemoveSeqs =
     case Retry of
     nil ->
