@@ -50,11 +50,11 @@ create(Db, Selector0, Opts) ->
 
     {use_index, IndexSpecified} = proplists:lookup(use_index, Opts),
     case {length(UsableIndexes), length(IndexSpecified)} of
-        {0, 1} ->
-            ?MANGO_ERROR({no_usable_index, selector_unsupported});
         {0, 0} ->
             AllDocs = mango_idx:special(Db),
             create_cursor(Db, AllDocs, Selector, Opts);
+        {0, _} ->
+            ?MANGO_ERROR({no_usable_index, selector_unsupported});
         _ ->
             create_cursor(Db, UsableIndexes, Selector, Opts)
     end.

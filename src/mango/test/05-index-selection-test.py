@@ -91,6 +91,20 @@ class IndexSelectionTests:
         else:
             raise AssertionError("did not reject bad use_index")
 
+    def test_reject_use_index_ddoc_and_name_invalid_fields(self):
+        # index on ["company","manager"] which should not be valid
+        ddocid = "_design/a0c425a60cf3c3c09e3c537c9ef20059dcef9198"
+        name = "a0c425a60cf3c3c09e3c537c9ef20059dcef9198"
+        selector = {
+            "company": "Pharmex"
+        }
+        try:
+            self.db.find(selector, use_index=[ddocid,name])
+        except Exception as e:
+            self.assertEqual(e.response.status_code, 400)
+        else:
+            raise AssertionError("did not reject bad use_index")
+
     def test_reject_use_index_sort_order(self):
         # index on ["company","manager"] which should not be valid
         ddocid = "_design/a0c425a60cf3c3c09e3c537c9ef20059dcef9198"
@@ -100,6 +114,21 @@ class IndexSelectionTests:
         }
         try:
             self.db.find(selector, use_index=ddocid, sort=[{"manager":"desc"}])
+        except Exception as e:
+            self.assertEqual(e.response.status_code, 400)
+        else:
+            raise AssertionError("did not reject bad use_index")
+
+    def test_reject_use_index_ddoc_and_name_sort_order(self):
+        # index on ["company","manager"] which should not be valid
+        ddocid = "_design/a0c425a60cf3c3c09e3c537c9ef20059dcef9198"
+        name = "a0c425a60cf3c3c09e3c537c9ef20059dcef9198"
+        selector = {
+            "company": {"$gt": None},
+            "manager": {"$gt": None}
+        }
+        try:
+            self.db.find(selector, use_index=[ddocid,name], sort=[{"manager":"desc"}])
         except Exception as e:
             self.assertEqual(e.response.status_code, 400)
         else:
