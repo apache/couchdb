@@ -238,7 +238,25 @@ query_all_docs_access(Db, Args0, Callback, Acc) ->
         ]}
     },
     VName = <<"_access">>,
-    query_view(Db, DDoc, VName, Args0, Callback, Acc).
+    %% add startkey/endkey
+    UserCtx = couch_db:get_user_ctx(Db),
+    UserName = UserCtx#user_ctx.name,
+    couch_log:info("~n~n UserName:~p~n~n", [UserName]),
+    % TODO: add roles
+    Args = prefix_startkey_endkey(UserName, Args0),
+    query_view(Db, DDoc, VName, Args, Callback, Acc).
+
+prefix_startkey_endkey(UserName, #mrargs{start_key=StartKey, end_key=EndKey} = Args0) ->
+    Args0#mrargs {
+        start_key = case StartKey of
+            undefined -> [UserName];
+            StartKey -> [UserName, StartKey]
+        end,
+        end_key = case EndKey of
+            undefined -> [UserName, {}];
+            EndKey -> [UserName, EndKey, {}]
+        end
+    }.
 
 query_all_docs_admin(Db, Args0, Callback, Acc) ->
     Sig = couch_util:with_db(Db, fun(WDb) ->
@@ -267,7 +285,6 @@ query_view(Db, DDoc, VName, Args) ->
 query_view(Db, DDoc, VName, Args, Callback, Acc) when is_list(Args) ->
     query_view(Db, DDoc, VName, to_mrargs(Args), Callback, Acc);
 query_view(Db, DDoc, VName, Args0, Callback, Acc0) ->
-    couch_log:info("~n~n DDoc:~p, VName: ~p ~n~n", [DDoc, VName]),
     case couch_mrview_util:get_view(Db, DDoc, VName, Args0) of
         {ok, VInfo, Sig, Args} ->
             {ok, Acc1} = case Args#mrargs.preflight_fun of
@@ -285,6 +302,7 @@ get_view_index_pid(Db, DDoc, ViewName, Args0) ->
 
 
 query_view(Db, {Type, View, Ref}, Args, Callback, Acc) ->
+    couch_log:info("~n~n Args:~p~n~n", [Args]),
     try
         case Type of
             map -> map_fold(Db, View, Args, Callback, Acc);

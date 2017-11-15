@@ -252,6 +252,11 @@ transfer_fields([{<<"_id">>, Id} | Rest], Doc, DbName) ->
     validate_docid(Id, DbName),
     transfer_fields(Rest, Doc#doc{id=Id}, DbName);
 
+transfer_fields([{<<"_access">>, _Access} = Field | Rest],
+    #doc{body=Fields} = Doc, DbName) ->
+    % TODO: validate access as array strings, and optional arrays of strings
+    transfer_fields(Rest, Doc#doc{body=[Field|Fields]}, DbName);
+
 transfer_fields([{<<"_rev">>, Rev} | Rest], #doc{revs={0, []}}=Doc, DbName) ->
     {Pos, RevId} = parse_rev(Rev),
     transfer_fields(Rest,
