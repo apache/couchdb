@@ -268,7 +268,7 @@ class DbPerClass(unittest.TestCase):
     @classmethod
     def setUpClass(klass):
         klass.db = Database(random_db_name())
-        klass.db.create(q=1, n=3)
+        klass.db.create(q=1, n=1)
 
     def setUp(self):
         self.db = self.__class__.db
