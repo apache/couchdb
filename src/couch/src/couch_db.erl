@@ -946,13 +946,7 @@ prep_and_validate_replicated_updates(Db, [Bucket|RestBuckets], [OldInfo|RestOldI
         OldLeafs = couch_key_tree:get_all_leafs_full(OldTree),
         OldLeafsLU = [{Start, RevId} || {Start, [{RevId, _}|_]} <- OldLeafs],
         NewPaths = lists:map(fun couch_doc:to_path/1, Bucket),
-        SortedPaths = lists:sort(NewPaths),
-        NewRevTree = lists:foldl(
-            fun(NewPath, AccTree) ->
-                {NewTree, _} = couch_key_tree:merge(AccTree, NewPath),
-                NewTree
-            end,
-            OldTree, SortedPaths),
+        NewRevTree = couch_key_tree:multi_merge(OldTree, NewPaths),
         Leafs = couch_key_tree:get_all_leafs_full(NewRevTree),
         LeafRevsFullDict = dict:from_list( [{{Start, RevId}, FullPath} || {Start, [{RevId, _}|_]}=FullPath <- Leafs]),
         {ValidatedBucket, AccErrors3} =

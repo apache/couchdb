@@ -59,6 +59,7 @@ get_key_leafs/2,
 map/2,
 map_leafs/2,
 mapfold/3,
+multi_merge/2,
 merge/3,
 merge/2,
 remove_leafs/2,
@@ -70,6 +71,15 @@ full_stem/2
 -type treenode() :: {Key::term(), Value::term(), [Node::treenode()]}.
 -type tree() :: {Depth::pos_integer(), [treenode()]}.
 -type revtree() :: [tree()].
+
+
+%% @doc Merge multiple paths into the given tree.
+-spec multi_merge(revtree(), tree()) -> revtree().
+multi_merge(RevTree, Trees) ->
+    lists:foldl(fun(Tree) ->
+        {NewRevTree, _} = merge(RevTree, Tree),
+        NewRevTree
+    end, RevTree, lists:sort(Trees)).
 
 
 %% @doc Merge a path into the given tree and then stem the result.
