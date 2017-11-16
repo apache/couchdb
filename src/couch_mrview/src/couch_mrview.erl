@@ -223,7 +223,7 @@ query_all_docs(Db, Args0, Callback, Acc) ->
         false -> query_all_docs_access(Db, Args0, Callback, Acc)
     end.
 
-query_all_docs_access(Db, Args0, Callback, Acc) ->
+query_all_docs_access(Db, Args0, Callback0, Acc) ->
     % query our not yest existing, home-grown _access view.
     % use query_view for this.
     DDoc = #doc{
@@ -244,6 +244,18 @@ query_all_docs_access(Db, Args0, Callback, Acc) ->
     couch_log:info("~n~n UserName:~p~n~n", [UserName]),
     % TODO: add roles
     Args = prefix_startkey_endkey(UserName, Args0, Args0#mrargs.direction),
+    % filter out the user-prefix from the key, so _all_docs looks normal
+    % this isn’t a separate function because I’m binding Callback0 and I don’t
+    % know the Erlang equivalent of JS’s fun.bind(this, newarg)
+    Callback = fun
+        ({row, Props}, Acc0) ->
+            [_User, Key] = proplists:get_value(key, Props),
+            Row0 = proplists:delete(key, Props),
+            Row = [{key, Key} | Row0],
+            Callback0({row, Row}, Acc0);
+        (Row, Acc0) ->
+            Callback0(Row, Acc0)
+        end,
     query_view(Db, DDoc, VName, Args, Callback, Acc).
 
 prefix_startkey_endkey(UserName, Args, fwd) ->
@@ -315,7 +327,6 @@ get_view_index_pid(Db, DDoc, ViewName, Args0) ->
 
 
 query_view(Db, {Type, View, Ref}, Args, Callback, Acc) ->
-    couch_log:info("~n~n Args:~p~n~n", [Args]),
     try
         case Type of
             map -> map_fold(Db, View, Args, Callback, Acc);
@@ -795,7 +806,6 @@ default_cb(ok, ddoc_updated) ->
     {ok, ddoc_updated};
 default_cb(Row, Acc) ->
     {ok, [Row | Acc]}.
-
 
 to_mrargs(KeyList) ->
     lists:foldl(fun({Key, Value}, Acc) ->
