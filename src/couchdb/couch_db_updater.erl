@@ -884,7 +884,10 @@ copy_docs(Db, #db{updater_fd = DestFd} = NewDb, InfoBySeq0, Retry) ->
                         fun({_, _, _, AttLen, _, _, _, _}, S) -> S + AttLen end,
                         SummarySize, AttsInfo),
                     {IsDel, Pos, Seq, TotalLeafSize}
-                end, RevTree)}
+                end, RevTree)};
+        (U) ->
+             ?LOG_INFO("Drop a document from compaction: not found in db : ~p", [U]),
+            []
         end, LookupResults),
 
     NewFullDocInfos = stem_full_doc_infos(Db, NewFullDocInfos1),
