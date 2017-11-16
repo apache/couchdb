@@ -81,10 +81,14 @@ class Database(object):
         r = self.sess.delete(self.url)
 
     def recreate(self):
+        r = self.sess.get(self.url)
+        db_info = r.json()
+        docs = db_info["doc_count"] + db_info["doc_del_count"]
+        if docs == 0:
+            # db never used - create unnecessary
+            return
         self.delete()
-        delay()
         self.create()
-        delay()
 
     def save_doc(self, doc):
         self.save_docs([doc])
@@ -126,11 +130,17 @@ class Database(object):
             body["index"]["partial_filter_selector"] = partial_filter_selector
         body = json.dumps(body)
         r = self.sess.post(self.path("_index"), data=body)
-        delay()
         r.raise_for_status()
         assert r.json()["id"] is not None
         assert r.json()["name"] is not None
-        return r.json()["result"] == "created"
+
+        created = r.json()["result"] == "created"
+        if created:
+            # wait until the database reports the index as available
+            while len(self.get_index(r.json()["id"], r.json()["name"])) < 1:
+                delay(t=0.1)
+
+        return created
 
     def create_text_index(self, analyzer=None, idx_type="text",
         partial_filter_selector=None, default_field=None, fields=None, 
@@ -157,7 +167,6 @@ class Database(object):
             body["ddoc"] = ddoc
         body = json.dumps(body)
         r = self.sess.post(self.path("_index"), data=body)
-        delay()
         r.raise_for_status()
         return r.json()["result"] == "created"
 
@@ -169,12 +178,27 @@ class Database(object):
         r = self.sess.get(self.path("_index?"+limit+";"+skip))
         r.raise_for_status()
         return r.json()["indexes"]
+    
+    def get_index(self, ddocid, name):
+        if ddocid is None:
+            return [i for i in self.list_indexes() if i["name"] == name]
+
+        ddocid = ddocid.replace("%2F", "/")
+        if not ddocid.startswith("_design/"):
+            ddocid = "_design/" + ddocid
+
+        if name is None:
+            return [i for i in self.list_indexes() if i["ddoc"] == ddocid]
+        else:
+            return [i for i in self.list_indexes() if i["ddoc"] == ddocid and i["name"] == name]
 
     def delete_index(self, ddocid, name, idx_type="json"):
         path = ["_index", ddocid, idx_type, name]
         r = self.sess.delete(self.path(path), params={"w": "3"})
-        delay()
         r.raise_for_status()
+
+        while len(self.get_index(ddocid, name)) == 1:
+            delay(t=0.1)
 
     def bulk_delete(self, docs):
         body = {
@@ -183,7 +207,6 @@ class Database(object):
         }
         body = json.dumps(body)
         r = self.sess.post(self.path("_index/_bulk_delete"), data=body)
-        delay(n=10)
         return r.json()
 
     def find(self, selector, limit=25, skip=0, sort=None, fields=None,
@@ -245,7 +268,7 @@ class DbPerClass(unittest.TestCase):
     @classmethod
     def setUpClass(klass):
         klass.db = Database(random_db_name())
-        klass.db.create(q=1, n=3)
+        klass.db.create(q=1, n=1)
 
     def setUp(self):
         self.db = self.__class__.db
