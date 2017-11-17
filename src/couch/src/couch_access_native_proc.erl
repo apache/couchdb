@@ -112,9 +112,12 @@ code_change(_OldVsn, St, _Extra) ->
 % -seq, since that one we will always need, and by-access-id can be opt-in.
 % the second dimension is the number of emit kv pairs:
 % [ // the return value
-%   [ // the first index
-%     ['k1', 'v1'], // the first k/v pair for the first indexes
+%   [ // the first views
+%     ['k1', 'v1'], // the first k/v pair for the first view
 %     ['k2', 'v2']  // second, etc.
+%   ],
+%   [ // second view
+%     ['l1', 'w1'] // first k/v par in second view
 %   ]
 % ]
 % {"id":"account/bongel","key":"account/bongel","value":{"rev":"1-967a00dff5e02add41819138abb3284d"}},
@@ -122,13 +125,14 @@ code_change(_OldVsn, St, _Extra) ->
 map_doc(_St, {Doc}) ->
     case couch_util:get_value(<<"_access">>, Doc) of
         undefined ->
-            [[]]; % do not index this doc
+            [[],[]]; % do not index this doc
         Access when is_list(Access) ->
             Id = couch_util:get_value(<<"_id">>, Doc),
             Rev = couch_util:get_value(<<"_rev">>, Doc),
             lists:map(fun(UserOrRole) -> [
                 [[UserOrRole, Id], Rev]
-            ] end, Access);
+            ] end, Access)
+            ++ [[]]; %TODO: implement by-access-seq
         _Else ->
-            [[]] % no comprende
+            [[],[]] % no comprende
     end.

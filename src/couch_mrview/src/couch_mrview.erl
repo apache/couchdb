@@ -231,19 +231,23 @@ query_all_docs_access(Db, Args0, Callback0, Acc) ->
         body = {[
             {<<"language">>,<<"_access">>},
             {<<"views">>, {[
-                {<<"_access">>, {[
-                    {<<"map">>, <<"_access/map">>}
+                {<<"_access_by_id">>, {[
+                    {<<"map">>, <<"_access/by-id-map">>},
+                    {<<"reduce">>, <<"_count">>}
+                ]}},
+                {<<"_access_by_seq">>, {[
+                    {<<"map">>, <<"_access/by-seq-map">>},
+                    {<<"reduce">>, <<"_count">>}
                 ]}}
             ]}}
         ]}
     },
-    VName = <<"_access">>,
     %% add startkey/endkey
     UserCtx = couch_db:get_user_ctx(Db),
     UserName = UserCtx#user_ctx.name,
-    couch_log:info("~n~n UserName:~p~n~n", [UserName]),
     % TODO: add roles
-    Args = prefix_startkey_endkey(UserName, Args0, Args0#mrargs.direction),
+    Args1 = prefix_startkey_endkey(UserName, Args0, Args0#mrargs.direction),
+    Args = Args1#mrargs{reduce=false},
     % filter out the user-prefix from the key, so _all_docs looks normal
     % this isn’t a separate function because I’m binding Callback0 and I don’t
     % know the Erlang equivalent of JS’s fun.bind(this, newarg)
@@ -256,6 +260,7 @@ query_all_docs_access(Db, Args0, Callback0, Acc) ->
         (Row, Acc0) ->
             Callback0(Row, Acc0)
         end,
+    VName = <<"_access_by_id">>,
     query_view(Db, DDoc, VName, Args, Callback, Acc).
 
 prefix_startkey_endkey(UserName, Args, fwd) ->
