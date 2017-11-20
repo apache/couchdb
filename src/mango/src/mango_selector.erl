@@ -596,9 +596,19 @@ has_required_fields(Selector, RequiredFields) when not is_list(Selector) ->
 % We can "see" through $and operator. We ignore other
 % combination operators because they can't be used to restrict
 % an index.
-has_required_fields([{[{<<"$and">>, Args}]}], RequiredFields) 
+has_required_fields([{[{<<"$and">>, Args}]}], RequiredFields)
         when is_list(Args) ->
     has_required_fields(Args, RequiredFields);
+
+% We can "see" through $or operator if all the clauses require
+% the same field.
+has_required_fields([{[{<<"$or">>, Args}]} | Rest], [Field | RequiredFields])
+        when is_list(Args) ->
+    Pred = fun(A) -> has_required_fields(A, [Field]) end,
+    case lists:all(Pred, Args) of
+        true -> has_required_fields(Rest, RequiredFields);
+        _ ->  has_required_fields(Rest, [Field | RequiredFields])
+    end;
 
 has_required_fields([{[{Field, Cond}]} | Rest], RequiredFields) ->
     case Cond of
@@ -662,7 +672,7 @@ has_required_fields_and_false_test() ->
     Normalized = normalize(Selector),
     ?assertEqual(false, has_required_fields(Normalized, RequiredFields)).
 
-has_required_fields_or_test() ->
+has_required_fields_or_false_test() ->
     RequiredFields = [<<"A">>],
     Selector = {[{<<"$or">>,
           [
@@ -672,5 +682,19 @@ has_required_fields_or_test() ->
     }]},
     Normalized = normalize(Selector),
     ?assertEqual(false, has_required_fields(Normalized, RequiredFields)).
+
+has_required_fields_or_true_test() ->
+    RequiredFields = [<<"A">>, <<"B">>, <<"C">>],
+    Selector = {[{<<"A">>, "foo"},
+          {<<"$or">>,
+              [
+                  {[{<<"B">>, <<"bar">>}]},
+                  {[{<<"B">>, <<"baz">>}]}
+              ]
+          },
+		  {<<"C">>, "qux"}
+	]},
+    Normalized = normalize(Selector),
+    ?assertEqual(true, has_required_fields(Normalized, RequiredFields)).
 
 -endif.
