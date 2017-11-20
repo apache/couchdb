@@ -693,7 +693,7 @@ has_required_fields_and_false_test() ->
     Normalized = normalize(Selector),
     ?assertEqual(false, has_required_fields(Normalized, RequiredFields)).
 
-has_required_fields_or_test() ->
+has_required_fields_or_false_test() ->
     RequiredFields = [<<"A">>],
     Selector = {[{<<"$or">>,
           [
@@ -703,5 +703,19 @@ has_required_fields_or_test() ->
     }]},
     Normalized = normalize(Selector),
     ?assertEqual(false, has_required_fields(Normalized, RequiredFields)).
+
+has_required_fields_or_true_test() ->
+    RequiredFields = [<<"A">>, <<"B">>, <<"C">>],
+    Selector = {[{<<"A">>, "foo"},
+          {<<"$or">>,
+              [
+                  {[{<<"B">>, <<"bar">>}]},
+                  {[{<<"B">>, <<"baz">>}]}
+              ]
+          },
+		  {<<"C">>, "qux"}
+	]},
+    Normalized = normalize(Selector),
+    ?assertEqual(true, has_required_fields(Normalized, RequiredFields)).
 
 -endif.
