@@ -114,17 +114,17 @@ link_cluster_event_listener(Mod, Fun, Args)
 % Mem3 cluster callbacks
 
 cluster_unstable(Server) ->
+    ok = gen_server:call(Server, set_unstable),
     couch_replicator_notifier:notify({cluster, unstable}),
     couch_stats:update_gauge([couch_replicator, cluster_is_stable], 0),
     couch_log:notice("~s : cluster unstable", [?MODULE]),
-    gen_server:cast(Server, cluster_unstable),
     Server.
 
 cluster_stable(Server) ->
+    ok = gen_server:call(Server, set_stable),
     couch_replicator_notifier:notify({cluster, stable}),
     couch_stats:update_gauge([couch_replicator, cluster_is_stable], 1),
     couch_log:notice("~s : cluster stable", [?MODULE]),
-    gen_server:cast(Server, cluster_stable),
     Server.
 
 
@@ -147,18 +147,18 @@ terminate(_Reason, _State) ->
 
 
 handle_call(is_stable, _From, #state{cluster_stable = IsStable} = State) ->
-    {reply, IsStable, State}.
+    {reply, IsStable, State};
+
+handle_call(set_stable, _From, State) ->
+    {reply, ok, State#state{cluster_stable = true}};
+
+handle_call(set_unstable, _From, State) ->
+    {reply, ok, State#state{cluster_stable = false}}.
 
 
 handle_cast({set_period, Period}, #state{mem3_cluster_pid = Pid} = State) ->
     ok = mem3_cluster:set_period(Pid, Period),
-    {noreply, State};
-
-handle_cast(cluster_stable, State) ->
-    {noreply, State#state{cluster_stable = true}};
-
-handle_cast(cluster_unstable, State) ->
-    {noreply, State#state{cluster_stable = false}}.
+    {noreply, State}.
 
 
 handle_info(restart_config_listener, State) ->
@@ -193,3 +193,56 @@ owner_int(ShardName, DocId) ->
     Shards = mem3:shards(DbName, DocId),
     Nodes = [N || #shard{node=N} <- Shards, lists:member(N, Live)],
     mem3:owner(DbName, DocId, Nodes).
+
+
+
+-ifdef(TEST).
+
+-include_lib("eunit/include/eunit.hrl").
+
+
+replicator_clustering_test_() ->
+    {
+        foreach,
+        fun setup/0,
+        fun teardown/1,
+        [
+            t_stable_callback(),
+            t_unstable_callback()
+        ]
+    }.
+
+
+t_stable_callback() ->
+    ?_test(begin
+        ?assertEqual(false, is_stable()),
+        cluster_stable(whereis(?MODULE)),
+        ?assertEqual(true, is_stable())
+    end).
+
+
+t_unstable_callback() ->
+    ?_test(begin
+        cluster_stable(whereis(?MODULE)),
+        ?assertEqual(true, is_stable()),
+        cluster_unstable(whereis(?MODULE)),
+        ?assertEqual(false, is_stable())
+    end).
+
+
+setup() ->
+    meck:expect(couch_log, notice, 2, ok),
+    meck:expect(config, get, fun(_, _, Default) -> Default end),
+    meck:expect(config, listen_for_changes, 2, ok),
+    meck:expect(couch_stats, update_gauge, 2, ok),
+    meck:expect(couch_replicator_notifier, notify, 1, ok),
+    {ok, Pid} = start_link(),
+    Pid.
+
+
+teardown(Pid) ->
+    unlink(Pid),
+    exit(Pid, kill),
+    meck:unload().
+
+-endif.
