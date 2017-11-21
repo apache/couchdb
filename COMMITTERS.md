@@ -32,7 +32,7 @@ mean this in the sense of being loyal to the project and its interests.
  * Klaus Trainer <klaus_trainer@apache.org>
  * Benjamin Young <bigbluehat@apache.org>
  * Robert Kowalski <robertkowalski@apache.org>
- * Max Thayer <garbados@apache.org>
+ * Diana Thayer <garbados@apache.org>
  * Gianugo Rabellino <gianugo@apache.org>
  * Jenn Schiffer <jenn@apache.org>
  * Lena Reinhard <lena@apache.org>
