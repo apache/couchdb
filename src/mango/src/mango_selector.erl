@@ -578,36 +578,46 @@ match({[_, _ | _] = _Props} = Sel, _Value, _Cmp) ->
 % until we match then all or run out of selector to
 % match against.
 
+has_required_fields(Selector, RequiredFields) ->
+    Remainder = has_required_fields_int(Selector, RequiredFields),
+    Remainder == [].
+
 % Empty selector
-has_required_fields({[]}, _) ->
-    false;
+has_required_fields_int({[]}, Remainder) ->
+    Remainder;
 
 % No more required fields
-has_required_fields(_, []) ->
-    true;
+has_required_fields_int(_, []) ->
+    [];
 
 % No more selector
-has_required_fields([], _) ->
-    false;
+has_required_fields_int([], Remainder) ->
+    Remainder;
 
-has_required_fields(Selector, RequiredFields) when not is_list(Selector) ->
-    has_required_fields([Selector], RequiredFields);
+has_required_fields_int(Selector, RequiredFields) when not is_list(Selector) ->
+    has_required_fields_int([Selector], RequiredFields);
 
 % We can "see" through $and operator. We ignore other
 % combination operators because they can't be used to restrict
 % an index.
-has_required_fields([{[{<<"$and">>, Args}]}], RequiredFields) 
+has_required_fields_int([{[{<<"$and">>, Args}]}], RequiredFields) 
         when is_list(Args) ->
-    has_required_fields(Args, RequiredFields);
+    has_required_fields_int(Args, RequiredFields);
 
-has_required_fields([{[{Field, Cond}]} | Rest], RequiredFields) ->
+% Handle $and operator where it has peers
+has_required_fields_int([{[{<<"$and">>, Args}]} | Rest], RequiredFields) 
+        when is_list(Args) ->
+    Remainder = has_required_fields_int(Args, RequiredFields),
+    has_required_fields_int(Rest, Remainder);
+
+has_required_fields_int([{[{Field, Cond}]} | Rest], RequiredFields) ->
     case Cond of
         % $exists:false is a special case - this is the only operator
         % that explicitly does not require a field to exist
         {[{<<"$exists">>, false}]} ->
-            has_required_fields(Rest, RequiredFields);
+            has_required_fields_int(Rest, RequiredFields);
         _ ->
-            has_required_fields(Rest, lists:delete(Field, RequiredFields))
+            has_required_fields_int(Rest, lists:delete(Field, RequiredFields))
     end.
 
 
@@ -650,6 +660,27 @@ has_required_fields_and_true_test() ->
     }]},
     Normalized = normalize(Selector),
     ?assertEqual(true, has_required_fields(Normalized, RequiredFields)).
+
+has_required_fields_nested_and_true_test() ->
+    RequiredFields = [<<"A">>, <<"B">>],
+    Selector1 = {[{<<"$and">>,
+          [
+              {[{<<"A">>, <<"foo">>}]}
+          ]
+    }]},
+    Selector2 = {[{<<"$and">>,
+          [
+              {[{<<"B">>, <<"foo">>}]}
+          ]
+    }]},
+    Selector = {[{<<"$and">>,
+          [
+              Selector1,
+              Selector2
+          ]
+    }]},
+
+    ?assertEqual(true, has_required_fields(Selector, RequiredFields)).
 
 has_required_fields_and_false_test() ->
     RequiredFields = [<<"A">>, <<"C">>],
