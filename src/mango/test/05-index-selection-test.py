@@ -28,6 +28,16 @@ class IndexSelectionTests:
             }, explain=True)
         self.assertEqual(resp["index"]["type"], "json")
 
+    def test_with_nested_and(self):
+        resp = self.db.find({
+                "name.first": {
+                    "$gt": "a",
+                    "$lt": "z"
+                },
+                "name.last": "Foo"
+            }, explain=True)
+        self.assertEqual(resp["index"]["type"], "json")
+
     def test_use_most_columns(self):
         # ddoc id for the age index
         ddocid = "_design/ad3d537c03cd7c6a43cf8dff66ef70ea54c2b40f"
