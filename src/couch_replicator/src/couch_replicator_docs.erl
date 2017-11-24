@@ -499,6 +499,11 @@ convert_options([{<<"create_target">>, V} | _R]) when not is_boolean(V)->
     throw({bad_request, <<"parameter `create_target` must be a boolean">>});
 convert_options([{<<"create_target">>, V} | R]) ->
     [{create_target, V} | convert_options(R)];
+convert_options([{<<"create_target_params">>, V} | _R]) when not is_tuple(V) ->
+    throw({bad_request,
+        <<"parameter `create_target_params` must be a JSON object">>});
+convert_options([{<<"create_target_params">>, V} | R]) ->
+    [{create_target_params, V} | convert_options(R)];
 convert_options([{<<"continuous">>, V} | _R]) when not is_boolean(V)->
     throw({bad_request, <<"parameter `continuous` must be a boolean">>});
 convert_options([{<<"continuous">>, V} | R]) ->
