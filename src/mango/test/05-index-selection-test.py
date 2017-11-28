@@ -181,6 +181,14 @@ class IndexSelectionTests:
             self.db.save_doc(design_doc)
 
 
+    def test_explain_sort_reverse(self):
+        selector = {
+            "manager": {"$gt": None}
+        }
+        resp_explain = self.db.find(selector, fields=["manager"], sort=[{"manager":"desc"}], explain=True)
+        self.assertEqual(resp_explain["index"]["type"], "json")
+        
+
 class JSONIndexSelectionTests(mango.UserDocsTests, IndexSelectionTests):
 
     @classmethod
