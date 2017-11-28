@@ -66,7 +66,7 @@ explain(Cursor) ->
         {include_docs, Args#mrargs.include_docs},
         {view_type, Args#mrargs.view_type},
         {reduce, Args#mrargs.reduce},
-        {start_key, Args#mrargs.start_key},
+        {start_key, maybe_replace_max_json(Args#mrargs.start_key)},
         {end_key, maybe_replace_max_json(Args#mrargs.end_key)},
         {direction, Args#mrargs.direction},
         {stable, Args#mrargs.stable},
