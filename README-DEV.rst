@@ -150,7 +150,7 @@ to make targets::
     make eunit apps=couch,chttpd
 
     # Run only tests from couch_btree_tests suite
-    make eunit suites=couch_btree_tests
+    make eunit apps=couch suites=couch_btree
 
     # Run only only specific tests
     make eunit tests=btree_open_test,reductions_test
