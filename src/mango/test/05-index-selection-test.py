@@ -46,7 +46,7 @@ class IndexSelectionTests:
                 "name.last": "Something or other",
                 "age": {"$gt": 1}
             }, explain=True)
-        self.assertNotEqual(resp["index"]["ddoc"], ddocid)
+        self.assertNotEqual(resp["index"]["ddoc"], "_design/" + ddocid)
 
         resp = self.db.find({
                 "name.first": "Stephanie",
@@ -107,6 +107,10 @@ class IndexSelectionTests:
         resp = self.db.find(selector, use_index=[ddocid,name], return_raw=True)
         self.assertEqual(resp["warning"], "{0}, {1} was not used because it is not a valid index for this query.".format(ddocid, name))
 
+        # should still return a correct result
+        for d in resp["docs"]:
+            self.assertEqual(d["company"], "Pharmex")
+
     def test_reject_use_index_sort_order(self):
         # index on ["company","manager"] which should not be valid
         # and there is no valid fallback (i.e. an index on ["company"])
@@ -135,6 +139,7 @@ class IndexSelectionTests:
 
         resp = self.db.find(selector, sort=["foo", "bar"], use_index=ddocid_invalid, return_raw=True)
         self.assertEqual(resp["warning"], '{0} was not used because it does not contain a valid index for this query.'.format(ddocid_invalid))    
+        self.assertEqual(len(resp["docs"]), 0)
 
     def test_prefer_use_index_over_optimal_index(self):
         # index on ["company"] even though index on ["company", "manager"] is better
