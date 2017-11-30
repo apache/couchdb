@@ -21,12 +21,12 @@ setup() ->
     DbName = ?tempdb(),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     couch_db:close(Db),
-    {ok, IndexerPid} = fake_index(Db),
+    fake_index(DbName),
+    {ok, IndexerPid} = couch_index_server:get_index(test_index, Db, undefined),
     ?assertNot(is_opened(Db)),
     {Db, IndexerPid}.
 
-fake_index(Db) ->
-    DbName = couch_db:name(Db),
+fake_index(DbName) ->
     ok = meck:new([test_index], [non_strict]),
     ok = meck:expect(test_index, init, ['_', '_'], {ok, 10}),
     ok = meck:expect(test_index, open, fun(_Db, State) ->
@@ -45,8 +45,10 @@ fake_index(Db) ->
         (update_seq, Seq) ->
             Seq
     end),
-
-    couch_index_server:get_index(test_index, Db, undefined).
+    ok = meck:expect(test_index, close, ['_'], ok),
+    ok = meck:expect(test_index, swap_compacted, fun(_, NewState) ->
+        {ok, NewState}
+    end).
 
 teardown(_) ->
     (catch meck:unload(test_index)),
