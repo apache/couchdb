@@ -152,43 +152,42 @@ group_indexes_by_type(Indexes) ->
 
 
 maybe_add_warning(UserFun, #cursor{index = Index, opts = Opts}, UserAcc) ->
-    UseIndexInvalid = case lists:keyfind(use_index, 1, Opts) of
+    NoIndexWarning = case Index#idx.type of
+        <<"special">> ->
+            <<"no matching index found, create an index to optimize query time">>;
+        _ ->
+            ok
+    end,
+
+    UseIndexInvalidWarning = case lists:keyfind(use_index, 1, Opts) of
         {use_index, []} ->
-            [];
+            NoIndexWarning;
         {use_index, [DesignId]} ->
             case filter_indexes([Index], DesignId) of
                 [] ->
-                    [fmt("_design/~s was not used because it does not contain a valid index for this query.", 
-                        [ddoc_name(DesignId)])];
+                    fmt("_design/~s was not used because it does not contain a valid index for this query.", 
+                        [ddoc_name(DesignId)]);
                 _ ->
-                    []
+                    NoIndexWarning
             end;
         {use_index, [DesignId, ViewName]} ->
             case filter_indexes([Index], DesignId, ViewName) of
                 [] ->
-                    [fmt("_design/~s, ~s was not used because it is not a valid index for this query.", 
-                        [ddoc_name(DesignId), ViewName])];
+                    fmt("_design/~s, ~s was not used because it is not a valid index for this query.", 
+                        [ddoc_name(DesignId), ViewName]);
                 _ ->
-                    []
+                    NoIndexWarning
             end
     end,
 
-    NoIndex = case Index#idx.type of
-        <<"special">> ->
-            [<<"no matching index found, create an index to optimize query time">>];
-        _ ->
-            []
-    end,
-
-    maybe_add_warning_int(UseIndexInvalid ++ NoIndex, UserFun, UserAcc).
+    maybe_add_warning_int(UseIndexInvalidWarning, UserFun, UserAcc).
 
 
-maybe_add_warning_int([], _, UserAcc) ->
+maybe_add_warning_int(ok, _, UserAcc) ->
    UserAcc;
 
-maybe_add_warning_int(Warnings, UserFun, UserAcc) ->
-    % only include the first warning
-    Arg = {add_key, warning, hd(Warnings)},
+maybe_add_warning_int(Warning, UserFun, UserAcc) ->
+    Arg = {add_key, warning, Warning},
     {_Go, UserAcc0} = UserFun(Arg, UserAcc),
     UserAcc0.
 
