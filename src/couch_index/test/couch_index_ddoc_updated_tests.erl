@@ -25,7 +25,7 @@ start() ->
 
 
 stop({Ctx, DbName}) ->
-    (catch meck:unload(test_index)),
+    meck:unload(test_index),
     ok = fabric:delete_db(DbName, [?ADMIN_CTX]),
     DbDir = config:get("couchdb", "database_dir", "."),
     WaitFun = fun() ->

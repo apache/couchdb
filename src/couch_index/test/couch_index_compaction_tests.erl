@@ -51,9 +51,7 @@ fake_index(DbName) ->
     end).
 
 teardown(_) ->
-    (catch meck:unload(test_index)),
-    (catch meck:unload(couch_util)),
-    ok.
+    meck:unload(test_index).
 
 compaction_test_() ->
     {
