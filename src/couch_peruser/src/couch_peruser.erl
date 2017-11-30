@@ -34,7 +34,8 @@
     db_name :: binary(),
     delete_dbs :: boolean(),
     changes_pid :: pid(),
-    changes_ref :: reference()
+    changes_ref :: reference(),
+    q_for_peruser_db :: integer()
 }).
 
 -record(state, {
@@ -43,7 +44,8 @@
     delete_dbs :: boolean(),
     states :: list(),
     mem3_cluster_pid :: pid(),
-    cluster_stable :: boolean()
+    cluster_stable :: boolean(),
+    q_for_peruser_db :: integer()
 }).
 
 -define(USERDB_PREFIX, "userdb-").
@@ -70,6 +72,8 @@ init_state() ->
         DbName = ?l2b(config:get(
                          "couch_httpd_auth", "authentication_db", "_users")),
         DeleteDbs = config:get_boolean("couch_peruser", "delete_dbs", false),
+        Q = config:get_integer("couch_peruser", "q", 1),
+
 
         % set up cluster-stable listener
         Period = abs(config:get_integer("couch_peruser", "cluster_quiet_period",
@@ -85,7 +89,8 @@ init_state() ->
             db_name = DbName,
             delete_dbs = DeleteDbs,
             mem3_cluster_pid = Mem3Cluster,
-            cluster_stable = false
+            cluster_stable = false,
+            q_for_peruser_db = Q
         }
     end.
 
@@ -95,14 +100,15 @@ start_listening(#state{states=ChangesStates}=State)
     when length(ChangesStates) > 0 ->
     % couch_log:debug("peruser: start_listening() already run on node ~p in pid ~p", [node(), self()]),
     State;
-start_listening(#state{db_name=DbName, delete_dbs=DeleteDbs} = State) ->
+start_listening(#state{db_name=DbName, delete_dbs=DeleteDbs, q_for_peruser_db = Q} = State) ->
     % couch_log:debug("peruser: start_listening() on node ~p", [node()]),
     try
         States = lists:map(fun (A) ->
             S = #changes_state{
                 parent = State#state.parent,
                 db_name = A#shard.name,
-                delete_dbs = DeleteDbs
+                delete_dbs = DeleteDbs,
+                q_for_peruser_db = Q
             },
             {Pid, Ref} = spawn_opt(
                 ?MODULE, init_changes_handler, [S], [link, monitor]),
@@ -138,7 +144,7 @@ init_changes_handler(#changes_state{db_name=DbName} = ChangesState) ->
 changes_handler(
     {change, {Doc}, _Prepend},
     _ResType,
-    ChangesState=#changes_state{db_name=DbName}) ->
+    ChangesState=#changes_state{db_name=DbName, q_for_peruser_db = Q}) ->
     % couch_log:debug("peruser: changes_handler() on DbName/Doc ~p/~p", [DbName, Doc]),
 
     case couch_util:get_value(<<"id">>, Doc) of
@@ -147,7 +153,7 @@ changes_handler(
         true ->
             case couch_util:get_value(<<"deleted">>, Doc, false) of
             false ->
-                UserDb = ensure_user_db(User),
+                UserDb = ensure_user_db(User, Q),
                 ok = ensure_security(User, UserDb, fun add_user/3),
                 ChangesState;
             true ->
@@ -214,13 +220,13 @@ delete_user_db(User) ->
     end,
     UserDb.
 
--spec ensure_user_db(User :: binary()) -> binary().
-ensure_user_db(User) ->
+-spec ensure_user_db(User :: binary(), Q :: integer()) -> binary().
+ensure_user_db(User, Q) ->
     UserDb = user_db_name(User),
     try
         {ok, _DbInfo} = fabric:get_db_info(UserDb)
     catch error:database_does_not_exist ->
-        case fabric:create_db(UserDb, [?ADMIN_CTX]) of
+        case fabric:create_db(UserDb, [?ADMIN_CTX, {q, integer_to_list(Q)}]) of
         {error, file_exists} -> ok;
         ok -> ok;
         accepted -> ok
