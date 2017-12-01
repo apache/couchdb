@@ -1,6 +1,8 @@
 defmodule BasicsTest do
   use CouchTestCase
 
+  @moduletag :basics
+
   @moduledoc """
   Test CouchDB basics.
   This is a port of the basics.js suite
@@ -19,7 +21,9 @@ defmodule BasicsTest do
   @tag :with_db
   test "PUT on existing DB should return 412 instead of 500", context do
     db_name = context[:db_name]
-    assert Couch.put("/#{db_name}").status_code == 412
+    resp = Couch.put("/#{db_name}")
+    assert resp.status_code == 412
+    refute resp.body["ok"]
   end
 
   @tag :with_db_name
@@ -114,5 +118,157 @@ defmodule BasicsTest do
     #assert resp3.body["_rev"] == new_rev
   end
 
+  @tag :with_db
+  test "Simple map functions", context do
+    db_name = context[:db_name]
+    map_fun = "function(doc) { if (doc.a==4) { emit(null, doc.b); } }"
+    red_fun = "function(keys, values) { return sum(values); }"
+    map_doc = %{:views => %{:baz => %{:map => map_fun}}}
+    red_doc = %{:views => %{:baz => %{:map => map_fun, :reduce => red_fun}}}
 
+    # Bootstrap database and ddoc
+    assert Couch.post("/#{db_name}", [body: %{:_id => "0", :a => 1, :b => 1}]).body["ok"]
+    assert Couch.post("/#{db_name}", [body: %{:_id => "1", :a => 2, :b => 4}]).body["ok"]
+    assert Couch.post("/#{db_name}", [body: %{:_id => "2", :a => 3, :b => 9}]).body["ok"]
+    assert Couch.post("/#{db_name}", [body: %{:_id => "3", :a => 4, :b => 16}]).body["ok"]
+    assert Couch.put("/#{db_name}/_design/foo", [body: map_doc]).body["ok"]
+    assert Couch.put("/#{db_name}/_design/bar", [body: red_doc]).body["ok"]
+    assert Couch.get("/#{db_name}").body["doc_count"] == 6
+
+    # Initial view query test
+    resp = Couch.get("/#{db_name}/_design/foo/_view/baz")
+    assert resp.body["total_rows"] == 1
+    assert hd(resp.body["rows"])["value"] == 16
+
+    # Modified doc and test for updated view results
+    doc0 = Couch.get("/#{db_name}/0").body
+    doc0 = Map.put(doc0, :a, 4)
+    assert Couch.put("/#{db_name}/0", [body: doc0]).body["ok"]
+    resp = Couch.get("/#{db_name}/_design/foo/_view/baz")
+    assert resp.body["total_rows"] == 2
+
+    # Write 2 more docs and test for updated view results
+    assert Couch.post("/#{db_name}", [body: %{:a => 3, :b => 9}]).body["ok"]
+    assert Couch.post("/#{db_name}", [body: %{:a => 4, :b => 16}]).body["ok"]
+    resp = Couch.get("/#{db_name}/_design/foo/_view/baz")
+    assert resp.body["total_rows"] == 3
+    assert Couch.get("/#{db_name}").body["doc_count"] == 8
+
+    # Test reduce function
+    resp = Couch.get("/#{db_name}/_design/bar/_view/baz")
+    assert hd(resp.body["rows"])["value"] == 33
+
+    # Delete doc and test for updated view results
+    doc0 = Couch.get("/#{db_name}/0").body
+    assert Couch.delete("/#{db_name}/0?rev=#{doc0["_rev"]}").body["ok"]
+    resp = Couch.get("/#{db_name}/_design/foo/_view/baz")
+    assert resp.body["total_rows"] == 2
+    assert Couch.get("/#{db_name}").body["doc_count"] == 7
+    assert Couch.get("/#{db_name}/0").status_code == 404
+    refute Couch.get("/#{db_name}/0?rev=#{doc0["_rev"]}").status_code == 404
+  end
+
+  @tag :with_db
+  test "POST doc response has a Location header", context do
+    db_name = context[:db_name]
+    resp = Couch.post("/#{db_name}", [body: %{:foo => :bar}])
+    assert resp.body["ok"]
+    loc = resp.headers["Location"]
+    assert loc, "should have a Location header"
+    locs = Enum.reverse(String.split(loc, "/"))
+    assert hd(locs) == resp.body["id"]
+    assert hd(tl(locs)) == db_name
+  end
+
+  @tag :with_db
+  test "POST doc with an _id field isn't overwritten by uuid", context do
+    db_name = context[:db_name]
+    resp = Couch.post("/#{db_name}", [body: %{:_id => "oppossum", :yar => "matey"}])
+    assert resp.body["ok"]
+    assert resp.body["id"] == "oppossum"
+    assert Couch.get("/#{db_name}/oppossum").body["yar"] == "matey"
+  end
+
+  @tag :with_db
+  test "PUT doc has a Location header", context do
+    db_name = context[:db_name]
+    resp = Couch.put("/#{db_name}/newdoc", [body: %{:a => 1}])
+    assert String.ends_with?(resp.headers["location"], "/#{db_name}/newdoc")
+    # TODO: make protocol check use defined protocol value
+    assert String.starts_with?(resp.headers["location"], "http")
+  end
+
+  @tag :with_db
+  test "DELETE'ing a non-existent doc should 404", context do
+    db_name = context[:db_name]
+    assert Couch.delete("/#{db_name}/doc-does-not-exist").status_code == 404
+  end
+
+  @tag :with_db
+  test "Check for invalid document members", context do
+    db_name = context[:db_name]
+    bad_docs = [
+      {:goldfish, %{:_zing => 4}},
+      {:zebrafish, %{:_zoom => "hello"}},
+      {:mudfish, %{:zane => "goldfish", :_fan => "something smells delicious"}},
+      {:tastyfish, %{:_bing => %{"wha?" => "soda can"}}}
+    ]
+
+    Enum.each(bad_docs, fn {id, doc} ->
+      resp = Couch.put("/#{db_name}/#{id}", [body: doc])
+      assert resp.status_code == 400
+      assert resp.body["error"] == "doc_validation"
+
+      resp = Couch.post("/#{db_name}", [body: doc])
+      assert resp.status_code == 400
+      assert resp.body["error"] == "doc_validation"
+    end)
+  end
+
+  @tag :with_db
+  test "PUT error when body not an object", context do
+    db_name = context[:db_name]
+    resp = Couch.put("/#{db_name}/bar", [body: "[]"])
+    assert resp.status_code == 400
+    assert resp.body["error"] == "bad_request"
+    assert resp.body["reason"] == "Document must be a JSON object"
+  end
+
+  @tag :with_db
+  test "_bulk_docs POST error when body not an object", context do
+    db_name = context[:db_name]
+    resp = Couch.post("/#{db_name}/_bulk_docs", [body: "[]"])
+    assert resp.status_code == 400
+    assert resp.body["error"] == "bad_request"
+    assert resp.body["reason"] == "Request body must be a JSON object"
+  end
+
+  @tag :with_db
+  test "_all_docs POST error when multi-get is not a {'key': [...]} structure", context do
+    db_name = context[:db_name]
+    resp = Couch.post("/#{db_name}/_all_docs", [body: "[]"])
+    assert resp.status_code == 400
+    assert resp.body["error"] == "bad_request"
+    assert resp.body["reason"] == "Request body must be a JSON object"
+
+    resp = Couch.post("/#{db_name}/_all_docs", [body: %{:keys => 1}])
+    assert resp.status_code == 400
+    assert resp.body["error"] == "bad_request"
+    assert resp.body["reason"] == "`keys` body member must be an array."
+  end
+
+  @tag :with_db
+  test "oops, the doc id got lost in code nirwana", context do
+    db_name = context[:db_name]
+    resp = Couch.delete("/#{db_name}/?rev=foobarbaz")
+    assert resp.status_code == 400, "should return a bad request"
+    assert resp.body["error"] == "bad_request"
+    assert resp.body["reason"] == "You tried to DELETE a database with a ?=rev parameter. Did you mean to DELETE a document instead?"
+  end
+
+  @tag :with_db
+  test "On restart, a request for creating an already existing db can not override", context do
+    # TODO
+    assert true
+  end
 end
