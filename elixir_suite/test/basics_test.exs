@@ -92,11 +92,12 @@ defmodule BasicsTest do
   test "Can create several documents", context do
     db_name = context[:db_name]
     assert Couch.post("/#{db_name}", [body: %{:_id => "1", :a => 2, :b => 4}]).body["ok"]
-    assert Couch.post("/#{db_name}", [body: %{:_id => "2", :a => 3, :b => 9}])
+    assert Couch.post("/#{db_name}", [body: %{:_id => "2", :a => 3, :b => 9}]).body["ok"]
     assert Couch.post("/#{db_name}", [body: %{:_id => "3", :a => 4, :b => 16}]).body["ok"]
     assert Couch.get("/#{db_name}").body["doc_count"] == 3
   end
 
+  @tag :pending
   @tag :with_db
   test "Regression test for COUCHDB-954", context do
     db_name = context[:db_name]
@@ -189,6 +190,7 @@ defmodule BasicsTest do
     assert Couch.get("/#{db_name}/oppossum").body["yar"] == "matey"
   end
 
+  @tag :pending
   @tag :with_db
   test "PUT doc has a Location header", context do
     db_name = context[:db_name]
@@ -266,6 +268,7 @@ defmodule BasicsTest do
     assert resp.body["reason"] == "You tried to DELETE a database with a ?=rev parameter. Did you mean to DELETE a document instead?"
   end
 
+  @tag :pending
   @tag :with_db
   test "On restart, a request for creating an already existing db can not override", context do
     # TODO
