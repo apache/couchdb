@@ -47,9 +47,9 @@ handle_cast({add_task, [Retry, TotalChanges]}, State) ->
         ]);
     false ->
         couch_task_status:add_task(TaskProps0),
-        couch_task_status:set_update_frequency(?TIMEOUT),
-        erlang:send_after(800, self(), track_fsize)
+        couch_task_status:set_update_frequency(?TIMEOUT)
     end,
+    erlang:send_after(?TIMEOUT + 300, self(), track_fsize),
     {noreply, State};
 handle_cast({update_task, NumChanges}, State) ->
     [Changes, Total] = couch_task_status:get([changes_done, total_changes]),
@@ -62,6 +62,9 @@ handle_cast({update_task, NumChanges}, State) ->
     end,
     couch_task_status:update([{changes_done, Changes2}, {progress, Progress}]),
     {noreply, State};
+handle_cast({update_merge_progress, Progress}, State) ->
+    couch_task_status:update([{progress, Progress}]),
+    {noreply, State};
 handle_cast(merge, State) ->
     couch_task_status:update([{merged_on, timestamp()}]),
     {noreply, State};
@@ -71,9 +74,8 @@ handle_cast(_Msg, State) ->
     {noreply, State}.
 
 handle_info(track_fsize, #state{filepath=Filepath, stop=Stop}=State) ->
-    case Stop of
-        true -> ok;
-        _ -> erlang:send_after(?TIMEOUT, self(), track_fsize)
+    if Stop == true -> ok; true ->
+        erlang:send_after(?TIMEOUT, self(), track_fsize)
     end,
     Meta = Filepath ++ ".compact.meta",
     Data = Filepath ++ ".compact.data",

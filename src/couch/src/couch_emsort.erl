@@ -136,6 +136,8 @@
 -record(ems, {
     fd,
     root,
+    added = 0,
+    merged = 0,
     bb_chunk = 10,
     chain_chunk = 100
 }).
@@ -151,6 +153,10 @@ open(Fd, Options) ->
 
 set_options(Ems, []) ->
     Ems;
+set_options(Ems, [{added, Added} | Rest]) ->
+    set_options(Ems#ems{added=Added}, Rest);
+set_options(Ems, [{merged, Merged} | Rest]) ->
+    set_options(Ems#ems{merged=Merged}, Rest);
 set_options(Ems, [{root, Root} | Rest]) ->
     set_options(Ems#ems{root=Root}, Rest);
 set_options(Ems, [{chain_chunk, Count} | Rest]) when is_integer(Count) ->
@@ -163,8 +169,8 @@ get_fd(#ems{fd=Fd}) ->
     Fd.
 
 
-get_state(#ems{root=Root}) ->
-    Root.
+get_state(#ems{root=Root, added=Added}) ->
+    [{root, Root},{added,Added}].
 
 
 add(Ems, []) ->
@@ -201,11 +207,11 @@ next({Ems, Chains}) ->
     {ok, KV, {Ems, RestChains}}.
 
 
-add_bb_pos(#ems{root=undefined}=Ems, Pos) ->
-    Ems#ems{root={[Pos], nil}};
-add_bb_pos(#ems{root={BB, Prev}}=Ems, Pos) ->
+add_bb_pos(#ems{root=undefined, added=ACount}=Ems, Pos) ->
+    Ems#ems{root={[Pos], nil}, added=ACount+1};
+add_bb_pos(#ems{root={BB, Prev}, added=ACount}=Ems, Pos) ->
     {NewBB, NewPrev} = append_item(Ems, {BB, Prev}, Pos, Ems#ems.bb_chunk),
-    Ems#ems{root={NewBB, NewPrev}}.
+    Ems#ems{root={NewBB, NewPrev}, added=ACount+1}.
 
 
 write_kvs(Ems, KVs) ->
@@ -254,7 +260,28 @@ merge_rest_back_bone(Ems, Choose, BBPos, Acc) ->
     {ok, {BB, NextBB}} = couch_file:pread_term(Ems#ems.fd, BBPos),
     NewPos = merge_chains(Ems, Choose, BB),
     {NewBB, NewPrev} = append_item(Ems, Acc, NewPos, Ems#ems.bb_chunk),
-    merge_rest_back_bone(Ems, Choose, NextBB, {NewBB, NewPrev}).
+
+    MCount =
+    case Choose of
+    small -> 
+        Merged = Ems#ems.merged + Ems#ems.bb_chunk,
+        case erlang:get(status_updater) of
+        undefined -> 
+            ok;
+        Pid -> 
+            Progress = 
+            case ok of
+                _ when Ems#ems.merged < Ems#ems.added -> (Merged * 100) div Ems#ems.added;
+                _ -> 100
+            end,
+            gen_server:cast(Pid, {update_merge_progress, Progress})
+        end,    
+        Merged;
+    _Else -> 
+        Ems#ems.merged
+    end,
+
+    merge_rest_back_bone(Ems#ems{merged=MCount}, Choose, NextBB, {NewBB, NewPrev}).
 
 
 merge_chains(Ems, Choose, BB) ->
