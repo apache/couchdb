@@ -66,7 +66,7 @@ explain(Cursor) ->
         {include_docs, Args#mrargs.include_docs},
         {view_type, Args#mrargs.view_type},
         {reduce, Args#mrargs.reduce},
-        {start_key, Args#mrargs.start_key},
+        {start_key, maybe_replace_max_json(Args#mrargs.start_key)},
         {end_key, maybe_replace_max_json(Args#mrargs.end_key)},
         {direction, Args#mrargs.direction},
         {stable, Args#mrargs.stable},
@@ -137,7 +137,7 @@ execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFu
                     {_Go, FinalUserAcc} = UserFun(Arg, LastCursor#cursor.user_acc),
                     Stats0 = LastCursor#cursor.execution_stats,
                     FinalUserAcc0 = mango_execution_stats:maybe_add_stats(Opts, UserFun, Stats0, FinalUserAcc),
-                    FinalUserAcc1 = mango_cursor:maybe_add_warning(UserFun, Idx, FinalUserAcc0),
+                    FinalUserAcc1 = mango_cursor:maybe_add_warning(UserFun, Cursor, FinalUserAcc0),
                     {ok, FinalUserAcc1};
                 {error, Reason} ->
                     {error, Reason}
