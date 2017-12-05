@@ -159,6 +159,18 @@ class BasicFindTests(mango.UserDocsTests):
         assert len(docs) == 1
         assert docs[0]["user_id"] == 7
 
+    def test_multi_cond_duplicate_field(self):
+        # need to explicitly define JSON as dict won't allow duplicate keys
+        body = ("{\"selector\":{\"location.city\":{\"$regex\": \"^L+\"},"
+                "\"location.city\":{\"$exists\":true}}}") 
+        r = self.db.sess.post(self.db.path("_find"), data=body)
+        r.raise_for_status()
+        docs = r.json()["docs"]
+
+        # expectation is that only the second instance
+        # of the "location.city" field is used
+        self.assertEqual(len(docs), 15)
+
     def test_multi_cond_or(self):
         docs = self.db.find({
                 "$and":[
