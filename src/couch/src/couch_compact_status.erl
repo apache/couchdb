@@ -32,8 +32,8 @@ handle_cast({add_task, [Retry, TotalChanges]}, State) ->
         {database, State#state.dbname},
         {progress, 0},
         {changes_done, 0},
-        {meta_size, 0},
-        {data_size, 0},
+        {compact_meta_size, 0},
+        {compact_data_size, 0},
         {merged_on, 0},
         {total_changes, TotalChanges}
     ],
@@ -81,7 +81,7 @@ handle_info(track_fsize, #state{filepath=Filepath, stop=Stop}=State) ->
     Data = Filepath ++ ".compact.data",
     MetaSize = filelib:file_size(Meta),
     DataSize = filelib:file_size(Data),
-    couch_task_status:update([{meta_size, MetaSize}, {data_size, DataSize}]),
+    couch_task_status:update([{compact_meta_size, MetaSize}, {compact_data_size, DataSize}]),
     {noreply, State};
 handle_info({'EXIT', _From, Reason}, State) ->
     {stop, Reason, State};
