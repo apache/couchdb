@@ -30,4 +30,10 @@ defmodule Couch do
   def process_response_body(body) do
     body |> IO.iodata_to_binary |> :jiffy.decode([:return_maps])
   end
+
+  def login(user, pass) do
+    resp = Couch.post("/_session", body: %{:username => user, :password => pass})
+    true = resp.body["ok"]
+    resp.body
+  end
 end
