@@ -1326,7 +1326,11 @@ bind_emsort(Db, Fd, nil) ->
     {ok, Ems} = couch_emsort:open(Fd),
     Db#db{id_tree=Ems};
 bind_emsort(Db, Fd, State) ->
-    {ok, Ems} = couch_emsort:open(Fd, State),
+    {ok, Ems} =
+    case State of
+        [{root, _},{added,_}] -> couch_emsort:open(Fd, State);
+        _ ->  couch_emsort:open(Fd, [{root, State}])
+    end,
     Db#db{id_tree=Ems}.
 
 
