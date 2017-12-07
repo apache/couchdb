@@ -1,8 +1,6 @@
 defmodule UUIDsTest do
   use CouchTestCase
 
-  @moduletag :config
-
   @moduledoc """
   Test CouchDB UUIDs API
   This is a port of the uuids.js suite
