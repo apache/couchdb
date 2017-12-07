@@ -1,11 +1,6 @@
 ExUnit.configure(exclude: [pending: true])
 ExUnit.start()
 
-# TODO
-#def random_db_name do
-#  "asdf"
-#end
-
 defmodule CouchTestCase do
   use ExUnit.Case
 
