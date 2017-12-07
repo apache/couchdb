@@ -1,0 +1,2 @@
+all:
+	mix test --trace
