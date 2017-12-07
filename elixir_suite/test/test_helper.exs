@@ -15,31 +15,36 @@ defmodule CouchTestCase do
       use ExUnit.Case
 
       setup context do
-        {:ok, db_context} = set_db_context(context)
-        {:ok, cfg_context} = set_config_context(context)
-        {:ok, db_context ++ cfg_context}
+        setup_funs = [
+          &set_db_context/1,
+          &set_config_context/1
+        ]
+        context = Enum.reduce(setup_funs, context, fn setup_fun, acc ->
+          setup_fun.(acc)
+        end)
+        {:ok, context}
       end
 
       def set_db_context(context) do
-        db_name = if context[:with_db] != nil or context[:with_db_name] != nil do
-          if context[:with_db] != nil and context[:with_db] != true do
-            context[:with_db]
-          else
-            case context[:with_db_name] do
-              nil -> random_db_name()
-              true -> random_db_name()
-              name -> name
-            end
-          end
+        context = case context do
+          %{:with_db_name => true} ->
+            Map.put(context, :db_name, random_db_name())
+          %{:with_db_name => db_name} when is_binary(db_name) ->
+            Map.put(context, :db_name, db_name)
+          %{:with_db => true} ->
+            Map.put(context, :db_name, random_db_name())
+          %{:with_db => db_name} when is_binary(db_name) ->
+            Map.put(context, :db_name, db_name)
+          _ ->
+            context
         end
 
-        if context[:with_db] != nil do
-          {:ok, _} = create_db(db_name)
-
-          on_exit(fn -> delete_db(db_name) end)
+        if Map.has_key? context, :with_db do
+          {:ok, _} = create_db(context[:db_name])
+          on_exit(fn -> delete_db(context[:db_name]) end)
         end
 
-        {:ok, db_name: db_name}
+        context
       end
 
       def set_config_context(context) do
@@ -48,7 +53,7 @@ defmodule CouchTestCase do
             set_config(cfg)
           end)
         end
-        {:ok, []}
+        context
       end
 
       def random_db_name do
