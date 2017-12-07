@@ -79,9 +79,10 @@ defmodule UUIDsTest do
     assert u1 < u2
   end
 
+  @utc_id_suffix "frog"
   @tag config: [
     {"uuids", "algorithm", "utc_id"},
-    {"uuids", "utc_id_suffix", "frog"}
+    {"uuids", "utc_id_suffix", @utc_id_suffix}
   ]
   test "utc_id uuids are correct" do
     resp = Couch.get("/_uuids", query: %{:count => 10})
@@ -89,8 +90,8 @@ defmodule UUIDsTest do
     [uuid | rest_uuids] = resp.body["uuids"]
 
     Enum.reduce(rest_uuids, uuid, fn curr, acc ->
-      assert String.length(curr) == 14 + String.length("frog")
-      assert String.slice(curr, 14..-1) == "frog"
+      assert String.length(curr) == 14 + String.length(@utc_id_suffix)
+      assert String.slice(curr, 14..-1) == @utc_id_suffix
       assert curr > acc
       curr
     end)
