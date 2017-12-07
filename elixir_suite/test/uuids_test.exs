@@ -50,10 +50,7 @@ defmodule UUIDsTest do
   test "sequential uuids are sequential" do
     resp = Couch.get("/_uuids", query: %{:count => 1000})
     assert resp.status_code == 200
-    [uuid | rest_uuids] = resp.body["uuids"]
-
-    assert String.length(uuid) == 32
-    Enum.reduce(rest_uuids, uuid, fn curr, acc ->
+    Enum.reduce(resp.body["uuids"], fn curr, acc ->
       assert String.length(curr) == 32
       assert acc < curr
       curr
@@ -87,9 +84,7 @@ defmodule UUIDsTest do
   test "utc_id uuids are correct" do
     resp = Couch.get("/_uuids", query: %{:count => 10})
     assert resp.status_code == 200
-    [uuid | rest_uuids] = resp.body["uuids"]
-
-    Enum.reduce(rest_uuids, uuid, fn curr, acc ->
+    Enum.reduce(resp.body["uuids"], fn curr, acc ->
       assert String.length(curr) == 14 + String.length(@utc_id_suffix)
       assert String.slice(curr, 14..-1) == @utc_id_suffix
       assert curr > acc
