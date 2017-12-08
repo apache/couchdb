@@ -135,7 +135,6 @@
 ^src/couchjs-node/Makefile.in
 ^src/couch_dbupdates
 ^src/ejson/.*
-^src/etap/.*
 ^src/fauxton/app/addons/config/assets/less/config.less
 ^src/fauxton/assets/css/codemirror.css
 ^src/fauxton/assets/css/nv.d3.css
@@ -171,9 +170,7 @@
 ^src/ddoc_cache/README.md
 ^src/ets_lru/ebin/.*.beam
 ^src/ets_lru/ebin/ets_lru.app
-^src/ets_lru/test/etap.erl
 ^src/ejson/.*
-^src/etap/.*
 ^src/fabric/ebin/.*.beam
 ^src/fabric/ebin/fabric.app
 ^src/ibrowse/.*
@@ -190,15 +187,6 @@
 ^stamp-h1
 ^test/Makefile
 ^test/Makefile.in
-^test/etap/.*.beam
-^test/etap/.*.o
-^test/etap/etap.erl
-^test/etap/.deps/.*
-^test/etap/test_cfg_register
-^test/etap/Makefile
-^test/etap/Makefile.in
-^test/etap/temp..*
-^test/etap/fixtures/*
 ^test/javascript/Makefile
 ^test/javascript/Makefile.in
 ^test/local.ini
