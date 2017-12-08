@@ -17,18 +17,13 @@
 -define(TIMEOUT, 120).
 
 
-setup() ->
-    Ctx = test_util:start_couch(),
-    config:set("log", "include_sasl", "false", false),
-    Ctx.
-
 
 create_delete_db_test_()->
     {
         "Database create/delete tests",
         {
             setup,
-            fun setup/0, fun test_util:stop_couch/1,
+            fun test_util:start_couch/0, fun test_util:stop_couch/1,
             fun(_) ->
                 [should_create_db(),
                  should_delete_db(),
@@ -44,7 +39,7 @@ open_db_test_()->
         "Database open tests",
         {
             setup,
-            fun setup/0, fun test_util:stop_couch/1,
+            fun test_util:start_couch/0, fun test_util:stop_couch/1,
             fun(_) ->
                 [should_create_db_if_missing()]
             end
