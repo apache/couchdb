@@ -67,7 +67,7 @@ cluster_stable(Server) ->
 
 init(ChildMod) ->
     {ok, _Mem3Cluster} = mem3_cluster:start_link(?MODULE, self(),
-        ?CLUSTER_STABILITY_PERIOD_SEC, ?CLUSTER_STABILITY_PERIOD_SEC),
+        cluster_stability_period(), cluster_stability_period()),
     {ok, ChildMod}.
 
 
@@ -172,3 +172,7 @@ stop_server(ChildMod, ChildId) ->
 
 sup_module(ChildMod) ->
     list_to_atom(lists:concat([ChildMod, "_sup"])).
+
+
+cluster_stability_period() ->
+    config:get_integer("rexi", "cluster_stability_period", 300).
