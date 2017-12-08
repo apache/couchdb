@@ -53,69 +53,83 @@ open_db_test_()->
 
 
 should_create_db() ->
-    DbName = ?tempdb(),
-    {ok, Db} = couch_db:create(DbName, []),
-    ok = couch_db:close(Db),
-    {ok, AllDbs} = couch_server:all_databases(),
-    ?_assert(lists:member(DbName, AllDbs)).
+    ?_test(begin
+        DbName = ?tempdb(),
+        {ok, Before} = couch_server:all_databases(),
+        ?assertNot(lists:member(DbName, Before)),
+        {ok, Db} = couch_db:create(DbName, []),
+        ok = couch_db:close(Db),
+        {ok, After} = couch_server:all_databases(),
+        ?assert(lists:member(DbName, After))
+    end).
 
 should_delete_db() ->
-    DbName = ?tempdb(),
-    couch_db:create(DbName, []),
-    couch_server:delete(DbName, []),
-    {ok, AllDbs} = couch_server:all_databases(),
-    ?_assertNot(lists:member(DbName, AllDbs)).
+    ?_test(begin
+        DbName = ?tempdb(),
+        couch_db:create(DbName, []),
+        {ok, Before} = couch_server:all_databases(),
+        ?assert(lists:member(DbName, Before)),
+        couch_server:delete(DbName, []),
+        {ok, After} = couch_server:all_databases(),
+        ?assertNot(lists:member(DbName, After))
+    end).
 
 should_create_multiple_dbs() ->
-    gen_server:call(couch_server, {set_max_dbs_open, 3}),
+    ?_test(begin
+        gen_server:call(couch_server, {set_max_dbs_open, 3}),
 
-    DbNames = [?tempdb() || _ <- lists:seq(1, 6)],
-    lists:foreach(fun(DbName) ->
-        {ok, Db} = couch_db:create(DbName, []),
-        ok = couch_db:close(Db)
-    end, DbNames),
+        DbNames = [?tempdb() || _ <- lists:seq(1, 6)],
+        {ok, Before} = couch_server:all_databases(),
+        [?assertNot(lists:member(DbName, Before))  || DbName <- DbNames],
 
-    {ok, AllDbs} = couch_server:all_databases(),
-    NumCreated = lists:foldl(fun(DbName, Acc) ->
-        ?assert(lists:member(DbName, AllDbs)),
-        Acc+1
-    end, 0, DbNames),
+        lists:foreach(fun(DbName) ->
+            {ok, Db} = couch_db:create(DbName, []),
+            ok = couch_db:close(Db)
+        end, DbNames),
 
-    ?_assertEqual(NumCreated, 6).
+        {ok, After} = couch_server:all_databases(),
+        [?assert(lists:member(DbName, After)) || DbName <- DbNames]
+    end).
 
 should_delete_multiple_dbs() ->
-    DbNames = [?tempdb() || _ <- lists:seq(1, 6)],
-    lists:foreach(fun(DbName) ->
-        {ok, Db} = couch_db:create(DbName, []),
-        ok = couch_db:close(Db)
-    end, DbNames),
+    ?_test(begin
+        DbNames = [?tempdb() || _ <- lists:seq(1, 6)],
+        lists:foreach(fun(DbName) ->
+            {ok, Db} = couch_db:create(DbName, []),
+            ok = couch_db:close(Db)
+        end, DbNames),
 
-    lists:foreach(fun(DbName) ->
-        ok = couch_server:delete(DbName, [])
-    end, DbNames),
+        lists:foreach(fun(DbName) ->
+            ok = couch_server:delete(DbName, [])
+        end, DbNames),
 
-    {ok, AllDbs} = couch_server:all_databases(),
-    NumDeleted = lists:foldl(fun(DbName, Acc) ->
-        ?assertNot(lists:member(DbName, AllDbs)),
-        Acc + 1
-    end, 0, DbNames),
+        {ok, AllDbs} = couch_server:all_databases(),
+        NumDeleted = lists:foldl(fun(DbName, Acc) ->
+            ?assertNot(lists:member(DbName, AllDbs)),
+            Acc + 1
+        end, 0, DbNames),
 
-    ?_assertEqual(NumDeleted, 6).
+        ?assertEqual(NumDeleted, 6)
+    end).
 
 should_create_delete_database_continuously() ->
-    DbName = ?tempdb(),
-    {ok, Db} = couch_db:create(DbName, []),
-    couch_db:close(Db),
-    [{timeout, ?TIMEOUT, {integer_to_list(N) ++ " times",
-                           ?_assert(loop(DbName, N))}}
-     || N <- [10, 100]].
+    ?_test(begin
+        DbName = ?tempdb(),
+        {ok, Db} = couch_db:create(DbName, []),
+        couch_db:close(Db),
+        [{timeout, ?TIMEOUT, {integer_to_list(N) ++ " times",
+                               ?assert(loop(DbName, N))}}
+         || N <- [10, 100]]
+    end).
 
 should_create_db_if_missing() ->
-    DbName = ?tempdb(),
-    {ok, Db} = couch_db:open(DbName, [{create_if_missing, true}]),
-    ok = couch_db:close(Db),
-    {ok, AllDbs} = couch_server:all_databases(),
-    ?_assert(lists:member(DbName, AllDbs)).
+    ?_test(begin
+        DbName = ?tempdb(),
+        {ok, Db} = couch_db:open(DbName, [{create_if_missing, true}]),
+        ok = couch_db:close(Db),
+        {ok, AllDbs} = couch_server:all_databases(),
+        ?assert(lists:member(DbName, AllDbs))
+    end).
 
 loop(_, 0) ->
     true;
