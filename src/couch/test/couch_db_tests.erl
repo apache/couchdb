@@ -26,10 +26,32 @@ create_delete_db_test_()->
             fun test_util:start_couch/0, fun test_util:stop_couch/1,
             fun(_) ->
                 [should_create_db(),
-                 should_delete_db(),
-                 should_create_multiple_dbs(),
-                 should_delete_multiple_dbs(),
-                 should_create_delete_database_continuously()]
+                 should_delete_db()]
+            end
+        }
+    }.
+
+create_delete_multiple_dbs_test_()->
+    {
+        "Multiple database create/delete tests",
+        {
+            setup,
+            fun test_util:start_couch/0, fun test_util:stop_couch/1,
+            fun(_) ->
+                [should_create_multiple_dbs(),
+                 should_delete_multiple_dbs()]
+            end
+        }
+    }.
+
+create_delete_database_continuously_test_() ->
+    {
+        "Continious database create/delete tests",
+        {
+            setup,
+            fun test_util:start_couch/0, fun test_util:stop_couch/1,
+            fun(_) ->
+                [should_create_delete_database_continuously()]
             end
         }
     }.
