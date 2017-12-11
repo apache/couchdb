@@ -19,55 +19,50 @@
 -define(PASS, "pass").
 
 setup() ->
+    Ctx = test_util:start_couch([chttpd]),
     Hashed = couch_passwords:hash_admin_password(?PASS),
     ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist=false),
     Addr = config:get("httpd", "bind_address", "127.0.0.1"),
     Port = mochiweb_socket_server:get(chttpd, port),
-    lists:flatten(io_lib:format("http://~s:~b/_session", [Addr, Port])).
+    Url = ?l2b(io_lib:format("http://~s:~b/_session", [Addr, Port])),
+    ContentType = [{"Content-Type", "application/json"}],
+    Payload = jiffy:encode({[{name, ?l2b(?USER)}, {password, ?l2b(?PASS)}]}),
+    {ok, ?b2l(Url), ContentType, ?b2l(Payload), Ctx}.
 
-teardown(_) ->
-    ok = config:delete("admins", ?USER, _Persist=false).
+teardown({ok, _, _, _, Ctx}) ->
+    ok = config:delete("admins", ?USER, _Persist=false),
+    test_util:stop_couch(Ctx).
 
 cookie_test_() ->
     {
         "Cookie domain tests",
         {
             setup,
-            fun() -> test_util:start_couch([chttpd]) end,
-            fun test_util:stop_couch/1,
-            {
-                foreach,
-                fun setup/0,
-                fun teardown/1,
+            fun setup/0,
+            fun teardown/1,
+            fun({ok, Url, ContentType, Payload, _}) ->
                 [
-                    fun should_set_cookie_domain/1,
-                    fun should_not_set_cookie_domain/1
+                    should_set_cookie_domain(Url, ContentType, Payload),
+                    should_not_set_cookie_domain(Url, ContentType, Payload)
                 ]
-
-            }
+            end
         }
     }.
 
-should_set_cookie_domain(Url) ->
+should_set_cookie_domain(Url, ContentType, Payload) ->
     ?_test(begin
         ok = config:set("couch_httpd_auth", "cookie_domain",
             "example.com", false),
-        {ok, Code, Headers, _} = test_request:post(Url,
-            [{"Content-Type", "application/json"}],
-            "{\"name\":\"" ++ ?USER ++ "\", \"password\": \"" ++ ?PASS ++ "\"}"
-        ),
+        {ok, Code, Headers, _} = test_request:post(Url, ContentType, Payload),
         ?assertEqual(200, Code),
         Cookie = proplists:get_value("Set-Cookie", Headers),
         ?assert(string:str(Cookie, "; Domain=example.com") > 0)
     end).
 
-should_not_set_cookie_domain(Url) ->
+should_not_set_cookie_domain(Url, ContentType, Payload) ->
     ?_test(begin
         ok = config:set("couch_httpd_auth", "cookie_domain", "", false),
-        {ok, Code, Headers, _} = test_request:post(Url,
-            [{"Content-Type", "application/json"}],
-            "{\"name\":\"" ++ ?USER ++ "\", \"password\": \"" ++ ?PASS ++ "\"}"
-        ),
+        {ok, Code, Headers, _} = test_request:post(Url, ContentType, Payload),
         ?assertEqual(200, Code),
         Cookie = proplists:get_value("Set-Cookie", Headers),
         ?assertEqual(0, string:str(Cookie, "; Domain="))
