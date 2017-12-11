@@ -18,38 +18,37 @@
 -define(USER, "cookie_domain_test_admin").
 -define(PASS, "pass").
 
-setup(PortType) ->
+setup() ->
     Hashed = couch_passwords:hash_admin_password(?PASS),
     ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist=false),
     Addr = config:get("httpd", "bind_address", "127.0.0.1"),
-    lists:concat(["http://", Addr, ":", port(PortType), "/_session"]).
+    Port = mochiweb_socket_server:get(chttpd, port),
+    lists:flatten(io_lib:format("http://~s:~b/_session", [Addr, Port])).
 
-teardown(_,_) ->
+teardown(_) ->
     ok = config:delete("admins", ?USER, _Persist=false).
 
 cookie_test_() ->
-    Tests = [
-        fun should_set_cookie_domain/2,
-        fun should_not_set_cookie_domain/2
-    ],
     {
         "Cookie domain tests",
         {
             setup,
-            fun() -> test_util:start_couch([chttpd]) end, fun test_util:stop_couch/1,
-            [
-                make_test_case(clustered, Tests)
-            ]
+            fun() -> test_util:start_couch([chttpd]) end,
+            fun test_util:stop_couch/1,
+            {
+                foreach,
+                fun setup/0,
+                fun teardown/1,
+                [
+                    fun should_set_cookie_domain/1,
+                    fun should_not_set_cookie_domain/1
+                ]
+
+            }
         }
     }.
 
-make_test_case(Mod, Funs) ->
-{
-    lists:flatten(io_lib:format("~s", [Mod])),
-    {foreachx, fun setup/1, fun teardown/2, [{Mod, Fun} || Fun <- Funs]}
-}.
-
-should_set_cookie_domain(_PortType, Url) ->
+should_set_cookie_domain(Url) ->
     ?_assertEqual(true,
         begin
             ok = config:set("couch_httpd_auth", "cookie_domain", "example.com", false),
@@ -60,7 +59,7 @@ should_set_cookie_domain(_PortType, Url) ->
             string:str(Cookie, "; Domain=example.com") > 0
         end).
 
-should_not_set_cookie_domain(_PortType, Url) ->
+should_not_set_cookie_domain(Url) ->
     ?_assertEqual(0,
         begin
             ok = config:set("couch_httpd_auth", "cookie_domain", "", false),
@@ -70,8 +69,3 @@ should_not_set_cookie_domain(_PortType, Url) ->
             Cookie = proplists:get_value("Set-Cookie", Headers),
             string:str(Cookie, "; Domain=")
         end).
-
-port(clustered) ->
-    integer_to_list(mochiweb_socket_server:get(chttpd, port));
-port(backdoor) ->
-    integer_to_list(mochiweb_socket_server:get(couch_httpd, port)).
