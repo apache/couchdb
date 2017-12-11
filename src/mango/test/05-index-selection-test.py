@@ -38,6 +38,22 @@ class IndexSelectionTests:
             }, explain=True)
         self.assertEqual(resp["index"]["type"], "json")
 
+    def test_with_or(self):
+        # index on ["company","manager"]
+        ddocid = "_design/a0c425a60cf3c3c09e3c537c9ef20059dcef9198"
+
+        resp = self.db.find({
+                "company": {
+                    "$gt": "a",
+                    "$lt": "z"
+                },
+                "$or": [
+                    {"manager": "Foo"},
+                    {"manager": "Bar"}
+                ]
+            }, explain=True)
+        self.assertEqual(resp["index"]["ddoc"], ddocid)
+
     def test_use_most_columns(self):
         # ddoc id for the age index
         ddocid = "_design/ad3d537c03cd7c6a43cf8dff66ef70ea54c2b40f"
