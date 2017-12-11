@@ -75,9 +75,14 @@ open_db_test_()->
         {
             setup,
             fun test_util:start_couch/0, fun test_util:stop_couch/1,
-            fun(_) ->
-                [should_create_db_if_missing()]
-            end
+            {
+                foreach,
+                fun() -> ?tempdb() end,
+                [
+                    fun should_create_db_if_missing/1,
+                    fun should_open_db_if_exists/1
+                ]
+            }
         }
     }.
 
@@ -133,13 +138,25 @@ should_create_delete_database_continuously(Times, DbName) ->
         end, lists:seq(1, Times))
     end)}.
 
-should_create_db_if_missing() ->
+should_create_db_if_missing(DbName) ->
     ?_test(begin
-        DbName = ?tempdb(),
+        {ok, Before} = couch_server:all_databases(),
+        ?assertNot(lists:member(DbName, Before)),
         {ok, Db} = couch_db:open(DbName, [{create_if_missing, true}]),
         ok = couch_db:close(Db),
-        {ok, AllDbs} = couch_server:all_databases(),
-        ?assert(lists:member(DbName, AllDbs))
+        {ok, After} = couch_server:all_databases(),
+        ?assert(lists:member(DbName, After))
+    end).
+
+should_open_db_if_exists(DbName) ->
+    ?_test(begin
+        ?assert(create_db(DbName)),
+        {ok, Before} = couch_server:all_databases(),
+        ?assert(lists:member(DbName, Before)),
+        {ok, Db} = couch_db:open(DbName, [{create_if_missing, true}]),
+        ok = couch_db:close(Db),
+        {ok, After} = couch_server:all_databases(),
+        ?assert(lists:member(DbName, After))
     end).
 
 
