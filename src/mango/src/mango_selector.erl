@@ -820,5 +820,46 @@ has_required_fields_or_nested_and_true_test() ->
     Normalized = normalize(Selector),
     ?assertEqual(true, has_required_fields(Normalized, RequiredFields)).
 
+has_required_fields_or_nested_or_true_test() ->
+    RequiredFields = [<<"A">>],
+    Selector1 = {[{<<"$or">>,
+          [
+              {[{<<"A">>, <<"foo">>}]}
+          ]
+    }]},
+    Selector2 = {[{<<"$or">>,
+          [
+              {[{<<"A">>, <<"bar">>}]}
+          ]
+    }]},
+    Selector = {[{<<"$or">>,
+          [
+              Selector1,
+              Selector2
+          ]
+    }]},
+    Normalized = normalize(Selector),
+    ?assertEqual(true, has_required_fields(Normalized, RequiredFields)).
+
+has_required_fields_or_nested_or_false_test() ->
+    RequiredFields = [<<"A">>],
+    Selector1 = {[{<<"$or">>,
+          [
+              {[{<<"A">>, <<"foo">>}]}
+          ]
+    }]},
+    Selector2 = {[{<<"$or">>,
+          [
+              {[{<<"B">>, <<"bar">>}]}
+          ]
+    }]},
+    Selector = {[{<<"$or">>,
+          [
+              Selector1,
+              Selector2
+          ]
+    }]},
+    Normalized = normalize(Selector),
+    ?assertEqual(false, has_required_fields(Normalized, RequiredFields)).
 
 -endif.
