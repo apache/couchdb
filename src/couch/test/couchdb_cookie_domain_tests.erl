@@ -49,23 +49,26 @@ cookie_test_() ->
     }.
 
 should_set_cookie_domain(Url) ->
-    ?_assertEqual(true,
-        begin
-            ok = config:set("couch_httpd_auth", "cookie_domain", "example.com", false),
-            {ok, Code, Headers, _} = test_request:post(Url, [{"Content-Type", "application/json"}],
-                "{\"name\":\"" ++ ?USER ++ "\", \"password\": \"" ++ ?PASS ++ "\"}"),
-            ?assert(Code =:= 200),
-            Cookie = proplists:get_value("Set-Cookie", Headers),
-            string:str(Cookie, "; Domain=example.com") > 0
-        end).
+    ?_test(begin
+        ok = config:set("couch_httpd_auth", "cookie_domain",
+            "example.com", false),
+        {ok, Code, Headers, _} = test_request:post(Url,
+            [{"Content-Type", "application/json"}],
+            "{\"name\":\"" ++ ?USER ++ "\", \"password\": \"" ++ ?PASS ++ "\"}"
+        ),
+        ?assertEqual(200, Code),
+        Cookie = proplists:get_value("Set-Cookie", Headers),
+        ?assert(string:str(Cookie, "; Domain=example.com") > 0)
+    end).
 
 should_not_set_cookie_domain(Url) ->
-    ?_assertEqual(0,
-        begin
-            ok = config:set("couch_httpd_auth", "cookie_domain", "", false),
-            {ok, Code, Headers, _} = test_request:post(Url, [{"Content-Type", "application/json"}],
-                "{\"name\":\"" ++ ?USER ++ "\", \"password\": \"" ++ ?PASS ++ "\"}"),
-            ?assert(Code =:= 200),
-            Cookie = proplists:get_value("Set-Cookie", Headers),
-            string:str(Cookie, "; Domain=")
-        end).
+    ?_test(begin
+        ok = config:set("couch_httpd_auth", "cookie_domain", "", false),
+        {ok, Code, Headers, _} = test_request:post(Url,
+            [{"Content-Type", "application/json"}],
+            "{\"name\":\"" ++ ?USER ++ "\", \"password\": \"" ++ ?PASS ++ "\"}"
+        ),
+        ?assertEqual(200, Code),
+        Cookie = proplists:get_value("Set-Cookie", Headers),
+        ?assertEqual(0, string:str(Cookie, "; Domain="))
+    end).
