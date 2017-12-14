@@ -597,14 +597,31 @@ has_required_fields_int([], Remainder) ->
 has_required_fields_int(Selector, RequiredFields) when not is_list(Selector) ->
     has_required_fields_int([Selector], RequiredFields);
 
-% We can "see" through $and operator. We ignore other
-% combination operators because they can't be used to restrict
-% an index.
+% We can "see" through $and operator. Iterate
+% through the list of child operators.
 has_required_fields_int([{[{<<"$and">>, Args}]}], RequiredFields) 
         when is_list(Args) ->
     has_required_fields_int(Args, RequiredFields);
 
-% Handle $and operator where it has peers
+% We can "see" through $or operator. Required fields
+% must be covered by all children.
+has_required_fields_int([{[{<<"$or">>, Args}]} | Rest], RequiredFields) 
+        when is_list(Args) ->
+    Remainder0 = lists:foldl(fun(Arg, Acc) ->
+        % for each child test coverage against the full
+        % set of required fields
+        Remainder = has_required_fields_int(Arg, RequiredFields),
+
+        % collect the remaining fields across all children
+        Acc ++ Remainder
+    end, [], Args),
+
+    % remove duplicate fields
+    Remainder1 = lists:usort(Remainder0),
+    has_required_fields_int(Rest, Remainder1);
+
+% Handle $and operator where it has peers. Required fields
+% can be covered by any child.
 has_required_fields_int([{[{<<"$and">>, Args}]} | Rest], RequiredFields) 
         when is_list(Args) ->
     Remainder = has_required_fields_int(Args, RequiredFields),
@@ -680,7 +697,8 @@ has_required_fields_nested_and_true_test() ->
           ]
     }]},
 
-    ?assertEqual(true, has_required_fields(Selector, RequiredFields)).
+    Normalized = normalize(Selector),
+    ?assertEqual(true, has_required_fields(Normalized, RequiredFields)).
 
 has_required_fields_and_false_test() ->
     RequiredFields = [<<"A">>, <<"C">>],
@@ -693,12 +711,152 @@ has_required_fields_and_false_test() ->
     Normalized = normalize(Selector),
     ?assertEqual(false, has_required_fields(Normalized, RequiredFields)).
 
-has_required_fields_or_test() ->
+has_required_fields_or_false_test() ->
     RequiredFields = [<<"A">>],
     Selector = {[{<<"$or">>,
           [
               {[{<<"A">>, <<"foo">>}]},
               {[{<<"B">>, <<"foo">>}]}
+          ]
+    }]},
+    Normalized = normalize(Selector),
+    ?assertEqual(false, has_required_fields(Normalized, RequiredFields)).
+
+has_required_fields_or_true_test() ->
+    RequiredFields = [<<"A">>, <<"B">>, <<"C">>],
+    Selector = {[{<<"A">>, "foo"},
+          {<<"$or">>,
+              [
+                  {[{<<"B">>, <<"bar">>}]},
+                  {[{<<"B">>, <<"baz">>}]}
+              ]
+          },
+		  {<<"C">>, "qux"}
+	]},
+    Normalized = normalize(Selector),
+    ?assertEqual(true, has_required_fields(Normalized, RequiredFields)).
+
+has_required_fields_and_nested_or_true_test() ->
+    RequiredFields = [<<"A">>, <<"B">>],
+    Selector1 = {[{<<"$and">>,
+          [
+              {[{<<"A">>, <<"foo">>}]}
+          ]
+    }]},
+    Selector2 = {[{<<"$or">>,
+          [
+              {[{<<"B">>, <<"foo">>}]},
+              {[{<<"B">>, <<"foo">>}]}
+          ]
+    }]},
+    Selector = {[{<<"$and">>,
+          [
+              Selector1,
+              Selector2
+          ]
+    }]},
+    Normalized = normalize(Selector),
+    ?assertEqual(true, has_required_fields(Normalized, RequiredFields)),
+
+    SelectorReverse = {[{<<"$and">>,
+          [
+              Selector2,
+              Selector1
+          ]
+    }]},
+    NormalizedReverse = normalize(SelectorReverse),
+    ?assertEqual(true, has_required_fields(NormalizedReverse, RequiredFields)).
+
+has_required_fields_and_nested_or_false_test() ->
+    RequiredFields = [<<"A">>, <<"B">>],
+    Selector1 = {[{<<"$and">>,
+          [
+              {[{<<"A">>, <<"foo">>}]}
+          ]
+    }]},
+    Selector2 = {[{<<"$or">>,
+          [
+              {[{<<"A">>, <<"foo">>}]},
+              {[{<<"B">>, <<"foo">>}]}
+          ]
+    }]},
+    Selector = {[{<<"$and">>,
+          [
+              Selector1,
+              Selector2
+          ]
+    }]},
+    Normalized = normalize(Selector),
+    ?assertEqual(false, has_required_fields(Normalized, RequiredFields)),
+
+    SelectorReverse = {[{<<"$and">>,
+          [
+              Selector2,
+              Selector1
+          ]
+    }]},
+
+    NormalizedReverse = normalize(SelectorReverse),
+    ?assertEqual(false, has_required_fields(NormalizedReverse, RequiredFields)).
+
+has_required_fields_or_nested_and_true_test() ->
+    RequiredFields = [<<"A">>],
+    Selector1 = {[{<<"$and">>,
+          [
+              {[{<<"A">>, <<"foo">>}]}
+          ]
+    }]},
+    Selector2 = {[{<<"$and">>,
+          [
+              {[{<<"A">>, <<"foo">>}]}
+          ]
+    }]},
+    Selector = {[{<<"$or">>,
+          [
+              Selector1,
+              Selector2
+          ]
+    }]},
+    Normalized = normalize(Selector),
+    ?assertEqual(true, has_required_fields(Normalized, RequiredFields)).
+
+has_required_fields_or_nested_or_true_test() ->
+    RequiredFields = [<<"A">>],
+    Selector1 = {[{<<"$or">>,
+          [
+              {[{<<"A">>, <<"foo">>}]}
+          ]
+    }]},
+    Selector2 = {[{<<"$or">>,
+          [
+              {[{<<"A">>, <<"bar">>}]}
+          ]
+    }]},
+    Selector = {[{<<"$or">>,
+          [
+              Selector1,
+              Selector2
+          ]
+    }]},
+    Normalized = normalize(Selector),
+    ?assertEqual(true, has_required_fields(Normalized, RequiredFields)).
+
+has_required_fields_or_nested_or_false_test() ->
+    RequiredFields = [<<"A">>],
+    Selector1 = {[{<<"$or">>,
+          [
+              {[{<<"A">>, <<"foo">>}]}
+          ]
+    }]},
+    Selector2 = {[{<<"$or">>,
+          [
+              {[{<<"B">>, <<"bar">>}]}
+          ]
+    }]},
+    Selector = {[{<<"$or">>,
+          [
+              Selector1,
+              Selector2
           ]
     }]},
     Normalized = normalize(Selector),
