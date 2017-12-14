@@ -27,13 +27,47 @@ defmodule Couch do
     end
   end
 
-  def process_response_body(body) do
-    body |> IO.iodata_to_binary |> :jiffy.decode([:return_maps])
+  def process_response_body(headers, body) do
+    case headers[:'content-type'] do
+      "application/json" ->
+        body |> IO.iodata_to_binary |> :jiffy.decode([:return_maps])
+      _ ->
+        process_response_body(body)
+    end
   end
 
   def login(user, pass) do
     resp = Couch.post("/_session", body: %{:username => user, :password => pass})
     true = resp.body["ok"]
     resp.body
+  end
+
+  # HACK: this is here until this commit lands in a release
+  # https://github.com/myfreeweb/httpotion/commit/f3fa2f0bc3b9b400573942b3ba4628b48bc3c614
+  def handle_response(response) do
+    case response do
+      { :ok, status_code, headers, body, _ } ->
+        processed_headers = process_response_headers(headers)
+        %HTTPotion.Response{
+          status_code: process_status_code(status_code),
+          headers: processed_headers,
+          body: process_response_body(processed_headers, body)
+        }
+      { :ok, status_code, headers, body } ->
+        processed_headers = process_response_headers(headers)
+        %HTTPotion.Response{
+          status_code: process_status_code(status_code),
+          headers: processed_headers,
+          body: process_response_body(processed_headers, body)
+        }
+      { :ibrowse_req_id, id } ->
+        %HTTPotion.AsyncResponse{ id: id }
+      { :error, { :conn_failed, { :error, reason }}} ->
+        %HTTPotion.ErrorResponse{ message: error_to_string(reason)}
+      { :error, :conn_failed } ->
+        %HTTPotion.ErrorResponse{ message: "conn_failed"}
+      { :error, reason } ->
+        %HTTPotion.ErrorResponse{ message: error_to_string(reason)}
+    end
   end
 end
