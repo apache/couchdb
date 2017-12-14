@@ -12,16 +12,6 @@ defmodule ReduceTest do
     (n + 1) * n / 2
   end
 
-  def make_docs(id, count) do
-    for i <- id..count do
-      %{
-        :_id => Integer.to_string(i),
-        :integer => i,
-        :string => Integer.to_string(i)
-      }
-    end
-  end
-
   @tag :with_db
   test "Basic reduce functions", context do
     db_name = context[:db_name]

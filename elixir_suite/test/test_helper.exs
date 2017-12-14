@@ -26,6 +26,10 @@ defmodule CouchTestCase do
             Map.put(context, :db_name, random_db_name())
           %{:with_db_name => db_name} when is_binary(db_name) ->
             Map.put(context, :db_name, db_name)
+          %{:with_random_db => db_name} when is_binary(db_name) ->
+            context
+            |> Map.put(:db_name, random_db_name(db_name))
+            |> Map.put(:with_db, true)
           %{:with_db => true} ->
             Map.put(context, :db_name, random_db_name())
           %{:with_db => db_name} when is_binary(db_name) ->
@@ -52,9 +56,13 @@ defmodule CouchTestCase do
       end
 
       def random_db_name do
+        random_db_name("random-test-db")
+      end
+
+      def random_db_name(prefix) do
         time = :erlang.monotonic_time()
         umi = :erlang.unique_integer([:monotonic])
-        "random-test-db-#{time}-#{umi}"
+        "#{prefix}-#{time}-#{umi}"
       end
 
       def set_config({section, key, value}) do
@@ -111,6 +119,16 @@ defmodule CouchTestCase do
           "_id": "foo",
           "bar": "baz"
         }
+      end
+
+      def make_docs(id, count) do
+        for i <- id..count do
+          %{
+            :_id => Integer.to_string(i),
+            :integer => i,
+            :string => Integer.to_string(i)
+          }
+        end
       end
     end
   end
