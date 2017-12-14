@@ -300,16 +300,22 @@ compact_time_left(#config{period = #period{to = {ToH, ToM} = To}}) ->
     end.
 
 
-get_db_config(DbName) ->
-    case ets:lookup(?CONFIG_ETS, DbName) of
+get_db_config(ShardName) ->
+    case ets:lookup(?CONFIG_ETS, ShardName) of
     [] ->
-        case ets:lookup(?CONFIG_ETS, <<"_default">>) of
+        DbName = mem3:dbname(ShardName),
+        case ets:lookup(?CONFIG_ETS, DbName) of
         [] ->
-            nil;
-        [{<<"_default">>, Config}] ->
+            case ets:lookup(?CONFIG_ETS, <<"_default">>) of
+            [] ->
+                nil;
+            [{<<"_default">>, Config}] ->
+                {ok, Config}
+            end;
+        [{DbName, Config}] ->
             {ok, Config}
         end;
-    [{DbName, Config}] ->
+    [{ShardName, Config}] ->
         {ok, Config}
     end.
 
