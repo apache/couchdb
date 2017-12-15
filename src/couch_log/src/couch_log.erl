@@ -28,35 +28,51 @@
 
 
 -spec debug(string(), list()) -> ok.
-debug(Fmt, Args) -> log(debug, Fmt, Args).
+debug(Fmt, Args) ->
+    couch_stats:increment_counter([couch_log, level, debug]),
+    log(debug, Fmt, Args).
 
 
 -spec info(string(), list()) -> ok.
-info(Fmt, Args) -> log(info, Fmt, Args).
+info(Fmt, Args) ->
+    couch_stats:increment_counter([couch_log, level, info]),
+    log(info, Fmt, Args).
 
 
 -spec notice(string(), list()) -> ok.
-notice(Fmt, Args) -> log(notice, Fmt, Args).
+notice(Fmt, Args) ->
+    couch_stats:increment_counter([couch_log, level, notice]),
+    log(notice, Fmt, Args).
 
 
 -spec warning(string(), list()) -> ok.
-warning(Fmt, Args) -> log(warning, Fmt, Args).
+warning(Fmt, Args) ->
+    couch_stats:increment_counter([couch_log, level, warning]),
+    log(warning, Fmt, Args).
 
 
 -spec error(string(), list()) -> ok.
-error(Fmt, Args) -> log(error, Fmt, Args).
+error(Fmt, Args) ->
+    couch_stats:increment_counter([couch_log, level, error]),
+    log(error, Fmt, Args).
 
 
 -spec critical(string(), list()) -> ok.
-critical(Fmt, Args) -> log(critical, Fmt, Args).
+critical(Fmt, Args) ->
+    couch_stats:increment_counter([couch_log, level, critical]),
+    log(critical, Fmt, Args).
 
 
 -spec alert(string(), list()) -> ok.
-alert(Fmt, Args) -> log(alert, Fmt, Args).
+alert(Fmt, Args) ->
+    couch_stats:increment_counter([couch_log, level, alert]),
+    log(alert, Fmt, Args).
 
 
 -spec emergency(string(), list()) -> ok.
-emergency(Fmt, Args) -> log(emergency, Fmt, Args).
+emergency(Fmt, Args) ->
+    couch_stats:increment_counter([couch_log, level, emergency]),
+    log(emergency, Fmt, Args).
 
 
 -spec set_level(atom() | string() | integer()) -> true.
