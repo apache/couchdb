@@ -50,20 +50,54 @@ defmodule ReplicationTest do
   Enum.each(@db_pairs_prefixes, fn {name, src_prefix, tgt_prefix} ->
     @src_prefix src_prefix
     @tgt_prefix tgt_prefix
-    @tag config: [
-      {"replicator", "startup_jitter", "0"}
-    ]
+    #
+    # @tag config: [
+    #   {"replicator", "startup_jitter", "0"}
+    # ]
     # test "simple #{name} replication" do
     #   run_simple_repl(@src_prefix, @tgt_prefix)
     # end
+    #
+    # @tag config: [
+    #   {"replicator", "startup_jitter", "0"}
+    # ]
     # test "replicate with since_seq - #{name}" do
     #   run_since_seq_repl(@src_prefix, @tgt_prefix)
     # end
+    #
+    # @tag config: [
+    #   {"replicator", "startup_jitter", "0"}
+    # ]
     # test "validate_doc_update failure replications - #{name}" do
     #   run_vdu_repl(@src_prefix, @tgt_prefix)
     # end
-    test "create_target filter option - #{name}" do
-      run_create_target_repl(@src_prefix, @tgt_prefix)
+    #
+    # @tag config: [
+    #   {"replicator", "startup_jitter", "0"}
+    # ]
+    # test "create_target filter option - #{name}" do
+    #   run_create_target_repl(@src_prefix, @tgt_prefix)
+    # end
+    #
+    # @tag config: [
+    #   {"replicator", "startup_jitter", "0"}
+    # ]
+    # test "filtered replications - #{name}" do
+    #   run_filtered_repl(@src_prefix, @tgt_prefix)
+    # end
+    #
+    # @tag config: [
+    #   {"replicator", "startup_jitter", "0"}
+    # ]
+    # test "replication restarts after filter change - COUCHDB-892 - #{name}" do
+    #   run_filter_changed_repl(@src_prefix, @tgt_prefix)
+    # end
+
+    @tag config: [
+      {"replicator", "startup_jitter", "0"}
+    ]
+    test "replication by doc ids - #{name}" do
+      run_by_id_repl(@src_prefix, @tgt_prefix)
     end
   end)
 
@@ -82,15 +116,15 @@ defmodule ReplicationTest do
     att2_data = get_att2_data()
 
     ddoc = %{
-      :_id => "_design/foo",
-      :language => "javascript",
-      :value => "ddoc"
+      "_id" => "_design/foo",
+      "language" => "javascript",
+      "value" => "ddoc"
     }
     docs = make_docs(1..20) ++ [ddoc]
     docs = save_docs(src_db_name, docs)
 
     docs = for doc <- docs do
-      if doc[:integer] >= 10 and doc[:integer] < 15 do
+      if doc["integer"] >= 10 and doc["integer"] < 15 do
         add_attachment(src_db_name, doc, body: att1_data)
       else
         doc
@@ -119,31 +153,30 @@ defmodule ReplicationTest do
     assert history["doc_write_failures"] == 0
 
     for doc <- docs do
-      resp = Couch.get!("/#{tgt_db_name}/#{doc[:_id]}")
-      copy = to_atoms(resp.body)
+      copy = Couch.get!("/#{tgt_db_name}/#{doc["_id"]}").body
       assert cmp_json(doc, copy)
 
-      if doc[:integer] >= 10 and doc[:integer] < 15 do
-        atts = copy[:"_attachments"]
+      if doc["integer"] >= 10 and doc["integer"] < 15 do
+        atts = copy["_attachments"]
         assert is_map(atts)
-        att = atts[:"readme.txt"]
+        att = atts["readme.txt"]
         assert is_map(att)
-        assert att[:revpos] == 2
-        assert String.match?(att[:content_type], ~r/text\/plain/)
-        assert att[:stub]
+        assert att["revpos"] == 2
+        assert String.match?(att["content_type"], ~r/text\/plain/)
+        assert att["stub"]
 
-        resp = Couch.get!("/#{tgt_db_name}/#{copy[:_id]}/readme.txt")
+        resp = Couch.get!("/#{tgt_db_name}/#{copy["_id"]}/readme.txt")
         assert String.length(resp.body) == String.length(att1_data)
         assert resp.body == att1_data
       end
     end
 
     # Add one more doc to source and more attachments to existing docs
-    new_doc = %{:_id => "foo666", :value => "d"}
+    new_doc = %{"_id" => "foo666", "value" => "d"}
     [new_doc] = save_docs(src_db_name, [new_doc])
 
     docs = for doc <- docs do
-      if doc[:integer] >= 10 and doc[:integer] < 15 do
+      if doc["integer"] >= 10 and doc["integer"] < 15 do
         ctype = "application/binary"
         opts = [name: "data.dat", body: att2_data, content_type: ctype]
         add_attachment(src_db_name, doc, opts)
@@ -173,34 +206,32 @@ defmodule ReplicationTest do
     assert history["docs_written"] == 6
     assert history["doc_write_failures"] == 0
 
-    resp = Couch.get!("/#{tgt_db_name}/#{new_doc[:_id]}")
-    copy = to_atoms(resp.body)
-    assert copy[:_id] == new_doc[:_id]
-    assert copy[:value] == new_doc[:value]
+    copy = Couch.get!("/#{tgt_db_name}/#{new_doc["_id"]}").body
+    assert copy["_id"] == new_doc["_id"]
+    assert copy["value"] == new_doc["value"]
 
     for i <- 10..14 do
       doc = Enum.at(docs, i - 1)
-      resp = Couch.get!("/#{tgt_db_name}/#{i}")
-      copy = to_atoms(resp.body)
+      copy = Couch.get!("/#{tgt_db_name}/#{i}").body
       assert cmp_json(doc, copy)
 
-      atts = copy[:_attachments]
+      atts = copy["_attachments"]
       assert is_map(atts)
-      att = atts[:"readme.txt"]
+      att = atts["readme.txt"]
       assert is_map(atts)
-      assert att[:revpos] == 2
-      assert String.match?(att[:content_type], ~r/text\/plain/)
-      assert att[:stub]
+      assert att["revpos"] == 2
+      assert String.match?(att["content_type"], ~r/text\/plain/)
+      assert att["stub"]
 
       resp = Couch.get!("/#{tgt_db_name}/#{i}/readme.txt")
       assert String.length(resp.body) == String.length(att1_data)
       assert resp.body == att1_data
 
-      att = atts[:"data.dat"]
+      att = atts["data.dat"]
       assert is_map(att)
-      assert att[:revpos] == 3
-      assert String.match?(att[:content_type], ~r/application\/binary/)
-      assert att[:stub]
+      assert att["revpos"] == 3
+      assert String.match?(att["content_type"], ~r/application\/binary/)
+      assert att["stub"]
 
       resp = Couch.get!("/#{tgt_db_name}/#{i}/data.dat")
       assert String.length(resp.body) == String.length(att2_data)
@@ -209,9 +240,9 @@ defmodule ReplicationTest do
 
     # Test deletion is replicated
     del_doc = %{
-      :_id => "1",
-      :_rev => Enum.at(docs, 0)[:_rev],
-      :_deleted => true
+      "_id" => "1",
+      "_rev" => Enum.at(docs, 0)["_rev"],
+      "_deleted" => true
     }
     [del_doc] = save_docs(src_db_name, [del_doc])
 
@@ -234,12 +265,12 @@ defmodule ReplicationTest do
     assert history["docs_written"] == 1
     assert history["doc_write_failures"] == 0
 
-    resp = Couch.get("/#{tgt_db_name}/#{del_doc[:_id]}")
+    resp = Couch.get("/#{tgt_db_name}/#{del_doc["_id"]}")
     assert resp.status_code == 404
 
     resp = Couch.get!("/#{tgt_db_name}/_changes")
-    [change] = Enum.filter(resp.body["results"], &(&1["id"] == del_doc[:_id]))
-    assert change["id"] == del_doc[:_id]
+    [change] = Enum.filter(resp.body["results"], &(&1["id"] == del_doc["_id"]))
+    assert change["id"] == del_doc["_id"]
     assert change["deleted"]
 
     # Test replicating a conflict
@@ -301,7 +332,7 @@ defmodule ReplicationTest do
     assert String.match?(conflict, ~r/^2-/)
 
     # Resolve the conflict and re-replicate new revision
-    resolve_doc = %{:_id => "2", :_rev => conflict, :_deleted => true}
+    resolve_doc = %{"_id" => "2", "_rev" => conflict, "_deleted" => true}
     save_docs(tgt_db_name, [resolve_doc])
     save_docs(src_db_name, [Map.put(doc, :value, "rainbow")])
 
@@ -329,12 +360,12 @@ defmodule ReplicationTest do
 
     # Test that existing revisions are not replicated
     src_docs = [
-      %{:_id => "foo1", :value => 111},
-      %{:_id => "foo2", :value => 222},
-      %{:_id => "foo3", :value => 333}
+      %{"_id" => "foo1", "value" => 111},
+      %{"_id" => "foo2", "value" => 222},
+      %{"_id" => "foo3", "value" => 333}
     ]
     save_docs(src_db_name, src_docs)
-    save_docs(tgt_db_name, Enum.filter(src_docs, &(&1[:_id] != "foo2")))
+    save_docs(tgt_db_name, Enum.filter(src_docs, &(&1["_id"] != "foo2")))
 
     result = replicate(src_prefix <> src_db_name, tgt_prefix <> tgt_db_name)
     assert result["ok"]
@@ -354,8 +385,8 @@ defmodule ReplicationTest do
     assert history["doc_write_failures"] == 0
 
     docs = [
-      %{:_id => "foo4", :value => 444},
-      %{:_id => "foo5", :value => 555}
+      %{"_id" => "foo4", "value" => 444},
+      %{"_id" => "foo5", "value" => 555}
     ]
     save_docs(src_db_name, docs)
     save_docs(tgt_db_name, docs)
@@ -423,10 +454,10 @@ defmodule ReplicationTest do
     assert history["doc_write_failures"] == 0
 
     Enum.each(docs, fn doc ->
-      result = Couch.get("/#{tgt_db_name}/#{doc[:_id]}")
-      if Enum.member?(expected_ids, doc[:_id]) do
+      result = Couch.get("/#{tgt_db_name}/#{doc["_id"]}")
+      if Enum.member?(expected_ids, doc["_id"]) do
         assert result.status_code < 300
-        assert cmp_json(doc, to_atoms(result.body))
+        assert cmp_json(doc, result.body)
       else
         assert result.status_code == 404
       end
@@ -448,7 +479,7 @@ defmodule ReplicationTest do
 
     docs = make_docs(1..7)
     docs = for doc <- docs do
-      if doc[:integer] == 2 do
+      if doc["integer"] == 2 do
         Map.put(doc, "_attachments", %{
           "hello.txt" => %{
             :content_type => "text/plain",
@@ -462,9 +493,9 @@ defmodule ReplicationTest do
     docs = save_docs(src_db_name, docs)
 
     ddoc = %{
-      :_id => "_design/test",
-      :language => "javascript",
-      :validate_doc_update => """
+      "_id" => "_design/test",
+      "language" => "javascript",
+      "validate_doc_update" => """
         function(newDoc, oldDoc, userCtx, secObj) {
           if((newDoc.integer % 2) !== 0) {
             throw {forbidden: "I only like multiples of 2."};
@@ -486,10 +517,10 @@ defmodule ReplicationTest do
     assert history["doc_write_failures"] == 4
 
     for doc <- docs do
-      result = Couch.get("/#{tgt_db_name}/#{doc[:_id]}")
-      if rem(doc[:integer], 2) == 0 do
+      result = Couch.get("/#{tgt_db_name}/#{doc["_id"]}")
+      if rem(doc["integer"], 2) == 0 do
         assert result.status_code < 300
-        assert result.body["integer"] == doc[:integer]
+        assert result.body["integer"] == doc["integer"]
       else
         assert result.status_code == 404
       end
@@ -524,6 +555,465 @@ defmodule ReplicationTest do
     assert tgt_shards == src_shards
   end
 
+  def run_filtered_repl(src_prefix, tgt_prefix) do
+    base_db_name = random_db_name()
+    src_db_name = base_db_name <> "_src"
+    tgt_db_name = base_db_name <> "_tgt"
+    repl_src = src_prefix <> src_db_name
+    repl_tgt = tgt_prefix <> tgt_db_name
+
+    create_db(src_db_name)
+    create_db(tgt_db_name)
+
+    on_exit(fn -> delete_db(src_db_name) end)
+    on_exit(fn -> delete_db(tgt_db_name) end)
+
+    docs = make_docs(1..30)
+    ddoc = %{
+      "_id" => "_design/mydesign",
+      "language" => "javascript",
+      "filters" => %{
+        "myfilter" => """
+          function(doc, req) {
+            var modulus = Number(req.query.modulus);
+            var special = req.query.special;
+            return (doc.integer % modulus === 0) || (doc.string === special);
+          }
+        """
+      }
+    }
+
+    [_ | docs] = save_docs(src_db_name, [ddoc | docs])
+
+    repl_body = %{
+      "filter" => "mydesign/myfilter",
+      "query_params" => %{
+        "modulus" => "2",
+        "special" => "7"
+      }
+    }
+
+    result = replicate(repl_src, repl_tgt, body: repl_body)
+    assert result["ok"]
+
+    Enum.each(docs, fn doc ->
+      resp = Couch.get!("/#{tgt_db_name}/#{doc["_id"]}")
+      if(rem(doc["integer"], 2) == 0 || doc["string"] == "7") do
+        assert resp.status_code < 300
+        assert cmp_json(doc, resp.body)
+      else
+        assert resp.status_code == 404
+      end
+    end)
+
+    assert is_list(result["history"])
+    assert length(result["history"]) == 1
+    history = Enum.at(result["history"], 0)
+
+    # We (incorrectly) don't record update sequences for things
+    # that don't pass the changes feed filter. Historically the
+    # last document to pass was the second to last doc which has
+    # an update sequence of 30. Work that has been applied to avoid
+    # conflicts from duplicate IDs breaking _bulk_docs updates added
+    # a sort to the logic which changes this. Now the last document
+    # to pass has a doc id of "8" and is at update_seq 29 (because only
+    # "9" and the design doc are after it).
+    #
+    # In the future the fix ought to be that we record that update
+    # sequence of the database. BigCouch has some existing work on
+    # this in the clustered case because if you have very few documents
+    # that pass the filter then (given single node's behavior) you end
+    # up having to rescan a large portion of the database.
+    # we can't rely on sequences in a cluster
+    # not only can one figure appear twice (at least for n>1), there's also
+    # hashes involved now - so comparing seq==29 is lottery
+    # (= cutting off hashes is nonsense) above, there was brute-force
+    # comparing all attrs of all docs - now we did check if excluded docs
+    # did NOT make it in any way, we can't rely on sequences in a
+    # cluster (so leave out)
+
+    # 16 => 15 docs with even integer field  + 1 doc with string field "7"
+    assert history["missing_checked"] == 16
+    assert history["missing_found"] == 16
+    assert history["docs_read"] == 16
+    assert history["docs_written"] == 16
+    assert history["doc_write_failures"] == 0
+
+    new_docs = make_docs(50..55)
+    new_docs = save_docs(src_db_name, new_docs)
+
+    result = replicate(repl_src, repl_tgt, body: repl_body)
+    assert result["ok"]
+
+    Enum.each(new_docs, fn doc ->
+      resp = Couch.get!("/#{tgt_db_name}/#{doc["_id"]}")
+      if(rem(doc["integer"], 2) == 0) do
+        assert resp.status_code < 300
+        assert cmp_json(doc, resp.body)
+      else
+        assert resp.status_code == 404
+      end
+    end)
+
+    assert is_list(result["history"])
+    assert length(result["history"]) == 2
+    history = Enum.at(result["history"], 0)
+
+    assert history["missing_checked"] == 3
+    assert history["missing_found"] == 3
+    assert history["docs_read"] == 3
+    assert history["docs_written"] == 3
+    assert history["doc_write_failures"] == 0
+  end
+
+  def run_filter_changed_repl(src_prefix, tgt_prefix) do
+    base_db_name = random_db_name()
+    src_db_name = base_db_name <> "_src"
+    tgt_db_name = base_db_name <> "_tgt"
+    repl_src = src_prefix <> src_db_name
+    repl_tgt = tgt_prefix <> tgt_db_name
+
+    create_db(src_db_name)
+    create_db(tgt_db_name)
+
+    on_exit(fn -> delete_db(src_db_name) end)
+    on_exit(fn -> delete_db(tgt_db_name) end)
+
+    filter_fun_1 = """
+      function(doc, req) {
+        if(doc.value < Number(req.query.maxvalue)) {
+          return true;
+        } else {
+          return false;
+        }
+      }
+    """
+
+    filter_fun_2 = """
+      function(doc, req) {
+        return true;
+      }
+    """
+
+    docs = [
+      %{"_id" => "foo1", "value" => 1},
+      %{"_id" => "foo2", "value" => 2},
+      %{"_id" => "foo3", :value => 3},
+      %{"_id" => "foo4", :value => 4}
+    ]
+    ddoc = %{
+      "_id" => "_design/mydesign",
+      :language => "javascript",
+      :filters => %{
+        :myfilter => filter_fun_1
+      }
+    }
+
+    [ddoc | _] = save_docs(src_db_name, [ddoc | docs])
+
+    repl_body = %{
+      :filter => "mydesign/myfilter",
+      :query_params => %{
+        :maxvalue => "3"
+      }
+    }
+    result = replicate(repl_src, repl_tgt, body: repl_body)
+    assert result["ok"]
+
+    assert is_list(result["history"])
+    assert length(result["history"]) == 1
+    history = Enum.at(result["history"], 0)
+    assert history["docs_read"] == 2
+    assert history["docs_written"] == 2
+    assert history["doc_write_failures"] == 0
+
+    resp = Couch.get!("/#{tgt_db_name}/foo1")
+    assert HTTPotion.Response.success?(resp)
+    assert resp.body["value"] == 1
+
+    resp = Couch.get!("/#{tgt_db_name}/foo2")
+    assert HTTPotion.Response.success?(resp)
+    assert resp.body["value"] == 2
+
+    resp = Couch.get!("/#{tgt_db_name}/foo3")
+    assert resp.status_code == 404
+
+    resp = Couch.get!("/#{tgt_db_name}/foo4")
+    assert resp.status_code == 404
+
+    # Replication should start from scratch after the filter's code changed
+    ddoc = Map.put(ddoc, :filters, %{:myfilter => filter_fun_2})
+    [_] = save_docs(src_db_name, [ddoc])
+
+    result = replicate(repl_src, repl_tgt, body: repl_body)
+    assert result["ok"]
+
+    assert is_list(result["history"])
+    assert length(result["history"]) == 1
+    history = Enum.at(result["history"], 0)
+    assert history["docs_read"] == 3
+    assert history["docs_written"] == 3
+    assert history["doc_write_failures"] == 0
+
+    resp = Couch.get!("/#{tgt_db_name}/foo1")
+    assert HTTPotion.Response.success?(resp)
+    assert resp.body["value"] == 1
+
+    resp = Couch.get!("/#{tgt_db_name}/foo2")
+    assert HTTPotion.Response.success?(resp)
+    assert resp.body["value"] == 2
+
+    resp = Couch.get!("/#{tgt_db_name}/foo3")
+    assert HTTPotion.Response.success?(resp)
+    assert resp.body["value"] == 3
+
+    resp = Couch.get!("/#{tgt_db_name}/foo4")
+    assert HTTPotion.Response.success?(resp)
+    assert resp.body["value"] == 4
+
+    resp = Couch.get!("/#{tgt_db_name}/_design/mydesign")
+    assert HTTPotion.Response.success?(resp)
+  end
+
+  def run_by_id_repl(src_prefix, tgt_prefix) do
+    target_doc_ids = [
+      %{
+        :initial => ["1", "2", "10"],
+        :after => [],
+        :conflict_id => "2"
+      },
+      %{
+        :initial => ["1", "2"],
+        :after => ["7"],
+        :conflict_id => "1"
+      },
+      %{
+        :initial => ["1", "foo_666", "10"],
+        :after => ["7"],
+        :conflict_id => "10"
+      },
+      %{
+        :initial => ["_design/foo", "8"],
+        :after => ["foo_5"],
+        :conflict_id => "8"
+      },
+      %{
+        :initial => ["_design%2Ffoo", "8"],
+        :after => ["foo_5"],
+        :conflict_id => "8"
+      },
+      %{
+        :initial => [],
+        :after => ["foo_1000", "_design/foo", "1"],
+        :conflict_id => "1"
+      }
+    ]
+
+    Enum.each(target_doc_ids, fn test_data ->
+      run_by_id_repl_impl(src_prefix, tgt_prefix, test_data)
+    end)
+  end
+
+  def run_by_id_repl_impl(src_prefix, tgt_prefix, test_data) do
+    base_db_name = random_db_name()
+    src_db_name = base_db_name <> "_src"
+    tgt_db_name = base_db_name <> "_tgt"
+    repl_src = src_prefix <> src_db_name
+    repl_tgt = tgt_prefix <> tgt_db_name
+
+    create_db(src_db_name)
+    create_db(tgt_db_name)
+
+    on_exit(fn -> delete_db(src_db_name) end)
+    on_exit(fn -> delete_db(tgt_db_name) end)
+
+    docs = make_docs(1..10)
+    ddoc = %{
+      "_id" => "_design/foo",
+      :language => "javascript",
+      "integer" => 1
+    }
+
+    doc_ids = test_data[:initial]
+    num_missing = Enum.count(doc_ids, fn doc_id ->
+      String.starts_with?(doc_id, "foo_")
+    end)
+    total_replicated = length(doc_ids) - num_missing
+
+    [_ | docs] = save_docs(src_db_name, [ddoc | docs])
+
+    repl_body = %{:doc_ids => doc_ids}
+    result = replicate(repl_src, repl_tgt, body: repl_body)
+    assert result["ok"]
+
+    if(total_replicated == 0) do
+      assert result["no_changes"]
+    else
+      assert is_binary(result["start_time"])
+      assert is_binary(result["end_time"])
+      assert result["docs_read"] == total_replicated
+      assert result["docs_written"] == total_replicated
+      assert result["doc_write_failures"] == 0
+    end
+
+    Enum.each(doc_ids, fn doc_id ->
+      doc_id = URI.decode(doc_id)
+      orig = Couch.get!("/#{src_db_name}/#{doc_id}")
+      copy = Couch.get!("/#{tgt_db_name}/#{doc_id}")
+
+      if(String.starts_with?(doc_id, "foo_")) do
+        assert orig.status_code == 404
+        assert copy.status_code == 404
+      else
+        assert HTTPotion.Response.success?(orig)
+        assert HTTPotion.Response.success?(copy)
+        assert cmp_json(orig.body, copy.body)
+      end
+    end)
+
+    # Be absolutely sure that other docs were not replicated
+    Enum.each(docs, fn doc ->
+      encoded_id = URI.encode_www_form(doc["_id"])
+      copy = Couch.get!("/#{tgt_db_name}/#{doc["_id"]}")
+      is_doc_id = &(Enum.member?(doc_ids, &1))
+      if(is_doc_id.(doc["_id"]) or is_doc_id.(encoded_id)) do
+        assert HTTPotion.Response.success?(copy)
+      else
+        assert copy.status_code == 404
+      end
+    end)
+
+    tgt_info = get_db_info(tgt_db_name)
+    assert tgt_info["doc_count"] == total_replicated
+
+    doc_ids_after = test_data[:after]
+    num_missing_after = Enum.count(doc_ids_after, fn doc_id ->
+      String.starts_with?(doc_id, "foo_")
+    end)
+
+    repl_body = %{:doc_ids => doc_ids_after}
+    result = replicate(repl_src, repl_tgt, body: repl_body)
+    assert result["ok"]
+
+    total_replicated_after = length(doc_ids_after) - num_missing_after
+    if(total_replicated_after == 0) do
+      assert result["no_changes"]
+    else
+      assert is_binary(result["start_time"])
+      assert is_binary(result["end_time"])
+      assert result["docs_read"] == total_replicated_after
+      assert result["docs_written"] == total_replicated_after
+      assert result["doc_write_failures"] == 0
+    end
+
+    Enum.each(doc_ids_after, fn doc_id ->
+      orig = Couch.get!("/#{src_db_name}/#{doc_id}")
+      copy = Couch.get!("/#{tgt_db_name}/#{doc_id}")
+
+      if(String.starts_with?(doc_id, "foo_")) do
+        assert orig.status_code == 404
+        assert copy.status_code == 404
+      else
+        assert HTTPotion.Response.success?(orig)
+        assert HTTPotion.Response.success?(copy)
+        assert cmp_json(orig.body, copy.body)
+      end
+    end)
+
+    # Be absolutely sure that other docs were not replicated
+    all_doc_ids = doc_ids ++ doc_ids_after
+    Enum.each(docs, fn doc ->
+      encoded_id = URI.encode_www_form(doc["_id"])
+      copy = Couch.get!("/#{tgt_db_name}/#{doc["_id"]}")
+      is_doc_id = &(Enum.member?(all_doc_ids, &1))
+      if(is_doc_id.(doc["_id"]) or is_doc_id.(encoded_id)) do
+        assert HTTPotion.Response.success?(copy)
+      else
+        assert copy.status_code == 404
+      end
+    end)
+
+    tgt_info = get_db_info(tgt_db_name)
+    assert tgt_info["doc_count"] == total_replicated + total_replicated_after, "#{inspect test_data}"
+
+    # Update a source document and re-replicate (no conflict introduced)
+    conflict_id = test_data[:conflict_id]
+    doc = Couch.get!("/#{src_db_name}/#{conflict_id}").body
+    assert is_map(doc)
+    doc = Map.put(doc, "integer", 666)
+    [doc] = save_docs(src_db_name, [doc])
+
+    att1 = [
+      name: "readme.txt",
+      body: get_att1_data(),
+      content_type: "text/plain"
+    ]
+    att2 = [
+      name: "data.dat",
+      body: get_att2_data(),
+      content_type: "application/binary"
+    ]
+    doc = add_attachment(src_db_name, doc, att1)
+    doc = add_attachment(src_db_name, doc, att2)
+
+    repl_body = %{:doc_ids => [conflict_id]}
+    result = replicate(repl_src, repl_tgt, body: repl_body)
+    assert result["ok"]
+
+    assert result["docs_read"] == 1
+    assert result["docs_written"] == 1
+    assert result["doc_write_failures"] == 0
+
+    query = %{"conflicts" => "true"}
+    copy = Couch.get!("/#{tgt_db_name}/#{conflict_id}", query: query)
+    assert HTTPotion.Response.success?(copy)
+    assert copy.body["integer"] == 666
+    assert String.starts_with?(copy.body["_rev"], "4-")
+    assert not Map.has_key?(doc, "_conflicts")
+
+    atts = copy.body["_attachments"]
+    assert is_map(atts)
+    assert is_map(atts["readme.txt"])
+    assert atts["readme.txt"]["revpos"] == 3
+    assert String.match?(atts["readme.txt"]["content_type"], ~r/text\/plain/)
+    assert atts["readme.txt"]["stub"]
+
+    att1_data = Couch.get!("/#{tgt_db_name}/#{conflict_id}/readme.txt").body
+    assert String.length(att1_data) == String.length(att1[:body])
+    assert att1_data == att1[:body]
+
+    assert is_map(atts["data.dat"])
+    assert atts["data.dat"]["revpos"] == 4
+    ct_re = ~r/application\/binary/
+    assert String.match?(atts["data.dat"]["content_type"], ct_re)
+    assert atts["data.dat"]["stub"]
+
+    att2_data = Couch.get!("/#{tgt_db_name}/#{conflict_id}/data.dat").body
+    assert String.length(att2_data) == String.length(att2[:body])
+    assert att2_data == att2[:body]
+
+    # Generate a conflict using replication by doc ids
+    orig = Couch.get!("/#{src_db_name}/#{conflict_id}").body
+    orig = Map.update!(orig, "integer", &(&1 + 100))
+    [_] = save_docs(src_db_name, [orig])
+
+    copy = Couch.get!("/#{tgt_db_name}/#{conflict_id}").body
+    copy = Map.update!(copy, "integer", &(&1 + 1))
+    [_] = save_docs(tgt_db_name, [copy])
+
+    result = replicate(repl_src, repl_tgt, body: repl_body)
+    assert result["ok"]
+    assert result["docs_read"] == 1
+    assert result["docs_written"] == 1
+    assert result["doc_write_failures"] == 0
+
+    copy = Couch.get!("/#{tgt_db_name}/#{conflict_id}", query: query).body
+    assert String.match?(copy["_rev"], ~r/^5-/)
+    assert is_list(copy["_conflicts"])
+    assert length(copy["_conflicts"]) == 1
+    conflict_rev = Enum.at(copy["_conflicts"], 0)
+    assert String.match?(conflict_rev, ~r/^5-/)
+  end
 
   def get_db_info(db_name) do
     resp = Couch.get("/#{db_name}")
@@ -565,7 +1055,7 @@ defmodule ReplicationTest do
     resp = Couch.post("/#{db_name}/_bulk_docs", query: query, body: body)
     assert HTTPotion.Response.success?(resp)
     for {doc, resp} <- Enum.zip(docs, resp.body) do
-      Map.put(doc, :_rev, resp["rev"])
+      Map.put(doc, "_rev", resp["rev"])
     end
   end
 
@@ -576,21 +1066,21 @@ defmodule ReplicationTest do
       content_type: "text/plain"
     ]
     att = Keyword.merge(defaults, att) |> Enum.into(%{})
-    uri = "/#{db_name}/#{URI.encode(doc[:_id])}/#{att[:name]}"
+    uri = "/#{db_name}/#{URI.encode(doc["_id"])}/#{att[:name]}"
     headers = ["Content-Type": att[:content_type]]
-    params = if doc[:_rev] do
-      %{:w => 3, :rev => doc[:_rev]}
+    params = if doc["_rev"] do
+      %{:w => 3, :rev => doc["_rev"]}
     else
       %{:w => 3}
     end
     resp = Couch.put(uri, headers: headers, query: params, body: att[:body])
     assert HTTPotion.Response.success?(resp)
-    Map.put(doc, :_rev, resp.body["rev"])
+    Map.put(doc, "_rev", resp.body["rev"])
   end
 
   def make_docs(ids) do
     for id <- ids, str_id = Integer.to_string(id) do
-      %{:_id => str_id, :integer => id, :string => str_id}
+      %{"_id" => str_id, "integer" => id, "string" => str_id}
     end
   end
 
@@ -619,9 +1109,11 @@ defmodule ReplicationTest do
         if cmp_json(v, rhs[k]) do
           {:cont, true}
         else
+          Logger.error "#{inspect lhs} != #{inspect rhs}"
           {:halt, false}
         end
       else
+        Logger.error "#{inspect lhs} != #{inspect rhs}"
         {:halt, false}
       end
     end)
@@ -638,19 +1130,5 @@ defmodule ReplicationTest do
   def decode_seq(seq) do
     seq = String.replace(seq, ~r/\d+-/, "", global: false)
     :erlang.binary_to_term(Base.url_decode64!(seq, padding: false))
-  end
-
-  def to_atoms(json) when is_map(json) do
-    Enum.map(json, fn {k, v} ->
-      {String.to_atom(k), to_atoms(v)}
-    end) |> Enum.into(%{})
-  end
-
-  def to_atoms(json) when is_list(json) do
-    Enum.map(json, &(to_atoms(&1)))
-  end
-
-  def to_atoms(json) do
-    json
   end
 end
