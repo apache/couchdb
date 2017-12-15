@@ -10,9 +10,12 @@ defmodule Couch do
   end
 
   def process_request_headers(headers) do
-    headers
-    |> Dict.put(:"User-Agent", "couch-potion")
-    |> Dict.put(:"Content-Type", "application/json")
+    headers = Keyword.put(headers, :"User-Agent", "couch-potion")
+    if headers[:"Content-Type"] do
+      headers
+    else
+      Keyword.put(headers, :"Content-Type", "application/json")
+    end
   end
 
   def process_options(options) do
