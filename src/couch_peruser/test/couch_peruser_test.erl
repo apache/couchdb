@@ -156,6 +156,20 @@ should_create_user_db_with_default(TestAuthDb) ->
         ?_assertEqual(1, couch_util:get_value(q, ClusterInfo))
     ].
 
+should_create_user_db_with_custom_prefix(TestAuthDb) ->
+    set_config("couch_peruser", "database_prefix", "newuserdb-"),
+    create_user(TestAuthDb, "fooo"),
+    wait_for_db_create(<<"newuserdb-666f6f6f">>),
+    delete_config("couch_peruser", "database_prefix", "newuserdb-"),
+    ?_assert(lists:member(<<"newuserdb-666f6f6f">>, all_dbs())).
+
+should_create_user_db_with_custom_special_prefix(TestAuthDb) ->
+    set_config("couch_peruser", "database_prefix", "userdb_$()+--/"),
+    create_user(TestAuthDb, "fooo"),
+    wait_for_db_create(<<"userdb_$()+--/666f6f6f">>),
+    delete_config("couch_peruser", "database_prefix", "userdb_$()+--/"),
+    ?_assert(lists:member(<<"userdb_$()+--/666f6f6f">>, all_dbs())).
+
 should_create_anon_user_db_with_default(TestAuthDb) ->
     create_anon_user(TestAuthDb, "fooo"),
     wait_for_db_create(<<"userdb-666f6f6f">>),
@@ -165,6 +179,20 @@ should_create_anon_user_db_with_default(TestAuthDb) ->
         ?_assert(lists:member(<<"userdb-666f6f6f">>, all_dbs())),
         ?_assertEqual(1, couch_util:get_value(q, ClusterInfo))
     ].
+
+should_create_anon_user_db_with_custom_prefix(TestAuthDb) ->
+    set_config("couch_peruser", "database_prefix", "newuserdb-"),
+    create_anon_user(TestAuthDb, "fooo"),
+    wait_for_db_create(<<"newuserdb-666f6f6f">>),
+    delete_config("couch_peruser", "database_prefix", "newuserdb-"),
+    ?_assert(lists:member(<<"newuserdb-666f6f6f">>, all_dbs())).
+
+should_create_anon_user_db_with_custom_special_prefix(TestAuthDb) ->
+    set_config("couch_peruser", "database_prefix", "userdb_$()+--/"),
+    create_anon_user(TestAuthDb, "fooo"),
+    wait_for_db_create(<<"userdb_$()+--/666f6f6f">>),
+    delete_config("couch_peruser", "database_prefix", "userdb_$()+--/"),
+    ?_assert(lists:member(<<"userdb_$()+--/666f6f6f">>, all_dbs())).
 
 should_create_user_db_with_q4(TestAuthDb) ->
     set_config("couch_peruser", "q", "4"),
@@ -213,6 +241,40 @@ should_delete_user_db(TestAuthDb) ->
     wait_for_db_delete(UserDbName),
     AfterDelete = lists:member(UserDbName, all_dbs()),
     [?_assert(AfterCreate), ?_assertNot(AfterDelete)].
+
+should_delete_user_db_with_custom_prefix(TestAuthDb) ->
+    User = "bar",
+    UserDbName = <<"newuserdb-626172">>,
+    set_config("couch_peruser", "delete_dbs", "true"),
+    set_config("couch_peruser", "database_prefix", "newuserdb-"),
+    create_user(TestAuthDb, User),
+    wait_for_db_create(UserDbName),
+    AfterCreate = lists:member(UserDbName, all_dbs()),
+    delete_user(TestAuthDb, User),
+    wait_for_db_delete(UserDbName),
+    delete_config("couch_peruser", "database_prefix", "newuserdb-"),
+    AfterDelete = lists:member(UserDbName, all_dbs()),
+    [
+        ?_assert(AfterCreate),
+        ?_assertNot(AfterDelete)
+    ].
+
+should_delete_user_db_with_custom_special_prefix(TestAuthDb) ->
+    User = "bar",
+    UserDbName = <<"userdb_$()+--/626172">>,
+    set_config("couch_peruser", "delete_dbs", "true"),
+    set_config("couch_peruser", "database_prefix", "userdb_$()+--/"),
+    create_user(TestAuthDb, User),
+    wait_for_db_create(UserDbName),
+    AfterCreate = lists:member(UserDbName, all_dbs()),
+    delete_user(TestAuthDb, User),
+    wait_for_db_delete(UserDbName),
+    delete_config("couch_peruser", "database_prefix", "userdb_$()+--/"),
+    AfterDelete = lists:member(UserDbName, all_dbs()),
+    [
+        ?_assert(AfterCreate),
+        ?_assertNot(AfterDelete)
+    ].
 
 should_reflect_config_changes(TestAuthDb) ->
     User = "baz",
@@ -445,11 +507,17 @@ couch_peruser_test_() ->
                 fun setup/0, fun teardown/1,
                 [
                     fun should_create_anon_user_db_with_default/1,
+                    fun should_create_anon_user_db_with_custom_prefix/1,
+                    fun should_create_anon_user_db_with_custom_special_prefix/1,
                     fun should_create_user_db_with_default/1,
+                    fun should_create_user_db_with_custom_prefix/1,
+                    fun should_create_user_db_with_custom_special_prefix/1,
                     fun should_create_user_db_with_q4/1,
                     fun should_create_anon_user_db_with_q4/1,
                     fun should_not_delete_user_db/1,
                     fun should_delete_user_db/1,
+                    fun should_delete_user_db_with_custom_prefix/1,
+                    fun should_delete_user_db_with_custom_special_prefix/1,
                     fun should_reflect_config_changes/1,
                     fun should_add_user_to_db_admins/1,
                     fun should_add_user_to_db_members/1,
