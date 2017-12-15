@@ -28,11 +28,10 @@ defmodule Couch do
   end
 
   def process_response_body(headers, body) do
-    case headers[:'content-type'] do
-      "application/json" ->
-        body |> IO.iodata_to_binary |> :jiffy.decode([:return_maps])
-      _ ->
-        process_response_body(body)
+    if String.match?(headers[:"Content-Type"], ~r/application\/json/) do
+      body |> IO.iodata_to_binary |> :jiffy.decode([:return_maps])
+    else
+      process_response_body(body)
     end
   end
 
