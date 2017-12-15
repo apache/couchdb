@@ -59,8 +59,11 @@ defmodule ReplicationTest do
     # test "replicate with since_seq - #{name}" do
     #   run_since_seq_repl(@src_prefix, @tgt_prefix)
     # end
-    test "validate_doc_update failure replications - #{name}" do
-      run_vdu_repl(@src_prefix, @tgt_prefix)
+    # test "validate_doc_update failure replications - #{name}" do
+    #   run_vdu_repl(@src_prefix, @tgt_prefix)
+    # end
+    test "create_target filter option - #{name}" do
+      run_create_target_repl(@src_prefix, @tgt_prefix)
     end
   end)
 
@@ -493,6 +496,35 @@ defmodule ReplicationTest do
     end
   end
 
+  def run_create_target_repl(src_prefix, tgt_prefix) do
+    base_db_name = random_db_name()
+    src_db_name = base_db_name <> "_src"
+    tgt_db_name = base_db_name <> "_tgt"
+    repl_src = src_prefix <> src_db_name
+    repl_tgt = tgt_prefix <> tgt_db_name
+
+    create_db(src_db_name)
+
+    on_exit(fn -> delete_db(src_db_name) end)
+    # This is created by the replication
+    on_exit(fn -> delete_db(tgt_db_name) end)
+
+    docs = make_docs(1..2)
+    save_docs(src_db_name, docs)
+
+    replicate(repl_src, repl_tgt, body: %{:create_target => true})
+
+    src_info = get_db_info(src_db_name)
+    tgt_info = get_db_info(tgt_db_name)
+
+    assert tgt_info["doc_count"] == src_info["doc_count"]
+
+    src_shards = seq_to_shards(src_info["update_seq"])
+    tgt_shards = seq_to_shards(tgt_info["update_seq"])
+    assert tgt_shards == src_shards
+  end
+
+
   def get_db_info(db_name) do
     resp = Couch.get("/#{db_name}")
     assert HTTPotion.Response.success?(resp)
@@ -597,6 +629,16 @@ defmodule ReplicationTest do
 
   def cmp_json(lhs, rhs), do: lhs == rhs
 
+  def seq_to_shards(seq) do
+    for {_node, range, update_seq} <- decode_seq(seq) do
+      {range, update_seq}
+    end
+  end
+
+  def decode_seq(seq) do
+    seq = String.replace(seq, ~r/\d+-/, "", global: false)
+    :erlang.binary_to_term(Base.url_decode64!(seq, padding: false))
+  end
 
   def to_atoms(json) when is_map(json) do
     Enum.map(json, fn {k, v} ->
