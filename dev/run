@@ -130,6 +130,8 @@ def setup_argparse():
                       help='The node number to seed them when creating the node(s)')
     parser.add_option('-c', '--config-overrides', action="append", default=[],
                       help='Optional key=val config overrides. Can be repeated')
+    parser.add_option('--no-eval', action='store_true', default=False,
+                      help='Do not eval subcommand output')
     return parser.parse_args()
 
 
@@ -150,6 +152,7 @@ def setup_context(opts, args):
             'haproxy': opts.haproxy,
             'haproxy_port': opts.haproxy_port,
             'config_overrides': opts.config_overrides,
+            'no_eval': opts.no_eval,
             'reset_logs': True,
             'procs': []}
 
@@ -549,15 +552,19 @@ def join(ctx, lead_port, user, password):
 
 @log('Exec command {cmd}')
 def run_command(ctx, cmd):
-    p = sp.Popen(cmd, shell=True, stdout=sp.PIPE, stderr=sys.stderr)
-    while True:
-        line = p.stdout.readline()
-        if not line:
-            break
-        eval(line)
-    p.wait()
-    exit(p.returncode)
-
+    if ctx['no_eval']:
+        p = sp.Popen(cmd, shell=True)
+        p.wait()
+        exit(p.returncode)
+    else:
+        p = sp.Popen(cmd, shell=True, stdout=sp.PIPE, stderr=sys.stderr)
+        while True:
+            line = p.stdout.readline()
+            if not line:
+                break
+            eval(line)
+        p.wait()
+        exit(p.returncode)
 
 @log('Restart all nodes')
 def reboot_nodes(ctx):

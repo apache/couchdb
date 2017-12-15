@@ -112,6 +112,11 @@ soak-eunit: couch
 	@$(REBAR) setup_eunit 2> /dev/null
 	while [ $$? -eq 0 ] ; do $(REBAR) -r eunit $(EUNIT_OPTS) ; done
 
+.PHONY: elixir
+elixir:
+	@rm -rf dev/lib
+	@dev/run -a adm:pass --no-eval test/elixir/run
+
 .PHONY: javascript
 # target: javascript - Run JavaScript test suites or specific ones defined by suites option
 javascript:
