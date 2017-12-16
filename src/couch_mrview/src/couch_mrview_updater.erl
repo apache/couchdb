@@ -196,7 +196,18 @@ map_docs(Parent, #mrst{db_name = DbName, idx_name = IdxName} = State0) ->
                     {erlang:max(Seq, SeqAcc), [{Id, Seq, Rev, []} | Results]};
                 ({Id, Seq, Rev, Doc}, {SeqAcc, Results}) ->
                     couch_stats:increment_counter([couchdb, mrview, map_doc]),
-                    {ok, Res} = couch_query_servers:map_doc_raw(QServer, Doc),
+                    % couch_log:info("~nIdxName: ~p, Doc: ~p~n~n", [IdxName, Doc]),
+                    Doc0 = case IdxName of
+                        <<"_design/_access">> ->
+                            % splice in seq
+                            {Props} = Doc#doc.body,
+                            Doc#doc{
+                                body = {Props++[{<<"_seq">>, Seq}]}
+                            };
+                        _Else ->
+                            Doc
+                        end,
+                    {ok, Res} = couch_query_servers:map_doc_raw(QServer, Doc0),
                     {erlang:max(Seq, SeqAcc), [{Id, Seq, Rev, Res} | Results]}
             end,
             FoldFun = fun(Docs, Acc) ->

@@ -16,6 +16,7 @@
 -export([fold/4, full_reduce/1, final_reduce/2, size/1, foldl/3, foldl/4]).
 -export([fold_reduce/4, lookup/2, get_state/1, set_options/2]).
 -export([extract/2, assemble/3, less/3]).
+-export([full_reduce_with_options/2]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -34,6 +35,8 @@ assemble(#btree{assemble_kv=Assemble}, Key, Value) ->
 less(#btree{less=undefined}, A, B) ->
     A < B;
 less(#btree{less=Less}, A, B) ->
+    couch_log:info("~n A:~p~n", [A]),
+    couch_log:info("~n B:~p~n", [B]),
     Less(A, B).
 
 % pass in 'nil' for State if a new Btree.
@@ -92,10 +95,28 @@ fold_reduce(#btree{root=Root}=Bt, Fun, Acc, Options) ->
         throw:{stop, AccDone} -> {ok, AccDone}
     end.
 
+full_reduce_with_options(Bt, Options0) ->
+    CountFun = fun(_SeqStart, PartialReds, 0) ->
+        {ok, couch_btree:final_reduce(Bt, PartialReds)}
+    end,
+    [UserName] = proplists:get_value(start_key, Options0, <<"">>),
+    % couch_log:info("~n Options0:~p~n", [Options0]),
+    % couch_log:info("~n UserName:~p~n", [UserName]),
+    EndKey = {[UserName, {[]}], {[]}},
+    % couch_log:info("~n EndKey:~p~n", [EndKey]),
+    Options = Options0 ++ [
+        {end_key, EndKey}
+    ],
+    couch_log:info("~n Options:~p~n", [Options]),
+    R = fold_reduce(Bt, CountFun, 0, Options),
+    couch_log:info("~n~n R: ~p ~n", [R]),
+    R.
+
 full_reduce(#btree{root=nil,reduce=Reduce}) ->
     {ok, Reduce(reduce, [])};
 full_reduce(#btree{root=Root}) ->
     {ok, element(2, Root)}.
+
 
 size(#btree{root = nil}) ->
     0;

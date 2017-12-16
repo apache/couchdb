@@ -36,7 +36,6 @@
 }).
 
 start_link() ->
-    couch_log:info("~n~ncouch_access_native_proc: start_link~n~n", []),
     gen_server:start_link(?MODULE, [], []).
 
 
@@ -49,7 +48,6 @@ prompt(Pid, Data) ->
 
 
 init(_) ->
-    couch_log:info("~n~ncouch_access_native_proc: init~n~n", []),
     {ok, #st{}}.
 
 
@@ -129,10 +127,16 @@ map_doc(_St, {Doc}) ->
         Access when is_list(Access) ->
             Id = couch_util:get_value(<<"_id">>, Doc),
             Rev = couch_util:get_value(<<"_rev">>, Doc),
+            Seq = couch_util:get_value(<<"_seq">>, Doc),
+            % by-access-id
             lists:map(fun(UserOrRole) -> [
                 [[UserOrRole, Id], Rev]
             ] end, Access)
-            ++ [[]]; %TODO: implement by-access-seq
+            ++
+            % by-access-seq
+            lists:map(fun(UserOrRole) -> [
+                [[UserOrRole, Seq], Rev]
+            ] end, Access);
         _Else ->
-            [[],[]] % no comprende
+            [[],[]] % no comprende: should not be needed once we implement _access field validation
     end.

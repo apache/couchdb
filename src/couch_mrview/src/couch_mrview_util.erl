@@ -20,6 +20,7 @@
 -export([index_file/2, compaction_file/2, open_file/1]).
 -export([delete_files/2, delete_index_file/2, delete_compaction_file/2]).
 -export([get_row_count/1, all_docs_reduce_to_count/1, reduce_to_count/1]).
+-export([get_access_row_count/2]).
 -export([get_view_changes_count/1]).
 -export([all_docs_key_opts/1, all_docs_key_opts/2, key_opts/1, key_opts/2]).
 -export([fold/4, fold_reduce/4]).
@@ -382,6 +383,11 @@ temp_view_to_ddoc({Props}) ->
         ]}}
     ]},
     couch_doc:from_json_obj(DDoc).
+
+get_access_row_count(#mrview{btree=Bt}, UserName) ->
+    couch_btree:full_reduce_with_options(Bt, [
+        {start_key, UserName}
+    ]).
 
 
 get_row_count(#mrview{btree=Bt}) ->

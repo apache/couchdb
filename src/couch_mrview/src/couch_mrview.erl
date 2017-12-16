@@ -242,7 +242,6 @@ query_all_docs_access(Db, Args0, Callback0, Acc) ->
             ]}}
         ]}
     },
-    %% add startkey/endkey
     UserCtx = couch_db:get_user_ctx(Db),
     UserName = UserCtx#user_ctx.name,
     % TODO: add roles
@@ -551,7 +550,14 @@ all_docs_fold(Db, #mrargs{direction=Dir, keys=Keys0}=Args, Callback, UAcc) ->
 
 
 map_fold(Db, View, Args, Callback, UAcc) ->
-    {ok, Total} = couch_mrview_util:get_row_count(View),
+    % couch_log:info("~n~n View: ~p~n", [View]),
+    {ok, Total} = case View#mrview.def of
+        <<"_access/by-id-map">> ->
+            couch_mrview_util:get_access_row_count(View, Args#mrargs.start_key);
+        _Else ->
+            couch_mrview_util:get_row_count(View)
+    end,
+    couch_log:info("~n~n Total: ~p~n", [Total]),
     Acc = #mracc{
         db=Db,
         total_rows=Total,
