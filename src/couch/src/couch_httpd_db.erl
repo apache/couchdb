@@ -616,7 +616,8 @@ db_doc_req(#httpd{method='COPY'}=Req, Db, SourceDocId) ->
         missing_rev -> nil;
         Rev -> Rev
     end,
-    {TargetDocId, TargetRevs} = parse_copy_destination_header(Req),
+    {TargetDocId0, TargetRevs} = parse_copy_destination_header(Req),
+    TargetDocId = list_to_binary(mochiweb_util:unquote(TargetDocId0)),
     % open old doc
     Doc = couch_doc_open(Db, SourceDocId, SourceRev, []),
     % save new doc

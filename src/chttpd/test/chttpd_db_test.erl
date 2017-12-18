@@ -19,6 +19,10 @@
 -define(PASS, "pass").
 -define(AUTH, {basic_auth, {?USER, ?PASS}}).
 -define(CONTENT_JSON, {"Content-Type", "application/json"}).
+-define(DESTHEADER1, {"Destination", "foo%E5%95%8Abar"}).
+-define(DESTHEADER2, {"Destination", "foo%2Fbar%23baz%3Fpow%3Afiz"}).
+
+
 -define(FIXTURE_TXT, ?ABS_PATH(?FILE)).
 -define(i2l(I), integer_to_list(I)).
 
@@ -70,7 +74,8 @@ all_test_() ->
                     fun should_succeed_on_all_docs_with_queries_limit_skip/1,
                     fun should_succeed_on_all_docs_with_multiple_queries/1,
                     fun should_succeed_on_design_docs_with_multiple_queries/1,
-                    fun should_fail_on_multiple_queries_with_keys_and_queries/1
+                    fun should_fail_on_multiple_queries_with_keys_and_queries/1,
+                    fun should_return_correct_id_on_doc_copy/1
                 ]
             }
         }
@@ -300,6 +305,25 @@ should_fail_on_multiple_queries_with_keys_and_queries(Url) ->
             {<<"error">>,<<"bad_request">>},
             {<<"reason">>,<<"`keys` and `queries` are mutually exclusive">>}]},
             ?JSON_DECODE(RespBody))
+    end).
+
+
+should_return_correct_id_on_doc_copy(Url) ->
+    ?_test(begin
+        {ok, _, _, _} = create_doc(Url, "testdoc"),
+        {_, _, _, ResultBody1} = test_request:copy(Url ++ "/testdoc/",
+            [?CONTENT_JSON, ?AUTH, ?DESTHEADER1]),
+        {ResultJson1} = ?JSON_DECODE(ResultBody1),
+        Id1 = couch_util:get_value(<<"id">>, ResultJson1),
+        
+        {_, _, _, ResultBody2} = test_request:copy(Url ++ "/testdoc/",
+            [?CONTENT_JSON, ?AUTH, ?DESTHEADER2]),
+        {ResultJson2} = ?JSON_DECODE(ResultBody2),
+        Id2 = couch_util:get_value(<<"id">>, ResultJson2),
+        [
+            ?assertEqual(<<102,111,111,229,149,138,98,97,114>>, Id1),
+            ?assertEqual(<<"foo/bar#baz?pow:fiz">>, Id2)
+        ]
     end).
 
 
