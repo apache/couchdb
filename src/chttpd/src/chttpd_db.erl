@@ -984,35 +984,11 @@ http_code_from_status(Status) ->
     end.
 
 update_doc(Db, DocId, #doc{deleted=Deleted, body=DocBody}=Doc, Options) ->
-    {_, Ref} = spawn_monitor(fun() ->
-        try fabric:update_doc(Db, Doc, Options) of
-            Resp ->
-                exit({exit_ok, Resp})
-        catch
-            throw:Reason ->
-                exit({exit_throw, Reason});
-            error:Reason ->
-                exit({exit_error, Reason});
-            exit:Reason ->
-                exit({exit_exit, Reason})
-        end
-    end),
-    Result = receive
-        {'DOWN', Ref, _, _, {exit_ok, Ret}} ->
-            Ret;
-        {'DOWN', Ref, _, _, {exit_throw, Reason}} ->
-            throw(Reason);
-        {'DOWN', Ref, _, _, {exit_error, Reason}} ->
-            erlang:error(Reason);
-        {'DOWN', Ref, _, _, {exit_exit, Reason}} ->
-            erlang:exit(Reason)
-    end,
-
-    case Result of
-    {ok, NewRev} ->
-        Accepted = false;
-    {accepted, NewRev} ->
-        Accepted = true
+    Accepted = case fabric_util:defer(fabric, update_doc, [Db, Doc, Options]) of
+        {ok, NewRev} ->
+            false;
+        {accepted, NewRev} ->
+            true
     end,
     Etag = couch_httpd:doc_etag(DocId, DocBody, NewRev),
     Status = case {Accepted, Deleted} of
