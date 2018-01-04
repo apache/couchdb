@@ -40,17 +40,14 @@
 
 -define(tempfile,
     fun() ->
-        A = integer_to_list(couch_util:unique_monotonic_integer()),
-        N = node(),
-        FileName = lists:flatten(io_lib:format("~p-~s", [N, A])),
+        Suffix = couch_uuids:random(),
+        FileName = io_lib:format("~p-~s", [node(), Suffix]),
         filename:join([?TEMPDIR, FileName])
     end).
 -define(tempdb,
     fun() ->
-            Nums = integer_to_list(couch_util:unique_monotonic_integer()),
-            Prefix = "eunit-test-db",
-            Suffix = lists:concat([integer_to_list(Num) || Num <- Nums]),
-            list_to_binary(Prefix ++ "-" ++ Suffix)
+        Suffix = couch_uuids:random(),
+        iolist_to_binary(["eunit-test-db-", Suffix])
     end).
 -define(docid,
     fun() ->
