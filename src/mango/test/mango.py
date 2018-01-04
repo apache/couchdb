@@ -82,13 +82,15 @@ class Database(object):
 
     def recreate(self):
         r = self.sess.get(self.url)
-        db_info = r.json()
-        docs = db_info["doc_count"] + db_info["doc_del_count"]
-        if docs == 0:
-            # db never used - create unnecessary
-            return
-        self.delete()
+        if r.status_code == 200:
+            db_info = r.json()
+            docs = db_info["doc_count"] + db_info["doc_del_count"]
+            if docs == 0:
+                # db never used - create unnecessary
+                return
+            self.delete()
         self.create()
+        self.recreate()
 
     def save_doc(self, doc):
         self.save_docs([doc])
