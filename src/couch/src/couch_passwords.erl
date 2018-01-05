@@ -26,6 +26,9 @@ simple(Password, Salt) when is_binary(Password), is_binary(Salt) ->
     ?l2b(couch_util:to_hex(crypto:hash(sha, <<Password/binary, Salt/binary>>)));
 simple(Password, Salt) when is_binary(Salt) ->
     Msg = io_lib:format("Password value of '~p' is invalid.", [Password]),
+    throw({forbidden, Msg});
+simple(Password, Salt) when is_binary(Password) ->
+    Msg = io_lib:format("Salt value of '~p' is invalid.", [Salt]),
     throw({forbidden, Msg}).
 
 %% CouchDB utility functions
@@ -74,6 +77,11 @@ pbkdf2(Password, Salt, Iterations) when is_binary(Salt),
                                         is_integer(Iterations),
                                         Iterations > 0 ->
     Msg = io_lib:format("Password value of '~p' is invalid.", [Password]),
+    throw({forbidden, Msg});
+pbkdf2(Password, Salt, Iterations) when is_binary(Password),
+                                        is_integer(Iterations),
+                                        Iterations > 0 ->
+    Msg = io_lib:format("Salt value of '~p' is invalid.", [Salt]),
     throw({forbidden, Msg}).
 
 -spec pbkdf2(binary(), binary(), integer(), integer())
