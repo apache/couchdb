@@ -102,6 +102,8 @@ all_test_() ->
                 fun setup/0, fun teardown/1,
                 [
                     fun should_allow_admin_db_compaction/1,
+                    fun should_allow_valid_password_to_create_user/1,
+                    fun should_disallow_invalid_password_to_create_user/1,
                     fun should_disallow_anonymous_db_compaction/1,
                     fun should_disallow_db_member_db_compaction/1,
                     fun should_allow_db_admin_db_compaction/1,
@@ -123,6 +125,26 @@ should_allow_admin_db_compaction([Url,_UsersUrl]) ->
             {InnerJson} = ResultJson,
             couch_util:get_value(<<"ok">>, InnerJson, undefined)
         end).
+
+
+should_allow_valid_password_to_create_user([_Url, UsersUrl]) ->
+    UserDoc = "{\"_id\": \"org.couchdb.user:foo\", \"name\": \"foo\",
+                \"type\": \"user\", \"roles\": [], \"password\": \"bar\"}",
+    {ok, _, _, ResultBody} = test_request:post(UsersUrl,
+        [?CONTENT_JSON, ?AUTH], UserDoc),
+    ResultJson = ?JSON_DECODE(ResultBody),
+    {InnerJson} = ResultJson,
+    ?_assertEqual(true, couch_util:get_value(<<"ok">>, InnerJson)).
+
+should_disallow_invalid_password_to_create_user([_Url, UsersUrl]) ->
+    UserDoc = "{\"_id\": \"org.couchdb.user:foo\", \"name\": \"foo\",
+                \"type\": \"user\", \"roles\": [], \"password\": 123}",
+    {ok, _, _, ResultBody} = test_request:post(UsersUrl,
+        [?CONTENT_JSON, ?AUTH], UserDoc),
+    ResultJson = ?JSON_DECODE(ResultBody),
+    {InnerJson} = ResultJson,
+    ErrType = couch_util:get_value(<<"error">>, InnerJson),
+    ?_assertEqual(<<"forbidden">>, ErrType).
 
 should_disallow_anonymous_db_compaction([Url,_UsersUrl]) ->
     {ok, _, _, ResultBody} = test_request:post(Url ++ "/_compact",
