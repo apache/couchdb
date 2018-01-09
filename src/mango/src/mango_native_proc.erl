@@ -172,19 +172,12 @@ get_text_entries({IdxProps}, Doc) ->
 
 
 get_index_partial_filter_selector(IdxProps) ->
-    case couch_util:get_value(<<"partial_filter_selector">>, IdxProps) of
-        undefined ->
+    case couch_util:get_value(<<"partial_filter_selector">>, IdxProps, {[]}) of
+        {[]} ->
             % this is to support legacy text indexes that had the partial_filter_selector
             % set as selector
-            case couch_util:get_value(<<"selector">>, IdxProps, []) of
-                [] -> 
-                    {[]};
-                Else -> 
-                    Else
-            end;
-        [] -> 
-            {[]};
-        Else -> 
+            couch_util:get_value(<<"selector">>, IdxProps, {[]});
+        Else ->
             Else
     end.
 
