@@ -70,11 +70,16 @@ fixup_terminator(Tokens) ->
             Tokens ++ [{dot, Line}]
     end.
 
+
+-ifdef(pre18).
+
 line(Token) ->
-    case erlang:function_exported(erl_scan, line, 1) of
-        true ->
-            erl_scan:line(Token);
-        false ->
-            {line, Line} = erl_scan:token_info(Token, line),
-            Line
-    end.
+    {line, Line} = erl_scan:token_info(Token, line),
+    Line.
+
+-else.
+
+line(Token) ->
+    erl_scan:line(Token).
+
+-endif.
