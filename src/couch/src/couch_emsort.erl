@@ -131,12 +131,14 @@
 
 -export([open/1, open/2, get_fd/1, get_state/1]).
 -export([add/2, merge/1, sort/1, iter/1, next/1]).
+-export([get_merged/1]).
 
 
 -record(ems, {
     fd,
     root,
     added = 0,
+    sorted = 0,
     merged = 0,
     bb_chunk = 10,
     chain_chunk = 100
@@ -155,8 +157,6 @@ set_options(Ems, []) ->
     Ems;
 set_options(Ems, [{added, Added} | Rest]) ->
     set_options(Ems#ems{added=Added}, Rest);
-set_options(Ems, [{merged, Merged} | Rest]) ->
-    set_options(Ems#ems{merged=Merged}, Rest);
 set_options(Ems, [{root, Root} | Rest]) ->
     set_options(Ems#ems{root=Root}, Rest);
 set_options(Ems, [{chain_chunk, Count} | Rest]) when is_integer(Count) ->
@@ -171,6 +171,8 @@ get_fd(#ems{fd=Fd}) ->
 
 get_state(#ems{root=Root, added=Added}) ->
     [{root, Root},{added,Added}].
+
+get_merged({#ems{merged=Merged}=Ems, _}) -> Merged.
 
 
 add(Ems, []) ->
@@ -202,9 +204,9 @@ iter(#ems{root={_, _}}) ->
 
 next({_Ems, []}) ->
     finished;
-next({Ems, Chains}) ->
+next({#ems{merged=MCount}=Ems, Chains}) ->
     {KV, RestChains} = choose_kv(small, Ems, Chains),
-    {ok, KV, {Ems, RestChains}}.
+    {ok, KV, {Ems#ems{merged=MCount+1}, RestChains}}.
 
 
 add_bb_pos(#ems{root=undefined, added=ACount}=Ems, Pos) ->
@@ -238,15 +240,15 @@ decimate(#ems{root={BB, NextBB}}=Ems) ->
 
     % The first pass gives us a sort with pointers linked from
     % largest to smallest.
-    {RevBB, RevNextBB} = merge_back_bone(Ems, small, BB, NextBB),
+    {Ems1, {RevBB, RevNextBB}} = merge_back_bone(Ems, small, BB, NextBB),
 
     % We have to run a second pass so that links are pointed
     % back from smallest to largest.
-    {FwdBB, FwdNextBB} = merge_back_bone(Ems, big, RevBB, RevNextBB),
+    {Ems2, {FwdBB, FwdNextBB}} = merge_back_bone(Ems1, big, RevBB, RevNextBB),
 
     % Continue deicmating until we have an acceptable bound on
     % the number of keys to use.
-    decimate(Ems#ems{root={FwdBB, FwdNextBB}}).
+    decimate(Ems2#ems{root={FwdBB, FwdNextBB}}).
 
 
 merge_back_bone(Ems, Choose, BB, NextBB) ->
@@ -254,34 +256,36 @@ merge_back_bone(Ems, Choose, BB, NextBB) ->
     merge_rest_back_bone(Ems, Choose, NextBB, {[BBPos], nil}).
 
 
-merge_rest_back_bone(_Ems, _Choose, nil, Acc) ->
-    Acc;
+merge_rest_back_bone(Ems, _Choose, nil, Acc) ->
+    {Ems, Acc};
 merge_rest_back_bone(Ems, Choose, BBPos, Acc) ->
     {ok, {BB, NextBB}} = couch_file:pread_term(Ems#ems.fd, BBPos),
     NewPos = merge_chains(Ems, Choose, BB),
     {NewBB, NewPrev} = append_item(Ems, Acc, NewPos, Ems#ems.bb_chunk),
 
-    MCount =
+    Total = Ems#ems.added * 2, % two passes of sort
+
+    SCount =
     case Choose of
     small -> 
-        Merged = Ems#ems.merged + Ems#ems.bb_chunk,
-        case erlang:get(status_updater) of
-        undefined -> 
-            ok;
-        Pid -> 
-            Progress = 
-            case ok of
-                _ when Ems#ems.merged < Ems#ems.added -> (Merged * 100) div Ems#ems.added;
-                _ -> 100
-            end,
-            gen_server:cast(Pid, {update_merge_progress, Progress})
-        end,    
-        Merged;
+        Ems#ems.sorted + Ems#ems.bb_chunk;
     _Else -> 
-        Ems#ems.merged
+        Ems#ems.sorted + Ems#ems.chain_chunk
     end,
 
-    merge_rest_back_bone(Ems#ems{merged=MCount}, Choose, NextBB, {NewBB, NewPrev}).
+    case erlang:get(status_updater) of
+    undefined ->
+        ok;
+    Pid ->
+        Progress =
+        case ok of
+            _ when SCount < Total -> (SCount * 100) div Total;
+            _ -> 100
+        end,
+        gen_server:cast(Pid, {update_progress, Progress})
+    end,
+
+    merge_rest_back_bone(Ems#ems{sorted=SCount}, Choose, NextBB, {NewBB, NewPrev}).
 
 
 merge_chains(Ems, Choose, BB) ->

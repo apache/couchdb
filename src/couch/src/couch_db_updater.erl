@@ -1345,12 +1345,14 @@ bind_id_tree(Db, Fd, State) ->
 
 sort_meta_data(Db0) ->
     SU_pid = get_status_updater(Db0#db.name, Db0#db.filepath),
-    gen_server:cast(SU_pid, merge),
+    gen_server:cast(SU_pid, sort_start),
     {ok, Ems} = couch_emsort:merge(Db0#db.id_tree),
     Db0#db{id_tree=Ems}.
 
 
 copy_meta_data(#db{fd=Fd, header=Header}=Db) ->
+    SU_pid = get_status_updater(Db#db.name, Db#db.filepath),
+    gen_server:cast(SU_pid, merge_start),
     Src = Db#db.id_tree,
     DstState = couch_db_header:id_tree_state(Header),
     {ok, IdTree0} = couch_btree:open(DstState, Fd, [
@@ -1365,22 +1367,29 @@ copy_meta_data(#db{fd=Fd, header=Header}=Db) ->
         rem_seqs=[],
         infos=[]
     },
-    Acc = merge_docids(Iter, Acc0),
+    Acc = merge_docids(Iter, Acc0, SU_pid),
     {ok, IdTree} = couch_btree:add(Acc#merge_st.id_tree, Acc#merge_st.infos),
     {ok, SeqTree} = couch_btree:add_remove(
         Acc#merge_st.seq_tree, [], Acc#merge_st.rem_seqs
     ),
-    SU_pid = get_status_updater(Db#db.name, Db#db.filepath),
     gen_server:cast(SU_pid, done),
     Db#db{id_tree=IdTree, seq_tree=SeqTree}.
 
 
-merge_docids(Iter, #merge_st{infos=Infos}=Acc) when length(Infos) > 1000 ->
+merge_docids(Iter, #merge_st{infos=Infos}=Acc, SU_pid) when length(Infos) > 1000 ->
     #merge_st{
         id_tree=IdTree0,
         seq_tree=SeqTree0,
         rem_seqs=RemSeqs
     } = Acc,
+    Merged = couch_emsort:get_merged(Iter),
+    {ok, Total} = couch_btree:full_reduce(SeqTree0),
+    Progress =
+    case ok of
+        _ when Merged < Total -> (Merged * 100) div Total;
+        _ -> 100
+    end,
+    gen_server:cast(SU_pid, {update_progress, Progress}),
     {ok, IdTree1} = couch_btree:add(IdTree0, Infos),
     {ok, SeqTree1} = couch_btree:add_remove(SeqTree0, [], RemSeqs),
     Acc1 = Acc#merge_st{
@@ -1389,8 +1398,8 @@ merge_docids(Iter, #merge_st{infos=Infos}=Acc) when length(Infos) > 1000 ->
         rem_seqs=[],
         infos=[]
     },
-    merge_docids(Iter, Acc1);
-merge_docids(Iter, #merge_st{curr=Curr}=Acc) ->
+    merge_docids(Iter, Acc1, SU_pid);
+merge_docids(Iter, #merge_st{curr=Curr}=Acc, SU_pid) ->
     case next_info(Iter, Curr, []) of
         {NextIter, NewCurr, FDI, Seqs} ->
             Acc1 = Acc#merge_st{
@@ -1398,7 +1407,7 @@ merge_docids(Iter, #merge_st{curr=Curr}=Acc) ->
                 rem_seqs = Seqs ++ Acc#merge_st.rem_seqs,
                 curr = NewCurr
             },
-            merge_docids(NextIter, Acc1);
+            merge_docids(NextIter, Acc1, SU_pid);
         {finished, FDI, Seqs} ->
             Acc#merge_st{
                 infos = [FDI | Acc#merge_st.infos],

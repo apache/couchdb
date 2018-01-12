@@ -34,7 +34,8 @@ handle_cast({add_task, [Retry, TotalChanges]}, State) ->
         {changes_done, 0},
         {compact_meta_size, 0},
         {compact_data_size, 0},
-        {merged_on, 0},
+        {sort_start, 0},
+        {merge_start, 0},
         {total_changes, TotalChanges}
     ],
     case (Retry =/= nil) and couch_task_status:is_task_added() of
@@ -62,11 +63,14 @@ handle_cast({update_task, NumChanges}, State) ->
     end,
     couch_task_status:update([{changes_done, Changes2}, {progress, Progress}]),
     {noreply, State};
-handle_cast({update_merge_progress, Progress}, State) ->
+handle_cast({update_progress, Progress}, State) ->
     couch_task_status:update([{progress, Progress}]),
     {noreply, State};
-handle_cast(merge, State) ->
-    couch_task_status:update([{merged_on, timestamp()}]),
+handle_cast(sort_start, State) ->
+    couch_task_status:update([{sort_start, timestamp()}]),
+    {noreply, State};
+handle_cast(merge_start, State) ->
+    couch_task_status:update([{merge_start, timestamp()}]),
     {noreply, State};
 handle_cast(done, State) ->
     {noreply, State#state{stop=true}};
