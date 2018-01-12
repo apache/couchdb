@@ -32,8 +32,28 @@ build_eunit_config(Config0, AppFile) ->
     Cwd = filename:absname(rebar_utils:get_cwd()),
     DataDir = Cwd ++ "/tmp/data",
     ViewIndexDir = Cwd ++ "/tmp/data",
+    TmpDataDir = Cwd ++ "/tmp/tmp_data",
+    cleanup_dirs([DataDir, TmpDataDir]),
     Config1 = rebar_config:set_global(Config0, template, "setup_eunit"),
     Config2 = rebar_config:set_global(Config1, prefix, Cwd),
     Config3 = rebar_config:set_global(Config2, data_dir, DataDir),
     Config = rebar_config:set_global(Config3, view_index_dir, ViewIndexDir),
     rebar_templater:create(Config, AppFile).
+
+
+cleanup_dirs(Dirs) ->
+    lists:foreach(fun(Dir) ->
+        case filelib:is_dir(Dir) of
+            true -> del_dir(Dir);
+            false -> ok
+        end
+    end, Dirs).
+
+
+del_dir(Dir) ->
+    All = filelib:wildcard(Dir ++ "/**"),
+    {Dirs, Files} = lists:partition(fun filelib:is_dir/1, All),
+    ok = lists:foreach(fun file:delete/1, Files),
+    SortedDirs = lists:sort(fun(A, B) -> length(A) > length(B) end, Dirs),
+    ok = lists:foreach(fun file:del_dir/1, SortedDirs),
+    ok = file:del_dir(Dir).

@@ -68,6 +68,7 @@ set_level(Level) ->
 log(Level, Fmt, Args) ->
     case couch_log_util:should_log(Level) of
         true ->
+            couch_stats:increment_counter([couch_log, level, Level]),
             Entry = couch_log_formatter:format(Level, self(), Fmt, Args),
             ok = couch_log_server:log(Entry);
         false ->

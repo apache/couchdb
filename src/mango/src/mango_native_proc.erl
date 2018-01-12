@@ -113,6 +113,9 @@ handle_cast(garbage_collect, St) ->
     erlang:garbage_collect(),
     {noreply, St};
 
+handle_cast(stop, St) ->
+    {stop, normal, St};
+
 handle_cast(Msg, St) ->
     {stop, {invalid_cast, Msg}, St}.
 
@@ -169,19 +172,12 @@ get_text_entries({IdxProps}, Doc) ->
 
 
 get_index_partial_filter_selector(IdxProps) ->
-    case couch_util:get_value(<<"partial_filter_selector">>, IdxProps) of
-        undefined ->
+    case couch_util:get_value(<<"partial_filter_selector">>, IdxProps, {[]}) of
+        {[]} ->
             % this is to support legacy text indexes that had the partial_filter_selector
             % set as selector
-            case couch_util:get_value(<<"selector">>, IdxProps, []) of
-                [] -> 
-                    {[]};
-                Else -> 
-                    Else
-            end;
-        [] -> 
-            {[]};
-        Else -> 
+            couch_util:get_value(<<"selector">>, IdxProps, {[]});
+        Else ->
             Else
     end.
 
@@ -364,3 +360,34 @@ validate_index_info(IndexInfo) ->
         end
     end, [], IdxTypes),
     lists:member(valid_index, Results).
+
+
+-ifdef(TEST).
+
+-include_lib("eunit/include/eunit.hrl").
+
+handle_garbage_collect_cast_test() ->
+    Pid = self(),
+    {_, TracerRef} = spawn_monitor(fun() ->
+        erlang:trace(Pid, true, [garbage_collection]),
+        receive {trace, Pid, gc_start, _} ->
+            erlang:trace(Pid, false, [garbage_collection]),
+            exit(gc_start)
+        end
+    end),
+    erlang:yield(),
+    ?assertEqual({noreply, []}, handle_cast(garbage_collect, [])),
+    receive
+        {'DOWN', TracerRef, _, _, Msg} -> ?assertEqual(gc_start, Msg)
+    after 1000 ->
+        erlang:error({assertion_failed, [{module, ?MODULE}, {line, ?LINE},
+            {expected, gc_start}, {reason, timeout}]})
+    end.
+
+handle_stop_cast_test() ->
+    ?assertEqual({stop, normal, []}, handle_cast(stop, [])).
+
+handle_invalid_cast_test() ->
+    ?assertEqual({stop, {invalid_cast, random}, []}, handle_cast(random, [])).
+
+-endif.

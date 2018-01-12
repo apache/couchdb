@@ -66,6 +66,11 @@ set_config(Section, Key, Value) ->
         get_base_url(), "/_config/", Section, "/", Key]),
     do_request(put, Url, "\"" ++ Value ++ "\"").
 
+delete_config(Section, Key, Value) ->
+    Url = lists:concat([
+        get_base_url(), "/_config/", Section, "/", Key]),
+    do_request(delete, Url, "\"" ++ Value ++ "\"").
+
 do_request(Method, Url) ->
     Headers = [{basic_auth, {?ADMIN_USERNAME, ?ADMIN_PASSWORD}}],
     {ok, _, _, _} = test_request:request(Method, Url, Headers).
@@ -141,15 +146,50 @@ get_cluster_base_url() ->
     "http://" ++ Addr ++ ":" ++ Port.
 
 
-should_create_user_db(TestAuthDb) ->
+should_create_user_db_with_default(TestAuthDb) ->
     create_user(TestAuthDb, "foo"),
     wait_for_db_create(<<"userdb-666f6f">>),
-    ?_assert(lists:member(<<"userdb-666f6f">>, all_dbs())).
+    {ok, DbInfo} = fabric:get_db_info(<<"userdb-666f6f">>),
+    {ClusterInfo} = couch_util:get_value(cluster, DbInfo),
+    [
+        ?_assert(lists:member(<<"userdb-666f6f">>, all_dbs())),
+        ?_assertEqual(1, couch_util:get_value(q, ClusterInfo))
+    ].
 
-should_create_anon_user_db(TestAuthDb) ->
+should_create_anon_user_db_with_default(TestAuthDb) ->
     create_anon_user(TestAuthDb, "fooo"),
     wait_for_db_create(<<"userdb-666f6f6f">>),
-    ?_assert(lists:member(<<"userdb-666f6f6f">>, all_dbs())).
+    {ok, DbInfo} = fabric:get_db_info(<<"userdb-666f6f6f">>),
+    {ClusterInfo} = couch_util:get_value(cluster, DbInfo),
+    [
+        ?_assert(lists:member(<<"userdb-666f6f6f">>, all_dbs())),
+        ?_assertEqual(1, couch_util:get_value(q, ClusterInfo))
+    ].
+
+should_create_user_db_with_q4(TestAuthDb) ->
+    set_config("couch_peruser", "q", "4"),
+    create_user(TestAuthDb, "foo"),
+    wait_for_db_create(<<"userdb-666f6f">>),
+    {ok, DbInfo} = fabric:get_db_info(<<"userdb-666f6f">>),
+    {ClusterInfo} = couch_util:get_value(cluster, DbInfo),
+    delete_config("couch_peruser", "q", "4"),
+
+    [
+        ?_assert(lists:member(<<"userdb-666f6f">>, all_dbs())),
+        ?_assertEqual(4, couch_util:get_value(q, ClusterInfo))
+    ].
+
+should_create_anon_user_db_with_q4(TestAuthDb) ->
+    set_config("couch_peruser", "q", "4"),
+    create_anon_user(TestAuthDb, "fooo"),
+    wait_for_db_create(<<"userdb-666f6f6f">>),
+    {ok, TargetInfo} = fabric:get_db_info(<<"userdb-666f6f6f">>),
+    {ClusterInfo} = couch_util:get_value(cluster, TargetInfo),
+    delete_config("couch_peruser", "q", "4"),
+    [
+        ?_assert(lists:member(<<"userdb-666f6f6f">>, all_dbs())),
+        ?_assertEqual(4, couch_util:get_value(q, ClusterInfo))
+    ].
 
 should_not_delete_user_db(TestAuthDb) ->
     User = "foo",
@@ -381,8 +421,10 @@ couch_peruser_test_() ->
                 foreach,
                 fun setup/0, fun teardown/1,
                 [
-                    fun should_create_anon_user_db/1,
-                    fun should_create_user_db/1,
+                    fun should_create_anon_user_db_with_default/1,
+                    fun should_create_user_db_with_default/1,
+                    fun should_create_user_db_with_q4/1,
+                    fun should_create_anon_user_db_with_q4/1,
                     fun should_not_delete_user_db/1,
                     fun should_delete_user_db/1,
                     fun should_reflect_config_changes/1,

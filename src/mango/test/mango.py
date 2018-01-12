@@ -82,13 +82,15 @@ class Database(object):
 
     def recreate(self):
         r = self.sess.get(self.url)
-        db_info = r.json()
-        docs = db_info["doc_count"] + db_info["doc_del_count"]
-        if docs == 0:
-            # db never used - create unnecessary
-            return
-        self.delete()
+        if r.status_code == 200:
+            db_info = r.json()
+            docs = db_info["doc_count"] + db_info["doc_del_count"]
+            if docs == 0:
+                # db never used - create unnecessary
+                return
+            self.delete()
         self.create()
+        self.recreate()
 
     def save_doc(self, doc):
         self.save_docs([doc])
@@ -143,7 +145,7 @@ class Database(object):
         return created
 
     def create_text_index(self, analyzer=None, idx_type="text",
-        partial_filter_selector=None, default_field=None, fields=None, 
+        partial_filter_selector=None, selector=None, default_field=None, fields=None, 
         name=None, ddoc=None,index_array_lengths=None):
         body = {
             "index": {
@@ -159,6 +161,8 @@ class Database(object):
             body["index"]["default_field"] = default_field
         if index_array_lengths is not None:
             body["index"]["index_array_lengths"] = index_array_lengths
+        if selector is not None:
+            body["index"]["selector"] = selector
         if partial_filter_selector is not None:
             body["index"]["partial_filter_selector"] = partial_filter_selector
         if fields is not None:

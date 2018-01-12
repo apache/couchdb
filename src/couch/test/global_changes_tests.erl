@@ -32,7 +32,7 @@ teardown({_, DbName}) ->
     ok.
 
 http_create_db(Name) ->
-    Resp = {ok, Status, _, _} = test_request:put(db_url(Name), [?AUTH], ""),
+    {ok, Status, _, _} = test_request:put(db_url(Name), [?AUTH], ""),
     true = lists:member(Status, [201, 202]),
     ok.
     

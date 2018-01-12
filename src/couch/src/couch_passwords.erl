@@ -23,7 +23,13 @@
 %% legacy scheme, not used for new passwords.
 -spec simple(binary(), binary()) -> binary().
 simple(Password, Salt) when is_binary(Password), is_binary(Salt) ->
-    ?l2b(couch_util:to_hex(crypto:hash(sha, <<Password/binary, Salt/binary>>))).
+    ?l2b(couch_util:to_hex(crypto:hash(sha, <<Password/binary, Salt/binary>>)));
+simple(Password, Salt) when is_binary(Salt) ->
+    Msg = io_lib:format("Password value of '~p' is invalid.", [Password]),
+    throw({forbidden, Msg});
+simple(Password, Salt) when is_binary(Password) ->
+    Msg = io_lib:format("Salt value of '~p' is invalid.", [Salt]),
+    throw({forbidden, Msg}).
 
 %% CouchDB utility functions
 -spec hash_admin_password(binary() | list()) -> binary().
@@ -66,7 +72,17 @@ pbkdf2(Password, Salt, Iterations) when is_binary(Password),
                                         is_integer(Iterations),
                                         Iterations > 0 ->
     {ok, Result} = pbkdf2(Password, Salt, Iterations, ?SHA1_OUTPUT_LENGTH),
-    Result.
+    Result;
+pbkdf2(Password, Salt, Iterations) when is_binary(Salt),
+                                        is_integer(Iterations),
+                                        Iterations > 0 ->
+    Msg = io_lib:format("Password value of '~p' is invalid.", [Password]),
+    throw({forbidden, Msg});
+pbkdf2(Password, Salt, Iterations) when is_binary(Password),
+                                        is_integer(Iterations),
+                                        Iterations > 0 ->
+    Msg = io_lib:format("Salt value of '~p' is invalid.", [Salt]),
+    throw({forbidden, Msg}).
 
 -spec pbkdf2(binary(), binary(), integer(), integer())
     -> {ok, binary()} | {error, derived_key_too_long}.
