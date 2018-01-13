@@ -43,6 +43,7 @@ get_node_info(Node, Key) ->
 init([]) ->
     ets:new(?MODULE, [named_table, {read_concurrency, true}]),
     UpdateSeq = initialize_nodelist(),
+    mem3_dns:discover_peers(),
     {Pid, _} = spawn_monitor(fun() -> listen_for_changes(UpdateSeq) end),
     {ok, #state{changes_pid = Pid, update_seq = UpdateSeq}}.
 
