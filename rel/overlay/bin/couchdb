@@ -26,6 +26,10 @@ export BINDIR="$ROOTDIR/erts-$ERTS_VSN/bin"
 export EMU=beam
 export PROGNAME=`echo $0 | sed 's/.*\///'`
 
+ARGS_FILE="${COUCHDB_ARGS_FILE:-$ROOTDIR/etc/vm.args}"
+SYSCONFIG_FILE="${COUCHDB_SYSCONFIG_FILE:-$ROOTDIR/releases/$APP_VSN/sys.config}"
+
 exec "$BINDIR/erlexec" -boot "$ROOTDIR/releases/$APP_VSN/couchdb" \
-     -args_file "$ROOTDIR/etc/vm.args" \
-     -config "$ROOTDIR/releases/$APP_VSN/sys.config" "$@"
+     -args_file "${ARGS_FILE}" \
+     -config "${SYSCONFIG_FILE}" "$@"
+
