@@ -17,14 +17,18 @@
 -define(DEPTH, 10).
 
 setup() ->
-    test_util:start(?MODULE, [], [{dont_mock, [config]}]).
+    meck:new(config),
+    meck:expect(config, get, fun(_, _, Default) -> Default end).
+
+teardown(_) ->
+    meck:unload(config).
 
 key_tree_merge_test_()->
     {
         "Key tree merge",
         {
             setup,
-            fun setup/0, fun test_util:stop/1,
+            fun setup/0, fun teardown/1,
             [
                 should_merge_with_empty_tree(),
                 should_merge_reflexive(),
@@ -51,7 +55,7 @@ key_tree_missing_leaves_test_()->
         "Missing tree leaves",
         {
             setup,
-            fun setup/0, fun test_util:stop/1,
+            fun setup/0, fun teardown/1,
             [
                 should_not_find_missing_leaves(),
                 should_find_missing_leaves()
@@ -64,7 +68,7 @@ key_tree_remove_leaves_test_()->
         "Remove tree leaves",
         {
             setup,
-            fun setup/0, fun test_util:stop/1,
+            fun setup/0, fun teardown/1,
             [
                 should_have_no_effect_on_removing_no_leaves(),
                 should_have_no_effect_on_removing_non_existant_branch(),
@@ -81,7 +85,7 @@ key_tree_get_leaves_test_()->
         "Leaves retrieving",
         {
             setup,
-            fun setup/0, fun test_util:stop/1,
+            fun setup/0, fun teardown/1,
             [
                 should_extract_subtree(),
                 should_extract_subsubtree(),
@@ -103,7 +107,7 @@ key_tree_leaf_counting_test_()->
         "Leaf counting",
         {
             setup,
-            fun setup/0, fun test_util:stop/1,
+            fun setup/0, fun teardown/1,
             [
                 should_have_no_leaves_for_empty_tree(),
                 should_have_single_leaf_for_tree_with_single_node(),
@@ -118,7 +122,7 @@ key_tree_stemming_test_()->
         "Stemming",
         {
             setup,
-            fun setup/0, fun test_util:stop/1,
+            fun setup/0, fun teardown/1,
             [
                 should_have_no_effect_for_stemming_more_levels_than_exists(),
                 should_return_one_deepest_node(),
