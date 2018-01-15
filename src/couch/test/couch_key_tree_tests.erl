@@ -241,11 +241,14 @@ should_create_conflicts_on_merge()->
                   couch_key_tree:merge([OneChild], Stemmed, ?DEPTH)).
 
 should_create_no_conflicts_on_full_stem()->
+    %% Full stem is run from couch_key_tree:repair_tree/2. That is triggered
+    %% when a matching node ("1aa") is found in the rev tree and the tree to
+    %% be merged.
     OneChild = {1, {"1","foo",[{"1a", "bar", []}]}},
     Stemmed = {3, {"1aa", "bar", []}},
     TwoChild = {1, {"1","foo", [{"1a", "bar", [{"1aa", "bar", []}]}]}},
     {Merged, new_leaf} = couch_key_tree:merge([OneChild, Stemmed], TwoChild),
-    ?_assertEqual([TwoChild], couch_key_tree:full_stem(Merged, ?DEPTH)).
+    ?_assertEqual([TwoChild], couch_key_tree:stem(Merged, ?DEPTH)).
 
 should_ignore_conflicting_branch()->
     %% this test is based on couch-902-test-case2.py
