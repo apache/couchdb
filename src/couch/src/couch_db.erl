@@ -1738,14 +1738,29 @@ do_pipe([Filter|Rest], F0) ->
 
 set_namespace_range(Options, undefined) -> Options;
 set_namespace_range(Options, NS) ->
-    %% FIXME depending on order we might need to swap keys
-    SK = select_gt(
-           proplists:get_value(start_key, Options, <<"">>),
-           <<NS/binary, "/">>),
-    EK = select_lt(
-           proplists:get_value(end_key, Options, <<NS/binary, "0">>),
-           <<NS/binary, "0">>),
-    [{start_key, SK}, {end_key_gt, EK}].
+    SK0 = proplists:get_value(start_key, Options, <<NS/binary, "/">>),
+    EKType = case proplists:get_value(end_key_gt, Options) of
+        undefined -> end_key;
+        _ -> end_key_gt
+    end,
+    EK0 = case EKType of
+        end_key ->
+            proplists:get_value(end_key, Options, <<NS/binary, "0">>);
+        end_key_gt ->
+            proplists:get_value(end_key_gt, Options, <<NS/binary, "0">>)
+    end,
+    case SK0 =< EK0 of
+        true ->
+            SK = select_gt(SK0, <<NS/binary, "/">>),
+            EK = select_lt(EK0, <<NS/binary, "0">>),
+            [{dir, proplists:get_value(dir, Options, fwd)},
+                {start_key, SK}, {EKType, EK}];
+        false ->
+            SK = select_lt(SK0, <<NS/binary, "0">>),
+            EK = select_gt(EK0, <<NS/binary, "/">>),
+            [{dir, proplists:get_value(dir, Options, fwd)},
+                {start_key, SK}, {EKType, EK}]
+    end.
 
 select_gt(V1, V2) when V1 < V2 -> V2;
 select_gt(V1, _V2) -> V1.
