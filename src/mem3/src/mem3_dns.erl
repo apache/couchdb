@@ -47,13 +47,13 @@ handle_call(_Call, _From, State) ->
     {reply, ok, State}.
 
 handle_cast(discover_peers, #state{max_tries = 0} = State) ->
-    {ok, State};
+    {noreply, State};
 
 handle_cast(discover_peers, St) ->
     case query_dns(St#state.record_name) of
     {ok, Hostnames} ->
         add_nodes(Hostnames),
-        {ok, St#state{discovered_names = Hostnames}};
+        {noreply, St#state{discovered_names = Hostnames}};
     {error, Error} ->
         #state{max_tries = Max, timeout = Timeout} = St,
         NewSt = St#state{
@@ -61,7 +61,7 @@ handle_cast(discover_peers, St) ->
             max_tries = Max-1,
             timeout = 2*Timeout
         },
-        {ok, NewSt, Timeout}
+        {noreply, NewSt, Timeout}
     end.
 
 handle_info(timeout, State) ->
