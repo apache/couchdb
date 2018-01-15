@@ -500,14 +500,11 @@ stem_tree({Depth, Child}, Limit, Seen) ->
     end.
 
 
-stem_tree(_Depth, {_Key, _Val, []} = Leaf, Limit, Seen) ->
-    {Seen, Limit - 1, Leaf, []};
+stem_tree(_Depth, {Key, _Val, []} = Leaf, Limit, Seen) ->
+    {check_key(Key, Seen), Limit - 1, Leaf, []};
 
 stem_tree(Depth, {Key, Val, Children}, Limit, Seen0) ->
-    Seen1 = case sets:is_element(Key, Seen0) of
-        true -> throw(dupe_keys);
-        false -> sets:add_element(Key, Seen0)
-    end,
+    Seen1 = check_key(Key, Seen0),
     FinalAcc = lists:foldl(fun(Child, Acc) ->
         {SeenAcc, LimitPosAcc, ChildAcc, BranchAcc} = Acc,
         case stem_tree(Depth + 1, Child, Limit, SeenAcc) of
@@ -534,6 +531,15 @@ stem_tree(Depth, {Key, Val, Children}, Limit, Seen0) ->
             {FinalSeen, -1, NewBranches ++ FinalBranches};
         N when N < 0, length(FinalChildren) == 0 ->
             {FinalSeen, FinalLimitPos - 1, FinalBranches}
+    end.
+
+
+check_key(Key, Seen) ->
+    case sets:is_element(Key, Seen) of
+        true ->
+            throw(dupe_keys);
+        false ->
+            sets:add_element(Key, Seen)
     end.
 
 
