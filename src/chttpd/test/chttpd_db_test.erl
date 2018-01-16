@@ -20,6 +20,7 @@
 -define(AUTH, {basic_auth, {?USER, ?PASS}}).
 -define(CONTENT_JSON, {"Content-Type", "application/json"}).
 -define(FIXTURE_TXT, ?ABS_PATH(?FILE)).
+-define(i2l(I), integer_to_list(I)).
 
 setup() ->
     Hashed = couch_passwords:hash_admin_password(?PASS),
@@ -62,7 +63,9 @@ all_test_() ->
                     fun should_return_404_for_delete_att_on_notadoc/1,
                     fun should_return_409_for_del_att_without_rev/1,
                     fun should_return_200_for_del_att_with_rev/1,
-                    fun should_return_409_for_put_att_nonexistent_rev/1
+                    fun should_return_409_for_put_att_nonexistent_rev/1,
+                    fun should_return_update_seq_when_set_on_all_docs/1,
+                    fun should_not_return_update_seq_when_unset_on_all_docs/1
                 ]
             }
         }
@@ -184,6 +187,34 @@ should_return_409_for_put_att_nonexistent_rev(Url) ->
             {<<"error">>,<<"not_found">>},
             {<<"reason">>,<<"missing_rev">>}]},
             ?JSON_DECODE(RespBody))
+    end).
+
+
+should_return_update_seq_when_set_on_all_docs(Url) ->
+    ?_test(begin
+        [create_doc(Url, "testdoc" ++ ?i2l(I)) || I <- lists:seq(1, 3)],
+        {ok, RC, _, RespBody} = test_request:get(Url ++ "/_all_docs/"
+            ++ "?update_seq=true&keys=[\"testdoc1\"]",[?CONTENT_JSON, ?AUTH]),
+        ?assertEqual(200, RC),
+        {ResultJson} = ?JSON_DECODE(RespBody),
+        ?assertNotEqual(undefined,
+            couch_util:get_value(<<"update_seq">>, ResultJson)),
+        ?assertNotEqual(undefined,
+            couch_util:get_value(<<"offset">>, ResultJson))
+    end).
+
+
+should_not_return_update_seq_when_unset_on_all_docs(Url) ->
+    ?_test(begin
+        [create_doc(Url, "testdoc" ++ ?i2l(I)) || I <- lists:seq(1, 3)],
+        {ok, RC, _, RespBody} = test_request:get(Url ++ "/_all_docs/"
+            ++ "?update_seq=false&keys=[\"testdoc1\"]",[?CONTENT_JSON, ?AUTH]),
+        ?assertEqual(200, RC),
+        {ResultJson} = ?JSON_DECODE(RespBody),
+        ?assertEqual(undefined,
+            couch_util:get_value(<<"update_seq">>, ResultJson)),
+        ?assertNotEqual(undefined,
+            couch_util:get_value(<<"offset">>, ResultJson))
     end).
 
 
