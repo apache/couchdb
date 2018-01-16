@@ -75,8 +75,8 @@ stem/2
 %% @doc Merge multiple paths into the given tree.
 -spec multi_merge(revtree(), tree()) -> revtree().
 multi_merge(RevTree, Trees) ->
-    lists:foldl(fun(Tree) ->
-        {NewRevTree, _} = merge(RevTree, Tree),
+    lists:foldl(fun(Tree, RevTreeAcc) ->
+        {NewRevTree, _} = merge(RevTreeAcc, Tree),
         NewRevTree
     end, RevTree, lists:sort(Trees)).
 
