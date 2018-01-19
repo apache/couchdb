@@ -223,7 +223,7 @@ init([]) ->
     MaxDbsOpen = list_to_integer(
             config:get("couchdb", "max_dbs_open", integer_to_list(?MAX_DBS_OPEN))),
     UpdateLruOnRead =
-        config:get("couchdb", "update_lru_on_read", "true") =:= "true",
+        config:get("couchdb", "update_lru_on_read", "false") =:= "true",
     ok = config:listen_for_changes(?MODULE, nil),
     ok = couch_file:init_delete_dir(RootDir),
     hash_admin_passwords(),
