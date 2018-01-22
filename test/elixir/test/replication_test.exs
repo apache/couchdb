@@ -92,12 +92,19 @@ defmodule ReplicationTest do
     # test "replication restarts after filter change - COUCHDB-892 - #{name}" do
     #   run_filter_changed_repl(@src_prefix, @tgt_prefix)
     # end
+    #
+    # @tag config: [
+    #   {"replicator", "startup_jitter", "0"}
+    # ]
+    # test "replication by doc ids - #{name}" do
+    #   run_by_id_repl(@src_prefix, @tgt_prefix)
+    # end
 
     @tag config: [
       {"replicator", "startup_jitter", "0"}
     ]
-    test "replication by doc ids - #{name}" do
-      run_by_id_repl(@src_prefix, @tgt_prefix)
+    test "continuous replication - #{name}" do
+      run_continuous_repl(@src_prefix, @tgt_prefix)
     end
   end)
 
@@ -1015,6 +1022,218 @@ defmodule ReplicationTest do
     assert String.match?(conflict_rev, ~r/^5-/)
   end
 
+  def run_continuous_repl(src_prefix, tgt_prefix) do
+    base_db_name = random_db_name()
+    src_db_name = base_db_name <> "_src"
+    tgt_db_name = base_db_name <> "_tgt"
+    repl_src = src_prefix <> src_db_name
+    repl_tgt = tgt_prefix <> tgt_db_name
+
+    create_db(src_db_name)
+    create_db(tgt_db_name)
+
+    ddoc = %{
+      "_id" => "_design/mydesign",
+      :language => "javascript",
+      :filters => %{
+        :myfilter => "function(doc, req) { return true; }"
+      }
+    }
+    docs = make_docs(1..25)
+    docs = save_docs(src_db_name, docs ++ [ddoc])
+
+    att1_data = get_att1_data()
+    att2_data = get_att2_data()
+
+    docs = for doc <- docs do
+      if doc["integer"] >= 10 and doc["integer"] < 15 do
+        add_attachment(src_db_name, doc, body: att1_data)
+      else
+        doc
+      end
+    end
+
+    repl_body = %{:continuous => true}
+    result = replicate(repl_src, repl_tgt, body: repl_body)
+
+    assert result["ok"]
+    assert is_binary(result["_local_id"])
+
+    repl_id = result["_local_id"]
+
+    Logger.debug "#{src_db_name} - #{repl_id}"
+    wait_for_seq(src_db_name, repl_id)
+
+    Enum.each(docs, fn doc ->
+      resp = Couch.get!("/#{tgt_db_name}/#{doc["_id"]}")
+      assert resp.status_code < 300
+      assert cmp_json(doc, resp.body)
+
+      if doc["integer"] >= 10 and doc["integer"] < 15 do
+        atts = resp.body["_attachments"]
+        assert is_map(atts)
+        att = atts["readme.txt"]
+        assert is_map(att)
+        assert att["revpos"] == 2
+        assert String.match?(att["content_type"], ~r/text\/plain/)
+        assert att["stub"]
+
+        resp = Couch.get!("/#{tgt_db_name}/#{doc["_id"]}/readme.txt")
+        assert String.length(resp.body) == String.length(att1_data)
+        assert resp.body == att1_data
+      end
+    end)
+
+    src_info = get_db_info(src_db_name)
+    tgt_info = get_db_info(tgt_db_name)
+
+    assert tgt_info["doc_count"] == src_info["doc_count"]
+
+    # Add attachments to more source docs
+    docs = for doc <- docs do
+      is_ddoc = String.starts_with?(doc["_id"], "_design/")
+      case doc["integer"] do
+        n when n >= 10 and n < 15 ->
+          ctype = "application/binary"
+          opts = [name: "data.dat", body: att2_data, content_type: ctype]
+          add_attachment(src_db_name, doc, opts)
+        _ when is_ddoc ->
+          add_attachment(src_db_name, doc)
+        _ ->
+          doc
+      end
+    end
+
+    wait_for_seq(src_db_name, repl_id)
+
+    Enum.each(docs, fn doc ->
+      is_ddoc = String.starts_with?(doc["_id"], "_design/")
+      case doc["integer"] do
+        N when N >= 10 and N < 15 or is_ddoc ->
+          resp = Couch.get!("/#{tgt_db_name}/#{doc["_id"]}")
+          atts = resp.body["_attachments"]
+          assert is_map(atts)
+          att = atts["readme.txt"]
+          assert is_map(att)
+          assert att["revpos"] == 2
+          assert String.match?(att["content_type"], ~r/text\/plain/)
+          assert att["stub"]
+
+          resp = Couch.get!("/#{tgt_db_name}/#{doc["_id"]}/readme.txt")
+          assert String.length(resp.body) == String.length(att1_data)
+          assert resp.body == att1_data
+
+          if not is_ddoc do
+            att = atts["data.dat"]
+            assert is_map(att)
+            assert att["revpos"] == 3
+            assert String.match?(att["content_type"], ~r/application\/binary/)
+            assert att["stub"]
+
+            resp = Couch.get!("/#{tgt_db_name}/#{doc["_id"]}/data.dat")
+            assert String.length(resp.body) == String.length(att2_data)
+            assert resp.body == att2_data
+          end
+        _ ->
+          :ok
+      end
+    end)
+
+    src_info = get_db_info(src_db_name)
+    tgt_info = get_db_info(tgt_db_name)
+
+    assert tgt_info["doc_count"] == src_info["doc_count"]
+
+    ddoc = Enum.last(docs)
+    ctype = "application/binary"
+    opts = [name: "data.dat", body: att2_data, content_type: ctype]
+    add_attachment(src_db_name, ddoc, opts)
+
+    wait_for_seq(src_db_name, repl_id)
+
+    copy = Couch.get("/#{tgt_db_name}/#{ddoc["_id"]}")
+    atts = copy["_attachments"]
+    assert is_map(atts)
+    att = atts["readme.txt"]
+    assert is_map(att)
+    assert att["revpos"] == 2
+    assert String.match?(att["content_type"], ~r/text\/plain/)
+    assert att["stub"]
+
+    resp = Couch.get!("/#{tgt_db_name}/#{copy["_id"]}/readme.txt")
+    assert String.length(resp.body) == String.length(att1_data)
+    assert resp.body == att1_data
+
+    att = atts["data.dat"]
+    assert is_map(att)
+    assert att["revpos"] == 3
+    assert String.match?(att["content_type"], ~r/application\/binary/)
+    assert att["stub"]
+
+    resp = Couch.get!("/#{tgt_db_name}/#{copy["_id"]}/data.dat")
+    assert String.length(resp.body) == String.length(att2_data)
+    assert resp.body == att2_data
+
+    src_info = get_db_info(src_db_name)
+    tgt_info = get_db_info(tgt_db_name)
+
+    assert tgt_info["doc_count"] == src_info["doc_count"]
+
+    # Check creating new normal documents
+    new_docs = make_docs(25..35)
+    new_docs = save_docs(src_db_name, new_docs)
+
+    wait_for_seq(src_db_name, repl_id)
+
+    Enum.each(new_docs, fn doc ->
+      resp = Couch.get!("/#{tgt_db_name}/#{doc["_id"]}")
+      assert resp.status_code < 300
+      assert cmp_json(doc, resp.body)
+    end)
+
+    src_info = get_db_info(src_db_name)
+    tgt_info = get_db_info(tgt_db_name)
+
+    assert tgt_info["doc_count"] == src_info["doc_count"]
+
+    # Delete docs from the source
+
+    doc1 = Enum.at(docs, 0)
+    doc2 = Enum.at(docs, 6)
+
+    Couch.delete!(src_db_name, doc1["_id"])
+    Couch.delete!(src_db_name, doc2["_id"])
+
+    wait_for_seq(src_db_name, repl_id)
+
+    resp = Couch.get(tgt_db_name, doc1["_id"])
+    assert resp.status_code == 404
+    resp = Couch.get(tgt_db_name, doc2["_id"])
+    assert resp.status_code == 404
+
+    changes = get_db_changes(tgt_db_name, %{:since => tgt_info["update_seq"]})
+    # quite unfortunately, there is no way on relying on ordering in a cluster
+    # but we can assume a length of 2
+    changes = for change <- changes["results"] do
+      {change["_id"], change["deleted"]}
+    end
+    assert Enum.sort(changes) == [{doc1["_id"], true}, {doc2["_id"], true}]
+
+    # Cancel the replication
+    repl_body = %{:continuous => true, :cancel => true}
+    resp = replicate(repl_src, repl_tgt, repl_body)
+    assert resp["ok"]
+    assert resp["_local_id"] == repl_id
+
+    doc = %{"_id" => "foobar", "value": 666}
+    [doc] = save_docs(src_db_name, [doc])
+
+    wait_for_replication_stop(repl_id, 30000)
+
+    resp = Couch.get("/#{tgt_db_name}/#{doc["_id"]}")
+    assert resp.status_code == 404
+  end
+
   def get_db_info(db_name) do
     resp = Couch.get("/#{db_name}")
     assert HTTPotion.Response.success?(resp)
@@ -1043,8 +1262,8 @@ defmodule ReplicationTest do
     end
   end
 
-  def get_db_changes(db_name) do
-    resp = Couch.get("/#{db_name}/_changes")
+  def get_db_changes(db_name, query \\ %{}) do
+    resp = Couch.get("/#{db_name}/_changes", query: query)
     assert HTTPotion.Response.success?(resp), "#{inspect resp}"
     resp.body
   end
@@ -1076,6 +1295,66 @@ defmodule ReplicationTest do
     resp = Couch.put(uri, headers: headers, query: params, body: att[:body])
     assert HTTPotion.Response.success?(resp)
     Map.put(doc, "_rev", resp.body["rev"])
+  end
+
+  def wait_for_seq(src_db_name, repl_id) do
+    src_info = get_db_info(src_db_name)
+    src_seq = src_info["update_seq"]
+    wait_for_seq(src_seq, repl_id, 30000)
+  end
+
+  def wait_for_seq(src_seq, _, wait_left) when wait_left <= 0 do
+    assert false, "Timeout waiting for replication sequence: #{src_seq}"
+  end
+
+  def wait_for_seq(src_seq, repl_id, wait_left) do
+    task = get_task(repl_id, 0)
+    Logger.debug "task: #{src_seq} #{inspect task}"
+    if not is_map(task) or task["through_seq"] != src_seq do
+      :timer.sleep(500)
+      wait_for_seq(src_seq, repl_id, wait_left - 500)
+    end
+    task
+  end
+
+  def wait_for_replication_stop(repl_id, wait_left) when wait_left <= 0 do
+    assert false, "Timeout waiting for replication task to stop: #{repl_id}"
+  end
+
+  def wait_for_replication_stop(repl_id, wait_left) do
+    task = get_task(repl_id, 0)
+    if is_map(task) do
+      :timer.sleep(500)
+      wait_for_replication_stop(repl_id, wait_left - 500)
+    end
+  end
+
+  def get_last_seq(db_name) do
+    body = get_db_changes(db_name, %{:since => "now"})
+    body["last_seq"]
+  end
+
+  def get_task(repl_id, delay) when delay <= 0 do
+    try_get_task(repl_id)
+  end
+
+  def get_task(repl_id, delay) do
+    case try_get_task(repl_id) do
+      result when is_map(result) ->
+        result
+      _ ->
+        :timer.sleep(500)
+        get_task(repl_id, delay - 500)
+    end
+  end
+
+  def try_get_task(repl_id) do
+    resp = Couch.get("/_active_tasks")
+    assert HTTPotion.Response.success?(resp)
+    assert is_list(resp.body)
+    Enum.find(resp.body, :null, fn task ->
+      task["replication_id"] == repl_id
+    end)
   end
 
   def make_docs(ids) do
