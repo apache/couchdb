@@ -128,15 +128,13 @@ should_delete_multiple_dbs(DbNames) ->
 
 should_create_delete_database_continuously(Times, DbName) ->
     {lists:flatten(io_lib:format("~b times", [Times])),
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         ?assert(create_db(DbName)),
         lists:foreach(fun(_) ->
-            {timeout, ?TIMEOUT, [
-                ?assert(delete_db(DbName)),
-                ?assert(create_db(DbName))
-            ]}
+            ?assert(delete_db(DbName)),
+            ?assert(create_db(DbName))
         end, lists:seq(1, Times))
-    end)}.
+    end)}}.
 
 should_create_db_if_missing(DbName) ->
     ?_test(begin
