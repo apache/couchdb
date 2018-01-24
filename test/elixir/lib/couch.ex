@@ -1,3 +1,35 @@
+defmodule Couch.Session do
+  @enforce_keys [:cookie]
+  defstruct [:cookie]
+
+  def new(cookie) do
+    %Couch.Session{cookie: cookie}
+  end
+
+  def get(sess, url, opts \\ []), do: go(sess, :get, url, opts)
+  def get!(sess, url, opts \\ []), do: go(sess, :get, url, opts)
+  def put(sess, url, opts \\ []), do: go(sess, :put, url, opts)
+  def put!(sess, url, opts \\ []), do: go(sess, :put, url, opts)
+  def post(sess, url, opts \\ []), do: go(sess, :post, url, opts)
+  def post!(sess, url, opts \\ []), do: go(sess, :post, url, opts)
+  def delete(sess, url, opts \\ []), do: go(sess, :delete, url, opts)
+  def delete!(sess, url, opts \\ []), do: go(sess, :delete, url, opts)
+
+  # Skipping head/patch/options for YAGNI. Feel free to add
+  # if the need arises.
+
+  def go(%Couch.Session{} = sess, method, url, opts) do
+    opts = Keyword.merge(opts, [cookie: sess.cookie])
+    Couch.request(method, url, opts)
+  end
+
+  def go!(%Couch.Session{} = sess, method, url, opts) do
+    opts = Keyword.merge(opts, [cookie: sess.cookie])
+    Couch.request!(method, url, opts)
+  end
+end
+
+
 defmodule Couch do
   use HTTPotion.Base
 
@@ -9,17 +41,28 @@ defmodule Couch do
     "http://localhost:15984" <> url
   end
 
-  def process_request_headers(headers) do
+  def process_request_headers(headers, options) do
     headers = Keyword.put(headers, :"User-Agent", "couch-potion")
-    if headers[:"Content-Type"] do
+    headers = if headers[:"Content-Type"] do
       headers
     else
       Keyword.put(headers, :"Content-Type", "application/json")
     end
+    case Keyword.get options, :cookie do
+      nil ->
+        headers
+      cookie ->
+        Keyword.put headers, :"Cookie", cookie
+    end
   end
 
+
   def process_options(options) do
-    Dict.put options, :basic_auth, {"adm", "pass"}
+    if Keyword.get(options, :cookie) == nil do
+      Keyword.put(options, :basic_auth, {"adm", "pass"})
+    else
+      options
+    end
   end
 
   def process_request_body(body) do
@@ -41,7 +84,9 @@ defmodule Couch do
   def login(user, pass) do
     resp = Couch.post("/_session", body: %{:username => user, :password => pass})
     true = resp.body["ok"]
-    resp.body
+    cookie = resp.headers[:'set-cookie']
+    [token | _] = String.split(cookie, ";")
+    %Couch.Session{cookie: token}
   end
 
   # HACK: this is here until this commit lands in a release
@@ -71,5 +116,36 @@ defmodule Couch do
       { :error, reason } ->
         %HTTPotion.ErrorResponse{ message: error_to_string(reason)}
     end
+  end
+
+  # Anther HACK: Until we can get process_request_headers/2 merged
+  # upstream.
+  @spec process_arguments(atom, String.t, [{atom(), any()}]) :: %{}
+  defp process_arguments(method, url, options) do
+    options    = process_options(options)
+
+    body       = Keyword.get(options, :body, "")
+    headers    = Keyword.merge Application.get_env(:httpotion, :default_headers, []), Keyword.get(options, :headers, [])
+    timeout    = Keyword.get(options, :timeout, Application.get_env(:httpotion, :default_timeout, 5000))
+    ib_options = Keyword.merge Application.get_env(:httpotion, :default_ibrowse, []), Keyword.get(options, :ibrowse, [])
+    follow_redirects = Keyword.get(options, :follow_redirects, Application.get_env(:httpotion, :default_follow_redirects, false))
+
+    ib_options = if stream_to = Keyword.get(options, :stream_to), do: Keyword.put(ib_options, :stream_to, spawn(__MODULE__, :transformer, [stream_to, method, url, options])), else: ib_options
+    ib_options = if user_password = Keyword.get(options, :basic_auth) do
+      {user, password} = user_password
+      Keyword.put(ib_options, :basic_auth, { to_charlist(user), to_charlist(password) })
+    else
+      ib_options
+    end
+
+    %{
+      method:     method,
+      url:        url |> to_string |> process_url(options) |> to_charlist,
+      body:       body |> process_request_body,
+      headers:    headers |> process_request_headers(options) |> Enum.map(fn ({k, v}) -> { to_charlist(k), to_charlist(v) } end),
+      timeout:    timeout,
+      ib_options: ib_options,
+      follow_redirects: follow_redirects
+    }
   end
 end
