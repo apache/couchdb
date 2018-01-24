@@ -211,24 +211,6 @@ dialyze: .rebar
 	@$(REBAR) -r dialyze $(DIALYZE_OPTS)
 
 
-.PHONY: docker-image
-# target: docker-image - Build Docker image
-docker-image:
-	@docker build --rm -t couchdb/dev-cluster .
-
-
-.PHONY: docker-start
-# target: docker-start - Start CouchDB in Docker container
-docker-start:
-	@docker run -d -P -t couchdb/dev-cluster > .docker-id
-
-
-.PHONY: docker-stop
-# target: docker-stop - Stop Docker container
-docker-stop:
-	@docker stop `cat .docker-id`
-
-
 .PHONY: introspect
 # target: introspect - Check for commits difference between rebar.config and repository
 introspect:

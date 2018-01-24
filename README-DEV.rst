@@ -198,30 +198,6 @@ See ``make help`` for more info and useful commands.
 
 Please report any problems to the developer's mailing list.
 
-Testing a cluster
------------------
-
-We use `Docker <https://docker.io>`_ to safely run a local three node
-cluster all inside a single docker container.
-
-Assuming you have Docker installed and running::
-
-    make docker-image
-
-This will create a docker image (tagged 'couchdb/dev-cluster') capable
-of running a joined three node cluster.
-
-To start it up::
-
-    make docker-start
-
-A three node cluster should now be running (you can now use ``docker ps``
-to find the exposed ports of the nodes).
-
-To stop it::
-
-    make docker-stop
-
 Releasing
 ---------
 
