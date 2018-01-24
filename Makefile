@@ -129,6 +129,40 @@ endif
             'test/javascript/run --suites "$(suites)" \
             --ignore "$(ignore_js_suites)"'
 
+.PHONY: test-cluster-with-quorum
+test-cluster-with-quorum:
+	@mkdir -p share/www/script/test
+ifeq ($(IN_RELEASE), true)
+	@cp test/javascript/tests/lorem*.txt share/www/script/test/
+else
+	@mkdir -p src/fauxton/dist/release/test
+	@cp test/javascript/tests/lorem*.txt src/fauxton/dist/release/test/
+endif
+	@rm -rf dev/lib
+	@dev/run -n 3 -q --with-admin-party-please \
+            --enable-erlang-views --degrade-cluster 1 \
+            -c 'startup_jitter=0' \
+            'test/javascript/run --suites "$(suites)" \
+            --ignore "$(ignore_js_suites)" \
+	    --path test/javascript/tests-cluster/with-quorum'
+
+.PHONY: test-cluster-without-quorum
+test-cluster-without-quorum:
+	@mkdir -p share/www/script/test
+ifeq ($(IN_RELEASE), true)
+	@cp test/javascript/tests/lorem*.txt share/www/script/test/
+else
+	@mkdir -p src/fauxton/dist/release/test
+	@cp test/javascript/tests/lorem*.txt src/fauxton/dist/release/test/
+endif
+	@rm -rf dev/lib
+	@dev/run -n 3 -q --with-admin-party-please \
+            --enable-erlang-views --degrade-cluster 2 \
+            -c 'startup_jitter=0' \
+            'test/javascript/run --suites "$(suites)" \
+            --ignore "$(ignore_js_suites)" \
+            --path test/javascript/tests-cluster/without-quorum'
+
 .PHONY: soak-javascript
 soak-javascript:
 	@mkdir -p share/www/script/test

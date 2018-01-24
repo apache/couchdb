@@ -146,9 +146,9 @@ maybe_stop(W, Counters) ->
         {ok, {W, Counters}};
     false ->
         case lists:sum([1 || {_, ok} <- Counters]) of
-        W ->
+        NumOk when NumOk >= (W div 2 +1) ->
             {stop, ok};
-        NumOk when NumOk >= (W div 2 + 1) ->
+        NumOk when NumOk > 0 ->
             {stop, accepted};
         _ ->
             {error, internal_server_error}

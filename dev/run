@@ -130,6 +130,8 @@ def setup_argparse():
                       help='The node number to seed them when creating the node(s)')
     parser.add_option('-c', '--config-overrides', action="append", default=[],
                       help='Optional key=val config overrides. Can be repeated')
+    parser.add_option('--degrade-cluster', dest="degrade_cluster",type=int, default=0,
+                      help='The number of nodes that should be stopped after cluster config')
     return parser.parse_args()
 
 
@@ -142,6 +144,7 @@ def setup_context(opts, args):
             'admin': opts.admin.split(':', 1) if opts.admin else None,
             'nodes': ['node%d' % (i + opts.node_number) for i in range(opts.nodes)],
             'node_number': opts.node_number,
+            'degrade_cluster': opts.degrade_cluster,
             'devdir': os.path.dirname(fpath),
             'rootdir': os.path.dirname(os.path.dirname(fpath)),
             'cmd': ' '.join(args),
@@ -337,18 +340,35 @@ def startup(ctx):
         cluster_setup_with_admin_party(ctx)
     else:
         cluster_setup(ctx)
-
+    if ctx['degrade_cluster'] > 0:
+        degrade_cluster(ctx)
 
 def kill_processes(ctx):
     for proc in ctx['procs']:
         if proc and proc.returncode is None:
             proc.kill()
 
+def degrade_cluster(ctx):
+    if ctx['with_haproxy']:
+        haproxy_proc = ctx['procs'].pop()
+    for i in range(0,ctx['degrade_cluster']):
+        proc = ctx['procs'].pop()
+        if proc is not None:
+            kill_process(proc)
+    if ctx['with_haproxy']:
+         ctx['procs'].append(haproxy_proc)
+
+@log('Stoping proc {proc.pid}')
+def kill_process(proc):
+    if proc and proc.returncode is None:
+        proc.kill()
 
 def boot_nodes(ctx):
     for node in ctx['nodes']:
         ctx['procs'].append(boot_node(ctx, node))
-    ctx['procs'].append(boot_haproxy(ctx))
+    haproxy_proc = boot_haproxy(ctx)
+    if haproxy_proc is not None:
+        ctx['procs'].append(haproxy_proc)
 
 
 def ensure_all_nodes_alive(ctx):
