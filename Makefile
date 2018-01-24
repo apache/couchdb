@@ -258,6 +258,7 @@ ifeq ($(IN_RELEASE), true)
 	@cp -R share/docs/html/* rel/couchdb/share/www/docs/
 	@cp share/docs/man/apachecouchdb.1 rel/couchdb/share/docs/couchdb.1
 else
+	@mkdir -p rel/couchdb/share/www/docs/
 	@mkdir -p rel/couchdb/share/docs/
 	@cp -R src/docs/build/html/ rel/couchdb/share/www/docs
 	@cp src/docs/build/man/apachecouchdb.1 rel/couchdb/share/docs/couchdb.1
