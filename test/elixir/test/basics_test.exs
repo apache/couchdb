@@ -94,7 +94,9 @@ defmodule BasicsTest do
     assert Couch.post("/#{db_name}", [body: %{:_id => "1", :a => 2, :b => 4}]).body["ok"]
     assert Couch.post("/#{db_name}", [body: %{:_id => "2", :a => 3, :b => 9}]).body["ok"]
     assert Couch.post("/#{db_name}", [body: %{:_id => "3", :a => 4, :b => 16}]).body["ok"]
-    assert Couch.get("/#{db_name}").body["doc_count"] == 3
+    retry_until(fn ->
+      Couch.get("/#{db_name}").body["doc_count"] == 3
+    end)
   end
 
   @tag :pending
@@ -145,14 +147,16 @@ defmodule BasicsTest do
     doc0 = Couch.get("/#{db_name}/0").body
     doc0 = Map.put(doc0, :a, 4)
     assert Couch.put("/#{db_name}/0", [body: doc0]).body["ok"]
-    resp = Couch.get("/#{db_name}/_design/foo/_view/baz")
-    assert resp.body["total_rows"] == 2
+    retry_until(fn ->
+      Couch.get("/#{db_name}/_design/foo/_view/baz").body["total_rows"] == 2
+    end)
 
     # Write 2 more docs and test for updated view results
     assert Couch.post("/#{db_name}", [body: %{:a => 3, :b => 9}]).body["ok"]
     assert Couch.post("/#{db_name}", [body: %{:a => 4, :b => 16}]).body["ok"]
-    resp = Couch.get("/#{db_name}/_design/foo/_view/baz")
-    assert resp.body["total_rows"] == 3
+    retry_until(fn ->
+      Couch.get("/#{db_name}/_design/foo/_view/baz").body["total_rows"] == 3
+    end)
     assert Couch.get("/#{db_name}").body["doc_count"] == 8
 
     # Test reduce function
@@ -162,8 +166,9 @@ defmodule BasicsTest do
     # Delete doc and test for updated view results
     doc0 = Couch.get("/#{db_name}/0").body
     assert Couch.delete("/#{db_name}/0?rev=#{doc0["_rev"]}").body["ok"]
-    resp = Couch.get("/#{db_name}/_design/foo/_view/baz")
-    assert resp.body["total_rows"] == 2
+    retry_until(fn ->
+      Couch.get("/#{db_name}/_design/foo/_view/baz").body["total_rows"] == 2
+    end)
     assert Couch.get("/#{db_name}").body["doc_count"] == 7
     assert Couch.get("/#{db_name}/0").status_code == 404
     refute Couch.get("/#{db_name}/0?rev=#{doc0["_rev"]}").status_code == 404
