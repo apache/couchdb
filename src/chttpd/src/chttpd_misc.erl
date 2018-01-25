@@ -240,7 +240,9 @@ cancel_replication(PostBody, Ctx) ->
             {error, badrpc};
         Else ->
             % Unclear what to do here -- pick the first error?
-            hd(Else)
+            % Except try ignoring any {error, not_found} responses
+            % because we'll always get two of those
+            hd(Else -- [{error, not_found}])
         end
     end.
 
