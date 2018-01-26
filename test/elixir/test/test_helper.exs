@@ -12,7 +12,8 @@ defmodule CouchTestCase do
       setup context do
         setup_funs = [
           &set_db_context/1,
-          &set_config_context/1
+          &set_config_context/1,
+          &set_user_context/1
         ]
         context = Enum.reduce(setup_funs, context, fn setup_fun, acc ->
           setup_fun.(acc)
@@ -55,6 +56,23 @@ defmodule CouchTestCase do
         context
       end
 
+      def set_user_context(context) do
+        case Map.get(context, :user) do
+          nil ->
+            context
+          user when is_list(user) ->
+            user = create_user(user)
+            on_exit(fn ->
+              query = %{:rev => user["_rev"]}
+              resp = Couch.delete("/_users/#{user["_id"]}", query: query)
+              assert HTTPotion.Response.success? resp
+            end)
+            context = Map.put(context, :user, user)
+            userinfo = user["name"] <> ":" <> user["password"]
+            Map.put(context, :userinfo, userinfo)
+        end
+      end
+
       def random_db_name do
         random_db_name("random-test-db")
       end
@@ -95,6 +113,43 @@ defmodule CouchTestCase do
           assert resp.status_code == 200
           {node, resp.body}
         end)
+      end
+
+      def create_user(user) do
+        required = [:name, :password, :roles]
+        Enum.each(required, fn key ->
+          assert Keyword.has_key?(user, key), "User missing key: #{key}"
+        end)
+
+        name = Keyword.get(user, :name)
+        password = Keyword.get(user, :password)
+        roles = Keyword.get(user, :roles)
+
+        assert is_binary(name), "User name must be a string"
+        assert is_binary(password), "User password must be a string"
+        assert is_list(roles), "Roles must be a list of strings"
+        Enum.each(roles, fn role ->
+          assert is_binary(role), "Roles must be a list of strings"
+        end)
+
+        user_doc = %{
+          "_id" => "org.couchdb.user:" <> name,
+          "type" => "user",
+          "name" => name,
+          "roles" => roles,
+          "password" => password
+        }
+        resp = Couch.get("/_users/#{user_doc["_id"]}")
+        user_doc = case resp.status_code do
+          404 ->
+            user_doc
+          sc when sc >= 200 and sc < 300 ->
+            Map.put(user_doc, "_rev", resp.body["_rev"])
+        end
+        resp = Couch.post("/_users", body: user_doc)
+        assert HTTPotion.Response.success? resp
+        assert resp.body["ok"]
+        Map.put(user_doc, "_rev", resp.body["rev"])
       end
 
       def create_db(db_name) do
