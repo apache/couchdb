@@ -66,15 +66,7 @@ defmodule CouchTestCase do
       end
 
       def set_config({section, key, value}) do
-        resp = Couch.get("/_membership")
-        existing = Enum.map(resp.body["all_nodes"], fn node ->
-          url = "/_node/#{node}/_config/#{section}/#{key}"
-          headers = ["X-Couch-Persist": "false"]
-          body = :jiffy.encode(value)
-          resp = Couch.put(url, headers: headers, body: body)
-          assert resp.status_code == 200
-          {node, resp.body}
-        end)
+        existing = set_config_raw(section, key, value)
         on_exit(fn ->
           Enum.each(existing, fn {node, prev_value} ->
             if prev_value != "" do
@@ -90,6 +82,18 @@ defmodule CouchTestCase do
               assert resp.status_code == 200
             end
           end)
+        end)
+      end
+
+      def set_config_raw(section, key, value) do
+        resp = Couch.get("/_membership")
+        Enum.map(resp.body["all_nodes"], fn node ->
+          url = "/_node/#{node}/_config/#{section}/#{key}"
+          headers = ["X-Couch-Persist": "false"]
+          body = :jiffy.encode(value)
+          resp = Couch.put(url, headers: headers, body: body)
+          assert resp.status_code == 200
+          {node, resp.body}
         end)
       end
 
