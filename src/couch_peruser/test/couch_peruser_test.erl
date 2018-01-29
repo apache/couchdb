@@ -42,7 +42,6 @@ setup() ->
     set_config("couch_peruser", "cluster_start_period", "1"),
     set_config("couch_peruser", "enable", "true"),
     set_config("cluster", "n", "1"),
-    timer:sleep(1000),
     TestAuthDb.
 
 teardown(TestAuthDb) ->
@@ -62,9 +61,7 @@ teardown(TestAuthDb) ->
     end, all_dbs()).
 
 set_config(Section, Key, Value) ->
-    Url = lists:concat([
-        get_base_url(), "/_config/", Section, "/", Key]),
-    do_request(put, Url, "\"" ++ Value ++ "\"").
+    ok = config:set(Section, Key, Value, _Persist=false).
 
 delete_config(Section, Key, Value) ->
     Url = lists:concat([
