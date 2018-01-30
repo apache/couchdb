@@ -91,6 +91,8 @@ fauxton: share/www
 .PHONY: check
 # target: check - Test everything
 check: all
+	@$(MAKE) test-cluster-with-quorum
+	@$(MAKE) test-cluster-without-quorum
 	@$(MAKE) eunit
 	@$(MAKE) javascript
 	@$(MAKE) mango-test
@@ -129,6 +131,7 @@ endif
             'test/javascript/run --suites "$(suites)" \
             --ignore "$(ignore_js_suites)"'
 
+# TODO: port to Makefile.win
 .PHONY: test-cluster-with-quorum
 test-cluster-with-quorum:
 	@mkdir -p share/www/script/test
@@ -146,6 +149,7 @@ endif
             --ignore "$(ignore_js_suites)" \
 	    --path test/javascript/tests-cluster/with-quorum'
 
+# TODO: port to Makefile.win
 .PHONY: test-cluster-without-quorum
 test-cluster-without-quorum:
 	@mkdir -p share/www/script/test
