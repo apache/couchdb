@@ -223,6 +223,7 @@ build-test:
 .PHONY: mango-test
 # target: mango-test - Run Mango tests
 mango-test: all
+	@rm -rf dev/lib
 	./test/build/test-run-couch-for-mango.sh \
 
 
