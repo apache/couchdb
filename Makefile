@@ -116,7 +116,7 @@ soak-eunit: couch
 
 .PHONY: javascript
 # target: javascript - Run JavaScript test suites or specific ones defined by suites option
-javascript:
+javascript: devclean
 	@mkdir -p share/www/script/test
 ifeq ($(IN_RELEASE), true)
 	@cp test/javascript/tests/lorem*.txt share/www/script/test/
@@ -124,7 +124,6 @@ else
 	@mkdir -p src/fauxton/dist/release/test
 	@cp test/javascript/tests/lorem*.txt src/fauxton/dist/release/test/
 endif
-	@rm -rf dev/lib
 	@dev/run -n 1 -q --with-admin-party-please \
             --enable-erlang-views \
             -c 'startup_jitter=0' \
@@ -133,7 +132,7 @@ endif
 
 # TODO: port to Makefile.win
 .PHONY: test-cluster-with-quorum
-test-cluster-with-quorum:
+test-cluster-with-quorum: devclean
 	@mkdir -p share/www/script/test
 ifeq ($(IN_RELEASE), true)
 	@cp test/javascript/tests/lorem*.txt share/www/script/test/
@@ -141,7 +140,6 @@ else
 	@mkdir -p src/fauxton/dist/release/test
 	@cp test/javascript/tests/lorem*.txt src/fauxton/dist/release/test/
 endif
-	@rm -rf dev/lib
 	@dev/run -n 3 -q --with-admin-party-please \
             --enable-erlang-views --degrade-cluster 1 \
             -c 'startup_jitter=0' \
@@ -151,7 +149,7 @@ endif
 
 # TODO: port to Makefile.win
 .PHONY: test-cluster-without-quorum
-test-cluster-without-quorum:
+test-cluster-without-quorum: devclean
 	@mkdir -p share/www/script/test
 ifeq ($(IN_RELEASE), true)
 	@cp test/javascript/tests/lorem*.txt share/www/script/test/
@@ -159,7 +157,6 @@ else
 	@mkdir -p src/fauxton/dist/release/test
 	@cp test/javascript/tests/lorem*.txt src/fauxton/dist/release/test/
 endif
-	@rm -rf dev/lib
 	@dev/run -n 3 -q --with-admin-party-please \
             --enable-erlang-views --degrade-cluster 2 \
             -c 'startup_jitter=0' \
@@ -222,8 +219,7 @@ build-test:
 
 .PHONY: mango-test
 # target: mango-test - Run Mango tests
-mango-test: all
-	@rm -rf dev/lib
+mango-test: devclean all
 	./test/build/test-run-couch-for-mango.sh \
 
 
