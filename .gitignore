@@ -53,6 +53,7 @@ src/mochiweb/
 src/oauth/
 src/rebar/
 src/snappy/
+src/triq/
 tmp/
 
 src/couch/*.o
