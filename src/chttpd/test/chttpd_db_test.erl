@@ -70,6 +70,11 @@ all_test_() ->
                     fun should_return_409_for_put_att_nonexistent_rev/1,
                     fun should_return_update_seq_when_set_on_all_docs/1,
                     fun should_not_return_update_seq_when_unset_on_all_docs/1,
+                    fun should_succeed_on_all_docs_with_queries_keys/1,
+                    fun should_succeed_on_all_docs_with_queries_limit_skip/1,
+                    fun should_succeed_on_all_docs_with_multiple_queries/1,
+                    fun should_succeed_on_design_docs_with_multiple_queries/1,
+                    fun should_fail_on_multiple_queries_with_keys_and_queries/1,
                     fun should_return_correct_id_on_doc_copy/1
                 ]
             }
@@ -220,6 +225,86 @@ should_not_return_update_seq_when_unset_on_all_docs(Url) ->
             couch_util:get_value(<<"update_seq">>, ResultJson)),
         ?assertNotEqual(undefined,
             couch_util:get_value(<<"offset">>, ResultJson))
+    end).
+
+
+should_succeed_on_all_docs_with_queries_keys(Url) ->
+    ?_test(begin
+        [create_doc(Url, "testdoc" ++ ?i2l(I)) || I <- lists:seq(1, 10)],
+        QueryDoc = "{\"queries\": [{\"keys\": [ \"testdoc3\", \"testdoc8\"]}]}",
+        {ok, RC, _, RespBody} = test_request:post(Url ++ "/_all_docs/",
+            [?CONTENT_JSON, ?AUTH], QueryDoc),
+        ?assertEqual(200, RC),
+        {ResultJson} = ?JSON_DECODE(RespBody),
+        ResultJsonBody = couch_util:get_value(<<"results">>, ResultJson),
+        {InnerJson} = lists:nth(1, ResultJsonBody),
+        ?assertEqual(2, length(couch_util:get_value(<<"rows">>, InnerJson)))
+    end).
+
+
+should_succeed_on_all_docs_with_queries_limit_skip(Url) ->
+    ?_test(begin
+        [create_doc(Url, "testdoc" ++ ?i2l(I)) || I <- lists:seq(1, 10)],
+        QueryDoc = "{\"queries\": [{\"limit\": 5, \"skip\": 2}]}",
+        {ok, RC, _, RespBody} = test_request:post(Url ++ "/_all_docs/",
+            [?CONTENT_JSON, ?AUTH], QueryDoc),
+        ?assertEqual(200, RC),
+        {ResultJson} = ?JSON_DECODE(RespBody),
+        ResultJsonBody = couch_util:get_value(<<"results">>, ResultJson),
+        {InnerJson} = lists:nth(1, ResultJsonBody),
+        ?assertEqual(2, couch_util:get_value(<<"offset">>, InnerJson)),
+        ?assertEqual(5, length(couch_util:get_value(<<"rows">>, InnerJson)))
+    end).
+
+
+should_succeed_on_all_docs_with_multiple_queries(Url) ->
+    ?_test(begin
+        [create_doc(Url, "testdoc" ++ ?i2l(I)) || I <- lists:seq(1, 10)],
+        QueryDoc = "{\"queries\": [{\"keys\": [ \"testdoc3\", \"testdoc8\"]},
+            {\"limit\": 5, \"skip\": 2}]}",
+        {ok, RC, _, RespBody} = test_request:post(Url ++ "/_all_docs/",
+            [?CONTENT_JSON, ?AUTH], QueryDoc),
+        ?assertEqual(200, RC),
+        {ResultJson} = ?JSON_DECODE(RespBody),
+        ResultJsonBody = couch_util:get_value(<<"results">>, ResultJson),
+        {InnerJson1} = lists:nth(1, ResultJsonBody),
+        ?assertEqual(2, length(couch_util:get_value(<<"rows">>, InnerJson1))),
+        {InnerJson2} = lists:nth(2, ResultJsonBody),
+        ?assertEqual(2, couch_util:get_value(<<"offset">>, InnerJson2)),
+        ?assertEqual(5, length(couch_util:get_value(<<"rows">>, InnerJson2)))
+    end).
+
+
+should_succeed_on_design_docs_with_multiple_queries(Url) ->
+    ?_test(begin
+        [create_doc(Url, "_design/ddoc" ++ ?i2l(I)) || I <- lists:seq(1, 10)],
+        QueryDoc = "{\"queries\": [{\"keys\": [ \"_design/ddoc3\",
+            \"_design/ddoc8\"]}, {\"limit\": 5, \"skip\": 2}]}",
+        {ok, RC, _, RespBody} = test_request:post(Url ++ "/_design_docs/",
+            [?CONTENT_JSON, ?AUTH], QueryDoc),
+        ?assertEqual(200, RC),
+        {ResultJson} = ?JSON_DECODE(RespBody),
+        ResultJsonBody = couch_util:get_value(<<"results">>, ResultJson),
+        {InnerJson1} = lists:nth(1, ResultJsonBody),
+        ?assertEqual(2, length(couch_util:get_value(<<"rows">>, InnerJson1))),
+        {InnerJson2} = lists:nth(2, ResultJsonBody),
+        ?assertEqual(2, couch_util:get_value(<<"offset">>, InnerJson2)),
+        ?assertEqual(5, length(couch_util:get_value(<<"rows">>, InnerJson2)))
+    end).
+
+
+should_fail_on_multiple_queries_with_keys_and_queries(Url) ->
+    ?_test(begin
+        [create_doc(Url, "testdoc" ++ ?i2l(I)) || I <- lists:seq(1, 10)],
+        QueryDoc = "{\"queries\": [{\"keys\": [ \"testdoc3\", \"testdoc8\"]}],
+            \"keys\": [ \"testdoc4\", \"testdoc9\"]}",
+        {ok, RC, _, RespBody} = test_request:post(Url ++ "/_all_docs/",
+            [?CONTENT_JSON, ?AUTH], QueryDoc),
+        ?assertEqual(400, RC),
+        ?assertMatch({[
+            {<<"error">>,<<"bad_request">>},
+            {<<"reason">>,<<"`keys` and `queries` are mutually exclusive">>}]},
+            ?JSON_DECODE(RespBody))
     end).
 
 
