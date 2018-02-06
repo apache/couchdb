@@ -12,6 +12,7 @@ WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 License for the specific language governing permissions and limitations under
 the License.
 */
+// jenkins user == uid 910 for reference
 pipeline {
   // no top-level agent; agents must be declared for each stage
   agent none
@@ -33,7 +34,7 @@ pipeline {
         // each time. Instead, manually insert docker pull then run with the
         // the docker image.
         node {
-          label 'couchdbtest'
+          label 'ubuntu'
         }
       }
       steps {
@@ -78,7 +79,7 @@ pipeline {
     stage('Test') {
       steps {
         parallel(centos6erlang183: {
-          node(label: 'couchdbtest') {
+          node(label: 'ubuntu') {
             timeout(time: 60, unit: "MINUTES") {
               sh 'docker pull couchdbdev/centos-6-erlang-18.3'
               withDockerContainer(image: 'couchdbdev/centos-6-erlang-18.3', args: '-e LD_LIBRARY_PATH=/usr/local/bin') {
@@ -118,7 +119,7 @@ pipeline {
           } // node
         },
         centos7erlangdefault: {
-          node(label: 'couchdbtest') {
+          node(label: 'ubuntu') {
             timeout(time: 45, unit: "MINUTES") {
               sh 'docker pull couchdbdev/centos-7-erlang-default'
               withDockerContainer(image: 'couchdbdev/centos-7-erlang-default', args: '-e LD_LIBRARY_PATH=/usr/local/bin') {
@@ -143,7 +144,7 @@ pipeline {
           } // node
         },
         centos7erlang183: {
-          node(label: 'couchdbtest') {
+          node(label: 'ubuntu') {
             timeout(time: 60, unit: "MINUTES") {
               sh 'docker pull couchdbdev/centos-7-erlang-18.3'
               withDockerContainer(image: 'couchdbdev/centos-7-erlang-18.3', args: '-e LD_LIBRARY_PATH=/usr/local/bin') {
@@ -183,7 +184,7 @@ pipeline {
           } // node
         },
         ubuntu1404erlangdefault: {
-          node(label: 'couchdbtest') {
+          node(label: 'ubuntu') {
             timeout(time: 45, unit: "MINUTES") {
               sh 'docker pull couchdbdev/ubuntu-14.04-erlang-default'
               withDockerContainer(image: 'couchdbdev/ubuntu-14.04-erlang-default') {
@@ -206,7 +207,7 @@ pipeline {
           } // node
         },
         ubuntu1404erlang183: {
-          node(label: 'couchdbtest') {
+          node(label: 'ubuntu') {
             timeout(time: 60, unit: "MINUTES") {
               sh 'docker pull couchdbdev/ubuntu-14.04-erlang-18.3'
               withDockerContainer(image: 'couchdbdev/ubuntu-14.04-erlang-18.3') {
@@ -246,7 +247,7 @@ pipeline {
           } // node
         },
         ubuntu1604erlangdefault: {
-          node(label: 'couchdbtest') {
+          node(label: 'ubuntu') {
             timeout(time: 45, unit: "MINUTES") {
               sh 'docker pull couchdbdev/ubuntu-16.04-erlang-default'
               withDockerContainer(image: 'couchdbdev/ubuntu-16.04-erlang-default') {
@@ -269,7 +270,7 @@ pipeline {
           } // node
         },
         ubuntu1604erlang183: {
-          node(label: 'couchdbtest') {
+          node(label: 'ubuntu') {
             timeout(time: 60, unit: "MINUTES") {
               sh 'docker pull couchdbdev/ubuntu-16.04-erlang-18.3'
               withDockerContainer(image: 'couchdbdev/ubuntu-16.04-erlang-18.3') {
@@ -309,7 +310,7 @@ pipeline {
           } // node
         },
         debian8erlangdefault: {
-          node(label: 'couchdbtest') {
+          node(label: 'ubuntu') {
             timeout(time: 45, unit: "MINUTES") {
               sh 'docker pull couchdbdev/debian-8-erlang-default'
               withDockerContainer(image: 'couchdbdev/debian-8-erlang-default') {
@@ -332,7 +333,7 @@ pipeline {
           } // node
         },
         debian8erlang183: {
-          node(label: 'couchdbtest') {
+          node(label: 'ubuntu') {
             timeout(time: 60, unit: "MINUTES") {
               sh 'docker pull couchdbdev/debian-8-erlang-18.3'
               withDockerContainer(image: 'couchdbdev/debian-8-erlang-18.3') {
@@ -372,7 +373,7 @@ pipeline {
           } // node
         },
         debian9erlangdefault: {
-          node(label: 'couchdbtest') {
+          node(label: 'ubuntu') {
             timeout(time: 45, unit: "MINUTES") {
               sh 'docker pull couchdbdev/debian-9-erlang-default'
               withDockerContainer(image: 'couchdbdev/debian-9-erlang-default') {
@@ -395,7 +396,7 @@ pipeline {
           } // node
         },
         debian9erlang183: {
-          node(label: 'couchdbtest') {
+          node(label: 'ubuntu') {
             timeout(time: 60, unit: "MINUTES") {
               sh 'docker pull couchdbdev/debian-9-erlang-18.3'
               withDockerContainer(image: 'couchdbdev/debian-9-erlang-18.3') {
@@ -447,7 +448,7 @@ pipeline {
         // each time. Instead, manually insert docker pull then run with the
         // the docker image.
         node {
-          label 'couchdbtest'
+          label 'ubuntu'
         }
       }
       steps {

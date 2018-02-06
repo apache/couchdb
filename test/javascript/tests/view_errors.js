@@ -169,7 +169,7 @@ couchTests.view_errors = function(debug) {
       T(xhr.status == 400);
       result = JSON.parse(xhr.responseText);
       T(result.error == "bad_request");
-      T(result.reason == "`keys` member must be a array.");
+      T(result.reason == "`keys` member must be an array.");
 
       // if the reduce grows to fast, throw an overflow error
       var path = "/" + db_name + "/_design/testbig/_view/reduce_too_big";

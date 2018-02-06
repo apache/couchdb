@@ -499,6 +499,11 @@ convert_options([{<<"create_target">>, V} | _R]) when not is_boolean(V)->
     throw({bad_request, <<"parameter `create_target` must be a boolean">>});
 convert_options([{<<"create_target">>, V} | R]) ->
     [{create_target, V} | convert_options(R)];
+convert_options([{<<"create_target_params">>, V} | _R]) when not is_tuple(V) ->
+    throw({bad_request,
+        <<"parameter `create_target_params` must be a JSON object">>});
+convert_options([{<<"create_target_params">>, V} | R]) ->
+    [{create_target_params, V} | convert_options(R)];
 convert_options([{<<"continuous">>, V} | _R]) when not is_boolean(V)->
     throw({bad_request, <<"parameter `continuous` must be a boolean">>});
 convert_options([{<<"continuous">>, V} | R]) ->
@@ -690,7 +695,8 @@ strip_credentials(Url) when is_binary(Url) ->
         "http\\1://\\2",
         [{return, binary}]);
 strip_credentials({Props}) ->
-    {lists:keydelete(<<"oauth">>, 1, Props)}.
+    Props1 = lists:keydelete(<<"oauth">>, 1, Props),
+    {lists:keydelete(<<"headers">>, 1, Props1)}.
 
 
 error_reason({shutdown, Error}) ->
@@ -755,5 +761,34 @@ check_convert_options_fail_test() ->
         convert_options([{<<"doc_ids">>, not_a_list}])),
     ?assertThrow({bad_request, _},
         convert_options([{<<"selector">>, [{key, value}]}])).
+
+check_strip_credentials_test() ->
+    [?assertEqual(Expected, strip_credentials(Body)) || {Expected, Body} <- [
+        {
+            undefined,
+            undefined
+        },
+        {
+            <<"https://remote_server/database">>,
+            <<"https://foo:bar@remote_server/database">>
+        },
+        {
+            {[{<<"_id">>, <<"foo">>}]},
+            {[{<<"_id">>, <<"foo">>}, {<<"oauth">>, <<"bar">>}]}
+        },
+        {
+            {[{<<"_id">>, <<"foo">>}]},
+            {[{<<"_id">>, <<"foo">>}, {<<"headers">>, <<"bar">>}]}
+        },
+        {
+            {[{<<"_id">>, <<"foo">>}, {<<"other">>, <<"bar">>}]},
+            {[{<<"_id">>, <<"foo">>}, {<<"other">>, <<"bar">>}]}
+        },
+        {
+            {[{<<"_id">>, <<"foo">>}]},
+            {[{<<"_id">>, <<"foo">>}, {<<"oauth">>, <<"bar">>},
+                {<<"headers">>, <<"baz">>}]}
+        }
+    ]].
 
 -endif.

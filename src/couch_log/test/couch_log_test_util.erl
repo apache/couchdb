@@ -22,12 +22,15 @@ start() ->
     application:set_env(config, ini_files, config_files()),
     application:start(config),
     ignore_common_loggers(),
-    application:start(couch_log).
+    application:start(couch_log),
+    meck:new(couch_stats),
+    ok = meck:expect(couch_stats, increment_counter, ['_'], ok).
 
 
 stop(_) ->
     application:stop(config),
-    application:stop(couch_log).
+    application:stop(couch_log),
+    meck:unload(couch_stats).
 
 
 with_level(Name, Fun) ->

@@ -24,6 +24,9 @@ while ( [ $COUCH_STARTED -ne 0 ] ); do
   fi
 done
 
+# wait for cluster setup to complete
+sleep 5
+
 cd src/mango/
 nosetests
 

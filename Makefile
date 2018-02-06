@@ -91,6 +91,8 @@ fauxton: share/www
 .PHONY: check
 # target: check - Test everything
 check: all
+	@$(MAKE) test-cluster-with-quorum
+	@$(MAKE) test-cluster-without-quorum
 	@$(MAKE) eunit
 	@$(MAKE) javascript
 	@$(MAKE) mango-test
@@ -114,7 +116,7 @@ soak-eunit: couch
 
 .PHONY: javascript
 # target: javascript - Run JavaScript test suites or specific ones defined by suites option
-javascript:
+javascript: devclean
 	@mkdir -p share/www/script/test
 ifeq ($(IN_RELEASE), true)
 	@cp test/javascript/tests/lorem*.txt share/www/script/test/
@@ -122,12 +124,45 @@ else
 	@mkdir -p src/fauxton/dist/release/test
 	@cp test/javascript/tests/lorem*.txt src/fauxton/dist/release/test/
 endif
-	@rm -rf dev/lib
 	@dev/run -n 1 -q --with-admin-party-please \
             --enable-erlang-views \
             -c 'startup_jitter=0' \
             'test/javascript/run --suites "$(suites)" \
             --ignore "$(ignore_js_suites)"'
+
+# TODO: port to Makefile.win
+.PHONY: test-cluster-with-quorum
+test-cluster-with-quorum: devclean
+	@mkdir -p share/www/script/test
+ifeq ($(IN_RELEASE), true)
+	@cp test/javascript/tests/lorem*.txt share/www/script/test/
+else
+	@mkdir -p src/fauxton/dist/release/test
+	@cp test/javascript/tests/lorem*.txt src/fauxton/dist/release/test/
+endif
+	@dev/run -n 3 -q --with-admin-party-please \
+            --enable-erlang-views --degrade-cluster 1 \
+            -c 'startup_jitter=0' \
+            'test/javascript/run --suites "$(suites)" \
+            --ignore "$(ignore_js_suites)" \
+	    --path test/javascript/tests-cluster/with-quorum'
+
+# TODO: port to Makefile.win
+.PHONY: test-cluster-without-quorum
+test-cluster-without-quorum: devclean
+	@mkdir -p share/www/script/test
+ifeq ($(IN_RELEASE), true)
+	@cp test/javascript/tests/lorem*.txt share/www/script/test/
+else
+	@mkdir -p src/fauxton/dist/release/test
+	@cp test/javascript/tests/lorem*.txt src/fauxton/dist/release/test/
+endif
+	@dev/run -n 3 -q --with-admin-party-please \
+            --enable-erlang-views --degrade-cluster 2 \
+            -c 'startup_jitter=0' \
+            'test/javascript/run --suites "$(suites)" \
+            --ignore "$(ignore_js_suites)" \
+            --path test/javascript/tests-cluster/without-quorum'
 
 .PHONY: soak-javascript
 soak-javascript:
@@ -184,7 +219,7 @@ build-test:
 
 .PHONY: mango-test
 # target: mango-test - Run Mango tests
-mango-test: all
+mango-test: devclean all
 	./test/build/test-run-couch-for-mango.sh \
 
 
@@ -209,24 +244,6 @@ check-plt:
 # target: dialyze - Analyze the code for discrepancies
 dialyze: .rebar
 	@$(REBAR) -r dialyze $(DIALYZE_OPTS)
-
-
-.PHONY: docker-image
-# target: docker-image - Build Docker image
-docker-image:
-	@docker build --rm -t couchdb/dev-cluster .
-
-
-.PHONY: docker-start
-# target: docker-start - Start CouchDB in Docker container
-docker-start:
-	@docker run -d -P -t couchdb/dev-cluster > .docker-id
-
-
-.PHONY: docker-stop
-# target: docker-stop - Stop Docker container
-docker-stop:
-	@docker stop `cat .docker-id`
 
 
 .PHONY: introspect
@@ -276,6 +293,7 @@ ifeq ($(IN_RELEASE), true)
 	@cp -R share/docs/html/* rel/couchdb/share/www/docs/
 	@cp share/docs/man/apachecouchdb.1 rel/couchdb/share/docs/couchdb.1
 else
+	@mkdir -p rel/couchdb/share/www/docs/
 	@mkdir -p rel/couchdb/share/docs/
 	@cp -R src/docs/build/html/ rel/couchdb/share/www/docs
 	@cp src/docs/build/man/apachecouchdb.1 rel/couchdb/share/docs/couchdb.1

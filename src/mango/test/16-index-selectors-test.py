@@ -272,7 +272,17 @@ class IndexSelectorJson(mango.DbPerClass):
         self.assertEqual(len(docs), 3)
 
     @unittest.skipUnless(mango.has_text_service(), "requires text service")
+    def test_text_old_selector_still_supported_via_api(self):
+        selector = {"location": {"$gte": "FRA"}}
+        self.db.create_text_index(fields=[{"name":"location", "type":"string"}], 
+            selector=selector, 
+            ddoc="Selected", 
+            name="Selected")
+        docs = self.db.find({"location": {"$exists":True}}, use_index='Selected')
+        self.assertEqual(len(docs), 3)
+
+    @unittest.skipUnless(mango.has_text_service(), "requires text service")
     def test_text_partial_filter_only_in_return_if_not_default(self):
-        self.db.create_text_index(fields=[{"name":"location"}])
+        self.db.create_text_index(fields=[{"name":"location", "type":"string"}])
         index = self.db.list_indexes()[1]
         self.assertEqual('partial_filter_selector' in index['def'], False)

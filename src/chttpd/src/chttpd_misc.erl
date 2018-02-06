@@ -14,6 +14,7 @@
 
 -export([
     handle_all_dbs_req/1,
+    handle_dbs_info_req/1,
     handle_node_req/1,
     handle_favicon_req/1,
     handle_favicon_req/2,
@@ -36,6 +37,8 @@
 -import(chttpd,
     [send_json/2,send_json/3,send_method_not_allowed/2,
     send_chunk/2,start_chunked_response/3]).
+
+-define(MAX_DB_NUM_FOR_DBS_INFO, 100).
 
 % httpd global handlers
 
@@ -140,6 +143,38 @@ all_dbs_callback(complete, #vacc{resp=Resp0}=Acc) ->
 all_dbs_callback({error, Reason}, #vacc{resp=Resp0}=Acc) ->
     {ok, Resp1} = chttpd:send_delayed_error(Resp0, Reason),
     {ok, Acc#vacc{resp=Resp1}}.
+
+handle_dbs_info_req(#httpd{method='POST'}=Req) ->
+    chttpd:validate_ctype(Req, "application/json"),
+    Props = chttpd:json_body_obj(Req),
+    Keys = couch_mrview_util:get_view_keys(Props),
+    case Keys of
+        undefined -> throw({bad_request, "`keys` member must exist."});
+        _ -> ok
+    end,
+    MaxNumber = config:get_integer("chttpd",
+        "max_db_number_for_dbs_info_req", ?MAX_DB_NUM_FOR_DBS_INFO),
+    case length(Keys) =< MaxNumber of
+        true -> ok;
+        false -> throw({bad_request, too_many_keys})
+    end,
+    {ok, Resp} = chttpd:start_json_response(Req, 200),
+    send_chunk(Resp, "["),
+    lists:foldl(fun(DbName, AccSeparator) ->
+        case catch fabric:get_db_info(DbName) of
+            {ok, Result} ->
+                Json = ?JSON_ENCODE({[{key, DbName}, {info, {Result}}]}),
+                send_chunk(Resp, AccSeparator ++ Json);
+            _ ->
+                Json = ?JSON_ENCODE({[{key, DbName}, {error, not_found}]}),
+                send_chunk(Resp, AccSeparator ++ Json)
+        end,
+        "," % AccSeparator now has a comma
+    end, "", Keys),
+    send_chunk(Resp, "]"),
+    chttpd:end_json_response(Resp);
+handle_dbs_info_req(Req) ->
+    send_method_not_allowed(Req, "POST").
 
 handle_task_status_req(#httpd{method='GET'}=Req) ->
     {Replies, _BadNodes} = gen_server:multi_call(couch_task_status, all),

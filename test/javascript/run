@@ -107,7 +107,10 @@ def options():
                        dest="ignore", help="Ignore test suites"),
         op.make_option("-u", "--suites", type="string", action="callback",
                        default=None, callback=get_delimited_list,
-                       dest="suites", help="Run specific suites")
+                       dest="suites", help="Run specific suites"),
+        op.make_option("-p", "--path", type="string",
+                       default="test/javascript/tests",
+                       dest="test_path", help="Path where the tests are located")
     ]
 
 
@@ -118,10 +121,9 @@ def main():
     run_list = []
     ignore_list = []
     tests = []
-
-    run_list = ["test/javascript/tests"] if not opts.suites else opts.suites
-    run_list = build_test_case_paths(run_list)
-    ignore_list = build_test_case_paths(opts.ignore)
+    run_list = [opts.test_path] if not opts.suites else opts.suites
+    run_list = build_test_case_paths(opts.test_path,run_list)
+    ignore_list = build_test_case_paths(opts.test_path,opts.ignore)
     # sort is needed because certain tests fail if executed out of order
     tests = sorted(list(set(run_list)-set(ignore_list)))
 
@@ -151,7 +153,7 @@ def main():
         failed, passed) + os.linesep)
     exit(failed > 0)
 
-def build_test_case_paths(args=None):
+def build_test_case_paths(path,args=None):
     tests = []
     if args is None:
         args = []
@@ -161,7 +163,7 @@ def build_test_case_paths(args=None):
         elif os.path.isfile(name):
             check = tests.append(name)
         else:
-            pname = os.path.join("test/javascript/tests", name)
+            pname = os.path.join(path, name)
             if os.path.isfile(pname):
                 tests.append(pname)
             elif os.path.isfile(pname + ".js"):

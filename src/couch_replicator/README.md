@@ -262,7 +262,7 @@ A description of each child:
         `error_backoff/1` is where the backoff period is calculated.
         Consecutive errors are held in the `errcnt` field in the ETS table.
 
-     2. Fetchig filter code succeeds, replication ID is calculated and job is
+     2. Fetching filter code succeeds, replication ID is calculated and job is
         added to the scheduler. However, because this is a filtered replication
         the source database could get an updated filter. Which means
         replication ID could change again. So the worker is spawned to

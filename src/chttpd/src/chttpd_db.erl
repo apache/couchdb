@@ -520,14 +520,18 @@ db_req(#httpd{method='GET',path_parts=[_,OP]}=Req, Db) when ?IS_ALL_DOCS(OP) ->
 
 db_req(#httpd{method='POST',path_parts=[_,OP]}=Req, Db) when ?IS_ALL_DOCS(OP) ->
     chttpd:validate_ctype(Req, "application/json"),
-    {Fields} = chttpd:json_body_obj(Req),
-    case couch_util:get_value(<<"keys">>, Fields, nil) of
-    Keys when is_list(Keys) ->
-        all_docs_view(Req, Db, Keys, OP);
-    nil ->
-        all_docs_view(Req, Db, undefined, OP);
-    _ ->
-        throw({bad_request, "`keys` body member must be an array."})
+    Props = chttpd:json_body_obj(Req),
+    Keys = couch_mrview_util:get_view_keys(Props),
+    Queries = couch_mrview_util:get_view_queries(Props),
+    case {Queries, Keys} of
+        {Queries, undefined} when is_list(Queries) ->
+            multi_all_docs_view(Req, Db, OP, Queries);
+        {undefined, Keys} when is_list(Keys) ->
+            all_docs_view(Req, Db, Keys, OP);
+        {undefined, undefined} ->
+            all_docs_view(Req, Db, undefined, OP);
+        {_, _} ->
+            throw({bad_request, "`keys` and `queries` are mutually exclusive"})
     end;
 
 db_req(#httpd{path_parts=[_,OP]}=Req, _Db) when ?IS_ALL_DOCS(OP) ->
@@ -635,6 +639,28 @@ db_req(#httpd{path_parts=[_, DocId]}=Req, Db) ->
 
 db_req(#httpd{path_parts=[_, DocId | FileNameParts]}=Req, Db) ->
     db_attachment_req(Req, Db, DocId, FileNameParts).
+
+multi_all_docs_view(Req, Db, OP, Queries) ->
+    Args0 = couch_mrview_http:parse_params(Req, undefined),
+    Args1 = Args0#mrargs{view_type=map},
+    ArgQueries = lists:map(fun({Query}) ->
+        QueryArg1 = couch_mrview_http:parse_params(Query, undefined,
+            Args1, [decoded]),
+        QueryArgs2 = couch_mrview_util:validate_args(QueryArg1),
+        set_namespace(OP, QueryArgs2)
+    end, Queries),
+    Options = [{user_ctx, Req#httpd.user_ctx}],
+    VAcc0 = #vacc{db=Db, req=Req, prepend="\r\n"},
+    FirstChunk = "{\"results\":[",
+    {ok, Resp0} = chttpd:start_delayed_json_response(VAcc0#vacc.req, 200, [], FirstChunk),
+    VAcc1 = VAcc0#vacc{resp=Resp0},
+    VAcc2 = lists:foldl(fun(Args, Acc0) ->
+        {ok, Acc1} = fabric:all_docs(Db, Options,
+            fun couch_mrview_http:view_cb/2, Acc0, Args),
+        Acc1
+    end, VAcc1, ArgQueries),
+    {ok, Resp1} = chttpd:send_delayed_chunk(VAcc2#vacc.resp, "\r\n]}"),
+    chttpd:end_delayed_json_response(Resp1).
 
 all_docs_view(Req, Db, Keys, OP) ->
     Args0 = couch_mrview_http:parse_params(Req, Keys),
@@ -825,7 +851,8 @@ db_doc_req(#httpd{method='COPY', user_ctx=Ctx}=Req, Db, SourceDocId) ->
         missing_rev -> nil;
         Rev -> Rev
     end,
-    {TargetDocId, TargetRevs} = couch_httpd_db:parse_copy_destination_header(Req),
+    {TargetDocId0, TargetRevs} = couch_httpd_db:parse_copy_destination_header(Req),
+    TargetDocId = list_to_binary(mochiweb_util:unquote(TargetDocId0)),
     % open old doc
     Doc = couch_doc_open(Db, SourceDocId, SourceRev, []),
     % save new doc
