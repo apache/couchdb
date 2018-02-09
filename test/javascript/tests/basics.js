@@ -268,7 +268,7 @@ couchTests.basics = function(debug) {
   T(xhr.status == 400);
   result = JSON.parse(xhr.responseText);
   T(result.error == "bad_request");
-  T(result.reason == "`keys` member must be an array.");
+  T(result.reason == "`keys` body member must be an array.");
 
   // oops, the doc id got lost in code nirwana
   xhr = CouchDB.request("DELETE", "/" + db_name + "/?rev=foobarbaz");
