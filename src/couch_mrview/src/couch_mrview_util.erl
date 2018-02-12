@@ -800,7 +800,8 @@ reduced_external_size(Tree) ->
     case couch_btree:full_reduce(Tree) of
         {ok, {_, _, Size}} -> Size;
         % return 0 for versions of the reduce function without Size
-        {ok, {_, _}} -> 0
+        {ok, {_, _}} -> 0;
+        _ -> 0
     end.
 
 
