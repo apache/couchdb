@@ -25,7 +25,7 @@ start() ->
 
 
 stop({Ctx, DbName}) ->
-    (catch meck:unload(test_index)),
+    meck:unload(test_index),
     ok = fabric:delete_db(DbName, [?ADMIN_CTX]),
     DbDir = config:get("couchdb", "database_dir", "."),
     WaitFun = fun() ->
@@ -121,7 +121,8 @@ fake_index() ->
             crypto:hash(md5, term_to_binary(DDoc));
         (update_seq, Seq) ->
             Seq
-    end).
+    end),
+    ok = meck:expect(test_index, shutdown, ['_'], ok).
 
 
 get_indexes_by_ddoc(DDocID, N) ->

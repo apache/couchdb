@@ -19,7 +19,12 @@
 -define(PASS, "pass").
 -define(AUTH, {basic_auth, {?USER, ?PASS}}).
 -define(CONTENT_JSON, {"Content-Type", "application/json"}).
+-define(DESTHEADER1, {"Destination", "foo%E5%95%8Abar"}).
+-define(DESTHEADER2, {"Destination", "foo%2Fbar%23baz%3Fpow%3Afiz"}).
+
+
 -define(FIXTURE_TXT, ?ABS_PATH(?FILE)).
+-define(i2l(I), integer_to_list(I)).
 
 setup() ->
     Hashed = couch_passwords:hash_admin_password(?PASS),
@@ -62,7 +67,10 @@ all_test_() ->
                     fun should_return_404_for_delete_att_on_notadoc/1,
                     fun should_return_409_for_del_att_without_rev/1,
                     fun should_return_200_for_del_att_with_rev/1,
-                    fun should_return_409_for_put_att_nonexistent_rev/1
+                    fun should_return_409_for_put_att_nonexistent_rev/1,
+                    fun should_return_update_seq_when_set_on_all_docs/1,
+                    fun should_not_return_update_seq_when_unset_on_all_docs/1,
+                    fun should_return_correct_id_on_doc_copy/1
                 ]
             }
         }
@@ -184,6 +192,53 @@ should_return_409_for_put_att_nonexistent_rev(Url) ->
             {<<"error">>,<<"not_found">>},
             {<<"reason">>,<<"missing_rev">>}]},
             ?JSON_DECODE(RespBody))
+    end).
+
+
+should_return_update_seq_when_set_on_all_docs(Url) ->
+    ?_test(begin
+        [create_doc(Url, "testdoc" ++ ?i2l(I)) || I <- lists:seq(1, 3)],
+        {ok, RC, _, RespBody} = test_request:get(Url ++ "/_all_docs/"
+            ++ "?update_seq=true&keys=[\"testdoc1\"]",[?CONTENT_JSON, ?AUTH]),
+        ?assertEqual(200, RC),
+        {ResultJson} = ?JSON_DECODE(RespBody),
+        ?assertNotEqual(undefined,
+            couch_util:get_value(<<"update_seq">>, ResultJson)),
+        ?assertNotEqual(undefined,
+            couch_util:get_value(<<"offset">>, ResultJson))
+    end).
+
+
+should_not_return_update_seq_when_unset_on_all_docs(Url) ->
+    ?_test(begin
+        [create_doc(Url, "testdoc" ++ ?i2l(I)) || I <- lists:seq(1, 3)],
+        {ok, RC, _, RespBody} = test_request:get(Url ++ "/_all_docs/"
+            ++ "?update_seq=false&keys=[\"testdoc1\"]",[?CONTENT_JSON, ?AUTH]),
+        ?assertEqual(200, RC),
+        {ResultJson} = ?JSON_DECODE(RespBody),
+        ?assertEqual(undefined,
+            couch_util:get_value(<<"update_seq">>, ResultJson)),
+        ?assertNotEqual(undefined,
+            couch_util:get_value(<<"offset">>, ResultJson))
+    end).
+
+
+should_return_correct_id_on_doc_copy(Url) ->
+    ?_test(begin
+        {ok, _, _, _} = create_doc(Url, "testdoc"),
+        {_, _, _, ResultBody1} = test_request:copy(Url ++ "/testdoc/",
+            [?CONTENT_JSON, ?AUTH, ?DESTHEADER1]),
+        {ResultJson1} = ?JSON_DECODE(ResultBody1),
+        Id1 = couch_util:get_value(<<"id">>, ResultJson1),
+        
+        {_, _, _, ResultBody2} = test_request:copy(Url ++ "/testdoc/",
+            [?CONTENT_JSON, ?AUTH, ?DESTHEADER2]),
+        {ResultJson2} = ?JSON_DECODE(ResultBody2),
+        Id2 = couch_util:get_value(<<"id">>, ResultJson2),
+        [
+            ?assertEqual(<<102,111,111,229,149,138,98,97,114>>, Id1),
+            ?assertEqual(<<"foo/bar#baz?pow:fiz">>, Id2)
+        ]
     end).
 
 

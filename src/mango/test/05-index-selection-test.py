@@ -28,6 +28,32 @@ class IndexSelectionTests:
             }, explain=True)
         self.assertEqual(resp["index"]["type"], "json")
 
+    def test_with_nested_and(self):
+        resp = self.db.find({
+                "name.first": {
+                    "$gt": "a",
+                    "$lt": "z"
+                },
+                "name.last": "Foo"
+            }, explain=True)
+        self.assertEqual(resp["index"]["type"], "json")
+
+    def test_with_or(self):
+        # index on ["company","manager"]
+        ddocid = "_design/a0c425a60cf3c3c09e3c537c9ef20059dcef9198"
+
+        resp = self.db.find({
+                "company": {
+                    "$gt": "a",
+                    "$lt": "z"
+                },
+                "$or": [
+                    {"manager": "Foo"},
+                    {"manager": "Bar"}
+                ]
+            }, explain=True)
+        self.assertEqual(resp["index"]["ddoc"], ddocid)
+
     def test_use_most_columns(self):
         # ddoc id for the age index
         ddocid = "_design/ad3d537c03cd7c6a43cf8dff66ef70ea54c2b40f"
@@ -56,12 +82,8 @@ class IndexSelectionTests:
     def test_invalid_use_index(self):
         # ddoc id for the age index
         ddocid = "_design/ad3d537c03cd7c6a43cf8dff66ef70ea54c2b40f"
-        try:
-            self.db.find({}, use_index=ddocid)
-        except Exception as e:
-            self.assertEqual(e.response.status_code, 400)
-        else:
-            raise AssertionError("bad find")
+        r = self.db.find({}, use_index=ddocid, return_raw=True)
+        self.assertEqual(r["warning"], '{0} was not used because it does not contain a valid index for this query.'.format(ddocid))
 
     def test_uses_index_when_no_range_or_equals(self):
         # index on ["manager"] should be valid because
@@ -77,33 +99,78 @@ class IndexSelectionTests:
         resp_explain = self.db.find(selector, explain=True)
         self.assertEqual(resp_explain["index"]["type"], "json")
 
-
     def test_reject_use_index_invalid_fields(self):
         # index on ["company","manager"] which should not be valid
         ddocid = "_design/a0c425a60cf3c3c09e3c537c9ef20059dcef9198"
         selector = {
             "company": "Pharmex"
         }
+        r = self.db.find(selector, use_index=ddocid, return_raw=True)
+        self.assertEqual(r["warning"], '{0} was not used because it does not contain a valid index for this query.'.format(ddocid))
+        
+        # should still return a correct result
+        for d in r["docs"]:
+            self.assertEqual(d["company"], "Pharmex")
+
+    def test_reject_use_index_ddoc_and_name_invalid_fields(self):
+        # index on ["company","manager"] which should not be valid
+        ddocid = "_design/a0c425a60cf3c3c09e3c537c9ef20059dcef9198"
+        name = "a0c425a60cf3c3c09e3c537c9ef20059dcef9198"
+        selector = {
+            "company": "Pharmex"
+        }
+        
+        resp = self.db.find(selector, use_index=[ddocid,name], return_raw=True)
+        self.assertEqual(resp["warning"], "{0}, {1} was not used because it is not a valid index for this query.".format(ddocid, name))
+
+        # should still return a correct result
+        for d in resp["docs"]:
+            self.assertEqual(d["company"], "Pharmex")
+
+    def test_reject_use_index_sort_order(self):
+        # index on ["company","manager"] which should not be valid
+        # and there is no valid fallback (i.e. an index on ["company"])
+        ddocid = "_design/a0c425a60cf3c3c09e3c537c9ef20059dcef9198"
+        selector = {
+            "company": {"$gt": None}
+        }
         try:
-            self.db.find(selector, use_index=ddocid)
+            self.db.find(selector, use_index=ddocid, sort=[{"company":"desc"}])
         except Exception as e:
             self.assertEqual(e.response.status_code, 400)
         else:
             raise AssertionError("did not reject bad use_index")
 
-    def test_reject_use_index_sort_order(self):
-        # index on ["company","manager"] which should not be valid
-        ddocid = "_design/a0c425a60cf3c3c09e3c537c9ef20059dcef9198"
+    def test_use_index_fallback_if_valid_sort(self):
+        ddocid_valid = "_design/fallbackfoo"
+        ddocid_invalid = "_design/fallbackfoobar"
+        self.db.create_index(fields=["foo"], ddoc=ddocid_invalid)
+        self.db.create_index(fields=["foo", "bar"], ddoc=ddocid_valid)
         selector = {
-            "company": {"$gt": None},
-            "manager": {"$gt": None}
+            "foo": {"$gt": None}
         }
-        try:
-            self.db.find(selector, use_index=ddocid, sort=[{"manager":"desc"}])
-        except Exception as e:
-            self.assertEqual(e.response.status_code, 400)
-        else:
-            raise AssertionError("did not reject bad use_index")
+
+        resp_explain = self.db.find(selector, sort=["foo", "bar"], use_index=ddocid_invalid, explain=True)
+        self.assertEqual(resp_explain["index"]["ddoc"], ddocid_valid)    
+
+        resp = self.db.find(selector, sort=["foo", "bar"], use_index=ddocid_invalid, return_raw=True)
+        self.assertEqual(resp["warning"], '{0} was not used because it does not contain a valid index for this query.'.format(ddocid_invalid))    
+        self.assertEqual(len(resp["docs"]), 0)
+
+    def test_prefer_use_index_over_optimal_index(self):
+        # index on ["company"] even though index on ["company", "manager"] is better
+        ddocid_preferred = "_design/testsuboptimal"
+        self.db.create_index(fields=["baz"], ddoc=ddocid_preferred)
+        self.db.create_index(fields=["baz", "bar"])
+        selector = {
+            "baz": {"$gt": None},
+            "bar": {"$gt": None}
+        }
+        resp = self.db.find(selector, use_index=ddocid_preferred, return_raw=True)
+        self.assertTrue("warning" not in resp)
+
+        resp_explain = self.db.find(selector, use_index=ddocid_preferred, explain=True)
+        self.assertEqual(resp_explain["index"]["ddoc"], ddocid_preferred)
 
     # This doc will not be saved given the new ddoc validation code
     # in couch_mrview
@@ -141,6 +208,14 @@ class IndexSelectionTests:
         with self.assertRaises(KeyError):
             self.db.save_doc(design_doc)
 
+
+    def test_explain_sort_reverse(self):
+        selector = {
+            "manager": {"$gt": None}
+        }
+        resp_explain = self.db.find(selector, fields=["manager"], sort=[{"manager":"desc"}], explain=True)
+        self.assertEqual(resp_explain["index"]["type"], "json")
+        
 
 class JSONIndexSelectionTests(mango.UserDocsTests, IndexSelectionTests):
 
@@ -181,15 +256,13 @@ class JSONIndexSelectionTests(mango.UserDocsTests, IndexSelectionTests):
 
 
 @unittest.skipUnless(mango.has_text_service(), "requires text service")
-class TextIndexSelectionTests(mango.UserDocsTests, IndexSelectionTests):
+class TextIndexSelectionTests(mango.UserDocsTests):
 
     @classmethod
     def setUpClass(klass):
         super(TextIndexSelectionTests, klass).setUpClass()
-
-    def setUp(self):
-        self.db.recreate()
-        user_docs.add_text_indexes(self.db, {})
+        if mango.has_text_service():
+            user_docs.add_text_indexes(klass.db, {})
 
     def test_with_text(self):
         resp = self.db.find({

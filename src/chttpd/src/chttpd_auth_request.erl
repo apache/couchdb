@@ -35,6 +35,8 @@ authorize_request_int(#httpd{path_parts=[<<"favicon.ico">>|_]}=Req) ->
     Req;
 authorize_request_int(#httpd{path_parts=[<<"_all_dbs">>|_]}=Req) ->
     Req;
+authorize_request_int(#httpd{path_parts=[<<"_dbs_info">>|_]}=Req) ->
+    Req;
 authorize_request_int(#httpd{path_parts=[<<"_replicator">>], method='PUT'}=Req) ->
     require_admin(Req);
 authorize_request_int(#httpd{path_parts=[<<"_replicator">>], method='DELETE'}=Req) ->
@@ -80,6 +82,8 @@ server_authorization_check(#httpd{path_parts=[<<"_replicate">>]}=Req) ->
 server_authorization_check(#httpd{path_parts=[<<"_stats">>]}=Req) ->
     Req;
 server_authorization_check(#httpd{path_parts=[<<"_active_tasks">>]}=Req) ->
+    Req;
+server_authorization_check(#httpd{path_parts=[<<"_dbs_info">>]}=Req) ->
     Req;
 server_authorization_check(#httpd{method=Method, path_parts=[<<"_utils">>|_]}=Req)
   when Method =:= 'HEAD' orelse Method =:= 'GET' ->

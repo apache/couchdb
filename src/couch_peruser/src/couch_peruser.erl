@@ -34,7 +34,9 @@
     db_name :: binary(),
     delete_dbs :: boolean(),
     changes_pid :: pid(),
-    changes_ref :: reference()
+    changes_ref :: reference(),
+    q_for_peruser_db :: integer(),
+    peruser_dbname_prefix :: binary()
 }).
 
 -record(state, {
@@ -43,10 +45,12 @@
     delete_dbs :: boolean(),
     states :: list(),
     mem3_cluster_pid :: pid(),
-    cluster_stable :: boolean()
+    cluster_stable :: boolean(),
+    q_for_peruser_db :: integer(),
+    peruser_dbname_prefix :: binary()
 }).
 
--define(USERDB_PREFIX, "userdb-").
+-define(DEFAULT_USERDB_PREFIX, "userdb-").
 -define(RELISTEN_DELAY, 5000).
 -define(DEFAULT_QUIET_PERIOD, 60). % seconds
 -define(DEFAULT_START_PERIOD, 5). % seconds
@@ -70,6 +74,16 @@ init_state() ->
         DbName = ?l2b(config:get(
                          "couch_httpd_auth", "authentication_db", "_users")),
         DeleteDbs = config:get_boolean("couch_peruser", "delete_dbs", false),
+        Q = config:get_integer("couch_peruser", "q", 1),
+        Prefix = config:get("couch_peruser", "database_prefix", ?DEFAULT_USERDB_PREFIX),
+        case couch_db:validate_dbname(Prefix) of
+            ok -> ok;
+            Error ->
+                couch_log:error("couch_peruser can't proceed as illegal database prefix ~p.
+                    Error: ~p", [Prefix, Error]),
+                throw(Error)
+        end,
+
 
         % set up cluster-stable listener
         Period = abs(config:get_integer("couch_peruser", "cluster_quiet_period",
@@ -85,7 +99,9 @@ init_state() ->
             db_name = DbName,
             delete_dbs = DeleteDbs,
             mem3_cluster_pid = Mem3Cluster,
-            cluster_stable = false
+            cluster_stable = false,
+            q_for_peruser_db = Q,
+            peruser_dbname_prefix = ?l2b(Prefix)
         }
     end.
 
@@ -95,14 +111,17 @@ start_listening(#state{states=ChangesStates}=State)
     when length(ChangesStates) > 0 ->
     % couch_log:debug("peruser: start_listening() already run on node ~p in pid ~p", [node(), self()]),
     State;
-start_listening(#state{db_name=DbName, delete_dbs=DeleteDbs} = State) ->
+start_listening(#state{db_name=DbName, delete_dbs=DeleteDbs,
+    q_for_peruser_db = Q, peruser_dbname_prefix = Prefix} = State) ->
     % couch_log:debug("peruser: start_listening() on node ~p", [node()]),
     try
         States = lists:map(fun (A) ->
             S = #changes_state{
                 parent = State#state.parent,
                 db_name = A#shard.name,
-                delete_dbs = DeleteDbs
+                delete_dbs = DeleteDbs,
+                q_for_peruser_db = Q,
+                peruser_dbname_prefix = Prefix
             },
             {Pid, Ref} = spawn_opt(
                 ?MODULE, init_changes_handler, [S], [link, monitor]),
@@ -138,7 +157,8 @@ init_changes_handler(#changes_state{db_name=DbName} = ChangesState) ->
 changes_handler(
     {change, {Doc}, _Prepend},
     _ResType,
-    ChangesState=#changes_state{db_name=DbName}) ->
+    ChangesState=#changes_state{db_name=DbName, q_for_peruser_db = Q,
+        peruser_dbname_prefix = Prefix}) ->
     % couch_log:debug("peruser: changes_handler() on DbName/Doc ~p/~p", [DbName, Doc]),
 
     case couch_util:get_value(<<"id">>, Doc) of
@@ -147,16 +167,16 @@ changes_handler(
         true ->
             case couch_util:get_value(<<"deleted">>, Doc, false) of
             false ->
-                UserDb = ensure_user_db(User),
+                UserDb = ensure_user_db(Prefix, User, Q),
                 ok = ensure_security(User, UserDb, fun add_user/3),
                 ChangesState;
             true ->
                 case ChangesState#changes_state.delete_dbs of
                 true ->
-                    _UserDb = delete_user_db(User),
+                    _UserDb = delete_user_db(Prefix, User),
                     ChangesState;
                 false ->
-                    UserDb = user_db_name(User),
+                    UserDb = user_db_name(Prefix, User),
                     ok = ensure_security(User, UserDb, fun remove_user/3),
                     ChangesState
                 end
@@ -201,9 +221,9 @@ should_handle_doc_int(ShardName, DocId) ->
         false
   end.
 
--spec delete_user_db(User :: binary()) -> binary().
-delete_user_db(User) ->
-    UserDb = user_db_name(User),
+-spec delete_user_db(Prefix:: binary(), User :: binary()) -> binary().
+delete_user_db(Prefix, User) ->
+    UserDb = user_db_name(Prefix, User),
     try
         case fabric:delete_db(UserDb, [?ADMIN_CTX]) of
         ok -> ok;
@@ -214,13 +234,13 @@ delete_user_db(User) ->
     end,
     UserDb.
 
--spec ensure_user_db(User :: binary()) -> binary().
-ensure_user_db(User) ->
-    UserDb = user_db_name(User),
+-spec ensure_user_db(Prefix:: binary(), User :: binary(), Q :: integer()) -> binary().
+ensure_user_db(Prefix, User, Q) ->
+    UserDb = user_db_name(Prefix, User),
     try
         {ok, _DbInfo} = fabric:get_db_info(UserDb)
     catch error:database_does_not_exist ->
-        case fabric:create_db(UserDb, [?ADMIN_CTX]) of
+        case fabric:create_db(UserDb, [?ADMIN_CTX, {q, integer_to_list(Q)}]) of
         {error, file_exists} -> ok;
         ok -> ok;
         accepted -> ok
@@ -294,11 +314,11 @@ ensure_security(User, UserDb, TransformFun) ->
         end
     end.
 
--spec user_db_name(User :: binary()) -> binary().
-user_db_name(User) ->
+-spec user_db_name(Prefix :: binary(), User :: binary()) -> binary().
+user_db_name(Prefix, User) ->
     HexUser = list_to_binary(
         [string:to_lower(integer_to_list(X, 16)) || <<X>> <= User]),
-    <<?USERDB_PREFIX,HexUser/binary>>.
+    <<Prefix/binary,HexUser/binary>>.
 
 -spec exit_changes(State :: #state{}) -> ok.
 exit_changes(State) ->

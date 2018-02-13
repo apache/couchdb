@@ -498,7 +498,3 @@ value_pref(Other, ?REV_MISSING) ->
     Other;
 value_pref(Last, _) ->
     Last.
-
-
-% Tests moved to test/etap/06?-*.t
-

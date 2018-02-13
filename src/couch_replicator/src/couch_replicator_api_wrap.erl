@@ -24,7 +24,7 @@
 
 -export([
     db_open/2,
-    db_open/3,
+    db_open/4,
     db_close/1,
     get_db_info/1,
     get_pending_count/2,
@@ -68,20 +68,21 @@ db_uri(Db) ->
 
 
 db_open(Db, Options) ->
-    db_open(Db, Options, false).
+    db_open(Db, Options, false, []).
 
-db_open(#httpdb{} = Db1, _Options, Create) ->
+db_open(#httpdb{} = Db1, _Options, Create, CreateParams) ->
     {ok, Db} = couch_replicator_httpc:setup(Db1),
     try
         case Create of
         false ->
             ok;
         true ->
-            send_req(Db, [{method, put}],
+            Db2 = maybe_append_create_query_params(Db, CreateParams),
+            send_req(Db2, [{method, put}],
                 fun(401, _, _) ->
-                    throw({unauthorized, ?l2b(db_uri(Db))});
+                    throw({unauthorized, ?l2b(db_uri(Db2))});
                 (403, _, _) ->
-                    throw({forbidden, ?l2b(db_uri(Db))});
+                    throw({forbidden, ?l2b(db_uri(Db2))});
                 (_, _, _) ->
                     ok
                 end)
@@ -118,7 +119,7 @@ db_open(#httpdb{} = Db1, _Options, Create) ->
             db_close(Db),
             erlang:exit(Error)
     end;
-db_open(DbName, Options, Create) ->
+db_open(DbName, Options, Create, _CreateParams) ->
     try
         case Create of
         false ->
@@ -1018,6 +1019,14 @@ normalize_db(#httpdb{} = HttpDb) ->
 
 normalize_db(<<DbName/binary>>) ->
     DbName.
+
+
+maybe_append_create_query_params(Db, []) ->
+    Db;
+
+maybe_append_create_query_params(Db, CreateParams) ->
+    NewUrl = Db#httpdb.url ++ "?" ++ mochiweb_util:urlencode(CreateParams),
+    Db#httpdb{url = NewUrl}.
 
 
 -ifdef(TEST).

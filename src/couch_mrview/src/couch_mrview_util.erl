@@ -1161,7 +1161,7 @@ get_view_keys({Props}) ->
         Keys when is_list(Keys) ->
             Keys;
         _ ->
-            throw({bad_request, "`keys` member must be a array."})
+            throw({bad_request, "`keys` member must be an array."})
     end.
 
 
@@ -1172,7 +1172,7 @@ get_view_queries({Props}) ->
         Queries when is_list(Queries) ->
             Queries;
         _ ->
-            throw({bad_request, "`queries` member must be a array."})
+            throw({bad_request, "`queries` member must be an array."})
     end.
 
 

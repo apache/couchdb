@@ -59,7 +59,8 @@ go(DbName, Options, QueryArgs, Callback, Acc0) ->
         conflicts = Conflicts,
         skip = Skip,
         keys = Keys0,
-        extra = Extra
+        extra = Extra,
+        update_seq = UpdateSeq
     } = QueryArgs,
     DocOptions1 = case Conflicts of
         true -> [conflicts|DocOptions0];
@@ -97,7 +98,12 @@ go(DbName, Options, QueryArgs, Callback, Acc0) ->
     end,
     case Resp of
         {ok, TotalRows} ->
-            {ok, Acc1} = Callback({meta, [{total, TotalRows}]}, Acc0),
+            Meta = case UpdateSeq of
+                false -> [{total, TotalRows}, {offset, null}];
+                true ->
+                    [{total, TotalRows}, {offset, null}, {update_seq, null}]
+            end,
+            {ok, Acc1} = Callback({meta, Meta}, Acc0),
             {ok, Acc2} = doc_receive_loop(
                 Keys3, queue:new(), SpawnFun, MaxJobs, Callback, Acc1
             ),
