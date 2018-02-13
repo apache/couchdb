@@ -388,8 +388,8 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                 erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
                 {ok, #file{fd=Fd, is_sys=IsSys, pread_limit=Limit}}
             end;
-        Error ->
-            init_status_error(ReturnPid, Ref, Error)
+        {error, Reason} ->
+            init_status_error(ReturnPid, Ref, {error, Reason})
         end;
     false ->
         % open in read mode first, so we don't create the file if it doesn't exist.
@@ -403,8 +403,8 @@ init({Filepath, Options, ReturnPid, Ref}) ->
             {ok, Eof} = file:position(Fd, eof),
             erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
             {ok, #file{fd=Fd, eof=Eof, is_sys=IsSys, pread_limit=Limit}};
-        Error ->
-            init_status_error(ReturnPid, Ref, Error)
+        {error, Reason} ->
+            init_status_error(ReturnPid, Ref, {error, Reason})
         end
     end.
 
