@@ -14,7 +14,7 @@
 
 -record(httpdb, {
     url,
-    oauth = nil,
+    auth_props = [],
     headers = [
         {"Accept", "application/json"},
         {"User-Agent", "CouchDB-Replicator/" ++ couch_server:get_version()}
@@ -26,13 +26,6 @@
     httpc_pool = nil,
     http_connections,
     first_error_timestamp = nil,
-    proxy_url
-}).
-
--record(oauth, {
-    consumer_key,
-    token,
-    token_secret,
-    consumer_secret,
-    signature_method
+    proxy_url,
+    auth_context = nil
 }).
