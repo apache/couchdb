@@ -324,7 +324,7 @@ validate_doc_update(DDoc, EditDoc, DiskDoc, Ctx, SecObj) ->
         couch_stats:increment_counter([couchdb, query_server, vdu_rejects], 1)
     end,
     case Resp of
-        1 ->
+        RespCode when RespCode == 1; RespCode == ok; RespCode == true ->
             ok;
         {[{<<"forbidden">>, Message}]} ->
             throw({forbidden, Message});
