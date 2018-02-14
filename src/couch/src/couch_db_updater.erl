@@ -1467,13 +1467,9 @@ make_doc_summary(#db{compression = Comp}, {Body0, Atts0}) ->
     couch_file:assemble_file_chunk(SummaryBin, crypto:hash(md5, SummaryBin)).
 
 
-get_meta_body_size(Meta, Summary) ->
-    case lists:keyfind(ejson_size, 1, Meta) of
-        {ejson_size, ExternalSize} ->
-            ExternalSize;
-        false ->
-            couch_compress:uncompressed_size(Summary)
-    end.
+get_meta_body_size(Meta) ->
+    {ejson_size, ExternalSize} = lists:keyfind(ejson_size, 1, Meta),
+    ExternalSize.
 
 
 default_security_object(<<"shards/", _/binary>>) ->
