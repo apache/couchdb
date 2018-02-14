@@ -46,6 +46,7 @@ Options:
   -c | --with-curl            request that couchjs is linked to cURL (default false)
   --disable-fauxton           do not build Fauxton
   --disable-docs              do not build any documentation or manpages
+  --dev                       alias for --with-curl --disable-docs --disable-fauxton
   --skip-deps                 do not update erlang dependencies
   --rebar=PATH                use rebar by specified path (version >=2.6.0 && <3.0 required)
 EOF
@@ -73,6 +74,14 @@ parse_opts() {
 
             --disable-docs)
                 WITH_DOCS=0
+                shift
+                continue
+                ;;
+
+            --dev)
+                WITH_DOCS=0
+                WITH_FAUXTON=0
+                WITH_CURL="true"
                 shift
                 continue
                 ;;
