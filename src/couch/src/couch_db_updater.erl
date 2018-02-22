@@ -1137,7 +1137,7 @@ copy_docs(Db, #db{fd = DestFd} = NewDb, MixedInfos, Retry) ->
         {{Id, Seq}, FDI}
     end, NewInfos),
     {ok, IdEms} = couch_emsort:add(NewDb#db.id_tree, FDIKVs),
-    update_compact_task(length(NewInfos)),
+    update_compact_task(length(NewInfos), NewDb#db.name, NewDb#db.filepath),
     NewDb#db{id_tree=IdEms, seq_tree=SeqTree}.
 
 
@@ -1177,25 +1177,8 @@ copy_compact(Db, NewDb0, Retry) ->
         end
     end,
 
-    TaskProps0 = [
-        {type, database_compaction},
-        {database, Db#db.name},
-        {progress, 0},
-        {changes_done, 0},
-        {total_changes, TotalChanges}
-    ],
-    case (Retry =/= nil) and couch_task_status:is_task_added() of
-    true ->
-        couch_task_status:update([
-            {retry, true},
-            {progress, 0},
-            {changes_done, 0},
-            {total_changes, TotalChanges}
-        ]);
-    false ->
-        couch_task_status:add_task(TaskProps0),
-        couch_task_status:set_update_frequency(500)
-    end,
+    SU_pid = get_status_updater(Db#db.name, Db#db.filepath),
+    gen_server:cast(SU_pid, {add_task, [Retry, TotalChanges]}),
 
     {ok, _, {NewDb2, Uncopied, _, _}} =
         couch_btree:foldl(Db#db.seq_tree, EnumBySeqFun,
@@ -1343,7 +1326,11 @@ bind_emsort(Db, Fd, nil) ->
     {ok, Ems} = couch_emsort:open(Fd),
     Db#db{id_tree=Ems};
 bind_emsort(Db, Fd, State) ->
-    {ok, Ems} = couch_emsort:open(Fd, [{root, State}]),
+    {ok, Ems} =
+    case State of
+        [{root, _},{added,_}] -> couch_emsort:open(Fd, State);
+        _ ->  couch_emsort:open(Fd, [{root, State}])
+    end,
     Db#db{id_tree=Ems}.
 
 
@@ -1357,11 +1344,15 @@ bind_id_tree(Db, Fd, State) ->
 
 
 sort_meta_data(Db0) ->
+    SU_pid = get_status_updater(Db0#db.name, Db0#db.filepath),
+    gen_server:cast(SU_pid, sort_start),
     {ok, Ems} = couch_emsort:merge(Db0#db.id_tree),
     Db0#db{id_tree=Ems}.
 
 
 copy_meta_data(#db{fd=Fd, header=Header}=Db) ->
+    SU_pid = get_status_updater(Db#db.name, Db#db.filepath),
+    gen_server:cast(SU_pid, merge_start),
     Src = Db#db.id_tree,
     DstState = couch_db_header:id_tree_state(Header),
     {ok, IdTree0} = couch_btree:open(DstState, Fd, [
@@ -1376,20 +1367,29 @@ copy_meta_data(#db{fd=Fd, header=Header}=Db) ->
         rem_seqs=[],
         infos=[]
     },
-    Acc = merge_docids(Iter, Acc0),
+    Acc = merge_docids(Iter, Acc0, SU_pid),
     {ok, IdTree} = couch_btree:add(Acc#merge_st.id_tree, Acc#merge_st.infos),
     {ok, SeqTree} = couch_btree:add_remove(
         Acc#merge_st.seq_tree, [], Acc#merge_st.rem_seqs
     ),
+    gen_server:cast(SU_pid, done),
     Db#db{id_tree=IdTree, seq_tree=SeqTree}.
 
 
-merge_docids(Iter, #merge_st{infos=Infos}=Acc) when length(Infos) > 1000 ->
+merge_docids(Iter, #merge_st{infos=Infos}=Acc, SU_pid) when length(Infos) > 1000 ->
     #merge_st{
         id_tree=IdTree0,
         seq_tree=SeqTree0,
         rem_seqs=RemSeqs
     } = Acc,
+    Merged = couch_emsort:get_merged(Iter),
+    {ok, Total} = couch_btree:full_reduce(SeqTree0),
+    Progress =
+    case ok of
+        _ when Merged < Total -> (Merged * 100) div Total;
+        _ -> 100
+    end,
+    gen_server:cast(SU_pid, {update_progress, Progress}),
     {ok, IdTree1} = couch_btree:add(IdTree0, Infos),
     {ok, SeqTree1} = couch_btree:add_remove(SeqTree0, [], RemSeqs),
     Acc1 = Acc#merge_st{
@@ -1398,8 +1398,8 @@ merge_docids(Iter, #merge_st{infos=Infos}=Acc) when length(Infos) > 1000 ->
         rem_seqs=[],
         infos=[]
     },
-    merge_docids(Iter, Acc1);
-merge_docids(Iter, #merge_st{curr=Curr}=Acc) ->
+    merge_docids(Iter, Acc1, SU_pid);
+merge_docids(Iter, #merge_st{curr=Curr}=Acc, SU_pid) ->
     case next_info(Iter, Curr, []) of
         {NextIter, NewCurr, FDI, Seqs} ->
             Acc1 = Acc#merge_st{
@@ -1407,7 +1407,7 @@ merge_docids(Iter, #merge_st{curr=Curr}=Acc) ->
                 rem_seqs = Seqs ++ Acc#merge_st.rem_seqs,
                 curr = NewCurr
             },
-            merge_docids(NextIter, Acc1);
+            merge_docids(NextIter, Acc1, SU_pid);
         {finished, FDI, Seqs} ->
             Acc#merge_st{
                 infos = [FDI | Acc#merge_st.infos],
@@ -1437,16 +1437,9 @@ next_info(Iter, {Id, Seq, FDI}, Seqs) ->
     end.
 
 
-update_compact_task(NumChanges) ->
-    [Changes, Total] = couch_task_status:get([changes_done, total_changes]),
-    Changes2 = Changes + NumChanges,
-    Progress = case Total of
-    0 ->
-        0;
-    _ ->
-        (Changes2 * 100) div Total
-    end,
-    couch_task_status:update([{changes_done, Changes2}, {progress, Progress}]).
+update_compact_task(NumChanges, DbName, Filepath) ->
+    SU_pid = get_status_updater(DbName, Filepath),
+    gen_server:cast(SU_pid, {update_task, NumChanges}).
 
 
 make_doc_summary(#db{compression = Comp}, {Body0, Atts0}) ->
@@ -1518,3 +1511,15 @@ hibernate_if_no_idle_limit() ->
         Timeout when is_integer(Timeout) ->
             Timeout
     end.
+
+get_status_updater(DbName, Filepath) ->
+    case erlang:get(status_updater) of
+    undefined ->
+        {ok, SU_pid} = couch_compact_status:start_link(DbName, Filepath),
+        erlang:put(status_updater, SU_pid),
+        SU_pid;
+    Pid ->
+        Pid
+    end.
+
+
