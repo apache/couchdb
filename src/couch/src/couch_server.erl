@@ -77,16 +77,20 @@ open(DbName, Options0) ->
     case ets:lookup(couch_dbs, DbName) of
     [#entry{db = Db0, lock = Lock} = Entry] when Lock =/= locked ->
         update_lru(DbName, Entry#entry.db_options),
-        {ok, Db1} = couch_db:incref(Db0),
-        couch_db:set_user_ctx(Db1, Ctx);
+        case couch_db:incref(Db0) of
+            {down,Db0} -> open(DbName, Options0);
+            {ok, Db1} -> couch_db:set_user_ctx(Db1, Ctx)
+        end;
     _ ->
         Options = maybe_add_sys_db_callbacks(DbName, Options0),
         Timeout = couch_util:get_value(timeout, Options, infinity),
         Create = couch_util:get_value(create_if_missing, Options, false),
         case gen_server:call(couch_server, {open, DbName, Options}, Timeout) of
         {ok, Db0} ->
-            {ok, Db1} = couch_db:incref(Db0),
-            couch_db:set_user_ctx(Db1, Ctx);
+            case couch_db:incref(Db0) of
+                {down,Db0} -> open(DbName, Options0);
+                {ok, Db1} -> couch_db:set_user_ctx(Db1, Ctx)
+            end;
         {not_found, no_db_file} when Create ->
             couch_log:warning("creating missing database: ~s", [DbName]),
             couch_server:create(DbName, Options);
@@ -109,8 +113,10 @@ create(DbName, Options0) ->
     case gen_server:call(couch_server, {create, DbName, Options}, infinity) of
     {ok, Db0} ->
         Ctx = couch_util:get_value(user_ctx, Options, #user_ctx{}),
-        {ok, Db1} = couch_db:incref(Db0),
-        couch_db:set_user_ctx(Db1, Ctx);
+        case couch_db:incref(Db0) of
+            {down,Db0} -> create(DbName, Options0);
+            {ok, Db1} -> couch_db:set_user_ctx(Db1, Ctx)
+        end;
     Error ->
         Error
     end.

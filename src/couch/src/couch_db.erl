@@ -200,7 +200,12 @@ reopen(#db{main_pid = Pid, fd = Fd, fd_monitor = OldRef, user_ctx = UserCtx}) ->
 
 incref(#db{fd = Fd} = Db) ->
     Ref = erlang:monitor(process, Fd),
-    {ok, Db#db{fd_monitor = Ref}}.
+    receive
+        {'DOWN', Ref, _, _, _} ->
+            {down, Db}
+    after 0 ->
+        {ok, Db#db{fd_monitor = Ref}}
+    end.
 
 clustered_db(DbName, UserCtx) ->
     clustered_db(DbName, UserCtx, []).
