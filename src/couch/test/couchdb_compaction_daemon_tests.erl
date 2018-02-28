@@ -195,6 +195,7 @@ get_db_frag(DbName) ->
     couch_db:close(Db),
     FileSize = get_size(file, Info),
     DataSize = get_size(active, Info),
+    couch_log:error("XKCD: ~p ~p ~w", [FileSize, DataSize, Info]),
     {round((FileSize - DataSize) / FileSize * 100), FileSize}.
 
 get_view_frag(DbName) ->
