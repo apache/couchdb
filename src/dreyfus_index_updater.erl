@@ -17,7 +17,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include("dreyfus.hrl").
 
--export([update/2, load_docs/3]).
+-export([update/2, load_docs/2]).
 
 -import(couch_query_servers, [get_os_process/1, ret_os_process/1, proc_prompt/2]).
 
@@ -51,10 +51,10 @@ update(IndexPid, Index) ->
         Proc = get_os_process(Index#index.def_lang),
         try
             true = proc_prompt(Proc, [<<"add_fun">>, Index#index.def]),
-            EnumFun = fun ?MODULE:load_docs/3,
+            EnumFun = fun ?MODULE:load_docs/2,
             Acc0 = {0, IndexPid, Db, Proc, TotalChanges, now()},
 
-            {ok, _, _} = couch_db:enum_docs_since(Db, CurSeq, EnumFun, Acc0, []),
+            {ok, _} = couch_db:fold_changes(Db, CurSeq, EnumFun, Acc0),
             ok = clouseau_rpc:commit(IndexPid, NewCurSeq)
         after
             ret_os_process(Proc)
@@ -64,7 +64,7 @@ update(IndexPid, Index) ->
         couch_db:close(Db)
     end.
 
-load_docs(FDI, _, {I, IndexPid, Db, Proc, Total, LastCommitTime}=Acc) ->
+load_docs(FDI, {I, IndexPid, Db, Proc, Total, LastCommitTime}=Acc) ->
     couch_task_status:update([{changes_done, I}, {progress, (I * 100) div Total}]),
     DI = couch_doc:to_doc_info(FDI),
     #doc_info{id=Id, high_seq=Seq, revs=[#rev_info{deleted=Del}|_]} = DI,
