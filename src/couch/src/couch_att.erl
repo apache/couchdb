@@ -152,9 +152,31 @@
     data_prop() | encoding_prop()
 ].
 
+-type disk_att_v1() :: {
+    Name :: binary(),
+    Type :: binary(),
+    Sp :: any(),
+    AttLen :: non_neg_integer(),
+    RevPos :: non_neg_integer(),
+    Md5 :: binary()
+}.
 
--type att() :: #att{} | attachment().
+-type disk_att_v2() :: {
+    Name :: binary(),
+    Type :: binary(),
+    Sp :: any(),
+    AttLen :: non_neg_integer(),
+    DiskLen :: non_neg_integer(),
+    RevPos :: non_neg_integer(),
+    Md5 :: binary(),
+    Enc :: identity | gzip
+}.
 
+-type disk_att_v3() :: {Base :: tuple(), Extended :: list()}.
+
+-type disk_att() :: disk_att_v1() | disk_att_v2() | disk_att_v3().
+
+-type att() :: #att{} | attachment() | disk_att().
 
 new() ->
     %% We construct a record by default for compatability. This will be
