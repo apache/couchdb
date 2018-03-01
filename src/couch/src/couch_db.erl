@@ -199,13 +199,23 @@ reopen(#db{main_pid = Pid, fd = Fd, fd_monitor = OldRef, user_ctx = UserCtx}) ->
     end.
 
 incref(#db{fd = Fd} = Db) ->
+    incref(Db,couch_file:lock(Fd)).
+
+incref(#db{fd = Fd} = Db, true = _Locked) ->
+    % first monitor
     Ref = erlang:monitor(process, Fd),
-    receive
-        {'DOWN', Ref, _, _, _} ->
-            {down, Db}
-    after 0 ->
-        {ok, Db#db{fd_monitor = Ref}}
-    end.
+    % than release the lock
+    couch_file:unlock(Fd),
+    {ok, Db#db{fd_monitor = Ref}};
+% we are not able to write the lock,
+% either the file will be closed or another process want to monitor
+% we will try it again
+incref(#db{fd = _Fd} = _Db, false = _Locked) ->
+    % maybe sleep??
+    timer:sleep(1),
+    retry.
+
+
 
 clustered_db(DbName, UserCtx) ->
     clustered_db(DbName, UserCtx, []).
@@ -244,7 +254,7 @@ close(?NEW_PSE_DB) ->
     ok.
 
 is_idle(#db{compactor_pid=nil, waiting_delayed_commit=nil} = Db) ->
-    monitored_by(Db) == [];
+    monitored_by(Db) == [] andalso couch_file:lock(Db#db.fd);
 is_idle(_Db) ->
     false.
 

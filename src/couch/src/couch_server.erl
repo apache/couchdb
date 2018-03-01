@@ -78,7 +78,7 @@ open(DbName, Options0) ->
     [#entry{db = Db0, lock = Lock} = Entry] when Lock =/= locked ->
         update_lru(DbName, Entry#entry.db_options),
         case couch_db:incref(Db0) of
-            {down,Db0} -> open(DbName, Options0);
+            retry -> open(DbName, Options0);
             {ok, Db1} -> couch_db:set_user_ctx(Db1, Ctx)
         end;
     _ ->
@@ -88,7 +88,7 @@ open(DbName, Options0) ->
         case gen_server:call(couch_server, {open, DbName, Options}, Timeout) of
         {ok, Db0} ->
             case couch_db:incref(Db0) of
-                {down,Db0} -> open(DbName, Options0);
+                retry -> open(DbName, Options0);
                 {ok, Db1} -> couch_db:set_user_ctx(Db1, Ctx)
             end;
         {not_found, no_db_file} when Create ->
@@ -114,7 +114,7 @@ create(DbName, Options0) ->
     {ok, Db0} ->
         Ctx = couch_util:get_value(user_ctx, Options, #user_ctx{}),
         case couch_db:incref(Db0) of
-            {down,Db0} -> create(DbName, Options0);
+            retry -> create(DbName, Options0);
             {ok, Db1} -> couch_db:set_user_ctx(Db1, Ctx)
         end;
     Error ->
@@ -209,6 +209,7 @@ init([]) ->
     hash_admin_passwords(),
     ets:new(couch_dbs, [set, protected, named_table, {keypos, #entry.name}]),
     ets:new(couch_dbs_pid_to_name, [set, protected, named_table]),
+    ets:new(couch_lock, [set, public, named_table, {write_concurrency, true}, {read_concurrency, true}]),
     process_flag(trap_exit, true),
     {ok, #server{root_dir=RootDir,
                 max_dbs_open=MaxDbsOpen,

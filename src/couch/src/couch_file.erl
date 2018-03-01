@@ -45,6 +45,7 @@
 -export([write_header/2, read_header/1]).
 -export([delete/2, delete/3, nuke_dir/2, init_delete_dir/1]).
 -export([msec_since_last_read/1]).
+-export([lock/1, unlock/1]).
 
 % gen_server callbacks
 -export([init/1, terminate/2, code_change/3]).
@@ -694,17 +695,24 @@ split_iolist([Byte | Rest], SplitAt, BeginAcc) when is_integer(Byte) ->
 % System dbs aren't monitored by couch_stats_process_tracker
 is_idle(#file{is_sys=true}) ->
     case process_info(self(), monitored_by) of
-        {monitored_by, []} -> true;
+        {monitored_by, []} -> lock(self());
         _ -> false
     end;
 is_idle(#file{is_sys=false}) ->
     Tracker = whereis(couch_stats_process_tracker),
     case process_info(self(), monitored_by) of
-        {monitored_by, []} -> true;
-        {monitored_by, [Tracker]} -> true;
+        {monitored_by, []} -> lock(self());
+        {monitored_by, [Tracker]} -> lock(self());
         {monitored_by, [_]} -> exit(tracker_monitoring_failed);
         _ -> false
     end.
+
+lock(Fd) -> try
+                ets:new(list_to_atom(pid_to_list(Fd)), named_table), true
+            catch
+                _:_ -> false
+            end.
+unlock(Fd) -> ets:delete(list_to_atom(pid_to_list(Fd))).
 
 -spec process_info(CouchFilePid :: pid()) ->
     {Fd :: pid() | tuple(), FilePath :: string()} | undefined.

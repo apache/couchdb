@@ -353,6 +353,8 @@ handle_info(timeout, #db{fd=Fd, name=DbName} = Db) ->
     IdleLimitMSec = update_idle_limit_from_config(),
     case couch_db:is_idle(Db) of
         true ->
+            % we have to unlock Fd, cause close_db_if_idle will check is_idle again
+            couch_file:unlock(Fd),
             MSecSinceLastRead = couch_file:msec_since_last_read(Fd),
             case MSecSinceLastRead > IdleLimitMSec of
                 true ->
