@@ -224,18 +224,7 @@ monitor(#db{main_pid=MainPid}) ->
     erlang:monitor(process, MainPid).
 
 start_compact(#db{} = Db) ->
-    start_compact(Db, []).
-
-start_compact(#db{} = Db, Opts) ->
-    case lists:keyfind(notify, 1, Opts) of
-        {notify, Pid, Term} ->
-            % We fake a gen_server call here which sends the
-            % response back to the specified pid.
-            Db#db.main_pid ! {'$gen_call', {Pid, Term}, start_compact},
-            ok;
-        _ ->
-            gen_server:call(Db#db.main_pid, start_compact)
-    end.
+    gen_server:call(Db#db.main_pid, start_compact).
 
 cancel_compact(#db{main_pid=Pid}) ->
     gen_server:call(Pid, cancel_compact).
