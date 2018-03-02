@@ -781,8 +781,23 @@ set_default_security_object(Fd, Header, Compression, Options) ->
 % It replaces purge_tree_state and upurge_tree_state with
 % with purged_docs disk pointer that stores only the last purge request
 downgrade_purge_info(Fd, Header) ->
-    {db_header, _, UpSeq, _, IdTreeState, SeqTreeState, LocalTreeState, PSeq,
-        PTS, SecurityPtr, RevsLimit, Uuid, Epochs, CompactedSeq, UPST, _
+    {
+        db_header,
+        _DiskVer,
+        UpSeq,
+        _Unused,
+        IdTreeState,
+        SeqTreeState,
+        LocalTreeState,
+        PSeq,
+        PTS,
+        SecurityPtr,
+        RevsLimit,
+        Uuid,
+        Epochs,
+        CompactedSeq,
+        UPST,
+        _PDocsLimit
     } = Header,
     PurgedDocsPtr = case PTS of
         nil -> nil;
