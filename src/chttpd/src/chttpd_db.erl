@@ -1266,6 +1266,7 @@ db_attachment_req(#httpd{method=Method, user_ctx=Ctx}=Req, Db, DocId, FileNamePa
     DocEdited = Doc#doc{
         atts = NewAtt ++ [A || A <- Atts, couch_att:fetch(name, A) /= FileName]
     },
+    couch_att:validate_attachment_count(length(DocEdited#doc.atts)),
     W = chttpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
     case fabric:update_doc(Db, DocEdited, [{user_ctx,Ctx}, {w,W}]) of
     {ok, UpdatedRev} ->

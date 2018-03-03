@@ -135,6 +135,7 @@ from_json_obj_validate(EJson, DbName) ->
     Doc = from_json_obj(EJson, DbName),
     case couch_ejson_size:encoded_size(Doc#doc.body) =< MaxSize of
         true ->
+             validate_attachment_count(Doc#doc.atts),
              validate_attachment_sizes(Doc#doc.atts),
              Doc;
         false ->
@@ -152,6 +153,9 @@ validate_attachment_sizes(Atts) ->
          couch_att:validate_attachment_size(AttName, AttSize, MaxAttSize)
     end, Atts).
 
+
+validate_attachment_count(Atts) ->
+    couch_att:validate_attachment_count(length(Atts)).
 
 from_json_obj({Props}) ->
     from_json_obj({Props}, undefined).
