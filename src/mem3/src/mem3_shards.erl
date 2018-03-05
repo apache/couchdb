@@ -69,19 +69,14 @@ for_docid(DbName, DocId) ->
 for_docid(DbName, DocId, Options) ->
     HashKey = mem3_util:hash(DocId),
     ShardHead = #shard{
-        name = '_',
-        node = '_',
         dbname = DbName,
-        range = ['$1','$2'],
-        ref = '_'
+        range = ['$1', '$2'],
+        _ = '_'
     },
     OrderedShardHead = #ordered_shard{
-        name = '_',
-        node = '_',
         dbname = DbName,
-        range = ['$1','$2'],
-        ref = '_',
-        order = '_'
+        range = ['$1', '$2'],
+        _ = '_'
     },
     Conditions = [{'=<', '$1', HashKey}, {'=<', HashKey, '$2'}],
     ShardSpec = {ShardHead, Conditions, ['$_']},
@@ -107,18 +102,13 @@ for_shard_name(ShardName, Options) ->
     DbName = mem3:dbname(ShardName),
     ShardHead = #shard{
         name = ShardName,
-        node = '_',
         dbname = DbName,
-        range = '_',
-        ref = '_'
+        _ = '_'
     },
     OrderedShardHead = #ordered_shard{
         name = ShardName,
-        node = '_',
         dbname = DbName,
-        range = '_',
-        ref = '_',
-        order = '_'
+        _ = '_'
     },
     ShardSpec = {ShardHead, [], ['$_']},
     OrderedShardSpec = {OrderedShardHead, [], ['$_']},
@@ -160,7 +150,7 @@ fold(Fun, Acc) ->
     {ok, Db} = mem3_util:ensure_exists(DbName),
     FAcc = {Db, Fun, Acc},
     try
-        {ok, _, LastAcc} = couch_db:enum_docs(Db, fun fold_fun/3, FAcc, []),
+        {ok, LastAcc} = couch_db:fold_docs(Db, fun fold_fun/2, FAcc),
         {_Db, _UFun, UAcc} = LastAcc,
         UAcc
     after
@@ -305,10 +295,10 @@ start_changes_listener(SinceSeq) ->
     end),
     Pid.
 
-fold_fun(#full_doc_info{}=FDI, _, Acc) ->
+fold_fun(#full_doc_info{}=FDI, Acc) ->
     DI = couch_doc:to_doc_info(FDI),
-    fold_fun(DI, nil, Acc);
-fold_fun(#doc_info{}=DI, _, {Db, UFun, UAcc}) ->
+    fold_fun(DI, Acc);
+fold_fun(#doc_info{}=DI, {Db, UFun, UAcc}) ->
     case couch_db:open_doc(Db, DI, [ejson_body, conflicts]) of
         {ok, Doc} ->
             {Props} = Doc#doc.body,
@@ -322,8 +312,9 @@ fold_fun(#doc_info{}=DI, _, {Db, UFun, UAcc}) ->
 get_update_seq() ->
     DbName = config:get("mem3", "shards_db", "_dbs"),
     {ok, Db} = mem3_util:ensure_exists(DbName),
+    Seq = couch_db:get_update_seq(Db),
     couch_db:close(Db),
-    couch_db:get_update_seq(Db).
+    Seq.
 
 listen_for_changes(Since) ->
     DbName = config:get("mem3", "shards_db", "_dbs"),
@@ -361,7 +352,7 @@ changes_callback({change, {Change}, _}, _) ->
                 ets:insert(?OPENERS, {DbName, Writer}),
                 Msg = {cache_insert_change, DbName, Writer, Seq},
                 gen_server:cast(?MODULE, Msg),
-                [create_if_missing(mem3:name(S)) || S
+                [create_if_missing(mem3:name(S), mem3:engine(S)) || S
                     <- Shards, mem3:node(S) =:= node()]
             end
         end
@@ -412,20 +403,18 @@ in_range(Shard, HashKey) ->
     [B, E] = mem3:range(Shard),
     B =< HashKey andalso HashKey =< E.
 
-create_if_missing(Name) ->
-    DbDir = config:get("couchdb", "database_dir"),
-    Filename = filename:join(DbDir, ?b2l(Name) ++ ".couch"),
-    case filelib:is_regular(Filename) of
-    true ->
-        ok;
-    false ->
-        case couch_server:create(Name, [?ADMIN_CTX]) of
-        {ok, Db} ->
-            couch_db:close(Db);
-        Error ->
-            couch_log:error("~p tried to create ~s, got ~p",
-                [?MODULE, Name, Error])
-        end
+create_if_missing(Name, Options) ->
+    case couch_server:exists(Name) of
+        true ->
+            ok;
+        false ->
+            case couch_server:create(Name, [?ADMIN_CTX] ++ Options) of
+            {ok, Db} ->
+                couch_db:close(Db);
+            Error ->
+                couch_log:error("~p tried to create ~s, got ~p",
+                    [?MODULE, Name, Error])
+            end
     end.
 
 cache_insert(#st{cur_size=Cur}=St, DbName, Writer, Timeout) ->

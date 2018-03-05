@@ -139,12 +139,7 @@ process_response({error, sel_conn_closed}, Worker, HttpDb, Params, _Cb) ->
 %% next request.
 process_response({error, connection_closing}, Worker, HttpDb, Params, _Cb) ->
     stop_and_release_worker(HttpDb#httpdb.httpc_pool, Worker),
-    throw({retry, HttpDb, Params});
-
-process_response({error, req_timedout}, _Worker, HttpDb, Params, _Cb) ->
-    % ibrowse worker terminated because remote peer closed the socket
-    % -> not an error
-    throw({retry, HttpDb, Params});
+    maybe_retry({error, connection_closing}, Worker, HttpDb, Params);
 
 process_response({ibrowse_req_id, ReqId}, Worker, HttpDb, Params, Callback) ->
     process_stream_response(ReqId, Worker, HttpDb, Params, Callback);

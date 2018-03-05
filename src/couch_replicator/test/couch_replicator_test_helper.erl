@@ -22,7 +22,7 @@ compare_dbs(Source, Target, ExceptIds) ->
     {ok, SourceDb} = couch_db:open_int(Source, []),
     {ok, TargetDb} = couch_db:open_int(Target, []),
 
-    Fun = fun(FullDocInfo, _, Acc) ->
+    Fun = fun(FullDocInfo, Acc) ->
         {ok, DocSource} = couch_db:open_doc(SourceDb, FullDocInfo),
         Id = DocSource#doc.id,
         case lists:member(Id, ExceptIds) of
@@ -35,7 +35,7 @@ compare_dbs(Source, Target, ExceptIds) ->
         {ok, Acc}
     end,
 
-    {ok, _, _} = couch_db:enum_docs(SourceDb, Fun, [], []),
+    {ok, _} = couch_db:fold_docs(SourceDb, Fun, [], []),
     ok = couch_db:close(SourceDb),
     ok = couch_db:close(TargetDb).
 
