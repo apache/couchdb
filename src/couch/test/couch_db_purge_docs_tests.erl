@@ -228,7 +228,7 @@ purge_conflicts(DbName) ->
             % create a conflict
             DocConflict = #doc{
                 id = <<"foo">>,
-                revs = {1, [couch_crypto:hash(md5, <<"v1.2">>)]},
+                revs = {1, [crypto:hash(md5, <<"v1.2">>)]},
                 body = {[ {<<"vsn">>,  <<"v1.2">>}]}
             },
             {ok, _} = couch_db:update_doc(Db2, DocConflict, [], replicated_changes),
