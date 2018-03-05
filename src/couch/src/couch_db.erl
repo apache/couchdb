@@ -211,8 +211,6 @@ incref(#db{fd = Fd} = Db, true = _Locked) ->
 % either the file will be closed or another process want to monitor
 % we will try it again
 incref(#db{fd = _Fd} = _Db, false = _Locked) ->
-    % maybe sleep??
-    timer:sleep(1),
     retry.
 
 

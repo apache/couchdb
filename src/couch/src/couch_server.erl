@@ -209,7 +209,6 @@ init([]) ->
     hash_admin_passwords(),
     ets:new(couch_dbs, [set, protected, named_table, {keypos, #entry.name}]),
     ets:new(couch_dbs_pid_to_name, [set, protected, named_table]),
-    ets:new(couch_lock, [set, public, named_table, {write_concurrency, true}, {read_concurrency, true}]),
     process_flag(trap_exit, true),
     {ok, #server{root_dir=RootDir,
                 max_dbs_open=MaxDbsOpen,
