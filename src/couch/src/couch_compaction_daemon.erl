@@ -152,8 +152,7 @@ compact_loop(Parent) ->
     true ->
         receive {Parent, have_config} -> ok end;
     false ->
-        PausePeriod = list_to_integer(
-            config:get("compaction_daemon", "check_interval", "300")),
+        PausePeriod = config:get_integer("compaction_daemon", "check_interval", 3600),
         ok = timer:sleep(PausePeriod * 1000)
     end,
     compact_loop(Parent).
