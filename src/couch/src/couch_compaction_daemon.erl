@@ -126,6 +126,7 @@ handle_config_terminate(_Server, _Reason, _State) ->
     erlang:send_after(?RELISTEN_DELAY, whereis(?MODULE), restart_config_listener).
 
 compact_loop(Parent) ->
+    SnoozePeriod = config:get_integer("compaction_daemon", "snooze_period", 3),
     {ok, _} = couch_server:all_databases(
         fun(DbName, Acc) ->
             case ets:info(?CONFIG_ETS, size) =:= 0 of
@@ -138,7 +139,8 @@ compact_loop(Parent) ->
                 {ok, Config} ->
                     case check_period(Config) of
                     true ->
-                        maybe_compact_db(Parent, DbName, Config);
+                        maybe_compact_db(Parent, DbName, Config),
+                        ok = timer:sleep(SnoozePeriod * 1000);
                     false ->
                         ok
                     end
@@ -150,8 +152,7 @@ compact_loop(Parent) ->
     true ->
         receive {Parent, have_config} -> ok end;
     false ->
-        PausePeriod = list_to_integer(
-            config:get("compaction_daemon", "check_interval", "300")),
+        PausePeriod = config:get_integer("compaction_daemon", "check_interval", 3600),
         ok = timer:sleep(PausePeriod * 1000)
     end,
     compact_loop(Parent).
@@ -229,23 +230,26 @@ maybe_compact_views(DbName, [DDocName | Rest], Config) ->
             maybe_compact_views(DbName, Rest, Config);
         timeout ->
             ok
-        end;
+        end,
+        SnoozePeriod = config:get_integer("compaction_daemon", "snooze_period", 3),
+        ok = timer:sleep(SnoozePeriod * 1000);
     false ->
         ok
     end.
 
 
 db_ddoc_names(Db) ->
-    {ok, _, DDocNames} = couch_db:enum_docs(
-        Db,
-        fun(#full_doc_info{id = <<"_design/", _/binary>>, deleted = true}, _, Acc) ->
-            {ok, Acc};
-        (#full_doc_info{id = <<"_design/", Id/binary>>}, _, Acc) ->
-            {ok, [Id | Acc]};
-        (_, _, Acc) ->
-            {stop, Acc}
-        end, [], [{start_key, <<"_design/">>}, {end_key_gt, <<"_design0">>}]),
+    FoldFun = fun ddoc_name/2,
+    Opts = [{start_key, <<"_design/">>}],
+    {ok, DDocNames} = couch_db:fold_docs(Db, FoldFun, [], Opts),
     DDocNames.
+
+ddoc_name(#full_doc_info{id = <<"_design/", _/binary>>, deleted = true}, Acc) ->
+    {ok, Acc};
+ddoc_name(#full_doc_info{id = <<"_design/", Id/binary>>}, Acc) ->
+    {ok, [Id | Acc]};
+ddoc_name(_, Acc) ->
+    {stop, Acc}.
 
 
 maybe_compact_view(DbName, GroupId, Config) ->
@@ -391,21 +395,22 @@ check_frag(Threshold, Frag) ->
 
 
 frag(Props) ->
-    FileSize = couch_util:get_value(disk_size, Props),
+    {Sizes} = couch_util:get_value(sizes, Props),
+    FileSize = couch_util:get_value(file, Sizes),
     MinFileSize = list_to_integer(
         config:get("compaction_daemon", "min_file_size", "131072")),
     case FileSize < MinFileSize of
     true ->
         {0, FileSize};
     false ->
-        case couch_util:get_value(data_size, Props) of
-        null ->
-            {100, FileSize};
+        case couch_util:get_value(active, Sizes) of
         0 ->
             {0, FileSize};
-        DataSize ->
+        DataSize when is_integer(DataSize), DataSize > 0 ->
             Frag = round(((FileSize - DataSize) / FileSize * 100)),
-            {Frag, space_required(DataSize)}
+            {Frag, space_required(DataSize)};
+        _ ->
+            {100, FileSize}
         end
     end.
 

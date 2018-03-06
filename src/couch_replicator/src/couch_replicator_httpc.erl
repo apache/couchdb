@@ -14,7 +14,7 @@
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("ibrowse/include/ibrowse.hrl").
--include("couch_replicator_api_wrap.hrl").
+-include_lib("couch_replicator/include/couch_replicator_api_wrap.hrl").
 
 -export([setup/1]).
 -export([send_req/3]).
@@ -51,8 +51,17 @@ setup(Db) ->
         undefined -> Url;
         _ when is_list(ProxyURL) -> ProxyURL
     end,
-    {ok, Pid} = couch_replicator_httpc_pool:start_link(HttpcURL, [{max_connections, MaxConns}]),
-    {ok, Db#httpdb{httpc_pool = Pid}}.
+    {ok, Pid} = couch_replicator_httpc_pool:start_link(HttpcURL,
+        [{max_connections, MaxConns}]),
+    case couch_replicator_auth:initialize(Db#httpdb{httpc_pool = Pid}) of
+        {ok, Db1} ->
+            {ok, Db1};
+        {error, Error} ->
+            LogMsg = "~p: auth plugin initialization failed ~p ~p",
+            LogUrl = couch_util:url_strip_password(Url),
+            couch_log:error(LogMsg, [?MODULE, LogUrl, Error]),
+            throw({replication_auth_error, Error})
+    end.
 
 
 send_req(HttpDb, Params1, Callback) ->
@@ -86,11 +95,11 @@ send_req(HttpDb, Params1, Callback) ->
     end.
 
 
-send_ibrowse_req(#httpdb{headers = BaseHeaders} = HttpDb, Params) ->
+send_ibrowse_req(#httpdb{headers = BaseHeaders} = HttpDb0, Params) ->
     Method = get_value(method, Params, get),
     UserHeaders = lists:keysort(1, get_value(headers, Params, [])),
     Headers1 = lists:ukeymerge(1, UserHeaders, BaseHeaders),
-    Headers2 = oauth_header(HttpDb, Params) ++ Headers1,
+    {Headers2, HttpDb} = couch_replicator_auth:update_headers(HttpDb0, Headers1),
     Url = full_url(HttpDb, Params),
     Body = get_value(body, Params, []),
     case get_value(path, Params) == "_changes" of
@@ -139,12 +148,7 @@ process_response({error, sel_conn_closed}, Worker, HttpDb, Params, _Cb) ->
 %% next request.
 process_response({error, connection_closing}, Worker, HttpDb, Params, _Cb) ->
     stop_and_release_worker(HttpDb#httpdb.httpc_pool, Worker),
-    throw({retry, HttpDb, Params});
-
-process_response({error, req_timedout}, _Worker, HttpDb, Params, _Cb) ->
-    % ibrowse worker terminated because remote peer closed the socket
-    % -> not an error
-    throw({retry, HttpDb, Params});
+    maybe_retry({error, connection_closing}, Worker, HttpDb, Params);
 
 process_response({ibrowse_req_id, ReqId}, Worker, HttpDb, Params, Callback) ->
     process_stream_response(ReqId, Worker, HttpDb, Params, Callback);
@@ -162,6 +166,7 @@ process_response({ok, Code, Headers, Body}, Worker, HttpDb, Params, Callback) ->
         Json ->
             ?JSON_DECODE(Json)
         end,
+        process_auth_response(HttpDb, Ok, Headers, Params),
         Callback(Ok, Headers, EJson);
     R when R =:= 301 ; R =:= 302 ; R =:= 303 ->
         backoff_success(HttpDb, Params),
@@ -184,8 +189,9 @@ process_stream_response(ReqId, Worker, HttpDb, Params, Callback) ->
             backoff(HttpDb#httpdb{timeout = Timeout}, Params);
         Ok when (Ok >= 200 andalso Ok < 300) ; (Ok >= 400 andalso Ok < 500) ->
             backoff_success(HttpDb, Params),
+            HttpDb1 = process_auth_response(HttpDb, Ok, Headers, Params),
             StreamDataFun = fun() ->
-                stream_data_self(HttpDb, Params, Worker, ReqId, Callback)
+                stream_data_self(HttpDb1, Params, Worker, ReqId, Callback)
             end,
             put(?STREAM_STATUS, {streaming, Worker}),
             ibrowse:stream_next(ReqId),
@@ -195,9 +201,9 @@ process_stream_response(ReqId, Worker, HttpDb, Params, Callback) ->
             catch
                 throw:{maybe_retry_req, connection_closed} ->
                     maybe_retry({connection_closed, mid_stream},
-                        Worker, HttpDb, Params);
+                        Worker, HttpDb1, Params);
                 throw:{maybe_retry_req, Err} ->
-                    maybe_retry(Err, Worker, HttpDb, Params)
+                    maybe_retry(Err, Worker, HttpDb1, Params)
             end;
         R when R =:= 301 ; R =:= 302 ; R =:= 303 ->
             backoff_success(HttpDb, Params),
@@ -218,6 +224,16 @@ process_stream_response(ReqId, Worker, HttpDb, Params, Callback) ->
         % seem to be always true when there's a very high rate of requests
         % and many open connections.
         maybe_retry(timeout, Worker, HttpDb, Params)
+    end.
+
+
+process_auth_response(HttpDb, Code, Headers, Params) ->
+    case couch_replicator_auth:handle_response(HttpDb, Code, Headers) of
+        {continue, HttpDb1} ->
+            HttpDb1;
+        {retry, HttpDb1} ->
+            log_retry_error(Params, HttpDb1, 0, Code),
+            throw({retry, HttpDb1, Params})
     end.
 
 
@@ -400,28 +416,6 @@ query_args_to_string([], Acc) ->
     "?" ++ string:join(lists:reverse(Acc), "&");
 query_args_to_string([{K, V} | Rest], Acc) ->
     query_args_to_string(Rest, [K ++ "=" ++ couch_httpd:quote(V) | Acc]).
-
-
-oauth_header(#httpdb{oauth = nil}, _ConnParams) ->
-    [];
-oauth_header(#httpdb{url = BaseUrl, oauth = OAuth}, ConnParams) ->
-    Consumer = {
-        OAuth#oauth.consumer_key,
-        OAuth#oauth.consumer_secret,
-        OAuth#oauth.signature_method
-    },
-    Method = case get_value(method, ConnParams, get) of
-    get -> "GET";
-    post -> "POST";
-    put -> "PUT";
-    head -> "HEAD"
-    end,
-    QSL = get_value(qs, ConnParams, []),
-    OAuthParams = oauth:sign(Method,
-        BaseUrl ++ get_value(path, ConnParams, []),
-        QSL, Consumer, OAuth#oauth.token, OAuth#oauth.token_secret) -- QSL,
-    [{"Authorization",
-        "OAuth " ++ oauth:header_params_encode(OAuthParams)}].
 
 
 do_redirect(_Worker, Code, Headers, #httpdb{url = Url} = HttpDb, Params, _Cb) ->
