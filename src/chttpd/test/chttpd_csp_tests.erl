@@ -10,21 +10,20 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(couchdb_csp_tests).
+-module(chttpd_csp_tests).
 
 -include_lib("couch/include/couch_eunit.hrl").
-
--define(TIMEOUT, 1000).
 
 
 setup() ->
     ok = config:set("csp", "enable", "true", false),
-    Addr = config:get("httpd", "bind_address", "127.0.0.1"),
-    Port = integer_to_list(mochiweb_socket_server:get(couch_httpd, port)),
+    Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
+    Port = mochiweb_socket_server:get(chttpd, port),
     lists:concat(["http://", Addr, ":", Port, "/_utils/"]).
 
 teardown(_) ->
     ok.
+
 
 
 csp_test_() ->
@@ -32,7 +31,7 @@ csp_test_() ->
         "Content Security Policy tests",
         {
             setup,
-            fun test_util:start_couch/0, fun test_util:stop_couch/1,
+            fun chttpd_test_util:start_couch/0, fun chttpd_test_util:stop_couch/1,
             {
                 foreach,
                 fun setup/0, fun teardown/1,
