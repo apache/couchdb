@@ -464,7 +464,10 @@ fold_docs(St, UserFun, UserAcc, Options) ->
 
 
 fold_local_docs(St, UserFun, UserAcc, Options) ->
-    fold_docs_int(St, St#st.local_tree, UserFun, UserAcc, Options).
+    case fold_docs_int(St, St#st.local_tree, UserFun, UserAcc, Options) of
+        {ok, _Reds, FinalAcc} -> {ok, null, FinalAcc};
+        {ok, FinalAcc} -> {ok, FinalAcc}
+    end.
 
 
 fold_changes(St, SinceSeq, UserFun, UserAcc, Options) ->

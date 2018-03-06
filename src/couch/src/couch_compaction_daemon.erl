@@ -126,6 +126,7 @@ handle_config_terminate(_Server, _Reason, _State) ->
     erlang:send_after(?RELISTEN_DELAY, whereis(?MODULE), restart_config_listener).
 
 compact_loop(Parent) ->
+    SnoozePeriod = config:get_integer("compaction_daemon", "snooze_period", 3),
     {ok, _} = couch_server:all_databases(
         fun(DbName, Acc) ->
             case ets:info(?CONFIG_ETS, size) =:= 0 of
@@ -138,7 +139,8 @@ compact_loop(Parent) ->
                 {ok, Config} ->
                     case check_period(Config) of
                     true ->
-                        maybe_compact_db(Parent, DbName, Config);
+                        maybe_compact_db(Parent, DbName, Config),
+                        ok = timer:sleep(SnoozePeriod * 1000);
                     false ->
                         ok
                     end
@@ -150,8 +152,7 @@ compact_loop(Parent) ->
     true ->
         receive {Parent, have_config} -> ok end;
     false ->
-        PausePeriod = list_to_integer(
-            config:get("compaction_daemon", "check_interval", "300")),
+        PausePeriod = config:get_integer("compaction_daemon", "check_interval", 3600),
         ok = timer:sleep(PausePeriod * 1000)
     end,
     compact_loop(Parent).
@@ -229,7 +230,9 @@ maybe_compact_views(DbName, [DDocName | Rest], Config) ->
             maybe_compact_views(DbName, Rest, Config);
         timeout ->
             ok
-        end;
+        end,
+        SnoozePeriod = config:get_integer("compaction_daemon", "snooze_period", 3),
+        ok = timer:sleep(SnoozePeriod * 1000);
     false ->
         ok
     end.
