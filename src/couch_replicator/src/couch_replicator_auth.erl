@@ -33,7 +33,8 @@
 
 % Behavior API
 
--callback initialize(#httpdb{}) -> {ok, #httpdb{}, term()} | ignore.
+-callback initialize(#httpdb{}) ->
+    {ok, #httpdb{}, term()} | {error, term()} | ignore.
 
 -callback update_headers(term(), headers()) -> {headers(), term()}.
 

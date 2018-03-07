@@ -100,7 +100,8 @@
 
 % Behavior API callbacks
 
--spec initialize(#httpdb{}) -> {ok, #httpdb{}, term()} | ignore.
+-spec initialize(#httpdb{}) ->
+    {ok, #httpdb{}, term()} | {error, term()} | ignore.
 initialize(#httpdb{} = HttpDb) ->
     case init_state(HttpDb) of
         {ok, HttpDb1, State} ->
