@@ -529,7 +529,7 @@ free_space_rec(Path, [{MountPoint0, Total, Usage} | Rest]) ->
             trunc(Total - (Total * (Usage / 100))) * 1024
         end;
     {error, Reason} ->
-        couch_log:warning("Compaction daemon - unable to calculate free space"
+        couch_log:debug("Compaction daemon - unable to calculate free space"
             " for `~s`: `~s`",
             [MountPoint0, Reason]),
         free_space_rec(Path, Rest)
