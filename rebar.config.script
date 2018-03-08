@@ -64,7 +64,9 @@ DepDescs = [
 {ibrowse,          "ibrowse",          {tag, "CouchDB-4.0.1"}},
 {jiffy,            "jiffy",            {tag, "CouchDB-0.14.11-2"}},
 {mochiweb,         "mochiweb",         {tag, "v2.17.0"}},
-{meck,             "meck",             {tag, "0.8.8"}}
+{meck,             "meck",             {tag, "0.8.8"}},
+{bcrypt,           {url, "https://github.com/apache/couchdb-erlang-bcrypt"},
+                   {tag, "1.0.2"}}
 
 ],
 
@@ -97,7 +99,7 @@ AddConfig = [
         {plt_location, local},
         {plt_location, COUCHDB_ROOT},
         {plt_extra_apps, [
-            asn1, compiler, crypto, inets, kernel, os_mon, runtime_tools,
+            asn1, bcrypt, compiler, crypto, inets, kernel, os_mon, runtime_tools,
             sasl, ssl, stdlib, syntax_tools, xmerl]},
         {warnings, [unmatched_returns, error_handling, race_conditions]}]},
     {post_hooks, [{compile, "escript support/build_js.escript"}]}

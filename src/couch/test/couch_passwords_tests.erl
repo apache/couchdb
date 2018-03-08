@@ -14,7 +14,6 @@
 
 -include_lib("couch/include/couch_eunit.hrl").
 
-
 pbkdf2_test_()->
     {"PBKDF2",
      [
@@ -52,3 +51,44 @@ pbkdf2_test_()->
                {ok, <<"eefe3d61cd4da4e4e9945b3d6ba2158c2634e984">>},
                couch_passwords:pbkdf2(<<"password">>, <<"salt">>, 16777216, 20)
            )}}]}.
+
+
+
+setup() ->
+    test_util:start(?MODULE, [bcrypt]).
+
+teardown(Ctx)->
+    test_util:stop(Ctx).
+
+bcrypt_test_() ->
+    {
+        "Bcrypt",
+        {
+            foreach,
+            fun setup/0, fun teardown/1,
+            [
+                {timeout, 1, fun bcrypt_logRounds_4/0},
+                {timeout, 5, fun bcrypt_logRounds_12/0},
+                {timeout, 180, fun bcrypt_logRounds_18/0},
+                {timeout, 5, fun bcrypt_null_byte/0}
+
+            ]
+        }
+    }.
+
+bcrypt_logRounds_4() ->
+    bcrypt_assert_equal(<<"password">>, 4).
+
+bcrypt_logRounds_12() ->
+    bcrypt_assert_equal(<<"password">>, 12).
+
+bcrypt_logRounds_18() ->
+    bcrypt_assert_equal(<<"password">>, 18).
+
+bcrypt_null_byte() ->
+    bcrypt_assert_equal(<<"passw\0rd">>, 12).
+
+bcrypt_assert_equal(Password, Rounds) when is_integer(Rounds) ->
+    HashPass = couch_passwords:bcrypt(Password, Rounds),
+    ReHashPass = couch_passwords:bcrypt(Password, HashPass),
+    ?_assertEqual(HashPass, ReHashPass).
