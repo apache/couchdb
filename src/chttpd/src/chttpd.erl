@@ -149,11 +149,39 @@ handle_request(MochiReq0) ->
 maybe_trace(MochiReq) ->
     case MochiReq:get_header_value("x-couchdb-trace") of
         "true" ->
-            couch_log:info("Trace initializing...", []),
-            lg:trace(['_', {scope, [self()]}], lg_file_tracer, "traces.lz4", #{mode => profile});
+            case is_tracer_running() of
+                true ->
+                    couch_log:info("Tracer updating scope with request pid:~p", [self()]),
+                    % https://github.com/rabbitmq/looking_glass/blob/master/src/lg.erl#L125
+                    Children = supervisor:which_children(looking_glass_sup),
+                    {default, PoolPid, supervisor, _} = lists:keyfind(default, 1, Children),
+                    Tracers = lg_tracer_pool:tracers(PoolPid),
+                    TracersMap = maps:from_list(lists:zip(lists:seq(0, length(Tracers) - 1), Tracers)),
+                    TracerState = #{mode => profile, tracers => TracersMap},
+                    TraceFlags = [call, procs, timestamp, arity, return_to, set_on_spawn],
+                    erlang:trace(self(), true, [{tracer, lg_tracer, TracerState} | TraceFlags]);
+                false ->
+                    couch_log:info("Trace initializing...", []),
+                    lg:trace(['_', {scope, [self()]}], lg_file_tracer, "traces.lz4", #{mode => profile})
+            end;
+        "false" ->
+            case is_tracer_running() of false -> ok; true ->
+                couch_log:info("Trace stopping...", []),
+                lg:stop()
+            end;
         _ ->
             ok
     end.
+
+
+is_tracer_running() ->
+   case whereis(looking_glass_sup) of
+        undefined ->
+            false;
+        Pid when is_pid(Pid) ->
+            Children = supervisor:which_children(Pid),
+            lists:keymember(default, 1, Children)
+   end.
 
 
 handle_request_int(MochiReq) ->
