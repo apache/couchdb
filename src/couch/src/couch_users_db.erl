@@ -23,6 +23,7 @@
 -define(SIMPLE, <<"simple">>).
 -define(PASSWORD_SHA, <<"password_sha">>).
 -define(PBKDF2, <<"pbkdf2">>).
+-define(BCRYPT, <<"bcrypt">>).
 -define(ITERATIONS, <<"iterations">>).
 -define(SALT, <<"salt">>).
 -define(replace(L, K, V), lists:keystore(K, 1, L, {K, V})).
@@ -59,7 +60,7 @@ before_doc_update(Doc, Db) ->
 %    newDoc.salt = salt
 %    newDoc.password = null
 save_doc(#doc{body={Body}} = Doc) ->
-    %% Support both schemes to smooth migration from legacy scheme
+    %% Support all schemes to smooth migration from legacy scheme
     Scheme = config:get("couch_httpd_auth", "password_scheme", "pbkdf2"),
     case {couch_util:get_value(?PASSWORD, Body), Scheme} of
     {null, _} -> % server admins don't have a user-db password entry
@@ -84,6 +85,13 @@ save_doc(#doc{body={Body}} = Doc) ->
         Body3 = ?replace(Body2, ?SALT, Salt),
         Body4 = proplists:delete(?PASSWORD, Body3),
         Doc#doc{body={Body4}};
+    {ClearPassword, "bcrypt"} ->
+        LogRounds = list_to_integer(config:get("couch_httpd_auth", "log_rounds", "10")),
+        DerivedKey = couch_passwords:bcrypt(ClearPassword, LogRounds),
+        Body0 = ?replace(Body, ?PASSWORD_SCHEME, ?BCRYPT),
+        Body1 = ?replace(Body0, ?DERIVED_KEY, DerivedKey),
+        Body2 = proplists:delete(?PASSWORD, Body1),
+        Doc#doc{body={Body2}};
     {_ClearPassword, Scheme} ->
         couch_log:error("[couch_httpd_auth] password_scheme value of '~p' is invalid.", [Scheme]),
         throw({forbidden, "Server cannot hash passwords at this time."})
