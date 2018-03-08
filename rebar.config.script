@@ -84,10 +84,15 @@ MakeDep = fun
         {AppName, ".*", {git, Url, Version}, Options}
 end,
 
+ExternalDeps = [
+    {lz4, ".*", {git, "https://github.com/rabbitmq/lz4-erlang", "master"}},
+    {looking_glass, ".*", {git, "https://github.com/rabbitmq/looking_glass.git", "master"}}
+],
+
 AddConfig = [
     {require_otp_vsn, "R16B03|R16B03-1|17|18|19|20"},
     {deps_dir, "src"},
-    {deps, lists:map(MakeDep, DepDescs)},
+    {deps, lists:map(MakeDep, DepDescs) ++ ExternalDeps},
     {sub_dirs, SubDirs},
     {lib_dirs, ["src"]},
     {erl_opts, [debug_info, {i, "../"}]},

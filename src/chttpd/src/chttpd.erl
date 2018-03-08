@@ -142,7 +142,19 @@ stop() ->
 handle_request(MochiReq0) ->
     erlang:put(?REWRITE_COUNT, 0),
     MochiReq = couch_httpd_vhost:dispatch_host(MochiReq0),
+    maybe_trace(MochiReq),
     handle_request_int(MochiReq).
+
+
+maybe_trace(MochiReq) ->
+    case MochiReq:get_header_value("x-couchdb-trace") of
+        "true" ->
+            couch_log:info("Trace initializing...", []),
+            lg:trace(['_', {scope, [self()]}], lg_file_tracer, "traces.lz4", #{mode => profile});
+        _ ->
+            ok
+    end.
+
 
 handle_request_int(MochiReq) ->
     Begin = os:timestamp(),
