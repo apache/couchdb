@@ -116,6 +116,17 @@ eunit: couch
 	@$(REBAR) setup_eunit 2> /dev/null
 	@$(REBAR) -r eunit $(EUNIT_OPTS)
 
+
+setup-eunit: export BUILDDIR = $(shell pwd)
+setup-eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
+setup-eunit:
+	@$(REBAR) setup_eunit 2> /dev/null
+
+just-eunit: export BUILDDIR = $(shell pwd)
+just-eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
+just-eunit:
+	@$(REBAR) -r eunit $(EUNIT_OPTS)
+
 .PHONY: soak-eunit
 soak-eunit: export BUILDDIR = $(shell pwd)
 soak-eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
