@@ -309,7 +309,12 @@ handle_session_req(#httpd{method='POST', mochi_req=MochiReq}=Req, AuthModule) ->
             Secret = ?l2b(ensure_cookie_auth_secret()),
             UserSalt = couch_util:get_value(<<"salt">>, UserProps),
             CurrentTime = make_cookie_time(),
-            Cookie = cookie_auth_cookie(Req, ?b2l(UserName), <<Secret/binary, UserSalt/binary>>, CurrentTime),
+            Cookie = case UserSalt of
+                undefined ->
+                    cookie_auth_cookie(Req, ?b2l(UserName), <<Secret/binary>>, CurrentTime);
+                _ ->
+                    cookie_auth_cookie(Req, ?b2l(UserName), <<Secret/binary, UserSalt/binary>>, CurrentTime)
+            end,
             % TODO document the "next" feature in Futon
             {Code, Headers} = case couch_httpd:qs_value(Req, "next", nil) of
                 nil ->
@@ -401,7 +406,10 @@ authenticate(Pass, UserProps) ->
             Iterations = couch_util:get_value(<<"iterations">>, UserProps, 10000),
             verify_iterations(Iterations),
             {couch_passwords:pbkdf2(Pass, UserSalt, Iterations),
-             couch_util:get_value(<<"derived_key">>, UserProps, nil)}
+             couch_util:get_value(<<"derived_key">>, UserProps, nil)};
+        <<"bcrypt">> ->
+            UserHash = couch_util:get_value(<<"derived_key">>, UserProps, nil),
+            {couch_passwords:bcrypt(Pass, UserHash), UserHash}
     end,
     couch_passwords:verify(PasswordHash, ExpectedHash).
 
