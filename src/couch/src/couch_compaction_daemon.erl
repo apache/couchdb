@@ -519,9 +519,9 @@ free_space(Path) ->
 
 free_space_rec(_Path, []) ->
     undefined;
-free_space_rec(Path, [{MountPoint0, Total, Usage} | Rest]) ->
-    case abs_path(MountPoint0) of
-    {ok, MountPoint} ->
+free_space_rec(Path0, [{MountPoint, Total, Usage} | Rest]) ->
+    case abs_path(Path0) of
+    {ok, Path} ->
         case MountPoint =:= string:substr(Path, 1, length(MountPoint)) of
         false ->
             free_space_rec(Path, Rest);
@@ -529,10 +529,10 @@ free_space_rec(Path, [{MountPoint0, Total, Usage} | Rest]) ->
             trunc(Total - (Total * (Usage / 100))) * 1024
         end;
     {error, Reason} ->
-        couch_log:warning("Compaction daemon - unable to calculate free space"
-            " for `~s`: `~s`",
-            [MountPoint0, Reason]),
-        free_space_rec(Path, Rest)
+        couch_log:debug("Compaction daemon - unable to calculate free space"
+            " for `~s`: `~s` for mount mount `~p`",
+            [Path0, Reason, MountPoint]),
+        free_space_rec(Path0, Rest)
     end.
 
 abs_path(Path0) ->
@@ -557,3 +557,33 @@ abs_path2(Path0) ->
     _ ->
         {ok, Path ++ "/"}
     end.
+
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+free_space_rec_test() ->
+    ?assertEqual(undefined, free_space_rec("", [])),
+    ?assertEqual(51200, free_space_rec("/tmp/", [{"/", 100, 50}])),
+    ?assertEqual(51200, free_space_rec("/tmp/", [
+        {"/floop", 200, 25},
+        {"/run", 0, 0},
+        {"/", 100, 50}
+    ])),
+    ?assertEqual(undefined, free_space_rec("/flopp/", [{"/", 300, 75}])),
+    ?assertEqual(undefined, free_space_rec("/flopp/", [
+        {"/floop", 200, 25},
+        {"/run", 0, 0},
+        {"/", 100, 50}
+    ])),
+    ok.
+
+abs_path2_test() ->
+    ?assertEqual({ok, "/a/"}, abs_path2("/a")),
+    ?assertEqual({ok, "/a/"}, abs_path2("/a/")),
+
+    ?assertEqual({ok, "/a/b/"}, abs_path2("/a/b")),
+    ?assertEqual({ok, "/a/b/"}, abs_path2("/a/b")),
+    ok.
+
+-endif.
