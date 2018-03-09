@@ -19,6 +19,7 @@
 -export([compact/3, swap_compacted/2, remove_compacted/1]).
 -export([index_file_exists/1]).
 -export([update_local_purge_doc/2, verify_index_exists/1]).
+-export([maybe_create_local_purge_doc/2]).
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
@@ -218,24 +219,6 @@ index_file_exists(State) ->
     filelib:is_file(IndexFName).
 
 
-update_local_purge_doc(Db, State) ->
-    Sig = couch_index_util:hexsig(get(signature, State)),
-    Doc = couch_doc:from_json_obj({[
-        {<<"_id">>, couch_mrview_util:get_local_purge_doc_id(Sig)},
-        {<<"purge_seq">>, get(purge_seq, State)},
-        {<<"timestamp_utc">>, couch_util:utc_string()},
-        {<<"verify_module">>, <<"couch_mrview_index">>},
-        {<<"verify_function">>, <<"verify_index_exists">>},
-        {<<"verify_options">>, {[
-            {<<"dbname">>, get(db_name, State)},
-            {<<"ddoc_id">>, get(idx_name, State)},
-            {<<"signature">>, Sig}
-        ]}},
-        {<<"type">>, <<"mrview">>}
-    ]}),
-    couch_db:update_doc(Db, Doc, []).
-
-
 verify_index_exists(Options) ->
     ShardDbName = couch_mrview_util:get_value_from_options(
         <<"dbname">>,
@@ -279,7 +262,7 @@ verify_index_exists(Options) ->
     end.
 
 
-maybe_create_local_purge_doc(Db, State) ->
+maybe_create_local_purge_doc(Db, #mrst{}=State) ->
     Sig = couch_index_util:hexsig(get(signature, State)),
     LocalPurgeDocId = couch_mrview_util:get_local_purge_doc_id(Sig),
     case couch_db:open_doc(Db, LocalPurgeDocId, []) of
@@ -287,4 +270,78 @@ maybe_create_local_purge_doc(Db, State) ->
             update_local_purge_doc(Db, State);
         {ok, _LocalPurgeDoc} ->
             ok
+    end;
+maybe_create_local_purge_doc(DbName, #doc{}=DDoc) ->
+    {ok, Db} = case couch_db:open_int(DbName, []) of
+        {ok, _} = Resp -> Resp;
+        Else -> exit(Else)
+    end,
+    try
+        {ok, DefaultPurgeSeq} = couch_db:get_purge_seq(Db),
+        case get_index_type(DDoc, <<"views">>) of true ->
+            try couch_mrview_util:ddoc_to_mrst(DbName, DDoc) of
+                {ok, MRSt} -> update_local_purge_doc(Db, MRSt, DefaultPurgeSeq)
+            catch _:_ ->
+                ok
+            end;
+        false ->
+            ok
+        end
+    catch E:T ->
+        Stack = erlang:get_stacktrace(),
+        couch_log:error(
+            "Error occurs when creating local purge document ~p ~p",
+            [{E, T}, Stack]
+        )
+    after
+        catch couch_db:close(Db)
+    end.
+
+
+update_local_purge_doc(Db, State) ->
+    Sig = couch_index_util:hexsig(get(signature, State)),
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, couch_mrview_util:get_local_purge_doc_id(Sig)},
+        {<<"purge_seq">>, get(purge_seq, State)},
+        {<<"timestamp_utc">>, couch_util:utc_string()},
+        {<<"verify_module">>, <<"couch_mrview_index">>},
+        {<<"verify_function">>, <<"verify_index_exists">>},
+        {<<"verify_options">>, {[
+            {<<"dbname">>, get(db_name, State)},
+            {<<"ddoc_id">>, get(idx_name, State)},
+            {<<"signature">>, Sig}
+        ]}},
+        {<<"type">>, <<"mrview">>}
+    ]}),
+    couch_db:update_doc(Db, Doc, []).
+
+
+update_local_purge_doc(Db, State, PSeq) ->
+    Sig = couch_index_util:hexsig(State#mrst.sig),
+    DocId = couch_mrview_util:get_local_purge_doc_id(Sig),
+    case couch_db:open_doc(Db, DocId, []) of
+        {not_found, _Reason} ->
+            Doc = couch_doc:from_json_obj({[
+                {<<"_id">>, DocId},
+                {<<"purge_seq">>, PSeq},
+                {<<"timestamp_utc">>, couch_util:utc_string()},
+                {<<"verify_module">>, <<"couch_mrview_index">>},
+                {<<"verify_function">>, <<"verify_index_exists">>},
+                {<<"verify_options">>, {[
+                    {<<"dbname">>, State#mrst.db_name},
+                    {<<"ddoc_id">>, State#mrst.idx_name},
+                    {<<"signature">>, Sig}
+                ]}},
+                {<<"type">>, <<"mrview">>}
+            ]}),
+            couch_db:update_doc(Db, Doc, []);
+        {ok, _LocalPurgeDoc} ->
+            ok
+    end.
+
+
+get_index_type(#doc{body={Props}}, IndexType) ->
+    case couch_util:get_value(IndexType, Props) of
+        undefined -> false;
+        _ -> true
     end.

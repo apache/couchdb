@@ -58,6 +58,7 @@ start(#st{} = St, DbName, Options, Parent) ->
     NewSt3 = sort_meta_data(NewSt2),
     NewSt4 = commit_compaction_data(NewSt3),
     NewSt5 = copy_meta_data(NewSt4),
+    couch_db_plugin:before_copy_purge_info(DbName),
     NewSt6 = copy_purge_info(St, NewSt5, Parent),
     {ok, NewSt7} = couch_bt_engine:commit_data(NewSt6),
     ok = couch_bt_engine:decref(NewSt7),
