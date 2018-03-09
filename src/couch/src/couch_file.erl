@@ -216,9 +216,9 @@ sync(Filepath) when is_list(Filepath) ->
     case file:open(Filepath, [append, raw]) of
         {ok, Fd} ->
             try ok = file:sync(Fd) after ok = file:close(Fd) end;
-        Error ->
-            throw(Error)
-        end;
+        {error, Error} ->
+            erlang:error(Error)
+    end;
 sync(Fd) ->
     gen_server:call(Fd, sync, infinity).
 
@@ -393,18 +393,18 @@ init({Filepath, Options, ReturnPid, Ref}) ->
         % open in read mode first, so we don't create the file if it doesn't exist.
         case file:open(Filepath, [read, raw]) of
         {ok, Fd_Read} ->
-             case file:open(Filepath, OpenOptions) of
-               {ok, Fd} ->
-                  %% Save Fd in process dictionary for debugging purposes
-                  put(couch_file_fd, {Fd, Filepath}),
-                  ok = file:close(Fd_Read),
-                  maybe_track_open_os_files(Options),
-                  {ok, Eof} = file:position(Fd, eof),
-                  erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-                  {ok, #file{fd=Fd, eof=Eof, is_sys=IsSys, pread_limit=Limit}};
-                Error ->
-                  init_status_error(ReturnPid, Ref, Error)
-                end;
+            case file:open(Filepath, OpenOptions) of
+                {ok, Fd} ->
+                     %% Save Fd in process dictionary for debugging purposes
+                     put(couch_file_fd, {Fd, Filepath}),
+                     ok = file:close(Fd_Read),
+                     maybe_track_open_os_files(Options),
+                     {ok, Eof} = file:position(Fd, eof),
+                     erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
+                     {ok, #file{fd=Fd, eof=Eof, is_sys=IsSys, pread_limit=Limit}};
+                 Error ->
+                     init_status_error(ReturnPid, Ref, Error)
+            end;
         Error ->
             init_status_error(ReturnPid, Ref, Error)
         end
