@@ -214,11 +214,11 @@ truncate(Fd, Pos) ->
 
 sync(Filepath) when is_list(Filepath) ->
     case file:open(Filepath, [append, raw]) of
-      {ok, Fd} ->
-         try ok = file:sync(Fd) after ok = file:close(Fd) end;
-      Error ->
-         throw(Error)
-      end;
+        {ok, Fd} ->
+            try ok = file:sync(Fd) after ok = file:close(Fd) end;
+        Error ->
+            throw(Error)
+        end;
 sync(Fd) ->
     gen_server:call(Fd, sync, infinity).
 
