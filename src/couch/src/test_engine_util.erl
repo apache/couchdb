@@ -29,6 +29,9 @@
     test_engine_ref_counting
 ]).
 
+-define(COMPACTOR_TIMEOUT, 50000).
+-define(ATTACHMENT_WRITE_TIMEOUT, 10000).
+-define(MAKE_DOC_SUMMARY_TIMEOUT, 5000).
 
 create_tests(EngineApp) ->
     create_tests(EngineApp, EngineApp).
@@ -343,7 +346,7 @@ make_doc_summary(Engine, St, DocData) ->
             Summary;
         {'DOWN', Ref, _, _, Error} ->
             erlang:error({make_doc_summary_error, Error})
-    after 1000 ->
+    after ?MAKE_DOC_SUMMARY_TIMEOUT ->
         erlang:error(make_doc_summary_timeout)
     end.
 
@@ -361,7 +364,7 @@ prep_atts(Engine, St, [{FileName, Data} | Rest]) ->
             throw(not_supported);
         {'DOWN', Ref, _, _, Resp} ->
             Resp
-        after 5000 ->
+        after ?ATTACHMENT_WRITE_TIMEOUT ->
             erlang:error(attachment_write_timeout)
     end,
     [Att | prep_atts(Engine, St, Rest)].
@@ -576,7 +579,7 @@ compact(Engine, St1, DbPath) ->
             Term0;
         {'DOWN', Ref, _, _, Reason} ->
             erlang:error({compactor_died, Reason})
-        after 10000 ->
+        after ?COMPACTOR_TIMEOUT ->
             erlang:error(compactor_timed_out)
     end,
 
