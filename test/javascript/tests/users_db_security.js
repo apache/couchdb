@@ -15,6 +15,8 @@ couchTests.users_db_security = function(debug) {
   var usersDb = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   try { usersDb.createDb(); } catch (e) { /* ignore if exists*/ }
 
+  var passwordSchemes = ['pbkdf2', 'bcrypt'];
+
   if (debug) debugger;
 
   var loginUser = function(username) {
@@ -86,7 +88,7 @@ couchTests.users_db_security = function(debug) {
     }
   };
 
-  var testFun = function()
+  var testFun = function(scheme, derivedKeyTest, saltTest)
   {
 
     // _users db
@@ -105,11 +107,13 @@ couchTests.users_db_security = function(debug) {
 
     // jan's gonna be admin as he's the first user
     TEquals(true, usersDb.save(userDoc).ok, "should save document");
-    wait(5000)
+    wait(5000);
     userDoc = open_as(usersDb, "org.couchdb.user:jchris", "jchris");
     TEquals(undefined, userDoc.password, "password field should be null 1");
-    TEquals(40, userDoc.derived_key.length, "derived_key should exist");
-    TEquals(32, userDoc.salt.length, "salt should exist");
+    TEquals(scheme, userDoc.password_scheme, "password_scheme should be " + scheme);
+    derivedKeyTest(userDoc.derived_key);
+    saltTest(userDoc.salt);
+
 
     // create server admin
 
@@ -141,10 +145,13 @@ couchTests.users_db_security = function(debug) {
     var jchrisDoc = open_as(usersDb, "org.couchdb.user:jchris", "jan");
 
     TEquals(undefined, jchrisDoc.password, "password field should be null 2");
-    TEquals(40, jchrisDoc.derived_key.length, "derived_key should exist");
-    TEquals(32, jchrisDoc.salt.length, "salt should exist");
+    TEquals(scheme, jchrisDoc.password_scheme, "password_scheme should be " + scheme);
+    derivedKeyTest(jchrisDoc.derived_key);
+    saltTest(jchrisDoc.salt);
 
-    TEquals(true, userDoc.salt != jchrisDoc.salt, "should have new salt");
+    if(userDoc.salt || jchrisDoc.salt) {
+      TEquals(true, userDoc.salt != jchrisDoc.salt, "should have new salt");
+    }
     TEquals(true, userDoc.derived_key != jchrisDoc.derived_key,
       "should have new derived_key");
 
@@ -227,7 +234,7 @@ couchTests.users_db_security = function(debug) {
       TEquals("forbidden", e.error, "non-admins can't read design docs");
     }
 
-    // admin shold be able to read _list
+    // admin should be able to read _list
     var listPath = ddoc["_id"] + "/_list/names/test";
     var result = request_as(usersDb, listPath, "jan");
     var lines = result.responseText.split("\n");
@@ -373,14 +380,124 @@ couchTests.users_db_security = function(debug) {
     });
   };
 
+  var derivedKeyTests = {
+    pbkdf2: function(derived_key) {
+      TEquals(40, derived_key.length, "derived_key should exist");
+    },
+    bcrypt: function(derived_key) {
+      TEquals(60, derived_key.length, "derived_key should exist");
+    }
+  };
+  var saltTests = {
+    pbkdf2: function(salt) {
+      TEquals(32, salt.length, "salt should exist");
+    },
+    bcrypt: function(salt) {
+      TEquals(undefined, salt, "salt should not exist");
+    }
+  };
+  passwordSchemes.forEach(function(scheme){
+    run_on_modified_server(
+      [{
+        section: "couch_httpd_auth",
+        key: "iterations", value: "1"
+      }, {
+        section: "couch_httpd_auth",
+        key: "password_scheme", value: scheme
+      }, {
+        section: "admins",
+        key: "jan", value: "apple"
+      }],
+      function() {
+        try {
+          testFun(scheme, derivedKeyTests[scheme], saltTests[scheme]);
+        } finally {
+          CouchDB.login("jan", "apple");
+          usersDb.deleteDb(); // cleanup
+          sleep(5000);
+          usersDb.createDb();
+        }
+      }
+    );
+  });
+
+  var testFunUpdatePasswordScheme = function() {
+    var userDocs = {
+      jchris: {
+        _id: "org.couchdb.user:jchris",
+        type: "user",
+        name: "jchris",
+        password: "mp3",
+        roles: []
+      },
+      fdmanana: {
+        _id: "org.couchdb.user:fdmanana",
+        type: "user",
+        name: "fdmanana",
+        password: "foobar",
+        roles: []
+      }
+    };
+
+    // create new user (has pbkdf2 hash)
+    TEquals(true, usersDb.save(userDocs.jchris).ok, "should save document");
+    wait(5000);
+    var userDoc = open_as(usersDb, "org.couchdb.user:jchris", "jchris");
+    TEquals(undefined, userDoc.password, "password field should be null 1");
+    TEquals("pbkdf2", userDoc.password_scheme, "password_scheme should be pbkdf2");
+    derivedKeyTests.pbkdf2(userDoc.derived_key);
+    saltTests.pbkdf2(userDoc.salt);
+
+    // change scheme to bcrypt
+    CouchDB.login("jan", "apple");
+    var xhr = CouchDB.request("PUT", "/_node/node1@127.0.0.1/_config/couch_httpd_auth/password_scheme", {
+      body : JSON.stringify("bcrypt"),
+      headers: {"X-Couch-Persist": "false"}
+    });
+    TEquals(200, xhr.status);
+    xhr = CouchDB.request("GET", "/_node/node1@127.0.0.1/_config/couch_httpd_auth/password_scheme");
+    var scheme = JSON.parse(xhr.responseText);
+    TEquals("bcrypt", scheme);
+
+    // create new user (has bcrypt hash)
+    TEquals(true, usersDb.save(userDocs.fdmanana).ok, "should save document");
+    wait(5000);
+    userDoc = open_as(usersDb, "org.couchdb.user:fdmanana", "fdmanana");
+    TEquals(undefined, userDoc.password, "password field should be null 1");
+    TEquals("bcrypt", userDoc.password_scheme, "password_scheme should be bcrypt");
+    derivedKeyTests.bcrypt(userDoc.derived_key);
+    saltTests.bcrypt(userDoc.salt);
+
+    // test that both users can still log in
+    TEquals(true, CouchDB.login(userDocs.jchris.name, userDocs.jchris.password).ok);
+    TEquals(true, CouchDB.login(userDocs.fdmanana.name, userDocs.fdmanana.password).ok);
+
+    // change scheme back to pbkdf2
+    CouchDB.login("jan", "apple");
+    var xhr = CouchDB.request("PUT", "/_node/node1@127.0.0.1/_config/couch_httpd_auth/password_scheme", {
+        body : JSON.stringify("pbkdf2"),
+        headers: {"X-Couch-Persist": "false"}
+    });
+    TEquals(200, xhr.status);
+    xhr = CouchDB.request("GET", "/_node/node1@127.0.0.1/_config/couch_httpd_auth/password_scheme");
+    var scheme = JSON.parse(xhr.responseText);
+    TEquals("pbkdf2", scheme);
+
+    // test that both users can still log in
+    TEquals(true, CouchDB.login(userDocs.jchris.name, userDocs.jchris.password).ok);
+    TEquals(true, CouchDB.login(userDocs.fdmanana.name, userDocs.fdmanana.password).ok);
+  };
   run_on_modified_server(
-    [{section: "couch_httpd_auth",
-      key: "iterations", value: "1"},
-   {section: "admins",
-    key: "jan", value: "apple"}],
+    [{
+      section: "couch_httpd_auth",
+      key: "iterations", value: "1"
+    }, {
+      section: "admins",
+      key: "jan", value: "apple"
+    }],
     function() {
       try {
-        testFun();
+        testFunUpdatePasswordScheme();
       } finally {
         CouchDB.login("jan", "apple");
         usersDb.deleteDb(); // cleanup
@@ -389,5 +506,6 @@ couchTests.users_db_security = function(debug) {
       }
     }
   );
+
   CouchDB.logout();
 };

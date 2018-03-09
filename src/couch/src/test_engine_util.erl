@@ -58,7 +58,7 @@ gather(Module) ->
         case {atom_to_list(Fun), Arity} of
             {[$c, $e, $t, $_ | _], 0} ->
                 TestFun = make_test_fun(Module, Fun),
-                [{spawn, TestFun} | Acc];
+                [{timeout, 60, {spawn, TestFun}} | Acc];
             _ ->
                 Acc
         end

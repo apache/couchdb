@@ -37,8 +37,8 @@ track(Name) ->
     track(self(), Name).
 
 -spec track(pid(), any()) -> ok.
-track(Name, Pid) ->
-    gen_server:cast(?MODULE, {track, Name, Pid}).
+track(Pid, Name) ->
+    gen_server:cast(?MODULE, {track, Pid, Name}).
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
