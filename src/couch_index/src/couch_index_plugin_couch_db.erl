@@ -13,30 +13,12 @@
 -module(couch_index_plugin_couch_db).
 
 -export([
-    before_copy_purge_info/1
+    maybe_init_index_purge_state/2
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
 
-before_copy_purge_info(DbName) ->
-    {ok, DDocs} = design_docs(DbName),
-    lists:map(fun(DDoc) ->
-        JsonDDoc = couch_doc:from_json_obj(DDoc),
-        couch_mrview_index:maybe_create_local_purge_doc(DbName, JsonDDoc)
-    end, DDocs).
-
-%% Internal functions
-
-design_docs(DbName) ->
-    try
-        case fabric:design_docs(mem3:dbname(DbName)) of
-            {error, {maintenance_mode, _, _Node}} ->
-                {ok, []};
-            Else ->
-                Else
-        end
-    catch error:database_does_not_exist ->
-        {ok, []}
-    end.
+maybe_init_index_purge_state(DbName, DDoc) ->
+    couch_mrview_index:maybe_create_local_purge_doc(DbName, DDoc).

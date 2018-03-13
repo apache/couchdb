@@ -44,6 +44,12 @@ start(#st{} = St, DbName, Options, Parent) ->
     } = St,
     couch_log:debug("Compaction process spawned for db \"~s\"", [DbName]),
 
+    {ok, DDocs} = design_docs(DbName),
+    lists:map(fun(DDoc) ->
+        JsonDDoc = couch_doc:from_json_obj(DDoc),
+        couch_db_plugin:maybe_init_index_purge_state(DbName, JsonDDoc)
+    end, DDocs),
+
     {ok, NewSt, DName, DFd, MFd, Retry} =
             open_compaction_files(Header, FilePath, Options),
     erlang:monitor(process, MFd),
@@ -58,7 +64,6 @@ start(#st{} = St, DbName, Options, Parent) ->
     NewSt3 = sort_meta_data(NewSt2),
     NewSt4 = commit_compaction_data(NewSt3),
     NewSt5 = copy_meta_data(NewSt4),
-    couch_db_plugin:before_copy_purge_info(DbName),
     NewSt6 = copy_purge_info(St, NewSt5, Parent),
     {ok, NewSt7} = couch_bt_engine:commit_data(NewSt6),
     ok = couch_bt_engine:decref(NewSt7),
@@ -571,3 +576,15 @@ update_compact_task(NumChanges) ->
     end,
     couch_task_status:update([{changes_done, Changes2}, {progress, Progress}]).
 
+
+design_docs(DbName) ->
+    try
+        case fabric:design_docs(mem3:dbname(DbName)) of
+            {error, {maintenance_mode, _, _Node}} ->
+                {ok, []};
+            Else ->
+                Else
+        end
+    catch error:database_does_not_exist ->
+        {ok, []}
+    end.
