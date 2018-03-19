@@ -496,6 +496,7 @@ db_req(#httpd{path_parts=[_, <<"_bulk_get">>]}=Req, _Db) ->
 
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_purge">>]}=Req, Db) ->
+    check_purge_enabled(),
     couch_stats:increment_counter([couchdb, httpd, purge_requests]),
     chttpd:validate_ctype(Req, "application/json"),
     W = chttpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
@@ -511,6 +512,7 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_purge">>]}=Req, Db) ->
     send_json(Req, Code, {[{<<"purged">>, {Purged}}]});
 
 db_req(#httpd{path_parts=[_,<<"_purge">>]}=Req, _Db) ->
+    check_purge_enabled(),
     send_method_not_allowed(Req, "POST");
 
 
@@ -609,6 +611,7 @@ db_req(#httpd{path_parts=[_,<<"_revs_limit">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "PUT,GET");
 
 db_req(#httpd{method='PUT',path_parts=[_,<<"_purged_docs_limit">>]}=Req, Db) ->
+    check_purge_enabled(),
     Limit = chttpd:json_body(Req),
     Options = [{user_ctx, Req#httpd.user_ctx}],
     case chttpd:json_body(Req) of
@@ -620,6 +623,7 @@ db_req(#httpd{method='PUT',path_parts=[_,<<"_purged_docs_limit">>]}=Req, Db) ->
     end;
 
 db_req(#httpd{method='GET',path_parts=[_,<<"_purged_docs_limit">>]}=Req, Db) ->
+    check_purge_enabled(),
     send_json(Req, fabric:get_purged_docs_limit(Db));
 
 % Special case to enable using an unencoded slash in the URL of design docs,
@@ -1735,6 +1739,14 @@ bulk_get_json_error(DocId, Rev, Error, Reason) ->
                              {<<"rev">>, Rev},
                              {<<"error">>, Error},
                              {<<"reason">>, Reason}]}}]}).
+
+check_purge_enabled() ->
+    case config:get("couchdb", "allow_purge", "false") of
+        "true" ->
+            ok;
+        _ ->
+            throw(method_not_allowed)
+    end.
 
 
 -ifdef(TEST).
