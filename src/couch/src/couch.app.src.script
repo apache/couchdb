@@ -33,7 +33,6 @@ ConfigFile = filename:join([os:getenv("COUCHDB_APPS_CONFIG_DIR"), "couch.config"
         kernel,
         stdlib,
         crypto,
-        bcrypt,
         sasl,
         inets,
         ssl,
