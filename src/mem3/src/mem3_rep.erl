@@ -73,12 +73,11 @@ go(#shard{} = Source, #shard{} = Target, Opts) ->
     go(Acc).
 
 
-go(#acc{source=Source, batch_count=BC}=Acc0) ->
+go(#acc{source=Source, batch_count=BC}=Acc) ->
     case couch_db:open(Source#shard.name, [?ADMIN_CTX]) of
     {ok, Db} ->
-        Acc = Acc0#acc{db=Db},
         Resp = try
-            repl(Db, Acc)
+            repl(Acc#acc{db = Db})
         catch error:{not_found, no_db_file} ->
             {error, missing_target}
         after
@@ -170,9 +169,9 @@ find_source_seq_int(#doc{body={Props}}, SrcNode0, TgtNode0, TgtUUID, TgtSeq) ->
     end.
 
 
-repl(Db, Acc0) ->
+repl(#acc{db = Db} = Acc0) ->
     erlang:put(io_priority, {internal_repl, couch_db:name(Db)}),
-    #acc{seq=Seq} = Acc1 = calculate_start_seq(Acc0#acc{source = Db}),
+    #acc{seq=Seq} = Acc1 = calculate_start_seq(Acc0),
     case Seq >= couch_db:get_update_seq(Db) of
         true ->
             {ok, 0};
@@ -186,7 +185,7 @@ repl(Db, Acc0) ->
 
 calculate_start_seq(Acc) ->
     #acc{
-        source = Db,
+        db = Db,
         target = #shard{node=Node, name=Name}
     } = Acc,
     %% Give the target our UUID and ask it to return the checkpoint doc
@@ -222,7 +221,7 @@ calculate_start_seq(Acc) ->
 
 compare_epochs(Acc) ->
     #acc{
-        source = Db,
+        db = Db,
         target = #shard{node=Node, name=Name}
     } = Acc,
     UUID = couch_db:get_uuid(Db),
@@ -303,13 +302,13 @@ chunk_revs([{Id, R, A}|Revs], {Count, Chunk}, Chunks, Limit) ->
     ).
 
 
-open_docs(#acc{source=Source, infos=Infos}, Missing) ->
+open_docs(#acc{db=Db, infos=Infos}, Missing) ->
     lists:flatmap(fun({Id, Revs, _}) ->
         FDI = lists:keyfind(Id, #full_doc_info.id, Infos),
         #full_doc_info{rev_tree=RevTree} = FDI,
         {FoundRevs, _} = couch_key_tree:get_key_leafs(RevTree, Revs),
         lists:map(fun({#leaf{deleted=IsDel, ptr=SummaryPtr}, FoundRevPath}) ->
-            couch_db:make_doc(Source, Id, IsDel, SummaryPtr, FoundRevPath)
+            couch_db:make_doc(Db, Id, IsDel, SummaryPtr, FoundRevPath)
         end, FoundRevs)
     end, Missing).
 
@@ -325,7 +324,7 @@ save_on_target(Node, Name, Docs) ->
 
 
 update_locals(Acc) ->
-    #acc{seq=Seq, source=Db, target=Target, localid=Id, history=History} = Acc,
+    #acc{seq=Seq, db=Db, target=Target, localid=Id, history=History} = Acc,
     #shard{name=Name, node=Node} = Target,
     NewEntry = [
         {<<"source_node">>, atom_to_binary(node(), utf8)},
