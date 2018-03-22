@@ -49,6 +49,22 @@ design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
         fun couch_mrview_http:view_cb/2, VAcc, Args),
     {ok, Resp#vacc.resp}.
 
+handle_view_req(#httpd{method='POST',
+    path_parts=[_, _, _, _, ViewName, <<"queries">>]}=Req, Db, DDoc) ->
+    chttpd:validate_ctype(Req, "application/json"),
+    Props = couch_httpd:json_body_obj(Req),
+    case couch_mrview_util:get_view_queries(Props) of
+        undefined ->
+            throw({bad_request,
+                <<"POST body must include `queries` parameter.">>});
+        Queries ->
+            multi_query_view(Req, Db, DDoc, ViewName, Queries)
+    end;
+
+handle_view_req(#httpd{path_parts=[_, _, _, _, _, <<"queries">>]}=Req,
+    _Db, _DDoc) ->
+    chttpd:send_method_not_allowed(Req, "POST");
+
 handle_view_req(#httpd{method='GET',
         path_parts=[_, _, _, _, ViewName]}=Req, Db, DDoc) ->
     couch_stats:increment_counter([couchdb, httpd, view_reads]),
