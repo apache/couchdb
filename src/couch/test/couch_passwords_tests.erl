@@ -69,7 +69,6 @@ bcrypt_test_() ->
             [
                 {timeout, 1, fun bcrypt_logRounds_4/0},
                 {timeout, 5, fun bcrypt_logRounds_12/0},
-                {timeout, 180, fun bcrypt_logRounds_18/0},
                 {timeout, 5, fun bcrypt_null_byte/0}
 
             ]
@@ -81,9 +80,6 @@ bcrypt_logRounds_4() ->
 
 bcrypt_logRounds_12() ->
     bcrypt_assert_equal(<<"password">>, 12).
-
-bcrypt_logRounds_18() ->
-    bcrypt_assert_equal(<<"password">>, 18).
 
 bcrypt_null_byte() ->
     bcrypt_assert_equal(<<"passw\0rd">>, 12).
