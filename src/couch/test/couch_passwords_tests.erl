@@ -68,6 +68,7 @@ bcrypt_test_() ->
             fun setup/0, fun teardown/1,
             [
                 {timeout, 1, fun bcrypt_logRounds_4/0},
+                {timeout, 1, fun bcrypt_logRounds_5/0},
                 {timeout, 5, fun bcrypt_logRounds_12/0},
                 {timeout, 5, fun bcrypt_null_byte/0}
 
@@ -77,6 +78,9 @@ bcrypt_test_() ->
 
 bcrypt_logRounds_4() ->
     bcrypt_assert_equal(<<"password">>, 4).
+
+bcrypt_logRounds_5() ->
+    bcrypt_assert_equal(<<"password">>, 5).
 
 bcrypt_logRounds_12() ->
     bcrypt_assert_equal(<<"password">>, 12).
