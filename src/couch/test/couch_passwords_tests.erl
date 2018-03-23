@@ -63,10 +63,14 @@ bcrypt_test_() ->
             end,
             fun test_util:stop_applications/1,
             [
-                {timeout, 1, fun bcrypt_logRounds_4/0},
-                {timeout, 1, fun bcrypt_logRounds_5/0},
-                {timeout, 5, fun bcrypt_logRounds_12/0},
-                {timeout, 5, fun bcrypt_null_byte/0}
+                {"Log rounds: 4",
+                {timeout, 1, fun bcrypt_logRounds_4/0}},
+                {"Log rounds: 5",
+                {timeout, 1, fun bcrypt_logRounds_5/0}},
+                {"Log rounds: 12",
+                {timeout, 5, fun bcrypt_logRounds_12/0}},
+                {"Null byte",
+                {timeout, 5, fun bcrypt_null_byte/0}}
 
             ]
         }
