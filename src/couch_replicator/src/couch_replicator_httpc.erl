@@ -28,7 +28,7 @@
 -define(replace(L, K, V), lists:keystore(K, 1, L, {K, V})).
 -define(MAX_WAIT, 5 * 60 * 1000).
 -define(STREAM_STATUS, ibrowse_stream_status).
-
+-define(STOP_HTTP_WORKER, stop_http_worker).
 
 % This limit is for the number of messages we're willing to discard
 % from an HTTP stream in clean_mailbox/1 before killing the worker
@@ -78,10 +78,14 @@ send_req(HttpDb, Params1, Callback) ->
         throw:{retry, NewHttpDb0, NewParams0} ->
             {retry, NewHttpDb0, NewParams0}
     after
-        ok = couch_replicator_httpc_pool:release_worker(
-            HttpDb#httpdb.httpc_pool,
-            Worker
-        ),
+        Pool = HttpDb#httpdb.httpc_pool,
+        case get(?STOP_HTTP_WORKER) of
+            stop ->
+                ok = stop_and_release_worker(Pool, Worker),
+                erase(?STOP_HTTP_WORKER);
+            undefined ->
+                ok = couch_replicator_httpc_pool:release_worker(Pool, Worker)
+        end,
         clean_mailbox(Response)
     end,
     % This is necessary to keep this tail-recursive. Calling
@@ -138,7 +142,7 @@ stop_and_release_worker(Pool, Worker) ->
     ok = couch_replicator_httpc_pool:release_worker_sync(Pool, Worker).
 
 process_response({error, sel_conn_closed}, Worker, HttpDb, Params, _Cb) ->
-    stop_and_release_worker(HttpDb#httpdb.httpc_pool, Worker),
+    put(?STOP_HTTP_WORKER, stop),
     maybe_retry(sel_conn_closed, Worker, HttpDb, Params);
 
 
@@ -147,7 +151,7 @@ process_response({error, sel_conn_closed}, Worker, HttpDb, Params, _Cb) ->
 %% and closes the socket, ibrowse will detect that error when it sends
 %% next request.
 process_response({error, connection_closing}, Worker, HttpDb, Params, _Cb) ->
-    stop_and_release_worker(HttpDb#httpdb.httpc_pool, Worker),
+    put(?STOP_HTTP_WORKER, stop),
     maybe_retry({error, connection_closing}, Worker, HttpDb, Params);
 
 process_response({ibrowse_req_id, ReqId}, Worker, HttpDb, Params, Callback) ->
@@ -167,6 +171,7 @@ process_response({ok, Code, Headers, Body}, Worker, HttpDb, Params, Callback) ->
             ?JSON_DECODE(Json)
         end,
         process_auth_response(HttpDb, Ok, Headers, Params),
+        if Ok =:= 413 -> put(?STOP_HTTP_WORKER, stop); true -> ok end,
         Callback(Ok, Headers, EJson);
     R when R =:= 301 ; R =:= 302 ; R =:= 303 ->
         backoff_success(HttpDb, Params),
@@ -194,6 +199,7 @@ process_stream_response(ReqId, Worker, HttpDb, Params, Callback) ->
                 stream_data_self(HttpDb1, Params, Worker, ReqId, Callback)
             end,
             put(?STREAM_STATUS, {streaming, Worker}),
+            if Ok =:= 413 -> put(?STOP_HTTP_WORKER, stop); true -> ok end,
             ibrowse:stream_next(ReqId),
             try
                 Ret = Callback(Ok, Headers, StreamDataFun),
