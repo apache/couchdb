@@ -53,24 +53,24 @@ pbkdf2_test_()->
            )}}]}.
 
 
-
-setup() ->
-    test_util:start(?MODULE, [bcrypt]).
-
-teardown(Ctx)->
-    test_util:stop(Ctx).
-
 bcrypt_test_() ->
     {
         "Bcrypt",
         {
-            foreach,
-            fun setup/0, fun teardown/1,
+            setup,
+            fun() ->
+                test_util:start_applications([bcrypt])
+            end,
+            fun test_util:stop_applications/1,
             [
-                {timeout, 1, fun bcrypt_logRounds_4/0},
-                {timeout, 5, fun bcrypt_logRounds_12/0},
-                {timeout, 180, fun bcrypt_logRounds_18/0},
-                {timeout, 5, fun bcrypt_null_byte/0}
+                {"Log rounds: 4",
+                {timeout, 1, fun bcrypt_logRounds_4/0}},
+                {"Log rounds: 5",
+                {timeout, 1, fun bcrypt_logRounds_5/0}},
+                {"Log rounds: 12",
+                {timeout, 5, fun bcrypt_logRounds_12/0}},
+                {"Null byte",
+                {timeout, 5, fun bcrypt_null_byte/0}}
 
             ]
         }
@@ -79,11 +79,11 @@ bcrypt_test_() ->
 bcrypt_logRounds_4() ->
     bcrypt_assert_equal(<<"password">>, 4).
 
+bcrypt_logRounds_5() ->
+    bcrypt_assert_equal(<<"password">>, 5).
+
 bcrypt_logRounds_12() ->
     bcrypt_assert_equal(<<"password">>, 12).
-
-bcrypt_logRounds_18() ->
-    bcrypt_assert_equal(<<"password">>, 18).
 
 bcrypt_null_byte() ->
     bcrypt_assert_equal(<<"passw\0rd">>, 12).
@@ -91,4 +91,4 @@ bcrypt_null_byte() ->
 bcrypt_assert_equal(Password, Rounds) when is_integer(Rounds) ->
     HashPass = couch_passwords:bcrypt(Password, Rounds),
     ReHashPass = couch_passwords:bcrypt(Password, HashPass),
-    ?_assertEqual(HashPass, ReHashPass).
+    ?assertEqual(HashPass, ReHashPass).
