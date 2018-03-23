@@ -53,19 +53,15 @@ pbkdf2_test_()->
            )}}]}.
 
 
-
-setup() ->
-    test_util:start(?MODULE, [bcrypt]).
-
-teardown(Ctx)->
-    test_util:stop(Ctx).
-
 bcrypt_test_() ->
     {
         "Bcrypt",
         {
-            foreach,
-            fun setup/0, fun teardown/1,
+            setup,
+            fun() ->
+                test_util:start_applications([bcrypt])
+            end,
+            fun test_util:stop_applications/1,
             [
                 {timeout, 1, fun bcrypt_logRounds_4/0},
                 {timeout, 1, fun bcrypt_logRounds_5/0},
