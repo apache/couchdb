@@ -1170,6 +1170,19 @@ before_response(Req0, Code0, Headers0, Args0) ->
 
 respond_(#httpd{mochi_req = MochiReq}, Code, Headers, _Args, start_response) ->
     MochiReq:start_response({Code, Headers});
+respond_(#httpd{mochi_req = MochiReq}, 413, Headers, Args, Type) ->
+    % Special handling for the 413 response. Make sure the socket is closed as
+    % we don't know how much data was read before the error was thrown. Also
+    % drain all the data in the receive buffer to avoid connction being reset
+    % before the 413 response is parsed by the client. This is still racy, it
+    % just increases the chances of 413 being detected correctly by the client
+    % (rather than getting a brutal TCP reset).
+    erlang:put(mochiweb_request_force_close, true),
+    Socket = MochiReq:get(socket),
+    mochiweb_socket:recv(Socket, 0, 0),
+    Result = MochiReq:Type({413, Headers, Args}),
+    mochiweb_socket:recv(Socket, 0, 0),
+    Result;
 respond_(#httpd{mochi_req = MochiReq}, Code, Headers, Args, Type) ->
     MochiReq:Type({Code, Headers, Args}).
 
