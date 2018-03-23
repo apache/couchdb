@@ -91,4 +91,4 @@ bcrypt_null_byte() ->
 bcrypt_assert_equal(Password, Rounds) when is_integer(Rounds) ->
     HashPass = couch_passwords:bcrypt(Password, Rounds),
     ReHashPass = couch_passwords:bcrypt(Password, HashPass),
-    ?_assertEqual(HashPass, ReHashPass).
+    ?assertEqual(HashPass, ReHashPass).
