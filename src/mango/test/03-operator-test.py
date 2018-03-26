@@ -264,6 +264,13 @@ class OperatorTextTests(mango.UserDocsTextTests, OperatorTests):
 
 
 class OperatorAllDocsTests(mango.UserDocsTestsNoIndexes, OperatorTests):
-    pass
+    def test_range_id_eq(self):
+        doc_id = "8e1c90c0-ac18-4832-8081-40d14325bde0"
+        r = self.db.find({
+                "_id": doc_id
+            }, explain=True, return_raw=True)
+        
+        self.assertEqual(r["mrargs"]["end_key"], doc_id)
+        self.assertEqual(r["mrargs"]["start_key"], doc_id)
 
 

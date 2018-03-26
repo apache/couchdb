@@ -161,7 +161,8 @@ build_shards_by_node(DbName, DocProps) ->
             name_shard(#shard{
                 dbname = DbName,
                 node = to_atom(Node),
-                range = [Beg, End]
+                range = [Beg, End],
+                opts = get_engine_opt(DocProps)
             }, Suffix)
         end, Ranges)
     end, ByNode).
@@ -178,7 +179,8 @@ build_shards_by_range(DbName, DocProps) ->
                 dbname = DbName,
                 node = to_atom(Node),
                 range = [Beg, End],
-                order = Order
+                order = Order,
+                opts = get_engine_opt(DocProps)
             }, Suffix)
         end, lists:zip(Nodes, lists:seq(1, length(Nodes))))
     end, ByRange).
@@ -194,6 +196,14 @@ to_integer(N) when is_binary(N) ->
     list_to_integer(binary_to_list(N));
 to_integer(N) when is_list(N) ->
     list_to_integer(N).
+
+get_engine_opt(DocProps) ->
+    case couch_util:get_value(<<"engine">>, DocProps) of
+        Engine when is_binary(Engine) ->
+            [{engine, Engine}];
+        _ ->
+            []
+    end.
 
 n_val(undefined, NodeCount) ->
     n_val(config:get("cluster", "n", "3"), NodeCount);
@@ -248,7 +258,8 @@ downcast(#ordered_shard{}=S) ->
        node = S#ordered_shard.node,
        dbname = S#ordered_shard.dbname,
        range = S#ordered_shard.range,
-       ref = S#ordered_shard.ref
+       ref = S#ordered_shard.ref,
+       opts = S#ordered_shard.opts
       };
 downcast(Shards) when is_list(Shards) ->
     [downcast(Shard) || Shard <- Shards].

@@ -12,7 +12,7 @@
 
 -module(couch_passwords).
 
--export([simple/2, pbkdf2/3, pbkdf2/4, verify/2]).
+-export([simple/2, pbkdf2/3, pbkdf2/4, bcrypt/2, verify/2]).
 -export([hash_admin_password/1, get_unhashed_admins/0]).
 
 -include_lib("couch/include/couch_db.hrl").
@@ -23,7 +23,13 @@
 %% legacy scheme, not used for new passwords.
 -spec simple(binary(), binary()) -> binary().
 simple(Password, Salt) when is_binary(Password), is_binary(Salt) ->
-    ?l2b(couch_util:to_hex(crypto:hash(sha, <<Password/binary, Salt/binary>>))).
+    ?l2b(couch_util:to_hex(crypto:hash(sha, <<Password/binary, Salt/binary>>)));
+simple(Password, Salt) when is_binary(Salt) ->
+    Msg = io_lib:format("Password value of '~p' is invalid.", [Password]),
+    throw({forbidden, Msg});
+simple(Password, Salt) when is_binary(Password) ->
+    Msg = io_lib:format("Salt value of '~p' is invalid.", [Salt]),
+    throw({forbidden, Msg}).
 
 %% CouchDB utility functions
 -spec hash_admin_password(binary() | list()) -> binary().
@@ -45,7 +51,10 @@ hash_admin_password("pbkdf2", ClearPassword) ->
                                         Salt ,list_to_integer(Iterations)),
     ?l2b("-pbkdf2-" ++ ?b2l(DerivedKey) ++ ","
         ++ ?b2l(Salt) ++ ","
-        ++ Iterations).
+        ++ Iterations);
+hash_admin_password("bcrypt", ClearPassword) ->
+    LogRounds = list_to_integer(config:get("couch_httpd_auth", "log_rounds", "10")),
+    ?l2b("-bcrypt-" ++ couch_passwords:bcrypt(couch_util:to_binary(ClearPassword), LogRounds)).
 
 -spec get_unhashed_admins() -> list().
 get_unhashed_admins() ->
@@ -53,6 +62,8 @@ get_unhashed_admins() ->
         fun({_User, "-hashed-" ++ _}) ->
             false; % already hashed
         ({_User, "-pbkdf2-" ++ _}) ->
+            false; % already hashed
+        ({_User, "-bcrypt-" ++ _}) ->
             false; % already hashed
         ({_User, _ClearPassword}) ->
             true
@@ -66,7 +77,17 @@ pbkdf2(Password, Salt, Iterations) when is_binary(Password),
                                         is_integer(Iterations),
                                         Iterations > 0 ->
     {ok, Result} = pbkdf2(Password, Salt, Iterations, ?SHA1_OUTPUT_LENGTH),
-    Result.
+    Result;
+pbkdf2(Password, Salt, Iterations) when is_binary(Salt),
+                                        is_integer(Iterations),
+                                        Iterations > 0 ->
+    Msg = io_lib:format("Password value of '~p' is invalid.", [Password]),
+    throw({forbidden, Msg});
+pbkdf2(Password, Salt, Iterations) when is_binary(Password),
+                                        is_integer(Iterations),
+                                        Iterations > 0 ->
+    Msg = io_lib:format("Salt value of '~p' is invalid.", [Salt]),
+    throw({forbidden, Msg}).
 
 -spec pbkdf2(binary(), binary(), integer(), integer())
     -> {ok, binary()} | {error, derived_key_too_long}.
@@ -106,6 +127,16 @@ pbkdf2(Password, Salt, Iterations, BlockIndex, Iteration, Prev, Acc) ->
     Next = crypto:hmac(sha, Password, Prev),
     pbkdf2(Password, Salt, Iterations, BlockIndex, Iteration + 1,
                    Next, crypto:exor(Next, Acc)).
+
+%% Define the bcrypt functions to hash a password
+-spec bcrypt(binary(), binary()) -> binary();
+    (binary(), integer()) -> binary().
+bcrypt(Password, Salt) when is_binary(Salt) ->
+    {ok, Hash} = bcrypt:hashpw(Password, Salt),
+    list_to_binary(Hash);
+bcrypt(Password, LogRounds) when is_integer(LogRounds) ->
+    {ok, Salt} = bcrypt:gen_salt(LogRounds),
+    bcrypt(Password, list_to_binary(Salt)).
 
 %% verify two lists for equality without short-circuits to avoid timing attacks.
 -spec verify(string(), string(), integer()) -> boolean().

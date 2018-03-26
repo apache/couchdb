@@ -41,6 +41,7 @@ handlers(url_handler) ->
         {<<"favicon.ico">>, chttpd_misc, handle_favicon_req},
         {<<"_utils">>, chttpd_misc, handle_utils_dir_req},
         {<<"_all_dbs">>, chttpd_misc, handle_all_dbs_req},
+        {<<"_dbs_info">>, chttpd_misc, handle_dbs_info_req},
         {<<"_active_tasks">>, chttpd_misc, handle_task_status_req},
         {<<"_node">>, chttpd_misc, handle_node_req},
         {<<"_reload_query_servers">>, chttpd_misc, handle_reload_query_servers_req},

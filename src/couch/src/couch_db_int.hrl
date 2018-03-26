@@ -10,36 +10,9 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
+
 -record(db, {
-    main_pid = nil,
-    compactor_pid = nil,
-    instance_start_time, % number of microsecs since jan 1 1970 as a binary string
-    fd,
-    fd_monitor,
-    header = couch_db_header:new(),
-    committed_update_seq,
-    id_tree,
-    seq_tree,
-    local_tree,
-    update_seq,
-    name,
-    filepath,
-    validate_doc_funs = undefined,
-    security = [],
-    security_ptr = nil,
-    user_ctx = #user_ctx{},
-    waiting_delayed_commit = nil,
-    revs_limit = 1000,
-    fsync_options = [],
-    options = [],
-    compression,
-    before_doc_update = nil, % nil | fun(Doc, Db) -> NewDoc
-    after_doc_read = nil    % nil | fun(Doc, Db) -> NewDoc
-}).
-
-
--record(new_pse_db, {
-    vsn,
+    vsn = 1,
     name,
     filepath,
 
@@ -66,28 +39,36 @@
 }).
 
 
--define(NEW_PSE_DB, {
+-define(OLD_DB_REC, {
     db,
-    _, % Version
-    _, % Name
-    _, % FilePath
-    _, % Engine
     _, % MainPid
     _, % CompactorPid
-    _, % CommittedUpdateSeq
     _, % InstanceStartTime
-    _, % UserCtx
-    _, % Security
+    _, % Fd
+    _, % FdMonitor
+    _, % Header
+    _, % CommittedUpdateSeq
+    _, % IdTree
+    _, % SeqTree
+    _, % LocalTree
+    _, % UpdateSeq
+    _, % Name
+    _, % FilePath
     _, % ValidateDocFuns
-    _, % BeforeDocUpdate
-    _, % AfterDocRead
+    _, % Security
+    _, % SecurityPtr
+    _, % UserCtx
     _, % WaitingDelayedCommit
+    _, % RevsLimit
+    _, % FsyncOptions
     _, % Options
-    _  % Compression
+    _, % Compression
+    _, % BeforeDocUpdate
+    _  % AfterDocRead
 }).
 
 
--define(PSE_DB_NAME(Db), element(3, Db)).
--define(PSE_DB_MAIN_PID(Db), element(6, Db)).
--define(PSE_DB_USER_CTX(Db), element(10, Db)).
--define(PSE_DB_SECURITY(Db), element(11, Db)).
+-define(OLD_DB_NAME(Db), element(2, Db)).
+-define(OLD_DB_MAIN_PID(Db), element(13, Db)).
+-define(OLD_DB_USER_CTX(Db), element(18, Db)).
+-define(OLD_DB_SECURITY(Db), element(16, Db)).

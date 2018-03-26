@@ -126,6 +126,7 @@ handle_config_terminate(_Server, _Reason, _State) ->
     erlang:send_after(?RELISTEN_DELAY, whereis(?MODULE), restart_config_listener).
 
 compact_loop(Parent) ->
+    SnoozePeriod = config:get_integer("compaction_daemon", "snooze_period", 3),
     {ok, _} = couch_server:all_databases(
         fun(DbName, Acc) ->
             case ets:info(?CONFIG_ETS, size) =:= 0 of
@@ -138,7 +139,8 @@ compact_loop(Parent) ->
                 {ok, Config} ->
                     case check_period(Config) of
                     true ->
-                        maybe_compact_db(Parent, DbName, Config);
+                        maybe_compact_db(Parent, DbName, Config),
+                        ok = timer:sleep(SnoozePeriod * 1000);
                     false ->
                         ok
                     end
@@ -150,8 +152,7 @@ compact_loop(Parent) ->
     true ->
         receive {Parent, have_config} -> ok end;
     false ->
-        PausePeriod = list_to_integer(
-            config:get("compaction_daemon", "check_interval", "300")),
+        PausePeriod = config:get_integer("compaction_daemon", "check_interval", 3600),
         ok = timer:sleep(PausePeriod * 1000)
     end,
     compact_loop(Parent).
@@ -229,23 +230,26 @@ maybe_compact_views(DbName, [DDocName | Rest], Config) ->
             maybe_compact_views(DbName, Rest, Config);
         timeout ->
             ok
-        end;
+        end,
+        SnoozePeriod = config:get_integer("compaction_daemon", "snooze_period", 3),
+        ok = timer:sleep(SnoozePeriod * 1000);
     false ->
         ok
     end.
 
 
 db_ddoc_names(Db) ->
-    {ok, _, DDocNames} = couch_db:enum_docs(
-        Db,
-        fun(#full_doc_info{id = <<"_design/", _/binary>>, deleted = true}, _, Acc) ->
-            {ok, Acc};
-        (#full_doc_info{id = <<"_design/", Id/binary>>}, _, Acc) ->
-            {ok, [Id | Acc]};
-        (_, _, Acc) ->
-            {stop, Acc}
-        end, [], [{start_key, <<"_design/">>}, {end_key_gt, <<"_design0">>}]),
+    FoldFun = fun ddoc_name/2,
+    Opts = [{start_key, <<"_design/">>}],
+    {ok, DDocNames} = couch_db:fold_docs(Db, FoldFun, [], Opts),
     DDocNames.
+
+ddoc_name(#full_doc_info{id = <<"_design/", _/binary>>, deleted = true}, Acc) ->
+    {ok, Acc};
+ddoc_name(#full_doc_info{id = <<"_design/", Id/binary>>}, Acc) ->
+    {ok, [Id | Acc]};
+ddoc_name(_, Acc) ->
+    {stop, Acc}.
 
 
 maybe_compact_view(DbName, GroupId, Config) ->
@@ -397,21 +401,22 @@ check_frag(Threshold, Frag) ->
 
 
 frag(Props) ->
-    FileSize = couch_util:get_value(disk_size, Props),
+    {Sizes} = couch_util:get_value(sizes, Props),
+    FileSize = couch_util:get_value(file, Sizes),
     MinFileSize = list_to_integer(
         config:get("compaction_daemon", "min_file_size", "131072")),
     case FileSize < MinFileSize of
     true ->
         {0, FileSize};
     false ->
-        case couch_util:get_value(data_size, Props) of
-        null ->
-            {100, FileSize};
+        case couch_util:get_value(active, Sizes) of
         0 ->
             {0, FileSize};
-        DataSize ->
+        DataSize when is_integer(DataSize), DataSize > 0 ->
             Frag = round(((FileSize - DataSize) / FileSize * 100)),
-            {Frag, space_required(DataSize)}
+            {Frag, space_required(DataSize)};
+        _ ->
+            {100, FileSize}
         end
     end.
 
@@ -520,9 +525,9 @@ free_space(Path) ->
 
 free_space_rec(_Path, []) ->
     undefined;
-free_space_rec(Path, [{MountPoint0, Total, Usage} | Rest]) ->
-    case abs_path(MountPoint0) of
-    {ok, MountPoint} ->
+free_space_rec(Path0, [{MountPoint, Total, Usage} | Rest]) ->
+    case abs_path(Path0) of
+    {ok, Path} ->
         case MountPoint =:= string:substr(Path, 1, length(MountPoint)) of
         false ->
             free_space_rec(Path, Rest);
@@ -530,10 +535,10 @@ free_space_rec(Path, [{MountPoint0, Total, Usage} | Rest]) ->
             trunc(Total - (Total * (Usage / 100))) * 1024
         end;
     {error, Reason} ->
-        couch_log:warning("Compaction daemon - unable to calculate free space"
-            " for `~s`: `~s`",
-            [MountPoint0, Reason]),
-        free_space_rec(Path, Rest)
+        couch_log:debug("Compaction daemon - unable to calculate free space"
+            " for `~s`: `~s` for mount mount `~p`",
+            [Path0, Reason, MountPoint]),
+        free_space_rec(Path0, Rest)
     end.
 
 abs_path(Path0) ->
@@ -558,3 +563,33 @@ abs_path2(Path0) ->
     _ ->
         {ok, Path ++ "/"}
     end.
+
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+free_space_rec_test() ->
+    ?assertEqual(undefined, free_space_rec("", [])),
+    ?assertEqual(51200, free_space_rec("/tmp/", [{"/", 100, 50}])),
+    ?assertEqual(51200, free_space_rec("/tmp/", [
+        {"/floop", 200, 25},
+        {"/run", 0, 0},
+        {"/", 100, 50}
+    ])),
+    ?assertEqual(undefined, free_space_rec("/flopp/", [{"/", 300, 75}])),
+    ?assertEqual(undefined, free_space_rec("/flopp/", [
+        {"/floop", 200, 25},
+        {"/run", 0, 0},
+        {"/", 100, 50}
+    ])),
+    ok.
+
+abs_path2_test() ->
+    ?assertEqual({ok, "/a/"}, abs_path2("/a")),
+    ?assertEqual({ok, "/a/"}, abs_path2("/a/")),
+
+    ?assertEqual({ok, "/a/b/"}, abs_path2("/a/b")),
+    ?assertEqual({ok, "/a/b/"}, abs_path2("/a/b")),
+    ok.
+
+-endif.

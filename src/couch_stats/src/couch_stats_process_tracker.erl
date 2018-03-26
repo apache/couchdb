@@ -37,8 +37,8 @@ track(Name) ->
     track(self(), Name).
 
 -spec track(pid(), any()) -> ok.
-track(Name, Pid) ->
-    gen_server:cast(?MODULE, {track, Name, Pid}).
+track(Pid, Name) ->
+    gen_server:cast(?MODULE, {track, Pid, Name}).
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -48,7 +48,7 @@ init([]) ->
     {ok, #st{}}.
 
 handle_call(Msg, _From, State) ->
-    couch_log:notice("~p received unknown call ~p", [?MODULE, Msg]),
+    error_logger:error_msg("~p received unknown call ~p", [?MODULE, Msg]),
     {noreply, State}.
 
 handle_cast({track, Pid, Name}, State) ->
@@ -57,13 +57,13 @@ handle_cast({track, Pid, Name}, State) ->
     ets:insert(?MODULE, {Ref, Name}),
     {noreply, State};
 handle_cast(Msg, State) ->
-    couch_log:notice("~p received unknown cast ~p", [?MODULE, Msg]),
+    error_logger:error_msg("~p received unknown cast ~p", [?MODULE, Msg]),
     {noreply, State}.
 
 handle_info({'DOWN', Ref, _, _, _}=Msg, State) ->
     case ets:lookup(?MODULE, Ref) of
         [] ->
-            couch_log:notice(
+            error_logger:error_msg(
                 "~p received unknown exit; message was ~p", [?MODULE, Msg]
             );
         [{Ref, Name}] ->
@@ -72,7 +72,7 @@ handle_info({'DOWN', Ref, _, _, _}=Msg, State) ->
     end,
     {noreply, State};
 handle_info(Msg, State) ->
-    couch_log:notice("~p received unknown message ~p", [?MODULE, Msg]),
+    error_logger:error_msg("~p received unknown message ~p", [?MODULE, Msg]),
     {noreply, State}.
 
 terminate(_Reason, _State) ->

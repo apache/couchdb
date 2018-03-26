@@ -73,7 +73,7 @@ stem/2
 
 %% @doc Merge a path into the given tree and then stem the result.
 %% Although Tree is of type tree(), it must not contain any branches.
--spec merge(revtree(), tree(), pos_integer()) ->
+-spec merge(revtree(), tree() | path(), pos_integer()) ->
                 {revtree(), new_leaf | new_branch | internal_node}.
 merge(RevTree, Tree, StemDepth) ->
     {Merged, Result} = merge(RevTree, Tree),
@@ -84,7 +84,7 @@ merge(RevTree, Tree, StemDepth) ->
 
 
 %% @doc Merge a path into a tree.
--spec merge(revtree(), tree()) ->
+-spec merge(revtree(), tree() | path()) ->
                 {revtree(), new_leaf | new_branch | internal_node}.
 merge(RevTree, Tree) ->
     {Merged, Result} = merge_tree(RevTree, Tree, []),
@@ -94,7 +94,7 @@ merge(RevTree, Tree) ->
 %% @doc Attempt to merge Tree into each branch of the RevTree.
 %% If it can't find a branch that the new tree merges into, add it as a
 %% new branch in the RevTree.
--spec merge_tree(revtree(), tree(), revtree()) ->
+-spec merge_tree(revtree(), tree() | path(), revtree()) ->
                 {revtree(), new_leaf | new_branch | internal_node}.
 merge_tree([], Tree, []) ->
     {[Tree], new_leaf};
