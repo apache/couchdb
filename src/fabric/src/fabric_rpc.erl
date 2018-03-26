@@ -302,9 +302,9 @@ get_or_create_db(DbName, Options) ->
     couch_db:open_int(DbName, [{create_if_missing, true} | Options]).
 
 
-view_cb({meta, Meta}, Acc) ->
+view_cb({meta, Meta}, #vacc{etag = ETag} = Acc) ->
     % Map function starting
-    ok = rexi:stream2({meta, Meta}),
+    ok = rexi:stream2([{meta, Meta}, {etag, ETag}]),
     {ok, Acc};
 view_cb({row, Row}, Acc) ->
     % Adding another row

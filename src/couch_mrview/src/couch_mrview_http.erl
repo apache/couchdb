@@ -344,11 +344,22 @@ view_cb(complete, #vacc{resp=undefined}=Acc) ->
     {ok, Resp} = chttpd:send_json(Acc#vacc.req, 200, {[{rows, []}]}),
     {ok, Acc#vacc{resp=Resp}};
 
-view_cb(Msg, #vacc{resp=undefined}=Acc) ->
+view_cb(Msg, #vacc{resp=undefined, etag=undefined}=Acc) ->
     %% Start response
     Headers = [],
     {ok, Resp} = chttpd:start_delayed_json_response(Acc#vacc.req, 200, Headers),
     view_cb(Msg, Acc#vacc{resp=Resp, should_close=true});
+
+view_cb(Msg, #vacc{req=Req, resp=undefined, etag=ETag}=Acc) ->
+    Headers = [{"ETag", ETag}],
+    case chttpd:etag_match(Req, ETag) of
+        true ->
+            {ok, Resp} = chttpd:send_response(Req, 304, Headers, <<>>),
+            {stop, Acc#vacc{resp=Resp}};
+        false ->
+            {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, Headers),
+            view_cb(Msg, Acc#vacc{resp=Resp, should_close=true})
+    end;
 
 %% ---------------------------------------------------
 

@@ -95,6 +95,9 @@ handle_message({rexi_EXIT, Reason}, Worker, State) ->
     fabric_view:handle_worker_exit(State, Worker, Reason);
 
 handle_message({meta, Meta0}, {Worker, From}, State) ->
+    handle_message([{meta, Meta0}, {etag, undefined}], {Worker, From}, State);
+
+handle_message([{meta, Meta0}, {etag, ETag0}], {Worker, From}, State) ->
     Tot = couch_util:get_value(total, Meta0, 0),
     Off = couch_util:get_value(offset, Meta0, 0),
     Seq = couch_util:get_value(update_seq, Meta0, 0),
@@ -103,8 +106,9 @@ handle_message({meta, Meta0}, {Worker, From}, State) ->
         counters = Counters0,
         total_rows = Total0,
         offset = Offset0,
-        user_acc = AccIn,
-        update_seq = UpdateSeq0
+        user_acc = AccIn0,
+        update_seq = UpdateSeq0,
+        etag = ETags0
     } = State,
     % Assert that we don't have other messages from this
     % worker when the total_and_offset message arrives.
@@ -117,13 +121,15 @@ handle_message({meta, Meta0}, {Worker, From}, State) ->
         nil -> nil;
         _   -> [{Worker, Seq} | UpdateSeq0]
     end,
+    ETags = sets:add_element(ETag0, ETags0),
     case fabric_dict:any(0, Counters1) of
     true ->
         {ok, State#collector{
             counters = Counters1,
             total_rows = Total,
             update_seq = UpdateSeq,
-            offset = Offset
+            offset = Offset,
+            etag = ETags
         }};
     false ->
         FinalOffset = erlang:min(Total, Offset+State#collector.skip),
@@ -134,11 +140,14 @@ handle_message({meta, Meta0}, {Worker, From}, State) ->
                 _ ->
                     [{update_seq, fabric_view_changes:pack_seqs(UpdateSeq)}]
             end,
+        ETag = make_etag(ETags),
+        {ok, AccIn} = maybe_set_etag(ETag, AccIn0),
         {Go, Acc} = Callback({meta, Meta}, AccIn),
         {Go, State#collector{
             counters = fabric_dict:decrement_all(Counters1),
             total_rows = Total,
             offset = FinalOffset,
+            etag = ETag,
             user_acc = Acc
         }}
     end;
@@ -256,3 +265,35 @@ key_index(KeyA, [{KeyB, Value}|KVs], CmpFun) ->
         0 -> Value;
         _ -> key_index(KeyA, KVs, CmpFun)
     end.
+
+maybe_set_etag(undefined, Acc) ->
+    {ok, Acc};
+maybe_set_etag(ETag, #vacc{} = Acc) ->
+    {ok, Acc#vacc{etag = ETag}};
+maybe_set_etag(_, Acc) ->
+    {ok, Acc}.
+
+make_etag(ETags) ->
+    case sets:size(ETags) > 0 andalso not sets:is_element(undefined, ETags) of
+        true -> ?b2l(chttpd:make_etag(ETags));
+        false -> undefined
+    end.
+
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+make_etag_test() ->
+    EtagsEmpty = sets:new(),
+    EtagsUndef1 = sets:from_list([undefined]),
+    EtagsUndef2 = sets:from_list([chttpd:make_etag(a), undefined]),
+    ETags1 = sets:from_list([chttpd:make_etag(A) || A <- [a, b, a, c, c, b]]),
+    ETags2 = sets:from_list([chttpd:make_etag(A) || A <- [b, c, a, b, a, c]]),
+    [
+        ?assertEqual(undefined, make_etag(EtagsEmpty)),
+        ?assertEqual(undefined, make_etag(EtagsUndef1)),
+        ?assertEqual(undefined, make_etag(EtagsUndef2)),
+        ?assertEqual(make_etag(ETags1), make_etag(ETags2))
+    ].
+
+-endif.

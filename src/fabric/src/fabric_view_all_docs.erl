@@ -143,6 +143,9 @@ handle_message({rexi_EXIT, Reason}, Worker, State) ->
     fabric_view:handle_worker_exit(State, Worker, Reason);
 
 handle_message({meta, Meta0}, {Worker, From}, State) ->
+    handle_message([{meta, Meta0}, {etag, undefined}], {Worker, From}, State);
+
+handle_message([{meta, Meta0}, {etag, _}], {Worker, From}, State) ->
     Tot = couch_util:get_value(total, Meta0, 0),
     Off = couch_util:get_value(offset, Meta0, 0),
     Seq = couch_util:get_value(update_seq, Meta0, 0),

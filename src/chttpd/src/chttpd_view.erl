@@ -41,7 +41,12 @@ multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
 
 
 design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
-    Args = couch_mrview_http:parse_params(Req, Keys),
+    Args0 = couch_mrview_http:parse_params(Req, Keys),
+    ETagFun = fun(Sig, Acc) ->
+        ETag = couch_httpd:make_etag(Sig),
+        {ok, Acc#vacc{etag=ETag}}
+    end,
+    Args = Args0#mrargs{preflight_fun=ETagFun},
     Max = chttpd:chunked_response_buffer_size(),
     VAcc = #vacc{db=Db, req=Req, threshold=Max},
     Options = [{user_ctx, Req#httpd.user_ctx}],
