@@ -270,7 +270,7 @@ dialyze: .rebar
 # target: introspect - Check for commits difference between rebar.config and repository
 introspect:
 	@$(REBAR) -r update-deps
-	@./introspect
+	@build-aux/introspect
 
 ################################################################################
 # Distributing
