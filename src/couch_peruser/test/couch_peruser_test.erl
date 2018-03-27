@@ -434,61 +434,52 @@ should_remove_user_from_db_members(TestAuthDb) ->
       ?_assertNot(QuxAfter)
     ].
 
-% infinite loop waiting for a db to be created, either this returns true
-% or we get a test timeout error
+
 wait_for_db_create(UserDbName) ->
-    case all_dbs_with_errors() of
-        {error, _, _ , _} ->
-            timer:sleep(?WAIT_FOR_DB_TIMEOUT),
-            wait_for_db_create(UserDbName);
-        {ok, _, _, AllDbs} ->
-            case lists:member(UserDbName, AllDbs) of
-                true -> true;
-                _Else ->
-                    timer:sleep(?WAIT_FOR_DB_TIMEOUT),
-                    wait_for_db_create(UserDbName)
-            end
-    end.
+    test_util:wait(fun() ->
+        case all_dbs_with_errors() of
+            {error, _, _ , _} -> wait;
+            {ok, _, _, AllDbs} ->
+                case lists:member(UserDbName, AllDbs) of
+                    true -> true;
+                    false -> wait
+                end
+        end
+    end).
 
-% infinite loop waiting for a db to be deleted, either this returns true
-% or we get a test timeout error
 wait_for_db_delete(UserDbName) ->
-    case all_dbs_with_errors() of
-        {ok, 500, _ , _} ->
-            timer:sleep(?WAIT_FOR_DB_TIMEOUT),
-            wait_for_db_delete(UserDbName);
-        {ok, _, _, AllDbs} ->
-            case not lists:member(UserDbName, AllDbs) of
-                true -> true;
-                _Else ->
-                    timer:sleep(?WAIT_FOR_DB_TIMEOUT),
-                    wait_for_db_delete(UserDbName)
-            end
-    end.
+    test_util:wait(fun() ->
+        case all_dbs_with_errors() of
+            {ok, 500, _ , _} -> wait;
+            {ok, _, _, AllDbs} ->
+                case not lists:member(UserDbName, AllDbs) of
+                    true -> true;
+                    false -> wait
+                end
+        end
+    end).
 
-wait_for_security_create(Type, User, UserDbName) ->
-    {MemberProperties} = proplists:get_value(Type,
-        get_security(UserDbName)),
-    Names = proplists:get_value(<<"names">>, MemberProperties),
+wait_for_security_create(Type, User0, UserDbName) ->
+    User = ?l2b(User0),
+    test_util:wait(fun() ->
+        {Props} = proplists:get_value(Type, get_security(UserDbName)),
+        Names = proplists:get_value(<<"names">>, Props),
+        case lists:member(User, Names) of
+            true -> true;
+            false -> wait
+        end
+    end).
 
-    case lists:member(?l2b(User), Names) of
-        true -> true;
-        _Else ->
-            timer:sleep(?WAIT_FOR_DB_TIMEOUT),
-            wait_for_security_create(Type, User, UserDbName)
-    end.
-
-wait_for_security_delete(Type, User, UserDbName) ->
-    {MemberProperties} = proplists:get_value(Type,
-        get_security(UserDbName)),
-    Names = proplists:get_value(<<"names">>, MemberProperties),
-
-    case not lists:member(?l2b(User), Names) of
-        true -> true;
-        _Else ->
-            timer:sleep(?WAIT_FOR_DB_TIMEOUT),
-            wait_for_security_delete(Type, User, UserDbName)
-    end.
+wait_for_security_delete(Type, User0, UserDbName) ->
+    User = ?l2b(User0),
+    test_util:wait(fun() ->
+        {Props} = proplists:get_value(Type, get_security(UserDbName)),
+        Names = proplists:get_value(<<"names">>, Props),
+        case not lists:member(User, Names) of
+            true -> true;
+            false -> wait
+        end
+    end).
 
 couch_peruser_test_() ->
     {
