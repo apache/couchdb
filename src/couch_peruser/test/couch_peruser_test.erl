@@ -196,7 +196,6 @@ should_create_user_db_with_q4(TestAuthDb) ->
     {ok, DbInfo} = fabric:get_db_info(<<"userdb-666f6f">>),
     {ClusterInfo} = couch_util:get_value(cluster, DbInfo),
     delete_config("couch_peruser", "q"),
-
     [
         ?_assert(lists:member(<<"userdb-666f6f">>, all_dbs())),
         ?_assertEqual(4, couch_util:get_value(q, ClusterInfo))
