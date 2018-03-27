@@ -104,7 +104,7 @@ init({Mod, IdxState}) ->
                 Mod:get(idx_name, IdxState),
                 couch_index_util:hexsig(Mod:get(signature, IdxState))
             ],
-            couch_log:info("Opening index for db: ~s idx: ~s sig: ~p", Args),
+            couch_log:debug("Opening index for db: ~s idx: ~s sig: ~p", Args),
             proc_lib:init_ack({ok, self()}),
             gen_server:enter_loop(?MODULE, [], State);
         Other ->
@@ -131,7 +131,7 @@ terminate(Reason0, State) ->
         couch_index_util:hexsig(Mod:get(signature, IdxState)),
         Reason
     ],
-    couch_log:info("Closing index for db: ~s idx: ~s sig: ~p because ~r", Args),
+    couch_log:debug("Closing index for db: ~s idx: ~s sig: ~p because ~r", Args),
     ok.
 
 
@@ -366,7 +366,7 @@ handle_info(maybe_close, State) ->
     end;
 handle_info({'DOWN', _, _, _Pid, _}, #st{mod=Mod, idx_state=IdxState}=State) ->
     Args = [Mod:get(db_name, IdxState), Mod:get(idx_name, IdxState)],
-    couch_log:info("Index shutdown by monitor notice for db: ~s idx: ~s", Args),
+    couch_log:debug("Index shutdown by monitor notice for db: ~s idx: ~s", Args),
     catch send_all(State#st.waiters, shutdown),
     {stop, normal, State#st{waiters=[]}}.
 

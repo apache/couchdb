@@ -284,8 +284,14 @@ create_db_req(#httpd{}=Req, DbName) ->
     N = chttpd:qs_value(Req, "n", config:get("cluster", "n", "3")),
     Q = chttpd:qs_value(Req, "q", config:get("cluster", "q", "8")),
     P = chttpd:qs_value(Req, "placement", config:get("cluster", "placement")),
+    EngineOpt = parse_engine_opt(Req),
+    Options = [
+        {n, N},
+        {q, Q},
+        {placement, P}
+    ] ++ EngineOpt,
     DocUrl = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName)),
-    case fabric:create_db(DbName, [{n,N}, {q,Q}, {placement,P}]) of
+    case fabric:create_db(DbName, Options) of
     ok ->
         send_json(Req, 201, [{"Location", DocUrl}], {[{ok, true}]});
     accepted ->
@@ -518,20 +524,31 @@ db_req(#httpd{method='GET',path_parts=[_,OP]}=Req, Db) when ?IS_ALL_DOCS(OP) ->
         throw({bad_request, "`keys` parameter must be an array."})
     end;
 
+db_req(#httpd{method='POST',
+    path_parts=[_, OP, <<"queries">>]}=Req, Db) when ?IS_ALL_DOCS(OP) ->
+    Props = chttpd:json_body_obj(Req),
+    case couch_mrview_util:get_view_queries(Props) of
+        undefined ->
+            throw({bad_request,
+                <<"POST body must include `queries` parameter.">>});
+        Queries ->
+            multi_all_docs_view(Req, Db, OP, Queries)
+    end;
+
+db_req(#httpd{path_parts=[_, OP, <<"queries">>]}=Req,
+    _Db) when ?IS_ALL_DOCS(OP) ->
+    send_method_not_allowed(Req, "POST");
+
 db_req(#httpd{method='POST',path_parts=[_,OP]}=Req, Db) when ?IS_ALL_DOCS(OP) ->
     chttpd:validate_ctype(Req, "application/json"),
-    Props = chttpd:json_body_obj(Req),
-    Keys = couch_mrview_util:get_view_keys(Props),
-    Queries = couch_mrview_util:get_view_queries(Props),
-    case {Queries, Keys} of
-        {Queries, undefined} when is_list(Queries) ->
-            multi_all_docs_view(Req, Db, OP, Queries);
-        {undefined, Keys} when is_list(Keys) ->
-            all_docs_view(Req, Db, Keys, OP);
-        {undefined, undefined} ->
-            all_docs_view(Req, Db, undefined, OP);
-        {_, _} ->
-            throw({bad_request, "`keys` and `queries` are mutually exclusive"})
+    {Fields} = chttpd:json_body_obj(Req),
+    case couch_util:get_value(<<"keys">>, Fields, nil) of
+    Keys when is_list(Keys) ->
+        all_docs_view(Req, Db, Keys, OP);
+    nil ->
+        all_docs_view(Req, Db, undefined, OP);
+    _ ->
+        throw({bad_request, "`keys` body member must be an array."})
     end;
 
 db_req(#httpd{path_parts=[_,OP]}=Req, _Db) when ?IS_ALL_DOCS(OP) ->
@@ -652,7 +669,8 @@ multi_all_docs_view(Req, Db, OP, Queries) ->
     Options = [{user_ctx, Req#httpd.user_ctx}],
     VAcc0 = #vacc{db=Db, req=Req, prepend="\r\n"},
     FirstChunk = "{\"results\":[",
-    {ok, Resp0} = chttpd:start_delayed_json_response(VAcc0#vacc.req, 200, [], FirstChunk),
+    {ok, Resp0} = chttpd:start_delayed_json_response(VAcc0#vacc.req,
+        200, [], FirstChunk),
     VAcc1 = VAcc0#vacc{resp=Resp0},
     VAcc2 = lists:foldl(fun(Args, Acc0) ->
         {ok, Acc1} = fabric:all_docs(Db, Options,
@@ -1380,6 +1398,20 @@ get_md5_header(Req) ->
 
 parse_doc_query(Req) ->
     lists:foldl(fun parse_doc_query/2, #doc_query_args{}, chttpd:qs(Req)).
+
+parse_engine_opt(Req) ->
+    case chttpd:qs_value(Req, "engine") of
+        undefined ->
+            [];
+        Extension ->
+            Available = couch_server:get_engine_extensions(),
+            case lists:member(Extension, Available) of
+                true ->
+                    [{engine, iolist_to_binary(Extension)}];
+                false ->
+                    throw({bad_request, invalid_engine_extension})
+            end
+    end.
 
 parse_doc_query({Key, Value}, Args) ->
     case {Key, Value} of

@@ -41,7 +41,7 @@ handle_req(#httpd{} = Req, Db0) ->
             case mango_error:info(Module, Reason) of
             {500, ErrorStr, ReasonStr} ->
                 Stack = erlang:get_stacktrace(),
-                chttpd:send_error(Req, 500, [], ErrorStr, ReasonStr, Stack);
+                chttpd:send_error(Req, {ErrorStr, ReasonStr, Stack});
             {Code, ErrorStr, ReasonStr} ->
                 chttpd:send_error(Req, Code, ErrorStr, ReasonStr)
             end

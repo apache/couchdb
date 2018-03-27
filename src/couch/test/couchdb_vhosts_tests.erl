@@ -46,14 +46,6 @@ setup() ->
     couch_db:ensure_full_commit(Db),
     couch_db:close(Db),
 
-    test_util:with_process_restart(couch_httpd, fun() ->
-        config:set("httpd_global_handlers", "_utils",
-            "{couch_httpd_misc_handlers, handle_utils_dir_req, <<\""
-                ++ ?TEMPDIR
-                ++ "\">>}"
-        )
-    end),
-
     Addr = config:get("httpd", "bind_address", "127.0.0.1"),
     Port = integer_to_list(mochiweb_socket_server:get(couch_httpd, port)),
     Url = "http://" ++ Addr ++ ":" ++ Port,
@@ -76,7 +68,6 @@ vhosts_test_() ->
                 [
                     fun should_return_database_info/1,
                     fun should_return_revs_info/1,
-                    fun should_serve_utils_for_vhost/1,
                     fun should_return_virtual_request_path_field_in_request/1,
                     fun should_return_real_request_path_field_in_request/1,
                     fun should_match_wildcard_vhost/1,
@@ -114,22 +105,6 @@ should_return_revs_info({Url, DbName}) ->
             {ok, _, _, Body} ->
                 {JsonBody} = jiffy:decode(Body),
                 ?assert(proplists:is_defined(<<"_revs_info">>, JsonBody));
-            Else ->
-                erlang:error({assertion_failed,
-                             [{module, ?MODULE},
-                              {line, ?LINE},
-                              {reason, ?iofmt("Request failed: ~p", [Else])}]})
-        end
-    end).
-
-should_serve_utils_for_vhost({Url, DbName}) ->
-    ?_test(begin
-        ok = config:set("vhosts", "example.com", "/" ++ DbName, false),
-        ensure_index_file(),
-        case test_request:get(Url ++ "/_utils/index.html", [],
-                              [{host_header, "example.com"}]) of
-            {ok, _, _, Body} ->
-                ?assertMatch(<<"<!DOCTYPE html>", _/binary>>, Body);
             Else ->
                 erlang:error({assertion_failed,
                              [{module, ?MODULE},
