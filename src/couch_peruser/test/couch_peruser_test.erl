@@ -63,10 +63,8 @@ teardown(TestAuthDb) ->
 set_config(Section, Key, Value) ->
     ok = config:set(Section, Key, Value, _Persist=false).
 
-delete_config(Section, Key, Value) ->
-    Url = lists:concat([
-        get_base_url(), "/_config/", Section, "/", Key]),
-    do_request(delete, Url, "\"" ++ Value ++ "\"").
+delete_config(Section, Key) ->
+    ok = config:delete(Section, Key, _Persist=false).
 
 do_request(Method, Url) ->
     Headers = [{basic_auth, {?ADMIN_USERNAME, ?ADMIN_PASSWORD}}],
@@ -157,14 +155,14 @@ should_create_user_db_with_custom_prefix(TestAuthDb) ->
     set_config("couch_peruser", "database_prefix", "newuserdb-"),
     create_user(TestAuthDb, "fooo"),
     wait_for_db_create(<<"newuserdb-666f6f6f">>),
-    delete_config("couch_peruser", "database_prefix", "newuserdb-"),
+    delete_config("couch_peruser", "database_prefix"),
     ?_assert(lists:member(<<"newuserdb-666f6f6f">>, all_dbs())).
 
 should_create_user_db_with_custom_special_prefix(TestAuthDb) ->
     set_config("couch_peruser", "database_prefix", "userdb_$()+--/"),
     create_user(TestAuthDb, "fooo"),
     wait_for_db_create(<<"userdb_$()+--/666f6f6f">>),
-    delete_config("couch_peruser", "database_prefix", "userdb_$()+--/"),
+    delete_config("couch_peruser", "database_prefix"),
     ?_assert(lists:member(<<"userdb_$()+--/666f6f6f">>, all_dbs())).
 
 should_create_anon_user_db_with_default(TestAuthDb) ->
@@ -181,14 +179,14 @@ should_create_anon_user_db_with_custom_prefix(TestAuthDb) ->
     set_config("couch_peruser", "database_prefix", "newuserdb-"),
     create_anon_user(TestAuthDb, "fooo"),
     wait_for_db_create(<<"newuserdb-666f6f6f">>),
-    delete_config("couch_peruser", "database_prefix", "newuserdb-"),
+    delete_config("couch_peruser", "database_prefix"),
     ?_assert(lists:member(<<"newuserdb-666f6f6f">>, all_dbs())).
 
 should_create_anon_user_db_with_custom_special_prefix(TestAuthDb) ->
     set_config("couch_peruser", "database_prefix", "userdb_$()+--/"),
     create_anon_user(TestAuthDb, "fooo"),
     wait_for_db_create(<<"userdb_$()+--/666f6f6f">>),
-    delete_config("couch_peruser", "database_prefix", "userdb_$()+--/"),
+    delete_config("couch_peruser", "database_prefix"),
     ?_assert(lists:member(<<"userdb_$()+--/666f6f6f">>, all_dbs())).
 
 should_create_user_db_with_q4(TestAuthDb) ->
@@ -197,7 +195,7 @@ should_create_user_db_with_q4(TestAuthDb) ->
     wait_for_db_create(<<"userdb-666f6f">>),
     {ok, DbInfo} = fabric:get_db_info(<<"userdb-666f6f">>),
     {ClusterInfo} = couch_util:get_value(cluster, DbInfo),
-    delete_config("couch_peruser", "q", "4"),
+    delete_config("couch_peruser", "q"),
 
     [
         ?_assert(lists:member(<<"userdb-666f6f">>, all_dbs())),
@@ -210,7 +208,7 @@ should_create_anon_user_db_with_q4(TestAuthDb) ->
     wait_for_db_create(<<"userdb-666f6f6f">>),
     {ok, TargetInfo} = fabric:get_db_info(<<"userdb-666f6f6f">>),
     {ClusterInfo} = couch_util:get_value(cluster, TargetInfo),
-    delete_config("couch_peruser", "q", "4"),
+    delete_config("couch_peruser", "q"),
     [
         ?_assert(lists:member(<<"userdb-666f6f6f">>, all_dbs())),
         ?_assertEqual(4, couch_util:get_value(q, ClusterInfo))
@@ -249,7 +247,7 @@ should_delete_user_db_with_custom_prefix(TestAuthDb) ->
     AfterCreate = lists:member(UserDbName, all_dbs()),
     delete_user(TestAuthDb, User),
     wait_for_db_delete(UserDbName),
-    delete_config("couch_peruser", "database_prefix", "newuserdb-"),
+    delete_config("couch_peruser", "database_prefix"),
     AfterDelete = lists:member(UserDbName, all_dbs()),
     [
         ?_assert(AfterCreate),
@@ -266,7 +264,7 @@ should_delete_user_db_with_custom_special_prefix(TestAuthDb) ->
     AfterCreate = lists:member(UserDbName, all_dbs()),
     delete_user(TestAuthDb, User),
     wait_for_db_delete(UserDbName),
-    delete_config("couch_peruser", "database_prefix", "userdb_$()+--/"),
+    delete_config("couch_peruser", "database_prefix"),
     AfterDelete = lists:member(UserDbName, all_dbs()),
     [
         ?_assert(AfterCreate),
