@@ -18,7 +18,6 @@
 -define(ADMIN_USERNAME, "admin").
 -define(ADMIN_PASSWORD, "secret").
 
--define(WAIT_FOR_DB_TIMEOUT, 1000).
 -define(WAIT_FOR_USER_DELETE_TIMEOUT, 3000).
 
 setup_all() ->
