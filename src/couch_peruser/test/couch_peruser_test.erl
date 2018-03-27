@@ -111,9 +111,13 @@ delete_user(AuthDb, Name) ->
 get_security(DbName) ->
     Url = lists:concat([
         get_cluster_base_url(), "/", ?b2l(DbName), "/_security"]),
-    {ok, 200, _, Body} = do_request(get, Url),
-    {SecurityProperties} = jiffy:decode(Body),
-    SecurityProperties.
+    test_util:wait(fun() ->
+        {ok, 200, _, Body} = do_request(get, Url),
+        case jiffy:decode(Body) of
+            {[]} -> wait;
+            {SecurityProperties} -> SecurityProperties
+        end
+    end).
 
 set_security(DbName, SecurityProperties) ->
     Url = lists:concat([
