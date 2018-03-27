@@ -53,10 +53,10 @@ teardown(TestAuthDb) ->
     set_config("cluster", "n", "3"),
     do_request(delete, get_cluster_base_url() ++ "/" ++ ?b2l(TestAuthDb)),
     do_request(delete, get_base_url() ++ "/" ++ ?b2l(TestAuthDb)),
-    lists:foreach(fun (DbName) ->
-        case DbName of
-        <<"userdb-",_/binary>> -> delete_db(DbName);
-        _ -> ok
+    lists:foreach(fun(DbName) ->
+        case binary:part(DbName, 0, 7) of
+            <<"userdb-">> -> delete_db(DbName);
+            _ -> ok
         end
     end, all_dbs()).
 
