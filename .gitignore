@@ -52,7 +52,6 @@ src/meck/
 src/mochiweb/
 src/oauth/
 src/rebar/
-src/setup/
 src/snappy/
 tmp/
 
