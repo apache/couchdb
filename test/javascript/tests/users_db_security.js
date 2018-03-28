@@ -411,11 +411,27 @@ couchTests.users_db_security = function(debug) {
       function() {
         try {
           testFun(scheme, derivedKeyTests[scheme], saltTests[scheme]);
+        } catch (e) {
+          throw(e)
         } finally {
           CouchDB.login("jan", "apple");
           usersDb.deleteDb(); // cleanup
-          sleep(5000);
+          waitForSuccess(function() {
+            var req = CouchDB.request("GET", db_name);
+            if (req.status == 404) {
+              return true
+            }
+            throw({});
+          }, 'usersDb.deleteDb')
+
           usersDb.createDb();
+          waitForSuccess(function() {
+            var req = CouchDB.request("GET", db_name);
+            if (req.status == 200) {
+              return true
+            }
+            throw({});
+          }, 'usersDb.creteDb')
         }
       }
     );
@@ -501,8 +517,21 @@ couchTests.users_db_security = function(debug) {
       } finally {
         CouchDB.login("jan", "apple");
         usersDb.deleteDb(); // cleanup
-        sleep(5000);
+        waitForSuccess(function() {
+          var req = CouchDB.request("GET", db_name);
+          if (req.status == 404) {
+            return true
+          }
+          throw({});
+        }, 'usersDb.deleteDb')
         usersDb.createDb();
+        waitForSuccess(function() {
+          var req = CouchDB.request("GET", db_name);
+          if (req.status == 200) {
+            return true
+          }
+          throw({});
+        }, 'usersDb.creteDb')
       }
     }
   );
