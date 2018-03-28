@@ -394,15 +394,15 @@ upgrade_mrargs({mrargs,
 -include_lib("eunit/include/eunit.hrl").
 
 make_etag_test() ->
-    EtagsEmpty = sets:new(),
-    EtagsUndef1 = sets:from_list([undefined]),
-    EtagsUndef2 = sets:from_list([chttpd:make_etag(a), undefined]),
+    ETagsEmpty = sets:new(),
+    ETagsUndef1 = sets:from_list([undefined]),
+    ETagsUndef2 = sets:from_list([chttpd:make_etag(a), undefined]),
     ETags1 = sets:from_list([chttpd:make_etag(A) || A <- [a, b, a, c, c, b]]),
     ETags2 = sets:from_list([chttpd:make_etag(A) || A <- [b, c, a, b, a, c]]),
     [
-        ?assertEqual(undefined, make_etag(EtagsEmpty)),
-        ?assertEqual(undefined, make_etag(EtagsUndef1)),
-        ?assertEqual(undefined, make_etag(EtagsUndef2)),
+        ?assertEqual(undefined, make_etag(ETagsEmpty)),
+        ?assertEqual(undefined, make_etag(ETagsUndef1)),
+        ?assertEqual(undefined, make_etag(ETagsUndef2)),
         ?assertEqual(make_etag(ETags1), make_etag(ETags2))
     ].
 
