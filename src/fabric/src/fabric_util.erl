@@ -19,6 +19,7 @@
 -export([stream_start/2, stream_start/4]).
 -export([log_timeout/2, remove_done_workers/2]).
 -export([is_users_db/1, is_replicator_db/1, fake_db/2]).
+-export([make_etag/1, maybe_set_etag/2]).
 -export([upgrade_mrargs/1]).
 
 -compile({inline, [{doc_id_and_rev,1}]}).
@@ -308,6 +309,19 @@ fake_db(DbName, Opts) ->
     {ok, Db} = couch_db:clustered_db(DbName, UserCtx, SecProps),
     Db.
 
+maybe_set_etag(undefined, Acc) ->
+    {ok, Acc};
+maybe_set_etag(ETag, #vacc{} = Acc) ->
+    {ok, Acc#vacc{etag = ETag}};
+maybe_set_etag(_, Acc) ->
+    {ok, Acc}.
+
+make_etag(ETags) ->
+    case sets:size(ETags) > 0 andalso not sets:is_element(undefined, ETags) of
+        true -> ?b2l(chttpd:make_etag(ETags));
+        false -> undefined
+    end.
+
 %% test function
 kv(Item, Count) ->
     {make_key(Item), {Item,Count}}.
@@ -374,3 +388,22 @@ upgrade_mrargs({mrargs,
         sorted = Sorted,
         extra = Extra
     }.
+
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+make_etag_test() ->
+    EtagsEmpty = sets:new(),
+    EtagsUndef1 = sets:from_list([undefined]),
+    EtagsUndef2 = sets:from_list([chttpd:make_etag(a), undefined]),
+    ETags1 = sets:from_list([chttpd:make_etag(A) || A <- [a, b, a, c, c, b]]),
+    ETags2 = sets:from_list([chttpd:make_etag(A) || A <- [b, c, a, b, a, c]]),
+    [
+        ?assertEqual(undefined, make_etag(EtagsEmpty)),
+        ?assertEqual(undefined, make_etag(EtagsUndef1)),
+        ?assertEqual(undefined, make_etag(EtagsUndef2)),
+        ?assertEqual(make_etag(ETags1), make_etag(ETags2))
+    ].
+
+-endif.

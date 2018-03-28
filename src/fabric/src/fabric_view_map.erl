@@ -140,8 +140,8 @@ handle_message([{meta, Meta0}, {etag, ETag0}], {Worker, From}, State) ->
                 _ ->
                     [{update_seq, fabric_view_changes:pack_seqs(UpdateSeq)}]
             end,
-        ETag = make_etag(ETags),
-        {ok, AccIn} = maybe_set_etag(ETag, AccIn0),
+        ETag = fabric_util:make_etag(ETags),
+        {ok, AccIn} = fabric_util:maybe_set_etag(ETag, AccIn0),
         {Go, Acc} = Callback({meta, Meta}, AccIn),
         {Go, State#collector{
             counters = fabric_dict:decrement_all(Counters1),
@@ -265,35 +265,3 @@ key_index(KeyA, [{KeyB, Value}|KVs], CmpFun) ->
         0 -> Value;
         _ -> key_index(KeyA, KVs, CmpFun)
     end.
-
-maybe_set_etag(undefined, Acc) ->
-    {ok, Acc};
-maybe_set_etag(ETag, #vacc{} = Acc) ->
-    {ok, Acc#vacc{etag = ETag}};
-maybe_set_etag(_, Acc) ->
-    {ok, Acc}.
-
-make_etag(ETags) ->
-    case sets:size(ETags) > 0 andalso not sets:is_element(undefined, ETags) of
-        true -> ?b2l(chttpd:make_etag(ETags));
-        false -> undefined
-    end.
-
-
--ifdef(TEST).
--include_lib("eunit/include/eunit.hrl").
-
-make_etag_test() ->
-    EtagsEmpty = sets:new(),
-    EtagsUndef1 = sets:from_list([undefined]),
-    EtagsUndef2 = sets:from_list([chttpd:make_etag(a), undefined]),
-    ETags1 = sets:from_list([chttpd:make_etag(A) || A <- [a, b, a, c, c, b]]),
-    ETags2 = sets:from_list([chttpd:make_etag(A) || A <- [b, c, a, b, a, c]]),
-    [
-        ?assertEqual(undefined, make_etag(EtagsEmpty)),
-        ?assertEqual(undefined, make_etag(EtagsUndef1)),
-        ?assertEqual(undefined, make_etag(EtagsUndef2)),
-        ?assertEqual(make_etag(ETags1), make_etag(ETags2))
-    ].
-
--endif.
