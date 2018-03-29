@@ -216,7 +216,9 @@ query_all_docs(Db, Args, Callback, Acc) when is_list(Args) ->
     query_all_docs(Db, to_mrargs(Args), Callback, Acc);
 query_all_docs(Db, Args0, Callback, Acc) ->
     Sig = couch_util:with_db(Db, fun(WDb) ->
-        {ok, Info} = couch_db:get_db_info(WDb),
+        {ok, Info0} = couch_db:get_db_info(WDb),
+        Keys = [db_name, doc_count, doc_del_count, update_seq, purge_seq],
+        Info = lists:filter(fun({K, _}) -> lists:member(K, Keys) end, Info0),
         couch_index_util:hexsig(crypto:hash(md5, term_to_binary(Info)))
     end),
     Args1 = Args0#mrargs{view_type=map},
