@@ -105,12 +105,16 @@ handle_message({rexi_EXIT, Reason}, Worker, State) ->
     fabric_view:handle_worker_exit(State, Worker, Reason);
 
 handle_message({meta, Meta0}, {Worker, From}, State) ->
+    handle_message([{meta, Meta0}, {etag, undefined}], {Worker, From}, State);
+
+handle_message([{meta, Meta0}, {etag, ETag0}], {Worker, From}, State) ->
     Seq = couch_util:get_value(update_seq, Meta0, 0),
     #collector{
         callback = Callback,
         counters = Counters0,
-        user_acc = AccIn,
-        update_seq = UpdateSeq0
+        user_acc = AccIn0,
+        update_seq = UpdateSeq0,
+        etag = ETags0
     } = State,
     % Assert that we don't have other messages from this
     % worker when the total_and_offset message arrives.
@@ -121,11 +125,13 @@ handle_message({meta, Meta0}, {Worker, From}, State) ->
         nil -> nil;
         _   -> [{Worker, Seq} | UpdateSeq0]
     end,
+    ETags = [ETag0 | ETags0],
     case fabric_dict:any(0, Counters1) of
     true ->
         {ok, State#collector{
             counters = Counters1,
-            update_seq = UpdateSeq
+            update_seq = UpdateSeq,
+            etag = ETags
         }};
     false ->
         Meta = case UpdateSeq of
@@ -134,9 +140,12 @@ handle_message({meta, Meta0}, {Worker, From}, State) ->
             _ ->
                 [{update_seq, fabric_view_changes:pack_seqs(UpdateSeq)}]
         end,
+        ETag = fabric_util:make_etag(ETags),
+        {ok, AccIn} = fabric_util:maybe_set_etag(ETag, AccIn0),
         {Go, Acc} = Callback({meta, Meta}, AccIn),
         {Go, State#collector{
             counters = fabric_dict:decrement_all(Counters1),
+            etag = ETag,
             user_acc = Acc
         }}
     end;

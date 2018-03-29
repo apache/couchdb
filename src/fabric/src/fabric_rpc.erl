@@ -324,9 +324,9 @@ view_cb(ok, ddoc_updated) ->
     rexi:reply({ok, ddoc_updated}).
 
 
-reduce_cb({meta, Meta}, Acc) ->
+reduce_cb({meta, Meta}, #vacc{etag = ETag} = Acc) ->
     % Map function starting
-    ok = rexi:stream2({meta, Meta}),
+    ok = rexi:stream2([{meta, Meta}, {etag, ETag}]),
     {ok, Acc};
 reduce_cb({row, Row}, Acc) ->
     % Adding another row
