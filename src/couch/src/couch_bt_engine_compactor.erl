@@ -386,7 +386,7 @@ commit_compaction_data(#st{header = OldHeader} = St0, Fd) ->
     MetaFd = couch_emsort:get_fd(St0#st.id_tree),
     MetaState = couch_emsort:get_state(St0#st.id_tree),
     St1 = bind_id_tree(St0, St0#st.fd, DataState),
-    Header = St1#st.header,
+    Header = couch_bt_engine:update_header(St1, St1#st.header),
     CompHeader = #comp_header{
         db_header = Header,
         meta_state = MetaState
