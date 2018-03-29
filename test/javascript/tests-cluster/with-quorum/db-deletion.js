@@ -19,10 +19,10 @@ couchTests.db_deletion = function(debug) {
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
 
   db.createDb();
-  
-  // DB Deletion should return 200 - Ok
+
+  // DB Deletion should return 202 - Acceted as the custer is not complete
   xhr = CouchDB.request("DELETE", "/" + db_name + "/");
-  T(xhr.status == 200);
+  T(xhr.status == 202);
 
 // DB Deletion should return 404 - Not found
   xhr = CouchDB.request("DELETE", "/not-existing-db/");
