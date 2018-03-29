@@ -121,7 +121,7 @@ handle_message([{meta, Meta0}, {etag, ETag0}], {Worker, From}, State) ->
         nil -> nil;
         _   -> [{Worker, Seq} | UpdateSeq0]
     end,
-    ETags = sets:add_element(ETag0, ETags0),
+    ETags = [ETag0 | ETags0],
     case fabric_dict:any(0, Counters1) of
     true ->
         {ok, State#collector{

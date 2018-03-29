@@ -32,7 +32,7 @@
     sorted,
     user_acc,
     update_seq,
-    etag = sets:new()
+    etag = []
 }).
 
 -record(stream_acc, {

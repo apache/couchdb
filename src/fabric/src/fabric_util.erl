@@ -316,10 +316,12 @@ maybe_set_etag(ETag, #vacc{} = Acc) ->
 maybe_set_etag(_, Acc) ->
     {ok, Acc}.
 
+make_etag([]) ->
+    undefined;
 make_etag(ETags) ->
-    case sets:size(ETags) > 0 andalso not sets:is_element(undefined, ETags) of
-        true -> ?b2l(chttpd:make_etag(ETags));
-        false -> undefined
+    case lists:member(undefined, ETags) of
+        true -> undefined;
+        false -> ?b2l(chttpd:make_etag(lists:usort(ETags)))
     end.
 
 %% test function
@@ -394,11 +396,29 @@ upgrade_mrargs({mrargs,
 -include_lib("eunit/include/eunit.hrl").
 
 make_etag_test() ->
-    ETagsEmpty = sets:new(),
-    ETagsUndef1 = sets:from_list([undefined]),
-    ETagsUndef2 = sets:from_list([chttpd:make_etag(a), undefined]),
-    ETags1 = sets:from_list([chttpd:make_etag(A) || A <- [a, b, a, c, c, b]]),
-    ETags2 = sets:from_list([chttpd:make_etag(A) || A <- [b, c, a, b, a, c]]),
+    ETagsEmpty = [],
+    ETagsUndef1 = [undefined],
+    ETagsUndef2 = [chttpd:make_etag(a), undefined],
+    ETags1 = [
+        <<"\"2F332B4YM6IYB0S4TL61WB07T\"">>,
+        <<"\"AVHZC4PRSDE1I6C13FMROYFER\"">>,
+        <<"\"D7Q054EV4MVV6G57TRLUVQUNG\"">>,
+        <<"\"CT8FCP4VF9AHGS75L255B4TAN\"">>,
+        <<"\"8WRGVGKV4IQWH5JELHHBD8SCP\"">>,
+        <<"\"1YTAPUW4HXKHL3JO3Y487O5H\"">>,
+        <<"\"189S9QEX2P5CG3XSYHX0DMIUM\"">>,
+        <<"\"DXK436MEITBQGE9CY61MH6OFD\"">>
+    ],
+    ETags2 = [
+        <<"\"189S9QEX2P5CG3XSYHX0DMIUM\"">>,
+        <<"\"2F332B4YM6IYB0S4TL61WB07T\"">>,
+        <<"\"8WRGVGKV4IQWH5JELHHBD8SCP\"">>,
+        <<"\"D7Q054EV4MVV6G57TRLUVQUNG\"">>,
+        <<"\"DXK436MEITBQGE9CY61MH6OFD\"">>,
+        <<"\"CT8FCP4VF9AHGS75L255B4TAN\"">>,
+        <<"\"AVHZC4PRSDE1I6C13FMROYFER\"">>,
+        <<"\"1YTAPUW4HXKHL3JO3Y487O5H\"">>
+    ],
     [
         ?assertEqual(undefined, make_etag(ETagsEmpty)),
         ?assertEqual(undefined, make_etag(ETagsUndef1)),
