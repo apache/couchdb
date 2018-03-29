@@ -47,7 +47,8 @@
 
 -export([
     upgrade/1,
-    downgrade/1
+    downgrade/1,
+    to_tuple/1
 ]).
 
 -export([
@@ -707,6 +708,9 @@ upgrade(#att{} = Att) ->
     [{F, element(I, Att)} || {F, I} <- Map, element(I, Att) /= undefined];
 upgrade(Att) ->
     Att.
+
+to_tuple(#att{name=Name, att_len=Len, type=Type, encoding=Encoding}) ->
+    {att, Name, Len, Type, Encoding}.
 
 
 %% Downgrade is exposed for interactive convenience. In practice, unless done

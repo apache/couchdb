@@ -136,9 +136,24 @@ from_json_obj_validate(EJson, DbName) ->
     case couch_ejson_size:encoded_size(Doc#doc.body) =< MaxSize of
         true ->
              validate_attachment_sizes(Doc#doc.atts),
+             validate_total_document_size(Doc),
              Doc;
         false ->
             throw({request_entity_too_large, Doc#doc.id})
+    end.
+
+
+% sum up the json body size + attachment body size and
+% make sure it is < max_http_request_size
+validate_total_document_size(#doc{id=DocId, body=Body, atts=Atts0}) ->
+    MaxReqSize = config:get_integer("httpd", "max_http_request_size", 4294967296), % 2 GB
+    Boundary = couch_uuids:random(), % mock boundary, is only used for the length
+    Atts = lists:map(fun couch_att:to_tuple/1, Atts0),
+    {_, DocSum} = couch_httpd_multipart:length_multipart_stream(Boundary,
+        ?JSON_ENCODE(Body), Atts),
+    case DocSum =< MaxReqSize of
+        true -> ok;
+        false -> throw({request_entity_too_large, DocId})
     end.
 
 
