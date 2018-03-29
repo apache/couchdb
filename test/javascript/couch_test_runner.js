@@ -427,7 +427,9 @@ function waitForSuccess(fun, tag) {
       try {
         fun();
         break;
-      } catch (e) {}
+      } catch (e) {
+        log(e)
+      }
       // sync http req allow async req to happen
       try {
         CouchDB.request("GET", "/test_suite_db/?tag="+encodeURIComponent(tag));

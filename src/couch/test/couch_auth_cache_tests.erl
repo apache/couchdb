@@ -52,7 +52,8 @@ couch_auth_cache_test_() ->
                     fun should_drop_cache_on_auth_db_change/1,
                     fun should_restore_cache_on_auth_db_change/1,
                     fun should_recover_cache_after_shutdown/1,
-                    fun should_close_old_db_on_auth_db_change/1
+                    fun should_close_old_db_on_auth_db_change/1,
+                    fun should_get_admin_from_config/1
                 ]
             }
         }
@@ -236,6 +237,19 @@ should_close_old_db_on_auth_db_change(DbName) ->
                          ?b2l(?tempdb()), false),
         ?assertEqual(ok, wait_db(DbName, fun is_closed/1))
     end)}.
+
+should_get_admin_from_config(_DbName) ->
+    ?_test(begin
+        config:set("admins", "testadmin", "password", false),
+        Creds = test_util:wait(fun() ->
+            case couch_auth_cache:get_user_creds("testadmin") of
+                {ok, Creds0, _} -> Creds0;
+                nil -> wait
+            end
+        end),
+        Roles = couch_util:get_value(<<"roles">>, Creds),
+        ?assertEqual([<<"_admin">>], Roles)
+    end).
 
 update_user_doc(DbName, UserName, Password) ->
     update_user_doc(DbName, UserName, Password, nil).

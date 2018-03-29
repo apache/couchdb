@@ -194,9 +194,11 @@ get_shard([#shard{node = Node, name = Name} | Rest], Opts, Timeout, Factor) ->
             throw(Error);
         {Ref, {'rexi_EXIT', {{forbidden, _} = Error, _}}} ->
             throw(Error);
-        {Ref, _Else} ->
+        {Ref, Reason} ->
+            couch_log:debug("Failed to open shard ~p because: ~p", [Name, Reason]),
             get_shard(Rest, Opts, Timeout, Factor)
         after Timeout ->
+            couch_log:debug("Failed to open shard ~p after: ~p", [Name, Timeout]),
             get_shard(Rest, Opts, Factor * Timeout, Factor)
         end
     after

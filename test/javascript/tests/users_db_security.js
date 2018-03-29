@@ -32,7 +32,13 @@ couchTests.users_db_security = function(debug) {
     // the actual tests
     var username1 = username.replace(/[0-9]$/, "");
     var password = pws[username];
-    T(CouchDB.login(username1, pws[username]).ok);
+    waitForSuccess(function() {
+      var req = CouchDB.login(username1, pws[username]);
+      if (req.ok) {
+        return true
+      }
+      throw({});
+    }, 'loginUser');
   };
 
   var open_as = function(db, docId, username) {
@@ -107,7 +113,6 @@ couchTests.users_db_security = function(debug) {
 
     // jan's gonna be admin as he's the first user
     TEquals(true, usersDb.save(userDoc).ok, "should save document");
-    wait(5000);
     userDoc = open_as(usersDb, "org.couchdb.user:jchris", "jchris");
     TEquals(undefined, userDoc.password, "password field should be null 1");
     TEquals(scheme, userDoc.password_scheme, "password_scheme should be " + scheme);
@@ -411,11 +416,27 @@ couchTests.users_db_security = function(debug) {
       function() {
         try {
           testFun(scheme, derivedKeyTests[scheme], saltTests[scheme]);
+        } catch (e) {
+          throw(e)
         } finally {
           CouchDB.login("jan", "apple");
           usersDb.deleteDb(); // cleanup
-          sleep(5000);
+          waitForSuccess(function() {
+            var req = CouchDB.request("GET", db_name);
+            if (req.status == 404) {
+              return true
+            }
+            throw({});
+          }, 'usersDb.deleteDb')
+
           usersDb.createDb();
+          waitForSuccess(function() {
+            var req = CouchDB.request("GET", db_name);
+            if (req.status == 200) {
+              return true
+            }
+            throw({});
+          }, 'usersDb.creteDb')
         }
       }
     );
@@ -501,8 +522,21 @@ couchTests.users_db_security = function(debug) {
       } finally {
         CouchDB.login("jan", "apple");
         usersDb.deleteDb(); // cleanup
-        sleep(5000);
+        waitForSuccess(function() {
+          var req = CouchDB.request("GET", db_name);
+          if (req.status == 404) {
+            return true
+          }
+          throw({});
+        }, 'usersDb.deleteDb')
         usersDb.createDb();
+        waitForSuccess(function() {
+          var req = CouchDB.request("GET", db_name);
+          if (req.status == 200) {
+            return true
+          }
+          throw({});
+        }, 'usersDb.creteDb')
       }
     }
   );

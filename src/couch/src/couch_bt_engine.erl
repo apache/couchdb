@@ -92,6 +92,7 @@
 % Used by the compactor
 -export([
     set_update_seq/2,
+    update_header/2,
     copy_security/2
 ]).
 
