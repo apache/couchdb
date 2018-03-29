@@ -145,7 +145,7 @@ handle_message({rexi_EXIT, Reason}, Worker, State) ->
 handle_message({meta, Meta0}, {Worker, From}, State) ->
     handle_message([{meta, Meta0}, {etag, undefined}], {Worker, From}, State);
 
-handle_message([{meta, Meta0}, {etag, _}], {Worker, From}, State) ->
+handle_message([{meta, Meta0}, {etag, ETag0}], {Worker, From}, State) ->
     Tot = couch_util:get_value(total, Meta0, 0),
     Off = couch_util:get_value(offset, Meta0, 0),
     Seq = couch_util:get_value(update_seq, Meta0, 0),
@@ -154,8 +154,9 @@ handle_message([{meta, Meta0}, {etag, _}], {Worker, From}, State) ->
         counters = Counters0,
         total_rows = Total0,
         offset = Offset0,
-        user_acc = AccIn,
-        update_seq = UpdateSeq0
+        user_acc = AccIn0,
+        update_seq = UpdateSeq0,
+        etag = ETags0
     } = State,
     % Assert that we don't have other messages from this
     % worker when the total_and_offset message arrives.
@@ -169,13 +170,15 @@ handle_message([{meta, Meta0}, {etag, _}], {Worker, From}, State) ->
         {_, null} -> null;
         _   -> [{Worker, Seq} | UpdateSeq0]
     end,
+    ETags = sets:add_element(ETag0, ETags0),
     case fabric_dict:any(0, Counters1) of
     true ->
         {ok, State#collector{
             counters = Counters1,
             total_rows = Total,
             update_seq = UpdateSeq,
-            offset = Offset
+            offset = Offset,
+            etag = ETags
         }};
     false ->
         FinalOffset = case Offset of
@@ -191,11 +194,14 @@ handle_message([{meta, Meta0}, {etag, _}], {Worker, From}, State) ->
                 _ ->
                     [{update_seq, fabric_view_changes:pack_seqs(UpdateSeq)}]
             end,
+        ETag = fabric_util:make_etag(ETags),
+        {ok, AccIn} = fabric_util:maybe_set_etag(ETag, AccIn0),
         {Go, Acc} = Callback({meta, Meta}, AccIn),
         {Go, State#collector{
             counters = fabric_dict:decrement_all(Counters1),
             total_rows = Total,
             offset = FinalOffset,
+            etag = ETag,
             user_acc = Acc,
             update_seq = UpdateSeq0
         }}
