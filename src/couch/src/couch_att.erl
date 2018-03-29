@@ -52,7 +52,8 @@
 
 -export([
     max_attachment_size/0,
-    validate_attachment_size/3
+    validate_attachment_size/3,
+    validate_attachment_count/1
 ]).
 
 -compile(nowarn_deprecated_type).
@@ -737,6 +738,25 @@ max_attachment_size() ->
             infinity;
         MaxAttSize ->
             list_to_integer(MaxAttSize)
+    end.
+
+
+max_attachment_count() ->
+    case config:get("couchdb", "max_attachments_per_document", "infinity") of
+        "infinity" ->
+            infinity;
+        MaxAttSize ->
+            list_to_integer(MaxAttSize)
+    end.
+
+
+validate_attachment_count(AttCount) ->
+    case max_attachment_count() of
+        infinity -> ok;
+        MaxAttCount when AttCount =< MaxAttCount -> ok;
+        _TooManyAttachments ->
+            throw({request_entity_too_large,
+                <<"hit max_attachments_per_document">>})
     end.
 
 
