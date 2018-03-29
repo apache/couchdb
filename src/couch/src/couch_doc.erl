@@ -145,7 +145,8 @@ from_json_obj_validate(EJson, DbName) ->
 
 % sum up the json body size + attachment body size and
 % make sure it is < max_http_request_size
-validate_total_document_size(#doc{id=DocId, body=Body, atts=Atts0}) ->
+validate_total_document_size(#doc{id=DocId, body=Body, atts=Atts0}=Doc) ->
+    couch_log:debug("~nData: ~p~n", [Doc]),
     MaxReqSize = config:get_integer("httpd", "max_http_request_size", 4294967296), % 2 GB
     Boundary = couch_uuids:random(), % mock boundary, is only used for the length
     Atts = lists:map(fun couch_att:to_tuple/1, Atts0),
