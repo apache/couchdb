@@ -91,7 +91,7 @@ handle_scheduler_req(Req) ->
 handle_req(#httpd{method = 'POST', user_ctx = UserCtx} = Req) ->
     couch_httpd:validate_ctype(Req, "application/json"),
     RepDoc = {Props} = couch_httpd:json_body_obj(Req),
-    couch_replicator_httpd_utils:validate_rep_props(Props),
+    couch_replicator_httpd_util:validate_rep_props(Props),
     case couch_replicator:replicate(RepDoc, UserCtx) of
     {error, {Error, Reason}} ->
         send_json(
