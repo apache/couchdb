@@ -105,13 +105,13 @@ middleman(Req, chunked) ->
 
     % take requests from the DB writers and get data from the receiver
     N = erlang:list_to_integer(config:get("cluster","n")),
-    Timeout = fabric_util:request_timeout(),
+    Timeout = fabric_util:attachments_timeout(),
     middleman_loop(Receiver, N, [], [], Timeout);
 
 middleman(Req, Length) ->
     Receiver = spawn(fun() -> receive_unchunked_attachment(Req, Length) end),
     N = erlang:list_to_integer(config:get("cluster","n")),
-    Timeout = fabric_util:request_timeout(),
+    Timeout = fabric_util:attachments_timeout(),
     middleman_loop(Receiver, N, [], [], Timeout).
 
 middleman_loop(Receiver, N, Counters0, ChunkList0, Timeout) ->
@@ -153,5 +153,6 @@ middleman_loop(Receiver, N, Counters0, ChunkList0, Timeout) ->
 
         middleman_loop(Receiver, N, Counters3, ChunkList3, Timeout)
     after Timeout ->
+        exit(Receiver, kill),
         ok
     end.
