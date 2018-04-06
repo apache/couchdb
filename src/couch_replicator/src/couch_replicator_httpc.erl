@@ -71,14 +71,14 @@ send_req(HttpDb, Params1, Callback) ->
         [{K, ?b2l(iolist_to_binary(V))} || {K, V} <- get_value(qs, Params1, [])]),
     Params = ?replace(Params2, ibrowse_options,
         lists:keysort(1, get_value(ibrowse_options, Params2, []))),
-    {Worker, Response} = send_ibrowse_req(HttpDb, Params),
+    {Worker, Response, HttpDb1} = send_ibrowse_req(HttpDb, Params),
     Ret = try
-        process_response(Response, Worker, HttpDb, Params, Callback)
+        process_response(Response, Worker, HttpDb1, Params, Callback)
     catch
         throw:{retry, NewHttpDb0, NewParams0} ->
             {retry, NewHttpDb0, NewParams0}
     after
-        Pool = HttpDb#httpdb.httpc_pool,
+        Pool = HttpDb1#httpdb.httpc_pool,
         case get(?STOP_HTTP_WORKER) of
             stop ->
                 ok = stop_and_release_worker(Pool, Worker),
@@ -124,7 +124,7 @@ send_ibrowse_req(#httpdb{headers = BaseHeaders} = HttpDb0, Params) ->
     backoff_before_request(Worker, HttpDb, Params),
     Response = ibrowse:send_req_direct(
         Worker, Url, Headers2, Method, Body, IbrowseOptions, Timeout),
-    {Worker, Response}.
+    {Worker, Response, HttpDb}.
 
 
 %% Stop worker, wait for it to die, then release it. Make sure it is dead before
