@@ -67,8 +67,7 @@ DepDescs = [
 {meck,             "meck",             {tag, "0.8.8"}},
 {bcrypt,           {url, "https://github.com/apache/couchdb-erlang-bcrypt"},
                    {tag, "1.0.2"}},
-{triq,             {url, "https://gitlab.com/triq/triq.git"},
-                   "79bd272025434e152745067c36350faa7274c653"}
+{triq,             "triq",             {tag, "v1.2.0"}}
 ],
 
 
