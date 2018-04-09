@@ -181,6 +181,13 @@
             CompactedSeq::non_neg_integer().
 
 
+% The database should make a note of the time when it
+% was last compacted. If the database doesn't need compacting it
+% can just hard code a return value of 0.
+-callback get_last_compaction(DbHandle::db_handle()) ->
+            LastCompaction::non_neg_integer().
+
+
 % The number of documents in the database which have all leaf
 % revisions marked as deleted.
 -callback get_del_doc_count(DbHandle::db_handle()) ->
@@ -593,6 +600,7 @@
 
     get_engine/1,
     get_compacted_seq/1,
+    get_last_compaction/1,
     get_del_doc_count/1,
     get_disk_version/1,
     get_doc_count/1,
@@ -715,6 +723,11 @@ get_engine(#db{} = Db) ->
 get_compacted_seq(#db{} = Db) ->
     #db{engine = {Engine, EngineState}} = Db,
     Engine:get_compacted_seq(EngineState).
+
+
+get_last_compaction(#db{} = Db) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    Engine:get_last_compaction(EngineState).
 
 
 get_del_doc_count(#db{} = Db) ->

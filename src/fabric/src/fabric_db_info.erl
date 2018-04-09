@@ -95,6 +95,13 @@ merge_results(Info) ->
             [{purge_seq, lists:sum(X)} | Acc];
         (compact_running, X, Acc) ->
             [{compact_running, lists:member(true, X)} | Acc];
+        (last_compaction, Times, Acc) ->
+            case lists:member(null, Times) of
+                true ->
+                    [{last_compaction, null} | Acc];
+                false ->
+                    [{last_compaction, lists:min(Times)} | Acc]
+            end;
         (disk_size, X, Acc) -> % legacy
             [{disk_size, lists:sum(X)} | Acc];
         (data_size, X, Acc) -> % legacy

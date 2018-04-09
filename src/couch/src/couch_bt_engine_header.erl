@@ -37,7 +37,8 @@
     revs_limit/1,
     uuid/1,
     epochs/1,
-    compacted_seq/1
+    compacted_seq/1,
+    last_compaction/1
 ]).
 
 
@@ -66,7 +67,8 @@
     revs_limit = 1000,
     uuid,
     epochs,
-    compacted_seq
+    compacted_seq,
+    last_compaction
 }).
 
 
@@ -82,7 +84,8 @@ from(Header0) ->
     #db_header{
         uuid = Header#db_header.uuid,
         epochs = Header#db_header.epochs,
-        compacted_seq = Header#db_header.compacted_seq
+        compacted_seq = Header#db_header.compacted_seq,
+        last_compaction = Header#db_header.last_compaction
     }.
 
 
@@ -176,6 +179,10 @@ epochs(Header) ->
 
 compacted_seq(Header) ->
     get_field(Header, compacted_seq).
+
+
+last_compaction(Header) ->
+    get_field(Header, last_compaction).
 
 
 get_field(Header, Field) ->

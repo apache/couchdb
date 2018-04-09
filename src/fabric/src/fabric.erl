@@ -78,6 +78,7 @@ all_dbs(Prefix) when is_list(Prefix) ->
         {doc_del_count, non_neg_integer()} |
         {purge_seq, non_neg_integer()} |
         {compact_running, boolean()} |
+        {last_compaction, non_neg_integer()} |
         {disk_size, non_neg_integer()} |
         {disk_format_version, pos_integer()}
     ]}.

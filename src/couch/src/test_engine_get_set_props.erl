@@ -39,7 +39,8 @@ cet_default_props() ->
     ?assertEqual(1000, Engine:get_revs_limit(St)),
     ?assertMatch(<<_:32/binary>>, Engine:get_uuid(St)),
     ?assertEqual([{Node, 0}], Engine:get_epochs(St)),
-    ?assertEqual(0, Engine:get_compacted_seq(St)).
+    ?assertEqual(0, Engine:get_compacted_seq(St)),
+    ?assertEqual(undefined, Engine:get_last_compaction(St)).
 
 
 cet_set_security() ->

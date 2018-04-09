@@ -31,6 +31,7 @@
     last_activity/1,
 
     get_compacted_seq/1,
+    get_last_compaction/1,
     get_del_doc_count/1,
     get_disk_version/1,
     get_doc_count/1,
@@ -197,6 +198,10 @@ last_activity(#st{fd = Fd}) ->
 
 get_compacted_seq(#st{header = Header}) ->
     couch_bt_engine_header:get(Header, compacted_seq).
+
+
+get_last_compaction(#st{header = Header}) ->
+    couch_bt_engine_header:get(Header, last_compaction).
 
 
 get_del_doc_count(#st{} = St) ->
@@ -933,6 +938,7 @@ finish_compaction_int(#st{} = OldSt, #st{} = NewSt1) ->
     {ok, NewSt2} = commit_data(NewSt1#st{
         header = couch_bt_engine_header:set(Header, [
             {compacted_seq, get_update_seq(OldSt)},
+            {last_compaction, now_secs()},
             {revs_limit, get_revs_limit(OldSt)}
         ]),
         local_tree = NewLocal2
@@ -961,3 +967,8 @@ finish_compaction_int(#st{} = OldSt, #st{} = NewSt1) ->
     {ok, NewSt2#st{
         filepath = FilePath
     }, undefined}.
+
+
+now_secs() ->
+    {Mega, Sec, _Micro} = os:timestamp(),
+    Mega * 1000000 + Sec.
