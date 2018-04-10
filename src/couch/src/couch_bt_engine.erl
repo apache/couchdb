@@ -35,8 +35,9 @@
     get_disk_version/1,
     get_doc_count/1,
     get_epochs/1,
-    get_last_purged/1,
+    get_oldest_purge_seq/1,
     get_purge_seq/1,
+    get_purged_docs_limit/1,
     get_revs_limit/1,
     get_security/1,
     get_size_info/1,
@@ -45,14 +46,18 @@
 
     set_revs_limit/2,
     set_security/2,
+    set_purged_docs_limit/2,
 
     open_docs/2,
     open_local_docs/2,
+    open_purged_docs/2,
     read_doc_body/2,
 
     serialize_doc/2,
     write_doc_body/2,
-    write_doc_infos/4,
+    write_doc_infos/3,
+    purge_doc_revs/3,
+
 
     commit_data/1,
 
@@ -63,10 +68,13 @@
     fold_docs/4,
     fold_local_docs/4,
     fold_changes/5,
+    fold_purged_docs/5,
     count_changes_since/2,
 
     start_compaction/4,
-    finish_compaction/4
+    finish_compaction/4,
+
+    downgrade_purge_info/1
 ]).
 
 
@@ -85,7 +93,9 @@
     seq_tree_reduce/2,
 
     local_tree_split/1,
-    local_tree_join/2
+    local_tree_join/2,
+
+    purge_tree_reduce/2
 ]).
 
 
@@ -99,6 +109,17 @@
 
 -include_lib("couch/include/couch_db.hrl").
 -include("couch_bt_engine.hrl").
+
+
+-record(pacc, {
+    add_docs = [],
+    rem_ids = [],
+    rem_seqs = [],
+    add_upurges = [],
+    add_purges = [],
+    update_seq,
+    purge_seq
+}).
 
 
 exists(FilePath) ->
@@ -217,18 +238,18 @@ get_epochs(#st{header = Header}) ->
     couch_bt_engine_header:get(Header, epochs).
 
 
-get_last_purged(#st{header = Header} = St) ->
-    case couch_bt_engine_header:get(Header, purged_docs) of
-        nil ->
-            [];
-        Pointer ->
-            {ok, PurgeInfo} = couch_file:pread_term(St#st.fd, Pointer),
-            PurgeInfo
-    end.
-
-
 get_purge_seq(#st{header = Header}) ->
     couch_bt_engine_header:get(Header, purge_seq).
+
+
+get_oldest_purge_seq(#st{} = St) ->
+    FoldFun = fun({K, _V}, _) -> {stop, K} end,
+    {ok, _, OldestSeq} = couch_btree:foldl(St#st.purge_tree, FoldFun, 0),
+    OldestSeq.
+
+
+get_purged_docs_limit(#st{header = Header}) ->
+    couch_bt_engine_header:get(Header, purged_docs_limit).
 
 
 get_revs_limit(#st{header = Header}) ->
@@ -274,6 +295,16 @@ get_uuid(#st{header = Header}) ->
     couch_bt_engine_header:get(Header, uuid).
 
 
+set_purged_docs_limit(#st{header = Header} = St, PurgedDocsLimit) ->
+    NewSt = St#st{
+        header = couch_bt_engine_header:set(Header, [
+            {purged_docs_limit, PurgedDocsLimit}
+        ]),
+        needs_commit = true
+    },
+    {ok, increment_update_seq(NewSt)}.
+
+
 set_revs_limit(#st{header = Header} = St, RevsLimit) ->
     NewSt = St#st{
         header = couch_bt_engine_header:set(Header, [
@@ -308,6 +339,14 @@ open_local_docs(#st{} = St, DocIds) ->
     Results = couch_btree:lookup(St#st.local_tree, DocIds),
     lists:map(fun
         ({ok, Doc}) -> Doc;
+        (not_found) -> not_found
+    end, Results).
+
+
+open_purged_docs(St, UUIDs) ->
+    Results = couch_btree:lookup(St#st.upurge_tree, UUIDs),
+    lists:map(fun
+        ({ok, IdRevs}) -> IdRevs;
         (not_found) -> not_found
     end, Results).
 
@@ -351,7 +390,7 @@ write_doc_body(St, #doc{} = Doc) ->
     {ok, Doc#doc{body = Ptr}, Written}.
 
 
-write_doc_infos(#st{} = St, Pairs, LocalDocs, PurgedIdRevs) ->
+write_doc_infos(#st{} = St, Pairs, LocalDocs) ->
     #st{
         id_tree = IdTree,
         seq_tree = SeqTree,
@@ -391,29 +430,71 @@ write_doc_infos(#st{} = St, Pairs, LocalDocs, PurgedIdRevs) ->
         erlang:max(Seq, Acc)
     end, get_update_seq(St), Add),
 
-    NewHeader = case PurgedIdRevs of
-        [] ->
-            couch_bt_engine_header:set(St#st.header, [
-                {update_seq, NewUpdateSeq}
-            ]);
-        _ ->
-            {ok, Ptr, _} = couch_file:append_term(St#st.fd, PurgedIdRevs),
-            OldPurgeSeq = couch_bt_engine_header:get(St#st.header, purge_seq),
-            % We bump NewUpdateSeq because we have to ensure that
-            % indexers see that they need to process the new purge
-            % information.
-            couch_bt_engine_header:set(St#st.header, [
-                {update_seq, NewUpdateSeq + 1},
-                {purge_seq, OldPurgeSeq + 1},
-                {purged_docs, Ptr}
-            ])
-    end,
+    NewHeader = couch_bt_engine_header:set(St#st.header, [
+        {update_seq, NewUpdateSeq}
+    ]),
 
     {ok, St#st{
         header = NewHeader,
         id_tree = IdTree2,
         seq_tree = SeqTree2,
         local_tree = LocalTree2,
+        needs_commit = true
+    }}.
+
+
+purge_doc_revs(#st{} = St, DocInfos, Purges) ->
+    #st{
+        id_tree = IdTree,
+        seq_tree = SeqTree,
+        purge_tree = PurgeTree,
+        upurge_tree = UPurgeTree
+    } = St,
+    UpdateSeq = couch_bt_engine_header:get(St#st.header, update_seq),
+    PurgeSeq = couch_bt_engine_header:get(St#st.header, purge_seq),
+    PAcc0 = #pacc{update_seq = UpdateSeq, purge_seq = PurgeSeq},
+
+    PAcc = lists:foldl(fun(DocInfoPurge, Acc) ->
+        {{OldFDI, NewFDI}, {UUId, DocId, Revs}} = DocInfoPurge,
+        NextPSeq = Acc#pacc.purge_seq + 1,
+        Acc2 = Acc#pacc{
+            rem_seqs = [OldFDI#full_doc_info.update_seq|Acc#pacc.rem_seqs],
+            add_upurges = [{UUId, {DocId, Revs}}|Acc#pacc.add_upurges],
+            add_purges =  [{NextPSeq, UUId}|Acc#pacc.add_purges],
+            purge_seq = NextPSeq
+        },
+        case NewFDI of
+            #full_doc_info{id = DocId, update_seq = NewUSeq} ->
+                Acc2#pacc{
+                    add_docs = [NewFDI|Acc2#pacc.add_docs],
+                    update_seq = NewUSeq
+                };
+            not_found ->
+                Acc2#pacc{rem_ids = [DocId|Acc#pacc.rem_ids]}
+        end
+    end, PAcc0, lists:zip(DocInfos, Purges)),
+
+    % We bump NewUpdateSeq because we have to ensure that
+    % indexers see that they need to process the new purge
+    % information.
+    NewUpdateSeq = if UpdateSeq == PAcc#pacc.update_seq -> UpdateSeq + 1;
+        true -> PAcc#pacc.update_seq end,
+    Header2 = couch_bt_engine_header:set(St#st.header, [
+        {update_seq, NewUpdateSeq},
+        {purge_seq, PAcc#pacc.purge_seq}
+    ]),
+    {ok, IdTree2} = couch_btree:add_remove(IdTree,
+            PAcc#pacc.add_docs, PAcc#pacc.rem_ids),
+    {ok, SeqTree2} = couch_btree:add_remove(SeqTree,
+            PAcc#pacc.add_docs, PAcc#pacc.rem_seqs),
+    {ok, UPurgeTree2} = couch_btree:add(UPurgeTree, PAcc#pacc.add_upurges),
+    {ok, PurgeTree2} = couch_btree:add(PurgeTree, PAcc#pacc.add_purges),
+    {ok, St#st{
+        header = Header2,
+        id_tree = IdTree2,
+        seq_tree = SeqTree2,
+        purge_tree = PurgeTree2,
+        upurge_tree = UPurgeTree2,
         needs_commit = true
     }}.
 
@@ -478,6 +559,35 @@ fold_changes(St, SinceSeq, UserFun, UserAcc, Options) ->
     {ok, _, OutAcc} = couch_btree:fold(St#st.seq_tree, Fun, InAcc, Opts),
     {_, FinalUserAcc} = OutAcc,
     {ok, FinalUserAcc}.
+
+
+fold_purged_docs(St, StartSeq0, UserFun, UserAcc, Options) ->
+    StartSeq = StartSeq0 + 1,
+    PurgeTree = St#st.purge_tree,
+    {ok, _, MinSeq} = couch_btree:foldl(PurgeTree,
+        fun({K, _V}, _) -> {stop, K} end, 0),
+    if (MinSeq =< StartSeq) ->
+        Fun = fun drop_reductions2/4,
+        UFun = fun(PSeq, UUID, {PAcc, UUIDAcc}) ->
+            {ok, {[PSeq| PAcc],[UUID| UUIDAcc]}}
+        end,
+        PUAcc = {[], []},
+        InAcc = {UFun, PUAcc},
+        Opts = [{start_key, StartSeq}] ++ Options,
+        {ok, _, OutAcc} = couch_btree:fold(PurgeTree, Fun, InAcc, Opts),
+        {_, {PSeqs0, UUIDs0}} = OutAcc,
+        PSeqs = lists:reverse(PSeqs0),
+        UUIDs = lists:reverse(UUIDs0),
+        DocResults = couch_btree:lookup(St#st.upurge_tree, UUIDs),
+        FinalAcc = pfoldl(UserFun, UserAcc, PSeqs, DocResults),
+        {ok, FinalAcc};
+    true ->
+        throw({invalid_start_purge_seq, StartSeq0})
+    end.
+
+pfoldl(F, Accu, [PSeq| PSeqs], [{ok, {UUID, {Id, Revs}}}| DocResults]) ->
+    pfoldl(F, F({PSeq, UUID, Id, Revs}, Accu), PSeqs, DocResults);
+pfoldl(_F, Accu, [], []) -> Accu.
 
 
 count_changes_since(St, SinceSeq) ->
@@ -604,6 +714,13 @@ seq_tree_reduce(rereduce, Reds) ->
     lists:sum(Reds).
 
 
+purge_tree_reduce(reduce, IdRevs) ->
+    % count the number of purge requests
+    length(IdRevs);
+purge_tree_reduce(rereduce, Reds) ->
+    lists:sum(Reds).
+
+
 local_tree_split(#doc{revs = {0, [Rev]}} = Doc) when is_binary(Rev) ->
     #doc{
         id = Id,
@@ -618,6 +735,13 @@ local_tree_split(#doc{revs = {0, [Rev]}} = Doc) when is_integer(Rev) ->
     } = Doc,
     {Id, {Rev, BodyData}}.
 
+
+local_tree_join(Id, {Rev, BodyData}) when is_binary(Rev) ->
+    #doc{
+        id = Id,
+        revs = {0, [Rev]},
+        body = BodyData
+    };
 
 local_tree_join(Id, {Rev, BodyData}) when is_integer(Rev) ->
     #doc{
@@ -682,7 +806,8 @@ init_state(FilePath, Fd, Header0, Options) ->
     Compression = couch_compress:get_compression_method(),
 
     Header1 = couch_bt_engine_header:upgrade(Header0),
-    Header = set_default_security_object(Fd, Header1, Compression, Options),
+    Header2 = set_default_security_object(Fd, Header1, Compression, Options),
+    Header = upgrade_purge_info(Fd, Header2),
 
     IdTreeState = couch_bt_engine_header:id_tree_state(Header),
     {ok, IdTree} = couch_btree:open(IdTreeState, Fd, [
@@ -707,6 +832,16 @@ init_state(FilePath, Fd, Header0, Options) ->
             {compression, Compression}
         ]),
 
+    PurgeTreeState = couch_bt_engine_header:purge_tree_state(Header),
+    {ok, PurgeTree} = couch_btree:open(PurgeTreeState, Fd, [
+        {reduce, fun ?MODULE:purge_tree_reduce/2}
+    ]),
+
+    UPurgeTreeState = couch_bt_engine_header:upurge_tree_state(Header),
+    {ok, UPurgeTree} = couch_btree:open(UPurgeTreeState, Fd, [
+        {reduce, fun ?MODULE:purge_tree_reduce/2}
+    ]),
+
     ok = couch_file:set_db_pid(Fd, self()),
 
     St = #st{
@@ -719,7 +854,9 @@ init_state(FilePath, Fd, Header0, Options) ->
         id_tree = IdTree,
         seq_tree = SeqTree,
         local_tree = LocalTree,
-        compression = Compression
+        compression = Compression,
+        purge_tree = PurgeTree,
+        upurge_tree = UPurgeTree
     },
 
     % If this is a new database we've just created a
@@ -738,7 +875,9 @@ update_header(St, Header) ->
     couch_bt_engine_header:set(Header, [
         {seq_tree_state, couch_btree:get_state(St#st.seq_tree)},
         {id_tree_state, couch_btree:get_state(St#st.id_tree)},
-        {local_tree_state, couch_btree:get_state(St#st.local_tree)}
+        {local_tree_state, couch_btree:get_state(St#st.local_tree)},
+        {purge_tree_state, couch_btree:get_state(St#st.purge_tree)},
+        {upurge_tree_state, couch_btree:get_state(St#st.upurge_tree)}
     ]).
 
 
@@ -760,6 +899,106 @@ set_default_security_object(Fd, Header, Compression, Options) ->
             AppendOpts = [{compression, Compression}],
             {ok, Ptr, _} = couch_file:append_term(Fd, Default, AppendOpts),
             couch_bt_engine_header:set(Header, security_ptr, Ptr)
+    end.
+
+
+% This function is here, and not in couch_bt_engine_header
+% because it requires modifying file contents
+upgrade_purge_info(Fd, Header) ->
+    case couch_bt_engine_header:get(Header, purge_tree_state) of
+    nil ->
+        Header;
+    Ptr when is_tuple(Ptr) ->
+        Header;
+    Ptr when is_integer(Ptr)->
+        % old PurgeDocs format - upgrade to purge_tree
+        {ok, PurgedIdsRevs} = couch_file:pread_term(Fd, Ptr),
+        PSeq = couch_bt_engine_header:purge_seq(Header),
+
+        {NPSeq, AddU0, AddP0} = lists:foldl(fun({Id, Revs}, {Seq, UAcc, PAcc}) ->
+            UUId = couch_uuids:new(),
+            NewUAcc = [{UUId, {Id, Revs}} | UAcc],
+            NewPAcc = [{Seq+1, UUId} | PAcc],
+            {Seq+1, NewUAcc, NewPAcc}
+        end, {PSeq-1, [], []}, PurgedIdsRevs),
+        AddU = lists:reverse(AddU0),
+        AddP = lists:reverse(AddP0),
+
+        {ok, UPTree0} = couch_btree:open(nil, Fd, [
+            {reduce, fun ?MODULE:purge_tree_reduce/2}
+        ]),
+        {ok, UPTree} = couch_btree:add_remove(UPTree0, AddU, []),
+        UPTreeState = couch_btree:get_state(UPTree),
+        {ok, PTree0} = couch_btree:open(nil, Fd, [
+            {reduce, fun ?MODULE:purge_tree_reduce/2}
+        ]),
+        {ok, PTree} = couch_btree:add_remove(PTree0, AddP, []),
+        PTreeState = couch_btree:get_state(PTree),
+        couch_bt_engine_header:set(Header, [
+            {purge_seq, NPSeq},
+            {purge_tree_state, PTreeState},
+            {upurge_tree_state, UPTreeState}
+        ])
+    end.
+
+
+% This function is to rollback clustered purge.
+% It replaces purge_tree_state and upurge_tree_state with
+% with  purged_docs disk pointer that stores only the last
+% purged Id and Revs
+downgrade_purge_info(FilePath) ->
+    {ok, Fd} = open_db_file(FilePath, []),
+    try
+        {ok, Header} = couch_file:read_header(Fd),
+        PSeq = couch_bt_engine_header:purge_seq(Header),
+        PurgedDocs = case  couch_bt_engine_header:purge_tree_state(Header) of
+            nil -> nil;
+            PTS when is_tuple(PTS) ->
+                {ok, PTree} = couch_btree:open(PTS, Fd, [
+                    {reduce, fun ?MODULE:purge_tree_reduce/2}
+                ]),
+                UPST = couch_bt_engine_header:upurge_tree_state(Header),
+                {ok, UPTree} = couch_btree:open(UPST, Fd, [
+                    {reduce, fun ?MODULE:purge_tree_reduce/2}
+                ]),
+                [{ok, {PSeq, UUID}}] = couch_btree:lookup(PTree, [PSeq]),
+                [{ok, {UUID, IdRevs}}] = couch_btree:lookup(UPTree, [UUID]),
+                Compression = couch_compress:get_compression_method(),
+                AppendOpts = [{compression, Compression}],
+                {ok, Ptr, _} = couch_file:append_term(Fd, [IdRevs], AppendOpts),
+                Ptr
+        end,
+
+        OldDiskVersion = couch_bt_engine_header:disk_version(Header) - 1,
+        OldHeader = {
+            db_header,
+            OldDiskVersion,
+            couch_bt_engine_header:update_seq(Header),
+            couch_bt_engine_header:get(Header, unused),
+            couch_bt_engine_header:id_tree_state(Header),
+            couch_bt_engine_header:seq_tree_state(Header),
+            couch_bt_engine_header:local_tree_state(Header),
+            PSeq,
+            PurgedDocs,
+            couch_bt_engine_header:security_ptr(Header),
+            couch_bt_engine_header:revs_limit(Header),
+            couch_bt_engine_header:uuid(Header),
+            couch_bt_engine_header:epochs(Header),
+            couch_bt_engine_header:compacted_seq(Header)
+        },
+
+        DefaultFSync = "[before_header, after_header, on_file_open]",
+        FsyncStr = config:get("couchdb", "fsync_options", DefaultFSync),
+        {ok, FsyncOptions} = couch_util:parse_term(FsyncStr),
+        Before = lists:member(before_header, FsyncOptions),
+        After = lists:member(after_header, FsyncOptions),
+        if Before -> couch_file:sync(Fd); true -> ok end,
+        ok = couch_file:write_header(Fd, OldHeader),
+        if After -> couch_file:sync(Fd); true -> ok end
+    catch
+        _ -> {error, no_valid_header}
+    after
+        couch_file:close(Fd)
     end.
 
 
@@ -906,6 +1145,13 @@ drop_reductions(_, _, _, Acc) ->
     {ok, Acc}.
 
 
+drop_reductions2(visit, {PurgeSeq, UUID}, _Reds, {UserFun, UserAcc}) ->
+    {Go, NewUserAcc} = UserFun(PurgeSeq, UUID, UserAcc),
+    {Go, {UserFun, NewUserAcc}};
+drop_reductions2(_, _, _, Acc) ->
+    {ok, Acc}.
+
+
 fold_docs_reduce_to_count(Reds) ->
     RedFun = fun id_tree_reduce/2,
     FinalRed = couch_btree:final_reduce(RedFun, Reds),
@@ -933,7 +1179,8 @@ finish_compaction_int(#st{} = OldSt, #st{} = NewSt1) ->
     {ok, NewSt2} = commit_data(NewSt1#st{
         header = couch_bt_engine_header:set(Header, [
             {compacted_seq, get_update_seq(OldSt)},
-            {revs_limit, get_revs_limit(OldSt)}
+            {revs_limit, get_revs_limit(OldSt)},
+            {purged_docs_limit, get_purged_docs_limit(OldSt)}
         ]),
         local_tree = NewLocal2
     }),

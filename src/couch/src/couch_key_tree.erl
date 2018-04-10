@@ -67,7 +67,7 @@ stem/2
 
 -include_lib("couch/include/couch_db.hrl").
 -type treenode() :: {Key::term(), Value::term(), [Node::treenode()]}.
--type tree() :: {Depth::pos_integer(), [treenode()]}.
+-type tree() :: {Depth::pos_integer(), treenode()}.
 -type revtree() :: [tree()].
 
 

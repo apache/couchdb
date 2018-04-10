@@ -57,8 +57,8 @@ couch_file_compression_test_() ->
                     fun should_use_none/1,
                     fun should_use_deflate_1/1,
                     fun should_use_deflate_9/1,
-                    fun should_use_snappy/1,
-                    fun should_compare_compression_methods/1
+                    fun should_use_snappy/1
+                    %fun should_compare_compression_methods/1
                 ]
             }
         }

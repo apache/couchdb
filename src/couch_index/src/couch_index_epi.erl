@@ -28,8 +28,9 @@ app() ->
     couch_index.
 
 providers() ->
-    [].
-
+    [
+        {couch_db, couch_index_plugin_couch_db}
+    ].
 
 services() ->
     [

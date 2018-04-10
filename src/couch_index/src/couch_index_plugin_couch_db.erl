@@ -10,17 +10,15 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--record(st, {
-    filepath,
-    fd,
-    fd_monitor,
-    fsync_options,
-    header,
-    needs_commit,
-    id_tree,
-    seq_tree,
-    local_tree,
-    compression,
-    purge_tree,
-    upurge_tree
-}).
+-module(couch_index_plugin_couch_db).
+
+-export([
+    maybe_init_index_purge_state/2
+]).
+
+-include_lib("couch/include/couch_db.hrl").
+-include_lib("couch_mrview/include/couch_mrview.hrl").
+
+
+maybe_init_index_purge_state(DbName, DDoc) ->
+    couch_mrview_index:maybe_create_local_purge_doc(DbName, DDoc).

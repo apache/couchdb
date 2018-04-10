@@ -18,7 +18,8 @@
     after_doc_read/2,
     validate_docid/1,
     check_is_admin/1,
-    on_delete/2
+    on_delete/2,
+    maybe_init_index_purge_state/2
 ]).
 
 -define(SERVICE_ID, couch_db).
@@ -59,6 +60,11 @@ check_is_admin(Db) ->
 on_delete(DbName, Options) ->
     Handle = couch_epi:get_handle(?SERVICE_ID),
     couch_epi:apply(Handle, ?SERVICE_ID, on_delete, [DbName, Options], []).
+
+maybe_init_index_purge_state(DbName, DDoc) ->
+    Handle = couch_epi:get_handle(?SERVICE_ID),
+    couch_epi:apply(Handle, ?SERVICE_ID, maybe_init_index_purge_state,
+        [DbName, DDoc], []).
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions

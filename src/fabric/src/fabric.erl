@@ -21,12 +21,13 @@
     delete_db/2, get_db_info/1, get_doc_count/1, set_revs_limit/3,
     set_security/2, set_security/3, get_revs_limit/1, get_security/1,
     get_security/2, get_all_security/1, get_all_security/2,
+    get_purged_docs_limit/1, set_purged_docs_limit/3,
     compact/1, compact/2]).
 
 % Documents
 -export([open_doc/3, open_revs/4, get_doc_info/3, get_full_doc_info/3,
     get_missing_revs/2, get_missing_revs/3, update_doc/3, update_docs/3,
-    purge_docs/2, att_receiver/2]).
+    purge_docs/3, att_receiver/2]).
 
 % Views
 -export([all_docs/4, all_docs/5, changes/4, query_view/3, query_view/4,
@@ -136,6 +137,18 @@ set_security(DbName, SecObj) ->
 -spec set_security(dbname(), SecObj::json_obj(), [option()]) -> ok.
 set_security(DbName, SecObj, Options) ->
     fabric_db_meta:set_security(dbname(DbName), SecObj, opts(Options)).
+
+%% @doc sets the upper bound for the number of stored purge requests
+-spec set_purged_docs_limit(dbname(), pos_integer(), [option()]) -> ok.
+set_purged_docs_limit(DbName, Limit, Options)
+        when is_integer(Limit), Limit > 0 ->
+    fabric_db_meta:set_purged_docs_limit(dbname(DbName), Limit, opts(Options)).
+
+%% @doc retrieves the upper bound for the number of stored purge requests
+-spec get_purged_docs_limit(dbname()) -> pos_integer() | no_return().
+get_purged_docs_limit(DbName) ->
+    {ok, Db} = fabric_util:get_db(dbname(DbName), [?ADMIN_CTX]),
+    try couch_db:get_purged_docs_limit(Db) after catch couch_db:close(Db) end.
 
 get_security(DbName) ->
     get_security(DbName, [?ADMIN_CTX]).
@@ -267,8 +280,24 @@ update_docs(DbName, Docs, Options) ->
         {aborted, PreCommitFailures}
     end.
 
-purge_docs(_DbName, _IdsRevs) ->
-    not_implemented.
+
+%% @doc purge revisions for a list '{Id, Revs}'
+%%      returns {ok, {PurgeSeq, Results}}
+-spec purge_docs(dbname(), [{docid(), [revision()]}], [option()]) ->
+    {Health, {PurgeSeq, [{Health, [revision()]}] }} when
+    Health     :: ok | accepted,
+    PurgeSeq   :: any().
+purge_docs(DbName, IdsRevs, Options) when is_list(IdsRevs) ->
+    IdsRevs2 = [idrevs(IdRs) || IdRs <- IdsRevs],
+    case fabric_doc_purge:go(dbname(DbName), IdsRevs2, opts(Options)) of
+        {ok, Results} ->
+            {ok, Results};
+        {accepted, Results} ->
+            {accepted, Results};
+        Error ->
+            throw(Error)
+    end.
+
 
 %% @doc spawns a process to upload attachment data and
 %%      returns a function that shards can use to communicate
