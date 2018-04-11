@@ -18,9 +18,9 @@
 
 % DBs
 -export([all_dbs/0, all_dbs/1, create_db/1, create_db/2, delete_db/1,
-    delete_db/2, get_db_info/1, get_doc_count/1, set_revs_limit/3,
-    set_security/2, set_security/3, get_revs_limit/1, get_security/1,
-    get_security/2, get_all_security/1, get_all_security/2,
+    delete_db/2, get_db_info/1, get_db_info/2, get_doc_count/1,
+    set_revs_limit/3, set_security/2, set_security/3, get_revs_limit/1,
+    get_security/1, get_security/2, get_all_security/1, get_all_security/2,
     compact/1, compact/2]).
 
 % Documents
@@ -44,6 +44,7 @@
 -type callback() :: fun((any(), any()) -> {ok | stop, any()}).
 -type json_obj() :: {[{binary() | atom(), any()}]}.
 -type option() :: atom() | {atom(), any()}.
+-type db_info_type() :: set | aggregate.
 
 %% db operations
 %% @equiv all_dbs(<<>>)
@@ -83,6 +84,23 @@ all_dbs(Prefix) when is_list(Prefix) ->
     ]}.
 get_db_info(DbName) ->
     fabric_db_info:go(dbname(DbName)).
+
+%% @doc returns a property list of interesting properties
+%%      about the database such as `doc_count', `disk_size',
+%%      etc.
+%%      TODO: fix return type def
+-spec get_db_info(dbname(), db_info_type()) ->
+    {ok, [
+        {instance_start_time, binary()} |
+        {doc_count, non_neg_integer()} |
+        {doc_del_count, non_neg_integer()} |
+        {purge_seq, non_neg_integer()} |
+        {compact_running, boolean()} |
+        {disk_size, non_neg_integer()} |
+        {disk_format_version, pos_integer()}
+    ]}.
+get_db_info(DbName, Type) ->
+    fabric_db_info:go(dbname(DbName), Type).
 
 %% @doc the number of docs in a database
 -spec get_doc_count(dbname()) ->

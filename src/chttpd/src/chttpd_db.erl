@@ -321,9 +321,17 @@ do_db_req(#httpd{path_parts=[DbName|_], user_ctx=Ctx}=Req, Fun) ->
 db_req(#httpd{method='GET',path_parts=[DbName]}=Req, _Db) ->
     % measure the time required to generate the etag, see if it's worth it
     T0 = os:timestamp(),
-    {ok, DbInfo} = fabric:get_db_info(DbName),
+    {ok, DbInfo} = fabric:get_db_info(DbName, aggregate),
     DeltaT = timer:now_diff(os:timestamp(), T0) / 1000,
     couch_stats:update_histogram([couchdb, dbinfo], DeltaT),
+    send_json(Req, {DbInfo});
+
+db_req(#httpd{method='GET',path_parts=[DbName, <<"_info">>]}=Req, _Db) ->
+    % measure the time required to generate the etag, see if it's worth it
+    %%T0 = os:timestamp(),
+    {ok, DbInfo} = fabric:get_db_info(DbName, set),
+    %%DeltaT = timer:now_diff(os:timestamp(), T0) / 1000,
+    %%couch_stats:update_histogram([couchdb, dbinfo], DeltaT),
     send_json(Req, {DbInfo});
 
 db_req(#httpd{method='POST', path_parts=[DbName], user_ctx=Ctx}=Req, Db) ->

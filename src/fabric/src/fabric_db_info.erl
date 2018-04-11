@@ -12,18 +12,21 @@
 
 -module(fabric_db_info).
 
--export([go/1]).
+-export([go/1, go/2]).
 
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 
 go(DbName) ->
+    go(DbName, aggregate).
+
+go(DbName, Type) ->
     Shards = mem3:shards(DbName),
     Workers = fabric_util:submit_jobs(Shards, get_db_info, []),
     RexiMon = fabric_util:create_monitors(Shards),
     Fun = fun handle_message/3,
     {ok, ClusterInfo} = get_cluster_info(Shards),
-    Acc0 = {fabric_dict:init(Workers, nil), [{cluster, ClusterInfo}]},
+    Acc0 = {fabric_dict:init(Workers, nil), [{cluster, ClusterInfo}], Type},
     try
         case fabric_util:recv(Workers, #shard.ref, Fun, Acc0) of
             {ok, Acc} -> {ok, Acc};
@@ -43,35 +46,35 @@ go(DbName) ->
         rexi_monitor:stop(RexiMon)
     end.
 
-handle_message({rexi_DOWN, _, {_,NodeRef},_}, _Shard, {Counters, Acc}) ->
+handle_message({rexi_DOWN, _, {_,NodeRef},_}, _Shard, {Counters, Acc, Type}) ->
     case fabric_util:remove_down_workers(Counters, NodeRef) of
     {ok, NewCounters} ->
-        {ok, {NewCounters, Acc}};
+        {ok, {NewCounters, Acc, Type}};
     error ->
         {error, {nodedown, <<"progress not possible">>}}
     end;
 
-handle_message({rexi_EXIT, Reason}, Shard, {Counters, Acc}) ->
+handle_message({rexi_EXIT, Reason}, Shard, {Counters, Acc, Type}) ->
     NewCounters = fabric_dict:erase(Shard, Counters),
     case fabric_view:is_progress_possible(NewCounters) of
     true ->
-        {ok, {NewCounters, Acc}};
+        {ok, {NewCounters, Acc, Type}};
     false ->
         {error, Reason}
     end;
 
-handle_message({ok, Info}, #shard{dbname=Name} = Shard, {Counters, Acc}) ->
+handle_message({ok, Info}, #shard{dbname=Name} = Shard, {Counters, Acc, aggregate}) ->
     case fabric_dict:lookup_element(Shard, Counters) of
     undefined ->
         % already heard from someone else in this range
-        {ok, {Counters, Acc}};
+        {ok, {Counters, Acc, aggregate}};
     nil ->
         Seq = couch_util:get_value(update_seq, Info),
         C1 = fabric_dict:store(Shard, Seq, Counters),
         C2 = fabric_view:remove_overlapping_shards(Shard, C1),
         case fabric_dict:any(nil, C2) of
         true ->
-            {ok, {C2, [Info|Acc]}};
+            {ok, {C2, [Info|Acc], aggregate}};
         false ->
             {stop, [
                 {db_name,Name},
@@ -80,7 +83,27 @@ handle_message({ok, Info}, #shard{dbname=Name} = Shard, {Counters, Acc}) ->
             ]}
         end
     end;
-handle_message(_, _, Acc) ->
+handle_message({ok, Info0}, Shard, {Counters, Acc, set}) ->
+    #shard{
+       range = [B, E],
+       node = Node
+    } = Shard,
+    HexBeg = couch_util:to_hex(<<B:32/integer>>),
+    HexEnd = couch_util:to_hex(<<E:32/integer>>),
+    Range = list_to_binary(HexBeg ++ "-" ++ HexEnd),
+    Seq = couch_util:get_value(update_seq, Info0),
+    Info = {Range, [{node, Node} | Info0]},
+    C1 = fabric_dict:store(Shard, Seq, Counters),
+    Acc1 = [Info|Acc],
+    case fabric_dict:any(nil, C1) of
+    true ->
+        {ok, {C1, Acc1, set}};
+    false ->
+        {stop, format_results(Acc1)}
+    end;
+handle_message(_Msg, _Shard, {_, _, aggregate}=Acc) ->
+    {ok, Acc};
+handle_message(_Msg, _Shard, {_, _, set}=Acc) ->
     {ok, Acc}.
 
 merge_results(Info) ->
@@ -110,6 +133,20 @@ merge_results(Info) ->
         (_, _, Acc) ->
             Acc
     end, [{instance_start_time, <<"0">>}], Dict).
+
+format_results(Infos) ->
+    dict:to_list(lists:foldl(
+        fun({R,I}, D) ->
+            case dict:find(R, D) of
+                {ok, L} ->
+                    dict:store(R, [{I} | L], D);
+                error ->
+                    dict:store(R, [{I}], D)
+            end
+        end,
+        dict:new(),
+        Infos
+    )).
 
 merge_other_results(Results) ->
     Dict = lists:foldl(fun({Props}, D) ->
