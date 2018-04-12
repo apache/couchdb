@@ -82,16 +82,17 @@ handle_call(cancel_compact, _From, #db{compactor_pid = Pid} = Db) ->
 
 handle_call({set_security, NewSec}, _From, #db{} = Db) ->
     {ok, NewDb} = couch_db_engine:set_security(Db, NewSec),
-    NewSecDb = NewDb#db{
+    NewSecDb = commit_data(NewDb#db{
         security = NewSec
-    },
+    }),
     ok = gen_server:call(couch_server, {db_updated, NewSecDb}, infinity),
     {reply, ok, NewSecDb, idle_limit()};
 
 handle_call({set_revs_limit, Limit}, _From, Db) ->
     {ok, Db2} = couch_db_engine:set_revs_limit(Db, Limit),
-    ok = gen_server:call(couch_server, {db_updated, Db2}, infinity),
-    {reply, ok, Db2, idle_limit()};
+    Db3 = commit_data(Db2),
+    ok = gen_server:call(couch_server, {db_updated, Db3}, infinity),
+    {reply, ok, Db3, idle_limit()};
 
 handle_call({purge_docs, _IdRevs}, _From,
         #db{compactor_pid=Pid}=Db) when Pid /= nil ->
@@ -160,12 +161,12 @@ handle_call({purge_docs, IdRevs}, _From, Db) ->
     Pairs = pair_purge_info(PreviousFDIs, FDIs),
 
     {ok, Db2} = couch_db_engine:write_doc_infos(Db, Pairs, [], PurgedIdRevs),
-
-    ok = gen_server:call(couch_server, {db_updated, Db2}, infinity),
+    Db3 = commit_data(Db2),
+    ok = gen_server:call(couch_server, {db_updated, Db3}, infinity),
     couch_event:notify(Db#db.name, updated),
 
-    PurgeSeq = couch_db_engine:get_purge_seq(Db2),
-    {reply, {ok, PurgeSeq, PurgedIdRevs}, Db2, idle_limit()};
+    PurgeSeq = couch_db_engine:get_purge_seq(Db3),
+    {reply, {ok, PurgeSeq, PurgedIdRevs}, Db3, idle_limit()};
 
 handle_call(Msg, From, Db) ->
     case couch_db_engine:handle_db_updater_call(Msg, From, Db) of
