@@ -15,6 +15,7 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include("couch_db.hrl").
 -include("couch_db_int.hrl").
+-include("couch_bt_engine.hrl").
 
 -export([init_code_path/0]).
 -export([source_file/1, build_file/1]).
@@ -234,7 +235,8 @@ stop(#test_context{mocked = Mocked, started = Apps}) ->
     meck:unload(Mocked),
     stop_applications(Apps).
 
-fake_db(Fields) ->
+fake_db(Fields0) ->
+    {ok, Db, Fields} = maybe_set_engine(Fields0),
     Indexes = lists:zip(
             record_info(fields, db),
             lists:seq(2, record_info(size, db))
@@ -242,7 +244,27 @@ fake_db(Fields) ->
     lists:foldl(fun({FieldName, Value}, Acc) ->
         Idx = couch_util:get_value(FieldName, Indexes),
         setelement(Idx, Acc, Value)
-    end, #db{}, Fields).
+    end, Db, Fields).
+
+maybe_set_engine(Fields0) ->
+    case lists:member(engine, Fields0) of
+        true ->
+            {ok, #db{}, Fields0};
+        false ->
+            {ok, Header, Fields} = get_engine_header(Fields0),
+            Db = #db{engine = {couch_bt_engine, #st{header = Header}}},
+            {ok, Db, Fields}
+    end.
+
+get_engine_header(Fields) ->
+    Keys = [disk_version, update_seq, unused, id_tree_state,
+        seq_tree_state, local_tree_state, purge_seq, purged_docs,
+        security_ptr, revs_limit, uuid, epochs, compacted_seq],
+    {HeadFields, RestFields} = lists:partition(
+        fun({K, _}) -> lists:member(K, Keys) end, Fields),
+    Header0 = couch_bt_engine_header:new(),
+    Header = couch_bt_engine_header:set(Header0, HeadFields),
+    {ok, Header, RestFields}.
 
 now_us() ->
     {MegaSecs, Secs, MicroSecs} = os:timestamp(),
