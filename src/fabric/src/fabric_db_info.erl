@@ -18,18 +18,22 @@
 -include_lib("mem3/include/mem3.hrl").
 
 go(DbName) ->
-    go(DbName, aggregate).
+    go(DbName, [{format, aggregate}]).
 
-go(DbName, Type) ->
+go(DbName, Options) ->
     Shards = mem3:shards(DbName),
     Workers = fabric_util:submit_jobs(Shards, get_db_info, []),
     RexiMon = fabric_util:create_monitors(Shards),
-    Fun = fun handle_message/3,
+    Fun = case couch_util:get_value(format, Options, aggregate) of
+        set -> fun handle_set_message/3;
+        _ -> fun handle_aggr_message/3
+    end,
     {ok, ClusterInfo} = get_cluster_info(Shards),
-    Acc0 = {fabric_dict:init(Workers, nil), [{cluster, ClusterInfo}], Type},
+    Acc0 = fabric_dict:init(Workers, nil),
     try
         case fabric_util:recv(Workers, #shard.ref, Fun, Acc0) of
-            {ok, Acc} -> {ok, Acc};
+            {ok, Acc} ->
+                {ok, [{cluster, {ClusterInfo}} | Acc]};
             {timeout, {WorkersDict, _}} ->
                 DefunctWorkers = fabric_util:remove_done_workers(
                     WorkersDict,
@@ -40,71 +44,84 @@ go(DbName, Type) ->
                     "get_db_info"
                 ),
                 {error, timeout};
-            {error, Error} -> throw(Error)
+            {error, Error} ->
+                throw(Error)
         end
     after
         rexi_monitor:stop(RexiMon)
     end.
 
-handle_message({rexi_DOWN, _, {_,NodeRef},_}, _Shard, {Counters, Acc, Type}) ->
-    case fabric_util:remove_down_workers(Counters, NodeRef) of
-    {ok, NewCounters} ->
-        {ok, {NewCounters, Acc, Type}};
-    error ->
-        {error, {nodedown, <<"progress not possible">>}}
+
+handle_aggr_message({ok, Info}, Shard, Counters) ->
+    case fabric_dict:lookup_element(Shard, Counters) of
+        undefined ->
+            % already heard from someone else in this range
+            {ok, Counters};
+        nil ->
+            C1 = fabric_dict:store(Shard, Info, Counters),
+            C2 = fabric_view:remove_overlapping_shards(Shard, C1),
+            case fabric_dict:any(nil, C2) of
+                true ->
+                    {ok, C2};
+                false ->
+                    {stop, merge_results(C2)}
+            end
     end;
 
-handle_message({rexi_EXIT, Reason}, Shard, {Counters, Acc, Type}) ->
+handle_aggr_message({rexi_DOWN, _, {_,NodeRef},_}, _Shard, Counters) ->
+    case fabric_util:remove_down_workers(Counters, NodeRef) of
+        {ok, NewCounters} ->
+            {ok, NewCounters};
+        error ->
+            {error, {nodedown, <<"progress not possible">>}}
+    end;
+
+handle_aggr_message({rexi_EXIT, Reason}, Shard, Counters) ->
     NewCounters = fabric_dict:erase(Shard, Counters),
     case fabric_view:is_progress_possible(NewCounters) of
-    true ->
-        {ok, {NewCounters, Acc, Type}};
-    false ->
-        {error, Reason}
+        true ->
+            {ok, NewCounters};
+        false ->
+            {error, Reason}
     end;
 
-handle_message({ok, Info}, #shard{dbname=Name} = Shard, {Counters, Acc, aggregate}) ->
-    case fabric_dict:lookup_element(Shard, Counters) of
-    undefined ->
-        % already heard from someone else in this range
-        {ok, {Counters, Acc, aggregate}};
-    nil ->
-        Seq = couch_util:get_value(update_seq, Info),
-        C1 = fabric_dict:store(Shard, Seq, Counters),
-        C2 = fabric_view:remove_overlapping_shards(Shard, C1),
-        case fabric_dict:any(nil, C2) of
-        true ->
-            {ok, {C2, [Info|Acc], aggregate}};
-        false ->
-            {stop, [
-                {db_name,Name},
-                {update_seq, fabric_view_changes:pack_seqs(C2)} |
-                merge_results(lists:flatten([Info|Acc]))
-            ]}
-        end
-    end;
-handle_message({ok, Info0}, Shard, {Counters, Acc, set}) ->
-    #shard{
-       range = [B, E],
-       node = Node
-    } = Shard,
-    HexBeg = couch_util:to_hex(<<B:32/integer>>),
-    HexEnd = couch_util:to_hex(<<E:32/integer>>),
-    Range = list_to_binary(HexBeg ++ "-" ++ HexEnd),
-    Seq = couch_util:get_value(update_seq, Info0),
-    Info = {Range, [{node, Node} | Info0]},
-    C1 = fabric_dict:store(Shard, Seq, Counters),
-    Acc1 = [Info|Acc],
+handle_aggr_message(Else, _Shard, _Acc) ->
+    %% TODO: do we want this behavior change?
+    {error, Else}.
+
+
+handle_set_message({ok, Info}, Shard, Counters) ->
+    C1 = fabric_dict:store(Shard, Info, Counters),
     case fabric_dict:any(nil, C1) of
-    true ->
-        {ok, {C1, Acc1, set}};
-    false ->
-        {stop, format_results(Acc1)}
+        true ->
+            {ok, C1};
+        false ->
+            {stop, [{shards, {format_results(C1)}}]}
     end;
-handle_message(_Msg, _Shard, {_, _, aggregate}=Acc) ->
-    {ok, Acc};
-handle_message(_Msg, _Shard, {_, _, set}=Acc) ->
-    {ok, Acc}.
+
+handle_set_message({rexi_DOWN, _, {_,NodeRef},_}, _Shard, Counters) ->
+    %% TODO: add error info to Counters rather than deleting
+    case fabric_util:remove_down_workers(Counters, NodeRef) of
+        {ok, NewCounters} ->
+            {ok, NewCounters};
+        error ->
+            {error, {nodedown, <<"progress not possible">>}}
+    end;
+
+handle_set_message({rexi_EXIT, Reason}, Shard, Counters) ->
+    %% TODO: add error info to Counters rather than deleting
+    NewCounters = fabric_dict:erase(Shard, Counters),
+    case fabric_view:is_progress_possible(NewCounters) of
+        true ->
+            {ok, NewCounters};
+        false ->
+            {error, Reason}
+    end;
+
+handle_set_message(Else, _Shard, _Acc) ->
+    %% TODO: do we want this behavior change?
+    {error, Else}.
+
 
 merge_results(Info) ->
     Dict = lists:foldl(fun({K,V},D0) -> orddict:append(K,V,D0) end,
@@ -134,9 +151,18 @@ merge_results(Info) ->
             Acc
     end, [{instance_start_time, <<"0">>}], Dict).
 
-format_results(Infos) ->
+
+format_results(Counters) ->
     dict:to_list(lists:foldl(
-        fun({R,I}, D) ->
+        fun({S,I0}, D) ->
+            #shard{
+               range = [B, E],
+               node = Node
+            } = S,
+            I = [{node, Node} | I0],
+            HB = couch_util:to_hex(<<B:32/integer>>),
+            HE = couch_util:to_hex(<<E:32/integer>>),
+            R = list_to_binary(HB ++ "-" ++ HE),
             case dict:find(R, D) of
                 {ok, L} ->
                     dict:store(R, [{I} | L], D);
@@ -145,7 +171,7 @@ format_results(Infos) ->
             end
         end,
         dict:new(),
-        Infos
+        fabric_dict:to_list(Counters)
     )).
 
 merge_other_results(Results) ->

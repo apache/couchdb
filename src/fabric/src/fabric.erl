@@ -99,8 +99,8 @@ get_db_info(DbName) ->
         {disk_size, non_neg_integer()} |
         {disk_format_version, pos_integer()}
     ]}.
-get_db_info(DbName, Type) ->
-    fabric_db_info:go(dbname(DbName), Type).
+get_db_info(DbName, Options) ->
+    fabric_db_info:go(dbname(DbName), Options).
 
 %% @doc the number of docs in a database
 -spec get_doc_count(dbname()) ->
