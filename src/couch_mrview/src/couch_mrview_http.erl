@@ -351,7 +351,7 @@ view_cb(Msg, #vacc{resp=undefined, etag=undefined}=Acc) ->
     view_cb(Msg, Acc#vacc{resp=Resp, should_close=true});
 
 view_cb(Msg, #vacc{req=Req, resp=undefined, etag=ETag}=Acc) ->
-    Headers = [{"ETag", ETag}],
+    Headers = [{"ETag", ETag}, {<<"Vary">>, <<"Accept">>}],
     case chttpd:etag_match(Req, ETag) of
         true ->
             {ok, Resp} = chttpd:send_response(Req, 304, Headers, <<>>),
