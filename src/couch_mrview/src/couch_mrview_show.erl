@@ -244,13 +244,20 @@ list_cb(complete, Acc) ->
     {ok, Resp2}.
 
 start_list_resp(Head, Acc) ->
-    #lacc{db=Db, req=Req, qserver=QServer, lname=LName} = Acc,
-    JsonReq = json_req_obj(Req, Db),
-
-    [<<"start">>,Chunk,JsonResp] = couch_query_servers:ddoc_proc_prompt(QServer,
-        [<<"lists">>, LName], [Head, JsonReq]),
-    Acc2 = send_non_empty_chunk(fixup_headers(JsonResp, Acc), Chunk),
-    {ok, Acc2}.
+    #lacc{db=Db, req=Req, etag=ETag, qserver=QServer, lname=LName} = Acc,
+    case chttpd:etag_match(Req, ETag) of
+        true ->
+            Headers = [{"ETag", ETag}, {<<"Vary">>, <<"Accept">>}],
+            {ok, Resp} = chttpd:send_response(Req, 304, Headers, <<>>),
+            {stop, Resp};
+        false ->
+            JsonReq = json_req_obj(Req, Db),
+            [<<"start">>, Chunk, JsonResp]
+                = couch_query_servers:ddoc_proc_prompt(QServer,
+                [<<"lists">>, LName], [Head, JsonReq]),
+            Acc2 = send_non_empty_chunk(fixup_headers(JsonResp, Acc), Chunk),
+            {ok, Acc2}
+    end.
 
 fixup_headers(Headers, #lacc{etag=ETag} = Acc) ->
     Headers2 = apply_etag(Headers, ETag),

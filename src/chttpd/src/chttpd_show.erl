@@ -202,7 +202,12 @@ handle_view_list(Req, Db, DDoc, LName, {ViewDesignName, ViewName}, Keys) ->
     DbName = couch_db:name(Db),
     {ok, VDoc} = ddoc_cache:open(DbName, <<"_design/", ViewDesignName/binary>>),
     CB = fun couch_mrview_show:list_cb/2,
-    QueryArgs = couch_mrview_http:parse_params(Req, Keys),
+    QueryArgs0 = couch_mrview_http:parse_params(Req, Keys),
+    ETagFun = fun(Sig, Acc) ->
+        ETag = couch_httpd:make_etag(Sig),
+        {ok, Acc#vacc{etag=ETag}}
+    end,
+    QueryArgs = QueryArgs0#mrargs{preflight_fun=ETagFun},
     Options = [{user_ctx, Req#httpd.user_ctx}],
     couch_query_servers:with_ddoc_proc(DDoc, fun(QServer) ->
         Acc = #lacc{

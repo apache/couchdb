@@ -313,6 +313,8 @@ maybe_set_etag(undefined, Acc) ->
     {ok, Acc};
 maybe_set_etag(ETag, #vacc{} = Acc) ->
     {ok, Acc#vacc{etag = ETag}};
+maybe_set_etag(ETag, #lacc{} = Acc) ->
+    {ok, Acc#lacc{etag = ETag}};
 maybe_set_etag(_, Acc) ->
     {ok, Acc}.
 
