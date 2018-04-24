@@ -17,6 +17,8 @@
     go/2,
     go/3,
     make_local_id/2,
+    make_purge_id/2,
+    verify_purge_checkpoint/2,
     find_source_seq/4
 ]).
 
@@ -35,6 +37,7 @@
     infos = [],
     seq = 0,
     localid,
+    purgeid,
     source,
     target,
     filter,
@@ -118,6 +121,40 @@ make_local_id(SourceThing, TargetThing, Filter) ->
     <<"_local/shard-sync-", S/binary, "-", T/binary, F/binary>>.
 
 
+make_purge_id(SourceUUID, TargetUUID) ->
+    <<"_local/purge-mem3-", SourceUUID/binary, "-", TargetUUID/binary>>.
+
+
+verify_purge_checkpoint(DbName, Props) ->
+    try
+        Type = couch_util:get_value(<<"type">>, Props),
+        if Type =/= <<"internal_replication">> -> false; true ->
+            SourceBin = couch_util:get_value(<<"source">>, Props),
+            TargetBin = couch_util:get_value(<<"target">>, Props),
+            Range = couch_util:get_value(<<"range">>, Props),
+
+            Source = binary_to_existing_atom(SourceBin, latin1),
+            Target = binary_to_existing_atom(TargetBin, latin1),
+
+            try
+                Shards = mem3:shards(DbName),
+                Nodes = lists:foldl(fun(Shard, Acc) ->
+                    case Shard#shard.range == Range of
+                        true -> [Shard#shard.node | Acc];
+                        false -> Acc
+                    end
+                end, [], mem3:shards(DbName)),
+                lists:member(Source, Nodes) andalso lists:member(Target, Nodes)
+            catch
+                error:database_does_not_exist ->
+                    false
+            end
+        end
+    catch _:_ ->
+        false
+    end.
+
+
 %% @doc Find and return the largest update_seq in SourceDb
 %% that the client has seen from TargetNode.
 %%
@@ -169,18 +206,130 @@ find_source_seq_int(#doc{body={Props}}, SrcNode0, TgtNode0, TgtUUID, TgtSeq) ->
     end.
 
 
-repl(#acc{db = Db} = Acc0) ->
-    erlang:put(io_priority, {internal_repl, couch_db:name(Db)}),
-    #acc{seq=Seq} = Acc1 = calculate_start_seq(Acc0),
-    case Seq >= couch_db:get_update_seq(Db) of
-        true ->
-            {ok, 0};
-        false ->
-            Fun = fun ?MODULE:changes_enumerator/2,
-            {ok, Acc2} = couch_db:fold_changes(Db, Seq, Fun, Acc1),
-            {ok, #acc{seq = LastSeq}} = replicate_batch(Acc2),
-            {ok, couch_db:count_changes_since(Db, LastSeq)}
+repl(#acc{db = Db0} = Acc0) ->
+    erlang:put(io_priority, {internal_repl, couch_db:name(Db0)}),
+    Acc1 = calculate_start_seq(Acc0),
+    try
+        Acc3 = case config:get_boolean("mem3", "replicate_purges", false) of
+            true ->
+                Acc2 = pull_purges(Acc1),
+                push_purges(Acc2);
+            false ->
+                Acc1
+        end,
+        push_changes(Acc3)
+    catch
+        throw:{finished, Count} ->
+            {ok, Count}
     end.
+
+
+pull_purges(#acc{} = Acc0) ->
+    #acc{
+        batch_size = Count,
+        seq = UpdateSeq,
+        target = Target
+    } = Acc0,
+    #shard{
+        node = TgtNode,
+        name = TgtDbName
+    } = Target,
+
+    with_src_db(Acc0, fun(Db) ->
+        SrcUUID = couch_db:get_uuid(Db),
+        {LocalPurgeId, Infos, ThroughSeq, Remaining} =
+                mem3_rpc:load_purge_infos(TgtNode, TgtDbName, SrcUUID, Count),
+
+        if Infos == [] -> ok; true ->
+            {ok, _} = couch_db:purge_docs(Db, Infos, [replicated_edits]),
+            Body = purge_cp_body(Acc0, ThroughSeq),
+            mem3_rpc:save_purge_checkpoint(
+                    TgtNode, TgtDbName, LocalPurgeId, Body)
+        end,
+
+        if Remaining =< 0 -> ok; true ->
+            PurgeSeq = couch_db:get_purge_seq(Db),
+            OldestPurgeSeq = couch_db:get_oldest_purge_seq(Db),
+            PurgesToPush = PurgeSeq - OldestPurgeSeq,
+            Changes = couch_db:count_changes_since(Db, UpdateSeq),
+            throw({finished, Remaining + PurgesToPush + Changes})
+        end,
+
+        Acc0#acc{purgeid = LocalPurgeId}
+    end).
+
+
+push_purges(#acc{} = Acc0) ->
+    #acc{
+        batch_size = BatchSize,
+        purgeid = LocalPurgeId,
+        seq = UpdateSeq,
+        target = Target
+    } = Acc0,
+    #shard{
+        node = TgtNode,
+        name = TgtDbName
+    } = Target,
+
+    with_src_db(Acc0, fun(Db) ->
+        StartSeq = case couch_db:open_doc(Db, LocalPurgeId, []) of
+            {ok, #doc{body = {Props}}} ->
+                couch_util:get_value(<<"purge_seq">>, Props);
+            {not_found, _} ->
+                Oldest = couch_db:get_oldest_purge_seq(Db),
+                erlang:max(0, Oldest - 1)
+        end,
+
+        FoldFun = fun({PSeq, UUID, Id, Revs}, {Count, Infos, _}) ->
+            NewCount = Count + length(Revs),
+            NewInfos = [{UUID, Id, Revs} | Infos],
+            Status = if NewCount < BatchSize -> ok; true -> stop end,
+            {Status, {NewCount, NewInfos, PSeq}}
+        end,
+        InitAcc = {0, [], StartSeq},
+        {ok, {_, Infos, ThroughSeq}} =
+            couch_db:fold_purge_infos(Db, StartSeq, FoldFun, InitAcc),
+
+        if Infos == [] -> ok; true ->
+            ok = purge_on_target(TgtNode, TgtDbName, Infos),
+            Doc = #doc{
+                id = LocalPurgeId,
+                body = purge_cp_body(Acc0, ThroughSeq)
+            },
+            {ok, _} = couch_db:update_doc(Db, Doc, [])
+        end,
+
+        PurgeSeq = couch_db:get_purge_seq(Db),
+        if ThroughSeq >= PurgeSeq -> ok; true ->
+            Remaining = PurgeSeq - ThroughSeq,
+            Changes = couch_db:count_changes_since(Db, UpdateSeq),
+            throw({finished, Remaining + Changes})
+        end,
+
+        Acc0
+    end).
+
+
+push_changes(#acc{} = Acc0) ->
+    #acc{
+        db = Db0,
+        seq = Seq
+    } = Acc0,
+
+    % Avoid needless rewriting the internal replication
+    % checkpoint document if nothing is replicated.
+    UpdateSeq = couch_db:get_update_seq(Db0),
+    if Seq < UpdateSeq -> ok; true ->
+        throw({finished, 0})
+    end,
+
+    with_src_db(Acc0, fun(Db) ->
+        Acc1 = Acc0#acc{db = Db},
+        Fun = fun ?MODULE:changes_enumerator/2,
+        {ok, Acc2} = couch_db:fold_changes(Db, Seq, Fun, Acc1),
+        {ok, #acc{seq = LastSeq}} = replicate_batch(Acc2),
+        {ok, couch_db:count_changes_since(Db, LastSeq)}
+    end).
 
 
 calculate_start_seq(Acc) ->
@@ -323,6 +472,15 @@ save_on_target(Node, Name, Docs) ->
     ok.
 
 
+purge_on_target(Node, Name, PurgeInfos) ->
+    mem3_rpc:purge_docs(Node, Name, PurgeInfos, [
+        replicated_changes,
+        full_commit,
+        ?ADMIN_CTX,
+        {io_priority, {internal_repl, Name}}
+    ]),
+    ok.
+
 update_locals(Acc) ->
     #acc{seq=Seq, db=Db, target=Target, localid=Id, history=History} = Acc,
     #shard{name=Name, node=Node} = Target,
@@ -334,6 +492,23 @@ update_locals(Acc) ->
     ],
     NewBody = mem3_rpc:save_checkpoint(Node, Name, Id, Seq, NewEntry, History),
     {ok, _} = couch_db:update_doc(Db, #doc{id = Id, body = NewBody}, []).
+
+
+purge_cp_body(#acc{} = Acc, PurgeSeq) ->
+    #acc{
+        source = Source,
+        target = Target
+    } = Acc,
+    {Mega, Secs, _} = os:timestamp(),
+    NowSecs = Mega * 1000000 + Secs,
+    {[
+        {<<"type">>, <<"internal_replication">>},
+        {<<"updated_on">>, NowSecs},
+        {<<"purge_seq">>, PurgeSeq},
+        {<<"source">>, atom_to_binary(Source#shard.node, latin1)},
+        {<<"target">>, atom_to_binary(Target#shard.node, latin1)},
+        {<<"range">>, Source#shard.range}
+    ]}.
 
 
 find_repl_doc(SrcDb, TgtUUIDPrefix) ->
@@ -363,6 +538,15 @@ find_repl_doc(SrcDb, TgtUUIDPrefix) ->
         Else ->
             couch_log:error("Error finding replication doc: ~w", [Else]),
             {not_found, missing}
+    end.
+
+
+with_src_db(#acc{source = Source}, Fun) ->
+    {ok, Db} = couch_db:open(Source#shard.name, [?ADMIN_CTX]),
+    try
+        Fun(Db)
+    after
+        couch_db:close(Db)
     end.
 
 
