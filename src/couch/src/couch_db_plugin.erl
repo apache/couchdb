@@ -18,6 +18,7 @@
     after_doc_read/2,
     validate_docid/1,
     check_is_admin/1,
+    is_valid_purge_client/2,
     on_compact/2,
     on_delete/2
 ]).
@@ -56,6 +57,11 @@ check_is_admin(Db) ->
     Handle = couch_epi:get_handle(?SERVICE_ID),
     %% callbacks return true only if it specifically allow the given Id
     couch_epi:any(Handle, ?SERVICE_ID, check_is_admin, [Db], []).
+
+is_valid_purge_client(DbName, Props) ->
+    Handle = couch_epi:get_handle(?SERVICE_ID),
+    %% callbacks return true only if it specifically allow the given Id
+    couch_epi:any(Handle, ?SERVICE_ID, is_valid_purge_client, [DbName, Props], []).
 
 on_compact(DbName, DDocs) ->
     Handle = couch_epi:get_handle(?SERVICE_ID),
