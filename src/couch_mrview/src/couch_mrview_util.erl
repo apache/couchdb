@@ -13,6 +13,8 @@
 -module(couch_mrview_util).
 
 -export([get_view/4, get_view_index_pid/4]).
+-export([get_local_purge_doc_id/1, get_value_from_options/2]).
+-export([verify_view_filename/1, get_signature_from_filename/1]).
 -export([ddoc_to_mrst/2, init_state/4, reset_index/3]).
 -export([make_header/1]).
 -export([index_file/2, compaction_file/2, open_file/1]).
@@ -41,6 +43,39 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
+
+get_local_purge_doc_id(Sig) ->
+    ?l2b(?LOCAL_DOC_PREFIX ++ "purge-mrview-" ++ Sig).
+
+
+get_value_from_options(Key, Options) ->
+    case couch_util:get_value(Key, Options) of
+        undefined ->
+            Reason = <<"'", Key/binary, "' must exists in options.">>,
+            throw({bad_request, Reason});
+        Value -> Value
+    end.
+
+
+verify_view_filename(FileName) ->
+    FilePathList = filename:split(FileName),
+    PureFN = lists:last(FilePathList),
+    case filename:extension(PureFN) of
+        ".view" ->
+            Sig = filename:basename(PureFN),
+            case [Ch || Ch <- Sig, not (((Ch >= $0) and (Ch =< $9))
+                orelse ((Ch >= $a) and (Ch =< $f))
+                orelse ((Ch >= $A) and (Ch =< $F)))] == [] of
+                true -> true;
+                false -> false
+            end;
+        _ -> false
+    end.
+
+get_signature_from_filename(FileName) ->
+    FilePathList = filename:split(FileName),
+    PureFN = lists:last(FilePathList),
+    filename:basename(PureFN, ".view").
 
 get_view(Db, DDoc, ViewName, Args0) ->
     case get_view_index_state(Db, DDoc, ViewName, Args0) of
@@ -197,7 +232,7 @@ extract_view(Lang, #mrargs{view_type=red}=Args, Name, [View | Rest]) ->
 view_sig(Db, State, View, #mrargs{include_docs=true}=Args) ->
     BaseSig = view_sig(Db, State, View, Args#mrargs{include_docs=false}),
     UpdateSeq = couch_db:get_update_seq(Db),
-    {ok, PurgeSeq} = couch_db:get_purge_seq(Db),
+    PurgeSeq = couch_db:get_purge_seq(Db),
     #mrst{
         seq_indexed=SeqIndexed,
         keyseq_indexed=KeySeqIndexed
@@ -231,7 +266,7 @@ view_sig_term(BaseSig, UpdateSeq, PurgeSeq, KeySeqIndexed, SeqIndexed, Args) ->
 
 
 init_state(Db, Fd, #mrst{views=Views}=State, nil) ->
-    {ok, PurgeSeq} = couch_db:get_purge_seq(Db),
+    PurgeSeq = couch_db:get_purge_seq(Db),
     Header = #mrheader{
         seq=0,
         purge_seq=PurgeSeq,
