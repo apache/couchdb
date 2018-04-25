@@ -18,32 +18,38 @@
 
 
 -define(TEST_MODULES, [
-    test_engine_open_close_delete,
-    test_engine_get_set_props,
-    test_engine_read_write_docs,
-    test_engine_attachments,
-    test_engine_fold_docs,
-    test_engine_fold_changes,
-    test_engine_purge_docs,
-    test_engine_compaction,
-    test_engine_ref_counting
+    %% test_engine_open_close_delete,
+    %% test_engine_get_set_props,
+    %% test_engine_read_write_docs,
+    %% test_engine_attachments,
+    %% test_engine_fold_docs,
+    test_engine_fold_changes %,
+    %% test_engine_purge_docs,
+    %% test_engine_compaction,
+    %% test_engine_ref_counting
 ]).
 
+
+-define(SHUTDOWN_TIMEOUT, 5000).
 -define(COMPACTOR_TIMEOUT, 50000).
 -define(ATTACHMENT_WRITE_TIMEOUT, 10000).
 -define(MAKE_DOC_SUMMARY_TIMEOUT, 5000).
 
-create_tests(EngineApp) ->
-    create_tests(EngineApp, EngineApp).
+
+create_tests(EngineApp, Extension) ->
+    create_tests(EngineApp, EngineApp, Extension).
 
 
-create_tests(EngineApp, EngineModule) ->
-    application:set_env(couch, test_engine, {EngineApp, EngineModule}),
+create_tests(EngineApp, EngineModule, Extension) ->
+    TestEngine = {EngineApp, EngineModule, Extension},
+    application:set_env(couch, test_engine, TestEngine),
     Tests = lists:map(fun(TestMod) ->
         {atom_to_list(TestMod), gather(TestMod)}
     end, ?TEST_MODULES),
     Setup = fun() ->
         Ctx = test_util:start_couch(),
+        EngineModStr = atom_to_list(EngineModule),
+        config:set("couchdb_engines", Extension, EngineModStr, false),
         config:set("log", "include_sasl", "false", false),
         Ctx
     end,
@@ -77,93 +83,108 @@ make_test_fun(Module, Fun) ->
     end,
     {Name, Wrapper}.
 
+
 rootdir() ->
     config:get("couchdb", "database_dir", ".").
 
 
-dbpath() ->
-    binary_to_list(filename:join(rootdir(), couch_uuids:random())).
+dbname() ->
+    UUID = couch_uuids:random(),
+    <<"db-", UUID/binary>>.
 
 
 get_engine() ->
     case application:get_env(couch, test_engine) of
-        {ok, {_, Engine}} ->
-            Engine;
+        {ok, {_App, _Mod, Extension}} ->
+            list_to_binary(Extension);
         _ ->
-            couch_bt_engine
+            <<"couch">>
     end.
 
 
-init_engine() ->
-    init_engine(default).
+create_db() ->
+    create_db(dbname()).
 
 
-init_engine(default) ->
+create_db(DbName) ->
     Engine = get_engine(),
-    DbPath = dbpath(),
-    {ok, St} = Engine:init(DbPath, [
-            create,
-            {default_security_object, []}
-        ]),
-    {ok, Engine, St};
+    couch_db:create(DbName, [{engine, Engine}, ?ADMIN_CTX]).
 
-init_engine(dbpath) ->
+
+open_db(DbName) ->
     Engine = get_engine(),
-    DbPath = dbpath(),
-    {ok, St} = Engine:init(DbPath, [
-            create,
-            {default_security_object, []}
-        ]),
-    {ok, Engine, DbPath, St}.
+    couch_db:open_int(DbName, [{engine, Engine}, ?ADMIN_CTX]).
 
 
-apply_actions(_Engine, St, []) ->
-    {ok, St};
+shutdown_db(Db) ->
+    Pid = couch_db:get_pid(Db),
+    Ref = erlang:monitor(process, Pid),
+    exit(Pid, kill),
+    receive
+        {'DOWN', Ref, _, _, _} ->
+            ok
+    after ?SHUTDOWN_TIMEOUT ->
+        erlang:error(database_shutdown_timeout)
+    end,
+    test_util:wait(fun() ->
+        case ets:member(couch_dbs, couch_db:name(Db)) of
+            true -> wait;
+            false -> ok
+        end
+    end).
 
-apply_actions(Engine, St, [Action | Rest]) ->
-    NewSt = apply_action(Engine, St, Action),
-    apply_actions(Engine, NewSt, Rest).
+
+apply_actions(Db, []) ->
+    {ok, Db};
+
+apply_actions(Db, [Action | Rest]) ->
+    {ok, NewDb} = apply_action(Db, Action),
+    apply_actions(NewDb, Rest).
 
 
-apply_action(Engine, St, {batch, BatchActions}) ->
-    apply_batch(Engine, St, BatchActions);
+apply_action(Db, {batch, BatchActions}) ->
+    apply_batch(Db, BatchActions);
 
-apply_action(Engine, St, Action) ->
-    apply_batch(Engine, St, [Action]).
+apply_action(Db, Action) ->
+    apply_batch(Db, [Action]).
 
 
-apply_batch(Engine, St, Actions) ->
-    UpdateSeq = Engine:get_update_seq(St) + 1,
-    AccIn = {UpdateSeq, [], [], []},
+apply_batch(Db, Actions) ->
+    AccIn = {[], [], []},
     AccOut = lists:foldl(fun(Action, Acc) ->
-        {SeqAcc, DocAcc, LDocAcc, PurgeAcc} = Acc,
-        case Action of
-            {_, {<<"_local/", _/binary>>, _}} ->
-                LDoc = gen_local_write(Engine, St, Action),
-                {SeqAcc, DocAcc, [LDoc | LDocAcc], PurgeAcc};
-            _ ->
-                case gen_write(Engine, St, Action, SeqAcc) of
-                    {_OldFDI, _NewFDI} = Pair ->
-                        {SeqAcc + 1, [Pair | DocAcc], LDocAcc, PurgeAcc};
-                    {Pair, NewSeqAcc, NewPurgeInfo} ->
-                        NewPurgeAcc = [NewPurgeInfo | PurgeAcc],
-                        {NewSeqAcc, [Pair | DocAcc], LDocAcc, NewPurgeAcc}
-                end
+        {DocAcc, LDocAcc, PurgeAcc} = Acc,
+        case gen_write(Db, Action) of
+            {local, Doc} ->
+                {DocAcc, [Doc | LDocAcc], PurgeAcc};
+            {purge, PurgeInfo} ->
+                {DocAcc, LDocAcc, [PurgeInfo | PurgeAcc]};
+            Doc ->
+                {[Doc | DocAcc], LDocAcc, PurgeAcc}
         end
     end, AccIn, Actions),
-    {_, Docs0, LDocs, PurgeIdRevs} = AccOut,
+
+    {Docs0, LDocs0, PurgeInfos0} = AccOut,
     Docs = lists:reverse(Docs0),
-    {ok, NewSt} = Engine:write_doc_infos(St, Docs, LDocs, PurgeIdRevs),
-    NewSt.
+    LDocs = lists:reverse(LDocs0),
+    PurgeInfos = lists:reverse(PurgeInfos0),
+
+    couch_log:error("XKCD: DOCS: ~p~n", [Docs]),
+
+    {ok, Resp} = couch_db:update_docs(Db, Docs ++ LDocs),
+    couch_log:error("XKCD: RESP ~p", [Resp]),
+    {ok, Db1} = couch_db:reopen(Db),
+
+    {ok, _, _} = couch_db:purge_docs(Db1, PurgeInfos),
+    couch_db:reopen(Db1).
 
 
-gen_local_write(Engine, St, {Action, {DocId, Body}}) ->
-    PrevRev = case Engine:open_local_docs(St, [DocId]) of
-        [not_found] ->
+gen_write(Db, {Action, {<<"_local/", _/binary>> = DocId, Body}}) ->
+    PrevRev = case couch_db:open_doc(Db, DocId) of
+        {not_found, _} ->
             0;
-        [#doc{revs = {0, []}}] ->
+        {ok, #doc{revs = {0, []}}} ->
             0;
-        [#doc{revs = {0, [RevStr | _]}}] ->
+        {ok, #doc{revs = {0, [RevStr | _]}}} ->
             binary_to_integer(RevStr)
     end,
     {RevId, Deleted} = case Action of
@@ -172,117 +193,42 @@ gen_local_write(Engine, St, {Action, {DocId, Body}}) ->
         delete ->
             {0, true}
     end,
-    #doc{
+    {local, #doc{
         id = DocId,
-        revs = {0, [RevId]},
+        revs = {0, [list_to_binary(integer_to_list(RevId))]},
         body = Body,
         deleted = Deleted
-    }.
+    }};
 
-gen_write(Engine, St, {Action, {DocId, Body}}, UpdateSeq) ->
-    gen_write(Engine, St, {Action, {DocId, Body, []}}, UpdateSeq);
+gen_write(Db, {Action, {DocId, Body}}) ->
+    gen_write(Db, {Action, {DocId, Body, []}});
 
-gen_write(Engine, St, {create, {DocId, Body, Atts0}}, UpdateSeq) ->
-    [not_found] = Engine:open_docs(St, [DocId]),
-    Atts = [couch_att:to_disk_term(Att) || Att <- Atts0],
-
-    Rev = crypto:hash(md5, term_to_binary({DocId, Body, Atts})),
-
-    Doc0 = #doc{
+gen_write(Db, {create, {DocId, Body, Atts}}) ->
+    {not_found, _} = couch_db:open_doc(Db, DocId),
+    #doc{
         id = DocId,
-        revs = {0, [Rev]},
+        revs = {0, []},
         deleted = false,
         body = Body,
         atts = Atts
-    },
+    };
 
-    Doc1 = make_doc_summary(Engine, St, Doc0),
-    {ok, Doc2, Len} = Engine:write_doc_body(St, Doc1),
-
-    Sizes = #size_info{
-        active = Len,
-        external = erlang:external_size(Doc1#doc.body)
-    },
-
-    Leaf = #leaf{
-        deleted = false,
-        ptr = Doc2#doc.body,
-        seq = UpdateSeq,
-        sizes = Sizes,
-        atts = Atts
-    },
-
-    {not_found, #full_doc_info{
-        id = DocId,
-        deleted = false,
-        update_seq = UpdateSeq,
-        rev_tree = [{0, {Rev, Leaf, []}}],
-        sizes = Sizes
-    }};
-
-gen_write(Engine, St, {purge, {DocId, PrevRevs0, _}}, UpdateSeq) ->
-    [#full_doc_info{} = PrevFDI] = Engine:open_docs(St, [DocId]),
+gen_write(_Db, {purge, {DocId, PrevRevs0, _}}) ->
     PrevRevs = if is_list(PrevRevs0) -> PrevRevs0; true -> [PrevRevs0] end,
+    {purge, {DocId, PrevRevs}};
+
+gen_write(Db, {Action, {DocId, Body, Atts}}) ->
+    #full_doc_info{} = PrevFDI = couch_db:get_full_doc_info(Db, DocId),
 
     #full_doc_info{
-        rev_tree = PrevTree
-    } = PrevFDI,
-
-    {NewTree, RemRevs} = couch_key_tree:remove_leafs(PrevTree, PrevRevs),
-    RemovedAll = lists:sort(RemRevs) == lists:sort(PrevRevs),
-    if RemovedAll -> ok; true ->
-        % If we didn't purge all the requested revisions
-        % then its a bug in the test.
-        erlang:error({invalid_purge_test_revs, PrevRevs})
-    end,
-
-    case NewTree of
-        [] ->
-            % We've completely purged the document
-            {{PrevFDI, not_found}, UpdateSeq, {DocId, RemRevs}};
-        _ ->
-            % We have to relabel the update_seq of all
-            % leaves. See couch_db_updater for details.
-            {NewNewTree, NewUpdateSeq} = couch_key_tree:mapfold(fun
-                (_RevId, Leaf, leaf, InnerSeqAcc) ->
-                    {Leaf#leaf{seq = InnerSeqAcc}, InnerSeqAcc + 1};
-                (_RevId, Value, _Type, InnerSeqAcc) ->
-                    {Value, InnerSeqAcc}
-            end, UpdateSeq, NewTree),
-            NewFDI = PrevFDI#full_doc_info{
-                update_seq = NewUpdateSeq - 1,
-                rev_tree = NewNewTree
-            },
-            {{PrevFDI, NewFDI}, NewUpdateSeq, {DocId, RemRevs}}
-    end;
-
-gen_write(Engine, St, {Action, {DocId, Body, Atts0}}, UpdateSeq) ->
-    [#full_doc_info{} = PrevFDI] = Engine:open_docs(St, [DocId]),
-    Atts = [couch_att:to_disk_term(Att) || Att <- Atts0],
-
-    #full_doc_info{
-        id = DocId,
-        rev_tree = PrevRevTree
+        id = DocId
     } = PrevFDI,
 
     #rev_info{
         rev = PrevRev
     } = prev_rev(PrevFDI),
 
-    {RevPos, PrevRevId} = PrevRev,
-
-    Rev = gen_revision(Action, DocId, PrevRev, Body, Atts),
-
-    Doc0 = #doc{
-        id = DocId,
-        revs = {RevPos + 1, [Rev, PrevRevId]},
-        deleted = false,
-        body = Body,
-        atts = Atts
-    },
-
-    Doc1 = make_doc_summary(Engine, St, Doc0),
-    {ok, Doc2, Len} = Engine:write_doc_body(St, Doc1),
+    NewRev = gen_rev(Action, DocId, PrevRev, Body, Atts),
 
     Deleted = case Action of
         update -> false;
@@ -290,73 +236,30 @@ gen_write(Engine, St, {Action, {DocId, Body, Atts0}}, UpdateSeq) ->
         delete -> true
     end,
 
-    Sizes = #size_info{
-        active = Len,
-        external = erlang:external_size(Doc1#doc.body)
-    },
-
-    Leaf = #leaf{
+    #doc{
+        id = DocId,
+        revs = NewRev,
         deleted = Deleted,
-        ptr = Doc2#doc.body,
-        seq = UpdateSeq,
-        sizes = Sizes,
+        body = Body,
         atts = Atts
-    },
-
-    Path = gen_path(Action, RevPos, PrevRevId, Rev, Leaf),
-    RevsLimit = Engine:get_revs_limit(St),
-    NodeType = case Action of
-        conflict -> new_branch;
-        _ -> new_leaf
-    end,
-    {NewTree, NodeType} = couch_key_tree:merge(PrevRevTree, Path, RevsLimit),
-
-    NewFDI = PrevFDI#full_doc_info{
-        deleted = couch_doc:is_deleted(NewTree),
-        update_seq = UpdateSeq,
-        rev_tree = NewTree,
-        sizes = Sizes
-    },
-
-    {PrevFDI, NewFDI}.
+    }.
 
 
-gen_revision(conflict, DocId, _PrevRev, Body, Atts) ->
-    crypto:hash(md5, term_to_binary({DocId, Body, Atts}));
-gen_revision(delete, DocId, PrevRev, Body, Atts) ->
-    gen_revision(update, DocId, PrevRev, Body, Atts);
-gen_revision(update, DocId, PrevRev, Body, Atts) ->
-    crypto:hash(md5, term_to_binary({DocId, PrevRev, Body, Atts})).
+gen_rev(A, DocId, {Pos, Rev}, Body, Atts) when A == update; A == delete ->
+    NewRev = crypto:hash(md5, term_to_binary({DocId, Rev, Body, Atts})),
+    {Pos + 1, [NewRev, Rev]};
+gen_rev(conflict, DocId, _, Body, Atts) ->
+    UUID = couch_uuids:random(),
+    NewRev = crypto:hash(md5, term_to_binary({DocId, UUID, Body, Atts})),
+    {1, [NewRev]}.
 
 
-gen_path(conflict, _RevPos, _PrevRevId, Rev, Leaf) ->
-    {0, {Rev, Leaf, []}};
-gen_path(delete, RevPos, PrevRevId, Rev, Leaf) ->
-    gen_path(update, RevPos, PrevRevId, Rev, Leaf);
-gen_path(update, RevPos, PrevRevId, Rev, Leaf) ->
-    {RevPos, {PrevRevId, ?REV_MISSING, [{Rev, Leaf, []}]}}.
-
-
-make_doc_summary(Engine, St, DocData) ->
-    {_, Ref} = spawn_monitor(fun() ->
-        exit({result, Engine:serialize_doc(St, DocData)})
-    end),
-    receive
-        {'DOWN', Ref, _, _, {result, Summary}} ->
-            Summary;
-        {'DOWN', Ref, _, _, Error} ->
-            erlang:error({make_doc_summary_error, Error})
-    after ?MAKE_DOC_SUMMARY_TIMEOUT ->
-        erlang:error(make_doc_summary_timeout)
-    end.
-
-
-prep_atts(_Engine, _St, []) ->
+prep_atts(_Db, []) ->
     [];
 
-prep_atts(Engine, St, [{FileName, Data} | Rest]) ->
+prep_atts(Db, [{FileName, Data} | Rest]) ->
     {_, Ref} = spawn_monitor(fun() ->
-        {ok, Stream} = Engine:open_write_stream(St, []),
+        {ok, Stream} = couch_db:open_write_stream(Db, []),
         exit(write_att(Stream, FileName, Data, Data))
     end),
     Att = receive
@@ -367,7 +270,7 @@ prep_atts(Engine, St, [{FileName, Data} | Rest]) ->
         after ?ATTACHMENT_WRITE_TIMEOUT ->
             erlang:error(attachment_write_timeout)
     end,
-    [Att | prep_atts(Engine, St, Rest)].
+    [Att | prep_atts(Db, Rest)].
 
 
 write_att(Stream, FileName, OrigData, <<>>) ->
@@ -403,16 +306,16 @@ prev_rev(#full_doc_info{} = FDI) ->
     PrevRev.
 
 
-db_as_term(Engine, St) ->
+db_as_term(Db) ->
     [
-        {props, db_props_as_term(Engine, St)},
-        {docs, db_docs_as_term(Engine, St)},
-        {local_docs, db_local_docs_as_term(Engine, St)},
-        {changes, db_changes_as_term(Engine, St)}
+        {props, db_props_as_term(Db)},
+        {docs, db_docs_as_term(Db)},
+        {local_docs, db_local_docs_as_term(Db)},
+        {changes, db_changes_as_term(Db)}
     ].
 
 
-db_props_as_term(Engine, St) ->
+db_props_as_term(Db) ->
     Props = [
         get_doc_count,
         get_del_doc_count,
@@ -426,40 +329,40 @@ db_props_as_term(Engine, St) ->
         get_epochs
     ],
     lists:map(fun(Fun) ->
-        {Fun, Engine:Fun(St)}
+        {Fun, couch_db:Fun(Db)}
     end, Props).
 
 
-db_docs_as_term(Engine, St) ->
+db_docs_as_term(Db) ->
     FoldFun = fun(FDI, Acc) -> {ok, [FDI | Acc]} end,
-    {ok, FDIs} = Engine:fold_docs(St, FoldFun, [], []),
+    {ok, FDIs} = couch_db:fold_docs(Db, FoldFun, [], []),
     lists:reverse(lists:map(fun(FDI) ->
-        fdi_to_term(Engine, St, FDI)
+        fdi_to_term(Db, FDI)
     end, FDIs)).
 
 
-db_local_docs_as_term(Engine, St) ->
+db_local_docs_as_term(Db) ->
     FoldFun = fun(Doc, Acc) -> {ok, [Doc | Acc]} end,
-    {ok, LDocs} = Engine:fold_local_docs(St, FoldFun, [], []),
+    {ok, LDocs} = couch_db:fold_local_docs(Db, FoldFun, [], []),
     lists:reverse(LDocs).
 
 
-db_changes_as_term(Engine, St) ->
+db_changes_as_term(Db) ->
     FoldFun = fun(FDI, Acc) -> {ok, [FDI | Acc]} end,
-    {ok, Changes} = Engine:fold_changes(St, 0, FoldFun, [], []),
+    {ok, Changes} = couch_db:fold_changes(Db, 0, FoldFun, [], []),
     lists:reverse(lists:map(fun(FDI) ->
-        fdi_to_term(Engine, St, FDI)
+        fdi_to_term(Db, FDI)
     end, Changes)).
 
 
-fdi_to_term(Engine, St, FDI) ->
+fdi_to_term(Db, FDI) ->
     #full_doc_info{
         id = DocId,
         rev_tree = OldTree
     } = FDI,
     {NewRevTree, _} = couch_key_tree:mapfold(fun(Rev, Node, Type, Acc) ->
         tree_to_term(Rev, Node, Type, Acc, DocId)
-    end, {Engine, St}, OldTree),
+    end, Db, OldTree),
     FDI#full_doc_info{
         rev_tree = NewRevTree,
         % Blank out sizes because we allow storage
@@ -475,7 +378,7 @@ fdi_to_term(Engine, St, FDI) ->
 tree_to_term(_Rev, _Leaf, branch, Acc, _DocId) ->
     {?REV_MISSING, Acc};
 
-tree_to_term({Pos, RevId}, #leaf{} = Leaf, leaf, {Engine, St}, DocId) ->
+tree_to_term({Pos, RevId}, #leaf{} = Leaf, leaf, Db, DocId) ->
     #leaf{
         deleted = Deleted,
         ptr = Ptr
@@ -488,7 +391,7 @@ tree_to_term({Pos, RevId}, #leaf{} = Leaf, leaf, {Engine, St}, DocId) ->
         body = Ptr
     },
 
-    Doc1 = Engine:read_doc_body(St, Doc0),
+    Doc1 = couch_db_engine:read_doc_body(Db, Doc0),
 
     Body = if not is_binary(Doc1#doc.body) -> Doc1#doc.body; true ->
         couch_compress:decompress(Doc1#doc.body)
@@ -498,7 +401,7 @@ tree_to_term({Pos, RevId}, #leaf{} = Leaf, leaf, {Engine, St}, DocId) ->
         couch_compress:decompress(Doc1#doc.atts)
     end,
 
-    StreamSrc = fun(Sp) -> Engine:open_read_stream(St, Sp) end,
+    StreamSrc = fun(Sp) -> couch_db:open_read_stream(Db, Sp) end,
     Atts2 = [couch_att:from_disk_term(StreamSrc, Att) || Att <- Atts1],
     Atts = [att_to_term(Att) || Att <- Atts2],
 
@@ -507,7 +410,7 @@ tree_to_term({Pos, RevId}, #leaf{} = Leaf, leaf, {Engine, St}, DocId) ->
         sizes = #size_info{active = -1, external = -1},
         atts = Atts
     },
-    {NewLeaf, {Engine, St}}.
+    {NewLeaf, Db}.
 
 
 att_to_term(Att) ->
@@ -564,9 +467,8 @@ list_diff([T1 | R1], [T2 | R2]) ->
     end.
 
 
-compact(Engine, St1, DbPath) ->
-    DbName = filename:basename(DbPath),
-    {ok, St2, Pid} = Engine:start_compaction(St1, DbName, [], self()),
+compact(Db) ->
+    {ok, Pid} = couch_db:start_compact(Db),
     Ref = erlang:monitor(process, Pid),
 
     % Ideally I'd assert that Pid is linked to us
@@ -574,16 +476,16 @@ compact(Engine, St1, DbPath) ->
     % that it could have finished compacting by
     % the time we check... Quite the quandry.
 
-    Term = receive
-        {'$gen_cast', {compact_done, Engine, Term0}} ->
-            Term0;
+    receive
+        {'DOWN', Ref, _, _, normal} ->
+            ok;
         {'DOWN', Ref, _, _, Reason} ->
             erlang:error({compactor_died, Reason})
         after ?COMPACTOR_TIMEOUT ->
             erlang:error(compactor_timed_out)
     end,
 
-    {ok, St2, DbName, Pid, Term}.
+    {ok, Pid}.
 
 
 with_config(Config, Fun) ->
@@ -601,7 +503,7 @@ apply_config([]) ->
 apply_config([{Section, Key, Value} | Rest]) ->
     Orig = config:get(Section, Key),
     case Value of
-        undefined -> config:delete(Section, Key);
-        _ -> config:set(Section, Key, Value)
+        undefined -> config:delete(Section, Key, false);
+        _ -> config:set(Section, Key, Value, false)
     end,
     [{Section, Key, Orig} | apply_config(Rest)].

@@ -62,39 +62,41 @@ cet_fold_range_local() ->
 
 
 cet_fold_stop() ->
-    fold_stop(fold_docs, fun docid/1).
+    fold_user_fun_stop(fold_docs, fun docid/1).
 
 
 cet_fold_stop_local() ->
-    fold_stop(fold_local_docs, fun local_docid/1).
+    fold_user_fun_stop(fold_local_docs, fun local_docid/1).
 
 
 % This is a loose test but we have to have this until
 % I figure out what to do about the total_rows/offset
 % meta data included in _all_docs
 cet_fold_include_reductions() ->
-    {ok, Engine, St} = init_st(fun docid/1),
+    {ok, Db} = init_st(fun docid/1),
     FoldFun = fun(_, _, nil) -> {ok, nil} end,
-    {ok, Count, nil} = Engine:fold_docs(St, FoldFun, nil, [include_reductions]),
+    Opts = [include_reductions],
+    {ok, Count, nil} = couch_db_engine:fold_docs(Db, FoldFun, nil, Opts),
     ?assert(is_integer(Count)),
     ?assert(Count >= 0).
 
 
 fold_all(FoldFun, DocIdFun) ->
     DocIds = [DocIdFun(I) || I <- lists:seq(1, ?NUM_DOCS)],
-    {ok, Engine, St} = init_st(DocIdFun),
+    {ok, Db} = init_st(DocIdFun),
 
-    {ok, DocIdAccFwd} = Engine:FoldFun(St, fun fold_fun/2, [], []),
+    {ok, DocIdAccFwd} = couch_db_engine:FoldFun(Db, fun fold_fun/2, [], []),
     ?assertEqual(?NUM_DOCS, length(DocIdAccFwd)),
     ?assertEqual(DocIds, lists:reverse(DocIdAccFwd)),
 
-    {ok, DocIdAccRev} = Engine:FoldFun(St, fun fold_fun/2, [], [{dir, rev}]),
+    Opts = [{dir, rev}],
+    {ok, DocIdAccRev} = couch_db_engine:FoldFun(Db, fun fold_fun/2, [], Opts),
     ?assertEqual(?NUM_DOCS, length(DocIdAccRev)),
     ?assertEqual(DocIds, DocIdAccRev).
 
 
 fold_start_key(FoldFun, DocIdFun) ->
-    {ok, Engine, St} = init_st(DocIdFun),
+    {ok, Db} = init_st(DocIdFun),
 
     StartKeyNum = ?NUM_DOCS div 4,
     StartKey = DocIdFun(StartKeyNum),
@@ -103,35 +105,35 @@ fold_start_key(FoldFun, DocIdFun) ->
     DocIdsFwd = [DocIdFun(I) || I <- lists:seq(StartKeyNum, ?NUM_DOCS)],
     DocIdsRev = [DocIdFun(I) || I <- lists:seq(1, StartKeyNum)],
 
-    ?assertEqual({ok, []}, Engine:FoldFun(St, fun fold_fun/2, [], [
+    ?assertEqual({ok, []}, couch_db_engine:FoldFun(Db, fun fold_fun/2, [], [
             {start_key, <<255>>}
         ])),
 
-    ?assertEqual({ok, []}, Engine:FoldFun(St, fun fold_fun/2, [], [
+    ?assertEqual({ok, []}, couch_db_engine:FoldFun(Db, fun fold_fun/2, [], [
             {dir, rev},
             {start_key, <<"">>}
         ])),
 
-    {ok, AllDocIdAccFwd} = Engine:FoldFun(St, fun fold_fun/2, [], [
+    {ok, AllDocIdAccFwd} = couch_db_engine:FoldFun(Db, fun fold_fun/2, [], [
             {start_key, <<"">>}
         ]),
     ?assertEqual(length(AllDocIds), length(AllDocIdAccFwd)),
     ?assertEqual(AllDocIds, lists:reverse(AllDocIdAccFwd)),
 
-    {ok, AllDocIdAccRev} = Engine:FoldFun(St, fun fold_fun/2, [], [
+    {ok, AllDocIdAccRev} = couch_db_engine:FoldFun(Db, fun fold_fun/2, [], [
             {dir, rev},
             {start_key, <<255>>}
         ]),
     ?assertEqual(length(AllDocIds), length(AllDocIdAccRev)),
     ?assertEqual(AllDocIds, AllDocIdAccRev),
 
-    {ok, DocIdAccFwd} = Engine:FoldFun(St, fun fold_fun/2, [], [
+    {ok, DocIdAccFwd} = couch_db_engine:FoldFun(Db, fun fold_fun/2, [], [
             {start_key, StartKey}
         ]),
     ?assertEqual(length(DocIdsFwd), length(DocIdAccFwd)),
     ?assertEqual(DocIdsFwd, lists:reverse(DocIdAccFwd)),
 
-    {ok, DocIdAccRev} = Engine:FoldFun(St, fun fold_fun/2, [], [
+    {ok, DocIdAccRev} = couch_db_engine:FoldFun(Db, fun fold_fun/2, [], [
             {dir, rev},
             {start_key, StartKey}
         ]),
@@ -140,29 +142,29 @@ fold_start_key(FoldFun, DocIdFun) ->
 
 
 fold_end_key(FoldFun, DocIdFun) ->
-    {ok, Engine, St} = init_st(DocIdFun),
+    {ok, Db} = init_st(DocIdFun),
 
     EndKeyNum = ?NUM_DOCS div 4,
     EndKey = DocIdFun(EndKeyNum),
 
-    ?assertEqual({ok, []}, Engine:FoldFun(St, fun fold_fun/2, [], [
+    ?assertEqual({ok, []}, couch_db_engine:FoldFun(Db, fun fold_fun/2, [], [
             {end_key, <<"">>}
         ])),
 
-    ?assertEqual({ok, []}, Engine:FoldFun(St, fun fold_fun/2, [], [
+    ?assertEqual({ok, []}, couch_db_engine:FoldFun(Db, fun fold_fun/2, [], [
             {dir, rev},
             {end_key, <<255>>}
         ])),
 
     AllDocIds = [DocIdFun(I) || I <- lists:seq(1, ?NUM_DOCS)],
 
-    {ok, AllDocIdAccFwd} = Engine:FoldFun(St, fun fold_fun/2, [], [
+    {ok, AllDocIdAccFwd} = couch_db_engine:FoldFun(Db, fun fold_fun/2, [], [
             {end_key, <<255>>}
         ]),
     ?assertEqual(length(AllDocIds), length(AllDocIdAccFwd)),
     ?assertEqual(AllDocIds, lists:reverse(AllDocIdAccFwd)),
 
-    {ok, AllDocIdAccRev} = Engine:FoldFun(St, fun fold_fun/2, [], [
+    {ok, AllDocIdAccRev} = couch_db_engine:FoldFun(Db, fun fold_fun/2, [], [
             {dir, rev},
             {end_key, <<"">>}
         ]),
@@ -171,7 +173,7 @@ fold_end_key(FoldFun, DocIdFun) ->
 
     DocIdsFwd = [DocIdFun(I) || I <- lists:seq(1, EndKeyNum)],
 
-    {ok, DocIdAccFwd} = Engine:FoldFun(St, fun fold_fun/2, [], [
+    {ok, DocIdAccFwd} = couch_db_engine:FoldFun(Db, fun fold_fun/2, [], [
             {end_key, EndKey}
         ]),
     ?assertEqual(length(DocIdsFwd), length(DocIdAccFwd)),
@@ -179,7 +181,7 @@ fold_end_key(FoldFun, DocIdFun) ->
 
     DocIdsRev = [DocIdFun(I) || I <- lists:seq(EndKeyNum, ?NUM_DOCS)],
 
-    {ok, DocIdAccRev} = Engine:FoldFun(St, fun fold_fun/2, [], [
+    {ok, DocIdAccRev} = couch_db_engine:FoldFun(Db, fun fold_fun/2, [], [
             {dir, rev},
             {end_key, EndKey}
         ]),
@@ -188,29 +190,29 @@ fold_end_key(FoldFun, DocIdFun) ->
 
 
 fold_end_key_gt(FoldFun, DocIdFun) ->
-    {ok, Engine, St} = init_st(DocIdFun),
+    {ok, Db} = init_st(DocIdFun),
 
     EndKeyNum = ?NUM_DOCS div 4,
     EndKey = DocIdFun(EndKeyNum),
 
-    ?assertEqual({ok, []}, Engine:FoldFun(St, fun fold_fun/2, [], [
+    ?assertEqual({ok, []}, couch_db_engine:FoldFun(Db, fun fold_fun/2, [], [
             {end_key_gt, <<"">>}
         ])),
 
-    ?assertEqual({ok, []}, Engine:FoldFun(St, fun fold_fun/2, [], [
+    ?assertEqual({ok, []}, couch_db_engine:FoldFun(Db, fun fold_fun/2, [], [
             {dir, rev},
             {end_key_gt, <<255>>}
         ])),
 
     AllDocIds = [DocIdFun(I) || I <- lists:seq(1, ?NUM_DOCS)],
 
-    {ok, AllDocIdAccFwd} = Engine:FoldFun(St, fun fold_fun/2, [], [
+    {ok, AllDocIdAccFwd} = couch_db_engine:FoldFun(Db, fun fold_fun/2, [], [
             {end_key_gt, <<255>>}
         ]),
     ?assertEqual(length(AllDocIds), length(AllDocIdAccFwd)),
     ?assertEqual(AllDocIds, lists:reverse(AllDocIdAccFwd)),
 
-    {ok, AllDocIdAccRev} = Engine:FoldFun(St, fun fold_fun/2, [], [
+    {ok, AllDocIdAccRev} = couch_db_engine:FoldFun(Db, fun fold_fun/2, [], [
             {dir, rev},
             {end_key_gt, <<"">>}
         ]),
@@ -219,7 +221,7 @@ fold_end_key_gt(FoldFun, DocIdFun) ->
 
     DocIdsFwd = [DocIdFun(I) || I <- lists:seq(1, EndKeyNum - 1)],
 
-    {ok, DocIdAccFwd} = Engine:FoldFun(St, fun fold_fun/2, [], [
+    {ok, DocIdAccFwd} = couch_db_engine:FoldFun(Db, fun fold_fun/2, [], [
             {end_key_gt, EndKey}
         ]),
     ?assertEqual(length(DocIdsFwd), length(DocIdAccFwd)),
@@ -227,7 +229,7 @@ fold_end_key_gt(FoldFun, DocIdFun) ->
 
     DocIdsRev = [DocIdFun(I) || I <- lists:seq(EndKeyNum + 1, ?NUM_DOCS)],
 
-    {ok, DocIdAccRev} = Engine:FoldFun(St, fun fold_fun/2, [], [
+    {ok, DocIdAccRev} = couch_db_engine:FoldFun(Db, fun fold_fun/2, [], [
             {dir, rev},
             {end_key_gt, EndKey}
         ]),
@@ -236,7 +238,7 @@ fold_end_key_gt(FoldFun, DocIdFun) ->
 
 
 fold_range(FoldFun, DocIdFun) ->
-    {ok, Engine, St} = init_st(DocIdFun),
+    {ok, Db} = init_st(DocIdFun),
 
     StartKeyNum = ?NUM_DOCS div 4,
     EndKeyNum = StartKeyNum * 3,
@@ -244,12 +246,12 @@ fold_range(FoldFun, DocIdFun) ->
     StartKey = DocIdFun(StartKeyNum),
     EndKey = DocIdFun(EndKeyNum),
 
-    ?assertEqual({ok, []}, Engine:FoldFun(St, fun fold_fun/2, [], [
+    ?assertEqual({ok, []}, couch_db_engine:FoldFun(Db, fun fold_fun/2, [], [
             {start_key, <<"">>},
             {end_key, <<"">>}
         ])),
 
-    ?assertEqual({ok, []}, Engine:FoldFun(St, fun fold_fun/2, [], [
+    ?assertEqual({ok, []}, couch_db_engine:FoldFun(Db, fun fold_fun/2, [], [
             {dir, rev},
             {start_key, <<"">>},
             {end_key, <<255>>}
@@ -257,14 +259,14 @@ fold_range(FoldFun, DocIdFun) ->
 
     AllDocIds = [DocIdFun(I) || I <- lists:seq(1, ?NUM_DOCS)],
 
-    {ok, AllDocIdAccFwd} = Engine:FoldFun(St, fun fold_fun/2, [], [
+    {ok, AllDocIdAccFwd} = couch_db_engine:FoldFun(Db, fun fold_fun/2, [], [
             {start_key, <<"">>},
             {end_key, <<255>>}
         ]),
     ?assertEqual(length(AllDocIds), length(AllDocIdAccFwd)),
     ?assertEqual(AllDocIds, lists:reverse(AllDocIdAccFwd)),
 
-    {ok, AllDocIdAccRev} = Engine:FoldFun(St, fun fold_fun/2, [], [
+    {ok, AllDocIdAccRev} = couch_db_engine:FoldFun(Db, fun fold_fun/2, [], [
             {dir, rev},
             {start_key, <<255>>},
             {end_key_gt, <<"">>}
@@ -274,7 +276,7 @@ fold_range(FoldFun, DocIdFun) ->
 
     DocIdsFwd = [DocIdFun(I) || I <- lists:seq(StartKeyNum, EndKeyNum)],
 
-    {ok, DocIdAccFwd} = Engine:FoldFun(St, fun fold_fun/2, [], [
+    {ok, DocIdAccFwd} = couch_db_engine:FoldFun(Db, fun fold_fun/2, [], [
             {start_key, StartKey},
             {end_key, EndKey}
         ]),
@@ -283,13 +285,13 @@ fold_range(FoldFun, DocIdFun) ->
 
     DocIdsRev = [DocIdFun(I) || I <- lists:seq(StartKeyNum, EndKeyNum)],
 
-    ?assertEqual({ok, []}, Engine:FoldFun(St, fun fold_fun/2, [], [
+    ?assertEqual({ok, []}, couch_db_engine:FoldFun(Db, fun fold_fun/2, [], [
             {dir, rev},
             {start_key, StartKey},
             {end_key, EndKey}
         ])),
 
-    {ok, DocIdAccRev} = Engine:FoldFun(St, fun fold_fun/2, [], [
+    {ok, DocIdAccRev} = couch_db_engine:FoldFun(Db, fun fold_fun/2, [], [
             {dir, rev},
             {start_key, EndKey},
             {end_key, StartKey}
@@ -298,24 +300,24 @@ fold_range(FoldFun, DocIdFun) ->
     ?assertEqual(DocIdsRev, DocIdAccRev).
 
 
-fold_stop(FoldFun, DocIdFun) ->
-    {ok, Engine, St} = init_st(DocIdFun),
+fold_user_fun_stop(FoldFun, DocIdFun) ->
+    {ok, Db} = init_st(DocIdFun),
 
     StartKeyNum = ?NUM_DOCS div 4,
     StartKey = DocIdFun(StartKeyNum),
 
-    ?assertEqual({ok, []}, Engine:FoldFun(St, fun fold_fun_stop/2, [], [
+    ?assertEqual({ok, []}, couch_db_engine:FoldFun(Db, fun fold_stop/2, [], [
             {start_key, <<255>>}
         ])),
 
-    ?assertEqual({ok, []}, Engine:FoldFun(St, fun fold_fun_stop/2, [], [
+    ?assertEqual({ok, []}, couch_db_engine:FoldFun(Db, fun fold_stop/2, [], [
             {dir, rev},
             {start_key, <<"">>}
         ])),
 
     SuffixDocIds = [DocIdFun(I) || I <- lists:seq(?NUM_DOCS - 3, ?NUM_DOCS)],
 
-    {ok, SuffixDocIdAcc} = Engine:FoldFun(St, fun fold_fun_stop/2, [], [
+    {ok, SuffixDocIdAcc} = couch_db_engine:FoldFun(Db, fun fold_stop/2, [], [
             {start_key, DocIdFun(?NUM_DOCS - 3)}
         ]),
     ?assertEqual(length(SuffixDocIds), length(SuffixDocIdAcc)),
@@ -323,7 +325,7 @@ fold_stop(FoldFun, DocIdFun) ->
 
     PrefixDocIds = [DocIdFun(I) || I <- lists:seq(1, 3)],
 
-    {ok, PrefixDocIdAcc} = Engine:FoldFun(St, fun fold_fun_stop/2, [], [
+    {ok, PrefixDocIdAcc} = couch_db_engine:FoldFun(Db, fun fold_stop/2, [], [
             {dir, rev},
             {start_key, DocIdFun(3)}
         ]),
@@ -333,7 +335,7 @@ fold_stop(FoldFun, DocIdFun) ->
     FiveDocIdsFwd = [DocIdFun(I)
             || I <- lists:seq(StartKeyNum, StartKeyNum + 5)],
 
-    {ok, FiveDocIdAccFwd} = Engine:FoldFun(St, fun fold_fun_stop/2, [], [
+    {ok, FiveDocIdAccFwd} = couch_db_engine:FoldFun(Db, fun fold_stop/2, [], [
             {start_key, StartKey}
         ]),
     ?assertEqual(length(FiveDocIdsFwd), length(FiveDocIdAccFwd)),
@@ -342,7 +344,7 @@ fold_stop(FoldFun, DocIdFun) ->
     FiveDocIdsRev = [DocIdFun(I)
             || I <- lists:seq(StartKeyNum - 5, StartKeyNum)],
 
-    {ok, FiveDocIdAccRev} = Engine:FoldFun(St, fun fold_fun_stop/2, [], [
+    {ok, FiveDocIdAccRev} = couch_db_engine:FoldFun(Db, fun fold_stop/2, [], [
             {dir, rev},
             {start_key, StartKey}
         ]),
@@ -351,12 +353,11 @@ fold_stop(FoldFun, DocIdFun) ->
 
 
 init_st(DocIdFun) ->
-    {ok, Engine, St1} = test_engine_util:init_engine(),
+    {ok, Db1} = test_engine_util:create_db(),
     Actions = lists:map(fun(Id) ->
-        {create, {DocIdFun(Id), [{<<"int">>, Id}]}}
+        {create, {DocIdFun(Id), {[{<<"int">>, Id}]}}}
     end, lists:seq(1, ?NUM_DOCS)),
-    {ok, St2} = test_engine_util:apply_actions(Engine, St1, Actions),
-    {ok, Engine, St2}.
+    test_engine_util:apply_batch(Db1, Actions).
 
 
 fold_fun(Doc, Acc) ->
@@ -367,7 +368,7 @@ fold_fun(Doc, Acc) ->
     {ok, [Id | Acc]}.
 
 
-fold_fun_stop(Doc, Acc) ->
+fold_stop(Doc, Acc) ->
     Id = case Doc of
         #doc{id = Id0} -> Id0;
         #full_doc_info{id = Id0} -> Id0

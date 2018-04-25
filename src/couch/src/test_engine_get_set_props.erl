@@ -18,32 +18,52 @@
 
 
 cet_default_props() ->
-    Engine = test_engine_util:get_engine(),
-    DbPath = test_engine_util:dbpath(),
-
-    {ok, St} = Engine:init(DbPath, [
-            create,
-            {default_security_object, dso}
-        ]),
-
+    {ok, {_App, Engine, _Extension}} = application:get_env(couch, test_engine),
+    {ok, Db} = test_engine_util:create_db(),
     Node = node(),
 
-    ?assertEqual(0, Engine:get_doc_count(St)),
-    ?assertEqual(0, Engine:get_del_doc_count(St)),
-    ?assertEqual(true, is_list(Engine:get_size_info(St))),
-    ?assertEqual(true, is_integer(Engine:get_disk_version(St))),
-    ?assertEqual(0, Engine:get_update_seq(St)),
-    ?assertEqual(0, Engine:get_purge_seq(St)),
-    ?assertEqual([], Engine:get_last_purged(St)),
-    ?assertEqual(dso, Engine:get_security(St)),
-    ?assertEqual(1000, Engine:get_revs_limit(St)),
-    ?assertMatch(<<_:32/binary>>, Engine:get_uuid(St)),
-    ?assertEqual([{Node, 0}], Engine:get_epochs(St)),
-    ?assertEqual(0, Engine:get_compacted_seq(St)).
+    ?assertEqual(Engine, couch_db_engine:get_engine(Db)),
+    ?assertEqual(0, couch_db_engine:get_doc_count(Db)),
+    ?assertEqual(0, couch_db_engine:get_del_doc_count(Db)),
+    ?assertEqual(true, is_list(couch_db_engine:get_size_info(Db))),
+    ?assertEqual(true, is_integer(couch_db_engine:get_disk_version(Db))),
+    ?assertEqual(0, couch_db_engine:get_update_seq(Db)),
+    ?assertEqual(0, couch_db_engine:get_purge_seq(Db)),
+    ?assertEqual([], couch_db_engine:get_last_purged(Db)),
+    ?assertEqual([], couch_db_engine:get_security(Db)),
+    ?assertEqual(1000, couch_db_engine:get_revs_limit(Db)),
+    ?assertMatch(<<_:32/binary>>, couch_db_engine:get_uuid(Db)),
+    ?assertEqual([{Node, 0}], couch_db_engine:get_epochs(Db)),
+    ?assertEqual(0, couch_db_engine:get_compacted_seq(Db)).
+
+
+-define(ADMIN_ONLY_SEC_PROPS, {[
+    {<<"members">>, {[
+        {<<"roles">>, [<<"_admin">>]}
+    ]}},
+    {<<"admins">>, {[
+        {<<"roles">>, [<<"_admin">>]}
+    ]}}
+]}).
+
+
+cet_admin_only_security() ->
+    Config = [{"couchdb", "default_security", "admin_only"}],
+    {ok, Db1} = test_engine_util:with_config(Config, fun() ->
+        test_engine_util:create_db()
+    end),
+
+    ?assertEqual(?ADMIN_ONLY_SEC_PROPS, couch_db:get_security(Db1)),
+    test_engine_util:shutdown_db(Db1),
+
+    {ok, Db2} = couch_db:reopen(Db1),
+    couch_log:error("~n~n~n~n~s -> ~s~n~n", [couch_db:name(Db1), couch_db:name(Db2)]),
+    ?assertEqual(?ADMIN_ONLY_SEC_PROPS, couch_db:get_security(Db2)).
 
 
 cet_set_security() ->
-    check_prop_set(get_security, set_security, dso, [{<<"readers">>, []}]).
+    SecProps = {[{<<"foo">>, <<"bar">>}]},
+    check_prop_set(get_security, set_security, {[]}, SecProps).
 
 
 cet_set_revs_limit() ->
@@ -51,20 +71,16 @@ cet_set_revs_limit() ->
 
 
 check_prop_set(GetFun, SetFun, Default, Value) ->
-    Engine = test_engine_util:get_engine(),
-    DbPath = test_engine_util:dbpath(),
+    {ok, Db0} = test_engine_util:create_db(),
 
-    {ok, St0} = Engine:init(DbPath, [
-            create,
-            {default_security_object, dso}
-        ]),
-    ?assertEqual(Default, Engine:GetFun(St0)),
+    ?assertEqual(Default, couch_db:GetFun(Db0)),
+    ?assertMatch(ok, couch_db:SetFun(Db0, Value)),
 
-    {ok, St1} = Engine:SetFun(St0, Value),
-    ?assertEqual(Value, Engine:GetFun(St1)),
+    {ok, Db1} = couch_db:reopen(Db0),
+    ?assertEqual(Value, couch_db:GetFun(Db1)),
 
-    {ok, St2} = Engine:commit_data(St1),
-    Engine:terminate(normal, St2),
+    ?assertMatch({ok, _}, couch_db:ensure_full_commit(Db1)),
+    test_engine_util:shutdown_db(Db1),
 
-    {ok, St3} = Engine:init(DbPath, []),
-    ?assertEqual(Value, Engine:GetFun(St3)).
+    {ok, Db2} = couch_db:reopen(Db1),
+    ?assertEqual(Value, couch_db:GetFun(Db2)).

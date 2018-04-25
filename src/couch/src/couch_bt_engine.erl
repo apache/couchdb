@@ -727,7 +727,7 @@ init_state(FilePath, Fd, Header0, Options) ->
     % to be written to disk.
     case Header /= Header0 of
         true ->
-            {ok, NewSt} = commit_data(St),
+            {ok, NewSt} = commit_data(St#st{needs_commit = true}),
             NewSt;
         false ->
             St

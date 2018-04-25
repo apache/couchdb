@@ -161,8 +161,11 @@ reopen(#db{} = Db) ->
     % We could have just swapped out the storage engine
     % for this database during a compaction so we just
     % reimplement this as a close/open pair now.
-    close(Db),
-    open(Db#db.name, [{user_ctx, Db#db.user_ctx} | Db#db.options]).
+    try
+        open(Db#db.name, [{user_ctx, Db#db.user_ctx} | Db#db.options])
+    after
+        close(Db)
+    end.
 
 
 % You shouldn't call this. Its part of the ref counting between
