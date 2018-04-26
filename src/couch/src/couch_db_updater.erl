@@ -128,7 +128,7 @@ handle_call({purge_docs, IdRevs}, _From, Db) ->
                 % If we purged every #leaf{} in the doc record
                 % then we're removing it completely from the
                 % database.
-                FDIAcc;
+                {FDIAcc, SeqAcc0};
             _ ->
                 % Its possible to purge the #leaf{} that contains
                 % the update_seq where this doc sits in the update_seq
