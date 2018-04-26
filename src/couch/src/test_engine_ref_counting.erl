@@ -22,48 +22,53 @@
 
 
 cet_empty_monitors() ->
-    {ok, Engine, St} = test_engine_util:init_engine(),
-    Pids = Engine:monitored_by(St),
+    {ok, Db} = test_engine_util:create_db(),
+    Pids = couch_db_engine:monitored_by(Db),
     ?assert(is_list(Pids)),
-    ?assertEqual([], Pids -- [self(), whereis(couch_stats_process_tracker)]).
+    Expected = [
+        self(),
+        couch_db:get_pid(Db),
+        whereis(couch_stats_process_tracker)
+    ],
+    ?assertEqual([], Pids -- Expected).
 
 
 cet_incref_decref() ->
-    {ok, Engine, St} = test_engine_util:init_engine(),
+    {ok, Db} = test_engine_util:create_db(),
 
-    {Pid, _} = Client = start_client(Engine, St),
+    {Pid, _} = Client = start_client(Db),
     wait_client(Client),
 
-    Pids1 = Engine:monitored_by(St),
+    Pids1 = couch_db_engine:monitored_by(Db),
     ?assert(lists:member(Pid, Pids1)),
 
     close_client(Client),
 
-    Pids2 = Engine:monitored_by(St),
+    Pids2 = couch_db_engine:monitored_by(Db),
     ?assert(not lists:member(Pid, Pids2)).
 
 
 cet_incref_decref_many() ->
-    {ok, Engine, St} = test_engine_util:init_engine(),
+    {ok, Db} = test_engine_util:create_db(),
     Clients = lists:map(fun(_) ->
-        start_client(Engine, St)
+        start_client(Db)
     end, lists:seq(1, ?NUM_CLIENTS)),
 
     lists:foreach(fun(C) -> wait_client(C) end, Clients),
 
-    Pids1 = Engine:monitored_by(St),
-    % +2 for db pid and process tracker
-    ?assertEqual(?NUM_CLIENTS + 2, length(Pids1)),
+    Pids1 = couch_db_engine:monitored_by(Db),
+    % +3 for self, db pid, and process tracker
+    ?assertEqual(?NUM_CLIENTS + 3, length(Pids1)),
 
     lists:foreach(fun(C) -> close_client(C) end, Clients),
 
-    Pids2 = Engine:monitored_by(St),
-    ?assertEqual(2, length(Pids2)).
+    Pids2 = couch_db_engine:monitored_by(Db),
+    ?assertEqual(3, length(Pids2)).
 
 
-start_client(Engine, St1) ->
+start_client(Db0) ->
     spawn_monitor(fun() ->
-        {ok, St2} = Engine:incref(St1),
+        {ok, Db1} = couch_db:open_int(couch_db:name(Db0), []),
 
         receive
             {waiting, Pid} ->
@@ -74,12 +79,11 @@ start_client(Engine, St1) ->
 
         receive
             close ->
+                couch_db:close(Db1),
                 ok
         after 1000 ->
             erlang:error(timeout)
-        end,
-
-        Engine:decref(St2)
+        end
     end).
 
 

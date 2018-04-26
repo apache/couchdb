@@ -18,147 +18,153 @@
 -include_lib("couch/include/couch_db.hrl").
 
 
--define(NUM_DOCS, 100).
+-define(NUM_DOCS, 25).
 
 
 cet_empty_changes() ->
-    {ok, Engine, St} = test_engine_util:init_engine(),
-
-    ?assertEqual(0, Engine:count_changes_since(St, 0)),
-    ?assertEqual({ok, []}, Engine:fold_changes(St, 0, fun fold_fun/2, [], [])).
+    {ok, Db} = test_engine_util:create_db(),
+    ?assertEqual(0, couch_db_engine:count_changes_since(Db, 0)),
+    ?assertEqual({ok, []},
+            couch_db_engine:fold_changes(Db, 0, fun fold_fun/2, [], [])).
 
 
 cet_single_change() ->
-    {ok, Engine, St1} = test_engine_util:init_engine(),
-    Actions = [{create, {<<"a">>, []}}],
-    {ok, St2} = test_engine_util:apply_actions(Engine, St1, Actions),
+    {ok, Db1} = test_engine_util:create_db(),
+    Actions = [{create, {<<"a">>, {[]}}}],
+    {ok, Db2} = test_engine_util:apply_actions(Db1, Actions),
 
-    ?assertEqual(1, Engine:count_changes_since(St2, 0)),
+    ?assertEqual(1, couch_db_engine:count_changes_since(Db2, 0)),
     ?assertEqual({ok, [{<<"a">>, 1}]},
-            Engine:fold_changes(St2, 0, fun fold_fun/2, [], [])).
+            couch_db_engine:fold_changes(Db2, 0, fun fold_fun/2, [], [])).
 
 
 cet_two_changes() ->
-    {ok, Engine, St1} = test_engine_util:init_engine(),
+    {ok, Db1} = test_engine_util:create_db(),
     Actions = [
-        {create, {<<"a">>, []}},
-        {create, {<<"b">>, []}}
+        {create, {<<"a">>, {[]}}},
+        {create, {<<"b">>, {[]}}}
     ],
-    {ok, St2} = test_engine_util:apply_actions(Engine, St1, Actions),
+    {ok, Db2} = test_engine_util:apply_actions(Db1, Actions),
 
-    ?assertEqual(2, Engine:count_changes_since(St2, 0)),
-    {ok, Changes} = Engine:fold_changes(St2, 0, fun fold_fun/2, [], []),
+    ?assertEqual(2, couch_db_engine:count_changes_since(Db2, 0)),
+    {ok, Changes} =
+            couch_db_engine:fold_changes(Db2, 0, fun fold_fun/2, [], []),
     ?assertEqual([{<<"a">>, 1}, {<<"b">>, 2}], lists:reverse(Changes)).
 
 
 cet_two_changes_batch() ->
-    {ok, Engine, St1} = test_engine_util:init_engine(),
+    {ok, Db1} = test_engine_util:create_db(),
     Actions1 = [
         {batch, [
-            {create, {<<"a">>, []}},
-            {create, {<<"b">>, []}}
+            {create, {<<"a">>, {[]}}},
+            {create, {<<"b">>, {[]}}}
         ]}
     ],
-    {ok, St2} = test_engine_util:apply_actions(Engine, St1, Actions1),
+    {ok, Db2} = test_engine_util:apply_actions(Db1, Actions1),
 
-    ?assertEqual(2, Engine:count_changes_since(St2, 0)),
-    {ok, Changes1} = Engine:fold_changes(St2, 0, fun fold_fun/2, [], []),
+    ?assertEqual(2, couch_db_engine:count_changes_since(Db2, 0)),
+    {ok, Changes1} =
+            couch_db_engine:fold_changes(Db2, 0, fun fold_fun/2, [], []),
     ?assertEqual([{<<"a">>, 1}, {<<"b">>, 2}], lists:reverse(Changes1)),
 
-    {ok, Engine, St3} = test_engine_util:init_engine(),
+    {ok, Db3} = test_engine_util:create_db(),
     Actions2 = [
         {batch, [
-            {create, {<<"b">>, []}},
-            {create, {<<"a">>, []}}
+            {create, {<<"b">>, {[]}}},
+            {create, {<<"a">>, {[]}}}
         ]}
     ],
-    {ok, St4} = test_engine_util:apply_actions(Engine, St3, Actions2),
+    {ok, Db4} = test_engine_util:apply_actions(Db3, Actions2),
 
-    ?assertEqual(2, Engine:count_changes_since(St4, 0)),
-    {ok, Changes2} = Engine:fold_changes(St4, 0, fun fold_fun/2, [], []),
-    ?assertEqual([{<<"b">>, 1}, {<<"a">>, 2}], lists:reverse(Changes2)).
+    ?assertEqual(2, couch_db_engine:count_changes_since(Db4, 0)),
+    {ok, Changes2} =
+            couch_db_engine:fold_changes(Db4, 0, fun fold_fun/2, [], []),
+    ?assertEqual([{<<"a">>, 1}, {<<"b">>, 2}], lists:reverse(Changes2)).
 
 
 cet_update_one() ->
-    {ok, Engine, St1} = test_engine_util:init_engine(),
+    {ok, Db1} = test_engine_util:create_db(),
     Actions = [
-        {create, {<<"a">>, []}},
-        {update, {<<"a">>, []}}
+        {create, {<<"a">>, {[]}}},
+        {update, {<<"a">>, {[]}}}
     ],
-    {ok, St2} = test_engine_util:apply_actions(Engine, St1, Actions),
+    {ok, Db2} = test_engine_util:apply_actions(Db1, Actions),
 
-    ?assertEqual(1, Engine:count_changes_since(St2, 0)),
+    ?assertEqual(1, couch_db_engine:count_changes_since(Db2, 0)),
     ?assertEqual({ok, [{<<"a">>, 2}]},
-            Engine:fold_changes(St2, 0, fun fold_fun/2, [], [])).
+            couch_db_engine:fold_changes(Db2, 0, fun fold_fun/2, [], [])).
 
 
 cet_update_first_of_two() ->
-    {ok, Engine, St1} = test_engine_util:init_engine(),
+    {ok, Db1} = test_engine_util:create_db(),
     Actions = [
-        {create, {<<"a">>, []}},
-        {create, {<<"b">>, []}},
-        {update, {<<"a">>, []}}
+        {create, {<<"a">>, {[]}}},
+        {create, {<<"b">>, {[]}}},
+        {update, {<<"a">>, {[]}}}
     ],
-    {ok, St2} = test_engine_util:apply_actions(Engine, St1, Actions),
+    {ok, Db2} = test_engine_util:apply_actions(Db1, Actions),
 
-    ?assertEqual(2, Engine:count_changes_since(St2, 0)),
-    {ok, Changes} = Engine:fold_changes(St2, 0, fun fold_fun/2, [], []),
+    ?assertEqual(2, couch_db_engine:count_changes_since(Db2, 0)),
+    {ok, Changes} =
+            couch_db_engine:fold_changes(Db2, 0, fun fold_fun/2, [], []),
     ?assertEqual([{<<"b">>, 2}, {<<"a">>, 3}], lists:reverse(Changes)).
 
 
 cet_update_second_of_two() ->
-    {ok, Engine, St1} = test_engine_util:init_engine(),
+    {ok, Db1} = test_engine_util:create_db(),
     Actions = [
-        {create, {<<"a">>, []}},
-        {create, {<<"b">>, []}},
-        {update, {<<"b">>, []}}
+        {create, {<<"a">>, {[]}}},
+        {create, {<<"b">>, {[]}}},
+        {update, {<<"b">>, {[]}}}
     ],
-    {ok, St2} = test_engine_util:apply_actions(Engine, St1, Actions),
+    {ok, Db2} = test_engine_util:apply_actions(Db1, Actions),
 
-    ?assertEqual(2, Engine:count_changes_since(St2, 0)),
-    {ok, Changes} = Engine:fold_changes(St2, 0, fun fold_fun/2, [], []),
+    ?assertEqual(2, couch_db_engine:count_changes_since(Db2, 0)),
+    {ok, Changes} =
+            couch_db_engine:fold_changes(Db2, 0, fun fold_fun/2, [], []),
     ?assertEqual([{<<"a">>, 1}, {<<"b">>, 3}], lists:reverse(Changes)).
 
 
 cet_check_mutation_ordering() ->
     Actions = shuffle(lists:map(fun(Seq) ->
-        {create, {docid(Seq), []}}
+        {create, {docid(Seq), {[]}}}
     end, lists:seq(1, ?NUM_DOCS))),
 
     DocIdOrder = [DocId || {_, {DocId, _}} <- Actions],
     DocSeqs = lists:zip(DocIdOrder, lists:seq(1, ?NUM_DOCS)),
 
-    {ok, Engine, St1} = test_engine_util:init_engine(),
-    {ok, St2} = test_engine_util:apply_actions(Engine, St1, Actions),
+    {ok, Db1} = test_engine_util:create_db(),
+    {ok, Db2} = test_engine_util:apply_actions(Db1, Actions),
 
     % First lets see that we can get the correct
     % suffix/prefix starting at every update sequence
     lists:foreach(fun(Seq) ->
-        {ok, Suffix} = Engine:fold_changes(St2, Seq, fun fold_fun/2, [], []),
+        {ok, Suffix} =
+                couch_db_engine:fold_changes(Db2, Seq, fun fold_fun/2, [], []),
         ?assertEqual(lists:nthtail(Seq, DocSeqs), lists:reverse(Suffix)),
 
-        {ok, Prefix} = Engine:fold_changes(St2, Seq, fun fold_fun/2, [], [
-                {dir, rev}
-            ]),
+        {ok, Prefix} = couch_db_engine:fold_changes(
+                Db2, Seq, fun fold_fun/2, [], [{dir, rev}]),
         ?assertEqual(lists:sublist(DocSeqs, Seq + 1), Prefix)
     end, lists:seq(0, ?NUM_DOCS)),
 
-    ok = do_mutation_ordering(Engine, St2, ?NUM_DOCS + 1, DocSeqs, []).
+    ok = do_mutation_ordering(Db2, ?NUM_DOCS + 1, DocSeqs, []).
 
 
-do_mutation_ordering(Engine, St, _Seq, [], FinalDocSeqs) ->
-    {ok, RevOrder} = Engine:fold_changes(St, 0, fun fold_fun/2, [], []),
+do_mutation_ordering(Db, _Seq, [], FinalDocSeqs) ->
+    {ok, RevOrder} = couch_db_engine:fold_changes(Db, 0, fun fold_fun/2, [], []),
     ?assertEqual(FinalDocSeqs, lists:reverse(RevOrder)),
     ok;
 
-do_mutation_ordering(Engine, St, Seq, [{DocId, _OldSeq} | Rest], DocSeqAcc) ->
-    Actions = [{update, {DocId, []}}],
-    {ok, NewSt} = test_engine_util:apply_actions(Engine, St, Actions),
+do_mutation_ordering(Db, Seq, [{DocId, _OldSeq} | Rest], DocSeqAcc) ->
+    Actions = [{update, {DocId, {[]}}}],
+    {ok, NewDb} = test_engine_util:apply_actions(Db, Actions),
     NewAcc = DocSeqAcc ++ [{DocId, Seq}],
     Expected = Rest ++ NewAcc,
-    {ok, RevOrder} = Engine:fold_changes(NewSt, 0, fun fold_fun/2, [], []),
+    {ok, RevOrder} =
+            couch_db_engine:fold_changes(NewDb, 0, fun fold_fun/2, [], []),
     ?assertEqual(Expected, lists:reverse(RevOrder)),
-    do_mutation_ordering(Engine, NewSt, Seq + 1, Rest, NewAcc).
+    do_mutation_ordering(NewDb, Seq + 1, Rest, NewAcc).
 
 
 shuffle(List) ->

@@ -19,66 +19,75 @@
 
 
 cet_compact_empty() ->
-    {ok, Engine, Path, St1} = test_engine_util:init_engine(dbpath),
-    Db1 = test_engine_util:db_as_term(Engine, St1),
-    {ok, St2, DbName, _, Term} = test_engine_util:compact(Engine, St1, Path),
-    {ok, St3, undefined} = Engine:finish_compaction(St2, DbName, [], Term),
-    Db2 = test_engine_util:db_as_term(Engine, St3),
-    Diff = test_engine_util:term_diff(Db1, Db2),
+    {ok, Db1} = test_engine_util:create_db(),
+    Term1 = test_engine_util:db_as_term(Db1),
+
+    test_engine_util:compact(Db1),
+
+    {ok, Db2} = couch_db:reopen(Db1),
+    Term2 = test_engine_util:db_as_term(Db2),
+
+    Diff = test_engine_util:term_diff(Term1, Term2),
     ?assertEqual(nodiff, Diff).
 
 
 cet_compact_doc() ->
-    {ok, Engine, Path, St1} = test_engine_util:init_engine(dbpath),
-    Actions = [{create, {<<"foo">>, []}}],
-    {ok, St2} = test_engine_util:apply_actions(Engine, St1, Actions),
-    Db1 = test_engine_util:db_as_term(Engine, St2),
-    {ok, St3, DbName, _, Term} = test_engine_util:compact(Engine, St2, Path),
-    {ok, St4, undefined} = Engine:finish_compaction(St3, DbName, [], Term),
-    Db2 = test_engine_util:db_as_term(Engine, St4),
-    Diff = test_engine_util:term_diff(Db1, Db2),
+    {ok, Db1} = test_engine_util:create_db(),
+    Actions = [{create, {<<"foo">>, {[]}}}],
+    {ok, Db2} = test_engine_util:apply_actions(Db1, Actions),
+    Term1 = test_engine_util:db_as_term(Db2),
+
+    test_engine_util:compact(Db2),
+
+    {ok, Db3} = couch_db:reopen(Db2),
+    Term2 = test_engine_util:db_as_term(Db3),
+
+    Diff = test_engine_util:term_diff(Term1, Term2),
     ?assertEqual(nodiff, Diff).
 
 
 cet_compact_local_doc() ->
-    {ok, Engine, Path, St1} = test_engine_util:init_engine(dbpath),
-    Actions = [{create, {<<"_local/foo">>, []}}],
-    {ok, St2} = test_engine_util:apply_actions(Engine, St1, Actions),
-    Db1 = test_engine_util:db_as_term(Engine, St2),
-    {ok, St3, DbName, _, Term} = test_engine_util:compact(Engine, St2, Path),
-    {ok, St4, undefined} = Engine:finish_compaction(St3, DbName, [], Term),
-    Db2 = test_engine_util:db_as_term(Engine, St4),
-    Diff = test_engine_util:term_diff(Db1, Db2),
+    {ok, Db1} = test_engine_util:create_db(),
+    Actions = [{create, {<<"_local/foo">>, {[]}}}],
+    {ok, Db2} = test_engine_util:apply_actions(Db1, Actions),
+    Term1 = test_engine_util:db_as_term(Db2),
+
+    test_engine_util:compact(Db2),
+
+    {ok, Db3} = couch_db:reopen(Db2),
+    Term2 = test_engine_util:db_as_term(Db3),
+
+    Diff = test_engine_util:term_diff(Term1, Term2),
     ?assertEqual(nodiff, Diff).
 
 
 cet_compact_with_everything() ->
-    {ok, Engine, Path, St1} = test_engine_util:init_engine(dbpath),
+    {ok, Db1} = test_engine_util:create_db(),
 
     % Add a whole bunch of docs
     DocActions = lists:map(fun(Seq) ->
-        {create, {docid(Seq), [{<<"int">>, Seq}]}}
+        {create, {docid(Seq), {[{<<"int">>, Seq}]}}}
     end, lists:seq(1, 1000)),
 
     LocalActions = lists:map(fun(I) ->
-        {create, {local_docid(I), [{<<"int">>, I}]}}
+        {create, {local_docid(I), {[{<<"int">>, I}]}}}
     end, lists:seq(1, 25)),
 
     Actions1 = DocActions ++ LocalActions,
 
-    {ok, St2} = test_engine_util:apply_actions(Engine, St1, Actions1),
-    {ok, St3} = Engine:set_security(St2, [{<<"readers">>, <<"ohai">>}]),
-    {ok, St4} = Engine:set_revs_limit(St3, 500),
+    {ok, Db2} = test_engine_util:apply_batch(Db1, Actions1),
+    ok = couch_db:set_security(Db1, {[{<<"foo">>, <<"bar">>}]}),
+    ok = couch_db:set_revs_limit(Db1, 500),
 
     Actions2 = [
-        {create, {<<"foo">>, []}},
-        {create, {<<"bar">>, [{<<"hooray">>, <<"purple">>}]}},
-        {conflict, {<<"bar">>, [{<<"booo">>, false}]}}
+        {create, {<<"foo">>, {[]}}},
+        {create, {<<"bar">>, {[{<<"hooray">>, <<"purple">>}]}}},
+        {conflict, {<<"bar">>, {[{<<"booo">>, false}]}}}
     ],
 
-    {ok, St5} = test_engine_util:apply_actions(Engine, St4, Actions2),
+    {ok, Db3} = test_engine_util:apply_actions(Db2, Actions2),
 
-    [FooFDI, BarFDI] = Engine:open_docs(St5, [<<"foo">>, <<"bar">>]),
+    [FooFDI, BarFDI] = couch_db_engine:open_docs(Db3, [<<"foo">>, <<"bar">>]),
 
     FooRev = test_engine_util:prev_rev(FooFDI),
     BarRev = test_engine_util:prev_rev(BarFDI),
@@ -90,17 +99,20 @@ cet_compact_with_everything() ->
         ]}
     ],
 
-    {ok, St6} = test_engine_util:apply_actions(Engine, St5, Actions3),
+    {ok, Db4} = test_engine_util:apply_actions(Db3, Actions3),
 
     PurgedIdRevs = [
         {<<"bar">>, [BarRev#rev_info.rev]},
         {<<"foo">>, [FooRev#rev_info.rev]}
     ],
 
-    ?assertEqual(PurgedIdRevs, lists:sort(Engine:get_last_purged(St6))),
+    ?assertEqual(
+            PurgedIdRevs,
+            lists:sort(couch_db_engine:get_last_purged(Db4))
+        ),
 
-    {ok, St7} = try
-        [Att0, Att1, Att2, Att3, Att4] = test_engine_util:prep_atts(Engine, St6, [
+    {ok, Db5} = try
+        [Att0, Att1, Att2, Att3, Att4] = test_engine_util:prep_atts(Db4, [
                 {<<"ohai.txt">>, crypto:strong_rand_bytes(2048)},
                 {<<"stuff.py">>, crypto:strong_rand_bytes(32768)},
                 {<<"a.erl">>, crypto:strong_rand_bytes(29)},
@@ -109,69 +121,61 @@ cet_compact_with_everything() ->
             ]),
 
         Actions4 = [
-            {create, {<<"small_att">>, [], [Att0]}},
-            {create, {<<"large_att">>, [], [Att1]}},
-            {create, {<<"multi_att">>, [], [Att2, Att3, Att4]}}
+            {create, {<<"small_att">>, {[]}, [Att0]}},
+            {create, {<<"large_att">>, {[]}, [Att1]}},
+            {create, {<<"multi_att">>, {[]}, [Att2, Att3, Att4]}}
         ],
-        test_engine_util:apply_actions(Engine, St6, Actions4)
+        test_engine_util:apply_actions(Db4, Actions4)
     catch throw:not_supported ->
-        {ok, St6}
+        {ok, Db4}
     end,
-    {ok, St8} = Engine:commit_data(St7),
+    {ok, _} = couch_db:ensure_full_commit(Db5),
+    {ok, Db6} = couch_db:reopen(Db5),
 
-    Db1 = test_engine_util:db_as_term(Engine, St8),
+    Term1 = test_engine_util:db_as_term(Db6),
 
     Config = [
         {"database_compaction", "doc_buffer_size", "1024"},
         {"database_compaction", "checkpoint_after", "2048"}
     ],
 
-    {ok, St9, DbName, _, Term} = test_engine_util:with_config(Config, fun() ->
-        test_engine_util:compact(Engine, St8, Path)
+    test_engine_util:with_config(Config, fun() ->
+        test_engine_util:compact(Db6)
     end),
 
-    {ok, St10, undefined} = Engine:finish_compaction(St9, DbName, [], Term),
-    Db2 = test_engine_util:db_as_term(Engine, St10),
-    Diff = test_engine_util:term_diff(Db1, Db2),
+    {ok, Db7} = couch_db:reopen(Db6),
+    Term2 = test_engine_util:db_as_term(Db7),
+
+    Diff = test_engine_util:term_diff(Term1, Term2),
     ?assertEqual(nodiff, Diff).
 
 
 cet_recompact_updates() ->
-    {ok, Engine, Path, St1} = test_engine_util:init_engine(dbpath),
+    {ok, Db1} = test_engine_util:create_db(),
 
-    Actions1 = [
-        {create, {<<"foo">>, []}},
-        {create, {<<"bar">>, []}}
-    ],
+    Actions1 = lists:map(fun(Seq) ->
+        {create, {docid(Seq), {[{<<"int">>, Seq}]}}}
+    end, lists:seq(1, 1000)),
+    {ok, Db2} = test_engine_util:apply_batch(Db1, Actions1),
 
-    {ok, St2} = test_engine_util:apply_actions(Engine, St1, Actions1),
-    {ok, St3, DbName, _, Term} = test_engine_util:compact(Engine, St2, Path),
+    {ok, Compactor} = couch_db:start_compact(Db2),
+    catch erlang:suspend_process(Compactor),
 
     Actions2 = [
-        {update, {<<"foo">>, [{<<"updated">>, true}]}},
-        {create, {<<"baz">>, []}}
+        {update, {<<"0001">>, {[{<<"updated">>, true}]}}},
+        {create, {<<"boop">>, {[]}}}
     ],
 
-    {ok, St4} = test_engine_util:apply_actions(Engine, St3, Actions2),
-    Db1 = test_engine_util:db_as_term(Engine, St4),
+    {ok, Db3} = test_engine_util:apply_actions(Db2, Actions2),
+    Term1 = test_engine_util:db_as_term(Db3),
 
-    {ok, St5, NewPid} = Engine:finish_compaction(St4, DbName, [], Term),
+    catch erlang:resume_process(Compactor),
+    test_engine_util:compact(Db3),
 
-    ?assertEqual(true, is_pid(NewPid)),
-    Ref = erlang:monitor(process, NewPid),
+    {ok, Db4} = couch_db:reopen(Db3),
+    Term2 = test_engine_util:db_as_term(Db4),
 
-    NewTerm = receive
-        {'$gen_cast', {compact_done, Engine, Term0}} ->
-            Term0;
-        {'DOWN', Ref, _, _, Reason} ->
-            erlang:error({compactor_died, Reason})
-        after 10000 ->
-            erlang:error(compactor_timed_out)
-    end,
-
-    {ok, St6, undefined} = Engine:finish_compaction(St5, DbName, [], NewTerm),
-    Db2 = test_engine_util:db_as_term(Engine, St6),
-    Diff = test_engine_util:term_diff(Db1, Db2),
+    Diff = test_engine_util:term_diff(Term1, Term2),
     ?assertEqual(nodiff, Diff).
 
 

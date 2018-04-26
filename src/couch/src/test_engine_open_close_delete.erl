@@ -18,64 +18,59 @@
 
 
 cet_open_non_existent() ->
-    Engine = test_engine_util:get_engine(),
-    DbPath = test_engine_util:dbpath(),
-
-    ?assertEqual(false, Engine:exists(DbPath)),
-    ?assertThrow({not_found, no_db_file}, Engine:init(DbPath, [])),
-    ?assertEqual(false, Engine:exists(DbPath)).
+    % Try twice to check that a failed open doesn't create
+    % the database for some reason.
+    DbName = test_engine_util:dbname(),
+    ?assertEqual({not_found, no_db_file}, test_engine_util:open_db(DbName)),
+    ?assertEqual({not_found, no_db_file}, test_engine_util:open_db(DbName)).
 
 
 cet_open_create() ->
-    process_flag(trap_exit, true),
-    Engine = test_engine_util:get_engine(),
-    DbPath = test_engine_util:dbpath(),
+    DbName = test_engine_util:dbname(),
 
-    ?assertEqual(false, Engine:exists(DbPath)),
-    ?assertMatch({ok, _}, Engine:init(DbPath, [create])),
-    ?assertEqual(true, Engine:exists(DbPath)).
+    ?assertEqual(false, couch_server:exists(DbName)),
+    ?assertEqual({not_found, no_db_file}, test_engine_util:open_db(DbName)),
+    ?assertMatch({ok, _}, test_engine_util:create_db(DbName)),
+    ?assertEqual(true, couch_server:exists(DbName)).
 
 
 cet_open_when_exists() ->
-    Engine = test_engine_util:get_engine(),
-    DbPath = test_engine_util:dbpath(),
+    DbName = test_engine_util:dbname(),
 
-    ?assertEqual(false, Engine:exists(DbPath)),
-    ?assertMatch({ok, _}, Engine:init(DbPath, [create])),
-    ?assertThrow({error, eexist}, Engine:init(DbPath, [create])).
+    ?assertEqual(false, couch_server:exists(DbName)),
+    ?assertEqual({not_found, no_db_file}, test_engine_util:open_db(DbName)),
+    ?assertMatch({ok, _}, test_engine_util:create_db(DbName)),
+    ?assertEqual(file_exists, test_engine_util:create_db(DbName)).
 
 
 cet_terminate() ->
-    Engine = test_engine_util:get_engine(),
-    DbPath = test_engine_util:dbpath(),
+    DbName = test_engine_util:dbname(),
 
-    ?assertEqual(false, Engine:exists(DbPath)),
-    {ok, St} = Engine:init(DbPath, [create]),
-    Engine:terminate(normal, St),
-    ?assertEqual(true, Engine:exists(DbPath)).
+    ?assertEqual(false, couch_server:exists(DbName)),
+    ?assertEqual({not_found, no_db_file}, test_engine_util:open_db(DbName)),
+    ?assertEqual(ok, cycle_db(DbName, create_db)),
+    ?assertEqual(true, couch_server:exists(DbName)).
 
 
 cet_rapid_recycle() ->
-    Engine = test_engine_util:get_engine(),
-    DbPath = test_engine_util:dbpath(),
+    DbName = test_engine_util:dbname(),
 
-    {ok, St0} = Engine:init(DbPath, [create]),
-    Engine:terminate(normal, St0),
-
+    ?assertEqual(ok, cycle_db(DbName, create_db)),
     lists:foreach(fun(_) ->
-        {ok, St1} = Engine:init(DbPath, []),
-        Engine:terminate(normal, St1)
+        ?assertEqual(ok, cycle_db(DbName, open_db))
     end, lists:seq(1, 100)).
 
 
 cet_delete() ->
-    Engine = test_engine_util:get_engine(),
-    RootDir = test_engine_util:rootdir(),
-    DbPath = test_engine_util:dbpath(),
+    DbName = test_engine_util:dbname(),
 
-    ?assertEqual(false, Engine:exists(DbPath)),
-    {ok, St} = Engine:init(DbPath, [create]),
-    Engine:terminate(normal, St),
-    ?assertEqual(true, Engine:exists(DbPath)),
-    ?assertEqual(ok, Engine:delete(RootDir, DbPath, [async])),
-    ?assertEqual(false, Engine:exists(DbPath)).
+    ?assertEqual(false, couch_server:exists(DbName)),
+    ?assertMatch(ok, cycle_db(DbName, create_db)),
+    ?assertEqual(true, couch_server:exists(DbName)),
+    ?assertEqual(ok, couch_server:delete(DbName, [])),
+    ?assertEqual(false, couch_server:exists(DbName)).
+
+
+cycle_db(DbName, Type) ->
+    {ok, Db} = test_engine_util:Type(DbName),
+    test_engine_util:shutdown_db(Db).
