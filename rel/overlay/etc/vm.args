@@ -45,3 +45,6 @@
 
 # Comment this line out to enable the interactive Erlang shell on startup
 +Bd -noinput
+
+# Force use of the smp scheduler, fixes #1296
+-smp enable
