@@ -262,7 +262,7 @@ handle_approved_config_req(#httpd{method='PUT', path_parts=[_, Section, Key]}=Re
         <<"admins">> ->
             couch_passwords:hash_admin_password(RawValue);
         _ ->
-            RawValue
+            string:trim(RawValue)
         end
     end,
     OldValue = config:get(Section, Key, ""),
