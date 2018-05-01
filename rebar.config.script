@@ -57,7 +57,7 @@ DepDescs = [
 %% Non-Erlang deps
 {docs,             {url, "https://github.com/apache/couchdb-documentation"},
                    {tag, "2.1.0"}, [raw]},
-{fauxton,          {url, "https://github.com/dch/couchdb-fauxton/releases"},
+{fauxton,          {url, "https://github.com/dch/couchdb-fauxton"},
                    {tag, "v1.1.x-test"}, [raw]},
 %% Third party deps
 {folsom,           "folsom",           {tag, "CouchDB-0.8.2"}},
