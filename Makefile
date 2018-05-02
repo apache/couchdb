@@ -17,7 +17,7 @@ IN_RELEASE = $(shell if [ ! -d .git ]; then echo true; fi)
 ifeq ($(IN_RELEASE), true)
 COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)
 else
-RELTAG = $(shell git describe | grep -E '^[0-9]+\.[0-9]\.[0-9]+(-RC[0-9]+)?$$')
+RELTAG = $(shell git describe --dirty --abbrev=0 --tags --always --first-parent | grep -Eo '^[0-9]+\.[0-9]\.[0-9]+(-RC[0-9]+)?')
 ifeq ($(RELTAG),)
 COUCHDB_VERSION_SUFFIX = $(shell git rev-parse --short --verify HEAD)
 COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)-$(COUCHDB_VERSION_SUFFIX)
