@@ -17,7 +17,11 @@ IN_RELEASE = $(shell if [ ! -d .git ]; then echo true; fi)
 ifeq ($(IN_RELEASE), true)
 COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)
 else
-RELTAG = $(shell git describe --dirty --abbrev=0 --tags --always --first-parent | grep -Eo '^[0-9]+\.[0-9]\.[0-9]+(-RC[0-9]+)?')
+# IN_RC generates a tarball that has the -RCx suffix in the name if needed
+IN_RC = $(shell git describe --tags --always --first-parent \
+							| grep -Eo -- '-RC[0-9]+' 2>/dev/null)
+RELTAG = $(shell git describe --dirty --abbrev=0 --tags --always --first-parent \
+				| grep -Eo '^[0-9]+\.[0-9]\.[0-9]+')
 ifeq ($(RELTAG),)
 COUCHDB_VERSION_SUFFIX = $(shell git rev-parse --short --verify HEAD)
 COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)-$(COUCHDB_VERSION_SUFFIX)
@@ -292,8 +296,8 @@ dist: all
 	@mkdir -p apache-couchdb-$(COUCHDB_VERSION)/share/docs/man
 	@cp src/docs/build/man/apachecouchdb.1 apache-couchdb-$(COUCHDB_VERSION)/share/docs/man/
 
-	@tar czf apache-couchdb-$(COUCHDB_VERSION).tar.gz apache-couchdb-$(COUCHDB_VERSION)
-	@echo "Done: apache-couchdb-$(COUCHDB_VERSION).tar.gz"
+	@tar czf apache-couchdb-$(COUCHDB_VERSION)$(IN_RC).tar.gz apache-couchdb-$(COUCHDB_VERSION)
+	@echo "Done: apache-couchdb-$(COUCHDB_VERSION)$(IN_RC).tar.gz"
 
 
 .PHONY: release
