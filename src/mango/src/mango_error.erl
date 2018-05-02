@@ -308,7 +308,7 @@ info(mango_sort, {invalid_sort_json, BadSort}) ->
     {
         400,
         <<"invalid_sort_json">>,
-        fmt("Sort must be an array of sort specs, not: ~w", [BadSort])
+        fmt("Sort must be an array of sort specs, not: ~p", [BadSort])
     };
 info(mango_sort, {invalid_sort_dir, BadSpec}) ->
     {
@@ -320,7 +320,7 @@ info(mango_sort, {invalid_sort_field, BadField}) ->
     {
         400,
         <<"invalid_sort_field">>,
-        fmt("Invalid sort field: ~w", [BadField])
+        fmt("Invalid sort field: ~p", [BadField])
     };
 info(mango_sort, {unsupported, mixed_sort}) ->
     {
