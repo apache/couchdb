@@ -293,7 +293,7 @@ handle_node_req(#httpd{path_parts=[_, _Node, <<"_config">>, _Section]}=Req) ->
 % "value"
 handle_node_req(#httpd{method='PUT', path_parts=[_, Node, <<"_config">>, Section, Key]}=Req) ->
     couch_util:check_config_blacklist(Section),
-    Value = string:trim(chttpd:json_body(Req)),
+    Value = couch_util:trim(chttpd:json_body(Req)),
     Persist = chttpd:header_value(Req, "X-Couch-Persist") /= "false",
     OldValue = call_node(Node, config, get, [Section, Key, ""]),
     case call_node(Node, config, set, [Section, Key, ?b2l(Value), Persist]) of
