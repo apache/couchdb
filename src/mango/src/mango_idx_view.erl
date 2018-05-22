@@ -127,7 +127,7 @@ is_usable(Idx, Selector, SortFields) ->
     % _id and _rev are implicitly in every document so
     % we don't need to check the selector for these either
     RequiredFields2 = ordsets:subtract(
-        lists:usort(RequiredFields1), 
+        RequiredFields1,
         [<<"_id">>, <<"_rev">>]),
 
     mango_selector:has_required_fields(Selector, RequiredFields2)
