@@ -18,9 +18,16 @@
 -include_lib("couch/include/couch_db.hrl").
 
 
-cet_read_empty_docs() ->
+setup_each() ->
     {ok, Db} = cpse_util:create_db(),
+    Db.
 
+
+teardown_each(Db) ->
+    ok = couch_server:delete(couch_db:name(Db), []).
+
+
+cpse_read_docs_from_empty_db(Db) ->
     ?assertEqual([not_found], couch_db_engine:open_docs(Db, [<<"foo">>])),
     ?assertEqual(
         [not_found, not_found],
@@ -28,9 +35,7 @@ cet_read_empty_docs() ->
     ).
 
 
-cet_read_empty_local_docs() ->
-    {ok, Db} = cpse_util:create_db(),
-
+cpse_read_empty_local_docs(Db) ->
     {LocalA, LocalB} = {<<"_local/a">>, <<"_local/b">>},
     ?assertEqual([not_found], couch_db_engine:open_local_docs(Db, [LocalA])),
     ?assertEqual(
@@ -39,9 +44,7 @@ cet_read_empty_local_docs() ->
     ).
 
 
-cet_write_one_doc() ->
-    {ok, Db1} = cpse_util:create_db(),
-
+cpse_write_one_doc(Db1) ->
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_update_seq(Db1)),
@@ -82,9 +85,7 @@ cet_write_one_doc() ->
     ?assertEqual({[{<<"vsn">>, 1}]}, Body1).
 
 
-cet_write_two_docs() ->
-    {ok, Db1} = cpse_util:create_db(),
-
+cpse_write_two_docs(Db1) ->
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_update_seq(Db1)),
@@ -107,9 +108,7 @@ cet_write_two_docs() ->
     ?assertEqual(false, lists:member(not_found, Resps)).
 
 
-cet_write_three_doc_batch() ->
-    {ok, Db1} = cpse_util:create_db(),
-
+cpse_write_three_doc_batch(Db1) ->
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_update_seq(Db1)),
@@ -135,9 +134,7 @@ cet_write_three_doc_batch() ->
     ?assertEqual(false, lists:member(not_found, Resps)).
 
 
-cet_update_doc() ->
-    {ok, Db1} = cpse_util:create_db(),
-
+cpse_update_doc(Db1) ->
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_update_seq(Db1)),
@@ -179,9 +176,7 @@ cet_update_doc() ->
     ?assertEqual({[{<<"vsn">>, 2}]}, Body1).
 
 
-cet_delete_doc() ->
-    {ok, Db1} = cpse_util:create_db(),
-
+cpse_delete_doc(Db1) ->
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_update_seq(Db1)),
@@ -222,9 +217,7 @@ cet_delete_doc() ->
     ?assertEqual({[]}, Body1).
 
 
-cet_write_local_doc() ->
-    {ok, Db1} = cpse_util:create_db(),
-
+cpse_write_local_doc(Db1) ->
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_update_seq(Db1)),
@@ -247,9 +240,7 @@ cet_write_local_doc() ->
     ?assertEqual({[{<<"yay">>, false}]}, Doc#doc.body).
 
 
-cet_write_mixed_batch() ->
-    {ok, Db1} = cpse_util:create_db(),
-
+cpse_write_mixed_batch(Db1) ->
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_update_seq(Db1)),
@@ -277,9 +268,7 @@ cet_write_mixed_batch() ->
     [#doc{}] = couch_db_engine:open_local_docs(Db3, [<<"_local/foo">>]).
 
 
-cet_update_local_doc() ->
-    {ok, Db1} = cpse_util:create_db(),
-
+cpse_update_local_doc(Db1) ->
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_update_seq(Db1)),
@@ -303,9 +292,7 @@ cet_update_local_doc() ->
     ?assertEqual({[{<<"stuff">>, null}]}, Doc#doc.body).
 
 
-cet_delete_local_doc() ->
-    {ok, Db1} = cpse_util:create_db(),
-
+cpse_delete_local_doc(Db1) ->
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_update_seq(Db1)),

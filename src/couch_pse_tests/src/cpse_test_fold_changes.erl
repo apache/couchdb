@@ -21,15 +21,22 @@
 -define(NUM_DOCS, 25).
 
 
-cet_empty_changes() ->
+setup_each() ->
     {ok, Db} = cpse_util:create_db(),
+    Db.
+
+
+teardown_each(Db) ->
+    ok = couch_server:delete(couch_db:name(Db), []).
+
+
+cpse_empty_changes(Db) ->
     ?assertEqual(0, couch_db_engine:count_changes_since(Db, 0)),
     ?assertEqual({ok, []},
             couch_db_engine:fold_changes(Db, 0, fun fold_fun/2, [], [])).
 
 
-cet_single_change() ->
-    {ok, Db1} = cpse_util:create_db(),
+cpse_single_change(Db1) ->
     Actions = [{create, {<<"a">>, {[]}}}],
     {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
 
@@ -38,8 +45,7 @@ cet_single_change() ->
             couch_db_engine:fold_changes(Db2, 0, fun fold_fun/2, [], [])).
 
 
-cet_two_changes() ->
-    {ok, Db1} = cpse_util:create_db(),
+cpse_two_changes(Db1) ->
     Actions = [
         {create, {<<"a">>, {[]}}},
         {create, {<<"b">>, {[]}}}
@@ -52,38 +58,37 @@ cet_two_changes() ->
     ?assertEqual([{<<"a">>, 1}, {<<"b">>, 2}], lists:reverse(Changes)).
 
 
-cet_two_changes_batch() ->
-    {ok, Db1} = cpse_util:create_db(),
-    Actions1 = [
+cpse_two_changes_batch(Db1) ->
+    Actions = [
         {batch, [
             {create, {<<"a">>, {[]}}},
             {create, {<<"b">>, {[]}}}
         ]}
     ],
-    {ok, Db2} = cpse_util:apply_actions(Db1, Actions1),
+    {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
 
     ?assertEqual(2, couch_db_engine:count_changes_since(Db2, 0)),
-    {ok, Changes1} =
+    {ok, Changes} =
             couch_db_engine:fold_changes(Db2, 0, fun fold_fun/2, [], []),
-    ?assertEqual([{<<"a">>, 1}, {<<"b">>, 2}], lists:reverse(Changes1)),
+    ?assertEqual([{<<"a">>, 1}, {<<"b">>, 2}], lists:reverse(Changes)).
 
-    {ok, Db3} = cpse_util:create_db(),
-    Actions2 = [
+
+cpse_two_changes_batch_sorted(Db1) ->
+    Actions = [
         {batch, [
             {create, {<<"b">>, {[]}}},
             {create, {<<"a">>, {[]}}}
         ]}
     ],
-    {ok, Db4} = cpse_util:apply_actions(Db3, Actions2),
+    {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
 
-    ?assertEqual(2, couch_db_engine:count_changes_since(Db4, 0)),
-    {ok, Changes2} =
-            couch_db_engine:fold_changes(Db4, 0, fun fold_fun/2, [], []),
-    ?assertEqual([{<<"a">>, 1}, {<<"b">>, 2}], lists:reverse(Changes2)).
+    ?assertEqual(2, couch_db_engine:count_changes_since(Db2, 0)),
+    {ok, Changes} =
+            couch_db_engine:fold_changes(Db2, 0, fun fold_fun/2, [], []),
+    ?assertEqual([{<<"a">>, 1}, {<<"b">>, 2}], lists:reverse(Changes)).
 
 
-cet_update_one() ->
-    {ok, Db1} = cpse_util:create_db(),
+cpse_update_one(Db1) ->
     Actions = [
         {create, {<<"a">>, {[]}}},
         {update, {<<"a">>, {[]}}}
@@ -95,8 +100,7 @@ cet_update_one() ->
             couch_db_engine:fold_changes(Db2, 0, fun fold_fun/2, [], [])).
 
 
-cet_update_first_of_two() ->
-    {ok, Db1} = cpse_util:create_db(),
+cpse_update_first_of_two(Db1) ->
     Actions = [
         {create, {<<"a">>, {[]}}},
         {create, {<<"b">>, {[]}}},
@@ -110,8 +114,7 @@ cet_update_first_of_two() ->
     ?assertEqual([{<<"b">>, 2}, {<<"a">>, 3}], lists:reverse(Changes)).
 
 
-cet_update_second_of_two() ->
-    {ok, Db1} = cpse_util:create_db(),
+cpse_update_second_of_two(Db1) ->
     Actions = [
         {create, {<<"a">>, {[]}}},
         {create, {<<"b">>, {[]}}},
@@ -125,7 +128,7 @@ cet_update_second_of_two() ->
     ?assertEqual([{<<"a">>, 1}, {<<"b">>, 3}], lists:reverse(Changes)).
 
 
-cet_check_mutation_ordering() ->
+cpse_check_mutation_ordering(Db1) ->
     Actions = shuffle(lists:map(fun(Seq) ->
         {create, {docid(Seq), {[]}}}
     end, lists:seq(1, ?NUM_DOCS))),
@@ -133,7 +136,6 @@ cet_check_mutation_ordering() ->
     DocIdOrder = [DocId || {_, {DocId, _}} <- Actions],
     DocSeqs = lists:zip(DocIdOrder, lists:seq(1, ?NUM_DOCS)),
 
-    {ok, Db1} = cpse_util:create_db(),
     {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
 
     % First lets see that we can get the correct

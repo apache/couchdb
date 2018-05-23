@@ -17,9 +17,17 @@
 -include_lib("eunit/include/eunit.hrl").
 
 
-cet_default_props() ->
+setup_each() ->
+    cpse_util:dbname().
+
+
+teardown_each(DbName) ->
+    ok = couch_server:delete(DbName, []).
+
+
+cpse_default_props(DbName) ->
     {ok, {_App, Engine, _Extension}} = application:get_env(couch, test_engine),
-    {ok, Db} = cpse_util:create_db(),
+    {ok, Db} = cpse_util:create_db(DbName),
     Node = node(),
 
     ?assertEqual(Engine, couch_db_engine:get_engine(Db)),
@@ -47,10 +55,10 @@ cet_default_props() ->
 ]}).
 
 
-cet_admin_only_security() ->
+cpse_admin_only_security(DbName) ->
     Config = [{"couchdb", "default_security", "admin_only"}],
     {ok, Db1} = cpse_util:with_config(Config, fun() ->
-        cpse_util:create_db()
+        cpse_util:create_db(DbName)
     end),
 
     ?assertEqual(?ADMIN_ONLY_SEC_PROPS, couch_db:get_security(Db1)),
@@ -61,17 +69,17 @@ cet_admin_only_security() ->
     ?assertEqual(?ADMIN_ONLY_SEC_PROPS, couch_db:get_security(Db2)).
 
 
-cet_set_security() ->
+cpse_set_security(DbName) ->
     SecProps = {[{<<"foo">>, <<"bar">>}]},
-    check_prop_set(get_security, set_security, {[]}, SecProps).
+    check_prop_set(DbName, get_security, set_security, {[]}, SecProps).
 
 
-cet_set_revs_limit() ->
-    check_prop_set(get_revs_limit, set_revs_limit, 1000, 50).
+cpse_set_revs_limit(DbName) ->
+    check_prop_set(DbName, get_revs_limit, set_revs_limit, 1000, 50).
 
 
-check_prop_set(GetFun, SetFun, Default, Value) ->
-    {ok, Db0} = cpse_util:create_db(),
+check_prop_set(DbName, GetFun, SetFun, Default, Value) ->
+    {ok, Db0} = cpse_util:create_db(DbName),
 
     ?assertEqual(Default, couch_db:GetFun(Db0)),
     ?assertMatch(ok, couch_db:SetFun(Db0, Value)),

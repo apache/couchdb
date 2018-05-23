@@ -18,8 +18,16 @@
 -include_lib("couch/include/couch_db.hrl").
 
 
-cet_compact_empty() ->
-    {ok, Db1} = cpse_util:create_db(),
+setup_each() ->
+    {ok, Db} = cpse_util:create_db(),
+    Db.
+
+
+teardown_each(Db) ->
+    ok = couch_server:delete(couch_db:name(Db), []).
+
+
+cpse_compact_empty(Db1) ->
     Term1 = cpse_util:db_as_term(Db1),
 
     cpse_util:compact(Db1),
@@ -31,8 +39,7 @@ cet_compact_empty() ->
     ?assertEqual(nodiff, Diff).
 
 
-cet_compact_doc() ->
-    {ok, Db1} = cpse_util:create_db(),
+cpse_compact_doc(Db1) ->
     Actions = [{create, {<<"foo">>, {[]}}}],
     {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
     Term1 = cpse_util:db_as_term(Db2),
@@ -46,8 +53,7 @@ cet_compact_doc() ->
     ?assertEqual(nodiff, Diff).
 
 
-cet_compact_local_doc() ->
-    {ok, Db1} = cpse_util:create_db(),
+cpse_compact_local_doc(Db1) ->
     Actions = [{create, {<<"_local/foo">>, {[]}}}],
     {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
     Term1 = cpse_util:db_as_term(Db2),
@@ -61,9 +67,7 @@ cet_compact_local_doc() ->
     ?assertEqual(nodiff, Diff).
 
 
-cet_compact_with_everything() ->
-    {ok, Db1} = cpse_util:create_db(),
-
+cpse_compact_with_everything(Db1) ->
     % Add a whole bunch of docs
     DocActions = lists:map(fun(Seq) ->
         {create, {docid(Seq), {[{<<"int">>, Seq}]}}}
@@ -150,9 +154,7 @@ cet_compact_with_everything() ->
     ?assertEqual(nodiff, Diff).
 
 
-cet_recompact_updates() ->
-    {ok, Db1} = cpse_util:create_db(),
-
+cpse_recompact_updates(Db1) ->
     Actions1 = lists:map(fun(Seq) ->
         {create, {docid(Seq), {[{<<"int">>, Seq}]}}}
     end, lists:seq(1, 1000)),

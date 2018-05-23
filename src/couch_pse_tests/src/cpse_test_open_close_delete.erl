@@ -17,53 +17,53 @@
 -include_lib("eunit/include/eunit.hrl").
 
 
-cet_open_non_existent() ->
+setup_each() ->
+    cpse_util:dbname().
+
+
+teardown_each(DbName) ->
+    case couch_server:exists(DbName) of
+        true -> ok = couch_server:delete(DbName, []);
+        false -> ok
+    end.
+
+
+cpse_open_non_existent(DbName) ->
     % Try twice to check that a failed open doesn't create
     % the database for some reason.
-    DbName = cpse_util:dbname(),
     ?assertEqual({not_found, no_db_file}, cpse_util:open_db(DbName)),
     ?assertEqual({not_found, no_db_file}, cpse_util:open_db(DbName)).
 
 
-cet_open_create() ->
-    DbName = cpse_util:dbname(),
-
+cpse_open_create(DbName) ->
     ?assertEqual(false, couch_server:exists(DbName)),
     ?assertEqual({not_found, no_db_file}, cpse_util:open_db(DbName)),
     ?assertMatch({ok, _}, cpse_util:create_db(DbName)),
     ?assertEqual(true, couch_server:exists(DbName)).
 
 
-cet_open_when_exists() ->
-    DbName = cpse_util:dbname(),
-
+cpse_open_when_exists(DbName) ->
     ?assertEqual(false, couch_server:exists(DbName)),
     ?assertEqual({not_found, no_db_file}, cpse_util:open_db(DbName)),
     ?assertMatch({ok, _}, cpse_util:create_db(DbName)),
     ?assertEqual(file_exists, cpse_util:create_db(DbName)).
 
 
-cet_terminate() ->
-    DbName = cpse_util:dbname(),
-
+cpse_terminate(DbName) ->
     ?assertEqual(false, couch_server:exists(DbName)),
     ?assertEqual({not_found, no_db_file}, cpse_util:open_db(DbName)),
     ?assertEqual(ok, cycle_db(DbName, create_db)),
     ?assertEqual(true, couch_server:exists(DbName)).
 
 
-cet_rapid_recycle() ->
-    DbName = cpse_util:dbname(),
-
+cpse_rapid_recycle(DbName) ->
     ?assertEqual(ok, cycle_db(DbName, create_db)),
     lists:foreach(fun(_) ->
         ?assertEqual(ok, cycle_db(DbName, open_db))
     end, lists:seq(1, 100)).
 
 
-cet_delete() ->
-    DbName = cpse_util:dbname(),
-
+cpse_delete(DbName) ->
     ?assertEqual(false, couch_server:exists(DbName)),
     ?assertMatch(ok, cycle_db(DbName, create_db)),
     ?assertEqual(true, couch_server:exists(DbName)),

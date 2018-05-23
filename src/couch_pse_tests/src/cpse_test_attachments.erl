@@ -18,9 +18,16 @@
 -include_lib("couch/include/couch_db.hrl").
 
 
-cet_write_attachment() ->
-    {ok, Db1} = cpse_util:create_db(),
+setup_each() ->
+    {ok, Db} = cpse_util:create_db(),
+    Db.
 
+
+teardown_each(Db) ->
+    ok = couch_server:delete(couch_db:name(Db), []).
+
+
+cpse_write_attachment(Db1) ->
     AttBin = crypto:strong_rand_bytes(32768),
 
     try
@@ -72,9 +79,7 @@ cet_write_attachment() ->
 % attachments streams when restarting (for instance if
 % we ever have something that stores attachemnts in
 % an external object store)
-cet_inactive_stream() ->
-    {ok, Db1} = cpse_util:create_db(),
-
+cpse_inactive_stream(Db1) ->
     AttBin = crypto:strong_rand_bytes(32768),
 
     try

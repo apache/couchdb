@@ -18,9 +18,16 @@
 -include_lib("couch/include/couch_db.hrl").
 
 
-cet_purge_simple() ->
-    {ok, Db1} = cpse_util:create_db(),
+setup_each() ->
+    {ok, Db} = cpse_util:create_db(),
+    Db.
 
+
+teardown_each(Db) ->
+    ok = couch_server:delete(couch_db:name(Db), []).
+
+
+cpse_purge_simple(Db1) ->
     Actions1 = [
         {create, {<<"foo">>, {[{<<"vsn">>, 1}]}}}
     ],
@@ -48,9 +55,7 @@ cet_purge_simple() ->
     ?assertEqual([{<<"foo">>, [Rev]}], couch_db_engine:get_last_purged(Db3)).
 
 
-cet_purge_conflicts() ->
-    {ok, Db1} = cpse_util:create_db(),
-
+cpse_purge_conflicts(Db1) ->
     Actions1 = [
         {create, {<<"foo">>, {[{<<"vsn">>, 1}]}}},
         {conflict, {<<"foo">>, {[{<<"vsn">>, 2}]}}}
@@ -94,9 +99,7 @@ cet_purge_conflicts() ->
     ?assertEqual([{<<"foo">>, [Rev2]}], couch_db_engine:get_last_purged(Db4)).
 
 
-cet_add_delete_purge() ->
-    {ok, Db1} = cpse_util:create_db(),
-
+cpse_add_delete_purge(Db1) ->
     Actions1 = [
         {create, {<<"foo">>, {[{<<"vsn">>, 1}]}}},
         {delete, {<<"foo">>, {[{<<"vsn">>, 2}]}}}
@@ -126,9 +129,7 @@ cet_add_delete_purge() ->
     ?assertEqual([{<<"foo">>, [Rev]}], couch_db_engine:get_last_purged(Db3)).
 
 
-cet_add_two_purge_one() ->
-    {ok, Db1} = cpse_util:create_db(),
-
+cpse_add_two_purge_one(Db1) ->
     Actions1 = [
         {create, {<<"foo">>, {[{<<"vsn">>, 1}]}}},
         {create, {<<"bar">>, {[]}}}
