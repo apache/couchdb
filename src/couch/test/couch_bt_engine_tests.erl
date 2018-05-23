@@ -17,4 +17,4 @@
 
 
 couch_bt_engine_test_()->
-    test_engine_util:create_tests(couch, couch_bt_engine, "couch").
+    cpse_util:create_tests(couch, couch_bt_engine, "couch").
