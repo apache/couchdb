@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(test_engine_util).
+-module(cpse_util).
 -compile(export_all).
 
 
@@ -18,15 +18,15 @@
 
 
 -define(TEST_MODULES, [
-    test_engine_open_close_delete,
-    test_engine_get_set_props,
-    test_engine_read_write_docs,
-    test_engine_attachments,
-    test_engine_fold_docs,
-    test_engine_fold_changes,
-    test_engine_purge_docs,
-    test_engine_compaction,
-    test_engine_ref_counting
+    cpse_test_open_close_delete,
+    cpse_test_get_set_props,
+    cpse_test_read_write_docs,
+    cpse_test_attachments,
+    cpse_test_fold_docs,
+    cpse_test_fold_changes,
+    cpse_test_purge_docs,
+    cpse_test_compaction,
+    cpse_test_ref_counting
 ]).
 
 
@@ -206,7 +206,8 @@ gen_write(Db, {Action, {<<"_local/", _/binary>> = DocId, Body}}) ->
         deleted = Deleted
     }};
 
-    Rev = couch_hash:md5_hash(term_to_binary({DocId, Body, Atts})),
+gen_write(Db, {Action, {DocId, Body}}) ->
+    gen_write(Db, {Action, {DocId, Body, []}});
 
 gen_write(Db, {create, {DocId, Body, Atts}}) ->
     {not_found, _} = couch_db:open_doc(Db, DocId),
@@ -252,33 +253,7 @@ gen_write(Db, {Action, {DocId, Body, Atts}}) ->
         deleted = Deleted,
         body = Body,
         atts = Atts
-    },
-
-    Path = gen_path(Action, RevPos, PrevRevId, Rev, Leaf),
-    RevsLimit = Engine:get_revs_limit(St),
-    NodeType = case Action of
-        conflict -> new_branch;
-        _ -> new_leaf
-    end,
-    {MergedTree, NodeType} = couch_key_tree:merge(PrevRevTree, Path),
-    NewTree = couch_key_tree:stem(MergedTree, RevsLimit),
-
-    NewFDI = PrevFDI#full_doc_info{
-        deleted = couch_doc:is_deleted(NewTree),
-        update_seq = UpdateSeq,
-        rev_tree = NewTree,
-        sizes = Sizes
-    },
-
-    {PrevFDI, NewFDI}.
-
-
-gen_revision(conflict, DocId, _PrevRev, Body, Atts) ->
-    couch_hash:md5_hash(term_to_binary({DocId, Body, Atts}));
-gen_revision(delete, DocId, PrevRev, Body, Atts) ->
-    gen_revision(update, DocId, PrevRev, Body, Atts);
-gen_revision(update, DocId, PrevRev, Body, Atts) ->
-    couch_hash:md5_hash(term_to_binary({DocId, PrevRev, Body, Atts})).
+    }}.
 
 
 gen_rev(A, DocId, {Pos, Rev}, Body, Atts) when A == update; A == delete ->

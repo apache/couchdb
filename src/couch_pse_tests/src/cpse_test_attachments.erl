@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(test_engine_attachments).
+-module(cpse_test_attachments).
 -compile(export_all).
 
 

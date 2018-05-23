@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(test_engine_open_close_delete).
+-module(cpse_test_open_close_delete).
 -compile(export_all).
 
 

@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(test_engine_get_set_props).
+-module(cpse_test_get_set_props).
 -compile(export_all).
 
 

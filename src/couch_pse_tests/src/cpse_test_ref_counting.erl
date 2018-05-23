@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(test_engine_ref_counting).
+-module(cpse_test_ref_counting).
 -compile(export_all).
 
 
