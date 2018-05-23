@@ -22,16 +22,16 @@
 
 
 cet_empty_changes() ->
-    {ok, Db} = test_engine_util:create_db(),
+    {ok, Db} = cpse_util:create_db(),
     ?assertEqual(0, couch_db_engine:count_changes_since(Db, 0)),
     ?assertEqual({ok, []},
             couch_db_engine:fold_changes(Db, 0, fun fold_fun/2, [], [])).
 
 
 cet_single_change() ->
-    {ok, Db1} = test_engine_util:create_db(),
+    {ok, Db1} = cpse_util:create_db(),
     Actions = [{create, {<<"a">>, {[]}}}],
-    {ok, Db2} = test_engine_util:apply_actions(Db1, Actions),
+    {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
 
     ?assertEqual(1, couch_db_engine:count_changes_since(Db2, 0)),
     ?assertEqual({ok, [{<<"a">>, 1}]},
@@ -39,12 +39,12 @@ cet_single_change() ->
 
 
 cet_two_changes() ->
-    {ok, Db1} = test_engine_util:create_db(),
+    {ok, Db1} = cpse_util:create_db(),
     Actions = [
         {create, {<<"a">>, {[]}}},
         {create, {<<"b">>, {[]}}}
     ],
-    {ok, Db2} = test_engine_util:apply_actions(Db1, Actions),
+    {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
 
     ?assertEqual(2, couch_db_engine:count_changes_since(Db2, 0)),
     {ok, Changes} =
@@ -53,28 +53,28 @@ cet_two_changes() ->
 
 
 cet_two_changes_batch() ->
-    {ok, Db1} = test_engine_util:create_db(),
+    {ok, Db1} = cpse_util:create_db(),
     Actions1 = [
         {batch, [
             {create, {<<"a">>, {[]}}},
             {create, {<<"b">>, {[]}}}
         ]}
     ],
-    {ok, Db2} = test_engine_util:apply_actions(Db1, Actions1),
+    {ok, Db2} = cpse_util:apply_actions(Db1, Actions1),
 
     ?assertEqual(2, couch_db_engine:count_changes_since(Db2, 0)),
     {ok, Changes1} =
             couch_db_engine:fold_changes(Db2, 0, fun fold_fun/2, [], []),
     ?assertEqual([{<<"a">>, 1}, {<<"b">>, 2}], lists:reverse(Changes1)),
 
-    {ok, Db3} = test_engine_util:create_db(),
+    {ok, Db3} = cpse_util:create_db(),
     Actions2 = [
         {batch, [
             {create, {<<"b">>, {[]}}},
             {create, {<<"a">>, {[]}}}
         ]}
     ],
-    {ok, Db4} = test_engine_util:apply_actions(Db3, Actions2),
+    {ok, Db4} = cpse_util:apply_actions(Db3, Actions2),
 
     ?assertEqual(2, couch_db_engine:count_changes_since(Db4, 0)),
     {ok, Changes2} =
@@ -83,12 +83,12 @@ cet_two_changes_batch() ->
 
 
 cet_update_one() ->
-    {ok, Db1} = test_engine_util:create_db(),
+    {ok, Db1} = cpse_util:create_db(),
     Actions = [
         {create, {<<"a">>, {[]}}},
         {update, {<<"a">>, {[]}}}
     ],
-    {ok, Db2} = test_engine_util:apply_actions(Db1, Actions),
+    {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
 
     ?assertEqual(1, couch_db_engine:count_changes_since(Db2, 0)),
     ?assertEqual({ok, [{<<"a">>, 2}]},
@@ -96,13 +96,13 @@ cet_update_one() ->
 
 
 cet_update_first_of_two() ->
-    {ok, Db1} = test_engine_util:create_db(),
+    {ok, Db1} = cpse_util:create_db(),
     Actions = [
         {create, {<<"a">>, {[]}}},
         {create, {<<"b">>, {[]}}},
         {update, {<<"a">>, {[]}}}
     ],
-    {ok, Db2} = test_engine_util:apply_actions(Db1, Actions),
+    {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
 
     ?assertEqual(2, couch_db_engine:count_changes_since(Db2, 0)),
     {ok, Changes} =
@@ -111,13 +111,13 @@ cet_update_first_of_two() ->
 
 
 cet_update_second_of_two() ->
-    {ok, Db1} = test_engine_util:create_db(),
+    {ok, Db1} = cpse_util:create_db(),
     Actions = [
         {create, {<<"a">>, {[]}}},
         {create, {<<"b">>, {[]}}},
         {update, {<<"b">>, {[]}}}
     ],
-    {ok, Db2} = test_engine_util:apply_actions(Db1, Actions),
+    {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
 
     ?assertEqual(2, couch_db_engine:count_changes_since(Db2, 0)),
     {ok, Changes} =
@@ -133,8 +133,8 @@ cet_check_mutation_ordering() ->
     DocIdOrder = [DocId || {_, {DocId, _}} <- Actions],
     DocSeqs = lists:zip(DocIdOrder, lists:seq(1, ?NUM_DOCS)),
 
-    {ok, Db1} = test_engine_util:create_db(),
-    {ok, Db2} = test_engine_util:apply_actions(Db1, Actions),
+    {ok, Db1} = cpse_util:create_db(),
+    {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
 
     % First lets see that we can get the correct
     % suffix/prefix starting at every update sequence
@@ -158,7 +158,7 @@ do_mutation_ordering(Db, _Seq, [], FinalDocSeqs) ->
 
 do_mutation_ordering(Db, Seq, [{DocId, _OldSeq} | Rest], DocSeqAcc) ->
     Actions = [{update, {DocId, {[]}}}],
-    {ok, NewDb} = test_engine_util:apply_actions(Db, Actions),
+    {ok, NewDb} = cpse_util:apply_actions(Db, Actions),
     NewAcc = DocSeqAcc ++ [{DocId, Seq}],
     Expected = Rest ++ NewAcc,
     {ok, RevOrder} =

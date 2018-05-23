@@ -353,11 +353,11 @@ fold_user_fun_stop(FoldFun, DocIdFun) ->
 
 
 init_st(DocIdFun) ->
-    {ok, Db1} = test_engine_util:create_db(),
+    {ok, Db1} = cpse_util:create_db(),
     Actions = lists:map(fun(Id) ->
         {create, {DocIdFun(Id), {[{<<"int">>, Id}]}}}
     end, lists:seq(1, ?NUM_DOCS)),
-    test_engine_util:apply_batch(Db1, Actions).
+    cpse_util:apply_batch(Db1, Actions).
 
 
 fold_fun(Doc, Acc) ->

@@ -22,7 +22,7 @@
 
 
 cet_empty_monitors() ->
-    {ok, Db} = test_engine_util:create_db(),
+    {ok, Db} = cpse_util:create_db(),
     Pids = couch_db_engine:monitored_by(Db),
     ?assert(is_list(Pids)),
     Expected = [
@@ -34,7 +34,7 @@ cet_empty_monitors() ->
 
 
 cet_incref_decref() ->
-    {ok, Db} = test_engine_util:create_db(),
+    {ok, Db} = cpse_util:create_db(),
 
     {Pid, _} = Client = start_client(Db),
     wait_client(Client),
@@ -49,7 +49,7 @@ cet_incref_decref() ->
 
 
 cet_incref_decref_many() ->
-    {ok, Db} = test_engine_util:create_db(),
+    {ok, Db} = cpse_util:create_db(),
     Clients = lists:map(fun(_) ->
         start_client(Db)
     end, lists:seq(1, ?NUM_CLIENTS)),

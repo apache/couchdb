@@ -20,40 +20,40 @@
 cet_open_non_existent() ->
     % Try twice to check that a failed open doesn't create
     % the database for some reason.
-    DbName = test_engine_util:dbname(),
-    ?assertEqual({not_found, no_db_file}, test_engine_util:open_db(DbName)),
-    ?assertEqual({not_found, no_db_file}, test_engine_util:open_db(DbName)).
+    DbName = cpse_util:dbname(),
+    ?assertEqual({not_found, no_db_file}, cpse_util:open_db(DbName)),
+    ?assertEqual({not_found, no_db_file}, cpse_util:open_db(DbName)).
 
 
 cet_open_create() ->
-    DbName = test_engine_util:dbname(),
+    DbName = cpse_util:dbname(),
 
     ?assertEqual(false, couch_server:exists(DbName)),
-    ?assertEqual({not_found, no_db_file}, test_engine_util:open_db(DbName)),
-    ?assertMatch({ok, _}, test_engine_util:create_db(DbName)),
+    ?assertEqual({not_found, no_db_file}, cpse_util:open_db(DbName)),
+    ?assertMatch({ok, _}, cpse_util:create_db(DbName)),
     ?assertEqual(true, couch_server:exists(DbName)).
 
 
 cet_open_when_exists() ->
-    DbName = test_engine_util:dbname(),
+    DbName = cpse_util:dbname(),
 
     ?assertEqual(false, couch_server:exists(DbName)),
-    ?assertEqual({not_found, no_db_file}, test_engine_util:open_db(DbName)),
-    ?assertMatch({ok, _}, test_engine_util:create_db(DbName)),
-    ?assertEqual(file_exists, test_engine_util:create_db(DbName)).
+    ?assertEqual({not_found, no_db_file}, cpse_util:open_db(DbName)),
+    ?assertMatch({ok, _}, cpse_util:create_db(DbName)),
+    ?assertEqual(file_exists, cpse_util:create_db(DbName)).
 
 
 cet_terminate() ->
-    DbName = test_engine_util:dbname(),
+    DbName = cpse_util:dbname(),
 
     ?assertEqual(false, couch_server:exists(DbName)),
-    ?assertEqual({not_found, no_db_file}, test_engine_util:open_db(DbName)),
+    ?assertEqual({not_found, no_db_file}, cpse_util:open_db(DbName)),
     ?assertEqual(ok, cycle_db(DbName, create_db)),
     ?assertEqual(true, couch_server:exists(DbName)).
 
 
 cet_rapid_recycle() ->
-    DbName = test_engine_util:dbname(),
+    DbName = cpse_util:dbname(),
 
     ?assertEqual(ok, cycle_db(DbName, create_db)),
     lists:foreach(fun(_) ->
@@ -62,7 +62,7 @@ cet_rapid_recycle() ->
 
 
 cet_delete() ->
-    DbName = test_engine_util:dbname(),
+    DbName = cpse_util:dbname(),
 
     ?assertEqual(false, couch_server:exists(DbName)),
     ?assertMatch(ok, cycle_db(DbName, create_db)),
@@ -72,5 +72,5 @@ cet_delete() ->
 
 
 cycle_db(DbName, Type) ->
-    {ok, Db} = test_engine_util:Type(DbName),
-    test_engine_util:shutdown_db(Db).
+    {ok, Db} = cpse_util:Type(DbName),
+    cpse_util:shutdown_db(Db).

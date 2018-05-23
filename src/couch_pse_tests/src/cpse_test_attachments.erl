@@ -19,12 +19,12 @@
 
 
 cet_write_attachment() ->
-    {ok, Db1} = test_engine_util:create_db(),
+    {ok, Db1} = cpse_util:create_db(),
 
     AttBin = crypto:strong_rand_bytes(32768),
 
     try
-        [Att0] = test_engine_util:prep_atts(Db1, [
+        [Att0] = cpse_util:prep_atts(Db1, [
                 {<<"ohai.txt">>, AttBin}
             ]),
 
@@ -32,9 +32,9 @@ cet_write_attachment() ->
         ?assertEqual(true, couch_db_engine:is_active_stream(Db1, Stream)),
 
         Actions = [{create, {<<"first">>, {[]}, [Att0]}}],
-        {ok, Db2} = test_engine_util:apply_actions(Db1, Actions),
+        {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
         {ok, _} = couch_db:ensure_full_commit(Db2),
-        test_engine_util:shutdown_db(Db2),
+        cpse_util:shutdown_db(Db2),
 
         {ok, Db3} = couch_db:reopen(Db2),
 
@@ -44,7 +44,7 @@ cet_write_attachment() ->
             rev = {RevPos, PrevRevId},
             deleted = Deleted,
             body_sp = DocPtr
-        } = test_engine_util:prev_rev(FDI),
+        } = cpse_util:prev_rev(FDI),
 
         Doc0 = #doc{
             id = <<"foo">>,
@@ -73,19 +73,19 @@ cet_write_attachment() ->
 % we ever have something that stores attachemnts in
 % an external object store)
 cet_inactive_stream() ->
-    {ok, Db1} = test_engine_util:create_db(),
+    {ok, Db1} = cpse_util:create_db(),
 
     AttBin = crypto:strong_rand_bytes(32768),
 
     try
-        [Att0] = test_engine_util:prep_atts(Db1, [
+        [Att0] = cpse_util:prep_atts(Db1, [
                 {<<"ohai.txt">>, AttBin}
             ]),
 
         {stream, Stream} = couch_att:fetch(data, Att0),
         ?assertEqual(true, couch_db_engine:is_active_stream(Db1, Stream)),
 
-        test_engine_util:shutdown_db(Db1),
+        cpse_util:shutdown_db(Db1),
         {ok, Db2} = couch_db:reopen(Db1),
 
         ?assertEqual(false, couch_db_engine:is_active_stream(Db2, Stream))

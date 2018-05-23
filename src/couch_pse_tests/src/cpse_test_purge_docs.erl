@@ -19,12 +19,12 @@
 
 
 cet_purge_simple() ->
-    {ok, Db1} = test_engine_util:create_db(),
+    {ok, Db1} = cpse_util:create_db(),
 
     Actions1 = [
         {create, {<<"foo">>, {[{<<"vsn">>, 1}]}}}
     ],
-    {ok, Db2} = test_engine_util:apply_actions(Db1, Actions1),
+    {ok, Db2} = cpse_util:apply_actions(Db1, Actions1),
 
     ?assertEqual(1, couch_db_engine:get_doc_count(Db2)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db2)),
@@ -33,13 +33,13 @@ cet_purge_simple() ->
     ?assertEqual([], couch_db_engine:get_last_purged(Db2)),
 
     [FDI] = couch_db_engine:open_docs(Db2, [<<"foo">>]),
-    PrevRev = test_engine_util:prev_rev(FDI),
+    PrevRev = cpse_util:prev_rev(FDI),
     Rev = PrevRev#rev_info.rev,
 
     Actions2 = [
         {purge, {<<"foo">>, Rev}}
     ],
-    {ok, Db3} = test_engine_util:apply_actions(Db2, Actions2),
+    {ok, Db3} = cpse_util:apply_actions(Db2, Actions2),
 
     ?assertEqual(0, couch_db_engine:get_doc_count(Db3)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db3)),
@@ -49,13 +49,13 @@ cet_purge_simple() ->
 
 
 cet_purge_conflicts() ->
-    {ok, Db1} = test_engine_util:create_db(),
+    {ok, Db1} = cpse_util:create_db(),
 
     Actions1 = [
         {create, {<<"foo">>, {[{<<"vsn">>, 1}]}}},
         {conflict, {<<"foo">>, {[{<<"vsn">>, 2}]}}}
     ],
-    {ok, Db2} = test_engine_util:apply_actions(Db1, Actions1),
+    {ok, Db2} = cpse_util:apply_actions(Db1, Actions1),
 
     ?assertEqual(1, couch_db_engine:get_doc_count(Db2)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db2)),
@@ -64,13 +64,13 @@ cet_purge_conflicts() ->
     ?assertEqual([], couch_db_engine:get_last_purged(Db2)),
 
     [FDI1] = couch_db_engine:open_docs(Db2, [<<"foo">>]),
-    PrevRev1 = test_engine_util:prev_rev(FDI1),
+    PrevRev1 = cpse_util:prev_rev(FDI1),
     Rev1 = PrevRev1#rev_info.rev,
 
     Actions2 = [
         {purge, {<<"foo">>, Rev1}}
     ],
-    {ok, Db3} = test_engine_util:apply_actions(Db2, Actions2),
+    {ok, Db3} = cpse_util:apply_actions(Db2, Actions2),
 
     ?assertEqual(1, couch_db_engine:get_doc_count(Db3)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db3)),
@@ -79,13 +79,13 @@ cet_purge_conflicts() ->
     ?assertEqual([{<<"foo">>, [Rev1]}], couch_db_engine:get_last_purged(Db3)),
 
     [FDI2] = couch_db_engine:open_docs(Db3, [<<"foo">>]),
-    PrevRev2 = test_engine_util:prev_rev(FDI2),
+    PrevRev2 = cpse_util:prev_rev(FDI2),
     Rev2 = PrevRev2#rev_info.rev,
 
     Actions3 = [
         {purge, {<<"foo">>, Rev2}}
     ],
-    {ok, Db4} = test_engine_util:apply_actions(Db3, Actions3),
+    {ok, Db4} = cpse_util:apply_actions(Db3, Actions3),
 
     ?assertEqual(0, couch_db_engine:get_doc_count(Db4)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db4)),
@@ -95,14 +95,14 @@ cet_purge_conflicts() ->
 
 
 cet_add_delete_purge() ->
-    {ok, Db1} = test_engine_util:create_db(),
+    {ok, Db1} = cpse_util:create_db(),
 
     Actions1 = [
         {create, {<<"foo">>, {[{<<"vsn">>, 1}]}}},
         {delete, {<<"foo">>, {[{<<"vsn">>, 2}]}}}
     ],
 
-    {ok, Db2} = test_engine_util:apply_actions(Db1, Actions1),
+    {ok, Db2} = cpse_util:apply_actions(Db1, Actions1),
 
     ?assertEqual(0, couch_db_engine:get_doc_count(Db2)),
     ?assertEqual(1, couch_db_engine:get_del_doc_count(Db2)),
@@ -111,13 +111,13 @@ cet_add_delete_purge() ->
     ?assertEqual([], couch_db_engine:get_last_purged(Db2)),
 
     [FDI] = couch_db_engine:open_docs(Db2, [<<"foo">>]),
-    PrevRev = test_engine_util:prev_rev(FDI),
+    PrevRev = cpse_util:prev_rev(FDI),
     Rev = PrevRev#rev_info.rev,
 
     Actions2 = [
         {purge, {<<"foo">>, Rev}}
     ],
-    {ok, Db3} = test_engine_util:apply_actions(Db2, Actions2),
+    {ok, Db3} = cpse_util:apply_actions(Db2, Actions2),
 
     ?assertEqual(0, couch_db_engine:get_doc_count(Db3)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db3)),
@@ -127,14 +127,14 @@ cet_add_delete_purge() ->
 
 
 cet_add_two_purge_one() ->
-    {ok, Db1} = test_engine_util:create_db(),
+    {ok, Db1} = cpse_util:create_db(),
 
     Actions1 = [
         {create, {<<"foo">>, {[{<<"vsn">>, 1}]}}},
         {create, {<<"bar">>, {[]}}}
     ],
 
-    {ok, Db2} = test_engine_util:apply_actions(Db1, Actions1),
+    {ok, Db2} = cpse_util:apply_actions(Db1, Actions1),
 
     ?assertEqual(2, couch_db_engine:get_doc_count(Db2)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db2)),
@@ -143,13 +143,13 @@ cet_add_two_purge_one() ->
     ?assertEqual([], couch_db_engine:get_last_purged(Db2)),
 
     [FDI] = couch_db_engine:open_docs(Db2, [<<"foo">>]),
-    PrevRev = test_engine_util:prev_rev(FDI),
+    PrevRev = cpse_util:prev_rev(FDI),
     Rev = PrevRev#rev_info.rev,
 
     Actions2 = [
         {purge, {<<"foo">>, Rev}}
     ],
-    {ok, Db3} = test_engine_util:apply_actions(Db2, Actions2),
+    {ok, Db3} = cpse_util:apply_actions(Db2, Actions2),
 
     ?assertEqual(1, couch_db_engine:get_doc_count(Db3)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db3)),

@@ -19,7 +19,7 @@
 
 
 cet_read_empty_docs() ->
-    {ok, Db} = test_engine_util:create_db(),
+    {ok, Db} = cpse_util:create_db(),
 
     ?assertEqual([not_found], couch_db_engine:open_docs(Db, [<<"foo">>])),
     ?assertEqual(
@@ -29,7 +29,7 @@ cet_read_empty_docs() ->
 
 
 cet_read_empty_local_docs() ->
-    {ok, Db} = test_engine_util:create_db(),
+    {ok, Db} = cpse_util:create_db(),
 
     {LocalA, LocalB} = {<<"_local/a">>, <<"_local/b">>},
     ?assertEqual([not_found], couch_db_engine:open_local_docs(Db, [LocalA])),
@@ -40,7 +40,7 @@ cet_read_empty_local_docs() ->
 
 
 cet_write_one_doc() ->
-    {ok, Db1} = test_engine_util:create_db(),
+    {ok, Db1} = cpse_util:create_db(),
 
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db1)),
@@ -49,11 +49,11 @@ cet_write_one_doc() ->
     Actions = [
         {create, {<<"foo">>, {[{<<"vsn">>, 1}]}}}
     ],
-    {ok, Db2} = test_engine_util:apply_actions(Db1, Actions),
+    {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
     ?assertEqual(1, couch_db_engine:get_doc_count(Db2)),
 
     {ok, _} = couch_db:ensure_full_commit(Db2),
-    test_engine_util:shutdown_db(Db2),
+    cpse_util:shutdown_db(Db2),
 
     {ok, Db3} = couch_db:reopen(Db2),
 
@@ -66,7 +66,7 @@ cet_write_one_doc() ->
         rev = {RevPos, PrevRevId},
         deleted = Deleted,
         body_sp = DocPtr
-    } = test_engine_util:prev_rev(FDI),
+    } = cpse_util:prev_rev(FDI),
 
     Doc0 = #doc{
         id = <<"foo">>,
@@ -83,7 +83,7 @@ cet_write_one_doc() ->
 
 
 cet_write_two_docs() ->
-    {ok, Db1} = test_engine_util:create_db(),
+    {ok, Db1} = cpse_util:create_db(),
 
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db1)),
@@ -93,9 +93,9 @@ cet_write_two_docs() ->
         {create, {<<"foo">>, {[{<<"vsn">>, 1}]}}},
         {create, {<<"bar">>, {[{<<"stuff">>, true}]}}}
     ],
-    {ok, Db2} = test_engine_util:apply_actions(Db1, Actions),
+    {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
     {ok, _} = couch_db:ensure_full_commit(Db2),
-    test_engine_util:shutdown_db(Db2),
+    cpse_util:shutdown_db(Db2),
 
     {ok, Db3} = couch_db:reopen(Db2),
 
@@ -108,7 +108,7 @@ cet_write_two_docs() ->
 
 
 cet_write_three_doc_batch() ->
-    {ok, Db1} = test_engine_util:create_db(),
+    {ok, Db1} = cpse_util:create_db(),
 
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db1)),
@@ -121,9 +121,9 @@ cet_write_three_doc_batch() ->
             {create, {<<"baz">>, {[]}}}
         ]}
     ],
-    {ok, Db2} = test_engine_util:apply_actions(Db1, Actions),
+    {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
     {ok, _} = couch_db:ensure_full_commit(Db2),
-    test_engine_util:shutdown_db(Db2),
+    cpse_util:shutdown_db(Db2),
 
     {ok, Db3} = couch_db:reopen(Db2),
 
@@ -136,7 +136,7 @@ cet_write_three_doc_batch() ->
 
 
 cet_update_doc() ->
-    {ok, Db1} = test_engine_util:create_db(),
+    {ok, Db1} = cpse_util:create_db(),
 
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db1)),
@@ -146,9 +146,9 @@ cet_update_doc() ->
         {create, {<<"foo">>, {[{<<"vsn">>, 1}]}}},
         {update, {<<"foo">>, {[{<<"vsn">>, 2}]}}}
     ],
-    {ok, Db2} = test_engine_util:apply_actions(Db1, Actions),
+    {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
     {ok, _} = couch_db:ensure_full_commit(Db2),
-    test_engine_util:shutdown_db(Db2),
+    cpse_util:shutdown_db(Db2),
 
     {ok, Db3} = couch_db:reopen(Db2),
 
@@ -162,7 +162,7 @@ cet_update_doc() ->
         rev = {RevPos, PrevRevId},
         deleted = Deleted,
         body_sp = DocPtr
-    } = test_engine_util:prev_rev(FDI),
+    } = cpse_util:prev_rev(FDI),
 
     Doc0 = #doc{
         id = <<"foo">>,
@@ -180,7 +180,7 @@ cet_update_doc() ->
 
 
 cet_delete_doc() ->
-    {ok, Db1} = test_engine_util:create_db(),
+    {ok, Db1} = cpse_util:create_db(),
 
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db1)),
@@ -190,9 +190,9 @@ cet_delete_doc() ->
         {create, {<<"foo">>, {[{<<"vsn">>, 1}]}}},
         {delete, {<<"foo">>, {[]}}}
     ],
-    {ok, Db2} = test_engine_util:apply_actions(Db1, Actions),
+    {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
     {ok, _} = couch_db:ensure_full_commit(Db2),
-    test_engine_util:shutdown_db(Db2),
+    cpse_util:shutdown_db(Db2),
 
     {ok, Db3} = couch_db:reopen(Db2),
     ?assertEqual(0, couch_db_engine:get_doc_count(Db3)),
@@ -205,7 +205,7 @@ cet_delete_doc() ->
         rev = {RevPos, PrevRevId},
         deleted = Deleted,
         body_sp = DocPtr
-    } = test_engine_util:prev_rev(FDI),
+    } = cpse_util:prev_rev(FDI),
 
     Doc0 = #doc{
         id = <<"foo">>,
@@ -223,7 +223,7 @@ cet_delete_doc() ->
 
 
 cet_write_local_doc() ->
-    {ok, Db1} = test_engine_util:create_db(),
+    {ok, Db1} = cpse_util:create_db(),
 
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db1)),
@@ -232,9 +232,9 @@ cet_write_local_doc() ->
     Actions = [
         {create, {<<"_local/foo">>, {[{<<"yay">>, false}]}}}
     ],
-    {ok, Db2} = test_engine_util:apply_actions(Db1, Actions),
+    {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
     {ok, _} = couch_db:ensure_full_commit(Db2),
-    test_engine_util:shutdown_db(Db2),
+    cpse_util:shutdown_db(Db2),
 
     {ok, Db3} = couch_db:reopen(Db2),
 
@@ -248,7 +248,7 @@ cet_write_local_doc() ->
 
 
 cet_write_mixed_batch() ->
-    {ok, Db1} = test_engine_util:create_db(),
+    {ok, Db1} = cpse_util:create_db(),
 
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db1)),
@@ -260,9 +260,9 @@ cet_write_mixed_batch() ->
             {create, {<<"_local/foo">>, {[{<<"yay">>, false}]}}}
         ]}
     ],
-    {ok, Db2} = test_engine_util:apply_actions(Db1, Actions),
+    {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
     {ok, _} = couch_db:ensure_full_commit(Db2),
-    test_engine_util:shutdown_db(Db2),
+    cpse_util:shutdown_db(Db2),
 
     {ok, Db3} = couch_db:reopen(Db2),
 
@@ -278,7 +278,7 @@ cet_write_mixed_batch() ->
 
 
 cet_update_local_doc() ->
-    {ok, Db1} = test_engine_util:create_db(),
+    {ok, Db1} = cpse_util:create_db(),
 
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db1)),
@@ -288,9 +288,9 @@ cet_update_local_doc() ->
         {create, {<<"_local/foo">>, {[]}}},
         {update, {<<"_local/foo">>, {[{<<"stuff">>, null}]}}}
     ],
-    {ok, Db2} = test_engine_util:apply_actions(Db1, Actions),
+    {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
     {ok, _} = couch_db:ensure_full_commit(Db1),
-    test_engine_util:shutdown_db(Db2),
+    cpse_util:shutdown_db(Db2),
 
     {ok, Db3} = couch_db:reopen(Db2),
 
@@ -304,7 +304,7 @@ cet_update_local_doc() ->
 
 
 cet_delete_local_doc() ->
-    {ok, Db1} = test_engine_util:create_db(),
+    {ok, Db1} = cpse_util:create_db(),
 
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db1)),
@@ -314,9 +314,9 @@ cet_delete_local_doc() ->
         {create, {<<"_local/foo">>, []}},
         {delete, {<<"_local/foo">>, []}}
     ],
-    {ok, Db2} = test_engine_util:apply_actions(Db1, Actions),
+    {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
     {ok, _} = couch_db:ensure_full_commit(Db2),
-    test_engine_util:shutdown_db(Db2),
+    cpse_util:shutdown_db(Db2),
 
     {ok, Db3} = couch_db:reopen(Db2),
 
