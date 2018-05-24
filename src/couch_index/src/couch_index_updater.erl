@@ -174,7 +174,7 @@ update(Idx, Mod, IdxState) ->
             end
         end,
 
-        Proc = fun(DocInfo, _, {IdxStateAcc, _}) ->
+        Proc = fun(DocInfo, {IdxStateAcc, _}) ->
             case CommittedOnly and (GetSeq(DocInfo) > DbCommittedSeq) of
                 true ->
                     {stop, {IdxStateAcc, false}};
@@ -188,7 +188,7 @@ update(Idx, Mod, IdxState) ->
 
         {ok, InitIdxState} = Mod:start_update(Idx, PurgedIdxState, NumChanges),
         Acc0 = {InitIdxState, true},
-        {ok, _, Acc} = couch_db:enum_docs_since(Db, CurrSeq, Proc, Acc0, []),
+        {ok, Acc} = couch_db:fold_changes(Db, CurrSeq, Proc, Acc0, []),
         {ProcIdxSt, SendLast} = Acc,
 
         % If we didn't bail due to hitting the last committed seq we need
@@ -206,7 +206,7 @@ update(Idx, Mod, IdxState) ->
 
 
 purge_index(Db, Mod, IdxState) ->
-    DbPurgeSeq = couch_db:get_purge_seq(Db),
+    {ok, DbPurgeSeq} = couch_db:get_purge_seq(Db),
     IdxPurgeSeq = Mod:get(purge_seq, IdxState),
     if
         DbPurgeSeq == IdxPurgeSeq ->

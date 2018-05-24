@@ -41,31 +41,33 @@ SubDirs = [
     "src/mango",
     "src/mem3",
     "src/rexi",
+    "src/setup",
     "rel"
 ],
 
 DepDescs = [
 %% Independent Apps
-{config,           "config",           {tag, "1.0.1"}},
+{config,           "config",           {tag, "1.0.3"}},
 {b64url,           "b64url",           {tag, "1.0.1"}},
 {ets_lru,          "ets-lru",          {tag, "1.0.0"}},
 {khash,            "khash",            {tag, "1.0.1"}},
 {snappy,           "snappy",           {tag, "CouchDB-1.0.0"}},
-{setup,            "setup",            {tag, "1.0.1"}},
 {ioq,              "ioq",              {tag, "1.0.1"}},
 
 %% Non-Erlang deps
 {docs,             {url, "https://github.com/apache/couchdb-documentation"},
                    {tag, "2.1.0"}, [raw]},
 {fauxton,          {url, "https://github.com/apache/couchdb-fauxton"},
-                   {tag, "v1.1.13"}, [raw]},
+                   {tag, "v1.1.15"}, [raw]},
 %% Third party deps
 {folsom,           "folsom",           {tag, "CouchDB-0.8.2"}},
 {ibrowse,          "ibrowse",          {tag, "CouchDB-4.0.1"}},
 {jiffy,            "jiffy",            {tag, "CouchDB-0.14.11-2"}},
-{mochiweb,         "mochiweb",         {tag, "CouchDB-2.12.0-1"}},
-{meck,             "meck",             {tag, "0.8.8"}}
-
+{mochiweb,         "mochiweb",         {tag, "v2.17.0"}},
+{meck,             "meck",             {tag, "0.8.8"}},
+{bcrypt,           {url, "https://github.com/apache/couchdb-erlang-bcrypt"},
+                   {tag, "1.0.2"}},
+{triq,             "triq",             {tag, "v1.2.0"}}
 ],
 
 
@@ -90,15 +92,15 @@ AddConfig = [
     {deps, lists:map(MakeDep, DepDescs)},
     {sub_dirs, SubDirs},
     {lib_dirs, ["src"]},
-    {erl_opts, [debug_info, {i, "../"}]},
+    {erl_opts, [bin_opt_info, debug_info, {i, "../"}]},
     {eunit_opts, [verbose]},
     {plugins, [eunit_plugin]},
     {dialyzer, [
         {plt_location, local},
         {plt_location, COUCHDB_ROOT},
         {plt_extra_apps, [
-            asn1, compiler, crypto, inets, kernel, os_mon, runtime_tools,
-            sasl, ssl, stdlib, syntax_tools, xmerl]},
+            asn1, bcrypt, compiler, crypto, inets, kernel, os_mon, runtime_tools,
+            sasl, setup, ssl, stdlib, syntax_tools, xmerl]},
         {warnings, [unmatched_returns, error_handling, race_conditions]}]},
     {post_hooks, [{compile, "escript support/build_js.escript"}]}
 ],

@@ -27,7 +27,8 @@
    get_json_value/3,
    pp_rep_id/1,
    iso8601/1,
-   filter_state/3
+   filter_state/3,
+   remove_basic_auth_from_headers/1
 ]).
 
 -export([
@@ -36,7 +37,7 @@
 
 -include_lib("couch/include/couch_db.hrl").
 -include("couch_replicator.hrl").
--include("couch_replicator_api_wrap.hrl").
+-include_lib("couch_replicator/include/couch_replicator_api_wrap.hrl").
 
 -import(couch_util, [
     get_value/2,
@@ -174,3 +175,88 @@ filter_state(State, States, Info) ->
         false ->
             skip
     end.
+
+
+remove_basic_auth_from_headers(Headers) ->
+    Headers1 = mochiweb_headers:make(Headers),
+    case mochiweb_headers:get_value("Authorization", Headers1) of
+        undefined ->
+            {{undefined, undefined}, Headers};
+        Auth ->
+            {Basic, Base64} = lists:splitwith(fun(X) -> X =/= $\s end, Auth),
+            maybe_remove_basic_auth(string:to_lower(Basic), Base64, Headers1)
+    end.
+
+
+maybe_remove_basic_auth("basic", " " ++ Base64, Headers) ->
+    Headers1 = mochiweb_headers:delete_any("Authorization", Headers),
+    {decode_basic_creds(Base64), mochiweb_headers:to_list(Headers1)};
+maybe_remove_basic_auth(_, _, Headers) ->
+    {{undefined, undefined}, mochiweb_headers:to_list(Headers)}.
+
+
+decode_basic_creds(Base64) ->
+    try re:split(base64:decode(Base64), ":", [{return, list}, {parts, 2}]) of
+        [User, Pass] ->
+            {User, Pass};
+        _ ->
+            {undefined, undefined}
+    catch
+        % Tolerate invalid B64 values here to avoid crashing replicator
+        error:function_clause ->
+            {undefined, undefined}
+    end.
+
+
+-ifdef(TEST).
+
+-include_lib("eunit/include/eunit.hrl").
+
+remove_basic_auth_from_headers_test_() ->
+    [?_assertMatch({{User, Pass}, NoAuthHeaders},
+        remove_basic_auth_from_headers(Headers)) ||
+        {{User, Pass, NoAuthHeaders}, Headers} <- [
+            {
+                {undefined, undefined, []},
+                []
+            },
+            {
+                {undefined, undefined, [{"h", "v"}]},
+                [{"h", "v"}]
+            },
+            {
+                {undefined, undefined, [{"Authorization", "junk"}]},
+                [{"Authorization", "junk"}]
+            },
+            {
+                {undefined, undefined, []},
+                [{"Authorization", "basic X"}]
+            },
+            {
+                {"user", "pass", []},
+                [{"Authorization", "Basic " ++ b64creds("user", "pass")}]
+            },
+            {
+                {"user", "pass", []},
+                [{"AuThorization", "Basic " ++ b64creds("user", "pass")}]
+            },
+            {
+                {"user", "pass", []},
+                [{"Authorization", "bAsIc " ++ b64creds("user", "pass")}]
+            },
+            {
+                {"user", "pass", [{"h", "v"}]},
+                [
+                    {"Authorization", "Basic " ++ b64creds("user", "pass")},
+                    {"h", "v"}
+                ]
+            }
+        ]
+    ].
+
+
+b64creds(User, Pass) ->
+    base64:encode_to_string(User ++ ":" ++ Pass).
+
+
+-endif.

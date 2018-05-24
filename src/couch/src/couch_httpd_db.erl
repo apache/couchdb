@@ -217,7 +217,13 @@ handle_design_info_req(#httpd{
 
 create_db_req(#httpd{user_ctx=UserCtx}=Req, DbName) ->
     ok = couch_httpd:verify_is_server_admin(Req),
-    case couch_server:create(DbName, [{user_ctx, UserCtx}]) of
+    Engine = case couch_httpd:qs_value(Req, "engine") of
+        EngineStr when is_list(EngineStr) ->
+            [{engine, iolist_to_binary(EngineStr)}];
+        _ ->
+            []
+    end,
+    case couch_server:create(DbName, [{user_ctx, UserCtx}] ++ Engine) of
     {ok, Db} ->
         couch_db:close(Db),
         DbUrl = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName)),
@@ -616,7 +622,8 @@ db_doc_req(#httpd{method='COPY'}=Req, Db, SourceDocId) ->
         missing_rev -> nil;
         Rev -> Rev
     end,
-    {TargetDocId, TargetRevs} = parse_copy_destination_header(Req),
+    {TargetDocId0, TargetRevs} = parse_copy_destination_header(Req),
+    TargetDocId = list_to_binary(mochiweb_util:unquote(TargetDocId0)),
     % open old doc
     Doc = couch_doc_open(Db, SourceDocId, SourceRev, []),
     % save new doc

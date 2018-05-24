@@ -114,3 +114,16 @@ class ChooseCorrectIndexForDocs(mango.DbPerClass):
         explain = self.db.find(selector, explain=True)
         self.assertEqual(explain["index"]["ddoc"], "_design/bbb")
         self.assertEqual(explain["mrargs"]["end_key"], [10, '<MAX>'])
+
+    # all documents contain an _id and _rev field they
+    # should not be used to restrict indexes based on the
+    # fields required by the selector
+    def test_choose_index_with_id(self):
+        self.db.create_index(["name", "_id"], ddoc="aaa")
+        explain = self.db.find({"name": "Eddie"}, explain=True)
+        self.assertEqual(explain["index"]["ddoc"], '_design/aaa')
+
+    def test_choose_index_with_rev(self):
+        self.db.create_index(["name", "_rev"], ddoc="aaa")
+        explain = self.db.find({"name": "Eddie"}, explain=True)
+        self.assertEqual(explain["index"]["ddoc"], '_design/aaa')

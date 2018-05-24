@@ -1,7 +1,9 @@
 *.o
-*.pyc
+*.sha256
+*.sha512
 *.snap
 *.so
+*.pyc
 .DS_Store
 .rebar/
 .eunit/
@@ -26,6 +28,7 @@ share/server/main.js
 share/www
 src/b64url/
 src/bear/
+src/bcrypt/
 src/config/
 src/couch/priv/couch_js/config.h
 src/couch/priv/couchjs
@@ -49,8 +52,8 @@ src/meck/
 src/mochiweb/
 src/oauth/
 src/rebar/
-src/setup/
 src/snappy/
+src/triq/
 tmp/
 
 src/couch/*.o

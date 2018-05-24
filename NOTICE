@@ -177,3 +177,10 @@ This product also includes the following third-party components:
 * velocity-react
 
   Copyright (c) 2015 Twitter, Inc.
+
+* erlang-bcrypt
+  - Erlang code: Copyright (c) 2011 Hunter Morris <hunter.morris@smarkets.com>
+  - Blowfish block cipher & bcrypt (hashing) code for OpenBSD, Copyright
+    1997 Niels Provos <provos@physnet.uni-hamburg.de>
+  - The asynchronous queue code (c_src/async_queue.c and c_src/async_queue.h)
+    is from the esnappy project, copyright 2011 Konstantin V. Sorokin.

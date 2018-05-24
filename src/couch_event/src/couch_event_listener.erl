@@ -23,10 +23,6 @@
 ]).
 
 -export([
-    behaviour_info/1
-]).
-
--export([
     do_init/3,
     loop/2
 ]).
@@ -38,16 +34,20 @@
 }).
 
 
-behaviour_info(callbacks) ->
-    [
-        {init,1},
-        {terminate,2},
-        {handle_cast,2},
-        {handle_event,3},
-        {handle_info,2}
-    ];
-behaviour_info(_) ->
-    undefined.
+-callback init(Arg :: term()) ->
+    term().
+
+-callback terminate(Reason :: term(), State :: term()) ->
+    term().
+
+-callback handle_cast(Message :: term(), State :: term()) ->
+    term().
+
+-callback handle_event(DbName :: term(), Event :: term(), State :: term()) ->
+    term().
+
+-callback handle_info(Message :: term(), State :: term()) ->
+    term().
 
 
 start(Mod, Arg, Options) ->
