@@ -39,13 +39,13 @@ pipeline {
       }
       steps {
         // This image has the oldest Erlang we support, 16B03
-        sh 'docker pull couchdbdev/ubuntu-14.04-erlang-default:latest'
+        sh 'docker pull couchdbdev/ubuntu-trusty-erlang-default:latest'
         timeout(time: 15, unit: "MINUTES") {
           // https://github.com/jenkins-infra/jenkins.io/blob/master/Jenkinsfile#64
           // We need the jenkins user mapped inside of the image
           // npm config cache below is required because /home/jenkins doesn't
           // ACTUALLY exist in the image
-          withDockerContainer(image: 'couchdbdev/ubuntu-14.04-erlang-default', args: '-e npm_config_cache=npm-cache -e HOME=. -v=/etc/passwd:/etc/passwd -v /etc/group:/etc/group') {
+          withDockerContainer(image: 'couchdbdev/ubuntu-trusty-erlang-default', args: '-e npm_config_cache=npm-cache -e HOME=. -v=/etc/passwd:/etc/passwd -v /etc/group:/etc/group') {
             sh '''
               set
               rm -rf apache-couchdb-*
@@ -78,24 +78,23 @@ pipeline {
     // Build packages on supported platforms using esl's erlang
     stage('Test') {
       steps {
-        parallel(centos6erlang183: {
+        parallel(centos6: {
           node(label: 'ubuntu') {
             timeout(time: 60, unit: "MINUTES") {
-              sh 'docker pull couchdbdev/centos-6-erlang-18.3'
-              withDockerContainer(image: 'couchdbdev/centos-6-erlang-18.3', args: '-e LD_LIBRARY_PATH=/usr/local/bin') {
+              sh 'docker pull couchdbdev/centos-6-erlang-19.3.6'
+              withDockerContainer(image: 'couchdbdev/centos-6-erlang-19.3.6') {
                 sh 'rm -f apache-couchdb-*.tar.gz'
                 unstash 'tarball'
                 sh '''
                   cwd=$(pwd)
                   mkdir -p $COUCHDB_IO_LOG_DIR
 
-                  # Build CouchDB from tarball
+                  # Build CouchDB from tarball & test
                   builddir=$(mktemp -d)
                   cd $builddir
                   tar -xf $cwd/apache-couchdb-*.tar.gz
                   cd apache-couchdb-*
                   ./configure --with-curl
-                  make all
                   make check || (build-aux/logfile-uploader.py && false)
 
                   # Build CouchDB packages
@@ -118,49 +117,23 @@ pipeline {
             deleteDir()
           } // node
         },
-        centos7erlangdefault: {
-          node(label: 'ubuntu') {
-            timeout(time: 45, unit: "MINUTES") {
-              sh 'docker pull couchdbdev/centos-7-erlang-default'
-              withDockerContainer(image: 'couchdbdev/centos-7-erlang-default', args: '-e LD_LIBRARY_PATH=/usr/local/bin') {
-                sh 'rm -f apache-couchdb-*.tar.gz'
-                unstash 'tarball'
-                sh '''
-                  cwd=$(pwd)
-                  mkdir -p $COUCHDB_IO_LOG_DIR
-
-                  # Build CouchDB from tarball
-                  builddir=$(mktemp -d)
-                  cd $builddir
-                  tar -xf $cwd/apache-couchdb-*.tar.gz
-                  cd apache-couchdb-*
-                  ./configure --with-curl
-                  make all
-                  make check || (build-aux/logfile-uploader.py && false)
-                '''
-              } // withDocker
-            } // timeout
-            deleteDir()
-          } // node
-        },
-        centos7erlang183: {
+        centos7: {
           node(label: 'ubuntu') {
             timeout(time: 60, unit: "MINUTES") {
-              sh 'docker pull couchdbdev/centos-7-erlang-18.3'
-              withDockerContainer(image: 'couchdbdev/centos-7-erlang-18.3', args: '-e LD_LIBRARY_PATH=/usr/local/bin') {
+              sh 'docker pull couchdbdev/centos-7-erlang-19.3.6'
+              withDockerContainer(image: 'couchdbdev/centos-7-erlang-19.3.6') {
                 sh 'rm -f apache-couchdb-*.tar.gz'
                 unstash 'tarball'
                 sh '''
                   cwd=$(pwd)
                   mkdir -p $COUCHDB_IO_LOG_DIR
 
-                  # Build CouchDB from tarball
+                  # Build CouchDB from tarball & test
                   builddir=$(mktemp -d)
                   cd $builddir
                   tar -xf $cwd/apache-couchdb-*.tar.gz
                   cd apache-couchdb-*
                   ./configure --with-curl
-                  make all
                   make check || (build-aux/logfile-uploader.py && false)
 
                   # Build CouchDB packages
@@ -183,47 +156,23 @@ pipeline {
             deleteDir()
           } // node
         },
-        ubuntu1404erlangdefault: {
-          node(label: 'ubuntu') {
-            timeout(time: 45, unit: "MINUTES") {
-              sh 'docker pull couchdbdev/ubuntu-14.04-erlang-default'
-              withDockerContainer(image: 'couchdbdev/ubuntu-14.04-erlang-default') {
-                sh 'rm -f apache-couchdb-*.tar.gz'
-                unstash 'tarball'
-                sh '''
-                  cwd=$(pwd)
-                  mkdir -p $COUCHDB_IO_LOG_DIR
-                  builddir=$(mktemp -d)
-                  cd $builddir
-                  tar -xf $cwd/apache-couchdb-*.tar.gz
-                  cd apache-couchdb-*
-                  ./configure --with-curl
-                  make all
-                  make check || (build-aux/logfile-uploader.py && false)
-                '''
-              } // withDocker
-            } // timeout
-            deleteDir()
-          } // node
-        },
-        ubuntu1404erlang183: {
+        ubuntutrusty: {
           node(label: 'ubuntu') {
             timeout(time: 60, unit: "MINUTES") {
-              sh 'docker pull couchdbdev/ubuntu-14.04-erlang-18.3'
-              withDockerContainer(image: 'couchdbdev/ubuntu-14.04-erlang-18.3') {
+              sh 'docker pull couchdbdev/ubuntu-trusty-erlang-19.3.6'
+              withDockerContainer(image: 'couchdbdev/ubuntu-trusty-erlang-19.3.6') {
                 sh 'rm -f apache-couchdb-*.tar.gz'
                 unstash 'tarball'
                 sh '''
                   cwd=$(pwd)
                   mkdir -p $COUCHDB_IO_LOG_DIR
 
-                  # Build CouchDB from tarball
+                  # Build CouchDB from tarball & test
                   builddir=$(mktemp -d)
                   cd $builddir
                   tar -xf $cwd/apache-couchdb-*.tar.gz
                   cd apache-couchdb-*
                   ./configure --with-curl
-                  make all
                   make check || (build-aux/logfile-uploader.py && false)
 
                   # Build CouchDB packages
@@ -238,7 +187,7 @@ pipeline {
 
                   # Cleanup & save for posterity
                   rm -rf $cwd/pkgs/$platform && mkdir -p $cwd/pkgs/$platform
-                  mv ../couchdb/*deb $cwd/pkgs/$platform || true
+                  mv ../couchdb/*.deb $cwd/pkgs/$platform || true
                 '''
               } // withDocker
             } // timeout
@@ -246,47 +195,23 @@ pipeline {
             deleteDir()
           } // node
         },
-        ubuntu1604erlangdefault: {
-          node(label: 'ubuntu') {
-            timeout(time: 45, unit: "MINUTES") {
-              sh 'docker pull couchdbdev/ubuntu-16.04-erlang-default'
-              withDockerContainer(image: 'couchdbdev/ubuntu-16.04-erlang-default') {
-                sh 'rm -f apache-couchdb-*.tar.gz'
-                unstash 'tarball'
-                sh '''
-                  cwd=$(pwd)
-                  mkdir -p $COUCHDB_IO_LOG_DIR
-                  builddir=$(mktemp -d)
-                  cd $builddir
-                  tar -xf $cwd/apache-couchdb-*.tar.gz
-                  cd apache-couchdb-*
-                  ./configure --with-curl
-                  make all
-                  make check || (build-aux/logfile-uploader.py && false)
-                '''
-              } // withDocker
-            } // timeout
-            deleteDir()
-          } // node
-        },
-        ubuntu1604erlang183: {
+        ubuntuxenial: {
           node(label: 'ubuntu') {
             timeout(time: 60, unit: "MINUTES") {
-              sh 'docker pull couchdbdev/ubuntu-16.04-erlang-18.3'
-              withDockerContainer(image: 'couchdbdev/ubuntu-16.04-erlang-18.3') {
+              sh 'docker pull couchdbdev/ubuntu-xenial-erlang-19.3.6'
+              withDockerContainer(image: 'couchdbdev/ubuntu-xenial-erlang-19.3.6') {
                 sh 'rm -f apache-couchdb-*.tar.gz'
                 unstash 'tarball'
                 sh '''
                   cwd=$(pwd)
                   mkdir -p $COUCHDB_IO_LOG_DIR
 
-                  # Build CouchDB from tarball
+                  # Build CouchDB from tarball & test
                   builddir=$(mktemp -d)
                   cd $builddir
                   tar -xf $cwd/apache-couchdb-*.tar.gz
                   cd apache-couchdb-*
                   ./configure --with-curl
-                  make all
                   make check || (build-aux/logfile-uploader.py && false)
 
                   # Build CouchDB packages
@@ -301,7 +226,7 @@ pipeline {
 
                   # Cleanup & save for posterity
                   rm -rf $cwd/pkgs/$platform && mkdir -p $cwd/pkgs/$platform
-                  mv ../couchdb/*deb $cwd/pkgs/$platform || true
+                  mv ../couchdb/*.deb $cwd/pkgs/$platform || true
                 '''
               } // withDocker
             } // timeout
@@ -309,47 +234,23 @@ pipeline {
             deleteDir()
           } // node
         },
-        debian8erlangdefault: {
-          node(label: 'ubuntu') {
-            timeout(time: 45, unit: "MINUTES") {
-              sh 'docker pull couchdbdev/debian-8-erlang-default'
-              withDockerContainer(image: 'couchdbdev/debian-8-erlang-default') {
-                sh 'rm -f apache-couchdb-*.tar.gz'
-                unstash 'tarball'
-                sh '''
-                  cwd=$(pwd)
-                  mkdir -p $COUCHDB_IO_LOG_DIR
-                  builddir=$(mktemp -d)
-                  cd $builddir
-                  tar -xf $cwd/apache-couchdb-*.tar.gz
-                  cd apache-couchdb-*
-                  ./configure --with-curl
-                  make all
-                  make check || (build-aux/logfile-uploader.py && false)
-                '''
-              } // withDocker
-            } // timeout
-            deleteDir()
-          } // node
-        },
-        debian8erlang183: {
+        ubuntubionic: {
           node(label: 'ubuntu') {
             timeout(time: 60, unit: "MINUTES") {
-              sh 'docker pull couchdbdev/debian-8-erlang-18.3'
-              withDockerContainer(image: 'couchdbdev/debian-8-erlang-18.3') {
+              sh 'docker pull couchdbdev/ubuntu-bionic-erlang-19.3.6'
+              withDockerContainer(image: 'couchdbdev/ubuntu-bionic-erlang-19.3.6') {
                 sh 'rm -f apache-couchdb-*.tar.gz'
                 unstash 'tarball'
                 sh '''
                   cwd=$(pwd)
                   mkdir -p $COUCHDB_IO_LOG_DIR
 
-                  # Build CouchDB from tarball
+                  # Build CouchDB from tarball & test
                   builddir=$(mktemp -d)
                   cd $builddir
                   tar -xf $cwd/apache-couchdb-*.tar.gz
                   cd apache-couchdb-*
                   ./configure --with-curl
-                  make all
                   make check || (build-aux/logfile-uploader.py && false)
 
                   # Build CouchDB packages
@@ -364,7 +265,7 @@ pipeline {
 
                   # Cleanup & save for posterity
                   rm -rf $cwd/pkgs/$platform && mkdir -p $cwd/pkgs/$platform
-                  mv ../couchdb/*deb $cwd/pkgs/$platform || true
+                  mv ../couchdb/*.deb $cwd/pkgs/$platform || true
                 '''
               } // withDocker
             } // timeout
@@ -372,47 +273,23 @@ pipeline {
             deleteDir()
           } // node
         },
-        debian9erlangdefault: {
-          node(label: 'ubuntu') {
-            timeout(time: 45, unit: "MINUTES") {
-              sh 'docker pull couchdbdev/debian-9-erlang-default'
-              withDockerContainer(image: 'couchdbdev/debian-9-erlang-default') {
-                sh 'rm -f apache-couchdb-*.tar.gz'
-                unstash 'tarball'
-                sh '''
-                  cwd=$(pwd)
-                  mkdir -p $COUCHDB_IO_LOG_DIR
-                  builddir=$(mktemp -d)
-                  cd $builddir
-                  tar -xf $cwd/apache-couchdb-*.tar.gz
-                  cd apache-couchdb-*
-                  ./configure --with-curl
-                  make all
-                  make check || (build-aux/logfile-uploader.py && false)
-                '''
-              } // withDocker
-            } // timeout
-            deleteDir()
-          } // node
-        },
-        debian9erlang183: {
+        debianjessie: {
           node(label: 'ubuntu') {
             timeout(time: 60, unit: "MINUTES") {
-              sh 'docker pull couchdbdev/debian-9-erlang-18.3'
-              withDockerContainer(image: 'couchdbdev/debian-9-erlang-18.3') {
+              sh 'docker pull couchdbdev/debian-jessie-erlang-19.3.6'
+              withDockerContainer(image: 'couchdbdev/debian-jessie-erlang-19.3.6') {
                 sh 'rm -f apache-couchdb-*.tar.gz'
                 unstash 'tarball'
                 sh '''
                   cwd=$(pwd)
                   mkdir -p $COUCHDB_IO_LOG_DIR
 
-                  # Build CouchDB from tarball
+                  # Build CouchDB from tarball & test
                   builddir=$(mktemp -d)
                   cd $builddir
                   tar -xf $cwd/apache-couchdb-*.tar.gz
                   cd apache-couchdb-*
                   ./configure --with-curl
-                  make all
                   make check || (build-aux/logfile-uploader.py && false)
 
                   # Build CouchDB packages
@@ -427,7 +304,46 @@ pipeline {
 
                   # Cleanup & save for posterity
                   rm -rf $cwd/pkgs/$platform && mkdir -p $cwd/pkgs/$platform
-                  mv ../couchdb/*deb $cwd/pkgs/$platform || true
+                  mv ../couchdb/*.deb $cwd/pkgs/$platform || true
+                '''
+              } // withDocker
+            } // timeout
+            archiveArtifacts artifacts: 'pkgs/**', fingerprint: true
+            deleteDir()
+          } // node
+        },
+        debianstretch: {
+          node(label: 'ubuntu') {
+            timeout(time: 60, unit: "MINUTES") {
+              sh 'docker pull couchdbdev/debian-stretch-erlang-19.3.6'
+              withDockerContainer(image: 'couchdbdev/debian-stretch-erlang-19.3.6') {
+                sh 'rm -f apache-couchdb-*.tar.gz'
+                unstash 'tarball'
+                sh '''
+                  cwd=$(pwd)
+                  mkdir -p $COUCHDB_IO_LOG_DIR
+
+                  # Build CouchDB from tarball & test
+                  builddir=$(mktemp -d)
+                  cd $builddir
+                  tar -xf $cwd/apache-couchdb-*.tar.gz
+                  cd apache-couchdb-*
+                  ./configure --with-curl
+                  make check || (build-aux/logfile-uploader.py && false)
+
+                  # Build CouchDB packages
+                  cd $builddir
+                  git clone https://github.com/apache/couchdb-pkg
+                  mkdir couchdb
+                  cp $cwd/apache-couchdb-*.tar.gz couchdb
+                  tar -xf $cwd/apache-couchdb-*.tar.gz -C couchdb
+                  cd couchdb-pkg
+                  platform=$(lsb_release -cs)
+                  make $platform PLATFORM=$platform
+
+                  # Cleanup & save for posterity
+                  rm -rf $cwd/pkgs/$platform && mkdir -p $cwd/pkgs/$platform
+                  mv ../couchdb/*.deb $cwd/pkgs/$platform || true
                 '''
               } // withDocker
             } // timeout
@@ -463,19 +379,28 @@ pipeline {
               rsync -avz -e "ssh -o StrictHostKeyChecking=no -i $KEY" jenkins@couchdb-vm2.apache.org:/var/www/html/$BRANCH_NAME . || mkdir -p $BRANCH_NAME
               rm -rf $BRANCH_NAME/debian/* $BRANCH_NAME/el6/* $BRANCH_NAME/el7/*
               mkdir -p $BRANCH_NAME/debian $BRANCH_NAME/el6 $BRANCH_NAME/el7 $BRANCH_NAME/source
+              rsync -avz -e "ssh -o StrictHostKeyChecking=no -i $KEY" jenkins@couchdb-vm2.apache.org:/var/www/html/js .
             '''
             echo 'Building Debian repo...'
             sh '''
               git clone https://github.com/apache/couchdb-pkg
-              reprepro -b couchdb-pkg/repo includedeb jessie pkgs/jessie/*deb
-              reprepro -b couchdb-pkg/repo includedeb trusty pkgs/trusty/*deb
-              reprepro -b couchdb-pkg/repo includedeb xenial pkgs/xenial/*deb
-              reprepro -b couchdb-pkg/repo includedeb stretch pkgs/stretch/*deb
+              cp js/debian-jessie/*.deb pkgs/jessie
+              reprepro -b couchdb-pkg/repo includedeb jessie pkgs/jessie/*.deb
+              cp js/debian-stretch/*.deb pkgs/stretch
+              reprepro -b couchdb-pkg/repo includedeb stretch pkgs/stretch/*.deb
+              cp js/ubuntu-trusty/*.deb pkgs/trusty
+              reprepro -b couchdb-pkg/repo includedeb trusty pkgs/trusty/*.deb
+              cp js/ubuntu-xenial/*.deb pkgs/xenial
+              reprepro -b couchdb-pkg/repo includedeb xenial pkgs/xenial/*.deb
+              cp js/ubuntu-bionic/*.deb pkgs/bionic
+              reprepro -b couchdb-pkg/repo includedeb bionic pkgs/bionic/*.deb
             '''
             echo 'Building CentOS repos...'
             sh '''
+              cp js/centos-6/*rpm pkgs/centos6
+              cp js/centos-7/*rpm pkgs/centos7
               cd pkgs/centos6 && createrepo --database .
-              cd ../centos7 && rm -f js* && createrepo --database .
+              cd ../centos7 && createrepo --database .
             '''
             echo 'Building tree to upload...'
             sh '''
