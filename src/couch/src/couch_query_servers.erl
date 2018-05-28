@@ -17,6 +17,7 @@
 -export([reduce/3, rereduce/3,validate_doc_update/5]).
 -export([filter_docs/5]).
 -export([filter_view/3]).
+-export([finalize/1]).
 -export([rewrite/3]).
 
 -export([with_ddoc_proc/2, proc_prompt/2, ddoc_prompt/3, ddoc_proc_prompt/3, json_doc/1]).
@@ -85,6 +86,16 @@ group_reductions_results(List) ->
     _ ->
      [Heads | group_reductions_results(Tails)]
     end.
+
+finalize(Reductions) ->
+    {ok, lists:map(fun(Reduction) ->
+        case hyper:is_hyper(Reduction) of
+            true ->
+                hyper:card(Reduction);
+            false ->
+                Reduction
+        end
+    end, Reductions)}.
 
 rereduce(_Lang, [], _ReducedValues) ->
     {ok, []};
@@ -171,7 +182,10 @@ builtin_reduce(rereduce, [<<"_count",_/binary>>|BuiltinReds], KVs, Acc) ->
     builtin_reduce(rereduce, BuiltinReds, KVs, [Count|Acc]);
 builtin_reduce(Re, [<<"_stats",_/binary>>|BuiltinReds], KVs, Acc) ->
     Stats = builtin_stats(Re, KVs),
-    builtin_reduce(Re, BuiltinReds, KVs, [Stats|Acc]).
+    builtin_reduce(Re, BuiltinReds, KVs, [Stats|Acc]);
+builtin_reduce(Re, [<<"_distinct",_/binary>>|BuiltinReds], KVs, Acc) ->
+    Distinct = count_distinct_keys(Re, KVs),
+    builtin_reduce(Re, BuiltinReds, KVs, [Distinct|Acc]).
 
 
 builtin_sum_rows([], Acc) ->
@@ -303,6 +317,13 @@ get_number(Key, Props) ->
         throw({invalid_value, iolist_to_binary(Msg)})
     end.
 
+% TODO allow customization of precision in the ddoc.
+count_distinct_keys(reduce, KVs) ->
+    lists:foldl(fun([[Key, _Id], _Value], Filter) ->
+        hyper:insert(term_to_binary(Key), Filter)
+    end, hyper:new(11), KVs);
+count_distinct_keys(rereduce, Reds) ->
+    hyper:union([Filter || [_, Filter] <- Reds]).
 
 % use the function stored in ddoc.validate_doc_update to test an update.
 -spec validate_doc_update(DDoc, EditDoc, DiskDoc, Ctx, SecObj) -> ok when
