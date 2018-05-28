@@ -91,7 +91,7 @@ finalize(Reductions) ->
     {ok, lists:map(fun(Reduction) ->
         case hyper:is_hyper(Reduction) of
             true ->
-                hyper:card(Reduction);
+                round(hyper:card(Reduction));
             false ->
                 Reduction
         end
@@ -183,8 +183,8 @@ builtin_reduce(rereduce, [<<"_count",_/binary>>|BuiltinReds], KVs, Acc) ->
 builtin_reduce(Re, [<<"_stats",_/binary>>|BuiltinReds], KVs, Acc) ->
     Stats = builtin_stats(Re, KVs),
     builtin_reduce(Re, BuiltinReds, KVs, [Stats|Acc]);
-builtin_reduce(Re, [<<"_distinct",_/binary>>|BuiltinReds], KVs, Acc) ->
-    Distinct = count_distinct_keys(Re, KVs),
+builtin_reduce(Re, [<<"_approx_count_distinct",_/binary>>|BuiltinReds], KVs, Acc) ->
+    Distinct = approx_count_distinct(Re, KVs),
     builtin_reduce(Re, BuiltinReds, KVs, [Distinct|Acc]).
 
 
@@ -318,11 +318,11 @@ get_number(Key, Props) ->
     end.
 
 % TODO allow customization of precision in the ddoc.
-count_distinct_keys(reduce, KVs) ->
+approx_count_distinct(reduce, KVs) ->
     lists:foldl(fun([[Key, _Id], _Value], Filter) ->
         hyper:insert(term_to_binary(Key), Filter)
     end, hyper:new(11), KVs);
-count_distinct_keys(rereduce, Reds) ->
+approx_count_distinct(rereduce, Reds) ->
     hyper:union([Filter || [_, Filter] <- Reds]).
 
 % use the function stored in ddoc.validate_doc_update to test an update.
