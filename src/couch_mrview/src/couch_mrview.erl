@@ -184,6 +184,8 @@ validate(DbName,  DDoc) ->
                 ok;
             ({_RedName, <<"_stats", _/binary>>}) ->
                 ok;
+            ({_RedName, <<"_distinct", _/binary>>}) ->
+                ok;
             ({_RedName, <<"_", _/binary>> = Bad}) ->
                 Msg = ["`", Bad, "` is not a supported reduce function."],
                 throw({invalid_design_doc, Msg});
