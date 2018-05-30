@@ -44,6 +44,8 @@ start(#st{} = St, DbName, Options, Parent) ->
     } = St,
     couch_log:debug("Compaction process spawned for db \"~s\"", [DbName]),
 
+    couch_db_engine:trigger_on_compact(DbName),
+
     {ok, NewSt, DName, DFd, MFd, Retry} =
             open_compaction_files(Header, FilePath, Options),
     erlang:monitor(process, MFd),

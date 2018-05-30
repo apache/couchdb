@@ -627,7 +627,8 @@
     count_changes_since/2,
 
     start_compaction/1,
-    finish_compaction/2
+    finish_compaction/2,
+    trigger_on_compact/1
 ]).
 
 
@@ -891,3 +892,31 @@ finish_compaction(Db, CompactInfo) ->
     end,
     ok = gen_server:call(couch_server, {db_updated, NewDb}, infinity),
     {ok, NewDb}.
+
+
+trigger_on_compact(DbName) ->
+    {ok, DDocs} = get_ddocs(DbName),
+    couch_db_plugin:on_compact(DbName, DDocs).
+
+
+get_ddocs(<<"shards/", _/binary>> = DbName) ->
+    {_, Ref} = spawn_monitor(fun() ->
+        exit(fabric:design_docs(mem3:dbname(DbName)))
+    end),
+    receive
+        {'DOWN', Ref, _, _, {ok, JsonDDocs}} ->
+            {ok, lists:map(fun(JsonDDoc) ->
+                couch_doc:from_json_obj(JsonDDoc)
+            end, JsonDDocs)};
+        {'DOWN', Ref, _, _, Else} ->
+            Else
+    end;
+get_ddocs(DbName) ->
+    couch_util:with_db(DbName, fun(Db) ->
+        FoldFun = fun(FDI, Acc) ->
+            Doc = couch_db:open_doc_int(Db, FDI, []),
+            {ok, [Doc | Acc]}
+        end,
+        {ok, Docs} = couch_db:fold_design_docs(Db, FoldFun, [], []),
+        {ok, lists:reverse(Docs)}
+    end).
