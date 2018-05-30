@@ -25,7 +25,10 @@
     cpse_test_attachments,
     cpse_test_fold_docs,
     cpse_test_fold_changes,
+    cpse_test_fold_purge_infos,
     cpse_test_purge_docs,
+    cpse_test_purge_replication,
+    cpse_test_purge_bad_checkpoints,
     cpse_test_compaction,
     cpse_test_ref_counting
 ]).
@@ -116,6 +119,131 @@ shutdown_db(Db) ->
     end).
 
 
+save_doc(DbName, Json) ->
+    {ok, [Rev]} = save_docs(DbName, [Json], []),
+    {ok, Rev}.
+
+
+save_docs(DbName, JsonDocs) ->
+    save_docs(DbName, JsonDocs, []).
+
+
+save_docs(DbName, JsonDocs, Options) ->
+    Docs = lists:map(fun(JDoc) ->
+        couch_doc:from_json_obj(?JSON_DECODE(?JSON_ENCODE(JDoc)))
+    end, JsonDocs),
+    Opts = [full_commit | Options],
+    {ok, Db} = couch_db:open_int(DbName, []),
+    try
+        case lists:member(replicated_changes, Options) of
+            true ->
+                {ok, []} = couch_db:update_docs(
+                        Db, Docs, Opts, replicated_changes),
+                {ok, lists:map(fun(Doc) ->
+                    {Pos, [RevId | _]} = Doc#doc.revs,
+                    {Pos, RevId}
+                end, Docs)};
+            false ->
+                {ok, Resp} = couch_db:update_docs(Db, Docs, Opts),
+                {ok, [Rev || {ok, Rev} <- Resp]}
+        end
+    after
+        couch_db:close(Db)
+    end.
+
+
+open_doc(DbName, DocId0) ->
+    DocId = ?JSON_DECODE(?JSON_ENCODE(DocId0)),
+    {ok, Db} = couch_db:open_int(DbName, []),
+    try
+        couch_db:get_doc_info(Db, DocId)
+    after
+        couch_db:close(Db)
+    end.
+
+
+purge(DbName, PurgeInfos) ->
+    purge(DbName, PurgeInfos, []).
+
+
+purge(DbName, PurgeInfos0, Options) when is_list(PurgeInfos0) ->
+    PurgeInfos = lists:map(fun({UUID, DocIdJson, Revs}) ->
+        {UUID, ?JSON_DECODE(?JSON_ENCODE(DocIdJson)), Revs}
+    end, PurgeInfos0),
+    {ok, Db} = couch_db:open_int(DbName, []),
+    try
+        couch_db:purge_docs(Db, PurgeInfos, Options)
+    after
+        couch_db:close(Db)
+    end.
+
+
+uuid() ->
+    couch_uuids:random().
+
+
+assert_db_props(Module, Line, DbName, Props) when is_binary(DbName) ->
+    {ok, Db} = couch_db:open_int(DbName, []),
+    try
+        assert_db_props(Module, Line, Db, Props)
+    catch error:{assertEqual, Props} ->
+        {_, Rest} = proplists:split(Props, [module, line]),
+        erlang:error({assertEqual, [{module, Module}, {line, Line} | Rest]})
+    after
+        couch_db:close(Db)
+    end;
+
+assert_db_props(Module, Line, Db, Props) ->
+    try
+        assert_each_prop(Db, Props)
+    catch error:{assertEqual, Props} ->
+        {_, Rest} = proplists:split(Props, [module, line]),
+        erlang:error({assertEqual, [{module, Module}, {line, Line} | Rest]})
+    end.
+
+
+assert_each_prop(_Db, []) ->
+    ok;
+assert_each_prop(Db, [{doc_count, Expect} | Rest]) ->
+    {ok, DocCount} = couch_db:get_doc_count(Db),
+    ?assertEqual(Expect, DocCount),
+    assert_each_prop(Db, Rest);
+assert_each_prop(Db, [{del_doc_count, Expect} | Rest]) ->
+    {ok, DelDocCount} = couch_db:get_del_doc_count(Db),
+    ?assertEqual(Expect, DelDocCount),
+    assert_each_prop(Db, Rest);
+assert_each_prop(Db, [{update_seq, Expect} | Rest]) ->
+    UpdateSeq = couch_db:get_update_seq(Db),
+    ?assertEqual(Expect, UpdateSeq),
+    assert_each_prop(Db, Rest);
+assert_each_prop(Db, [{changes, Expect} | Rest]) ->
+    {ok, NumChanges} = couch_db:fold_changes(Db, 0, fun aep_changes/2, 0, []),
+    ?assertEqual(Expect, NumChanges),
+    assert_each_prop(Db, Rest);
+assert_each_prop(Db, [{purge_seq, Expect} | Rest]) ->
+    PurgeSeq = couch_db:get_purge_seq(Db),
+    ?assertEqual(Expect, PurgeSeq),
+    assert_each_prop(Db, Rest);
+assert_each_prop(Db, [{purge_infos, Expect} | Rest]) ->
+    {ok, PurgeInfos} = couch_db:fold_purge_infos(Db, 0, fun aep_fold/2, [], []),
+    ?assertEqual(Expect, lists:reverse(PurgeInfos)),
+    assert_each_prop(Db, Rest).
+
+
+aep_changes(_A, Acc) ->
+    {ok, Acc + 1}.
+
+
+aep_fold({_PSeq, UUID, Id, Revs}, Acc) ->
+    {ok, [{UUID, Id, Revs} | Acc]}.
+
+
+apply_actions(DbName, Actions) when is_binary(DbName) ->
+    {ok, Db0} = couch_db:open_int(DbName, [?ADMIN_CTX]),
+    {ok, Db1} = apply_actions(Db0, Actions),
+    couch_db:close(Db1),
+    ok;
+
 apply_actions(Db, []) ->
     {ok, Db};
 
@@ -161,7 +289,7 @@ apply_batch(Db, Actions) ->
     {ok, Db2} = couch_db:reopen(Db1),
 
     if PurgeInfos == [] -> ok; true ->
-        {ok, _, _} = couch_db:purge_docs(Db2, PurgeInfos)
+        {ok, _} = couch_db:purge_docs(Db2, PurgeInfos)
     end,
     couch_db:reopen(Db2).
 
@@ -203,7 +331,7 @@ gen_write(Db, {create, {DocId, Body, Atts}}) ->
 
 gen_write(_Db, {purge, {DocId, PrevRevs0, _}}) ->
     PrevRevs = if is_list(PrevRevs0) -> PrevRevs0; true -> [PrevRevs0] end,
-    {purge, {DocId, PrevRevs}};
+    {purge, {couch_uuids:random(), DocId, PrevRevs}};
 
 gen_write(Db, {Action, {DocId, Body, Atts}}) ->
     #full_doc_info{} = PrevFDI = couch_db:get_full_doc_info(Db, DocId),
@@ -304,7 +432,8 @@ db_as_term(Db) ->
         {props, db_props_as_term(Db)},
         {docs, db_docs_as_term(Db)},
         {local_docs, db_local_docs_as_term(Db)},
-        {changes, db_changes_as_term(Db)}
+        {changes, db_changes_as_term(Db)},
+        {purged_docs, db_purged_docs_as_term(Db)}
     ].
 
 
@@ -315,7 +444,7 @@ db_props_as_term(Db) ->
         get_disk_version,
         get_update_seq,
         get_purge_seq,
-        get_last_purged,
+        get_purge_infos_limit,
         get_security,
         get_revs_limit,
         get_uuid,
@@ -346,6 +475,16 @@ db_changes_as_term(Db) ->
     lists:reverse(lists:map(fun(FDI) ->
         fdi_to_term(Db, FDI)
     end, Changes)).
+
+
+db_purged_docs_as_term(Db) ->
+    InitPSeq = couch_db_engine:get_oldest_purge_seq(Db) - 1,
+    FoldFun = fun({PSeq, UUID, Id, Revs}, Acc) ->
+        {ok, [{PSeq, UUID, Id, Revs} | Acc]}
+    end,
+    {ok, PDocs} = couch_db_engine:fold_purge_infos(
+            Db, InitPSeq, FoldFun, [], []),
+    lists:reverse(PDocs).
 
 
 fdi_to_term(Db, FDI) ->
@@ -476,8 +615,8 @@ compact(Db) ->
             ok;
         {'DOWN', Ref, _, _, Reason} ->
             erlang:error({compactor_died, Reason})
-        after ?COMPACTOR_TIMEOUT ->
-            erlang:error(compactor_timed_out)
+    after ?COMPACTOR_TIMEOUT ->
+        erlang:error(compactor_timed_out)
     end,
 
     test_util:wait(fun() ->

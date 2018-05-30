@@ -18,142 +18,446 @@
 -include_lib("couch/include/couch_db.hrl").
 
 
+-define(REV_DEPTH, 100).
+
+
 setup_each() ->
     {ok, Db} = cpse_util:create_db(),
-    Db.
+    couch_db:name(Db).
 
 
-teardown_each(Db) ->
-    ok = couch_server:delete(couch_db:name(Db), []).
+teardown_each(DbName) ->
+    ok = couch_server:delete(DbName, []).
 
 
-cpse_purge_simple(Db1) ->
-    Actions1 = [
-        {create, {<<"foo">>, {[{<<"vsn">>, 1}]}}}
-    ],
-    {ok, Db2} = cpse_util:apply_actions(Db1, Actions1),
+cpse_purge_simple(DbName) ->
+    {ok, Rev} = cpse_util:save_doc(DbName, {[{'_id', foo1}, {vsn, 1.1}]}),
 
-    ?assertEqual(1, couch_db_engine:get_doc_count(Db2)),
-    ?assertEqual(0, couch_db_engine:get_del_doc_count(Db2)),
-    ?assertEqual(1, couch_db_engine:get_update_seq(Db2)),
-    ?assertEqual(0, couch_db_engine:get_purge_seq(Db2)),
-    ?assertEqual([], couch_db_engine:get_last_purged(Db2)),
+    cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [
+        {doc_count, 1},
+        {del_doc_count, 0},
+        {update_seq, 1},
+        {purge_seq, 0},
+        {purge_infos, []}
+    ]),
 
-    [FDI] = couch_db_engine:open_docs(Db2, [<<"foo">>]),
-    PrevRev = cpse_util:prev_rev(FDI),
-    Rev = PrevRev#rev_info.rev,
-
-    Actions2 = [
-        {purge, {<<"foo">>, Rev}}
-    ],
-    {ok, Db3} = cpse_util:apply_actions(Db2, Actions2),
-
-    ?assertEqual(0, couch_db_engine:get_doc_count(Db3)),
-    ?assertEqual(0, couch_db_engine:get_del_doc_count(Db3)),
-    ?assertEqual(2, couch_db_engine:get_update_seq(Db3)),
-    ?assertEqual(1, couch_db_engine:get_purge_seq(Db3)),
-    ?assertEqual([{<<"foo">>, [Rev]}], couch_db_engine:get_last_purged(Db3)).
-
-
-cpse_purge_conflicts(Db1) ->
-    Actions1 = [
-        {create, {<<"foo">>, {[{<<"vsn">>, 1}]}}},
-        {conflict, {<<"foo">>, {[{<<"vsn">>, 2}]}}}
-    ],
-    {ok, Db2} = cpse_util:apply_actions(Db1, Actions1),
-
-    ?assertEqual(1, couch_db_engine:get_doc_count(Db2)),
-    ?assertEqual(0, couch_db_engine:get_del_doc_count(Db2)),
-    ?assertEqual(2, couch_db_engine:get_update_seq(Db2)),
-    ?assertEqual(0, couch_db_engine:get_purge_seq(Db2)),
-    ?assertEqual([], couch_db_engine:get_last_purged(Db2)),
-
-    [FDI1] = couch_db_engine:open_docs(Db2, [<<"foo">>]),
-    PrevRev1 = cpse_util:prev_rev(FDI1),
-    Rev1 = PrevRev1#rev_info.rev,
-
-    Actions2 = [
-        {purge, {<<"foo">>, Rev1}}
-    ],
-    {ok, Db3} = cpse_util:apply_actions(Db2, Actions2),
-
-    ?assertEqual(1, couch_db_engine:get_doc_count(Db3)),
-    ?assertEqual(0, couch_db_engine:get_del_doc_count(Db3)),
-    ?assertEqual(4, couch_db_engine:get_update_seq(Db3)),
-    ?assertEqual(1, couch_db_engine:get_purge_seq(Db3)),
-    ?assertEqual([{<<"foo">>, [Rev1]}], couch_db_engine:get_last_purged(Db3)),
-
-    [FDI2] = couch_db_engine:open_docs(Db3, [<<"foo">>]),
-    PrevRev2 = cpse_util:prev_rev(FDI2),
-    Rev2 = PrevRev2#rev_info.rev,
-
-    Actions3 = [
-        {purge, {<<"foo">>, Rev2}}
-    ],
-    {ok, Db4} = cpse_util:apply_actions(Db3, Actions3),
-
-    ?assertEqual(0, couch_db_engine:get_doc_count(Db4)),
-    ?assertEqual(0, couch_db_engine:get_del_doc_count(Db4)),
-    ?assertEqual(5, couch_db_engine:get_update_seq(Db4)),
-    ?assertEqual(2, couch_db_engine:get_purge_seq(Db4)),
-    ?assertEqual([{<<"foo">>, [Rev2]}], couch_db_engine:get_last_purged(Db4)).
-
-
-cpse_add_delete_purge(Db1) ->
-    Actions1 = [
-        {create, {<<"foo">>, {[{<<"vsn">>, 1}]}}},
-        {delete, {<<"foo">>, {[{<<"vsn">>, 2}]}}}
+    PurgeInfos = [
+        {cpse_util:uuid(), <<"foo1">>, [Rev]}
     ],
 
-    {ok, Db2} = cpse_util:apply_actions(Db1, Actions1),
+    {ok, [{ok, PRevs}]} = cpse_util:purge(DbName, PurgeInfos),
+    ?assertEqual([Rev], PRevs),
 
-    ?assertEqual(0, couch_db_engine:get_doc_count(Db2)),
-    ?assertEqual(1, couch_db_engine:get_del_doc_count(Db2)),
-    ?assertEqual(2, couch_db_engine:get_update_seq(Db2)),
-    ?assertEqual(0, couch_db_engine:get_purge_seq(Db2)),
-    ?assertEqual([], couch_db_engine:get_last_purged(Db2)),
+    cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [
+        {doc_count, 0},
+        {del_doc_count, 0},
+        {update_seq, 2},
+        {purge_seq, 1},
+        {purge_infos, PurgeInfos}
+    ]).
 
-    [FDI] = couch_db_engine:open_docs(Db2, [<<"foo">>]),
-    PrevRev = cpse_util:prev_rev(FDI),
-    Rev = PrevRev#rev_info.rev,
 
-    Actions2 = [
-        {purge, {<<"foo">>, Rev}}
+cpse_purge_simple_info_check(DbName) ->
+    {ok, Rev} = cpse_util:save_doc(DbName, {[{'_id', foo1}, {vsn, 1.1}]}),
+    PurgeInfos = [
+        {cpse_util:uuid(), <<"foo1">>, [Rev]}
     ],
-    {ok, Db3} = cpse_util:apply_actions(Db2, Actions2),
+    {ok, [{ok, PRevs}]} = cpse_util:purge(DbName, PurgeInfos),
+    ?assertEqual([Rev], PRevs),
 
-    ?assertEqual(0, couch_db_engine:get_doc_count(Db3)),
-    ?assertEqual(0, couch_db_engine:get_del_doc_count(Db3)),
-    ?assertEqual(3, couch_db_engine:get_update_seq(Db3)),
-    ?assertEqual(1, couch_db_engine:get_purge_seq(Db3)),
-    ?assertEqual([{<<"foo">>, [Rev]}], couch_db_engine:get_last_purged(Db3)).
+    {ok, AllInfos} = couch_util:with_db(DbName, fun(Db) ->
+        couch_db_engine:fold_purge_infos(Db, 0, fun fold_all_infos/2, [], [])
+    end),
+
+    ?assertMatch([{1, <<_/binary>>, <<"foo1">>, [Rev]}], AllInfos).
 
 
-cpse_add_two_purge_one(Db1) ->
-    Actions1 = [
-        {create, {<<"foo">>, {[{<<"vsn">>, 1}]}}},
-        {create, {<<"bar">>, {[]}}}
+cpse_purge_empty_db(DbName) ->
+    PurgeInfos = [
+        {cpse_util:uuid(), <<"foo">>, [{0, <<0>>}]}
     ],
 
-    {ok, Db2} = cpse_util:apply_actions(Db1, Actions1),
+    {ok, [{ok, PRevs}]} = cpse_util:purge(DbName, PurgeInfos),
+    ?assertEqual([], PRevs),
 
-    ?assertEqual(2, couch_db_engine:get_doc_count(Db2)),
-    ?assertEqual(0, couch_db_engine:get_del_doc_count(Db2)),
-    ?assertEqual(2, couch_db_engine:get_update_seq(Db2)),
-    ?assertEqual(0, couch_db_engine:get_purge_seq(Db2)),
-    ?assertEqual([], couch_db_engine:get_last_purged(Db2)),
+    cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [
+        {doc_count, 0},
+        {del_doc_count, 0},
+        {update_seq, 1},
+        {changes, 0},
+        {purge_seq, 1},
+        {purge_infos, PurgeInfos}
+    ]).
 
-    [FDI] = couch_db_engine:open_docs(Db2, [<<"foo">>]),
-    PrevRev = cpse_util:prev_rev(FDI),
-    Rev = PrevRev#rev_info.rev,
 
-    Actions2 = [
-        {purge, {<<"foo">>, Rev}}
+cpse_purge_single_docid(DbName) ->
+    {ok, [Rev1, _Rev2]} = cpse_util:save_docs(DbName, [
+        {[{'_id', foo1}, {vsn, 1}]},
+        {[{'_id', foo2}, {vsn, 2}]}
+    ]),
+
+    cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [
+        {doc_count, 2},
+        {del_doc_count, 0},
+        {update_seq, 2},
+        {changes, 2},
+        {purge_seq, 0},
+        {purge_infos, []}
+    ]),
+
+    PurgeInfos = [
+        {cpse_util:uuid(), <<"foo1">>, [Rev1]}
     ],
-    {ok, Db3} = cpse_util:apply_actions(Db2, Actions2),
+    {ok, [{ok, PRevs}]} = cpse_util:purge(DbName, PurgeInfos),
+    ?assertEqual([Rev1], PRevs),
 
-    ?assertEqual(1, couch_db_engine:get_doc_count(Db3)),
-    ?assertEqual(0, couch_db_engine:get_del_doc_count(Db3)),
-    ?assertEqual(3, couch_db_engine:get_update_seq(Db3)),
-    ?assertEqual(1, couch_db_engine:get_purge_seq(Db3)),
-    ?assertEqual([{<<"foo">>, [Rev]}], couch_db_engine:get_last_purged(Db3)).
+    cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [
+        {doc_count, 1},
+        {del_doc_count, 0},
+        {update_seq, 3},
+        {changes, 1},
+        {purge_seq, 1},
+        {purge_infos, PurgeInfos}
+    ]).
+
+
+cpse_purge_multiple_docids(DbName) ->
+    {ok, [Rev1, Rev2]} = cpse_util:save_docs(DbName, [
+        {[{'_id', foo1}, {vsn, 1.1}]},
+        {[{'_id', foo2}, {vsn, 1.2}]}
+    ]),
+
+    cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [
+        {doc_count, 2},
+        {del_doc_count, 0},
+        {update_seq, 2},
+        {changes, 2},
+        {purge_seq, 0},
+        {purge_infos, []}
+    ]),
+
+    PurgeInfos = [
+        {cpse_util:uuid(), <<"foo1">>, [Rev1]},
+        {cpse_util:uuid(), <<"foo2">>, [Rev2]}
+    ],
+
+    {ok, [{ok, PRevs1}, {ok, PRevs2}]} = cpse_util:purge(DbName, PurgeInfos),
+
+    ?assertEqual([Rev1], PRevs1),
+    ?assertEqual([Rev2], PRevs2),
+
+    cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [
+        {doc_count, 0},
+        {del_doc_count, 0},
+        {update_seq, 3},
+        {changes, 0},
+        {purge_seq, 2},
+        {purge_infos, PurgeInfos}
+    ]).
+
+
+cpse_purge_no_docids(DbName) ->
+    {ok, [_Rev1, _Rev2]} = cpse_util:save_docs(DbName, [
+        {[{'_id', foo1}, {vsn, 1}]},
+        {[{'_id', foo2}, {vsn, 2}]}
+    ]),
+
+    cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [
+        {doc_count, 2},
+        {del_doc_count, 0},
+        {update_seq, 2},
+        {changes, 2},
+        {purge_seq, 0},
+        {purge_infos, []}
+    ]),
+
+    {ok, []} = cpse_util:purge(DbName, []),
+
+    cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [
+        {doc_count, 2},
+        {del_doc_count, 0},
+        {update_seq, 2},
+        {changes, 2},
+        {purge_seq, 0},
+        {purge_infos, []}
+    ]).
+
+
+cpse_purge_rev_path(DbName) ->
+    {ok, Rev1} = cpse_util:save_doc(DbName, {[{'_id', foo}, {vsn, 1}]}),
+    Update = {[
+        {<<"_id">>, <<"foo">>},
+        {<<"_rev">>, couch_doc:rev_to_str(Rev1)},
+        {<<"_deleted">>, true},
+        {<<"vsn">>, 2}
+    ]},
+    {ok, Rev2} = cpse_util:save_doc(DbName, Update),
+
+    cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [
+        {doc_count, 0},
+        {del_doc_count, 1},
+        {update_seq, 2},
+        {changes, 1},
+        {purge_seq, 0},
+        {purge_infos, []}
+    ]),
+
+    PurgeInfos = [
+        {cpse_util:uuid(), <<"foo">>, [Rev2]}
+    ],
+
+    {ok, [{ok, PRevs}]} = cpse_util:purge(DbName, PurgeInfos),
+    ?assertEqual([Rev2], PRevs),
+
+    cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [
+        {doc_count, 0},
+        {del_doc_count, 0},
+        {update_seq, 3},
+        {changes, 0},
+        {purge_seq, 1},
+        {purge_infos, PurgeInfos}
+    ]).
+
+
+cpse_purge_deep_revision_path(DbName) ->
+    {ok, InitRev} = cpse_util:save_doc(DbName, {[{'_id', bar}, {vsn, 0}]}),
+    LastRev = lists:foldl(fun(Count, PrevRev) ->
+        Update = {[
+            {'_id', bar},
+            {'_rev', couch_doc:rev_to_str(PrevRev)},
+            {vsn, Count}
+        ]},
+        {ok, NewRev} = cpse_util:save_doc(DbName, Update),
+        NewRev
+    end, InitRev, lists:seq(1, ?REV_DEPTH)),
+
+    PurgeInfos = [
+        {cpse_util:uuid(), <<"bar">>, [LastRev]}
+    ],
+
+    {ok, [{ok, PRevs}]} = cpse_util:purge(DbName, PurgeInfos),
+    ?assertEqual([LastRev], PRevs),
+
+    cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [
+        {doc_count, 0},
+        {del_doc_count, 0},
+        {update_seq, ?REV_DEPTH + 2},
+        {changes, 0},
+        {purge_seq, 1},
+        {purge_infos, PurgeInfos}
+    ]).
+
+
+cpse_purge_partial_revs(DbName) ->
+    {ok, Rev1} = cpse_util:save_doc(DbName, {[{'_id', foo}, {vsn, <<"1.1">>}]}),
+    Update = {[
+        {'_id', foo},
+        {'_rev', couch_doc:rev_to_str({1, [crypto:hash(md5, <<"1.2">>)]})},
+        {vsn, <<"1.2">>}
+    ]},
+    {ok, [_Rev2]} = cpse_util:save_docs(DbName, [Update], [replicated_changes]),
+
+    PurgeInfos = [
+        {cpse_util:uuid(), <<"foo">>, [Rev1]}
+    ],
+
+    {ok, [{ok, PRevs}]} = cpse_util:purge(DbName, PurgeInfos),
+    ?assertEqual([Rev1], PRevs),
+
+    cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [
+        {doc_count, 1},
+        {del_doc_count, 0},
+        {update_seq, 3},
+        {changes, 1},
+        {purge_seq, 1},
+        {purge_infos, PurgeInfos}
+    ]).
+
+
+cpse_purge_missing_docid(DbName) ->
+    {ok, [Rev1, _Rev2]} = cpse_util:save_docs(DbName, [
+        {[{'_id', foo1}, {vsn, 1}]},
+        {[{'_id', foo2}, {vsn, 2}]}
+    ]),
+
+    cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [
+        {doc_count, 2},
+        {del_doc_count, 0},
+        {update_seq, 2},
+        {changes, 2},
+        {purge_seq, 0},
+        {purge_infos, []}
+    ]),
+
+    PurgeInfos = [
+        {cpse_util:uuid(), <<"baz">>, [Rev1]}
+    ],
+
+    {ok, [{ok, []}]} = cpse_util:purge(DbName, PurgeInfos),
+
+    cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [
+        {doc_count, 2},
+        {del_doc_count, 0},
+        {update_seq, 3},
+        {changes, 2},
+        {purge_seq, 1},
+        {purge_infos, PurgeInfos}
+    ]).
+
+
+cpse_purge_duplicate_docids(DbName) ->
+    {ok, [Rev1, _Rev2]} = cpse_util:save_docs(DbName, [
+        {[{'_id', foo1}, {vsn, 1}]},
+        {[{'_id', foo2}, {vsn, 2}]}
+    ]),
+
+    cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [
+        {doc_count, 2},
+        {del_doc_count, 0},
+        {update_seq, 2},
+        {purge_seq, 0},
+        {changes, 2},
+        {purge_infos, []}
+    ]),
+
+    PurgeInfos = [
+        {cpse_util:uuid(), <<"foo1">>, [Rev1]},
+        {cpse_util:uuid(), <<"foo1">>, [Rev1]}
+    ],
+
+    {ok, Resp} = cpse_util:purge(DbName, PurgeInfos),
+    ?assertEqual([{ok, [Rev1]}, {ok, []}], Resp),
+
+    cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [
+        {doc_count, 1},
+        {del_doc_count, 0},
+        {update_seq, 3},
+        {purge_seq, 2},
+        {changes, 1},
+        {purge_infos, PurgeInfos}
+    ]).
+
+
+cpse_purge_internal_revision(DbName) ->
+    {ok, Rev1} = cpse_util:save_doc(DbName, {[{'_id', foo}, {vsn, 1}]}),
+    Update = {[
+        {'_id', foo},
+        {'_rev', couch_doc:rev_to_str(Rev1)},
+        {vsn, 2}
+    ]},
+    {ok, _Rev2} = cpse_util:save_doc(DbName, Update),
+
+    PurgeInfos = [
+        {cpse_util:uuid(), <<"foo">>, [Rev1]}
+    ],
+
+    {ok, [{ok, PRevs}]} = cpse_util:purge(DbName, PurgeInfos),
+    ?assertEqual([], PRevs),
+
+    cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [
+        {doc_count, 1},
+        {del_doc_count, 0},
+        {update_seq, 3},
+        {changes, 1},
+        {purge_seq, 1},
+        {purge_infos, PurgeInfos}
+    ]).
+
+
+cpse_purge_missing_revision(DbName) ->
+    {ok, [_Rev1, Rev2]} = cpse_util:save_docs(DbName, [
+        {[{'_id', foo1}, {vsn, 1}]},
+        {[{'_id', foo2}, {vsn, 2}]}
+    ]),
+
+    PurgeInfos = [
+        {cpse_util:uuid(), <<"foo1">>, [Rev2]}
+    ],
+
+    {ok, [{ok, PRevs}]} = cpse_util:purge(DbName, PurgeInfos),
+    ?assertEqual([], PRevs),
+
+    cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [
+        {doc_count, 2},
+        {del_doc_count, 0},
+        {update_seq, 3},
+        {changes, 2},
+        {purge_seq, 1},
+        {purge_infos, PurgeInfos}
+    ]).
+
+
+cpse_purge_repeated_revisions(DbName) ->
+    {ok, Rev1} = cpse_util:save_doc(DbName, {[{'_id', foo}, {vsn, <<"1.1">>}]}),
+    Update = {[
+        {'_id', foo},
+        {'_rev', couch_doc:rev_to_str({1, [crypto:hash(md5, <<"1.2">>)]})},
+        {vsn, <<"1.2">>}
+    ]},
+    {ok, [Rev2]} = cpse_util:save_docs(DbName, [Update], [replicated_changes]),
+
+    cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [
+        {doc_count, 1},
+        {del_doc_count, 0},
+        {update_seq, 2},
+        {changes, 1},
+        {purge_seq, 0},
+        {purge_infos, []}
+    ]),
+
+    PurgeInfos1 = [
+        {cpse_util:uuid(), <<"foo">>, [Rev1]},
+        {cpse_util:uuid(), <<"foo">>, [Rev1, Rev2]}
+    ],
+
+    {ok, [{ok, PRevs1}, {ok, PRevs2}]} = cpse_util:purge(DbName, PurgeInfos1),
+    ?assertEqual([Rev1], PRevs1),
+    ?assertEqual([Rev2], PRevs2),
+
+    cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [
+        {doc_count, 0},
+        {del_doc_count, 0},
+        {update_seq, 3},
+        {changes, 0},
+        {purge_seq, 2},
+        {purge_infos, PurgeInfos1}
+    ]).
+
+
+cpse_purge_repeated_uuid(DbName) ->
+    {ok, Rev} = cpse_util:save_doc(DbName, {[{'_id', foo1}, {vsn, 1.1}]}),
+
+    cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [
+        {doc_count, 1},
+        {del_doc_count, 0},
+        {update_seq, 1},
+        {changes, 1},
+        {purge_seq, 0},
+        {purge_infos, []}
+    ]),
+
+    PurgeInfos = [
+        {cpse_util:uuid(), <<"foo1">>, [Rev]}
+    ],
+
+    {ok, [{ok, PRevs1}]} = cpse_util:purge(DbName, PurgeInfos),
+    ?assertEqual([Rev], PRevs1),
+
+    % Attempting to purge a repeated UUID is an error
+    ?assertThrow({badreq, _}, cpse_util:purge(DbName, PurgeInfos)),
+
+    % Although we can replicate it in
+    {ok, []} = cpse_util:purge(DbName, PurgeInfos, [replicated_changes]),
+
+    cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [
+        {doc_count, 0},
+        {del_doc_count, 0},
+        {update_seq, 2},
+        {changes, 0},
+        {purge_seq, 1},
+        {purge_infos, PurgeInfos}
+    ]).
+
+
+fold_all_infos(Info, Acc) ->
+    {ok, [Info | Acc]}.
