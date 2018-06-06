@@ -288,17 +288,24 @@ process_request(#httpd{mochi_req = MochiReq} = HttpReq) ->
         not_preflight ->
             case chttpd_auth:authenticate(HttpReq, fun authenticate_request/1) of
             #httpd{} = Req ->
-                HandlerFun = chttpd_handlers:url_handler(
-                    HandlerKey, fun chttpd_db:handle_request/1),
-                AuthorizedReq = chttpd_auth:authorize(possibly_hack(Req),
-                    fun chttpd_auth_request:authorize_request/1),
-                {AuthorizedReq, HandlerFun(AuthorizedReq)};
+                handle_req_after_auth(HandlerKey, Req);
             Response ->
                 {HttpReq, Response}
             end;
         Response ->
             {HttpReq, Response}
         end
+    catch Tag:Error ->
+        {HttpReq, catch_error(HttpReq, Tag, Error)}
+    end.
+
+handle_req_after_auth(HandlerKey, HttpReq) ->
+    try
+        HandlerFun = chttpd_handlers:url_handler(HandlerKey,
+            fun chttpd_db:handle_request/1),
+        AuthorizedReq = chttpd_auth:authorize(possibly_hack(HttpReq),
+            fun chttpd_auth_request:authorize_request/1),
+        {AuthorizedReq, HandlerFun(AuthorizedReq)}
     catch Tag:Error ->
         {HttpReq, catch_error(HttpReq, Tag, Error)}
     end.
