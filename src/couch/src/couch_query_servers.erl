@@ -17,7 +17,7 @@
 -export([reduce/3, rereduce/3,validate_doc_update/5]).
 -export([filter_docs/5]).
 -export([filter_view/3]).
--export([finalize/1]).
+-export([finalize/2]).
 -export([rewrite/3]).
 
 -export([with_ddoc_proc/2, proc_prompt/2, ddoc_prompt/3, ddoc_proc_prompt/3, json_doc/1]).
@@ -87,15 +87,16 @@ group_reductions_results(List) ->
      [Heads | group_reductions_results(Tails)]
     end.
 
-finalize(Reductions) ->
-    {ok, lists:map(fun(Reduction) ->
-        case hyper:is_hyper(Reduction) of
-            true ->
-                round(hyper:card(Reduction));
-            false ->
-                Reduction
-        end
-    end, Reductions)}.
+finalize(<<"_approx_count_distinct">>, Reduction) ->
+    true = hyper:is_hyper(Reduction),
+    {ok, round(hyper:card(Reduction))};
+finalize(<<"_stats">>, {_, _, _, _, _} = Unpacked) ->
+    {ok, pack_stats(Unpacked)};
+finalize(<<"_stats">>, {Packed}) ->
+    % Legacy code path before we had the finalize operation
+    {ok, {Packed}};
+finalize(_RedSrc, Reduction) ->
+    {ok, Reduction}.
 
 rereduce(_Lang, [], _ReducedValues) ->
     {ok, []};
@@ -250,11 +251,11 @@ sum_arrays(Else, _) ->
     throw_sum_error(Else).
 
 builtin_stats(_, []) ->
-    {[{sum,0}, {count,0}, {min,0}, {max,0}, {sumsqr,0}]};
+    {0, 0, 0, 0, 0};
 builtin_stats(_, [[_,First]|Rest]) ->
-    Unpacked = lists:foldl(fun([_Key, Value], Acc) -> stat_values(Value, Acc) end,
-                           build_initial_accumulator(First), Rest),
-    pack_stats(Unpacked).
+    lists:foldl(fun([_Key, Value], Acc) ->
+        stat_values(Value, Acc)
+    end, build_initial_accumulator(First), Rest).
 
 stat_values(Value, Acc) when is_list(Value), is_list(Acc) ->
     lists:zipwith(fun stat_values/2, Value, Acc);
@@ -281,6 +282,8 @@ build_initial_accumulator(L) when is_list(L) ->
     [build_initial_accumulator(X) || X <- L];
 build_initial_accumulator(X) when is_number(X) ->
     {X, 1, X, X, X*X};
+build_initial_accumulator({_, _, _, _, _} = AlreadyUnpacked) ->
+    AlreadyUnpacked;
 build_initial_accumulator({Props}) ->
     unpack_stats({Props});
 build_initial_accumulator(Else) ->
