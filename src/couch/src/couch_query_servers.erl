@@ -87,12 +87,12 @@ group_reductions_results(List) ->
      [Heads | group_reductions_results(Tails)]
     end.
 
-finalize(<<"_approx_count_distinct">>, Reduction) ->
+finalize(<<"_approx_count_distinct",_/binary>>, Reduction) ->
     true = hyper:is_hyper(Reduction),
     {ok, round(hyper:card(Reduction))};
-finalize(<<"_stats">>, {_, _, _, _, _} = Unpacked) ->
+finalize(<<"_stats",_/binary>>, {_, _, _, _, _} = Unpacked) ->
     {ok, pack_stats(Unpacked)};
-finalize(<<"_stats">>, {Packed}) ->
+finalize(<<"_stats",_/binary>>, {Packed}) ->
     % Legacy code path before we had the finalize operation
     {ok, {Packed}};
 finalize(_RedSrc, Reduction) ->
