@@ -1245,4 +1245,38 @@ test_log_request(RawPath, UserCtx) ->
     ok = meck:unload(couch_log),
     Message.
 
+handle_req_after_auth_test() ->
+    Headers = mochiweb_headers:make([{"HOST", "127.0.0.1:15984"}]),
+    MochiReq = mochiweb_request:new(socket, [], 'PUT', "/newdb", version,
+        Headers),
+    UserCtx = #user_ctx{name = <<"retain_user">>},
+    Roles = [<<"_reader">>],
+    AuthorizedCtx = #user_ctx{name = <<"retain_user">>, roles = Roles},
+    Req = #httpd{
+        mochi_req = MochiReq,
+        begin_ts = {1458,588713,124003},
+        original_method = 'PUT',
+        peer = "127.0.0.1",
+        nonce = "nonce",
+        user_ctx = UserCtx
+    },
+    AuthorizedReq = Req#httpd{user_ctx = AuthorizedCtx},
+    ok = meck:new(chttpd_handlers, [passthrough]),
+    ok = meck:new(chttpd_auth, [passthrough]),
+    ok = meck:expect(chttpd_handlers, url_handler, fun(_Key, _Fun) ->
+         fun(_Req) -> handled_authorized_req end
+    end),
+    ok = meck:expect(chttpd_auth, authorize, fun(_Req, _Fun) ->
+        AuthorizedReq
+    end),
+    ?assertEqual({AuthorizedReq, handled_authorized_req},
+        handle_req_after_auth(foo_key, Req)),
+    ok = meck:expect(chttpd_auth, authorize, fun(_Req, _Fun) ->
+        meck:exception(throw, {http_abort, resp, some_reason})
+    end),
+    ?assertEqual({Req, {aborted, resp, some_reason}},
+        handle_req_after_auth(foo_key, Req)),
+    ok = meck:unload(chttpd_handlers),
+    ok = meck:unload(chttpd_auth).
+
 -endif.
