@@ -30,7 +30,7 @@ DESTDIR=
 
 # Rebar options
 apps=
-skip_deps=folsom,meck,mochiweb,triq,snappy
+skip_deps=folsom,meck,mochiweb,triq,snappy,bcrypt,hyper
 suites=
 tests=
 
