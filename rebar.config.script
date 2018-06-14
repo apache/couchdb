@@ -88,8 +88,8 @@ MakeDep = fun
 end,
 
 ErlOpts = case os:getenv("ERL_OPTS") of
-    "bin_opt_info" -> [bin_opt_info, debug_info, {i, "../"}];
-    Else -> [Else, {i, "../"}]
+    false -> [];
+    Opts -> [list_to_atom(O) || O <- string:tokens(Opts, ",")]
 end,
 
 AddConfig = [
@@ -98,7 +98,7 @@ AddConfig = [
     {deps, lists:map(MakeDep, DepDescs)},
     {sub_dirs, SubDirs},
     {lib_dirs, ["src"]},
-    {erl_opts, ErlOpts},
+    {erl_opts, [{i, "../"} | ErlOpts]},
     {eunit_opts, [verbose]},
     {plugins, [eunit_plugin]},
     {dialyzer, [

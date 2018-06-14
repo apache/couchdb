@@ -76,7 +76,7 @@ help:
 
 
 .PHONY: couch
-# target: couch - Build CouchDB core
+# target: couch - Build CouchDB core, use ERL_OPTS to provide custom compiler's options
 couch: config.erl
 	@COUCHDB_VERSION=$(COUCHDB_VERSION) $(REBAR) compile $(COMPILE_OPTS)
 	@cp src/couch/priv/couchjs bin/
