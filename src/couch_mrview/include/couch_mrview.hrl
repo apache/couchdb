@@ -87,6 +87,7 @@
     conflicts,
     callback,
     sorted = true,
+    shard_key,
     extra = []
 }).
 

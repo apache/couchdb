@@ -543,6 +543,10 @@ parse_param(Key, Val, Args, IsDecoded) ->
             Args#mrargs{update=lazy};
         "update" ->
             throw({query_parse_error, <<"Invalid value for `update`.">>});
+        "shardkey" ->
+            Args#mrargs{shard_key=couch_util:to_binary(Val)};
+        "shard_key" ->
+            Args#mrargs{shard_key=couch_util:to_binary(Val)};
         "descending" ->
             case parse_boolean(Val) of
                 true -> Args#mrargs{direction=rev};
