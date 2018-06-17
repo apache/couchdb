@@ -338,6 +338,9 @@ is_whitespace(_Else) -> false.
 
 
 % removes leading and trailing whitespace from a string
+trim(String) when is_binary(String) ->
+    % mirror string:trim() behaviour of returning a binary when a binary is passed in
+    ?l2b(trim(?b2l(String)));
 trim(String) ->
     String2 = lists:dropwhile(fun is_whitespace/1, String),
     lists:reverse(lists:dropwhile(fun is_whitespace/1, lists:reverse(String2))).
