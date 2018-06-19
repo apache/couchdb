@@ -277,7 +277,7 @@ purge_docs(_DbName, _IdsRevs) ->
         {unknown_transfer_encoding, any()}) ->
     function() | binary().
 att_receiver(Req, Length) ->
-    fabric_doc_attachments:receiver(Req, Length).
+    fabric_doc_attachments2:receiver_tuple(Req, Length).
 
 %% @equiv all_docs(DbName, [], Callback, Acc0, QueryArgs)
 all_docs(DbName, Callback, Acc, QueryArgs) ->
