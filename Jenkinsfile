@@ -368,8 +368,8 @@ pipeline {
         }
       }
       steps {
-        sh 'docker pull couchdbdev/debian-8-base:latest'
-        withDockerContainer(image: 'couchdbdev/debian-8-base:latest', args: '-e npm_config_cache=npm-cache -e HOME=. -v=/etc/passwd:/etc/passwd -v /etc/group:/etc/group') {
+        sh 'docker pull couchdbdev/debian-stretch-erlang-19.3.6:latest'
+        withDockerContainer(image: 'couchdbdev/debian-stretch-erlang-19.3.6:latest', args: '-e npm_config_cache=npm-cache -e HOME=. -v=/etc/passwd:/etc/passwd -v /etc/group:/etc/group') {
           withCredentials([file(credentialsId: 'jenkins-key', variable: 'KEY')]) {
             sh 'rm -rf pkgs *.tar.gz'
             unarchive mapping: ['pkgs/' : '.']
