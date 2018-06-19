@@ -440,6 +440,8 @@ make_att_reader({follows, Parser, Ref}) ->
                 throw({mp_parser_died, Reason})
         end
     end;
+make_att_reader({fabric_attachment_receiver, Middleman, Length}) ->
+    fabric_doc_atts:receiver_callback(Middleman, Length);
 make_att_reader(Else) ->
     Else.
 
