@@ -37,6 +37,7 @@
 -export([unique_monotonic_integer/0]).
 -export([check_config_blacklist/1]).
 -export([check_md5/2]).
+-export([set_mqd_off_heap/0]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -637,6 +638,15 @@ validate_callback_exists(Module, Function, Arity) ->
 check_md5(_NewSig, <<>>) -> ok;
 check_md5(Sig, Sig) -> ok;
 check_md5(_, _) -> throw(md5_mismatch).
+
+
+set_mqd_off_heap() ->
+    try
+        erlang:process_flag(message_queue_data, off_heap),
+        ok
+    catch error:badarg ->
+        ok
+    end.
 
 
 ensure_loaded(Module) when is_atom(Module) ->
