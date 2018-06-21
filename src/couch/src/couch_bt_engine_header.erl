@@ -69,7 +69,8 @@
     uuid,
     epochs,
     compacted_seq,
-    purge_infos_limit = 1000
+    purge_infos_limit = 1000,
+    props_ptr
 }).
 
 
