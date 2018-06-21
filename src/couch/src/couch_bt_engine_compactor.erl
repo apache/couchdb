@@ -276,9 +276,13 @@ copy_compact(DbName, St, NewSt0, Retry) ->
     SecProps = couch_bt_engine:get_security(St),
     {ok, NewSt4} = couch_bt_engine:copy_security(NewSt3, SecProps),
 
+    % Copy general properties over
+    Props = couch_bt_engine:get_props(St),
+    {ok, NewSt5} = couch_bt_engine:set_props(NewSt4, Props),
+
     FinalUpdateSeq = couch_bt_engine:get_update_seq(St),
-    {ok, NewSt5} = couch_bt_engine:set_update_seq(NewSt4, FinalUpdateSeq),
-    commit_compaction_data(NewSt5).
+    {ok, NewSt6} = couch_bt_engine:set_update_seq(NewSt5, FinalUpdateSeq),
+    commit_compaction_data(NewSt6).
 
 
 copy_docs(St, #st{} = NewSt, MixedInfos, Retry) ->

@@ -243,6 +243,10 @@
 -callback get_security(DbHandle::db_handle()) -> SecProps::any().
 
 
+% Get the current properties.
+-callback get_props(DbHandle::db_handle()) -> Props::[any()].
+
+
 % This information is displayed in the database info poperties. It
 % should just be a list of {Name::atom(), Size::non_neg_integer()}
 % tuples that will then be combined across shards. Currently,
@@ -285,6 +289,15 @@
 
 
 -callback set_security(DbHandle::db_handle(), SecProps::any()) ->
+        {ok, NewDbHandle::db_handle()}.
+
+
+% This function is only called by couch_db_updater and
+% as such is guaranteed to be single threaded calls. The
+% database should simply store provided property list
+% unaltered.
+
+-callback set_props(DbHandle::db_handle(), Props::any()) ->
         {ok, NewDbHandle::db_handle()}.
 
 
@@ -670,6 +683,7 @@
     get_purge_infos_limit/1,
     get_revs_limit/1,
     get_security/1,
+    get_props/1,
     get_size_info/1,
     get_update_seq/1,
     get_uuid/1,
@@ -677,6 +691,7 @@
     set_revs_limit/2,
     set_security/2,
     set_purge_infos_limit/2,
+    set_props/2,
 
     open_docs/2,
     open_local_docs/2,
@@ -836,6 +851,11 @@ get_security(#db{} = Db) ->
     Engine:get_security(EngineState).
 
 
+get_props(#db{} = Db) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    Engine:get_props(EngineState).
+
+
 get_size_info(#db{} = Db) ->
     #db{engine = {Engine, EngineState}} = Db,
     Engine:get_size_info(EngineState).
@@ -865,6 +885,12 @@ set_purge_infos_limit(#db{} = Db, PurgedDocsLimit) ->
 set_security(#db{} = Db, SecProps) ->
     #db{engine = {Engine, EngineState}} = Db,
     {ok, NewSt} = Engine:set_security(EngineState, SecProps),
+    {ok, Db#db{engine = {Engine, NewSt}}}.
+
+
+set_props(#db{} = Db, Props) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    {ok, NewSt} = Engine:set_props(EngineState, Props),
     {ok, Db#db{engine = {Engine, NewSt}}}.
 
 

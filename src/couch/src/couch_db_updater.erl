@@ -310,21 +310,24 @@ init_db(DbName, FilePath, EngineState, Options) ->
     BDU = couch_util:get_value(before_doc_update, Options, nil),
     ADR = couch_util:get_value(after_doc_read, Options, nil),
 
-    CleanedOpts = [Opt || Opt <- Options, Opt /= create],
+    NonCreateOpts = [Opt || Opt <- Options, Opt /= create],
 
     InitDb = #db{
         name = DbName,
         filepath = FilePath,
         engine = EngineState,
         instance_start_time = StartTime,
-        options = CleanedOpts,
+        options = NonCreateOpts,
         before_doc_update = BDU,
         after_doc_read = ADR
     },
 
+    DbProps = couch_db_engine:get_props(InitDb),
+
     InitDb#db{
         committed_update_seq = couch_db_engine:get_update_seq(InitDb),
-        security = couch_db_engine:get_security(InitDb)
+        security = couch_db_engine:get_security(InitDb),
+        options = lists:keystore(props, 1, NonCreateOpts, {props, DbProps})
     }.
 
 
