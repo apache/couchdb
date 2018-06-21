@@ -39,12 +39,15 @@
     get_purge_seq/1,
     get_revs_limit/1,
     get_security/1,
+    get_prop/2,
+    get_prop/3,
     get_size_info/1,
     get_update_seq/1,
     get_uuid/1,
 
     set_revs_limit/2,
     set_security/2,
+    set_prop/3,
 
     open_docs/2,
     open_local_docs/2,
@@ -266,6 +269,28 @@ get_security(#st{header = Header} = St) ->
     end.
 
 
+get_props(#st{header = Header} = St) ->
+    case couch_bt_engine_header:get(Header, props_ptr) of
+        undefined -> {ok, []};
+        Pointer -> couch_file:pread_term(St#st.fd, Pointer)
+    end.
+    
+
+get_prop(St, Key) ->
+    {ok, Props} = get_props(St),
+    case lists:keyfind(Key, 1, Props) of
+        false -> {error, no_value};
+        {Key, Value} -> {ok, Value}
+    end.
+
+
+get_prop(St, Key, DefaultValue) ->
+    case get_prop(St, Key) of
+        {error, no_value} -> {ok, DefaultValue};
+        Value -> Value
+    end.
+
+
 get_update_seq(#st{header = Header}) ->
     couch_bt_engine_header:get(Header, update_seq).
 
@@ -290,6 +315,20 @@ set_security(#st{header = Header} = St, NewSecurity) ->
     NewSt = St#st{
         header = couch_bt_engine_header:set(Header, [
             {security_ptr, Ptr}
+        ]),
+        needs_commit = true
+    },
+    {ok, increment_update_seq(NewSt)}.
+
+
+set_prop(#st{header = Header} = St, Key, Value) ->
+    {ok, OldProps} = get_props(St),
+    NewProps = [{Key, Value} | OldProps],
+    Options = [{compression, St#st.compression}],
+    {ok, Ptr, _} = couch_file:append_term(St#st.fd, NewProps, Options),
+    NewSt = St#st{
+        header = couch_bt_engine_header:set(Header, [
+            {props_ptr, Ptr}
         ]),
         needs_commit = true
     },
@@ -682,7 +721,8 @@ init_state(FilePath, Fd, Header0, Options) ->
     Compression = couch_compress:get_compression_method(),
 
     Header1 = couch_bt_engine_header:upgrade(Header0),
-    Header = set_default_security_object(Fd, Header1, Compression, Options),
+    Header2 = set_default_security_object(Fd, Header1, Compression, Options),
+    Header = set_default_props(Fd, Header2, Compression, Options),
 
     IdTreeState = couch_bt_engine_header:id_tree_state(Header),
     {ok, IdTree} = couch_btree:open(IdTreeState, Fd, [
