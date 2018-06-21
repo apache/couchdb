@@ -66,7 +66,8 @@
     revs_limit = 1000,
     uuid,
     epochs,
-    compacted_seq
+    compacted_seq,
+    props_ptr
 }).
 
 

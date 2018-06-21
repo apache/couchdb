@@ -224,6 +224,19 @@
 % the last value that was passed to set_security/2.
 -callback get_security(DbHandle::db_handle()) -> SecProps::any().
 
+% Get the current properties.
+-callback get_props(DbHandle::db_handle()) -> Props::any().
+
+% Get the current properties. This should just return
+% the last value that was passed to set_prop/2.
+-callback get_prop(DbHandle::db_handle(), Prop::atom()) ->
+    {ok, SecProps::json()} | {error, no_value}.
+
+% Get the current properties. If the value isn't set it will return the set default value.
+% This should just return the last value that was passed to set_prop/2.
+-callback get_prop(DbHandle::db_handle(), Prop::atom(), DefaultValue::any()) ->
+    {ok, SecProps::json()}.
+
 
 % This information is displayed in the database info poperties. It
 % should just be a list of {Name::atom(), Size::non_neg_integer()}
@@ -262,6 +275,15 @@
         {ok, NewDbHandle::db_handle()}.
 
 -callback set_security(DbHandle::db_handle(), SecProps::any()) ->
+        {ok, NewDbHandle::db_handle()}.
+
+
+% This function is only called by couch_db_updater and
+% as such is guaranteed to be single threaded calls. The
+% database should simply store prop key and value somewhere so
+% they can be returned by the corresponding get_prop calls.
+
+-callback set_prop(DbHandle::db_handle(), PropKey::atom(), PropValue::any()) ->
         {ok, NewDbHandle::db_handle()}.
 
 
@@ -601,12 +623,16 @@
     get_purge_seq/1,
     get_revs_limit/1,
     get_security/1,
+    get_props/1,
+    get_prop/2,
+    get_prop/3,
     get_size_info/1,
     get_update_seq/1,
     get_uuid/1,
 
     set_revs_limit/2,
     set_security/2,
+    set_prop/3,
 
     open_docs/2,
     open_local_docs/2,
@@ -757,6 +783,21 @@ get_security(#db{} = Db) ->
     Engine:get_security(EngineState).
 
 
+get_props(#db{} = Db) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    Engine:get_props(EngineState).
+
+
+get_prop(#db{} = Db, Prop) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    Engine:get_prop(EngineState, Prop).
+
+
+get_prop(#db{} = Db, Prop, DefaultValue) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    Engine:get_prop(EngineState, Prop, DefaultValue).
+
+
 get_size_info(#db{} = Db) ->
     #db{engine = {Engine, EngineState}} = Db,
     Engine:get_size_info(EngineState).
@@ -780,6 +821,12 @@ set_revs_limit(#db{} = Db, RevsLimit) ->
 set_security(#db{} = Db, SecProps) ->
     #db{engine = {Engine, EngineState}} = Db,
     {ok, NewSt} = Engine:set_security(EngineState, SecProps),
+    {ok, Db#db{engine = {Engine, NewSt}}}.
+
+
+set_prop(#db{} = Db, Key, Value) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    {ok, NewSt} = Engine:set_prop(EngineState, Key, Value),
     {ok, Db#db{engine = {Engine, NewSt}}}.
 
 

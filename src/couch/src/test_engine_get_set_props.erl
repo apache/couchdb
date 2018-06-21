@@ -50,6 +50,28 @@ cet_set_revs_limit() ->
     check_prop_set(get_revs_limit, set_revs_limit, 1000, 50).
 
 
+cet_set_prop() ->
+    Engine = test_engine_util:get_engine(),
+    DbPath = test_engine_util:dbpath(),
+
+    {ok, St0} = Engine:init(DbPath, [
+            create,
+            {default_security_object, dso}
+        ]),
+    ?assertEqual({error, no_value}, Engine:get_prop(St0, shardkey)),
+
+    ?assertEqual(false, Engine:get_prop(St0, shardkey, false)),
+
+    {ok, St1} = Engine:set_prop(St0, shardkey, true),
+    ?assertEqual({ok, true}, Engine:get_prop(St1, shardkey)),
+
+    {ok, St2} = Engine:commit_data(St1),
+    Engine:terminate(normal, St2),
+
+    {ok, St3} = Engine:init(DbPath, []),
+    ?assertEqual({ok, true}, Engine:get_prop(St3, shardkey)).
+
+
 check_prop_set(GetFun, SetFun, Default, Value) ->
     Engine = test_engine_util:get_engine(),
     DbPath = test_engine_util:dbpath(),

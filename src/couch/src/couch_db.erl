@@ -47,6 +47,7 @@
     get_pid/1,
     get_revs_limit/1,
     get_security/1,
+    get_props/1,
     get_update_seq/1,
     get_user_ctx/1,
     get_uuid/1,
@@ -58,6 +59,7 @@
 
     set_revs_limit/2,
     set_security/2,
+    set_prop/3,
     set_user_ctx/2,
 
     ensure_full_commit/1,
@@ -577,6 +579,15 @@ set_security(#db{main_pid=Pid}=Db, {NewSecProps}) when is_list(NewSecProps) ->
     ok;
 set_security(_, _) ->
     throw(bad_request).
+
+get_props(#db{props=Props}) ->
+    Props.
+
+set_prop(#db{main_pid=Pid}=Db, Key, Value) ->
+    check_is_admin(Db),
+    ok = gen_server:call(Pid, {set_prop, Key, Value}, infinity),
+    {ok, _} = ensure_full_commit(Db),
+    ok.
 
 set_user_ctx(#db{} = Db, UserCtx) ->
     {ok, Db#db{user_ctx = UserCtx}}.

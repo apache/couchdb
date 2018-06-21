@@ -35,7 +35,8 @@
     waiting_delayed_commit = nil,
 
     options = [],
-    compression
+    compression,
+    props = []
 }).
 
 

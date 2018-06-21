@@ -164,6 +164,10 @@ make_document([#shard{dbname=DbName}|_] = Shards, Suffix, Options) ->
         {[[<<"add">>, Range, Node] | Raw], orddict:append(Node, Range, ByNode),
             orddict:append(Range, Node, ByRange)}
     end, {[], [], []}, Shards),
+    InitialProps = case couch_util:get_value(initial_props, Options) of
+        I when is_list(I) -> [{<<"options">>, {I}}];
+        _ -> []
+    end,
     EngineProp = case couch_util:get_value(engine, Options) of
         E when is_binary(E) -> [{<<"engine">>, E}];
         _ -> []
@@ -175,7 +179,7 @@ make_document([#shard{dbname=DbName}|_] = Shards, Suffix, Options) ->
             {<<"changelog">>, lists:sort(RawOut)},
             {<<"by_node">>, {[{K,lists:sort(V)} || {K,V} <- ByNodeOut]}},
             {<<"by_range">>, {[{K,lists:sort(V)} || {K,V} <- ByRangeOut]}}
-        ] ++ EngineProp}
+        ] ++ EngineProp ++ InitialProps}
     }.
 
 db_exists(DbName) -> is_list(catch mem3:shards(DbName)).

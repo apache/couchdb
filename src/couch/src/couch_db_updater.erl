@@ -88,6 +88,14 @@ handle_call({set_security, NewSec}, _From, #db{} = Db) ->
     ok = gen_server:call(couch_server, {db_updated, NewSecDb}, infinity),
     {reply, ok, NewSecDb, idle_limit()};
 
+handle_call({set_prop, Key, Value}, _From, #db{} = Db) ->
+    {ok, NewDb} = couch_db_engine:set_prop(Db, Key, Value),
+    NewPropDb = commit_data(NewDb#db{
+        props = couch_db_engine:get_props(NewDb)
+    }),
+    ok = gen_server:call(couch_server, {db_updated, NewPropDb}, infinity),
+    {reply, ok, NewPropDb, idle_limit()};
+
 handle_call({set_revs_limit, Limit}, _From, Db) ->
     {ok, Db2} = couch_db_engine:set_revs_limit(Db, Limit),
     Db3 = commit_data(Db2),
@@ -375,7 +383,8 @@ init_db(DbName, FilePath, EngineState, Options) ->
 
     InitDb#db{
         committed_update_seq = couch_db_engine:get_update_seq(InitDb),
-        security = couch_db_engine:get_security(InitDb)
+        security = couch_db_engine:get_security(InitDb),
+        props = couch_db_engine:get_props(InitDb)
     }.
 
 

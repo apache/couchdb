@@ -162,7 +162,7 @@ build_shards_by_node(DbName, DocProps) ->
                 dbname = DbName,
                 node = to_atom(Node),
                 range = [Beg, End],
-                opts = get_engine_opt(DocProps)
+                opts = get_engine_opt(DocProps) ++ get_opts(DocProps)
             }, Suffix)
         end, Ranges)
     end, ByNode).
@@ -180,7 +180,7 @@ build_shards_by_range(DbName, DocProps) ->
                 node = to_atom(Node),
                 range = [Beg, End],
                 order = Order,
-                opts = get_engine_opt(DocProps)
+                opts = get_engine_opt(DocProps) ++ get_opts(DocProps)
             }, Suffix)
         end, lists:zip(Nodes, lists:seq(1, length(Nodes))))
     end, ByRange).
@@ -196,6 +196,14 @@ to_integer(N) when is_binary(N) ->
     list_to_integer(binary_to_list(N));
 to_integer(N) when is_list(N) ->
     list_to_integer(N).
+
+get_opts(DocProps) ->
+    case couch_util:get_value(<<"options">>, DocProps) of
+        {Opts} ->
+            Opts;
+        _ ->
+            []
+    end.
 
 get_engine_opt(DocProps) ->
     case couch_util:get_value(<<"engine">>, DocProps) of
