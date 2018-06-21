@@ -11,6 +11,9 @@
 % the License.
 
 -module(couch_httpd_auth).
+
+-compile(tuple_calls).
+
 -include_lib("couch/include/couch_db.hrl").
 
 -export([party_mode_handler/1]).

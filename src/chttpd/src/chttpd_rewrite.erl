@@ -16,6 +16,9 @@
 %% @doc Module for URL rewriting by pattern matching.
 
 -module(chttpd_rewrite).
+
+-compile(tuple_calls).
+
 -export([handle_rewrite_req/3]).
 -include_lib("couch/include/couch_db.hrl").
 

@@ -11,6 +11,9 @@
 % the License.
 
 -module(chttpd_db).
+
+-compile(tuple_calls).
+
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
