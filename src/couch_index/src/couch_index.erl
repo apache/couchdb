@@ -13,6 +13,8 @@
 -module(couch_index).
 -behaviour(gen_server).
 
+-compile(tuple_calls).
+
 -vsn(3).
 
 %% API
