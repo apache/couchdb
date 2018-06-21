@@ -94,7 +94,7 @@ ErlOpts = case os:getenv("ERL_OPTS") of
 end,
 
 AddConfig = [
-    {require_otp_vsn, "R16B03|R16B03-1|17|18|19|20"},
+    {require_otp_vsn, "R16B03|R16B03-1|17|18|19|20|21"},
     {deps_dir, "src"},
     {deps, lists:map(MakeDep, DepDescs)},
     {sub_dirs, SubDirs},
