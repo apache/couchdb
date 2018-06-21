@@ -129,7 +129,7 @@ append_term_md5(Fd, Term, Options) ->
 
 append_binary(Fd, Bin) ->
     ioq:call(Fd, {append_bin, assemble_file_chunk(Bin)}, erlang:get(io_priority)).
-    
+
 append_binary_md5(Fd, Bin) ->
     ioq:call(Fd,
         {append_bin, assemble_file_chunk(Bin, crypto:hash(md5, Bin))},
@@ -701,7 +701,8 @@ is_idle(#file{is_sys=true}) ->
     end;
 is_idle(#file{is_sys=false}) ->
     Tracker = whereis(couch_stats_process_tracker),
-    case process_info(self(), monitored_by) of
+    {monitored_by, PidsAndRefs} = process_info(self(), monitored_by),
+    case lists:filter(fun is_pid/1, PidsAndRefs) of
         {monitored_by, []} -> true;
         {monitored_by, [Tracker]} -> true;
         {monitored_by, [_]} -> exit(tracker_monitoring_failed);

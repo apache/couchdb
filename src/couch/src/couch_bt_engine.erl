@@ -185,7 +185,7 @@ decref(St) ->
 monitored_by(St) ->
     case erlang:process_info(St#st.fd, monitored_by) of
         {monitored_by, Pids} ->
-            Pids;
+            lists:filter(fun is_pid/1, Pids);
         _ ->
             []
     end.
