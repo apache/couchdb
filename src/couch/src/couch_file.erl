@@ -695,19 +695,22 @@ split_iolist([Sublist| Rest], SplitAt, BeginAcc) when is_list(Sublist) ->
 split_iolist([Byte | Rest], SplitAt, BeginAcc) when is_integer(Byte) ->
     split_iolist(Rest, SplitAt - 1, [Byte | BeginAcc]).
 
+monitored_by_pids() ->
+    {monitored_by, PidsAndRefs} = process_info(self(), monitored_by),
+    lists:filter(fun is_pid/1, PidsAndRefs).
 
 % System dbs aren't monitored by couch_stats_process_tracker
 is_idle(#file{is_sys=true}) ->
-    case process_info(self(), monitored_by) of
-        {monitored_by, []} -> true;
+    case monitored_by_pids() of
+        [] -> true;
         _ -> false
     end;
 is_idle(#file{is_sys=false}) ->
     Tracker = whereis(couch_stats_process_tracker),
-    case process_info(self(), monitored_by) of
-        {monitored_by, []} -> true;
-        {monitored_by, [Tracker]} -> true;
-        {monitored_by, [_]} -> exit(tracker_monitoring_failed);
+    case monitored_by_pids() of
+        [] -> true;
+        [Tracker] -> true;
+        [_] -> exit(tracker_monitoring_failed);
         _ -> false
     end.
 
