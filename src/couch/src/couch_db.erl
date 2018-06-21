@@ -584,6 +584,10 @@ get_db_info(Db) ->
         undefined -> null;
         Else1 -> Else1
     end,
+    Props = case couch_db_engine:get_props(Db) of
+        undefined -> null;
+        Else2 -> {Else2}
+    end,
     InfoList = [
         {db_name, Name},
         {engine, couch_db_engine:get_engine(Db)},
@@ -605,6 +609,7 @@ get_db_info(Db) ->
         {disk_format_version, DiskVersion},
         {committed_update_seq, CommittedUpdateSeq},
         {compacted_seq, CompactedSeq},
+        {props, Props},
         {uuid, Uuid}
     ],
     {ok, InfoList}.
