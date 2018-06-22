@@ -67,8 +67,14 @@ defmodule Couch do
 
 
   def process_options(options) do
+
     if Keyword.get(options, :cookie) == nil do
-      Keyword.put(options, :basic_auth, {"adm", "pass"})
+      headers = Keyword.get(options, :headers, [])
+      if headers[:basic_auth] != nil or headers[:authorization] != nil do
+        options
+      else
+        Keyword.put(options, :basic_auth, {"adm", "pass"})
+      end
     else
       options
     end
