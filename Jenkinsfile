@@ -78,7 +78,32 @@ pipeline {
     // Build packages on supported platforms using esl's erlang
     stage('Test') {
       steps {
-        parallel(centos6: {
+        parallel(freebsd: {
+          node(label: 'couchdb && freebsd') {
+            timeout(time: 60, unit: "MINUTES") {
+              deleteDir()
+              unstash 'tarball'
+              withEnv(['HOME='+pwd()]) {
+                sh '''
+                  cwd=$(pwd)
+                  mkdir -p $COUCHDB_IO_LOG_DIR
+  
+                  # Build CouchDB from tarball & test
+                  builddir=$(mktemp -d)
+                  cd $builddir
+                  tar -xf $cwd/apache-couchdb-*.tar.gz
+                  cd apache-couchdb-*
+                  ./configure --with-curl
+                  gmake check || (build-aux/logfile-uploader.py && false)
+
+                  # No package build for FreeBSD at this time
+                '''
+              } // withEnv
+            } // timeout
+            deleteDir()
+          } // node
+        },
+        centos6: {
           node(label: 'ubuntu') {
             timeout(time: 60, unit: "MINUTES") {
               sh 'docker pull couchdbdev/centos-6-erlang-19.3.6'
