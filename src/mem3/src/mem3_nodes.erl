@@ -93,15 +93,7 @@ initialize_nodelist() ->
     DbName = config:get("mem3", "nodes_db", "_nodes"),
     {ok, Db} = mem3_util:ensure_exists(DbName),
     {ok, _} = couch_db:fold_docs(Db, fun first_fold/2, Db, []),
-    % add self if not already present
-    case ets:lookup(?MODULE, node()) of
-    [_] ->
-        ok;
-    [] ->
-        ets:insert(?MODULE, {node(), []}),
-        Doc = #doc{id = couch_util:to_binary(node())},
-        {ok, _} = couch_db:update_doc(Db, Doc, [])
-    end,
+    insert_if_missing(Db, [node() | mem3_seeds:get_seeds()]),
     Seq = couch_db:get_update_seq(Db),
     couch_db:close(Db),
     Seq.
@@ -145,3 +137,19 @@ changes_callback({change, {Change}, _}, _) ->
     {ok, couch_util:get_value(<<"seq">>, Change)};
 changes_callback(timeout, _) ->
     {ok, nil}.
+
+insert_if_missing(Db, Nodes) ->
+    Docs = lists:foldl(fun(Node, Acc) ->
+        case ets:lookup(?MODULE, Node) of
+            [_] ->
+                Acc;
+            [] ->
+                ets:insert(?MODULE, {Node, []}),
+                [#doc{id = couch_util:to_binary(Node)} | Acc]
+        end
+    end, [], Nodes),
+    if Docs =/= [] ->
+        {ok, _} = couch_db:update_docs(Db, Docs, []);
+    true ->
+        {ok, []}
+    end.
