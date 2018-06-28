@@ -19,6 +19,9 @@
 -export([start_link/0, get_active/0, get_queue/0, push/1, push/2,
     remove_node/1, remove_shard/1, initial_sync/1, get_backlog/0, nodes_db/0,
     shards_db/0, users_db/0, find_next_node/0]).
+-export([
+    local_dbs/0
+]).
 
 -import(queue, [in/2, out/1, to_list/1, join/2, from_list/1, is_empty/1]).
 
