@@ -355,7 +355,7 @@ query_view(DbName, Options, DDoc, ViewName, Callback, Acc0, QueryArgs0) ->
     {ok, #mrst{views=Views, language=Lang}} =
         couch_mrview_util:ddoc_to_mrst(Db, DDoc),
     QueryArgs1 = couch_mrview_util:set_view_type(QueryArgs0, View, Views),
-    QueryArgs2 = couch_mrview_util:validate_args(QueryArgs1),
+    QueryArgs2 = couch_mrview_util:validate_and_update_args(QueryArgs1),
     VInfo = couch_mrview_util:extract_view(Lang, QueryArgs2, View, Views),
     case is_reduce_view(QueryArgs2) of
         true ->

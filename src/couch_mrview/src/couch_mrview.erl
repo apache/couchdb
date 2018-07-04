@@ -223,7 +223,7 @@ query_all_docs(Db, Args0, Callback, Acc) ->
         couch_index_util:hexsig(crypto:hash(md5, term_to_binary(Info)))
     end),
     Args1 = Args0#mrargs{view_type=map},
-    Args2 = couch_mrview_util:validate_args(Args1),
+    Args2 = couch_mrview_util:validate_and_update_args(Args1),
     {ok, Acc1} = case Args2#mrargs.preflight_fun of
         PFFun when is_function(PFFun, 2) -> PFFun(Sig, Acc);
         _ -> {ok, Acc}

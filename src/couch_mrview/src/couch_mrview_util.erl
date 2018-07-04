@@ -24,7 +24,7 @@
 -export([temp_view_to_ddoc/1]).
 -export([calculate_external_size/1]).
 -export([calculate_active_size/1]).
--export([validate_args/1]).
+-export([validate_and_update_args/1]).
 -export([maybe_load_doc/3, maybe_load_doc/4]).
 -export([maybe_update_index_file/1]).
 -export([extract_view/4, extract_view_reduce/1]).
@@ -59,7 +59,7 @@ get_view(Db, DDoc, ViewName, Args0) ->
 get_view_index_pid(Db, DDoc, ViewName, Args0) ->
     ArgCheck = fun(InitState) ->
         Args1 = set_view_type(Args0, ViewName, InitState#mrst.views),
-        {ok, validate_args(Args1)}
+        {ok, validate_and_update_args(Args1)}
     end,
     couch_index_server:get_index(?MOD, Db, DDoc, ArgCheck).
 
@@ -546,6 +546,17 @@ validate_args(Args) ->
         {red, _} -> mrverror(<<"`conflicts` is invalid for reduce views.">>)
     end,
 
+    case is_boolean(Args#mrargs.sorted) of
+        true -> ok;
+        _ -> mrverror(<<"Invalid value for `sorted`.">>)
+    end,
+
+    true.
+
+
+update_args(#mrargs{} = Args) ->
+    GroupLevel = determine_group_level(Args),
+
     SKDocId = case {Args#mrargs.direction, Args#mrargs.start_key_docid} of
         {fwd, undefined} -> <<>>;
         {rev, undefined} -> <<255>>;
@@ -558,16 +569,16 @@ validate_args(Args) ->
         {_, EKDocId1} -> EKDocId1
     end,
 
-    case is_boolean(Args#mrargs.sorted) of
-        true -> ok;
-        _ -> mrverror(<<"Invalid value for `sorted`.">>)
-    end,
-
     Args#mrargs{
         start_key_docid=SKDocId,
         end_key_docid=EKDocId,
         group_level=GroupLevel
     }.
+
+
+validate_and_update_args(#mrargs{} = Args) ->
+    true = validate_args(Args),
+    update_args(Args).
 
 
 determine_group_level(#mrargs{group=undefined, group_level=undefined}) ->

@@ -663,7 +663,7 @@ multi_all_docs_view(Req, Db, OP, Queries) ->
     ArgQueries = lists:map(fun({Query}) ->
         QueryArg1 = couch_mrview_http:parse_params(Query, undefined,
             Args1, [decoded]),
-        QueryArgs2 = couch_mrview_util:validate_args(QueryArg1),
+        QueryArgs2 = couch_mrview_util:validate_and_update_args(QueryArg1),
         set_namespace(OP, QueryArgs2)
     end, Queries),
     Options = [{user_ctx, Req#httpd.user_ctx}],
@@ -683,7 +683,7 @@ multi_all_docs_view(Req, Db, OP, Queries) ->
 all_docs_view(Req, Db, Keys, OP) ->
     Args0 = couch_mrview_http:parse_params(Req, Keys),
     Args1 = Args0#mrargs{view_type=map},
-    Args2 = couch_mrview_util:validate_args(Args1),
+    Args2 = couch_mrview_util:validate_and_update_args(Args1),
     Args3 = set_namespace(OP, Args2),
     Options = [{user_ctx, Req#httpd.user_ctx}],
     Max = chttpd:chunked_response_buffer_size(),

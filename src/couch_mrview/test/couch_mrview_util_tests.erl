@@ -34,6 +34,6 @@ couch_mrview_util_test_() ->
 
 validate_group_level(Group, GroupLevel) ->
     Args0 = #mrargs{group=Group, group_level=GroupLevel, view_type=red},
-    Args1 = couch_mrview_util:validate_args(Args0),
+    Args1 = couch_mrview_util:validate_and_update_args(Args0),
     Args1#mrargs.group_level.
 

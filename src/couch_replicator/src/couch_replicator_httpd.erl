@@ -124,7 +124,7 @@ handle_scheduler_docs(Db, Req) when is_binary(Db) ->
         reduce = false,
         extra = [{filter_states, States}]
     },
-    VArgs2 = couch_mrview_util:validate_args(VArgs1),
+    VArgs2 = couch_mrview_util:validate_and_update_args(VArgs1),
     Opts = [{user_ctx, Req#httpd.user_ctx}],
     Max = chttpd:chunked_response_buffer_size(),
     Acc = couch_replicator_httpd_util:docs_acc_new(Req, Db, Max),

@@ -296,7 +296,7 @@ multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
     {ok, _, _, Args1} = couch_mrview_util:get_view(Db, DDoc, ViewName, Args0),
     ArgQueries = lists:map(fun({Query}) ->
         QueryArg = parse_params(Query, undefined, Args1),
-        couch_mrview_util:validate_args(QueryArg)
+        couch_mrview_util:validate_and_update_args(QueryArg)
     end, Queries),
     {ok, Resp2} = couch_httpd:etag_maybe(Req, fun() ->
         Max = chttpd:chunked_response_buffer_size(),
