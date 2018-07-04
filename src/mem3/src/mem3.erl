@@ -239,7 +239,7 @@ belongs(DbName, DocId) when is_binary(DbName), is_binary(DocId) ->
     true.
 
 belongs(Begin, End, DocId) ->
-    HashKey = mem3_util:hash(DocId),
+    HashKey = mem3_util:docid_hash(DocId),
     Begin =< HashKey andalso HashKey =< End.
 
 range(#shard{range = Range}) ->

@@ -16,6 +16,7 @@
     n_val/2, to_atom/1, to_integer/1, write_db_doc/1, delete_db_doc/1,
     shard_info/1, ensure_exists/1, open_db_doc/1]).
 -export([is_deleted/1, rotate_list/2]).
+-export([docid_hash/1, docid_hash/2]).
 
 %% do not use outside mem3.
 -export([build_ordered_shards/2, downcast/1]).
@@ -33,6 +34,20 @@ hash(Item) when is_binary(Item) ->
     erlang:crc32(Item);
 hash(Item) ->
     erlang:crc32(term_to_binary(Item)).
+
+
+docid_hash(DocId) when is_binary(DocId) ->
+    docid_hash(DocId, []).
+
+docid_hash(DocId, Options) when is_binary(DocId), is_list(Options) ->
+    Data = case lists:member(partitioned, Options) of
+        true ->
+            hd(binary:split(DocId, <<":">>));
+        false ->
+            DocId
+    end,
+    erlang:crc32(Data).
+
 
 name_shard(Shard) ->
     name_shard(Shard, "").
