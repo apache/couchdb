@@ -525,7 +525,7 @@ handle_call({delete, DbName, Options}, _From, Server) ->
         DelOpt = [{context, delete} | Options],
 
         % Make sure and remove all compaction data
-        delete_compaction_files(DbNameList, DelOpt),
+        delete_compaction_files(DbNameList, Options),
 
         {ok, {Engine, FilePath}} = get_engine(Server, DbNameList),
         RootDir = Server#server.root_dir,
