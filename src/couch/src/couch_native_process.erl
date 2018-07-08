@@ -226,6 +226,18 @@ ddoc(State, {_, Fun}, [<<"filters">>|_], [Docs, Req]) ->
     end,
     Resp = lists:map(FilterFunWrapper, Docs),
     {State, [true, Resp]};
+ddoc(State, {_, Fun}, [<<"views">>|_], [Docs]) ->
+    MapFunWrapper = fun(Doc) ->
+        case catch Fun(Doc) of
+        undefined -> true;
+        ok -> false;
+        false -> false;
+        [_|_] -> true;
+        {'EXIT', Error} -> couch_log:error("~p", [Error])
+        end
+    end,
+    Resp = lists:map(MapFunWrapper, Docs),
+    {State, [true, Resp]};
 ddoc(State, {_, Fun}, [<<"shows">>|_], Args) ->
     Resp = case (catch apply(Fun, Args)) of
         FunResp when is_list(FunResp) ->

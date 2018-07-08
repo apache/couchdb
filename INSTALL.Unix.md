@@ -137,8 +137,10 @@ You can install this by running:
 
 You can install the remaining dependencies by running:
 
-    pkg install npm4 help2man openssl icu curl git \
-        autoconf automake libtool node spidermonkey185
+    pkg install help2man openssl icu curl git bash \
+        autoconf automake libtool node spidermonkey185 \
+        erlang node8 npm-node8 lang/python py27-sphinx py27-pip
+    pip install --upgrade sphinx_rtd_theme nose requests hypothesis
 
 ## Installing
 

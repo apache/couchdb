@@ -504,23 +504,24 @@ merge_rev_trees(Limit, MergeConflicts, [NewDocs|RestDocsList],
         [OldDocInfo|RestOldInfo], AccNewInfos, AccRemoveSeqs, AccSeq) ->
     erlang:put(last_id_merged, OldDocInfo#full_doc_info.id), % for debugging
     NewDocInfo0 = lists:foldl(fun({Client, NewDoc}, OldInfoAcc) ->
-        merge_rev_tree(OldInfoAcc, NewDoc, Client, Limit, MergeConflicts)
+        merge_rev_tree(OldInfoAcc, NewDoc, Client, MergeConflicts)
     end, OldDocInfo, NewDocs),
+    NewDocInfo1 = stem_full_doc_info(NewDocInfo0, Limit),
     % When MergeConflicts is false, we updated #full_doc_info.deleted on every
     % iteration of merge_rev_tree. However, merge_rev_tree does not update
     % #full_doc_info.deleted when MergeConflicts is true, since we don't need
     % to know whether the doc is deleted between iterations. Since we still
     % need to know if the doc is deleted after the merge happens, we have to
     % set it here.
-    NewDocInfo1 = case MergeConflicts of
+    NewDocInfo2 = case MergeConflicts of
         true ->
-            NewDocInfo0#full_doc_info{
-                deleted = couch_doc:is_deleted(NewDocInfo0)
+            NewDocInfo1#full_doc_info{
+                deleted = couch_doc:is_deleted(NewDocInfo1)
             };
         false ->
-            NewDocInfo0
+            NewDocInfo1
     end,
-    if NewDocInfo1 == OldDocInfo ->
+    if NewDocInfo2 == OldDocInfo ->
         % nothing changed
         merge_rev_trees(Limit, MergeConflicts, RestDocsList, RestOldInfo,
             AccNewInfos, AccRemoveSeqs, AccSeq);
@@ -529,7 +530,7 @@ merge_rev_trees(Limit, MergeConflicts, [NewDocs|RestDocsList],
         % important to note that the update_seq on OldDocInfo should
         % be identical to the value on NewDocInfo1.
         OldSeq = OldDocInfo#full_doc_info.update_seq,
-        NewDocInfo2 = NewDocInfo1#full_doc_info{
+        NewDocInfo3 = NewDocInfo2#full_doc_info{
             update_seq = AccSeq + 1
         },
         RemoveSeqs = case OldSeq of
@@ -537,10 +538,10 @@ merge_rev_trees(Limit, MergeConflicts, [NewDocs|RestDocsList],
             _ -> [OldSeq | AccRemoveSeqs]
         end,
         merge_rev_trees(Limit, MergeConflicts, RestDocsList, RestOldInfo,
-            [NewDocInfo2|AccNewInfos], RemoveSeqs, AccSeq+1)
+            [NewDocInfo3|AccNewInfos], RemoveSeqs, AccSeq+1)
     end.
 
-merge_rev_tree(OldInfo, NewDoc, Client, Limit, false)
+merge_rev_tree(OldInfo, NewDoc, Client, false)
         when OldInfo#full_doc_info.deleted ->
     % We're recreating a document that was previously
     % deleted. To check that this is a recreation from
@@ -574,7 +575,7 @@ merge_rev_tree(OldInfo, NewDoc, Client, Limit, false)
             % Merge our modified new doc into the tree
             #full_doc_info{rev_tree=OldTree} = OldInfo,
             NewTree0 = couch_doc:to_path(NewDoc2),
-            case couch_key_tree:merge(OldTree, NewTree0, Limit) of
+            case couch_key_tree:merge(OldTree, NewTree0) of
                 {NewTree1, new_leaf} ->
                     % We changed the revision id so inform the caller
                     send_result(Client, NewDoc, {ok, {OldPos+1, NewRevId}}),
@@ -589,7 +590,7 @@ merge_rev_tree(OldInfo, NewDoc, Client, Limit, false)
             send_result(Client, NewDoc, conflict),
             OldInfo
     end;
-merge_rev_tree(OldInfo, NewDoc, Client, Limit, false) ->
+merge_rev_tree(OldInfo, NewDoc, Client, false) ->
     % We're attempting to merge a new revision into an
     % undeleted document. To not be a conflict we require
     % that the merge results in extending a branch.
@@ -597,7 +598,7 @@ merge_rev_tree(OldInfo, NewDoc, Client, Limit, false) ->
     OldTree = OldInfo#full_doc_info.rev_tree,
     NewTree0 = couch_doc:to_path(NewDoc),
     NewDeleted = NewDoc#doc.deleted,
-    case couch_key_tree:merge(OldTree, NewTree0, Limit) of
+    case couch_key_tree:merge(OldTree, NewTree0) of
         {NewTree, new_leaf} when not NewDeleted ->
             OldInfo#full_doc_info{
                 rev_tree = NewTree,
@@ -615,13 +616,17 @@ merge_rev_tree(OldInfo, NewDoc, Client, Limit, false) ->
             send_result(Client, NewDoc, conflict),
             OldInfo
     end;
-merge_rev_tree(OldInfo, NewDoc, _Client, Limit, true) ->
+merge_rev_tree(OldInfo, NewDoc, _Client, true) ->
     % We're merging in revisions without caring about
     % conflicts. Most likely this is a replication update.
     OldTree = OldInfo#full_doc_info.rev_tree,
     NewTree0 = couch_doc:to_path(NewDoc),
-    {NewTree, _} = couch_key_tree:merge(OldTree, NewTree0, Limit),
+    {NewTree, _} = couch_key_tree:merge(OldTree, NewTree0),
     OldInfo#full_doc_info{rev_tree = NewTree}.
+
+stem_full_doc_info(#full_doc_info{rev_tree = Tree} = Info, Limit) ->
+    Stemmed = couch_key_tree:stem(Tree, Limit),
+    Info#full_doc_info{rev_tree = Stemmed}.
 
 update_docs_int(Db, DocsList, LocalDocs, MergeConflicts, FullCommit) ->
     UpdateSeq = couch_db_engine:get_update_seq(Db),
