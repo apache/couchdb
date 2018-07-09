@@ -582,8 +582,8 @@ parse_param(Key, Val, Args, IsDecoded) ->
             Args#mrargs{callback=couch_util:to_binary(Val)};
         "sorted" ->
             Args#mrargs{sorted=parse_boolean(Val)};
-        "partition_key" ->
-            Args#mrargs{partition_key=couch_util:to_binary(Val)};
+        "partition" ->
+            Args#mrargs{partition=couch_util:to_binary(Val)};
         _ ->
             BKey = couch_util:to_binary(Key),
             BVal = couch_util:to_binary(Val),

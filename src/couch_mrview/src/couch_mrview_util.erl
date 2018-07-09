@@ -560,15 +560,15 @@ validate_args(Args) ->
         _ -> mrverror(<<"Invalid value for `sorted`.">>)
     end,
 
-    case {Args#mrargs.partitioned, Args#mrargs.partition_key} of
+    case {Args#mrargs.partitioned, Args#mrargs.partition} of
         {true, undefined} ->
-            mrverror(<<"`partition_key` parameter is mandatory for queries to this database.">>);
-        {true, _PartitionKey} ->
+            mrverror(<<"`partition` parameter is mandatory for queries to this database.">>);
+        {true, _Partition} ->
             ok;
         {undefined, undefined} ->
             ok;
-        {undefined, _PartitionKey} ->
-            mrverror(<<"`partition_key` parameter is not supported in this database.">>)
+        {undefined, _Partition} ->
+            mrverror(<<"`partition` parameter is not supported in this database.">>)
     end,
     Args.
 
@@ -592,23 +592,23 @@ update_args(#mrargs{} = Args) ->
     HighestKey = {[{<<239, 191, 176>>, null}]}, % \ufff0
 
     {StartKey, EndKey} = case Args of
-        #mrargs{partition_key=undefined} ->
+        #mrargs{partition=undefined} ->
             {Args#mrargs.start_key, Args#mrargs.end_key};
 
-        #mrargs{partition_key=PKey0} when not is_binary(PKey0) ->
-            mrverror(<<"`partition_key` must be a string.">>);
+        #mrargs{partition=P0} when not is_binary(P0) ->
+            mrverror(<<"`partition` must be a string.">>);
 
-        #mrargs{partition_key=PKey0, start_key=undefined, end_key=undefined} ->
-            {[PKey0, LowestKey], [PKey0, HighestKey]};
+        #mrargs{partition=P0, start_key=undefined, end_key=undefined} ->
+            {[P0, LowestKey], [P0, HighestKey]};
 
-        #mrargs{partition_key=PKey0, start_key=SK0, end_key=undefined} ->
-            {[PKey0, SK0], [PKey0, HighestKey]};
+        #mrargs{partition=P0, start_key=SK0, end_key=undefined} ->
+            {[P0, SK0], [P0, HighestKey]};
 
-        #mrargs{partition_key=PKey0, start_key=undefined, end_key=EK0} ->
-            {[PKey0, LowestKey], [PKey0, EK0]};
+        #mrargs{partition=P0, start_key=undefined, end_key=EK0} ->
+            {[P0, LowestKey], [P0, EK0]};
 
-        #mrargs{partition_key=PKey0, start_key=SK0, end_key=EK0} ->
-            {[PKey0, SK0], [PKey0, EK0]}
+        #mrargs{partition=P0, start_key=SK0, end_key=EK0} ->
+            {[P0, SK0], [P0, EK0]}
     end,
 
     Args#mrargs{

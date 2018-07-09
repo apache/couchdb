@@ -89,7 +89,7 @@
     callback,
     sorted = true,
     partitioned,
-    partition_key,
+    partition,
     extra = []
 }).
 
