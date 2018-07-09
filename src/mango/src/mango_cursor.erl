@@ -48,18 +48,12 @@
 create(Db, Selector0, Opts) ->
     Selector = mango_selector:normalize(Selector0),
     UsableIndexes = mango_idx:get_usable_indexes(Db, Selector, Opts),
-    case length(UsableIndexes) of
-        0 ->
-            AllDocs = mango_idx:special(Db),
-            create_cursor(Db, AllDocs, Selector, Opts);
-        _ ->
-            case mango_cursor:maybe_filter_indexes_by_ddoc(UsableIndexes, Opts) of
-                [] ->
-                    % use_index doesn't match a valid index - fall back to a valid one
-                    create_cursor(Db, UsableIndexes, Selector, Opts);
-                UserSpecifiedIndex ->
-                    create_cursor(Db, UserSpecifiedIndex, Selector, Opts)
-            end
+    case mango_cursor:maybe_filter_indexes_by_ddoc(UsableIndexes, Opts) of
+        [] ->
+            % use_index doesn't match a valid index - fall back to a valid one
+            create_cursor(Db, UsableIndexes, Selector, Opts);
+        UserSpecifiedIndex ->
+            create_cursor(Db, UserSpecifiedIndex, Selector, Opts)
     end.
 
 

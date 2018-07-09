@@ -30,20 +30,23 @@ DESTDIR=
 
 # Rebar options
 apps=
-skip_deps=folsom,meck,mochiweb,proper,snappy
+skip_deps=folsom,meck,mochiweb,triq,snappy,bcrypt,hyper
 suites=
 tests=
 
+COMPILE_OPTS=$(shell echo "\
+	apps=$(apps) \
+	" | sed -e 's/[a-z_]\{1,\}= / /g')
 EUNIT_OPTS=$(shell echo "\
 	apps=$(apps) \
 	skip_deps=$(skip_deps) \
 	suites=$(suites) \
 	tests=$(tests) \
-	" | sed -e 's/[a-z]\+= / /g')
+	" | sed -e 's/[a-z]\{1,\}= / /g')
 DIALYZE_OPTS=$(shell echo "\
 	apps=$(apps) \
 	skip_deps=$(skip_deps) \
-	" | sed -e 's/[a-z]\+= / /g')
+	" | sed -e 's/[a-z]\{1,\}= / /g')
 
 #ignore javascript tests
 ignore_js_suites=
@@ -73,9 +76,9 @@ help:
 
 
 .PHONY: couch
-# target: couch - Build CouchDB core
+# target: couch - Build CouchDB core, use ERL_OPTS to provide custom compiler's options
 couch: config.erl
-	@COUCHDB_VERSION=$(COUCHDB_VERSION) $(REBAR) compile
+	@COUCHDB_VERSION=$(COUCHDB_VERSION) $(REBAR) compile $(COMPILE_OPTS)
 	@cp src/couch/priv/couchjs bin/
 
 

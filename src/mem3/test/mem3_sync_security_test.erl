@@ -19,11 +19,14 @@
 
 go_test() ->
     Ctx = test_util:start_couch([fabric, mem3]),
-    ok = meck:new(fabric, [passthrough]),
-    meck:expect(fabric, all_dbs, fun() ->
-        {ok, [<<"NoExistDb1">>, <<"NoExistDb2">>]}
-    end),
-    Result = mem3_sync_security:go(),
-    meck:unload(fabric),
-    test_util:stop_couch(Ctx),
-    ?assertEqual(ok, Result).
+    try
+        ok = meck:new(fabric, [passthrough]),
+        meck:expect(fabric, all_dbs, fun() ->
+            {ok, [<<"NoExistDb1">>, <<"NoExistDb2">>]}
+        end),
+        Result = mem3_sync_security:go(),
+        ?assertEqual(ok, Result)
+    after
+        meck:unload(),
+        test_util:stop_couch(Ctx)
+    end.

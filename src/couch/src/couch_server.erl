@@ -210,6 +210,8 @@ close_db_if_idle(DbName) ->
 
 
 init([]) ->
+    couch_util:set_mqd_off_heap(),
+
     % Mark pluggable storage engines as a supported feature
     config:enable_feature('pluggable-storage-engines'),
 
@@ -223,7 +225,7 @@ init([]) ->
     MaxDbsOpen = list_to_integer(
             config:get("couchdb", "max_dbs_open", integer_to_list(?MAX_DBS_OPEN))),
     UpdateLruOnRead =
-        config:get("couchdb", "update_lru_on_read", "true") =:= "true",
+        config:get("couchdb", "update_lru_on_read", "false") =:= "true",
     ok = config:listen_for_changes(?MODULE, nil),
     ok = couch_file:init_delete_dir(RootDir),
     hash_admin_passwords(),
@@ -523,7 +525,7 @@ handle_call({delete, DbName, Options}, _From, Server) ->
         DelOpt = [{context, delete} | Options],
 
         % Make sure and remove all compaction data
-        delete_compaction_files(DbNameList, DelOpt),
+        delete_compaction_files(DbNameList, Options),
 
         {ok, {Engine, FilePath}} = get_engine(Server, DbNameList),
         RootDir = Server#server.root_dir,
