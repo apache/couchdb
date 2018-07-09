@@ -354,16 +354,20 @@ query_view(DbName, Options, DDoc, ViewName, Callback, Acc0, QueryArgs0) ->
     end,
     {ok, #mrst{views=Views, language=Lang}} =
         couch_mrview_util:ddoc_to_mrst(Db, DDoc),
+
+    Partitioned = mem3:is_partitioned(hd(mem3:shards(Db))), % hideous
+
     QueryArgs1 = couch_mrview_util:set_view_type(QueryArgs0, View, Views),
-    QueryArgs2 = couch_mrview_util:validate_and_update_args(QueryArgs1),
-    VInfo = couch_mrview_util:extract_view(Lang, QueryArgs2, View, Views),
-    case is_reduce_view(QueryArgs2) of
+    QueryArgs2 = couch_mrview_util:set_view_options(QueryArgs1, partitioned, Partitioned),
+    QueryArgs3 = couch_mrview_util:validate_and_update_args(QueryArgs2),
+    VInfo = couch_mrview_util:extract_view(Lang, QueryArgs3, View, Views),
+    case is_reduce_view(QueryArgs3) of
         true ->
             fabric_view_reduce:go(
                 Db,
                 DDoc,
                 View,
-                QueryArgs2,
+                QueryArgs3,
                 Callback,
                 Acc0,
                 VInfo
@@ -374,7 +378,7 @@ query_view(DbName, Options, DDoc, ViewName, Callback, Acc0, QueryArgs0) ->
                 Options,
                 DDoc,
                 View,
-                QueryArgs2,
+                QueryArgs3,
                 Callback,
                 Acc0,
                 VInfo

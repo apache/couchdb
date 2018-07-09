@@ -24,7 +24,7 @@
 -export([temp_view_to_ddoc/1]).
 -export([calculate_external_size/1]).
 -export([calculate_active_size/1]).
--export([validate_and_update_args/1, validate_and_update_args/2]).
+-export([validate_args/1, validate_and_update_args/1]).
 -export([maybe_load_doc/3, maybe_load_doc/4]).
 -export([maybe_update_index_file/1]).
 -export([extract_view/4, extract_view_reduce/1]).
@@ -33,6 +33,7 @@
 -export([changes_key_opts/2]).
 -export([fold_changes/4]).
 -export([to_key_seq/1]).
+-export([set_view_options/3]).
 -export([partition_key/2, unpartition_key/1]).
 
 -define(MOD, couch_mrview_index).
@@ -60,7 +61,7 @@ get_view(Db, DDoc, ViewName, Args0) ->
 get_view_index_pid(Db, DDoc, ViewName, Args0) ->
     ArgCheck = fun(InitState) ->
         Args1 = set_view_type(Args0, ViewName, InitState#mrst.views),
-        {ok, validate_and_update_args(Args1)}
+        {ok, validate_args(Args1)}
     end,
     couch_index_server:get_index(?MOD, Db, DDoc, ArgCheck).
 
@@ -449,7 +450,7 @@ fold_reduce({NthRed, Lang, View}, Fun,  Acc, Options) ->
     couch_btree:fold_reduce(Bt, WrapperFun, Acc, Options).
 
 
-validate_args(Args, Options) ->
+validate_args(Args) ->
     GroupLevel = determine_group_level(Args),
     Reduce = Args#mrargs.reduce,
     case Reduce == undefined orelse is_boolean(Reduce) of
@@ -559,21 +560,20 @@ validate_args(Args, Options) ->
         _ -> mrverror(<<"Invalid value for `sorted`.">>)
     end,
 
-    case {lists:member(partitioned, Options), Args#mrargs.partition_key} of
+    case {Args#mrargs.partitioned, Args#mrargs.partition_key} of
         {true, undefined} ->
             mrverror(<<"`partition_key` parameter is mandatory for queries to this database.">>);
         {true, _PartitionKey} ->
             ok;
-        {false, undefined} ->
+        {undefined, undefined} ->
             ok;
-        {false, _PartitionKey} ->
+        {undefined, _PartitionKey} ->
             mrverror(<<"`partition_key` parameter is not supported in this database.">>)
     end,
+    Args.
 
-    true.
 
-
-update_args(#mrargs{} = Args, _Options) ->
+update_args(#mrargs{} = Args) ->
     GroupLevel = determine_group_level(Args),
 
     SKDocId = case {Args#mrargs.direction, Args#mrargs.start_key_docid} of
@@ -621,11 +621,8 @@ update_args(#mrargs{} = Args, _Options) ->
 
 
 validate_and_update_args(#mrargs{} = Args) ->
-    validate_and_update_args(Args, []).
-
-validate_and_update_args(#mrargs{} = Args, Options) ->
-    true = validate_args(Args, Options),
-    update_args(Args, Options).
+    Args = validate_args(Args),
+    update_args(Args).
 
 
 determine_group_level(#mrargs{group=undefined, group_level=undefined}) ->
@@ -1259,6 +1256,10 @@ kv_external_size(KVList, Reduction) ->
         ?term_size(Key) + ?term_size(Value) + Acc
     end, ?term_size(Reduction), KVList).
 
+set_view_options(#mrargs{} = Args, partitioned, true) ->
+    Args#mrargs{partitioned=true};
+set_view_options(#mrargs{} = Args, partitioned, false) ->
+    Args#mrargs{partitioned=false}.
 
 partition_key(Key, DocId) ->
     [hd(binary:split(DocId, <<":">>)), Key].

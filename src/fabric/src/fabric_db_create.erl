@@ -168,6 +168,10 @@ make_document([#shard{dbname=DbName}|_] = Shards, Suffix, Options) ->
         E when is_binary(E) -> [{<<"engine">>, E}];
         _ -> []
     end,
+    PartitionedProp = case lists:member(partitioned, Options) of
+        true  -> [{<<"partitioned">>, true}];
+        false -> []
+    end,
     #doc{
         id = DbName,
         body = {[
@@ -175,7 +179,7 @@ make_document([#shard{dbname=DbName}|_] = Shards, Suffix, Options) ->
             {<<"changelog">>, lists:sort(RawOut)},
             {<<"by_node">>, {[{K,lists:sort(V)} || {K,V} <- ByNodeOut]}},
             {<<"by_range">>, {[{K,lists:sort(V)} || {K,V} <- ByRangeOut]}}
-        ] ++ EngineProp}
+        ] ++ EngineProp ++ PartitionedProp}
     }.
 
 db_exists(DbName) -> is_list(catch mem3:shards(DbName)).

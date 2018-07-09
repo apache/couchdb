@@ -23,7 +23,7 @@
 -export([get_placement/1]).
 
 %% For mem3 use only.
--export([name/1, node/1, range/1, engine/1]).
+-export([name/1, node/1, range/1, engine/1, is_partitioned/1]).
 
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
@@ -330,6 +330,14 @@ engine(Opts) when is_list(Opts) ->
         _ ->
             []
     end.
+
+is_partitioned(#shard{opts=Opts}) ->
+    is_partitioned(Opts);
+is_partitioned(#ordered_shard{opts=Opts}) ->
+    is_partitioned(Opts);
+is_partitioned(Opts) when is_list(Opts) ->
+    lists:member(partitioned, Opts).
+
 
 -ifdef(TEST).
 
