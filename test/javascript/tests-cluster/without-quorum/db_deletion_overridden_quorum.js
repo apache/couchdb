@@ -19,11 +19,7 @@ couchTests.db_deletion_overridden_quorum = function(debug) {
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"},{"w":1});
   db.createDb();
 
-
-  //db.deleteDb();
-  // TODO DB deletions fails if the quorum is not met.
+  // DB deletions does not consider overriden quorum param.
   xhr = CouchDB.request("DELETE", "/" + db_name + "/");
-  //T(db.last_req.status="200","Should return 200");
-  console.log("Skipped-TODO: Fix issue 500 Error on delete - Not considering overriden quorum. 200->"+xhr.status);
-
+  T(db.last_req.status="202","Should return 202");
 };
