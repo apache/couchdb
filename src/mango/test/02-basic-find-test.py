@@ -333,3 +333,10 @@ class BasicFindTests(mango.UserDocsTests):
         assert explain["mrargs"]["start_key"] == [0]
         assert explain["mrargs"]["end_key"] == ["<MAX>"]
         assert explain["mrargs"]["include_docs"] == True
+
+    def test_sort_with_all_docs(self):
+        explain = self.db.find({
+            "_id": {"$gt": 0},
+            "age": {"$gt": 0}
+        }, sort=["_id"], explain=True)
+        self.assertEquals(explain["index"]["type"], "special")

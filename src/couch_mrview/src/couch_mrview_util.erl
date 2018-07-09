@@ -23,6 +23,7 @@
 -export([fold/4, fold_reduce/4]).
 -export([temp_view_to_ddoc/1]).
 -export([calculate_external_size/1]).
+-export([calculate_active_size/1]).
 -export([validate_args/1]).
 -export([maybe_load_doc/3, maybe_load_doc/4]).
 -export([maybe_update_index_file/1]).
@@ -196,7 +197,7 @@ extract_view(Lang, #mrargs{view_type=red}=Args, Name, [View | Rest]) ->
 view_sig(Db, State, View, #mrargs{include_docs=true}=Args) ->
     BaseSig = view_sig(Db, State, View, Args#mrargs{include_docs=false}),
     UpdateSeq = couch_db:get_update_seq(Db),
-    PurgeSeq = couch_db:get_purge_seq(Db),
+    {ok, PurgeSeq} = couch_db:get_purge_seq(Db),
     #mrst{
         seq_indexed=SeqIndexed,
         keyseq_indexed=KeySeqIndexed
@@ -230,9 +231,10 @@ view_sig_term(BaseSig, UpdateSeq, PurgeSeq, KeySeqIndexed, SeqIndexed, Args) ->
 
 
 init_state(Db, Fd, #mrst{views=Views}=State, nil) ->
+    {ok, PurgeSeq} = couch_db:get_purge_seq(Db),
     Header = #mrheader{
         seq=0,
-        purge_seq=couch_db:get_purge_seq(Db),
+        purge_seq=PurgeSeq,
         id_btree_state=nil,
         log_btree_state=nil,
         view_states=[make_view_state(#mrview{}) || _ <- Views]
@@ -267,7 +269,9 @@ init_state(Db, Fd, State, Header) ->
         view_states=ViewStates
     } = Header,
 
-    IdBtOpts = [{compression, couch_db:compression(Db)}],
+    IdBtOpts = [
+        {compression, couch_compress:get_compression_method()}
+    ],
     {ok, IdBtree} = couch_btree:open(IdBtreeState, Fd, IdBtOpts),
     {ok, LogBtree} = case SeqIndexed orelse KeySeqIndexed of
         true -> couch_btree:open(LogBtreeState, Fd, IdBtOpts);
@@ -287,10 +291,10 @@ init_state(Db, Fd, State, Header) ->
         views=Views2
     }.
 
-open_view(Db, Fd, Lang, ViewState, View) ->
+open_view(_Db, Fd, Lang, ViewState, View) ->
     ReduceFun = make_reduce_fun(Lang, View#mrview.reduce_funs),
     LessFun = maybe_define_less_fun(View),
-    Compression = couch_db:compression(Db),
+    Compression = couch_compress:get_compression_method(),
     BTState = get_key_btree_state(ViewState),
     ViewBtOpts = [
         {less, LessFun},
@@ -354,7 +358,7 @@ get_row_count(#mrview{btree=Bt}) ->
 
 
 all_docs_reduce_to_count(Reductions) ->
-    Reduce = fun couch_db_updater:btree_by_id_reduce/2,
+    Reduce = fun couch_bt_engine:id_tree_reduce/2,
     {Count, _, _} = couch_btree:final_reduce(Reduce, Reductions),
     Count.
 
@@ -825,6 +829,22 @@ calculate_external_size(Views) ->
         end
     end,
     {ok, lists:foldl(SumFun, 0, Views)}.
+
+
+calculate_active_size(Views) ->
+    BtSize = fun
+        (nil) -> 0;
+        (Bt) -> couch_btree:size(Bt)
+    end,
+    FoldFun = fun(View, Acc) ->
+        Sizes = [
+            BtSize(View#mrview.btree),
+            BtSize(View#mrview.seq_btree),
+            BtSize(View#mrview.key_byseq_btree)
+        ],
+        Acc + lists:sum([S || S <- Sizes, is_integer(S)])
+    end,
+    {ok, lists:foldl(FoldFun, 0, Views)}.
 
 
 sum_btree_sizes(nil, _) ->

@@ -16,7 +16,8 @@
 -export([
     normalize/1,
     match/2,
-    has_required_fields/2
+    has_required_fields/2,
+    is_constant_field/2
 ]).
 
 
@@ -638,10 +639,120 @@ has_required_fields_int([{[{Field, Cond}]} | Rest], RequiredFields) ->
     end.
 
 
+% Returns true if a field in the selector is a constant value e.g. {a: {$eq: 1}}
+is_constant_field({[]}, _Field) ->
+    false;
+
+is_constant_field(Selector, Field) when not is_list(Selector) ->
+    is_constant_field([Selector], Field);
+
+is_constant_field([], _Field) ->
+    false;
+
+is_constant_field([{[{<<"$and">>, Args}]}], Field) when is_list(Args) ->
+    lists:any(fun(Arg) -> is_constant_field(Arg, Field) end, Args);
+
+is_constant_field([{[{<<"$and">>, Args}]}], Field) ->
+    is_constant_field(Args, Field);
+
+is_constant_field([{[{Field, {[{Cond, _Val}]}}]} | _Rest], Field) ->
+    Cond =:= <<"$eq">>;
+
+is_constant_field([{[{_UnMatched, _}]} | Rest], Field) ->
+    is_constant_field(Rest, Field).
+
+
 %%%%%%%% module tests below %%%%%%%%
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
+
+is_constant_field_basic_test() ->
+    Selector = normalize({[{<<"A">>, <<"foo">>}]}),
+    Field = <<"A">>,
+    ?assertEqual(true, is_constant_field(Selector, Field)).
+
+is_constant_field_basic_two_test() ->
+    Selector = normalize({[{<<"$and">>,
+        [
+            {[{<<"cars">>,{[{<<"$eq">>,<<"2">>}]}}]},
+            {[{<<"age">>,{[{<<"$gt">>,10}]}}]}
+        ]
+    }]}),
+    Field = <<"cars">>,
+    ?assertEqual(true, is_constant_field(Selector, Field)).
+
+is_constant_field_not_eq_test() ->
+    Selector = normalize({[{<<"$and">>,
+        [
+            {[{<<"cars">>,{[{<<"$eq">>,<<"2">>}]}}]},
+            {[{<<"age">>,{[{<<"$gt">>,10}]}}]}
+        ]
+    }]}),
+    Field = <<"age">>,
+    ?assertEqual(false, is_constant_field(Selector, Field)).
+
+is_constant_field_missing_field_test() ->
+    Selector = normalize({[{<<"$and">>,
+        [
+            {[{<<"cars">>,{[{<<"$eq">>,<<"2">>}]}}]},
+            {[{<<"age">>,{[{<<"$gt">>,10}]}}]}
+        ]
+    }]}),
+    Field = <<"wrong">>,
+    ?assertEqual(false, is_constant_field(Selector, Field)).
+
+is_constant_field_or_field_test() ->
+    Selector = {[{<<"$or">>,
+          [
+              {[{<<"A">>, <<"foo">>}]},
+              {[{<<"B">>, <<"foo">>}]}
+          ]
+    }]},
+    Normalized = normalize(Selector),
+    Field = <<"A">>,
+    ?assertEqual(false, is_constant_field(Normalized, Field)).
+
+is_constant_field_empty_selector_test() ->
+    Selector = normalize({[]}),
+    Field = <<"wrong">>,
+    ?assertEqual(false, is_constant_field(Selector, Field)).
+
+is_constant_nested_and_test() ->
+    Selector1 = {[{<<"$and">>,
+          [
+              {[{<<"A">>, <<"foo">>}]}
+          ]
+    }]},
+    Selector2 = {[{<<"$and">>,
+          [
+              {[{<<"B">>, {[{<<"$gt">>,10}]}}]}
+          ]
+    }]},
+    Selector = {[{<<"$and">>,
+          [
+              Selector1,
+              Selector2
+          ]
+    }]},
+
+    Normalized = normalize(Selector),
+    ?assertEqual(true, is_constant_field(Normalized, <<"A">>)),
+    ?assertEqual(false, is_constant_field(Normalized, <<"B">>)).
+
+is_constant_combined_or_and_equals_test() ->
+    Selector = {[{<<"A">>, "foo"},
+          {<<"$or">>,
+              [
+                  {[{<<"B">>, <<"bar">>}]},
+                  {[{<<"B">>, <<"baz">>}]}
+              ]
+          },
+		  {<<"C">>, "qux"}
+	]},
+    Normalized = normalize(Selector),
+    ?assertEqual(true, is_constant_field(Normalized, <<"C">>)),
+    ?assertEqual(false, is_constant_field(Normalized, <<"B">>)).
 
 has_required_fields_basic_test() ->
     RequiredFields = [<<"A">>],

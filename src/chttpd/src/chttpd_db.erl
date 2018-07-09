@@ -284,8 +284,14 @@ create_db_req(#httpd{}=Req, DbName) ->
     N = chttpd:qs_value(Req, "n", config:get("cluster", "n", "3")),
     Q = chttpd:qs_value(Req, "q", config:get("cluster", "q", "8")),
     P = chttpd:qs_value(Req, "placement", config:get("cluster", "placement")),
+    EngineOpt = parse_engine_opt(Req),
+    Options = [
+        {n, N},
+        {q, Q},
+        {placement, P}
+    ] ++ EngineOpt,
     DocUrl = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName)),
-    case fabric:create_db(DbName, [{n,N}, {q,Q}, {placement,P}]) of
+    case fabric:create_db(DbName, Options) of
     ok ->
         send_json(Req, 201, [{"Location", DocUrl}], {[{ok, true}]});
     accepted ->
@@ -308,7 +314,6 @@ delete_db_req(#httpd{}=Req, DbName) ->
     end.
 
 do_db_req(#httpd{path_parts=[DbName|_], user_ctx=Ctx}=Req, Fun) ->
-    fabric:get_security(DbName, [{user_ctx,Ctx}]), % calls check_is_reader
     {ok, Db} = couch_db:clustered_db(DbName, Ctx),
     Fun(Req, Db).
 
@@ -518,6 +523,21 @@ db_req(#httpd{method='GET',path_parts=[_,OP]}=Req, Db) when ?IS_ALL_DOCS(OP) ->
         throw({bad_request, "`keys` parameter must be an array."})
     end;
 
+db_req(#httpd{method='POST',
+    path_parts=[_, OP, <<"queries">>]}=Req, Db) when ?IS_ALL_DOCS(OP) ->
+    Props = chttpd:json_body_obj(Req),
+    case couch_mrview_util:get_view_queries(Props) of
+        undefined ->
+            throw({bad_request,
+                <<"POST body must include `queries` parameter.">>});
+        Queries ->
+            multi_all_docs_view(Req, Db, OP, Queries)
+    end;
+
+db_req(#httpd{path_parts=[_, OP, <<"queries">>]}=Req,
+    _Db) when ?IS_ALL_DOCS(OP) ->
+    send_method_not_allowed(Req, "POST");
+
 db_req(#httpd{method='POST',path_parts=[_,OP]}=Req, Db) when ?IS_ALL_DOCS(OP) ->
     chttpd:validate_ctype(Req, "application/json"),
     {Fields} = chttpd:json_body_obj(Req),
@@ -635,6 +655,29 @@ db_req(#httpd{path_parts=[_, DocId]}=Req, Db) ->
 
 db_req(#httpd{path_parts=[_, DocId | FileNameParts]}=Req, Db) ->
     db_attachment_req(Req, Db, DocId, FileNameParts).
+
+multi_all_docs_view(Req, Db, OP, Queries) ->
+    Args0 = couch_mrview_http:parse_params(Req, undefined),
+    Args1 = Args0#mrargs{view_type=map},
+    ArgQueries = lists:map(fun({Query}) ->
+        QueryArg1 = couch_mrview_http:parse_params(Query, undefined,
+            Args1, [decoded]),
+        QueryArgs2 = couch_mrview_util:validate_args(QueryArg1),
+        set_namespace(OP, QueryArgs2)
+    end, Queries),
+    Options = [{user_ctx, Req#httpd.user_ctx}],
+    VAcc0 = #vacc{db=Db, req=Req, prepend="\r\n"},
+    FirstChunk = "{\"results\":[",
+    {ok, Resp0} = chttpd:start_delayed_json_response(VAcc0#vacc.req,
+        200, [], FirstChunk),
+    VAcc1 = VAcc0#vacc{resp=Resp0},
+    VAcc2 = lists:foldl(fun(Args, Acc0) ->
+        {ok, Acc1} = fabric:all_docs(Db, Options,
+            fun couch_mrview_http:view_cb/2, Acc0, Args),
+        Acc1
+    end, VAcc1, ArgQueries),
+    {ok, Resp1} = chttpd:send_delayed_chunk(VAcc2#vacc.resp, "\r\n]}"),
+    chttpd:end_delayed_json_response(Resp1).
 
 all_docs_view(Req, Db, Keys, OP) ->
     Args0 = couch_mrview_http:parse_params(Req, Keys),
@@ -1354,6 +1397,20 @@ get_md5_header(Req) ->
 
 parse_doc_query(Req) ->
     lists:foldl(fun parse_doc_query/2, #doc_query_args{}, chttpd:qs(Req)).
+
+parse_engine_opt(Req) ->
+    case chttpd:qs_value(Req, "engine") of
+        undefined ->
+            [];
+        Extension ->
+            Available = couch_server:get_engine_extensions(),
+            case lists:member(Extension, Available) of
+                true ->
+                    [{engine, iolist_to_binary(Extension)}];
+                false ->
+                    throw({bad_request, invalid_engine_extension})
+            end
+    end.
 
 parse_doc_query({Key, Value}, Args) ->
     case {Key, Value} of

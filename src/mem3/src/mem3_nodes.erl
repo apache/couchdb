@@ -102,8 +102,9 @@ initialize_nodelist() ->
         Doc = #doc{id = couch_util:to_binary(node())},
         {ok, _} = couch_db:update_doc(Db, Doc, [])
     end,
+    Seq = couch_db:get_update_seq(Db),
     couch_db:close(Db),
-    couch_db:get_update_seq(Db).
+    Seq.
 
 first_fold(#full_doc_info{id = <<"_design/", _/binary>>}, Acc) ->
     {ok, Acc};

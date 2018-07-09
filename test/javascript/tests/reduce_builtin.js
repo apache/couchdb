@@ -37,6 +37,12 @@ couchTests.reduce_builtin = function(debug) {
       emit(doc.integer, doc.integer);
   };
 
+  var check_approx_distinct = function(expected, estimated) {
+    // see https://en.wikipedia.org/wiki/HyperLogLog
+    var err =  1.04 / Math.sqrt(Math.pow(2, 11 - 1));
+    return Math.abs(expected - estimated) < expected * err;
+  };
+
   var result = db.query(map, "_sum");
   T(result.rows[0].value == 2*summate(numDocs));
   result = db.query(map, "_count");
@@ -47,26 +53,40 @@ couchTests.reduce_builtin = function(debug) {
   T(result.rows[0].value.min == 1);
   T(result.rows[0].value.max == 500);
   T(result.rows[0].value.sumsqr == 2*sumsqr(numDocs));
+  result = db.query(map, "_approx_count_distinct");
+  T(check_approx_distinct(numDocs, result.rows[0].value));
 
   result = db.query(map, "_sum", {startkey: 4, endkey: 4});
   T(result.rows[0].value == 8);
   result = db.query(map, "_count", {startkey: 4, endkey: 4});
   T(result.rows[0].value == 2);
+  result = db.query(map, "_approx_count_distinct", {startkey:4, endkey:4});
+  T(check_approx_distinct(1, result.rows[0].value));
 
   result = db.query(map, "_sum", {startkey: 4, endkey: 5});
   T(result.rows[0].value == 18);
   result = db.query(map, "_count", {startkey: 4, endkey: 5});
   T(result.rows[0].value == 4);
+  result = db.query(map, "_approx_count_distinct", {startkey:4, endkey:5});
+  T(check_approx_distinct(2, result.rows[0].value));
+
 
   result = db.query(map, "_sum", {startkey: 4, endkey: 6});
   T(result.rows[0].value == 30);
   result = db.query(map, "_count", {startkey: 4, endkey: 6});
   T(result.rows[0].value == 6);
+  result = db.query(map, "_approx_count_distinct", {startkey: 4, endkey: 6});
+  T(check_approx_distinct(3, result.rows[0].value));
 
   result = db.query(map, "_sum", {group:true, limit:3});
   T(result.rows[0].value == 2);
   T(result.rows[1].value == 4);
   T(result.rows[2].value == 6);
+
+  result = db.query(map, "_approx_count_distinct", {group:true, limit:3});
+  T(check_approx_distinct(1, result.rows[0].value));
+  T(check_approx_distinct(1, result.rows[1].value));
+  T(check_approx_distinct(1, result.rows[2].value));
 
   for(var i=1; i<numDocs/2; i+=30) {
     result = db.query(map, "_sum", {startkey: i, endkey: numDocs - i});

@@ -14,27 +14,39 @@ include version.mk
 
 REBAR?=$(shell echo `pwd`/bin/rebar)
 IN_RELEASE = $(shell if [ ! -d .git ]; then echo true; fi)
-COUCHDB_VERSION_SUFFIX = $(shell if [ ! -z "$(COUCH_RC)" ]; then echo '-RC$(COUCH_RC)'; else if [ -d .git ]; then echo '-`git rev-parse --short --verify HEAD`'; fi; fi)
-COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)$(COUCHDB_VERSION_SUFFIX)
+ifeq ($(IN_RELEASE), true)
+COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)
+else
+RELTAG = $(shell git describe | grep -E '^[0-9]+\.[0-9]\.[0-9]+(-RC[0-9]+)?$$')
+ifeq ($(RELTAG),)
+COUCHDB_VERSION_SUFFIX = $(shell git rev-parse --short --verify HEAD)
+COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)-$(COUCHDB_VERSION_SUFFIX)
+else
+COUCHDB_VERSION = $(RELTAG)
+endif
+endif
 
 DESTDIR=
 
 # Rebar options
 apps=
-skip_deps=folsom,meck,mochiweb,proper,snappy
+skip_deps=folsom,meck,mochiweb,triq,snappy,bcrypt,hyper
 suites=
 tests=
 
+COMPILE_OPTS=$(shell echo "\
+	apps=$(apps) \
+	" | sed -e 's/[a-z_]\{1,\}= / /g')
 EUNIT_OPTS=$(shell echo "\
 	apps=$(apps) \
 	skip_deps=$(skip_deps) \
 	suites=$(suites) \
 	tests=$(tests) \
-	" | sed -e 's/[a-z]\+= / /g')
+	" | sed -e 's/[a-z]\{1,\}= / /g')
 DIALYZE_OPTS=$(shell echo "\
 	apps=$(apps) \
 	skip_deps=$(skip_deps) \
-	" | sed -e 's/[a-z]\+= / /g')
+	" | sed -e 's/[a-z]\{1,\}= / /g')
 
 #ignore javascript tests
 ignore_js_suites=
@@ -64,9 +76,9 @@ help:
 
 
 .PHONY: couch
-# target: couch - Build CouchDB core
+# target: couch - Build CouchDB core, use ERL_OPTS to provide custom compiler's options
 couch: config.erl
-	@COUCHDB_VERSION=$(COUCHDB_VERSION) $(REBAR) compile
+	@COUCHDB_VERSION=$(COUCHDB_VERSION) $(REBAR) compile $(COMPILE_OPTS)
 	@cp src/couch/priv/couchjs bin/
 
 
@@ -105,6 +117,17 @@ eunit: export BUILDDIR = $(shell pwd)
 eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 eunit: couch
 	@$(REBAR) setup_eunit 2> /dev/null
+	@$(REBAR) -r eunit $(EUNIT_OPTS)
+
+
+setup-eunit: export BUILDDIR = $(shell pwd)
+setup-eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
+setup-eunit:
+	@$(REBAR) setup_eunit 2> /dev/null
+
+just-eunit: export BUILDDIR = $(shell pwd)
+just-eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
+just-eunit:
 	@$(REBAR) -r eunit $(EUNIT_OPTS)
 
 .PHONY: soak-eunit
@@ -250,7 +273,7 @@ dialyze: .rebar
 # target: introspect - Check for commits difference between rebar.config and repository
 introspect:
 	@$(REBAR) -r update-deps
-	@./introspect
+	@build-aux/introspect
 
 ################################################################################
 # Distributing

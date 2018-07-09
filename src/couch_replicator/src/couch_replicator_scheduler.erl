@@ -56,7 +56,7 @@
 
 -include("couch_replicator_scheduler.hrl").
 -include("couch_replicator.hrl").
--include("couch_replicator_api_wrap.hrl").
+-include_lib("couch_replicator/include/couch_replicator_api_wrap.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
 %% types
@@ -138,11 +138,15 @@ job_summary(JobId, HealthThreshold) ->
             ErrorCount = consecutive_crashes(History, HealthThreshold),
             {State, Info} = case {Pid, ErrorCount} of
                 {undefined, 0}  ->
-                    {pending, null};
+                    case History of
+                        [{{crashed, Error}, _When} | _] ->
+                            {crashing, crash_reason_json(Error)};
+                        [_ | _] ->
+                            {pending, null}
+                    end;
                 {undefined, ErrorCount} when ErrorCount > 0 ->
                      [{{crashed, Error}, _When} | _] = History,
-                     ErrMsg = couch_replicator_utils:rep_error_to_binary(Error),
-                     {crashing, ErrMsg};
+                     {crashing, crash_reason_json(Error)};
                 {Pid, ErrorCount} when is_pid(Pid) ->
                      {running, null}
             end,
@@ -1021,7 +1025,11 @@ scheduler_test_() ->
             t_oneshot_will_hog_the_scheduler(),
             t_if_excess_is_trimmed_rotation_doesnt_happen(),
             t_if_transient_job_crashes_it_gets_removed(),
-            t_if_permanent_job_crashes_it_stays_in_ets()
+            t_if_permanent_job_crashes_it_stays_in_ets(),
+            t_job_summary_running(),
+            t_job_summary_pending(),
+            t_job_summary_crashing_once(),
+            t_job_summary_crashing_many_times()
          ]
     }.
 
@@ -1298,6 +1306,72 @@ t_if_permanent_job_crashes_it_stays_in_ets() ->
         [Latest | _] = Job1#job.history,
         ?assertMatch({{crashed, failed}, _}, Latest)
    end).
+
+
+t_job_summary_running() ->
+    ?_test(begin
+        Job =  #job{
+            id = job1,
+            pid = mock_pid(),
+            history = [added()],
+            rep = #rep{
+                db_name = <<"db1">>,
+                source = <<"s">>,
+                target = <<"t">>
+            }
+        },
+        setup_jobs([Job]),
+        Summary = job_summary(job1, ?DEFAULT_HEALTH_THRESHOLD_SEC),
+        ?assertEqual(running, proplists:get_value(state, Summary)),
+        ?assertEqual(null, proplists:get_value(info, Summary)),
+        ?assertEqual(0, proplists:get_value(error_count, Summary))
+    end).
+
+
+t_job_summary_pending() ->
+    ?_test(begin
+        Job =  #job{
+            id = job1,
+            pid = undefined,
+            history = [stopped(20), started(10), added()],
+            rep = #rep{source = <<"s">>, target = <<"t">>}
+        },
+        setup_jobs([Job]),
+        Summary = job_summary(job1, ?DEFAULT_HEALTH_THRESHOLD_SEC),
+        ?assertEqual(pending, proplists:get_value(state, Summary)),
+        ?assertEqual(null, proplists:get_value(info, Summary)),
+        ?assertEqual(0, proplists:get_value(error_count, Summary))
+    end).
+
+
+t_job_summary_crashing_once() ->
+    ?_test(begin
+        Job =  #job{
+            id = job1,
+            history = [crashed(?DEFAULT_HEALTH_THRESHOLD_SEC + 1), started(0)],
+            rep = #rep{source = <<"s">>, target = <<"t">>}
+        },
+        setup_jobs([Job]),
+        Summary = job_summary(job1, ?DEFAULT_HEALTH_THRESHOLD_SEC),
+        ?assertEqual(crashing, proplists:get_value(state, Summary)),
+        ?assertEqual(<<"some_reason">>, proplists:get_value(info, Summary)),
+        ?assertEqual(0, proplists:get_value(error_count, Summary))
+    end).
+
+
+t_job_summary_crashing_many_times() ->
+    ?_test(begin
+        Job =  #job{
+            id = job1,
+            history = [crashed(4), started(3), crashed(2), started(1)],
+            rep = #rep{source = <<"s">>, target = <<"t">>}
+        },
+        setup_jobs([Job]),
+        Summary = job_summary(job1, ?DEFAULT_HEALTH_THRESHOLD_SEC),
+        ?assertEqual(crashing, proplists:get_value(state, Summary)),
+        ?assertEqual(<<"some_reason">>, proplists:get_value(info, Summary)),
+        ?assertEqual(2, proplists:get_value(error_count, Summary))
+    end).
 
 
 % Test helper functions

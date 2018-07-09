@@ -44,7 +44,7 @@
 -export([append_term/2, append_term/3, append_term_md5/2, append_term_md5/3]).
 -export([write_header/2, read_header/1]).
 -export([delete/2, delete/3, nuke_dir/2, init_delete_dir/1]).
--export([msec_since_last_read/1]).
+-export([last_read/1]).
 
 % gen_server callbacks
 -export([init/1, terminate/2, code_change/3]).
@@ -213,8 +213,12 @@ truncate(Fd, Pos) ->
 %%----------------------------------------------------------------------
 
 sync(Filepath) when is_list(Filepath) ->
-    {ok, Fd} = file:open(Filepath, [append, raw]),
-    try ok = file:sync(Fd) after ok = file:close(Fd) end;
+    case file:open(Filepath, [append, raw]) of
+        {ok, Fd} ->
+            try ok = file:sync(Fd) after ok = file:close(Fd) end;
+        {error, Error} ->
+            erlang:error(Error)
+    end;
 sync(Fd) ->
     gen_server:call(Fd, sync, infinity).
 
@@ -340,15 +344,9 @@ init_status_error(ReturnPid, Ref, Error) ->
     ignore.
 
 
-% Return time since last read. The return value is conservative in the
-% sense that if no read timestamp has been found, it would return 0. This
-% result is used to decide if reader is idle so returning 0 will avoid marking
-% it idle by accident when process is starting up.
-msec_since_last_read(Fd) when is_pid(Fd) ->
+last_read(Fd) when is_pid(Fd) ->
     Now = os:timestamp(),
-    LastRead = couch_util:process_dict_get(Fd, read_timestamp, Now),
-    DtMSec = timer:now_diff(Now, LastRead) div 1000,
-    max(0, DtMSec).
+    couch_util:process_dict_get(Fd, read_timestamp, Now).
 
 
 % server functions
@@ -395,14 +393,18 @@ init({Filepath, Options, ReturnPid, Ref}) ->
         % open in read mode first, so we don't create the file if it doesn't exist.
         case file:open(Filepath, [read, raw]) of
         {ok, Fd_Read} ->
-            {ok, Fd} = file:open(Filepath, OpenOptions),
-            %% Save Fd in process dictionary for debugging purposes
-            put(couch_file_fd, {Fd, Filepath}),
-            ok = file:close(Fd_Read),
-            maybe_track_open_os_files(Options),
-            {ok, Eof} = file:position(Fd, eof),
-            erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-            {ok, #file{fd=Fd, eof=Eof, is_sys=IsSys, pread_limit=Limit}};
+            case file:open(Filepath, OpenOptions) of
+                {ok, Fd} ->
+                     %% Save Fd in process dictionary for debugging purposes
+                     put(couch_file_fd, {Fd, Filepath}),
+                     ok = file:close(Fd_Read),
+                     maybe_track_open_os_files(Options),
+                     {ok, Eof} = file:position(Fd, eof),
+                     erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
+                     {ok, #file{fd=Fd, eof=Eof, is_sys=IsSys, pread_limit=Limit}};
+                 Error ->
+                     init_status_error(ReturnPid, Ref, Error)
+            end;
         Error ->
             init_status_error(ReturnPid, Ref, Error)
         end
