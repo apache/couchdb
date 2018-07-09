@@ -311,7 +311,8 @@ write_kvs(State, UpdateSeq, ViewKVs, DocIdKeys, Seqs, Log0) ->
     #mrst{
         id_btree=IdBtree,
         log_btree=LogBtree,
-        first_build=FirstBuild
+        first_build=FirstBuild,
+        partitioned=Partitioned
     } = State,
 
     Revs = dict:from_list(dict:fetch_keys(Log0)),
@@ -328,8 +329,15 @@ write_kvs(State, UpdateSeq, ViewKVs, DocIdKeys, Seqs, Log0) ->
         _ -> update_log(LogBtree, Log, Revs, Seqs, FirstBuild)
     end,
 
-    UpdateView = fun(#mrview{id_num=ViewId}=View, {ViewId, {KVs, SKVs}}) ->
+    UpdateView = fun(#mrview{id_num=ViewId}=View, {ViewId, {KVs0, SKVs}}) ->
         #mrview{seq_indexed=SIndexed, keyseq_indexed=KSIndexed} = View,
+        KVs = case Partitioned of
+            true ->
+                [{{[partition(D), K], D}, V} || {{K, D}, V} <- KVs0];
+            false ->
+                KVs0
+        end,
+
         ToRem = couch_util:dict_find(ViewId, ToRemByView, []),
         {ok, VBtree2} = couch_btree:add_remove(View#mrview.btree, KVs, ToRem),
         NewUpdateSeq = case VBtree2 =/= View#mrview.btree of
@@ -484,3 +492,6 @@ maybe_notify(State, View, KVs, ToRem) ->
         [Key || {Key, _DocId} <- ToRem]
     end,
     couch_index_plugin:index_update(State, View, Updated, Removed).
+
+partition(DocId) ->
+    hd(binary:split(DocId, <<":">>)).

@@ -31,7 +31,8 @@
     doc_acc,
     doc_queue,
     write_queue,
-    qserver=nil
+    qserver=nil,
+    partitioned=false
 }).
 
 
@@ -87,6 +88,7 @@
     conflicts,
     callback,
     sorted = true,
+    partition_key,
     extra = []
 }).
 
