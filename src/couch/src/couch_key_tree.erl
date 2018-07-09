@@ -59,6 +59,7 @@ get_key_leafs/2,
 map/2,
 map_leafs/2,
 mapfold/3,
+multi_merge/2,
 merge/3,
 merge/2,
 remove_leafs/2,
@@ -69,6 +70,15 @@ stem/2
 -type treenode() :: {Key::term(), Value::term(), [Node::treenode()]}.
 -type tree() :: {Depth::pos_integer(), [treenode()]}.
 -type revtree() :: [tree()].
+
+
+%% @doc Merge multiple paths into the given tree.
+-spec multi_merge(revtree(), tree()) -> revtree().
+multi_merge(RevTree, Trees) ->
+    lists:foldl(fun(Tree, RevTreeAcc) ->
+        {NewRevTree, _} = merge(RevTreeAcc, Tree),
+        NewRevTree
+    end, RevTree, lists:sort(Trees)).
 
 
 %% @doc Merge a path into the given tree and then stem the result.
@@ -470,6 +480,70 @@ map_leafs_simple(Fun, Pos, [{Key, Value, SubTree} | RestTree]) ->
 
 
 stem(Trees, Limit) ->
+    try
+        {_, Branches} = lists:foldl(fun(Tree, {Seen, TreeAcc}) ->
+            {NewSeen, NewBranches} = stem_tree(Tree, Limit, Seen),
+            {NewSeen, NewBranches ++ TreeAcc}
+        end, {sets:new(), []}, Trees),
+        lists:sort(Branches)
+    catch throw:dupe_keys ->
+        repair_tree(Trees, Limit)
+    end.
+
+
+stem_tree({Depth, Child}, Limit, Seen) ->
+    case stem_tree(Depth, Child, Limit, Seen) of
+        {NewSeen, _, NewChild, NewBranches} ->
+            {NewSeen, [{Depth, NewChild} | NewBranches]};
+        {NewSeen, _, NewBranches} ->
+            {NewSeen, NewBranches}
+    end.
+
+
+stem_tree(_Depth, {Key, _Val, []} = Leaf, Limit, Seen) ->
+    {check_key(Key, Seen), Limit - 1, Leaf, []};
+
+stem_tree(Depth, {Key, Val, Children}, Limit, Seen0) ->
+    Seen1 = check_key(Key, Seen0),
+    FinalAcc = lists:foldl(fun(Child, Acc) ->
+        {SeenAcc, LimitPosAcc, ChildAcc, BranchAcc} = Acc,
+        case stem_tree(Depth + 1, Child, Limit, SeenAcc) of
+            {NewSeenAcc, LimitPos, NewChild, NewBranches} ->
+                NewLimitPosAcc = erlang:max(LimitPos, LimitPosAcc),
+                NewChildAcc = [NewChild | ChildAcc],
+                NewBranchAcc = NewBranches ++ BranchAcc,
+                {NewSeenAcc, NewLimitPosAcc, NewChildAcc, NewBranchAcc};
+            {NewSeenAcc, LimitPos, NewBranches} ->
+                NewLimitPosAcc = erlang:max(LimitPos, LimitPosAcc),
+                NewBranchAcc = NewBranches ++ BranchAcc,
+                {NewSeenAcc, NewLimitPosAcc, ChildAcc, NewBranchAcc}
+        end
+    end, {Seen1, -1, [], []}, Children),
+    {FinalSeen, FinalLimitPos, FinalChildren, FinalBranches} = FinalAcc,
+    case FinalLimitPos of
+        N when N > 0, length(FinalChildren) > 0 ->
+            FinalNode = {Key, Val, lists:reverse(FinalChildren)},
+            {FinalSeen, FinalLimitPos - 1, FinalNode, FinalBranches};
+        0 when length(FinalChildren) > 0 ->
+            NewBranches = lists:map(fun(Child) ->
+                {Depth + 1, Child}
+            end, lists:reverse(FinalChildren)),
+            {FinalSeen, -1, NewBranches ++ FinalBranches};
+        N when N < 0, length(FinalChildren) == 0 ->
+            {FinalSeen, FinalLimitPos - 1, FinalBranches}
+    end.
+
+
+check_key(Key, Seen) ->
+    case sets:is_element(Key, Seen) of
+        true ->
+            throw(dupe_keys);
+        false ->
+            sets:add_element(Key, Seen)
+    end.
+
+
+repair_tree(Trees, Limit) ->
     % flatten each branch in a tree into a tree path, sort by starting rev #
     Paths = lists:sort(lists:map(fun({Pos, Path}) ->
         StemmedPath = lists:sublist(Path, Limit),

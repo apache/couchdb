@@ -184,6 +184,7 @@ handle_config_terminate(_Server, _Reason, _State) ->
     erlang:send_after(?RELISTEN_DELAY, whereis(?MODULE), restart_config_listener).
 
 init([]) ->
+    couch_util:set_mqd_off_heap(),
     ets:new(?SHARDS, [
         bag,
         public,
@@ -724,42 +725,25 @@ spawn_link_mock_writer(Db, Shards, Timeout) ->
 
 
 mem3_shards_changes_test_() -> {
-    "Test mem3_shards changes listener", {
-        foreach,
-        fun setup_changes/0, fun teardown_changes/1,
+    "Test mem3_shards changes listener",
+    {
+        setup,
+        fun test_util:start_couch/0, fun test_util:stop_couch/1,
         [
-            fun should_kill_changes_listener_on_shutdown/1
+            fun should_kill_changes_listener_on_shutdown/0
         ]
     }
 }.
 
 
-setup_changes() ->
-    RespDb = test_util:fake_db([{name, <<"dbs">>}, {update_seq, 0}]),
-    ok = meck:expect(mem3_util, ensure_exists, ['_'], {ok, RespDb}),
-    ok = meck:expect(couch_db, close, ['_'], ok),
-    ok = application:start(config),
+should_kill_changes_listener_on_shutdown() ->
     {ok, Pid} = ?MODULE:start_link(),
+    {ok, ChangesPid} = get_changes_pid(),
+    ?assert(is_process_alive(ChangesPid)),
     true = erlang:unlink(Pid),
-    Pid.
-
-
-teardown_changes(Pid) ->
-    true = exit(Pid, shutdown),
-    ok = application:stop(config),
-    meck:unload().
-
-
-should_kill_changes_listener_on_shutdown(Pid) ->
-    ?_test(begin
-        ?assert(is_process_alive(Pid)),
-        {ok, ChangesPid} = get_changes_pid(),
-        ?assert(is_process_alive(ChangesPid)),
-        true = test_util:stop_sync_throw(
-            ChangesPid, fun() -> exit(Pid, shutdown) end, wait_timeout),
-        ?assertNot(is_process_alive(ChangesPid)),
-        ok
-    end).
-
+    true = test_util:stop_sync_throw(
+        ChangesPid, fun() -> exit(Pid, shutdown) end, wait_timeout),
+    ?assertNot(is_process_alive(ChangesPid)),
+    exit(Pid, shutdown).
 
 -endif.

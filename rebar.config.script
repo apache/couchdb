@@ -51,23 +51,24 @@ DepDescs = [
 {b64url,           "b64url",           {tag, "1.0.1"}},
 {ets_lru,          "ets-lru",          {tag, "1.0.0"}},
 {khash,            "khash",            {tag, "1.0.1"}},
-{snappy,           "snappy",           {tag, "CouchDB-1.0.0"}},
+{snappy,           "snappy",           {tag, "CouchDB-1.0.1"}},
 {ioq,              "ioq",              {tag, "1.0.1"}},
 
 %% Non-Erlang deps
 {docs,             {url, "https://github.com/apache/couchdb-documentation"},
                    {tag, "2.1.0"}, [raw]},
 {fauxton,          {url, "https://github.com/apache/couchdb-fauxton"},
-                   {tag, "v1.1.13"}, [raw]},
+                   {tag, "v1.1.15"}, [raw]},
 %% Third party deps
 {folsom,           "folsom",           {tag, "CouchDB-0.8.2"}},
+{hyper,            "hyper",            {tag, "CouchDB-2.2.0-3"}},
 {ibrowse,          "ibrowse",          {tag, "CouchDB-4.0.1"}},
 {jiffy,            "jiffy",            {tag, "CouchDB-0.14.11-2"}},
 {mochiweb,         "mochiweb",         {tag, "v2.17.0"}},
 {meck,             "meck",             {tag, "0.8.8"}},
 {bcrypt,           {url, "https://github.com/apache/couchdb-erlang-bcrypt"},
-                   {tag, "1.0.2"}}
-
+                   {tag, "1.0.2"}},
+{triq,             "triq",             {tag, "v1.2.0"}}
 ],
 
 
@@ -86,13 +87,18 @@ MakeDep = fun
         {AppName, ".*", {git, Url, Version}, Options}
 end,
 
+ErlOpts = case os:getenv("ERL_OPTS") of
+    false -> [];
+    Opts -> [list_to_atom(O) || O <- string:tokens(Opts, ",")]
+end,
+
 AddConfig = [
     {require_otp_vsn, "R16B03|R16B03-1|17|18|19|20"},
     {deps_dir, "src"},
     {deps, lists:map(MakeDep, DepDescs)},
     {sub_dirs, SubDirs},
     {lib_dirs, ["src"]},
-    {erl_opts, [bin_opt_info, debug_info, {i, "../"}]},
+    {erl_opts, [{i, "../"} | ErlOpts]},
     {eunit_opts, [verbose]},
     {plugins, [eunit_plugin]},
     {dialyzer, [

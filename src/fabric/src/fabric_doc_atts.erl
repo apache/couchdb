@@ -10,13 +10,16 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(fabric_doc_attachments).
+-module(fabric_doc_atts).
 
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
-%% couch api calls
--export([receiver/2]).
+-export([
+    receiver/2,
+    receiver_callback/2
+]).
+
 
 receiver(_Req, undefined) ->
     <<"">>;
@@ -24,14 +27,22 @@ receiver(_Req, {unknown_transfer_encoding, Unknown}) ->
     exit({unknown_transfer_encoding, Unknown});
 receiver(Req, chunked) ->
     MiddleMan = spawn(fun() -> middleman(Req, chunked) end),
-    fun(4096, ChunkFun, State) ->
-        write_chunks(MiddleMan, ChunkFun, State)
-    end;
+    {fabric_attachment_receiver, MiddleMan, chunked};
 receiver(_Req, 0) ->
     <<"">>;
 receiver(Req, Length) when is_integer(Length) ->
     maybe_send_continue(Req),
     Middleman = spawn(fun() -> middleman(Req, Length) end),
+    {fabric_attachment_receiver, Middleman, Length};
+receiver(_Req, Length) ->
+    exit({length_not_integer, Length}).
+
+
+receiver_callback(Middleman, chunked) ->
+    fun(4096, ChunkFun, State) ->
+        write_chunks(Middleman, ChunkFun, State)
+    end;
+receiver_callback(Middleman, Length) when is_integer(Length) ->
     fun() ->
         Middleman ! {self(), gimme_data},
         Timeout = fabric_util:attachments_timeout(),
@@ -42,9 +53,8 @@ receiver(Req, Length) when is_integer(Length) ->
         after Timeout ->
             exit(timeout)
         end
-    end;
-receiver(_Req, Length) ->
-    exit({length_not_integer, Length}).
+    end.
+
 
 %%
 %% internal

@@ -39,6 +39,7 @@ start_link(ServerId) ->
     gen_server:start_link({local, ServerId}, ?MODULE, [], []).
 
 init([]) ->
+    couch_util:set_mqd_off_heap(),
     {ok, #st{}}.
 
 handle_call(get_errors, _From, #st{errors = Errors} = St) ->

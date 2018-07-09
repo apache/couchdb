@@ -208,7 +208,8 @@ remove_writer(WriterPid, WriterRef, Counters) ->
         {ok, {WriterRef, _}} ->
             case num_mp_writers() of
                 N when N > 1 ->
-                    num_mp_writers(N - 1);
+                    num_mp_writers(N - 1),
+                    orddict:erase(WriterPid, Counters);
                 _ ->
                     abort_parsing
             end;

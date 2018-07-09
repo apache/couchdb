@@ -167,7 +167,6 @@ init([Command, Options, PortOptions]) ->
     spawn(fun() ->
             % this ensure the real os process is killed when this process dies.
             erlang:monitor(process, Pid),
-            receive _ -> ok end,
             killer(?b2l(KillCmd))
         end),
     OsProc =
