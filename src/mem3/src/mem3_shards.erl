@@ -67,26 +67,27 @@ for_docid(DbName, DocId) ->
     for_docid(DbName, DocId, []).
 
 for_docid(DbName, DocId, Options) ->
-    HashKey = mem3_util:docid_hash(DocId),
     ShardHead = #shard{
         dbname = DbName,
-        range = ['$1', '$2'],
         _ = '_'
     },
     OrderedShardHead = #ordered_shard{
         dbname = DbName,
-        range = ['$1', '$2'],
         _ = '_'
     },
-    Conditions = [{'=<', '$1', HashKey}, {'=<', HashKey, '$2'}],
-    ShardSpec = {ShardHead, Conditions, ['$_']},
-    OrderedShardSpec = {OrderedShardHead, Conditions, ['$_']},
+    ShardSpec = {ShardHead, [], ['$_']},
+    OrderedShardSpec = {OrderedShardHead, [], ['$_']},
     Shards = try ets:select(?SHARDS, [ShardSpec, OrderedShardSpec]) of
         [] ->
             load_shards_from_disk(DbName, DocId);
-        Else ->
+        Shards0 ->
             gen_server:cast(?MODULE, {cache_hit, DbName}),
-            Else
+            Options1 = case mem3:is_partitioned(hd(Shards0)) of
+                true  -> [partitioned];
+                false -> []
+            end,
+            HashKey = mem3_util:docid_hash(DocId, Options1),
+            [S || S <- Shards0, in_range(S, HashKey)]
     catch error:badarg ->
         load_shards_from_disk(DbName, DocId)
     end,
@@ -397,7 +398,11 @@ load_shards_from_db(ShardDb, DbName) ->
 
 load_shards_from_disk(DbName, DocId)->
     Shards = load_shards_from_disk(DbName),
-    HashKey = mem3_util:docid_hash(DocId),
+    Options = case mem3:is_partitioned(hd(Shards)) of
+        true  -> [partitioned];
+        false -> []
+    end,
+    HashKey = mem3_util:docid_hash(DocId, Options),
     [S || S <- Shards, in_range(S, HashKey)].
 
 in_range(Shard, HashKey) ->
