@@ -34,7 +34,6 @@
 -export([fold_changes/4]).
 -export([to_key_seq/1]).
 -export([set_view_options/3]).
--export([partition_key/2, unpartition_key/1]).
 
 -define(MOD, couch_mrview_index).
 -define(GET_VIEW_RETRY_COUNT, 1).
@@ -1260,9 +1259,3 @@ set_view_options(#mrargs{} = Args, partitioned, true) ->
     Args#mrargs{partitioned=true};
 set_view_options(#mrargs{} = Args, partitioned, false) ->
     Args#mrargs{partitioned=false}.
-
-partition_key(Key, DocId) ->
-    [hd(binary:split(DocId, <<":">>)), Key].
-
-unpartition_key([_Partition, Key]) ->
-    Key.
