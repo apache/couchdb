@@ -317,10 +317,15 @@ index_of(X, [X|_Rest], I) ->
 index_of(X, [_|Rest], I) ->
     index_of(X, Rest, I+1).
 
-get_shards(DbName, #mrargs{stable=true}) ->
+get_shards(DbName, #mrargs{partitioned=false,stable=true}) ->
     mem3:ushards(DbName);
-get_shards(DbName, #mrargs{stable=false}) ->
-    mem3:shards(DbName).
+get_shards(DbName, #mrargs{partitioned=false,stable=false}) ->
+    mem3:shards(DbName);
+get_shards(DbName, #mrargs{partitioned=true,stable=true}=Args) ->
+    mem3:ushards(DbName, Args#mrargs.partition);
+get_shards(DbName, #mrargs{partitioned=true,stable=false}=Args) ->
+    mem3:shards(DbName, Args#mrargs.partition).
+
 
 maybe_update_others(DbName, DDoc, ShardsInvolved, ViewName,
     #mrargs{update=lazy} = Args) ->
