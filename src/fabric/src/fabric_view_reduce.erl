@@ -82,7 +82,8 @@ go2(DbName, Workers, {red, {_, Lang, View}, _}=VInfo, Args, Callback, Acc0) ->
         collation = couch_util:get_value(<<"collation">>, View#mrview.options),
         rows = dict:new(),
         user_acc = Acc0,
-        update_seq = case UpdateSeq of true -> []; false -> nil end
+        update_seq = case UpdateSeq of true -> []; false -> nil end,
+        partitioned = Args#mrargs.partitioned
     },
     try rexi_utils:recv(Workers, #shard.ref, fun handle_message/3,
         State, infinity, 1000 * 60 * 60) of

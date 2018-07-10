@@ -76,7 +76,8 @@ go(DbName, Workers, {map, View, _}, Args, Callback, Acc0) ->
         sorted = Args#mrargs.sorted,
         collation = Collation,
         user_acc = Acc0,
-        update_seq = case UpdateSeq of true -> []; false -> nil end
+        update_seq = case UpdateSeq of true -> []; false -> nil end,
+        partitioned = Args#mrargs.partitioned
     },
     case rexi_utils:recv(Workers, #shard.ref, fun handle_message/3,
         State, infinity, 1000 * 60 * 60) of

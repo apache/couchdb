@@ -31,7 +31,8 @@
     lang,
     sorted,
     user_acc,
-    update_seq
+    update_seq,
+    partitioned=false
 }).
 
 -record(stream_acc, {
