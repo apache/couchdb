@@ -102,9 +102,9 @@ definitions({file, FilePath}) ->
         {error, Reason} ->
             {error, {FilePath, Reason}}
     end;
-definitions({module, Module}) when is_atom(Module) ->
-    definitions({module, [Module]});
-definitions({module, Modules}) ->
+definitions({static_module, Module}) when is_atom(Module) ->
+    definitions({static_module, [Module]});
+definitions({static_module, Modules}) ->
     Data = lists:append([M:data() || M <- Modules]),
     Hash = couch_epi_functions_gen:hash(Modules),
     {ok, Hash, Data}.

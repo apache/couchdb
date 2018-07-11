@@ -175,7 +175,7 @@ setup(data_file) ->
         handle = couch_epi:get_handle(Key),
         kv = KV,
         pid = Pid};
-setup(data_module) ->
+setup(static_data_module) ->
     error_logger:tty(false),
 
     Key = {test_app, descriptions},
@@ -183,7 +183,7 @@ setup(data_module) ->
     ok = generate_module(provider, ?DATA_MODULE1(provider)),
     KV = start_state_storage(),
 
-    ok = start_epi([{provider_epi, plugin_module([KV, {module, provider}])}]),
+    ok = start_epi([{provider_epi, plugin_module([KV, {static_module, provider}])}]),
 
     Pid = whereis(couch_epi:get_handle(Key)),
     Handle = couch_epi:get_handle(Key),
@@ -244,7 +244,7 @@ epi_config_update_test_() ->
     ],
     Cases = [
         data_file,
-        data_module,
+        static_data_module,
         functions
     ],
     {
@@ -264,7 +264,7 @@ epi_data_source_test_() ->
     ],
     Cases = [
         data_file,
-        data_module
+        static_data_module
     ],
     {
         "epi data API tests",
@@ -305,7 +305,7 @@ epi_providers_order_test_() ->
 epi_reload_test_() ->
     Cases = [
         data_file,
-        data_module,
+        static_data_module,
         functions
     ],
     Funs = [
@@ -565,7 +565,7 @@ update(Case, #ctx{pid = Pid, modules = Modules} = Ctx) ->
 update_definitions(data_file, #ctx{file = File}) ->
     {ok, _} = file:copy(?DATA_FILE2, File),
     ok;
-update_definitions(data_module, #ctx{}) ->
+update_definitions(static_data_module, #ctx{}) ->
     ok = generate_module(provider, ?DATA_MODULE2(provider));
 update_definitions(functions, #ctx{}) ->
     ok = generate_module(provider1, ?MODULE2(provider1)).
