@@ -506,7 +506,7 @@ merge_rev_trees(Limit, MergeConflicts, [NewDocs|RestDocsList],
     NewDocInfo0 = lists:foldl(fun({Client, NewDoc}, OldInfoAcc) ->
         merge_rev_tree(OldInfoAcc, NewDoc, Client, MergeConflicts)
     end, OldDocInfo, NewDocs),
-    NewDocInfo1 = stem_full_doc_info(NewDocInfo0, Limit),
+    NewDocInfo1 = maybe_stem_full_doc_info(NewDocInfo0, Limit),
     % When MergeConflicts is false, we updated #full_doc_info.deleted on every
     % iteration of merge_rev_tree. However, merge_rev_tree does not update
     % #full_doc_info.deleted when MergeConflicts is true, since we don't need
@@ -624,9 +624,14 @@ merge_rev_tree(OldInfo, NewDoc, _Client, true) ->
     {NewTree, _} = couch_key_tree:merge(OldTree, NewTree0),
     OldInfo#full_doc_info{rev_tree = NewTree}.
 
-stem_full_doc_info(#full_doc_info{rev_tree = Tree} = Info, Limit) ->
-    Stemmed = couch_key_tree:stem(Tree, Limit),
-    Info#full_doc_info{rev_tree = Stemmed}.
+maybe_stem_full_doc_info(#full_doc_info{rev_tree = Tree} = Info, Limit) ->
+    case config:get_boolean("couchdb", "stem_interactive_updates", true) of
+        true ->
+            Stemmed = couch_key_tree:stem(Tree, Limit),
+            Info#full_doc_info{rev_tree = Stemmed};
+        false ->
+            Info
+    end.
 
 update_docs_int(Db, DocsList, LocalDocs, MergeConflicts, FullCommit) ->
     UpdateSeq = couch_db_engine:get_update_seq(Db),
