@@ -309,7 +309,8 @@ gen_write(Engine, St, {Action, {DocId, Body, Atts0}}, UpdateSeq) ->
         conflict -> new_branch;
         _ -> new_leaf
     end,
-    {NewTree, NodeType} = couch_key_tree:merge(PrevRevTree, Path, RevsLimit),
+    {MergedTree, NodeType} = couch_key_tree:merge(PrevRevTree, Path),
+    NewTree = couch_key_tree:stem(MergedTree, RevsLimit),
 
     NewFDI = PrevFDI#full_doc_info{
         deleted = couch_doc:is_deleted(NewTree),

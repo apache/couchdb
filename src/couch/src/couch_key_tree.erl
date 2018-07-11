@@ -60,7 +60,6 @@ map/2,
 map_leafs/2,
 mapfold/3,
 multi_merge/2,
-merge/3,
 merge/2,
 remove_leafs/2,
 stem/2
@@ -79,18 +78,6 @@ multi_merge(RevTree, Trees) ->
         {NewRevTree, _} = merge(RevTreeAcc, Tree),
         NewRevTree
     end, RevTree, lists:sort(Trees)).
-
-
-%% @doc Merge a path into the given tree and then stem the result.
-%% Although Tree is of type tree(), it must not contain any branches.
--spec merge(revtree(), tree() | path(), pos_integer()) ->
-                {revtree(), new_leaf | new_branch | internal_node}.
-merge(RevTree, Tree, StemDepth) ->
-    {Merged, Result} = merge(RevTree, Tree),
-    case config:get("couchdb", "stem_interactive_updates", "true") of
-        "true" -> {stem(Merged, StemDepth), Result};
-        _ -> {Merged, Result}
-    end.
 
 
 %% @doc Merge a path into a tree.
