@@ -66,6 +66,38 @@ There are also additional functions to get the same data in various formats
 - `couch_epi:keys(Handle)` - returns list of configured keys
 - `couch_epi:subscribers(Handle)` - return list of known subscribers
 
+The difference between `static_module` and `callback_module` providers is in how
+couch_epi detects the changes. `static_module` is designed for the cases when you
+have your data hardcoded in the module. For example you might have the following:
+
+```
+-export([data/0]).
+
+data() ->
+    [
+        {[complex, key, 2], [
+            {type, counter},
+            {desc, bar}
+        ]},
+        {[complex, key, 1], [
+            {type, counter},
+            {desc, updated_foo}
+        ]}
+    ].
+```
+
+The changes are detected by relying on `vsn` module attribute. Therefore we
+would notice the change only when data source module is recompiled.
+
+The `callback_module` provider uses the return value from `data/0` to detect
+changes and it is useful for cases when the data term is constructed dynamically.
+For example to cache values of CouchDB config one could use the following:
+
+```
+-export([data/0]).
+data() ->
+    config:get("dreyfus").
+```
 
 # Function dispatch example
 
