@@ -39,7 +39,8 @@ could add an entry in its implementation of couch_epi_plugin behaviour:
                 {priv_file, "stats_descriptions.cfg"}, [{interval, 5000}]}
             {{couch_stats, descriptions},
                 {file, "/tmp/extra_stats.cfg"}, [{interval, 5000}]},
-            {{couch_stats, descriptions}, {module, my_stats}}
+            {{couch_stats, descriptions}, {static_module, my_stats}},
+            {{couch_stats, descriptions}, {callback_module, my_stats}}
         ].
 
 When service provider wants to learn about all the installed config data for it to use

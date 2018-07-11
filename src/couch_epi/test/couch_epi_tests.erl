@@ -17,7 +17,7 @@
 -define(DATA_FILE1, ?ABS_PATH("test/fixtures/app_data1.cfg")).
 -define(DATA_FILE2, ?ABS_PATH("test/fixtures/app_data2.cfg")).
 
--export([notify_cb/4, save/3]).
+-export([notify_cb/4, save/3, get/2]).
 
 -record(ctx, {file, handle, pid, kv, key, modules = []}).
 
@@ -81,6 +81,14 @@
                 {desc, updated_foo}
             ]}
         ].
+").
+
+-define(DATA_MODULE3(Name, Kv), "
+    -export([data/0]).
+
+data() ->
+    {ok, Data} = couch_epi_tests:get('" ++ atom_to_list(Kv) ++ "', data),
+    Data.
 ").
 
 %% ------------------------------------------------------------------
@@ -194,6 +202,33 @@ setup(static_data_module) ->
         modules = [Handle, provider],
         kv = KV,
         pid = Pid};
+setup(callback_data_module) ->
+    error_logger:tty(false),
+
+    Key = {test_app, descriptions},
+
+    KV = start_state_storage(),
+    Value = [
+        {[complex, key, 1], [
+            {type, counter},
+            {desc, foo}
+        ]}
+    ],
+    save(KV, data, Value),
+
+    ok = generate_module(provider, ?DATA_MODULE3(provider, KV)),
+
+    ok = start_epi([{provider_epi, plugin_module([KV, {callback_module, provider}])}]),
+
+    Pid = whereis(couch_epi:get_handle(Key)),
+    Handle = couch_epi:get_handle(Key),
+
+    #ctx{
+       key = Key,
+       handle = Handle,
+       modules = [Handle, provider],
+       kv = KV,
+       pid = Pid};
 setup(functions) ->
     Key = my_service,
     error_logger:tty(false),
@@ -245,6 +280,7 @@ epi_config_update_test_() ->
     Cases = [
         data_file,
         static_data_module,
+        callback_data_module,
         functions
     ],
     {
@@ -264,7 +300,8 @@ epi_data_source_test_() ->
     ],
     Cases = [
         data_file,
-        static_data_module
+        static_data_module,
+        callback_data_module
     ],
     {
         "epi data API tests",
@@ -306,6 +343,7 @@ epi_reload_test_() ->
     Cases = [
         data_file,
         static_data_module,
+        callback_data_module,
         functions
     ],
     Funs = [
@@ -567,6 +605,19 @@ update_definitions(data_file, #ctx{file = File}) ->
     ok;
 update_definitions(static_data_module, #ctx{}) ->
     ok = generate_module(provider, ?DATA_MODULE2(provider));
+update_definitions(callback_data_module, #ctx{kv = Kv}) ->
+    Value = [
+        {[complex, key, 2], [
+            {type, counter},
+            {desc, bar}
+        ]},
+        {[complex, key, 1], [
+            {type, counter},
+            {desc, updated_foo}
+        ]}
+    ],
+    save(Kv, data, Value),
+    ok;
 update_definitions(functions, #ctx{}) ->
     ok = generate_module(provider1, ?MODULE2(provider1)).
 
@@ -597,6 +648,8 @@ save(Kv, Key, Value) ->
     call(Kv, {set, Key, Value}).
 
 get(#ctx{kv = Kv}, Key) ->
+    call(Kv, {get, Key});
+get(Kv, Key) ->
     call(Kv, {get, Key}).
 
 call(Server, Msg) ->

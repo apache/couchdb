@@ -122,6 +122,7 @@ modules(#couch_epi_spec{kind = services, value = Module}) ->
 modules(#couch_epi_spec{kind = data_providers, value = Value}) ->
     case Value of
         {static_module, Module} -> [Module];
+        {callback_module, Module} -> [Module];
         _ -> []
     end;
 modules(#couch_epi_spec{kind = data_subscriptions, behaviour = Module}) ->
