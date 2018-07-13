@@ -79,12 +79,12 @@ maybe_stop(W, Counters) ->
         case {Ok + NotFound, Ok, NotFound} of
         {W, 0, W} ->
             {#shard{dbname=Name}, _} = hd(Counters),
-            couch_log:warning("~p not_found ~s", [?MODULE, Name]),
+            couch_log:warning("~p not_found ~d", [?MODULE, Name]),
             {stop, not_found};
         {W, _, _} ->
             {stop, ok};
-        {N, M, _} when N >= (W div 2 + 1), M > 0 ->
-            {stop, accepted};
+        {_, M, _} when M > 0 ->
+            {stop,accepted};
         _ ->
             {error, internal_server_error}
         end
