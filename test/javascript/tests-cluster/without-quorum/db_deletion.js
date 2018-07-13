@@ -10,19 +10,21 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-// Do DB deletion in a cluster with quorum conditions.
+// Do DB creation under cluster with quorum conditions.
 couchTests.db_deletion = function(debug) {
 
   if (debug) debugger;
 
   var db_name = get_random_db_name()
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
+
   db.createDb();
-
-  //db.deleteDb();
-  // TODO DB deletions fails if the quorum is not met.
+  
+  // DB Deletion should return 202 - Acepted
   xhr = CouchDB.request("DELETE", "/" + db_name + "/");
-  //T(db.last_req.status="202","Should return 202");
-  console.log("Skipped-TODO: Fix issue 500 Error on delete. 202->"+xhr.status)
-
+  T(xhr.status == 202);
+  
+  // DB Deletion should return 404 - Not found
+  xhr = CouchDB.request("DELETE", "/not-existing-db/");
+  T(xhr.status == 404);
 };

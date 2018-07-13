@@ -23,6 +23,5 @@ couchTests.db_creation = function(debug) {
   T(xhr.status == 202);
 
   // cleanup
-  // TODO DB deletions fails if the quorum is not met.
-  xhr = CouchDB.request("DELETE", "/" + db_name + "/");
+  db.deleteDb();
 };
