@@ -791,25 +791,16 @@ increment_update_seq(#st{header = Header} = St) ->
     }.
 
 
-set_default_values(Fd, Header, Compression, Options, PtrName, OptName, DefaultValue) ->
-    case couch_bt_engine_header:get(Header, PtrName) of
+set_default_security_object(Fd, Header, Compression, Options) ->
+    case couch_bt_engine_header:get(Header, security_ptr) of
         Pointer when is_integer(Pointer) ->
             Header;
-        Val when Val =:= nil; Val =:= undefined ->
-            Default = couch_util:get_value(OptName, Options, DefaultValue),
+        _ ->
+            Default = couch_util:get_value(default_security_object, Options),
             AppendOpts = [{compression, Compression}],
             {ok, Ptr, _} = couch_file:append_term(Fd, Default, AppendOpts),
-            couch_bt_engine_header:set(Header, PtrName, Ptr)
+            couch_bt_engine_header:set(Header, security_ptr, Ptr)
     end.
-
-set_default_security_object(Fd, Header, Compression, Options) ->
-    set_default_values(Fd, Header, Compression, Options,
-        security_ptr, default_security_object, undefined).
-
-
-set_default_props(Fd, Header, Compression, Options) ->
-    set_default_values(Fd, Header, Compression, Options,
-        props_ptr, default_props, []).
 
 
 delete_compaction_files(FilePath) ->
