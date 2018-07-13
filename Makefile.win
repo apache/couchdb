@@ -14,12 +14,14 @@ include version.mk
 
 SHELL=cmd.exe
 REBAR?=$(shell where rebar.cmd)
+COUCHDB_GIT_SHA=$(git_sha)
 IN_RELEASE = $(shell if not exist .git echo true)
 ifeq ($(IN_RELEASE), true)
 COUCHDB_VERSION_SUFFIX=
 COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)
 else
-COUCHDB_VERSION_SUFFIX = -$(shell git rev-parse --short --verify HEAD)
+COUCHDB_GIT_SHA=$(shell git rev-parse --short --verify HEAD)
+COUCHDB_VERSION_SUFFIX = -$(COUCHDB_GIT_SHA)
 COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)$(COUCHDB_VERSION_SUFFIX)
 endif
 
@@ -53,7 +55,7 @@ all: couch fauxton docs
 .PHONY: couch
 # target: couch - Build CouchDB core
 couch: config.erl
-	@set COUCHDB_VERSION=$(COUCHDB_VERSION) && $(REBAR) compile
+	@set COUCHDB_VERSION=$(COUCHDB_VERSION) && set COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) && $(REBAR) compile
 	@copy src\couch\priv\couchjs.exe bin
 
 

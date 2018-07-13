@@ -39,6 +39,13 @@ Version = case os:getenv("COUCHDB_VERSION") of
         string:strip(Version0, right)
 end,
 
+GitSha = case os:getenv("COUCHDB_GIT_SHA") of
+    false ->
+        ""; % release builds won’t get a fallback
+    GitSha0 ->
+        string:strip(GitSha0, right)
+end,
+
 CouchConfig = case filelib:is_file(os:getenv("COUCHDB_CONFIG")) of
     true ->
         {ok, Result} = file:consult(os:getenv("COUCHDB_CONFIG")),
@@ -149,6 +156,7 @@ AddConfig = [
     {port_specs, PortSpecs},
     {erl_opts, PlatformDefines ++ [
         {d, 'COUCHDB_VERSION', Version},
+        {d, 'COUCHDB_GIT_SHA', GitSha},
         {i, "../"}
     ] ++ MD5Config},
     {eunit_compile_opts, PlatformDefines}

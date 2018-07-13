@@ -13,6 +13,7 @@
 include version.mk
 
 REBAR?=$(shell echo `pwd`/bin/rebar)
+COUCHDB_GIT_SHA=$(git_sha)
 IN_RELEASE = $(shell if [ ! -d .git ]; then echo true; fi)
 ifeq ($(IN_RELEASE), true)
 COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)
@@ -22,8 +23,9 @@ IN_RC = $(shell git describe --tags --always --first-parent \
 							| grep -Eo -- '-RC[0-9]+' 2>/dev/null)
 RELTAG = $(shell git describe --dirty --abbrev=0 --tags --always --first-parent \
 				| grep -Eo '^[0-9]+\.[0-9]\.[0-9]+')
+COUCHDB_GIT_SHA=$(shell git rev-parse --short --verify HEAD)
 ifeq ($(RELTAG),)
-COUCHDB_VERSION_SUFFIX = $(shell git rev-parse --short --verify HEAD)
+COUCHDB_VERSION_SUFFIX = $(COUCHDB_GIT_SHA)
 COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)-$(COUCHDB_VERSION_SUFFIX)
 else
 COUCHDB_VERSION = $(RELTAG)
@@ -82,7 +84,7 @@ help:
 .PHONY: couch
 # target: couch - Build CouchDB core, use ERL_OPTS to provide custom compiler's options
 couch: config.erl
-	@COUCHDB_VERSION=$(COUCHDB_VERSION) $(REBAR) compile $(COMPILE_OPTS)
+	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) compile $(COMPILE_OPTS)
 	@cp src/couch/priv/couchjs bin/
 
 
