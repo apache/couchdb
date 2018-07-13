@@ -92,6 +92,7 @@
 % Used by the compactor
 -export([
     set_update_seq/2,
+    update_header/2,
     copy_security/2
 ]).
 
@@ -113,7 +114,7 @@ delete(RootDir, FilePath, Async) ->
     %% Delete any leftover compaction files. If we don't do this a
     %% subsequent request for this DB will try to open them to use
     %% as a recovery.
-    delete_compaction_files(RootDir, FilePath, [{context, delete}]),
+    delete_compaction_files(RootDir, FilePath, [{context, compaction}]),
 
     % Delete the actual database file
     couch_file:delete(RootDir, FilePath, Async).
@@ -764,7 +765,7 @@ set_default_security_object(Fd, Header, Compression, Options) ->
 
 delete_compaction_files(FilePath) ->
     RootDir = config:get("couchdb", "database_dir", "."),
-    DelOpts = [{context, delete}],
+    DelOpts = [{context, compaction}],
     delete_compaction_files(RootDir, FilePath, DelOpts).
 
 

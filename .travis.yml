@@ -64,6 +64,14 @@ script:
 after_failure:
   - build-aux/logfile-uploader.py
 
+# start a push build on master and release branches + PRs build on every branch
+# Avoid double build on PRs (See https://github.com/travis-ci/travis-ci/issues/1147)
+branches:
+  only:
+    - master
+    - /^\d+\.x\.x$/
+    - /^\d+\.\d+\.x$/
+
 # Re-enable once test suite is reliable
 #notifications:
 #  email: false

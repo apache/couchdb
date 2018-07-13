@@ -314,7 +314,6 @@ delete_db_req(#httpd{}=Req, DbName) ->
     end.
 
 do_db_req(#httpd{path_parts=[DbName|_], user_ctx=Ctx}=Req, Fun) ->
-    fabric:get_security(DbName, [{user_ctx,Ctx}]), % calls check_is_reader
     {ok, Db} = couch_db:clustered_db(DbName, Ctx),
     Fun(Req, Db).
 
