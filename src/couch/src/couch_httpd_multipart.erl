@@ -263,14 +263,15 @@ atts_to_mp([{Att, Name, Len, Type, Encoding} | RestAtts], Boundary, WriteFun,
     WriteFun(<<"\r\n--", Boundary/binary>>),
     atts_to_mp(RestAtts, Boundary, WriteFun, AttFun).
 
-length_multipart_stream(Boundary, JsonBytes, Atts) ->
+length_multipart_stream(BoundarySize, JsonByteSize, Atts) when
+        is_integer(BoundarySize), is_integer(JsonByteSize) ->
     AttsSize = lists:foldl(fun({_Att, Name, Len, Type, Encoding}, AccAttsSize) ->
           AccAttsSize +
           4 + % "\r\n\r\n"
           length(integer_to_list(Len)) +
           Len +
           4 + % "\r\n--"
-          size(Boundary) +
+          BoundarySize +
           % attachment headers
           % (the length of the Content-Length has already been set)
           size(Name) +
@@ -287,15 +288,15 @@ length_multipart_stream(Boundary, JsonBytes, Atts) ->
           end
         end, 0, Atts),
     if AttsSize == 0 ->
-        {<<"application/json">>, iolist_size(JsonBytes)};
+        {json, JsonByteSize};
     true ->
-        {<<"multipart/related; boundary=\"", Boundary/binary, "\"">>,
+        {multipart,
             2 + % "--"
-            size(Boundary) +
+            BoundarySize +
             36 + % "\r\ncontent-type: application/json\r\n\r\n"
-            iolist_size(JsonBytes) +
+            JsonByteSize +
             4 + % "\r\n--"
-            size(Boundary) +
+            BoundarySize +
             + AttsSize +
             2 % "--"
             }
