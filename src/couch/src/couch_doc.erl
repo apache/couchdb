@@ -148,7 +148,7 @@ from_json_obj_validate(EJson, DbName) ->
 validate_total_document_size(#doc{id=DocId, body=Body, atts=Atts0}=Doc) ->
     couch_log:debug("~nData: ~p~n", [Doc]),
     MaxReqSize = config:get_integer("httpd", "max_http_request_size", 4294967296), % 4 GB
-    Boundary = couch_uuids:random(), % mock boundary, is only used for the length
+    Boundary = <<"d07e231b4fc27759fd822449377fcba7">>,
     Atts = lists:map(fun couch_att:to_tuple/1, Atts0),
     {_, DocSum} = couch_httpd_multipart:length_multipart_stream(Boundary,
         ?JSON_ENCODE(Body), Atts),
