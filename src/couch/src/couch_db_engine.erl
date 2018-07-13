@@ -180,6 +180,11 @@
 -callback get_compacted_seq(DbHandle::db_handle()) ->
             CompactedSeq::non_neg_integer().
 
+% Whether the database is partitioned by the user's choice of
+% document id
+-callback get_partitioned(DbHAndle::db_handle()) ->
+            Partitioned::boolean().
+
 
 % The number of documents in the database which have all leaf
 % revisions marked as deleted.
@@ -593,6 +598,7 @@
 
     get_engine/1,
     get_compacted_seq/1,
+    get_partitioned/1,
     get_del_doc_count/1,
     get_disk_version/1,
     get_doc_count/1,
@@ -715,6 +721,11 @@ get_engine(#db{} = Db) ->
 get_compacted_seq(#db{} = Db) ->
     #db{engine = {Engine, EngineState}} = Db,
     Engine:get_compacted_seq(EngineState).
+
+
+get_partitioned(#db{} = Db) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    Engine:get_partitioned(EngineState).
 
 
 get_del_doc_count(#db{} = Db) ->

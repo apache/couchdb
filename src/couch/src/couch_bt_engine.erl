@@ -31,6 +31,7 @@
     last_activity/1,
 
     get_compacted_seq/1,
+    get_partitioned/1,
     get_del_doc_count/1,
     get_disk_version/1,
     get_doc_count/1,
@@ -197,6 +198,10 @@ last_activity(#st{fd = Fd}) ->
 
 get_compacted_seq(#st{header = Header}) ->
     couch_bt_engine_header:get(Header, compacted_seq).
+
+
+get_partitioned(#st{header = Header}) ->
+    couch_bt_engine_header:get(Header, partitioned).
 
 
 get_del_doc_count(#st{} = St) ->
@@ -682,7 +687,8 @@ init_state(FilePath, Fd, Header0, Options) ->
     Compression = couch_compress:get_compression_method(),
 
     Header1 = couch_bt_engine_header:upgrade(Header0),
-    Header = set_default_security_object(Fd, Header1, Compression, Options),
+    Header2 = set_default_security_object(Fd, Header1, Compression, Options),
+    Header = set_partitioned(Header2, Options),
 
     IdTreeState = couch_bt_engine_header:id_tree_state(Header),
     {ok, IdTree} = couch_btree:open(IdTreeState, Fd, [
@@ -761,6 +767,11 @@ set_default_security_object(Fd, Header, Compression, Options) ->
             {ok, Ptr, _} = couch_file:append_term(Fd, Default, AppendOpts),
             couch_bt_engine_header:set(Header, security_ptr, Ptr)
     end.
+
+
+set_partitioned(Header, Options) ->
+    Partitioned = lists:member(partitioned, Options),
+    couch_bt_engine_header:set(Header, partitioned, true).
 
 
 delete_compaction_files(FilePath) ->
@@ -933,6 +944,7 @@ finish_compaction_int(#st{} = OldSt, #st{} = NewSt1) ->
     {ok, NewSt2} = commit_data(NewSt1#st{
         header = couch_bt_engine_header:set(Header, [
             {compacted_seq, get_update_seq(OldSt)},
+            {partitioned, get_partitioned(OldSt)},
             {revs_limit, get_revs_limit(OldSt)}
         ]),
         local_tree = NewLocal2

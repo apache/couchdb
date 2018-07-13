@@ -37,7 +37,8 @@
     revs_limit/1,
     uuid/1,
     epochs/1,
-    compacted_seq/1
+    compacted_seq/1,
+    partitioned/1
 ]).
 
 
@@ -66,7 +67,8 @@
     revs_limit = 1000,
     uuid,
     epochs,
-    compacted_seq
+    compacted_seq,
+    partitioned
 }).
 
 
@@ -82,7 +84,8 @@ from(Header0) ->
     #db_header{
         uuid = Header#db_header.uuid,
         epochs = Header#db_header.epochs,
-        compacted_seq = Header#db_header.compacted_seq
+        compacted_seq = Header#db_header.compacted_seq,
+        partitioned = Header#db_header.partitioned
     }.
 
 
@@ -101,7 +104,8 @@ upgrade(Header) ->
         fun upgrade_disk_version/1,
         fun upgrade_uuid/1,
         fun upgrade_epochs/1,
-        fun upgrade_compacted_seq/1
+        fun upgrade_compacted_seq/1,
+        fun upgrade_partitioned/1
     ],
     lists:foldl(fun(F, HdrAcc) ->
         F(HdrAcc)
@@ -176,6 +180,10 @@ epochs(Header) ->
 
 compacted_seq(Header) ->
     get_field(Header, compacted_seq).
+
+
+partitioned(Header) ->
+    get_field(Header, partitioned).
 
 
 get_field(Header, Field) ->
@@ -300,6 +308,14 @@ upgrade_compacted_seq(#db_header{}=Header) ->
         undefined ->
             Header#db_header{compacted_seq=0};
         _ ->
+            Header
+    end.
+
+upgrade_partitioned(#db_header{}=Header) ->
+    case Header#db_header.partitioned of
+        undefined ->
+            Header#db_header{partitioned=false};
+        Partitioned when is_boolean(Partitioned) ->
             Header
     end.
 

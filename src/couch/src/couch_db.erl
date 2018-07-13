@@ -36,6 +36,7 @@
     get_before_doc_update_fun/1,
     get_committed_update_seq/1,
     get_compacted_seq/1,
+    get_partitioned/1,
     get_compactor_pid/1,
     get_db_info/1,
     get_del_doc_count/1,
@@ -418,6 +419,11 @@ get_instance_start_time(#db{instance_start_time = IST}) ->
 get_compacted_seq(#db{}=Db) ->
     couch_db_engine:get_compacted_seq(Db).
 
+
+get_partitioned(#db{}=Db) ->
+    couch_db_engine:get_partitioned(Db).
+
+
 get_compactor_pid(#db{compactor_pid = Pid}) ->
     Pid.
 
@@ -443,6 +449,10 @@ get_db_info(Db) ->
         undefined -> null;
         Else1 -> Else1
     end,
+    Partitioned = case get_partitioned(Db) of
+        undefined -> null;
+        Else2 -> Else2
+    end,
     InfoList = [
         {db_name, Name},
         {engine, couch_db_engine:get_engine(Db)},
@@ -464,6 +474,7 @@ get_db_info(Db) ->
         {disk_format_version, DiskVersion},
         {committed_update_seq, CommittedUpdateSeq},
         {compacted_seq, CompactedSeq},
+        {partitioned, Partitioned},
         {uuid, Uuid}
     ],
     {ok, InfoList}.
