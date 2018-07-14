@@ -205,6 +205,13 @@ couchTests.users_db = function(debug) {
       } finally {
         CouchDB.login("jan", "apple");
         usersDb.deleteDb(); // cleanup
+        waitForSuccess(function() {
+            var req = CouchDB.request("GET", usersDb.name);
+            if (req.status == 404) {
+              return true
+            }
+            throw({});
+        }, "usersdb.deleteDb")
         usersDb.createDb();
         usersDbAlt.deleteDb(); // cleanup
       }
