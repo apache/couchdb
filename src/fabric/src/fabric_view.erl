@@ -230,8 +230,9 @@ get_next_row(#collector{reducer = RedSrc} = St) when RedSrc =/= undefined ->
         end, Counters0, Records),
         Wrapped = [[V] || #view_row{value=V} <- Records],
         {ok, [Reduced]} = couch_query_servers:rereduce(Lang, [RedSrc], Wrapped),
+        {ok, Finalized} = couch_query_servers:finalize(RedSrc, Reduced),
         NewSt = St#collector{keys=RestKeys, rows=NewRowDict, counters=Counters},
-        {#view_row{key=Key, id=reduced, value=Reduced}, NewSt};
+        {#view_row{key=Key, id=reduced, value=Finalized}, NewSt};
     error ->
         get_next_row(St#collector{keys=RestKeys})
     end;

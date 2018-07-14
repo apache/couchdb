@@ -48,3 +48,6 @@
 
 # Force use of the smp scheduler, fixes #1296
 -smp enable
+
+# Set maximum SSL session lifetime to reap terminated replication readers
+-ssl session_lifetime 300

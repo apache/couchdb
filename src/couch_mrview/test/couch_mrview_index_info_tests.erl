@@ -18,13 +18,12 @@
 -define(TIMEOUT, 1000).
 
 
--ifdef(run_broken_tests).
-
 setup() ->
     {ok, Db} = couch_mrview_test_util:init_db(?tempdb(), map),
     couch_mrview:query_view(Db, <<"_design/bar">>, <<"baz">>),
     {ok, Info} = couch_mrview:get_info(Db, <<"_design/bar">>),
     {Db, Info}.
+
 
 teardown({Db, _}) ->
     couch_db:close(Db),
@@ -37,39 +36,86 @@ view_info_test_() ->
         "Views index tests",
         {
             setup,
-            fun test_util:start_couch/0, fun test_util:stop_couch/1,
+            fun test_util:start_couch/0,
+            fun test_util:stop_couch/1,
             {
                 foreach,
-                fun setup/0, fun teardown/1,
+                fun setup/0,
+                fun teardown/1,
                 [
-                    fun should_get_property/1
+                    fun sig_is_binary/1,
+                    fun language_is_js/1,
+                    fun file_size_is_non_neg_int/1,
+                    fun active_size_is_non_neg_int/1,
+                    fun external_size_is_non_neg_int/1,
+                    fun disk_size_is_file_size/1,
+                    fun data_size_is_external_size/1,
+                    fun active_size_less_than_file_size/1,
+                    fun update_seq_is_non_neg_int/1,
+                    fun purge_seq_is_non_neg_int/1,
+                    fun update_opts_is_bin_list/1
                 ]
             }
         }
     }.
 
 
-should_get_property({_, Info}) ->
-    InfoProps = [
-        {signature, <<"276df562b152b3c4e5d34024f62672ed">>},
-        {language, <<"javascript">>},
-        {disk_size, 314},
-        {data_size, 263},
-        {update_seq, 11},
-        {purge_seq, 0},
-        {updater_running, false},
-        {compact_running, false},
-        {waiting_clients, 0}
-    ],
-    [
-        {atom_to_list(Key), ?_assertEqual(Val, getval(Key, Info))}
-        || {Key, Val} <- InfoProps
-    ].
+sig_is_binary({_, Info}) ->
+    ?_assert(is_binary(prop(signature, Info))).
 
 
-getval(Key, PL) ->
-    {value, {Key, Val}} = lists:keysearch(Key, 1, PL),
-    Val.
+language_is_js({_, Info}) ->
+    ?_assertEqual(<<"javascript">>, prop(language, Info)).
 
 
--endif.
+file_size_is_non_neg_int({_, Info}) ->
+    ?_assert(check_non_neg_int([sizes, file], Info)).
+
+
+active_size_is_non_neg_int({_, Info}) ->
+    ?_assert(check_non_neg_int([sizes, active], Info)).
+
+
+external_size_is_non_neg_int({_, Info}) ->
+    ?_assert(check_non_neg_int([sizes, external], Info)).
+
+
+disk_size_is_file_size({_, Info}) ->
+    ?_assertEqual(prop([sizes, file], Info), prop(disk_size, Info)).
+
+
+data_size_is_external_size({_, Info}) ->
+    ?_assertEqual(prop([sizes, external], Info), prop(data_size, Info)).
+
+
+active_size_less_than_file_size({_, Info}) ->
+    ?_assert(prop([sizes, active], Info) < prop([sizes, file], Info)).
+
+
+update_seq_is_non_neg_int({_, Info}) ->
+    ?_assert(check_non_neg_int(update_seq, Info)).
+
+
+purge_seq_is_non_neg_int({_, Info}) ->
+    ?_assert(check_non_neg_int(purge_seq, Info)).
+
+
+update_opts_is_bin_list({_, Info}) ->
+    Opts = prop(update_options, Info),
+    ?_assert(is_list(Opts) andalso
+            (Opts == [] orelse lists:all([is_binary(B) || B <- Opts]))).
+
+
+check_non_neg_int(Key, Info) ->
+    Size = prop(Key, Info),
+    is_integer(Size) andalso Size >= 0.
+
+
+prop(Key, {Props}) when is_list(Props) ->
+    prop(Key, Props);
+prop([Key], Info) ->
+    prop(Key, Info);
+prop([Key | Rest], Info) ->
+    prop(Rest, prop(Key, Info));
+prop(Key, Info) when is_atom(Key), is_list(Info) ->
+    couch_util:get_value(Key, Info).
