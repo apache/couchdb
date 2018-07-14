@@ -176,13 +176,13 @@ handle_db_updater_info({'DOWN', Ref, _, _, _}, #st{fd_monitor=Ref} = St) ->
 
 
 incref(St) ->
-    incref(St,couch_file:lock(St#st.fd)).
+    incref(St,lock(St)).
 
 incref(St, true = _Locked) ->
     % first monitor
     Ref = erlang:monitor(process, St#st.fd),
     % than release the lock
-    couch_file:unlock(St#st.fd),
+    unlock(St),
     % ok
     {ok, St#st{fd_monitor = Ref}};
 % we are not able to write the lock,
