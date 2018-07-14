@@ -61,13 +61,14 @@ get(info, State) ->
     } = State,
     {ok, FileSize} = couch_file:bytes(Fd),
     {ok, ExternalSize} = couch_mrview_util:calculate_external_size(Views),
+    {ok, ActiveViewSize} = couch_mrview_util:calculate_active_size(Views),
     LogBtSize = case LogBtree of
         nil ->
             0;
         _ ->
             couch_btree:size(LogBtree)
     end,
-    ActiveSize = couch_btree:size(IdBtree) + LogBtSize + ExternalSize,
+    ActiveSize = couch_btree:size(IdBtree) + LogBtSize + ActiveViewSize,
 
     UpdateOptions0 = get(update_options, State),
     UpdateOptions = [atom_to_binary(O, latin1) || O <- UpdateOptions0],

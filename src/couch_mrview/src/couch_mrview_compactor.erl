@@ -233,6 +233,8 @@ compact_view(#mrview{id_num=VID}=View, EmptyView, BufferSize, Acc0) ->
 
     {EmptyView#mrview{btree=NewBt,
                       seq_btree=NewSeqBt,
+                      update_seq=View#mrview.update_seq,
+                      purge_seq=View#mrview.purge_seq,
                       key_byseq_btree=NewKeyBySeqBt}, FinalAcc}.
 
 compact_view_btree(Btree, EmptyBtree, VID, BufferSize, Acc0) ->
