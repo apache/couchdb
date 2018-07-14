@@ -74,6 +74,8 @@ compaction_daemon_test_() ->
 
 should_compact_by_default_rule(DbName) ->
     {timeout, ?TIMEOUT_S, ?_test(begin
+        couch_log:error("XKCD: I AM TEST!", []),
+
         CompactionMonitor = spawn_compaction_monitor(DbName),
 
         {_, DbFileSize} = get_db_frag(DbName),
@@ -93,6 +95,8 @@ should_compact_by_default_rule(DbName) ->
 
         {DbFrag2, DbFileSize2} = get_db_frag(DbName),
         {ViewFrag2, ViewFileSize2} = get_view_frag(DbName),
+
+        couch_log:error("XKCD: ~p ~p ~p", [DbFileSize, DbFileSize2, DbFrag2]),
 
         ?assert(DbFrag2 < 70),
         ?assert(ViewFrag2 < 70),
@@ -196,6 +200,7 @@ get_db_frag(DbName) ->
     couch_db:close(Db),
     FileSize = get_size(file, Info),
     DataSize = get_size(active, Info),
+    couch_log:error("XKCD: ~p ~p ~w", [FileSize, DataSize, Info]),
     {round((FileSize - DataSize) / FileSize * 100), FileSize}.
 
 get_view_frag(DbName) ->
