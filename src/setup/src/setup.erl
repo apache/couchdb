@@ -30,15 +30,29 @@ require_node_count(undefined) ->
 require_node_count(_) ->
     ok.
 
-error_bind_address() ->
-    throw({error, "Cluster setup requires bind_addres != 127.0.0.1"}).
+error_local_bind_address() ->
+    throw({error, "Cluster setup requires a remote bind_address (not 127.0.0.1 nor ::1)"}).
 
-require_bind_address("127.0.0.1", undefined) ->
-    error_bind_address();
-require_bind_address("127.0.0.1", <<"127.0.0.1">>) ->
-    error_bind_address();
-require_bind_address(_, _) ->
-    ok.
+error_invalid_bind_address(InvalidBindAddress) ->
+    throw({error, io:format("Setup requires a valid IP bind_address. " ++
+                         "~p is invalid.", [InvalidBindAddress])}).
+
+require_remote_bind_address(OldBindAddress, NewBindAddress) ->
+    case {OldBindAddress, NewBindAddress} of
+        {"127.0.0.1", undefined} -> error_local_bind_address();
+        {_, <<"127.0.0.1">>} -> error_local_bind_address();
+        {"::1", undefined} -> error_local_bind_address();
+        {_, <<"::1">>} -> error_local_bind_address();
+        {_, undefined} -> ok;
+        {_, PresentNewBindAddress} -> require_valid_bind_address(PresentNewBindAddress)
+    end.
+
+require_valid_bind_address(BindAddress) ->
+    ListBindAddress = binary_to_list(BindAddress),
+    case inet_parse:address(ListBindAddress) of
+        {ok, _} -> ok;
+        {error, _} -> error_invalid_bind_address(ListBindAddress)
+    end.
 
 is_cluster_enabled() ->
     % bind_address != 127.0.0.1 AND admins != empty
@@ -143,7 +157,7 @@ enable_cluster_int(Options, false) ->
     % if bind_address == 127.0.0.1 and no bind_address in req -> error
     CurrentBindAddress = config:get("chttpd","bind_address"),
     NewBindAddress = proplists:get_value(bind_address, Options),
-    ok = require_bind_address(CurrentBindAddress, NewBindAddress),
+    ok = require_remote_bind_address(CurrentBindAddress, NewBindAddress),
     NodeCount = couch_util:get_value(node_count, Options),
     ok = require_node_count(NodeCount),
     Port = proplists:get_value(port, Options),
@@ -162,6 +176,7 @@ setup_node(NewCredentials, NewBindAddress, NodeCount, Port) ->
             set_admin(Username, Password)
     end,
 
+    ok = require_valid_bind_address(NewBindAddress),
     case NewBindAddress of
         undefined ->
             config:set("chttpd", "bind_address", "0.0.0.0");
