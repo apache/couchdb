@@ -189,6 +189,28 @@ defmodule CouchTestCase do
           }
         end
       end
+
+      def retry_until(condition, sleep \\ 100, timeout \\ 5000) do
+        retry_until(condition, now(:ms), sleep, timeout)
+      end
+
+      defp retry_until(condition, start, sleep, timeout) do
+        if (now(:ms) > start + timeout) do
+          raise "timed out"
+        else
+          if condition.() do
+            :ok
+          else
+            :timer.sleep(sleep)
+            retry_until(condition, start, sleep, timeout)
+          end
+        end
+      end
+
+      defp now(:ms) do
+        div(:erlang.system_time, 100000)
+      end
+
     end
   end
 end
