@@ -136,7 +136,6 @@ enable_cluster_http(Options) ->
         {ok, "201", _, _} ->
             ok;
         Else ->
-            couch_log:notice("send_req: ~p~n", [Else]),
             {error, Else}
     end.
 
@@ -163,7 +162,7 @@ enable_cluster_int(Options, false) ->
     Port = proplists:get_value(port, Options),
 
     setup_node(NewCredentials, NewBindAddress, NodeCount, Port),
-    couch_log:notice("Enable Cluster: ~p~n", [Options]).
+    couch_log:debug("Enable Cluster: ~p~n", [Options]).
 
 set_admin(Username, Password) ->
     config:set("admins", binary_to_list(Username), binary_to_list(Password)).
@@ -226,7 +225,7 @@ enable_single_node(Options) ->
     setup_node(NewCredentials, NewBindAddress, 1, Port),
     Dbs = proplists:get_value(ensure_dbs_exist, Options, cluster_system_dbs()),
     finish_cluster_int(Dbs, has_cluster_system_dbs(Dbs)),
-    couch_log:notice("Enable Single Node: ~p~n", [Options]).
+    couch_log:debug("Enable Single Node: ~p~n", [Options]).
 
 
 add_node(Options) ->
@@ -235,7 +234,7 @@ add_node(Options) ->
 add_node_int(_Options, false) ->
     {error, cluster_not_enabled};
 add_node_int(Options, true) ->
-    couch_log:notice("add node_int: ~p~n", [Options]),
+    couch_log:debug("add node_int: ~p~n", [Options]),
     ErlangCookie = erlang:get_cookie(),
 
     % POST to nodeB/_setup
@@ -266,7 +265,6 @@ add_node_int(Options, true) ->
             % when done, PUT :5986/nodes/nodeB
             create_node_doc(Host, Name);
         Else ->
-            couch_log:notice("send_req: ~p~n", [Else]),
             Else
     end.
 
