@@ -23,6 +23,7 @@
 -export([fold/4, fold_reduce/4]).
 -export([temp_view_to_ddoc/1]).
 -export([calculate_external_size/1]).
+-export([calculate_active_size/1]).
 -export([validate_args/1]).
 -export([maybe_load_doc/3, maybe_load_doc/4]).
 -export([maybe_update_index_file/1]).
@@ -828,6 +829,22 @@ calculate_external_size(Views) ->
         end
     end,
     {ok, lists:foldl(SumFun, 0, Views)}.
+
+
+calculate_active_size(Views) ->
+    BtSize = fun
+        (nil) -> 0;
+        (Bt) -> couch_btree:size(Bt)
+    end,
+    FoldFun = fun(View, Acc) ->
+        Sizes = [
+            BtSize(View#mrview.btree),
+            BtSize(View#mrview.seq_btree),
+            BtSize(View#mrview.key_byseq_btree)
+        ],
+        Acc + lists:sum([S || S <- Sizes, is_integer(S)])
+    end,
+    {ok, lists:foldl(FoldFun, 0, Views)}.
 
 
 sum_btree_sizes(nil, _) ->

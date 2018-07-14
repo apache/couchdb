@@ -17,6 +17,7 @@
 
 -export([default_authentication_handler/1]).
 -export([cookie_authentication_handler/1]).
+-export([proxy_authentication_handler/1]).
 -export([party_mode_handler/1]).
 
 -export([handle_session_req/1]).
@@ -46,6 +47,9 @@ default_authentication_handler(Req) ->
 
 cookie_authentication_handler(Req) ->
     couch_httpd_auth:cookie_authentication_handler(Req, chttpd_auth_cache).
+
+proxy_authentication_handler(Req) ->
+    couch_httpd_auth:proxy_authentication_handler(Req).
 
 party_mode_handler(Req) ->
     case config:get("chttpd", "require_valid_user", "false") of

@@ -17,7 +17,11 @@ IN_RELEASE = $(shell if [ ! -d .git ]; then echo true; fi)
 ifeq ($(IN_RELEASE), true)
 COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)
 else
-RELTAG = $(shell git describe | grep -E '^[0-9]+\.[0-9]\.[0-9]+(-RC[0-9]+)?$$')
+# IN_RC generates a tarball that has the -RCx suffix in the name if needed
+IN_RC = $(shell git describe --tags --always --first-parent \
+							| grep -Eo -- '-RC[0-9]+' 2>/dev/null)
+RELTAG = $(shell git describe --dirty --abbrev=0 --tags --always --first-parent \
+				| grep -Eo '^[0-9]+\.[0-9]\.[0-9]+')
 ifeq ($(RELTAG),)
 COUCHDB_VERSION_SUFFIX = $(shell git rev-parse --short --verify HEAD)
 COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)-$(COUCHDB_VERSION_SUFFIX)
@@ -30,20 +34,23 @@ DESTDIR=
 
 # Rebar options
 apps=
-skip_deps=folsom,meck,mochiweb,triq,snappy
+skip_deps=folsom,meck,mochiweb,triq,snappy,bcrypt,hyper
 suites=
 tests=
 
+COMPILE_OPTS=$(shell echo "\
+	apps=$(apps) \
+	" | sed -e 's/[a-z_]\{1,\}= / /g')
 EUNIT_OPTS=$(shell echo "\
 	apps=$(apps) \
 	skip_deps=$(skip_deps) \
 	suites=$(suites) \
 	tests=$(tests) \
-	" | sed -e 's/[a-z]\+= / /g')
+	" | sed -e 's/[a-z]\{1,\}= / /g')
 DIALYZE_OPTS=$(shell echo "\
 	apps=$(apps) \
 	skip_deps=$(skip_deps) \
-	" | sed -e 's/[a-z]\+= / /g')
+	" | sed -e 's/[a-z]\{1,\}= / /g')
 
 #ignore javascript tests
 ignore_js_suites=
@@ -73,9 +80,9 @@ help:
 
 
 .PHONY: couch
-# target: couch - Build CouchDB core
+# target: couch - Build CouchDB core, use ERL_OPTS to provide custom compiler's options
 couch: config.erl
-	@COUCHDB_VERSION=$(COUCHDB_VERSION) $(REBAR) compile
+	@COUCHDB_VERSION=$(COUCHDB_VERSION) $(REBAR) compile $(COMPILE_OPTS)
 	@cp src/couch/priv/couchjs bin/
 
 
@@ -289,8 +296,8 @@ dist: all
 	@mkdir -p apache-couchdb-$(COUCHDB_VERSION)/share/docs/man
 	@cp src/docs/build/man/apachecouchdb.1 apache-couchdb-$(COUCHDB_VERSION)/share/docs/man/
 
-	@tar czf apache-couchdb-$(COUCHDB_VERSION).tar.gz apache-couchdb-$(COUCHDB_VERSION)
-	@echo "Done: apache-couchdb-$(COUCHDB_VERSION).tar.gz"
+	@tar czf apache-couchdb-$(COUCHDB_VERSION)$(IN_RC).tar.gz apache-couchdb-$(COUCHDB_VERSION)
+	@echo "Done: apache-couchdb-$(COUCHDB_VERSION)$(IN_RC).tar.gz"
 
 
 .PHONY: release

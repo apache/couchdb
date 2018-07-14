@@ -879,16 +879,10 @@ prep_and_validate_replicated_updates(Db, [Bucket|RestBuckets], [OldInfo|RestOldI
             {[], AccErrors}, Bucket),
         prep_and_validate_replicated_updates(Db, RestBuckets, RestOldInfo, [ValidatedBucket | AccPrepped], AccErrors3);
     #full_doc_info{rev_tree=OldTree} ->
-        RevsLimit = get_revs_limit(Db),
         OldLeafs = couch_key_tree:get_all_leafs_full(OldTree),
         OldLeafsLU = [{Start, RevId} || {Start, [{RevId, _}|_]} <- OldLeafs],
-        NewRevTree = lists:foldl(
-            fun(NewDoc, AccTree) ->
-                {NewTree, _} = couch_key_tree:merge(AccTree,
-                    couch_doc:to_path(NewDoc), RevsLimit),
-                NewTree
-            end,
-            OldTree, Bucket),
+        NewPaths = lists:map(fun couch_doc:to_path/1, Bucket),
+        NewRevTree = couch_key_tree:multi_merge(OldTree, NewPaths),
         Leafs = couch_key_tree:get_all_leafs_full(NewRevTree),
         LeafRevsFullDict = dict:from_list( [{{Start, RevId}, FullPath} || {Start, [{RevId, _}|_]}=FullPath <- Leafs]),
         {ValidatedBucket, AccErrors3} =
