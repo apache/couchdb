@@ -340,7 +340,7 @@ doc_member(Db, RowProps, Opts, ExecutionStats) ->
         undefined ->
             ExecutionStats1 = mango_execution_stats:incr_quorum_docs_examined(ExecutionStats),
             Id = couch_util:get_value(id, RowProps),
-            case mango_util:defer(fabric, open_doc, [Db, Id, Opts]) of
+            case fabric_util:defer(fabric, open_doc, [Db, Id, Opts]) of
                 {ok, #doc{}=Doc} ->
                     {ok, couch_doc:to_json_obj(Doc, []), {execution_stats, ExecutionStats1}};
                 Else ->

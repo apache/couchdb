@@ -20,6 +20,7 @@
 -export([log_timeout/2, remove_done_workers/2]).
 -export([is_users_db/1, is_replicator_db/1, fake_db/2]).
 -export([upgrade_mrargs/1]).
+-export([defer/3]).
 
 -compile({inline, [{doc_id_and_rev,1}]}).
 
@@ -265,6 +266,29 @@ create_monitors(Shards) ->
         rexi_utils:server_pid(N) || #shard{node=N} <- Shards
     ]),
     rexi_monitor:start(MonRefs).
+
+
+defer(Mod, Fun, Args) ->
+    {Pid, Ref} = erlang:spawn_monitor(?MODULE, do_defer, [Mod, Fun, Args]),
+    receive
+        {'DOWN', Ref, process, Pid, {defer_ok, Value}} ->
+            Value;
+        {'DOWN', Ref, process, Pid, {defer_failed, Class, Reason, Stack}} ->
+            erlang:raise(Class, Reason, Stack)
+    end.
+
+
+do_defer(Mod, Fun, Args) ->
+    try erlang:apply(Mod, Fun, Args) of
+        Resp ->
+            erlang:exit({defer_ok, Resp})
+    catch
+        Class:Reason ->
+            Stack = erlang:get_stacktrace(),
+            couch_log:error("Defered error: ~w~n    ~p", [{Class, Reason}, Stack]),
+            erlang:exit({defer_failed, Class, Reason, Stack})
+    end.
+
 
 %% verify only id and rev are used in key.
 update_counter_test() ->
