@@ -92,6 +92,8 @@ get_admin(UserName) when is_list(UserName) ->
     "-pbkdf2-" ++ HashedPwdSaltAndIterations ->
         [HashedPwd, Salt, Iterations] = string:tokens(HashedPwdSaltAndIterations, ","),
         make_admin_doc(HashedPwd, Salt, Iterations);
+    "-bcrypt-" ++ HashedPwd ->
+        make_admin_doc(HashedPwd);
     _Else ->
 	nil
     end.
@@ -107,6 +109,11 @@ make_admin_doc(DerivedKey, Salt, Iterations) ->
      {<<"salt">>, ?l2b(Salt)},
      {<<"iterations">>, list_to_integer(Iterations)},
      {<<"password_scheme">>, <<"pbkdf2">>},
+     {<<"derived_key">>, ?l2b(DerivedKey)}].
+
+make_admin_doc(DerivedKey) ->
+    [{<<"roles">>, [<<"_admin">>]},
+     {<<"password_scheme">>, <<"bcrypt">>},
      {<<"derived_key">>, ?l2b(DerivedKey)}].
 
 get_from_cache(UserName) ->
@@ -327,13 +334,8 @@ refresh_entries(AuthDb) ->
         AuthDb2Seq = couch_db:get_update_seq(AuthDb2),
         case AuthDb2Seq > AuthDbSeq of
         true ->
-            {ok, _, _} = couch_db:enum_docs_since(
-                AuthDb2,
-                AuthDbSeq,
-                fun(DocInfo, _, _) -> refresh_entry(AuthDb2, DocInfo) end,
-                AuthDbSeq,
-                []
-            ),
+            Fun = fun(DocInfo, _) -> refresh_entry(AuthDb2, DocInfo) end,
+            {ok, _} = couch_db:fold_changes(AuthDb2, AuthDbSeq, Fun, nil),
             true = ets:insert(?STATE, {auth_db, AuthDb2});
         false ->
             ok

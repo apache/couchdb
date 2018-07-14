@@ -28,6 +28,7 @@ share/server/main.js
 share/www
 src/b64url/
 src/bear/
+src/bcrypt/
 src/config/
 src/couch/priv/couch_js/config.h
 src/couch/priv/couchjs
@@ -51,8 +52,9 @@ src/meck/
 src/mochiweb/
 src/oauth/
 src/rebar/
-src/setup/
 src/snappy/
+src/triq/
+src/hyper/
 tmp/
 
 src/couch/*.o

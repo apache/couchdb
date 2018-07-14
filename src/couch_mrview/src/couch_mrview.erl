@@ -41,6 +41,7 @@
     user_acc,
     last_go=ok,
     reduce_fun,
+    finalizer,
     update_seq,
     args
 }).
@@ -183,6 +184,8 @@ validate(DbName,  DDoc) ->
             ({_RedName, <<"_count", _/binary>>}) ->
                 ok;
             ({_RedName, <<"_stats", _/binary>>}) ->
+                ok;
+            ({_RedName, <<"_approx_count_distinct", _/binary>>}) ->
                 ok;
             ({_RedName, <<"_", _/binary>> = Bad}) ->
                 Msg = ["`", Bad, "` is not a supported reduce function."],
@@ -423,8 +426,18 @@ all_docs_fold(Db, #mrargs{keys=undefined}=Args, Callback, UAcc) ->
         update_seq=UpdateSeq,
         args=Args
     },
-    [Opts] = couch_mrview_util:all_docs_key_opts(Args),
-    {ok, Offset, FinalAcc} = couch_db:enum_docs(Db, fun map_fold/3, Acc, Opts),
+    [Opts1] = couch_mrview_util:all_docs_key_opts(Args),
+    % TODO: This is a terrible hack for now. We'll probably have
+    % to rewrite _all_docs to not be part of mrview and not expect
+    % a btree. For now non-btree's will just have to pass 0 or
+    % some fake reductions to get an offset.
+    Opts2 = [include_reductions | Opts1],
+    FunName = case couch_util:get_value(namespace, Args#mrargs.extra) of
+        <<"_design">> -> fold_design_docs;
+        <<"_local">> -> fold_local_docs;
+        _ -> fold_docs
+    end,
+    {ok, Offset, FinalAcc} = couch_db:FunName(Db, fun map_fold/3, Acc, Opts2),
     finish_fold(FinalAcc, [{total, Total}, {offset, Offset}]);
 all_docs_fold(Db, #mrargs{direction=Dir, keys=Keys0}=Args, Callback, UAcc) ->
     ReduceFun = get_reduce_fun(Args),
@@ -539,17 +552,25 @@ map_fold({{Key, Id}, Val}, _Offset, Acc) ->
         user_acc=UAcc1,
         last_go=Go
     }};
-map_fold({<<"_local/",_/binary>> = DocId, {Rev0, Body}}, _Offset, #mracc{} = Acc) ->
+map_fold(#doc{id = <<"_local/", _/binary>>} = Doc, _Offset, #mracc{} = Acc) ->
     #mracc{
         limit=Limit,
         callback=Callback,
         user_acc=UAcc0,
         args=Args
     } = Acc,
-    Rev = {0, list_to_binary(integer_to_list(Rev0))},
-    Value = {[{rev, couch_doc:rev_to_str(Rev)}]},
-    Doc = if Args#mrargs.include_docs -> [{doc, Body}]; true -> [] end,
-    Row = [{id, DocId}, {key, DocId}, {value, Value}] ++ Doc,
+    #doc{
+        id = DocId,
+        revs = {Pos, [RevId | _]}
+    } = Doc,
+    Rev = {Pos, RevId},
+    Row = [
+        {id, DocId},
+        {key, DocId},
+        {value, {[{rev, couch_doc:rev_to_str(Rev)}]}}
+    ] ++ if not Args#mrargs.include_docs -> []; true ->
+        [{doc, couch_doc:to_json_obj(Doc, Args#mrargs.doc_options)}]
+    end,
     {Go, UAcc1} = Callback({row, Row}, UAcc0),
     {Go, Acc#mracc{
         limit=Limit-1,
@@ -559,7 +580,14 @@ map_fold({<<"_local/",_/binary>> = DocId, {Rev0, Body}}, _Offset, #mracc{} = Acc
         last_go=Go
     }}.
 
-red_fold(Db, {_Nth, _Lang, View}=RedView, Args, Callback, UAcc) ->
+red_fold(Db, {NthRed, _Lang, View}=RedView, Args, Callback, UAcc) ->
+    Finalizer = case couch_util:get_value(finalizer, Args#mrargs.extra) of
+        undefined ->
+            {_, FunSrc} = lists:nth(NthRed, View#mrview.reduce_funs),
+            FunSrc;
+        CustomFun->
+            CustomFun
+    end,
     Acc = #mracc{
         db=Db,
         total_rows=null,
@@ -569,6 +597,7 @@ red_fold(Db, {_Nth, _Lang, View}=RedView, Args, Callback, UAcc) ->
         callback=Callback,
         user_acc=UAcc,
         update_seq=View#mrview.update_seq,
+        finalizer=Finalizer,
         args=Args
     },
     Grouping = {key_group_level, Args#mrargs.group_level},
@@ -600,41 +629,50 @@ red_fold(_Key, _Red, #mracc{limit=0} = Acc) ->
     {stop, Acc};
 red_fold(_Key, Red, #mracc{group_level=0} = Acc) ->
     #mracc{
+        finalizer=Finalizer,
         limit=Limit,
         callback=Callback,
         user_acc=UAcc0
     } = Acc,
-    Row = [{key, null}, {value, Red}],
+    Row = [{key, null}, {value, maybe_finalize(Red, Finalizer)}],
     {Go, UAcc1} = Callback({row, Row}, UAcc0),
     {Go, Acc#mracc{user_acc=UAcc1, limit=Limit-1, last_go=Go}};
 red_fold(Key, Red, #mracc{group_level=exact} = Acc) ->
     #mracc{
+        finalizer=Finalizer,
         limit=Limit,
         callback=Callback,
         user_acc=UAcc0
     } = Acc,
-    Row = [{key, Key}, {value, Red}],
+    Row = [{key, Key}, {value, maybe_finalize(Red, Finalizer)}],
     {Go, UAcc1} = Callback({row, Row}, UAcc0),
     {Go, Acc#mracc{user_acc=UAcc1, limit=Limit-1, last_go=Go}};
 red_fold(K, Red, #mracc{group_level=I} = Acc) when I > 0, is_list(K) ->
     #mracc{
+        finalizer=Finalizer,
         limit=Limit,
         callback=Callback,
         user_acc=UAcc0
     } = Acc,
-    Row = [{key, lists:sublist(K, I)}, {value, Red}],
+    Row = [{key, lists:sublist(K, I)}, {value, maybe_finalize(Red, Finalizer)}],
     {Go, UAcc1} = Callback({row, Row}, UAcc0),
     {Go, Acc#mracc{user_acc=UAcc1, limit=Limit-1, last_go=Go}};
 red_fold(K, Red, #mracc{group_level=I} = Acc) when I > 0 ->
     #mracc{
+        finalizer=Finalizer,
         limit=Limit,
         callback=Callback,
         user_acc=UAcc0
     } = Acc,
-    Row = [{key, K}, {value, Red}],
+    Row = [{key, K}, {value, maybe_finalize(Red, Finalizer)}],
     {Go, UAcc1} = Callback({row, Row}, UAcc0),
     {Go, Acc#mracc{user_acc=UAcc1, limit=Limit-1, last_go=Go}}.
 
+maybe_finalize(Red, null) ->
+    Red;
+maybe_finalize(Red, RedSrc) ->
+    {ok, Finalized} = couch_query_servers:finalize(RedSrc, Red),
+    Finalized.
 
 finish_fold(#mracc{last_go=ok, update_seq=UpdateSeq}=Acc,  ExtraMeta) ->
     #mracc{callback=Callback, user_acc=UAcc, args=Args}=Acc,

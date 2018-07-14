@@ -85,35 +85,35 @@ build_shards_test() ->
         [{shard,<<"shards/00000000-1fffffff/testdb1">>,
           'bigcouch@node.local',<<"testdb1">>,
           [0,536870911],
-          undefined},
+          undefined,[]},
          {shard,<<"shards/20000000-3fffffff/testdb1">>,
           'bigcouch@node.local',<<"testdb1">>,
           [536870912,1073741823],
-          undefined},
+          undefined,[]},
          {shard,<<"shards/40000000-5fffffff/testdb1">>,
           'bigcouch@node.local',<<"testdb1">>,
           [1073741824,1610612735],
-          undefined},
+          undefined,[]},
          {shard,<<"shards/60000000-7fffffff/testdb1">>,
           'bigcouch@node.local',<<"testdb1">>,
           [1610612736,2147483647],
-          undefined},
+          undefined,[]},
          {shard,<<"shards/80000000-9fffffff/testdb1">>,
           'bigcouch@node.local',<<"testdb1">>,
           [2147483648,2684354559],
-          undefined},
+          undefined,[]},
          {shard,<<"shards/a0000000-bfffffff/testdb1">>,
           'bigcouch@node.local',<<"testdb1">>,
           [2684354560,3221225471],
-          undefined},
+          undefined,[]},
          {shard,<<"shards/c0000000-dfffffff/testdb1">>,
           'bigcouch@node.local',<<"testdb1">>,
           [3221225472,3758096383],
-          undefined},
+          undefined,[]},
          {shard,<<"shards/e0000000-ffffffff/testdb1">>,
           'bigcouch@node.local',<<"testdb1">>,
           [3758096384,4294967295],
-          undefined}],
+          undefined,[]}],
     ?assertEqual(ExpectedShards1, Shards1),
     ok.
 
@@ -121,47 +121,18 @@ build_shards_test() ->
 %% n_val tests
 
 nval_test_() ->
-    {"n_val tests explicit",
-     [
-      {setup,
-       fun () ->
-               meck:new([couch_log]),
-               meck:expect(couch_log, error, fun(_, _) -> ok end),
-               ok
-       end,
-       fun (_) -> meck:unload([couch_log]) end,
-       [
-        ?_assertEqual(2, mem3_util:n_val(2,4)),
-        ?_assertEqual(1, mem3_util:n_val(-1,4)),
-        ?_assertEqual(4, mem3_util:n_val(6,4))
+    {
+        setup,
+        fun() ->
+            meck:new([config, couch_log]),
+            meck:expect(couch_log, error, 2, ok),
+            meck:expect(config, get, 3, "5")
+        end,
+        fun(_) -> meck:unload() end,
+        [
+            ?_assertEqual(2, mem3_util:n_val(2, 4)),
+            ?_assertEqual(1, mem3_util:n_val(-1, 4)),
+            ?_assertEqual(4, mem3_util:n_val(6, 4)),
+            ?_assertEqual(5, mem3_util:n_val(undefined, 6))
         ]
-       }
-     ]
     }.
-
-
-config_01_setup() ->
-    Ini = filename:join([code:lib_dir(mem3, test), "01-config-default.ini"]),
-    {ok, Pid} = config:start_link([Ini]),
-    Pid.
-
-config_teardown(Pid) ->
-    test_util:stop_config(Pid).
-
-
-n_val_test_() ->
-    {"n_val tests with config",
-     [
-      {setup,
-       fun config_01_setup/0,
-       fun config_teardown/1,
-       fun(Pid) ->
-           {with, Pid, [
-               fun n_val_1/1
-            ]}
-       end}
-     ]
-    }.
-
-n_val_1(_Pid) ->
-    ?assertEqual(3, mem3_util:n_val(undefined, 4)).

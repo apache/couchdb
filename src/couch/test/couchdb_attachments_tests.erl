@@ -21,9 +21,9 @@
 -define(ATT_TXT_NAME, <<"file.erl">>).
 -define(FIXTURE_PNG, filename:join([?FIXTURESDIR, "logo.png"])).
 -define(FIXTURE_TXT, ?ABS_PATH(?FILE)).
--define(TIMEOUT, 1000).
--define(TIMEOUT_EUNIT, 10).
--define(TIMEWAIT, 100).
+-define(TIMEOUT, 5000).
+-define(TIMEOUT_EUNIT, 100).
+-define(TIMEWAIT, 1000).
 -define(i2l(I), integer_to_list(I)).
 
 

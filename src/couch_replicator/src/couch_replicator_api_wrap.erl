@@ -142,7 +142,8 @@ db_open(DbName, Options, Create, _CreateParams) ->
         throw({unauthorized, DbName})
     end.
 
-db_close(#httpdb{httpc_pool = Pool}) ->
+db_close(#httpdb{httpc_pool = Pool} = HttpDb) ->
+    couch_replicator_auth:cleanup(HttpDb),
     unlink(Pool),
     ok = couch_replicator_httpc_pool:stop(Pool);
 db_close(DbName) ->
@@ -1009,7 +1010,7 @@ header_value(Key, Headers, Default) ->
 normalize_db(#httpdb{} = HttpDb) ->
     #httpdb{
         url = HttpDb#httpdb.url,
-        oauth = HttpDb#httpdb.oauth,
+        auth_props = lists:sort(HttpDb#httpdb.auth_props),
         headers = lists:keysort(1, HttpDb#httpdb.headers),
         timeout = HttpDb#httpdb.timeout,
         ibrowse_options = lists:keysort(1, HttpDb#httpdb.ibrowse_options),
@@ -1037,7 +1038,7 @@ maybe_append_create_query_params(Db, CreateParams) ->
 normalize_http_db_test() ->
     HttpDb =  #httpdb{
         url = "http://host/db",
-        oauth = #oauth{},
+        auth_props = [{"key", "val"}],
         headers = [{"k2","v2"}, {"k1","v1"}],
         timeout = 30000,
         ibrowse_options = [{k2, v2}, {k1, v1}],

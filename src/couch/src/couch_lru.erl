@@ -46,7 +46,7 @@ close_int({Lru, DbName, Iter}, {Tree, Dict} = Cache) ->
     case ets:update_element(couch_dbs, DbName, {#entry.lock, locked}) of
     true ->
         [#entry{db = Db, pid = Pid}] = ets:lookup(couch_dbs, DbName),
-        case couch_db:is_idle(Db) of true ->
+        case couch_db:is_idle(Db) andalso couch_db:lock(Db) of true ->
             true = ets:delete(couch_dbs, DbName),
             true = ets:delete(couch_dbs_pid_to_name, Pid),
             exit(Pid, kill),

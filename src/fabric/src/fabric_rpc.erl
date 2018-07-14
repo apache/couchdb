@@ -82,7 +82,7 @@ changes(DbName, Options, StartVector, DbOptions) ->
         },
         try
             {ok, #cacc{seq=LastSeq, pending=Pending, epochs=Epochs}} =
-                couch_db:changes_since(Db, StartSeq, Enum, Opts, Acc0),
+                couch_db:fold_changes(Db, StartSeq, Enum, Acc0, Opts),
             rexi:stream_last({complete, [
                 {seq, {LastSeq, uuid(Db), couch_db:owner_of(Epochs, LastSeq)}},
                 {pending, Pending}
@@ -142,8 +142,9 @@ reduce_view(DbName, DDoc, ViewName, Args0, DbOptions) ->
     couch_mrview:query_view(Db, DDoc, ViewName, Args, fun reduce_cb/2, VAcc0).
 
 fix_skip_and_limit(Args) ->
-    #mrargs{skip=Skip, limit=Limit}=Args,
-    Args#mrargs{skip=0, limit=Skip+Limit}.
+    #mrargs{skip=Skip, limit=Limit, extra=Extra}=Args,
+    % the coordinator needs to finalize each row, so make sure the shards don't
+    Args#mrargs{skip=0, limit=Skip+Limit, extra=[{finalizer,null} | Extra]}.
 
 create_db(DbName) ->
     create_db(DbName, []).
@@ -224,7 +225,7 @@ get_missing_revs(DbName, IdRevsList, Options) ->
         Ids = [Id1 || {Id1, _Revs} <- IdRevsList],
         {ok, lists:zipwith(fun({Id, Revs}, FullDocInfoResult) ->
             case FullDocInfoResult of
-            {ok, #full_doc_info{rev_tree=RevisionTree} = FullInfo} ->
+            #full_doc_info{rev_tree=RevisionTree} = FullInfo ->
                 MissingRevs = couch_key_tree:find_missing(RevisionTree, Revs),
                 {Id, MissingRevs, possible_ancestors(FullInfo, MissingRevs)};
             not_found ->
@@ -255,8 +256,7 @@ group_info(DbName, DDocId, DbOptions) ->
 reset_validation_funs(DbName) ->
     case get_or_create_db(DbName, []) of
     {ok, Db} ->
-        DbPid = couch_db:get_pid(Db),
-        gen_server:cast(DbPid, {load_validation_funs, undefined});
+        couch_db:reload_validation_funs(Db);
     _ ->
         ok
     end.
@@ -344,6 +344,8 @@ reduce_cb(ok, ddoc_updated) ->
     rexi:reply({ok, ddoc_updated}).
 
 
+changes_enumerator(#full_doc_info{} = FDI, Acc) ->
+    changes_enumerator(couch_doc:to_doc_info(FDI), Acc);
 changes_enumerator(#doc_info{id= <<"_local/", _/binary>>, high_seq=Seq}, Acc) ->
     {ok, Acc#cacc{seq = Seq, pending = Acc#cacc.pending-1}};
 changes_enumerator(DocInfo, Acc) ->
@@ -438,6 +440,8 @@ make_att_reader({follows, Parser, Ref}) ->
                 throw({mp_parser_died, Reason})
         end
     end;
+make_att_reader({fabric_attachment_receiver, Middleman, Length}) ->
+    fabric_doc_atts:receiver_callback(Middleman, Length);
 make_att_reader(Else) ->
     Else.
 

@@ -12,7 +12,7 @@
 
 -module(couch_util).
 
--export([priv_dir/0, normpath/1]).
+-export([priv_dir/0, normpath/1, fold_files/5]).
 -export([should_flush/0, should_flush/1, to_existing_atom/1]).
 -export([rand32/0, implode/2, collate/2, collate/3]).
 -export([abs_pathname/1,abs_pathname/2, trim/1, drop_dot_couch_ext/1]).
@@ -36,6 +36,8 @@
 -export([process_dict_get/2, process_dict_get/3]).
 -export([unique_monotonic_integer/0]).
 -export([check_config_blacklist/1]).
+-export([check_md5/2]).
+-export([set_mqd_off_heap/0]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -76,6 +78,44 @@ normparts(["." | RestParts], Acc) ->
     normparts(RestParts, Acc);
 normparts([Part | RestParts], Acc) ->
     normparts(RestParts, [Part | Acc]).
+
+
+% This is implementation is similar the builtin filelib:fold_files/5
+% except that this version will run the user supplied function
+% on directories that match the regular expression as well.
+%
+% This is motivated by the case when couch_server is searching
+% for pluggable storage engines. This change allows a
+% database to be either a file or a directory.
+fold_files(Dir, RegExp, Recursive, Fun, Acc) ->
+    {ok, Re} = re:compile(RegExp, [unicode]),
+    fold_files1(Dir, Re, Recursive, Fun, Acc).
+
+fold_files1(Dir, RegExp, Recursive, Fun, Acc) ->
+    case file:list_dir(Dir) of
+        {ok, Files} ->
+            fold_files2(Files, Dir, RegExp, Recursive, Fun, Acc);
+        {error, _} ->
+            Acc
+    end.
+
+fold_files2([], _Dir, _RegExp, _Recursive, _Fun, Acc) ->
+    Acc;
+fold_files2([File | Rest], Dir, RegExp, Recursive, Fun, Acc0) ->
+    FullName = filename:join(Dir, File),
+    case (catch re:run(File, RegExp, [{capture, none}])) of
+        match ->
+            Acc1 = Fun(FullName, Acc0),
+            fold_files2(Rest, Dir, RegExp, Recursive, Fun, Acc1);
+        _ ->
+            case Recursive andalso filelib:is_dir(FullName) of
+                true ->
+                    Acc1 = fold_files1(FullName, RegExp, Recursive, Fun, Acc0),
+                    fold_files2(Rest, Dir, RegExp, Recursive, Fun, Acc1);
+                false ->
+                    fold_files2(Rest, Dir, RegExp, Recursive, Fun, Acc0)
+            end
+    end.
 
 % works like list_to_existing_atom, except can be list or binary and it
 % gives you the original value instead of an error if no existing atom.
@@ -262,15 +302,45 @@ separate_cmd_args(" " ++ Rest, CmdAcc) ->
 separate_cmd_args([Char|Rest], CmdAcc) ->
     separate_cmd_args(Rest, [Char | CmdAcc]).
 
-% Is a character whitespace?
-is_whitespace($\s) -> true;
-is_whitespace($\t) -> true;
-is_whitespace($\n) -> true;
-is_whitespace($\r) -> true;
+% Is a character whitespace (from https://en.wikipedia.org/wiki/Whitespace_character#Unicode)?
+is_whitespace(9) -> true;
+is_whitespace(10) -> true;
+is_whitespace(11) -> true;
+is_whitespace(12) -> true;
+is_whitespace(13) -> true;
+is_whitespace(32) -> true;
+is_whitespace(133) -> true;
+is_whitespace(160) -> true;
+is_whitespace(5760) -> true;
+is_whitespace(8192) -> true;
+is_whitespace(8193) -> true;
+is_whitespace(8194) -> true;
+is_whitespace(8195) -> true;
+is_whitespace(8196) -> true;
+is_whitespace(8197) -> true;
+is_whitespace(8198) -> true;
+is_whitespace(8199) -> true;
+is_whitespace(8200) -> true;
+is_whitespace(8201) -> true;
+is_whitespace(8202) -> true;
+is_whitespace(8232) -> true;
+is_whitespace(8233) -> true;
+is_whitespace(8239) -> true;
+is_whitespace(8287) -> true;
+is_whitespace(12288) -> true;
+is_whitespace(6158) -> true;
+is_whitespace(8203) -> true;
+is_whitespace(8204) -> true;
+is_whitespace(8205) -> true;
+is_whitespace(8288) -> true;
+is_whitespace(65279) -> true;
 is_whitespace(_Else) -> false.
 
 
 % removes leading and trailing whitespace from a string
+trim(String) when is_binary(String) ->
+    % mirror string:trim() behaviour of returning a binary when a binary is passed in
+    ?l2b(trim(?b2l(String)));
 trim(String) ->
     String2 = lists:dropwhile(fun is_whitespace/1, String),
     lists:reverse(lists:dropwhile(fun is_whitespace/1, lists:reverse(String2))).
@@ -593,6 +663,21 @@ validate_callback_exists(Module, Function, Arity) ->
         throw({error,
             {undefined_callback, CallbackStr, {Module, Function, Arity}}})
     end.
+
+
+check_md5(_NewSig, <<>>) -> ok;
+check_md5(Sig, Sig) -> ok;
+check_md5(_, _) -> throw(md5_mismatch).
+
+
+set_mqd_off_heap() ->
+    try
+        erlang:process_flag(message_queue_data, off_heap),
+        ok
+    catch error:badarg ->
+        ok
+    end.
+
 
 ensure_loaded(Module) when is_atom(Module) ->
     case code:ensure_loaded(Module) of

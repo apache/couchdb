@@ -70,7 +70,8 @@ explain(Cursor) ->
         {end_key, maybe_replace_max_json(Args#mrargs.end_key)},
         {direction, Args#mrargs.direction},
         {stable, Args#mrargs.stable},
-        {update, Args#mrargs.update}
+        {update, Args#mrargs.update},
+        {conflicts, Args#mrargs.conflicts}
     ]}}].
 
 
@@ -283,9 +284,8 @@ apply_opts([{r, RStr} | Rest], Args) ->
     NewArgs = Args#mrargs{include_docs = IncludeDocs},
     apply_opts(Rest, NewArgs);
 apply_opts([{conflicts, true} | Rest], Args) ->
-    % I need to patch things so that views can specify
-    % parameters when loading the docs from disk
-    apply_opts(Rest, Args);
+    NewArgs = Args#mrargs{conflicts = true},
+    apply_opts(Rest, NewArgs);
 apply_opts([{conflicts, false} | Rest], Args) ->
     % Ignored cause default
     apply_opts(Rest, Args);
