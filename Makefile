@@ -13,22 +13,49 @@
 include version.mk
 
 REBAR?=$(shell echo `pwd`/bin/rebar)
+
+# Handle the following scenarios:
+#   1. When building from a tarball, use version.mk.
+#   2. When building from a clean release tag (#.#.#), use that tag.
+#   3. When building from a clean RC tag (#.#.#-RC#), use JUST the version
+#      number inside the tarball, but use the full name for the name of the
+#      tarball itself.
+#   4. When not on a clean tag, use version.mk + git sha + dirty status.
+
 COUCHDB_GIT_SHA=$(git_sha)
+
 IN_RELEASE = $(shell if [ ! -d .git ]; then echo true; fi)
 ifeq ($(IN_RELEASE), true)
+
+# 1. Building from tarball, use version.mk.
 COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)
+
 else
-# IN_RC generates a tarball that has the -RCx suffix in the name if needed
+
+# Gather some additional information.
+# We do it this way so we don't bake shell-isms into Makefile
+# to make it easier to port to Windows. I know, I know. -jst
+# IN_RC contains the -RCx suffix in the name if present
 IN_RC = $(shell git describe --tags --always --first-parent \
-							| grep -Eo -- '-RC[0-9]+' 2>/dev/null)
-RELTAG = $(shell git describe --dirty --abbrev=0 --tags --always --first-parent \
-				| grep -Eo '^[0-9]+\.[0-9]\.[0-9]+')
+        | grep -Eo -- '-RC[0-9]+' 2>/dev/null)
+# ON_TAG matches *ONLY* if we are on a release or RC tag
+ON_TAG = $(shell git describe --tags --always --first-parent \
+        | grep -Eo -- '^[0-9]+\.[0-9]\.[0-9]+(-RC[0-9]+)?$$' 2>/dev/null)
+# RELTAG contains the #.#.# from git describe, which might be used
+RELTAG = $(shell git describe --tags --always --first-parent \
+        | grep -Eo -- '^[0-9]+\.[0-9]\.[0-9]+' 2>/dev/null)
+# DIRTY identifies if we're not on a commit
+DIRTY = $(shell git describe --dirty | grep -Eo -- '-dirty' 2>/dev/null)
+# COUCHDB_GIT_SHA is our current git hash.
 COUCHDB_GIT_SHA=$(shell git rev-parse --short --verify HEAD)
-ifeq ($(RELTAG),)
-COUCHDB_VERSION_SUFFIX = $(COUCHDB_GIT_SHA)
+
+ifeq ($(ON_TAG),)
+# 4. Not on a tag.
+COUCHDB_VERSION_SUFFIX = $(COUCHDB_GIT_SHA)$(DIRTY)
 COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)-$(COUCHDB_VERSION_SUFFIX)
 else
-COUCHDB_VERSION = $(RELTAG)
+# 2 and 3. On a tag.
+COUCHDB_VERSION = $(RELTAG)$(DIRTY)
 endif
 endif
 
