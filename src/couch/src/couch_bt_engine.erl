@@ -771,7 +771,7 @@ set_default_security_object(Fd, Header, Compression, Options) ->
 
 set_partitioned(Header, Options) ->
     Partitioned = lists:member(partitioned, Options),
-    couch_bt_engine_header:set(Header, partitioned, true).
+    couch_bt_engine_header:set(Header, partitioned, Partitioned).
 
 
 delete_compaction_files(FilePath) ->
