@@ -373,7 +373,13 @@ couchTests.design_docs = function(debug) {
     }
 
     T(db.deleteDoc(designDoc).ok);
-    T(db.open(designDoc._id) == null);
+    waitForSuccess(function() {
+      var ddoc = db.open(designDoc._id)
+      if (ddoc != null) {
+        throw({});
+      }
+      return true;
+    }, 'db.open(designDoc._id)');
     T(db.view("test/no_docs") == null);
 
     T(db.ensureFullCommit().ok);
