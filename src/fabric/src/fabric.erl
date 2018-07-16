@@ -79,7 +79,9 @@ all_dbs(Prefix) when is_list(Prefix) ->
         {purge_seq, non_neg_integer()} |
         {compact_running, boolean()} |
         {disk_size, non_neg_integer()} |
-        {disk_format_version, pos_integer()}
+        {disk_format_version, pos_integer()} |
+        {cluster, any()} |
+        {partitioned, boolean()}
     ]}.
 get_db_info(DbName) ->
     fabric_db_info:go(dbname(DbName)).

@@ -107,6 +107,9 @@ merge_results(Info) ->
             [{disk_format_version, lists:max(X)} | Acc];
         (cluster, [X], Acc) ->
             [{cluster, {X}} | Acc];
+        (partitioned, X, Acc) ->
+            %% require unanimity here
+            [{partitioned, [Y || Y <- X, Y /= true] == []} | Acc];
         (_, _, Acc) ->
             Acc
     end, [{instance_start_time, <<"0">>}], Dict).
