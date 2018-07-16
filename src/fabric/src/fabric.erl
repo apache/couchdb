@@ -354,10 +354,10 @@ query_view(DbName, Options, DDoc, ViewName, Callback, Acc0, QueryArgs0) ->
     false ->
         ok
     end,
-    {ok, #mrst{views=Views, language=Lang}} =
+    {ok, #mrst{views=Views, language=Lang, design_opts=DesignOpts}} =
         couch_mrview_util:ddoc_to_mrst(Db, DDoc),
 
-    Partitioned = mem3:is_partitioned(Db),
+    Partitioned = couch_util:get_value(<<"partitioned">>, DesignOpts, false),
 
     QueryArgs1 = couch_mrview_util:set_view_type(QueryArgs0, View, Views),
     QueryArgs2 = couch_mrview_util:set_view_options(QueryArgs1, partitioned, Partitioned),

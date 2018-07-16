@@ -135,6 +135,7 @@ ddoc_to_mrst(DbName, #doc{id=Id, body={Fields}}) ->
     {DesignOpts} = proplists:get_value(<<"options">>, Fields, {[]}),
     SeqIndexed = proplists:get_value(<<"seq_indexed">>, DesignOpts, false),
     KeySeqIndexed = proplists:get_value(<<"keyseq_indexed">>, DesignOpts, false),
+    Partitioned = proplists:get_value(<<"partitioned">>, DesignOpts, false),
 
     {RawViews} = couch_util:get_value(<<"views">>, Fields, {[]}),
     BySrc = lists:foldl(MakeDict, dict:new(), RawViews),
@@ -155,7 +156,8 @@ ddoc_to_mrst(DbName, #doc{id=Id, body={Fields}}) ->
         language=Language,
         design_opts=DesignOpts,
         seq_indexed=SeqIndexed,
-        keyseq_indexed=KeySeqIndexed
+        keyseq_indexed=KeySeqIndexed,
+        partitioned=Partitioned
     },
     SigInfo = {Views, Language, DesignOpts, couch_index_util:sort_lib(Lib)},
     {ok, IdxState#mrst{sig=crypto:hash(md5, term_to_binary(SigInfo))}}.
@@ -281,7 +283,6 @@ init_state(Db, Fd, State, Header) ->
 
     OpenViewFun = fun(St, View) -> open_view(Db, Fd, Lang, St, View) end,
     Views2 = lists:zipwith(OpenViewFun, ViewStates, Views),
-    Partitioned = couch_db_engine:get_partitioned(Db),
 
     State#mrst{
         fd=Fd,
@@ -290,8 +291,7 @@ init_state(Db, Fd, State, Header) ->
         purge_seq=PurgeSeq,
         id_btree=IdBtree,
         log_btree=LogBtree,
-        views=Views2,
-        partitioned=Partitioned
+        views=Views2
     }.
 
 open_view(_Db, Fd, Lang, ViewState, View) ->
@@ -554,14 +554,14 @@ validate_args(Args) ->
         _ -> mrverror(<<"Invalid value for `sorted`.">>)
     end,
 
-    case {Args#mrargs.partitioned, Args#mrargs.partition} of
+    case {Args#mrargs.partitioned == true, Args#mrargs.partition} of
         {true, undefined} ->
             mrverror(<<"`partition` parameter is mandatory for queries to this database.">>);
         {true, _Partition} ->
             ok;
-        {undefined, undefined} ->
+        {false, undefined} ->
             ok;
-        {undefined, _Partition} ->
+        {false, _Partition} ->
             mrverror(<<"`partition` parameter is not supported in this database.">>)
     end,
     Args.
