@@ -71,6 +71,13 @@ ConfigSrc = [["#define ", K, " ", V, $\n] || {K, V} <- ConfigH],
 ConfigBin = iolist_to_binary(ConfigSrc),
 ok = CopyIfDifferent(CouchJSConfig, ConfigBin),
 
+MD5Config = case lists:keyfind(erlang_md5, 1, CouchConfig) of
+    {erlang_md5, true} ->
+        [{d, 'ERLANG_MD5', true}];
+    {erlang_md5, false} ->
+        []
+end,
+
 %% TODO support curl on Windows
 {JS_CFLAGS, JS_LDFLAGS} = case lists:keyfind(with_curl, 1, CouchConfig) of
     {with_curl, true} ->
@@ -151,7 +158,7 @@ AddConfig = [
         {d, 'COUCHDB_VERSION', Version},
         {d, 'COUCHDB_GIT_SHA', GitSha},
         {i, "../"}
-    ]},
+    ] ++ MD5Config},
     {eunit_compile_opts, PlatformDefines}
 ].
 
