@@ -82,7 +82,7 @@ for_docid(DbName, DocId, Options) ->
             load_shards_from_disk(DbName, DocId);
         Shards0 ->
             gen_server:cast(?MODULE, {cache_hit, DbName}),
-            Options1 = case mem3:is_partitioned(hd(Shards0)) of
+            Options1 = case mem3:is_partitioned(Shards0) of
                 true  -> [partitioned];
                 false -> []
             end,

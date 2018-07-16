@@ -338,15 +338,15 @@ engine(Opts) when is_list(Opts) ->
     end.
 
 is_partitioned(DbName) when is_binary(DbName) ->
-    lists:all(fun is_partitioned/1, mem3:shards(DbName));
+    is_partitioned(mem3:shards(DbName));
+
+is_partitioned(Shards) when is_list(Shards) ->
+    lists:all(fun is_partitioned/1, Shards);
 
 is_partitioned(#shard{opts=Opts}) ->
-    is_partitioned(Opts);
+    lists:member(partitioned, Opts);
 
 is_partitioned(#ordered_shard{opts=Opts}) ->
-    is_partitioned(Opts);
-
-is_partitioned(Opts) when is_list(Opts) ->
     lists:member(partitioned, Opts).
 
 
