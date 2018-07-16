@@ -182,7 +182,7 @@
 
 % Whether the database is partitioned by the user's choice of
 % document id
--callback get_partitioned(DbHAndle::db_handle()) ->
+-callback get_partitioned(DbHandle::db_handle()) ->
             Partitioned::boolean().
 
 

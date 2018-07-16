@@ -281,12 +281,7 @@ init_state(Db, Fd, State, Header) ->
 
     OpenViewFun = fun(St, View) -> open_view(Db, Fd, Lang, St, View) end,
     Views2 = lists:zipwith(OpenViewFun, ViewStates, Views),
-
-    Partitioned = case couch_db_engine:get_prop(Db, partitioned) of
-        {ok, true} -> true;
-        {ok, false} -> false;
-        {error, no_value} -> false
-    end,
+    Partitioned = couch_db_engine:get_partitioned(Db),
 
     State#mrst{
         fd=Fd,

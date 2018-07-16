@@ -355,7 +355,7 @@ query_view(DbName, Options, DDoc, ViewName, Callback, Acc0, QueryArgs0) ->
     {ok, #mrst{views=Views, language=Lang}} =
         couch_mrview_util:ddoc_to_mrst(Db, DDoc),
 
-    Partitioned = mem3:is_partitioned(hd(mem3:shards(Db))), % hideous
+    Partitioned = mem3:is_partitioned(Db),
 
     QueryArgs1 = couch_mrview_util:set_view_type(QueryArgs0, View, Views),
     QueryArgs2 = couch_mrview_util:set_view_options(QueryArgs1, partitioned, Partitioned),
