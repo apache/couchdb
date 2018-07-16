@@ -363,11 +363,11 @@ bindings(State, Sig, DDoc) ->
 % thanks to erlview, via:
 % http://erlang.org/pipermail/erlang-questions/2003-November/010544.html
 makefun(State, Source) ->
-    Sig = crypto:hash(md5, Source),
+    Sig = couch_hash:md5_hash(Source),
     BindFuns = bindings(State, Sig),
     {Sig, makefun(State, Source, BindFuns)}.
 makefun(State, Source, {DDoc}) ->
-    Sig = crypto:hash(md5, lists:flatten([Source, term_to_binary(DDoc)])),
+    Sig = couch_hash:md5_hash(lists:flatten([Source, term_to_binary(DDoc)])),
     BindFuns = bindings(State, Sig, {DDoc}),
     {Sig, makefun(State, Source, BindFuns)};
 makefun(_State, Source, BindFuns) when is_list(BindFuns) ->
