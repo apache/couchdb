@@ -35,8 +35,12 @@ done
 
 cd ..
 
-# create CONTRIBUTORS file
+
 if test -e .git; then
+    # save git sha in version.mk
+    git_sha=`git rev-parse --short HEAD`
+    echo "git_sha=$git_sha" >> $RELDIR/version.mk
+    # create CONTRIBUTORS file
     OS=`uname -s`
     case "$OS" in
     Linux|CYGWIN*) # GNU sed
