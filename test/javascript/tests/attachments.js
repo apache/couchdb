@@ -291,7 +291,8 @@ couchTests.attachments= function(debug) {
     _attachments:{
       "foo.txt": {
         content_type:"text/plain",
-        data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
+        data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ=",
+        length: "This is a base64 encoded text".length
       }
     }
   };

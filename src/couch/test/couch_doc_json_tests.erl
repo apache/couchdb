@@ -38,8 +38,11 @@ mock(couch_log) ->
     ok;
 mock(config) ->
     meck:new(config, [passthrough]),
-    meck:expect(config, get_integer,
-        fun("couchdb", "max_document_size", 4294967296) -> 1024 end),
+    meck:expect(config, get_integer, fun
+        ("couchdb", "max_document_size", 4294967296) -> 1024;
+        ("httpd", "max_http_request_size", 4294967296) -> 1024
+    end),
+
     meck:expect(config, get, fun(_, _) -> undefined end),
     meck:expect(config, get, fun(_, _, Default) -> Default end),
     ok.
@@ -123,6 +126,44 @@ from_json_success_cases() ->
                 ])
             ]},
             "Attachments are parsed correctly."
+        },
+        % see if we count our bytes correctly. This doc should be *exactly* 1024 bytes
+        {
+            {[
+                {<<"_attachments">>, {[
+                    {<<"big.xml">>, {[
+                        {<<"content_type">>, <<"xml/yay">>},
+                        {<<"revpos">>, 1},
+                        {<<"length">>, 319},
+                        {<<"stub">>, true}
+                    ]}},
+                    {<<"big.json">>, {[
+                        {<<"content_type">>, <<"json/ftw">>},
+                        {<<"revpos">>, 1},
+                        {<<"length">>, 319},
+                        {<<"stub">>, true}
+                    ]}}
+                ]}}
+            ]},
+            #doc{atts = [
+                couch_att:new([
+                    {name, <<"big.xml">>},
+                    {data, stub},
+                    {type, <<"xml/yay">>},
+                    {att_len, 319},
+                    {disk_len, 319},
+                    {revpos, 1}
+                ]),
+                couch_att:new([
+                    {name, <<"big.json">>},
+                    {data, stub},
+                    {type, <<"json/ftw">>},
+                    {att_len, 319},
+                    {disk_len, 319},
+                    {revpos, 1}
+                ])
+            ]},
+            "Document and attachments == max_http_request_size"
         },
         {
             {[{<<"_deleted">>, true}]},
@@ -281,6 +322,49 @@ from_json_error_cases() ->
             end,
             {request_entity_too_large, <<"large_doc">>},
             "Document too large."
+        },
+        % doc json body and each attachment are small enough, but combined are >
+        % max_http_request_size
+        {
+            {[
+                {<<"_id">>, <<"normal_doc_with_atts">>},
+                {<<"_attachments">>, {[
+                    {<<"big.xml">>, {[
+                        {<<"content_type">>, <<"xml/yay">>},
+                        {<<"revpos">>, 1},
+                        {<<"length">>, 768},
+                        {<<"stub">>, true}
+                    ]}},
+                    {<<"big.json">>, {[
+                        {<<"content_type">>, <<"json/ftw">>},
+                        {<<"revpos">>, 1},
+                        {<<"length">>, 768},
+                        {<<"stub">>, true}
+                    ]}}
+                ]}}
+            ]},
+            {request_entity_too_large, <<"normal_doc_with_atts">>},
+            "Document too large because of attachments."
+        },
+        % see if we count our bytes correctly. This doc should be *exactly* 1025 bytes
+        {
+            {[
+                {<<"_attachments">>, {[
+                    {<<"big.xml">>, {[
+                        {<<"content_type">>, <<"xml/yay">>},
+                        {<<"revpos">>, 1},
+                        {<<"length">>, 320},
+                        {<<"stub">>, true}
+                    ]}},
+                    {<<"big.json">>, {[
+                        {<<"content_type">>, <<"json/ftw">>},
+                        {<<"revpos">>, 1},
+                        {<<"length">>, 319},
+                        {<<"stub">>, true}
+                    ]}}
+                ]}}
+            ]},
+            "Document and attachments == max_http_request_size + 1"
         }
     ],
 

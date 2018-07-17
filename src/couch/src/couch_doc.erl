@@ -133,12 +133,27 @@ from_json_obj_validate(EJson) ->
 from_json_obj_validate(EJson, DbName) ->
     MaxSize = config:get_integer("couchdb", "max_document_size", 4294967296),
     Doc = from_json_obj(EJson, DbName),
-    case couch_ejson_size:encoded_size(Doc#doc.body) =< MaxSize of
+    BodySize = couch_ejson_size:encoded_size(Doc#doc.body),
+    case BodySize =< MaxSize of
         true ->
              validate_attachment_sizes(Doc#doc.atts),
+             validate_total_document_size(Doc, BodySize),
              Doc;
         false ->
             throw({request_entity_too_large, Doc#doc.id})
+    end.
+
+
+% sum up the json body size + attachment body size and
+% make sure it is < max_http_request_size
+validate_total_document_size(#doc{id=DocId, atts=Atts0}=Doc, BodySize) ->
+    MaxReqSize = config:get_integer("httpd", "max_http_request_size", 4294967296), % 4 GB
+    Atts = lists:map(fun couch_att:to_tuple/1, Atts0),
+    {_, DocSum} = couch_httpd_multipart:length_multipart_stream(32, BodySize,
+        Atts),
+    case DocSum =< MaxReqSize of
+        true -> ok;
+        false -> throw({request_entity_too_large, DocId})
     end.
 
 
@@ -421,7 +436,13 @@ merge_stubs(#doc{id=Id,atts=MemBins}=StubsDoc, #doc{atts=DiskBins}) ->
 len_doc_to_multi_part_stream(Boundary, JsonBytes, Atts, SendEncodedAtts) ->
     AttsToInclude = lists:filter(fun(Att) -> not couch_att:is_stub(Att) end, Atts),
     AttsDecoded = decode_attributes(AttsToInclude, SendEncodedAtts),
-    couch_httpd_multipart:length_multipart_stream(Boundary, JsonBytes, AttsDecoded).
+    case couch_httpd_multipart:length_multipart_stream(byte_size(Boundary),
+           iolist_size(JsonBytes), AttsDecoded) of
+       {json, Len} ->
+           {<<"application/json">>, Len};
+       {multipart, Len} ->
+           {<<"multipart/related; boundary=\"", Boundary/binary, "\"">>, Len}
+    end.
 
 
 doc_to_multi_part_stream(Boundary, JsonBytes, Atts, WriteFun,
