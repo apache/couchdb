@@ -593,14 +593,23 @@ update_args(#mrargs{} = Args) ->
         #mrargs{partition=P0} when not is_binary(P0) ->
             mrverror(<<"`partition` must be a string.">>);
 
-        #mrargs{partition=P0, start_key=undefined, end_key=undefined} ->
+        #mrargs{partition=P0, direction=fwd, start_key=undefined, end_key=undefined} ->
             {[P0, LowestKey], [P0, HighestKey]};
 
-        #mrargs{partition=P0, start_key=SK0, end_key=undefined} ->
+        #mrargs{partition=P0, direction=rev, start_key=undefined, end_key=undefined} ->
+            {[P0, HighestKey], [P0, LowestKey]};
+
+        #mrargs{partition=P0, direction=fwd, start_key=SK0, end_key=undefined} ->
             {[P0, SK0], [P0, HighestKey]};
 
-        #mrargs{partition=P0, start_key=undefined, end_key=EK0} ->
+        #mrargs{partition=P0, direction=rev, start_key=SK0, end_key=undefined} ->
+            {[P0, SK0], [P0, LowestKey]};
+
+        #mrargs{partition=P0, direction=fwd, start_key=undefined, end_key=EK0} ->
             {[P0, LowestKey], [P0, EK0]};
+
+        #mrargs{partition=P0, direction=rev, start_key=undefined, end_key=EK0} ->
+            {[P0, HighestKey], [P0, EK0]};
 
         #mrargs{partition=P0, start_key=SK0, end_key=EK0} ->
             {[P0, SK0], [P0, EK0]}
