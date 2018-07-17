@@ -74,7 +74,7 @@ ok = CopyIfDifferent(CouchJSConfig, ConfigBin),
 MD5Config = case lists:keyfind(erlang_md5, 1, CouchConfig) of
     {erlang_md5, true} ->
         [{d, 'ERLANG_MD5', true}];
-    {erlang_md5, false} ->
+    _ ->
         []
 end,
 
