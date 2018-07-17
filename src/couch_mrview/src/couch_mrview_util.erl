@@ -535,9 +535,10 @@ validate_args(Args) ->
         _ -> mrverror(<<"Invalid value for `inclusive_end`.">>)
     end,
 
-    case {Args#mrargs.view_type, Args#mrargs.include_docs} of
-        {red, true} -> mrverror(<<"`include_docs` is invalid for reduce">>);
-        {_, ID} when is_boolean(ID) -> ok;
+    case {Args#mrargs.partitioned, Args#mrargs.view_type, Args#mrargs.include_docs} of
+        {true, _, true} -> mrverror(<<"`include_docs` is invalid for partitioned views">>);
+        {_, red, true} -> mrverror(<<"`include_docs` is invalid for reduce">>);
+        {_, _, ID} when is_boolean(ID) -> ok;
         _ -> mrverror(<<"Invalid value for `include_docs`">>)
     end,
 
