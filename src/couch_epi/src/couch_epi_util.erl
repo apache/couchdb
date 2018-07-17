@@ -22,7 +22,7 @@ module_version(Module) ->
     VSNs.
 
 hash(Term) ->
-    <<SigInt:128/integer>> = crypto:hash(md5, term_to_binary(Term)),
+    <<SigInt:128/integer>> = couch_hash:md5_hash(term_to_binary(Term)),
     lists:flatten(io_lib:format("\"~.36B\"",[SigInt])).
 
 module_exists(Module) ->
