@@ -92,8 +92,6 @@ get_admin(UserName) when is_list(UserName) ->
     "-pbkdf2-" ++ HashedPwdSaltAndIterations ->
         [HashedPwd, Salt, Iterations] = string:tokens(HashedPwdSaltAndIterations, ","),
         make_admin_doc(HashedPwd, Salt, Iterations);
-    "-bcrypt-" ++ HashedPwd ->
-        make_admin_doc(HashedPwd);
     _Else ->
 	nil
     end.
@@ -109,11 +107,6 @@ make_admin_doc(DerivedKey, Salt, Iterations) ->
      {<<"salt">>, ?l2b(Salt)},
      {<<"iterations">>, list_to_integer(Iterations)},
      {<<"password_scheme">>, <<"pbkdf2">>},
-     {<<"derived_key">>, ?l2b(DerivedKey)}].
-
-make_admin_doc(DerivedKey) ->
-    [{<<"roles">>, [<<"_admin">>]},
-     {<<"password_scheme">>, <<"bcrypt">>},
      {<<"derived_key">>, ?l2b(DerivedKey)}].
 
 get_from_cache(UserName) ->

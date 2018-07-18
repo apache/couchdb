@@ -31,7 +31,6 @@
         kernel,
         stdlib,
         crypto,
-        bcrypt,
         sasl,
         inets,
         ssl,
