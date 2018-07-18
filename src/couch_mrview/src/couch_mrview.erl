@@ -56,7 +56,9 @@ validate_ddoc_fields(DDoc) ->
         [{<<"filters">>, object}, {any, [object, string]}],
         [{<<"language">>, string}],
         [{<<"lists">>, object}, {any, [object, string]}],
-        [{<<"options">>, object}],
+        [{<<"options">>, object}, {<<"include_design">>, boolean}],
+        [{<<"options">>, object}, {<<"partitioned">>, boolean}],
+        [{<<"options">>, object}, {<<"local_seq">>, boolean}],
         [{<<"rewrites">>, [string, array]}],
         [{<<"shows">>, object}, {any, [object, string]}],
         [{<<"updates">>, object}, {any, [object, string]}],
@@ -133,6 +135,8 @@ validate_ddoc_field(Value, array) when is_list(Value) ->
     ok;
 validate_ddoc_field({Value}, object) when is_list(Value) ->
     ok;
+validate_ddoc_field(Value, boolean) when is_boolean(Value) ->
+    ok;
 validate_ddoc_field({Props}, {any, Type}) ->
     validate_ddoc_field1(Props, Type);
 validate_ddoc_field({Props}, {Key, Type}) ->
@@ -176,6 +180,7 @@ validate(DbName,  DDoc) ->
         (#mrview{reduce_funs = [{Name, _} | _]}) -> Name;
         (_) -> null
     end,
+    Partitioned = mem3:is_partitioned(DbName),
     ValidateView = fun(Proc, #mrview{def=MapSrc, reduce_funs=Reds}=View) ->
         couch_query_servers:try_compile(Proc, map, GetName(View), MapSrc),
         lists:foreach(fun
@@ -189,6 +194,9 @@ validate(DbName,  DDoc) ->
                 ok;
             ({_RedName, <<"_", _/binary>> = Bad}) ->
                 Msg = ["`", Bad, "` is not a supported reduce function."],
+                throw({invalid_design_doc, Msg});
+            ({_RedName, _RedSrc}) when Partitioned ->
+                Msg = <<"partitioned views must use built-in reduces.">>,
                 throw({invalid_design_doc, Msg});
             ({RedName, RedSrc}) ->
                 couch_query_servers:try_compile(Proc, reduce, RedName, RedSrc)
