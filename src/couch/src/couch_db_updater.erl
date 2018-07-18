@@ -28,8 +28,7 @@ init({Engine, DbName, FilePath, Options0}) ->
     update_idle_limit_from_config(),
     DefaultSecObj = default_security_object(DbName),
     Partitioned = lists:member(partitioned, Options0),
-    Options1 = [{default_security_object, DefaultSecObj} | Options0],
-    Options = [{default_props, [{partitioned, Partitioned}]} | Options1],
+    Options = [{default_security_object, DefaultSecObj} | Options0],
     try
         {ok, EngineState} = couch_db_engine:init(Engine, FilePath, Options),
         Db = init_db(DbName, FilePath, EngineState, Options),
