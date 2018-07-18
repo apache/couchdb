@@ -277,6 +277,8 @@ transform_row(#view_row{key=Key, id=Id, value=Value, doc=Doc}) ->
 
 unpartition_row(#collector{partitioned=true}, #view_row{key=[_Partition, Key]} = Row) ->
     Row#view_row{key = Key};
+unpartition_row(#collector{partitioned=true}, #view_row{key=null} = Row) ->
+    Row#view_row{key = null};
 unpartition_row(#collector{partitioned=false}, Row) ->
     Row.
 
