@@ -337,7 +337,8 @@ engine(Opts) when is_list(Opts) ->
             []
     end.
 
-is_partitioned(DbName) when is_binary(DbName) ->
+is_partitioned(DbName0) when is_binary(DbName0) ->
+    DbName = dbname(DbName0),
     is_partitioned(mem3:shards(DbName));
 
 is_partitioned(Shards) when is_list(Shards) ->

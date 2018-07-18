@@ -135,7 +135,17 @@ ddoc_to_mrst(DbName, #doc{id=Id, body={Fields}}) ->
     {DesignOpts} = proplists:get_value(<<"options">>, Fields, {[]}),
     SeqIndexed = proplists:get_value(<<"seq_indexed">>, DesignOpts, false),
     KeySeqIndexed = proplists:get_value(<<"keyseq_indexed">>, DesignOpts, false),
-    Partitioned = proplists:get_value(<<"partitioned">>, DesignOpts, false),
+
+    DbPartitioned = mem3:is_partitioned(DbName),
+    ViewPartitioned = proplists:get_value(<<"partitioned">>, DesignOpts),
+    Partitioned = if
+        not DbPartitioned ->
+            false;
+        is_boolean(ViewPartitioned) ->
+            ViewPartitioned;
+        true ->
+            DbPartitioned
+    end,
 
     {RawViews} = couch_util:get_value(<<"views">>, Fields, {[]}),
     BySrc = lists:foldl(MakeDict, dict:new(), RawViews),
