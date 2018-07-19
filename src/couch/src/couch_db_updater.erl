@@ -27,7 +27,6 @@ init({Engine, DbName, FilePath, Options0}) ->
     erlang:put(io_priority, {db_update, DbName}),
     update_idle_limit_from_config(),
     DefaultSecObj = default_security_object(DbName),
-    Partitioned = lists:member(partitioned, Options0),
     Options = [{default_security_object, DefaultSecObj} | Options0],
     try
         {ok, EngineState} = couch_db_engine:init(Engine, FilePath, Options),
