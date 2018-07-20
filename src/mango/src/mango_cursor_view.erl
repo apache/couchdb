@@ -92,10 +92,11 @@ maybe_replace_max_json([H | T] = EndKey) when is_list(EndKey) ->
 maybe_replace_max_json(EndKey) ->
     EndKey.
 
-base_args(#cursor{index = Idx} = Cursor) ->
+base_args(#cursor{index = Idx, opts = Opts} = Cursor) ->
     #mrargs{
         view_type = map,
         reduce = false,
+        partition = couch_util:get_value(partition, Opts),
         start_key = mango_idx:start_key(Idx, Cursor#cursor.ranges),
         end_key = mango_idx:end_key(Idx, Cursor#cursor.ranges),
         include_docs = true

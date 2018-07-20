@@ -20,8 +20,14 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
-go(DbName, Options, #mrargs{keys=undefined} = QueryArgs, Callback, Acc) ->
-    Shards = mem3:shards(DbName),
+go(DbName, Options, #mrargs{keys=undefined} = QueryArgs0, Callback, Acc) ->
+    case QueryArgs0#mrargs.partitioned of
+        true ->
+            Shards = mem3:shards(DbName, QueryArgs0#mrargs.partition);
+        _ ->
+            Shards = mem3:shards(DbName)
+    end,
+    QueryArgs = QueryArgs0#mrargs{partitioned = true},
     Workers0 = fabric_util:submit_jobs(
             Shards, fabric_rpc, all_docs, [Options, QueryArgs]),
     RexiMon = fabric_util:create_monitors(Workers0),

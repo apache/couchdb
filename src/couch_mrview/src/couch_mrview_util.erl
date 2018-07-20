@@ -24,7 +24,7 @@
 -export([temp_view_to_ddoc/1]).
 -export([calculate_external_size/1]).
 -export([calculate_active_size/1]).
--export([validate_args/1, validate_and_update_args/1]).
+-export([validate_args/1, validate_and_update_args/1, validate_and_update_args/2]).
 -export([maybe_load_doc/3, maybe_load_doc/4]).
 -export([maybe_update_index_file/1]).
 -export([extract_view/4, extract_view_reduce/1]).
@@ -545,10 +545,9 @@ validate_args(Args) ->
         _ -> mrverror(<<"Invalid value for `inclusive_end`.">>)
     end,
 
-    case {Args#mrargs.partitioned, Args#mrargs.view_type, Args#mrargs.include_docs} of
-        {true, _, true} -> mrverror(<<"`include_docs` is invalid for partitioned views">>);
-        {_, red, true} -> mrverror(<<"`include_docs` is invalid for reduce">>);
-        {_, _, ID} when is_boolean(ID) -> ok;
+    case {Args#mrargs.view_type, Args#mrargs.include_docs} of
+        {red, true} -> mrverror(<<"`include_docs` is invalid for reduce">>);
+        {_, ID} when is_boolean(ID) -> ok;
         _ -> mrverror(<<"Invalid value for `include_docs`">>)
     end,
 
@@ -573,12 +572,12 @@ validate_args(Args) ->
         {false, undefined} ->
             ok;
         {false, _Partition} ->
-            mrverror(<<"`partition` parameter is not supported in this view.">>)
+            ok % mrverror(<<"`partition` parameter is not supported in this view.">>)
     end,
     Args.
 
 
-update_args(#mrargs{} = Args) ->
+update_args(#mrargs{} = Args, Options) ->
     GroupLevel = determine_group_level(Args),
 
     SKDocId = case {Args#mrargs.direction, Args#mrargs.start_key_docid} of
@@ -593,50 +592,20 @@ update_args(#mrargs{} = Args) ->
         {_, EKDocId1} -> EKDocId1
     end,
 
-    LowestKey = null,
-    HighestKey = {[{<<239, 191, 176>>, null}]}, % \ufff0
-
-    {StartKey, EndKey} = case Args of
-        #mrargs{partition=undefined} ->
-            {Args#mrargs.start_key, Args#mrargs.end_key};
-
-        #mrargs{partition=P0} when not is_binary(P0) ->
-            mrverror(<<"`partition` must be a string.">>);
-
-        #mrargs{partition=P0, direction=fwd, start_key=undefined, end_key=undefined} ->
-            {[P0, LowestKey], [P0, HighestKey]};
-
-        #mrargs{partition=P0, direction=rev, start_key=undefined, end_key=undefined} ->
-            {[P0, HighestKey], [P0, LowestKey]};
-
-        #mrargs{partition=P0, direction=fwd, start_key=SK0, end_key=undefined} ->
-            {[P0, SK0], [P0, HighestKey]};
-
-        #mrargs{partition=P0, direction=rev, start_key=SK0, end_key=undefined} ->
-            {[P0, SK0], [P0, LowestKey]};
-
-        #mrargs{partition=P0, direction=fwd, start_key=undefined, end_key=EK0} ->
-            {[P0, LowestKey], [P0, EK0]};
-
-        #mrargs{partition=P0, direction=rev, start_key=undefined, end_key=EK0} ->
-            {[P0, HighestKey], [P0, EK0]};
-
-        #mrargs{partition=P0, start_key=SK0, end_key=EK0} ->
-            {[P0, SK0], [P0, EK0]}
-    end,
-
-    Args#mrargs{
-        start_key=StartKey,
-        end_key=EndKey,
+    Args1 = Args#mrargs{
         start_key_docid=SKDocId,
         end_key_docid=EKDocId,
         group_level=GroupLevel
-    }.
+    },
+    partition_mrargs(Args1, Options).
 
 
 validate_and_update_args(#mrargs{} = Args) ->
+    validate_and_update_args(Args, []).
+
+validate_and_update_args(#mrargs{} = Args, Options) ->
     Args = validate_args(Args),
-    update_args(Args).
+    update_args(Args, Options).
 
 
 determine_group_level(#mrargs{group=undefined, group_level=undefined}) ->
@@ -1274,3 +1243,108 @@ set_view_options(#mrargs{} = Args, partitioned, true) ->
     Args#mrargs{partitioned=true};
 set_view_options(#mrargs{} = Args, partitioned, false) ->
     Args#mrargs{partitioned=false}.
+
+
+partition_mrargs(#mrargs{} = Args, Options) ->
+couch_log:notice("partition ~p ~p", [Args, Options]),
+    case {Args, lists:member(all_docs, Options)} of
+        {#mrargs{partition=undefined}, _} ->
+            Args;
+
+        {#mrargs{partition=P0}, _} when not is_binary(P0) ->
+            mrverror(<<"`partition` must be a string.">>);
+
+        {#mrargs{}, false} ->
+            partition_as_lists(Args);
+
+        {#mrargs{}, true} ->
+            partition_as_strings(Args)
+    end.
+
+
+partition_as_strings(Args) ->
+    case Args of
+        #mrargs{partition=P0, direction=fwd, start_key=undefined, end_key=undefined} ->
+            Args#mrargs{start_key = <<P0/binary, $:>>, end_key = <<P0/binary, $;>>};
+
+        #mrargs{partition=P0, direction=rev, start_key=undefined, end_key=undefined} ->
+            Args#mrargs{start_key = <<P0/binary, $;>>, end_key = <<P0/binary, $:>>};
+
+        #mrargs{partition=P0, direction=fwd, start_key=SK0, end_key=undefined} ->
+            case prefix(SK0, <<P0/binary, $:>>) of
+                true ->
+                    Args#mrargs{start_key = SK0, end_key = <<P0/binary, $;>>};
+                false ->
+                    mrverror(<<"`start_key` must be prefixed with selected partition.">>)
+            end;
+
+        #mrargs{partition=P0, direction=rev, start_key=SK0, end_key=undefined} ->
+            case prefix(SK0, <<P0/binary, $:>>) of
+                true ->
+                    Args#mrargs{start_key = SK0, end_key = <<P0/binary, $:>>};
+                false ->
+                    mrverror(<<"`start_key` must be prefixed with selected partition.">>)
+            end;
+
+        #mrargs{partition=P0, direction=fwd, start_key=undefined, end_key=EK0} ->
+            case prefix(EK0, <<P0/binary, $:>>) of
+                true ->
+                    Args#mrargs{start_key = <<P0/binary, $:>>, end_key = EK0};
+                false ->
+                    mrverror(<<"`end_key` must be prefixed with selected partition.">>)
+            end;
+
+        #mrargs{partition=P0, direction=rev, start_key=undefined, end_key=EK0} ->
+            case prefix(EK0, <<P0/binary, $:>>) of
+                true ->
+                    Args#mrargs{start_key = EK0, end_key = <<P0/binary, $:>>};
+                false ->
+                    mrverror(<<"`end_key` must be prefixed with selected partition.">>)
+            end;
+
+        #mrargs{partition=P0, start_key=SK0, end_key=EK0} ->
+            case {prefix(SK0, <<P0/binary, $:>>), prefix(EK0, <<P0/binary, $:>>)} of
+                {false, false} ->
+                    mrverror(<<"`start_key` and `end_key` must be prefixed with selected partition.">>);
+                {false, true} ->
+                    mrverror(<<"`start_key` must be prefixed with selected partition.">>);
+                {true, false} ->
+                    mrverror(<<"`end_key` must be prefixed with selected partition.">>);
+                {true, true} ->
+                    Args
+            end
+    end.
+
+
+partition_as_lists(Args) ->
+    LowestKey = null,
+    HighestKey = {[{<<239, 191, 176>>, null}]}, % \ufff0
+
+    case Args of
+        #mrargs{partition=P0, direction=fwd, start_key=undefined, end_key=undefined} ->
+            Args#mrargs{start_key=[P0, LowestKey], end_key=[P0, HighestKey]};
+
+        #mrargs{partition=P0, direction=rev, start_key=undefined, end_key=undefined} ->
+            Args#mrargs{start_key=[P0, HighestKey], end_key=[P0, LowestKey]};
+
+        #mrargs{partition=P0, direction=fwd, start_key=SK0, end_key=undefined} ->
+            Args#mrargs{start_key=[P0, SK0], end_key=[P0, HighestKey]};
+
+        #mrargs{partition=P0, direction=rev, start_key=SK0, end_key=undefined} ->
+            Args#mrargs{start_key=[P0, SK0], end_key=[P0, LowestKey]};
+
+        #mrargs{partition=P0, direction=fwd, start_key=undefined, end_key=EK0} ->
+            Args#mrargs{start_key=[P0, LowestKey], end_key=[P0, EK0]};
+
+        #mrargs{partition=P0, direction=rev, start_key=undefined, end_key=EK0} ->
+            Args#mrargs{start_key=[P0, HighestKey], end_key=[P0, EK0]};
+
+        #mrargs{partition=P0, start_key=SK0, end_key=EK0} ->
+            Args#mrargs{start_key=[P0, SK0], end_key=[P0, EK0]}
+    end.
+
+prefix(Subject, Prefix) ->
+    case binary:match(Subject, Prefix) of
+        {0, _} -> true;
+        _      -> false
+    end.
