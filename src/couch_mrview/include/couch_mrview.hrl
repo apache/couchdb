@@ -88,6 +88,7 @@
     conflicts,
     callback,
     sorted = true,
+    updated = false,
     partitioned,
     partition,
     extra = []

@@ -577,6 +577,9 @@ validate_args(Args) ->
     Args.
 
 
+update_args(#mrargs{updated=true} = Args, _Options) -> % hackish idempotencies
+    Args;
+
 update_args(#mrargs{} = Args, Options) ->
     GroupLevel = determine_group_level(Args),
 
@@ -597,7 +600,8 @@ update_args(#mrargs{} = Args, Options) ->
         end_key_docid=EKDocId,
         group_level=GroupLevel
     },
-    partition_mrargs(Args1, Options).
+    Args2 = partition_mrargs(Args1, Options),
+    Args2#mrargs{updated = true}.
 
 
 validate_and_update_args(#mrargs{} = Args) ->
