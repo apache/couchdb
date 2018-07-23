@@ -1250,7 +1250,6 @@ set_view_options(#mrargs{} = Args, partitioned, false) ->
 
 
 partition_mrargs(#mrargs{} = Args, Options) ->
-couch_log:notice("partition ~p ~p", [Args, Options]),
     case {Args, lists:member(all_docs, Options)} of
         {#mrargs{partition=undefined}, _} ->
             Args;
