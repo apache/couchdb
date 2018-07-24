@@ -48,6 +48,7 @@ defmodule ReplicationTest do
 
     create_db(src_db_name)
     create_db(tgt_db_name)
+    delete_on_exit [src_db_name, tgt_db_name]
 
     doc = %{"_id" => "doc1"}
     [doc] = save_docs(src_db_name, [doc])
@@ -113,6 +114,7 @@ defmodule ReplicationTest do
 
     create_db(src_db_name)
     create_db(tgt_db_name)
+    delete_on_exit [src_db_name, tgt_db_name]
 
     save_docs(src_db_name, make_docs(1..6))
 
@@ -151,6 +153,7 @@ defmodule ReplicationTest do
 
     create_db(src_db_name)
     create_db(tgt_db_name)
+    delete_on_exit [src_db_name, tgt_db_name]
 
     save_docs(src_db_name, make_docs(1..6))
 
@@ -246,9 +249,7 @@ defmodule ReplicationTest do
 
     create_db(src_db_name)
     create_db(tgt_db_name)
-
-    on_exit(fn -> delete_db(src_db_name) end)
-    on_exit(fn -> delete_db(tgt_db_name) end)
+    delete_on_exit [src_db_name, tgt_db_name]
 
     att1_data = get_att1_data()
     att2_data = get_att2_data()
@@ -561,9 +562,7 @@ defmodule ReplicationTest do
 
     create_db(src_db_name)
     create_db(tgt_db_name)
-
-    on_exit(fn -> delete_db(src_db_name) end)
-    on_exit(fn -> delete_db(tgt_db_name) end)
+    delete_on_exit [src_db_name, tgt_db_name]
 
     docs = make_docs(1..5)
     docs = save_docs(src_db_name, docs)
@@ -611,9 +610,7 @@ defmodule ReplicationTest do
 
     create_db(src_db_name)
     create_db(tgt_db_name)
-
-    on_exit(fn -> delete_db(src_db_name) end)
-    on_exit(fn -> delete_db(tgt_db_name) end)
+    delete_on_exit [src_db_name, tgt_db_name]
 
     docs = make_docs(1..7)
     docs = for doc <- docs do
@@ -673,10 +670,8 @@ defmodule ReplicationTest do
     repl_tgt = tgt_prefix <> tgt_db_name
 
     create_db(src_db_name)
-
-    on_exit(fn -> delete_db(src_db_name) end)
-    # This is created by the replication
-    on_exit(fn -> delete_db(tgt_db_name) end)
+    delete_on_exit [src_db_name, tgt_db_name]
+    # tgt_db_name is created by the replication
 
     docs = make_docs(1..2)
     save_docs(src_db_name, docs)
@@ -702,9 +697,7 @@ defmodule ReplicationTest do
 
     create_db(src_db_name)
     create_db(tgt_db_name)
-
-    on_exit(fn -> delete_db(src_db_name) end)
-    on_exit(fn -> delete_db(tgt_db_name) end)
+    delete_on_exit [src_db_name, tgt_db_name]
 
     docs = make_docs(1..30)
     ddoc = %{
@@ -813,9 +806,7 @@ defmodule ReplicationTest do
 
     create_db(src_db_name)
     create_db(tgt_db_name)
-
-    on_exit(fn -> delete_db(src_db_name) end)
-    on_exit(fn -> delete_db(tgt_db_name) end)
+    delete_on_exit [src_db_name, tgt_db_name]
 
     filter_fun_1 = """
       function(doc, req) {
@@ -961,9 +952,7 @@ defmodule ReplicationTest do
 
     create_db(src_db_name)
     create_db(tgt_db_name)
-
-    on_exit(fn -> delete_db(src_db_name) end)
-    on_exit(fn -> delete_db(tgt_db_name) end)
+    delete_on_exit [src_db_name, tgt_db_name]
 
     docs = make_docs(1..10)
     ddoc = %{
@@ -1163,6 +1152,7 @@ defmodule ReplicationTest do
 
     create_db(src_db_name)
     create_db(tgt_db_name)
+    delete_on_exit [src_db_name, tgt_db_name]
 
     ddoc = %{
       "_id" => "_design/mydesign",
@@ -1377,6 +1367,7 @@ defmodule ReplicationTest do
 
     create_db(src_db_name)
     create_db(tgt_db_name)
+    delete_on_exit [src_db_name, tgt_db_name]
 
     doc = %{"_id" => "foobar"}
     [doc] = save_docs(src_db_name, [doc])
@@ -1424,6 +1415,7 @@ defmodule ReplicationTest do
 
     create_db(src_db_name)
     create_db(tgt_db_name)
+    delete_on_exit [src_db_name, tgt_db_name]
 
     set_security(tgt_db_name, %{
         :admins => %{
@@ -1474,6 +1466,7 @@ defmodule ReplicationTest do
 
     create_db(src_db_name)
     create_db(tgt_db_name)
+    delete_on_exit [src_db_name, tgt_db_name]
 
     set_security(tgt_db_name, %{
         :admins => %{
@@ -1707,5 +1700,13 @@ defmodule ReplicationTest do
   def decode_seq(seq) do
     seq = String.replace(seq, ~r/\d+-/, "", global: false)
     :erlang.binary_to_term(Base.url_decode64!(seq, padding: false))
+  end
+
+  def delete_on_exit(db_names) when is_list(db_names) do
+    on_exit(fn ->
+      Enum.each(db_names, fn(name) ->
+        delete_db name
+      end)
+    end)
   end
 end
