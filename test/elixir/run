@@ -1,4 +1,6 @@
 #!/bin/bash -e
+
 cd "$(dirname "$0")"
+source ./activate
 mix deps.get
 mix test --trace

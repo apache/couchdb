@@ -1,0 +1,226 @@
+#!/bin/bash
+## -*-shell-script-*-
+set -e
+
+ESL_PACKAGES=http://packages.erlang-solutions.com/erlang/esl-erlang/FLAVOUR_1_general
+FREE_BSD_PACKAGE=https://pkg.freebsd.org/FreeBSD:12:i386/latest/All/erlang-19.3.6.9,4.txz
+
+ELIXIR_PACKAGES=https://github.com/elixir-lang/elixir/releases/download
+# The following setting is ignored for windows and BSD
+ERLANG_VSN=21.0-1
+
+ELIXIR_VSN=v1.6.6
+
+WIN_SKIP_APPS=(\
+    jinterface \
+    gs \
+    wx \
+    ic \
+    odbc
+)
+
+PREFIX=${1:-`pwd`}
+
+
+function ensure_tool() {
+    type "${1}" > /dev/null 2>&1 && return 0
+    return 1
+}
+
+function pkg_mgr() {
+    case $(uname -s) in
+        Linux)
+            ensure_tool 'dpkg' && echo deb && return 0
+            ensure_tool 'rpm' && echo rpm && return 0
+            echo '      We only support dpkg and rpm based distributions' >&2
+            exit 1
+            ;;
+        CYGWIN*)
+            echo win && return 0
+            ;;
+        Darwin)
+            echo macos && return 0
+            ;;
+        BSD)
+            ensure_tool 'xz' &&  echo txz && return 0
+            return 1
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+function download() {
+    ! (ensure_tool 'curl' || ensure_tool 'wget') \
+        && echo '      Please install either `curl` or `wget`' >&2 && exit 1
+
+    local url="$1"
+    local dest="$2"
+
+    echo "      Downloading ${url} to ${dest}" >&2
+    ensure_tool 'wget' && wget --max-redirect=1 -O ${dest} ${url} && return 0
+    ensure_tool 'curl' && curl -L -o ${dest} ${url} && return 0
+    return 1
+}
+
+function get_erlang_package() {
+    local package="$1"
+    case $(pkg_mgr) in
+        deb)
+            download ${ESL_PACKAGES}/esl-erlang_${ERLANG_VSN}~debian~jessie_amd64.deb "${package}" \
+                && return 0
+            ;;
+        rpm)
+            download ${ESL_PACKAGES}/esl-erlang_${ERLANG_VSN}~centos~7_amd64.rpm "${package}" \
+                && return 0
+            ;;
+        win)
+            cp /relax/bits/otp_src_18.3.tar.gz "${package}" \
+                && return 0
+            ;;
+        txz)
+            download ${FREE_BSD_PACKAGE} "${package}" \
+                && return 0
+            ;;
+        macos)
+            download ${ESL_PACKAGES}/esl-erlang_${ERLANG_VSN}~osx~10.10_compiled.tgz "${package}" \
+                && return 0
+            ;;
+    esac
+    echo "      Unsuported package manager `pkg_mgr`" >&2
+    return 1
+}
+
+function unpack() {
+    local package="$1"
+    local dest_dir="$2"
+    case $(pkg_mgr) in
+        deb)
+            dpkg -x "${package}" "${dest_dir}" \
+                && return 0
+            ;;
+        rpm)
+            (cd "${dest_dir}" \
+                && rpm2cpio "${package}" | cpio -idmv) \
+                && return 0
+            ;;
+        macos)
+            tar -xzf "${package}" --strip-components=1 -C "${dest_dir}" \
+                && return 0
+            ;;
+        txz)
+            tar -xf "${package}" --use-compress-program=xz \
+                --strip-components=4 -C "${dest_dir}" /usr/local/lib/erlang/ \
+                && return 0
+            ;;
+        win)
+            tar xzf "${package}" -C "${dest_dir}" \
+                && return 0
+            ;;
+    esac
+    return 1
+}
+
+function build_win() {
+    local src="$1"
+    (cd ${src} \
+        && for app in "${WIN_SKIP_APPS[@]}"; do touch lib/${app}/SKIP; done \
+        && ./otp_build env_win32 x64 \
+        && ./otp_build autoconf \
+        && ./otp_build configure \
+        && ./otp_build boot -a \
+        && ./otp_build release -a
+    )
+}
+
+function install() {
+    local from="$1"
+    local to="$2"
+    case $(pkg_mgr) in
+        deb|rpm)
+            cp -r ${from}/usr/lib/erlang/* ${to}
+            ${to}/Install -minimal  ${to} && return 0
+            ;;
+        macos)
+            cp -r ${from}/* ${to}
+            ${to}/Install -minimal  ${to} && return 0
+            ;;
+        txz)
+            mv ${from}/* ${to}
+            rm -rf ${to}/bin
+            ${to}/Install -minimal  ${to} && return 0
+            ;;
+        win)
+            build_win ${from}
+            ${from}/release/win32/Install.exe -s ${to} && return 0
+            ;;
+    esac
+    return 1
+}
+
+function check_erlang_install() {
+    local build=$1
+    ${build}/bin/erl -eval \
+        'erlang:display(erlang:system_info(otp_release)), halt().'  -noshell \
+        > /dev/null 2>&1 && return 0
+    return 1
+}
+
+function check_elixir_install() {
+    local erlang=$1
+    local build=$2
+    PATH="${erlang}/bin/:$PATH"
+    "${build}/bin/elixir" --version | grep 'compiled with'
+    return $?
+}
+
+platform=$(pkg_mgr)
+erlang_package="${PREFIX}/.erlang/pkg/${platform}/erlang.${platform}"
+mkdir -p "$(dirname ${erlang_package})"
+src="${PREFIX}/.erlang/src/${platform}"
+erlang_build="${PREFIX}/.erlang/build/${platform}"
+
+if [ ! -f "${erlang_build}/bin/erl" ]; then
+    if [ ! -d "${src}" ]; then
+        if [ ! -f "${erlang_package}" ]; then
+            echo "==> Downloading package"
+            get_erlang_package "${erlang_package}" \
+                || { echo "===> Cannot download package"; exit 1; }
+            echo "===> Got package"
+        fi
+        mkdir -p "${src}"
+        echo "==> Unpacking package ${erlang_package}"
+        unpack "${erlang_package}" "${src}" \
+            || { echo "===> Cannot unpack package ${erlang_package}"; exit 1; }
+        echo "===> Unpacked package"
+    fi
+    mkdir -p ${erlang_build}
+    echo "==> Install package ${erlang_package} to ${erlang_build}"
+    install "${src}" "${erlang_build}" \
+        || { echo "===> Cannot install package"; exit 1; }
+    echo "===> OK"
+fi
+check_erlang_install "${erlang_build}" && echo "Installation is finished"
+
+elixir_build="${PREFIX}/.elixir/build"
+elixir_package="${PREFIX}/.elixir/pkg/elixir.zip"
+if [ ! -f "${elixir_build}/bin/iex" ]; then
+    if [ ! -f "${elixir_package}" ]; then
+        echo "==> Download elixir package"
+        mkdir -p .elixir/pkg/
+        download ${ELIXIR_PACKAGES}/${ELIXIR_VSN}/Precompiled.zip "${elixir_package}" \
+            || { echo "===> Cannot download package"; exit 1; }
+        echo "===> Got elixir package"
+    fi
+    echo "==> Unpack elixir"
+    ensure_tool 'unzip' || { echo 'Please install `unzip`'; exit 1; }
+    unzip -qq "${elixir_package}" -d "${elixir_build}" \
+        ||  { echo "===> Cannot unpack package ${elixir_package}"; exit 1; }
+    echo "===> Unpacked elixir package"
+fi
+check_elixir_install "${erlang_build}" "${elixir_build}" && echo "==> OK"
+
+cat << EOF > ${PREFIX}/activate
+export PATH=${elixir_build}/bin/:${erlang_build}/bin/:\$PATH
+EOF

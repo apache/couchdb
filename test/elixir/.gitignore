@@ -1,2 +1,5 @@
 _build/
 deps/
+activate
+.erlang
+.elixir
