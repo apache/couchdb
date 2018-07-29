@@ -387,7 +387,7 @@ flush_trees(#db{} = Db,
         rev_tree = Flushed,
         sizes = #size_info{
             active = FinalAS + TotalAttSize,
-            external = FinalES + TotalAttSize
+            external = FinalES
         }
     },
     flush_trees(Db, RestUnflushed, [NewInfo | AccFlushed]).
@@ -415,7 +415,7 @@ check_doc_atts(Db, Doc) ->
     end.
 
 
-add_sizes(Type, #leaf{sizes=Sizes, atts=AttSizes}, Acc) ->
+add_sizes(Type, #leaf{deleted=Deleted, sizes=Sizes, atts=AttSizes}, Acc) ->
     % Maybe upgrade from disk_size only
     #size_info{
         active = ActiveSize,
@@ -423,7 +423,15 @@ add_sizes(Type, #leaf{sizes=Sizes, atts=AttSizes}, Acc) ->
     } = upgrade_sizes(Sizes),
     {ASAcc, ESAcc, AttsAcc} = Acc,
     NewASAcc = ActiveSize + ASAcc,
-    NewESAcc = ESAcc + if Type == leaf -> ExternalSize; true -> 0 end,
+    NewESAcc = case {Type, Deleted} of
+        {leaf, false} ->
+            SumFun = fun({_, S}, A) -> S + A end,
+            TotalAttSizes = lists:foldl(SumFun, 0, AttSizes),
+            ESAcc + ExternalSize + TotalAttSizes;
+        {leaf, _} ->
+            ESAcc + ExternalSize;
+        _ -> 0
+    end,
     NewAttsAcc = lists:umerge(AttSizes, AttsAcc),
     {NewASAcc, NewESAcc, NewAttsAcc}.
 
