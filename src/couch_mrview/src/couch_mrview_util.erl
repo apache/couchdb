@@ -566,13 +566,13 @@ validate_args(Args) ->
 
     case {Args#mrargs.partitioned == true, Args#mrargs.partition} of
         {true, undefined} ->
-            mrverror(<<"`partition` parameter is mandatory for queries to this view.">>);
+            ok; % mrverror(<<"`partition` parameter is mandatory for queries to this view.">>);
         {true, _Partition} ->
             ok;
         {false, undefined} ->
             ok;
         {false, _Partition} ->
-            ok % mrverror(<<"`partition` parameter is not supported in this view.">>)
+            ok %mrverror(<<"`partition` parameter is not supported in this view.">>)
     end,
     Args.
 
