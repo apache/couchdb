@@ -18,10 +18,10 @@ defmodule ReduceTest do
     view_url = "/#{db_name}/_design/foo/_view/bar"
     num_docs = 500
     map = ~s"""
-function (doc) {
-  emit(doc.integer, doc.integer);
-  emit(doc.integer, doc.integer);
-};
+    function (doc) {
+      emit(doc.integer, doc.integer);
+      emit(doc.integer, doc.integer);
+    };
     """
     reduce = "function (keys, values) { return sum(values); };"
     red_doc = %{:views => %{:bar => %{:map => map, :reduce => reduce}}}
@@ -142,40 +142,39 @@ function (doc) {
     view_url = "/#{db_name}/_design/foo/_view/bar"
     map = "function (doc) { emit(doc.val, doc.val); };"
     reduce = ~s"""
-function (keys, values, rereduce) {
-    // This computes the standard deviation of the mapped results
-    var stdDeviation=0.0;
-    var count=0;
-    var total=0.0;
-    var sqrTotal=0.0;
+    function (keys, values, rereduce) {
+      // This computes the standard deviation of the mapped results
+      var stdDeviation=0.0;
+      var count=0;
+      var total=0.0;
+      var sqrTotal=0.0;
 
-    if (!rereduce) {
-      // This is the reduce phase, we are reducing over emitted values from
-      // the map functions.
-      for(var i in values) {
-        total = total + values[i];
-        sqrTotal = sqrTotal + (values[i] * values[i]);
+      if (!rereduce) {
+        // This is the reduce phase, we are reducing over emitted values from
+        // the map functions.
+        for(var i in values) {
+          total = total + values[i];
+          sqrTotal = sqrTotal + (values[i] * values[i]);
+        }
+        count = values.length;
+      } else {
+        // This is the rereduce phase, we are re-reducing previosuly
+        // reduced values.
+        for(var i in values) {
+          count = count + values[i].count;
+          total = total + values[i].total;
+          sqrTotal = sqrTotal + values[i].sqrTotal;
+        }
       }
-      count = values.length;
-    }
-    else {
-      // This is the rereduce phase, we are re-reducing previosuly
-      // reduced values.
-      for(var i in values) {
-        count = count + values[i].count;
-        total = total + values[i].total;
-        sqrTotal = sqrTotal + values[i].sqrTotal;
-      }
-    }
 
-    var variance =  (sqrTotal - ((total * total)/count)) / count;
-    stdDeviation = Math.sqrt(variance);
+      var variance =  (sqrTotal - ((total * total)/count)) / count;
+      stdDeviation = Math.sqrt(variance);
 
-    // the reduce result. It contains enough information to be rereduced
-    // with other reduce results.
-    return {"stdDeviation":stdDeviation,"count":count,
+      // the reduce result. It contains enough information to be rereduced
+      // with other reduce results.
+      return {"stdDeviation":stdDeviation,"count":count,
         "total":total,"sqrTotal":sqrTotal};
-}
+    }
     """
 
     red_doc = %{:views => %{:bar => %{:map => map, :reduce => reduce}}}
