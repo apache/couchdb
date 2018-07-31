@@ -101,6 +101,9 @@ start_applications([App|Apps], Acc) ->
         io:format(standard_error, "Application ~s was left running!~n", [App]),
         application:stop(App),
         start_applications([App|Apps], Acc);
+    {error, Reason} ->
+        io:format(standard_error, "Cannot start application '~s', reason ~p~n", [App, Reason]),
+        throw({error, {cannot_start, App, Reason}});
     ok ->
         start_applications(Apps, [App|Acc])
     end.
