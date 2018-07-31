@@ -162,7 +162,6 @@ defmodule SecurityValidationTest do
     assert Couch.put("/#{db_name}/_security", body: %{sec_obj | admin_override: true}).body["ok"]
 
     # Change owner to Tom
-    resp = Couch.get("/_session")
     Map.put(test_doc, "author", "tom")
     resp = Couch.put("/#{db_name}/test_doc", body: test_doc)
     assert resp.body["ok"]
