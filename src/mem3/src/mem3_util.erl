@@ -16,6 +16,7 @@
     n_val/2, to_atom/1, to_integer/1, write_db_doc/1, delete_db_doc/1,
     shard_info/1, ensure_exists/1, open_db_doc/1]).
 -export([is_deleted/1, rotate_list/2]).
+-export([docid_hash/1, docid_hash/2]).
 
 %% do not use outside mem3.
 -export([build_ordered_shards/2, downcast/1]).
@@ -33,6 +34,28 @@ hash(Item) when is_binary(Item) ->
     erlang:crc32(Item);
 hash(Item) ->
     erlang:crc32(term_to_binary(Item)).
+
+
+docid_hash(DocId) when is_binary(DocId) ->
+    docid_hash(DocId, []).
+
+docid_hash(<<"_design/", _/binary>> = DocId, _Options) ->
+    erlang:crc32(DocId); % design docs are never placed by partition
+
+docid_hash(DocId, []) when is_binary(DocId) ->
+    docid_hash(DocId, [{partitioned, false}]);
+
+docid_hash(DocId, [{partitioned, false}]) when is_binary(DocId) ->
+    erlang:crc32(DocId);
+
+docid_hash(DocId, [{partitioned, true}]) when is_binary(DocId) ->
+    case binary:split(DocId, <<":">>) of
+        [Partition, _Rest] ->
+            erlang:crc32(Partition);
+        _ ->
+            throw({illegal_docid, <<"doc id must be of form partition:id">>})
+    end.
+
 
 name_shard(Shard) ->
     name_shard(Shard, "").
