@@ -14,7 +14,8 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
--export([handle_view_req/3, handle_temp_view_req/2]).
+-export([handle_view_req/3, handle_temp_view_req/2, handle_partition_view_req/4]).
+
 
 multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
     Args0 = couch_mrview_http:parse_params(Req, undefined),
@@ -42,12 +43,16 @@ multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
 
 design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
     Args = couch_mrview_http:parse_params(Req, Keys),
+    design_doc_view_int(Req, Db, DDoc, ViewName, Args).
+
+design_doc_view_int(Req, Db, DDoc, ViewName, #mrargs{} = Args) ->
     Max = chttpd:chunked_response_buffer_size(),
     VAcc = #vacc{db=Db, req=Req, threshold=Max},
     Options = [{user_ctx, Req#httpd.user_ctx}],
     {ok, Resp} = fabric:query_view(Db, Options, DDoc, ViewName,
         fun couch_mrview_http:view_cb/2, VAcc, Args),
     {ok, Resp#vacc.resp}.
+
 
 handle_view_req(#httpd{method='POST',
     path_parts=[_, _, _, _, ViewName, <<"queries">>]}=Req, Db, DDoc) ->
@@ -100,6 +105,37 @@ handle_temp_view_req(Req, _Db) ->
     Msg = <<"Temporary views are not supported in CouchDB">>,
     chttpd:send_error(Req, 410, gone, Msg).
 
+
+handle_partition_view_req(#httpd{method='GET',
+    path_parts=[_, _, _, _, _, _, ViewName]} = Req, Db, DDoc, PartitionKey) ->
+    Keys = chttpd:qs_json_value(Req, "keys", undefined),
+    Args = couch_mrview_http:parse_params(Req, Keys),
+
+    Restrictions = [
+        {include_docs, Args#mrargs.include_docs, true},
+        {conflicts, Args#mrargs.conflicts, true},
+        {stable, Args#mrargs.stable, true}
+    ],
+    lists:foreach(fun ({Param, Field, Value}) ->
+        case Field =:= Value of
+            true ->
+                Msg = iolist_to_binary(io_lib:format("~s is not allowed for a partition query", [Param])),
+                throw({
+                    bad_request,
+                    Msg
+                });
+            false ->
+                ok
+        end
+    end, Restrictions),
+    Args1 = Args#mrargs{
+        partition = PartitionKey,
+        partitioned = true
+    },
+    design_doc_view_int(Req, Db, DDoc, ViewName, Args1);
+
+handle_partition_view_req(Req, _Db, _DDoc, _Pk) ->
+        chttpd:send_method_not_allowed(Req, "GET").
 
 
 -ifdef(TEST).
