@@ -66,8 +66,22 @@ for_db(DbName, Options) ->
 for_docid(DbName, DocId) ->
     for_docid(DbName, DocId, []).
 
+%% This function performs one or two lookups now as it is not known
+%% ahead of time if the database is partitioned We first ask for the
+%% shards as if the database is not partitioned and then test the
+%% returned shards for a counter-indication that it was.  If so, we
+%% run the function again with the docid hash option enabled.
 for_docid(DbName, DocId, Options) ->
-    HashKey = mem3_util:hash(DocId),
+    Shards = for_docid(DbName, DocId, Options, [{partitioned, false}]),
+    case mem3:is_partitioned(Shards) of
+        true ->
+            for_docid(DbName, DocId, Options, [{partitioned, true}]);
+        false ->
+            Shards
+    end.
+
+for_docid(DbName, DocId, Options, HashOptions) ->
+    HashKey = mem3_util:docid_hash(DocId, HashOptions),
     ShardHead = #shard{
         dbname = DbName,
         range = ['$1', '$2'],
@@ -397,7 +411,8 @@ load_shards_from_db(ShardDb, DbName) ->
 
 load_shards_from_disk(DbName, DocId)->
     Shards = load_shards_from_disk(DbName),
-    HashKey = mem3_util:hash(DocId),
+    Options = [{partitioned, mem3:is_partitioned(Shards)}],
+    HashKey = mem3_util:docid_hash(DocId, Options),
     [S || S <- Shards, in_range(S, HashKey)].
 
 in_range(Shard, HashKey) ->
@@ -520,7 +535,6 @@ filter_shards_by_name(Name, Matches, [#shard{name=Name}=S|Ss]) ->
     filter_shards_by_name(Name, [S|Matches], Ss);
 filter_shards_by_name(Name, Matches, [_|Ss]) ->
     filter_shards_by_name(Name, Matches, Ss).
-
 
 -ifdef(TEST).
 

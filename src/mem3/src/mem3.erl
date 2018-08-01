@@ -13,7 +13,7 @@
 -module(mem3).
 
 -export([start/0, stop/0, restart/0, nodes/0, node_info/2, shards/1, shards/2,
-    choose_shards/2, n/1, n/2, dbname/1, ushards/1]).
+    choose_shards/2, n/1, n/2, dbname/1, ushards/1, ushards/2]).
 -export([get_shard/3, local_shards/1, shard_suffix/1, fold_shards/2]).
 -export([sync_security/0, sync_security/1]).
 -export([compare_nodelists/0, compare_shards/1]).
@@ -22,6 +22,7 @@
 -export([belongs/2, owner/3]).
 -export([get_placement/1]).
 -export([ping/1, ping/2]).
+-export([is_partitioned/1]).
 
 %% For mem3 use only.
 -export([name/1, node/1, range/1, engine/1]).
@@ -71,7 +72,7 @@ compare_shards(DbName) ->
 
 -spec n(DbName::iodata()) -> integer().
 n(DbName) ->
-    n(DbName, <<"foo">>).
+    n(DbName, <<"_design/foo">>).
 
 n(DbName, DocId) ->
     length(mem3:shards(DbName, DocId)).
@@ -135,6 +136,12 @@ ushards(DbName) ->
     ZoneMap = zone_map(Nodes),
     Shards = ushards(DbName, live_shards(DbName, Nodes, [ordered]), ZoneMap),
     mem3_util:downcast(Shards).
+
+-spec ushards(DbName::iodata(), DocId::binary()) -> [#shard{}].
+ushards(DbName, DocId) ->
+    Shards = shards_int(DbName, DocId, [ordered]),
+    Shard = hd(Shards),
+    mem3_util:downcast([Shard]).
 
 ushards(DbName, Shards0, ZoneMap) ->
     {L,S,D} = group_by_proximity(Shards0, ZoneMap),
@@ -232,13 +239,14 @@ dbname(_) ->
     erlang:error(badarg).
 
 %% @doc Determine if DocId belongs in shard (identified by record or filename)
-belongs(#shard{}=Shard, DocId) when is_binary(DocId) ->
+%% NOTE: only supported for design documents
+belongs(#shard{}=Shard, <<"_design/", _/binary>> = DocId) ->
     [Begin, End] = range(Shard),
     belongs(Begin, End, DocId);
-belongs(<<"shards/", _/binary>> = ShardName, DocId) when is_binary(DocId) ->
+belongs(<<"shards/", _/binary>> = ShardName, <<"_design/", _/binary>> = DocId) ->
     [Begin, End] = range(ShardName),
     belongs(Begin, End, DocId);
-belongs(DbName, DocId) when is_binary(DbName), is_binary(DocId) ->
+belongs(DbName, <<"_design/", _/binary>>) when is_binary(DbName) ->
     true.
 
 belongs(Begin, End, DocId) ->
@@ -354,6 +362,25 @@ ping(Node, Timeout) when is_atom(Node) ->
             erlang:disconnect_node(Node),
             pang
     end.
+
+is_partitioned(DbName0) when is_binary(DbName0) ->
+    DbName = dbname(DbName0),
+    try
+        is_partitioned(mem3:shards(DbName))
+    catch
+        error:database_does_not_exist ->
+            false
+    end;
+
+is_partitioned(Shards) when is_list(Shards) ->
+    lists:all(fun is_partitioned/1, Shards);
+
+is_partitioned(#shard{opts=Opts}) ->
+    couch_util:get_value(partitioned, Opts) == true;
+
+is_partitioned(#ordered_shard{opts=Opts}) ->
+    couch_util:get_value(partitioned, Opts) == true.
+
 
 -ifdef(TEST).
 
