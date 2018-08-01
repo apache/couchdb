@@ -285,10 +285,12 @@ create_db_req(#httpd{}=Req, DbName) ->
     Q = chttpd:qs_value(Req, "q", config:get("cluster", "q", "8")),
     P = chttpd:qs_value(Req, "placement", config:get("cluster", "placement")),
     EngineOpt = parse_engine_opt(Req),
+    Partitioned = parse_partitioned_opt(Req),
     Options = [
         {n, N},
         {q, Q},
-        {placement, P}
+        {placement, P},
+        {initial_props, [{partitioned, Partitioned}]}
     ] ++ EngineOpt,
     DocUrl = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName)),
     case fabric:create_db(DbName, Options) of
@@ -1411,6 +1413,18 @@ parse_engine_opt(Req) ->
                     throw({bad_request, invalid_engine_extension})
             end
     end.
+
+
+parse_partitioned_opt(Req) ->
+    case chttpd:qs_value(Req, "partitioned") of
+        undefined ->
+            false;
+        "true" ->
+            true;
+        _ ->
+            throw({bad_request, <<"`partitioned` parameter can only be set to true.">>})
+    end.
+
 
 parse_doc_query({Key, Value}, Args) ->
     case {Key, Value} of
