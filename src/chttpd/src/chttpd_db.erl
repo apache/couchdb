@@ -18,7 +18,8 @@
     db_req/2, couch_doc_open/4,handle_changes_req/2,
     update_doc_result_to_json/1, update_doc_result_to_json/2,
     handle_design_info_req/3, handle_view_cleanup_req/2,
-    update_doc/4, http_code_from_status/1]).
+    update_doc/4, http_code_from_status/1,
+    handle_partition_design_req/2]).
 
 -import(chttpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
@@ -250,20 +251,61 @@ handle_view_cleanup_req(Req, Db) ->
     ok = fabric:cleanup_index_files_all_nodes(Db),
     send_json(Req, 202, {[{ok, true}]}).
 
+
+handle_partition_design_req(#httpd{
+        path_parts=[DbName, <<"_partition">>, PartitionKey, _Design, Name, <<"_",_/binary>> = Action | _Rest]
+    }=Req, Db) -> 
+    case mem3:is_partitioned(DbName) of
+        false -> throw(<<"Database is not partitioned">>);
+        true -> ok
+    end,
+
+    DDoc = get_design_doc(DbName, Name),
+    case check_ddoc_can_use_partitionkey(DDoc) of
+        true ->
+            Handler = chttpd_handlers:partition_design_handler(Action, fun bad_action_partition_req/4),
+            Handler(Req, Db, DDoc, PartitionKey);
+        false ->
+            throw({bad_request, <<"Design doc cannot be used on a partitioned query">>})
+    end.
+
+
+check_ddoc_can_use_partitionkey(#doc{body={DDocBody}}) ->
+    case lists:keyfind(<<"options">>, 1, DDocBody) of
+        false ->
+            true; %design docs default to being partitioned query only
+        {_, {Options}} ->
+            case lists:keyfind(<<"partitioned">>, 1, Options) of
+                false -> true;
+                {_, Partitioned} -> Partitioned
+            end
+    end.
+
+    
+bad_action_partition_req(Req, _Db, _DDoc, _PartitionKey) ->
+    chttpd:send_error(Req, 404, <<"partition_error">>, <<"Invalid path.">>).
+
+
 handle_design_req(#httpd{
         path_parts=[_DbName, _Design, Name, <<"_",_/binary>> = Action | _Rest]
     }=Req, Db) ->
     DbName = mem3:dbname(couch_db:name(Db)),
-    case ddoc_cache:open(DbName, <<"_design/", Name/binary>>) of
-    {ok, DDoc} ->
-        Handler = chttpd_handlers:design_handler(Action, fun bad_action_req/3),
-        Handler(Req, Db, DDoc);
-    Error ->
-        throw(Error)
-    end;
+    DDoc = get_design_doc(DbName, <<"_design/", Name/binary>>),
+    Handler = chttpd_handlers:design_handler(Action, fun bad_action_req/3),
+    Handler(Req, Db, DDoc);
 
 handle_design_req(Req, Db) ->
     db_req(Req, Db).
+    
+
+get_design_doc(DbName, Name) ->
+    case ddoc_cache:open(DbName, <<"_design/", Name/binary>>) of
+    {ok, DDoc} ->
+        DDoc;
+    Error ->
+        throw(Error)
+    end.
+
 
 bad_action_req(#httpd{path_parts=[_, _, Name|FileNameParts]}=Req, Db, _DDoc) ->
     db_attachment_req(Req, Db, <<"_design/",Name/binary>>, FileNameParts).
