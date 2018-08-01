@@ -162,21 +162,23 @@ defmodule SecurityValidationTest do
     assert Couch.put("/#{db_name}/_security", body: %{sec_obj | admin_override: true}).body["ok"]
 
     # Change owner to Tom
-    Map.put(test_doc, "author", "tom")
+    test_doc = Map.put(test_doc, "author", "tom")
     resp = Couch.put("/#{db_name}/test_doc", body: test_doc)
     assert resp.body["ok"]
-    Map.put(test_doc, "_rev", resp.body["rev"])
+    test_doc = Map.put(test_doc, "_rev", resp.body["rev"])
 
     # Now Tom can update the document
-    Map.put(test_doc, "foo", "asdf")
+    test_doc = Map.put(test_doc, "foo", "asdf")
     resp = Couch.put("/#{db_name}/test_doc", [body: test_doc, headers: tom])
     assert resp.body["ok"]
-    Map.put(test_doc, "_rev", resp.body["rev"])
+    test_doc = Map.put(test_doc, "_rev", resp.body["rev"])
 
     # Jerry can't delete it
-    resp = Couch.delete("/#{db_name}/test_doc?rev=#{test_doc["_rev"]}", headers: jerry)
-    assert resp.status_code == 401
-    assert resp.body["error"] == "unauthorized"
+    retry_until(fn() ->
+      opts = [headers: jerry]
+      resp = Couch.delete("/#{db_name}/test_doc?rev=#{test_doc["_rev"]}", opts)
+      resp.status_code == 401 and resp.body["error"] == "unauthorized"
+    end)
   end
 end
 
