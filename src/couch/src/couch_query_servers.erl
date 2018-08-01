@@ -90,11 +90,8 @@ group_reductions_results(List) ->
 finalize(<<"_approx_count_distinct",_/binary>>, Reduction) ->
     true = hyper:is_hyper(Reduction),
     {ok, round(hyper:card(Reduction))};
-finalize(<<"_stats",_/binary>>, {_, _, _, _, _} = Unpacked) ->
+finalize(<<"_stats",_/binary>>, Unpacked) ->
     {ok, pack_stats(Unpacked)};
-finalize(<<"_stats",_/binary>>, {Packed}) ->
-    % Legacy code path before we had the finalize operation
-    {ok, {Packed}};
 finalize(_RedSrc, Reduction) ->
     {ok, Reduction}.
 
@@ -299,8 +296,12 @@ unpack_stats({PreRed}) when is_list(PreRed) ->
       get_number(<<"sumsqr">>, PreRed)
     }.
 
+
 pack_stats({Sum, Cnt, Min, Max, Sqr}) ->
     {[{<<"sum">>,Sum}, {<<"count">>,Cnt}, {<<"min">>,Min}, {<<"max">>,Max}, {<<"sumsqr">>,Sqr}]};
+pack_stats({Packed}) ->
+    % Legacy code path before we had the finalize operation
+    {Packed};
 pack_stats(Stats) when is_list(Stats) ->
     lists:map(fun pack_stats/1, Stats).
 
@@ -608,5 +609,50 @@ stat_values_test() ->
                   {14, 2, 3, 11, 130},
                   {18, 2, 5, 13, 194}
                  ], stat_values([2,3,5], [7,11,13])).
+
+reduce_stats_test() ->
+    ?assertEqual([
+        {[{<<"sum">>,2},{<<"count">>,1},{<<"min">>,2},{<<"max">>,2},{<<"sumsqr">>,4}]}
+    ], test_reduce(<<"_stats">>, [[[null, key], 2]])),
+
+    ?assertEqual([[
+        {[{<<"sum">>,1},{<<"count">>,1},{<<"min">>,1},{<<"max">>,1},{<<"sumsqr">>,1}]},
+        {[{<<"sum">>,2},{<<"count">>,1},{<<"min">>,2},{<<"max">>,2},{<<"sumsqr">>,4}]}
+    ]], test_reduce(<<"_stats">>, [[[null, key],[1,2]]])),
+
+    ?assertEqual(
+         {[{<<"sum">>,2},{<<"count">>,1},{<<"min">>,2},{<<"max">>,2},{<<"sumsqr">>,4}]}
+    , element(2, finalize(<<"_stats">>, {2, 1, 2, 2, 4}))),
+
+    ?assertEqual([
+        {[{<<"sum">>,1},{<<"count">>,1},{<<"min">>,1},{<<"max">>,1},{<<"sumsqr">>,1}]},
+        {[{<<"sum">>,2},{<<"count">>,1},{<<"min">>,2},{<<"max">>,2},{<<"sumsqr">>,4}]}
+    ], element(2, finalize(<<"_stats">>, [
+        {1, 1, 1, 1, 1},
+        {2, 1, 2, 2, 4}
+    ]))),
+
+    ?assertEqual([
+        {[{<<"sum">>,1},{<<"count">>,1},{<<"min">>,1},{<<"max">>,1},{<<"sumsqr">>,1}]},
+        {[{<<"sum">>,2},{<<"count">>,1},{<<"min">>,2},{<<"max">>,2},{<<"sumsqr">>,4}]}
+    ], element(2, finalize(<<"_stats">>, [
+        {1, 1, 1, 1, 1},
+        {[{<<"sum">>,2},{<<"count">>,1},{<<"min">>,2},{<<"max">>,2},{<<"sumsqr">>,4}]}
+    ]))),
+
+    ?assertEqual([
+        {[{<<"sum">>,1},{<<"count">>,1},{<<"min">>,1},{<<"max">>,1},{<<"sumsqr">>,1}]},
+        {[{<<"sum">>,2},{<<"count">>,1},{<<"min">>,2},{<<"max">>,2},{<<"sumsqr">>,4}]}
+    ], element(2, finalize(<<"_stats">>, [
+        {[{<<"sum">>,1},{<<"count">>,1},{<<"min">>,1},{<<"max">>,1},{<<"sumsqr">>,1}]},
+        {2, 1, 2, 2, 4}
+    ]))),
+    ok.
+
+test_reduce(Reducer, KVs) ->
+    ?assertMatch({ok, _}, reduce(<<"javascript">>, [Reducer], KVs)),
+    {ok, Reduced} = reduce(<<"javascript">>, [Reducer], KVs),
+    {ok, Finalized} = finalize(Reducer, Reduced),
+    Finalized.
 
 -endif.
