@@ -60,6 +60,7 @@ setup_legacy() ->
     lists:foreach(fun(File) -> file:delete(File) end, Files),
 
     % copy old db file into db dir
+    ?debugFmt("copy ~p ~p", [OldDbFilePath, NewDbFilePath]),
     {ok, _} = file:copy(OldDbFilePath, NewDbFilePath),
 
     % copy old view file into view dir
