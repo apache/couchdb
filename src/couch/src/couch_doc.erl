@@ -133,6 +133,12 @@ from_json_obj_validate(EJson) ->
 from_json_obj_validate(EJson, DbName) ->
     MaxSize = config:get_integer("couchdb", "max_document_size", 4294967296),
     Doc = from_json_obj(EJson, DbName),
+    case is_binary(DbName) andalso mem3:is_partitioned(DbName) of
+        true ->
+            couch_doc:validate_docid(Doc#doc.id, DbName);
+        false ->
+            ok
+    end,
     case couch_ejson_size:encoded_size(Doc#doc.body) =< MaxSize of
         true ->
              validate_attachment_sizes(Doc#doc.atts),
@@ -199,11 +205,23 @@ parse_revs(_) ->
 
 
 validate_docid(DocId, DbName) ->
-    case DbName =:= ?l2b(config:get("mem3", "shards_db", "_dbs")) andalso
-        lists:member(DocId, ?SYSTEM_DATABASES) of
-        true ->
+    SystemId = DbName =:= ?l2b(config:get("mem3", "shards_db", "_dbs")) andalso
+        lists:member(DocId, ?SYSTEM_DATABASES),
+    Partitioned = is_binary(DbName) andalso mem3:is_partitioned(DbName),
+    case {SystemId, Partitioned} of
+        {true, _} ->
             ok;
-        false ->
+        {false, true} ->
+            case binary:split(DocId, <<":">>) of
+                [<<"_design/", _/binary>> | _Rest] ->
+                    validate_docid(DocId);
+                [Partition, Rest] ->
+                    ok = validate_docid(Partition),
+                    validate_docid(Rest);
+                _ ->
+                    throw({illegal_docid, <<"doc id must be of form partition:id">>})
+            end;
+        {false, false} ->
             validate_docid(DocId)
     end.
 
