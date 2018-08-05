@@ -74,6 +74,9 @@ You can install the documentation dependencies by running:
 
     sudo apt-get --no-install-recommends -y install \
         python-sphinx
+        
+    sudo pip install --upgrade sphinx_rtd_theme nose requests hypothesis
+
 
 Be sure to update the version numbers to match your system's available
 packages.
