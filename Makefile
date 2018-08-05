@@ -254,7 +254,7 @@ list-eunit-apps:
 .PHONY: list-eunit-suites
 # target: list-eunit-suites - List EUnit target test suites
 list-eunit-suites:
-	@find ./src/ -type f -name *_test.erl -o -name *_tests.erl -printf "%f\n" \
+	@find ./src/ -type f -name *_test.erl -o -name *_tests.erl -exec basename {} \; \
 		| cut -d '.' -f -1 \
 		| sort
 
@@ -262,7 +262,7 @@ list-eunit-suites:
 .PHONY: list-js-suites
 # target: list-js-suites - List JavaScript test suites
 list-js-suites:
-	@find ./test/javascript/tests/ -type f -name *.js -printf "%f\n" \
+	@find ./test/javascript/tests/ -type f -name *.js -exec basename {} \; \
 		| cut -d '.' -f -1 \
 		| sort
 
