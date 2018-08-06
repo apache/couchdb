@@ -60,6 +60,8 @@ should_have_version(Url) ->
         Version = couch_util:get_value(<<"version">>, Json, undefined),
         CouchDB = couch_util:get_value(<<"couchdb">>, Json, undefined),
         Features = couch_util:get_value(<<"features">>, Json, undefined),
+        Sha = couch_util:get_value(<<"git_sha">>, Json, undefined),
+        ?assertNotEqual(Sha, undefined),
         ?assertEqual(<<"Welcome">>, CouchDB),
         RealVersion = list_to_binary(couch_server:get_version()),
         ?assertEqual(RealVersion, Version),
