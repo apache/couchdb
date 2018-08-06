@@ -1607,8 +1607,8 @@ set_namespace(<<"_local_docs">>, Args) ->
     set_namespace(<<"_local">>, Args);
 set_namespace(<<"_design_docs">>, Args) ->
     set_namespace(<<"_design">>, Args);
-set_namespace(NS, #mrargs{extra = Extra} = Args) ->
-    Args#mrargs{extra = [{namespace, NS} | Extra]}.
+set_namespace(NS, #mrargs{} = Args) ->
+    couch_mrview_util:set_extra(Args, namespace, NS).
 
 
 %% /db/_bulk_get stuff
