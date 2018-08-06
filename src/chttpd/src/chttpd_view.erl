@@ -40,8 +40,13 @@ multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
     chttpd:end_delayed_json_response(Resp1).
 
 
-design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
-    Args = couch_mrview_http:parse_params(Req, Keys),
+design_doc_view(#httpd{path_parts=[DbName | _]}=Req, Db, DDoc, ViewName, Keys) ->
+    Args0 = couch_mrview_http:parse_params(Req, Keys),
+    {Props} = DDoc#doc.body,
+    {Options} = couch_util:get_value(<<"options">>, Props, {[]}),
+    DbPartitioned = mem3:is_partitioned(DbName),
+    Partitioned = couch_util:get_value(<<"partitioned">>, Options, DbPartitioned),
+    Args = couch_mrview_util:set_extra(Args0, partitioned, Partitioned),
     Max = chttpd:chunked_response_buffer_size(),
     VAcc = #vacc{db=Db, req=Req, threshold=Max},
     Options = [{user_ctx, Req#httpd.user_ctx}],
