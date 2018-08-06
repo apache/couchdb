@@ -6,10 +6,11 @@ CouchDB developers. It dives a bit into the internal and explains how
 everything is connected together.
 
 A natural place to start is the top application supervisor:
-`couch_replicator_sup`. It's a `rest_for_one` so if a child process terminates,
-the rest of the children in the hierarchy following it are also terminated.
-This structure implies a useful constraint -- children lower in the list can
-safely call their siblings which are higher in the list.
+`couch_replicator_sup`. It's a `rest_for_one` restart strategy supervisor,
+so if a child process terminates, the rest of the children in the hierarchy
+following it are also terminated. This structure implies a useful constraint --
+children lower in the list can safely call their siblings which are higher in
+the list.
 
 A description of each child:
 
@@ -32,17 +33,17 @@ A description of each child:
     membership change include `couch_replicator_doc_processor` and
     `couch_replicator_db_changes`. When doc processor gets an `{cluster,
     stable}` event it will remove all the replication jobs not belonging to the
-    current node. When `couch_replicator_db_chanages` gets a `{cluster,
+    current node. When `couch_replicator_db_changes` gets a `{cluster,
     stable}` event, it will restart the `couch_multidb_changes` process it
     controls, which will launch an new scan of all the replicator databases.
 
   * `couch_replicator_connection`: Maintains a global replication connection
-    pool. It allows reusing connections across replication tasks. The Main
+    pool. It allows reusing connections across replication tasks. The main
     interface is `acquire/1` and `release/1`. The general idea is once a
     connection is established, it is kept around for
     `replicator.connection_close_interval` milliseconds in case another
     replication task wants to re-use it. It is worth pointing out how linking
-    and monitoring is handled: Workers are linked to the connection pool when
+    and monitoring is handled: workers are linked to the connection pool when
     they are created. If they crash, the connection pool will receive an 'EXIT'
     event and clean up after the worker. The connection pool also monitors
     owners (by monitoring the `Pid` from the `From` argument in the call to
@@ -50,21 +51,21 @@ A description of each child:
     message. Another interesting thing is that connection establishment
     (creation) happens in the owner process so the pool is not blocked on it.
 
- * `couch_replicator_rate_limiter` : Implements a rate limiter to handle
+ * `couch_replicator_rate_limiter`: Implements a rate limiter to handle
     connection throttling from sources or targets where requests return 429
     error codes. Uses the Additive Increase / Multiplicative Decrease feedback
     control algorithm to converge on the channel capacity. Implemented using a
     16-way sharded ETS table to maintain connection state. The table sharding
     code is split out to `couch_replicator_rate_limiter_tables` module. The
-    purpose of the module it so maintain and continually estimate sleep
+    purpose of the module it to maintain and continually estimate sleep
     intervals for each connection represented as a `{Method, Url}` pair. The
     interval is updated accordingly on each call to `failure/1` or `success/1`
     calls. For a successful request, a client should call `success/1`. Whenever
     a 429 response is received the client should call `failure/1`. When no
-    failures are happening the code is ensuring the ETS tables are empty in
+    failures are happening the code ensures the ETS tables are empty in
     order to have a lower impact on a running system.
 
- * `couch_replicator_scheduler` : This is the core component of the scheduling
+ * `couch_replicator_scheduler`: This is the core component of the scheduling
     replicator. It's main task is to switch between replication jobs, by
     stopping some and starting others to ensure all of them make progress.
     Replication jobs which fail are penalized using an exponential backoff.
@@ -92,7 +93,7 @@ A description of each child:
     function is called every `replicator.interval` milliseconds (default is
     60000 i.e. a minute). During each call the scheduler will try to stop some
     jobs, start some new ones and will also try to keep the maximum number of
-    jobs running less than `replicator.max_jobs` (deafult 500). So the
+    jobs running less than `replicator.max_jobs` (default 500). So the
     functions does these operations (actual code paste):
 
     ```
@@ -104,7 +105,7 @@ A description of each child:
     update_running_jobs_stats(State#state.stats_pid)
     ```
 
-    `Running` is the total number of currently runnig jobs. `Pending` is the
+    `Running` is the total number of currently running jobs. `Pending` is the
     total number of jobs waiting to be run. `stop_excess_jobs` will stop any
     exceeding the `replicator.max_jobs` configured limit. This code takes
     effect if user reduces the `max_jobs` configuration value.
@@ -132,7 +133,7 @@ A description of each child:
     interesting part is how the scheduler picks which jobs to stop and which
     ones to start:
 
-    * Stopping: When picking jobs to stop the cheduler will pick longest
+    * Stopping: When picking jobs to stop the scheduler will pick longest
       running continuous jobs first. The sorting callback function to get the
       longest running jobs is unsurprisingly called `longest_running/2`. To
       pick the longest running jobs it looks at the most recent `started`
@@ -163,9 +164,9 @@ A description of each child:
     main idea is to penalize such jobs such that they are forced to wait an
     exponentially larger amount of time with each consecutive crash. A central
     part to this algorithm is determining what forms a sequence of consecutive
-    crashes. If a job starts then quickly crashes, and after next start it
+    crashes. If a job starts then quickly crashes, and after its next start it
     crashes again, then that would become a sequence of 2 consecutive crashes.
-    The penalty then would be calcualted by `backoff_micros/1` function where
+    The penalty then would be calculated by `backoff_micros/1` function where
     the consecutive crash count would end up as the exponent. However for
     practical concerns there is also maximum penalty specified and that's the
     equivalent of 10 consecutive crashes. Timewise it ends up being about 8
@@ -187,13 +188,13 @@ A description of each child:
    not used to restart children. The scheduler handles restarts and error
    handling backoffs.
 
- * `couch_replicator_doc_processor`: The doc procesoor component is in charge
+ * `couch_replicator_doc_processor`: The doc processor component is in charge
    of processing replication document updates, turning them into replication
    jobs and adding those jobs to the scheduler. Unfortunately the only reason
    there is even a `couch_replicator_doc_processor` gen_server, instead of
    replication documents being turned to jobs and inserted into the scheduler
    directly, is because of one corner case -- filtered replications using
-   custom (Javascript mostly) filters. More about this later. It is better to
+   custom (JavaScript mostly) filters. More about this later. It is better to
    start with how updates flow through the doc processor:
 
    Document updates come via the `db_change/3` callback from
@@ -212,7 +213,7 @@ A description of each child:
    `triggered` and `error`. Both of those states are removed from the document
    then then update proceeds in the regular fashion. `failed` documents are
    also ignored here. `failed` is a terminal state which indicates the document
-   was somehow unsuitable to become a replication job (it was malforemd or a
+   was somehow unsuitable to become a replication job (it was malformed or a
    duplicate). Otherwise the state update proceeds to `process_updated/2`.
 
    `process_updated/2` is where replication document updates are parsed and
@@ -283,7 +284,7 @@ A description of each child:
    supervisor in the correct order (and monitored for crashes). This ensures
    the local replicator db exists, then returns `ignore`. This pattern is
    useful for doing setup-like things at the top level and in the correct order
-   regdaring the rest of the children in the supervisor.
+   regarding the rest of the children in the supervisor.
 
  * `couch_replicator_db_changes`: This process specializes and configures
    `couch_multidb_changes` so that it looks for `_replicator` suffixed shards

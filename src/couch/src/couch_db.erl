@@ -224,18 +224,7 @@ monitor(#db{main_pid=MainPid}) ->
     erlang:monitor(process, MainPid).
 
 start_compact(#db{} = Db) ->
-    start_compact(Db, []).
-
-start_compact(#db{} = Db, Opts) ->
-    case lists:keyfind(notify, 1, Opts) of
-        {notify, Pid, Term} ->
-            % We fake a gen_server call here which sends the
-            % response back to the specified pid.
-            Db#db.main_pid ! {'$gen_call', {Pid, Term}, start_compact},
-            ok;
-        _ ->
-            gen_server:call(Db#db.main_pid, start_compact)
-    end.
+    gen_server:call(Db#db.main_pid, start_compact).
 
 cancel_compact(#db{main_pid=Pid}) ->
     gen_server:call(Pid, cancel_compact).
@@ -881,16 +870,10 @@ prep_and_validate_replicated_updates(Db, [Bucket|RestBuckets], [OldInfo|RestOldI
             {[], AccErrors}, Bucket),
         prep_and_validate_replicated_updates(Db, RestBuckets, RestOldInfo, [ValidatedBucket | AccPrepped], AccErrors3);
     #full_doc_info{rev_tree=OldTree} ->
-        RevsLimit = get_revs_limit(Db),
         OldLeafs = couch_key_tree:get_all_leafs_full(OldTree),
         OldLeafsLU = [{Start, RevId} || {Start, [{RevId, _}|_]} <- OldLeafs],
-        NewRevTree = lists:foldl(
-            fun(NewDoc, AccTree) ->
-                {NewTree, _} = couch_key_tree:merge(AccTree,
-                    couch_doc:to_path(NewDoc), RevsLimit),
-                NewTree
-            end,
-            OldTree, Bucket),
+        NewPaths = lists:map(fun couch_doc:to_path/1, Bucket),
+        NewRevTree = couch_key_tree:multi_merge(OldTree, NewPaths),
         Leafs = couch_key_tree:get_all_leafs_full(NewRevTree),
         LeafRevsFullDict = dict:from_list( [{{Start, RevId}, FullPath} || {Start, [{RevId, _}|_]}=FullPath <- Leafs]),
         {ValidatedBucket, AccErrors3} =
@@ -955,7 +938,7 @@ new_revid(#doc{body=Body, revs={OldStart,OldRevs}, atts=Atts, deleted=Deleted}) 
             ?l2b(integer_to_list(couch_util:rand32()));
         Atts2 ->
             OldRev = case OldRevs of [] -> 0; [OldRev0|_] -> OldRev0 end,
-            crypto:hash(md5, term_to_binary([Deleted, OldStart, OldRev, Body, Atts2], [{minor_version, 1}]))
+            couch_hash:md5_hash(term_to_binary([Deleted, OldStart, OldRev, Body, Atts2], [{minor_version, 1}]))
     end.
 
 new_revs([], OutBuckets, IdRevsAcc) ->

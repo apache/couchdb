@@ -47,9 +47,11 @@ setup() ->
         save_doc(Db1, {[{<<"_id">>, <<"doc7">>}]}),
         save_doc(Db1, {[{<<"_id">>, <<"doc8">>}]})
     ]],
+    config:set("native_query_servers", "erlang", "{couch_native_process, start_link, []}", _Persist=false),
     {DbName, list_to_tuple(Revs2)}.
 
 teardown({DbName, _}) ->
+    config:delete("native_query_servers", "erlang", _Persist=false),
     delete_db(DbName),
     ok.
 
@@ -153,7 +155,8 @@ filter_by_view() ->
             fun setup/0, fun teardown/1,
             [
                 fun should_filter_by_view/1,
-                fun should_filter_by_fast_view/1
+                fun should_filter_by_fast_view/1,
+                fun should_filter_by_erlang_view/1
             ]
         }
     }.
@@ -732,6 +735,39 @@ should_filter_by_fast_view({DbName, _}) ->
             ?assertEqual(LastSeq, Seq),
             ?assertEqual(UpSeq, ViewUpSeq)
         end).
+
+should_filter_by_erlang_view({DbName, _}) ->
+    ?_test(
+        begin
+            DDocId = <<"_design/app">>,
+            DDoc = couch_doc:from_json_obj({[
+                {<<"_id">>, DDocId},
+                {<<"language">>, <<"erlang">>},
+                {<<"views">>, {[
+                    {<<"valid">>, {[
+                        {<<"map">>, <<"fun({Doc}) ->"
+                            " case lists:keyfind(<<\"_id\">>, 1, Doc) of"
+                                " {<<\"_id\">>, <<\"doc3\">>} ->  Emit(Doc, null); "
+                                " false -> ok"
+                            " end "
+                        "end.">>}
+                    ]}}
+                ]}}
+            ]}),
+            ChArgs = #changes_args{filter = "_view"},
+            Req = {json_req, {[{
+                <<"query">>, {[
+                    {<<"view">>, <<"app/valid">>}
+                ]}
+            }]}},
+            ok = update_ddoc(DbName, DDoc),
+            {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
+            ?assertEqual(1, length(Rows)),
+            [#row{seq = Seq, id = Id}] = Rows,
+            ?assertEqual(<<"doc3">>, Id),
+            ?assertEqual(6, Seq),
+            ?assertEqual(UpSeq, LastSeq)
+    end).
 
 update_ddoc(DbName, DDoc) ->
     {ok, Db} = couch_db:open_int(DbName, [?ADMIN_CTX]),

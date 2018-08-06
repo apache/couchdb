@@ -29,6 +29,9 @@
     test_engine_ref_counting
 ]).
 
+-define(COMPACTOR_TIMEOUT, 50000).
+-define(ATTACHMENT_WRITE_TIMEOUT, 10000).
+-define(MAKE_DOC_SUMMARY_TIMEOUT, 5000).
 
 create_tests(EngineApp) ->
     create_tests(EngineApp, EngineApp).
@@ -58,7 +61,7 @@ gather(Module) ->
         case {atom_to_list(Fun), Arity} of
             {[$c, $e, $t, $_ | _], 0} ->
                 TestFun = make_test_fun(Module, Fun),
-                [{spawn, TestFun} | Acc];
+                [{timeout, 60, {spawn, TestFun}} | Acc];
             _ ->
                 Acc
         end
@@ -183,7 +186,7 @@ gen_write(Engine, St, {create, {DocId, Body, Atts0}}, UpdateSeq) ->
     [not_found] = Engine:open_docs(St, [DocId]),
     Atts = [couch_att:to_disk_term(Att) || Att <- Atts0],
 
-    Rev = crypto:hash(md5, term_to_binary({DocId, Body, Atts})),
+    Rev = couch_hash:md5_hash(term_to_binary({DocId, Body, Atts})),
 
     Doc0 = #doc{
         id = DocId,
@@ -306,7 +309,8 @@ gen_write(Engine, St, {Action, {DocId, Body, Atts0}}, UpdateSeq) ->
         conflict -> new_branch;
         _ -> new_leaf
     end,
-    {NewTree, NodeType} = couch_key_tree:merge(PrevRevTree, Path, RevsLimit),
+    {MergedTree, NodeType} = couch_key_tree:merge(PrevRevTree, Path),
+    NewTree = couch_key_tree:stem(MergedTree, RevsLimit),
 
     NewFDI = PrevFDI#full_doc_info{
         deleted = couch_doc:is_deleted(NewTree),
@@ -319,11 +323,11 @@ gen_write(Engine, St, {Action, {DocId, Body, Atts0}}, UpdateSeq) ->
 
 
 gen_revision(conflict, DocId, _PrevRev, Body, Atts) ->
-    crypto:hash(md5, term_to_binary({DocId, Body, Atts}));
+    couch_hash:md5_hash(term_to_binary({DocId, Body, Atts}));
 gen_revision(delete, DocId, PrevRev, Body, Atts) ->
     gen_revision(update, DocId, PrevRev, Body, Atts);
 gen_revision(update, DocId, PrevRev, Body, Atts) ->
-    crypto:hash(md5, term_to_binary({DocId, PrevRev, Body, Atts})).
+    couch_hash:md5_hash(term_to_binary({DocId, PrevRev, Body, Atts})).
 
 
 gen_path(conflict, _RevPos, _PrevRevId, Rev, Leaf) ->
@@ -343,7 +347,7 @@ make_doc_summary(Engine, St, DocData) ->
             Summary;
         {'DOWN', Ref, _, _, Error} ->
             erlang:error({make_doc_summary_error, Error})
-    after 1000 ->
+    after ?MAKE_DOC_SUMMARY_TIMEOUT ->
         erlang:error(make_doc_summary_timeout)
     end.
 
@@ -361,7 +365,7 @@ prep_atts(Engine, St, [{FileName, Data} | Rest]) ->
             throw(not_supported);
         {'DOWN', Ref, _, _, Resp} ->
             Resp
-        after 5000 ->
+        after ?ATTACHMENT_WRITE_TIMEOUT ->
             erlang:error(attachment_write_timeout)
     end,
     [Att | prep_atts(Engine, St, Rest)].
@@ -369,7 +373,7 @@ prep_atts(Engine, St, [{FileName, Data} | Rest]) ->
 
 write_att(Stream, FileName, OrigData, <<>>) ->
     {StreamEngine, Len, Len, Md5, Md5} = couch_stream:close(Stream),
-    couch_util:check_md5(Md5, crypto:hash(md5, OrigData)),
+    couch_util:check_md5(Md5, couch_hash:md5_hash(OrigData)),
     Len = size(OrigData),
     couch_att:new([
         {name, FileName},
@@ -576,7 +580,7 @@ compact(Engine, St1, DbPath) ->
             Term0;
         {'DOWN', Ref, _, _, Reason} ->
             erlang:error({compactor_died, Reason})
-        after 10000 ->
+        after ?COMPACTOR_TIMEOUT ->
             erlang:error(compactor_timed_out)
     end,
 

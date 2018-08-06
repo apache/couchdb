@@ -132,7 +132,7 @@ append_binary(Fd, Bin) ->
     
 append_binary_md5(Fd, Bin) ->
     ioq:call(Fd,
-        {append_bin, assemble_file_chunk(Bin, crypto:hash(md5, Bin))},
+        {append_bin, assemble_file_chunk(Bin, couch_hash:md5_hash(Bin))},
         erlang:get(io_priority)).
 
 append_raw_chunk(Fd, Chunk) ->
@@ -175,7 +175,7 @@ pread_iolist(Fd, Pos) ->
     {ok, IoList, <<>>} ->
         {ok, IoList};
     {ok, IoList, Md5} ->
-        case crypto:hash(md5, IoList) of
+        case couch_hash:md5_hash(IoList) of
         Md5 ->
             {ok, IoList};
         _ ->
@@ -213,8 +213,12 @@ truncate(Fd, Pos) ->
 %%----------------------------------------------------------------------
 
 sync(Filepath) when is_list(Filepath) ->
-    {ok, Fd} = file:open(Filepath, [append, raw]),
-    try ok = file:sync(Fd) after ok = file:close(Fd) end;
+    case file:open(Filepath, [append, raw]) of
+        {ok, Fd} ->
+            try ok = file:sync(Fd) after ok = file:close(Fd) end;
+        {error, Error} ->
+            erlang:error(Error)
+    end;
 sync(Fd) ->
     gen_server:call(Fd, sync, infinity).
 
@@ -329,7 +333,7 @@ read_header(Fd) ->
 
 write_header(Fd, Data) ->
     Bin = term_to_binary(Data),
-    Md5 = crypto:hash(md5, Bin),
+    Md5 = couch_hash:md5_hash(Bin),
     % now we assemble the final header binary and write to disk
     FinalBin = <<Md5/binary, Bin/binary>>,
     ioq:call(Fd, {write_header, FinalBin}, erlang:get(io_priority)).
@@ -389,14 +393,18 @@ init({Filepath, Options, ReturnPid, Ref}) ->
         % open in read mode first, so we don't create the file if it doesn't exist.
         case file:open(Filepath, [read, raw]) of
         {ok, Fd_Read} ->
-            {ok, Fd} = file:open(Filepath, OpenOptions),
-            %% Save Fd in process dictionary for debugging purposes
-            put(couch_file_fd, {Fd, Filepath}),
-            ok = file:close(Fd_Read),
-            maybe_track_open_os_files(Options),
-            {ok, Eof} = file:position(Fd, eof),
-            erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-            {ok, #file{fd=Fd, eof=Eof, is_sys=IsSys, pread_limit=Limit}};
+            case file:open(Filepath, OpenOptions) of
+                {ok, Fd} ->
+                     %% Save Fd in process dictionary for debugging purposes
+                     put(couch_file_fd, {Fd, Filepath}),
+                     ok = file:close(Fd_Read),
+                     maybe_track_open_os_files(Options),
+                     {ok, Eof} = file:position(Fd, eof),
+                     erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
+                     {ok, #file{fd=Fd, eof=Eof, is_sys=IsSys, pread_limit=Limit}};
+                 Error ->
+                     init_status_error(ReturnPid, Ref, Error)
+            end;
         Error ->
             init_status_error(ReturnPid, Ref, Error)
         end
@@ -551,7 +559,7 @@ load_header(Fd, Pos, HeaderLen, RestBlock) ->
     end,
     <<Md5Sig:16/binary, HeaderBin/binary>> =
         iolist_to_binary(remove_block_prefixes(?PREFIX_SIZE, RawBin)),
-    Md5Sig = crypto:hash(md5, HeaderBin),
+    Md5Sig = couch_hash:md5_hash(HeaderBin),
     {ok, HeaderBin}.
 
 

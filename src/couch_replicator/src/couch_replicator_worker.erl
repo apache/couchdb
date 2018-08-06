@@ -20,9 +20,10 @@
 % gen_server callbacks
 -export([init/1, terminate/2, code_change/3]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
+-export([format_status/2]).
 
 -include_lib("couch/include/couch_db.hrl").
--include("couch_replicator_api_wrap.hrl").
+-include_lib("couch_replicator/include/couch_replicator_api_wrap.hrl").
 -include("couch_replicator.hrl").
 
 % TODO: maybe make both buffer max sizes configurable
@@ -218,6 +219,25 @@ terminate(_Reason, State) ->
     stop_db_compaction_notifier(State#state.source_db_compaction_notifier),
     stop_db_compaction_notifier(State#state.target_db_compaction_notifier).
 
+format_status(_Opt, [_PDict, State]) ->
+    #state{
+        cp = MainJobPid,
+        loop = LoopPid,
+        source = Source,
+        target = Target,
+        readers = Readers,
+        pending_fetch = PendingFetch,
+        batch = #batch{size = BatchSize}
+    } = State,
+    [
+        {main_pid, MainJobPid},
+        {loop, LoopPid},
+        {source, couch_replicator_api_wrap:db_uri(Source)},
+        {target, couch_replicator_api_wrap:db_uri(Target)},
+        {num_readers, length(Readers)},
+        {pending_fetch, PendingFetch},
+        {batch_size, BatchSize}
+    ].
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
@@ -559,3 +579,30 @@ maybe_report_stats(Cp, Stats) ->
     false ->
         Stats
     end.
+
+
+-ifdef(TEST).
+
+-include_lib("eunit/include/eunit.hrl").
+
+
+replication_worker_format_status_test() ->
+    State = #state{
+        cp = self(),
+        loop = self(),
+        source = #httpdb{url = "http://u:p@h/d1"},
+        target = #httpdb{url = "http://u:p@h/d2"},
+        readers = [r1, r2, r3],
+        pending_fetch = nil,
+        batch = #batch{size = 5}
+    },
+    Format = format_status(opts_ignored, [pdict, State]),
+    ?assertEqual(self(), proplists:get_value(main_pid, Format)),
+    ?assertEqual(self(), proplists:get_value(loop, Format)),
+    ?assertEqual("http://u:*****@h/d1", proplists:get_value(source, Format)),
+    ?assertEqual("http://u:*****@h/d2", proplists:get_value(target, Format)),
+    ?assertEqual(3, proplists:get_value(num_readers, Format)),
+    ?assertEqual(nil, proplists:get_value(pending_fetch, Format)),
+    ?assertEqual(5, proplists:get_value(batch_size, Format)).
+
+-endif.

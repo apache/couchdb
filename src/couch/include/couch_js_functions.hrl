@@ -64,6 +64,15 @@
             });
         }
 
+        var available_schemes = [\"simple\", \"pbkdf2\", \"bcrypt\"];
+        if (newDoc.password_scheme
+                && available_schemes.indexOf(newDoc.password_scheme) == -1) {
+            throw({
+                forbidden: 'Password scheme `' + newDoc.password_scheme
+                    + '` not supported.'
+            });
+        }
+
         if (newDoc.password_scheme === \"pbkdf2\") {
             if (typeof(newDoc.iterations) !== \"number\") {
                throw({forbidden: \"iterations must be a number.\"});

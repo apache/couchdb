@@ -143,8 +143,9 @@ reduce_view(DbName, DDoc, ViewName, Args0, DbOptions) ->
     couch_mrview:query_view(Db, DDoc, ViewName, Args, fun reduce_cb/2, VAcc0).
 
 fix_skip_and_limit(Args) ->
-    #mrargs{skip=Skip, limit=Limit}=Args,
-    Args#mrargs{skip=0, limit=Skip+Limit}.
+    #mrargs{skip=Skip, limit=Limit, extra=Extra}=Args,
+    % the coordinator needs to finalize each row, so make sure the shards don't
+    Args#mrargs{skip=0, limit=Skip+Limit, extra=[{finalizer,null} | Extra]}.
 
 create_db(DbName) ->
     create_db(DbName, []).
@@ -443,6 +444,8 @@ make_att_reader({follows, Parser, Ref}) ->
                 throw({mp_parser_died, Reason})
         end
     end;
+make_att_reader({fabric_attachment_receiver, Middleman, Length}) ->
+    fabric_doc_atts:receiver_callback(Middleman, Length);
 make_att_reader(Else) ->
     Else.
 

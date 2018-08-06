@@ -21,9 +21,9 @@
 -define(ATT_TXT_NAME, <<"file.erl">>).
 -define(FIXTURE_PNG, filename:join([?FIXTURESDIR, "logo.png"])).
 -define(FIXTURE_TXT, ?ABS_PATH(?FILE)).
--define(TIMEOUT, 1000).
--define(TIMEOUT_EUNIT, 10).
--define(TIMEWAIT, 100).
+-define(TIMEOUT, 5000).
+-define(TIMEOUT_EUNIT, 100).
+-define(TIMEWAIT, 1000).
 -define(i2l(I), integer_to_list(I)).
 
 
@@ -208,7 +208,7 @@ should_upload_attachment_with_valid_md5_header({Host, DbName}) ->
         Headers = [
             {"Content-Length", "34"},
             {"Content-Type", "text/plain"},
-            {"Content-MD5", ?b2l(base64:encode(crypto:hash(md5, Body)))},
+            {"Content-MD5", ?b2l(base64:encode(couch_hash:md5_hash(Body)))},
             {"Host", Host}
         ],
         {ok, Code, Json} = request("PUT", AttUrl, Headers, Body),
@@ -224,7 +224,7 @@ should_upload_attachment_by_chunks_with_valid_md5_header({Host, DbName}) ->
         Body = [chunked_body([Part1, Part2]), "\r\n"],
         Headers = [
             {"Content-Type", "text/plain"},
-            {"Content-MD5", ?b2l(base64:encode(crypto:hash(md5, AttData)))},
+            {"Content-MD5", ?b2l(base64:encode(couch_hash:md5_hash(AttData)))},
             {"Host", Host},
             {"Transfer-Encoding", "chunked"}
         ],
@@ -239,7 +239,7 @@ should_upload_attachment_by_chunks_with_valid_md5_trailer({Host, DbName}) ->
         AttData = <<"We all live in a yellow submarine!">>,
         <<Part1:21/binary, Part2:13/binary>> = AttData,
         Body = [chunked_body([Part1, Part2]),
-                "Content-MD5: ", base64:encode(crypto:hash(md5, AttData)),
+                "Content-MD5: ", base64:encode(couch_hash:md5_hash(AttData)),
                 "\r\n\r\n"],
         Headers = [
             {"Content-Type", "text/plain"},

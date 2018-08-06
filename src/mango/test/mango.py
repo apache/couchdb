@@ -95,6 +95,11 @@ class Database(object):
     def save_doc(self, doc):
         self.save_docs([doc])
 
+    def save_docs_with_conflicts(self, docs, **kwargs):
+        body = json.dumps({"docs": docs, "new_edits": False})
+        r = self.sess.post(self.path("_bulk_docs"), data=body, params=kwargs)
+        r.raise_for_status()
+
     def save_docs(self, docs, **kwargs):
         body = json.dumps({"docs": docs})
         r = self.sess.post(self.path("_bulk_docs"), data=body, params=kwargs)

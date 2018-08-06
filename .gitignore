@@ -51,8 +51,9 @@ src/meck/
 src/mochiweb/
 src/oauth/
 src/rebar/
-src/setup/
 src/snappy/
+src/triq/
+src/hyper/
 tmp/
 
 src/couch/*.o

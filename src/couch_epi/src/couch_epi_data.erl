@@ -111,4 +111,4 @@ definitions({module, Modules}) ->
 
 hash_of_file(FilePath) ->
     {ok, Data} = file:read_file(FilePath),
-    crypto:hash(md5, Data).
+    couch_hash:md5_hash(Data).

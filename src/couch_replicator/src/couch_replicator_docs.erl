@@ -35,7 +35,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("ibrowse/include/ibrowse.hrl").
 -include_lib("mem3/include/mem3.hrl").
--include("couch_replicator_api_wrap.hrl").
+-include_lib("couch_replicator/include/couch_replicator_api_wrap.hrl").
 -include("couch_replicator.hrl").
 -include("couch_replicator_js_functions.hrl").
 
@@ -396,28 +396,9 @@ parse_rep_db({Props}, Proxy, Options) ->
     {BinHeaders} = get_value(<<"headers">>, Props, {[]}),
     Headers = lists:ukeysort(1, [{?b2l(K), ?b2l(V)} || {K, V} <- BinHeaders]),
     DefaultHeaders = (#httpdb{})#httpdb.headers,
-    OAuth = case get_value(<<"oauth">>, AuthProps) of
-    undefined ->
-        nil;
-    {OauthProps} ->
-        #oauth{
-            consumer_key = ?b2l(get_value(<<"consumer_key">>, OauthProps)),
-            token = ?b2l(get_value(<<"token">>, OauthProps)),
-            token_secret = ?b2l(get_value(<<"token_secret">>, OauthProps)),
-            consumer_secret = ?b2l(get_value(<<"consumer_secret">>,
-                OauthProps)),
-            signature_method =
-                case get_value(<<"signature_method">>, OauthProps) of
-                undefined ->        hmac_sha1;
-                <<"PLAINTEXT">> ->  plaintext;
-                <<"HMAC-SHA1">> ->  hmac_sha1;
-                <<"RSA-SHA1">> ->   rsa_sha1
-                end
-        }
-    end,
     #httpdb{
         url = Url,
-        oauth = OAuth,
+        auth_props = AuthProps,
         headers = lists:ukeymerge(1, Headers, DefaultHeaders),
         ibrowse_options = lists:keysort(1,
             [{socket_options, get_value(socket_options, Options)} |
@@ -695,8 +676,7 @@ strip_credentials(Url) when is_binary(Url) ->
         "http\\1://\\2",
         [{return, binary}]);
 strip_credentials({Props}) ->
-    Props1 = lists:keydelete(<<"oauth">>, 1, Props),
-    {lists:keydelete(<<"headers">>, 1, Props1)}.
+    {lists:keydelete(<<"headers">>, 1, Props)}.
 
 
 error_reason({shutdown, Error}) ->
@@ -774,10 +754,6 @@ check_strip_credentials_test() ->
         },
         {
             {[{<<"_id">>, <<"foo">>}]},
-            {[{<<"_id">>, <<"foo">>}, {<<"oauth">>, <<"bar">>}]}
-        },
-        {
-            {[{<<"_id">>, <<"foo">>}]},
             {[{<<"_id">>, <<"foo">>}, {<<"headers">>, <<"bar">>}]}
         },
         {
@@ -786,8 +762,7 @@ check_strip_credentials_test() ->
         },
         {
             {[{<<"_id">>, <<"foo">>}]},
-            {[{<<"_id">>, <<"foo">>}, {<<"oauth">>, <<"bar">>},
-                {<<"headers">>, <<"baz">>}]}
+            {[{<<"_id">>, <<"foo">>}, {<<"headers">>, <<"baz">>}]}
         }
     ]].
 

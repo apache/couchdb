@@ -21,7 +21,7 @@
 -include_lib("ibrowse/include/ibrowse.hrl").
 
 -include_lib("couch/include/couch_db.hrl").
--include("couch_replicator_api_wrap.hrl").
+-include_lib("couch_replicator/include/couch_replicator_api_wrap.hrl").
 -include("couch_replicator.hrl").
 
 % replication_id/1 and replication_id/2 will attempt to fetch
@@ -112,7 +112,7 @@ maybe_append_filters(Base,
         {error, FilterParseError} ->
             throw({error, FilterParseError})
         end,
-    couch_util:to_hex(crypto:hash(md5, term_to_binary(Base2))).
+    couch_util:to_hex(couch_hash:md5_hash(term_to_binary(Base2))).
 
 
 maybe_append_options(Options, RepOptions) ->
@@ -127,60 +127,23 @@ maybe_append_options(Options, RepOptions) ->
     end, [], Options).
 
 
-get_rep_endpoint(_UserCtx, #httpdb{url=Url, headers=Headers, oauth=OAuth}) ->
+get_rep_endpoint(_UserCtx, #httpdb{url=Url, headers=Headers}) ->
     DefaultHeaders = (#httpdb{})#httpdb.headers,
-    case OAuth of
-    nil ->
-        {remote, Url, Headers -- DefaultHeaders};
-    #oauth{} ->
-        {remote, Url, Headers -- DefaultHeaders, OAuth}
-    end;
+    {remote, Url, Headers -- DefaultHeaders};
 get_rep_endpoint(UserCtx, <<DbName/binary>>) ->
     {local, DbName, UserCtx}.
 
 
 get_v4_endpoint(UserCtx, #httpdb{} = HttpDb) ->
-    {Url, Headers, OAuth} = case get_rep_endpoint(UserCtx, HttpDb) of
-        {remote, U, Hds} ->
-            {U, Hds, undefined};
-        {remote, U, Hds, OA} ->
-            {U, Hds, OA}
-    end,
-    {UserFromHeaders, HeadersWithoutBasicAuth} = remove_basic_auth(Headers),
+    {remote, Url, Headers} = get_rep_endpoint(UserCtx, HttpDb),
+    {{UserFromHeaders, _}, HeadersWithoutBasicAuth} =
+        couch_replicator_utils:remove_basic_auth_from_headers(Headers),
     {UserFromUrl, Host, NonDefaultPort, Path} = get_v4_url_info(Url),
     User = pick_defined_value([UserFromUrl, UserFromHeaders]),
+    OAuth = undefined, % Keep this to ensure checkpoints don't change
     {remote, User, Host, NonDefaultPort, Path, HeadersWithoutBasicAuth, OAuth};
 get_v4_endpoint(UserCtx, <<DbName/binary>>) ->
     {local, DbName, UserCtx}.
-
-
-remove_basic_auth(Headers) ->
-    case lists:partition(fun is_basic_auth/1, Headers) of
-        {[], HeadersWithoutBasicAuth} ->
-            {undefined, HeadersWithoutBasicAuth};
-        {[{_, "Basic " ++ Base64} | _], HeadersWithoutBasicAuth} ->
-            User = get_basic_auth_user(Base64),
-            {User, HeadersWithoutBasicAuth}
-    end.
-
-
-is_basic_auth({"Authorization", "Basic " ++ _Base64}) ->
-    true;
-is_basic_auth(_) ->
-    false.
-
-
-get_basic_auth_user(Base64) ->
-    try re:split(base64:decode(Base64), ":", [{return, list}, {parts, 2}]) of
-        [User, _Pass] ->
-            User;
-        _ ->
-            undefined
-    catch
-        % Tolerate invalid B64 values here to avoid crashing replicator
-        error:function_clause ->
-            undefined
-    end.
 
 
 pick_defined_value(Values) ->

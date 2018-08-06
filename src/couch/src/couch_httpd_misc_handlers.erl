@@ -61,30 +61,9 @@ handle_file_req(#httpd{method='GET'}=Req, Document) ->
 handle_file_req(Req, _) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
-handle_utils_dir_req(#httpd{method='GET'}=Req, DocumentRoot) ->
-    "/" ++ UrlPath = couch_httpd:path(Req),
-    case couch_httpd:partition(UrlPath) of
-    {_ActionKey, "/", RelativePath} ->
-        % GET /_utils/path or GET /_utils/
-        CachingHeaders = [{"Cache-Control", "private, must-revalidate"}],
-        EnableCsp = config:get("csp", "enable", "false"),
-        Headers = maybe_add_csp_headers(CachingHeaders, EnableCsp),
-        couch_httpd:serve_file(Req, RelativePath, DocumentRoot, Headers);
-    {_ActionKey, "", _RelativePath} ->
-        % GET /_utils
-        RedirectPath = couch_httpd:path(Req) ++ "/",
-        couch_httpd:send_redirect(Req, RedirectPath)
-    end;
 handle_utils_dir_req(Req, _) ->
-    send_method_not_allowed(Req, "GET,HEAD").
-
-maybe_add_csp_headers(Headers, "true") ->
-    DefaultValues = "default-src 'self'; img-src 'self' data:; font-src 'self'; "
-                    "script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline';",
-    Value = config:get("csp", "header_value", DefaultValues),
-    [{"Content-Security-Policy", Value} | Headers];
-maybe_add_csp_headers(Headers, _) ->
-    Headers.
+    send_error(Req, 410, <<"no_node_local_fauxton">>,
+        ?l2b("The web interface is no longer available on the node-local port.")).
 
 
 handle_all_dbs_req(#httpd{method='GET'}=Req) ->
@@ -283,7 +262,7 @@ handle_approved_config_req(#httpd{method='PUT', path_parts=[_, Section, Key]}=Re
         <<"admins">> ->
             couch_passwords:hash_admin_password(RawValue);
         _ ->
-            RawValue
+            couch_util:trim(RawValue)
         end
     end,
     OldValue = config:get(Section, Key, ""),
