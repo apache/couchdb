@@ -226,6 +226,18 @@ ddoc(State, {_, Fun}, [<<"filters">>|_], [Docs, Req]) ->
     end,
     Resp = lists:map(FilterFunWrapper, Docs),
     {State, [true, Resp]};
+ddoc(State, {_, Fun}, [<<"views">>|_], [Docs]) ->
+    MapFunWrapper = fun(Doc) ->
+        case catch Fun(Doc) of
+        undefined -> true;
+        ok -> false;
+        false -> false;
+        [_|_] -> true;
+        {'EXIT', Error} -> couch_log:error("~p", [Error])
+        end
+    end,
+    Resp = lists:map(MapFunWrapper, Docs),
+    {State, [true, Resp]};
 ddoc(State, {_, Fun}, [<<"shows">>|_], Args) ->
     Resp = case (catch apply(Fun, Args)) of
         FunResp when is_list(FunResp) ->
@@ -351,11 +363,11 @@ bindings(State, Sig, DDoc) ->
 % thanks to erlview, via:
 % http://erlang.org/pipermail/erlang-questions/2003-November/010544.html
 makefun(State, Source) ->
-    Sig = crypto:hash(md5, Source),
+    Sig = couch_hash:md5_hash(Source),
     BindFuns = bindings(State, Sig),
     {Sig, makefun(State, Source, BindFuns)}.
 makefun(State, Source, {DDoc}) ->
-    Sig = crypto:hash(md5, lists:flatten([Source, term_to_binary(DDoc)])),
+    Sig = couch_hash:md5_hash(lists:flatten([Source, term_to_binary(DDoc)])),
     BindFuns = bindings(State, Sig, {DDoc}),
     {Sig, makefun(State, Source, BindFuns)};
 makefun(_State, Source, BindFuns) when is_list(BindFuns) ->

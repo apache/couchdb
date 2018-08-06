@@ -34,7 +34,10 @@ authorize_request_int(#httpd{path_parts=[]}=Req) ->
 authorize_request_int(#httpd{path_parts=[<<"favicon.ico">>|_]}=Req) ->
     Req;
 authorize_request_int(#httpd{path_parts=[<<"_all_dbs">>|_]}=Req) ->
-    Req;
+   case config:get_boolean("chttpd", "admin_only_all_dbs", false) of
+       true -> require_admin(Req);
+       false -> Req
+   end;
 authorize_request_int(#httpd{path_parts=[<<"_dbs_info">>|_]}=Req) ->
     Req;
 authorize_request_int(#httpd{path_parts=[<<"_replicator">>], method='PUT'}=Req) ->

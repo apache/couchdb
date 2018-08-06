@@ -15,7 +15,7 @@
 -behaviour(config_listener).
 -vsn(3).
 
--export([open/2,create/2,delete/2,get_version/0,get_version/1,get_uuid/0]).
+-export([open/2,create/2,delete/2,get_version/0,get_version/1,get_git_sha/0,get_uuid/0]).
 -export([all_databases/0, all_databases/2]).
 -export([init/1, handle_call/3,sup_start_link/0]).
 -export([handle_cast/2,code_change/3,handle_info/2,terminate/2]).
@@ -57,6 +57,7 @@ get_version(short) ->
   [Version|_Rest] = string:tokens(get_version(), "+"),
   Version.
 
+get_git_sha() -> ?COUCHDB_GIT_SHA.
 
 get_uuid() ->
     case config:get("couchdb", "uuid", undefined) of
@@ -525,7 +526,7 @@ handle_call({delete, DbName, Options}, _From, Server) ->
         DelOpt = [{context, delete} | Options],
 
         % Make sure and remove all compaction data
-        delete_compaction_files(DbNameList, DelOpt),
+        delete_compaction_files(DbNameList, Options),
 
         {ok, {Engine, FilePath}} = get_engine(Server, DbNameList),
         RootDir = Server#server.root_dir,

@@ -112,7 +112,7 @@ maybe_append_filters(Base,
         {error, FilterParseError} ->
             throw({error, FilterParseError})
         end,
-    couch_util:to_hex(crypto:hash(md5, term_to_binary(Base2))).
+    couch_util:to_hex(couch_hash:md5_hash(term_to_binary(Base2))).
 
 
 maybe_append_options(Options, RepOptions) ->
