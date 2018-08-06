@@ -28,7 +28,7 @@
 -type code() :: non_neg_integer().
 
 
--define(DEFAULT_PLUGINS, "couch_replicator_auth_noop").
+-define(DEFAULT_PLUGINS, "couch_replicator_auth_session,couch_replicator_auth_noop").
 
 
 % Behavior API

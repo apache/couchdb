@@ -39,6 +39,13 @@ Version = case os:getenv("COUCHDB_VERSION") of
         string:strip(Version0, right)
 end,
 
+GitSha = case os:getenv("COUCHDB_GIT_SHA") of
+    false ->
+        ""; % release builds won’t get a fallback
+    GitSha0 ->
+        string:strip(GitSha0, right)
+end,
+
 CouchConfig = case filelib:is_file(os:getenv("COUCHDB_CONFIG")) of
     true ->
         {ok, Result} = file:consult(os:getenv("COUCHDB_CONFIG")),
@@ -63,6 +70,13 @@ CouchJSConfig = "priv/couch_js/config.h",
 ConfigSrc = [["#define ", K, " ", V, $\n] || {K, V} <- ConfigH],
 ConfigBin = iolist_to_binary(ConfigSrc),
 ok = CopyIfDifferent(CouchJSConfig, ConfigBin),
+
+MD5Config = case lists:keyfind(erlang_md5, 1, CouchConfig) of
+    {erlang_md5, true} ->
+        [{d, 'ERLANG_MD5', true}];
+    _ ->
+        []
+end,
 
 %% TODO support curl on Windows
 {JS_CFLAGS, JS_LDFLAGS} = case lists:keyfind(with_curl, 1, CouchConfig) of
@@ -142,8 +156,9 @@ AddConfig = [
     {port_specs, PortSpecs},
     {erl_opts, PlatformDefines ++ [
         {d, 'COUCHDB_VERSION', Version},
+        {d, 'COUCHDB_GIT_SHA', GitSha},
         {i, "../"}
-    ]},
+    ] ++ MD5Config},
     {eunit_compile_opts, PlatformDefines}
 ].
 

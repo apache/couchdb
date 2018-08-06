@@ -101,7 +101,11 @@ request(Method, Url, Headers, Body, Opts, N) ->
         {error, {'EXIT', {normal, _}}} ->
             % Connection closed right after a successful request that
             % used the same connection.
-            request(Method, Url, Headers, Body, N - 1);
+            request(Method, Url, Headers, Body, Opts, N - 1);
+        {error, retry_later} ->
+            % CouchDB is busy, let’s wait a bit
+            timer:sleep(3000 div N),
+            request(Method, Url, Headers, Body, Opts, N - 1);
         Error ->
             Error
     end.
