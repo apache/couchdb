@@ -353,18 +353,31 @@ query_view(DbName, Options, DDoc, ViewName, Callback, Acc0, QueryArgs0) ->
     false ->
         ok
     end,
-    {ok, #mrst{views=Views, language=Lang}} =
+    {ok, #mrst{views=Views, language=Lang, design_opts=DesignOpts}} =
         couch_mrview_util:ddoc_to_mrst(Db, DDoc),
+
+    DbPartitioned = mem3:is_partitioned(Db),
+    ViewPartitioned = couch_util:get_value(<<"partitioned">>, DesignOpts),
+    Partitioned = if
+        not DbPartitioned ->
+            false;
+        is_boolean(ViewPartitioned) ->
+            ViewPartitioned;
+        true ->
+            DbPartitioned
+    end,
+
     QueryArgs1 = couch_mrview_util:set_view_type(QueryArgs0, View, Views),
-    QueryArgs2 = couch_mrview_util:validate_args(QueryArgs1),
-    VInfo = couch_mrview_util:extract_view(Lang, QueryArgs2, View, Views),
-    case is_reduce_view(QueryArgs2) of
+    QueryArgs2 = couch_mrview_util:set_extra(QueryArgs1, partitioned, Partitioned),
+    QueryArgs3 = couch_mrview_util:validate_args(QueryArgs2),
+    VInfo = couch_mrview_util:extract_view(Lang, QueryArgs3, View, Views),
+    case is_reduce_view(QueryArgs3) of
         true ->
             fabric_view_reduce:go(
                 Db,
                 DDoc,
                 View,
-                QueryArgs2,
+                QueryArgs3,
                 Callback,
                 Acc0,
                 VInfo
@@ -375,7 +388,7 @@ query_view(DbName, Options, DDoc, ViewName, Callback, Acc0, QueryArgs0) ->
                 Options,
                 DDoc,
                 View,
-                QueryArgs2,
+                QueryArgs3,
                 Callback,
                 Acc0,
                 VInfo
