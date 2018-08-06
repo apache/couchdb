@@ -574,6 +574,17 @@ validate_args(Args) ->
         _ -> mrverror(<<"Invalid value for `sorted`.">>)
     end,
 
+    case {true == get_extra(Args, partitioned), get_extra(Args, partition)} of
+        {true, undefined} ->
+            mrverror(<<"`partition` parameter is mandatory for queries to this view.">>);
+        {true, _Partition} ->
+            ok;
+        {false, undefined} ->
+            ok;
+        {false, _Partition} ->
+            mrverror(<<"`partition` parameter is not supported in this view.">>)
+    end,
+
     Args#mrargs{
         start_key_docid=SKDocId,
         end_key_docid=EKDocId,
