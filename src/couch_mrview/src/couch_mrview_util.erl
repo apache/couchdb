@@ -612,6 +612,17 @@ validate_args(Args) ->
         _ -> mrverror(<<"Invalid value for `sorted`.">>)
     end,
 
+    case {get_extra(Args, partitioned, false), get_extra(Args, partition)} of
+        {true, undefined} ->
+            mrverror(<<"`partition` parameter is mandatory for queries to this view.">>);
+        {true, Partition} ->
+            couch_doc:validate_docid(Partition);
+        {false, undefined} ->
+            ok;
+        {false, _Partition} ->
+            mrverror(<<"`partition` parameter is not supported in this view.">>)
+    end,
+
     Args#mrargs{
         start_key_docid=SKDocId,
         end_key_docid=EKDocId,
