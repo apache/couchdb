@@ -64,7 +64,6 @@ stream_start(Workers0, Keypos, StartFun, Replacements) ->
     Timeout = request_timeout(),
     case rexi_utils:recv(Workers0, Keypos, Fun, Acc, Timeout, infinity) of
         {ok, #stream_acc{workers=Workers}} ->
-            true = fabric_view:is_progress_possible(Workers),
             AckedWorkers = fabric_dict:fold(fun(Worker, From, WorkerAcc) ->
                 rexi:stream_start(From),
                 [Worker | WorkerAcc]
