@@ -32,6 +32,7 @@
 -export([extract_view/4, extract_view_reduce/1]).
 -export([get_view_keys/1, get_view_queries/1]).
 -export([set_view_type/3]).
+-export([set_extra/3, get_extra/2, get_extra/3]).
 -export([changes_key_opts/2]).
 -export([fold_changes/4]).
 -export([to_key_seq/1]).
@@ -211,6 +212,19 @@ set_view_type(Args, ViewName, [View | Rest]) ->
                 false -> set_view_type(Args, ViewName, Rest)
             end
     end.
+
+
+set_extra(#mrargs{} = Args, Key, Value) ->
+    Extra0 = Args#mrargs.extra,
+    Extra1 = lists:ukeysort(1, [{Key, Value} | Extra0]),
+    Args#mrargs{extra = Extra1}.
+
+
+get_extra(#mrargs{} = Args, Key) ->
+    couch_util:get_value(Key, Args#mrargs.extra).
+
+get_extra(#mrargs{} = Args, Key, Default) ->
+    couch_util:get_value(Key, Args#mrargs.extra, Default).
 
 
 extract_view(_Lang, _Args, _ViewName, []) ->
