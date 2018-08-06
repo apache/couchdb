@@ -13,16 +13,49 @@
 include version.mk
 
 REBAR?=$(shell echo `pwd`/bin/rebar)
+
+# Handle the following scenarios:
+#   1. When building from a tarball, use version.mk.
+#   2. When building from a clean release tag (#.#.#), use that tag.
+#   3. When building from a clean RC tag (#.#.#-RC#), use JUST the version
+#      number inside the tarball, but use the full name for the name of the
+#      tarball itself.
+#   4. When not on a clean tag, use version.mk + git sha + dirty status.
+
+COUCHDB_GIT_SHA=$(git_sha)
+
 IN_RELEASE = $(shell if [ ! -d .git ]; then echo true; fi)
 ifeq ($(IN_RELEASE), true)
+
+# 1. Building from tarball, use version.mk.
 COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)
+
 else
-RELTAG = $(shell git describe | grep -E '^[0-9]+\.[0-9]\.[0-9]+(-RC[0-9]+)?$$')
-ifeq ($(RELTAG),)
-COUCHDB_VERSION_SUFFIX = $(shell git rev-parse --short --verify HEAD)
+
+# Gather some additional information.
+# We do it this way so we don't bake shell-isms into Makefile
+# to make it easier to port to Windows. I know, I know. -jst
+# IN_RC contains the -RCx suffix in the name if present
+IN_RC = $(shell git describe --tags --always --first-parent \
+        | grep -Eo -- '-RC[0-9]+' 2>/dev/null)
+# ON_TAG matches *ONLY* if we are on a release or RC tag
+ON_TAG = $(shell git describe --tags --always --first-parent \
+        | grep -Eo -- '^[0-9]+\.[0-9]\.[0-9]+(-RC[0-9]+)?$$' 2>/dev/null)
+# RELTAG contains the #.#.# from git describe, which might be used
+RELTAG = $(shell git describe --tags --always --first-parent \
+        | grep -Eo -- '^[0-9]+\.[0-9]\.[0-9]+' 2>/dev/null)
+# DIRTY identifies if we're not on a commit
+DIRTY = $(shell git describe --dirty | grep -Eo -- '-dirty' 2>/dev/null)
+# COUCHDB_GIT_SHA is our current git hash.
+COUCHDB_GIT_SHA=$(shell git rev-parse --short --verify HEAD)
+
+ifeq ($(ON_TAG),)
+# 4. Not on a tag.
+COUCHDB_VERSION_SUFFIX = $(COUCHDB_GIT_SHA)$(DIRTY)
 COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)-$(COUCHDB_VERSION_SUFFIX)
 else
-COUCHDB_VERSION = $(RELTAG)
+# 2 and 3. On a tag.
+COUCHDB_VERSION = $(RELTAG)$(DIRTY)
 endif
 endif
 
@@ -30,20 +63,23 @@ DESTDIR=
 
 # Rebar options
 apps=
-skip_deps=folsom,meck,mochiweb,triq,snappy
+skip_deps=folsom,meck,mochiweb,triq,snappy,bcrypt,hyper
 suites=
 tests=
 
+COMPILE_OPTS=$(shell echo "\
+	apps=$(apps) \
+	" | sed -e 's/[a-z_]\{1,\}= / /g')
 EUNIT_OPTS=$(shell echo "\
 	apps=$(apps) \
 	skip_deps=$(skip_deps) \
 	suites=$(suites) \
 	tests=$(tests) \
-	" | sed -e 's/[a-z]\+= / /g')
+	" | sed -e 's/[a-z]\{1,\}= / /g')
 DIALYZE_OPTS=$(shell echo "\
 	apps=$(apps) \
 	skip_deps=$(skip_deps) \
-	" | sed -e 's/[a-z]\+= / /g')
+	" | sed -e 's/[a-z]\{1,\}= / /g')
 
 #ignore javascript tests
 ignore_js_suites=
@@ -73,9 +109,9 @@ help:
 
 
 .PHONY: couch
-# target: couch - Build CouchDB core
+# target: couch - Build CouchDB core, use ERL_OPTS to provide custom compiler's options
 couch: config.erl
-	@COUCHDB_VERSION=$(COUCHDB_VERSION) $(REBAR) compile
+	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) compile $(COMPILE_OPTS)
 	@cp src/couch/priv/couchjs bin/
 
 
@@ -218,7 +254,7 @@ list-eunit-apps:
 .PHONY: list-eunit-suites
 # target: list-eunit-suites - List EUnit target test suites
 list-eunit-suites:
-	@find ./src/ -type f -name *_test.erl -o -name *_tests.erl -printf "%f\n" \
+	@find ./src/ -type f -name *_test.erl -o -name *_tests.erl -exec basename {} \; \
 		| cut -d '.' -f -1 \
 		| sort
 
@@ -226,7 +262,7 @@ list-eunit-suites:
 .PHONY: list-js-suites
 # target: list-js-suites - List JavaScript test suites
 list-js-suites:
-	@find ./test/javascript/tests/ -type f -name *.js -printf "%f\n" \
+	@find ./test/javascript/tests/ -type f -name *.js -exec basename {} \; \
 		| cut -d '.' -f -1 \
 		| sort
 
@@ -289,8 +325,8 @@ dist: all
 	@mkdir -p apache-couchdb-$(COUCHDB_VERSION)/share/docs/man
 	@cp src/docs/build/man/apachecouchdb.1 apache-couchdb-$(COUCHDB_VERSION)/share/docs/man/
 
-	@tar czf apache-couchdb-$(COUCHDB_VERSION).tar.gz apache-couchdb-$(COUCHDB_VERSION)
-	@echo "Done: apache-couchdb-$(COUCHDB_VERSION).tar.gz"
+	@tar czf apache-couchdb-$(COUCHDB_VERSION)$(IN_RC).tar.gz apache-couchdb-$(COUCHDB_VERSION)
+	@echo "Done: apache-couchdb-$(COUCHDB_VERSION)$(IN_RC).tar.gz"
 
 
 .PHONY: release

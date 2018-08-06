@@ -31,7 +31,6 @@
         kernel,
         stdlib,
         crypto,
-        bcrypt,
         sasl,
         inets,
         ssl,
@@ -47,6 +46,7 @@
         couch_log,
         couch_event,
         ioq,
-        couch_stats
+        couch_stats,
+        hyper
     ]}
 ]}.

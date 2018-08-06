@@ -41,6 +41,7 @@
     user_acc,
     last_go=ok,
     reduce_fun,
+    finalizer,
     update_seq,
     args
 }).
@@ -184,6 +185,8 @@ validate(DbName,  DDoc) ->
                 ok;
             ({_RedName, <<"_stats", _/binary>>}) ->
                 ok;
+            ({_RedName, <<"_approx_count_distinct", _/binary>>}) ->
+                ok;
             ({_RedName, <<"_", _/binary>> = Bad}) ->
                 Msg = ["`", Bad, "` is not a supported reduce function."],
                 throw({invalid_design_doc, Msg});
@@ -217,7 +220,7 @@ query_all_docs(Db, Args, Callback, Acc) when is_list(Args) ->
 query_all_docs(Db, Args0, Callback, Acc) ->
     Sig = couch_util:with_db(Db, fun(WDb) ->
         {ok, Info} = couch_db:get_db_info(WDb),
-        couch_index_util:hexsig(crypto:hash(md5, term_to_binary(Info)))
+        couch_index_util:hexsig(couch_hash:md5_hash(term_to_binary(Info)))
     end),
     Args1 = Args0#mrargs{view_type=map},
     Args2 = couch_mrview_util:validate_args(Args1),
@@ -577,7 +580,14 @@ map_fold(#doc{id = <<"_local/", _/binary>>} = Doc, _Offset, #mracc{} = Acc) ->
         last_go=Go
     }}.
 
-red_fold(Db, {_Nth, _Lang, View}=RedView, Args, Callback, UAcc) ->
+red_fold(Db, {NthRed, _Lang, View}=RedView, Args, Callback, UAcc) ->
+    Finalizer = case couch_util:get_value(finalizer, Args#mrargs.extra) of
+        undefined ->
+            {_, FunSrc} = lists:nth(NthRed, View#mrview.reduce_funs),
+            FunSrc;
+        CustomFun->
+            CustomFun
+    end,
     Acc = #mracc{
         db=Db,
         total_rows=null,
@@ -587,6 +597,7 @@ red_fold(Db, {_Nth, _Lang, View}=RedView, Args, Callback, UAcc) ->
         callback=Callback,
         user_acc=UAcc,
         update_seq=View#mrview.update_seq,
+        finalizer=Finalizer,
         args=Args
     },
     Grouping = {key_group_level, Args#mrargs.group_level},
@@ -618,41 +629,50 @@ red_fold(_Key, _Red, #mracc{limit=0} = Acc) ->
     {stop, Acc};
 red_fold(_Key, Red, #mracc{group_level=0} = Acc) ->
     #mracc{
+        finalizer=Finalizer,
         limit=Limit,
         callback=Callback,
         user_acc=UAcc0
     } = Acc,
-    Row = [{key, null}, {value, Red}],
+    Row = [{key, null}, {value, maybe_finalize(Red, Finalizer)}],
     {Go, UAcc1} = Callback({row, Row}, UAcc0),
     {Go, Acc#mracc{user_acc=UAcc1, limit=Limit-1, last_go=Go}};
 red_fold(Key, Red, #mracc{group_level=exact} = Acc) ->
     #mracc{
+        finalizer=Finalizer,
         limit=Limit,
         callback=Callback,
         user_acc=UAcc0
     } = Acc,
-    Row = [{key, Key}, {value, Red}],
+    Row = [{key, Key}, {value, maybe_finalize(Red, Finalizer)}],
     {Go, UAcc1} = Callback({row, Row}, UAcc0),
     {Go, Acc#mracc{user_acc=UAcc1, limit=Limit-1, last_go=Go}};
 red_fold(K, Red, #mracc{group_level=I} = Acc) when I > 0, is_list(K) ->
     #mracc{
+        finalizer=Finalizer,
         limit=Limit,
         callback=Callback,
         user_acc=UAcc0
     } = Acc,
-    Row = [{key, lists:sublist(K, I)}, {value, Red}],
+    Row = [{key, lists:sublist(K, I)}, {value, maybe_finalize(Red, Finalizer)}],
     {Go, UAcc1} = Callback({row, Row}, UAcc0),
     {Go, Acc#mracc{user_acc=UAcc1, limit=Limit-1, last_go=Go}};
 red_fold(K, Red, #mracc{group_level=I} = Acc) when I > 0 ->
     #mracc{
+        finalizer=Finalizer,
         limit=Limit,
         callback=Callback,
         user_acc=UAcc0
     } = Acc,
-    Row = [{key, K}, {value, Red}],
+    Row = [{key, K}, {value, maybe_finalize(Red, Finalizer)}],
     {Go, UAcc1} = Callback({row, Row}, UAcc0),
     {Go, Acc#mracc{user_acc=UAcc1, limit=Limit-1, last_go=Go}}.
 
+maybe_finalize(Red, null) ->
+    Red;
+maybe_finalize(Red, RedSrc) ->
+    {ok, Finalized} = couch_query_servers:finalize(RedSrc, Red),
+    Finalized.
 
 finish_fold(#mracc{last_go=ok, update_seq=UpdateSeq}=Acc,  ExtraMeta) ->
     #mracc{callback=Callback, user_acc=UAcc, args=Args}=Acc,

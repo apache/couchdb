@@ -104,10 +104,12 @@ start_link(https) ->
     end,
     SslOpts = ServerOpts ++ ClientOpts,
 
-    Options =
+    Options0 =
         [{port, Port},
          {ssl, true},
          {ssl_opts, SslOpts}],
+    CustomServerOpts = get_server_options("httpsd"),
+    Options = merge_server_options(Options0, CustomServerOpts),
     start_link(https, Options).
 
 start_link(Name, Options) ->
@@ -124,9 +126,8 @@ start_link(Name, Options) ->
         {name, Name},
         {ip, IP}
     ],
-    ServerOptsCfg = config:get("chttpd", "server_options", "[]"),
-    {ok, ServerOpts} = couch_util:parse_term(ServerOptsCfg),
-    Options2 = lists:keymerge(1, lists:sort(Options1), lists:sort(ServerOpts)),
+    ServerOpts = get_server_options("chttpd"),
+    Options2 = merge_server_options(Options1, ServerOpts),
     case mochiweb_http:start(Options2) of
     {ok, Pid} ->
         {ok, Pid};
@@ -134,6 +135,14 @@ start_link(Name, Options) ->
         io:format("Failure to start Mochiweb: ~s~n", [Reason]),
         {error, Reason}
     end.
+
+get_server_options(Module) ->
+    ServerOptsCfg = config:get(Module, "server_options", "[]"),
+    {ok, ServerOpts} = couch_util:parse_term(ServerOptsCfg),
+    ServerOpts.
+
+merge_server_options(A, B) ->
+    lists:keymerge(1, lists:sort(A), lists:sort(B)).
 
 stop() ->
     catch mochiweb_http:stop(https),
@@ -288,17 +297,24 @@ process_request(#httpd{mochi_req = MochiReq} = HttpReq) ->
         not_preflight ->
             case chttpd_auth:authenticate(HttpReq, fun authenticate_request/1) of
             #httpd{} = Req ->
-                HandlerFun = chttpd_handlers:url_handler(
-                    HandlerKey, fun chttpd_db:handle_request/1),
-                AuthorizedReq = chttpd_auth:authorize(possibly_hack(Req),
-                    fun chttpd_auth_request:authorize_request/1),
-                {AuthorizedReq, HandlerFun(AuthorizedReq)};
+                handle_req_after_auth(HandlerKey, Req);
             Response ->
                 {HttpReq, Response}
             end;
         Response ->
             {HttpReq, Response}
         end
+    catch Tag:Error ->
+        {HttpReq, catch_error(HttpReq, Tag, Error)}
+    end.
+
+handle_req_after_auth(HandlerKey, HttpReq) ->
+    try
+        HandlerFun = chttpd_handlers:url_handler(HandlerKey,
+            fun chttpd_db:handle_request/1),
+        AuthorizedReq = chttpd_auth:authorize(possibly_hack(HttpReq),
+            fun chttpd_auth_request:authorize_request/1),
+        {AuthorizedReq, HandlerFun(AuthorizedReq)}
     catch Tag:Error ->
         {HttpReq, catch_error(HttpReq, Tag, Error)}
     end.
@@ -665,7 +681,7 @@ doc_etag(#doc{id=Id, body=Body, revs={Start, [DiskRev|_]}}) ->
     couch_httpd:doc_etag(Id, Body, {Start, DiskRev}).
 
 make_etag(Term) ->
-    <<SigInt:128/integer>> = crypto:hash(md5, term_to_binary(Term)),
+    <<SigInt:128/integer>> = couch_hash:md5_hash(term_to_binary(Term)),
     list_to_binary(io_lib:format("\"~.36B\"",[SigInt])).
 
 etag_match(Req, CurrentEtag) when is_binary(CurrentEtag) ->
@@ -1237,5 +1253,39 @@ test_log_request(RawPath, UserCtx) ->
     Message = maybe_log(Req, Resp),
     ok = meck:unload(couch_log),
     Message.
+
+handle_req_after_auth_test() ->
+    Headers = mochiweb_headers:make([{"HOST", "127.0.0.1:15984"}]),
+    MochiReq = mochiweb_request:new(socket, [], 'PUT', "/newdb", version,
+        Headers),
+    UserCtx = #user_ctx{name = <<"retain_user">>},
+    Roles = [<<"_reader">>],
+    AuthorizedCtx = #user_ctx{name = <<"retain_user">>, roles = Roles},
+    Req = #httpd{
+        mochi_req = MochiReq,
+        begin_ts = {1458,588713,124003},
+        original_method = 'PUT',
+        peer = "127.0.0.1",
+        nonce = "nonce",
+        user_ctx = UserCtx
+    },
+    AuthorizedReq = Req#httpd{user_ctx = AuthorizedCtx},
+    ok = meck:new(chttpd_handlers, [passthrough]),
+    ok = meck:new(chttpd_auth, [passthrough]),
+    ok = meck:expect(chttpd_handlers, url_handler, fun(_Key, _Fun) ->
+         fun(_Req) -> handled_authorized_req end
+    end),
+    ok = meck:expect(chttpd_auth, authorize, fun(_Req, _Fun) ->
+        AuthorizedReq
+    end),
+    ?assertEqual({AuthorizedReq, handled_authorized_req},
+        handle_req_after_auth(foo_key, Req)),
+    ok = meck:expect(chttpd_auth, authorize, fun(_Req, _Fun) ->
+        meck:exception(throw, {http_abort, resp, some_reason})
+    end),
+    ?assertEqual({Req, {aborted, resp, some_reason}},
+        handle_req_after_auth(foo_key, Req)),
+    ok = meck:unload(chttpd_handlers),
+    ok = meck:unload(chttpd_auth).
 
 -endif.

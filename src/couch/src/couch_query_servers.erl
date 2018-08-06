@@ -17,6 +17,7 @@
 -export([reduce/3, rereduce/3,validate_doc_update/5]).
 -export([filter_docs/5]).
 -export([filter_view/3]).
+-export([finalize/2]).
 -export([rewrite/3]).
 
 -export([with_ddoc_proc/2, proc_prompt/2, ddoc_prompt/3, ddoc_proc_prompt/3, json_doc/1]).
@@ -85,6 +86,14 @@ group_reductions_results(List) ->
     _ ->
      [Heads | group_reductions_results(Tails)]
     end.
+
+finalize(<<"_approx_count_distinct",_/binary>>, Reduction) ->
+    true = hyper:is_hyper(Reduction),
+    {ok, round(hyper:card(Reduction))};
+finalize(<<"_stats",_/binary>>, Unpacked) ->
+    {ok, pack_stats(Unpacked)};
+finalize(_RedSrc, Reduction) ->
+    {ok, Reduction}.
 
 rereduce(_Lang, [], _ReducedValues) ->
     {ok, []};
@@ -171,7 +180,10 @@ builtin_reduce(rereduce, [<<"_count",_/binary>>|BuiltinReds], KVs, Acc) ->
     builtin_reduce(rereduce, BuiltinReds, KVs, [Count|Acc]);
 builtin_reduce(Re, [<<"_stats",_/binary>>|BuiltinReds], KVs, Acc) ->
     Stats = builtin_stats(Re, KVs),
-    builtin_reduce(Re, BuiltinReds, KVs, [Stats|Acc]).
+    builtin_reduce(Re, BuiltinReds, KVs, [Stats|Acc]);
+builtin_reduce(Re, [<<"_approx_count_distinct",_/binary>>|BuiltinReds], KVs, Acc) ->
+    Distinct = approx_count_distinct(Re, KVs),
+    builtin_reduce(Re, BuiltinReds, KVs, [Distinct|Acc]).
 
 
 builtin_sum_rows([], Acc) ->
@@ -236,11 +248,11 @@ sum_arrays(Else, _) ->
     throw_sum_error(Else).
 
 builtin_stats(_, []) ->
-    {[{sum,0}, {count,0}, {min,0}, {max,0}, {sumsqr,0}]};
+    {0, 0, 0, 0, 0};
 builtin_stats(_, [[_,First]|Rest]) ->
-    Unpacked = lists:foldl(fun([_Key, Value], Acc) -> stat_values(Value, Acc) end,
-                           build_initial_accumulator(First), Rest),
-    pack_stats(Unpacked).
+    lists:foldl(fun([_Key, Value], Acc) ->
+        stat_values(Value, Acc)
+    end, build_initial_accumulator(First), Rest).
 
 stat_values(Value, Acc) when is_list(Value), is_list(Acc) ->
     lists:zipwith(fun stat_values/2, Value, Acc);
@@ -267,6 +279,8 @@ build_initial_accumulator(L) when is_list(L) ->
     [build_initial_accumulator(X) || X <- L];
 build_initial_accumulator(X) when is_number(X) ->
     {X, 1, X, X, X*X};
+build_initial_accumulator({_, _, _, _, _} = AlreadyUnpacked) ->
+    AlreadyUnpacked;
 build_initial_accumulator({Props}) ->
     unpack_stats({Props});
 build_initial_accumulator(Else) ->
@@ -282,8 +296,12 @@ unpack_stats({PreRed}) when is_list(PreRed) ->
       get_number(<<"sumsqr">>, PreRed)
     }.
 
+
 pack_stats({Sum, Cnt, Min, Max, Sqr}) ->
     {[{<<"sum">>,Sum}, {<<"count">>,Cnt}, {<<"min">>,Min}, {<<"max">>,Max}, {<<"sumsqr">>,Sqr}]};
+pack_stats({Packed}) ->
+    % Legacy code path before we had the finalize operation
+    {Packed};
 pack_stats(Stats) when is_list(Stats) ->
     lists:map(fun pack_stats/1, Stats).
 
@@ -303,6 +321,13 @@ get_number(Key, Props) ->
         throw({invalid_value, iolist_to_binary(Msg)})
     end.
 
+% TODO allow customization of precision in the ddoc.
+approx_count_distinct(reduce, KVs) ->
+    lists:foldl(fun([[Key, _Id], _Value], Filter) ->
+        hyper:insert(term_to_binary(Key), Filter)
+    end, hyper:new(11), KVs);
+approx_count_distinct(rereduce, Reds) ->
+    hyper:union([Filter || [_, Filter] <- Reds]).
 
 % use the function stored in ddoc.validate_doc_update to test an update.
 -spec validate_doc_update(DDoc, EditDoc, DiskDoc, Ctx, SecObj) -> ok when
@@ -584,5 +609,50 @@ stat_values_test() ->
                   {14, 2, 3, 11, 130},
                   {18, 2, 5, 13, 194}
                  ], stat_values([2,3,5], [7,11,13])).
+
+reduce_stats_test() ->
+    ?assertEqual([
+        {[{<<"sum">>,2},{<<"count">>,1},{<<"min">>,2},{<<"max">>,2},{<<"sumsqr">>,4}]}
+    ], test_reduce(<<"_stats">>, [[[null, key], 2]])),
+
+    ?assertEqual([[
+        {[{<<"sum">>,1},{<<"count">>,1},{<<"min">>,1},{<<"max">>,1},{<<"sumsqr">>,1}]},
+        {[{<<"sum">>,2},{<<"count">>,1},{<<"min">>,2},{<<"max">>,2},{<<"sumsqr">>,4}]}
+    ]], test_reduce(<<"_stats">>, [[[null, key],[1,2]]])),
+
+    ?assertEqual(
+         {[{<<"sum">>,2},{<<"count">>,1},{<<"min">>,2},{<<"max">>,2},{<<"sumsqr">>,4}]}
+    , element(2, finalize(<<"_stats">>, {2, 1, 2, 2, 4}))),
+
+    ?assertEqual([
+        {[{<<"sum">>,1},{<<"count">>,1},{<<"min">>,1},{<<"max">>,1},{<<"sumsqr">>,1}]},
+        {[{<<"sum">>,2},{<<"count">>,1},{<<"min">>,2},{<<"max">>,2},{<<"sumsqr">>,4}]}
+    ], element(2, finalize(<<"_stats">>, [
+        {1, 1, 1, 1, 1},
+        {2, 1, 2, 2, 4}
+    ]))),
+
+    ?assertEqual([
+        {[{<<"sum">>,1},{<<"count">>,1},{<<"min">>,1},{<<"max">>,1},{<<"sumsqr">>,1}]},
+        {[{<<"sum">>,2},{<<"count">>,1},{<<"min">>,2},{<<"max">>,2},{<<"sumsqr">>,4}]}
+    ], element(2, finalize(<<"_stats">>, [
+        {1, 1, 1, 1, 1},
+        {[{<<"sum">>,2},{<<"count">>,1},{<<"min">>,2},{<<"max">>,2},{<<"sumsqr">>,4}]}
+    ]))),
+
+    ?assertEqual([
+        {[{<<"sum">>,1},{<<"count">>,1},{<<"min">>,1},{<<"max">>,1},{<<"sumsqr">>,1}]},
+        {[{<<"sum">>,2},{<<"count">>,1},{<<"min">>,2},{<<"max">>,2},{<<"sumsqr">>,4}]}
+    ], element(2, finalize(<<"_stats">>, [
+        {[{<<"sum">>,1},{<<"count">>,1},{<<"min">>,1},{<<"max">>,1},{<<"sumsqr">>,1}]},
+        {2, 1, 2, 2, 4}
+    ]))),
+    ok.
+
+test_reduce(Reducer, KVs) ->
+    ?assertMatch({ok, _}, reduce(<<"javascript">>, [Reducer], KVs)),
+    {ok, Reduced} = reduce(<<"javascript">>, [Reducer], KVs),
+    {ok, Finalized} = finalize(Reducer, Reduced),
+    Finalized.
 
 -endif.

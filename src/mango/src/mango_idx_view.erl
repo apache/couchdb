@@ -131,7 +131,8 @@ is_usable(Idx, Selector, SortFields) ->
         [<<"_id">>, <<"_rev">>]),
 
     mango_selector:has_required_fields(Selector, RequiredFields2)
-        andalso not is_text_search(Selector).
+        andalso not is_text_search(Selector)
+        andalso can_use_sort(RequiredFields, SortFields, Selector).
 
 
 is_text_search({[]}) ->
@@ -510,4 +511,31 @@ range_pos(Low, Arg, High) ->
                 _ ->
                     max
             end
+    end.
+
+
+% Can_use_sort works as follows:
+%
+% * no sort fields then we can use this
+% * Run out index columns we can't use this index
+% * If the current column is the start of the sort, return if sort is a prefix
+% * If the current column is constant, drop it and continue, else return false
+%
+% A constant column is a something that won't affect the sort
+% for example A: {$eq: 21}}
+%
+% Currently we only look at constant fields that are prefixes to the sort fields
+% set by the user. We considered adding in constant fields after sort fields
+% but were not 100% sure that it would not affect the sorting of the query.
+
+can_use_sort(_Cols, [], _Selector) ->
+    true;
+can_use_sort([], _SortFields, _Selector) ->
+    false;
+can_use_sort([Col | _] = Cols, [Col | _] = SortFields, _Selector) ->
+    lists:prefix(SortFields, Cols);
+can_use_sort([Col | RestCols], SortFields, Selector) ->
+    case mango_selector:is_constant_field(Selector, Col) of
+        true -> can_use_sort(RestCols, SortFields, Selector);
+        false -> false
     end.
