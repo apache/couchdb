@@ -614,6 +614,8 @@ red_fold(Db, {NthRed, _Lang, View}=RedView, Args, Callback, UAcc) ->
     end, Acc, OptList),
     finish_fold(Acc2, []).
 
+red_fold({p, _Partition, Key}, Red, Acc) ->
+    red_fold(Key, Red, Acc);
 red_fold(_Key, _Red, #mracc{skip=N}=Acc) when N > 0 ->
     {ok, Acc#mracc{skip=N-1, last_go=ok}};
 red_fold(Key, Red, #mracc{meta_sent=false}=Acc) ->

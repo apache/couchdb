@@ -40,6 +40,9 @@
 -define(MOD, couch_mrview_index).
 -define(GET_VIEW_RETRY_COUNT, 1).
 -define(GET_VIEW_RETRY_DELAY, 50).
+-define(LOWEST_KEY, null).
+-define(HIGHEST_KEY, {[{<<239, 191, 176>>, null}]}). % is {"\ufff0": null}
+
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
@@ -261,11 +264,12 @@ view_sig(_Db, State, View, Args0) ->
     PurgeSeq = View#mrview.purge_seq,
     SeqIndexed = View#mrview.seq_indexed,
     KeySeqIndexed = View#mrview.keyseq_indexed,
+    Partitioned = get_extra(Args0, partitioned, false),
     Args = Args0#mrargs{
         preflight_fun=undefined,
         extra=[]
     },
-    Term = view_sig_term(Sig, UpdateSeq, PurgeSeq, KeySeqIndexed, SeqIndexed, Args),
+    Term = view_sig_term(Sig, UpdateSeq, PurgeSeq, KeySeqIndexed, SeqIndexed, Partitioned, Args),
     couch_index_util:hexsig(couch_hash:md5_hash(term_to_binary(Term))).
 
 view_sig_term(BaseSig, UpdateSeq, PurgeSeq, false, false) ->
@@ -273,10 +277,12 @@ view_sig_term(BaseSig, UpdateSeq, PurgeSeq, false, false) ->
 view_sig_term(BaseSig, UpdateSeq, PurgeSeq, KeySeqIndexed, SeqIndexed) ->
     {BaseSig, UpdateSeq, PurgeSeq, KeySeqIndexed, SeqIndexed}.
 
-view_sig_term(BaseSig, UpdateSeq, PurgeSeq, false, false, Args) ->
+view_sig_term(BaseSig, UpdateSeq, PurgeSeq, false, false, false, Args) ->
     {BaseSig, UpdateSeq, PurgeSeq, Args};
-view_sig_term(BaseSig, UpdateSeq, PurgeSeq, KeySeqIndexed, SeqIndexed, Args) ->
-    {BaseSig, UpdateSeq, PurgeSeq, KeySeqIndexed, SeqIndexed, Args}.
+view_sig_term(BaseSig, UpdateSeq, PurgeSeq, KeySeqIndexed, SeqIndexed, false, Args) ->
+    {BaseSig, UpdateSeq, PurgeSeq, KeySeqIndexed, SeqIndexed, Args};
+view_sig_term(BaseSig, UpdateSeq, PurgeSeq, KeySeqIndexed, SeqIndexed, Partitioned, Args) ->
+    {BaseSig, UpdateSeq, PurgeSeq, KeySeqIndexed, SeqIndexed, Partitioned, Args}.
 
 
 init_state(Db, Fd, #mrst{views=Views}=State, nil) ->
@@ -623,7 +629,12 @@ validate_args(Args) ->
             mrverror(<<"`partition` parameter is not supported in this view.">>)
     end,
 
-    Args#mrargs{
+    Args1 = case get_extra(Args, partitioned, false) of
+        true  -> apply_partition(Args);
+        false -> Args
+    end,
+
+    Args1#mrargs{
         start_key_docid=SKDocId,
         end_key_docid=EKDocId,
         group_level=GroupLevel
@@ -641,6 +652,38 @@ determine_group_level(#mrargs{group=true, group_level=undefined}) ->
 determine_group_level(#mrargs{group_level=GroupLevel}) ->
     GroupLevel.
 
+apply_partition(#mrargs{} = Args0) ->
+    Partition = get_extra(Args0, partition),
+    apply_partition(Partition, Args0).
+
+apply_partition(_Partition, #mrargs{keys=[{p, _, _} | _]} = Args) ->
+    Args; % already applied
+
+apply_partition(Partition, #mrargs{keys=Keys} = Args) when Keys /= undefined ->
+    Args#mrargs{keys=[{p, Partition, K} || K <- Keys]};
+
+apply_partition(_Partition, #mrargs{start_key={p, _, _}, end_key={p, _, _}} = Args) ->
+    Args; % already applied.
+
+apply_partition(Partition, Args) ->
+    #mrargs{
+        direction = Dir,
+        start_key = StartKey,
+        end_key = EndKey
+    } = Args,
+
+    {DefSK, DefEK} = case Dir of
+        fwd -> {?LOWEST_KEY, ?HIGHEST_KEY};
+        rev -> {?HIGHEST_KEY, ?LOWEST_KEY}
+    end,
+
+    SK0 = if StartKey /= undefined -> StartKey; true -> DefSK end,
+    EK0 = if EndKey /= undefined -> EndKey; true -> DefEK end,
+
+    Args#mrargs{
+        start_key = {p, Partition, SK0},
+        end_key = {p, Partition, EK0}
+    }.
 
 check_range(#mrargs{start_key=undefined}, _Cmp) ->
     ok;
