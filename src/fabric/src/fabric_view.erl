@@ -119,8 +119,10 @@ maybe_send_row(State) ->
         counters = Counters,
         skip = Skip,
         limit = Limit,
-        user_acc = AccIn
+        user_acc = AccIn,
+        query_args = QueryArgs
     } = State,
+    Partitioned = couch_mrview_util:get_extra(QueryArgs, partitioned, false),
     case fabric_dict:any(0, Counters) of
     true ->
         {ok, State};
@@ -128,8 +130,14 @@ maybe_send_row(State) ->
         try get_next_row(State) of
         {_, NewState} when Skip > 0 ->
             maybe_send_row(NewState#collector{skip=Skip-1});
-        {Row, NewState} ->
-            case Callback(transform_row(possibly_embed_doc(NewState,Row)), AccIn) of
+        {Row0, NewState} ->
+            Row1 = possibly_embed_doc(NewState, Row0),
+            Row2 = if
+                Partitioned -> detach_partition(Row1);
+                true -> Row1
+            end,
+            Row3 = transform_row(Row2),
+            case Callback(Row3, AccIn) of
             {stop, Acc} ->
                 {stop, NewState#collector{user_acc=Acc, limit=Limit-1}};
             {ok, Acc} ->
@@ -194,6 +202,10 @@ possibly_embed_doc(#collector{db_name=DbName, query_args=Args},
         _ -> Row
     end.
 
+detach_partition(#view_row{key={p, _Partition, Key}} = Row) ->
+    Row#view_row{key = Key};
+detach_partition(#view_row{} = Row) ->
+    Row.
 
 keydict(undefined) ->
     undefined;
