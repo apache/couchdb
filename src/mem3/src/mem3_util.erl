@@ -35,7 +35,6 @@ hash(Item) when is_binary(Item) ->
 hash(Item) ->
     erlang:crc32(term_to_binary(Item)).
 
-
 docid_hash(DocId) when is_binary(DocId) ->
     docid_hash(DocId, []).
 
@@ -294,3 +293,61 @@ downcast(#ordered_shard{}=S) ->
       };
 downcast(Shards) when is_list(Shards) ->
     [downcast(Shard) || Shard <- Shards].
+
+-ifdef(TEST).
+
+-include_lib("eunit/include/eunit.hrl").
+
+docid_hash_design_doc_test() ->
+    Id = <<"_design/ddoc">>,
+    Hash = docid_hash(Id),
+    ?assertEqual(Hash, erlang:crc32(Id)).
+
+docid_hash_doc_partition_false_test() ->
+    Id = <<"partitionkey:docid">>,
+    IdHash = erlang:crc32(Id),
+    Hash = docid_hash(Id),
+    ?assertEqual(Hash, IdHash),
+    Hash = docid_hash(Id, []),
+    ?assertEqual(Hash, IdHash).
+
+docid_hash_doc_partition_true_test() ->
+    Id = <<"partitionkey:doc:id">>,
+    Hash = docid_hash(Id, [partitioned]),
+    ?assertEqual(Hash, erlang:crc32(<<"partitionkey">>)).
+
+
+add_shards_by_node_adds_partition_prop_test() ->
+    DocProp = [
+    {<<"_id">>, <<"database-name">>},
+    {<<"_rev">>,<<"1-fb8e28457a6e0c49de1848b5e4a28238">>},
+    {<<"shard_suffix">>,".1533550200"},
+    {<<"changelog">>, [[<<"add">>,<<"00000000-1fffffff">>,<<"node1@127.0.0.1">>]]},
+    {<<"by_node">>, {[{<<"node1@127.0.0.1">>, [<<"00000000-1fffffff">>,<<"20000000-3fffffff">>]}]}},
+    {<<"by_range">>, {[{<<"00000000-1fffffff">>,[<<"node1@127.0.0.1">>]}]}},
+    {<<"options">>,{[{partitioned,true}]}}
+   ],
+
+    [ShardRange | _] = build_shards_by_node(<<"database-name">>, DocProp),
+    Opts = ShardRange#shard.opts,
+    Partitioned = lists:keyfind(partitioned, 1, Opts),
+    ?assertEqual(Partitioned, {partitioned, true}).
+
+    
+add_shards_by_range_adds_partition_prop_test() ->
+    DocProp = [
+    {<<"_id">>, <<"database-name">>},
+    {<<"_rev">>,<<"1-fb8e28457a6e0c49de1848b5e4a28238">>},
+    {<<"shard_suffix">>,".1533550200"},
+    {<<"changelog">>, [[<<"add">>,<<"00000000-1fffffff">>,<<"node1@127.0.0.1">>]]},
+    {<<"by_node">>, {[{<<"node1@127.0.0.1">>, [<<"00000000-1fffffff">>,<<"20000000-3fffffff">>]}]}},
+    {<<"by_range">>, {[{<<"00000000-1fffffff">>,[<<"node1@127.0.0.1">>]}]}},
+    {<<"options">>,{[{partitioned,true}]}}
+   ],
+
+    [ShardRange | _] = build_shards_by_range(<<"database-name">>, DocProp),
+    Opts = ShardRange#ordered_shard.opts,
+    Partitioned = lists:keyfind(partitioned, 1, Opts),
+    ?assertEqual(Partitioned, {partitioned, true}).
+
+-endif.
