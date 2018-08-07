@@ -98,9 +98,9 @@ foldl({Engine, EngineState}, Fun, Acc) ->
 foldl(Engine, <<>>, Fun, Acc) ->
     foldl(Engine, Fun, Acc);
 foldl(Engine, Md5, UserFun, UserAcc) ->
-    InitAcc = {crypto:hash_init(md5), UserFun, UserAcc},
+    InitAcc = {couch_hash:md5_hash_init(), UserFun, UserAcc},
     {Md5Acc, _, OutAcc} = foldl(Engine, fun foldl_md5/2, InitAcc),
-    Md5 = crypto:hash_final(Md5Acc),
+    Md5 = couch_hash:md5_hash_final(Md5Acc),
     OutAcc.
 
 
@@ -128,7 +128,7 @@ range_foldl(Engine, From, To, UserFun, UserAcc) when To >= From ->
 
 
 foldl_md5(Bin, {Md5Acc, UserFun, UserAcc}) ->
-    NewMd5Acc = crypto:hash_update(Md5Acc, Bin),
+    NewMd5Acc = couch_hash:md5_hash_update(Md5Acc, Bin),
     {NewMd5Acc, UserFun, UserFun(Bin, UserAcc)}.
 
 
@@ -201,8 +201,8 @@ init({Engine, OpenerPid, OpenerPriority, Options}) ->
     {ok, #stream{
             engine=Engine,
             opener_monitor=erlang:monitor(process, OpenerPid),
-            md5=crypto:hash_init(md5),
-            identity_md5=crypto:hash_init(md5),
+            md5=couch_hash:md5_hash_init(),
+            identity_md5=couch_hash:md5_hash_init(),
             encoding_fun=EncodingFun,
             end_encoding_fun=EndEncodingFun,
             max_buffer=couch_util:get_value(
@@ -227,7 +227,7 @@ handle_call({write, Bin}, _From, Stream) ->
         encoding_fun = EncodingFun} = Stream,
     if BinSize + BufferLen > Max ->
         WriteBin = lists:reverse(Buffer, [Bin]),
-        IdenMd5_2 = crypto:hash_update(IdenMd5, WriteBin),
+        IdenMd5_2 = couch_hash:md5_hash_update(IdenMd5, WriteBin),
         case EncodingFun(WriteBin) of
         [] ->
             % case where the encoder did some internal buffering
@@ -238,7 +238,7 @@ handle_call({write, Bin}, _From, Stream) ->
         WriteBin2 ->
             NewEngine = do_write(Engine, WriteBin2),
             WrittenLen2 = WrittenLen + iolist_size(WriteBin2),
-            Md5_2 = crypto:hash_update(Md5, WriteBin2)
+            Md5_2 = couch_hash:md5_hash_update(Md5, WriteBin2)
         end,
 
         {reply, ok, Stream#stream{
@@ -268,9 +268,9 @@ handle_call(close, _From, Stream) ->
         end_encoding_fun = EndEncodingFun} = Stream,
 
     WriteBin = lists:reverse(Buffer),
-    IdenMd5Final = crypto:hash_final(crypto:hash_update(IdenMd5, WriteBin)),
+    IdenMd5Final = couch_hash:md5_hash_final(couch_hash:md5_hash_update(IdenMd5, WriteBin)),
     WriteBin2 = EncodingFun(WriteBin) ++ EndEncodingFun(),
-    Md5Final = crypto:hash_final(crypto:hash_update(Md5, WriteBin2)),
+    Md5Final = couch_hash:md5_hash_final(couch_hash:md5_hash_update(Md5, WriteBin2)),
     Result = case WriteBin2 of
     [] ->
         {do_finalize(Engine), WrittenLen, IdenLen, Md5Final, IdenMd5Final};

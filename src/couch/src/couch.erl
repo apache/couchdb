@@ -21,7 +21,6 @@ deps() ->
         inets,
         os_mon,
         crypto,
-        bcrypt,
         public_key,
         ssl,
         ibrowse,

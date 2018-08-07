@@ -49,6 +49,7 @@ handle_welcome_req(#httpd{method='GET'}=Req, WelcomeMessage) ->
     send_json(Req, {[
         {couchdb, WelcomeMessage},
         {version, list_to_binary(couch_server:get_version())},
+        {git_sha, list_to_binary(couch_server:get_git_sha())},
         {features, config:features()}
         ] ++ case config:get("vendor") of
         [] ->

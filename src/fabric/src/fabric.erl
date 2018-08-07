@@ -271,13 +271,14 @@ purge_docs(_DbName, _IdsRevs) ->
     not_implemented.
 
 %% @doc spawns a process to upload attachment data and
-%%      returns a function that shards can use to communicate
-%%      with the spawned middleman process
+%%      returns a fabric attachment receiver context tuple
+%%      with the spawned middleman process, an empty binary,
+%%      or exits with an error tuple {Error, Arg}
 -spec att_receiver(#httpd{}, Length :: undefined | chunked | pos_integer() |
         {unknown_transfer_encoding, any()}) ->
-    function() | binary().
+    {fabric_attachment_receiver, pid(), chunked | pos_integer()} | binary().
 att_receiver(Req, Length) ->
-    fabric_doc_attachments:receiver(Req, Length).
+    fabric_doc_atts:receiver(Req, Length).
 
 %% @equiv all_docs(DbName, [], Callback, Acc0, QueryArgs)
 all_docs(DbName, Callback, Acc, QueryArgs) ->
