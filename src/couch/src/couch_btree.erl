@@ -133,6 +133,20 @@ make_group_fun(Bt, exact) ->
     end;
 make_group_fun(Bt, GroupLevel) when is_integer(GroupLevel), GroupLevel > 0 ->
     fun
+        ({{p, _Partition, Key1}, _}, {{p, _Partition, Key2}, _}) ->
+            SL1 = lists:sublist(Key1, GroupLevel),
+            SL2 = lists:sublist(Key2, GroupLevel),
+            case less(Bt, {SL1, nil}, {SL2, nil}) of
+                false ->
+                    case less(Bt, {SL2, nil}, {SL1, nil}) of
+                        false ->
+                            true;
+                        _ ->
+                            false
+                    end;
+                _ ->
+                    false
+            end;
         ({[_|_] = Key1, _}, {[_|_] = Key2, _}) ->
             SL1 = lists:sublist(Key1, GroupLevel),
             SL2 = lists:sublist(Key2, GroupLevel),

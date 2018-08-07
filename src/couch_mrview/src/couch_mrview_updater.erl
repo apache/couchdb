@@ -311,9 +311,11 @@ write_kvs(State, UpdateSeq, ViewKVs, DocIdKeys, Seqs, Log0) ->
     #mrst{
         id_btree=IdBtree,
         log_btree=LogBtree,
-        first_build=FirstBuild
+        first_build=FirstBuild,
+        design_opts=DesignOpts
     } = State,
 
+    Partitioned = couch_util:get_value(<<"partitioned">>, DesignOpts, false),
     Revs = dict:from_list(dict:fetch_keys(Log0)),
 
     Log = dict:fold(fun({Id, _Rev}, DIKeys, Acc) ->
@@ -328,8 +330,9 @@ write_kvs(State, UpdateSeq, ViewKVs, DocIdKeys, Seqs, Log0) ->
         _ -> update_log(LogBtree, Log, Revs, Seqs, FirstBuild)
     end,
 
-    UpdateView = fun(#mrview{id_num=ViewId}=View, {ViewId, {KVs, SKVs}}) ->
+    UpdateView = fun(#mrview{id_num=ViewId}=View, {ViewId, {KVs0, SKVs}}) ->
         #mrview{seq_indexed=SIndexed, keyseq_indexed=KSIndexed} = View,
+        KVs = if Partitioned -> inject_partition(KVs0); true -> KVs0 end,
         ToRem = couch_util:dict_find(ViewId, ToRemByView, []),
         {ok, VBtree2} = couch_btree:add_remove(View#mrview.btree, KVs, ToRem),
         NewUpdateSeq = case VBtree2 =/= View#mrview.btree of
@@ -377,6 +380,13 @@ write_kvs(State, UpdateSeq, ViewKVs, DocIdKeys, Seqs, Log0) ->
         id_btree=IdBtree2,
         log_btree=LogBtree2
     }.
+
+inject_partition(KVs) ->
+    [{{{p, partition(DocId), Key}, DocId}, Value} || {{Key, DocId}, Value} <- KVs].
+
+partition(DocId) ->
+    [Partition, _Rest] = binary:split(DocId, <<":">>),
+    Partition.
 
 update_id_btree(Btree, DocIdKeys, true) ->
     ToAdd = [{Id, DIKeys} || {Id, DIKeys} <- DocIdKeys, DIKeys /= []],
