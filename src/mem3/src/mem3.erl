@@ -389,4 +389,26 @@ allowed_nodes_test_() ->
         ]
     }]}.
 
+is_partitioned_false_shards_db_test() ->
+    meck:expect(config, get, fun (_, _, Default) -> Default end),
+    ?assertEqual(is_partitioned(<<"_dbs">>), false),
+    meck:unload().
+
+is_partitioned_false_nodes_db_test() ->
+    meck:expect(config, get, fun (_, _, Default) -> Default end),
+    ?assertEqual(is_partitioned(<<"_nodes">>), false),
+    meck:unload().
+
+is_partitioned_true_partitioned_db_test() ->
+    Shard = #shard{
+        opts = [{partitioned, true}]
+    },
+    ?assertEqual(is_partitioned([Shard]), true).
+
+is_partitioned_false_partitioned_db_test() ->
+    Shard = #shard{
+        opts = []
+    },
+    ?assertEqual(is_partitioned([Shard]), false).
+
 -endif.
