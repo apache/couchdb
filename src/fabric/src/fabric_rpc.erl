@@ -100,8 +100,8 @@ all_docs(DbName, Options, Args0) ->
             set_io_priority(DbName, Options),
             Args = fix_skip_and_limit(Args1),
             {ok, Db} = get_or_create_db(DbName, Options),
-            VAcc0 = #vacc{db=Db},
-            couch_mrview:query_all_docs(Db, Args, fun view_cb/2, VAcc0)
+            CB = get_view_cb(Args),
+            couch_mrview:query_all_docs(Db, Args, CB, Args)
     end.
 
 update_mrview(DbName, {DDocId, Rev}, ViewName, Args0) ->
@@ -124,8 +124,8 @@ map_view(DbName, DDoc, ViewName, Args0, DbOptions) ->
     set_io_priority(DbName, DbOptions),
     Args = fix_skip_and_limit(fabric_util:upgrade_mrargs(Args0)),
     {ok, Db} = get_or_create_db(DbName, DbOptions),
-    VAcc0 = #vacc{db=Db},
-    couch_mrview:query_view(Db, DDoc, ViewName, Args, fun view_cb/2, VAcc0).
+    CB = get_view_cb(Args),
+    couch_mrview:query_view(Db, DDoc, ViewName, Args, CB, Args).
 
 %% @equiv reduce_view(DbName, DDoc, ViewName, Args0)
 reduce_view(DbName, DDocInfo, ViewName, Args0) ->
@@ -301,6 +301,17 @@ with_db(DbName, Options, {M,F,A}) ->
 
 get_or_create_db(DbName, Options) ->
     couch_db:open_int(DbName, [{create_if_missing, true} | Options]).
+
+
+get_view_cb(#mrargs{extra = Options}) ->
+    case couch_util:get_value(callback, Options) of
+        {Mod, Fun} when is_atom(Mod), is_atom(Fun) ->
+            fun Mod:Fun/2;
+        _ ->
+            fun view_cb/2
+    end;
+get_view_cb(_) ->
+    fun view_cb/2.
 
 
 view_cb({meta, Meta}, Acc) ->
