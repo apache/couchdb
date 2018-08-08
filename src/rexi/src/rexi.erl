@@ -19,6 +19,7 @@
 -export([stream_start/1, stream_cancel/1]).
 -export([stream/1, stream/2, stream/3, stream_ack/1, stream_ack/2]).
 -export([stream2/1, stream2/2, stream2/3, stream_last/1, stream_last/2]).
+-export([ping/0]).
 
 -include_lib("rexi/include/rexi.hrl").
 
@@ -232,6 +233,14 @@ stream_ack(Client) ->
 %% @doc Ack streamed messages
 stream_ack(Client, N) ->
     erlang:send(Client, {rexi_ack, N}).
+
+
+%% Sends a ping message to the coordinator. This is for long running
+%% operations on a node that could exceed the rexi timeout
+ping() -> 
+    {Caller, _} = get(rexi_from),
+    erlang:send(Caller, {rexi, '$rexi_ping'}).
+
 
 %% internal functions %%
 
