@@ -17,7 +17,16 @@
     shard_info/1, ensure_exists/1, open_db_doc/1]).
 -export([is_deleted/1, rotate_list/2]).
 -export([
-    iso8601_timestamp/0
+    iso8601_timestamp/0,
+    live_nodes/0,
+    replicate_dbs_to_all_nodes/1,
+    replicate_dbs_from_all_nodes/1,
+    range_overlap/2,
+    get_ring/1,
+    get_ring/2,
+    get_ring/4,
+    non_overlapping_shards/1,
+    non_overlapping_shards/3
 ]).
 
 %% do not use outside mem3.
@@ -286,3 +295,175 @@ iso8601_timestamp() ->
     {{Year,Month,Date},{Hour,Minute,Second}} = calendar:now_to_datetime(Now),
     Format = "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B.~6.10.0BZ",
     io_lib:format(Format, [Year, Month, Date, Hour, Minute, Second, Micro]).
+
+
+live_nodes() ->
+    LiveNodes = [node() | nodes()],
+    Mem3Nodes = lists:sort(mem3:nodes()),
+    [N || N <- Mem3Nodes, lists:member(N, LiveNodes)].
+
+
+% Replicate "dbs" db to all nodes. Basically push the changes to all the live
+% mem3:nodes(). Returns only after all current changes have been replicated,
+% which could be a while.
+%
+replicate_dbs_to_all_nodes(Timeout) ->
+    DbName = ?l2b(config:get("mem3", "shards_db", "_dbs")),
+    Targets= mem3_util:live_nodes() -- [node()],
+    Res =  [start_replication(node(), T, DbName, Timeout) || T <- Targets],
+    collect_replication_results(Res, Timeout).
+
+
+% Replicate "dbs" db from all nodes to this node. Basically make an rpc call
+% to all the nodes an have them push their changes to this node. Then monitor
+% them until they are all done.
+%
+replicate_dbs_from_all_nodes(Timeout) ->
+    DbName = ?l2b(config:get("mem3", "shards_db", "_dbs")),
+    Sources = mem3_util:live_nodes() -- [node()],
+    Res = [start_replication(S, node(), DbName, Timeout) || S <- Sources],
+    collect_replication_results(Res, Timeout).
+
+
+% Spawn and monitor a single replication of a database to a target node.
+% Returns {ok, PidRef}. This function could be called locally or remotely from
+% mem3_rpc, for instance when replicating other nodes' data to this node.
+%
+start_replication(Source, Target, DbName, Timeout) ->
+    spawn_monitor(fun() ->
+        case mem3_rpc:replicate(Source, Target, DbName, Timeout) of
+            {ok, 0} ->
+                exit(ok);
+            Other ->
+                exit(Other)
+        end
+    end).
+
+
+collect_replication_results(Replications, Timeout) ->
+    Res = [collect_replication_result(R, Timeout) || R <- Replications],
+    case [R || R <- Res, R =/= ok] of
+        [] ->
+            ok;
+        Errors ->
+            {error, Errors}
+    end.
+
+
+collect_replication_result({Pid, Ref}, Timeout) when is_pid(Pid) ->
+    receive
+        {'DOWN', Ref, _, _, Res} ->
+            Res
+    after Timeout ->
+        demonitor(Pid, [flush]),
+        exit(Pid, kill),
+        {error, {timeout, Timeout, node(Pid)}}
+    end;
+
+collect_replication_result(Error, _) ->
+    {error, Error}.
+
+
+% Consider these cases:
+%
+%       A-------B
+%
+% overlap:
+%   X--------Y
+%         X-Y
+%          X-------Y
+% X-------------------Y
+%
+% no overlap:
+% X-Y                     because A !=< Y
+%                   X-Y   because X !=< B
+%
+range_overlap([A, B], [X, Y]) when
+        is_integer(A), is_integer(B),
+        is_integer(X), is_integer(Y),
+        A =< B, X =< Y ->
+    A =< Y andalso X =< B.
+
+
+non_overlapping_shards(Shards) ->
+    {Start, End} = lists:foldl(fun(Shard, {Min, Max}) ->
+        [B, E] = mem3:range(Shard),
+        {min(B, Min), max(E, Max)}
+    end, {0, ?RING_END}, Shards),
+    non_overlapping_shards(Shards, Start, End).
+
+
+non_overlapping_shards([], _, _) ->
+    [];
+
+non_overlapping_shards(Shards, Start, End) ->
+    Ranges = lists:map(fun(Shard) ->
+        [B, E] = mem3:range(Shard),
+        {B, E}
+    end, Shards),
+    Ring = get_ring(Ranges, fun sort_ranges_fun/2, Start, End),
+    lists:filter(fun(Shard) ->
+        [B, E] = mem3:range(Shard),
+        lists:member({B, E}, Ring)
+    end, Shards).
+
+
+get_ring(Ranges) ->
+    get_ring(Ranges, fun sort_ranges_fun/2, 0, ?RING_END).
+
+get_ring(Ranges, SortFun) when is_function(SortFun, 2) ->
+    get_ring(Ranges, SortFun, 0, ?RING_END).
+
+
+% Build a ring out of a list of possibly overlapping ranges. If a ring cannot
+% be built then [] is returned. Start and End supply a custom range such that
+% only intervals in that range will be considered. SortFun is a custom sorting
+% function to sort intervals before the ring is built. The custom sort function
+% can be used to prioritize how the ring is built, for example, whether to use
+% shortest ranges first (and thus have more total shards) or longer or any
+% other scheme.
+%
+get_ring([], _SortFun, _Begin, _End) ->
+    [];
+get_ring(Ranges, SortFun, Start, End) when is_function(SortFun, 2),
+        is_integer(Start), is_integer(End),
+        Start >= 0, End >= 0, Start =< End  ->
+    Sorted = lists:usort(SortFun, Ranges),
+    case get_subring_int(Start, End, Sorted) of
+        fail -> [];
+        Ring -> Ring
+    end.
+
+
+get_subring_int(_, _, []) ->
+    fail;
+
+get_subring_int(Start, EndMax, [{Start, End} = Range | Tail]) ->
+    case End =:= EndMax of
+        true ->
+            [Range];
+        false ->
+            case get_subring_int(End + 1, EndMax, Tail) of
+                fail ->
+                    get_subring_int(Start, EndMax, Tail);
+                Acc ->
+                    [Range | Acc]
+            end
+    end;
+
+get_subring_int(Start1, _, [{Start2, _} | _]) when Start2 > Start1 ->
+    % Found a gap, this attempt is done
+    fail;
+
+get_subring_int(Start1, EndMax, [{Start2, _} | Rest]) when Start2 < Start1 ->
+    % We've overlapped the head, skip the shard
+    get_subring_int(Start1, EndMax, Rest).
+
+
+% Sort ranges by starting point, then sort so that
+% the longest range comes first
+sort_ranges_fun({B, E1}, {B, E2}) ->
+    E2 =< E1;
+
+sort_ranges_fun({B1, _}, {B2, _}) ->
+    B1 =< B2.

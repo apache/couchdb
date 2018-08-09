@@ -20,6 +20,7 @@
         mem3_shards,
         mem3_sync,
         mem3_sync_nodes,
+        mem3_shard_split,
         mem3_sup
     ]},
     {applications, [

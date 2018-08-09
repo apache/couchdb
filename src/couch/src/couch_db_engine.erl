@@ -319,6 +319,15 @@
         {ok, NewDbHandle::db_handle()}.
 
 
+% Set the current update sequence of the database. The intention is to use this
+% when copying a database such that the destination update sequence should
+% match exactly the source update sequence.
+-callback set_update_seq(
+    DbHandle::db_handle(),
+    UpdateSeq::non_neg_integer()) ->
+    {ok, NewDbHandle::db_handle()}.
+
+
 % This function will be called by many processes concurrently.
 % It should return a #full_doc_info{} record or not_found for
 % every provided DocId in the order those DocId's appear in
@@ -462,6 +471,13 @@
 % in such a way that we can efficiently load purge_info() by its UUID
 % as well as iterate over purge_info() entries in order of their PurgeSeq.
 -callback purge_docs(DbHandle::db_handle(), [doc_pair()], [purge_info()]) ->
+        {ok, NewDbHandle::db_handle()}.
+
+
+% This function should be called from a single threaded context and
+% should be used to copy purge infos from on database to another
+% when copying a database
+-callback copy_purge_infos(DbHandle::db_handle(), [purge_info()]) ->
         {ok, NewDbHandle::db_handle()}.
 
 
@@ -712,6 +728,8 @@
     set_purge_infos_limit/2,
     set_props/2,
 
+    set_update_seq/2,
+
     open_docs/2,
     open_local_docs/2,
     read_doc_body/2,
@@ -721,6 +739,7 @@
     write_doc_body/2,
     write_doc_infos/3,
     purge_docs/3,
+    copy_purge_infos/2,
     commit_data/1,
 
     open_write_stream/2,
@@ -918,6 +937,12 @@ set_props(#db{} = Db, Props) ->
     {ok, Db#db{engine = {Engine, NewSt}}}.
 
 
+set_update_seq(#db{} = Db, UpdateSeq) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    {ok, NewSt} = Engine:set_update_seq(EngineState, UpdateSeq),
+    {ok, Db#db{engine = {Engine, NewSt}}}.
+
+
 open_docs(#db{} = Db, DocIds) ->
     #db{engine = {Engine, EngineState}} = Db,
     Engine:open_docs(EngineState, DocIds).
@@ -958,6 +983,13 @@ purge_docs(#db{} = Db, DocUpdates, Purges) ->
     #db{engine = {Engine, EngineState}} = Db,
     {ok, NewSt} = Engine:purge_docs(
         EngineState, DocUpdates, Purges),
+    {ok, Db#db{engine = {Engine, NewSt}}}.
+
+
+copy_purge_infos(#db{} = Db, Purges) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    {ok, NewSt} = Engine:copy_purge_infos(
+        EngineState, Purges),
     {ok, Db#db{engine = {Engine, NewSt}}}.
 
 

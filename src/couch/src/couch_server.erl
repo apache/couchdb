@@ -25,6 +25,7 @@
 -export([delete_compaction_files/1]).
 -export([exists/1]).
 -export([get_engine_extensions/0]).
+-export([get_engine_path/2]).
 
 % config_listener api
 -export([handle_config_change/5, handle_config_terminate/3]).
@@ -764,6 +765,16 @@ get_engine_extensions() ->
             ["couch"];
         Entries ->
             [Ext || {Ext, _Mod} <- Entries]
+    end.
+
+
+get_engine_path(DbName, Engine) when is_binary(DbName), is_atom(Engine) ->
+    RootDir = config:get("couchdb", "database_dir", "."),
+    case lists:keyfind(Engine, 2, get_configured_engines()) of
+        {Ext, Engine} ->
+            {ok, make_filepath(RootDir, DbName, Ext)};
+        false ->
+            {error, {invalid_engine, Engine}}
     end.
 
 

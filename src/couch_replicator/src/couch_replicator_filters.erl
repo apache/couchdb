@@ -15,8 +15,7 @@
 -export([
     parse/1,
     fetch/4,
-    view_type/2,
-    ejsort/1
+    view_type/2
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
@@ -53,7 +52,7 @@ parse(Options) ->
         {undefined, _, undefined} ->
             {ok, {docids, DocIds}};
         {undefined, undefined, _} ->
-            {ok, {mango, ejsort(mango_selector:normalize(Selector))}};
+            {ok, {mango, couch_util:ejsort(mango_selector:normalize(Selector))}};
         _ ->
             Err = "`selector`, `filter` and `doc_ids` are mutually exclusive",
             {error, list_to_binary(Err)}
@@ -164,51 +163,3 @@ parse_user_filter(Filter) ->
         _ ->
             {error, <<"Invalid filter. Must match `ddocname/filtername`.">>}
     end.
-
-
-% Sort an EJSON object's properties to attempt
-% to generate a unique representation. This is used
-% to reduce the chance of getting different
-% replication checkpoints for the same Mango selector
-ejsort({V})->
-    ejsort_props(V, []);
-ejsort(V) when is_list(V) ->
-    ejsort_array(V, []);
-ejsort(V) ->
-    V.
-
-
-ejsort_props([], Acc)->
-    {lists:keysort(1, Acc)};
-ejsort_props([{K, V}| R], Acc) ->
-    ejsort_props(R, [{K, ejsort(V)} | Acc]).
-
-
-ejsort_array([], Acc)->
-    lists:reverse(Acc);
-ejsort_array([V | R], Acc) ->
-    ejsort_array(R, [ejsort(V) | Acc]).
-
-
--ifdef(TEST).
-
--include_lib("eunit/include/eunit.hrl").
-
-ejsort_basic_values_test() ->
-    ?assertEqual(ejsort(0), 0),
-    ?assertEqual(ejsort(<<"a">>), <<"a">>),
-    ?assertEqual(ejsort(true), true),
-    ?assertEqual(ejsort([]), []),
-    ?assertEqual(ejsort({[]}), {[]}).
-
-
-ejsort_compound_values_test() ->
-    ?assertEqual(ejsort([2, 1, 3, <<"a">>]), [2, 1, 3, <<"a">>]),
-    Ej1 = {[{<<"a">>, 0}, {<<"c">>, 0},  {<<"b">>, 0}]},
-    Ej1s =  {[{<<"a">>, 0}, {<<"b">>, 0}, {<<"c">>, 0}]},
-    ?assertEqual(ejsort(Ej1), Ej1s),
-    Ej2 = {[{<<"x">>, Ej1}, {<<"z">>, Ej1}, {<<"y">>, [Ej1, Ej1]}]},
-    ?assertEqual(ejsort(Ej2),
-        {[{<<"x">>, Ej1s}, {<<"y">>, [Ej1s, Ej1s]}, {<<"z">>, Ej1s}]}).
-
--endif.

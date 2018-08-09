@@ -23,6 +23,7 @@
 -export([validate_all_docs_args/2, validate_args/3]).
 -export([upgrade_mrargs/1]).
 
+
 -compile({inline, [{doc_id_and_rev,1}]}).
 
 -include_lib("fabric/include/fabric.hrl").

@@ -12,10 +12,14 @@
 
 -module(fabric_view).
 
--export([is_progress_possible/1, remove_overlapping_shards/2, maybe_send_row/1,
+-export([is_progress_possible/1, remove_overlapping_shards/2,
+    remove_overlapping_shards/3, maybe_send_row/1,
     transform_row/1, keydict/1, extract_view/4, get_shards/2,
     check_down_shards/2, handle_worker_exit/3,
-    get_shard_replacements/2, maybe_update_others/5]).
+    get_shard_replacements/2, maybe_update_others/5,
+    find_replacements/2
+]).
+
 -export([fix_skip_and_limit/1]).
 
 -include_lib("fabric/include/fabric.hrl").
@@ -46,62 +50,92 @@ handle_worker_exit(Collector, _Worker, Reason) ->
     {ok, Resp} = Callback({error, fabric_util:error_info(Reason)}, Acc),
     {error, Resp}.
 
+
+-spec get_worker_ranges([{#shard{}, any()}]) -> [{integer(), integer()}].
+get_worker_ranges(Counters) ->
+    fabric_dict:fold(fun(#shard{range=[X, Y]}, _, Acc) ->
+        [{X, Y} | Acc]
+    end, [], Counters).
+
+
 %% @doc looks for a fully covered keyrange in the list of counters
 -spec is_progress_possible([{#shard{}, term()}]) -> boolean().
-is_progress_possible([]) ->
-    false;
 is_progress_possible(Counters) ->
-    Ranges = fabric_dict:fold(fun(#shard{range=[X,Y]}, _, A) -> [{X,Y}|A] end,
-        [], Counters),
-    [{Start, Tail0} | Rest] = lists:ukeysort(1, Ranges),
-    Result = lists:foldl(fun
-    (_, fail) ->
-        % we've already declared failure
-        fail;
-    (_, complete) ->
-        % this is the success condition, we can fast-forward
-        complete;
-    ({X,_}, Tail) when X > (Tail+1) ->
-        % gap in the keyrange, we're dead
-        fail;
-    ({_,Y}, Tail) ->
-        case erlang:max(Tail, Y) of
-        End when (End+1) =:= (2 bsl 31) ->
-            complete;
-        Else ->
-            % the normal condition, adding to the tail
-            Else
-        end
-    end, if (Tail0+1) =:= (2 bsl 31) -> complete; true -> Tail0 end, Rest),
-    (Start =:= 0) andalso (Result =:= complete).
+    mem3_util:get_ring(get_worker_ranges(Counters)) =/= [].
+
 
 -spec remove_overlapping_shards(#shard{}, [{#shard{}, any()}]) ->
     [{#shard{}, any()}].
-remove_overlapping_shards(#shard{range=[A,B]} = Shard0, Shards) ->
-    fabric_dict:filter(fun(#shard{range=[X,Y], node=Node, ref=Ref} = Shard, _) ->
-        if Shard =:= Shard0 ->
-            % we can't remove ourselves
+remove_overlapping_shards(#shard{} = Shard, Counters) ->
+    remove_overlapping_shards(Shard, Counters, fun stop_worker/1).
+
+
+-spec remove_overlapping_shards(#shard{}, [{#shard{}, any()}], fun()) ->
+    [{#shard{}, any()}].
+remove_overlapping_shards(#shard{} = Shard, Counters, RemoveCb) ->
+    Counters1 = filter_exact_copies(Shard, Counters, RemoveCb),
+    filter_possible_overlaps(Shard, Counters1, RemoveCb).
+
+
+filter_possible_overlaps(Shard, Counters, RemoveCb) ->
+    Ranges = get_worker_ranges(Counters),
+    {Bs, Es} = lists:unzip(Ranges),
+    {MinB, MaxE} = {lists:min(Bs), lists:max(Es)},
+    #shard{range = [BShard, _] = RShard} = Shard,
+    % Use a custom sort function which prioritizes the given shard
+    % range when the start endpoints match.
+    SortFun  = fun
+        (R, {BO, _}) when R =:= RShard, BO =:= BShard ->
+            % If start matches with the shard's start, shard always wins
             true;
-        A < B, X >= A, X < B ->
-            % lower bound is inside our range
-            rexi:kill(Node, Ref),
+        ({BO, _}, R) when R =:= RShard, BO =:= BShard ->
+            % If start matches with te shard's start, shard always wins
             false;
-        A < B, Y > A, Y =< B ->
-            % upper bound is inside our range
-            rexi:kill(Node, Ref),
+        ({B, E1}, {B, E2}) ->
+            % If start matches, pick the longest range first
+            E2 >= E1;
+        ({B1, _}, {B2, _}) ->
+            % Then, by default, sort by start point
+            B1 =< B2
+    end,
+    Ring = mem3_util:get_ring(Ranges, SortFun, MinB, MaxE),
+    fabric_dict:filter(fun
+        (S, _) when S =:= Shard ->
+            % Keep the original shard
+            true;
+        (#shard{range = [B, E]} = S, _) ->
+            case lists:member({B, E}, Ring) of
+                true ->
+                    true; % Keep it
+                false ->
+                    % Duplicate range, delete after calling callback function
+                    case is_function(RemoveCb) of
+                        true -> RemoveCb(S);
+                        false -> ok
+                    end,
+                    false
+            end
+    end, Counters).
+
+
+filter_exact_copies(#shard{range = Range0} = Shard0, Shards, Cb) ->
+    fabric_dict:filter(fun
+        (Shard, _) when Shard =:= Shard0 ->
+            true; % Don't remove ourselves
+        (#shard{range = Range} = Shard, _) when Range =:= Range0 ->
+            case is_function(Cb) of
+                true ->  Cb(Shard);
+                false -> ok
+            end,
             false;
-        B < A, X >= A orelse B < A, X < B ->
-            % target shard wraps the key range, lower bound is inside
-            rexi:kill(Node, Ref),
-            false;
-        B < A, Y > A orelse B < A, Y =< B ->
-            % target shard wraps the key range, upper bound is inside
-            rexi:kill(Node, Ref),
-            false;
-        true ->
+        (_, _) ->
             true
-        end
     end, Shards).
+
+
+stop_worker(#shard{ref = Ref, node = Node}) ->
+    rexi:kill(Node, Ref).
+
 
 maybe_send_row(#collector{limit=0} = State) ->
     #collector{counters=Counters, user_acc=AccIn, callback=Callback} = State,
@@ -363,10 +397,10 @@ get_shard_replacements(DbName, UsedShards0) ->
     % For each seq shard range with a count of 1, find any
     % possible replacements from the unused shards. The
     % replacement list is keyed by range.
-    lists:foldl(fun(#shard{range=Range}, Acc) ->
+    lists:foldl(fun(#shard{range = [B, E] = Range}, Acc) ->
         case dict:find(Range, RangeCounts) of
             {ok, 1} ->
-                Repls = [S || S <- UnusedShards, S#shard.range =:= Range],
+                Repls = mem3_util:non_overlapping_shards(UnusedShards, B, E),
                 % Only keep non-empty lists of replacements
                 if Repls == [] -> Acc; true ->
                     [{Range, Repls} | Acc]
@@ -388,8 +422,76 @@ fix_skip_and_limit(#mrargs{} = Args) ->
     %% the coordinator needs to finalize each row, so make sure the shards don't
     {CoordArgs, remove_finalizer(WorkerArgs)}.
 
+
 remove_finalizer(Args) ->
     couch_mrview_util:set_extra(Args, finalizer, null).
+
+
+find_replacements(Workers, AllShards) ->
+    % Build map [B, E] => [Worker1, Worker2, ...] for all workers
+    WrkMap = lists:foldl(fun({#shard{range = [B, E]}, _} = W, Acc) ->
+         maps:update_with({B, E}, fun(Ws) -> [W | Ws] end, [], Acc)
+    end, #{}, fabric_dict:to_list(Workers)),
+
+    % Build map [B, E] => [Shard1, Shard2, ...] for all shards
+    AllMap = lists:foldl(fun(#shard{range = [B, E]} = S, Acc) ->
+         maps:update_with({B, E}, fun(Ss) -> [S | Ss] end, [], Acc)
+    end, #{}, AllShards),
+
+    % The sort function will  prioritize workers over other shards.
+    % The idea is to not unnecessarily kill workers if we don't have to
+    SortFun = fun
+        (R1 = {B, E1}, R2 = {B, E2}) ->
+            case {maps:is_key(R1, WrkMap), maps:is_key(R2, AllMap)} of
+                {true, true} ->
+                    % Both are workers, larger interval wins
+                    E1 >= E2;
+                {true, false} ->
+                    % First element is a worker range, it wins
+                    true;
+                {false, true} ->
+                    % Second element is a worker range, it wins
+                    false;
+                {false, false} ->
+                    % Neither one is a worker interval, pick larger one
+                    E1 >= E2
+            end;
+        ({B1, _}, {B2, _}) ->
+            B1 =< B2
+    end,
+
+    % Call get_ring/2 with all the ranges combined and the custom sort
+    % function. It returns a sequence of ranges that complete the ring. As many
+    % as possible will be workers but some workers might have been replaced.
+    Ring = mem3_util:get_ring(maps:keys(WrkMap) ++ maps:keys(AllMap), SortFun),
+
+    % Keep only workers that are members of the ring.
+    Workers1 = fabric_dict:filter(fun(#shard{range = [B, E]}, _) ->
+       lists:member({B, E}, Ring)
+    end, Workers),
+
+    % Also return workers that had to be removed
+    Removed = fabric_dict:filter(fun(#shard{range = [B, E]}, _) ->
+       not lists:member({B, E}, Ring)
+    end, Workers),
+
+   {Rep, _} = lists:foldl(fun(R, {RepAcc, AllMapAcc}) ->
+        case {maps:is_key(R, WrkMap), maps:is_key(R, AllMapAcc)} of
+            {true, _} ->
+                % There is a worker in that range. Don't change anything.
+                {RepAcc, AllMapAcc};
+            {false, true} ->
+                % No worker for this range. Replace from shards
+                [Shard | Rest] = maps:get(R, AllMapAcc),
+                {[Shard | RepAcc], AllMapAcc#{R := Rest}}
+         end
+    end, {[], AllMap}, Ring),
+
+    % Return the list of workers that are part of ring, list of removed workers
+    % and a list of replacement shards that could be used to make sure the ring
+    % completes.
+    {Workers1, Removed, Rep}.
+
 
 % unit test
 is_progress_possible_test() ->

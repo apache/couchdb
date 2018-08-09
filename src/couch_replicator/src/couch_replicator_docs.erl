@@ -188,8 +188,8 @@ ensure_cluster_rep_ddoc_exists(RepDb) ->
 
 -spec compare_ejson({[_]}, {[_]}) -> boolean().
 compare_ejson(EJson1, EJson2) ->
-    EjsonSorted1 = couch_replicator_filters:ejsort(EJson1),
-    EjsonSorted2 = couch_replicator_filters:ejsort(EJson2),
+    EjsonSorted1 = couch_util:ejsort(EJson1),
+    EjsonSorted2 = couch_util:ejsort(EJson2),
     EjsonSorted1 == EjsonSorted2.
 
 

@@ -51,6 +51,8 @@
     set_security/2,
     set_props/2,
 
+    set_update_seq/2,
+
     open_docs/2,
     open_local_docs/2,
     read_doc_body/2,
@@ -60,6 +62,7 @@
     write_doc_body/2,
     write_doc_infos/3,
     purge_docs/3,
+    copy_purge_infos/2,
 
     commit_data/1,
 
@@ -105,7 +108,6 @@
 
 % Used by the compactor
 -export([
-    set_update_seq/2,
     update_header/2,
     copy_security/2,
     copy_props/2
@@ -545,6 +547,21 @@ purge_docs(#st{} = St, Pairs, PurgeInfos) ->
         purge_tree = PurgeTree2,
         purge_seq_tree = PurgeSeqTree2,
         needs_commit = true
+    }}.
+
+
+copy_purge_infos(#st{} = St, PurgeInfos) ->
+    #st{
+
+        purge_tree = PurgeTree,
+        purge_seq_tree = PurgeSeqTree
+    } = St,
+    {ok, PurgeTree2} = couch_btree:add(PurgeTree, PurgeInfos),
+    {ok, PurgeSeqTree2} = couch_btree:add(PurgeSeqTree, PurgeInfos),
+    {ok, St#st{
+       purge_tree = PurgeTree2,
+       purge_seq_tree = PurgeSeqTree2,
+       needs_commit = true
     }}.
 
 

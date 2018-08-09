@@ -127,22 +127,28 @@ keep_sending_changes(DbName, Args, Callback, Seqs, AccIn, Timeout, UpListen, T0)
 send_changes(DbName, ChangesArgs, Callback, PackedSeqs, AccIn, Timeout) ->
     LiveNodes = [node() | nodes()],
     AllLiveShards = mem3:live_shards(DbName, LiveNodes),
-    Seqs = lists:flatmap(fun({#shard{name=Name, node=N} = Shard, Seq}) ->
-        case lists:member(Shard, AllLiveShards) of
-        true ->
-            Ref = rexi:cast(N, {fabric_rpc, changes, [Name,ChangesArgs,Seq]}),
-            [{Shard#shard{ref = Ref}, Seq}];
-        false ->
-            % Find some replacement shards to cover the missing range
-            % TODO It's possible in rare cases of shard merging to end up
-            % with overlapping shard ranges from this technique
-            lists:map(fun(#shard{name=Name2, node=N2} = NewShard) ->
-                Ref = rexi:cast(N2, {fabric_rpc, changes, [Name2, ChangesArgs,
-                    make_replacement_arg(N, Seq)]}),
-                {NewShard#shard{ref = Ref}, 0}
-            end, find_replacement_shards(Shard, AllLiveShards))
-        end
-    end, unpack_seqs(PackedSeqs, DbName)),
+    Seqs0 = unpack_seqs(PackedSeqs, DbName),
+    {WSeqs0, Dead, Reps} = fabric_view:find_replacements(Seqs0, AllLiveShards),
+    % Start workers which didn't need replacements
+    WSeqs = lists:map(fun({#shard{name = Name, node = N} = S, Seq}) ->
+         Ref = rexi:cast(N, {fabric_rpc, changes, [Name, ChangesArgs, Seq]}),
+         {S#shard{ref = Ref}, Seq}
+    end, WSeqs0),
+    % For some dead workers see if they are a result of split shards. In that
+    % case make a replacement argument so that local rexi workers can calculate
+    % (hopefully) a > 0 update sequence.
+    {WSplitSeqs0, Reps1} = find_split_shard_replacements(Dead, Reps),
+    WSplitSeqs = lists:map(fun({#shard{name = Name, node = N} = S, Seq}) ->
+         Arg = make_replacement_arg(N, Seq),
+         Ref = rexi:cast(N, {fabric_rpc, changes, [Name, ChangesArgs, Arg]}),
+         {S#shard{ref = Ref}, Seq}
+    end, WSplitSeqs0),
+    % For ranges that were not split start sequences from 0
+    WReps = lists:map(fun(#shard{name = Name, node = N} = S) ->
+         Ref = rexi:cast(N, {fabric_rpc, changes, [Name, ChangesArgs, 0]}),
+         {S#shard{ref = Ref}, 0}
+    end, Reps1),
+    Seqs = WSeqs ++ WSplitSeqs ++ WReps,
     {Workers0, _} = lists:unzip(Seqs),
     Repls = fabric_view:get_shard_replacements(DbName, Workers0),
     StartFun = fun(#shard{name=Name, node=N, range=R0}=Shard) ->
@@ -386,6 +392,24 @@ seq({Seq, _Uuid, _Node}) -> Seq;
 seq({Seq, _Uuid}) -> Seq;
 seq(Seq)          -> Seq.
 
+
+unpack_seq_regex_match(Packed) ->
+    NewPattern = "^\\[[0-9]+\s*,\s*\"(?<opaque>.*)\"\\]$",
+    OldPattern = "^\"?([0-9]+-)?(?<opaque>.*?)\"?$",
+    Options = [{capture, [opaque], binary}],
+    case re:run(Packed, NewPattern, Options) of
+    {match, Match} ->
+        Match;
+    nomatch ->
+        {match, Match} = re:run(Packed, OldPattern, Options),
+        Match
+    end.
+
+
+unpack_seq_decode_term(Opaque) ->
+    binary_to_term(couch_util:decodeBase64Url(Opaque)).
+
+
 unpack_seqs(0, DbName) ->
     fabric_dict:init(mem3:shards(DbName), 0);
 
@@ -396,23 +420,14 @@ unpack_seqs([_SeqNum, Opaque], DbName) -> % deprecated
     do_unpack_seqs(Opaque, DbName);
 
 unpack_seqs(Packed, DbName) ->
-    NewPattern = "^\\[[0-9]+\s*,\s*\"(?<opaque>.*)\"\\]$",
-    OldPattern = "^\"?([0-9]+-)?(?<opaque>.*?)\"?$",
-    Options = [{capture, [opaque], binary}],
-    Opaque = case re:run(Packed, NewPattern, Options) of
-    {match, Match} ->
-        Match;
-    nomatch ->
-        {match, Match} = re:run(Packed, OldPattern, Options),
-        Match
-    end,
+    Opaque = unpack_seq_regex_match(Packed),
     do_unpack_seqs(Opaque, DbName).
 
 do_unpack_seqs(Opaque, DbName) ->
     % A preventative fix for FB 13533 to remove duplicate shards.
     % This just picks each unique shard and keeps the largest seq
     % value recorded.
-    Decoded = binary_to_term(couch_util:decodeBase64Url(Opaque)),
+    Decoded = unpack_seq_decode_term(Opaque),
     DedupDict = lists:foldl(fun({Node, [A, B], Seq}, Acc) ->
         dict:append({Node, [A, B]}, Seq, Acc)
     end, dict:new(), Decoded),
@@ -431,28 +446,24 @@ do_unpack_seqs(Opaque, DbName) ->
         end
     end, Deduped),
 
-    % Fill holes in the since sequence. If/when we ever start
-    % using overlapping shard ranges this will need to be updated
-    % to not include shard ranges that overlap entries in Upacked.
-    % A quick and dirty approach would be like such:
-    %
-    %   lists:foldl(fun(S, Acc) ->
-    %       fabric_view:remove_overlapping_shards(S, Acc)
-    %   end, mem3:shards(DbName), Unpacked)
-    %
-    % Unfortunately remove_overlapping_shards isn't reusable because
-    % of its calls to rexi:kill/2. When we get to overlapping
-    % shard ranges and have to rewrite shard range management
-    % we can revisit this simpler algorithm.
+    % This just handles the case if the ring in the unpacked sequence
+    % received is not complete and in that case tries to fill in the
+    % missing ranges with shards from the shard map
     case fabric_view:is_progress_possible(Unpacked) of
         true ->
             Unpacked;
         false ->
-            Extract = fun({Shard, _Seq}) -> Shard#shard.range end,
-            Ranges = lists:usort(lists:map(Extract, Unpacked)),
-            Filter = fun(S) -> not lists:member(S#shard.range, Ranges) end,
-            Replacements = lists:filter(Filter, mem3:shards(DbName)),
-            Unpacked ++ [{R, get_old_seq(R, Deduped)} || R <- Replacements]
+            Shards = mem3:shard(DbName),
+            {Unpacked1, Dead, Reps} =
+                fabric_view:find_replacements(Unpacked, Shards),
+            {Splits0, Reps1} = find_split_shard_replacements(Dead, Reps),
+            Splits1 = lists:map(fun({#shard{} = S, Seq}) ->
+                {S, Seq}
+            end, Splits0),
+            RepSeqs = lists:map(fun(#shard{} = S) ->
+                {S, get_old_seq(S, Deduped)}
+            end, Reps1),
+            Unpacked1 ++ Splits1 ++ RepSeqs
     end.
 
 
@@ -491,22 +502,44 @@ changes_row(Props0) ->
     Props2 = lists:filter(fun({K,_V}) -> lists:member(K, Allowed) end, Props1),
     {change, {Props2}}.
 
-find_replacement_shards(#shard{range=Range}, AllShards) ->
-    % TODO make this moar betta -- we might have split or merged the partition
-    [Shard || Shard <- AllShards, Shard#shard.range =:= Range].
+
+% From the list of dead workers determine if any are a result of a split shard. In that
+% case perhaps there is a way to not rewind the changes feed back to 0
+find_split_shard_replacements(DeadWorkers, Shards) ->
+    Acc0 = {[], Shards},
+    fabric_dict:fold(fun(#shard{node = WN, range = R}, Seq, Acc) ->
+        [B, E] = R,
+        {SplitWorkers, Available} = Acc,
+        ShardsOnSameNode = [S || #shard{node = N} = S <- Available, N =:= WN],
+        SplitShards = mem3_util:non_overlapping_shards(ShardsOnSameNode, B, E),
+        NewWorkers = [{S, Seq} || S <- SplitShards],
+        NewAvailable = [S || S <- Available, not lists:member(S, SplitShards)],
+        {[NewWorkers | SplitWorkers], NewAvailable}
+    end, Acc0, DeadWorkers).
+
 
 validate_start_seq(_DbName, "now") ->
     ok;
-validate_start_seq(DbName, Seq) ->
-    try unpack_seqs(Seq, DbName) of _Any ->
+validate_start_seq(_DbName, 0) ->
+    ok;
+validate_start_seq(_DbName, "0") ->
+    ok;
+validate_start_seq(_DbName, Seq) ->
+    try
+        case Seq of
+            [_SeqNum, Opaque] ->
+                unpack_seq_decode_term(Opaque);
+            Seq ->
+                Opaque = unpack_seq_regex_match(Seq),
+                unpack_seq_decode_term(Opaque)
+        end,
         ok
     catch
-        error:database_does_not_exist ->
-            {error, database_does_not_exist};
         _:_ ->
             Reason = <<"Malformed sequence supplied in 'since' parameter.">>,
             {error, {bad_request, Reason}}
     end.
+
 
 get_changes_epoch() ->
     case application:get_env(fabric, changes_epoch) of

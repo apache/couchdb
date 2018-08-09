@@ -50,6 +50,8 @@ authorize_request_int(#httpd{path_parts=[<<"_replicator">>,<<"_changes">>|_]}=Re
     require_admin(Req);
 authorize_request_int(#httpd{path_parts=[<<"_replicator">>|_]}=Req) ->
     db_authorization_check(Req);
+authorize_request_int(#httpd{path_parts=[<<"_shard_splits">>|_]}=Req) ->
+    require_admin(Req);
 authorize_request_int(#httpd{path_parts=[<<"_users">>], method='PUT'}=Req) ->
     require_admin(Req);
 authorize_request_int(#httpd{path_parts=[<<"_users">>], method='DELETE'}=Req) ->

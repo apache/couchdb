@@ -25,12 +25,16 @@ init(_Args) ->
         child(mem3_sync_nodes), % Order important?
         child(mem3_sync),
         child(mem3_shards),
-        child(mem3_sync_event_listener)
+        child(mem3_sync_event_listener),
+        child(mem3_shard_split_sup)
     ],
     {ok, {{one_for_one,10,1}, couch_epi:register_service(mem3_epi, Children)}}.
 
 child(mem3_events) ->
     MFA = {gen_event, start_link, [{local, mem3_events}]},
     {mem3_events, MFA, permanent, 1000, worker, dynamic};
+child(mem3_shard_split_sup = Child) ->
+    MFA = {Child, start_link, []},
+    {Child, MFA, permanent, infinity, supervisor, [Child]};
 child(Child) ->
     {Child, {Child, start_link, []}, permanent, 1000, worker, [Child]}.

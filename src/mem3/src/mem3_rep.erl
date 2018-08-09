@@ -17,9 +17,11 @@
     go/2,
     go/3,
     make_local_id/2,
+    make_local_id/3,
     make_purge_id/2,
     verify_purge_checkpoint/2,
-    find_source_seq/4
+    find_source_seq/4,
+    local_id_hash/1
 ]).
 
 -export([
@@ -33,18 +35,24 @@
 -record(acc, {
     batch_size,
     batch_count,
-    revcount = 0,
-    infos = [],
     seq = 0,
-    localid,
-    purgeid,
+    revcount = 0,
     source,
-    target,
+    targets,
     filter,
     db,
-    history = {[]}
+    hashfun
 }).
 
+-record(tgt, {
+    shard,
+    seq = 0,
+    infos = [],
+    localid,
+    purgeid,
+    history = {[]},
+    remaining = 0
+}).
 
 go(Source, Target) ->
     go(Source, Target, []).
@@ -53,34 +61,43 @@ go(Source, Target) ->
 go(DbName, Node, Opts) when is_binary(DbName), is_atom(Node) ->
     go(#shard{name=DbName, node=node()}, #shard{name=DbName, node=Node}, Opts);
 
-
 go(#shard{} = Source, #shard{} = Target, Opts) ->
-    mem3_sync_security:maybe_sync(Source, Target),
-    BatchSize = case proplists:get_value(batch_size, Opts) of
-        BS when is_integer(BS), BS > 0 -> BS;
-        _ -> 100
-    end,
-    BatchCount = case proplists:get_value(batch_count, Opts) of
-        all -> all;
-        BC when is_integer(BC), BC > 0 -> BC;
-        _ -> 1
-    end,
-    Filter = proplists:get_value(filter, Opts),
-    Acc = #acc{
-        batch_size = BatchSize,
-        batch_count = BatchCount,
-        source = Source,
-        target = Target,
-        filter = Filter
-    },
-    go(Acc).
+    go(Source, targets_map(Source, Target), Opts);
+
+go(#shard{} = Source, #{} = Targets0, Opts) when map_size(Targets0) > 0 ->
+    Targets = maps:map(fun(_, T) -> #tgt{shard = T} end, Targets0),
+    case couch_server:exists(Source#shard.name) of
+        true ->
+            sync_security(Source, Targets),
+            BatchSize = case proplists:get_value(batch_size, Opts) of
+                BS when is_integer(BS), BS > 0 -> BS;
+                _ -> 100
+            end,
+            BatchCount = case proplists:get_value(batch_count, Opts) of
+                all -> all;
+                BC when is_integer(BC), BC > 0 -> BC;
+                _ -> 1
+            end,
+            Filter = proplists:get_value(filter, Opts),
+            Acc = #acc{
+                batch_size = BatchSize,
+                batch_count = BatchCount,
+                source = Source,
+                targets = Targets,
+                filter = Filter
+            },
+            go(Acc);
+        false ->
+            {error, missing_source}
+    end.
 
 
 go(#acc{source=Source, batch_count=BC}=Acc) ->
     case couch_db:open(Source#shard.name, [?ADMIN_CTX]) of
     {ok, Db} ->
         Resp = try
-            repl(Acc#acc{db = Db})
+            HashFun = mem3_hash:get_hash_fun(couch_db:name(Db)),
+            repl(Acc#acc{db = Db, hashfun = HashFun})
         catch error:{not_found, no_db_file} ->
             {error, missing_target}
         after
@@ -106,19 +123,29 @@ make_local_id(Source, Target) ->
 make_local_id(#shard{node=SourceNode}, #shard{node=TargetNode}, Filter) ->
     make_local_id(SourceNode, TargetNode, Filter);
 
+make_local_id(SourceThing, TargetThing, F) when is_binary(F) ->
+    S = local_id_hash(SourceThing),
+    T = local_id_hash(TargetThing),
+    <<"_local/shard-sync-", S/binary, "-", T/binary, F/binary>>;
 
 make_local_id(SourceThing, TargetThing, Filter) ->
-    S = couch_util:encodeBase64Url(couch_hash:md5_hash(term_to_binary(SourceThing))),
-    T = couch_util:encodeBase64Url(couch_hash:md5_hash(term_to_binary(TargetThing))),
-    F = case is_function(Filter) of
-        true ->
-            {new_uniq, Hash} = erlang:fun_info(Filter, new_uniq),
-            B = couch_util:encodeBase64Url(Hash),
-            <<"-", B/binary>>;
-        false ->
-            <<>>
-    end,
+    S = local_id_hash(SourceThing),
+    T = local_id_hash(TargetThing),
+    F = filter_hash(Filter),
     <<"_local/shard-sync-", S/binary, "-", T/binary, F/binary>>.
+
+
+filter_hash(Filter) when is_function(Filter) ->
+    {new_uniq, Hash} = erlang:fun_info(Filter, new_uniq),
+    B = couch_util:encodeBase64Url(Hash),
+    <<"-", B/binary>>;
+
+filter_hash(_) ->
+    <<>>.
+
+
+local_id_hash(Thing) ->
+    couch_util:encodeBase64Url(couch_hash:md5_hash(term_to_binary(Thing))).
 
 
 make_purge_id(SourceUUID, TargetUUID) ->
@@ -197,7 +224,6 @@ find_source_seq_int(#doc{body={Props}}, SrcNode0, TgtNode0, TgtUUID, TgtSeq) ->
         couch_util:get_value(<<"target_uuid">>, Entry) =:= TgtUUID andalso
         couch_util:get_value(<<"target_seq">>,  Entry) =<  TgtSeq
     end, SrcHistory),
-
     % This relies on SrcHistory being ordered desceding by source
     % sequence.
     case UseableHistory of
@@ -230,90 +256,83 @@ repl(#acc{db = Db0} = Acc0) ->
     end.
 
 
-pull_purges(#acc{} = Acc0) ->
-    #acc{
-        batch_size = Count,
-        seq = UpdateSeq,
-        target = Target
-    } = Acc0,
-    #shard{
-        node = TgtNode,
-        name = TgtDbName
-    } = Target,
-
+pull_purges(#acc{source = Source} = Acc0) ->
+    #acc{batch_size = Count, seq = UpdateSeq, targets = Targets0} = Acc0,
     with_src_db(Acc0, fun(Db) ->
-        SrcUUID = couch_db:get_uuid(Db),
-        {LocalPurgeId, Infos, ThroughSeq, Remaining} =
-                mem3_rpc:load_purge_infos(TgtNode, TgtDbName, SrcUUID, Count),
-
-        if Infos == [] -> ok; true ->
-            {ok, _} = couch_db:purge_docs(Db, Infos, [replicated_edits]),
-            Body = purge_cp_body(Acc0, ThroughSeq),
-            mem3_rpc:save_purge_checkpoint(
-                    TgtNode, TgtDbName, LocalPurgeId, Body)
-        end,
-
-        if Remaining =< 0 -> ok; true ->
+        Targets = maps:map(fun(_, #tgt{} = T) ->
+            pull_purges_tgt(Db, Count, Source, T)
+        end, reset_remaining(Targets0)),
+        Remaining = maps:foldl(fun(_, #tgt{remaining = R}, Sum) ->
+            Sum + R
+        end, 0, Targets),
+        if Remaining == 0 -> Acc0#acc{targets = Targets}; true ->
             PurgeSeq = couch_db:get_purge_seq(Db),
             OldestPurgeSeq = couch_db:get_oldest_purge_seq(Db),
             PurgesToPush = PurgeSeq - OldestPurgeSeq,
             Changes = couch_db:count_changes_since(Db, UpdateSeq),
-            throw({finished, Remaining + PurgesToPush + Changes})
-        end,
-
-        Acc0#acc{purgeid = LocalPurgeId}
+            Pending = Remaining + PurgesToPush + Changes,
+            throw({finished, Pending})
+        end
     end).
 
 
-push_purges(#acc{} = Acc0) ->
-    #acc{
-        batch_size = BatchSize,
-        purgeid = LocalPurgeId,
-        seq = UpdateSeq,
-        target = Target
-    } = Acc0,
-    #shard{
-        node = TgtNode,
-        name = TgtDbName
-    } = Target,
+pull_purges_tgt(Db, Count, SrcShard, #tgt{} = Tgt0) ->
+    #tgt{shard = TgtShard} = Tgt0,
+    SrcUUID = couch_db:get_uuid(Db),
+    #shard{node = TgtNode, name = TgtDbName} = TgtShard,
+    {LocalPurgeId, Infos, ThroughSeq, Remaining} =
+        mem3_rpc:load_purge_infos(TgtNode, TgtDbName, SrcUUID, Count),
+    Tgt = Tgt0#tgt{purgeid = LocalPurgeId},
+    if Infos == [] -> ok; true ->
+        {ok, _} = couch_db:purge_docs(Db, Infos, [replicated_edits]),
+        Body = purge_cp_body(SrcShard, TgtShard, ThroughSeq),
+        mem3_rpc:save_purge_checkpoint(TgtNode, TgtDbName, LocalPurgeId, Body)
+    end,
+    Tgt#tgt{remaining = max(0, Remaining)}.
 
-    with_src_db(Acc0, fun(Db) ->
-        StartSeq = case couch_db:open_doc(Db, LocalPurgeId, []) of
-            {ok, #doc{body = {Props}}} ->
-                couch_util:get_value(<<"purge_seq">>, Props);
-            {not_found, _} ->
-                Oldest = couch_db:get_oldest_purge_seq(Db),
-                erlang:max(0, Oldest - 1)
-        end,
 
-        FoldFun = fun({PSeq, UUID, Id, Revs}, {Count, Infos, _}) ->
-            NewCount = Count + length(Revs),
-            NewInfos = [{UUID, Id, Revs} | Infos],
-            Status = if NewCount < BatchSize -> ok; true -> stop end,
-            {Status, {NewCount, NewInfos, PSeq}}
-        end,
-        InitAcc = {0, [], StartSeq},
-        {ok, {_, Infos, ThroughSeq}} =
-            couch_db:fold_purge_infos(Db, StartSeq, FoldFun, InitAcc),
-
-        if Infos == [] -> ok; true ->
-            ok = purge_on_target(TgtNode, TgtDbName, Infos),
-            Doc = #doc{
-                id = LocalPurgeId,
-                body = purge_cp_body(Acc0, ThroughSeq)
-            },
-            {ok, _} = couch_db:update_doc(Db, Doc, [])
-        end,
-
-        PurgeSeq = couch_db:get_purge_seq(Db),
-        if ThroughSeq >= PurgeSeq -> ok; true ->
-            Remaining = PurgeSeq - ThroughSeq,
+push_purges(#acc{source = SrcShard} = Acc) ->
+    #acc{batch_size = BatchSize, seq = UpdateSeq, targets = Targets0} = Acc,
+    with_src_db(Acc, fun(Db) ->
+        Targets = maps:map(fun(_, #tgt{} = T) ->
+            push_purges_tgt(Db, BatchSize, SrcShard, T)
+        end, reset_remaining(Targets0)),
+        Remaining = maps:foldl(fun(_, #tgt{remaining = R}, Sum) ->
+            Sum + R
+        end, 0, Targets),
+        if Remaining == 0 -> Acc#acc{targets = Targets}; true ->
             Changes = couch_db:count_changes_since(Db, UpdateSeq),
             throw({finished, Remaining + Changes})
-        end,
-
-        Acc0
+        end
     end).
+
+
+push_purges_tgt(Db, BatchSize, SrcShard, Tgt) ->
+    #tgt{shard = TgtShard, purgeid = LocalPurgeId} = Tgt,
+    #shard{node = TgtNode, name = TgtDbName} = TgtShard,
+    StartSeq = case couch_db:open_doc(Db, LocalPurgeId, []) of
+        {ok, #doc{body = {Props}}} ->
+            couch_util:get_value(<<"purge_seq">>, Props);
+        {not_found, _} ->
+            Oldest = couch_db:get_oldest_purge_seq(Db),
+            erlang:max(0, Oldest - 1)
+    end,
+    FoldFun = fun({PSeq, UUID, Id, Revs}, {Count, Infos, _}) ->
+        NewCount = Count + length(Revs),
+        NewInfos = [{UUID, Id, Revs} | Infos],
+        Status = if NewCount < BatchSize -> ok; true -> stop end,
+        {Status, {NewCount, NewInfos, PSeq}}
+    end,
+    InitAcc = {0, [], StartSeq},
+    {ok, {_, Infos, ThroughSeq}} =
+        couch_db:fold_purge_infos(Db, StartSeq, FoldFun, InitAcc),
+    if Infos == [] -> ok; true ->
+        ok = purge_on_target(TgtNode, TgtDbName, Infos),
+        Body = purge_cp_body(SrcShard, TgtShard, ThroughSeq),
+        Doc = #doc{id = LocalPurgeId, body = Body},
+        {ok, _} = couch_db:update_doc(Db, Doc, [])
+    end,
+    Tgt#tgt{remaining = max(0, couch_db:get_purge_seq(Db) - ThroughSeq)}.
 
 
 push_changes(#acc{} = Acc0) ->
@@ -338,16 +357,24 @@ push_changes(#acc{} = Acc0) ->
     end).
 
 
-calculate_start_seq(Acc) ->
-    #acc{
-        db = Db,
-        target = #shard{node=Node, name=Name}
-    } = Acc,
-    %% Give the target our UUID and ask it to return the checkpoint doc
+calculate_start_seq(#acc{db = Db, targets = Targets0, filter = Filter} = Acc) ->
+    FilterHash = filter_hash(Filter),
+    Targets = maps:map(fun(_, #tgt{} = T) ->
+        calculate_start_seq_tgt(Db, FilterHash, T)
+    end, Targets0),
+    % There will always be at least one target
+    #tgt{seq = Seq0} = hd(maps:values(Targets)),
+    Seq = maps:fold(fun(_, #tgt{seq = S}, M) -> min(S, M)  end, Seq0, Targets),
+    Acc#acc{seq = Seq, targets = Targets}.
+
+
+calculate_start_seq_tgt(Db, FilterHash, #tgt{shard = TgtShard} = Tgt) ->
     UUID = couch_db:get_uuid(Db),
-    {NewDocId, Doc} = mem3_rpc:load_checkpoint(Node, Name, node(), UUID),
+    #shard{node = Node, name = Name} = TgtShard,
+    {NewDocId, Doc} = mem3_rpc:load_checkpoint(Node, Name, node(), UUID,
+        FilterHash),
     #doc{id=FoundId, body={TProps}} = Doc,
-    Acc1 = Acc#acc{localid = NewDocId},
+    Tgt1 = Tgt#tgt{localid = NewDocId},
     % NewDocId and FoundId may be different the first time
     % this code runs to save our newly named internal replication
     % checkpoints. We store NewDocId to use when saving checkpoints
@@ -369,58 +396,73 @@ calculate_start_seq(Acc) ->
                     Seq = TargetSeq,
                     History = couch_util:get_value(<<"history">>, TProps, {[]})
             end,
-            Acc1#acc{seq = Seq, history = History};
+            Tgt1#tgt{seq = Seq, history = History};
         {not_found, _} ->
-            compare_epochs(Acc1)
+            compare_epochs(Db, Tgt1)
     end.
 
-compare_epochs(Acc) ->
-    #acc{
-        db = Db,
-        target = #shard{node=Node, name=Name}
-    } = Acc,
+
+compare_epochs(Db, #tgt{shard = TgtShard} = Tgt) ->
+    #shard{node = Node, name = Name} = TgtShard,
     UUID = couch_db:get_uuid(Db),
     Epochs = couch_db:get_epochs(Db),
     Seq = mem3_rpc:find_common_seq(Node, Name, UUID, Epochs),
-    Acc#acc{seq = Seq, history = {[]}}.
+    Tgt#tgt{seq = Seq, history = {[]}}.
+
 
 changes_enumerator(#doc_info{id=DocId}, #acc{db=Db}=Acc) ->
     {ok, FDI} = couch_db:get_full_doc_info(Db, DocId),
     changes_enumerator(FDI, Acc);
-changes_enumerator(#full_doc_info{}=FDI, #acc{revcount=C, infos=Infos}=Acc0) ->
-    #doc_info{
-        high_seq=Seq,
-        revs=Revs
-    } = couch_doc:to_doc_info(FDI),
-    {Count, NewInfos} = case filter_doc(Acc0#acc.filter, FDI) of
-        keep -> {C + length(Revs), [FDI | Infos]};
-        discard -> {C, Infos}
+changes_enumerator(#full_doc_info{}=FDI, #acc{}=Acc0) ->
+    #acc{revcount = C, targets = Targets0, hashfun = HashFun} = Acc0,
+    #doc_info{high_seq=Seq, revs=Revs} = couch_doc:to_doc_info(FDI),
+    {Count, Targets} = case filter_doc(Acc0#acc.filter, FDI) of
+        keep -> {C + length(Revs), changes_append_fdi(FDI, Targets0, HashFun)};
+        discard -> {C, Targets0}
     end,
-    Acc1 = Acc0#acc{
-        seq=Seq,
-        revcount=Count,
-        infos=NewInfos
-    },
+    Acc1 = Acc0#acc{seq = Seq, revcount = Count, targets = Targets},
     Go = if Count < Acc1#acc.batch_size -> ok; true -> stop end,
     {Go, Acc1}.
 
 
-replicate_batch(#acc{target = #shard{node=Node, name=Name}} = Acc) ->
-    case find_missing_revs(Acc) of
-    [] ->
-        ok;
-    Missing ->
-        lists:map(fun(Chunk) ->
-            Docs = open_docs(Acc, Chunk),
+% First clause is a special case when there is just a single target
+% (the key then has to be `undefined`, see targets_map/1)
+%
+changes_append_fdi(FDI, #{undefined := Target} = Targets, _)
+        when map_size(Targets) == 1 ->
+    #tgt{infos = Infos} = Target,
+    Targets#{undefined :=  Target#tgt{infos = [FDI | Infos]}};
+changes_append_fdi(#full_doc_info{id = Id} = FDI, Targets, HashFun) ->
+    Key = mem3_shard_split_job:pickfun(Id, maps:keys(Targets), HashFun),
+    maps:update_with(Key, fun(#tgt{infos = Infos} = T) ->
+        T#tgt{infos = [FDI | Infos]}
+    end, Targets).
+
+
+replicate_batch(#acc{targets = Targets0, seq = Seq, db = Db} = Acc) ->
+    Targets = maps:map(fun(_, #tgt{} = T) ->
+        replicate_batch_tgt(T, Db, Seq)
+    end, Targets0),
+    {ok, Acc#acc{targets = Targets, revcount = 0}}.
+
+
+replicate_batch_tgt(#tgt{shard = TgtShard, infos = Infos} = Target, Db, Seq) ->
+    #shard{node = Node, name = Name} = TgtShard,
+    case find_missing_revs(Target) of
+        [] ->
+            ok;
+        Missing ->
+            lists:map(fun(Chunk) ->
+            Docs = open_docs(Db, Infos, Chunk),
             ok = save_on_target(Node, Name, Docs)
         end, chunk_revs(Missing))
     end,
-    update_locals(Acc),
-    {ok, Acc#acc{revcount=0, infos=[]}}.
+    update_locals(Target, Db, Seq),
+    Target#tgt{infos = []}.
 
 
-find_missing_revs(Acc) ->
-    #acc{target = #shard{node=Node, name=Name}, infos = Infos} = Acc,
+find_missing_revs(#tgt{shard = TgtShard, infos = Infos}) ->
+    #shard{node = Node, name = Name} = TgtShard,
     IdsRevs = lists:map(fun(FDI) ->
         #doc_info{id=Id, revs=RevInfos} = couch_doc:to_doc_info(FDI),
         {Id, [R || #rev_info{rev=R} <- RevInfos]}
@@ -461,7 +503,7 @@ chunk_revs([{Id, R, A}|Revs], {Count, Chunk}, Chunks, Limit) ->
     ).
 
 
-open_docs(#acc{db=Db, infos=Infos}, Missing) ->
+open_docs(Db, Infos, Missing) ->
     lists:flatmap(fun({Id, Revs, _}) ->
         FDI = lists:keyfind(Id, #full_doc_info.id, Infos),
         #full_doc_info{rev_tree=RevTree} = FDI,
@@ -491,9 +533,10 @@ purge_on_target(Node, Name, PurgeInfos) ->
     ]),
     ok.
 
-update_locals(Acc) ->
-    #acc{seq=Seq, db=Db, target=Target, localid=Id, history=History} = Acc,
-    #shard{name=Name, node=Node} = Target,
+
+update_locals(Target, Db, Seq) ->
+    #tgt{shard = TgtShard, localid = Id, history = History} = Target,
+    #shard{node = Node, name = Name} = TgtShard,
     NewEntry = [
         {<<"source_node">>, atom_to_binary(node(), utf8)},
         {<<"source_uuid">>, couch_db:get_uuid(Db)},
@@ -504,11 +547,7 @@ update_locals(Acc) ->
     {ok, _} = couch_db:update_doc(Db, #doc{id = Id, body = NewBody}, []).
 
 
-purge_cp_body(#acc{} = Acc, PurgeSeq) ->
-    #acc{
-        source = Source,
-        target = Target
-    } = Acc,
+purge_cp_body(#shard{} = Source, #shard{} = Target, PurgeSeq) ->
     {Mega, Secs, _} = os:timestamp(),
     NowSecs = Mega * 1000000 + Secs,
     {[
@@ -523,7 +562,7 @@ purge_cp_body(#acc{} = Acc, PurgeSeq) ->
 
 find_repl_doc(SrcDb, TgtUUIDPrefix) ->
     SrcUUID = couch_db:get_uuid(SrcDb),
-    S = couch_util:encodeBase64Url(couch_hash:md5_hash(term_to_binary(SrcUUID))),
+    S = local_id_hash(SrcUUID),
     DocIdPrefix = <<"_local/shard-sync-", S/binary, "-">>,
     FoldFun = fun(#doc{id = DocId, body = {BodyProps}} = Doc, _) ->
         TgtUUID = couch_util:get_value(<<"target_uuid">>, BodyProps, <<>>),
@@ -573,6 +612,49 @@ filter_doc(Filter, FullDocInfo) when is_function(Filter) ->
     end;
 filter_doc(_, _) ->
     keep.
+
+
+sync_security(#shard{} = Source, #{} = Targets) ->
+    maps:map(fun(_, #tgt{shard = Target}) ->
+        mem3_sync_security:maybe_sync(Source, Target)
+    end, Targets).
+
+
+targets_map(Src, #shard{name = <<"shards/", _/binary>> = Name, node = Node}) ->
+    Range = mem3:range(Name),
+    Shards0 = mem3:shards(mem3:dbname(Name)),
+    Shards1 = [S || S <- Shards0, not shard_eq(S, Src)],
+    Shards2 = [S || S <- Shards1, check_overlap(Range, Node, S)],
+    case length(Shards2) of
+        1 ->
+            #{undefined => hd(Shards2)};
+        N when N > 1 ->
+            ByRange = [{R, S} || #shard{range = R} = S <- Shards2],
+            maps:from_list(ByRange)
+    end;
+
+targets_map(_Src, Tgt) ->
+    #{undefined => Tgt}.
+
+
+shard_eq(#shard{name = Name, node = Node}, #shard{name = Name, node = Node}) ->
+    true;
+
+shard_eq(_, _) ->
+    false.
+
+
+check_overlap(SrcRange, Node, #shard{node = Node, range = TgtRange}) ->
+    mem3_util:range_overlap(SrcRange, TgtRange);
+
+check_overlap([_, _], _, #shard{}) ->
+    false.
+
+
+reset_remaining(#{} = Targets) ->
+    maps:map(fun(_, #tgt{} = T) ->
+        T#tgt{remaining = 0}
+    end, Targets).
 
 
 -ifdef(TEST).
