@@ -81,9 +81,9 @@ handle_index_req(#httpd{method='GET', path_parts=[_, _]}=Req, Db) ->
     JsonIdxs = lists:sublist(JsonIdxs0, Skip+1, Limit),
 	chttpd:send_json(Req, {[{total_rows, TotalRows}, {indexes, JsonIdxs}]});
 
-handle_index_req(#httpd{method='POST', path_parts=[_, _]}=Req, Db) ->
+handle_index_req(#httpd{method='POST', path_parts=[DbName, _]}=Req, Db) ->
     chttpd:validate_ctype(Req, "application/json"),
-    {ok, Opts} = mango_opts:validate_idx_create(chttpd:json_body_obj(Req)),
+    {ok, Opts} = mango_opts:validate_idx_create(DbName, chttpd:json_body_obj(Req)),
     {ok, Idx0} = mango_idx:new(Db, Opts),
     {ok, Idx} = mango_idx:validate_new(Idx0, Db),
     DbOpts = [{user_ctx, Req#httpd.user_ctx}, deleted, ejson_body],

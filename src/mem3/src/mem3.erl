@@ -372,7 +372,10 @@ is_partitioned(DbName0) when is_binary(DbName0) ->
             false
     end;
 
-is_partitioned(Shards) when is_list(Shards) ->
+is_partitioned([#shard{} | _] = Shards) ->
+    lists:all(fun is_partitioned/1, Shards);
+
+is_partitioned([#ordered_shard{} | _] = Shards) ->
     lists:all(fun is_partitioned/1, Shards);
 
 is_partitioned(#shard{opts=Opts}) ->

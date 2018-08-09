@@ -319,7 +319,9 @@ write_kvs(State, UpdateSeq, ViewKVs, DocIdKeys, Seqs, Log0) ->
         design_opts=DesignOpts
     } = State,
 
-    Partitioned = couch_util:get_value(<<"partitioned">>, DesignOpts, false),
+    DbPartitioned = mem3:is_partitioned(State#mrst.db_name),
+    Partitioned = couch_util:get_value(<<"partitioned">>, DesignOpts, DbPartitioned),
+
     Revs = dict:from_list(dict:fetch_keys(Log0)),
 
     Log = dict:fold(fun({Id, _Rev}, DIKeys, Acc) ->

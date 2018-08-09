@@ -41,8 +41,11 @@
 -define(GET_VIEW_RETRY_COUNT, 1).
 -define(GET_VIEW_RETRY_DELAY, 50).
 -define(LOWEST_KEY, null).
--define(HIGHEST_KEY, {[{<<239, 191, 176>>, null}]}). % is {"\ufff0": null}
-
+-define(HIGHEST_KEY, {<<255, 255, 255, 255>>}).
+-define(PARTITION_START(P), <<P/binary, $:>>).
+-define(PARTITION_END(P), <<P/binary, $;>>).
+-define(LOWEST(A, B), (if A < B -> A; true -> B end)).
+-define(HIGHEST(A, B), (if A > B -> A; true -> B end)).
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
@@ -618,20 +621,38 @@ validate_args(Args) ->
         _ -> mrverror(<<"Invalid value for `sorted`.">>)
     end,
 
-    case {get_extra(Args, partitioned, false), get_extra(Args, partition)} of
-        {true, undefined} ->
-            mrverror(<<"`partition` parameter is mandatory for queries to this view.">>);
-        {true, Partition} ->
-            couch_doc:validate_docid(Partition);
-        {false, undefined} ->
+    Style = get_extra(Args, style, normal),
+    Partitioned = get_extra(Args, partitioned, false),
+    Partition = get_extra(Args, partition),
+
+    case {Style, Partitioned, Partition} of
+        {all_docs, true, _} ->
+            ok; % _all_docs can be called with or without partition parameter.
+        {all_docs, false, undefined} ->
             ok;
-        {false, _Partition} ->
+        {all_docs, false, _Partition} ->
+            mrverror(<<"`partition` parameter is not supported in this db.">>);
+        {normal, true, undefined} ->
+            mrverror(<<"`partition` parameter is mandatory for queries to this view.">>);
+        {normal, true, Partition} ->
+            couch_doc:validate_docid(Partition);
+        {normal, false, undefined} ->
+            ok;
+        {normal, false, _Partition} ->
             mrverror(<<"`partition` parameter is not supported in this view.">>)
     end,
 
-    Args1 = case get_extra(Args, partitioned, false) of
-        true  -> apply_partition(Args);
-        false -> Args
+    Args1 = case {Style, Partitioned, Partition} of
+        {all_docs, true, undefined} ->
+            Args;
+        {all_docs, true, Partition} ->
+            apply_partition(Args, all_docs);
+        {all_docs, false, _} ->
+            Args;
+        {normal, true, _} ->
+            apply_partition(Args, normal);
+        {normal, false, _} ->
+            Args
     end,
 
     Args1#mrargs{
@@ -652,9 +673,12 @@ determine_group_level(#mrargs{group=true, group_level=undefined}) ->
 determine_group_level(#mrargs{group_level=GroupLevel}) ->
     GroupLevel.
 
-apply_partition(#mrargs{} = Args0) ->
+apply_partition(#mrargs{} = Args0, Style) ->
     Partition = get_extra(Args0, partition),
-    apply_partition(Partition, Args0).
+    case Style of
+        normal   -> apply_partition(Partition, Args0);
+        all_docs -> apply_all_docs_partition(Partition, Args0)
+    end;
 
 apply_partition(_Partition, #mrargs{keys=[{p, _, _} | _]} = Args) ->
     Args; % already applied
@@ -684,6 +708,33 @@ apply_partition(Partition, Args) ->
         start_key = {p, Partition, SK0},
         end_key = {p, Partition, EK0}
     }.
+
+%% all_docs is special as it's not really a view and is already
+%% effectively partitioned as the partition is a prefix of all keys.
+apply_all_docs_partition(Partition, #mrargs{direction=fwd, start_key=undefined, end_key=undefined} = Args) ->
+    Args#mrargs{start_key = ?PARTITION_START(Partition), end_key = ?PARTITION_END(Partition)};
+
+apply_all_docs_partition(Partition, #mrargs{direction=rev, start_key=undefined, end_key=undefined} = Args) ->
+    Args#mrargs{start_key = ?PARTITION_END(Partition), end_key = ?PARTITION_START(Partition)};
+
+apply_all_docs_partition(Partition, #mrargs{direction=fwd, start_key=SK, end_key=undefined} = Args) ->
+    Args#mrargs{start_key = ?HIGHEST(?PARTITION_START(Partition), SK), end_key = ?PARTITION_END(Partition)};
+
+apply_all_docs_partition(Partition, #mrargs{direction=rev, start_key=SK, end_key=undefined} = Args) ->
+    Args#mrargs{start_key = ?LOWEST(?PARTITION_END(Partition), SK), end_key = ?PARTITION_START(Partition)};
+
+apply_all_docs_partition(Partition, #mrargs{direction=fwd, start_key=undefined, end_key=EK} = Args) ->
+    Args#mrargs{start_key = ?PARTITION_START(Partition), end_key = ?LOWEST(?PARTITION_END(Partition), EK)};
+
+apply_all_docs_partition(Partition, #mrargs{direction=rev, start_key=undefined, end_key=EK} = Args) ->
+    Args#mrargs{start_key = ?PARTITION_END(Partition), end_key = ?HIGHEST(?PARTITION_START(Partition), EK)};
+
+apply_all_docs_partition(Partition, #mrargs{direction=fwd, start_key=SK, end_key=EK} = Args) ->
+    Args#mrargs{start_key = ?HIGHEST(?PARTITION_START(Partition), SK), end_key = ?LOWEST(?PARTITION_END(Partition), EK)};
+
+apply_all_docs_partition(Partition, #mrargs{direction=rev, start_key=SK, end_key=EK} = Args) ->
+    Args#mrargs{start_key = ?LOWEST(?PARTITION_END(Partition), SK), end_key = ?HIGHEST(?PARTITION_START(Partition), EK)}.
+
 
 check_range(#mrargs{start_key=undefined}, _Cmp) ->
     ok;
