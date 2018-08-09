@@ -58,8 +58,9 @@ list(Db) ->
 
 
 get_usable_indexes(Db, Selector, Opts) ->
-    ExistingIndexes = mango_idx:list(Db),
-
+    PQ = is_partitioned_query(Opts),
+    ExistingIndexes = filter_indexes_by_partitioned(
+        mango_idx:list(Db), PQ),
     GlobalIndexes = mango_cursor:remove_indexes_with_partial_filter_selector(ExistingIndexes),
     UserSpecifiedIndex = mango_cursor:maybe_filter_indexes_by_ddoc(ExistingIndexes, Opts),
     UsableIndexes0 = lists:usort(GlobalIndexes ++ UserSpecifiedIndex),
@@ -68,11 +69,34 @@ get_usable_indexes(Db, Selector, Opts) ->
     UsableFilter = fun(I) -> is_usable(I, Selector, SortFields) end,
 
     case lists:filter(UsableFilter, UsableIndexes0) of
-        [] -> 
+        [] ->
             ?MANGO_ERROR({no_usable_index, missing_sort_index});
-        UsableIndexes -> 
+        UsableIndexes ->
             UsableIndexes
     end.
+
+
+filter_indexes_by_partitioned(Indexes, PQ) ->
+    filter_indexes_by_partitioned(Indexes, PQ, []).
+
+
+filter_indexes_by_partitioned([], _PQ, Acc) ->
+    lists:reverse(Acc);
+filter_indexes_by_partitioned([Idx | Rest], PQ, Acc) ->
+    {partitioned, PI} = lists:keyfind(partitioned, 1, Idx#idx.design_opts),
+    case {Idx#idx.def, PI, PQ} of
+        {all_docs, _, _} ->
+            % all_docs works both ways.
+            filter_indexes_by_partitioned(Rest, PQ, [Idx | Acc]);
+        {_, Same, Same} ->
+            filter_indexes_by_partitioned(Rest, PQ, [Idx | Acc]);
+        {_, _, _} ->
+             filter_indexes_by_partitioned(Rest, PQ, Acc)
+    end.
+
+
+is_partitioned_query(Opts) ->
+    lists:keyfind(partition, 1, Opts) /= {partition, <<>>}.
 
 
 recover(Db) ->
@@ -101,6 +125,7 @@ get_sort_fields(Opts) ->
 
 new(Db, Opts) ->
     Def = get_idx_def(Opts),
+    DesignOpts = get_idx_design_opts(Db, Opts),
     Type = get_idx_type(Opts),
     IdxName = get_idx_name(Def, Opts),
     DDoc = get_idx_ddoc(Def, Opts),
@@ -110,6 +135,7 @@ new(Db, Opts) ->
         name = IdxName,
         type = Type,
         def = Def,
+        design_opts = DesignOpts,
         opts = filter_opts(Opts)
     }}.
 
@@ -182,11 +208,13 @@ from_ddoc(Db, {Props}) ->
 
 
 special(Db) ->
+    Partitioned = mem3:is_partitioned(Db),
     AllDocs = #idx{
         dbname = db_to_name(Db),
         name = <<"_all_docs">>,
         type = <<"special">>,
         def = all_docs,
+        design_opts = [{partitioned, Partitioned}],
         opts = []
     },
     % Add one for _update_seq
@@ -285,6 +313,12 @@ get_idx_def(Opts) ->
     end.
 
 
+get_idx_design_opts(Db, Opts) ->
+    DbPartitioned = mem3:is_partitioned(couch_db:name(Db)),
+    Partitioned = proplists:get_value(partitioned, Opts, DbPartitioned),
+    [{partitioned, Partitioned}].
+
+
 get_idx_type(Opts) ->
     case proplists:get_value(type, Opts) of
         <<"json">> -> <<"json">>;
@@ -340,6 +374,8 @@ filter_opts([{name, _} | Rest]) ->
 filter_opts([{type, _} | Rest]) ->
     filter_opts(Rest);
 filter_opts([{w, _} | Rest]) ->
+    filter_opts(Rest);
+filter_opts([{partitioned, _} | Rest]) ->
     filter_opts(Rest);
 filter_opts([Opt | Rest]) ->
     [Opt | filter_opts(Rest)].
