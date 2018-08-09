@@ -228,12 +228,13 @@ query_all_docs(Db, Args0, Callback, Acc) ->
         couch_index_util:hexsig(couch_hash:md5_hash(term_to_binary(Info)))
     end),
     Args1 = Args0#mrargs{view_type=map},
-    Args2 = couch_mrview_util:validate_args(Args1),
-    {ok, Acc1} = case Args2#mrargs.preflight_fun of
+    Args2 = couch_mrview_util:set_extra(Args1, style, all_docs),
+    Args3 = couch_mrview_util:validate_args(Args2),
+    {ok, Acc1} = case Args3#mrargs.preflight_fun of
         PFFun when is_function(PFFun, 2) -> PFFun(Sig, Acc);
         _ -> {ok, Acc}
     end,
-    all_docs_fold(Db, Args2, Callback, Acc1).
+    all_docs_fold(Db, Args3, Callback, Acc1).
 
 
 query_view(Db, DDoc, VName) ->

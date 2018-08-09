@@ -29,6 +29,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 -include("mango_cursor.hrl").
+-include("mango_idx.hrl").
 -include("mango_idx_view.hrl").
 
 create(Db, Indexes, Selector, Opts) ->
@@ -71,7 +72,8 @@ explain(Cursor) ->
         {direction, Args#mrargs.direction},
         {stable, Args#mrargs.stable},
         {update, Args#mrargs.update},
-        {conflicts, Args#mrargs.conflicts}
+        {conflicts, Args#mrargs.conflicts},
+        {extra, {Args#mrargs.extra}}
     ]}}].
 
 
@@ -93,14 +95,28 @@ maybe_replace_max_json([H | T] = EndKey) when is_list(EndKey) ->
 maybe_replace_max_json(EndKey) ->
     EndKey.
 
-base_args(#cursor{index = Idx} = Cursor) ->
-    #mrargs{
+base_args(#cursor{index = Idx, opts = Opts} = Cursor) ->
+    Args1 = #mrargs{
         view_type = map,
         reduce = false,
         start_key = mango_idx:start_key(Idx, Cursor#cursor.ranges),
         end_key = mango_idx:end_key(Idx, Cursor#cursor.ranges),
         include_docs = true
-    }.
+    },
+    Partitioned = couch_util:get_value(partitioned, Idx#idx.design_opts),
+    Args2 = couch_mrview_util:set_extra(Args1, partitioned, Partitioned),
+    Args3 = case couch_util:get_value(partition, Opts) of
+        <<>> ->
+            Args2;
+        Partition ->
+            couch_mrview_util:set_extra(Args2, partition, Partition)
+    end,
+    add_style(Idx, Args3).
+
+add_style(#idx{def = all_docs}, Args) ->
+    couch_mrview_util:set_extra(Args, style, all_docs);
+add_style(_, Args) ->
+    Args.
 
 
 execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFun, UserAcc) ->

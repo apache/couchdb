@@ -118,7 +118,7 @@ go(DbName, _Options, Workers, QueryArgs, Callback, Acc0) ->
     #mrargs{limit = Limit, skip = Skip, update_seq = UpdateSeq} = QueryArgs,
     State = #collector{
         db_name = DbName,
-        query_args = QueryArgs,
+        query_args = couch_mrview_util:set_extra(QueryArgs, style, all_docs),
         callback = Callback,
         counters = fabric_dict:init(Workers, 0),
         skip = Skip,
