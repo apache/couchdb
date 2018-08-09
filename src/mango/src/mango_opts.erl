@@ -81,6 +81,12 @@ validate_find({Props}) ->
             {tag, selector},
             {validator, fun validate_selector/1}
         ]},
+        {<<"partition">>, [
+            {tag, partition},
+            {optional, true},
+            {default, <<>>},
+            {validator, fun is_string/1}
+        ]},
         {<<"use_index">>, [
             {tag, use_index},
             {optional, true},

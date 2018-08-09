@@ -294,9 +294,12 @@ all_docs(DbName, Callback, Acc, QueryArgs) ->
         #mrargs{} | [option()]) ->
     {ok, any()} | {error, Reason :: term()}.
 
-all_docs(DbName, Options, Callback, Acc0, #mrargs{} = QueryArgs) when
+
+all_docs(DbName, Options, Callback, Acc0, #mrargs{} = QueryArgs0) when
         is_function(Callback, 2) ->
-    fabric_view_all_docs:go(dbname(DbName), opts(Options), QueryArgs, Callback, Acc0);
+    DbPartitioned = mem3:is_partitioned(dbname(DbName)),
+    QueryArgs1 = couch_mrview_util:set_extra(QueryArgs0, partitioned, DbPartitioned),
+    fabric_view_all_docs:go(dbname(DbName), opts(Options), QueryArgs1, Callback, Acc0);
 
 %% @doc convenience function that takes a keylist rather than a record
 %% @equiv all_docs(DbName, Callback, Acc0, kl_to_query_args(QueryArgs))

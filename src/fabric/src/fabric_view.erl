@@ -122,7 +122,7 @@ maybe_send_row(State) ->
         user_acc = AccIn,
         query_args = QueryArgs
     } = State,
-    Partitioned = couch_mrview_util:get_extra(QueryArgs, partitioned, false),
+    Partitioned = couch_mrview_util:get_extra(QueryArgs, partitioned),
     case fabric_dict:any(0, Counters) of
     true ->
         {ok, State};

@@ -684,12 +684,15 @@ multi_all_docs_view(Req, Db, OP, Queries) ->
 all_docs_view(Req, Db, Keys, OP) ->
     Args0 = couch_mrview_http:parse_params(Req, Keys),
     Args1 = Args0#mrargs{view_type=map},
-    Args2 = couch_mrview_util:validate_args(Args1),
-    Args3 = set_namespace(OP, Args2),
+    DbPartitioned = mem3:is_partitioned(couch_db:name(Db)),
+    Args2 = couch_mrview_util:set_extra(Args1, partitioned, DbPartitioned),
+    Args3 = couch_mrview_util:set_extra(Args2, style, all_docs),
+    Args4 = couch_mrview_util:validate_args(Args3),
+    Args5 = set_namespace(OP, Args4),
     Options = [{user_ctx, Req#httpd.user_ctx}],
     Max = chttpd:chunked_response_buffer_size(),
     VAcc = #vacc{db=Db, req=Req, threshold=Max},
-    {ok, Resp} = fabric:all_docs(Db, Options, fun couch_mrview_http:view_cb/2, VAcc, Args3),
+    {ok, Resp} = fabric:all_docs(Db, Options, fun couch_mrview_http:view_cb/2, VAcc, Args5),
     {ok, Resp#vacc.resp}.
 
 db_doc_req(#httpd{method='DELETE'}=Req, Db, DocId) ->
