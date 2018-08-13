@@ -21,7 +21,7 @@
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
 go(DbName, Options, #mrargs{keys=undefined} = QueryArgs, Callback, Acc) ->
-    Shards = mem3:shards(DbName),
+    Shards = shards(DbName, QueryArgs),
     Workers0 = fabric_util:submit_jobs(
             Shards, fabric_rpc, all_docs, [Options, QueryArgs]),
     RexiMon = fabric_util:create_monitors(Workers0),
@@ -135,6 +135,28 @@ go(DbName, _Options, Workers, QueryArgs, Callback, Acc0) ->
     {error, Resp} ->
         {ok, Resp}
     end.
+
+shards(DbName, Args) ->
+    case couch_mrview_util:get_extra(Args, partitioned) of
+        true ->
+            StartKey = partition(Args#mrargs.start_key),
+            EndKey = partition(Args#mrargs.end_key),
+            case {StartKey, EndKey} of
+                {Same, Same} when Same =/= undefined ->
+                    mem3:shards(DbName, <<Same/binary, ":foo">>);
+                {_, _} ->
+                    mem3:shards(DbName)
+            end;
+        _ ->
+            mem3:shards(DbName)
+    end.
+
+partition(undefined) ->
+    undefined;
+partition(null) ->
+    null;
+partition(Key) when is_binary(Key) ->
+    hd(binary:split(Key, <<":">>)).
 
 handle_message({rexi_DOWN, _, {_, NodeRef}, _}, _, State) ->
     fabric_view:check_down_shards(State, NodeRef);
