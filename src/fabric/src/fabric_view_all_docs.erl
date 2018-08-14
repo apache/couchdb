@@ -316,3 +316,89 @@ cancel_read_pids(Pids) ->
         {empty, _} ->
             ok
     end.
+
+-ifdef(TEST).
+
+-include_lib("eunit/include/eunit.hrl").
+
+    shards_for_partition_gets_partitioned_shards_test() ->
+        DbName = <<"db">>,
+        Args = #mrargs{
+            start_key = <<"pk:id">>,
+            end_key = <<"pk:idZ">>,
+            extra = [{partitioned, true}]
+        },
+        meck:expect(mem3, shards, fun(<<"db">>, <<"pk:foo">>) -> [] end),
+        shards(DbName, Args),
+        meck:validate(mem3),
+        meck:unload(mem3).
+
+    shards_for_no_partition_gets_all_shards_test() ->
+        DbName = <<"db">>,
+        Args = #mrargs{
+            start_key = <<"pk:id">>,
+            end_key = <<"pk:idZ">>,
+            extra = [{partitioned, false}]
+        },
+        meck:expect(mem3, shards, fun(<<"db">>) -> [] end),
+        shards(DbName, Args),
+        meck:validate(mem3),
+        meck:unload(mem3).
+    
+    shards_for_different_partitions_gets_all_shards_test() ->
+        DbName = <<"db">>,
+        Args = #mrargs{
+            start_key = <<"pk1:id">>,
+            end_key = <<"pk2:idZ">>,
+            extra = [{partitioned, true}]
+        },
+        meck:expect(mem3, shards, fun(<<"db">>) -> [] end),
+        shards(DbName, Args),
+        meck:validate(mem3),
+        meck:unload(mem3).
+    
+    shards_for_no_startkey_all_shards_test() ->
+        DbName = <<"db">>,
+        Args = #mrargs{
+            end_key = <<"pk:idZ">>,
+            extra = [{partitioned, true}]
+        },
+        meck:expect(mem3, shards, fun(<<"db">>) -> [] end),
+        shards(DbName, Args),
+        meck:validate(mem3),
+        meck:unload(mem3).
+    
+    shards_for_no_endkey_all_shards_test() ->
+        DbName = <<"db">>,
+        Args = #mrargs{
+            start_key = <<"pk:idZ">>,
+            extra = [{partitioned, true}]
+        },
+        meck:expect(mem3, shards, fun(<<"db">>) -> [] end),
+        shards(DbName, Args),
+        meck:validate(mem3),
+        meck:unload(mem3).
+    
+    shards_for_no_keys_all_shards_test() ->
+        DbName = <<"db">>,
+        Args = #mrargs{
+            extra = [{partitioned, true}]
+        },
+        meck:expect(mem3, shards, fun(<<"db">>) -> [] end),
+        shards(DbName, Args),
+        meck:validate(mem3),
+        meck:unload(mem3).
+    
+    shards_for_non_binary_keys_all_shards_test() ->
+        DbName = <<"db">>,
+        Args = #mrargs{
+            start_key = null,
+            end_key = null,
+            extra = [{partitioned, true}]
+        },
+        meck:expect(mem3, shards, fun(<<"db">>) -> [] end),
+        shards(DbName, Args),
+        meck:validate(mem3),
+        meck:unload(mem3).
+
+-endif.
