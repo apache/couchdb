@@ -20,14 +20,18 @@
     get_missing_revs/4,
     update_docs/4,
     load_checkpoint/4,
-    save_checkpoint/6
+    save_checkpoint/6,
+    save_checkpoint/7,
+    get_purge_seq/3
 ]).
 
 % Private RPC callbacks
 -export([
     find_common_seq_rpc/3,
     load_checkpoint_rpc/3,
-    save_checkpoint_rpc/5
+    save_checkpoint_rpc/5,
+    save_checkpoint_rpc/6,
+    load_purges_rpc/2
 ]).
 
 
@@ -43,19 +47,33 @@ update_docs(Node, DbName, Docs, Options) ->
     rexi_call(Node, {fabric_rpc, update_docs, [DbName, Docs, Options]}).
 
 
+get_purge_seq(Node, DbName, Options) ->
+    rexi_call(Node, {fabric_rpc, get_purge_seq, [DbName, Options]}).
+
+
 load_checkpoint(Node, DbName, SourceNode, SourceUUID) ->
     Args = [DbName, SourceNode, SourceUUID],
     rexi_call(Node, {mem3_rpc, load_checkpoint_rpc, Args}).
 
-
+% Remove after upgrade to clustered purge
 save_checkpoint(Node, DbName, DocId, Seq, Entry, History) ->
     Args = [DbName, DocId, Seq, Entry, History],
+    rexi_call(Node, {mem3_rpc, save_checkpoint_rpc, Args}).
+
+
+save_checkpoint(Node, DbName, DocId, Seq, PurgeSeq, Entry, History) ->
+    Args = [DbName, DocId, Seq, PurgeSeq, Entry, History],
     rexi_call(Node, {mem3_rpc, save_checkpoint_rpc, Args}).
 
 
 find_common_seq(Node, DbName, SourceUUID, SourceEpochs) ->
     Args = [DbName, SourceUUID, SourceEpochs],
     rexi_call(Node, {mem3_rpc, find_common_seq_rpc, Args}).
+
+
+% stub function for mixed cluster upgrade of clustered purge
+load_purges_rpc(_DbName, _SourceUUID) ->
+    rexi:reply({ok, {[], nil, nil}}).
 
 
 load_checkpoint_rpc(DbName, SourceNode, SourceUUID) ->
@@ -80,7 +98,7 @@ load_checkpoint_rpc(DbName, SourceNode, SourceUUID) ->
         rexi:reply(Error)
     end.
 
-
+% Remove after upgrade to clustered purge
 save_checkpoint_rpc(DbName, Id, SourceSeq, NewEntry0, History0) ->
     erlang:put(io_priority, {internal_repl, DbName}),
     case get_or_create_db(DbName, [?ADMIN_CTX]) of
@@ -110,6 +128,40 @@ save_checkpoint_rpc(DbName, Id, SourceSeq, NewEntry0, History0) ->
         Error ->
             rexi:reply(Error)
     end.
+
+
+save_checkpoint_rpc(DbName, Id, SourceSeq, SourcePurgeSeq,
+        NewEntry0, History0) ->
+    erlang:put(io_priority, {internal_repl, DbName}),
+    case get_or_create_db(DbName, [?ADMIN_CTX]) of
+        {ok, Db} ->
+            NewEntry = {[
+                {<<"target_node">>, atom_to_binary(node(), utf8)},
+                {<<"target_uuid">>, couch_db:get_uuid(Db)},
+                {<<"target_seq">>, couch_db:get_update_seq(Db)}
+            ] ++ NewEntry0},
+            Body = {[
+                {<<"seq">>, SourceSeq},
+                {<<"purge_seq">>, SourcePurgeSeq},
+                {<<"target_uuid">>, couch_db:get_uuid(Db)},
+                {<<"history">>, add_checkpoint(NewEntry, History0)}
+            ]},
+            Doc = #doc{id = Id, body = Body},
+            rexi:reply(try couch_db:update_doc(Db, Doc, []) of
+                {ok, _} ->
+                    {ok, Body};
+                Else ->
+                    {error, Else}
+            catch
+                Exception ->
+                    Exception;
+                error:Reason ->
+                    {error, Reason}
+            end);
+        Error ->
+            rexi:reply(Error)
+    end.
+
 
 find_common_seq_rpc(DbName, SourceUUID, SourceEpochs) ->
     erlang:put(io_priority, {internal_repl, DbName}),

@@ -84,6 +84,8 @@
     seq_tree_join/2,
     seq_tree_reduce/2,
 
+    purge_tree_reduce/2,
+
     local_tree_split/1,
     local_tree_join/2
 ]).
@@ -604,6 +606,13 @@ seq_tree_reduce(rereduce, Reds) ->
     lists:sum(Reds).
 
 
+purge_tree_reduce(reduce, IdRevs) ->
+    % count the number of purge requests
+    length(IdRevs);
+purge_tree_reduce(rereduce, Reds) ->
+    lists:sum(Reds).
+
+
 local_tree_split(#doc{revs = {0, [Rev]}} = Doc) when is_binary(Rev) ->
     #doc{
         id = Id,
@@ -681,7 +690,16 @@ init_state(FilePath, Fd, Header0, Options) ->
 
     Compression = couch_compress:get_compression_method(),
 
-    Header1 = couch_bt_engine_header:upgrade(Header0),
+    DiskV = couch_bt_engine_header:disk_version(Header0),
+    Header1 = case couch_bt_engine_header:latest(DiskV) of
+        undefined ->
+            % disk_version is higher that the latest version
+            % db must be the format of Clustered Purge,
+            % perform downgrade
+            downgrade_purge_info(Fd, Header0);
+        _ ->
+            couch_bt_engine_header:upgrade(Header0)
+    end,
     Header = set_default_security_object(Fd, Header1, Compression, Options),
 
     IdTreeState = couch_bt_engine_header:id_tree_state(Header),
@@ -727,7 +745,7 @@ init_state(FilePath, Fd, Header0, Options) ->
     % to be written to disk.
     case Header /= Header0 of
         true ->
-            {ok, NewSt} = commit_data(St),
+            {ok, NewSt} = commit_data(St#st{needs_commit = true}),
             NewSt;
         false ->
             St
@@ -761,6 +779,60 @@ set_default_security_object(Fd, Header, Compression, Options) ->
             {ok, Ptr, _} = couch_file:append_term(Fd, Default, AppendOpts),
             couch_bt_engine_header:set(Header, security_ptr, Ptr)
     end.
+
+
+% This function is to rollback pf clustered purge.
+% It replaces purge_tree_state and upurge_tree_state with
+% with purged_docs disk pointer that stores only the last purge request
+downgrade_purge_info(Fd, Header) ->
+    {
+        db_header,
+        _DiskVer,
+        UpSeq,
+        _Unused,
+        IdTreeState,
+        SeqTreeState,
+        LocalTreeState,
+        PSeq,
+        PTS,
+        SecurityPtr,
+        RevsLimit,
+        Uuid,
+        Epochs,
+        CompactedSeq,
+        UPST,
+        _PDocsLimit
+    } = Header,
+    PurgedDocsPtr = case PTS of
+        nil -> nil;
+        _ when is_tuple(PTS) ->
+            {ok, PTree} = couch_btree:open(PTS, Fd, [
+                {reduce, fun ?MODULE:purge_tree_reduce/2}
+            ]),
+            {ok, UPTree} = couch_btree:open(UPST, Fd, [
+                {reduce, fun ?MODULE:purge_tree_reduce/2}
+            ]),
+            [{ok, {PSeq, UUID}}] = couch_btree:lookup(PTree, [PSeq]),
+            [{ok, {UUID, IdRevs}}] = couch_btree:lookup(UPTree, [UUID]),
+            Compression = couch_compress:get_compression_method(),
+            AppendOps = [{compression, Compression}],
+            {ok, Ptr, _} = couch_file:append_term(Fd, [IdRevs], AppendOps),
+            Ptr
+    end,
+    NewHeader = couch_bt_engine_header:new(),
+    couch_bt_engine_header:set(NewHeader, [
+        {update_seq, UpSeq},
+        {id_tree_state, IdTreeState},
+        {seq_tree_state, SeqTreeState},
+        {local_tree_state, LocalTreeState},
+        {purge_seq, PSeq},
+        {purged_docs, PurgedDocsPtr},
+        {security_ptr, SecurityPtr},
+        {revs_limit, RevsLimit},
+        {uuid, Uuid},
+        {epochs, Epochs},
+        {compacted_seq, CompactedSeq}
+    ]).
 
 
 delete_compaction_files(FilePath) ->
