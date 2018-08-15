@@ -248,7 +248,9 @@ update_doc(DbName, Doc, Options) ->
     {ok, []} ->
         % replication success
         #doc{revs = {Pos, [RevId | _]}} = doc(Doc),
-        {ok, {Pos, RevId}}
+        {ok, {Pos, RevId}};
+    {error, [Error]} ->
+        throw(Error)
     end.
 
 %% @doc update a list of docs
@@ -261,6 +263,8 @@ update_docs(DbName, Docs, Options) ->
             {ok, Results};
         {accepted, Results} ->
             {accepted, Results};
+        {error, Error} ->
+            {error, Error};
         Error ->
             throw(Error)
     catch {aborted, PreCommitFailures} ->
@@ -595,3 +599,55 @@ kl_to_record(KeyList,RecName) ->
 
 set_namespace(NS, #mrargs{extra = Extra} = Args) ->
     Args#mrargs{extra = [{namespace, NS} | Extra]}.
+
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+update_doc_test_() ->
+    {
+        "Update doc tests", {
+            setup, fun setup/0, fun teardown/1,
+            fun(Ctx) -> [
+                should_throw_conflict(Ctx)
+            ] end
+        }
+    }.
+
+should_throw_conflict(Doc) ->
+    ?_test(begin
+        ?assertThrow(conflict, update_doc(<<"test-db">>, Doc, []))
+    end).
+
+
+setup() ->
+    Doc = #doc{
+        id = <<"test_doc">>,
+        revs = {3, [<<5,68,252,180,43,161,216,223,26,119,71,219,212,229,
+            159,113>>]},
+        body = {[{<<"foo">>,<<"asdf">>},{<<"author">>,<<"tom">>}]},
+        atts = [], deleted = false, meta = []
+    },
+    ok = application:ensure_started(config),
+    ok = meck:expect(mem3, shards, fun(_, _) -> [] end),
+    ok = meck:expect(mem3, quorum, fun(_) -> 1 end),
+    ok = meck:expect(rexi, cast, fun(_, _) -> ok end),
+    ok = meck:expect(rexi_utils, recv,
+        fun(_, _, _, _, _, _) ->
+            {ok, {error, [{Doc, conflict}]}}
+        end),
+    ok = meck:expect(couch_util, reorder_results,
+        fun(_, [{_, Res}]) ->
+            [Res]
+        end),
+    ok = meck:expect(fabric_util, create_monitors, fun(_) -> ok end),
+    ok = meck:expect(rexi_monitor, stop, fun(_) -> ok end),
+    Doc.
+
+
+teardown(_) ->
+    meck:unload(),
+    ok = application:stop(config).
+
+
+-endif.
