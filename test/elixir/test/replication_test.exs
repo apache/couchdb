@@ -1648,12 +1648,6 @@ defmodule ReplicationTest do
     end)
   end
 
-  def make_docs(ids) do
-    for id <- ids, str_id = Integer.to_string(id) do
-      %{"_id" => str_id, "integer" => id, "string" => str_id}
-    end
-  end
-
   def set_user(uri, userinfo) do
     case URI.parse(uri) do
       %{scheme: nil} ->

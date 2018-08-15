@@ -180,13 +180,18 @@ defmodule CouchTestCase do
         }
       end
 
-      def make_docs(id, count) do
-        for i <- id..count do
-          %{
-            :_id => Integer.to_string(i),
-            :integer => i,
-            :string => Integer.to_string(i)
-          }
+      # Generate range of docs with strings as keys
+      def make_docs(id_range) do
+        for id <- id_range, str_id = Integer.to_string(id) do
+          %{"_id" => str_id, "integer" => id, "string" => str_id}
+        end
+      end
+
+      # Generate range of docs with atoms as keys, which are more
+      # idiomatic, and are encoded by jiffy to binaries
+      def create_docs(id_range) do
+        for id <- id_range, str_id = Integer.to_string(id) do
+          %{_id: str_id, integer: id, string: str_id}
         end
       end
 
@@ -209,6 +214,20 @@ defmodule CouchTestCase do
 
       defp now(:ms) do
         div(:erlang.system_time, 100000)
+      end
+
+      def rev(doc = %{_id: id}, %{"id" => id, "rev" => rev}) do
+        Map.put(doc, :_rev, rev)
+      end
+
+      def rev(docs, rows) when length(docs) == length(rows) do
+        for {doc, row} <- Enum.zip(docs, rows), do: rev(doc, row)
+      end
+
+      def pretty_inspect(resp) do
+        opts = [
+          pretty: true, width: 20, limit: :infinity, printable_limit: :infinity]
+        inspect(resp, opts)
       end
 
     end

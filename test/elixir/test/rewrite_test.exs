@@ -263,7 +263,7 @@ defmodule RewriteTest do
       """
       ddoc = String.replace(ddoc, ~r/[\r\n]+/, "")
 
-      docs1 = make_docs(0, 9)
+      docs1 = make_docs(0..9)
       docs2 = [
         %{"a" => 1, "b" => 1, "string" => "doc 1", "type" => "complex"},
         %{"a" => 1, "b" => 2, "string" => "doc 2", "type" => "complex"},
