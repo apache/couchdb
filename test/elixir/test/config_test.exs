@@ -85,7 +85,7 @@ defmodule ConfigTest do
   test "Server-side password hashing, and raw updates disabling that", context do
     plain_pass = "s3cret"
     set_config(context, "admins", "administrator", plain_pass)
-    assert Couch.login("administrator", plain_pass)["ok"]
+    assert Couch.login("administrator", plain_pass)
     hash_pass = get_config(context, "admins", "administrator")
     assert Regex.match?(~r/^-pbkdf2-/, hash_pass) or Regex.match?(~r/^-hashed-/, hash_pass)
     delete_config(context, "admins", "administrator")

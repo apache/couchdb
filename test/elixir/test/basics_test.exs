@@ -112,7 +112,7 @@ defmodule BasicsTest do
     doc = Map.put(doc, :_rev, old_rev)
     resp2 = Couch.post("/#{db_name}", [body: doc])
     assert resp2.body["ok"]
-    new_rev = resp2.body["rev"]
+    _new_rev = resp2.body["rev"]
 
     # TODO: enable chunked encoding
     #resp3 = Couch.get("/#{db_name}/COUCHDB-954", [query: %{:open_revs => "[#{old_rev}, #{new_rev}]"}])
@@ -275,7 +275,7 @@ defmodule BasicsTest do
 
   @tag :pending
   @tag :with_db
-  test "On restart, a request for creating an already existing db can not override", context do
+  test "On restart, a request for creating an already existing db can not override", _context do
     # TODO
     assert true
   end
