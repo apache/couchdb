@@ -401,7 +401,7 @@ get_stats() ->
     MessageQueues0 = [{couch_file, {CF}}, {couch_db_updater, {CDU}}],
     MessageQueues = MessageQueues0 ++ message_queues(registered()),
     [
-        {uptime, element(1,statistics(wall_clock)) div 1000},
+        {uptime, couch_app:uptime() div 1000},
         {memory, {Memory}},
         {run_queue, statistics(run_queue)},
         {ets_table_count, length(ets:all())},
