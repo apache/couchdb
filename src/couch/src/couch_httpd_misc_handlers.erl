@@ -13,7 +13,7 @@
 -module(couch_httpd_misc_handlers).
 
 -export([handle_welcome_req/2,handle_favicon_req/2,handle_utils_dir_req/2,
-    handle_all_dbs_req/1,handle_restart_req/1,
+    handle_all_dbs_req/1,
     handle_uuids_req/1,handle_config_req/1,
     handle_task_status_req/1, handle_file_req/2]).
 
@@ -79,27 +79,6 @@ handle_task_status_req(#httpd{method='GET'}=Req) ->
     send_json(Req, [{Props} || Props <- couch_task_status:all()]);
 handle_task_status_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
-
-
-handle_restart_req(#httpd{method='GET', path_parts=[_, <<"token">>]}=Req) ->
-    ok = couch_httpd:verify_is_server_admin(Req),
-    Token = case application:get_env(couch, instance_token) of
-        {ok, Tok} ->
-            Tok;
-        _ ->
-            Tok = erlang:phash2(make_ref()),
-            application:set_env(couch, instance_token, Tok),
-            Tok
-    end,
-    send_json(Req, 200, {[{token, Token}]});
-handle_restart_req(#httpd{method='POST'}=Req) ->
-    couch_httpd:validate_ctype(Req, "application/json"),
-    ok = couch_httpd:verify_is_server_admin(Req),
-    Result = send_json(Req, 202, {[{ok, true}]}),
-    couch:restart(),
-    Result;
-handle_restart_req(Req) ->
-    send_method_not_allowed(Req, "POST").
 
 
 handle_uuids_req(#httpd{method='GET'}=Req) ->
